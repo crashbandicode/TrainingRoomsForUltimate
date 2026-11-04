@@ -537,8 +537,8 @@ fn publish_frame(s: &Session) {
             if let crate::model::menu::grid::GridKind::Roster(use_) = layout.kind {
                 let editor = s.roster.filter(|e| e.use_() == use_).unwrap_or_else(|| crate::editors::roster::RosterEditor::new(use_));
                 let values = editor.values(menu.kept(editor.key()));
-                editor.decorate(&mut next, &values, editor.solo_enabled(menu));
-                editor.decorate_badges(&mut next, menu, &values);
+                editor.decorate(&mut next, &values);
+                editor.decorate_badges(&mut next, menu);
             }
         }
         if let Some(reason) = s.refusal {

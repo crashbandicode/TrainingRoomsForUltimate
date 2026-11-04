@@ -368,12 +368,8 @@ impl Panes {
             let (x, y) = centre(usize::from(frame.tile_focus));
             // The fork's cursor tint (roster_grid.rs:279-291): the active cell's highlight takes the
             // editing role's colour at alpha 80, so the same-role order badge stays legible over it.
-            let tint = if frame.tile_roster_grid {
-                let [r, g, b, _] = if frame.tile_cpu { CPU } else { PLAYER };
-                [r, g, b, 80]
-            } else {
-                p::ACCENT
-            };
+            let [r, g, b, _] = [PLAYER, CPU][usize::from(frame.tile_cpu)];
+            let tint = [p::ACCENT, [r, g, b, 80]][usize::from(frame.tile_roster_grid)];
             self.rect(p::IDX_TILE_HI, x, y, cell_w + 2.0, cell_h + 2.0, tint);
         } else {
             self.hide(p::IDX_TILE_HI);
@@ -381,56 +377,26 @@ impl Panes {
         self.draw_roster_badges(frame, &centre);
     }
 
-    /// The roster grid's corner badges and Solo Popo markers, the fork's geometry
-    /// (`scripts/roster-grid/main.rs:299-348`): the order badges 52x28 at x±36/y+35 (above the cell
-    /// centre; Player left red, CPU right blue), the Solo Popo "S" 40x28 at x±36/y−35 (below it) on
-    /// the Ice Climbers cell. Both roles' badges show at once; empty badges hide.
+    /// The roster grid's per-role marks in the fork's geometry (`scripts/roster-grid/main.rs:299-348`), Player
+    /// left red, CPU right blue, both roles at once: the All-stripes 4x86 at x±56, the order badges 52x28 at
+    /// x±36/y+35, the Solo Popo "S" 40x28 at x±36/y−35 on the Ice Climbers cell (kind 0x4b). Empty marks hide.
     unsafe fn draw_roster_badges(&self, frame: &Frame, centre: &dyn Fn(usize) -> (f32, f32)) {
         let roster = frame.view == View::Tiles && frame.tile_roster_grid;
-        for i in 0..p::TILES {
-            let shown = roster && i < usize::from(frame.tile_count) && frame.tile_state[i] != TILE_HIDDEN;
-            let (x, y) = centre(i);
-            // The fork's All-stripes (roster_grid.rs:213-225; builder main.rs:316-332): 4-wide
-            // vertical stripes at x±56, the role's tint.
-            if shown && frame.tile_stripes_p[i] {
-                self.rect(p::IDX_TILE_STRIPE_P + i, x - 56.0, y, 4.0, 86.0, PLAYER);
-            } else {
-                self.hide(p::IDX_TILE_STRIPE_P + i);
+        let count = usize::from(frame.tile_count);
+        let ic = (0..count).find(|i| roster && frame.tile_n[*i] == 0x4b);
+        for (r, (side, colour)) in [(-1.0, PLAYER), (1.0, CPU)].into_iter().enumerate() {
+            for i in 0..p::TILES {
+                let on = roster && i < count && frame.tile_state[i] != TILE_HIDDEN;
+                let ((x, y), b, at) = (centre(i), &frame.tile_badges[r][i], r * p::TILES + i);
+                let (stripe, badge) = (p::IDX_TILE_STRIPE + at, p::IDX_TILE_BADGE + at);
+                self.rect(stripe, x + side * 56.0, y, 4.0, 86.0, colour);
+                self.show(stripe, on && frame.tile_stripes[r][i]);
+                self.label(badge, b.units(), x + side * 36.0, y + 35.0, 52.0, colour);
+                self.show(badge, on && !b.is_empty());
             }
-            if shown && frame.tile_stripes_c[i] {
-                self.rect(p::IDX_TILE_STRIPE_C + i, x + 56.0, y, 4.0, 86.0, CPU);
-            } else {
-                self.hide(p::IDX_TILE_STRIPE_C + i);
-            }
-            if shown && !frame.tile_badges_p[i].is_empty() {
-                self.label(p::IDX_TILE_BADGE_P + i, frame.tile_badges_p[i].units(), x - 36.0, y + 35.0, 52.0, PLAYER);
-            } else {
-                self.hide(p::IDX_TILE_BADGE_P + i);
-            }
-            if shown && !frame.tile_badges_c[i].is_empty() {
-                self.label(p::IDX_TILE_BADGE_C + i, frame.tile_badges_c[i].units(), x + 36.0, y + 35.0, 52.0, CPU);
-            } else {
-                self.hide(p::IDX_TILE_BADGE_C + i);
-            }
-        }
-        // The Solo Popo "S" markers sit on the Ice Climbers cell (the tile whose kind is 0x4b).
-        let ic = roster.then(|| (0..usize::from(frame.tile_count))
-            .find(|i| frame.tile_n[*i] == u16::try_from(0x4b).unwrap_or(u16::MAX))).flatten();
-        if let Some(i) = ic {
-            let (x, y) = centre(i);
-            if frame.tile_solo_p {
-                self.label(p::IDX_TILE_SOLO_P, &[u16::from(b'S')], x - 36.0, y - 35.0, 40.0, PLAYER);
-            } else {
-                self.hide(p::IDX_TILE_SOLO_P);
-            }
-            if frame.tile_solo_c {
-                self.label(p::IDX_TILE_SOLO_C, &[u16::from(b'S')], x + 36.0, y - 35.0, 40.0, CPU);
-            } else {
-                self.hide(p::IDX_TILE_SOLO_C);
-            }
-        } else {
-            self.hide(p::IDX_TILE_SOLO_P);
-            self.hide(p::IDX_TILE_SOLO_C);
+            let ((x, y), solo) = (centre(ic.unwrap_or(0)), p::IDX_TILE_SOLO + r);
+            self.label(solo, &[83], x + side * 36.0, y - 35.0, 40.0, colour); // "S"
+            self.show(solo, ic.is_some() && frame.tile_solo[r]);
         }
     }
 }

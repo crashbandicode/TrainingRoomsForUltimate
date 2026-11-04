@@ -227,17 +227,14 @@ pub const IDX_LOG_SHAFT: usize = IDX_LOG_GLYPH + LOG_ROWS * LOG_SLOTS;
 pub const IDX_LOG_HEAD: usize = IDX_LOG_SHAFT + LOG_ROWS * LOG_SLOTS;
 pub const IDX_LOG_FRAME: usize = IDX_LOG_HEAD + LOG_ROWS * LOG_SLOTS;
 pub const IDX_LOG_STATUS: usize = IDX_LOG_FRAME + LOG_ROWS;
-/// The roster grid's corner badges (the fork's `roster_p_NN` / `roster_c_NN`: the order number per cell per
-/// role, Player top-left, CPU top-right) and the Solo Popo "S" corner markers on the Ice Climbers cell.
-/// Appended after the input log, so no existing index moves.
-pub const IDX_TILE_BADGE_P: usize = IDX_LOG_STATUS + LOG_ROWS;
-pub const IDX_TILE_BADGE_C: usize = IDX_TILE_BADGE_P + TILES;
-pub const IDX_TILE_STRIPE_P: usize = IDX_TILE_BADGE_C + TILES;
-pub const IDX_TILE_STRIPE_C: usize = IDX_TILE_STRIPE_P + TILES;
-pub const IDX_TILE_SOLO_P: usize = IDX_TILE_STRIPE_C + TILES;
-pub const IDX_TILE_SOLO_C: usize = IDX_TILE_SOLO_P + 1;
+/// The roster grid's per-role marks, Player block then CPU block (`Frame::tile_badges` etc.): the fork's corner
+/// badges (`roster_p_NN` / `roster_c_NN`), All-stripes and the Solo Popo "S" markers. Appended after the input
+/// log, so no existing index moves.
+pub const IDX_TILE_BADGE: usize = IDX_LOG_STATUS + LOG_ROWS;
+pub const IDX_TILE_STRIPE: usize = IDX_TILE_BADGE + 2 * TILES;
+pub const IDX_TILE_SOLO: usize = IDX_TILE_STRIPE + 2 * TILES;
 /// How many panes the plugin adds to the layout.
-pub const COUNT: usize = IDX_TILE_SOLO_C + 1;
+pub const COUNT: usize = IDX_TILE_SOLO + 2;
 
 pub const fn log_slot(row: usize, slot: usize) -> usize {
     row * LOG_SLOTS + slot
@@ -317,12 +314,7 @@ pub const fn name_of(index: usize) -> Name {
         i if i >= IDX_CHIP_BADGE && i < IDX_CHIP_BADGE + CHIPS => Name::indexed("tr_cb_", i - IDX_CHIP_BADGE),
         i if i >= IDX_TILE && i < IDX_TILE + TILES => Name::indexed("tr_ti_", i - IDX_TILE),
         i if i >= IDX_TILE_LABEL && i < IDX_TILE_LABEL + TILES => Name::indexed("tr_tl_", i - IDX_TILE_LABEL),
-        i if i >= IDX_TILE_BADGE_P && i < IDX_TILE_BADGE_P + TILES => Name::indexed("tr_bp_", i - IDX_TILE_BADGE_P),
-        i if i >= IDX_TILE_BADGE_C && i < IDX_TILE_BADGE_C + TILES => Name::indexed("tr_bc_", i - IDX_TILE_BADGE_C),
-        i if i >= IDX_TILE_STRIPE_P && i < IDX_TILE_STRIPE_P + TILES => Name::indexed("tr_ts_", i - IDX_TILE_STRIPE_P),
-        i if i >= IDX_TILE_STRIPE_C && i < IDX_TILE_STRIPE_C + TILES => Name::indexed("tr_us_", i - IDX_TILE_STRIPE_C),
-        IDX_TILE_SOLO_P => Name::new("tr_sp"),
-        IDX_TILE_SOLO_C => Name::new("tr_sc"),
+        i if i >= IDX_TILE_BADGE && i < COUNT => name2("tr_rm", (i - IDX_TILE_BADGE) / TILES, i % TILES),
         i if i >= IDX_TAB && i < IDX_TAB + TABS => Name::indexed("tr_tab_", i - IDX_TAB),
         i if i >= IDX_GROUP && i < IDX_GROUP + GROUPS => Name::indexed("tr_grp_", i - IDX_GROUP),
         i if i >= IDX_ROW && i < IDX_ROW + 2 * ROWS => {
@@ -424,11 +416,8 @@ pub const fn spec(index: usize) -> Spec {
         i if i >= IDX_CHIP_BADGE && i < IDX_CHIP_BADGE + CHIPS => Spec { visible: false, ..text(name, [0.0, 0.0, 60.0, 44.0], Align::Center, FONT, 4, TEXT) },
         i if i >= IDX_TILE && i < IDX_TILE + TILES => rect(name, [0.0, 0.0, 100.0, 60.0], HIGHLIGHT, false),
         i if i >= IDX_TILE_LABEL && i < IDX_TILE_LABEL + TILES => Spec { visible: false, ..text(name, [0.0, 0.0, 100.0, 40.0], Align::Center, FONT_SMALL, 28, TEXT) },
-        i if i >= IDX_TILE_BADGE_P && i < IDX_TILE_BADGE_P + TILES => Spec { visible: false, ..text(name, [0.0, 0.0, 52.0, 28.0], Align::Center, FONT_SMALL, 4, TEXT) },
-        i if i >= IDX_TILE_BADGE_C && i < IDX_TILE_BADGE_C + TILES => Spec { visible: false, ..text(name, [0.0, 0.0, 52.0, 28.0], Align::Center, FONT_SMALL, 4, TEXT) },
-        i if i >= IDX_TILE_STRIPE_P && i < IDX_TILE_STRIPE_P + TILES => Spec { visible: false, ..rect(name, [0.0, 0.0, 4.0, 86.0], [255, 83, 92, 255], false) },
-        i if i >= IDX_TILE_STRIPE_C && i < IDX_TILE_STRIPE_C + TILES => Spec { visible: false, ..rect(name, [0.0, 0.0, 4.0, 86.0], [75, 164, 255, 255], false) },
-        i if i == IDX_TILE_SOLO_P || i == IDX_TILE_SOLO_C => Spec { visible: false, ..text(name, [0.0, 0.0, 40.0, 28.0], Align::Center, FONT_SMALL, 2, TEXT) },
+        i if i >= IDX_TILE_STRIPE && i < IDX_TILE_SOLO => Spec { visible: false, ..rect(name, [0.0, 0.0, 4.0, 86.0], TEXT, false) },
+        i if i >= IDX_TILE_BADGE => Spec { visible: false, ..text(name, [0.0, 0.0, 52.0, 28.0], Align::Center, FONT_SMALL, 4, TEXT) },
         IDX_TAB_HI => rect(name, [-740.0, TAB_Y, 200.0, TAB_H], ACCENT, true),
         IDX_TITLE => text(name, [600.0, TAB_Y, 560.0, TAB_H], Align::Right, FONT_SMALL, 40, TEXT_DIM),
         IDX_SEP => rect(name, [0.0, TAB_Y - 52.0, 1760.0, 3.0], RULE, true),
