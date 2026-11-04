@@ -4,6 +4,9 @@
 
 mod common;
 
+#[path = "common/callgraph.rs"]
+mod callgraph;
+
 #[path = "../src/model.rs"]
 #[allow(dead_code)]
 mod model;
@@ -338,11 +341,11 @@ fn core06_off_restores() {
 
 #[test]
 fn core06_site_guards() {
-    // Three hooks, nine called natives and six relied windows; HB1's three exclusive rows are absent.
+    // Three hooks, nine called natives and nine relied windows (the Lua stack reads and HB1's three HitModule windows).
     let hooks: Vec<&str> = SITES.iter().filter(|s| matches!(s.kind, SeamKind::Hook { .. })).map(|s| s.name).collect();
     assert_eq!(hooks, sites_hitbox::HOOK_ROWS);
     assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Called)).count(), 9);
-    assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Relied)).count(), 6);
+    assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Relied)).count(), 9);
     for site in SITES.iter() {
         assert_eq!(site.guard.len(), 64, "{}: a 64-byte guard", site.name);
         assert_eq!(site.feature, Feature::Hitbox);
@@ -397,6 +400,9 @@ fn core06_site_guards() {
         (sites_hitbox::HITBOX_ACCESSOR_OFFSET, "sv_battle_object_module_accessor"),
         (sites_hitbox::HITBOX_ATTACK_STACK_OFFSET, "hitbox_attack_stack"),
         (sites_hitbox::HITBOX_CATCH_STACK_OFFSET, "hitbox_catch_stack"),
+        (sites_hitbox::HITBOX_HURT_MODULE_OFFSET, "hurtbox_module"),
+        (sites_hitbox::HITBOX_HURT_GROUPS_OFFSET, "hurtbox_groups"),
+        (sites_hitbox::HITBOX_HURT_PART_OFFSET, "hurtbox_part_shape"),
     ] {
         assert_eq!(model::sites_hitbox::SITES.iter().find(|s| s.name == name).map(|s| s.offset), Some(offset), "{name}");
     }
@@ -544,7 +550,7 @@ fn core06_lua_stack_layout_matches_the_owned_elf() {
     assert_eq!(w(accessor + 4), ldr_x(0, 8, 0x1a0));
 }
 
-// ---- historical pure HB1 facts; no runtime reader or RC guard dependency ---------------------------------------------
+// ---- the hurtbox part records and the owned-ELF instructions they come from ---------------------------------------------
 
 /// A 0x50-byte part record as the game keeps it.
 fn part(status: u32, a: [f32; 3], b: [f32; 3], size: f32, node: u64) -> [u8; 0x50] {
@@ -623,6 +629,504 @@ fn core06_hurtbox_layout_matches_the_owned_elf() {
     assert_eq!(w(0x469540), 0xb9807818, "ldrsw x24, [x0, #0x78]");
     // get_part_size(group) answers the group's count (slot 0x170): `ldrsh w0, [x8, #0x6]`.
     assert_eq!(w(0x46a8bc), 0x79c0_0d00);
+}
+
+// ---- the hurtbox reader and the dispatch (decision HB1, renderer-agnostic) ---------------------------------------------
+
+use model::hitbox::layout as hb_layout;
+
+/// No HitModule bytes are exposed: the module pointer once, the two table pointers and the part total, the group record's
+/// first/count, and each enabled part's 0x50-byte record — every address is checked, any other read fails.
+struct HurtSpy {
+    module: usize,
+    groups: usize,
+    parts: usize,
+    total: i32,
+    first: i16,
+    count: i16,
+    records: Vec<[u8; 0x50]>,
+    parts_read: Vec<usize>,
+}
+
+impl hitbox::HurtboxReader for HurtSpy {
+    fn module(&mut self) -> usize {
+        self.module
+    }
+
+    fn read_usize(&mut self, at: usize) -> usize {
+        if at == self.module + hb_layout::HIT_GROUPS {
+            self.groups
+        } else if at == self.module + hb_layout::HIT_PARTS {
+            self.parts
+        } else {
+            panic!("non-table pointer read {at:#x}")
+        }
+    }
+
+    fn read_i32(&mut self, at: usize) -> i32 {
+        assert_eq!(at, self.module + hb_layout::HIT_PART_TOTAL, "the part count is read once, at +0x78");
+        self.total
+    }
+
+    fn read_i16(&mut self, at: usize) -> i16 {
+        let group = self.groups + hitbox::HURTBOX_GROUP * hb_layout::HIT_GROUP_STRIDE;
+        if at == group + hb_layout::HIT_GROUP_FIRST {
+            self.first
+        } else if at == group + hb_layout::HIT_GROUP_COUNT {
+            self.count
+        } else {
+            panic!("non-group-field read {at:#x}")
+        }
+    }
+
+    fn read_part(&mut self, at: usize, record: &mut [u8; hb_layout::HIT_PART_STRIDE]) {
+        assert_eq!((at - self.parts) % hb_layout::HIT_PART_STRIDE, 0, "a part record starts on the 0x50 stride");
+        self.parts_read.push(at);
+        *record = self.records[(at - self.parts) / hb_layout::HIT_PART_STRIDE];
+    }
+}
+
+fn hurt_spy(records: Vec<[u8; 0x50]>, first: i16, count: i16) -> HurtSpy {
+    HurtSpy { module: 0xb000, groups: 0xc000, parts: 0xd000, total: records.len() as i32, first, count, records, parts_read: Vec::new() }
+}
+
+#[test]
+fn core06_hurtbox_reader_enumerates_the_enabled_parts() {
+    // Group 0 only, the records on the 0x50 stride, exactly the reads the runtime would make.
+    let mut records = vec![part(0, [0.6, 0.0, 0.0], [2.4, 0.0, 0.0], 2.4, 0x51a3_6341); 3];
+    records.push(part(hitbox::HIT_STATUS_OFF, [1.0; 3], [2.0; 3], 1.0, 9)); // switched off: read, not drawn
+    let mut spy = hurt_spy(records, 0, 4);
+    let mut out = [hitbox::Sphere::NONE; hitbox::MAX_HELD];
+    let mut len = 0;
+    let left = hitbox::want_hurtboxes(&mut spy, &mut out, &mut len);
+    assert_eq!((len, left), (6, 0), "three capsule parts x 2 spheres (lr02 geometry: 1.8 apart, size 2.4)");
+    for (i, at) in spy.parts_read.iter().enumerate() {
+        assert_eq!(*at, 0xd000 + i * hb_layout::HIT_PART_STRIDE);
+    }
+    for sphere in &out[..len] {
+        assert_eq!(sphere.tint, hitbox::HURTBOX_TINT, "yellow");
+        assert_eq!(sphere.joint, 0x51a3_6341);
+        assert!((sphere.scale - hitbox::sphere_scale(2.4)).abs() < 1e-6);
+        assert_eq!(sphere.key >> 24, hitbox::KIND_HURT);
+    }
+    assert_eq!(out[0].key, hitbox::sphere_key(hitbox::KIND_HURT, 0, 0));
+    assert_eq!(out[1].key, hitbox::sphere_key(hitbox::KIND_HURT, 0, 1));
+    assert_eq!(out[2].key, hitbox::sphere_key(hitbox::KIND_HURT, 1, 0));
+    // A group that starts past the part count, or a count the bound refuses, reads nothing else.
+    let mut spy = hurt_spy(vec![part(0, [0.0; 3], [1.0; 3], 1.0, 7)], 8, 4);
+    let mut len = 0;
+    assert_eq!(hitbox::want_hurtboxes(&mut spy, &mut out, &mut len), 0);
+    assert_eq!(len, 0, "first 8 + count 4 > total 1: not a hurtbox table");
+    assert!(spy.parts_read.is_empty());
+    // No module: nothing.
+    let mut spy = hurt_spy(Vec::new(), 0, 0);
+    spy.module = 0;
+    let mut len = 0;
+    assert_eq!(hitbox::want_hurtboxes(&mut spy, &mut out, &mut len), 0);
+    // Parts per fighter: a second fighter's own table is enumerated the same way, by its own indices.
+    let mut other = hurt_spy(vec![part(0, [1.0, 2.0, 3.0], [1.0, 2.0, 3.0], 3.0, 7)], 0, 1);
+    other.module = 0xb100;
+    other.groups = 0xc100;
+    other.parts = 0xd100;
+    let mut len = 0;
+    assert_eq!(hitbox::want_hurtboxes(&mut other, &mut out, &mut len), 0);
+    assert_eq!(len, 1, "a coinciding centre pair is one sphere");
+    assert_eq!(out[0].pos, [1.0, 2.0, 3.0]);
+    assert_eq!(out[0].key, hitbox::sphere_key(hitbox::KIND_HURT, 0, 0));
+}
+
+#[test]
+fn core06_hurtbox_dispatch_equivalence_with_the_hitbox_rules() {
+    // The hurt spheres go through the same set, the same requests and the same retention rules as the hit spheres, in one
+    // reconcile: kept while unchanged, killed by their own handle when their shape changes or their part goes, dropped when
+    // the set is full, and cleared together on the stop paths.
+    /// One active attack slot while `on`, none otherwise (the hit the test switches on and off).
+    struct OneHit(bool);
+    impl hitbox::AttackReader for OneHit {
+        fn active(&mut self, slot: i32) -> bool {
+            self.0 && slot == 1
+        }
+        fn data(&mut self, _slot: i32) -> usize {
+            0x1000
+        }
+        fn read_u64(&mut self, _at: usize) -> u64 {
+            7
+        }
+        fn read_f32(&mut self, at: usize) -> f32 {
+            match at {
+                0x1024 => 2.0,
+                0x1000 => 1.0,
+                0x1004 | 0x1008 | 0x1010 | 0x1014 | 0x1018 => 0.0,
+                _ => panic!("non-attack scalar read {at:#x}"),
+            }
+        }
+    }
+    let mut hurt = hurt_spy(vec![part(0, [0.6, 0.0, 0.0], [2.4, 0.0, 0.0], 2.4, 0x51a3_6341); 2], 0, 2);
+    let mut set = hitbox::HandleSet::new();
+    let mut fx = RequestSpy::new();
+    let mut wants = [hitbox::Sphere::NONE; hitbox::MAX_HELD];
+    // First pass with one active hit slot and two hurt parts: 1 + 2x2 spheres.
+    let (counts, len) = hitbox::reconcile_frame(&mut set, facts(true, true, false, 0), &mut wants, &mut OneHit(true), Some(&mut hurt), &mut fx);
+    assert_eq!((counts.spawned, counts.dropped), (5, 0));
+    assert_eq!(len, 5);
+    let keys: Vec<_> = fx.requests.iter().map(|s| s.key).collect();
+    assert_eq!(keys[0], hitbox::sphere_key(hitbox::KIND_HIT, 1, 0));
+    assert_eq!(keys[1], hitbox::sphere_key(hitbox::KIND_HURT, 0, 0));
+    assert_eq!(*keys.last().unwrap(), hitbox::sphere_key(hitbox::KIND_HURT, 1, 1));
+    // Unchanged frame: everything kept, no request.
+    let (counts, len) = hitbox::reconcile_frame(&mut set, facts(true, true, false, 0), &mut wants, &mut OneHit(true), Some(&mut hurt), &mut fx);
+    assert_eq!((counts.kept, counts.spawned, counts.killed, len), (5, 0, 0, 5));
+    // The hit goes away: only the hit sphere is killed, by its own handle.
+    let hit_handle = *fx.fx.live.first().unwrap();
+    let (counts, _) = hitbox::reconcile_frame(&mut set, facts(true, true, false, 0), &mut wants, &mut OneHit(false), Some(&mut hurt), &mut fx);
+    assert_eq!((counts.killed, counts.kept, counts.spawned), (1, 4, 0));
+    assert!(!fx.fx.live.contains(&hit_handle));
+    // A hurt part moves: its two spheres are killed and requested again; the rest kept.
+    let before = fx.requests.len();
+    hurt.records[0] = part(0, [3.6, 0.0, 0.0], [5.4, 0.0, 0.0], 2.4, 0x51a3_6341);
+    let (counts, _) = hitbox::reconcile_frame(&mut set, facts(true, true, false, 0), &mut wants, &mut OneHit(false), Some(&mut hurt), &mut fx);
+    assert_eq!((counts.killed, counts.spawned, counts.kept), (2, 2, 2));
+    assert_eq!(fx.requests.len(), before + 2);
+    assert_eq!(fx.requests[before].key, hitbox::sphere_key(hitbox::KIND_HURT, 0, 0));
+    // A part is switched off: its spheres go, by their own handles.
+    hurt.records[0] = part(hitbox::HIT_STATUS_OFF, [0.0; 3], [1.0; 3], 1.0, 7);
+    let (counts, _) = hitbox::reconcile_frame(&mut set, facts(true, true, false, 0), &mut wants, &mut OneHit(false), Some(&mut hurt), &mut fx);
+    assert_eq!((counts.killed, counts.kept, counts.spawned), (2, 2, 0));
+    // Shielding and a grab status clear the whole set (hurt spheres included), like the hit spheres; the game's own shield
+    // bubble is never owned. Off clears too (facts the plan already covers).
+    for (enabled, status) in [(true, ids().guard_on), (true, ids().catch), (false, 0)] {
+        let mut set = hitbox::HandleSet::new();
+        let mut fx = RequestSpy::new();
+        let mut hurt = hurt_spy(vec![part(0, [2.0, 1.0, 0.5], [2.0, 1.0, 0.5], 1.0, 7)], 0, 1); // a point part: one sphere
+        let mut wants = [hitbox::Sphere::NONE; hitbox::MAX_HELD];
+        hitbox::reconcile_frame(&mut set, facts(true, true, false, 0), &mut wants, &mut OneHit(false), Some(&mut hurt), &mut fx);
+        assert_eq!(set.len(), 1);
+        fx.fx.live.push(900); // the game's own shield bubble: never owned
+        let (counts, len) = hitbox::reconcile_frame(&mut set, facts(true, enabled, false, status), &mut wants, &mut OneHit(false), Some(&mut hurt), &mut fx);
+        assert_eq!((counts.killed, len), (1, 0));
+        assert!(fx.fx.live.contains(&900));
+        assert!(set.is_empty());
+    }
+    // The unwired runtime passes None: no hurt read, no hurt sphere, the ordinary pass untouched.
+    let mut set = hitbox::HandleSet::new();
+    let mut fx = RequestSpy::new();
+    let mut wants = [hitbox::Sphere::NONE; hitbox::MAX_HELD];
+    let (counts, len) = hitbox::reconcile_frame(&mut set, facts(true, true, false, 0), &mut wants, &mut OneHit(true), None, &mut fx);
+    assert_eq!((counts.spawned, len), (1, 1), "the hit sphere only");
+    assert!(fx.requests.iter().all(|s| s.key >> 24 == hitbox::KIND_HIT));
+}
+
+#[test]
+fn core06_ridley_first_pass_completes_in_the_model() {
+    // Ridley's first pass as the Eden evidence recorded it (stream `hitbox`, hb-04, 2026-11-02: the CPU Ridley's hurtboxes
+    // drew, 55 spheres wanted, 53 requested in the first pass and 2 refused by the game's effect pool, `failed=0` after):
+    // 27 capsule parts at the lr02 part geometry (centres 1.8 apart, size 2.4 -> 2 spheres a part) and one point part.
+    let mut records = vec![part(0, [0.6, 0.0, 0.0], [2.4, 0.0, 0.0], 2.4, 0x51a3_6341); 27];
+    records.push(part(0, [1.0, 2.0, 3.0], [1.0, 2.0, 3.0], 3.0, 0x51a3_6341));
+    let mut hurt = hurt_spy(records, 0, 28);
+    let mut wants = [hitbox::Sphere::NONE; hitbox::MAX_HELD];
+    let mut len = 0;
+    assert_eq!(hitbox::want_hurtboxes(&mut hurt, &mut wants, &mut len), 0, "the whole first pass fits the want buffer");
+    assert_eq!(len, 55);
+    // The set holds the first pass: every sphere requested, none dropped, and the next pass keeps them all.
+    let mut set = hitbox::HandleSet::new();
+    let mut big = FakeFx::new(10_000);
+    let (counts, _) = hitbox::reconcile_frame(&mut set, facts(true, true, false, 0), &mut wants, &mut NoHit, Some(&mut hurt), &mut big);
+    assert_eq!((counts.spawned, counts.failed, counts.dropped), (55, 0, 0));
+    let (counts, _) = hitbox::reconcile_frame(&mut set, facts(true, true, false, 0), &mut wants, &mut NoHit, Some(&mut hurt), &mut big);
+    assert_eq!((counts.kept, counts.spawned, counts.killed), (55, 0, 0));
+    // And with the pool two short, as hb-04 saw it: 53 asked, 2 refused, and once the game's own effects end and the pool
+    // gets room, the refused two are asked again and spawn (`failed=0` afterwards, as hb-04 recorded).
+    let mut set = hitbox::HandleSet::new();
+    let mut short = FakeFx::new(53);
+    let (counts, _) = hitbox::reconcile_frame(&mut set, facts(true, true, false, 0), &mut wants, &mut NoHit, Some(&mut hurt), &mut short);
+    assert_eq!((counts.spawned, counts.failed, counts.dropped), (53, 2, 0));
+    short.pool = 55; // the game's own effects end; the pool gets room
+    let (counts, _) = hitbox::reconcile_frame(&mut set, facts(true, true, false, 0), &mut wants, &mut NoHit, Some(&mut hurt), &mut short);
+    assert_eq!((counts.kept, counts.spawned, counts.failed), (53, 2, 0), "the two refused spheres are asked again");
+}
+
+// ---- the live reader over a fake memory layout, the census, the shipped build's silence (C2) -------------------------
+
+/// The fake layout's fields (offsets into one 8-aligned buffer).
+const FAKE_ACCESSOR: usize = 0x100;
+const FAKE_MODULE: usize = 0x200;
+const FAKE_GROUPS: usize = 0x300;
+const FAKE_PARTS: usize = 0x400;
+
+#[repr(align(8))]
+struct Align8([u8; 0x800]);
+
+/// Fake game memory for `hitbox::GameHurt`: `load` answers only the addresses the layout laid out
+/// (anything else fails the test, so the reader's address chain is pinned exactly), and addresses in
+/// `unmapped` answer 0 the way Eden answers an unmapped read.
+struct FakeMem {
+    buf: Box<Align8>,
+    reads: Vec<usize>,
+    unmapped: Vec<usize>,
+}
+
+impl FakeMem {
+    fn new() -> FakeMem {
+        FakeMem { buf: Box::new(Align8([0; 0x800])), reads: Vec::new(), unmapped: Vec::new() }
+    }
+
+    fn base(&self) -> usize {
+        self.buf.0.as_ptr() as usize
+    }
+
+    fn set_u64(&mut self, at: usize, value: u64) {
+        let from = at - self.base();
+        self.buf.0[from..from + 8].copy_from_slice(&value.to_le_bytes());
+    }
+
+    fn set_u32(&mut self, at: usize, value: u32) {
+        let from = at - self.base();
+        self.buf.0[from..from + 4].copy_from_slice(&value.to_le_bytes());
+    }
+
+    fn set_i16(&mut self, at: usize, value: i16) {
+        let from = at - self.base();
+        self.buf.0[from..from + 2].copy_from_slice(&value.to_le_bytes());
+    }
+
+    fn put_part(&mut self, index: usize, record: [u8; 0x50]) {
+        let from = FAKE_PARTS + index * 0x50;
+        self.buf.0[from..from + 0x50].copy_from_slice(&record);
+    }
+
+    fn load(&mut self, at: usize, out: &mut [u8]) {
+        let base = self.base();
+        assert!(at >= base && at + out.len() <= base + 0x800, "read outside the fake layout: {at:#x}");
+        self.reads.push(at);
+        if self.unmapped.contains(&at) {
+            out.fill(0);
+            return;
+        }
+        let from = at - base;
+        out.copy_from_slice(&self.buf.0[from..from + out.len()]);
+    }
+}
+
+/// A fake layout: the memory and the absolute addresses of its accessor, HitModule, group and part tables.
+struct FakeLayout {
+    mem: FakeMem,
+    accessor: usize,
+    module: usize,
+    groups: usize,
+    parts: usize,
+}
+
+/// A fake layout with a three-part group 0: one capsule, one part switched off, one point part.
+fn fake_hurt_module() -> FakeLayout {
+    let mut mem = FakeMem::new();
+    let base = mem.base();
+    let (accessor, module, groups, parts) = (base + FAKE_ACCESSOR, base + FAKE_MODULE, base + FAKE_GROUPS, base + FAKE_PARTS);
+    mem.set_u64(accessor + hb_layout::HIT_MODULE, module as u64);
+    mem.set_u64(module + hb_layout::HIT_GROUPS, groups as u64);
+    mem.set_u64(module + hb_layout::HIT_PARTS, parts as u64);
+    mem.set_u32(module + hb_layout::HIT_PART_TOTAL, 3);
+    mem.set_i16(groups + hb_layout::HIT_GROUP_FIRST, 0);
+    mem.set_i16(groups + hb_layout::HIT_GROUP_COUNT, 3);
+    mem.put_part(0, part(0, [0.0, 1.0, 0.0], [0.0, 5.0, 0.0], 2.0, 0x51a3_6341));
+    mem.put_part(1, part(hitbox::HIT_STATUS_OFF, [0.0; 3], [1.0; 3], 1.0, 9));
+    mem.put_part(2, part(0, [1.0, 2.0, 3.0], [1.0, 2.0, 3.0], 3.0, 7));
+    FakeLayout { mem, accessor, module, groups, parts }
+}
+
+/// One `want_hurtboxes` over the fake layout: the spheres it left out, the wants it made and the exact addresses read.
+fn want_via(layout: &mut FakeLayout, out: &mut [hitbox::Sphere]) -> (u32, usize, Vec<usize>) {
+    let mut len = 0;
+    let accessor = layout.accessor;
+    let mut hurt = hitbox::GameHurt { accessor, load: |at: usize, dst: &mut [u8]| layout.mem.load(at, dst) };
+    let left = hitbox::want_hurtboxes(&mut hurt, out, &mut len);
+    let _ = hurt;
+    (left, len, layout.mem.reads.clone())
+}
+
+#[test]
+fn core06_game_hurt_reads_the_live_layout_at_the_exact_addresses() {
+    let mut layout = fake_hurt_module();
+    let (module, groups, parts) = (layout.module, layout.groups, layout.parts);
+    let mut out = [hitbox::Sphere::NONE; hitbox::MAX_HELD];
+    let (left, len, reads) = want_via(&mut layout, &mut out);
+    assert_eq!((len, left), (4, 0), "the capsule's three spheres (4 apart at size 2) and the point part's one; the off part nothing");
+    assert_eq!(
+        reads,
+        vec![
+            layout.accessor + hb_layout::HIT_MODULE,
+            module + hb_layout::HIT_GROUPS,
+            module + hb_layout::HIT_PARTS,
+            module + hb_layout::HIT_PART_TOTAL,
+            groups + hb_layout::HIT_GROUP_FIRST,
+            groups + hb_layout::HIT_GROUP_COUNT,
+            parts,
+            parts + hb_layout::HIT_PART_STRIDE,
+            parts + 2 * hb_layout::HIT_PART_STRIDE,
+        ],
+        "the module pointer once, the two table pointers, the part total, the group's first/count, every part in place"
+    );
+    assert_eq!((out[0].pos, out[1].pos, out[2].pos, out[3].pos), ([0.0, 1.0, 0.0], [0.0, 3.0, 0.0], [0.0, 5.0, 0.0], [1.0, 2.0, 3.0]));
+    assert_eq!(out[3].joint, 7);
+    for sphere in &out[..len] {
+        assert_eq!(sphere.tint, hitbox::HURTBOX_TINT, "yellow");
+        assert_eq!(sphere.key >> 24, hitbox::KIND_HURT);
+    }
+}
+
+#[test]
+fn core06_game_hurt_refuses_a_null_or_mistyped_pointer() {
+    let mut out = [hitbox::Sphere::NONE; hitbox::MAX_HELD];
+
+    // A null module pointer: only the accessor's module field is read, nothing else.
+    let mut layout = fake_hurt_module();
+    let field = layout.accessor + hb_layout::HIT_MODULE;
+    layout.mem.set_u64(field, 0);
+    assert_eq!(want_via(&mut layout, &mut out), (0, 0, vec![field]), "nothing past the null module pointer");
+
+    // A mis-typed (misaligned) module pointer: refused the same way.
+    let mut layout = fake_hurt_module();
+    let field = layout.accessor + hb_layout::HIT_MODULE;
+    layout.mem.set_u64(field, (layout.module + 2) as u64);
+    assert_eq!(want_via(&mut layout, &mut out), (0, 0, vec![field]), "nothing past the misaligned module pointer");
+
+    // A module pointer into unmapped memory: the table reads answer 0 (Eden's unmapped read), the reader refuses them.
+    let mut layout = fake_hurt_module();
+    let (field, groups_at, parts_at) =
+        (layout.accessor + hb_layout::HIT_MODULE, layout.module + hb_layout::HIT_GROUPS, layout.module + hb_layout::HIT_PARTS);
+    layout.mem.unmapped.push(groups_at);
+    assert_eq!(want_via(&mut layout, &mut out), (0, 0, vec![field, groups_at, parts_at]), "both tables are read, both answer 0, nothing else");
+
+    // A null group or part table pointer: refused before any group field or part record is read.
+    for (name, offset) in [("group", hb_layout::HIT_GROUPS), ("part", hb_layout::HIT_PARTS)] {
+        let mut layout = fake_hurt_module();
+        let (field, groups_at, parts_at) =
+            (layout.accessor + hb_layout::HIT_MODULE, layout.module + hb_layout::HIT_GROUPS, layout.module + hb_layout::HIT_PARTS);
+        layout.mem.set_u64(layout.module + offset, 0);
+        assert_eq!(want_via(&mut layout, &mut out), (0, 0, vec![field, groups_at, parts_at]), "no group field or part read with the {name} table pointer null");
+    }
+
+    // Part limits hold: a count past MAX_HURTBOX_PARTS, and a group past the part total, read no part record.
+    for (first, count) in [(0i16, 65i16), (8i16, 4i16)] {
+        let mut layout = fake_hurt_module();
+        let groups = layout.groups;
+        layout.mem.set_i16(groups + hb_layout::HIT_GROUP_FIRST, first);
+        layout.mem.set_i16(groups + hb_layout::HIT_GROUP_COUNT, count);
+        let (left, len, reads) = want_via(&mut layout, &mut out);
+        assert_eq!((left, len), (0, 0), "no sphere for first {first} count {count}");
+        assert!(!reads.iter().any(|at| *at >= layout.parts), "no part read for first {first} count {count}");
+    }
+
+    // The reader itself refuses a null or misaligned accessor without any read, and a misaligned part
+    // record address in place (zeroed, no read).
+    let stray = std::cell::Cell::new(0usize);
+    let mut hurt = hitbox::GameHurt { accessor: 0, load: |_at: usize, _: &mut [u8]| stray.set(stray.get() + 1) };
+    assert_eq!(hitbox::HurtboxReader::module(&mut hurt), 0);
+    let mut layout = fake_hurt_module();
+    let mut hurt = hitbox::GameHurt { accessor: layout.accessor + 2, load: |_at: usize, _: &mut [u8]| stray.set(stray.get() + 1) };
+    assert_eq!(hitbox::HurtboxReader::module(&mut hurt), 0, "a misaligned accessor is refused without a read");
+    let _ = hurt;
+    assert_eq!(stray.get(), 0, "no read happened for either refused accessor");
+    let parts = layout.parts;
+    let mut hurt = hitbox::GameHurt { accessor: layout.accessor, load: |at: usize, dst: &mut [u8]| layout.mem.load(at, dst) };
+    let mut record = [7u8; hb_layout::HIT_PART_STRIDE];
+    hitbox::HurtboxReader::read_part(&mut hurt, parts + 2, &mut record);
+    let _ = hurt;
+    assert_eq!(record, [0; hb_layout::HIT_PART_STRIDE], "a misaligned record address is refused in place");
+    assert!(!layout.mem.reads.contains(&(parts + 2)));
+}
+
+#[test]
+fn core06_hurt_census_window_and_line_format() {
+    let mut census = hitbox::HurtCensus::EMPTY;
+    assert_eq!(census.window(600), None, "an empty window does not close");
+    assert_eq!(census.window(0), None, "a zero window never closes");
+    census.observe(19, 45, 100);
+    census.observe(23, 55, 140);
+    for _ in 0..598 {
+        census.observe(20, 50, 120);
+    }
+    let window = census.window(600).unwrap();
+    assert_eq!((window.frames, window.parts, window.parts_max, window.first), (600, 20, 23, 45), "the last parts, the most seen, the first pass's total");
+    assert_eq!((window.ticks_min, window.ticks_avg, window.ticks_max), (100, 120, 140), "min, integer average, max over the window");
+    // The runtime writes the prefix and the fighter kind around the model's fields.
+    assert_eq!(
+        format!("[Hitbox] hurt census kind=91 {window}"),
+        "[Hitbox] hurt census kind=91 parts=20 parts_max=23 first_pass=45 frames=600 ticks_min=100 ticks_avg=120 ticks_max=140"
+    );
+    // The window reset: the aggregates start over; the first pass's total and the part maximum are kept.
+    assert_eq!(census.frames, 0);
+    census.observe(3, 4, 600);
+    for _ in 0..599 {
+        census.observe(3, 4, 700);
+    }
+    let window = census.window(600).unwrap();
+    assert_eq!((window.parts, window.parts_max, window.first), (3, 23, 45));
+    assert_eq!((window.ticks_min, window.ticks_avg, window.ticks_max), (600, 699, 700));
+    // The observed frames saturate instead of wrapping (a window cannot lie by overflow).
+    let mut census = hitbox::HurtCensus::EMPTY;
+    census.frames = u32::MAX;
+    census.observe(1, 1, 1);
+    assert_eq!(census.frames, u32::MAX);
+    // The want scratch is sized for the hit slots' and the hurt parts' spheres together.
+    assert_eq!(hitbox::WANT_SCRATCH, hitbox::SLOTS as usize * hitbox::SPHERE_MAX + hitbox::MAX_HURTBOX_PARTS as usize * hitbox::SPHERE_MAX);
+    const { assert!(hitbox::WANT_SCRATCH >= hitbox::MAX_HELD) };
+}
+
+#[test]
+fn core06_release_build_never_touches_the_hit_module() {
+    // The shipped build reads no HitModule: the live reader (`GameHurt`, its raw `mem_load`) and the
+    // model walk (`hurt_parts`, `want_hurtboxes`) are named only inside the runtime file's diag-gated
+    // `stats` module, the per-frame census call is itself `#[cfg(feature = "diag")]`, and the dispatch
+    // keeps passing `None` (the model tests above pin what that does). The built release NRO is
+    // re-checked at the gates (no census string in it; the diag NRO carries the line).
+    let src = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/src/runtime/features/hitbox.rs")).unwrap();
+    let toks = callgraph::lex(&src);
+    let refs = |name: &str| -> Vec<usize> {
+        toks.iter().enumerate().filter(|(_, t)| matches!(t, callgraph::Tok::Ident(s) if s == name)).map(|(i, _)| i).collect()
+    };
+    let mut stats_span = None;
+    for i in 0..toks.len() - 2 {
+        if matches!(&toks[i], callgraph::Tok::Ident(s) if s == "mod")
+            && matches!(&toks[i + 1], callgraph::Tok::Ident(s) if s == "stats")
+            && matches!(&toks[i + 2], callgraph::Tok::Punct('{'))
+        {
+            let mut depth = 0i32;
+            let close = (i + 2..toks.len())
+                .find(|&k| match &toks[k] {
+                    callgraph::Tok::Punct('{') => {
+                        depth += 1;
+                        false
+                    }
+                    callgraph::Tok::Punct('}') => {
+                        depth -= 1;
+                        depth == 0
+                    }
+                    _ => false,
+                })
+                .expect("the stats module closes");
+            stats_span = Some((i, close));
+            break;
+        }
+    }
+    let (stats_open, stats_close) = stats_span.expect("one diag `mod stats` block");
+    assert!(
+        toks[..stats_open].iter().rev().take(10).any(|t| matches!(t, callgraph::Tok::Ident(s) if s == "cfg")),
+        "the stats module is diag-gated"
+    );
+    let inside = |i: usize| i > stats_open && i < stats_close;
+    for name in ["GameHurt", "mem_load", "hurt_parts", "HurtCensus"] {
+        let found = refs(name);
+        assert!(!found.is_empty(), "{name} must appear in the runtime file");
+        assert!(found.iter().all(|&i| inside(i)), "{name} is named outside the diag-gated stats module");
+    }
+    // The per-frame census call: cfg-gated wherever it sits.
+    for i in refs("hurt_census") {
+        assert!(
+            inside(i) || toks[..i].iter().rev().take(24).any(|t| matches!(t, callgraph::Tok::Ident(s) if s == "cfg")),
+            "the census call at token {i} is cfg-gated"
+        );
+    }
 }
 
 #[test]
@@ -725,6 +1229,24 @@ impl hitbox::AttackReader for AttackSpy {
     }
 }
 
+/// No active attack slot at all (the Ridley first pass: hurtboxes only).
+struct NoHit;
+
+impl hitbox::AttackReader for NoHit {
+    fn active(&mut self, _slot: i32) -> bool {
+        false
+    }
+    fn data(&mut self, slot: i32) -> usize {
+        panic!("inactive slot read {slot}")
+    }
+    fn read_u64(&mut self, at: usize) -> u64 {
+        panic!("non-attack node read {at:#x}")
+    }
+    fn read_f32(&mut self, at: usize) -> f32 {
+        panic!("non-attack scalar read {at:#x}")
+    }
+}
+
 struct RequestSpy {
     fx: FakeFx,
     requests: Vec<hitbox::Sphere>,
@@ -757,7 +1279,7 @@ fn core06_rc_dispatch_reads_only_attacks_and_requests_hits_and_grabs() {
     let mut reads = AttackSpy::default();
     let mut fx = RequestSpy::new();
     let facts = facts(true, hitbox::enabled(&snapshot), false, 0);
-    let (counts, hits) = hitbox::reconcile_frame(&mut set, facts, &mut wants, &mut reads, &mut fx);
+    let (counts, hits) = hitbox::reconcile_frame(&mut set, facts, &mut wants, &mut reads, None, &mut fx);
     assert_eq!((counts.spawned, counts.failed, counts.dropped, hits), (6, 0, 0, 5));
     assert_eq!(reads.active, (0..8).collect::<Vec<_>>());
     assert_eq!(reads.data, [1, 5, 6]);
@@ -773,7 +1295,7 @@ fn core06_rc_dispatch_reads_only_attacks_and_requests_hits_and_grabs() {
     assert_eq!(fx.requests[4].tint, hitbox::hitbox_tint(5));
     assert_eq!(fx.requests[5], grab);
     assert!(fx.requests.iter().all(|s| s.key >> 24 != hitbox::KIND_HURT));
-    let (counts, hits) = hitbox::reconcile_frame(&mut set, facts, &mut wants, &mut reads, &mut fx);
+    let (counts, hits) = hitbox::reconcile_frame(&mut set, facts, &mut wants, &mut reads, None, &mut fx);
     assert_eq!((counts.spawned, counts.kept, hits), (0, 6, 5), "unchanged owned handles are retained");
     assert_eq!(fx.requests.len(), 6);
 }
@@ -788,10 +1310,10 @@ fn core06_rc_dispatch_preserves_grab_shield_off_and_retirement_cleanup() {
         let grab = sphere(hitbox::sphere_key(hitbox::KIND_GRAB, 2, 0), 4.0);
         set.push_grab(grab);
         let mut wants = [hitbox::Sphere::NONE; hitbox::MAX_HELD];
-        hitbox::reconcile_frame(&mut set, facts(true, true, false, 0), &mut wants, &mut AttackSpy::default(), &mut fx);
+        hitbox::reconcile_frame(&mut set, facts(true, true, false, 0), &mut wants, &mut AttackSpy::default(), None, &mut fx);
         let mut reads = AttackSpy::default();
         let requests = fx.requests.len();
-        let (counts, hits) = hitbox::reconcile_frame(&mut set, facts(visualizes, enabled, false, status), &mut wants, &mut reads, &mut fx);
+        let (counts, hits) = hitbox::reconcile_frame(&mut set, facts(visualizes, enabled, false, status), &mut wants, &mut reads, None, &mut fx);
         assert_eq!((reads.active.len(), reads.data.len(), reads.reads.len(), hits), (0, 0, 0, 0));
         assert_eq!(fx.requests.len(), requests, "no attack/HB1/ordinary shield request on stop path");
         assert_eq!((counts.killed, counts.kept), if keep_grab { (5, 1) } else { (6, 0) });
@@ -801,14 +1323,20 @@ fn core06_rc_dispatch_preserves_grab_shield_off_and_retirement_cleanup() {
 }
 
 #[test]
-fn core06_rc_closure_excludes_hb1_without_disabling_ordinary_visualization() {
+fn core06_rc_closure_holds_hb1_at_the_unwired_draw_route() {
     // Identical SITES/closure is used with and without `diag`; run this probe
     // in both host feature closures, and verify each compiled RC NRO separately.
-    for retired in [0x203_db10, 0x46_9af0, 0x46_8490] {
-        assert!(!SITES.iter().any(|s| s.offset == retired));
-        assert!(!capabilities::all_sites().any(|s| s.name.starts_with("hurtbox_")));
-        assert_eq!(capabilities::blocked_by(Feature::Hitbox, &|s| s.offset != retired), None);
+    // The draw route is the operator's call (option A, an isolated visualization sphere, or the fork's shared-pool
+    // `sys_shield` route; `docs/HB1-RENDER-ROUTES.md`): the three relied HitModule windows are back (the reader and
+    // the diag census read them), but no hurt sphere is requested yet and no hurtbox site is hooked — the rows are
+    // relied on, never written, and the runtime's dispatch still passes `None` (the source scan below pins that).
+    for (offset, name) in [(sites_hitbox::HITBOX_HURT_MODULE_OFFSET, "hurtbox_module"), (sites_hitbox::HITBOX_HURT_GROUPS_OFFSET, "hurtbox_groups"), (sites_hitbox::HITBOX_HURT_PART_OFFSET, "hurtbox_part_shape")] {
+        let site = SITES.iter().find(|s| s.offset == offset).unwrap_or_else(|| panic!("{name} back"));
+        assert_eq!(site.name, name);
+        assert!(matches!(site.kind, SeamKind::Relied), "{name}: relied on, never written");
+        assert!(!capabilities::all_sites().any(|s| s.offset == offset && matches!(s.kind, SeamKind::Hook { .. })), "{name}: never hooked");
     }
+    assert!(!SITES.iter().any(|s| matches!(s.kind, SeamKind::Hook { .. }) && s.name.starts_with("hurtbox_")));
     for required in ["hitbox_attack", "hitbox_catch", "hitbox_set_rebound", "attack_is_attack", "attack_data", "effect_req_follow", "sphere_effect_kill"] {
         assert_eq!(capabilities::blocked_by(Feature::Hitbox, &|s| s.name != required), Some(required));
     }

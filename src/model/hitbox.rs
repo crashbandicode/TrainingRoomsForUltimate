@@ -162,7 +162,12 @@ pub fn second_centre(b: [f32; 3]) -> Option<[f32; 3]> {
     (b != [0.0; 3]).then_some(b)
 }
 
-// ---- historical pure HB1 rules (2026-11-02); no reader or dispatch in the RC ---------------------------------------
+// ---- hurtboxes (decision HB1 (a), 2026-11-02) -----------------------------------------------------------------------
+//
+// The rules below are renderer-agnostic and host-tested: what a part's shape is, which parts a pass reads, and the spheres
+// they become. The draw route (the operator's option A, an isolated visualization sphere, or the fork's shared-pool
+// `sys_shield`) is not picked yet (`docs/HB1-RENDER-ROUTES.md`, `OPTION-A-DESIGN.md`): the runtime plans the hurt spheres
+// but requests none until the route is wired, so the dispatch here is the one interface a route plugs into.
 
 /// Hurtboxes are drawn yellow.
 pub const HURTBOX_TINT: [f32; 3] = [1.0, 1.0, 0.0];
@@ -484,6 +489,9 @@ impl Default for SleepBook {
 
 /// Spheres one fighter can hold at once (every attack slot's and every hurtbox part's spheres together).
 pub const MAX_HELD: usize = 128;
+/// The want scratch of one pass: the attack slots' spheres and the hurt parts' spheres together (decision HB1), so a
+/// full slot set never starves the hurt enumeration; what still does not fit is counted in `Counts::dropped`.
+pub const WANT_SCRATCH: usize = SLOTS as usize * SPHERE_MAX + MAX_HURTBOX_PARTS as usize * SPHERE_MAX;
 /// Grab spheres waiting for the fighter's pass (the `CATCH` command records them; the pass requests them).
 pub const MAX_PENDING: usize = 24;
 /// Fighters tracked at once (eight entries; a fighter that is gone is forgotten without a game call).
@@ -562,10 +570,209 @@ pub fn want_hitboxes(reader: &mut impl AttackReader, out: &mut [Sphere], len: &m
     left_out
 }
 
-/// The production RC pass's planning and owned-handle dispatch. Returns counts
-/// and ordinary hitbox spheres wanted (pending CATCH spheres stay in the set).
-/// HB1 has no reader or request path here, in release or diagnostic builds.
-pub fn reconcile_frame(set: &mut HandleSet, facts: FrameFacts, wants: &mut [Sphere], reader: &mut impl AttackReader, fx: &mut impl Effects) -> (Counts, usize) {
+/// The retained hurtbox reader. The runtime supplies the HitModule pointer and the in-place table reads; host probes run this
+/// same enumeration with address-counting spies (as `AttackReader` does for the attack slots). Every address is derived from
+/// `module()`; the reader only answers reads.
+pub trait HurtboxReader {
+    /// The fighter's `HitModule` (accessor `+0xb0`), or 0 when the fighter has none.
+    fn module(&mut self) -> usize;
+    fn read_usize(&mut self, at: usize) -> usize;
+    fn read_i32(&mut self, at: usize) -> i32;
+    fn read_i16(&mut self, at: usize) -> i16;
+    /// The 0x50-byte part record at `at` (the part table's record `at` names), read in place.
+    fn read_part(&mut self, at: usize, record: &mut [u8; layout::HIT_PART_STRIDE]);
+}
+
+/// The spheres of the fighter's enabled hurtbox parts (decision HB1 (a)): `HitModule`'s group `HURTBOX_GROUP` — the one the
+/// fighters' scripts address — its parts that are not switched off, each its capsule on its bone, yellow, with the same sphere
+/// rule as a hitbox. The tables are read in place (layout `layout::HIT_*`); a table that does not look like one gives nothing.
+/// Appends to `out[..*len]`; returns how many were left out for lack of room.
+pub fn want_hurtboxes(reader: &mut (impl HurtboxReader + ?Sized), out: &mut [Sphere], len: &mut usize) -> u32 {
+    let mut left_out = 0;
+    hurt_parts(reader, |index, shape| left_out += push_shape(out, len, KIND_HURT, index, shape, HURTBOX_TINT) as usize);
+    left_out as u32
+}
+
+/// Walks the enabled parts of group `HURTBOX_GROUP` once, in part order: `each(index, shape)` for every part that is not
+/// switched off — all of them, whatever `each` keeps (the draw appends spheres, the diag census only counts). Returns the
+/// enabled parts seen; a module or table pointer that is missing or does not look like one is 0 parts.
+pub fn hurt_parts(reader: &mut (impl HurtboxReader + ?Sized), mut each: impl FnMut(usize, &Shape)) -> usize {
+    let module = reader.module();
+    if module == 0 {
+        return 0;
+    }
+    let groups = reader.read_usize(module + layout::HIT_GROUPS);
+    let parts = reader.read_usize(module + layout::HIT_PARTS);
+    if groups == 0 || parts == 0 {
+        return 0;
+    }
+    let total = reader.read_i32(module + layout::HIT_PART_TOTAL);
+    let group = groups + HURTBOX_GROUP * layout::HIT_GROUP_STRIDE;
+    let first = reader.read_i16(group + layout::HIT_GROUP_FIRST);
+    let count = reader.read_i16(group + layout::HIT_GROUP_COUNT);
+    let Some(range) = group_parts(first, count, total) else { return 0 };
+    let mut seen = 0;
+    for index in range {
+        let mut record = [0u8; layout::HIT_PART_STRIDE];
+        reader.read_part(parts + index * layout::HIT_PART_STRIDE, &mut record);
+        if let Some(shape) = hurtbox_shape(&record) {
+            seen += 1;
+            each(index, &shape);
+        }
+    }
+    seen
+}
+
+/// The live `HitModule` of one fighter as a `HurtboxReader` (decision HB1), its reads bound to `load`: the runtime binds one
+/// raw game-memory read, a host probe binds a fake layout (exact addresses). Every pointer read is type-checked first — a
+/// null or misaligned address or pointer is refused with 0 — because Eden answers 0 for an unmapped read, so a missing
+/// check would not show there (playbook EDEN, "Read the results").
+pub struct GameHurt<F> {
+    /// The fighter object's accessor address (the module pointer is read at `+layout::HIT_MODULE`).
+    pub accessor: usize,
+    /// `load(at, out)`: the `out.len()` bytes at `at`.
+    pub load: F,
+}
+
+impl<F: FnMut(usize, &mut [u8])> GameHurt<F> {
+    /// The pointer-sized value at `at` as a pointer: a null or misaligned address or pointer is refused (0).
+    fn pointer(&mut self, at: usize) -> usize {
+        let mut bytes = [0u8; 8];
+        if at == 0 || !at.is_multiple_of(8) {
+            return 0;
+        }
+        (self.load)(at, &mut bytes);
+        let pointer = usize::from_le_bytes(bytes);
+        if pointer == 0 || !pointer.is_multiple_of(8) {
+            0
+        } else {
+            pointer
+        }
+    }
+
+    /// The `width`-byte little-endian scalar at `at`: a null or misaligned address is refused (0).
+    fn scalar(&mut self, at: usize, width: usize) -> u64 {
+        let mut bytes = [0u8; 8];
+        if at == 0 || !at.is_multiple_of(width) {
+            return 0;
+        }
+        (self.load)(at, &mut bytes[..width]);
+        u64::from_le_bytes(bytes)
+    }
+}
+
+impl<F: FnMut(usize, &mut [u8])> HurtboxReader for GameHurt<F> {
+    fn module(&mut self) -> usize {
+        if self.accessor == 0 {
+            return 0;
+        }
+        self.pointer(self.accessor.wrapping_add(layout::HIT_MODULE))
+    }
+
+    fn read_usize(&mut self, at: usize) -> usize {
+        self.pointer(at)
+    }
+
+    fn read_i32(&mut self, at: usize) -> i32 {
+        self.scalar(at, 4) as i32
+    }
+
+    fn read_i16(&mut self, at: usize) -> i16 {
+        self.scalar(at, 2) as i16
+    }
+
+    fn read_part(&mut self, at: usize, record: &mut [u8; layout::HIT_PART_STRIDE]) {
+        // The part table's stride is 0x50, so an 8-aligned table keeps every record 8-aligned.
+        if at == 0 || !at.is_multiple_of(8) {
+            *record = [0; layout::HIT_PART_STRIDE];
+            return;
+        }
+        (self.load)(at, record);
+    }
+}
+
+/// One fighter kind's hurt census (the diag build only; the shipped build reads no HitModule): the enabled parts and the
+/// spheres they want of every observed pass, and the read's cost in ticks. The state of one window; `window` closes a full
+/// one into the `[Hitbox] hurt census` line's fields and opens the next (the first pass's total is kept, never reset).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct HurtCensus {
+    /// Frames observed in the open window.
+    pub frames: u32,
+    /// The enabled parts of the last observed pass.
+    pub parts: u32,
+    /// The most enabled parts seen (kept across windows).
+    pub parts_max: u32,
+    /// The spheres the kind's first observed pass wanted.
+    pub first: Option<u32>,
+    /// The read costs of the open window, summed (the average divides by the frames).
+    pub ticks: u64,
+    pub ticks_min: u64,
+    pub ticks_max: u64,
+}
+
+impl HurtCensus {
+    pub const EMPTY: HurtCensus = HurtCensus { frames: 0, parts: 0, parts_max: 0, first: None, ticks: 0, ticks_min: 0, ticks_max: 0 };
+
+    /// Observe one pass: `parts` enabled parts, `spheres` the pass wanted, `ticks` the read cost.
+    pub fn observe(&mut self, parts: usize, spheres: usize, ticks: u64) {
+        self.frames = self.frames.saturating_add(1);
+        self.parts = parts as u32;
+        self.parts_max = self.parts_max.max(self.parts);
+        self.first = Some(self.first.unwrap_or(spheres as u32));
+        self.ticks = self.ticks.saturating_add(ticks);
+        self.ticks_min = if self.ticks_min == 0 { ticks } else { self.ticks_min.min(ticks) };
+        self.ticks_max = self.ticks_max.max(ticks);
+    }
+
+    /// The window closed after `window` observed frames (`None` before that, and for a 0 window), reset for the next one.
+    pub fn window(&mut self, window: u32) -> Option<HurtWindow> {
+        if window == 0 || self.frames < window {
+            return None;
+        }
+        let closed = HurtWindow {
+            frames: self.frames,
+            parts: self.parts,
+            parts_max: self.parts_max,
+            first: self.first.unwrap_or(0),
+            ticks_avg: self.ticks / u64::from(self.frames.max(1)),
+            ticks_min: self.ticks_min,
+            ticks_max: self.ticks_max,
+        };
+        self.frames = 0;
+        self.ticks = 0;
+        self.ticks_min = 0;
+        self.ticks_max = 0;
+        Some(closed)
+    }
+}
+
+/// One closed census window: the fields of one `[Hitbox] hurt census` line (the runtime writes the prefix and the kind).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct HurtWindow {
+    pub frames: u32,
+    pub parts: u32,
+    pub parts_max: u32,
+    pub first: u32,
+    pub ticks_avg: u64,
+    pub ticks_min: u64,
+    pub ticks_max: u64,
+}
+
+impl core::fmt::Display for HurtWindow {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(
+            f,
+            "parts={} parts_max={} first_pass={} frames={} ticks_min={} ticks_avg={} ticks_max={}",
+            self.parts, self.parts_max, self.first, self.frames, self.ticks_min, self.ticks_avg, self.ticks_max
+        )
+    }
+}
+
+/// The production pass's planning and owned-handle dispatch. Returns counts and ordinary hitbox spheres wanted (pending CATCH
+/// spheres stay in the set). `hurt` is the hurtbox reader of the same per-frame entry (decision HB1): `Some` plans the enabled
+/// parts' spheres and requests them through the same set and effect interface as the hitboxes — the draw route's plug-in point,
+/// unwired in the runtime until the operator picks option A or the shared-pool route (`docs/HB1-RENDER-ROUTES.md`).
+pub fn reconcile_frame(set: &mut HandleSet, facts: FrameFacts, wants: &mut [Sphere], reader: &mut impl AttackReader, hurt: Option<&mut dyn HurtboxReader>, fx: &mut impl Effects) -> (Counts, usize) {
     if !facts.visualizes || !facts.enabled || facts.ids.shielding(facts.status) {
         return (set.clear(fx), 0);
     }
@@ -573,7 +780,10 @@ pub fn reconcile_frame(set: &mut HandleSet, facts: FrameFacts, wants: &mut [Sphe
         return (set.reconcile(&[], true, fx), 0);
     }
     let mut len = 0;
-    let left_out = want_hitboxes(reader, wants, &mut len);
+    let mut left_out = want_hitboxes(reader, wants, &mut len);
+    if let Some(hurt) = hurt {
+        left_out += want_hurtboxes(hurt, wants, &mut len);
+    }
     let mut counts = set.reconcile(&wants[..len], true, fx);
     counts.dropped += left_out;
     (counts, len)
