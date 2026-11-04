@@ -101,7 +101,8 @@ pub(crate) unsafe fn frame(fighter: usize) {
         }
         drop(lease);
         // The roster cycle's once-per-game-frame steps run on Player 1's body (each returns at once when nothing is pending): the
-        // source leases, the Kirby hat requests, the item engine (a granted or restored item) and the preload planner.
+        // source leases, the item engine (a granted or restored item) and the preload planner. The Kirby hat requests run per
+        // Kirby with that Kirby's own body instead (`features::states::state_kirby_opff_hook`, the fork's call site).
         let accessor = game::natives::fighter_accessor(fighter);
         if accessor != 0 {
             let body = accessor as *mut BattleObjectModuleAccessor;
@@ -109,10 +110,6 @@ pub(crate) unsafe fn frame(fighter: usize) {
             {
                 let _step = HookScope::enter_hook(HookId::RosterSources);
                 crate::runtime::roster::character_roster::sources::on_frame(body);
-            }
-            {
-                let _step = HookScope::enter_hook(HookId::RosterKirby);
-                crate::runtime::roster::kirby_hats::on_frame(body);
             }
             let _items = HookScope::enter_hook(HookId::RosterItems);
             // Diag build: an item grant Eden asked for in `diag-item.req` (the Give item screen is not built yet).

@@ -1834,7 +1834,14 @@
    "dest": "src/model/kirby/kirby_hat_cycle.rs",
    "crate": "root",
    "src_sha256": "685316a7023abcc3e32de85829aa6450514c2807e32191b536920dbb84184528",
-   "dest_sha256": "c20d4581954236dde414b7fcb5c7a0f6d846c552776d95c402a822713af81d09"
+   "dest_sha256": "0c831a2650c6db7b1cc4efbf0feb1bb05d55bc320082b0ce6e1ff4e8868d5611",
+   "edits": [
+    {
+     "old": "    (left_click && right_click, left_click || right_click)\n}\n",
+     "new": "    (left_click && right_click, left_click || right_click)\n}\n\n/// The role a Kirby frame callback serves: the role whose Kirby body is the callback's own body. The callback\n/// runs once per Kirby with that Kirby's body (the fork's `SITE_KIRBY_OPFF` call), so each role is reached by\n/// its own body; any other body serves no role.\npub fn hat_role<T: PartialEq>(body: T, roles: [Option<T>; 2]) -> Option<usize> {\n    roles.iter().position(|role| role.as_ref() == Some(&body))\n}\n",
+     "reason": "B4-3 (Surface lane LANE-SURFACE-REPORT.md 'B4-3 root cause'; Ally lane LANE-ALLY-REPORT.md Round 4 section 3; primary-approved 2026-11-04): the Kirby hat step runs per Kirby with that Kirby's own body from features::states::state_kirby_opff_hook (the fork's SITE_KIRBY_OPFF call site, src/training/character_specific/kirby.rs:37), not from lobby::frame with Player 1's body; the role match is the host-tested hat_role"
+    }
+   ]
   },
   {
    "src": "src/mii_hud_portrait_policy.rs",
@@ -3476,7 +3483,7 @@
    "dest": "src/runtime/roster/kirby_hats.rs",
    "crate": "root",
    "src_sha256": "3e2e73f9157b54434492472cf64ae8993af5f508e47fbc67c944667da95d6f52",
-   "dest_sha256": "df609f063efae42d3af12a92733798d34f3ddf9a059f06a91e664b013f4f1522",
+   "dest_sha256": "f88cdc0e73dec7fdcf5a3c972545fa2ed34ef611a84aa7a57619b74fb773d638",
    "edits": [
     {
      "old": "fn notice(role: usize, text: String) {",
@@ -3637,6 +3644,26 @@
      "reason": "phase 23 worker B (glm-03 follow-up): role_lookup records the facts behind a failed role_body - the entry id the lobby maps the role to, the game's entry object, the active-cell index and installed count (F11 fields) and, when the accessor resolves, the kind it saw; the chord's failure path emits one [KirbyHats] role_body line splitting accessor-missing from kind-mismatch. No lookup behaviour change until the trace facts return.",
      "old": "    if shortcut.would_request(special, neutral, left_click, right_click) && permitted() {\n        let role = usize::from(right_click);\n        bodies[role] = role_body(role);\n    }\n",
      "new": "    if shortcut.would_request(special, neutral, left_click, right_click) && permitted() {\n        let role = usize::from(right_click);\n        bodies[role] = role_body(role);\n        if bodies[role].is_none() {\n            // The chord was eligible and permitted but the role had no Kirby body: say which case it\n            // is (glm-03 follow-up), once per chord attempt (the latch edges this branch).\n            let lookup = role_lookup(role);\n            match lookup.accessor {\n                Some(accessor) => crate::engine::compat::logging::diagnostic(format_args!(\n                    \"[KirbyHats] role_body role={} case=kind kind_seen=0x{:x} accessor=0x{:x} entry={} entry_ptr=0x{:x} active_index={} installed={}\",\n                    role, lookup.kind.unwrap_or(0) as u32, accessor as usize, lookup.entry,\n                    lookup.entry_ptr, lookup.active_index, lookup.installed\n                )),\n                None => crate::engine::compat::logging::diagnostic(format_args!(\n                    \"[KirbyHats] role_body role={} case=accessor entry={} entry_ptr=0x{:x} active_index={} installed={}\",\n                    role, lookup.entry, lookup.entry_ptr, lookup.active_index, lookup.installed\n                )),\n            }\n        }\n    }\n"
+    },
+    {
+     "old": "use crate::engine::kirby::kirby_hat_cycle::{operator_clicks, HatContinuation, HatCycle, HatSnapshot, ShortcutLatch};\n",
+     "new": "use crate::engine::kirby::kirby_hat_cycle::{hat_role, operator_clicks, HatContinuation, HatCycle, HatSnapshot, ShortcutLatch};\n",
+     "reason": "B4-3 (Surface lane LANE-SURFACE-REPORT.md 'B4-3 root cause'; Ally lane LANE-ALLY-REPORT.md Round 4 section 3; primary-approved 2026-11-04): the Kirby hat step runs per Kirby with that Kirby's own body from features::states::state_kirby_opff_hook (the fork's SITE_KIRBY_OPFF call site, src/training/character_specific/kirby.rs:37), not from lobby::frame with Player 1's body; the role match is the host-tested hat_role"
+    },
+    {
+     "old": "    training::ui::notifications::notification(\n        if role == 0 {\n            \"Kirby Hats\"\n        } else {\n            \"CPU Kirby Hats\"\n        }\n        .into(),\n        text,\n        120,\n    );\n",
+     "new": "    training::ui::notifications::notification([\"Kirby Hats\", \"CPU Kirby Hats\"][role].into(), text, 120);\n",
+     "reason": "B4-3 (Surface lane LANE-SURFACE-REPORT.md 'B4-3 root cause'; Ally lane LANE-ALLY-REPORT.md Round 4 section 3; primary-approved 2026-11-04): the Kirby hat step runs per Kirby with that Kirby's own body from features::states::state_kirby_opff_hook (the fork's SITE_KIRBY_OPFF call site, src/training/character_specific/kirby.rs:37), not from lobby::frame with Player 1's body; the role match is the host-tested hat_role"
+    },
+    {
+     "old": "/// Service from Kirby's native frame callback while that body is owned by the game.\n",
+     "new": "/// Service from Kirby's native frame callback while that body is owned by the game: called once per Kirby with\n/// that Kirby's own body (`features::states::state_kirby_opff_hook`, the fork's `SITE_KIRBY_OPFF` call), so the\n/// CPU role's Kirby reaches its own pending request.\n",
+     "reason": "B4-3 (Surface lane LANE-SURFACE-REPORT.md 'B4-3 root cause'; Ally lane LANE-ALLY-REPORT.md Round 4 section 3; primary-approved 2026-11-04): the Kirby hat step runs per Kirby with that Kirby's own body from features::states::state_kirby_opff_hook (the fork's SITE_KIRBY_OPFF call site, src/training/character_specific/kirby.rs:37), not from lobby::frame with Player 1's body; the role match is the host-tested hat_role"
+    },
+    {
+     "old": "    let role = if role_body(0) == Some(body) {\n        0\n    } else if role_body(1) == Some(body) {\n        1\n    } else {\n        return;\n    };\n",
+     "new": "    let Some(role) = hat_role(body, [role_body(0), role_body(1)]) else { return };\n",
+     "reason": "B4-3 (Surface lane LANE-SURFACE-REPORT.md 'B4-3 root cause'; Ally lane LANE-ALLY-REPORT.md Round 4 section 3; primary-approved 2026-11-04): the Kirby hat step runs per Kirby with that Kirby's own body from features::states::state_kirby_opff_hook (the fork's SITE_KIRBY_OPFF call site, src/training/character_specific/kirby.rs:37), not from lobby::frame with Player 1's body; the role match is the host-tested hat_role"
     }
    ]
   },

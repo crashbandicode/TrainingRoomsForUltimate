@@ -281,8 +281,17 @@ fn run_inner() {
     // SPEC-core-06: the hitbox visualizer rides on the CPU core's per-fighter frame wrapper; its closure (own rows, the Training
     // predicate, the shared natives' rows) must have passed as a whole.
     let (hitbox_on, hb_written) = hitbox::install(&hb_found, cpu_core_on && capabilities::unit_usable(Feature::Hitbox, &usable));
-    // Package 3: the save states ride on the CPU core's per-frame wrapper and constant lookup.
+    // Package 6: the roster cycle (hot swap, preload, Kirby hats, items), the Mii files and the waiting-room practice engine. The cycle
+    // starts only when every game function its code calls through `smash::` passed its guard (`roster::CALLED_ROWS`); each of its
+    // files then checks its own seam rows and installs nothing when they are refused (the seam fields of the install line say which).
+    let state_row_usable = |name: &str| sites_pkg3::STATE_SITES.iter().position(|s| s.name == name).is_some_and(|i| state_found[i].usable());
+    let own_row_usable = |name: &str| sites_pkg6::SITES.iter().position(|s| s.name == name).is_some_and(|i| found6[i].usable());
+    let roster_on = roster::CALLED_ROWS.iter().all(|name| row_usable(name) || row4_usable(name) || state_row_usable(name) || own_row_usable(name));
+    // Package 3: the save states ride on the CPU core's per-frame wrapper and constant lookup. The Kirby copy routine's hook also
+    // carries the roster cycle's Kirby hat step, so it installs on its own row when the cycle starts.
     let mut state_written = [Written::Skipped; state_boot::N];
+    let kirby_hats = roster_on && state_row_usable("state_kirby_opff");
+    states::KIRBY_HATS.store(kirby_hats, std::sync::atomic::Ordering::Release);
     let state_on = state_boot::install(&state_found, cpu_core_on && capabilities::unit_usable(Feature::StateCore, &usable), &mut state_written);
     let state_reports = state_boot::reports(&state_found, &state_written);
     // Package 4: the recorder, the chords' poll and the notices.
@@ -321,12 +330,6 @@ fn run_inner() {
     // R2-1: the layer's whole closure (its own rows and the cross-feature rows its code calls) must have passed.
     let macros_rows_ok = recording_on && capabilities::unit_usable(Feature::NamedMacros, &usable);
     let (macros_on, capture_on) = crate::runtime::macros::install(named_source, macros_rows_ok);
-    // Package 6: the roster cycle (hot swap, preload, Kirby hats, items), the Mii files and the waiting-room practice engine. The cycle
-    // starts only when every game function its code calls through `smash::` passed its guard (`roster::CALLED_ROWS`); each of its
-    // files then checks its own seam rows and installs nothing when they are refused (the seam fields of the install line say which).
-    let state_row_usable = |name: &str| sites_pkg3::STATE_SITES.iter().position(|s| s.name == name).is_some_and(|i| state_found[i].usable());
-    let own_row_usable = |name: &str| sites_pkg6::SITES.iter().position(|s| s.name == name).is_some_and(|i| found6[i].usable());
-    let roster_on = roster::CALLED_ROWS.iter().all(|name| row_usable(name) || row4_usable(name) || state_row_usable(name) || own_row_usable(name));
     // F9: the No. of CPUs field the cycle's Training sources depend on is read only when the game's own root load, reader and pause
     // menu writer are the 13.0.5 instructions (the rows name it in the install line otherwise; then Training admits no source: the
     // shipped preload-off path).

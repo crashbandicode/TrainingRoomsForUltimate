@@ -11,7 +11,7 @@ use crate::runtime::compat::sync::read;
 use crate::runtime::compat::common::consts::FighterId;
 use crate::runtime::compat::common::input::{Buttons, MappedInputs};
 use crate::runtime::compat::common::{self, button_config, menu, try_get_module_accessor};
-use crate::engine::kirby::kirby_hat_cycle::{operator_clicks, HatContinuation, HatCycle, HatSnapshot, ShortcutLatch};
+use crate::engine::kirby::kirby_hat_cycle::{hat_role, operator_clicks, HatContinuation, HatCycle, HatSnapshot, ShortcutLatch};
 use crate::runtime::lobby::training;
 use crate::runtime::roster::character_roster::sources::{self, Lease};
 use crate::engine::swap::source_lifetime::Holder;
@@ -65,16 +65,7 @@ fn clear_pending(role: usize, state: &mut State) {
 }
 
 fn notice(role: usize, text: std::borrow::Cow<'static, str>) {
-    training::ui::notifications::notification(
-        if role == 0 {
-            "Kirby Hats"
-        } else {
-            "CPU Kirby Hats"
-        }
-        .into(),
-        text,
-        120,
-    );
+    training::ui::notifications::notification(["Kirby Hats", "CPU Kirby Hats"][role].into(), text, 120);
 }
 
 unsafe fn permitted() -> bool {
@@ -254,20 +245,16 @@ unsafe fn sample_shortcut(latch: &Mutex<ShortcutLatch>, out: &mut MappedInputs, 
     }
 }
 
-/// Service from Kirby's native frame callback while that body is owned by the game.
+/// Service from Kirby's native frame callback while that body is owned by the game: called once per Kirby with
+/// that Kirby's own body (`features::states::state_kirby_opff_hook`, the fork's `SITE_KIRBY_OPFF` call), so the
+/// CPU role's Kirby reaches its own pending request.
 pub unsafe fn on_frame(body: *mut app::BattleObjectModuleAccessor) {
     let waiting = training::lobby::active() && training::lobby::is_waiting_scene();
     if (PENDING_ROLES.load(Ordering::Acquire) == 0 && !waiting)
         || body.is_null() || !common::is_training_mode() {
         return;
     }
-    let role = if role_body(0) == Some(body) {
-        0
-    } else if role_body(1) == Some(body) {
-        1
-    } else {
-        return;
-    };
+    let Some(role) = hat_role(body, [role_body(0), role_body(1)]) else { return };
     // Resolve roster ownership before the hat mutex: roster completion can clear
     // this role's memory. Never restore onto the temporary character-select body.
     let settled = waiting && common::is_ready_go()

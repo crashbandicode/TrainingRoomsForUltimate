@@ -1446,7 +1446,8 @@ pub unsafe fn state_pokemon_decide_hook(ctx: &mut InlineCtx) {
 
 /// Kirby's per-frame copy routine `(param, kirby fighter)`: while a load runs, whether the copy start flag
 /// was set is remembered before the original (which clears it); if it was, the copied charge is written
-/// from the record and the wait ends.
+/// from the record and the wait ends. Then, as the fork does (`src/training/character_specific/kirby.rs:37`),
+/// the Kirby hats' step runs with this Kirby's own body, so each role's Kirby serves its own request.
 #[skyline::hook(offset = s::STATE_KIRBY_OPFF_OFFSET)]
 pub unsafe fn state_kirby_opff_hook(param: usize, fighter: usize) -> u64 {
     let _scope = HookScope::enter();
@@ -1459,8 +1460,18 @@ pub unsafe fn state_kirby_opff_hook(param: usize, fighter: usize) -> u64 {
     if started {
         kirby_copy_started(fighter);
     }
+    if fighter != 0 && KIRBY_HATS.load(Ordering::Acquire) {
+        let _step = HookScope::enter_hook(crate::model::hook_stats::HookId::RosterKirby);
+        // `on_frame` returns at once for a null body.
+        let body = *((fighter + FIGHTER_ACCESSOR_FIELD) as *const *mut _);
+        crate::runtime::roster::kirby_hats::on_frame(body);
+    }
     result
 }
+
+/// The Kirby hats' step in `state_kirby_opff_hook` runs: boot set it when the roster cycle started and the hook
+/// was installed for it (`state_boot::install`).
+pub static KIRBY_HATS: AtomicBool = AtomicBool::new(false);
 
 unsafe fn kirby_copy_started(fighter: usize) {
     let entry = ((fighter + FIGHTER_ENTRY_FIELD) as *const i32).read();

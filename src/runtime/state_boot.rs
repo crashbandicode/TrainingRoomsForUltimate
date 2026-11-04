@@ -21,7 +21,9 @@ pub fn check() -> [GuardOutcome; N] {
 }
 
 /// Install the hooks when every row is usable and `frame_wrapper` (the CPU core's per-frame hook) is in.
-/// Returns whether the feature is installed; marks the rows in `written`.
+/// Returns whether the feature is installed; marks the rows in `written`. When boot has set
+/// `states::KIRBY_HATS` (the roster cycle started and the `state_kirby_opff` row is usable), Kirby's copy
+/// routine hook installs on its own: it carries the Kirby hat step.
 pub fn install(found: &[GuardOutcome; N], frame_wrapper: bool, written: &mut [Written; N]) -> bool {
     states::set_active(false);
     for (slot, outcome) in written.iter_mut().zip(found) {
@@ -29,16 +31,23 @@ pub fn install(found: &[GuardOutcome; N], frame_wrapper: bool, written: &mut [Wr
             *slot = Written::Checked;
         }
     }
-    // The rows are installed together: they share the frame step and the constant table, and the
-    // frame step calls the natives unguarded once it runs.
-    if !frame_wrapper || !found.iter().all(|f| f.usable()) {
-        return false;
-    }
     let mut mark = |name: &str, form: Written| {
         if let Some(i) = STATE_SITES.iter().position(|s| s.name == name) {
             written[i] = form;
         }
     };
+    // The rows are installed together: they share the frame step and the constant table, and the
+    // frame step calls the natives unguarded once it runs. The one exception is Kirby's copy routine:
+    // its hook is the Kirby hats' per-Kirby call site (the fork's `SITE_KIRBY_OPFF`), which must not
+    // depend on the other save-state rows; its own row still guards it.
+    let all = frame_wrapper && found.iter().all(|f| f.usable());
+    if all || states::KIRBY_HATS.load(std::sync::atomic::Ordering::Acquire) {
+        skyline::install_hook!(states::state_kirby_opff_hook);
+        mark("state_kirby_opff", Written::Far);
+    }
+    if !all {
+        return false;
+    }
     // Each hook with the row it writes, in install order (a replace hook is Skyline's far jump).
     macro_rules! far {
         ($($($hook:ident)::+ => $row:literal,)+) => { $( skyline::install_hook!($($hook)::+); mark($row, Written::Far); )+ };
@@ -68,9 +77,6 @@ pub fn install(found: &[GuardOutcome; N], frame_wrapper: bool, written: &mut [Wr
     // The inline hook at the Pokemon decide store is a one-word branch.
     skyline::install_hook!(states::state_pokemon_decide_hook);
     mark("state_pokemon_decide", Written::Near);
-    far! {
-        states::state_kirby_opff_hook => "state_kirby_opff",
-    }
     states::set_active(true);
     true
 }

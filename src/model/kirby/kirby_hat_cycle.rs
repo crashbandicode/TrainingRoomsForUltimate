@@ -129,6 +129,13 @@ pub const fn operator_clicks(left_click: bool, right_click: bool) -> (bool, bool
     (left_click && right_click, left_click || right_click)
 }
 
+/// The role a Kirby frame callback serves: the role whose Kirby body is the callback's own body. The callback
+/// runs once per Kirby with that Kirby's body (the fork's `SITE_KIRBY_OPFF` call), so each role is reached by
+/// its own body; any other body serves no role.
+pub fn hat_role<T: PartialEq>(body: T, roles: [Option<T>; 2]) -> Option<usize> {
+    roles.iter().position(|role| role.as_ref() == Some(&body))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
