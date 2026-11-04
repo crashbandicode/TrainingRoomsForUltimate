@@ -239,6 +239,9 @@
       "cap": 30,
       "start_gate": null,
       "end_gate": null
+    },
+    "cpu-next-frames": {
+      "library": "cpu-next-frames"
     }
   },
   "gates": {
@@ -583,7 +586,6 @@
   "rows": [
     {
       "id": "01-main",
-      "budget_min": 1,
       "start": "boot",
       "end": "main",
       "steps": [
@@ -603,91 +605,17 @@
       ]
     },
     {
-      "id": "02-stage",
-      "budget_min": 0.5,
+      "id": "02-to-training",
+      "budget_min": 4,
       "start": "main",
-      "end": "stage",
-      "steps": [
-        {
-          "play": "main-stage"
-        },
-        {
-          "gate": "stage"
-        },
-        {
-          "shot": "stage"
-        }
-      ]
-    },
-    {
-      "id": "03-css",
-      "budget_min": 0.5,
-      "start": "stage",
-      "end": "css",
-      "steps": [
-        {
-          "play": "stage-css"
-        },
-        {
-          "gate": "css"
-        },
-        {
-          "shot": "css"
-        }
-      ]
-    },
-    {
-      "id": "04-steve",
-      "budget_min": 0.5,
-      "start": "css",
-      "end": "steve-selected",
-      "steps": [
-        {
-          "play": "steve-hover"
-        },
-        {
-          "gate": "steve78"
-        },
-        {
-          "play": "steve-place"
-        },
-        {
-          "gate": "steve-selected"
-        },
-        {
-          "shot": "cpu-route-start"
-        }
-      ]
-    },
-    {
-      "id": "05a-cpu-approach",
-      "budget_min": 0.5,
-      "start": "steve-selected",
-      "end": "steve-selected",
-      "steps": [
-        {
-          "play": "lr04-cpu-approach"
-        },
-        {
-          "gate": "steve-selected"
-        },
-        {
-          "shot": "cpu-approach-review"
-        }
-      ]
-    },
-    {
-      "id": "p23-coin-any-cpu",
-      "budget_min": 6,
-      "start": "steve-selected",
       "end": "training",
       "steps": [
         {
-          "run": "steps2.py:coinany_dispatch",
-          "args": {
-            "action": "coinany"
-          },
+          "run": "nav_recover.py:to_training",
           "check": true
+        },
+        {
+          "shot": "training"
         }
       ]
     },
@@ -707,7 +635,7 @@
       ]
     },
     {
-      "id": "p23-n2-natural-death-invincibility-redo2",
+      "id": "p23-n2-cpu-half",
       "budget_min": 6,
       "start": "training",
       "end": "training",
@@ -715,7 +643,7 @@
         {
           "run": "steps2.py:dispatch",
           "args": {
-            "action": "n2redo2"
+            "action": "n2cpu"
           },
           "check": true
         }

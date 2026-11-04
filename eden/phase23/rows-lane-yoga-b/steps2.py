@@ -204,6 +204,45 @@ def coinany(ctx):
     return out
 
 
+def n2cpu(ctx):
+    """N2 CPU half: the fixture keeps the recorder honest (duration 300, crop Off) and the respawn
+    row Off/On; the CPU's walk-off is the plugin's own input playback (the recorded P1 walk), the
+    pad-2 macro is the fallback; respawn stills every ~0.35 s after the KO window."""
+    out = {}
+    DURATION300 = [0]*8 + [1] + [0]*10
+    for case in ("off", "on"):
+        respawn = [1, 0] if case == "on" else [0, 0]
+        patch = {"menu": {"respawn_invincibility": respawn, "save_state_autoload": [0, 0],
+                          "recording_duration": DURATION300, "recording_crop": [0, 1]}}
+        (ctx.row_dir / f"p23-n2cpu-{case}.json").write_text(json.dumps(patch) + "\n")
+        mark = b.mark(ctx)
+        b.reload_settings(ctx, patch, f"n2cpu-{case}")
+        wait(ctx, mark, r'\[CyclePreload\] applied', 15)
+        ctx.gate('training-hud-unpaused')
+        # record P1's walk-off into slot 1 (the full 300 frames; crop Off keeps them)
+        mark = now_tick(ctx)
+        chord(ctx, 'zr,down')
+        result_lockout = wait(ctx, mark, r'\[PracticeRecording\] record_lockout ', 15)
+        ctx.play('p23-walkoff-left')
+        mark = now_tick(ctx)
+        complete = wait(ctx, mark, r'\[PracticeRecording\] recording_complete ', 35)
+        out[f'record_{case}'] = {'lockout': result_lockout[-140:] if result_lockout else None,
+                                  'complete': complete[-140:] if complete else None}
+        time.sleep(3.0)
+        # play it on the CPU: the plugin's playback chord
+        mark = now_tick(ctx)
+        chord(ctx, 'zr,up')
+        playback = wait(ctx, mark, r'\[PracticeRecording\] playback_shortcut ', 15)
+        out[f'playback_{case}'] = playback[-140:] if playback else None
+        time.sleep(5.0)
+        for i in range(14):
+            time.sleep(0.35)
+            b.capture(ctx, f'n2cpu-respawn-{case}-{i}', 'respawn-window still')
+        print(f"n2cpu {case}:", out[f'record_{case}'], out[f'playback_{case}'], flush=True)
+    (ctx.row_dir / 'n2cpu.json').write_text(json.dumps(out, indent=2) + '\n')
+    return out
+
+
 def dispatch(ctx, action, **args):
     try:
         settled = steps.settle(ctx)
@@ -406,15 +445,13 @@ def n4t(ctx):
     out = {}
     b.fixture(ctx, 'p23-n4.json', fresh=True)          # DI Up, SDI none, override Off, Steve/Lucas kept
     ctx.gate('training-hud-unpaused')
-    record_path = ctx.row_dir / 'n4-slot1-record.gif'
     record_tick = _now_tick(ctx)
     chord(ctx, 'zr,down')                  # Input Record chord
     out['record_start'] = _wait_tick(ctx, record_tick, '[PracticeRecording] record_lockout ')[-160:]
     ctx.stick(0, -1, 200)
     ctx.stick(-1, 0, 300)                  # the sway: the standby's first non-neutral input
     ctx.stick(0, 0, 200)
-    out['record_done'] = _wait_tick(ctx, record_tick, 'recording_complete', 25)[-160:]
-    out['record'] = steps._wait_clip(ctx, record_path, 9000)
+    out['record_done'] = _wait_tick(ctx, record_tick, 'recording_complete', 30)[-160:]
     ctx.gate('training-hud-unpaused')
     for case in ('off', 'on'):
         if case == 'on':

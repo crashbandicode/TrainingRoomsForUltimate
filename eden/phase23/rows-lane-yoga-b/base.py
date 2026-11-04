@@ -82,10 +82,8 @@ def quit_css(ctx):
     ctx.play('confirm-native-quit-frames');ctx.gate('ready')
 
 def reenter(ctx):
-    load('navigation').return_cpu_to_lucas(ctx)
+    load('nav_recover').to_training(ctx)
     since=mark(ctx)
-    ctx.play('enter-training')
-    ctx.gate('training-hud-unpaused')
     st=state(ctx);st['scene_since']=since;save_state(ctx,st)
     return since
 
@@ -258,16 +256,10 @@ def trio(ctx,index):
     return result
 
 def recover(ctx, failed):
-    """Only known screens permit a continuation; failure never fabricates a start."""
     ctx.call('input.reset')
-    for gate,route in (('training-hud-unpaused','training'),('native-pause','pause'),('ready','css')):
-        try: ctx.gate(gate)
-        except RuntimeError: continue
-        if route=='pause': ctx.play('pause-close');ctx.gate('training-hud-unpaused')
-        if route=='css': reenter(ctx)
-        ctx.log({'recovered_after':failed,'observed':gate,'end':'training'})
-        return {'failed':failed,'route':route,'end':'training'}
-    raise RuntimeError('No qualified same-boot route to Training after '+failed)
+    out=load('nav_recover').to_training(ctx)
+    ctx.log({'recovered_after':failed,'nav_recover':out})
+    return out
 
 def final(ctx):
     result=notice(ctx)
