@@ -54,6 +54,10 @@ fn note(out: usize, slot: i64, state: usize) {
     pending.set_controller(&NativeTls, controller);
     // Chords read the raw controller before the delay, so they are never delayed (SPEC-input-04 §5).
     if slot == 0 && controller != 0 && scene::is_training() {
+        unsafe { crate::runtime::developer_reload::on_poll(slot, controller) };
+        // Capture the raw menu poll before chords::on_poll suppresses modal Plus.
+        // The same existing controller-holder argument and guarded sites apply.
+        ui::input::on_p1_poll(state);
         unsafe { chords::on_poll(controller) };
     }
 }
@@ -75,7 +79,7 @@ pub unsafe fn caller_b_note(ctx: &mut InlineCtx) {
 fn apply() {
     // A pass that made no call has no note.
     let Some(pending) = PENDING.get() else { return };
-    let (out, slot, holder) = pending.take(&NativeTls);
+    let (out, slot, _holder) = pending.take(&NativeTls);
     // Package 6: the controller operating the CPU (native Behavior = Control) reaches the roster cycle's operator handlers.
     if out != 0 && slot == 1 && scene::is_training() {
         let controller = pending.controller(&NativeTls);
@@ -85,10 +89,8 @@ fn apply() {
     if out == 0 || !input_delay::applies(slot as i32, scene::is_training()) {
         return;
     }
-    // The menu reads P1 before the delay (SPEC-core-03 §4.1 sub-handler order); it sets the MENU owner,
-    // which makes the poll below output neutral.
-    unsafe { crate::runtime::developer_reload::on_poll(slot, pending.controller(&NativeTls)) };
-    ui::input::on_p1_poll(holder);
+    // The raw menu stage ran before the mapping call, before modal Plus
+    // suppression. Its MENU owner makes the mapped poll below output neutral.
     // Package 6: the roster's cycle chords and the Kirby hat shortcut see P1's record before the delay (and may consume the chord).
     if slot == 0 {
         let controller = pending.controller(&NativeTls);

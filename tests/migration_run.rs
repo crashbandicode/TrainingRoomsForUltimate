@@ -197,6 +197,118 @@ fn migration_item_on_load_converts_player_records_in_the_copy() {
 }
 
 #[test]
+fn migration_cpu_item_selection_keeps_never_saved_player_absent() {
+    let t = Tmp::new();
+    fork_folder(&t);
+    let mut settings: Value = serde_json::from_slice(&fs::read(t.fork().join("training_modpack_menu.conf")).unwrap()).unwrap();
+    let mut selection = vec![0; 17];
+    selection[9] = 1; // CPU 1st Var.; the same-slot R.O.B. resolves to Gyro, not the player's kind.
+    settings["menu"]["character_item"] = serde_json::json!(selection);
+    write(&t.fork().join("training_modpack_menu.conf"), &serde_json::to_vec(&settings).unwrap());
+    let mut source: Value = serde_json::from_str(&saves(-1, 0x2d)).unwrap();
+    source["player"][1]["fighter_kind"] = 7.into();
+    source["cpu"][1]["fighter_kind"] = 0x2d.into();
+    write(&t.fork().join("save_states.json"), &serde_json::to_vec(&source).unwrap());
+    let original = tree(&t.fork());
+    let (receipt, marker) = full_import(&t);
+    marker.unwrap();
+    assert_eq!(receipt.converted, 1, "only the saved player, even though both CPU kinds resolve");
+    let mut expected = source;
+    expected["player"][1]["held_item"] = serde_json::json!({
+        "state": "item", "choice": 29, "variation": 0,
+        "lifetime": -1, "lifetime_max": -1, "fuse": -1, "fuse_max": -1
+    });
+    let copied: Value = serde_json::from_slice(&fs::read(t.rooms().join("save_states.json")).unwrap()).unwrap();
+    assert_eq!(copied, expected, "never-saved player and every CPU record stay byte-semantically unchanged");
+    assert_eq!(tree(&t.fork()), original, "source bytes untouched");
+    let saved = tree(&t.rooms());
+    let (source, dest) = (t.fork(), t.rooms());
+    assert!(matches!(run_blocking(Roots { source: &source, dest: &dest }, 9, "0.1.0", &mut |_| {}), Stage::MarkerPresent));
+    assert_eq!(tree(&dest), saved, "second boot does not rewrite imported data");
+    let marker: Value = serde_json::from_slice(&fs::read(dest.join("migration.json")).unwrap()).unwrap();
+    assert_eq!(marker["converted_item_snapshots"], 1);
+}
+
+#[test]
+fn migration_cpu_item_selection_survives_fresh_process() {
+    const NAME: &str = "migration_cpu_item_selection_survives_fresh_process";
+    const ROOT: &str = "TR_N6_PROCESS_ROOT";
+    const PHASE: &str = "TR_N6_PROCESS_PHASE";
+    let stamp = || std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos().to_string();
+    if let Some(root) = std::env::var_os(ROOT) {
+        let root = PathBuf::from(root);
+        let (source, dest) = (root.join("TrainingModpack"), root.join("TrainingRooms"));
+        let phase = std::env::var(PHASE).unwrap();
+        let started = stamp();
+        let expected: Value = serde_json::from_slice(&fs::read(root.join("expected.json")).unwrap()).unwrap();
+        if phase == "save" {
+            let Stage::Imported { blocking, marker } = run_blocking(Roots { source: &source, dest: &dest }, 16, "0.1.0", &mut |_| {}) else { panic!("import did not run") };
+            assert_eq!(blocking.pending_captures(), 0);
+            marker.unwrap().unwrap();
+            assert_eq!(blocking.receipt.converted, 1);
+            let actual: Value = serde_json::from_slice(&fs::read(dest.join("save_states.json")).unwrap()).unwrap();
+            assert_eq!(actual, expected["copy"], "validate exact persisted fixture, not a recreated seed");
+        } else {
+            assert_eq!(phase, "restore");
+            let (mut restored, outcome) = model::state::persist::load(&dest.join("save_states.json"));
+            assert_eq!(outcome, model::state::persist::Outcome::Read);
+            assert_eq!(restored.player[0].fighter_kind, -1);
+            assert_eq!(restored.player[0].held_item, None);
+            assert_eq!(restored.player[1].held_item, Some(model::state::held_item::HeldItem::Item {
+                choice: 29, variation: 7, lifetime: -1, lifetime_max: -1, fuse: -1, fuse_max: -1
+            }));
+            assert!(restored.cpu.iter().all(|record| record.held_item.is_none()));
+            // Continue with a different legacy variation: neither a conversion nor boot may overwrite it.
+            let before = restored.clone();
+            assert_eq!(model::state::convert::convert_file(&mut restored, 9), 0);
+            assert_eq!(restored, before);
+            assert!(matches!(run_blocking(Roots { source: &source, dest: &dest }, 17, "0.1.0", &mut |_| {}), Stage::MarkerPresent));
+        }
+        let source_hash = sha256_hex(&fs::read(source.join("save_states.json")).unwrap());
+        assert_eq!(source_hash, expected["source_sha256"].as_str().unwrap());
+        let receipt = serde_json::json!({
+            "phase": phase, "pid": std::process::id(), "started_ns": started, "finished_ns": stamp(),
+            "save_sha256": sha256_hex(&fs::read(dest.join("save_states.json")).unwrap()),
+            "marker_sha256": sha256_hex(&fs::read(dest.join("migration.json")).unwrap()), "source_sha256": source_hash
+        });
+        write(&root.join(format!("{phase}-process.json")), &serde_json::to_vec(&receipt).unwrap());
+        return;
+    }
+    let t = Tmp::new();
+    let mut source: Value = serde_json::from_str(&saves(-1, 0x2d)).unwrap();
+    source["player"][1]["fighter_kind"] = 7.into();
+    source["cpu"][1]["fighter_kind"] = 0x2d.into();
+    let bytes = serde_json::to_vec(&source).unwrap();
+    write(&t.fork().join("save_states.json"), &bytes);
+    let mut selection = vec![0; 17];
+    selection[16] = 1;
+    write(&t.fork().join("training_modpack_menu.conf"), &serde_json::to_vec(&serde_json::json!({"menu": {"character_item": selection}})).unwrap());
+    source["player"][1]["held_item"] = serde_json::json!({"state":"item", "choice":29, "variation":7, "lifetime":-1, "lifetime_max":-1, "fuse":-1, "fuse_max":-1});
+    write(&t.0.join("expected.json"), &serde_json::to_vec(&serde_json::json!({"copy": source, "source_sha256": sha256_hex(&bytes)})).unwrap());
+    let exe = std::env::current_exe().unwrap();
+    let launch = |phase| {
+        let start = stamp();
+        let result = std::process::Command::new(&exe).args(["--exact", NAME, "--nocapture"])
+            .env(ROOT, &t.0).env(PHASE, phase).output().unwrap();
+        assert!(result.status.success(), "{phase}: {}{}", String::from_utf8_lossy(&result.stdout), String::from_utf8_lossy(&result.stderr));
+        (start, stamp())
+    };
+    let (save_started, save_exited) = launch("save");
+    let (restore_started, restore_exited) = launch("restore");
+    let load = |phase| serde_json::from_slice::<Value>(&fs::read(t.0.join(format!("{phase}-process.json"))).unwrap()).unwrap();
+    let (saved, restored) = (load("save"), load("restore"));
+    assert_ne!(saved["pid"], restored["pid"]);
+    assert!(save_exited.parse::<u128>().unwrap() <= restore_started.parse::<u128>().unwrap());
+    for key in ["save_sha256", "marker_sha256", "source_sha256"] {
+        assert_eq!(saved[key], restored[key], "durable {key} unchanged after fresh-process continuation");
+    }
+    println!("N6 fresh-process evidence {}", serde_json::json!({"save": saved, "restore": restored,
+        "save_launch_ns":save_started, "save_exit_observed_ns":save_exited,
+        "restore_launch_ns":restore_started, "restore_exit_observed_ns":restore_exited,
+        "saver_success_before_restore_launch":true, "equal_persisted_hashes":true}));
+}
+
+#[test]
 fn migration_item_on_load_never_overwrites_a_snapshot_or_an_existing_save() {
     let t = Tmp::new();
     fork_folder(&t);
@@ -270,6 +382,112 @@ fn migration_existing_destinations_are_never_overwritten() {
     assert_eq!(fs::read(t.rooms().join("button_config.ini")).unwrap(), b"mine\n");
     assert_eq!(fs::read(t.rooms().join("setups/a.json")).unwrap(), b"mine");
     assert_eq!(receipt.skipped.iter().filter(|(_, r)| r == "exists").count(), 2);
+}
+
+#[cfg(unix)]
+#[test]
+fn core08_existing_dangling_destination_is_preserved_not_replaced() {
+    let t = Tmp::new();
+    fork_folder(&t);
+    fs::create_dir_all(t.rooms()).unwrap();
+    let target = t.rooms().join("button_config.ini");
+    std::os::unix::fs::symlink("user-owned-missing.ini", &target).unwrap();
+    let before = tree(&t.fork());
+    let (receipt, marker) = full_import(&t);
+    marker.unwrap();
+    assert_eq!(fs::read_link(&target).unwrap(), Path::new("user-owned-missing.ini"),
+        "an occupied destination is not absent just because its referent is missing");
+    assert!(receipt.skipped.iter().any(|(p, r)| p == "button_config.ini" && r == "exists"));
+    assert_eq!(tree(&t.fork()), before);
+}
+
+#[cfg(unix)]
+#[test]
+fn n8_destination_appearing_after_blocking_is_preserved_at_publication() {
+    let t = Tmp::new();
+    write(&t.fork().join("replay_captures/11.smd/11.tmrc"), b"complete source capture");
+    let (source, dest) = (t.fork(), t.rooms());
+    let roots = Roots { source: &source, dest: &dest };
+    let Stage::Imported { blocking, marker } = run_blocking(roots, 1, "0.1.0", &mut |_| {}) else { panic!() };
+    assert!(marker.is_none() && blocking.pending_captures() == 1);
+    let target = dest.join("replay_captures/11.smd/11.tmrc");
+    fs::create_dir_all(target.parent().unwrap()).unwrap();
+    std::os::unix::fs::symlink("user-owned-missing.tmrc", &target).unwrap();
+    let (receipt, marker) = run_background(roots, blocking, &mut |_| {});
+    marker.unwrap();
+    assert_eq!(fs::read_link(&target).unwrap(), Path::new("user-owned-missing.tmrc"));
+    assert!(receipt.files.is_empty());
+    assert_eq!(receipt.skipped, [("replay_captures/11.smd/11.tmrc".to_owned(), "exists".to_owned())]);
+    assert!(!target.with_file_name("11.tmrc.part").exists());
+    assert_eq!(fs::read(source.join("replay_captures/11.smd/11.tmrc")).unwrap(), b"complete source capture");
+}
+
+#[cfg(unix)]
+#[test]
+fn core08_existing_marker_entry_blocks_import_even_without_a_referent() {
+    let t = Tmp::new();
+    fork_folder(&t);
+    fs::create_dir_all(t.rooms()).unwrap();
+    let marker = t.rooms().join("migration.json");
+    std::os::unix::fs::symlink("user-owned-marker.json", &marker).unwrap();
+    let (source, dest) = (t.fork(), t.rooms());
+    let stage = run_blocking(Roots { source: &source, dest: &dest }, 1, "0.1.0", &mut |_| {});
+    assert!(matches!(stage, Stage::MarkerPresent));
+    assert_eq!(fs::read_link(marker).unwrap(), Path::new("user-owned-marker.json"));
+    assert!(!dest.join("settings.json").exists());
+}
+
+#[cfg(unix)]
+#[test]
+fn core08_marker_inspection_error_defers_import_without_calling_it_present() {
+    let t = Tmp::new();
+    fork_folder(&t);
+    std::os::unix::fs::symlink("TrainingRooms", t.rooms()).unwrap();
+    let (source, dest) = (t.fork(), t.rooms());
+    let mut messages = Vec::new();
+    let stage = run_blocking(Roots { source: &source, dest: &dest }, 1, "0.1.0", &mut |s| messages.push(s.to_owned()));
+    assert_eq!(status_word(&stage), "partial");
+    let Stage::Imported { blocking, marker } = stage else { panic!("inspection error must not be marker-present or no-source") };
+    assert!(marker.unwrap().is_err() && blocking.marker_withheld());
+    assert!(blocking.receipt.files.is_empty() && blocking.pending_captures() == 0);
+    assert_eq!(blocking.receipt.unlisted[0].0, "migration.json");
+    assert!(messages.iter().any(|s| s.contains("cannot inspect migration.json")));
+    assert_eq!(fs::read_link(&dest).unwrap(), Path::new("TrainingRooms"));
+}
+
+#[cfg(unix)]
+#[test]
+fn core08_destination_inspection_error_is_partial_and_retryable() {
+    let t = Tmp::new();
+    write(&t.fork().join("macros/m.json"), b"macro");
+    write(&t.fork().join("button_config.ini"), b"buttons");
+    fs::create_dir_all(t.rooms()).unwrap();
+    std::os::unix::fs::symlink("macros", t.rooms().join("macros")).unwrap();
+    let (receipt, marker) = full_import(&t);
+    assert!(marker.is_err());
+    assert_eq!(receipt.result(), ImportResult::Partial);
+    assert!(receipt.skipped.iter().any(|(path, reason)| path == "macros/m.json" && reason.starts_with("io:")));
+    assert_eq!(fs::read(t.rooms().join("button_config.ini")).unwrap(), b"buttons");
+    assert!(!t.rooms().join("migration.json").exists());
+    fs::remove_file(t.rooms().join("macros")).unwrap();
+    let (_, marker) = full_import(&t);
+    marker.unwrap();
+    assert_eq!(fs::read(t.rooms().join("macros/m.json")).unwrap(), b"macro");
+}
+
+#[cfg(unix)]
+#[test]
+fn core08_marker_appearing_during_background_is_not_replaced() {
+    let t = Tmp::new();
+    write(&t.fork().join("replay_captures/11.smd/11.tmrc"), b"capture");
+    let (source, dest) = (t.fork(), t.rooms());
+    let roots = Roots { source: &source, dest: &dest };
+    let Stage::Imported { blocking, .. } = run_blocking(roots, 1, "0.1.0", &mut |_| {}) else { panic!() };
+    fs::create_dir_all(&dest).unwrap();
+    std::os::unix::fs::symlink("operator-marker.json", dest.join("migration.json")).unwrap();
+    let (_, marker) = run_background(roots, blocking, &mut |_| {});
+    marker.unwrap();
+    assert_eq!(fs::read_link(dest.join("migration.json")).unwrap(), Path::new("operator-marker.json"));
 }
 
 #[test]

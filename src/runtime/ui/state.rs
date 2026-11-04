@@ -63,4 +63,7 @@ pub fn release_menu() {
     MENU_SHOWN.store(false, Ordering::Release);
     crate::runtime::published::INPUT_OWNERS.fetch_and(!Owners::MENU.bits(), Ordering::AcqRel);
     RELEASES.fetch_add(1, Ordering::Relaxed);
+    // Renderer loss/overflow cancels queued physical polls too, even when the
+    // ring is full. Old confirmation cannot run after a later opening.
+    crate::runtime::ui::worker::push_reset();
 }

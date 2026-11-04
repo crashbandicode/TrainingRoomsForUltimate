@@ -12,7 +12,7 @@ use super::menu::options::{ACTIONS, CHORD_ROWS, DIRECTIONS, SITUATIONS, SWAP_GRO
 use super::catalog::ITEMS;
 use super::menu::grid::{GridKind, GridLayout, RosterUse};
 use super::menu::table::{Control, Row, GROUPS, ROWS};
-use super::menu::{ChordTarget, Grey, Menu, Screen, SliderState, DELAY_ROWS, OVERRIDE_COLUMN};
+use super::menu::{ChordCapture, ChordTarget, Grey, Menu, Screen, SliderState, DELAY_ROWS, OVERRIDE_COLUMN};
 use super::panes::ROWS as ROW_LINES;
 
 const HINT_LIST: &str = "Up/Down choose   A set   B back";
@@ -20,7 +20,7 @@ const HINT_CHECKLIST: &str = "Up/Down move   A tick   ZL all or none   B back";
 const HINT_DELAY: &str = "Up/Down move   A tick or edit the handle   Y clear   ZL all   B back";
 const HINT_SLIDER: &str = "Left/Right other handle   A pick up or put down   Up/Down/Left/Right change   B back";
 const HINT_DIRECTIONS: &str = "Up/Down move   A add one weight   Y clear   ZL all or none   B back";
-const HINT_CHORD: &str = "Hold one button and press the others   A confirm   Y empty   B back";
+const HINT_CHORD: &str = "X capture   A confirm   Y empty   B cancel";
 
 /// First line of a window of `ROW_LINES` rows over `total` that keeps `cursor` in view.
 pub fn window_start(cursor: usize, total: usize) -> usize {
@@ -439,7 +439,7 @@ fn chords_frame(menu: &Menu, screen: &Screen, cursor: usize, frame: &mut Frame) 
         let chord = Chord::from_row(menu.settings().menu.get(id).unwrap_or(&[]));
         let _ = write!(line.value, "{chord}  >");
     });
-    let _ = frame.help[0].write_str("Hold one button of the chord and press the others.");
+    let _ = frame.help[0].write_str("Choose a row; X in its editor starts physical chord capture.");
     let _ = frame.hint.write_str("Up/Down move   A change the chord   B back");
 }
 
@@ -447,9 +447,18 @@ fn chord_entry_frame(menu: &Menu, screen: &Screen, captured: Chord, frame: &mut 
     base(menu, screen, frame);
     push(frame, "Chord", &format!("{captured}"), Tone::On);
     frame.focus = Some(0);
-    let _ = frame.help[0].write_str("Hold one button and press the others to set the chord.");
+    let _ = frame.help[0].write_str("X starts capture: release all, hold the chord, then release all to preview.");
     let _ = frame.help[1].write_str("An empty chord never passes (a menu shortcut with none is disabled).");
-    let _ = frame.hint.write_str(HINT_CHORD);
+    let hint = match menu.chord_capture() {
+        ChordCapture::Preview => HINT_CHORD,
+        ChordCapture::Release => "Release all buttons to start capture",
+        ChordCapture::Buttons(_) => "Hold one button, press the others; release all to preview",
+    };
+    let _ = frame.hint.write_str(hint);
+    if let Some(why) = menu.chord_refusal() {
+        frame.help[1].clear();
+        let _ = frame.help[1].write_str(why.text());
+    }
 }
 
 fn external_frame(menu: &Menu, screen: &Screen, frame: &mut Frame) {
@@ -642,7 +651,15 @@ mod tests {
         m.press(Button::A);
         let f = frame(&m);
         assert!(f.crumb.string_lossy().contains("Save State Save"));
-        assert!(f.hint.string_lossy().contains("press the others"));
+        assert_eq!(f.hint.string_lossy(), "X capture   A confirm   Y empty   B cancel");
+        assert!(f.help[0].string_lossy().contains("X starts capture"));
+        m.press(Button::X);
+        assert_eq!(frame(&m).hint.string_lossy(), "Release all buttons to start capture");
+        assert!(m.chord_poll(0, 0));
+        assert_eq!(frame(&m).hint.string_lossy(), "Hold one button, press the others; release all to preview");
+        assert!(m.chord_poll(1 << 6, 1 << 6));
+        assert!(m.chord_poll(0, 0));
+        assert_eq!(frame(&m).hint.string_lossy(), "X capture   A confirm   Y empty   B cancel");
         let _ = (Page::Cpu, Editor::GiveItem);
     }
 

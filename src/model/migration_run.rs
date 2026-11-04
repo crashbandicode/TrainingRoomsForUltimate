@@ -134,6 +134,16 @@ fn error_text(error: &io::Error) -> String {
     format!("{} ({})", io_reason(error), error)
 }
 
+/// Occupancy belongs to the directory entry, not to a symlink's referent.
+/// Only NotFound means absent; an uninspectable destination is an I/O error.
+fn entry_exists(path: &Path) -> io::Result<bool> {
+    match fs::symlink_metadata(path) {
+        Ok(_) => Ok(true),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(false),
+        Err(error) => Err(error),
+    }
+}
+
 /// Every file of the imported names inside `source` (relative, `/` separated), with its size.
 fn list_source(source: &Path) -> Listing {
     let mut listing = Listing { files: Vec::new(), unlisted: Vec::new() };
@@ -200,6 +210,9 @@ fn walk(path: &Path, rel: &str, out: &mut Listing) {
 /// bytes (the converted `save_states.json`); it needs the whole file in memory (the blocking part is
 /// capped at 8 MiB). Never overwrites: if `to` exists when the copy is done it is kept.
 fn copy_file(from: &Path, to: &Path, transform: Option<&dyn Fn(Vec<u8>) -> Vec<u8>>) -> io::Result<Option<(u64, String, String)>> {
+    if entry_exists(to)? {
+        return Ok(None);
+    }
     if let Some(parent) = to.parent() {
         fs::create_dir_all(parent)?;
     }
@@ -242,10 +255,17 @@ fn copy_file(from: &Path, to: &Path, transform: Option<&dyn Fn(Vec<u8>) -> Vec<u
             return Err(error);
         }
     }
-    if to.exists() {
-        // Another writer got there first: keep theirs.
-        let _ = fs::remove_file(&part);
-        return Ok(None);
+    match entry_exists(to) {
+        Ok(false) => {}
+        Ok(true) => {
+            // Another writer got there first: keep their entry, even if dangling.
+            let _ = fs::remove_file(&part);
+            return Ok(None);
+        }
+        Err(error) => {
+            let _ = fs::remove_file(&part);
+            return Err(error);
+        }
     }
     if let Err(error) = fs::rename(&part, to) {
         let _ = fs::remove_file(&part);
@@ -309,13 +329,28 @@ fn record(receipt: &mut Receipt, action: &Action<'_>, result: io::Result<Option<
 
 /// The blocking part: the small files, before the settings load. `now` is a tick for the marker.
 pub fn run_blocking(roots: Roots<'_>, now: u64, plugin: &str, log: &mut dyn FnMut(&str)) -> Stage {
-    if roots.dest.join(file::MIGRATION).exists() {
-        return Stage::MarkerPresent;
+    match entry_exists(&roots.dest.join(file::MIGRATION)) {
+        Ok(true) => return Stage::MarkerPresent,
+        Ok(false) => {}
+        Err(error) => {
+            let reason = error_text(&error);
+            log(&format!("[Migration] cannot inspect {}: {reason}; import deferred", file::MIGRATION));
+            let receipt = Receipt {
+                skipped: vec![(file::MIGRATION.to_owned(), io_reason(&error))],
+                unlisted: vec![(file::MIGRATION.to_owned(), reason.clone())],
+                outcomes: vec![Outcome::IoError],
+                ..Receipt::default()
+            };
+            let blocking = Blocking { receipt, background: Vec::new(), now, plugin: plugin.to_owned() };
+            return Stage::Imported { blocking, marker: Some(Err(reason)) };
+        }
     }
     let mut listing = examine_source(roots.source);
     let unlisted = listing.as_mut().map(|l| std::mem::take(&mut l.unlisted)).unwrap_or_default();
     let sources: Option<Vec<Source<'_>>> = listing.as_ref().map(|l| l.files.iter().map(|(rel, bytes)| Source { rel, bytes: *bytes }).collect());
-    let destination_exists = |to: &str| roots.dest.join(to).exists();
+    // An inspection error is not an Exists skip: copy_file rechecks it fallibly
+    // before any write, so it becomes an I/O outcome and withholds the marker.
+    let destination_exists = |to: &str| entry_exists(&roots.dest.join(to)).is_ok_and(|exists| exists);
     let plan = migration::plan(false, sources.as_deref(), destination_exists);
     let actions = match plan {
         Plan::MarkerPresent => return Stage::MarkerPresent,
@@ -423,6 +458,10 @@ fn write_marker_unless_withheld(dest: &Path, blocking: &Blocking) -> Result<(), 
 
 /// `migration.json` (SPEC-core-08 §4 rule 5), written through the atomic replace.
 fn write_marker(dest: &Path, blocking: &Blocking) -> io::Result<()> {
+    let path = dest.join(file::MIGRATION);
+    if entry_exists(&path)? {
+        return Ok(());
+    }
     fs::create_dir_all(dest)?;
     let receipt = &blocking.receipt;
     let files: Vec<Value> = receipt
@@ -442,7 +481,7 @@ fn write_marker(dest: &Path, blocking: &Blocking) -> io::Result<()> {
         "converted_item_snapshots": receipt.converted,
     });
     let text = serde_json::to_string_pretty(&marker).map_err(io::Error::other)?;
-    write_replace(&dest.join(file::MIGRATION), format!("{text}\n").as_bytes())
+    write_replace(&path, format!("{text}\n").as_bytes())
 }
 
 /// The install line's `migration=` word for a finished blocking part.

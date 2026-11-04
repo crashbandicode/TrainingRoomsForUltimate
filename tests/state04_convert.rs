@@ -104,6 +104,45 @@ fn state04_convert_never_overwrites() {
 }
 
 #[test]
+fn state04_cpu_selection_requires_a_saved_player_in_both_representations() {
+    // CPU-selected item kind does not make an absent player record a saved one (core-08 §4 N6).
+    // Literal oracle: CPU R.O.B. first/eighth variations are Gyro choices29/variation0 or7.
+    for (index, variation) in [(9, 0), (16, 7)] {
+        let mut file = SaveFile::default();
+        for slot in 0..5 {
+            file.cpu[slot] = record(0x2d);
+        }
+        file.player[1] = record(7);
+        file.player[2] = SavedState { held_item: Some(HeldItem::Empty), ..record(7) };
+        file.player[3] = SavedState { held_item: Some(HeldItem::Unsupported), ..record(7) };
+        file.player[4] = SavedState { held_item: item(25, 7), ..record(7) };
+        let mut json: serde_json::Value = serde_json::from_str(&file.to_pretty()).unwrap();
+        let before = json.clone();
+        assert_eq!(convert::convert_json(&mut json, index), 1, "never-saved player must remain absent");
+        assert_eq!(convert_file(&mut file, index), 1);
+        assert_eq!(file.player[0].held_item, None);
+        assert_eq!(file.player[1].held_item, item(29, variation));
+        assert_eq!(json, serde_json::from_str::<serde_json::Value>(&file.to_pretty()).unwrap(), "JSON import and typed converter agree");
+        assert_eq!(json["cpu"], before["cpu"], "CPU-role records never receive the item");
+        assert_eq!(convert::convert_json(&mut json, index), 0, "idempotent even without a marker");
+        assert_eq!(snapshot_for(index, -1, 0x2d), None, "the shared snapshot constructor owns target validity");
+    }
+}
+
+#[test]
+fn state04_cpu_selection_does_not_invent_an_absent_or_invalid_player_kind() {
+    for player in [json!({}), json!({"fighter_kind": null}), json!({"fighter_kind": "7"}), json!({"fighter_kind": -1}), json!({"fighter_kind": 2147483648_i64})] {
+        let mut file = json!({"player": [player], "cpu": [{"fighter_kind": 0x2d}]});
+        let original = file.clone();
+        assert_eq!(convert::convert_json(&mut file, 9), 0);
+        assert_eq!(file, original, "invalid/absent player is not rewritten");
+    }
+    let mut valid = json!({"player": [{"fighter_kind": 7, "held_item": null}], "cpu": [{"fighter_kind": 0x2d}]});
+    assert_eq!(convert::convert_json(&mut valid, 9), 1, "null snapshot on an actual save is convertible");
+    assert_eq!(valid["player"][0]["held_item"]["choice"], 29);
+}
+
+#[test]
 fn state04_setting_retired() {
     // The old key is a one-hot array; None and a missing key convert nothing.
     let mut one_hot = vec![0; convert::SETTING_OPTIONS];
