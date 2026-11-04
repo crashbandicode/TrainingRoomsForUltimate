@@ -693,7 +693,8 @@ impl<F: FnMut(usize, &mut [u8])> HurtboxReader for GameHurt<F> {
     }
 }
 
-/// One fighter kind's hurt census (the diag build only; the shipped build reads no HitModule): the enabled parts and the
+/// One fighter kind's hurt census (the diag build only; the shipped build has no census — its HitModule reads are the
+/// pass's own, while the setting is On): the enabled parts and the
 /// spheres they want of every observed pass, and the read's cost in ticks. The state of one window; `window` closes a full
 /// one into the `[Hitbox] hurt census` line's fields and opens the next (the first pass's total is kept, never reset).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
