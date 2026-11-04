@@ -1,0 +1,1565 @@
+{
+  "archive": "/home/intpa/smash-training-lobby/artifacts/trainingrooms-lead-astra4/rc9/lr16",
+  "files": [
+    {
+      "path": "RESULTS.md",
+      "bytes": 865,
+      "sha256": "0747554f4b85e0404e193c9a6cc0eca16a9776b05e2d4e7e5c0297a86feb7614"
+    },
+    {
+      "path": "config.json",
+      "bytes": 5875,
+      "sha256": "e09285865091d4a20c9491e3cbf45c25acca9fd17a37fbde4bab91dd13dad819"
+    },
+    {
+      "path": "dry-run.log",
+      "bytes": 1222,
+      "sha256": "6705c6a590fa1fd45621bf004d7003c9c68b65e556951882a7e4d7301eb5eb60"
+    },
+    {
+      "path": "final-status.json",
+      "bytes": 125,
+      "sha256": "634a3408179344b3846fcc843d4bda0095f56cb57c9fe54fbc0b6084f264864b"
+    },
+    {
+      "path": "harvest.json",
+      "bytes": 256,
+      "sha256": "e5c8da5ddc11bbbf762b5ae2a8bd76c18ea5c3d46f15c3698d0e9b7966e7dfd4"
+    },
+    {
+      "path": "lifecycle-down.log",
+      "bytes": 306,
+      "sha256": "32ca161523abfb9552ca42964f72d59b966bce8d900ff021c941b184ed1d7ced"
+    },
+    {
+      "path": "lifecycle-up.log",
+      "bytes": 1460,
+      "sha256": "27576621b2a78dbdd33a028b0bc8659a714815d77bfd9a563a3555ba7e17a772"
+    },
+    {
+      "path": "out/01-main/yoga-005808Z-201006-GATE-FAILED-main.png",
+      "bytes": 815170,
+      "sha256": "d2ef3a897f9c6dae7b8a7e266603d9b8849aa266bcb8e9eb1350de3be675cbd5"
+    },
+    {
+      "path": "out/01-main/yoga-005817Z-820468-GATE-FAILED-main.png",
+      "bytes": 135954,
+      "sha256": "8e282f51a7e7f9cc990a721f8c7f018f3b8835e8afcf0972ad98e88450168c28"
+    },
+    {
+      "path": "out/01-main/yoga-005819Z-590613-main.png",
+      "bytes": 407751,
+      "sha256": "fc3c27ba552a2e26d383411016cbfe7739d91b4d752450342c5fb489d5027886"
+    },
+    {
+      "path": "out/01-main/yoga-005819Z-788631-gate-main.png",
+      "bytes": 408778,
+      "sha256": "1ac2c3d8df84fa750c0f47c2da6c42f2694f0fa47607fbc455f15e50d2647ad3"
+    },
+    {
+      "path": "out/01-main.json",
+      "bytes": 6394,
+      "sha256": "9614a67bc7122da60d56d371f8c3ea91a56d84685d9cc3fd9c02fe3c199cac6b"
+    },
+    {
+      "path": "out/02-stage/yoga-005819Z-595604-gate-main.png",
+      "bytes": 407321,
+      "sha256": "712adcfd2702fe80f6db0e8b8c94279eab095681a89f9dff745c1ab2ecbc056d"
+    },
+    {
+      "path": "out/02-stage/yoga-005829Z-099399-stage.png",
+      "bytes": 1144510,
+      "sha256": "ef610ca400109af74bbce6663226faaf0ca5a1266ab0b1476ae59adf29521e5e"
+    },
+    {
+      "path": "out/02-stage/yoga-005829Z-418043-gate-stage.png",
+      "bytes": 1144300,
+      "sha256": "ad7d9286d179683ce9898304e29d5a33efffc9f7016a2d33fb407d2b2302b164"
+    },
+    {
+      "path": "out/02-stage.json",
+      "bytes": 581,
+      "sha256": "8732b56886090b816810c39623f4ce5e9eb879914da1693c84fae679d61156f2"
+    },
+    {
+      "path": "out/03-css/yoga-005829Z-090214-gate-stage.png",
+      "bytes": 1144835,
+      "sha256": "33b7d8db99197ea63ce8107985c872cac1b716ed719971657c578d8b8dd103bd"
+    },
+    {
+      "path": "out/03-css/yoga-005834Z-367291-css.png",
+      "bytes": 1057123,
+      "sha256": "8392b6825cba6034a3385775a044e62149be6a922be48ff25f4c0c953caadcfa"
+    },
+    {
+      "path": "out/03-css/yoga-005834Z-793294-gate-css.png",
+      "bytes": 1058136,
+      "sha256": "0a0e8010ff8748bb089108ba788f93547dcef19fcd48bf0761f2065cd45e22e2"
+    },
+    {
+      "path": "out/03-css.json",
+      "bytes": 568,
+      "sha256": "cf7e64a72e2f137296509fd6e3f77798d1eeb4295dc2b393ffec9289b015fda5"
+    },
+    {
+      "path": "out/04-steve/tile-yoga-events.log",
+      "bytes": 348,
+      "sha256": "0d68d8f039b0ae122971d7a804d66ab93ab787eb3724c1587913d931812b8d8d"
+    },
+    {
+      "path": "out/04-steve/yoga-005834Z-431047-gate-css.png",
+      "bytes": 1055037,
+      "sha256": "489bdce58617ae1e3837065aa7bd01cef5023c608116557d224d688eed320c7b"
+    },
+    {
+      "path": "out/04-steve/yoga-005836Z-538682-gate-steve-selected.png",
+      "bytes": 736734,
+      "sha256": "9b580a10b5597843e8b47fed443b63541df2340284618f56b7ddab6ffbae4c26"
+    },
+    {
+      "path": "out/04-steve/yoga-005836Z-976333-cpu-route-start.png",
+      "bytes": 735939,
+      "sha256": "19f118123b43606d86c0aa478a4a7ca2d30051e0d664a1459e9f1a6578dd250b"
+    },
+    {
+      "path": "out/04-steve.json",
+      "bytes": 911,
+      "sha256": "e80e1d7c1cf8d7aedc592df1e2a5bcdc20b8d10bacfb23421f4d1220de5aead0"
+    },
+    {
+      "path": "out/05a-cpu-approach/tile-yoga-events.log",
+      "bytes": 348,
+      "sha256": "0d68d8f039b0ae122971d7a804d66ab93ab787eb3724c1587913d931812b8d8d"
+    },
+    {
+      "path": "out/05a-cpu-approach/yoga-005836Z-958850-gate-steve-selected.png",
+      "bytes": 739650,
+      "sha256": "4fb0e9814608b87f811781460eebf3d9a1870a42a54309d17f6aa1a707201cd9"
+    },
+    {
+      "path": "out/05a-cpu-approach/yoga-005837Z-135893-cpu-approach-review.png",
+      "bytes": 738677,
+      "sha256": "05673b56b950931c5abd767ad272692c2350b3cabe8c037f2fcc26018c0caa92"
+    },
+    {
+      "path": "out/05a-cpu-approach/yoga-005837Z-665368-gate-steve-selected.png",
+      "bytes": 734647,
+      "sha256": "d1384513522a2a143ff2a8c0568b119d2789c68564252ee6599ee3d30af8ec51"
+    },
+    {
+      "path": "out/05a-cpu-approach.json",
+      "bytes": 904,
+      "sha256": "0f18aaf724c9f76dbdc012a5cd43d20e71fbd7a57010db936320fe4f0842b2c6"
+    },
+    {
+      "path": "out/05b-cpu-pick/tile-yoga-events.log",
+      "bytes": 494,
+      "sha256": "8435b99c92d5169660e0bb3ffc828f8b2745311f6ebe03031c5c23d4f3f7a432"
+    },
+    {
+      "path": "out/05b-cpu-pick/yoga-005838Z-318904-gate-steve-selected.png",
+      "bytes": 738315,
+      "sha256": "6a57a569a788eee9e46cd798cdbec235e07d9e4fe63bc3ce8d73b94a5ad0a0a5"
+    },
+    {
+      "path": "out/05b-cpu-pick/yoga-005839Z-238283-cpu-held-review.png",
+      "bytes": 1111274,
+      "sha256": "73a4be294df5da119423a9ee354edb07874c824572e5417d54614084c15c4ad1"
+    },
+    {
+      "path": "out/05b-cpu-pick.json",
+      "bytes": 936,
+      "sha256": "10d432b84afc8f9b5f45ceba4c757a3a0d799cac9bce7834e471ddaa363050db"
+    },
+    {
+      "path": "out/05c-cpu74/yoga-005839Z-846760-gate-cpu85-held.png",
+      "bytes": 1112306,
+      "sha256": "b06c27ecbbeb2704e07cd8c78f1d1f702f2ec46bea94ff38529469aa08c8c755"
+    },
+    {
+      "path": "out/05c-cpu74/yoga-005840Z-630176-gate-cpu-held74.png",
+      "bytes": 1123095,
+      "sha256": "cb13eda768decae6cc21c11b62345abaf0c70dde68834005c7dd47f359f85fcd"
+    },
+    {
+      "path": "out/05c-cpu74/yoga-005840Z-968116-cpu74.png",
+      "bytes": 1122560,
+      "sha256": "5992a2b58cd60b7ea3ff067588a804faa5bfd692dba7c92332fd86f65e6a0679"
+    },
+    {
+      "path": "out/05c-cpu74.json",
+      "bytes": 769,
+      "sha256": "14a1a0ef11bf21ad07d49b4bf0e6d984bcf6039a2de7b089712e62c791f74949"
+    },
+    {
+      "path": "out/06-lucas/yoga-005840Z-200072-gate-cpu-held74.png",
+      "bytes": 1123599,
+      "sha256": "be9d4c021b42f5ecbea51fd96572125a67321a4521294e6147f7a86fbcaddd26"
+    },
+    {
+      "path": "out/06-lucas/yoga-005851Z-135826-ready.png",
+      "bytes": 794678,
+      "sha256": "b08c5e08d456763236f127073e32512e052984ea7343cb15b6683b745c30a51f"
+    },
+    {
+      "path": "out/06-lucas/yoga-005851Z-615483-gate-ready.png",
+      "bytes": 795589,
+      "sha256": "eec10f29f1c8575013111b447896ecfcfcf7ee9cd1920a67c5c5f0fde8dc6bd3"
+    },
+    {
+      "path": "out/06-lucas.json",
+      "bytes": 786,
+      "sha256": "6a57cf253aebee6c9d07921533eba692a2bf35db5e6a1fe503e9ebc9d9c99fa9"
+    },
+    {
+      "path": "out/07-training/delay2-settings-settings.json",
+      "bytes": 16946,
+      "sha256": "77e8dc122317171670b32d45ba3a283992eff0497dd4015f0dc92be40f38330b"
+    },
+    {
+      "path": "out/07-training/diag-yoga-practice-diagnostics.log",
+      "bytes": 29387,
+      "sha256": "fe77c24a062af57ad40620f44de01f6fff700698aab236896f4a65508cf306f4"
+    },
+    {
+      "path": "out/07-training/settings-yoga-settings.json",
+      "bytes": 32411,
+      "sha256": "35702f2b2f58855e2bf809966d86b377d19432faefb757345bfb46668f14628b"
+    },
+    {
+      "path": "out/07-training/yoga-005851Z-179861-gate-ready.png",
+      "bytes": 796603,
+      "sha256": "91bc3187b2bb63c05dc871706fd7dde5990d9b945d8de5014d5c5ed6bc82cca1"
+    },
+    {
+      "path": "out/07-training/yoga-005859Z-486658-training.png",
+      "bytes": 190633,
+      "sha256": "f08633329598cfcdc67831780a4fa660629ea0f5cca4cae4804a7805c3f05938"
+    },
+    {
+      "path": "out/07-training/yoga-005859Z-705270-gate-training-hud-unpaused.png",
+      "bytes": 192220,
+      "sha256": "7cdff30f7925cc8d6b792d30e0b38bdb7f3dd1c331037c06a09aa5210c308c10"
+    },
+    {
+      "path": "out/07-training.json",
+      "bytes": 1891,
+      "sha256": "ccb089fd7fe7482a36defed4822135ce55f41918622ccece67aa25a544034d2c"
+    },
+    {
+      "path": "out/RC-TEARDOWN-1/pending-window.json",
+      "bytes": 13496,
+      "sha256": "a93a690681e9e6b16351efe807c1a8424411b87b6c47f0670601d5127c5c080d"
+    },
+    {
+      "path": "out/RC-TEARDOWN-1/practice-diagnostics.log",
+      "bytes": 107933,
+      "sha256": "2c84366e13c63511dfe6ea84e068aab43ce80f2920fc746e5d98547a45d78fa6"
+    },
+    {
+      "path": "out/RC-TEARDOWN-1/slow-36-settings.json",
+      "bytes": 16946,
+      "sha256": "ad861a99b6f32facfb386334b044cbba4dd97a217f502514ed1076cadba00277"
+    },
+    {
+      "path": "out/RC-TEARDOWN-1/teardown.json",
+      "bytes": 35044,
+      "sha256": "c5228fbe451f530f49ec17a80be1b2518817472a4ad21860c38480d867bf65a5"
+    },
+    {
+      "path": "out/RC-TEARDOWN-1/yoga-005859Z-422627-gate-training-hud-unpaused.png",
+      "bytes": 190881,
+      "sha256": "2ebef61bb7a1272ce26e3fd404a7194330e8cd9157db0b4ab826343404826e6a"
+    },
+    {
+      "path": "out/RC-TEARDOWN-1/yoga-005900Z-967733-gate-training-hud-unpaused.png",
+      "bytes": 172062,
+      "sha256": "b05faffaa15eb5afd2fcd135078e25cc305e8ba50f540e3b286d696178d195b2"
+    },
+    {
+      "path": "out/RC-TEARDOWN-1/yoga-005901Z-473824-gate-native-pause.png",
+      "bytes": 269640,
+      "sha256": "3302175d6908cd14f96a004a291ba45d258ea1a16b416a0c2208a2af61c43cba"
+    },
+    {
+      "path": "out/RC-TEARDOWN-1/yoga-005901Z-797833-gate-native-pause.png",
+      "bytes": 270044,
+      "sha256": "2f365adb689ba137f98d8cec4d12018d1083b3db59479f6cf43999a981e44d80"
+    },
+    {
+      "path": "out/RC-TEARDOWN-1/yoga-005902Z-487260-gate-quit-focus.png",
+      "bytes": 248397,
+      "sha256": "c9c4128235b116a9af5aa27d03ccf7453b17e6ee22395c2fc45d8ca5fd7ad27b"
+    },
+    {
+      "path": "out/RC-TEARDOWN-1/yoga-005902Z-986650-gate-quit-focus.png",
+      "bytes": 270377,
+      "sha256": "5636d86d64fc4b99ce67abf3064ff7fcae37a6fb25922fd086b4f949c75bfe64"
+    },
+    {
+      "path": "out/RC-TEARDOWN-1/yoga-005909Z-081689-gate-ready.png",
+      "bytes": 792033,
+      "sha256": "1015f9e391428a3407e17f1972a65f63aa956a7d5739b0bbc5113d867719cc12"
+    },
+    {
+      "path": "out/RC-TEARDOWN-1/yoga-005909Z-424577-gate-ready.png",
+      "bytes": 792311,
+      "sha256": "cf14e82c430347df4102ae1e1dc5336e5e5d0dcbaef31700821b6660709ab5e9"
+    },
+    {
+      "path": "out/RC-TEARDOWN-1/yoga-005909Z-470620-gate-ready.png",
+      "bytes": 788239,
+      "sha256": "376a8dc2b3560f2414f8ed3a4bd59634a546771a1afd9a551e898c5be6c581a8"
+    },
+    {
+      "path": "out/RC-TEARDOWN-1/yoga-005910Z-345730-return-cpu-held-40.png",
+      "bytes": 1124154,
+      "sha256": "c2b149089fe1401affc3258fe1d9684d5ee98d88659da35dc7ad1769fb44daef"
+    },
+    {
+      "path": "out/RC-TEARDOWN-1/yoga-005911Z-795714-gate-return-sonic-held.png",
+      "bytes": 1125740,
+      "sha256": "6174da4a8f25d622c296ab3e0fc3b63369762df6b3109fe4f682f01ea94fcb37"
+    },
+    {
+      "path": "out/RC-TEARDOWN-1/yoga-005914Z-026725-gate-ready.png",
+      "bytes": 805190,
+      "sha256": "fc7c4b092d71070c1c8f20db83fe15a326d6df7740e22db08eb3ac42126fa3bd"
+    },
+    {
+      "path": "out/RC-TEARDOWN-1/yoga-005914Z-130360-gate-ready.png",
+      "bytes": 808146,
+      "sha256": "8b2bf774cf6599d6d3b164f815fc1ae916cd883b0580ca62d01a98caa0686377"
+    },
+    {
+      "path": "out/RC-TEARDOWN-1/yoga-005914Z-694352-returned-steve-lucas-ready.png",
+      "bytes": 803596,
+      "sha256": "42e4a837af9e0a0068de4c1daeb39fca4acda18d55af1de7975892729877f430"
+    },
+    {
+      "path": "out/RC-TEARDOWN-1/yoga-005918Z-261199-gate-training-hud-unpaused.png",
+      "bytes": 185781,
+      "sha256": "07e2fd4f62c5c4cd32fdc47418b8582c9bb09618fda27283b9c89a454aef158a"
+    },
+    {
+      "path": "out/RC-TEARDOWN-1/yoga-005918Z-933737-hud-before-0.png",
+      "bytes": 182072,
+      "sha256": "8d0a4c0f95afcc389b3606176d829af7053b4b930b919adacbd92d34a7d07e4e"
+    },
+    {
+      "path": "out/RC-TEARDOWN-1/yoga-005920Z-948462-Captain-Falcon.png",
+      "bytes": 236227,
+      "sha256": "8e723b5350f58c872033c9c9e5d773dc66574a13694b743805c4806a59a386ce"
+    },
+    {
+      "path": "out/RC-TEARDOWN-1/yoga-005922Z-178932-settled-Captain-Falcon.png",
+      "bytes": 220939,
+      "sha256": "9b1f798d2d6f2bd189b05666082b675a742103a03e33fd51dacc455c102fad75"
+    },
+    {
+      "path": "out/RC-TEARDOWN-1/yoga-005922Z-506858-gate-hud-settled-0.png",
+      "bytes": 234073,
+      "sha256": "0f34720a8c64b3490191d0a68d3c46d30754e4e6cf30649697895e504b420a16"
+    },
+    {
+      "path": "out/RC-TEARDOWN-1/yoga-005922Z-507132-hud-before-0.png",
+      "bytes": 228560,
+      "sha256": "7e34fa513073923d2270ffd540c82e481a28606c25747c75c7b075aeff291a84"
+    },
+    {
+      "path": "out/RC-TEARDOWN-1/yoga-005922Z-881582-gate-hud-settled-0.png",
+      "bytes": 214576,
+      "sha256": "36388086fe48934126b4c858f01dd634cb10e59cba80e3693637b641e0f84f7e"
+    },
+    {
+      "path": "out/RC-TEARDOWN-1/yoga-005923Z-905004-Dark-Pit.png",
+      "bytes": 244315,
+      "sha256": "5476d24064f96bc2b8ae3295595c477dde257831a949271b24a7ee3a1205b4c4"
+    },
+    {
+      "path": "out/RC-TEARDOWN-1/yoga-005926Z-032668-gate-hud-settled-0.png",
+      "bytes": 249156,
+      "sha256": "39e3db2b0fece1683bc54294adfc6b800ebbe691bd8d1f07495a339396310a17"
+    },
+    {
+      "path": "out/RC-TEARDOWN-1/yoga-005926Z-473224-gate-hud-settled-0.png",
+      "bytes": 249634,
+      "sha256": "136363927aa60277305d5040e319e6a005ff428ebc341d3def8b2e641adc2371"
+    },
+    {
+      "path": "out/RC-TEARDOWN-1/yoga-005926Z-881857-settled-Dark-Pit.png",
+      "bytes": 248711,
+      "sha256": "a23d940a7685cc7d7eeadf46a75bf18f0ceb4fa3868f10b88094619ffc42b7c1"
+    },
+    {
+      "path": "out/RC-TEARDOWN-1/yoga-005926Z-964399-hud-before-0.png",
+      "bytes": 248250,
+      "sha256": "dadb42df6124908f91a51c4c98253166675f3f06694a03cf51e8afb2940d3cf9"
+    },
+    {
+      "path": "out/RC-TEARDOWN-1/yoga-005927Z-050598-Donkey-Kong.png",
+      "bytes": 267640,
+      "sha256": "90133caca53ece77b7682bbdd3acc6ae6c0f939899f6db75ca8ade7f311b4ee1"
+    },
+    {
+      "path": "out/RC-TEARDOWN-1/yoga-005928Z-004130-gate-hud-settled-0.png",
+      "bytes": 270375,
+      "sha256": "6dc09e0ad2a2b73cda0aecf165aa39545c2333d58775ddf4e951621094fe0a50"
+    },
+    {
+      "path": "out/RC-TEARDOWN-1/yoga-005929Z-103964-settled-Donkey-Kong.png",
+      "bytes": 288480,
+      "sha256": "8e26a840d879772153e88c107e5ec06360e46f8a9528fe22ccc516dcbcaff556"
+    },
+    {
+      "path": "out/RC-TEARDOWN-1/yoga-005929Z-735233-gate-hud-settled-0.png",
+      "bytes": 280826,
+      "sha256": "40ae7b698bd056b697b54dbca49475c1c4dcf9aa547252011f4140b614e893b5"
+    },
+    {
+      "path": "out/RC-TEARDOWN-1/yoga-005937Z-714943-gate-ready.png",
+      "bytes": 789102,
+      "sha256": "889905777e2ab1f5d59878e28203c7ff119ce2ffdff9b81c6118d6e3366610f8"
+    },
+    {
+      "path": "out/RC-TEARDOWN-1/yoga-005937Z-730467-gate-ready.png",
+      "bytes": 788505,
+      "sha256": "a72504198d333d63cc875c7882f21ee65bc49f0e24c69fe40d6fe1564b6bea4d"
+    },
+    {
+      "path": "out/RC-TEARDOWN-1/yoga-005938Z-731849-gate-ready.png",
+      "bytes": 791518,
+      "sha256": "355df18144d452c1537cc08f852391e90561ba90ab22d12f65c202b9f690fdbb"
+    },
+    {
+      "path": "out/RC-TEARDOWN-1/yoga-005939Z-570617-return-cpu-held-40.png",
+      "bytes": 1122523,
+      "sha256": "bf129849d6ad51d964e8b75047c8a55eb39a70355b7db1b6029b502040e04924"
+    },
+    {
+      "path": "out/RC-TEARDOWN-1/yoga-005939Z-874361-gate-return-sonic-held.png",
+      "bytes": 1122502,
+      "sha256": "dd3f6522fd6697604a35fb939224c65ef6737a25fda288927731a19ec0a39543"
+    },
+    {
+      "path": "out/RC-TEARDOWN-1/yoga-005947Z-091793-gate-ready.png",
+      "bytes": 799359,
+      "sha256": "2cf5378f3b11e094c0f38dd0dbdbd10694df4e70fbf763945cb1ebc4e93d21d1"
+    },
+    {
+      "path": "out/RC-TEARDOWN-1/yoga-005947Z-119815-returned-steve-lucas-ready.png",
+      "bytes": 798577,
+      "sha256": "a1d06d1e636fa87131aaf50c4c2990d171a50a2612849957a9fc368a7a6546b5"
+    },
+    {
+      "path": "out/RC-TEARDOWN-1/yoga-005947Z-665066-gate-ready.png",
+      "bytes": 798934,
+      "sha256": "0637feaffc900bdece3f23436ab9714e493092e269e33ca37bd3882187dc8dd6"
+    },
+    {
+      "path": "out/RC-TEARDOWN-1/yoga-005952Z-458386-gate-training-hud-unpaused.png",
+      "bytes": 173322,
+      "sha256": "eedbd63bae99fd551df5a23555d68a899b67070af59f41309a68b92a8d55223d"
+    },
+    {
+      "path": "out/RC-TEARDOWN-1/yoga-005952Z-464555-hud-before-0.png",
+      "bytes": 165302,
+      "sha256": "c69db168215fe0327fcaa9eaad9cd3f56b9e30a559b1e17db4f487dcb99c40cc"
+    },
+    {
+      "path": "out/RC-TEARDOWN-1/yoga-005954Z-625706-Captain-Falcon.png",
+      "bytes": 246389,
+      "sha256": "b50557f988b0c72ab401eed0ab6c3a20bcd84417432c2dff2aae289782f79e60"
+    },
+    {
+      "path": "out/RC-TEARDOWN-1/yoga-005956Z-281627-settled-Captain-Falcon.png",
+      "bytes": 228688,
+      "sha256": "ebf178d45223b6ffe803c73cc050b95367fc7027238013d06b43789c40063e47"
+    },
+    {
+      "path": "out/RC-TEARDOWN-1/yoga-005956Z-383265-gate-hud-settled-0.png",
+      "bytes": 231471,
+      "sha256": "5d622524fef1e93833069b9f2a48b12a64ef0ce3d271a060733f44da46ea0422"
+    },
+    {
+      "path": "out/RC-TEARDOWN-1/yoga-005956Z-409132-gate-hud-settled-0.png",
+      "bytes": 228640,
+      "sha256": "93dcb4c657a79085b7776b38f8008c497a2cb04627e4cfb950cb64bdd93c3520"
+    },
+    {
+      "path": "out/RC-TEARDOWN-1.json",
+      "bytes": 36523,
+      "sha256": "3143a21508fb31b8a57b32ae904f78f36685881c18379b8f0dfc46d5d27701d3"
+    },
+    {
+      "path": "out/RC-TEARDOWN-2/pending-window.json",
+      "bytes": 13506,
+      "sha256": "58163abea56b8df7bb8d3234972be238c876e3b0577644018b270ebb98cf050c"
+    },
+    {
+      "path": "out/RC-TEARDOWN-2/practice-diagnostics.log",
+      "bytes": 48350,
+      "sha256": "db17c986dd8e43577e511d2c5fbfdcbc4fca6f35ae630c6662307cd14fbd73de"
+    },
+    {
+      "path": "out/RC-TEARDOWN-2/practice-diagnostics.previous.log",
+      "bytes": 130949,
+      "sha256": "da1f41dba3cc56dfe51bd015be6e8823e7380684bdb91da0785a0f764dc904f8"
+    },
+    {
+      "path": "out/RC-TEARDOWN-2/slow-36-settings.json",
+      "bytes": 16946,
+      "sha256": "ad861a99b6f32facfb386334b044cbba4dd97a217f502514ed1076cadba00277"
+    },
+    {
+      "path": "out/RC-TEARDOWN-2/teardown.json",
+      "bytes": 31483,
+      "sha256": "595e9015a1524cabdf36bc09d41176c3b79fffcd8048ac4211066baa7701a2a9"
+    },
+    {
+      "path": "out/RC-TEARDOWN-2/yoga-005956Z-854659-gate-training-hud-unpaused.png",
+      "bytes": 228791,
+      "sha256": "47c725924f40382ab39f5e43af5f2220a6ea9a075ccce0b0c7daf66eed28d2b8"
+    },
+    {
+      "path": "out/RC-TEARDOWN-2/yoga-005957Z-808062-gate-training-hud-unpaused.png",
+      "bytes": 239125,
+      "sha256": "b3179469324da10189d44cafda765d416eeb78c851d5d24f2c11d81b12d11039"
+    },
+    {
+      "path": "out/RC-TEARDOWN-2/yoga-005958Z-065433-gate-native-pause.png",
+      "bytes": 272491,
+      "sha256": "3f564b4c1a4862ae2c68447417864cfd7f6d8471741657b1358b1c3b7d6d7ee3"
+    },
+    {
+      "path": "out/RC-TEARDOWN-2/yoga-005958Z-532586-gate-native-pause.png",
+      "bytes": 275879,
+      "sha256": "4bf1e3ecc229cb211cf468081992c8e2db42538bf417f5bb73e36e3e2c5d247f"
+    },
+    {
+      "path": "out/RC-TEARDOWN-2/yoga-005959Z-105341-gate-quit-focus.png",
+      "bytes": 304193,
+      "sha256": "1ebf2f5d2185cae6ed46be2b2ecbe3b9087bd3cc86140c30a03ee5925bc5d4c1"
+    },
+    {
+      "path": "out/RC-TEARDOWN-2/yoga-005959Z-382857-gate-quit-focus.png",
+      "bytes": 306146,
+      "sha256": "c710cf655c94c3a92ade2e832a10d7ad6391fe0385306645e8786a1f8e80a9e5"
+    },
+    {
+      "path": "out/RC-TEARDOWN-2/yoga-010006Z-122478-gate-ready.png",
+      "bytes": 789546,
+      "sha256": "8bf040100511a1079184fe4068656b0187b4c28bf2728f3632915fe381bed548"
+    },
+    {
+      "path": "out/RC-TEARDOWN-2/yoga-010006Z-382849-gate-ready.png",
+      "bytes": 787716,
+      "sha256": "78699f75f65988d2fcb271b00db3b193b4313ff9d3ea084eb83da8a65adbf00d"
+    },
+    {
+      "path": "out/RC-TEARDOWN-2/yoga-010006Z-544219-gate-ready.png",
+      "bytes": 788886,
+      "sha256": "ef80606a7692c4eecc17c3d78ff75f93a1abe1bc47a451523411f6c72a6ebc5e"
+    },
+    {
+      "path": "out/RC-TEARDOWN-2/yoga-010008Z-874422-return-cpu-held-40.png",
+      "bytes": 1124456,
+      "sha256": "2a2385e71648b8c78264cec1b5632562c1dd3d5e3d72e3fa0cc870331244cacb"
+    },
+    {
+      "path": "out/RC-TEARDOWN-2/yoga-010008Z-956561-gate-return-sonic-held.png",
+      "bytes": 1123979,
+      "sha256": "e0e8ef70a4dd76a91afd181e4156281578c5d26f119b17c7e106ea36faeaf072"
+    },
+    {
+      "path": "out/RC-TEARDOWN-2/yoga-010011Z-173459-returned-steve-lucas-ready.png",
+      "bytes": 805619,
+      "sha256": "f4057cb7ad8dd2bf3f294a40861bd7a693f878bd3e198309904892bca2f77cf3"
+    },
+    {
+      "path": "out/RC-TEARDOWN-2/yoga-010011Z-348795-gate-ready.png",
+      "bytes": 804712,
+      "sha256": "bf10732a45a75fe5144e47d0620a3d327d980af377db455bf899f7c9f2c1a74d"
+    },
+    {
+      "path": "out/RC-TEARDOWN-2/yoga-010011Z-489468-gate-ready.png",
+      "bytes": 804449,
+      "sha256": "fd09947d65eb7a03921298ae95060faffe3b68e21a7432521af977efec1302be"
+    },
+    {
+      "path": "out/RC-TEARDOWN-2/yoga-010015Z-147058-hud-before-0.png",
+      "bytes": 192089,
+      "sha256": "50ed9238eab69b0a67f0806912161db0bbf38603b11f40dd66584cf11f416a55"
+    },
+    {
+      "path": "out/RC-TEARDOWN-2/yoga-010015Z-591704-gate-training-hud-unpaused.png",
+      "bytes": 194276,
+      "sha256": "4cdb6b7405ff52024970af2e3a8dcc3f8dd87f2e7c64ff6b3fd58aaaf3c324d3"
+    },
+    {
+      "path": "out/RC-TEARDOWN-2/yoga-010017Z-202303-Captain-Falcon.png",
+      "bytes": 167420,
+      "sha256": "4f861c99031160d5ca69d18c51594df9b467c8f93001ced13c565dffa656c3bf"
+    },
+    {
+      "path": "out/RC-TEARDOWN-2/yoga-010018Z-384046-gate-hud-settled-0.png",
+      "bytes": 230173,
+      "sha256": "ddc4f5f30a5164f555cd6994ea67aee4bda65de68e8750c9f7c0fd65f83bea3e"
+    },
+    {
+      "path": "out/RC-TEARDOWN-2/yoga-010019Z-098458-settled-Captain-Falcon.png",
+      "bytes": 234166,
+      "sha256": "d50bacfe6b611398511372b4fa682cf132030561e6de8beb131af6832e8f4af9"
+    },
+    {
+      "path": "out/RC-TEARDOWN-2/yoga-010019Z-298830-gate-hud-settled-0.png",
+      "bytes": 235706,
+      "sha256": "7edc269917060175c238347d6db0233c73aeb6602e073fb16aeef73079496a86"
+    },
+    {
+      "path": "out/RC-TEARDOWN-2/yoga-010019Z-625522-hud-before-0.png",
+      "bytes": 233809,
+      "sha256": "94d29a0515c81ebd46064bfe7d233c51e37e17e3445e7adcf9fbb142821038c9"
+    },
+    {
+      "path": "out/RC-TEARDOWN-2/yoga-010020Z-942750-Dark-Pit.png",
+      "bytes": 244453,
+      "sha256": "7a23cee82514821f9e2cf2e94bd268840a6413d9225796d1bfbcbe85d74d1338"
+    },
+    {
+      "path": "out/RC-TEARDOWN-2/yoga-010023Z-010006-settled-Dark-Pit.png",
+      "bytes": 248194,
+      "sha256": "5b395c84643ae4356ce312d85ae7c8caea4f6b94e97376bd626883bd67d3496b"
+    },
+    {
+      "path": "out/RC-TEARDOWN-2/yoga-010023Z-075951-hud-before-0.png",
+      "bytes": 247277,
+      "sha256": "6e50c3f443df129de143dfbc0c61e3a5a89251ed14b0ef053fa8ba0c5e6d9076"
+    },
+    {
+      "path": "out/RC-TEARDOWN-2/yoga-010023Z-463266-gate-hud-settled-0.png",
+      "bytes": 248047,
+      "sha256": "6f9301f0f3b452852b983158863746b560bf8e0e216e059e66f5225e1d076a60"
+    },
+    {
+      "path": "out/RC-TEARDOWN-2/yoga-010023Z-472760-gate-hud-settled-0.png",
+      "bytes": 249995,
+      "sha256": "eba87b59b0901eac7b0922a7754bf85c3780db9fcb12e0276c1ec0cc4c999082"
+    },
+    {
+      "path": "out/RC-TEARDOWN-2/yoga-010024Z-992823-Donkey-Kong.png",
+      "bytes": 268593,
+      "sha256": "9594e520c0f4d2163f3b660b7547a69a4b1aa6dd84dafa69101b1346ccd5b195"
+    },
+    {
+      "path": "out/RC-TEARDOWN-2/yoga-010025Z-473628-gate-hud-settled-0.png",
+      "bytes": 268298,
+      "sha256": "38ecfecb40c1da69c07f3a70335a834056259948dad519f583a05c9731427d37"
+    },
+    {
+      "path": "out/RC-TEARDOWN-2/yoga-010026Z-482423-settled-Donkey-Kong.png",
+      "bytes": 272947,
+      "sha256": "43aa94110f2db95cdf4e89454573b71f8557f5a4dfc6a364cfaf8d9421f6a2b7"
+    },
+    {
+      "path": "out/RC-TEARDOWN-2/yoga-010026Z-865391-gate-hud-settled-0.png",
+      "bytes": 270030,
+      "sha256": "f80830c25c1dd2539a12d9a01fa51d2e9f9fccbed2a9d52e91b584b4192d2c20"
+    },
+    {
+      "path": "out/RC-TEARDOWN-2/yoga-010034Z-262138-gate-ready.png",
+      "bytes": 787790,
+      "sha256": "be1f7e4e21fdff0bdb549224211faeba8c5be2bd02702da570fe6895aa0cb34e"
+    },
+    {
+      "path": "out/RC-TEARDOWN-2/yoga-010034Z-511591-gate-ready.png",
+      "bytes": 788662,
+      "sha256": "04ebafbe2dfde12a624fc5152139657774198562761c8bdb37bb4b8cbee71196"
+    },
+    {
+      "path": "out/RC-TEARDOWN-2/yoga-010034Z-969767-gate-ready.png",
+      "bytes": 786879,
+      "sha256": "c9c07d53ce19bb0f680b58d6048dd57568530ac6bfafae8c44127d992d1df65d"
+    },
+    {
+      "path": "out/RC-TEARDOWN-2/yoga-010036Z-625128-gate-return-sonic-held.png",
+      "bytes": 1123107,
+      "sha256": "5a1899454481c05fd3ad193e6cf5b0c561a2c653a28b4e7a969ecb000a42af8d"
+    },
+    {
+      "path": "out/RC-TEARDOWN-2/yoga-010036Z-672625-return-cpu-held-40.png",
+      "bytes": 1123003,
+      "sha256": "b7fb19f9b76e42a8a08f03e8e4039cab5b98efd6ba5b112766f34d7cb5c81e78"
+    },
+    {
+      "path": "out/RC-TEARDOWN-2/yoga-010039Z-509497-returned-steve-lucas-ready.png",
+      "bytes": 802651,
+      "sha256": "f31636e3b0996931548745fcceeae4e340654d84dbab65c6845bc02dce95decf"
+    },
+    {
+      "path": "out/RC-TEARDOWN-2/yoga-010039Z-893917-gate-ready.png",
+      "bytes": 803635,
+      "sha256": "2db1b2a0d3ace230ec9c754b7fad14f944668e438bc8282d3aeff07a3129b2bd"
+    },
+    {
+      "path": "out/RC-TEARDOWN-2/yoga-010039Z-990644-gate-ready.png",
+      "bytes": 802655,
+      "sha256": "be930dff1b7e82f330a27466a847215a2007a064420dda1857cc21113ac3f0d1"
+    },
+    {
+      "path": "out/RC-TEARDOWN-2/yoga-010044Z-076898-hud-before-0.png",
+      "bytes": 191984,
+      "sha256": "04d2aa7decbcc5fce4b44aaeeadf6e88f46ca9ee204643a9e9f54708d6c207ed"
+    },
+    {
+      "path": "out/RC-TEARDOWN-2/yoga-010044Z-194930-gate-training-hud-unpaused.png",
+      "bytes": 193422,
+      "sha256": "2d0f7e6a3bc76ee83988af9f433406b0e183dac43e641cba50e2bbf6576f0700"
+    },
+    {
+      "path": "out/RC-TEARDOWN-2/yoga-010045Z-219326-Captain-Falcon.png",
+      "bytes": 166978,
+      "sha256": "46dc15be173f2eb005f5b150c8b834e6ef015f8db969d9e130c888d0278866ba"
+    },
+    {
+      "path": "out/RC-TEARDOWN-2/yoga-010047Z-055698-gate-hud-settled-0.png",
+      "bytes": 234336,
+      "sha256": "8e6297f6960db820cd93bdb937c70164ca657ed6f321b0f41193c42064605f7f"
+    },
+    {
+      "path": "out/RC-TEARDOWN-2/yoga-010047Z-933323-gate-hud-settled-0.png",
+      "bytes": 229099,
+      "sha256": "9ab249fabb42a79852f916eb00a992cb7db71515709344626e721de63f710058"
+    },
+    {
+      "path": "out/RC-TEARDOWN-2/yoga-010048Z-087427-settled-Captain-Falcon.png",
+      "bytes": 232912,
+      "sha256": "8b909ff76f0acb5cf956ca84c26da8d278d44400d4d349a54170a6bba3a7c758"
+    },
+    {
+      "path": "out/RC-TEARDOWN-2.json",
+      "bytes": 32853,
+      "sha256": "fa507d3dc17245fdbfa1fd61012181349d3a7707190a4cd5cd0230fbdcb7f6fc"
+    },
+    {
+      "path": "out/RC-TEARDOWN-3/pending-window.json",
+      "bytes": 13449,
+      "sha256": "281bcd2c00cee3c6e0546b9ccbb2e017c2492ec8f8a0b0571d58d557121cb4c7"
+    },
+    {
+      "path": "out/RC-TEARDOWN-3/practice-diagnostics.log",
+      "bytes": 113689,
+      "sha256": "5da1858c7d15b5e07016f14be989b8656e41be8ff6f6e2b55c8aec01547ab9b4"
+    },
+    {
+      "path": "out/RC-TEARDOWN-3/practice-diagnostics.previous.log",
+      "bytes": 130949,
+      "sha256": "da1f41dba3cc56dfe51bd015be6e8823e7380684bdb91da0785a0f764dc904f8"
+    },
+    {
+      "path": "out/RC-TEARDOWN-3/slow-36-settings.json",
+      "bytes": 16946,
+      "sha256": "ad861a99b6f32facfb386334b044cbba4dd97a217f502514ed1076cadba00277"
+    },
+    {
+      "path": "out/RC-TEARDOWN-3/teardown.json",
+      "bytes": 25674,
+      "sha256": "2b798eaf4ebfb8f2a37c5a76090c215105beeec7b631662559730816f1ae7791"
+    },
+    {
+      "path": "out/RC-TEARDOWN-3/yoga-010048Z-302982-gate-training-hud-unpaused.png",
+      "bytes": 233131,
+      "sha256": "599dd5bf3a8a01c23b4bde8e82bee09bccb63af520e208e60887d85baa01742a"
+    },
+    {
+      "path": "out/RC-TEARDOWN-3/yoga-010048Z-880250-gate-training-hud-unpaused.png",
+      "bytes": 231640,
+      "sha256": "a9011fb448f000228c46d4affc9388fe421624318ec22a78410b3635144de64b"
+    },
+    {
+      "path": "out/RC-TEARDOWN-3/yoga-010049Z-120892-gate-native-pause.png",
+      "bytes": 340114,
+      "sha256": "8c4d27063c205a1e01d3f9830048747855a9010fb7543ef7c82c71dc52e19d1d"
+    },
+    {
+      "path": "out/RC-TEARDOWN-3/yoga-010049Z-899583-gate-native-pause.png",
+      "bytes": 336729,
+      "sha256": "f1ce8b51c5c839a90199f38bc87cd4c90571bd4dcdf358d188388c74db585cde"
+    },
+    {
+      "path": "out/RC-TEARDOWN-3/yoga-010050Z-247666-gate-quit-focus.png",
+      "bytes": 335833,
+      "sha256": "bc25ff5cdc47955649fcfea0eec55e7092c5b29e2dbc3a5ca7f14d7f14ed1306"
+    },
+    {
+      "path": "out/RC-TEARDOWN-3/yoga-010050Z-905451-gate-quit-focus.png",
+      "bytes": 336866,
+      "sha256": "69c31fda002b921839839cc2d8b8f6baf15100f4d0d6f80f5a2f0d80dd0a337d"
+    },
+    {
+      "path": "out/RC-TEARDOWN-3/yoga-010057Z-419440-gate-ready.png",
+      "bytes": 788033,
+      "sha256": "f2985bda95e8a88a38fd0d78d07303497af03bad3a2a740cb76a3d8e8aec454e"
+    },
+    {
+      "path": "out/RC-TEARDOWN-3/yoga-010057Z-953135-gate-ready.png",
+      "bytes": 789129,
+      "sha256": "0d0e125ffc8939a9fb87d65ed520c1aedfaca870195c3ca4cde586f8d79d72c9"
+    },
+    {
+      "path": "out/RC-TEARDOWN-3/yoga-010057Z-954032-gate-ready.png",
+      "bytes": 789648,
+      "sha256": "6410b02d2f4dade174e2668a1028d5d5ec90d492f76d56a179e0788da530ec41"
+    },
+    {
+      "path": "out/RC-TEARDOWN-3/yoga-010059Z-640301-gate-return-sonic-held.png",
+      "bytes": 1124140,
+      "sha256": "64e590a8ebdeb642024aa68010627e51b930034ccbe3414e3199c059ae3fb349"
+    },
+    {
+      "path": "out/RC-TEARDOWN-3/yoga-010059Z-982483-return-cpu-held-40.png",
+      "bytes": 1123856,
+      "sha256": "29548de9427f32995c92899cc1e2972a0f76f226d5c25d005f5ce302c9b04f2b"
+    },
+    {
+      "path": "out/RC-TEARDOWN-3/yoga-010102Z-111955-gate-ready.png",
+      "bytes": 803584,
+      "sha256": "32995e9671370817eebba37bc23c9b3049051f5afee43796919b0f5c66eeaadc"
+    },
+    {
+      "path": "out/RC-TEARDOWN-3/yoga-010102Z-619137-gate-ready.png",
+      "bytes": 802401,
+      "sha256": "44622956cde9d85f5ff3caf90f1e5250ebcb60ffe64d691ae6d102cc54413eb8"
+    },
+    {
+      "path": "out/RC-TEARDOWN-3/yoga-010102Z-915809-returned-steve-lucas-ready.png",
+      "bytes": 805303,
+      "sha256": "0a9accfd14d4f4469619162346e2e4fc6bd04a4384557d0554b3acd9824c2478"
+    },
+    {
+      "path": "out/RC-TEARDOWN-3/yoga-010108Z-415296-gate-training-hud-unpaused.png",
+      "bytes": 169007,
+      "sha256": "99d56ee1802d5bbfc9733bbab248f6d13dfe25a2b35b592f221f1a628c77e409"
+    },
+    {
+      "path": "out/RC-TEARDOWN-3/yoga-010108Z-499815-hud-before-0.png",
+      "bytes": 176959,
+      "sha256": "b96cc837b55c3c3dcea217c8cca01b652ed044674459523d96a9eabdb130fd90"
+    },
+    {
+      "path": "out/RC-TEARDOWN-3/yoga-010109Z-964373-Captain-Falcon.png",
+      "bytes": 241334,
+      "sha256": "7fc6091fa250da6b7a12ba1770a4978344ecacf7cca0e53bee72ece032858f92"
+    },
+    {
+      "path": "out/RC-TEARDOWN-3/yoga-010111Z-571006-gate-hud-settled-0.png",
+      "bytes": 231556,
+      "sha256": "0f887f27a87a4dd90f796abc52531c37abe1f056960a2a10ec28cfdc1164f54c"
+    },
+    {
+      "path": "out/RC-TEARDOWN-3/yoga-010112Z-198420-gate-hud-settled-0.png",
+      "bytes": 232856,
+      "sha256": "166d94d87a81b2c18d2602dec91b91eefeb14c9fe9480d0c0e7d8fce23aa1a48"
+    },
+    {
+      "path": "out/RC-TEARDOWN-3/yoga-010112Z-229654-Dark-Pit.png",
+      "bytes": 246888,
+      "sha256": "40e17875268ac0eee8707c9468b34ed4d0252d04ff8ff74ef4d9ece5cdec6216"
+    },
+    {
+      "path": "out/RC-TEARDOWN-3/yoga-010112Z-494509-hud-before-0.png",
+      "bytes": 231087,
+      "sha256": "187f8be40b30d37d067bedf8d78b9688c6fa07af09ee29a213d7bc11d4bec289"
+    },
+    {
+      "path": "out/RC-TEARDOWN-3/yoga-010112Z-585751-settled-Captain-Falcon.png",
+      "bytes": 231395,
+      "sha256": "8c0071dbb64e681094f183d6d701841b0e7a38b12db6ddf264677c57a1f1eb3f"
+    },
+    {
+      "path": "out/RC-TEARDOWN-3/yoga-010115Z-836401-gate-hud-settled-0.png",
+      "bytes": 253315,
+      "sha256": "0fa53fae854aa298943ef57905ae943f0e405050afe1cc464196bc67207f74e1"
+    },
+    {
+      "path": "out/RC-TEARDOWN-3/yoga-010116Z-288466-settled-Dark-Pit.png",
+      "bytes": 247100,
+      "sha256": "b62eb70c70bf24e9d689e6cb21ed60ae32757a72e290a4d6a677377c5c0d974a"
+    },
+    {
+      "path": "out/RC-TEARDOWN-3/yoga-010116Z-717968-hud-before-0.png",
+      "bytes": 247055,
+      "sha256": "6cd8c0e12c19bb8b57cacfefd755c5d8671bc054a248e84ce0388ad317abe3c4"
+    },
+    {
+      "path": "out/RC-TEARDOWN-3/yoga-010116Z-866465-gate-hud-settled-0.png",
+      "bytes": 246180,
+      "sha256": "2b5ed988c57a8010bae1f49be38286629bab1b47199d4ca25c34f39b6657718c"
+    },
+    {
+      "path": "out/RC-TEARDOWN-3/yoga-010117Z-872456-Donkey-Kong.png",
+      "bytes": 267106,
+      "sha256": "c9eb524fe5313a3220266f6b67db7d5dab8e169eba9a9b74ede9aed1a1562202"
+    },
+    {
+      "path": "out/RC-TEARDOWN-3/yoga-010118Z-408185-gate-hud-settled-0.png",
+      "bytes": 266937,
+      "sha256": "5f4f1074ec0306d5dc7264b89161b89286f7f63cf2b001e1edeb32cfb70935e0"
+    },
+    {
+      "path": "out/RC-TEARDOWN-3/yoga-010118Z-786710-gate-hud-settled-0.png",
+      "bytes": 270829,
+      "sha256": "08267469008555a057e1093c2a2ec1108b377164ac734c6f9ea1e6f316123e95"
+    },
+    {
+      "path": "out/RC-TEARDOWN-3/yoga-010118Z-991960-settled-Donkey-Kong.png",
+      "bytes": 273085,
+      "sha256": "c9f7af7cd654b7f73735fc9cccc557839bba0ce78d4e92af6dfde5133e29715c"
+    },
+    {
+      "path": "out/RC-TEARDOWN-3/yoga-010127Z-036258-gate-ready.png",
+      "bytes": 787781,
+      "sha256": "aee4b712d4e4e19154a4a71115550ed7167a4f5f68327525834528cef6e4ab76"
+    },
+    {
+      "path": "out/RC-TEARDOWN-3/yoga-010127Z-395328-gate-ready.png",
+      "bytes": 791579,
+      "sha256": "1baceebfe2a31e82c3cad7f93260fe831aaaa5967e1ab69b8e5854717de7eb97"
+    },
+    {
+      "path": "out/RC-TEARDOWN-3/yoga-010127Z-560628-gate-ready.png",
+      "bytes": 789611,
+      "sha256": "82390800e6a0bebabac67d323b262d139fda8db70580b0b358d2428b24a1f1d4"
+    },
+    {
+      "path": "out/RC-TEARDOWN-3/yoga-010129Z-459959-return-cpu-held-40.png",
+      "bytes": 1123702,
+      "sha256": "64ab4b267c75dfabf03155156ff5c9dd016ded3c3e1068e48dc7ec06c52555c2"
+    },
+    {
+      "path": "out/RC-TEARDOWN-3/yoga-010129Z-886937-gate-return-sonic-held.png",
+      "bytes": 1123453,
+      "sha256": "9ae2c149552bd5904ee982feb430f10b05588e9e046debe6bf0cf8b92ec89d95"
+    },
+    {
+      "path": "out/RC-TEARDOWN-3/yoga-010132Z-048496-gate-ready.png",
+      "bytes": 806222,
+      "sha256": "53a9042338d68e5c0236b33829ee2fb1d9d5c86e8f52f8f87145332203c0440a"
+    },
+    {
+      "path": "out/RC-TEARDOWN-3/yoga-010132Z-561994-gate-ready.png",
+      "bytes": 804685,
+      "sha256": "a40289373b7efa629bb7fcdf0c1fd0d7cebf09b4fbb03075d5ece05cb091a5e7"
+    },
+    {
+      "path": "out/RC-TEARDOWN-3/yoga-010132Z-996316-returned-steve-lucas-ready.png",
+      "bytes": 805104,
+      "sha256": "f9a06f84b52b652f3931e0d427de796745501d9cf0a13ad109796da068b0e867"
+    },
+    {
+      "path": "out/RC-TEARDOWN-3/yoga-010136Z-251373-hud-before-0.png",
+      "bytes": 190794,
+      "sha256": "afb845a47c31a310951cf08861f291a49417bdeb02d95a9dbe42ac1e2797a133"
+    },
+    {
+      "path": "out/RC-TEARDOWN-3/yoga-010136Z-284690-gate-training-hud-unpaused.png",
+      "bytes": 195187,
+      "sha256": "b99a7cad3efa64c853d5f307fbebd1e84ee5a158331de96ecb9ba76dbf052e98"
+    },
+    {
+      "path": "out/RC-TEARDOWN-3/yoga-010138Z-998874-Captain-Falcon.png",
+      "bytes": 165110,
+      "sha256": "7fe23f31dea535aedf758fc879cb4624a18ae2162d4f888403cdb669b17ea5ab"
+    },
+    {
+      "path": "out/RC-TEARDOWN-3/yoga-010139Z-879620-gate-hud-settled-0.png",
+      "bytes": 231190,
+      "sha256": "c2a9a13bda622427a039afe5d00bc219e5fef01a2beab2ec26ded01b70fcc076"
+    },
+    {
+      "path": "out/RC-TEARDOWN-3/yoga-010140Z-244181-settled-Captain-Falcon.png",
+      "bytes": 232560,
+      "sha256": "e1a56e66c7a7accf8b7ab5ab2dc1f5d03857c552f972ea94cca6af24b2144fc3"
+    },
+    {
+      "path": "out/RC-TEARDOWN-3/yoga-010140Z-550019-gate-hud-settled-0.png",
+      "bytes": 233291,
+      "sha256": "7a0ec403748471547e7d27a0a450dac71b52ba5f3e90ea50ccd6da595b9d8703"
+    },
+    {
+      "path": "out/RC-TEARDOWN-3.json",
+      "bytes": 27063,
+      "sha256": "0f443f76e599a42981b884f2e5636564b509507fe0ff42c11d3ad744f1a118df"
+    },
+    {
+      "path": "out/actions.jsonl",
+      "bytes": 190718,
+      "sha256": "6209a04931ecd53242a5e7622ddb3b06f67a9acdf737785728019045f34b9ac3"
+    },
+    {
+      "path": "out/dry-run.json",
+      "bytes": 1049,
+      "sha256": "027c770699f9dba92ce4fbab780a58b05583c98d79719a37c90612bf3f0fb769"
+    },
+    {
+      "path": "out/manifests/812a28b532c6020103a72105d20cbf4a9be85064d5597cf72923429431caaea9.json",
+      "bytes": 33404,
+      "sha256": "812a28b532c6020103a72105d20cbf4a9be85064d5597cf72923429431caaea9"
+    },
+    {
+      "path": "out/pace.json",
+      "bytes": 69,
+      "sha256": "d10b4ad79087e7c6eb7dec5b6a867693a8521cf5b8317ce85f51f5a370adf2da"
+    },
+    {
+      "path": "out/project-state.json",
+      "bytes": 55,
+      "sha256": "0d3ec50c2679a779217b529c0120a53ea175bc23679653db503b1a69845e8006"
+    },
+    {
+      "path": "reentry-contact.png",
+      "bytes": 285142,
+      "sha256": "5ccb3f4107aa56ed7a6f4d8f219c7b3dca22b36ec7ce5023df0cb59e6fb8435d"
+    },
+    {
+      "path": "rows/HANDOFF.md",
+      "bytes": 1895,
+      "sha256": "cee83245349ce89e8c39e4cc8f370083751a9af4aa1dcca27881c40367a4c80a"
+    },
+    {
+      "path": "rows/base.py",
+      "bytes": 12555,
+      "sha256": "9db689e69d44aeb284eda62c579249c9cb79bcc992e0a801b956ed453198eec0"
+    },
+    {
+      "path": "rows/baseline.json",
+      "bytes": 16946,
+      "sha256": "77e8dc122317171670b32d45ba3a283992eff0497dd4015f0dc92be40f38330b"
+    },
+    {
+      "path": "rows/catalog.json",
+      "bytes": 5714,
+      "sha256": "b55ca29c87ebb25a469d99336be50c92a750b3a92c52e13c61364e1f2d916ce0"
+    },
+    {
+      "path": "rows/lead.py",
+      "bytes": 10480,
+      "sha256": "2c64e4bbb735b387d67c4de4e420651481e1e64dc8084a083907ae897571456a"
+    },
+    {
+      "path": "rows/lr16.py",
+      "bytes": 1425,
+      "sha256": "ad674c1d3dc13c6b515fc61040be9352f51f0a0ca157d235ad61c0bdb9c1514a"
+    },
+    {
+      "path": "rows/navigation.py",
+      "bytes": 4872,
+      "sha256": "15f78946418b9af2aed88857631f9c968c12e5c485e3b10163bc22f3dacb8ad5"
+    },
+    {
+      "path": "rows/out/dry-run.json",
+      "bytes": 1096,
+      "sha256": "1db06890d350d9d8366bdde5bd6444318d59fc6fe5503f178c2cdb8d0c7b3bd3"
+    },
+    {
+      "path": "rows/pilot-markers.json",
+      "bytes": 2324,
+      "sha256": "0a6d3669b4986b0fd9485ef694ce0e529b990e73965ab04614ad9707031734ec"
+    },
+    {
+      "path": "rows/pilot_gates.py",
+      "bytes": 10976,
+      "sha256": "17ddefbb87f6e1b396c6f9b5e825fbd845b16974bf99d0dccf04ffe2f59021c2"
+    },
+    {
+      "path": "rows/prior.py",
+      "bytes": 17660,
+      "sha256": "85386dde228186530d36eedf5a026aea532e5b0a534434efedb7be446e8352e0"
+    },
+    {
+      "path": "rows/rc-settings/cycle_preload.ini",
+      "bytes": 218,
+      "sha256": "19cf0208af0d9956a39521b1d7e3110ab35d3fd30c4c0879873b9fd79e0902c5"
+    },
+    {
+      "path": "rows/rc-settings/developer.ini",
+      "bytes": 18,
+      "sha256": "67a947da3d85f460168f7a06578ff1d7ac8607bad52f8619c0b30fa8cfba68cf"
+    },
+    {
+      "path": "rows/rc-settings/hats-canonical.json",
+      "bytes": 809,
+      "sha256": "fe0d3cb2f2aa3b6ba4d0d1519f6a5eeee9247171b0bba259ac42a21b306a06d7"
+    },
+    {
+      "path": "rows/rc-settings/hats-role-0.json",
+      "bytes": 734,
+      "sha256": "7fc3cb13a97713c7573cbf9778a95c8749509dc5655458d39468b9d41c06bed4"
+    },
+    {
+      "path": "rows/rc-settings/hats-role-1.json",
+      "bytes": 1310,
+      "sha256": "b1cf8278a64f7a19596657ac5ccc84c7d736e05f8d37673cd019cfeb8e5198f0"
+    },
+    {
+      "path": "rows/rc-settings/initial.json",
+      "bytes": 16946,
+      "sha256": "20e9c5081a05a06e51671e7041fa613d79b8d05232690781b42483dc4b3faabb"
+    },
+    {
+      "path": "rows/rc-settings/kirby-hats.json",
+      "bytes": 1942,
+      "sha256": "bb0c5b417840989057a3905bfac733ddfaede8d9c37db2eeef995d6d08904441"
+    },
+    {
+      "path": "rows/rc-settings/mii-bank.json",
+      "bytes": 7116,
+      "sha256": "aa131c8acb75f317bf4bebc98e7d2cbf90b6f1f8b592a8d6040a79a934fa6836"
+    },
+    {
+      "path": "rows/rc-settings/notice-both.json",
+      "bytes": 7116,
+      "sha256": "67af394049375e4b1170a013fa2a8ddd47fedffd491f295270438e8331e54908"
+    },
+    {
+      "path": "rows/rc-settings/notice-cpu.json",
+      "bytes": 7116,
+      "sha256": "adae8cc12da274b6973baf0056e8701cc559d1a9508380a3636f56e9be95dc41"
+    },
+    {
+      "path": "rows/rc-settings/notice-p1.json",
+      "bytes": 7116,
+      "sha256": "9f87cbbb3cc04e698bf07c2368dbd67e628f2afa169972e1e4850c01de068544"
+    },
+    {
+      "path": "rows/rc-settings/notice-valid-cpu.json",
+      "bytes": 7116,
+      "sha256": "19cbb874003eaa3b4f55beef82fecc97f2160fb13577cfda051ff40fc697b51b"
+    },
+    {
+      "path": "rows/rc-settings/notice-valid-p1.json",
+      "bytes": 7116,
+      "sha256": "cde75fdac748162675a7a433e10a1ae3a7bba5813471e7447e2e0517544e2ae9"
+    },
+    {
+      "path": "rows/rc-settings/ordinary-return.json",
+      "bytes": 16946,
+      "sha256": "20e9c5081a05a06e51671e7041fa613d79b8d05232690781b42483dc4b3faabb"
+    },
+    {
+      "path": "rows/rc-settings/slow-36.json",
+      "bytes": 7116,
+      "sha256": "0ede38b39e697ebd9c6b8950ab24f67bd8b86481402d3b55ef0a4ee1f86cf366"
+    },
+    {
+      "path": "rows/rc-settings/specials-aegis.json",
+      "bytes": 1335,
+      "sha256": "80bce0b3dff70647756cdeb747efe713d3373c597b8b0f01edb36285262a0db9"
+    },
+    {
+      "path": "rows/rc-settings/specials-ic.json",
+      "bytes": 1335,
+      "sha256": "c8146f74d25232d7fbaa8cc59f20dbdae5f5c8c876b65dd091449bae893962ad"
+    },
+    {
+      "path": "rows/rc-settings/specials-ordinary.json",
+      "bytes": 1335,
+      "sha256": "7bc2b47150e85a1f0d97edce27f47ea38dee3236c987b27030af4fba5b168e0c"
+    },
+    {
+      "path": "rows/rc-settings/specials-pt.json",
+      "bytes": 1335,
+      "sha256": "7bc2b47150e85a1f0d97edce27f47ea38dee3236c987b27030af4fba5b168e0c"
+    },
+    {
+      "path": "rows/rc_roster_segment.py",
+      "bytes": 14873,
+      "sha256": "3ce86876dbe270ce7617ae358e00bfac734a75a0740c00be7b58c404b8789d93"
+    },
+    {
+      "path": "rows/refs/112112-cpu-row.png",
+      "bytes": 218137,
+      "sha256": "85308502ea5df5574095975894616e99e1f6c6b7e66c3f07942f837b2ffb33d7"
+    },
+    {
+      "path": "rows/refs/112115-cpu-tag.png",
+      "bytes": 232153,
+      "sha256": "ffba72e5517692a3034bf7d5d8091e4e0b03cf7588facd920b81d562009c6acf"
+    },
+    {
+      "path": "rows/refs/112253-player-row.png",
+      "bytes": 460595,
+      "sha256": "16f38936547346bff699dd5c3009b492a24af02837ed38483b26d03e6fb02931"
+    },
+    {
+      "path": "rows/refs/112256-player-tag.png",
+      "bytes": 244057,
+      "sha256": "8fbab7baa4cca0e919234ce2588a5a1e026c9cf40edd168c58809304ff02832a"
+    },
+    {
+      "path": "rows/refs/cpu-held74.png",
+      "bytes": 12296,
+      "sha256": "b0e89ddafe4979de6deb208412f869745f8e0692f6a07694d87e2f05fbec8ab7"
+    },
+    {
+      "path": "rows/refs/cpu85-held.png",
+      "bytes": 6386,
+      "sha256": "552ed5825f743b85e469d8104d6d8bf5ac099c8e46346a70b86f7e4a267c8ed5"
+    },
+    {
+      "path": "rows/refs/css.png",
+      "bytes": 133535,
+      "sha256": "a7a15642548952e4e263e42d467542b2877576cac4785061c21988e6cd7c0b76"
+    },
+    {
+      "path": "rows/refs/current-pilot-cpu.png",
+      "bytes": 194903,
+      "sha256": "6a109b1da041e11c0a89f5214deec9c45bbfe02b2406b1507de96a023b6ee4ba"
+    },
+    {
+      "path": "rows/refs/current-pilot-player.png",
+      "bytes": 258703,
+      "sha256": "5f04fce5640cd388096879d640d41aa62fcef931b9363f427f36f24447b775fb"
+    },
+    {
+      "path": "rows/refs/main.png",
+      "bytes": 10178,
+      "sha256": "902628cebd8620847be44e41a826046740f495ca0dfa7e78d8482c43c0da1bdc"
+    },
+    {
+      "path": "rows/refs/native-pause.png",
+      "bytes": 5406,
+      "sha256": "3f03f8a24e7685cf86c5c00f4d06d2d48a3d15d23259c64872d0a5ff4ba717e5"
+    },
+    {
+      "path": "rows/refs/quit-focus.png",
+      "bytes": 5760,
+      "sha256": "8101e26010b70dc07f24bac30c077c2152059f87f27f4b6c0d30a0b197b69c67"
+    },
+    {
+      "path": "rows/refs/ready.png",
+      "bytes": 10857,
+      "sha256": "760e864b6bfdfd06d46fd0ce8ceed91f456f09f2caef75401d4e9a49a952522f"
+    },
+    {
+      "path": "rows/refs/return-roy-held.png",
+      "bytes": 3546,
+      "sha256": "08f86998536a62d02ccb8709b1cd5aa33696b24bed948f1bee2fa164ded1aaf3"
+    },
+    {
+      "path": "rows/refs/return-sonic-held.png",
+      "bytes": 1121687,
+      "sha256": "e42d97e1d1b1f8ec59708299fb8317f5a71efb8db25f2c33cec7646aa5726871"
+    },
+    {
+      "path": "rows/refs/smash-submenu.png",
+      "bytes": 3652,
+      "sha256": "ab968c4f7e3b2562cca4bd363ce9979847edf311c834873af24c45e4df3e0fd7"
+    },
+    {
+      "path": "rows/refs/stage.png",
+      "bytes": 5038,
+      "sha256": "99e7013e2be97b8173498e36a9b0e3b849c4e403bd239f1febda185470617033"
+    },
+    {
+      "path": "rows/refs/steve-selected.png",
+      "bytes": 3588,
+      "sha256": "e643e8ff4b88a51db98a47956725384342f8e3a2288aa43afcea4f41746ea37f"
+    },
+    {
+      "path": "rows/refs/title.png",
+      "bytes": 137065,
+      "sha256": "d596fc978988d3bd65678fc95f915016e76af5fef12c3de2cd52734cdb7856ac"
+    },
+    {
+      "path": "rows/refs/training-closed.png",
+      "bytes": 1753,
+      "sha256": "bf8371948c69d7ab8871254389ed81e85fc316eaeaf547f128b3d770154e238d"
+    },
+    {
+      "path": "rows/refs/training-hud-unpaused.png",
+      "bytes": 745,
+      "sha256": "7ecf9a4258ace218ad179e2fe14dcaf9d3dd906c594dec2ec8216cb5e02a8d2c"
+    },
+    {
+      "path": "rows/review.py",
+      "bytes": 8442,
+      "sha256": "f3c8ac595c536ab07e80555038a11a5ba0a008676fa1816349f83072d7f5458e"
+    },
+    {
+      "path": "rows/rows.json",
+      "bytes": 33404,
+      "sha256": "812a28b532c6020103a72105d20cbf4a9be85064d5597cf72923429431caaea9"
+    },
+    {
+      "path": "rows/segments/confirm-native-quit-frames.edenmacro.json",
+      "bytes": 578,
+      "sha256": "6fc21293dea72efe1bfb888735d8a62d8a6754d8a1855e8bbcde9af08e24080b"
+    },
+    {
+      "path": "rows/segments/cpu-hat-next.edenmacro.json",
+      "bytes": 1506,
+      "sha256": "759f368fc126ef2e43dc9cb8868dff970edc6b844b812debc45cc3c65f676bf3"
+    },
+    {
+      "path": "rows/segments/cpu-next-frames.edenmacro.json",
+      "bytes": 571,
+      "sha256": "771d9c618735334c245cbe3ea86f6753f73744aaff6841945ab9b570506f17f5"
+    },
+    {
+      "path": "rows/segments/cpu74-lucas.edenmacro.json",
+      "bytes": 4053,
+      "sha256": "0c1b4ceca55fbd4c41f0be6040c072b0d21b2804d814b0bc541a0d91761c3298"
+    },
+    {
+      "path": "rows/segments/enter-training.edenmacro.json",
+      "bytes": 569,
+      "sha256": "7cdd035473160fec1a0e8c601c05f599f5b21556ac1cb4479b358c629e05b5c1"
+    },
+    {
+      "path": "rows/segments/focus-native-quit-frames.edenmacro.json",
+      "bytes": 579,
+      "sha256": "281999e46939ca06c960cef0108b28672c611435d33260ddeddfc6c9dd475b46"
+    },
+    {
+      "path": "rows/segments/hat-next.edenmacro.json",
+      "bytes": 562,
+      "sha256": "90fb2d7218d3946b3e43dfd8f025b932a6e8fc230ce0204516840aa31e415b55"
+    },
+    {
+      "path": "rows/segments/intro-cancel.edenmacro.json",
+      "bytes": 570,
+      "sha256": "1b506dbfc689e79e8bfca69b74274ab674b91ac8359219a1a4c95faa81aae70f"
+    },
+    {
+      "path": "rows/segments/kirby-taunt-loss.edenmacro.json",
+      "bytes": 572,
+      "sha256": "b498e49e9dfb149f832c4851b3556779b758643a7a1d56a527b11c0c844642b1"
+    },
+    {
+      "path": "rows/segments/lr04-cpu-approach.edenmacro.json",
+      "bytes": 915,
+      "sha256": "27b8846bc5f9aa21d7c3746d1cef7894369f7479f29f937c248ca5f23d580396"
+    },
+    {
+      "path": "rows/segments/lr04-cpu-pick.edenmacro.json",
+      "bytes": 1602,
+      "sha256": "fc6319148f476318cbd86fb5a2d3d63e4b135808aa34a21cada687b6dbddc1f9"
+    },
+    {
+      "path": "rows/segments/lr04-cpu85-to74.edenmacro.json",
+      "bytes": 570,
+      "sha256": "96f97989b34e29973e53d7ad4174cdececb754e1727bb22c5ca7d7abde102cdb"
+    },
+    {
+      "path": "rows/segments/lr04-return-cpu-pick.edenmacro.json",
+      "bytes": 1610,
+      "sha256": "cb9f52fb0a7256174eb44eb2202ac11057fc6f0de848bea27a841d7df75dab28"
+    },
+    {
+      "path": "rows/segments/lr04-roy-lucas.edenmacro.json",
+      "bytes": 917,
+      "sha256": "dc74d27fceb1d3387e2d0679424f2f9de484762dc634da7d532115e9b20c0702"
+    },
+    {
+      "path": "rows/segments/lr10-p1-short.edenmacro.json",
+      "bytes": 2112,
+      "sha256": "b9bada57630efa1a0b101b03ec9115596a94bb746cc94697d4cb6006ceb478a8"
+    },
+    {
+      "path": "rows/segments/lr13-request-quit-frames.edenmacro.json",
+      "bytes": 2108,
+      "sha256": "0064db5b2e2887005299fd9bfb8e1d925182778d7f4287a3f8604be8cdc3ed13"
+    },
+    {
+      "path": "rows/segments/lr14-request-quit-frames.edenmacro.json",
+      "bytes": 1797,
+      "sha256": "86ec79593c8656f28b73146a098db4001ddaf89d3b9ca781d83b883f92341650"
+    },
+    {
+      "path": "rows/segments/lucas-pick.edenmacro.json",
+      "bytes": 734,
+      "sha256": "7d74e4e47ffa0a99604767a08e0188a647281926508c614ac7f42c0590991f66"
+    },
+    {
+      "path": "rows/segments/main-stage.edenmacro.json",
+      "bytes": 8596,
+      "sha256": "ce6714b44f34f04cacd0d17454e4773c8906d289e5a37e34c606c604e6e4acfb"
+    },
+    {
+      "path": "rows/segments/p1-next-frames.edenmacro.json",
+      "bytes": 742,
+      "sha256": "d56e381eebfc979cfc4380a80f24af11c057990f306c4ad66b23c6e6641d6df4"
+    },
+    {
+      "path": "rows/segments/pause-close.edenmacro.json",
+      "bytes": 563,
+      "sha256": "5e8ab5d918a72f8825aa47489cf0895edf975642cb915e74e6cfceed61982969"
+    },
+    {
+      "path": "rows/segments/pause-open.edenmacro.json",
+      "bytes": 565,
+      "sha256": "64dd73ecc545a194de80411cddb3b8cbd5e37be8e7a4e077a39a5dedee23fe24"
+    },
+    {
+      "path": "rows/segments/pilot-arm.edenmacro.json",
+      "bytes": 738,
+      "sha256": "bd024e051944683b3ef4b73fc0da3821d03c3627d441eed05e0477531961e728"
+    },
+    {
+      "path": "rows/segments/pilot-page-step.edenmacro.json",
+      "bytes": 573,
+      "sha256": "db109fa89164d216cf7516057f28626012db5f7015ee870691e47c194074c2ac"
+    },
+    {
+      "path": "rows/segments/pilot-release.edenmacro.json",
+      "bytes": 570,
+      "sha256": "48793ebf9713be0db63f2dfa3575e4ce0e84e68fa6e0c923c50a1b1c08780b92"
+    },
+    {
+      "path": "rows/segments/stage-css.edenmacro.json",
+      "bytes": 561,
+      "sha256": "240249606f15207106e4cc654cc3ee173efa97d51ea276586c82e6c7c438db74"
+    },
+    {
+      "path": "rows/segments/steve-hover.edenmacro.json",
+      "bytes": 566,
+      "sha256": "edf2fb3e2db4b65571420dbc839219a005687f7b8685bf7201f940d06d2dd414"
+    },
+    {
+      "path": "rows/segments/steve-place.edenmacro.json",
+      "bytes": 734,
+      "sha256": "c02d3b0a91229c573ee848b686afc575649b4697734c3041351525e98dbe2fdc"
+    },
+    {
+      "path": "rows/segments/title-main.edenmacro.json",
+      "bytes": 562,
+      "sha256": "4aec26838a662da6d8b171800c30971e8cabb660bb09b864d1ec703ab602c44e"
+    },
+    {
+      "path": "rows/segments/tr-menu-close.edenmacro.json",
+      "bytes": 565,
+      "sha256": "053cc52d14e53619148e497728801ecb402d78bae9c3604f23588d20ee3e8b26"
+    },
+    {
+      "path": "rows/segments/tr-menu-open.edenmacro.json",
+      "bytes": 567,
+      "sha256": "e5a74d02bad51116d0a3346d2084587705bbcfbcf40835ff53c0e5d4ed5160d7"
+    },
+    {
+      "path": "rows/segments/tr2-grab.edenmacro.json",
+      "bytes": 1516,
+      "sha256": "669636ea88736e083359108702781d4413253bd18467565412af5bd67a618f81"
+    },
+    {
+      "path": "rows/segments/tr2-jab-x4.edenmacro.json",
+      "bytes": 4007,
+      "sha256": "8711f9282b8042cbb15bd57379a2105d3d9a787ad2405361cff73a13b034b1c2"
+    },
+    {
+      "path": "rows/segments/tr2-shield-hold-60.edenmacro.json",
+      "bytes": 1525,
+      "sha256": "98932c52af8031de73fc5c1ca31a27288376228db0cf80e51e4efa0a7caabca5"
+    },
+    {
+      "path": "rows/slim_actions.py",
+      "bytes": 12171,
+      "sha256": "83f7a20498280cfa558b3575e3a9d664d24f3759cd6b22672d0540b6ede4d793"
+    },
+    {
+      "path": "rows/steps.py",
+      "bytes": 11549,
+      "sha256": "921512201a3f387c2383f357397b14d5e2386b4c06f40bcd94eb84dcef3f1b4a"
+    },
+    {
+      "path": "rows/strict_predicates.py",
+      "bytes": 1094,
+      "sha256": "f5a6c99482c94b0a2c18a27c917be5d7734d8a6525caef9da4626555fc84249b"
+    },
+    {
+      "path": "runner.log",
+      "bytes": 1721,
+      "sha256": "d3cfec078a2c9702b9f262d2fb370f42dc2ef83d40584dfa7cb7c80f3783eacc"
+    },
+    {
+      "path": "state/.lock",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "state/actions.jsonl",
+      "bytes": 166543,
+      "sha256": "b0188496ecd25c050511da91db629f83b97e859d4e82e8f2a863bf72784643d2"
+    },
+    {
+      "path": "state/dry-run.json",
+      "bytes": 1049,
+      "sha256": "027c770699f9dba92ce4fbab780a58b05583c98d79719a37c90612bf3f0fb769"
+    },
+    {
+      "path": "state/instances.json",
+      "bytes": 1152,
+      "sha256": "daf26a138d1bc7e3e0614d296d00148fec2b27784e7c2895e2072a60d4ec01b1"
+    },
+    {
+      "path": "state/lifecycle.json",
+      "bytes": 13115,
+      "sha256": "414fb4333738ffeb01f3ee50e21815aa49d4261d859e404f353dbd4eb98501ea"
+    },
+    {
+      "path": "state/run-yoga/console.log",
+      "bytes": 837078,
+      "sha256": "766b4eb3d75d815dcd7e008845039c69923f708e6919e96762ef433b0d48c868"
+    },
+    {
+      "path": "state/run-yoga/control.jsonl",
+      "bytes": 394801,
+      "sha256": "12059acbb70720e95bc56a49ec209ff0d547f43e50a11a1324c302a0dae3b14b"
+    },
+    {
+      "path": "state/run-yoga/memory.peak",
+      "bytes": 11,
+      "sha256": "11047b1dca899a95c43b45b299502ce3ee0a0ff6faf7302f721ebaf1b7d250a5"
+    },
+    {
+      "path": "state/run-yoga/run.json",
+      "bytes": 1688,
+      "sha256": "b1fa344b006cb0fa47c486a69a17853ced114cea883a433d073f789022f1f505"
+    },
+    {
+      "path": "state/run-yoga/trace.json",
+      "bytes": 1012,
+      "sha256": "d309729d0245f2ebc8a56de97522f75c7f172321f5828cfe7df0e683251b08d3"
+    },
+    {
+      "path": "state/run-yoga/yoga.trace.jsonl",
+      "bytes": 46652,
+      "sha256": "d8f0604da2eb4e1b4929517a22a81552c14932f905bb286c36a76b580a4599c3"
+    },
+    {
+      "path": "state/yoga-restore.json",
+      "bytes": 89,
+      "sha256": "f46e5fb4be288a8fdbf9fb219f900b81743f714b4b3ead6cc9760f8f4d14c893"
+    },
+    {
+      "path": "state/yoga-snapshot.json",
+      "bytes": 5091013,
+      "sha256": "f7aed7ef53757f20e445f4c23512316f0ec5262a4a543ac72e3e336a6b77c812"
+    },
+    {
+      "path": "state/yoga-verify.json",
+      "bytes": 66,
+      "sha256": "90047eb5e48ed394cfa070220a5888833bd40204da9e291168d3b7423429e39e"
+    },
+    {
+      "path": "timing.json",
+      "bytes": 312,
+      "sha256": "fd6ef32ff5cc3e7fc08f196d96a72653147c2cd79658e5b018168f7b4d1ef971"
+    },
+    {
+      "path": "unit-journal.log",
+      "bytes": 4752,
+      "sha256": "70daac380a9223903ab67c31eeefb98068f3aab16c03df1bb7f419eb9ca4f622"
+    }
+  ]
+}

@@ -1,0 +1,1276 @@
+{"on": "yoga", "method": "trace.list", "params": null, "ok": true, "time": 1793753879.12608}
+{"on": "yoga", "method": "trace.list", "params": null, "ok": true, "time": 1793753879.126334}
+{"on": "yoga", "method": "modules.list", "params": null, "ok": true, "time": 1793753879.1265152}
+{"hook": true, "on": "yoga", "trace_wiring": {"main+0x653240": "1", "main+0x6524e0": "2"}, "trace_jsonl": "/home/intpa/eden-runs/lr-16/state/run-yoga/yoga.trace.jsonl", "modules": {"modules": [{"base": "0x80a87000", "build_id": "285183cac95179371cc22cec3723f882e1589659000000000000000000000000", "name": "rtld", "size": "16384"}, {"base": "0x80a8b000", "build_id": "21450c647b8c5940ed5b68218ea128fd3c5d597d000000000000000000000000", "name": "main", "size": "121929728"}, {"base": "0x87ed3000", "build_id": "60c6edbbfcebd4176cc301d5d9cb5a6f094f9360000000000000000000000000", "name": "subsdk0", "size": "7426048"}, {"base": "0x885e8000", "build_id": "eaa2c23a4aa1fabbeb98f389c47e0450570cab0c000000000000000000000000", "name": "subsdk9", "size": "122880"}, {"base": "0x88606000", "build_id": "5fd4f531c1195e9e5510c9e73f22cd39612839f8000000000000000000000000", "name": "sdk", "size": "13611008"}, {"base": "0x65e0cc000", "build_id": "d9d3ca4865e015d425e8f94a58da63077145db01bcf290adc27e052db4e074ad", "name": "nro:d9d3ca4865e015d425e8f94a58da63077145db01bcf290adc27e052db4e074ad", "size": "139264"}, {"base": "0x871392000", "build_id": "4fc17f530e56f29473461204d4a50cf7423f398d812e418653c8d6085eb448ce", "name": "nro:4fc17f530e56f29473461204d4a50cf7423f398d812e418653c8d6085eb448ce", "size": "126976"}, {"base": "0xa1cecb000", "build_id": "ff821cc231d1ea3ae44e97994b12d6681a3dab63000000000000000000000000", "name": "nro:ff821cc231d1ea3ae44e97994b12d6681a3dab63000000000000000000000000", "size": "1540096"}, {"base": "0x25d7fd1000", "build_id": "13f5177a7e86f0150f1a22aa9e611eacd010397c000000000000000000000000", "name": "nro:13f5177a7e86f0150f1a22aa9e611eacd010397c000000000000000000000000", "size": "8544256"}, {"base": "0x2772ea6000", "build_id": "8a0af59aa8aa2e452c03fd979490b1f102edaface3ad0a4faaded275c216d965", "name": "nro:8a0af59aa8aa2e452c03fd979490b1f102edaface3ad0a4faaded275c216d965", "size": "57344"}, {"base": "0x2d872d6000", "build_id": "fb9ef633eef26ca4cf3bf9cfdef95e00e09a52ef34d4aaa1c680a39150c7bb4f", "name": "nro:fb9ef633eef26ca4cf3bf9cfdef95e00e09a52ef34d4aaa1c680a39150c7bb4f", "size": "114688"}, {"base": "0x3913090000", "build_id": "a814751f043feb85f420817822a8131224b7183f000000000000000000000000", "name": "nro:a814751f043feb85f420817822a8131224b7183f000000000000000000000000", "size": "1462272"}, {"base": "0x3be0f1c000", "build_id": "508704be83a09b949e5f6f26d8a61600af7dce120c9e82b26c5b550a17053621", "name": "nro:508704be83a09b949e5f6f26d8a61600af7dce120c9e82b26c5b550a17053621", "size": "57344"}, {"base": "0x3c91acc000", "build_id": "c3cfb834914e233ab0068d5607f03d55c2fcb947bc861df032b96e63168f10a1", "name": "nro:c3cfb834914e233ab0068d5607f03d55c2fcb947bc861df032b96e63168f10a1", "size": "503808"}, {"base": "0x51e1570000", "build_id": "be8df7b97fba1b3cdbe3bb9c746eab167e79a9bb000000000000000000000000", "name": "nro:be8df7b97fba1b3cdbe3bb9c746eab167e79a9bb000000000000000000000000", "size": "1417216"}, {"base": "0x51fb02c000", "build_id": "a780fbeb1e37a009aeb17234bd4fe99cc8eb93e8000000000000000000000000", "name": "nro:a780fbeb1e37a009aeb17234bd4fe99cc8eb93e8000000000000000000000000", "size": "4259840"}, {"base": "0x69cc021000", "build_id": "10b23442aaf54a1709837213cf470c031e9568635d538b1d17f30537913fcec4", "name": "nro:10b23442aaf54a1709837213cf470c031e9568635d538b1d17f30537913fcec4", "size": "126976"}, {"base": "0x7386386000", "build_id": "adcd051806c2ef5ce4404e6ea584c0ffbcd87dcffe49102611aa6784f505c0c7", "name": "nro:adcd051806c2ef5ce4404e6ea584c0ffbcd87dcffe49102611aa6784f505c0c7", "size": "1208320"}, {"base": "0x7ca8a3a000", "build_id": "70fefd46ae26d11f9464f4bf30a821229252768e928ffee99bac27c45ea691d8", "name": "nro:70fefd46ae26d11f9464f4bf30a821229252768e928ffee99bac27c45ea691d8", "size": "6033408"}, {"base": "0x7f4261f000", "build_id": "6a467d2797fe8fe85eb4f3b7f99e700a9d37aa83000000000000000000000000", "name": "nro:6a467d2797fe8fe85eb4f3b7f99e700a9d37aa83000000000000000000000000", "size": "13348864"}]}, "time": 1793753879.126543}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753879.1280284}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/01-main/yoga-005759Z-079469-gate-main.png"}, "ok": true, "time": 1793753879.1537628}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753880.179906}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/01-main/yoga-005800Z-004310-gate-main.png"}, "ok": true, "time": 1793753880.2011356}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753881.210783}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/01-main/yoga-005801Z-929150-gate-main.png"}, "ok": true, "time": 1793753881.2307603}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753882.239322}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/01-main/yoga-005802Z-498532-gate-main.png"}, "ok": true, "time": 1793753882.4334433}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753883.462746}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/01-main/yoga-005803Z-886293-gate-main.png"}, "ok": true, "time": 1793753883.6560287}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753884.6817157}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/01-main/yoga-005804Z-838547-gate-main.png"}, "ok": true, "time": 1793753884.8252163}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753885.848748}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/01-main/yoga-005805Z-829640-gate-main.png"}, "ok": true, "time": 1793753885.9897616}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753887.0125713}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/01-main/yoga-005807Z-666189-gate-main.png"}, "ok": true, "time": 1793753887.1853676}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753888.214057}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/01-main/yoga-005808Z-201006-GATE-FAILED-main.png"}, "ok": true, "time": 1793753888.3568163}
+{"gate": "main", "on": "yoga", "recover": "intro-cancel", "after": "RuntimeError('gate main on yoga did not pass within 8 s')", "time": 1793753888.3570406}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/eden-runs/lr-16/rows/segments/intro-cancel.edenmacro.json"}, "ok": true, "time": 1793753888.3591952}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753888.3596516}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753888.5602365}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753888.7608593}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753888.9615808}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753889.1622334}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793753889.1624508}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753889.163781}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/01-main/yoga-005809Z-921970-gate-main.png"}, "ok": true, "time": 1793753889.1821525}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753890.1955404}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/01-main/yoga-005810Z-677812-gate-main.png"}, "ok": true, "time": 1793753890.2205925}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753891.2339635}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/01-main/yoga-005811Z-150271-gate-main.png"}, "ok": true, "time": 1793753891.2594707}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753892.272897}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/01-main/yoga-005812Z-024572-gate-main.png"}, "ok": true, "time": 1793753892.2964535}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753893.309432}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/01-main/yoga-005813Z-565057-gate-main.png"}, "ok": true, "time": 1793753893.3348293}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753894.3484719}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/01-main/yoga-005814Z-683952-gate-main.png"}, "ok": true, "time": 1793753894.3750503}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753895.385894}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/01-main/yoga-005815Z-980490-gate-main.png"}, "ok": true, "time": 1793753895.4112227}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753896.4233477}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/01-main/yoga-005816Z-436337-gate-main.png"}, "ok": true, "time": 1793753896.4467359}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753897.4587278}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/01-main/yoga-005817Z-820468-GATE-FAILED-main.png"}, "ok": true, "time": 1793753897.4828584}
+{"gate": "main", "on": "yoga", "recover": "intro-cancel", "after": "RuntimeError('gate main on yoga did not pass within 8 s')", "time": 1793753897.4831016}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/eden-runs/lr-16/rows/segments/intro-cancel.edenmacro.json"}, "ok": true, "time": 1793753897.4850228}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753897.4863207}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753897.6869252}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753897.887573}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753898.0881999}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753898.2888722}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793753898.2890851}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753898.2904236}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/01-main/yoga-005818Z-482556-gate-main.png"}, "ok": true, "time": 1793753898.3083215}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753899.3175724}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/01-main/yoga-005819Z-788631-gate-main.png"}, "ok": true, "time": 1793753899.3730316}
+{"gate": "main", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/01-main/yoga-005819Z-788631-gate-main.png", "time": 1793753899.3917463}
+{"gate": "installed", "on": ["yoga"], "pass": true, "lines": {"yoga": "cpu_common=installed"}, "time": 1793753899.3920422}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753899.3935335}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/01-main/yoga-005819Z-590613-main.png"}, "ok": true, "time": 1793753899.4484203}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793753899.4492292}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753899.451522}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/02-stage/yoga-005819Z-595604-gate-main.png"}, "ok": true, "time": 1793753899.5057306}
+{"gate": "main", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/02-stage/yoga-005819Z-595604-gate-main.png", "time": 1793753899.520356}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/eden-runs/lr-16/rows/segments/main-stage.edenmacro.json"}, "ok": true, "time": 1793753899.5214844}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753899.5220153}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753899.7244241}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753899.9256232}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753900.1261168}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753900.3267303}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753900.5273223}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753900.727901}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753900.9286342}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753901.1292717}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753901.3302016}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753901.5310597}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753901.7316282}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753901.9322941}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753902.1331077}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753902.3337479}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753902.5343444}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753902.7349489}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753902.9355307}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753903.136166}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753903.336825}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753903.5375288}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753903.7380946}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753903.9385498}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753904.139049}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753904.3396926}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753904.5402243}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753904.7407548}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753904.941306}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753905.1417742}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753905.342274}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753905.542782}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753905.7432675}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753905.9445636}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753906.1450958}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753906.345557}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753906.5466635}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753906.747206}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753906.9477367}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753907.1482131}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753907.348778}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753907.5494535}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753907.7501793}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753907.950885}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753908.151528}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753908.3521934}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753908.5528846}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753908.7535756}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753908.954286}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753909.1549559}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753909.3556}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753909.5562158}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793753909.556474}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753909.5581613}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/02-stage/yoga-005829Z-418043-gate-stage.png"}, "ok": true, "time": 1793753909.6575885}
+{"gate": "stage", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/02-stage/yoga-005829Z-418043-gate-stage.png", "time": 1793753909.6842961}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753909.6860185}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/02-stage/yoga-005829Z-099399-stage.png"}, "ok": true, "time": 1793753909.785346}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793753909.7859035}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753909.788014}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/03-css/yoga-005829Z-090214-gate-stage.png"}, "ok": true, "time": 1793753909.8880978}
+{"gate": "stage", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/03-css/yoga-005829Z-090214-gate-stage.png", "time": 1793753909.9148293}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/eden-runs/lr-16/rows/segments/stage-css.edenmacro.json"}, "ok": true, "time": 1793753909.9159873}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753909.9163783}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753910.1170897}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753910.3178096}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753910.5185359}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753910.7191522}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753910.9197361}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753911.1212316}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753911.3218973}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793753911.3221748}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753911.3238573}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/03-css/yoga-005831Z-035732-gate-css.png"}, "ok": true, "time": 1793753911.3440084}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753912.3606522}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/03-css/yoga-005832Z-832329-gate-css.png"}, "ok": true, "time": 1793753912.3783824}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753913.3947933}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/03-css/yoga-005833Z-923813-gate-css.png"}, "ok": true, "time": 1793753913.523617}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753914.5526483}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/03-css/yoga-005834Z-793294-gate-css.png"}, "ok": true, "time": 1793753914.6493542}
+{"gate": "css", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/03-css/yoga-005834Z-793294-gate-css.png", "time": 1793753914.6748152}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753914.6763086}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/03-css/yoga-005834Z-367291-css.png"}, "ok": true, "time": 1793753914.7716694}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793753914.7722747}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753914.7742958}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/04-steve/yoga-005834Z-431047-gate-css.png"}, "ok": true, "time": 1793753914.8693905}
+{"gate": "css", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/04-steve/yoga-005834Z-431047-gate-css.png", "time": 1793753914.9008174}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/eden-runs/lr-16/rows/segments/steve-hover.edenmacro.json"}, "ok": true, "time": 1793753914.9026823}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753914.9031773}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753915.103807}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753915.3044665}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753915.5051622}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753915.7058384}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753915.9065235}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753916.1071064}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793753916.1073399}
+{"gate": "steve78", "on": ["yoga"], "pass": true, "lines": {"yoga": "settled screen=css at=78 hovered=78"}, "time": 1793753916.1075208}
+{"gate": "steve78", "on": ["yoga"], "pass": true, "lines": {"yoga": "settled screen=css at=78 hovered=78"}, "time": 1793753916.107604}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/eden-runs/lr-16/rows/segments/steve-place.edenmacro.json"}, "ok": true, "time": 1793753916.1083999}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753916.1086323}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753916.3091707}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753916.5098143}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793753916.5100453}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753916.5114815}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/04-steve/yoga-005836Z-538682-gate-steve-selected.png"}, "ok": true, "time": 1793753916.611552}
+{"gate": "steve-selected", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/04-steve/yoga-005836Z-538682-gate-steve-selected.png", "time": 1793753916.6331005}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753916.6348684}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/04-steve/yoga-005836Z-976333-cpu-route-start.png"}, "ok": true, "time": 1793753916.7351768}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793753916.7359238}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753916.7378933}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/05a-cpu-approach/yoga-005836Z-958850-gate-steve-selected.png"}, "ok": true, "time": 1793753916.8375726}
+{"gate": "steve-selected", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/05a-cpu-approach/yoga-005836Z-958850-gate-steve-selected.png", "time": 1793753916.8591833}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/eden-runs/lr-16/rows/segments/lr04-cpu-approach.edenmacro.json"}, "ok": true, "time": 1793753916.8602843}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753916.860682}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753917.0612147}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753917.261829}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753917.4628582}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753917.6634667}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753917.8640437}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793753917.8642614}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753917.8656049}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/05a-cpu-approach/yoga-005837Z-665368-gate-steve-selected.png"}, "ok": true, "time": 1793753917.9667757}
+{"gate": "steve-selected", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/05a-cpu-approach/yoga-005837Z-665368-gate-steve-selected.png", "time": 1793753917.988298}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753917.9900684}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/05a-cpu-approach/yoga-005837Z-135893-cpu-approach-review.png"}, "ok": true, "time": 1793753918.0894458}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793753918.090172}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753918.0922265}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/05b-cpu-pick/yoga-005838Z-318904-gate-steve-selected.png"}, "ok": true, "time": 1793753918.1919813}
+{"gate": "steve-selected", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/05b-cpu-pick/yoga-005838Z-318904-gate-steve-selected.png", "time": 1793753918.2135165}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/eden-runs/lr-16/rows/segments/lr04-cpu-pick.edenmacro.json"}, "ok": true, "time": 1793753918.2147017}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753918.214995}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753918.4155467}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753918.6161394}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753918.816847}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753919.0175316}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753919.2181942}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753919.4187915}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753919.6194365}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793753919.6196666}
+{"gate": "cpu-token-fresh", "on": ["yoga"], "pass": true, "lines": {"yoga": "step screen=css dir=left from=86 to=85 token=p2"}, "time": 1793753919.6198032}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753919.6211786}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/05b-cpu-pick/yoga-005839Z-238283-cpu-held-review.png"}, "ok": true, "time": 1793753919.718255}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793753919.7189045}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753919.7207778}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/05c-cpu74/yoga-005839Z-846760-gate-cpu85-held.png"}, "ok": true, "time": 1793753919.8142104}
+{"gate": "cpu85-held", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/05c-cpu74/yoga-005839Z-846760-gate-cpu85-held.png", "time": 1793753919.8373098}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/eden-runs/lr-16/rows/segments/lr04-cpu85-to74.edenmacro.json"}, "ok": true, "time": 1793753919.83845}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753919.8387198}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753920.0392742}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753920.2398796}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793753920.2401187}
+{"gate": "cpu74-fresh", "on": ["yoga"], "pass": true, "lines": {"yoga": "step screen=css dir=up from=85 to=74 token=p2"}, "time": 1793753920.2402747}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753920.2415717}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/05c-cpu74/yoga-005840Z-630176-gate-cpu-held74.png"}, "ok": true, "time": 1793753920.3340724}
+{"gate": "cpu-held74", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/05c-cpu74/yoga-005840Z-630176-gate-cpu-held74.png", "time": 1793753920.3571706}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753920.3589022}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/05c-cpu74/yoga-005840Z-968116-cpu74.png"}, "ok": true, "time": 1793753920.452699}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793753920.4533186}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753920.455143}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/06-lucas/yoga-005840Z-200072-gate-cpu-held74.png"}, "ok": true, "time": 1793753920.5487933}
+{"gate": "cpu-held74", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/06-lucas/yoga-005840Z-200072-gate-cpu-held74.png", "time": 1793753920.571504}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/eden-runs/lr-16/rows/segments/cpu74-lucas.edenmacro.json"}, "ok": true, "time": 1793753920.5725744}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753920.5727992}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753920.7744918}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753920.975139}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753921.1757503}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753921.376357}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753921.5769897}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753921.7776139}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753921.9782228}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753922.178795}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753922.3794143}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753922.5801551}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753922.7808712}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753922.9815152}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753923.1822796}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753923.382897}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753923.5837102}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753923.7844965}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753923.9851637}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753924.1857502}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753924.3863919}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753924.5870953}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753924.7880208}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753924.9892824}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753925.1898901}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753925.3909857}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753925.5914543}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753925.7919683}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753925.9925501}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753926.1931856}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753926.393785}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753926.5944467}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753926.7950659}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753926.9956772}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753927.1962736}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753927.3967903}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753927.5973117}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753927.7982779}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753927.9989183}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753928.1994963}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753928.4007118}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753928.6013446}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753928.8019888}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753929.0025997}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793753929.0028257}
+{"gate": "lucas", "on": ["yoga"], "pass": true, "lines": {"yoga": "settled screen=css at=39 hovered=39"}, "time": 1793753929.0029662}
+{"gate": "lucas", "on": ["yoga"], "pass": true, "lines": {"yoga": "settled screen=css at=39 hovered=39"}, "time": 1793753929.0030422}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/eden-runs/lr-16/rows/segments/lucas-pick.edenmacro.json"}, "ok": true, "time": 1793753929.0039744}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753929.0043063}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753929.2054203}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753929.4060318}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753929.6066394}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753929.8072588}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753930.007906}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753930.20854}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753930.4102488}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793753930.4105618}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753930.4118257}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/06-lucas/yoga-005850Z-871451-gate-ready.png"}, "ok": true, "time": 1793753930.514554}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753931.5384793}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/06-lucas/yoga-005851Z-615483-gate-ready.png"}, "ok": true, "time": 1793753931.6432185}
+{"gate": "ready", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/06-lucas/yoga-005851Z-615483-gate-ready.png", "time": 1793753931.6653814}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753931.6670089}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/06-lucas/yoga-005851Z-135826-ready.png"}, "ok": true, "time": 1793753931.7704122}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793753931.7709632}
+{"gate": "delay2-settings", "on": "yoga", "pass": true, "copy": "/home/intpa/eden-runs/lr-16/out/07-training/delay2-settings-settings.json", "time": 1793753931.771729}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753931.7731168}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/07-training/yoga-005851Z-179861-gate-ready.png"}, "ok": true, "time": 1793753931.8757048}
+{"gate": "ready", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/07-training/yoga-005851Z-179861-gate-ready.png", "time": 1793753931.8975146}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/eden-runs/lr-16/rows/segments/enter-training.edenmacro.json"}, "ok": true, "time": 1793753931.899256}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753931.8997211}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753932.1003363}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753932.3009953}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753932.5016084}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753932.7021947}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753932.9029074}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753933.1036515}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793753933.1044245}
+{"gate": "p1-original", "on": ["yoga"], "pass": true, "lines": {"yoga": "[CharacterRoster] observed owner=0 entry=0x11ad89c000 kind=0x58"}, "time": 1793753938.2098622}
+{"gate": "cpu-original", "on": ["yoga"], "pass": true, "lines": {"yoga": "[CharacterRoster] observed owner=1 entry=0x11ad8a2000 kind=0x28"}, "time": 1793753938.5102997}
+{"gate": "catalog", "on": ["yoga"], "pass": true, "lines": {"yoga": "[MiiAutoInit] catalog ready; capture_armed=[true, true] generations=[2, 2] opening=2"}, "time": 1793753939.7118104}
+{"gate": "player-owner", "on": ["yoga"], "pass": true, "lines": {"yoga": "[MiiOrdinaryPlayer] catalog owner qualified; immutable origin retained"}, "time": 1793753939.7119734}
+{"gate": "cpu-owner", "on": ["yoga"], "pass": true, "lines": {"yoga": "[MiiOrdinaryCpu] catalog owner qualified; immutable origin retained"}, "time": 1793753939.7120576}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753939.7135823}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/07-training/yoga-005859Z-705270-gate-training-hud-unpaused.png"}, "ok": true, "time": 1793753939.742434}
+{"gate": "training-hud-unpaused", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/07-training/yoga-005859Z-705270-gate-training-hud-unpaused.png", "time": 1793753939.7537625}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753939.7554233}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/07-training/yoga-005859Z-486658-training.png"}, "ok": true, "time": 1793753939.7827306}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793753939.7834775}
+{"hook": true, "on": "yoga", "project_sha256": {"strict_predicates.py": "f5a6c99482c94b0a2c18a27c917be5d7734d8a6525caef9da4626555fc84249b", "steps.py": "921512201a3f387c2383f357397b14d5e2386b4c06f40bcd94eb84dcef3f1b4a", "base.py": "9db689e69d44aeb284eda62c579249c9cb79bcc992e0a801b956ed453198eec0", "review.py": "f3c8ac595c536ab07e80555038a11a5ba0a008676fa1816349f83072d7f5458e", "prior.py": "85386dde228186530d36eedf5a026aea532e5b0a534434efedb7be446e8352e0", "pilot_gates.py": "17ddefbb87f6e1b396c6f9b5e825fbd845b16974bf99d0dccf04ffe2f59021c2", "navigation.py": "15f78946418b9af2aed88857631f9c968c12e5c485e3b10163bc22f3dacb8ad5", "rc_roster_segment.py": "3ce86876dbe270ce7617ae358e00bfac734a75a0740c00be7b58c404b8789d93", "lr16.py": "ad674c1d3dc13c6b515fc61040be9352f51f0a0ca157d235ad61c0bdb9c1514a", "lead.py": "2c64e4bbb735b387d67c4de4e420651481e1e64dc8084a083907ae897571456a", "slim_actions.py": "83f7a20498280cfa558b3575e3a9d664d24f3759cd6b22672d0540b6ede4d793"}, "action": "teardown", "index": 1, "time": 1793753939.798376}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753939.8003466}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005859Z-422627-gate-training-hud-unpaused.png"}, "ok": true, "time": 1793753939.829893}
+{"gate": "training-hud-unpaused", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005859Z-422627-gate-training-hud-unpaused.png", "time": 1793753939.840457}
+{"hook": true, "on": "yoga", "settings_publication": "slow-36", "ack": "651973769 #212 [TrainingRooms] diag_settings_reload rerolls=0x0 issues=0", "time": 1793753940.3478134}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753940.3528469}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005900Z-967733-gate-training-hud-unpaused.png"}, "ok": true, "time": 1793753940.380033}
+{"gate": "training-hud-unpaused", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005900Z-967733-gate-training-hud-unpaused.png", "time": 1793753940.3904495}
+{"on": "yoga", "method": "input.button", "params": {"button": "plus", "state": "tap", "duration_ms": 120, "lease_ms": 620}, "ok": true, "time": 1793753940.3908482}
+{"gate": "pause", "on": ["yoga"], "pass": true, "lines": {"yoga": "pause_owner begin queue_dropped=0 owners=0x10"}, "time": 1793753940.5611172}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753940.5625463}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005900Z-599313-gate-native-pause.png"}, "ok": true, "time": 1793753940.5892031}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753941.601286}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005901Z-473824-gate-native-pause.png"}, "ok": true, "time": 1793753941.643402}
+{"gate": "native-pause", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005901Z-473824-gate-native-pause.png", "time": 1793753941.6548328}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753941.6567142}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005901Z-797833-gate-native-pause.png"}, "ok": true, "time": 1793753941.6931283}
+{"gate": "native-pause", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005901Z-797833-gate-native-pause.png", "time": 1793753941.7049525}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/eden-runs/lr-16/rows/segments/focus-native-quit-frames.edenmacro.json"}, "ok": true, "time": 1793753941.7062585}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753941.7066743}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753941.9072287}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753942.1078577}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793753942.1081102}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753942.1103354}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005902Z-487260-gate-quit-focus.png"}, "ok": true, "time": 1793753942.145286}
+{"gate": "quit-focus", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005902Z-487260-gate-quit-focus.png", "time": 1793753942.1582565}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753942.15986}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005902Z-986650-gate-quit-focus.png"}, "ok": true, "time": 1793753942.1962342}
+{"gate": "quit-focus", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005902Z-986650-gate-quit-focus.png", "time": 1793753942.2082791}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/eden-runs/lr-16/rows/segments/confirm-native-quit-frames.edenmacro.json"}, "ok": true, "time": 1793753942.2092907}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753942.2095714}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753942.4100466}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753942.6106665}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793753942.611018}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753942.6124036}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005902Z-503623-gate-ready.png"}, "ok": true, "time": 1793753942.6447756}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753943.6595275}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005903Z-675846-gate-ready.png"}, "ok": true, "time": 1793753943.6807914}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753944.6890433}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005904Z-177207-gate-ready.png"}, "ok": true, "time": 1793753944.7128294}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753945.7218583}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005905Z-052423-gate-ready.png"}, "ok": true, "time": 1793753945.7430089}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753946.7520087}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005906Z-143502-gate-ready.png"}, "ok": true, "time": 1793753946.8587425}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753947.8846235}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005907Z-823284-gate-ready.png"}, "ok": true, "time": 1793753947.9890075}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753949.0093343}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005909Z-470620-gate-ready.png"}, "ok": true, "time": 1793753949.1114717}
+{"gate": "ready", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005909Z-470620-gate-ready.png", "time": 1793753949.129547}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753949.1319048}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005909Z-081689-gate-ready.png"}, "ok": true, "time": 1793753949.2348773}
+{"gate": "ready", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005909Z-081689-gate-ready.png", "time": 1793753949.2576435}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753949.259288}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005909Z-424577-gate-ready.png"}, "ok": true, "time": 1793753949.3610463}
+{"gate": "ready", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005909Z-424577-gate-ready.png", "time": 1793753949.3796778}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/eden-runs/lr-16/rows/segments/lr04-return-cpu-pick.edenmacro.json"}, "ok": true, "time": 1793753949.3806183}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753949.38103}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753949.581537}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753949.781993}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753949.9824815}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753950.182995}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753950.383471}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753950.5846102}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753950.7856133}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753950.98621}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793753950.986428}
+{"gate": "hook-log", "on": ["yoga"], "pass": true, "lines": {"yoga": "step screen=css dir=right from=39 to=40 token=p2"}, "time": 1793753950.9866776}
+{"gate": "hook-log", "on": ["yoga"], "pass": true, "lines": {"yoga": "settled screen=css at=40 hovered=40"}, "time": 1793753950.9868803}
+{"hook": true, "on": "yoga", "return_cpu_pickup": {"edge": [39, 40], "token": "p2"}, "time": 1793753950.9869134}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753950.9882247}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005910Z-345730-return-cpu-held-40.png"}, "ok": true, "time": 1793753951.0847657}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753951.0867326}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005911Z-795714-gate-return-sonic-held.png"}, "ok": true, "time": 1793753951.1826506}
+{"gate": "return-sonic-held", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005911Z-795714-gate-return-sonic-held.png", "time": 1793753951.2441611}
+{"on": "yoga", "method": "input.button", "params": {"button": "lstick", "state": "press", "lease_ms": 2000}, "ok": true, "time": 1793753951.2447028}
+{"on": "yoga", "method": "input.button", "params": {"button": "left", "state": "tap", "duration_ms": 120, "lease_ms": 620}, "ok": true, "time": 1793753951.2448766}
+{"on": "yoga", "method": "input.button", "params": {"button": "lstick", "state": "release"}, "ok": true, "time": 1793753951.415414}
+{"gate": "hook-log", "on": ["yoga"], "pass": true, "lines": {"yoga": "step screen=css dir=left from=40 to=39 token=p2"}, "time": 1793753951.4156222}
+{"gate": "hook-log", "on": ["yoga"], "pass": true, "lines": {"yoga": "settled screen=css at=39 hovered=39"}, "time": 1793753951.7160764}
+{"gate": "lucas", "on": ["yoga"], "pass": true, "lines": {"yoga": "settled screen=css at=39 hovered=39"}, "time": 1793753951.71623}
+{"gate": "lucas", "on": ["yoga"], "pass": true, "lines": {"yoga": "settled screen=css at=39 hovered=39"}, "time": 1793753951.7163007}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/eden-runs/lr-16/rows/segments/lucas-pick.edenmacro.json"}, "ok": true, "time": 1793753951.7193263}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753951.7196546}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753951.92016}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753952.1207483}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753952.3213553}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753952.522045}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753952.7226067}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753952.9232264}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753953.124399}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793753953.1246781}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753953.1259997}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005913Z-060622-gate-ready.png"}, "ok": true, "time": 1793753953.23115}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753954.2540007}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005914Z-130360-gate-ready.png"}, "ok": true, "time": 1793753954.3591485}
+{"gate": "ready", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005914Z-130360-gate-ready.png", "time": 1793753954.380987}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753954.3826287}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005914Z-694352-returned-steve-lucas-ready.png"}, "ok": true, "time": 1793753954.4884083}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753954.4929264}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005914Z-026725-gate-ready.png"}, "ok": true, "time": 1793753954.5959072}
+{"gate": "ready", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005914Z-026725-gate-ready.png", "time": 1793753954.6179907}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/eden-runs/lr-16/rows/segments/enter-training.edenmacro.json"}, "ok": true, "time": 1793753954.6196012}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753954.6201296}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753954.8208215}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753955.0214405}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753955.2221482}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753955.4228296}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753955.623396}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753955.824009}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793753955.8242342}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753955.8255808}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005915Z-633945-gate-training-hud-unpaused.png"}, "ok": true, "time": 1793753955.8432174}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753956.8505967}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005916Z-757987-gate-training-hud-unpaused.png"}, "ok": true, "time": 1793753956.87106}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753957.8794215}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005917Z-586805-gate-training-hud-unpaused.png"}, "ok": true, "time": 1793753957.8994722}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753958.9081113}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005918Z-261199-gate-training-hud-unpaused.png"}, "ok": true, "time": 1793753958.9335957}
+{"gate": "training-hud-unpaused", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005918Z-261199-gate-training-hud-unpaused.png", "time": 1793753958.9441335}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753958.9458802}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005918Z-933737-hud-before-0.png"}, "ok": true, "time": 1793753958.9721403}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/eden-runs/lr-16/rows/segments/p1-next-frames.edenmacro.json"}, "ok": true, "time": 1793753958.9759076}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753958.9762747}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753959.1769538}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753959.3778965}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753959.5785058}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793753959.5787678}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753960.3858225}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005920Z-948462-Captain-Falcon.png"}, "ok": true, "time": 1793753960.4278996}
+{"hook": true, "on": "yoga", "media": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005920Z-948462-Captain-Falcon.png", "expectation": "logical role 0, actual body/HUD 0xb, ready; return/original if planned", "review": "pending", "time": 1793753960.4281135}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753960.4295835}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005920Z-636983-gate-hud-settled-0.png"}, "ok": true, "time": 1793753960.4589477}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753960.985982}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005920Z-130024-gate-hud-settled-0.png"}, "ok": true, "time": 1793753961.0169344}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753961.5653872}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005921Z-525998-gate-hud-settled-0.png"}, "ok": true, "time": 1793753961.5947995}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753962.1413643}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005922Z-506858-gate-hud-settled-0.png"}, "ok": true, "time": 1793753962.1698422}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753962.711752}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005922Z-881582-gate-hud-settled-0.png"}, "ok": true, "time": 1793753962.739474}
+{"gate": "hud-settled-0", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005922Z-881582-gate-hud-settled-0.png", "mark": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005918Z-933737-hud-before-0.png", "time": 1793753962.7814305}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753962.7831056}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005922Z-178932-settled-Captain-Falcon.png"}, "ok": true, "time": 1793753962.8128018}
+{"hook": true, "on": "yoga", "media": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005922Z-178932-settled-Captain-Falcon.png", "expectation": "Settled full body AND matching HUD; visual review required", "review": "pending", "time": 1793753962.8129387}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753962.8144546}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005922Z-507132-hud-before-0.png"}, "ok": true, "time": 1793753962.8449843}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/eden-runs/lr-16/rows/segments/p1-next-frames.edenmacro.json"}, "ok": true, "time": 1793753962.8493698}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753962.849617}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753963.05048}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753963.2511015}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753963.451811}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793753963.4520555}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753963.4547527}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005923Z-905004-Dark-Pit.png"}, "ok": true, "time": 1793753963.4850242}
+{"hook": true, "on": "yoga", "media": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005923Z-905004-Dark-Pit.png", "expectation": "logical role 0, actual body/HUD 0x1f, ready; return/original if planned", "review": "pending", "time": 1793753963.4852283}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753963.4867766}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005923Z-835235-gate-hud-settled-0.png"}, "ok": true, "time": 1793753963.5166838}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753964.0408711}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005924Z-066222-gate-hud-settled-0.png"}, "ok": true, "time": 1793753964.0713916}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753964.6152601}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005924Z-392189-gate-hud-settled-0.png"}, "ok": true, "time": 1793753964.6464543}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753965.184159}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005925Z-278291-gate-hud-settled-0.png"}, "ok": true, "time": 1793753965.215418}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753965.753815}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005925Z-947819-gate-hud-settled-0.png"}, "ok": true, "time": 1793753965.7847657}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753966.3303545}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005926Z-473224-gate-hud-settled-0.png"}, "ok": true, "time": 1793753966.3598776}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753966.8979466}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005926Z-032668-gate-hud-settled-0.png"}, "ok": true, "time": 1793753966.9279711}
+{"gate": "hud-settled-0", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005926Z-032668-gate-hud-settled-0.png", "mark": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005922Z-507132-hud-before-0.png", "time": 1793753966.9640899}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753966.965701}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005926Z-881857-settled-Dark-Pit.png"}, "ok": true, "time": 1793753966.997219}
+{"hook": true, "on": "yoga", "media": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005926Z-881857-settled-Dark-Pit.png", "expectation": "Settled full body AND matching HUD; visual review required", "review": "pending", "time": 1793753966.9973462}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753966.998893}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005926Z-964399-hud-before-0.png"}, "ok": true, "time": 1793753967.029234}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/eden-runs/lr-16/rows/segments/p1-next-frames.edenmacro.json"}, "ok": true, "time": 1793753967.0327406}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753967.0348783}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753967.2354918}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753967.436006}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753967.636834}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793753967.63702}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753967.638975}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005927Z-050598-Donkey-Kong.png"}, "ok": true, "time": 1793753967.6739392}
+{"hook": true, "on": "yoga", "media": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005927Z-050598-Donkey-Kong.png", "expectation": "logical role 0, actual body/HUD 0x1, ready; return/original if planned", "review": "pending", "time": 1793753967.6740725}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753967.675602}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005927Z-791240-gate-hud-settled-0.png"}, "ok": true, "time": 1793753967.7101436}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753968.235281}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005928Z-401692-gate-hud-settled-0.png"}, "ok": true, "time": 1793753968.2687314}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753968.8158681}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005928Z-004130-gate-hud-settled-0.png"}, "ok": true, "time": 1793753968.8510044}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753969.3976004}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005929Z-735233-gate-hud-settled-0.png"}, "ok": true, "time": 1793753969.4333017}
+{"gate": "hud-settled-0", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005929Z-735233-gate-hud-settled-0.png", "mark": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005926Z-964399-hud-before-0.png", "time": 1793753969.479312}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753969.4810386}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005929Z-103964-settled-Donkey-Kong.png"}, "ok": true, "time": 1793753969.5149386}
+{"hook": true, "on": "yoga", "media": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005929Z-103964-settled-Donkey-Kong.png", "expectation": "Settled full body AND matching HUD; visual review required", "review": "pending", "time": 1793753969.5150695}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/eden-runs/lr-16/rows/segments/lr14-request-quit-frames.edenmacro.json"}, "ok": true, "time": 1793753969.5232575}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753969.5236042}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753969.7241569}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753969.924723}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753970.12523}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753970.325825}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793753970.3261979}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753970.3276157}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005930Z-678991-gate-ready.png"}, "ok": true, "time": 1793753970.3627408}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753971.3736174}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005931Z-766248-gate-ready.png"}, "ok": true, "time": 1793753971.3934288}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753972.4010847}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005932Z-218756-gate-ready.png"}, "ok": true, "time": 1793753972.4218447}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753973.4304655}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005933Z-623691-gate-ready.png"}, "ok": true, "time": 1793753973.4492204}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753974.4577622}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005934Z-966211-gate-ready.png"}, "ok": true, "time": 1793753974.5657978}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753975.5920327}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005935Z-208240-gate-ready.png"}, "ok": true, "time": 1793753975.6949694}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753976.7204452}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005936Z-579560-gate-ready.png"}, "ok": true, "time": 1793753976.8247128}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753977.8444939}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005937Z-730467-gate-ready.png"}, "ok": true, "time": 1793753977.9452124}
+{"gate": "ready", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005937Z-730467-gate-ready.png", "time": 1793753977.9631193}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753977.9676273}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005937Z-714943-gate-ready.png"}, "ok": true, "time": 1793753978.0712385}
+{"gate": "ready", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005937Z-714943-gate-ready.png", "time": 1793753978.0892117}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753978.090683}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005938Z-731849-gate-ready.png"}, "ok": true, "time": 1793753978.192921}
+{"gate": "ready", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005938Z-731849-gate-ready.png", "time": 1793753978.2110374}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/eden-runs/lr-16/rows/segments/lr04-return-cpu-pick.edenmacro.json"}, "ok": true, "time": 1793753978.2126966}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753978.2132962}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753978.4147537}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753978.6152403}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753978.8157916}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753979.0164027}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753979.2176082}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753979.418368}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753979.6189995}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753979.8196373}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793753979.8198686}
+{"gate": "hook-log", "on": ["yoga"], "pass": true, "lines": {"yoga": "step screen=css dir=right from=39 to=40 token=p2"}, "time": 1793753979.820009}
+{"gate": "hook-log", "on": ["yoga"], "pass": true, "lines": {"yoga": "settled screen=css at=40 hovered=40"}, "time": 1793753979.820097}
+{"hook": true, "on": "yoga", "return_cpu_pickup": {"edge": [39, 40], "token": "p2"}, "time": 1793753979.8201249}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753979.8215134}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005939Z-570617-return-cpu-held-40.png"}, "ok": true, "time": 1793753979.9181128}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753979.9198143}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005939Z-874361-gate-return-sonic-held.png"}, "ok": true, "time": 1793753980.0151865}
+{"gate": "return-sonic-held", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005939Z-874361-gate-return-sonic-held.png", "time": 1793753980.057783}
+{"on": "yoga", "method": "input.button", "params": {"button": "lstick", "state": "press", "lease_ms": 2000}, "ok": true, "time": 1793753980.0582979}
+{"on": "yoga", "method": "input.button", "params": {"button": "left", "state": "tap", "duration_ms": 120, "lease_ms": 620}, "ok": true, "time": 1793753980.0584652}
+{"on": "yoga", "method": "input.button", "params": {"button": "lstick", "state": "release"}, "ok": true, "time": 1793753980.2290783}
+{"gate": "hook-log", "on": ["yoga"], "pass": true, "lines": {"yoga": "step screen=css dir=left from=40 to=39 token=p2"}, "time": 1793753980.229286}
+{"gate": "hook-log", "on": ["yoga"], "pass": true, "lines": {"yoga": "settled screen=css at=39 hovered=39"}, "time": 1793753980.229362}
+{"gate": "lucas", "on": ["yoga"], "pass": true, "lines": {"yoga": "settled screen=css at=39 hovered=39"}, "time": 1793753980.2294269}
+{"gate": "lucas", "on": ["yoga"], "pass": true, "lines": {"yoga": "settled screen=css at=39 hovered=39"}, "time": 1793753980.2294827}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/eden-runs/lr-16/rows/segments/lucas-pick.edenmacro.json"}, "ok": true, "time": 1793753980.2303014}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753980.2305474}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753980.431066}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753980.6316817}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753980.832441}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753981.033053}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753981.2336733}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753981.434251}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753981.6349943}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793753981.6352913}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753981.6367774}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005941Z-845303-gate-ready.png"}, "ok": true, "time": 1793753981.7435238}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753982.7657893}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005942Z-964275-gate-ready.png"}, "ok": true, "time": 1793753982.874207}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753983.8991556}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005943Z-335948-gate-ready.png"}, "ok": true, "time": 1793753984.004952}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753985.030425}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005945Z-608494-gate-ready.png"}, "ok": true, "time": 1793753985.136477}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753986.1640904}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005946Z-233017-gate-ready.png"}, "ok": true, "time": 1793753986.2715824}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753987.2975187}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005947Z-665066-gate-ready.png"}, "ok": true, "time": 1793753987.4029589}
+{"gate": "ready", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005947Z-665066-gate-ready.png", "time": 1793753987.4273312}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753987.4289742}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005947Z-119815-returned-steve-lucas-ready.png"}, "ok": true, "time": 1793753987.5348034}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753987.5399697}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005947Z-091793-gate-ready.png"}, "ok": true, "time": 1793753987.6490476}
+{"gate": "ready", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005947Z-091793-gate-ready.png", "time": 1793753987.6700585}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/eden-runs/lr-16/rows/segments/enter-training.edenmacro.json"}, "ok": true, "time": 1793753987.6719527}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753987.6729164}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753987.8748248}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753988.0755386}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753988.2761898}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753988.4768279}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753988.677501}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793753988.6777868}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753988.679126}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005948Z-180455-gate-training-hud-unpaused.png"}, "ok": true, "time": 1793753988.6963942}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753989.7038915}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005949Z-026467-gate-training-hud-unpaused.png"}, "ok": true, "time": 1793753989.724245}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753990.733121}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005950Z-273189-gate-training-hud-unpaused.png"}, "ok": true, "time": 1793753990.7557416}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753991.7648265}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005951Z-955865-gate-training-hud-unpaused.png"}, "ok": true, "time": 1793753991.8108091}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753992.8263183}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005952Z-458386-gate-training-hud-unpaused.png"}, "ok": true, "time": 1793753992.854707}
+{"gate": "training-hud-unpaused", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005952Z-458386-gate-training-hud-unpaused.png", "time": 1793753992.866289}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753992.8683925}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005952Z-464555-hud-before-0.png"}, "ok": true, "time": 1793753992.894034}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/eden-runs/lr-16/rows/segments/p1-next-frames.edenmacro.json"}, "ok": true, "time": 1793753992.898211}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753992.8985443}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753993.0997438}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753993.3003747}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753993.501165}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793753993.501494}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753994.4114652}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005954Z-625706-Captain-Falcon.png"}, "ok": true, "time": 1793753994.442472}
+{"hook": true, "on": "yoga", "media": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005954Z-625706-Captain-Falcon.png", "expectation": "logical role 0, actual body/HUD 0xb, ready; return/original if planned", "review": "pending", "time": 1793753994.442704}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753994.4441504}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005954Z-250789-gate-hud-settled-0.png"}, "ok": true, "time": 1793753994.4731638}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753994.9980173}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005954Z-149893-gate-hud-settled-0.png"}, "ok": true, "time": 1793753995.0277996}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753995.5652003}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005955Z-295164-gate-hud-settled-0.png"}, "ok": true, "time": 1793753995.5961487}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753996.1351757}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005956Z-383265-gate-hud-settled-0.png"}, "ok": true, "time": 1793753996.1648757}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753996.712281}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005956Z-409132-gate-hud-settled-0.png"}, "ok": true, "time": 1793753996.7397282}
+{"gate": "hud-settled-0", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005956Z-409132-gate-hud-settled-0.png", "mark": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005952Z-464555-hud-before-0.png", "time": 1793753996.7756789}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753996.7772148}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005956Z-281627-settled-Captain-Falcon.png"}, "ok": true, "time": 1793753996.8051271}
+{"hook": true, "on": "yoga", "media": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-1/yoga-005956Z-281627-settled-Captain-Falcon.png", "expectation": "Settled full body AND matching HUD; visual review required", "review": "pending", "time": 1793753996.8052723}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793753996.8155818}
+{"hook": true, "on": "yoga", "project_sha256": {"strict_predicates.py": "f5a6c99482c94b0a2c18a27c917be5d7734d8a6525caef9da4626555fc84249b", "steps.py": "921512201a3f387c2383f357397b14d5e2386b4c06f40bcd94eb84dcef3f1b4a", "base.py": "9db689e69d44aeb284eda62c579249c9cb79bcc992e0a801b956ed453198eec0", "review.py": "f3c8ac595c536ab07e80555038a11a5ba0a008676fa1816349f83072d7f5458e", "prior.py": "85386dde228186530d36eedf5a026aea532e5b0a534434efedb7be446e8352e0", "pilot_gates.py": "17ddefbb87f6e1b396c6f9b5e825fbd845b16974bf99d0dccf04ffe2f59021c2", "navigation.py": "15f78946418b9af2aed88857631f9c968c12e5c485e3b10163bc22f3dacb8ad5", "rc_roster_segment.py": "3ce86876dbe270ce7617ae358e00bfac734a75a0740c00be7b58c404b8789d93", "lr16.py": "ad674c1d3dc13c6b515fc61040be9352f51f0a0ca157d235ad61c0bdb9c1514a", "lead.py": "2c64e4bbb735b387d67c4de4e420651481e1e64dc8084a083907ae897571456a", "slim_actions.py": "83f7a20498280cfa558b3575e3a9d664d24f3759cd6b22672d0540b6ede4d793"}, "action": "teardown", "index": 2, "time": 1793753996.8300395}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753996.831805}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-005956Z-854659-gate-training-hud-unpaused.png"}, "ok": true, "time": 1793753996.8666732}
+{"gate": "training-hud-unpaused", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-005956Z-854659-gate-training-hud-unpaused.png", "time": 1793753996.8760166}
+{"hook": true, "on": "yoga", "settings_publication": "slow-36", "ack": "652030902 #627 [TrainingRooms] diag_settings_reload rerolls=0x0 issues=0", "time": 1793753997.3845904}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753997.3897033}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-005957Z-808062-gate-training-hud-unpaused.png"}, "ok": true, "time": 1793753997.4185078}
+{"gate": "training-hud-unpaused", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-005957Z-808062-gate-training-hud-unpaused.png", "time": 1793753997.4305656}
+{"on": "yoga", "method": "input.button", "params": {"button": "plus", "state": "tap", "duration_ms": 120, "lease_ms": 620}, "ok": true, "time": 1793753997.431061}
+{"gate": "pause", "on": ["yoga"], "pass": true, "lines": {"yoga": "pause_owner begin queue_dropped=0 owners=0x10"}, "time": 1793753997.6014292}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753997.603242}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-005957Z-381125-gate-native-pause.png"}, "ok": true, "time": 1793753997.6299589}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753998.6419892}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-005958Z-065433-gate-native-pause.png"}, "ok": true, "time": 1793753998.6769307}
+{"gate": "native-pause", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-005958Z-065433-gate-native-pause.png", "time": 1793753998.6883783}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753998.6904345}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-005958Z-532586-gate-native-pause.png"}, "ok": true, "time": 1793753998.7274647}
+{"gate": "native-pause", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-005958Z-532586-gate-native-pause.png", "time": 1793753998.7393408}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/eden-runs/lr-16/rows/segments/focus-native-quit-frames.edenmacro.json"}, "ok": true, "time": 1793753998.7409163}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753998.7421882}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753998.9427507}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753999.1433558}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793753999.1443405}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753999.1469176}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-005959Z-105341-gate-quit-focus.png"}, "ok": true, "time": 1793753999.1860354}
+{"gate": "quit-focus", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-005959Z-105341-gate-quit-focus.png", "time": 1793753999.2005644}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753999.2023056}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-005959Z-382857-gate-quit-focus.png"}, "ok": true, "time": 1793753999.2420173}
+{"gate": "quit-focus", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-005959Z-382857-gate-quit-focus.png", "time": 1793753999.253553}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/eden-runs/lr-16/rows/segments/confirm-native-quit-frames.edenmacro.json"}, "ok": true, "time": 1793753999.2545376}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753999.255231}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753999.4558198}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793753999.6565125}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793753999.6567435}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793753999.6580324}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-005959Z-091144-gate-ready.png"}, "ok": true, "time": 1793753999.6902757}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754000.7052052}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010000Z-345192-gate-ready.png"}, "ok": true, "time": 1793754000.7255447}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754001.7339435}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010001Z-090050-gate-ready.png"}, "ok": true, "time": 1793754001.753997}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754002.7625365}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010002Z-678713-gate-ready.png"}, "ok": true, "time": 1793754002.874286}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754003.897928}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010003Z-065878-gate-ready.png"}, "ok": true, "time": 1793754004.004021}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754005.0309944}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010005Z-108827-gate-ready.png"}, "ok": true, "time": 1793754005.1343675}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754006.1560295}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010006Z-122478-gate-ready.png"}, "ok": true, "time": 1793754006.258874}
+{"gate": "ready", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010006Z-122478-gate-ready.png", "time": 1793754006.282569}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754006.2861896}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010006Z-382849-gate-ready.png"}, "ok": true, "time": 1793754006.3926313}
+{"gate": "ready", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010006Z-382849-gate-ready.png", "time": 1793754006.4156697}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754006.417468}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010006Z-544219-gate-ready.png"}, "ok": true, "time": 1793754006.5210621}
+{"gate": "ready", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010006Z-544219-gate-ready.png", "time": 1793754006.539797}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/eden-runs/lr-16/rows/segments/lr04-return-cpu-pick.edenmacro.json"}, "ok": true, "time": 1793754006.5418518}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754006.542193}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754006.7427008}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754006.9432993}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754007.1437964}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754007.3442748}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754007.5447688}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754007.7452643}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754007.9458005}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754008.1463044}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793754008.1464763}
+{"gate": "hook-log", "on": ["yoga"], "pass": true, "lines": {"yoga": "step screen=css dir=right from=39 to=40 token=p2"}, "time": 1793754008.14657}
+{"gate": "hook-log", "on": ["yoga"], "pass": true, "lines": {"yoga": "settled screen=css at=40 hovered=40"}, "time": 1793754008.1466353}
+{"hook": true, "on": "yoga", "return_cpu_pickup": {"edge": [39, 40], "token": "p2"}, "time": 1793754008.1466615}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754008.1478384}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010008Z-874422-return-cpu-held-40.png"}, "ok": true, "time": 1793754008.244502}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754008.2459052}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010008Z-956561-gate-return-sonic-held.png"}, "ok": true, "time": 1793754008.3400357}
+{"gate": "return-sonic-held", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010008Z-956561-gate-return-sonic-held.png", "time": 1793754008.3762443}
+{"on": "yoga", "method": "input.button", "params": {"button": "lstick", "state": "press", "lease_ms": 2000}, "ok": true, "time": 1793754008.3775764}
+{"on": "yoga", "method": "input.button", "params": {"button": "left", "state": "tap", "duration_ms": 120, "lease_ms": 620}, "ok": true, "time": 1793754008.3777876}
+{"on": "yoga", "method": "input.button", "params": {"button": "lstick", "state": "release"}, "ok": true, "time": 1793754008.5482886}
+{"gate": "hook-log", "on": ["yoga"], "pass": true, "lines": {"yoga": "step screen=css dir=left from=40 to=39 token=p2"}, "time": 1793754008.5484219}
+{"gate": "hook-log", "on": ["yoga"], "pass": true, "lines": {"yoga": "settled screen=css at=39 hovered=39"}, "time": 1793754008.8487167}
+{"gate": "lucas", "on": ["yoga"], "pass": true, "lines": {"yoga": "settled screen=css at=39 hovered=39"}, "time": 1793754008.8488312}
+{"gate": "lucas", "on": ["yoga"], "pass": true, "lines": {"yoga": "settled screen=css at=39 hovered=39"}, "time": 1793754008.8488917}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/eden-runs/lr-16/rows/segments/lucas-pick.edenmacro.json"}, "ok": true, "time": 1793754008.849831}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754008.8506176}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754009.0512066}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754009.2518313}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754009.4524696}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754009.6530683}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754009.8536952}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754010.054586}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754010.2552223}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793754010.2554483}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754010.256931}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010010Z-991283-gate-ready.png"}, "ok": true, "time": 1793754010.3635232}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754011.3873534}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010011Z-489468-gate-ready.png"}, "ok": true, "time": 1793754011.492597}
+{"gate": "ready", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010011Z-489468-gate-ready.png", "time": 1793754011.5154188}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754011.517064}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010011Z-173459-returned-steve-lucas-ready.png"}, "ok": true, "time": 1793754011.6217964}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754011.6272404}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010011Z-348795-gate-ready.png"}, "ok": true, "time": 1793754011.7336226}
+{"gate": "ready", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010011Z-348795-gate-ready.png", "time": 1793754011.7566333}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/eden-runs/lr-16/rows/segments/enter-training.edenmacro.json"}, "ok": true, "time": 1793754011.757824}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754011.759201}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754011.959738}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754012.160354}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754012.3609755}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754012.5616038}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754012.7622902}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793754012.7625198}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754012.7638836}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010012Z-972205-gate-training-hud-unpaused.png"}, "ok": true, "time": 1793754012.7815936}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754013.7889917}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010013Z-178233-gate-training-hud-unpaused.png"}, "ok": true, "time": 1793754013.8098545}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754014.8190248}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010014Z-184331-gate-training-hud-unpaused.png"}, "ok": true, "time": 1793754014.8423562}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754015.8514457}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010015Z-591704-gate-training-hud-unpaused.png"}, "ok": true, "time": 1793754015.8824923}
+{"gate": "training-hud-unpaused", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010015Z-591704-gate-training-hud-unpaused.png", "time": 1793754015.893739}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754015.8980148}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010015Z-147058-hud-before-0.png"}, "ok": true, "time": 1793754015.92754}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/eden-runs/lr-16/rows/segments/p1-next-frames.edenmacro.json"}, "ok": true, "time": 1793754015.93102}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754015.9312973}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754016.131794}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754016.332257}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754016.5327954}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793754016.5330892}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754017.2429938}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010017Z-202303-Captain-Falcon.png"}, "ok": true, "time": 1793754017.2725625}
+{"hook": true, "on": "yoga", "media": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010017Z-202303-Captain-Falcon.png", "expectation": "logical role 0, actual body/HUD 0xb, ready; return/original if planned", "review": "pending", "time": 1793754017.2728422}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754017.2745407}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010017Z-684179-gate-hud-settled-0.png"}, "ok": true, "time": 1793754017.3005385}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754017.822824}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010017Z-025742-gate-hud-settled-0.png"}, "ok": true, "time": 1793754017.8517358}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754018.3976095}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010018Z-748274-gate-hud-settled-0.png"}, "ok": true, "time": 1793754018.4255621}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754018.9632862}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010018Z-384046-gate-hud-settled-0.png"}, "ok": true, "time": 1793754018.9913273}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754019.5371156}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010019Z-298830-gate-hud-settled-0.png"}, "ok": true, "time": 1793754019.566795}
+{"gate": "hud-settled-0", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010019Z-298830-gate-hud-settled-0.png", "mark": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010015Z-147058-hud-before-0.png", "time": 1793754019.605119}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754019.606912}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010019Z-098458-settled-Captain-Falcon.png"}, "ok": true, "time": 1793754019.6362448}
+{"hook": true, "on": "yoga", "media": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010019Z-098458-settled-Captain-Falcon.png", "expectation": "Settled full body AND matching HUD; visual review required", "review": "pending", "time": 1793754019.6364198}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754019.6384552}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010019Z-625522-hud-before-0.png"}, "ok": true, "time": 1793754019.6712735}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/eden-runs/lr-16/rows/segments/p1-next-frames.edenmacro.json"}, "ok": true, "time": 1793754019.674881}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754019.67528}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754019.8759167}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754020.07655}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754020.277145}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793754020.2773716}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754020.2798736}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010020Z-942750-Dark-Pit.png"}, "ok": true, "time": 1793754020.30804}
+{"hook": true, "on": "yoga", "media": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010020Z-942750-Dark-Pit.png", "expectation": "logical role 0, actual body/HUD 0x1f, ready; return/original if planned", "review": "pending", "time": 1793754020.3082497}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754020.3098853}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010020Z-074977-gate-hud-settled-0.png"}, "ok": true, "time": 1793754020.3396347}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754020.8592317}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010020Z-419937-gate-hud-settled-0.png"}, "ok": true, "time": 1793754020.8888485}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754021.4270935}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010021Z-219094-gate-hud-settled-0.png"}, "ok": true, "time": 1793754021.4566422}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754022.0019085}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010022Z-039500-gate-hud-settled-0.png"}, "ok": true, "time": 1793754022.0324764}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754022.570586}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010022Z-733268-gate-hud-settled-0.png"}, "ok": true, "time": 1793754022.600481}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754023.146348}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010023Z-463266-gate-hud-settled-0.png"}, "ok": true, "time": 1793754023.1752753}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754023.7203412}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010023Z-472760-gate-hud-settled-0.png"}, "ok": true, "time": 1793754023.7519848}
+{"gate": "hud-settled-0", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010023Z-472760-gate-hud-settled-0.png", "mark": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010019Z-625522-hud-before-0.png", "time": 1793754023.795101}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754023.7969334}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010023Z-010006-settled-Dark-Pit.png"}, "ok": true, "time": 1793754023.8273282}
+{"hook": true, "on": "yoga", "media": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010023Z-010006-settled-Dark-Pit.png", "expectation": "Settled full body AND matching HUD; visual review required", "review": "pending", "time": 1793754023.827476}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754023.829026}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010023Z-075951-hud-before-0.png"}, "ok": true, "time": 1793754023.8582733}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/eden-runs/lr-16/rows/segments/p1-next-frames.edenmacro.json"}, "ok": true, "time": 1793754023.8633738}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754023.8638687}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754024.0643048}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754024.264797}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754024.4652622}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793754024.4654245}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754024.4678125}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010024Z-992823-Donkey-Kong.png"}, "ok": true, "time": 1793754024.5018225}
+{"hook": true, "on": "yoga", "media": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010024Z-992823-Donkey-Kong.png", "expectation": "logical role 0, actual body/HUD 0x1, ready; return/original if planned", "review": "pending", "time": 1793754024.5020483}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754024.5036266}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010024Z-789705-gate-hud-settled-0.png"}, "ok": true, "time": 1793754024.5384696}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754025.0596063}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010025Z-698373-gate-hud-settled-0.png"}, "ok": true, "time": 1793754025.094808}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754025.6342971}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010025Z-473628-gate-hud-settled-0.png"}, "ok": true, "time": 1793754025.6703362}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754026.2157526}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010026Z-865391-gate-hud-settled-0.png"}, "ok": true, "time": 1793754026.2494388}
+{"gate": "hud-settled-0", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010026Z-865391-gate-hud-settled-0.png", "mark": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010023Z-075951-hud-before-0.png", "time": 1793754026.2868376}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754026.2884126}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010026Z-482423-settled-Donkey-Kong.png"}, "ok": true, "time": 1793754026.324749}
+{"hook": true, "on": "yoga", "media": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010026Z-482423-settled-Donkey-Kong.png", "expectation": "Settled full body AND matching HUD; visual review required", "review": "pending", "time": 1793754026.3249779}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/eden-runs/lr-16/rows/segments/lr14-request-quit-frames.edenmacro.json"}, "ok": true, "time": 1793754026.336404}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754026.3366647}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754026.537181}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754026.7377737}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754026.9383557}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754027.1389909}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793754027.1393838}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754027.1408825}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010027Z-944952-gate-ready.png"}, "ok": true, "time": 1793754027.1725674}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754028.1856465}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010028Z-822977-gate-ready.png"}, "ok": true, "time": 1793754028.2038255}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754029.212208}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010029Z-340447-gate-ready.png"}, "ok": true, "time": 1793754029.2409267}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754030.24952}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010030Z-689699-gate-ready.png"}, "ok": true, "time": 1793754030.2698689}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754031.2789986}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010031Z-133719-gate-ready.png"}, "ok": true, "time": 1793754031.3848634}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754032.412562}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010032Z-705268-gate-ready.png"}, "ok": true, "time": 1793754032.513425}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754033.533678}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010033Z-771578-gate-ready.png"}, "ok": true, "time": 1793754033.6363604}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754034.6577666}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010034Z-969767-gate-ready.png"}, "ok": true, "time": 1793754034.759757}
+{"gate": "ready", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010034Z-969767-gate-ready.png", "time": 1793754034.781668}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754034.7883961}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010034Z-511591-gate-ready.png"}, "ok": true, "time": 1793754034.8904955}
+{"gate": "ready", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010034Z-511591-gate-ready.png", "time": 1793754034.9087322}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754034.9101934}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010034Z-262138-gate-ready.png"}, "ok": true, "time": 1793754035.0122867}
+{"gate": "ready", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010034Z-262138-gate-ready.png", "time": 1793754035.0308404}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/eden-runs/lr-16/rows/segments/lr04-return-cpu-pick.edenmacro.json"}, "ok": true, "time": 1793754035.0319593}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754035.0321891}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754035.2326949}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754035.4331884}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754035.6337593}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754035.834699}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754036.0353818}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754036.2359865}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754036.4369318}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754036.6375425}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793754036.6379313}
+{"gate": "hook-log", "on": ["yoga"], "pass": true, "lines": {"yoga": "step screen=css dir=right from=39 to=40 token=p2"}, "time": 1793754036.6380823}
+{"gate": "hook-log", "on": ["yoga"], "pass": true, "lines": {"yoga": "settled screen=css at=40 hovered=40"}, "time": 1793754036.6381724}
+{"hook": true, "on": "yoga", "return_cpu_pickup": {"edge": [39, 40], "token": "p2"}, "time": 1793754036.6382}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754036.6396093}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010036Z-672625-return-cpu-held-40.png"}, "ok": true, "time": 1793754036.7374384}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754036.740543}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010036Z-625128-gate-return-sonic-held.png"}, "ok": true, "time": 1793754036.8369434}
+{"gate": "return-sonic-held", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010036Z-625128-gate-return-sonic-held.png", "time": 1793754036.8796678}
+{"on": "yoga", "method": "input.button", "params": {"button": "lstick", "state": "press", "lease_ms": 2000}, "ok": true, "time": 1793754036.8801966}
+{"on": "yoga", "method": "input.button", "params": {"button": "left", "state": "tap", "duration_ms": 120, "lease_ms": 620}, "ok": true, "time": 1793754036.880398}
+{"on": "yoga", "method": "input.button", "params": {"button": "lstick", "state": "release"}, "ok": true, "time": 1793754037.0509734}
+{"gate": "hook-log", "on": ["yoga"], "pass": true, "lines": {"yoga": "step screen=css dir=left from=40 to=39 token=p2"}, "time": 1793754037.0512023}
+{"gate": "hook-log", "on": ["yoga"], "pass": true, "lines": {"yoga": "settled screen=css at=39 hovered=39"}, "time": 1793754037.0512831}
+{"gate": "lucas", "on": ["yoga"], "pass": true, "lines": {"yoga": "settled screen=css at=39 hovered=39"}, "time": 1793754037.0513515}
+{"gate": "lucas", "on": ["yoga"], "pass": true, "lines": {"yoga": "settled screen=css at=39 hovered=39"}, "time": 1793754037.0514176}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/eden-runs/lr-16/rows/segments/lucas-pick.edenmacro.json"}, "ok": true, "time": 1793754037.0531344}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754037.053569}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754037.25424}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754037.45527}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754037.6562865}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754037.8569262}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754038.0575464}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754038.2581646}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754038.4588041}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793754038.4590952}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754038.4605777}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010038Z-690501-gate-ready.png"}, "ok": true, "time": 1793754038.567612}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754039.5868936}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010039Z-990644-gate-ready.png"}, "ok": true, "time": 1793754039.6912873}
+{"gate": "ready", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010039Z-990644-gate-ready.png", "time": 1793754039.709909}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754039.7114363}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010039Z-509497-returned-steve-lucas-ready.png"}, "ok": true, "time": 1793754039.815682}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754039.8207135}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010039Z-893917-gate-ready.png"}, "ok": true, "time": 1793754039.9272704}
+{"gate": "ready", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010039Z-893917-gate-ready.png", "time": 1793754039.9489021}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/eden-runs/lr-16/rows/segments/enter-training.edenmacro.json"}, "ok": true, "time": 1793754039.9500308}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754039.9503844}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754040.150959}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754040.351565}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754040.5525217}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754040.753177}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754040.9538019}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754041.1545236}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793754041.1547704}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754041.1561537}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010041Z-212073-gate-training-hud-unpaused.png"}, "ok": true, "time": 1793754041.174836}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754042.1826282}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010042Z-783458-gate-training-hud-unpaused.png"}, "ok": true, "time": 1793754042.202479}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754043.2116191}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010043Z-761527-gate-training-hud-unpaused.png"}, "ok": true, "time": 1793754043.23195}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754044.242068}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010044Z-194930-gate-training-hud-unpaused.png"}, "ok": true, "time": 1793754044.2685432}
+{"gate": "training-hud-unpaused", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010044Z-194930-gate-training-hud-unpaused.png", "time": 1793754044.2798727}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754044.2819674}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010044Z-076898-hud-before-0.png"}, "ok": true, "time": 1793754044.309749}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/eden-runs/lr-16/rows/segments/p1-next-frames.edenmacro.json"}, "ok": true, "time": 1793754044.3143306}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754044.3151789}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754044.5157883}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754044.7165422}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754044.9171789}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793754044.9174078}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754045.6270876}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010045Z-219326-Captain-Falcon.png"}, "ok": true, "time": 1793754045.651601}
+{"hook": true, "on": "yoga", "media": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010045Z-219326-Captain-Falcon.png", "expectation": "logical role 0, actual body/HUD 0xb, ready; return/original if planned", "review": "pending", "time": 1793754045.6518188}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754045.653308}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010045Z-404362-gate-hud-settled-0.png"}, "ok": true, "time": 1793754045.6830769}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754046.206285}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010046Z-418691-gate-hud-settled-0.png"}, "ok": true, "time": 1793754046.2355943}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754046.7796135}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010046Z-789759-gate-hud-settled-0.png"}, "ok": true, "time": 1793754046.809312}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754047.3567793}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010047Z-933323-gate-hud-settled-0.png"}, "ok": true, "time": 1793754047.388427}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754047.9269762}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010047Z-055698-gate-hud-settled-0.png"}, "ok": true, "time": 1793754047.9558597}
+{"gate": "hud-settled-0", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010047Z-055698-gate-hud-settled-0.png", "mark": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010044Z-076898-hud-before-0.png", "time": 1793754047.9992328}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754048.0009677}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010048Z-087427-settled-Captain-Falcon.png"}, "ok": true, "time": 1793754048.0299735}
+{"hook": true, "on": "yoga", "media": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-2/yoga-010048Z-087427-settled-Captain-Falcon.png", "expectation": "Settled full body AND matching HUD; visual review required", "review": "pending", "time": 1793754048.0301948}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793754048.0483346}
+{"hook": true, "on": "yoga", "project_sha256": {"strict_predicates.py": "f5a6c99482c94b0a2c18a27c917be5d7734d8a6525caef9da4626555fc84249b", "steps.py": "921512201a3f387c2383f357397b14d5e2386b4c06f40bcd94eb84dcef3f1b4a", "base.py": "9db689e69d44aeb284eda62c579249c9cb79bcc992e0a801b956ed453198eec0", "review.py": "f3c8ac595c536ab07e80555038a11a5ba0a008676fa1816349f83072d7f5458e", "prior.py": "85386dde228186530d36eedf5a026aea532e5b0a534434efedb7be446e8352e0", "pilot_gates.py": "17ddefbb87f6e1b396c6f9b5e825fbd845b16974bf99d0dccf04ffe2f59021c2", "navigation.py": "15f78946418b9af2aed88857631f9c968c12e5c485e3b10163bc22f3dacb8ad5", "rc_roster_segment.py": "3ce86876dbe270ce7617ae358e00bfac734a75a0740c00be7b58c404b8789d93", "lr16.py": "ad674c1d3dc13c6b515fc61040be9352f51f0a0ca157d235ad61c0bdb9c1514a", "lead.py": "2c64e4bbb735b387d67c4de4e420651481e1e64dc8084a083907ae897571456a", "slim_actions.py": "83f7a20498280cfa558b3575e3a9d664d24f3759cd6b22672d0540b6ede4d793"}, "action": "teardown", "index": 3, "time": 1793754048.0657074}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754048.067797}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010048Z-880250-gate-training-hud-unpaused.png"}, "ok": true, "time": 1793754048.0975869}
+{"gate": "training-hud-unpaused", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010048Z-880250-gate-training-hud-unpaused.png", "time": 1793754048.1071732}
+{"hook": true, "on": "yoga", "settings_publication": "slow-36", "ack": "652081966 #984 [TrainingRooms] diag_settings_reload rerolls=0x0 issues=0", "time": 1793754048.4154646}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754048.420091}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010048Z-302982-gate-training-hud-unpaused.png"}, "ok": true, "time": 1793754048.4491222}
+{"gate": "training-hud-unpaused", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010048Z-302982-gate-training-hud-unpaused.png", "time": 1793754048.4598403}
+{"on": "yoga", "method": "input.button", "params": {"button": "plus", "state": "tap", "duration_ms": 120, "lease_ms": 620}, "ok": true, "time": 1793754048.4602258}
+{"gate": "pause", "on": ["yoga"], "pass": true, "lines": {"yoga": "pause_owner begin queue_dropped=0 owners=0x10"}, "time": 1793754048.6305118}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754048.632083}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010048Z-162112-gate-native-pause.png"}, "ok": true, "time": 1793754048.6678638}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754049.6820374}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010049Z-120892-gate-native-pause.png"}, "ok": true, "time": 1793754049.7265675}
+{"gate": "native-pause", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010049Z-120892-gate-native-pause.png", "time": 1793754049.7413216}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754049.7428179}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010049Z-899583-gate-native-pause.png"}, "ok": true, "time": 1793754049.7830462}
+{"gate": "native-pause", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010049Z-899583-gate-native-pause.png", "time": 1793754049.797857}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/eden-runs/lr-16/rows/segments/focus-native-quit-frames.edenmacro.json"}, "ok": true, "time": 1793754049.7987318}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754049.7990515}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754049.9997175}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754050.2002037}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793754050.2008872}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754050.2027051}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010050Z-905451-gate-quit-focus.png"}, "ok": true, "time": 1793754050.2466793}
+{"gate": "quit-focus", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010050Z-905451-gate-quit-focus.png", "time": 1793754050.2594955}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754050.261167}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010050Z-247666-gate-quit-focus.png"}, "ok": true, "time": 1793754050.301147}
+{"gate": "quit-focus", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010050Z-247666-gate-quit-focus.png", "time": 1793754050.3172433}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/eden-runs/lr-16/rows/segments/confirm-native-quit-frames.edenmacro.json"}, "ok": true, "time": 1793754050.3186803}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754050.3200836}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754050.5208037}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754050.721483}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793754050.7219691}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754050.7235417}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010050Z-597604-gate-ready.png"}, "ok": true, "time": 1793754050.759225}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754051.7763932}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010051Z-533711-gate-ready.png"}, "ok": true, "time": 1793754051.7940257}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754052.8029876}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010052Z-125524-gate-ready.png"}, "ok": true, "time": 1793754052.8223662}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754053.8308501}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010053Z-020686-gate-ready.png"}, "ok": true, "time": 1793754053.9407153}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754054.9651778}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010054Z-327483-gate-ready.png"}, "ok": true, "time": 1793754055.0701191}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754056.0959296}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010056Z-059237-gate-ready.png"}, "ok": true, "time": 1793754056.197828}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754057.2228196}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010057Z-954032-gate-ready.png"}, "ok": true, "time": 1793754057.3255644}
+{"gate": "ready", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010057Z-954032-gate-ready.png", "time": 1793754057.3481333}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754057.3508391}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010057Z-953135-gate-ready.png"}, "ok": true, "time": 1793754057.451396}
+{"gate": "ready", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010057Z-953135-gate-ready.png", "time": 1793754057.469797}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754057.4713526}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010057Z-419440-gate-ready.png"}, "ok": true, "time": 1793754057.572733}
+{"gate": "ready", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010057Z-419440-gate-ready.png", "time": 1793754057.5909052}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/eden-runs/lr-16/rows/segments/lr04-return-cpu-pick.edenmacro.json"}, "ok": true, "time": 1793754057.591938}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754057.5924015}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754057.792992}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754057.9936006}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754058.195148}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754058.395778}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754058.596401}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754058.797063}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754058.9991267}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754059.199935}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793754059.2002106}
+{"gate": "hook-log", "on": ["yoga"], "pass": true, "lines": {"yoga": "step screen=css dir=right from=39 to=40 token=p2"}, "time": 1793754059.2003589}
+{"gate": "hook-log", "on": ["yoga"], "pass": true, "lines": {"yoga": "settled screen=css at=40 hovered=40"}, "time": 1793754059.200438}
+{"hook": true, "on": "yoga", "return_cpu_pickup": {"edge": [39, 40], "token": "p2"}, "time": 1793754059.2004604}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754059.2019145}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010059Z-982483-return-cpu-held-40.png"}, "ok": true, "time": 1793754059.300401}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754059.3024445}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010059Z-640301-gate-return-sonic-held.png"}, "ok": true, "time": 1793754059.3981209}
+{"gate": "return-sonic-held", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010059Z-640301-gate-return-sonic-held.png", "time": 1793754059.441316}
+{"on": "yoga", "method": "input.button", "params": {"button": "lstick", "state": "press", "lease_ms": 2000}, "ok": true, "time": 1793754059.4418483}
+{"on": "yoga", "method": "input.button", "params": {"button": "left", "state": "tap", "duration_ms": 120, "lease_ms": 620}, "ok": true, "time": 1793754059.4420342}
+{"on": "yoga", "method": "input.button", "params": {"button": "lstick", "state": "release"}, "ok": true, "time": 1793754059.6127074}
+{"gate": "hook-log", "on": ["yoga"], "pass": true, "lines": {"yoga": "step screen=css dir=left from=40 to=39 token=p2"}, "time": 1793754059.6129165}
+{"gate": "hook-log", "on": ["yoga"], "pass": true, "lines": {"yoga": "settled screen=css at=39 hovered=39"}, "time": 1793754059.9133005}
+{"gate": "lucas", "on": ["yoga"], "pass": true, "lines": {"yoga": "settled screen=css at=39 hovered=39"}, "time": 1793754059.9134507}
+{"gate": "lucas", "on": ["yoga"], "pass": true, "lines": {"yoga": "settled screen=css at=39 hovered=39"}, "time": 1793754059.9135227}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/eden-runs/lr-16/rows/segments/lucas-pick.edenmacro.json"}, "ok": true, "time": 1793754059.9145148}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754059.9157143}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754060.1161559}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754060.3167582}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754060.517256}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754060.717782}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754060.919015}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754061.1197894}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754061.3204434}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793754061.3207657}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754061.3224978}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010101Z-691395-gate-ready.png"}, "ok": true, "time": 1793754061.4345763}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754062.4599764}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010102Z-111955-gate-ready.png"}, "ok": true, "time": 1793754062.5682206}
+{"gate": "ready", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010102Z-111955-gate-ready.png", "time": 1793754062.5929477}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754062.5947726}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010102Z-915809-returned-steve-lucas-ready.png"}, "ok": true, "time": 1793754062.701982}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754062.708445}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010102Z-619137-gate-ready.png"}, "ok": true, "time": 1793754062.8159487}
+{"gate": "ready", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010102Z-619137-gate-ready.png", "time": 1793754062.8406932}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/eden-runs/lr-16/rows/segments/enter-training.edenmacro.json"}, "ok": true, "time": 1793754062.8428698}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754062.843741}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754063.044422}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754063.2451422}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754063.4467297}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754063.647211}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754063.8477652}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754064.0483353}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793754064.0485594}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754064.0499701}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010104Z-109489-gate-training-hud-unpaused.png"}, "ok": true, "time": 1793754064.068046}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754065.0755732}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010105Z-707922-gate-training-hud-unpaused.png"}, "ok": true, "time": 1793754065.0982208}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754066.1074736}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010106Z-594759-gate-training-hud-unpaused.png"}, "ok": true, "time": 1793754066.129378}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754067.1380937}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010107Z-231336-gate-training-hud-unpaused.png"}, "ok": true, "time": 1793754067.1857877}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754068.202255}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010108Z-415296-gate-training-hud-unpaused.png"}, "ok": true, "time": 1793754068.2337327}
+{"gate": "training-hud-unpaused", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010108Z-415296-gate-training-hud-unpaused.png", "time": 1793754068.2435071}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754068.2464392}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010108Z-499815-hud-before-0.png"}, "ok": true, "time": 1793754068.275639}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/eden-runs/lr-16/rows/segments/p1-next-frames.edenmacro.json"}, "ok": true, "time": 1793754068.2794082}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754068.2797732}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754068.480432}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754068.6810741}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754068.8817625}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793754068.8820152}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754069.7957938}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010109Z-964373-Captain-Falcon.png"}, "ok": true, "time": 1793754069.8252332}
+{"hook": true, "on": "yoga", "media": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010109Z-964373-Captain-Falcon.png", "expectation": "logical role 0, actual body/HUD 0xb, ready; return/original if planned", "review": "pending", "time": 1793754069.8254623}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754069.8270447}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010109Z-236296-gate-hud-settled-0.png"}, "ok": true, "time": 1793754069.8571506}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754070.3841708}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010110Z-338949-gate-hud-settled-0.png"}, "ok": true, "time": 1793754070.4147754}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754070.9601848}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010110Z-326520-gate-hud-settled-0.png"}, "ok": true, "time": 1793754070.9915826}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754071.52848}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010111Z-571006-gate-hud-settled-0.png"}, "ok": true, "time": 1793754071.5573688}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754072.09502}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010112Z-198420-gate-hud-settled-0.png"}, "ok": true, "time": 1793754072.1245716}
+{"gate": "hud-settled-0", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010112Z-198420-gate-hud-settled-0.png", "mark": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010108Z-499815-hud-before-0.png", "time": 1793754072.167864}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754072.1704497}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010112Z-585751-settled-Captain-Falcon.png"}, "ok": true, "time": 1793754072.2025383}
+{"hook": true, "on": "yoga", "media": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010112Z-585751-settled-Captain-Falcon.png", "expectation": "Settled full body AND matching HUD; visual review required", "review": "pending", "time": 1793754072.2026935}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754072.2063842}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010112Z-494509-hud-before-0.png"}, "ok": true, "time": 1793754072.2401118}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/eden-runs/lr-16/rows/segments/p1-next-frames.edenmacro.json"}, "ok": true, "time": 1793754072.2457073}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754072.2459702}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754072.4465427}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754072.6471493}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754072.8477798}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793754072.848112}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754072.851136}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010112Z-229654-Dark-Pit.png"}, "ok": true, "time": 1793754072.8815694}
+{"hook": true, "on": "yoga", "media": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010112Z-229654-Dark-Pit.png", "expectation": "logical role 0, actual body/HUD 0x1f, ready; return/original if planned", "review": "pending", "time": 1793754072.881714}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754072.8830762}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010112Z-123177-gate-hud-settled-0.png"}, "ok": true, "time": 1793754072.9141605}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754073.4385345}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010113Z-681078-gate-hud-settled-0.png"}, "ok": true, "time": 1793754073.469734}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754074.0070996}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010114Z-231392-gate-hud-settled-0.png"}, "ok": true, "time": 1793754074.038978}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754074.585181}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010114Z-322335-gate-hud-settled-0.png"}, "ok": true, "time": 1793754074.615802}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754075.159587}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010115Z-735224-gate-hud-settled-0.png"}, "ok": true, "time": 1793754075.1927288}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754075.7307456}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010115Z-836401-gate-hud-settled-0.png"}, "ok": true, "time": 1793754075.762106}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754076.3007755}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010116Z-866465-gate-hud-settled-0.png"}, "ok": true, "time": 1793754076.3297336}
+{"gate": "hud-settled-0", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010116Z-866465-gate-hud-settled-0.png", "mark": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010112Z-494509-hud-before-0.png", "time": 1793754076.3656216}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754076.3671992}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010116Z-288466-settled-Dark-Pit.png"}, "ok": true, "time": 1793754076.3979955}
+{"hook": true, "on": "yoga", "media": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010116Z-288466-settled-Dark-Pit.png", "expectation": "Settled full body AND matching HUD; visual review required", "review": "pending", "time": 1793754076.398134}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754076.3996706}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010116Z-717968-hud-before-0.png"}, "ok": true, "time": 1793754076.4327323}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/eden-runs/lr-16/rows/segments/p1-next-frames.edenmacro.json"}, "ok": true, "time": 1793754076.4367766}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754076.439341}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754076.6400661}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754076.8407557}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754077.0412734}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793754077.0414329}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754077.0467992}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010117Z-872456-Donkey-Kong.png"}, "ok": true, "time": 1793754077.079736}
+{"hook": true, "on": "yoga", "media": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010117Z-872456-Donkey-Kong.png", "expectation": "logical role 0, actual body/HUD 0x1, ready; return/original if planned", "review": "pending", "time": 1793754077.0798776}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754077.0813751}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010117Z-428406-gate-hud-settled-0.png"}, "ok": true, "time": 1793754077.1127086}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754077.6346836}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010117Z-772884-gate-hud-settled-0.png"}, "ok": true, "time": 1793754077.6680803}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754078.2142472}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010118Z-408185-gate-hud-settled-0.png"}, "ok": true, "time": 1793754078.2465775}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754078.7855809}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010118Z-786710-gate-hud-settled-0.png"}, "ok": true, "time": 1793754078.820198}
+{"gate": "hud-settled-0", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010118Z-786710-gate-hud-settled-0.png", "mark": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010116Z-717968-hud-before-0.png", "time": 1793754078.8581998}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754078.8599088}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010118Z-991960-settled-Donkey-Kong.png"}, "ok": true, "time": 1793754078.8921883}
+{"hook": true, "on": "yoga", "media": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010118Z-991960-settled-Donkey-Kong.png", "expectation": "Settled full body AND matching HUD; visual review required", "review": "pending", "time": 1793754078.8924007}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/eden-runs/lr-16/rows/segments/lr14-request-quit-frames.edenmacro.json"}, "ok": true, "time": 1793754078.904549}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754078.904849}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754079.1054063}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754079.3060308}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754079.5066962}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754079.7073715}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793754079.7076192}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754079.7090125}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010119Z-078062-gate-ready.png"}, "ok": true, "time": 1793754079.7371662}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754080.749932}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010120Z-089508-gate-ready.png"}, "ok": true, "time": 1793754080.7675683}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754081.7753866}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010121Z-600072-gate-ready.png"}, "ok": true, "time": 1793754081.7939343}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754082.8026874}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010122Z-835492-gate-ready.png"}, "ok": true, "time": 1793754082.8227699}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754083.8315864}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010123Z-711219-gate-ready.png"}, "ok": true, "time": 1793754083.9388735}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754084.9643466}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010124Z-471774-gate-ready.png"}, "ok": true, "time": 1793754085.0638783}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754086.0885358}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010126Z-713445-gate-ready.png"}, "ok": true, "time": 1793754086.192735}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754087.2173307}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010127Z-560628-gate-ready.png"}, "ok": true, "time": 1793754087.31996}
+{"gate": "ready", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010127Z-560628-gate-ready.png", "time": 1793754087.3423107}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754087.348914}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010127Z-036258-gate-ready.png"}, "ok": true, "time": 1793754087.4507287}
+{"gate": "ready", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010127Z-036258-gate-ready.png", "time": 1793754087.4726126}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754087.4743145}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010127Z-395328-gate-ready.png"}, "ok": true, "time": 1793754087.5764139}
+{"gate": "ready", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010127Z-395328-gate-ready.png", "time": 1793754087.5951428}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/eden-runs/lr-16/rows/segments/lr04-return-cpu-pick.edenmacro.json"}, "ok": true, "time": 1793754087.5960603}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754087.5964682}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754087.7971637}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754087.997854}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754088.1984122}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754088.398983}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754088.5994804}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754088.8000076}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754089.0011826}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754089.2018387}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793754089.202486}
+{"gate": "hook-log", "on": ["yoga"], "pass": true, "lines": {"yoga": "step screen=css dir=right from=39 to=40 token=p2"}, "time": 1793754089.2026906}
+{"gate": "hook-log", "on": ["yoga"], "pass": true, "lines": {"yoga": "settled screen=css at=40 hovered=40"}, "time": 1793754089.2028184}
+{"hook": true, "on": "yoga", "return_cpu_pickup": {"edge": [39, 40], "token": "p2"}, "time": 1793754089.2028582}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754089.2043214}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010129Z-459959-return-cpu-held-40.png"}, "ok": true, "time": 1793754089.2999198}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754089.3017151}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010129Z-886937-gate-return-sonic-held.png"}, "ok": true, "time": 1793754089.396265}
+{"gate": "return-sonic-held", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010129Z-886937-gate-return-sonic-held.png", "time": 1793754089.4387267}
+{"on": "yoga", "method": "input.button", "params": {"button": "lstick", "state": "press", "lease_ms": 2000}, "ok": true, "time": 1793754089.4392722}
+{"on": "yoga", "method": "input.button", "params": {"button": "left", "state": "tap", "duration_ms": 120, "lease_ms": 620}, "ok": true, "time": 1793754089.4397626}
+{"on": "yoga", "method": "input.button", "params": {"button": "lstick", "state": "release"}, "ok": true, "time": 1793754089.610386}
+{"gate": "hook-log", "on": ["yoga"], "pass": true, "lines": {"yoga": "step screen=css dir=left from=40 to=39 token=p2"}, "time": 1793754089.6106102}
+{"gate": "hook-log", "on": ["yoga"], "pass": true, "lines": {"yoga": "settled screen=css at=39 hovered=39"}, "time": 1793754089.610713}
+{"gate": "lucas", "on": ["yoga"], "pass": true, "lines": {"yoga": "settled screen=css at=39 hovered=39"}, "time": 1793754089.610784}
+{"gate": "lucas", "on": ["yoga"], "pass": true, "lines": {"yoga": "settled screen=css at=39 hovered=39"}, "time": 1793754089.6108472}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/eden-runs/lr-16/rows/segments/lucas-pick.edenmacro.json"}, "ok": true, "time": 1793754089.6116211}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754089.6119003}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754089.8128107}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754090.0134926}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754090.214181}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754090.4147613}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754090.6152852}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754090.8158722}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754091.0163245}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793754091.0164733}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754091.0177255}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010131Z-776322-gate-ready.png"}, "ok": true, "time": 1793754091.1224482}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754092.1419394}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010132Z-048496-gate-ready.png"}, "ok": true, "time": 1793754092.2474403}
+{"gate": "ready", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010132Z-048496-gate-ready.png", "time": 1793754092.2663562}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754092.2679148}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010132Z-996316-returned-steve-lucas-ready.png"}, "ok": true, "time": 1793754092.3724556}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754092.3784544}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010132Z-561994-gate-ready.png"}, "ok": true, "time": 1793754092.4827693}
+{"gate": "ready", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010132Z-561994-gate-ready.png", "time": 1793754092.504816}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/eden-runs/lr-16/rows/segments/enter-training.edenmacro.json"}, "ok": true, "time": 1793754092.5059228}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754092.5071144}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754092.7077389}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754092.908354}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754093.1090329}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754093.3096232}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754093.5102034}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754093.7107902}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793754093.711027}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754093.712456}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010133Z-589592-gate-training-hud-unpaused.png"}, "ok": true, "time": 1793754093.7309713}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754094.7384856}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010134Z-637256-gate-training-hud-unpaused.png"}, "ok": true, "time": 1793754094.7605994}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754095.7694}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010135Z-535528-gate-training-hud-unpaused.png"}, "ok": true, "time": 1793754095.7928817}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754096.8021488}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010136Z-284690-gate-training-hud-unpaused.png"}, "ok": true, "time": 1793754096.8350246}
+{"gate": "training-hud-unpaused", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010136Z-284690-gate-training-hud-unpaused.png", "time": 1793754096.8460858}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754096.848172}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010136Z-251373-hud-before-0.png"}, "ok": true, "time": 1793754096.8748324}
+{"on": "yoga", "method": "macro.play", "params": {"path": "/home/intpa/eden-runs/lr-16/rows/segments/p1-next-frames.edenmacro.json"}, "ok": true, "time": 1793754096.882678}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754096.8839896}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754097.0844386}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754097.2854838}
+{"on": "yoga", "method": "macro.status", "params": null, "ok": true, "time": 1793754097.4863107}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793754097.4867597}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754098.19886}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010138Z-998874-Captain-Falcon.png"}, "ok": true, "time": 1793754098.2267065}
+{"hook": true, "on": "yoga", "media": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010138Z-998874-Captain-Falcon.png", "expectation": "logical role 0, actual body/HUD 0xb, ready; return/original if planned", "review": "pending", "time": 1793754098.226926}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754098.2283719}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010138Z-446674-gate-hud-settled-0.png"}, "ok": true, "time": 1793754098.2575788}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754098.7827845}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010138Z-909915-gate-hud-settled-0.png"}, "ok": true, "time": 1793754098.8165865}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754099.3615131}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010139Z-644761-gate-hud-settled-0.png"}, "ok": true, "time": 1793754099.3900945}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754099.933753}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010139Z-879620-gate-hud-settled-0.png"}, "ok": true, "time": 1793754099.9642277}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754100.50631}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010140Z-550019-gate-hud-settled-0.png"}, "ok": true, "time": 1793754100.5364063}
+{"gate": "hud-settled-0", "on": "yoga", "pass": true, "shot": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010140Z-550019-gate-hud-settled-0.png", "mark": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010136Z-251373-hud-before-0.png", "time": 1793754100.5803192}
+{"on": "yoga", "method": "ui.tree", "params": {"brief": true, "visible_only": true}, "ok": true, "time": 1793754100.5820923}
+{"on": "yoga", "method": "ui.screenshot", "params": {"target": "o100", "path": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010140Z-244181-settled-Captain-Falcon.png"}, "ok": true, "time": 1793754100.6140745}
+{"hook": true, "on": "yoga", "media": "/home/intpa/eden-runs/lr-16/out/RC-TEARDOWN-3/yoga-010140Z-244181-settled-Captain-Falcon.png", "expectation": "Settled full body AND matching HUD; visual review required", "review": "pending", "time": 1793754100.614218}
+{"on": "yoga", "method": "input.reset", "params": null, "ok": true, "time": 1793754100.6262534}

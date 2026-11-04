@@ -1,0 +1,64 @@
+{
+  "unit": "eden-life-5b48c6c8bc6a475387907d254af867c9-yoga.service",
+  "state": "stopped",
+  "owner": "OpenCode ses_e5c466751ffeQY7rRsnoHAlnqN/lead",
+  "token": "5b48c6c8bc6a475387907d254af867c9",
+  "profile": "/home/intpa/eden-runs/lr-16/work/profiles/profile-yoga",
+  "app_sha256": "6a0c80d2b85861fa0d92d5ef6238af7d08a8da94e50e20446a2a54120bee94eb",
+  "owned_pids": [
+    {
+      "pid": 68782,
+      "start": "65188244",
+      "boot": "5fbdfbc4-1404-4dc2-bc7a-8c7c074446ee"
+    },
+    {
+      "pid": 68788,
+      "start": "65188246",
+      "boot": "5fbdfbc4-1404-4dc2-bc7a-8c7c074446ee"
+    }
+  ],
+  "runtime_cap_s": 1200,
+  "started": "2026-11-04T00:57:40.544935+00:00",
+  "game_loaded": "2026-11-04T00:57:54.457974+00:00",
+  "stopped": "2026-11-04T01:02:25.837028+00:00",
+  "owned_pids_stopped": {
+    "owned_pids_stopped": [
+      {
+        "pid": 68782,
+        "start": "65188244",
+        "boot": "5fbdfbc4-1404-4dc2-bc7a-8c7c074446ee"
+      },
+      {
+        "pid": 68788,
+        "start": "65188246",
+        "boot": "5fbdfbc4-1404-4dc2-bc7a-8c7c074446ee"
+      },
+      {
+        "pid": 68816,
+        "start": "65188295",
+        "boot": "5fbdfbc4-1404-4dc2-bc7a-8c7c074446ee"
+      }
+    ],
+    "main_pid_stopped": {
+      "pid": 68782,
+      "start": "65188244",
+      "boot": "5fbdfbc4-1404-4dc2-bc7a-8c7c074446ee"
+    },
+    "main_stop_signals": [
+      "SIGTERM",
+      "SIGKILL"
+    ]
+  },
+  "resources": {
+    "memory_peak": 6683848704,
+    "limits": {
+      "MemoryMax": "8589934592",
+      "MemorySwapMax": "0",
+      "TasksMax": "256",
+      "RuntimeMaxUSec": "20min",
+      "KillMode": "mixed",
+      "KillSignal": "15",
+      "FinalKillSignal": "9"
+    }
+  }
+}

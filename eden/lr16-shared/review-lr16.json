@@ -1,0 +1,62 @@
+[
+  {
+    "sequences": [
+      479,
+      481,
+      483,
+      486,
+      487
+    ],
+    "queue_to_finalize_ms": 733,
+    "queue_to_drain_ms": 1024,
+    "drain_wait_us": 291563,
+    "interruptions": 1,
+    "index": 1,
+    "receipt": "out/RC-TEARDOWN-1.json",
+    "fresh_build": 583,
+    "fresh_ready": 594,
+    "continuation": 601,
+    "shot": "out/RC-TEARDOWN-1/yoga-005956Z-281627-settled-Captain-Falcon.png",
+    "shot_sha256": "ebf178d45223b6ffe803c73cc050b95367fc7027238013d06b43789c40063e47"
+  },
+  {
+    "sequences": [
+      857,
+      859,
+      861,
+      864,
+      865
+    ],
+    "queue_to_finalize_ms": 716,
+    "queue_to_drain_ms": 853,
+    "drain_wait_us": 136930,
+    "interruptions": 1,
+    "index": 2,
+    "receipt": "out/RC-TEARDOWN-2.json",
+    "fresh_build": 947,
+    "fresh_ready": 957,
+    "continuation": 964,
+    "shot": "out/RC-TEARDOWN-2/yoga-010048Z-087427-settled-Captain-Falcon.png",
+    "shot_sha256": "8b909ff76f0acb5cf956ca84c26da8d278d44400d4d349a54170a6bba3a7c758"
+  },
+  {
+    "sequences": [
+      1206,
+      1208,
+      1210,
+      1213,
+      1214
+    ],
+    "queue_to_finalize_ms": 748,
+    "queue_to_drain_ms": 916,
+    "drain_wait_us": 167410,
+    "interruptions": 1,
+    "index": 3,
+    "receipt": "out/RC-TEARDOWN-3.json",
+    "fresh_build": 1297,
+    "fresh_ready": 1306,
+    "continuation": 1313,
+    "shot": "out/RC-TEARDOWN-3/yoga-010140Z-244181-settled-Captain-Falcon.png",
+    "shot_sha256": "e1a56e66c7a7accf8b7ab5ab2dc1f5d03857c552f972ea94cca6af24b2144fc3"
+  }
+]

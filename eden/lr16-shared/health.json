@@ -1,0 +1,30 @@
+{
+  "console": {
+    "sha256": "766b4eb3d75d815dcd7e008845039c69923f708e6919e96762ef433b0d48c868",
+    "bytes": 837078,
+    "matches": []
+  },
+  "journal": {
+    "sha256": "70daac380a9223903ab67c31eeefb98068f3aab16c03df1bb7f419eb9ca4f622",
+    "bytes": 4752,
+    "matches": []
+  },
+  "yoga-restore": {
+    "restored": true,
+    "preserved": "/home/intpa/eden-runs/lr-16/state/post-run-yoga"
+  },
+  "yoga-verify": {
+    "equal": true,
+    "snapshot_equal": true,
+    "entries": 21410
+  },
+  "final_status": {
+    "phase": "down",
+    "claimed": true,
+    "released": true,
+    "owned_pids": {
+      "yoga": []
+    },
+    "cleanup_failures": []
+  }
+}

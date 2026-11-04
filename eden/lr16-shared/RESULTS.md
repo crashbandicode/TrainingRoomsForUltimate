@@ -1,0 +1,12 @@
+# lr-16 — 2026-11-04
+- RC9 diag5da1c5f11e4ecdf939867a1172a41a881a57687b8a14c6697c51fe2ccacbe46f/source5205a8f9; merged evidence base5ed8db1; unchanged Eden6a0c80d2; playbook5ddfae6.
+- One canonical boot from lr15 config;12PASS/0FAILED/0unrun, no retries; up30s/rows222s/Down53s. Manifest812a28b532c6020103a72105d20cbf4a9be85064d5597cf72923429431caaea9.
+- RC-TEARDOWN-1: queue479→finalize481→drained483→teardown486→empty ledger487; fresh build583→ready594→Falcon601.
+- RC-TEARDOWN-2: queue857→finalize859→drained861→teardown864→empty ledger865; fresh build947→ready957→Falcon964.
+- RC-TEARDOWN-3: queue1206→finalize1208→drained1210→teardown1213→empty ledger1214; fresh build1297→ready1306→Falcon1313.
+- Each: Sora/Kazuya/Steve,36frame quit, waited1/alias_ok=true, no normal built before drain, task_pending0/predicted[]/actual[]/residual[]/missing[], completed fresh BodyBank construction. Same-process fresh scene only.
+- All three settled re-entry screenshots visually reviewed: Falcon body AND matching P1 HUD, Lucas CPU. Exact shot paths/hashes in review-lr16.json; raw reentry-contact.png derived from originals.
+- Immediate Down after third: forced signal9/code2, no cap; cleanup_failures[], released, restore+separateverify equal, fresh owned_pids[]. Full console/journal no Unmapped/new-crash matches; health.json.
+- Receipts out/RC-TEARDOWN-{1,2,3}.json and each teardown.json; raw artifacts/trainingrooms-lead-astra4/rc9/lr16. Reproduce via review_lr16.py; uses prior tested review.teardown/receipt_binding.
+- RC-HATS already CLOSED by Primary on five distinct hats; transitional repeat frame is not the closure basis. CPU hats and renderer-unavailable R3 producer not run, awaiting operator decision.
+- No product edit/push/tag/release/card/DBI. Watcher completed/reaped; scoped COMPLIANCE.md supplies manual dispositions, Primary owns phase close-out.
