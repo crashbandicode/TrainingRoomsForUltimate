@@ -256,18 +256,18 @@ pub fn drain() {
 #[cfg(target_arch = "aarch64")]
 fn console_write(bytes: &[u8]) {
     // SAFETY: SVC 0x27 reads `len` bytes at `ptr`, both live for the call, and writes nothing in this
-    // process but its result register; x0–x7 are declared clobbered as for any supervisor call.
+    // process but its result register. The console kernel returns from an SVC with x8-x17 zeroed as
+    // well as x0-x7 (the v0.1.0 console boot crash: a static pointer the compiler kept in x8 was zeroed
+    // by the SVC return and the load after it faulted at 0), so the block clobbers the whole
+    // `extern "C"` integer register set with `clobber_abi("C")`, exactly as the plugin's other SVC
+    // sites do (`preload_metrics.rs`, `practice_trace.rs`, `mii_ordinary_native.rs`, `threads.rs`,
+    // `practice_stage_request.rs`).
     unsafe {
         core::arch::asm!(
             "svc #0x27",
             inout("x0") bytes.as_ptr() => _,
             inout("x1") bytes.len() => _,
-            lateout("x2") _,
-            lateout("x3") _,
-            lateout("x4") _,
-            lateout("x5") _,
-            lateout("x6") _,
-            lateout("x7") _,
+            clobber_abi("C"),
             options(nostack, readonly),
         );
     }
