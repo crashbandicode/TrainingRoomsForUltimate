@@ -423,9 +423,13 @@ delay popup (N3, slot sets checklist only) as proposed; N5 extended to the stage
 | FW1 | Ally Eden rigs and the Windows firewall prompt | agents may add an inbound **Block** rule (Windows Defender Firewall) for each rig `eden.exe` path they create (Training rows need no inbound network); never Allow rules; never answer the prompt itself; each rule recorded in the rig notes |
 | F6 | First-boot group-build hitch (~0.1 s first-use setup on the game thread; Kirby-first 91–109 ms) | **fix in both trees**: a fork worker root-causes it on M5q and ships M5r; the clean room carries the fix (fix-ledger row F6) |
 
-## Open 2026-11-04 (the primary, for the operator)
+## Answered 2026-11-04 (~06:5xZ, the operator via the primary)
 
-### HB1-route · How hitbox and hurtbox spheres are drawn
+| # | Decision | Answer |
+| --- | --- | --- |
+| HB1-route | How hitbox and hurtbox spheres are drawn | **Route B** (as recommended): the fork's shared-pool `sys_shield` spheres. This **reverses** the 2026-11-03 Phase 3 default "option A (isolated sphere)", which the option A study could not route safely. Route A stays later research. The Ridley first-frame refusals are counted and logged |
+
+### HB1-route · How hitbox and hurtbox spheres are drawn (the question as asked)
 
 HB1 (a) above draws hurtboxes in yellow. On 2026-11-03 (~11:0xZ, Phase 3 scope) the operator asked for an isolated
 visualization sphere ("option A") by default. The follow-up study (`OPTION-A-DESIGN.md`, stream/slim-phase3-rc6,
