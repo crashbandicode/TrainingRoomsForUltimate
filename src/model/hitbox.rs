@@ -162,7 +162,12 @@ pub fn second_centre(b: [f32; 3]) -> Option<[f32; 3]> {
     (b != [0.0; 3]).then_some(b)
 }
 
-// ---- historical pure HB1 rules (2026-11-02); no reader or dispatch in the RC ---------------------------------------
+// ---- hurtboxes (decision HB1 (a), 2026-11-02) -----------------------------------------------------------------------
+//
+// The rules below are renderer-agnostic and host-tested: what a part's shape is, which parts a pass reads, and the spheres
+// they become. The draw route (the operator's option A, an isolated visualization sphere, or the fork's shared-pool
+// `sys_shield`) is not picked yet (`docs/HB1-RENDER-ROUTES.md`, `OPTION-A-DESIGN.md`): the runtime plans the hurt spheres
+// but requests none until the route is wired, so the dispatch here is the one interface a route plugs into.
 
 /// Hurtboxes are drawn yellow.
 pub const HURTBOX_TINT: [f32; 3] = [1.0, 1.0, 0.0];
@@ -562,10 +567,54 @@ pub fn want_hitboxes(reader: &mut impl AttackReader, out: &mut [Sphere], len: &m
     left_out
 }
 
-/// The production RC pass's planning and owned-handle dispatch. Returns counts
-/// and ordinary hitbox spheres wanted (pending CATCH spheres stay in the set).
-/// HB1 has no reader or request path here, in release or diagnostic builds.
-pub fn reconcile_frame(set: &mut HandleSet, facts: FrameFacts, wants: &mut [Sphere], reader: &mut impl AttackReader, fx: &mut impl Effects) -> (Counts, usize) {
+/// The retained hurtbox reader. The runtime supplies the HitModule pointer and the in-place table reads; host probes run this
+/// same enumeration with address-counting spies (as `AttackReader` does for the attack slots). Every address is derived from
+/// `module()`; the reader only answers reads.
+pub trait HurtboxReader {
+    /// The fighter's `HitModule` (accessor `+0xb0`), or 0 when the fighter has none.
+    fn module(&mut self) -> usize;
+    fn read_usize(&mut self, at: usize) -> usize;
+    fn read_i32(&mut self, at: usize) -> i32;
+    fn read_i16(&mut self, at: usize) -> i16;
+    /// The 0x50-byte part record at `at` (the part table's record `at` names), read in place.
+    fn read_part(&mut self, at: usize, record: &mut [u8; layout::HIT_PART_STRIDE]);
+}
+
+/// The spheres of the fighter's enabled hurtbox parts (decision HB1 (a)): `HitModule`'s group `HURTBOX_GROUP` — the one the
+/// fighters' scripts address — its parts that are not switched off, each its capsule on its bone, yellow, with the same sphere
+/// rule as a hitbox. The tables are read in place (layout `layout::HIT_*`); a table that does not look like one gives nothing.
+/// Appends to `out[..*len]`; returns how many were left out for lack of room.
+pub fn want_hurtboxes(reader: &mut (impl HurtboxReader + ?Sized), out: &mut [Sphere], len: &mut usize) -> u32 {
+    let module = reader.module();
+    if module == 0 {
+        return 0;
+    }
+    let groups = reader.read_usize(module + layout::HIT_GROUPS);
+    let parts = reader.read_usize(module + layout::HIT_PARTS);
+    if groups == 0 || parts == 0 {
+        return 0;
+    }
+    let total = reader.read_i32(module + layout::HIT_PART_TOTAL);
+    let group = groups + HURTBOX_GROUP * layout::HIT_GROUP_STRIDE;
+    let first = reader.read_i16(group + layout::HIT_GROUP_FIRST);
+    let count = reader.read_i16(group + layout::HIT_GROUP_COUNT);
+    let Some(range) = group_parts(first, count, total) else { return 0 };
+    let mut left_out = 0;
+    for index in range {
+        let mut record = [0u8; layout::HIT_PART_STRIDE];
+        reader.read_part(parts + index * layout::HIT_PART_STRIDE, &mut record);
+        if let Some(shape) = hurtbox_shape(&record) {
+            left_out += push_shape(out, len, KIND_HURT, index, &shape, HURTBOX_TINT);
+        }
+    }
+    left_out
+}
+
+/// The production pass's planning and owned-handle dispatch. Returns counts and ordinary hitbox spheres wanted (pending CATCH
+/// spheres stay in the set). `hurt` is the hurtbox reader of the same per-frame entry (decision HB1): `Some` plans the enabled
+/// parts' spheres and requests them through the same set and effect interface as the hitboxes — the draw route's plug-in point,
+/// unwired in the runtime until the operator picks option A or the shared-pool route (`docs/HB1-RENDER-ROUTES.md`).
+pub fn reconcile_frame(set: &mut HandleSet, facts: FrameFacts, wants: &mut [Sphere], reader: &mut impl AttackReader, hurt: Option<&mut dyn HurtboxReader>, fx: &mut impl Effects) -> (Counts, usize) {
     if !facts.visualizes || !facts.enabled || facts.ids.shielding(facts.status) {
         return (set.clear(fx), 0);
     }
@@ -573,7 +622,10 @@ pub fn reconcile_frame(set: &mut HandleSet, facts: FrameFacts, wants: &mut [Sphe
         return (set.reconcile(&[], true, fx), 0);
     }
     let mut len = 0;
-    let left_out = want_hitboxes(reader, wants, &mut len);
+    let mut left_out = want_hitboxes(reader, wants, &mut len);
+    if let Some(hurt) = hurt {
+        left_out += want_hurtboxes(hurt, wants, &mut len);
+    }
     let mut counts = set.reconcile(&wants[..len], true, fx);
     counts.dropped += left_out;
     (counts, len)

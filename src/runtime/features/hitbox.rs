@@ -15,7 +15,12 @@
 //! says the feature's whole closure passed its guards it makes no call and reads no native. Every native goes through
 //! `game::natives`, whose grant check refuses a row boot rejected.
 //!
-//! HB1 hurtboxes and their HitModule reads are excluded from this RC.
+//! HB1's renderer-agnostic half is implemented and host-proven (`model::hitbox`: the hurtbox reader, the enumeration of the
+//! enabled parts and the dispatch into the same handle sets): the pass's dispatch takes the hurt reader as the draw route's
+//! plug-in point. The draw route itself is not wired: the operator's option A (an isolated visualization sphere) against the
+//! fork's shared-pool `sys_shield` route is still open (`docs/HB1-RENDER-ROUTES.md`, `OPTION-A-DESIGN.md`), so the runtime
+//! requests no hurt spheres and reads no HitModule table yet; the wiring is one `Some(GameHurt(accessor))` plus the three
+//! relied `hurtbox_*` guard rows re-added to `sites_hitbox`.
 //! No allocation: the spheres and the handle sets are fixed storage, the Lua stack and attack data are read in place, and
 //! every entry point counts under a `HookScope`. The pass and the hooks run on the game thread.
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, AtomicUsize, Ordering};
@@ -310,7 +315,9 @@ pub unsafe fn frame(fighter: usize) {
         seen_epoch[i] = epoch;
         counts = set.clear(&mut fx);
     }
-    let (c, hits) = hitbox::reconcile_frame(set, facts, wants, &mut GameAttacks(accessor), &mut fx);
+    // The hurt reader stays unwired (the draw route is the operator's option A vs the shared-pool route, see the module
+    // notes): `None` plans no hurt spheres and reads no HitModule table.
+    let (c, hits) = hitbox::reconcile_frame(set, facts, wants, &mut GameAttacks(accessor), None, &mut fx);
     #[cfg(feature = "diag")]
     stats::wanted(hits as u32, 0);
     #[cfg(not(feature = "diag"))]
