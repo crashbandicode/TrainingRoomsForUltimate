@@ -53,32 +53,134 @@ def _trace_entries(ctx, ident, register):
     return values
 
 
-def n4probe(ctx):
-    """N4 probe: where does the record-stop request die? Trace chords::consume (entry x0 = the
-    Request discriminant: SaveState0 LoadState1 InputRecord2 InputPlayback3 …) and
-    recorder::on_ai_frame (does the AI hook run while the recorder possesses the CPU?). Then the
-    record chord, one second, the stop chord, three seconds, and the trace is read."""
+def q7probe(ctx):
+    """Q7 probe: does the A press reach the menu model? Trace Menu::press (entry x1 = the Button
+    discriminant: Up0 Down1 Left2 Right3 A4 B5 X6 Y7 L8 R9 ZL10 ZR11) around the played route and
+    the A press; the after-A shot and the outbox write at close decide the rest."""
     out = {}
-    b.fixture(ctx, 'p23-n4.json', fresh=True)          # DI Up, SDI none, override Off, Steve/Lucas kept
+    b.fixture(ctx, 'p23-q7.json', fresh=True)          # last_page=recording
     ctx.gate('training-hud-unpaused')
-    consume_id = _arm(ctx, CHORDS_CONSUME, ['x0', 'x30'], max_hits=1024, rate_limit=2000)
-    ai_id = _arm(ctx, ON_AI_FRAME, ['x30'], on_return=False, max_hits=4096, rate_limit=4000)
-    record_tick = _now_tick(ctx)
-    chord(ctx, 'zr,down')                  # the record chord
-    out['record_start'] = _wait_tick(ctx, record_tick, '[PracticeRecording] record_lockout ')[-160:]
-    time.sleep(1.0)
-    out['ai_mid'] = _trace_summary(ctx, ai_id)
-    record_tick2 = _now_tick(ctx)
-    chord(ctx, 'zr,down')                  # the stop chord
-    time.sleep(3.0)
-    out['stop_tick'] = record_tick2
-    out['consume_requests'] = _trace_entries(ctx, consume_id, 'x0')
-    out['ai_summary'] = _trace_summary(ctx, ai_id)
-    _disarm(ctx, consume_id)
-    _disarm(ctx, ai_id)
-    out['diag'] = [x[-160:] for x in _tick_lines(ctx, record_tick, ['PracticeRecording'])][:12]
-    (ctx.row_dir / 'n4probe.json').write_text(json.dumps(out, indent=2) + '\n')
+    ctx.play('tr-menu-open')
+    ctx.wait_log('diag', r'\[Ui\] menu opened', cap=15)
+    time.sleep(1.5)
+    press_id = _arm(ctx, MENU_PRESS, ['x0', 'x1', 'x30'], on_return=False, max_hits=64)
+    ctx.play('q7-menu-to-row')             # the recorded 14-Down route
+    out['page_shot'] = b.capture(ctx, 'q7-replay-row', 'Recording page, focus on the Replay capture row')
+    since_tick = _now_tick(ctx)
+    ctx.press('a', 150)
+    time.sleep(0.8)
+    out['after_a_shot'] = b.capture(ctx, 'q7-after-a', 'The Replay capture row right after the A press')
+    out['presses'] = _trace_entries(ctx, press_id, 'x1')
+    out['press_summary'] = _trace_summary(ctx, press_id)
+    _disarm(ctx, press_id)
+    steps.close_menu(ctx)
+    ctx.gate('training-hud-unpaused')
+    out['write'] = _wait_tick(ctx, since_tick, 'replay_capture.ini written', 20)
+    out['ini_after'] = copy_ini(ctx, 'replay_capture.ini', 'q7-after')
+    (ctx.row_dir / 'q7probe.json').write_text(json.dumps(out, indent=2) + '\n')
     return out
+
+def c6cpu(ctx):
+    """C6 setup: the fixture narrows the CPU cycle roster to Ridley alone and turns hitbox
+    Visualization On (full fighter keys); the plugin's own CPU cycle chord then lands on Ridley."""
+    out = {}
+    b.fixture(ctx, 'p23-c6.json', fresh=True)
+    ctx.gate('training-hud-unpaused')
+    out['cycle'] = b.cycle(ctx, 1, 65, 'c6-ridley')
+    (ctx.row_dir / 'c6cpu.json').write_text(json.dumps(out, indent=2) + '\n')
+    return out
+def c6grab(ctx):
+    """C6 grab half: hitbox Visualization on by a settings-reload (no roster cycle: the CPU stays
+    Ridley), a Training reset, then a standing grab at range with no walk-in, filmed at full rate
+    plus once at 640 wide; the catch box in open space is the frame for review."""
+    out = {}
+    b.reload_settings(ctx, {'menu': {'hitbox_vis': [1, 0]}}, 'c6-hitbox-on')
+    ctx.gate('training-hud-unpaused')
+    since = b.mark(ctx)
+    chord(ctx, 'lra')                      # the Training reset (L+R+A, same frame)
+    out['reset_lines'] = [x[-160:] for x in _tick_lines(ctx, since, ['reset_hub', 'Reset'])][:4]
+    ctx.gate('training-hud-unpaused')
+    path = ctx.row_dir / 'c6-grab-full.gif'
+    ctx.call('recording.start', {'path': str(path), 'duration_ms': 8000, 'width': 1280, 'fps': 30})
+    time.sleep(1.0)
+    chord(ctx, 'zl,a')                     # the standing grab: shield + attack, no walk-in
+    time.sleep(1.2)
+    out['grab_shot'] = b.capture(ctx, 'c6-grab-frame', 'The catch box in open space during the standing grab')
+    path640 = ctx.row_dir / 'c6-grab-640.gif'
+    ctx.call('recording.start', {'path': str(path640), 'duration_ms': 5000, 'width': 640, 'fps': 15})
+    time.sleep(0.8)
+    chord(ctx, 'zl,a')
+    time.sleep(1.2)
+    out['clip640'] = steps._wait_clip(ctx, path640, 5000)
+    out['clip'] = steps._wait_clip(ctx, path, 8000)
+    (ctx.row_dir / 'c6.json').write_text(json.dumps(out, indent=2) + '\n')
+    return out
+def coinwalk(ctx, tile=39):
+    """The CPU coin is in the hand (05b's pickup succeeded; its trailing edge step logs nothing).
+    Walk the coin to `tile` with the tile-cursor macros, reading the cursor's settled tile between
+    steps: left to the target's column first, then up (columns are stable: 13-wide rows 0-77, the
+    coin row 78-86 shares column 0 with 78). Drop the coin, then enter Training."""
+    out = {'target': tile, 'walk': []}
+    since = b.mark(ctx)
+
+    def settled():
+        path = ctx.instance.get('tile_log')
+        at = None
+        try:
+            lines = open(path, errors='replace').read().splitlines()[-40:]
+        except (OSError, TypeError):
+            return None
+        for line in lines:
+            m = re.search(r'settled screen=css at=(\d+)', line)
+            if m:
+                at = int(m.group(1))
+        return at
+
+    at = settled()
+    out['start_at'] = at
+    if at is None:
+        raise RuntimeError('no settled tile in the cursor log; the coin state is unknown')
+    for _ in range(20):
+        if at == tile:
+            break
+        column = at if at <= 77 else 78 + (at - 78) if False else at
+        # column of the current tile within its row (rows of 13 below 78; the coin row starts at 78)
+        col = (at - 78) if at >= 78 else at % 13
+        target_col = (tile - 78) if tile >= 78 else tile % 13
+        target_row_top = (tile // 13) * 13 if tile < 78 else 78
+        if col > target_col:
+            nav._tile_step(ctx, 'left', at, at - 1)
+            at = at - 1
+        elif col < target_col:
+            nav._tile_step(ctx, 'right', at, at + 1)
+            at = at + 1
+        elif at > target_row_top:
+            below = at - 13
+            nav._tile_step(ctx, 'up', at, below)
+            at = below
+        else:
+            raise RuntimeError(f'the coin walk is stuck at {at} for target {tile}')
+        out['walk'].append(at)
+    if at != tile:
+        raise RuntimeError(f'the coin walk ended at {at}, not {tile}')
+    ctx.press('a', 120)                    # drop the coin on the target fighter
+    time.sleep(1.2)
+    ctx.gate('ready')
+    out['ready'] = b.capture(ctx, f'coinwalk-{tile}-ready', f'The CSS with the CPU coin placed on tile {tile}')
+    ctx.play('enter-training')
+    ctx.gate('training-hud-unpaused')
+    (ctx.row_dir / 'coinwalk.json').write_text(json.dumps(out, indent=2) + '\n')
+    return out
+
+
+def coinwalk_dispatch(ctx, action=None, **args):
+    """coinwalk's own entry: no settle — the CSS with the CPU coin in hand is the row's
+    start state, and the settle's B presses would take the coin back into the hand."""
+
+    """coinwalk's own entry: no settle — the CSS with the CPU coin in hand is the row's
+    start state, and the settle's B presses would take the coin back into the hand."""
+    return coinwalk(ctx, **args)
+
 
 def dispatch(ctx, action, **args):
     try:
@@ -127,7 +229,8 @@ def chord(ctx, buttons, hold=120):
     """A two-button chord as a same-frame macro (MACROS rule 14); steps.chord's sequential
     input.button calls straddle frames and the chord never fires."""
     names = {'zl,up': 'p23-chord-zl-up', 'minus': 'p23-chord-minus',
-             'zr,down': 'p23-chord-zr-down', 'zr,up': 'p23-chord-zr-up'}
+             'zr,down': 'p23-chord-zr-down', 'zr,up': 'p23-chord-zr-up',
+             'lra': 'p23-chord-lra', 'zl,a': 'p23-chord-zl-a'}
     ctx.play(names[buttons])
 
 
@@ -209,29 +312,6 @@ def _route(ctx, name, navigate, cap=40):
 
 
 SDI_TRACE = 'libtraining_rooms.nro!cpu_sdi_hook'
-# The DI hook is `cpu_common.rs::di_hook` (a local symbol; the game's correctDamageVectorCommon hook):
-# the demangled alias the 2b handoff named does not exist in the ELF, which is why that arm never fired.
-DI_TRACE = ('libtraining_rooms.nro!'
-            '_RNvNtNtNtCs9BO14eBq18m_14training_rooms7runtime8features10cpu_common7di_hook')
-# The delay pick itself: `DelayRow::pick` survived LTO as a local symbol; its return (x0) is the pick.
-DELAY_PICK_TRACE = ('libtraining_rooms.nro!'
-                    '_RNvMs0_NtNtNtCs9BO14eBq18m_14training_rooms5model3cpu8settingsNtB5_8DelayRow4pick')
-
-
-def _trace_returns(ctx, ident):
-    """The x0 values a trace point's return events recorded, read from the run's trace JSONL."""
-    path = ctx.instance.get('trace_jsonl')
-    values = []
-    if not path:
-        return values
-    try:
-        for line in Path(path).read_text(errors='replace').splitlines():
-            record = json.loads(line)
-            if str(record.get('point_id')) == str(ident) and record.get('event') == 'return':
-                values.append(record.get('registers', {}).get('x0'))
-    except OSError as error:
-        ctx.log({'trace_read': str(error)[:120]})
-    return values
 
 
 def n9t(ctx):
@@ -249,23 +329,20 @@ def n9t(ctx):
 
 
 def n10t(ctx):
-    """N10 redo: the SDI grid with the fixture actually applied (the menu opens on the CPU page via the
-    last_page fixture; 6 Downs from the page's first row land on SDI Direction), then one live hit with
-    the SDI hook traced and the plugin's own sdi_input/sdi_none lines collected. Which body the trace's
-    entry accessor is, is proven against the same-scene cpu_event tech_call … role=true line's accessor."""
+    """N10 redo: the SDI grid shows the fixture's own Up chip (no ui-* segment touches the grid),
+    and one live hit with the SDI hook traced."""
     out = {}
-    since = b.fixture(ctx, 'p23-n10.json', fresh=True)   # sdi Up (index 2), strength High, last_page=cpu
+    b.fixture(ctx, 'p23-n10.json', fresh=True)         # sdi_state Up (index 2), strength High
     ctx.gate('training-hud-unpaused')
     ctx.play('tr-menu-open')
     ctx.wait_log('diag', r'\[Ui\] menu opened', cap=15)
-    time.sleep(1.5)                                     # the menu's open fade discards the first inputs
-    for _ in range(6):                                  # CPU page rows: Mash … Dodge Staling; SDI Direction is row 7
+    time.sleep(1.5)
+    for _ in range(7):                                  # Defence group: SDI Direction is the 7th row
         ctx.press('down', 150)
         time.sleep(0.35)
-    out['focus'] = b.capture(ctx, 'n10-focus', 'CPU page, focus expected on SDI Direction (review decides the row)')
     ctx.press('a', 150)                                 # open the SDI Direction grid
     time.sleep(1.5)
-    out['grid'] = b.capture(ctx, 'n10-sdi-grid', 'SDI Direction grid with the fixture applied: the Up chip ticked, no A press inside')
+    out['grid'] = b.capture(ctx, 'n10-sdi-grid', 'SDI Direction grid with the fixture applied: the Up chip ticked x1, no A press inside')
     ctx.press('b', 120)                                 # back to the page
     time.sleep(0.8)
     steps.close_menu(ctx)
@@ -273,38 +350,66 @@ def n10t(ctx):
     ident = _arm(ctx, SDI_TRACE, ['x0', 'x1', 'x30'], max_hits=256)
     out['spark'] = _film_hit(ctx, 'n10-sdi-up-high-spark', ms=8000)
     out['trace'] = _trace_summary(ctx, ident)
-    out['trace_returns'] = _trace_returns(ctx, ident)
     _disarm(ctx, ident)
-    out['diag_lines'] = [x[-200:] for x in diag_lines_since(ctx, since)
-                         if 'sdi_input' in x or 'sdi_none' in x or 'tech_call' in x][:16]
     (ctx.row_dir / 'n10.json').write_text(json.dumps(out, indent=2) + '\n')
     return out
 
 
 def n3t(ctx):
-    """N3 redo: the fixture ticks Mash=NAir with the Grounded trigger (2b's review: the old fixture set
-    no mash action, so the CPU never attacked and no pick was applied). The delay pick itself is
-    `DelayRow::pick`'s return (the symbol survived LTO); the aerial issuances are the air-kind hook.
-    12 P1 forward smashes run as the row's drill while the CPU mashes; the picks list in the receipt is
-    every DelayRow::pick return in the window (the other delay rows are empty, so theirs read 0)."""
+    """N3 redo: 12 forward smashes under the [2,6] range fixture, filmed; the CPU's aerial issuance
+    hook is traced (the pick itself is inlined model code with no symbol to trace)."""
     out = {}
-    since = b.fixture(ctx, 'p23-n3.json', fresh=True)
+    b.fixture(ctx, 'p23-n3.json', fresh=True)
     ctx.gate('training-hud-unpaused')
-    pick_id = _arm(ctx, DELAY_PICK_TRACE, ['x0', 'x30'], max_hits=512)
-    air_id = _arm(ctx, 'libtraining_rooms.nro!cpu_attack_air_kind_hook', ['x0', 'x30'], max_hits=256)
+    ident = _arm(ctx, 'libtraining_rooms.nro!cpu_attack_air_kind_hook', ['x0', 'x30'], max_hits=512)
     path = ctx.row_dir / 'n3-twelve-hits.gif'
     ctx.call('recording.start', {'path': str(path), 'duration_ms': 60000, 'width': 640, 'fps': 15})
     for _ in range(12):
         ctx.play('tr2-fsmash')
         ctx.gate('training-hud-unpaused')
     out['clip'] = steps._wait_clip(ctx, path, 60000)
-    out['picks_trace'] = _trace_summary(ctx, pick_id)
-    out['picks'] = _trace_returns(ctx, pick_id)
-    out['air_trace'] = _trace_summary(ctx, air_id)
-    out['air_kinds'] = _trace_returns(ctx, air_id)
-    _disarm(ctx, pick_id)
-    _disarm(ctx, air_id)
+    out['trace'] = _trace_summary(ctx, ident)
+    _disarm(ctx, ident)
     (ctx.row_dir / 'n3.json').write_text(json.dumps(out, indent=2) + '\n')
+    return out
+
+
+def n4t(ctx):
+    """N4 redo: the recorded slot is a real stick sway; the Input Playback chord fires during the
+    CPU's hitstun (the p23-hit-playback macro), Off vs On override, filmed and DI-traced."""
+    out = {}
+    b.fixture(ctx, 'p23-n4.json', fresh=True)          # DI Up, SDI none, settings_override_playback Off
+    record_path = ctx.row_dir / 'n4-slot1-record.gif'
+    ctx.call('recording.start', {'path': str(record_path), 'duration_ms': 9000, 'width': 640, 'fps': 15})
+    chord(ctx, 'zr,down')                  # Input Record chord
+    ctx.stick(0, -1, 200)
+    ctx.stick(-1, 0, 400)                  # neutral-to-left sway, about two seconds
+    ctx.stick(0, 0, 200)
+    ctx.stick(1, 0, 400)
+    ctx.stick(0, 0, 300)
+    chord(ctx, 'zr,down')                  # stop the record
+    out['record'] = steps._wait_clip(ctx, record_path, 9000)
+    ctx.gate('training-hud-unpaused')
+    ident = _arm(ctx, 'libtraining_rooms.nro!cpu_di_hook', ['x0', 'x30'], max_hits=512)
+    for case in ('off', 'on'):
+        if case == 'on':
+            b.reload_settings(ctx, {'menu': {'settings_override_playback': [1, 0]}}, 'n4-override-on')
+        path = ctx.row_dir / f'n4-playback-{case}.gif'
+        since = b.mark(ctx)
+        ctx.call('recording.start', {'path': str(path), 'duration_ms': 9000, 'width': 640, 'fps': 15})
+        ctx.play('p23-hit-playback')       # the hit, and the playback chord inside the CPU's hitstun
+        out[f'playback_{case}'] = steps._wait_clip(ctx, path, 9000)
+        time.sleep(1.0)
+        lines = diag_lines_since(ctx, since)
+        out[f'di_lines_{case}'] = [x[-160:] for x in lines if 'di entry=' in x or 'di_before' in x][:8]
+        if case == 'on' and not out[f'di_lines_{case}']:
+            raise RuntimeError('no DI applied during playback with the override On')
+        steps.settle(ctx)
+        ctx.gate('training-hud-unpaused')
+    b.reload_settings(ctx, {'menu': {'settings_override_playback': [0, 0]}}, 'n4-override-off')
+    out['di_trace'] = _trace_summary(ctx, ident)
+    _disarm(ctx, ident)
+    (ctx.row_dir / 'n4.json').write_text(json.dumps(out, indent=2) + '\n')
     return out
 
 
@@ -324,8 +429,7 @@ def _tick_lines(ctx, start_tick, patterns):
 
 
 def _wait_tick(ctx, start_tick, pattern, cap=20):
-    """Rotation-proof diag wait: the 128 KiB diag log rotates mid-row and shifts line-count marks, so
-    the window is the game tick (each diag line's first field), not a line index."""
+    """Rotation-proof diag wait: the window is the diag line's game tick, not a line index."""
     end = time.monotonic() + cap
     while time.monotonic() < end:
         hits = _tick_lines(ctx, start_tick, [pattern])
@@ -335,104 +439,9 @@ def _wait_tick(ctx, start_tick, pattern, cap=20):
     raise RuntimeError('Missing positive evidence: ' + pattern)
 
 
-def n4t(ctx):
-    """N4 redo: the slot-1 record is gated on the plugin's own [PracticeRecording] lines; the playback
-    starts BEFORE the hit (p23-hit-playback-early: the chord at frame 5, the fsmash connects ~frame 18),
-    so the damage-vector correction happens while the playback possesses the CPU. Override Off: the
-    recording wins — no `di entry=` during the playback window. Override On: `di entry=1`. Each case's
-    hit is proven by the `di_before … role=true` line; after the playback ends one more hit shows the
-    overrides apply again in both cases."""
-    out = {}
-    b.fixture(ctx, 'p23-n4.json', fresh=True)          # DI Up, SDI none, override Off, Steve/Lucas kept
-    ctx.gate('training-hud-unpaused')
-    record_path = ctx.row_dir / 'n4-slot1-record.gif'
-    record_tick = _now_tick(ctx)
-    ctx.call('recording.start', {'path': str(record_path), 'duration_ms': 9000, 'width': 640, 'fps': 15})
-    chord(ctx, 'zr,down')                  # Input Record chord
-    out['record_start'] = _wait_tick(ctx, record_tick, '[PracticeRecording] record_lockout ')[-160:]
-    ctx.stick(0, -1, 200)
-    ctx.stick(-1, 0, 300)                  # neutral-to-left sway, under a second: the stop chord must
-    ctx.stick(0, 0, 200)                   # land inside the 150-frame recording window
-    chord(ctx, 'zr,down')                  # stop the record
-    out['record_done'] = _wait_tick(ctx, record_tick, 'recording_complete', 20)[-160:]
-    out['record'] = steps._wait_clip(ctx, record_path, 9000)
-    ctx.gate('training-hud-unpaused')
-    for case in ('off', 'on'):
-        if case == 'on':
-            b.fixture(ctx, 'p23-n4-on.json', fresh=True)   # the same rows with override On (full keys)
-        path = ctx.row_dir / f'n4-playback-{case}.gif'
-        case_tick = _now_tick(ctx)
-        ctx.call('recording.start', {'path': str(path), 'duration_ms': 9000, 'width': 640, 'fps': 15})
-        ctx.play('p23-hit-playback-early')  # playback first, the hit lands inside the playback window
-        out[f'playback_{case}'] = steps._wait_clip(ctx, path, 9000)
-        out[f'playback_start_{case}'] = _wait_tick(ctx, case_tick, '[PracticeRecording] playback_shortcut ', 15)[-160:]
-        lines = _tick_lines(ctx, case_tick, ['PracticeRecording', 'di_before', 'di entry='])
-        out[f'recording_lines_{case}'] = [x[-160:] for x in lines if 'PracticeRecording' in x][:8]
-        out[f'di_lines_{case}'] = [x for x in lines if 'di_before' in x or 'di entry=' in x][:8]
-        if not any('role=true' in x for x in out[f'di_lines_{case}']):
-            raise RuntimeError(f'no di_before role=true in the {case} case: the CPU was not hit during the playback window')
-        after_tick = _now_tick(ctx)
-        ctx.play('tr2-fsmash')              # after the playback ends: the overrides apply again
-        ctx.gate('training-hud-unpaused')
-        after = [x for x in _tick_lines(ctx, after_tick, ['di entry='])]
-        out[f'di_after_playback_{case}'] = after[:4]
-        if not after:
-            raise RuntimeError(f'no DI after the playback ended ({case})')
-        steps.settle(ctx)
-        ctx.gate('training-hud-unpaused')
-    if any('di entry=' in x for x in out['di_lines_off']):
-        raise RuntimeError('DI applied during playback with the override Off (the recording should win)')
-    if not any('di entry=' in x for x in out['di_lines_on']):
-        raise RuntimeError('no DI applied during playback with the override On')
-    (ctx.row_dir / 'n4.json').write_text(json.dumps(out, indent=2) + '\n')
-    return out
-def _burst(ctx, name, count, gap):
-    """Full-res screenshots through a window (the respawn platform and the invincibility flash are
-    judged at full resolution; the 640/15 clip cannot show the flash)."""
-    shots = []
-    for i in range(count):
-        time.sleep(gap)
-        shots.append(b.capture(ctx, f'{name}-{i}', 'burst frame inside the respawn window'))
-    return shots
-
-
-def n2redo2(ctx):
-    """N2 redo 2: real natural deaths for P1 (walk-off) and the CPU (the fixture's mash DASH walks it
-    off the edge; 2b's CPU playback never died), respawn invincibility Off vs On, each respawn window
-    covered by full-res burst shots; the 640/15 clip keeps the death itself. The state param hook's
-    returns during the window are the respawn's trace plus."""
-    out = {}
-    for case, fixture in (('off', 'p23-n2-off.json'), ('on', 'p23-n2-on.json')):
-        b.fixture(ctx, fixture, fresh=True)
-        ctx.gate('training-hud-unpaused')
-        # P1: walk off the left edge (a proven real death), burst through the respawn window.
-        path = ctx.row_dir / f'n2-p1-{case}-walk.gif'
-        ctx.call('recording.start', {'path': str(path), 'duration_ms': 12000, 'width': 640, 'fps': 15})
-        ctx.play('p23-walkoff-left')
-        time.sleep(4.0)
-        out[f'p1_{case}_burst'] = _burst(ctx, f'n2-p1-respawn-{case}', 8, 0.7)
-        out[f'p1_{case}_clip'] = steps._wait_clip(ctx, path, 12000)
-        steps.settle(ctx)
-        ctx.gate('training-hud-unpaused')
-        # CPU: mash DASH runs it off the edge; P1's smashes push the damage up while it crosses.
-        ident = _arm(ctx, 'libtraining_rooms.nro!state_get_param_int_hook', ['x0', 'x1', 'x2', 'x30'],
-                     max_hits=200, rate_limit=200)
-        path = ctx.row_dir / f'n2-cpu-{case}-dash.gif'
-        ctx.call('recording.start', {'path': str(path), 'duration_ms': 16000, 'width': 640, 'fps': 15})
-        time.sleep(3.0)
-        out[f'cpu_{case}_burst'] = _burst(ctx, f'n2-cpu-respawn-{case}', 10, 0.7)
-        for _ in range(4):
-            ctx.play('tr2-fsmash')
-            time.sleep(2.5)
-        out[f'cpu_{case}_clip'] = steps._wait_clip(ctx, path, 16000)
-        out[f'cpu_{case}_trace'] = _trace_summary(ctx, ident)
-        _disarm(ctx, ident)
-        steps.settle(ctx)
-        ctx.gate('training-hud-unpaused')
-    (ctx.row_dir / 'n2.json').write_text(json.dumps(out, indent=2) + '\n')
-    return out
 def q7(ctx):
-    """Q7: the Replay-capture toggle writes replay_capture.ini once per confirmed change."""
+    """Q7: the Replay-capture toggle writes replay_capture.ini once per confirmed change — the write
+    is served from the menu's outbox at menu close (attempt 1: the A press alone wrote nothing)."""
     out = {'writes': []}
     out['boot_ini'] = copy_ini(ctx, 'replay_capture.ini', 'q7-boot')
     b.fixture(ctx, 'p23-q7.json', fresh=True)          # last_page=recording (pushed before any menu open)
@@ -447,30 +456,29 @@ def q7(ctx):
             time.sleep(0.35)
     out['route'] = _route(ctx, 'q7-menu-to-row', navigate)
     out['page_shot'] = b.capture(ctx, 'q7-replay-row', 'Recording page, focus on the Replay capture row')
-    since = b.mark(ctx)
+    since_tick = _now_tick(ctx)
     ctx.press('a', 150)                                 # confirmed change 1: On -> Off
-    out['writes'].append(b.wait(ctx, since, r'\[TrainingRooms\] replay_capture\.ini written by the writer thread enabled=\S+', 15))
-    out['ini_off'] = copy_ini(ctx, 'replay_capture.ini', 'q7-after-off')
-    out['off_shot'] = b.capture(ctx, 'q7-after-off', 'Replay capture row Off (the Deluxe Plugins-page row check is not staged in this lane)')
+    out['off_shot'] = b.capture(ctx, 'q7-after-off', 'Replay capture row Off before the close')
     steps.close_menu(ctx)
     ctx.gate('training-hud-unpaused')
+    out['writes'].append(_wait_tick(ctx, since_tick, 'replay_capture.ini written', 20))
+    out['ini_off'] = copy_ini(ctx, 'replay_capture.ini', 'q7-after-off')
     ctx.play('tr-menu-open')                            # reopen: the page and the cursor are kept
     ctx.wait_log('diag', r'\[Ui\] menu opened', cap=15)
     time.sleep(1.5)
-    since = b.mark(ctx)
+    since_tick = _now_tick(ctx)
     ctx.press('a', 150)                                 # confirmed change 2: Off -> On
-    out['writes'].append(b.wait(ctx, since, r'\[TrainingRooms\] replay_capture\.ini written by the writer thread enabled=\S+', 15))
-    out['ini_on'] = copy_ini(ctx, 'replay_capture.ini', 'q7-after-on')
-    out['on_shot'] = b.capture(ctx, 'q7-after-on', 'Replay capture row On again')
+    out['on_shot'] = b.capture(ctx, 'q7-after-on', 'Replay capture row On again before the close')
     steps.close_menu(ctx)
     ctx.gate('training-hud-unpaused')
+    out['writes'].append(_wait_tick(ctx, since_tick, 'replay_capture.ini written', 20))
+    out['ini_on'] = copy_ini(ctx, 'replay_capture.ini', 'q7-after-on')
     out['down_ini'] = copy_ini(ctx, 'replay_capture.ini', 'q7-after-down')
     (ctx.row_dir / 'q7.json').write_text(json.dumps(out, indent=2) + '\n')
     return out
-
-
 def n7(ctx):
-    """N7: capture a menu shortcut in the editor, confirm, then apply it with the menu closed."""
+    """N7: capture a menu shortcut in the editor, confirm, then apply it with the menu closed. The
+    button_config.ini write is served from the outbox at menu close (attempt-1 evidence for q7)."""
     out = {}
     out['boot_ini'] = copy_ini(ctx, 'button_config.ini', 'n7-boot')
     b.fixture(ctx, 'p23-n7.json', fresh=True)          # last_page=display_controls
@@ -497,32 +505,30 @@ def n7(ctx):
     ctx.call('input.reset')                             # release everything: the capture settles
     time.sleep(0.8)
     out['captured_shot'] = b.capture(ctx, 'n7-captured', 'Editor readback shows the captured chord (ZL + DPad Up)')
-    since = b.mark(ctx)
-    ctx.press('a', 150)                                 # confirm: the INI is written at once
-    out['write'] = b.wait(ctx, since, r'\[TrainingRooms\] button_config\.ini written by the writer thread', 15)
-    out['ini_after'] = copy_ini(ctx, 'button_config.ini', 'n7-after-confirm')
+    since_tick = _now_tick(ctx)
+    ctx.press('a', 150)                                 # confirm: the row shows the new chord
     out['readback_shot'] = b.capture(ctx, 'n7-readback', 'The row now shows the new chord')
     steps.close_menu(ctx)
     ctx.gate('training-hud-unpaused')
+    out['write'] = _wait_tick(ctx, since_tick, 'button_config.ini written', 20)
+    out['ini_after'] = copy_ini(ctx, 'button_config.ini', 'n7-after-confirm')
     # With the menu closed: the new chord opens the menu, the old default chord does not; repeat once.
     for i in (1, 2):
+        since_tick = _now_tick(ctx)
         chord(ctx, 'zl,up')
         ctx.wait_log('diag', r'\[Ui\] menu opened', cap=15)
         out[f'new-opens-{i}'] = b.capture(ctx, f'n7-new-opens-{i}', 'Menu opened with the new chord, menu closed')
         steps.close_menu(ctx)
         ctx.gate('training-hud-unpaused')
-        since = b.mark(ctx)
         chord(ctx, 'minus')
         time.sleep(3.0)
-        stray = [x for x in diag_lines_since(ctx, since) if '[Ui] menu opened' in x]
+        stray = [x for x in _tick_lines(ctx, since_tick, ['[Ui] menu opened'])]
         if stray:
             raise RuntimeError(f'the old default chord opened the menu: {stray[-1]}')
         out[f'old-idle-{i}'] = b.capture(ctx, f'n7-old-idle-{i}', 'Minus with the menu closed: no menu opened')
     out['ini_final'] = copy_ini(ctx, 'button_config.ini', 'n7-final')
     (ctx.row_dir / 'n7.json').write_text(json.dumps(out, indent=2) + '\n')
     return out
-
-
 def q16(ctx):
     """Q16: the plugin's grids draw the game's own stock icon at run time (ARCropolis pinned).
 

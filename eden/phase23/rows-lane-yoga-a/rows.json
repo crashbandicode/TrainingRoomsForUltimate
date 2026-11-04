@@ -677,113 +677,16 @@
       ]
     },
     {
-      "id": "05b-cpu-pick",
-      "budget_min": 0.5,
+      "id": "p23-coinwalk-lucas",
+      "budget_min": 5,
       "start": "steve-selected",
-      "end": "cpu-held-review",
-      "steps": [
-        {
-          "play": "lr04-cpu-pick"
-        },
-        {
-          "gate": "cpu-token-fresh"
-        },
-        {
-          "shot": "cpu-held-review"
-        }
-      ]
-    },
-    {
-      "id": "05c-cpu74",
-      "budget_min": 0.5,
-      "start": "cpu-held-review",
-      "end": "cpu-held74",
-      "steps": [
-        {
-          "play": "lr04-cpu85-to74"
-        },
-        {
-          "gate": "cpu74-fresh"
-        },
-        {
-          "gate": "cpu-held74"
-        },
-        {
-          "shot": "cpu74"
-        }
-      ]
-    },
-    {
-      "id": "06-lucas",
-      "budget_min": 1,
-      "start": "cpu-held74",
-      "end": "ready",
-      "steps": [
-        {
-          "play": "cpu74-lucas"
-        },
-        {
-          "gate": "lucas"
-        },
-        {
-          "play": "lucas-pick"
-        },
-        {
-          "gate": "ready"
-        },
-        {
-          "shot": "ready"
-        }
-      ]
-    },
-    {
-      "id": "07-training",
-      "budget_min": 1,
-      "start": "ready",
       "end": "training",
       "steps": [
         {
-          "play": "enter-training"
-        },
-        {
-          "gate": "p1-original"
-        },
-        {
-          "gate": "cpu-original"
-        },
-        {
-          "gate": "catalog"
-        },
-        {
-          "gate": "player-owner"
-        },
-        {
-          "gate": "cpu-owner"
-        },
-        {
-          "gate": "training-hud-unpaused"
-        },
-        {
-          "shot": "training"
-        },
-        {
-          "copy": "settings"
-        },
-        {
-          "copy": "diag"
-        }
-      ]
-    },
-    {
-      "id": "p23-n4-di-during-playback-probe",
-      "budget_min": 4,
-      "start": "training",
-      "end": "training",
-      "steps": [
-        {
-          "run": "steps2.py:dispatch",
+          "run": "steps2.py:coinwalk_dispatch",
           "args": {
-            "action": "n4probe"
+            "action": "coinwalk",
+            "tile": 39
           },
           "check": true
         }

@@ -670,113 +670,61 @@
       ]
     },
     {
-      "id": "05b-cpu-pick",
-      "budget_min": 0.5,
+      "id": "p23-coinwalk-ridley",
+      "budget_min": 5,
       "start": "steve-selected",
-      "end": "cpu-held-review",
-      "steps": [
-        {
-          "play": "lr04-cpu-pick"
-        },
-        {
-          "gate": "cpu-token-fresh"
-        },
-        {
-          "shot": "cpu-held-review"
-        }
-      ]
-    },
-    {
-      "id": "05c-cpu74",
-      "budget_min": 0.5,
-      "start": "cpu-held-review",
-      "end": "cpu-held74",
-      "steps": [
-        {
-          "play": "lr04-cpu85-to74"
-        },
-        {
-          "gate": "cpu74-fresh"
-        },
-        {
-          "gate": "cpu-held74"
-        },
-        {
-          "shot": "cpu74"
-        }
-      ]
-    },
-    {
-      "id": "06-lucas",
-      "budget_min": 1,
-      "start": "cpu-held74",
-      "end": "ready",
-      "steps": [
-        {
-          "play": "cpu74-lucas"
-        },
-        {
-          "gate": "lucas"
-        },
-        {
-          "play": "lucas-pick"
-        },
-        {
-          "gate": "ready"
-        },
-        {
-          "shot": "ready"
-        }
-      ]
-    },
-    {
-      "id": "07-training",
-      "budget_min": 1,
-      "start": "ready",
       "end": "training",
       "steps": [
         {
-          "play": "enter-training"
-        },
-        {
-          "gate": "p1-original"
-        },
-        {
-          "gate": "cpu-original"
-        },
-        {
-          "gate": "catalog"
-        },
-        {
-          "gate": "player-owner"
-        },
-        {
-          "gate": "cpu-owner"
-        },
-        {
-          "gate": "training-hud-unpaused"
-        },
-        {
-          "shot": "training"
-        },
-        {
-          "copy": "settings"
-        },
-        {
-          "copy": "diag"
+          "run": "steps2.py:coinwalk_dispatch",
+          "args": {
+            "action": "coinwalk",
+            "tile": 65
+          },
+          "check": true
         }
       ]
     },
     {
-      "id": "p23-q7-native-write-probe",
-      "budget_min": 4,
+      "id": "p23-c6-grab-half",
+      "budget_min": 5,
       "start": "training",
       "end": "training",
       "steps": [
         {
           "run": "steps2.py:dispatch",
           "args": {
-            "action": "q7probe"
+            "action": "c6grab"
+          },
+          "check": true
+        }
+      ]
+    },
+    {
+      "id": "p23-n7-capture-apply-menu-closed",
+      "budget_min": 5,
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "run": "steps2.py:dispatch",
+          "args": {
+            "action": "n7"
+          },
+          "check": true
+        }
+      ]
+    },
+    {
+      "id": "p23-b7-airdodge-shield-tilt-side2",
+      "budget_min": 5,
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "run": "steps2.py:dispatch",
+          "args": {
+            "action": "b7side2"
           },
           "check": true
         }

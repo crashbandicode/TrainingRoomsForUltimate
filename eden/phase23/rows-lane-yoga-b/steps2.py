@@ -80,6 +80,108 @@ def q7probe(ctx):
     (ctx.row_dir / 'q7probe.json').write_text(json.dumps(out, indent=2) + '\n')
     return out
 
+def c6cpu(ctx):
+    """C6 setup: the fixture narrows the CPU cycle roster to Ridley alone and turns hitbox
+    Visualization On (full fighter keys); the plugin's own CPU cycle chord then lands on Ridley."""
+    out = {}
+    b.fixture(ctx, 'p23-c6.json', fresh=True)
+    ctx.gate('training-hud-unpaused')
+    out['cycle'] = b.cycle(ctx, 1, 65, 'c6-ridley')
+    (ctx.row_dir / 'c6cpu.json').write_text(json.dumps(out, indent=2) + '\n')
+    return out
+def c6grab(ctx):
+    """C6 grab half: hitbox Visualization on by a settings-reload (no roster cycle: the CPU stays
+    Ridley), a Training reset, then a standing grab at range with no walk-in, filmed at full rate
+    plus once at 640 wide; the catch box in open space is the frame for review."""
+    out = {}
+    b.reload_settings(ctx, {'menu': {'hitbox_vis': [1, 0]}}, 'c6-hitbox-on')
+    ctx.gate('training-hud-unpaused')
+    since = b.mark(ctx)
+    chord(ctx, 'lra')                      # the Training reset (L+R+A, same frame)
+    out['reset_lines'] = [x[-160:] for x in _tick_lines(ctx, since, ['reset_hub', 'Reset'])][:4]
+    ctx.gate('training-hud-unpaused')
+    path = ctx.row_dir / 'c6-grab-full.gif'
+    ctx.call('recording.start', {'path': str(path), 'duration_ms': 8000, 'width': 1280, 'fps': 30})
+    time.sleep(1.0)
+    chord(ctx, 'zl,a')                     # the standing grab: shield + attack, no walk-in
+    time.sleep(1.2)
+    out['grab_shot'] = b.capture(ctx, 'c6-grab-frame', 'The catch box in open space during the standing grab')
+    path640 = ctx.row_dir / 'c6-grab-640.gif'
+    ctx.call('recording.start', {'path': str(path640), 'duration_ms': 5000, 'width': 640, 'fps': 15})
+    time.sleep(0.8)
+    chord(ctx, 'zl,a')
+    time.sleep(1.2)
+    out['clip640'] = steps._wait_clip(ctx, path640, 5000)
+    out['clip'] = steps._wait_clip(ctx, path, 8000)
+    (ctx.row_dir / 'c6.json').write_text(json.dumps(out, indent=2) + '\n')
+    return out
+def coinwalk(ctx, tile=39):
+    """The CPU coin is in the hand (05b's pickup succeeded; its trailing edge step logs nothing).
+    Walk the coin to `tile` with the tile-cursor macros, reading the cursor's settled tile between
+    steps: left to the target's column first, then up (columns are stable: 13-wide rows 0-77, the
+    coin row 78-86 shares column 0 with 78). Drop the coin, then enter Training."""
+    out = {'target': tile, 'walk': []}
+    since = b.mark(ctx)
+
+    def settled():
+        path = ctx.instance.get('tile_log')
+        at = None
+        try:
+            lines = open(path, errors='replace').read().splitlines()[-40:]
+        except (OSError, TypeError):
+            return None
+        for line in lines:
+            m = re.search(r'settled screen=css at=(\d+)', line)
+            if m:
+                at = int(m.group(1))
+        return at
+
+    at = settled()
+    out['start_at'] = at
+    if at is None:
+        raise RuntimeError('no settled tile in the cursor log; the coin state is unknown')
+    for _ in range(20):
+        if at == tile:
+            break
+        column = at if at <= 77 else 78 + (at - 78) if False else at
+        # column of the current tile within its row (rows of 13 below 78; the coin row starts at 78)
+        col = (at - 78) if at >= 78 else at % 13
+        target_col = (tile - 78) if tile >= 78 else tile % 13
+        target_row_top = (tile // 13) * 13 if tile < 78 else 78
+        if col > target_col:
+            nav._tile_step(ctx, 'left', at, at - 1)
+            at = at - 1
+        elif col < target_col:
+            nav._tile_step(ctx, 'right', at, at + 1)
+            at = at + 1
+        elif at > target_row_top:
+            below = at - 13
+            nav._tile_step(ctx, 'up', at, below)
+            at = below
+        else:
+            raise RuntimeError(f'the coin walk is stuck at {at} for target {tile}')
+        out['walk'].append(at)
+    if at != tile:
+        raise RuntimeError(f'the coin walk ended at {at}, not {tile}')
+    ctx.press('a', 120)                    # drop the coin on the target fighter
+    time.sleep(1.2)
+    ctx.gate('ready')
+    out['ready'] = b.capture(ctx, f'coinwalk-{tile}-ready', f'The CSS with the CPU coin placed on tile {tile}')
+    ctx.play('enter-training')
+    ctx.gate('training-hud-unpaused')
+    (ctx.row_dir / 'coinwalk.json').write_text(json.dumps(out, indent=2) + '\n')
+    return out
+
+
+def coinwalk_dispatch(ctx, action=None, **args):
+    """coinwalk's own entry: no settle — the CSS with the CPU coin in hand is the row's
+    start state, and the settle's B presses would take the coin back into the hand."""
+
+    """coinwalk's own entry: no settle — the CSS with the CPU coin in hand is the row's
+    start state, and the settle's B presses would take the coin back into the hand."""
+    return coinwalk(ctx, **args)
+
+
 def dispatch(ctx, action, **args):
     try:
         settled = steps.settle(ctx)
@@ -127,7 +229,8 @@ def chord(ctx, buttons, hold=120):
     """A two-button chord as a same-frame macro (MACROS rule 14); steps.chord's sequential
     input.button calls straddle frames and the chord never fires."""
     names = {'zl,up': 'p23-chord-zl-up', 'minus': 'p23-chord-minus',
-             'zr,down': 'p23-chord-zr-down', 'zr,up': 'p23-chord-zr-up'}
+             'zr,down': 'p23-chord-zr-down', 'zr,up': 'p23-chord-zr-up',
+             'lra': 'p23-chord-lra', 'zl,a': 'p23-chord-zl-a'}
     ctx.play(names[buttons])
 
 
