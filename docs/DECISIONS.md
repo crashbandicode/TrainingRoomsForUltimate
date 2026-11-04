@@ -428,7 +428,7 @@ delay popup (N3, slot sets checklist only) as proposed; N5 extended to the stage
 | # | Decision | Answer |
 | --- | --- | --- |
 | HB1-route | How hitbox and hurtbox spheres are drawn | **Route B** (as recommended): the fork's shared-pool `sys_shield` spheres. This **reverses** the 2026-11-03 Phase 3 default "option A (isolated sphere)", which the option A study could not route safely. Route A stays later research. The Ridley first-frame refusals are counted and logged |
-| TRIO-DIRECT (~17:45Z) | With Player Swapping On, a Player Direct swap's completion check compares the solo `Forms::starting` shape against the entry's trio descriptor (`count=3 … flags=0x4`) and can never complete; `busy()` stays true and every chord refuses (Surface Round 2) | **Proposed, pending the operator**: Option A — under trio practice ON, plan and check the trio forms for the Player role (see the section below) |
+| TRIO-DIRECT (~17:45Z, answered ~17:55Z) | With Player Swapping On, a Player Direct swap's completion check compares the solo `Forms::starting` shape against the entry's trio descriptor (`count=3 … flags=0x4`) and can never complete; `busy()` stays true and every chord refuses (Surface Round 2) | **Option A (the operator, ~17:45Z)**: under trio practice ON, a Player Direct/Cycle swap plans and checks the GROUP forms the entry is actually built with, the same way the cycle path handles grouped fighters; the completion check then matches the regrouped descriptor. Fix on `p23/buildsplit-fix` with a host test for the planned forms under trio ON/OFF (see the section below) |
 | MENU-CLOSE (~13:58Z) | Closing the menu published its open-time snapshot and undid rows the game adopted while it was open (D1 write-backs, e.g. a CPU Kirby copy; Ally batch finding 2, `artifacts/phase23/FINDINGS-REPORT.md`) | **Close commits only the rows the player changed in this menu session** (as recommended). Every other row keeps its live value, including write-backs adopted while the menu was open. When the player and the game changed the same row, the player's edit wins. Regression test `tests/findings_menu_close.rs` (branch `p23/findings`) |
 
 The MENU-CLOSE choice as shown to the operator:
@@ -475,7 +475,9 @@ Options:
 Sources: `docs/HB1-RENDER-ROUTES.md` (branch `p23/hb1`), `OPTION-A-DESIGN.md`, Eden runs hb-03 and hb-04 (stream
 `hitbox`). Picture: `tools/render_hb1_route.py`.
 
-### TRIO-DIRECT · Direct swap under Player Swapping (trio): plan the trio forms (the question as asked)
+### TRIO-DIRECT · Direct swap under Player Swapping: plan the group forms — operator chose A (2026-11-04)
+
+**ANSWERED 2026-11-04 ~17:45Z (the operator, via the primary): option A.** With Player Swapping (trio_practice) ON, a Player Direct/Cycle swap plans and checks the GROUP forms the entry is actually built with, the same way the cycle path handles grouped fighters; the completion check (character_roster.rs:1069-1074) then matches the regrouped descriptor. Root cause only (no guard, skip or timeout); a host test for the planned forms under trio ON/OFF; full gates; the fix lands on `p23/buildsplit-fix` from `p23/integration` with a new diag NRO in a new gates folder. The question as raised:
 
 Raised 2026-11-04 ~17:17Z by the Surface lane's Round-2 root-cause analysis (not yet reproduced live under
 tracepoints; the facts below are from the B4 boot's diag log read live plus the source).
