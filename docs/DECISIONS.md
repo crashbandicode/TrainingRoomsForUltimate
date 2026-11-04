@@ -187,6 +187,20 @@ one more development probe.
 
 ![Q16 portraits](decisions/16-fighter-portraits.png)
 
+**Answered again 2026-11-04 (operator, Phase 2/3): run-time read stays, nothing baked; E9 amended to what the game does.**
+- **The operator asked:** "why would a fallback be needed? At that point we might as well bake the icon in like the fork." Then: "yes record it that way".
+- **Icon set:** the grids draw the game's `chara_2` stock-icon set. It is the same image as the fork's baked `fighter-NN.png` (decode check, panel 3).
+- **E8 (a mod shows):** PASS on Eden. A mod replacing Mario's `chara_2` icon makes the "5. Mario" tile draw the mod's icon (run `tr-p23-surface-q16n`).
+- **E9 (an unreadable icon), amended.** An unreadable mod icon file shows the **stock icon**, and nothing is substituted.
+  - Observed on Eden (run `tr-p23-surface-e9c3`): a valid mod icon whose host read was refused after discovery. ARCropolis served the game's own Samus icon.
+  - The earlier wording, "an unreadable file keeps the text tile", can't happen through a mod. A malformed icon file crashes the game's own loader whoever asks for it, so it is no test of the plugin.
+- **The names-only tile is a safety state, not an icon source.** It shows only when the texture helper refuses to call the game, because its guards found changed game code (for example after a game update).
+  - Host tests cover the parts: the guards refuse a changed word (`src/model/seams/native_seams/tests.rs`); every texture-helper entry checks `usable()` first (`tests/capabilities.rs:462-464`); the text-tile carry (`src/model/ui_texture.rs:178`); nothing is baked (`tests/core07_assets.rs`).
+  - The grid's gate itself (`thumbs::run` requests nothing unless `texture::usable()`) is runtime code; source citation only.
+- **Not baking:** baked icons would not show mods (E8), would add the fork's 89 icons (≈406 KB of PNG) to the plugin, and could not be drawn anyway in the one state where the names-only tile appears.
+
+![Q16 answer: E8, E9 and the icon set](decisions/16-fighter-portraits-answer.png)
+
 ### Q17 · Which chips show the game's DI / SDI visual
 
 Should only the DI and SDI chips show the game's own visual, with Airdodge Direction and Shield Tilt keeping
