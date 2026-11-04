@@ -1,5 +1,13 @@
 # Phase 2/3 Eden route library
 
+## Use these first (Phase 1 already solved navigation)
+
+- **Character / stage select:** the tile cursor plugin `libssbu_tile_cursor.nro` (`b8313ca2`, pinned in every plugin set). L3 + D-pad = exactly one tile; `ssbu-tile-cursor/events.log` reports the tile. Playbook `docs/TILE-CURSOR.md`. Never stick-steer the CSS/SSS.
+- **Routes:** `/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/segments/` (`enter-training`, `cycle-cpu`, `cycle-player`, `leave-css`, CPU picks …).
+- **Hooks:** `eden/lr03-shared` … `eden/lr16-shared` (roster/CSS segments, `pilot_gates.py` = P1 pilot arm/check, `base.py::reload_settings` = fixture merged onto live settings).
+- **Settings by fixture:** with the MENU-CLOSE fix (`21046a1`) a fixture survives menu visits; set toggles, CPU lists and the menu's start page (`last_page`) by fixture, not by presses.
+
+## Added in Phase 2/3
 One line per reusable piece: file — what it does — start state → end state — host(s) proven on. Read this before
 building a route; add to it as soon as something works (playbook WORKFLOW "Running agent workers without churn").
 
