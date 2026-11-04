@@ -428,6 +428,7 @@ delay popup (N3, slot sets checklist only) as proposed; N5 extended to the stage
 | # | Decision | Answer |
 | --- | --- | --- |
 | HB1-route | How hitbox and hurtbox spheres are drawn | **Route B** (as recommended): the fork's shared-pool `sys_shield` spheres. This **reverses** the 2026-11-03 Phase 3 default "option A (isolated sphere)", which the option A study could not route safely. Route A stays later research. The Ridley first-frame refusals are counted and logged |
+| TRIO-DIRECT (~17:45Z) | With Player Swapping On, a Player Direct swap's completion check compares the solo `Forms::starting` shape against the entry's trio descriptor (`count=3 … flags=0x4`) and can never complete; `busy()` stays true and every chord refuses (Surface Round 2) | **Proposed, pending the operator**: Option A — under trio practice ON, plan and check the trio forms for the Player role (see the section below) |
 | MENU-CLOSE (~13:58Z) | Closing the menu published its open-time snapshot and undid rows the game adopted while it was open (D1 write-backs, e.g. a CPU Kirby copy; Ally batch finding 2, `artifacts/phase23/FINDINGS-REPORT.md`) | **Close commits only the rows the player changed in this menu session** (as recommended). Every other row keeps its live value, including write-backs adopted while the menu was open. When the player and the game changed the same row, the player's edit wins. Regression test `tests/findings_menu_close.rs` (branch `p23/findings`) |
 
 The MENU-CLOSE choice as shown to the operator:
@@ -473,3 +474,51 @@ Options:
 
 Sources: `docs/HB1-RENDER-ROUTES.md` (branch `p23/hb1`), `OPTION-A-DESIGN.md`, Eden runs hb-03 and hb-04 (stream
 `hitbox`). Picture: `tools/render_hb1_route.py`.
+
+### TRIO-DIRECT · Direct swap under Player Swapping (trio): plan the trio forms (the question as asked)
+
+Raised 2026-11-04 ~17:17Z by the Surface lane's Round-2 root-cause analysis (not yet reproduced live under
+tracepoints; the facts below are from the B4 boot's diag log read live plus the source).
+
+**The facts.** With Player Swapping (`trio_practice`, the menu's Player Swapping row) **On**, a Player-role
+swap builds (or meets) a **trio-shaped** entry descriptor, but the swap's completion check compares against
+the **solo** shape, so the swap can never complete and the roster engine stays busy forever:
+
+- the request: a fixture's `diag_settings_reload` (or a menu change) dispatches
+  `Selection::Direct(target)` for `Role::Player`; `active.forms = configured_forms(...) =
+  Forms::starting(kind)` — for Mario the **solo** shape (`count=1, kinds=[0, MAX, MAX], flags=0x0`);
+- the entry the check reads (`character_roster.rs:1069-1074` → `ready_forms`): the descriptor held
+  `count=3, kinds=[0x00, 0x1c, 0x36] (Mario, Chrom, Mii Brawler), flags=0x4`, `installed=3, changing=0` —
+  the trio/Player-Swapping group shape;
+- `EntryState::ready()` requires `count == forms.count` (3 ≠ 1) and `flags == forms.flags` (0x4 ≠ 0x0) —
+  refused on every tick;
+- consequence chain (observed on the B4 boot, run `tr-p23-surface-b4`): `state.active` never clears →
+  `INSTALL.suspends_practice()` (= `busy()`) stays true forever → every `permitted()`-gated chord refuses
+  silently (B4-3: three Kirby-hat chord attempts, zero `[KirbyHats]` lines; B4-4/5 never started); no
+  `complete owner=0` line ever; the `[BuildSplit] stall owner=0 … flags=0x4` meter keeps printing the frozen
+  shape. A second, related defect is recorded in the same report: on the diag-reload path the Player-side
+  dispatch itself is unreliable (a repro boot's push was never dispatched; the menu's `player_character`
+  stayed the game-adopted pick), which needs its own bounded look once this shape question is decided.
+
+![Trio direct swap](decisions/trio-direct-swap.png)
+
+**Options:**
+
+1. **Option A (recommended): under trio practice ON, a Player Direct/Cycle swap plans and checks the trio
+   forms.** `requested_forms_at`/`configured_forms` return the trio `Forms` for the Player role when
+   `trio_practice == On` (the same grouped-fighter treatment the cycle path already applies), and the
+   completion check then matches the re-grouped descriptor. The player keeps the instant-swap group; the
+   fixture/menu path behaves like the cycle path.
+2. **Option B: a Direct swap leaves trio and goes solo.** A Direct (fixture/menu-set) swap tears the trio
+   group down and installs the solo fighter; the trio group is rebuilt only by the cycle path. Simpler check,
+   but a fixture push would silently change the Player Swapping experience and every menu-set character
+   would drop the group.
+3. **Option C: other** (e.g. the completion check accepts the target as the trio group's active member
+   without replanning forms). Less explicit than A; the forms the swap promises and the forms the entry ends
+   with would still differ.
+
+Sources: Surface lane report `artifacts/phase23/LANE-SURFACE-REPORT.md` ("Round 2"), run
+`tr-p23-surface-b4` (diag `c04a316c…`) and the repro `tr-p23-surface-b4b`; source
+`src/runtime/roster/character_roster.rs` (`ready_forms`, the completion check, `configured_forms`),
+`src/model/swap/character_forms.rs` (`Forms::starting`, `EntryState::ready`),
+`src/runtime/roster/build_split.rs` (`tick_any`, the stall meter). Picture: drawn for this decision.
