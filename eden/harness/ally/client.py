@@ -206,8 +206,11 @@ def main(argv=None):
                 print(f"{title} {n}: {line[:300]}")
         print(f"-- {len(text)} lines, {len(result['fail'])} failing, {len(result['unmapped_other'])} other Unmapped, {len(result['review'])} panic/abort/crash")
         sys.exit(1 if result["fail"] else 0)
-    elif op == "game":  # muted and saved before the game boots, then load and wait for it
-        ops(p, argv[1], [["mute"], ["load"]], 200)
+    elif op == "game":  # muted, stop-confirmation off ("Never ask", else game.stop wedges on the dialog), then load and wait
+        ops(p, argv[1], [["mute"],
+                         ["call", "settings.set", {"key": "ui.confirmStop", "value": 2}],
+                         ["call", "settings.save"],
+                         ["load"]], 200)
         print(json.dumps(ops(p, argv[1], [["waitstatus", "loading_complete", True, 180]], 260)))
     elif op == "ops":
         print(json.dumps(ops(p, argv[1], json.loads(Path(argv[2][1:]).read_text() if argv[2].startswith("@") else argv[2]))))
