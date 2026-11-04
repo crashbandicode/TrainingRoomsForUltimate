@@ -94,8 +94,19 @@ Only the `hitbox_vis` setting (SPEC-core-04).
 | per-frame work (Off) | one `set_sleep_effect(false)` + one setting read per fighter (upstream); `077a8e43`: plus the Training check first | one setting read per fighter; no game call when Off (Q4) | diag counters |
 | per-frame work (On) | kill_kind + up to 8 × 16 `req_follow` + 2 setter calls each, per fighter | same unless Q1/Q3 change the model | diag counters, effect-pool occupancy |
 
-§8 cost rows stay **pending** until the Eden census (rows-C C1/C4: the `[Hitbox] hurt census` and `[Hitbox] stats`
-lines record the HitModule read's cost and the pass's own cost on the integrated candidate's diag build).
+**Measured (rows-C C4, 2026-11-04):** Eden run `gbc-04`, diag `c04a316c` (`p23/integration` `21046a1`, route B),
+P1 Steve vs CPU Ridley, visualization On, idle plus shield and grab, 81 `[Hitbox] stats` windows of 600 frames
+(`/home/intpa/eden-runs/gbc-04/practice-diagnostics*.log`):
+
+| Measure | Value |
+| --- | --- |
+| HitModule read per kind, census `ticks_avg` (median over windows) | Steve 0x58: 34 (10 parts); Ridley 0x42: 93 (19 parts); 0x40: 44 (11 parts); 0x44: 70 (11 parts) |
+| census `ticks_max` (worst window) | 699–3,097 per kind |
+| the pass's own cost, `pass_ticks_avg` | median 466, range 444–967 (hb-03 before route B: 225–231 idle) |
+| `pass_ticks_max` | one outlier window at 62,955; the other windows are far lower (likely a load window; not attributed) |
+
+Route B (shared-pool `sys_shield`) roughly doubles the per-pass cost against hb-03, and Ridley (19 parts) is the
+heaviest kind measured. The numbers are emulator ticks, not console time.
 | heap allocations in hooks | upstream's shield rewrite collects 36 Lua values into a `Vec` per attack command; the visualizer itself allocates nothing | 0 (fixed-size array for the rewrite) | counting allocator |
 
 ## 9. Test provenance
