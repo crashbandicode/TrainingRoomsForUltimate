@@ -121,3 +121,11 @@ ceiling = 137841
 date = "2026-11-05"
 reason = "rc.3 candidate (p23/rc3-candidate): frame strip + Change Stage + menu navigation + hitbox own orbs merged; measured 137841 at 888fdaa (tools/sloc.py), +1368 over 136473 at main 36d7f46, the sum of the four lane entries above"
 approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed' (rc.3 features)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 138089
+date = "2026-11-05"
+reason = "rc.4: seam checks read this plugin's own writes as the bytes they replaced (p23/seam-self, root cause of rc.2's Change Stage skip); measured 138089 at c8682d8 (tools/size_gate.py), +248 over 137841"
+approved_by = "Operator 2026-11-05 via primary 35137355 (seam-self order, 16:30Z): 'Raise as needed', an exact entry"
