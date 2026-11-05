@@ -110,7 +110,9 @@ fn env() -> Env {
 
 /// A Combos row's result (SPEC-input-07 §6): a notice, and the names the open menu shows.
 fn combo_note(s: &mut Session, note: &str) {
-    notices::upsert(0x2A, "Combos", note, 180, DEFAULT_COLOR);
+    // The action note replaces the skipped-file notice (`model::combo_record::apply_combo_action`).
+    notices::clear(crate::model::combo_record::ComboNotices::SKIPPED_ID);
+    notices::upsert(crate::model::combo_record::ComboNotices::ACTION_ID, "Combos", note, 180, DEFAULT_COLOR);
     let (target, draft) = crate::runtime::features::combo::labels();
     if let Some(m) = s.menu.as_mut() {
         m.set_combo_labels(target, draft);

@@ -683,6 +683,17 @@ const fn under(mut spec: Spec, parent: Name) -> Spec {
     spec
 }
 
+/// Centre of `TrModDisp0`, below the combo bar. The header box is the highest notice text
+/// (local y 445, height 50). Sixteen units are the plate padding `p23/notice-plates` draws
+/// around that text. The combo bar's bottom is `STRIP_Y + BAR_Y - BAR_H / 2`, and 8 units stay clear of it.
+pub const NOTICE_ORIGIN_Y: f32 = {
+    let header_top = 445.0 + 50.0 / 2.0;
+    let plate_pad = 16.0;
+    let bar_bottom = iv::STRIP_Y + cb::BAR_Y - cb::BAR_H / 2.0;
+    let gap = 8.0;
+    bar_bottom - gap - (header_top + plate_pad)
+};
+
 /// Pane `index`'s kind and place.
 pub const fn spec(index: usize) -> Spec {
     let name = name_of(index);
@@ -691,7 +702,7 @@ pub const fn spec(index: usize) -> Spec {
         IDX_ORBS => Spec { name, parent: ROOT_PANE, kind: Kind::Null, x: 0.0, y: 0.0, w: 1920.0, h: 1080.0, visible: false },
         i if i >= IDX_ORB && i < IDX_ORB + ORBS => under(rect(name, [0.0, 0.0, 64.0, 64.0], [255; 4], false), name_of(IDX_ORBS)),
         IDX_MENU => Spec { name, parent: ROOT_PANE, kind: Kind::Null, x: 0.0, y: 0.0, w: 1920.0, h: 1080.0, visible: false },
-        IDX_NOTICE => Spec { name, parent: ROOT_PANE, kind: Kind::Null, x: 0.0, y: 0.0, w: 1920.0, h: 1080.0, visible: false },
+        IDX_NOTICE => Spec { name, parent: ROOT_PANE, kind: Kind::Null, x: 0.0, y: NOTICE_ORIGIN_Y, w: 1920.0, h: 1080.0, visible: false },
         IDX_NOTICE_BASE => under(rect(name, [0.0, 405.0, 1000.0, 150.0], NOTICE_BACKGROUND, true), name_of(IDX_NOTICE)),
         IDX_NOTICE_HEADER => under(text(name, [0.0, 445.0, 960.0, 50.0], Align::Center, FONT_SMALL, 24, NOTICE_HEADER), name_of(IDX_NOTICE)),
         IDX_NOTICE_TEXT => under(text(name, [0.0, 390.0, 960.0, 70.0], Align::Center, FONT, 48, TEXT), name_of(IDX_NOTICE)),

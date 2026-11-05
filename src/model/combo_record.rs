@@ -344,6 +344,70 @@ pub fn clean_name(typed: &str) -> Option<String> {
     (!name.is_empty()).then_some(name)
 }
 
+/// Saved combos footer. The named library's first line is the focused row's full label
+/// (`Name · N links · recorded on X`); the second line is this list's controls.
+pub fn saved_combos_footer(library_footer: &str) -> String {
+    let label = library_footer.lines().next().unwrap_or("");
+    format!("{label}\nA Target · X Rename · Y Delete · B Return")
+}
+
+/// Whether opening the list should post, repeat, or clear the skipped-file notice.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum SkipPost {
+    Same,
+    Post(String),
+    Clear,
+}
+
+/// The two standing notices for Saved combos. `0x2B` names a file the list could not use.
+/// `0x2A` is the action note (the target note, and the other Combos results).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct ComboNotices {
+    posted: Option<String>,
+}
+
+impl ComboNotices {
+    pub const SKIPPED_ID: u8 = 0x2B;
+    pub const ACTION_ID: u8 = 0x2A;
+
+    pub fn new() -> Self {
+        Self { posted: None }
+    }
+
+    /// Opening the list. The skipped-file notice posts only when its text changes, so a later
+    /// open of the same set does not reset the 300-frame length.
+    pub fn post_skipped(&mut self, skipped: &[SkippedFile]) -> SkipPost {
+        match skipped_note(skipped) {
+            Some(text) if self.posted.as_deref() == Some(text.as_str()) => SkipPost::Same,
+            Some(text) => {
+                self.posted = Some(text.clone());
+                SkipPost::Post(text)
+            }
+            None => {
+                if self.posted.take().is_some() {
+                    SkipPost::Clear
+                } else {
+                    SkipPost::Same
+                }
+            }
+        }
+    }
+}
+
+/// An action note (the target note, and the other Combos results) replaces the skipped-file
+/// notice. The open menu freezes whichever standing notice is in front, so leaving `0x2B` queued
+/// would keep the target note off the screen.
+pub fn apply_combo_action(queue: &mut super::notify::Queue, text: &str) {
+    queue.clear_id(ComboNotices::SKIPPED_ID);
+    queue.upsert(
+        ComboNotices::ACTION_ID,
+        "Combos",
+        super::notify::Body::copied(text),
+        180,
+        super::notify::DEFAULT_COLOR,
+    );
+}
+
 #[cfg(test)]
 #[path = "combo_record_tests.rs"]
 mod tests;
@@ -351,3 +415,7 @@ mod tests;
 #[cfg(test)]
 #[path = "combo_record_share_tests.rs"]
 mod share_tests;
+
+#[cfg(test)]
+#[path = "combo_notice_tests.rs"]
+mod notice_tests;

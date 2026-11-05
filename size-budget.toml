@@ -209,3 +209,11 @@ ceiling = 140750
 date = "2026-11-05"
 reason = "rc.5 fix P-CYCLE (p23/cpu-cycle-fix): one cycle list for the CPU cycle and its menu numbers, and the grid's numbers to a trace function for the rows (operator's bug report: a Mii Gunner cycled though not listed); measured 140750 at c45c1cd (tools/size_gate.py), +176 over the rc.5 candidate's 140574"
 approved_by = "Operator 2026-11-05 via primary 35137355 (P-CYCLE order, ~19:50Z): 'Raise as needed', own commit"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 140822
+date = "2026-11-05"
+reason = "rc.5 fixes2 (p23/rc5-fixes2): the notice slot sits below the frame strip, and Saved combos keeps the focused row's full label and posts the skipped-file notice only when that set changes; measured 140822 at 3b43069 (tools/size_gate.py), +72 over the P-CYCLE ceiling 140750"
+approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed'"

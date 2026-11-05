@@ -53,7 +53,7 @@ fn the_list_names_bad_files_and_reports_its_counts() {
     let g = graph();
     assert!(names(&g, "combos::show_list", "list"));
     assert!(calls(&g, "combos::show_list", "combos::note_skipped"));
-    assert!(names(&g, "combos::note_skipped", "skipped_note") && names(&g, "combos::note_skipped", "upsert"));
+    assert!(names(&g, "combos::note_skipped", "post_skipped") && names(&g, "combos::note_skipped", "upsert"));
     assert!(calls(&g, "combos::load_target", "combos::note_skipped"), "an unreadable target is named too");
     assert!(names(&g, "combos::show_list", "listed") && names(&g, "combos::show_list", "shared"));
     assert!(calls(&g, "combo::listed", "combo::tr_combo_listed_v1"));
