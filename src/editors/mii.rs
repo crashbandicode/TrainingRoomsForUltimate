@@ -129,18 +129,35 @@ mod tests {
         assert_eq!(pending.actions.len(), 1);
         assert!(matches!(pending.actions[0], Action::ReloadCpu(choice) if choice.canonical == second));
         list.press(Button::Down, &mut menu);
-        assert!(list.editor_request().is_none(), "RC never dispatches the native editor");
+        assert!(list.editor_request().is_some(), "Add New follows the two saved choices");
         let mut frame = Frame::new();
         list.frame(&menu, &mut frame);
-        assert_eq!(frame.row_count, 2);
-        assert_eq!(frame.focus, Some(1));
-        assert!(!frame.rows.iter().any(|row| row.label.string_lossy().contains("Add New")));
+        assert!(frame.rows[..usize::from(frame.row_count)].iter().any(|row| row.label.string_lossy() == "Add New…"));
     }
 
     #[test]
-    fn unqualified_empty_catalog_refuses_editor_without_granting_role_permissions() {
+    fn waiting_catalog_opens_each_class_at_add_new_without_role_permissions() {
+        use crate::engine::mii_root::mii_menu::EditorSeed;
         let mut menu = Menu::new(Settings::factory(), Env::default());
         let mut list = MiiList::new(Snapshot::default(), None, 1, &menu).unwrap();
+        for class in 0..3 {
+            list.open(class);
+            let mut frame = Frame::new();
+            list.frame(&menu, &mut frame);
+            assert_eq!(frame.row_count, 1);
+            assert_eq!(frame.rows[0].label.string_lossy(), "Add New…");
+            let request = list.editor_request().unwrap();
+            assert!(matches!(request.seed, EditorSeed::NativeDefault(kind) if kind.kind() == 0x48 + u32::from(class)));
+            list.press(Button::ZR, &mut menu);
+            assert!(list.close().is_none());
+        }
+    }
+
+    #[test]
+    fn unavailable_capability_refuses_editor_without_granting_role_permissions() {
+        let mut menu = Menu::new(Settings::factory(), Env::default());
+        let mut list = MiiList::new(Snapshot::default(), None, 1, &menu).unwrap();
+        list.catalog.set_editor_available(false);
         for class in 0..3 {
             list.open(class);
             let mut frame = Frame::new();

@@ -39,9 +39,11 @@ fn rejected_editor_preflight_does_not_reject_retained_stage_or_catalog() {
 }
 
 #[test]
-fn rc_availability_and_native_call_sites_bind_the_tested_boundary() {
+fn availability_and_native_call_sites_bind_the_tested_boundary() {
+    // The native editor is available (operator 2026-11-05, the Mii editor bring-over); the capability still gates every
+    // native entry point, so switching it off again restores the tested refusals below.
     let menu = include_str!("../src/model/mii_root/mii_menu.rs");
-    assert!(menu.contains("pub const NATIVE_EDITOR_AVAILABLE: bool = false;"));
+    assert!(menu.contains("pub const NATIVE_EDITOR_AVAILABLE: bool = true;"));
     let bridge = include_str!("../src/runtime/mii/mii_editor_bridge/mod.rs");
     let init = bridge.split("pub(crate) fn init() {").nth(1).unwrap();
     let (shared, editor) = init.split_once("fn init_editor(base: usize) {").unwrap();

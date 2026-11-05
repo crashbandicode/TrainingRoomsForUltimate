@@ -5,8 +5,11 @@ use crate::engine::mii::selection::{self, Action, Active, DropdownRow, PlayerOri
 
 use crate::engine::compat::panel_view as macro_panel;
 
-/// RC keeps saved catalog selection; native creation awaits runtime qualification.
-pub const NATIVE_EDITOR_AVAILABLE: bool = false;
+/// Add New opens the game's native Mii editor (the fork's editor, carried; operator 2026-11-05: bring it over). Its Save
+/// makes a new native Smash Mii only (`mii_editor_bridge::edit_decide`: a fresh draft through the game's allocator; a
+/// saved ID never enters, so no saved or protected original is overwritten). The capability stays one switch: with it
+/// false the list hides Add New and the bridge refuses before any native work (`tests/mii_install_boundary.rs`).
+pub const NATIVE_EDITOR_AVAILABLE: bool = true;
 
 pub const PAGES: [(&str, &str, MiiClass); 3] = [
     ("mii_brawler_config", "Mii Brawler", MiiClass::Brawler),

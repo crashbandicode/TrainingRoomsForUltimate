@@ -8987,7 +8987,7 @@
    "dest": "src/runtime/mii/mii_editor_bridge/mod.rs",
    "crate": "root",
    "src_sha256": "469dd011585d19e4999c25d02c9ea2faa6c9f1c1743686b55adbdadd09ce33ca",
-   "dest_sha256": "4b0c6125dd053e37f7f59cb033b2eb1a67a5baf728f7412971a4410ce25a24e7",
+   "dest_sha256": "6d20f9b89c80689febac6fbf5a41a9c413588ad4f4b508781913d5900b9d1255",
    "edits": [
     {
      "old": "pub(crate) struct Trace {\n    events: Vec<Event>,\n    input_checks: Vec<(&'static str, [native::InputChange; 3])>,\n}",
@@ -9285,6 +9285,16 @@
      "old": "pub(crate) fn init() {\n    let base = unsafe { getRegionAddress(Region::Text) as usize };\n    // WP-A2: the 64-byte rows (20 hook sites, the called/relied contracts, the scene_queue entry ARCropolis may\n    // hook) decide; today's FNV verdict is the shadow/legacy decision. All rows are checked before any hook.\n    let legacy = unsafe { fingerprints::matches(base) };\n    if !crate::runtime::seams::seam_install::gate(\"mii_editor_bridge\", fingerprints::SEAMS_MII_EDITOR_BRIDGE, legacy) {\n        crate::engine::compat::logging::diagnostic(format_args!(\"[MiiEditor] unsupported native code; disabled\"));\n        return;\n    }\n    #[cfg(feature = \"diag\")]\n    crate::runtime::compat::filesystem::init();\n    BASE.store(base, Ordering::Release);\n    unsafe { native_default::init(base); }\n    skyline::install_hooks!(training_ui, training_state, editor_parent, edit_initialized,\n        edit_frame, edit_decide, editor_release);\n    connected::init();\n",
      "new": "pub(crate) fn init() {\n    let base = unsafe { getRegionAddress(Region::Text) as usize };\n    install::run(crate::engine::mii_root::mii_menu::NATIVE_EDITOR_AVAILABLE,\n        || {\n            // Existing Training-state contract only. Editor-only fingerprint\n            // rows and native reads no longer gate retained stage/catalog work.\n            let legacy = unsafe { fingerprints::retained_matches(base) };\n            if !crate::runtime::seams::seam_install::gate(\"mii_editor_bridge\",\n                fingerprints::RETAINED_SEAMS, legacy) { return false; }\n            BASE.store(base, Ordering::Release);\n            RETAINED_ENABLED.store(true, Ordering::Release);\n            true\n        },\n        || {\n            let legacy = unsafe { fingerprints::matches(base) };\n            crate::runtime::seams::seam_install::gate(\"mii_editor_bridge\",\n                fingerprints::SEAMS_MII_EDITOR_BRIDGE, legacy)\n        },\n        || {\n            skyline::install_hook!(training_state);\n        },\n        || init_editor(base),\n    );\n}\n\n/// Unavailable in both RC release and diag; no editor-only initialization runs.\nfn init_editor(base: usize) {\n    // The applicable WP-A2 rows were accepted before the shared hook write.\n    #[cfg(feature = \"diag\")]\n    crate::runtime::compat::filesystem::init();\n    unsafe { native_default::init(base); }\n    skyline::install_hooks!(training_ui, editor_parent, edit_initialized,\n        edit_frame, edit_decide, editor_release);\n    connected::init();\n",
      "reason": "RC7 R3-4: split retained Training-stage/catalog initialization from unavailable editor-only hooks, lifecycle, keyboard, resume and trace work; existing native contracts and editor refusal preserved."
+    },
+    {
+     "old": "//! Private native-editor integration. Ordinary Training is qualified; the new\n//! Quickplay adapter remains an unpublished runtime qualification candidate.\n",
+     "new": "//! Private native-editor integration: Add New opens the game's Mii editor from Training, Quickplay or Local\n//! Wireless waiting practice (`editor_origin`), and an explicit Save makes a new native Mii only (`edit_decide`).\n//! The fork qualified ordinary Training; the waiting-room adapters and the resume after a match have no runtime\n//! proof in this repository yet.\n",
+     "reason": "rc.3 (2026-11-05): native Mii editor available again (operator, primary 35137355: bring the fork's editor over); Add New Save still makes only a new native Mii (edit_decide); the capability switch and its refusals stay."
+    },
+    {
+     "old": "/// Unavailable in both RC release and diag; no editor-only initialization runs.\nfn init_editor(base: usize) {\n",
+     "new": "/// Runs in release and diag builds once `NATIVE_EDITOR_AVAILABLE` holds and every editor seam row passed\n/// (`install::run`); otherwise no editor-only initialization runs.\nfn init_editor(base: usize) {\n",
+     "reason": "rc.3 (2026-11-05): native Mii editor available again (operator, primary 35137355: bring the fork's editor over); Add New Save still makes only a new native Mii (edit_decide); the capability switch and its refusals stay."
     }
    ]
   },
@@ -9699,7 +9709,7 @@
    "dest": "src/model/mii_root/mii_menu.rs",
    "crate": "tui",
    "src_sha256": "94d7a41fe2ff5d3c4dcaed6ff0e87df4c96d64bd927a99e4550a198784cb761c",
-   "dest_sha256": "b346b3294a7f562884691c39034fbf18f247e557b542fdc7bef45e1f26503923",
+   "dest_sha256": "83d7fff0adcb22e90011aa48ba79fc6727811630377e37272f15f1579ed37ffc",
    "edits": [
     {
      "old": "use {crate::macro_panel, crate::StatefulTable, crate::SubMenu, crate::SubMenuType, crate::engine::compat::grid::NX_SUBMENU_COLUMNS, crate::NX_SUBMENU_ROWS};",
@@ -9800,6 +9810,11 @@
      "old": "                    .map(|entry| entry.name);\n                labels.push(format!(\"{name}: {}\", selected.unwrap_or(\"Unavailable\")));\n            }\n            let can_add = cfg!(feature = \"mii-editor-alpha\") && self.snapshot.is_complete();\n            labels.push(if can_add { \"Add New\" } else { \"Add New (unavailable)\" }.into());\n            View { panel: macro_panel::View { title: title.into(), labels, selected: self.cursor,\n                footer: status }, disabled: vec![self.editor_only, self.editor_only, !can_add] }\n        }\n    }\n}\n",
      "new": "                    .map(|entry| entry.name);\n                labels.push(format!(\"{name}: {}\", selected.unwrap_or(\"Unavailable\")));\n            }\n            let can_add = cfg!(feature = \"mii-editor-alpha\") && self.snapshot.is_complete();\n            let mut disabled = vec![self.editor_only, self.editor_only];\n            if self.editor_available {\n                labels.push(if can_add { \"Add New\" } else { \"Add New (unavailable)\" }.into());\n                disabled.push(!can_add);\n            }\n            View { panel: macro_panel::View { title: title.into(), labels, selected: self.cursor,\n                footer: status }, disabled }\n        }\n    }\n}\n",
      "reason": "RC reset: adapter capability hides unproven native Mii editor and provider refuses fresh/resumed sessions, while saved catalog selection and generic enabled policy remain."
+    },
+    {
+     "old": "/// RC keeps saved catalog selection; native creation awaits runtime qualification.\npub const NATIVE_EDITOR_AVAILABLE: bool = false;\n",
+     "new": "/// Add New opens the game's native Mii editor (the fork's editor, carried; operator 2026-11-05: bring it over). Its Save\n/// makes a new native Smash Mii only (`mii_editor_bridge::edit_decide`: a fresh draft through the game's allocator; a\n/// saved ID never enters, so no saved or protected original is overwritten). The capability stays one switch: with it\n/// false the list hides Add New and the bridge refuses before any native work (`tests/mii_install_boundary.rs`).\npub const NATIVE_EDITOR_AVAILABLE: bool = true;\n",
+     "reason": "rc.3 (2026-11-05): native Mii editor available again (operator, primary 35137355: bring the fork's editor over); Add New Save still makes only a new native Mii (edit_decide); the capability switch and its refusals stay."
     }
    ]
   },
