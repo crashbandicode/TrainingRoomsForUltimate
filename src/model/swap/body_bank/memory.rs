@@ -137,7 +137,7 @@ pub fn outstanding(state: GroupState, cost: GroupCost) -> u64 {
     match state {
         GroupState::Prefetching => with_margin(cost.total()),
         GroupState::Prefetched => with_margin(cost.build),
-        GroupState::Planned | GroupState::Built | GroupState::Failed => 0,
+        GroupState::Planned | GroupState::Held(_) | GroupState::Built | GroupState::Failed => 0,
     }
 }
 
@@ -353,5 +353,25 @@ mod tests {
         assert_eq!(helper_members(0x4b), ([0x4b, 0x4c, u32::MAX], 2));
         assert_eq!(helper_members(0x52), ([0x52, u32::MAX, u32::MAX], 1));
         assert!(helper_cost(0x24).total() >= cost(&[0x24, 0x25, 0x26]).total());
+    }
+
+    /// tr-p23-hot-measure-1 (release `031f1eae`), the CPU cycle under All after the Mii stretch: the window
+    /// `[34,0,1]` was built at frame 80722 and its next group `[2,3,4]` met the plugin's own svcGetInfo reads of
+    /// 2,943,725,568 B used (frame 80686) and 2,950,082,560 B (80891) of 3,444,572,160 B. The group's need
+    /// (prefetch + build summed per kind, margin, floor) is above both headrooms, so the admission refuses it,
+    /// the cause of g03 frame 85's "Loaded 2/5 (3 failed)". The same group is admitted once the headroom
+    /// covers its need; the start is therefore held and retried, never failed (`GroupState::Held`).
+    #[test]
+    fn frame85_group_refused_by_headroom_then_admitted() {
+        const BUDGET: u64 = 3_444_572_160;
+        let group = cost(&[0x2, 0x3, 0x4]);
+        let need = with_margin(group.total()) + FLOOR;
+        assert!((530 * MIB..531 * MIB).contains(&need), "need {} MiB", need / MIB);
+        for used in [2_943_725_568u64, 2_950_082_560] {
+            let decision = admit(Some(BUDGET - used), 0, group);
+            assert_eq!(decision.admission, Admission::Refuse, "{decision:?}");
+        }
+        assert_eq!(admit(Some(need), 0, group).admission, Admission::Admit);
+        assert_eq!(outstanding(GroupState::Held(super::super::Hold::Memory), group), 0, "a held group holds no memory");
     }
 }

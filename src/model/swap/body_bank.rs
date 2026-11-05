@@ -670,9 +670,38 @@ pub enum GroupState {
     Built,
     /// Prefetch or build failed; keys released; never retried in this scene.
     Failed,
+    /// Planned, but its prefetch start found too little process headroom or too few free pool
+    /// bodies; nothing native was touched. It keeps its place in the plan (no helper duplicates
+    /// its kinds) and its start is retried when the capacity returns.
+    Held(Hold),
+}
+
+/// The group whose prefetch starts next, from `(state, publishable)` in plan order: the first
+/// planned one, else a held one (a held group is retried but never blocks a group the admission
+/// has not seen yet). Held retries rotate: the first held group at or after `turn` (modulo the
+/// group count), so a smaller held group is not starved by a larger one before it.
+/// `publishable` is false for a Mii group whose record is not out.
+pub fn next_start(groups: impl Iterator<Item = (GroupState, bool)> + Clone, turn: usize) -> Option<usize> {
+    if let Some(planned) = groups.clone().position(|(state, publishable)| publishable && state == GroupState::Planned) {
+        return Some(planned);
+    }
+    let count = groups.clone().count();
+    (0..count).map(|k| (turn + k) % count).find(|i| groups.clone().nth(*i)
+        .is_some_and(|(state, publishable)| publishable && matches!(state, GroupState::Held(_))))
+}
+
+/// What a held group waits for.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Hold {
+    Memory,
+    Pool,
 }
 
 impl GroupState {
+    /// The start of its prefetch is still owed (planned, or held for capacity).
+    pub fn startable(self) -> bool {
+        matches!(self, Self::Planned | Self::Held(_))
+    }
     /// A request may switch into this group without a Reload.
     pub fn reachable(self) -> bool {
         matches!(self, Self::Prefetched | Self::Built)
@@ -1013,8 +1042,9 @@ pub fn plan_extra_groups_with(
 /// denominator; only a built group's members are ready; failed groups stay counted.
 /// A prefetched group is loaded but not built: its first switch needs no reload (it is
 /// reachable) yet is not instant, so it is counted apart from `ready` and from the
-/// groups whose load is still owed (`pending`). `planned == ready + prefetched + failed
-/// + pending`.
+/// groups whose load is still owed (`pending`). A held group waits for memory or pool bodies
+/// and is counted apart (`held`, with the reason; memory outranks the pool). `planned == ready +
+/// prefetched + failed + pending + held`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct GroupCounts {
     pub planned: u8,
@@ -1022,6 +1052,17 @@ pub struct GroupCounts {
     pub prefetched: u8,
     pub failed: u8,
     pub pending: u8,
+    pub held: u8,
+    pub hold: Option<Hold>,
+}
+
+/// The reason a count of held fighters shows: memory when any group waits for it.
+pub fn merge_hold(a: Option<Hold>, b: Option<Hold>) -> Option<Hold> {
+    match (a, b) {
+        (Some(Hold::Memory), _) | (_, Some(Hold::Memory)) => Some(Hold::Memory),
+        (Some(Hold::Pool), _) | (_, Some(Hold::Pool)) => Some(Hold::Pool),
+        (None, None) => None,
+    }
 }
 
 pub fn count_extra_groups(groups: &[(Members, GroupState)]) -> GroupCounts {
@@ -1038,6 +1079,10 @@ pub fn count_extra_groups_iter(groups: impl IntoIterator<Item = (Members, GroupS
             GroupState::Prefetched => counts.prefetched += count,
             GroupState::Failed => counts.failed += count,
             GroupState::Planned | GroupState::Prefetching => counts.pending += count,
+            GroupState::Held(hold) => {
+                counts.held += count;
+                counts.hold = merge_hold(counts.hold, Some(hold));
+            }
         }
     }
     counts
@@ -1058,8 +1103,8 @@ pub enum WindowStatus {
 }
 
 /// One role's contribution to the fighter status. `planned == ready + prefetched + failed +
-/// pending + unstarted`, where `unstarted` (planned members of a role without a bank) is what
-/// remains of `planned`.
+/// pending + held + unstarted`, where `unstarted` (planned members of a role without a bank) is
+/// what remains of `planned`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct RoleCounts {
     pub planned: u8,
@@ -1067,6 +1112,8 @@ pub struct RoleCounts {
     pub prefetched: u8,
     pub failed: u8,
     pub pending: u8,
+    pub held: u8,
+    pub hold: Option<Hold>,
 }
 
 /// The Fighters notice's `swap` mask: the roles whose own next swap builds their unstarted fighters.
@@ -1078,7 +1125,7 @@ impl RoleCounts {
     /// without a bank, or a plan beyond its window): only that role's next swap builds them.
     pub fn unstarted(self) -> u8 {
         let accounted = u16::from(self.ready) + u16::from(self.prefetched)
-            + u16::from(self.failed) + u16::from(self.pending);
+            + u16::from(self.failed) + u16::from(self.pending) + u16::from(self.held);
         u16::from(self.planned).saturating_sub(accounted) as u8
     }
 
@@ -1102,6 +1149,8 @@ pub fn role_counts(planned_targets: u8, extra: u8, window: WindowStatus, groups:
         prefetched: groups.prefetched,
         failed: groups.failed,
         pending: groups.pending,
+        held: groups.held,
+        hold: groups.hold,
     };
     match window {
         WindowStatus::Built => counts.ready = counts.ready.saturating_add(extra),
@@ -2425,9 +2474,9 @@ mod tests {
             (members(&[NESS, FALCON, PEACH]), GroupState::Prefetching),
             (members(&[0x1c, 0x2c]), GroupState::Failed),
         ]);
-        assert_eq!(counts, GroupCounts { planned: 7, ready: 2, prefetched: 0, failed: 2, pending: 3 });
+        assert_eq!(counts, GroupCounts { planned: 7, ready: 2, prefetched: 0, failed: 2, pending: 3, ..Default::default() });
         let settled = count_extra_groups(&[(members(&[FOX, PIKACHU]), GroupState::Built)]);
-        assert_eq!(settled, GroupCounts { planned: 2, ready: 2, prefetched: 0, failed: 0, pending: 0 });
+        assert_eq!(settled, GroupCounts { planned: 2, ready: 2, prefetched: 0, failed: 0, pending: 0, ..Default::default() });
         assert_eq!(count_extra_groups(&[]), GroupCounts::default());
         // Split of the old `building`: a prefetched group is reachable (no reload) and owes no work;
         // a planned or prefetching group still owes its load.
@@ -2437,7 +2486,7 @@ mod tests {
             (members(&[0x1c]), GroupState::Planned),
             (members(&[0x2c]), GroupState::Prefetching),
         ]);
-        assert_eq!(split, GroupCounts { planned: 7, ready: 2, prefetched: 3, failed: 0, pending: 2 });
+        assert_eq!(split, GroupCounts { planned: 7, ready: 2, prefetched: 3, failed: 0, pending: 2, ..Default::default() });
         assert_eq!(split.planned, split.ready + split.prefetched + split.failed + split.pending);
         // A role's contribution (what the status sums over the two roles).
         let none = GroupCounts::default();
@@ -2449,18 +2498,18 @@ mod tests {
         // Built window with two extras and a prefetched group.
         let groups = count_extra_groups(&[(members(&[FOX, PIKACHU]), GroupState::Prefetched)]);
         assert_eq!(role_counts(4, 2, WindowStatus::Built, groups),
-            RoleCounts { planned: 4, ready: 2, prefetched: 2, failed: 0, pending: 0 });
+            RoleCounts { planned: 4, ready: 2, prefetched: 2, failed: 0, pending: 0, ..Default::default() });
         // The same window while the bank builds or switches: the extras are owed work.
         assert_eq!(role_counts(4, 2, WindowStatus::Busy, groups),
-            RoleCounts { planned: 4, ready: 0, prefetched: 2, failed: 0, pending: 2 });
+            RoleCounts { planned: 4, ready: 0, prefetched: 2, failed: 0, pending: 2, ..Default::default() });
         // A failed bank keeps its extras in the denominator, as failed.
         assert_eq!(role_counts(2, 2, WindowStatus::Failed, none),
-            RoleCounts { planned: 2, ready: 0, prefetched: 0, failed: 2, pending: 0 });
+            RoleCounts { planned: 2, ready: 0, prefetched: 0, failed: 2, pending: 0, ..Default::default() });
         // The receipt may lag the bank: the bank's own members win, never fewer than they are.
         assert_eq!(role_counts(1, 2, WindowStatus::Built, groups).planned, 4);
         // The planner's receipt may be ahead of the bank (groups planned, not yet in the bank).
         assert_eq!(role_counts(6, 2, WindowStatus::Built, groups),
-            RoleCounts { planned: 6, ready: 2, prefetched: 2, failed: 0, pending: 0 });
+            RoleCounts { planned: 6, ready: 2, prefetched: 2, failed: 0, pending: 0, ..Default::default() });
     }
 
     #[test]
@@ -2932,11 +2981,11 @@ mod tests {
         let back = GroupExchange::new(after, before, Members::new(&[3, 7, 8]).unwrap()).unwrap();
         assert!(back.rebaseline(&after.descriptor, before));
         assert_eq!(count_extra_groups(&[(one, GroupState::Built)]),
-            GroupCounts { planned: 1, ready: 1, prefetched: 0, failed: 0, pending: 0 });
+            GroupCounts { planned: 1, ready: 1, prefetched: 0, failed: 0, pending: 0, ..Default::default() });
         assert_eq!(count_extra_groups(&[(one, GroupState::Prefetched), (members(&[FOX, PIKACHU]), GroupState::Built)]),
-            GroupCounts { planned: 3, ready: 2, prefetched: 1, failed: 0, pending: 0 });
+            GroupCounts { planned: 3, ready: 2, prefetched: 1, failed: 0, pending: 0, ..Default::default() });
         assert_eq!(count_extra_groups(&[(one, GroupState::Failed)]),
-            GroupCounts { planned: 1, ready: 0, prefetched: 0, failed: 1, pending: 0 });
+            GroupCounts { planned: 1, ready: 0, prefetched: 0, failed: 1, pending: 0, ..Default::default() });
     }
 
     #[test]
@@ -3060,5 +3109,44 @@ mod tests {
             }
             assert!(bodies <= ready.saturating_sub(6), "{ready}: {:?}", plan);
         }
+    }
+
+    /// tr-p23-hot-measure-1, g03 frame 85 ("Loaded 2/5 (3 failed)"): the CPU window `[34,0,1]` built, its two
+    /// reusable extras ready, and the next group `[2,3,4]` refused at its prefetch start for headroom. Held, the
+    /// group is counted apart from failures and keeps its place in the plan and the body budget.
+    #[test]
+    fn held_group_counts_apart_from_failed() {
+        let held = count_extra_groups(&[(members(&[0x2, 0x3, 0x4]), GroupState::Held(Hold::Memory))]);
+        assert_eq!(held, GroupCounts { planned: 3, held: 3, hold: Some(Hold::Memory), ..Default::default() });
+        let role = role_counts(5, 2, WindowStatus::Built, held);
+        assert_eq!((role.planned, role.ready, role.failed, role.pending, role.held, role.unstarted()), (5, 2, 0, 0, 3, 0));
+        assert_eq!(role.swap_owed(1), 0, "a held group does not wait for a swap");
+        assert!(GroupState::Held(Hold::Memory).counts_bodies() && GroupState::Held(Hold::Pool).counts_bodies());
+        assert!(!GroupState::Held(Hold::Memory).holds_keys() && !GroupState::Held(Hold::Memory).reachable());
+        assert!(GroupState::Held(Hold::Pool).startable() && GroupState::Planned.startable());
+        for state in [GroupState::Prefetching, GroupState::Prefetched, GroupState::Built, GroupState::Failed] {
+            assert!(!state.startable(), "{state:?}");
+        }
+        let both = count_extra_groups(&[(members(&[0x7]), GroupState::Held(Hold::Pool)),
+            (members(&[0x8, 0xb]), GroupState::Held(Hold::Memory))]);
+        assert_eq!((both.held, both.hold), (3, Some(Hold::Memory)), "memory outranks the pool");
+        assert_eq!(merge_hold(Some(Hold::Pool), None), Some(Hold::Pool));
+        assert_eq!(merge_hold(None, None), None);
+    }
+
+    /// The start order: a planned group first; held groups only when none is planned, rotating from `turn` so
+    /// a large held group never starves a smaller one after it; a Mii group waits for its record.
+    #[test]
+    fn held_groups_retry_after_planned_and_rotate() {
+        let held = GroupState::Held(Hold::Memory);
+        let groups = [(held, true), (GroupState::Planned, true), (held, true)];
+        assert_eq!(next_start(groups.iter().copied(), 0), Some(1), "a planned group goes before every held one");
+        let groups = [(held, true), (GroupState::Built, true), (held, true)];
+        assert_eq!(next_start(groups.iter().copied(), 0), Some(0));
+        assert_eq!(next_start(groups.iter().copied(), 1), Some(2), "the turn passes to the next held group");
+        assert_eq!(next_start(groups.iter().copied(), 3), Some(0), "and wraps");
+        let groups = [(GroupState::Planned, false), (held, false), (GroupState::Prefetched, true)];
+        assert_eq!(next_start(groups.iter().copied(), 0), None, "a Mii group waits for its record; nothing else starts");
+        assert_eq!(next_start([].iter().copied(), 5), None);
     }
 }

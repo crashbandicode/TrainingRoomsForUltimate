@@ -167,7 +167,7 @@ use crate::engine::swap::body_bank::{
     count_extra_groups_iter, dispatcher_array_header_ok, dispatcher_idle_words, native_group_request, original_bankable,
     pair_request, pair_resource_references, plan_extra_groups_with, prefetch_outcome,
     swap_commit_index_in, async_build_eligible, construction_task, TickGap,
-    GroupBudget, GroupExchange, GroupOwner, GroupPolicy, GroupState, Members, Phase, Special,
+    GroupBudget, GroupExchange, GroupOwner, GroupPolicy, GroupState, Hold, Members, Phase, Special,
     SpecialPolicy, BANK_FLAG, MAX_EXTRA_GROUPS, NANA, NATIVE_MEMBERS, PAIR_ACTIVE_FLAG, POOL_RESERVE, POPO,
     entry_bytes_of, mii_reuse_bytes_match, MiiEntryBytes, MiiIdentity, MII_ENTRY_START, RESOURCE_WORDS,
 };
@@ -828,6 +828,8 @@ pub(crate) fn progress() -> crate::engine::preload::cycle_preload_policy::BuiltF
         result.prefetched = result.prefetched.saturating_add(counts.prefetched);
         result.failed = result.failed.saturating_add(counts.failed);
         result.pending = result.pending.saturating_add(counts.pending);
+        result.held = result.held.saturating_add(counts.held);
+        result.hold = crate::engine::swap::body_bank::merge_hold(result.hold, counts.hold);
         // The Waiting text names the role whose own swap its unstarted fighters wait for.
         result.swap |= counts.swap_owed(role);
     }
@@ -1416,6 +1418,8 @@ struct Bank {
     construction: Option<Construction>,
     /// P3-0: the tick-gap meter of the swap in flight (armed at the request, read at Ready).
     tick: TickGap,
+    /// Advances at every held group's refused retry, so the retries rotate over the held groups.
+    held_turn: usize,
 }
 
 fn role(owner: u32) -> Option<usize> {
@@ -1599,7 +1603,7 @@ pub(super) unsafe fn build(entry: *const u8, owner: u32, members: Members) -> bo
         acknowledged: false, departed: false, failed: false,
         groups: storage.groups, alias: 0, exchange: None, swap: None, prefetch: None, swap_started: None,
         pair_logged: false, identity: None, activated: Default::default(),
-        construction: None, tick: TickGap::default(),
+        construction: None, tick: TickGap::default(), held_turn: 0,
     });
     EXTRAS[role].store((members.count() - 1) as u8, Ordering::Release);
     GROUP_BODIES[role].store(0, Ordering::Release);
@@ -1863,7 +1867,7 @@ unsafe fn service_locked(entry: *mut u8, owner: u32, role: usize) -> Action {
             // Keep their copy-package dependencies current before the next
             // requested registration, without restarting group lifecycle work.
             return if !idle { Action::None }
-                else if bank.prefetch.is_some() || bank.groups.iter().any(|g| g.state == GroupState::Planned) {
+                else if bank.prefetch.is_some() || bank.groups.iter().any(|g| g.state.startable()) {
                     Action::Lifecycle
                 } else { Action::SyncCopies };
         }
@@ -3373,8 +3377,11 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
             }
         // A Mii group's key request reads its CharInfo from the owner's record:
         // it starts only after the adapter published it (`pending_mii_publication`).
-        } else if let Some(group) = bank.groups.iter().position(|g| g.state == GroupState::Planned
-            && (g.identity.is_none() || g.charinfo_published)) {
+        // A group held for memory or pool space is started again, after every group not yet tried
+        // (a held group never blocks one the admission has not seen): the admission below decides on
+        // the capacity of this tick.
+        } else if let Some(group) = crate::engine::swap::body_bank::next_start(bank.groups.iter()
+            .map(|g| (g.state, g.identity.is_none() || g.charinfo_published)), bank.held_turn) {
             Step::Start(group, *bank.groups[group].members, bank.alias)
         } else { Step::Idle }
     };
@@ -3458,9 +3465,10 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
             let (capacity, live) = pool_counts(base).unwrap_or((0, 0));
             let pool_free = (capacity as usize).saturating_sub(usize::from(live)).saturating_sub(POOL_RESERVE);
             if pool_free < members.count() {
-                fail_group(role, group, "fighter pool reserve");
-                trace!("[GroupSwap] fallback owner={} group={} reason=fighter pool {}/{} reserve {} < {} bodies",
-                    owner, group, live, capacity, POOL_RESERVE, members.count());
+                if hold_group(role, group, Hold::Pool) {
+                    trace!("[GroupSwap] held owner={} group={} reason=fighter pool {}/{} reserve {} < {} bodies; retried",
+                        owner, group, live, capacity, POOL_RESERVE, members.count());
+                }
                 return;
             }
             // GS-PANIC: the group's measured cost (prefetch + build) against the headroom every other consumer has
@@ -3484,11 +3492,14 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
                     }
                     return;
                 }
+                // A refusal holds the group (nothing native was touched): the headroom moves as helper
+                // sources retarget and other groups settle, so its start is retried; it never fails here.
                 Admission::Refuse => {
-                    trace!("[GroupSwap] fallback owner={} group={} reason=process headroom {:?} < {} bytes kinds={:x?} outstanding={} prefetch={} build={}",
-                        owner, group, headroom, decision.need, &members.kinds()[..members.count()], decision.outstanding,
-                        cost.prefetch, cost.build);
-                    fail_group(role, group, "process headroom");
+                    if hold_group(role, group, Hold::Memory) {
+                        trace!("[GroupSwap] held owner={} group={} reason=process headroom {:?} < {} bytes kinds={:x?} outstanding={} prefetch={} build={}; retried",
+                            owner, group, headroom, decision.need, &members.kinds()[..members.count()], decision.outstanding,
+                            cost.prefetch, cost.build);
+                    }
                     return;
                 }
             }
@@ -3582,6 +3593,19 @@ fn log_memory(owner: u32, group: usize, kinds: &[u32], phase: &str, before: Opti
     trace!("[GroupSwap] memory owner={} group={} kinds={:x?} phase={} committed={:?}->{:?} delta={} estimate={} headroom={:?}",
         owner, group, kinds, phase, before, committed, delta.map_or_else(|| "na".to_string(), |d| d.to_string()), estimate,
         after.headroom());
+}
+
+/// A refused start holds the group for `hold` (`GroupState::Held`); a held group refused again
+/// passes the retry turn to the next held group. True the first time it is held for this reason
+/// (one log line per hold, not one per tick).
+fn hold_group(role: usize, group: usize, hold: Hold) -> bool {
+    let mut state = BANKS[role].lock();
+    let Some(bank) = state.as_mut() else { return false; };
+    let Some(g) = bank.groups.get_mut(group) else { return false; };
+    let first = g.state != GroupState::Held(hold);
+    if !first { bank.held_turn = group + 1; }
+    g.state = GroupState::Held(hold);
+    first
 }
 
 fn fail_group(role: usize, group: usize, _reason: &str) {

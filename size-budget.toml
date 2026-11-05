@@ -153,3 +153,11 @@ ceiling = 139982
 date = "2026-11-05"
 reason = "rc.4 candidate (p23/rc4-candidate): the rc.3 candidate + the combo helper + the Mii editor bring-over + the rc.3 review fixes merged; measured 139982 at ea3e531 (tools/sloc.py), 137841 + 1834 + 171 + 136, the lane entries above"
 approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed' (rc.3 features)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 140067
+date = "2026-11-05"
+reason = "P-HOT (p23/hot-slots from rc.4 ff69e53): a capacity refusal holds an extra group instead of failing it (GroupState::Held, retry rotation, notice wording; primary 20:50Z root cause of Loaded 2/5 (3 failed)); measured 140067 (tools/size_gate.py), +85 over 139982"
+approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed' (P-HOT order 18:32Z: size entry)"

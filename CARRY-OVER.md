@@ -673,3 +673,19 @@ that were missing or different are now ported from the M5q stage, each citing it
 Carried-file changes are recorded manifest edits. Fork tests carried: `replay185_headgear`, `ldn_backend` and
 `quickplay_backend`; `source_provenance` is recorded as not carried, with the reason. `carry_pkg6.py verify`
 re-derives all 250 files from stage m5q. The list, with what stays different and why, is `docs/MII.md`.
+
+## p23/hot-slots: a capacity refusal holds an extra group instead of failing it (2026-11-05, P-HOT)
+
+The fork fails an extra group when its prefetch start finds too little process headroom or too few free pool bodies
+(`fail_group`, `GroupState::Failed`: "never retried in this scene") and the Fighters notice reports it as "failed".
+Eden `tr-p23-hot-measure-1` (release `031f1eae`) showed "Loaded 2/5 (3 failed)" for the CPU group `[2,3,4]` refused
+for headroom (530.5 MiB needed, 477.6 MiB free) while helper sources still held the look-ahead loaded during a Mii
+stretch (`artifacts/phase23/LANE-HOT-SLOTS-REPORT.md` §8). Here the group is held (`GroupState::Held(Hold)`): it
+keeps its place in the plan and the body budget, holds no memory or keys, is started again by the lifecycle after every
+planned group (held retries rotate, `body_bank::next_start`), and the notice says "(N waiting for memory)" or "(N
+waiting for pool space)". A swap that reaches it is handled like a planned group. 36 recorded manifest edits of five
+pkg6 files (`cycle_preload_policy.rs`, `body_bank.rs`, `body_bank/memory.rs`, `swap_model/fallback.rs`,
+`native_body_bank.rs`); `carry_pkg6.py verify` re-derives all 250 files from stage m5q. Tests:
+`frame85_group_refused_by_headroom_then_admitted`, `held_group_counts_apart_from_failed`,
+`held_groups_retry_after_planned_and_rotate`, `held_fighters_read_waiting_not_failed`,
+`held_group_at_a_swap_is_disposed_like_planned`, `tests/group_hold_wiring.rs`.
