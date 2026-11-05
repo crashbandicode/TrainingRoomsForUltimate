@@ -46,6 +46,12 @@ pub struct Ledger<const N: usize> {
     pub paused: bool,
 }
 
+impl<const N: usize> Default for Ledger<N> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<const N: usize> Ledger<N> {
     pub const fn new() -> Self {
         Self { retiring: [None; N], paused: false }
