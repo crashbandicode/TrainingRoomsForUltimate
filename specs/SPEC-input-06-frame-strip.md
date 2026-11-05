@@ -23,9 +23,9 @@ test of SPEC-cpu-07 §3: any of the five transition terms, or a cancel (`runtime
 
 | Term | Definition |
 | --- | --- |
-| **hit** | A frame `H` on which the CPU's hitstop starts (`StopModule::is_stop` false on the frame before, true now) while the CPU's status is hitstun (`DAMAGE ..< DAMAGE_FALL`) or shieldstun (`GUARD_DAMAGE`). On hit or on shield follows from that status. |
-| **action** | A run of P1 frames that are not actionable. It starts on the first non-actionable frame `S`. |
-| **follow-up** | A hit `H₂` whose action started after P1 was actionable again following the previous hit `H₁` (P1 had at least one actionable frame `A₁` in between). Hits of one action (multi-hit moves) are not follow-ups. |
+| **hit** | A frame `H` on which the CPU's hitstop starts (`StopModule::is_stop` false on the frame before, true now) while P1 is not in hitstun, shieldstun or shield (that would be the CPU hitting P1). On shield when the CPU is shielding (`GUARD_ON ..= GUARD_DAMAGE`) or in shieldstun and not in hitstun; on hit otherwise. A projectile's hit counts. |
+| **action** | A run of P1 frames that are not actionable. It starts on the first non-actionable frame `S`, or when a press buffered during the last action starts a new attack with no actionable frame between: another move than the action's, or the same attack status from its motion's start (the motion frame goes back). |
+| **follow-up** | A hit `H₂` of another action than the previous hit `H₁`'s, both on hit, with the CPU free for at most 20 frames before `H₂` (`DROP_MAX`; later, it is a new exchange). `A₁` is P1's first actionable frame after `H₁`, or `S₂` when the follow-up was buffered. Hits of one action (multi-hit moves) are not follow-ups. |
 | **free frame `F`** | The CPU's first actionable frame after a hit. |
 | **link** | For a follow-up on hit: `link = H₂ − F₁`, where `F₁` is the free frame the first hit would have given. If the CPU had an actionable frame before `H₂`, `F₁` is that frame (observed) and the link is a **drop** (`link ≥ 1`). Otherwise it is a **true combo** and `F₁ = (H₂ − 1) + r + K`, where `r` is the CPU's hitstun left (§4) read on frame `H₂ − 1` and `K` is the sampling constant (§4). A true combo's link is `≤ 0`; `−link` is the number of frames it had to spare. |
 | **input** | The follow-up's press: the latest frame `I ≤ S₂` on which an attack, special, grab, jump or shield button went down (a new press in P1's mapped inputs), looked for up to 15 frames back; if there is none, `I = S₂`. `input = I − A₁`: negative means pressed before P1 could act (buffered), 0 on time, positive late. |
@@ -96,9 +96,11 @@ SPEC-input-02 §3.3, kept).
 
 | Readout | Shows |
 | --- | --- |
-| ADVANTAGE | `+N` (green) / `−N` (red) / `±0`, then "on hit" or "on shield"; `—` until the first exchange ends |
-| LINK | the latest link: `−N` and "TRUE combo" (green), or `+N` and "DROP" (red). A true combo whose `r` could not be read shows "TRUE" with no number. `—` until the first follow-up |
-| INPUT | the latest follow-up: `+N` "Nf late", `−N` "buffered Nf", or `0` "on time", then "· S spare" or "· S past" |
+| ADVANTAGE | `+N` (green) / `-N` (red) / `0`, then "on hit" or "on shield"; `-` until the first exchange ends |
+| LINK | the latest link: `-N` and "TRUE combo" (green), or `+N` and "DROP" (red). A true combo whose `r` could not be read shows "TRUE" with no number. `-` until the first follow-up |
+| INPUT | the latest follow-up: `+N` "Nf late", `-N` "buffered Nf", or `0` "on time", then ", S spare" or ", Sf past" |
+
+The texts are ASCII: the game's font is not assumed to carry `−` or `→` (the LAST row writes `Jab > Up tilt`).
 
 ### 3.5 When it updates, freezes and hides
 
@@ -138,8 +140,18 @@ So the value is the hitstun frames left, and hitstun ends when it reaches 0. Whe
 free frame) is therefore measured: on every hit that is not followed up, the diag build logs `r` on each hitstun
 frame and the observed free frame. `K = 1` was assumed for the model and must be confirmed by that log.
 
-**When `r` is unavailable** (the id did not resolve, `get_float` was not granted, or the value is not finite or not
-in 0..=255): a true combo shows "TRUE" without its number, and the link margin is absent. Everything else is drawn.
+**When `r` is unavailable** (the id did not resolve, the value is not finite or not in 0..=255, or `get_float`'s row
+was refused): a true combo shows "TRUE" without its number, and the link margin is absent. Everything else is drawn.
+`WorkModule::get_float` is the CPU tech unit's row, so the read runs behind its own gate (`input_display::reaction_left`,
+`REACTION_ON`, set by boot from that unit's closure); the strip's other reads are the input display unit's closure
+(`model::capabilities::CROSS_NEEDS`), and a refused row there turns the whole strip off, as for every unit.
+
+**Hitlag left is not read.** `StopModule::is_stop` on every frame draws the hitlag cells and finds the hits; nothing
+in §2 needs how many hitlag frames remain, so `StopModule::get_hit_stop_real_frame` (`0x2089250`) is not called.
+
+**Diag lines** (diag build only): `[FrameStrip] constants resolved …`, `panes resolved found=N of 121`, `reaction r=…`
+on each CPU hitstun frame, `stun_check predicted=… seen=…` for each hit not followed up, `link …` for each link,
+`advantage …` for each exchange, `shown=… menu_open=… on=…` on each show or hide.
 
 ## 5. Timing
 
