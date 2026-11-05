@@ -65,9 +65,10 @@ In this order (`docs/DECISIONS.md` DEFERRED-LIST on `review/menu-proposal` `6d19
 
 - Combo: switch P1 to the combo's recorded fighter, with the same Switch/Keep prompt as a named macro.
 - Lobby Items (N11): now in rc.5 (`p23/lobby-items`, primary order 2026-11-05 18:58Z); see the N11 section below.
-- Ten hot fighters plus five hot hats; preloading starts on entering Training; no hitch on the first switch to a
-  fighter that is not preloaded yet (F6).
-- Saved/replay Mii busts in the Mii lists (Q15).
+- Ten hot fighters plus five hot hats (five while one CPU; operator decision HOT-SLOTS-CEILING); preloading starts on
+  entering Training; no hitch on the first switch to a fighter that is not preloaded yet (F6).
+- Replay/saved-Mii busts (Q15): not built; the Mii rows stay text (operator 2026-11-05; the game makes a Mii picture
+  only through its live selector).
 - Backgrounds behind the plugin's notices and status texts (UI22).
 - Timer-recording truncation: root cause and fix.
 - Then F9 helper promotion, fixed seats and the hat/item cutover.
