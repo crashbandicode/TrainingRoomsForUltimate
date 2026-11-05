@@ -286,13 +286,16 @@ fn a_stale_place_is_clamped_when_the_table_changed() {
     let without = m.cursor();
     let fallback = m.focused_row().unwrap();
     m.press(Button::A);
+    assert!(matches!(m.screen(), Some(Screen::List { row, .. }) if *row == fallback), "its dropdown is open at the close");
     let m = reopened(&m, Env { pilot_present: true, ..Env::default() });
-    assert!(m.cursor() <= without);
-    assert!(m.cursor() < m.entry_count(Page::Cpu));
-    assert!(m.focus().is_some(), "the clamped cursor is on an entry");
-    assert_ne!(m.focused_row(), Some(fallback), "the hidden row is not focused");
-    assert_eq!(m.screen(), None, "a screen of a row that is gone is not resumed");
+    // With the pilot present the fallback row is gone, so the page has one entry fewer: the kept index now names the
+    // page's last entry, the reset line (review MN-4: the old check, "the hidden row is not focused", could not fail).
+    assert_eq!(m.entry_count(Page::Cpu), without + 1);
+    assert_eq!(m.cursor(), without, "the index is kept where it still names an entry");
+    assert!(matches!(m.focus(), Some(Entry::ResetPage(_))), "the entry at that index now: {:?}", m.focus());
+    assert_eq!(m.screen(), None, "the dropdown of a row that is gone is not resumed on whatever is focused now");
 }
+
 
 // ---- Reset page to defaults (operator 2026-11-05: no hidden ZR reset; an explicit, confirmed line) ---------------
 
@@ -392,6 +395,130 @@ fn b_cancels_the_reset() {
     let m = reopened(&m, Env::default());
     assert_eq!(m.screen(), None);
     assert!(matches!(m.focus(), Some(Entry::ResetPage(_))));
+}
+
+// ---- where ZL + Up / Down are jumps (review MN-1) ------------------------------------------------------------------
+
+#[test]
+fn only_pages_and_popup_lists_take_jumps() {
+    let mut m = menu();
+    assert!(m.takes_jumps(), "a page");
+    goto_row(&mut m, row_of("mash_state"));
+    m.press(Button::A);
+    assert!(m.takes_jumps(), "a checklist");
+    m.press(Button::B);
+    goto_row(&mut m, row_of("sdi_strength"));
+    m.press(Button::A);
+    assert!(m.takes_jumps(), "a dropdown list");
+    m.press(Button::B);
+    goto_row(&mut m, row_of("air_dodge_dir"));
+    m.press(Button::A);
+    assert!(matches!(m.screen(), Some(Screen::Directions { .. })));
+    assert!(!m.takes_jumps(), "a direction grid");
+    m.press(Button::B);
+    let items = ROWS.iter().position(|r| matches!(r.control, Control::Editor(Editor::GiveItem))).unwrap();
+    goto_row(&mut m, items);
+    m.press(Button::A);
+    assert!(matches!(m.screen(), Some(Screen::Grid { .. })));
+    assert!(!m.takes_jumps(), "a grid");
+}
+
+/// The adapter sends plain Up / Down on a direction grid (`Adapter::set_jumps(false)`); should a jump still arrive (the
+/// screen changed under a held ZL), the grid moves as for the plain direction and ZL's all-or-none still works.
+#[test]
+fn a_direction_grid_moves_on_a_jump_and_zl_still_fills_it() {
+    let mut m = menu();
+    let row = row_of("air_dodge_dir");
+    goto_row(&mut m, row);
+    m.press(Button::A);
+    let chip = |m: &Menu| match m.screen() { Some(Screen::Directions { chip, .. }) => *chip, other => panic!("{other:?}") };
+    let start = chip(&m);
+    m.press(Button::Up);
+    let by_up = chip(&m);
+    m.press(Button::Down);
+    assert_eq!(chip(&m), start);
+    m.press(Button::JumpUp);
+    assert_eq!(chip(&m), by_up, "a jump on a direction grid is the plain Up");
+    m.press(Button::JumpDown);
+    assert_eq!(chip(&m), start);
+    let before = m.settings().menu.get("air_dodge_dir").unwrap().to_vec();
+    m.press(Button::ZL);
+    let after = m.settings().menu.get("air_dodge_dir").unwrap().to_vec();
+    assert_ne!(after, before, "ZL fills (or clears) every direction");
+    assert!(after.iter().all(|v| *v != 0) || after.iter().all(|v| *v == 0));
+}
+
+#[test]
+fn a_checklist_takes_the_zl_tap_as_all_or_none() {
+    let mut m = menu();
+    let mash = row_of("mash_state");
+    goto_row(&mut m, mash);
+    m.press(Button::A);
+    let before = m.settings().menu.get("mash_state").unwrap().to_vec();
+    m.press(Button::ZL);
+    let after = m.settings().menu.get("mash_state").unwrap().to_vec();
+    assert_ne!(after, before);
+    assert!(after.iter().all(|v| *v != 0) || after.iter().all(|v| *v == 0), "all or none: {after:?}");
+}
+
+// ---- the worker's keeper (review MN-4) -------------------------------------------------------------------------------
+
+/// The settings the worker reads at an opening: the committed file, whose `last_page` a close wrote.
+fn committed(m: &Menu) -> Settings {
+    let mut s = m.settings().clone();
+    s.set_last_page(m.page().id());
+    s
+}
+
+/// The worker's path, as `runtime::ui::worker` runs it: `drop_model` whenever the input generation moves (a close, a
+/// scene change, a Training reset, a lobby change), `open` at the next opening.
+#[test]
+fn the_keeper_brings_the_menu_back_across_closes_scenes_and_resets() {
+    use model::menu::PlaceKeeper;
+    let mut keeper = PlaceKeeper::new();
+    let mut slot: Option<Menu> = None;
+    // First opening of the boot: no place yet, the factory page.
+    let m = keeper.open(&mut slot, Settings::factory(), Env::default());
+    assert_eq!(m.page(), Page::Cpu);
+    to_page(m, Page::FightersStages);
+    m.press(Button::JumpDown);
+    m.press(Button::Down);
+    let (page, cursor) = (m.page(), m.cursor());
+    // A close: the model is dropped, the place kept.
+    m.press(Button::B);
+    let settings = committed(slot.as_ref().unwrap());
+    keeper.drop_model(&mut slot);
+    assert!(slot.is_none());
+    let m = keeper.open(&mut slot, settings.clone(), Env::default());
+    assert_eq!((m.page(), m.cursor()), (page, cursor), "reopened where it closed");
+    // A scene change with a checklist open (no close, no last_page commit): the checklist comes back.
+    goto_row(m, row_of("mash_state"));
+    m.press(Button::A);
+    m.press(Button::JumpDown);
+    let open = *m.screen().unwrap();
+    keeper.drop_model(&mut slot);
+    // A Training reset and a lobby change move the generation again with no model: the place stays.
+    keeper.drop_model(&mut slot);
+    keeper.drop_model(&mut slot);
+    let m = keeper.open(&mut slot, settings.clone(), Env::default());
+    assert_eq!(m.page(), Page::Cpu, "the page of the dropped model, not the file's last_page");
+    assert_eq!(m.screen(), Some(&open));
+    assert_eq!(m.focused_row(), Some(row_of("mash_state")));
+    // A grid open at a drop is not resumed: its row is focused.
+    m.press(Button::B);
+    let items = ROWS.iter().position(|r| matches!(r.control, Control::Editor(Editor::GiveItem))).unwrap();
+    goto_row(m, items);
+    m.press(Button::A);
+    keeper.drop_model(&mut slot);
+    let m = keeper.open(&mut slot, settings.clone(), Env::default());
+    assert_eq!((m.screen(), m.focused_row()), (None, Some(items)));
+    // A model still held at an opening is reopened with the new settings and brought back to the kept place.
+    let kept = keeper.place();
+    let mut fresh = settings.clone();
+    fresh.set_last_page(Page::Saves.id());
+    let m = keeper.open(&mut slot, fresh, Env::default());
+    assert_eq!(m.focused_row(), Some(items));
+    assert_eq!(keeper.place(), kept, "opening keeps the place; only a drop replaces it");
 }
 
 #[test]

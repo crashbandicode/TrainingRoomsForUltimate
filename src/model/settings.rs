@@ -466,7 +466,7 @@ fn snapshot_from(label: &'static str, nested: Option<Nested>, issues: &mut Vec<I
         .then(|| entries.items.iter().find(|(id, _)| id == super::frame_strip::OLD_ROW))
         .flatten()
         .and_then(|(_, value)| value.as_array()?.iter().map(|v| v.as_u64().filter(|v| *v <= 1).map(|v| v as u8)).collect::<Option<Vec<u8>>>())
-        .and_then(|old| super::frame_strip::migrate(&old));
+        .map(|old| super::frame_strip::migrate(&old));
     if let (Some(row), Some((index, _))) = (migrated, def(strip)) {
         snapshot.rows[index] = row.to_vec();
     }

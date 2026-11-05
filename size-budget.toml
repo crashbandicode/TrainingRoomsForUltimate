@@ -137,3 +137,11 @@ ceiling = 136644
 date = "2026-11-05"
 reason = "rc.3: the Mii editor bring-over (Add New available again, and the rest of the fork's Mii behaviour ported: docs/MII.md); measured 136644 at 203ecf0 (tools/size_gate.py), +171 over 136473"
 approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed' (rc.3 features)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 137977
+date = "2026-11-05"
+reason = "rc.3 review fixes (p23/rc3-fixes): IV-1..IV-4, HB-1..HB-5, MN-1, MN-2, MN-4 and the reset wording on p23/rc3-candidate 3c8f5bc; measured 137977 at 3a01f8b (tools/size_gate.py), +136 over 137841"
+approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed' (rc.3 features)"

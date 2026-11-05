@@ -144,8 +144,8 @@ impl Step {
     }
 }
 
-/// The adapter's memory between polls: the held buttons, the stick hold counters, and whether anything was
-/// pressed while ZL was held (then its release is not a tap).
+/// The adapter's memory between polls: the held buttons, the stick hold counters, whether anything was pressed
+/// while ZL was held (then its release is not a tap), and whether the screen showing takes jumps.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Adapter {
     logical: u16,
@@ -153,11 +153,19 @@ pub struct Adapter {
     stick: [bool; 4],
     repeat: [HoldRepeat; 4],
     zl_used: bool,
+    /// The screen showing takes no jumps (`Menu::takes_jumps` false, set by the runtime before each poll).
+    no_jumps: bool,
 }
 
 impl Adapter {
     pub const fn new() -> Adapter {
-        Adapter { logical: 0, dpad: [false; 4], stick: [false; 4], repeat: [HoldRepeat::new(); 4], zl_used: false }
+        Adapter { logical: 0, dpad: [false; 4], stick: [false; 4], repeat: [HoldRepeat::new(); 4], zl_used: false, no_jumps: false }
+    }
+
+    /// Whether the screen showing takes ZL + Up / Down as jumps (`Menu::takes_jumps`). Where it does not, ZL is its
+    /// own button, sent on its press as before the section jump, and Up / Down stay directions (review MN-1).
+    pub fn set_jumps(&mut self, jumps: bool) {
+        self.no_jumps = !jumps;
     }
 
     /// The edge rule of a chord: every button held and at least one pressed this poll.
@@ -173,11 +181,17 @@ impl Adapter {
         let (dpad, stick) = directions(buttons);
         let mut step = Step { held: logical, pressed, changed: logical != self.logical, ..Step::default() };
         if open {
-            // ZL is a modifier while held: Up / Down become section jumps. Its own action (all or none) is a tap,
-            // sent on the release when nothing else was pressed during the hold.
+            // On a screen that takes jumps ZL is a modifier while held: Up / Down become jumps, and its own action
+            // (all or none) is a tap, sent on the release when nothing else was pressed during the hold or on the
+            // release's own poll (review MN-2). On any other screen ZL is sent on its press, as before the section
+            // jump, and Up / Down stay directions (review MN-1).
             let zl_held = logical & ZL != 0;
+            let jumps = !self.no_jumps;
             if pressed & ZL != 0 {
-                self.zl_used = false;
+                self.zl_used = !jumps;
+                if !jumps {
+                    step.push(Button::ZL);
+                }
             }
             for i in 0..4 {
                 let repeat = self.repeat[i].frame(stick[i]);
@@ -185,8 +199,8 @@ impl Adapter {
                 if (dpad[i] && !self.dpad[i]) || (stick[i] && !self.stick[i]) || repeat {
                     let button = DIRECTION_BUTTONS[i];
                     step.push(match button {
-                        Button::Up if zl_held => Button::JumpUp,
-                        Button::Down if zl_held => Button::JumpDown,
+                        Button::Up if zl_held && jumps => Button::JumpUp,
+                        Button::Down if zl_held && jumps => Button::JumpDown,
                         other => other,
                     });
                     self.zl_used |= zl_held;
@@ -202,7 +216,7 @@ impl Adapter {
                 }
             }
             if self.logical & ZL != 0 && !zl_held {
-                if !self.zl_used {
+                if !self.zl_used && step.presses().next().is_none() {
                     step.push(Button::ZL);
                 }
                 self.zl_used = false;
@@ -352,6 +366,69 @@ mod tests {
         let mut a = Adapter::new();
         let g = |a: &mut Adapter, bits: &[u32]| a.poll(mask(bits), Style::GameCube, true, true, NO_SHORTCUTS).presses().collect::<Vec<_>>();
         assert_eq!(g(&mut a, &[bit::L, bit::DPAD_DOWN]), [Button::JumpDown]);
+    }
+
+    /// Review MN-1: on a screen without jumps (a direction grid, the slider, a roster or stage grid, a panel) ZL is
+    /// its own button at once and Up / Down stay directions while it is held; the release sends nothing more.
+    #[test]
+    fn on_a_screen_without_jumps_zl_is_its_own_button_and_up_down_move() {
+        let mut a = Adapter::new();
+        a.set_jumps(false);
+        let p = |a: &mut Adapter, bits: &[u32]| a.poll(mask(bits), Style::Pro, true, true, NO_SHORTCUTS).presses().collect::<Vec<_>>();
+        assert_eq!(p(&mut a, &[bit::ZL]), [Button::ZL], "ZL acts on its press (all or none in a direction grid)");
+        assert_eq!(p(&mut a, &[bit::ZL, bit::DPAD_UP]), [Button::Up], "Up moves, held ZL or not");
+        assert_eq!(p(&mut a, &[bit::ZL]), []);
+        assert_eq!(p(&mut a, &[bit::ZL, bit::DPAD_DOWN]), [Button::Down]);
+        assert_eq!(p(&mut a, &[]), [], "ZL was sent on its press; its release sends nothing");
+        // The stick repeats the plain direction.
+        assert_eq!(p(&mut a, &[bit::ZL]), [Button::ZL]);
+        assert_eq!(p(&mut a, &[bit::ZL, bit::LSTICK_UP]), [Button::Up]);
+        let repeats = (1..=21).filter(|_| p(&mut a, &[bit::ZL, bit::LSTICK_UP]) == [Button::Up]).count();
+        assert_eq!(repeats, 1);
+        p(&mut a, &[]);
+        // A GameCube pad's L is its ZL: resting on it no longer blocks Up in a direction grid.
+        let mut g = Adapter::new();
+        g.set_jumps(false);
+        let gc = |a: &mut Adapter, bits: &[u32]| a.poll(mask(bits), Style::GameCube, true, true, NO_SHORTCUTS).presses().collect::<Vec<_>>();
+        assert_eq!(gc(&mut g, &[bit::L]), [Button::ZL]);
+        assert_eq!(gc(&mut g, &[bit::L, bit::DPAD_UP]), [Button::Up]);
+        // The screen changes under a held ZL: a jump screen's tap that was already used stays used; a ZL pressed on
+        // a screen without jumps was sent and is not sent again on a jump screen's release.
+        let mut a = Adapter::new();
+        assert_eq!(p(&mut a, &[bit::ZL]), [], "a page: ZL waits for its release");
+        a.set_jumps(false);
+        assert_eq!(p(&mut a, &[bit::ZL, bit::DPAD_UP]), [Button::Up], "a direction grid opened under it");
+        a.set_jumps(true);
+        assert_eq!(p(&mut a, &[]), [], "it steered: no tap");
+        a.set_jumps(false);
+        assert_eq!(p(&mut a, &[bit::ZL]), [Button::ZL]);
+        a.set_jumps(true);
+        assert_eq!(p(&mut a, &[bit::ZL, bit::DPAD_DOWN]), [Button::JumpDown], "back on a page the hold jumps");
+        assert_eq!(p(&mut a, &[]), [], "and its release is no second ZL");
+    }
+
+    /// Review MN-2: ZL let go on the same poll as another press is not a tap (the press used the hold).
+    #[test]
+    fn a_zl_release_with_another_press_on_the_same_poll_is_not_a_tap() {
+        let mut a = Adapter::new();
+        let p = |a: &mut Adapter, bits: &[u32]| a.poll(mask(bits), Style::Pro, true, true, NO_SHORTCUTS).presses().collect::<Vec<_>>();
+        assert_eq!(p(&mut a, &[bit::ZL]), []);
+        assert_eq!(p(&mut a, &[bit::A]), [Button::A], "A ticks the entry; ZL's all-or-none does not follow");
+        assert_eq!(p(&mut a, &[]), []);
+        assert_eq!(p(&mut a, &[bit::ZL]), []);
+        assert_eq!(p(&mut a, &[bit::DPAD_DOWN]), [Button::Down], "a direction on the release poll is a plain move");
+        assert_eq!(p(&mut a, &[]), []);
+        // A stick repeat on the release poll counts too.
+        let mut a = Adapter::new();
+        p(&mut a, &[bit::LSTICK_DOWN]);
+        // The hold repeats on its 21st poll after the press: the 20 polls before it are with ZL held.
+        for _ in 0..20 {
+            assert_eq!(p(&mut a, &[bit::ZL, bit::LSTICK_DOWN]), []);
+        }
+        assert_eq!(p(&mut a, &[bit::LSTICK_DOWN]), [Button::Down], "the repeat on the release poll");
+        // A tap alone still works.
+        assert_eq!(p(&mut a, &[bit::ZL]), []);
+        assert_eq!(p(&mut a, &[]), [Button::ZL]);
     }
 
     #[test]

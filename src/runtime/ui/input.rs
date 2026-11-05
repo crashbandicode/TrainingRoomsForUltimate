@@ -79,6 +79,8 @@ pub fn on_p1_poll(holder: usize) {
     // A chord (the permanent one or an INI shortcut) opens the menu only while a renderer exists (R2-2, SPEC-core-05 question 1).
     let allowed = readiness::may_open(facts);
     let shortcuts = chords::shortcuts();
+    // ZL + Up / Down are jumps only where the screen showing takes them (the worker publishes it, review MN-1).
+    adapter.set_jumps(state::JUMPS.load(Ordering::Acquire));
     let step = adapter.poll(buttons, style, open, allowed, shortcuts);
     if step.open || (chord_open && allowed && !open) {
         adapter.resync(buttons, style);

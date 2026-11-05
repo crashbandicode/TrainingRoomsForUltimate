@@ -206,16 +206,26 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
     }
     let waiting = name == b"info_waiting";
     let active = if waiting { crate::runtime::lobby::training::lobby::requested() } else { name == b"info_training" && scene::is_training() };
-    if !active || layout.is_null() {
+    if layout.is_null() {
         return;
     }
     let _scope = HookScope::enter_hook(HookId::HitboxOrbs);
     let mut cache = ORB_PANES.lock();
+    let registrations = tick::REGISTRATIONS.load(Ordering::Acquire);
+    if !active {
+        // Review HB-1: the waiting layout outlives its practice request (and Training's layout can tick outside
+        // Training), and the orb container sits outside the plugin host `tick` hides. Hide what the last tick showed,
+        // but only in the layout those panes belong to: another layout's cached panes may be gone.
+        if cache.layout == layout as usize && cache.registrations == registrations && cache.container != 0 {
+            let shown = cache.shown;
+            write_tick(&mut cache, orbs::pane_tick(0, shown));
+        }
+        return;
+    }
     let on = SETTING.load(Ordering::Acquire);
     if !on && cache.shown == 0 && cache.layout == layout as usize {
         return;
     }
-    let registrations = tick::REGISTRATIONS.load(Ordering::Acquire);
     if cache.layout != layout as usize || cache.registrations != registrations {
         let container = pane::find_child((*layout).root_pane, p::name_of(p::IDX_ORBS).as_bytes());
         cache.layout = layout as usize;
@@ -242,14 +252,15 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
             None => [0.0; 2],
         };
         let board = BOARD.lock();
-        for orb in board.live() {
-            let [a, b] = orbs::edge_points(orb);
-            let (Some(c), Some(ea), Some(eb)) = (natives::world_to_screen(&orb.centre), natives::world_to_screen(&a), natives::world_to_screen(&b)) else { continue };
-            let Some(plan) = orbs::plan_pane(c, [ea, eb], half, orb.color) else { continue };
+        // Hitboxes and grab boxes take the panes first; past `ORBS` the cut takes hurtboxes (review HB-2).
+        for orb in board.in_draw_order() {
             if n == p::ORBS {
                 over += 1;
                 continue;
             }
+            let [a, b] = orbs::edge_points(orb);
+            let (Some(c), Some(ea), Some(eb)) = (natives::world_to_screen(&orb.centre), natives::world_to_screen(&a), natives::world_to_screen(&b)) else { continue };
+            let Some(plan) = orbs::plan_pane(c, [ea, eb], half, orb.color) else { continue };
             let target = cache.panes[n] as *mut skyline::nn::ui2d::Pane;
             if !target.is_null() {
                 pane::set_pos(target, plan.x, plan.y);
@@ -261,18 +272,34 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
             n += 1;
         }
     }
-    for k in n..cache.shown {
+    let shown = cache.shown;
+    write_tick(&mut cache, orbs::pane_tick(n, shown));
+    // Release builds say it too, once: more orbs than panes means a fighter's spheres were cut (review HB-2).
+    static OVER_SAID: AtomicBool = AtomicBool::new(false);
+    if over != 0 && !OVER_SAID.swap(true, Ordering::Relaxed) {
+        crate::runtime::diag_log::diagnostic(format_args!(
+            "[Hitbox] more orbs than panes: drawn={n} cut={over} (hurtboxes cut first; said once)"
+        ));
+    }
+    #[cfg(feature = "diag")]
+    stats::orbs_drawn(n as u32, over);
+}
+
+/// Apply one tick's pane writes (`orbs::pane_tick`): hide the panes that stop showing an orb, show or hide the
+/// container, and keep how many show.
+unsafe fn write_tick(cache: &mut OrbPanes, tick: Option<orbs::PaneTick>) {
+    use crate::runtime::ui::pane;
+    let Some(tick) = tick else { return };
+    for k in tick.hide.0..tick.hide.1.min(crate::model::panes::ORBS) {
         let target = cache.panes[k] as *mut skyline::nn::ui2d::Pane;
         if !target.is_null() {
             pane::set_visible(target, false);
         }
     }
-    pane::set_visible(cache.container as *mut skyline::nn::ui2d::Pane, n != 0);
-    cache.shown = n;
-    #[cfg(feature = "diag")]
-    stats::orbs_drawn(n as u32, over);
-    #[cfg(not(feature = "diag"))]
-    let _ = over;
+    if cache.container != 0 {
+        pane::set_visible(cache.container as *mut skyline::nn::ui2d::Pane, tick.container);
+    }
+    cache.shown = tick.shown;
 }
 
 /// Spheres held by every fighter together (the per-frame pass skips everything when this is 0 and the setting is Off).

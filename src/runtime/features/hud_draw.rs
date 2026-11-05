@@ -100,6 +100,9 @@ pub unsafe fn draw(layout: *mut Layout, name: &[u8]) {
                 iv::COUNT
             ));
             let notice = pane::find_child(root, p::name_of(p::IDX_NOTICE).as_bytes()) as usize;
+            // Without the strip's container (another mod's layout, the stock archive) the strip neither samples nor
+            // takes the frame advantage from the notice (review IV-2).
+            input_display::set_panes(strip[iv::at::CONTAINER] != 0);
             *c = Containers { layout: layout as usize, registrations, notice, strip, bar };
         }
         (c.notice as *mut Pane, c.strip, c.bar)

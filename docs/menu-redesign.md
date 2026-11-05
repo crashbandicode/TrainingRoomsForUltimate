@@ -76,6 +76,11 @@ roster grids and was easy to hit by accident on a page. Each page now ends with 
 which asks for confirmation (A reset, B cancel) and logs the page and the rows it changed. ZL + Up/Down jumps
 between the sections of a page, and the menu reopens where it was closed.
 
+Changed 2026-11-05 (review MN-1/MN-2): ZL + Up/Down jumps only where a jump means something, on a page (a section)
+and in the popup lists (a window). On the other screens (the direction grids, the sliders, the roster and stage grids,
+the panels) ZL acts on its press as before and Up/Down move as usual. Letting go of ZL on the same frame as another
+press is not a ZL tap. The reset's confirmation says the menu shortcuts stay (they are not settings of the page).
+
 ### Page 1 — CPU (what the CPU does)
 
 | Section | Row | Control | Values / default | Today |
