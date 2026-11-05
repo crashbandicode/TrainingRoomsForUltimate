@@ -10,6 +10,8 @@ pub mod cycle_preload_capacity;
 pub mod cycle_preload_config;
 pub mod cycle_preload_policy;
 pub mod preload_metrics;
+// P-HOT helper entries by purpose (not carried; LANE-HOT-SLOTS-REPORT.md §5.1).
+pub mod hat_slots;
 // Clean-room tests of the carried INI writer (not carried): the reboot sequences of docs/PACKAGE-6-PLAN.md (removed after v0.2.0-rc.1; see that tag) section 7.
 #[cfg(test)]
 mod ini_transactions_tests;

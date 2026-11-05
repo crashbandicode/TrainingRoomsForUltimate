@@ -175,6 +175,8 @@ struct State {
     sources: [Option<Source>; 8],
     wants: [Option<Want>; CHANNELS],
     preload: [Option<Want>; crate::runtime::roster::cycle_preload::MAX_TARGETS],
+    /// Why each `preload` target is planned (P-HOT §5.1): a fighter target or a hat-only one.
+    preload_purpose: [Option<crate::engine::preload::hat_slots::Purpose>; crate::runtime::roster::cycle_preload::MAX_TARGETS],
     preload_failed: u128,
     preload_settled: bool,
     preload_limit: u8,
@@ -195,6 +197,7 @@ static STATE: Mutex<State> = Mutex::new(State {
     sources: [None; 8],
     wants: [None; CHANNELS],
     preload: [None; crate::runtime::roster::cycle_preload::MAX_TARGETS],
+    preload_purpose: [None; crate::runtime::roster::cycle_preload::MAX_TARGETS],
     preload_failed: 0,
     preload_settled: false,
     preload_limit: 0,
@@ -207,6 +210,12 @@ static STATE: Mutex<State> = Mutex::new(State {
     #[cfg(feature = "managed-third-source-alpha")]
     creation_hold: None,
 });
+/// P-HOT §3.5.1 (operator decisions "B" and "1"): entry 3 borrowed by the fifth Kirby hat while one CPU is visible.
+/// F9 reads `current()` (a borrowed entry 3 holds no CPU rotation fighter) and ends the borrow with
+/// `release(Release::Retired | Release::Promoted)`; a new scene ends it too. Lock order: STATE, then ENTRY3_BORROW.
+#[cfg(feature = "managed-third-source-alpha")]
+pub(crate) static ENTRY3_BORROW: Mutex<crate::engine::preload::hat_slots::BorrowBook<u32, SceneEpoch>> =
+    Mutex::new(crate::engine::preload::hat_slots::BorrowBook::new());
 static HAS_CONSUMERS: AtomicBool = AtomicBool::new(false);
 /// LOG-REFUSED: the (slot, reason) pairs whose memory refusal of a kind was already logged in this scene, one
 /// bit per kind (`reason` = what × admission, [`refusal_reason`]); cleared by `scene_changed`. A preload refused on
@@ -434,7 +443,8 @@ unsafe fn helper_target(target: crate::runtime::roster::cycle_preload::Target)
     Some(target)
 }
 
-pub(crate) unsafe fn set_preload_plan(epoch:SceneEpoch,targets:[Option<crate::runtime::roster::cycle_preload::Target>;crate::runtime::roster::cycle_preload::MAX_TARGETS]) {
+pub(crate) unsafe fn set_preload_plan(epoch:SceneEpoch,targets:[Option<crate::runtime::roster::cycle_preload::Target>;crate::runtime::roster::cycle_preload::MAX_TARGETS],
+    purposes:[Option<crate::engine::preload::hat_slots::Purpose>;crate::runtime::roster::cycle_preload::MAX_TARGETS]) {
     let Ok(backend)=qualified_backend() else {return;};
     let limit=preload_limit(backend);
     let targets=std::array::from_fn::<_,{crate::runtime::roster::cycle_preload::MAX_TARGETS},_>(|i|
@@ -448,6 +458,9 @@ pub(crate) unsafe fn set_preload_plan(epoch:SceneEpoch,targets:[Option<crate::ru
         .map(|t|Want {epoch:state.book.epoch(),kind:t.kind,configuration:t.configuration,
             #[cfg(feature="mii-hud-portrait-alpha")] avoid:0}));
     if plan!=state.preload {state.preload_settled=false;state.preload=plan;}
+    state.preload_purpose=purposes;
+    #[cfg(feature = "managed-third-source-alpha")]
+    ENTRY3_BORROW.lock().departed(state.book.epoch());
 }
 
 fn note_preload_settled() {
@@ -493,12 +506,49 @@ fn selected_request(state:&State,slot:u32,menu_open:bool)->Option<(Want,bool)> {
             #[cfg(feature="mii-hud-portrait-alpha")] avoid:0}));
     let targets:[Option<Want>;crate::runtime::roster::cycle_preload::MAX_TARGETS]=std::array::from_fn(|i|state.preload[i].filter(|w|i<usize::from(settings.slots)
         && (state.preload_failed|state.failed)&(1u128<<w.kind)==0));
+    // P-HOT (LANE-HOT-SLOTS-REPORT.md §5.1, §3.5.1): Training's helper entries by purpose.
+    #[cfg(feature="managed-third-source-alpha")]
+    let targets=purpose_view(state,slot as usize,targets);
     // Scheduling grants no native admission; the created destination must still
     // pass its full registration, protected-record and source-lifetime checks.
     let targets=crate::engine::preload::cycle_preload_policy::schedulable(targets,exact_supported,want_exact);
     crate::engine::preload::cycle_preload_policy::missing(targets,sources,slot as usize,
         state.book.can_replace(slot as usize)==Ok(true),state.wants.iter().any(Option::is_some))
         .map(|want|(want,true))
+}
+
+/// P-HOT §5.1: the targets Training's helper `slot` may load, by purpose (`hat_slots::slot_view`): the created entries
+/// take hat-only targets first, entry 2 fighter targets only, entry 3 fighter targets and the fifth hat only through
+/// the borrow (§3.5.1 rule 1). While entry 3 is borrowed it keeps the borrowed hat and nothing else, even when the plan
+/// no longer wants it (rule 2: F9 ends a borrow, P-HOT never replaces it). The waiting rooms keep the one plan order.
+#[cfg(feature="managed-third-source-alpha")]
+fn purpose_view(state:&State,slot:usize,targets:[Option<Want>;crate::runtime::roster::cycle_preload::MAX_TARGETS])
+    ->[Option<Want>;crate::runtime::roster::cycle_preload::MAX_TARGETS] {
+    use crate::engine::preload::hat_slots::{borrow_admitted,slot_view,Purpose,SlotFacts,BORROW_ENTRY};
+    let training=unsafe{crate::runtime::compat::common::is_native_training_mode()};
+    let record=if training {ENTRY3_BORROW.lock().current().filter(|b|state.book.is_current(b.epoch))} else {None};
+    let borrowed=record.and_then(|b|targets.iter().flatten().copied().find(|w|w.kind==b.kind&&w.configuration.is_none()));
+    if slot==BORROW_ENTRY && record.is_some() && borrowed.is_none() {return [None;crate::runtime::roster::cycle_preload::MAX_TARGETS];}
+    let plan=std::array::from_fn(|i|targets[i].map(|w|(w,state.preload_purpose[i].unwrap_or(Purpose::Fighter))));
+    let extras=crate::engine::preload::cycle_preload_capacity::EXTRA_SLOTS;
+    let in_plan=|s:usize|state.sources[s].filter(|source|state.book.is_current(source.token.epoch()))
+        .is_some_and(|source|targets.iter().flatten().any(|w|w.kind==source.kind&&w.configuration==source.configuration));
+    let created_busy=extras.iter().all(|s|reservation_for(state,*s as u32).is_none()||in_plan(*s));
+    let borrow_open=training&&borrow_admitted(unsafe{native_source::training_cpu_quantity()},
+        crate::runtime::ui::state::PAUSE_ACTIVE.load(Ordering::Acquire),state.book.can_replace(BORROW_ENTRY)==Ok(true));
+    slot_view(plan,SlotFacts{training,slot,created:extras.contains(&slot),created_busy,borrow_open,borrowed})
+}
+
+/// P-HOT §3.5.1 rule 2: a speculative hat-only load admitted on Training's entry 3 publishes the borrow record.
+#[cfg(feature="managed-third-source-alpha")]
+fn publish_borrow(state:&State,slot:u32,wanted:Want,speculative:bool) {
+    use crate::engine::preload::hat_slots::{Purpose,BORROW_ENTRY};
+    if !speculative || slot as usize!=BORROW_ENTRY || !unsafe{crate::runtime::compat::common::is_native_training_mode()} {return;}
+    let hat=state.preload.iter().zip(state.preload_purpose.iter())
+        .any(|(w,p)|*w==Some(wanted)&&*p==Some(Purpose::Hat));
+    if hat && ENTRY3_BORROW.lock().publish(wanted.kind,state.book.epoch(),u64::from(crate::runtime::roster::cycle_preload::frame())) {
+        crate::engine::compat::logging::diagnostic(format_args!("[HatSlots] entry 3 borrowed kind=0x{:x} (fifth hat, one CPU)",wanted.kind));
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -2238,6 +2288,8 @@ pub unsafe fn service(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) {
         original,
         memory_committed,
     });
+    #[cfg(feature = "managed-third-source-alpha")]
+    publish_borrow(&state, slot, wanted, speculative);
     #[cfg(feature = "mii-managed-source-coexist-alpha")]
     {
         if let Some(registry)=registry.as_mut() {

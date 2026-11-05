@@ -527,11 +527,18 @@ pub unsafe fn on_frame(body: &mut smash::app::BattleObjectModuleAccessor) {
     let helper_slots = settings.slots;
     // `kirby_hats::preload_targets` yields Player hats only while the Player's current fighter is
     // Kirby with hats in its cycle: then those hats outrank the CPU's fighter look-ahead.
-    let desired = if lanes[crate::engine::preload::cycle_preload_policy::PLAYER_HATS].iter().any(Option::is_some) {
-        crate::engine::preload::cycle_preload_policy::merge_player_hats_first(lanes, helper_slots)
+    let order = if lanes[crate::engine::preload::cycle_preload_policy::PLAYER_HATS].iter().any(Option::is_some) {
+        crate::engine::preload::cycle_preload_policy::merge_player_hats_first(lanes, settings.slots)
     } else {
-        crate::engine::preload::cycle_preload_policy::merge(lanes, helper_slots)
+        crate::engine::preload::cycle_preload_policy::merge(lanes, settings.slots)
     };
-    crate::runtime::roster::character_roster::sources::set_preload_plan(epoch, desired);
+    // P-HOT (LANE-HOT-SLOTS-REPORT.md §5.1): one merged order under the Cycle Preload cap; the fighter look-ahead keeps
+    // what the Ready Fighters budget leaves (`helper_budget`), the hats have their own budget (Ready Hats). A hat of a
+    // kind a fighter lane wants is that fighter target: the shared body.
+    let hat_budget = crate::engine::preload::hat_slots::ready_hats(menu.cycle_preload_ready_hats).min(settings.slots);
+    let fighter = |target: Target| lanes[2].contains(&Some(target)) || lanes[3].contains(&Some(target));
+    let plan = crate::engine::preload::hat_slots::budgeted(order, fighter, hat_budget, helper_slots);
+    let desired = plan.map(|entry| entry.map(|(target, _)| target));
+    crate::runtime::roster::character_roster::sources::set_preload_plan(epoch, desired, plan.map(|entry| entry.map(|(_, purpose)| purpose)));
     poll_status(false, false, Some(desired));
 }

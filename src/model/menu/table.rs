@@ -216,7 +216,7 @@ const fn delay(group: u8, title: &'static str, id: &'static str, step: u16, rang
 const TOGGLE: Control = Control::Toggle;
 
 /// The rows in page order, then group order, then the order they appear in (MENU-DRAFT §2).
-pub static ROWS: [Row; 104] = [
+pub static ROWS: [Row; 105] = [
     // CPU > Reactions
     r(REACT, "Mash", "mash_state", Control::MultiSelect(&o::ACTIONS),
       "Actions the CPU performs as soon as it can.\nWith several ticked it picks one at random."),
@@ -410,6 +410,8 @@ pub static ROWS: [Row; 104] = [
       "What is kept ready: fighters, Kirby hats, or both."),
     r(LOADING, "Ready Fighters", "cycle_preload_ready_fighters", Control::Number { first: 2, step: 1 },
       "The total number of fighters kept ready across roles."),
+    r(LOADING, "Ready Hats", "cycle_preload_ready_hats", Control::Number { first: 0, step: 1 },
+      "How many Kirby hats are kept ready, apart from the fighters.\nA hat of a ready fighter shares its body."),
     r(LOADING, "Ready Fighter Bodies", "cycle_preload_bank_members", Control::Dropdown(&o::BODIES),
       "How many bodies a ready fighter keeps.\nOff, two or three; some groups need three."),
     r(LOADING, "Group Swap", "cycle_preload_group_swap", TOGGLE,

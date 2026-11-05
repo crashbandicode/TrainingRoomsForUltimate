@@ -723,3 +723,15 @@ The fork defaults Ready Fighters to 8 (`cycle_preload_config.rs`, row 102 above)
 included (DECISIONS 2026-11-02, the operator's "ten total hot fighters"): 3 recorded manifest edits of
 `cycle_preload_config.rs` (the constant and its test), `factory.rs` index 8, `tests/core02_menu.rs`. Saved settings keep
 their value; only a new or reset profile gets 10.
+
+### p23/hot-slots: Ready Hats, hats off the fighter budget, helper entries by purpose (2026-11-05, P-HOT §5.1)
+
+The fork charges Kirby-hat helpers against Ready Fighters (`GroupBudget::hats_wanted`) and lets any helper target take
+any helper entry. P-HOT (DECISIONS 2026-11-02: "Hat sources are not charged against the fighter budget"; operator
+decisions "B" and "1", 2026-11-05): `hats_wanted` is gone from `GroupBudget`; the helper plan is budgeted by
+`preload::hat_slots::budgeted` (Ready Hats, a new clean-room row, 0..=5, default 5); Training's helper entries take
+targets by purpose (`hat_slots::slot_view`: created 7/6/5/4 hats first, entry 2 fighters only, entry 3 the fifth hat
+only through the borrow), and the borrow record F9 reads is `character_sources::ENTRY3_BORROW`. 18 recorded manifest
+edits of `body_bank.rs`, `character_sources.rs`, `cycle_preload.rs`, `native_body_bank.rs`; `carry_pkg6.py verify`
+re-derives all 250 files. Tests: `hat_slots` (3), `hats_are_not_charged_against_ready_fighters`,
+`ready_hats_row_defaults_to_five`, `tests/hat_slots_wiring.rs` (2).

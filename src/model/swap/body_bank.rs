@@ -838,10 +838,9 @@ pub fn prefetch_outcome(ready: bool, elapsed_us: u64, timeout_us: u64) -> GroupS
 /// One shared ready-fighter budget.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct GroupBudget {
-    /// Total built bodies across both visible roles, including the active fighters.
+    /// Total built bodies across both visible roles, including the active fighters. Kirby hats are not charged here:
+    /// they have their own budget (P-HOT, `preload::hat_slots`, "Ready Hats").
     pub ready_fighters: usize,
-    /// Kirby-hat helper targets wanted by a Kirby role; charged before deeper groups.
-    pub hats_wanted: usize,
     /// Fighter-pool bodies available after the reserve (capacity − live − reserve).
     pub pool_free: usize,
     /// Special groups the planner may form; each is placed whole (PT 3, Aegis 2,
@@ -890,8 +889,7 @@ pub fn plan_extra_groups_with(
     // Every visible role has one active body even without a bank (Kirby, a Mii,
     // a native group): count it so hats and helper slots agree with the planner.
     let used: usize = windows.iter().map(|window| window.map_or(1, |members| members.count())).sum::<usize>()
-        + existing.iter().flat_map(|groups| groups.iter()).map(|members| members.count()).sum::<usize>()
-        + budget.hats_wanted;
+        + existing.iter().flat_map(|groups| groups.iter()).map(|members| members.count()).sum::<usize>();
     let mut remaining = budget.ready_fighters.saturating_sub(used).min(budget.pool_free);
     // Borrow the complete lanes instead of allocating temporary candidate lists.
     // Prefix checks preserve first-occurrence order without imposing a lane cap.
@@ -2262,7 +2260,7 @@ mod tests {
     }
 
     fn budget(ready_fighters: usize) -> GroupBudget {
-        GroupBudget { ready_fighters, hats_wanted: 0, pool_free: 16, special: SpecialPolicy::NONE }
+        GroupBudget { ready_fighters, pool_free: 16, special: SpecialPolicy::NONE }
     }
 
     fn budget_special(ready_fighters: usize, special: SpecialPolicy) -> GroupBudget {
@@ -2369,23 +2367,18 @@ mod tests {
         let plan = plan_extra_groups(windows, [&existing_p1, &[]], upcoming, [None, None], budget(10));
         assert!(plan[0].iter().all(Option::is_none), "{:?}", plan[0]);
         assert_eq!(kinds_of(&plan[1]), vec![vec![PEACH, FALCON]]);
-        // Hat neighbours of a Kirby role are charged before deeper groups.
-        let plan = plan_extra_groups(windows, [&[], &[]], upcoming, [None, None],
-            GroupBudget { ready_fighters: 10, hats_wanted: 2, pool_free: 16, special: SpecialPolicy::NONE });
-        assert_eq!(kinds_of(&plan[0]), vec![vec![FOX, PIKACHU]]);
-        assert!(plan[1].iter().all(Option::is_none));
         // The fighter pool caps bodies regardless of the setting.
         let plan = plan_extra_groups(windows, [&[], &[]], upcoming, [None, None],
-            GroupBudget { ready_fighters: 12, hats_wanted: 0, pool_free: 3, special: SpecialPolicy::NONE });
+            GroupBudget { ready_fighters: 12, pool_free: 3, special: SpecialPolicy::NONE });
         assert_eq!(kinds_of(&plan[0]), vec![vec![FOX, PIKACHU, NESS]]);
         assert!(plan[1].iter().all(Option::is_none));
         // One free pool body buys the nearest neighbour as a one-member group.
         let plan = plan_extra_groups(windows, [&[], &[]], upcoming, [None, None],
-            GroupBudget { ready_fighters: 12, hats_wanted: 0, pool_free: 1, special: SpecialPolicy::NONE });
+            GroupBudget { ready_fighters: 12, pool_free: 1, special: SpecialPolicy::NONE });
         assert_eq!(kinds_of(&plan[0]), vec![vec![FOX]]);
         assert!(plan[1].iter().all(Option::is_none));
         let plan = plan_extra_groups(windows, [&[], &[]], upcoming, [None, None],
-            GroupBudget { ready_fighters: 12, hats_wanted: 0, pool_free: 0, special: SpecialPolicy::NONE });
+            GroupBudget { ready_fighters: 12, pool_free: 0, special: SpecialPolicy::NONE });
         assert!(plan.iter().flatten().all(Option::is_none));
         // A role without a window bank gets nothing even with budget to spare; the
         // other role may then hold several groups, the last one a pair.
@@ -2395,7 +2388,7 @@ mod tests {
         // Window members and duplicates in the lookahead are skipped; at most MAX_EXTRA_GROUPS.
         let long: [u32; 12] = [MARIO, LINK, FOX, FOX, PIKACHU, NESS, FALCON, PEACH, 0x1c, 0x2c, 0x2e, 0x59];
         let plan = plan_extra_groups([windows[0], None], [&[], &[]], [&long, &[]], [None, None],
-            GroupBudget { ready_fighters: 40, hats_wanted: 0, pool_free: 40, special: SpecialPolicy::NONE });
+            GroupBudget { ready_fighters: 40, pool_free: 40, special: SpecialPolicy::NONE });
         assert_eq!(kinds_of(&plan[0]), vec![vec![FOX, PIKACHU, NESS], vec![FALCON, PEACH, 0x1c], vec![0x2c, 0x2e, 0x59]]);
         let full: [Members; 3] = [members(&[FOX, PIKACHU]), members(&[NESS, FALCON]), members(&[PEACH, 0x1c])];
         let plan = plan_extra_groups([windows[0], None], [&full, &[]], [&long, &[]], [None, None], budget(40));
@@ -2676,7 +2669,7 @@ mod tests {
         // Group slots: three specials fill a role's MAX_EXTRA_GROUPS and nothing ordinary follows.
         let many: &[u32] = &[0x24, 0x5a, POPO, FOX];
         let plan = plan_extra_groups([windows[0], None], [&[], &[]], [many, &[]], [None, None],
-            GroupBudget { ready_fighters: 40, hats_wanted: 0, pool_free: 40, special: SpecialPolicy::ALL });
+            GroupBudget { ready_fighters: 40, pool_free: 40, special: SpecialPolicy::ALL });
         assert_eq!(kinds_of(&plan[0]), vec![vec![0x24, 0x25, 0x26], vec![0x5a, 0x5b], vec![POPO, NANA]]);
         // The pair-group policy wins over Solo Popo membership for the same lane kind;
         // without it a Solo lane entry is an ordinary member (EXCLUSIONS row 5).
@@ -3132,6 +3125,19 @@ mod tests {
         assert_eq!((both.held, both.hold), (3, Some(Hold::Memory)), "memory outranks the pool");
         assert_eq!(merge_hold(Some(Hold::Pool), None), Some(Hold::Pool));
         assert_eq!(merge_hold(None, None), None);
+    }
+
+    /// P-HOT (§3.2, DECISIONS 2026-11-02: "Hat sources are not charged against the fighter budget"): Ready Fighters 10
+    /// with both windows built (6 bodies) leaves 4 bodies for groups, interleaved by depth, whatever hats a Kirby role
+    /// wants; the old rule charged two hats first and left the CPU nothing.
+    #[test]
+    fn hats_are_not_charged_against_ready_fighters() {
+        let windows = [Some(members(&[MARIO, LINK, SAMUS])), Some(members(&[LUIGI, DK, YOSHI]))];
+        let upcoming: [&[u32]; 2] = [&[FOX, PIKACHU, NESS, FALCON, PEACH], &[PEACH, FALCON, NESS, PIKACHU, FOX]];
+        let plan = plan_extra_groups(windows, [&[], &[]], upcoming, [None, None],
+            GroupBudget { ready_fighters: 10, pool_free: 16, special: SpecialPolicy::NONE });
+        assert_eq!(kinds_of(&plan[0]), vec![vec![FOX, PIKACHU]]);
+        assert_eq!(kinds_of(&plan[1]), vec![vec![PEACH, FALCON]]);
     }
 
     /// The start order: a planned group first; held groups only when none is planned, rotating from `turn` so

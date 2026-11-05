@@ -48,7 +48,7 @@ pub const LRA_RESET: usize = 1;
 pub const STAGE_HAZARDS: usize = 2;
 
 /// Number of rows.
-pub const COUNT: usize = 109;
+pub const COUNT: usize = 110;
 
 /// The rows this build knows, in menu order of their first appearance in SPEC-core-02 §2.7. The
 /// first three keep the indices the earlier packages use.
@@ -169,6 +169,8 @@ pub static DEFS: [Def; COUNT] = [
     row!("cycle_preload_bank_members", Single, 3, [2]),
     // Ready Fighters 2..=12: 10 is index 8.
     row!("cycle_preload_ready_fighters", Single, 11, [8]),
+    // Ready Hats 0..=5: 5 is index 5 (P-HOT, the hat budget apart from Ready Fighters).
+    row!("cycle_preload_ready_hats", Single, 6, [5]),
     // Group Swap and the seven group switches, all On.
     row!("cycle_preload_group_swap", Single, 2, [0]),
     row!("cycle_preload_ic_pair_bank", Single, 2, [0]),

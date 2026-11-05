@@ -217,3 +217,11 @@ ceiling = 140834
 date = "2026-11-05"
 reason = "P-HOT (p23/hot-slots on rc.5 6618de9): a capacity refusal holds an extra group instead of failing it (GroupState::Held, retry rotation, notice wording; primary 20:50Z root cause of Loaded 2/5 (3 failed)); measured 140834 (tools/size_gate.py), +84 over 140750"
 approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed' (P-HOT order 18:32Z: size entry)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 141132
+date = "2026-11-05"
+reason = "P-HOT section 5.1 (p23/hot-slots): the Ready Hats row and budget, hats off the Ready Fighters budget, Training helper entries by purpose and the entry-3 borrow record (operator decisions B and 1); measured 141132 (tools/size_gate.py), +298 over 140834"
+approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed' (P-HOT order 18:32Z: size entry)"

@@ -604,9 +604,9 @@ fn window_lane(menu: &crate::engine::compat::menu::TrainingModpackMenu, role: us
 /// but report/filter only banks actually built. Construction is demand-driven:
 /// the first selected fighter loads its upcoming members; later hits reuse them.
 /// With group swap on, the shared budget is `ready_fighters` (bodies across both
-/// roles, active fighters included): window groups first, then Kirby-hat
-/// neighbours of a Kirby role, then extra groups by cycle depth; helper slots
-/// get what remains of that budget, capped by the saved slot count.
+/// roles, active fighters included): window groups first, then extra groups by
+/// cycle depth; fighter helper slots get what remains of that budget, capped by
+/// the saved slot count. Kirby hats have their own budget ("Ready Hats", P-HOT).
 pub(crate) fn plan_budget(menu: &crate::engine::compat::menu::TrainingModpackMenu,
     lanes: &[[Option<crate::runtime::roster::cycle_preload::Target>; crate::runtime::roster::cycle_preload::MAX_TARGETS]; 4])
     -> [Option<Members>; 2] {
@@ -763,7 +763,7 @@ fn plan_groups(settings: &crate::engine::preload::cycle_preload_config::Settings
         kinds
     });
     let planned = plan_extra_groups_with(policy, windows, [&existing[0], &existing[1]], [&upcoming[0], &upcoming[1]],
-        originals, GroupBudget { ready_fighters: usize::from(settings.ready_fighters), hats_wanted, pool_free, special });
+        originals, GroupBudget { ready_fighters: usize::from(settings.ready_fighters), pool_free, special });
     let mut bodies = 0usize;
     for role in 0..2 {
         let mut state = BANKS[role].lock();
