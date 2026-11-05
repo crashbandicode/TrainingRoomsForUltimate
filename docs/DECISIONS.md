@@ -1120,3 +1120,31 @@ defaults" for a page if ever needed."
 - Each page gets an explicit "Reset page to defaults" row with A/B confirmation, and a page reset is logged.
 - Y (reset the focused row) is unchanged.
 - It is implemented with the menu navigation work on `p23/menu-nav`.
+
+### DEFERRED-LIST · What of the deferred list (`docs/ROADMAP.md`) gets built — answered (2026-11-05)
+
+**Asked:** after rc.5, is everything implemented? Answer: one ordered item had never shipped (Lobby Items, N11), and
+the 2026-11-03 deferred list was still open. Each item was explained to the operator.
+
+**Answered 2026-11-05 (~18:1xZ and ~18:3xZ) by the operator**, verbatim:
+- "the switch p1 to a combo's recorded fighter should follow the same logic that the replay macro uses where it
+  prompts the user to swap and they can say yes or no. Yes I want the lobby items off switch. Ten hot fighters plus
+  five hot hats and named-macro library extensions I'd like as well."
+- "do 2, 3, 5 (and also I'd like to not have to start a swap in order to start loading. it should load as soon as you
+  enter training), drop 4, 7, once those are done do 1. if 1 can also be done in parallel to the other tasks its fine
+  to work on it as well."
+
+| Item | Decision |
+| --- | --- |
+| Combo: switch P1 to the recorded fighter | **Build.** The same Switch/Keep prompt as a named macro recorded on another fighter; Switch loads P1's fighter, Keep practises on the current one. |
+| Lobby Items (N11, ordered 2026-11-03) | **Build** (confirmed). |
+| Ten hot fighters plus five hot hats | **Build.** A separate hat budget; up to 15 preloaded bodies, measured in Eden first. |
+| Loading starts on entering Training | **Build (new).** Preloading starts when Training loads, not at the first swap. |
+| Named-macro library extensions (F8 design C) | **Covered by rc.5** (`p23/replay-window`: Setup library, Edit placement, Replay window, a named macro from another fighter with Switch/Keep). The ROADMAP row goes. |
+| 2 · Saved/replay Mii bust provider (Q15) | **Build.** Replay Miis get a bust in the Mii lists. |
+| 3 · Frame/status text backgrounds (UI22) | **Build.** Backing plates behind the plugin's notices. |
+| 5 · Latency work (F6) | **Build.** The first switch to a fighter that is not preloaded yet must not hitch (first-use setup off the game thread or warmed at boot). |
+| 7 · Timer-recording truncation | **Build:** root cause and fix. |
+| 1 · F9 helper promotion, fixed seats, hat/item cutover | **Build after the items above.** Design and native facts may start in parallel; its code waits for the hot-fighter work (both use the parked CPU entries 2/3). |
+| 4 · State-destructor alternative | **Dropped.** |
+| Remaining feature/edge-case inventory | Not chosen. |
