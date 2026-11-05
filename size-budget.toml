@@ -209,3 +209,11 @@ ceiling = 140750
 date = "2026-11-05"
 reason = "rc.5 fix P-CYCLE (p23/cpu-cycle-fix): one cycle list for the CPU cycle and its menu numbers, and the grid's numbers to a trace function for the rows (operator's bug report: a Mii Gunner cycled though not listed); measured 140750 at c45c1cd (tools/size_gate.py), +176 over the rc.5 candidate's 140574"
 approved_by = "Operator 2026-11-05 via primary 35137355 (P-CYCLE order, ~19:50Z): 'Raise as needed', own commit"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 140793
+date = "2026-11-05"
+reason = "rc.6 notice plates (p23/notice-plates): a dark plate behind each notice text and the light body colours that read on it; measured 140793 at c438cb5 (tools/size_gate.py), +43 over the rc.5 candidate's 140750"
+approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed'"
