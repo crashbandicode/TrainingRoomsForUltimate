@@ -103,7 +103,7 @@ mod tests {
         far_jump(&mut live, site, 0x8_0000_1000);
         // Without the record the window reads our own hook: occupied for a hook row there.
         let expected = window(&original, site);
-        assert_eq!(guard_outcome(&expected, &window(&live, site), HOOK).usable(), false);
+        assert!(!guard_outcome(&expected, &window(&live, site), HOOK).usable());
         // While booting, the change since `before` is ours.
         let (seen, n) = unpatch(site, &window(&live, site), [patch]);
         assert_eq!((guard_outcome(&expected, &seen, HOOK), n), (crate::model::guard::GuardOutcome::Stock, 1));

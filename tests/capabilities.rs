@@ -573,5 +573,4 @@ fn the_input_display_degrades_apart_from_input_delay() {
 #[test]
 fn writing_sites_counts_every_row_that_writes_code() {
     assert_eq!(capabilities::all_sites().filter(|site| capabilities::writes_code(site)).count(), capabilities::WRITING_SITES);
-    assert!(capabilities::WRITING_SITES > 0);
 }
