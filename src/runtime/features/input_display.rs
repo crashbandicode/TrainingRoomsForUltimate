@@ -164,6 +164,8 @@ pub unsafe fn sample_frame(player: usize) {
     #[cfg(feature = "diag")]
     let (check, advantage) = (tracker.stun_check, tracker.advantage());
     tracker.step(p1, cpu, inputs);
+    // The combo helper reads the same step (SPEC-input-07 §3); lock order TRACKER, then the helper's.
+    crate::runtime::features::combo::after_strip(&tracker);
     #[cfg(feature = "diag")]
     {
         let (check_now, link, advantage_now) = (tracker.stun_check, tracker.latest_link(), tracker.advantage());
@@ -209,6 +211,7 @@ fn diag_frame(cpu: &Sample, before: Option<(u32, u32)>, now: Option<(u32, u32)>,
 /// Session clear: leaving Training, a hot swap, a lobby change.
 pub fn session_clear() {
     TRACKER.lock().clear();
+    crate::runtime::features::combo::session_clear();
 }
 
 /// The plugin's layout was registered again: every pane is written again.

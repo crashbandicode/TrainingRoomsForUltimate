@@ -48,7 +48,7 @@ pub const LRA_RESET: usize = 1;
 pub const STAGE_HAZARDS: usize = 2;
 
 /// Number of rows.
-pub const COUNT: usize = 105;
+pub const COUNT: usize = 108;
 
 /// The rows this build knows, in menu order of their first appearance in SPEC-core-02 §2.7. The
 /// first three keep the indices the earlier packages use.
@@ -150,6 +150,10 @@ pub static DEFS: [Def; COUNT] = [
     // Player Swapping, Lobby Practice, Training Stage Rotation, Solo Popo (all Off).
     row!("macro_source", Single, 2, [0]),
     row!("fighter_prompt", Single, 2, [0]),
+    // SPEC-input-07 §6: the combo helper Off, 1 frame of tolerance, keep playing.
+    row!("combo_helper", Single, 2, [1]),
+    row!("combo_tolerance", Single, 3, [1]),
+    row!("combo_after", Single, 2, [0]),
     row!("trio_practice", Single, 2, [1]),
     row!("lobby_practice", Single, 2, [1]),
     row!("training_stage_rotation", Single, 2, [1]),

@@ -6,7 +6,7 @@
 
 use core::fmt::{self, Write};
 
-use super::menu::table::{Control, Info, Row, GROUPS, ROWS};
+use super::menu::table::{Control, Editor, Info, Row, GROUPS, ROWS};
 use super::menu::{Entry, Grey, Menu, RowValue};
 use super::panes::{GROUPS as GROUP_LINES, ROWS as ROW_LINES, TABS};
 
@@ -324,6 +324,15 @@ fn group_of(entry: Entry) -> usize {
     }
 }
 
+/// A name row's value (the combo target, the draft): the name, or "none".
+fn named(out: &mut Text<72>, name: &str) -> fmt::Result {
+    if name.is_empty() {
+        out.write_str("none  >")
+    } else {
+        write!(out, "{name}  >")
+    }
+}
+
 /// How a row's value reads on the page (the mockups' right-hand column).
 pub fn write_value(menu: &Menu, row: usize, out: &mut Text<72>) {
     let r = &ROWS[row];
@@ -376,6 +385,8 @@ pub fn write_value(menu: &Menu, row: usize, out: &mut Text<72>) {
             let _ = match r.control {
                 Control::Info(Info::PermanentShortcut) => out.write_str("B + D-pad Up"),
                 Control::Info(Info::PilotControl) => out.write_str("CPU pilot plugin"),
+                Control::Editor(Editor::ComboTarget) => named(out, menu.env().combo_target.as_str()),
+                Control::Editor(Editor::ComboName) => named(out, menu.env().combo_draft.as_str()),
                 _ => out.write_str(">"),
             };
         }

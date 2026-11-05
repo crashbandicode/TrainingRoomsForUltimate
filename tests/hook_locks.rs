@@ -41,6 +41,7 @@ const HOOK_LOCKS: &[(&str, &str)] = &[
     ("features/input_display.rs", "TRACKER"),
     ("features/input_display.rs", "IDS"),
     ("features/input_display.rs", "RENDERER"),
+    ("features/combo.rs", "HELPER"),
     ("features/input_delay.rs", "ADAPTER"),
     ("features/notices.rs", "QUEUE"),
     ("features/notices.rs", "BOOT_NOTICES"),

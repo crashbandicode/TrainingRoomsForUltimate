@@ -270,6 +270,7 @@ impl ClipEditor {
             Pad::Left => ClipAction::Nudge(-1), Pad::Right => ClipAction::Nudge(1),
             Pad::Up => ClipAction::PreviousFighter, Pad::Down => ClipAction::NextFighter,
             Pad::Extra => ClipAction::TogglePlay,
+            Pad::Rename => return None,
         })
     }
 

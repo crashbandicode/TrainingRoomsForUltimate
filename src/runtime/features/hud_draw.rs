@@ -16,7 +16,7 @@ use skyline::nn::ui2d::{Layout, Pane};
 use crate::model::frame_strip_plan::{Changed, Look};
 use crate::model::input_delay::Owners;
 use crate::model::notify::TickOut;
-use crate::model::panes::{self as p, iv};
+use crate::model::panes::{self as p, cb, iv};
 #[cfg(feature = "diag")]
 use crate::runtime::diag_log::diagnostic;
 use crate::runtime::features::{input_display, notices};
@@ -38,10 +38,12 @@ struct Containers {
     registrations: u32,
     notice: usize,
     strip: [usize; iv::COUNT],
+    /// The combo bar's panes (SPEC-input-07 §7), below its container `TrCb` inside the strip's.
+    bar: [usize; cb::COUNT],
 }
 
 static CONTAINERS: Mutex<Containers> =
-    Mutex::new(Containers { layout: 0, registrations: 0, notice: 0, strip: [0; iv::COUNT] });
+    Mutex::new(Containers { layout: 0, registrations: 0, notice: 0, strip: [0; iv::COUNT], bar: [0; cb::COUNT] });
 
 /// The longest text written to one pane (the notice header's 24 units).
 const TEXT_UNITS: usize = 48;
@@ -70,8 +72,9 @@ pub unsafe fn draw(layout: *mut Layout, name: &[u8]) {
         diagnostic(format_args!("[TrainingRooms] hud_draw layout registrations={registrations}"));
         notices::on_layout_registered();
         input_display::on_layout_registered();
+        crate::runtime::features::combo::on_layout_registered();
     }
-    let (notice, strip) = {
+    let (notice, strip, bar) = {
         let mut c = CONTAINERS.lock();
         if c.layout != layout as usize || c.registrations != registrations {
             let container = pane::find_child(root, p::name_of(p::IDX_IV).as_bytes());
@@ -82,6 +85,14 @@ pub unsafe fn draw(layout: *mut Layout, name: &[u8]) {
                     *slot = pane::find(container, p::name_of(p::IDX_IV + local).as_bytes()) as usize;
                 }
             }
+            let mut bar = [0usize; cb::COUNT];
+            let bar_root = if container.is_null() { container } else { pane::find(container, p::name_of(p::IDX_CB).as_bytes()) };
+            if !bar_root.is_null() {
+                bar[cb::at::CONTAINER] = bar_root as usize;
+                for (local, slot) in bar.iter_mut().enumerate().skip(1) {
+                    *slot = pane::find(bar_root, p::name_of(p::IDX_CB + local).as_bytes()) as usize;
+                }
+            }
             #[cfg(feature = "diag")]
             diagnostic(format_args!(
                 "[FrameStrip] panes resolved found={} of {}",
@@ -89,15 +100,23 @@ pub unsafe fn draw(layout: *mut Layout, name: &[u8]) {
                 iv::COUNT
             ));
             let notice = pane::find_child(root, p::name_of(p::IDX_NOTICE).as_bytes()) as usize;
-            *c = Containers { layout: layout as usize, registrations, notice, strip };
+            *c = Containers { layout: layout as usize, registrations, notice, strip, bar };
         }
-        (c.notice as *mut Pane, c.strip)
+        (c.notice as *mut Pane, c.strip, c.bar)
     };
     let owners = published::input_owners();
     let menu_open = owners.contains(Owners::MENU) || owners.contains(Owners::VANILLA_PAUSE);
     write_notice(notice, &notices::hud_tick(!waiting && !notice.is_null()));
     if strip[iv::at::CONTAINER] != 0 {
-        input_display::hud_tick(menu_open, |local, look, changed| write_look(strip[local] as *mut Pane, local, look, changed));
+        input_display::hud_tick(menu_open, |local, look, changed| {
+            write_look(strip[local] as *mut Pane, p::IDX_IV + local, look, changed)
+        });
+    }
+    if bar[cb::at::CONTAINER] != 0 {
+        let strip_shown = !menu_open && input_display::sampling();
+        crate::runtime::features::combo::hud_tick(strip_shown, |local, look, changed| {
+            write_look(bar[local] as *mut Pane, p::IDX_CB + local, look, changed)
+        });
     }
 }
 
@@ -108,7 +127,7 @@ unsafe fn find(root: *mut Pane, index: usize) -> *mut Pane {
 
 /// One frame-strip pane: only the parts `changed` names (SPEC-input-06 §5.2). Colours are sRGB in the look and
 /// linear light in the pane.
-unsafe fn write_look(target: *mut Pane, local: usize, look: &Look, changed: Changed) {
+unsafe fn write_look(target: *mut Pane, index: usize, look: &Look, changed: Changed) {
     if target.is_null() {
         return;
     }
@@ -127,7 +146,7 @@ unsafe fn write_look(target: *mut Pane, local: usize, look: &Look, changed: Chan
     if changed.rot {
         pane::set_rot_z(target, look.rot);
     }
-    match p::spec(p::IDX_IV + local).kind {
+    match p::spec(index).kind {
         p::Kind::Rect { .. } if changed.color => pane::set_rect_color(target, p::linear(look.color)),
         p::Kind::Text { .. } => {
             if changed.text {

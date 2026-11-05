@@ -403,21 +403,35 @@
    "dest": "src/model/macro_ui/clip_panel.rs",
    "crate": "tui",
    "src_sha256": "0064feed6e12daaa07f3881e49c930bb335458b4216f104a12373fd935db5ea0",
-   "dest_sha256": "409e4514dc728f60bc5981dc789b9611d53e278a293a4b8633c32ae524e080fa"
+   "dest_sha256": "76bd488dd80bdc93e659d75341fc41a2c7376b8d031192c8a2ddc73b2236469f",
+   "edits": [
+    {
+     "old": "            Pad::Extra => ClipAction::TogglePlay,\n        })",
+     "new": "            Pad::Extra => ClipAction::TogglePlay,\n            Pad::Rename => return None,\n        })",
+     "reason": "SPEC-input-07 \u00a74 (combo helper, 2026-11-05): X renames a row of a caller-titled library (Pad::Rename -> Effect::Rename); other panels ignore it"
+    }
+   ]
   },
   {
    "src": "training_mod_tui/src/replay_panel.rs",
    "dest": "src/model/macro_ui/replay_panel.rs",
    "crate": "tui",
    "src_sha256": "7f2595db169a3703c99d74d4ed25a7247c01dfd601bfd5e5cfa19350ea98eef9",
-   "dest_sha256": "dbc2f5292c8a986c550cdf55fc6a27157e3cc6ffa7064255197295bac6d0dd68"
+   "dest_sha256": "b6ae2d2c232cc7b7db8722edfff2da260ba3abad8867996c6e68cc2f7091e2b7",
+   "edits": [
+    {
+     "old": "            Pad::Confirm => return self.confirm(),\n        }\n        Effect::None",
+     "new": "            Pad::Confirm => return self.confirm(),\n            Pad::Rename => {}\n        }\n        Effect::None",
+     "reason": "SPEC-input-07 \u00a74 (combo helper, 2026-11-05): X renames a row of a caller-titled library (Pad::Rename -> Effect::Rename); other panels ignore it"
+    }
+   ]
   },
   {
    "src": "training_mod_tui/src/macro_panel.rs",
    "dest": "src/model/macro_ui/macro_panel.rs",
    "crate": "tui",
    "src_sha256": "1b6e698f679029bc6fa83ff9cd43756302bd939debaad2d3eeeacd10fb166da1",
-   "dest_sha256": "f5175b9b09f40631de9c2d2f6270e9258968ddb7bdbc4df208f7503cd0109876",
+   "dest_sha256": "8460cac276d5e6740f7da7deb5dbaeda7c80110a4a7bcefe88548bac2bc177ed",
    "edits": [
     {
      "old": "    /// Facing, status, and frames for one playback. Empty when the fighter is not ready.\n    pub fn copy_playback(",
@@ -498,6 +512,26 @@
      "old": "    prior: Option<Box<LibraryPage>>,\n}\n\n// NameDraft is already boxed and only one draft is active. Keep the exact Mii\n// value inline rather than adding a second allocation to every macro name edit.\n#[allow(clippy::large_enum_variant)]\nenum NameBody {\n    Macro {\n        frames: Vec<InputFrame>,\n        start: StartState,\n        placement: Placement,\n        version: String,\n        mii: Option<crate::engine::mii::lifetime::Configuration>,\n    },\n    /// Name and caret only. The setup or other draft stays with the caller.\n    External { token: u64, summary: String, title: &'static str },\n}\n",
      "new": "    prior: Option<Box<LibraryPage>>,\n}\n\n// One allocation owns the large macro payload; the small name/caret state stays\n// inline, including while parked. External naming needs no payload allocation.\nstruct MacroNameBody {\n    frames: Vec<InputFrame>,\n    start: StartState,\n    placement: Placement,\n    version: String,\n    mii: Option<crate::engine::mii::lifetime::Configuration>,\n}\n\nenum NameBody {\n    Macro(Box<MacroNameBody>),\n    /// Name and caret only. The setup or other draft stays with the caller.\n    External { token: u64, summary: String, title: &'static str },\n}\n",
      "reason": "Integrate approved Slim4b86500 retirement/scope and cold-owner/SDK roots into current composed source. Preserve current pkg6 const locks, F6 task ordering, Setup lifecycle and Deluxe persistence. Retired probe consumers removed with their features; shared host oracle retained. New exact composition requires fresh gates."
+    },
+    {
+     "old": "    /// Y: backspace while naming.\n    Extra,\n}",
+     "new": "    /// Y: backspace while naming.\n    Extra,\n    /// X: rename the row of a caller-titled library (SPEC-input-07 \u00a74); nothing elsewhere.\n    Rename,\n}",
+     "reason": "SPEC-input-07 \u00a74 (combo helper, 2026-11-05): X renames a row of a caller-titled library (Pad::Rename -> Effect::Rename); other panels ignore it"
+    },
+    {
+     "old": "pub const SETUP_KEYBOARD_TITLE: &str = \"Name setup\";",
+     "new": "pub const SETUP_KEYBOARD_TITLE: &str = \"Name setup\";\n/// The combo helper's names (SPEC-input-07 \u00a75).\npub const COMBO_KEYBOARD_TITLE: &str = \"Name combo\";",
+     "reason": "SPEC-input-07 \u00a74 (combo helper, 2026-11-05): X renames a row of a caller-titled library (Pad::Rename -> Effect::Rename); other panels ignore it"
+    },
+    {
+     "old": "    /// Y on a caller-titled library. The runtime owns the meaning of the row.\n    Alternate { id: String },",
+     "new": "    /// Y on a caller-titled library. The runtime owns the meaning of the row.\n    Alternate { id: String },\n    /// X on a caller-titled library: the runtime renames the row.\n    Rename { id: String },",
+     "reason": "SPEC-input-07 \u00a74 (combo helper, 2026-11-05): X renames a row of a caller-titled library (Pad::Rename -> Effect::Rename); other panels ignore it"
+    },
+    {
+     "old": "            Pad::Extra => self.extra(),\n        }\n    }",
+     "new": "            Pad::Extra => self.extra(),\n            Pad::Rename => self.rename(),\n        }\n    }\n\n    /// X on a caller-titled library that does not bind a slot: the row goes to the runtime to rename.\n    fn rename(&mut self) -> Effect {\n        let Screen::Library(page) = &self.screen else { return Effect::None };\n        if page.alternate.is_none() || page.binds_slot {\n            return Effect::None;\n        }\n        let Some(id) = page.rows.get(page.cursor).map(|row| row.id.clone()) else { return Effect::None };\n        self.screen = Screen::Closed;\n        Effect::Rename { id }\n    }",
+     "reason": "SPEC-input-07 \u00a74 (combo helper, 2026-11-05): X renames a row of a caller-titled library (Pad::Rename -> Effect::Rename); other panels ignore it"
     }
    ]
   },
@@ -506,7 +540,14 @@
    "dest": "src/model/macro_ui/macro_panel/fighter.rs",
    "crate": "tui",
    "src_sha256": "1a4e2da3199c28c0d66ad424b2d6cbdb38b9e9ed283e529dfbc8e29e01b50f69",
-   "dest_sha256": "1a4e2da3199c28c0d66ad424b2d6cbdb38b9e9ed283e529dfbc8e29e01b50f69"
+   "dest_sha256": "8e4e45d47a509f28c922267c2fe30eb28e7867eb97133b5917a95fa98f0680a3",
+   "edits": [
+    {
+     "old": "            Pad::Extra => {}",
+     "new": "            Pad::Extra | Pad::Rename => {}",
+     "reason": "SPEC-input-07 \u00a74 (combo helper, 2026-11-05): X renames a row of a caller-titled library (Pad::Rename -> Effect::Rename); other panels ignore it"
+    }
+   ]
   },
   {
    "src": "src/lib.rs",
@@ -680,7 +721,7 @@
    "dest": "src/runtime/macros/named_macros.rs",
    "crate": "root",
    "src_sha256": "737474479d5f05b064ab645d850ceb189cad3943097ae4fdb5fc74d2fcda0809",
-   "dest_sha256": "1f2f67a84941c3f00c93c07d72c4ef902a9d75fcdc95da752ac68951517e7933",
+   "dest_sha256": "fab394492e6877dd57db16ca814e8e87bf88a57de03347710a5915c8cf3de0f9",
    "edits": [
     {
      "old": "use training_mod_sync::*;",
@@ -1215,6 +1256,26 @@
      "old": "    assign(&menu::MENU_RECEIVED_INPUT, true);\n}\n\npub fn open_editor() {\n    if !practice_ready() {\n        return;\n    }\n    if !lock_write(&UI).open_editor(None) {\n",
      "new": "    assign(&menu::MENU_RECEIVED_INPUT, true);\n}\n\npub fn open_editor() {\n    if !crate::runtime::ADVANCED_RECORDING_WORKFLOWS {\n        notify(\"Placement editing is unavailable in this release\");\n        return;\n    }\n    if !practice_ready() {\n        return;\n    }\n    if !lock_write(&UI).open_editor(None) {\n",
      "reason": "RC reset 11ee226: close unproven advanced recording/editor entry points and require matching ordinary playback identity; retain ordinary recording, capture and library operations."
+    },
+    {
+     "old": "static LIST_CHOICE: RwLock<Option<String>> = RwLock::new(None);\n",
+     "new": "static LIST_CHOICE: RwLock<Option<String>> = RwLock::new(None);\nstatic LIST_RENAME: RwLock<Option<String>> = RwLock::new(None);\n\n/// X on a library opened through [`open_external_library`]: the opener renames the row.\npub fn take_list_rename() -> Option<String> {\n    lock_write(&LIST_RENAME).take()\n}\n",
+     "reason": "SPEC-input-07 \u00a74-\u00a75 (combo helper, 2026-11-05): a caller-owned name with its own keyboard header (offer_external_name_titled), and X on a caller-titled library handed to the opener (take_list_rename)"
+    },
+    {
+     "old": "            *lock_write(&LIST_CHOICE) = None;\n",
+     "new": "            *lock_write(&LIST_CHOICE) = None;\n            *lock_write(&LIST_RENAME) = None;\n",
+     "reason": "SPEC-input-07 \u00a74-\u00a75 (combo helper, 2026-11-05): a caller-owned name with its own keyboard header (offer_external_name_titled), and X on a caller-titled library handed to the opener (take_list_rename)"
+    },
+    {
+     "old": "    let effect = lock_write(&UI).offer_name(\n        NameContext { token, title: SETUP_KEYBOARD_TITLE },\n        default_name,\n        summary,\n    );\n",
+     "new": "    offer_external_name_titled(token, SETUP_KEYBOARD_TITLE, default_name, summary);\n}\n\n/// A caller-owned name under its own keyboard header (the combo library's \"Name combo\", SPEC-input-07 \u00a75).\npub fn offer_external_name_titled(token: u64, title: &'static str, default_name: &str, summary: &str) {\n    let effect = lock_write(&UI).offer_name(NameContext { token, title }, default_name, summary);\n",
+     "reason": "SPEC-input-07 \u00a74-\u00a75 (combo helper, 2026-11-05): a caller-owned name with its own keyboard header (offer_external_name_titled), and X on a caller-titled library handed to the opener (take_list_rename)"
+    },
+    {
+     "old": "        Effect::Alternate { id } => *lock_write(&LIST_ACTION) = Some(id),\n",
+     "new": "        Effect::Alternate { id } => *lock_write(&LIST_ACTION) = Some(id),\n        Effect::Rename { id } => *lock_write(&LIST_RENAME) = Some(id),\n",
+     "reason": "SPEC-input-07 \u00a74-\u00a75 (combo helper, 2026-11-05): a caller-owned name with its own keyboard header (offer_external_name_titled), and X on a caller-titled library handed to the opener (take_list_rename)"
     }
    ]
   },

@@ -298,6 +298,9 @@ pub struct Tracker {
     last_hit: Option<Hit>,
     /// Stun checks for the diag build: a hit not followed up, its predicted and observed free frames.
     pub stun_check: Option<(u32, u32)>,
+    /// Exchanges started since the last clear, and the open one's first hit (SPEC-input-07 §2).
+    exchange: u32,
+    exchange_hit: u32,
 }
 
 impl Default for Tracker {
@@ -330,7 +333,26 @@ impl Tracker {
             reaction: None,
             last_hit: None,
             stun_check: None,
+            exchange: 0,
+            exchange_hit: 0,
         }
+    }
+
+    /// The frames stepped since the last clear.
+    pub fn frame(&self) -> u32 {
+        self.frame
+    }
+
+    /// How many exchanges started since the last clear, and the frame of the open one's first hit. A hit the strip does
+    /// not link to the one before starts one; another hit of the same action does not (SPEC-input-07 §2).
+    pub fn exchange(&self) -> (u32, u32) {
+        (self.exchange, self.exchange_hit)
+    }
+
+    /// Whether a follow-up could still link to the last hit (the follow-up rule of `on_hit`).
+    pub fn exchange_open(&self) -> bool {
+        self.last_hit
+            .is_some_and(|hit| !hit.on_shield && hit.cpu_free.is_none_or(|free| self.frame.saturating_sub(free) <= DROP_MAX))
     }
 
     /// The frames on screen, oldest first.
@@ -458,6 +480,10 @@ impl Tracker {
                 && prev.action != self.action
                 && prev.cpu_free.is_none_or(|free| frame.saturating_sub(free) <= DROP_MAX)
         });
+        if follow_up.is_none() && self.last_hit.is_none_or(|prev| prev.action != self.action) {
+            self.exchange = self.exchange.wrapping_add(1);
+            self.exchange_hit = frame;
+        }
         if let Some(prev) = follow_up {
             // A buffered follow-up starts on the first frame P1 could act, without an actionable sample between.
             let actionable = prev.p1_free.unwrap_or(self.action_start).min(self.action_start);

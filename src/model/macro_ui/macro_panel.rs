@@ -26,12 +26,16 @@ pub enum Pad {
     Back,
     /// Y: backspace while naming.
     Extra,
+    /// X: rename the row of a caller-titled library (SPEC-input-07 §4); nothing elsewhere.
+    Rename,
 }
 
 /// Native keyboard header for a numbered or named CPU recording.
 pub const MACRO_KEYBOARD_TITLE: &str = "Name macro";
 /// Native keyboard header for a setup draft. Callers may pass another literal.
 pub const SETUP_KEYBOARD_TITLE: &str = "Name setup";
+/// The combo helper's names (SPEC-input-07 §5).
+pub const COMBO_KEYBOARD_TITLE: &str = "Name combo";
 
 /// Caller-owned naming session. The TUI stores the token and keyboard title, not the payload.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -135,6 +139,8 @@ pub enum Effect {
     BindToSlot { id: String },
     /// Y on a caller-titled library. The runtime owns the meaning of the row.
     Alternate { id: String },
+    /// X on a caller-titled library: the runtime renames the row.
+    Rename { id: String },
     /// A on a caller-titled library opened with [`MacroUi::open_library_forward`].
     /// The runtime owns the row; the named-macro loader never sees it.
     ForwardChoose { id: String },
@@ -691,7 +697,19 @@ impl MacroUi {
             Pad::Confirm => self.confirm(),
             Pad::Back => self.back(),
             Pad::Extra => self.extra(),
+            Pad::Rename => self.rename(),
         }
+    }
+
+    /// X on a caller-titled library that does not bind a slot: the row goes to the runtime to rename.
+    fn rename(&mut self) -> Effect {
+        let Screen::Library(page) = &self.screen else { return Effect::None };
+        if page.alternate.is_none() || page.binds_slot {
+            return Effect::None;
+        }
+        let Some(id) = page.rows.get(page.cursor).map(|row| row.id.clone()) else { return Effect::None };
+        self.screen = Screen::Closed;
+        Effect::Rename { id }
     }
 
     /// Install a macro that was just written or loaded. Closes any panel.

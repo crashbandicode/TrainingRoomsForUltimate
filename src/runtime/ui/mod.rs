@@ -11,6 +11,7 @@
 pub mod anchors;
 pub mod archive;
 pub mod chips;
+pub mod combos;
 pub mod effect_texture;
 pub mod external;
 pub mod facts;
