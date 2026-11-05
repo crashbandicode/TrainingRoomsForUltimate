@@ -153,3 +153,11 @@ ceiling = 139982
 date = "2026-11-05"
 reason = "rc.4 candidate (p23/rc4-candidate): the rc.3 candidate + the combo helper + the Mii editor bring-over + the rc.3 review fixes merged; measured 139982 at ea3e531 (tools/sloc.py), 137841 + 1834 + 171 + 136, the lane entries above"
 approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed' (rc.3 features)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 140156
+date = "2026-11-05"
+reason = "Timer-recording truncation fix (P-TIMER, p23/timer-recording) on the rc.4 candidate ff69e53: capture breaks in the capture model, the .smd/.tmrc formats and the clip editor; measured 140156 at 2f46449 (tools/size_gate.py), +174 over 139982"
+approved_by = "Operator 2026-11-05 via primary (P-TIMER order, 18:32Z; size rule as for P-N11): 'Raise as needed'"
