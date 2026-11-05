@@ -1221,6 +1221,12 @@ rc.5.
   - "Combos work in Training", **for rc.5 only**. The operator asked "and it will be enabled in the lobby as well
     right?"; rc.6 enables combos in lobby practice (`p23/combos-lobby`) and removes the limit.
 - The same evening, the operator ordered rc.5 published once its test session passes, with no separate rc.4 release.
+- **~23:0xZ, "A": combo naming in online lobbies.**
+  - In an online waiting room the Switch keyboard is not shown safe to open, so a saved combo keeps the default "Combo N"
+    name, and the user renames it later in Training.
+  - Local-wireless rooms and Training keep the keyboard.
+  - The rejected option was to prove the keyboard safe with a two-console online room first.
+  - Registered as `combo-name-online-default` (`p23/combos-lobby`).
 
 ### INTRO-ONCE · The Training intro notices — ordered (2026-11-05)
 
