@@ -37,18 +37,17 @@ for it are in `artifacts/phase23/rc4-combined/rows-mii/` and have not run yet.
 
 ## Kept different on purpose, or not carried
 
-- **Replay Window retry and exact-Mii named macros: ported 2026-11-05** (operator: "yes port enable the fork's Replay
-  Window retry / exact-Mii named macros"). Recording → Named macros → **Replay window** is back. Choosing a capture's
-  Mii track retries a missed import (`workflows::clip_target` answers "not resolved", and the window resolves the
-  recorded Mii before it asks), then Switch loads that exact Mii on the CPU. A clip saved from it carries the Mii, and
-  loading that named macro offers Switch (restore the Mii) or Keep (play on the current CPU). The RC flag
-  `ADVANCED_RECORDING_WORKFLOWS` became `engine::macro_ui::workflows::RELEASE` (`src/model/macro_ui/workflows.rs`,
-  host tests beside it).
-- **Still closed, as in the RC:**
-  - switching the CPU to a recorded *ordinary* (non-Mii) fighter, from the window or a named macro: an ordinary track
-    plays on the current CPU, and an ordinary named macro recorded with another fighter waits for that fighter;
-  - the Setup library;
-  - Edit placement.
+- **Replay Window retry and exact-Mii named macros: ported 2026-11-05**, with the rest of the RC's frozen recording
+  workflows (operator: "yes port enable the fork's Replay Window retry / exact-Mii named macros", then "Switch CPU to
+  recorded fighter, Setup library, Edit placement"). The RC flag `ADVANCED_RECORDING_WORKFLOWS` and its gates are
+  gone: the fork's code runs as it did.
+  - **Replay window** (Recording → Named macros): choosing a capture's Mii track retries a missed import (the track's
+    target is "not resolved" until the window resolves the recorded Mii,
+    `engine::macro_ui::replay_target::clip_target`), then Switch loads that exact Mii on the CPU. An ordinary track's
+    Switch loads its fighter.
+  - **Named macros:** a macro carrying a Mii, or recorded with another ordinary fighter, offers Switch (load the recorded
+    fighter or exact Mii) or Keep (play on the current CPU).
+  - **Edit placement** and the **Setup library** (Saves → Setup library) are back.
 - **Editor trace file** (`mii-editor-last.json`): diagnostic builds only; the fork wrote it in every build.
 - **Menu input gate:** the editor also waits while the game's pause or the native waiting-room menu is open (the
   shared `captures_input`), not only for the plugin menu.

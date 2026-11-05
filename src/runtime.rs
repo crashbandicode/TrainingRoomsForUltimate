@@ -4,11 +4,6 @@
 //! NOT YET SWITCH-COMPILED: written against Skyline 0.6.0's API from its sources. The first
 //! `cargo skyline build` may need small fixes.
 
-// The fork's recording workflows this release ships (`engine::macro_ui::workflows`): the replay window and exact-Mii
-// named macros (operator 2026-11-05); the Setup library, Edit placement and ordinary-fighter switching stay closed.
-// Their shared capture/save-state consumers and cleanup paths stay resident.
-pub(crate) const WORKFLOWS: crate::engine::macro_ui::workflows::Workflows = crate::engine::macro_ui::workflows::RELEASE;
-
 mod alloc;
 mod boot;
 mod clock;
