@@ -113,7 +113,7 @@ fn the_intro_seen_flag_survives_a_settings_round_trip() {
     assert!(text.contains("\"intro_seen\": true") || text.contains("\"intro_seen\":true"));
     let loaded = model::settings::parse(&text).settings;
     assert!(loaded.intro_seen());
-    assert_eq!(loaded.to_json().contains("intro_seen"), true);
+    assert!(loaded.to_json().contains("intro_seen"));
     let again = model::settings::parse(&loaded.to_json()).settings;
     assert!(again.intro_seen());
     assert!(boot_notices::intro_already_seen(true, &again));
@@ -182,7 +182,7 @@ fn a_page_reset_does_not_reset_the_intro_flag() {
 }
 
 fn queue_contains(queue: &Queue, header: &str) -> bool {
-    let mut copy = queue.clone();
+    let mut copy = *queue;
     headers_of(&mut copy).iter().any(|h| h == header)
 }
 
