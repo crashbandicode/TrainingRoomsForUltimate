@@ -1,8 +1,28 @@
 # Media
 
-Every GIF in [`media/`](media/) is actual Eden footage: whole screen, 1280×720, one continuous take trimmed only at the
-ends, under 10 s, game-speed timing kept. Frames were reviewed (start, action, result) before a clip was kept. The
+Every GIF in [`media/`](media/) is actual Eden footage with game-speed timing kept. Up to rc.3: whole screen, 1280×720,
+one continuous take trimmed only at the ends, under 10 s. From rc.4: 640 wide, at most 15 fps, the action only (cuts
+and crops are listed with each clip), under 10 MB. Frames were reviewed (start, action, result) before a clip was kept. The
 raw takes stay outside git with their runs.
+
+## 0.2.0-rc.4 clips (2026-11-05)
+
+Run `tr-p23-rc4-docs-1` on the Yoga, 2026-11-05 18:22–18:51Z: the RELEASE NRO of `p23/rc4-candidate` `ff69e53`
+(`031f1eaecbd3d0d0284616baf10b8e8c955623b8821ce42976266c1dd10b2d9d`), with the CPU pilot, Online Deluxe and tile-cursor
+plugins installed; Eden muted. P1 Mario and CPU Mario on Final Destination, Hitbox Visualization On, Input Display Frame
+strip. These clips follow the newer clip rule: 640 wide, at most 15 fps, the action only, under 10 MB, reviewed frame by
+frame. They come from Eden's own recorder, cut and given one shared palette (no dither) after review. Facts in the
+captions come from guest tracepoints and the profile's files, not from a diag build.
+
+| File | What it shows |
+| --- | --- |
+| `combo-helper.gif` | The **combo helper** bar under the frame strip (the top of the screen, cropped). The target is *Combo 2*: P1's own three up tilts, saved with *Save last combo* from a save state. Earlier in the run the CPU pilot drove P1 and its combo was saved as *Combo 1*, but the pilot seldom repeated that one-link combo, so the attempts are P1's. Each attempt starts from the same save state. First the reference presses again: link 1 is graded **on time** (1 frame early, inside the 1-frame tolerance). Then the late version: link 1 **2f early**, link 2 **14f late**. Then the early one: link 1 **5f early**. The verdicts read DROP because the reference itself doesn't link at this damage (saved as DROP +5 / +2); the helper grades the press timing against the reference. Offsets from `tr_combo_link_v1`: −1, −2 and +14, −5. 640×190, every second frame (7.5 fps), 18.0 s, 7.7 MB. |
+| `mii-editor.gif` | The **Mii editor**. Fighters & Stages › Mii Brawler opens the Player list (*1. 格斗 [1111]*, *Add New…*), and A on *Add New…* opens the game's own Mii Fighter Settings, seeded from the saved Mii. Neutral Special › *2 Flashing Mach Punch*, OK, Save. Training comes back. The list again shows the new Mii, *2. 格斗 [2111]*, and A takes it as the Player choice (it applies when P1 next becomes a Mii Brawler). The game gave the new Mii id 13345, and exactly one file, `mii_13345.bin`, was added; every other Mii file stayed byte-identical (tracepoints on the editor's decision and release; the profile's save folder). Cut: the load before the editor and the loading screen after Save. Training returns with the boot's character-select fighters, not the menu's (seen here). 640×360, 15 fps, 27.0 s, 3.3 MB. |
+
+Not in these clips:
+- **Exit without saving:** not shown; the rc.4 session `tr-p23-rc4-2` row mii-03 proved that it writes nothing.
+- **An interrupted editor:** that needs a Quickplay or Local Wireless match starting while you edit, which Training
+  can't show.
 
 ## 0.2.0-rc.3 clips (2026-11-05)
 

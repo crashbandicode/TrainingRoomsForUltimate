@@ -91,6 +91,14 @@ NRO `50d95130`.*
 
 While the CPU pilot plugin plays Player 1, recording is refused with a notice.
 
+### Combos
+
+![The combo helper grading attempts: on time, 2f early, 14f late, 5f early](docs/media/combo-helper.gif)
+
+*Save last combo* (Recording › Combos) keeps your last combo as a file and makes it the target. With *Combo helper* On, a
+bar under the frame strip grades each attempt link by link: whether it linked, and whether you pressed on time, early or
+late. *Eden, 2026-11-05, rc.4 release NRO `031f1eae`; see [docs/MEDIA.md](docs/MEDIA.md).*
+
 ### Fighters, cycles and Kirby hats
 
 ![Character Cycles: order badges on the game's stock icons](docs/media/cycle-badges.gif)
@@ -101,6 +109,15 @@ game's stock icons.
 ![P1's hat chord on the CPU Kirby](docs/media/cpu-kirby-hat.gif)
 
 Kirby hats change with a chord, for Player 1 or the CPU.
+
+### Mii fighters
+
+![Add New opens the game's own Mii editor; the saved Mii appears in the list](docs/media/mii-editor.gif)
+
+Each Mii class (Fighters & Stages › Mii Brawler, Swordfighter, Gunner) lists your saved Miis per role (ZR switches
+Player and CPU). *Add New…* opens Smash's own Mii Fighter editor from Training. Saving creates a new Mii and leaves the
+others untouched, and leaving without saving creates nothing. See [docs/MII.md](docs/MII.md). *Eden, 2026-11-05, rc.4
+release NRO `031f1eae`.*
 
 ### Stages
 
