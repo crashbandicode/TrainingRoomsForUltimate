@@ -863,6 +863,7 @@ impl Menu {
             // The console mode is read now and the layout stays until the grid closes.
             Editor::GiveItem => Screen::Grid { layout: GridLayout::new(GridKind::Items, self.env.console), page: 0, cell: 0 },
             Editor::StageGrid => Screen::Grid { layout: GridLayout::new(GridKind::Stages, self.env.console), page: 0, cell: 0 },
+            Editor::ChangeStage => Screen::Grid { layout: GridLayout::new(GridKind::StageChange, self.env.console), page: 0, cell: 0 },
             Editor::PortraitPlayer => self.roster_screen(RosterUse::PlayerPick),
             Editor::PortraitCpu => self.roster_screen(RosterUse::CpuPick),
             Editor::CharacterCycles => self.roster_screen(RosterUse::Cycles),
@@ -1355,8 +1356,8 @@ impl Menu {
                 let cell = cell.min(layout.page_len(next).saturating_sub(1));
                 self.top(screen(next, cell));
             }
-            // A, X, Y on the Lobby Stages grid: the stage editor applies them (rotation order, direct stage, form).
-            Button::A | Button::X | Button::Y if layout.kind == GridKind::Stages => {
+            // A, X, Y on the Lobby Stages or Change Stage grid: the stage editor applies them (rotation order, direct stage, form).
+            Button::A | Button::X | Button::Y if matches!(layout.kind, GridKind::Stages | GridKind::StageChange) => {
                 if let Some(tile) = layout.tile(page, cell) {
                     self.outbox.stage_press = u16::try_from(tile).ok().map(|tile| (tile, button));
                 }
@@ -1385,7 +1386,7 @@ impl Menu {
         self.outbox.give_item.take()
     }
 
-    /// The press on the Lobby Stages grid since the last call, if any: (tile, button), tile 0 being All.
+    /// The press on the Lobby Stages or Change Stage grid since the last call, if any: (tile, button), tile 0 being All.
     pub fn take_stage_press(&mut self) -> Option<(u16, Button)> {
         self.outbox.stage_press.take()
     }

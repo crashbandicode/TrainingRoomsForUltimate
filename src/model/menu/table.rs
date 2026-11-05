@@ -123,6 +123,8 @@ pub enum Editor {
     /// Mii Brawler (`0`), Swordfighter (`1`), Gunner (`2`).
     MiiList(u8),
     StageGrid,
+    /// Change Stage: the stage grid in Direct mode (`GridKind::StageChange`).
+    ChangeStage,
     SetupSave,
     SetupLibrary,
     NamedLibrary,
@@ -205,7 +207,7 @@ const fn delay(group: u8, title: &'static str, id: &'static str, step: u16, rang
 const TOGGLE: Control = Control::Toggle;
 
 /// The rows in page order, then group order, then the order they appear in (MENU-DRAFT §2).
-pub static ROWS: [Row; 92] = [
+pub static ROWS: [Row; 93] = [
     // CPU > Reactions
     r(REACT, "Mash", "mash_state", Control::MultiSelect(&o::ACTIONS),
       "Actions the CPU performs as soon as it can.\nWith several ticked it picks one at random."),
@@ -354,6 +356,8 @@ pub static ROWS: [Row; 92] = [
     r(EXTRAS, "Mii Gunner", "mii_gunner_config", Control::Editor(Editor::MiiList(2)),
       "The Mii used for the Gunner: a saved Mii, a replay Mii\nor a new one."),
     // Fighters & Stages > Stages
+    r(STAGES, "Change Stage", "", Control::Editor(Editor::ChangeStage),
+      "A on a stage goes there now and closes the menu.\nY picks the stage's form first."),
     r(STAGES, "Lobby Practice", "lobby_practice", TOGGLE,
       "On: practice runs in the waiting room too.\nOff: only in Training."),
     r(STAGES, "Lobby Stages", "lobby_stages", Control::Editor(Editor::StageGrid),

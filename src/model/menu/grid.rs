@@ -16,6 +16,9 @@ pub enum ConsoleMode {
 pub enum GridKind {
     Items,
     Stages,
+    /// Change Stage: the stage grid without its All tile; A goes to a stage now. Its tile numbers are the stage grid's (stage
+    /// `i` of the catalog is tile `i + 1`), so the labels, thumbnails and the stage editor read both grids alike.
+    StageChange,
     /// The portrait roster (Player/CPU Character, Character Cycles, Kirby Hats): the approved one-page 13 x 7 grid of the character
     /// select screen in both console modes, the last row of 9 centred (`engine::swap::roster_grid`).
     Roster(RosterUse),
@@ -80,8 +83,14 @@ impl GridLayout {
         match self.kind {
             GridKind::Items => ITEM_TILES,
             GridKind::Stages => STAGE_TILES,
+            GridKind::StageChange => STAGE_TILES - 1,
             GridKind::Roster(_) => ROSTER_TILES,
         }
+    }
+
+    /// The tile number of the grid's first cell (1 for Change Stage, whose first tile is the first stage).
+    pub const fn first(&self) -> usize {
+        matches!(self.kind, GridKind::StageChange) as usize
     }
 
     /// Cells on a full page.
@@ -108,7 +117,7 @@ impl GridLayout {
     /// The tile number (in the grid's own order) at `cell` (row-major) of `page`.
     pub const fn tile(&self, page: usize, cell: usize) -> Option<usize> {
         if cell < self.page_len(page) {
-            Some(page * self.per_page() + cell)
+            Some(page * self.per_page() + cell + self.first())
         } else {
             None
         }

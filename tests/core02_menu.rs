@@ -254,10 +254,11 @@ fn layout_row_counts_match_the_rc_freeze() {
         [Page::Cpu, Page::Saves, Page::Recording, Page::FightersStages, Page::DisplayControls, Page::Developer]
             .map(|page| row_count(page, pilot))
     };
-    assert_eq!(counts(false), [31, 11, 15, 20, 11, 3]);
-    assert_eq!(counts(true), [30, 11, 15, 20, 11, 3]);
-    assert_eq!(counts(false)[..5].iter().sum::<usize>(), 88);
-    assert_eq!(counts(true)[..5].iter().sum::<usize>(), 87);
+    // Fighters & Stages has 21 since Change Stage (operator order via the primary, 2026-11-05 12:50Z).
+    assert_eq!(counts(false), [31, 11, 15, 21, 11, 3]);
+    assert_eq!(counts(true), [30, 11, 15, 21, 11, 3]);
+    assert_eq!(counts(false)[..5].iter().sum::<usize>(), 89);
+    assert_eq!(counts(true)[..5].iter().sum::<usize>(), 88);
     // Controls (MENU-DRAFT §2): 4 direction grids, 7 delay rows, 13 multi-selects (the 12 checklists,\n    // 3 of them slot sets, and Swap groups).
     let n = |f: &dyn Fn(&Control) -> bool| ROWS.iter().filter(|r| r.vis != model::menu::table::Vis::PilotPresent && f(&r.control)).count();
     assert_eq!(n(&|c| matches!(c, Control::DirectionGrid { .. })), 4);
@@ -266,7 +267,7 @@ fn layout_row_counts_match_the_rc_freeze() {
     assert_eq!(n(&|c| matches!(c, Control::Slider)), 2);
     // The RC defers four editors, retaining the empty Setup group index so
     // persisted group IDs do not move. Every other group still has rows.
-    assert_eq!(ROWS.len(), 92);
+    assert_eq!(ROWS.len(), 93);
     assert!(!ROWS.iter().any(|r| matches!(r.control,
         Control::Editor(Editor::SetupSave | Editor::SetupLibrary | Editor::EditPlacement | Editor::ReplayWindow))));
     assert_eq!(GROUPS[7].title, "Setup library");
@@ -1702,6 +1703,36 @@ fn core03_stage_grid_rotation_and_form_same_in_both_layouts() {
     let handheld = GridLayout::new(GridKind::Stages, ConsoleMode::Handheld);
     let order = |l: &GridLayout| -> Vec<usize> { (0..l.pages()).flat_map(|p| (0..l.page_len(p)).filter_map(move |c| l.tile(p, c))).collect() };
     assert_eq!(order(&docked), order(&handheld));
+}
+
+#[test]
+fn change_stage_comes_before_the_rotation_rows_and_opens_the_stages_without_all() {
+    let mut m = menu_with(Env { console: ConsoleMode::Docked, ..Env::default() });
+    let titles: Vec<&str> = (0..m.entry_count(Page::FightersStages))
+        .filter_map(|i| match m.entry(Page::FightersStages, i) { Some(Entry::Row(r)) => Some(ROWS[r].title), _ => None })
+        .collect();
+    let at = |t: &str| titles.iter().position(|x| *x == t).unwrap_or_else(|| panic!("{t} in {titles:?}"));
+    assert!(at("Change Stage") < at("Lobby Stages") && at("Lobby Stages") < at("Training Stage Rotation"), "{titles:?}");
+    goto(&mut m, "Change Stage");
+    m.press(Button::A);
+    let Some(Screen::Grid { layout, page: 0, cell: 0 }) = m.screen().copied() else { panic!("{:?}", m.screen()) };
+    assert_eq!(layout, GridLayout::new(GridKind::StageChange, ConsoleMode::Docked));
+    m.press(Button::Y);
+    assert_eq!(m.take_stage_press(), Some((1, Button::Y)), "the first tile is the first stage (tile 1), not All");
+    m.press(Button::A);
+    assert_eq!(m.take_stage_press(), Some((1, Button::A)));
+    m.press(Button::B);
+    assert!(m.screen().is_none(), "B goes back to the page: {:?}", m.screen());
+}
+
+#[test]
+fn change_stage_grid_pages_cover_every_stage_once_and_no_all_tile() {
+    for mode in [ConsoleMode::Docked, ConsoleMode::Handheld] {
+        let l = GridLayout::new(GridKind::StageChange, mode);
+        let tiles: Vec<usize> = (0..l.pages()).flat_map(|p| (0..l.page_len(p)).filter_map(move |c| l.tile(p, c))).collect();
+        assert_eq!(tiles, (1..STAGE_TILES).collect::<Vec<_>>(), "{mode:?}: the stage grid's numbers, All left out");
+        assert_eq!(l.tile(l.pages(), 0), None);
+    }
 }
 
 #[test]

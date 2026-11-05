@@ -7,7 +7,8 @@
 //!   while All is on becomes the only one (the roster grid's own rank rules, `engine::swap::roster_grid::{select_kind, deselect_kind}`);
 //! * the stage preferences, top-level key `stage_preferences` (`stage_menu::Preferences`): Y cycles the focused stage's form among the
 //!   forms the game has for it (`Form::next`); X switches Rotation / Direct; in Direct, A picks the stage (and its form) to go to, which
-//!   the caller requests from the waiting room's practice stage (`practice_stage_request`).
+//!   the caller requests from the practice stage (`practice_stage_request`) when the menu closes;
+//! * the Change Stage grid (`change`, `decorate_change`): the same tiles without All, always Direct.
 //!
 //! Until the badge panes exist the order and the form are written into the tile's own label (`3. Battlefield  [BF]`).
 
@@ -126,6 +127,40 @@ impl StageEditor {
         }
     }
 
+    /// One press on the Change Stage grid (`GridKind::StageChange`, tiles numbered as here): always Direct. Y cycles the stage's
+    /// form as on Lobby Stages; A asks to go to the stage with its form. X (the mode switch) does nothing here.
+    pub fn change(&mut self, tile: usize, button: Button) -> Effect {
+        match (button, Self::stage_of(tile)) {
+            (Button::Y, Some(_)) => self.press(tile, button),
+            (Button::A, Some(index)) => {
+                let selection = Selection { stage: STAGES[index].0, form: self.form_of(index) };
+                self.preferences.direct_stage = selection.stage;
+                self.preferences.direct_form = selection.form;
+                Effect::Request(selection)
+            }
+            _ => Effect::Nothing,
+        }
+    }
+
+    /// The Change Stage grid's tiles (each stage with its form tag), help and footer.
+    pub fn decorate_change(&self, frame: &mut Frame, focused: usize) {
+        for i in 0..usize::from(frame.tile_count).min(frame.tiles.len()) {
+            let Some(index) = Self::stage_of(usize::from(frame.tile_n[i])) else { continue };
+            if let Some(tag) = self.form_tag(index) {
+                let mut label = frame.tiles[i];
+                let _ = write!(label, " [{tag}]");
+                frame.tiles[i] = label;
+            }
+        }
+        frame.help[1].clear();
+        let _ = frame.help[1].write_str("A goes to the stage now and closes the menu. Y picks its form first.");
+        frame.hint.clear();
+        if let Some(index) = Self::stage_of(focused) {
+            let _ = write!(frame.hint, "Form: {}   ", form_name(self.form_of(index)));
+        }
+        let _ = frame.hint.write_str("A change stage   Y form   L/R page   B back");
+    }
+
     /// The form tag of a stage that has more than one form (`N`, `Ω`, `BF`); none for a single-form stage.
     fn form_tag(&self, index: usize) -> Option<&'static str> {
         let forms = native_forms(STAGES[index].0);
@@ -174,14 +209,10 @@ impl StageEditor {
         frame.help[1].clear();
         let _ = frame.help[1].write_str(match self.mode() {
             Mode::Rotation => "Rotation: A adds or removes a stage (the number is its place), All takes every stage.",
-            Mode::Direct => "Direct: A goes to this stage in the waiting room now.",
+            Mode::Direct => "Direct: A goes to this stage now and closes the menu.",
         });
         frame.hint.clear();
-        let form = Self::stage_of(focused).map(|i| match self.form_of(i) {
-            Form::Normal => "Normal",
-            Form::Omega => "Omega",
-            Form::Battlefield => "Battlefield",
-        });
+        let form = Self::stage_of(focused).map(|i| form_name(self.form_of(i)));
         let _ = write!(
             frame.hint,
             "{}A {}   Y form   X {}   L/R page   B back",
@@ -189,6 +220,14 @@ impl StageEditor {
             if self.mode() == Mode::Rotation { "add / remove" } else { "go there" },
             if self.mode() == Mode::Rotation { "direct" } else { "rotation" }
         );
+    }
+}
+
+fn form_name(form: Form) -> &'static str {
+    match form {
+        Form::Normal => "Normal",
+        Form::Omega => "Omega",
+        Form::Battlefield => "Battlefield",
     }
 }
 
@@ -261,6 +300,38 @@ mod tests {
         let prefs: Preferences = serde_json::from_value(e.preferences_value()).unwrap();
         assert_eq!(prefs.mode, Mode::Direct);
         assert_eq!(e.press(0, Button::A), Effect::Nothing, "All is not a stage to go to");
+    }
+
+    #[test]
+    fn change_stage_goes_to_the_stage_with_the_form_y_picked_and_keeps_the_rotation() {
+        let mut e = StageEditor::read(None, None);
+        let before = e.order_value();
+        let battlefield = index_of(0) + 1;
+        assert_eq!(e.change(battlefield, Button::A), Effect::Request(Selection { stage: 0, form: Form::Normal }));
+        assert_eq!(e.change(battlefield, Button::Y), Effect::Changed, "Y first picks the form");
+        assert_eq!(e.change(battlefield, Button::A), Effect::Request(Selection { stage: 0, form: Form::Omega }));
+        assert_eq!((e.preferences.direct_stage, e.preferences.direct_form), (0, Form::Omega));
+        assert_eq!(e.change(battlefield, Button::X), Effect::Nothing, "no mode switch on Change Stage");
+        assert_eq!(e.mode(), Mode::Rotation, "the Lobby Stages mode is untouched");
+        assert_eq!(e.change(0, Button::A), Effect::Nothing, "no All tile to go to");
+        assert_eq!(e.change(STAGES.len() + 1, Button::A), Effect::Nothing, "past the catalog");
+        assert_eq!(e.order_value(), before, "the rotation order is untouched");
+    }
+
+    #[test]
+    fn change_stage_tiles_show_the_form_tag_and_the_footer_shows_the_controls() {
+        let mut e = StageEditor::read(None, None);
+        let battlefield = index_of(0) + 1;
+        e.change(battlefield, Button::Y);
+        let mut f = Frame::new();
+        f.tile_count = 2;
+        f.tile_n[0] = battlefield as u16;
+        f.tile_n[1] = (index_of(0) + 2) as u16;
+        let _ = f.tiles[0].write_str(STAGES[battlefield - 1].1);
+        e.decorate_change(&mut f, battlefield);
+        assert!(f.tiles[0].string_lossy().ends_with(" [Ω]"), "{:?}", f.tiles[0]);
+        assert!(f.hint.string_lossy().starts_with("Form: Omega   A change stage   Y form"), "{:?}", f.hint);
+        assert!(f.help[1].string_lossy().contains("closes the menu"));
     }
 
     #[test]
