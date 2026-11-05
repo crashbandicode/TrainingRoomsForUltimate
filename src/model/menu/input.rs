@@ -15,8 +15,14 @@ pub enum Button {
     Y,
     L,
     R,
+    /// A tap: ZL pressed and released with nothing else pressed while it was held (the adapter sends it on the
+    /// release). Held, ZL is the section-jump modifier instead.
     ZL,
     ZR,
+    /// ZL held + Up: the previous section of a page, or one window up in a popup list.
+    JumpUp,
+    /// ZL held + Down: the next section of a page, or one window down in a popup list.
+    JumpDown,
 }
 
 /// Frames a stick direction repeats at.

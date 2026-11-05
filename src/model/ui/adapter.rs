@@ -129,7 +129,7 @@ pub struct Step {
     pub pressed: u16,
     /// Release-only polls must reach an active physical chord capture too.
     pub changed: bool,
-    pub presses: [Option<Button>; 12],
+    pub presses: [Option<Button>; 14],
 }
 
 impl Step {
@@ -144,18 +144,20 @@ impl Step {
     }
 }
 
-/// The adapter's memory between polls: the held buttons, and the stick hold counters.
+/// The adapter's memory between polls: the held buttons, the stick hold counters, and whether anything was
+/// pressed while ZL was held (then its release is not a tap).
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Adapter {
     logical: u16,
     dpad: [bool; 4],
     stick: [bool; 4],
     repeat: [HoldRepeat; 4],
+    zl_used: bool,
 }
 
 impl Adapter {
     pub const fn new() -> Adapter {
-        Adapter { logical: 0, dpad: [false; 4], stick: [false; 4], repeat: [HoldRepeat::new(); 4] }
+        Adapter { logical: 0, dpad: [false; 4], stick: [false; 4], repeat: [HoldRepeat::new(); 4], zl_used: false }
     }
 
     /// The edge rule of a chord: every button held and at least one pressed this poll.
@@ -171,20 +173,39 @@ impl Adapter {
         let (dpad, stick) = directions(buttons);
         let mut step = Step { held: logical, pressed, changed: logical != self.logical, ..Step::default() };
         if open {
+            // ZL is a modifier while held: Up / Down become section jumps. Its own action (all or none) is a tap,
+            // sent on the release when nothing else was pressed during the hold.
+            let zl_held = logical & ZL != 0;
+            if pressed & ZL != 0 {
+                self.zl_used = false;
+            }
             for i in 0..4 {
                 let repeat = self.repeat[i].frame(stick[i]);
                 // A d-pad direction presses on its edge only; a stick direction on its edge and every 21 frames.
                 if (dpad[i] && !self.dpad[i]) || (stick[i] && !self.stick[i]) || repeat {
-                    step.push(DIRECTION_BUTTONS[i]);
+                    let button = DIRECTION_BUTTONS[i];
+                    step.push(match button {
+                        Button::Up if zl_held => Button::JumpUp,
+                        Button::Down if zl_held => Button::JumpDown,
+                        other => other,
+                    });
+                    self.zl_used |= zl_held;
                     if !repeat {
                         self.repeat[i].reset();
                     }
                 }
             }
-            for (bit, button) in [(A, Button::A), (B, Button::B), (X, Button::X), (Y, Button::Y), (L, Button::L), (R, Button::R), (ZL, Button::ZL), (ZR, Button::ZR)] {
+            for (bit, button) in [(A, Button::A), (B, Button::B), (X, Button::X), (Y, Button::Y), (L, Button::L), (R, Button::R), (ZR, Button::ZR)] {
                 if pressed & bit != 0 {
                     step.push(button);
+                    self.zl_used |= zl_held;
                 }
+            }
+            if self.logical & ZL != 0 && !zl_held {
+                if !self.zl_used {
+                    step.push(Button::ZL);
+                }
+                self.zl_used = false;
             }
         } else {
             for repeat in &mut self.repeat {
@@ -211,6 +232,8 @@ impl Adapter {
         for repeat in &mut self.repeat {
             repeat.reset();
         }
+        // A ZL still held from the chord that opened the menu (a shortcut such as ZL + D-pad Up) is not a tap.
+        self.zl_used = true;
     }
 }
 
@@ -293,6 +316,57 @@ mod tests {
         assert_eq!(logical(mask(&[bit::LEFT_SL]), Style::DualJoyCon), ZL);
         assert_eq!(logical(mask(&[bit::RIGHT_SR]), Style::Pro), ZR);
         assert_eq!(logical(mask(&[bit::REAL_L]), Style::GameCube), ZL);
+    }
+
+    #[test]
+    fn zl_held_turns_up_and_down_into_section_jumps_and_its_release_is_then_not_a_tap() {
+        let mut a = Adapter::new();
+        let p = |a: &mut Adapter, bits: &[u32]| a.poll(mask(bits), Style::Pro, true, true, NO_SHORTCUTS).presses().collect::<Vec<_>>();
+        assert_eq!(p(&mut a, &[bit::ZL]), [], "ZL alone presses nothing yet");
+        assert_eq!(p(&mut a, &[bit::ZL, bit::DPAD_DOWN]), [Button::JumpDown]);
+        assert_eq!(p(&mut a, &[bit::ZL]), []);
+        assert_eq!(p(&mut a, &[bit::ZL, bit::DPAD_UP]), [Button::JumpUp]);
+        // Left / Right are not jumps; they still mark ZL as used.
+        assert_eq!(p(&mut a, &[bit::ZL, bit::DPAD_RIGHT]), [Button::Right]);
+        assert_eq!(p(&mut a, &[]), [], "a ZL that steered is not a tap on its release");
+        // The stick repeats the jump while held, as it repeats a move.
+        let mut a = Adapter::new();
+        p(&mut a, &[bit::ZL]);
+        assert_eq!(p(&mut a, &[bit::ZL, bit::LSTICK_DOWN]), [Button::JumpDown]);
+        let repeats = (1..=21).filter(|_| p(&mut a, &[bit::ZL, bit::LSTICK_DOWN]) == [Button::JumpDown]).count();
+        assert_eq!(repeats, 1);
+    }
+
+    #[test]
+    fn a_zl_tap_is_sent_on_its_release() {
+        let mut a = Adapter::new();
+        let p = |a: &mut Adapter, bits: &[u32]| a.poll(mask(bits), Style::Pro, true, true, NO_SHORTCUTS).presses().collect::<Vec<_>>();
+        assert_eq!(p(&mut a, &[bit::ZL]), []);
+        assert_eq!(p(&mut a, &[bit::ZL]), []);
+        assert_eq!(p(&mut a, &[]), [Button::ZL]);
+        // A button pressed during the hold uses it too.
+        assert_eq!(p(&mut a, &[bit::ZL]), []);
+        assert_eq!(p(&mut a, &[bit::ZL, bit::A]), [Button::A]);
+        assert_eq!(p(&mut a, &[]), []);
+        // A GameCube pad's L is its ZL and works the same.
+        let mut a = Adapter::new();
+        let g = |a: &mut Adapter, bits: &[u32]| a.poll(mask(bits), Style::GameCube, true, true, NO_SHORTCUTS).presses().collect::<Vec<_>>();
+        assert_eq!(g(&mut a, &[bit::L, bit::DPAD_DOWN]), [Button::JumpDown]);
+    }
+
+    #[test]
+    fn a_zl_held_since_the_opening_chord_is_not_a_tap() {
+        let mut a = Adapter::new();
+        let held = mask(&[bit::ZL, bit::DPAD_UP]);
+        let shortcut = [Chord(ZL | DPAD_UP), Chord::NONE];
+        a.poll(mask(&[bit::ZL]), Style::Pro, false, true, shortcut);
+        assert!(a.poll(held, Style::Pro, false, true, shortcut).open);
+        a.resync(held, Style::Pro);
+        assert_eq!(a.poll(mask(&[bit::ZL]), Style::Pro, true, true, shortcut).presses().count(), 0);
+        assert_eq!(a.poll(0, Style::Pro, true, true, shortcut).presses().count(), 0);
+        // The next ZL is a fresh tap.
+        a.poll(mask(&[bit::ZL]), Style::Pro, true, true, shortcut);
+        assert_eq!(a.poll(0, Style::Pro, true, true, shortcut).presses().collect::<Vec<_>>(), [Button::ZL]);
     }
 
     #[test]

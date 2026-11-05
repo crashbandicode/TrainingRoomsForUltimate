@@ -313,7 +313,7 @@ pub fn fade_alpha(count: u32) -> u8 {
         (255.0 / 16f32.log10() * ((remaining + 1) as f32).log10()).clamp(0.0, 255.0) as u8
     }
 }
-const HINT_PAGE: &str = "L/R page   Up/Down move   Left/Right change   A open   X save defaults   Y reset row   ZR reset page   B close";
+const HINT_PAGE: &str = "L/R page   Up/Down move   ZL+Up/Down section   Left/Right change   A open   X save defaults   Y reset row   ZR reset page   B close";
 
 fn group_of(entry: Entry) -> usize {
     match entry {

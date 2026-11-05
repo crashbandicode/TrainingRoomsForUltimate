@@ -15,9 +15,9 @@ use super::menu::table::{Control, Row, GROUPS, ROWS};
 use super::menu::{ChordCapture, ChordTarget, Grey, Menu, Screen, SliderState, DELAY_ROWS, OVERRIDE_COLUMN};
 use super::panes::ROWS as ROW_LINES;
 
-const HINT_LIST: &str = "Up/Down choose   A set   B back";
-const HINT_CHECKLIST: &str = "Up/Down move   A tick   ZL all or none   B back";
-const HINT_DELAY: &str = "Up/Down move   A tick or edit the handle   Y clear   ZL all   B back";
+const HINT_LIST: &str = "Up/Down choose   ZL+Up/Down jump   A set   B back";
+const HINT_CHECKLIST: &str = "Up/Down move   ZL+Up/Down jump   A tick   ZL all or none   B back";
+const HINT_DELAY: &str = "Up/Down move   ZL+Up/Down jump   A tick or edit the handle   Y clear   ZL all   B back";
 const HINT_SLIDER: &str = "Left/Right other handle   A pick up or put down   Up/Down/Left/Right change   B back";
 const HINT_DIRECTIONS: &str = "Up/Down move   A add one weight   Y clear   ZL all or none   B back";
 const HINT_CHORD: &str = "X capture   A confirm   Y empty   B cancel";
@@ -405,7 +405,7 @@ fn swap_frame(menu: &Menu, screen: &Screen, cursor: usize, frame: &mut Frame) {
         frame.help[1].clear();
         let _ = frame.help[1].write_str(Grey::text(grey));
     }
-    let _ = frame.hint.write_str("Up/Down move   A switch   B back");
+    let _ = frame.hint.write_str("Up/Down move   ZL+Up/Down jump   A switch   B back");
 }
 
 /// Situation overrides (mockup 06): the situation dropdown line, then the actions as boxes in columns of 10;
@@ -429,7 +429,7 @@ fn overrides_frame(menu: &Menu, screen: &Screen, situation: usize, cursor: usize
     frame.focus = (cursor == 0).then_some(0);
     let _ = frame.help[0].write_str("The actions the CPU may take in this situation (one at random).");
     frame.help[1].clear();
-    let _ = frame.hint.write_str("Left/Right situation or column   Up/Down move   A tick   ZL all or none   B back");
+    let _ = frame.hint.write_str("Left/Right situation or column   Up/Down move   ZL+Up/Down jump   A tick   ZL all or none   B back");
 }
 fn chords_frame(menu: &Menu, screen: &Screen, cursor: usize, frame: &mut Frame) {
     base(menu, screen, frame);
@@ -440,7 +440,7 @@ fn chords_frame(menu: &Menu, screen: &Screen, cursor: usize, frame: &mut Frame) 
         let _ = write!(line.value, "{chord}  >");
     });
     let _ = frame.help[0].write_str("Choose a row; X in its editor starts physical chord capture.");
-    let _ = frame.hint.write_str("Up/Down move   A change the chord   B back");
+    let _ = frame.hint.write_str("Up/Down move   ZL+Up/Down jump   A change the chord   B back");
 }
 
 fn chord_entry_frame(menu: &Menu, screen: &Screen, captured: Chord, frame: &mut Frame) {
