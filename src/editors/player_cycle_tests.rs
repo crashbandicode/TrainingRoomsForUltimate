@@ -407,6 +407,11 @@ fn the_page_reset_restores_both_character_cycles() {
         live
     };
     let mut menu = Menu::new(live.clone(), Env::default());
+    menu.set_kept("player_kirby_hats", serde_json::json!(ranks(&[FOX])));
+    menu.set_kept("cpu_kirby_hats", serde_json::json!(ranks(&[KIRBY])));
+    menu.set_kept("player_character", serde_json::to_value(TrioFighter::KIRBY).unwrap());
+    menu.set_kept("cpu_character", serde_json::to_value(TrioFighter::PIKACHU).unwrap());
+    menu.set_kept("lobby_stages", serde_json::json!([1u8, 0]));
     confirm_fighters_reset(&mut menu);
     let all = serde_json::json!(all_values());
     assert_eq!(menu.kept("player_roster"), Some(&all));
@@ -419,6 +424,14 @@ fn the_page_reset_restores_both_character_cycles() {
     let view = TrainingModpackMenu::from_snapshot(&menu.settings().menu);
     assert_eq!(view.player_roster, OrderedFighterRoster::all());
     assert_eq!(view.cpu_roster, OrderedFighterRoster::all());
+    let hats = serde_json::to_value(crate::engine::swap::ordered_roster::DEFAULT_KIRBY_HATS).unwrap();
+    let mario = serde_json::to_value(TrioFighter::MARIO).unwrap();
+    let stages = serde_json::to_value(crate::engine::stages::lobby_stages::LobbyStageOrder::NATIVE).unwrap();
+    assert_eq!(menu.kept("player_kirby_hats"), Some(&hats));
+    assert_eq!(menu.kept("cpu_kirby_hats"), Some(&hats));
+    assert_eq!(menu.kept("player_character"), Some(&mario));
+    assert_eq!(menu.kept("cpu_character"), Some(&mario));
+    assert_eq!(menu.kept("lobby_stages"), Some(&stages));
     assert_eq!(
         menu.settings().menu.get("playback_mash"),
         Some(&[1, 0][..])

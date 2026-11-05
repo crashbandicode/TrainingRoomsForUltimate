@@ -1235,17 +1235,28 @@ impl Menu {
         self.reset_kept(id)
     }
 
-    /// Factory JSON for a kept key. The engines that own those values compile on test and Switch only.
+    // Choice counts: 89 with mii-saved-alpha, else 86. Lobby stages: STAGES.len() == 117.
+    const CYCLE_CHOICES: usize = if cfg!(feature = "mii-saved-alpha") { 89 } else { 86 };
+    const LOBBY_STAGES: usize = 117;
+
+    /// Factory JSON of a kept key. A missing key already means this. `None` when this menu does not own it.
     fn kept_page_default(id: &str) -> Option<serde_json::Value> {
-        #[cfg(any(test, target_os = "switch"))]
-        {
-            crate::engine::compat::menu::kept_page_default(id)
+        let values = match id {
+            "player_roster" | "cpu_roster" => Self::bytes(Self::CYCLE_CHOICES + 1, &[(0, 1)]),
+            "player_kirby_hats" | "cpu_kirby_hats" => Self::bytes(Self::CYCLE_CHOICES + 1, &[(1, 1)]),
+            "player_character" | "cpu_character" => Self::bytes(Self::CYCLE_CHOICES, &[(0, 1)]),
+            "lobby_stages" => Self::bytes(Self::LOBBY_STAGES + 1, &[(1, 1)]),
+            _ => return None,
+        };
+        Some(serde_json::Value::Array(values))
+    }
+
+    fn bytes(len: usize, set: &[(usize, u8)]) -> Vec<serde_json::Value> {
+        let mut values = vec![serde_json::Value::from(0u8); len];
+        for (index, byte) in set {
+            values[*index] = serde_json::Value::from(*byte);
         }
-        #[cfg(not(any(test, target_os = "switch")))]
-        {
-            let _ = id;
-            None
-        }
+        values
     }
 
     fn reset_kept(&mut self, id: &str) -> bool {

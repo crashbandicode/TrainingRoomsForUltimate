@@ -141,22 +141,6 @@ fn kept_or<T: serde::de::DeserializeOwned>(snapshot: &Snapshot, id: &str, fallba
     snapshot.extra().get(id).and_then(|value| serde_json::from_value(value.clone()).ok()).unwrap_or(fallback)
 }
 
-/// The factory JSON of a kept menu key. A missing key already means this value (`BASE_MENU`).
-/// `None` for a key this view does not own. Page reset writes it when the defaults snapshot
-/// has no saved value (SETTINGS-PERSIST, P1-CYCLE).
-pub fn kept_page_default(id: &str) -> Option<serde_json::Value> {
-    Some(match id {
-        "lobby_stages" => serde_json::to_value(BASE_MENU.lobby_stages).ok()?,
-        "player_character" => serde_json::to_value(BASE_MENU.player_character).ok()?,
-        "cpu_character" => serde_json::to_value(BASE_MENU.cpu_character).ok()?,
-        "player_roster" => serde_json::to_value(BASE_MENU.player_roster).ok()?,
-        "cpu_roster" => serde_json::to_value(BASE_MENU.cpu_roster).ok()?,
-        "player_kirby_hats" => serde_json::to_value(BASE_MENU.player_kirby_hats).ok()?,
-        "cpu_kirby_hats" => serde_json::to_value(BASE_MENU.cpu_kirby_hats).ok()?,
-        _ => return None,
-    })
-}
-
 /// The settings the carried engines read (grows with each carried layer).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TrainingModpackMenu {
