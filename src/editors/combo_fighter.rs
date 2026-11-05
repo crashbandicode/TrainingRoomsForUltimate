@@ -10,10 +10,8 @@ use crate::engine::swap::trio::{TrioFighter, CHOICES};
 pub enum Kept {
     /// *Ask before switching fighter* is Off: as for a named macro, the current fighter is kept without asking.
     SettingOff = 1,
-    /// Player Swapping is Off: the roster loader changes only the CPU.
-    PlayerSwappingOff = 2,
     /// `recorded_on` is not a fighter this build can load.
-    Unknown = 3,
+    Unknown = 2,
 }
 
 /// What choosing a combo does about P1's fighter.
@@ -45,8 +43,9 @@ pub fn fighter_named(name: &str) -> Option<TrioFighter> {
 }
 
 /// The plan for a combo recorded on `recorded_on` while P1 is `p1` (its kind and its name as the list writes it).
-/// `prompt_enabled`: *Ask before switching fighter*. `player_swapping`: the roster loader's Player role may load.
-pub fn plan(recorded_on: Option<&str>, p1: Option<(u32, &str)>, prompt_enabled: bool, player_swapping: bool) -> Plan {
+/// `prompt_enabled`: *Ask before switching fighter*. Player Swapping plays no part: a Switch is one explicit load the
+/// user chose (`character_roster::request_player_kind`), which that setting does not refuse.
+pub fn plan(recorded_on: Option<&str>, p1: Option<(u32, &str)>, prompt_enabled: bool) -> Plan {
     let (Some(recorded), Some((kind, label))) = (recorded_on, p1) else { return Plan::Proceed };
     let fighter = fighter_named(recorded);
     let matches = match fighter {
@@ -54,12 +53,11 @@ pub fn plan(recorded_on: Option<&str>, p1: Option<(u32, &str)>, prompt_enabled: 
         // A fighter the roster does not list is still the same one when the names agree.
         None => recorded.trim().eq_ignore_ascii_case(label),
     };
-    match (fighter_gate(prompt_enabled, fighter.is_some() && player_swapping, matches), fighter) {
+    match (fighter_gate(prompt_enabled, fighter.is_some(), matches), fighter) {
         (FighterGate::Proceed, _) => Plan::Proceed,
         (FighterGate::Prompt, Some(fighter)) => Plan::Ask(fighter),
         (_, None) => Plan::Keep(Kept::Unknown),
-        (_, Some(_)) if !prompt_enabled => Plan::Keep(Kept::SettingOff),
-        (_, Some(_)) => Plan::Keep(Kept::PlayerSwappingOff),
+        (_, Some(_)) => Plan::Keep(Kept::SettingOff),
     }
 }
 
@@ -68,8 +66,7 @@ pub fn plan(recorded_on: Option<&str>, p1: Option<(u32, &str)>, prompt_enabled: 
 pub fn kept_note(kept: Kept, recorded: &str, p1: &str) -> Option<String> {
     match kept {
         Kept::SettingOff => None,
-        Kept::PlayerSwappingOff => Some(format!("P1 stays {p1}: turn on Player Swapping to switch")),
-        Kept::Unknown => Some(format!("{} is not a fighter this build can load", recorded.trim())),
+        Kept::Unknown => Some(format!("{} is not a fighter this build can load (P1 stays {p1})", recorded.trim())),
     }
 }
 
@@ -90,32 +87,31 @@ mod tests {
 
     #[test]
     fn no_question_without_a_recorded_fighter_or_when_it_is_p1s() {
-        assert_eq!(plan(None, Some((MARIO, "Mario")), true, true), Plan::Proceed);
-        assert_eq!(plan(Some("Mario"), Some((MARIO, "Mario")), true, true), Plan::Proceed);
-        assert_eq!(plan(Some("  mario "), Some((MARIO, "Mario")), true, true), Plan::Proceed, "case and spaces");
+        assert_eq!(plan(None, Some((MARIO, "Mario")), true), Plan::Proceed);
+        assert_eq!(plan(Some("Mario"), Some((MARIO, "Mario")), true), Plan::Proceed);
+        assert_eq!(plan(Some("  mario "), Some((MARIO, "Mario")), true), Plan::Proceed, "case and spaces");
         // P1 not known yet (no practice entry observed): never a question.
-        assert_eq!(plan(Some("Ryu"), None, true, true), Plan::Proceed);
+        assert_eq!(plan(Some("Ryu"), None, true), Plan::Proceed);
     }
 
     #[test]
-    fn another_fighter_is_asked_about_when_p1_can_switch() {
-        assert_eq!(plan(Some("Ryu"), Some((MARIO, "Mario")), true, true), Plan::Ask(TrioFighter::from_kind(RYU).unwrap()));
-        assert_eq!(plan(Some("RYU"), Some((MARIO, "Mario")), true, true), Plan::Ask(TrioFighter::from_kind(RYU).unwrap()));
+    fn another_fighter_is_asked_about() {
+        // Player Swapping is not an input: a Switch is one explicit load, admitted with it Off (report §2a).
+        assert_eq!(plan(Some("Ryu"), Some((MARIO, "Mario")), true), Plan::Ask(TrioFighter::from_kind(RYU).unwrap()));
+        assert_eq!(plan(Some("RYU"), Some((MARIO, "Mario")), true), Plan::Ask(TrioFighter::from_kind(RYU).unwrap()));
     }
 
     #[test]
     fn it_is_kept_without_asking_as_a_named_macro_would_be() {
         // The setting Off: keep, silently.
-        assert_eq!(plan(Some("Ryu"), Some((MARIO, "Mario")), false, true), Plan::Keep(Kept::SettingOff));
+        assert_eq!(plan(Some("Ryu"), Some((MARIO, "Mario")), false), Plan::Keep(Kept::SettingOff));
         assert_eq!(kept_note(Kept::SettingOff, "Ryu", "Mario"), None);
-        // Player Swapping Off: the loader changes only the CPU; the note says how to switch.
-        assert_eq!(plan(Some("Ryu"), Some((MARIO, "Mario")), true, false), Plan::Keep(Kept::PlayerSwappingOff));
-        assert_eq!(kept_note(Kept::PlayerSwappingOff, "Ryu", "Mario").unwrap(), "P1 stays Mario: turn on Player Swapping to switch");
-        // A name no roster fighter has: nothing to switch to.
-        assert_eq!(plan(Some("Ryuu"), Some((MARIO, "Mario")), true, true), Plan::Keep(Kept::Unknown));
-        assert_eq!(kept_note(Kept::Unknown, " Ryuu ", "Mario").unwrap(), "Ryuu is not a fighter this build can load");
+        // A name no roster fighter has: nothing to switch to, whatever the setting.
+        assert_eq!(plan(Some("Ryuu"), Some((MARIO, "Mario")), true), Plan::Keep(Kept::Unknown));
+        assert_eq!(plan(Some("Ryuu"), Some((MARIO, "Mario")), false), Plan::Keep(Kept::Unknown));
+        assert_eq!(kept_note(Kept::Unknown, " Ryuu ", "Mario").unwrap(), "Ryuu is not a fighter this build can load (P1 stays Mario)");
         // ...unless it is P1's own name (a fighter the roster does not list, written by its label).
-        assert_eq!(plan(Some("0x48"), Some((0x48, "0x48")), true, true), Plan::Proceed);
+        assert_eq!(plan(Some("0x48"), Some((0x48, "0x48")), true), Plan::Proceed);
     }
 
     /// The shared Fighter Mismatch screen with the `Combo` origin: the same rows and keys, Player 1 in the footer, and

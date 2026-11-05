@@ -297,7 +297,7 @@ impl Ui {
         let p1_label = p1.map(|kind| named_macros::fighter_label(kind as i32));
         let prompt_enabled = crate::runtime::compat::sync::read(&crate::runtime::compat::menu::MENU).fighter_prompt == OnOff::ON;
         let recorded_on = record.recorded_on.clone();
-        let plan = fighter::plan(recorded_on.as_deref(), p1.zip(p1_label.as_deref()), prompt_enabled, roster::player_swapping());
+        let plan = fighter::plan(recorded_on.as_deref(), p1.zip(p1_label.as_deref()), prompt_enabled);
         let recorded = recorded_on.as_deref().and_then(fighter::fighter_named).map(TrioFighter::kind);
         PROMPT_REVISION.fetch_add(1, Ordering::AcqRel);
         self.switch_at_close = None;

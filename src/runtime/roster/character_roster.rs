@@ -252,6 +252,9 @@ struct Request {
     selection: Selection,
     age: usize,
     restoring: bool,
+    /// One explicit Direct load the user chose outside the cycle (a combo's Switch,
+    /// `request_player_kind`): admitted even while the role's cycle is off.
+    once: bool,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -587,9 +590,15 @@ fn queue(role: Role, selection: Selection) {
 }
 
 fn queue_request(role: Role, selection: Selection, restoring: bool) {
+    queue_admitted(role, selection, restoring, false);
+}
+
+/// `once`: one explicit Direct load outside the cycle; the role's cycle setting
+/// (Player Swapping) does not refuse it and is not changed by it.
+fn queue_admitted(role: Role, selection: Selection, restoring: bool, once: bool) {
     // FAIL 2: a user's request leaves one line on every path, including the ones that drop it.
     let user = !restoring && !matches!(selection, Selection::RefreshPartners);
-    if !role.enabled() && !matches!(selection, Selection::RefreshPartners) {
+    if !role.enabled() && !once && !matches!(selection, Selection::RefreshPartners) {
         if user {
             trace!("[CharacterRoster] request ignored role={:?} selection={:?}: this role's roster cycle is off", role, selection);
         }
@@ -677,6 +686,7 @@ fn queue_request(role: Role, selection: Selection, restoring: bool) {
         selection,
         age: 0,
         restoring,
+        once,
     });
     if scope.waiting() && !restoring && !matches!(selection, Selection::RefreshPartners) {
         WAITING_MEMORY.lock().manual_request(role as usize);
@@ -721,27 +731,24 @@ pub fn request_cpu_kind(kind: u32) -> bool {
     )
 }
 
-/// Player 1's fighter may be changed: the Player role is enabled (Player Swapping On).
-pub fn player_swapping() -> bool {
-    Role::Player.enabled()
-}
-
 /// Player 1's fighter kind as the loader last observed it (None before a practice entry).
 pub fn player_kind() -> Option<u32> {
     state_for(Role::Player).lock().observed.map(|(_, kind)| kind)
 }
 
 /// Ask the existing loader to change Player 1 to `kind` (a combo's recorded
-/// fighter, SPEC-input-07 §4a): the Direct request a Player Character pick makes.
+/// fighter, SPEC-input-07 §4a): the Direct request a Player Character pick makes,
+/// as one explicit load the user chose, so Player Swapping Off does not refuse it
+/// (that setting keeps the plugin from cycling P1 on its own; it is not changed).
 /// False when nothing was queued; the loader's notice says why.
 pub fn request_player_kind(kind: u32) -> bool {
     let Some(fighter) = TrioFighter::from_kind(kind) else {
         return false;
     };
-    if !Role::Player.enabled() || state_for(Role::Player).lock().pending.is_some() {
+    if state_for(Role::Player).lock().pending.is_some() {
         return false;
     }
-    queue(Role::Player, Selection::Direct(fighter));
+    queue_admitted(Role::Player, Selection::Direct(fighter), false, true);
     state_for(Role::Player).lock().pending.is_some_and(
         |request| matches!(request.selection, Selection::Direct(target) if target == fighter),
     )
@@ -1278,7 +1285,7 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
     let mut state = state_for(role).lock();
     if request.epoch != state.epoch
         || scope(role) != Some(request.scope)
-        || (!role.enabled() && !matches!(request.selection, Selection::RefreshPartners))
+        || (!role.enabled() && !request.once && !matches!(request.selection, Selection::RefreshPartners))
     {
         state.pending = None;
         trace!("[CharacterRoster] dropped stale request at native boundary");

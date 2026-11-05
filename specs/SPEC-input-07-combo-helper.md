@@ -90,21 +90,22 @@ the same logic that the replay macro uses where it prompts the user to swap and 
 - **The gate.** It is the named macros' own gate (`macro_panel::fighter::gate`):
   - **Matches:** `recorded_on` names a roster fighter (the names `recorded_on` is written with, ignoring case and
     surrounding spaces) whose kind is P1's, as the roster loader last observed it.
-  - **Can switch:** that fighter exists **and** Player Swapping is On. With it Off, the roster loader changes only the
-    CPU.
+  - **Can switch:** that fighter exists. Player Swapping plays no part: it keeps the plugin from cycling P1 on its own,
+    and a Switch is one load the user chose (see Switch below).
   - **Asks:** the setting **Ask before switching fighter** (Recording › Named macros) is On.
 - **No question** when `recorded_on` is missing, when it is P1's fighter, or when P1's fighter is not known yet.
 - **Kept without asking**, with the target note saying why:
   - the setting is Off (no note, as for a named macro);
-  - Player Swapping is Off ("P1 stays Mario: turn on Player Swapping to switch");
-  - the name is not a fighter this build can load ("Ryuu is not a fighter this build can load").
+  - the name is not a fighter this build can load ("Ryuu is not a fighter this build can load (P1 stays Mario)").
 - **The question.** It is the shared **Fighter Mismatch** screen: *Keep current fighter* (the default) or *Switch to
   recorded fighter*, A chooses, B cancels. The footer reads "Recorded on Ryu · P1 is Mario". Nothing is written before
   the answer.
   - **Keep:** the combo becomes the target, and P1 is unchanged.
   - **Switch:** the combo becomes the target. When the menu closes, P1's switch goes to the roster loader's Player role
-    with the request a Player Character pick makes (`character_roster::request_player_kind`, `Selection::Direct`). No
-    native site is added. A refusal carries the loader's own notice, plus "P1 was not switched to Ryu".
+    with the request a Player Character pick makes (`character_roster::request_player_kind`, `Selection::Direct`), as
+    one explicit load (`once`): Player Swapping Off does not refuse it and is not changed by it. The P1 cycle chord, the
+    Player Character pick and the waiting restore keep that setting's gate. No native site is added. A refusal carries
+    the loader's own notice, plus "P1 was not switched to Ryu".
   - **B:** nothing changes, and the list opens again.
 - **A question nobody answered** is retired when a later choice, the list closing or the scene ending moves it on.
 
@@ -160,7 +161,7 @@ trace point (`libtraining_rooms.nro!<name>` with the unstripped ELF loaded) reco
 | `tr_combo_attempt_v1` | outcome: 1 completed, 2 stopped, 3 cleared | true links | reference links | first link not true + 1 (0 none) |
 | `tr_combo_saved_v1` | links saved | first link's verdict value | 0 | 0 |
 | `tr_combo_listed_v1` | files listed | files skipped (one notice names the first) | listed files whose names the plugin did not choose (copied in) | 0 |
-| `tr_combo_fighter_v1` (§4a) | event: 1 no question, 2 kept without asking, 3 asked, 4 Keep, 5 Switch, 6 cancelled, 7 switch asked of the loader | the recorded fighter's kind (`u32::MAX` none or unknown) | P1's kind (`u32::MAX` unknown) | event 2: why (1 setting Off, 2 Player Swapping Off, 3 unknown name); event 7: 1 queued, 0 refused |
+| `tr_combo_fighter_v1` (§4a) | event: 1 no question, 2 kept without asking, 3 asked, 4 Keep, 5 Switch, 6 cancelled, 7 switch asked of the loader | the recorded fighter's kind (`u32::MAX` none or unknown) | P1's kind (`u32::MAX` unknown) | event 2: why (1 setting Off, 2 unknown name); event 7: 1 queued, 0 refused |
 
 The rows also read `combos/*.json` and the HUD.
 

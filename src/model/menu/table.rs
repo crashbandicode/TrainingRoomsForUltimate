@@ -369,7 +369,7 @@ pub static ROWS: [Row; 104] = [
       "Keep playing, or load the save state to retry\nfrom the same spot."),
     // Fighters & Stages > Player 1 and CPU
     r(PEOPLE, "Player Swapping", "trio_practice", TOGGLE,
-      "On: the Player 1 cycle chord changes your fighter.\nOff: only the CPU can be changed."),
+      "On: the Player 1 cycle chord changes your fighter.\nOff: only a combo's Switch changes Player 1."),
     r(PEOPLE, "Player Character", "player_character", Control::Editor(Editor::PortraitPlayer),
       "Pick Player 1's fighter from the portrait grid."),
     r(PEOPLE, "CPU Character", "cpu_character", Control::Editor(Editor::PortraitCpu),

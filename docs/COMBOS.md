@@ -119,7 +119,8 @@ question a named macro recorded on another fighter asks:
 
 - *Keep current fighter* (the default): the combo becomes the target, and you practise it on the fighter you have.
 - *Switch to recorded fighter*: the combo becomes the target, and Player 1 changes to that fighter when you close the
-  menu.
+  menu. This works with **Player Swapping** (Fighters & Stages) On or Off. Player Swapping stays as it is, and with it
+  Off the plugin still never changes Player 1 on its own.
 - B: nothing changes.
 
 The question is skipped in these cases:
@@ -127,5 +128,4 @@ The question is skipped in these cases:
 - **No question at all** when the combo has no `recorded_on` or when the fighter already matches.
 - **The current fighter is kept, without asking:**
   - when **Ask before switching fighter** (Recording › Named macros) is Off;
-  - when **Player Swapping** (Fighters & Stages) is Off, because only the CPU can be changed then; the notice says so;
   - when `recorded_on` is not a fighter name the plugin knows; the notice says so.
