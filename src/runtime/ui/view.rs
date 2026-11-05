@@ -6,7 +6,7 @@ use skyline::nn::ui2d::Pane;
 use crate::model::frame::{Frame, Tone, View};
 use crate::model::menu::options::DIRECTIONS;
 use crate::model::menu::CHIP_POS;
-use crate::model::screens::TILE_HIDDEN;
+use crate::model::screens::{TILE_GREYED, TILE_HIDDEN};
 use crate::model::panes as p;
 
 /// The fork's role colours (`src/training/ui/roster_grid.rs:9-10`): the roster grid's Player and CPU badges, stripes,
@@ -334,10 +334,13 @@ impl Panes {
                 self.label(p::IDX_TILE_LABEL + i, frame.tiles[i].units(), label_left + label_w / 2.0, y, label_w, p::TEXT);
                 continue;
             }
+            // A roster tile the editing role cannot choose draws greyed (the fork's `roster_grid.rs` 197-206 tint).
+            let greyed = frame.tile_roster_grid && frame.tile_state[i] == TILE_GREYED;
             if frame.tile_roster_grid && crate::runtime::ui::thumbs::is_bound(i) {
                 let (icon, label, _) = p::roster_tile(cell_w, cell_h, true);
-                self.rect(p::IDX_TILE + i, x, y + icon.y, icon.w, icon.h, [255, 255, 255, 255]);
-                self.label(p::IDX_TILE_LABEL + i, frame.tiles[i].units(), x, y + label.y, label.w, p::TEXT);
+                let tint = if greyed { [110, 110, 110, 150] } else { [255, 255, 255, 255] };
+                self.rect(p::IDX_TILE + i, x, y + icon.y, icon.w, icon.h, tint);
+                self.label(p::IDX_TILE_LABEL + i, frame.tiles[i].units(), x, y + label.y, label.w, if greyed { p::TEXT_OFF } else { p::TEXT });
                 continue;
             }
             if frame.tile_stage_grid && crate::runtime::ui::thumbs::is_bound(i) {
@@ -362,7 +365,7 @@ impl Panes {
                 continue;
             }
             self.rect(p::IDX_TILE + i, x, y, cell_w - 10.0, cell_h - 8.0, p::HIGHLIGHT);
-            self.label(p::IDX_TILE_LABEL + i, frame.tiles[i].units(), x, y, cell_w - 18.0, p::TEXT);
+            self.label(p::IDX_TILE_LABEL + i, frame.tiles[i].units(), x, y, cell_w - 18.0, if greyed { p::TEXT_OFF } else { p::TEXT });
         }
         if shown && frame.tile_count > 0 {
             let (x, y) = centre(usize::from(frame.tile_focus));

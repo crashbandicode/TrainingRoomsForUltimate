@@ -627,3 +627,49 @@ ledger is regenerated. `carry_pkg4.py verify` (against stage m5q): verified 40 f
 | Was here | Fork path (stage m5q) | src sha256 | Lines (`tools/sloc.py`) |
 | --- | --- | --- | --- |
 | `src/model/macros/ui_anchor.rs` | `training_mod_macros/src/ui_anchor.rs` | `3e4118ca933404e4` | 134 |
+
+## p23/mii-editor: native Mii editor available again (2026-11-05, rc.3)
+
+The operator asked for the fork's Mii editor, which had no entry in the menu, to be brought over (primary 35137355,
+2026-11-05 ~14:16Z). Every file of the fork's `src/mii_editor_bridge/` and its Lua helpers was already carried (pkg6
+ledger); only the 2026-11-03 closure above kept it shut. `NATIVE_EDITOR_AVAILABLE` is now `true`:
+
+- The Mii lists show *Add New…* again, and `request` / `begin_session` admit Training, Quickplay and Local Wireless
+  waiting practice, as in the fork.
+- `install::run` runs `init_editor` once the editor's 64-byte seam rows pass (`mii_editor_bridge`, enforcing).
+- Save is unchanged from the fork: `edit_decide` sends only a fresh draft to the game's allocator (a new slot) and reuses
+  an identical saved Mii. A saved ID never enters, so no saved Mii or protected original is overwritten.
+- The capability switch and both refusals stay; with it `false` the closure's behaviour returns.
+
+Two carried files changed only by recorded exact-text edits: the constant and its comment in `mii_root/mii_menu.rs`,
+and two comments in `mii_editor_bridge/mod.rs`. The ledger was regenerated, and `carry_pkg6.py verify` re-derived
+all 247 files from stage m5q byte for byte. The adapter tests in `src/editors/mii.rs` check Add New after the saved
+choices, Add New on an empty catalog for each class (native default seed, no role permission), and the refusal when
+the capability is off. `tests/mii_install_boundary.rs` pins the constant at `true`. Not carried, as before: the fork's
+Lua test files (`lua_helpers/tests/`) and the diag Mii Test observers. Runtime proof is pending: the rows for
+the combined rc.3 Eden session are in `artifacts/phase23/rc3-combined/rows-mii/`; the waiting-room origins and the
+resume after a match have no row.
+
+### p23/mii-editor: the rest of the fork's Mii behaviour, ported directly (2026-11-05)
+
+The operator asked whether Mii creation matches the fork (interruption, replay Miis matched against saved ones, and
+so on), then that the port be a direct one: it is our own code. A fork-against-here comparison found every editor,
+replay-Mii, selection, cycle, HUD-portrait and identity path carried and reachable in a release build. The behaviours
+that were missing or different are now ported from the M5q stage, each citing its fork lines:
+
+- Add New with a Player/CPU choice from the same opening drops that opening's reloads and requests the editor before
+  the catalog close (`containers/app.rs` 923-931, `common/menu.rs` 483-491): `MiiList::close_for`, `menu_handoff`.
+- A portrait pick drops that role's Mii reload (`app.rs` 522-531): `close_for`'s `picked`, from the worker.
+- Stored Mii choices are parsed one selector at a time (`training_mod_consts/src/menu_json.rs` 17-37):
+  `engine::compat::menu::mii_preferences_of`.
+- Mii tiles in Character Cycles, the portrait picks and Kirby Hats follow the catalog's admission: greyed and refused
+  when not admitted, numbered when admitted, the Mii slot-0 rule (`app.rs` 563-685 and 745-800,
+  `training/ui/roster_grid.rs` 197-206 and 304-308): `editors::roster::MiiTiles`, `MiiList::tiles`.
+- Waiting-room Add New needs the installed editor (`ENABLED`, as the fork's `mod.rs` 204-213).
+- An opening with no Mii catalog says so instead of "Reading…" forever (the fork showed no Mii pages then).
+- `mii_editor_bridge.called_376d990`: an exact 64-byte row for the Colour selector the resume path calls, in the
+  editor preflight. The fork had no guard for it.
+
+Carried-file changes are recorded manifest edits. Fork tests carried: `replay185_headgear`, `ldn_backend` and
+`quickplay_backend`; `source_provenance` is recorded as not carried, with the reason. `carry_pkg6.py verify`
+re-derives all 250 files from stage m5q. The list, with what stays different and why, is `docs/MII.md`.

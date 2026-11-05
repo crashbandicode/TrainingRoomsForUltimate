@@ -129,3 +129,11 @@ ceiling = 138826
 date = "2026-11-05"
 reason = "rc.3: the combo helper (SPEC-input-07, operator decision COMBO-HELPER A) on the frame strip; measured 138826 at 7d6e0be (tools/sloc.py), +1834 over 136992"
 approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed' (rc.3 features)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 136644
+date = "2026-11-05"
+reason = "rc.3: the Mii editor bring-over (Add New available again, and the rest of the fork's Mii behaviour ported: docs/MII.md); measured 136644 at 203ecf0 (tools/size_gate.py), +171 over 136473"
+approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed' (rc.3 features)"

@@ -326,7 +326,7 @@ fn press(button: Button, s: &mut Session) {
                 }
             }
             if let Some((tile, button)) = m.take_roster_press() {
-                roster_press(m, &mut s.roster, tile, button);
+                roster_press(m, &mut s.roster, tile, button, mii_tiles(&s.mii));
             }
         }
         m.is_closed()
@@ -539,7 +539,13 @@ fn close_session(s: &mut Session) {
 }
 
 /// A press on the portrait roster grid: package 6's roster rules on the active kept key (`editors::roster`).
-fn roster_press(m: &mut Menu, editor: &mut Option<crate::editors::roster::RosterEditor>, tile: u16, button: Button) {
+/// This opening's Mii tiles for the roster grids: what the mounted catalog admits (none before it arrives).
+fn mii_tiles(list: &Option<crate::editors::mii::MiiList>) -> crate::editors::roster::MiiTiles {
+    list.as_ref().map(crate::editors::mii::MiiList::tiles).unwrap_or_default()
+}
+
+fn roster_press(m: &mut Menu, editor: &mut Option<crate::editors::roster::RosterEditor>, tile: u16, button: Button,
+    mii: crate::editors::roster::MiiTiles) {
     use crate::editors::roster::RosterEditor;
     let Some(Screen::Grid { layout, .. }) = m.screen().copied() else { return };
     let crate::model::menu::grid::GridKind::Roster(use_) = layout.kind else { return };
@@ -547,6 +553,7 @@ fn roster_press(m: &mut Menu, editor: &mut Option<crate::editors::roster::Roster
         *editor = Some(RosterEditor::new(use_));
     }
     let Some(e) = editor.as_mut() else { return };
+    e.set_mii(mii);
     e.apply(m, usize::from(tile), button);
 }
 
@@ -583,7 +590,15 @@ fn publish_frame(s: &Session) {
         } else {
             frame_of(menu, &mut next, stage_label);
             next.help = [crate::model::frame::Text::new(); 2];
-            let _ = core::fmt::Write::write_str(&mut next.help[0], "Reading saved and replay Miis…");
+            #[cfg(feature = "mii-saved-alpha")]
+            let none = crate::runtime::ui::menu_app::no_catalog(s.opening);
+            #[cfg(not(feature = "mii-saved-alpha"))]
+            let none = true;
+            let _ = core::fmt::Write::write_str(&mut next.help[0], if none {
+                "Mii lists open in Training and in waiting practice."
+            } else {
+                "Reading saved and replay Miis…"
+            });
         }
     } else {
         frame_of(menu, &mut next, stage_label);
@@ -602,7 +617,8 @@ fn publish_frame(s: &Session) {
                 }
             }
             if let crate::model::menu::grid::GridKind::Roster(use_) = layout.kind {
-                let editor = s.roster.filter(|e| e.use_() == use_).unwrap_or_else(|| crate::editors::roster::RosterEditor::new(use_));
+                let mut editor = s.roster.filter(|e| e.use_() == use_).unwrap_or_else(|| crate::editors::roster::RosterEditor::new(use_));
+                editor.set_mii(mii_tiles(&s.mii));
                 let values = editor.values(menu.kept(editor.key()));
                 editor.decorate(&mut next, &values);
                 editor.decorate_badges(&mut next, menu);
@@ -685,10 +701,19 @@ fn begin_close(
 ) {
     #[cfg(feature = "mii-saved-alpha")]
     if let Some(list) = s.mii.as_ref() {
+        // A portrait pick this opening (its kept value differs from the live settings) resolves that role's choice itself.
+        let picked = s.menu.as_ref().map_or([false; 2], |menu| {
+            let live = SETTINGS.lock();
+            let changed = |key: &str| live.as_ref().is_some_and(|live| live.menu.extra().get(key) != menu.kept(key));
+            [changed("player_character"), changed("cpu_character")]
+        });
         s.pending_close = Some(crate::runtime::mii::menu_handoff::CloseIntent {
             opening: s.opening,
             epoch: list.epoch(),
-            selection: list.close(),
+            #[cfg(feature = "mii-editor-alpha")]
+            selection: list.close_for(editor.is_some(), picked),
+            #[cfg(not(feature = "mii-editor-alpha"))]
+            selection: list.close_for(false, picked),
             #[cfg(feature = "mii-editor-alpha")]
             editor,
         });

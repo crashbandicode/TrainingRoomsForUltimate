@@ -24,6 +24,9 @@ pub mod mii;
 #[cfg(any(test, target_os = "switch"))]
 #[path = "../model/mii_root/mod.rs"]
 pub mod mii_root;
+#[cfg(test)]
+#[path = "../model/mii_fork_tests/mod.rs"]
+mod mii_fork_tests;
 #[cfg(any(test, target_os = "switch"))]
 #[path = "../model/preload/mod.rs"]
 pub mod preload;

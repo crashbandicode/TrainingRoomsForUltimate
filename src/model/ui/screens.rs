@@ -355,6 +355,9 @@ pub const PANEL_CELLS: usize = PANEL_COLS * PANEL_ROWS;
 /// `tile_state` of a cell that draws nothing (an empty label of the layer's page).
 pub const TILE_HIDDEN: u8 = 255;
 
+/// `tile_state` of a greyed cell: a delay box while a range is set, or a roster tile the editing role cannot choose.
+pub const TILE_GREYED: u8 = 2;
+
 const HINT_PANEL: &str = "D-pad move   A confirm   Y delete or other   B back";
 
 /// A panel of the named-macro / replay layer (package 4): its title, the labels of its 4 x 8 page (an empty one draws nothing),

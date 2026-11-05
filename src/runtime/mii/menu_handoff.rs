@@ -59,15 +59,17 @@ pub(crate) fn service() {
         let opening = mii_saved_alpha::menu_open();
         let captured = mii_saved_alpha::menu_ready(opening);
         #[cfg(feature = "mii-editor-alpha")]
-        if !captured { super::mii_editor_bridge::menu_ready(opening); }
+        let requested = captured || super::mii_editor_bridge::menu_ready(opening);
         #[cfg(not(feature = "mii-editor-alpha"))]
-        let _ = captured;
+        let requested = captured;
+        if !requested { menu_app::note_no_catalog(sequence); }
     } else {
         let intent = intent.filter(|i| i.epoch == mii_saved_alpha::menu_epoch());
         if let Some(intent) = intent {
-            mii_saved_alpha::menu_close(intent.selection);
+            // The fork's order (`common/menu.rs` 486-491): the editor request first, then the catalog close.
             #[cfg(feature = "mii-editor-alpha")]
             if let Some(editor) = intent.editor { super::mii_editor_bridge::request(editor); }
+            mii_saved_alpha::menu_close(intent.selection);
         } else {
             mii_saved_alpha::menu_close(None);
         }

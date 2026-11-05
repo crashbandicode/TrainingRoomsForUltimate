@@ -1,5 +1,7 @@
-//! Private native-editor integration. Ordinary Training is qualified; the new
-//! Quickplay adapter remains an unpublished runtime qualification candidate.
+//! Private native-editor integration: Add New opens the game's Mii editor from Training, Quickplay or Local
+//! Wireless waiting practice (`editor_origin`), and an explicit Save makes a new native Mii only (`edit_decide`).
+//! The fork qualified ordinary Training; the waiting-room adapters and the resume after a match have no runtime
+//! proof in this repository yet.
 mod native;
 mod native_default;
 mod draft;
@@ -231,13 +233,13 @@ fn resume_checkpoint(
 }
 
 fn quickplay_available() -> bool {
-    RETAINED_ENABLED.load(Ordering::Acquire) && crate::runtime::lobby::training::lobby::active()
+    ENABLED.load(Ordering::Acquire) && crate::runtime::lobby::training::lobby::active()
         && crate::runtime::lobby::game_mode::current().is_some_and(|mode|
             crate::engine::mii::backend::Layout::quickplay_waiting_mode(mode.mode))
 }
 
 pub(super) fn local_wireless_available() -> bool {
-    RETAINED_ENABLED.load(Ordering::Acquire) && crate::runtime::lobby::training::lobby::active()
+    ENABLED.load(Ordering::Acquire) && crate::runtime::lobby::training::lobby::active()
         && crate::runtime::lobby::game_mode::current().is_some_and(|mode| mode.mode == 0x02010000)
 }
 
@@ -247,11 +249,13 @@ fn waiting_catalog_ready() -> bool {
 }
 
 /// Queue the waiting-room editor catalog. No file IO, writer wait, or fighter capture here.
-pub(crate) fn menu_ready(opening: u64) {
-    if !waiting_catalog_ready() || ACTIVE.load(Ordering::Acquire) { return; }
+/// Returns whether a catalog was requested.
+pub(crate) fn menu_ready(opening: u64) -> bool {
+    if !waiting_catalog_ready() || ACTIVE.load(Ordering::Acquire) { return false; }
     crate::runtime::roster::character_roster::mii_catalog_request::request(
         crate::engine::mii::catalog_request::Kind::Editor { opening },
     );
+    true
 }
 
 pub(crate) enum OpenedCatalog {
@@ -776,7 +780,8 @@ pub(crate) fn init() {
     );
 }
 
-/// Unavailable in both RC release and diag; no editor-only initialization runs.
+/// Runs in release and diag builds once `NATIVE_EDITOR_AVAILABLE` holds and every editor seam row passed
+/// (`install::run`); otherwise no editor-only initialization runs.
 fn init_editor(base: usize) {
     // The applicable WP-A2 rows were accepted before the shared hook write.
     #[cfg(feature = "diag")]

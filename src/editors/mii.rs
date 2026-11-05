@@ -4,7 +4,7 @@
 use core::fmt::Write;
 
 use crate::engine::mii::inventory::{MiiClass, Snapshot};
-use crate::engine::mii::selection::Preferences;
+use crate::engine::mii::selection::{Action, Preferences};
 use crate::engine::mii_root::mii_menu::{CatalogMenu, Context, PendingSelection};
 use crate::model::frame::{page_frame, Frame, Text, Tone, View};
 use crate::model::menu::input::Button;
@@ -19,8 +19,7 @@ pub struct MiiList {
 
 impl MiiList {
     pub fn new(snapshot: Snapshot, context: Option<Context>, epoch: u64, menu: &Menu) -> Option<Self> {
-        let preferences = menu.top_extra("mii_preferences").cloned()
-            .and_then(|value| serde_json::from_value(value).ok()).unwrap_or_default();
+        let preferences = crate::engine::compat::menu::mii_preferences_of(menu.top_extra("mii_preferences"));
         let mut catalog = match context {
             Some(context) if context.epoch == epoch => CatalogMenu::new(snapshot, context, &preferences)?,
             Some(_) => return None,
@@ -46,6 +45,26 @@ impl MiiList {
     }
 
     pub fn epoch(&self) -> u64 { self.epoch }
+
+    /// The roster grids' Mii tiles for this opening (the fork's `app.rs` 563-685 asks the mounted catalog the same).
+    pub fn tiles(&self) -> crate::editors::roster::MiiTiles {
+        #[cfg(feature = "mii-saved-alpha")]
+        let player = [0x48u32, 0x49, 0x4a].map(|kind| self.catalog.alpha_player_cycle(kind));
+        #[cfg(not(feature = "mii-saved-alpha"))]
+        let player = [false; 3];
+        #[cfg(feature = "mii-ordinary-cpu-alpha")]
+        let (cpu, cpu_original_only) = (
+            [0x48u32, 0x49, 0x4a].map(|kind| self.catalog.alpha_cpu_cycle(kind)),
+            [0x48u32, 0x49, 0x4a].map(|kind| self.catalog.cpu_unnumbered_original(kind, &self.preferences)),
+        );
+        #[cfg(not(feature = "mii-ordinary-cpu-alpha"))]
+        let (cpu, cpu_original_only) = ([false; 3], [false; 3]);
+        #[cfg(feature = "mii-managed-helper-alpha")]
+        let hat = [0x48u32, 0x49, 0x4a].map(|kind| self.catalog.alpha_helper_hat(kind));
+        #[cfg(not(feature = "mii-managed-helper-alpha"))]
+        let hat = [false; 3];
+        crate::editors::roster::MiiTiles { player, cpu, hat, cpu_original_only }
+    }
 
     pub fn leave(&mut self) { self.opened = None; }
 
@@ -73,6 +92,20 @@ impl MiiList {
     }
 
     pub fn close(&self) -> Option<PendingSelection> { self.catalog.close(&self.preferences) }
+
+    /// The selection a close hands over (fork `training_mod_tui/src/containers/app.rs`). Add New opens the editor
+    /// alone (923-931): the choices made in this opening stay saved in `mii_preferences`, but their reload actions
+    /// are dropped, so no Training reload races the editor's quit. A portrait pick drops its role's reload (522-531):
+    /// that pick resolves the role's freshly saved choice itself. `picked` is `[Player, CPU]`.
+    pub fn close_for(&self, editor: bool, picked: [bool; 2]) -> Option<PendingSelection> {
+        if editor { return None; }
+        let mut pending = self.close()?;
+        pending.actions.retain(|action| match action {
+            Action::ReloadPlayer(_) => !picked[0],
+            Action::ReloadCpu(_) => !picked[1],
+        });
+        Some(pending)
+    }
 
     pub fn frame(&self, menu: &Menu, frame: &mut Frame) {
         let view = self.catalog.view(&self.preferences);
@@ -129,18 +162,41 @@ mod tests {
         assert_eq!(pending.actions.len(), 1);
         assert!(matches!(pending.actions[0], Action::ReloadCpu(choice) if choice.canonical == second));
         list.press(Button::Down, &mut menu);
-        assert!(list.editor_request().is_none(), "RC never dispatches the native editor");
+        assert!(list.editor_request().is_some(), "Add New follows the two saved choices");
+        assert!(list.close_for(true, [false; 2]).is_none(), "Add New drops this opening's reload actions");
+        assert!(matches!(list.close_for(false, [false; 2]).unwrap().actions[0], Action::ReloadCpu(choice) if choice.canonical == second));
+        assert!(list.close_for(false, [false, true]).unwrap().actions.is_empty(), "a CPU portrait pick drops the CPU reload");
+        assert_eq!(list.close_for(false, [true, false]).unwrap().actions.len(), 1, "a Player pick keeps the CPU reload");
+        let prefs: Preferences = serde_json::from_value(menu.top_extra("mii_preferences").unwrap().clone()).unwrap();
+        assert_eq!(prefs.get(Role::Cpu, MiiClass::Brawler), Some(second), "the choice itself stays saved");
         let mut frame = Frame::new();
         list.frame(&menu, &mut frame);
-        assert_eq!(frame.row_count, 2);
-        assert_eq!(frame.focus, Some(1));
-        assert!(!frame.rows.iter().any(|row| row.label.string_lossy().contains("Add New")));
+        assert!(frame.rows[..usize::from(frame.row_count)].iter().any(|row| row.label.string_lossy() == "Add New…"));
     }
 
     #[test]
-    fn unqualified_empty_catalog_refuses_editor_without_granting_role_permissions() {
+    fn waiting_catalog_opens_each_class_at_add_new_without_role_permissions() {
+        use crate::engine::mii_root::mii_menu::EditorSeed;
         let mut menu = Menu::new(Settings::factory(), Env::default());
         let mut list = MiiList::new(Snapshot::default(), None, 1, &menu).unwrap();
+        for class in 0..3 {
+            list.open(class);
+            let mut frame = Frame::new();
+            list.frame(&menu, &mut frame);
+            assert_eq!(frame.row_count, 1);
+            assert_eq!(frame.rows[0].label.string_lossy(), "Add New…");
+            let request = list.editor_request().unwrap();
+            assert!(matches!(request.seed, EditorSeed::NativeDefault(kind) if kind.kind() == 0x48 + u32::from(class)));
+            list.press(Button::ZR, &mut menu);
+            assert!(list.close().is_none());
+        }
+    }
+
+    #[test]
+    fn unavailable_capability_refuses_editor_without_granting_role_permissions() {
+        let mut menu = Menu::new(Settings::factory(), Env::default());
+        let mut list = MiiList::new(Snapshot::default(), None, 1, &menu).unwrap();
+        list.catalog.set_editor_available(false);
         for class in 0..3 {
             list.open(class);
             let mut frame = Frame::new();

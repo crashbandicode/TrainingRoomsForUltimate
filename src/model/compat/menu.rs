@@ -111,6 +111,27 @@ pub fn kept_or_default<T: serde::de::DeserializeOwned + Default>(extra: &serde_j
     extra.get(key).and_then(|value| serde_json::from_value(value.clone()).ok()).unwrap_or_default()
 }
 
+/// The stored `mii_preferences`, one selector at a time (the fork's `deserialize_mii_preferences`,
+/// `training_mod_consts/src/menu_json.rs` 17-37): each valid selector is kept, unknown fields are ignored, and only an
+/// invalid selector is left unset, so one bad entry never resets the other five.
+pub fn mii_preferences_of(value: Option<&serde_json::Value>) -> crate::engine::mii::selection::Preferences {
+    use crate::engine::mii::{inventory::Canonical, selection::{Preferences, Role, CLASSES}};
+    let mut preferences = Preferences::default();
+    let Some(value) = value else { return preferences };
+    for (role, key) in [(Role::Player, "player"), (Role::Cpu, "cpu")] {
+        if let Some(selectors) = value.get(key).and_then(serde_json::Value::as_array) {
+            for (class, selector) in CLASSES.iter().zip(selectors) {
+                if let Ok(identity) = serde_json::from_value::<Canonical>(selector.clone()) {
+                    if let Ok(updated) = preferences.clone().with(role, *class, Some(identity)) {
+                        preferences = updated;
+                    }
+                }
+            }
+        }
+    }
+    preferences
+}
+
 /// A kept key of the snapshot (a row whose value is not a plain array) as a typed value; a missing or malformed one is `fallback`.
 fn kept_or<T: serde::de::DeserializeOwned>(snapshot: &Snapshot, id: &str, fallback: T) -> T {
     snapshot.extra().get(id).and_then(|value| serde_json::from_value(value.clone()).ok()).unwrap_or(fallback)
@@ -504,6 +525,35 @@ mod tests {
         assert_eq!(mii, MiiPreferences::default(), "a malformed stored preference is the default");
         let missing: StagePreferences = kept_or_default(&serde_json::Map::new(), "stage_preferences");
         assert_eq!(missing, StagePreferences::default());
+    }
+
+    #[test]
+    fn one_bad_mii_selector_keeps_the_other_choices() {
+        use crate::engine::mii::inventory::{build_snapshot, MiiClass, RawSlot, TaggedId, CHARINFO_LEN, TAG_CHARA, TAG_HAT, TAG_OUTFIT};
+        use crate::engine::mii::selection::{Preferences as MiiPreferences, Role};
+        let snapshot = build_snapshot((0..2).map(|i| RawSlot {
+            index: i, slot_id: i as u32 + 1, name_len: 1,
+            name_units: [65 + i as u16, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            colour: i as u8, voice: 37, specials: [0; 4], charinfo: [0; CHARINFO_LEN],
+            tag_outfit: TaggedId(u64::from(TAG_OUTFIT) << 56 | 1),
+            tag_hat: TaggedId(u64::from(TAG_HAT) << 56 | 2),
+            tag_chara: TaggedId(u64::from(TAG_CHARA) << 56 | MiiClass::Brawler.chara_hash40()),
+        }).collect());
+        let (first, second) = (snapshot.configs[0].canonical, snapshot.configs[1].canonical);
+        let stored = MiiPreferences::default()
+            .with(Role::Player, MiiClass::Brawler, Some(first)).unwrap()
+            .with(Role::Cpu, MiiClass::Brawler, Some(second)).unwrap();
+        let mut value = serde_json::to_value(&stored).unwrap();
+        assert_eq!(mii_preferences_of(Some(&value)), stored, "a valid value reads back whole");
+        value["cpu"][0] = serde_json::json!("not a canonical");
+        value["note"] = serde_json::json!("a field this build does not know");
+        let strict: Option<MiiPreferences> = serde_json::from_value(value.clone()).ok();
+        assert_eq!(strict, None, "the whole-value parse refuses it");
+        let tolerant = mii_preferences_of(Some(&value));
+        assert_eq!(tolerant.get(Role::Player, MiiClass::Brawler), Some(first), "the valid choice stays");
+        assert_eq!(tolerant.get(Role::Cpu, MiiClass::Brawler), None, "only the bad selector is unset");
+        assert_eq!(mii_preferences_of(None), MiiPreferences::default());
+        assert_eq!(mii_preferences_of(Some(&serde_json::json!("not an object"))), MiiPreferences::default());
     }
 
     #[test]
