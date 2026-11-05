@@ -83,3 +83,16 @@ fn the_menu_reads_the_runtime_admission_and_slot_zero() {
     assert!(editor.contains("(RosterUse::Cycles, Role::Cpu) => self.cpu_cycle[k],"));
     assert!(editor.contains("let members = cycle_members(roster_of(values), admitted);"));
 }
+
+/// The rows' evidence: each drawn cycle grid reports its numbered kinds to an exported, never-inlined trace function.
+#[test]
+fn the_grid_reports_its_numbers_to_a_trace_function() {
+    let g = graph();
+    let names_both = |f: &callgraph::Func| ["decorate_badges", "tr_cycle_badges_v1"]
+        .iter().all(|want| f.body.iter().any(|t| matches!(t, Tok::Ident(s) if s == want)));
+    assert!(g.funcs.iter().any(|f| f.module == "worker" && names_both(f)), "the draw that builds the badges reports them");
+    let worker = include_str!("../src/runtime/ui/worker.rs");
+    let at = worker.find("pub extern \"C\" fn tr_cycle_badges_v1(").expect("exported");
+    let head = &worker[worker[..at].rfind("\n\n").unwrap()..at];
+    assert!(head.contains("#[no_mangle]") && head.contains("#[inline(never)]"));
+}

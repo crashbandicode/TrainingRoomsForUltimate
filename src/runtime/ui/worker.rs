@@ -622,7 +622,13 @@ fn publish_frame(s: &Session) {
                 editor.set_mii(mii_tiles(&s.mii));
                 let values = editor.values(menu.kept(editor.key()));
                 editor.decorate(&mut next, &values);
-                editor.decorate_badges(&mut next, menu);
+                let numbers = editor.decorate_badges(&mut next, menu);
+                if editor.use_() == crate::model::menu::grid::RosterUse::Cycles {
+                    for (role, n) in numbers.iter().enumerate() {
+                        let slot_zero = n.slot_zero.map_or(0, |kind| (kind & 0xff) + 1);
+                        tr_cycle_badges_v1(n.mask[0], n.mask[1], n.mask[2], role as u32 | u32::from(n.count) << 8 | slot_zero << 16);
+                    }
+                }
             }
         }
         if let Some(reason) = s.refusal {
@@ -692,6 +698,15 @@ pub fn adopt_published(settings: &Settings) {
     }
 }
 
+
+/// The portrait grid drew a cycle's numbers (P-CYCLE; the rc.5 rows read it with an Eden trace point, no diag print):
+/// which catalog kinds carry a number, as a mask over `trio::CHOICES` indices (x0 bits 0..64, x1 64..128, x2 128..), and
+/// x3 = role (0 Player, 1 CPU) | the highest number << 8 | (slot-0 kind + 1) << 16 (0: none).
+#[no_mangle]
+#[inline(never)]
+pub extern "C" fn tr_cycle_badges_v1(lo: u64, mid: u64, hi: u64, role_count: u32) {
+    core::hint::black_box((0x4359_434c_u32, lo, mid, hi, role_count));
+}
 
 /// Construct once on the worker. No settings/outbox side effects occur until
 /// the native handoff owns the intent; a full queue keeps this exact value.

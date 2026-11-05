@@ -22,6 +22,15 @@ use crate::model::menu::grid::RosterUse;
 use crate::model::menu::input::Button;
 use crate::model::menu::Menu;
 
+/// What a cycle grid numbers for one role (P-CYCLE, the rows' evidence): which catalog kinds carry a number (a mask over
+/// `trio::CHOICES` indices), the highest number, and the slot-0 kind the 0 names.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Numbers {
+    pub mask: [u64; 3],
+    pub count: u8,
+    pub slot_zero: Option<u32>,
+}
+
 /// What a press changed.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Effect {
@@ -268,11 +277,12 @@ impl RosterEditor {
     /// Fill the fork's per-role corner badges (`roster_grid.rs:227-251`: the order number; "All" on the All cell),
     /// All-stripes (`:213-225`: the cell is in that role's All order) and Solo Popo "S" flags (`:253-271`, cycles
     /// only) from the menu's kept keys, for both roles at once. Picks keep none.
-    pub fn decorate_badges(&self, frame: &mut Frame, menu: &Menu) {
+    pub fn decorate_badges(&self, frame: &mut Frame, menu: &Menu) -> [Numbers; 2] {
         let (kinds, hats) = (kinds(), self.use_ == RosterUse::Hats);
         let original_solo = flag_on(menu, "solo_popo_original");
+        let mut numbers = [Numbers::default(); 2];
         if self.pick() {
-            return;
+            return numbers;
         }
         for (r, role) in [Role::Player, Role::Cpu].into_iter().enumerate() {
             let pick = Self::new([RosterUse::PlayerPick, RosterUse::CpuPick][r]);
@@ -287,6 +297,13 @@ impl RosterEditor {
             // The fork's `role_cycle_exclusion` (app.rs:690-703): the CPU has one Solo setting for both.
             let excluded = cycle_exclusion(original, if r == 0 { original_solo } else { solo }, solo);
             let badges = roster_badges(self.use_, &values, excluded, role, &self.mii);
+            numbers[r].slot_zero = original;
+            for (i, badge) in badges.iter().enumerate() {
+                if let Some(n) = badge.filter(|n| *n > 0) {
+                    numbers[r].mask[i / 64] |= 1 << (i % 64);
+                    numbers[r].count = numbers[r].count.max(n);
+                }
+            }
             let all = values.first() == Some(&1);
             for (cell, info) in (0..CELLS).filter_map(|c| Some((c, self.grid.info(c)?))) {
                 let badge = info.kind().and_then(|k| badges[catalog_index(&kinds, k)?]);
@@ -301,6 +318,7 @@ impl RosterEditor {
             }
             frame.tile_solo[r] = !hats && solo;
         }
+        numbers
     }
 }
 
@@ -635,6 +653,12 @@ mod tests {
         editor.decorate_badges(&mut frame, &menu_with_kept(&kept));
         let badge = |kind| frame.tile_badges[1][cell_of(kind)].string_lossy();
         assert_eq!((badge(0x00), badge(0x07), badge(0x06)), ("0".into(), "1".into(), "2".into()), "Mario is slot 0, as the runtime");
+        // The rows' evidence (`tr_cycle_badges_v1`): Fox and Kirby numbered, two numbers, slot 0 Mario.
+        let numbers = editor.decorate_badges(&mut frame, &menu_with_kept(&kept))[1];
+        let index = |kind| CHOICES.iter().position(|(k, _)| *k == kind).unwrap();
+        let bit = |kind| numbers.mask[index(kind) / 64] >> (index(kind) % 64) & 1 == 1;
+        assert!(bit(0x07) && bit(0x06) && !bit(0x00));
+        assert_eq!((numbers.count, numbers.slot_zero), (2, Some(0x00)));
         // Without a scene the saved pick stands in (today's form).
         let mut editor = RosterEditor::new(RosterUse::Cycles);
         editor.set_mii(MiiTiles::default());
