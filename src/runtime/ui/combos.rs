@@ -89,7 +89,7 @@ impl Ui {
     pub fn open(&mut self, editor: Editor) -> Result<Opened, String> {
         self.load_target();
         if crate::runtime::ui::facts::fact_waiting_scene() {
-            return Err("Combos work in Training".into());
+            return Err("Combos work in Training".into()); // restriction: combos-training-only
         }
         let opened = match editor {
             Editor::ComboName => {
@@ -156,7 +156,7 @@ impl Ui {
             .collect();
         named_macros::open_external_library(rows, listing.skipped.len(), "Saved combos", Some("delete".into()));
         if !external::panel_up() {
-            return Err("Wait for the practice fighters to finish loading".into());
+            return Err("Wait for the practice fighters to finish loading".into()); // restriction: combo-save-wait-load
         }
         Ok(())
     }

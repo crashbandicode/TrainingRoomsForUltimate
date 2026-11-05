@@ -5,3 +5,9 @@ the 3 above it (playbook `docs/CHECKLIST.md`, the "cites an approved restriction
 
 | ID | Message | Why | Approved |
 | --- | --- | --- | --- |
+| `mii-class-unavailable` | `"{label} - unavailable"` (`src/editors/roster.rs`) | A greyed Mii tile: the role has no Mii of that class it can load (`docs/MII.md` row 17; the fork's behaviour). | operator 2026-11-05 ("approve all four") |
+| `replay-preview-fighter` | "Preview fighter is not available" (`src/model/macro_ui/replay_target.rs`) | The capture's fighter kind is not one the roster can load, so there is nothing to preview or switch to. | operator 2026-11-05 ("approve all four") |
+| `replay-mii-metadata` | "Recorded Mii metadata is unavailable" (`src/model/macro_ui/replay_target.rs`) | The capture's Mii could not be resolved, so Switch cannot load that exact Mii; Keep still plays the inputs. | operator 2026-11-05 ("approve all four") |
+| `replay-mii-loader-build` | "Replay Mii loading is unavailable in this build" (`src/model/macro_ui/replay_target.rs`) | Only builds without the Mii loader (`mii-ordinary-cpu-alpha` off); release builds have it. | operator 2026-11-05 ("approve all four") |
+| `combos-training-only` | "Combos work in Training" (`src/runtime/ui/combos.rs`) | The combo list and helper run in native Training; a waiting room's practice does not offer them yet. | operator 2026-11-05, for rc.5 only; rc.6 enables combos in lobby practice (p23/combos-lobby) |
+| `combo-save-wait-load` | "Wait for the practice fighters to finish loading" (`src/runtime/ui/combos.rs`) | The combo list opens only once the practice fighters have loaded (the panel is not up yet). | operator 2026-11-05 ("yes to both") |

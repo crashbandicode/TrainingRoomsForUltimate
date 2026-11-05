@@ -270,7 +270,7 @@ impl RosterEditor {
         let focus = usize::from(frame.tile_focus);
         if let Some(info) = self.grid.info(focus).filter(|info| info.kind().is_some_and(|kind| self.mii_blocked(kind))) {
             frame.help[1].clear();
-            let _ = write!(frame.help[1], "{} - unavailable", info.label);
+            let _ = write!(frame.help[1], "{} - unavailable", info.label); // restriction: mii-class-unavailable
         }
     }
 

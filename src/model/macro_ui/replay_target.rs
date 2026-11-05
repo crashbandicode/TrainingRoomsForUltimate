@@ -24,7 +24,7 @@ pub fn clip_target(
 ) -> Result<Option<Target>, String> {
     if crate::engine::mii::inventory::MiiClass::from_kind(kind as u32).is_none() {
         if crate::engine::swap::trio::TrioFighter::from_kind(kind as u32).is_none() {
-            return Err("Preview fighter is not available".into());
+            return Err("Preview fighter is not available".into()); // restriction: replay-preview-fighter
         }
         return Ok(Some(Target::fighter(kind as u32)));
     }
@@ -33,10 +33,10 @@ pub fn clip_target(
         return Err("Capture fighter identity changed".into());
     }
     if resolve_failed {
-        return Err("Recorded Mii metadata is unavailable".into());
+        return Err("Recorded Mii metadata is unavailable".into()); // restriction: replay-mii-metadata
     }
     if !mii_loader {
-        return Err("Replay Mii loading is unavailable in this build".into());
+        return Err("Replay Mii loading is unavailable in this build".into()); // restriction: replay-mii-loader-build
     }
     Ok(resolved.map(Target::mii))
 }
