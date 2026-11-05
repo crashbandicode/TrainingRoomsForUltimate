@@ -48,14 +48,29 @@ The RC is M5q parity plus the new UI and clean MIT provenance; this list is not 
 | Ten hot fighters plus five separate hot hats | Proven capacity behaviour kept; no separate 15-body feature. |
 | Saved/replay Mii bust provider (Q15) | No new provider or hook; the native saved-Mii selection stays. |
 | Frame/status text backgrounds (UI22) | Reverted to the pre-UI22 state. The input log and its light-background contrast are gone in rc.3 (the frame strip has its own backdrop). |
-| Named-macro library/preview extensions (F8 design C) | Exposed operations narrowed; basic capture and synchronization kept. |
-| State-destructor alternative | Never integrated. |
 | Further latency work (F6) | M5q cold-switch hitches kept; the zero-Unmapped and zero-allocation fixes stay. |
 | Hitbox sphere replacement | Done for fighter spheres in rc.3 (own discs, never refused). Projectiles keep the game's effect spheres. |
 | Remaining feature/edge-case inventory | Kept for later planning. |
 
 Timer-recording truncation is an observed TrainingRooms limitation with no established M5q equivalence; it is not
 called an inherited bug. (The input-log contrast went with the input log in rc.3.)
+
+The named-macro library and preview extensions (F8 design C) are done in rc.5 (`p23/replay-window`: Setup library,
+Edit placement, Replay window, and a named macro recorded on another fighter with Switch/Keep). The state-destructor
+alternative was dropped by the operator.
+
+## Next (operator 2026-11-05, DEFERRED-LIST)
+
+In this order (`docs/DECISIONS.md` DEFERRED-LIST on `review/menu-proposal` `6d19902`):
+
+- Combo: switch P1 to the combo's recorded fighter, with the same Switch/Keep prompt as a named macro.
+- Lobby Items (N11).
+- Ten hot fighters plus five hot hats; preloading starts on entering Training; no hitch on the first switch to a
+  fighter that is not preloaded yet (F6).
+- Saved/replay Mii busts in the Mii lists (Q15).
+- Backgrounds behind the plugin's notices and status texts (UI22).
+- Timer-recording truncation: root cause and fix.
+- Then F9 helper promotion, fixed seats and the hat/item cutover.
 
 ## Phase 2 N11: Lobby Items (operator order)
 
