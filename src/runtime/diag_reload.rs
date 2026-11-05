@@ -85,9 +85,20 @@ fn poll_pause_dump() {
     diagnostic(format_args!("[TrainingRooms] diag_pause_dump tag={tag} object=0x{menu:x} written={written}"));
 }
 
+/// `diag-hitbox-route.req`: the hitbox visualizer's route and A/B view (`model::hitbox_orbs::parse_request`), HB1 route A4
+/// prototype. Read and deleted once a second like the other requests.
+fn poll_hitbox_route() {
+    let Some(path) = FixedPath::<128>::in_root("diag-hitbox-route.req") else { return };
+    let Ok(bytes) = fs::read(path.as_str()) else { return };
+    let _ = fs::remove_file(path.as_str());
+    let request = crate::model::hitbox_orbs::parse_request(&String::from_utf8_lossy(&bytes));
+    crate::runtime::features::hitbox::set_request(request);
+}
+
 fn poll() {
     poll_item_request();
     poll_pause_dump();
+    poll_hitbox_route();
     let Some(path) = FixedPath::<128>::in_root(NAME) else { return };
     let Ok(bytes) = fs::read(path.as_str()) else { return };
     let _ = fs::remove_file(path.as_str());

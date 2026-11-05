@@ -271,8 +271,14 @@ pub const IDX_LOG_SHAFT: usize = IDX_LOG_GLYPH + LOG_ROWS * LOG_SLOTS;
 pub const IDX_LOG_HEAD: usize = IDX_LOG_SHAFT + LOG_ROWS * LOG_SLOTS;
 pub const IDX_LOG_FRAME: usize = IDX_LOG_HEAD + LOG_ROWS * LOG_SLOTS;
 pub const IDX_LOG_STATUS: usize = IDX_LOG_FRAME + LOG_ROWS;
+/// The hitbox visualizer's own orbs (`model::hitbox_orbs`, diag prototype of HB1 route A4): a container under
+/// `RootPane` and `ORBS` pictures of the plugin's own disc texture (`tr_orb_disc`, drawn by the layout builder), tinted by
+/// their vertex colours.
+pub const ORBS: usize = 192;
+pub const IDX_ORBS: usize = IDX_LOG_STATUS + LOG_ROWS;
+pub const IDX_ORB: usize = IDX_ORBS + 1;
 /// How many panes the plugin adds to the layout.
-pub const COUNT: usize = IDX_LOG_STATUS + LOG_ROWS;
+pub const COUNT: usize = IDX_ORB + ORBS;
 
 pub const fn log_slot(row: usize, slot: usize) -> usize {
     row * LOG_SLOTS + slot
@@ -323,6 +329,8 @@ pub const fn row_value_index(i: usize) -> usize {
 pub const fn name_of(index: usize) -> Name {
     match index {
         i if i >= IDX_ITEM_ICON && i < IDX_ITEM_ICON + ITEM_ICONS => Name::indexed("tr_item_", i - IDX_ITEM_ICON),
+        IDX_ORBS => Name::new("TrOrbs"),
+        i if i >= IDX_ORB && i < IDX_ORB + ORBS => Name::indexed(if i - IDX_ORB < 100 { "tr_oa_" } else { "tr_ob_" }, (i - IDX_ORB) % 100),
         IDX_MENU => ROOT,
         IDX_NOTICE => Name::new("TrModDisp0"),
         IDX_NOTICE_BASE => Name::new("TrModDisp0Base"),
@@ -429,6 +437,8 @@ pub const fn spec(index: usize) -> Spec {
     let name = name_of(index);
     match index {
         i if i >= IDX_ITEM_ICON && i < IDX_ITEM_ICON + ITEM_ICONS => rect(name, [0.0, 0.0, 64.0, 64.0], [255; 4], false),
+        IDX_ORBS => Spec { name, parent: ROOT_PANE, kind: Kind::Null, x: 0.0, y: 0.0, w: 1920.0, h: 1080.0, visible: false },
+        i if i >= IDX_ORB && i < IDX_ORB + ORBS => under(rect(name, [0.0, 0.0, 64.0, 64.0], [255; 4], false), name_of(IDX_ORBS)),
         IDX_MENU => Spec { name, parent: ROOT_PANE, kind: Kind::Null, x: 0.0, y: 0.0, w: 1920.0, h: 1080.0, visible: false },
         IDX_NOTICE => Spec { name, parent: ROOT_PANE, kind: Kind::Null, x: 0.0, y: 0.0, w: 1920.0, h: 1080.0, visible: false },
         IDX_NOTICE_BASE => under(rect(name, [0.0, 405.0, 1000.0, 150.0], NOTICE_BACKGROUND, true), name_of(IDX_NOTICE)),

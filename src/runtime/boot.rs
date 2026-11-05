@@ -318,6 +318,11 @@ fn run_inner() {
     if !ui::hud::register(hud_draw::draw) {
         diagnostic(format_args!("[TrainingRooms] hud draw not registered: every slot taken"));
     }
+    // HB1 route A4 prototype (diag only): the hitbox visualizer's own orbs draw from the same tick.
+    #[cfg(feature = "diag")]
+    if !ui::hud::register(hitbox::draw_orbs) {
+        diagnostic(format_args!("[TrainingRooms] orb draw not registered: every slot taken"));
+    }
 
     // Package 6: the CPU-as-P1 fallback (Q11). It installs only while the standalone CPU pilot is absent (`ui::install` found out
     // above) and only when the CPU core, the input hooks, the save-state natives and every game function it calls passed their guards.

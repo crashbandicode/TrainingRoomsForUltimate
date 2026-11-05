@@ -67,6 +67,9 @@ const BOUNDARIES: &[Boundary] = &[
     Boundary { function: "macros::after_layout_draw", owner: Some(Feature::NamedMacros), gate: Gate::Flag("ready") },
     // SPEC-core-06: the hitbox visualizer's per-fighter pass, called from the CPU core's frame wrapper: nothing until boot installs it.
     Boundary { function: "hitbox::frame", owner: Some(Feature::Hitbox), gate: Gate::Flag("INSTALLED") },
+    // HB1 route A4 prototype: the own orbs' layout-tick draw and the A/B view's call from the P1 input hook (diag builds).
+    Boundary { function: "hitbox::draw_orbs", owner: Some(Feature::Hitbox), gate: Gate::Flag("INSTALLED") },
+    Boundary { function: "hitbox::view_poll", owner: Some(Feature::Hitbox), gate: Gate::Flag("INSTALLED") },
     // The input display's reads in the input-delay hook: dormant until boot enables the display.
     Boundary { function: "input_display::on_p1_poll", owner: Some(Feature::InputDisplay), gate: Gate::Flag("ENABLED") },
     // The recorder's entry points the other features call: dormant until boot enables the recorder.
@@ -131,6 +134,7 @@ impl Analysis {
         let mut graph = Graph::scan(&root.join("src/runtime"), &["lobby", "mii", "roster", "seams"]);
         // Function-pointer tables the text cannot show: the layout tick runs the registered draw callbacks.
         graph.dynamic.push(("hud::run".to_owned(), "hud_draw::draw".to_owned()));
+        graph.dynamic.push(("hud::run".to_owned(), "hitbox::draw_orbs".to_owned()));
         // SPEC-core-06: the held-sphere state machine (`model::hitbox::HandleSet`, not scanned) calls back into the runtime's effect module.
         for (from, to) in [("hitbox::frame", "hitbox::sphere_alive"), ("hitbox::frame", "hitbox::sphere_kill_own"), ("hitbox::frame", "hitbox::sphere_spawn"), ("hitbox::hitbox_rebound_hook", "hitbox::sphere_alive"), ("hitbox::hitbox_rebound_hook", "hitbox::sphere_kill_own")] {
             graph.dynamic.push((from.to_owned(), to.to_owned()));

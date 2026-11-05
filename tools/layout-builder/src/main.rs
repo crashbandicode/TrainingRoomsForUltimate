@@ -15,7 +15,8 @@
 
 use nx_layout_toolbox::bflyt::{read_bflyt, write_bflyt, ClonePaneSpec, Color8, PaneEdit, BFLYT};
 use nx_layout_toolbox::sarc::{read_arc, write_arc};
-use nx_layout_toolbox::bntx::{read_bntx, write_bntx, pipeline::{import_png_file, ImportOptions}};
+use nx_layout_toolbox::bntx::{read_bntx, write_bntx, TextureFormat, pipeline::{import_dds, import_png_file, ImportOptions}};
+use nx_layout_toolbox::dds::Dds;
 
 #[path = "../../../src/model/archive_recipe.rs"]
 #[allow(dead_code)]
@@ -147,6 +148,39 @@ fn add_pane(layout: &mut BFLYT, spec: &Spec, waiting: bool) -> Result<()> {
     Ok(())
 }
 
+/// The orb disc's side in pixels.
+const ORB_DISC: u32 = 64;
+
+/// The hitbox orbs' texture (RGBA8, white): a disc whose opacity rises from a translucent middle to a brighter rim and fades
+/// over its last pixels, so a tinted pane reads as a sphere's outline; 4 x 4 samples per pixel for a smooth edge.
+fn orb_disc() -> Vec<u8> {
+    let alpha = |d: f32| -> f32 {
+        if d >= 1.0 {
+            return 0.0;
+        }
+        let rim = ((d - 0.70) / 0.30).max(0.0);
+        let a = 0.30 + 0.58 * rim * rim;
+        if d > 0.94 { a * (1.0 - d) / 0.06 } else { a }
+    };
+    let size = ORB_DISC as f32;
+    let centre = (size - 1.0) / 2.0;
+    let mut out = Vec::with_capacity((ORB_DISC * ORB_DISC * 4) as usize);
+    for y in 0..ORB_DISC {
+        for x in 0..ORB_DISC {
+            let mut total = 0.0;
+            for sy in 0..4 {
+                for sx in 0..4 {
+                    let dx = x as f32 + (sx as f32 + 0.5) / 4.0 - 0.5 - centre;
+                    let dy = y as f32 + (sy as f32 + 0.5) / 4.0 - 0.5 - centre;
+                    total += alpha((dx * dx + dy * dy).sqrt() / (size / 2.0));
+                }
+            }
+            out.extend_from_slice(&[255, 255, 255, (255.0 * total / 16.0).round() as u8]);
+        }
+    }
+    out
+}
+
 fn add_waiting_text_material(layout: &mut BFLYT) -> Result<()> {
     if layout.materials.iter().any(|m| m.name == OWNED_TEXT_MATERIAL) {
         return Err("owned text material already exists".into());
@@ -207,6 +241,25 @@ fn build(stock_path: &str, out: &str, waiting: bool) -> Result<()> {
         layout.add_material_from_template(&template, &texture, Some(&texture)).map_err(err("item material"))?;
         layout.set_pane(name.as_str(), &PaneEdit { bind_material: Some(texture), ..Default::default() })
             .map_err(err("item picture material"))?;
+    }
+    // The hitbox visualizer's own orbs: one disc texture drawn here (`orb_disc`, the plugin's own artwork, no picture file),
+    // one material, every orb picture bound to it; the panes' vertex colours tint it.
+    const ORB_TEXTURE: &str = "tr_orb_disc";
+    let disc = Dds {
+        format: TextureFormat::R8G8B8A8Unorm, width: ORB_DISC, height: ORB_DISC, depth: 1, mip_count: 1, array_count: 1,
+        is_cube: false, data: orb_disc(),
+    };
+    import_dds(&mut bntx, ORB_TEXTURE, &disc, None).map_err(err("import orb disc"))?;
+    let first_orb = panes::name_of(panes::IDX_ORB);
+    let orb_template_index = layout.find_pane(first_orb.as_str()).and_then(|p| p.picture.as_ref())
+        .ok_or("orb picture missing")?.material_index;
+    let orb_template = layout.materials.get(usize::from(orb_template_index)).ok_or("orb template material missing")?.name.clone();
+    layout.add_texture_ref(ORB_TEXTURE);
+    layout.add_material_from_template(&orb_template, ORB_TEXTURE, Some(ORB_TEXTURE)).map_err(err("orb material"))?;
+    for i in 0..panes::ORBS {
+        let name = panes::name_of(panes::IDX_ORB + i);
+        layout.set_pane(name.as_str(), &PaneEdit { bind_material: Some(ORB_TEXTURE.into()), ..Default::default() })
+            .map_err(err("orb picture material"))?;
     }
     arc.files[textures].data = write_bntx(&bntx).map_err(err("write item textures"))?;
     arc.files[index].data = write_bflyt(&layout).map_err(err("write bflyt"))?;
@@ -333,8 +386,8 @@ mod tests {
                 assert_eq!(a.parent, b.parent);
             }
         }
-        assert_eq!(roots, 3, "menu, notices and input log");
-        for root in [panes::IDX_MENU, panes::IDX_NOTICE, panes::IDX_LOG] {
+        assert_eq!(roots, 4, "menu, notices, input log and the hitbox orbs");
+        for root in [panes::IDX_MENU, panes::IDX_NOTICE, panes::IDX_LOG, panes::IDX_ORBS] {
             assert_eq!(waiting[root].parent, WAITING_PORT);
         }
     }

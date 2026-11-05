@@ -27,13 +27,14 @@
 //! fighter per frame as the hurt census (`[Hitbox] hurt census`: the parts, the first pass and the read cost).
 //! No allocation: the spheres and the handle sets are fixed storage, the Lua stack and attack data are read in place, and
 //! every entry point counts under a `HookScope`. The pass and the hooks run on the game thread.
-use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, AtomicU8, AtomicUsize, Ordering};
 
 use hos_lock::Mutex;
 
 use crate::model::cpu::hash::{hash40, lua_bind_hash};
 use crate::model::guard::GuardOutcome;
 use crate::model::hitbox::{self, layout, Cell, Counts, Effects, FrameFacts, Indices, SetTable, Shape, SleepBook, Sphere, StatusIds};
+use crate::model::hitbox_orbs::{self as orbs, Board, Orb, OrbSink, Route, View};
 use crate::model::install_line::{SiteReport, Written};
 use crate::model::scene::Scene;
 use crate::model::settings::Snapshot;
@@ -142,15 +143,228 @@ fn book_set(accessor: usize, slept: bool) {
 
 // ---- the spheres the plugin keeps (lead ruling 2026-11-02 on Q3) ------------------------------------------------------
 
-/// Every fighter's held spheres, the scratch list of the spheres a pass wants, and the save-state epoch each set last saw.
+/// Every fighter's held spheres, the scratch list of the spheres a pass wants, the save-state epoch each set last saw, the
+/// route each set was filled under, the A/B view epoch each set last applied, and the pass count each set was last seen at.
 struct Store {
     table: SetTable,
     seen_epoch: [u32; hitbox::FIGHTER_SETS],
     wants: [Sphere; hitbox::WANT_SCRATCH],
+    routes: [u8; hitbox::FIGHTER_SETS],
+    view_applied: [u32; hitbox::FIGHTER_SETS],
+    seen_pass: [u32; hitbox::FIGHTER_SETS],
+    passes: u32,
 }
 
-static STORE: Mutex<Store> =
-    Mutex::new(Store { table: SetTable::new(), seen_epoch: [0; hitbox::FIGHTER_SETS], wants: [Sphere::NONE; hitbox::WANT_SCRATCH] });
+static STORE: Mutex<Store> = Mutex::new(Store {
+    table: SetTable::new(),
+    seen_epoch: [0; hitbox::FIGHTER_SETS],
+    wants: [Sphere::NONE; hitbox::WANT_SCRATCH],
+    routes: [0; hitbox::FIGHTER_SETS],
+    view_applied: [0; hitbox::FIGHTER_SETS],
+    seen_pass: [0; hitbox::FIGHTER_SETS],
+    passes: 0,
+});
+
+// ---- own orbs (HB1 route A4, diag prototype; `model::hitbox_orbs`) ----------------------------------------------------
+//
+// The route is route B unless the diag build's request file (`diag-hitbox-route.req`, `runtime::diag_reload`) says
+// otherwise, so a release build behaves as before. With `Route::Orbs` no effect is requested: each held sphere becomes an
+// orb placed on its bone by the game's `joint_global_position_with_offset`, published on `BOARD`, and drawn by the layout
+// tick (`draw_orbs`) as one of the plugin's own disc panes. `Route::Both` keeps route B's effects and computes the orbs
+// beside them; `View` picks the layer shown, which flips on the identical frame while the game is paused (`view_poll`).
+
+static ROUTE: AtomicU8 = AtomicU8::new(0);
+static VIEW: AtomicU8 = AtomicU8::new(2);
+/// The last argument of the joint position call (`joint=0|1`).
+static JOINT_FLAG: AtomicBool = AtomicBool::new(false);
+/// Bumped by every request that changes the view: the sets re-apply route B's visibility.
+static VIEW_EPOCH: AtomicU32 = AtomicU32::new(1);
+static POLL_EPOCH: AtomicU32 = AtomicU32::new(1);
+static BOARD: Mutex<Board> = Mutex::new(Board::new());
+
+fn route() -> Route {
+    Route::from_code(ROUTE.load(Ordering::Acquire))
+}
+
+fn view() -> View {
+    View::from_code(VIEW.load(Ordering::Acquire))
+}
+
+/// Diag only: a request from `diag-hitbox-route.req`.
+#[cfg(feature = "diag")]
+pub fn set_request(request: orbs::Request) {
+    if let Some(route) = request.route {
+        ROUTE.store(route.code(), Ordering::Release);
+    }
+    if let Some(view) = request.view {
+        VIEW.store(view.code(), Ordering::Release);
+    }
+    if let Some(flag) = request.joint_flag {
+        JOINT_FLAG.store(flag, Ordering::Release);
+    }
+    let epoch = VIEW_EPOCH.fetch_add(1, Ordering::AcqRel) + 1;
+    let passes = STORE.lock().passes;
+    crate::runtime::diag_log::diagnostic(format_args!(
+        "[Hitbox] orbs request route={:?} view={:?} joint={} epoch={epoch} pass={passes}",
+        route(),
+        view(),
+        JOINT_FLAG.load(Ordering::Acquire)
+    ));
+}
+
+/// Clear set `i` with the effects interface of the route it was filled under; its orbs go too.
+fn clear_set(store: &mut Store, i: usize, accessor: usize) -> Counts {
+    BOARD.lock().clear(accessor);
+    if Route::from_code(store.routes[i]).effects() {
+        store.table.sets[i].clear(&mut effects(accessor))
+    } else {
+        store.table.sets[i].clear(&mut OrbSink { status: i32::MIN })
+    }
+}
+
+/// Place every sphere `set` holds on its bone and publish them as `accessor`'s orbs.
+unsafe fn publish_orbs(accessor: usize, set: &hitbox::HandleSet) -> usize {
+    let flag = JOINT_FLAG.load(Ordering::Acquire);
+    let mut placed = [Orb::NONE; hitbox::MAX_HELD];
+    let mut len = 0;
+    for sphere in set.spheres() {
+        if let Some(centre) = natives::joint_position(accessor, sphere.joint, &sphere.pos, flag) {
+            placed[len] = orbs::orb_of(sphere, centre);
+            len += 1;
+        }
+    }
+    BOARD.lock().publish(accessor, placed[..len].iter().copied())
+}
+
+/// Route B's spheres of set `i` shown or hidden for the A/B view (only under `Route::Both`).
+unsafe fn apply_view(store: &mut Store, i: usize, epoch: u32, force: bool) {
+    let key = store.table.key(i);
+    if key == 0 || Route::from_code(store.routes[i]) != Route::Both || (store.view_applied[i] == epoch && !force) {
+        return;
+    }
+    let (_, effects_shown) = orbs::layers(Route::Both, view());
+    for handle in store.table.sets[i].handles() {
+        natives::sphere_set_visible(key, handle, effects_shown);
+    }
+    store.view_applied[i] = epoch;
+}
+
+/// The orb panes of the layout last drawn into, resolved once per layout registration, and how many were shown.
+struct OrbPanes {
+    layout: usize,
+    registrations: u32,
+    container: usize,
+    panes: [usize; crate::model::panes::ORBS],
+    shown: usize,
+}
+
+static ORB_PANES: Mutex<OrbPanes> =
+    Mutex::new(OrbPanes { layout: 0, registrations: 0, container: 0, panes: [0; crate::model::panes::ORBS], shown: 0 });
+
+/// The layout tick's draw (`ui::hud`): every live orb projected with the game's own `world_to_screen` (so the orbs follow
+/// the camera, paused or not) and written into one of the plugin's disc panes; the rest hidden. A readiness boundary:
+/// nothing before boot installed the feature.
+///
+/// # Safety
+/// `layout` is the live layout the tick passed; called on the UI job thread inside the tick.
+pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
+    use crate::model::panes as p;
+    use crate::runtime::ui::{pane, tick};
+    if !INSTALLED.load(Ordering::Acquire) {
+        return;
+    }
+    let waiting = name == b"info_waiting";
+    let active = if waiting { crate::runtime::lobby::training::lobby::requested() } else { name == b"info_training" && scene::is_training() };
+    if !active || layout.is_null() {
+        return;
+    }
+    let _scope = HookScope::enter_hook(HookId::HitboxOrbs);
+    let (shown, _) = orbs::layers(route(), view());
+    let mut cache = ORB_PANES.lock();
+    if !shown && cache.shown == 0 {
+        return;
+    }
+    let registrations = tick::REGISTRATIONS.load(Ordering::Acquire);
+    if cache.layout != layout as usize || cache.registrations != registrations {
+        let root = (*layout).root_pane;
+        let parent = if waiting { pane::find_child(root, b"TrModPort") } else { root };
+        let container = pane::find_child(parent, p::name_of(p::IDX_ORBS).as_bytes());
+        cache.layout = layout as usize;
+        cache.registrations = registrations;
+        cache.container = container as usize;
+        cache.shown = 0;
+        for k in 0..p::ORBS {
+            cache.panes[k] = pane::find_child(container, p::name_of(p::IDX_ORB + k).as_bytes()) as usize;
+        }
+    }
+    if cache.container == 0 {
+        return;
+    }
+    let menu = crate::runtime::published::input_owners().contains(crate::model::input_delay::Owners::MENU);
+    let mut n = 0;
+    let mut over = 0;
+    if shown && SETTING.load(Ordering::Acquire) && !menu {
+        let half = match natives::screen_size_words() {
+            Some([w, h]) => [orbs::screen_half(w, orbs::SCREEN_HALF_DEFAULT[0]), orbs::screen_half(h, orbs::SCREEN_HALF_DEFAULT[1])],
+            None => [0.0; 2],
+        };
+        let board = BOARD.lock();
+        for orb in board.live() {
+            let [a, b] = orbs::edge_points(orb);
+            let (Some(c), Some(ea), Some(eb)) = (natives::world_to_screen(&orb.centre), natives::world_to_screen(&a), natives::world_to_screen(&b)) else { continue };
+            let Some(plan) = orbs::plan_pane(c, [ea, eb], half, orb.color) else { continue };
+            if n == p::ORBS {
+                over += 1;
+                continue;
+            }
+            let target = cache.panes[n] as *mut skyline::nn::ui2d::Pane;
+            if !target.is_null() {
+                pane::set_pos(target, plan.x, plan.y);
+                pane::set_width(target, plan.size);
+                pane::set_height(target, plan.size);
+                pane::set_rect_color(target, plan.color);
+                pane::set_visible(target, true);
+            }
+            n += 1;
+        }
+    }
+    for k in n..cache.shown {
+        let target = cache.panes[k] as *mut skyline::nn::ui2d::Pane;
+        if !target.is_null() {
+            pane::set_visible(target, false);
+        }
+    }
+    pane::set_visible(cache.container as *mut skyline::nn::ui2d::Pane, n != 0);
+    cache.shown = n;
+    #[cfg(feature = "diag")]
+    stats::orbs_drawn(n as u32, over);
+    #[cfg(not(feature = "diag"))]
+    let _ = over;
+}
+
+/// The input hook's call while the game may be paused (no fighter pass runs then): applies a new A/B view to route B's
+/// spheres of the fighters seen in the last passes, so both layers are shown on one frozen frame.
+///
+/// # Safety
+/// Called on the game thread from the P1 input hook.
+pub unsafe fn view_poll() {
+    if !INSTALLED.load(Ordering::Acquire) || route() != Route::Both {
+        return;
+    }
+    let epoch = VIEW_EPOCH.load(Ordering::Acquire);
+    if POLL_EPOCH.swap(epoch, Ordering::AcqRel) == epoch {
+        return;
+    }
+    let _scope = HookScope::enter_hook(HookId::HitboxOrbs);
+    let mut store = STORE.lock();
+    for i in 0..hitbox::FIGHTER_SETS {
+        if store.passes.wrapping_sub(store.seen_pass[i]) < orbs::STALE_PUBLISHES {
+            apply_view(&mut store, i, epoch, false);
+        }
+    }
+    #[cfg(feature = "diag")]
+    crate::runtime::diag_log::diagnostic(format_args!("[Hitbox] orbs view_poll view={:?} epoch={epoch} pass={}", view(), store.passes));
+}
 /// Spheres held by every fighter together (the per-frame pass skips everything when this is 0 and the setting is Off).
 static HELD: AtomicUsize = AtomicUsize::new(0);
 /// Bumped when a save state was loaded: every fighter's set kills its spheres on its next pass.
@@ -174,6 +388,7 @@ pub fn forget_fighter(fighter: usize) {
         store.table.sets[i].forget();
     }
     HELD.store(store.table.held_spheres(), Ordering::Relaxed);
+    BOARD.lock().clear(accessor);
 }
 
 /// The game's effect module of one fighter, as `model::hitbox::Effects`.
@@ -300,11 +515,10 @@ pub unsafe fn frame(fighter: usize) {
         return;
     }
     let visualizes = visualizes(accessor);
-    let mut fx = effects(accessor);
     if !visualizes || !ensure_ready() {
         // Not (or no longer) a practice fighter: its own spheres go, its effect flag is never touched.
         if let Some(i) = store.table.find(accessor) {
-            store.table.sets[i].clear(&mut fx);
+            clear_set(&mut store, i, accessor);
             HELD.store(store.table.held_spheres(), Ordering::Relaxed);
         }
         return;
@@ -321,14 +535,19 @@ pub unsafe fn frame(fighter: usize) {
     }
     let i = store.table.index_for(accessor);
     let epoch = RESTORE_EPOCH.load(Ordering::Acquire);
-    let Store { table, seen_epoch, wants } = &mut *store;
-    let set = &mut table.sets[i];
+    let route = route();
     let mut counts = Counts::default();
-    if seen_epoch[i] != epoch {
-        // A save state was loaded since this fighter's last pass: its spheres go and come back from the restored state.
-        seen_epoch[i] = epoch;
-        counts = set.clear(&mut fx);
+    if store.seen_epoch[i] != epoch || store.routes[i] != route.code() {
+        // A save state was loaded since this fighter's last pass, or the route changed: its spheres go and come back from the
+        // restored state, under the route now in force.
+        store.seen_epoch[i] = epoch;
+        counts = clear_set(&mut store, i, accessor);
+        store.routes[i] = route.code();
     }
+    store.passes = store.passes.wrapping_add(1);
+    store.seen_pass[i] = store.passes;
+    let Store { table, wants, .. } = &mut *store;
+    let set = &mut table.sets[i];
     // Route B (operator decision 2026-11-04 ~06:5xZ, `docs/DECISIONS.md` HB1-route, `review/menu-proposal` commit
     // `5ca5e3b`): while the setting is On the pass reads the HitModule (the relied `hurtbox_*` rows) and plans the
     // enabled parts' hurt spheres into the same wants, drawn from the same shared effect pool as the hit spheres
@@ -336,7 +555,12 @@ pub unsafe fn frame(fighter: usize) {
     // the dispatch takes first — reads no HitModule, so the shipped build's HitModule reads are On-only.
     let mut hurt = enabled.then(|| hitbox::GameHurt { accessor, load: mem_load });
     let hurt: Option<&mut dyn hitbox::HurtboxReader> = hurt.as_mut().map(|h| h as _);
-    let (c, len) = hitbox::reconcile_frame(set, facts, wants, &mut GameAttacks(accessor), hurt, &mut fx);
+    let (c, len) = if route.effects() {
+        hitbox::reconcile_frame(set, facts, wants, &mut GameAttacks(accessor), hurt, &mut effects(accessor))
+    } else {
+        hitbox::reconcile_frame(set, facts, wants, &mut GameAttacks(accessor), hurt, &mut OrbSink { status })
+    };
+    let placed = if route.orbs() { publish_orbs(accessor, set) } else { 0 };
     #[cfg(feature = "diag")]
     let (hits, hurts) = {
         let hits = wants[..len].iter().filter(|s| s.key >> 24 == hitbox::KIND_HIT).count() as u32;
@@ -346,15 +570,22 @@ pub unsafe fn frame(fighter: usize) {
     stats::wanted(hits, hurts);
     #[cfg(not(feature = "diag"))]
     let _ = len;
+    let held_now = set.len();
+    HELD.store(table.held_spheres(), Ordering::Relaxed);
+    if route == Route::Both {
+        apply_view(&mut store, i, VIEW_EPOCH.load(Ordering::Acquire), c.spawned != 0);
+    }
+    drop(store);
     counts.kept += c.kept;
     counts.spawned += c.spawned;
     counts.killed += c.killed;
     counts.ended += c.ended;
     counts.failed += c.failed;
     counts.dropped += c.dropped;
-    let held_now = set.len();
-    HELD.store(table.held_spheres(), Ordering::Relaxed);
-    drop(store);
+    #[cfg(feature = "diag")]
+    stats::orbs_pass(i, route, placed as u32, held_now as u32, c.failed);
+    #[cfg(not(feature = "diag"))]
+    let _ = placed;
     // The diag hurt census (decision HB1): a second HitModule read per fighter per frame over the pass's own read,
     // for the census line's parts/first-pass/cost fields; no sphere is requested by the census itself, and the
     // shipped build has no census at all (the module notes).
@@ -446,7 +677,7 @@ pub unsafe fn hitbox_rebound_hook(accessor: usize, rebound: bool) {
     if hitbox::kill_on_rebound(rebound, true, true, shielding) {
         let mut store = STORE.lock();
         if let Some(i) = store.table.find(accessor) {
-            let c = store.table.sets[i].clear(&mut effects(accessor));
+            let c = clear_set(&mut store, i, accessor);
             HELD.store(store.table.held_spheres(), Ordering::Relaxed);
             #[cfg(feature = "diag")]
             stats::rebound_cleared(c.killed);
@@ -640,6 +871,32 @@ mod stats {
 
     pub fn rebound_cleared(killed: u32) {
         diagnostic(format_args!("[Hitbox] rebound cleared: killed={killed}"));
+    }
+
+    // ---- own orbs (HB1 route A4 prototype) ----------------------------------------------------------------------------
+
+    static PASS_NO: AtomicU32 = AtomicU32::new(0);
+    static LAST_ORB_PASS: [AtomicU64; hitbox::FIGHTER_SETS] = [const { AtomicU64::new(u64::MAX) }; hitbox::FIGHTER_SETS];
+    static LAST_DRAWN: AtomicU64 = AtomicU64::new(u64::MAX);
+
+    /// One fighter's (set `set`) pass: a line whenever its route, placed orbs, held spheres or refused requests change
+    /// (route B's `failed` of the same pass beside the orbs' placed count).
+    pub fn orbs_pass(set: usize, route: super::Route, placed: u32, held: u32, failed: u32) {
+        let pass = PASS_NO.fetch_add(1, Ordering::Relaxed) + 1;
+        let key = (u64::from(route.code()) << 48) | (u64::from(placed) << 32) | (u64::from(held) << 16) | u64::from(failed);
+        if LAST_ORB_PASS[set % hitbox::FIGHTER_SETS].swap(key, Ordering::Relaxed) != key && (route.orbs() || failed != 0) {
+            diagnostic(format_args!("[Hitbox] orbs pass set={set} route={route:?} placed={placed} held={held} failed={failed} pass={pass}"));
+        }
+    }
+
+    /// One layout tick's draw: a line whenever the number of orb panes shown changes, with the pass number it was drawn at
+    /// (a paused game draws at one pass number).
+    pub fn orbs_drawn(n: u32, over: u32) {
+        let pass = PASS_NO.load(Ordering::Relaxed);
+        let key = (u64::from(n) << 32) | u64::from(over);
+        if LAST_DRAWN.swap(key, Ordering::Relaxed) != key {
+            diagnostic(format_args!("[Hitbox] orbs drawn n={n} over={over} view={:?} pass={pass}", super::view()));
+        }
     }
 
     // ---- the hurt census (decision HB1) -------------------------------------------------------------------------------
