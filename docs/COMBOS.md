@@ -92,7 +92,8 @@ move, not one fighter's moves, so a combo recorded on one fighter can be practis
 - **Unknown fields are ignored**, at the top and inside links and steps, so you can add your own notes. A rename keeps
   them.
 - **A file that cannot be used** is skipped: the list shows the others. A notice names the first such file and the
-  reason, for example `typo.json skipped: bad combo field: to`, and adds "(+N more)" when there are several. Reasons:
+  reason, for example `typo.json skipped: malformed file: bad combo field: to` (a misspelt follow-up move), and adds
+  "(+N more)" when there are several. Reasons:
   - a misspelt move, button or aim;
   - a missing or empty `links`;
   - more than 16 links or 4 steps;

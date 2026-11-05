@@ -100,7 +100,7 @@ fn a_bad_file_is_skipped_with_its_name_and_reason_and_the_others_stay() {
     assert_eq!(listing.entries.iter().map(|e| e.name.as_str()).collect::<Vec<_>>(), ["Good"]);
     let reasons: Vec<(&str, &str)> = listing.skipped.iter().map(|s| (s.file.as_str(), s.reason.as_str())).collect();
     assert_eq!(reasons.len(), 3, "{reasons:?}");
-    assert!(reasons.iter().any(|(f, r)| *f == "typo.json" && r.contains("to")), "{reasons:?}");
+    assert!(reasons.contains(&("typo.json", "malformed file: bad combo field: to")), "the text docs/COMBOS.md shows: {reasons:?}");
     assert!(reasons.iter().any(|(f, r)| *f == "newer.json" && r.contains("schema version 2")), "{reasons:?}");
     assert!(reasons.iter().any(|(f, r)| *f == "broken.json" && r.contains("malformed")), "{reasons:?}");
     // One notice: the first file, its reason, and how many more.
