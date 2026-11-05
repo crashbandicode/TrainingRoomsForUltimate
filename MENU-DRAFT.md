@@ -268,7 +268,7 @@ outside the menu.
 | Character Extras | — | Preload Samples | single | On, Off | Off | ours | sparse timing/memory samples |
 | Character Extras | — | Ready Fighter Bodies | single | Off, 2, 3 | native max (3) | ours | names from `cycle_preload_config.rs` test `ALL_NAMES` |
 | Character Extras | — | Group Swap | single | On, Off | On | ours | master switch for the group rows |
-| Character Extras | — | Ready Fighters | single | total across roles | 8 | ours | |
+| Character Extras | — | Ready Fighters | single | total across roles | 10 | ours | |
 | Character Extras | — | Ice Climbers Pair Bank | single | On, Off | On | ours | needs 3 bodies |
 | Character Extras | — | Original Fighter Bank | single | On, Off | On | ours | |
 | Character Extras | — | Solo Popo Groups | single | On, Off | On | ours | needs Group Swap |
@@ -376,7 +376,7 @@ change, so existing settings files load as they are (the retired
 | Fighters & Stages | Stages | Stage Hazards | toggle | On, Off | Off | upstream | from Misc; grouped with the stage rows (mockup v1's placement, adopted) |
 | Fighters & Stages | Loading *(advanced)* | Cycle Preload | dropdown | Off, 1–5 | built-in max | ours | was single |
 | Fighters & Stages | Loading *(advanced)* | Preload | dropdown | Fighters, Hats, Both | Both | ours | was "Preload Sources" |
-| Fighters & Stages | Loading *(advanced)* | Ready Fighters | number | total across roles | 8 | ours | was single |
+| Fighters & Stages | Loading *(advanced)* | Ready Fighters | number | total across roles | 10 | ours | was single |
 | Fighters & Stages | Loading *(advanced)* | Ready Fighter Bodies | dropdown | Off, 2, 3 | native max (3) | ours | was single |
 | Fighters & Stages | Loading *(advanced)* | Group Swap | toggle | On, Off | On | ours | master switch |
 | Fighters & Stages | Loading *(advanced)* | Swap groups | multi-select | Ice Climbers pair bank, Original fighter bank, Solo Popo groups, Ice Climbers pair groups, PT/Aegis groups, Ice Climbers pair group, Mii groups | all on | ours | replaces 7 toggle rows; entries grey with the reason when a dependency is off |

@@ -2265,7 +2265,7 @@
    "dest": "src/model/preload/cycle_preload_config.rs",
    "crate": "consts",
    "src_sha256": "49c8a777d9e7c728aa8ecc7a51df2f7990f3edf458fdf7163be3b82fa9e3bf01",
-   "dest_sha256": "985f142ef73c32955afab08e7a51c2afa130ed2c8fbaf1fab25709d5be160c25",
+   "dest_sha256": "dc73cd77352b18f95133881e638e5b8b58f7dfb83bf613a9dffd314de4f46ff5",
    "edits": [
     {
      "delete_from": "// The exported menu macro resolves these names at its use site.\nmod bank_submenu {",
@@ -2306,6 +2306,21 @@
      "old": "    if file.write_all(text.as_bytes()).is_err() {\n        return Err(\"could not write cycle preload ini\");\n    }\n    let _ = file.sync_all();\n    Ok(())",
      "new": "    if file.write_all(text.as_bytes()).is_err() || file.sync_all().is_err() {\n        return Err(\"could not write cycle preload ini\");\n    }\n    Ok(())",
      "reason": "R1 durable publish: the temporary file is flushed to storage and a failed flush fails the store before the rename retires the live file (the fork ignored the sync_all result); offered back to the fork through the fix ledger"
+    },
+    {
+     "old": "/// room for this many built bodies. The runtime still bounds every group.\npub const READY_FIGHTERS_MAX: u8 = 12;\n/// Operator target: eight hot-swappable fighters across Player and CPU.\npub const READY_FIGHTERS_DEFAULT: u8 = 8;\n\npub const fn valid_ready_fighters(total: u8) -> bool {\n",
+     "new": "/// room for this many built bodies. The runtime still bounds every group.\npub const READY_FIGHTERS_MAX: u8 = 12;\n/// Operator target (DECISIONS 2026-11-02, P-HOT): ten hot fighters across Player and CPU, the two\n/// active fighters included.\npub const READY_FIGHTERS_DEFAULT: u8 = 10;\n\npub const fn valid_ready_fighters(total: u8) -> bool {\n",
+     "reason": "P-HOT section 3.2 (DECISIONS 2026-11-02, operator: ten hot fighters including both active fighters): Ready Fighters defaults to 10"
+    },
+    {
+     "old": "\n    #[test]\n    fn group_swap_and_ready_fighters_default_on_and_eight_and_reject_bad_values() {\n        const { assert!(Settings::DEFAULT.group_swap) };\n        assert_eq!(Settings::DEFAULT.ready_fighters, READY_FIGHTERS_DEFAULT);\n        assert_eq!(READY_FIGHTERS_DEFAULT, 8);\n        assert!(Settings::DEFAULT.groups_enabled());\n        assert!(!Settings::FAIL_CLOSED.groups_enabled() && !Settings::CLOSED.groups_enabled());\n",
+     "new": "\n    #[test]\n    fn group_swap_and_ready_fighters_default_on_and_ten_and_reject_bad_values() {\n        const { assert!(Settings::DEFAULT.group_swap) };\n        assert_eq!(Settings::DEFAULT.ready_fighters, READY_FIGHTERS_DEFAULT);\n        assert_eq!(READY_FIGHTERS_DEFAULT, 10, \"P-HOT: ten hot fighters, both active fighters included\");\n        assert!(Settings::DEFAULT.groups_enabled());\n        assert!(!Settings::FAIL_CLOSED.groups_enabled() && !Settings::CLOSED.groups_enabled());\n",
+     "reason": "P-HOT section 3.2 (DECISIONS 2026-11-02, operator: ten hot fighters including both active fighters): Ready Fighters defaults to 10"
+    },
+    {
+     "old": "        assert_eq!(crate::engine::compat::menu::BASE_MENU.cycle_preload_group_swap, OnOff::ON);\n        assert_eq!(crate::engine::compat::menu::BASE_MENU.cycle_preload_ready_fighters, default_ready_fighters());\n        assert_eq!(default_ready_fighters(), CyclePreloadReadyFighters::EIGHT);\n        let text = render(Settings::DEFAULT);\n        assert!(text.contains(\"\\ngroup_swap=on\\n\") && text.contains(\"\\nready_fighters=8\\n\"));\n\n        // Older files without the keys keep the built-in choices.\n",
+     "new": "        assert_eq!(crate::engine::compat::menu::BASE_MENU.cycle_preload_group_swap, OnOff::ON);\n        assert_eq!(crate::engine::compat::menu::BASE_MENU.cycle_preload_ready_fighters, default_ready_fighters());\n        assert_eq!(default_ready_fighters(), CyclePreloadReadyFighters::TEN);\n        let text = render(Settings::DEFAULT);\n        assert!(text.contains(\"\\ngroup_swap=on\\n\") && text.contains(\"\\nready_fighters=10\\n\"));\n\n        // Older files without the keys keep the built-in choices.\n",
+     "reason": "P-HOT section 3.2 (DECISIONS 2026-11-02, operator: ten hot fighters including both active fighters): Ready Fighters defaults to 10"
     }
    ]
   },

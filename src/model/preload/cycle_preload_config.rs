@@ -104,8 +104,9 @@ pub const READY_FIGHTERS_MIN: u8 = 2;
 /// bodies; two visible roles, up to five helpers and a six-body reserve leave
 /// room for this many built bodies. The runtime still bounds every group.
 pub const READY_FIGHTERS_MAX: u8 = 12;
-/// Operator target: eight hot-swappable fighters across Player and CPU.
-pub const READY_FIGHTERS_DEFAULT: u8 = 8;
+/// Operator target (DECISIONS 2026-11-02, P-HOT): ten hot fighters across Player and CPU, the two
+/// active fighters included.
+pub const READY_FIGHTERS_DEFAULT: u8 = 10;
 
 pub const fn valid_ready_fighters(total: u8) -> bool {
     total >= READY_FIGHTERS_MIN && total <= READY_FIGHTERS_MAX
@@ -2123,10 +2124,10 @@ mod tests {
     }
 
     #[test]
-    fn group_swap_and_ready_fighters_default_on_and_eight_and_reject_bad_values() {
+    fn group_swap_and_ready_fighters_default_on_and_ten_and_reject_bad_values() {
         const { assert!(Settings::DEFAULT.group_swap) };
         assert_eq!(Settings::DEFAULT.ready_fighters, READY_FIGHTERS_DEFAULT);
-        assert_eq!(READY_FIGHTERS_DEFAULT, 8);
+        assert_eq!(READY_FIGHTERS_DEFAULT, 10, "P-HOT: ten hot fighters, both active fighters included");
         assert!(Settings::DEFAULT.groups_enabled());
         assert!(!Settings::FAIL_CLOSED.groups_enabled() && !Settings::CLOSED.groups_enabled());
         assert!(!Settings { group_swap: false, ..Settings::DEFAULT }.groups_enabled());
@@ -2135,9 +2136,9 @@ mod tests {
         assert!(!Settings { fighters: false, hats: true, ..Settings::DEFAULT }.groups_enabled());
         assert_eq!(crate::engine::compat::menu::BASE_MENU.cycle_preload_group_swap, OnOff::ON);
         assert_eq!(crate::engine::compat::menu::BASE_MENU.cycle_preload_ready_fighters, default_ready_fighters());
-        assert_eq!(default_ready_fighters(), CyclePreloadReadyFighters::EIGHT);
+        assert_eq!(default_ready_fighters(), CyclePreloadReadyFighters::TEN);
         let text = render(Settings::DEFAULT);
-        assert!(text.contains("\ngroup_swap=on\n") && text.contains("\nready_fighters=8\n"));
+        assert!(text.contains("\ngroup_swap=on\n") && text.contains("\nready_fighters=10\n"));
 
         // Older files without the keys keep the built-in choices.
         let older = "[cycle_preload]\nslots=2\nsources=both\nmeasurements=on\nbank_members=3\n";

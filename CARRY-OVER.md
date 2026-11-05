@@ -689,3 +689,10 @@ pkg6 files (`cycle_preload_policy.rs`, `body_bank.rs`, `body_bank/memory.rs`, `s
 `frame85_group_refused_by_headroom_then_admitted`, `held_group_counts_apart_from_failed`,
 `held_groups_retry_after_planned_and_rotate`, `held_fighters_read_waiting_not_failed`,
 `held_group_at_a_swap_is_disposed_like_planned`, `tests/group_hold_wiring.rs`.
+
+### p23/hot-slots: Ready Fighters defaults to 10 (2026-11-05, P-HOT §3.2)
+
+The fork defaults Ready Fighters to 8 (`cycle_preload_config.rs`, row 102 above). P-HOT sets 10, both active fighters
+included (DECISIONS 2026-11-02, the operator's "ten total hot fighters"): 3 recorded manifest edits of
+`cycle_preload_config.rs` (the constant and its test), `factory.rs` index 8, `tests/core02_menu.rs`. Saved settings keep
+their value; only a new or reset profile gets 10.

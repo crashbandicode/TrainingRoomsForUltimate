@@ -180,7 +180,8 @@ const SPEC_TABLE: &[(&str, Kind, usize, &[usize])] = &[
     ("cycle_preload_slots", Kind::Single, 6, &[5]),
     ("cycle_preload_sources", Kind::Single, 3, &[2]),
     ("cycle_preload_bank_members", Kind::Single, 3, &[2]),
-    ("cycle_preload_ready_fighters", Kind::Single, 11, &[6]),
+    // P-HOT: Ready Fighters 2..=12 starts at 10 (index 8).
+    ("cycle_preload_ready_fighters", Kind::Single, 11, &[8]),
     ("cycle_preload_group_swap", Kind::Single, 2, &[0]),
     ("cycle_preload_ic_pair_bank", Kind::Single, 2, &[0]),
     ("cycle_preload_original_bank", Kind::Single, 2, &[0]),
@@ -561,9 +562,9 @@ fn number_row_steps_and_clamps() {
     }
     m.press(Button::A);
     assert_eq!(m.settings().menu.input_delay(), 5);
-    // Ready Fighters runs 2..=12 and starts at 8.
+    // Ready Fighters runs 2..=12 and starts at 10 (P-HOT).
     goto(&mut m, "cycle_preload_ready_fighters");
-    assert_eq!(m.value(row_of("cycle_preload_ready_fighters")), RowValue::Number(Some(8)));
+    assert_eq!(m.value(row_of("cycle_preload_ready_fighters")), RowValue::Number(Some(10)));
     for _ in 0..10 {
         m.press(Button::Right);
     }

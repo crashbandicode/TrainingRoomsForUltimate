@@ -167,8 +167,8 @@ pub static DEFS: [Def; COUNT] = [
     row!("cycle_preload_sources", Single, 3, [2]),
     // Ready Fighter Bodies: Off, 2, 3 (the native maximum, 3).
     row!("cycle_preload_bank_members", Single, 3, [2]),
-    // Ready Fighters 2..=12: 8 is index 6.
-    row!("cycle_preload_ready_fighters", Single, 11, [6]),
+    // Ready Fighters 2..=12: 10 is index 8.
+    row!("cycle_preload_ready_fighters", Single, 11, [8]),
     // Group Swap and the seven group switches, all On.
     row!("cycle_preload_group_swap", Single, 2, [0]),
     row!("cycle_preload_ic_pair_bank", Single, 2, [0]),

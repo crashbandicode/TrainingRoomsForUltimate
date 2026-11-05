@@ -488,7 +488,7 @@ PAGES = [
         ("Loading", True, [
             ("Cycle Preload", "drop", "5 (built-in max)", "ours"),
             ("Preload", "drop", "Both", "ours"),
-            ("Ready Fighters", "number", "8", "ours"),
+            ("Ready Fighters", "number", "10", "ours"),
             ("Ready Fighter Bodies", "drop", "3", "ours"),
             ("Group Swap", "toggle", "ON", "ours"),
             ("Swap groups", "multi", "7 of 7 selected", "ours"),
