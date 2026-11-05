@@ -153,3 +153,11 @@ ceiling = 139982
 date = "2026-11-05"
 reason = "rc.4 candidate (p23/rc4-candidate): the rc.3 candidate + the combo helper + the Mii editor bring-over + the rc.3 review fixes merged; measured 139982 at ea3e531 (tools/sloc.py), 137841 + 1834 + 171 + 136, the lane entries above"
 approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed' (rc.3 features)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 138089
+date = "2026-11-05"
+reason = "rc.4: seam checks read this plugin's own writes as the bytes they replaced (p23/seam-self, root cause of rc.2's Change Stage skip); measured 138089 at c8682d8 (tools/size_gate.py), +248 over 137841"
+approved_by = "Operator 2026-11-05 via primary 35137355 (seam-self order, 16:30Z): 'Raise as needed', an exact entry"

@@ -23,8 +23,9 @@ use crate::runtime::game;
 ///
 /// The practice observer runs first, as the fork does (`src/lib.rs`: `practice_stage_observer::init` before
 /// `lobby_stage_probe::init`, "Verify original resource instructions before the entry probe patches them"): its seam group reads
-/// `lobby_stage.resource_request` (`0x25f7874`), which `lobby_stage::init` then hooks. In the other order the row reads our own
-/// hook (`occupied`), the authoritative group skips all its sites and no stage request is ever served (rc.2's Direct pick).
+/// `lobby_stage.resource_request` (`0x25f7874`), which `lobby_stage::init` then hooks. rc.2 had the other order: the row read our own
+/// hook (`occupied`) and the group skipped all its sites. The seam installer now reads our own writes as the bytes they replaced
+/// (`seam_install::prime` / `seal`, `model::own_patches`), so either order verifies; this one stays the fork's.
 pub(crate) fn init() {
     training::lobby::init();
     #[cfg(feature = "practice-stage")]

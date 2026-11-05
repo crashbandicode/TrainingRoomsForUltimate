@@ -283,6 +283,52 @@ const fn own_hook_pairs(tables: &[&[Seam]]) -> [(&'static str, &'static str); OW
 /// that rule (`Site::own_hook`, and the installer's registration of the hook's replacement address).
 pub static OWN_HOOK_PAIRS: [(&str, &str); OWN_HOOK_ROWS] = own_hook_pairs(&TABLES);
 
+/// A compared hook row: a site in code this plugin writes (`model::own_patches`).
+const fn writes_code(seam: &Seam) -> bool {
+    matches!(seam.kind, SeamKind::Hook { .. }) && seam.compared() && matches!(region_of(seam.offset), Some(MainRegion::Text))
+}
+
+const fn patch_rows(tables: &[&[Seam]]) -> usize {
+    let (mut n, mut t) = (0, 0);
+    while t < tables.len() {
+        let rows = tables[t];
+        let mut i = 0;
+        while i < rows.len() {
+            if writes_code(&rows[i]) {
+                n += 1;
+            }
+            i += 1;
+        }
+        t += 1;
+    }
+    n
+}
+
+/// Compared hook rows in code: the installer records the bytes at each (`seam_install::prime` / `seal`).
+pub const PATCH_ROWS: usize = patch_rows(&TABLES);
+
+const fn patch_sites(tables: &[&[Seam]]) -> [usize; PATCH_ROWS] {
+    let mut out = [0; PATCH_ROWS];
+    let (mut n, mut k, mut t) = (0, 0, 0);
+    while t < tables.len() {
+        let rows = tables[t];
+        let mut i = 0;
+        while i < rows.len() {
+            if writes_code(&rows[i]) {
+                out[n] = k;
+                n += 1;
+            }
+            i += 1;
+            k += 1;
+        }
+        t += 1;
+    }
+    out
+}
+
+/// The global index (`SITES`) of every compared hook row in code, in table order.
+pub static PATCH_SITES: [usize; PATCH_ROWS] = patch_sites(&TABLES);
+
 const fn entry_or_body_count(tables: &[&[Seam]]) -> usize {
     let (mut n, mut t) = (0, 0);
     while t < tables.len() {
