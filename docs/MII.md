@@ -37,10 +37,18 @@ for it are in `artifacts/phase23/rc4-combined/rows-mii/` and have not run yet.
 
 ## Kept different on purpose, or not carried
 
-- **Replay Window retry and exact-Mii named macros.** In the fork, choosing a capture's track in Recording → Replay
-  Window retried a missed import and loaded that exact Mii on the CPU, and a named macro could carry a Mii. Here those
-  are part of the advanced recording workflows the RC leaves out (`ADVANCED_RECORDING_WORKFLOWS = false`). The Mii code
-  behind them is carried but not reachable.
+- **Replay Window retry and exact-Mii named macros: ported 2026-11-05** (operator: "yes port enable the fork's Replay
+  Window retry / exact-Mii named macros"). Recording → Named macros → **Replay window** is back. Choosing a capture's
+  Mii track retries a missed import (`workflows::clip_target` answers "not resolved", and the window resolves the
+  recorded Mii before it asks), then Switch loads that exact Mii on the CPU. A clip saved from it carries the Mii, and
+  loading that named macro offers Switch (restore the Mii) or Keep (play on the current CPU). The RC flag
+  `ADVANCED_RECORDING_WORKFLOWS` became `engine::macro_ui::workflows::RELEASE` (`src/model/macro_ui/workflows.rs`,
+  host tests beside it).
+- **Still closed, as in the RC:**
+  - switching the CPU to a recorded *ordinary* (non-Mii) fighter, from the window or a named macro: an ordinary track
+    plays on the current CPU, and an ordinary named macro recorded with another fighter waits for that fighter;
+  - the Setup library;
+  - Edit placement.
 - **Editor trace file** (`mii-editor-last.json`): diagnostic builds only; the fork wrote it in every build.
 - **Menu input gate:** the editor also waits while the game's pause or the native waiting-room menu is open (the
   shared `captures_input`), not only for the plugin menu.

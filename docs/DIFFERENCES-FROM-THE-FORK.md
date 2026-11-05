@@ -30,8 +30,8 @@ This page lists only the changes, each checked against the code of 0.2.0-rc.3 (`
 | Grids page more densely: 5×8 docked, 4×4 handheld. | `src/model/menu/grid.rs:76-77` |
 | Fighter grids show the game's own stock icons, loaded at run time through the game's mod-aware loader, so modded icons show. | `src/runtime/roster/character_roster.rs:2168-2174` |
 | The DI and SDI chips show the game's own DI line and SDI streak (the streak drawn ×2.0). | `src/model/effect_chips.rs:7-16` |
-| Menu shortcuts 1 and 2 are edited in the menu with a chord editor, apply at once and are saved to `button_config.ini`. B + D-pad Up always opens the menu. | `src/model/menu/table.rs:396-399` |
-| A *Replay capture* row writes `replay_capture.ini`; the Online Deluxe overlay's row shows the same value. | `src/model/menu/table.rs:334`, `src/runtime/deluxe_row.rs:31` |
+| Menu shortcuts 1 and 2 are edited in the menu with a chord editor, apply at once and are saved to `button_config.ini`. B + D-pad Up always opens the menu. | `src/model/menu/table.rs:422-425` |
+| A *Replay capture* row writes `replay_capture.ini`; the Online Deluxe overlay's row shows the same value. | `src/model/menu/table.rs:345`, `src/runtime/deluxe_row.rs:31` |
 
 ![Fighter grid with cycle badges](media/cycle-badges.gif)
 
