@@ -76,7 +76,7 @@ fn the_orb_panes_cover_four_full_fighters() {
     assert_eq!(model::panes::ORBS, orbs::ORB_FIGHTERS * MAX_HELD);
     let mut board = Board::new();
     for f in 0..orbs::ORB_FIGHTERS {
-        let kind = |i: usize| if i % 8 == 0 { hitbox::KIND_HIT } else { hitbox::KIND_HURT };
+        let kind = |i: usize| if i.is_multiple_of(8) { hitbox::KIND_HIT } else { hitbox::KIND_HURT };
         assert_eq!(board.publish((f + 1) << 8, (0..MAX_HELD).map(|i| orb_of_kind(i as f32, kind(i)))), MAX_HELD);
     }
     assert_eq!(board.in_draw_order().count(), model::panes::ORBS, "every orb of a full board has a pane");
