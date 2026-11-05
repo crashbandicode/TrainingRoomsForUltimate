@@ -185,3 +185,11 @@ ceiling = 140171
 date = "2026-11-05"
 reason = "Lobby Items (Phase 2 N11, p23/lobby-items) on the rc.4 candidate ff69e53: the row, the policy, the spawner switch hook, the one removal and the seam rows; measured 140171 at c52859f (tools/size_gate.py), +189 over 139982"
 approved_by = "Operator 2026-11-05 via primary (P-N11 order, ~18:15Z): 'Raise as needed'"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 140564
+date = "2026-11-05"
+reason = "rc.5 candidate with Lobby Items (primary order 2026-11-05 18:58Z): p23/lobby-items d253092 merged into p23/rc5-candidate; measured 140564 at 6d76742 (tools/size_gate.py) = 140375 (the rc.5 candidate entry above) + 189 (Lobby Items, its lane entry)"
+approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed'"
