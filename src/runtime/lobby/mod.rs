@@ -6,6 +6,8 @@
 
 pub(crate) mod automation_helper;
 pub(crate) mod game_mode;
+#[cfg(feature = "practice-stage")]
+pub(crate) mod lobby_items;
 pub(crate) mod lobby_stage;
 #[cfg(feature = "practice-stage")]
 pub(crate) mod practice_stage;
@@ -29,6 +31,9 @@ pub(crate) fn init() {
     training::lobby::init();
     #[cfg(feature = "practice-stage")]
     practice_stage::init();
+    // Lobby Items (N11) compares the observer's item-gate rows too; its own hook site is nobody else's.
+    #[cfg(feature = "practice-stage")]
+    lobby_items::init();
     lobby_stage::init();
 }
 
@@ -129,6 +134,9 @@ pub(crate) unsafe fn frame(fighter: usize) {
             crate::runtime::roster::character_items::on_frame(body);
 
             drop(_items);
+            // Lobby Items (N11): the one removal an Off edge owes in the waiting room (nothing on the other frames).
+            #[cfg(feature = "practice-stage")]
+            lobby_items::frame();
             let _preload = HookScope::enter_hook(HookId::RosterPreload);
             crate::runtime::roster::cycle_preload::on_frame(&mut *body);
         }

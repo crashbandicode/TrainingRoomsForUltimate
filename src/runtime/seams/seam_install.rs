@@ -53,6 +53,7 @@ use crate::model::version as model;
 /// shadow: the groups no shipped build compiles (`automation_helper_*`, `kirby_resource_probe`,
 /// `console_map_probe`, `native_unlink_probe`, `practice_trace`, `source_lifecycle_probe`).
 const AUTHORITATIVE: &[&str] = &[
+    "lobby_items",
     "native_body_bank",
     "character_roster",
     "character_lifecycle",

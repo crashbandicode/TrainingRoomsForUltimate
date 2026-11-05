@@ -66,3 +66,14 @@ removes an existing item once through the native removal; no per-frame sweep. Tr
 matches are untouched. Acceptance: host tests for policy, scene, persistence and import; 64-byte guards; zero hook
 allocations; one Eden batch (Off no-spawn window, existing-item removal, On spawn return, zero Unmapped, both consoles
 `desync_seen` 0 in an online smoke with the row Off).
+
+**Implemented 2026-11-05 (`p23/lobby-items`), Eden batch pending.**
+
+- **Spawning:** one inline hook on the item spawner's own switch test (`main+0x15d9a80`, the `cbz` after
+  `ldrb w8,[c,#0x30]`). In a qualified waiting scene with the row Off, the native takes its own off path; elsewhere the
+  hook leaves everything alone. Nothing is written to the game, so nothing needs restoring.
+- **Existing items:** removed once per Off edge through `ItemManager::remove_item_from_id`, from Player 1's frame, and
+  only after the practice ItemGate allows it.
+- **Code:** the policy is in `src/model/lobby_items.rs`, the runtime in `src/runtime/lobby/lobby_items.rs`, and the
+  seam rows in `rows_lobby_items.rs` (`tools/gen_rows_lobby_items.py`).
+- **Design and static facts:** the P-N11 section of the lane report.

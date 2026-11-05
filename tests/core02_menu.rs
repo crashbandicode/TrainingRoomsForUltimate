@@ -216,8 +216,8 @@ fn core02_factory_table_matches_spec() {
         let (_, range) = settings::def(&format!("{id}_range")).unwrap();
         assert_eq!((range.kind, range.len, range.default.len()), (Kind::Range, 0, 0), "{id}");
     }
-    // Nothing else is in the table, and no id is there twice.
-    assert_eq!(DEFS.len(), SPEC_TABLE.len() + 2 + 7);
+    // Nothing else is in the table, and no id is there twice (the + 1 is Lobby Items, Phase 2 N11, appended).
+    assert_eq!(DEFS.len(), SPEC_TABLE.len() + 2 + 7 + 1);
     for (i, def) in DEFS.iter().enumerate() {
         assert!(!DEFS[..i].iter().any(|d| d.id == def.id), "{} twice", def.id);
     }
@@ -268,11 +268,12 @@ fn layout_row_counts_match_the_rc_freeze() {
     };
     // Fighters & Stages has 21 since Change Stage (operator order via the primary, 2026-11-05 12:50Z); Display &
     // Controls lost "Group inputs by status" to the frame strip (SPEC-input-06 §3.1, 2026-11-05); Recording gained the
-    // 7 rows of the Combos group (SPEC-input-07 §6, 2026-11-05).
-    assert_eq!(counts(false), [31, 11, 22, 21, 10, 3]);
-    assert_eq!(counts(true), [30, 11, 22, 21, 10, 3]);
-    assert_eq!(counts(false)[..5].iter().sum::<usize>(), 95);
-    assert_eq!(counts(true)[..5].iter().sum::<usize>(), 94);
+    // 7 rows of the Combos group (SPEC-input-07 §6, 2026-11-05). Fighters & Stages gained Lobby Items after Stage Hazards
+    // (Phase 2 N11, the primary's P-N11, 2026-11-05).
+    assert_eq!(counts(false), [31, 11, 22, 22, 10, 3]);
+    assert_eq!(counts(true), [30, 11, 22, 22, 10, 3]);
+    assert_eq!(counts(false)[..5].iter().sum::<usize>(), 96);
+    assert_eq!(counts(true)[..5].iter().sum::<usize>(), 95);
     // Controls (MENU-DRAFT §2): 4 direction grids, 7 delay rows, 13 multi-selects (the 12 checklists,\n    // 3 of them slot sets, and Swap groups).
     let n = |f: &dyn Fn(&Control) -> bool| ROWS.iter().filter(|r| r.vis != model::menu::table::Vis::PilotPresent && f(&r.control)).count();
     assert_eq!(n(&|c| matches!(c, Control::DirectionGrid { .. })), 4);
@@ -280,8 +281,8 @@ fn layout_row_counts_match_the_rc_freeze() {
     assert_eq!(n(&|c| matches!(c, Control::MultiSelect(_) | Control::SwapGroups)), 13, "12 checklists and Swap groups");
     assert_eq!(n(&|c| matches!(c, Control::Slider)), 2);
     // The RC defers four editors, retaining the empty Setup group index so
-    // persisted group IDs do not move. Every other group still has rows.
-    assert_eq!(ROWS.len(), 99);
+    // persisted group IDs do not move. Every other group still has rows. (100: Lobby Items, Phase 2 N11.)
+    assert_eq!(ROWS.len(), 100);
     assert!(!ROWS.iter().any(|r| matches!(r.control,
         Control::Editor(Editor::SetupSave | Editor::SetupLibrary | Editor::EditPlacement | Editor::ReplayWindow))));
     assert_eq!(GROUPS[7].title, "Setup library");
