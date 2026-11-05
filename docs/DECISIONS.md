@@ -1091,3 +1091,21 @@ Steps 1–3 can run in parallel with the frame strip work: they need only the sh
 
 **Recommendation:** A, the combo bar under the strip, with the Combos group and its own `combos/` library as drawn.
 Nothing is implemented until the operator picks.
+
+### SETTINGS-PERSIST · No accidental page reset; an explicit "Reset page to defaults" — answered (2026-11-05)
+
+**The cause (rc.2 on the operator's console):** "Player Swapping" kept turning Off.
+- On a page list, ZR is an instant `reset_page()` (`src/model/menu/mod.rs:804`, `:919-927`), which restores the whole
+  page from `defaults_menu`.
+- The card's `settings.json` has `menu.trio_practice = [1, 0]` (On) and `defaults_menu.trio_practice = [0, 1]` (Off);
+  the defaults were imported from the fork.
+- The card's diagnostics show a refused P1 cycle, "roster cycle is off" (#70).
+- ZR means "switch role" inside the Character Cycles grid, so the page reset is easy to hit by accident. No other code
+  writes the setting.
+
+**Answered 2026-11-05 ~13:2xZ by the operator:** "a setting should persist once it's changed and have a "reset to
+defaults" for a page if ever needed."
+- ZR on a page list no longer resets anything.
+- Each page gets an explicit "Reset page to defaults" row with A/B confirmation, and a page reset is logged.
+- Y (reset the focused row) is unchanged.
+- It is implemented with the menu navigation work on `p23/menu-nav`.
