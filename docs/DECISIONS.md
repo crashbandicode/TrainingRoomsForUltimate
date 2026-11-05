@@ -1242,7 +1242,7 @@ need to simplify the logic". The ask:
 
 Earlier: convert macro to combo, and crop, as separate options on a particular macro or combo.
 
-**Answered ~23:4xZ:**
+**Answered ~23:5xZ:**
 - One Record shortcut follows the pop-up's tab.
 - Combo from macro reuses the replay-to-macro "snap".
 - Every recording remembers its start state.
