@@ -4,7 +4,9 @@
 
 use super::external;
 use crate::engine::macro_ui::macro_panel::{LibraryRow, View, COMBO_KEYBOARD_TITLE};
-use crate::model::combo_record::{clean_name, default_name, ComboLibrary, ComboRecord, DIR};
+use crate::model::combo_record::{
+    clean_name, default_name, saved_combos_footer, ComboLibrary, ComboNotices, ComboRecord, SkipPost, DIR,
+};
 use crate::model::notify::DEFAULT_COLOR;
 use crate::model::store::SkippedFile;
 use crate::runtime::features::notices;
@@ -21,16 +23,6 @@ pub fn is_combo(editor: Editor) -> bool {
 
 fn library() -> ComboLibrary {
     ComboLibrary::new(format!("{}/{DIR}", crate::model::storage::ROOT))
-}
-
-/// The standing notice that names a combo file the plugin could not use (the Combos notes use `0x2A`).
-const FILE_NOTICE: u8 = 0x2B;
-
-/// One notice naming the first unusable file and why, and how many more there are: never a silent drop.
-fn note_skipped(skipped: &[SkippedFile]) {
-    if let Some(text) = crate::model::combo_record::skipped_note(skipped) {
-        notices::upsert(FILE_NOTICE, "Saved combos", &text, 300, DEFAULT_COLOR);
-    }
 }
 
 /// What a name the keyboard returns is for.
@@ -56,6 +48,8 @@ pub struct Ui {
     draft: Option<String>,
     /// The target's id and name.
     target: Option<(String, String)>,
+    /// The skipped-file notice last posted, so opening the list again does not re-arm it.
+    notices: ComboNotices,
     listed: usize,
     loaded: bool,
 }
@@ -71,7 +65,7 @@ impl Ui {
         if let Some(id) = library.selected() {
             match library.load(&id) {
                 Ok(record) => self.apply_target(Some((id, record))),
-                Err(why) => note_skipped(&[SkippedFile { file: format!("{id}.json"), reason: why.to_string() }]),
+                Err(why) => self.note_skipped(&[SkippedFile { file: format!("{id}.json"), reason: why.to_string() }]),
             }
         }
     }
@@ -141,7 +135,7 @@ impl Ui {
         self.listed = listing.entries.len();
         let shared = listing.entries.iter().filter(|e| e.shared()).count();
         live::listed(self.listed, listing.skipped.len(), shared);
-        note_skipped(&listing.skipped);
+        self.note_skipped(&listing.skipped);
         if self.listed == 0 {
             return Err("No combos saved yet: Save last combo first".into());
         }
@@ -276,9 +270,18 @@ impl Ui {
     pub fn view(&self) -> Option<View> {
         let mut view = external::panel_view_now()?;
         if matches!(self.active, Some(Editor::ComboLibrary | Editor::ComboTarget)) && self.naming.is_none() {
-            view.footer = "> marks the target.\nA Target · X Rename · Y Delete · B Return".into();
+            view.footer = saved_combos_footer(&view.footer);
         }
         Some(view)
+    }
+
+    /// One notice naming the first unusable file and why. The same skipped set does not post again.
+    fn note_skipped(&mut self, skipped: &[SkippedFile]) {
+        match self.notices.post_skipped(skipped) {
+            SkipPost::Post(text) => notices::upsert(ComboNotices::SKIPPED_ID, "Saved combos", &text, 300, DEFAULT_COLOR),
+            SkipPost::Clear => notices::clear(ComboNotices::SKIPPED_ID),
+            SkipPost::Same => {}
+        }
     }
 
     /// The panel closed (B, or the menu lost its layer): a pending name stays with the panel's own continuation.
