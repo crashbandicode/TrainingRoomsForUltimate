@@ -4,10 +4,6 @@
 //! NOT YET SWITCH-COMPILED: written against Skyline 0.6.0's API from its sources. The first
 //! `cargo skyline build` may need small fixes.
 
-// RC freeze: unproven Setup, placement, preview and fighter-install workflows stay closed.
-// Keep their shared capture/save-state consumers and cleanup paths resident.
-pub(crate) const ADVANCED_RECORDING_WORKFLOWS: bool = false;
-
 mod alloc;
 mod boot;
 mod clock;

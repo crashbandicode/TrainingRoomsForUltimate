@@ -214,9 +214,6 @@ pub(crate) fn slot_export_complete(success: bool) {
 fn run(command: Command) {
     let text = std::str::from_utf8(&command.text[..command.len]).unwrap_or("");
     match command.kind {
-        OPEN_PLACEMENT | REPLAY_WINDOW | CLIP if !crate::runtime::ADVANCED_RECORDING_WORKFLOWS => {
-            diagnostic(format_args!("[NamedMacroDiag] editor unavailable in this release"));
-        }
         SAVE_SLOT => {
             *SAVE_NAME.lock() = Some((named_macros::session_revision(), command));
             named_macros::diag_export_slot(usize::try_from(command.number).unwrap_or(0));

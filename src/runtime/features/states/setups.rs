@@ -119,9 +119,6 @@ fn enqueue(target: Target, action: Action) -> Result<Ticket, &'static str> {
 }
 
 pub(crate) fn request_snapshot(target: Target) -> Result<Ticket, &'static str> {
-    if !crate::runtime::ADVANCED_RECORDING_WORKFLOWS {
-        return Err("Setup library is unavailable in this release");
-    }
     if target.slot >= 5 {
         return Err(Refusal::Slot.message());
     }
@@ -142,9 +139,6 @@ pub(crate) fn request_bind(
     record: &SetupRecord,
     restore: bool,
 ) -> Result<Ticket, &'static str> {
-    if !crate::runtime::ADVANCED_RECORDING_WORKFLOWS {
-        return Err("Setup library is unavailable in this release");
-    }
     let prepared = prepare(record)?;
     prepared
         .validate(target, &facts()?, restore)

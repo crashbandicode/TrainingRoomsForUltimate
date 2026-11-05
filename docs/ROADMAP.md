@@ -46,7 +46,6 @@ The RC is M5q parity plus the new UI and clean MIT provenance; this list is not 
 | F9 helper promotion, fixed-seat ownership, hat/item cutover | Removed from the RC; M5q count behaviour kept. Partial count/body/HUD/reset evidence only. |
 | Hurtboxes (HB1) | Phase 3 work; see the hitbox visualizer's current state in the README. |
 | Ten hot fighters plus five separate hot hats | Proven capacity behaviour kept; no separate 15-body feature. |
-| Setup Library / SaveSetup | Screen entries and transactions disabled; saved files left intact. |
 | Saved/replay Mii bust provider (Q15) | No new provider or hook; the native saved-Mii selection stays. |
 | Frame/status text backgrounds (UI22) | Reverted to the pre-UI22 state. The input log and its light-background contrast are gone in rc.3 (the frame strip has its own backdrop). |
 | Named-macro library/preview extensions (F8 design C) | Exposed operations narrowed; basic capture and synchronization kept. |
