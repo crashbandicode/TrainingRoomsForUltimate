@@ -4,7 +4,9 @@ Every GIF in [`media/`](media/) is actual Eden footage: whole screen, 1280×720,
 ends, under 10 s, game-speed timing kept. Frames were reviewed (start, action, result) before a clip was kept. The
 raw takes stay outside git with their runs.
 
-## Menu navigation (2026-11-05)
+## 0.2.0-rc.3 clips (2026-11-05)
+
+### Menu navigation
 
 Run `tr-p23-menu-nav-02` on the Yoga, 2026-11-05 ~14:09Z: the `p23/menu-nav` diag build at `7ab1c50` (NRO
 `1273c29f60503f76f02c1610cf291f2a0997db1b686ba1062c93204ab5812a1d`; the diag build adds log lines only, the menu draws
@@ -14,8 +16,20 @@ the same), with the CPU pilot, Online Deluxe and tile-cursor plugins installed.
 | --- | --- |
 | `menu-section-jump.gif` | CPU page from Reactions: ZL + Down jumps Defence, Ledge & Tech, Shield, Attacks & Movement and Player 1 control (where *Reset page to defaults* closes the page), then ZL + Up goes back two sections. The footer lists ZL+Up/Down section and no ZR page reset. 9.0 s. |
 
-Since this branch, ZR on a page no longer resets it (the `menu-defaults.gif` clip below shows the old key): each page
+Since rc.3, ZR on a page no longer resets it (the `menu-defaults.gif` clip below shows the old key): each page
 ends with *Reset page to defaults*, which asks for confirmation.
+
+### Not captured yet
+
+The other rc.3 features have no clip in `media/` yet. Their captures are in the combined rc.3 Eden session:
+
+| Feature | Clip | Where it is captured |
+| --- | --- | --- |
+| Frame strip | `frame-strip.gif` | the combined session's frame-strip rows (`iv_rel.py`, 1280 wide, 9 s) |
+| Own hitbox discs | `own-orbs-two-ridleys.gif` | the hitbox rows, `hb-07-docs-gif` |
+| Change Stage | none yet | requested for the combined session |
+
+`hitbox-overlay.gif` below shows rc.1's effect spheres; rc.3 draws fighter spheres as discs.
 
 ## 0.2.0-rc.1 clips (2026-11-05)
 

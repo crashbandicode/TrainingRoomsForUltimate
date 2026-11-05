@@ -36,19 +36,28 @@ flowchart LR
 | Kirby hat: Player 1 / CPU | Special + L3 / Special + R3 |
 | Reset the training room | L + R + A |
 
-In the menu: L/R change page, A edits, Y resets a row, X saves the current values as defaults, B goes back. The chords are edited
-on Display & Controls › Button chords.
+In the menu: L/R change page, ZL + Up/Down jumps to the previous or next section, A edits, Y resets a row, X saves the
+current values as defaults, B goes back. Each page ends with *Reset page to defaults*, which asks first. The menu reopens
+where you left it. The chords are edited on Display & Controls › Button chords.
 
 ## Features
 
-Clips are Eden footage of the 0.2.0-rc.1 release NRO `706c993f`, recorded 2026-11-05, except the two marked RC10;
-see [docs/MEDIA.md](docs/MEDIA.md).
+Clips are Eden footage of the 0.2.0-rc.1 release NRO `706c993f`, recorded 2026-11-05, except those marked RC10 or with
+their own build; see [docs/MEDIA.md](docs/MEDIA.md).
 
 ### Hitboxes and grab boxes
 
 ![Forward smash with the overlay on: yellow hurtboxes on both fighters](docs/media/hitbox-overlay.gif)
 
-Hitbox Visualization (Display & Controls) draws the fighters' hurtboxes (yellow), hitboxes and grab boxes.
+Hitbox Visualization (Display & Controls) draws the fighters' hurtboxes (yellow), hitboxes and grab boxes. Since rc.3
+every fighter sphere is the plugin's own disc, so none is ever missing, even with two large fighters; projectiles keep
+the game's effect spheres, and the discs trail the camera by one to two frames while it pans. (The clip shows rc.1.)
+
+### Frame strip
+
+The input display (Display & Controls › Input Display) is a strip at the top of the screen with the last second of
+Player 1's and the CPU's frames, each press, how the last follow-up linked (a true combo by N frames, or dropped) and the
+frame advantage. It replaces the 15-row input log. *No clip yet.*
 
 ### CPU reactions
 
@@ -100,11 +109,22 @@ Kirby hats change with a chord, for Player 1 or the CPU.
 Pick the stages and their order for Training rotation and waiting-room practice. *RC10, 2026-11-04, NRO
 `50d95130`.*
 
+*Change Stage* (Fighters & Stages › Stages) goes to the stage you pick when the menu closes, in Training and in
+waiting-room practice; Y picks its form first. *No clip yet.*
+
 ### Waiting rooms
 
 ![The menu in a Local Wireless waiting room](docs/media/waiting-menu.gif)
 
 The same menu works while you wait in an online or local room.
+
+### Menu navigation
+
+![ZL + Down jumps through the CPU page's sections](docs/media/menu-section-jump.gif)
+
+ZL + Up/Down jumps between a page's sections (in popup lists, a screenful). The menu reopens on the page and row you
+left. ZR no longer resets a page: each page ends with *Reset page to defaults*, which asks first. *Eden, 2026-11-05,
+`p23/menu-nav` diag NRO `1273c29f`, the navigation code rc.3 merged.*
 
 ### Menu shortcuts and replay capture
 
@@ -118,14 +138,17 @@ The *Replay capture* row and the Online Deluxe overlay show the same setting.
 
 ## Status
 
-**0.2.0-rc.2** (2026-11-05) is the console test build. It adds to rc.1:
-- the pause-helper fix: a pause that opens while a preloaded helper fighter is loading retires that load, and the
-  helper is created again after the pause;
-- the Solo Popo marks on the icon's lower corners, keeping the name clear;
-- the Kirby hat-request ending rules: a request always ends by game frames, and ends when the role stops being Kirby.
+**0.2.0-rc.3** (2026-11-05) is the console test build. It adds to rc.2:
+- the **frame strip** input display, replacing the 15-row input log;
+- **Change Stage**: a row that switches the stage now, in Training and in waiting rooms;
+- **menu navigation**: ZL + Up/Down jumps sections, the menu reopens where you left it, ZR no longer resets a page by
+  accident, and *Reset page to defaults* asks first;
+- **own hitbox discs** for every fighter sphere, never refused (projectiles keep the effect spheres; the discs trail
+  the camera by one to two frames, a known limit).
 
-Limitations kept from the fork are listed in [Differences from the fork](docs/DIFFERENCES-FROM-THE-FORK.md); planned
-work is in the [ROADMAP](docs/ROADMAP.md). 0.1.0 crashes at console boot; use the newest build, 0.2.0-rc.2.
+rc.2 added the pause-helper fix, the Solo Popo mark placement and the Kirby hat-request endings. Limitations kept from
+the fork are listed in [Differences from the fork](docs/DIFFERENCES-FROM-THE-FORK.md); planned work is in the
+[ROADMAP](docs/ROADMAP.md). 0.1.0 crashes at console boot; use the newest build, 0.2.0-rc.3.
 
 ## Build
 
