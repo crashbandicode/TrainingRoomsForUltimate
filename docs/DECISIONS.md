@@ -726,3 +726,40 @@ both marks at the icon's lower corners, above the label; "Ice Climbers" is fully
 list. The host test `the_solo_marks_never_cover_the_tile_name` checks every roster use in both console modes.
 
 ![Solo S after the fix](decisions/SOLO-S-PLACEMENT-after.png)
+
+### HB-OWN-ORBS · How TrainingRooms draws its own hitbox orbs (Route A) — open (2026-11-05)
+
+The operator ordered the Route A research on 2026-11-05 ~03:05Z: "begin the hitbox research where we do our own orbs for
+characters like ridley". The work runs in lane `tr-lane-hitbox`, branch `p23/hitbox-orbs`, and the report is
+`artifacts/phase23/LANE-HITBOX-REPORT.md`.
+
+**Today (Route B):** every sphere is a game `sys_shield` effect from the one shared effect system. Ridley's first frame
+asks for 55 spheres (plus Steve's 19), and hb-04 saw 2 of them refused. The pool is shared with every game effect in the
+scene.
+
+**Routes studied (static, the owned 13.0.5 ELF):**
+- **A1, a private effect system:** the game builds exactly one, with its own 64 MiB heap. A second one needs new GPU
+  memory, draw and fence work on the render thread. Not safe.
+- **A2, the game's debug draw:** dead. The shaders load, but no draw code uses them, and `sv_debug_draw` functions are
+  `ret` stubs.
+- **A3, raising the pool:** changes the game's own effects online. A workaround, rejected.
+- **A4, feasible:** the plugin draws its own orbs as translucent discs in its own HUD layout. Each orb is placed from
+  the fighter's bones and projected with the game's camera (`world_to_screen`). The orbs are never refused, and no game
+  effect is used for fighters.
+
+**The visible change:**
+- the orbs are flat discs on top of the scene, with no depth hiding by the stage or the other fighter, instead of 3D
+  glowing shield bubbles;
+- up to one frame of lag while the camera moves (to be measured).
+
+Tints stay as now.
+
+**Options:**
+1. **(recommended)** Own orbs for every fighter sphere: hit, hurt and grab. Projectiles keep Route B.
+2. Own orbs for hurtboxes only. Hit and grab boxes stay 3D Route B spheres, a mixed look.
+3. Keep Route B, and close Route A.
+
+![Own orbs mockup](decisions/HB-OWN-ORBS.png)
+
+Picture: on the left a real Route B frame (Eden gbc-04); on the right a **mockup** with hand-placed orbs on a real
+visualizer-Off frame.
