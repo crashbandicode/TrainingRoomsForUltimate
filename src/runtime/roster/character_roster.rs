@@ -721,6 +721,32 @@ pub fn request_cpu_kind(kind: u32) -> bool {
     )
 }
 
+/// Player 1's fighter may be changed: the Player role is enabled (Player Swapping On).
+pub fn player_swapping() -> bool {
+    Role::Player.enabled()
+}
+
+/// Player 1's fighter kind as the loader last observed it (None before a practice entry).
+pub fn player_kind() -> Option<u32> {
+    state_for(Role::Player).lock().observed.map(|(_, kind)| kind)
+}
+
+/// Ask the existing loader to change Player 1 to `kind` (a combo's recorded
+/// fighter, SPEC-input-07 §4a): the Direct request a Player Character pick makes.
+/// False when nothing was queued; the loader's notice says why.
+pub fn request_player_kind(kind: u32) -> bool {
+    let Some(fighter) = TrioFighter::from_kind(kind) else {
+        return false;
+    };
+    if !Role::Player.enabled() || state_for(Role::Player).lock().pending.is_some() {
+        return false;
+    }
+    queue(Role::Player, Selection::Direct(fighter));
+    state_for(Role::Player).lock().pending.is_some_and(
+        |request| matches!(request.selection, Selection::Direct(target) if target == fighter),
+    )
+}
+
 /// Runs before the delay queue. Consume only our request, giving conflicting
 /// save/record/menu requests precedence. Preserve suppression through a held
 /// chord so it cannot turn into a delayed taunt or a player trio request.

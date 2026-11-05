@@ -109,6 +109,14 @@ pub extern "C" fn tr_combo_listed_v1(entries: u32, skipped: u32, shared: u32, _r
     core::hint::black_box((0x4c49_5354_u32, entries, skipped, shared));
 }
 
+/// A chosen combo's fighter question (SPEC-input-07 §4a, §8): the event (`editors::combo_fighter::event`), the recorded
+/// fighter's kind and P1's (`u32::MAX` none), and its detail (why it was kept; whether the switch was queued).
+#[no_mangle]
+#[inline(never)]
+pub extern "C" fn tr_combo_fighter_v1(event: u32, recorded: u32, current: u32, detail: u32) {
+    core::hint::black_box((0x4647_4854_u32, event, recorded, current, detail));
+}
+
 /// P1's fighter kind at the strip's last sample, for a save's `recorded_on` (worker).
 pub fn p1_kind() -> Option<i32> {
     let kind = P1_KIND.load(Ordering::Relaxed);
@@ -124,6 +132,11 @@ pub fn last_combo() -> Option<Combo> {
 pub fn listed(entries: usize, skipped: usize, shared: usize) {
     let count = |n: usize| u32::try_from(n).unwrap_or(u32::MAX);
     tr_combo_listed_v1(count(entries), count(skipped), count(shared), 0);
+}
+
+/// The worker decided or answered a combo's fighter question (`tr_combo_fighter_v1`).
+pub fn fighter_event(event: u32, recorded: Option<u32>, current: Option<u32>, detail: u32) {
+    tr_combo_fighter_v1(event, recorded.unwrap_or(u32::MAX), current.unwrap_or(u32::MAX), detail);
 }
 
 /// The worker saved `combo`.

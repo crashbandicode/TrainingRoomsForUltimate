@@ -340,7 +340,7 @@ pub static ROWS: [Row; 104] = [
     r(MACROS, "Source", "macro_source", Control::Dropdown(&o::MACRO_SOURCE),
       "Where the CPU's recordings come from:\nthe numbered slots or the named library."),
     r(MACROS, "Ask before switching fighter", "fighter_prompt", TOGGLE,
-      "On: a replay or named recording asks before it\nswitches the CPU's fighter."),
+      "On: a replay or named recording asks before it\nswitches the CPU, a combo before it switches P1."),
     r(MACROS, "Named library", "named_macro_library", Control::Editor(Editor::NamedLibrary),
       "The named recordings on the card.\nA loads one, Y copies it into the current slot."),
     r(MACROS, "Save slot to library...", "", Control::Editor(Editor::SaveSlotToLibrary),

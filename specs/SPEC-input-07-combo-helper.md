@@ -75,11 +75,38 @@ The helper grades only while *Combo helper* is On, a target is set and the strip
 - A combo is not tied to a fighter: the helper grades whatever fighter P1 is. `recorded_on` comes from the strip's
   per-frame sample (`natives::fighter_kind`, an existing guarded native, the CPU core unit's `utility_get_kind` row;
   it runs behind its own gate, `input_display::p1_fighter` / `KIND_ON`, so without that row a save records no fighter
-  and the strip is unchanged). There is no *Switch to the recorded fighter*
-  option, because the existing playback switch (`character_roster::request_cpu_kind`) changes the CPU only.
+  and the strip is unchanged). Choosing a combo recorded on another fighter can switch P1 to it (§4a).
 - **Save last combo** keeps the most recent exchange that has at least one link: the open one, else the one before.
 - **Rename** rewrites only `name` (the id never changes). **Delete** removes the file; deleting the target clears
   `selected.txt` and the helper's target.
+
+## 4a. Switching P1 to the recorded fighter
+
+Operator, 2026-11-05 (`docs/DECISIONS.md` DEFERRED-LIST): "the switch p1 to a combo's recorded fighter should follow
+the same logic that the replay macro uses where it prompts the user to swap and they can say yes or no."
+
+- **When it asks.** Only when the user chooses a combo in **Saved combos** (A). The target restored from
+  `selected.txt` and the target that *Save last combo* sets never ask.
+- **The gate.** It is the named macros' own gate (`macro_panel::fighter::gate`):
+  - **Matches:** `recorded_on` names a roster fighter (the names `recorded_on` is written with, ignoring case and
+    surrounding spaces) whose kind is P1's, as the roster loader last observed it.
+  - **Can switch:** that fighter exists **and** Player Swapping is On. With it Off, the roster loader changes only the
+    CPU.
+  - **Asks:** the setting **Ask before switching fighter** (Recording › Named macros) is On.
+- **No question** when `recorded_on` is missing, when it is P1's fighter, or when P1's fighter is not known yet.
+- **Kept without asking**, with the target note saying why:
+  - the setting is Off (no note, as for a named macro);
+  - Player Swapping is Off ("P1 stays Mario: turn on Player Swapping to switch");
+  - the name is not a fighter this build can load ("Ryuu is not a fighter this build can load").
+- **The question.** It is the shared **Fighter Mismatch** screen: *Keep current fighter* (the default) or *Switch to
+  recorded fighter*, A chooses, B cancels. The footer reads "Recorded on Ryu · P1 is Mario". Nothing is written before
+  the answer.
+  - **Keep:** the combo becomes the target, and P1 is unchanged.
+  - **Switch:** the combo becomes the target. When the menu closes, P1's switch goes to the roster loader's Player role
+    with the request a Player Character pick makes (`character_roster::request_player_kind`, `Selection::Direct`). No
+    native site is added. A refusal carries the loader's own notice, plus "P1 was not switched to Ryu".
+  - **B:** nothing changes, and the list opens again.
+- **A question nobody answered** is retired when a later choice, the list closing or the scene ending moves it on.
 
 ## 5. Names: the Switch keyboard
 
@@ -124,7 +151,7 @@ The rows are in Training; in waiting-room practice the strip does not sample, so
 
 ## 8. Observability (no diag prints)
 
-The helper reports through four exported functions that do nothing but take their arguments, so an Eden guest
+The helper reports through five exported functions that do nothing but take their arguments, so an Eden guest
 trace point (`libtraining_rooms.nro!<name>` with the unstripped ELF loaded) records each event's registers:
 
 | Symbol | x0 | x1 | x2 | x3 |
@@ -133,6 +160,7 @@ trace point (`libtraining_rooms.nro!<name>` with the unstripped ELF loaded) reco
 | `tr_combo_attempt_v1` | outcome: 1 completed, 2 stopped, 3 cleared | true links | reference links | first link not true + 1 (0 none) |
 | `tr_combo_saved_v1` | links saved | first link's verdict value | 0 | 0 |
 | `tr_combo_listed_v1` | files listed | files skipped (one notice names the first) | listed files whose names the plugin did not choose (copied in) | 0 |
+| `tr_combo_fighter_v1` (§4a) | event: 1 no question, 2 kept without asking, 3 asked, 4 Keep, 5 Switch, 6 cancelled, 7 switch asked of the loader | the recorded fighter's kind (`u32::MAX` none or unknown) | P1's kind (`u32::MAX` unknown) | event 2: why (1 setting Off, 2 Player Swapping Off, 3 unknown name); event 7: 1 queued, 0 refused |
 
 The rows also read `combos/*.json` and the HUD.
 

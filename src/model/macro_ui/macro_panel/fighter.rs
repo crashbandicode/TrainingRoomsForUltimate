@@ -49,6 +49,9 @@ pub enum Origin {
     Named,
     /// Replay clip/track selection. The clip editor keeps the candidate.
     Clip,
+    /// A chosen combo (SPEC-input-07 §4a): the question is about Player 1's
+    /// fighter, and the combos UI keeps the candidate.
+    Combo,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -107,12 +110,19 @@ impl Prompt {
         for (label, (text, _)) in labels.iter_mut().zip(ROWS) {
             *label = text.to_owned();
         }
-        View {
-            title: "Fighter Mismatch".to_owned(),
-            footer: format!(
+        let footer = match self.origin {
+            Origin::Combo => format!(
+                "Recorded on {} · P1 is {}\nThe combo is graded the same on either. A chooses, B cancels.",
+                self.recorded, self.current
+            ),
+            Origin::Named | Origin::Clip => format!(
                 "Recorded {} · current CPU {}\nInputs are the same either way. A chooses, B cancels.",
                 self.recorded, self.current
             ),
+        };
+        View {
+            title: "Fighter Mismatch".to_owned(),
+            footer,
             labels,
             selected: self.cursor,
         }

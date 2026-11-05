@@ -1,8 +1,19 @@
 //! The Recording page's Combos group on the menu worker (SPEC-input-07 §4–§6): the draft name, *Save last combo*, the
 //! saved combos (A target, X rename, Y delete) and the target. Files go through the generic store; names through the
 //! named-macro panel's caller-owned naming (the setup library's path), so the keyboard has one owner.
+//!
+//! Choosing a combo recorded on another fighter asks the named macros' Switch/Keep question about Player 1 (§4a): the
+//! shared prompt with the `Combo` origin, the plan from `editors::combo_fighter`, and a Switch asked of the roster
+//! loader's Player role when the menu closes (`after_close`).
+
+use core::sync::atomic::{AtomicU64, Ordering};
 
 use super::external;
+use crate::editors::combo_fighter::{self as fighter, event, Plan};
+use crate::engine::compat::menu::OnOff;
+use crate::engine::macro_ui::macro_panel::FighterChoice;
+use crate::engine::swap::trio::TrioFighter;
+use crate::runtime::roster::character_roster as roster;
 use crate::engine::macro_ui::macro_panel::{LibraryRow, View, COMBO_KEYBOARD_TITLE};
 use crate::model::combo_record::{clean_name, default_name, ComboLibrary, ComboRecord, DIR};
 use crate::model::notify::DEFAULT_COLOR;
@@ -14,6 +25,23 @@ use crate::runtime::macros::named_macros;
 
 /// Name tokens of this library: the high bit keeps them apart from the setup library's revisions.
 const TOKEN_BASE: u64 = 1 << 63;
+
+/// The fighter question's revision: a later choice, or the list's panel going away, retires an unanswered question
+/// (`named_macros::fighter_prompt_stale`).
+static PROMPT_REVISION: AtomicU64 = AtomicU64::new(1);
+
+pub fn prompt_revision() -> u64 {
+    PROMPT_REVISION.load(Ordering::Acquire)
+}
+
+/// A chosen combo waiting for the answer to its fighter question: nothing is written until the answer.
+struct Asking {
+    id: String,
+    record: ComboRecord,
+    fighter: TrioFighter,
+    p1: Option<u32>,
+    p1_label: String,
+}
 
 pub fn is_combo(editor: Editor) -> bool {
     matches!(editor, Editor::ComboName | Editor::ComboSave | Editor::ComboLibrary | Editor::ComboTarget)
@@ -58,6 +86,9 @@ pub struct Ui {
     target: Option<(String, String)>,
     listed: usize,
     loaded: bool,
+    asking: Option<Asking>,
+    /// Switch was answered: P1's switch is asked for when the menu closes.
+    switch_at_close: Option<TrioFighter>,
 }
 
 impl Ui {
@@ -161,9 +192,21 @@ impl Ui {
         Ok(())
     }
 
-    /// Every worker poll: names the keyboard confirmed, and the list's A, X and Y. Returns a note to show.
+    /// Every worker poll: the fighter question's answer, names the keyboard confirmed, and the list's A, X and Y.
+    /// Returns a note to show.
     pub fn tick(&mut self) -> Option<String> {
         self.load_target();
+        if let Some(answer) = named_macros::take_combo_fighter_choice() {
+            // An answer with no question waiting belongs to a panel the menu already closed: nothing to apply.
+            if let Some(asking) = self.asking.take() {
+                return self.answered(asking, answer);
+            }
+        }
+        if self.asking.is_some() && !external::panel_up() {
+            // Retired unanswered (the scene or the selection moved on): nothing changed.
+            self.asking = None;
+            self.active = None;
+        }
         if let Some((token, _)) = self.naming {
             if let Some(confirmed) = named_macros::take_confirmed_name() {
                 if confirmed.context.token == token {
@@ -184,8 +227,18 @@ impl Ui {
             return None;
         }
         if let Some(id) = named_macros::take_list_choice() {
-            self.active = None;
-            return Some(self.choose(&id).unwrap_or_else(|why| why));
+            return match self.choose(&id) {
+                // The fighter question is up: the group keeps the panel until it is answered.
+                Ok(None) => None,
+                Ok(Some(note)) => {
+                    self.active = None;
+                    Some(note)
+                }
+                Err(why) => {
+                    self.active = None;
+                    Some(why)
+                }
+            };
         }
         if let Some(id) = named_macros::take_list_action() {
             self.active = None;
@@ -236,16 +289,95 @@ impl Ui {
         }
     }
 
-    fn choose(&mut self, id: &str) -> Result<String, String> {
-        let library = library();
-        let record = library.load(id).map_err(|e| e.to_string())?;
-        library.select(Some(id)).map_err(|e| e.to_string())?;
-        let note = match &record.recorded_on {
+    /// A in the list: the combo becomes the target, unless it was recorded on another fighter and the question opens
+    /// first (`Ok(None)`; the answer arrives in `tick`).
+    fn choose(&mut self, id: &str) -> Result<Option<String>, String> {
+        let record = library().load(id).map_err(|e| e.to_string())?;
+        let p1 = roster::player_kind();
+        let p1_label = p1.map(|kind| named_macros::fighter_label(kind as i32));
+        let prompt_enabled = crate::runtime::compat::sync::read(&crate::runtime::compat::menu::MENU).fighter_prompt == OnOff::ON;
+        let recorded_on = record.recorded_on.clone();
+        let plan = fighter::plan(recorded_on.as_deref(), p1.zip(p1_label.as_deref()), prompt_enabled, roster::player_swapping());
+        let recorded = recorded_on.as_deref().and_then(fighter::fighter_named).map(TrioFighter::kind);
+        PROMPT_REVISION.fetch_add(1, Ordering::AcqRel);
+        self.switch_at_close = None;
+        let p1_label = p1_label.unwrap_or_default();
+        let tail = match plan {
+            Plan::Ask(wanted) => {
+                if named_macros::open_combo_fighter_prompt(prompt_revision(), wanted.name().to_owned(), p1_label.clone()) {
+                    live::fighter_event(event::ASKED, recorded, p1, 0);
+                    self.asking = Some(Asking { id: id.to_owned(), record, fighter: wanted, p1, p1_label });
+                    return Ok(None);
+                }
+                // The question could not open: the safe default, as Keep.
+                live::fighter_event(event::KEPT, recorded, p1, 0);
+                Some(fighter::answer_note(FighterChoice::Keep, wanted, &p1_label))
+            }
+            Plan::Keep(kept) => {
+                live::fighter_event(event::KEPT, recorded, p1, kept as u32);
+                fighter::kept_note(kept, recorded_on.as_deref().unwrap_or_default(), &p1_label)
+            }
+            Plan::Proceed => {
+                live::fighter_event(event::PROCEED, recorded, p1, 0);
+                None
+            }
+        };
+        self.target(id, record, tail).map(Some)
+    }
+
+    /// The combo becomes the target: `selected.txt`, the helper, and the note (with `tail`).
+    fn target(&mut self, id: &str, record: ComboRecord, tail: Option<String>) -> Result<String, String> {
+        library().select(Some(id)).map_err(|e| e.to_string())?;
+        let mut note = match &record.recorded_on {
             Some(fighter) => format!("Target: {} ({} links, recorded on {fighter})", record.name, record.combo.len()),
             None => format!("Target: {} ({} links)", record.name, record.combo.len()),
         };
+        if let Some(tail) = tail {
+            note.push_str("; ");
+            note.push_str(&tail);
+        }
         self.apply_target(Some((id.to_owned(), record)));
         Ok(note)
+    }
+
+    /// The answer to the fighter question. Cancel changes nothing and opens the list again; Keep and Switch make the
+    /// combo the target, and Switch asks for P1's fighter when the menu closes.
+    fn answered(&mut self, asking: Asking, answer: Option<FighterChoice>) -> Option<String> {
+        let recorded = Some(asking.fighter.kind());
+        let Some(choice) = answer else {
+            live::fighter_event(event::CANCELLED, recorded, asking.p1, 0);
+            if let Err(why) = self.show_list() {
+                self.active = None;
+                return Some(why);
+            }
+            return None;
+        };
+        let code = if choice == FighterChoice::Switch { event::SWITCH } else { event::KEEP };
+        live::fighter_event(code, recorded, asking.p1, 0);
+        self.active = None;
+        let tail = fighter::answer_note(choice, asking.fighter, &asking.p1_label);
+        match self.target(&asking.id, asking.record, Some(tail)) {
+            Ok(note) => {
+                if choice == FighterChoice::Switch {
+                    self.switch_at_close = Some(asking.fighter);
+                }
+                Some(note)
+            }
+            Err(why) => Some(why),
+        }
+    }
+
+    /// The menu closed (`worker::close_session`): P1's switch, when Switch was answered, goes to the roster loader now,
+    /// so the loader's wait for the menu to release input starts here (the Practice Stage request's moment). Refusals
+    /// carry the loader's own notice; this one names the fighter.
+    pub fn after_close(&mut self) {
+        let Some(wanted) = self.switch_at_close.take() else { return };
+        let queued = roster::request_player_kind(wanted.kind());
+        live::fighter_event(event::REQUESTED, Some(wanted.kind()), roster::player_kind(), u32::from(queued));
+        if !queued {
+            let note = format!("P1 was not switched to {}", wanted.name());
+            notices::upsert(0x2A, "Combos", &note, 180, DEFAULT_COLOR);
+        }
     }
 
     fn delete(&mut self, id: &str) -> Result<String, String> {
@@ -275,7 +407,7 @@ impl Ui {
 
     pub fn view(&self) -> Option<View> {
         let mut view = external::panel_view_now()?;
-        if matches!(self.active, Some(Editor::ComboLibrary | Editor::ComboTarget)) && self.naming.is_none() {
+        if matches!(self.active, Some(Editor::ComboLibrary | Editor::ComboTarget)) && self.naming.is_none() && self.asking.is_none() {
             view.footer = "> marks the target.\nA Target · X Rename · Y Delete · B Return".into();
         }
         Some(view)
@@ -285,6 +417,9 @@ impl Ui {
     pub fn leave_panel(&mut self) {
         if !named_macros::suspended() {
             self.active = None;
+            if self.asking.take().is_some() {
+                PROMPT_REVISION.fetch_add(1, Ordering::AcqRel);
+            }
         }
     }
 }
