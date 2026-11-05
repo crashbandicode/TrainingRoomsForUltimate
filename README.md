@@ -118,10 +118,14 @@ The *Replay capture* row and the Online Deluxe overlay show the same setting.
 
 ## Status
 
-**0.2.0-rc.1** (2026-11-05) is the console test build. Known issues: a pause that opens while a preloaded helper
-fighter is still loading can crash; the Solo Popo marks' placement and the Kirby hat-request rules change in rc.2
-([ROADMAP](docs/ROADMAP.md)). Limitations kept from the fork are listed in
-[Differences from the fork](docs/DIFFERENCES-FROM-THE-FORK.md). 0.1.0 crashes at console boot; use 0.2.0-rc.1.
+**0.2.0-rc.2** (2026-11-05) is the console test build. It adds to rc.1:
+- the pause-helper fix: a pause that opens while a preloaded helper fighter is loading retires that load, and the
+  helper is created again after the pause;
+- the Solo Popo marks on the icon's lower corners, keeping the name clear;
+- the Kirby hat-request ending rules: a request always ends by game frames, and ends when the role stops being Kirby.
+
+Limitations kept from the fork are listed in [Differences from the fork](docs/DIFFERENCES-FROM-THE-FORK.md); planned
+work is in the [ROADMAP](docs/ROADMAP.md). 0.1.0 crashes at console boot; use the newest build, 0.2.0-rc.2.
 
 ## Build
 
