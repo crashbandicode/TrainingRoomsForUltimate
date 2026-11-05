@@ -621,8 +621,12 @@ pub(crate) fn plan_budget(menu: &crate::engine::compat::menu::TrainingModpackMen
             // (Pyra, PT, IC, the Miis) must not give its share to helper sources, which stay resident for the scene
             // (Yoga swoff2 steps 79-97).
             if !grouped && lane.iter().any(Option::is_some) {
-                let roster = if role == 0 { menu.player_roster.fighters_excluding_fixed(None) }
-                    else { menu.cpu_roster.fighters_excluding_fixed(None) };
+                // P-CYCLE: the one cycle list, with the CPU owner's published Mii admission.
+                let roster = if role == 0 {
+                    crate::engine::swap::cycle_members::cycle_members(menu.player_roster, crate::engine::swap::cycle_members::ALL_MII)
+                } else {
+                    crate::engine::swap::cycle_members::cycle_members(menu.cpu_roster, super::cpu_cycle_admission())
+                };
                 let mut cycle = crate::engine::swap::ordered_roster::KindList::new(0);
                 for fighter in roster.iter() { cycle.push(fighter.kind()); }
                 // The `window_lane` rule: a cycle `0x4b` is a member only as this role's Solo Popo.

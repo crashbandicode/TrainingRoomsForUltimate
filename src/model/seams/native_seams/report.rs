@@ -75,6 +75,27 @@ const fn unusable(bits: u8) -> bool {
     matches!(bits & CODE_MASK, OCCUPIED | FOREIGN | OUT_OF_REGION | UNCAPTURED)
 }
 
+/// Whether a check that records `code` over the row's `old` bits names the row in the shipped log: a refused code
+/// (`occupied`, `foreign`, `out_of_region`) the row did not have yet. The installer puts this plugin's own writes back
+/// before it compares (`model::own_patches`), so such a code means another plugin's write or a change that is no hook.
+pub const fn names_row(old: u8, code: u8) -> bool {
+    old & CODE_MASK != code & CODE_MASK && matches!(code & CODE_MASK, OCCUPIED | FOREIGN | OUT_OF_REGION)
+}
+
+/// The shipped line that names a refused row (`names_row`).
+pub struct RefusedLine<'a> {
+    pub label: &'a str,
+    pub group: &'a str,
+    pub offset: usize,
+    pub code: u8,
+}
+
+impl fmt::Display for RefusedLine<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[TrainingSeams] seam={} group={} offset={:#x} outcome={}", self.label, self.group, self.offset, code_name(self.code))
+    }
+}
+
 /// Bits after a check records `code`, flags kept. From the install line on (`booted`), a changed code
 /// (a first check included) makes the row pending and restarts its interval (`SEEN` cleared).
 pub const fn recorded(old: u8, code: u8, booted: bool) -> u8 {

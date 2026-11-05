@@ -5,3 +5,4 @@ pub mod clip_browser;
 pub mod clip_panel;
 pub mod macro_panel;
 pub mod replay_panel;
+pub mod replay_target;

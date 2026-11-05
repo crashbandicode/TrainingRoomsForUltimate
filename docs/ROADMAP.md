@@ -46,17 +46,32 @@ The RC is M5q parity plus the new UI and clean MIT provenance; this list is not 
 | F9 helper promotion, fixed-seat ownership, hat/item cutover | Removed from the RC; M5q count behaviour kept. Partial count/body/HUD/reset evidence only. |
 | Hurtboxes (HB1) | Phase 3 work; see the hitbox visualizer's current state in the README. |
 | Ten hot fighters plus five separate hot hats | Proven capacity behaviour kept; no separate 15-body feature. |
-| Setup Library / SaveSetup | Screen entries and transactions disabled; saved files left intact. |
 | Saved/replay Mii bust provider (Q15) | No new provider or hook; the native saved-Mii selection stays. |
 | Frame/status text backgrounds (UI22) | Reverted to the pre-UI22 state. The input log and its light-background contrast are gone in rc.3 (the frame strip has its own backdrop). |
-| Named-macro library/preview extensions (F8 design C) | Exposed operations narrowed; basic capture and synchronization kept. |
-| State-destructor alternative | Never integrated. |
 | Further latency work (F6) | M5q cold-switch hitches kept; the zero-Unmapped and zero-allocation fixes stay. |
 | Hitbox sphere replacement | Done for fighter spheres in rc.3 (own discs, never refused). Projectiles keep the game's effect spheres. |
 | Remaining feature/edge-case inventory | Kept for later planning. |
 
 Timer-recording truncation is an observed TrainingRooms limitation with no established M5q equivalence; it is not
 called an inherited bug. (The input-log contrast went with the input log in rc.3.)
+
+The named-macro library and preview extensions (F8 design C) are done in rc.5 (`p23/replay-window`: Setup library,
+Edit placement, Replay window, and a named macro recorded on another fighter with Switch/Keep). The state-destructor
+alternative was dropped by the operator.
+
+## Next (operator 2026-11-05, DEFERRED-LIST)
+
+In this order (`docs/DECISIONS.md` DEFERRED-LIST on `review/menu-proposal` `6d19902`):
+
+- Combo: switch P1 to the combo's recorded fighter, with the same Switch/Keep prompt as a named macro.
+- Lobby Items (N11): now in rc.5 (`p23/lobby-items`, primary order 2026-11-05 18:58Z); see the N11 section below.
+- Ten hot fighters plus five hot hats (five while one CPU; operator decision HOT-SLOTS-CEILING); preloading starts on
+  entering Training; no hitch on the first switch to a fighter that is not preloaded yet (F6).
+- Replay/saved-Mii busts (Q15): not built; the Mii rows stay text (operator 2026-11-05; the game makes a Mii picture
+  only through its live selector).
+- Backgrounds behind the plugin's notices and status texts (UI22).
+- Timer-recording truncation: root cause and fix.
+- Then F9 helper promotion, fixed seats and the hat/item cutover.
 
 ## Phase 2 N11: Lobby Items (operator order)
 
@@ -66,3 +81,14 @@ removes an existing item once through the native removal; no per-frame sweep. Tr
 matches are untouched. Acceptance: host tests for policy, scene, persistence and import; 64-byte guards; zero hook
 allocations; one Eden batch (Off no-spawn window, existing-item removal, On spawn return, zero Unmapped, both consoles
 `desync_seen` 0 in an online smoke with the row Off).
+
+**Implemented 2026-11-05 (`p23/lobby-items`), in 0.2.0-rc.5; its Eden rows run in the rc.5 grouped session.**
+
+- **Spawning:** one inline hook on the item spawner's own switch test (`main+0x15d9a80`, the `cbz` after
+  `ldrb w8,[c,#0x30]`). In a qualified waiting scene with the row Off, the native takes its own off path; elsewhere the
+  hook leaves everything alone. Nothing is written to the game, so nothing needs restoring.
+- **Existing items:** removed once per Off edge through `ItemManager::remove_item_from_id`, from Player 1's frame, and
+  only after the practice ItemGate allows it.
+- **Code:** the policy is in `src/model/lobby_items.rs`, the runtime in `src/runtime/lobby/lobby_items.rs`, and the
+  seam rows in `rows_lobby_items.rs` (`tools/gen_rows_lobby_items.py`).
+- **Design and static facts:** the P-N11 section of the lane report.

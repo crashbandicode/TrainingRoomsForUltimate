@@ -59,6 +59,13 @@ The input display (Display & Controls › Input Display) is a strip at the top o
 Player 1's and the CPU's frames, each press, how the last follow-up linked (a true combo by N frames, or dropped) and the
 frame advantage. It replaces the 15-row input log. *No clip yet.*
 
+### Combos
+
+Recording › Combos saves a combo you landed, and the combo helper grades your next attempts against it, link by link.
+Each saved combo is a small JSON file in `sd:/ultimate/TrainingRooms/combos/`. You can edit it, copy it to another
+card or share it, and any fighter can practise it; [docs/COMBOS.md](docs/COMBOS.md) describes the format. *No clip
+yet.*
+
 ### CPU reactions
 
 ![DI Up, two forward smashes](docs/media/di-up.gif)
@@ -91,6 +98,17 @@ NRO `50d95130`.*
 
 While the CPU pilot plugin plays Player 1, recording is refused with a notice.
 
+### Combos
+
+![The combo helper grading two attempts against a true combo: on time, then 3f early](docs/media/combo-helper.gif)
+
+*The combo helper bar under the frame strip: the saved up tilt → up tilt (TRUE −4) attempted on time, then 3 frames
+early. Eden, 2026-11-05, `ff69e53` (release `031f1eae…`).*
+
+*Save last combo* (Recording › Combos) keeps your last combo as a file and makes it the target. With *Combo helper* On, a
+bar under the frame strip grades each attempt link by link: whether it linked, and whether you pressed on time, early or
+late. See [docs/MEDIA.md](docs/MEDIA.md).
+
 ### Fighters, cycles and Kirby hats
 
 ![Character Cycles: order badges on the game's stock icons](docs/media/cycle-badges.gif)
@@ -101,6 +119,22 @@ game's stock icons.
 ![P1's hat chord on the CPU Kirby](docs/media/cpu-kirby-hat.gif)
 
 Kirby hats change with a chord, for Player 1 or the CPU.
+
+### Mii fighters
+
+![Add New opens the game's own Mii editor; a special is picked and saved](docs/media/mii-editor.gif)
+
+*Add New opens Smash's Mii Fighter editor: Neutral Special 3 picked, OK, Save. Eden, 2026-11-05, `ff69e53` (release
+`031f1eae…`).*
+
+![The new Mii in the Mii Brawler list, picked as the Player choice](docs/media/mii-editor-list.gif)
+
+*A new Mii (2. 格斗 [2111]) in the Mii Brawler list, picked as the Player choice. Eden, 2026-11-05, `ff69e53` (release
+`031f1eae…`).*
+
+Each Mii class (Fighters & Stages › Mii Brawler, Swordfighter, Gunner) lists your saved Miis per role (ZR switches
+Player and CPU). *Add New…* opens Smash's own Mii Fighter editor from Training. Saving creates a new Mii and leaves the
+others untouched, and leaving without saving creates nothing. See [docs/MII.md](docs/MII.md).
 
 ### Stages
 

@@ -285,6 +285,47 @@ fn core06_training_gate() {
     assert!(!hitbox::enabled(&snapshot));
 }
 
+/// The waiting room resolves its own entry gate (tr-p23-rc5-1, 2026-11-05: Hitbox Visualization On, a boot whose first
+/// practice was the waiting room, 691 orb ticks with nothing drawn). The Lobby scene judges a fighter by its entry, read
+/// with the work id `ensure_ready` gets from the constant table. Before the fix only three callers asked: Training's pass
+/// (whose scene needs no entry), the ATTACK/CATCH command hook and the rebound hook; the pass asked
+/// `!visualizes || !ensure_ready()`, so in the Lobby it never asked (visualizes needed the id first). The Lobby's own
+/// path, `visualizes`, must ask itself, through the model's `practice_entry`.
+#[test]
+fn core06_lobby_resolves_its_entry_gate() {
+    let g = callgraph::Graph::scan(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime"), &[]);
+    let found = g.find("hitbox::visualizes");
+    assert_eq!(found.len(), 1, "{found:?}");
+    let body = &g.funcs[found[0]].body;
+    let names = |ident: &str| body.iter().any(|t| matches!(t, callgraph::Tok::Ident(s) if s == ident));
+    assert!(names("ensure_ready"), "visualizes must resolve the entry work id on the waiting room's own path");
+    assert!(names("practice_entry"), "visualizes takes the entry through model::hitbox::practice_entry");
+
+    // The model: native Training needs no entry and asks nothing; the waiting room asks for the work id when it does not
+    // know it, then reads the fighter's entry; an object that is not a fighter, or no practice scene, asks nothing.
+    use model::scene::Scene;
+    use std::cell::Cell as Count;
+    let lobby_cpu = model::cpu::role::LOBBY_CPU_ENTRY;
+    for (scene, fighter, id, entry, want_asked, want) in [
+        (Some(Scene::Training), true, Some(7), 0, false, None),
+        (None, true, Some(7), 0, false, None),
+        (Some(Scene::Lobby), false, Some(7), 0, false, None),
+        (Some(Scene::Lobby), true, None, 0, true, None),
+        (Some(Scene::Lobby), true, Some(7), 0, true, Some(0)),
+        (Some(Scene::Lobby), true, Some(7), lobby_cpu, true, Some(lobby_cpu)),
+        (Some(Scene::Lobby), true, Some(7), 3, true, Some(3)),
+    ] {
+        let (asked, read_with) = (Count::new(false), Count::new(None));
+        let got = hitbox::practice_entry(scene, fighter, || { asked.set(true); id }, |work| { read_with.set(Some(work)); entry });
+        assert_eq!((asked.get(), got), (want_asked, want), "{scene:?} fighter={fighter} id={id:?}");
+        assert_eq!(read_with.get(), if want.is_some() { id } else { None });
+        // The first Lobby frame of a boot draws Player 1 and the practice CPU: no earlier Training or attack needed.
+        if scene == Some(Scene::Lobby) && fighter && id.is_some() {
+            assert_eq!(hitbox::visualizes_entry(scene, got), entry == 0 || entry == lobby_cpu);
+        }
+    }
+}
+
 #[test]
 fn core06_off_restores() {
     // Replay the pass over frames with the sleep record the runtime keeps (one entry per fighter accessor).

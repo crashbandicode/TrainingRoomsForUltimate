@@ -1,5 +1,7 @@
-//! A saved combo (SPEC-input-07 §4): `sd:/ultimate/TrainingRooms/combos/<id>.json` on the generic store, with
-//! `selected.txt` naming the target. Read by hand from `serde_json::Value` so a bad field is refused with its name.
+//! A saved combo (SPEC-input-07 §4, `docs/COMBOS.md`): `sd:/ultimate/TrainingRooms/combos/<id>.json` on the generic
+//! store, with `selected.txt` naming the target. An open, shareable format: read by hand from `serde_json::Value`, so
+//! unknown fields are ignored and a bad field is refused with its name; a file people copy in may have any safe file
+//! name, may leave out `schema_version` and `name`, and keeps its own extra fields when it is renamed.
 
 use core::fmt;
 
@@ -9,14 +11,17 @@ use serde_json::{json, Map, Value};
 
 use super::combo::{Aim, Combo, LinkRec, Step, LINKS, STEPS};
 use super::frame_strip::{Button, Move, Verdict};
-use super::store::{Record, Store, StoreError};
+use super::store::{default_id, Record, SkippedFile, Store, StoreError};
 
+/// The format's version. Fields added since are optional, so rc.4 (the first writer) reads every file written now.
 pub const SCHEMA_VERSION: u32 = 1;
 pub const MAX_FILE_BYTES: u64 = 64 * 1024;
 /// Longest name, in Unicode scalar values (the keyboard's limit, `MAX_NAME_CHARS` of macros and setups).
 pub const MAX_NAME_CHARS: usize = 48;
 /// The directory under the data folder.
 pub const DIR: &str = "combos";
+/// Longest file name a shared combo may have, in characters before `.json`.
+pub const MAX_FILE_NAME_CHARS: usize = 64;
 
 pub type ComboLibrary = Store<ComboRecord>;
 
@@ -41,11 +46,25 @@ impl From<StoreError> for ComboError {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 pub struct ComboRecord {
     pub name: String,
     pub combo: Combo,
+    /// The name of P1's fighter when the combo was saved. Metadata only: the helper grades whatever fighter P1 is.
+    pub recorded_on: Option<String>,
+    /// The JSON object the record was read from. Writing it back (a rename) changes only `name` (and adds
+    /// `schema_version` when the file had none), so fields someone added by hand stay.
+    source: Option<Map<String, Value>>,
 }
+
+/// Two records are the same combo when their name, links and recorded fighter are (not how their files are laid out).
+impl PartialEq for ComboRecord {
+    fn eq(&self, other: &Self) -> bool {
+        (&self.name, &self.combo, &self.recorded_on) == (&other.name, &other.combo, &other.recorded_on)
+    }
+}
+
+impl Eq for ComboRecord {}
 
 /// One row of the list.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -53,9 +72,48 @@ pub struct ComboEntry {
     pub id: String,
     pub name: String,
     pub links: usize,
+    pub recorded_on: Option<String>,
+}
+
+impl ComboEntry {
+    /// A file the plugin did not name (someone copied it in): its id is not one the store makes.
+    pub fn shared(&self) -> bool {
+        !default_id(&self.id)
+    }
+
+    /// The list row's text: `Name · N links · recorded on X`.
+    pub fn label(&self) -> String {
+        let mut label = format!("{} · {} links", self.name, self.links);
+        if let Some(fighter) = &self.recorded_on {
+            label.push_str(" · recorded on ");
+            label.push_str(fighter);
+        }
+        label
+    }
+}
+
+/// Whether a file name (without `.json`) may hold a combo: 1 to 64 characters, no path or drive separator, no
+/// character a FAT card cannot store, no control character, no leading dot and no surrounding spaces.
+pub fn shareable_id(id: &str) -> bool {
+    let chars = id.chars().count();
+    (1..=MAX_FILE_NAME_CHARS).contains(&chars)
+        && !id.starts_with('.')
+        && id.trim() == id
+        && !id.chars().any(|c| c.is_control() || matches!(c, '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|'))
+}
+
+/// A name as the list shows it: control characters dropped, trimmed, at most 48 characters; `None` when nothing is left.
+fn shown_name(text: &str) -> Option<String> {
+    let kept: String = text.chars().filter(|c| !c.is_control()).collect();
+    clean_name(&kept)
 }
 
 impl ComboRecord {
+    /// A combo the plugin saves now (no file yet).
+    pub fn new(name: String, combo: Combo, recorded_on: Option<String>) -> Self {
+        ComboRecord { name, combo, recorded_on, source: None }
+    }
+
     pub fn validate(&self) -> Result<(), ComboError> {
         let chars = self.name.trim().chars().count();
         if chars == 0 || chars > MAX_NAME_CHARS || self.name.chars().any(char::is_control) {
@@ -68,6 +126,12 @@ impl ComboRecord {
     }
 
     fn to_value(&self) -> Value {
+        if let Some(source) = &self.source {
+            let mut object = source.clone();
+            object.insert("schema_version".into(), json!(SCHEMA_VERSION));
+            object.insert("name".into(), json!(self.name));
+            return Value::Object(object);
+        }
         let links: Vec<Value> = self
             .combo
             .links()
@@ -86,21 +150,36 @@ impl ComboRecord {
                 })
             })
             .collect();
-        json!({"schema_version": SCHEMA_VERSION, "name": self.name, "links": links})
+        let mut value = json!({"schema_version": SCHEMA_VERSION, "name": self.name, "links": links});
+        if let Some(fighter) = &self.recorded_on {
+            value["recorded_on"] = json!(fighter);
+        }
+        value
     }
 
+    /// Tolerant where a person may have typed the file, strict where a wrong value would grade the wrong thing:
+    /// `schema_version` may be left out (it is 1), `name` may be left out or blank (the file name is used,
+    /// `Record::adopt`), `recorded_on` is kept only when it is text, and unknown fields are ignored; the links must
+    /// be exact.
     fn from_value(value: &Value) -> Result<ComboRecord, &'static str> {
         let object = value.as_object().ok_or("not an object")?;
-        if object.get("schema_version").and_then(Value::as_u64) != Some(u64::from(SCHEMA_VERSION)) {
-            return Err("schema_version");
+        match object.get("schema_version") {
+            None => {}
+            Some(version) if version.as_u64() == Some(u64::from(SCHEMA_VERSION)) => {}
+            Some(_) => return Err("schema_version"),
         }
-        let name = object.get("name").and_then(Value::as_str).ok_or("name")?.to_owned();
+        let name = match object.get("name") {
+            None | Some(Value::Null) => String::new(),
+            Some(Value::String(text)) => shown_name(text).unwrap_or_default(),
+            Some(_) => return Err("name"),
+        };
+        let recorded_on = object.get("recorded_on").and_then(Value::as_str).and_then(shown_name);
         let links = object.get("links").and_then(Value::as_array).ok_or("links")?;
         if links.is_empty() || links.len() > LINKS {
             return Err("links");
         }
         let combo = Combo::from_links(links.iter().map(link_of).collect::<Result<Vec<_>, _>>()?).ok_or("links")?;
-        Ok(ComboRecord { name, combo })
+        Ok(ComboRecord { name, combo, recorded_on, source: Some(object.clone()) })
     }
 }
 
@@ -227,8 +306,31 @@ impl Record for ComboRecord {
     }
 
     fn summary(&self, id: &str) -> ComboEntry {
-        ComboEntry { id: id.to_owned(), name: self.name.clone(), links: self.combo.len() }
+        ComboEntry { id: id.to_owned(), name: self.name.clone(), links: self.combo.len(), recorded_on: self.recorded_on.clone() }
     }
+
+    /// Shared files may have any safe name (`shareable_id`), not only the slugs the store makes.
+    fn accepts_id(id: &str) -> bool {
+        shareable_id(id)
+    }
+
+    /// A file without a usable `name` is called by its file name.
+    fn adopt(&mut self, id: &str) {
+        if self.name.is_empty() {
+            self.name = shown_name(id).unwrap_or_default();
+        }
+    }
+}
+
+/// The notice for files the list could not use: the first one's name and why, and how many more. `None` when there are none.
+pub fn skipped_note(skipped: &[SkippedFile]) -> Option<String> {
+    let first = skipped.first()?;
+    let file = if first.file.is_empty() { "A combo file" } else { first.file.as_str() };
+    let mut note = format!("{file} skipped: {}", first.reason);
+    if skipped.len() > 1 {
+        note.push_str(&format!(" (+{} more)", skipped.len() - 1));
+    }
+    Some(note)
 }
 
 /// "Combo N" with the lowest N no entry uses (SPEC-input-07 §5).
@@ -245,3 +347,7 @@ pub fn clean_name(typed: &str) -> Option<String> {
 #[cfg(test)]
 #[path = "combo_record_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "combo_record_share_tests.rs"]
+mod share_tests;

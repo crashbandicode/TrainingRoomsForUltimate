@@ -96,6 +96,9 @@ fn run_inner() {
     // would, before any hook of ours (the default order) or, with `,after`, just before the install line.
     #[cfg(feature = "seam-drill")]
     crate::runtime::seams::seam_drill::before();
+    // Before the first hook or patch of this plugin (and after the drill's stand-ins, which play another plugin): keep the bytes at
+    // every site a hook row writes, so a later seam check reads our own writes as what they replaced (`model::own_patches`).
+    crate::runtime::seams::seam_install::prime();
 
     // 2. Panic policy (decision B2): log it, no pop-up. `panic = "abort"` then ends the process.
     std::panic::set_hook(Box::new(|info| {
@@ -305,6 +308,9 @@ fn run_inner() {
     // SPEC-input-06 §4: the strip's hitstun-left read is the CPU tech unit's `work_get_float` row; without it a true
     // combo shows no margin and the rest of the strip draws.
     input_display::set_reaction(display_on && capabilities::unit_usable(Feature::CpuTech, &usable));
+    // SPEC-input-07 §4: a saved combo's "recorded on" reads P1's fighter with the CPU core's `utility_get_kind` row;
+    // without it a save records no fighter and the strip and the helper are unchanged.
+    input_display::set_fighter_read(display_on && capabilities::unit_usable(Feature::CpuCore, &usable));
     let recording_closure = capabilities::unit_usable(Feature::Recording, &usable);
     let notices_closure = capabilities::cross_blocked_by(Feature::Notices, &usable).is_none();
     let (recording_on, notices_on) = install_pkg4(input_delay_on && recording_closure, cpu_core_on, notices_closure, &found4, &mut written4);
@@ -413,6 +419,8 @@ fn run_inner() {
         FeatureReport { feature: Feature::Roster.name(), installed: roster_on, reason: (!roster_on).then_some("site_guard"), site: None },
     ];
     feature_reports_fit(&features);
+    // Every boot write is in place: record what our writes left (before the drill's "after" stand-ins, which play another plugin).
+    crate::runtime::seams::seam_install::seal();
     #[cfg(feature = "seam-drill")]
     crate::runtime::seams::seam_drill::after();
     let seam_fields = crate::runtime::seams::seam_install::InstallFields;

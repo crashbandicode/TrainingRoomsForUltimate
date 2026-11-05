@@ -76,6 +76,8 @@ const BOUNDARIES: &[Boundary] = &[
     Boundary { function: "input_display::sampling", owner: Some(Feature::InputDisplay), gate: Gate::Flag("ENABLED") },
     // Its hitstun-left read: the CPU tech unit's work_get_float row (boot sets the flag from that unit's closure).
     Boundary { function: "input_display::reaction_left", owner: Some(Feature::CpuTech), gate: Gate::Flag("REACTION_ON") },
+    // A saved combo's "recorded on": the CPU core unit's utility_get_kind row (boot sets the flag from that unit's closure).
+    Boundary { function: "input_display::p1_fighter", owner: Some(Feature::CpuCore), gate: Gate::Flag("KIND_ON") },
     // The recorder's entry points the other features call: dormant until boot enables the recorder.
     Boundary { function: "recorder::request_playback", owner: Some(Feature::Recording), gate: Gate::Flag("ENABLED") },
     Boundary { function: "recorder::on_state_restored", owner: Some(Feature::Recording), gate: Gate::Flag("ENABLED") },
@@ -567,4 +569,10 @@ fn the_input_display_degrades_apart_from_input_delay() {
     // The CPU core's role test is the core's own: its two reset-hub rows stay in its closure.
     let usable = |s: &model::sites::Site| s.name != "is_operation_cpu";
     assert_eq!(capabilities::blocked_by(Feature::CpuCore, &usable), Some("is_operation_cpu"));
+}
+
+/// The seam installer sizes its own-write records with `WRITING_SITES` (`runtime::seams::seam_install::prime`).
+#[test]
+fn writing_sites_counts_every_row_that_writes_code() {
+    assert_eq!(capabilities::all_sites().filter(|site| capabilities::writes_code(site)).count(), capabilities::WRITING_SITES);
 }

@@ -24,6 +24,8 @@ pub mod rows_a5;
 /// WP-R: the per-body identity view's hook sites (`src/swap_native/identity_view.rs`).
 pub mod rows_identity;
 pub mod rows_q15;
+/// Phase 2 N11: Lobby Items' spawner switch hook and the instructions it relies on (`src/runtime/lobby/lobby_items.rs`).
+pub mod rows_lobby_items;
 /// The installer's outcome-slot bits and its late report (`[TrainingSeams] late …`, R-A0b).
 pub mod report;
 /// The hook-sharing drill's setting and sites (the diagnostic build's stand-ins).
@@ -186,8 +188,10 @@ impl Site {
 
 /// Every row file, in table order: the one list a new row file joins (`COUNT`, `SITES`, and the host
 /// tests' `all()` read it).
-const TABLES: [&[Seam]; 7] =
-    [rows_a1::ROWS, rows_a2::ROWS, rows_a3::ROWS, rows_a4::ROWS, rows_a5::ROWS, rows_identity::ROWS, rows_q15::ROWS];
+const TABLES: [&[Seam]; 8] = [
+    rows_a1::ROWS, rows_a2::ROWS, rows_a3::ROWS, rows_a4::ROWS, rows_a5::ROWS, rows_identity::ROWS, rows_q15::ROWS,
+    rows_lobby_items::ROWS,
+];
 
 const fn total(tables: &[&[Seam]]) -> usize {
     let (mut n, mut t) = (0, 0);
@@ -282,6 +286,52 @@ const fn own_hook_pairs(tables: &[&[Seam]]) -> [(&'static str, &'static str); OW
 /// (row label, own hook label) of every `Sharing::OwnHook` row, in table order: the run-time view of
 /// that rule (`Site::own_hook`, and the installer's registration of the hook's replacement address).
 pub static OWN_HOOK_PAIRS: [(&str, &str); OWN_HOOK_ROWS] = own_hook_pairs(&TABLES);
+
+/// A compared hook row: a site in code this plugin writes (`model::own_patches`).
+const fn writes_code(seam: &Seam) -> bool {
+    matches!(seam.kind, SeamKind::Hook { .. }) && seam.compared() && matches!(region_of(seam.offset), Some(MainRegion::Text))
+}
+
+const fn patch_rows(tables: &[&[Seam]]) -> usize {
+    let (mut n, mut t) = (0, 0);
+    while t < tables.len() {
+        let rows = tables[t];
+        let mut i = 0;
+        while i < rows.len() {
+            if writes_code(&rows[i]) {
+                n += 1;
+            }
+            i += 1;
+        }
+        t += 1;
+    }
+    n
+}
+
+/// Compared hook rows in code: the installer records the bytes at each (`seam_install::prime` / `seal`).
+pub const PATCH_ROWS: usize = patch_rows(&TABLES);
+
+const fn patch_sites(tables: &[&[Seam]]) -> [usize; PATCH_ROWS] {
+    let mut out = [0; PATCH_ROWS];
+    let (mut n, mut k, mut t) = (0, 0, 0);
+    while t < tables.len() {
+        let rows = tables[t];
+        let mut i = 0;
+        while i < rows.len() {
+            if writes_code(&rows[i]) {
+                out[n] = k;
+                n += 1;
+            }
+            i += 1;
+            k += 1;
+        }
+        t += 1;
+    }
+    out
+}
+
+/// The global index (`SITES`) of every compared hook row in code, in table order.
+pub static PATCH_SITES: [usize; PATCH_ROWS] = patch_sites(&TABLES);
 
 const fn entry_or_body_count(tables: &[&[Seam]]) -> usize {
     let (mut n, mut t) = (0, 0);

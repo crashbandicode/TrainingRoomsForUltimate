@@ -224,6 +224,11 @@ impl Snapshot {
         self.rows[STAGE_HAZARDS][0] != 0
     }
 
+    /// Lobby Items (Fighters & Stages, default On, the native behaviour): the first option (`On`) set, or neither set.
+    pub fn lobby_items(&self) -> bool {
+        self.get("lobby_items").is_none_or(|row| row.first().copied().unwrap_or(0) != 0 || row.iter().all(|v| *v == 0))
+    }
+
     fn to_value(&self) -> Value {
         let mut object = self.extra.clone();
         for (def, row) in DEFS.iter().zip(&self.rows) {

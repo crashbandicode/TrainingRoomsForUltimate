@@ -5,6 +5,9 @@
 use super::external;
 use crate::engine::macro_ui::macro_panel::{LibraryRow, View, COMBO_KEYBOARD_TITLE};
 use crate::model::combo_record::{clean_name, default_name, ComboLibrary, ComboRecord, DIR};
+use crate::model::notify::DEFAULT_COLOR;
+use crate::model::store::SkippedFile;
+use crate::runtime::features::notices;
 use crate::model::menu::{input::Button, table::Editor};
 use crate::runtime::features::combo as live;
 use crate::runtime::macros::named_macros;
@@ -18,6 +21,16 @@ pub fn is_combo(editor: Editor) -> bool {
 
 fn library() -> ComboLibrary {
     ComboLibrary::new(format!("{}/{DIR}", crate::model::storage::ROOT))
+}
+
+/// The standing notice that names a combo file the plugin could not use (the Combos notes use `0x2A`).
+const FILE_NOTICE: u8 = 0x2B;
+
+/// One notice naming the first unusable file and why, and how many more there are: never a silent drop.
+fn note_skipped(skipped: &[SkippedFile]) {
+    if let Some(text) = crate::model::combo_record::skipped_note(skipped) {
+        notices::upsert(FILE_NOTICE, "Saved combos", &text, 300, DEFAULT_COLOR);
+    }
 }
 
 /// What a name the keyboard returns is for.
@@ -56,8 +69,9 @@ impl Ui {
         self.loaded = true;
         let library = library();
         if let Some(id) = library.selected() {
-            if let Ok(record) = library.load(&id) {
-                self.apply_target(Some((id, record)));
+            match library.load(&id) {
+                Ok(record) => self.apply_target(Some((id, record))),
+                Err(why) => note_skipped(&[SkippedFile { file: format!("{id}.json"), reason: why.to_string() }]),
             }
         }
     }
@@ -108,7 +122,8 @@ impl Ui {
             Some(name) => name,
             None => default_name(&library.list().map_err(|e| e.to_string())?.entries),
         };
-        let record = ComboRecord { name, combo };
+        let recorded_on = live::p1_kind().map(named_macros::fighter_label);
+        let record = ComboRecord::new(name, combo, recorded_on);
         let id = library.save_new(&record).map_err(|e| e.to_string())?;
         live::set_draft("");
         live::saved(&combo);
@@ -124,6 +139,9 @@ impl Ui {
     fn show_list(&mut self) -> Result<(), String> {
         let listing = library().list().map_err(|e| e.to_string())?;
         self.listed = listing.entries.len();
+        let shared = listing.entries.iter().filter(|e| e.shared()).count();
+        live::listed(self.listed, listing.skipped.len(), shared);
+        note_skipped(&listing.skipped);
         if self.listed == 0 {
             return Err("No combos saved yet: Save last combo first".into());
         }
@@ -132,7 +150,7 @@ impl Ui {
             .entries
             .into_iter()
             .map(|e| LibraryRow {
-                label: format!("{}{} · {} links", if Some(e.id.as_str()) == target { "> " } else { "" }, e.name, e.links),
+                label: format!("{}{}", if Some(e.id.as_str()) == target { "> " } else { "" }, e.label()),
                 id: e.id,
             })
             .collect();
@@ -222,7 +240,10 @@ impl Ui {
         let library = library();
         let record = library.load(id).map_err(|e| e.to_string())?;
         library.select(Some(id)).map_err(|e| e.to_string())?;
-        let note = format!("Target: {} ({} links)", record.name, record.combo.len());
+        let note = match &record.recorded_on {
+            Some(fighter) => format!("Target: {} ({} links, recorded on {fighter})", record.name, record.combo.len()),
+            None => format!("Target: {} ({} links)", record.name, record.combo.len()),
+        };
         self.apply_target(Some((id.to_owned(), record)));
         Ok(note)
     }

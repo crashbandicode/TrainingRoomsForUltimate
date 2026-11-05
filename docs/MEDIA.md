@@ -1,8 +1,31 @@
 # Media
 
-Every GIF in [`media/`](media/) is actual Eden footage: whole screen, 1280×720, one continuous take trimmed only at the
-ends, under 10 s, game-speed timing kept. Frames were reviewed (start, action, result) before a clip was kept. The
-raw takes stay outside git with their runs.
+Every GIF in [`media/`](media/) is actual Eden footage: whole screen, 1280×720, one clip per behaviour, under 10 s,
+game-speed timing kept, trimmed at the ends (any cut inside a clip is listed with it). Frames were reviewed (start,
+action, result) before a clip was kept. The raw takes stay outside git with their runs.
+
+## 0.2.0-rc.4 clips (2026-11-05)
+
+Run `tr-p23-rc4-docs-2` on the Yoga, 2026-11-05 19:32–20:05Z: the RELEASE NRO of `p23/rc4-candidate` `ff69e53`
+(`031f1eaecbd3d0d0284616baf10b8e8c955623b8821ce42976266c1dd10b2d9d`), with the CPU pilot, Online Deluxe and tile-cursor
+plugins installed; Eden muted. P1 Mario and CPU Mario, Hitbox Visualization Off, Input Display Frame strip. Each clip is
+one continuous take from Eden's own recorder at 1280, re-encoded with the playbook's `tools/eden-solo/encode.py` (one
+shared palette, no dither, fps 0: Eden's own frame times). Facts in the captions come from guest tracepoints and the
+profile's files, not from a diag build.
+
+| File | What it shows |
+| --- | --- |
+| `combo-helper.gif` | The **combo helper** bar under the frame strip, on Training's stage. The target is *Combo 1*: P1's up tilt into up tilt, saved with *Save last combo*, a **true** link (TRUE −4) at the CPU's 42% (every save-state load sets it). Two attempts from the same save state: the same presses, graded **on time** ("clean, 1 of 1"); then the follow-up 3 frames sooner, **Attack 3f early**, still true ("1 of 1 true"). Offsets from `tr_combo_link_v1`: 0 and −3. 1280×720, every second frame kept with its time (7.5 fps), 9.4 s, 12.9 MB: the camera follows the fighters, so the whole frame moves and compresses less than the playbook's 3–5 MB note. |
+| `mii-editor.gif` | The **Mii editor**: in Fighters & Stages › Mii Brawler (*1. 格斗 [1111]*, *2. 格斗 [2111]*, *Add New…*), A on *Add New…* opens the game's own Mii Fighter Settings, seeded from the role's Player choice; Special Moves › Neutral Special › *3 Exploding Side Kick*, OK, Save. The game gave the new Mii id 13349, and exactly one file, `mii_13349.bin`, was added; every other Mii file stayed byte-identical (tracepoints on the editor's decision and release; the profile's save folder). 1280×720, 9.3 s, 3.9 MB. |
+| `mii-editor-list.gif` | Mii Brawler's list after a save earlier in the run (id 13345): Down to the new Mii, *2. 格斗 [2111]*, and A takes it as the Player choice (the marker moves to it; it applies when P1 next becomes a Mii Brawler). 1280×720, 4.5 s, 41 KB. |
+
+After the editor saves, Training comes back with the boot's character-select fighters, not the menu's (reported to the Mii
+lane).
+
+Not in these clips:
+- **Exit without saving:** not shown; the rc.4 session `tr-p23-rc4-2` row mii-03 proved that it writes nothing.
+- **An interrupted editor:** that needs a Quickplay or Local Wireless match starting while you edit, which Training
+  can't show.
 
 ## 0.2.0-rc.3 clips (2026-11-05)
 
@@ -32,11 +55,16 @@ the same), with the CPU pilot, Online Deluxe and tile-cursor plugins installed.
 Since rc.3, ZR on a page no longer resets it (the `menu-defaults.gif` clip below shows the old key): each page
 ends with *Reset page to defaults*, which asks for confirmation.
 
-### Not captured yet
+### Change Stage
 
-| Feature | Clip | Where it is captured |
-| --- | --- | --- |
-| Change Stage | `change-stage.gif` | the rc.3 follow-up boot (the combined session's take ended before the new stage was in) |
+Run `tr-p23-rc3-fu2-2` on the Surface, 2026-11-05 ~17:30Z: the RELEASE NRO of `p23/rc3-candidate` `f0eda16` (with
+the rc.3 review fixes; `e73d5af842c04430f73ab09b8b3dd74371f01adec194ade76e568b7ac357d2de`), the same plugins and fighters
+as above. Re-encoded the same way (step 2, 96 colours), each frame then given 160 ms so the clip plays in 9.3 s for the
+9.5 s taken.
+
+| File | What it shows |
+| --- | --- |
+| `change-stage.gif` | Fighters & Stages › Change Stage: the stage grid with Battlefield picked; Y gives its Ω form and A closes the menu ("Stage requested" on the old stage); Training reloads on Battlefield Ω (the game's stage id went from `0x15b` to `0x1`, read by a guest tracepoint). 9.3 s, step 2. |
 
 `hitbox-overlay.gif` below shows rc.1's effect spheres; rc.3 draws fighter spheres as discs.
 

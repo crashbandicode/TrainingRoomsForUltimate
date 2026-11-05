@@ -150,25 +150,13 @@ pub(crate) fn cancel_character_selection() {
 }
 /// Select a recording as the named macro. `prompt` is true only for an explicit
 /// library load: boot restore and a clip saved right after its own fighter choice
-/// never ask. During the RC freeze only matching-current playback is enabled;
-/// a boot-restored selection waits for its recorded CPU identity.
-fn commit_selected(id:String, recording:MacroRecording, prompt:bool, current:Option<i32>) -> Result<Effect,String> {
+/// never ask, and a mismatch there keeps the current CPU.
+fn commit_selected(id:String, recording:MacroRecording, prompt:bool, current:Option<i32>) -> Result<Effect,crate::engine::macros::MacroError> {
     let context=load_context(&recording,prompt,current);
-    if !crate::runtime::ADVANCED_RECORDING_WORKFLOWS {
-        let target = recording.playback_target().map_err(|e| e.to_string())?;
-        if target.configuration().is_some() {
-            return Err("Exact Mii named loading is unavailable in this release".into());
-        }
-        // Boot may restore the selection before a CPU exists. Published playback
-        // remains gated on its recorded identity once the fighter settles.
-        if current.is_some() && !context.matches {
-            return Err("Choose the recorded CPU fighter before loading this macro".into());
-        }
-    }
     // A pending question changes nothing yet: the old selection's revision, and
     // any exact-Mii receipt tied to it, stay valid until the user answers.
     if context.gate(&recording)!=FighterGate::Prompt {begin_selection();}
-    lock_write(&UI).offer_load(id,recording,context).map_err(|e| e.to_string())
+    lock_write(&UI).offer_load(id,recording,context)
 }
 /// The named selection changes now: retire every request tied to the old one.
 fn begin_selection() {
@@ -188,7 +176,7 @@ fn load_context(recording:&MacroRecording, prompt:bool, current:Option<i32>) -> 
         matches,
         prompt_enabled:prompt && read(&MENU).fighter_prompt==OnOff::ON,
         // An exact Mii can only be requested by the Mii alpha; other builds keep the CPU.
-        can_switch:crate::runtime::ADVANCED_RECORDING_WORKFLOWS && target.is_some_and(|target|cfg!(feature="mii-ordinary-cpu-alpha") || target.configuration().is_none()),
+        can_switch:target.is_some_and(|target|cfg!(feature="mii-ordinary-cpu-alpha") || target.configuration().is_none()),
         revision:selection_revision(),
         recorded_label:if target.is_some_and(|target|target.configuration().is_some()) {format!("{recorded} (recorded Mii)")} else {recorded},
         current_label:current.map_or_else(||"CPU".to_owned(),fighter_label),
@@ -246,7 +234,6 @@ static CHARACTER_REQUEST: hos_lock::Mailbox<(crate::engine::mii::replay::Target,
 static CHARACTER_RESULT: hos_lock::Mailbox<(u64, bool), 1> = hos_lock::Mailbox::new();
 
 fn submit_loaded_character() {
-    if !crate::runtime::ADVANCED_RECORDING_WORKFLOWS { return; }
     if CHARACTER_PENDING.load(Ordering::Acquire) { return; }
     let target=lock_read(&UI).loaded_target();
     let Some(target)=target else{return;};
@@ -267,8 +254,7 @@ fn submit_loaded_character() {
 /// Game callback only. The roster remains the sole admission/loader provider.
 pub fn service_character_request() {
     CHARACTER_REQUEST.drain(|(target, revision)| {
-        let eligible = crate::runtime::ADVANCED_RECORDING_WORKFLOWS
-            && revision == selection_revision() && source_is_named()
+        let eligible = revision == selection_revision() && source_is_named()
             && crate::runtime::roster::character_roster::cpu_reload_ready();
         #[cfg(feature="mii-ordinary-cpu-alpha")]
         let accepted = eligible && crate::runtime::roster::character_roster::mii_replay::request_named(target);
@@ -489,13 +475,12 @@ pub fn publish_queries() {
             ui.marker(), ui.loaded_placement().map(|p| (p.delta_x, p.delta_y)),
             ui.ready_velocity(true), ui.loaded_target())
     };
-    let loaded_matches = (crate::runtime::ADVANCED_RECORDING_WORKFLOWS && plays_current)
-        || target.is_some_and(|target| exact_target_ready(target, cpu_kind()));
+    let loaded_matches = plays_current || target.is_some_and(|target| exact_target_ready(target, cpu_kind()));
     let (browser_pending, browser_release) = crate::runtime::macros::replay_capture::browser_queries();
     QUERIES.publish(crate::model::macro_handoff::MacroQueries {
         session: session_revision(),
         source_is_named: source_is_named(),
-        playback_allowed: playback_allowed && loaded_matches && PREPARED_REVISION.load(Ordering::Acquire) == revision,
+        playback_allowed: playback_allowed && PREPARED_REVISION.load(Ordering::Acquire) == revision,
         playback_len: PLAY_FRAMES.len() as u32,
         playback_facing: start.map_or(1.0, |start| start.facing),
         playback_status: start.map_or(0, |start| start.status),
@@ -633,8 +618,8 @@ pub fn init() {
     let Ok(recording) = library().load(id) else {
         return;
     };
-    // A restored selection is not an explicit choice. It never forces a fighter;
-    // the RC published gate waits for its recorded CPU before allowing playback.
+    // A restored selection is not an explicit choice: it plays on whichever CPU
+    // Training starts with instead of forcing the recorded fighter.
     // No fighter exists at plugin init, so no native accessor is read here.
     let _ = commit_selected(id.to_owned(), recording, false, None);
 }
@@ -779,10 +764,6 @@ pub fn open_external_library(
 }
 
 pub fn open_editor() {
-    if !crate::runtime::ADVANCED_RECORDING_WORKFLOWS {
-        notify("Placement editing is unavailable in this release");
-        return;
-    }
     if !practice_ready() {
         return;
     }

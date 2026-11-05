@@ -206,7 +206,7 @@
    "dest": "src/model/seams/native_seams/mod.rs",
    "crate": "consts",
    "src_sha256": "9c16e57af94e9f6424c92a5bd3de8df64508eb3cda01ff7c4eb9c1054c8338e3",
-   "dest_sha256": "e1853fb2ca44cc7596b5b4ebe92ec09e0e43af76d6e0e0c5d1a6ab1e96c10252",
+   "dest_sha256": "986b15ee9f386859e6461bf8fca7dc672825f25287e7b03355807fda4d6978b9",
    "edits": [
     {
      "old": "        first.then_some(seam.offset)\n    })\n}\n\n/// The 64-byte comparison of one site.\n#[derive(Clone, Copy, Debug, PartialEq, Eq)]\npub enum GuardOutcome {\n    /// Identical to 13.0.5.\n    Stock,\n    /// Only Skyline hook shapes differ. `at` is the byte offset of the first; `usable` applies the\n    /// kind's rule (false: another plugin owns the words we would replace or rely on).\n    HookedByOther { at: usize, usable: bool },\n    /// A `Sharing::EntryOrBody` entry row whose entry another plugin's far jump owns, with the body\n    /// after it stock: usable, through the body site (`entry_or_body_outcome`).\n    Shared,\n    /// A change that is not a hook: the site is left alone.\n    Foreign { first_diff: usize },\n}\n\nimpl GuardOutcome {\n    pub const fn usable(self) -> bool {\n        match self {\n            GuardOutcome::Stock | GuardOutcome::Shared => true,\n            GuardOutcome::HookedByOther { usable, .. } => usable,\n            GuardOutcome::Foreign { .. } => false,\n        }\n    }\n\n    /// The install line's word for the outcome.\n    pub const fn code(self) -> &'static str {\n        match self {\n            GuardOutcome::Stock => \"stock\",\n            GuardOutcome::HookedByOther { usable: true, .. } => \"other\",\n            GuardOutcome::HookedByOther { usable: false, .. } => \"occupied\",\n            GuardOutcome::Shared => \"shared\",\n            GuardOutcome::Foreign { .. } => \"foreign\",\n        }\n    }\n}\n\nconst WORDS: usize = GUARD_BYTES / 4;\nconst NOP: u32 = 0xd503_201f;\nconst LDR_X17_LITERAL_8: u32 = 0x5800_0051;\nconst BR_X17: u32 = 0xd61f_0220;\nconst B_MASK: u32 = 0xfc00_0000;\nconst B_OPCODE: u32 = 0x1400_0000;\n\nfn words(bytes: &[u8; GUARD_BYTES]) -> [u32; WORDS] {\n    let mut out = [0u32; WORDS];\n    for (i, word) in out.iter_mut().enumerate() {\n        *word = u32::from_le_bytes([bytes[4 * i], bytes[4 * i + 1], bytes[4 * i + 2], bytes[4 * i + 3]]);\n    }\n    out\n}\n\n/// Length in words of a Skyline hook shape starting at word `i` (cut at the end of the window).\nfn hook_shape(actual: &[u32; WORDS], i: usize) -> Option<usize> {\n    let at = |k: usize| actual.get(i + k).copied();\n    let len = if at(0) == Some(NOP) && at(1) == Some(LDR_X17_LITERAL_8) && at(2) == Some(BR_X17) {\n        5\n    } else if at(0) == Some(LDR_X17_LITERAL_8) && at(1) == Some(BR_X17) {\n        4\n    } else if actual[i] & B_MASK == B_OPCODE {\n        1\n    } else {\n        return None;\n    };\n    Some(len.min(WORDS - i))\n}\n\n/// Whether a hook shape at word `word` takes words this kind needs as they are.\nconst fn blocks(kind: SeamKind, word: usize) -> bool {\n    match kind {\n        SeamKind::Hook { .. } => word < HOOK_SPAN_WORDS,\n        SeamKind::Called => false,\n        SeamKind::Relied => word == 0,\n    }\n}\n\n/// Compare a site's 64 bytes now (`actual`) with its 13.0.5 bytes (`expected`).\npub fn guard_outcome(expected: &[u8; GUARD_BYTES], actual: &[u8; GUARD_BYTES], kind: SeamKind) -> GuardOutcome {\n    let expected = words(expected);\n    let actual = words(actual);\n    let mut first_hook = None;\n    let mut usable = true;\n    let mut i = 0;\n    while i < WORDS {\n        if actual[i] == expected[i] {\n            i += 1;\n            continue;\n        }\n        let Some(len) = hook_shape(&actual, i) else {\n            return GuardOutcome::Foreign { first_diff: 4 * i };\n        };\n        first_hook.get_or_insert(4 * i);\n        // A shape that starts inside the span also covers every word it spans.\n        if (i..i + len).any(|w| blocks(kind, w)) {\n            usable = false;\n        }\n        i += len;\n    }\n    match first_hook {\n        None => GuardOutcome::Stock,\n        Some(at) => GuardOutcome::HookedByOther { at, usable },\n    }\n}\n",
@@ -282,6 +282,21 @@
      "old": "}\n\n/// Every row file, in table order: the one list a new row file joins (`COUNT`, `SITES`, and the host\n/// tests' `all()` read it).\nconst TABLES: [&[Seam]; 8] =\n    [rows_a1::ROWS, rows_a2::ROWS, rows_a3::ROWS, rows_a4::ROWS, rows_a5::ROWS, rows_identity::ROWS, rows_q15::ROWS, rows_training_count::ROWS];\n\nconst fn total(tables: &[&[Seam]]) -> usize {\n    let (mut n, mut t) = (0, 0);\n    while t < tables.len() {\n",
      "new": "}\n\n/// Every row file, in table order: the one list a new row file joins (`COUNT`, `SITES`, and the host\n/// tests' `all()` read it).\nconst TABLES: [&[Seam]; 7] =\n    [rows_a1::ROWS, rows_a2::ROWS, rows_a3::ROWS, rows_a4::ROWS, rows_a5::ROWS, rows_identity::ROWS, rows_q15::ROWS];\n\nconst fn total(tables: &[&[Seam]]) -> usize {\n    let (mut n, mut t) = (0, 0);\n    while t < tables.len() {\n",
      "reason": "RC reset lead composition: apply reviewed pkg6 cf161f5 F9/created-exact retirement after Slim 7950485 observer removal; preserve both closures and ordinary Mii/helper safety."
+    },
+    {
+     "old": "\nconst fn entry_or_body_count(tables: &[&[Seam]]) -> usize {\n",
+     "new": "\n/// A compared hook row: a site in code this plugin writes (`model::own_patches`).\nconst fn writes_code(seam: &Seam) -> bool {\n    matches!(seam.kind, SeamKind::Hook { .. }) && seam.compared() && matches!(region_of(seam.offset), Some(MainRegion::Text))\n}\n\nconst fn patch_rows(tables: &[&[Seam]]) -> usize {\n    let (mut n, mut t) = (0, 0);\n    while t < tables.len() {\n        let rows = tables[t];\n        let mut i = 0;\n        while i < rows.len() {\n            if writes_code(&rows[i]) {\n                n += 1;\n            }\n            i += 1;\n        }\n        t += 1;\n    }\n    n\n}\n\n/// Compared hook rows in code: the installer records the bytes at each (`seam_install::prime` / `seal`).\npub const PATCH_ROWS: usize = patch_rows(&TABLES);\n\nconst fn patch_sites(tables: &[&[Seam]]) -> [usize; PATCH_ROWS] {\n    let mut out = [0; PATCH_ROWS];\n    let (mut n, mut k, mut t) = (0, 0, 0);\n    while t < tables.len() {\n        let rows = tables[t];\n        let mut i = 0;\n        while i < rows.len() {\n            if writes_code(&rows[i]) {\n                out[n] = k;\n                n += 1;\n            }\n            i += 1;\n            k += 1;\n        }\n        t += 1;\n    }\n    out\n}\n\n/// The global index (`SITES`) of every compared hook row in code, in table order.\npub static PATCH_SITES: [usize; PATCH_ROWS] = patch_sites(&TABLES);\n\nconst fn entry_or_body_count(tables: &[&[Seam]]) -> usize {\n",
+     "reason": "rc.4 seam-self (2026-11-05, primary 35137355): seam checks put this plugin's own writes back before comparing (model::own_patches; prime/seal record the bytes at every site a hook row writes), and a refused row is named once in the shipped log (report::names_row / RefusedLine). Root cause of rc.2's Change Stage skip: a check read our own lobby_stage hook as occupied."
+    },
+    {
+     "old": "pub mod rows_identity;\npub mod rows_q15;\n/// The installer's outcome-slot bits and its late report (`[TrainingSeams] late \u2026`, R-A0b).\npub mod report;\n",
+     "new": "pub mod rows_identity;\npub mod rows_q15;\n/// Phase 2 N11: Lobby Items' spawner switch hook and the instructions it relies on (`src/runtime/lobby/lobby_items.rs`).\npub mod rows_lobby_items;\n/// The installer's outcome-slot bits and its late report (`[TrainingSeams] late \u2026`, R-A0b).\npub mod report;\n",
+     "reason": "Phase 2 N11 (primary 2026-11-05, P-N11 Lobby Items): the Lobby Items seam rows (rows_lobby_items.rs) and their authoritative group"
+    },
+    {
+     "old": "/// Every row file, in table order: the one list a new row file joins (`COUNT`, `SITES`, and the host\n/// tests' `all()` read it).\nconst TABLES: [&[Seam]; 7] =\n    [rows_a1::ROWS, rows_a2::ROWS, rows_a3::ROWS, rows_a4::ROWS, rows_a5::ROWS, rows_identity::ROWS, rows_q15::ROWS];\n\nconst fn total(tables: &[&[Seam]]) -> usize {\n",
+     "new": "/// Every row file, in table order: the one list a new row file joins (`COUNT`, `SITES`, and the host\n/// tests' `all()` read it).\nconst TABLES: [&[Seam]; 8] = [\n    rows_a1::ROWS, rows_a2::ROWS, rows_a3::ROWS, rows_a4::ROWS, rows_a5::ROWS, rows_identity::ROWS, rows_q15::ROWS,\n    rows_lobby_items::ROWS,\n];\n\nconst fn total(tables: &[&[Seam]]) -> usize {\n",
+     "reason": "Phase 2 N11 (primary 2026-11-05, P-N11 Lobby Items): the Lobby Items seam rows (rows_lobby_items.rs) and their authoritative group"
     }
    ]
   },
@@ -556,7 +571,14 @@
    "dest": "src/model/seams/native_seams/report.rs",
    "crate": "consts",
    "src_sha256": "b8dc43434245d6cc9c1d149cd17e762daebac0e5adc312e674509bac1501a0ad",
-   "dest_sha256": "8051418b4b4a54a0a1680ed7390b65f6f46c645a8f2f518b4932851a1ae80dc2"
+   "dest_sha256": "2f3b4fbd836c2ad33ca46df95915c6df447858374d6d0a002191cb67855ad1b3",
+   "edits": [
+    {
+     "old": "    matches!(bits & CODE_MASK, OCCUPIED | FOREIGN | OUT_OF_REGION | UNCAPTURED)\n}\n",
+     "new": "    matches!(bits & CODE_MASK, OCCUPIED | FOREIGN | OUT_OF_REGION | UNCAPTURED)\n}\n\n/// Whether a check that records `code` over the row's `old` bits names the row in the shipped log: a refused code\n/// (`occupied`, `foreign`, `out_of_region`) the row did not have yet. The installer puts this plugin's own writes back\n/// before it compares (`model::own_patches`), so such a code means another plugin's write or a change that is no hook.\npub const fn names_row(old: u8, code: u8) -> bool {\n    old & CODE_MASK != code & CODE_MASK && matches!(code & CODE_MASK, OCCUPIED | FOREIGN | OUT_OF_REGION)\n}\n\n/// The shipped line that names a refused row (`names_row`).\npub struct RefusedLine<'a> {\n    pub label: &'a str,\n    pub group: &'a str,\n    pub offset: usize,\n    pub code: u8,\n}\n\nimpl fmt::Display for RefusedLine<'_> {\n    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {\n        write!(f, \"[TrainingSeams] seam={} group={} offset={:#x} outcome={}\", self.label, self.group, self.offset, code_name(self.code))\n    }\n}\n",
+     "reason": "rc.4 seam-self (2026-11-05, primary 35137355): seam checks put this plugin's own writes back before comparing (model::own_patches; prime/seal record the bytes at every site a hook row writes), and a refused row is named once in the shipped log (report::names_row / RefusedLine). Root cause of rc.2's Change Stage skip: a check read our own lobby_stage hook as occupied."
+    }
+   ]
   },
   {
    "src": "training_mod_consts/src/native_seams/drill.rs",
@@ -1842,7 +1864,7 @@
    "dest": "src/model/preload/cycle_preload_policy.rs",
    "crate": "root",
    "src_sha256": "8f006ae6d6f978d500da383c4edbb5e731d9b91e19fa7b3e18037e73224ae7b2",
-   "dest_sha256": "6e8b58e93d781836fc207555df3da96e87b14a752680aa78c641a9d7ddc67f55",
+   "dest_sha256": "8f54d421e87716cfb2dba0cc27261d0ac228c453e9a64b4b61c602f410c7a475",
    "edits": [
     {
      "old": "/// CPU's fighter look-ahead. Each CPU fighter that `merge` would place before the last Player hat\n/// moves, in its own order, to just behind that hat; every other pair of targets keeps `merge`'s\n/// order, and a target in both lanes keeps the earlier, hat position. The cost is the CPU's next\n/// swap, which may then find no warm helper for its fighter. Without a Player hat this is `merge`.\npub fn merge_player_hats_first<T: Copy + Eq, const N: usize>(lanes: [[Option<T>; N]; 4], slots: u8) -> [Option<T>; N] {\n    let mut order: Vec<(usize, T)> = Vec::with_capacity(4 * N);\n    for depth in 0..N {\n        for (lane, targets) in lanes.iter().enumerate() {\n            if let Some(target) = targets[depth] {\n                order.push((lane, target));\n            }\n        }\n    }\n    if let Some(last_hat) = order.iter().rposition(|(lane, _)| *lane == PLAYER_HATS) {\n        let (head, tail) = order.split_at(last_hat + 1);\n        let mut ranked: Vec<(usize, T)> = head.iter().copied().filter(|(lane, _)| *lane != CPU_FIGHTERS).collect();\n        ranked.extend(head.iter().copied().filter(|(lane, _)| *lane == CPU_FIGHTERS));\n        ranked.extend_from_slice(tail);\n        order = ranked;\n    }\n    let limit = usize::from(slots).min(crate::engine::preload::cycle_preload_capacity::MAX_TARGETS).min(N);\n    let mut result = [None; N];\n    let mut count = 0;\n    for (_, target) in order {\n        if count >= limit {\n",
@@ -1983,6 +2005,11 @@
      "old": "        for (role, f) in [player, cpu].iter().enumerate() {\n            let counts = RoleCounts { planned: f.planned, ready: f.ready, prefetched: f.prefetched,\n                failed: f.failed, pending: f.pending };\n            assert_eq!(counts.unstarted(), f.unstarted());\n            total = BuiltFighters { planned: total.planned + f.planned, ready: total.ready + f.ready,\n                prefetched: total.prefetched + f.prefetched, failed: total.failed + f.failed,\n                pending: total.pending + f.pending, swap: total.swap | counts.swap_owed(role) };\n        }\n        total\n",
      "new": "        for (role, f) in [player, cpu].iter().enumerate() {\n            let counts = RoleCounts { planned: f.planned, ready: f.ready, prefetched: f.prefetched,\n                failed: f.failed, pending: f.pending, held: f.held, hold: f.hold };\n            assert_eq!(counts.unstarted(), f.unstarted());\n            total = BuiltFighters { planned: total.planned + f.planned, ready: total.ready + f.ready,\n                prefetched: total.prefetched + f.prefetched, failed: total.failed + f.failed,\n                pending: total.pending + f.pending, swap: total.swap | counts.swap_owed(role),\n                held: total.held + f.held, hold: crate::engine::swap::body_bank::merge_hold(total.hold, f.hold) };\n        }\n        total\n",
      "reason": "P-HOT (primary 2026-11-05 20:50Z, LANE-HOT-SLOTS-REPORT section 8): a capacity refusal at a group prefetch start (process headroom, pool reserve) holds the group (GroupState::Held), retried with rotation, named in the notice; it no longer fails the group for the scene"
+    },
+    {
+     "old": "            Progress::Ready => return write!(f, \"Ready {}/{}\", fighters.ready, planned),\n        }\n        let waits_for = fighters.hold.filter(|_| fighters.held > 0).map(|hold| match hold {\n            crate::engine::swap::body_bank::Hold::Memory => \"memory\",\n            crate::engine::swap::body_bank::Hold::Pool => \"pool space\",\n        });\n        match (failed > 0, waits_for) {\n            (true, Some(what)) => write!(f, \" ({} failed, {} waiting for {})\", failed, fighters.held, what)?,\n            (true, None) => write!(f, \" ({} failed)\", failed)?,\n            (false, Some(what)) => write!(f, \" ({} waiting for {})\", fighters.held, what)?,\n            (false, None) => {}\n        }\n",
+     "new": "            Progress::Ready => return write!(f, \"Ready {}/{}\", fighters.ready, planned),\n        }\n        use crate::engine::swap::body_bank::Hold;\n        let held = fighters.held;\n        match (failed > 0, fighters.hold.filter(|_| held > 0)) {\n            (true, Some(hold)) => {\n                let what = if hold == Hold::Memory { \"memory\" } else { \"pool space\" };\n                // restriction: preload-failed-and-waiting\n                write!(f, \" ({} failed, {} waiting for {})\", failed, held, what)?\n            }\n            (true, None) => write!(f, \" ({} failed)\", failed)?,\n            // restriction: preload-wait-memory\n            (false, Some(Hold::Memory)) => write!(f, \" ({} waiting for memory)\", held)?,\n            // restriction: preload-wait-pool\n            (false, Some(Hold::Pool)) => write!(f, \" ({} waiting for pool space)\", held)?,\n            (false, None) => {}\n        }\n",
+     "reason": "Operator 2026-11-05 (via primary ~21:58Z, \"yes\"): the three approved notice strings, one literal per arm, each citing its docs/RESTRICTIONS.md row"
     }
    ]
   },
@@ -2430,7 +2457,7 @@
    "dest": "src/runtime/seams/seam_install.rs",
    "crate": "root",
    "src_sha256": "8c81d985258c0189ec1161fdc60efe573952596c55325cce07fbe9dc8c7503cd",
-   "dest_sha256": "f8256da97e5ee35c9a9d1b95b84a1b3396442d25bb24aea46940c7bb4822da3b",
+   "dest_sha256": "1c2d86d5e1f84e0235c3251490f0ba9ef130d9488bb697610422507fcd9e7a7c",
    "edits": [
     {
      "old": "use crate::model;\n",
@@ -2481,6 +2508,36 @@
      "old": "    \"mii_origin_observer\",\n    \"mii_pool_observer\",\n",
      "new": "",
      "reason": "RC RESET option2: retire observer-only authoritative groups."
+    },
+    {
+     "old": "use core::sync::atomic::{AtomicBool, AtomicU8, AtomicUsize, Ordering};\n",
+     "new": "use core::sync::atomic::{AtomicBool, AtomicU32, AtomicU8, AtomicUsize, Ordering};\n",
+     "reason": "rc.4 seam-self (2026-11-05, primary 35137355): seam checks put this plugin's own writes back before comparing (model::own_patches; prime/seal record the bytes at every site a hook row writes), and a refused row is named once in the shipped log (report::names_row / RefusedLine). Root cause of rc.2's Change Stage skip: a check read our own lobby_stage hook as occupied."
+    },
+    {
+     "old": "use crate::engine::compat::logging;\nuse crate::model::version as model;\n",
+     "new": "use crate::engine::compat::logging;\nuse crate::model::own_patches::{self, OwnPatch, SPAN};\nuse crate::model::version as model;\n",
+     "reason": "rc.4 seam-self (2026-11-05, primary 35137355): seam checks put this plugin's own writes back before comparing (model::own_patches; prime/seal record the bytes at every site a hook row writes), and a refused row is named once in the shipped log (report::names_row / RefusedLine). Root cause of rc.2's Change Stage skip: a check read our own lobby_stage hook as occupied."
+    },
+    {
+     "old": "    [const { (AtomicUsize::new(0), AtomicUsize::new(0)) }; native_seams::OWN_HOOK_ROWS];\n\n",
+     "new": "    [const { (AtomicUsize::new(0), AtomicUsize::new(0)) }; native_seams::OWN_HOOK_ROWS];\n\n/// Our own writes in code (`model::own_patches`): one slot per site a hook row writes, in the native table\n/// (`native_seams::PATCH_SITES`) or in TrainingRooms' own site tables (`capabilities::all_sites`), one per offset. Each keeps the\n/// 20 bytes there before the boot wrote anything (`prime`) and the bytes our writes left (`seal`), as words. Every `main` write of this\n/// plugin happens during the boot (the only later hook goes into the `common` NRO when it loads); a hook added after `seal` would\n/// need its own record.\nconst SPAN_WORDS: usize = SPAN / 4;\n/// Every native hook row in code plus every such row of TrainingRooms' own tables (some share an offset).\nconst OWN_CAPACITY: usize = native_seams::PATCH_ROWS + crate::model::capabilities::WRITING_SITES;\nstatic OWN_OFFSET: [AtomicUsize; OWN_CAPACITY] = [const { AtomicUsize::new(0) }; OWN_CAPACITY];\nstatic OWN_BEFORE: [[AtomicU32; SPAN_WORDS]; OWN_CAPACITY] =\n    [const { [const { AtomicU32::new(0) }; SPAN_WORDS] }; OWN_CAPACITY];\nstatic OWN_AFTER: [[AtomicU32; SPAN_WORDS]; OWN_CAPACITY] =\n    [const { [const { AtomicU32::new(0) }; SPAN_WORDS] }; OWN_CAPACITY];\n/// Per slot: `OWN_BOOTING` (`before` kept; any change since is ours) or `OWN_RECORDED` (`after` kept too).\nstatic OWN_STATE: [AtomicU8; OWN_CAPACITY] = [const { AtomicU8::new(OWN_NONE) }; OWN_CAPACITY];\n/// Slots in use (set once by `prime`; 0 before it: checks then compare the bytes as they are, as before).\nstatic OWN_SLOTS: AtomicUsize = AtomicUsize::new(0);\nconst OWN_NONE: u8 = 0;\nconst OWN_BOOTING: u8 = 1;\nconst OWN_RECORDED: u8 = 2;\n\n/// The 20 bytes at a site, when they lie inside `main`'s `.text`.\nunsafe fn read_span(offset: usize) -> Option<[u8; SPAN]> {\n    let text = getRegionAddress(Region::Text) as usize;\n    let rodata = getRegionAddress(Region::Rodata) as usize;\n    let start = text.checked_add(offset)?;\n    if !offset.is_multiple_of(4) || start.checked_add(SPAN)? > rodata {\n        return None;\n    }\n    let mut bytes = [0u8; SPAN];\n    bytes.copy_from_slice(core::slice::from_raw_parts(start as *const u8, SPAN));\n    Some(bytes)\n}\n\nfn store_words(slot: &[AtomicU32; SPAN_WORDS], bytes: &[u8; SPAN]) {\n    for (word, chunk) in slot.iter().zip(bytes.chunks_exact(4)) {\n        word.store(u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]), Ordering::Relaxed);\n    }\n}\n\nfn load_words(slot: &[AtomicU32; SPAN_WORDS]) -> [u8; SPAN] {\n    let mut bytes = [0u8; SPAN];\n    for (word, chunk) in slot.iter().zip(bytes.chunks_exact_mut(4)) {\n        chunk.copy_from_slice(&word.load(Ordering::Relaxed).to_le_bytes());\n    }\n    bytes\n}\n\n/// The offset of every site a hook row of any table writes in code.\nfn own_sites() -> impl Iterator<Item = usize> {\n    native_seams::PATCH_SITES.iter().map(|&index| native_seams::SITES[index].offset).chain(\n        crate::model::capabilities::all_sites().filter(|site| crate::model::capabilities::writes_code(site)).map(|site| site.offset),\n    )\n}\n\n/// Boot, before the first hook or patch of this plugin (after the hook-sharing drill's stand-ins, which play another\n/// plugin): keep the bytes at every site a hook row writes. From here until `seal`, a change at one of them is ours (only\n/// this plugin's boot runs), so a check puts the kept bytes back first.\npub(crate) fn prime() {\n    let mut slots = 0;\n    for offset in own_sites() {\n        let known = (0..slots).any(|slot| OWN_OFFSET[slot].load(Ordering::Relaxed) == offset);\n        if known || slots == OWN_CAPACITY {\n            continue;\n        }\n        // SAFETY: bounds-checked against main's .text inside read_span.\n        if let Some(bytes) = unsafe { read_span(offset) } {\n            OWN_OFFSET[slots].store(offset, Ordering::Relaxed);\n            store_words(&OWN_BEFORE[slots], &bytes);\n            OWN_STATE[slots].store(OWN_BOOTING, Ordering::Relaxed);\n            slots += 1;\n        }\n    }\n    OWN_SLOTS.store(slots, Ordering::Release);\n}\n\n/// Record the bytes our writes left at one slot; whether they differ from the bytes before the boot.\nfn record_after(slot: usize) -> bool {\n    // SAFETY: bounds-checked against main's .text inside read_span.\n    let Some(bytes) = (unsafe { read_span(OWN_OFFSET[slot].load(Ordering::Relaxed)) }) else { return false };\n    store_words(&OWN_AFTER[slot], &bytes);\n    OWN_STATE[slot].store(OWN_RECORDED, Ordering::Release);\n    bytes != load_words(&OWN_BEFORE[slot])\n}\n\n/// Every boot hook and patch is in place (just before the install line, and before the drill's \"after\" stand-ins): record\n/// what our writes left, so from now on only those exact bytes are put back. Another plugin hooking over one of them\n/// later changes them, and it reads as it did before this change. Writes one `[TrainingSeams] own_writes=<sites written>\n/// sites=<sites recorded>` line.\npub(crate) fn seal() {\n    let slots = OWN_SLOTS.load(Ordering::Acquire);\n    let written = (0..slots).filter(|&slot| record_after(slot)).count();\n    logging::diagnostic(format_args!(\"[TrainingSeams] own_writes={} sites={}\", written, slots));\n}\n\n/// Our recorded writes that can show inside the 64 bytes at `offset` (no heap: a lazy walk of the fixed slots).\nfn own_writes(offset: usize) -> impl Iterator<Item = OwnPatch> {\n    (0..OWN_SLOTS.load(Ordering::Acquire)).filter_map(move |slot| {\n        let patch = OwnPatch {\n            offset: OWN_OFFSET[slot].load(Ordering::Relaxed),\n            before: load_words(&OWN_BEFORE[slot]),\n            after: (OWN_STATE[slot].load(Ordering::Acquire) == OWN_RECORDED).then(|| load_words(&OWN_AFTER[slot])),\n        };\n        patch.touches(offset).then_some(patch)\n    })\n}\n\n",
+     "reason": "rc.4 seam-self (2026-11-05, primary 35137355): seam checks put this plugin's own writes back before comparing (model::own_patches; prime/seal record the bytes at every site a hook row writes), and a refused row is named once in the shipped log (report::names_row / RefusedLine). Root cause of rc.2's Change Stage skip: a check read our own lobby_stage hook as occupied."
+    },
+    {
+     "old": "        record(index, OUT_OF_REGION);\n",
+     "new": "        unexpected(index, seam, OUT_OF_REGION);\n",
+     "reason": "rc.4 seam-self (2026-11-05, primary 35137355): seam checks put this plugin's own writes back before comparing (model::own_patches; prime/seal record the bytes at every site a hook row writes), and a refused row is named once in the shipped log (report::names_row / RefusedLine). Root cause of rc.2's Change Stage skip: a check read our own lobby_stage hook as occupied."
+    },
+    {
+     "old": "    };\n    let outcome = seam.outcome_with(&actual, own_target(seam));\n    record(index, outcome_code(outcome));\n    Some(outcome)\n}\n\n",
+     "new": "    };\n    // Our own hooks and patches read as the bytes they replaced (`model::own_patches`): only another plugin's write, or a\n    // change that is no hook at all, can make a row unusable.\n    let (actual, _) = own_patches::unpatch(seam.offset, &actual, own_writes(seam.offset));\n    let outcome = seam.outcome_with(&actual, own_target(seam));\n    unexpected(index, seam, outcome_code(outcome));\n    Some(outcome)\n}\n\n/// Record a row's outcome, and name the row in the shipped log the first time it reads `occupied`, `foreign` or`n/// `out_of_region` (`report::names_row`): after `check` put our own writes back, only another plugin's write or a change that is no\n/// hook can do that.\nfn unexpected(index: usize, seam: &Site, code: u8) {\n    let old = OUTCOMES.get(index).map_or(UNCHECKED, |slot| slot.load(Ordering::Acquire));\n    record(index, code);\n    if report::names_row(old, code) {\n        logging::diagnostic(format_args!(\"{}\", report::RefusedLine { label: seam.label, group: seam.group, offset: seam.offset, code }));\n    }\n}\n\n",
+     "reason": "rc.4 seam-self (2026-11-05, primary 35137355): seam checks put this plugin's own writes back before comparing (model::own_patches; prime/seal record the bytes at every site a hook row writes), and a refused row is named once in the shipped log (report::names_row / RefusedLine). Root cause of rc.2's Change Stage skip: a check read our own lobby_stage hook as occupied."
+    },
+    {
+     "old": "/// `console_map_probe`, `native_unlink_probe`, `practice_trace`, `source_lifecycle_probe`).\nconst AUTHORITATIVE: &[&str] = &[\n    \"native_body_bank\",\n    \"character_roster\",\n",
+     "new": "/// `console_map_probe`, `native_unlink_probe`, `practice_trace`, `source_lifecycle_probe`).\nconst AUTHORITATIVE: &[&str] = &[\n    \"lobby_items\",\n    \"native_body_bank\",\n    \"character_roster\",\n",
+     "reason": "Phase 2 N11 (primary 2026-11-05, P-N11 Lobby Items): the Lobby Items seam rows (rows_lobby_items.rs) and their authoritative group"
     }
    ]
   },
@@ -3014,7 +3071,7 @@
    "dest": "src/runtime/roster/character_roster.rs",
    "crate": "root",
    "src_sha256": "07d282cdc6c5b4b080a5c0b3e4107a033f623ea3e5809783e0ff595afe759dd5",
-   "dest_sha256": "8b5f2c0e5aec101794cf88574464fc16ea2340004d0f0c55da138b6e604e8d1b",
+   "dest_sha256": "38cd36fa69dd634ee561b3d716635e5e6b931d534b610282fd3998edd2184467",
    "edits": [
     {
      "old": "fn notify(role: Role, message: String) {",
@@ -3521,6 +3578,16 @@
      "old": "/// The active role's roster-grid stock icon, queried on the UI job thread. The native builder\n/// supplies patch paths, names and regional costume remapping. `picture=0` is the game's own small\n/// stock icon (the waiting-room icon): the same stock-icon art the fork's menu showed, which the\n/// operator asked the character grids to use (2026-11-03), loaded at run time through the game's\n/// mod-aware file-resource service instead of baked into the layout.\npub(crate) unsafe fn menu_stock_icon_hash(kind: u32, cpu: bool) -> Option<u64> {\n    let base = BASE.load(Ordering::Acquire);\n    // init publishes BASE only after the enforcing character_roster seam gate\n    // accepts roster.kind_hash and roster.icon_hash (both 64-byte guards).\n    // These carried seams are not members of game::Granted's core Site tables.\n    if base == 0 { return None; }\n    let owner = if cpu { if lobby::active() { 4 } else { 1 } } else { 0 };\n    let costume = crate::engine::swap::swap_model::presentation::waiting_icon_costume(kind, row_colour(base, owner));\n    let hash = fighter_picture_hash(base, kind, costume, 0);\n    (hash & 0xffffffffff != 0).then_some(hash)\n}",
      "new": "/// The roster-grid stock icon, queried on the UI job thread. The native builder supplies patch\n/// paths, names and regional costume remapping. `picture=2` is the game's stock-icon set\n/// (`chara_2`, the 64\u00d764 flat head icon \u2014 the art the fork's menu showed, its SmashWiki\n/// stock-icon PNGs, which the operator asked the character grids to use; 2026-11-03 decision\n/// amended 2026-11-04, SPEC-core-07 Q16), loaded at run time through the game's mod-aware\n/// file-resource service instead of baked into the layout. `picture=0` is the game's 128\u00d7128\n/// `chara_0` portrait crop, not the stock icon.\n///\n/// The costume is the fighter's default (0), never a presentation-row byte: the grid lists every\n/// fighter, and the costume a live entry wears is not a property of the list. The first cut read\n/// the role's presentation row (`E[0]`/`E[1]`) here; that byte belongs to the match entries, so a\n/// grid followed whatever the entries wore (Eden glm-icons-03: the CPU list drew every fighter at\n/// costume 7, wedding Mario and pink DK) or named files that do not exist (glm-gifs-04 and\n/// glm-mods-10: blank text tiles; the byte then held a value without a `chara_2_*` file). The\n/// tracepoints on the key builder `main+0x3238a70` (glm-icons-03 out/04-trace-grid) captured\n/// costume 0 for the Player page and costume 7 for the CPU page of the same grid.\npub(crate) unsafe fn menu_stock_icon_hash(kind: u32) -> Option<u64> {\n    let base = BASE.load(Ordering::Acquire);\n    // init publishes BASE only after the enforcing character_roster seam gate\n    // accepts roster.kind_hash and roster.icon_hash (both 64-byte guards).\n    // These carried seams are not members of game::Granted's core Site tables.\n    if base == 0 { return None; }\n    let hash = fighter_picture_hash(base, kind, 0, 2);\n    (hash & 0xffffffffff != 0).then_some(hash)\n}",
      "reason": "RC10 stock-icon root fix (worker glm-icons, 2026-11-04): the menu grids take the fighter's default costume (0), not a presentation-row byte. The row read made the grids follow the match entries' costume (Eden glm-icons-03 trace: CPU page requested chara_0_*_07 for every fighter) or name files that do not exist (glm-gifs-04/glm-mods-10 blank tiles). Amended the same day (operator): the stock-icon set is `picture=2` (`chara_2`, the 64\u00d764 flat head icon the fork's fighter-00.png matches \u2014 decoded next to it in primary-review/rc10-mario-picture-sets.png), not `picture=0` (`chara_0`, the 128\u00d7128 portrait crop); the live-costume read stays in the waiting-room paths that bind a specific entry's icon."
+    },
+    {
+     "old": "    let fighters = match role {\n        Role::Player => m.player_roster.fighters_excluding_fixed(excluded),\n        Role::Cpu => m.cpu_roster.fighters_excluding_fixed(excluded),\n",
+     "new": "    // P-CYCLE: the one cycle list (`cycle_members`), with no Mii class: this loader cannot load a Mii, and while it\n    // serves the cycle no Mii owner does, so the menu's published admission is none too.\n    let roster = match role {\n        Role::Player => m.player_roster,\n        Role::Cpu => m.cpu_roster,\n",
+     "reason": "P-CYCLE (operator 2026-11-05: a Mii Gunner cycled for the CPU though the menu did not list it): every cycle walker walks engine::swap::cycle_members (the one list the portrait grid numbers); the CPU Mii owner computes its Mii admission (cycle_members::cpu_admission) under its own lock, walks it and publishes it; the menu reads it and each role's slot 0 (character_roster::cycle_facts)"
+    },
+    {
+     "old": "    let mut out = crate::engine::swap::ordered_roster::FighterList::new(TrioFighter::MARIO);\n    for f in fighters.iter().filter(|f| !(0x48..=0x4a).contains(&f.kind())) {\n        out.push(*f);\n    }\n    out\n",
+     "new": "    crate::engine::swap::cycle_members::cycle_members_excluding(roster, crate::engine::swap::cycle_members::NO_MII, excluded)\n}\n\n/// The CPU cycle's Mii admission as the CPU Mii owner last computed it (`cycle_members::cpu_admission`, published from\n/// its service; none while it is not qualified). Every CPU cycle walker and the menu read this one answer (P-CYCLE).\npub(crate) fn cpu_cycle_admission() -> crate::engine::swap::cycle_members::MiiAdmission {\n    #[cfg(feature = \"mii-ordinary-cpu-alpha\")]\n    return mii_ordinary_cpu::published_admission();\n    #[cfg(not(feature = \"mii-ordinary-cpu-alpha\"))]\n    crate::engine::swap::cycle_members::NO_MII\n}\n\n/// What the portrait grid shows of the cycles (P-CYCLE): the CPU cycle's Mii admission, and each role's slot 0\n/// (`[Player, CPU]`: the scene's original kind, the fighter the cycle returns to) while a practice scene has one.\n/// Atomics only: the menu worker reads them, never an owner.\npub fn cycle_facts() -> (crate::engine::swap::cycle_members::MiiAdmission, [Option<u32>; 2]) {\n    (cpu_cycle_admission(), [original_kind(Role::Player), original_kind(Role::Cpu)])\n",
+     "reason": "P-CYCLE (operator 2026-11-05: a Mii Gunner cycled for the CPU though the menu did not list it): every cycle walker walks engine::swap::cycle_members (the one list the portrait grid numbers); the CPU Mii owner computes its Mii admission (cycle_members::cpu_admission) under its own lock, walks it and publishes it; the menu reads it and each role's slot 0 (character_roster::cycle_facts)"
     }
    ]
   },
@@ -3529,7 +3596,7 @@
    "dest": "src/runtime/roster/cycle_preload.rs",
    "crate": "root",
    "src_sha256": "ec95b169b5ec06064bc45222a48e3f7ab72a94db32bf9d3c3b619e87e50caac3",
-   "dest_sha256": "c7953a2bd2dcef220024a522762c173eea9ce1c2d13790dd7e926edb447c83a0",
+   "dest_sha256": "df1a28a792230dd57ad5c80486ce1dd4e634cc9ccbe7cf778ec1c707242c99f6",
    "edits": [
     {
      "old": "    let roster = if role == 0 {\n        menu.player_roster.fighters()\n    } else {\n        menu.cpu_roster.fighters()\n    };\n    let preferences = crate::runtime::compat::common::menu::mii_preferences();\n",
@@ -3650,6 +3717,16 @@
      "delete_from": "/// UI readiness is built-body readiness; an asset-helper hit is not sufficient.\n",
      "delete_to": "pub(crate) fn settings_changed() {\n",
      "reason": "RC native warning-root audit, lead 2026-11-03 12:57Z: remove five orphan APIs; retain live original_kind, progress, registry and native transaction paths."
+    },
+    {
+     "old": "    use crate::engine::swap::mii_cycle::{self, Identity, Live};\n    let roster = if role == 0 {\n        menu.player_roster.fighters_excluding_fixed(None)\n",
+     "new": "    use crate::engine::swap::mii_cycle::{self, Identity, Live};\n    // P-CYCLE: the one cycle list; the CPU's Mii admission is its owner's published one, the Player's is unchanged.\n    let roster = if role == 0 {\n        crate::engine::swap::cycle_members::cycle_members(menu.player_roster, crate::engine::swap::cycle_members::ALL_MII)\n",
+     "reason": "P-CYCLE (operator 2026-11-05: a Mii Gunner cycled for the CPU though the menu did not list it): every cycle walker walks engine::swap::cycle_members (the one list the portrait grid numbers); the CPU Mii owner computes its Mii admission (cycle_members::cpu_admission) under its own lock, walks it and publishes it; the menu reads it and each role's slot 0 (character_roster::cycle_facts)"
+    },
+    {
+     "old": "        menu.cpu_roster.fighters_excluding_fixed(None)\n",
+     "new": "        crate::engine::swap::cycle_members::cycle_members(menu.cpu_roster, crate::runtime::roster::character_roster::cpu_cycle_admission())\n",
+     "reason": "P-CYCLE (operator 2026-11-05: a Mii Gunner cycled for the CPU though the menu did not list it): every cycle walker walks engine::swap::cycle_members (the one list the portrait grid numbers); the CPU Mii owner computes its Mii admission (cycle_members::cpu_admission) under its own lock, walks it and publishes it; the menu reads it and each role's slot 0 (character_roster::cycle_facts)"
     }
    ]
   },
@@ -5035,7 +5112,7 @@
    "dest": "src/runtime/roster/native_body_bank.rs",
    "crate": "root",
    "src_sha256": "ccf7ac678691fa0101a1eff5dbd9300a1b12fe64e9ebbde515697adfbb841c98",
-   "dest_sha256": "8702abdc288b46200f09c47b9e420e34722f421cf5768eb7ca7e2aa78797dfac",
+   "dest_sha256": "fec5a5212edf145e125c8e029ccd7fc077d03a07fbf2a6c0a4f06112b5908f1b",
    "edits": [
     {
      "old": "unsafe fn finalize_entry(entry: *mut u8) -> u64 {\n",
@@ -5702,6 +5779,11 @@
      "delete_from": "/// Value-only menu hint for a numbered cycle choice, using the same native\n",
      "delete_to": "/// A kind held by any of this role's groups (window or extra): helper look-ahead\n",
      "reason": "RC native warning-root audit, lead 2026-11-03 12:57Z: remove five orphan APIs; retain live original_kind, progress, registry and native transaction paths."
+    },
+    {
+     "old": "                let roster = if role == 0 { menu.player_roster.fighters_excluding_fixed(None) }\n                    else { menu.cpu_roster.fighters_excluding_fixed(None) };\n",
+     "new": "                // P-CYCLE: the one cycle list, with the CPU owner's published Mii admission.\n                let roster = if role == 0 {\n                    crate::engine::swap::cycle_members::cycle_members(menu.player_roster, crate::engine::swap::cycle_members::ALL_MII)\n                } else {\n                    crate::engine::swap::cycle_members::cycle_members(menu.cpu_roster, super::cpu_cycle_admission())\n                };\n",
+     "reason": "P-CYCLE (operator 2026-11-05: a Mii Gunner cycled for the CPU though the menu did not list it): every cycle walker walks engine::swap::cycle_members (the one list the portrait grid numbers); the CPU Mii owner computes its Mii admission (cycle_members::cpu_admission) under its own lock, walks it and publishes it; the menu reads it and each role's slot 0 (character_roster::cycle_facts)"
     },
     {
      "old": "    pair_request, pair_resource_references, plan_extra_groups_with, prefetch_outcome,\n    swap_commit_index_in, async_build_eligible, construction_task, TickGap,\n    GroupBudget, GroupExchange, GroupOwner, GroupPolicy, GroupState, Members, Phase, Special,\n    SpecialPolicy, BANK_FLAG, MAX_EXTRA_GROUPS, NANA, NATIVE_MEMBERS, PAIR_ACTIVE_FLAG, POOL_RESERVE, POPO,\n    entry_bytes_of, mii_reuse_bytes_match, MiiEntryBytes, MiiIdentity, MII_ENTRY_START, RESOURCE_WORDS,\n",
@@ -7395,7 +7477,7 @@
    "dest": "src/runtime/mii/mii_ordinary_cpu.rs",
    "crate": "root",
    "src_sha256": "db7e15715560db924eba68ba570e97540f1b445b1cf4989a172c0426dd32c6ce",
-   "dest_sha256": "334b3b2689e66fd73cc2c50a4f1d1bd67a550f4bf449e3ed26af4ee75f5f2fa6",
+   "dest_sha256": "e5823c1c9d252adb288a27c82d760dc1467900ebec2868e001dfb75cee4355a0",
    "edits": [
     {
      "old": "fn note(reason:&str) { trace!(\"[MiiOrdinaryCpu] {reason}\"); }",
@@ -7641,6 +7723,36 @@
      "old": "    let requested=setting(&MENU).cpu_roster.fighters().iter()",
      "new": "    let requested=setting(&MENU).cpu_roster.fighters_excluding_fixed(None).iter()",
      "reason": "F6 roster_input allocation root: interrogate the same ordered roster in fixed storage inside intercept; preserve setting snapshots, membership and all transaction guards."
+    },
+    {
+     "old": "    Ok(provenance::VisibleMii {authority,descriptor:now.descriptor,record:now.record})\n}\n",
+     "new": "    Ok(provenance::VisibleMii {authority,descriptor:now.descriptor,record:now.record})\n}\n\n/// The CPU cycle's Mii admission (`cycle_members::cpu_admission`) from the owner's state: qualified as `intercept`'s\n/// `ordinary_cycle` is (not departed, menu valid, no capture, a catalog, this epoch), and the captured saved original\n/// is slot 0. The menu shows it (`publish_admission`) and every CPU walker walks it (P-CYCLE).\nfn cycle_admission(s:&State)->crate::engine::swap::cycle_members::MiiAdmission {\n    let (Some(o),Some(catalog))=(s.owner.as_ref(),s.catalog.as_ref()) else {return crate::engine::swap::cycle_members::NO_MII;};\n    let qualified=!s.departed && s.menu_valid && !s.capture && o.origin.binding.epoch==epoch();\n    crate::engine::swap::cycle_members::cpu_admission(qualified,catalog,o.origin_saved.map(|c|c.canonical()))\n}\nstatic ADMISSION:core::sync::atomic::AtomicU8=core::sync::atomic::AtomicU8::new(0);\nfn publish_admission(admitted:crate::engine::swap::cycle_members::MiiAdmission) {\n    ADMISSION.store(admitted.iter().enumerate().fold(0u8,|acc,(i,on)|acc|(u8::from(*on)<<i)),Ordering::Release);\n}\npub(super) fn published_admission()->crate::engine::swap::cycle_members::MiiAdmission {\n    let bits=ADMISSION.load(Ordering::Acquire);\n    [bits&1!=0,bits&2!=0,bits&4!=0]\n}\n",
+     "reason": "P-CYCLE (operator 2026-11-05: a Mii Gunner cycled for the CPU though the menu did not list it): every cycle walker walks engine::swap::cycle_members (the one list the portrait grid numbers); the CPU Mii owner computes its Mii admission (cycle_members::cpu_admission) under its own lock, walks it and publishes it; the menu reads it and each role's slot 0 (character_roster::cycle_facts)"
+    },
+    {
+     "old": "    if !matches!(owner,1|4) || !ENABLED.load(Ordering::Acquire) {return false;}\n    #[cfg(feature=\"native-body-bank-alpha\")]\n",
+     "new": "    if !matches!(owner,1|4) || !ENABLED.load(Ordering::Acquire) {return false;}\n    // P-CYCLE: the admission the menu shows is the one the walkers walk, refreshed every frame from this state.\n    publish_admission(cycle_admission(&STATE.lock()));\n    #[cfg(feature=\"native-body-bank-alpha\")]\n",
+     "reason": "P-CYCLE (operator 2026-11-05: a Mii Gunner cycled for the CPU though the menu did not list it): every cycle walker walks engine::swap::cycle_members (the one list the portrait grid numbers); the CPU Mii owner computes its Mii admission (cycle_members::cpu_admission) under its own lock, walks it and publishes it; the menu reads it and each role's slot 0 (character_roster::cycle_facts)"
+    },
+    {
+     "old": "        let s=STATE.lock();\n        s.owner.as_ref().zip(s.request).map(|(o,r)|\n             (o.origin,o.origin_saved,o.expected,o.live,r,s.catalog.as_ref().map(Arc::clone),s.reservation.held(),s.restore))\n",
+     "new": "        let s=STATE.lock();\n        let admitted=cycle_admission(&s);\n        s.owner.as_ref().zip(s.request).map(|(o,r)|\n             (o.origin,o.origin_saved,o.expected,o.live,r,s.catalog.as_ref().map(Arc::clone),s.reservation.held(),s.restore,admitted))\n",
+     "reason": "P-CYCLE (operator 2026-11-05: a Mii Gunner cycled for the CPU though the menu did not list it): every cycle walker walks engine::swap::cycle_members (the one list the portrait grid numbers); the CPU Mii owner computes its Mii admission (cycle_members::cpu_admission) under its own lock, walks it and publishes it; the menu reads it and each role's slot 0 (character_roster::cycle_facts)"
+    },
+    {
+     "old": "    let Some((origin,origin_saved,expected,live,request,Some(catalog),retained,restore))=pending else{return false;};\n",
+     "new": "    let Some((origin,origin_saved,expected,live,request,Some(catalog),retained,restore,admitted))=pending else{return false;};\n",
+     "reason": "P-CYCLE (operator 2026-11-05: a Mii Gunner cycled for the CPU though the menu did not list it): every cycle walker walks engine::swap::cycle_members (the one list the portrait grid numbers); the CPU Mii owner computes its Mii admission (cycle_members::cpu_admission) under its own lock, walks it and publishes it; the menu reads it and each role's slot 0 (character_roster::cycle_facts)"
+    },
+    {
+     "old": "        mii_cycle::next_qualified_cpu(&menu.cpu_roster.fighters(),&catalog,&menu::mii_preferences(),\n",
+     "new": "        // P-CYCLE: the cycle the menu numbers (`cycle_members` with this owner's admission), not the unfiltered roster.\n        mii_cycle::next_qualified_cpu(&crate::engine::swap::cycle_members::cycle_members(menu.cpu_roster,admitted),\n            &catalog,&menu::mii_preferences(),\n",
+     "reason": "P-CYCLE (operator 2026-11-05: a Mii Gunner cycled for the CPU though the menu did not list it): every cycle walker walks engine::swap::cycle_members (the one list the portrait grid numbers); the CPU Mii owner computes its Mii admission (cycle_members::cpu_admission) under its own lock, walks it and publishes it; the menu reads it and each role's slot 0 (character_roster::cycle_facts)"
+    },
+    {
+     "old": "pub(super) fn scene_changed() {\n    let mut s=STATE.lock();s.capture=false;s.menu_valid=false;s.catalog=None;s.request=None;s.replay_result=None;s.recapture_log=None;\n",
+     "new": "pub(super) fn scene_changed() {\n    publish_admission(crate::engine::swap::cycle_members::NO_MII);\n    let mut s=STATE.lock();s.capture=false;s.menu_valid=false;s.catalog=None;s.request=None;s.replay_result=None;s.recapture_log=None;\n",
+     "reason": "P-CYCLE (operator 2026-11-05: a Mii Gunner cycled for the CPU though the menu did not list it): every cycle walker walks engine::swap::cycle_members (the one list the portrait grid numbers); the CPU Mii owner computes its Mii admission (cycle_members::cpu_admission) under its own lock, walks it and publishes it; the menu reads it and each role's slot 0 (character_roster::cycle_facts)"
     }
    ]
   },
@@ -9933,7 +10045,7 @@
    "dest": "src/model/mii_root/mii_menu.rs",
    "crate": "tui",
    "src_sha256": "94d7a41fe2ff5d3c4dcaed6ff0e87df4c96d64bd927a99e4550a198784cb761c",
-   "dest_sha256": "83d7fff0adcb22e90011aa48ba79fc6727811630377e37272f15f1579ed37ffc",
+   "dest_sha256": "44de705fdd76df64cb4078ced1d9911e75e59939d7965c28092449b5597beddd",
    "edits": [
     {
      "old": "use {crate::macro_panel, crate::StatefulTable, crate::SubMenu, crate::SubMenuType, crate::engine::compat::grid::NX_SUBMENU_COLUMNS, crate::NX_SUBMENU_ROWS};",
@@ -10039,6 +10151,11 @@
      "old": "/// RC keeps saved catalog selection; native creation awaits runtime qualification.\npub const NATIVE_EDITOR_AVAILABLE: bool = false;\n",
      "new": "/// Add New opens the game's native Mii editor (the fork's editor, carried; operator 2026-11-05: bring it over). Its Save\n/// makes a new native Smash Mii only (`mii_editor_bridge::edit_decide`: a fresh draft through the game's allocator; a\n/// saved ID never enters, so no saved or protected original is overwritten). The capability stays one switch: with it\n/// false the list hides Add New and the bridge refuses before any native work (`tests/mii_install_boundary.rs`).\npub const NATIVE_EDITOR_AVAILABLE: bool = true;\n",
      "reason": "rc.3 (2026-11-05): native Mii editor available again (operator, primary 35137355: bring the fork's editor over); Add New Save still makes only a new native Mii (edit_decide); the capability switch and its refusals stay."
+    },
+    {
+     "old": "if row.selected { \"\u2713 \" } else { \"\" }",
+     "new": "if row.selected { \"> \" } else { \"\" }",
+     "reason": "rc.5 review (primary 2026-11-05 ~20:10Z): the picked-Mii marker U+2713 is in none of the game's 14 fonts (nintendoP_RodinNTLG B/EB/UB cmaps, read from data.arc), so the menu drew an empty box (docs/media/mii-editor-list.gif); \"> \" as the roster editor, the combo list and the Direct stage mark their pick; tests/ui_glyphs.rs guards every literal"
     }
    ]
   },
@@ -10359,7 +10476,14 @@
    "dest": "src/runtime/lobby/practice_stage.rs",
    "crate": "root",
    "src_sha256": "7ee9680b0e147c0f3a3bd5f18a3b27acb979a1d80857ca59d92cc0718f9c94a0",
-   "dest_sha256": "ea1e7be6b369bd76b3406ffa12fc054f49bdaa4747db2bca9ba0d723b47075c7"
+   "dest_sha256": "47b0df317262bde0eb8a80a6da0b3a1f8e21dd8dad6f9f48199cf0d921460336",
+   "edits": [
+    {
+     "old": "            && blocked_kinds == 0,\n    })\n}\n\n",
+     "new": "            && blocked_kinds == 0,\n    })\n}\n\n/// The read-only ItemGate's verdict, for Lobby Items' one removal (`lobby_items`), which waits while it says no.\npub(super) unsafe fn item_gate_ready(base: usize) -> bool {\n    item_gate(base).is_some_and(|gate| gate.ready)\n}\n\n",
+     "reason": "Phase 2 N11 (primary 2026-11-05, P-N11 Lobby Items): the read-only ItemGate verdict for Lobby Items one removal, which waits while it says no"
+    }
+   ]
   },
   {
    "src": "src/lobby_stage_probe.rs",

@@ -96,6 +96,7 @@ const SHIELD: u8 = 3;
 const ATTACKS: u8 = 4;
 const P1: u8 = 5;
 const STATES: u8 = 6;
+const SETUPS: u8 = 7;
 const RECORDING: u8 = 8;
 const PLAYBACK: u8 = 9;
 const MACROS: u8 = 10;
@@ -215,7 +216,7 @@ const fn delay(group: u8, title: &'static str, id: &'static str, step: u16, rang
 const TOGGLE: Control = Control::Toggle;
 
 /// The rows in page order, then group order, then the order they appear in (MENU-DRAFT §2).
-pub static ROWS: [Row; 99] = [
+pub static ROWS: [Row; 104] = [
     // CPU > Reactions
     r(REACT, "Mash", "mash_state", Control::MultiSelect(&o::ACTIONS),
       "Actions the CPU performs as soon as it can.\nWith several ticked it picks one at random."),
@@ -308,6 +309,11 @@ pub static ROWS: [Row; 99] = [
       "The range a random value for the CPU is drawn from.\nUsed only when damage on load is Random Value."),
     r(STATES, "Buffs on load", "buff_state", Control::MultiSelect(&o::BUFFS),
       "Character buffs applied after a load.\nTick every buff that should be on."),
+    // Saves > Setup library (operator 2026-11-05: it ships again)
+    r(SETUPS, "Save setup to library...", "setup_library_save", Control::Editor(Editor::SetupSave),
+      "Names the selected slot's setup and keeps it.\nIt can be restored later from the library."),
+    r(SETUPS, "Setup library", "", Control::Editor(Editor::SetupLibrary),
+      "The saved setups. A binds a setup to the slot and\nrestores it; Y binds it without restoring."),
     // Recording > Recording
     r(RECORDING, "Record Slot", "recording_slot", Control::Dropdown(&o::SLOTS),
       "The slot a new recording goes to."),
@@ -339,6 +345,11 @@ pub static ROWS: [Row; 99] = [
       "The named recordings on the card.\nA loads one, Y copies it into the current slot."),
     r(MACROS, "Save slot to library...", "", Control::Editor(Editor::SaveSlotToLibrary),
       "Names the current slot's recording and keeps it."),
+    // Operator 2026-11-05: Edit placement and the replay window ship again, in the fork's order.
+    r(MACROS, "Edit placement", "", Control::Editor(Editor::EditPlacement),
+      "Nudges where a loaded recording starts."),
+    r(MACROS, "Replay window", "", Control::Editor(Editor::ReplayWindow),
+      "Saved match captures: pick a fighter and an input window\nto turn into a recording."),
     r(MACROS, "Replay capture", "", Control::ReplayCapture,
       "On: capture match inputs when saving a replay.\nThis choice is saved automatically."),
     // Recording > Combos (SPEC-input-07 §6)
@@ -389,6 +400,9 @@ pub static ROWS: [Row; 99] = [
       "On: Training moves through the Lobby Stages order.\nOff: the stage stays."),
     r(STAGES, "Stage Hazards", "stage_hazards", TOGGLE,
       "On: stage hazards are active in Training.\nOff: they are not."),
+    // Phase 2 N11 (docs/ROADMAP.md): the waiting room's item spawner.
+    r(STAGES, "Lobby Items", "lobby_items", TOGGLE,
+      "On: items appear in the waiting room as usual.\nOff: no items appear there."),
     // Fighters & Stages > Loading (advanced)
     r(LOADING, "Cycle Preload", "cycle_preload_slots", Control::Dropdown(&o::CYCLE_SLOTS),
       "How many fighters per role are kept ready for swaps.\nOff loads each fighter when you swap."),

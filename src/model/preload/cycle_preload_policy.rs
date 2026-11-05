@@ -267,14 +267,19 @@ impl std::fmt::Display for CacheText {
             Progress::Done => return write!(f, "All loaded ({}/{}, {} instant)", loaded, planned, fighters.ready),
             Progress::Ready => return write!(f, "Ready {}/{}", fighters.ready, planned),
         }
-        let waits_for = fighters.hold.filter(|_| fighters.held > 0).map(|hold| match hold {
-            crate::engine::swap::body_bank::Hold::Memory => "memory",
-            crate::engine::swap::body_bank::Hold::Pool => "pool space",
-        });
-        match (failed > 0, waits_for) {
-            (true, Some(what)) => write!(f, " ({} failed, {} waiting for {})", failed, fighters.held, what)?,
+        use crate::engine::swap::body_bank::Hold;
+        let held = fighters.held;
+        match (failed > 0, fighters.hold.filter(|_| held > 0)) {
+            (true, Some(hold)) => {
+                let what = if hold == Hold::Memory { "memory" } else { "pool space" };
+                // restriction: preload-failed-and-waiting
+                write!(f, " ({} failed, {} waiting for {})", failed, held, what)?
+            }
             (true, None) => write!(f, " ({} failed)", failed)?,
-            (false, Some(what)) => write!(f, " ({} waiting for {})", fighters.held, what)?,
+            // restriction: preload-wait-memory
+            (false, Some(Hold::Memory)) => write!(f, " ({} waiting for memory)", held)?,
+            // restriction: preload-wait-pool
+            (false, Some(Hold::Pool)) => write!(f, " ({} waiting for pool space)", held)?,
             (false, None) => {}
         }
         Ok(())

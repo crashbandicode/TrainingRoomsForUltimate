@@ -6,6 +6,8 @@
 
 pub(crate) mod automation_helper;
 pub(crate) mod game_mode;
+#[cfg(feature = "practice-stage")]
+pub(crate) mod lobby_items;
 pub(crate) mod lobby_stage;
 #[cfg(feature = "practice-stage")]
 pub(crate) mod practice_stage;
@@ -23,12 +25,16 @@ use crate::runtime::game;
 ///
 /// The practice observer runs first, as the fork does (`src/lib.rs`: `practice_stage_observer::init` before
 /// `lobby_stage_probe::init`, "Verify original resource instructions before the entry probe patches them"): its seam group reads
-/// `lobby_stage.resource_request` (`0x25f7874`), which `lobby_stage::init` then hooks. In the other order the row reads our own
-/// hook (`occupied`), the authoritative group skips all its sites and no stage request is ever served (rc.2's Direct pick).
+/// `lobby_stage.resource_request` (`0x25f7874`), which `lobby_stage::init` then hooks. rc.2 had the other order: the row read our own
+/// hook (`occupied`) and the group skipped all its sites. The seam installer now reads our own writes as the bytes they replaced
+/// (`seam_install::prime` / `seal`, `model::own_patches`), so either order verifies; this one stays the fork's.
 pub(crate) fn init() {
     training::lobby::init();
     #[cfg(feature = "practice-stage")]
     practice_stage::init();
+    // Lobby Items (N11) compares the observer's item-gate rows too; its own hook site is nobody else's.
+    #[cfg(feature = "practice-stage")]
+    lobby_items::init();
     lobby_stage::init();
 }
 
@@ -129,6 +135,9 @@ pub(crate) unsafe fn frame(fighter: usize) {
             crate::runtime::roster::character_items::on_frame(body);
 
             drop(_items);
+            // Lobby Items (N11): the one removal an Off edge owes in the waiting room (nothing on the other frames).
+            #[cfg(feature = "practice-stage")]
+            lobby_items::frame();
             let _preload = HookScope::enter_hook(HookId::RosterPreload);
             crate::runtime::roster::cycle_preload::on_frame(&mut *body);
         }

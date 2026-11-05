@@ -29,7 +29,7 @@ for it are in `artifacts/phase23/rc4-combined/rows-mii/` and have not run yet.
 | 14 | Per-role (Player/CPU) choice per class page (Brawler, Swordfighter, Gunner); the choice applies on close (reload now if that class is on screen, else on a later cycle); the role's character-select Mii is greyed in its own list | `mii_menu.rs`, `selection.rs:186-252` | `src/model/mii_root/mii_menu.rs`, `src/editors/mii.rs`, `src/model/mii/selection.rs` | present (one list per class, ZR switches the role: the decided menu) |
 | 15 | A portrait pick in Player/CPU Character drops that role's Mii reload from the same opening | `app.rs:522-531` | `src/editors/mii.rs` `close_for` (`picked`), `src/runtime/ui/worker.rs` `begin_close` | **ported 2026-11-05** |
 | 16 | Stored Mii choices are read one by one: a bad entry or an unknown field leaves the other choices | `training_mod_consts/src/menu_json.rs:17-37` | `src/model/compat/menu.rs` `mii_preferences_of` | **ported 2026-11-05** |
-| 17 | Mii tiles in Character Cycles, the portrait picks and Kirby Hats: a class with no admitted Mii for that role is greyed and refuses A ("… - unavailable"); admitted Mii tiles take their cycle number; the role's original Mii takes the grey 0 only without a numbered place | `app.rs:563-685,745-800`, `src/training/ui/roster_grid.rs:197-206,304-308` | `src/editors/roster.rs` `MiiTiles`, `roster_badges`; `src/editors/mii.rs` `tiles`; `src/runtime/ui/view.rs` (greyed tint) | **ported 2026-11-05** |
+| 17 | Mii tiles in Character Cycles, the portrait picks and Kirby Hats: a class with no admitted Mii for that role is greyed and refuses A ("… - unavailable"); admitted Mii tiles take their cycle number; the role's original Mii takes the grey 0 only without a numbered place. **P-CYCLE (2026-11-05):** the CPU cycle's numbers are its walkers' own list (`engine::swap::cycle_members`: All and the ranks, with the Mii classes the CPU Mii owner admits; All includes them, numbered), so a greyed class never cycles and every cycled class is numbered; the 0 is the runtime's slot 0 (the scene's original), not the saved pick | `app.rs:563-685,745-800`, `src/training/ui/roster_grid.rs:197-206,304-308` | `src/editors/roster.rs` `MiiTiles`, `roster_badges`; `src/editors/mii.rs` `tiles`; `src/model/swap/cycle_members.rs`; `src/runtime/ui/view.rs` (greyed tint) | **ported 2026-11-05**; fixed by P-CYCLE |
 | 18 | Cycles load the chosen Mii; preloaded helpers and the body bank carry it | `training_mod_consts/src/mii_cycle.rs`, `mii_managed_helper.rs` | `src/model/swap/mii_cycle.rs`, `src/runtime/mii/mii_managed_helper.rs` | present |
 | 19 | HUD portraits show the chosen Mii (Training, the Local Wireless CPU icon, the Quickplay CPU); the Ready card keeps the real-match fighter | `mii_hud_portrait.rs` | `src/runtime/mii/mii_hud_portrait.rs` | present |
 | 20 | The exact Mii is kept across L+R+A, save-state loads, swaps, stage changes and a same-lobby return | `character_lifecycle.rs`, `mii_ordinary_*` | same files under `src/runtime/` | present |
@@ -37,10 +37,17 @@ for it are in `artifacts/phase23/rc4-combined/rows-mii/` and have not run yet.
 
 ## Kept different on purpose, or not carried
 
-- **Replay Window retry and exact-Mii named macros.** In the fork, choosing a capture's track in Recording → Replay
-  Window retried a missed import and loaded that exact Mii on the CPU, and a named macro could carry a Mii. Here those
-  are part of the advanced recording workflows the RC leaves out (`ADVANCED_RECORDING_WORKFLOWS = false`). The Mii code
-  behind them is carried but not reachable.
+- **Replay Window retry and exact-Mii named macros: ported 2026-11-05**, with the rest of the RC's frozen recording
+  workflows (operator: "yes port enable the fork's Replay Window retry / exact-Mii named macros", then "Switch CPU to
+  recorded fighter, Setup library, Edit placement"). The RC flag `ADVANCED_RECORDING_WORKFLOWS` and its gates are
+  gone: the fork's code runs as it did.
+  - **Replay window** (Recording → Named macros): choosing a capture's Mii track retries a missed import (the track's
+    target is "not resolved" until the window resolves the recorded Mii,
+    `engine::macro_ui::replay_target::clip_target`), then Switch loads that exact Mii on the CPU. An ordinary track's
+    Switch loads its fighter.
+  - **Named macros:** a macro carrying a Mii, or recorded with another ordinary fighter, offers Switch (load the recorded
+    fighter or exact Mii) or Keep (play on the current CPU).
+  - **Edit placement** and the **Setup library** (Saves → Setup library) are back.
 - **Editor trace file** (`mii-editor-last.json`): diagnostic builds only; the fork wrote it in every build.
 - **Menu input gate:** the editor also waits while the game's pause or the native waiting-room menu is open (the
   shared `captures_input`), not only for the plugin menu.

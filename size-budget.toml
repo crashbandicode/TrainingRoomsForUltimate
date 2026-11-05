@@ -157,7 +157,63 @@ approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed' (rc.3
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 140067
+ceiling = 138089
 date = "2026-11-05"
-reason = "P-HOT (p23/hot-slots from rc.4 ff69e53): a capacity refusal holds an extra group instead of failing it (GroupState::Held, retry rotation, notice wording; primary 20:50Z root cause of Loaded 2/5 (3 failed)); measured 140067 (tools/size_gate.py), +85 over 139982"
+reason = "rc.4: seam checks read this plugin's own writes as the bytes they replaced (p23/seam-self, root cause of rc.2's Change Stage skip); measured 138089 at c8682d8 (tools/size_gate.py), +248 over 137841"
+approved_by = "Operator 2026-11-05 via primary 35137355 (seam-self order, 16:30Z): 'Raise as needed', an exact entry"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 140134
+date = "2026-11-05"
+reason = "rc.5: shareable combo files, not tied to a fighter (p23/combo-share, operator 2026-11-05); measured 140134 at 86ee6a1 (tools/size_gate.py), +152 over 139982"
+approved_by = "Operator 2026-11-05 via primary 35137355 (P21 order, ~17:55Z): 'Raise as needed', own commit"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 140375
+date = "2026-11-05"
+reason = "rc.5 candidate (p23/rc5-candidate): rc.4 ff69e53 + main 038ca9f + replay-window e3e69ce + seam-self a18c2f4 + combo-share 40ed83a merged; measured 140375 at e794ad6 (tools/size_gate.py) = 139975 (rc.4 + replay-window) + 248 (seam-self) + 152 (combo-share), the lane entries above"
+approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed'"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 140171
+date = "2026-11-05"
+reason = "Lobby Items (Phase 2 N11, p23/lobby-items) on the rc.4 candidate ff69e53: the row, the policy, the spawner switch hook, the one removal and the seam rows; measured 140171 at c52859f (tools/size_gate.py), +189 over 139982"
+approved_by = "Operator 2026-11-05 via primary (P-N11 order, ~18:15Z): 'Raise as needed'"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 140564
+date = "2026-11-05"
+reason = "rc.5 candidate with Lobby Items (primary order 2026-11-05 18:58Z): p23/lobby-items d253092 merged into p23/rc5-candidate; measured 140564 at 6d76742 (tools/size_gate.py) = 140375 (the rc.5 candidate entry above) + 189 (Lobby Items, its lane entry)"
+approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed'"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 140574
+date = "2026-11-05"
+reason = "rc.5: the waiting room resolves its own hitbox entry gate (90bc099; Eden tr-p23-rc5-1 finding, primary 2026-11-05 ~19:16Z): measured 140574 = 140564 + 10 (model::hitbox::practice_entry and the runtime visualizes through it)"
+approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed'"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 140750
+date = "2026-11-05"
+reason = "rc.5 fix P-CYCLE (p23/cpu-cycle-fix): one cycle list for the CPU cycle and its menu numbers, and the grid's numbers to a trace function for the rows (operator's bug report: a Mii Gunner cycled though not listed); measured 140750 at c45c1cd (tools/size_gate.py), +176 over the rc.5 candidate's 140574"
+approved_by = "Operator 2026-11-05 via primary 35137355 (P-CYCLE order, ~19:50Z): 'Raise as needed', own commit"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 140834
+date = "2026-11-05"
+reason = "P-HOT (p23/hot-slots on rc.5 6618de9): a capacity refusal holds an extra group instead of failing it (GroupState::Held, retry rotation, notice wording; primary 20:50Z root cause of Loaded 2/5 (3 failed)); measured 140834 (tools/size_gate.py), +84 over 140750"
 approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed' (P-HOT order 18:32Z: size entry)"

@@ -108,6 +108,11 @@ unsafe fn item_gate(base: usize) -> Option<ItemGate> {
     })
 }
 
+/// The read-only ItemGate's verdict, for Lobby Items' one removal (`lobby_items`), which waits while it says no.
+pub(super) unsafe fn item_gate_ready(base: usize) -> bool {
+    item_gate(base).is_some_and(|gate| gate.ready)
+}
+
 fn log_budget(counter: &AtomicUsize) -> bool {
     let line = counter.fetch_add(1, Ordering::Relaxed);
     if line == LIMIT {

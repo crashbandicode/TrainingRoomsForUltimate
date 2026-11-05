@@ -127,6 +127,23 @@ pub(super) unsafe fn visible_exact(current:*const u8,kind:u32)->Result<provenanc
     Ok(provenance::VisibleMii {authority,descriptor:now.descriptor,record:now.record})
 }
 
+/// The CPU cycle's Mii admission (`cycle_members::cpu_admission`) from the owner's state: qualified as `intercept`'s
+/// `ordinary_cycle` is (not departed, menu valid, no capture, a catalog, this epoch), and the captured saved original
+/// is slot 0. The menu shows it (`publish_admission`) and every CPU walker walks it (P-CYCLE).
+fn cycle_admission(s:&State)->crate::engine::swap::cycle_members::MiiAdmission {
+    let (Some(o),Some(catalog))=(s.owner.as_ref(),s.catalog.as_ref()) else {return crate::engine::swap::cycle_members::NO_MII;};
+    let qualified=!s.departed && s.menu_valid && !s.capture && o.origin.binding.epoch==epoch();
+    crate::engine::swap::cycle_members::cpu_admission(qualified,catalog,o.origin_saved.map(|c|c.canonical()))
+}
+static ADMISSION:core::sync::atomic::AtomicU8=core::sync::atomic::AtomicU8::new(0);
+fn publish_admission(admitted:crate::engine::swap::cycle_members::MiiAdmission) {
+    ADMISSION.store(admitted.iter().enumerate().fold(0u8,|acc,(i,on)|acc|(u8::from(*on)<<i)),Ordering::Release);
+}
+pub(super) fn published_admission()->crate::engine::swap::cycle_members::MiiAdmission {
+    let bits=ADMISSION.load(Ordering::Acquire);
+    [bits&1!=0,bits&2!=0,bits&4!=0]
+}
+
 pub(super) fn preload_pending()->bool {
     let s=STATE.lock(); s.capture || s.request.is_some() || s.busy()
 }
@@ -545,6 +562,8 @@ pub(super) unsafe fn service(entry:*mut u8,owner:u32)->bool {
     #[cfg(feature = "console-swap-trace")]
     let _swap_stack = crate::runtime::roster::practice_trace::scope(0x1080011);
     if !matches!(owner,1|4) || !ENABLED.load(Ordering::Acquire) {return false;}
+    // P-CYCLE: the admission the menu shows is the one the walkers walk, refreshed every frame from this state.
+    publish_admission(cycle_admission(&STATE.lock()));
     #[cfg(feature="native-body-bank-alpha")]
     {
         let bank=STATE.lock().bank;
@@ -763,10 +782,11 @@ unsafe fn begin(entry:*mut u8)->bool {
     if blocker.is_some() {return false;}
     let pending={
         let s=STATE.lock();
+        let admitted=cycle_admission(&s);
         s.owner.as_ref().zip(s.request).map(|(o,r)|
-             (o.origin,o.origin_saved,o.expected,o.live,r,s.catalog.as_ref().map(Arc::clone),s.reservation.held(),s.restore))
+             (o.origin,o.origin_saved,o.expected,o.live,r,s.catalog.as_ref().map(Arc::clone),s.reservation.held(),s.restore,admitted))
     };
-    let Some((origin,origin_saved,expected,live,request,Some(catalog),retained,restore))=pending else{return false;};
+    let Some((origin,origin_saved,expected,live,request,Some(catalog),retained,restore,admitted))=pending else{return false;};
     let active=live.target.publish(origin_saved);
     if !request_current(request,active) {
         clear_request(request);note("CPU request epoch/configuration changed");
@@ -875,7 +895,9 @@ unsafe fn begin(entry:*mut u8)->bool {
             |c|Identity::Saved(c.canonical()));
         let current=if live.cursor.is_none() && live.target==Target::ORIGINAL {Live::Original}
             else {Live::Numbered{identity,cursor:live.cursor}};
-        mii_cycle::next_qualified_cpu(&menu.cpu_roster.fighters(),&catalog,&menu::mii_preferences(),
+        // P-CYCLE: the cycle the menu numbers (`cycle_members` with this owner's admission), not the unfiltered roster.
+        mii_cycle::next_qualified_cpu(&crate::engine::swap::cycle_members::cycle_members(menu.cpu_roster,admitted),
+            &catalog,&menu::mii_preferences(),
             origin_saved.map_or(Identity::Fighter(origin.original_kind),|c|Identity::Saved(c.canonical())),current,|step|match qualify(step) {
                 Ok(value)=>Some(value),
                 Err(reason)=>{
@@ -1478,6 +1500,7 @@ pub(super) unsafe fn complete_generic(entry:*mut u8,token:InstallToken,kind:u32,
     }
 }
 pub(super) fn scene_changed() {
+    publish_admission(crate::engine::swap::cycle_members::NO_MII);
     let mut s=STATE.lock();s.capture=false;s.menu_valid=false;s.catalog=None;s.request=None;s.replay_result=None;s.recapture_log=None;
     s.departed=true;s.generic=None;s.restore=None;
     // A pending bank switch observes departed and settles without publication.

@@ -61,18 +61,14 @@ impl Editor {
         self.raw_for(view.entry,view.fighter_kind,view.previous_selected)
     }
     /// The recorded identity a Switch would load. `Ok(None)` is a Mii whose exact
-    /// configuration is not resolved yet. Preview and Keep never need either.
+    /// configuration is not resolved yet. Preview and Keep never need either
+    /// (`engine::macro_ui::replay_target::clip_target`, host-tested).
     fn target_for(&self,entry:i32,kind:i32,previous:bool)->Result<Option<Target>,String> {
-        if MiiClass::from_kind(kind as u32).is_none() {
-            if crate::engine::swap::trio::TrioFighter::from_kind(kind as u32).is_none() {
-                return Err("Preview fighter is not available".into());
-            }
-            return Ok(Some(Target::fighter(kind as u32)));
-        }
-        self.raw_for(entry,kind,previous)?;
-        if self.resolve_failed & (1 << entry as usize) != 0 { return Err("Recorded Mii metadata is unavailable".into()); }
-        if !cfg!(feature="mii-ordinary-cpu-alpha") {return Err("Replay Mii loading is unavailable in this build".into());}
-        Ok(self.resolved[entry as usize].map(Target::mii))
+        let raw=self.raw_for(entry,kind,previous);
+        let index=usize::try_from(entry).ok().filter(|index|*index<self.resolved.len());
+        crate::engine::macro_ui::replay_target::clip_target(kind, raw.as_ref().map_err(String::as_str),
+            index.and_then(|index|self.resolved[index]), index.is_some_and(|index|self.resolve_failed & (1 << index) != 0),
+            cfg!(feature="mii-ordinary-cpu-alpha"))
     }
     fn target(&self)->Result<Option<Target>,String> {
         let view=self.view();
@@ -181,10 +177,6 @@ fn notify(message: String) {
 }
 
 pub fn open_editor() {
-    if !crate::runtime::ADVANCED_RECORDING_WORKFLOWS {
-        notify("Replay editing is unavailable in this release".into());
-        return;
-    }
     open_browser(None);
 }
 
@@ -844,10 +836,6 @@ pub fn on_pad(pad: Pad) {
 }
 
 pub fn on_action(action: ClipAction) {
-    if !crate::runtime::ADVANCED_RECORDING_WORKFLOWS {
-        notify("Replay editing is unavailable in this release".into());
-        return;
-    }
     // A track or capture change is an explicit selection: a recorded fighter that is
     // not the settled CPU asks once, and nothing changes until it is answered.
     if matches!(action, ClipAction::PreviousFighter | ClipAction::NextFighter | ClipAction::ToggleCapture) {

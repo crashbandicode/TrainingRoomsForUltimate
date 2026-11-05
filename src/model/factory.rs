@@ -48,7 +48,7 @@ pub const LRA_RESET: usize = 1;
 pub const STAGE_HAZARDS: usize = 2;
 
 /// Number of rows.
-pub const COUNT: usize = 108;
+pub const COUNT: usize = 109;
 
 /// The rows this build knows, in menu order of their first appearance in SPEC-core-02 §2.7. The
 /// first three keep the indices the earlier packages use.
@@ -186,4 +186,6 @@ pub static DEFS: [Def; COUNT] = [
     range_row!("ledge_delay_range"),
     range_row!("oos_offset_range"),
     range_row!("reaction_time_range"),
+    // Phase 2 N11: appended, so every stored row keeps its index; the menu shows it with the Stages rows.
+    row!("lobby_items", Single, 2, [0]),
 ];
