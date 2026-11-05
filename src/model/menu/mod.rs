@@ -1206,6 +1206,13 @@ impl Menu {
         if matches!(row.control, Control::Editor(Editor::ButtonChords)) {
             for (_, id) in CHORD_ROWS { changed |= self.reset_row(id); }
         }
+        // One row, two kept keys. The row id is the Player key; the CPU key is the sibling.
+        if matches!(row.control, Control::Editor(Editor::CharacterCycles)) {
+            changed |= self.reset_row("cpu_roster");
+        }
+        if matches!(row.control, Control::Editor(Editor::KirbyHats)) {
+            changed |= self.reset_row("cpu_kirby_hats");
+        }
         changed |= self.reset_row(row.id);
         if let Control::MultiSelectRange { range_id, .. } = row.control {
             changed |= self.reset_row(range_id);
@@ -1214,12 +1221,46 @@ impl Menu {
     }
 
     fn reset_row(&mut self, id: &str) -> bool {
-        let Some(saved) = self.settings.defaults.get(id).filter(|_| !id.is_empty()).map(<[u8]>::to_vec) else {
+        if id.is_empty() {
             return false;
-        };
-        let changed = saved != self.get(id);
-        self.put(id, &saved);
-        changed
+        }
+        if let Some(saved) = self.settings.defaults.get(id).map(<[u8]>::to_vec) {
+            let changed = saved != self.get(id);
+            self.put(id, &saved);
+            return changed;
+        }
+        // A kept key is not a DEFS row, so `Snapshot::get` never sees it. The defaults snapshot
+        // holds the player's saved value when they stored one (`save_defaults` copies `extra`).
+        // Otherwise the factory is what a missing key already means.
+        self.reset_kept(id)
+    }
+
+    /// Factory JSON for a kept key. The engines that own those values compile on test and Switch only.
+    fn kept_page_default(id: &str) -> Option<serde_json::Value> {
+        #[cfg(any(test, target_os = "switch"))]
+        {
+            crate::engine::compat::menu::kept_page_default(id)
+        }
+        #[cfg(not(any(test, target_os = "switch")))]
+        {
+            let _ = id;
+            None
+        }
+    }
+
+    fn reset_kept(&mut self, id: &str) -> bool {
+        let saved = self.settings.defaults.extra().get(id).cloned();
+        let target = saved.clone().or_else(|| Self::kept_page_default(id));
+        let Some(target) = target else { return false };
+        // Absence is already the factory. Writing it would mark a reset that changed nothing.
+        if self.kept(id).is_none() && saved.is_none() {
+            return false;
+        }
+        if self.kept(id) == Some(&target) {
+            return false;
+        }
+        self.set_kept(id, target);
+        true
     }
 
     fn press_list(&mut self, button: Button, row: usize, cursor: usize) {

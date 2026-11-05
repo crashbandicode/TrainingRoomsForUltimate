@@ -328,3 +328,103 @@ fn a_missing_roster_key_means_the_same_thing_to_the_grid_and_the_runtime() {
         view.cpu_roster
     );
 }
+
+fn confirm_fighters_reset(menu: &mut crate::model::menu::Menu) {
+    use crate::model::menu::input::Button;
+    use crate::model::menu::table::Page;
+    use crate::model::menu::Entry;
+    for _ in 0..6 {
+        if menu.page() == Page::FightersStages {
+            break;
+        }
+        menu.press(Button::R);
+    }
+    assert_eq!(menu.page(), Page::FightersStages);
+    for _ in 0..=menu.entry_count(Page::FightersStages) {
+        if matches!(menu.focus(), Some(Entry::ResetPage(_))) {
+            break;
+        }
+        menu.press(Button::Up);
+    }
+    assert!(matches!(menu.focus(), Some(Entry::ResetPage(_))));
+    menu.press(Button::A);
+    menu.press(Button::A);
+}
+
+/// SETTINGS-PERSIST: confirming Reset page to defaults on Fighters & Stages puts both cycle rosters
+/// back. A saved default wins. With none stored, the factory is All, the same as a missing key.
+/// A row on another page stays.
+#[test]
+fn the_page_reset_restores_both_character_cycles() {
+    use crate::model::menu::table::Page;
+    use crate::model::menu::{Env, Menu};
+    use crate::model::settings::Settings;
+
+    let player = ranks(&[FOX, KIRBY]);
+    let cpu = ranks(&[MARIO, FOX]);
+    let saved_player = ranks(&[KIRBY]);
+    let saved_cpu = ranks(&[FOX, MARIO]);
+    let editor = RosterEditor::new(RosterUse::Cycles);
+
+    let mut settings = Settings::factory();
+    settings
+        .defaults
+        .set_kept("player_roster", serde_json::json!(saved_player.clone()))
+        .unwrap();
+    settings
+        .defaults
+        .set_kept("cpu_roster", serde_json::json!(saved_cpu.clone()))
+        .unwrap();
+    settings.menu.set("playback_mash", &[1, 0]).unwrap();
+    let mut menu = Menu::new(settings, Env::default());
+    menu.set_kept("player_roster", serde_json::json!(player.clone()));
+    menu.set_kept("cpu_roster", serde_json::json!(cpu.clone()));
+    confirm_fighters_reset(&mut menu);
+    assert_eq!(
+        menu.kept("player_roster"),
+        Some(&serde_json::json!(saved_player))
+    );
+    assert_eq!(menu.kept("cpu_roster"), Some(&serde_json::json!(saved_cpu)));
+    assert_eq!(
+        menu.settings().menu.get("playback_mash"),
+        Some(&[1, 0][..]),
+        "another page stays"
+    );
+    let (page, changed) = menu.take_page_reset().expect("the reset ran");
+    assert_eq!(page, Page::FightersStages);
+    assert!(changed.contains(&"player_roster"), "{changed:?}");
+
+    let mut settings = Settings::factory();
+    settings.menu.set("playback_mash", &[1, 0]).unwrap();
+    let live = {
+        let mut live = settings.clone();
+        live.menu
+            .set_kept("player_roster", serde_json::json!(player.clone()))
+            .unwrap();
+        live.menu
+            .set_kept("cpu_roster", serde_json::json!(cpu.clone()))
+            .unwrap();
+        live
+    };
+    let mut menu = Menu::new(live.clone(), Env::default());
+    confirm_fighters_reset(&mut menu);
+    let all = serde_json::json!(all_values());
+    assert_eq!(menu.kept("player_roster"), Some(&all));
+    assert_eq!(menu.kept("cpu_roster"), Some(&all));
+    assert_eq!(
+        editor.values(menu.kept("player_roster")),
+        all_values()
+    );
+    assert_eq!(editor.values(menu.kept("cpu_roster")), all_values());
+    let view = TrainingModpackMenu::from_snapshot(&menu.settings().menu);
+    assert_eq!(view.player_roster, OrderedFighterRoster::all());
+    assert_eq!(view.cpu_roster, OrderedFighterRoster::all());
+    assert_eq!(
+        menu.settings().menu.get("playback_mash"),
+        Some(&[1, 0][..])
+    );
+    let merged = menu.commit_onto(&live);
+    assert_eq!(merged.menu.extra().get("player_roster"), Some(&all));
+    assert_eq!(merged.menu.extra().get("cpu_roster"), Some(&all));
+    assert_eq!(merged.menu.get("playback_mash"), live.menu.get("playback_mash"));
+}
