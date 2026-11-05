@@ -73,7 +73,9 @@ The helper grades only while *Combo helper* is On, a target is set and the strip
   The list re-reads the folder at each opening, shows `Name · N links · recorded on X`, and names the first unusable
   file and its reason in one notice.
 - A combo is not tied to a fighter: the helper grades whatever fighter P1 is. `recorded_on` comes from the strip's
-  per-frame sample (`natives::fighter_kind`, an existing guarded native). There is no *Switch to the recorded fighter*
+  per-frame sample (`natives::fighter_kind`, an existing guarded native, the CPU core unit's `utility_get_kind` row;
+  it runs behind its own gate, `input_display::p1_fighter` / `KIND_ON`, so without that row a save records no fighter
+  and the strip is unchanged). There is no *Switch to the recorded fighter*
   option, because the existing playback switch (`character_roster::request_cpu_kind`) changes the CPU only.
 - **Save last combo** keeps the most recent exchange that has at least one link: the open one, else the one before.
 - **Rename** rewrites only `name` (the id never changes). **Delete** removes the file; deleting the target clears

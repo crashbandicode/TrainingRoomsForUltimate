@@ -76,6 +76,8 @@ const BOUNDARIES: &[Boundary] = &[
     Boundary { function: "input_display::sampling", owner: Some(Feature::InputDisplay), gate: Gate::Flag("ENABLED") },
     // Its hitstun-left read: the CPU tech unit's work_get_float row (boot sets the flag from that unit's closure).
     Boundary { function: "input_display::reaction_left", owner: Some(Feature::CpuTech), gate: Gate::Flag("REACTION_ON") },
+    // A saved combo's "recorded on": the CPU core unit's utility_get_kind row (boot sets the flag from that unit's closure).
+    Boundary { function: "input_display::p1_fighter", owner: Some(Feature::CpuCore), gate: Gate::Flag("KIND_ON") },
     // The recorder's entry points the other features call: dormant until boot enables the recorder.
     Boundary { function: "recorder::request_playback", owner: Some(Feature::Recording), gate: Gate::Flag("ENABLED") },
     Boundary { function: "recorder::on_state_restored", owner: Some(Feature::Recording), gate: Gate::Flag("ENABLED") },

@@ -29,14 +29,15 @@ fn names(g: &Graph, key: &str, ident: &str) -> bool {
     g.funcs[one(g, key)].body.iter().any(|t| matches!(t, Tok::Ident(s) if s == ident))
 }
 
-/// "Recorded on X": the strip's per-frame sample reads P1's fighter with the existing guarded native and hands it to
-/// the helper, which keeps it; *Save last combo* writes its name into the new file. The helper's grading takes no
+/// "Recorded on X": the strip's per-frame sample reads P1's fighter with the existing guarded native (behind the CPU
+/// core unit's gate, `tests/capabilities.rs`) and hands it to the helper, which keeps it; *Save last combo* writes its name into the new file. The helper's grading takes no
 /// fighter (`Helper::step` gets the tracker and the settings only).
 #[test]
 fn the_strip_hands_p1s_fighter_to_the_save_and_not_to_the_grading() {
     let g = graph();
     assert!(calls(&g, "input_display::sample_frame", "combo::after_strip"));
-    assert!(names(&g, "input_display::sample_frame", "fighter_kind"));
+    assert!(calls(&g, "input_display::sample_frame", "input_display::p1_fighter"));
+    assert!(names(&g, "input_display::p1_fighter", "fighter_kind") && names(&g, "input_display::p1_fighter", "KIND_ON"));
     assert!(names(&g, "combo::after_strip", "P1_KIND"));
     assert!(names(&g, "combos::save", "p1_kind") && names(&g, "combos::save", "fighter_label"));
     assert!(names(&g, "combos::save", "save_new"), "a save never replaces a file");

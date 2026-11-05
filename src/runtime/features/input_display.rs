@@ -25,6 +25,8 @@ use crate::runtime::published;
 static ENABLED: AtomicBool = AtomicBool::new(false);
 /// The hitstun-left read may run (`reaction_left`).
 static REACTION_ON: AtomicBool = AtomicBool::new(false);
+/// P1's fighter read may run (`p1_fighter`).
+static KIND_ON: AtomicBool = AtomicBool::new(false);
 /// P1's latest mapped inputs, packed (`pack`).
 static INPUTS: AtomicU64 = AtomicU64::new(0);
 /// The constants resolved once (`ids`).
@@ -121,6 +123,21 @@ pub fn set_reaction(on: bool) {
     REACTION_ON.store(on, Ordering::Release);
 }
 
+/// P1's fighter, for a saved combo's "recorded on" (SPEC-input-07 §4, metadata only): `utility::get_kind` is the CPU
+/// core unit's row, so the read runs only while that unit's closure passed (boot); otherwise `None`, and a save
+/// records no fighter.
+unsafe fn p1_fighter(accessor: usize) -> Option<i32> {
+    if !KIND_ON.load(Ordering::Acquire) {
+        return None;
+    }
+    natives::fighter_kind(accessor)
+}
+
+/// Boot: the fighter read's row passed its guard (the CPU core unit's closure).
+pub fn set_fighter_read(on: bool) {
+    KIND_ON.store(on, Ordering::Release);
+}
+
 /// One fighter's frame (SPEC-input-06 §4).
 unsafe fn sample(accessor: usize, ids: &Table, p1: bool) -> Sample {
     let status = natives::status_kind(accessor);
@@ -172,7 +189,7 @@ pub unsafe fn sample_frame(player: usize) {
     }
     let inputs = unpack(INPUTS.load(Ordering::Acquire));
     // P1's fighter, for a saved combo's "recorded on" (metadata; the existing guarded read, no new native site).
-    let p1_kind = natives::fighter_kind(player);
+    let p1_kind = p1_fighter(player);
     let mut tracker = TRACKER.lock();
     #[cfg(feature = "diag")]
     let (check, advantage) = (tracker.stun_check, tracker.advantage());
