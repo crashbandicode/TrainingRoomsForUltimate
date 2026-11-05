@@ -539,7 +539,16 @@ Sources: Surface lane report `artifacts/phase23/LANE-SURFACE-REPORT.md` ("Round 
 `src/model/swap/character_forms.rs` (`Forms::starting`, `EntryState::ready`),
 `src/runtime/roster/build_split.rs` (`tick_any`, the stall meter). Picture: drawn for this decision.
 
-### PAUSE-HELPER · Pausing while a helper entry has no actor — open (2026-11-04)
+### PAUSE-HELPER · Pausing while a helper entry has no actor — answered (2026-11-05)
+
+**Answered 2026-11-05 ~01:00Z by the operator: option (a), cancel at pause-open** ("go with your recommendations on
+all four"). When the game's pause opens while a helper entry has no actor, the plugin retires that entry through the
+native path finalize already uses and creates (or reloads) it again after the pause. It needs a host test of the
+mid-scene retire and an Eden row: a pause opened inside a creation window, then a resume and a quit, with no unmapped
+access. The hat-reload windows get the same treatment if they turn out exposed. **The fork stays as it is** (the
+11-03 "no fork work" ruling); no fork action was asked for. Evidence since the entry was written: Eden showed the
+same null access with no user pause at Training entry (`tr-p23-primary-finalA3`, exit loop slot-7 call
+`main+0x1559118`) and after Quit Training (`tr-lane-yoga-b8`).
 
 Raised 2026-11-04 ~21:42Z by the Ally lane's root cause of the Surface lane's B3 finding. Corrected ~21:51Z, and
 measured by the Surface lane ~22:02Z (run `tr-p23-surface-b4t`, diag `3aaa3288`). No fix exists yet. Any guard, skip
@@ -630,7 +639,12 @@ Sources: `artifacts/phase23/LANE-ALLY-REPORT.md` ("Round 4" §2) and `LANE-SURFA
 (`out/trace/b4t-kirby.trace.jsonl`, `out/pause-exit/`). The owned 13.0.5 `main-13.0.5.elf` was read with llvm-objdump.
 Picture: drawn for this decision (`tools/render_decisions.py d_pausehelper`).
 
-### HAT-REQUEST-END · A Kirby hat request must always end — open (2026-11-04)
+### HAT-REQUEST-END · A Kirby hat request must always end — answered (2026-11-05)
+
+**Answered 2026-11-05 ~01:00Z by the operator: option A, both rules** (R1: the timeout counts every game frame; R2: a
+role that stops being Kirby ends its request). The call-site fix is already in `p23/candidate` (`faa28eb`; B4-3/4/5
+pass on Eden). The Eden proof for R2: swap the CPU off Kirby while a hat request is pending, then a hat chord on a
+Kirby again works.
 
 Raised 2026-11-04 ~21:53Z by the primary, from the Ally lane's B4-3 root cause (`LANE-ALLY-REPORT.md` "Round 4" §3).
 This is source analysis only. Nothing here is implemented, and the call-site fix for B4-3 is separate (branch
@@ -674,3 +688,30 @@ after 15 s with "could not be loaded".
 Sources: `src/runtime/roster/kirby_hats.rs` (TrainingRooms `p23/b4-pilot-refusal` `0254849`), the fork's
 `src/kirby_hats.rs` and `src/training/character_specific/kirby.rs:37`, and `LANE-SURFACE-REPORT.md` "B4-3 root cause".
 Picture: drawn for this decision (`tools/render_decisions.py d_hatrequest`).
+
+### SIZE-BUDGET-RC · The Phase 2/3 candidate over the RC size ceiling — answered (2026-11-05)
+
+`p23/candidate` `5023fac` counted 136,105 lines against the RC ceiling 136,069 (`size-budget.toml`, rustfmt-sloc4),
+36 over: the rc10 menu merge (+30), the B4-1 pilot refusal (+16), the roster mark names (+8), the Kirby hat call site
+(0). The rule is "cut code, or record a raise with approval". The options were a 36-line raise or a cut.
+
+**Answered 2026-11-05 ~01:00Z by the operator: cut.** `p23/size-cut` `164a6c6` removes `src/model/macros/ui_anchor.rs`,
+a carried file with no user (`docs/SIZE-PLAN.md` macros row 1, risk L), recorded as not carried in the pkg4 manifest
+and ledger: 135,970, 99 under the ceiling. Gates pass with `size_budget`. The NROs are byte-identical to the
+candidate's (LTO had dropped the module), so no Eden row re-runs. `size-budget.toml` is unchanged.
+
+![Size budget](decisions/SIZE-BUDGET-RC.png)
+
+### SOLO-S-PLACEMENT · Where the Solo Popo "S" marks sit on the roster grid — answered (2026-11-05)
+
+On `p23/candidate` the red P1 "S" (bottom-left) and the blue CPU "S" (bottom-right) on the Ice Climbers tile sit on
+the tile's name label (Eden `tr-p23-primary-finalB3`, `04-grid-badges`).
+
+**Answered 2026-11-05 ~01:00Z by the operator:** "for ice climbers the name doesn't show on the icon it instead shows
+at the bottom. If we show the name below the icon it should not cover the name just the icon partially." So the marks
+may overlap the icon's lower corners, never the name label. The fork shows names at the bottom of the screen, not on
+the tiles; TrainingRooms keeps its per-tile names, and the marks move up off the label line.
+
+![Solo S placement](decisions/SOLO-S-PLACEMENT.png)
+
+Picture: the Eden frame crop (today) with the rule; the after-fix frame follows on the Eden proof.
