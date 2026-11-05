@@ -89,3 +89,11 @@ ceiling = 136992
 date = "2026-11-05"
 reason = "rc.3: the frame strip (SPEC-input-06, operator decision INPUT-VIZ A) replacing the input log; measured 136992 at 873f9d1 (tools/sloc.py), +519 over 136473"
 approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed' (rc.3 features)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 136526
+date = "2026-11-05"
+reason = "rc.3 Change Stage (p23/change-stage b274144): the practice stage request served again (observer before the lobby stage hook) and the Change Stage row (stage grid without All, A goes there, Y form, request at menu close); measured 136526 at b274144 (tools/sloc.py), +53 over 136473"
+approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed' (rc.3 features)"

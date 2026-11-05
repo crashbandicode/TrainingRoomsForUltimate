@@ -18,14 +18,18 @@ use smash::app::BattleObjectModuleAccessor;
 use crate::model::lra_reset::{entry_id_valid, FIGHTER_ENTRY_ID_FIELD};
 use crate::runtime::game;
 
-/// Start the practice engine and stage rotation, then the feature-gated practice update hook.
-/// That hook initializes stage requests only after its native checks pass. Called once from boot,
-/// after the roster cycle's own `init` and before the install line.
+/// Start the practice engine, the feature-gated practice update hook (it initializes stage requests only after its native
+/// checks pass), then the stage rotation. Called once from boot, after the roster cycle's own `init` and before the install line.
+///
+/// The practice observer runs first, as the fork does (`src/lib.rs`: `practice_stage_observer::init` before
+/// `lobby_stage_probe::init`, "Verify original resource instructions before the entry probe patches them"): its seam group reads
+/// `lobby_stage.resource_request` (`0x25f7874`), which `lobby_stage::init` then hooks. In the other order the row reads our own
+/// hook (`occupied`), the authoritative group skips all its sites and no stage request is ever served (rc.2's Direct pick).
 pub(crate) fn init() {
     training::lobby::init();
-    lobby_stage::init();
     #[cfg(feature = "practice-stage")]
     practice_stage::init();
+    lobby_stage::init();
 }
 
 /// Once per game frame, before the input processing (the input poll's note for Player 1).

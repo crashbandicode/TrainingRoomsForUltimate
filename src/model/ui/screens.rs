@@ -284,7 +284,7 @@ fn tile_label(kind: GridKind, n: usize, short: bool, stage: StageLabel, out: &mu
     let name: &str = match kind {
         GridKind::Items => ITEMS.get(n).copied().unwrap_or("-"),
         GridKind::Stages if n == 0 => "All",
-        GridKind::Stages => stage(n - 1),
+        GridKind::Stages | GridKind::StageChange => stage(n.saturating_sub(1)),
         // The roster editor (engine::swap::roster_grid) writes the names, ranks and picks: this module has no engine.
         GridKind::Roster(_) => "",
     };
@@ -316,7 +316,7 @@ fn grid_frame(menu: &Menu, screen: &Screen, layout: GridLayout, page: usize, cel
         }
     }
     frame.tile_count = len as u8;
-    frame.tile_stage_grid = layout.kind == GridKind::Stages;
+    frame.tile_stage_grid = matches!(layout.kind, GridKind::Stages | GridKind::StageChange);
     frame.tile_item_grid = layout.kind == GridKind::Items;
     frame.tile_centre_last = matches!(layout.kind, GridKind::Roster(_));
     frame.tile_sig = ((page as u32) << 8) | u32::from(layout.cols) | (u32::from(layout.rows) << 4);
@@ -324,6 +324,7 @@ fn grid_frame(menu: &Menu, screen: &Screen, layout: GridLayout, page: usize, cel
     let title = match layout.kind {
         GridKind::Items => "Give item",
         GridKind::Stages => "Stage grid",
+        GridKind::StageChange => "Change Stage",
         GridKind::Roster(RosterUse::PlayerPick) => "Player Character",
         GridKind::Roster(RosterUse::CpuPick) => "CPU Character",
         GridKind::Roster(RosterUse::Cycles) => "Character Cycles",
@@ -333,6 +334,7 @@ fn grid_frame(menu: &Menu, screen: &Screen, layout: GridLayout, page: usize, cel
     let _ = frame.help[0].write_str(match layout.kind {
         GridKind::Items => "A gives Player 1 this item now.",
         GridKind::Stages => "Stages the lobby cycles through; All takes every stage.",
+        GridKind::StageChange => "The stage to go to now, in Training or the waiting room.",
         GridKind::Roster(RosterUse::PlayerPick | RosterUse::CpuPick) => "A picks the fighter; X shows the next form of a shared slot.",
         GridKind::Roster(RosterUse::Cycles) => "A adds in order, R removes, Y marks Solo Popo on Ice Climbers, X previews forms, ZR switches role.",
         GridKind::Roster(RosterUse::Hats) => "A adds in order (All takes everyone), R removes, X previews forms, ZR switches role.",
@@ -770,6 +772,19 @@ mod tests {
         let m = open_grid(ConsoleMode::Handheld, "Lobby Stages");
         let pages = crate::model::menu::grid::STAGE_TILES.div_ceil(16);
         assert!(frame(&m).crumb.string_lossy().contains(&format!("page 1 of {pages}")));
+    }
+
+    #[test]
+    fn the_change_stage_grid_starts_on_the_first_stage_with_its_picture_and_says_what_a_does() {
+        use crate::model::menu::grid::ConsoleMode;
+        let m = open_grid(ConsoleMode::Docked, "Change Stage");
+        let f = frame(&m);
+        assert_eq!((f.view, f.tile_count), (View::Tiles, 40));
+        assert!(f.tile_stage_grid, "stage pictures, as on Lobby Stages");
+        assert_eq!(&f.tile_n[..3], &[1, 2, 3], "the stage grid's numbers, without All");
+        assert_eq!(f.tiles[0].string_lossy(), "Battlefield", "catalog stage 0, not All");
+        assert!(f.crumb.string_lossy().contains("Change Stage"), "{:?}", f.crumb);
+        assert!(f.help[0].string_lossy().contains("go to now"), "{:?}", f.help[0]);
     }
     #[test]
     fn a_panel_of_the_macro_layer_is_a_4_by_8_tile_page_with_a_two_line_footer() {

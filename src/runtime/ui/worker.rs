@@ -114,7 +114,8 @@ struct Session {
     setups: super::setups::Ui,
     setup_note: Option<String>,
     stage_context: Option<crate::runtime::lobby::practice_stage_request::MenuContext>,
-    stage_request: Option<u64>,
+    /// The stage picked to go to: requested when the menu has closed (`close_session`).
+    stage_close: Option<crate::engine::stages::stage_forms::Selection>,
     phase: Phase,
     /// The panel row the menu is on while `phase` is `Panel`.
     panel: Option<Editor>,
@@ -133,8 +134,6 @@ impl Session {
     /// The worker has something to poll (the layer changes its panels on the game thread, the keyboard returns there).
     fn watching(&self) -> bool {
         if self.setups.watching() { return true; }
-        if self.stage_request.is_some() && self.menu.as_ref().is_some_and(|m| matches!(m.screen(),
-            Some(Screen::Grid { layout, .. }) if layout.kind == crate::model::menu::grid::GridKind::Stages)) { return true; }
         #[cfg(feature = "mii-saved-alpha")]
         if self.pending_close.is_some() { return true; }
         self.phase != Phase::Menu || self.menu.as_ref().is_some_and(|m| matches!(m.screen(), Some(Screen::External(Editor::MiiList(_)))))
@@ -181,7 +180,7 @@ fn sync_input_generation(s: &mut Session) {
         s.input_generation = generation;
         s.menu = None;
         s.stage_context = None;
-        s.stage_request = None;
+        s.stage_close = None;
         // Practice cleanup can suspend a same-lobby draft. The provider and
         // external-name owner distinguish actual retirement on the worker.
         s.setup_note = None;
@@ -202,7 +201,7 @@ fn sync_input_generation(s: &mut Session) {
 fn handle(event: Event, s: &mut Session) {
     if event == Event::Open {
         s.stage_context = crate::runtime::lobby::practice_stage_request::menu_context();
-        s.stage_request = None;
+        s.stage_close = None;
         let settings = SETTINGS.lock().clone().unwrap_or_else(Settings::factory);
         match &mut s.menu {
             Some(m) => m.reopen(settings, env()),
@@ -281,7 +280,12 @@ fn press(button: Button, s: &mut Session) {
                 requests::give_item(item);
             }
             if let Some((tile, button)) = m.take_stage_press() {
-                stage_press(m, tile, button, s.stage_context, &mut s.stage_request, &mut s.refusal);
+                s.stage_close = stage_press(m, tile, button);
+                // A stage to go to closes the menu; the request is made when it has closed (`close_session`).
+                for _ in 0..8 {
+                    if s.stage_close.is_none() || m.is_closed() { break; }
+                    m.press(Button::B);
+                }
             }
             if let Some((tile, button)) = m.take_roster_press() {
                 roster_press(m, &mut s.roster, tile, button);
@@ -443,26 +447,36 @@ fn sync_mii(s: &mut Session) {
         if let Some(class) = class { list.open(class); } else { list.leave(); }
     }
 }
-/// A, X or Y on the Lobby Stages grid: the stage editor applies it to the menu's kept values; a Direct pick is requested from the
-/// waiting room's practice stage (state only: the request is made by the stage hooks on the game's side).
-fn stage_press(m: &mut Menu, tile: u16, button: Button,
-    context: Option<crate::runtime::lobby::practice_stage_request::MenuContext>,
-    request: &mut Option<u64>, note: &mut Option<&'static str>) {
+/// A, X or Y on the Lobby Stages or Change Stage grid: the stage editor applies it to the menu's kept values. A stage to go to (A on
+/// Change Stage, or A in Direct on Lobby Stages) is returned: the menu closes and `close_session` requests it then.
+fn stage_press(m: &mut Menu, tile: u16, button: Button) -> Option<crate::engine::stages::stage_forms::Selection> {
     use crate::editors::stages::{Effect, StageEditor, ORDER_KEY, PREFERENCES_KEY};
+    let change = matches!(m.screen(), Some(Screen::Grid { layout, .. })
+        if layout.kind == crate::model::menu::grid::GridKind::StageChange);
     let mut editor = StageEditor::read(m.kept(ORDER_KEY), m.top_extra(PREFERENCES_KEY));
-    let effect = editor.press(usize::from(tile), button);
+    let effect = if change { editor.change(usize::from(tile), button) } else { editor.press(usize::from(tile), button) };
     if effect == Effect::Nothing {
-        return;
+        return None;
     }
     m.set_kept(ORDER_KEY, editor.order_value());
     m.set_top_extra(PREFERENCES_KEY, editor.preferences_value());
-    if let Effect::Request(selection) = effect {
-        let result = context.ok_or("No practice stage when this menu opened")
-            .and_then(|context| crate::runtime::lobby::practice_stage_request::request_in(context, selection));
-        *note = Some(match result {
-            Ok(id) => { *request = Some(id); return; },
-            Err(why) => why,
-        });
+    match effect {
+        Effect::Request(selection) => Some(selection),
+        _ => None,
+    }
+}
+
+/// Close the menu, then request the stage picked in it, as the fork does (`src/common/menu.rs`, `stage_close`): with the
+/// practice stage the menu opened on (`menu_context`), so the native update serves it once the menu is gone. A refusal is
+/// a notice; nothing is half-applied (the request is all or nothing, `practice_stage_request::queue`).
+fn close_session(s: &mut Session) {
+    if let Some(menu) = s.menu.as_mut() { close(menu, &mut s.setups); }
+    let Some(selection) = s.stage_close.take() else { return };
+    let result = s.stage_context.ok_or("no practice stage when this menu opened")
+        .and_then(|context| crate::runtime::lobby::practice_stage_request::request_in(context, selection));
+    diagnostic(format_args!("[PracticeStageRequest] menu_close selection={selection:?} result={result:?}"));
+    if let Err(why) = result {
+        notices::post("Practice Stage", why, 180, DEFAULT_COLOR);
     }
 }
 
@@ -514,24 +528,17 @@ fn publish_frame(s: &Session) {
     } else {
         frame_of(menu, &mut next, stage_label);
         if let Some(Screen::Grid { layout, page, cell }) = menu.screen().copied() {
-            if layout.kind == crate::model::menu::grid::GridKind::Stages {
+            use crate::model::menu::grid::GridKind;
+            if matches!(layout.kind, GridKind::Stages | GridKind::StageChange) {
                 let editor = crate::editors::stages::StageEditor::read(
                     menu.kept(crate::editors::stages::ORDER_KEY),
                     menu.top_extra(crate::editors::stages::PREFERENCES_KEY),
                 );
-                editor.decorate(&mut next, layout.tile(page, cell).unwrap_or(0));
-                if let Some(status) = crate::runtime::lobby::practice_stage_request::status()
-                    .filter(|status| s.stage_request == Some(status.id)) {
-                    use crate::runtime::lobby::practice_stage_request::Phase;
-                    let text = match status.phase {
-                        Phase::Queued => "Stage request queued",
-                        Phase::NativeOwned => "Stage loading",
-                        Phase::Complete => "Stage ready",
-                        Phase::Refused(why) | Phase::Retained(why) => why,
-                        Phase::Departed { .. } => "Stage request ended with the practice scene",
-                    };
-                    next.help[1].clear();
-                    let _ = core::fmt::Write::write_str(&mut next.help[1], text);
+                let focused = layout.tile(page, cell).unwrap_or(0);
+                if layout.kind == GridKind::StageChange {
+                    editor.decorate_change(&mut next, focused);
+                } else {
+                    editor.decorate(&mut next, focused);
                 }
             }
             if let crate::model::menu::grid::GridKind::Roster(use_) = layout.kind {
@@ -628,7 +635,7 @@ fn begin_close(
         retry_close(s);
         return;
     }
-    if let Some(menu) = s.menu.as_mut() { close(menu, &mut s.setups); }
+    close_session(s);
 }
 
 #[cfg(feature = "mii-saved-alpha")]
@@ -647,9 +654,7 @@ fn retry_close(s: &mut Session) {
         return;
     }
     match crate::runtime::mii::menu_handoff::post_close(intent) {
-        Ok(()) => {
-            if let Some(menu) = s.menu.as_mut() { close(menu, &mut s.setups); }
-        }
+        Ok(()) => close_session(s),
         Err(intent) => s.pending_close = Some(intent),
     }
 }
