@@ -153,11 +153,3 @@ ceiling = 139982
 date = "2026-11-05"
 reason = "rc.4 candidate (p23/rc4-candidate): the rc.3 candidate + the combo helper + the Mii editor bring-over + the rc.3 review fixes merged; measured 139982 at ea3e531 (tools/sloc.py), 137841 + 1834 + 171 + 136, the lane entries above"
 approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed' (rc.3 features)"
-
-[[budget]]
-scope = "total"
-basis = "rustfmt-sloc4"
-ceiling = 140104
-date = "2026-11-05"
-reason = "rc.4: the replay window's Mii retry and exact-Mii named macros (p23/replay-window on p23/rc4-candidate ff69e53; operator 'yes port enable the fork's Replay Window retry / exact-Mii named macros'); measured 140104 at 2345f93 (tools/size_gate.py), +122 over 139982"
-approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed'"
