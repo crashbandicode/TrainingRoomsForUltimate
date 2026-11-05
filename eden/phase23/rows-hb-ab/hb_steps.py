@@ -507,3 +507,94 @@ def slow_attack(ctx):
 def slow_grab(ctx):
     """A standing grab at 10 % speed; at its first pass with a grab sphere the speed drops to 1 %."""
     return _slow_event(ctx, 'slow-grab', 'hb-sideb', r'grabs=[1-9]', 'grab', False)
+
+
+# ---- ab3: Training's own frame-by-frame speed (operator tip, primary 12:12Z) -------------------------------------
+# Speed "1 Frame (Press ZL)" (SmashWiki, Training Mode): the battle stays frozen; a ZL tap advances one frame. Both views
+# are shot with no tap in between, so they show the same game frame; the pass counter is recorded with every shot.
+
+def menu_route(ctx, seq=(), tag='route', settle=0.5):
+    """Play the named segments in order (Training menu navigation), then one shot."""
+    for name in seq:
+        ctx.play(name)
+        time.sleep(settle)
+    time.sleep(1.0)
+    return save(ctx, tag, {'seq': list(seq), 'shot': str(ctx.shot(tag))})
+
+
+def _note(ctx, tag):
+    r = _ridley(ctx)
+    return {'shot': str(ctx.shot(tag)), 'passes': _passes(ctx), 'seq': line_count(ctx),
+            'ridley': _last_state(ctx).get(r['set']), 'utc': time.strftime('%H:%M:%SZ', time.gmtime())}
+
+
+def fbf_check(ctx):
+    """Frozen? Two shots 2 s apart with no tap, then one ZL tap and a shot: the pass counter must stay, then move."""
+    a = _note(ctx, 'fbf-still-0')
+    time.sleep(2.0)
+    b = _note(ctx, 'fbf-still-1')
+    ctx.play('hb-zl')
+    time.sleep(1.0)
+    c = _note(ctx, 'fbf-after-tap')
+    got = {'still0': a, 'still1': b, 'after_tap': c}
+    save(ctx, 'fbf-check', got)
+    if a['passes'] != b['passes'] or c['passes'] == b['passes']:
+        raise RuntimeError(f'not frozen / no step: passes {a["passes"]} {b["passes"]} {c["passes"]}')
+    return got
+
+
+def _fbf_views(ctx, tag):
+    shots = {}
+    for key, view in (('effects', 'effects'), ('orbs', 'orbs'), ('effects_again', 'effects'), ('both', 'both')):
+        n0 = line_count(ctx)
+        route(ctx, f'view={view}')
+        poll = wait_new(ctx, n0, r'\[Hitbox\] orbs view_poll view=%s' % VIEW_NAMES[view], 20)[-1]
+        time.sleep(1.0)
+        shots[key] = _note(ctx, f'{tag}-{key}') | {'poll': poll}
+    return shots
+
+
+def fbf_pair(ctx, start='hb-zl-csmash', pattern='hits=[1-9]', tag='fbf-attack', taps=60):
+    """Reset (ZL held = normal speed), start the move on one stepped frame, tap ZL one frame at a time until Ridley's
+    pass has the wanted spheres, then shoot every view with no tap in between."""
+    r = _ridley(ctx)
+    route(ctx, 'route=both view=effects orbtint=off')
+    ctx.play('hb-lra')
+    ctx.play('hb-zl-hold')
+    time.sleep(0.5)
+    n0 = line_count(ctx)
+    ctx.play(start)
+    steps = 1
+    found = None
+    while steps <= taps:
+        time.sleep(0.25)
+        found = [l for l in lines_after(ctx, n0, r'\[Hitbox\] orbs pass set=%d [^\n]*%s' % (r['set'], pattern))]
+        if found:
+            break
+        ctx.play('hb-zl')
+        steps += 1
+    if not found:
+        raise RuntimeError(f'{tag}: no {pattern} after {steps} stepped frames')
+    time.sleep(1.0)
+    n1 = line_count(ctx)
+    shots = _fbf_views(ctx, tag)
+    changes = lines_after(ctx, n1, r'\[Hitbox\] orbs pass set=%d ' % r['set'])
+    got = {'start': start, 'stepped_frames': steps, 'trigger_line': found[-1], 'shots': shots,
+           'ridley_changes_during_shots': changes}
+    save(ctx, tag, got)
+    passes = {k: v['passes'] for k, v in shots.items()}
+    if len(set(passes.values())) != 1 or changes:
+        raise RuntimeError(f'{tag}: the frame moved between shots: passes {passes} changes {changes}')
+    return got
+
+
+def prepare(ctx):
+    """Visualizer On, route Both, positions reset; which set is Ridley (the larger), for the frame picks."""
+    route(ctx, 'route=both view=both orbtint=off ' + joint_word(ctx))
+    push(ctx, RIDLEY, STEVE, True)
+    ctx.play('hb-lra')
+    time.sleep(4)
+    last = _last_state(ctx)
+    ridley_set = max(last, key=lambda k: last[k]['placed'])
+    (ctx.runner.out / 'ridley.json').write_text(json.dumps({'set': ridley_set, 'standing': last[ridley_set], 'all': last}))
+    return save(ctx, 'prepare', {'ridley_set': ridley_set, 'last': last, 'shot': str(ctx.shot('prepared'))})

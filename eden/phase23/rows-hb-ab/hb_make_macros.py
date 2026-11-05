@@ -11,6 +11,7 @@ from pathlib import Path
 
 OUT = Path(__file__).resolve().parent / 'segments'
 A, B, Y, L, R, ZR, PLUS = 1, 2, 8, 64, 128, 512, 1024
+ZL, LEFT, UP, RIGHT, DOWN = 256, 4096, 8192, 16384, 32768
 
 
 def event(frame, buttons=0, lx=0.0, ly=0.0):
@@ -54,6 +55,14 @@ def main():
     # Ridley's side special (Space Pirate Rush): its CATCH box is out while he runs (ZR + A jumped and aired in ab2:
     # this profile's shoulder buttons are not shield).
     write('hb-sideb', [event(0), event(2, B, 1.0), event(8, 0, 1.0), event(9)], 14)
+    # Training's frame-by-frame speed ("1 Frame (Press ZL)"): menu taps, a one-frame ZL tap, ZL held (normal speed),
+    # and the attack / side special read on the frame a ZL tap advances.
+    for name, bits in (('down', DOWN), ('up', UP), ('right', RIGHT), ('left', LEFT), ('a', A)):
+        write(f'hb-{name}', [event(0), event(2, bits), event(6)], 12)
+    write('hb-zl', [event(0), event(2, ZL), event(3)], 8)
+    write('hb-zl-hold', [event(0), event(2, ZL), event(92)], 96)
+    write('hb-zl-csmash', [event(0), cstick(event(2, ZL), 1.0), cstick(event(3), 1.0), event(5)], 10)
+    write('hb-zl-sideb', [event(0), event(2, ZL | B, 1.0), event(3, B, 1.0), event(5)], 10)
     # Pause, camera mode, back.
     write('hb-plus', [event(0), event(2, PLUS), event(8)], 14)
     write('hb-y', [event(0), event(2, Y), event(8)], 14)

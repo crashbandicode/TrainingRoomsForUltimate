@@ -67,6 +67,8 @@ plan = {
         row('07c-slow-standing', 'Training-settled', 'Training-settled', 'hb_steps.py:slow_standing', 3),
         row('08c-slow-attack', 'Training-settled', 'Training-settled', 'hb_steps.py:slow_attack', 3),
         row('09c-slow-grab', 'Training-settled', 'Training-settled', 'hb_steps.py:slow_grab', 3),
+        row('06-prepare', 'Training-settled', 'Training-settled', 'hb_steps.py:prepare', 2),
+        {'id': '12-fbf-probe', 'start': 'Training-settled', 'end': 'Training-menu-other', 'budget_min': 2, 'steps': [{'run': 'hb_steps.py:menu_route', 'check': True, 'args': {'seq': ['hb-plus', 'hb-down', 'hb-down', 'hb-down', 'hb-down', 'hb-down', 'hb-a'], 'tag': 'fbf-probe'}}]},
         row('10-lag', 'Training-settled', 'Training-settled', 'hb_steps.py:lag_clips', 3),
         row('11-off', 'Training-settled', 'Training-settled', 'hb_steps.py:off_and_scan', 2),
     ],

@@ -43,6 +43,11 @@
       "row": "nav03-room-list",
       "library": "confirm"
     },
+    "hb-a": {
+      "file": "segments/hb-a.edenmacro.json",
+      "sha256": "b90b94e177afb221a149051da3630541f434d709da5b578ed2e5c8fb3c476280",
+      "cap": 20
+    },
     "hb-b": {
       "file": "segments/hb-b.edenmacro.json",
       "sha256": "4999deaadea2c2a323fc562eb78d956ad5384ad11bc5d6fb855fc0784d2532aa",
@@ -153,6 +158,11 @@
       "sha256": "e0035e8a2b2f3157b0f29c0ef7a06cf53e3c6e6b628597bdd6cd8cf76d3671b9",
       "cap": 20
     },
+    "hb-down": {
+      "file": "segments/hb-down.edenmacro.json",
+      "sha256": "54dfa276047eaf2e2fc468b16fcdd98fe42321c5ad0433d87a6794a84ce45e8a",
+      "cap": 20
+    },
     "hb-grab-p10": {
       "file": "segments/hb-grab-p10.edenmacro.json",
       "sha256": "c15db18a1b07d3a940075fd307c8fb8ba36a90ac776830b22a9dbe5b2731ee48",
@@ -238,6 +248,11 @@
       "sha256": "ca9c156e7b9ce2b0efdb5deca825f7e0bb3aa72eb8544660c307e70d0085411b",
       "cap": 20
     },
+    "hb-left": {
+      "file": "segments/hb-left.edenmacro.json",
+      "sha256": "e23499830508c256983c997e6e6c835950969b75e173595b9b90737502c8f81c",
+      "cap": 20
+    },
     "hb-lra": {
       "file": "segments/hb-lra.edenmacro.json",
       "sha256": "7135837b075b6d1adb5dd6567016d22bb849266ba51215fa3b4698625e45af47",
@@ -248,9 +263,19 @@
       "sha256": "b97e08bf03762ce55ccb8cdbf76690db7bd0f444506f7e2c8af54481deb25789",
       "cap": 20
     },
+    "hb-right": {
+      "file": "segments/hb-right.edenmacro.json",
+      "sha256": "717a3ef2bf0bcd956a556302825a4b31c31cb3f3a8d7e82acc706dcd544c29b4",
+      "cap": 20
+    },
     "hb-sideb": {
       "file": "segments/hb-sideb.edenmacro.json",
       "sha256": "1a0e3a1320f437f8640d17dce37a6d6158267decf0c56609e2d8ce98d6d9deb2",
+      "cap": 20
+    },
+    "hb-up": {
+      "file": "segments/hb-up.edenmacro.json",
+      "sha256": "3a9aa3e875781b981bbbfeb9318fb1a9258cb8fa229ff446e62007eb2c841ebb",
       "cap": 20
     },
     "hb-walk": {
@@ -261,6 +286,26 @@
     "hb-y": {
       "file": "segments/hb-y.edenmacro.json",
       "sha256": "da1410ba226e606e6c95873c2c897554897de181bea137a58c183782b46e8c58",
+      "cap": 20
+    },
+    "hb-zl-csmash": {
+      "file": "segments/hb-zl-csmash.edenmacro.json",
+      "sha256": "655ded9d75c8ef6754ffbca0fc7ef76118606cea4b2d310af51cc0b636ad7428",
+      "cap": 20
+    },
+    "hb-zl-hold": {
+      "file": "segments/hb-zl-hold.edenmacro.json",
+      "sha256": "93d25f00a70498a9be6c7127e7d368c6dd8f07670f68eba43f9bf2b4ca9be8af",
+      "cap": 20
+    },
+    "hb-zl-sideb": {
+      "file": "segments/hb-zl-sideb.edenmacro.json",
+      "sha256": "c0b55da19d2df6fee3473d1d1294e1948e89030cc3e997e2882a1704de0c2152",
+      "cap": 20
+    },
+    "hb-zl": {
+      "file": "segments/hb-zl.edenmacro.json",
+      "sha256": "9f00f88086c1feeed64f0ba1f4c682f8cd0555a6295d9a15c7555cf5445dd156",
       "cap": 20
     }
   },
@@ -622,6 +667,42 @@
         {
           "run": "hb_steps.py:slow_grab",
           "check": true
+        }
+      ]
+    },
+    {
+      "id": "06-prepare",
+      "start": "Training-settled",
+      "end": "Training-settled",
+      "budget_min": 2,
+      "steps": [
+        {
+          "run": "hb_steps.py:prepare",
+          "check": true
+        }
+      ]
+    },
+    {
+      "id": "12-fbf-probe",
+      "start": "Training-settled",
+      "end": "Training-menu-other",
+      "budget_min": 2,
+      "steps": [
+        {
+          "run": "hb_steps.py:menu_route",
+          "check": true,
+          "args": {
+            "seq": [
+              "hb-plus",
+              "hb-down",
+              "hb-down",
+              "hb-down",
+              "hb-down",
+              "hb-down",
+              "hb-a"
+            ],
+            "tag": "fbf-probe"
+          }
         }
       ]
     },
