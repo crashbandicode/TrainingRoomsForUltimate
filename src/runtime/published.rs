@@ -12,6 +12,8 @@ static LRA_RESET: AtomicBool = AtomicBool::new(true);
 static STAGE_HAZARDS: AtomicBool = AtomicBool::new(false);
 static DEVELOPER_PAGE: AtomicBool = AtomicBool::new(false);
 static HUD: AtomicBool = AtomicBool::new(true);
+/// Lobby Items (N11): On, the native behaviour, until the first publish.
+static LOBBY_ITEMS: AtomicBool = AtomicBool::new(true);
 
 /// Every feature's settings as a game-thread hook reads them: computed from a snapshot by the publishing thread (boot, the
 /// menu worker, the diag reload) and read wait-free by the hooks (stream/sync: a hook never waits on a lock another thread
@@ -95,6 +97,7 @@ pub fn publish(snapshot: &Snapshot, rerolls: u8) {
     LRA_RESET.store(snapshot.lra_reset(), Ordering::Release);
     STAGE_HAZARDS.store(snapshot.stage_hazards(), Ordering::Release);
     HUD.store(snapshot.hud(), Ordering::Release);
+    LOBBY_ITEMS.store(snapshot.lobby_items(), Ordering::Release);
     crate::runtime::developer::publish(snapshot);
     crate::runtime::developer_reload::publish(snapshot);
 }
@@ -114,6 +117,11 @@ pub fn hud() -> bool {
 
 pub fn stage_hazards() -> bool {
     STAGE_HAZARDS.load(Ordering::Acquire)
+}
+
+/// The Lobby Items row (Phase 2 N11): the spawner hook and the removal step read it.
+pub fn lobby_items() -> bool {
+    LOBBY_ITEMS.load(Ordering::Acquire)
 }
 
 /// Decision N1: whether `developer.ini` said `developer_page=on` at boot (the menu reads it in a

@@ -103,6 +103,9 @@ hook_ids! {
     MacroPanel => "macro_panel",
     DeveloperFloat => "developer_float",
     DeveloperBackshield => "developer_backshield",
+    /// Phase 2 N11: the item spawner's switch test (Lobby Items), and its one removal on Player 1's frame.
+    LobbyItems => "lobby_items",
+    LobbyItemsRemove => "lobby_items_remove",
     /// Every hook that has no name of its own yet (`HookScope::enter()`): allocations inside them are
     /// still counted, their invocations are counted together.
     Other => "other",

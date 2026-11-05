@@ -125,6 +125,8 @@ pub mod sites_pkg6;
 pub mod sites_pkg2;
 #[path = "model/stage_hazards.rs"]
 pub mod stage_hazards;
+#[path = "model/lobby_items.rs"]
+pub mod lobby_items;
 #[path = "model/store.rs"]
 pub mod store;
 #[path = "model/state/mod.rs"]

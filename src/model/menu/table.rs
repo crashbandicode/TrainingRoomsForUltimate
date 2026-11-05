@@ -216,7 +216,7 @@ const fn delay(group: u8, title: &'static str, id: &'static str, step: u16, rang
 const TOGGLE: Control = Control::Toggle;
 
 /// The rows in page order, then group order, then the order they appear in (MENU-DRAFT §2).
-pub static ROWS: [Row; 103] = [
+pub static ROWS: [Row; 104] = [
     // CPU > Reactions
     r(REACT, "Mash", "mash_state", Control::MultiSelect(&o::ACTIONS),
       "Actions the CPU performs as soon as it can.\nWith several ticked it picks one at random."),
@@ -400,6 +400,9 @@ pub static ROWS: [Row; 103] = [
       "On: Training moves through the Lobby Stages order.\nOff: the stage stays."),
     r(STAGES, "Stage Hazards", "stage_hazards", TOGGLE,
       "On: stage hazards are active in Training.\nOff: they are not."),
+    // Phase 2 N11 (docs/ROADMAP.md): the waiting room's item spawner.
+    r(STAGES, "Lobby Items", "lobby_items", TOGGLE,
+      "On: items appear in the waiting room as usual.\nOff: no items appear there."),
     // Fighters & Stages > Loading (advanced)
     r(LOADING, "Cycle Preload", "cycle_preload_slots", Control::Dropdown(&o::CYCLE_SLOTS),
       "How many fighters per role are kept ready for swaps.\nOff loads each fighter when you swap."),
