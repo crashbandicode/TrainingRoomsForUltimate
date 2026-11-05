@@ -13,7 +13,7 @@ import time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-ELF = '/home/intpa/smash-training-lobby/artifacts/phase23/hitbox-orbs/nro-ab4/diag/libtraining_rooms.so'
+ELF = '/home/intpa/smash-training-lobby/artifacts/phase23/hitbox-orbs/nro-rc3/diag/libtraining_rooms.so'
 PUBLISH = 'libtraining_rooms.nro!_RNvNtNtNtCskE0RJeV9NF0_14training_rooms7runtime8features6hitbox12publish_orbs'
 DRAW = 'libtraining_rooms.nro!_RNvNtNtNtCskE0RJeV9NF0_14training_rooms7runtime8features6hitbox9draw_orbs'
 RIDLEY, STEVE, MARIO = 63, 76, 0
@@ -143,9 +143,13 @@ def preload(ctx):
         got['unmapped_mode'] = ctx.call('trace.unmapped_access', {'mode': 'log'})
     except RuntimeError as error:
         got['unmapped_mode_error'] = repr(error)
-    got['symbols'] = ctx.call('symbols.load', {'module': 'libtraining_rooms.nro', 'elf': ELF})
-    got['publish'] = ctx.call('trace.arm', {'target': PUBLISH, 'mode': 'counters'})
-    got['draw'] = ctx.call('trace.arm', {'target': DRAW, 'mode': 'counters'})
+    for key, method, params in (('symbols', 'symbols.load', {'module': 'libtraining_rooms.nro', 'elf': ELF}),
+                                ('publish', 'trace.arm', {'target': PUBLISH, 'mode': 'counters'}),
+                                ('draw', 'trace.arm', {'target': DRAW, 'mode': 'counters'})):
+        try:
+            got[key] = ctx.call(method, params)
+        except RuntimeError as error:  # the counters are evidence, not a gate
+            got[key + '_error'] = repr(error)
     ctx.call('game.load', {'path': ctx.instance['game']}, job_cap=180)
     ctx.gate('loaded')
     return save(ctx, 'preload', got)
@@ -260,8 +264,8 @@ def _resume(ctx):
     ctx.gate('training-hud-unpaused')
 
 
-STATE = re.compile(r'\[Hitbox\] orbs pass set=(\d+) route=Both (?:asked=\d+ )?placed=(\d+) held=\d+ failed=\d+ hits=(\d+) grabs=(\d+) '
-                   r'status=(-?\d+) pass=(\d+)')
+STATE = re.compile(r'\[Hitbox\] orbs pass set=(\d+) (?:route=Both (?:asked=\d+ )?)?placed=(\d+) (?:held=\d+ failed=\d+ )?hits=(\d+) '
+                   r'(?:hurts=\d+ )?grabs=(\d+) status=(-?\d+) pass=(\d+)')
 
 
 def _last_state(ctx):
@@ -730,3 +734,184 @@ def benefit(ctx, tag='benefit'):
     if not got['set']['same_frame']:
         raise RuntimeError(f'{tag}: the frame moved between shots: {got["set"]["passes"]}')
     return got
+
+
+# ---- rc.3 proof (primary 13:44Z): own orbs in the release route, diag build of the same commit -------------------------
+
+ORB_LINE = r'\[Hitbox\] orbs (pass|drawn) [^\n]*'
+
+
+def _orb_lines(ctx, n0):
+    return lines_after(ctx, n0, ORB_LINE)
+
+
+def _ridley_line(ctx, n0, pattern, cap=40):
+    r = _ridley(ctx)
+    return wait_new(ctx, n0, r'\[Hitbox\] orbs pass set=%d [^\n]*%s' % (r['set'], pattern), cap)[-1]
+
+
+def proof_two_ridleys(ctx):
+    """P1 Ridley vs CPU Ridley standing: every sphere of both drawn (placed = hurts, 55 each)."""
+    got = prepare_vs(ctx, RIDLEY, 'Ridley')
+    time.sleep(1.0)
+    last = _last_state(ctx)
+    drawn = [l for l in diag_text(ctx).splitlines() if '[Hitbox] orbs drawn ' in l][-1:]
+    got = {'last': last, 'drawn': drawn, 'shot': str(ctx.shot('two-ridleys'))}
+    save(ctx, 'proof-two-ridleys', got)
+    if len(last) < 2 or any(v['placed'] < 50 for v in last.values()):
+        raise RuntimeError(f'two Ridleys: not every sphere placed: {last}')
+    return got
+
+
+def _slowed(ctx, segment, pattern, tag, pre=None):
+    """Reset, run `segment` at 10 % speed until Ridley's pass shows `pattern`, then 1 %; a shot once the screen caught up."""
+    ctx.play('hb-lra')
+    time.sleep(3.0)
+    got = {}
+    try:
+        speed(ctx, 10)
+        n0 = line_count(ctx)
+        ctx.play(segment)
+        got['trigger'] = _ridley_line(ctx, n0, pattern)
+        speed(ctx, 1)
+        time.sleep(6.0)
+        got['shot'] = str(ctx.shot(tag))
+        got['lines'] = _orb_lines(ctx, n0)[-12:]
+    finally:
+        speed(ctx, 100)
+    time.sleep(3.0)
+    return save(ctx, tag, got)
+
+
+def proof_attack(ctx):
+    """Ridley's forward smash: hit spheres drawn (the pass holds hits>0)."""
+    return _slowed(ctx, 'hb-csmash', 'hits=[1-9]', 'proof-attack')
+
+
+def proof_grab(ctx):
+    """A grab out of shield (ZL is this profile's shield): grab spheres drawn."""
+    return _slowed(ctx, 'hb-zl-shieldgrab', 'grabs=[1-9]', 'proof-grab')
+
+
+def proof_shield(ctx):
+    """Shield held: Ridley's pass draws no sphere (SPEC: shielding, redraw=false); the CPU's stay."""
+    ctx.play('hb-lra')
+    time.sleep(3.0)
+    n0 = line_count(ctx)
+    ctx.call('input.button', {'button': 'zl', 'state': 'press', 'lease_ms': 4000})
+    try:
+        line = _ridley_line(ctx, n0, r'placed=0 [^\n]*status=2[78] ', 10)
+        time.sleep(1.5)
+        shot = str(ctx.shot('proof-shield'))
+    finally:
+        ctx.call('input.reset')
+    time.sleep(2.0)
+    back = _ridley_line(ctx, n0, r'placed=5[0-9] ', 15)
+    return save(ctx, 'proof-shield', {'shielding': line, 'shot': shot, 'after': back, 'lines': _orb_lines(ctx, n0)[-12:]})
+
+
+def proof_off(ctx):
+    """Visualizer Off: every orb hidden (`orbs drawn n=0`); then On again."""
+    n0 = line_count(ctx)
+    push(ctx, RIDLEY, RIDLEY, False)
+    off = wait_new(ctx, n0, r'\[Hitbox\] orbs drawn n=0 ', 15)[-1]
+    time.sleep(1.5)
+    shot = str(ctx.shot('proof-off'))
+    n1 = line_count(ctx)
+    push(ctx, RIDLEY, RIDLEY, True)
+    on = wait_new(ctx, n1, r'\[Hitbox\] orbs drawn n=[1-9]', 15)[-1]
+    time.sleep(1.5)
+    return save(ctx, 'proof-off', {'off': off, 'shot': shot, 'on_again': on, 'shot_on': str(ctx.shot('proof-on-again'))})
+
+
+def proof_menus(ctx):
+    """The plugin's menu and the vanilla pause over the orbs (the orb container is drawn first)."""
+    ctx.play('hb-lra')
+    time.sleep(3.0)
+    got = {}
+    ctx.play('tr-menu-open')
+    time.sleep(2.0)
+    got['plugin_menu'] = str(ctx.shot('proof-plugin-menu'))
+    for _ in range(2):
+        ctx.play('hb-b')
+        time.sleep(0.8)
+    time.sleep(1.5)
+    ctx.play('hb-plus')
+    time.sleep(2.0)
+    got['pause'] = str(ctx.shot('proof-pause'))
+    _resume(ctx)
+    got['drawn'] = [l for l in diag_text(ctx).splitlines() if '[Hitbox] orbs drawn ' in l][-4:]
+    return save(ctx, 'proof-menus', got)
+
+
+def proof_save_load(ctx):
+    """Save state, walk, load state: the orbs come back on the restored pose (the set is cleared at the restore epoch)."""
+    ctx.play('hb-lra')
+    time.sleep(3.0)
+    n0 = line_count(ctx)
+    ctx.play('hb-save')
+    time.sleep(1.5)
+    ctx.play('hb-walk-right')
+    time.sleep(1.0)
+    moved = str(ctx.shot('proof-before-load'))
+    n1 = line_count(ctx)
+    ctx.play('hb-load')
+    time.sleep(3.0)
+    states = [l for l in diag_text(ctx).splitlines()[-400:] if 'State' in l or 'state' in l][-8:]
+    back = _ridley_line(ctx, n1, r'placed=5[0-9] ', 15)
+    return save(ctx, 'proof-save-load', {'moved': moved, 'loaded': str(ctx.shot('proof-after-load')), 'after': back,
+                                         'state_lines': states, 'lines': _orb_lines(ctx, n0)[-16:]})
+
+
+def proof_lra(ctx):
+    """L+R+A: positions reset; Ridley's orbs come back after the entry statuses."""
+    n0 = line_count(ctx)
+    ctx.play('hb-lra')
+    back = _ridley_line(ctx, n0, r'placed=5[0-9] ', 20)
+    time.sleep(2.0)
+    return save(ctx, 'proof-lra', {'after': back, 'shot': str(ctx.shot('proof-lra')), 'lines': _orb_lines(ctx, n0)[-12:]})
+
+
+def proof_gif(ctx, seconds=7):
+    """The docs GIF: two Ridleys, own orbs, P1 walks and forward-smashes; 1280 wide, under 10 s."""
+    ctx.play('hb-lra')
+    time.sleep(3.0)
+    gif = ctx.runner.out / 'own-orbs-two-ridleys.gif'
+    ctx.call('recording.start', {'path': str(gif), 'fps': 15, 'width': 1280, 'duration_ms': seconds * 1000})
+    time.sleep(0.8)
+    ctx.play('hb-csmash')
+    time.sleep(1.4)
+    ctx.play('hb-walk')
+    time.sleep(0.4)
+    ctx.play('hb-csmash')
+    status = _recording_done(ctx, cap=40)
+    return save(ctx, 'proof-gif', {'gif': str(gif), 'status': status})
+
+
+def proof_ordinary(ctx):
+    """One ordinary fighter: CPU Mario against P1 Ridley."""
+    got = prepare_vs(ctx, MARIO, 'Mario')
+    time.sleep(1.0)
+    last = _last_state(ctx)
+    got = {'last': last, 'shot': str(ctx.shot('proof-ordinary'))}
+    save(ctx, 'proof-ordinary', got)
+    if len(last) < 2 or any(v['placed'] == 0 for v in last.values()):
+        raise RuntimeError(f'ordinary fighter: a fighter without spheres: {last}')
+    return got
+
+
+def proof_scan(ctx):
+    """Unmapped accesses (trace) and panics (diag log, console log) over the boot."""
+    got = {}
+    try:
+        got['unmapped'] = ctx.call('trace.unmapped_access', {})
+    except RuntimeError as error:
+        got['unmapped_error'] = repr(error)
+    text = diag_text(ctx)
+    got['panic_lines'] = [l for l in text.splitlines() if 'panic' in l.lower()][-5:]
+    console = Path(ctx.instance.get('console_log', ''))
+    if console.is_file():
+        c = console.read_text(errors='replace')
+        got['console_unmapped'] = len(re.findall(r'(?i)unmapped', c))
+        got['console_panic'] = len(re.findall(r'(?i)panic', c))
+    return save(ctx, 'proof-scan', got)

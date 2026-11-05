@@ -1,7 +1,7 @@
 {
   "game_id": "01006A800016E000",
   "start": "boot",
-  "scope": "Hitbox own-orbs A/B run ab2 (HB1 route A4 prototype; primary 03:56Z and 11:38Z orders) on the diag NRO of p23/hitbox-orbs b771f08: P1 Ridley + CPU Steve by in-fight pushes; route B first-frame refusals against own orbs; both layers on one paused frame per pair with a repeat shot for frame identity (standing; fsmash in hitlag, accepted on held hit spheres; grab, accepted on a held grab sphere); camera-lag clips with cyan orbs; Off. Joint flag 0 from ab1 row 06.",
+  "scope": "rc.3 own-orbs proof (decision HB-OWN-ORBS, option 1) on the diag build of the release route: two Ridleys standing, attack, grab, shield, Off, the plugin menu and the vanilla pause, save/load, L+R+A, the docs GIF, an ordinary fighter, the unmapped/panic scan.",
   "segments": {
     "main-stage": {
       "file": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/segments/main-stage.edenmacro.json",
@@ -253,6 +253,11 @@
       "sha256": "e23499830508c256983c997e6e6c835950969b75e173595b9b90737502c8f81c",
       "cap": 20
     },
+    "hb-load": {
+      "file": "segments/hb-load.edenmacro.json",
+      "sha256": "cd512f7648605d7cd319dc494d2153e923f8ad2a4978d4863a245b7245549919",
+      "cap": 20
+    },
     "hb-lra": {
       "file": "segments/hb-lra.edenmacro.json",
       "sha256": "7135837b075b6d1adb5dd6567016d22bb849266ba51215fa3b4698625e45af47",
@@ -268,6 +273,11 @@
       "sha256": "717a3ef2bf0bcd956a556302825a4b31c31cb3f3a8d7e82acc706dcd544c29b4",
       "cap": 20
     },
+    "hb-save": {
+      "file": "segments/hb-save.edenmacro.json",
+      "sha256": "9dd6f05fd92d5f3b4f0729492f262ebb88b91ec27cc74adfd6a546f1bff093bd",
+      "cap": 20
+    },
     "hb-sideb": {
       "file": "segments/hb-sideb.edenmacro.json",
       "sha256": "1a0e3a1320f437f8640d17dce37a6d6158267decf0c56609e2d8ce98d6d9deb2",
@@ -276,6 +286,11 @@
     "hb-up": {
       "file": "segments/hb-up.edenmacro.json",
       "sha256": "3a9aa3e875781b981bbbfeb9318fb1a9258cb8fa229ff446e62007eb2c841ebb",
+      "cap": 20
+    },
+    "hb-walk-right": {
+      "file": "segments/hb-walk-right.edenmacro.json",
+      "sha256": "db69cd741e1cc29cfb283abceca3e6d5b2b3e106eae136737326433e9790a714",
       "cap": 20
     },
     "hb-walk": {
@@ -316,6 +331,11 @@
     "hb-zl": {
       "file": "segments/hb-zl.edenmacro.json",
       "sha256": "9f00f88086c1feeed64f0ba1f4c682f8cd0555a6295d9a15c7555cf5445dd156",
+      "cap": 20
+    },
+    "tr-menu-open": {
+      "file": "segments/tr-menu-open.edenmacro.json",
+      "sha256": "e5a74d02bad51116d0a3346d2084587705bbcfbcf40835ff53c0e5d4ed5160d7",
       "cap": 20
     }
   },
@@ -585,217 +605,147 @@
       ]
     },
     {
-      "id": "05-first-frame",
+      "id": "10-two-ridleys",
       "start": "Training-settled",
       "end": "Training-settled",
       "budget_min": 3,
       "steps": [
         {
-          "run": "hb_steps.py:first_frame",
-          "check": true
+          "run": "hb_steps.py:proof_two_ridleys",
+          "check": true,
+          "args": {}
         }
       ]
     },
     {
-      "id": "07-ab-standing",
+      "id": "11-attack",
       "start": "Training-settled",
       "end": "Training-settled",
       "budget_min": 3,
       "steps": [
         {
-          "run": "hb_steps.py:ab_standing",
-          "check": true
+          "run": "hb_steps.py:proof_attack",
+          "check": true,
+          "args": {}
         }
       ]
     },
     {
-      "id": "08-ab-attack",
-      "start": "Training-settled",
-      "end": "Training-settled",
-      "budget_min": 8,
-      "steps": [
-        {
-          "run": "hb_steps.py:ab_attack",
-          "check": true
-        }
-      ]
-    },
-    {
-      "id": "09-ab-grab",
-      "start": "Training-settled",
-      "end": "Training-settled",
-      "budget_min": 8,
-      "steps": [
-        {
-          "run": "hb_steps.py:ab_grab",
-          "check": true
-        }
-      ]
-    },
-    {
-      "id": "07b-probe",
-      "start": "Training-settled",
-      "end": "Training-settled",
-      "budget_min": 2,
-      "steps": [
-        {
-          "run": "hb_steps.py:probe_pause",
-          "check": true
-        }
-      ]
-    },
-    {
-      "id": "07c-slow-standing",
+      "id": "12-grab",
       "start": "Training-settled",
       "end": "Training-settled",
       "budget_min": 3,
       "steps": [
         {
-          "run": "hb_steps.py:slow_standing",
-          "check": true
+          "run": "hb_steps.py:proof_grab",
+          "check": true,
+          "args": {}
         }
       ]
     },
     {
-      "id": "08c-slow-attack",
+      "id": "13-shield",
       "start": "Training-settled",
       "end": "Training-settled",
       "budget_min": 3,
       "steps": [
         {
-          "run": "hb_steps.py:slow_attack",
-          "check": true
+          "run": "hb_steps.py:proof_shield",
+          "check": true,
+          "args": {}
         }
       ]
     },
     {
-      "id": "09c-slow-grab",
+      "id": "14-off",
       "start": "Training-settled",
       "end": "Training-settled",
       "budget_min": 3,
       "steps": [
         {
-          "run": "hb_steps.py:slow_grab",
-          "check": true
+          "run": "hb_steps.py:proof_off",
+          "check": true,
+          "args": {}
         }
       ]
     },
     {
-      "id": "06-prepare",
-      "start": "Training-settled",
-      "end": "Training-settled",
-      "budget_min": 2,
-      "steps": [
-        {
-          "run": "hb_steps.py:prepare",
-          "check": true
-        }
-      ]
-    },
-    {
-      "id": "10-lag",
+      "id": "15-menus",
       "start": "Training-settled",
       "end": "Training-settled",
       "budget_min": 3,
       "steps": [
         {
-          "run": "hb_steps.py:lag_clips",
-          "check": true
+          "run": "hb_steps.py:proof_menus",
+          "check": true,
+          "args": {}
         }
       ]
     },
     {
-      "id": "11-off",
+      "id": "16-save-load",
       "start": "Training-settled",
       "end": "Training-settled",
-      "budget_min": 2,
+      "budget_min": 3,
       "steps": [
         {
-          "run": "hb_steps.py:off_and_scan",
-          "check": true
+          "run": "hb_steps.py:proof_save_load",
+          "check": true,
+          "args": {}
         }
       ]
     },
     {
-      "id": "12-fbf-probe",
+      "id": "17-lra",
       "start": "Training-settled",
-      "end": "Training-menu-other",
-      "budget_min": 2,
+      "end": "Training-settled",
+      "budget_min": 3,
       "steps": [
         {
-          "run": "hb_steps.py:menu_route",
+          "run": "hb_steps.py:proof_lra",
+          "check": true,
+          "args": {}
+        }
+      ]
+    },
+    {
+      "id": "18-gif",
+      "start": "Training-settled",
+      "end": "Training-settled",
+      "budget_min": 3,
+      "steps": [
+        {
+          "run": "hb_steps.py:proof_gif",
           "check": true,
           "args": {
-            "seq": [
-              "hb-plus",
-              "hb-down",
-              "hb-down",
-              "hb-down",
-              "hb-down",
-              "hb-down",
-              "hb-a"
-            ],
-            "tag": "fbf-probe"
+            "seconds": 7
           }
         }
       ]
     },
     {
-      "id": "30-prepare-vs",
-      "start": "Training-menu-other",
-      "end": "Training-menu-other",
+      "id": "19-ordinary",
+      "start": "Training-settled",
+      "end": "Training-settled",
       "budget_min": 3,
       "steps": [
         {
-          "run": "hb_steps.py:prepare_vs",
+          "run": "hb_steps.py:proof_ordinary",
           "check": true,
-          "args": {
-            "cpu": 63,
-            "cpu_name": "Ridley"
-          }
+          "args": {}
         }
       ]
     },
     {
-      "id": "31-freeze",
-      "start": "Training-menu-other",
-      "end": "Training-menu-other",
+      "id": "20-scan",
+      "start": "Training-settled",
+      "end": "Training-settled",
       "budget_min": 3,
       "steps": [
         {
-          "run": "hb_steps.py:menu_route",
+          "run": "hb_steps.py:proof_scan",
           "check": true,
-          "args": {
-            "seq": [
-              "hb-plus",
-              "hb-down",
-              "hb-down",
-              "hb-down",
-              "hb-down",
-              "hb-down",
-              "hb-a",
-              "hb-right",
-              "hb-b",
-              "hb-b"
-            ],
-            "tag": "frozen",
-            "settle": 0.8
-          }
-        }
-      ]
-    },
-    {
-      "id": "32-benefit",
-      "start": "Training-menu-other",
-      "end": "Training-menu-other",
-      "budget_min": 3,
-      "steps": [
-        {
-          "run": "hb_steps.py:benefit",
-          "check": true,
-          "args": {
-            "tag": "benefit"
-          }
+          "args": {}
         }
       ]
     }

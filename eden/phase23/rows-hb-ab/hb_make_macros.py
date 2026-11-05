@@ -69,6 +69,10 @@ def main():
     # Shield grab at normal speed (ZL held runs the frozen game and shields), A while shielding, ZL let go two frames
     # later: the game freezes again early in the grab, before its box comes out.
     write('hb-zl-shieldgrab', [event(0), event(2, ZL), event(30, ZL | A), event(32, ZL), event(33)], 40)
+    # rc.3 proof: the plugin's save / load state chords (ZL + D-pad Down / Up, same frame), a walk to the right.
+    write('hb-save', [event(0), event(2, ZL | DOWN), event(8)], 14)
+    write('hb-load', [event(0), event(2, ZL | UP), event(8)], 14)
+    write('hb-walk-right', [event(0), event(2, 0, 1.0), event(62)], 70)
     # Pause, camera mode, back.
     write('hb-plus', [event(0), event(2, PLUS), event(8)], 14)
     write('hb-y', [event(0), event(2, Y), event(8)], 14)
