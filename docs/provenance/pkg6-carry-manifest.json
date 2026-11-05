@@ -1834,12 +1834,17 @@
    "dest": "src/model/kirby/kirby_hat_cycle.rs",
    "crate": "root",
    "src_sha256": "685316a7023abcc3e32de85829aa6450514c2807e32191b536920dbb84184528",
-   "dest_sha256": "0c831a2650c6db7b1cc4efbf0feb1bb05d55bc320082b0ce6e1ff4e8868d5611",
+   "dest_sha256": "af2ce66fe7e7cc13e8f816923a9dbcbbd366931504c33b415bb8f540c1ffe968",
    "edits": [
     {
      "old": "    (left_click && right_click, left_click || right_click)\n}\n",
      "new": "    (left_click && right_click, left_click || right_click)\n}\n\n/// The role a Kirby frame callback serves: the role whose Kirby body is the callback's own body. The callback\n/// runs once per Kirby with that Kirby's body (the fork's `SITE_KIRBY_OPFF` call), so each role is reached by\n/// its own body; any other body serves no role.\npub fn hat_role<T: PartialEq>(body: T, roles: [Option<T>; 2]) -> Option<usize> {\n    roles.iter().position(|role| role.as_ref() == Some(&body))\n}\n",
      "reason": "B4-3 (Surface lane LANE-SURFACE-REPORT.md 'B4-3 root cause'; Ally lane LANE-ALLY-REPORT.md Round 4 section 3; primary-approved 2026-11-04): the Kirby hat step runs per Kirby with that Kirby's own body from features::states::state_kirby_opff_hook (the fork's SITE_KIRBY_OPFF call site, src/training/character_specific/kirby.rs:37), not from lobby::frame with Player 1's body; the role match is the host-tested hat_role"
+    },
+    {
+     "old": "    roles.iter().position(|role| role.as_ref() == Some(&body))\n}\n",
+     "new": "    roles.iter().position(|role| role.as_ref() == Some(&body))\n}\n\n/// The game frames a pending hat request may take before it ends with \"Kirby hat could not be loaded\".\npub const REQUEST_FRAMES: u16 = 900;\n\n/// HAT-REQUEST-END R1 (operator option A, 2026-11-05): one game frame of a pending request, counted whether or not its\n/// role's Kirby was served this frame (`held`: a save state is restoring it). The new age, and whether it ends now.\npub const fn request_frame(age: u16, held: bool) -> (u16, bool) {\n    if held {\n        return (age, false);\n    }\n    let age = age.saturating_add(1);\n    (age, age > REQUEST_FRAMES)\n}\n\n/// HAT-REQUEST-END R2: committing a fighter other than Kirby (kind 6) to a role ends that role's pending request.\npub const fn commit_ends_request(kind: u32) -> bool {\n    kind != 6\n}\n",
+     "reason": "HAT-REQUEST-END (operator option A, 2026-11-05; docs/DECISIONS.md on review/menu-proposal deccd62): R1, a pending request ages every game frame (kirby_hats::tick from lobby::frame, request_frame) and always ends after 900 frames with Kirby hat could not be loaded; R2, fighter_committed(role, non-Kirby) clears the role's pending request and releases its lease (commit_ends_request)"
     }
    ]
   },
@@ -3483,7 +3488,7 @@
    "dest": "src/runtime/roster/kirby_hats.rs",
    "crate": "root",
    "src_sha256": "3e2e73f9157b54434492472cf64ae8993af5f508e47fbc67c944667da95d6f52",
-   "dest_sha256": "f88cdc0e73dec7fdcf5a3c972545fa2ed34ef611a84aa7a57619b74fb773d638",
+   "dest_sha256": "3129f8db7203aea46c3df2997d55a60902a4d1c94c32840f0d814212e740b034",
    "edits": [
     {
      "old": "fn notice(role: usize, text: String) {",
@@ -3664,6 +3669,41 @@
      "old": "    let role = if role_body(0) == Some(body) {\n        0\n    } else if role_body(1) == Some(body) {\n        1\n    } else {\n        return;\n    };\n",
      "new": "    let Some(role) = hat_role(body, [role_body(0), role_body(1)]) else { return };\n",
      "reason": "B4-3 (Surface lane LANE-SURFACE-REPORT.md 'B4-3 root cause'; Ally lane LANE-ALLY-REPORT.md Round 4 section 3; primary-approved 2026-11-04): the Kirby hat step runs per Kirby with that Kirby's own body from features::states::state_kirby_opff_hook (the fork's SITE_KIRBY_OPFF call site, src/training/character_specific/kirby.rs:37), not from lobby::frame with Player 1's body; the role match is the host-tested hat_role"
+    },
+    {
+     "old": "use crate::engine::kirby::kirby_hat_cycle::{hat_role, operator_clicks, HatContinuation, HatCycle, HatSnapshot, ShortcutLatch};\n",
+     "new": "use crate::engine::kirby::kirby_hat_cycle::{\n    commit_ends_request, hat_role, operator_clicks, request_frame, HatContinuation, HatCycle, HatSnapshot, ShortcutLatch,\n};\n",
+     "reason": "HAT-REQUEST-END (operator option A, 2026-11-05; docs/DECISIONS.md on review/menu-proposal deccd62): R1, a pending request ages every game frame (kirby_hats::tick from lobby::frame, request_frame) and always ends after 900 frames with Kirby hat could not be loaded; R2, fighter_committed(role, non-Kirby) clears the role's pending request and releases its lease (commit_ends_request)"
+    },
+    {
+     "old": "    pending.age = pending.age.saturating_add(1);\n",
+     "new": "",
+     "reason": "HAT-REQUEST-END (operator option A, 2026-11-05; docs/DECISIONS.md on review/menu-proposal deccd62): R1, a pending request ages every game frame (kirby_hats::tick from lobby::frame, request_frame) and always ends after 900 frames with Kirby hat could not be loaded; R2, fighter_committed(role, non-Kirby) clears the role's pending request and releases its lease (commit_ends_request)"
+    },
+    {
+     "old": "        return;\n    }\n    if pending.age > 900 {\n        clear_pending(role, &mut state);\n        drop(state);\n        notice(role, \"Kirby hat could not be loaded\".into());\n",
+     "new": "",
+     "reason": "HAT-REQUEST-END (operator option A, 2026-11-05; docs/DECISIONS.md on review/menu-proposal deccd62): R1, a pending request ages every game frame (kirby_hats::tick from lobby::frame, request_frame) and always ends after 900 frames with Kirby hat could not be loaded; R2, fighter_committed(role, non-Kirby) clears the role's pending request and releases its lease (commit_ends_request)"
+    },
+    {
+     "old": "\npub fn cancel_pending() {\n",
+     "new": "\n/// HAT-REQUEST-END R1 (operator option A, 2026-11-05): once per game frame (Player 1's frame step), every pending\n/// request ages whether or not its role's Kirby reached `on_frame`, so it always ends: confirmed there, or here with\n/// \"Kirby hat could not be loaded\". A save state restoring the request holds its age, as `on_frame` holds it.\npub fn tick() {\n    if PENDING_ROLES.load(Ordering::Acquire) == 0 {\n        return;\n    }\n    for (role, state) in STATES.iter().enumerate() {\n        let mut state = state.lock();\n        let Some(pending) = state.pending.as_mut() else { continue };\n        let expired;\n        (pending.age, expired) = request_frame(pending.age, pending.restoring && training::save_states::is_loading());\n        if expired {\n            clear_pending(role, &mut state);\n            drop(state);\n            notice(role, \"Kirby hat could not be loaded\".into());\n        }\n    }\n}\n\npub fn cancel_pending() {\n",
+     "reason": "HAT-REQUEST-END (operator option A, 2026-11-05; docs/DECISIONS.md on review/menu-proposal deccd62): R1, a pending request ages every game frame (kirby_hats::tick from lobby::frame, request_frame) and always ends after 900 frames with Kirby hat could not be loaded; R2, fighter_committed(role, non-Kirby) clears the role's pending request and releases its lease (commit_ends_request)"
+    },
+    {
+     "old": "/// An accepted swap away from Kirby must not restore an obsolete hat later.\n",
+     "new": "/// An accepted swap away from Kirby must not restore an obsolete hat later, and ends the role's pending request\n/// (HAT-REQUEST-END R2, operator option A, 2026-11-05): its lease is released as `clear_pending` does.\n",
+     "reason": "HAT-REQUEST-END (operator option A, 2026-11-05; docs/DECISIONS.md on review/menu-proposal deccd62): R1, a pending request ages every game frame (kirby_hats::tick from lobby::frame, request_frame) and always ends after 900 frames with Kirby hat could not be loaded; R2, fighter_committed(role, non-Kirby) clears the role's pending request and releases its lease (commit_ends_request)"
+    },
+    {
+     "old": "    if kind == 6 { return; }\n",
+     "new": "    if !commit_ends_request(kind) { return; }\n",
+     "reason": "HAT-REQUEST-END (operator option A, 2026-11-05; docs/DECISIONS.md on review/menu-proposal deccd62): R1, a pending request ages every game frame (kirby_hats::tick from lobby::frame, request_frame) and always ends after 900 frames with Kirby hat could not be loaded; R2, fighter_committed(role, non-Kirby) clears the role's pending request and releases its lease (commit_ends_request)"
+    },
+    {
+     "old": "    state.cycle = HatCycle::new();\n}\n",
+     "new": "    state.cycle = HatCycle::new();\n    clear_pending(role, &mut state);\n}\n",
+     "reason": "HAT-REQUEST-END (operator option A, 2026-11-05; docs/DECISIONS.md on review/menu-proposal deccd62): R1, a pending request ages every game frame (kirby_hats::tick from lobby::frame, request_frame) and always ends after 900 frames with Kirby hat could not be loaded; R2, fighter_committed(role, non-Kirby) clears the role's pending request and releases its lease (commit_ends_request)"
     }
    ]
   },

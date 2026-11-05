@@ -104,3 +104,30 @@ fn the_renderer_runs_every_view_over_the_real_pane_array() {
     frame.tile_stage_grid = true;
     unsafe { panes.draw(&frame) };
 }
+
+/// SOLO-S-PLACEMENT (operator 2026-11-05): on every layout the roster grid uses, the Player and CPU "S" marks never
+/// intersect the tile's name label. With the portrait drawn they sit on its lower corners (covering it partly), clear
+/// of the order badges above; without it the centred name stays clear too.
+#[test]
+fn the_solo_marks_never_cover_the_tile_name() {
+    use model::menu::grid::{ConsoleMode, GridKind, GridLayout, RosterUse};
+    for mode in [ConsoleMode::Docked, ConsoleMode::Handheld] {
+        for use_ in [RosterUse::Cycles, RosterUse::Hats, RosterUse::PlayerPick, RosterUse::CpuPick] {
+            let layout = GridLayout::new(GridKind::Roster(use_), mode);
+            let cell_w = (p::ROW_RIGHT - p::ROW_LEFT) / f32::from(layout.cols);
+            let cell_h = p::TILE_AREA_H / f32::from(layout.rows);
+            for pictured in [true, false] {
+                let (icon, label, marks) = p::roster_tile(cell_w, cell_h, pictured);
+                for mark in marks {
+                    assert!(!mark.overlaps(label), "{mode:?} {use_:?} pictured={pictured}: {mark:?} covers the name {label:?}");
+                    if pictured {
+                        assert!(mark.overlaps(icon), "the mark sits on the portrait's corner: {mark:?} {icon:?}");
+                        let badge = p::Area { x: mark.x, y: 35.0, w: 52.0, h: p::MARK_H };
+                        assert!(!mark.overlaps(badge), "clear of the order badge above");
+                    }
+                }
+                assert!(!marks[0].overlaps(marks[1]), "the Player and CPU marks stay apart");
+            }
+        }
+    }
+}

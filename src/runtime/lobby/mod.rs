@@ -111,6 +111,11 @@ pub(crate) unsafe fn frame(fighter: usize) {
                 let _step = HookScope::enter_hook(HookId::RosterSources);
                 crate::runtime::roster::character_roster::sources::on_frame(body);
             }
+            {
+                // HAT-REQUEST-END R1: the pending hat requests' clock, once per game frame.
+                let _step = HookScope::enter_hook(HookId::RosterKirby);
+                crate::runtime::roster::kirby_hats::tick();
+            }
             let _items = HookScope::enter_hook(HookId::RosterItems);
             // Diag build: an item grant Eden asked for in `diag-item.req` (the Give item screen is not built yet).
             #[cfg(feature = "diag")]

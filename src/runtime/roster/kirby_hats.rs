@@ -11,7 +11,9 @@ use crate::runtime::compat::sync::read;
 use crate::runtime::compat::common::consts::FighterId;
 use crate::runtime::compat::common::input::{Buttons, MappedInputs};
 use crate::runtime::compat::common::{self, button_config, menu, try_get_module_accessor};
-use crate::engine::kirby::kirby_hat_cycle::{hat_role, operator_clicks, HatContinuation, HatCycle, HatSnapshot, ShortcutLatch};
+use crate::engine::kirby::kirby_hat_cycle::{
+    commit_ends_request, hat_role, operator_clicks, request_frame, HatContinuation, HatCycle, HatSnapshot, ShortcutLatch,
+};
 use crate::runtime::lobby::training;
 use crate::runtime::roster::character_roster::sources::{self, Lease};
 use crate::engine::swap::source_lifetime::Holder;
@@ -291,7 +293,6 @@ pub unsafe fn on_frame(body: *mut app::BattleObjectModuleAccessor) {
         clear_pending(role, &mut state);
         return;
     }
-    pending.age = pending.age.saturating_add(1);
     if pending.started
         && equipped(body) == Some(pending.kind)
         && !WorkModule::is_flag(body, *FIGHTER_KIRBY_INSTANCE_WORK_ID_FLAG_COPY_ON_START)
@@ -316,12 +317,6 @@ pub unsafe fn on_frame(body: *mut app::BattleObjectModuleAccessor) {
             .map(|f| f.name())
             .unwrap_or("Kirby hat");
         notice(role, name.into());
-        return;
-    }
-    if pending.age > 900 {
-        clear_pending(role, &mut state);
-        drop(state);
-        notice(role, "Kirby hat could not be loaded".into());
         return;
     }
     if !pending.started
@@ -389,6 +384,26 @@ pub unsafe fn on_frame(body: *mut app::BattleObjectModuleAccessor) {
     state.pending = Some(pending);
 }
 
+/// HAT-REQUEST-END R1 (operator option A, 2026-11-05): once per game frame (Player 1's frame step), every pending
+/// request ages whether or not its role's Kirby reached `on_frame`, so it always ends: confirmed there, or here with
+/// "Kirby hat could not be loaded". A save state restoring the request holds its age, as `on_frame` holds it.
+pub fn tick() {
+    if PENDING_ROLES.load(Ordering::Acquire) == 0 {
+        return;
+    }
+    for (role, state) in STATES.iter().enumerate() {
+        let mut state = state.lock();
+        let Some(pending) = state.pending.as_mut() else { continue };
+        let expired;
+        (pending.age, expired) = request_frame(pending.age, pending.restoring && training::save_states::is_loading());
+        if expired {
+            clear_pending(role, &mut state);
+            drop(state);
+            notice(role, "Kirby hat could not be loaded".into());
+        }
+    }
+}
+
 pub fn cancel_pending() {
     for (role, state) in STATES.iter().enumerate() {
         let mut state = state.lock();
@@ -425,12 +440,14 @@ pub fn practice_departed(waiting: bool) {
 
 pub fn fresh_lobby() { invalidate_runtime(Some(false)); }
 
-/// An accepted swap away from Kirby must not restore an obsolete hat later.
+/// An accepted swap away from Kirby must not restore an obsolete hat later, and ends the role's pending request
+/// (HAT-REQUEST-END R2, operator option A, 2026-11-05): its lease is released as `clear_pending` does.
 pub fn fighter_committed(role: usize, kind: u32) {
-    if kind == 6 { return; }
+    if !commit_ends_request(kind) { return; }
     let mut state = STATES[role].lock();
     state.continuation.clear();
     state.cycle = HatCycle::new();
+    clear_pending(role, &mut state);
 }
 
 /// Restore uses the same asynchronous source acquisition as the shortcut. The
