@@ -4,6 +4,8 @@
 
 pub mod clip;
 #[cfg(any(test, target_os = "switch"))]
+pub mod combo_fighter;
+#[cfg(any(test, target_os = "switch"))]
 pub mod mii;
 #[cfg(any(test, target_os = "switch"))]
 pub mod roster;

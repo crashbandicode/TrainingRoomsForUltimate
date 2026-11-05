@@ -209,3 +209,11 @@ ceiling = 140750
 date = "2026-11-05"
 reason = "rc.5 fix P-CYCLE (p23/cpu-cycle-fix): one cycle list for the CPU cycle and its menu numbers, and the grid's numbers to a trace function for the rows (operator's bug report: a Mii Gunner cycled though not listed); measured 140750 at c45c1cd (tools/size_gate.py), +176 over the rc.5 candidate's 140574"
 approved_by = "Operator 2026-11-05 via primary 35137355 (P-CYCLE order, ~19:50Z): 'Raise as needed', own commit"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 140843
+date = "2026-11-05"
+reason = "rc.6: switch P1 to a combo's recorded fighter with the named macros' Switch/Keep question, one explicit P1 load (p23/combo-switch, operator 2026-11-05 DEFERRED-LIST); measured 140843 at 5bdccb6 (tools/size_gate.py), +279 over the rc.5 candidate's 140564"
+approved_by = "Operator 2026-11-05: 'Raise as needed' (standing; relayed by primary 35137355 in the P21 order ~17:55Z; the P22 order of 18:30Z did not restate it), own commit"
