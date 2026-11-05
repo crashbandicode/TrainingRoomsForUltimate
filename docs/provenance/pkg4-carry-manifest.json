@@ -214,20 +214,6 @@
    ]
   },
   {
-   "src": "training_mod_macros/src/ui_anchor.rs",
-   "dest": "src/model/macros/ui_anchor.rs",
-   "crate": "macros",
-   "src_sha256": "3e4118ca933404e476f112b5ad912ccc1420e80182fd0485f6914d2f930cf684",
-   "dest_sha256": "71e828686eb57061dc83d0ae5d64f331c0fe05950f4896af064157710995f0e6",
-   "edits": [
-    {
-     "old": "        .chunks_exact(4)\n        .map(|w| u32::from_le_bytes([w[0], w[1], w[2], w[3]]))",
-     "new": "        .as_chunks::<4>()\n        .0\n        .iter()\n        .map(|w| u32::from_le_bytes(*w))",
-     "reason": "clippy 1.98 chunks_exact_to_as_chunks: the same words through as_chunks"
-    }
-   ]
-  },
-  {
    "src": "training_mod_macros/src/window.rs",
    "dest": "src/model/macros/window.rs",
    "crate": "macros",
@@ -338,7 +324,7 @@
    "dest": "src/model/macros/mod.rs",
    "crate": "macros",
    "src_sha256": "561c0de012c6f235d735c9d956305c7aa98fe0cdf7a1c560552a0a6275abc4ad",
-   "dest_sha256": "7471df8655c04bdc6d7b1950fdcaaf339193563a1c2930a902d7c157538a68d8",
+   "dest_sha256": "305d049f5612a281b1898113c2834491f4f440a27395a7edcc82a0e558497edd",
    "edits": [
     {
      "old": "mod capture_settings;\n",
@@ -378,6 +364,11 @@
      "old": "pub use live_capture::{LiveCapturePool, NativeRecordKey, MAX_RETAINED_CAPTURES};",
      "new": "pub use live_capture::{LiveCapturePool, NativeRecordKey, MAX_RETAINED_CAPTURES};\n#[cfg(any(feature = \"diag\", test))]\npub use live_capture::{FirstSeal, SealReason};",
      "reason": "Approved worker-only first-truncation evidence; preserve capture decisions and bytes"
+    },
+    {
+     "old": "pub mod ui_anchor;\n",
+     "new": "",
+     "reason": "ui_anchor is not carried: no user (no module, test or tool references it; docs/SIZE-PLAN.md 'macros / recording' row 1); deleted 2026-11-04 on p23/size-cut, the cut option for the p23/candidate size budget (lead decision pending)"
     }
    ]
   },
@@ -2181,6 +2172,14 @@
      "reason": "smash-match-data keeps what the plugin uses (lead ruling 2026-11-02, slim stream): clip.rs is the test oracle (tests/oracle); a trait carries the clip methods of the foreign `Capture`"
     }
    ]
+  }
+ ],
+ "not_carried": [
+  {
+   "src": "training_mod_macros/src/ui_anchor.rs",
+   "src_sha256": "3e4118ca933404e476f112b5ad912ccc1420e80182fd0485f6914d2f930cf684",
+   "dest": "src/model/macros/ui_anchor.rs",
+   "reason": "not carried: no user (no module, test or tool references it; docs/SIZE-PLAN.md 'macros / recording' row 1); deleted 2026-11-04 on p23/size-cut, the cut option for the p23/candidate size budget (lead decision pending)"
   }
  ]
 }

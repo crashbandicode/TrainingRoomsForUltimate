@@ -615,3 +615,15 @@ Slim full rederivation on9c65c2e found two DIFFERS: named_macros.rs and replay_c
 
 ### RC native-editor exposure closure (2026-11-03)
 Added an explicit adapter capability: production MiiList hides Add New and cannot create EditorRequest, while ordinary saved selection, role permissions and close actions remain. Generic enabled CatalogMenu behavior/tests are retained. Native request and begin_session independently refuse the disabled RC capability before native work/session publication, including resume bypass. Shared catalog mount/read and ordinary CPU/group services remain. Two carried files have exact recorded transforms; all247files rederived with reviewed destination bytes and original source hash pins preserved. Adapter regressions cover saved CPU selection/close with no extra row and empty unqualified context without editor dispatch. Full candidate Cargo/native/runtime gates remain pending.
+
+## p23/size-cut: `ui_anchor` not carried (2026-11-04, cut option; lead decision pending)
+
+Not carried: no user. No module, test or tool references `crate::model::macros::ui_anchor` (`docs/SIZE-PLAN.md`
+"macros / recording", first row: "no user (M)"); the clean room's UI anchors are `model::sites_ui` and
+`runtime::ui::anchors`. Deleted from `src/` and moved from the pkg4 manifest's `files` to a new `not_carried` list (the
+pkg6 precedent, `e79019b`); `src/model/macros/mod.rs` gains the exact-text edit that drops `pub mod ui_anchor;`, and the
+ledger is regenerated. `carry_pkg4.py verify` (against stage m5q): verified 40 files.
+
+| Was here | Fork path (stage m5q) | src sha256 | Lines (`tools/sloc.py`) |
+| --- | --- | --- | --- |
+| `src/model/macros/ui_anchor.rs` | `training_mod_macros/src/ui_anchor.rs` | `3e4118ca933404e4` | 134 |
