@@ -81,3 +81,11 @@ ceiling = 136473
 date = "2026-11-05"
 reason = "rc.2: PAUSE-HELPER (a) + Ally Round 8 fixes, Solo-S placement and HAT-REQUEST-END A; measured 136473 at 1dcbdf2 (tools/sloc.py), +404 over 136069"
 approved_by = "Operator 2026-11-05 via primary 35137355: 'raise the size limit if needed, ship rc.2 when ready'"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 136797
+date = "2026-11-05"
+reason = "rc.3 menu navigation (p23/menu-nav): ZL + Up/Down section jump and the remembered place (b168718), the confirmed Reset page to defaults line replacing the ZR page reset (bb8e5a9); measured 136797 at bb8e5a9 (tools/sloc.py), +324 over 136473 at main 36d7f46"
+approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed' (rc.3 features)"
