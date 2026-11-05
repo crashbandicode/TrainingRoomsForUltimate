@@ -13,7 +13,7 @@ import time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-ELF = '/home/intpa/smash-training-lobby/artifacts/phase23/hitbox-orbs/nro-ab3/diag/libtraining_rooms.so'
+ELF = '/home/intpa/smash-training-lobby/artifacts/phase23/hitbox-orbs/nro-ab4/diag/libtraining_rooms.so'
 PUBLISH = 'libtraining_rooms.nro!_RNvNtNtNtCskE0RJeV9NF0_14training_rooms7runtime8features6hitbox12publish_orbs'
 DRAW = 'libtraining_rooms.nro!_RNvNtNtNtCskE0RJeV9NF0_14training_rooms7runtime8features6hitbox9draw_orbs'
 RIDLEY, STEVE, MARIO = 63, 76, 0
@@ -698,3 +698,35 @@ def sideb_probe(ctx, frames=10, tint='cyan', view='orbs', tag='sideb'):
     time.sleep(3)
     route(ctx, 'orbtint=off view=both')
     return save(ctx, f'{tag}-probe', got)
+
+
+# ---- ab4: where today's spheres go missing (primary 12:38Z) ----------------------------------------------------------
+
+def prepare_vs(ctx, cpu=RIDLEY, cpu_name='Ridley'):
+    """P1 Ridley against CPU `cpu` (after the fighters row's Ridley vs Steve), visualizer On, route Both, positions reset."""
+    n0 = line_count(ctx)
+    route(ctx, 'route=both view=both orbtint=off ' + joint_word(ctx))
+    pushed = push(ctx, RIDLEY, cpu, True)
+    done = wait_new(ctx, n0, r'\[CharacterRoster\] complete owner=1 target=%s' % cpu_name, 90)[-1]
+    time.sleep(3)
+    ctx.play('hb-lra')
+    time.sleep(5)
+    last = _last_state(ctx)
+    ridley_set = max(last, key=lambda k: last[k]['placed'])
+    (ctx.runner.out / 'ridley.json').write_text(json.dumps({'set': ridley_set, 'standing': last[ridley_set], 'all': last}))
+    return save(ctx, 'prepare-vs', {'pushed': pushed, 'cpu': done, 'last': last, 'shot': str(ctx.shot('prepared-vs'))})
+
+
+def benefit(ctx, tag='benefit'):
+    """On the frozen frame (Training speed 1 Frame, no step): each fighter's last pass line (asked / placed / held / failed),
+    then every view and the cyan-orbs probe with no step between (`_fbf_set`)."""
+    r = _ridley(ctx)
+    lines = {}
+    for m in re.finditer(r'[^\n]*\[Hitbox\] orbs pass set=(\d+) route=Both asked=[^\n]*', diag_text(ctx)):
+        lines[m.group(1)] = m.group(0)
+    refused = [l for l in diag_text(ctx).splitlines() if '[Hitbox] refused ' in l][-12:]
+    got = {'last_pass_lines': lines, 'refused_tail': refused, 'set': _fbf_set(ctx, tag, r)}
+    save(ctx, tag, got)
+    if not got['set']['same_frame']:
+        raise RuntimeError(f'{tag}: the frame moved between shots: {got["set"]["passes"]}')
+    return got
