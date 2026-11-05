@@ -266,6 +266,35 @@ def _recorder_reset(ctx):
 
 
 
+def uicheck(ctx):
+    """Candidate regression: the Training layout resolves with nothing missing and the menu opens (both by content)."""
+    out = {}
+    out['layout_lines_before'] = [x[-200:] for x in _tick_lines(ctx, 0, ['[Ui] layout='])][-6:]
+    open_tick = _now_tick(ctx)
+    ctx.play('tr-menu-open')
+    out['menu_opened'] = _wait_tick(ctx, open_tick, '[Ui] menu opened', 15)[-160:]
+    time.sleep(1.5)
+    out['menu_shot'] = b.capture(ctx, 'uicheck-menu', 'The TrainingRooms menu opened on the candidate build')
+    out['layout_lines_after_open'] = [x[-200:] for x in _tick_lines(ctx, open_tick, ['[Ui] layout='])][:6]
+    steps.close_menu(ctx)
+    ctx.gate('training-hud-unpaused')
+    copies = []
+    for name in ('practice-diagnostics.previous.log', 'practice-diagnostics.log'):
+        src = plugin_dir(ctx) / name
+        if src.exists():
+            dst = ctx.row_dir / f'uicheck-{name}'
+            dst.write_bytes(src.read_bytes())
+            copies.append(str(dst))
+    out['diag_copy'] = copies
+    lines = out['layout_lines_before'] + out['layout_lines_after_open']
+    out['layout_ok'] = any('layout=info_training' in x and 'resolved' in x and 'missing=0' in x for x in lines)
+    (ctx.row_dir / 'uicheck.json').write_text(json.dumps(out, indent=2) + '\n')
+    if not out['layout_ok']:
+        raise RuntimeError('no [Ui] layout=info_training resolved … missing=0 line by content')
+    return out
+
+
+
 def dispatch(ctx, action, **args):
     try:
         settled = steps.settle(ctx)
