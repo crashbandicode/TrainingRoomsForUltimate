@@ -268,7 +268,7 @@ fn memory_refused(slot: u32, kind: u32, decision: crate::engine::swap::body_bank
 static PAUSE: Mutex<crate::model::pause_helper::Ledger<{ crate::engine::preload::cycle_preload_capacity::ALL_EXTRA_SLOTS.len() }>> =
     Mutex::new(crate::model::pause_helper::Ledger::new());
 
-/// The game's Training pause state was installed (`0x1558660`, `opened`) or its exit block is about to walk entries
+/// The game's Training pause state was installed (`0x1558668`, `opened`) or its exit block is about to walk entries
 /// 1-7 (`0x1558f4c`). At pause-open every helper entry this plugin created that the exit block would walk with no
 /// actor is retired through the native single-slot retire, and creation is held until the exit block. At the exit
 /// block any exposed entry is reported (diagnostic only; this design must make it impossible). No plugin lock is held
@@ -277,6 +277,8 @@ static PAUSE: Mutex<crate::model::pause_helper::Ledger<{ crate::engine::preload:
 pub(super) unsafe fn pause_state(opened: bool) {
     use super::native_source_capacity::{entry_at, entry_facts, retire_at};
     PAUSE.lock().paused = opened;
+    // F3: no reload (hat, trio, swap) or source load starts until the exit block; a running one completes natively.
+    INSTALL.hold(opened);
     let mut exposed = 0u8;
     for slot in 1..8usize {
         let entry = entry_at(slot);
@@ -311,13 +313,13 @@ pub(super) unsafe fn pause_state(opened: bool) {
 
 /// A retire this ledger began has both native completions: the slot may be created again in this scene.
 #[cfg(feature = "managed-third-source-alpha")]
-fn pause_retire_completed(state: &mut State, index: usize, complete: bool) {
+fn pause_retire_completed(state: &mut State, index: usize, complete: bool, path: &str) {
     if complete {
         state.capacities[index].attempted = None;
         state.capacities[index].stable = None;
         crate::engine::compat::logging::diagnostic(format_args!(
-            "[PauseHelper] retire complete capacity={} reservation_cleared={}; creation allowed again",
-            index, state.capacities[index].reservation.is_none()));
+            "[PauseHelper] retire complete capacity={} path={} reservation_cleared={}; creation allowed again",
+            index, path, state.capacities[index].reservation.is_none()));
     }
 }
 
@@ -1242,6 +1244,7 @@ pub fn scene_changed() {
     #[cfg(feature = "managed-third-source-alpha")]
     {
         *PAUSE.lock() = crate::model::pause_helper::Ledger::new();
+        INSTALL.hold(false);
     }
     let mut state = STATE.lock();
     #[cfg(feature = "mii-managed-source-coexist-alpha")]
@@ -2465,7 +2468,7 @@ fn capacity_owner_retired_at(owner: usize, slot:u32) -> bool {
         Some((epoch, value))
     };
     let complete = PAUSE.lock().owner_retired(capacity_index(slot));
-    pause_retire_completed(&mut state, capacity_index(slot), complete);
+    pause_retire_completed(&mut state, capacity_index(slot), complete, "owner-cleanup");
     let observed = state.capacities[capacity_index(slot)].observation;
     let cleared = state.capacities[capacity_index(slot)].reservation.is_none();
     drop(state);
@@ -2497,15 +2500,26 @@ pub unsafe fn on_destroy(entry: *const u8, slot: u32) {
     if is_capacity {
         if let Some((epoch, mut value)) = state.capacities[capacity_index(slot)].reservation {
             if value.entry == entry as usize {
-                state.capacities[capacity_index(slot)].first_load = None;
+                let index = capacity_index(slot);
+                state.capacities[index].first_load = None;
                 value.entry_destroyed = true;
-                state.capacities[capacity_index(slot)].reservation = if value.owner_retired {
+                // PAUSE-HELPER F1: a pause retire whose owner stays live is complete now; the owner is reused.
+                let kept = PAUSE.lock().retiring(index, entry as usize)
+                    .then(|| capacity::reuse_owner(slot as usize, entry as usize, value.resource));
+                let reused = kept.is_some_and(|(kept, _)| kept);
+                state.capacities[index].reservation = if value.owner_retired || reused {
                     None
                 } else {
                     Some((epoch, value))
                 };
-                let complete = PAUSE.lock().destroyed(capacity_index(slot), entry as usize);
-                pause_retire_completed(&mut state, capacity_index(slot), complete);
+                if let Some((_, owner)) = kept {
+                    crate::engine::compat::logging::diagnostic(format_args!(
+                        "[PauseHelper] entry destroyed slot={} owner=0x{:x} live={:x?} reused={}",
+                        slot, value.resource, owner, reused));
+                }
+                let complete = if reused { PAUSE.lock().reused(index, entry as usize) }
+                    else { PAUSE.lock().destroyed(index, entry as usize) };
+                pause_retire_completed(&mut state, index, complete, if reused { "owner-reuse" } else { "owner-cleanup" });
             }
         }
     }

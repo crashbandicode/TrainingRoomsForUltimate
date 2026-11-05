@@ -631,10 +631,25 @@ pub(super) unsafe fn create_at(claimant: Claimant, slot: usize) -> bool {
     {
         return false;
     }
+    summon(slot)
+}
+
+unsafe fn summon(slot: usize) -> bool {
     let create: unsafe extern "C" fn(i32) =
         std::mem::transmute(BASE.load(Ordering::Acquire) + 0x1652f40);
     create(slot as i32);
     true
+}
+
+/// PAUSE-HELPER F1: the same native call for a slot whose pause-retired entry left its owner bound to this claim
+/// (`managed::reuse_owner`); `0x4eb6a0` then creates only the entry and keeps that owner (`0x4eb750-0x4eb76c`).
+#[cfg(feature = "managed-third-source-alpha")]
+unsafe fn create_reusing(slot: usize, owner: usize) -> bool {
+    claim_index(slot).is_some_and(|index| claim_state(index) == (Claimant::Managed as u8, owner))
+        && owner != 0
+        && CREATION_VERIFIED.load(Ordering::Acquire)
+        && PAUSE_RETIRE_VERIFIED.load(Ordering::Acquire)
+        && summon(slot)
 }
 
 /// An unknown slot reads as claimed, so it can never be created.
@@ -709,9 +724,13 @@ unsafe fn owner_cleanup_complete(ctx: &InlineCtx) {
 // `0x652160` is the entry destructor body: its `+0x14` carries `character_lifecycle::destruction_trace`, which fans
 // out `on_destroy` exactly as at finalize; the owner cleanup (`0x17e44c4`) follows natively.
 
-/// The pause-state install, after the PC-relative `adrp/add` (`x19` = the Training state object, `x8` = `0x1558720`).
+/// The state store's last word (`str xzr,[x19,#0x250]`). Not `0x1558660`: `0x15581f0 b 0x1558664` (Training ending,
+/// state `0x1558700`) lands one word after it. Both paths run this word; `x8` names the state being installed.
 #[cfg(feature = "managed-third-source-alpha")]
-const PAUSE_INSTALL: usize = 0x1558660;
+const PAUSE_INSTALL: usize = 0x1558668;
+/// The pause state the exit block belongs to.
+#[cfg(feature = "managed-third-source-alpha")]
+const PAUSE_STATE: usize = 0x1558720;
 /// The pause state's exit block, first instruction (`ldr w8,[x19,#0x16c]`).
 #[cfg(feature = "managed-third-source-alpha")]
 const PAUSE_EXIT: usize = 0x1558f4c;
@@ -730,19 +749,26 @@ const RETIRE_FREE: usize = 0x392eb40;
 #[cfg(feature = "managed-third-source-alpha")]
 const FIGHTER_MANAGER_INSTANCE: usize = 0x52b94f8;
 
-/// Exact 13.0.5 words: the two hook sites and the reference retire (its four `bl` targets are the callees above).
+/// Exact 13.0.5 words: the two hook sites, the reference retire (its four `bl` targets are the callees above) and the
+/// creation helper's owner step `0x4eb750-0x4eb76c` the re-creation relies on (`adrp/ldr` G = `[0x5324680]`,
+/// `ldr x8,[G+8*slot+0xe8]`, `cbnz x8,0x4eb770`, `bl 0x17eb000`: an owner is created only when none is live).
 #[cfg(feature = "managed-third-source-alpha")]
-const PAUSE_CONTRACT: [(usize, [u32; 16]); 3] = [
-    (PAUSE_INSTALL, [0x3907d27f, 0xf9012668, 0xf9012a7f, 0xf9402bf9, 0xa9497bfd, 0xa9484ff4, 0xa94757f6, 0xa9465ff8,
-                     0x910283ff, 0xd65f03c0, 0x9001eee8, 0xf9457d08, 0xb40001a8, 0xb9400909, 0x53177d29, 0x71000d3f]),
+const PAUSE_CONTRACT: [(usize, [u32; 16]); 4] = [
+    (PAUSE_INSTALL, [0xf9012a7f, 0xf9402bf9, 0xa9497bfd, 0xa9484ff4, 0xa94757f6, 0xa9465ff8, 0x910283ff, 0xd65f03c0,
+                     0x9001eee8, 0xf9457d08, 0xb40001a8, 0xb9400909, 0x53177d29, 0x71000d3f, 0x54000061, 0x394b5d09]),
     (PAUSE_EXIT, [0xb9416e68, 0xb9016a68, 0x12800014, 0x91058668, 0x320003e9, 0xb9016e74, 0x3907b27f, 0x79000109,
                   0xb001eb16, 0xf9427ec8, 0xf9400108, 0xf9401509, 0x52aa0015, 0xb40001c9, 0x528b240a, 0x386a692a]),
     (RETIRE_REFERENCE, [0xf9402b15, 0xb4000875, 0x320003e1, 0xaa1503e0, 0x9405a11d, 0xaa1503e0, 0x94059d2f, 0xf9402b15,
                         0xf9002b1f, 0xb40000b5, 0xaa1503e0, 0x94059c4a, 0xaa1503e0, 0x94d10ec0, 0xb940a308, 0x51000508]),
+    (OWNER_REUSE, [0xb00271c8, 0xf9434100, 0x8b140c08, 0xf9407508, 0xb5000088, 0xaa1303e1, 0x2a1f03e2, 0x944bfe25,
+                   0xa9487bfd, 0xa9474ff4, 0x910243ff, 0xd65f03c0, 0x94d35bb4, 0, 0, 0]),
 ];
+#[cfg(feature = "managed-third-source-alpha")]
+const OWNER_REUSE: usize = 0x4eb750;
 
 #[cfg(feature = "managed-third-source-alpha")]
-const PAUSE_SEAMS: &[&str] = &["capacity.pause_state_install", "capacity.pause_state_exit", "lifecycle.destruction_entry"];
+const PAUSE_SEAMS: &[&str] = &["capacity.pause_state_install", "capacity.pause_state_exit", "capacity.retire_653490",
+    "body_bank.finalize_entry", "lifecycle.destruction_entry", "special_groups.heap_free"];
 
 #[cfg(feature = "managed-third-source-alpha")]
 static PAUSE_RETIRE_VERIFIED: AtomicBool = AtomicBool::new(false);
@@ -768,12 +794,14 @@ unsafe fn verify_pause_retire(base: usize) -> Result<(), usize> {
     Ok(())
 }
 
-/// The pause state was just installed: retire our actorless helpers before its exit block can walk them.
+/// A state was just installed: when it is the pause state, retire our actorless helpers before its exit block walks.
 #[cfg(feature = "managed-third-source-alpha")]
-#[skyline::hook(offset = 0x1558660, inline)]
-unsafe fn pause_state_installed(_ctx: &InlineCtx) {
+#[skyline::hook(offset = 0x1558668, inline)]
+unsafe fn pause_state_installed(ctx: &InlineCtx) {
     crate::runtime::threads::headroom("pause_state_installed");
-    super::sources::pause_state(true);
+    if ctx.registers[8].x() as usize == BASE.load(Ordering::Acquire) + PAUSE_STATE {
+        super::sources::pause_state(true);
+    }
 }
 
 /// The pause state's exit block is about to walk the entries: release the creation hold; report any actorless walk.
@@ -816,7 +844,11 @@ pub(super) unsafe fn entry_facts(entry: usize) -> crate::model::pause_helper::En
 /// Must be called with no plugin lock held: the destructor's callbacks take them.
 #[cfg(feature = "managed-third-source-alpha")]
 pub(super) unsafe fn retire_at(slot: usize, entry: usize) -> bool {
-    if !PAUSE_RETIRE_VERIFIED.load(Ordering::Acquire) || entry == 0 || entry_at(slot) != entry {
+    if !PAUSE_RETIRE_VERIFIED.load(Ordering::Acquire)
+        || !crate::runtime::roster::character_lifecycle::DESTRUCTION_TRACED.load(Ordering::Acquire)
+        || entry == 0
+        || entry_at(slot) != entry
+    {
         return false;
     }
     let base = BASE.load(Ordering::Acquire);
@@ -965,6 +997,37 @@ pub(super) mod managed {
     /// Native owner cleanup only; never scene departure.
     pub(super) fn unregister(index: usize) {
         CREATED.lock()[index] = None;
+    }
+
+    /// PAUSE-HELPER F1, from the entry destructor's callback of a pause retire: when the slot's owner `resource` is
+    /// still bound to its claim and reusable (`model::pause_helper::Owner`), the record keeps that owner with no entry.
+    /// The claim stays bound to the live owner until its native cleanup, and the slot is created again under it
+    /// (`preflight_checked`, `create_reserved`). Returns whether it was kept, and the owner as read.
+    pub(crate) unsafe fn reuse_owner(slot: usize, entry: usize, resource: usize) -> (bool, crate::model::pause_helper::Owner) {
+        let base = BASE.load(Ordering::Acquire);
+        let context = read::<*const u8>(base as *const u8, 0x5324680);
+        let root = |at: usize| if aligned(context) { read::<usize>(context, at) } else { 0 };
+        let current = root(slot * 8) as *const u8;
+        let owner = crate::model::pause_helper::Owner {
+            resource: current as usize,
+            alias: root(0xe8 + slot * 8),
+            vtable: aligned(current) && read::<usize>(current, 0) == base + 0x509fb10,
+            header: if aligned(current) { read(current, 0x58) } else { 0 },
+        };
+        let Some(index) = claim_index(slot) else { return (false, owner) };
+        let mut created = CREATED.lock();
+        let kept = owner.reusable(resource)
+            && claim_state(index) == (Claimant::Managed as u8, resource)
+            && created[index].is_some_and(|record| record.entry == entry && record.resource == resource);
+        if let Some(record) = created[index].as_mut().filter(|_| kept) {
+            record.entry = 0;
+        }
+        (kept, owner)
+    }
+
+    /// Registered creations that hold an entry; a kept owner (`reuse_owner`) holds none until its re-creation.
+    fn live(created: CreatedSlots) -> u32 {
+        created.iter().flatten().filter(|record| record.entry != 0).count() as u32
     }
 
     /// Registered creations as the one value Mii owner checks may accept. An
@@ -1550,10 +1613,13 @@ pub(super) mod managed {
         if !extra_compiled(target) || (layout.waiting() && target != SLOT && !cfg!(feature = "lobby-preload-extended")) {
             return Err(Refusal::Extra);
         }
-        if claimed_at(target) { return Err(Refusal::Claimed); }
-        if !owners[2..].contains(&slot) { return Err(Refusal::Callback); }
         let created = created();
-        if registered_prefix(created,layout).ok_or(Refusal::Order)? != earlier { return Err(Refusal::Order); }
+        // PAUSE-HELPER F1: this slot's owner kept by a pause retire; it is reused, still under its claim.
+        let reuse = registered_at(created, target).filter(|record| record.entry == 0).map(|record| record.resource);
+        if claimed_at(target) && reuse.is_none() { return Err(Refusal::Claimed); }
+        if !owners[2..].contains(&slot) { return Err(Refusal::Callback); }
+        let registered = registered_prefix(created,layout).ok_or(Refusal::Order)?;
+        if reuse.is_none() && registered != earlier { return Err(Refusal::Order); }
         let scene = current_snapshot(layout, ctx, entry, slot).ok_or(Refusal::Snapshot)?;
         let shape = match layout {
             // Every slot 4..8 is null except an earlier registered creation, which
@@ -1568,10 +1634,10 @@ pub(super) mod managed {
             #[cfg(feature = "lobby-preload-extended")]
             Layout::QuickplayWaiting => waiting_creation_shape(scene,created),
         };
-        if scene.count != 4 + earlier as u32 || !shape { return Err(Refusal::Shape); }
+        if scene.count != 4 + reuse.map_or(earlier as u32, |_| live(created)) || !shape { return Err(Refusal::Shape); }
         if scene.backup.iter().any(|p| *p != 0) { return Err(Refusal::Backup); }
-        if scene.resources[target] != 0
-            || scene.aliases[target] != 0
+        if scene.resources[target] != reuse.unwrap_or(0)
+            || scene.aliases[target] != reuse.unwrap_or(0)
             || scene.selection[target] != 2
         {
             return Err(Refusal::Occupied);
@@ -1662,8 +1728,12 @@ pub(super) mod managed {
         before: Preflight,
     ) -> Option<Reservation> {
         let target = before.input.slot;
+        // Non-zero only for a kept owner (the preflight admitted no other): the delta is then the entry alone.
+        let reused = before.scene.resources[target];
+        let mut fresh = before.scene;
+        (fresh.resources[target], fresh.aliases[target]) = (0, 0);
         if preflight_for(ctx, entry, slot, target as u32) != Some(before)
-            || !create_at(Claimant::Managed, target)
+            || !if reused != 0 { create_reusing(target, reused) } else { create_at(Claimant::Managed, target) }
         {
             return None;
         }
@@ -1673,7 +1743,8 @@ pub(super) mod managed {
         bind_owner_at(Claimant::Managed, target,
             after.map_or_else(|| bound_resource(target), |after| after.resources[target]));
         let after = after?;
-        if !creation_delta_at(before.scene, after, target)
+        if !creation_delta_at(fresh, after, target)
+            || (reused != 0 && after.resources[target] != reused)
             || after.aliases[target] != after.resources[target]
             || original_resources(after) != Some(before.resources)
             || inputs_for(target).ok() != Some(before.input)
@@ -1758,9 +1829,9 @@ pub(super) mod managed {
             return Err(("scene/lifetime/current-entry", target));
         }
         let created = created();
-        let Some(registered) = registered_prefix(created,reservation.scene.layout) else {
+        if registered_prefix(created,reservation.scene.layout).is_none() {
             return Err(("created registry order or claims", target));
-        };
+        }
         if registered_at(created, target).is_none_or(|record|
             record.entry != reservation.entry || record.resource != reservation.resource)
         {
@@ -1783,7 +1854,7 @@ pub(super) mod managed {
         if !aligned(internal)
             || internal as usize != reservation.scene.internal
             || read::<usize>(service, 0) != reservation.scene.service_inner
-            || read::<u32>(internal, 0xa0) != 4 + registered as u32
+            || read::<u32>(internal, 0xa0) != 4 + live(created)
             || (reservation.scene.layout == Layout::Training
                 && native_source::training_cpu_quantity() != Some(1))
             || [read::<u8>(internal, 0xea), read(internal, 0xeb)] != reservation.scene.rules

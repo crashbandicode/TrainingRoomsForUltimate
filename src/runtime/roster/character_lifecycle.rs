@@ -127,6 +127,10 @@ unsafe fn reload_trace(ctx: &mut InlineCtx) {
     }
 }
 
+/// `destruction_trace` is installed: every native entry destruction reaches `on_destroy` (PAUSE-HELPER's retire
+/// relies on it, so the plugin never keeps a freed entry in a token or reservation).
+pub(crate) static DESTRUCTION_TRACED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
 #[skyline::hook(offset = 0x652174, inline)]
 unsafe fn destruction_trace(ctx: &mut InlineCtx) {
     crate::runtime::threads::headroom("destruction_trace");
@@ -177,6 +181,7 @@ pub fn init() {
             refresh_entry_portrait,
             refresh_ordinal_portrait
         );
+        DESTRUCTION_TRACED.store(true, Ordering::Release);
         trace!("[CharacterLifecycle] main21450c647b8c5940; fingerprints passed");
     }
 }

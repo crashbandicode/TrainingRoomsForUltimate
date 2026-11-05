@@ -1,6 +1,6 @@
 //! Serialize asynchronous native fighter installs without treating resource-only
 //! loading as a suspension of the visible practice fighters.
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct InstallToken(u64);
@@ -8,11 +8,18 @@ pub struct InstallToken(u64);
 pub struct InstallGate {
     active: AtomicU64,
     next: AtomicU64,
+    held: AtomicBool,
 }
 
 impl InstallGate {
     pub const fn new() -> Self {
-        Self { active: AtomicU64::new(0), next: AtomicU64::new(2) }
+        Self { active: AtomicU64::new(0), next: AtomicU64::new(2), held: AtomicBool::new(false) }
+    }
+
+    /// PAUSE-HELPER (Ally Round 8 F3): no install starts from the pause state's install to its exit block, so no
+    /// reload empties an actor the exit block walks. A held gate reads as busy; callers keep their request.
+    pub fn hold(&self, held: bool) {
+        self.held.store(held, Ordering::Release);
     }
 
     pub fn active(&self) -> bool {
@@ -31,7 +38,7 @@ impl InstallGate {
     /// The caller retains the token until native completion or destruction.
     /// Cancelling plugin intent or leaving a scene does not end a native install.
     pub fn try_begin(&self, suspend_practice: bool) -> Option<InstallToken> {
-        if self.active() { return None; }
+        if self.active() || self.held.load(Ordering::Acquire) { return None; }
         let mut generation = self.next.fetch_add(2, Ordering::Relaxed);
         // Zero is reserved for idle, including at integer wraparound.
         if generation == 0 { generation = self.next.fetch_add(2, Ordering::Relaxed); }
@@ -79,6 +86,20 @@ mod tests {
         assert!(gate.suspends_practice());
         assert_eq!(gate.try_begin(false), None);
         assert!(gate.finish(current));
+    }
+
+    #[test]
+    fn a_held_gate_starts_no_install_and_keeps_the_running_one() {
+        let gate = InstallGate::new();
+        let running = gate.try_begin(false).unwrap();
+        gate.hold(true);
+        assert!(gate.finish(running), "an install begun before the hold completes normally");
+        assert_eq!(gate.try_begin(true), None, "no reload starts while held");
+        assert_eq!(gate.try_begin(false), None, "no creation or source load starts while held");
+        assert!(!gate.active());
+        gate.hold(false);
+        let after = gate.try_begin(true).unwrap();
+        assert!(gate.finish(after), "the held request starts after the exit block");
     }
 
     #[test]

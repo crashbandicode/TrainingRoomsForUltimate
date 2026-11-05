@@ -10,10 +10,10 @@
 //!
 //! The runtime half (`runtime::roster::native_source_capacity`, `runtime::roster::character_sources`) retires such an
 //! entry at pause-open through the native single-slot retire the game itself runs (FighterManager teardown per slot,
-//! `0x66e914-0x66e94c`; the summon removal mid-battle, `0x4eb00c-0x4eb04c`), holds creation while the pause state is
-//! installed, and lets the slot be created again once both native completions of the retire arrived (the entry
-//! destructor's callback and the owner cleanup, in either order). This module decides and sequences; it never touches
-//! memory.
+//! `0x66e914-0x66e94c`; the summon removal mid-battle, `0x4eb00c-0x4eb04c`), holds creation and every install start
+//! while the pause state is installed, and lets the slot be created again: with its live owner reused, as the game's
+//! creation helper `0x4eb6a0` does, once the entry destructor's callback arrived; otherwise once the owner cleanup
+//! arrived too. This module decides and sequences; it never touches memory.
 
 /// What the runtime read from one present FighterManager entry.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -35,6 +35,25 @@ impl EntryFacts {
     /// Walked with no actor: the setter would write through null.
     pub const fn exposed(self) -> bool {
         self.walked() && self.actor == 0
+    }
+}
+
+/// The owner context of a retired slot, read in the entry destructor's callback (Ally Round 8 F1): `resource`
+/// `[G+8*slot]`, `alias` `[G+0xe8+8*slot]` (G = `[main+0x5324680]`), the owner's vtable and its header kind `+0x58`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Owner {
+    pub resource: usize,
+    pub alias: usize,
+    pub vtable: bool,
+    pub header: u32,
+}
+
+impl Owner {
+    /// The game's single-slot retire leaves the owner, and its creation helper `0x4eb6a0` reuses a live one
+    /// (`0x4eb750-0x4eb76c` creates an owner only when `[G+0xe8+8*slot] == 0`). Reusable: still the slot's bound owner
+    /// in both roots and as empty as a fresh creation leaves it (no header kind), which the creation check requires.
+    pub const fn reusable(self, bound: usize) -> bool {
+        bound != 0 && self.resource == bound && self.alias == bound && self.vtable && self.header == u32::MAX
     }
 }
 
@@ -79,6 +98,21 @@ impl<const N: usize> Ledger<N> {
     /// The entry destructor's callback for `entry`; true when the retire is complete (create the slot again).
     pub fn destroyed(&mut self, index: usize, entry: usize) -> bool {
         self.complete(index, Some(entry))
+    }
+
+    /// Whether slot index `index` is mid-retire of `entry`.
+    pub fn retiring(&self, index: usize, entry: usize) -> bool {
+        matches!(self.retiring.get(index), Some(Some((retired, _, _))) if *retired == entry)
+    }
+
+    /// The destructor's callback for `entry` with its owner kept for reuse (`Owner::reusable`): the retire is complete
+    /// without an owner cleanup, which the game runs only at departure.
+    pub fn reused(&mut self, index: usize, entry: usize) -> bool {
+        let hit = self.retiring(index, entry);
+        if hit {
+            self.retiring[index] = None;
+        }
+        hit
     }
 
     /// The owner cleanup of slot index `index`; true when the retire is complete (create the slot again).
@@ -163,6 +197,29 @@ mod tests {
         ledger.refused(2);
         ledger.refused(9);
         assert!(ledger.begin(2, 0x40), "a later pause can retire it");
+    }
+
+    #[test]
+    fn only_the_bound_live_empty_owner_is_reused() {
+        let owner = Owner { resource: 0x1180, alias: 0x1180, vtable: true, header: u32::MAX };
+        assert!(owner.reusable(0x1180), "the summon-removal case: owner kept, empty");
+        assert!(!owner.reusable(0x2200), "another owner is bound to the claim");
+        assert!(!owner.reusable(0), "no bound owner");
+        assert!(!Owner { resource: 0, alias: 0, ..owner }.reusable(0x1180), "the owner was cleaned up: create a new one");
+        assert!(!Owner { alias: 0, ..owner }.reusable(0x1180), "0x4eb6a0 would create a new owner over it");
+        assert!(!Owner { vtable: false, ..owner }.reusable(0x1180));
+        assert!(!Owner { header: 0x5c, ..owner }.reusable(0x1180), "a header kind: not the empty owner creation checks");
+    }
+
+    #[test]
+    fn a_reused_owner_completes_the_retire_on_the_destructor_alone() {
+        let mut ledger = Ledger::<6>::new();
+        assert!(!ledger.retiring(1, 0x20) && !ledger.reused(1, 0x20), "an ordinary destruction is not a retire");
+        assert!(ledger.begin(1, 0x20));
+        assert!(ledger.retiring(1, 0x20) && !ledger.retiring(1, 0x30) && !ledger.retiring(9, 0x20));
+        assert!(!ledger.reused(1, 0x30), "another entry");
+        assert!(ledger.reused(1, 0x20), "complete: the slot is created again with its owner");
+        assert!(!ledger.retiring(1, 0x20) && !ledger.owner_retired(1), "the departure's owner cleanup is ordinary again");
     }
 
     /// The b4t sequence end to end: a helper is created, a pause opens inside its no-actor window, the entry is
