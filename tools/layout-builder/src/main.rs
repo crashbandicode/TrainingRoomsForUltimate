@@ -23,6 +23,7 @@ mod archive_recipe;
 #[path = "../../../src/model/ui/panes.rs"]
 #[allow(dead_code)]
 mod panes;
+mod pane_table;
 
 use panes::{Align, Kind, Spec};
 
@@ -218,7 +219,13 @@ fn build(stock_path: &str, out: &str, waiting: bool) -> Result<()> {
     std::fs::create_dir_all(out).map_err(err("out dir"))?;
     std::fs::write(format!("{out}/target.arc"), &target).map_err(err("write target"))?;
     std::fs::write(format!("{out}/{recipe_name}.tra1"), &recipe).map_err(err("write recipe"))?;
+    // The pane table this recipe was built from (both layouts share it): committed as assets/panes-recipe.sha256 and
+    // checked by the plugin's tests/pane_recipe_guard.rs, so a pane-table change without a rebuild fails the gates.
+    let pane_table = pane_table::digest(&panes::specs());
+    std::fs::write(format!("{out}/panes-recipe.sha256"), format!("{pane_table}\n")).map_err(err("write pane digest"))?;
     let report = serde_json::json!({
+        "pane_table_sha256": pane_table,
+        "builder": pane_table::BUILDER,
         "stock_bytes": stock.len(),
         "stock_fnv": format!("{:016x}", archive_recipe::fingerprint(&stock)),
         "untouched_roundtrip_identical": untouched == stock,
@@ -292,6 +299,23 @@ mod tests {
             layout.fonts.clear();
             assert_eq!(add_pane(&mut layout,&spec,waiting),Err("qualified text font missing".into()));
         }
+    }
+
+    /// `pane_table::BUILDER` names this builder's version and the pinned layout library revision.
+    #[test]
+    fn the_builder_identity_matches_the_manifest() {
+        let manifest = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/Cargo.toml")).unwrap();
+        let rev = manifest.split("rev = \"").nth(1).and_then(|s| s.split('"').next()).expect("pinned toolbox rev");
+        assert_eq!(pane_table::BUILDER, format!("layout-builder {}; nx-layout-toolbox {rev}", env!("CARGO_PKG_VERSION")));
+    }
+
+    #[test]
+    fn the_sha256_matches_the_standard_vectors() {
+        let hex = |d: [u8; 32]| d.iter().map(|b| format!("{b:02x}")).collect::<String>();
+        assert_eq!(hex(pane_table::sha256(b"")), "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+        assert_eq!(hex(pane_table::sha256(b"abc")), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+        let two_blocks = b"abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
+        assert_eq!(hex(pane_table::sha256(two_blocks)), "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1");
     }
 
     #[test]
