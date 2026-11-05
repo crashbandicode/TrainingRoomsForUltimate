@@ -12,3 +12,7 @@ pub mod stages;
 
 #[cfg(any(test, target_os = "switch"))]
 pub mod setups;
+
+// P-CYCLE: the grid's numbered list is the CPU cycle's order (ngine::swap::cycle_members with the grid's own badges).
+#[cfg(test)]
+mod cycle_members_tests;

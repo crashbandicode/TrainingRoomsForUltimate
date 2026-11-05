@@ -46,24 +46,22 @@ impl MiiList {
 
     pub fn epoch(&self) -> u64 { self.epoch }
 
-    /// The roster grids' Mii tiles for this opening (the fork's `app.rs` 563-685 asks the mounted catalog the same).
+    /// The roster grids' Mii tiles for this opening (the fork's `app.rs` 563-685 asks the mounted catalog the same). The
+    /// CPU cycle's admission and the slot 0s are the runtime's, set by the worker (`MiiTiles::cpu_cycle`, `slot_zero`).
     pub fn tiles(&self) -> crate::editors::roster::MiiTiles {
         #[cfg(feature = "mii-saved-alpha")]
         let player = [0x48u32, 0x49, 0x4a].map(|kind| self.catalog.alpha_player_cycle(kind));
         #[cfg(not(feature = "mii-saved-alpha"))]
         let player = [false; 3];
         #[cfg(feature = "mii-ordinary-cpu-alpha")]
-        let (cpu, cpu_original_only) = (
-            [0x48u32, 0x49, 0x4a].map(|kind| self.catalog.alpha_cpu_cycle(kind)),
-            [0x48u32, 0x49, 0x4a].map(|kind| self.catalog.cpu_unnumbered_original(kind, &self.preferences)),
-        );
+        let cpu = [0x48u32, 0x49, 0x4a].map(|kind| self.catalog.alpha_cpu_cycle(kind));
         #[cfg(not(feature = "mii-ordinary-cpu-alpha"))]
-        let (cpu, cpu_original_only) = ([false; 3], [false; 3]);
+        let cpu = [false; 3];
         #[cfg(feature = "mii-managed-helper-alpha")]
         let hat = [0x48u32, 0x49, 0x4a].map(|kind| self.catalog.alpha_helper_hat(kind));
         #[cfg(not(feature = "mii-managed-helper-alpha"))]
         let hat = [false; 3];
-        crate::editors::roster::MiiTiles { player, cpu, hat, cpu_original_only }
+        crate::editors::roster::MiiTiles { player, cpu, hat, ..Default::default() }
     }
 
     pub fn leave(&mut self) { self.opened = None; }

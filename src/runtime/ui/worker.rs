@@ -539,7 +539,10 @@ fn close_session(s: &mut Session) {
 /// A press on the portrait roster grid: package 6's roster rules on the active kept key (`editors::roster`).
 /// This opening's Mii tiles for the roster grids: what the mounted catalog admits (none before it arrives).
 fn mii_tiles(list: &Option<crate::editors::mii::MiiList>) -> crate::editors::roster::MiiTiles {
-    list.as_ref().map(crate::editors::mii::MiiList::tiles).unwrap_or_default()
+    let mut tiles = list.as_ref().map(crate::editors::mii::MiiList::tiles).unwrap_or_default();
+    // P-CYCLE: the CPU cycle's Mii admission and both slot 0s are the runtime's, so the grid numbers what cycles.
+    (tiles.cpu_cycle, tiles.slot_zero) = crate::runtime::roster::character_roster::cycle_facts();
+    tiles
 }
 
 fn roster_press(m: &mut Menu, editor: &mut Option<crate::editors::roster::RosterEditor>, tile: u16, button: Button,
