@@ -9786,7 +9786,7 @@
    "dest": "src/model/mii_root/mii_menu.rs",
    "crate": "tui",
    "src_sha256": "94d7a41fe2ff5d3c4dcaed6ff0e87df4c96d64bd927a99e4550a198784cb761c",
-   "dest_sha256": "83d7fff0adcb22e90011aa48ba79fc6727811630377e37272f15f1579ed37ffc",
+   "dest_sha256": "44de705fdd76df64cb4078ced1d9911e75e59939d7965c28092449b5597beddd",
    "edits": [
     {
      "old": "use {crate::macro_panel, crate::StatefulTable, crate::SubMenu, crate::SubMenuType, crate::engine::compat::grid::NX_SUBMENU_COLUMNS, crate::NX_SUBMENU_ROWS};",
@@ -9892,6 +9892,11 @@
      "old": "/// RC keeps saved catalog selection; native creation awaits runtime qualification.\npub const NATIVE_EDITOR_AVAILABLE: bool = false;\n",
      "new": "/// Add New opens the game's native Mii editor (the fork's editor, carried; operator 2026-11-05: bring it over). Its Save\n/// makes a new native Smash Mii only (`mii_editor_bridge::edit_decide`: a fresh draft through the game's allocator; a\n/// saved ID never enters, so no saved or protected original is overwritten). The capability stays one switch: with it\n/// false the list hides Add New and the bridge refuses before any native work (`tests/mii_install_boundary.rs`).\npub const NATIVE_EDITOR_AVAILABLE: bool = true;\n",
      "reason": "rc.3 (2026-11-05): native Mii editor available again (operator, primary 35137355: bring the fork's editor over); Add New Save still makes only a new native Mii (edit_decide); the capability switch and its refusals stay."
+    },
+    {
+     "old": "if row.selected { \"\u2713 \" } else { \"\" }",
+     "new": "if row.selected { \"> \" } else { \"\" }",
+     "reason": "rc.5 review (primary 2026-11-05 ~20:10Z): the picked-Mii marker U+2713 is in none of the game's 14 fonts (nintendoP_RodinNTLG B/EB/UB cmaps, read from data.arc), so the menu drew an empty box (docs/media/mii-editor-list.gif); \"> \" as the roster editor, the combo list and the Direct stage mark their pick; tests/ui_glyphs.rs guards every literal"
     }
    ]
   },

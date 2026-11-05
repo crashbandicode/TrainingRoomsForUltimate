@@ -691,3 +691,13 @@ Carried-file changes are recorded pkg6 edits: `native_seams/mod.rs` (`PATCH_ROWS
 Host tests (`engine::seams::own_write_tests`, `model::own_patches`) cover the practice stage group checked in the wrong
 order (it verifies), every real row with every hook row's site hooked (each reads its 13.0.5 bytes), and another
 plugin's hook over ours (`occupied` again). The report is `artifacts/phase23/LANE-SEAM-SELF-REPORT.md`.
+
+## rc.5: the Mii list marks the picked Mii with a character the game draws (2026-11-05)
+
+The Mii list marked the picked Mii with `✓ ` (U+2713). None of the game's 14 fonts in 13.0.5's data.arc maps it (the
+menu's Latin face, `nintendoP_RodinNTLG` B003/EB003/UB003, has 8,612 characters each; read with
+`artifacts/phase23/rc5-combined/glyphs/font_cmap.py`), so the list drew an empty box before the name
+(`docs/media/mii-editor-list.gif`). It now uses `> `, the mark the roster editor, the combo list and the Direct stage use
+for their pick. Carried-file change: one recorded pkg6 edit of `src/model/mii_root/mii_menu.rs`; `carry_pkg6.py verify`
+re-derives all 250 files. `tests/ui_glyphs.rs` fails on any character in a non-test string or char literal under `src/`
+that is neither ASCII nor in its font-proven list (… · Ω — § é, each mapped by all three Rodin weights).

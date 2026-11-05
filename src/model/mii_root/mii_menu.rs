@@ -462,7 +462,7 @@ impl CatalogMenu {
             let mut labels: Vec<String> = visible.clone().map(|(index, row)| {
                 let moves: String = row.canonical.appearance.specials.iter()
                     .map(|value| char::from(b'1' + *value)).collect();
-                format!("{}. {}{} [{}]", index + 1, if row.selected { "✓ " } else { "" }, row.name, moves)
+                format!("{}. {}{} [{}]", index + 1, if row.selected { "> " } else { "" }, row.name, moves)
             }).collect();
             let mut disabled: Vec<bool> = visible.map(|(_, row)| self.editor_only || row.greyed).collect();
             if self.editor_available && self.list_mode && self.rows.len() >= start && self.rows.len() < start + page_size {
