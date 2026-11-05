@@ -707,6 +707,12 @@ left 99 lines; the Solo-S/HAT-REQUEST-END work used 89 of them, and the PAUSE-HE
 (owner reuse, install hold, seam rows) goes over. The raise is appended to `size-budget.toml` as a new entry at the
 exact counted size of the final rc.2 tree, with this approval in `approved_by`; earlier entries stay unchanged.
 
+**rc.3, answered 2026-11-05 ~12:55Z by the operator: "Raise as needed".** The features are the frame strip (+484 at
+`p23/input-viz` `d27221c`), change stage, menu navigation, the Mii editor bring-over, and the disc orbs if chosen.
+- Each feature branch appends a `[[budget]]` entry at its exact counted size with this approval in `approved_by`.
+- The rc.3 integration appends one entry at the exact count of the merged tree.
+- No allowance or padding; earlier entries stay unchanged.
+
 ### SOLO-S-PLACEMENT · Where the Solo Popo "S" marks sit on the roster grid — answered (2026-11-05)
 
 On `p23/candidate` the red P1 "S" (bottom-left) and the blue CPU "S" (bottom-right) on the Ice Climbers tile sit on
