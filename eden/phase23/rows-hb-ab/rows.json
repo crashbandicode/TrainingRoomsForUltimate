@@ -683,30 +683,6 @@
       ]
     },
     {
-      "id": "12-fbf-probe",
-      "start": "Training-settled",
-      "end": "Training-menu-other",
-      "budget_min": 2,
-      "steps": [
-        {
-          "run": "hb_steps.py:menu_route",
-          "check": true,
-          "args": {
-            "seq": [
-              "hb-plus",
-              "hb-down",
-              "hb-down",
-              "hb-down",
-              "hb-down",
-              "hb-down",
-              "hb-a"
-            ],
-            "tag": "fbf-probe"
-          }
-        }
-      ]
-    },
-    {
       "id": "10-lag",
       "start": "Training-settled",
       "end": "Training-settled",
@@ -727,6 +703,30 @@
         {
           "run": "hb_steps.py:off_and_scan",
           "check": true
+        }
+      ]
+    },
+    {
+      "id": "12-fbf-probe",
+      "start": "Training-settled",
+      "end": "Training-menu-other",
+      "budget_min": 2,
+      "steps": [
+        {
+          "run": "hb_steps.py:menu_route",
+          "check": true,
+          "args": {
+            "seq": [
+              "hb-plus",
+              "hb-down",
+              "hb-down",
+              "hb-down",
+              "hb-down",
+              "hb-down",
+              "hb-a"
+            ],
+            "tag": "fbf-probe"
+          }
         }
       ]
     }
