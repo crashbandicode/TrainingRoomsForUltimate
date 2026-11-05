@@ -81,3 +81,11 @@ ceiling = 136473
 date = "2026-11-05"
 reason = "rc.2: PAUSE-HELPER (a) + Ally Round 8 fixes, Solo-S placement and HAT-REQUEST-END A; measured 136473 at 1dcbdf2 (tools/sloc.py), +404 over 136069"
 approved_by = "Operator 2026-11-05 via primary 35137355: 'raise the size limit if needed, ship rc.2 when ready'"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 136644
+date = "2026-11-05"
+reason = "rc.3: the Mii editor bring-over (Add New available again, and the rest of the fork's Mii behaviour ported: docs/MII.md); measured 136644 at 203ecf0 (tools/size_gate.py), +171 over 136473"
+approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed' (rc.3 features)"
