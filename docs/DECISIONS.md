@@ -868,3 +868,163 @@ Kong); the frame numbers are **illustrative**, a plausible Steve jab → up tilt
 
 **Recommendation:** A, the frame strip, with B's history as its LAST row (as drawn). Nothing is implemented until the
 operator picks.
+
+### COMBO-HELPER · Record a combo and have a helper grade your attempts — open (2026-11-05)
+
+The operator asked on 2026-11-05: "also not sure if this is posible but adding a new section under recording where you
+can record a combo and give it an optional name and enable "combo helper" which tells you whether you got the combo or
+how off you were. for example doing nair loops with pikachu. a mockup for that would be nice as well. not sure how
+involved it would be."
+
+**Short answer: it is possible, and it builds on the frame strip (INPUT-VIZ A).** The strip already measures every
+link: the hit, the opponent's free frame, your first actionable frame and your press. The helper adds three things:
+a saved reference, a matcher that compares each attempt with it link by link, and a small display. It needs no new
+hook and no new native site.
+
+**Today** (line numbers at `main` `36d7f46`, v0.2.0-rc.2):
+- **Recording page:** the Recording, Playback and Named macros groups (`src/model/menu/table.rs:302-333`).
+- **Named recordings:** `Named library` and `Save slot to library...` open the carried named-macro panel
+  (`src/runtime/ui/external.rs:20-28`).
+  - Its files are `sd:/ultimate/TrainingRooms/macros/<id>.json`, plus `selected.txt` for the selection
+    (`src/runtime/macros/named_macros.rs:420-432`).
+  - It runs on the generic `model::store::Store`: path-safe ids, atomic writes, a size cap
+    (`src/model/macros/library.rs:1-48`). The setup library is a second user of the same store.
+- **Names:** the game's own keyboard (`runtime::mii::native_keyboard::request`, `named_macros.rs:337`), at most 48
+  characters (`MAX_NAME_CHARS`, `src/model/macros/recording.rs:23`).
+- **The frame strip** (`SPEC-input-06`, in progress at `c02cbb3`) emits one `frame_strip::Link` per follow-up:
+  - fields: verdict, hit, free frame, `A₁`, press, input, window, and the two moves (`src/model/frame_strip.rs:214`);
+  - plus every new press as a `Press` (`:187`).
+
+**The words.** These are the strip's own: **link** (≤ 0 is a true combo), **input** and **combo window**. Two more:
+- **Reference:** the saved combo, with the recorded inputs and the strip's measurements of each link when it was
+  recorded.
+- **Offset:** a press's frame from your first actionable frame `A₁`, minus the same press in the reference.
+  Positive means later than recorded.
+
+**The menu.** Both pictures are mockups over the real rc.1 Recording page; values are illustrative.
+- **New group "Combos" on the Recording page:**
+  - *Save last combo...*: keeps the hits since both fighters could last act (the strip's exchange), then opens the
+    game's keyboard for an optional name. An empty name gives "Combo N".
+  - *Saved combos*: a list. A sets the target, X renames it with the keyboard, Y deletes it.
+  - *Combo helper*: On / Off.
+  - *Target combo*: the saved combo to measure against.
+  - *On-time tolerance*: ±0 / ±1 / ±2 frames.
+  - *After an attempt*: Keep playing, or Load save state (retry from the same spot and percent).
+- Recording a combo needs no arming: do it once, and if it came out right, save it.
+
+![Recording page: the Combos group](decisions/COMBO-HELPER-menu-recording-page.png)
+
+![Saved combos and the keyboard step](decisions/COMBO-HELPER-menu-saved-combos.png)
+
+**Two in-game layouts.** Both are over a real Eden Training frame (`p4zc-rc9`). It is the only Eden frame with Pikachu
+on screen, and there Pikachu is the CPU and P1 is Steve. The numbers illustrate a P1 Pikachu short-hop nair loop: five
+nairs, four links, with link 3 dropped because the jump came 2 frames late. Per link, each layout shows whether it hit,
+TRUE −N or DROP +N, and each press against the recording. Under that, the attempt result ("3 of 4 links true · link 3
+dropped by 1f: jump 2f late") and the last 8 attempts.
+1. **(recommended) A · Combo bar under the strip.**
+   - An 864 × 132 bar right under the frame strip, one cell per link (four at a time).
+   - In each cell, a timing ruler shows your jump (▼) against the recorded one (□), with the jumps that still combo in
+     green.
+   - It reads as part of the strip and keeps your eyes on one place.
+   - It needs the strip On, and the two together reach about 290 px from the top. High juggles go behind them.
+2. **B · Link ladder.**
+   - A 392 px panel on the left, one row per link.
+   - Each row has one timeline with both presses of the follow-up (jump and nair), recorded and yours.
+   - It shows more detail per press, and it works with the strip Off.
+   - It covers the left third of the stage.
+
+![Option A: combo bar under the strip](decisions/COMBO-HELPER-A-combo-bar.png)
+
+![Option B: link ladder](decisions/COMBO-HELPER-B-link-ladder.png)
+
+**Feasibility.**
+- **The reference** is one record per combo:
+  - P1's mapped inputs per frame (the existing `InputFrame`), up to 600 frames;
+  - per link, from the strip's `Link`: the moves, the hit frame, `A₁`, the link value and the window;
+  - per link, the presses between the two hits, each as button, stick bin and frame from `A₁`;
+  - the context: both fighter kinds, the CPU's damage at the first hit, and a fingerprint of the CPU settings that
+    move it (DI, SDI, air dodge, mash).
+- **Matching an attempt:**
+  - **Start:** with the helper On and a target set, an attempt starts on the first hit of a new exchange whose move and
+    first press match the reference's first link. With "Load save state" it starts on the first hit after the load.
+  - **Each link** ends on the strip's next `Link` event. Hits inside one action are never links (the strip's rule),
+    so Pikachu's multi-hit nair counts once.
+    - The presses of the follow-up are matched in order with the reference's, by button class and stick bin.
+    - An extra or different press is a **wrong move**, e.g. a fair (stick forward) where the reference has a nair.
+    - A press that never came is **missing**.
+  - **Completed:** all reference links have hit: "N of M links true".
+  - **Stopped:** the exchange ends (both fighters actionable, no hit) before the last link: "stopped at link k".
+  - **Cleared:** a save-state load, a scene change or a hot swap clears the attempt (the strip's rules).
+  - **History:** the last 8 attempts, the clean streak and the best are kept until the target changes.
+- **"How off":**
+  - each press's offset against the reference (within the tolerance counts as on time);
+  - each link's value against the recorded one (TRUE −1 against −3) and the spare;
+  - the gap between presses (jump to nair);
+  - a wrong move or a missing press.
+  - The summary names the first link that was not true, and its largest offset.
+- **Storage (recommended): a combo library of its own on the same `Store`.**
+  - The files are `sd:/ultimate/TrainingRooms/combos/<id>.json` and `combos/selected.txt`, for the target.
+  - Rename and delete work as in the named library.
+  - Not inside the named-macro library:
+    - Its records are CPU playback macros (placement, Mii identity, the CPU's *Named Library* source would list
+      them).
+    - A combo field there would need a schema bump, which older readers refuse.
+- **Native reads:** no new hook and no new site. The helper uses the strip's samples and P1's inputs. Two optional
+  extra reads, both on existing sites:
+  - P1's `MotionModule::motion_kind` (`src/model/sites_pkg2.rs:39`, read today for the CPU only), to tell aerials
+    apart beyond the input chip. All aerials are one `Move` family.
+  - The CPU's damage (`damage_of`, `sites_pkg2.rs:381`), for the context check.
+- **HUD:** A or B is about 90 panes each.
+  - With the strip's ~120, that is about 210, under the input log's 271 that the strip removes.
+  - The panes are written only when a link or an attempt resolves, not every frame.
+  - The new panes go into both layout recipes, and the size budget is checked.
+- **Risks:**
+  - **DI, SDI, percent and weight change the links.** The record keeps the context. When an attempt's context differs,
+    the bar says so, e.g. "CPU at 45% (recorded 30%)". TRUE and DROP stay correct, because they are measured live;
+    only the "against the recording" offsets lose meaning. "After an attempt: Load save state" drills from the same
+    spot.
+  - **Pikachu's nair:**
+    - Its landing lag sets `A₁`. The strip's actionable test has not been checked against frame data yet.
+    - The nair is multi-hit, so the link runs from its last hit to the next nair's first hit.
+  - **Jump-cancelled aerials and the strip's INPUT readout.** The strip measures the aerial's press, because the
+    action that hits starts with the aerial. So a perfect loop reads "+5, 5f late" on the strip (as in picture A).
+    The helper's per-press comparison is what shows the jump's timing. The strip could learn that a jump starts an
+    action.
+  - **Hitstun left (`r`, `K`) is not proven yet** (SPEC-input-06 §4). Until it is, TRUE links have no number, in the
+    reference too.
+  - **The keyboard** is driven through `named_macros`' job queue today. The helper needs its own job id there.
+  - **Limits it shares with the strip:** primary CPU only; projectile hits count as hits but have no active cells.
+
+**Steps, in order:**
+1. **The spec** (`SPEC-input-07`, combo helper) and **the pure model** (`model::combo`):
+   - the reference type, and the matcher fed with `frame_strip::Link` and `Press`;
+   - host tests: a clean nair loop, a late jump, a miss, a wrong move, a multi-hit nair, and a clear on a save-state
+     load.
+2. **The store:** the `ComboRecording` record and the `combos/` library (validation, rename, delete, `selected.txt`),
+   with host tests.
+3. **The menu:**
+   - the Combos rows (`table.rs`, `factory.rs`: `combo_helper`, `combo_tolerance`, `combo_after`);
+   - the Saved combos screen, with rename through the native keyboard under its own job id;
+   - core02 menu tests.
+4. **Capture:** a fixed ring of the current exchange, kept in the strip's per-frame step: P1 inputs (600) and links
+   (16). *Save last combo* builds the record on the worker thread, not in a hook.
+5. **The helper at run time:** the matcher steps on P1's entry callback after the strip, and publishes a snapshot for
+   the UI.
+6. **The HUD:** the chosen layout's panes, the recipes, the pane plan with writes on change, and the size budget.
+7. **After an attempt:** call the existing save-state load.
+8. **Eden rows:**
+   - record a nair loop and save it under a name;
+   - three attempts: clean, a late jump, a missed link;
+   - rename, delete, and read it back from the file.
+
+Steps 1–3 can run in parallel with the frame strip work: they need only the shape of `frame_strip::Link` and `Press`
+(`c02cbb3`). Steps 4–8 need the strip merged.
+
+**Not proven yet:**
+- every number in the pictures, including the nair-loop frame data;
+- whether the strip marks Pikachu actionable in the air between the jump and the nair;
+- the keyboard with a second owner;
+- the pane counts.
+
+**Recommendation:** A, the combo bar under the strip, with the Combos group and its own `combos/` library as drawn.
+Nothing is implemented until the operator picks.
