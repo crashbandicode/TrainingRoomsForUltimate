@@ -1,0 +1,443 @@
+{
+  "game_id": "01006A800016E000",
+  "start": "boot",
+  "scope": "Change Stage (primary 12:50Z) on the diag build of p23/change-stage: three changes through the new row in ordinary Training (FD, Battlefield Omega, Smashville), each checked in the log (menu_close, native completion) and on screen; save/load and L+R+A after; trace.unmapped_access (log mode) total.",
+  "segments": {
+    "main-stage": {
+      "file": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/segments/main-stage.edenmacro.json",
+      "sha256": "ce6714b44f34f04cacd0d17454e4773c8906d289e5a37e34c606c604e6e4acfb",
+      "cap": 60,
+      "start_gate": "main",
+      "end_gate": "stage",
+      "from_run": "lr-03",
+      "row": "02-stage",
+      "library": "main-stage"
+    },
+    "stage-css": {
+      "file": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/segments/stage-css.edenmacro.json",
+      "sha256": "240249606f15207106e4cc654cc3ee173efa97d51ea276586c82e6c7c438db74",
+      "cap": 30,
+      "start_gate": "stage",
+      "end_gate": "css",
+      "from_run": "lr-03",
+      "row": "03-css",
+      "library": "stage-css"
+    },
+    "attract-cancel": {
+      "file": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/segments/attract-cancel.edenmacro.json",
+      "sha256": "1b506dbfc689e79e8bfca69b74274ab674b91ac8359219a1a4c95faa81aae70f",
+      "cap": 30,
+      "start_gate": null,
+      "end_gate": "main",
+      "from_run": "p4r-shared",
+      "row": "nav00-attract-cancel",
+      "library": "attract-cancel"
+    },
+    "title-confirm": {
+      "file": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/segments/confirm.edenmacro.json",
+      "sha256": "131cecfb68a24040b38aeaf929c806caf361e29b7e39d241147a5821cb87007d",
+      "cap": 60,
+      "start_gate": "title-fast",
+      "end_gate": "main-settled",
+      "from_run": "p4r-shared",
+      "row": "nav03-room-list",
+      "library": "confirm"
+    },
+    "p1-next-frames": {
+      "file": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/segments/p1-next-frames.edenmacro.json",
+      "sha256": "d56e381eebfc979cfc4380a80f24af11c057990f306c4ad66b23c6e6641d6df4",
+      "cap": 20,
+      "library": "p1-next-frames"
+    },
+    "hat-next": {
+      "file": "segments/hat-next.edenmacro.json",
+      "sha256": "90fb2d7218d3946b3e43dfd8f025b932a6e8fc230ce0204516840aa31e415b55",
+      "cap": 15
+    },
+    "p23-hat-right": {
+      "file": "segments/p23-hat-right.edenmacro.json",
+      "sha256": "6f1ea5e76d99a4955b331aba288824939604fdd0ea7df48ec9df5dd1512ce22f",
+      "cap": 15
+    },
+    "p23-hat-left-p2": {
+      "file": "segments/p23-hat-left-p2.edenmacro.json",
+      "sha256": "9692724571246bd0ddcf7cf556531b8da409aa72fa53f19221b74ab853bc04b9",
+      "cap": 15
+    },
+    "p23-record": {
+      "file": "segments/p23-record.edenmacro.json",
+      "sha256": "74c0af531437b1cb885b2286d251392f55b18fedc4d5217d01ea9ce36e8c3c39",
+      "cap": 15
+    },
+    "pilot-arm": {
+      "file": "segments/pilot-arm.edenmacro.json",
+      "sha256": "bd024e051944683b3ef4b73fc0da3821d03c3627d441eed05e0477531961e728",
+      "cap": 20
+    },
+    "pilot-page-step": {
+      "file": "segments/pilot-page-step.edenmacro.json",
+      "sha256": "db109fa89164d216cf7516057f28626012db5f7015ee870691e47c194074c2ac",
+      "cap": 20
+    },
+    "pilot-release": {
+      "file": "segments/pilot-release.edenmacro.json",
+      "sha256": "48793ebf9713be0db63f2dfa3575e4ce0e84e68fa6e0c923c50a1b1c08780b92",
+      "cap": 20
+    },
+    "cpu-next-frames": {
+      "file": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/segments/cpu-next-frames.edenmacro.json",
+      "sha256": "771d9c618735334c245cbe3ea86f6753f73744aaff6841945ab9b570506f17f5",
+      "cap": 20,
+      "library": "cpu-next-frames"
+    },
+    "bc-record": {
+      "file": "segments/bc-record.edenmacro.json",
+      "sha256": "eba9dbcfe14b2df6e18052e704674a1888898bb32473cb5bd33812e1b7524737",
+      "cap": 15
+    },
+    "focus-native-quit-frames": {
+      "file": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/segments/focus-native-quit-frames.edenmacro.json",
+      "sha256": "281999e46939ca06c960cef0108b28672c611435d33260ddeddfc6c9dd475b46",
+      "cap": 30,
+      "library": "focus-native-quit-frames"
+    },
+    "confirm-native-quit-frames": {
+      "file": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/segments/confirm-native-quit-frames.edenmacro.json",
+      "sha256": "6fc21293dea72efe1bfb888735d8a62d8a6754d8a1855e8bbcde9af08e24080b",
+      "cap": 30,
+      "library": "confirm-native-quit-frames"
+    },
+    "p23-state-save": {
+      "file": "segments/p23-state-save.edenmacro.json",
+      "sha256": "36ad179e45a5dddb5bd96fcd040cb3be71bc8c375c6ff1bdef038ed000845645",
+      "cap": 30
+    },
+    "p23-state-load": {
+      "file": "segments/p23-state-load.edenmacro.json",
+      "sha256": "7bceabbcf6e0b8a331b850348c5a339e61edaf7fdcb681ac754779e9d9731671",
+      "cap": 30
+    },
+    "p23-chord-lra": {
+      "file": "segments/p23-chord-lra.edenmacro.json",
+      "sha256": "4b8ec3a2212cf9b9a4e55aba6687255967ad6da8d0cb69c68894d7b5fc02d01b",
+      "cap": 30
+    }
+  },
+  "gates": {
+    "loaded": {
+      "kind": "status",
+      "expect": {
+        "running": true,
+        "loading_complete": true
+      },
+      "max_frame_age_ms": 1500,
+      "cap": 180
+    },
+    "main-fast": {
+      "kind": "image",
+      "reference": "refs/main-current.png",
+      "sha256": "d13e49e01a0255ed794d3ca6415965c4212c67474164b4019b0f3a6777974a7f",
+      "roi": [
+        180,
+        475,
+        390,
+        525
+      ],
+      "tolerance": 8,
+      "cap": 3,
+      "recover": "attract-cancel"
+    },
+    "main": {
+      "kind": "image",
+      "reference": "refs/main-current.png",
+      "sha256": "d13e49e01a0255ed794d3ca6415965c4212c67474164b4019b0f3a6777974a7f",
+      "roi": [
+        180,
+        475,
+        390,
+        525
+      ],
+      "tolerance": 8,
+      "cap": 8,
+      "recover": "attract-cancel"
+    },
+    "main-settled": {
+      "kind": "image",
+      "reference": "refs/main-current.png",
+      "sha256": "d13e49e01a0255ed794d3ca6415965c4212c67474164b4019b0f3a6777974a7f",
+      "roi": [
+        180,
+        475,
+        390,
+        525
+      ],
+      "tolerance": 8,
+      "cap": 15,
+      "recover": "attract-cancel"
+    },
+    "title-fast": {
+      "kind": "image",
+      "reference": "refs/title-fast.png",
+      "sha256": "89370a412ebfcca407a7de6a1e70f5ae5c21506013bb3c3b3158bd1be79b6acb",
+      "roi": [
+        450,
+        120,
+        830,
+        215
+      ],
+      "cap": 3,
+      "recover": "attract-cancel"
+    },
+    "stage": {
+      "kind": "image",
+      "reference": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/refs/stage.png",
+      "sha256": "99e7013e2be97b8173498e36a9b0e3b849c4e403bd239f1febda185470617033",
+      "roi": [
+        110,
+        445,
+        290,
+        495
+      ],
+      "tolerance": 8,
+      "cap": 45,
+      "reference_is_roi": true,
+      "from_run": "lr-03",
+      "library": "stage"
+    },
+    "css": {
+      "kind": "image",
+      "reference": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/refs/css.png",
+      "sha256": "a7a15642548952e4e263e42d467542b2877576cac4785061c21988e6cd7c0b76",
+      "roi": [
+        55,
+        55,
+        675,
+        155
+      ],
+      "tolerance": 8,
+      "cap": 60,
+      "reference_is_roi": true,
+      "from_run": "lr-03",
+      "library": "css"
+    },
+    "installed": {
+      "kind": "log",
+      "source": "events",
+      "pattern": "cpu_common=installed",
+      "whole_file": true,
+      "cap": 120
+    },
+    "actual-ready": {
+      "kind": "image",
+      "reference": "refs/p4zc-ready.png",
+      "sha256": "9ad5211b30724e3221d3e64ff42d54b8df1092c4093da58d9a01cf0f073852a1",
+      "roi": [
+        300,
+        180,
+        520,
+        240
+      ],
+      "tolerance": 8,
+      "cap": 15
+    },
+    "actual-training-current": {
+      "kind": "image",
+      "reference": "refs/actual-training-current.png",
+      "sha256": "2f254170e11887f37300f3f4ebb2a551b86215f244c4487d8d9dd8f544e00d5c",
+      "roi": [
+        1080,
+        135,
+        1200,
+        157
+      ],
+      "tolerance": 8,
+      "cap": 120
+    },
+    "training-hud-unpaused": {
+      "kind": "image",
+      "reference": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/refs/training-hud-unpaused.png",
+      "sha256": "7ecf9a4258ace218ad179e2fe14dcaf9d3dd906c594dec2ec8216cb5e02a8d2c",
+      "roi": [
+        280,
+        580,
+        302,
+        615
+      ],
+      "tolerance": 8,
+      "cap": 10,
+      "reference_is_roi": true,
+      "from_run": "lr-03",
+      "library": "training-hud-unpaused"
+    },
+    "native-pause": {
+      "kind": "image",
+      "reference": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/refs/native-pause.png",
+      "sha256": "3f03f8a24e7685cf86c5c00f4d06d2d48a3d15d23259c64872d0a5ff4ba717e5",
+      "roi": [
+        105,
+        142,
+        260,
+        174
+      ],
+      "tolerance": 8,
+      "cap": 15,
+      "reference_is_roi": true
+    },
+    "cpu-kirby-diag": {
+      "kind": "log",
+      "source": "diag",
+      "pattern": "\\[CharacterRoster\\] observed owner=1 [^\\n]*kind=0x6\\b",
+      "cap": 60
+    },
+    "quit-focus": {
+      "kind": "image",
+      "reference": "/home/intpa/smash-training-lobby/tmp-p23/integration/eden/phase23/rows-A/refs/quit-focus.png",
+      "sha256": "8101e26010b70dc07f24bac30c077c2152059f87f27f4b6c0d30a0b197b69c67",
+      "roi": [
+        65,
+        16,
+        275,
+        47
+      ],
+      "tolerance": 8,
+      "cap": 15,
+      "reference_is_roi": true
+    }
+  },
+  "rows": [
+    {
+      "id": "00-load",
+      "start": "boot",
+      "end": "loaded",
+      "steps": [
+        {
+          "run": "steps.py:preload_trace",
+          "check": true
+        }
+      ]
+    },
+    {
+      "id": "01-main",
+      "start": "loaded",
+      "end": "main",
+      "steps": [
+        {
+          "run": "p4t_boot.py:boot_to_main",
+          "check": true
+        },
+        {
+          "gate": "installed"
+        },
+        {
+          "shot": "main"
+        }
+      ]
+    },
+    {
+      "id": "02-stage",
+      "start": "main",
+      "end": "stage",
+      "steps": [
+        {
+          "play": "main-stage"
+        },
+        {
+          "gate": "stage"
+        },
+        {
+          "shot": "stage"
+        }
+      ]
+    },
+    {
+      "id": "03-training",
+      "start": "stage",
+      "end": "Training-settled",
+      "steps": [
+        {
+          "gate": "training-hud-unpaused"
+        },
+        {
+          "shot": "Training-HUD-settled"
+        }
+      ]
+    },
+    {
+      "id": "04-cs-fd",
+      "start": "Training-settled",
+      "end": "Training-settled",
+      "steps": [
+        {
+          "run": "steps.py:cs_fd_recorded",
+          "check": true
+        }
+      ]
+    },
+    {
+      "id": "05-cs-bf-omega",
+      "start": "Training-settled",
+      "end": "Training-settled",
+      "steps": [
+        {
+          "run": "steps.py:cs_bf_omega",
+          "check": true
+        }
+      ]
+    },
+    {
+      "id": "06-cs-smashville",
+      "start": "Training-settled",
+      "end": "Training-settled",
+      "steps": [
+        {
+          "run": "steps.py:cs_smashville",
+          "check": true
+        }
+      ]
+    },
+    {
+      "id": "07-cs-save-load-lra",
+      "start": "Training-settled",
+      "end": "Training-settled",
+      "steps": [
+        {
+          "run": "steps.py:cs_save_load_lra",
+          "check": true
+        }
+      ]
+    },
+    {
+      "id": "08-cs-unmapped",
+      "start": "Training-settled",
+      "end": "Training-settled",
+      "steps": [
+        {
+          "run": "steps.py:cs_unmapped",
+          "check": true
+        }
+      ]
+    }
+  ],
+  "setup": [
+    {
+      "state": "Eden frontend up, game not yet loaded (defer-load); row 00-load calls game.load; solo_popo_player_cycle and solo_popo_cpu On (rc2-settings.json)",
+      "via": "fixture",
+      "ref": "config defer_load; steps.py:preload drops an inherited developer.ini then loads the pinned XCI"
+    },
+    {
+      "state": "Fixture: cpu_roster and player_roster = Kirby only ([all=0, rank 1 at element 7]); hat orders All; trio_practice carried; characters left to the game; solo_popo_player_cycle and solo_popo_cpu On (rc2-settings.json)",
+      "via": "fixture",
+      "ref": "files: b4f-settings.json pinned to user/sdmc/ultimate/TrainingRooms/settings.json"
+    },
+    {
+      "state": "Training, HUD settled, plugin menu closed (P1 Mario, CPU Kirby)",
+      "via": "segment",
+      "ref": "main-stage + stage-css library segments, tile-cursor CSS pick and plus (steps.py:css_pick_and_enter)"
+    },
+    {
+      "state": "P1 pilot armed (B4-1/B4-2): the lr14t pilot-page route inside the plugin menu (pilot-arm/pilot-page-step macros), page shape checked with the rows-A pilot_gates markers",
+      "via": "hook",
+      "ref": "steps.py:pilot_arm; pilot_gates.py + pilot-markers.json + refs copied from eden/phase23/rows-A (lr16-shared lineage)"
+    }
+  ]
+}
