@@ -201,3 +201,11 @@ ceiling = 140574
 date = "2026-11-05"
 reason = "rc.5: the waiting room resolves its own hitbox entry gate (90bc099; Eden tr-p23-rc5-1 finding, primary 2026-11-05 ~19:16Z): measured 140574 = 140564 + 10 (model::hitbox::practice_entry and the runtime visualizes through it)"
 approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed'"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 140750
+date = "2026-11-05"
+reason = "rc.5 fix P-CYCLE (p23/cpu-cycle-fix): one cycle list for the CPU cycle and its menu numbers, and the grid's numbers to a trace function for the rows (operator's bug report: a Mii Gunner cycled though not listed); measured 140750 at c45c1cd (tools/size_gate.py), +176 over the rc.5 candidate's 140574"
+approved_by = "Operator 2026-11-05 via primary 35137355 (P-CYCLE order, ~19:50Z): 'Raise as needed', own commit"
