@@ -307,6 +307,16 @@
       "file": "segments/hb-zl.edenmacro.json",
       "sha256": "9f00f88086c1feeed64f0ba1f4c682f8cd0555a6295d9a15c7555cf5445dd156",
       "cap": 20
+    },
+    "hb-zl-a": {
+      "file": "segments/hb-zl-a.edenmacro.json",
+      "sha256": "1670f4b388fa08111ffcbafba6c4509e2d9acc50933761e52869ea4936763ece",
+      "cap": 20
+    },
+    "hb-zl-shieldgrab": {
+      "file": "segments/hb-zl-shieldgrab.edenmacro.json",
+      "sha256": "d3b460e7453a11a788b91e86d3d6cfcaae197bd3c191f57bc29456ae0d8813ee",
+      "cap": 20
     }
   },
   "gates": {
@@ -726,6 +736,361 @@
               "hb-a"
             ],
             "tag": "fbf-probe"
+          }
+        }
+      ]
+    },
+    {
+      "id": "13-speed-left",
+      "start": "Training-menu-other",
+      "end": "Training-menu-other",
+      "budget_min": 1,
+      "steps": [
+        {
+          "run": "hb_steps.py:menu_route",
+          "check": true,
+          "args": {
+            "seq": [
+              "hb-left"
+            ],
+            "tag": "speed-left1"
+          }
+        }
+      ]
+    },
+    {
+      "id": "14-speed-scan",
+      "start": "Training-menu-other",
+      "end": "Training-menu-other",
+      "budget_min": 2,
+      "steps": [
+        {
+          "run": "hb_steps.py:speed_scan",
+          "check": true,
+          "args": {
+            "n": 10
+          }
+        }
+      ]
+    },
+    {
+      "id": "15-speed-1frame",
+      "start": "Training-menu-other",
+      "end": "Training-menu-other",
+      "budget_min": 2,
+      "steps": [
+        {
+          "run": "hb_steps.py:menu_route",
+          "check": true,
+          "args": {
+            "seq": [
+              "hb-left",
+              "hb-left",
+              "hb-left",
+              "hb-left"
+            ],
+            "tag": "speed-1frame"
+          }
+        }
+      ]
+    },
+    {
+      "id": "16-menu-close",
+      "start": "Training-menu-other",
+      "end": "Training-frozen",
+      "budget_min": 2,
+      "steps": [
+        {
+          "run": "hb_steps.py:menu_route",
+          "check": true,
+          "args": {
+            "seq": [
+              "hb-b",
+              "hb-b"
+            ],
+            "tag": "menu-closed",
+            "settle": 1.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "17-fbf-check",
+      "start": "Training-frozen",
+      "end": "Training-frozen",
+      "budget_min": 2,
+      "steps": [
+        {
+          "run": "hb_steps.py:fbf_check",
+          "check": true,
+          "args": {}
+        }
+      ]
+    },
+    {
+      "id": "18-fbf-grab",
+      "start": "Training-frozen",
+      "end": "Training-frozen",
+      "budget_min": 4,
+      "steps": [
+        {
+          "run": "hb_steps.py:fbf_pair",
+          "check": true,
+          "args": {
+            "start": "hb-zl-sideb",
+            "pattern": "grabs=[1-9]",
+            "tag": "fbf-grab",
+            "taps": 40,
+            "then": [
+              2,
+              2,
+              2
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "19-fbf-grab-a",
+      "start": "Training-frozen",
+      "end": "Training-frozen",
+      "budget_min": 4,
+      "steps": [
+        {
+          "run": "hb_steps.py:fbf_pair",
+          "check": true,
+          "args": {
+            "start": "hb-zl-a",
+            "pattern": "grabs=[1-9]",
+            "tag": "fbf-grab-a",
+            "taps": 30,
+            "then": [
+              1
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "20-fbf-shieldgrab",
+      "start": "Training-frozen",
+      "end": "Training-frozen",
+      "budget_min": 4,
+      "steps": [
+        {
+          "run": "hb_steps.py:fbf_pair",
+          "check": true,
+          "args": {
+            "start": "hb-zl-shieldgrab",
+            "pattern": "grabs=[1-9]",
+            "tag": "fbf-grab",
+            "taps": 20,
+            "then": [
+              1
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "21-speed-x1",
+      "start": "Training-frozen",
+      "end": "Training-settled",
+      "budget_min": 3,
+      "steps": [
+        {
+          "run": "hb_steps.py:menu_route",
+          "check": true,
+          "args": {
+            "seq": [
+              "hb-plus",
+              "hb-down",
+              "hb-down",
+              "hb-down",
+              "hb-down",
+              "hb-down",
+              "hb-a",
+              "hb-left",
+              "hb-b",
+              "hb-b"
+            ],
+            "tag": "speed-x1",
+            "settle": 0.8
+          }
+        }
+      ]
+    },
+    {
+      "id": "22-sideb-probe",
+      "start": "Training-settled",
+      "end": "Training-settled",
+      "budget_min": 3,
+      "steps": [
+        {
+          "run": "hb_steps.py:sideb_probe",
+          "check": true,
+          "args": {
+            "frames": 10
+          }
+        }
+      ]
+    },
+    {
+      "id": "23-menu-open",
+      "start": "Training-settled",
+      "end": "Training-settled",
+      "budget_min": 3,
+      "steps": [
+        {
+          "run": "hb_steps.py:menu_route",
+          "check": true,
+          "args": {
+            "seq": [
+              "hb-plus"
+            ],
+            "tag": "menu-open",
+            "settle": 1.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "24-menu-restore",
+      "start": "Training-settled",
+      "end": "Training-settled",
+      "budget_min": 3,
+      "steps": [
+        {
+          "run": "hb_steps.py:menu_route",
+          "check": true,
+          "args": {
+            "seq": [
+              "hb-right",
+              "hb-up",
+              "hb-left",
+              "hb-up",
+              "hb-up",
+              "hb-up",
+              "hb-up",
+              "hb-left"
+            ],
+            "tag": "menu-restore",
+            "settle": 0.8
+          }
+        }
+      ]
+    },
+    {
+      "id": "25-menu-close",
+      "start": "Training-settled",
+      "end": "Training-settled",
+      "budget_min": 3,
+      "steps": [
+        {
+          "run": "hb_steps.py:menu_route",
+          "check": true,
+          "args": {
+            "seq": [
+              "hb-b",
+              "hb-b"
+            ],
+            "tag": "menu-closed-x1",
+            "settle": 1.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "26-sideb-probe",
+      "start": "Training-settled",
+      "end": "Training-settled",
+      "budget_min": 3,
+      "steps": [
+        {
+          "run": "hb_steps.py:sideb_probe",
+          "check": true,
+          "args": {
+            "frames": 10
+          }
+        }
+      ]
+    },
+    {
+      "id": "27-sideb-yellow",
+      "start": "Training-settled",
+      "end": "Training-settled",
+      "budget_min": 3,
+      "steps": [
+        {
+          "run": "hb_steps.py:sideb_probe",
+          "check": true,
+          "args": {
+            "frames": 6,
+            "tint": "off",
+            "view": "orbs",
+            "tag": "sideb-yellow"
+          }
+        }
+      ]
+    },
+    {
+      "id": "28-slow-grab-repro",
+      "start": "Training-settled",
+      "end": "Training-settled",
+      "budget_min": 3,
+      "steps": [
+        {
+          "run": "hb_steps.py:slow_grab",
+          "check": true,
+          "args": {}
+        }
+      ]
+    },
+    {
+      "id": "29-flip-probe",
+      "start": "Training-settled",
+      "end": "Training-settled",
+      "budget_min": 3,
+      "steps": [
+        {
+          "run": "hb_steps.py:flip_probe",
+          "check": true,
+          "args": {
+            "tint": "off",
+            "tag": "flip"
+          }
+        }
+      ]
+    },
+    {
+      "id": "30-flip-probe-cyan",
+      "start": "Training-settled",
+      "end": "Training-settled",
+      "budget_min": 3,
+      "steps": [
+        {
+          "run": "hb_steps.py:flip_probe",
+          "check": true,
+          "args": {
+            "tint": "cyan",
+            "tag": "flipcyan"
+          }
+        }
+      ]
+    },
+    {
+      "id": "31-flip-lag",
+      "start": "Training-settled",
+      "end": "Training-settled",
+      "budget_min": 3,
+      "steps": [
+        {
+          "run": "hb_steps.py:flip_probe",
+          "check": true,
+          "args": {
+            "tint": "cyan",
+            "tag": "fliplag",
+            "n": 9
           }
         }
       ]

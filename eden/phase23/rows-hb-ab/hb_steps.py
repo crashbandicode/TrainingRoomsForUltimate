@@ -620,3 +620,81 @@ def prepare(ctx):
     ridley_set = max(last, key=lambda k: last[k]['placed'])
     (ctx.runner.out / 'ridley.json').write_text(json.dumps({'set': ridley_set, 'standing': last[ridley_set], 'all': last}))
     return save(ctx, 'prepare', {'ridley_set': ridley_set, 'last': last, 'shot': str(ctx.shot('prepared'))})
+
+
+def speed_scan(ctx, n=10):
+    """Right on the focused Speed row n times; a shot after each press and one montage of the value and the help line."""
+    from PIL import Image
+    shots = []
+    for i in range(n):
+        ctx.play('hb-right')
+        time.sleep(0.6)
+        shots.append(str(ctx.shot(f'speed-right{i + 1}')))
+    tiles = [Image.open(p).convert('RGB') for p in shots]
+    out = Image.new('RGB', (1200, 60 * n), 'black')
+    for i, im in enumerate(tiles):
+        out.paste(im.crop((300, 130, 600, 185)), (0, 60 * i))
+        out.paste(im.crop((100, 600, 1000, 645)), (300, 60 * i))
+    montage = ctx.row_dir / 'speed-montage.png'
+    out.save(montage)
+    return save(ctx, 'speed-scan', {'shots': shots, 'montage': str(montage)})
+
+
+def flip_probe(ctx, tint='off', tag='flip', n=3):
+    """ab2's sequence (view effects, side special at 10 % then 1 %, flip to orbs), with the orbs view shot three times,
+    one slowed frame apart, and the pass counter at each: does the orb layer appear a frame later?"""
+    r = _ridley(ctx)
+    route(ctx, f'route=both view=effects orbtint={tint}')
+    ctx.play('hb-lra')
+    time.sleep(3)
+    got = {'tint': tint, 'shots': []}
+    try:
+        speed(ctx, 10)
+        n0 = line_count(ctx)
+        ctx.play('hb-sideb')
+        got['trigger'] = wait_new(ctx, n0, r'\[Hitbox\] orbs pass set=%d [^\n]*grabs=[1-9]' % r['set'], 40)[-1]
+        speed(ctx, 1)
+        time.sleep(1.0)
+        got['shots'].append({'view': 'effects', 'shot': str(ctx.shot(f'{tag}-effects')), 'passes': _passes(ctx)})
+        n1 = line_count(ctx)
+        route(ctx, 'view=orbs')
+        got['poll'] = wait_new(ctx, n1, r'\[Hitbox\] orbs view_poll view=Orbs', 20)[-1]
+        for i in range(n):
+            time.sleep(1.7)
+            st = ctx.call('status') or {}
+            got['shots'].append({'view': 'orbs', 'shot': str(ctx.shot(f'{tag}-orbs-{i}')), 'passes': _passes(ctx),
+                                 'eden': {k: st.get(k) for k in ('game_fps', 'last_frame_age_ms', 'shaders_building', 'stats_age_ms')}})
+        got['lines'] = lines_after(ctx, n0, r'\[Hitbox\] (orbs pass set=|pass held|orbs drawn|orbs view_poll)')
+    finally:
+        speed(ctx, 100)
+    time.sleep(3)
+    route(ctx, 'orbtint=off view=both')
+    return save(ctx, f'{tag}-probe', got)
+
+
+def sideb_probe(ctx, frames=10, tint='cyan', view='orbs', tag='sideb'):
+    """ab2's missing hurt discs: Ridley's side special at 10 % speed, then 1 %; from its first pass with a grab sphere, per
+    slowed frame: the orbs view tinted cyan, `orbprobe=1` (where the hurt-tinted panes went) and a shot."""
+    r = _ridley(ctx)
+    route(ctx, f'route=both view={view} orbtint={tint}')
+    ctx.play('hb-lra')
+    time.sleep(3)
+    got = {'frames': [], 'tint': tint, 'view': view}
+    try:
+        speed(ctx, 10)
+        n0 = line_count(ctx)
+        ctx.play('hb-sideb')
+        got['trigger'] = wait_new(ctx, n0, r'\[Hitbox\] orbs pass set=%d [^\n]*grabs=[1-9]' % r['set'], 40)[-1]
+        speed(ctx, 1)
+        for i in range(frames):
+            n1 = line_count(ctx)
+            route(ctx, 'orbprobe=1')
+            probe = wait_new(ctx, n1, r'\[Hitbox\] orbs drawn ', 20)[-1]
+            got['frames'].append({'probe': probe, 'shot': str(ctx.shot(f'{tag}-{i}')), 'passes': _passes(ctx)})
+            time.sleep(0.8)
+        got['lines'] = lines_after(ctx, n0, r'\[Hitbox\] (orbs pass set=|pass held)')
+    finally:
+        speed(ctx, 100)
+    time.sleep(3)
+    route(ctx, 'orbtint=off view=both')
+    return save(ctx, f'{tag}-probe', got)

@@ -63,6 +63,12 @@ def main():
     write('hb-zl-hold', [event(0), event(2, ZL), event(92)], 96)
     write('hb-zl-csmash', [event(0), cstick(event(2, ZL), 1.0), cstick(event(3), 1.0), event(5)], 10)
     write('hb-zl-sideb', [event(0), event(2, ZL | B, 1.0), event(3, B, 1.0), event(5)], 10)
+    # ZL is also this profile's shield (ab3: each stepped ZL put Ridley in guard, statuses 27/28/29), so shield + A on the
+    # stepped frame is a standing grab.
+    write('hb-zl-a', [event(0), event(2, ZL | A), event(3, A), event(5)], 10)
+    # Shield grab at normal speed (ZL held runs the frozen game and shields), A while shielding, ZL let go two frames
+    # later: the game freezes again early in the grab, before its box comes out.
+    write('hb-zl-shieldgrab', [event(0), event(2, ZL), event(30, ZL | A), event(32, ZL), event(33)], 40)
     # Pause, camera mode, back.
     write('hb-plus', [event(0), event(2, PLUS), event(8)], 14)
     write('hb-y', [event(0), event(2, Y), event(8)], 14)
