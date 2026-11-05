@@ -10,8 +10,9 @@ from pathlib import Path
 
 
 def save(ctx, name, value):
-    (ctx.row_dir / (name + '.json')).write_text(json.dumps(value, indent=2, default=str) + '\n')
-    return value
+    text = json.dumps(value, indent=2, default=str)
+    (ctx.row_dir / (name + '.json')).write_text(text + '\n')
+    return json.loads(text)  # the runner writes the return into its receipt
 
 
 def diag_lines(ctx):
@@ -82,8 +83,11 @@ def links(ctx):
     checks (the hitstun read's prediction against the free frame seen)."""
     ctx.gate('training-hud-unpaused')
     tries = []
-    for n in (10, 14, 18, 22, 26, 32, 40):
-        tries.append(attempt(ctx, 'iv-combo-%02d' % n))
+    # Up tilt first (the brief's move; it misses a short CPU), then the jab's own follow-up and down tilt.
+    segs = ['iv-combo-%02d' % n for n in (10, 14, 18, 26)] + ['iv-jj-%02d' % n for n in (6, 9, 12, 16, 22, 30)] \
+        + ['iv-jd-%02d' % n for n in (10, 16, 22, 30)]
+    for seg in segs:
+        tries.append(attempt(ctx, seg))
         ctx.check_stop()
     text = '\n'.join(l for t in tries for l in t['lines'])
     verdicts = re.findall(r'link verdict=(\w+)\(([^)]*)\)[^\n]*input=(-?\d+)', text)

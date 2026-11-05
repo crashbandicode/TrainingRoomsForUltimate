@@ -117,12 +117,12 @@ fn link_true_combo_with_its_margin_window_and_late_input() {
     s.push(p1_stop(Move::UpTilt, ATTACK_HI3, 5.0), cpu_hit(true, 30.0), NONE);
     let t = s.run();
     let link = t.latest_link().expect("a follow-up");
-    // r on frame 25 is 18 - (25 - 11) = 4: free frame 25 + 4 + 1 = 30; the hit on 26 beat it by 4.
-    assert_eq!(link.verdict, Verdict::True(Some(-4)));
-    assert_eq!((link.hit, link.free, link.actionable, link.press), (26, Some(30), 20, 21));
+    // r on frame 25 is 18 - (25 - 11) = 4: free frame 25 + 4 + K = 29; the hit on 26 beat it by 3.
+    assert_eq!(link.verdict, Verdict::True(Some(-3)));
+    assert_eq!((link.hit, link.free, link.actionable, link.press), (26, Some(29), 20, 21));
     assert_eq!(link.input, 1, "pressed one frame after P1 could act");
-    assert_eq!(link.window, Some((20, 25)), "presses 20..=25 hit by frame 30");
-    assert_eq!(link.spare(), Some(4));
+    assert_eq!(link.window, Some((20, 24)), "presses 20..=24 hit by frame 29");
+    assert_eq!(link.spare(), Some(3));
     assert_eq!((link.from, link.to), (Move::Jab, Move::UpTilt));
 }
 
@@ -134,24 +134,24 @@ fn link_drop_counts_the_free_frames_and_has_no_window_when_even_frame_one_drops(
     s.push(p1_stop(Move::UpTilt, ATTACK_HI3, 5.0), cpu_hit(true, 30.0), NONE);
     let t = s.run();
     let link = t.latest_link().unwrap();
-    // r reaches 0 on frame 21; the CPU is sampled actionable from 22, so the hit on 26 came 4 frames late.
-    assert_eq!(link.verdict, Verdict::Drop(4));
-    assert_eq!(link.free, Some(22));
-    assert_eq!(link.window, None, "the window would end on 21 - 4 = 17, before P1 could act on 20");
-    assert_eq!(link.spare(), Some(-4));
+    // r reaches 0 on frame 21, where the CPU is already actionable, so the hit on 26 came 5 frames late.
+    assert_eq!(link.verdict, Verdict::Drop(5));
+    assert_eq!(link.free, Some(21));
+    assert_eq!(link.window, None, "the window would end on 21 - 5 = 16, before P1 could act on 20");
+    assert_eq!(link.spare(), Some(-5));
 }
 
 #[test]
 fn link_drop_with_a_window_the_press_missed() {
     let mut s = Script::new();
     jab(&mut s, 14.0, 24);
-    // Free frame 7 + 4 + 14 + 1 = 26. A press on 24 hits on 29: three frames late; the window was 20..=21.
+    // Free frame 7 + 4 + 14 + K = 25. A press on 24 hits on 29: four frames late; the window was 20..=20.
     up_tilt(&mut s, 24, |f| cpu_after(7, 4, 14.0, f));
     s.push(p1_stop(Move::UpTilt, ATTACK_HI3, 5.0), cpu_hit(true, 30.0), NONE);
     let link = s.run().latest_link().unwrap();
-    assert_eq!(link.verdict, Verdict::Drop(3));
+    assert_eq!(link.verdict, Verdict::Drop(4));
     assert_eq!(link.input, 4);
-    assert_eq!(link.window, Some((20, 21)));
+    assert_eq!(link.window, Some((20, 20)));
 }
 
 #[test]
@@ -177,9 +177,9 @@ fn link_buffered_press_starts_on_the_first_actionable_frame() {
     s.push(p1_stop(Move::UpTilt, ATTACK_HI3, 5.0), cpu_hit(true, 30.0), NONE);
     let link = s.run().latest_link().unwrap();
     assert_eq!((link.actionable, link.press, link.input), (20, 17, -3), "buffered three frames");
-    // r on 24 is 5: free 24 + 5 + 1 = 30; the hit on 25 beat it by 5.
-    assert_eq!(link.verdict, Verdict::True(Some(-5)));
-    assert_eq!(link.window, Some((20, 25)));
+    // r on 24 is 5: free 24 + 5 + K = 29; the hit on 25 beat it by 4.
+    assert_eq!(link.verdict, Verdict::True(Some(-4)));
+    assert_eq!(link.window, Some((20, 24)));
 }
 
 #[test]
@@ -201,9 +201,9 @@ fn link_through_hitlag_reads_the_frame_before_the_hit() {
     up_tilt(&mut s, 25, |f| cpu_after(7, 8, 18.0, f));
     s.push(p1_stop(Move::UpTilt, ATTACK_HI3, 5.0), cpu_hit(true, 30.0), NONE);
     let link = s.run().latest_link().unwrap();
-    // Free frame 7 + 8 + 18 + 1 = 34 (r on 29 is 18 - 14 = 4: 29 + 4 + 1); the hit on 30 beat it by 4.
-    assert_eq!(link.verdict, Verdict::True(Some(-4)));
-    assert_eq!(link.free, Some(34));
+    // Free frame 7 + 8 + 18 + K = 33 (r on 29 is 18 - 14 = 4: 29 + 4 + K); the hit on 30 beat it by 3.
+    assert_eq!(link.verdict, Verdict::True(Some(-3)));
+    assert_eq!(link.free, Some(33));
 }
 
 #[test]
@@ -259,9 +259,9 @@ fn advantage_on_hit_after_the_exchange_ends() {
     let mut s = Script::new();
     jab(&mut s, 12.0, 30);
     let t = s.run();
-    // Free frames: P1 20, the CPU 7 + 4 + 12 + 1 = 24.
-    assert_eq!(t.advantage(), Some(Advantage { value: 4, on_shield: false, p1: 20, cpu: 24 }));
-    assert_eq!(t.stun_check, Some((24, 24)), "the read predicted the free frame it saw");
+    // Free frames: P1 20, the CPU 7 + 4 + 12 + K = 23.
+    assert_eq!(t.advantage(), Some(Advantage { value: 3, on_shield: false, p1: 20, cpu: 23 }));
+    assert_eq!(t.stun_check, Some((23, 23)), "the read predicted the free frame it saw");
 }
 
 #[test]
@@ -345,9 +345,9 @@ fn clear_forgets_everything() {
 
 #[test]
 fn predicted_free_rounds_up_and_refuses_nonsense() {
-    assert_eq!(predicted_free(10, 3.0), Some(14));
-    assert_eq!(predicted_free(10, 2.4), Some(14), "2.4 needs three more frames to reach 0");
-    assert_eq!(predicted_free(10, 0.0), Some(11));
+    assert_eq!(predicted_free(10, 3.0), Some(13));
+    assert_eq!(predicted_free(10, 2.4), Some(13), "2.4 needs three more frames to reach 0");
+    assert_eq!(predicted_free(10, 0.0), Some(10));
     assert_eq!(predicted_free(10, -1.0), None);
     assert_eq!(predicted_free(10, f32::NAN), None);
     assert_eq!(predicted_free(10, 1000.0), None);

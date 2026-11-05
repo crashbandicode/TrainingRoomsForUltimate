@@ -15,7 +15,9 @@ pub const FREEZE_AFTER: u16 = 30;
 /// How far back a follow-up's press is looked for (SPEC-input-06 §2, "input").
 pub const INPUT_LOOKBACK: u32 = 15;
 /// The sampling constant `K` (SPEC-input-06 §4): the free frame a hitstun read predicts is `(H - 1) + ceil(r) + K`.
-pub const K: i32 = 1;
+/// Measured 0 on Eden (`tr-p23-ally-iv1`, 2026-11-05: every one of 30 stun checks with K = 1 predicted one frame late;
+/// on the frame the CPU reads `r = 0` it is already actionable).
+pub const K: i32 = 0;
 /// A follow-up that comes more than this many frames after the CPU could act is a new exchange, not a drop.
 pub const DROP_MAX: u32 = 20;
 /// A hitstun read above this is not believed (the game's largest reactions stay far below it).

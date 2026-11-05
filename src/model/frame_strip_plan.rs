@@ -199,7 +199,7 @@ impl<'a> Layout<'a> {
     fn look(&self, i: usize) -> Look {
         use at::*;
         match i {
-            CONTAINER => Look { visible: true, ..Look::HIDDEN },
+            CONTAINER => Look { visible: true, y: STRIP_Y, ..Look::HIDDEN },
             BACKDROP => Look::rect(0.0, 0.0, STRIP_W, BACKDROP_COLOR),
             i if (LANE_LABEL..LANE_LABEL + 3).contains(&i) => {
                 let (name, y, color) = [("IN", IN_Y, MUTED), ("P1", P1_Y, P1_TAG), ("CPU", CPU_Y, CPU_TAG)][i - LANE_LABEL];

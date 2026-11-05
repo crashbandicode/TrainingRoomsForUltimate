@@ -16,17 +16,17 @@ fn attack(mv: Move, status: i32, frame: u32) -> Sample {
     Sample { attack: Some(mv), status, motion_frame: frame as f32, ..Sample::default() }
 }
 
-/// The CPU hit on 7 with 4 frames of hitlag and 18 of hitstun (free on 30), as in the model's tests.
+/// The CPU hit on 7 with 4 frames of hitlag and 18 of hitstun (free on 29), as in the model's tests.
 fn cpu(frame: u32) -> Sample {
     match frame {
         0..=6 => idle(),
         7..=10 => Sample { stop: true, hitstun: true, reaction: Some(18.0), ..Sample::default() },
-        f if f < 30 => Sample { hitstun: true, reaction: Some(18.0 - (f - 11) as f32), ..Sample::default() },
+        f if f < 29 => Sample { hitstun: true, reaction: Some(18.0 - (f - 11) as f32), ..Sample::default() },
         _ => idle(),
     }
 }
 
-/// Jab → up tilt, a true combo by 4 (the up tilt pressed one frame late), then the CPU in the second hit's hitlag.
+/// Jab → up tilt, a true combo by 3 (the up tilt pressed one frame late), then the CPU in the second hit's hitlag.
 fn true_combo() -> Tracker {
     let mut t = Tracker::new();
     for f in 1..=26u32 {
@@ -102,15 +102,15 @@ fn the_readouts_and_the_last_row_tell_the_link() {
     let t = true_combo();
     let mut r = Renderer::new();
     let (_, seen) = draw_all(&mut r, &t, true);
-    assert_eq!(text_of(&seen, at::READ_VALUE + 1), "-4");
+    assert_eq!(text_of(&seen, at::READ_VALUE + 1), "-3");
     assert_eq!(text_of(&seen, at::READ_SUB + 1), "TRUE combo");
     assert_eq!(text_of(&seen, at::READ_VALUE + 2), "+1");
-    assert_eq!(text_of(&seen, at::READ_SUB + 2), "1f late, 4 spare");
+    assert_eq!(text_of(&seen, at::READ_SUB + 2), "1f late, 3 spare");
     assert_eq!(text_of(&seen, at::READ_VALUE), "-", "no exchange has ended yet");
-    assert_eq!(text_of(&seen, at::WINDOW_TEXT), "window 6f");
-    assert_eq!(text_of(&seen, at::PILL_TEXT), "TRUE -4");
+    assert_eq!(text_of(&seen, at::WINDOW_TEXT), "window 5f");
+    assert_eq!(text_of(&seen, at::PILL_TEXT), "TRUE -3");
     assert_eq!(text_of(&seen, at::MOVE_TEXT), "Jab > Up tilt");
-    assert_eq!(text_of(&seen, at::BRACKET_TEXT), "link -4");
+    assert_eq!(text_of(&seen, at::BRACKET_TEXT), "link -3");
     let pill = seen.iter().find(|(i, ..)| *i == at::PILL).unwrap().1;
     assert_eq!(pill.color, GOOD);
 }
@@ -151,7 +151,7 @@ fn input_lines() {
     let base = true_combo().latest_link().unwrap();
     let mut l = base;
     l.input = -3;
-    assert_eq!(String::from_utf16(input_line(&l).units()).unwrap(), "buffered 3f, 4 spare");
+    assert_eq!(String::from_utf16(input_line(&l).units()).unwrap(), "buffered 3f, 3 spare");
     l.input = 0;
     l.verdict = crate::model::frame_strip::Verdict::Drop(2);
     assert_eq!(String::from_utf16(input_line(&l).units()).unwrap(), "on time, 2f past");

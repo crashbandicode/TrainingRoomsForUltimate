@@ -86,8 +86,11 @@ unsafe fn ids() -> Option<Table> {
         IDS_READY.store(true, Ordering::Release);
         #[cfg(feature = "diag")]
         crate::runtime::diag_log::diagnostic(format_args!(
-            "[FrameStrip] constants resolved missing={missing} reaction_frame={}",
-            IDS.lock().as_ref().map_or(0, |t| t.get(C::ReactionFrame))
+            "[FrameStrip] constants resolved missing={missing} reaction_frame={} attack={:#x} attack_hi3={:#x} final={:#x}",
+            IDS.lock().as_ref().map_or(0, |t| t.get(C::ReactionFrame)),
+            IDS.lock().as_ref().map_or(0, |t| t.get(C::Attack)),
+            IDS.lock().as_ref().map_or(0, |t| t.get(C::AttackHi3)),
+            IDS.lock().as_ref().map_or(0, |t| t.get(C::Final))
         ));
     }
     IDS.lock().clone()
@@ -148,6 +151,14 @@ pub unsafe fn sample_frame(player: usize) {
     let Some(ids) = ids() else { return };
     let p1 = sample(player, &ids, true);
     let cpu = sample(cpu, &ids, false);
+    // Diag build: P1's busy frames, to check the lane classification against the game.
+    #[cfg(feature = "diag")]
+    if !p1.actionable || p1.active || p1.stop {
+        crate::runtime::diag_log::diagnostic(format_args!(
+            "[FrameStrip] p1 status={:#x} stop={} active={} actionable={} attack={:?} mf={}",
+            p1.status, p1.stop, p1.active, p1.actionable, p1.attack, p1.motion_frame
+        ));
+    }
     let inputs = unpack(INPUTS.load(Ordering::Acquire));
     let mut tracker = TRACKER.lock();
     #[cfg(feature = "diag")]

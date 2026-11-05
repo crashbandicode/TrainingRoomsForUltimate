@@ -41,6 +41,17 @@ def combo(n):
                                          (n + 2, 0, (0, 0.6)), (n + 8, 0, Z)], n + 70)
 
 
+def jab_jab(n):
+    """Jab, then A again on frame n (the jab's own follow-up, or a fresh jab once it has ended).""" 
+    return macro('iv-jj-%02d' % n, [(0, A, Z), (2, 0, Z), (n, A, Z), (n + 2, 0, Z)], n + 70)
+
+
+def jab_dtilt(n):
+    """Jab, then down tilt: the stick tilted down (0.6) from n-5, A again on n.""" 
+    return macro('iv-jd-%02d' % n, [(0, A, Z), (2, 0, Z), (n - 5, 0, (0, -0.6)), (n, A, (0, -0.6)),
+                                       (n + 2, 0, (0, -0.6)), (n + 8, 0, Z)], n + 70)
+
+
 def main():
     for d in (RUN / 'inputs', SEG, ROWS / 'refs'):
         d.mkdir(parents=True, exist_ok=True)
@@ -60,7 +71,8 @@ def main():
         macro('iv-jab', [(0, A, Z), (2, 0, Z)], 60),
         macro('iv-menu-open', [(0, B | DUP, Z), (8, 0, Z)], 14),
         macro('iv-menu-close', [(0, B, Z), (6, 0, Z), (40, B, Z), (46, 0, Z)], 80),
-    ] + [combo(n) for n in (10, 14, 18, 22, 26, 32, 40)]))
+    ] + [combo(n) for n in (10, 14, 18, 22, 26, 32, 40)] + [jab_jab(n) for n in (6, 9, 12, 16, 22, 30)]
+      + [jab_dtilt(n) for n in (10, 16, 22, 30)]))
     rows = {
         "game_id": base['game_id'],
         "start": "boot",
