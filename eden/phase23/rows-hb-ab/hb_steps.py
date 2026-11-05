@@ -13,7 +13,7 @@ import time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-ELF = '/home/intpa/smash-training-lobby/artifacts/phase23/hitbox-orbs/nro-b771f08/diag/libtraining_rooms.so'
+ELF = '/home/intpa/smash-training-lobby/artifacts/phase23/hitbox-orbs/nro-ab3/diag/libtraining_rooms.so'
 PUBLISH = 'libtraining_rooms.nro!_RNvNtNtNtCskE0RJeV9NF0_14training_rooms7runtime8features6hitbox12publish_orbs'
 DRAW = 'libtraining_rooms.nro!_RNvNtNtNtCskE0RJeV9NF0_14training_rooms7runtime8features6hitbox9draw_orbs'
 RIDLEY, STEVE, MARIO = 63, 76, 0
@@ -554,9 +554,26 @@ def _fbf_views(ctx, tag):
     return shots
 
 
-def fbf_pair(ctx, start='hb-zl-csmash', pattern='hits=[1-9]', tag='fbf-attack', taps=60):
+def _fbf_set(ctx, tag, r):
+    """Every view on the current (frozen) frame, then the pane probe and a cyan-orbs shot of the same frame."""
+    n1 = line_count(ctx)
+    shots = _fbf_views(ctx, tag)
+    n2 = line_count(ctx)
+    route(ctx, 'view=orbs orbtint=cyan orbprobe=1')
+    probe = wait_new(ctx, n2, r'\[Hitbox\] orbs drawn ', 20)[-1]
+    time.sleep(1.0)
+    shots['orbs_cyan'] = _note(ctx, f'{tag}-orbs_cyan') | {'probe': probe}
+    route(ctx, 'orbtint=off view=effects')
+    changes = lines_after(ctx, n1, r'\[Hitbox\] orbs pass set=%d ' % r['set'])
+    passes = {k: v['passes'] for k, v in shots.items()}
+    return {'shots': shots, 'passes': passes, 'same_frame': len(set(passes.values())) == 1 and not changes,
+            'ridley_changes_during_shots': changes,
+            'drawn_lines': lines_after(ctx, n1, r'\[Hitbox\] orbs drawn ')}
+
+
+def fbf_pair(ctx, start='hb-zl-csmash', pattern='hits=[1-9]', tag='fbf-attack', taps=60, then=()):
     """Reset (ZL held = normal speed), start the move on one stepped frame, tap ZL one frame at a time until Ridley's
-    pass has the wanted spheres, then shoot every view with no tap in between."""
+    pass has the wanted spheres, then shoot every view with no tap in between; `then` = more frames to step and shoot."""
     r = _ridley(ctx)
     route(ctx, 'route=both view=effects orbtint=off')
     ctx.play('hb-lra')
@@ -567,8 +584,8 @@ def fbf_pair(ctx, start='hb-zl-csmash', pattern='hits=[1-9]', tag='fbf-attack', 
     steps = 1
     found = None
     while steps <= taps:
-        time.sleep(0.25)
-        found = [l for l in lines_after(ctx, n0, r'\[Hitbox\] orbs pass set=%d [^\n]*%s' % (r['set'], pattern))]
+        time.sleep(0.4)
+        found = lines_after(ctx, n0, r'\[Hitbox\] orbs pass set=%d [^\n]*%s' % (r['set'], pattern))
         if found:
             break
         ctx.play('hb-zl')
@@ -576,15 +593,20 @@ def fbf_pair(ctx, start='hb-zl-csmash', pattern='hits=[1-9]', tag='fbf-attack', 
     if not found:
         raise RuntimeError(f'{tag}: no {pattern} after {steps} stepped frames')
     time.sleep(1.0)
-    n1 = line_count(ctx)
-    shots = _fbf_views(ctx, tag)
-    changes = lines_after(ctx, n1, r'\[Hitbox\] orbs pass set=%d ' % r['set'])
-    got = {'start': start, 'stepped_frames': steps, 'trigger_line': found[-1], 'shots': shots,
-           'ridley_changes_during_shots': changes}
+    got = {'start': start, 'stepped_frames': steps, 'trigger_line': found[-1], 'sets': {}}
+    got['sets']['0'] = _fbf_set(ctx, f'{tag}-f0', r)
+    total = 0
+    for k in then:
+        for _ in range(k):
+            ctx.play('hb-zl')
+            time.sleep(0.4)
+        total += k
+        time.sleep(1.0)
+        got['sets'][str(total)] = _fbf_set(ctx, f'{tag}-f{total}', r)
+    got['pass_lines'] = lines_after(ctx, n0, r'\[Hitbox\] (orbs pass set=|pass held)')
     save(ctx, tag, got)
-    passes = {k: v['passes'] for k, v in shots.items()}
-    if len(set(passes.values())) != 1 or changes:
-        raise RuntimeError(f'{tag}: the frame moved between shots: passes {passes} changes {changes}')
+    if not got['sets']['0']['same_frame']:
+        raise RuntimeError(f'{tag}: the frame moved between shots: {got["sets"]["0"]["passes"]}')
     return got
 
 
