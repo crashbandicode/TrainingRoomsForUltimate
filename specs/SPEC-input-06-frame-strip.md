@@ -109,10 +109,14 @@ The texts are ASCII: the game's font is not assumed to carry `−` or `→` (the
   scrolling and keeps the last exchange on screen. It moves again on the next non-actionable frame or new press.
 - **Hidden:** while the TrainingRooms menu or the game's pause menu is open, when the row is Off, and outside Training
   and lobby practice. Sampling continues under the pause only on frames the game runs (none while paused).
-- **Cleared:** on a scene change, a hot swap and a save-state load (the frames before it no longer happened).
+- **Cleared:** on a scene change, a hot swap, a save-state load, and whenever the game initialises a fighter again (a
+  Training reset, a CPU replaced; review IV-4, 2026-11-05): the frames before it no longer happened.
 - **Frame advantage notice:** while the strip is shown, the "Frame Advantage" notice is not posted, because the
   ADVANTAGE readout shows the same number and the notice would cover the strip. The Frame Advantage row keeps its
-  meaning when the strip is Off.
+  meaning when the strip is Off, and when the layout has no strip panes (another mod's `info_training`, the stock
+  archive): then the strip neither samples nor draws and the notice posts as before (review IV-2).
+- **Settings from before the strip:** the retired `input_display` row is read as the base read it, padded or cut to
+  its four options, its first set option the mode; Off stays Off, anything else is the strip (review IV-3).
 
 ## 4. Native reads
 
