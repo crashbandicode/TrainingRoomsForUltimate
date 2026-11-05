@@ -243,6 +243,52 @@ pub struct Place {
     screen: Option<(Page, Screen)>,
 }
 
+/// The worker's memory of where the menu was, across the model drops of a close, a scene change or a Training reset,
+/// for the rest of the boot. The worker drops its model whenever the input generation moves (every close and every
+/// session clear) and builds or reopens one at the next opening; both go through here, so the save and the restore are
+/// host-tested as the worker runs them (review MN-4).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct PlaceKeeper {
+    place: Option<Place>,
+}
+
+impl PlaceKeeper {
+    pub const fn new() -> PlaceKeeper {
+        PlaceKeeper { place: None }
+    }
+
+    /// The model is dropped: keep where it was. With no model (already dropped, or the menu never opened this
+    /// session) the place kept before stays.
+    pub fn drop_model(&mut self, menu: &mut Option<Menu>) {
+        if let Some(m) = menu.take() {
+            self.place = Some(m.place());
+        }
+    }
+
+    /// An opening: the model still held is reopened with `settings`, else a new one is built; then it comes back to the
+    /// place kept (`Menu::restore_place`, clamped to the table as it stands now). A model still held would have its
+    /// own cursors replaced by the older place; no path reaches that today, since every close and session clear drops
+    /// the model first (review MN-3, left as it is).
+    pub fn open<'a>(&self, menu: &'a mut Option<Menu>, settings: Settings, env: Env) -> &'a mut Menu {
+        let opened = match menu.take() {
+            Some(mut m) => {
+                m.reopen(settings, env);
+                m
+            }
+            None => Menu::new(settings, env),
+        };
+        let m = menu.insert(opened);
+        if let Some(place) = self.place {
+            m.restore_place(place);
+        }
+        m
+    }
+
+    pub fn place(&self) -> Option<Place> {
+        self.place
+    }
+}
+
 /// The sub-screens the model owns entirely, which can be reopened as they were (a handle being dragged or a
 /// range being edited is put down first). The chord editor (a capture in progress), the grids (their layout, the
 /// textures and the requests belong to the runtime) and the external editors (the runtime's panels) are not
@@ -874,11 +920,30 @@ impl Menu {
 
     // ---- input -------------------------------------------------------------------------------
 
+    /// Whether what is showing takes ZL + Up / Down as jumps: a page (the section jump) and the popup lists (a window).
+    /// Everywhere else (the slider, the direction grid, the roster and stage grids, the external panels, a handle being
+    /// edited, the reset confirmation) ZL is its own button and Up / Down move as usual; the input adapter asks this
+    /// (through the worker) before it turns a direction into a jump (review MN-1).
+    pub fn takes_jumps(&self) -> bool {
+        match self.stack.last() {
+            None => true,
+            Some(Screen::List { .. } | Screen::Checklist { .. } | Screen::SwapGroups { .. } | Screen::Overrides { .. } | Screen::Chords { .. }) => true,
+            Some(Screen::Delay { editing, .. }) => !editing,
+            Some(_) => false,
+        }
+    }
+
     /// One logical button press (an accepted press edge, or a stick repeat).
     pub fn press(&mut self, button: Button) {
         if matches!(self.screen(), Some(Screen::ChordEntry { .. })) && self.chord_capture != ChordCapture::Preview {
             return;
         }
+        // A jump that reaches a screen without jumps (the screen changed under a held ZL) is the plain direction.
+        let button = match button {
+            Button::JumpUp if !self.takes_jumps() => Button::Up,
+            Button::JumpDown if !self.takes_jumps() => Button::Down,
+            other => other,
+        };
         match self.stack.last().copied() {
             None => self.press_page(button),
             Some(Screen::List { row, cursor }) => self.press_list(button, row, cursor),

@@ -21,6 +21,9 @@ pub static EXT_SHOWN: AtomicBool = AtomicBool::new(false);
 pub static PILOT_PRESENT: AtomicBool = AtomicBool::new(false);
 /// The game's own pause menu is open (`L_staying_help` left its rest position), SPEC-core-03 §2.4.
 pub static PAUSE_ACTIVE: AtomicBool = AtomicBool::new(false);
+/// What the menu shows takes ZL + Up / Down as jumps (`Menu::takes_jumps`, a page or a popup list): set by the worker
+/// after every event, read by the input hook before each poll (review MN-1). A closed menu opens on a page.
+pub static JUMPS: AtomicBool = AtomicBool::new(true);
 
 /// The frame the worker last built, and its sequence number (the tick draws when it changed). A wait-free triple buffer (stream/sync):
 /// the worker is its one writer and the UI tick its one reader, so neither waits on the other.

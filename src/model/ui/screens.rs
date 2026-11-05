@@ -11,7 +11,7 @@ use super::menu::chord::Chord;
 use super::menu::options::{ACTIONS, CHORD_ROWS, DIRECTIONS, SITUATIONS, SWAP_GROUPS, YES_NO_RANDOM};
 use super::catalog::ITEMS;
 use super::menu::grid::{GridKind, GridLayout, RosterUse};
-use super::menu::table::{Control, Row, GROUPS, ROWS};
+use super::menu::table::{Control, Editor, Row, GROUPS, ROWS};
 use super::menu::{ChordCapture, ChordTarget, Grey, Menu, Screen, SliderState, DELAY_ROWS, OVERRIDE_COLUMN};
 use super::panes::ROWS as ROW_LINES;
 
@@ -478,7 +478,15 @@ fn confirm_reset_frame(menu: &Menu, screen: &Screen, frame: &mut Frame) {
     push(frame, "B  cancel", "", Tone::Normal);
     frame.focus = Some(1);
     let _ = write!(frame.help[0], "Every setting on {} goes back to your saved defaults.", menu.page().title());
-    let _ = frame.help[1].write_str("Other pages are not changed.");
+    // The menu shortcuts are not settings of the page (they live in the shortcuts file), so the reset leaves them.
+    let shortcuts = ROWS.iter().any(|r| {
+        r.page() == menu.page() && r.visible(menu.env().pilot_present) && matches!(r.control, Control::Editor(Editor::ShortcutSlot(_)))
+    });
+    let _ = frame.help[1].write_str(if shortcuts {
+        "The menu shortcuts stay as they are. Other pages are not changed."
+    } else {
+        "Other pages are not changed."
+    });
     let _ = frame.hint.write_str("A reset   B cancel");
 }
 
@@ -558,6 +566,33 @@ mod tests {
         assert!(f.crumb.string_lossy().ends_with(RESET_LABEL));
         assert_eq!(f.hint.string_lossy(), "A reset   B cancel");
         assert!(f.help[0].string_lossy().contains(Page::Cpu.title()));
+        assert!(!f.help[1].string_lossy().contains("shortcut"), "the CPU page has no shortcut rows");
+    }
+
+    /// The confirmation says what the reset leaves: on Display & Controls the two menu shortcuts are not settings of
+    /// the page (they live in the shortcuts file), and a confirmed reset leaves them as they are.
+    #[test]
+    fn the_reset_confirmation_names_what_stays() {
+        let shortcuts = [crate::model::menu::chord::Chord(0x41), crate::model::menu::chord::Chord::NONE];
+        let mut m = Menu::new(Settings::factory(), Env { shortcuts, ..Env::default() });
+        for _ in 0..6 {
+            if m.page() == Page::DisplayControls {
+                break;
+            }
+            m.press(Button::R);
+        }
+        assert_eq!(m.page(), Page::DisplayControls);
+        while !matches!(m.focus(), Some(Entry::ResetPage(_))) {
+            m.press(Button::Up);
+        }
+        m.press(Button::A);
+        let f = frame(&m);
+        assert!(f.help[1].string_lossy().contains("menu shortcuts stay"), "{}", f.help[1].string_lossy());
+        m.press(Button::A);
+        assert_eq!(m.env().shortcuts, shortcuts, "the reset left the shortcuts");
+        let (page, changed) = m.take_page_reset().expect("the reset ran");
+        assert_eq!(page, Page::DisplayControls);
+        assert!(changed.iter().all(|id| !id.contains("shortcut")), "{changed:?}");
     }
 
     #[test]
