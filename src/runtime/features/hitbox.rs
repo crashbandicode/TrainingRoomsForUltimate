@@ -179,6 +179,7 @@ static VIEW: AtomicU8 = AtomicU8::new(2);
 static JOINT_FLAG: AtomicBool = AtomicBool::new(false);
 /// Bumped by every request that changes the view: the sets re-apply route B's visibility.
 static VIEW_EPOCH: AtomicU32 = AtomicU32::new(1);
+#[cfg(feature = "diag")]
 static POLL_EPOCH: AtomicU32 = AtomicU32::new(1);
 static BOARD: Mutex<Board> = Mutex::new(Board::new());
 
@@ -249,6 +250,7 @@ unsafe fn apply_view(store: &mut Store, i: usize, epoch: u32, force: bool) {
     store.view_applied[i] = epoch;
 }
 
+#[cfg(feature = "diag")]
 /// The orb panes of the layout last drawn into, resolved once per layout registration, and how many were shown.
 struct OrbPanes {
     layout: usize,
@@ -258,9 +260,11 @@ struct OrbPanes {
     shown: usize,
 }
 
+#[cfg(feature = "diag")]
 static ORB_PANES: Mutex<OrbPanes> =
     Mutex::new(OrbPanes { layout: 0, registrations: 0, container: 0, panes: [0; crate::model::panes::ORBS], shown: 0 });
 
+#[cfg(feature = "diag")]
 /// The layout tick's draw (`ui::hud`): every live orb projected with the game's own `world_to_screen` (so the orbs follow
 /// the camera, paused or not) and written into one of the plugin's disc panes; the rest hidden. A readiness boundary:
 /// nothing before boot installed the feature.
@@ -342,6 +346,7 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
     let _ = over;
 }
 
+#[cfg(feature = "diag")]
 /// The input hook's call while the game may be paused (no fighter pass runs then): applies a new A/B view to route B's
 /// spheres of the fighters seen in the last passes, so both layers are shown on one frozen frame.
 ///

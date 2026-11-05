@@ -514,6 +514,7 @@ pub mod natives {
         })
     }
 
+    #[cfg(feature = "diag")]
     /// The game's world-to-screen projection with the render camera (`(out_x*, out_y*, pos&, false)`): pixels, y down
     /// (`None` when the row was not granted).
     pub unsafe fn world_to_screen(pos: &[f32; 3]) -> Option<[f32; 2]> {
@@ -526,6 +527,7 @@ pub mod natives {
         })
     }
 
+    #[cfg(feature = "diag")]
     /// The two screen size words that projection maps with (read only when its relied row was granted).
     pub unsafe fn screen_size_words() -> Option<[f32; 2]> {
         use crate::model::sites_hitbox::{ORB_SCREEN_H_WORD, ORB_SCREEN_SIZE_OFFSET, ORB_SCREEN_W_WORD};
