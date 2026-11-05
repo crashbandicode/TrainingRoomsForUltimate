@@ -364,9 +364,9 @@ pub(crate) fn mixed_targets(
     origin: Option<Configuration>,
 ) -> [Option<Target>; MAX_TARGETS] {
     use crate::engine::swap::mii_cycle::{self, Identity, Live};
-    // P-CYCLE: the one cycle list; the CPU's Mii admission is its owner's published one, the Player's is unchanged.
+    // P-CYCLE / P1-CYCLE: the one cycle list. Each role's Mii admission is its owner's published one.
     let roster = if role == 0 {
-        crate::engine::swap::cycle_members::cycle_members(menu.player_roster, crate::engine::swap::cycle_members::ALL_MII)
+        crate::engine::swap::cycle_members::cycle_members(menu.player_roster, crate::runtime::roster::character_roster::player_cycle_admission())
     } else {
         crate::engine::swap::cycle_members::cycle_members(menu.cpu_roster, crate::runtime::roster::character_roster::cpu_cycle_admission())
     };

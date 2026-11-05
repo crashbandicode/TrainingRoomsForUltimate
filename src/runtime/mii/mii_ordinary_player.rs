@@ -7,7 +7,7 @@ use std::convert::TryInto;
 use crate::engine::mii::{
     inventory::{MiiClass,Snapshot as Catalog}, lifetime::Configuration,
     ordinary_player::{Gate,Phase,Request,SameClass,Ticket},
-    selection::{Action,PlayerLive,PlayerOrigin},
+    selection::{Action,Origin,PlayerLive,PlayerOrigin},
     identity::Identity as TxnIdentity,
     transition::{Outcome,ReadyReceipt,Refusal},
 };
@@ -434,11 +434,31 @@ unsafe fn at_origin(origin:&native::Snapshot,expected:&native::Snapshot,active:O
             && crate::engine::swap::body_bank::original_bankable(origin.original_kind)
             && crate::runtime::roster::cycle_preload_config::snapshot().original_bank_enabled()))
 }
+/// The Player cycle's Mii admission (`cycle_members::player_admission`) from the owner's state: qualified as `begin`
+/// serves the cycle (menu valid, capture finished, this epoch, a catalog), and the captured saved original is a Mii
+/// origin. The menu shows it (`publish_admission`) and every Player walker walks it (P1-CYCLE).
+fn cycle_admission(s:&State)->crate::engine::swap::cycle_members::MiiAdmission {
+    let (Some(o),Some(catalog))=(s.owner.as_ref(),s.catalog.as_ref()) else {return crate::engine::swap::cycle_members::NO_MII;};
+    let qualified=s.menu_valid && !s.capture && o.origin.binding.epoch==epoch();
+    if !qualified {return crate::engine::swap::cycle_members::NO_MII;}
+    let origin=match o.origin_saved {Some(c)=>PlayerOrigin::Mii(Origin(c.canonical())),None=>PlayerOrigin::NotMii};
+    crate::engine::swap::cycle_members::player_admission(catalog,origin)
+}
+static ADMISSION:core::sync::atomic::AtomicU8=core::sync::atomic::AtomicU8::new(0);
+fn publish_admission(admitted:crate::engine::swap::cycle_members::MiiAdmission) {
+    ADMISSION.store(admitted.iter().enumerate().fold(0u8,|acc,(i,on)|acc|(u8::from(*on)<<i)),Ordering::Release);
+}
+pub(super) fn published_admission()->crate::engine::swap::cycle_members::MiiAdmission {
+    let bits=ADMISSION.load(Ordering::Acquire);
+    [bits&1!=0,bits&2!=0,bits&4!=0]
+}
 #[inline(never)]
 pub(super) unsafe fn service(entry:*mut u8,owner:u32)->bool {
     #[cfg(feature = "console-swap-trace")]
     let _swap_stack = crate::runtime::roster::practice_trace::scope(0x1080001);
     if owner!=0 || !ENABLED.load(Ordering::Acquire) {return false;}
+    // P1-CYCLE: the admission the menu shows is the one the walkers walk, refreshed every frame from this state.
+    publish_admission(cycle_admission(&STATE.lock()));
     #[cfg(feature="native-body-bank-alpha")]
     {
         let bank=STATE.lock().bank;
@@ -615,10 +635,11 @@ unsafe fn begin(entry:*mut u8)->bool {
     if !permitted() {return false;}
     let pending={
         let s=STATE.lock();
+        let admitted=cycle_admission(&s);
         s.owner.as_ref().zip(s.request).map(|(o,request)|
-             (o.origin,o.origin_saved,o.expected,o.active,o.cursor,s.catalog.as_ref().map(Arc::clone),request,s.restore))
+             (o.origin,o.origin_saved,o.expected,o.active,o.cursor,s.catalog.as_ref().map(Arc::clone),request,s.restore,admitted))
     };
-    let Some((origin,origin_saved,expected,active,cursor,Some(catalog),request,restore))=pending else{return false;};
+    let Some((origin,origin_saved,expected,active,cursor,Some(catalog),request,restore,admitted))=pending else{return false;};
     if !request.current(mii_saved_alpha::menu_epoch(),active.map(|c|c.canonical())) {
         clear_request(request);note("menu-close request expired before preparation");
         if request.direct_kind().is_some() {notify(Role::Player,"Character choice expired; select it again".into());}
@@ -714,7 +735,8 @@ unsafe fn begin(entry:*mut u8)->bool {
         let live=if at_origin(&origin,&expected,active,origin_saved,cursor) {
             Live::Original
         } else {Live::Numbered{identity,cursor}};
-        mii_cycle::next_qualified_player_with_ice_climbers(&menu.player_roster.fighters(),&catalog,&menu::mii_preferences(),
+        // P1-CYCLE: the cycle the menu numbers (`cycle_members` with this owner's admission), not the unfiltered roster.
+        mii_cycle::next_qualified_player_with_ice_climbers(&crate::engine::swap::cycle_members::cycle_members(menu.player_roster,admitted),&catalog,&menu::mii_preferences(),
             origin_saved.map_or(Identity::Fighter(origin.original_kind),|c|Identity::Saved(c.canonical())),live,
             menu.solo_popo_original!=menu.solo_popo_player_cycle,|step|match qualify(step) {
                 Ok(value)=>Some(value),
@@ -1279,6 +1301,7 @@ pub(super) unsafe fn complete_generic(entry:*mut u8,token:InstallToken,kind:u32)
     }
 }
 pub(super) fn scene_changed() {
+    publish_admission(crate::engine::swap::cycle_members::NO_MII);
     let mut s=STATE.lock();s.capture=false;s.menu_valid=false;s.catalog=None;s.request=None;
     s.generic=None;s.restore=None;
     #[cfg(feature="native-body-bank-alpha")]

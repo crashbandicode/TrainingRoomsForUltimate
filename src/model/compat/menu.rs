@@ -95,11 +95,15 @@ const fn trio_practice_default() -> OnOff {
 const fn character_default() -> TrioFighter {
     TrioFighter::MARIO
 }
+/// A missing `player_roster` key is All. That is the portrait grid's factory (`RosterEditor::values` writes a leading
+/// 1), so the typed view and the grid read one roster. `DEFAULT_PLAYER_ROSTER` is the named explicit list, not this
+/// fallback (P1-CYCLE).
 const fn player_roster_default() -> OrderedFighterRoster {
-    DEFAULT_PLAYER_ROSTER
+    OrderedFighterRoster::all()
 }
+/// A missing `cpu_roster` key is All, the same factory as `player_roster_default`.
 const fn cpu_roster_default() -> OrderedFighterRoster {
-    DEFAULT_CPU_ROSTER
+    OrderedFighterRoster::all()
 }
 const fn kirby_hats_default() -> OrderedFighterRoster {
     DEFAULT_KIRBY_HATS
@@ -249,8 +253,8 @@ pub const BASE_MENU: TrainingModpackMenu = TrainingModpackMenu {
     trio_practice: OnOff::OFF,
     player_character: TrioFighter::MARIO,
     cpu_character: TrioFighter::MARIO,
-    player_roster: DEFAULT_PLAYER_ROSTER,
-    cpu_roster: DEFAULT_CPU_ROSTER,
+    player_roster: OrderedFighterRoster::all(),
+    cpu_roster: OrderedFighterRoster::all(),
     player_kirby_hats: DEFAULT_KIRBY_HATS,
     cpu_kirby_hats: DEFAULT_KIRBY_HATS,
 };

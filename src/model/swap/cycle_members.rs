@@ -34,7 +34,8 @@ pub fn roster_of(values: &[u8]) -> OrderedFighterRoster {
     serde_json::from_value(serde_json::Value::from(values.to_vec())).unwrap_or(OrderedFighterRoster::all())
 }
 
-/// Every Mii class: the walkers whose Mii admission is their own (the Player's), unchanged by P-CYCLE.
+/// Every Mii class. The Player cycle does not use this: it walks [`player_admission`], the same list the P1 Cycles
+/// grid numbers (P1-CYCLE).
 pub const ALL_MII: MiiAdmission = [true; 3];
 
 /// The ordered members of one role's cycle, before slot 0 is taken out: All in CSS order, otherwise the ranks in rank
@@ -100,6 +101,21 @@ pub fn cpu_admission(qualified: bool, catalog: &Snapshot, original: Option<Canon
     for (slot, class) in admitted.iter_mut().zip(CLASSES) {
         *slot = crate::engine::mii::ordinary_cpu::supported_kind(class.kind())
             && selection::eligible(catalog, Role::Cpu, class, PlayerOrigin::NotMii).any(|cfg| Some(cfg.canonical) != original);
+    }
+    admitted
+}
+
+/// The Player cycle's Mii admission. A class is in when the Player walker would load it: `selection::eligible` for
+/// `Role::Player` yields a configuration (`class_selectable`). That is when `mii_cycle::numbered_saved` resolves the
+/// class. For the Player, eligibility already excludes the origin configuration, so the origin's own class is in only
+/// when another configuration of it exists. A preference only picks which configuration resolves. The live fighter
+/// being a Mii, and a hat match, are not part of this: those are `alpha_player_cycle`, the Player-pick rule. The
+/// Player Mii owner computes this from the catalog and origin it walks and publishes it; the menu and every Player
+/// walker read the publication (P1-CYCLE). Allocation-free.
+pub fn player_admission(catalog: &Snapshot, origin: PlayerOrigin) -> MiiAdmission {
+    let mut admitted = NO_MII;
+    for (slot, class) in admitted.iter_mut().zip(CLASSES) {
+        *slot = selection::class_selectable(catalog, Role::Player, class, origin);
     }
     admitted
 }

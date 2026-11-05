@@ -541,7 +541,7 @@ fn close_session(s: &mut Session) {
 fn mii_tiles(list: &Option<crate::editors::mii::MiiList>) -> crate::editors::roster::MiiTiles {
     let mut tiles = list.as_ref().map(crate::editors::mii::MiiList::tiles).unwrap_or_default();
     // P-CYCLE: the CPU cycle's Mii admission and both slot 0s are the runtime's, so the grid numbers what cycles.
-    (tiles.cpu_cycle, tiles.slot_zero) = crate::runtime::roster::character_roster::cycle_facts();
+    (tiles.player_cycle, tiles.cpu_cycle, tiles.slot_zero) = crate::runtime::roster::character_roster::cycle_facts();
     tiles
 }
 
