@@ -7,8 +7,8 @@
 //! * `button_config.ini`: the two menu shortcuts (draft 9, N7), requested by `chords::commit_shortcut`.
 //! * `replay_capture.ini`: the Replay capture toggle (Q7), `request_replay_capture` (the menu row) and
 //!   `persist_replay_capture` (the Deluxe Plugins-page row, `runtime::deluxe_row`); this thread is the file's only writer.
-//! * `settings.json`: the menu's settings on close, `request_settings` (the menu worker thread allocates the text;
-//!   the writer only moves it to the file).
+//! * `settings.json`: the menu's settings on close, `request_settings`. The writer thread serializes the live
+//!   settings, so a flag stored while a close is in flight is the one that reaches the file.
 //!
 //! A failed write keeps the change in memory for the session and says so with a notice (SPEC-input-04 question 6
 //! (c)); the old file is untouched.
@@ -35,7 +35,7 @@ static SHORTCUTS: Mutex<Option<MenuShortcuts>> = Mutex::new(None);
 /// A `replay_capture.ini` write is due. The value is read when the write happens ([`replay_capture`]), so the file ends at
 /// the newest preference whichever row (the menu, or the Deluxe Plugins page) changed it last.
 static REPLAY_CAPTURE_DUE: AtomicBool = AtomicBool::new(false);
-static SETTINGS: Mutex<Option<String>> = Mutex::new(None);
+static SETTINGS_DUE: AtomicBool = AtomicBool::new(false);
 
 /// The Replay capture toggle as the file holds it (boot) or as the menu last set it; the preference itself once the capture
 /// adapter is ready (see [`replay_capture`]).
@@ -69,9 +69,9 @@ pub fn persist_replay_capture() {
     REPLAY_CAPTURE_DUE.store(true, Ordering::Release);
 }
 
-/// Queue a `settings.json` rewrite with this text (the menu's close). The text is moved, not copied.
-pub fn request_settings(json: String) {
-    *SETTINGS.lock() = Some(json);
+/// Queue a `settings.json` rewrite of the live settings (the menu's close, or the intro flag).
+pub fn request_settings() {
+    SETTINGS_DUE.store(true, Ordering::Release);
 }
 
 /// The Replay capture preference now (the menu shows it, the INI is written from it): the capture layer's own preference
@@ -111,9 +111,22 @@ fn run() {
         if REPLAY_CAPTURE_DUE.swap(false, Ordering::AcqRel) {
             write_replay_capture(replay_capture());
         }
-        let settings = SETTINGS.lock().take();
-        if let Some(json) = settings {
-            write_settings(&json);
+        let due = SETTINGS_DUE.swap(false, Ordering::AcqRel);
+        let intro = notices::intro_store_due();
+        if due || intro {
+            match crate::runtime::ui::worker::settings_json_for_write(intro) {
+                Some(json) => {
+                    if intro {
+                        notices::clear_intro_store();
+                    }
+                    write_settings(&json);
+                }
+                None => {
+                    if due {
+                        SETTINGS_DUE.store(true, Ordering::Release);
+                    }
+                }
+            }
         }
     }
 }

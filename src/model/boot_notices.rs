@@ -55,9 +55,20 @@ pub struct BootNotices {
     posted: bool,
 }
 
+/// A settings file that already existed at boot has had its first time, even with no `intro_seen` key.
+/// A missing file has not. A stored `intro_seen: true` has, on its own.
+pub fn intro_already_seen(file_existed: bool, settings: &super::settings::Settings) -> bool {
+    settings.intro_seen() || file_existed
+}
+
 impl BootNotices {
     pub const fn new() -> Self {
         Self { posted: false }
+    }
+
+    /// One process. `posted` starts consumed when this install has already had its first time.
+    pub fn for_install(file_existed: bool, settings: &super::settings::Settings) -> Self {
+        Self { posted: intro_already_seen(file_existed, settings) }
     }
 
     /// Only a real native Training HUD with published settings consumes the boot edge.

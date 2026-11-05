@@ -75,8 +75,23 @@ pub fn wake() {
 /// The settings the menu opens on and commits to: what was loaded at boot, then each commit.
 static SETTINGS: Mutex<Option<Settings>> = Mutex::new(None);
 
-pub fn start(settings: Settings) {
+/// Keep the boot settings for the writer even when the menu thread does not start.
+pub fn remember(settings: Settings) {
     *SETTINGS.lock() = Some(settings);
+}
+
+/// The text the writer thread stores. When `mark_intro` is set, the intro flag is recorded first.
+pub fn settings_json_for_write(mark_intro: bool) -> Option<String> {
+    let mut guard = SETTINGS.lock();
+    let settings = guard.as_mut()?;
+    if mark_intro {
+        settings.mark_intro_seen();
+    }
+    Some(settings.to_json())
+}
+
+pub fn start(settings: Settings) {
+    remember(settings);
     let spawned = crate::runtime::threads::spawn(crate::model::thread_stacks::ThreadId::Menu, run);
     if let Err(error) = spawned {
         diagnostic(format_args!("[TrainingRooms] menu worker did not start: {error}"));
@@ -661,7 +676,7 @@ static NEXT_FRAME: Mutex<Frame> = Mutex::new(Frame::new());
 /// the settings file is rewritten by the writer thread. `defaults` addresses the saved-defaults snapshot instead of the current one.
 /// Nothing is published to the other packages: they read none of these rows.
 pub fn adopt_typed(defaults: bool, rows: &[(&'static str, Vec<u8>)], kept: &[(&'static str, serde_json::Value)]) {
-    let json = {
+    let changed = {
         let mut guard = SETTINGS.lock();
         let Some(settings) = guard.as_mut() else { return };
         let target = if defaults { &mut settings.defaults } else { &mut settings.menu };
@@ -677,10 +692,10 @@ pub fn adopt_typed(defaults: bool, rows: &[(&'static str, Vec<u8>)], kept: &[(&'
                 changed = true;
             }
         }
-        changed.then(|| settings.to_json())
+        changed
     };
-    if let Some(json) = json {
-        writer::request_settings(json);
+    if changed {
+        writer::request_settings();
     }
 }
 
@@ -773,11 +788,11 @@ fn close(menu: &mut Menu, setups: &mut super::setups::Ui) {
     published::publish(&settings.menu, outbox.rerolls);
     // The carried engines read the typed view of the committed settings (decision D1).
     crate::runtime::compat::menu::apply_kept(&settings);
-    let json = settings.to_json();
     *SETTINGS.lock() = Some(settings);
     // Every file write goes through the writer thread (`features::writer`): this only hands over the requests.
+    // The writer serializes the live settings, including an intro flag stored on that object.
     if outbox.changed {
-        writer::request_settings(json);
+        writer::request_settings();
     }
     // Q7: the Replay capture toggle is live at once; the writer rewrites `replay_capture.ini`.
     if let Some(on) = outbox.replay_capture {

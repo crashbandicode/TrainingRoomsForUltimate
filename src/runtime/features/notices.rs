@@ -27,6 +27,32 @@ static QUEUE: Mutex<Queue> = Mutex::new(Queue::new());
 static BOOT_NOTICES: Mutex<crate::model::boot_notices::BootNotices> =
     Mutex::new(crate::model::boot_notices::BootNotices::new());
 static STARTUP_PENDING: AtomicBool = AtomicBool::new(true);
+/// The writer thread stores `intro_seen` after this process posted the six intro notices.
+static INTRO_STORE_DUE: AtomicBool = AtomicBool::new(false);
+
+/// A new process. An install that has already had its first time does not post again.
+pub fn arm_intro(file_existed: bool, settings: &crate::model::settings::Settings) {
+    *BOOT_NOTICES.lock() = crate::model::boot_notices::BootNotices::for_install(file_existed, settings);
+    if crate::model::boot_notices::intro_already_seen(file_existed, settings) {
+        STARTUP_PENDING.store(false, Ordering::Release);
+    }
+}
+
+/// The HUD tick asked for the intro flag to be written. The writer thread reads this.
+pub fn intro_store_due() -> bool {
+    INTRO_STORE_DUE.load(Ordering::Acquire)
+}
+
+pub fn clear_intro_store() {
+    INTRO_STORE_DUE.store(false, Ordering::Release);
+}
+
+/// Grouped-session trace point. It runs once, when this process posts the six intro notices.
+#[no_mangle]
+#[inline(never)]
+pub extern "C" fn tr_intro_posted_v1() {
+    core::hint::black_box(0x494E_5452_u32);
+}
 
 /// The frame-advantage notification's title.
 const FRAME_ADVANTAGE_HEADER: &str = "Frame Advantage";
@@ -181,6 +207,8 @@ pub fn hud_tick(native_hud_ready: bool) -> TickOut {
         let mut queue = QUEUE.lock();
         if needs_startup && BOOT_NOTICES.lock().post_once(native_hud_ready, startup_chords, &mut queue) {
             STARTUP_PENDING.store(false, Ordering::Release);
+            INTRO_STORE_DUE.store(true, Ordering::Release);
+            tr_intro_posted_v1();
         }
         take_mail(&mut queue);
         // Waiting practice has no Combo Display option. A value observed in a
