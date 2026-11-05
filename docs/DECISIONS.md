@@ -772,6 +772,9 @@ visualizer-Off frame.
 
 A/B from real data (2026-11-05, Eden run `tr-p23-hitbox-ab2`, diag prototype on `p23/hitbox-orbs`):
 [HB-OWN-ORBS-ab.png](decisions/HB-OWN-ORBS-ab.png) replaces the hand-placed mockup above.
+Grab row redone on one frame (run `tr-p23-hitbox-ab3`, Training's frame-by-frame speed, both halves pass 17818). The
+hurt discs missing in the first grab row were a capture lag, not a prototype bug: at 1 % speed during the side special
+the screen trailed the game by ~4 frames, so that "orbs" shot showed a frame from before the switch. No fix needed.
 
 ### INPUT-VIZ · A compact input display for combo timing — answered (2026-11-05)
 
