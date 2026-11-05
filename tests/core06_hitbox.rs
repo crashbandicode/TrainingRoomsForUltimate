@@ -341,11 +341,12 @@ fn core06_off_restores() {
 
 #[test]
 fn core06_site_guards() {
-    // Three hooks, nine called natives and nine relied windows (the Lua stack reads and HB1's three HitModule windows).
+    // Three hooks, eleven called natives and ten relied windows (the Lua stack reads, HB1's three HitModule windows and, for
+    // the own orbs (decision HB-OWN-ORBS), the bone transform, the projection and its screen size words).
     let hooks: Vec<&str> = SITES.iter().filter(|s| matches!(s.kind, SeamKind::Hook { .. })).map(|s| s.name).collect();
     assert_eq!(hooks, sites_hitbox::HOOK_ROWS);
-    assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Called)).count(), 9);
-    assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Relied)).count(), 9);
+    assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Called)).count(), 11);
+    assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Relied)).count(), 10);
     for site in SITES.iter() {
         assert_eq!(site.guard.len(), 64, "{}: a 64-byte guard", site.name);
         assert_eq!(site.feature, Feature::Hitbox);
@@ -403,6 +404,9 @@ fn core06_site_guards() {
         (sites_hitbox::HITBOX_HURT_MODULE_OFFSET, "hurtbox_module"),
         (sites_hitbox::HITBOX_HURT_GROUPS_OFFSET, "hurtbox_groups"),
         (sites_hitbox::HITBOX_HURT_PART_OFFSET, "hurtbox_part_shape"),
+        (sites_hitbox::ORB_JOINT_POSITION_OFFSET, "orb_joint_position"),
+        (sites_hitbox::ORB_WORLD_TO_SCREEN_OFFSET, "orb_world_to_screen"),
+        (sites_hitbox::ORB_SCREEN_SIZE_OFFSET, "orb_screen_size"),
     ] {
         assert_eq!(model::sites_hitbox::SITES.iter().find(|s| s.name == name).map(|s| s.offset), Some(offset), "{name}");
     }

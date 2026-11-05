@@ -1,0 +1,753 @@
+{
+  "game_id": "01006A800016E000",
+  "start": "boot",
+  "scope": "rc.3 own-orbs proof (decision HB-OWN-ORBS, option 1) on the diag build of the release route: two Ridleys standing, attack, grab, shield, Off, the plugin menu and the vanilla pause, save/load, L+R+A, the docs GIF, an ordinary fighter, the unmapped/panic scan.",
+  "segments": {
+    "main-stage": {
+      "file": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/segments/main-stage.edenmacro.json",
+      "sha256": "ce6714b44f34f04cacd0d17454e4773c8906d289e5a37e34c606c604e6e4acfb",
+      "cap": 60,
+      "start_gate": "main",
+      "end_gate": "stage",
+      "from_run": "lr-03",
+      "row": "02-stage",
+      "library": "main-stage"
+    },
+    "stage-css": {
+      "file": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/segments/stage-css.edenmacro.json",
+      "sha256": "240249606f15207106e4cc654cc3ee173efa97d51ea276586c82e6c7c438db74",
+      "cap": 30,
+      "start_gate": "stage",
+      "end_gate": "css",
+      "from_run": "lr-03",
+      "row": "03-css",
+      "library": "stage-css"
+    },
+    "attract-cancel": {
+      "file": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/segments/attract-cancel.edenmacro.json",
+      "sha256": "1b506dbfc689e79e8bfca69b74274ab674b91ac8359219a1a4c95faa81aae70f",
+      "cap": 30,
+      "start_gate": null,
+      "end_gate": "main",
+      "from_run": "p4r-shared",
+      "row": "nav00-attract-cancel",
+      "library": "attract-cancel"
+    },
+    "title-confirm": {
+      "file": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/segments/confirm.edenmacro.json",
+      "sha256": "131cecfb68a24040b38aeaf929c806caf361e29b7e39d241147a5821cb87007d",
+      "cap": 60,
+      "start_gate": "title-fast",
+      "end_gate": "main-settled",
+      "from_run": "p4r-shared",
+      "row": "nav03-room-list",
+      "library": "confirm"
+    },
+    "hb-a": {
+      "file": "segments/hb-a.edenmacro.json",
+      "sha256": "b90b94e177afb221a149051da3630541f434d709da5b578ed2e5c8fb3c476280",
+      "cap": 20
+    },
+    "hb-b": {
+      "file": "segments/hb-b.edenmacro.json",
+      "sha256": "4999deaadea2c2a323fc562eb78d956ad5384ad11bc5d6fb855fc0784d2532aa",
+      "cap": 20
+    },
+    "hb-cam-pan": {
+      "file": "segments/hb-cam-pan.edenmacro.json",
+      "sha256": "a1c8a8d96c0ba75dadffd5d83a2e859721798411f0d78a377a29bd39675acfe5",
+      "cap": 20
+    },
+    "hb-csmash-p10": {
+      "file": "segments/hb-csmash-p10.edenmacro.json",
+      "sha256": "285409df11ba8a515aeca182b2702d75bc9bfcdf10ac027543baf22aa22adeb1",
+      "cap": 20
+    },
+    "hb-csmash-p12": {
+      "file": "segments/hb-csmash-p12.edenmacro.json",
+      "sha256": "8e057423eb2a49ec308f9b5cb56ea2c48bf73c895110f6610a190c6a36badfd8",
+      "cap": 20
+    },
+    "hb-csmash-p14": {
+      "file": "segments/hb-csmash-p14.edenmacro.json",
+      "sha256": "406ef447aa01159ba37cee5c7ec5c68bd72037569a377088229f8e87ae60f578",
+      "cap": 20
+    },
+    "hb-csmash-p16": {
+      "file": "segments/hb-csmash-p16.edenmacro.json",
+      "sha256": "c5f1f336323f8e6b633403fac8524c2e7f4009251e37f5a10e6caed38b1e4b50",
+      "cap": 20
+    },
+    "hb-csmash-p18": {
+      "file": "segments/hb-csmash-p18.edenmacro.json",
+      "sha256": "5d7854c98075c9c77ffc91a426f059db9ade2b9f54a4bb49bc8baaa7194a90c6",
+      "cap": 20
+    },
+    "hb-csmash-p20": {
+      "file": "segments/hb-csmash-p20.edenmacro.json",
+      "sha256": "5aef77fe2a918524c727c7cabb0528b3f2ccc9265a295312efbb9bc3f32acb6b",
+      "cap": 20
+    },
+    "hb-csmash-p22": {
+      "file": "segments/hb-csmash-p22.edenmacro.json",
+      "sha256": "98134669bd9e3e7af93ce07dc218e522328b65c2183b53f531269c4f5f3bd3eb",
+      "cap": 20
+    },
+    "hb-csmash-p24": {
+      "file": "segments/hb-csmash-p24.edenmacro.json",
+      "sha256": "9ef4fe6e0726737466490c8457daf4492009e2488829a18cac6f8d16520d13cc",
+      "cap": 20
+    },
+    "hb-csmash-p26": {
+      "file": "segments/hb-csmash-p26.edenmacro.json",
+      "sha256": "88b70b82f7c94bc06fc1b32dc2104b8b704c72fa9e37b9b80804697a29417f87",
+      "cap": 20
+    },
+    "hb-csmash-p28": {
+      "file": "segments/hb-csmash-p28.edenmacro.json",
+      "sha256": "4c1dced47a70fc08e0ff215ca9de35d362322f2f88e2133760370efd41e90c99",
+      "cap": 20
+    },
+    "hb-csmash-p30": {
+      "file": "segments/hb-csmash-p30.edenmacro.json",
+      "sha256": "2fe44e2bc9f7d8361841a4263dfcb36c6488f898be3fe2e32b5290e9d15f5b83",
+      "cap": 20
+    },
+    "hb-csmash-p32": {
+      "file": "segments/hb-csmash-p32.edenmacro.json",
+      "sha256": "068dfd1d0b8735c0f817f3b652aa03360346812e7f26a1bd068d462bbe90166b",
+      "cap": 20
+    },
+    "hb-csmash-p34": {
+      "file": "segments/hb-csmash-p34.edenmacro.json",
+      "sha256": "60e1e15bb6a0ed8ac9e67b5edfa400721299d8bec413c9e63f36af855b9b42ac",
+      "cap": 20
+    },
+    "hb-csmash-p36": {
+      "file": "segments/hb-csmash-p36.edenmacro.json",
+      "sha256": "6ea5727db141dd34a98f5b04e0527d8f4c41988897c7a571907017b529fede12",
+      "cap": 20
+    },
+    "hb-csmash-p38": {
+      "file": "segments/hb-csmash-p38.edenmacro.json",
+      "sha256": "d9b6b1ecb42c0fe64a132679e2dcb4198ae6e88316e7ed936175907f8fececc7",
+      "cap": 20
+    },
+    "hb-csmash-p40": {
+      "file": "segments/hb-csmash-p40.edenmacro.json",
+      "sha256": "fa8079ea8c26248fb83f48d114483b71348711905457f8e01bb668adf8adfdfd",
+      "cap": 20
+    },
+    "hb-csmash-p42": {
+      "file": "segments/hb-csmash-p42.edenmacro.json",
+      "sha256": "942ec9e69d7dfcb21323d2384c0e2e2c3d84928f290362163888839f47bb5748",
+      "cap": 20
+    },
+    "hb-csmash-p44": {
+      "file": "segments/hb-csmash-p44.edenmacro.json",
+      "sha256": "b3ae90d3c93072b9ec214b2c611ec551f30bc4429896a5a5ca022c69c9f16b73",
+      "cap": 20
+    },
+    "hb-csmash-p8": {
+      "file": "segments/hb-csmash-p8.edenmacro.json",
+      "sha256": "965ac1ce58aae50fd47a46b41dd5c01a45c59d59e55e3587f2607684bc59196e",
+      "cap": 20
+    },
+    "hb-csmash": {
+      "file": "segments/hb-csmash.edenmacro.json",
+      "sha256": "e0035e8a2b2f3157b0f29c0ef7a06cf53e3c6e6b628597bdd6cd8cf76d3671b9",
+      "cap": 20
+    },
+    "hb-down": {
+      "file": "segments/hb-down.edenmacro.json",
+      "sha256": "54dfa276047eaf2e2fc468b16fcdd98fe42321c5ad0433d87a6794a84ce45e8a",
+      "cap": 20
+    },
+    "hb-grab-p10": {
+      "file": "segments/hb-grab-p10.edenmacro.json",
+      "sha256": "c15db18a1b07d3a940075fd307c8fb8ba36a90ac776830b22a9dbe5b2731ee48",
+      "cap": 20
+    },
+    "hb-grab-p11": {
+      "file": "segments/hb-grab-p11.edenmacro.json",
+      "sha256": "debd1e03f958af6c7664545541836c6eba9e5e04c32e4152fcac22481ef0efb3",
+      "cap": 20
+    },
+    "hb-grab-p12": {
+      "file": "segments/hb-grab-p12.edenmacro.json",
+      "sha256": "0a5721da376597caddd3f447d82b9116a6e9c3c079a99ac253f7461bd2dc3e23",
+      "cap": 20
+    },
+    "hb-grab-p13": {
+      "file": "segments/hb-grab-p13.edenmacro.json",
+      "sha256": "ccf74cf7b2e3436d614af084f22fdfb9545187f1eeee8552df5e7bcc202f3523",
+      "cap": 20
+    },
+    "hb-grab-p14": {
+      "file": "segments/hb-grab-p14.edenmacro.json",
+      "sha256": "c98bfd86c315a3fefc765a80a5c5459cd5d44d103a8f7b2b70d9843c37618f27",
+      "cap": 20
+    },
+    "hb-grab-p15": {
+      "file": "segments/hb-grab-p15.edenmacro.json",
+      "sha256": "fb3cf3068a71ba41b601582922d3bf5bec35a02e020e3e6f1e2eaa078980400d",
+      "cap": 20
+    },
+    "hb-grab-p16": {
+      "file": "segments/hb-grab-p16.edenmacro.json",
+      "sha256": "ecabf8fb045911926301c7c91ce4e8658318172734932f37b524f59842e0e838",
+      "cap": 20
+    },
+    "hb-grab-p17": {
+      "file": "segments/hb-grab-p17.edenmacro.json",
+      "sha256": "af212c9edf975c75421b0479ef24ae41a826057ea157250e2280475d04e01648",
+      "cap": 20
+    },
+    "hb-grab-p18": {
+      "file": "segments/hb-grab-p18.edenmacro.json",
+      "sha256": "e8d49f5e4ea766fdeb86d790aca9eb0bfa4f678b944001c8f998a8a9ab16f100",
+      "cap": 20
+    },
+    "hb-grab-p3": {
+      "file": "segments/hb-grab-p3.edenmacro.json",
+      "sha256": "683744543c3b45d1eada902910c907b0576452fe561e2cc5f6ffbe1f4d5f734b",
+      "cap": 20
+    },
+    "hb-grab-p4": {
+      "file": "segments/hb-grab-p4.edenmacro.json",
+      "sha256": "e568a263927aa8d44ea313d81bfbae28b540dc2c38e614b01f0d29add6670a99",
+      "cap": 20
+    },
+    "hb-grab-p5": {
+      "file": "segments/hb-grab-p5.edenmacro.json",
+      "sha256": "92b006da4098d1fc5541034dbaf740fa6722ae9742e255c17c338bac8a69bf18",
+      "cap": 20
+    },
+    "hb-grab-p6": {
+      "file": "segments/hb-grab-p6.edenmacro.json",
+      "sha256": "c54c4939eada7de4ca512d9a7522c55fa89468c4c5b2555e429b1b4e7ea52f84",
+      "cap": 20
+    },
+    "hb-grab-p7": {
+      "file": "segments/hb-grab-p7.edenmacro.json",
+      "sha256": "6a4e8d6e3f4e396f0cabe36108210c04b5007b6cbebb4f2a9e1f611c56b18412",
+      "cap": 20
+    },
+    "hb-grab-p8": {
+      "file": "segments/hb-grab-p8.edenmacro.json",
+      "sha256": "130294c408f33d864ece9fb8e26a8a7f716538cd36e92842670448aaefe6557e",
+      "cap": 20
+    },
+    "hb-grab-p9": {
+      "file": "segments/hb-grab-p9.edenmacro.json",
+      "sha256": "1e5025dc468ca5f2aac8d153728fba6d341e21f235da12c5408c720ea636296c",
+      "cap": 20
+    },
+    "hb-grab": {
+      "file": "segments/hb-grab.edenmacro.json",
+      "sha256": "ca9c156e7b9ce2b0efdb5deca825f7e0bb3aa72eb8544660c307e70d0085411b",
+      "cap": 20
+    },
+    "hb-left": {
+      "file": "segments/hb-left.edenmacro.json",
+      "sha256": "e23499830508c256983c997e6e6c835950969b75e173595b9b90737502c8f81c",
+      "cap": 20
+    },
+    "hb-load": {
+      "file": "segments/hb-load.edenmacro.json",
+      "sha256": "cd512f7648605d7cd319dc494d2153e923f8ad2a4978d4863a245b7245549919",
+      "cap": 20
+    },
+    "hb-lra": {
+      "file": "segments/hb-lra.edenmacro.json",
+      "sha256": "7135837b075b6d1adb5dd6567016d22bb849266ba51215fa3b4698625e45af47",
+      "cap": 20
+    },
+    "hb-plus": {
+      "file": "segments/hb-plus.edenmacro.json",
+      "sha256": "b97e08bf03762ce55ccb8cdbf76690db7bd0f444506f7e2c8af54481deb25789",
+      "cap": 20
+    },
+    "hb-right": {
+      "file": "segments/hb-right.edenmacro.json",
+      "sha256": "717a3ef2bf0bcd956a556302825a4b31c31cb3f3a8d7e82acc706dcd544c29b4",
+      "cap": 20
+    },
+    "hb-save": {
+      "file": "segments/hb-save.edenmacro.json",
+      "sha256": "9dd6f05fd92d5f3b4f0729492f262ebb88b91ec27cc74adfd6a546f1bff093bd",
+      "cap": 20
+    },
+    "hb-sideb": {
+      "file": "segments/hb-sideb.edenmacro.json",
+      "sha256": "1a0e3a1320f437f8640d17dce37a6d6158267decf0c56609e2d8ce98d6d9deb2",
+      "cap": 20
+    },
+    "hb-up": {
+      "file": "segments/hb-up.edenmacro.json",
+      "sha256": "3a9aa3e875781b981bbbfeb9318fb1a9258cb8fa229ff446e62007eb2c841ebb",
+      "cap": 20
+    },
+    "hb-walk-right": {
+      "file": "segments/hb-walk-right.edenmacro.json",
+      "sha256": "db69cd741e1cc29cfb283abceca3e6d5b2b3e106eae136737326433e9790a714",
+      "cap": 20
+    },
+    "hb-walk": {
+      "file": "segments/hb-walk.edenmacro.json",
+      "sha256": "e65a966fd7ceb01699d4830e0be01297b892f0822475b1858e13ea0effcd638a",
+      "cap": 20
+    },
+    "hb-y": {
+      "file": "segments/hb-y.edenmacro.json",
+      "sha256": "da1410ba226e606e6c95873c2c897554897de181bea137a58c183782b46e8c58",
+      "cap": 20
+    },
+    "hb-zl-a": {
+      "file": "segments/hb-zl-a.edenmacro.json",
+      "sha256": "1670f4b388fa08111ffcbafba6c4509e2d9acc50933761e52869ea4936763ece",
+      "cap": 20
+    },
+    "hb-zl-csmash": {
+      "file": "segments/hb-zl-csmash.edenmacro.json",
+      "sha256": "655ded9d75c8ef6754ffbca0fc7ef76118606cea4b2d310af51cc0b636ad7428",
+      "cap": 20
+    },
+    "hb-zl-hold": {
+      "file": "segments/hb-zl-hold.edenmacro.json",
+      "sha256": "93d25f00a70498a9be6c7127e7d368c6dd8f07670f68eba43f9bf2b4ca9be8af",
+      "cap": 20
+    },
+    "hb-zl-shieldgrab": {
+      "file": "segments/hb-zl-shieldgrab.edenmacro.json",
+      "sha256": "d3b460e7453a11a788b91e86d3d6cfcaae197bd3c191f57bc29456ae0d8813ee",
+      "cap": 20
+    },
+    "hb-zl-sideb": {
+      "file": "segments/hb-zl-sideb.edenmacro.json",
+      "sha256": "c0b55da19d2df6fee3473d1d1294e1948e89030cc3e997e2882a1704de0c2152",
+      "cap": 20
+    },
+    "hb-zl": {
+      "file": "segments/hb-zl.edenmacro.json",
+      "sha256": "9f00f88086c1feeed64f0ba1f4c682f8cd0555a6295d9a15c7555cf5445dd156",
+      "cap": 20
+    },
+    "tr-menu-open": {
+      "file": "segments/tr-menu-open.edenmacro.json",
+      "sha256": "e5a74d02bad51116d0a3346d2084587705bbcfbcf40835ff53c0e5d4ed5160d7",
+      "cap": 20
+    }
+  },
+  "gates": {
+    "loaded": {
+      "kind": "status",
+      "expect": {
+        "running": true,
+        "loading_complete": true
+      },
+      "max_frame_age_ms": 1500,
+      "cap": 180
+    },
+    "main-fast": {
+      "kind": "image",
+      "reference": "refs/main-current.png",
+      "sha256": "d13e49e01a0255ed794d3ca6415965c4212c67474164b4019b0f3a6777974a7f",
+      "roi": [
+        180,
+        475,
+        390,
+        525
+      ],
+      "tolerance": 8,
+      "cap": 3,
+      "recover": "attract-cancel"
+    },
+    "main": {
+      "kind": "image",
+      "reference": "refs/main-current.png",
+      "sha256": "d13e49e01a0255ed794d3ca6415965c4212c67474164b4019b0f3a6777974a7f",
+      "roi": [
+        180,
+        475,
+        390,
+        525
+      ],
+      "tolerance": 8,
+      "cap": 8,
+      "recover": "attract-cancel"
+    },
+    "main-settled": {
+      "kind": "image",
+      "reference": "refs/main-current.png",
+      "sha256": "d13e49e01a0255ed794d3ca6415965c4212c67474164b4019b0f3a6777974a7f",
+      "roi": [
+        180,
+        475,
+        390,
+        525
+      ],
+      "tolerance": 8,
+      "cap": 15,
+      "recover": "attract-cancel"
+    },
+    "title-fast": {
+      "kind": "image",
+      "reference": "refs/title-fast.png",
+      "sha256": "89370a412ebfcca407a7de6a1e70f5ae5c21506013bb3c3b3158bd1be79b6acb",
+      "roi": [
+        450,
+        120,
+        830,
+        215
+      ],
+      "cap": 3,
+      "recover": "attract-cancel"
+    },
+    "stage": {
+      "kind": "image",
+      "reference": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/refs/stage.png",
+      "sha256": "99e7013e2be97b8173498e36a9b0e3b849c4e403bd239f1febda185470617033",
+      "roi": [
+        110,
+        445,
+        290,
+        495
+      ],
+      "tolerance": 8,
+      "cap": 45,
+      "reference_is_roi": true,
+      "from_run": "lr-03",
+      "library": "stage"
+    },
+    "css": {
+      "kind": "image",
+      "reference": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/refs/css.png",
+      "sha256": "a7a15642548952e4e263e42d467542b2877576cac4785061c21988e6cd7c0b76",
+      "roi": [
+        55,
+        55,
+        675,
+        155
+      ],
+      "tolerance": 8,
+      "cap": 60,
+      "reference_is_roi": true,
+      "from_run": "lr-03",
+      "library": "css"
+    },
+    "installed": {
+      "kind": "log",
+      "source": "events",
+      "pattern": "cpu_common=installed",
+      "whole_file": true,
+      "cap": 120
+    },
+    "actual-ready": {
+      "kind": "image",
+      "reference": "refs/p4zc-ready.png",
+      "sha256": "9ad5211b30724e3221d3e64ff42d54b8df1092c4093da58d9a01cf0f073852a1",
+      "roi": [
+        300,
+        180,
+        520,
+        240
+      ],
+      "tolerance": 8,
+      "cap": 15
+    },
+    "actual-training-current": {
+      "kind": "image",
+      "reference": "refs/actual-training-current.png",
+      "sha256": "2f254170e11887f37300f3f4ebb2a551b86215f244c4487d8d9dd8f544e00d5c",
+      "roi": [
+        1080,
+        135,
+        1200,
+        157
+      ],
+      "tolerance": 8,
+      "cap": 120
+    },
+    "training-hud-unpaused": {
+      "kind": "image",
+      "reference": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/refs/training-hud-unpaused.png",
+      "sha256": "7ecf9a4258ace218ad179e2fe14dcaf9d3dd906c594dec2ec8216cb5e02a8d2c",
+      "roi": [
+        280,
+        580,
+        302,
+        615
+      ],
+      "tolerance": 8,
+      "cap": 10,
+      "reference_is_roi": true,
+      "from_run": "lr-03",
+      "library": "training-hud-unpaused"
+    },
+    "native-pause": {
+      "kind": "image",
+      "reference": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/refs/native-pause.png",
+      "sha256": "3f03f8a24e7685cf86c5c00f4d06d2d48a3d15d23259c64872d0a5ff4ba717e5",
+      "roi": [
+        105,
+        142,
+        260,
+        174
+      ],
+      "tolerance": 8,
+      "cap": 15,
+      "reference_is_roi": true
+    }
+  },
+  "setup": [
+    {
+      "state": "Eden frontend up, game not loaded (defer-load); boot tracing then game.load",
+      "via": "hook",
+      "ref": "hb_steps.py:preload (trace.configure unmapped log, symbols, counters on publish_orbs/draw_orbs)"
+    },
+    {
+      "state": "Boot settings: the rc2d fixture (hitbox_vis Off) pinned in config files",
+      "via": "fixture",
+      "ref": "files: rc2-settings.json -> user/sdmc/ultimate/TrainingRooms/settings.json"
+    },
+    {
+      "state": "Training, HUD settled",
+      "via": "segment",
+      "ref": "main-stage + stage-css library segments, tile cursor pick"
+    },
+    {
+      "state": "P1 Ridley, CPU Steve, CPU Behavior Stop, synchronous swaps",
+      "via": "fixture",
+      "ref": "hb_steps.py:push (diag-settings-next.json from hb-base-settings.json, Ally gbc-04 route)"
+    },
+    {
+      "state": "Route and A/B view",
+      "via": "fixture",
+      "ref": "diag-hitbox-route.req (hb_steps.py:route)"
+    },
+    {
+      "state": "Paused on a fixed game frame",
+      "via": "segment",
+      "ref": "hb-plus, hb-csmash-pK, hb-grab-pK (Plus at frame K)"
+    }
+  ],
+  "rows": [
+    {
+      "id": "00-load",
+      "start": "boot",
+      "end": "loaded",
+      "budget_min": 4,
+      "steps": [
+        {
+          "run": "hb_steps.py:preload",
+          "check": true
+        }
+      ]
+    },
+    {
+      "id": "01-main",
+      "start": "loaded",
+      "end": "main",
+      "budget_min": 3,
+      "steps": [
+        {
+          "run": "p4t_boot.py:boot_to_main",
+          "check": true
+        },
+        {
+          "gate": "installed"
+        },
+        {
+          "shot": "main"
+        }
+      ]
+    },
+    {
+      "id": "02-stage",
+      "start": "main",
+      "end": "stage",
+      "budget_min": 2,
+      "steps": [
+        {
+          "play": "main-stage"
+        },
+        {
+          "gate": "stage"
+        },
+        {
+          "shot": "stage"
+        }
+      ]
+    },
+    {
+      "id": "03-training",
+      "start": "stage",
+      "end": "Training-settled",
+      "budget_min": 3,
+      "steps": [
+        {
+          "run": "hb_steps.py:css_pick_and_enter",
+          "check": true
+        }
+      ]
+    },
+    {
+      "id": "04-fighters",
+      "start": "Training-settled",
+      "end": "Training-settled",
+      "budget_min": 4,
+      "steps": [
+        {
+          "run": "hb_steps.py:fighters",
+          "check": true
+        }
+      ]
+    },
+    {
+      "id": "10-two-ridleys",
+      "start": "Training-settled",
+      "end": "Training-settled",
+      "budget_min": 3,
+      "steps": [
+        {
+          "run": "hb_steps.py:proof_two_ridleys",
+          "check": true,
+          "args": {}
+        }
+      ]
+    },
+    {
+      "id": "11-attack",
+      "start": "Training-settled",
+      "end": "Training-settled",
+      "budget_min": 3,
+      "steps": [
+        {
+          "run": "hb_steps.py:proof_attack",
+          "check": true,
+          "args": {}
+        }
+      ]
+    },
+    {
+      "id": "12-grab",
+      "start": "Training-settled",
+      "end": "Training-settled",
+      "budget_min": 3,
+      "steps": [
+        {
+          "run": "hb_steps.py:proof_grab",
+          "check": true,
+          "args": {}
+        }
+      ]
+    },
+    {
+      "id": "13-shield",
+      "start": "Training-settled",
+      "end": "Training-settled",
+      "budget_min": 3,
+      "steps": [
+        {
+          "run": "hb_steps.py:proof_shield",
+          "check": true,
+          "args": {}
+        }
+      ]
+    },
+    {
+      "id": "14-off",
+      "start": "Training-settled",
+      "end": "Training-settled",
+      "budget_min": 3,
+      "steps": [
+        {
+          "run": "hb_steps.py:proof_off",
+          "check": true,
+          "args": {}
+        }
+      ]
+    },
+    {
+      "id": "15-menus",
+      "start": "Training-settled",
+      "end": "Training-settled",
+      "budget_min": 3,
+      "steps": [
+        {
+          "run": "hb_steps.py:proof_menus",
+          "check": true,
+          "args": {}
+        }
+      ]
+    },
+    {
+      "id": "16-save-load",
+      "start": "Training-settled",
+      "end": "Training-settled",
+      "budget_min": 3,
+      "steps": [
+        {
+          "run": "hb_steps.py:proof_save_load",
+          "check": true,
+          "args": {}
+        }
+      ]
+    },
+    {
+      "id": "17-lra",
+      "start": "Training-settled",
+      "end": "Training-settled",
+      "budget_min": 3,
+      "steps": [
+        {
+          "run": "hb_steps.py:proof_lra",
+          "check": true,
+          "args": {}
+        }
+      ]
+    },
+    {
+      "id": "18-gif",
+      "start": "Training-settled",
+      "end": "Training-settled",
+      "budget_min": 3,
+      "steps": [
+        {
+          "run": "hb_steps.py:proof_gif",
+          "check": true,
+          "args": {
+            "seconds": 7
+          }
+        }
+      ]
+    },
+    {
+      "id": "19-ordinary",
+      "start": "Training-settled",
+      "end": "Training-settled",
+      "budget_min": 3,
+      "steps": [
+        {
+          "run": "hb_steps.py:proof_ordinary",
+          "check": true,
+          "args": {}
+        }
+      ]
+    },
+    {
+      "id": "20-scan",
+      "start": "Training-settled",
+      "end": "Training-settled",
+      "budget_min": 3,
+      "steps": [
+        {
+          "run": "hb_steps.py:proof_scan",
+          "check": true,
+          "args": {}
+        }
+      ]
+    }
+  ]
+}

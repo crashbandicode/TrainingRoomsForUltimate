@@ -85,7 +85,6 @@ approved_by = "Operator 2026-11-05 via primary 35137355: 'raise the size limit i
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-<<<<<<< HEAD
 ceiling = 136992
 date = "2026-11-05"
 reason = "rc.3: the frame strip (SPEC-input-06, operator decision INPUT-VIZ A) replacing the input log; measured 136992 at 873f9d1 (tools/sloc.py), +519 over 136473"
@@ -105,4 +104,12 @@ basis = "rustfmt-sloc4"
 ceiling = 136797
 date = "2026-11-05"
 reason = "rc.3 menu navigation (p23/menu-nav): ZL + Up/Down section jump and the remembered place (b168718), the confirmed Reset page to defaults line replacing the ZR page reset (bb8e5a9); measured 136797 at bb8e5a9 (tools/sloc.py), +324 over 136473 at main 36d7f46"
+approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed' (rc.3 features)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 136945
+date = "2026-11-05"
+reason = "rc.3: HB-OWN-ORBS option 1 (own orbs for every fighter sphere in release, decision 2026-11-05); measured 136945 at b9436b1 (tools/size_gate.py), +472 over 136473"
 approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed' (rc.3 features)"

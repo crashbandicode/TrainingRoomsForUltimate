@@ -77,6 +77,7 @@ hook_ids! {
     HitboxCatch => "hitbox_catch",
     HitboxRebound => "hitbox_rebound",
     HitboxFrame => "hitbox_frame",
+    HitboxOrbs => "hitbox_orbs",
     /// Package 6, nested inside the hooks above so an allocation is charged to the step that made it: the roster cycle's input
     /// step (P1 and the CPU operator), its per-frame steps (sources, Kirby hats, items, preload, the practice lease) and package
     /// 3's per-fighter state frame.

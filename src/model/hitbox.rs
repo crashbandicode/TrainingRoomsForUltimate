@@ -867,6 +867,11 @@ impl HandleSet {
         self.held[..self.len].iter().map(|h| h.handle)
     }
 
+    /// The spheres held now (the own orbs are placed from them).
+    pub fn spheres(&self) -> impl Iterator<Item = &Sphere> + '_ {
+        self.held[..self.len].iter().map(|h| &h.sphere)
+    }
+
     /// The `CATCH` command made a grab sphere: requested by the fighter's next pass. `false` when the queue is full.
     pub fn push_grab(&mut self, sphere: Sphere) -> bool {
         if self.pending_len == MAX_PENDING {
@@ -999,6 +1004,11 @@ impl SetTable {
         };
         self.used[i] = self.clock;
         i
+    }
+
+    /// The key (accessor address) of set `i`, 0 when free.
+    pub fn key(&self, i: usize) -> usize {
+        self.keys[i]
     }
 
     /// The set of `key` if it has one.

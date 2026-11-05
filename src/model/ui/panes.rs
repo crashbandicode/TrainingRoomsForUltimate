@@ -253,8 +253,14 @@ pub const NOTICE_LONG_UNITS: u16 = 321;
 /// its own container `TrIv` under `RootPane` and the panes below it, all named `TrIv…`. The input package writes
 /// them (`model::frame_strip_plan`).
 pub const IDX_IV: usize = IDX_NOTICE_LONG + 1;
+/// The hitbox visualizer's own orbs (`model::hitbox_orbs`, decision HB-OWN-ORBS): a container under `RootPane` (the
+/// layout builder makes it RootPane's first child in both layouts, so every other pane draws over it) and `ORBS` pictures of the plugin's own disc texture (`tr_orb_disc`, drawn by the layout builder), tinted by
+/// their vertex colours.
+pub const ORBS: usize = 192;
+pub const IDX_ORBS: usize = IDX_IV + iv::COUNT;
+pub const IDX_ORB: usize = IDX_ORBS + 1;
 /// How many panes the plugin adds to the layout.
-pub const COUNT: usize = IDX_IV + iv::COUNT;
+pub const COUNT: usize = IDX_ORB + ORBS;
 
 /// The frame strip's pane indices and geometry (canvas units, the container's centre is the origin).
 pub mod iv {
@@ -458,13 +464,15 @@ pub const fn row_value_index(i: usize) -> usize {
 pub const fn name_of(index: usize) -> Name {
     match index {
         i if i >= IDX_ITEM_ICON && i < IDX_ITEM_ICON + ITEM_ICONS => Name::indexed("tr_item_", i - IDX_ITEM_ICON),
+        IDX_ORBS => Name::new("TrOrbs"),
+        i if i >= IDX_ORB && i < IDX_ORB + ORBS => Name::indexed(if i - IDX_ORB < 100 { "tr_oa_" } else { "tr_ob_" }, (i - IDX_ORB) % 100),
         IDX_MENU => ROOT,
         IDX_NOTICE => Name::new("TrModDisp0"),
         IDX_NOTICE_BASE => Name::new("TrModDisp0Base"),
         IDX_NOTICE_HEADER => Name::new("TrModDisp0Header"),
         IDX_NOTICE_TEXT => Name::new("TrModDisp0Txt"),
         IDX_NOTICE_LONG => Name::new("TrModDisp0Long"),
-        i if i >= IDX_IV && i < COUNT => iv_name(i - IDX_IV),
+        i if i >= IDX_IV && i < IDX_ORBS => iv_name(i - IDX_IV),
         IDX_CHIP_HI => Name::new("tr_ch_hi"),
         IDX_TILE_HI => Name::new("tr_ti_hi"),
         IDX_BG => Name::new("tr_bg"),
@@ -549,6 +557,8 @@ pub const fn spec(index: usize) -> Spec {
     let name = name_of(index);
     match index {
         i if i >= IDX_ITEM_ICON && i < IDX_ITEM_ICON + ITEM_ICONS => rect(name, [0.0, 0.0, 64.0, 64.0], [255; 4], false),
+        IDX_ORBS => Spec { name, parent: ROOT_PANE, kind: Kind::Null, x: 0.0, y: 0.0, w: 1920.0, h: 1080.0, visible: false },
+        i if i >= IDX_ORB && i < IDX_ORB + ORBS => under(rect(name, [0.0, 0.0, 64.0, 64.0], [255; 4], false), name_of(IDX_ORBS)),
         IDX_MENU => Spec { name, parent: ROOT_PANE, kind: Kind::Null, x: 0.0, y: 0.0, w: 1920.0, h: 1080.0, visible: false },
         IDX_NOTICE => Spec { name, parent: ROOT_PANE, kind: Kind::Null, x: 0.0, y: 0.0, w: 1920.0, h: 1080.0, visible: false },
         IDX_NOTICE_BASE => under(rect(name, [0.0, 405.0, 1000.0, 150.0], NOTICE_BACKGROUND, true), name_of(IDX_NOTICE)),
@@ -557,7 +567,7 @@ pub const fn spec(index: usize) -> Spec {
         IDX_NOTICE_LONG => under(text(name, [0.0, 325.0, 960.0, 180.0], Align::Center, (14.0, 24.0),
             NOTICE_LONG_UNITS, TEXT), name_of(IDX_NOTICE)),
         IDX_BG => rect(name, [0.0, 0.0, PANEL_W, PANEL_H], PANEL, true),
-        i if i >= IDX_IV && i < COUNT => iv_spec(i - IDX_IV, name),
+        i if i >= IDX_IV && i < IDX_ORBS => iv_spec(i - IDX_IV, name),
         IDX_CHIP_HI => rect(name, [0.0, 0.0, CHIP_SIZE + 16.0, CHIP_SIZE + 16.0], ACCENT, false),
         IDX_TILE_HI => rect(name, [0.0, 0.0, 100.0, 60.0], ACCENT, false),
         i if i >= IDX_CHIP && i < IDX_CHIP + CHIPS => rect(name, [0.0, 0.0, CHIP_SIZE, CHIP_SIZE], HIGHLIGHT, false),

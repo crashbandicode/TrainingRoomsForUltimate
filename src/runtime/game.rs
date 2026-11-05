@@ -496,6 +496,45 @@ pub mod natives {
     pub unsafe fn set_sleep_effect(accessor: usize, sleep: bool) {
         at::<extern "C" fn(usize, bool)>(crate::model::sites_hitbox::HITBOX_SLEEP_EFFECT_OFFSET).map_or_else(Default::default, |f| f(accessor, sleep))
     }
+
+    /// `ModelModule::joint_global_position_with_offset(accessor, joint, offset, out, false)`: the world position of `offset`
+    /// in the bone's frame (`None` when the row was not granted). With `false` the call only reads the joint matrix; `true`
+    /// would make it update the model first (slot `0x140` calls its own `0xb0`), a write the visualizer never makes.
+    pub unsafe fn joint_position(accessor: usize, joint: u64, offset: &[f32; 3]) -> Option<[f32; 3]> {
+        type JointPosition = extern "C" fn(usize, u64, *const [f32; 4], *mut [f32; 4], bool);
+        let local = Vector4 { v: [offset[0], offset[1], offset[2], 0.0] };
+        let mut out = Vector4 { v: [0.0; 4] };
+        at::<JointPosition>(crate::model::sites_hitbox::ORB_JOINT_POSITION_OFFSET).map(|f| {
+            f(accessor, joint, &local.v, &mut out.v, false);
+            [out.v[0], out.v[1], out.v[2]]
+        })
+    }
+
+    /// The game's world-to-screen projection with the render camera (`(out_x*, out_y*, pos&, false)`): pixels, y down
+    /// (`None` when the row was not granted).
+    pub unsafe fn world_to_screen(pos: &[f32; 3]) -> Option<[f32; 2]> {
+        type Project = extern "C" fn(*mut f32, *mut f32, *const [f32; 4], bool);
+        let at_pos = Vector4 { v: [pos[0], pos[1], pos[2], 0.0] };
+        let (mut x, mut y) = (0.0f32, 0.0f32);
+        at::<Project>(crate::model::sites_hitbox::ORB_WORLD_TO_SCREEN_OFFSET).map(|f| {
+            f(&mut x, &mut y, &at_pos.v, false);
+            [x, y]
+        })
+    }
+
+    /// The two screen size words that projection maps with (read only when its relied row was granted).
+    pub unsafe fn screen_size_words() -> Option<[f32; 2]> {
+        use crate::model::sites_hitbox::{ORB_SCREEN_H_WORD, ORB_SCREEN_SIZE_OFFSET, ORB_SCREEN_W_WORD};
+        super::granted(ORB_SCREEN_SIZE_OFFSET).then(|| {
+            [((text_base() + ORB_SCREEN_W_WORD) as *const f32).read_volatile(), ((text_base() + ORB_SCREEN_H_WORD) as *const f32).read_volatile()]
+        })
+    }
+
+    /// A `phx::Vector3f` as the game reads it (16 bytes, 16-aligned).
+    #[repr(C, align(16))]
+    struct Vector4 {
+        v: [f32; 4],
+    }
 }
 
 /// The game's `app::smashball::is_training_mode()`; false when its guard did not pass.
