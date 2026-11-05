@@ -253,8 +253,69 @@ pub const NOTICE_LONG_UNITS: u16 = 321;
 /// its own container `TrIv` under `RootPane` and the panes below it, all named `TrIv…`. The input package writes
 /// them (`model::frame_strip_plan`).
 pub const IDX_IV: usize = IDX_NOTICE_LONG + 1;
+/// The combo bar under the strip (SPEC-input-07 §7, operator decision COMBO-HELPER A, 2026-11-05): its own container
+/// `TrCb` inside `TrIv` (so it hides with the strip and the layout keeps three roots), and panes named `TrCb…`.
+pub const IDX_CB: usize = IDX_IV + iv::COUNT;
 /// How many panes the plugin adds to the layout.
-pub const COUNT: usize = IDX_IV + iv::COUNT;
+pub const COUNT: usize = IDX_CB + cb::COUNT;
+
+/// The combo bar's pane indices and geometry (canvas units; the bar's centre is the origin of its panes).
+pub mod cb {
+    /// Link cells and result pills.
+    pub const CELLS: usize = 4;
+    pub const PILLS: usize = 8;
+
+    pub mod at {
+        use super::{CELLS, PILLS};
+        pub const CONTAINER: usize = 0;
+        pub const BACKDROP: usize = 1;
+        pub const HEADER: usize = 2;
+        pub const STREAK: usize = 3;
+        pub const RESULT: usize = 4;
+        pub const REASON: usize = 5;
+        pub const PILL: usize = 6;
+        /// Per cell, one block of `CELLS` each: backdrop, title, verdict, offset, ruler, window, recorded and your press.
+        pub const CELL: usize = PILL + PILLS;
+        pub const TITLE: usize = CELL + CELLS;
+        pub const VERDICT: usize = TITLE + CELLS;
+        pub const OFFSET: usize = VERDICT + CELLS;
+        pub const RULER: usize = OFFSET + CELLS;
+        pub const WINDOW: usize = RULER + CELLS;
+        pub const RECORDED: usize = WINDOW + CELLS;
+        pub const YOURS: usize = RECORDED + CELLS;
+        pub const COUNT: usize = YOURS + CELLS;
+    }
+
+    pub const COUNT: usize = at::COUNT;
+
+    /// The bar's centre below the strip's, and its size (the mockup's 864 × 132).
+    pub const BAR_Y: f32 = -184.0;
+    pub const BAR_W: f32 = 864.0;
+    pub const BAR_H: f32 = 132.0;
+    pub const LEFT: f32 = -414.0;
+    pub const HEADER_Y: f32 = 48.0;
+    pub const FOOTER_Y: f32 = -48.0;
+    pub const CELL_Y: f32 = 2.0;
+    pub const CELL_W: f32 = 200.0;
+    pub const CELL_H: f32 = 64.0;
+    pub const CELL_PITCH: f32 = 208.0;
+    pub const CELL_X0: f32 = -312.0;
+    pub const TITLE_DY: f32 = 18.0;
+    pub const VERDICT_DY: f32 = -2.0;
+    pub const RULER_DY: f32 = -22.0;
+    /// The ruler: frames from A₁, `RULER_FROM ..= RULER_FROM + RULER_FRAMES`, `PER_FRAME` units each.
+    pub const RULER_FROM: i32 = -10;
+    pub const RULER_FRAMES: i32 = 30;
+    pub const PER_FRAME: f32 = 6.0;
+    pub const RULER_W: f32 = RULER_FRAMES as f32 * PER_FRAME;
+    pub const PILL_SIZE: f32 = 14.0;
+    pub const PILL_X0: f32 = 166.0;
+    pub const PILL_PITCH: f32 = 20.0;
+    pub const STREAK_X: f32 = 370.0;
+    pub const BACKDROP_COLOR: [u8; 4] = [14, 18, 27, 222];
+    pub const CELL_COLOR: [u8; 4] = [30, 36, 48, 255];
+    pub const TEXT_UNITS: u16 = 24;
+}
 
 /// The frame strip's pane indices and geometry (canvas units, the container's centre is the origin).
 pub mod iv {
@@ -428,6 +489,72 @@ const fn iv_spec(local: usize, name: Name) -> Spec {
     }
 }
 
+/// The combo bar's pane names.
+const fn cb_name(local: usize) -> Name {
+    use cb::at::*;
+    use cb::CELLS;
+    match local {
+        CONTAINER => Name::new("TrCb"),
+        BACKDROP => Name::new("TrCbBg"),
+        HEADER => Name::new("TrCbHead"),
+        STREAK => Name::new("TrCbStrk"),
+        RESULT => Name::new("TrCbRes"),
+        REASON => Name::new("TrCbWhy"),
+        i if i < CELL => Name::indexed("TrCbPill", i - PILL),
+        i if i < COUNT => {
+            let n = (i - CELL) % CELLS;
+            match (i - CELL) / CELLS {
+                0 => Name::indexed("TrCbCell", n),
+                1 => Name::indexed("TrCbTit", n),
+                2 => Name::indexed("TrCbVer", n),
+                3 => Name::indexed("TrCbOff", n),
+                4 => Name::indexed("TrCbRul", n),
+                5 => Name::indexed("TrCbWin", n),
+                6 => Name::indexed("TrCbRec", n),
+                _ => Name::indexed("TrCbYou", n),
+            }
+        }
+        _ => panic!("no such combo bar pane"),
+    }
+}
+
+/// A hidden text box of the combo bar; `x` is the box's centre.
+const fn cb_text(name: Name, [x, y, w]: [f32; 3], align: Align, font: (f32, f32)) -> Spec {
+    Spec { visible: false, ..under(text(name, [x, y, w, 26.0], align, font, cb::TEXT_UNITS, TEXT), Name::new("TrCb")) }
+}
+
+/// The combo bar's panes: kind, place and size, all hidden until the helper draws them.
+const fn cb_spec(local: usize, name: Name) -> Spec {
+    use cb::at::*;
+    use cb::{
+        BAR_H, BAR_W, BAR_Y, CELLS, CELL_COLOR, CELL_H, CELL_W, CELL_Y, FOOTER_Y, HEADER_Y, LEFT, PILL_SIZE, RULER_DY,
+        RULER_W, STREAK_X, TITLE_DY, VERDICT_DY,
+    };
+    use iv::{FONT_SUB, FONT_TAG};
+    let parent = Name::new("TrCb");
+    match local {
+        CONTAINER => Spec { name, parent: Name::new("TrIv"), kind: Kind::Null, x: 0.0, y: BAR_Y, w: BAR_W, h: BAR_H, visible: false },
+        BACKDROP => Spec { visible: false, ..under(rect(name, [0.0, 0.0, BAR_W, BAR_H], cb::BACKDROP_COLOR, true), parent) },
+        HEADER => cb_text(name, [LEFT + 180.0, HEADER_Y, 360.0], Align::Left, FONT_SUB),
+        STREAK => cb_text(name, [STREAK_X, HEADER_Y, 120.0], Align::Center, FONT_TAG),
+        RESULT => cb_text(name, [LEFT + 120.0, FOOTER_Y, 240.0], Align::Left, FONT_SUB),
+        REASON => cb_text(name, [LEFT + 260.0 + 200.0, FOOTER_Y, 400.0], Align::Left, FONT_SUB),
+        i if i < CELL => under(rect(name, [0.0, HEADER_Y, PILL_SIZE, PILL_SIZE], TEXT, false), parent),
+        i if i < TITLE => under(rect(name, [0.0, CELL_Y, CELL_W, CELL_H], CELL_COLOR, false), parent),
+        i if i < VERDICT => cb_text(name, [0.0, CELL_Y + TITLE_DY, CELL_W - 8.0], Align::Center, FONT_TAG),
+        i if i < OFFSET => cb_text(name, [0.0, CELL_Y + VERDICT_DY, 96.0], Align::Center, FONT_TAG),
+        i if i < RULER => cb_text(name, [0.0, CELL_Y + VERDICT_DY, 100.0], Align::Center, FONT_TAG),
+        i if i < WINDOW => under(rect(name, [0.0, CELL_Y + RULER_DY, RULER_W, 3.0], RULE, false), parent),
+        i if i < RECORDED => under(rect(name, [0.0, CELL_Y + RULER_DY, 6.0, 9.0], TEXT, false), parent),
+        i if i < YOURS => under(rect(name, [0.0, CELL_Y + RULER_DY, 4.0, 16.0], TEXT, false), parent),
+        i if i < COUNT => under(rect(name, [0.0, CELL_Y + RULER_DY, 6.0, 12.0], TEXT, false), parent),
+        _ => {
+            let _ = CELLS;
+            panic!("no such combo bar pane")
+        }
+    }
+}
+
 /// A roster mark's name: one prefix per block (Player and CPU badges, Player and CPU stripes, the Solo markers) and the
 /// tile as two digits. `name2` writes its second number as one digit, so it cannot name 88 tiles.
 const fn mark_name(n: usize) -> Name {
@@ -464,7 +591,8 @@ pub const fn name_of(index: usize) -> Name {
         IDX_NOTICE_HEADER => Name::new("TrModDisp0Header"),
         IDX_NOTICE_TEXT => Name::new("TrModDisp0Txt"),
         IDX_NOTICE_LONG => Name::new("TrModDisp0Long"),
-        i if i >= IDX_IV && i < COUNT => iv_name(i - IDX_IV),
+        i if i >= IDX_IV && i < IDX_CB => iv_name(i - IDX_IV),
+        i if i >= IDX_CB && i < COUNT => cb_name(i - IDX_CB),
         IDX_CHIP_HI => Name::new("tr_ch_hi"),
         IDX_TILE_HI => Name::new("tr_ti_hi"),
         IDX_BG => Name::new("tr_bg"),
@@ -557,7 +685,8 @@ pub const fn spec(index: usize) -> Spec {
         IDX_NOTICE_LONG => under(text(name, [0.0, 325.0, 960.0, 180.0], Align::Center, (14.0, 24.0),
             NOTICE_LONG_UNITS, TEXT), name_of(IDX_NOTICE)),
         IDX_BG => rect(name, [0.0, 0.0, PANEL_W, PANEL_H], PANEL, true),
-        i if i >= IDX_IV && i < COUNT => iv_spec(i - IDX_IV, name),
+        i if i >= IDX_IV && i < IDX_CB => iv_spec(i - IDX_IV, name),
+        i if i >= IDX_CB && i < COUNT => cb_spec(i - IDX_CB, name),
         IDX_CHIP_HI => rect(name, [0.0, 0.0, CHIP_SIZE + 16.0, CHIP_SIZE + 16.0], ACCENT, false),
         IDX_TILE_HI => rect(name, [0.0, 0.0, 100.0, 60.0], ACCENT, false),
         i if i >= IDX_CHIP && i < IDX_CHIP + CHIPS => rect(name, [0.0, 0.0, CHIP_SIZE, CHIP_SIZE], HIGHLIGHT, false),

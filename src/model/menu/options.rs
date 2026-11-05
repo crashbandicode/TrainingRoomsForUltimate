@@ -38,6 +38,9 @@ pub static BUFFS: [&str; 18] = [
     "Jump", "Speed", "Shield", "Buster", "Smash", "Power Dragon", "Mini Waft", "Half Waft", "Full Waft",
 ];
 pub static INPUT_DISPLAY: [&str; 2] = ["Off", "Frame strip"];
+/// SPEC-input-07 §6: frames from the recorded press that still count as on time, and what follows an attempt.
+pub static COMBO_TOLERANCE: [&str; 3] = ["Exact", "1 frame", "2 frames"];
+pub static COMBO_AFTER: [&str; 2] = ["Keep playing", "Load save state"];
 pub static MACRO_SOURCE: [&str; 2] = ["Numbered Slots", "Named Library"];
 pub static CYCLE_SLOTS: [&str; 6] = ["Off", "1", "2", "3", "4", "5"];
 pub static SOURCES: [&str; 3] = ["Fighters", "Hats", "Both"];

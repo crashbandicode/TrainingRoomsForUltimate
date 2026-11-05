@@ -24,7 +24,7 @@ use crate::runtime::diag_log::diagnostic;
 use crate::runtime::features::{chords, notices, writer};
 use crate::runtime::published;
 use crate::runtime::macros::{named_macros, replay_capture};
-use crate::runtime::ui::{external, requests};
+use crate::runtime::ui::{combos, external, requests};
 use crate::runtime::ui::state::{CLOSE_COUNT, CLOSING, EXT_SHOWN, FRAME, FRAME_SEQ, OPEN};
 
 static INPUT: Ring<64> = Ring::new();
@@ -102,7 +102,18 @@ fn env() -> Env {
         console: console_mode(),
         shortcuts: chords::shortcuts(),
         replay_capture: writer::replay_capture(),
+        combo_target: crate::runtime::features::combo::labels().0,
+        combo_draft: crate::runtime::features::combo::labels().1,
         ..Env::default()
+    }
+}
+
+/// A Combos row's result (SPEC-input-07 §6): a notice, and the names the open menu shows.
+fn combo_note(s: &mut Session, note: &str) {
+    notices::upsert(0x2A, "Combos", note, 180, DEFAULT_COLOR);
+    let (target, draft) = crate::runtime::features::combo::labels();
+    if let Some(m) = s.menu.as_mut() {
+        m.set_combo_labels(target, draft);
     }
 }
 
@@ -113,6 +124,7 @@ struct Session {
     menu: Option<Menu>,
     setups: super::setups::Ui,
     setup_note: Option<String>,
+    combos: combos::Ui,
     stage_context: Option<crate::runtime::lobby::practice_stage_request::MenuContext>,
     stage_request: Option<u64>,
     phase: Phase,
@@ -254,6 +266,8 @@ fn press(button: Button, s: &mut Session) {
             // The layer's panel owns the buttons; the menu stays on its row until the panel closes.
             if s.panel.is_some_and(is_setup) {
                 s.setups.press(button);
+            } else if s.panel.is_some_and(combos::is_combo) {
+                s.combos.press(button);
             } else {
                 external::press_panel(button);
             }
@@ -326,6 +340,9 @@ fn sync_panels(s: &mut Session) {
         notices::upsert(0x29, "Setup library", &note, 180, DEFAULT_COLOR);
         s.setup_note = Some(note);
     }
+    if let Some(note) = s.combos.tick() {
+        combo_note(s, &note);
+    }
     // A keyboard name the frame wrapper confirmed: its library write is file I/O, done here.
     if s.menu.is_none() {
         return;
@@ -345,10 +362,25 @@ fn sync_panels(s: &mut Session) {
     }
     if open && s.phase == Phase::Menu {
         let entered = s.menu.as_ref().and_then(|m| match m.screen() {
-            Some(Screen::External(editor)) if external::is_layer_panel(*editor) || is_setup(*editor) => Some(*editor),
+            Some(Screen::External(editor))
+                if external::is_layer_panel(*editor) || is_setup(*editor) || combos::is_combo(*editor) => Some(*editor),
             _ => None,
         });
-        if let Some(editor) = entered {
+        if let Some(editor) = entered.filter(|e| combos::is_combo(*e)) {
+            // The Combos group (SPEC-input-07 §6): a list or name page opens as a panel; Save runs and the row closes.
+            match s.combos.open(editor) {
+                Ok(combos::Opened::Panel) => {
+                    s.phase = Phase::Panel;
+                    s.panel = Some(editor);
+                }
+                Ok(combos::Opened::Done(note)) | Err(note) => {
+                    combo_note(s, &note);
+                    if let Some(m) = s.menu.as_mut() {
+                        m.press(Button::B);
+                    }
+                }
+            }
+        } else if let Some(editor) = entered {
             let slot = s.menu.as_ref().and_then(record_slot);
             let opened = if is_setup(editor) {
                 match s.menu.as_ref().map(|m| s.setups.open(editor, m)) {
@@ -382,10 +414,12 @@ fn sync_panels(s: &mut Session) {
             // The menu lost its renderer or the session ended: the layer's panel goes with it.
             external::close_panel();
             s.setups.leave_panel();
+            s.combos.leave_panel();
             s.panel = None;
         }
         Step::PopRow => {
             s.setups.leave_panel();
+            s.combos.leave_panel();
             s.panel = None;
             if let Some(m) = s.menu.as_mut() {
                 // A resumed external name can overlay the reopened page.
@@ -501,6 +535,8 @@ fn publish_frame(s: &Session) {
         // The layer's page may be between two views (a capture loading, a keyboard open): keep what is on screen.
         let Some(view) = (if s.panel.is_some_and(is_setup) {
             s.setups.view()
+        } else if s.panel.is_some_and(combos::is_combo) {
+            s.combos.view()
         } else { external::panel_view_now() }) else { return };
         panel_frame(menu, &view.title, &view.footer, &view.labels, view.selected, &mut next);
     } else if matches!(menu.screen(), Some(Screen::External(Editor::MiiList(_)))) {

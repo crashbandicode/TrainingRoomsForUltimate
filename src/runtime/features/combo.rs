@@ -1,0 +1,133 @@
+//! The combo helper at run time (SPEC-input-07; operator decision COMBO-HELPER A, 2026-11-05).
+//!
+//! - On P1's entry callback, right after the frame strip's tracker stepped (`input_display::sample_frame`), the helper
+//!   (`model::combo`) takes one step on the same tracker. Fixed arrays; nothing here allocates.
+//! - After an attempt, *Load save state* asks for the Load chord's own load (`states::request_load`).
+//! - The menu worker sets the target and reads the last combo (`runtime::ui::combos`).
+//! - The HUD tick draws the bar under the strip (`model::combo_plan`), writing only what changed.
+//! - Every graded link, resolved attempt and saved combo calls an exported trace function (§8): an Eden guest trace
+//!   point on it records the facts, with no log line.
+
+use hos_lock::Mutex;
+
+use crate::model::combo::{Combo, Helper, Label, Mark, Out, Outcome, Settings};
+use crate::model::combo_plan::Renderer;
+use crate::model::frame_strip::{Tracker, Verdict};
+use crate::model::frame_strip_plan::{Changed, Look, Text};
+use crate::runtime::published;
+
+static HELPER: Mutex<Helper> = Mutex::new(Helper::new());
+static RENDERER: Mutex<Renderer> = Mutex::new(Renderer::new());
+/// The target's name for the bar, and the names the menu shows (target, draft).
+static NAME: Mutex<Text> = Mutex::new(Text::EMPTY);
+static LABELS: Mutex<(Label, Label)> = Mutex::new((Label::EMPTY, Label::EMPTY));
+
+fn settings() -> Settings {
+    published::live().map_or(Settings::factory(), |live| live.combo)
+}
+
+/// One frame, right after the strip's tracker stepped (game thread, inside the fighter's frame).
+pub fn after_strip(tracker: &Tracker) {
+    let out = HELPER.lock().step(tracker, settings());
+    report(out);
+}
+
+/// The strip's session clear (leaving Training, a hot swap, a lobby change).
+pub fn session_clear() {
+    let out = HELPER.lock().clear();
+    report(out);
+}
+
+fn report(out: Out) {
+    if let Some((index, grade)) = out.link {
+        let tolerance = settings().tolerance;
+        let flags = u32::from(grade.is_true())
+            | u32::from(grade.clean(tolerance)) << 1
+            | u32::from(grade.wrong_move) << 2
+            | u32::from(grade.missing().is_some()) << 3;
+        let offset = match grade.marks[0] {
+            Some(Mark::At(d)) => d,
+            _ => i32::MIN,
+        };
+        tr_combo_link_v1(index as u32, verdict_value(grade.link.verdict), flags, offset);
+    }
+    if let Some(s) = out.resolved {
+        let outcome = match s.outcome {
+            Outcome::Completed => 1,
+            Outcome::Stopped => 2,
+            Outcome::Cleared => 3,
+        };
+        tr_combo_attempt_v1(outcome, u32::from(s.true_links), u32::from(s.total), s.fault.map_or(0, |(k, _)| u32::from(k) + 1));
+    }
+    if out.load {
+        crate::runtime::features::states::request_load();
+    }
+}
+
+fn verdict_value(verdict: Verdict) -> i32 {
+    match verdict {
+        Verdict::True(Some(link)) | Verdict::Drop(link) => link,
+        Verdict::True(None) => i32::MIN,
+    }
+}
+
+/// A link of an attempt was graded (SPEC-input-07 §8): its index, the verdict's link value (`i32::MIN` unknown), flags
+/// (bit 0 true, 1 clean, 2 wrong move, 3 a missing press) and the first press's offset (`i32::MIN` none).
+#[no_mangle]
+#[inline(never)]
+pub extern "C" fn tr_combo_link_v1(index: u32, link: i32, flags: u32, offset: i32) {
+    core::hint::black_box((index, link, flags, offset));
+}
+
+/// An attempt resolved: outcome (1 completed, 2 stopped, 3 cleared), true links, reference links, first link not true + 1.
+#[no_mangle]
+#[inline(never)]
+pub extern "C" fn tr_combo_attempt_v1(outcome: u32, true_links: u32, total: u32, first_bad: u32) {
+    core::hint::black_box((outcome, true_links, total, first_bad));
+}
+
+/// A combo was saved: its links and the first link's verdict value.
+#[no_mangle]
+#[inline(never)]
+pub extern "C" fn tr_combo_saved_v1(links: u32, first: i32, _reserved0: u32, _reserved1: u32) {
+    core::hint::black_box((links, first));
+}
+
+/// *Save last combo* (worker): the open exchange when it has a link, else the one before.
+pub fn last_combo() -> Option<Combo> {
+    HELPER.lock().last_combo()
+}
+
+/// The worker saved `combo`.
+pub fn saved(combo: &Combo) {
+    tr_combo_saved_v1(combo.len() as u32, combo.get(0).map_or(i32::MIN, |l| verdict_value(l.verdict)), 0, 0);
+}
+
+/// A new target (worker): the helper starts over on it, and the bar shows its name.
+pub fn set_target(target: Option<(Combo, &str)>) {
+    HELPER.lock().set_target(target.map(|(combo, _)| combo));
+    *NAME.lock() = Text::new(target.map_or("", |(_, name)| name));
+    LABELS.lock().0 = Label::new(target.map_or("", |(_, name)| name));
+}
+
+/// The draft name the next save uses (worker).
+pub fn set_draft(draft: &str) {
+    LABELS.lock().1 = Label::new(draft);
+}
+
+/// The menu's labels: the target's name and the draft (`model::menu::Env`).
+pub fn labels() -> (Label, Label) {
+    *LABELS.lock()
+}
+
+/// The plugin's layout was registered again: every pane is written again.
+pub fn on_layout_registered() {
+    RENDERER.lock().invalidate();
+}
+
+/// One HUD tick: the bar's writes, shown with the strip while the helper is On and has a target.
+pub fn hud_tick(strip_shown: bool, apply: impl FnMut(usize, &Look, Changed)) -> usize {
+    let helper = *HELPER.lock();
+    let name = *NAME.lock();
+    RENDERER.lock().draw(&helper, &name, strip_shown, apply)
+}

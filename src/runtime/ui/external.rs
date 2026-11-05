@@ -53,6 +53,7 @@ pub fn pad_of(button: Button) -> Option<Pad> {
         Button::A => Pad::Confirm,
         Button::B => Pad::Back,
         Button::Y => Pad::Extra,
+        Button::X => Pad::Rename,
         _ => return None,
     })
 }

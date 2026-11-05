@@ -50,6 +50,12 @@ pub fn take_list_action() -> Option<String> {
 }
 
 static LIST_CHOICE: RwLock<Option<String>> = RwLock::new(None);
+static LIST_RENAME: RwLock<Option<String>> = RwLock::new(None);
+
+/// X on a library opened through [`open_external_library`]: the opener renames the row.
+pub fn take_list_rename() -> Option<String> {
+    lock_write(&LIST_RENAME).take()
+}
 
 /// A on a library opened through [`open_external_library`]. The named-macro
 /// loader never sees that row; the opener owns it.
@@ -108,6 +114,7 @@ pub fn worker_lifecycle() {
             *lock_write(&CONFIRMED_NAME) = None;
             *lock_write(&LIST_ACTION) = None;
             *lock_write(&LIST_CHOICE) = None;
+            *lock_write(&LIST_RENAME) = None;
             if !keep {
                 *lock_write(&RECORD_SLOT) = None;
                 lock_write(&UI).close_transient();
@@ -745,11 +752,12 @@ pub fn slot_exported(frames: Vec<InputFrame>, start: StartState) {
 }
 
 pub fn offer_external_name(token: u64, default_name: &str, summary: &str) {
-    let effect = lock_write(&UI).offer_name(
-        NameContext { token, title: SETUP_KEYBOARD_TITLE },
-        default_name,
-        summary,
-    );
+    offer_external_name_titled(token, SETUP_KEYBOARD_TITLE, default_name, summary);
+}
+
+/// A caller-owned name under its own keyboard header (the combo library's "Name combo", SPEC-input-07 §5).
+pub fn offer_external_name_titled(token: u64, title: &'static str, default_name: &str, summary: &str) {
+    let effect = lock_write(&UI).offer_name(NameContext { token, title }, default_name, summary);
     apply_effect(effect);
     request_native_name();
     if panel_visible() {
@@ -1385,6 +1393,7 @@ fn apply_effect(effect: Effect) {
         Effect::Choose(id) => load_id(&id),
         Effect::BindToSlot { id } => bind_to_slot(&id),
         Effect::Alternate { id } => *lock_write(&LIST_ACTION) = Some(id),
+        Effect::Rename { id } => *lock_write(&LIST_RENAME) = Some(id),
         Effect::ForwardChoose { id } => *lock_write(&LIST_CHOICE) = Some(id),
         Effect::NameConfirmed { context, name } => {
             *lock_write(&CONFIRMED_NAME) = Some(NameConfirmation { context, name });

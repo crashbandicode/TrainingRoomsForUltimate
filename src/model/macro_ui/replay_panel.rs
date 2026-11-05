@@ -83,6 +83,7 @@ impl ReplayEditor {
             Pad::Back => return Effect::Close,
             Pad::Extra => { self.window.forward(Step::Frame); }
             Pad::Confirm => return self.confirm(),
+            Pad::Rename => {}
         }
         Effect::None
     }

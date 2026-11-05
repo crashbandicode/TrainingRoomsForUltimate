@@ -38,6 +38,9 @@ pub struct Env {
     pub shortcuts: [Chord; 2],
     /// `replay_capture.ini` (Q7).
     pub replay_capture: bool,
+    /// The combo helper's target and draft names (SPEC-input-07 §6), kept by the menu worker.
+    pub combo_target: super::combo::Label,
+    pub combo_draft: super::combo::Label,
 }
 
 impl Default for Env {
@@ -50,6 +53,8 @@ impl Default for Env {
             // The file of record is the INI, which defaults to off when absent (lead ruling 2026-11-02);
         // the runtime sets this from it at boot.
         replay_capture: false,
+            combo_target: super::combo::Label::EMPTY,
+            combo_draft: super::combo::Label::EMPTY,
         }
     }
 }
@@ -700,6 +705,12 @@ impl Menu {
 
     /// The console's operation mode changed (docked or undocked). A grid already open keeps the
     /// layout it opened with; the next one opened takes the new mode (SPEC-core-03 §2.5).
+    /// The combo helper's target and draft names changed while the menu is open (SPEC-input-07 §6).
+    pub fn set_combo_labels(&mut self, target: super::combo::Label, draft: super::combo::Label) {
+        self.env.combo_target = target;
+        self.env.combo_draft = draft;
+    }
+
     pub fn set_console(&mut self, mode: ConsoleMode) {
         self.env.console = mode;
     }

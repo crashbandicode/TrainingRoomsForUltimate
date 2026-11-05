@@ -180,6 +180,10 @@ const SPEC_TABLE: &[(&str, Kind, usize, &[usize])] = &[
     ("cycle_preload_native_groups", Kind::Single, 2, &[0]),
     ("cycle_preload_pair_groups", Kind::Single, 2, &[0]),
     ("cycle_preload_mii_groups", Kind::Single, 2, &[0]),
+    // SPEC-input-07 §6 (combo helper, 2026-11-05): Off, 1 frame, keep playing.
+    ("combo_helper", Kind::Single, 2, &[1]),
+    ("combo_tolerance", Kind::Single, 3, &[1]),
+    ("combo_after", Kind::Single, 2, &[0]),
 ];
 
 #[test]
@@ -254,10 +258,11 @@ fn layout_row_counts_match_the_rc_freeze() {
             .map(|page| row_count(page, pilot))
     };
     // Display & Controls lost "Group inputs by status" to the frame strip (SPEC-input-06 §3.1, 2026-11-05).
-    assert_eq!(counts(false), [31, 11, 15, 20, 10, 3]);
-    assert_eq!(counts(true), [30, 11, 15, 20, 10, 3]);
-    assert_eq!(counts(false)[..5].iter().sum::<usize>(), 87);
-    assert_eq!(counts(true)[..5].iter().sum::<usize>(), 86);
+    // Recording gained the 7 rows of the Combos group (SPEC-input-07 §6, 2026-11-05).
+    assert_eq!(counts(false), [31, 11, 22, 20, 10, 3]);
+    assert_eq!(counts(true), [30, 11, 22, 20, 10, 3]);
+    assert_eq!(counts(false)[..5].iter().sum::<usize>(), 94);
+    assert_eq!(counts(true)[..5].iter().sum::<usize>(), 93);
     // Controls (MENU-DRAFT §2): 4 direction grids, 7 delay rows, 13 multi-selects (the 12 checklists,\n    // 3 of them slot sets, and Swap groups).
     let n = |f: &dyn Fn(&Control) -> bool| ROWS.iter().filter(|r| r.vis != model::menu::table::Vis::PilotPresent && f(&r.control)).count();
     assert_eq!(n(&|c| matches!(c, Control::DirectionGrid { .. })), 4);
@@ -266,7 +271,7 @@ fn layout_row_counts_match_the_rc_freeze() {
     assert_eq!(n(&|c| matches!(c, Control::Slider)), 2);
     // The RC defers four editors, retaining the empty Setup group index so
     // persisted group IDs do not move. Every other group still has rows.
-    assert_eq!(ROWS.len(), 91);
+    assert_eq!(ROWS.len(), 98);
     assert!(!ROWS.iter().any(|r| matches!(r.control,
         Control::Editor(Editor::SetupSave | Editor::SetupLibrary | Editor::EditPlacement | Editor::ReplayWindow))));
     assert_eq!(GROUPS[7].title, "Setup library");

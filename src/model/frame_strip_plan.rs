@@ -78,13 +78,13 @@ pub struct Look {
 }
 
 impl Look {
-    const HIDDEN: Look = Look { visible: false, x: 0.0, y: 0.0, w: 0.0, rot: 0.0, color: [0; 4], text: Text::EMPTY };
+    pub(crate) const HIDDEN: Look = Look { visible: false, x: 0.0, y: 0.0, w: 0.0, rot: 0.0, color: [0; 4], text: Text::EMPTY };
 
-    const fn rect(x: f32, y: f32, w: f32, color: [u8; 4]) -> Look {
+    pub(crate) const fn rect(x: f32, y: f32, w: f32, color: [u8; 4]) -> Look {
         Look { visible: true, x, y, w, rot: 0.0, color, text: Text::EMPTY }
     }
 
-    fn text(x: f32, y: f32, text: Text, color: [u8; 4]) -> Look {
+    pub(crate) fn text(x: f32, y: f32, text: Text, color: [u8; 4]) -> Look {
         Look { visible: true, x, y, w: 0.0, rot: 0.0, color, text }
     }
 }
@@ -101,7 +101,7 @@ pub struct Changed {
 }
 
 impl Changed {
-    fn between(old: Option<&Look>, new: &Look) -> Changed {
+    pub(crate) fn between(old: Option<&Look>, new: &Look) -> Changed {
         let Some(old) = old else {
             return Changed { visible: true, pos: true, width: true, rot: true, color: true, text: true };
         };

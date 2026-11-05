@@ -57,6 +57,12 @@ pub mod input_delay;
 pub mod frame_strip;
 #[path = "model/frame_strip_plan.rs"]
 pub mod frame_strip_plan;
+#[path = "model/combo.rs"]
+pub mod combo;
+#[path = "model/combo_plan.rs"]
+pub mod combo_plan;
+#[path = "model/combo_record.rs"]
+pub mod combo_record;
 #[path = "model/install_line.rs"]
 pub mod install_line;
 #[path = "model/lra_reset.rs"]

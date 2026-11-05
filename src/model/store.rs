@@ -86,6 +86,8 @@ impl From<serde_json::Error> for StoreError {
 
 /// Longest id accepted, in characters.
 pub const MAX_ID_CHARS: usize = 48;
+/// The file naming a store's selected record (`Store::select`).
+pub const SELECTED: &str = "selected.txt";
 /// Default largest file read: 8 MiB. Other record types set their own bound through
 /// [`Record::MAX_FILE_BYTES`].
 pub const MAX_FILE_BYTES: u64 = 8 * 1024 * 1024;
@@ -263,6 +265,39 @@ impl<R: Record> Store<R> {
             return Err(lift::<R>(StoreError::NotFound(id.to_owned())));
         }
         self.write_atomic(id, &bytes).map_err(lift::<R>)
+    }
+
+    /// Removes the record `id` (and a leftover backup of it).
+    pub fn delete(&self, id: &str) -> Result<(), R::Error> {
+        check_id(id).map_err(lift::<R>)?;
+        match fs::remove_file(self.file(id, "json")) {
+            Ok(()) => {}
+            Err(err) if err.kind() == io::ErrorKind::NotFound => return Err(lift::<R>(StoreError::NotFound(id.to_owned()))),
+            Err(err) => return Err(lift::<R>(err.into())),
+        }
+        let _ = fs::remove_file(self.file(id, "json.bak"));
+        Ok(())
+    }
+
+    /// The id in `selected.txt`, when it names a valid id (the file may name a record since deleted).
+    pub fn selected(&self) -> Option<String> {
+        let text = fs::read_to_string(self.dir.join(SELECTED)).ok()?;
+        let id = text.trim();
+        check_id(id).is_ok().then(|| id.to_owned())
+    }
+
+    /// Writes `selected.txt` atomically; `None` removes it.
+    pub fn select(&self, id: Option<&str>) -> Result<(), R::Error> {
+        let path = self.dir.join(SELECTED);
+        let Some(id) = id else {
+            return match fs::remove_file(&path) {
+                Err(err) if err.kind() != io::ErrorKind::NotFound => Err(lift::<R>(err.into())),
+                _ => Ok(()),
+            };
+        };
+        check_id(id).map_err(lift::<R>)?;
+        fs::create_dir_all(&self.dir).map_err(|err| lift::<R>(err.into()))?;
+        write_replace(&path, id.as_bytes()).map_err(|err| lift::<R>(err.into()))
     }
 
     fn file(&self, id: &str, extension: &str) -> PathBuf {

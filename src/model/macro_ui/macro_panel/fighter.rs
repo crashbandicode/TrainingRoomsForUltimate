@@ -97,7 +97,7 @@ impl Prompt {
             Pad::Right | Pad::Down => self.cursor = (self.cursor + 1).min(ROWS.len() - 1),
             Pad::Confirm => return Outcome::Chose(self.choice()),
             Pad::Back => return Outcome::Cancelled,
-            Pad::Extra => {}
+            Pad::Extra | Pad::Rename => {}
         }
         Outcome::None
     }

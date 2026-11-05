@@ -65,7 +65,7 @@ const fn g(page: Page, title: &'static str) -> Group {
     Group { page, title, advanced: false }
 }
 
-pub static GROUPS: [Group; 18] = [
+pub static GROUPS: [Group; 19] = [
     g(Page::Cpu, "Reactions"),
     g(Page::Cpu, "Defence"),
     g(Page::Cpu, "Ledge & Tech"),
@@ -84,6 +84,8 @@ pub static GROUPS: [Group; 18] = [
     g(Page::DisplayControls, "On screen"),
     g(Page::DisplayControls, "Controls"),
     g(Page::Developer, "Developer"),
+    // Appended so no other group's index moves; a page lists its groups in table order (SPEC-input-07 §6).
+    g(Page::Recording, "Combos"),
 ];
 
 // Group indices, for the rows below.
@@ -104,6 +106,7 @@ const LOADING: u8 = 14;
 const SCREEN: u8 = 15;
 const CONTROLS: u8 = 16;
 const DEV: u8 = 17;
+const COMBOS: u8 = 18;
 
 /// The sub-screens that edit something the model does not own the content of (the fork's grids,
 /// lists and panels arrive with package 6; the libraries and the replay window with package 4).
@@ -129,6 +132,11 @@ pub enum Editor {
     SaveSlotToLibrary,
     EditPlacement,
     ReplayWindow,
+    /// The combo helper (SPEC-input-07 §6): the draft name, saving the last combo, the saved combos, the target.
+    ComboName,
+    ComboSave,
+    ComboLibrary,
+    ComboTarget,
 }
 
 /// A read-only row.
@@ -205,7 +213,7 @@ const fn delay(group: u8, title: &'static str, id: &'static str, step: u16, rang
 const TOGGLE: Control = Control::Toggle;
 
 /// The rows in page order, then group order, then the order they appear in (MENU-DRAFT §2).
-pub static ROWS: [Row; 91] = [
+pub static ROWS: [Row; 98] = [
     // CPU > Reactions
     r(REACT, "Mash", "mash_state", Control::MultiSelect(&o::ACTIONS),
       "Actions the CPU performs as soon as it can.\nWith several ticked it picks one at random."),
@@ -331,6 +339,21 @@ pub static ROWS: [Row; 91] = [
       "Names the current slot's recording and keeps it."),
     r(MACROS, "Replay capture", "", Control::ReplayCapture,
       "On: capture match inputs when saving a replay.\nThis choice is saved automatically."),
+    // Recording > Combos (SPEC-input-07 §6)
+    r(COMBOS, "Name (optional)", "", Control::Editor(Editor::ComboName),
+      "Names the next saved combo with the Switch keyboard.\nLeft empty, it is saved as Combo 1, Combo 2..."),
+    r(COMBOS, "Save last combo...", "", Control::Editor(Editor::ComboSave),
+      "Keeps your last combo (its links and presses)\nand makes it the target."),
+    r(COMBOS, "Saved combos", "", Control::Editor(Editor::ComboLibrary),
+      "Your saved combos.\nA sets the target, X renames, Y deletes."),
+    r(COMBOS, "Combo helper", "combo_helper", TOGGLE,
+      "On: each attempt at the target is graded under the\nframe strip, link by link."),
+    r(COMBOS, "Target combo", "", Control::Editor(Editor::ComboTarget),
+      "The saved combo your attempts are measured against.\nA chooses another."),
+    r(COMBOS, "On-time tolerance", "combo_tolerance", Control::Dropdown(&o::COMBO_TOLERANCE),
+      "How many frames from the recorded press\nstill count as on time."),
+    r(COMBOS, "After an attempt", "combo_after", Control::Dropdown(&o::COMBO_AFTER),
+      "Keep playing, or load the save state to retry\nfrom the same spot."),
     // Fighters & Stages > Player 1 and CPU
     r(PEOPLE, "Player Swapping", "trio_practice", TOGGLE,
       "On: the Player 1 cycle chord changes your fighter.\nOff: only the CPU can be changed."),
