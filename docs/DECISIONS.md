@@ -764,6 +764,9 @@ Tints stay as now.
 Picture: on the left a real Route B frame (Eden gbc-04); on the right a **mockup** with hand-placed orbs on a real
 visualizer-Off frame.
 
+A/B from real data (2026-11-05, Eden run `tr-p23-hitbox-ab2`, diag prototype on `p23/hitbox-orbs`):
+[HB-OWN-ORBS-ab.png](decisions/HB-OWN-ORBS-ab.png) replaces the hand-placed mockup above.
+
 ### INPUT-VIZ · A compact input display for combo timing — answered (2026-11-05)
 
 **Answered 2026-11-05 ~11:4xZ by the operator: "go with option A for the input display".** The frame strip replaces
