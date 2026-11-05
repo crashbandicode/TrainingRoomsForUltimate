@@ -649,3 +649,27 @@ the capability is off. `tests/mii_install_boundary.rs` pins the constant at `tru
 Lua test files (`lua_helpers/tests/`) and the diag Mii Test observers. Runtime proof is pending: the rows for
 the combined rc.3 Eden session are in `artifacts/phase23/rc3-combined/rows-mii/`; the waiting-room origins and the
 resume after a match have no row.
+
+### p23/mii-editor: the rest of the fork's Mii behaviour, ported directly (2026-11-05)
+
+The operator asked whether Mii creation matches the fork (interruption, replay Miis matched against saved ones, and
+so on), then that the port be a direct one: it is our own code. A fork-against-here comparison found every editor,
+replay-Mii, selection, cycle, HUD-portrait and identity path carried and reachable in a release build. The behaviours
+that were missing or different are now ported from the M5q stage, each citing its fork lines:
+
+- Add New with a Player/CPU choice from the same opening drops that opening's reloads and requests the editor before
+  the catalog close (`containers/app.rs` 923-931, `common/menu.rs` 483-491): `MiiList::close_for`, `menu_handoff`.
+- A portrait pick drops that role's Mii reload (`app.rs` 522-531): `close_for`'s `picked`, from the worker.
+- Stored Mii choices are parsed one selector at a time (`training_mod_consts/src/menu_json.rs` 17-37):
+  `engine::compat::menu::mii_preferences_of`.
+- Mii tiles in Character Cycles, the portrait picks and Kirby Hats follow the catalog's admission: greyed and refused
+  when not admitted, numbered when admitted, the Mii slot-0 rule (`app.rs` 563-685 and 745-800,
+  `training/ui/roster_grid.rs` 197-206 and 304-308): `editors::roster::MiiTiles`, `MiiList::tiles`.
+- Waiting-room Add New needs the installed editor (`ENABLED`, as the fork's `mod.rs` 204-213).
+- An opening with no Mii catalog says so instead of "Reading…" forever (the fork showed no Mii pages then).
+- `mii_editor_bridge.called_376d990`: an exact 64-byte row for the Colour selector the resume path calls, in the
+  editor preflight. The fork had no guard for it.
+
+Carried-file changes are recorded manifest edits. Fork tests carried: `replay185_headgear`, `ldn_backend` and
+`quickplay_backend`; `source_provenance` is recorded as not carried, with the reason. `carry_pkg6.py verify`
+re-derives all 250 files from stage m5q. The list, with what stays different and why, is `docs/MII.md`.

@@ -190,6 +190,7 @@ pub(crate) const SEAMS_MII_EDITOR_BRIDGE: &[&str] = &[
     "mii_editor_bridge.relied_372d7ec",
     "mii_editor_bridge.relied_374c9a4",
     "mii_editor_bridge.relied_374cbb8",
+    "mii_editor_bridge.called_376d990",
     "mii_editor_bridge.called_38f5d80",
     "mii_editor_bridge.called_38f5f30",
     "mii_editor_bridge.called_38f5fe0",

@@ -16,6 +16,7 @@ use crate::engine::swap::roster_grid::{
 };
 use crate::engine::swap::trio::CHOICES;
 use crate::model::frame::{Frame, Text};
+use crate::model::screens::TILE_GREYED;
 use crate::model::menu::grid::RosterUse;
 use crate::model::menu::input::Button;
 use crate::model::menu::Menu;
@@ -37,6 +38,49 @@ pub enum Effect {
 pub struct RosterEditor {
     grid: RosterGrid,
     use_: RosterUse,
+    mii: MiiTiles,
+}
+
+/// What this opening's Mii catalog admits per Mii class tile (`[Brawler, Swordfighter, Gunner]`), from `CatalogMenu`'s
+/// checks (`editors::mii::MiiList::tiles`): the fork's `roster_excluded`, `mii_cycle_admitted`, `hat_cell_disabled` and
+/// `roster_slot_zero` (`training_mod_tui/src/containers/app.rs` 563-685). The default (no catalog yet, or a build
+/// without the Mii features) admits no Mii tile, as the fork's menu did.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct MiiTiles {
+    /// `alpha_player_cycle`: Player picks and the Player cycle.
+    pub player: [bool; 3],
+    /// `alpha_cpu_cycle`: CPU picks and the CPU cycle.
+    pub cpu: [bool; 3],
+    /// `alpha_helper_hat`: Kirby hats.
+    pub hat: [bool; 3],
+    /// `cpu_unnumbered_original`: the CPU's captured Mii has no other configuration of its class (the grey 0).
+    pub cpu_original_only: [bool; 3],
+}
+
+fn mii_class(kind: u32) -> Option<usize> {
+    (0x48..=0x4a).contains(&kind).then(|| (kind - 0x48) as usize)
+}
+
+impl MiiTiles {
+    /// Whether a Mii class tile may be chosen for this use and role; `None` for every other tile.
+    pub fn admitted(&self, use_: RosterUse, role: Role, kind: u32) -> Option<bool> {
+        let k = mii_class(kind)?;
+        Some(match (use_, role) {
+            (RosterUse::Hats, _) => self.hat[k],
+            (RosterUse::PlayerPick, _) | (RosterUse::Cycles, Role::Player) => self.player[k],
+            (RosterUse::CpuPick, _) | (RosterUse::Cycles, Role::Cpu) => self.cpu[k],
+        })
+    }
+
+    /// The fork's `roster_slot_zero` for a Mii original: the CPU's captured Mii with no numbered alternative, or a Player
+    /// original whose class the Player cycle does not admit. Any other original keeps its slot 0.
+    fn original_slot_zero(&self, role: Role, kind: u32) -> bool {
+        let Some(k) = mii_class(kind) else { return true };
+        match role {
+            Role::Cpu => self.cpu_original_only[k],
+            Role::Player => !self.player[k],
+        }
+    }
 }
 
 fn kinds() -> Vec<u32> {
@@ -46,7 +90,17 @@ fn kinds() -> Vec<u32> {
 impl RosterEditor {
     pub fn new(use_: RosterUse) -> Self {
         let role = if use_ == RosterUse::CpuPick { Role::Cpu } else { Role::Player };
-        Self { grid: RosterGrid::new(role), use_ }
+        Self { grid: RosterGrid::new(role), use_, mii: MiiTiles::default() }
+    }
+
+    /// This opening's Mii admissions (the worker sets them from the mounted catalog before a press or a draw).
+    pub fn set_mii(&mut self, mii: MiiTiles) {
+        self.mii = mii;
+    }
+
+    /// A Mii class tile the catalog does not admit for the editing role: it cannot be chosen and draws greyed.
+    fn mii_blocked(&self, kind: u32) -> bool {
+        self.mii.admitted(self.use_, self.grid.role(), kind) == Some(false)
     }
 
     pub fn use_(&self) -> RosterUse {
@@ -125,6 +179,7 @@ impl RosterEditor {
                     Effect::Nothing
                 }
             }
+            (Button::A, CellContent::Fighter(kind)) if self.mii_blocked(kind) => Effect::Nothing,
             (Button::A, CellContent::Fighter(kind)) if self.pick() => {
                 let Some(index) = CHOICES.iter().position(|(k, _)| *k == kind) else { return Effect::Nothing };
                 if values.get(index) == Some(&1) {
@@ -187,10 +242,19 @@ impl RosterEditor {
                 }
             }
             frame.tiles[cell] = label;
+            if info.kind().is_some_and(|kind| self.mii_blocked(kind)) && frame.tile_state[cell] == 0 {
+                frame.tile_state[cell] = TILE_GREYED;
+            }
         }
         if !self.pick() {
             frame.help[1].clear();
             let _ = write!(frame.help[1], "Editing the {} list.", if self.grid.role() == Role::Player { "Player" } else { "CPU" });
+        }
+        // The fork's " - unavailable" (`training/ui/roster_grid.rs` 304-308) for the focused Mii tile.
+        let focus = usize::from(frame.tile_focus);
+        if let Some(info) = self.grid.info(focus).filter(|info| info.kind().is_some_and(|kind| self.mii_blocked(kind))) {
+            frame.help[1].clear();
+            let _ = write!(frame.help[1], "{} - unavailable", info.label);
         }
     }
 
@@ -213,7 +277,7 @@ impl RosterEditor {
             let solo = flag_on(menu, ["solo_popo_player_cycle", "solo_popo_cpu"][r]);
             // The fork's `role_cycle_exclusion` (app.rs:690-703): the CPU has one Solo setting for both.
             let excluded = cycle_exclusion(original, if r == 0 { original_solo } else { solo }, solo);
-            let badges = roster_badges_from_values(self.use_, &values, excluded);
+            let badges = roster_badges(self.use_, &values, excluded, role, &self.mii);
             let all = values.first() == Some(&1);
             for (cell, info) in (0..CELLS).filter_map(|c| Some((c, self.grid.info(c)?))) {
                 let badge = info.kind().and_then(|k| badges[catalog_index(&kinds, k)?]);
@@ -236,21 +300,25 @@ fn flag_on(menu: &Menu, key: &str) -> bool {
     menu.kept(key) == Some(&serde_json::json!([1, 0]))
 }
 
-/// Cells that never take an order badge: the Miis (this build's cycle engine drops them from every roster,
-/// `src/runtime/roster/character_roster.rs:513`; no Mii helper hats) and, for the hats, Kirby (app.rs:564-573).
-fn unbadged(use_: RosterUse, kind: u32) -> bool {
-    (0x48..=0x4a).contains(&kind) || (use_ == RosterUse::Hats && group_kind(kind) == 0x06)
+/// `roster_badges` with no Mii admitted (the host tests' form for the non-Mii rules).
+#[cfg(test)]
+pub fn roster_badges_from_values(use_: RosterUse, values: &[u8], excluded: Option<u32>) -> Vec<Option<u8>> {
+    roster_badges(use_, values, excluded, Role::Player, &MiiTiles::default())
 }
 
 /// The fork's corner-badge model (`training_mod_tui/src/containers/app.rs:745-799`) on TrainingRooms' data: one
 /// role's order number per catalog kind; `Some(0)` the slot-0 badge; `None` no badge. `excluded` is the role's
 /// cycle exclusion (`cycle_exclusion`, the fork's `role_cycle_exclusion`); its group takes the slot-0 badge in
-/// the cycles (`roster_slot_zero`, app.rs:621-643, without the Mii-catalog features this build lacks).
-pub fn roster_badges_from_values(use_: RosterUse, values: &[u8], excluded: Option<u32>) -> Vec<Option<u8>> {
+/// the cycles (`roster_slot_zero`, app.rs:621-643; a Mii original only by `MiiTiles::original_slot_zero`). Kirby
+/// takes no hat badge (app.rs:564-573), and nor does a Mii tile the catalog does not admit for `role` (app.rs:785-789).
+pub fn roster_badges(use_: RosterUse, values: &[u8], excluded: Option<u32>, role: Role, mii: &MiiTiles) -> Vec<Option<u8>> {
     let kinds = kinds();
-    let slot_zero = |kind: u32| use_ == RosterUse::Cycles && excluded == Some(group_kind(kind));
+    let slot_zero = |kind: u32| use_ == RosterUse::Cycles && excluded == Some(group_kind(kind))
+        && mii.original_slot_zero(role, kind);
+    let unbadged = |kind: u32| (use_ == RosterUse::Hats && group_kind(kind) == 0x06)
+        || mii.admitted(use_, role, kind) == Some(false);
     let all = values.first() == Some(&1);
-    let skip = (use_ == RosterUse::Hats).then_some(0x06).or(excluded);
+    let skip = (use_ == RosterUse::Hats).then_some(0x06).or(excluded.filter(|kind| slot_zero(*kind)));
     let mut order: Vec<u32> = if all {
         css_order(&kinds, values, skip)
     } else if use_ == RosterUse::Cycles {
@@ -262,12 +330,12 @@ pub fn roster_badges_from_values(use_: RosterUse, values: &[u8], excluded: Optio
     } else {
         Vec::new()
     };
-    order.retain(|kind| !unbadged(use_, *kind) && !slot_zero(*kind));
+    order.retain(|kind| !unbadged(*kind) && !slot_zero(*kind));
     let groups: Vec<u32> = order.into_iter().map(group_kind).collect();
     let number = |kind| groups.iter().position(|g| *g == group_kind(kind));
     let badge = |kind| match () {
         _ if slot_zero(kind) => Some(0),
-        _ if unbadged(use_, kind) => None,
+        _ if unbadged(kind) => None,
         _ if all || use_ == RosterUse::Cycles => number(kind).map(|i| i as u8 + 1),
         _ => group_rank(&kinds, values, kind),
     };
@@ -398,7 +466,7 @@ mod tests {
         assert_eq!(badge_of(&player_badges, 0x42), None, "the player's order does not number the CPU's pick");
         assert_eq!(badge_of(&cpu_badges, 0x42), Some(1));
         assert_eq!(badge_of(&cpu_badges, 0x58), None);
-        // The Miis take no badge in this build's cycles (the engine's roster filter drops them).
+        // A Mii takes no badge while no catalog admits its class (mii_tiles_follow_the_catalog_admission).
         assert_eq!(badge_of(&player_badges, 0x49), None);
     }
 
@@ -447,7 +515,7 @@ mod tests {
         assert_eq!(badge_of(&badges, 0x0b), Some(1));
         assert_eq!(badge_of(&badges, 0x07), Some(2));
         assert_eq!(badge_of(&badges, 0x06), None, "Kirby cannot be a hat");
-        assert_eq!(badge_of(&badges, 0x49), None, "no Mii helper hats in this build");
+        assert_eq!(badge_of(&badges, 0x49), None, "no Mii helper hat without an admitting catalog");
         // The Solo Popo markers are cycles-only: the hats view hides them (decorate_badges).
         let mut frame = Frame::new();
         let editor = RosterEditor::new(RosterUse::Hats);
@@ -485,6 +553,58 @@ mod tests {
         editor.decorate_badges(&mut frame, &menu_with_kept(&[("player_roster", &values), ("solo_popo_player_cycle", &[1u8, 0])]));
         assert!(!frame.tiles[cell_of(0x4b)].string_lossy().contains('S'), "the S is a corner marker now");
         assert!(frame.tile_solo[0] && !frame.tile_solo[1], "each role's own Solo Popo preference");
+    }
+
+    #[test]
+    fn mii_tiles_follow_the_catalog_admission() {
+        // No catalog: no Mii tile can be chosen (the fork greyed them, " - unavailable") and none takes a badge.
+        let brawler = cell_of(0x48);
+        for use_ in [RosterUse::PlayerPick, RosterUse::CpuPick, RosterUse::Cycles, RosterUse::Hats] {
+            let mut editor = RosterEditor::new(use_);
+            let mut values = editor.values(None);
+            assert_eq!(editor.press(brawler, Button::A, &mut values), Effect::Nothing, "{use_:?}");
+            let mut frame = Frame::new();
+            frame.tile_focus = brawler as u8;
+            editor.decorate(&mut frame, &values);
+            assert_eq!(frame.tile_state[brawler], TILE_GREYED, "{use_:?}");
+            assert!(frame.help[1].string_lossy().ends_with(" - unavailable"), "{use_:?}");
+            assert_eq!(frame.tile_state[cell_of(0x07)], 0, "other fighters stay as they are");
+        }
+        // The Player cycle admits the Brawler: it can be added and takes its number; the CPU cycle still does not.
+        let mii = MiiTiles { player: [true, false, false], ..MiiTiles::default() };
+        let mut editor = RosterEditor::new(RosterUse::Cycles);
+        editor.set_mii(mii);
+        let mut values = cycles_values(&[0x07]);
+        assert_eq!(editor.press(brawler, Button::A, &mut values), Effect::Changed);
+        let badges = roster_badges(RosterUse::Cycles, &values, None, Role::Player, &mii);
+        assert_eq!(badge_of(&badges, 0x07), Some(1));
+        assert_eq!(badge_of(&badges, 0x48), Some(2), "an admitted Mii takes its number");
+        assert_eq!(badge_of(&badges, 0x49), None, "a class with no admitted Mii takes none");
+        assert_eq!(badge_of(&roster_badges(RosterUse::Cycles, &values, None, Role::Cpu, &mii), 0x48), None);
+        assert_eq!(editor.press(0, Button::ZR, &mut values), Effect::Shown);
+        assert_eq!(editor.press(brawler, Button::A, &mut values), Effect::Nothing, "the CPU cycle does not admit it");
+        // Hats follow the helper admission only.
+        let mut hats = RosterEditor::new(RosterUse::Hats);
+        hats.set_mii(MiiTiles { hat: [true, false, false], ..MiiTiles::default() });
+        let mut values = hats.values(None);
+        values[0] = 0;
+        assert_eq!(hats.press(brawler, Button::A, &mut values), Effect::Changed);
+    }
+
+    #[test]
+    fn a_mii_original_takes_slot_zero_only_without_a_numbered_place() {
+        let values = cycles_values(&[0x07]);
+        // The CPU's captured Brawler with no other configuration of its class: the grey 0.
+        let only = MiiTiles { cpu: [true, false, false], cpu_original_only: [true, false, false], ..MiiTiles::default() };
+        assert_eq!(badge_of(&roster_badges(RosterUse::Cycles, &values, Some(0x48), Role::Cpu, &only), 0x48), Some(0));
+        // With another configuration the Brawler stays a numbered cycle member.
+        let other = MiiTiles { cpu: [true, false, false], ..MiiTiles::default() };
+        let both = cycles_values(&[0x07, 0x48]);
+        assert_eq!(badge_of(&roster_badges(RosterUse::Cycles, &both, Some(0x48), Role::Cpu, &other), 0x48), Some(2));
+        // A Player original whose class the Player cycle does not admit: the grey 0.
+        let badges = roster_badges(RosterUse::Cycles, &values, Some(0x48), Role::Player, &MiiTiles::default());
+        assert_eq!(badge_of(&badges, 0x48), Some(0));
+        assert_eq!(badge_of(&badges, 0x07), Some(1));
     }
 
     /// A minimal menu stub for decorate_badges: the kept keys as JSON arrays.

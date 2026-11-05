@@ -131,3 +131,16 @@ pub fn captures_input() -> bool {
 
 /// Native handoff observes the same opening/closing sequence as App.
 pub(crate) fn sequence() -> u32 { OPEN_SEQ.load(Ordering::Acquire) }
+
+/// The opening for which no Mii catalog was requested (none will come: not in Training or waiting practice, or the
+/// catalog adapters are off). The fork inserted its Mii pages only once a catalog was mounted (`containers/app.rs`
+/// 287-301); here the pages stay and say why they are empty. 0 = none (an opening's sequence is odd).
+#[cfg(feature = "mii-saved-alpha")]
+static NO_CATALOG: AtomicU32 = AtomicU32::new(0);
+
+#[cfg(feature = "mii-saved-alpha")]
+pub(crate) fn note_no_catalog(sequence: u32) { NO_CATALOG.store(sequence, Ordering::Release); }
+
+/// No catalog will come for the opening `sequence`.
+#[cfg(feature = "mii-saved-alpha")]
+pub(crate) fn no_catalog(sequence: u32) -> bool { sequence != 0 && NO_CATALOG.load(Ordering::Acquire) == sequence }

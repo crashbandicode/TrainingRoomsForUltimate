@@ -233,13 +233,13 @@ fn resume_checkpoint(
 }
 
 fn quickplay_available() -> bool {
-    RETAINED_ENABLED.load(Ordering::Acquire) && crate::runtime::lobby::training::lobby::active()
+    ENABLED.load(Ordering::Acquire) && crate::runtime::lobby::training::lobby::active()
         && crate::runtime::lobby::game_mode::current().is_some_and(|mode|
             crate::engine::mii::backend::Layout::quickplay_waiting_mode(mode.mode))
 }
 
 pub(super) fn local_wireless_available() -> bool {
-    RETAINED_ENABLED.load(Ordering::Acquire) && crate::runtime::lobby::training::lobby::active()
+    ENABLED.load(Ordering::Acquire) && crate::runtime::lobby::training::lobby::active()
         && crate::runtime::lobby::game_mode::current().is_some_and(|mode| mode.mode == 0x02010000)
 }
 
@@ -249,11 +249,13 @@ fn waiting_catalog_ready() -> bool {
 }
 
 /// Queue the waiting-room editor catalog. No file IO, writer wait, or fighter capture here.
-pub(crate) fn menu_ready(opening: u64) {
-    if !waiting_catalog_ready() || ACTIVE.load(Ordering::Acquire) { return; }
+/// Returns whether a catalog was requested.
+pub(crate) fn menu_ready(opening: u64) -> bool {
+    if !waiting_catalog_ready() || ACTIVE.load(Ordering::Acquire) { return false; }
     crate::runtime::roster::character_roster::mii_catalog_request::request(
         crate::engine::mii::catalog_request::Kind::Editor { opening },
     );
+    true
 }
 
 pub(crate) enum OpenedCatalog {

@@ -204,7 +204,7 @@ pub(crate) fn run_roster_change() {
 pub fn apply_kept(settings: &Settings) {
     let kept = Kept {
         stage: kept(settings, "stage_preferences"),
-        mii: kept(settings, "mii_preferences"),
+        mii: crate::engine::compat::menu::mii_preferences_of(settings.extra.get("mii_preferences")),
     };
     // The previous value is dropped after the guard (end of this statement), outside the lock.
     let _previous = KEPT.write().replace(kept);

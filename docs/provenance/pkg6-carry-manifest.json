@@ -329,7 +329,7 @@
    "dest": "src/model/seams/native_seams/rows_a2.rs",
    "crate": "consts",
    "src_sha256": "d2894a66f249d8dab23cfd8ecede6ce4a59784fb4ba58db998072b6251ef5ace",
-   "dest_sha256": "f11ff52ad8ff1a7b84303f5e4d5eb6f6ef433c230f17e7096e2652976c24ab49",
+   "dest_sha256": "96898e1e14d953bab2767c1b6f44e5a7602c6732d73879bdc355f145ef85f318",
    "edits": [
     {
      "old": "                0xe0, 0x03, 0x13, 0xaa, 0x14, 0x9f, 0x09, 0x94, 0xbb, 0x01, 0x00, 0xb4, 0x68, 0x23, 0x00, 0x91],\n        feature: \"mii-ordinary-player-alpha\", scopes: Scopes::ALL, read_only: true, per_frame: false, sharing: Sharing::None,\n        note: \"\" },\n    Seam { label: \"mii_quit_observer.update_entry\", group: \"mii_quit_observer\", offset: 0x376bce0,\n        kind: SeamKind::Hook { form: HookForm::Inline, placement: Placement::Entry },\n        guard: [0xff, 0x83, 0x02, 0xd1, 0xe8, 0x23, 0x00, 0xfd, 0xfa, 0x67, 0x05, 0xa9, 0xf8, 0x5f, 0x06, 0xa9,\n                0xf6, 0x57, 0x07, 0xa9, 0xf4, 0x4f, 0x08, 0xa9, 0xfd, 0x7b, 0x09, 0xa9, 0xfd, 0x43, 0x02, 0x91,\n                0xf8, 0xd9, 0x00, 0xb0, 0x18, 0x43, 0x45, 0xf9, 0x17, 0x00, 0x80, 0x12, 0x17, 0x5c, 0x02, 0xb9,\n                0x1f, 0x00, 0x05, 0x79, 0x00, 0x03, 0xc0, 0x3d, 0x08, 0xec, 0x40, 0x39, 0xf4, 0x03, 0x01, 0xaa],\n        feature: \"mii-quit-observer\", scopes: Scopes::ALL, read_only: true, per_frame: false, sharing: Sharing::None,\n        note: \"entry inline, diag-only; records entry sp/lr against the 0xa0 frame: must stay at the entry\" },\n    Seam { label: \"mii_quit_observer.direct_action\", group: \"mii_quit_observer\", offset: 0x376c32c,\n        kind: SeamKind::Hook { form: HookForm::Inline, placement: Placement::Mid },\n        guard: [0x68, 0x56, 0x42, 0xb9, 0x61, 0x52, 0x42, 0xb9, 0x1f, 0x05, 0x00, 0x31, 0x60, 0x35, 0x00, 0x54,\n                0x69, 0xde, 0x40, 0xf9, 0xe9, 0x2d, 0x00, 0xb4, 0x75, 0xe2, 0x06, 0x91, 0xe8, 0x03, 0x15, 0xaa,\n                0x2a, 0x21, 0x40, 0xb9, 0x5f, 0x01, 0x01, 0x6b, 0xea, 0xa7, 0x9f, 0x1a, 0x08, 0xb1, 0x89, 0x9a,\n                0x29, 0x59, 0x6a, 0xf8, 0x69, 0xff, 0xff, 0xb5, 0x1f, 0x01, 0x15, 0xeb, 0x60, 0x05, 0x00, 0x54],\n        feature: \"mii-quit-observer\", scopes: Scopes::ALL, read_only: true, per_frame: false, sharing: Sharing::None,\n        note: \"\" },\n    Seam { label: \"mii_quit_observer.registered_store\", group: \"mii_quit_observer\", offset: 0x376c6f0,\n        kind: SeamKind::Hook { form: HookForm::Inline, placement: Placement::Mid },\n        guard: [0x68, 0x5e, 0x02, 0xb9, 0xe9, 0x06, 0x00, 0x35, 0xca, 0x02, 0x40, 0xf9, 0xaa, 0x01, 0x00, 0xb4,\n                0xe9, 0x03, 0x16, 0xaa, 0x4b, 0x21, 0x40, 0xb9, 0x7f, 0x01, 0x08, 0x6b, 0xeb, 0xa7, 0x9f, 0x1a,\n                0x29, 0xb1, 0x8a, 0x9a, 0x4a, 0x59, 0x6b, 0xf8, 0x6a, 0xff, 0xff, 0xb5, 0x3f, 0x01, 0x16, 0xeb,\n                0x80, 0x00, 0x00, 0x54, 0x2a, 0x21, 0x40, 0xb9, 0x5f, 0x01, 0x08, 0x6b, 0xed, 0x29, 0x00, 0x54],\n        feature: \"mii-quit-observer\", scopes: Scopes::ALL, read_only: true, per_frame: false, sharing: Sharing::None,\n        note: \"\" },\n    Seam { label: \"mii_quit_observer.update_return\", group: \"mii_quit_observer\", offset: 0x376cc3c,\n        kind: SeamKind::Hook { form: HookForm::Inline, placement: Placement::Mid },\n        guard: [0xe8, 0x23, 0x40, 0xfd, 0xfd, 0x7b, 0x49, 0xa9, 0xf4, 0x4f, 0x48, 0xa9, 0xf6, 0x57, 0x47, 0xa9,\n                0xf8, 0x5f, 0x46, 0xa9, 0xfa, 0x67, 0x45, 0xa9, 0xff, 0x83, 0x02, 0x91, 0xc0, 0x03, 0x5f, 0xd6,\n                0x1f, 0x05, 0x00, 0x31, 0x61, 0xd9, 0xff, 0x54, 0x2a, 0xfe, 0xff, 0x17, 0x21, 0x15, 0x40, 0xf9,\n                0xb2, 0xfe, 0xff, 0x17, 0x60, 0x0e, 0x01, 0xf0, 0x00, 0x60, 0x26, 0x91, 0x8e, 0x4e, 0x09, 0x94],\n        feature: \"mii-quit-observer\", scopes: Scopes::ALL, read_only: true, per_frame: false, sharing: Sharing::None,\n        note: \"\" },\n    Seam { label: \"mii_quit_observer.called_376d5d0\", group: \"mii_quit_observer\", offset: 0x376d5d0,\n        kind: SeamKind::Called,\n        guard: [0xf5, 0x0f, 0x1d, 0xf8, 0xf4, 0x4f, 0x01, 0xa9, 0xfd, 0x7b, 0x02, 0xa9, 0xfd, 0x83, 0x00, 0x91,\n                0x28, 0xa0, 0x41, 0xb9, 0x09, 0x50, 0x42, 0xb9, 0x1f, 0x01, 0x09, 0x6b, 0x41, 0x09, 0x00, 0x54,\n                0x08, 0xfc, 0x40, 0x39, 0xf3, 0x03, 0x01, 0xaa, 0xf4, 0x03, 0x00, 0xaa, 0xa8, 0x00, 0x00, 0x34,\n                0x68, 0x02, 0x40, 0xf9, 0x08, 0xc1, 0x40, 0xf9, 0xe0, 0x03, 0x13, 0xaa, 0x00, 0x01, 0x3f, 0xd6],\n        feature: \"mii-quit-observer\", scopes: Scopes::ALL, read_only: true, per_frame: false, sharing: Sharing::None,\n        note: \"\" },\n    Seam { label: \"mii_quit_observer.predicate_return\", group: \"mii_quit_observer\", offset: 0x376d6dc,\n        kind: SeamKind::Hook { form: HookForm::Inline, placement: Placement::Mid },\n        guard: [0x20, 0x01, 0x00, 0x36, 0x68, 0xa2, 0x41, 0xb9, 0x88, 0x5a, 0x02, 0xb9, 0x68, 0x02, 0x40, 0xf9,\n                0x08, 0x19, 0x41, 0xf9, 0xe0, 0x03, 0x13, 0xaa, 0x00, 0x01, 0x3f, 0xd6, 0x08, 0x00, 0x00, 0x12,\n                0x88, 0x12, 0x0a, 0x39, 0x88, 0xea, 0x40, 0x39, 0x88, 0x00, 0x00, 0x35, 0x88, 0x36, 0x40, 0xb9,\n                0x1f, 0x0d, 0x00, 0x71, 0xa1, 0x00, 0x00, 0x54, 0xfd, 0x7b, 0x42, 0xa9, 0xf4, 0x4f, 0x41, 0xa9],\n        feature: \"mii-quit-observer\", scopes: Scopes::ALL, read_only: true, per_frame: false, sharing: Sharing::None,\n        note: \"\" },\n    Seam { label: \"mii_quit_observer.called_376d860\", group: \"mii_quit_observer\", offset: 0x376d860,\n        kind: SeamKind::Called,\n        guard: [0x00, 0x80, 0x00, 0xd1, 0x5b, 0xff, 0xff, 0x17, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,\n                0xff, 0xc3, 0x00, 0xd1, 0xf4, 0x4f, 0x01, 0xa9, 0xfd, 0x7b, 0x02, 0xa9, 0xfd, 0x83, 0x00, 0x91,\n                0xc1, 0x07, 0x00, 0xb4, 0x08, 0x58, 0x40, 0xf9, 0xf4, 0x03, 0x00, 0xaa, 0x68, 0x07, 0x00, 0xb4,\n                0x28, 0x00, 0x40, 0xf9, 0x08, 0xb9, 0x40, 0xf9, 0xe0, 0x03, 0x01, 0xaa, 0xf3, 0x03, 0x01, 0xaa],\n        feature: \"mii-quit-observer\", scopes: Scopes::ALL, read_only: true, per_frame: false, sharing: Sharing::None,\n        note: \"\" },\n    Seam { label: \"mii_quit_observer.called_376ded0\", group: \"mii_quit_observer\", offset: 0x376ded0,\n        kind: SeamKind::Called,\n        guard: [0xf8, 0x5f, 0xbc, 0xa9, 0xf6, 0x57, 0x01, 0xa9, 0xf4, 0x4f, 0x02, 0xa9, 0xfd, 0x7b, 0x03, 0xa9,\n                0xfd, 0xc3, 0x00, 0x91, 0x08, 0xec, 0x40, 0x39, 0x68, 0x00, 0x00, 0x34, 0x13, 0x00, 0x80, 0x12,\n                0x55, 0x00, 0x00, 0x14, 0x18, 0xf0, 0x40, 0xf9, 0x16, 0xa0, 0x07, 0x91, 0x1f, 0x03, 0x16, 0xeb,\n                0x60, 0xff, 0xff, 0x54, 0xf4, 0x03, 0x01, 0xaa, 0x17, 0xe0, 0x06, 0x91, 0x13, 0x00, 0x80, 0x12],\n        feature: \"mii-quit-observer\", scopes: Scopes::ALL, read_only: true, per_frame: false, sharing: Sharing::None,\n        note: \"\" },\n    Seam { label: \"mii_quit_observer.registered_action\", group: \"mii_quit_observer\", offset: 0x376e044,\n        kind: SeamKind::Hook { form: HookForm::Inline, placement: Placement::Mid },\n        guard: [0xe0, 0x03, 0x13, 0x2a, 0xfd, 0x7b, 0x43, 0xa9, 0xf4, 0x4f, 0x42, 0xa9, 0xf6, 0x57, 0x41, 0xa9,\n                0xf8, 0x5f, 0xc4, 0xa8, 0xc0, 0x03, 0x5f, 0xd6, 0x13, 0x1f, 0x40, 0xb9, 0xf9, 0xff, 0xff, 0x17,\n                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x82, 0x15, 0x00, 0xb4,\n                0xff, 0x43, 0x01, 0xd1, 0xf8, 0x5f, 0x01, 0xa9, 0xf6, 0x57, 0x02, 0xa9, 0xf4, 0x4f, 0x03, 0xa9],\n        feature: \"mii-quit-observer\", scopes: Scopes::ALL, read_only: true, per_frame: false, sharing: Sharing::None,\n        note: \"\" },\n    Seam { label: \"mii_hud_portrait.relied_377aef0\", group: \"mii_hud_portrait\", offset: 0x377aef0,\n        kind: SeamKind::Relied,\n        guard: [0xfd, 0xc3, 0x00, 0x91, 0x08, 0x04, 0x40, 0xf9, 0x13, 0x05, 0x40, 0xf9, 0x13, 0x08, 0x00, 0xb4,\n",
@@ -440,6 +440,11 @@
      "delete_from": "    Seam { label: \"mii_origin_observer.called_39c19d0\",",
      "delete_to": "    Seam { label: \"mii_saved_fingerprints.called_39c19d0\",",
      "reason": "RC RESET option2: retire origin/pool rows, retain the saved-Mii row at the same address."
+    },
+    {
+     "old": "        note: \"\" },\n    Seam { label: \"mii_hud_portrait.relied_377aef0\"",
+     "new": "        note: \"\" },\n    Seam { label: \"mii_editor_bridge.called_376d990\", group: \"mii_editor_bridge\", offset: 0x376d990,\n        kind: SeamKind::Called,\n        guard: [0xff, 0x43, 0x01, 0xd1, 0xf7, 0x0b, 0x00, 0xf9, 0xf6, 0x57, 0x02, 0xa9, 0xf4, 0x4f, 0x03, 0xa9,\n                0xfd, 0x7b, 0x04, 0xa9, 0xfd, 0x03, 0x01, 0x91, 0xf4, 0x03, 0x02, 0x2a, 0xf5, 0x03, 0x01, 0x2a,\n                0xf3, 0x03, 0x00, 0xaa, 0xe2, 0x03, 0x00, 0x37, 0x68, 0x02, 0x40, 0xf9, 0x08, 0x3d, 0x40, 0xf9,\n                0xe0, 0x03, 0x13, 0xaa, 0x00, 0x01, 0x3f, 0xd6, 0x40, 0x03, 0x00, 0x36, 0x68, 0xea, 0x40, 0x39],\n        feature: \"mii-editor-alpha\", scopes: Scopes::ALL, read_only: true, per_frame: false, sharing: Sharing::None,\n        note: \"cosmetic_resume::apply_color: the Colour selector's select(index, 0) when an interrupted Colour page is resumed\" },\n    Seam { label: \"mii_hud_portrait.relied_377aef0\"",
+     "reason": "rc.3 Mii port (2026-11-05): the Colour selector main+0x376d990 that cosmetic_resume::apply_color calls (fork cosmetic_resume.rs COLOR_SELECT) gets an exact 64-byte row in the editor preflight; the fork had no guard for it."
     }
    ]
   },
@@ -8719,12 +8724,17 @@
    "dest": "src/runtime/mii/mii_editor_bridge/fingerprints.rs",
    "crate": "root",
    "src_sha256": "ad1a0e8f9f954da2ec49705d73fe215527307a7c408766a1eaaf3d5958c802aa",
-   "dest_sha256": "85adac4fa29da42c4086c80e41c03d5b9708428a840ba8e63f043d16549a0dbf",
+   "dest_sha256": "9b5f1f49dac473d8bbbf680b5b248d0f4601ded7eb55ac236fc73c0d30cea0a2",
    "edits": [
     {
      "old": "    accepted\n}\n",
      "new": "    accepted\n}\n\n/// The retained callback uses only its existing Training context contract.\npub(crate) const RETAINED_SEAMS: &[&str] = &[\"mii_editor_bridge.training_state\"];\npub(super) unsafe fn retained_matches(base: usize) -> bool {\n    let &(offset, len, expected) = CODE.iter().find(|(offset, _, _)| *offset == 0x23ebbf0).unwrap();\n    crate::engine::mii::inventory::fnv1a64(std::slice::from_raw_parts((base + offset) as *const u8, len)) == expected\n}\n",
      "reason": "RC7 R3-4: split retained Training-stage/catalog initialization from unavailable editor-only hooks, lifecycle, keyboard, resume and trace work; existing native contracts and editor refusal preserved."
+    },
+    {
+     "old": "    \"mii_editor_bridge.relied_374cbb8\",\n    \"mii_editor_bridge.called_38f5d80\",",
+     "new": "    \"mii_editor_bridge.relied_374cbb8\",\n    \"mii_editor_bridge.called_376d990\",\n    \"mii_editor_bridge.called_38f5d80\",",
+     "reason": "rc.3 Mii port (2026-11-05): the Colour selector main+0x376d990 that cosmetic_resume::apply_color calls (fork cosmetic_resume.rs COLOR_SELECT) gets an exact 64-byte row in the editor preflight; the fork had no guard for it."
     }
    ]
   },
@@ -8987,7 +8997,7 @@
    "dest": "src/runtime/mii/mii_editor_bridge/mod.rs",
    "crate": "root",
    "src_sha256": "469dd011585d19e4999c25d02c9ea2faa6c9f1c1743686b55adbdadd09ce33ca",
-   "dest_sha256": "6d20f9b89c80689febac6fbf5a41a9c413588ad4f4b508781913d5900b9d1255",
+   "dest_sha256": "da744493aca50ab24ebb35c2c88e76999304bea160d0c66c6aacfc920babb9d6",
    "edits": [
     {
      "old": "pub(crate) struct Trace {\n    events: Vec<Event>,\n    input_checks: Vec<(&'static str, [native::InputChange; 3])>,\n}",
@@ -9295,6 +9305,21 @@
      "old": "/// Unavailable in both RC release and diag; no editor-only initialization runs.\nfn init_editor(base: usize) {\n",
      "new": "/// Runs in release and diag builds once `NATIVE_EDITOR_AVAILABLE` holds and every editor seam row passed\n/// (`install::run`); otherwise no editor-only initialization runs.\nfn init_editor(base: usize) {\n",
      "reason": "rc.3 (2026-11-05): native Mii editor available again (operator, primary 35137355: bring the fork's editor over); Add New Save still makes only a new native Mii (edit_decide); the capability switch and its refusals stay."
+    },
+    {
+     "old": "fn quickplay_available() -> bool {\n    RETAINED_ENABLED.load(Ordering::Acquire)",
+     "new": "fn quickplay_available() -> bool {\n    ENABLED.load(Ordering::Acquire)",
+     "reason": "rc.3 Mii port (2026-11-05): waiting-room editor availability reads ENABLED again, as the fork's quickplay_available / local_wireless_available (mii_editor_bridge/mod.rs 204-213): no waiting-room Add New unless the editor installed."
+    },
+    {
+     "old": "pub(super) fn local_wireless_available() -> bool {\n    RETAINED_ENABLED.load(Ordering::Acquire)",
+     "new": "pub(super) fn local_wireless_available() -> bool {\n    ENABLED.load(Ordering::Acquire)",
+     "reason": "rc.3 Mii port (2026-11-05): waiting-room editor availability reads ENABLED again, as the fork's quickplay_available / local_wireless_available (mii_editor_bridge/mod.rs 204-213): no waiting-room Add New unless the editor installed."
+    },
+    {
+     "old": "/// Queue the waiting-room editor catalog. No file IO, writer wait, or fighter capture here.\npub(crate) fn menu_ready(opening: u64) {\n    if !waiting_catalog_ready() || ACTIVE.load(Ordering::Acquire) { return; }\n    crate::runtime::roster::character_roster::mii_catalog_request::request(\n        crate::engine::mii::catalog_request::Kind::Editor { opening },\n    );\n}",
+     "new": "/// Queue the waiting-room editor catalog. No file IO, writer wait, or fighter capture here.\n/// Returns whether a catalog was requested.\npub(crate) fn menu_ready(opening: u64) -> bool {\n    if !waiting_catalog_ready() || ACTIVE.load(Ordering::Acquire) { return false; }\n    crate::runtime::roster::character_roster::mii_catalog_request::request(\n        crate::engine::mii::catalog_request::Kind::Editor { opening },\n    );\n    true\n}",
+     "reason": "rc.3 Mii port (2026-11-05): menu_ready says whether it requested the waiting-room catalog, so an opening with no Mii catalog can say so (the fork inserted its Mii pages only once a catalog was mounted, containers/app.rs 287-301)"
     }
    ]
   },
@@ -10143,6 +10168,77 @@
    "crate": "root",
    "src_sha256": "0b660f82e43258aaee60241bc531c29d8a35e17078a038f35b79ecd03f11dd37",
    "dest_sha256": "68bc8d3449f3e1f184fc35ae20c3097eaf881867f74cd02c86451722d39c466a"
+  },
+  {
+   "src": "training_mod_mii/tests/replay185_headgear.rs",
+   "dest": "tests/mii_replay185_headgear.rs",
+   "crate": "mii",
+   "src_sha256": "dc1217eeec20f201115dee096c09af7b3fc3b66afd8961353e56d481539109dd",
+   "dest_sha256": "b348e577e080d3eb7f5660d171c04c181adb3d7bd9c99899a0f1a42c3eda4040",
+   "prepend": "#[allow(dead_code, unused_imports)]\n#[path = \"../src/model/mii/mod.rs\"]\npub mod mii;\n#[allow(unused_imports)]\nmod engine {\n    pub use super::mii;\n}\n\n"
+  },
+  {
+   "src": "training_mod_mii/tests/quickplay_backend.rs",
+   "dest": "src/model/mii_fork_tests/quickplay_backend.rs",
+   "crate": "mii",
+   "src_sha256": "ceae39afaf18aadd6fceaaabc9c6f1189d680cd454bdceb8f83a7bf4cf1921d6",
+   "dest_sha256": "007cc4eb9ee0c9477f9b1b5ddf41106f703e1157f0dfb5011d3d6845e08c970d",
+   "edits": [
+    {
+     "old": "extern crate self as training_mod_consts;\npub use training_mod_mii as mii;\n",
+     "new": "",
+     "reason": "rc.3 Mii port (2026-11-05): the fork test crate aliased training_mod_mii as mii; here the prepended by-path mii module is that crate"
+    },
+    {
+     "old": "#[allow(dead_code)]\n#[path = \"../swap/character_memory.rs\"]\nmod character_memory;",
+     "new": "use crate::engine::swap::character_memory;",
+     "reason": "rc.3 Mii port (2026-11-05): the fork test is a lib test module here (src/model/mii_fork_tests), so the engine module it included by path is the crate engine module itself"
+    },
+    {
+     "old": "#[path = \"../mii_root/mii_hud_portrait_policy.rs\"]\nmod portrait_policy;",
+     "new": "use crate::engine::mii_root::mii_hud_portrait_policy as portrait_policy;",
+     "reason": "rc.3 Mii port (2026-11-05): the fork test is a lib test module here (src/model/mii_fork_tests), so the engine module it included by path is the crate engine module itself"
+    },
+    {
+     "old": "#[allow(dead_code, unexpected_cfgs)]\n#[path = \"../seams/native_fields.rs\"]\nmod native_fields;",
+     "new": "",
+     "reason": "rc.3 Mii port (2026-11-05): the fork test included this module only as a dependency of the portrait policy; as a lib test module the crate already has it"
+    },
+    {
+     "old": "#[path = \"../swap/native_hud_refresh.rs\"]\nmod native_hud_refresh;",
+     "new": "",
+     "reason": "rc.3 Mii port (2026-11-05): the fork test included this module only as a dependency of the portrait policy; as a lib test module the crate already has it"
+    },
+    {
+     "old": "// This host harness exercises native_fields' in-memory tests without the\n// Switch-only feature names declared by the product crate.\n",
+     "new": "",
+     "reason": "rc.3 Mii port (2026-11-05): the fork harness note about native_fields does not apply to the lib test module"
+    }
+   ]
+  },
+  {
+   "src": "training_mod_mii/tests/ldn_backend.rs",
+   "dest": "src/model/mii_fork_tests/ldn_backend.rs",
+   "crate": "mii",
+   "src_sha256": "09d80635f2cb30c8be3d7400b786cf6ca14cc7a37c66ba2c50be14443f824a36",
+   "dest_sha256": "419ee8d120d95fd5c116c634658882eec140eb246f27605d24d9e177172181bf",
+   "edits": [
+    {
+     "old": "extern crate self as training_mod_consts;\npub use training_mod_mii as mii;\n",
+     "new": "",
+     "reason": "rc.3 Mii port (2026-11-05): the fork test crate aliased training_mod_mii as mii; here the prepended by-path mii module is that crate"
+    },
+    {
+     "old": "#[allow(dead_code)]\n#[path = \"../swap/character_memory.rs\"]\nmod character_memory;",
+     "new": "use crate::engine::swap::character_memory;",
+     "reason": "rc.3 Mii port (2026-11-05): the fork test is a lib test module here (src/model/mii_fork_tests), so the engine module it included by path is the crate engine module itself"
+    },
+    {
+     "old": "#[allow(dead_code)]\n#[path = \"../swap/source_lifetime.rs\"]\nmod source_lifetime;",
+     "new": "use crate::engine::swap::source_lifetime;",
+     "reason": "rc.3 Mii port (2026-11-05): the fork test is a lib test module here (src/model/mii_fork_tests), so the engine module it included by path is the crate engine module itself"
+    }
+   ]
   }
  ],
  "not_carried": [
@@ -10253,6 +10349,12 @@
    "src_sha256": "2c2cc210370448859d74d2223d4beef014d7d7bce14964d762daab6a1d99b630",
    "dest": "src/model/mii_root/mii_pool_observer_policy.rs",
    "reason": "not carried: RC RESET option2; exclusive pool observer policy retired with its only runtime consumer."
+  },
+  {
+   "src": "training_mod_mii/tests/source_provenance.rs",
+   "src_sha256": "1c99921fa26810e8e61468209b37f13924eb3b9c4baf033ad9f4716cd8a803a8",
+   "dest": "src/model/mii_fork_tests/source_provenance.rs",
+   "reason": "not carried (rc.3 Mii port, 2026-11-05): its subjects are the runtime files native_install.rs and mii_source_provenance.rs, which a host test can only include by path from a test module; tools/sloc.py then counts those implementation files as test code (a test-gated mod reaching them). Reported instead."
   }
  ]
 }
