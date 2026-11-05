@@ -141,6 +141,9 @@ impl Grey {
 pub enum Entry {
     Group(usize),
     Row(usize),
+    /// The last line of every page, *Reset page to defaults*: A asks to confirm, then restores the page from the
+    /// saved defaults. It belongs to the page's last section (`usize` is that group).
+    ResetPage(usize),
 }
 
 /// A row's value as the renderer shows it.
@@ -224,6 +227,44 @@ pub enum Screen {
     Grid { layout: GridLayout, page: usize, cell: usize },
     /// A sub-screen whose content belongs to a later package.
     External(Editor),
+    /// *Reset page to defaults?*: A resets the page, B cancels.
+    ConfirmReset,
+}
+
+/// Where the menu was when it closed (`Menu::place`): kept by the runtime outside the model for the rest of the boot.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Place {
+    /// The page showing. A close commits it as `last_page` too; a session that ended without a close (a scene
+    /// change, the renderer lost) did not, so the page is kept here as well.
+    page: Page,
+    cursor: [usize; 6],
+    expanded: u32,
+    /// The page and the sub-screen open on it, when that screen can be resumed.
+    screen: Option<(Page, Screen)>,
+}
+
+/// The sub-screens the model owns entirely, which can be reopened as they were (a handle being dragged or a
+/// range being edited is put down first). The chord editor (a capture in progress), the grids (their layout, the
+/// textures and the requests belong to the runtime) and the external editors (the runtime's panels) are not
+/// resumed: their parent row is focused instead.
+fn resumable(screen: Screen) -> Option<Screen> {
+    match screen {
+        Screen::Delay { row, cursor, .. } => Some(Screen::Delay { row, cursor, editing: false }),
+        Screen::Slider { row, state } => Some(Screen::Slider {
+            row,
+            state: match state {
+                SliderState::LowerSelected | SliderState::LowerHover => SliderState::LowerHover,
+                SliderState::UpperSelected | SliderState::UpperHover => SliderState::UpperHover,
+            },
+        }),
+        Screen::List { .. }
+        | Screen::Checklist { .. }
+        | Screen::Directions { .. }
+        | Screen::SwapGroups { .. }
+        | Screen::Overrides { .. }
+        | Screen::Chords { .. } => Some(screen),
+        Screen::ChordEntry { .. } | Screen::Grid { .. } | Screen::External(_) | Screen::ConfirmReset => None,
+    }
 }
 
 /// The delay popup's checklist is drawn as columns of this many boxes (mockup 19).
@@ -231,6 +272,23 @@ pub const DELAY_ROWS: usize = 4;
 
 /// The situation overrides screen draws its 30 actions in three columns of this many boxes (mockup 06 shows 13 in two).
 pub const OVERRIDE_COLUMN: usize = 10;
+
+/// How far ZL + Up / Down moves in a popup list: one window of lines, the rows the sub-screens draw at once
+/// (`ui::panes::ROWS`; a test keeps them equal).
+pub const LIST_JUMP: usize = 12;
+
+/// The section an entry belongs to.
+fn group_of(entry: Entry) -> usize {
+    match entry {
+        Entry::Group(g) | Entry::ResetPage(g) => g,
+        Entry::Row(r) => usize::from(ROWS[r].group),
+    }
+}
+
+/// A list cursor after ZL + Up / Down: one window further, stopping at the first or last entry (no wrap).
+fn jumped(cursor: usize, len: usize, forward: bool) -> usize {
+    if forward { (cursor + LIST_JUMP).min(len.saturating_sub(1)) } else { cursor.saturating_sub(LIST_JUMP) }
+}
 
 /// The menu.
 #[derive(Clone, Debug)]
@@ -250,6 +308,8 @@ pub struct Menu {
     /// The row ids, kept keys and top-level keys the player changed this menu session
     /// (decision MENU-CLOSE): what the close commits on top of the live settings.
     edits: Vec<String>,
+    /// The last confirmed page reset: the page and the rows it changed, for the runtime's log line.
+    page_reset: Option<(Page, Vec<&'static str>)>,
 }
 
 const SLIDER_SLOW: u8 = 1;
@@ -273,6 +333,7 @@ impl Menu {
             chord_capture: ChordCapture::Preview,
             chord_refusal: None,
             edits: Vec::new(),
+            page_reset: None,
         };
         menu.sync();
         menu
@@ -290,6 +351,78 @@ impl Menu {
         self.chord_refusal = None;
         self.edits.clear();
         self.sync();
+    }
+
+    /// Where the menu is: each page's focused entry, the open advanced groups and the sub-screen open on the page
+    /// (the bottom of the stack, when it can be resumed). The runtime keeps it outside the model, which it drops at
+    /// every close, so the next opening comes back here (`restore_place`).
+    pub fn place(&self) -> Place {
+        let screen = self.stack.first().copied().and_then(resumable);
+        Place { page: self.page, cursor: self.cursor, expanded: self.expanded, screen: screen.map(|s| (self.page, s)) }
+    }
+
+    /// Come back to `place` after an opening: its page when that page is still in the ring (else the page `last_page`
+    /// gave, Q5). Every cursor is clamped to its page as the table and the install stand now, so a stale index never
+    /// points past the end; the sub-screen is reopened only on the same page, on the row that opens it, when that row
+    /// is still visible and not greyed and the screen's own cursor is still inside it. Otherwise the parent row stays
+    /// focused.
+    pub fn restore_place(&mut self, place: Place) {
+        self.cursor = place.cursor;
+        self.expanded = place.expanded;
+        if self.page_in_ring(place.page) {
+            self.page = place.page;
+        }
+        let page = self.page;
+        for other in Page::ALL {
+            self.page = other;
+            self.clamp_cursor();
+        }
+        self.page = page;
+        self.stack.clear();
+        if let Some((saved, screen)) = place.screen {
+            if saved == page && self.resumes(screen) {
+                self.stack.push(screen);
+            }
+        }
+    }
+
+    /// Whether `screen` still belongs to the focused row and its cursor is inside it.
+    fn resumes(&self, screen: Screen) -> bool {
+        let Some(focused) = self.focused_row() else { return false };
+        if self.grey(focused).is_some() {
+            return false;
+        }
+        let control = ROWS[focused].control;
+        let on_focused = |row: usize| row == focused;
+        match screen {
+            Screen::List { row, cursor } => {
+                on_focused(row)
+                    && matches!(control, Control::Dropdown(_) | Control::YesNoRandom | Control::Number { .. })
+                    && cursor < self.option_count(row)
+            }
+            Screen::Checklist { row, cursor } => {
+                on_focused(row) && matches!(control, Control::MultiSelect(_)) && cursor < self.option_count(row)
+            }
+            Screen::Delay { row, cursor, .. } => {
+                on_focused(row)
+                    && matches!(control, Control::MultiSelectRange { .. })
+                    && cursor < self.get(ROWS[row].id).len() + 2
+            }
+            Screen::Slider { row, .. } => on_focused(row) && matches!(control, Control::Slider),
+            Screen::Directions { row, chip } => {
+                on_focused(row) && matches!(control, Control::DirectionGrid { .. }) && chip < CHIP_POS.len()
+            }
+            Screen::SwapGroups { cursor } => matches!(control, Control::SwapGroups) && cursor < SWAP_GROUP_IDS.len(),
+            Screen::Overrides { situation, cursor } => {
+                matches!(control, Control::Editor(Editor::SituationOverrides))
+                    && situation < SITUATIONS.len()
+                    && cursor <= options::ACTIONS.len()
+            }
+            Screen::Chords { cursor } => {
+                matches!(control, Control::Editor(Editor::ButtonChords)) && cursor < CHORD_ROWS.len()
+            }
+            Screen::ChordEntry { .. } | Screen::Grid { .. } | Screen::External(_) | Screen::ConfirmReset => false,
+        }
     }
 
     fn sync(&mut self) {
@@ -342,13 +475,16 @@ impl Menu {
     }
 
     /// Visit the entries of `page` in order: a header for each group with a visible row, then its
-    /// rows unless the group is collapsed. `visit` returns `false` to stop.
+    /// rows unless the group is collapsed; last, the page's *Reset page to defaults* line. `visit` returns `false`
+    /// to stop.
     fn scan(&self, page: Page, mut visit: impl FnMut(usize, Entry) -> bool) {
         let mut n = 0;
+        let mut last = None;
         for (g, group) in GROUPS.iter().enumerate() {
             if group.page != page || !self.group_visible(g) {
                 continue;
             }
+            last = Some(g);
             if !visit(n, Entry::Group(g)) {
                 return;
             }
@@ -364,6 +500,9 @@ impl Menu {
                     n += 1;
                 }
             }
+        }
+        if let Some(g) = last {
+            visit(n, Entry::ResetPage(g));
         }
     }
 
@@ -393,7 +532,7 @@ impl Menu {
     /// A header can be focused only when it opens or closes an advanced group.
     fn focusable(&self, entry: Entry) -> bool {
         match entry {
-            Entry::Row(_) => true,
+            Entry::Row(_) | Entry::ResetPage(_) => true,
             Entry::Group(g) => GROUPS[g].advanced,
         }
     }
@@ -757,6 +896,16 @@ impl Menu {
                     self.stack.pop();
                 }
             }
+            Some(Screen::ConfirmReset) => match button {
+                Button::A => {
+                    self.stack.pop();
+                    self.reset_page();
+                }
+                Button::B => {
+                    self.stack.pop();
+                }
+                _ => {}
+            },
         }
     }
 
@@ -801,13 +950,13 @@ impl Menu {
             Button::Y => {
                 if let Some(row) = self.focused_row().and_then(|index| ROWS.get(index)) { self.reset_setting(row); }
             }
-            Button::ZR => self.reset_page(),
             Button::A => match self.focus() {
                 Some(Entry::Group(g)) => {
                     self.expanded ^= 1 << g;
                     self.clamp_cursor();
                 }
                 Some(Entry::Row(row)) => self.activate(row),
+                Some(Entry::ResetPage(_)) => self.stack.push(Screen::ConfirmReset),
                 None => {}
             },
             Button::Left | Button::Right => {
@@ -815,7 +964,40 @@ impl Menu {
                     self.cycle(row, button == Button::Right);
                 }
             }
-            Button::ZL => {}
+            Button::JumpUp => self.jump_section(false),
+            Button::JumpDown => self.jump_section(true),
+            // ZR no longer resets the page (it is the role switch inside the roster grids, easy to hit by
+            // accident): the page's last line does, after a confirmation.
+            Button::ZL | Button::ZR => {}
+        }
+    }
+
+    /// ZL + Up / Down on a page: the cursor goes to the first focusable entry of the previous or next section (a
+    /// group: its first row, or the header of a collapsed advanced group). It does not wrap: on the first or the
+    /// last section the cursor stays, unlike Up / Down, so the edge of the page is felt.
+    fn jump_section(&mut self, forward: bool) {
+        let page = self.page;
+        let Some(current) = self.focus().map(group_of) else { return };
+        let (mut before, mut after, mut seen, mut last) = (None, None, false, None);
+        self.scan(page, |n, entry| {
+            let group = group_of(entry);
+            if !self.focusable(entry) || last == Some(group) {
+                return true;
+            }
+            // `n` is the first focusable entry of `group`.
+            last = Some(group);
+            if group == current {
+                seen = true;
+            } else if !seen {
+                before = Some(n);
+            } else {
+                after = Some(n);
+                return false;
+            }
+            true
+        });
+        if let Some(at) = if forward { after } else { before } {
+            self.cursor[page.index()] = at;
         }
     }
 
@@ -917,42 +1099,51 @@ impl Menu {
         }
     }
 
-    /// ZR on a page restores its saved defaults. INI-held shortcuts and
-    /// replay capture are not in the settings snapshots and stay unchanged.
+    /// The confirmed *Reset page to defaults* restores the page's saved defaults and notes which rows changed
+    /// (`take_page_reset`). INI-held shortcuts and replay capture are not in the settings snapshots and stay unchanged.
     fn reset_page(&mut self) {
+        let mut changed = Vec::new();
         for row in &ROWS {
-            if row.page() == self.page && row.visible(self.env.pilot_present) {
-                self.reset_setting(row);
+            if row.page() == self.page && row.visible(self.env.pilot_present) && self.reset_setting(row) {
+                changed.push(if row.id.is_empty() { row.title } else { row.id });
             }
         }
+        self.page_reset = Some((self.page, changed));
+    }
+
+    /// The page reset that ran since the last take: the page and the rows it changed (ids, or titles for rows
+    /// without one).
+    pub fn take_page_reset(&mut self) -> Option<(Page, Vec<&'static str>)> {
+        self.page_reset.take()
     }
 
     /// One visible row can own several stored keys (range/checklist, groups,
-    /// overrides, chords); a focused-row reset restores that complete value.
-    fn reset_setting(&mut self, row: &Row) {
+    /// overrides, chords); a focused-row reset restores that complete value. True when a value changed.
+    fn reset_setting(&mut self, row: &Row) -> bool {
+        let mut changed = false;
         if matches!(row.control, Control::SwapGroups) {
-            for id in SWAP_GROUP_IDS { self.reset_row(id); }
+            for id in SWAP_GROUP_IDS { changed |= self.reset_row(id); }
         }
         if matches!(row.control, Control::Editor(Editor::SituationOverrides)) {
-            for (_, id) in SITUATIONS { self.reset_row(id); }
+            for (_, id) in SITUATIONS { changed |= self.reset_row(id); }
         }
         if matches!(row.control, Control::Editor(Editor::ButtonChords)) {
-            for (_, id) in CHORD_ROWS { self.reset_row(id); }
+            for (_, id) in CHORD_ROWS { changed |= self.reset_row(id); }
         }
-        self.reset_row(row.id);
+        changed |= self.reset_row(row.id);
         if let Control::MultiSelectRange { range_id, .. } = row.control {
-            self.reset_row(range_id);
+            changed |= self.reset_row(range_id);
         }
+        changed
     }
 
-    fn reset_row(&mut self, id: &str) {
-        if id.is_empty() {
-            return;
-        }
-        if let Some(saved) = self.settings.defaults.get(id) {
-            let saved = saved.to_vec();
-            self.put(id, &saved);
-        }
+    fn reset_row(&mut self, id: &str) -> bool {
+        let Some(saved) = self.settings.defaults.get(id).filter(|_| !id.is_empty()).map(<[u8]>::to_vec) else {
+            return false;
+        };
+        let changed = saved != self.get(id);
+        self.put(id, &saved);
+        changed
     }
 
     fn press_list(&mut self, button: Button, row: usize, cursor: usize) {
@@ -960,6 +1151,9 @@ impl Menu {
         match button {
             Button::Up => self.top(Screen::List { row, cursor: (cursor + len - 1) % len }),
             Button::Down => self.top(Screen::List { row, cursor: (cursor + 1) % len }),
+            Button::JumpUp | Button::JumpDown => {
+                self.top(Screen::List { row, cursor: jumped(cursor, len, button == Button::JumpDown) });
+            }
             Button::A => {
                 match ROWS[row].control {
                     Control::YesNoRandom => self.put_yes_no_random(ROWS[row].id, cursor),
@@ -998,6 +1192,9 @@ impl Menu {
         match button {
             Button::Up => self.top(Screen::Checklist { row, cursor: (cursor + len - 1) % len }),
             Button::Down => self.top(Screen::Checklist { row, cursor: (cursor + 1) % len }),
+            Button::JumpUp | Button::JumpDown => {
+                self.top(Screen::Checklist { row, cursor: jumped(cursor, len, button == Button::JumpDown) });
+            }
             Button::A => self.toggle_entry(id, cursor),
             Button::ZL => self.all_or_none(id),
             Button::B => {
@@ -1025,6 +1222,10 @@ impl Menu {
                     let next = if forward { (cursor + 1) % count } else { (cursor + count - 1) % count };
                     self.top(screen(next, false));
                 }
+            }
+            // The checklist entries and the two handles as one list; a handle being edited ignores the jump.
+            Button::JumpUp | Button::JumpDown if !editing => {
+                self.top(screen(jumped(cursor, len + 2, button == Button::JumpDown), false));
             }
             Button::Left | Button::Right => {
                 let forward = button == Button::Right;
@@ -1197,6 +1398,9 @@ impl Menu {
         match button {
             Button::Up => self.top(Screen::SwapGroups { cursor: (cursor + len - 1) % len }),
             Button::Down => self.top(Screen::SwapGroups { cursor: (cursor + 1) % len }),
+            Button::JumpUp | Button::JumpDown => {
+                self.top(Screen::SwapGroups { cursor: jumped(cursor, len, button == Button::JumpDown) });
+            }
             Button::A => {
                 if self.swap_entry_grey(cursor).is_none() {
                     let id = SWAP_GROUP_IDS[cursor];
@@ -1218,6 +1422,9 @@ impl Menu {
         match button {
             Button::Up => self.top(screen(situation, (cursor + len - 1) % len)),
             Button::Down => self.top(screen(situation, (cursor + 1) % len)),
+            Button::JumpUp | Button::JumpDown => {
+                self.top(screen(situation, jumped(cursor, len, button == Button::JumpDown)));
+            }
             Button::Left if cursor == 0 => {
                 self.top(screen((situation + SITUATIONS.len() - 1) % SITUATIONS.len(), 0));
             }
@@ -1244,6 +1451,9 @@ impl Menu {
         match button {
             Button::Up => self.top(Screen::Chords { cursor: (cursor + len - 1) % len }),
             Button::Down => self.top(Screen::Chords { cursor: (cursor + 1) % len }),
+            Button::JumpUp | Button::JumpDown => {
+                self.top(Screen::Chords { cursor: jumped(cursor, len, button == Button::JumpDown) });
+            }
             Button::A => {
                 let captured = Chord::from_row(self.get(CHORD_ROWS[cursor].1));
                 self.stack.push(Screen::ChordEntry { target: ChordTarget::Row(cursor as u8), captured });

@@ -4,6 +4,19 @@ Every GIF in [`media/`](media/) is actual Eden footage: whole screen, 1280×720,
 ends, under 10 s, game-speed timing kept. Frames were reviewed (start, action, result) before a clip was kept. The
 raw takes stay outside git with their runs.
 
+## Menu navigation (2026-11-05)
+
+Run `tr-p23-menu-nav-02` on the Yoga, 2026-11-05 ~14:09Z: the `p23/menu-nav` diag build at `7ab1c50` (NRO
+`1273c29f60503f76f02c1610cf291f2a0997db1b686ba1062c93204ab5812a1d`; the diag build adds log lines only, the menu draws
+the same), with the CPU pilot, Online Deluxe and tile-cursor plugins installed.
+
+| File | What it shows |
+| --- | --- |
+| `menu-section-jump.gif` | CPU page from Reactions: ZL + Down jumps Defence, Ledge & Tech, Shield, Attacks & Movement and Player 1 control (where *Reset page to defaults* closes the page), then ZL + Up goes back two sections. The footer lists ZL+Up/Down section and no ZR page reset. 9.0 s. |
+
+Since this branch, ZR on a page no longer resets it (the `menu-defaults.gif` clip below shows the old key): each page
+ends with *Reset page to defaults*, which asks for confirmation.
+
 ## 0.2.0-rc.1 clips (2026-11-05)
 
 Run `tr-p23-docs-capture-03` on the Surface, 2026-11-05Z: one boot of the released 0.2.0-rc.1 NRO

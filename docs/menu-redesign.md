@@ -71,6 +71,11 @@ page, X saves the current values as the defaults, B closes the menu, the help
 text of the focused row shows at the bottom, and the menu opens with Minus or
 the permanent B + D-pad Up.
 
+Changed 2026-11-05 (operator, `p23/menu-nav`): ZR no longer resets the page. ZR is the role switch inside the
+roster grids and was easy to hit by accident on a page. Each page now ends with a **Reset page to defaults** line,
+which asks for confirmation (A reset, B cancel) and logs the page and the rows it changed. ZL + Up/Down jumps
+between the sections of a page, and the menu reopens where it was closed.
+
 ### Page 1 — CPU (what the CPU does)
 
 | Section | Row | Control | Values / default | Today |

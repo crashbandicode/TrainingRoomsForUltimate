@@ -6,8 +6,10 @@ use core::sync::atomic::{AtomicU32, AtomicU64, AtomicUsize, Ordering};
 use super::adapter::Step;
 use super::menu::{input::Button, Menu};
 
-const BUTTONS: [Button; 12] = [Button::Up, Button::Right, Button::Down, Button::Left,
-    Button::A, Button::B, Button::X, Button::Y, Button::L, Button::R, Button::ZL, Button::ZR];
+const BUTTONS: [Button; 14] = [Button::Up, Button::Right, Button::Down, Button::Left,
+    Button::A, Button::B, Button::X, Button::Y, Button::L, Button::R, Button::ZL, Button::ZR,
+    Button::JumpUp, Button::JumpDown];
+const _: () = assert!(Button::JumpDown as u8 <= 15, "navigation presses are a u16 bit set");
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Packet {

@@ -111,6 +111,9 @@ fn env() -> Env {
 struct Session {
     input_generation: u32,
     menu: Option<Menu>,
+    /// Where the menu was when its model was last dropped (every close resets the input generation, which drops the
+    /// model): the next opening comes back here. Kept for the rest of the boot, across scenes and Training resets.
+    place: Option<crate::model::menu::Place>,
     setups: super::setups::Ui,
     setup_note: Option<String>,
     stage_context: Option<crate::runtime::lobby::practice_stage_request::MenuContext>,
@@ -178,6 +181,9 @@ fn sync_input_generation(s: &mut Session) {
     let generation = INPUT.generation();
     if generation != s.input_generation {
         s.input_generation = generation;
+        if let Some(menu) = s.menu.as_ref() {
+            s.place = Some(menu.place());
+        }
         s.menu = None;
         s.stage_context = None;
         s.stage_close = None;
@@ -203,9 +209,15 @@ fn handle(event: Event, s: &mut Session) {
         s.stage_context = crate::runtime::lobby::practice_stage_request::menu_context();
         s.stage_close = None;
         let settings = SETTINGS.lock().clone().unwrap_or_else(Settings::factory);
-        match &mut s.menu {
-            Some(m) => m.reopen(settings, env()),
-            None => s.menu = Some(Menu::new(settings, env())),
+        let menu = match &mut s.menu {
+            Some(m) => {
+                m.reopen(settings, env());
+                m
+            }
+            None => s.menu.insert(Menu::new(settings, env())),
+        };
+        if let Some(place) = s.place {
+            menu.restore_place(place);
         }
         s.panel = None;
         s.refusal = None;
@@ -221,6 +233,11 @@ fn handle(event: Event, s: &mut Session) {
         #[cfg(feature = "mii-saved-alpha")]
         { s.opening = crate::runtime::ui::menu_app::sequence(); }
         publish_frame(s);
+        #[cfg(feature = "diag")]
+        if let Some(m) = s.menu.as_ref() {
+            diagnostic(format_args!("[Ui] menu opened page={} cursor={} depth={} screen={:?}", m.page().id(), m.cursor(), m.depth(), m.screen()));
+        }
+        #[cfg(not(feature = "diag"))]
         diagnostic(format_args!("[Ui] menu opened"));
         return;
     }
@@ -276,6 +293,13 @@ fn press(button: Button, s: &mut Session) {
             }
         } else {
             m.press(button);
+            // Eden reads where each press left the cursor (the section jump, the remembered place).
+            #[cfg(feature = "diag")]
+            diagnostic(format_args!("[Ui] press {:?} page={} cursor={} depth={} screen={:?} row={:?}", button, m.page().id(), m.cursor(), m.depth(), m.screen(), m.help_row().map(|r| r.title)));
+            // Shipped builds write it too: a page reset is the player's explicit, confirmed choice.
+            if let Some((page, changed)) = m.take_page_reset() {
+                diagnostic(format_args!("[TrainingRooms] page reset page={} rows={} changed={}", page.id(), changed.len(), changed.join(",")));
+            }
             if let Some(item) = m.take_give_item() {
                 requests::give_item(item);
             }
