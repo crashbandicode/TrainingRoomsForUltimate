@@ -2,7 +2,7 @@
 //! The locks in `HOOK_LOCKS` are taken by game-thread hooks. This test follows the runtime's call graph (`tests/common/callgraph.rs`)
 //! from every entry point that runs on a plugin thread (the menu worker, the writer threads, the loaders, the publishing path)
 //! and fails if any function it reaches takes one of them. A plugin thread hands values to the game through
-//! `hos_lock::Published`, atomics or a lock-free mailbox instead (IMPLEMENTATION-PROGRESS-sync.md, audit table).
+//! `hos_lock::Published`, atomics or a lock-free mailbox instead (IMPLEMENTATION-PROGRESS-sync.md (removed after v0.2.0-rc.1; see that tag), audit table).
 //!
 //! How the scan reads the code:
 //! - **Lock sites:** a function takes a lock when its body has the static followed by `.lock(` / `.read(` / `.write(` /
@@ -290,7 +290,7 @@ fn static_locks(root: &Path) -> Vec<(String, String)> {
     out
 }
 
-/// The audit's raw material (IMPLEMENTATION-PROGRESS-sync.md): every static lock (ours and carried package-6 code, std or hos-lock)
+/// The audit's raw material (IMPLEMENTATION-PROGRESS-sync.md (removed after v0.2.0-rc.1; see that tag)): every static lock (ours and carried package-6 code, std or hos-lock)
 /// a plugin-thread entry reaches, with the function that takes it. Prints; never fails
 /// (`cargo test --test hook_locks report -- --nocapture`).
 #[test]

@@ -16,7 +16,7 @@ role's costume through the game's mod-aware file-resource service; the carried
 `character_roster.rs` helper is renamed `menu_stock_icon_hash` via manifest
 edit 42 (stage m5q, ledger regenerated). No layout/recipe change; no new hook.
 
-Evidence: `docs/MENU-GIFS.md` (six clips, NRO `50d95130...`), runs
+Evidence: `docs/MEDIA.md` (RC10 menu clips, six, NRO `50d95130...`), runs
 `glm-gifs-04`, `glm-gifs-05` (GIFs; character grids show the game's stock
 icons) and `glm-fd-stock` (Cosmic Destination moved aside attempt) under
 `/home/intpa/eden-runs/`; the stage grid follows stage mods - the FD tile
@@ -43,7 +43,7 @@ read, returns a callback-scoped raw NonNull<Fighter> from a game-thread-only uns
 helper, and checks both accessor and object id before full native cleanup. Old
 hat leases remain pinned through cleanup and are released only on the later
 callback. The unused predicate row/constants and roster dependency are retired.
-Astra APPROVE-WITH-CHANGES source requirements applied; see `docs/RC9-HATS.md`.
+Astra APPROVE-WITH-CHANGES source requirements applied; see `docs/RC9-HATS.md` (removed after v0.2.0-rc.1; see that tag).
 Kirby remains physically pinned to cell0; generic non-zero-cell resolution and
 non-first-roster Kirby are different acceptance clauses.
 
@@ -118,7 +118,7 @@ PRIMARY rescinded the aggregate 60GB cache admission gate. Fresh per-host disk >
 
 ## Objective and source
 
-RC = the functional rows M5q actually passed + already-working new UI + one R-D1 replay A/B and one R-O1 LDN session + clean MIT provenance. Exact matrix and assignments: parent TRAININGROOMS-STATUS.md, section RC RESET PLAN. No new Phase-1 feature work. Subsequent Phase 2 and Phase 3 are explicitly authorized below; deferred scope and exclusion boundaries: NEXT-VERSION.md.
+RC = the functional rows M5q actually passed + already-working new UI + one R-D1 replay A/B and one R-O1 LDN session + clean MIT provenance. Exact matrix and assignments: parent TRAININGROOMS-STATUS.md, section RC RESET PLAN. No new Phase-1 feature work. Subsequent Phase 2 and Phase 3 are explicitly authorized below; deferred scope and exclusion boundaries: NEXT-VERSION.md (removed after v0.2.0-rc.1; see that tag).
 
 Branch work/implementation, worktree /home/intpa/smash-training-lobby/TrainingRoomsForUltimate-work. Current product7b035f2: UI22 inverse0c60459; StateWriter40KiB8fe6261; UI freeze87597fc/6ba06e7; advanced-workflow closure11ee226; optional observers8c0ec63; coupled F9/exact-created admission withdrawal661f7ad. Lead resolved observer/count seam and carry overlap: seven tables,247 remaining carried files re-derived with every reviewed destination byte preserved. Add New/native custom-Mii editor exposure is closed by7b035f2 at the production adapter and fresh/resumed provider admission, preserving ordinary saved catalog/CPU Mii selection. Generic enabled model policy remains for later qualification; adapter regressions await the final host gate. Final source/NRO identities follow coherent composition, no scratch receipts.
 

@@ -2,7 +2,7 @@
 //! Pure rule in `model::scene`; the three facts are read here. Owned by package 6 (the lobby engine sets `lobby_active`, the
 //! hot-swap engine sets `HOT_SWAP_IN_PROGRESS` and holds the install gate).
 //!
-//! NOT YET SWITCH-COMPILED beyond the build recorded in IMPLEMENTATION-PROGRESS-pkg6.md.
+//! NOT YET SWITCH-COMPILED beyond the build recorded in IMPLEMENTATION-PROGRESS-pkg6.md (removed after v0.2.0-rc.1; see that tag).
 
 use std::sync::atomic::{AtomicBool, Ordering};
 

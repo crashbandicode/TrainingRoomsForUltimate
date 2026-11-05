@@ -67,7 +67,7 @@ Replay A/B with the desync detector and the two-console online rows are not run 
 | Requirement | Result | Evidence |
 | --- | --- | --- |
 | cdylib only, release profile, skyline =0.6.0, toolchain 1.98.1, `model`/`runtime` split | pass | `compliance.py` machine rows |
-| Gates: `cargo test` (24 binaries, 1,227 tests, 0 failed, Surface), clippy `--all-targets -D warnings` (0 warnings, Yoga gate folder with `SKIP_OWNED_ELF_FACT=1` because the owned ELF lives on the Surface; the ELF tests ran on the Surface), `cargo build --no-default-features`, Switch release and diag builds warning-free | pass | commands in `IMPLEMENTATION-PROGRESS-pkg4.md` |
+| Gates: `cargo test` (24 binaries, 1,227 tests, 0 failed, Surface), clippy `--all-targets -D warnings` (0 warnings, Yoga gate folder with `SKIP_OWNED_ELF_FACT=1` because the owned ELF lives on the Surface; the ELF tests ran on the Surface), `cargo build --no-default-features`, Switch release and diag builds warning-free | pass | commands in `IMPLEMENTATION-PROGRESS-pkg4.md` (removed after v0.2.0-rc.1; see that tag) |
 | 64-byte guard on every site, card scan | pass | `tests/input_sites.rs`; scan over the 2026-11-01 10:19 preflight copy: only the fork NRO and the CPU pilot (`0x2da180`, the AI function's entry, not our site) reference our offsets; the Combo Display / stale-moves sites and the natives are referenced by the fork only |
 | Hook placement (after the prologue / most specific instruction) | pass | `ai_epilogue` is the function's only return path, not its entry; the poll hooks are the caller-side sites of package 1 |
 | Hook sharing with the CPU pilot (the pilot owns the AI function's entry) | pass | both load orders in Eden (s4-01, s4-02); no foreign hook at our rows (`stock`) |
@@ -75,7 +75,7 @@ Replay A/B with the desync detector and the two-console online rows are not run 
 | No heap in hooks | pass | `heap_allocations=0` at install and after 600-frame reports (s4-01, s4-02) |
 | Eden: claim/release, one per host, profile copy, waits gated, console scan, run.json/memory.peak kept, profile restored | pass | `eden/EDEN-PACKAGE-4.md` |
 | Workarounds | none shipped; open decisions: status names (SPEC-input-02 question 1), `CONT_SPECIAL_S` placeholder (kept by the lead's ruling for parity) |
-| Slip | seven builds on the Yoga beside pkg5's Eden (disclosed in `IMPLEMENTATION-PROGRESS-pkg4.md`) |
+| Slip | seven builds on the Yoga beside pkg5's Eden (disclosed in `IMPLEMENTATION-PROGRESS-pkg4.md`) (removed after v0.2.0-rc.1; see that tag) |
 
 ## S4-4: named macros, replay store, live capture adapter, replay window (2026-11-02)
 

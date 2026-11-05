@@ -18,7 +18,7 @@
 //! HB1 route B (operator decision 2026-11-04 ~06:5xZ, `docs/DECISIONS.md` HB1-route, `review/menu-proposal`
 //! commit `5ca5e3b`; it reverses the 2026-11-03 option A default): the hurt spheres are drawn the fork's way, as yellow
 //! `sys_shield` spheres from the game's shared effect pool, through the same handle sets as the hit spheres
-//! (`docs/HB1-RENDER-ROUTES.md`). While the setting is On the pass constructs the `HitModule` reader (`GameHurt`, over the
+//! (`docs/HB1-RENDER-ROUTES.md (removed after v0.2.0-rc.1; see that tag)`). While the setting is On the pass constructs the `HitModule` reader (`GameHurt`, over the
 //! three relied `hurtbox_*` guard rows back in `sites_hitbox`) and plans the enabled parts' spheres into the same wants;
 //! the pool's refusals are counted (`Counts::failed`, the `[Hitbox] stats` line) and each refused sphere is asked again on
 //! a later pass, once the pool has room — one request per want per pass, never a respawn loop (the lead ruling above).
@@ -332,7 +332,7 @@ pub unsafe fn frame(fighter: usize) {
     // Route B (operator decision 2026-11-04 ~06:5xZ, `docs/DECISIONS.md` HB1-route, `review/menu-proposal` commit
     // `5ca5e3b`): while the setting is On the pass reads the HitModule (the relied `hurtbox_*` rows) and plans the
     // enabled parts' hurt spheres into the same wants, drawn from the same shared effect pool as the hit spheres
-    // (`docs/HB1-RENDER-ROUTES.md`). The reader is constructed only here, behind `enabled`: Off — and the stop paths
+    // (`docs/HB1-RENDER-ROUTES.md (removed after v0.2.0-rc.1; see that tag)`). The reader is constructed only here, behind `enabled`: Off — and the stop paths
     // the dispatch takes first — reads no HitModule, so the shipped build's HitModule reads are On-only.
     let mut hurt = enabled.then(|| hitbox::GameHurt { accessor, load: mem_load });
     let hurt: Option<&mut dyn hitbox::HurtboxReader> = hurt.as_mut().map(|h| h as _);

@@ -61,7 +61,7 @@ Savings are counted lines (E unless marked). Risk: L/M/H. "Rows" = Eden rows tha
 
 No clean-room Eden row has exercised the roster cycle yet (EDEN-PACKAGE-6: s6-01 sync probe, s6-02/03 boot and
 CPU-as-P1; "Not run: CP0/CP1/CP3 … needs the roster cycle"). Rows below are the planned ones of
-docs/PACKAGE-6-PLAN.md §8 (sets A/B/D, R-ID, R-PC) and must exist as a baseline before a roster refactor.
+docs/PACKAGE-6-PLAN.md (removed after v0.2.0-rc.1; see that tag) §8 (sets A/B/D, R-ID, R-PC) and must exist as a baseline before a roster refactor.
 
 | Finding (examples) | Change | Saves | Risk | Rows |
 | --- | --- | ---: | --- | --- |

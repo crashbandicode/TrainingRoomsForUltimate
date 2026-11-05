@@ -43,7 +43,7 @@ cargo-skyline from `/home/intpa/smash-training-lobby/toolchain/tools/skyline-ins
 2026-11-02: a detached clean checkout of `e8dbcc9`, pin unchanged, no `RUSTUP_TOOLCHAIN`, the Surface command above
 (script `/tmp/tr-pin-probe.ps1`): `Finished release … in 16.54s`, `libtraining_rooms.nro` sha256
 `26a5fef0383d2252f44868257bd7e95ccf17c7157b4e1c00a314e377016303f9` — byte-identical to the release NRO built
-earlier with a `RUSTUP_TOOLCHAIN=nightly-2026-02-14` override (`IMPLEMENTATION-PROGRESS.md`), so the build is
+earlier with a `RUSTUP_TOOLCHAIN=nightly-2026-02-14` override (`IMPLEMENTATION-PROGRESS.md`) (removed after v0.2.0-rc.1; see that tag), so the build is
 reproducible and the override is not needed. Resident size: `nro_size.py` → 172,032 B.
 
 ## Layout archive recipe (package 5, host tool)

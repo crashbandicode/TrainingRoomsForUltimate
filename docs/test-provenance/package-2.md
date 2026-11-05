@@ -147,11 +147,11 @@ state against the spec's roughly 128 bytes for one shared table; the clock still
 | Every hooked thunk is a 16-aligned leaf thunk that fits Skyline's 16-byte far jump without touching the next function | playbook | `cpu_sites_every_replace_hook_is_a_thunk_that_fits_the_far_jump` | `cpu-0N-install-line` | host pass |
 | No site or guard window within 0x40 of a site of the CPU pilot; only our own rows overlap each other | playbook | `cpu_sites_are_not_near_the_cpu_pilot`, `cpu_sites_overlapping_windows_are_all_our_own` | pilot coexistence rows | host pass |
 | Features need the core's natives; the slot row records its original | §4 | `cpu_sites_features_need_the_core`, `cpu_sites_the_frame_slot_holds_the_original_it_replaces` | - | host pass |
-| Card scan (2026-11-01 10:19 MTP preflight copy, 16 plugins): only `libtraining_modpack.nro` (the fork, never co-installed, B1) references any of the 19 offsets; `libssbu_cpu_pilot.nro` and every other plugin: no reference | playbook | `tools/build/scan-offsets.py` (output in `IMPLEMENTATION-PROGRESS.md`) | - | pass |
+| Card scan (2026-11-01 10:19 MTP preflight copy, 16 plugins): only `libtraining_modpack.nro` (the fork, never co-installed, B1) references any of the 19 offsets; `libssbu_cpu_pilot.nro` and every other plugin: no reference | playbook | `tools/build/scan-offsets.py` (output in `IMPLEMENTATION-PROGRESS.md`) (removed after v0.2.0-rc.1; see that tag) | - | pass |
 
 ## Not in this milestone
 
-The fixed camera (stage table) and the shield damage multiplier are open (IMPLEMENTATION-PROGRESS-pkg2.md, "Still open").
+The fixed camera (stage table) and the shield damage multiplier are open (IMPLEMENTATION-PROGRESS-pkg2.md (removed after v0.2.0-rc.1; see that tag), "Still open").
 
 ## Update 2026-11-02 (successor worker): Eden runs s2-01..s2-04 on the Ally, the two open items closed
 

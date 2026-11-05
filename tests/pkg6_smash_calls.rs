@@ -137,7 +137,7 @@ fn every_smash_call_of_the_carried_runtime_sources_is_covered_by_a_guarded_row()
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");
     // Only code that is compiled: a top-level area of `src/runtime` counts once `runtime.rs` declares it (`mod <area>;`). Carried
     // sources that are staged but not declared yet (the roster cycle) are not compiled, so their calls are not made; their list of
-    // unguarded calls is in IMPLEMENTATION-PROGRESS-pkg6.md and this test takes them in the moment their module is declared.
+    // unguarded calls is in IMPLEMENTATION-PROGRESS-pkg6.md (removed after v0.2.0-rc.1; see that tag) and this test takes them in the moment their module is declared.
     let declared = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime.rs")).unwrap();
     let mut files = Vec::new();
     for entry in std::fs::read_dir(&root).unwrap() {

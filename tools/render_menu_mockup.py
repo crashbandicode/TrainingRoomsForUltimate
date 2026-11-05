@@ -12,7 +12,7 @@ the fork's own 38 item icons (byte copies in docs/menu-mockup/captures/items/) a
 as a mock of run-time thumbnails: the clean room reads each stage's own game UI texture when the grid
 opens, so a stage mod's picture shows; the stage crops stand in for that. v6 removes the small origin tags
 ("upstream" / "ours") from the page rows: origin is internal information and lives in PROVENANCE.md and
-the provenance table of docs/MENU-PROPOSAL.md; the fourth field of each row below is kept as that
+the provenance table of docs/MENU-PROPOSAL.md (removed after v0.2.0-rc.1; see that tag); the fourth field of each row below is kept as that
 internal record and is never drawn. v8 draws the DI Direction chips with the game's own DI streak (the
 system effect `sys_vector`), a crop of one frame of a real Eden capture (tools/crop_menu_captures.py,
 docs/menu-mockup/captures/di/), rotated per direction as the game rotates that effect to the launch angle

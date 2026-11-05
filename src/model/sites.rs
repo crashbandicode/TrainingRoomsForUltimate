@@ -49,10 +49,10 @@ features! {
     /// SPEC-cpu-03: the ledge options.
     CpuLedge => "cpu_ledge",
     /// SPEC-cpu-04: tech, missed tech, hidden tech animations (the camera and the script status-change
-    /// hook need sites this table does not have yet, see `IMPLEMENTATION-PROGRESS.md`).
+    /// hook need sites this table does not have yet, see `IMPLEMENTATION-PROGRESS.md (removed after v0.2.0-rc.1; see that tag)`).
     CpuTech => "cpu_tech",
     /// SPEC-cpu-05: shield hold, decay override and tilt (the out-of-shield hook is in the `common`
-    /// script module and the damage multiplier needs the param-hook plugin, see `IMPLEMENTATION-PROGRESS.md`).
+    /// script module and the damage multiplier needs the param-hook plugin, see `IMPLEMENTATION-PROGRESS.md (removed after v0.2.0-rc.1; see that tag)`).
     CpuShield => "cpu_shield",
     /// Package 3 (save states): the natives and hooks of SPEC-state-01 (`sites_pkg3.rs`).
     StateCore => "state_core",
