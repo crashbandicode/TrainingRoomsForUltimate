@@ -697,6 +697,148 @@ unsafe fn owner_cleanup_complete(ctx: &InlineCtx) {
     }
 }
 
+// ---- PAUSE-HELPER (operator decision 2026-11-05, option (a); pure half `model::pause_helper`) ---------------------
+//
+// The Training pause state `0x1558720` is installed at `0x1558658-0x1558668` (`[x19+0x248] = 0x1558720`, the only
+// load of that pointer in 0x1540000-0x1570000) and its exit block `0x1558f4c-0x1559118` walks FighterManager entries
+// 1-7 and calls `0x6b82b0([e+0x4178], 1)` for each present entry with `[e+0x5920] != 3` and `[e+0x5aa0] ==
+// 0x50000000`. At pause-open the plugin retires its own created helper entries that loop would walk with no actor,
+// through the native single-slot retire the game itself runs: FighterManager teardown `0x66e850` per slot
+// (`0x66e914-0x66e94c`) and the summon removal mid-battle for slot 6 (`0x4eb00c-0x4eb04c`):
+//   0x653490(e, 1); 0x6524e0(e); [mgr+0x20+8*slot] = 0; 0x652160(e); 0x392eb40(e); [mgr+0xa0] -= 1.
+// `0x652160` is the entry destructor body: its `+0x14` carries `character_lifecycle::destruction_trace`, which fans
+// out `on_destroy` exactly as at finalize; the owner cleanup (`0x17e44c4`) follows natively.
+
+/// The pause-state install, after the PC-relative `adrp/add` (`x19` = the Training state object, `x8` = `0x1558720`).
+#[cfg(feature = "managed-third-source-alpha")]
+const PAUSE_INSTALL: usize = 0x1558660;
+/// The pause state's exit block, first instruction (`ldr w8,[x19,#0x16c]`).
+#[cfg(feature = "managed-third-source-alpha")]
+const PAUSE_EXIT: usize = 0x1558f4c;
+/// The game's own mid-battle single-slot retire (slot 6), the sequence `retire_at` mirrors.
+#[cfg(feature = "managed-third-source-alpha")]
+const RETIRE_REFERENCE: usize = 0x4eb00c;
+#[cfg(feature = "managed-third-source-alpha")]
+const RETIRE_UNLOAD: usize = 0x653490;
+#[cfg(feature = "managed-third-source-alpha")]
+const RETIRE_FINALIZE: usize = 0x6524e0;
+#[cfg(feature = "managed-third-source-alpha")]
+const RETIRE_DESTROY: usize = 0x652160;
+#[cfg(feature = "managed-third-source-alpha")]
+const RETIRE_FREE: usize = 0x392eb40;
+/// `lib::Singleton<app::FighterManager>::instance_`; `[[base+this]]` is the manager whose entries are at `+0x20+8i`.
+#[cfg(feature = "managed-third-source-alpha")]
+const FIGHTER_MANAGER_INSTANCE: usize = 0x52b94f8;
+
+/// Exact 13.0.5 words: the two hook sites and the reference retire (its four `bl` targets are the callees above).
+#[cfg(feature = "managed-third-source-alpha")]
+const PAUSE_CONTRACT: [(usize, [u32; 16]); 3] = [
+    (PAUSE_INSTALL, [0x3907d27f, 0xf9012668, 0xf9012a7f, 0xf9402bf9, 0xa9497bfd, 0xa9484ff4, 0xa94757f6, 0xa9465ff8,
+                     0x910283ff, 0xd65f03c0, 0x9001eee8, 0xf9457d08, 0xb40001a8, 0xb9400909, 0x53177d29, 0x71000d3f]),
+    (PAUSE_EXIT, [0xb9416e68, 0xb9016a68, 0x12800014, 0x91058668, 0x320003e9, 0xb9016e74, 0x3907b27f, 0x79000109,
+                  0xb001eb16, 0xf9427ec8, 0xf9400108, 0xf9401509, 0x52aa0015, 0xb40001c9, 0x528b240a, 0x386a692a]),
+    (RETIRE_REFERENCE, [0xf9402b15, 0xb4000875, 0x320003e1, 0xaa1503e0, 0x9405a11d, 0xaa1503e0, 0x94059d2f, 0xf9402b15,
+                        0xf9002b1f, 0xb40000b5, 0xaa1503e0, 0x94059c4a, 0xaa1503e0, 0x94d10ec0, 0xb940a308, 0x51000508]),
+];
+
+#[cfg(feature = "managed-third-source-alpha")]
+const PAUSE_SEAMS: &[&str] = &["capacity.pause_state_install", "capacity.pause_state_exit", "lifecycle.destruction_entry"];
+
+#[cfg(feature = "managed-third-source-alpha")]
+static PAUSE_RETIRE_VERIFIED: AtomicBool = AtomicBool::new(false);
+
+/// The words at the hook sites and the reference retire are exactly 13.0.5's, and the reference's four calls land on
+/// the callees `retire_at` uses.
+#[cfg(feature = "managed-third-source-alpha")]
+unsafe fn verify_pause_retire(base: usize) -> Result<(), usize> {
+    for (offset, words) in PAUSE_CONTRACT {
+        if std::slice::from_raw_parts((base + offset) as *const u32, words.len()) != words {
+            return Err(offset);
+        }
+    }
+    // `bl` at reference +0x10/+0x18/+0x2c/+0x34: 0x653490, 0x6524e0, 0x652160, 0x392eb40.
+    for (at, target) in [(0x10, RETIRE_UNLOAD), (0x18, RETIRE_FINALIZE), (0x2c, RETIRE_DESTROY), (0x34, RETIRE_FREE)] {
+        let site = RETIRE_REFERENCE + at;
+        let word = ((base + site) as *const u32).read();
+        let imm = ((word & 0x03ff_ffff) as i32) << 6 >> 6;
+        if word >> 26 != 0b100101 || site.wrapping_add_signed((imm as isize) << 2) != target {
+            return Err(site);
+        }
+    }
+    Ok(())
+}
+
+/// The pause state was just installed: retire our actorless helpers before its exit block can walk them.
+#[cfg(feature = "managed-third-source-alpha")]
+#[skyline::hook(offset = 0x1558660, inline)]
+unsafe fn pause_state_installed(_ctx: &InlineCtx) {
+    crate::runtime::threads::headroom("pause_state_installed");
+    super::sources::pause_state(true);
+}
+
+/// The pause state's exit block is about to walk the entries: release the creation hold; report any actorless walk.
+#[cfg(feature = "managed-third-source-alpha")]
+#[skyline::hook(offset = 0x1558f4c, inline)]
+unsafe fn pause_state_exit(_ctx: &InlineCtx) {
+    crate::runtime::threads::headroom("pause_state_exit");
+    super::sources::pause_state(false);
+}
+
+/// The FighterManager entry pointer in `slot` (1-7), or 0. Values only; game thread.
+#[cfg(feature = "managed-third-source-alpha")]
+pub(super) unsafe fn entry_at(slot: usize) -> usize {
+    let base = BASE.load(Ordering::Acquire);
+    if base == 0 || !(1..8).contains(&slot) {
+        return 0;
+    }
+    let outer = ((base + FIGHTER_MANAGER_INSTANCE) as *const usize).read_volatile();
+    if outer == 0 {
+        return 0;
+    }
+    let manager = (outer as *const usize).read_volatile();
+    if manager == 0 {
+        return 0;
+    }
+    ((manager + 0x20 + 8 * slot) as *const usize).read_volatile()
+}
+
+/// The three fields the pause state's exit loop reads from a present entry.
+#[cfg(feature = "managed-third-source-alpha")]
+pub(super) unsafe fn entry_facts(entry: usize) -> crate::model::pause_helper::EntryFacts {
+    crate::model::pause_helper::EntryFacts {
+        phase: ((entry + 0x5920) as *const u8).read_volatile(),
+        mark: ((entry + 0x5aa0) as *const u32).read_volatile(),
+        actor: ((entry + 0x4178) as *const u64).read_volatile(),
+    }
+}
+
+/// The native single-slot retire (see the section comment). Refuses unless verified and `slot` still holds `entry`.
+/// Must be called with no plugin lock held: the destructor's callbacks take them.
+#[cfg(feature = "managed-third-source-alpha")]
+pub(super) unsafe fn retire_at(slot: usize, entry: usize) -> bool {
+    if !PAUSE_RETIRE_VERIFIED.load(Ordering::Acquire) || entry == 0 || entry_at(slot) != entry {
+        return false;
+    }
+    let base = BASE.load(Ordering::Acquire);
+    let manager = (((base + FIGHTER_MANAGER_INSTANCE) as *const usize).read_volatile() as *const usize).read_volatile();
+    let cell = (manager + 0x20 + 8 * slot) as *mut usize;
+    let count = (manager + 0xa0) as *mut i32;
+    let unload: unsafe extern "C" fn(usize, u32) = std::mem::transmute(base + RETIRE_UNLOAD);
+    let finalize: unsafe extern "C" fn(usize) = std::mem::transmute(base + RETIRE_FINALIZE);
+    let destroy: unsafe extern "C" fn(usize) = std::mem::transmute(base + RETIRE_DESTROY);
+    let free: unsafe extern "C" fn(usize) = std::mem::transmute(base + RETIRE_FREE);
+    unload(entry, 1);
+    finalize(entry);
+    let current = cell.read_volatile();
+    cell.write_volatile(0);
+    if current != 0 {
+        destroy(current);
+        free(current);
+    }
+    count.write_volatile(count.read_volatile() - 1);
+    true
+}
+
 /// Seam-table rows (`native_seams::rows_a1`) at the start of each creation contract range and the two hooks
 /// installed with it. The FNV contracts above stay: they cover whole helper bodies (up to 2572 B) without
 /// embedding them, which a 64-byte row cannot. WP-A1 shadow: the contracts alone decide until
@@ -760,6 +902,19 @@ pub(super) unsafe fn init(base: usize, load_contract: Option<VerifiedLoad>) {
     CREATION_VERIFIED.store(true, Ordering::Release);
     #[cfg(feature = "managed-third-source-alpha")]
     managed::init();
+    // PAUSE-HELPER: only where helpers can be created. Without the contract the pause retire stays off (and logs why).
+    #[cfg(feature = "managed-third-source-alpha")]
+    {
+        let contract = verify_pause_retire(base);
+        if let Err(offset) = contract {
+            crate::engine::compat::logging::diagnostic(format_args!(
+                "[PauseHelper] contract mismatch +0x{:x}; pause retire disabled", offset));
+        }
+        if gate("native_source_capacity", PAUSE_SEAMS, contract.is_ok()) && contract.is_ok() {
+            skyline::install_hooks!(pause_state_installed, pause_state_exit);
+            PAUSE_RETIRE_VERIFIED.store(true, Ordering::Release);
+        }
+    }
 }
 
 #[cfg(feature = "managed-third-source-alpha")]

@@ -262,6 +262,65 @@ fn memory_refused(slot: u32, kind: u32, decision: crate::engine::swap::body_bank
         slot, kind, what, decision.admission, decision.headroom, decision.outstanding, decision.need, cost.prefetch, cost.build));
 }
 
+/// PAUSE-HELPER (`model::pause_helper`): capacity slots retired at a pause-open and waiting to be created again, and
+/// the creation hold while the game's pause state is installed. Lock order: STATE, then PAUSE.
+#[cfg(feature = "managed-third-source-alpha")]
+static PAUSE: Mutex<crate::model::pause_helper::Ledger<{ crate::engine::preload::cycle_preload_capacity::ALL_EXTRA_SLOTS.len() }>> =
+    Mutex::new(crate::model::pause_helper::Ledger::new());
+
+/// The game's Training pause state was installed (`0x1558660`, `opened`) or its exit block is about to walk entries
+/// 1-7 (`0x1558f4c`). At pause-open every helper entry this plugin created that the exit block would walk with no
+/// actor is retired through the native single-slot retire, and creation is held until the exit block. At the exit
+/// block any exposed entry is reported (diagnostic only; this design must make it impossible). No plugin lock is held
+/// across the native retire (its destructor callback takes them).
+#[cfg(feature = "managed-third-source-alpha")]
+pub(super) unsafe fn pause_state(opened: bool) {
+    use super::native_source_capacity::{entry_at, entry_facts, retire_at};
+    PAUSE.lock().paused = opened;
+    let mut exposed = 0u8;
+    for slot in 1..8usize {
+        let entry = entry_at(slot);
+        if entry == 0 || !aligned(entry as *const u8) || !entry_facts(entry).exposed() {
+            continue;
+        }
+        exposed = exposed.saturating_add(1);
+        let facts = entry_facts(entry);
+        let index = crate::engine::preload::cycle_preload_capacity::capacity_index(slot).filter(|index| {
+            STATE.lock().capacities[*index].reservation
+                .is_some_and(|(_, value)| value.entry == entry && !value.entry_destroyed && !value.owner_retired)
+        });
+        let ok = match index.filter(|index| opened && PAUSE.lock().begin(*index, entry)) {
+            Some(index) => {
+                let ok = retire_at(slot, entry);
+                if !ok { PAUSE.lock().refused(index); }
+                ok
+            }
+            None => false,
+        };
+        crate::engine::compat::logging::diagnostic(format_args!(
+            "[PauseHelper] {} slot={} entry=0x{:x} ours={} phase={} mark=0x{:x} retired={}",
+            if opened { "pause open: actorless entry" } else { "exit block walks an actorless entry" },
+            slot, entry, index.is_some(), facts.phase, facts.mark, ok));
+    }
+    #[cfg(feature = "diag")]
+    crate::engine::compat::logging::diagnostic(format_args!(
+        "[PauseHelper] pause {} exposed={} creation_held={}", if opened { "open" } else { "exit" }, exposed, opened));
+    #[cfg(not(feature = "diag"))]
+    let _ = exposed;
+}
+
+/// A retire this ledger began has both native completions: the slot may be created again in this scene.
+#[cfg(feature = "managed-third-source-alpha")]
+fn pause_retire_completed(state: &mut State, index: usize, complete: bool) {
+    if complete {
+        state.capacities[index].attempted = None;
+        state.capacities[index].stable = None;
+        crate::engine::compat::logging::diagnostic(format_args!(
+            "[PauseHelper] retire complete capacity={} reservation_cleared={}; creation allowed again",
+            index, state.capacities[index].reservation.is_none()));
+    }
+}
+
 /// Retires only speculative intent. Native loads/leases keep their normal owner.
 pub(crate) fn pause_preload() {
     let mut state=STATE.lock(); state.preload=[None;crate::runtime::roster::cycle_preload::MAX_TARGETS];state.preload_settled=false;
@@ -1180,6 +1239,10 @@ pub fn scene_changed() {
     super::mii_managed_helper::depart();
     // LOG-REFUSED: refusal lines are bounded per scene.
     *MEMORY_REFUSED.lock() = [[0; 4]; 8];
+    #[cfg(feature = "managed-third-source-alpha")]
+    {
+        *PAUSE.lock() = crate::model::pause_helper::Ledger::new();
+    }
     let mut state = STATE.lock();
     #[cfg(feature = "mii-managed-source-coexist-alpha")]
     let mut registry = coexist::registry();
@@ -1712,6 +1775,8 @@ fn creation_intent(state:&State,backend:Backend,speculative:bool)->Option<Creati
 /// qualification. Each slot has one attempt per scene and serializes via INSTALL.
 #[cfg(feature="managed-third-source-alpha")]
 unsafe fn create_capacity(ctx:&ServiceEntryContext,entry:*const u8,slot:u32,intent:CreationIntent) {
+    // PAUSE-HELPER: never hand the pause state's exit block a fresh entry with no actor; create after the pause.
+    if PAUSE.lock().paused {return;}
     let grace = if intent.speculative {
         let Some(generation) = crate::runtime::roster::cycle_preload::speculative_admission() else { return; };
         Some(generation)
@@ -2399,6 +2464,8 @@ fn capacity_owner_retired_at(owner: usize, slot:u32) -> bool {
     } else {
         Some((epoch, value))
     };
+    let complete = PAUSE.lock().owner_retired(capacity_index(slot));
+    pause_retire_completed(&mut state, capacity_index(slot), complete);
     let observed = state.capacities[capacity_index(slot)].observation;
     let cleared = state.capacities[capacity_index(slot)].reservation.is_none();
     drop(state);
@@ -2437,6 +2504,8 @@ pub unsafe fn on_destroy(entry: *const u8, slot: u32) {
                 } else {
                     Some((epoch, value))
                 };
+                let complete = PAUSE.lock().destroyed(capacity_index(slot), entry as usize);
+                pause_retire_completed(&mut state, capacity_index(slot), complete);
             }
         }
     }

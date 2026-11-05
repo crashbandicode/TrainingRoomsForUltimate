@@ -75,6 +75,8 @@ pub mod migration_run;
 pub mod notify;
 #[path = "model/recording.rs"]
 pub mod recording;
+#[path = "model/pause_helper.rs"]
+pub mod pause_helper;
 #[path = "model/settings.rs"]
 pub mod settings;
 #[path = "model/settings_file.rs"]
