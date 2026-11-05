@@ -702,6 +702,11 @@ candidate's (LTO had dropped the module), so no Eden row re-runs. `size-budget.t
 
 ![Size budget](decisions/SIZE-BUDGET-RC.png)
 
+**rc.2, answered 2026-11-05 ~02:59Z by the operator:** "raise the size limit if needed, ship rc.2 when ready". rc.1
+left 99 lines; the Solo-S/HAT-REQUEST-END work used 89 of them, and the PAUSE-HELPER (a) fix with its review fixes
+(owner reuse, install hold, seam rows) goes over. The raise is appended to `size-budget.toml` as a new entry at the
+exact counted size of the final rc.2 tree, with this approval in `approved_by`; earlier entries stay unchanged.
+
 ### SOLO-S-PLACEMENT · Where the Solo Popo "S" marks sit on the roster grid — answered (2026-11-05)
 
 On `p23/candidate` the red P1 "S" (bottom-left) and the blue CPU "S" (bottom-right) on the Ice Climbers tile sit on
@@ -715,3 +720,9 @@ the tiles; TrainingRooms keeps its per-tile names, and the marks move up off the
 ![Solo S placement](decisions/SOLO-S-PLACEMENT.png)
 
 Picture: the Eden frame crop (today) with the rule; the after-fix frame follows on the Eden proof.
+
+**After the fix (rc.2, `p23/rc2-ui-hats` `cc9495b`):** Eden `tr-p23-surface-rc2c` row `08-rc2-ic-solo` (02:52Z) shows
+both marks at the icon's lower corners, above the label; "Ice Climbers" is fully readable for the Player and the CPU
+list. The host test `the_solo_marks_never_cover_the_tile_name` checks every roster use in both console modes.
+
+![Solo S after the fix](decisions/SOLO-S-PLACEMENT-after.png)
