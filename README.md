@@ -59,6 +59,13 @@ The input display (Display & Controls › Input Display) is a strip at the top o
 Player 1's and the CPU's frames, each press, how the last follow-up linked (a true combo by N frames, or dropped) and the
 frame advantage. It replaces the 15-row input log. *No clip yet.*
 
+### Combos
+
+Recording › Combos saves a combo you landed, and the combo helper grades your next attempts against it, link by link.
+Each saved combo is a small JSON file in `sd:/ultimate/TrainingRooms/combos/`. You can edit it, copy it to another
+card or share it, and any fighter can practise it; [docs/COMBOS.md](docs/COMBOS.md) describes the format. *No clip
+yet.*
+
 ### CPU reactions
 
 ![DI Up, two forward smashes](docs/media/di-up.gif)

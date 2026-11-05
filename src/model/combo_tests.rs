@@ -367,3 +367,23 @@ fn settings_read_the_three_rows() {
     snapshot.set(ROW_AFTER, &[0, 1]).unwrap();
     assert_eq!(Settings::from_snapshot(&snapshot), Settings { on: true, tolerance: 2, load_after: true });
 }
+
+#[test]
+fn a_combo_recorded_on_another_fighter_grades_whatever_fighter_p1_is() {
+    use crate::model::combo_record::{ComboLibrary, ComboRecord};
+    // Saved while P1 was Ryu, read back from its file. The helper's input (`Sample`) carries no fighter: it grades the
+    // moves and timing of whatever fighter P1 is now.
+    let dir = std::env::temp_dir().join(format!("tr-combo-fighter-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let library = ComboLibrary::new(&dir);
+    let id = library.save_new(&ComboRecord::new("Ryu jabs".into(), recorded(), Some("Ryu".into()))).unwrap();
+    let back = library.load(&id).unwrap();
+    assert_eq!(back.recorded_on.as_deref(), Some("Ryu"));
+    let mut helper = Helper::new();
+    helper.set_target(Some(back.combo));
+    let mut run = Run::new(helper);
+    run.combo(JAB, &[(UP_TILT, 1), (UP_TILT, 1), (UP_TILT, 1)], ON);
+    let [summary] = run.resolved()[..] else { panic!("one result: {:?}", run.resolved()) };
+    assert_eq!((summary.outcome, summary.true_links, summary.total, summary.clean), (Outcome::Completed, 3, 3, true));
+    let _ = std::fs::remove_dir_all(&dir);
+}

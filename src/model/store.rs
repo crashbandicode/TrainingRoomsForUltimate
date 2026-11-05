@@ -15,7 +15,10 @@
 //! is `entry`.
 //!
 //! * Ids are stable and path-safe (`[a-z0-9_-]`, at most [`MAX_ID_CHARS`]). The
-//!   id is the file stem; it never changes when the record is overwritten.
+//!   id is the file stem; it never changes when the record is overwritten. A
+//!   record whose files people share accepts other safe names too
+//!   ([`Record::accepts_id`]); the ids the store makes are always slugs.
+//! * Hidden files (a leading `.`) are never records.
 //! * Updates write `<id>.json.tmp`, sync it, then rename it over the target, so
 //!   a reader or an interrupted write never sees a partial file. Where rename
 //!   cannot replace an existing file (FAT on Horizon is the concern), the old
@@ -119,6 +122,14 @@ pub trait Record: Serialize + DeserializeOwned {
     fn name(&self) -> &str;
     /// Listing row for the record stored under `id`.
     fn summary(&self, id: &str) -> Self::Summary;
+    /// Whether `id` (a file name without `.json`) may name a record of this store. Default: [`MAX_ID_CHARS`] of
+    /// `[a-z0-9_-]`, the ids the store itself makes. A store whose files people share may accept more.
+    fn accepts_id(id: &str) -> bool {
+        default_id(id)
+    }
+    /// Called with the file's id after a record was read and before it is validated: a record may take what its
+    /// file left out from the file's name. Default: nothing.
+    fn adopt(&mut self, _id: &str) {}
 }
 
 /// A `.json` file that could not be used, and why.
@@ -193,7 +204,8 @@ impl<R: Record> Store<R> {
         let mut names = Vec::new();
         for item in read_dir {
             match item {
-                Ok(item) if item.path().is_file() => {
+                // A hidden file is never a record (a card written from a Mac holds `._<name>` resource forks).
+                Ok(item) if item.path().is_file() && !item.file_name().to_string_lossy().starts_with('.') => {
                     names.push(item.file_name().to_string_lossy().into_owned())
                 }
                 Ok(_) => {}
@@ -210,10 +222,10 @@ impl<R: Record> Store<R> {
             let Some(id) = name.strip_suffix(".json") else {
                 continue;
             };
-            let result = check_id(id)
+            let result = check_id::<R>(id)
                 .and_then(|()| read_bounded(&self.file(id, "json"), R::MAX_FILE_BYTES))
                 .map_err(lift::<R>)
-                .and_then(|data| decode::<R>(&data));
+                .and_then(|data| decode::<R>(id, &data));
             match result {
                 Ok(rec) => entries.push((rec.name().to_lowercase(), id.to_owned(), rec.summary(id))),
                 Err(err) => listing.skipped.push(SkippedFile {
@@ -229,7 +241,7 @@ impl<R: Record> Store<R> {
 
     /// Loads and fully validates the record with this id.
     pub fn load(&self, id: &str) -> Result<R, R::Error> {
-        check_id(id).map_err(lift::<R>)?;
+        check_id::<R>(id).map_err(lift::<R>)?;
         let data = read_bounded(&self.file(id, "json"), R::MAX_FILE_BYTES)
             .map_err(|err| match err {
                 StoreError::Io(inner) if inner.kind() == io::ErrorKind::NotFound => {
@@ -238,7 +250,7 @@ impl<R: Record> Store<R> {
                 other => other,
             })
             .map_err(lift::<R>)?;
-        decode::<R>(&data)
+        decode::<R>(id, &data)
     }
 
     /// Saves as a brand-new file and returns its id. The id comes from the
@@ -255,7 +267,7 @@ impl<R: Record> Store<R> {
     /// Replaces the existing record `id` with `rec`. The file must already
     /// exist; on any failure the previous contents are left intact.
     pub fn overwrite(&self, id: &str, rec: &R) -> Result<(), R::Error> {
-        check_id(id).map_err(lift::<R>)?;
+        check_id::<R>(id).map_err(lift::<R>)?;
         let bytes = encode(rec)?;
         let exists = self
             .file(id, "json")
@@ -269,7 +281,7 @@ impl<R: Record> Store<R> {
 
     /// Removes the record `id` (and a leftover backup of it).
     pub fn delete(&self, id: &str) -> Result<(), R::Error> {
-        check_id(id).map_err(lift::<R>)?;
+        check_id::<R>(id).map_err(lift::<R>)?;
         match fs::remove_file(self.file(id, "json")) {
             Ok(()) => {}
             Err(err) if err.kind() == io::ErrorKind::NotFound => return Err(lift::<R>(StoreError::NotFound(id.to_owned()))),
@@ -283,7 +295,7 @@ impl<R: Record> Store<R> {
     pub fn selected(&self) -> Option<String> {
         let text = fs::read_to_string(self.dir.join(SELECTED)).ok()?;
         let id = text.trim();
-        check_id(id).is_ok().then(|| id.to_owned())
+        check_id::<R>(id).is_ok().then(|| id.to_owned())
     }
 
     /// Writes `selected.txt` atomically; `None` removes it.
@@ -295,7 +307,7 @@ impl<R: Record> Store<R> {
                 _ => Ok(()),
             };
         };
-        check_id(id).map_err(lift::<R>)?;
+        check_id::<R>(id).map_err(lift::<R>)?;
         fs::create_dir_all(&self.dir).map_err(|err| lift::<R>(err.into()))?;
         write_replace(&path, id.as_bytes()).map_err(|err| lift::<R>(err.into()))
     }
@@ -329,7 +341,7 @@ impl<R: Record> Store<R> {
         let orphans: Vec<String> = names
             .iter()
             .filter_map(|name| name.strip_suffix(".json.bak"))
-            .filter(|id| check_id(id).is_ok() && !names.contains(&format!("{id}.json")))
+            .filter(|id| check_id::<R>(id).is_ok() && !names.contains(&format!("{id}.json")))
             .map(str::to_owned)
             .collect();
         for id in orphans {
@@ -359,9 +371,10 @@ fn read_bounded(path: &Path, max: u64) -> Result<Vec<u8>, StoreError> {
     Ok(fs::read(path)?)
 }
 
-fn decode<R: Record>(data: &[u8]) -> Result<R, R::Error> {
+fn decode<R: Record>(id: &str, data: &[u8]) -> Result<R, R::Error> {
     match serde_json::from_slice::<R>(data) {
-        Ok(rec) => {
+        Ok(mut rec) => {
+            rec.adopt(id);
             rec.validate()?;
             Ok(rec)
         }
@@ -432,13 +445,15 @@ fn with_suffix(path: &Path, suffix: &str) -> PathBuf {
     PathBuf::from(os)
 }
 
-fn check_id(id: &str) -> Result<(), StoreError> {
-    let ok = !id.is_empty()
+/// The ids the store itself makes: [`MAX_ID_CHARS`] of `[a-z0-9_-]` (`slug`, with a `-N` suffix).
+pub fn default_id(id: &str) -> bool {
+    !id.is_empty()
         && id.len() <= MAX_ID_CHARS
-        && id
-            .bytes()
-            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-' || b == b'_');
-    if ok {
+        && id.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-' || b == b'_')
+}
+
+fn check_id<R: Record>(id: &str) -> Result<(), StoreError> {
+    if R::accepts_id(id) {
         Ok(())
     } else {
         Err(StoreError::InvalidId(id.to_owned()))

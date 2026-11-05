@@ -8,6 +8,8 @@
 //! - Every graded link, resolved attempt and saved combo calls an exported trace function (§8): an Eden guest trace
 //!   point on it records the facts, with no log line.
 
+use core::sync::atomic::{AtomicI32, Ordering};
+
 use hos_lock::Mutex;
 
 use crate::model::combo::{Combo, Helper, Label, Mark, Out, Outcome, Settings};
@@ -21,13 +23,17 @@ static RENDERER: Mutex<Renderer> = Mutex::new(Renderer::new());
 /// The target's name for the bar, and the names the menu shows (target, draft).
 static NAME: Mutex<Text> = Mutex::new(Text::EMPTY);
 static LABELS: Mutex<(Label, Label)> = Mutex::new((Label::EMPTY, Label::EMPTY));
+/// P1's fighter kind at the strip's last sample (-1 none): *Save last combo* writes its name as `recorded_on`.
+static P1_KIND: AtomicI32 = AtomicI32::new(-1);
 
 fn settings() -> Settings {
     published::live().map_or(Settings::factory(), |live| live.combo)
 }
 
-/// One frame, right after the strip's tracker stepped (game thread, inside the fighter's frame).
-pub fn after_strip(tracker: &Tracker) {
+/// One frame, right after the strip's tracker stepped (game thread, inside the fighter's frame). `p1_kind` is the
+/// fighter P1 is now: kept for the next save's `recorded_on` only; the helper grades whatever fighter P1 is.
+pub fn after_strip(tracker: &Tracker, p1_kind: Option<i32>) {
+    P1_KIND.store(p1_kind.unwrap_or(-1), Ordering::Relaxed);
     let out = HELPER.lock().step(tracker, settings());
     report(out);
 }
@@ -95,9 +101,29 @@ pub extern "C" fn tr_combo_saved_v1(links: u32, first: i32, _reserved0: u32, _re
     core::hint::black_box((0x5341_5645_u32, links, first));
 }
 
+/// The saved-combo list was read (SPEC-input-07 §8): files listed, files skipped (a notice names the first), and listed
+/// files whose names the plugin did not choose (copied in).
+#[no_mangle]
+#[inline(never)]
+pub extern "C" fn tr_combo_listed_v1(entries: u32, skipped: u32, shared: u32, _reserved: u32) {
+    core::hint::black_box((0x4c49_5354_u32, entries, skipped, shared));
+}
+
+/// P1's fighter kind at the strip's last sample, for a save's `recorded_on` (worker).
+pub fn p1_kind() -> Option<i32> {
+    let kind = P1_KIND.load(Ordering::Relaxed);
+    (kind >= 0).then_some(kind)
+}
+
 /// *Save last combo* (worker): the open exchange when it has a link, else the one before.
 pub fn last_combo() -> Option<Combo> {
     HELPER.lock().last_combo()
+}
+
+/// The worker read the saved-combo list (`tr_combo_listed_v1`).
+pub fn listed(entries: usize, skipped: usize, shared: usize) {
+    let count = |n: usize| u32::try_from(n).unwrap_or(u32::MAX);
+    tr_combo_listed_v1(count(entries), count(skipped), count(shared), 0);
 }
 
 /// The worker saved `combo`.

@@ -171,12 +171,14 @@ pub unsafe fn sample_frame(player: usize) {
         ));
     }
     let inputs = unpack(INPUTS.load(Ordering::Acquire));
+    // P1's fighter, for a saved combo's "recorded on" (metadata; the existing guarded read, no new native site).
+    let p1_kind = natives::fighter_kind(player);
     let mut tracker = TRACKER.lock();
     #[cfg(feature = "diag")]
     let (check, advantage) = (tracker.stun_check, tracker.advantage());
     tracker.step(p1, cpu, inputs);
     // The combo helper reads the same step (SPEC-input-07 §3); lock order TRACKER, then the helper's.
-    crate::runtime::features::combo::after_strip(&tracker);
+    crate::runtime::features::combo::after_strip(&tracker, p1_kind);
     #[cfg(feature = "diag")]
     {
         let (check_now, link, advantage_now) = (tracker.stun_check, tracker.latest_link(), tracker.advantage());
