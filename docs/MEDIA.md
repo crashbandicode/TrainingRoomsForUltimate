@@ -32,11 +32,16 @@ the same), with the CPU pilot, Online Deluxe and tile-cursor plugins installed.
 Since rc.3, ZR on a page no longer resets it (the `menu-defaults.gif` clip below shows the old key): each page
 ends with *Reset page to defaults*, which asks for confirmation.
 
-### Not captured yet
+### Change Stage
 
-| Feature | Clip | Where it is captured |
-| --- | --- | --- |
-| Change Stage | `change-stage.gif` | the rc.3 follow-up boot (the combined session's take ended before the new stage was in) |
+Run `tr-p23-rc3-fu2-2` on the Surface, 2026-11-05 ~17:30Z: the RELEASE NRO of `p23/rc3-candidate` `f0eda16` (with
+the rc.3 review fixes; `e73d5af842c04430f73ab09b8b3dd74371f01adec194ade76e568b7ac357d2de`), the same plugins and fighters
+as above. Re-encoded the same way (step 2, 96 colours), each frame then given 160 ms so the clip plays in 9.3 s for the
+9.5 s taken.
+
+| File | What it shows |
+| --- | --- |
+| `change-stage.gif` | Fighters & Stages › Change Stage: the stage grid with Battlefield picked; Y gives its Ω form and A closes the menu ("Stage requested" on the old stage); Training reloads on Battlefield Ω (the game's stage id went from `0x15b` to `0x1`, read by a guest tracepoint). 9.3 s, step 2. |
 
 `hitbox-overlay.gif` below shows rc.1's effect spheres; rc.3 draws fighter spheres as discs.
 
