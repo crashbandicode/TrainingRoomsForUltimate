@@ -2912,7 +2912,7 @@
    "dest": "src/runtime/roster/character_roster.rs",
    "crate": "root",
    "src_sha256": "07d282cdc6c5b4b080a5c0b3e4107a033f623ea3e5809783e0ff595afe759dd5",
-   "dest_sha256": "8b5f2c0e5aec101794cf88574464fc16ea2340004d0f0c55da138b6e604e8d1b",
+   "dest_sha256": "38cd36fa69dd634ee561b3d716635e5e6b931d534b610282fd3998edd2184467",
    "edits": [
     {
      "old": "fn notify(role: Role, message: String) {",
@@ -3419,6 +3419,16 @@
      "old": "/// The active role's roster-grid stock icon, queried on the UI job thread. The native builder\n/// supplies patch paths, names and regional costume remapping. `picture=0` is the game's own small\n/// stock icon (the waiting-room icon): the same stock-icon art the fork's menu showed, which the\n/// operator asked the character grids to use (2026-11-03), loaded at run time through the game's\n/// mod-aware file-resource service instead of baked into the layout.\npub(crate) unsafe fn menu_stock_icon_hash(kind: u32, cpu: bool) -> Option<u64> {\n    let base = BASE.load(Ordering::Acquire);\n    // init publishes BASE only after the enforcing character_roster seam gate\n    // accepts roster.kind_hash and roster.icon_hash (both 64-byte guards).\n    // These carried seams are not members of game::Granted's core Site tables.\n    if base == 0 { return None; }\n    let owner = if cpu { if lobby::active() { 4 } else { 1 } } else { 0 };\n    let costume = crate::engine::swap::swap_model::presentation::waiting_icon_costume(kind, row_colour(base, owner));\n    let hash = fighter_picture_hash(base, kind, costume, 0);\n    (hash & 0xffffffffff != 0).then_some(hash)\n}",
      "new": "/// The roster-grid stock icon, queried on the UI job thread. The native builder supplies patch\n/// paths, names and regional costume remapping. `picture=2` is the game's stock-icon set\n/// (`chara_2`, the 64\u00d764 flat head icon \u2014 the art the fork's menu showed, its SmashWiki\n/// stock-icon PNGs, which the operator asked the character grids to use; 2026-11-03 decision\n/// amended 2026-11-04, SPEC-core-07 Q16), loaded at run time through the game's mod-aware\n/// file-resource service instead of baked into the layout. `picture=0` is the game's 128\u00d7128\n/// `chara_0` portrait crop, not the stock icon.\n///\n/// The costume is the fighter's default (0), never a presentation-row byte: the grid lists every\n/// fighter, and the costume a live entry wears is not a property of the list. The first cut read\n/// the role's presentation row (`E[0]`/`E[1]`) here; that byte belongs to the match entries, so a\n/// grid followed whatever the entries wore (Eden glm-icons-03: the CPU list drew every fighter at\n/// costume 7, wedding Mario and pink DK) or named files that do not exist (glm-gifs-04 and\n/// glm-mods-10: blank text tiles; the byte then held a value without a `chara_2_*` file). The\n/// tracepoints on the key builder `main+0x3238a70` (glm-icons-03 out/04-trace-grid) captured\n/// costume 0 for the Player page and costume 7 for the CPU page of the same grid.\npub(crate) unsafe fn menu_stock_icon_hash(kind: u32) -> Option<u64> {\n    let base = BASE.load(Ordering::Acquire);\n    // init publishes BASE only after the enforcing character_roster seam gate\n    // accepts roster.kind_hash and roster.icon_hash (both 64-byte guards).\n    // These carried seams are not members of game::Granted's core Site tables.\n    if base == 0 { return None; }\n    let hash = fighter_picture_hash(base, kind, 0, 2);\n    (hash & 0xffffffffff != 0).then_some(hash)\n}",
      "reason": "RC10 stock-icon root fix (worker glm-icons, 2026-11-04): the menu grids take the fighter's default costume (0), not a presentation-row byte. The row read made the grids follow the match entries' costume (Eden glm-icons-03 trace: CPU page requested chara_0_*_07 for every fighter) or name files that do not exist (glm-gifs-04/glm-mods-10 blank tiles). Amended the same day (operator): the stock-icon set is `picture=2` (`chara_2`, the 64\u00d764 flat head icon the fork's fighter-00.png matches \u2014 decoded next to it in primary-review/rc10-mario-picture-sets.png), not `picture=0` (`chara_0`, the 128\u00d7128 portrait crop); the live-costume read stays in the waiting-room paths that bind a specific entry's icon."
+    },
+    {
+     "old": "    let fighters = match role {\n        Role::Player => m.player_roster.fighters_excluding_fixed(excluded),\n        Role::Cpu => m.cpu_roster.fighters_excluding_fixed(excluded),\n",
+     "new": "    // P-CYCLE: the one cycle list (`cycle_members`), with no Mii class: this loader cannot load a Mii, and while it\n    // serves the cycle no Mii owner does, so the menu's published admission is none too.\n    let roster = match role {\n        Role::Player => m.player_roster,\n        Role::Cpu => m.cpu_roster,\n",
+     "reason": "P-CYCLE (operator 2026-11-05: a Mii Gunner cycled for the CPU though the menu did not list it): every cycle walker walks engine::swap::cycle_members (the one list the portrait grid numbers); the CPU Mii owner computes its Mii admission (cycle_members::cpu_admission) under its own lock, walks it and publishes it; the menu reads it and each role's slot 0 (character_roster::cycle_facts)"
+    },
+    {
+     "old": "    let mut out = crate::engine::swap::ordered_roster::FighterList::new(TrioFighter::MARIO);\n    for f in fighters.iter().filter(|f| !(0x48..=0x4a).contains(&f.kind())) {\n        out.push(*f);\n    }\n    out\n",
+     "new": "    crate::engine::swap::cycle_members::cycle_members_excluding(roster, crate::engine::swap::cycle_members::NO_MII, excluded)\n}\n\n/// The CPU cycle's Mii admission as the CPU Mii owner last computed it (`cycle_members::cpu_admission`, published from\n/// its service; none while it is not qualified). Every CPU cycle walker and the menu read this one answer (P-CYCLE).\npub(crate) fn cpu_cycle_admission() -> crate::engine::swap::cycle_members::MiiAdmission {\n    #[cfg(feature = \"mii-ordinary-cpu-alpha\")]\n    return mii_ordinary_cpu::published_admission();\n    #[cfg(not(feature = \"mii-ordinary-cpu-alpha\"))]\n    crate::engine::swap::cycle_members::NO_MII\n}\n\n/// What the portrait grid shows of the cycles (P-CYCLE): the CPU cycle's Mii admission, and each role's slot 0\n/// (`[Player, CPU]`: the scene's original kind, the fighter the cycle returns to) while a practice scene has one.\n/// Atomics only: the menu worker reads them, never an owner.\npub fn cycle_facts() -> (crate::engine::swap::cycle_members::MiiAdmission, [Option<u32>; 2]) {\n    (cpu_cycle_admission(), [original_kind(Role::Player), original_kind(Role::Cpu)])\n",
+     "reason": "P-CYCLE (operator 2026-11-05: a Mii Gunner cycled for the CPU though the menu did not list it): every cycle walker walks engine::swap::cycle_members (the one list the portrait grid numbers); the CPU Mii owner computes its Mii admission (cycle_members::cpu_admission) under its own lock, walks it and publishes it; the menu reads it and each role's slot 0 (character_roster::cycle_facts)"
     }
    ]
   },
@@ -3427,7 +3437,7 @@
    "dest": "src/runtime/roster/cycle_preload.rs",
    "crate": "root",
    "src_sha256": "ec95b169b5ec06064bc45222a48e3f7ab72a94db32bf9d3c3b619e87e50caac3",
-   "dest_sha256": "c7953a2bd2dcef220024a522762c173eea9ce1c2d13790dd7e926edb447c83a0",
+   "dest_sha256": "df1a28a792230dd57ad5c80486ce1dd4e634cc9ccbe7cf778ec1c707242c99f6",
    "edits": [
     {
      "old": "    let roster = if role == 0 {\n        menu.player_roster.fighters()\n    } else {\n        menu.cpu_roster.fighters()\n    };\n    let preferences = crate::runtime::compat::common::menu::mii_preferences();\n",
@@ -3548,6 +3558,16 @@
      "delete_from": "/// UI readiness is built-body readiness; an asset-helper hit is not sufficient.\n",
      "delete_to": "pub(crate) fn settings_changed() {\n",
      "reason": "RC native warning-root audit, lead 2026-11-03 12:57Z: remove five orphan APIs; retain live original_kind, progress, registry and native transaction paths."
+    },
+    {
+     "old": "    use crate::engine::swap::mii_cycle::{self, Identity, Live};\n    let roster = if role == 0 {\n        menu.player_roster.fighters_excluding_fixed(None)\n",
+     "new": "    use crate::engine::swap::mii_cycle::{self, Identity, Live};\n    // P-CYCLE: the one cycle list; the CPU's Mii admission is its owner's published one, the Player's is unchanged.\n    let roster = if role == 0 {\n        crate::engine::swap::cycle_members::cycle_members(menu.player_roster, crate::engine::swap::cycle_members::ALL_MII)\n",
+     "reason": "P-CYCLE (operator 2026-11-05: a Mii Gunner cycled for the CPU though the menu did not list it): every cycle walker walks engine::swap::cycle_members (the one list the portrait grid numbers); the CPU Mii owner computes its Mii admission (cycle_members::cpu_admission) under its own lock, walks it and publishes it; the menu reads it and each role's slot 0 (character_roster::cycle_facts)"
+    },
+    {
+     "old": "        menu.cpu_roster.fighters_excluding_fixed(None)\n",
+     "new": "        crate::engine::swap::cycle_members::cycle_members(menu.cpu_roster, crate::runtime::roster::character_roster::cpu_cycle_admission())\n",
+     "reason": "P-CYCLE (operator 2026-11-05: a Mii Gunner cycled for the CPU though the menu did not list it): every cycle walker walks engine::swap::cycle_members (the one list the portrait grid numbers); the CPU Mii owner computes its Mii admission (cycle_members::cpu_admission) under its own lock, walks it and publishes it; the menu reads it and each role's slot 0 (character_roster::cycle_facts)"
     }
    ]
   },
@@ -4933,7 +4953,7 @@
    "dest": "src/runtime/roster/native_body_bank.rs",
    "crate": "root",
    "src_sha256": "ccf7ac678691fa0101a1eff5dbd9300a1b12fe64e9ebbde515697adfbb841c98",
-   "dest_sha256": "6730f1d23ef673c8a6ef3d87bb49a24e7af2d8ae45cc00bf550a7bc1fae8757e",
+   "dest_sha256": "8044c07f82a8c745f5e6b21d61931cfedb7426e775613a83f5a00b0e58098358",
    "edits": [
     {
      "old": "unsafe fn finalize_entry(entry: *mut u8) -> u64 {\n",
@@ -5600,6 +5620,11 @@
      "delete_from": "/// Value-only menu hint for a numbered cycle choice, using the same native\n",
      "delete_to": "/// A kind held by any of this role's groups (window or extra): helper look-ahead\n",
      "reason": "RC native warning-root audit, lead 2026-11-03 12:57Z: remove five orphan APIs; retain live original_kind, progress, registry and native transaction paths."
+    },
+    {
+     "old": "                let roster = if role == 0 { menu.player_roster.fighters_excluding_fixed(None) }\n                    else { menu.cpu_roster.fighters_excluding_fixed(None) };\n",
+     "new": "                // P-CYCLE: the one cycle list, with the CPU owner's published Mii admission.\n                let roster = if role == 0 {\n                    crate::engine::swap::cycle_members::cycle_members(menu.player_roster, crate::engine::swap::cycle_members::ALL_MII)\n                } else {\n                    crate::engine::swap::cycle_members::cycle_members(menu.cpu_roster, super::cpu_cycle_admission())\n                };\n",
+     "reason": "P-CYCLE (operator 2026-11-05: a Mii Gunner cycled for the CPU though the menu did not list it): every cycle walker walks engine::swap::cycle_members (the one list the portrait grid numbers); the CPU Mii owner computes its Mii admission (cycle_members::cpu_admission) under its own lock, walks it and publishes it; the menu reads it and each role's slot 0 (character_roster::cycle_facts)"
     }
    ]
   },
@@ -7248,7 +7273,7 @@
    "dest": "src/runtime/mii/mii_ordinary_cpu.rs",
    "crate": "root",
    "src_sha256": "db7e15715560db924eba68ba570e97540f1b445b1cf4989a172c0426dd32c6ce",
-   "dest_sha256": "334b3b2689e66fd73cc2c50a4f1d1bd67a550f4bf449e3ed26af4ee75f5f2fa6",
+   "dest_sha256": "e5823c1c9d252adb288a27c82d760dc1467900ebec2868e001dfb75cee4355a0",
    "edits": [
     {
      "old": "fn note(reason:&str) { trace!(\"[MiiOrdinaryCpu] {reason}\"); }",
@@ -7494,6 +7519,36 @@
      "old": "    let requested=setting(&MENU).cpu_roster.fighters().iter()",
      "new": "    let requested=setting(&MENU).cpu_roster.fighters_excluding_fixed(None).iter()",
      "reason": "F6 roster_input allocation root: interrogate the same ordered roster in fixed storage inside intercept; preserve setting snapshots, membership and all transaction guards."
+    },
+    {
+     "old": "    Ok(provenance::VisibleMii {authority,descriptor:now.descriptor,record:now.record})\n}\n",
+     "new": "    Ok(provenance::VisibleMii {authority,descriptor:now.descriptor,record:now.record})\n}\n\n/// The CPU cycle's Mii admission (`cycle_members::cpu_admission`) from the owner's state: qualified as `intercept`'s\n/// `ordinary_cycle` is (not departed, menu valid, no capture, a catalog, this epoch), and the captured saved original\n/// is slot 0. The menu shows it (`publish_admission`) and every CPU walker walks it (P-CYCLE).\nfn cycle_admission(s:&State)->crate::engine::swap::cycle_members::MiiAdmission {\n    let (Some(o),Some(catalog))=(s.owner.as_ref(),s.catalog.as_ref()) else {return crate::engine::swap::cycle_members::NO_MII;};\n    let qualified=!s.departed && s.menu_valid && !s.capture && o.origin.binding.epoch==epoch();\n    crate::engine::swap::cycle_members::cpu_admission(qualified,catalog,o.origin_saved.map(|c|c.canonical()))\n}\nstatic ADMISSION:core::sync::atomic::AtomicU8=core::sync::atomic::AtomicU8::new(0);\nfn publish_admission(admitted:crate::engine::swap::cycle_members::MiiAdmission) {\n    ADMISSION.store(admitted.iter().enumerate().fold(0u8,|acc,(i,on)|acc|(u8::from(*on)<<i)),Ordering::Release);\n}\npub(super) fn published_admission()->crate::engine::swap::cycle_members::MiiAdmission {\n    let bits=ADMISSION.load(Ordering::Acquire);\n    [bits&1!=0,bits&2!=0,bits&4!=0]\n}\n",
+     "reason": "P-CYCLE (operator 2026-11-05: a Mii Gunner cycled for the CPU though the menu did not list it): every cycle walker walks engine::swap::cycle_members (the one list the portrait grid numbers); the CPU Mii owner computes its Mii admission (cycle_members::cpu_admission) under its own lock, walks it and publishes it; the menu reads it and each role's slot 0 (character_roster::cycle_facts)"
+    },
+    {
+     "old": "    if !matches!(owner,1|4) || !ENABLED.load(Ordering::Acquire) {return false;}\n    #[cfg(feature=\"native-body-bank-alpha\")]\n",
+     "new": "    if !matches!(owner,1|4) || !ENABLED.load(Ordering::Acquire) {return false;}\n    // P-CYCLE: the admission the menu shows is the one the walkers walk, refreshed every frame from this state.\n    publish_admission(cycle_admission(&STATE.lock()));\n    #[cfg(feature=\"native-body-bank-alpha\")]\n",
+     "reason": "P-CYCLE (operator 2026-11-05: a Mii Gunner cycled for the CPU though the menu did not list it): every cycle walker walks engine::swap::cycle_members (the one list the portrait grid numbers); the CPU Mii owner computes its Mii admission (cycle_members::cpu_admission) under its own lock, walks it and publishes it; the menu reads it and each role's slot 0 (character_roster::cycle_facts)"
+    },
+    {
+     "old": "        let s=STATE.lock();\n        s.owner.as_ref().zip(s.request).map(|(o,r)|\n             (o.origin,o.origin_saved,o.expected,o.live,r,s.catalog.as_ref().map(Arc::clone),s.reservation.held(),s.restore))\n",
+     "new": "        let s=STATE.lock();\n        let admitted=cycle_admission(&s);\n        s.owner.as_ref().zip(s.request).map(|(o,r)|\n             (o.origin,o.origin_saved,o.expected,o.live,r,s.catalog.as_ref().map(Arc::clone),s.reservation.held(),s.restore,admitted))\n",
+     "reason": "P-CYCLE (operator 2026-11-05: a Mii Gunner cycled for the CPU though the menu did not list it): every cycle walker walks engine::swap::cycle_members (the one list the portrait grid numbers); the CPU Mii owner computes its Mii admission (cycle_members::cpu_admission) under its own lock, walks it and publishes it; the menu reads it and each role's slot 0 (character_roster::cycle_facts)"
+    },
+    {
+     "old": "    let Some((origin,origin_saved,expected,live,request,Some(catalog),retained,restore))=pending else{return false;};\n",
+     "new": "    let Some((origin,origin_saved,expected,live,request,Some(catalog),retained,restore,admitted))=pending else{return false;};\n",
+     "reason": "P-CYCLE (operator 2026-11-05: a Mii Gunner cycled for the CPU though the menu did not list it): every cycle walker walks engine::swap::cycle_members (the one list the portrait grid numbers); the CPU Mii owner computes its Mii admission (cycle_members::cpu_admission) under its own lock, walks it and publishes it; the menu reads it and each role's slot 0 (character_roster::cycle_facts)"
+    },
+    {
+     "old": "        mii_cycle::next_qualified_cpu(&menu.cpu_roster.fighters(),&catalog,&menu::mii_preferences(),\n",
+     "new": "        // P-CYCLE: the cycle the menu numbers (`cycle_members` with this owner's admission), not the unfiltered roster.\n        mii_cycle::next_qualified_cpu(&crate::engine::swap::cycle_members::cycle_members(menu.cpu_roster,admitted),\n            &catalog,&menu::mii_preferences(),\n",
+     "reason": "P-CYCLE (operator 2026-11-05: a Mii Gunner cycled for the CPU though the menu did not list it): every cycle walker walks engine::swap::cycle_members (the one list the portrait grid numbers); the CPU Mii owner computes its Mii admission (cycle_members::cpu_admission) under its own lock, walks it and publishes it; the menu reads it and each role's slot 0 (character_roster::cycle_facts)"
+    },
+    {
+     "old": "pub(super) fn scene_changed() {\n    let mut s=STATE.lock();s.capture=false;s.menu_valid=false;s.catalog=None;s.request=None;s.replay_result=None;s.recapture_log=None;\n",
+     "new": "pub(super) fn scene_changed() {\n    publish_admission(crate::engine::swap::cycle_members::NO_MII);\n    let mut s=STATE.lock();s.capture=false;s.menu_valid=false;s.catalog=None;s.request=None;s.replay_result=None;s.recapture_log=None;\n",
+     "reason": "P-CYCLE (operator 2026-11-05: a Mii Gunner cycled for the CPU though the menu did not list it): every cycle walker walks engine::swap::cycle_members (the one list the portrait grid numbers); the CPU Mii owner computes its Mii admission (cycle_members::cpu_admission) under its own lock, walks it and publishes it; the menu reads it and each role's slot 0 (character_roster::cycle_facts)"
     }
    ]
   },

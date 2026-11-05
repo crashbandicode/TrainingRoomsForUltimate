@@ -505,15 +505,29 @@ fn roster_fixed(m: &TrainingModpackMenu, role: Role) -> crate::engine::swap::ord
             crate::engine::swap::roster_grid::cycle_exclusion(cycle_original(role), solo, solo)
         }
     };
-    let fighters = match role {
-        Role::Player => m.player_roster.fighters_excluding_fixed(excluded),
-        Role::Cpu => m.cpu_roster.fighters_excluding_fixed(excluded),
+    // P-CYCLE: the one cycle list (`cycle_members`), with no Mii class: this loader cannot load a Mii, and while it
+    // serves the cycle no Mii owner does, so the menu's published admission is none too.
+    let roster = match role {
+        Role::Player => m.player_roster,
+        Role::Cpu => m.cpu_roster,
     };
-    let mut out = crate::engine::swap::ordered_roster::FighterList::new(TrioFighter::MARIO);
-    for f in fighters.iter().filter(|f| !(0x48..=0x4a).contains(&f.kind())) {
-        out.push(*f);
-    }
-    out
+    crate::engine::swap::cycle_members::cycle_members_excluding(roster, crate::engine::swap::cycle_members::NO_MII, excluded)
+}
+
+/// The CPU cycle's Mii admission as the CPU Mii owner last computed it (`cycle_members::cpu_admission`, published from
+/// its service; none while it is not qualified). Every CPU cycle walker and the menu read this one answer (P-CYCLE).
+pub(crate) fn cpu_cycle_admission() -> crate::engine::swap::cycle_members::MiiAdmission {
+    #[cfg(feature = "mii-ordinary-cpu-alpha")]
+    return mii_ordinary_cpu::published_admission();
+    #[cfg(not(feature = "mii-ordinary-cpu-alpha"))]
+    crate::engine::swap::cycle_members::NO_MII
+}
+
+/// What the portrait grid shows of the cycles (P-CYCLE): the CPU cycle's Mii admission, and each role's slot 0
+/// (`[Player, CPU]`: the scene's original kind, the fighter the cycle returns to) while a practice scene has one.
+/// Atomics only: the menu worker reads them, never an owner.
+pub fn cycle_facts() -> (crate::engine::swap::cycle_members::MiiAdmission, [Option<u32>; 2]) {
+    (cpu_cycle_admission(), [original_kind(Role::Player), original_kind(Role::Cpu)])
 }
 
 /// Numbered slot of `kind`'s group in `role`'s current cycle.

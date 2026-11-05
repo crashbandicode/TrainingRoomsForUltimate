@@ -17,4 +17,6 @@ pub mod trio;
 pub mod capacity_creation;
 pub mod ordered_roster;
 pub mod mii_cycle;
+// P-CYCLE: one role's cycle as the menu numbers it and every walker walks it (own code, not carried).
+pub mod cycle_members;
 pub mod character_memory;

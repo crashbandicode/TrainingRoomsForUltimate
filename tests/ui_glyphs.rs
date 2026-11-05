@@ -106,7 +106,7 @@ fn literals(src: &str) -> Vec<(usize, String)> {
                 i += 1;
                 continue;
             }
-            let close: String = std::iter::once('"').chain(std::iter::repeat('#').take(hashes)).collect();
+            let close: String = std::iter::once('"').chain(std::iter::repeat_n('#', hashes)).collect();
             let start_line = line;
             let mut text = String::new();
             k += 1;

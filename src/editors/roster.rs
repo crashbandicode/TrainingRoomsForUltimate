@@ -11,8 +11,9 @@ use core::fmt::Write;
 
 use serde_json::Value;
 
+use crate::engine::swap::cycle_members::{cycle_members, number_of, numbered, roster_of};
 use crate::engine::swap::roster_grid::{
-    catalog_index, css_order, cycle_exclusion, group_kind, group_rank, rank, select_all, CellContent, Outcome, Role, RosterGrid, CELLS,
+    catalog_index, css_order, cycle_exclusion, group_kind, group_rank, select_all, CellContent, Outcome, Role, RosterGrid, CELLS,
 };
 use crate::engine::swap::trio::CHOICES;
 use crate::model::frame::{Frame, Text};
@@ -20,6 +21,15 @@ use crate::model::screens::TILE_GREYED;
 use crate::model::menu::grid::RosterUse;
 use crate::model::menu::input::Button;
 use crate::model::menu::Menu;
+
+/// What a cycle grid numbers for one role (P-CYCLE, the rows' evidence): which catalog kinds carry a number (a mask over
+/// `trio::CHOICES` indices), the highest number, and the slot-0 kind the 0 names.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Numbers {
+    pub mask: [u64; 3],
+    pub count: u8,
+    pub slot_zero: Option<u32>,
+}
 
 /// What a press changed.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -41,20 +51,25 @@ pub struct RosterEditor {
     mii: MiiTiles,
 }
 
-/// What this opening's Mii catalog admits per Mii class tile (`[Brawler, Swordfighter, Gunner]`), from `CatalogMenu`'s
-/// checks (`editors::mii::MiiList::tiles`): the fork's `roster_excluded`, `mii_cycle_admitted`, `hat_cell_disabled` and
-/// `roster_slot_zero` (`training_mod_tui/src/containers/app.rs` 563-685). The default (no catalog yet, or a build
-/// without the Mii features) admits no Mii tile, as the fork's menu did.
+/// What this opening admits per Mii class tile (`[Brawler, Swordfighter, Gunner]`) and where each role's cycle returns
+/// to. The picks, the Player cycle and the hats come from `CatalogMenu`'s checks (`editors::mii::MiiList::tiles`): the
+/// fork's `roster_excluded`, `mii_cycle_admitted`, `hat_cell_disabled` and `roster_slot_zero`
+/// (`training_mod_tui/src/containers/app.rs` 563-685). The CPU cycle's admission and both slot 0s are the runtime's own,
+/// published (`character_roster::cycle_facts`), so the grid numbers exactly what cycles (P-CYCLE). The default admits no
+/// Mii tile and knows no slot 0.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct MiiTiles {
     /// `alpha_player_cycle`: Player picks and the Player cycle.
     pub player: [bool; 3],
-    /// `alpha_cpu_cycle`: CPU picks and the CPU cycle.
+    /// `alpha_cpu_cycle`: CPU picks (a manual pick, not the cycle).
     pub cpu: [bool; 3],
+    /// The CPU cycle's admission as the CPU Mii owner walks it (`cycle_members::cpu_admission`, published).
+    pub cpu_cycle: [bool; 3],
     /// `alpha_helper_hat`: Kirby hats.
     pub hat: [bool; 3],
-    /// `cpu_unnumbered_original`: the CPU's captured Mii has no other configuration of its class (the grey 0).
-    pub cpu_original_only: [bool; 3],
+    /// Each role's slot 0 as the runtime returns to it (`[Player, CPU]`: the scene's original kind), when a practice
+    /// scene is up. The saved pick stands in otherwise.
+    pub slot_zero: [Option<u32>; 2],
 }
 
 fn mii_class(kind: u32) -> Option<usize> {
@@ -68,16 +83,17 @@ impl MiiTiles {
         Some(match (use_, role) {
             (RosterUse::Hats, _) => self.hat[k],
             (RosterUse::PlayerPick, _) | (RosterUse::Cycles, Role::Player) => self.player[k],
-            (RosterUse::CpuPick, _) | (RosterUse::Cycles, Role::Cpu) => self.cpu[k],
+            (RosterUse::CpuPick, _) => self.cpu[k],
+            (RosterUse::Cycles, Role::Cpu) => self.cpu_cycle[k],
         })
     }
 
-    /// The fork's `roster_slot_zero` for a Mii original: the CPU's captured Mii with no numbered alternative, or a Player
-    /// original whose class the Player cycle does not admit. Any other original keeps its slot 0.
+    /// The fork's `roster_slot_zero` for a Mii original: a class the role's cycle does not number (for the CPU, its
+    /// captured Mii has no other configuration of the class). Any other original keeps its slot 0.
     fn original_slot_zero(&self, role: Role, kind: u32) -> bool {
         let Some(k) = mii_class(kind) else { return true };
         match role {
-            Role::Cpu => self.cpu_original_only[k],
+            Role::Cpu => !self.cpu_cycle[k],
             Role::Player => !self.player[k],
         }
     }
@@ -261,11 +277,12 @@ impl RosterEditor {
     /// Fill the fork's per-role corner badges (`roster_grid.rs:227-251`: the order number; "All" on the All cell),
     /// All-stripes (`:213-225`: the cell is in that role's All order) and Solo Popo "S" flags (`:253-271`, cycles
     /// only) from the menu's kept keys, for both roles at once. Picks keep none.
-    pub fn decorate_badges(&self, frame: &mut Frame, menu: &Menu) {
+    pub fn decorate_badges(&self, frame: &mut Frame, menu: &Menu) -> [Numbers; 2] {
         let (kinds, hats) = (kinds(), self.use_ == RosterUse::Hats);
         let original_solo = flag_on(menu, "solo_popo_original");
+        let mut numbers = [Numbers::default(); 2];
         if self.pick() {
-            return;
+            return numbers;
         }
         for (r, role) in [Role::Player, Role::Cpu].into_iter().enumerate() {
             let pick = Self::new([RosterUse::PlayerPick, RosterUse::CpuPick][r]);
@@ -273,11 +290,20 @@ impl RosterEditor {
             editor.grid = RosterGrid::new(role);
             let values = editor.values(menu.kept(editor.key()));
             let picked = pick.values(menu.kept(pick.key()));
-            let original = picked.iter().position(|v| *v == 1).map(|i| kinds[i]);
+            // The runtime's slot 0 (the scene's original), not the saved pick the runtime overwrites with the fighter it
+            // loaded: the 0 names the fighter the cycle returns to.
+            let original = self.mii.slot_zero[r].or_else(|| picked.iter().position(|v| *v == 1).map(|i| kinds[i]));
             let solo = flag_on(menu, ["solo_popo_player_cycle", "solo_popo_cpu"][r]);
             // The fork's `role_cycle_exclusion` (app.rs:690-703): the CPU has one Solo setting for both.
             let excluded = cycle_exclusion(original, if r == 0 { original_solo } else { solo }, solo);
             let badges = roster_badges(self.use_, &values, excluded, role, &self.mii);
+            numbers[r].slot_zero = original;
+            for (i, badge) in badges.iter().enumerate() {
+                if let Some(n) = badge.filter(|n| *n > 0) {
+                    numbers[r].mask[i / 64] |= 1 << (i % 64);
+                    numbers[r].count = numbers[r].count.max(n);
+                }
+            }
             let all = values.first() == Some(&1);
             for (cell, info) in (0..CELLS).filter_map(|c| Some((c, self.grid.info(c)?))) {
                 let badge = info.kind().and_then(|k| badges[catalog_index(&kinds, k)?]);
@@ -292,6 +318,7 @@ impl RosterEditor {
             }
             frame.tile_solo[r] = !hats && solo;
         }
+        numbers
     }
 }
 
@@ -318,25 +345,28 @@ pub fn roster_badges(use_: RosterUse, values: &[u8], excluded: Option<u32>, role
     let unbadged = |kind: u32| (use_ == RosterUse::Hats && group_kind(kind) == 0x06)
         || mii.admitted(use_, role, kind) == Some(false);
     let all = values.first() == Some(&1);
+    if use_ == RosterUse::Cycles {
+        // The cycle's own list (P-CYCLE): `cycle_members` with this role's Mii admission, numbered as the walkers step
+        // (`cycle_members::numbered`), so a number is exactly a position the cycle loads and nothing else cycles.
+        let admitted = [0x48, 0x49, 0x4a].map(|kind| mii.admitted(use_, role, kind) == Some(true));
+        let members = cycle_members(roster_of(values), admitted);
+        let order = numbered(&members, excluded);
+        let badge = |kind| match () {
+            _ if slot_zero(kind) => Some(0),
+            _ if unbadged(kind) => None,
+            _ => number_of(&order, kind).and_then(|n| u8::try_from(n).ok()),
+        };
+        return kinds.iter().map(|&kind| badge(kind)).collect();
+    }
     let skip = (use_ == RosterUse::Hats).then_some(0x06).or(excluded.filter(|kind| slot_zero(*kind)));
-    let mut order: Vec<u32> = if all {
-        css_order(&kinds, values, skip)
-    } else if use_ == RosterUse::Cycles {
-        // Stored ranks retain choices across scenes; number the order after this role's excluded cells
-        // drop out, as the cycle does (app.rs:759-768).
-        let mut ranked: Vec<_> = kinds.iter().enumerate().filter_map(|(i, kind)| rank(values, i).map(|r| (r, *kind))).collect();
-        ranked.sort_unstable_by_key(|(r, _)| *r);
-        ranked.into_iter().map(|(_, kind)| kind).collect()
-    } else {
-        Vec::new()
-    };
+    let mut order: Vec<u32> = if all { css_order(&kinds, values, skip) } else { Vec::new() };
     order.retain(|kind| !unbadged(*kind) && !slot_zero(*kind));
     let groups: Vec<u32> = order.into_iter().map(group_kind).collect();
     let number = |kind| groups.iter().position(|g| *g == group_kind(kind));
     let badge = |kind| match () {
         _ if slot_zero(kind) => Some(0),
         _ if unbadged(kind) => None,
-        _ if all || use_ == RosterUse::Cycles => number(kind).map(|i| i as u8 + 1),
+        _ if all => number(kind).map(|i| i as u8 + 1),
         _ => group_rank(&kinds, values, kind),
     };
     kinds.iter().map(|&kind| badge(kind)).collect()
@@ -594,17 +624,49 @@ mod tests {
     #[test]
     fn a_mii_original_takes_slot_zero_only_without_a_numbered_place() {
         let values = cycles_values(&[0x07]);
-        // The CPU's captured Brawler with no other configuration of its class: the grey 0.
-        let only = MiiTiles { cpu: [true, false, false], cpu_original_only: [true, false, false], ..MiiTiles::default() };
+        // The CPU's captured Brawler with no other configuration of its class (the CPU cycle does not admit the class,
+        // `cycle_members::cpu_admission`; a manual pick still may): the grey 0.
+        let only = MiiTiles { cpu: [true, false, false], ..MiiTiles::default() };
         assert_eq!(badge_of(&roster_badges(RosterUse::Cycles, &values, Some(0x48), Role::Cpu, &only), 0x48), Some(0));
-        // With another configuration the Brawler stays a numbered cycle member.
-        let other = MiiTiles { cpu: [true, false, false], ..MiiTiles::default() };
+        // With another configuration the CPU cycle admits the class: the Brawler stays a numbered cycle member.
+        let other = MiiTiles { cpu: [true, false, false], cpu_cycle: [true, false, false], ..MiiTiles::default() };
         let both = cycles_values(&[0x07, 0x48]);
         assert_eq!(badge_of(&roster_badges(RosterUse::Cycles, &both, Some(0x48), Role::Cpu, &other), 0x48), Some(2));
         // A Player original whose class the Player cycle does not admit: the grey 0.
         let badges = roster_badges(RosterUse::Cycles, &values, Some(0x48), Role::Player, &MiiTiles::default());
         assert_eq!(badge_of(&badges, 0x48), Some(0));
         assert_eq!(badge_of(&badges, 0x07), Some(1));
+    }
+
+    /// P-CYCLE: the CPU's 0 names the fighter the runtime returns to (the scene's original, `MiiTiles::slot_zero`), not
+    /// the saved pick the runtime overwrites with each fighter it loads; the numbers follow from it.
+    #[test]
+    fn the_cpu_zero_is_the_runtimes_original_not_the_overwritten_pick() {
+        let values = cycles_values(&[0x00, 0x07, 0x06]); // Mario, Fox, Kirby
+        let mut pick = vec![0u8; CHOICES.len()];
+        pick[CHOICES.iter().position(|(k, _)| *k == 0x07).unwrap()] = 1; // the runtime wrote Fox after a cycle
+        let kept = [("cpu_roster", &values[..]), ("cpu_character", &pick[..])];
+        let mut editor = RosterEditor::new(RosterUse::Cycles);
+        editor.set_mii(MiiTiles { slot_zero: [None, Some(0x00)], ..MiiTiles::default() });
+        let mut frame = Frame::new();
+        editor.decorate(&mut frame, &values);
+        editor.decorate_badges(&mut frame, &menu_with_kept(&kept));
+        let badge = |kind| frame.tile_badges[1][cell_of(kind)].string_lossy();
+        assert_eq!((badge(0x00), badge(0x07), badge(0x06)), ("0".into(), "1".into(), "2".into()), "Mario is slot 0, as the runtime");
+        // The rows' evidence (`tr_cycle_badges_v1`): Fox and Kirby numbered, two numbers, slot 0 Mario.
+        let numbers = editor.decorate_badges(&mut frame, &menu_with_kept(&kept))[1];
+        let index = |kind| CHOICES.iter().position(|(k, _)| *k == kind).unwrap();
+        let bit = |kind| numbers.mask[index(kind) / 64] >> (index(kind) % 64) & 1 == 1;
+        assert!(bit(0x07) && bit(0x06) && !bit(0x00));
+        assert_eq!((numbers.count, numbers.slot_zero), (2, Some(0x00)));
+        // Without a scene the saved pick stands in (today's form).
+        let mut editor = RosterEditor::new(RosterUse::Cycles);
+        editor.set_mii(MiiTiles::default());
+        let mut frame = Frame::new();
+        editor.decorate(&mut frame, &values);
+        editor.decorate_badges(&mut frame, &menu_with_kept(&kept));
+        let badge = |kind| frame.tile_badges[1][cell_of(kind)].string_lossy();
+        assert_eq!((badge(0x07), badge(0x00)), ("0".into(), "1".into()));
     }
 
     /// A minimal menu stub for decorate_badges: the kept keys as JSON arrays.
