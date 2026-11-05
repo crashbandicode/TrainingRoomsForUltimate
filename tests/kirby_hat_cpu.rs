@@ -43,3 +43,18 @@ fn the_kirby_hook_does_not_depend_on_the_other_save_state_rows() {
     assert!(main[..set].contains("roster_on && state_row_usable(\"state_kirby_opff\")"));
     assert!(set < main.find("state_boot::install(").expect("state install"));
 }
+
+/// HAT-REQUEST-END (operator option A, 2026-11-05), the wiring: R1's clock runs from Player 1's per-game-frame step,
+/// `on_frame` no longer ages or times out a request itself, and R2's `fighter_committed` clears the pending request.
+#[test]
+fn every_request_has_a_clock_and_a_swap_away_ends_it() {
+    let lobby = source("src/runtime/lobby/mod.rs");
+    assert!(lobby.contains("kirby_hats::tick()"), "lobby::frame runs the hat requests' clock every game frame");
+    let hats = source("src/runtime/roster/kirby_hats.rs");
+    let on_frame = body_of(&hats, "pub unsafe fn on_frame(");
+    assert!(!on_frame.contains("pending.age"), "the age advances only in tick, on every frame");
+    let tick = body_of(&hats, "pub fn tick()");
+    assert!(tick.contains("request_frame(") && tick.contains("Kirby hat could not be loaded"));
+    let committed = body_of(&hats, "pub fn fighter_committed(");
+    assert!(committed.contains("commit_ends_request(kind)") && committed.contains("clear_pending(role, &mut state)"));
+}

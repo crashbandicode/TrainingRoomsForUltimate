@@ -307,7 +307,7 @@ impl Panes {
         }
         let shown = frame.view == View::Tiles;
         let (cols, rows) = (f32::from(frame.tile_cols.max(1)), f32::from(frame.tile_rows.max(1)));
-        let (cell_w, cell_h) = ((p::ROW_RIGHT - p::ROW_LEFT) / cols, 620.0 / rows);
+        let (cell_w, cell_h) = ((p::ROW_RIGHT - p::ROW_LEFT) / cols, p::TILE_AREA_H / rows);
         let centre = |i: usize| {
             let per_row = usize::from(frame.tile_cols.max(1));
             let (c, r) = (i % per_row, i / per_row);
@@ -335,9 +335,9 @@ impl Panes {
                 continue;
             }
             if frame.tile_roster_grid && crate::runtime::ui::thumbs::is_bound(i) {
-                let size = (cell_h - 28.0).min(cell_w - 12.0);
-                self.rect(p::IDX_TILE + i, x, y + 10.0, size, size, [255, 255, 255, 255]);
-                self.label(p::IDX_TILE_LABEL + i, frame.tiles[i].units(), x, y - cell_h / 2.0 + 12.0, cell_w - 6.0, p::TEXT);
+                let (icon, label, _) = p::roster_tile(cell_w, cell_h, true);
+                self.rect(p::IDX_TILE + i, x, y + icon.y, icon.w, icon.h, [255, 255, 255, 255]);
+                self.label(p::IDX_TILE_LABEL + i, frame.tiles[i].units(), x, y + label.y, label.w, p::TEXT);
                 continue;
             }
             if frame.tile_stage_grid && crate::runtime::ui::thumbs::is_bound(i) {
@@ -374,13 +374,14 @@ impl Panes {
         } else {
             self.hide(p::IDX_TILE_HI);
         }
-        self.draw_roster_badges(frame, &centre);
+        self.draw_roster_badges(frame, &centre, (cell_w, cell_h));
     }
 
     /// The roster grid's per-role marks in the fork's geometry (`scripts/roster-grid/main.rs:299-348`), Player
     /// left red, CPU right blue, both roles at once: the All-stripes 4x86 at x±56, the order badges 52x28 at
-    /// x±36/y+35, the Solo Popo "S" 40x28 at x±36/y−35 on the Ice Climbers cell (kind 0x4b). Empty marks hide.
-    unsafe fn draw_roster_badges(&self, frame: &Frame, centre: &dyn Fn(usize) -> (f32, f32)) {
+    /// x±36/y+35, and the Solo Popo "S" 40x28 at x±36 on the Ice Climbers cell (kind 0x4b), off its name label
+    /// (`panes::roster_tile`). Empty marks hide.
+    unsafe fn draw_roster_badges(&self, frame: &Frame, centre: &dyn Fn(usize) -> (f32, f32), cell: (f32, f32)) {
         let roster = frame.view == View::Tiles && frame.tile_roster_grid;
         let count = usize::from(frame.tile_count);
         let ic = (0..count).find(|i| roster && frame.tile_n[*i] == 0x4b);
@@ -395,7 +396,9 @@ impl Panes {
                 self.show(badge, on && !b.is_empty());
             }
             let ((x, y), solo) = (centre(ic.unwrap_or(0)), p::IDX_TILE_SOLO + r);
-            self.label(solo, &[83], x + side * 36.0, y - 35.0, 40.0, colour); // "S"
+            let pictured = ic.is_some_and(crate::runtime::ui::thumbs::is_bound);
+            let mark = p::roster_tile(cell.0, cell.1, pictured).2[r];
+            self.label(solo, &[83], x + mark.x, y + mark.y, mark.w, colour); // "S"
             self.show(solo, ic.is_some() && frame.tile_solo[r]);
         }
     }

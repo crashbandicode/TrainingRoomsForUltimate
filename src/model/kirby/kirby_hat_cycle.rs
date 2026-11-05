@@ -136,6 +136,24 @@ pub fn hat_role<T: PartialEq>(body: T, roles: [Option<T>; 2]) -> Option<usize> {
     roles.iter().position(|role| role.as_ref() == Some(&body))
 }
 
+/// The game frames a pending hat request may take before it ends with "Kirby hat could not be loaded".
+pub const REQUEST_FRAMES: u16 = 900;
+
+/// HAT-REQUEST-END R1 (operator option A, 2026-11-05): one game frame of a pending request, counted whether or not its
+/// role's Kirby was served this frame (`held`: a save state is restoring it). The new age, and whether it ends now.
+pub const fn request_frame(age: u16, held: bool) -> (u16, bool) {
+    if held {
+        return (age, false);
+    }
+    let age = age.saturating_add(1);
+    (age, age > REQUEST_FRAMES)
+}
+
+/// HAT-REQUEST-END R2: committing a fighter other than Kirby (kind 6) to a role ends that role's pending request.
+pub const fn commit_ends_request(kind: u32) -> bool {
+    kind != 6
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

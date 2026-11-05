@@ -192,6 +192,42 @@ pub const IDX_CHIP_BADGE: usize = IDX_CHIP_LABEL + CHIPS;
 /// The item and stage grids' tiles (up to 5 x 8): a tile and a label each, and the focus ring. Their size and place
 /// are set when a grid opens (the layout follows the console mode).
 pub const TILES: usize = 88;
+/// The tile name label's and the roster marks' (badges, Solo Popo "S") box heights; the renderer sets only widths.
+pub const TILE_LABEL_H: f32 = 40.0;
+pub const MARK_H: f32 = 28.0;
+/// The height the grid's rows share (a tile is `(ROW_RIGHT - ROW_LEFT) / cols` by `TILE_AREA_H / rows`).
+pub const TILE_AREA_H: f32 = 620.0;
+
+/// A pane's box: centre and size in layout units (y up).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Area {
+    pub x: f32,
+    pub y: f32,
+    pub w: f32,
+    pub h: f32,
+}
+
+impl Area {
+    pub fn overlaps(self, other: Area) -> bool {
+        (self.x - other.x).abs() * 2.0 < self.w + other.w && (self.y - other.y).abs() * 2.0 < self.h + other.h
+    }
+}
+
+/// A roster grid tile's parts relative to its cell centre: the portrait, the name label and the Solo Popo "S" marks
+/// (Player left, CPU right). With the portrait drawn the name sits under it and the marks on the portrait's lower
+/// corners, just above the name (SOLO-S-PLACEMENT, operator 2026-11-05: cover the icon partially, never the name);
+/// without it the name is centred and the marks sit just under it.
+pub fn roster_tile(cell_w: f32, cell_h: f32, pictured: bool) -> (Area, Area, [Area; 2]) {
+    let size = (cell_h - 28.0).min(cell_w - 12.0);
+    let icon = Area { x: 0.0, y: 10.0, w: size, h: size };
+    let label = if pictured {
+        Area { x: 0.0, y: 12.0 - cell_h / 2.0, w: cell_w - 6.0, h: TILE_LABEL_H }
+    } else {
+        Area { x: 0.0, y: 0.0, w: cell_w - 18.0, h: TILE_LABEL_H }
+    };
+    let y = label.y + [-1.0, 1.0][usize::from(pictured)] * (TILE_LABEL_H + MARK_H) / 2.0;
+    (icon, label, [-36.0, 36.0].map(|x| Area { x, y, w: 40.0, h: MARK_H }))
+}
 pub const IDX_TILE_HI: usize = IDX_CHIP_BADGE + CHIPS;
 pub const IDX_TILE: usize = IDX_TILE_HI + 1;
 pub const IDX_TILE_LABEL: usize = IDX_TILE + TILES;
@@ -430,9 +466,9 @@ pub const fn spec(index: usize) -> Spec {
         i if i >= IDX_CHIP_LABEL && i < IDX_CHIP_LABEL + CHIPS => Spec { visible: false, ..text(name, [0.0, 0.0, CHIP_SIZE, 44.0], Align::Center, FONT_SMALL, 16, TEXT) },
         i if i >= IDX_CHIP_BADGE && i < IDX_CHIP_BADGE + CHIPS => Spec { visible: false, ..text(name, [0.0, 0.0, 60.0, 44.0], Align::Center, FONT, 4, TEXT) },
         i if i >= IDX_TILE && i < IDX_TILE + TILES => rect(name, [0.0, 0.0, 100.0, 60.0], HIGHLIGHT, false),
-        i if i >= IDX_TILE_LABEL && i < IDX_TILE_LABEL + TILES => Spec { visible: false, ..text(name, [0.0, 0.0, 100.0, 40.0], Align::Center, FONT_SMALL, 28, TEXT) },
+        i if i >= IDX_TILE_LABEL && i < IDX_TILE_LABEL + TILES => Spec { visible: false, ..text(name, [0.0, 0.0, 100.0, TILE_LABEL_H], Align::Center, FONT_SMALL, 28, TEXT) },
         i if i >= IDX_TILE_STRIPE && i < IDX_TILE_SOLO => Spec { visible: false, ..rect(name, [0.0, 0.0, 4.0, 86.0], TEXT, false) },
-        i if i >= IDX_TILE_BADGE && i < MENU_COUNT => Spec { visible: false, ..text(name, [0.0, 0.0, 52.0, 28.0], Align::Center, FONT_SMALL, 4, TEXT) },
+        i if i >= IDX_TILE_BADGE && i < MENU_COUNT => Spec { visible: false, ..text(name, [0.0, 0.0, 52.0, MARK_H], Align::Center, FONT_SMALL, 4, TEXT) },
         IDX_TAB_HI => rect(name, [-740.0, TAB_Y, 200.0, TAB_H], ACCENT, true),
         IDX_TITLE => text(name, [600.0, TAB_Y, 560.0, TAB_H], Align::Right, FONT_SMALL, 40, TEXT_DIM),
         IDX_SEP => rect(name, [0.0, TAB_Y - 52.0, 1760.0, 3.0], RULE, true),
