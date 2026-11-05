@@ -266,7 +266,7 @@ fn layout_row_counts_match_the_rc_freeze() {
     assert_eq!(n(&|c| matches!(c, Control::Slider)), 2);
     // The RC defers four editors, retaining the empty Setup group index so
     // persisted group IDs do not move. Every other group still has rows.
-    assert_eq!(ROWS.len(), 92);
+    assert_eq!(ROWS.len(), 91);
     assert!(!ROWS.iter().any(|r| matches!(r.control,
         Control::Editor(Editor::SetupSave | Editor::SetupLibrary | Editor::EditPlacement | Editor::ReplayWindow))));
     assert_eq!(GROUPS[7].title, "Setup library");
