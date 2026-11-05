@@ -45,6 +45,11 @@ const HOOK_LOCKS: &[(&str, &str)] = &[
     ("features/notices.rs", "QUEUE"),
     ("features/notices.rs", "BOOT_NOTICES"),
     ("features/hud_draw.rs", "CONTAINERS"),
+    // The hitbox visualizer's own orbs: the fighter pass publishes on BOARD (game thread, under STORE), the layout tick
+    // reads it under ORB_PANES (review HB-5, 2026-11-05).
+    ("features/hitbox.rs", "STORE"),
+    ("features/hitbox.rs", "BOARD"),
+    ("features/hitbox.rs", "ORB_PANES"),
     ("compat/menu.rs", "EDITED"),
     ("ui/input.rs", "ADAPTER"),
     ("ui/menu_app.rs", "QUICK_MENU_APP"),
@@ -307,6 +312,72 @@ fn report_locks_reached_from_plugin_threads() {
         println!("LOCK-REACH {line}");
     }
     println!("AMBIGUOUS {:?}", result.ambiguous);
+}
+
+/// The static locks taken more than once in one statement of `src`: each `NAME.lock()` guard is a temporary that lives to
+/// the end of its statement, and neither hos-lock lock is reentrant, so the second take waits on the first for ever
+/// (review IV-1, 2026-11-05: the frame strip's diag line took `IDS` four times). `names` are the locks `src` declares; a
+/// statement ends at `;`, `{` or `}`, and a match arm (`=>`) is its own temporary scope. Text-level, so
+/// `cfg(feature = "diag")` code is read too.
+fn relocks_in_one_statement(src: &str, names: &BTreeSet<String>) -> Vec<String> {
+    let toks = callgraph::lex(src);
+    let ident = |k: usize, s: &str| matches!(toks.get(k), Some(Tok::Ident(t)) if t == s);
+    let mut out = Vec::new();
+    let mut taken: BTreeMap<String, usize> = BTreeMap::new();
+    for i in 0..toks.len() {
+        match &toks[i] {
+            Tok::Punct(';' | '{' | '}') => taken.clear(),
+            Tok::Punct('>') if i > 0 && toks[i - 1] == Tok::Punct('=') => taken.clear(),
+            Tok::Ident(name)
+                if names.contains(name)
+                    && matches!(toks.get(i + 1), Some(Tok::Punct('.')))
+                    && LOCK_METHODS.iter().any(|m| ident(i + 2, m))
+                    && matches!(toks.get(i + 3), Some(Tok::Punct('('))) =>
+            {
+                let n = taken.entry(name.clone()).or_default();
+                *n += 1;
+                if *n == 2 {
+                    out.push(name.clone());
+                }
+            }
+            _ => {}
+        }
+    }
+    out
+}
+
+#[test]
+fn no_statement_takes_the_same_lock_twice() {
+    let runtime = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");
+    let mut by_file: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    for (file, name) in static_locks(&runtime) {
+        by_file.entry(file).or_default().insert(name);
+    }
+    let mut found = Vec::new();
+    for (file, names) in &by_file {
+        let src = std::fs::read_to_string(runtime.join(file)).unwrap();
+        for name in relocks_in_one_statement(&src, names) {
+            found.push(format!("{file}: {name}"));
+        }
+    }
+    assert!(by_file.get("features/input_display.rs").is_some_and(|n| n.contains("IDS")), "the scan sees the strip's locks");
+    assert!(found.is_empty(), "a statement takes a lock it already holds (it waits on itself): {found:?}");
+}
+
+#[test]
+fn the_relock_scan_catches_the_strip_line_and_passes_separate_statements() {
+    let names: BTreeSet<String> = ["IDS".to_owned()].into();
+    // Review IV-1 as committed in 5ff2e91.
+    let bad = r#"fn ids() { diagnostic(format_args!("{} {}", IDS.lock().as_ref().map_or(0, |t| t.get(C::A)),
+        IDS.lock().as_ref().map_or(0, |t| t.get(C::B)))); }"#;
+    assert_eq!(relocks_in_one_statement(bad, &names), ["IDS"]);
+    let good = "fn ids() { let a = IDS.lock().as_ref().map_or(0, |t| t.get(C::A)); *IDS.lock() = None; if x { IDS.lock(); } }";
+    assert!(relocks_in_one_statement(good, &names).is_empty());
+    let read_twice = "fn f() { g(IDS.read().len(), IDS.try_read().is_some()); }";
+    assert_eq!(relocks_in_one_statement(read_twice, &names), ["IDS"]);
+    // Each match arm drops its temporaries (replay_capture's `read_capture_source`).
+    let arms = "fn f() { let x = match id { a => (IDS.lock().unwrap().p.clone(), 1), b => (IDS.lock().unwrap().p.clone(), 2) }; }";
+    assert!(relocks_in_one_statement(arms, &names).is_empty());
 }
 
 /// Modules declared under `#[cfg(feature = "diag")]` (`mod x;` on the line after the attribute): Eden-only code the scan does not read.
