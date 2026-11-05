@@ -53,8 +53,10 @@ pub mod input_pending;
 pub mod ini_files;
 #[path = "model/input_delay.rs"]
 pub mod input_delay;
-#[path = "model/input_display.rs"]
-pub mod input_display;
+#[path = "model/frame_strip.rs"]
+pub mod frame_strip;
+#[path = "model/frame_strip_plan.rs"]
+pub mod frame_strip_plan;
 #[path = "model/install_line.rs"]
 pub mod install_line;
 #[path = "model/lra_reset.rs"]

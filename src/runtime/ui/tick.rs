@@ -216,8 +216,8 @@ unsafe fn resolve(r: &mut Resolved, layout: *mut Layout, waiting: bool) {
     let help = pane::find(root, if waiting { b"option_menu_setting" } else { b"L_staying_help" });
     let menu_root = if waiting { pane::find_child(root, b"TrModPort") } else { root };
     // Waiting readiness covers every hosted panel, including the notification
-    // and input-log consumers (SPEC-input-02 §6), not just the menu subtree.
-    let host_complete = !waiting || [p::IDX_NOTICE, p::IDX_LOG].iter()
+    // and frame-strip consumers (SPEC-input-06), not just the menu subtree.
+    let host_complete = !waiting || [p::IDX_NOTICE, p::IDX_IV].iter()
         .all(|&index| !pane::find_child(menu_root, p::name_of(index).as_bytes()).is_null());
     let mut all = [core::ptr::null_mut(); p::MENU_COUNT];
     let mut missing = 0;

@@ -567,6 +567,8 @@ unsafe fn fighter_frame(fighter: usize, receipt: Option<FrameReceipt>) {
         // The player entry: remember where it stands (a body's In / Out is relative to it).
         if training && current_frame {
             frame_advantage(accessor);
+            // SPEC-input-06: the frame strip's frame (nothing unless the display is enabled and On).
+            crate::runtime::features::input_display::sample_frame(accessor);
             PLAYER_X.store(natives::pos_x(accessor).to_bits(), Ordering::Relaxed);
             mash_player_position(accessor);
         }
@@ -1437,8 +1439,16 @@ pub unsafe fn cpu_stick_dir_hook(accessor: usize) -> f32 {
     angle.unwrap_or(original)
 }
 
+/// The primary CPU's live accessor for the frame strip (SPEC-input-06 §5.1): resolved through the live manager and
+/// matched against the role the CPU core tracks, never a saved pointer.
+pub(crate) unsafe fn strip_cpu(player: usize) -> Option<usize> {
+    let scene = role_scene()?;
+    let fresh = game::natives::module_accessor(i32::from(primary_entry(scene == Scene::Lobby)))?;
+    with(|cpu| role_adapter::primary_cpu(cpu, scene, player, fresh)).flatten()
+}
+
 /// Whether a fighter can act now: any of the five transition terms or a cancel (SPEC-cpu-07 §3).
-unsafe fn actionable(accessor: usize) -> bool {
+pub(crate) unsafe fn actionable(accessor: usize) -> bool {
     term_on(accessor, &TERM_ESCAPE_AIR)
         || term_on(accessor, &TERM_ATTACK_AIR)
         || term_on(accessor, &TERM_GUARD_ON)
@@ -1471,8 +1481,11 @@ unsafe fn frame_advantage(player: usize) {
         role_adapter::measurement(cpu, scene, player, fresh_cpu)).flatten() else { return };
     let (p, c) = (actionable(player), actionable(cpu_accessor));
     if let Some(Some(value)) = with(|cpu| cpu.frame_advantage(p, c)) {
-        // The notification (SPEC-cpu-07 §2): package 4's notices show it, clearing every other one.
-        notices::post_frame_advantage(value);
+        // The notification (SPEC-cpu-07 §2): package 4's notices show it, clearing every other one. Not while the
+        // frame strip shows the same number (SPEC-input-06 §3.5): the notice would cover the strip.
+        if !crate::runtime::features::input_display::sampling() {
+            notices::post_frame_advantage(value);
+        }
         cpu_event!("frame_advantage value={value}");
     }
 }

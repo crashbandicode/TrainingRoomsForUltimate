@@ -56,16 +56,16 @@ fn tree(rows: &[(usize, &str)]) -> Vec<Pane> {
 }
 
 #[test]
-fn notice_and_log_after_expanded_stock_are_reachable_without_larger_budget() {
+fn notice_and_strip_after_expanded_stock_are_reachable_without_larger_budget() {
     let mut rows = vec![(0, "RootPane"), (0, "stock")];
     rows.extend((0..4100).map(|_| (1, "stock_leaf")));
-    rows.extend([(0, "TrModMenu"), (0, "TrModDisp0"), (0, "TrModInputLog")]);
+    rows.extend([(0, "TrModMenu"), (0, "TrModDisp0"), (0, "TrIv")]);
     let mut nodes = tree(&rows);
     let root = nodes.as_mut_ptr();
     unsafe {
         assert!(pane::find(root, b"TrModDisp0").is_null(), "original failing search");
-        assert!(pane::find(root, b"TrModInputLog").is_null());
-        for name in [b"TrModMenu".as_slice(), b"TrModDisp0", b"TrModInputLog"] {
+        assert!(pane::find(root, b"TrIv").is_null());
+        for name in [b"TrModMenu".as_slice(), b"TrModDisp0", b"TrIv"] {
             assert!(!pane::find_child(root, name).is_null());
         }
     }
@@ -77,14 +77,14 @@ fn waiting_requires_direct_owned_host_and_containers() {
     unsafe { assert!(pane::find_child(wrong_host.as_mut_ptr(), b"TrModPort").is_null()); }
     let mut nodes = tree(&[(0,"RootPane"),(0,"stock"),(1,"TrModPort"),
         (2,"TrModDisp0"),(0,"TrModPort"),(4,"TrModMenu"),(4,"TrModDisp0"),
-        (6,"TrModDisp0Long"),(4,"TrModInputLog")]);
+        (6,"TrModDisp0Long"),(4,"TrIv")]);
     unsafe {
         let root = nodes.as_mut_ptr();
         let host = pane::find_child(root, b"TrModPort");
         assert_eq!(host, root.add(4));
         assert_eq!(pane::find_child(host, b"TrModDisp0"), root.add(6));
         assert_eq!(pane::find(pane::find_child(host, b"TrModDisp0"), b"TrModDisp0Long"), root.add(7));
-        assert_eq!(pane::find_child(host, b"TrModInputLog"), root.add(8));
+        assert_eq!(pane::find_child(host, b"TrIv"), root.add(8));
         assert!(pane::find_child(root, b"TrModDisp0").is_null());
         assert!(pane::find_child(host, b"missing").is_null());
         assert!(pane::find_child(core::ptr::null_mut(), b"TrModPort").is_null());
@@ -113,7 +113,7 @@ fn actual_expanded_training_and_waiting_fixture() {
         unsafe {
             let root = nodes.as_mut_ptr();
             let host = if kind == "waiting" { pane::find_child(root,b"TrModPort") } else { root };
-            for name in [b"TrModMenu".as_slice(),b"TrModDisp0",b"TrModInputLog"] {
+            for name in [b"TrModMenu".as_slice(),b"TrModDisp0",b"TrIv"] {
                 assert!(!pane::find_child(host,name).is_null(), "{kind} {name:?}");
             }
             let notice = pane::find_child(host,b"TrModDisp0");
@@ -121,10 +121,10 @@ fn actual_expanded_training_and_waiting_fixture() {
                 assert!(!pane::find(notice,name).is_null(), "{kind} {name:?}");
             }
             assert!(!pane::find(pane::find_child(host,b"TrModMenu"),b"tr_rl_00").is_null());
-            assert!(!pane::find(pane::find_child(host,b"TrModInputLog"),b"ILF_00").is_null());
+            assert!(!pane::find(pane::find_child(host,b"TrIv"),b"TrIvRun00").is_null());
             if kind == "training" {
                 assert!(pane::find(root,b"TrModDisp0").is_null());
-                assert!(pane::find(root,b"TrModInputLog").is_null());
+                assert!(pane::find(root,b"TrIv").is_null());
                 assert!(!pane::find(root,b"TrModMenu").is_null());
             }
         }

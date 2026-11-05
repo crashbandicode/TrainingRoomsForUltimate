@@ -149,8 +149,7 @@ const SPEC_TABLE: &[(&str, Kind, usize, &[usize])] = &[
     ("buff_state", Kind::Multiple, 18, &[]),
     ("frame_advantage", Kind::Single, 2, &[1]),
     ("hitbox_vis", Kind::Single, 2, &[1]),
-    ("input_display", Kind::Single, 4, &[1]),
-    ("input_display_status", Kind::Single, 2, &[1]),
+    ("input_display_strip", Kind::Single, 2, &[1]),
     ("input_delay", Kind::Single, 31, &[0]),
     ("stage_hazards", Kind::Single, 2, &[1]),
     ("hud", Kind::Single, 2, &[0]),
@@ -254,10 +253,11 @@ fn layout_row_counts_match_the_rc_freeze() {
         [Page::Cpu, Page::Saves, Page::Recording, Page::FightersStages, Page::DisplayControls, Page::Developer]
             .map(|page| row_count(page, pilot))
     };
-    assert_eq!(counts(false), [31, 11, 15, 20, 11, 3]);
-    assert_eq!(counts(true), [30, 11, 15, 20, 11, 3]);
-    assert_eq!(counts(false)[..5].iter().sum::<usize>(), 88);
-    assert_eq!(counts(true)[..5].iter().sum::<usize>(), 87);
+    // Display & Controls lost "Group inputs by status" to the frame strip (SPEC-input-06 §3.1, 2026-11-05).
+    assert_eq!(counts(false), [31, 11, 15, 20, 10, 3]);
+    assert_eq!(counts(true), [30, 11, 15, 20, 10, 3]);
+    assert_eq!(counts(false)[..5].iter().sum::<usize>(), 87);
+    assert_eq!(counts(true)[..5].iter().sum::<usize>(), 86);
     // Controls (MENU-DRAFT §2): 4 direction grids, 7 delay rows, 13 multi-selects (the 12 checklists,\n    // 3 of them slot sets, and Swap groups).
     let n = |f: &dyn Fn(&Control) -> bool| ROWS.iter().filter(|r| r.vis != model::menu::table::Vis::PilotPresent && f(&r.control)).count();
     assert_eq!(n(&|c| matches!(c, Control::DirectionGrid { .. })), 4);
@@ -266,7 +266,7 @@ fn layout_row_counts_match_the_rc_freeze() {
     assert_eq!(n(&|c| matches!(c, Control::Slider)), 2);
     // The RC defers four editors, retaining the empty Setup group index so
     // persisted group IDs do not move. Every other group still has rows.
-    assert_eq!(ROWS.len(), 92);
+    assert_eq!(ROWS.len(), 91);
     assert!(!ROWS.iter().any(|r| matches!(r.control,
         Control::Editor(Editor::SetupSave | Editor::SetupLibrary | Editor::EditPlacement | Editor::ReplayWindow))));
     assert_eq!(GROUPS[7].title, "Setup library");
@@ -1792,7 +1792,7 @@ fn dropdown_options_are_unique_and_row_values_read_back() {
             assert_eq!(sorted.len(), labels.len(), "{} has a repeated label", row.title);
         }
     }
-    assert_eq!(m.value(row_of("input_display")), RowValue::Choice(Some(1)), "Smash Inputs");
+    assert_eq!(m.value(row_of("input_display_strip")), RowValue::Choice(Some(1)), "Frame strip");
     assert_eq!(m.value(row_of("recording_duration")), RowValue::Choice(Some(3)), "150 frames");
 }
 

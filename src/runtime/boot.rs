@@ -302,6 +302,9 @@ fn run_inner() {
     // The input display's reads in the input-delay hook have their own flag, so Input Delay does not depend on them.
     let display_on = capabilities::unit_usable(Feature::InputDisplay, &usable);
     input_display::set_enabled(display_on);
+    // SPEC-input-06 §4: the strip's hitstun-left read is the CPU tech unit's `work_get_float` row; without it a true
+    // combo shows no margin and the rest of the strip draws.
+    input_display::set_reaction(display_on && capabilities::unit_usable(Feature::CpuTech, &usable));
     let recording_closure = capabilities::unit_usable(Feature::Recording, &usable);
     let notices_closure = capabilities::cross_blocked_by(Feature::Notices, &usable).is_none();
     let (recording_on, notices_on) = install_pkg4(input_delay_on && recording_closure, cpu_core_on, notices_closure, &found4, &mut written4);

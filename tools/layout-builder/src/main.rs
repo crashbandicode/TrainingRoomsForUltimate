@@ -333,8 +333,8 @@ mod tests {
                 assert_eq!(a.parent, b.parent);
             }
         }
-        assert_eq!(roots, 3, "menu, notices and input log");
-        for root in [panes::IDX_MENU, panes::IDX_NOTICE, panes::IDX_LOG] {
+        assert_eq!(roots, 3, "menu, notices and frame strip");
+        for root in [panes::IDX_MENU, panes::IDX_NOTICE, panes::IDX_IV] {
             assert_eq!(waiting[root].parent, WAITING_PORT);
         }
     }

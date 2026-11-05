@@ -45,10 +45,6 @@ impl Name {
         Name { bytes, len: (p.len() + 2) as u8 }
     }
 
-    const fn from_raw(bytes: [u8; 24], len: u8) -> Name {
-        Name { bytes, len }
-    }
-
     pub fn as_bytes(&self) -> &[u8] {
         &self.bytes[..usize::from(self.len)]
     }
@@ -253,44 +249,183 @@ pub const IDX_NOTICE_TEXT: usize = IDX_NOTICE + 3;
 pub const IDX_NOTICE_LONG: usize = IDX_NOTICE + 4;
 /// Full startup chord text plus its terminator; checked against notify::BODY_MAX.
 pub const NOTICE_LONG_UNITS: u16 = 321;
-/// The input log (SPEC-input-02, lead ruling 2026-11-02: text slots, no new textures): a column container, 15 row
-/// containers, and in each row 5 slots. A slot is a text box (a button glyph of the game's font, coloured) and two
-/// rectangles (the shaft and the head of the plugin's own arrow for a stick direction), plus the held-frames text
-/// (4 units) and the status text (48 units) of the row. Names are unique across the layout:
-/// `TrModInputLog` / `TrModInputLog<rr>` / `ILG_<rr>_<s>` / `ILA_<rr>_<s>` / `ILH_<rr>_<s>` / `ILF_<rr>` / `ILS_<rr>`.
-pub const LOG_ROWS: usize = 15;
-pub const LOG_SLOTS: usize = 5;
-/// A slot's x in its row, and the head of its arrow: its distance from the shaft's centre along the arrow.
-pub const LOG_SLOT_X0: f32 = -200.0;
-pub const LOG_SLOT_PITCH: f32 = 54.0;
-pub const LOG_HEAD_OFFSET: f32 = 16.0;
-pub const IDX_LOG: usize = IDX_NOTICE_LONG + 1;
-pub const IDX_LOG_ROW: usize = IDX_LOG + 1;
-pub const IDX_LOG_GLYPH: usize = IDX_LOG_ROW + LOG_ROWS;
-pub const IDX_LOG_SHAFT: usize = IDX_LOG_GLYPH + LOG_ROWS * LOG_SLOTS;
-pub const IDX_LOG_HEAD: usize = IDX_LOG_SHAFT + LOG_ROWS * LOG_SLOTS;
-pub const IDX_LOG_FRAME: usize = IDX_LOG_HEAD + LOG_ROWS * LOG_SLOTS;
-pub const IDX_LOG_STATUS: usize = IDX_LOG_FRAME + LOG_ROWS;
+/// The frame strip (SPEC-input-06, operator decision INPUT-VIZ A, 2026-11-05; it replaced the input log's 271 panes):
+/// its own container `TrIv` under `RootPane` and the panes below it, all named `TrIv…`. The input package writes
+/// them (`model::frame_strip_plan`).
+pub const IDX_IV: usize = IDX_NOTICE_LONG + 1;
 /// How many panes the plugin adds to the layout.
-pub const COUNT: usize = IDX_LOG_STATUS + LOG_ROWS;
+pub const COUNT: usize = IDX_IV + iv::COUNT;
 
-pub const fn log_slot(row: usize, slot: usize) -> usize {
-    row * LOG_SLOTS + slot
+/// The frame strip's pane indices and geometry (canvas units, the container's centre is the origin).
+pub mod iv {
+    /// Frames on screen, links in the LAST row, lane runs and run lengths per lane, chips.
+    pub const WINDOW: usize = 60;
+    pub const HISTORY: usize = 4;
+    pub const RUNS: usize = 16;
+    pub const RUN_LABELS: usize = 4;
+    pub const CHIPS: usize = 8;
+
+    /// The strip's pane indices (local: `IDX_IV + at::…` in the table).
+    pub mod at {
+        use super::{CHIPS, HISTORY, RUNS, RUN_LABELS};
+        pub const CONTAINER: usize = 0;
+        pub const BACKDROP: usize = 1;
+        /// IN, P1, CPU.
+        pub const LANE_LABEL: usize = 2;
+        /// The readouts' divider and the LAST row's rule.
+        pub const SEPARATOR: usize = 5;
+        /// P1's runs, then the CPU's.
+        pub const RUN: usize = 7;
+        pub const RUN_LABEL: usize = RUN + 2 * RUNS;
+        pub const CHIP_BOX: usize = RUN_LABEL + 2 * RUN_LABELS;
+        pub const CHIP_GLYPH: usize = CHIP_BOX + CHIPS;
+        pub const CHIP_SHAFT: usize = CHIP_GLYPH + CHIPS;
+        pub const CHIP_HEAD: usize = CHIP_SHAFT + CHIPS;
+        pub const CHIP_TICK: usize = CHIP_HEAD + CHIPS;
+        pub const WINDOW_BAR: usize = CHIP_TICK + CHIPS;
+        pub const WINDOW_TEXT: usize = WINDOW_BAR + 1;
+        /// The link bracket's left leg, bottom and right leg, then the advantage bracket's.
+        pub const BRACKET: usize = WINDOW_TEXT + 1;
+        pub const BRACKET_TEXT: usize = BRACKET + 6;
+        pub const NOW: usize = BRACKET_TEXT + 2;
+        pub const NOW_TEXT: usize = NOW + 1;
+        /// ADVANTAGE, LINK, INPUT: labels, values, sub-lines.
+        pub const READ_LABEL: usize = NOW_TEXT + 1;
+        pub const READ_VALUE: usize = READ_LABEL + 3;
+        pub const READ_SUB: usize = READ_VALUE + 3;
+        pub const LAST_TEXT: usize = READ_SUB + 3;
+        pub const PILL: usize = LAST_TEXT + 1;
+        pub const PILL_TEXT: usize = PILL + HISTORY;
+        pub const MOVE_TEXT: usize = PILL_TEXT + HISTORY;
+        pub const COUNT: usize = MOVE_TEXT + HISTORY;
+    }
+
+    pub const COUNT: usize = at::COUNT;
+
+    pub const STRIP_Y: f32 = 420.0;
+    pub const STRIP_W: f32 = 1296.0;
+    pub const STRIP_H: f32 = 216.0;
+    /// The left edge of the oldest frame's cell, the distance between frames and a cell's width.
+    pub const FIRST_X: f32 = -564.0;
+    pub const PITCH: f32 = 13.5;
+    pub const CELL_W: f32 = 12.0;
+    pub const NOW_X: f32 = FIRST_X + WINDOW as f32 * PITCH + 3.0;
+    pub const LABEL_X: f32 = -606.0;
+    pub const IN_Y: f32 = 73.5;
+    pub const P1_Y: f32 = 21.75;
+    pub const CPU_Y: f32 = -14.25;
+    pub const LANE_H: f32 = 28.5;
+    pub const CHIP: f32 = 30.0;
+    pub const TICK_Y: f32 = 47.25;
+    pub const TICK_H: f32 = 22.5;
+    pub const WINDOW_Y: f32 = 44.25;
+    pub const WINDOW_H: f32 = 7.5;
+    pub const LEG_Y: f32 = -39.0;
+    pub const LEG_H: f32 = 9.0;
+    pub const BAR_Y: f32 = -43.5;
+    pub const BRACKET_TEXT_Y: f32 = -57.0;
+    pub const READ_X: f32 = 276.0;
+    pub const READ_LABEL_Y: [f32; 3] = [90.0, 34.5, -21.0];
+    pub const READ_VALUE_Y: [f32; 3] = [64.5, 9.0, -46.5];
+    pub const READ_SUB_X: f32 = READ_X + 75.0;
+    pub const DIVIDER_X: f32 = 262.5;
+    pub const RULE_Y: f32 = -70.5;
+    pub const LAST_Y: f32 = -87.0;
+    pub const PILL_W: f32 = 96.0;
+    pub const PILL_STRIDE: f32 = 300.0;
+    pub const PILL_X0: f32 = FIRST_X + PILL_W / 2.0;
+    pub const BACKDROP_COLOR: [u8; 4] = [14, 18, 27, 222];
+    /// The text boxes' capacity in UTF-16 units.
+    pub const TEXT_UNITS: u16 = 24;
+    /// Small labels, the readouts' sub-lines, the readouts' values.
+    pub const FONT_TAG: (f32, f32) = (14.0, 22.0);
+    pub const FONT_SUB: (f32, f32) = (16.0, 26.0);
+    pub const FONT_VALUE: (f32, f32) = (26.0, 40.0);
 }
 
-/// A name with two index numbers: `prefix` + row + `_` + slot.
-const fn name2(prefix: &str, row: usize, slot: usize) -> Name {
-    let a = Name::indexed(prefix, row);
-    let mut bytes = [0u8; 24];
-    let len = a.len as usize;
-    let mut i = 0;
-    while i < len {
-        bytes[i] = a.bytes[i];
-        i += 1;
+/// The frame strip's pane names.
+const fn iv_name(local: usize) -> Name {
+    use iv::at::*;
+    use iv::{CHIPS, HISTORY, RUNS, RUN_LABELS};
+    match local {
+        CONTAINER => Name::new("TrIv"),
+        BACKDROP => Name::new("TrIvBg"),
+        i if i < SEPARATOR => Name::indexed("TrIvLab", i - LANE_LABEL),
+        i if i < RUN => Name::indexed("TrIvSep", i - SEPARATOR),
+        i if i < RUN_LABEL => Name::indexed("TrIvRun", i - RUN),
+        i if i < CHIP_BOX => Name::indexed("TrIvRunN", i - RUN_LABEL),
+        i if i < WINDOW_BAR => {
+            let n = (i - CHIP_BOX) % CHIPS;
+            match (i - CHIP_BOX) / CHIPS {
+                0 => Name::indexed("TrIvChB", n),
+                1 => Name::indexed("TrIvChG", n),
+                2 => Name::indexed("TrIvChS", n),
+                3 => Name::indexed("TrIvChH", n),
+                _ => Name::indexed("TrIvChT", n),
+            }
+        }
+        WINDOW_BAR => Name::new("TrIvWin"),
+        WINDOW_TEXT => Name::new("TrIvWinT"),
+        i if i < BRACKET_TEXT => Name::indexed("TrIvBr", i - BRACKET),
+        i if i < NOW => Name::indexed("TrIvBrT", i - BRACKET_TEXT),
+        NOW => Name::new("TrIvNow"),
+        NOW_TEXT => Name::new("TrIvNowT"),
+        i if i < READ_VALUE => Name::indexed("TrIvRl", i - READ_LABEL),
+        i if i < READ_SUB => Name::indexed("TrIvRv", i - READ_VALUE),
+        i if i < LAST_TEXT => Name::indexed("TrIvRs", i - READ_SUB),
+        LAST_TEXT => Name::new("TrIvLast"),
+        i if i < PILL_TEXT => Name::indexed("TrIvPill", i - PILL),
+        i if i < MOVE_TEXT => Name::indexed("TrIvPillT", i - PILL_TEXT),
+        i if i < MOVE_TEXT + HISTORY => Name::indexed("TrIvMove", i - MOVE_TEXT),
+        _ => {
+            let _ = (RUNS, RUN_LABELS);
+            panic!("no such frame strip pane")
+        }
     }
-    bytes[i] = b'_';
-    bytes[i + 1] = b'0' + slot as u8;
-    Name::from_raw(bytes, (len + 2) as u8)
+}
+
+/// A hidden text box of the frame strip.
+const fn iv_text(name: Name, [x, y, w]: [f32; 3], align: Align, font: (f32, f32)) -> Spec {
+    Spec { visible: false, ..under(text(name, [x, y, w, 30.0], align, font, iv::TEXT_UNITS, TEXT), Name::new("TrIv")) }
+}
+
+/// The frame strip's panes: kind, place and size, all hidden until the input package draws them.
+const fn iv_spec(local: usize, name: Name) -> Spec {
+    use iv::at::*;
+    use iv::{
+        BACKDROP_COLOR, BAR_Y, BRACKET_TEXT_Y, CELL_W, CHIP, DIVIDER_X, FONT_SUB, FONT_TAG, FONT_VALUE, IN_Y, LABEL_X,
+        LANE_H, LAST_Y, LEG_H, LEG_Y, NOW_X, PILL_W, READ_SUB_X, READ_X, RULE_Y, STRIP_H, STRIP_W, STRIP_Y, TEXT_UNITS,
+        TICK_H, TICK_Y, WINDOW_H, WINDOW_Y,
+    };
+    let parent = Name::new("TrIv");
+    match local {
+        CONTAINER => Spec { name, parent: ROOT_PANE, kind: Kind::Null, x: 0.0, y: STRIP_Y, w: STRIP_W, h: STRIP_H, visible: false },
+        BACKDROP => under(rect(name, [0.0, 0.0, STRIP_W, STRIP_H], BACKDROP_COLOR, true), parent),
+        i if i < SEPARATOR => iv_text(name, [LABEL_X, 0.0, 60.0], Align::Center, FONT_TAG),
+        SEPARATOR => under(rect(name, [DIVIDER_X, 19.5, 1.5, 147.0], RULE, false), parent),
+        i if i < RUN => under(rect(name, [0.0, RULE_Y, STRIP_W - 36.0, 1.5], RULE, false), parent),
+        i if i < RUN_LABEL => under(rect(name, [0.0, 0.0, CELL_W, LANE_H], TEXT, false), parent),
+        i if i < CHIP_BOX => iv_text(name, [0.0, 0.0, 60.0], Align::Center, FONT_TAG),
+        i if i < CHIP_GLYPH => under(rect(name, [0.0, IN_Y, CHIP, CHIP], TEXT, false), parent),
+        i if i < CHIP_SHAFT => Spec { visible: false, ..under(text(name, [0.0, IN_Y, CHIP, CHIP], Align::Center, FONT_SUB, 2, TEXT), parent) },
+        i if i < CHIP_HEAD => under(rect(name, [0.0, IN_Y, 4.5, 14.0], TEXT, false), parent),
+        i if i < CHIP_TICK => under(rect(name, [0.0, IN_Y, 9.0, 9.0], TEXT, false), parent),
+        i if i < WINDOW_BAR => under(rect(name, [0.0, TICK_Y, 1.5, TICK_H], TEXT, false), parent),
+        WINDOW_BAR => under(rect(name, [0.0, WINDOW_Y, 1.5, WINDOW_H], TEXT, false), parent),
+        WINDOW_TEXT => iv_text(name, [0.0, WINDOW_Y, 120.0], Align::Center, FONT_TAG),
+        i if i < BRACKET_TEXT && (i - BRACKET) % 3 == 1 => under(rect(name, [0.0, BAR_Y, 3.0, 3.0], TEXT, false), parent),
+        i if i < BRACKET_TEXT => under(rect(name, [0.0, LEG_Y, 3.0, LEG_H], TEXT, false), parent),
+        i if i < NOW => iv_text(name, [0.0, BRACKET_TEXT_Y, 120.0], Align::Center, FONT_TAG),
+        NOW => under(rect(name, [NOW_X, 32.25, 1.5, 121.5], TEXT, false), parent),
+        NOW_TEXT => iv_text(name, [NOW_X - 24.0, 84.0, 48.0], Align::Center, FONT_TAG),
+        i if i < READ_VALUE => iv_text(name, [READ_X + 60.0, 0.0, 120.0], Align::Left, FONT_TAG),
+        i if i < READ_SUB => Spec { visible: false, ..under(text(name, [READ_X + 30.0, 0.0, 60.0, 40.0], Align::Left, FONT_VALUE, TEXT_UNITS, TEXT), parent) },
+        i if i < LAST_TEXT => iv_text(name, [READ_SUB_X + 90.0, 0.0, 180.0], Align::Left, FONT_SUB),
+        LAST_TEXT => iv_text(name, [LABEL_X, LAST_Y, 60.0], Align::Center, FONT_TAG),
+        i if i < PILL_TEXT => under(rect(name, [0.0, LAST_Y, PILL_W, 24.0], TEXT, false), parent),
+        i if i < MOVE_TEXT => iv_text(name, [0.0, LAST_Y, PILL_W], Align::Center, FONT_TAG),
+        _ => iv_text(name, [0.0, LAST_Y, 200.0], Align::Left, FONT_TAG),
+    }
 }
 
 /// A roster mark's name: one prefix per block (Player and CPU badges, Player and CPU stripes, the Solo markers) and the
@@ -329,7 +464,7 @@ pub const fn name_of(index: usize) -> Name {
         IDX_NOTICE_HEADER => Name::new("TrModDisp0Header"),
         IDX_NOTICE_TEXT => Name::new("TrModDisp0Txt"),
         IDX_NOTICE_LONG => Name::new("TrModDisp0Long"),
-        IDX_LOG => Name::new("TrModInputLog"),
+        i if i >= IDX_IV && i < COUNT => iv_name(i - IDX_IV),
         IDX_CHIP_HI => Name::new("tr_ch_hi"),
         IDX_TILE_HI => Name::new("tr_ti_hi"),
         IDX_BG => Name::new("tr_bg"),
@@ -344,21 +479,6 @@ pub const fn name_of(index: usize) -> Name {
         i if i == IDX_HELP => Name::new("tr_help_0"),
         i if i == IDX_HELP + 1 => Name::new("tr_help_1"),
         IDX_HINT => Name::new("tr_hint"),
-        i if i >= IDX_LOG_ROW && i < IDX_LOG_ROW + LOG_ROWS => Name::indexed("TrModInputLog", i - IDX_LOG_ROW),
-        i if i >= IDX_LOG_GLYPH && i < IDX_LOG_GLYPH + LOG_ROWS * LOG_SLOTS => {
-            let n = i - IDX_LOG_GLYPH;
-            name2("ILG_", n / LOG_SLOTS, n % LOG_SLOTS)
-        }
-        i if i >= IDX_LOG_SHAFT && i < IDX_LOG_SHAFT + LOG_ROWS * LOG_SLOTS => {
-            let n = i - IDX_LOG_SHAFT;
-            name2("ILA_", n / LOG_SLOTS, n % LOG_SLOTS)
-        }
-        i if i >= IDX_LOG_HEAD && i < IDX_LOG_HEAD + LOG_ROWS * LOG_SLOTS => {
-            let n = i - IDX_LOG_HEAD;
-            name2("ILH_", n / LOG_SLOTS, n % LOG_SLOTS)
-        }
-        i if i >= IDX_LOG_FRAME && i < IDX_LOG_FRAME + LOG_ROWS => Name::indexed("ILF_", i - IDX_LOG_FRAME),
-        i if i >= IDX_LOG_STATUS && i < IDX_LOG_STATUS + LOG_ROWS => Name::indexed("ILS_", i - IDX_LOG_STATUS),
         i if i >= IDX_CHIP && i < IDX_CHIP + CHIPS => Name::indexed("tr_ch_", i - IDX_CHIP),
         i if i >= IDX_CHIP_NEEDLE && i < IDX_CHIP_NEEDLE + CHIPS => Name::indexed("tr_cn_", i - IDX_CHIP_NEEDLE),
         i if i >= IDX_CHIP_LABEL && i < IDX_CHIP_LABEL + CHIPS => Name::indexed("tr_cl_", i - IDX_CHIP_LABEL),
@@ -437,28 +557,7 @@ pub const fn spec(index: usize) -> Spec {
         IDX_NOTICE_LONG => under(text(name, [0.0, 325.0, 960.0, 180.0], Align::Center, (14.0, 24.0),
             NOTICE_LONG_UNITS, TEXT), name_of(IDX_NOTICE)),
         IDX_BG => rect(name, [0.0, 0.0, PANEL_W, PANEL_H], PANEL, true),
-        IDX_LOG => Spec { name, parent: ROOT_PANE, kind: Kind::Null, x: -700.0, y: 380.0, w: 520.0, h: 800.0, visible: false },
-        i if i >= IDX_LOG_ROW && i < IDX_LOG_ROW + LOG_ROWS => {
-            Spec { name, parent: name_of(IDX_LOG), kind: Kind::Null, x: 0.0, y: -52.5 * (i - IDX_LOG_ROW) as f32, w: 520.0, h: 50.0, visible: true }
-        }
-        i if i >= IDX_LOG_GLYPH && i < IDX_LOG_GLYPH + LOG_ROWS * LOG_SLOTS => {
-            let n = i - IDX_LOG_GLYPH;
-            under(Spec { visible: false, ..text(name, [LOG_SLOT_X0 + LOG_SLOT_PITCH * (n % LOG_SLOTS) as f32, 0.0, 50.0, 48.0], Align::Center, FONT, 4, TEXT) }, name_of(IDX_LOG_ROW + n / LOG_SLOTS))
-        }
-        i if i >= IDX_LOG_SHAFT && i < IDX_LOG_SHAFT + LOG_ROWS * LOG_SLOTS => {
-            let n = i - IDX_LOG_SHAFT;
-            under(rect(name, [LOG_SLOT_X0 + LOG_SLOT_PITCH * (n % LOG_SLOTS) as f32, 0.0, 8.0, 36.0], TEXT, false), name_of(IDX_LOG_ROW + n / LOG_SLOTS))
-        }
-        i if i >= IDX_LOG_HEAD && i < IDX_LOG_HEAD + LOG_ROWS * LOG_SLOTS => {
-            let n = i - IDX_LOG_HEAD;
-            under(rect(name, [LOG_SLOT_X0 + LOG_SLOT_PITCH * (n % LOG_SLOTS) as f32, LOG_HEAD_OFFSET, 18.0, 18.0], TEXT, false), name_of(IDX_LOG_ROW + n / LOG_SLOTS))
-        }
-        i if i >= IDX_LOG_FRAME && i < IDX_LOG_FRAME + LOG_ROWS => {
-            under(text(name, [130.0, 0.0, 70.0, 48.0], Align::Right, FONT_SMALL, 4, TEXT), name_of(IDX_LOG_ROW + (i - IDX_LOG_FRAME)))
-        }
-        i if i >= IDX_LOG_STATUS && i < IDX_LOG_STATUS + LOG_ROWS => {
-            under(text(name, [330.0, 0.0, 200.0, 48.0], Align::Left, FONT_SMALL, 48, TEXT_DIM), name_of(IDX_LOG_ROW + (i - IDX_LOG_STATUS)))
-        }
+        i if i >= IDX_IV && i < COUNT => iv_spec(i - IDX_IV, name),
         IDX_CHIP_HI => rect(name, [0.0, 0.0, CHIP_SIZE + 16.0, CHIP_SIZE + 16.0], ACCENT, false),
         IDX_TILE_HI => rect(name, [0.0, 0.0, 100.0, 60.0], ACCENT, false),
         i if i >= IDX_CHIP && i < IDX_CHIP + CHIPS => rect(name, [0.0, 0.0, CHIP_SIZE, CHIP_SIZE], HIGHLIGHT, false),

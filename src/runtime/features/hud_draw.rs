@@ -1,27 +1,23 @@
 //! Package 4's one HUD draw: the callback registered with package 5's layout tick (`ui::hud::register`). Once per
-//! tick of the plugin's `info_training` layout it runs the notice queue and the input display, and writes their
-//! answers into the panes of the plugin's own layout part (SPEC-core-05) by name: the notice slot `TrModDisp0`
-//! (header, text, colour) and the input log (`TrModInputLog`, its 15 rows and their slots).
+//! tick of the plugin's `info_training` layout it runs the notice queue and the frame strip (SPEC-input-06), and
+//! writes their answers into the panes of the plugin's own layout part (SPEC-core-05): the notice slot `TrModDisp0`
+//! (header, text, colour) and the strip (`TrIv` and its panes).
 //!
-//! Runs on the UI job thread, inside the tick. No pane pointer is kept between ticks: every write finds its pane
-//! by name below the layout's root (the panes the plan names are few after the first full refresh). When the
-//! layout is registered again everything the plugin wrote is gone, so the next tick draws it all again.
-//!
-//! The in-game frame counters (`input_display::tick_frame`) are not here: they tick with the simulation, in the CPU
-//! body's frame, whatever the number of UI ticks.
+//! Runs on the UI job thread, inside the tick. The containers and the strip's panes are found by name once per
+//! registration of the layout; when it is registered again everything the plugin wrote is gone, so the next tick
+//! finds and draws it all again.
 
 use core::sync::atomic::{AtomicU32, Ordering};
-use std::fmt::Write;
 
 use hos_lock::Mutex;
 
 use skyline::nn::ui2d::{Layout, Pane};
 
+use crate::model::frame_strip_plan::{Changed, Look};
 use crate::model::input_delay::Owners;
-use crate::model::input_display::{Glyph, Icons, Op, Plan, Slot, StatusText, ICON_SLOTS};
 use crate::model::notify::TickOut;
-use crate::model::panes as p;
-use crate::model::storage::FixedPath;
+use crate::model::panes::{self as p, iv};
+#[cfg(feature = "diag")]
 use crate::runtime::diag_log::diagnostic;
 use crate::runtime::features::{input_display, notices};
 use crate::runtime::ui::{pane, tick};
@@ -34,22 +30,20 @@ const INFO_WAITING: &[u8] = b"info_waiting";
 /// The `tick::REGISTRATIONS` value the last draw saw.
 static SEEN_REGISTRATIONS: AtomicU32 = AtomicU32::new(0);
 
-/// The two containers of the plugin's layout part, resolved once per registration of the layout (a walk from the
+/// The notice container and the frame strip's panes, resolved once per registration of the layout (a walk from the
 /// root visits the stock panes first and is capped, so the plugin's own panes are searched below their container).
+/// A strip pane the layout lacks stays 0 and is not written.
 struct Containers {
     layout: usize,
     registrations: u32,
     notice: usize,
-    column: usize,
+    strip: [usize; iv::COUNT],
 }
 
-/// The coalescer of the `input_display_plan` diag line.
-#[cfg(feature = "diag")]
-static PLAN_LOG: Mutex<crate::model::input_display::PlanLogGate> = Mutex::new(crate::model::input_display::PlanLogGate::new());
+static CONTAINERS: Mutex<Containers> =
+    Mutex::new(Containers { layout: 0, registrations: 0, notice: 0, strip: [0; iv::COUNT] });
 
-static CONTAINERS: Mutex<Containers> = Mutex::new(Containers { layout: 0, registrations: 0, notice: 0, column: 0 });
-
-/// The longest text written to one pane (the status text's 48 units, the held-frames' 4).
+/// The longest text written to one pane (the notice header's 24 units).
 const TEXT_UNITS: usize = 48;
 
 /// `ui::hud::HudDraw`: `layout` is the layout being ticked and `name` its name.
@@ -77,35 +71,74 @@ pub unsafe fn draw(layout: *mut Layout, name: &[u8]) {
         notices::on_layout_registered();
         input_display::on_layout_registered();
     }
-    let (notice, column) = {
+    let (notice, strip) = {
         let mut c = CONTAINERS.lock();
         if c.layout != layout as usize || c.registrations != registrations {
-            *c = Containers { layout: layout as usize, registrations, notice: pane::find_child(root, p::name_of(p::IDX_NOTICE).as_bytes()) as usize, column: pane::find_child(root, p::name_of(p::IDX_LOG).as_bytes()) as usize };
+            let container = pane::find_child(root, p::name_of(p::IDX_IV).as_bytes());
+            let mut strip = [0usize; iv::COUNT];
+            if !container.is_null() {
+                strip[iv::at::CONTAINER] = container as usize;
+                for (local, slot) in strip.iter_mut().enumerate().skip(1) {
+                    *slot = pane::find(container, p::name_of(p::IDX_IV + local).as_bytes()) as usize;
+                }
+            }
+            #[cfg(feature = "diag")]
+            diagnostic(format_args!(
+                "[FrameStrip] panes resolved found={} of {}",
+                strip.iter().filter(|s| **s != 0).count(),
+                iv::COUNT
+            ));
+            let notice = pane::find_child(root, p::name_of(p::IDX_NOTICE).as_bytes()) as usize;
+            *c = Containers { layout: layout as usize, registrations, notice, strip };
         }
-        (c.notice as *mut Pane, c.column as *mut Pane)
+        (c.notice as *mut Pane, c.strip)
     };
     let owners = published::input_owners();
     let menu_open = owners.contains(Owners::MENU) || owners.contains(Owners::VANILLA_PAUSE);
     write_notice(notice, &notices::hud_tick(!waiting && !notice.is_null()));
-    let plan = input_display::hud_tick(menu_open);
-    if !plan.is_empty() {
-        #[cfg(feature = "diag")]
-        {
-            let rows = plan.ops().iter().filter(|op| matches!(op, Op::Row { .. })).count();
-            let icons = plan.ops().iter().filter(|op| matches!(op, Op::Icons { .. })).count();
-            // Coalesced (`PlanLogGate`): the line is for a changed plan or a heartbeat, never one per tick; the check and the
-            // line format on the stack and allocate nothing, so the hook counter stays at 0 with the HUD drawing.
-            if PLAN_LOG.lock().should_log(plan.ops().len(), rows, icons) {
-                diagnostic(format_args!("[TrainingRooms] input_display_plan ops={} rows={rows} icons={icons}", plan.ops().len()));
-            }
-        }
-        write_plan(column, &plan);
+    if strip[iv::at::CONTAINER] != 0 {
+        input_display::hud_tick(menu_open, |local, look, changed| write_look(strip[local] as *mut Pane, local, look, changed));
     }
 }
 
 /// A pane of the plugin's layout part by its index in the pane table.
 unsafe fn find(root: *mut Pane, index: usize) -> *mut Pane {
     pane::find(root, p::name_of(index).as_bytes())
+}
+
+/// One frame-strip pane: only the parts `changed` names (SPEC-input-06 §5.2). Colours are sRGB in the look and
+/// linear light in the pane.
+unsafe fn write_look(target: *mut Pane, local: usize, look: &Look, changed: Changed) {
+    if target.is_null() {
+        return;
+    }
+    if changed.visible {
+        pane::set_visible(target, look.visible);
+    }
+    if !look.visible {
+        return;
+    }
+    if changed.pos {
+        pane::set_pos(target, look.x, look.y);
+    }
+    if changed.width && look.w > 0.0 {
+        pane::set_width(target, look.w);
+    }
+    if changed.rot {
+        pane::set_rot_z(target, look.rot);
+    }
+    match p::spec(p::IDX_IV + local).kind {
+        p::Kind::Rect { .. } if changed.color => pane::set_rect_color(target, p::linear(look.color)),
+        p::Kind::Text { .. } => {
+            if changed.text {
+                pane::set_text(target, look.text.units());
+            }
+            if changed.color {
+                pane::set_text_color(target, p::linear(look.color));
+            }
+        }
+        _ => {}
+    }
 }
 
 /// UTF-16 units of `text` (cut to `TEXT_UNITS`) in `out`; returns how many.
@@ -165,125 +198,3 @@ unsafe fn write_notice(container: *mut Pane, out: &TickOut) {
     ));
 }
 
-// ---- the input log ------------------------------------------------------------------------------------
-
-/// `cos` and `sin` of the eight stick directions (0 = right, counter-clockwise, 45 degrees apart): a table, because
-/// the float library's `cos` and `sin` link the whole math library into the NRO.
-const DIRECTION: [(f32, f32); 8] = [
-    (1.0, 0.0),
-    (0.707_106_77, 0.707_106_77),
-    (0.0, 1.0),
-    (-0.707_106_77, 0.707_106_77),
-    (-1.0, 0.0),
-    (-0.707_106_77, -0.707_106_77),
-    (0.0, -1.0),
-    (0.707_106_77, -0.707_106_77),
-];
-
-unsafe fn write_plan(column: *mut Pane, plan: &Plan) {
-    // `root` below is the log column: every pane of the log is its descendant.
-    let root = column;
-    for op in plan.ops() {
-        match *op {
-            Op::Column { visible } => {
-                if column.is_null() {
-                    missing("TrModInputLog");
-                    return;
-                }
-                pane::set_visible(column, visible);
-            }
-            Op::Row { phys, y, alpha } => {
-                let row = find(root, p::IDX_LOG_ROW + usize::from(phys));
-                if row.is_null() {
-                    missing("row");
-                    return;
-                }
-                pane::set_pos(row, pane::pos_x(row), y);
-                pane::set_alpha(row, alpha);
-                pane::set_visible(row, true);
-            }
-            Op::RowHidden { phys } => {
-                let row = find(root, p::IDX_LOG_ROW + usize::from(phys));
-                if !row.is_null() {
-                    pane::set_visible(row, false);
-                }
-            }
-            Op::Icons { phys, icons } => write_icons(root, usize::from(phys), &icons),
-            Op::Frames { phys, frames } => {
-                let target = find(root, p::IDX_LOG_FRAME + usize::from(phys));
-                if !target.is_null() {
-                    let mut text = FixedPath::<8>::new();
-                    let _ = write!(text, "{frames}");
-                    set_text(target, text.as_str());
-                }
-            }
-            Op::Status { phys, text } => {
-                let target = find(root, p::IDX_LOG_STATUS + usize::from(phys));
-                if !target.is_null() {
-                    match text {
-                        StatusText::Empty => set_text(target, ""),
-                        StatusText::Id { kind, status } => {
-                            let mut line = FixedPath::<32>::new();
-                            let _ = write!(line, "{kind}:{status}");
-                            set_text(target, line.as_str());
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-/// A pane the plan needs is not in the layout (the stock archive is showing): log once, the display is off for the
-/// session instead of panicking (SPEC-input-02 question 5).
-fn missing(what: &str) {
-    diagnostic(format_args!("[TrainingRooms] input_display pane missing: {what}; display off for this session"));
-    input_display::disable();
-}
-
-unsafe fn write_icons(root: *mut Pane, phys: usize, icons: &Icons) {
-    for slot in 0..ICON_SLOTS {
-        let at = p::log_slot(phys, slot);
-        let glyph = find(root, p::IDX_LOG_GLYPH + at);
-        let shaft = find(root, p::IDX_LOG_SHAFT + at);
-        let head = find(root, p::IDX_LOG_HEAD + at);
-        if glyph.is_null() || shaft.is_null() || head.is_null() {
-            missing("icon slot");
-            return;
-        }
-        match icons.slots()[slot] {
-            None => {
-                pane::set_visible(glyph, false);
-                pane::set_visible(shaft, false);
-                pane::set_visible(head, false);
-            }
-            Some(Slot { icon, color }) => {
-                let rgba = p::linear([color.0, color.1, color.2, 255]);
-                match icon.glyph() {
-                    Glyph::Font(unit) | Glyph::Letter(unit) => {
-                        pane::set_text(glyph, &[unit]);
-                        pane::set_text_color(glyph, rgba);
-                        pane::set_visible(glyph, true);
-                        pane::set_visible(shaft, false);
-                        pane::set_visible(head, false);
-                    }
-                    Glyph::Arrow(degrees) => {
-                        pane::set_visible(glyph, false);
-                        // The shaft is vertical and the head sits above it in the layout: turn both to the
-                        // direction and put the head that far along it from the shaft's centre.
-                        let (c, s) = DIRECTION[usize::from(degrees / 45) % 8];
-                        let turn = f32::from(degrees) - 90.0;
-                        let x = p::LOG_SLOT_X0 + p::LOG_SLOT_PITCH * slot as f32;
-                        pane::set_rot_z(shaft, turn);
-                        pane::set_rot_z(head, turn);
-                        pane::set_pos(head, x + p::LOG_HEAD_OFFSET * c, p::LOG_HEAD_OFFSET * s);
-                        pane::set_rect_color(shaft, rgba);
-                        pane::set_rect_color(head, rgba);
-                        pane::set_visible(shaft, true);
-                        pane::set_visible(head, true);
-                    }
-                }
-            }
-        }
-    }
-}

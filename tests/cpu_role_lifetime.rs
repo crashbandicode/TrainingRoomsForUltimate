@@ -68,6 +68,20 @@ impl NativeSpy {
     }
 }
 
+/// SPEC-input-06 §5.1: the frame strip's CPU is the live primary role only, whatever Frame Advantage says, and never
+/// a departed entry or P1 itself.
+#[test]
+fn the_frame_strip_reads_only_the_live_primary_cpu() {
+    let mut cpu = cpu();
+    cpu.settings.frame_advantage = false;
+    register(&mut cpu, TRAINING, 1, false, A);
+    assert_eq!(adapter::primary_cpu(&cpu, Scene::Training, P1, A), Some(A), "Frame Advantage off: still read");
+    assert_eq!(adapter::primary_cpu(&cpu, Scene::Training, P1, B), None, "not the registered accessor");
+    assert_eq!(adapter::primary_cpu(&cpu, Scene::Training, A, A), None, "never P1's own accessor");
+    adapter::entry_departed(&mut cpu, 1);
+    assert_eq!(adapter::primary_cpu(&cpu, Scene::Training, P1, A), None, "a departed entry is never read");
+}
+
 #[test]
 fn r3_predestruction_then_p1_before_replacement_never_queries_a() {
     let mut cpu = cpu();

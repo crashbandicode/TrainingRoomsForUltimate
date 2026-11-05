@@ -205,7 +205,7 @@ const fn delay(group: u8, title: &'static str, id: &'static str, step: u16, rang
 const TOGGLE: Control = Control::Toggle;
 
 /// The rows in page order, then group order, then the order they appear in (MENU-DRAFT §2).
-pub static ROWS: [Row; 92] = [
+pub static ROWS: [Row; 91] = [
     // CPU > Reactions
     r(REACT, "Mash", "mash_state", Control::MultiSelect(&o::ACTIONS),
       "Actions the CPU performs as soon as it can.\nWith several ticked it picks one at random."),
@@ -380,10 +380,8 @@ pub static ROWS: [Row; 92] = [
     r(SCREEN, "Hitbox Visualization", "hitbox_vis", TOGGLE, "On: hitboxes and grab boxes are drawn.\nHurtboxes are not available in this RC."),
     r(SCREEN, "Frame Advantage", "frame_advantage", TOGGLE,
       "On: the frame advantage after each exchange is shown."),
-    r(SCREEN, "Input Display", "input_display", Control::Dropdown(&o::INPUT_DISPLAY),
-      "How Player 1's inputs are shown: off, as the game\nreads them, as the raw buttons, or status only."),
-    r(SCREEN, "Group inputs by status", "input_display_status", TOGGLE,
-      "On: the input display groups inputs by the fighter's status."),
+    r(SCREEN, "Input Display", "input_display_strip", Control::Dropdown(&o::INPUT_DISPLAY),
+      "Frame strip: the last second of P1 and CPU frames,\nhow each follow-up linked and the frame advantage."),
     r(SCREEN, "Input Delay", "input_delay", Control::Number { first: 0, step: 1 },
       "Frames Player 1's inputs are held back, 0 to 30.\nChords are not delayed."),
     // Display & Controls > Controls

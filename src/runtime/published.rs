@@ -25,7 +25,7 @@ pub(crate) struct Live {
     pub recorder: crate::model::recording::RecorderSettings,
     /// The six chord rows; the two menu shortcuts are not taken from here (they live in the INI, `chords::shortcuts`).
     pub chords: crate::model::chords::ChordSet,
-    pub input_display: crate::model::input_display::Settings,
+    pub input_display: crate::model::frame_strip::Settings,
     /// The typed menu view of the rows (`compat::menu`, decision D1).
     pub menu: crate::engine::compat::menu::TrainingModpackMenu,
 }
@@ -77,7 +77,7 @@ pub fn publish(snapshot: &Snapshot, rerolls: u8) {
         states: crate::model::state::settings::StateSettings::from_snapshot(snapshot),
         recorder: crate::model::recording::RecorderSettings::from_snapshot(snapshot),
         chords: crate::model::chords::ChordSet::factory().with_rows(snapshot),
-        input_display: crate::model::input_display::Settings::from_snapshot(snapshot),
+        input_display: crate::model::frame_strip::Settings::from_snapshot(snapshot),
         menu,
     };
     crate::runtime::features::states::set_flags(&live.states);

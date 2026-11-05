@@ -455,9 +455,6 @@ unsafe fn on_ai_frame(ai: usize) {
     let state = rec().playback_state(queue_head.is_some());
     cpu::set_playback(state);
     bump(COUNT_NOTICE);
-    // The input log's in-game frame counters tick here, with the CPU body's frame; the HUD tick is the layout's
-    // (`features::hud_draw`).
-    input_display::tick_frame();
     report_counts();
 }
 

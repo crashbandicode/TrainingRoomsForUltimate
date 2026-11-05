@@ -48,7 +48,7 @@ pub const LRA_RESET: usize = 1;
 pub const STAGE_HAZARDS: usize = 2;
 
 /// Number of rows.
-pub const COUNT: usize = 106;
+pub const COUNT: usize = 105;
 
 /// The rows this build knows, in menu order of their first appearance in SPEC-core-02 §2.7. The
 /// first three keep the indices the earlier packages use.
@@ -136,9 +136,8 @@ pub static DEFS: [Def; COUNT] = [
     // Misc Settings.
     row!("frame_advantage", Single, 2, [1]),
     row!("hitbox_vis", Single, 2, [1]),
-    // None, Smash Inputs, Raw Inputs, Status Only: Smash Inputs.
-    row!("input_display", Single, 4, [1]),
-    row!("input_display_status", Single, 2, [1]),
+    // Off, Frame strip: the frame strip (SPEC-input-06 §3.1; it replaced `input_display` and `input_display_status`).
+    row!("input_display_strip", Single, 2, [1]),
     row!("hud", Single, 2, [0]),
     // Draft 9 (SPEC-core-04 §3.1): Off by default.
     row!("respawn_invincibility", Single, 2, [1]),
