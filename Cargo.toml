@@ -78,7 +78,7 @@ seam-drill = ["diag"]
 # section). Sub-crate features of the fork (`training_mod_consts/x`, `training_mod_tui/x`) are the same-name
 # features of this one crate. `dep:` entries are added with the carry of their crate (C6).
 # Not in the shipped closure ("carried, not shipped"): every `*-probe`/`*-observer`/`*-trace`/meter feature
-# and `automation-results-native` (see docs/PACKAGE-6-PLAN.md section 12).
+# and `automation-results-native` (see docs/PACKAGE-6-PLAN.md (removed after v0.2.0-rc.1; see that tag) section 12).
 native-body-bank-alpha = ["managed-visible-grouped-source-alpha", "lobby-preload-extended", "mii-ordinary-cpu-alpha"]
 cycle-preload-extended = ["managed-third-source-alpha"]
 console-practice-trace = ["diag"]

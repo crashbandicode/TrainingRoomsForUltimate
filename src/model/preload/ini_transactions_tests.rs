@@ -1,5 +1,5 @@
 //! Transaction and fail-closed tests for the carried `cycle_preload.ini` reader and writer (written for this repository; the
-//! Astra review patterns R1 and R4 of `artifacts/trainingrooms-reviews/R1-astra-pkg1`, docs/PACKAGE-6-PLAN.md section 7).
+//! Astra review patterns R1 and R4 of `artifacts/trainingrooms-reviews/R1-astra-pkg1`, docs/PACKAGE-6-PLAN.md (removed after v0.2.0-rc.1; see that tag) section 7).
 //!
 //! The carried tests drive one load or one store at a time. These run the sequences a reboot makes: load, load again; a store
 //! that fails half way and the load after it; the path left missing between the two renames of a replace. Every one goes through

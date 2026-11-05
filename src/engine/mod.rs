@@ -2,7 +2,7 @@
 //! `tools/carry_pkg6.py`; they are declared here, under `crate::engine`, and not in `model.rs`: the by-path test crates of the other
 //! packages include `model.rs`, and must not recompile, re-run and re-lint the carried code. Each area is `cfg(test)`-only (declared by
 //! `lib.rs`) until its runtime consumer is carried; the release build never carries unused code, and clippy `-D warnings` stays clean
-//! without an `allow` (docs/PACKAGE-6-PLAN.md section 5).
+//! without an `allow` (docs/PACKAGE-6-PLAN.md (removed after v0.2.0-rc.1; see that tag) section 5).
 
 #[path = "../model/compat/mod.rs"]
 pub mod compat;

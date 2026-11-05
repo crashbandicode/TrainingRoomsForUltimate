@@ -169,7 +169,7 @@ pub fn second_centre(b: [f32; 3]) -> Option<[f32; 3]> {
 // HB1-route, `review/menu-proposal` commit `5ca5e3b`; it reverses the 2026-11-03 option A default, which
 // `OPTION-A-DESIGN.md` could not route safely): `reconcile_frame` plans the enabled parts' spheres into the same wants and
 // requests them through the same set and `Effects` interface as the hitboxes, and the runtime passes `Some(GameHurt { .. })`
-// while the setting is On (`docs/HB1-RENDER-ROUTES.md`).
+// while the setting is On (`docs/HB1-RENDER-ROUTES.md (removed after v0.2.0-rc.1; see that tag)`).
 
 /// Hurtboxes are drawn yellow.
 pub const HURTBOX_TINT: [f32; 3] = [1.0, 1.0, 0.0];
@@ -776,7 +776,7 @@ impl core::fmt::Display for HurtWindow {
 /// entry (decision HB1 (a)); route B (operator decision 2026-11-04, `docs/DECISIONS.md` HB1-route, `review/menu-proposal`
 /// commit `5ca5e3b`) draws the enabled parts' spheres as yellow `sys_shield` spheres from the shared pool through the same
 /// set and `Effects` interface as the hitboxes: `Some` plans them, `None` (the runtime's Off dispatch, and every stop path
-/// the dispatch takes first) reads no HitModule and requests no hurt sphere (`docs/HB1-RENDER-ROUTES.md`).
+/// the dispatch takes first) reads no HitModule and requests no hurt sphere (`docs/HB1-RENDER-ROUTES.md (removed after v0.2.0-rc.1; see that tag)`).
 pub fn reconcile_frame(set: &mut HandleSet, facts: FrameFacts, wants: &mut [Sphere], reader: &mut impl AttackReader, hurt: Option<&mut dyn HurtboxReader>, fx: &mut impl Effects) -> (Counts, usize) {
     if !facts.visualizes || !facts.enabled || facts.ids.shielding(facts.status) {
         return (set.clear(fx), 0);

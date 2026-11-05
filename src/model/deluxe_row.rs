@@ -10,7 +10,7 @@
 //! write; the writer takes the value from the preference when it writes, so the file ends at the newest value whichever
 //! row changed it last.
 //!
-//! ABI (evidence in `IMPLEMENTATION-PROGRESS-deluxe.md`): the SDK resolves `ssbu_online_deluxe_plugin_api_v1` at run
+//! ABI (evidence in `IMPLEMENTATION-PROGRESS-deluxe.md (removed after v0.2.0-rc.1; see that tag)`): the SDK resolves `ssbu_online_deluxe_plugin_api_v1` at run
 //! time, accepts only table version 1 (32 bytes) and sends descriptor version 4 (72-byte `PluginDesc`) exactly once.
 //! The card's Deluxe 0.10.1 host exports that table and its `register` accepts descriptor versions 2 to 5, so the
 //! version 4 descriptor registers directly; no fallback exists or is needed. A host older than 0.5.3 answers

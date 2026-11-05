@@ -117,7 +117,7 @@ static LOBBY: AtomicBool = AtomicBool::new(false);
 const CONST_ATTEMPT_LIMIT: u32 = 900;
 
 /// The diag build counts how often each hook ran, so the per-frame budget is measured, not estimated
-/// (docs/implementation-packages.md, package 2). The shipped build compiles all of this away.
+/// (docs/implementation-packages.md (removed after v0.2.0-rc.1; see that tag), package 2). The shipped build compiles all of this away.
 #[cfg(feature = "diag")]
 mod counts {
     use std::sync::atomic::{AtomicU32, Ordering};

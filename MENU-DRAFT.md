@@ -13,7 +13,7 @@ each thumbnail from the stage's own game UI texture at run time, so a stage
 mod's picture shows — see *Grid pictures* below). Supersedes `docs/menu-redesign.md`
 (draft 1, which keeps the ASCII wireframe and the control definitions). Nothing
 here is built; the menu is implemented only after the operator approves this
-page. Rendered screens: `docs/MENU-PROPOSAL.md` (v10; the screens carry no
+page. Rendered screens: `docs/MENU-PROPOSAL.md` (removed after v0.2.0-rc.1; see that tag) (v10; the screens carry no
 origin tags, the Origin column in the tables below is the internal record).
 
 **Draft 9 (the operator's answers, 2026-11-01; the full list is

@@ -65,7 +65,7 @@ const KIB: usize = 1024;
 /// The table (one row per `ThreadId`, in its order).
 pub const THREADS: [ThreadStack; 17] = [
     // Includes registered TICK -> report_late owned path5696; measured11184 dominates.
-    // See docs/SH01-MEASURED-STACK-REVIEW.md; margin and SDK reserve are unchanged.
+    // See docs/SH01-MEASURED-STACK-REVIEW.md (removed after v0.2.0-rc.1; see that tag); margin and SDK reserve are unchanged.
     // the diagnostics drain (open, append, close every 50 ms), the late seam report, diag hook_stats and stack reports
     row(ThreadId::Heartbeat, c"tr-heartbeat", 32 * KIB, 5_696, 11_184, "Eden st-02..st-12, f6-37/sh-01", "diag_log::start_drain_thread::{closure#0}"),
     // settings.json read, recovery and the JSON parse, joined by the boot thread
@@ -91,7 +91,7 @@ pub const THREADS: [ThreadStack; 17] = [
     // returns parked layout archives to the pool after their grace
     row(ThreadId::Archive, c"tr-archive", 28 * KIB, 2_672, 7_840, "Eden st-02..st-12, f6-37/sh-01", "ui::archive::prepare::{closure#2}"),
     // ARCropolis read ABI includes a 131904-byte decoder frame. The qualified
-    // external path is separate from the owned-ELF scan; see docs/UI16-PROBE-STACK-FAULT.md.
+    // external path is separate from the owned-ELF scan; see docs/UI16-PROBE-STACK-FAULT.md (removed after v0.2.0-rc.1; see that tag).
     row(ThreadId::Probe, c"tr-probe", 204 * KIB, 3_440, 151_920, "Eden ui-17 same ARC92171b2f full probe", "ui::probe::install::{closure#0}").with_external(143_376),
     // diag: diag-macro.req read and parse
     row(ThreadId::MacroDiag, c"tr-macro-diag", 28 * KIB, 3_248, 8_768, "Eden st-02..st-12", "macros::diag::start::{closure#0}"),

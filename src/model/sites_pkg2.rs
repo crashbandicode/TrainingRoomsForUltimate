@@ -746,7 +746,7 @@ pub static SITES_PKG2: [Site; 51] = [
 /// A site in the `common` script module (`lua2cpp_common.nro`), found by symbol when that module loads and
 /// guarded against the 64 bytes of the owned 13.0.5 module (`tests/cpu_common.rs` reads them from
 /// `research/game-13.0.5/nro/lua2cpp_common.nro`, extracted from `data.arc`; see
-/// `IMPLEMENTATION-PROGRESS-pkg2.md`).
+/// `IMPLEMENTATION-PROGRESS-pkg2.md (removed after v0.2.0-rc.1; see that tag)`).
 #[derive(Clone, Copy, Debug)]
 pub struct CommonSite {
     pub name: &'static str,

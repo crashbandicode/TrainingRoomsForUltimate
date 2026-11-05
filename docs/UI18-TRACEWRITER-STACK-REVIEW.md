@@ -1,9 +1,0 @@
-# UI18 TraceWriter measured stack review
-
-UI18-02 exercised the native Mii-editor trace-writing path. Retained console SHA256 323035f2122db1ae2eb723ed907672e9227fcbdeba84fdfd118687a8a64316cb reports #586 used8624, size20480, free11856, low=true after preview/native-quit/editor-queued trace events #535/#536/#584. No stack overflow was observed.
-
-The previous1696 measurement equals the initial unpainted floor: spawn top0x10ef16e000 minus SP0x10ef16dd60 plus1024. It did not qualify active serialization/file writes. The new8624 is actual painted stack use, beyond that floor. Both r13 and r14 retain identical filesystem writer, boxed trace slot, editor trace writer and stack-paint source hashes. Both compiled writer entry frames are256 bytes; modeled direct depth2656 is below existing table2720. The historical59712-byte by-value trace frame has not returned: traces remain in boxed slots and the writer serializes by reference.
-
-Evidence: artifacts/trainingrooms-lead-astra4/main-r14/tracewriter-review/receipt.json and tmp-lead-astra4/review-tracewriter.py in the project parent bind source/assembly/console identities and raw lines. Static direct-depth paths omit SDK/indirect behavior and are not a measured call stack. The precise deepest native callee is unobserved; no attribution to a specific SDK function is asserted.
-
-Correction: retain measured8624 and allocate28672 (28KiB), the existing required() quarter margin plus16KiB reserve rounded to4KiB. Neither the margin nor reserve changes. Also retain s6-10 SettingsLoad9904 and nominal32KiB; its actual shared boot stack remains40KiB. Validate in the next coherent targeted host/native candidate and repeat the native-editor route before stack acceptance. R14 runtime hold remains until compiled qualification; no final gate closed by this document.

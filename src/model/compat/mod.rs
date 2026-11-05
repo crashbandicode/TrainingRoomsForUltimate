@@ -1,4 +1,4 @@
-//! Adapters for the names the carried fork code expects from the fork's mixed files (package 6, docs/PACKAGE-6-PLAN.md section 2).
+//! Adapters for the names the carried fork code expects from the fork's mixed files (package 6, docs/PACKAGE-6-PLAN.md (removed after v0.2.0-rc.1; see that tag) section 2).
 //! Our code, small, and the only place the carried files' expectations are met: the carried files themselves are never edited.
 //!
 //! `grid` and `logging` are unconditional; the typed-menu adapters serve the engines that run on the Switch (the model/runtime

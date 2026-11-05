@@ -1,0 +1,55 @@
+# Media
+
+Every GIF in [`media/`](media/) is actual Eden footage: whole screen, 1280×720, one continuous take trimmed only at the
+ends, under 10 s, game-speed timing kept. Frames were reviewed (start, action, result) before a clip was kept. The
+raw takes stay outside git with their runs.
+
+## 0.2.0-rc.1 clips (2026-11-05)
+
+Run `tr-p23-docs-capture-03` on the Surface, 2026-11-05Z: one boot of the released 0.2.0-rc.1 NRO
+(`706c993ff885273206eee656cce1313ec8690b29176b3ebf66ae38ec28c64a46`), with the CPU pilot, Online Deluxe and tile-cursor
+plugins installed. A boot settings file set Hitbox Visualization On, Respawn invincibility On, DI Up, SDI Up/High, and
+Kirby first in both cycle orders; the rest was changed in the menu on camera. P1 is Steve and the CPU Richter until
+the cycle chords switch both to Kirby. Clips marked *step 2* keep every second frame (each shown twice as long) to
+stay under 10 MB.
+
+| File | What it shows |
+| --- | --- |
+| `menu-tour.gif` | B + D-pad Up opens the menu on CPU; R steps Saves, Recording, Fighters & Stages, Display & Controls; A turns Hitbox Visualization Off. 9.5 s. |
+| `hitbox-overlay.gif` | Hitbox Visualization On: the yellow hurtbox shapes on both fighters; P1's forward smash lands (CPU to 20.5%). 6.0 s. |
+| `di-up.gif`, `di-none.gif` | The same two forward smashes from the same damage (36% and 51%) with CPU DI Up and SDI Up/High, then with both reset: the DI Up launches go higher. 9.5 s each, step 2. |
+| `di-sdi-chips.gif` | CPU page: the DI Direction grid (the game's DI line on each chip, Up ×1 picked) and the SDI Direction grid (the game's SDI streaks). 8.0 s. |
+| `respawn-on.gif` | Respawn invincibility On: P1 walks off, is KO'd and respawns on the game's platform at the top. 6.9 s, step 2. |
+| `respawn-off.gif` | Off (changed on the Saves page): the same KO, and P1 drops back in at once. 5.6 s, step 2. |
+| `cpu-kirby-hat.gif` | P1's Special + R3 gives the CPU Kirby a hat (Mario's), with the "CPU Kirby Hats" notice. 4.2 s. |
+| `p1-kirby-hat.gif` | P1's own Special + L3 hat chord, with the "Kirby Hats" notice. 4.1 s. |
+| `cycle-badges.gif` | Fighters & Stages › Character Cycles: the game's stock icons with the order badges (red for Player 1, blue for the CPU); ZR switches role. 9.5 s. |
+| `replay-capture.gif` | Recording page: A turns *Replay capture* On; the menu closes; L + R + Down opens the Online Deluxe overlay, whose Player Info page shows *Training Rooms › Replay capture: On*. 9.5 s. |
+| `menu-shortcut.gif` | Display & Controls › Menu shortcut 1: X captures ZL + D-pad Up in place of Minus, A confirms, the menu closes, and the new chord opens it at once. 9.5 s. |
+| `record-refused.gif` | With the CPU pilot driving P1 (armed on the Deluxe overlay), ZR + D-pad Down shows "P1 is controlled by an AI: recording is off". 4.7 s. |
+| `waiting-menu.gif` | A Local Wireless room hosted in Eden, Solo waiting practice: B + D-pad Up opens the menu on its last page (Display & Controls); R steps to CPU and Saves. 8.0 s. |
+
+Not captured in this session: a visible grab box (the 10%-speed take shows a forward smash into the CPU's shield, not a
+grab), the air dodge Out / shield tilt In clips (at 0% the forward smash barely lifts the CPU, so neither shows),
+and a multi-hit SDI clip.
+
+## Menu clips from RC10 (2026-11-04)
+
+Recorded with Eden-GIF on RC10 release boots on the Surface (runs `glm-gifs-04`, `glm-gifs-05`, `glm-mods-10`,
+`glm-zr-03`), ARCropolis `92171b2f…` pinned with the profile's Cosmic Destination stage mod live.
+
+| File | What it shows |
+| --- | --- |
+| `menu-tabs.gif` | B + Up opens the menu, R steps the five pages, B closes it. 7.9 s, NRO `50d95130`. |
+| `menu-cpu.gif` | CPU page: DI Direction's grid, Right + A picks Out ×1. 9.8 s, NRO `50d95130`. |
+| `menu-fighters.gif` | Character Cycles with the game's stock icons; ZR switches role three times and the icons stay on screen. 10.0 s, re-encoded to 640×360 at the time; release NRO `73e5ad24`. |
+| `menu-stages.gif` | Lobby Stages grid: thumbnails loaded through the game's mod-aware loader (the Final Destination tile shows the Cosmic Destination mod); A adds Battlefield (rank 2). 9.7 s, NRO `50d95130`. |
+| `menu-recording.gif` | ZR + Down records P1, ZR + Up plays it back under the "Input Recording — Playback" notice. 9.9 s, ≈3.3 fps. NRO `50d95130`. |
+| `menu-defaults.gif` | The X / Y / ZR page keys on Display & Controls (values already at their defaults, so none moves). 9.8 s, NRO `50d95130`. |
+
+The character grids draw the stock-icon set `chara_2` at the default costume, loaded at run time through the game's
+file-resource service (operator decision 2026-11-03, amended 2026-11-04). A ZR role switch keeps every texture the new
+page still uses (`model::ui_texture::carry`), so no icon leaves the screen.
+
+The earlier waiting-menu clip (`waiting-menu-r16.gif`, development build `758cee5`, 2026-11-03) is replaced by the
+rc.1 clip above; it and its provenance note remain in the history up to v0.2.0-rc.1.

@@ -12,7 +12,7 @@ no Eden row yet), **not built** (reported).
 | --- | --- | --- | --- |
 | The plugin has one `#[global_allocator]` (`runtime::alloc`: the counting allocator, or the recorder's forwarding `TraceAllocator` under `console-practice-trace`) | `pkg6_features::the_plugin_has_one_global_allocator` | - | host pass |
 | The byte meter of the one allocator counts live, peak, total, calls and largest request (`plugin-heap-meter`, `console-practice-trace`) | `hook_alloc::the_byte_meter_counts_what_the_one_global_allocator_serves` | diag boot with `diag,plugin-heap-meter`: `[HeapMeter]` lines | host pass |
-| Every feature of the table builds, alone and on the default set, and the allocator features together | `pkg6_features::the_feature_matrix_lists_every_feature` (the list); `python3 -I tools/feature_matrix.py --run` (the builds: host `cargo check`, Switch `cargo skyline check`) | - | see `IMPLEMENTATION-PROGRESS-pkg6.md` |
+| Every feature of the table builds, alone and on the default set, and the allocator features together | `pkg6_features::the_feature_matrix_lists_every_feature` (the list); `python3 -I tools/feature_matrix.py --run` (the builds: host `cargo check`, Switch `cargo skyline check`) | - | see `IMPLEMENTATION-PROGRESS-pkg6.md` (removed after v0.2.0-rc.1; see that tag) |
 | `default` is the shipped list (minus `deluxe-sdk`, L1); no diagnostic feature in it; every probe requires `diag` | `pkg6_features::*` | - | host pass |
 
 ## Owners of the moments the fork called the unused helpers from (lead ruling 2026-11-02)
