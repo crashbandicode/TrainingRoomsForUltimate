@@ -260,7 +260,7 @@ def _resume(ctx):
     ctx.gate('training-hud-unpaused')
 
 
-STATE = re.compile(r'\[Hitbox\] orbs pass set=(\d+) route=Both placed=(\d+) held=\d+ failed=\d+ hits=(\d+) grabs=(\d+) '
+STATE = re.compile(r'\[Hitbox\] orbs pass set=(\d+) route=Both (?:asked=\d+ )?placed=(\d+) held=\d+ failed=\d+ hits=(\d+) grabs=(\d+) '
                    r'status=(-?\d+) pass=(\d+)')
 
 

@@ -234,12 +234,12 @@ fn clear_set(store: &mut Store, i: usize, accessor: usize) -> Counts {
     }
 }
 
-/// Place every sphere `set` holds on its bone and publish them as `accessor`'s orbs.
-unsafe fn publish_orbs(accessor: usize, set: &hitbox::HandleSet) -> usize {
+/// Place `spheres` on their bones and publish them as `accessor`'s orbs (at most `MAX_HELD`).
+unsafe fn publish_orbs<'a>(accessor: usize, spheres: impl Iterator<Item = &'a Sphere>) -> usize {
     let flag = JOINT_FLAG.load(Ordering::Acquire);
     let mut placed = [Orb::NONE; hitbox::MAX_HELD];
     let mut len = 0;
-    for sphere in set.spheres() {
+    for sphere in spheres.take(hitbox::MAX_HELD) {
         if let Some(centre) = natives::joint_position(accessor, sphere.joint, &sphere.pos, flag) {
             placed[len] = orbs::orb_of(sphere, centre);
             len += 1;
@@ -581,7 +581,14 @@ pub unsafe fn frame(fighter: usize) {
     } else {
         hitbox::reconcile_frame(set, facts, wants, &mut GameAttacks(accessor), hurt, &mut OrbSink { status })
     };
-    let placed = if route.orbs() { publish_orbs(accessor, set) } else { 0 };
+    // Route Orbs: the held set is every wanted sphere (an orb is never refused). Route Both: the set holds only what Route B's
+    // pool granted, so the orbs are taken from the pass's wants plus the held grab spheres: what Route Orbs would draw on this
+    // frame, beside Route B's own result (the A/B shows Route B's refusals against the orbs on one frame).
+    let placed = match route {
+        Route::Effects => 0,
+        Route::Orbs => publish_orbs(accessor, set.spheres()),
+        Route::Both => publish_orbs(accessor, wants[..len].iter().chain(set.spheres().filter(|s| s.key >> 24 == hitbox::KIND_GRAB))),
+    };
     #[cfg(feature = "diag")]
     let (hits, hurts) = {
         let hits = wants[..len].iter().filter(|s| s.key >> 24 == hitbox::KIND_HIT).count() as u32;
@@ -610,7 +617,7 @@ pub unsafe fn frame(fighter: usize) {
     counts.failed += c.failed;
     counts.dropped += c.dropped;
     #[cfg(feature = "diag")]
-    stats::orbs_pass(i, route, placed as u32, held_now as u32, c.failed, held_kinds, status);
+    stats::orbs_pass(i, route, len as u32, placed as u32, held_now as u32, c.failed, held_kinds, status);
     #[cfg(not(feature = "diag"))]
     let _ = placed;
     // The diag hurt census (decision HB1): a second HitModule read per fighter per frame over the pass's own read,
@@ -908,19 +915,18 @@ mod stats {
 
     /// One fighter's (set `set`) pass: a line whenever its route, placed orbs, held spheres, held hit / grab spheres,
     /// refused requests or status change (route B's `failed` of the same pass beside the orbs' placed count).
-    pub fn orbs_pass(set: usize, route: super::Route, placed: u32, held: u32, failed: u32, kinds: [u32; 2], status: i32) {
+    /// `asked`: the spheres the pass wanted (hit and hurt); `held`: what the set holds after it (Route B: what the pool granted).
+    #[allow(clippy::too_many_arguments)]
+    pub fn orbs_pass(set: usize, route: super::Route, asked: u32, placed: u32, held: u32, failed: u32, kinds: [u32; 2], status: i32) {
         let pass = PASS_NO.fetch_add(1, Ordering::Relaxed) + 1;
         let [hits, grabs] = kinds;
-        let key = (u64::from(route.code()) << 60)
-            | (u64::from(placed & 0xff) << 52)
-            | (u64::from(held & 0xff) << 44)
-            | (u64::from(failed & 0xff) << 36)
-            | (u64::from(hits & 0x3f) << 30)
-            | (u64::from(grabs & 0x3f) << 24)
-            | u64::from(status as u32 & 0xff_ffff);
+        let key = [u64::from(route.code()), u64::from(asked), u64::from(placed), u64::from(held), u64::from(failed), u64::from(hits),
+            u64::from(grabs), u64::from(status as u32)]
+            .iter()
+            .fold(0xcbf2_9ce4_8422_2325u64, |h, v| (h ^ v).wrapping_mul(0x0000_0100_0000_01b3));
         if LAST_ORB_PASS[set % hitbox::FIGHTER_SETS].swap(key, Ordering::Relaxed) != key && (route.orbs() || failed != 0) {
             diagnostic(format_args!(
-                "[Hitbox] orbs pass set={set} route={route:?} placed={placed} held={held} failed={failed} hits={hits} grabs={grabs} status={status} pass={pass}"
+                "[Hitbox] orbs pass set={set} route={route:?} asked={asked} placed={placed} held={held} failed={failed} hits={hits} grabs={grabs} status={status} pass={pass}"
             ));
         }
     }
