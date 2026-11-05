@@ -895,7 +895,7 @@ hook and no new native site.
     (`src/runtime/macros/named_macros.rs:420-432`).
   - It runs on the generic `model::store::Store`: path-safe ids, atomic writes, a size cap
     (`src/model/macros/library.rs:1-48`). The setup library is a second user of the same store.
-- **Names:** the game's own keyboard (`runtime::mii::native_keyboard::request`, `named_macros.rs:337`), at most 48
+- **Names:** the Switch's own keyboard (`runtime::mii::native_keyboard::request`, `named_macros.rs:337`), at most 48
   characters (`MAX_NAME_CHARS`, `src/model/macros/recording.rs:23`).
 - **The frame strip** (`SPEC-input-06`, in progress at `c02cbb3`) emits one `frame_strip::Link` per follow-up:
   - fields: verdict, hit, free frame, `A₁`, press, input, window, and the two moves (`src/model/frame_strip.rs:214`);
@@ -909,9 +909,11 @@ hook and no new native site.
 
 **The menu.** Both pictures are mockups over the real rc.1 Recording page; values are illustrative.
 - **New group "Combos" on the Recording page:**
-  - *Save last combo...*: keeps the hits since both fighters could last act (the strip's exchange), then opens the
-    game's keyboard for an optional name. An empty name gives "Combo N".
-  - *Saved combos*: a list. A sets the target, X renames it with the keyboard, Y deletes it.
+  - *Name (optional)*: A opens the Switch's on-screen keyboard (operator 2026-11-05: "the name would use the
+    keyboard"). The typed name is used by the next *Save last combo* and then appears in *Saved combos*. Left empty,
+    the combo is saved as "Combo N".
+  - *Save last combo...*: keeps the hits since both fighters could last act (the strip's exchange), under that name.
+  - *Saved combos*: a list. A sets the target, X renames it with the same keyboard, Y deletes it.
   - *Combo helper*: On / Off.
   - *Target combo*: the saved combo to measure against.
   - *On-time tolerance*: ±0 / ±1 / ±2 frames.
@@ -920,7 +922,13 @@ hook and no new native site.
 
 ![Recording page: the Combos group](decisions/COMBO-HELPER-menu-recording-page.png)
 
-![Saved combos and the keyboard step](decisions/COMBO-HELPER-menu-saved-combos.png)
+![Name (optional): the Switch keyboard opens (schematic)](decisions/COMBO-HELPER-menu-name-keyboard.png)
+
+![Saved combos: the typed names](decisions/COMBO-HELPER-menu-saved-combos.png)
+
+The keyboard picture is a labelled schematic. The keyboard is the Switch's own UI and is not drawn from it; the
+picture shows what TrainingRooms passes in (the header "Name combo", the current name, the 48-character limit) and
+what comes back.
 
 **Two in-game layouts.** Both are over a real Eden Training frame (`p4zc-rc9`). It is the only Eden frame with Pikachu
 on screen, and there Pikachu is the CPU and P1 is Steve. The numbers illustrate a P1 Pikachu short-hop nair loop: five
@@ -975,6 +983,45 @@ dropped by 1f: jump 2f late") and the last 8 attempts.
     - Its records are CPU playback macros (placement, Mii identity, the CPU's *Named Library* source would list
       them).
     - A combo field there would need a schema bump, which older readers refuse.
+- **The name, on the Switch keyboard.** This reuses the plugin's keyboard path: the one named macros are named with,
+  whose inline adapter the Mii editor shares (`src/runtime/mii/native_keyboard.rs`,
+  `native_keyboard/inline_keyboard.rs`; lines at `main` `36d7f46`).
+  - **Which keyboard:**
+    - In Training, `request(id, "Name combo", current name)` opens the full-screen system keyboard: `ShowKeyboard`
+      with `make_preset_default`, the header text (64 UTF-16 units at most) and the initial text (`:75`, `:327-373`).
+    - In waiting-room practice, `request_inline(id, current name, cursor)` uses the inline keyboard with the
+      macro-name limit (`:89`). That is the transport waiting naming already uses there (`:5-6`).
+    - Only one keyboard is ever open: one shared lease across both transports and the Mii editor
+      (`inline_keyboard.rs:21-29`).
+  - **How it opens from our menu:**
+    - *Name (optional)* and the list's X are editor rows handled at run time, as *Named library* is
+      (`src/runtime/ui/external.rs:20-28`).
+    - A queues the request only when `native_keyboard::busy()` is false (`:116`) and no macro naming is pending.
+    - The keyboard opens at the UI boundary where `service` already runs (`named_macros::service_keyboard`, called
+      from `src/runtime/macros/port.rs:152`).
+  - **The result:**
+    - `Confirmed(name)`: the name is trimmed and kept.
+    - An empty name gives the default "Combo N", the lowest unused number.
+    - `Cancelled` (B): the previous name stays, or none.
+    - `Failed`: a notice ("The keyboard could not open"), and the name is unchanged.
+    - `Interrupted` (a scene change): the name is unchanged.
+    - The names are never written to the diagnostics log, as today (`native_keyboard.rs:278`).
+  - **Length and storage:**
+    - The limit is 48 characters, the same `MAX_NAME_CHARS` as macros, setups and Mii drafts (`native_keyboard.rs:26`,
+      `src/model/macros/recording.rs:23`). The keyboard itself is capped at 48 (`write_max_length`).
+    - The name is the `name` field of `combos/<id>.json`. The file's id is the store's path-safe stem and never
+      changes on a rename, so a rename rewrites only that field (the store's atomic overwrite).
+    - Until the next save, the draft name lives in the menu state, not in `settings.json`.
+  - **What it needs beyond today's path:**
+    - **Routing completions by owner.** `poll()` hands out every completion (`native_keyboard.rs:108`), and today's
+      only caller, `named_macros::service_keyboard`, drops one whose id is not its own (`named_macros.rs:567-573`). A
+      combo name's result would be lost. The fix is a small dispatcher: ids carry their owner (e.g. the high byte),
+      and `service_keyboard` passes the others on, or the poll moves into a shared keyboard service.
+    - **An owner for the combo-name job:** its id, what it names (the draft or a saved combo's id), and a check that
+      the combo still exists when the result arrives.
+    - **The menu while the keyboard is up:** in Training `ShowKeyboard` is synchronous and full screen, so the menu
+      simply waits. In the waiting room the inline keyboard runs alongside, so the menu ignores input until the
+      result arrives.
 - **Native reads:** no new hook and no new site. The helper uses the strip's samples and P1's inputs. Two optional
   extra reads, both on existing sites:
   - P1's `MotionModule::motion_kind` (`src/model/sites_pkg2.rs:39`, read today for the CPU only), to tell aerials
@@ -998,7 +1045,8 @@ dropped by 1f: jump 2f late") and the last 8 attempts.
     action.
   - **Hitstun left (`r`, `K`) is not proven yet** (SPEC-input-06 §4). Until it is, TRUE links have no number, in the
     reference too.
-  - **The keyboard** is driven through `named_macros`' job queue today. The helper needs its own job id there.
+  - **The keyboard's completions** are taken by `named_macros` today. A second owner needs the routing described
+    under *The name, on the Switch keyboard*.
   - **Limits it shares with the strip:** primary CPU only; projectile hits count as hits but have no active cells.
 
 **Steps, in order:**
@@ -1010,7 +1058,8 @@ dropped by 1f: jump 2f late") and the last 8 attempts.
    with host tests.
 3. **The menu:**
    - the Combos rows (`table.rs`, `factory.rs`: `combo_helper`, `combo_tolerance`, `combo_after`);
-   - the Saved combos screen, with rename through the native keyboard under its own job id;
+   - *Name (optional)* and the Saved combos screen, both naming through the Switch keyboard: the combo-name owner
+    and the completion routing by owner;
    - core02 menu tests.
 4. **Capture:** a fixed ring of the current exchange, kept in the strip's per-frame step: P1 inputs (600) and links
    (16). *Save last combo* builds the record on the worker thread, not in a hook.

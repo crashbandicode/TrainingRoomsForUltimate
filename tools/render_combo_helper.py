@@ -81,8 +81,9 @@ def new_tag(d, x, y):
 
 
 # ---- (a) The Recording page: a Combos group -----------------------------------------------------------------------
-GROUPS = [("Recording", 4), ("Playback", 6), ("Named macros", 5), ("Combos", 6)]
+GROUPS = [("Recording", 4), ("Playback", 6), ("Named macros", 5), ("Combos", 7)]
 ROWS = [
+    ("Name (optional)", "Pika nair loop", "action"),
     ("Save last combo...", "Pikachu · 4 links · 1.6 s", "action"),
     ("Saved combos", "3 saved", "action"),
     ("Combo helper", "[ON]", "on"),
@@ -90,7 +91,7 @@ ROWS = [
     ("On-time tolerance", "±1 frame", "pick"),
     ("After an attempt", "Load save state", "pick"),
 ]
-FOCUS = 3
+FOCUS = 0
 
 
 def clear_content(d, list_view=False):
@@ -106,7 +107,7 @@ def help_lines(d, first, second):
     text(d, (53, 640), second, MF, fill=M_TEXT, anchor="lm")
 
 
-def menu_page(bg):
+def menu_page(bg, annotate=True):
     img = bg.copy()
     d = ImageDraw.Draw(img)
     clear_content(d)
@@ -129,20 +130,73 @@ def menu_page(bg):
             w = d.textlength(">", font=MF)
             text(d, (VALUE_X, y), ">", MF, fill=M_TEXT, anchor="rm")
             text(d, (VALUE_X - w - 16, y), value, MF, fill=M_GROUP, anchor="rm")
-    help_lines(d, "The saved combo the helper measures your attempts against.",
-               "Left/Right picks another saved combo; A opens the list.")
+    help_lines(d, "A name for the next combo you save. A opens the Switch keyboard.",
+               "Optional: left empty, the combo is saved as \"Combo 4\".")
+    if not annotate:
+        return img
     o = iv.overlay()
     od = ImageDraw.Draw(o)
-    note(od, (560, 372, 1236, 556), "Mockup · Recording page, new Combos group", [
+    note(od, (560, 400, 1236, 562), "Mockup · Recording page, new Combos group", [
         "A real rc.1 menu frame; only the content area is redrawn, in the menu's",
-        "own colours. Save last combo: keeps the hits since both fighters could",
-        "last act (the frame strip's exchange) and opens the game's keyboard",
-        "for an optional name; an empty name keeps \"Combo 4\".",
-        "Combo helper On: in Training each attempt is measured against the",
-        "Target combo. After an attempt: Keep playing, or Load save state",
-        "(retry from the same spot). Values are illustrative.",
+        "own colours. Name (optional): A opens the Switch keyboard; the name is",
+        "used by the next Save last combo, which keeps the hits since both",
+        "fighters could last act (the frame strip's exchange). Combo helper On:",
+        "each attempt is measured against the Target combo. After an attempt:",
+        "Keep playing, or Load save state (retry from the same spot).",
+        "Values are illustrative.",
     ])
     img.alpha_composite(o)
+    return img
+
+
+def menu_keyboard(bg):
+    """The Name row's A: the Switch's own keyboard opens full screen over the game (ShowKeyboard). It is the
+    system's UI, so it is drawn here only as a labelled schematic: what TrainingRooms passes in (the header text,
+    the current name, the 48-character limit) and what comes back."""
+    img = menu_page(bg, annotate=False)
+    o = iv.overlay()
+    d = ImageDraw.Draw(o)
+    d.rectangle((0, 0, W, H), fill=(6, 8, 12, 214))
+    sheet = (150, 40, 1130, 575)
+    d.rounded_rectangle(sheet, radius=14, fill=(226, 229, 235, 255), outline=(255, 196, 64, 255), width=3)
+    text(d, (sheet[0] + 24, sheet[1] + 22), "SCHEMATIC · the Switch's own keyboard (system UI, not drawn from it)",
+         font(13, bold=True), fill=(150, 104, 0, 255))
+    text(d, ((sheet[0] + sheet[2]) / 2, sheet[1] + 72), "Name combo", font(22, bold=True), fill=(24, 28, 36, 255),
+         anchor="mm")
+    field = (sheet[0] + 120, sheet[1] + 102, sheet[2] - 120, sheet[1] + 152)
+    d.rounded_rectangle(field, radius=6, fill=(255, 255, 255, 255), outline=(120, 128, 140, 255), width=2)
+    typed = "Pika nair loop"
+    text(d, (field[0] + 16, (field[1] + field[3]) / 2), typed, font(20), fill=(24, 28, 36, 255), anchor="lm")
+    cx = field[0] + 16 + d.textlength(typed, font=font(20)) + 3
+    d.line([(cx, field[1] + 12), (cx, field[3] - 12)], fill=(40, 120, 220, 255), width=2)
+    text(d, (field[2] - 12, (field[1] + field[3]) / 2), f"{len(typed)} / 48", font(13), fill=(110, 118, 130, 255),
+         anchor="rm")
+    # A generic key grid: plain rounded squares, no system artwork.
+    kx0, ky0, key, gap = sheet[0] + 120, sheet[1] + 190, 62, 8
+    for row, count in enumerate((10, 10, 9, 7)):
+        indent = (10 - count) * (key + gap) / 2
+        for k in range(count):
+            x = kx0 + indent + k * (key + gap)
+            y = ky0 + row * (key + gap)
+            d.rounded_rectangle((x, y, x + key, y + key), radius=8, fill=(248, 249, 251, 255),
+                                outline=(170, 176, 188, 255), width=1)
+    sy = ky0 + 4 * (key + gap)
+    d.rounded_rectangle((kx0 + 2 * (key + gap), sy, kx0 + 7 * (key + gap) - gap, sy + key - 14), radius=8,
+                        fill=(248, 249, 251, 255), outline=(170, 176, 188, 255), width=1)
+    ok = (kx0 + 8 * (key + gap), sy, kx0 + 10 * (key + gap) - gap, sy + key - 14)
+    d.rounded_rectangle(ok, radius=8, fill=(64, 150, 230, 255))
+    text(d, ((ok[0] + ok[2]) / 2, (ok[1] + ok[3]) / 2), "OK", font(16, bold=True), fill=(255, 255, 255, 255),
+         anchor="mm")
+    img.alpha_composite(o)
+    lo = iv.overlay()
+    ld = ImageDraw.Draw(lo)
+    note(ld, (700, 588, 1268, 712), "Mockup · Name (optional) → the Switch keyboard", [
+        "Training: ShowKeyboard (preset default), header \"Name combo\", initial text",
+        "= the current name, 48 characters at most. Waiting room: the inline keyboard",
+        "Mii naming already uses. OK stores the name; B (cancel) keeps the old one;",
+        "OK on an empty field saves as \"Combo N\". The name appears in Saved combos.",
+    ])
+    img.alpha_composite(lo)
     return img
 
 
@@ -192,20 +246,21 @@ def menu_list(bg):
     for y in range(kb[1], kb[3], 14):
         od.line([(kb[0], y), (kb[0], min(y + 7, kb[3]))], fill=NEW, width=2)
         od.line([(kb[2], y), (kb[2], min(y + 7, kb[3]))], fill=NEW, width=2)
-    text(od, ((kb[0] + kb[2]) / 2, kb[1] + 70), "The game's keyboard opens here", font(16, bold=True), fill=NEW,
+    text(od, ((kb[0] + kb[2]) / 2, kb[1] + 62), "X rename: the Switch keyboard opens", font(16, bold=True),
+         fill=NEW, anchor="mm")
+    text(od, ((kb[0] + kb[2]) / 2, kb[1] + 90), "header \"Name combo\", the current name filled in", font(13),
+         fill=TEXT, anchor="mm")
+    text(od, ((kb[0] + kb[2]) / 2, kb[1] + 112), "48 characters at most · B keeps the old name", font(13),
+         fill=TEXT, anchor="mm")
+    text(od, ((kb[0] + kb[2]) / 2, kb[1] + 134), "OK on an empty field: \"Combo N\"", font(13), fill=TEXT,
          anchor="mm")
-    text(od, ((kb[0] + kb[2]) / 2, kb[1] + 98), "title \"Name combo\" · up to 48 characters", font(13), fill=TEXT,
-         anchor="mm")
-    text(od, ((kb[0] + kb[2]) / 2, kb[1] + 120), "empty name = \"Combo 4\" · cancel keeps the old name",
-         font(13), fill=TEXT, anchor="mm")
     note(od, (560, 330, 1236, 524), "Mockup · Saved combos", [
         "One file per combo in sd:/ultimate/TrainingRooms/combos/<id>.json, on the",
         "same Store as the named-macro and setup libraries (atomic writes, ids).",
         "Each holds P1's inputs, the per-link reference the frame strip measured,",
         "and the context: both fighters, the CPU's damage and DI settings.",
-        "X rename (and Save last combo) open the game's own keyboard,",
-        "titled \"Name combo\", 48 characters at most, as macros are named",
-        "today. The keyboard itself is the game's and is not drawn here.",
+        "The names are the ones typed on the Switch keyboard (Name (optional)",
+        "before saving, or X rename here); the name lives in the combo's file.",
         "The diamond and \"target\" mark the Target combo. Values illustrative.",
     ])
     img.alpha_composite(o)
@@ -453,6 +508,7 @@ def main():
     out = sys.argv[3]
     os.makedirs(out, exist_ok=True)
     for name, fn, bg in (("COMBO-HELPER-menu-recording-page", menu_page, menu_bg),
+                         ("COMBO-HELPER-menu-name-keyboard", menu_keyboard, menu_bg),
                          ("COMBO-HELPER-menu-saved-combos", menu_list, menu_bg),
                          ("COMBO-HELPER-A-combo-bar", option_a, game_bg),
                          ("COMBO-HELPER-B-link-ladder", option_b, game_bg)):
