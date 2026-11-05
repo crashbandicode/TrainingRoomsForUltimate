@@ -104,7 +104,7 @@ impl LiveCapturePool {
             key,
             live: Some(LiveRecord {
                 session: LiveSession { tracks: Vec::with_capacity(ENTRIES),
-                    truncated: false, first_counter: None },
+                    truncated: false, first_counter: None, breaks: Vec::new() },
                 last_tick: [None; ENTRIES],
                 sealed: [false; ENTRIES],
             }),
@@ -173,7 +173,8 @@ impl LiveCapturePool {
         let slot = entry as usize;
         if live.sealed[slot] || live.last_tick[slot] == Some(tick) { return false; }
         let gap = match live.last_tick[slot] {
-            Some(last) => last.checked_add(1) != Some(tick),
+            Some(last) => last.checked_add(1) != Some(tick)
+                && !(sample.is_valid() && resumes_after_break(live, slot, last, tick)),
             // The editor carries crop indexes across fighters. A late-starting
             // track must not silently shift the selected match time.
             None => live.session.first_counter.is_some_and(|first| first != tick),
@@ -248,6 +249,38 @@ impl LiveCapturePool {
         if self.active == Some(key) { self.finish_record(); }
         self.records.iter().find(|record| record.key == key)?.saved.clone()
     }
+}
+
+/// A forward jump from `last` to `tick` is a phase break, not a discontinuity, when the
+/// whole record went without live play in between: no admitted fighter was sampled at
+/// any counter inside the gap (the TIME! to sudden-death transition, a pause), and this
+/// fighter's track ends exactly where the timeline does. The first fighter to resume
+/// records the break; the others must resume at the same counter and frame index.
+/// Time is never compressed: the break keeps every later frame's true counter.
+fn resumes_after_break(live: &mut LiveRecord, slot: usize, last: u32, tick: u32) -> bool {
+    if tick <= last { return false; }
+    let Some(len) = live.session.tracks.iter().find(|t| t.entry == slot as i32)
+        .map(|t| t.frames.len() as u32) else { return false };
+    if let Some(b) = live.session.breaks.last() {
+        if b.counter == tick { return b.index == len; }
+        if b.counter > last { return false; }
+    }
+    // Every admitted, unsealed fighter stopped at the same counter, and there are at least two:
+    // a lone track cannot tell a stretch without play from its own dropped callbacks.
+    let mut stopped_together = 0;
+    for track in &live.session.tracks {
+        let other = track.entry as usize;
+        if live.sealed[other] { continue; }
+        if live.last_tick[other] != Some(last) { return false; }
+        stopped_together += 1;
+    }
+    let longest = live.session.tracks.iter().map(|t| t.frames.len() as u32).max().unwrap_or(0);
+    if stopped_together < 2 || len != longest || live.session.breaks.len() >= crate::engine::macros::MAX_BREAKS
+        || live.session.breaks.try_reserve(1).is_err() {
+        return false;
+    }
+    live.session.breaks.push(crate::engine::macros::CaptureBreak { index: len, counter: tick });
+    true
 }
 
 /// Pure worker facts, shared by every actual sealing branch. No native reads or allocation.
@@ -399,6 +432,95 @@ mod tests {
         assert_eq!(saved.tracks[0].frames[0].input.buttons, 17);
         pool.finish_partial();
         assert!(Arc::ptr_eq(&saved, &pool.snapshot(key).unwrap()));
+    }
+
+    /// P-TIMER, the p4c-03 shape (Steve vs Byleth, 1:00, sudden death; native counter 4449): 3600 counters of
+    /// regular time, a stretch with no live sample for anyone (TIME! to the sudden-death GO), then sudden death.
+    /// Before the fix both tracks were sealed at 3600 and the capture said truncated.
+    #[test]
+    fn a_timer_match_continues_through_sudden_death() {
+        let mut pool = LiveCapturePool::new();
+        let key = pool.start_record(0);
+        for tick in 0..3600 {
+            for entry in 0..2 {
+                assert!(pool.push(key, entry, tick, sample(tick)));
+            }
+        }
+        let resume = 3600 + 300;
+        for tick in resume..4449 {
+            for entry in [1, 0] {
+                assert!(pool.push(key, entry, tick, sample(tick)), "tick {tick} entry {entry}");
+            }
+        }
+        let saved = pool.snapshot(key).unwrap();
+        assert!(!saved.truncated, "complete: nothing was dropped");
+        assert_eq!(saved.breaks, vec![crate::engine::macros::CaptureBreak { index: 3600, counter: resume }]);
+        for track in &saved.tracks {
+            assert_eq!(track.frames.len(), 3600 + (4449 - resume) as usize);
+            assert_eq!(track.frames[3600].input.buttons, resume, "sudden death starts after the break");
+        }
+        assert_eq!(saved.counter_at(3599), Some(3599));
+        assert_eq!(saved.counter_at(3600), Some(resume), "true counters, time not compressed");
+        assert_eq!(saved.counter_at(3600 + 10), Some(resume + 10));
+    }
+
+    /// A lone fighter's gap stays a discontinuity: one track cannot tell a stretch without play from its own drops.
+    #[test]
+    fn a_lone_track_gap_and_an_invalid_resume_still_seal() {
+        let mut pool = LiveCapturePool::new();
+        let key = pool.start_record(0);
+        assert!(pool.push(key, 0, 1, sample(1)));
+        assert!(!pool.push(key, 0, 9, sample(9)));
+        assert!(pool.snapshot(key).unwrap().truncated);
+        let key = pool.start_record(1);
+        for entry in 0..2 { assert!(pool.push(key, entry, 1, sample(1))); }
+        let mut invalid = sample(9);
+        invalid.y = f32::NAN;
+        assert!(!pool.push(key, 0, 9, invalid));
+        let saved = pool.snapshot(key).unwrap();
+        assert!(saved.truncated && saved.breaks.is_empty(), "an invalid sample records no break");
+    }
+
+    #[test]
+    fn a_gap_while_another_fighter_played_still_seals() {
+        let mut pool = LiveCapturePool::new();
+        let key = pool.start_record(0);
+        for tick in 0..10 {
+            assert!(pool.push(key, 1, tick, sample(tick)));
+            if tick < 5 { assert!(pool.push(key, 0, tick, sample(tick))); }
+        }
+        assert!(!pool.push(key, 0, 10, sample(10)), "entry 0 missed ticks entry 1 played");
+        assert!(pool.push(key, 1, 10, sample(10)));
+        let saved = pool.snapshot(key).unwrap();
+        assert!(saved.truncated && saved.breaks.is_empty());
+        assert_eq!(saved.tracks.iter().find(|t| t.entry == 0).unwrap().frames.len(), 5);
+    }
+
+    #[test]
+    fn a_fighter_resuming_elsewhere_or_backwards_seals_and_breaks_are_bounded() {
+        let mut pool = LiveCapturePool::new();
+        let key = pool.start_record(0);
+        for tick in 0..4 {
+            for entry in 0..2 { assert!(pool.push(key, entry, tick, sample(tick))); }
+        }
+        assert!(pool.push(key, 0, 20, sample(20)));
+        assert!(!pool.push(key, 1, 21, sample(21)), "not the break's counter");
+        assert!(!pool.push(key, 0, 19, sample(19)), "backwards");
+        let saved = pool.snapshot(key).unwrap();
+        assert!(saved.truncated);
+        assert_eq!(saved.breaks.len(), 1);
+
+        let mut pool = LiveCapturePool::new();
+        let key = pool.start_record(1);
+        let mut tick = 0;
+        for _ in 0..=crate::engine::macros::MAX_BREAKS {
+            for entry in 0..2 { assert!(pool.push(key, entry, tick, sample(tick))); }
+            tick += 5;
+        }
+        assert!(!pool.push(key, 0, tick, sample(tick)), "one break more than MAX_BREAKS seals");
+        let saved = pool.snapshot(key).unwrap();
+        assert!(saved.truncated);
+        assert_eq!(saved.breaks.len(), crate::engine::macros::MAX_BREAKS);
     }
 
     #[test]

@@ -14,6 +14,9 @@ pub enum ClipEffect {
     Export(Box<MacroRecording>), Error(String),
 }
 
+/// P-TIMER: a selection across a capture break (play resumed after a stretch with no live play: sudden death).
+pub const BREAK_CROSSED: &str = "The selection crosses the sudden-death restart. Keep it on one side.";
+
 /// Frames of the same direction before held Left/Right starts repeating.
 const SCRUB_REPEAT_DELAY: u32 = 10;
 /// Hold time added when the fast modifier is already down, so the scroll
@@ -358,6 +361,10 @@ impl ClipEditor {
     }
 
     fn export_selection(&self, name: &str) -> Result<MacroRecording, String> {
+        // P-TIMER: the inputs after a break (sudden death) never play from a state before it.
+        if self.session.break_within(self.window.start(), self.window.end().saturating_sub(1)).is_some() {
+            return Err(BREAK_CROSSED.into());
+        }
         match self.move_start.as_ref() {
             Some(start) => self.track().export_move(&self.window, name, "13.0.5", start),
             None => self.track().export(&self.window, name, "13.0.5", &self.clean_statuses),
@@ -496,7 +503,7 @@ mod tests {
         frames[27].input.lstick_x = -127;
         let wanted: Vec<_> = frames[27..38].iter().map(|f| f.input).collect();
         let mut e = ClipEditor::new(ReplaySession { tracks: vec![ReplayTrack {
-            entry: 1, frames, quantized_analog: false }], truncated: false }, vec![0, 14]).unwrap()
+            entry: 1, frames, quantized_analog: false }], truncated: false, breaks: Vec::new() }, vec![0, 14]).unwrap()
             .with_move_rules(MoveStartRules { families: vec![MoveFamily { fighter: None,
                 statuses: vec![45, 46, 47], buttons: 0 }], setup: vec![6, 7], ground: 0, air: 2,
                 wait: 0, fall: 14, trigger_buttons: 0 });
@@ -673,7 +680,28 @@ mod tests {
             start: StartState { status: if i == 4 { 99 } else { 14 }, ..StartState::neutral(18, 0, 1.0) },
             x: i as f32, y: 0.0 }).collect();
         ClipEditor::new(ReplaySession { tracks: vec![ReplayTrack { entry: 1, frames,
-            quantized_analog: false }], truncated: false }, vec![14]).unwrap()
+            quantized_analog: false }], truncated: false, breaks: Vec::new() }, vec![14]).unwrap()
+    }
+    /// P-TIMER: a capture with a break at frame 6 (sudden death). A window across it is refused for preview and save;
+    /// windows on either side preview, the one after the break starting at the resumed frame.
+    #[test]
+    fn a_window_across_the_sudden_death_break_is_refused_and_each_side_works() {
+        let frames: Vec<ReplayFrame> = (0..10).map(|i| ReplayFrame { input: InputFrame { buttons: i, ..InputFrame::default() },
+            start: StartState { status: 14, ..StartState::neutral(18, 0, 1.0) }, x: i as f32, y: 0.0 }).collect();
+        let mut e = ClipEditor::new(ReplaySession { tracks: vec![ReplayTrack { entry: 1, frames,
+            quantized_analog: false }], truncated: false, breaks: vec![6] }, vec![14]).unwrap();
+        let ClipEffect::Error(message) = e.on_action(ClipAction::TogglePlay) else { panic!("whole capture crosses") };
+        assert_eq!(message, BREAK_CROSSED);
+        e.on_action(ClipAction::SelectOut); e.on_action(ClipAction::Nudge(-4));
+        assert_eq!((e.view().start, e.view().end), (0, 6));
+        let ClipEffect::Preview(before) = e.on_action(ClipAction::TogglePlay) else { panic!("regular time previews") };
+        assert_eq!(before.frames.iter().map(|f| f.buttons).collect::<Vec<_>>(), [0, 1, 2, 3, 4, 5]);
+        e.on_action(ClipAction::TogglePlay);
+        e.on_action(ClipAction::SelectOut); e.on_action(ClipAction::Nudge(4));
+        e.on_action(ClipAction::SelectIn); e.on_action(ClipAction::Nudge(6));
+        assert_eq!((e.view().start, e.view().end), (6, 10));
+        let ClipEffect::Preview(after) = e.on_action(ClipAction::TogglePlay) else { panic!("sudden death previews") };
+        assert_eq!(after.frames.iter().map(|f| f.buttons).collect::<Vec<_>>(), [6, 7, 8, 9]);
     }
     #[test]
     fn independent_handles_preview_last_included_frame_and_never_cross() {

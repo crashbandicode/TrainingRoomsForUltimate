@@ -158,7 +158,7 @@ mod tests {
             start: StartState { status: 14, speed_y: i as f32, ..StartState::neutral(18, 0, 1.0) },
             x: i as f32, y: 0.0 }).collect();
         ReplayEditor::new(ReplaySession { tracks: vec![ReplayTrack { entry: 1, frames,
-            quantized_analog: false }], truncated: false }, vec![0, 14]).unwrap()
+            quantized_analog: false }], truncated: false, breaks: Vec::new() }, vec![0, 14]).unwrap()
     }
 
     fn choose(editor: &mut ReplayEditor, cell: usize) -> Effect {

@@ -55,8 +55,23 @@ The RC is M5q parity plus the new UI and clean MIT provenance; this list is not 
 | Hitbox sphere replacement | Done for fighter spheres in rc.3 (own discs, never refused). Projectiles keep the game's effect spheres. |
 | Remaining feature/edge-case inventory | Kept for later planning. |
 
-Timer-recording truncation is an observed TrainingRooms limitation with no established M5q equivalence; it is not
-called an inherited bug. (The input-log contrast went with the input log in rc.3.)
+**Timer-recording truncation: fixed 2026-11-05** (`p23/timer-recording`; `docs/DECISIONS.md` DEFERRED-LIST item 7).
+This reverses the earlier note that called it an observed limitation with no established M5q equivalence.
+
+- **The bug:** a timer match that went to sudden death saved its live replay capture cut at the end of regular time,
+  marked truncated (Eden p4c-03: native counter 4449, both tracks 3600 frames).
+- **The cause:**
+  - Fighters are sampled only during READY…GO play. From TIME! to the sudden-death GO, the native recorder keeps
+    counting with no sample.
+  - The capture worker sealed every track at the first gap.
+- **It is inherited:** M5q's `live_capture.rs` gap rule and `live_replay.rs` `is_ready_go` gate are the same code.
+- **The fix:**
+  - A gap during which every fighter stopped together is now a `CaptureBreak`, which keeps the true counters. The
+    capture continues through sudden death, complete.
+  - The `.smd` timeline marks it with a global `Gap` event, and the editor cache keeps the break.
+  - The clip editor refuses a selection that crosses it.
+- **Still sealed:** a gap while another fighter played, a backwards counter, a lone track, an invalid sample, and more
+  than 16 breaks. (The input-log contrast went with the input log in rc.3.)
 
 ## Phase 2 N11: Lobby Items (operator order)
 

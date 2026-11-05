@@ -11,8 +11,10 @@ fn frame(value: u32) -> LiveFrame {
 #[test]
 fn worker_first_seal_gap_backward_and_simultaneous_invalid_preserve_prefix() {
     // The next rejected runtime counter is unknown. These are distinct counterexamples,
-    // not an invented observation of the p4c-03 failure.
-    for (next, invalid, flags) in [(3816, false, 1), (3813, false, 1), (3816, true, 3)] {
+    // not an invented observation of the p4c-03 failure. (P-TIMER, 2026-11-05: a forward jump
+    // where every fighter stopped together, (3816, valid), is a phase break and continues;
+    // `live_capture::tests::a_timer_match_continues_through_sudden_death`.)
+    for (next, invalid, flags) in [(3813, false, 1), (3816, true, 3)] {
         let mut pool = LiveCapturePool::new();
         let key = pool.start_record(0);
         for tick in 215..3815 {
@@ -167,7 +169,7 @@ fn worker_first_seal_serialized_bytes_match_independent_expected_prefix() {
     use crate::engine::macros::{SharedCaptureArchive, test_util::TempDir};
     let roots = [TempDir::new(), TempDir::new(), TempDir::new()];
     let expected = LiveSession { tracks: vec![LiveTrack { entry: 0, frames: vec![frame(11), frame(22)] }],
-        truncated: true, first_counter: Some(41) };
+        truncated: true, first_counter: Some(41), breaks: Vec::new() };
     for (index, consume) in [false, true].into_iter().enumerate() {
         let mut pool = LiveCapturePool::new();
         let key = pool.start_record(0);
