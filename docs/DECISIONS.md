@@ -1149,6 +1149,21 @@ the 2026-11-03 deferred list was still open. Each item was explained to the oper
 | 4 · State-destructor alternative | **Dropped.** |
 | Remaining feature/edge-case inventory | Not chosen. |
 
+### Q15-BUSTS · Busts for replay and saved Miis in the menu's lists — answered (2026-11-05)
+
+**Research** (Grok, `artifacts/phase23/LANE-GROK-MII-BUSTS-REPORT.md`): the game makes a Mii list picture only by
+writing the CharInfo into its live selector (slot 26) and publishing it (`main+0x3759500`). That is the
+`set_rep_mii_icon` path of `CharaMakeSelectDataScene`.
+- `main`, `sdk` and `subsdk0` have no CharInfo-to-texture call: 780 `nn::mii` symbols, all accessors and databases.
+- The HUD portrait needs a loaded fighter, a helper and live HUD writes.
+- The menu can only bind a texture the game has already built.
+
+**Asked:** A, text (no writes); B, borrow selector slot 26 and restore it (offered also as Training-only); C, the HUD
+portrait (not workable); or capture-and-cache, which needs a new texture-upload capability.
+
+**Answered 2026-11-05 ~21:0xZ by the operator: "just keep the text".** Mii rows stay text, and Q15's "bust where one
+exists" is closed as not built.
+
 ### HOT-SLOTS-CEILING · Ten fighters plus five hats against Training's helper entries — answered (2026-11-05)
 
 **Measured:** run `tr-p23-hot-measure-1`, Yoga, rc.4 release NRO `031f1eae`, 26 PASS, 0 Unmapped
