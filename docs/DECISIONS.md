@@ -775,6 +775,9 @@ A/B from real data (2026-11-05, Eden run `tr-p23-hitbox-ab2`, diag prototype on 
 Grab row redone on one frame (run `tr-p23-hitbox-ab3`, Training's frame-by-frame speed, both halves pass 17818). The
 hurt discs missing in the first grab row were a capture lag, not a prototype bug: at 1 % speed during the side special
 the screen trailed the game by ~4 frames, so that "orbs" shot showed a frame from before the switch. No fix needed.
+New top section "Where today's spheres go missing" (run `tr-p23-hitbox-ab4`, one frozen frame): with two Ridleys, Route B
+refuses 22 of P1 Ridley's 55 spheres on every pass (holds 33); the own orbs draw all 55. With Ridley + Steve (74) Route B
+loses Steve's left-knee capsule (`kneel`) only on the first 2 passes after a cold request.
 
 ### INPUT-VIZ · A compact input display for combo timing — answered (2026-11-05)
 
