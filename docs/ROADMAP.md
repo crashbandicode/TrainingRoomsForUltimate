@@ -64,7 +64,7 @@ alternative was dropped by the operator.
 In this order (`docs/DECISIONS.md` DEFERRED-LIST on `review/menu-proposal` `6d19902`):
 
 - Combo: switch P1 to the combo's recorded fighter, with the same Switch/Keep prompt as a named macro.
-- Lobby Items (N11).
+- Lobby Items (N11): now in rc.5 (`p23/lobby-items`, primary order 2026-11-05 18:58Z); see the N11 section below.
 - Ten hot fighters plus five hot hats; preloading starts on entering Training; no hitch on the first switch to a
   fighter that is not preloaded yet (F6).
 - Saved/replay Mii busts in the Mii lists (Q15).
@@ -81,7 +81,7 @@ matches are untouched. Acceptance: host tests for policy, scene, persistence and
 allocations; one Eden batch (Off no-spawn window, existing-item removal, On spawn return, zero Unmapped, both consoles
 `desync_seen` 0 in an online smoke with the row Off).
 
-**Implemented 2026-11-05 (`p23/lobby-items`), Eden batch pending.**
+**Implemented 2026-11-05 (`p23/lobby-items`), in 0.2.0-rc.5; its Eden rows run in the rc.5 grouped session.**
 
 - **Spawning:** one inline hook on the item spawner's own switch test (`main+0x15d9a80`, the `cbz` after
   `ldrb w8,[c,#0x30]`). In a qualified waiting scene with the row Off, the native takes its own off path; elsewhere the
