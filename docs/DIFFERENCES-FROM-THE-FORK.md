@@ -69,6 +69,14 @@ Operator decisions of 2026-11-05 (`origin/review/menu-proposal` `deccd62`); the 
 *Character Cycles, Player list: the red (Player) and blue (CPU) "S" marks on the Ice Climbers icon's lower corners,
 clear of the name. Eden run `tr-p23-surface-rc2d`, 2026-11-05, rc.2 diag NRO `719324b6` (the final rc.2 code).*
 
+## Added in rc.3
+
+Operator decision of 2026-11-05 (HB-OWN-ORBS, option 1: "go with discs for all", `origin/review/menu-proposal` `5cb1a2a`).
+
+| Change | Where in the code |
+| --- | --- |
+| Hitbox Visualization draws every fighter sphere (hitboxes, hurtboxes, grab boxes) as the plugin's own discs, never refused: the fork asked the game's shared effect pool, which refused part of a large fighter's spheres (two Ridleys: 22 of 55 on every frame). The discs sit under the HUD and the menus like the old spheres, are flat (no depth), stop at each sphere's radius (the old glow went past it) and trail the camera by one to two frames while it pans. Projectiles keep the game's effect spheres. | `src/model/hitbox_orbs.rs:24` (`OrbSink`), `src/runtime/features/hitbox.rs:171` (`publish_orbs`), `src/runtime/features/hitbox.rs:201` (`draw_orbs`), `tools/layout-builder/src/main.rs:67` (`orbs_first`) |
+
 ## Kept from M5q
 
 These fork limitations are unchanged in rc.1: adding CPUs keeps the wrong-CPU limitation; cold fighter switches can

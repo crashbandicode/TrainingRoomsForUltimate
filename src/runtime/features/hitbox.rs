@@ -227,6 +227,11 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
         }
     }
     if cache.container == 0 {
+        // The layout has no orb panes (the plugin's archive did not load): nothing is drawn; said once.
+        static MISSING_SAID: AtomicBool = AtomicBool::new(false);
+        if on && !MISSING_SAID.swap(true, Ordering::Relaxed) {
+            crate::runtime::diag_log::diagnostic(format_args!("[Hitbox] orb panes missing in the layout: fighter spheres are not drawn"));
+        }
         return;
     }
     let mut n = 0;

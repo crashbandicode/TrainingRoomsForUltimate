@@ -34,6 +34,31 @@ With the setting on, every active hitbox of a fighter in Training is drawn as a 
 | 6 | 0.8, 0.0, 1.0 | purple `#cc00ff` |
 | 7 | 1.0, 0.2, 0.8 | pink `#ff33cc` |
 
+### 2a. Rendering: own orbs for fighters (decision HB-OWN-ORBS, option 1, operator 2026-11-05)
+
+The operator decided "go with discs for all" after the A/B (`docs/decisions/HB-OWN-ORBS-ab.png`, `docs/DECISIONS.md`
+HB-OWN-ORBS): with two Ridleys the game's shared effect pool refused 22 of one fighter's 55 spheres on every pass; own
+orbs refuse none. This supersedes the upstream effect rendering for **fighters** (hit, hurt and grab spheres):
+
+- The sphere set (§2 colours, capsule sampling, hurtboxes of decision HB1, grab boxes) is unchanged; the per-frame pass
+  keeps each fighter's spheres (`HandleSet`, ruling Q3) through an own-orb sink that never refuses and ends an orb when the
+  fighter's status changes (the effect's `CONCLUDE_STATUS` rule).
+- Each held sphere is placed on its bone with `ModelModule::joint_global_position_with_offset(…, false)` (a read; `true`
+  would update the model first) and published per fighter in fixed storage.
+- The layout tick projects every orb with the game's own camera (`world_to_screen`'s projection, render camera) and draws
+  it as one of the plugin's disc panes (192 panes, one plugin-drawn disc texture tinted per colour, size from the projected
+  radius). The panes' container is RootPane's first child, so the HUD, the vanilla pause menu and the plugin's menu draw
+  over the orbs as they drew over the 3D effects; nothing is hidden for the menus.
+- The discs are flat and drawn over the stage and the fighters (no depth hiding); the effect spheres' glow extended past
+  each sphere's radius, a disc stops at it.
+- **Known limitation, camera lag:** while the camera pans, the discs trail the spheres' true screen position by about one
+  to two frames of motion (measured in Eden run `tr-p23-hitbox-ab2`); still, they coincide. Projecting from a render-side
+  camera was not attempted (no cheap, guarded site).
+- **Articles** (projectiles) keep the `sys_shield` effect spheres drawn at their `ATTACK` command (§6, Q1).
+- A failed guard of any row of the feature's closure leaves the whole feature uninstalled (install line
+  `hitbox=not_installed site=<row>`): nothing is drawn, no partial path. A layout without the orb panes draws nothing and
+  says so once (`[Hitbox] orb panes missing`).
+
 ## 3. Inputs
 
 - `hitbox_vis` setting; `shield_state` setting (see §6, the shield-damage rewrite that lives in the same hook).
@@ -53,6 +78,9 @@ With the setting on, every active hitbox of a fighter in Training is drawn as a 
 | Effect spawn | `EffectModule::req_follow(accessor, hash "sys_shield", bone hash, pos, zero rot, size×0.095, follow=true, attributes NO_JOINT_SCALE \| FOLLOW \| CONCLUDE_STATUS, 0, 0, 0, 0, true, true)` then `set_rgb_partial_last(r,g,b)` and `set_rate_last(8.0)` | per sphere per frame (per-frame pass) and at creation (command hooks) | called game functions (no hook) |
 | Effect removal | `EffectModule::set_visible_kind(accessor, "sys_shield", false)` then `kill_kind(accessor, "sys_shield", false, true)` | every frame before redrawing; on rebound cleared | called |
 | Effect sleep | `MotionAnimcmdModule::set_sleep_effect(accessor, bool)`: `false` at the start of every per-frame pass (restores), `true` when visualizing outside the exempt statuses | per fighter per frame | called |
+| Own orbs: bone position (§2a) | `ModelModule::joint_global_position_with_offset` lua_bind thunk `main+0x2057640`, last argument `false` | per held fighter sphere per pass | 64-byte guard (`orb_joint_position`) |
+| Own orbs: projection (§2a) | the projection behind `sv_camera_manager::world_to_screen`, `main+0x1341280` (`(out_x*, out_y*, pos&, false)`), and its screen-size words read at `main+0x13415f0` | per orb per layout tick | 64-byte guards (`orb_world_to_screen`, `orb_screen_size`) |
+| Own orbs: panes (§2a) | the plugin's own `TrOrbs` container and `tr_oa_*`/`tr_ob_*` pictures in `info_training` / `info_waiting` (position, size, colour, visibility) | per layout tick | the layout recipe digest |
 | Lua stack rewrite (shield feature) | pop the 36 parameters, push them back with index 20 replaced by `-999.0` when `shield_state == Infinite` | at `ATTACK`, Training only | — (SPEC-cpu-* shield owns the behaviour) |
 
 No memory is written outside these calls.
@@ -79,7 +107,8 @@ No memory is written outside these calls.
 - **Lobby practice (fork)**: `visualizes(accessor)` gates per fighter so opponents' hitboxes in a waiting room are never drawn and their effects never slept — carry over the gate hook.
 - **CPU-as-P1 / hot swap (fork)**: `is_training_mode()` false during a swap → nothing drawn that frame.
 - **Shield-damage rewrite inside the `ATTACK` hook**: a different feature (Infinite shield) piggybacks on this hook; it pops and re-pushes 36 Lua values on every attack command while Infinite is selected. Record as Q2 (ownership and cost).
-- **Effect budget**: the game's effect pool is finite; 8 slots × up to 16 spheres × fighters, respawned every frame, can exhaust it and drop other effects. Q3.
+- **Effect budget**: the game's effect pool is finite; 8 slots × up to 16 spheres × fighters, respawned every frame, can exhaust it and drop other effects. Q3. Fork: resolved for fighters by the own orbs (§2a); articles still use the pool.
+- **Fork, own orbs and the menus (§2a)**: the orbs are drawn under every pane of the layout (HUD, vanilla pause menu, plugin menu), as the 3D effects were; shielding and grab statuses draw no hurt orbs (step order above, unchanged).
 - **`077a8e43` difference**: at `97cbe9b9` the per-frame pass ran in every mode (online too), calling `set_sleep_effect(false)` on every fighter every frame and, with the setting On, drawing spheres in online matches (a desync-safe but visible and unwanted side effect, and a per-frame call outside Training). Fold in the early return.
 
 ## 7. Persistence
