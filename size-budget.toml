@@ -145,3 +145,11 @@ ceiling = 137977
 date = "2026-11-05"
 reason = "rc.3 review fixes (p23/rc3-fixes): IV-1..IV-4, HB-1..HB-5, MN-1, MN-2, MN-4 and the reset wording on p23/rc3-candidate 3c8f5bc; measured 137977 at 3a01f8b (tools/size_gate.py), +136 over 137841"
 approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed' (rc.3 features)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 139982
+date = "2026-11-05"
+reason = "rc.4 candidate (p23/rc4-candidate): the rc.3 candidate + the combo helper + the Mii editor bring-over + the rc.3 review fixes merged; measured 139982 at ea3e531 (tools/sloc.py), 137841 + 1834 + 171 + 136, the lane entries above"
+approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed' (rc.3 features)"
