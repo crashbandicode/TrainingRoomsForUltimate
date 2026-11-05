@@ -49,8 +49,7 @@ fn separated(notice: &Spec, nx: f32, ny: f32, other: &Spec, ox: f32, oy: f32) ->
     let o_right = ox + other.w / 2.0;
     let o_bottom = oy - other.h / 2.0;
     let o_top = oy + other.h / 2.0;
-    let apart = n_right + GAP <= o_left || o_right + GAP <= n_left || n_top + GAP <= o_bottom || o_top + GAP <= n_bottom;
-    apart
+    n_right + GAP <= o_left || o_right + GAP <= n_left || n_top + GAP <= o_bottom || o_top + GAP <= n_bottom
 }
 
 fn notice_indexes(specs: &[Spec]) -> Vec<usize> {
