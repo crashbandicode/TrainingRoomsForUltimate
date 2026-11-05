@@ -1187,3 +1187,39 @@ exists" is closed as not built.
 - Hats use entries 7, 6, 5 and 4 first. A fifth hat may take entry 3 only while the native CPU count is 1.
 - Raising the count retires that hat before the game activates entry 3. F9's promotion then takes the seat.
 - The ordering contract is in the hot-slots report §3.5 and the F9 design (`LANE-GROK-F9-REPORT.md`).
+
+**Follow-up, answered 2026-11-05 ~21:3xZ by the operator: "1".**
+- **The problem:** a pause close that raises No. of CPUs from 1 straight to 3 activates entry 3 in that same close.
+  The plugin has no code at the count change, and a Reload started there races activation (the s6-07 crash), so
+  the borrowed hat can't be retired first.
+- **Options asked:**
+  - (1) accept and correct: CPU 3 starts as the hat's fighter, labelled correctly through F9's promote path, then is
+    swapped to the seat's member with a normal load;
+  - (2) return the fifth hat at every pause open, plus a hook holding activation 1–6 s;
+  - (3) back to 10 + 4.
+- **Chosen: (1).** There is no activation hold and no hook at the count change, and the borrowed hat stays through
+  ordinary pauses. A raise from 1 to 2 still retires the borrow before entry 3 can activate.
+
+### RESTRICTIONS-RC5 · The refusal strings added since rc.3 — approved (2026-11-05)
+
+The new gate (playbook `0f0f533`, fixed `2276f7e`) flagged four product strings added since `v0.2.0-rc.3`:
+- "{label} - unavailable" (a greyed Mii tile);
+- "Preview fighter is not available";
+- "Recorded Mii metadata is unavailable";
+- "Replay Mii loading is unavailable in this build".
+
+All four are carried fork behaviour that reports missing data or a missing capability.
+
+**Approved 2026-11-05 ~21:3xZ by the operator: "approve all four".** They are registered in `docs/RESTRICTIONS.md` in
+rc.5. The three hot-slots status strings ("waiting for memory", "waiting for pool space", "N failed, N waiting for …")
+are not approved yet.
+
+### INTRO-ONCE · The Training intro notices — ordered (2026-11-05)
+
+**Operator 2026-11-05 ~21:3xZ:** "please disable the intro tutorial messages when we enter training. they should only
+show the first time."
+- **Today:** `BootNotices::post_once` posts "Welcome!", Open Menu, Save State, Load State, Input Record and Input
+  Playback on the first Training HUD of every game process.
+- **Ordered:** a persisted flag. They show on a new install's first Training entry, and never again. An existing
+  install counts as seen.
+- Branch `p23/intro-once` (Grok), for rc.6.
