@@ -1228,6 +1228,34 @@ rc.5.
   - The rejected option was to prove the keyboard safe with a two-console online room first.
   - Registered as `combo-name-online-default` (`p23/combos-lobby`).
 
+### RECORDING-REDESIGN · One system for record, playback, replay to macro and combo from macro — direction agreed (2026-11-05), mockups pending
+
+**The operator (~23:3xZ):** "the macro and input playback is a bit confusing and scattered as it is today … I think we
+need to simplify the logic". The ask:
+- Record, Playback, Replay to macro and Combo from macro;
+- up to 5 playbacks and 5 combos in memory, under one menu;
+- every macro named and saved as a file;
+- one active macro for the player and one for the CPU, and one combo hot for the player;
+- one shortcut for playback on P1, one for the CPU, and one for a tabbed scrollable pop-up (Player / CPU) that picks
+  the active macros and the combo to drill, with a cancel;
+- the pop-up shortcut supersedes "this button for this slot".
+
+Earlier: convert macro to combo, and crop, as separate options on a particular macro or combo.
+
+**Answered ~23:4xZ:**
+- One Record shortcut follows the pop-up's tab.
+- Combo from macro reuses the replay-to-macro "snap".
+- Every recording remembers its start state.
+- One Recording page.
+- The pop-up has a loop control: X cycles ∞ / 1 / 2 / … (configurable in the INI), with a repeat indicator.
+- The pop-up has page up/down.
+- Hot slots are automatic (most recent first), with pin in the menu and the pop-up; pinned items go to the top.
+- The heap and fighter-mismatch risks are noted.
+- **The redesign goes into rc.5** ("we can wait longer and get it right the first time").
+- The Source setting goes away, so the named-macro Switch issue (rw-01) is resolved by the redesign.
+
+**Next:** mockups for iteration (`tr-grok-convert`, `TASK-grok-recording-redesign.md`); then sign-off; then implementation.
+
 ### INTRO-ONCE · The Training intro notices — ordered (2026-11-05)
 
 **Operator 2026-11-05 ~21:3xZ:** "please disable the intro tutorial messages when we enter training. they should only
