@@ -89,3 +89,11 @@ ceiling = 136992
 date = "2026-11-05"
 reason = "rc.3: the frame strip (SPEC-input-06, operator decision INPUT-VIZ A) replacing the input log; measured 136992 at 873f9d1 (tools/sloc.py), +519 over 136473"
 approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed' (rc.3 features)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 138826
+date = "2026-11-05"
+reason = "rc.3: the combo helper (SPEC-input-07, operator decision COMBO-HELPER A) on the frame strip; measured 138826 at 7d6e0be (tools/sloc.py), +1834 over 136992"
+approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed' (rc.3 features)"
