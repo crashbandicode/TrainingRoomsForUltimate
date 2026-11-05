@@ -763,3 +763,101 @@ Tints stay as now.
 
 Picture: on the left a real Route B frame (Eden gbc-04); on the right a **mockup** with hand-placed orbs on a real
 visualizer-Off frame.
+
+### INPUT-VIZ · A compact input display for combo timing — open (2026-11-05)
+
+The operator asked on 2026-11-05: "in addition I'd like a mockup for a more compact, more intuitive version of the input
+visualization the modpack has. Something that will help timing combos etc easier to visualize. This would supercede our
+clean room port of that functionality".
+
+**Today** (`specs/SPEC-input-02-input-display.md`, `src/model/input_display.rs`): the "Input Display" row (Off / Smash
+Inputs / Raw Inputs / Status Only) and the "Group inputs by status" row draw a column of up to 15 rows on the left.
+Each row shows stick directions, buttons, the frames held (up to 99) and optionally the status name. The column shows
+how long an input was held, but not **when** it landed against what the two fighters were doing.
+
+**Three options.** Each picture is a **mockup** over a real Eden Training frame (`tr-p23-surface-rc2d`, Steve vs Donkey
+Kong); the frame numbers are **illustrative**, a plausible Steve jab → up tilt link.
+- The words used in all three:
+  - **link:** the frame the next hit landed, minus the opponent's first free frame. 0 or less is a true combo; above 0
+    the opponent could act first (a drop).
+  - **input:** the frame you pressed the follow-up, minus your own first actionable frame. Negative means buffered,
+    positive means late.
+  - **combo window:** the presses that would still have made a true combo.
+- All three use our own shapes and colours: rectangles and the game font, as the log uses today.
+- The pictures are drawn by `tools/render_input_viz.py`.
+
+1. **(recommended) A · Frame strip.** A strip about 860 × 145 layout px at the top of the screen.
+   - The last 60 frames as two lanes, P1 and the CPU. Each frame is coloured by state: startup, active, recovery,
+     actionable, hitlag, hitstun, shieldstun.
+   - P1's inputs sit above the lanes at the frame they landed, with the combo window under them.
+   - Brackets mark the link gap and the frame advantage.
+   - Three readouts: advantage, link and input.
+   - A LAST row lists the most recent links.
+
+   It answers "when did it land" directly and keeps a short history.
+2. **B · Link cards.** A 320 px panel on the left with one card per exchange, the last four.
+   - Each card shows the two inputs and the move names, TRUE or DROP with the link gap, your press against the combo
+     window, and the frame advantage after.
+   - There are no per-frame lanes. It is the easiest to read at a glance, but you can't see the frames themselves.
+3. **C · Link ruler.** A 620 × 125 panel at the top for drilling one link.
+   - A LINK ruler (≤ 0 green, > 0 red) and an INPUT ruler (the combo window in green).
+   - The latest attempt is a pointer, and the last few are fading dots, so your consistency shows over repeats.
+   - It is the most focused, but shows the least context.
+
+![Option A: frame strip](decisions/INPUT-VIZ-A-frame-strip.png)
+
+![Option B: link cards](decisions/INPUT-VIZ-B-link-cards.png)
+
+![Option C: link ruler](decisions/INPUT-VIZ-C-link-ruler.png)
+
+**Feasibility.** Line numbers are at `main` `36d7f46` (v0.2.0-rc.2); addresses are in the owned 13.0.5 `main`.
+
+| Data | Today | Source |
+| --- | --- | --- |
+| P1 inputs per game frame, after input delay | read (the log) | `runtime/features/input_display.rs:55` `on_p1_poll`, from `input_delay.rs:124`; the stick bins and buttons are SPEC-input-02 §3.3–3.4 |
+| Status kind, both fighters | read | `StatusModule::status_kind` `0x2087720` (`model/sites_pkg2.rs:14`, `runtime/game.rs:164`); classes in `model/cpu/status.rs:33` (hitstun), `:53` (shieldstun) |
+| Actionable, both fighters | read when Frame Advantage is On | five transition terms (`0x208dd60`) or `CancelModule::is_enable_cancel` `0x2092860`: `runtime/features/cpu.rs:1440-1448`, `sites_pkg2.rs:29,48` |
+| Frame advantage | computed, shown as a notice | `model/cpu/advantage.rs:63-112`, `cpu.rs:1451-1476`, `notices.rs:207` |
+| Hitlag (freeze) | read for the CPU | `StopModule::is_stop` `0x20891f0` (`sites_pkg4.rs:9`, `game.rs:325`); frames left would be `StopModule::get_hit_stop_real_frame` `0x2089250`, not read today |
+| Active frames, P1 (A only) | read by the hitbox lane | `AttackModule::is_attack` `0x1fd01c0` on 8 slots (`sites_hitbox.rs:19`, `model/hitbox.rs:24`, `game.rs:444`) |
+| Hitstun left when the next hit lands (the link of a true combo) | **not read** | `WorkModule::get_float` `0x208db50` (`sites_pkg2.rs:35`) with the damage-reaction frame work id: the id isn't in our tree yet (look it up through `lua_const`, `game.rs:114-124`, or the constants crate) |
+| Motion frame (startup labels) | read | `MotionModule::frame` `0x205cc70` (`sites_pkg2.rs:19`) |
+| Move names (B, C, A's LAST row) | available | the engine-common move families in `model/p1/move_observer.rs:7-22` (Jab, tilts, smashes, aerials, specials); no per-fighter table |
+
+- **Native reads per game frame.** About 24 calls for A: 2 × status, 2 × 6 for actionable, 2 × `is_stop`, and 8 ×
+  `is_attack` on P1. B and C need about 16, because a hit is seen as the CPU entering hitlag.
+  - Frame Advantage already makes 12 of these when it is On.
+  - None of this needs a new hook. The P1 poll and the CPU frame callback already run every frame.
+- **HUD.** Today's log is 271 panes (`model/ui/panes.rs:255-275`: 1 + 15 rows + 15 × 5 × 3 slot parts + 30 texts).
+  - **A, about 110 panes:** each lane is drawn as runs of one state, one rectangle per run (up to 16 per lane), not one
+    per frame. Add up to 8 input chips (glyph, arrow shaft, head and box), the window, 2 brackets, 9 readout texts and
+    the 12-pane LAST row.
+    - While anything moves, about 70 position, width or colour writes per UI tick.
+    - When both fighters have been actionable with no input for a short while, the strip freezes on the last exchange
+      and writes nothing.
+    - Hitlag would be a light solid colour in game; the hatching is only in the mockup.
+  - **B, about 70 panes:** 4 cards. It writes about 70 when an exchange ends and 4 alpha writes a frame while cards
+    fade.
+  - **C, about 50 panes:** the rulers are static, so it writes only when an exchange ends.
+  - All three fit the layout builder's cloned stock panes and need no new textures (rectangles and the game font, as
+    the log uses today).
+- **What each keeps of today's display:**
+  - **Smash inputs:** kept as the input chips in all three.
+  - **Raw inputs:** kept as a setting in A only; B and C read moves, not raw buttons.
+  - **Status grouping** ("Group inputs by status") and the **Status Only** mode: dropped. The state lanes (A) and move
+    names (B, C) replace them.
+  - **The 99-frame held count:** dropped. A can draw a hold bar after the chip instead.
+  - **Menu:** "Input Display" becomes Off / On, with Raw as a sub-option for A. The 15-row column and its 271 panes go,
+    and SPEC-input-02 is replaced by a new spec.
+- **Not proven yet:**
+  - All frame numbers in the pictures.
+  - The hitstun-left read: its work id, and whether it counts through hitlag. Without it, a true combo shows TRUE but
+    not its −N. Drops are measured exactly, because the opponent's free frames are seen.
+  - Whether `actionable` marks the exact first actionable frame for every move. Frame Advantage relies on it, but it
+    hasn't been checked against frame data.
+  - Projectile hits are not active cells in A; only the fighter's own attack slots are.
+  - With several CPUs or Ice Climbers, only the primary CPU is measured.
+  - The pane and write counts are estimates, not measurements.
+
+**Recommendation:** A, the frame strip, with B's history as its LAST row (as drawn). Nothing is implemented until the
+operator picks.
