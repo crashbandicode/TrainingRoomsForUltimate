@@ -1,0 +1,313 @@
+{
+ "bindings": {
+  "keyboard": "",
+  "gamepad": ""
+ },
+ "format": "eden-input-macro",
+ "game_id": "01006A800016E000",
+ "parent": {
+  "name": "",
+  "marker": ""
+ },
+ "player": 0,
+ "version": 1,
+ "name": "hb-fsmash-p14",
+ "events": [
+  {
+   "buttons": 0,
+   "frame": 0,
+   "motion": [
+    {
+     "accel": [
+      0,
+      0,
+      0
+     ],
+     "delta_us": 10000,
+     "gyro": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "accel": [
+      0,
+      0,
+      0
+     ],
+     "delta_us": 10000,
+     "gyro": [
+      0,
+      0,
+      0
+     ]
+    }
+   ],
+   "sticks": [
+    0.0,
+    0.0,
+    0,
+    0
+   ],
+   "triggers": [
+    0,
+    0
+   ]
+  },
+  {
+   "buttons": 0,
+   "frame": 2,
+   "motion": [
+    {
+     "accel": [
+      0,
+      0,
+      0
+     ],
+     "delta_us": 10000,
+     "gyro": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "accel": [
+      0,
+      0,
+      0
+     ],
+     "delta_us": 10000,
+     "gyro": [
+      0,
+      0,
+      0
+     ]
+    }
+   ],
+   "sticks": [
+    1.0,
+    0.0,
+    0,
+    0
+   ],
+   "triggers": [
+    0,
+    0
+   ]
+  },
+  {
+   "buttons": 1,
+   "frame": 3,
+   "motion": [
+    {
+     "accel": [
+      0,
+      0,
+      0
+     ],
+     "delta_us": 10000,
+     "gyro": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "accel": [
+      0,
+      0,
+      0
+     ],
+     "delta_us": 10000,
+     "gyro": [
+      0,
+      0,
+      0
+     ]
+    }
+   ],
+   "sticks": [
+    1.0,
+    0.0,
+    0,
+    0
+   ],
+   "triggers": [
+    0,
+    0
+   ]
+  },
+  {
+   "buttons": 0,
+   "frame": 5,
+   "motion": [
+    {
+     "accel": [
+      0,
+      0,
+      0
+     ],
+     "delta_us": 10000,
+     "gyro": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "accel": [
+      0,
+      0,
+      0
+     ],
+     "delta_us": 10000,
+     "gyro": [
+      0,
+      0,
+      0
+     ]
+    }
+   ],
+   "sticks": [
+    1.0,
+    0.0,
+    0,
+    0
+   ],
+   "triggers": [
+    0,
+    0
+   ]
+  },
+  {
+   "buttons": 0,
+   "frame": 6,
+   "motion": [
+    {
+     "accel": [
+      0,
+      0,
+      0
+     ],
+     "delta_us": 10000,
+     "gyro": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "accel": [
+      0,
+      0,
+      0
+     ],
+     "delta_us": 10000,
+     "gyro": [
+      0,
+      0,
+      0
+     ]
+    }
+   ],
+   "sticks": [
+    0.0,
+    0.0,
+    0,
+    0
+   ],
+   "triggers": [
+    0,
+    0
+   ]
+  },
+  {
+   "buttons": 1024,
+   "frame": 17,
+   "motion": [
+    {
+     "accel": [
+      0,
+      0,
+      0
+     ],
+     "delta_us": 10000,
+     "gyro": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "accel": [
+      0,
+      0,
+      0
+     ],
+     "delta_us": 10000,
+     "gyro": [
+      0,
+      0,
+      0
+     ]
+    }
+   ],
+   "sticks": [
+    0.0,
+    0.0,
+    0,
+    0
+   ],
+   "triggers": [
+    0,
+    0
+   ]
+  },
+  {
+   "buttons": 0,
+   "frame": 23,
+   "motion": [
+    {
+     "accel": [
+      0,
+      0,
+      0
+     ],
+     "delta_us": 10000,
+     "gyro": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "accel": [
+      0,
+      0,
+      0
+     ],
+     "delta_us": 10000,
+     "gyro": [
+      0,
+      0,
+      0
+     ]
+    }
+   ],
+   "sticks": [
+    0.0,
+    0.0,
+    0,
+    0
+   ],
+   "triggers": [
+    0,
+    0
+   ]
+  }
+ ],
+ "markers": [],
+ "duration_frames": 27
+}

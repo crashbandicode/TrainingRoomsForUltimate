@@ -1,0 +1,482 @@
+{
+  "game_id": "01006A800016E000",
+  "start": "boot",
+  "scope": "Hitbox own-orbs A/B (HB1 route A4 prototype, primary 03:56Z order) on the diag NRO e78ad90a of p23/hitbox-orbs 97d6b57: P1 Ridley + CPU Steve by in-fight pushes; route B first-frame refusals against own orbs; both layers on one paused frame per pair (standing, fsmash, grab); camera-motion clips; Off.",
+  "segments": {
+    "main-stage": {
+      "file": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/segments/main-stage.edenmacro.json",
+      "sha256": "ce6714b44f34f04cacd0d17454e4773c8906d289e5a37e34c606c604e6e4acfb",
+      "cap": 60,
+      "start_gate": "main",
+      "end_gate": "stage",
+      "from_run": "lr-03",
+      "row": "02-stage",
+      "library": "main-stage"
+    },
+    "stage-css": {
+      "file": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/segments/stage-css.edenmacro.json",
+      "sha256": "240249606f15207106e4cc654cc3ee173efa97d51ea276586c82e6c7c438db74",
+      "cap": 30,
+      "start_gate": "stage",
+      "end_gate": "css",
+      "from_run": "lr-03",
+      "row": "03-css",
+      "library": "stage-css"
+    },
+    "attract-cancel": {
+      "file": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/segments/attract-cancel.edenmacro.json",
+      "sha256": "1b506dbfc689e79e8bfca69b74274ab674b91ac8359219a1a4c95faa81aae70f",
+      "cap": 30,
+      "start_gate": null,
+      "end_gate": "main",
+      "from_run": "p4r-shared",
+      "row": "nav00-attract-cancel",
+      "library": "attract-cancel"
+    },
+    "title-confirm": {
+      "file": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/segments/confirm.edenmacro.json",
+      "sha256": "131cecfb68a24040b38aeaf929c806caf361e29b7e39d241147a5821cb87007d",
+      "cap": 60,
+      "start_gate": "title-fast",
+      "end_gate": "main-settled",
+      "from_run": "p4r-shared",
+      "row": "nav03-room-list",
+      "library": "confirm"
+    },
+    "hb-b": {
+      "file": "segments/hb-b.edenmacro.json",
+      "sha256": "4999deaadea2c2a323fc562eb78d956ad5384ad11bc5d6fb855fc0784d2532aa",
+      "cap": 20
+    },
+    "hb-cam-pan": {
+      "file": "segments/hb-cam-pan.edenmacro.json",
+      "sha256": "a1c8a8d96c0ba75dadffd5d83a2e859721798411f0d78a377a29bd39675acfe5",
+      "cap": 20
+    },
+    "hb-fsmash-p14": {
+      "file": "segments/hb-fsmash-p14.edenmacro.json",
+      "sha256": "ce6aeee3faf2e06f3c5ce4332b0c78d4a0c1f16f73d4fa5717b8d5057b4f0fca",
+      "cap": 20
+    },
+    "hb-fsmash-p18": {
+      "file": "segments/hb-fsmash-p18.edenmacro.json",
+      "sha256": "29b19a8863562172b76bfae419e987654dba23ff629f4e251454c896e56448b5",
+      "cap": 20
+    },
+    "hb-fsmash-p22": {
+      "file": "segments/hb-fsmash-p22.edenmacro.json",
+      "sha256": "da0cfc4336625707c82b50f23819fe0d81f539644401881a6b13b33d25db070c",
+      "cap": 20
+    },
+    "hb-fsmash-p26": {
+      "file": "segments/hb-fsmash-p26.edenmacro.json",
+      "sha256": "82c30894f297d037a125f8060ba901f1611b541f083aebf83d7364efc810f947",
+      "cap": 20
+    },
+    "hb-fsmash-p30": {
+      "file": "segments/hb-fsmash-p30.edenmacro.json",
+      "sha256": "20027345f56f917479a2a21c704cde001f7cf75c565b6b7b239665964bb4dbe6",
+      "cap": 20
+    },
+    "hb-grab-p10": {
+      "file": "segments/hb-grab-p10.edenmacro.json",
+      "sha256": "c15db18a1b07d3a940075fd307c8fb8ba36a90ac776830b22a9dbe5b2731ee48",
+      "cap": 20
+    },
+    "hb-grab-p12": {
+      "file": "segments/hb-grab-p12.edenmacro.json",
+      "sha256": "0a5721da376597caddd3f447d82b9116a6e9c3c079a99ac253f7461bd2dc3e23",
+      "cap": 20
+    },
+    "hb-grab-p6": {
+      "file": "segments/hb-grab-p6.edenmacro.json",
+      "sha256": "c54c4939eada7de4ca512d9a7522c55fa89468c4c5b2555e429b1b4e7ea52f84",
+      "cap": 20
+    },
+    "hb-grab-p7": {
+      "file": "segments/hb-grab-p7.edenmacro.json",
+      "sha256": "6a4e8d6e3f4e396f0cabe36108210c04b5007b6cbebb4f2a9e1f611c56b18412",
+      "cap": 20
+    },
+    "hb-grab-p8": {
+      "file": "segments/hb-grab-p8.edenmacro.json",
+      "sha256": "130294c408f33d864ece9fb8e26a8a7f716538cd36e92842670448aaefe6557e",
+      "cap": 20
+    },
+    "hb-grab-p9": {
+      "file": "segments/hb-grab-p9.edenmacro.json",
+      "sha256": "1e5025dc468ca5f2aac8d153728fba6d341e21f235da12c5408c720ea636296c",
+      "cap": 20
+    },
+    "hb-lra": {
+      "file": "segments/hb-lra.edenmacro.json",
+      "sha256": "7135837b075b6d1adb5dd6567016d22bb849266ba51215fa3b4698625e45af47",
+      "cap": 20
+    },
+    "hb-plus": {
+      "file": "segments/hb-plus.edenmacro.json",
+      "sha256": "b97e08bf03762ce55ccb8cdbf76690db7bd0f444506f7e2c8af54481deb25789",
+      "cap": 20
+    },
+    "hb-walk": {
+      "file": "segments/hb-walk.edenmacro.json",
+      "sha256": "e65a966fd7ceb01699d4830e0be01297b892f0822475b1858e13ea0effcd638a",
+      "cap": 20
+    },
+    "hb-y": {
+      "file": "segments/hb-y.edenmacro.json",
+      "sha256": "da1410ba226e606e6c95873c2c897554897de181bea137a58c183782b46e8c58",
+      "cap": 20
+    }
+  },
+  "gates": {
+    "loaded": {
+      "kind": "status",
+      "expect": {
+        "running": true,
+        "loading_complete": true
+      },
+      "max_frame_age_ms": 1500,
+      "cap": 180
+    },
+    "main-fast": {
+      "kind": "image",
+      "reference": "refs/main-current.png",
+      "sha256": "d13e49e01a0255ed794d3ca6415965c4212c67474164b4019b0f3a6777974a7f",
+      "roi": [
+        180,
+        475,
+        390,
+        525
+      ],
+      "tolerance": 8,
+      "cap": 3,
+      "recover": "attract-cancel"
+    },
+    "main": {
+      "kind": "image",
+      "reference": "refs/main-current.png",
+      "sha256": "d13e49e01a0255ed794d3ca6415965c4212c67474164b4019b0f3a6777974a7f",
+      "roi": [
+        180,
+        475,
+        390,
+        525
+      ],
+      "tolerance": 8,
+      "cap": 8,
+      "recover": "attract-cancel"
+    },
+    "main-settled": {
+      "kind": "image",
+      "reference": "refs/main-current.png",
+      "sha256": "d13e49e01a0255ed794d3ca6415965c4212c67474164b4019b0f3a6777974a7f",
+      "roi": [
+        180,
+        475,
+        390,
+        525
+      ],
+      "tolerance": 8,
+      "cap": 15,
+      "recover": "attract-cancel"
+    },
+    "title-fast": {
+      "kind": "image",
+      "reference": "refs/title-fast.png",
+      "sha256": "89370a412ebfcca407a7de6a1e70f5ae5c21506013bb3c3b3158bd1be79b6acb",
+      "roi": [
+        450,
+        120,
+        830,
+        215
+      ],
+      "cap": 3,
+      "recover": "attract-cancel"
+    },
+    "stage": {
+      "kind": "image",
+      "reference": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/refs/stage.png",
+      "sha256": "99e7013e2be97b8173498e36a9b0e3b849c4e403bd239f1febda185470617033",
+      "roi": [
+        110,
+        445,
+        290,
+        495
+      ],
+      "tolerance": 8,
+      "cap": 45,
+      "reference_is_roi": true,
+      "from_run": "lr-03",
+      "library": "stage"
+    },
+    "css": {
+      "kind": "image",
+      "reference": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/refs/css.png",
+      "sha256": "a7a15642548952e4e263e42d467542b2877576cac4785061c21988e6cd7c0b76",
+      "roi": [
+        55,
+        55,
+        675,
+        155
+      ],
+      "tolerance": 8,
+      "cap": 60,
+      "reference_is_roi": true,
+      "from_run": "lr-03",
+      "library": "css"
+    },
+    "installed": {
+      "kind": "log",
+      "source": "events",
+      "pattern": "cpu_common=installed",
+      "whole_file": true,
+      "cap": 120
+    },
+    "actual-ready": {
+      "kind": "image",
+      "reference": "refs/p4zc-ready.png",
+      "sha256": "9ad5211b30724e3221d3e64ff42d54b8df1092c4093da58d9a01cf0f073852a1",
+      "roi": [
+        300,
+        180,
+        520,
+        240
+      ],
+      "tolerance": 8,
+      "cap": 15
+    },
+    "actual-training-current": {
+      "kind": "image",
+      "reference": "refs/actual-training-current.png",
+      "sha256": "2f254170e11887f37300f3f4ebb2a551b86215f244c4487d8d9dd8f544e00d5c",
+      "roi": [
+        1080,
+        135,
+        1200,
+        157
+      ],
+      "tolerance": 8,
+      "cap": 120
+    },
+    "training-hud-unpaused": {
+      "kind": "image",
+      "reference": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/refs/training-hud-unpaused.png",
+      "sha256": "7ecf9a4258ace218ad179e2fe14dcaf9d3dd906c594dec2ec8216cb5e02a8d2c",
+      "roi": [
+        280,
+        580,
+        302,
+        615
+      ],
+      "tolerance": 8,
+      "cap": 10,
+      "reference_is_roi": true,
+      "from_run": "lr-03",
+      "library": "training-hud-unpaused"
+    },
+    "native-pause": {
+      "kind": "image",
+      "reference": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/refs/native-pause.png",
+      "sha256": "3f03f8a24e7685cf86c5c00f4d06d2d48a3d15d23259c64872d0a5ff4ba717e5",
+      "roi": [
+        105,
+        142,
+        260,
+        174
+      ],
+      "tolerance": 8,
+      "cap": 15,
+      "reference_is_roi": true
+    }
+  },
+  "setup": [
+    {
+      "state": "Eden frontend up, game not loaded (defer-load); boot tracing then game.load",
+      "via": "hook",
+      "ref": "hb_steps.py:preload (trace.configure unmapped log, symbols, counters on publish_orbs/draw_orbs)"
+    },
+    {
+      "state": "Boot settings: the rc2d fixture (hitbox_vis Off) pinned in config files",
+      "via": "fixture",
+      "ref": "files: rc2-settings.json -> user/sdmc/ultimate/TrainingRooms/settings.json"
+    },
+    {
+      "state": "Training, HUD settled",
+      "via": "segment",
+      "ref": "main-stage + stage-css library segments, tile cursor pick"
+    },
+    {
+      "state": "P1 Ridley, CPU Steve, CPU Behavior Stop, synchronous swaps",
+      "via": "fixture",
+      "ref": "hb_steps.py:push (diag-settings-next.json from hb-base-settings.json, Ally gbc-04 route)"
+    },
+    {
+      "state": "Route and A/B view",
+      "via": "fixture",
+      "ref": "diag-hitbox-route.req (hb_steps.py:route)"
+    },
+    {
+      "state": "Paused on a fixed game frame",
+      "via": "segment",
+      "ref": "hb-plus, hb-fsmash-pK, hb-grab-pK (Plus at frame K)"
+    }
+  ],
+  "rows": [
+    {
+      "id": "00-load",
+      "start": "boot",
+      "end": "loaded",
+      "budget_min": 4,
+      "steps": [
+        {
+          "run": "hb_steps.py:preload",
+          "check": true
+        }
+      ]
+    },
+    {
+      "id": "01-main",
+      "start": "loaded",
+      "end": "main",
+      "budget_min": 3,
+      "steps": [
+        {
+          "run": "p4t_boot.py:boot_to_main",
+          "check": true
+        },
+        {
+          "gate": "installed"
+        },
+        {
+          "shot": "main"
+        }
+      ]
+    },
+    {
+      "id": "02-stage",
+      "start": "main",
+      "end": "stage",
+      "budget_min": 2,
+      "steps": [
+        {
+          "play": "main-stage"
+        },
+        {
+          "gate": "stage"
+        },
+        {
+          "shot": "stage"
+        }
+      ]
+    },
+    {
+      "id": "03-training",
+      "start": "stage",
+      "end": "Training-settled",
+      "budget_min": 3,
+      "steps": [
+        {
+          "run": "hb_steps.py:css_pick_and_enter",
+          "check": true
+        }
+      ]
+    },
+    {
+      "id": "04-fighters",
+      "start": "Training-settled",
+      "end": "Training-settled",
+      "budget_min": 4,
+      "steps": [
+        {
+          "run": "hb_steps.py:fighters",
+          "check": true
+        }
+      ]
+    },
+    {
+      "id": "05-first-frame",
+      "start": "Training-settled",
+      "end": "Training-settled",
+      "budget_min": 3,
+      "steps": [
+        {
+          "run": "hb_steps.py:first_frame",
+          "check": true
+        }
+      ]
+    },
+    {
+      "id": "06-calibrate",
+      "start": "Training-settled",
+      "end": "Training-settled",
+      "budget_min": 2,
+      "steps": [
+        {
+          "run": "hb_steps.py:calibrate",
+          "check": true
+        }
+      ]
+    },
+    {
+      "id": "07-ab-standing",
+      "start": "Training-settled",
+      "end": "Training-settled",
+      "budget_min": 3,
+      "steps": [
+        {
+          "run": "hb_steps.py:ab_standing",
+          "check": true
+        }
+      ]
+    },
+    {
+      "id": "08-ab-attack",
+      "start": "Training-settled",
+      "end": "Training-settled",
+      "budget_min": 6,
+      "steps": [
+        {
+          "run": "hb_steps.py:ab_attack",
+          "check": true
+        }
+      ]
+    },
+    {
+      "id": "09-ab-grab",
+      "start": "Training-settled",
+      "end": "Training-settled",
+      "budget_min": 6,
+      "steps": [
+        {
+          "run": "hb_steps.py:ab_grab",
+          "check": true
+        }
+      ]
+    },
+    {
+      "id": "10-lag",
+      "start": "Training-settled",
+      "end": "Training-settled",
+      "budget_min": 3,
+      "steps": [
+        {
+          "run": "hb_steps.py:lag_clips",
+          "check": true
+        }
+      ]
+    },
+    {
+      "id": "11-off",
+      "start": "Training-settled",
+      "end": "Training-settled",
+      "budget_min": 2,
+      "steps": [
+        {
+          "run": "hb_steps.py:off_and_scan",
+          "check": true
+        }
+      ]
+    }
+  ]
+}
