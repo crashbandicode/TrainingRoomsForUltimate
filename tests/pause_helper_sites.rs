@@ -104,9 +104,9 @@ fn no_branch_lands_inside_either_pause_hook_site() {
     let Some(d) = owned_elf() else { return };
     let mut scanned = 0usize;
     for (off, va, size) in exec(&d) {
-        for (n, word) in d[off..off + size].chunks_exact(4).enumerate() {
+        for (n, word) in d[off..off + size].as_chunks::<4>().0.iter().enumerate() {
             let pc = va + 4 * n as u64;
-            if let Some(to) = target(pc, u32::from_le_bytes(word.try_into().unwrap())) {
+            if let Some(to) = target(pc, u32::from_le_bytes(*word)) {
                 for site in SITES {
                     assert!(!(site + 4..site + 20).contains(&to), "0x{pc:x} branches to 0x{to:x}, inside hook site 0x{site:x}");
                 }
