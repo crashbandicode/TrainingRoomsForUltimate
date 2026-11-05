@@ -22,15 +22,21 @@ This project was developed with the assistance of AI.
 
 ## Status
 
-**v0.1.0 is the Phase 1 parity release.** It matches fork M5q on the Training and
-waiting-room practice features, with the new five-page menu. Its acceptance:
-- the Phase 1 rows on Eden (`PHASE1-CLOSEOUT.md`);
-- the menu proof boot on the exact release NRO: character grids drawing the
-  game's `chara_2` stock icons, and stage mods through ARCropolis;
-- a null-read check on Eden's exact-PC unmapped-access log: 0 accesses across
-  swaps, Mii, save/load, recording and the menus.
+**v0.2.0-rc.1 is the Phase 2/3 console test build** (2026-11-05). All 22 Phase 2/3 acceptance rows
+(`eden/phase23/rows-A.md`, `rows-B.md`, `rows-C.md`) pass on Eden. It adds to 0.1.0:
+- the hurtbox/hitbox display (all enabled hurtboxes, grab boxes, shields unchanged);
+- the CPU options' remaining rows (DI during playback, SDI streaks, air-dodge and shield-tilt In/Out relative to the
+  opponent, delay ranges, death invincibility);
+- the fork's cycle badges on the character grids (order numbers per role, the All stripes, Solo Popo marks);
+- CPU Kirby hats, and Record refused while the standalone CPU pilot drives P1;
+- the console boot fix (SVC register clobbers) and the menu-close/P1-cycle fix.
 
-Hurtbox display and the other Phase 2/3 features come in a later release.
+Known before the console test: a pause that opens while a preloaded helper fighter is still loading makes the game
+write through a null pointer on Eden (decision PAUSE-HELPER, fix (a) approved, not in this build). The Solo Popo
+marks' placement and the hat-request ending rules (approved 2026-11-05) are also not in this build.
+
+**v0.1.0** was the Phase 1 parity release (`PHASE1-CLOSEOUT.md`). Its published NRO crashes at console boot (the
+SVC clobber fixed in this build); use 0.2.0-rc.1.
 
 See [HANDOFF.md](HANDOFF.md) for the current acceptance state and
 [NEXT-VERSION.md](NEXT-VERSION.md) for deferred work. The larger specification
