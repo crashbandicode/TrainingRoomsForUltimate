@@ -121,7 +121,7 @@ impl Ui {
         self.load_target();
         let opened = match editor {
             Editor::ComboName => {
-                if !name_keyboard_opens() {
+                if !Self::name_keyboard_opens() {
                     // restriction: combo-name-online-default
                     Opened::Done("The next combo gets a Combo N name".into())
                 } else {

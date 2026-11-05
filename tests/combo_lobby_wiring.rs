@@ -165,7 +165,7 @@ fn online_lobby_combo_naming_does_not_open_the_keyboard() {
     assert!(names(&g, "combos::name_keyboard_opens", "fact_waiting_scene"));
     let text = include_str!("../src/runtime/ui/combos.rs");
     let open = text.split("pub fn open").nth(1).unwrap().split("fn name_keyboard_opens").next().unwrap();
-    assert!(open.contains("if !name_keyboard_opens()"));
+    assert!(open.contains("if !Self::name_keyboard_opens()"));
     assert!(!open.contains("offer_external_name_titled"), "the closed path does not open a keyboard");
     assert!(open.contains("The next combo gets a Combo N name"));
 }
