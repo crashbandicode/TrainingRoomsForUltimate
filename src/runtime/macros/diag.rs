@@ -214,7 +214,10 @@ pub(crate) fn slot_export_complete(success: bool) {
 fn run(command: Command) {
     let text = std::str::from_utf8(&command.text[..command.len]).unwrap_or("");
     match command.kind {
-        OPEN_PLACEMENT | REPLAY_WINDOW | CLIP if !crate::runtime::ADVANCED_RECORDING_WORKFLOWS => {
+        OPEN_PLACEMENT if !crate::runtime::WORKFLOWS.placement => {
+            diagnostic(format_args!("[NamedMacroDiag] editor unavailable in this release"));
+        }
+        REPLAY_WINDOW | CLIP if !crate::runtime::WORKFLOWS.replay_window => {
             diagnostic(format_args!("[NamedMacroDiag] editor unavailable in this release"));
         }
         SAVE_SLOT => {

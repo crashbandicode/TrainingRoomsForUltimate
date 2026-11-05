@@ -59,7 +59,7 @@ impl Ui {
     }
 
     pub fn open(&mut self, editor: Editor, menu: &Menu) -> Result<(), String> {
-        if !crate::runtime::ADVANCED_RECORDING_WORKFLOWS {
+        if !crate::runtime::WORKFLOWS.setups {
             return Err("Setup library is unavailable in this release".into());
         }
         // A same-lobby parked naming session belongs to its original slot.

@@ -215,7 +215,7 @@ const fn delay(group: u8, title: &'static str, id: &'static str, step: u16, rang
 const TOGGLE: Control = Control::Toggle;
 
 /// The rows in page order, then group order, then the order they appear in (MENU-DRAFT §2).
-pub static ROWS: [Row; 99] = [
+pub static ROWS: [Row; 100] = [
     // CPU > Reactions
     r(REACT, "Mash", "mash_state", Control::MultiSelect(&o::ACTIONS),
       "Actions the CPU performs as soon as it can.\nWith several ticked it picks one at random."),
@@ -339,6 +339,9 @@ pub static ROWS: [Row; 99] = [
       "The named recordings on the card.\nA loads one, Y copies it into the current slot."),
     r(MACROS, "Save slot to library...", "", Control::Editor(Editor::SaveSlotToLibrary),
       "Names the current slot's recording and keeps it."),
+    // Operator 2026-11-05: the replay window ships again (its track choice, the Mii retry, exact-Mii clips).
+    r(MACROS, "Replay window", "", Control::Editor(Editor::ReplayWindow),
+      "Saved match captures: pick a fighter and an input window\nto turn into a recording."),
     r(MACROS, "Replay capture", "", Control::ReplayCapture,
       "On: capture match inputs when saving a replay.\nThis choice is saved automatically."),
     // Recording > Combos (SPEC-input-07 §6)

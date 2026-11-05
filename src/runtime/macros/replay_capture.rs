@@ -61,18 +61,14 @@ impl Editor {
         self.raw_for(view.entry,view.fighter_kind,view.previous_selected)
     }
     /// The recorded identity a Switch would load. `Ok(None)` is a Mii whose exact
-    /// configuration is not resolved yet. Preview and Keep never need either.
+    /// configuration is not resolved yet: its import is retried before the prompt
+    /// (`gate_selection`). Preview and Keep never need either (`workflows::clip_target`).
     fn target_for(&self,entry:i32,kind:i32,previous:bool)->Result<Option<Target>,String> {
-        if MiiClass::from_kind(kind as u32).is_none() {
-            if crate::engine::swap::trio::TrioFighter::from_kind(kind as u32).is_none() {
-                return Err("Preview fighter is not available".into());
-            }
-            return Ok(Some(Target::fighter(kind as u32)));
-        }
-        self.raw_for(entry,kind,previous)?;
-        if self.resolve_failed & (1 << entry as usize) != 0 { return Err("Recorded Mii metadata is unavailable".into()); }
-        if !cfg!(feature="mii-ordinary-cpu-alpha") {return Err("Replay Mii loading is unavailable in this build".into());}
-        Ok(self.resolved[entry as usize].map(Target::mii))
+        let raw=self.raw_for(entry,kind,previous);
+        let index=usize::try_from(entry).ok().filter(|index|*index<self.resolved.len());
+        crate::engine::macro_ui::workflows::clip_target(kind, raw.as_ref().map_err(String::as_str),
+            index.and_then(|index|self.resolved[index]), index.is_some_and(|index|self.resolve_failed & (1 << index) != 0),
+            cfg!(feature="mii-ordinary-cpu-alpha"))
     }
     fn target(&self)->Result<Option<Target>,String> {
         let view=self.view();
@@ -83,7 +79,9 @@ impl Editor {
     /// configuration is unknown or different is a mismatch.
     fn gate_for(&self,entry:i32,kind:i32,previous:bool,current:Option<i32>)->FighterGate {
         let target=self.target_for(entry,kind,previous);
-        let switchable=target.is_ok();
+        // A Switch is offered only for what this release loads on the CPU: an exact Mii (resolved, or retried first).
+        let switchable=crate::engine::macro_ui::workflows::clip_switchable(crate::runtime::WORKFLOWS, &target,
+            cfg!(feature="mii-ordinary-cpu-alpha"));
         let matches=target.ok().flatten().is_some_and(|target|
             crate::runtime::macros::named_macros::recorded_target_matches(target,current));
         let prompt=crate::runtime::macros::port::sync::read(&crate::runtime::compat::menu::MENU).fighter_prompt==crate::engine::compat::menu::OnOff::ON;
@@ -181,7 +179,7 @@ fn notify(message: String) {
 }
 
 pub fn open_editor() {
-    if !crate::runtime::ADVANCED_RECORDING_WORKFLOWS {
+    if !crate::runtime::WORKFLOWS.replay_window {
         notify("Replay editing is unavailable in this release".into());
         return;
     }
@@ -572,6 +570,9 @@ fn queue_reload(target: Target, revision: u64) {
 pub fn service_reload_request() {
     RELOAD_REQUEST.drain(|(target, revision)| {
         let eligible = revision == selection_revision()
+            && crate::engine::macro_ui::workflows::may_load_on_cpu(crate::runtime::WORKFLOWS,
+                crate::engine::mii::replay::SelectionSource::Clip, target.configuration().is_some(),
+                cfg!(feature="mii-ordinary-cpu-alpha"))
             && crate::runtime::roster::character_roster::cpu_reload_ready();
         #[cfg(feature="mii-ordinary-cpu-alpha")]
         let accepted = eligible && crate::runtime::roster::character_roster::mii_replay::request(target, revision);
@@ -844,7 +845,7 @@ pub fn on_pad(pad: Pad) {
 }
 
 pub fn on_action(action: ClipAction) {
-    if !crate::runtime::ADVANCED_RECORDING_WORKFLOWS {
+    if !crate::runtime::WORKFLOWS.replay_window {
         notify("Replay editing is unavailable in this release".into());
         return;
     }

@@ -268,22 +268,27 @@ fn layout_row_counts_match_the_rc_freeze() {
     };
     // Fighters & Stages has 21 since Change Stage (operator order via the primary, 2026-11-05 12:50Z); Display &
     // Controls lost "Group inputs by status" to the frame strip (SPEC-input-06 §3.1, 2026-11-05); Recording gained the
-    // 7 rows of the Combos group (SPEC-input-07 §6, 2026-11-05).
-    assert_eq!(counts(false), [31, 11, 22, 21, 10, 3]);
-    assert_eq!(counts(true), [30, 11, 22, 21, 10, 3]);
-    assert_eq!(counts(false)[..5].iter().sum::<usize>(), 95);
-    assert_eq!(counts(true)[..5].iter().sum::<usize>(), 94);
+    // 7 rows of the Combos group (SPEC-input-07 §6, 2026-11-05) and the Replay window row back
+    // (operator 2026-11-05).
+    assert_eq!(counts(false), [31, 11, 23, 21, 10, 3]);
+    assert_eq!(counts(true), [30, 11, 23, 21, 10, 3]);
+    assert_eq!(counts(false)[..5].iter().sum::<usize>(), 96);
+    assert_eq!(counts(true)[..5].iter().sum::<usize>(), 95);
     // Controls (MENU-DRAFT §2): 4 direction grids, 7 delay rows, 13 multi-selects (the 12 checklists,\n    // 3 of them slot sets, and Swap groups).
     let n = |f: &dyn Fn(&Control) -> bool| ROWS.iter().filter(|r| r.vis != model::menu::table::Vis::PilotPresent && f(&r.control)).count();
     assert_eq!(n(&|c| matches!(c, Control::DirectionGrid { .. })), 4);
     assert_eq!(n(&|c| matches!(c, Control::MultiSelectRange { .. })), 7);
     assert_eq!(n(&|c| matches!(c, Control::MultiSelect(_) | Control::SwapGroups)), 13, "12 checklists and Swap groups");
     assert_eq!(n(&|c| matches!(c, Control::Slider)), 2);
-    // The RC defers four editors, retaining the empty Setup group index so
-    // persisted group IDs do not move. Every other group still has rows.
-    assert_eq!(ROWS.len(), 99);
+    // The release defers three editors (the replay window ships again, operator 2026-11-05), retaining the empty Setup
+    // group index so persisted group IDs do not move. Every other group still has rows.
+    assert_eq!(ROWS.len(), 100);
     assert!(!ROWS.iter().any(|r| matches!(r.control,
-        Control::Editor(Editor::SetupSave | Editor::SetupLibrary | Editor::EditPlacement | Editor::ReplayWindow))));
+        Control::Editor(Editor::SetupSave | Editor::SetupLibrary | Editor::EditPlacement))));
+    let replay = ROWS.iter().position(|r| matches!(r.control, Control::Editor(Editor::ReplayWindow))).expect("the Replay window row");
+    let macros: Vec<&str> = ROWS.iter().filter(|r| r.group == ROWS[replay].group).map(|r| r.title).collect();
+    assert_eq!(macros, ["Source", "Ask before switching fighter", "Named library", "Save slot to library...", "Replay window", "Replay capture"],
+        "after Save slot to library, as the fork's Named Library, Save Slot to Library, (Edit Placement), Replay Window");
     assert_eq!(GROUPS[7].title, "Setup library");
     assert_eq!(GROUPS[7].page, Page::Saves);
     for (g, group) in GROUPS.iter().enumerate() {

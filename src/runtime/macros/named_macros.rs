@@ -21,6 +21,8 @@ use crate::engine::macro_ui::macro_panel::{
 
 use crate::runtime::macros::port::consts::{FighterId, MacroSource, OnOff, MENU};
 use crate::runtime::macros::port::input::MappedInputs;
+use crate::engine::macro_ui::workflows;
+use crate::engine::mii::replay::SelectionSource;
 use crate::runtime::compat::common::menu;
 use super::practice;
 use crate::runtime::lobby::training::ui::notifications::upsert;
@@ -150,19 +152,18 @@ pub(crate) fn cancel_character_selection() {
 }
 /// Select a recording as the named macro. `prompt` is true only for an explicit
 /// library load: boot restore and a clip saved right after its own fighter choice
-/// never ask. During the RC freeze only matching-current playback is enabled;
-/// a boot-restored selection waits for its recorded CPU identity.
+/// never ask. A macro carrying an exact Mii loads with its Switch / Keep choice; an
+/// ordinary one recorded with another fighter waits for that fighter unless the
+/// release switches ordinary fighters (`workflows::named_load_refusal`). A
+/// boot-restored selection waits for its recorded CPU identity.
 fn commit_selected(id:String, recording:MacroRecording, prompt:bool, current:Option<i32>) -> Result<Effect,String> {
     let context=load_context(&recording,prompt,current);
-    if !crate::runtime::ADVANCED_RECORDING_WORKFLOWS {
+    if !crate::runtime::WORKFLOWS.fighter_switch {
         let target = recording.playback_target().map_err(|e| e.to_string())?;
-        if target.configuration().is_some() {
-            return Err("Exact Mii named loading is unavailable in this release".into());
-        }
         // Boot may restore the selection before a CPU exists. Published playback
         // remains gated on its recorded identity once the fighter settles.
-        if current.is_some() && !context.matches {
-            return Err("Choose the recorded CPU fighter before loading this macro".into());
+        if let Some(why) = workflows::named_load_refusal(crate::runtime::WORKFLOWS, target, context.matches, current.is_some()) {
+            return Err(why.into());
         }
     }
     // A pending question changes nothing yet: the old selection's revision, and
@@ -188,7 +189,8 @@ fn load_context(recording:&MacroRecording, prompt:bool, current:Option<i32>) -> 
         matches,
         prompt_enabled:prompt && read(&MENU).fighter_prompt==OnOff::ON,
         // An exact Mii can only be requested by the Mii alpha; other builds keep the CPU.
-        can_switch:crate::runtime::ADVANCED_RECORDING_WORKFLOWS && target.is_some_and(|target|cfg!(feature="mii-ordinary-cpu-alpha") || target.configuration().is_none()),
+        can_switch:target.is_some_and(|target|workflows::may_load_on_cpu(crate::runtime::WORKFLOWS, SelectionSource::NamedMacro,
+            target.configuration().is_some(), cfg!(feature="mii-ordinary-cpu-alpha"))),
         revision:selection_revision(),
         recorded_label:if target.is_some_and(|target|target.configuration().is_some()) {format!("{recorded} (recorded Mii)")} else {recorded},
         current_label:current.map_or_else(||"CPU".to_owned(),fighter_label),
@@ -246,10 +248,13 @@ static CHARACTER_REQUEST: hos_lock::Mailbox<(crate::engine::mii::replay::Target,
 static CHARACTER_RESULT: hos_lock::Mailbox<(u64, bool), 1> = hos_lock::Mailbox::new();
 
 fn submit_loaded_character() {
-    if !crate::runtime::ADVANCED_RECORDING_WORKFLOWS { return; }
     if CHARACTER_PENDING.load(Ordering::Acquire) { return; }
     let target=lock_read(&UI).loaded_target();
     let Some(target)=target else{return;};
+    // An ordinary fighter is requested only when the release switches ordinary fighters; an exact Mii falls through to
+    // the Mii loader below (or its refusal in a build without it).
+    if target.configuration().is_none() && !crate::runtime::WORKFLOWS.fighter_switch { return; }
+    if target.configuration().is_some() && !crate::runtime::WORKFLOWS.exact_mii_named { return; }
     #[cfg(not(feature="mii-ordinary-cpu-alpha"))]
     if target.configuration().is_some() {
         let revision=selection_revision();
@@ -267,7 +272,8 @@ fn submit_loaded_character() {
 /// Game callback only. The roster remains the sole admission/loader provider.
 pub fn service_character_request() {
     CHARACTER_REQUEST.drain(|(target, revision)| {
-        let eligible = crate::runtime::ADVANCED_RECORDING_WORKFLOWS
+        let eligible = workflows::may_load_on_cpu(crate::runtime::WORKFLOWS, SelectionSource::NamedMacro,
+                target.configuration().is_some(), cfg!(feature="mii-ordinary-cpu-alpha"))
             && revision == selection_revision() && source_is_named()
             && crate::runtime::roster::character_roster::cpu_reload_ready();
         #[cfg(feature="mii-ordinary-cpu-alpha")]
@@ -489,7 +495,7 @@ pub fn publish_queries() {
             ui.marker(), ui.loaded_placement().map(|p| (p.delta_x, p.delta_y)),
             ui.ready_velocity(true), ui.loaded_target())
     };
-    let loaded_matches = (crate::runtime::ADVANCED_RECORDING_WORKFLOWS && plays_current)
+    let loaded_matches = (plays_current && workflows::keep_allowed(crate::runtime::WORKFLOWS, target))
         || target.is_some_and(|target| exact_target_ready(target, cpu_kind()));
     let (browser_pending, browser_release) = crate::runtime::macros::replay_capture::browser_queries();
     QUERIES.publish(crate::model::macro_handoff::MacroQueries {
@@ -779,7 +785,7 @@ pub fn open_external_library(
 }
 
 pub fn open_editor() {
-    if !crate::runtime::ADVANCED_RECORDING_WORKFLOWS {
+    if !crate::runtime::WORKFLOWS.placement {
         notify("Placement editing is unavailable in this release");
         return;
     }
