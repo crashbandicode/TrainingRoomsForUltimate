@@ -73,3 +73,11 @@ ceiling = 136069
 date = "2026-11-02"
 reason = "Operator unit migration: rustfmt 1.9.0-stable (48a229ceae), edition2021, sloc4 counting rules after formatting, excluding scripts/tools and vendored code. Historical clean-room ebfcb98 normalized136069 is the initial RC regression ceiling; fork M5q131081 is the comparator. The >=15% reduction target (about111400) is next-version work, not an RC blocker. No raw103200 or raw4318 allowance is compared or converted into normalized units. Ratchet after coherent pending Setup/UI/F9 composition; no invented normalized allowance."
 approved_by = "Operator decisions2026-11-02 via primary b81ec740; lead23:11 explicit normalized baseline136069 authorization"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 136473
+date = "2026-11-05"
+reason = "rc.2: PAUSE-HELPER (a) + Ally Round 8 fixes, Solo-S placement and HAT-REQUEST-END A; measured 136473 at 1dcbdf2 (tools/sloc.py), +404 over 136069"
+approved_by = "Operator 2026-11-05 via primary 35137355: 'raise the size limit if needed, ship rc.2 when ready'"
