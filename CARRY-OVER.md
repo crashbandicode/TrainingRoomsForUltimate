@@ -627,3 +627,21 @@ ledger is regenerated. `carry_pkg4.py verify` (against stage m5q): verified 40 f
 | Was here | Fork path (stage m5q) | src sha256 | Lines (`tools/sloc.py`) |
 | --- | --- | --- | --- |
 | `src/model/macros/ui_anchor.rs` | `training_mod_macros/src/ui_anchor.rs` | `3e4118ca933404e4` | 134 |
+
+## p23/seam-self: seam checks that know this plugin's own writes (2026-11-05, rc.4)
+
+A seam check could not tell this plugin's own hook from another plugin's: rc.2's Change Stage pick did nothing because
+`practice_stage`'s enforcing group read our own `lobby_stage` hook at `0x25f7874` as `occupied` (`5d19922` restored the
+order only). Now the installer records, for every site a hook row of any table writes, the 20 bytes there before the
+boot wrote anything (`seam_install::prime`, before the first hook) and the bytes our writes left
+(`seam_install::seal`, at the install line). A check puts our own writes back before it compares
+(`model::own_patches::unpatch`). Another plugin's patch is never put back: one from before our boot is in the "before"
+bytes, and one over ours no longer matches the "after" bytes. A row that still reads `occupied`, `foreign` or
+`out_of_region` is named once in the shipped log (`[TrainingSeams] seam=… group=… offset=… outcome=…`), and the seal
+writes `[TrainingSeams] own_writes=<n> sites=<m>`. There is no other behaviour change.
+
+Carried-file changes are recorded pkg6 edits: `native_seams/mod.rs` (`PATCH_ROWS`, `PATCH_SITES`), `native_seams/report.rs`
+(`names_row`, `RefusedLine`) and `runtime/seams/seam_install.rs`. `carry_pkg6.py verify` re-derives all 247 files.
+Host tests (`engine::seams::own_write_tests`, `model::own_patches`) cover the practice stage group checked in the wrong
+order (it verifies), every real row with every hook row's site hooked (each reads its 13.0.5 bytes), and another
+plugin's hook over ours (`occupied` again). The report is `artifacts/phase23/LANE-SEAM-SELF-REPORT.md`.

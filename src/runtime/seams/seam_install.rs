@@ -21,7 +21,7 @@
 //! `native_seams::report`). Hook paths only update the slot atomics.
 
 use core::fmt;
-use core::sync::atomic::{AtomicBool, AtomicU8, AtomicUsize, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicU32, AtomicU8, AtomicUsize, Ordering};
 
 use skyline::hooks::{getRegionAddress, Region};
 use crate::engine::seams::native_seams::report::{
@@ -31,6 +31,7 @@ use crate::engine::seams::native_seams::report::{
 use crate::engine::seams::native_seams::{self, GuardOutcome, ImageSite, Locator, MainRegion, Site, GUARD_BYTES};
 
 use crate::engine::compat::logging;
+use crate::model::own_patches::{self, OwnPatch, SPAN};
 use crate::model::version as model;
 
 /// Groups whose 64-byte outcome decides installation (the per-module flip). Empty = all shadow.
@@ -111,6 +112,113 @@ static LATE_ACTIVE: AtomicBool = AtomicBool::new(false);
 /// replacement address passed to `A64HookFunction`). One slot per such row (`OWN_HOOK_ROWS`).
 static OWN_HOOKS: [(AtomicUsize, AtomicUsize); native_seams::OWN_HOOK_ROWS] =
     [const { (AtomicUsize::new(0), AtomicUsize::new(0)) }; native_seams::OWN_HOOK_ROWS];
+
+/// Our own writes in code (`model::own_patches`): one slot per site a hook row writes, in the native table
+/// (`native_seams::PATCH_SITES`) or in TrainingRooms' own site tables (`capabilities::all_sites`), one per offset. Each keeps the
+/// 20 bytes there before the boot wrote anything (`prime`) and the bytes our writes left (`seal`), as words. Every `main` write of this
+/// plugin happens during the boot (the only later hook goes into the `common` NRO when it loads); a hook added after `seal` would
+/// need its own record.
+const SPAN_WORDS: usize = SPAN / 4;
+/// Every native hook row in code plus every such row of TrainingRooms' own tables (some share an offset).
+const OWN_CAPACITY: usize = native_seams::PATCH_ROWS + crate::model::capabilities::WRITING_SITES;
+static OWN_OFFSET: [AtomicUsize; OWN_CAPACITY] = [const { AtomicUsize::new(0) }; OWN_CAPACITY];
+static OWN_BEFORE: [[AtomicU32; SPAN_WORDS]; OWN_CAPACITY] =
+    [const { [const { AtomicU32::new(0) }; SPAN_WORDS] }; OWN_CAPACITY];
+static OWN_AFTER: [[AtomicU32; SPAN_WORDS]; OWN_CAPACITY] =
+    [const { [const { AtomicU32::new(0) }; SPAN_WORDS] }; OWN_CAPACITY];
+/// Per slot: `OWN_BOOTING` (`before` kept; any change since is ours) or `OWN_RECORDED` (`after` kept too).
+static OWN_STATE: [AtomicU8; OWN_CAPACITY] = [const { AtomicU8::new(OWN_NONE) }; OWN_CAPACITY];
+/// Slots in use (set once by `prime`; 0 before it: checks then compare the bytes as they are, as before).
+static OWN_SLOTS: AtomicUsize = AtomicUsize::new(0);
+const OWN_NONE: u8 = 0;
+const OWN_BOOTING: u8 = 1;
+const OWN_RECORDED: u8 = 2;
+
+/// The 20 bytes at a site, when they lie inside `main`'s `.text`.
+unsafe fn read_span(offset: usize) -> Option<[u8; SPAN]> {
+    let text = getRegionAddress(Region::Text) as usize;
+    let rodata = getRegionAddress(Region::Rodata) as usize;
+    let start = text.checked_add(offset)?;
+    if !offset.is_multiple_of(4) || start.checked_add(SPAN)? > rodata {
+        return None;
+    }
+    let mut bytes = [0u8; SPAN];
+    bytes.copy_from_slice(core::slice::from_raw_parts(start as *const u8, SPAN));
+    Some(bytes)
+}
+
+fn store_words(slot: &[AtomicU32; SPAN_WORDS], bytes: &[u8; SPAN]) {
+    for (word, chunk) in slot.iter().zip(bytes.chunks_exact(4)) {
+        word.store(u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]), Ordering::Relaxed);
+    }
+}
+
+fn load_words(slot: &[AtomicU32; SPAN_WORDS]) -> [u8; SPAN] {
+    let mut bytes = [0u8; SPAN];
+    for (word, chunk) in slot.iter().zip(bytes.chunks_exact_mut(4)) {
+        chunk.copy_from_slice(&word.load(Ordering::Relaxed).to_le_bytes());
+    }
+    bytes
+}
+
+/// The offset of every site a hook row of any table writes in code.
+fn own_sites() -> impl Iterator<Item = usize> {
+    native_seams::PATCH_SITES.iter().map(|&index| native_seams::SITES[index].offset).chain(
+        crate::model::capabilities::all_sites().filter(|site| crate::model::capabilities::writes_code(site)).map(|site| site.offset),
+    )
+}
+
+/// Boot, before the first hook or patch of this plugin (after the hook-sharing drill's stand-ins, which play another
+/// plugin): keep the bytes at every site a hook row writes. From here until `seal`, a change at one of them is ours (only
+/// this plugin's boot runs), so a check puts the kept bytes back first.
+pub(crate) fn prime() {
+    let mut slots = 0;
+    for offset in own_sites() {
+        let known = (0..slots).any(|slot| OWN_OFFSET[slot].load(Ordering::Relaxed) == offset);
+        if known || slots == OWN_CAPACITY {
+            continue;
+        }
+        // SAFETY: bounds-checked against main's .text inside read_span.
+        if let Some(bytes) = unsafe { read_span(offset) } {
+            OWN_OFFSET[slots].store(offset, Ordering::Relaxed);
+            store_words(&OWN_BEFORE[slots], &bytes);
+            OWN_STATE[slots].store(OWN_BOOTING, Ordering::Relaxed);
+            slots += 1;
+        }
+    }
+    OWN_SLOTS.store(slots, Ordering::Release);
+}
+
+/// Record the bytes our writes left at one slot; whether they differ from the bytes before the boot.
+fn record_after(slot: usize) -> bool {
+    // SAFETY: bounds-checked against main's .text inside read_span.
+    let Some(bytes) = (unsafe { read_span(OWN_OFFSET[slot].load(Ordering::Relaxed)) }) else { return false };
+    store_words(&OWN_AFTER[slot], &bytes);
+    OWN_STATE[slot].store(OWN_RECORDED, Ordering::Release);
+    bytes != load_words(&OWN_BEFORE[slot])
+}
+
+/// Every boot hook and patch is in place (just before the install line, and before the drill's "after" stand-ins): record
+/// what our writes left, so from now on only those exact bytes are put back. Another plugin hooking over one of them
+/// later changes them, and it reads as it did before this change. Writes one `[TrainingSeams] own_writes=<sites written>
+/// sites=<sites recorded>` line.
+pub(crate) fn seal() {
+    let slots = OWN_SLOTS.load(Ordering::Acquire);
+    let written = (0..slots).filter(|&slot| record_after(slot)).count();
+    logging::diagnostic(format_args!("[TrainingSeams] own_writes={} sites={}", written, slots));
+}
+
+/// Our recorded writes that can show inside the 64 bytes at `offset` (no heap: a lazy walk of the fixed slots).
+fn own_writes(offset: usize) -> impl Iterator<Item = OwnPatch> {
+    (0..OWN_SLOTS.load(Ordering::Acquire)).filter_map(move |slot| {
+        let patch = OwnPatch {
+            offset: OWN_OFFSET[slot].load(Ordering::Relaxed),
+            before: load_words(&OWN_BEFORE[slot]),
+            after: (OWN_STATE[slot].load(Ordering::Acquire) == OWN_RECORDED).then(|| load_words(&OWN_AFTER[slot])),
+        };
+        patch.touches(offset).then_some(patch)
+    })
+}
 
 fn outcome_code(outcome: GuardOutcome) -> u8 {
     match outcome {
@@ -216,12 +324,25 @@ pub(crate) fn check(label: &'static str) -> Option<GuardOutcome> {
     }
     // SAFETY: bounds-checked against the row's read-only region of main inside read_site.
     let Some(actual) = (unsafe { read_site(seam) }) else {
-        record(index, OUT_OF_REGION);
+        unexpected(index, seam, OUT_OF_REGION);
         return Some(GuardOutcome::Foreign { first_diff: 0 });
     };
+    // Our own hooks and patches read as the bytes they replaced (`model::own_patches`): only another plugin's write, or a
+    // change that is no hook at all, can make a row unusable.
+    let (actual, _) = own_patches::unpatch(seam.offset, &actual, own_writes(seam.offset));
     let outcome = seam.outcome_with(&actual, own_target(seam));
-    record(index, outcome_code(outcome));
+    unexpected(index, seam, outcome_code(outcome));
     Some(outcome)
+}
+
+/// Record a row's outcome, and name the row in the shipped log the first time it reads `occupied`, `foreign` or`n/// `out_of_region` (`report::names_row`): after `check` put our own writes back, only another plugin's write or a change that is no
+/// hook can do that.
+fn unexpected(index: usize, seam: &Site, code: u8) {
+    let old = OUTCOMES.get(index).map_or(UNCHECKED, |slot| slot.load(Ordering::Acquire));
+    record(index, code);
+    if report::names_row(old, code) {
+        logging::diagnostic(format_args!("{}", report::RefusedLine { label: seam.label, group: seam.group, offset: seam.offset, code }));
+    }
 }
 
 /// Which part of a `Sharing::EntryOrBody` site to hook.

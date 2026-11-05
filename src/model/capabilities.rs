@@ -21,6 +21,35 @@ use super::sites_u4;
 use super::sites_u4b;
 use super::sites_ui::UI_SITES;
 
+/// Whether a row is a site this plugin writes in code: a compared hook row inside `main`'s `.text`.
+pub const fn writes_code(site: &Site) -> bool {
+    matches!(site.kind, SeamKind::Hook { .. })
+        && site.compared()
+        && matches!(super::guard::region_of(site.offset), Some(super::guard::MainRegion::Text))
+}
+
+const fn writing(rows: &[Site]) -> usize {
+    let (mut n, mut i) = (0, 0);
+    while i < rows.len() {
+        if writes_code(&rows[i]) {
+            n += 1;
+        }
+        i += 1;
+    }
+    n
+}
+
+/// The rows of `all_sites` that write code (`writes_code`): the seam installer sizes its own-write records with it.
+pub const WRITING_SITES: usize = writing(&SITES)
+    + writing(&STATE_SITES)
+    + writing(&sites_pkg4::SITES)
+    + writing(&UI_SITES)
+    + writing(&sites_pkg6::SITES)
+    + writing(&sites_u4::SITES)
+    + writing(&sites_u4b::SITES)
+    + writing(&super::sites_hitbox::SITES)
+    + writing(&super::developer_debug::SITES);
+
 /// Every row of every table, in install-line order.
 pub fn all_sites() -> impl Iterator<Item = &'static Site> {
     SITES

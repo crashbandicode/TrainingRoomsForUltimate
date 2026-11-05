@@ -43,6 +43,8 @@ pub mod diag_ring;
 pub mod factory;
 #[path = "model/guard.rs"]
 pub mod guard;
+#[path = "model/own_patches.rs"]
+pub mod own_patches;
 #[path = "model/hook_stats.rs"]
 pub mod hook_stats;
 #[path = "model/input_adapter.rs"]

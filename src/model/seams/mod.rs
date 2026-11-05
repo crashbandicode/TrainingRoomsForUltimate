@@ -12,3 +12,6 @@ pub mod native_unlink_core;
 #[cfg(any(test, all(target_os = "switch", feature = "native-unlink-guard")))]
 pub mod native_unlink_guard;
 pub mod native_seams;
+/// The seam checks against this plugin's own writes, on the real rows (`model::own_patches`).
+#[cfg(test)]
+mod own_write_tests;

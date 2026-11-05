@@ -568,3 +568,10 @@ fn the_input_display_degrades_apart_from_input_delay() {
     let usable = |s: &model::sites::Site| s.name != "is_operation_cpu";
     assert_eq!(capabilities::blocked_by(Feature::CpuCore, &usable), Some("is_operation_cpu"));
 }
+
+/// The seam installer sizes its own-write records with `WRITING_SITES` (`runtime::seams::seam_install::prime`).
+#[test]
+fn writing_sites_counts_every_row_that_writes_code() {
+    assert_eq!(capabilities::all_sites().filter(|site| capabilities::writes_code(site)).count(), capabilities::WRITING_SITES);
+    assert!(capabilities::WRITING_SITES > 0);
+}

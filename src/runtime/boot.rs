@@ -96,6 +96,9 @@ fn run_inner() {
     // would, before any hook of ours (the default order) or, with `,after`, just before the install line.
     #[cfg(feature = "seam-drill")]
     crate::runtime::seams::seam_drill::before();
+    // Before the first hook or patch of this plugin (and after the drill's stand-ins, which play another plugin): keep the bytes at
+    // every site a hook row writes, so a later seam check reads our own writes as what they replaced (`model::own_patches`).
+    crate::runtime::seams::seam_install::prime();
 
     // 2. Panic policy (decision B2): log it, no pop-up. `panic = "abort"` then ends the process.
     std::panic::set_hook(Box::new(|info| {
@@ -413,6 +416,8 @@ fn run_inner() {
         FeatureReport { feature: Feature::Roster.name(), installed: roster_on, reason: (!roster_on).then_some("site_guard"), site: None },
     ];
     feature_reports_fit(&features);
+    // Every boot write is in place: record what our writes left (before the drill's "after" stand-ins, which play another plugin).
+    crate::runtime::seams::seam_install::seal();
     #[cfg(feature = "seam-drill")]
     crate::runtime::seams::seam_drill::after();
     let seam_fields = crate::runtime::seams::seam_install::InstallFields;
