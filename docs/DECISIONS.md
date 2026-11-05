@@ -764,7 +764,11 @@ Tints stay as now.
 Picture: on the left a real Route B frame (Eden gbc-04); on the right a **mockup** with hand-placed orbs on a real
 visualizer-Off frame.
 
-### INPUT-VIZ · A compact input display for combo timing — open (2026-11-05)
+### INPUT-VIZ · A compact input display for combo timing — answered (2026-11-05)
+
+**Answered 2026-11-05 ~11:4xZ by the operator: "go with option A for the input display".** The frame strip replaces
+the clean-room port of the input display (SPEC-input-02). It is implemented on its own branch from `main` `36d7f46`,
+and nothing ships until it passes gates and an Eden proof.
 
 The operator asked on 2026-11-05: "in addition I'd like a mockup for a more compact, more intuitive version of the input
 visualization the modpack has. Something that will help timing combos etc easier to visualize. This would supercede our
