@@ -63,7 +63,8 @@ fn core07_no_portrait_pictures() {
     assert!(offenders.is_empty(), "portrait or unblessed PNG outside the never-ships folders: {offenders:?}");
     // (b) The fork's roster-grid assets (its 89 stock icons) are not carried over.
     assert!(!root.join("scripts").join("roster-grid").exists(), "the fork's scripts/roster-grid is carried over");
-    // (c) `assets/` ships exactly the item icons and the two archive recipes - nothing portrait-sized.
+    // (c) `assets/` ships exactly the item icons and the two archive recipes - nothing portrait-sized. Beside them, the
+    // recipes' pane-table digest (`panes-recipe.sha256`, text, checked by tests/pane_recipe_guard.rs, never embedded).
     let assets = root.join("assets");
     let mut entries: Vec<String> = std::fs::read_dir(&assets)
         .unwrap_or_else(|error| panic!("read {}: {error}", assets.display()))
@@ -72,8 +73,8 @@ fn core07_no_portrait_pictures() {
     entries.sort();
     assert_eq!(
         entries,
-        ["info_training.tra1", "info_waiting.tra1", "item-icons"],
-        "assets/ holds more than the item icons and the archive recipes"
+        ["info_training.tra1", "info_waiting.tra1", "item-icons", "panes-recipe.sha256"],
+        "assets/ holds more than the item icons, the archive recipes and their pane-table digest"
     );
     let icons: Vec<String> = std::fs::read_dir(assets.join("item-icons"))
         .unwrap()
