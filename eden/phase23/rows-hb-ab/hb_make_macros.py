@@ -48,6 +48,12 @@ def main():
     for k in range(3, 19):
         g = 2
         write(f'hb-grab-p{k}', [event(0), event(g, ZR | A), event(g + 4), event(g + k, PLUS), event(g + k + 6)], g + k + 10)
+    # The same inputs without a pause (the slowed-speed method): c-stick fsmash, standing grab.
+    write('hb-csmash', [event(0), cstick(event(2), 1.0), event(6)], 12)
+    write('hb-grab', [event(0), event(2, ZR | A), event(6)], 12)
+    # Ridley's side special (Space Pirate Rush): its CATCH box is out while he runs (ZR + A jumped and aired in ab2:
+    # this profile's shoulder buttons are not shield).
+    write('hb-sideb', [event(0), event(2, B, 1.0), event(8, 0, 1.0), event(9)], 14)
     # Pause, camera mode, back.
     write('hb-plus', [event(0), event(2, PLUS), event(8)], 14)
     write('hb-y', [event(0), event(2, Y), event(8)], 14)

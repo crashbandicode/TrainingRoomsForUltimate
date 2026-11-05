@@ -46,12 +46,23 @@ def diag_text(ctx):
     return text
 
 
+SEQ = re.compile(r'^\d+ #(\d+) ')
+
+
+def _seq(line):
+    m = SEQ.match(line)
+    return int(m.group(1)) if m else -1
+
+
 def lines_after(ctx, n0, pat):
-    return [l for l in diag_text(ctx).splitlines()[n0:] if re.search(pat, l)]
+    """Lines with a sequence number above 
+0 (#N of the diag line; survives the log's rotation)."""
+    return [l for l in diag_text(ctx).splitlines() if _seq(l) > n0 and re.search(pat, l)]
 
 
 def line_count(ctx):
-    return len(diag_text(ctx).splitlines())
+    """The newest diag line's sequence number."""
+    return max((_seq(l) for l in diag_text(ctx).splitlines()), default=0)
 
 
 def wait_any(ctx, pat, cap):
@@ -170,6 +181,9 @@ def fighters(ctx):
     """P1 Ridley, CPU Steve by two in-fight pushes (a reset pair first, so the wanted pair differs), visualizer Off."""
     obs = [wait_any(ctx, r'\[CharacterRoster\] observed owner=%d[^\n]*' % o, 60) for o in (0, 1)]
     reset = push(ctx, MARIO, MARIO, False)
+    # Both reset swaps must finish first: a push during a swap is rejected ("Wait for the character swap to finish").
+    wait_any(ctx, r'\[CharacterRoster\] HUD refresh owner=0 kind=0x0 ', 60)
+    wait_any(ctx, r'\[CharacterRoster\] complete owner=1 target=Mario ', 60)
     time.sleep(3)
     n0 = line_count(ctx)
     wanted = push(ctx, RIDLEY, STEVE, False)
@@ -346,18 +360,9 @@ def lag_clips(ctx):
     time.sleep(2.5)
     # The still reference: both layers with nothing moving (the centroid offset the lag is measured against).
     clips['still_shots'] = [str(ctx.shot(f'still-{i}')) for i in range(2)]
-    ctx.play('hb-plus')
-    time.sleep(1.6)
-    ctx.play('hb-y')
-    time.sleep(4.0)
-    pan = ctx.runner.out / f'{ctx.row_dir.name}-pan.gif'
-    ctx.call('recording.start', {'path': str(pan), 'fps': 30, 'width': 1280, 'duration_ms': 3500})
-    time.sleep(0.3)
-    ctx.play('hb-cam-pan')
-    clips['pan'] = _recording_done(ctx)
+    # No paused camera pan: the Training menu does not stop the scene here and its stick moves menu values (12:17Z).
     route(ctx, 'orbtint=off')
-    _resume(ctx)
-    return save(ctx, 'lag-clips', {'walk': str(walk), 'pan': str(pan), 'status': clips})
+    return save(ctx, 'lag-clips', {'walk': str(walk), 'status': clips})
 
 
 def _recording_done(ctx, cap=30):
@@ -387,3 +392,118 @@ def off_and_scan(ctx):
     got['counters'] = counters(ctx)
     return save(ctx, 'off-and-scan', got)
 
+
+
+def probe_pause(ctx):
+    """Is the scene frozen in the Training pause? Shots at 1.5 s steps with no change (view orbs: the orbs do not
+    animate), after a standing pause and after a csmash pause; the pass state and pause lines around them."""
+    got = {}
+    for tag, seg in (('stand', 'hb-plus'), ('csmash20', 'hb-csmash-p20')):
+        route(ctx, 'view=orbs')
+        ctx.play('hb-lra')
+        time.sleep(2.5)
+        n0 = line_count(ctx)
+        ctx.play(seg)
+        time.sleep(1.0)
+        shots = []
+        for i in range(3):
+            shots.append(str(ctx.shot(f'probe-{tag}-{i}')))
+            time.sleep(1.5)
+        got[tag] = {'shots': shots, 'lines': lines_after(ctx, n0, r'\[(Hitbox\] orbs pass|PauseHelper|TrainingRooms\] pause_owner|TrainingRooms\] cpu_event status)')}
+        _resume(ctx)
+    route(ctx, 'view=both')
+    return save(ctx, 'probe', got)
+
+
+# ---- ab2 frozen-frame method (12:10Z): the Training menu does not stop the fighters (row 07b-probe), so the A/B is shot
+# with Eden's speed limit at 1 % (one game frame lasts 1.7 s) and, for the hitbox, inside the fsmash hitlag freeze. The
+# trace counter on publish_orbs (two passes per game frame) counts the game frames between the shots.
+
+def speed(ctx, pct):
+    return ctx.call('settings.set', {'key': 'core.speed_limit', 'value': str(pct)})
+
+
+def _passes(ctx):
+    for v in (counters(ctx) or {}).values():
+        if isinstance(v, dict) and 'publish_orbs' in str(v.get('target', '')):
+            return int(v.get('hits') or 0)
+    return None
+
+
+def _slow_views(ctx, tag, settle=2.4):
+    """Shots of the effects, orbs and both layers and the effects layer again, each after the flip's view_poll line and
+    one slowed frame; the publish_orbs pass count and the diag line count at each shot."""
+    shots = {}
+    for key, view in (('effects', 'effects'), ('orbs', 'orbs'), ('effects_again', 'effects'), ('both', 'both')):
+        n0 = line_count(ctx)
+        route(ctx, f'view={view}')
+        poll = wait_new(ctx, n0, r'\[Hitbox\] orbs view_poll view=%s' % VIEW_NAMES[view], 20)[-1]
+        time.sleep(settle)
+        before = _passes(ctx)
+        path = str(ctx.shot(f'{tag}-{key}'))
+        shots[key] = {'shot': path, 'poll': poll, 'passes_before_shot': before, 'passes_after_shot': _passes(ctx),
+                      'utc': time.strftime('%H:%M:%SZ', time.gmtime())}
+    return shots
+
+
+def _ridley_lines(ctx, n0, r):
+    return lines_after(ctx, n0, r'\[Hitbox\] orbs pass set=%d ' % r['set'])
+
+
+def slow_standing(ctx):
+    """Hurtboxes, both fighters idle, at 1 % speed."""
+    r = _ridley(ctx)
+    route(ctx, 'route=both view=both orbtint=off')
+    ctx.play('hb-lra')
+    time.sleep(4)
+    try:
+        speed(ctx, 1)
+        time.sleep(2.0)
+        n0 = line_count(ctx)
+        shots = _slow_views(ctx, 'standing')
+        changes = _ridley_lines(ctx, n0, r)
+    finally:
+        speed(ctx, 100)
+    route(ctx, 'view=both')
+    return save(ctx, 'slow-standing', {'shots': shots, 'ridley_state': _last_state(ctx).get(r['set']),
+                                       'ridley_changes_during_shots': changes})
+
+
+def _slow_event(ctx, name, segment, pattern, what, strict, delay=1.0):
+    r = _ridley(ctx)
+    route(ctx, 'route=both view=effects orbtint=off')
+    ctx.play('hb-lra')
+    time.sleep(3)
+    got = {'segment': segment}
+    try:
+        speed(ctx, 10)
+        n0 = line_count(ctx)
+        ctx.play(segment)
+        found = wait_new(ctx, n0, r'\[Hitbox\] orbs pass set=%d [^\n]*%s' % (r['set'], pattern), 40)
+        speed(ctx, 1)
+        got['trigger_line'] = found[-1]
+        # The game's own hit flash covers the hit spheres in the first hitlag frames: shoot from ~4 slowed frames on.
+        time.sleep(delay)
+        n1 = line_count(ctx)
+        got['shots'] = _slow_views(ctx, name)
+        got['ridley_changes_during_shots'] = _ridley_lines(ctx, n1, r)
+        got['all_lines'] = lines_after(ctx, n0, r'\[Hitbox\] (orbs pass|orbs view_poll)')
+    finally:
+        speed(ctx, 100)
+    time.sleep(3)
+    route(ctx, 'view=both')
+    if strict and got['ridley_changes_during_shots']:
+        save(ctx, name, got)
+        raise RuntimeError(f'{what}: Ridley changed during the shots: {got["ridley_changes_during_shots"]}')
+    return save(ctx, name, got)
+
+
+def slow_attack(ctx):
+    """Ridley's right-stick fsmash at 10 % speed; at its first pass with hit spheres the speed drops to 1 %; the hit lands on
+    Steve, so the shots fall in the hitlag freeze (Ridley's bones still: no orbs-pass change during the shots)."""
+    return _slow_event(ctx, 'slow-attack', 'hb-csmash', r'hits=[1-9]', 'attack', True, delay=7.0)
+
+
+def slow_grab(ctx):
+    """A standing grab at 10 % speed; at its first pass with a grab sphere the speed drops to 1 %."""
+    return _slow_event(ctx, 'slow-grab', 'hb-sideb', r'grabs=[1-9]', 'grab', False)

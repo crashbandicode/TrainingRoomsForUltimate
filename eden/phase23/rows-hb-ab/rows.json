@@ -148,6 +148,11 @@
       "sha256": "965ac1ce58aae50fd47a46b41dd5c01a45c59d59e55e3587f2607684bc59196e",
       "cap": 20
     },
+    "hb-csmash": {
+      "file": "segments/hb-csmash.edenmacro.json",
+      "sha256": "e0035e8a2b2f3157b0f29c0ef7a06cf53e3c6e6b628597bdd6cd8cf76d3671b9",
+      "cap": 20
+    },
     "hb-grab-p10": {
       "file": "segments/hb-grab-p10.edenmacro.json",
       "sha256": "c15db18a1b07d3a940075fd307c8fb8ba36a90ac776830b22a9dbe5b2731ee48",
@@ -228,6 +233,11 @@
       "sha256": "1e5025dc468ca5f2aac8d153728fba6d341e21f235da12c5408c720ea636296c",
       "cap": 20
     },
+    "hb-grab": {
+      "file": "segments/hb-grab.edenmacro.json",
+      "sha256": "ca9c156e7b9ce2b0efdb5deca825f7e0bb3aa72eb8544660c307e70d0085411b",
+      "cap": 20
+    },
     "hb-lra": {
       "file": "segments/hb-lra.edenmacro.json",
       "sha256": "7135837b075b6d1adb5dd6567016d22bb849266ba51215fa3b4698625e45af47",
@@ -236,6 +246,11 @@
     "hb-plus": {
       "file": "segments/hb-plus.edenmacro.json",
       "sha256": "b97e08bf03762ce55ccb8cdbf76690db7bd0f444506f7e2c8af54481deb25789",
+      "cap": 20
+    },
+    "hb-sideb": {
+      "file": "segments/hb-sideb.edenmacro.json",
+      "sha256": "1a0e3a1320f437f8640d17dce37a6d6158267decf0c56609e2d8ce98d6d9deb2",
       "cap": 20
     },
     "hb-walk": {
@@ -558,6 +573,54 @@
       "steps": [
         {
           "run": "hb_steps.py:ab_grab",
+          "check": true
+        }
+      ]
+    },
+    {
+      "id": "07b-probe",
+      "start": "Training-settled",
+      "end": "Training-settled",
+      "budget_min": 2,
+      "steps": [
+        {
+          "run": "hb_steps.py:probe_pause",
+          "check": true
+        }
+      ]
+    },
+    {
+      "id": "07c-slow-standing",
+      "start": "Training-settled",
+      "end": "Training-settled",
+      "budget_min": 3,
+      "steps": [
+        {
+          "run": "hb_steps.py:slow_standing",
+          "check": true
+        }
+      ]
+    },
+    {
+      "id": "08c-slow-attack",
+      "start": "Training-settled",
+      "end": "Training-settled",
+      "budget_min": 3,
+      "steps": [
+        {
+          "run": "hb_steps.py:slow_attack",
+          "check": true
+        }
+      ]
+    },
+    {
+      "id": "09c-slow-grab",
+      "start": "Training-settled",
+      "end": "Training-settled",
+      "budget_min": 3,
+      "steps": [
+        {
+          "run": "hb_steps.py:slow_grab",
           "check": true
         }
       ]
