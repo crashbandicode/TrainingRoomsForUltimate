@@ -59,9 +59,24 @@ The helper grades only while *Combo helper* is On, a target is set and the strip
 - `sd:/ultimate/TrainingRooms/combos/<id>.json` on the generic `model::store::Store` (path-safe ids, atomic writes,
   a size cap), and `combos/selected.txt` naming the target. Not inside the named-macro library (its records are
   playback macros, and a combo field there would need a schema bump older readers refuse).
-- The record: `schema_version` 1, `name` (1–48 characters), and `links` (1–16), each with `from`, `to`, `verdict`
-  (`true` with an optional link value, or `drop` with its value), `window` (`[start, end]` relative to A₁, or null)
-  and `steps` (`button`, `aim`, `offset`; 0–4). Unknown move or button names are refused.
+- The record: `schema_version` 1, `name` (1–48 characters), `recorded_on` (optional: P1's fighter at the save,
+  metadata only), and `links` (1–16), each with `from`, `to`, `verdict` (`true` with an optional link value, or `drop`
+  with its value), `window` (`[start, end]` relative to A₁, or null) and `steps` (`button`, `aim`, `offset`; 0–4).
+  Unknown move or button names are refused.
+- The format is open and shared (`docs/COMBOS.md`, operator 2026-11-05):
+  - unknown fields are ignored, and a rename keeps them;
+  - `schema_version` may be left out (it is 1), and a newer one is skipped;
+  - `name` may be left out (the file name is used);
+  - a file may have any safe name: 1–64 characters, none of `/ \ : * ? " < > |`, no leading dot and no surrounding
+    space. Hidden files are never combos.
+
+  The list re-reads the folder at each opening, shows `Name · N links · recorded on X`, and names the first unusable
+  file and its reason in one notice.
+- A combo is not tied to a fighter: the helper grades whatever fighter P1 is. `recorded_on` comes from the strip's
+  per-frame sample (`natives::fighter_kind`, an existing guarded native, the CPU core unit's `utility_get_kind` row;
+  it runs behind its own gate, `input_display::p1_fighter` / `KIND_ON`, so without that row a save records no fighter
+  and the strip is unchanged). There is no *Switch to the recorded fighter*
+  option, because the existing playback switch (`character_roster::request_cpu_kind`) changes the CPU only.
 - **Save last combo** keeps the most recent exchange that has at least one link: the open one, else the one before.
 - **Rename** rewrites only `name` (the id never changes). **Delete** removes the file; deleting the target clears
   `selected.txt` and the helper's target.
@@ -109,7 +124,7 @@ The rows are in Training; in waiting-room practice the strip does not sample, so
 
 ## 8. Observability (no diag prints)
 
-The helper reports through three exported functions that do nothing but take their arguments, so an Eden guest
+The helper reports through four exported functions that do nothing but take their arguments, so an Eden guest
 trace point (`libtraining_rooms.nro!<name>` with the unstripped ELF loaded) records each event's registers:
 
 | Symbol | x0 | x1 | x2 | x3 |
@@ -117,6 +132,7 @@ trace point (`libtraining_rooms.nro!<name>` with the unstripped ELF loaded) reco
 | `tr_combo_link_v1` | link index (0-based) | verdict link value (TRUE ≤ 0, DROP ≥ 1; `i32::MIN` unknown) | flags: bit0 true, bit1 clean, bit2 wrong move, bit3 a missing step | first step's offset (`i32::MIN` none) |
 | `tr_combo_attempt_v1` | outcome: 1 completed, 2 stopped, 3 cleared | true links | reference links | first link not true + 1 (0 none) |
 | `tr_combo_saved_v1` | links saved | first link's verdict value | 0 | 0 |
+| `tr_combo_listed_v1` | files listed | files skipped (one notice names the first) | listed files whose names the plugin did not choose (copied in) | 0 |
 
 The rows also read `combos/*.json` and the HUD.
 

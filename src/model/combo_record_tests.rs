@@ -16,7 +16,7 @@ fn record(name: &str) -> ComboRecord {
         link(Move::Aerial, Move::UpSmash, Verdict::Drop(1)),
     ])
     .unwrap();
-    ComboRecord { name: name.to_owned(), combo }
+    ComboRecord::new(name.to_owned(), combo, None)
 }
 
 fn scratch(tag: &str) -> std::path::PathBuf {
@@ -71,7 +71,7 @@ fn names_are_one_to_48_characters() {
 
 #[test]
 fn the_default_name_is_the_lowest_unused_combo_n() {
-    let entry = |name: &str| ComboEntry { id: String::new(), name: name.to_owned(), links: 1 };
+    let entry = |name: &str| ComboEntry { id: String::new(), name: name.to_owned(), links: 1, recorded_on: None };
     assert_eq!(default_name(&[]), "Combo 1");
     assert_eq!(default_name(&[entry("Combo 1"), entry("combo 3")]), "Combo 2");
     assert_eq!(default_name(&[entry("Combo 2")]), "Combo 1");

@@ -161,3 +161,11 @@ ceiling = 138089
 date = "2026-11-05"
 reason = "rc.4: seam checks read this plugin's own writes as the bytes they replaced (p23/seam-self, root cause of rc.2's Change Stage skip); measured 138089 at c8682d8 (tools/size_gate.py), +248 over 137841"
 approved_by = "Operator 2026-11-05 via primary 35137355 (seam-self order, 16:30Z): 'Raise as needed', an exact entry"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 140134
+date = "2026-11-05"
+reason = "rc.5: shareable combo files, not tied to a fighter (p23/combo-share, operator 2026-11-05); measured 140134 at 86ee6a1 (tools/size_gate.py), +152 over 139982"
+approved_by = "Operator 2026-11-05 via primary 35137355 (P21 order, ~17:55Z): 'Raise as needed', own commit"

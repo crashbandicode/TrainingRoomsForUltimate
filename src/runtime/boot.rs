@@ -308,6 +308,9 @@ fn run_inner() {
     // SPEC-input-06 §4: the strip's hitstun-left read is the CPU tech unit's `work_get_float` row; without it a true
     // combo shows no margin and the rest of the strip draws.
     input_display::set_reaction(display_on && capabilities::unit_usable(Feature::CpuTech, &usable));
+    // SPEC-input-07 §4: a saved combo's "recorded on" reads P1's fighter with the CPU core's `utility_get_kind` row;
+    // without it a save records no fighter and the strip and the helper are unchanged.
+    input_display::set_fighter_read(display_on && capabilities::unit_usable(Feature::CpuCore, &usable));
     let recording_closure = capabilities::unit_usable(Feature::Recording, &usable);
     let notices_closure = capabilities::cross_blocked_by(Feature::Notices, &usable).is_none();
     let (recording_on, notices_on) = install_pkg4(input_delay_on && recording_closure, cpu_core_on, notices_closure, &found4, &mut written4);
