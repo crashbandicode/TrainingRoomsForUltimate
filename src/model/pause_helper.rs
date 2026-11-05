@@ -1,19 +1,19 @@
 //! PAUSE-HELPER, pure half (operator decision 2026-11-05, option (a) "cancel at pause-open"; `docs/DECISIONS.md` on
 //! `review/menu-proposal` `deccd62`).
 //!
-//! The game's Training pause state (`main+0x1558720`, installed at `0x1558658-0x1558668`) runs an exit block on resume
-//! and quit (`0x1558f4c-0x1559118`). For each FighterManager entry 1-7 that is present, not at outer phase 3
-//! (`[e+0x5920]`) and carries the live mark `[e+0x5aa0] == 0x5000_0000`, it calls the AI control-type setter
+//! Training's running state (`main+0x1558720`, installed at `0x1558658-0x1558668` at each resume) runs its exit block
+//! (`0x1558f4c-0x1559118`) when the pause opens. For each FighterManager entry 1-7 that is present, not at outer
+//! phase 3 (`[e+0x5920]`) and carries the live mark `[e+0x5aa0] == 0x5000_0000`, it calls the AI control-type setter
 //! `0x6b82b0([e+0x4178], 1)`, which dereferences the actor alias `[e+0x4178]`. A helper entry the plugin created
-//! (`entry_summon_fighter`) has no actor there until its load installs one, and a pause that opens inside that window
-//! freezes it for the whole pause, so the exit block writes through a null actor (Surface lane `tr-p23-surface-b4t`).
+//! (`entry_summon_fighter`) has no actor there until its load installs one, so a pause that opens inside that window
+//! writes through a null actor (Surface lane `tr-p23-surface-b4t`).
 //!
 //! The runtime half (`runtime::roster::native_source_capacity`, `runtime::roster::character_sources`) retires such an
-//! entry at pause-open through the native single-slot retire the game itself runs (FighterManager teardown per slot,
-//! `0x66e914-0x66e94c`; the summon removal mid-battle, `0x4eb00c-0x4eb04c`), holds creation and every install start
-//! while the pause state is installed, and lets the slot be created again: with its live owner reused, as the game's
-//! creation helper `0x4eb6a0` does, once the entry destructor's callback arrived; otherwise once the owner cleanup
-//! arrived too. This module decides and sequences; it never touches memory.
+//! entry at the exit block's first word, before the walk, through the native single-slot retire the game itself runs
+//! (FighterManager teardown per slot, `0x66e914-0x66e94c`; the summon removal mid-battle, `0x4eb00c-0x4eb04c`), and
+//! lets the slot be created again: with its live owner reused, as the game's creation helper `0x4eb6a0` does, once
+//! the entry destructor's callback arrived; otherwise once the owner cleanup arrived too. This module decides and
+//! sequences; it never touches memory.
 
 /// What the runtime read from one present FighterManager entry.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -57,12 +57,10 @@ impl Owner {
     }
 }
 
-/// Per capacity slot: `Some((entry, destroyed, owner_retired))` while a pause retire waits for its two completions;
-/// `paused` while the pause state is installed (creation is held then: "created again after the pause").
+/// Per capacity slot: `Some((entry, destroyed, owner_retired))` while a pause retire waits for its completions.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Ledger<const N: usize> {
     retiring: [Option<(usize, bool, bool)>; N],
-    pub paused: bool,
 }
 
 impl<const N: usize> Default for Ledger<N> {
@@ -73,7 +71,7 @@ impl<const N: usize> Default for Ledger<N> {
 
 impl<const N: usize> Ledger<N> {
     pub const fn new() -> Self {
-        Self { retiring: [None; N], paused: false }
+        Self { retiring: [None; N] }
     }
 
     /// The runtime is about to retire `entry` in slot index `index`; false (do not retire) when that slot is already
@@ -223,18 +221,17 @@ mod tests {
     }
 
     /// The b4t sequence end to end: a helper is created, a pause opens inside its no-actor window, the entry is
-    /// retired and creation held; after the exit block and both native callbacks the slot is created again and its
-    /// actor arrives later.
+    /// retired before the walk; with its owner kept the slot is created again at once (or, without a reusable owner,
+    /// once the owner cleanup arrives) and its actor arrives later.
     #[test]
-    fn the_b4t_window_is_retired_at_pause_open_and_recreated_after_the_pause() {
+    fn the_b4t_window_is_retired_at_pause_open_and_recreated() {
         let mut ledger = Ledger::<6>::new();
-        ledger.paused = true;
         assert!(facts(0, 0x5000_0000, 0).exposed());
         assert!(ledger.begin(1, 0x11c60aa000));
-        assert!(!ledger.destroyed(1, 0x11c60aa000), "the destructor runs inside the retire");
-        assert!(ledger.paused, "no creation until the exit block");
-        ledger.paused = false;
-        assert!(ledger.owner_retired(1), "owner cleanup after the pause: create again");
+        assert!(ledger.reused(1, 0x11c60aa000), "the destructor runs inside the retire; the owner is kept");
+        assert!(ledger.begin(1, 0x11c60b0000), "the re-created entry, caught by a later pause");
+        assert!(!ledger.destroyed(1, 0x11c60b0000), "no reusable owner: wait for its cleanup");
+        assert!(ledger.owner_retired(1), "owner cleanup: create again");
         assert!(!facts(0, 0x5000_0000, 0x11a7108600).exposed(), "the recreated helper's actor arrives");
     }
 }

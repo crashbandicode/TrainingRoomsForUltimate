@@ -1,9 +1,9 @@
-//! PAUSE-HELPER hook sites (Ally Round 8 F2): an inline hook may replace up to 20 bytes (`native_seams` exact=20), so
-//! no direct branch anywhere in main may land inside `[site+4, site+20)` of either hook site. `0x1558660` failed this
-//! (`0x15581f0 b 0x1558664`); the install hook sits at `0x1558668`. Reads the owned 13.0.5 ELF linked next to the
-//! stage (`<stage>/../research`), like `native_seams`' owned-ELF facts.
+//! PAUSE-HELPER hook site (Ally Round 8 F2): an inline hook may replace up to 20 bytes (`native_seams` exact=20), so
+//! no direct branch anywhere in main may land inside `[site+4, site+20)` of the hook site. (`0x1558660`, the former
+//! install hook, failed this: `0x15581f0 b 0x1558664`; the install hook is gone, the retire runs at the exit block.)
+//! Reads the owned 13.0.5 ELF linked next to the stage (`<stage>/../research`), like `native_seams`' owned-ELF facts.
 
-const SITES: [u64; 2] = [0x1558668, 0x1558f4c];
+const SITES: [u64; 1] = [0x1558f4c];
 
 fn owned_elf() -> Option<Vec<u8>> {
     let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../research/game-13.0.5/main-13.0.5.elf");
@@ -77,7 +77,7 @@ fn contract() -> Vec<(u64, Vec<u32>)> {
 fn the_pause_contract_is_main_and_the_owner_step_creates_only_a_missing_owner() {
     let Some(d) = owned_elf() else { return };
     let rows = contract();
-    assert_eq!(rows.iter().map(|row| row.0).collect::<Vec<_>>(), [0x1558668, 0x1558f4c, 0x4eb00c, 0x4eb750]);
+    assert_eq!(rows.iter().map(|row| row.0).collect::<Vec<_>>(), [0x1558f4c, 0x4eb00c, 0x4eb750]);
     for (site, words) in &rows {
         assert_eq!(words.len(), 16, "0x{site:x}");
         for (n, expected) in words.iter().enumerate() {
@@ -94,13 +94,8 @@ fn the_pause_contract_is_main_and_the_owner_step_creates_only_a_missing_owner() 
     assert_eq!(target(0x4eb76c, word(&d, 0x4eb76c)), Some(0x17eb000), "bl 0x17eb000, the owner creation");
 }
 
-/// F3: the install gate's hold (`InstallGate::hold`), with the gate's own tests, by path.
-#[allow(dead_code)]
-#[path = "../src/runtime/roster/native_install.rs"]
-mod native_install;
-
 #[test]
-fn no_branch_lands_inside_either_pause_hook_site() {
+fn no_branch_lands_inside_the_pause_hook_site() {
     let Some(d) = owned_elf() else { return };
     let mut scanned = 0usize;
     for (off, va, size) in exec(&d) {

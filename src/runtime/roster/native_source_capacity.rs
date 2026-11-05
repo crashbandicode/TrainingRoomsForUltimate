@@ -714,24 +714,19 @@ unsafe fn owner_cleanup_complete(ctx: &InlineCtx) {
 
 // ---- PAUSE-HELPER (operator decision 2026-11-05, option (a); pure half `model::pause_helper`) ---------------------
 //
-// The Training pause state `0x1558720` is installed at `0x1558658-0x1558668` (`[x19+0x248] = 0x1558720`, the only
-// load of that pointer in 0x1540000-0x1570000) and its exit block `0x1558f4c-0x1559118` walks FighterManager entries
-// 1-7 and calls `0x6b82b0([e+0x4178], 1)` for each present entry with `[e+0x5920] != 3` and `[e+0x5aa0] ==
-// 0x50000000`. At pause-open the plugin retires its own created helper entries that loop would walk with no actor,
-// through the native single-slot retire the game itself runs: FighterManager teardown `0x66e850` per slot
-// (`0x66e914-0x66e94c`) and the summon removal mid-battle for slot 6 (`0x4eb00c-0x4eb04c`):
+// Training's running state `0x1558720` (installed at `0x1558658-0x1558668`, the only load of that pointer in
+// 0x1540000-0x1570000; Eden: at each resume) runs its exit block `0x1558f4c-0x1559118` when it is left, i.e. when the
+// pause opens (Eden rc2c: each exit-block hit precedes the menu's `pause_owner begin` by <0.1 s). The block walks
+// FighterManager entries 1-7 and calls `0x6b82b0([e+0x4178], 1)` for each present entry with `[e+0x5920] != 3` and
+// `[e+0x5aa0] == 0x50000000`. At its first word the plugin retires its own created helper entries that loop would
+// walk with no actor, through the native single-slot retire the game itself runs: FighterManager teardown `0x66e850`
+// per slot (`0x66e914-0x66e94c`) and the summon removal mid-battle for slot 6 (`0x4eb00c-0x4eb04c`):
 //   0x653490(e, 1); 0x6524e0(e); [mgr+0x20+8*slot] = 0; 0x652160(e); 0x392eb40(e); [mgr+0xa0] -= 1.
 // `0x652160` is the entry destructor body: its `+0x14` carries `character_lifecycle::destruction_trace`, which fans
-// out `on_destroy` exactly as at finalize; the owner cleanup (`0x17e44c4`) follows natively.
+// out `on_destroy` exactly as at finalize. The owner stays live (the game cleans owners up only at departure) and is
+// reused by the re-creation, as `0x4eb6a0` does (`managed::reuse_owner`).
 
-/// The state store's last word (`str xzr,[x19,#0x250]`). Not `0x1558660`: `0x15581f0 b 0x1558664` (Training ending,
-/// state `0x1558700`) lands one word after it. Both paths run this word; `x8` names the state being installed.
-#[cfg(feature = "managed-third-source-alpha")]
-const PAUSE_INSTALL: usize = 0x1558668;
-/// The pause state the exit block belongs to.
-#[cfg(feature = "managed-third-source-alpha")]
-const PAUSE_STATE: usize = 0x1558720;
-/// The pause state's exit block, first instruction (`ldr w8,[x19,#0x16c]`).
+/// The running state's exit block (at pause-open), first instruction (`ldr w8,[x19,#0x16c]`).
 #[cfg(feature = "managed-third-source-alpha")]
 const PAUSE_EXIT: usize = 0x1558f4c;
 /// The game's own mid-battle single-slot retire (slot 6), the sequence `retire_at` mirrors.
@@ -749,13 +744,11 @@ const RETIRE_FREE: usize = 0x392eb40;
 #[cfg(feature = "managed-third-source-alpha")]
 const FIGHTER_MANAGER_INSTANCE: usize = 0x52b94f8;
 
-/// Exact 13.0.5 words: the two hook sites, the reference retire (its four `bl` targets are the callees above) and the
+/// Exact 13.0.5 words: the hook site, the reference retire (its four `bl` targets are the callees above) and the
 /// creation helper's owner step `0x4eb750-0x4eb76c` the re-creation relies on (`adrp/ldr` G = `[0x5324680]`,
 /// `ldr x8,[G+8*slot+0xe8]`, `cbnz x8,0x4eb770`, `bl 0x17eb000`: an owner is created only when none is live).
 #[cfg(feature = "managed-third-source-alpha")]
-const PAUSE_CONTRACT: [(usize, [u32; 16]); 4] = [
-    (PAUSE_INSTALL, [0xf9012a7f, 0xf9402bf9, 0xa9497bfd, 0xa9484ff4, 0xa94757f6, 0xa9465ff8, 0x910283ff, 0xd65f03c0,
-                     0x9001eee8, 0xf9457d08, 0xb40001a8, 0xb9400909, 0x53177d29, 0x71000d3f, 0x54000061, 0x394b5d09]),
+const PAUSE_CONTRACT: [(usize, [u32; 16]); 3] = [
     (PAUSE_EXIT, [0xb9416e68, 0xb9016a68, 0x12800014, 0x91058668, 0x320003e9, 0xb9016e74, 0x3907b27f, 0x79000109,
                   0xb001eb16, 0xf9427ec8, 0xf9400108, 0xf9401509, 0x52aa0015, 0xb40001c9, 0x528b240a, 0x386a692a]),
     (RETIRE_REFERENCE, [0xf9402b15, 0xb4000875, 0x320003e1, 0xaa1503e0, 0x9405a11d, 0xaa1503e0, 0x94059d2f, 0xf9402b15,
@@ -767,13 +760,13 @@ const PAUSE_CONTRACT: [(usize, [u32; 16]); 4] = [
 const OWNER_REUSE: usize = 0x4eb750;
 
 #[cfg(feature = "managed-third-source-alpha")]
-const PAUSE_SEAMS: &[&str] = &["capacity.pause_state_install", "capacity.pause_state_exit", "capacity.retire_653490",
+const PAUSE_SEAMS: &[&str] = &["capacity.pause_state_exit", "capacity.retire_653490",
     "body_bank.finalize_entry", "lifecycle.destruction_entry", "special_groups.heap_free"];
 
 #[cfg(feature = "managed-third-source-alpha")]
 static PAUSE_RETIRE_VERIFIED: AtomicBool = AtomicBool::new(false);
 
-/// The words at the hook sites and the reference retire are exactly 13.0.5's, and the reference's four calls land on
+/// The words at the hook site, the owner step and the reference retire are exactly 13.0.5's, and the reference's four calls land on
 /// the callees `retire_at` uses.
 #[cfg(feature = "managed-third-source-alpha")]
 unsafe fn verify_pause_retire(base: usize) -> Result<(), usize> {
@@ -794,22 +787,12 @@ unsafe fn verify_pause_retire(base: usize) -> Result<(), usize> {
     Ok(())
 }
 
-/// A state was just installed: when it is the pause state, retire our actorless helpers before its exit block walks.
-#[cfg(feature = "managed-third-source-alpha")]
-#[skyline::hook(offset = 0x1558668, inline)]
-unsafe fn pause_state_installed(ctx: &InlineCtx) {
-    crate::runtime::threads::headroom("pause_state_installed");
-    if ctx.registers[8].x() as usize == BASE.load(Ordering::Acquire) + PAUSE_STATE {
-        super::sources::pause_state(true);
-    }
-}
-
-/// The pause state's exit block is about to walk the entries: release the creation hold; report any actorless walk.
+/// The pause is opening and the exit block is about to walk the entries: retire our actorless helpers first.
 #[cfg(feature = "managed-third-source-alpha")]
 #[skyline::hook(offset = 0x1558f4c, inline)]
 unsafe fn pause_state_exit(_ctx: &InlineCtx) {
     crate::runtime::threads::headroom("pause_state_exit");
-    super::sources::pause_state(false);
+    super::sources::pause_opening();
 }
 
 /// The FighterManager entry pointer in `slot` (1-7), or 0. Values only; game thread.
@@ -943,7 +926,7 @@ pub(super) unsafe fn init(base: usize, load_contract: Option<VerifiedLoad>) {
                 "[PauseHelper] contract mismatch +0x{:x}; pause retire disabled", offset));
         }
         if gate("native_source_capacity", PAUSE_SEAMS, contract.is_ok()) && contract.is_ok() {
-            skyline::install_hooks!(pause_state_installed, pause_state_exit);
+            skyline::install_hooks!(pause_state_exit);
             PAUSE_RETIRE_VERIFIED.store(true, Ordering::Release);
         }
     }
