@@ -217,3 +217,11 @@ ceiling = 140843
 date = "2026-11-05"
 reason = "rc.6: switch P1 to a combo's recorded fighter with the named macros' Switch/Keep question, one explicit P1 load (p23/combo-switch, operator 2026-11-05 DEFERRED-LIST); measured 140843 at 5bdccb6 (tools/size_gate.py), +279 over the rc.5 candidate's 140564"
 approved_by = "Operator 2026-11-05: 'Raise as needed' (standing; relayed by primary 35137355 in the P21 order ~17:55Z; the P22 order of 18:30Z did not restate it), own commit"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 141042
+date = "2026-11-05"
+reason = "rc.6 p23/combos-lobby: Switch/Keep merged onto the rc.5 candidate, and the combo rows open in lobby practice; measured 141042 at f9dc80d (tools/size_gate.py), +199 over the previous ceiling 140843"
+approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed', own commit"
