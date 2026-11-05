@@ -50,11 +50,6 @@ fn note(out: usize, slot: i64, state: usize) {
     // Package 6: the waiting-room practice engine's once-per-frame step, before this frame's input processing (Player 1's poll).
     if slot == 0 {
         crate::runtime::lobby::update();
-        // HB1 route A4 prototype (diag only): a new A/B view reaches route B's spheres even while the game is paused.
-        #[cfg(feature = "diag")]
-        unsafe {
-            crate::runtime::features::hitbox::view_poll()
-        };
     }
     pending.set_controller(&NativeTls, controller);
     // Chords read the raw controller before the delay, so they are never delayed (SPEC-input-04 §5).

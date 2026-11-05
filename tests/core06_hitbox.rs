@@ -341,12 +341,11 @@ fn core06_off_restores() {
 
 #[test]
 fn core06_site_guards() {
-    // Three hooks, twelve called natives and ten relied windows (the Lua stack reads, HB1's three HitModule windows and, for
-    // the own orbs of the route A4 prototype, the bone transform, the projection, its screen size words and per-handle
-    // visibility).
+    // Three hooks, eleven called natives and ten relied windows (the Lua stack reads, HB1's three HitModule windows and, for
+    // the own orbs (decision HB-OWN-ORBS), the bone transform, the projection and its screen size words).
     let hooks: Vec<&str> = SITES.iter().filter(|s| matches!(s.kind, SeamKind::Hook { .. })).map(|s| s.name).collect();
     assert_eq!(hooks, sites_hitbox::HOOK_ROWS);
-    assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Called)).count(), 12);
+    assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Called)).count(), 11);
     assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Relied)).count(), 10);
     for site in SITES.iter() {
         assert_eq!(site.guard.len(), 64, "{}: a 64-byte guard", site.name);
@@ -408,7 +407,6 @@ fn core06_site_guards() {
         (sites_hitbox::ORB_JOINT_POSITION_OFFSET, "orb_joint_position"),
         (sites_hitbox::ORB_WORLD_TO_SCREEN_OFFSET, "orb_world_to_screen"),
         (sites_hitbox::ORB_SCREEN_SIZE_OFFSET, "orb_screen_size"),
-        (sites_hitbox::HITBOX_SET_VISIBLE_OFFSET, "sphere_effect_set_visible"),
     ] {
         assert_eq!(model::sites_hitbox::SITES.iter().find(|s| s.name == name).map(|s| s.offset), Some(offset), "{name}");
     }

@@ -497,24 +497,19 @@ pub mod natives {
         at::<extern "C" fn(usize, bool)>(crate::model::sites_hitbox::HITBOX_SLEEP_EFFECT_OFFSET).map_or_else(Default::default, |f| f(accessor, sleep))
     }
 
-    /// `EffectModule::set_visible(accessor, handle, visible)`: shows or hides one of the plugin's own spheres.
-    pub unsafe fn sphere_set_visible(accessor: usize, handle: u32, visible: bool) {
-        at::<extern "C" fn(usize, u32, bool)>(crate::model::sites_hitbox::HITBOX_SET_VISIBLE_OFFSET).map_or_else(Default::default, |f| f(accessor, handle, visible))
-    }
-
-    /// `ModelModule::joint_global_position_with_offset(accessor, joint, offset, out, flag)`: the world position of `offset` in
-    /// the bone's frame (`None` when the row was not granted).
-    pub unsafe fn joint_position(accessor: usize, joint: u64, offset: &[f32; 3], flag: bool) -> Option<[f32; 3]> {
+    /// `ModelModule::joint_global_position_with_offset(accessor, joint, offset, out, false)`: the world position of `offset`
+    /// in the bone's frame (`None` when the row was not granted). With `false` the call only reads the joint matrix; `true`
+    /// would make it update the model first (slot `0x140` calls its own `0xb0`), a write the visualizer never makes.
+    pub unsafe fn joint_position(accessor: usize, joint: u64, offset: &[f32; 3]) -> Option<[f32; 3]> {
         type JointPosition = extern "C" fn(usize, u64, *const [f32; 4], *mut [f32; 4], bool);
         let local = Vector4 { v: [offset[0], offset[1], offset[2], 0.0] };
         let mut out = Vector4 { v: [0.0; 4] };
         at::<JointPosition>(crate::model::sites_hitbox::ORB_JOINT_POSITION_OFFSET).map(|f| {
-            f(accessor, joint, &local.v, &mut out.v, flag);
+            f(accessor, joint, &local.v, &mut out.v, false);
             [out.v[0], out.v[1], out.v[2]]
         })
     }
 
-    #[cfg(feature = "diag")]
     /// The game's world-to-screen projection with the render camera (`(out_x*, out_y*, pos&, false)`): pixels, y down
     /// (`None` when the row was not granted).
     pub unsafe fn world_to_screen(pos: &[f32; 3]) -> Option<[f32; 2]> {
@@ -527,7 +522,6 @@ pub mod natives {
         })
     }
 
-    #[cfg(feature = "diag")]
     /// The two screen size words that projection maps with (read only when its relied row was granted).
     pub unsafe fn screen_size_words() -> Option<[f32; 2]> {
         use crate::model::sites_hitbox::{ORB_SCREEN_H_WORD, ORB_SCREEN_SIZE_OFFSET, ORB_SCREEN_W_WORD};

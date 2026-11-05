@@ -49,15 +49,28 @@ fn err<E: std::fmt::Debug>(what: &str) -> impl FnOnce(E) -> String + '_ {
 fn layout_specs(waiting: bool) -> Vec<Spec> {
     let mut specs = panes::specs();
     if waiting {
-        // All three panel roots belong to the waiting host: menu, notices and
-        // input log. Keep their internal parent relationships unchanged.
+        // The panel roots belong to the waiting host: menu, notices and
+        // input log. Keep their internal parent relationships unchanged. The
+        // hitbox orbs stay under RootPane (`orbs_first`).
+        let orbs = panes::name_of(panes::IDX_ORBS);
         for spec in &mut specs {
-            if spec.parent == panes::Name::new("RootPane") {
+            if spec.parent == panes::Name::new("RootPane") && spec.name != orbs {
                 spec.parent = WAITING_PORT;
             }
         }
     }
     specs
+}
+
+/// The hitbox orbs are drawn under every stock and plugin pane, as the game's effect spheres were (under the HUD, the
+/// pause menu and the plugin's menu): their container becomes RootPane's first child.
+fn orbs_first(layout: &mut BFLYT) -> Result<()> {
+    let orbs = panes::name_of(panes::IDX_ORBS);
+    let root = layout.root_pane.as_mut().ok_or("root pane missing")?;
+    let at = root.children.iter().position(|p| p.name == orbs.as_str()).ok_or("orb container missing")?;
+    let container = root.children.remove(at);
+    root.children.insert(0, container);
+    Ok(())
 }
 
 fn add_pane(layout: &mut BFLYT, spec: &Spec, waiting: bool) -> Result<()> {
@@ -223,6 +236,7 @@ fn build(stock_path: &str, out: &str, waiting: bool) -> Result<()> {
     for spec in &specs {
         add_pane(&mut layout, spec, waiting)?;
     }
+    orbs_first(&mut layout)?;
     // These are the approved owned-game item renders, not baked fighter/stage portraits.
     // Keep the stock archive private; the distributed recipe contains only the delta.
     let textures = arc.position("timg/__Combined.bntx").ok_or("stock combined texture missing")?;
@@ -376,20 +390,22 @@ mod tests {
         let training = layout_specs(false);
         let waiting = layout_specs(true);
         assert_eq!(training.len(), waiting.len());
+        let orbs = panes::name_of(panes::IDX_ORBS);
         let mut roots = 0;
         for (a, b) in training.iter().zip(&waiting) {
             assert_eq!(a.name, b.name);
-            if a.parent == panes::Name::new("RootPane") {
+            if a.parent == panes::Name::new("RootPane") && a.name != orbs {
                 assert_eq!(b.parent, WAITING_PORT);
                 roots += 1;
             } else {
                 assert_eq!(a.parent, b.parent);
             }
         }
-        assert_eq!(roots, 4, "menu, notices, input log and the hitbox orbs");
-        for root in [panes::IDX_MENU, panes::IDX_NOTICE, panes::IDX_LOG, panes::IDX_ORBS] {
+        assert_eq!(roots, 3, "menu, notices and input log");
+        for root in [panes::IDX_MENU, panes::IDX_NOTICE, panes::IDX_LOG] {
             assert_eq!(waiting[root].parent, WAITING_PORT);
         }
+        assert_eq!(waiting[panes::IDX_ORBS].parent, panes::Name::new("RootPane"), "the orbs stay under RootPane, drawn first");
     }
 }
 

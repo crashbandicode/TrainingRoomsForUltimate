@@ -67,9 +67,8 @@ const BOUNDARIES: &[Boundary] = &[
     Boundary { function: "macros::after_layout_draw", owner: Some(Feature::NamedMacros), gate: Gate::Flag("ready") },
     // SPEC-core-06: the hitbox visualizer's per-fighter pass, called from the CPU core's frame wrapper: nothing until boot installs it.
     Boundary { function: "hitbox::frame", owner: Some(Feature::Hitbox), gate: Gate::Flag("INSTALLED") },
-    // HB1 route A4 prototype: the own orbs' layout-tick draw and the A/B view's call from the P1 input hook (diag builds).
+    // The own orbs' layout-tick draw (decision HB-OWN-ORBS).
     Boundary { function: "hitbox::draw_orbs", owner: Some(Feature::Hitbox), gate: Gate::Flag("INSTALLED") },
-    Boundary { function: "hitbox::view_poll", owner: Some(Feature::Hitbox), gate: Gate::Flag("INSTALLED") },
     // The input display's reads in the input-delay hook: dormant until boot enables the display.
     Boundary { function: "input_display::on_p1_poll", owner: Some(Feature::InputDisplay), gate: Gate::Flag("ENABLED") },
     // The recorder's entry points the other features call: dormant until boot enables the recorder.

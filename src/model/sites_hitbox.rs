@@ -5,7 +5,9 @@
 //!
 //! Three hooks (the `ATTACK` and `CATCH` animation commands and `GrabModule::set_rebound`), nine called natives of the
 //! attack, effect and motion modules, the Lua state's accessor getter, two relied-on windows (the Lua stack reads the plugin
-//! repeats from the game's own command code) and three relied-on windows of HitModule (the hurtbox tables, decision HB1).
+//! repeats from the game's own command code), three relied-on windows of HitModule (the hurtbox tables, decision HB1) and,
+//! for the own orbs (decision HB-OWN-ORBS), the joint-position thunk, the camera projection and its screen-size window. The
+//! effect natives remain for articles' spheres.
 //! Every row is a capability (`model::capabilities`); the natives the
 //! feature shares with other packages (`status_kind`, the constant lookup, `set_visible_kind`) stay in those packages' tables
 //! and enter the closure through `CROSS_NEEDS`.
@@ -31,19 +33,17 @@ pub const HITBOX_CATCH_STACK_OFFSET: usize = 0x22a_c2ec;
 pub const HITBOX_HURT_MODULE_OFFSET: usize = 0x203_db10;
 pub const HITBOX_HURT_GROUPS_OFFSET: usize = 0x46_9af0;
 pub const HITBOX_HURT_PART_OFFSET: usize = 0x46_8490;
-/// Own orbs (HB1 route A4, diag prototype; `model::hitbox_orbs`): the bone transform, the projection, its screen size words and
-/// the per-handle visibility of route B's spheres for the A/B view.
+/// Own orbs (decision HB-OWN-ORBS; `model::hitbox_orbs`): the bone transform, the projection and its screen size words.
 pub const ORB_JOINT_POSITION_OFFSET: usize = 0x205_7640;
 pub const ORB_WORLD_TO_SCREEN_OFFSET: usize = 0x134_1280;
 pub const ORB_SCREEN_SIZE_OFFSET: usize = 0x134_15f0;
-pub const HITBOX_SET_VISIBLE_OFFSET: usize = 0x201_7a30;
 /// The screen size words that projection reads (`.bss`, offsets from `.text`).
 pub const ORB_SCREEN_W_WORD: usize = 0x744_701c;
 pub const ORB_SCREEN_H_WORD: usize = 0x744_7020;
 /// The three hooks' rows (the other rows are called or relied on, never written).
 pub const HOOK_ROWS: [&str; 3] = ["hitbox_attack", "hitbox_catch", "hitbox_set_rebound"];
 
-pub static SITES: [Site; 25] = [
+pub static SITES: [Site; 24] = [
     Site {
         name: "hitbox_emitter_priority_limit",
         feature: Feature::Hitbox,
@@ -328,7 +328,7 @@ pub static SITES: [Site; 25] = [
             0x00, 0x3c, 0x40, 0xf9, 0x08, 0x00, 0x40, 0xf9, 0x03, 0xb9, 0x40, 0xf9, 0x60, 0x00, 0x1f, 0xd6,
             0x00, 0x3c, 0x40, 0xf9, 0x08, 0x00, 0x40, 0xf9, 0x04, 0xbd, 0x40, 0xf9, 0x80, 0x00, 0x1f, 0xd6,
         ],
-        note: "`ModelModule::joint_global_position_with_offset(accessor, Hash40 joint, offset&, out&, bool)` (lua_bind thunk `ldr x0,[x0,#0x78]; ldr x8,[x0]; ldr x5,[x8,#0x158]; and w4,w4,#1; br x5`): an own orb's world centre, the bone's transform of the sphere's offset (HB1 route A4 prototype).",
+        note: "`ModelModule::joint_global_position_with_offset(accessor, Hash40 joint, offset&, out&, bool)` (lua_bind thunk `ldr x0,[x0,#0x78]; ldr x8,[x0]; ldr x5,[x8,#0x158]; and w4,w4,#1; br x5`): an own orb's world centre, the bone's transform of the sphere's offset (decision HB-OWN-ORBS); called with false only (a read).",
     },
     Site {
         name: "orb_world_to_screen",
@@ -341,7 +341,7 @@ pub static SITES: [Site; 25] = [
             0xe0, 0x03, 0x80, 0x3d, 0x00, 0xd9, 0xc0, 0x3d, 0x28, 0x89, 0x01, 0x90, 0xf5, 0x03, 0x02, 0xaa,
             0xe0, 0x07, 0x80, 0x3d, 0x00, 0xad, 0xc1, 0x3d, 0x48, 0x89, 0x01, 0xb0, 0xf3, 0x03, 0x01, 0xaa,
         ],
-        note: "The projection behind `app::sv_camera_manager::world_to_screen` (`main+0x22832c0` calls it as `(out_x*, out_y*, pos&, bool)`): with `false`, the render camera's view (`[[main+0x5337ce8]+0x490]+0xe0`) and projection, divided by w, mapped to pixels; writes only its two outputs. Projects the own orbs (HB1 route A4 prototype).",
+        note: "The projection behind `app::sv_camera_manager::world_to_screen` (`main+0x22832c0` calls it as `(out_x*, out_y*, pos&, bool)`): with `false`, the render camera's view (`[[main+0x5337ce8]+0x490]+0xe0`) and projection, divided by w, mapped to pixels; writes only its two outputs. Projects the own orbs (decision HB-OWN-ORBS).",
     },
     Site {
         name: "orb_screen_size",
@@ -355,18 +355,5 @@ pub static SITES: [Site; 25] = [
             0x42, 0x1c, 0x24, 0x1e, 0xa8, 0x20, 0x20, 0x1e, 0x01, 0x01, 0x23, 0x1e, 0x88, 0x89, 0x01, 0xb0,
         ],
         note: "Inside that projection: the screen size words `main+0x744701c` / `+0x7447020` (`fcvtzu`, `ucvtf`, `* 0.5`, else the defaults at `main+0x44728b8` / `+0x44724c4`): the half extent the orbs map pixels back to the layout canvas with. Relied on, never written.",
-    },
-    Site {
-        name: "sphere_effect_set_visible",
-        feature: Feature::Hitbox,
-        offset: 0x2017a30,
-        kind: SeamKind::Called,
-        guard: [
-            0x00, 0xa0, 0x40, 0xf9, 0x08, 0x00, 0x40, 0xf9, 0x03, 0xc9, 0x40, 0xf9, 0x42, 0x00, 0x00, 0x12,
-            0x60, 0x00, 0x1f, 0xd6, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0xa0, 0x40, 0xf9, 0x08, 0x00, 0x40, 0xf9, 0x03, 0xcd, 0x40, 0xf9, 0x42, 0x00, 0x00, 0x12,
-            0x60, 0x00, 0x1f, 0xd6, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        ],
-        note: "`EffectModule::set_visible(accessor, unsigned handle, bool)` (lua_bind thunk to vtable slot 0x190): shows or hides one of the plugin's own route B spheres by its handle, for the diag A/B view of the own orbs.",
     },
 ];

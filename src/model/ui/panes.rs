@@ -271,8 +271,8 @@ pub const IDX_LOG_SHAFT: usize = IDX_LOG_GLYPH + LOG_ROWS * LOG_SLOTS;
 pub const IDX_LOG_HEAD: usize = IDX_LOG_SHAFT + LOG_ROWS * LOG_SLOTS;
 pub const IDX_LOG_FRAME: usize = IDX_LOG_HEAD + LOG_ROWS * LOG_SLOTS;
 pub const IDX_LOG_STATUS: usize = IDX_LOG_FRAME + LOG_ROWS;
-/// The hitbox visualizer's own orbs (`model::hitbox_orbs`, diag prototype of HB1 route A4): a container under
-/// `RootPane` and `ORBS` pictures of the plugin's own disc texture (`tr_orb_disc`, drawn by the layout builder), tinted by
+/// The hitbox visualizer's own orbs (`model::hitbox_orbs`, decision HB-OWN-ORBS): a container under `RootPane` (the
+/// layout builder makes it RootPane's first child in both layouts, so every other pane draws over it) and `ORBS` pictures of the plugin's own disc texture (`tr_orb_disc`, drawn by the layout builder), tinted by
 /// their vertex colours.
 pub const ORBS: usize = 192;
 pub const IDX_ORBS: usize = IDX_LOG_STATUS + LOG_ROWS;

@@ -1,6 +1,7 @@
-//! Own orbs: the hitbox visualizer's spheres drawn by the plugin's own layout panes instead of the game's `sys_shield`
-//! effects (decision HB1-route, route A4 in `artifacts/phase23/LANE-HITBOX-REPORT.md`). A diag-only prototype for the
-//! operator's A/B (primary order 2026-11-05 03:56Z): release builds keep route B; the diag build switches at run time.
+//! Own orbs: the hitbox visualizer's fighter spheres drawn by the plugin's own layout panes instead of the game's
+//! `sys_shield` effects (decision HB-OWN-ORBS, option 1, operator 2026-11-05: "go with discs for all"; the A/B is
+//! `docs/decisions/HB-OWN-ORBS-ab.png`). The shared effect pool refused part of a large fighter's spheres every pass; an
+//! orb is never refused. Articles keep the effect spheres.
 //!
 //! The same `HandleSet` keeps the spheres; `OrbSink` is its `Effects` for own orbs: a request always succeeds and a held
 //! orb lives while the fighter's status is the one it was made in (what the game's `CONCLUDE_STATUS` did to an effect).
@@ -9,108 +10,6 @@
 //! per orb (`plan_pane`). Pure and host-tested (`tests/core06_orbs.rs`).
 
 use super::hitbox::{Effects, Sphere, FIGHTER_SETS, MAX_HELD, SCALE};
-
-/// Which renderer draws the spheres. `Effects` is route B (release); `Orbs` draws only own orbs (no effect is requested);
-/// `Both` keeps route B's effects and computes the orbs beside them, for the A/B (`View` picks the layer shown).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Route {
-    Effects,
-    Orbs,
-    Both,
-}
-
-/// The layer shown while `Route::Both` runs.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum View {
-    Effects,
-    Orbs,
-    Both,
-}
-
-impl Route {
-    pub const fn code(self) -> u8 {
-        self as u8
-    }
-
-    pub const fn from_code(code: u8) -> Route {
-        match code {
-            1 => Route::Orbs,
-            2 => Route::Both,
-            _ => Route::Effects,
-        }
-    }
-
-    /// Whether the pass computes and publishes orbs.
-    pub const fn orbs(self) -> bool {
-        !matches!(self, Route::Effects)
-    }
-
-    /// Whether the fighter's set holds the game's effects (route B's `Effects`).
-    pub const fn effects(self) -> bool {
-        !matches!(self, Route::Orbs)
-    }
-}
-
-impl View {
-    pub const fn code(self) -> u8 {
-        self as u8
-    }
-
-    pub const fn from_code(code: u8) -> View {
-        match code {
-            0 => View::Effects,
-            1 => View::Orbs,
-            _ => View::Both,
-        }
-    }
-}
-
-/// Whether the orb panes show, and whether route B's effects show, for a route and view.
-pub const fn layers(route: Route, view: View) -> (bool, bool) {
-    match route {
-        Route::Effects => (false, true),
-        Route::Orbs => (true, false),
-        Route::Both => (!matches!(view, View::Effects), !matches!(view, View::Orbs)),
-    }
-}
-
-/// One diag request (`diag-hitbox-route.req`): words `route=effects|orbs|both`, `view=effects|orbs|both`, `joint=0|1`
-/// (the last argument of the joint position call) and `orbtint=cyan|off` (every orb drawn cyan, so both layers of one
-/// frame can be told apart for the camera-lag measure), in any order; unknown words are ignored.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct Request {
-    pub route: Option<Route>,
-    pub view: Option<View>,
-    pub joint_flag: Option<bool>,
-    pub cyan: Option<bool>,
-    /// orbprobe=1: the next orb draw logs where its panes went (diag).
-    pub probe: bool,
-}
-
-/// The colour every orb takes while `orbtint=cyan` is in force.
-pub const CYAN: [u8; 4] = [0, 255, 255, ORB_ALPHA];
-
-pub fn parse_request(text: &str) -> Request {
-    let mut out = Request::default();
-    for word in text.split_whitespace() {
-        let Some((key, value)) = word.split_once('=') else { continue };
-        let layer = match value {
-            "effects" => Some(0),
-            "orbs" => Some(1),
-            "both" => Some(2),
-            _ => None,
-        };
-        match (key, layer) {
-            ("route", Some(code)) => out.route = Some(Route::from_code(code)),
-            ("view", Some(code)) => out.view = Some(View::from_code(code)),
-            ("joint", _) if value == "0" || value == "1" => out.joint_flag = Some(value == "1"),
-            ("orbtint", _) if value == "cyan" || value == "off" => out.cyan = Some(value == "cyan"),
-            ("orbprobe", _) if value == "1" => out.probe = true,
-            _ => {}
-        }
-    }
-    out
-}
 
 /// An own orb's handle: non-zero, and naming the status the orb was made in.
 pub const fn orb_handle(status: i32) -> u32 {

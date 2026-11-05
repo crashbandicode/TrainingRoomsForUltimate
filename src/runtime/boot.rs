@@ -318,8 +318,7 @@ fn run_inner() {
     if !ui::hud::register(hud_draw::draw) {
         diagnostic(format_args!("[TrainingRooms] hud draw not registered: every slot taken"));
     }
-    // HB1 route A4 prototype (diag only): the hitbox visualizer's own orbs draw from the same tick.
-    #[cfg(feature = "diag")]
+    // The hitbox visualizer's own orbs (decision HB-OWN-ORBS) draw from the same tick.
     if !ui::hud::register(hitbox::draw_orbs) {
         diagnostic(format_args!("[TrainingRooms] orb draw not registered: every slot taken"));
     }

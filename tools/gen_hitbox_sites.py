@@ -59,13 +59,11 @@ ROWS = [
     ("hurtbox_part_shape", 0x468490, RELIED,
      "The hurtbox part update: a part whose status word is 3 (off) gets no shape; otherwise the capsule from the part's offset vectors `+0x08` and `+0x14`, size `+0x20` and node `+0x28` on its bone. Relied on, never written."),
     ("orb_joint_position", 0x2057640, CALLED,
-     "`ModelModule::joint_global_position_with_offset(accessor, Hash40 joint, offset&, out&, bool)` (lua_bind thunk `ldr x0,[x0,#0x78]; ldr x8,[x0]; ldr x5,[x8,#0x158]; and w4,w4,#1; br x5`): an own orb's world centre, the bone's transform of the sphere's offset (HB1 route A4 prototype)."),
+     "`ModelModule::joint_global_position_with_offset(accessor, Hash40 joint, offset&, out&, bool)` (lua_bind thunk `ldr x0,[x0,#0x78]; ldr x8,[x0]; ldr x5,[x8,#0x158]; and w4,w4,#1; br x5`): an own orb's world centre, the bone's transform of the sphere's offset (decision HB-OWN-ORBS); called with false only (a read)."),
     ("orb_world_to_screen", 0x1341280, CALLED,
-     "The projection behind `app::sv_camera_manager::world_to_screen` (`main+0x22832c0` calls it as `(out_x*, out_y*, pos&, bool)`): with `false`, the render camera's view (`[[main+0x5337ce8]+0x490]+0xe0`) and projection, divided by w, mapped to pixels; writes only its two outputs. Projects the own orbs (HB1 route A4 prototype)."),
+     "The projection behind `app::sv_camera_manager::world_to_screen` (`main+0x22832c0` calls it as `(out_x*, out_y*, pos&, bool)`): with `false`, the render camera's view (`[[main+0x5337ce8]+0x490]+0xe0`) and projection, divided by w, mapped to pixels; writes only its two outputs. Projects the own orbs (decision HB-OWN-ORBS)."),
     ("orb_screen_size", 0x13415F0, RELIED,
      "Inside that projection: the screen size words `main+0x744701c` / `+0x7447020` (`fcvtzu`, `ucvtf`, `* 0.5`, else the defaults at `main+0x44728b8` / `+0x44724c4`): the half extent the orbs map pixels back to the layout canvas with. Relied on, never written."),
-    ("sphere_effect_set_visible", 0x2017A30, CALLED,
-     "`EffectModule::set_visible(accessor, unsigned handle, bool)` (lua_bind thunk to vtable slot 0x190): shows or hides one of the plugin's own route B spheres by its handle, for the diag A/B view of the own orbs."),
 ]
 
 

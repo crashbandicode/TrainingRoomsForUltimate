@@ -1,4 +1,4 @@
-//! HB1 route A4 prototype (own orbs, `model::hitbox_orbs`): the request parser, the own-orb `Effects` sink inside the same
+//! Own orbs (decision HB-OWN-ORBS, `model::hitbox_orbs`): the own-orb `Effects` sink inside the same
 //! `HandleSet` the visualizer uses (never refused, concluded with the status like route B's effects), the board the layout
 //! tick reads, and the projection's pane plan.
 
@@ -7,41 +7,10 @@
 mod model;
 
 use model::hitbox::{self, HandleSet, Sphere, FIGHTER_SETS, MAX_HELD};
-use model::hitbox_orbs::{self as orbs, Board, Orb, OrbSink, Request, Route, View};
+use model::hitbox_orbs::{self as orbs, Board, Orb, OrbSink};
 
 fn sphere(key: u32, x: f32, size: f32) -> Sphere {
     Sphere { key, joint: 0x1234, pos: [x, 0.0, 0.0], scale: hitbox::sphere_scale(size), tint: hitbox::HURTBOX_TINT }
-}
-
-#[test]
-fn requests_parse_route_view_and_joint_flag() {
-    assert_eq!(orbs::parse_request("route=orbs"), Request { route: Some(Route::Orbs), ..Request::default() });
-    assert_eq!(
-        orbs::parse_request(" view=effects\nroute=both joint=1 junk route=nope orbtint=cyan"),
-        Request { route: Some(Route::Both), view: Some(View::Effects), joint_flag: Some(true), cyan: Some(true), probe: false }
-    );
-    assert_eq!(
-        orbs::parse_request("joint=0 view=orbs orbtint=off orbtint=red orbprobe=1"),
-        Request { route: None, view: Some(View::Orbs), joint_flag: Some(false), cyan: Some(false), probe: true }
-    );
-    assert_eq!(orbs::parse_request(""), Request::default());
-    for route in [Route::Effects, Route::Orbs, Route::Both] {
-        assert_eq!(Route::from_code(route.code()), route);
-    }
-    for view in [View::Effects, View::Orbs, View::Both] {
-        assert_eq!(View::from_code(view.code()), view);
-    }
-}
-
-#[test]
-fn layers_follow_route_and_view() {
-    assert_eq!(orbs::layers(Route::Effects, View::Orbs), (false, true), "route B ignores the view");
-    assert_eq!(orbs::layers(Route::Orbs, View::Effects), (true, false), "orbs only never shows effects");
-    assert_eq!(orbs::layers(Route::Both, View::Effects), (false, true));
-    assert_eq!(orbs::layers(Route::Both, View::Orbs), (true, false));
-    assert_eq!(orbs::layers(Route::Both, View::Both), (true, true));
-    assert!(!Route::Effects.orbs() && Route::Orbs.orbs() && Route::Both.orbs());
-    assert!(Route::Effects.effects() && !Route::Orbs.effects() && Route::Both.effects());
 }
 
 #[test]
