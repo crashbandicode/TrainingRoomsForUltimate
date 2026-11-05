@@ -150,6 +150,53 @@ fn a_named_macro_carries_its_mii_and_restores_it() {
     assert_eq!(ui.claim_character_request(), None);
 }
 
+/// The Eden fixture of `artifacts/phase23/rc4-combined/rows-replay`: a replay capture whose entry 1 is a Mii Gunner with
+/// REPLAY185's real companion (outfit 75, hat 125, colour 0, voice 37, specials 2221; `tests/mii_replay185_headgear.rs`)
+/// beside a Mario on entry 0, and a named macro carrying that Gunner's exact Mii. Written only on request:
+/// `RW_FIXTURE_DIR=<dir> cargo test --lib write_replay_window_fixture -- --ignored` makes `<dir>/replay_captures/` and
+/// `<dir>/macros/`, copied into the profile's `sd:/ultimate/TrainingRooms/`.
+#[test]
+#[ignore]
+fn write_replay_window_fixture() {
+    use crate::engine::macros::{CaptureArchive, Library, ReplayFrame, ReplaySession, ReplayTrack};
+    let dir = std::path::PathBuf::from(std::env::var("RW_FIXTURE_DIR").expect("RW_FIXTURE_DIR"));
+    let mut companion = vec![1, 1, 1, 0x4a, 1, 0];
+    companion.extend_from_slice(&[0; 0x26]);
+    companion.extend_from_slice(&[
+        0, 11, 0, 64, 64, 0, 0, 5, 9, 0, 0, 75, 8, 0, 10, 8, 7, 6, 1, 0, 18, 12, 8, 7, 6, 1, 1, 12, 2, 4, 9, 13, 8, 8, 6, 1, 8, 5,
+        1, 8, 5, 17, 20, 5, 4, 1, 4, 2, 20, 0,
+    ]);
+    companion.extend_from_slice(&[75, 0, 125, 0, 0, 0, 37, 0, 2, 2, 2, 1]);
+    let miis = ReplayMiis::from_bytes(&companion).unwrap();
+    let rows = RowIds { outfit: 0x1300_4b14_67a2_d93a, hat: 0x5a00_7d15_3956_e6b8 };
+    let gunner = miis.for_track(1, 0x4a).unwrap().resolve(rows).unwrap();
+    // Three seconds standing (status 0, WAIT: a clean start), with an A press every second.
+    let track = |entry: i32, kind: i32| ReplayTrack {
+        entry,
+        frames: (0..180)
+            .map(|f| ReplayFrame {
+                input: InputFrame { buttons: u32::from(f % 60 == 30), ..InputFrame::default() },
+                start: StartState::neutral(kind, 0, if entry == 0 { 1.0 } else { -1.0 }),
+                x: if entry == 0 { -30.0 } else { 30.0 },
+                y: 0.0,
+            })
+            .collect(),
+        quantized_analog: false,
+    };
+    let session = ReplaySession { tracks: vec![track(0, MARIO), track(1, 0x4a)], truncated: false };
+    let saved = CaptureArchive::new(dir.join("replay_captures"))
+        .save_with_miis("rc4-replay-window-gunner", "RC4 replay window: Mario vs Mii Gunner", "13.0.5", &session, Some(&miis))
+        .unwrap();
+    let mut macro_file = MacroRecording::new("RC4 Gunner Mii", "13.0.5", StartState::neutral(0x4a, 0, -1.0), frames()).unwrap();
+    macro_file.set_mii(gunner).unwrap();
+    let id = Library::new(dir.join("macros")).save_new(&macro_file).unwrap();
+    std::fs::write(
+        dir.join("fixture.json"),
+        serde_json::json!({ "capture_id": saved.id, "macro_id": id, "gunner_canonical": gunner.canonical().to_hex() }).to_string(),
+    )
+    .unwrap();
+}
+
 /// What stays closed: an ordinary named macro recorded with another fighter is refused while a CPU exists (the RC rule),
 /// and plays only on its own fighter; with no CPU yet (boot restore) it waits.
 #[test]
