@@ -138,7 +138,17 @@ All of them existed before this spec; no new hook or native site is added.
 So the value is the hitstun frames left, and hitstun ends when it reaches 0. Where it is decremented is not in
 `lua2cpp_common` and was not traced statically. The constant `K` (the frames between the sampled `r` and the sampled
 free frame) is therefore measured: on every hit that is not followed up, the diag build logs `r` on each hitstun
-frame and the observed free frame. `K = 1` was assumed for the model and must be confirmed by that log.
+frame and the observed free frame. **Measured `K = 0`** (Eden `tr-p23-ally-iv1`, 2026-11-05, diag `192502cc`): with
+the first assumption `K = 1`, all 30 stun checks predicted the free frame one frame late; on the frame the CPU reads
+`r = 0` it is already actionable.
+
+**Known limits from that boot (open):**
+- Fighter-specific attack statuses (above `FINAL`, e.g. Steve's jab) are named "Move" in the LAST row; only the
+  engine-common attack statuses have names.
+- P1's lane showed no hitlag cells: `StopModule::is_stop` was true for the CPU in hitlag and apparently not for P1 as
+  the attacker. Whether the attacker's freeze is `StopModule::is_hit` (`0x2089210`) is to be settled with a guest
+  tracepoint before any change.
+- Steve's jab startup frames read as actionable (P1 became busy on the hit frame), so they show no startup cells.
 
 **When `r` is unavailable** (the id did not resolve, the value is not finite or not in 0..=255, or `get_float`'s row
 was refused): a true combo shows "TRUE" without its number, and the link margin is absent. Everything else is drawn.
