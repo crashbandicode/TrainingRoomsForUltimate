@@ -83,6 +83,8 @@ pub struct Request {
     pub view: Option<View>,
     pub joint_flag: Option<bool>,
     pub cyan: Option<bool>,
+    /// orbprobe=1: the next orb draw logs where its panes went (diag).
+    pub probe: bool,
 }
 
 /// The colour every orb takes while `orbtint=cyan` is in force.
@@ -103,6 +105,7 @@ pub fn parse_request(text: &str) -> Request {
             ("view", Some(code)) => out.view = Some(View::from_code(code)),
             ("joint", _) if value == "0" || value == "1" => out.joint_flag = Some(value == "1"),
             ("orbtint", _) if value == "cyan" || value == "off" => out.cyan = Some(value == "cyan"),
+            ("orbprobe", _) if value == "1" => out.probe = true,
             _ => {}
         }
     }

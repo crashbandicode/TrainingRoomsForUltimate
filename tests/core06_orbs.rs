@@ -18,11 +18,11 @@ fn requests_parse_route_view_and_joint_flag() {
     assert_eq!(orbs::parse_request("route=orbs"), Request { route: Some(Route::Orbs), ..Request::default() });
     assert_eq!(
         orbs::parse_request(" view=effects\nroute=both joint=1 junk route=nope orbtint=cyan"),
-        Request { route: Some(Route::Both), view: Some(View::Effects), joint_flag: Some(true), cyan: Some(true) }
+        Request { route: Some(Route::Both), view: Some(View::Effects), joint_flag: Some(true), cyan: Some(true), probe: false }
     );
     assert_eq!(
-        orbs::parse_request("joint=0 view=orbs orbtint=off orbtint=red"),
-        Request { route: None, view: Some(View::Orbs), joint_flag: Some(false), cyan: Some(false) }
+        orbs::parse_request("joint=0 view=orbs orbtint=off orbtint=red orbprobe=1"),
+        Request { route: None, view: Some(View::Orbs), joint_flag: Some(false), cyan: Some(false), probe: true }
     );
     assert_eq!(orbs::parse_request(""), Request::default());
     for route in [Route::Effects, Route::Orbs, Route::Both] {

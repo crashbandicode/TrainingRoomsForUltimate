@@ -206,6 +206,9 @@ pub fn set_request(request: orbs::Request) {
     if let Some(cyan) = request.cyan {
         CYAN.store(cyan, Ordering::Release);
     }
+    if request.probe {
+        stats::PROBE.store(true, Ordering::Release);
+    }
     let epoch = VIEW_EPOCH.fetch_add(1, Ordering::AcqRel) + 1;
     let passes = STORE.lock().passes;
     crate::runtime::diag_log::diagnostic(format_args!(
@@ -315,6 +318,9 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
     let menu = crate::runtime::published::input_owners().contains(crate::model::input_delay::Owners::MENU);
     let mut n = 0;
     let mut over = 0;
+    // Diag: where the hurt-tinted (yellow) and the other planned panes went: count, x/y range, size range.
+    #[cfg(feature = "diag")]
+    let mut seen = [stats::PaneRange::EMPTY; 2];
     if shown && SETTING.load(Ordering::Acquire) && !menu {
         let half = match natives::screen_size_words() {
             Some([w, h]) => [orbs::screen_half(w, orbs::SCREEN_HALF_DEFAULT[0]), orbs::screen_half(h, orbs::SCREEN_HALF_DEFAULT[1])],
@@ -325,6 +331,8 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
             let [a, b] = orbs::edge_points(orb);
             let (Some(c), Some(ea), Some(eb)) = (natives::world_to_screen(&orb.centre), natives::world_to_screen(&a), natives::world_to_screen(&b)) else { continue };
             let Some(plan) = orbs::plan_pane(c, [ea, eb], half, orb.color) else { continue };
+            #[cfg(feature = "diag")]
+            seen[usize::from(!(plan.color[0] > 200 && plan.color[1] > 200 && plan.color[2] < 60))].add(&plan);
             if n == p::ORBS {
                 over += 1;
                 continue;
@@ -349,7 +357,7 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
     pane::set_visible(cache.container as *mut skyline::nn::ui2d::Pane, n != 0);
     cache.shown = n;
     #[cfg(feature = "diag")]
-    stats::orbs_drawn(n as u32, over);
+    stats::orbs_drawn(n as u32, over, &seen);
     #[cfg(not(feature = "diag"))]
     let _ = over;
 }
@@ -917,13 +925,42 @@ mod stats {
         }
     }
 
-    /// One layout tick's draw: a line whenever the number of orb panes shown changes, with the pass number it was drawn at
-    /// (a paused game draws at one pass number).
-    pub fn orbs_drawn(n: u32, over: u32) {
+    /// The planned panes of one class (hurt-tinted yellow, or the rest): count, canvas x/y range, size range, last colour.
+    #[derive(Clone, Copy)]
+    pub struct PaneRange {
+        n: u32,
+        x: [f32; 2],
+        y: [f32; 2],
+        size: [f32; 2],
+        color: [u8; 4],
+    }
+
+    impl PaneRange {
+        pub const EMPTY: PaneRange = PaneRange { n: 0, x: [f32::MAX, f32::MIN], y: [f32::MAX, f32::MIN], size: [f32::MAX, f32::MIN], color: [0; 4] };
+
+        pub fn add(&mut self, plan: &crate::model::hitbox_orbs::OrbPane) {
+            self.n += 1;
+            self.x = [self.x[0].min(plan.x), self.x[1].max(plan.x)];
+            self.y = [self.y[0].min(plan.y), self.y[1].max(plan.y)];
+            self.size = [self.size[0].min(plan.size), self.size[1].max(plan.size)];
+            self.color = plan.color;
+        }
+    }
+
+    /// Set by `orbprobe=1`: the next draw logs its pane ranges whatever changed.
+    pub static PROBE: core::sync::atomic::AtomicBool = core::sync::atomic::AtomicBool::new(false);
+
+    /// One layout tick's draw: a line whenever the number of orb panes shown changes (or on `orbprobe=1`), with the pass
+    /// number it was drawn at and where the hurt-tinted and the other panes went.
+    pub fn orbs_drawn(n: u32, over: u32, seen: &[PaneRange; 2]) {
         let pass = PASS_NO.load(Ordering::Relaxed);
         let key = (u64::from(n) << 32) | u64::from(over);
-        if LAST_DRAWN.swap(key, Ordering::Relaxed) != key {
-            diagnostic(format_args!("[Hitbox] orbs drawn n={n} over={over} view={:?} pass={pass}", super::view()));
+        if LAST_DRAWN.swap(key, Ordering::Relaxed) != key || PROBE.swap(false, Ordering::AcqRel) {
+            let [h, o] = seen;
+            diagnostic(format_args!(
+                "[Hitbox] orbs drawn n={n} over={over} view={:?} pass={pass} hurt_tint n={} x={:.0}..{:.0} y={:.0}..{:.0} size={:.1}..{:.1} rgba={:?} other n={} x={:.0}..{:.0} y={:.0}..{:.0} size={:.1}..{:.1}",
+                super::view(), h.n, h.x[0], h.x[1], h.y[0], h.y[1], h.size[0], h.size[1], h.color, o.n, o.x[0], o.x[1], o.y[0], o.y[1], o.size[0], o.size[1]
+            ));
         }
     }
 
