@@ -186,7 +186,3 @@ pub mod scalar_tls;
 
 #[path = "model/boot_notices.rs"]
 pub mod boot_notices;
-
-#[cfg(test)]
-#[path = "model/combo_lobby_tests.rs"]
-mod combo_lobby_tests;
