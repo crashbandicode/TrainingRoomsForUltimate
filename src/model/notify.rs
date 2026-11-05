@@ -18,8 +18,8 @@ pub const CAPACITY: usize = 8;
 pub const DELIVERED_CAPACITY: usize = 4;
 /// Longest notice body in bytes.
 pub const BODY_MAX: usize = 320;
-/// Text colour used when a post gives none (black).
-pub const DEFAULT_COLOR: [u8; 4] = [0, 0, 0, 255];
+/// Text colour used when a post gives none. Light, so it reads on the dark notice plate.
+pub const DEFAULT_COLOR: [u8; 4] = super::panes::TEXT;
 
 /// A UTF-8 body copied into the entry, independent of the producer's lifetime.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

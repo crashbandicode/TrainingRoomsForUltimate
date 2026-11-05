@@ -489,10 +489,10 @@ fn phase_notifications() {
     assert_eq!(Phase::Standby.tint(), Some([1.0, 0.0, 1.0]));
     assert_eq!(Phase::Recording.tint(), Some([1.0, 0.0, 0.0]));
     assert_eq!(Phase::Playback.tint(), None);
-    assert_eq!(Phase::Lockout.notice(), Some(("Lockout", [8, 8, 200, 255])));
-    assert_eq!(Phase::Standby.notice(), Some(("Standby", [200, 8, 200, 255])));
-    assert_eq!(Phase::Recording.notice(), Some(("Recording", [200, 8, 8, 255])));
-    assert_eq!(Phase::Playback.notice(), Some(("Playback", [0, 0, 0, 255])));
+    assert_eq!(Phase::Lockout.notice(), Some(("Lockout", [148, 176, 255, 255])));
+    assert_eq!(Phase::Standby.notice(), Some(("Standby", [255, 156, 255, 255])));
+    assert_eq!(Phase::Recording.notice(), Some(("Recording", [255, 132, 124, 255])));
+    assert_eq!(Phase::Playback.notice(), Some(("Playback", [236, 238, 242, 255])));
     assert_eq!(Phase::Idle.notice(), None);
     assert_eq!(NOTICE_HEADER, "Input Recording");
 }

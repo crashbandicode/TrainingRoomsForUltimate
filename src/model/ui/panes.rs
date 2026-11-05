@@ -240,13 +240,15 @@ pub const IDX_TILE_SOLO: usize = IDX_TILE_STRIPE + 2 * TILES;
 /// the renderer writes is below it. The panes after these (the notification panel and the input log) belong to the
 /// input package, which finds them by name when it draws.
 pub const MENU_COUNT: usize = IDX_TILE_SOLO + 2;
-/// The notification panel (SPEC-input-05): its own container under `RootPane`, a backing rectangle, a header and a
-/// text box. Written by the notices code of the input package.
+/// The notification panel (SPEC-input-05): its own container under `RootPane`. Each of its texts (header, short
+/// body, long body) has a dark plate drawn immediately before it. Written by the notices code of the input package.
 pub const IDX_NOTICE: usize = MENU_COUNT;
-pub const IDX_NOTICE_BASE: usize = IDX_NOTICE + 1;
+pub const IDX_NOTICE_HEADER_PLATE: usize = IDX_NOTICE + 1;
 pub const IDX_NOTICE_HEADER: usize = IDX_NOTICE + 2;
-pub const IDX_NOTICE_TEXT: usize = IDX_NOTICE + 3;
-pub const IDX_NOTICE_LONG: usize = IDX_NOTICE + 4;
+pub const IDX_NOTICE_TEXT_PLATE: usize = IDX_NOTICE + 3;
+pub const IDX_NOTICE_TEXT: usize = IDX_NOTICE + 4;
+pub const IDX_NOTICE_LONG_PLATE: usize = IDX_NOTICE + 5;
+pub const IDX_NOTICE_LONG: usize = IDX_NOTICE + 6;
 /// Full startup chord text plus its terminator; checked against notify::BODY_MAX.
 pub const NOTICE_LONG_UNITS: u16 = 321;
 /// The frame strip (SPEC-input-06, operator decision INPUT-VIZ A, 2026-11-05; it replaced the input log's 271 panes):
@@ -598,9 +600,11 @@ pub const fn name_of(index: usize) -> Name {
         i if i >= IDX_ORB && i < IDX_ORB + ORBS => Name::indexed(ORB_PREFIXES[(i - IDX_ORB) / 100], (i - IDX_ORB) % 100),
         IDX_MENU => ROOT,
         IDX_NOTICE => Name::new("TrModDisp0"),
-        IDX_NOTICE_BASE => Name::new("TrModDisp0Base"),
+        IDX_NOTICE_HEADER_PLATE => Name::new("TrModDisp0HdrPlate"),
         IDX_NOTICE_HEADER => Name::new("TrModDisp0Header"),
+        IDX_NOTICE_TEXT_PLATE => Name::new("TrModDisp0TxtPlate"),
         IDX_NOTICE_TEXT => Name::new("TrModDisp0Txt"),
+        IDX_NOTICE_LONG_PLATE => Name::new("TrModDisp0LongPlate"),
         IDX_NOTICE_LONG => Name::new("TrModDisp0Long"),
         i if i >= IDX_IV && i < IDX_CB => iv_name(i - IDX_IV),
         i if i >= IDX_CB && i < IDX_ORBS => cb_name(i - IDX_CB),
@@ -663,9 +667,33 @@ pub const TEXT: [u8; 4] = [236, 238, 242, 255];
 pub const TEXT_DIM: [u8; 4] = [150, 156, 168, 255];
 pub const TEXT_ON: [u8; 4] = [110, 210, 160, 255];
 pub const TEXT_OFF: [u8; 4] = [110, 116, 128, 255];
-/// Notices keep their specified black/custom body colors on an opaque light panel.
-pub const NOTICE_BACKGROUND: [u8; 4] = [255, 255, 255, 255];
-pub const NOTICE_HEADER: [u8; 4] = [38, 44, 56, 255];
+/// Opaque dark plate behind each notice text. A white plate disappeared on a bright stage; black body text
+/// on this plate is the UI20 failure (about 1.06:1), so the body colours are the light ones.
+pub const NOTICE_PLATE: [u8; 4] = PANEL;
+/// Padding, in canvas units, on every side of a notice text when its plate is sized.
+pub const NOTICE_PLATE_PAD: f32 = 16.0;
+pub const NOTICE_HEADER: [u8; 4] = TEXT;
+
+/// Which notice texts are shown. Each plate uses the same flag as its text.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct NoticeFaces {
+    pub header: bool,
+    pub body: bool,
+    pub long_body: bool,
+}
+
+/// `shown` is the notice container. A long body uses the long text and hides the short one.
+pub const fn notice_faces(shown: bool, long_body: bool) -> NoticeFaces {
+    NoticeFaces { header: shown, body: shown && !long_body, long_body: shown && long_body }
+}
+
+const fn padded([x, y, w, h]: [f32; 4]) -> [f32; 4] {
+    [x, y, w + 2.0 * NOTICE_PLATE_PAD, h + 2.0 * NOTICE_PLATE_PAD]
+}
+
+const NOTICE_HEADER_BOX: [f32; 4] = [0.0, 445.0, 960.0, 50.0];
+const NOTICE_TEXT_BOX: [f32; 4] = [0.0, 390.0, 960.0, 70.0];
+const NOTICE_LONG_BOX: [f32; 4] = [0.0, 325.0, 960.0, 180.0];
 
 /// `[x, y, w, h]`: a pane's place and size, the order `Spec` keeps them in.
 const fn rect(name: Name, [x, y, w, h]: [f32; 4], color: [u8; 4], visible: bool) -> Spec {
@@ -692,11 +720,13 @@ pub const fn spec(index: usize) -> Spec {
         i if i >= IDX_ORB && i < IDX_ORB + ORBS => under(rect(name, [0.0, 0.0, 64.0, 64.0], [255; 4], false), name_of(IDX_ORBS)),
         IDX_MENU => Spec { name, parent: ROOT_PANE, kind: Kind::Null, x: 0.0, y: 0.0, w: 1920.0, h: 1080.0, visible: false },
         IDX_NOTICE => Spec { name, parent: ROOT_PANE, kind: Kind::Null, x: 0.0, y: 0.0, w: 1920.0, h: 1080.0, visible: false },
-        IDX_NOTICE_BASE => under(rect(name, [0.0, 405.0, 1000.0, 150.0], NOTICE_BACKGROUND, true), name_of(IDX_NOTICE)),
-        IDX_NOTICE_HEADER => under(text(name, [0.0, 445.0, 960.0, 50.0], Align::Center, FONT_SMALL, 24, NOTICE_HEADER), name_of(IDX_NOTICE)),
-        IDX_NOTICE_TEXT => under(text(name, [0.0, 390.0, 960.0, 70.0], Align::Center, FONT, 48, TEXT), name_of(IDX_NOTICE)),
-        IDX_NOTICE_LONG => under(text(name, [0.0, 325.0, 960.0, 180.0], Align::Center, (14.0, 24.0),
-            NOTICE_LONG_UNITS, TEXT), name_of(IDX_NOTICE)),
+        IDX_NOTICE_HEADER_PLATE => under(rect(name, padded(NOTICE_HEADER_BOX), NOTICE_PLATE, true), name_of(IDX_NOTICE)),
+        IDX_NOTICE_HEADER => under(text(name, NOTICE_HEADER_BOX, Align::Center, FONT_SMALL, 24, NOTICE_HEADER), name_of(IDX_NOTICE)),
+        IDX_NOTICE_TEXT_PLATE => under(rect(name, padded(NOTICE_TEXT_BOX), NOTICE_PLATE, true), name_of(IDX_NOTICE)),
+        IDX_NOTICE_TEXT => under(text(name, NOTICE_TEXT_BOX, Align::Center, FONT, 48, TEXT), name_of(IDX_NOTICE)),
+        IDX_NOTICE_LONG_PLATE => under(rect(name, padded(NOTICE_LONG_BOX), NOTICE_PLATE, false), name_of(IDX_NOTICE)),
+        IDX_NOTICE_LONG => under(Spec { visible: false, ..text(name, NOTICE_LONG_BOX, Align::Center, (14.0, 24.0),
+            NOTICE_LONG_UNITS, TEXT) }, name_of(IDX_NOTICE)),
         IDX_BG => rect(name, [0.0, 0.0, PANEL_W, PANEL_H], PANEL, true),
         i if i >= IDX_IV && i < IDX_CB => iv_spec(i - IDX_IV, name),
         i if i >= IDX_CB && i < IDX_ORBS => cb_spec(i - IDX_CB, name),
