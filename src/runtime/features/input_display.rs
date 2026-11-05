@@ -224,7 +224,8 @@ pub fn session_clear() {
 
 /// The game initialised a fighter object again (`reset_hub::on_init`): a Training reset, a CPU replaced, a respawn.
 /// Nothing on the strip happened in this timeline any more, as after a save-state load (review IV-4: a hit just
-/// after a reset showed a link spanning it).
+/// after a reset showed a link spanning it). Kept out of line: the follow-up Eden rows arm its entry on release.
+#[inline(never)]
 pub fn fighter_initialised() {
     if ENABLED.load(Ordering::Acquire) {
         TRACKER.lock().clear();

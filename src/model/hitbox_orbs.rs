@@ -153,6 +153,8 @@ pub struct PaneTick {
     pub shown: usize,
 }
 
+// Kept out of line: the follow-up Eden rows arm its entry (x0 = drawn, x1 = shown) on the release NRO.
+#[inline(never)]
 pub fn pane_tick(drawn: usize, shown: usize) -> Option<PaneTick> {
     if drawn == 0 && shown == 0 {
         return None;
