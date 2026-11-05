@@ -76,21 +76,23 @@ fn verdict_value(verdict: Verdict) -> i32 {
 #[no_mangle]
 #[inline(never)]
 pub extern "C" fn tr_combo_link_v1(index: u32, link: i32, flags: u32, offset: i32) {
-    core::hint::black_box((index, link, flags, offset));
+    // Each trace function keeps a tag of its own: identical bodies are folded into one address by the release link
+    // (rc.4's ELF had link and attempt at the same offset), and a trace point could not tell them apart.
+    core::hint::black_box((0x4c49_4e4b_u32, index, link, flags, offset));
 }
 
 /// An attempt resolved: outcome (1 completed, 2 stopped, 3 cleared), true links, reference links, first link not true + 1.
 #[no_mangle]
 #[inline(never)]
 pub extern "C" fn tr_combo_attempt_v1(outcome: u32, true_links: u32, total: u32, first_bad: u32) {
-    core::hint::black_box((outcome, true_links, total, first_bad));
+    core::hint::black_box((0x4154_5450_u32, outcome, true_links, total, first_bad));
 }
 
 /// A combo was saved: its links and the first link's verdict value.
 #[no_mangle]
 #[inline(never)]
 pub extern "C" fn tr_combo_saved_v1(links: u32, first: i32, _reserved0: u32, _reserved1: u32) {
-    core::hint::black_box((links, first));
+    core::hint::black_box((0x5341_5645_u32, links, first));
 }
 
 /// *Save last combo* (worker): the open exchange when it has a link, else the one before.
