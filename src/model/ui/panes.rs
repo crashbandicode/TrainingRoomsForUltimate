@@ -255,10 +255,13 @@ pub const NOTICE_LONG_UNITS: u16 = 321;
 pub const IDX_IV: usize = IDX_NOTICE_LONG + 1;
 /// The hitbox visualizer's own orbs (`model::hitbox_orbs`, decision HB-OWN-ORBS): a container under `RootPane` (the
 /// layout builder makes it RootPane's first child in both layouts, so every other pane draws over it) and `ORBS` pictures of the plugin's own disc texture (`tr_orb_disc`, drawn by the layout builder), tinted by
-/// their vertex colours.
-pub const ORBS: usize = 192;
+/// their vertex colours. 512 = Training's most fighter objects (two fighters, each Ice Climbers with Nana) times the
+/// spheres one fighter holds (`hitbox::MAX_HELD`, 128); `tests/core06_orbs.rs` keeps the two equal (review HB-2).
+pub const ORBS: usize = 512;
 pub const IDX_ORBS: usize = IDX_IV + iv::COUNT;
 pub const IDX_ORB: usize = IDX_ORBS + 1;
+/// The orb panes' names: `tr_oa_00` .. `tr_of_11`, one prefix per hundred.
+const ORB_PREFIXES: [&str; 6] = ["tr_oa_", "tr_ob_", "tr_oc_", "tr_od_", "tr_oe_", "tr_of_"];
 /// How many panes the plugin adds to the layout.
 pub const COUNT: usize = IDX_ORB + ORBS;
 
@@ -465,7 +468,7 @@ pub const fn name_of(index: usize) -> Name {
     match index {
         i if i >= IDX_ITEM_ICON && i < IDX_ITEM_ICON + ITEM_ICONS => Name::indexed("tr_item_", i - IDX_ITEM_ICON),
         IDX_ORBS => Name::new("TrOrbs"),
-        i if i >= IDX_ORB && i < IDX_ORB + ORBS => Name::indexed(if i - IDX_ORB < 100 { "tr_oa_" } else { "tr_ob_" }, (i - IDX_ORB) % 100),
+        i if i >= IDX_ORB && i < IDX_ORB + ORBS => Name::indexed(ORB_PREFIXES[(i - IDX_ORB) / 100], (i - IDX_ORB) % 100),
         IDX_MENU => ROOT,
         IDX_NOTICE => Name::new("TrModDisp0"),
         IDX_NOTICE_BASE => Name::new("TrModDisp0Base"),

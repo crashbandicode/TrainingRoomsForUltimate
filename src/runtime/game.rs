@@ -498,8 +498,10 @@ pub mod natives {
     }
 
     /// `ModelModule::joint_global_position_with_offset(accessor, joint, offset, out, false)`: the world position of `offset`
-    /// in the bone's frame (`None` when the row was not granted). With `false` the call only reads the joint matrix; `true`
-    /// would make it update the model first (slot `0x140` calls its own `0xb0`), a write the visualizer never makes.
+    /// in the bone's frame (`None` when the row was not granted). The guarded thunk (`main+0x2057640`) jumps to the
+    /// ModelModule's vtable slot `0x158` with the flag masked to one bit (`and w4, w4, #1`). The plugin passes `false`, which
+    /// is meant to read the joint matrix without updating the model first. That rests on the implementation behind slot
+    /// `0x158`, not read yet: a follow-up Eden tracepoint on the thunk's `br x5` reads its address (review HB-3).
     pub unsafe fn joint_position(accessor: usize, joint: u64, offset: &[f32; 3]) -> Option<[f32; 3]> {
         type JointPosition = extern "C" fn(usize, u64, *const [f32; 4], *mut [f32; 4], bool);
         let local = Vector4 { v: [offset[0], offset[1], offset[2], 0.0] };

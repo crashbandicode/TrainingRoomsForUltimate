@@ -25,7 +25,7 @@ use crate::runtime::features::{chords, notices, writer};
 use crate::runtime::published;
 use crate::runtime::macros::{named_macros, replay_capture};
 use crate::runtime::ui::{external, requests};
-use crate::runtime::ui::state::{CLOSE_COUNT, CLOSING, EXT_SHOWN, FRAME, FRAME_SEQ, OPEN};
+use crate::runtime::ui::state::{CLOSE_COUNT, CLOSING, EXT_SHOWN, FRAME, FRAME_SEQ, JUMPS, OPEN};
 
 static INPUT: Ring<64> = Ring::new();
 static WORKER: OnceLock<Thread> = OnceLock::new();
@@ -113,7 +113,7 @@ struct Session {
     menu: Option<Menu>,
     /// Where the menu was when its model was last dropped (every close resets the input generation, which drops the
     /// model): the next opening comes back here. Kept for the rest of the boot, across scenes and Training resets.
-    place: Option<crate::model::menu::Place>,
+    keeper: crate::model::menu::PlaceKeeper,
     setups: super::setups::Ui,
     setup_note: Option<String>,
     stage_context: Option<crate::runtime::lobby::practice_stage_request::MenuContext>,
@@ -181,10 +181,7 @@ fn sync_input_generation(s: &mut Session) {
     let generation = INPUT.generation();
     if generation != s.input_generation {
         s.input_generation = generation;
-        if let Some(menu) = s.menu.as_ref() {
-            s.place = Some(menu.place());
-        }
-        s.menu = None;
+        s.keeper.drop_model(&mut s.menu);
         s.stage_context = None;
         s.stage_close = None;
         // Practice cleanup can suspend a same-lobby draft. The provider and
@@ -200,6 +197,7 @@ fn sync_input_generation(s: &mut Session) {
             EXT_SHOWN.store(false, Ordering::Release);
         }
         s.phase = Phase::Menu;
+        publish_jumps(s);
         diagnostic(format_args!("[Ui] menu session cleared"));
     }
 }
@@ -209,16 +207,7 @@ fn handle(event: Event, s: &mut Session) {
         s.stage_context = crate::runtime::lobby::practice_stage_request::menu_context();
         s.stage_close = None;
         let settings = SETTINGS.lock().clone().unwrap_or_else(Settings::factory);
-        let menu = match &mut s.menu {
-            Some(m) => {
-                m.reopen(settings, env());
-                m
-            }
-            None => s.menu.insert(Menu::new(settings, env())),
-        };
-        if let Some(place) = s.place {
-            menu.restore_place(place);
-        }
+        s.keeper.open(&mut s.menu, settings, env());
         s.panel = None;
         s.refusal = None;
         s.roster = None;
@@ -233,6 +222,7 @@ fn handle(event: Event, s: &mut Session) {
         #[cfg(feature = "mii-saved-alpha")]
         { s.opening = crate::runtime::ui::menu_app::sequence(); }
         publish_frame(s);
+        publish_jumps(s);
         #[cfg(feature = "diag")]
         if let Some(m) = s.menu.as_ref() {
             diagnostic(format_args!("[Ui] menu opened page={} cursor={} depth={} screen={:?}", m.page().id(), m.cursor(), m.depth(), m.screen()));
@@ -250,6 +240,14 @@ fn handle(event: Event, s: &mut Session) {
     }
     // Release-only packets also advance capture and update its hint/preview.
     if OPEN.load(Ordering::Acquire) { sync_panels(s); }
+    publish_jumps(s);
+}
+
+/// Tell the input hook whether ZL + Up / Down are jumps on what shows now (`Menu::takes_jumps`): only the menu's own
+/// pages and popup lists take them, never a layer panel or the clip editor (review MN-1).
+fn publish_jumps(s: &Session) {
+    let jumps = s.phase == Phase::Menu && s.menu.as_ref().is_none_or(Menu::takes_jumps);
+    JUMPS.store(jumps, Ordering::Release);
 }
 
 fn press(button: Button, s: &mut Session) {

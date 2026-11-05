@@ -645,13 +645,24 @@ impl Default for Settings {
     }
 }
 
-/// The migration of SPEC-input-06 §3.1: the new row's value from the old `input_display` array (Off stays Off, any
-/// other choice is the frame strip). `None` when the old value is not a one-of-four choice.
-pub fn migrate(old: &[u8]) -> Option<[u8; 2]> {
-    if old.len() != 4 || old.iter().filter(|v| **v != 0).count() != 1 {
-        return None;
+/// The migration of SPEC-input-06 §3.1: the new row's value from the old `input_display` array (its elements are
+/// already 0 or 1), read as the base read it (review IV-3): `settings::parse_row` padded or cut the array to its four
+/// options, and the display mode was the first option set (`None` = Off; Smash, Raw, Status Only, or nothing set,
+/// showed the display). Off stays Off; everything else is the frame strip.
+pub fn migrate(old: &[u8]) -> [u8; 2] {
+    if old.iter().take(4).position(|v| *v != 0) == Some(0) {
+        [1, 0]
+    } else {
+        [0, 1]
     }
-    Some(if old[0] != 0 { [1, 0] } else { [0, 1] })
+}
+
+/// Whether the strip samples and shows, and so owns the frame advantage (the Frame Advantage notice stands down while
+/// the strip shows the same number, SPEC-input-06 §3.5): boot enabled it, its row is On and the layout has its panes.
+/// Without the panes (another mod's `info_training`, the stock archive) nothing draws the strip, so the notice posts as
+/// before (review IV-2).
+pub const fn strip_owns_advantage(enabled: bool, on: bool, panes: bool) -> bool {
+    enabled && on && panes
 }
 
 #[cfg(test)]

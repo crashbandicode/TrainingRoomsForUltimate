@@ -343,6 +343,39 @@ fn clear_forgets_everything() {
     assert_eq!(t, Tracker::new());
 }
 
+/// Review IV-4: the runtime clears the tracker when the game initialises a fighter again (a Training reset, a CPU
+/// replaced), as on a save-state load. The jab connects, a reset comes while the CPU is still in hitstun, and an up
+/// tilt connects five frames after the old free frame: kept, the tracker joins the two hits into a `DROP 5` that spans
+/// the reset; cleared, the up tilt starts a fresh timeline with no link.
+#[test]
+fn a_reset_during_hitstun_leaves_no_link_spanning_it() {
+    let mut s = Script::new();
+    jab(&mut s, 10.0, 14);
+    let reset_at = s.frames.len();
+    let mut tail = Script::new();
+    for f in 14..21u32 {
+        tail.push(idle(), if f < 16 { cpu_after(7, 4, 10.0, f) } else { idle() }, NONE);
+    }
+    up_tilt(&mut tail, 21, |_| idle());
+    tail.push(p1_stop(Move::UpTilt, ATTACK_HI3, 5.0), cpu_hit(true, 30.0), NONE);
+    let run = |clear_at_reset: bool| {
+        let mut t = Tracker::new();
+        for (i, (p1, cpu, inputs)) in s.frames.iter().chain(tail.frames.iter()).enumerate() {
+            if clear_at_reset && i == reset_at {
+                t.clear();
+            }
+            t.step(*p1, *cpu, *inputs);
+        }
+        t
+    };
+    let kept = run(false);
+    assert!(matches!(kept.latest_link().map(|l| l.verdict), Some(Verdict::Drop(_))), "without the clear the link spans the reset: {:?}", kept.latest_link());
+    let cleared = run(true);
+    assert_eq!(cleared.latest_link(), None, "the hit before the reset is not part of this timeline");
+    assert_eq!(cleared.history().count(), 0);
+    assert!(cleared.columns().count() <= tail.frames.len(), "only frames after the reset are on screen");
+}
+
 #[test]
 fn predicted_free_rounds_up_and_refuses_nonsense() {
     assert_eq!(predicted_free(10, 3.0), Some(13));
@@ -406,11 +439,28 @@ fn the_status_predicates_use_the_resolved_constants() {
 
 #[test]
 fn migrate_the_old_rows() {
-    assert_eq!(migrate(&[1, 0, 0, 0]), Some([1, 0]), "Off stays Off");
+    assert_eq!(migrate(&[1, 0, 0, 0]), [1, 0], "Off stays Off");
     for old in [[0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]] {
-        assert_eq!(migrate(&old), Some([0, 1]), "Smash, Raw and Status Only become the frame strip");
+        assert_eq!(migrate(&old), [0, 1], "Smash, Raw and Status Only become the frame strip");
     }
-    assert_eq!(migrate(&[0, 0, 0, 0]), None);
-    assert_eq!(migrate(&[1, 1, 0, 0]), None);
-    assert_eq!(migrate(&[0, 1]), None);
+    // The base read (review IV-3): the array padded or cut to four options, the first option set is the mode, nothing
+    // set was the default (Smash Inputs).
+    assert_eq!(migrate(&[1, 0, 0]), [1, 0], "a short Off array was Off");
+    assert_eq!(migrate(&[1]), [1, 0]);
+    assert_eq!(migrate(&[1, 0, 0, 0, 1]), [1, 0], "a long array was cut to four options");
+    assert_eq!(migrate(&[0, 0, 0, 0, 1]), [0, 1], "an option past the fourth was not read");
+    assert_eq!(migrate(&[0, 1]), [0, 1]);
+    assert_eq!(migrate(&[1, 1, 0, 0]), [1, 0], "the first option set (None) was the mode");
+    assert_eq!(migrate(&[0, 0, 0, 0]), [0, 1], "nothing set showed the default display");
+    assert_eq!(migrate(&[]), [0, 1]);
+}
+
+/// Review IV-2: the strip owns the frame advantage only while it can draw it; a layout without its panes leaves the
+/// Frame Advantage notice posting as before (the base turned the display off on a missing pane, `input02`).
+#[test]
+fn a_layout_without_the_strip_panes_leaves_the_advantage_to_the_notice() {
+    assert!(strip_owns_advantage(true, true, true));
+    assert!(!strip_owns_advantage(true, true, false), "panes missing: the notice posts");
+    assert!(!strip_owns_advantage(true, false, true), "row Off: the notice posts");
+    assert!(!strip_owns_advantage(false, true, true), "boot did not enable the display: the notice posts");
 }

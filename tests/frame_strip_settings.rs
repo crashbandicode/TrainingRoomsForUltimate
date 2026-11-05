@@ -36,9 +36,29 @@ fn an_older_file_migrates_off_to_off_and_every_display_mode_to_the_strip() {
 fn the_new_row_wins_over_the_old_one_and_a_bad_old_value_keeps_the_default() {
     let loaded = parse(&file(json!({ "input_display_strip": [1, 0], "input_display": [0, 1, 0, 0] }), json!({})));
     assert_eq!(loaded.settings.menu.get("input_display_strip").unwrap(), [1, 0]);
-    let loaded = parse(&file(json!({ "input_display": [0, 2, 0, 0] }), json!({ "input_display": [1, 1, 0, 0] })));
-    assert_eq!(loaded.settings.menu.get("input_display_strip").unwrap(), [0, 1], "not a choice: the default");
+    // An element above 1 was refused by the base too (its factory value, Smash Inputs, showed the display).
+    let loaded = parse(&file(json!({ "input_display": [0, 2, 0, 0] }), json!({ "input_display": "Off" })));
+    assert_eq!(loaded.settings.menu.get("input_display_strip").unwrap(), [0, 1], "not a row: the default");
     assert_eq!(loaded.settings.defaults.get("input_display_strip").unwrap(), [0, 1]);
+}
+
+/// Review IV-3: the base padded or cut the old array to its four options (`parse_row`) and read the first option set,
+/// so a short or hand-edited Off loaded as Off; it must stay Off (it came back On before the fix).
+#[test]
+fn an_older_file_is_read_as_the_base_read_it() {
+    for (old, strip) in [
+        (json!([1, 0, 0]), [1, 0]),
+        (json!([1]), [1, 0]),
+        (json!([1, 1, 0, 0]), [1, 0]),
+        (json!([1, 0, 0, 0, 0]), [1, 0]),
+        (json!([0, 0, 1]), [0, 1]),
+        (json!([0, 0, 0, 0]), [0, 1]),
+        (json!([]), [0, 1]),
+    ] {
+        let loaded = parse(&file(json!({ "input_display": old }), json!({ "input_display": old })));
+        assert_eq!(loaded.settings.menu.get("input_display_strip").unwrap(), strip, "menu {old}");
+        assert_eq!(loaded.settings.defaults.get("input_display_strip").unwrap(), strip, "saved defaults {old}");
+    }
 }
 
 #[test]

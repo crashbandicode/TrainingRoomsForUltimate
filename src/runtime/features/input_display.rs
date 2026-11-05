@@ -45,12 +45,21 @@ fn settings() -> Settings {
     published::live().map_or(Settings::factory(), |live| live.input_display)
 }
 
-/// Whether the strip is sampling (boot enabled it and the row is On).
+/// The strip's panes were found in the layout last resolved (`hud_draw`, once per registration).
+static PANES: AtomicBool = AtomicBool::new(false);
+
+/// `hud_draw` resolved the layout's panes: whether the strip's container is there.
+pub fn set_panes(found: bool) {
+    PANES.store(found, Ordering::Release);
+}
+
+/// Whether the strip is sampling, and so owns the frame advantage (`model::frame_strip::strip_owns_advantage`): boot
+/// enabled it, the row is On and the layout has its panes.
 pub fn sampling() -> bool {
     if !ENABLED.load(Ordering::Acquire) {
         return false;
     }
-    settings().on
+    crate::model::frame_strip::strip_owns_advantage(true, settings().on, PANES.load(Ordering::Acquire))
 }
 
 fn pack(m: MappedInputs) -> u64 {
@@ -82,16 +91,18 @@ unsafe fn ids() -> Option<Table> {
         if missing == crate::model::frame_strip::ids::COUNT {
             return None;
         }
-        *IDS.lock() = Some(table);
-        IDS_READY.store(true, Ordering::Release);
+        // Logged from the local table: a guard is a temporary that lives to the end of its statement, and the lock is
+        // not reentrant, so taking `IDS` more than once in one statement would wait on itself.
         #[cfg(feature = "diag")]
         crate::runtime::diag_log::diagnostic(format_args!(
             "[FrameStrip] constants resolved missing={missing} reaction_frame={} attack={:#x} attack_hi3={:#x} final={:#x}",
-            IDS.lock().as_ref().map_or(0, |t| t.get(C::ReactionFrame)),
-            IDS.lock().as_ref().map_or(0, |t| t.get(C::Attack)),
-            IDS.lock().as_ref().map_or(0, |t| t.get(C::AttackHi3)),
-            IDS.lock().as_ref().map_or(0, |t| t.get(C::Final))
+            table.get(C::ReactionFrame),
+            table.get(C::Attack),
+            table.get(C::AttackHi3),
+            table.get(C::Final)
         ));
+        *IDS.lock() = Some(table);
+        IDS_READY.store(true, Ordering::Release);
     }
     IDS.lock().clone()
 }
@@ -140,7 +151,7 @@ unsafe fn sample(accessor: usize, ids: &Table, p1: bool) -> Sample {
 /// # Safety
 /// `player` is P1's live module accessor; the call is made on the game thread inside the fighter's frame.
 pub unsafe fn sample_frame(player: usize) {
-    if !ENABLED.load(Ordering::Acquire) || !settings().on || player == 0 {
+    if !ENABLED.load(Ordering::Acquire) || !sampling() || player == 0 {
         return;
     }
     if crate::runtime::features::states::is_loading() {
@@ -209,6 +220,16 @@ fn diag_frame(cpu: &Sample, before: Option<(u32, u32)>, now: Option<(u32, u32)>,
 /// Session clear: leaving Training, a hot swap, a lobby change.
 pub fn session_clear() {
     TRACKER.lock().clear();
+}
+
+/// The game initialised a fighter object again (`reset_hub::on_init`): a Training reset, a CPU replaced, a respawn.
+/// Nothing on the strip happened in this timeline any more, as after a save-state load (review IV-4: a hit just
+/// after a reset showed a link spanning it). Kept out of line: the follow-up Eden rows arm its entry on release.
+#[inline(never)]
+pub fn fighter_initialised() {
+    if ENABLED.load(Ordering::Acquire) {
+        TRACKER.lock().clear();
+    }
 }
 
 /// The plugin's layout was registered again: every pane is written again.

@@ -39,6 +39,8 @@ extern "C" fn on_init(a0: usize, a1: usize, a2: usize, a3: usize, a4: usize, a5:
     let _scope = HookScope::enter_hook(HookId::ResetHub);
     // SPEC-core-06: the hitbox visualizer drops this fighter's sphere records (no game call; its effect module may reuse the numbers).
     crate::runtime::features::hitbox::forget_fighter(a0);
+    // SPEC-input-06: the frame strip forgets what it showed (a reset, a fighter replaced), as on a save-state load.
+    crate::runtime::features::input_display::fighter_initialised();
     // Package 6: the waiting-room practice engine records the entry the game just initialised.
     unsafe { crate::runtime::lobby::observe(a0) };
     // SAFETY: `a0` is the fighter object the game just initialised.
