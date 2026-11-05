@@ -111,14 +111,20 @@ fn status_ids() -> StatusIds {
 /// Whether the practice visualizes this object (`hitbox::visualizes_entry`): native Training, every object; the waiting room's
 /// practice, only its practice fighters (Player 1 and package 2's lobby CPU entry, read from the fighter's work), never an article
 /// there; every other scene (online, a hot swap) never.
+///
+/// The entry's work id comes from the constant table (`ensure_ready`), asked here on the waiting room's own path
+/// (`hitbox::practice_entry`): the pass asks `visualizes` before `ensure_ready`, so a boot whose first practice was the waiting
+/// room never resolved it and drew no orb until an attack command ran (Eden tr-p23-rc5-1, 2026-11-05).
 unsafe fn visualizes(accessor: usize) -> bool {
     let scene = scene::current();
-    let entry = match scene {
-        Some(Scene::Lobby) if ENTRY_WORK_READY.load(Ordering::Acquire) && natives::is_fighter(accessor) => {
-            Some(natives::get_int(accessor, ENTRY_WORK.load(Ordering::Acquire)))
-        }
-        _ => None,
-    };
+    let fighter = matches!(scene, Some(Scene::Lobby)) && natives::is_fighter(accessor);
+    let entry = hitbox::practice_entry(
+        scene,
+        fighter,
+        || (ENTRY_WORK_READY.load(Ordering::Acquire) || ensure_ready()).then(|| ENTRY_WORK.load(Ordering::Acquire)),
+        // SAFETY: `accessor` is a live fighter's (the pass's or the hook's own), as `is_fighter` said.
+        |work| unsafe { natives::get_int(accessor, work) },
+    );
     hitbox::visualizes_entry(scene, entry)
 }
 

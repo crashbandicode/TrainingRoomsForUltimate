@@ -423,6 +423,23 @@ pub fn visualizes_entry(scene: Option<super::scene::Scene>, entry: Option<i32>) 
 /// The work id the lobby gate reads a command's object's entry with (resolved through the constant table).
 pub const ENTRY_ID_NAME: &str = "FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID";
 
+/// The entry `visualizes_entry` judges an object by. Only the waiting room's practice needs one, and only of a fighter: its
+/// entry is read from the fighter's work (`read`) with the work id `ENTRY_ID_NAME` resolves to, and `work_id` asks the
+/// constant table for that id when it is not known yet. The Lobby asks on its own path: a boot whose first practice is the
+/// waiting room runs no Training pass and maybe no attack command, the only callers that asked before (Eden
+/// tr-p23-rc5-1, 2026-11-05: no orb drawn). Native Training needs no entry; any other scene neither asks nor reads.
+pub fn practice_entry(
+    scene: Option<super::scene::Scene>,
+    fighter: bool,
+    work_id: impl FnOnce() -> Option<i32>,
+    read: impl FnOnce(i32) -> i32,
+) -> Option<i32> {
+    match scene {
+        Some(super::scene::Scene::Lobby) if fighter => work_id().map(read),
+        _ => None,
+    }
+}
+
 /// Whether the animation commands draw the shape they create: the setting is On and the object is one the practice visualizes.
 pub fn draw_on_command(enabled: bool, visualizes: bool) -> bool {
     enabled && visualizes
