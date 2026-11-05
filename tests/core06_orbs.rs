@@ -52,13 +52,74 @@ fn an_orb_is_the_hitbox_size_in_the_spheres_tint() {
     assert_eq!(orb.color, [255, 0, 0, orbs::ORB_ALPHA]);
     let yellow = orbs::orb_of(&sphere(2, 0.0, 1.0), [0.0; 3]);
     assert_eq!(&yellow.color[..3], &[255, 255, 0]);
+    // The orb keeps its sphere's kind (the cut order, review HB-2).
+    for kind in [hitbox::KIND_HIT, hitbox::KIND_HURT, hitbox::KIND_GRAB] {
+        assert_eq!(orbs::orb_of(&sphere(hitbox::sphere_key(kind, 3, 1), 0.0, 1.0), [0.0; 3]).kind, kind);
+    }
     // The tints of the colour table go through the layout's linear-light encoding.
     let orange = orbs::orb_of(&Sphere { tint: hitbox::tint(1), ..s }, [0.0; 3]);
     assert_eq!(orange.color, model::panes::linear([255, 102, 0, orbs::ORB_ALPHA]));
 }
 
 fn orb(x: f32) -> Orb {
-    Orb { centre: [x, 0.0, 0.0], radius: 1.0, color: [1, 2, 3, 4] }
+    Orb { centre: [x, 0.0, 0.0], radius: 1.0, color: [1, 2, 3, 4], kind: hitbox::KIND_HURT }
+}
+
+fn orb_of_kind(x: f32, kind: u32) -> Orb {
+    Orb { kind, ..orb(x) }
+}
+
+/// Review HB-2: the panes cover Training's worst case, four fighter objects (Player 1 and the CPU, each possibly Ice
+/// Climbers with Nana) of `MAX_HELD` spheres each, so a full board is drawn without a cut.
+#[test]
+fn the_orb_panes_cover_four_full_fighters() {
+    assert_eq!(model::panes::ORBS, orbs::ORB_FIGHTERS * MAX_HELD);
+    let mut board = Board::new();
+    for f in 0..orbs::ORB_FIGHTERS {
+        let kind = |i: usize| if i % 8 == 0 { hitbox::KIND_HIT } else { hitbox::KIND_HURT };
+        assert_eq!(board.publish((f + 1) << 8, (0..MAX_HELD).map(|i| orb_of_kind(i as f32, kind(i)))), MAX_HELD);
+    }
+    assert_eq!(board.in_draw_order().count(), model::panes::ORBS, "every orb of a full board has a pane");
+}
+
+/// Review HB-2: past the panes the cut is deterministic, every hitbox and grab box before any hurtbox. A gone fighter's
+/// last pass lingers beside four full fighters (the only way past `ORBS`).
+#[test]
+fn past_the_panes_hurtboxes_are_cut_first_and_the_order_is_stable() {
+    let mut board = Board::new();
+    // The gone fighter: 40 hurt spheres and 8 hit spheres, published first (the stalest slot).
+    board.publish(0x900, (0..48).map(|i| orb_of_kind(1000.0 + i as f32, if i < 8 { hitbox::KIND_HIT } else { hitbox::KIND_HURT })));
+    for f in 0..orbs::ORB_FIGHTERS {
+        let kind = |i: usize| match i % 16 { 0 => hitbox::KIND_HIT, 1 => hitbox::KIND_GRAB, _ => hitbox::KIND_HURT };
+        board.publish((f + 1) << 8, (0..MAX_HELD).map(|i| orb_of_kind((f * 1000 + i) as f32, kind(i))));
+    }
+    let all: Vec<Orb> = board.in_draw_order().copied().collect();
+    assert_eq!(all.len(), model::panes::ORBS + 48);
+    let drawn = &all[..model::panes::ORBS];
+    let cut = &all[model::panes::ORBS..];
+    let not_hurt = all.iter().filter(|o| o.kind != hitbox::KIND_HURT).count();
+    assert_eq!(drawn.iter().filter(|o| o.kind != hitbox::KIND_HURT).count(), not_hurt, "every hitbox and grab box is drawn");
+    assert!(cut.iter().all(|o| o.kind == hitbox::KIND_HURT), "only hurtboxes are cut");
+    assert!(drawn[..not_hurt].iter().all(|o| o.kind != hitbox::KIND_HURT), "hitboxes and grab boxes come first");
+    assert_eq!(board.in_draw_order().copied().collect::<Vec<_>>(), all, "the same board is cut the same way");
+    assert_eq!(board.live().count(), all.len(), "the order drops nothing and adds nothing");
+}
+
+/// Review HB-1: what the layout tick writes into the orb panes. An inactive tick (the waiting room's practice ended while
+/// its layout stays) hides every pane the last tick showed and the container; once hidden, nothing more is written.
+#[test]
+fn an_inactive_tick_hides_the_orbs_it_showed() {
+    use orbs::{pane_tick, PaneTick};
+    // Active: 37 orbs drawn after 0 shown: nothing to hide, the container shows.
+    assert_eq!(pane_tick(37, 0), Some(PaneTick { hide: (37, 37), container: true, shown: 37 }));
+    // Fewer orbs: the panes past them are hidden.
+    assert_eq!(pane_tick(20, 37), Some(PaneTick { hide: (20, 37), container: true, shown: 20 }));
+    // The practice ends: nothing drawn, every pane shown is hidden and the container with them.
+    assert_eq!(pane_tick(0, 20), Some(PaneTick { hide: (0, 20), container: false, shown: 0 }));
+    // The next inactive ticks write nothing.
+    assert_eq!(pane_tick(0, 0), None);
+    // After a new registration the runtime assumes every pane may show (`shown = ORBS`), so all of them are hidden.
+    assert_eq!(pane_tick(0, model::panes::ORBS), Some(PaneTick { hide: (0, model::panes::ORBS), container: false, shown: 0 }));
 }
 
 #[test]
@@ -74,18 +135,31 @@ fn the_board_keeps_each_fighters_last_pass_and_ages_out_the_gone() {
     assert_eq!(board.publish(0xc0, (0..MAX_HELD + 5).map(|i| orb(i as f32))), MAX_HELD);
     board.clear(0xc0);
     assert_eq!(board.live().count(), 29);
-    // A fighter that stops publishing ages out while others go on; a paused board (no publishes) keeps everything.
-    for _ in 0..orbs::STALE_PUBLISHES {
+    // A fighter that stops publishing ages out while others go on, counted in publishes, not in time: a paused game
+    // publishes nothing, so a pause of any length keeps everything (review HB-4: the old check compared two reads).
+    // 0xb0 last published one publish after 0xa0's 55 (then 0xa0's 10, then 0xc0's): it has seen 2 publishes since.
+    for _ in 0..orbs::STALE_PUBLISHES - 3 {
         board.publish(0xa0, (0..10).map(|i| orb(i as f32)));
     }
-    assert_eq!(board.live().count(), 10, "0xb0 aged out");
-    let before: Vec<Orb> = board.live().copied().collect();
-    assert_eq!(board.live().copied().collect::<Vec<_>>(), before);
-    // Every slot can be taken; a new fighter replaces the stalest.
-    for k in 1..=FIGHTER_SETS + 2 {
+    assert_eq!(board.live().count(), 29, "0xb0 is one publish from ageing out");
+    let paused: Vec<Orb> = board.live().copied().collect();
+    board.clear(0xdead); // an unknown fighter changes nothing
+    assert_eq!(board.live().copied().collect::<Vec<_>>(), paused);
+    board.publish(0xa0, (0..10).map(|i| orb(i as f32)));
+    assert_eq!(board.live().count(), 10, "0xb0 aged out on the publish that made it stale");
+    // Every slot can be taken; a new fighter replaces the stalest, the first one published.
+    board.clear_all();
+    for k in 1..=FIGHTER_SETS {
         board.publish(k << 8, std::iter::once(orb(k as f32)));
     }
-    assert!(board.live().count() <= FIGHTER_SETS);
+    let xs = |b: &Board| { let mut v: Vec<i32> = b.live().map(|o| o.centre[0] as i32).collect(); v.sort(); v };
+    assert_eq!(xs(&board), (1..=FIGHTER_SETS as i32).collect::<Vec<_>>());
+    board.publish((FIGHTER_SETS + 1) << 8, std::iter::once(orb((FIGHTER_SETS + 1) as f32)));
+    assert_eq!(xs(&board), (2..=FIGHTER_SETS as i32 + 1).collect::<Vec<_>>(), "fighter 1 (the stalest) was replaced");
+    // A fighter that published nothing (an empty slot) is taken before any fighter with orbs.
+    board.publish(2 << 8, std::iter::empty());
+    board.publish((FIGHTER_SETS + 2) << 8, std::iter::once(orb((FIGHTER_SETS + 2) as f32)));
+    assert_eq!(xs(&board), (3..=FIGHTER_SETS as i32 + 2).collect::<Vec<_>>(), "the empty slot went first");
     board.clear_all();
     assert_eq!(board.live().count(), 0);
     assert_eq!(board.publish(0, std::iter::once(orb(0.0))), 0, "no fighter, no orbs");
@@ -117,7 +191,7 @@ fn projected_orbs_map_onto_the_layout_canvas() {
     assert!(orbs::plan_pane([1925.0, 540.0], [[1955.0, 540.0], [1925.0, 540.0]], half, color).is_some(), "partly on the canvas");
     assert_eq!(orbs::plan_pane([960.0, 540.0], [[9000.0, 540.0], [960.0, 540.0]], half, color).unwrap().size, orbs::MAX_PANE);
     assert!(orbs::plan_pane([960.0, 540.0], [[970.0, 540.0]; 2], [0.0, 540.0], color).is_none(), "no screen size");
-    let o = Orb { centre: [1.0, 2.0, 3.0], radius: 0.5, color };
+    let o = Orb { centre: [1.0, 2.0, 3.0], radius: 0.5, color, kind: hitbox::KIND_HIT };
     assert_eq!(orbs::edge_points(&o), [[1.5, 2.0, 3.0], [1.0, 2.5, 3.0]]);
 }
 

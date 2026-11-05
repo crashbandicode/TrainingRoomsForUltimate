@@ -38,17 +38,26 @@ With the setting on, every active hitbox of a fighter in Training is drawn as a 
 
 The operator decided "go with discs for all" after the A/B (`docs/decisions/HB-OWN-ORBS-ab.png`, `docs/DECISIONS.md`
 HB-OWN-ORBS): with two Ridleys the game's shared effect pool refused 22 of one fighter's 55 spheres on every pass; own
-orbs refuse none. This supersedes the upstream effect rendering for **fighters** (hit, hurt and grab spheres):
+orbs do not use that pool. This supersedes the upstream effect rendering for **fighters** (hit, hurt and grab spheres):
 
 - The sphere set (§2 colours, capsule sampling, hurtboxes of decision HB1, grab boxes) is unchanged; the per-frame pass
   keeps each fighter's spheres (`HandleSet`, ruling Q3) through an own-orb sink that never refuses and ends an orb when the
   fighter's status changes (the effect's `CONCLUDE_STATUS` rule).
-- Each held sphere is placed on its bone with `ModelModule::joint_global_position_with_offset(…, false)` (a read; `true`
-  would update the model first) and published per fighter in fixed storage.
+- Each held sphere is placed on its bone with `ModelModule::joint_global_position_with_offset(…, false)` and published
+  per fighter in fixed storage. The flag is meant to make the call a read (no model update first); the guarded thunk
+  passes it to the implementation behind ModelModule's vtable slot `0x158`, which is not read yet (review HB-3: a
+  follow-up Eden tracepoint reads that slot's target).
 - The layout tick projects every orb with the game's own camera (`world_to_screen`'s projection, render camera) and draws
-  it as one of the plugin's disc panes (192 panes, one plugin-drawn disc texture tinted per colour, size from the projected
-  radius). The panes' container is RootPane's first child, so the HUD, the vanilla pause menu and the plugin's menu draw
-  over the orbs as they drew over the 3D effects; nothing is hidden for the menus.
+  it as one of the plugin's disc panes (one plugin-drawn disc texture tinted per colour, size from the projected radius).
+  The panes' container is RootPane's first child, so the HUD, the vanilla pause menu and the plugin's menu draw over the
+  orbs as they drew over the 3D effects; nothing is hidden for the menus.
+- **How many (review HB-2, 2026-11-05):** a fighter holds at most 128 spheres (`MAX_HELD`; more are counted as dropped,
+  as before). The layout has 512 orb panes: Training's most fighter objects, Player 1 and the CPU each possibly Ice
+  Climbers with Nana (four), times 128. More orbs than panes happen only while a gone fighter's last pass is still on the
+  board (a few frames). Then the cut is deterministic: every hitbox and grab box takes a pane before any hurtbox, each in
+  board-slot order, and the log says once `[Hitbox] more orbs than panes`.
+- When the practice ends while its layout stays (the waiting room after its request ends; Training's layout outside
+  Training), the tick hides every orb it showed and the container (review HB-1).
 - The discs are flat and drawn over the stage and the fighters (no depth hiding); the effect spheres' glow extended past
   each sphere's radius, a disc stops at it.
 - **Known limitation, camera lag:** while the camera pans, the discs trail the spheres' true screen position by about one

@@ -1,7 +1,10 @@
 //! Own orbs: the hitbox visualizer's fighter spheres drawn by the plugin's own layout panes instead of the game's
 //! `sys_shield` effects (decision HB-OWN-ORBS, option 1, operator 2026-11-05: "go with discs for all"; the A/B is
 //! `docs/decisions/HB-OWN-ORBS-ab.png`). The shared effect pool refused part of a large fighter's spheres every pass; an
-//! orb is never refused. Articles keep the effect spheres.
+//! orb is not asked of that pool. The layout holds `panes::ORBS` (512) orb panes, Training's most fighter objects
+//! (`ORB_FIGHTERS`) times the spheres one fighter holds (`MAX_HELD`). More orbs than panes happen only while a gone
+//! fighter's last pass is still on the board (a few frames): then the cut is deterministic, hitboxes and grab boxes before
+//! hurtboxes (`Board::in_draw_order`), and the layout tick says so once (review HB-2). Articles keep the effect spheres.
 //!
 //! The same `HandleSet` keeps the spheres; `OrbSink` is its `Effects` for own orbs: a request always succeeds and a held
 //! orb lives while the fighter's status is the one it was made in (what the game's `CONCLUDE_STATUS` did to an effect).
@@ -9,7 +12,12 @@
 //! fighter's orbs on the `Board`; the layout tick projects them with the game's own `world_to_screen` and plans one pane
 //! per orb (`plan_pane`). Pure and host-tested (`tests/core06_orbs.rs`).
 
-use super::hitbox::{Effects, Sphere, FIGHTER_SETS, MAX_HELD, SCALE};
+use super::hitbox::{Effects, Sphere, FIGHTER_SETS, KIND_HURT, MAX_HELD, SCALE};
+
+/// The most fighter objects Training (and the waiting room's practice) draws at once: Player 1 and the CPU, each of them
+/// possibly Ice Climbers, whose Nana is a fighter object of her own. No other fighter adds a fighter object (Pokémon
+/// Trainer's trainer, Pyra and Mythra's partner, summons and items are articles or swap in place).
+pub const ORB_FIGHTERS: usize = 4;
 
 /// An own orb's handle: non-zero, and naming the status the orb was made in.
 pub const fn orb_handle(status: i32) -> u32 {
@@ -39,10 +47,12 @@ pub struct Orb {
     pub centre: [f32; 3],
     pub radius: f32,
     pub color: [u8; 4],
+    /// The sphere's kind (`hitbox::KIND_HIT`, `KIND_HURT`, `KIND_GRAB`): the cut order when the panes run out.
+    pub kind: u32,
 }
 
 impl Orb {
-    pub const NONE: Orb = Orb { centre: [0.0; 3], radius: 0.0, color: [0; 4] };
+    pub const NONE: Orb = Orb { centre: [0.0; 3], radius: 0.0, color: [0; 4], kind: 0 };
 }
 
 /// The opacity of an orb pane's colour; the disc texture carries the shading.
@@ -53,7 +63,7 @@ pub const ORB_ALPHA: u8 = 255;
 pub fn orb_of(sphere: &Sphere, centre: [f32; 3]) -> Orb {
     let byte = |c: f32| (c.clamp(0.0, 1.0) * 255.0 + 0.5) as u8;
     let srgb = [byte(sphere.tint[0]), byte(sphere.tint[1]), byte(sphere.tint[2]), ORB_ALPHA];
-    Orb { centre, radius: sphere.scale / SCALE, color: super::panes::linear(srgb) }
+    Orb { centre, radius: sphere.scale / SCALE, color: super::panes::linear(srgb), kind: sphere.key >> 24 }
 }
 
 /// Publishes a fighter has missed before its orbs stop being drawn (other fighters' publishes count; a pause publishes
@@ -122,6 +132,32 @@ impl Board {
             .filter(move |&i| self.keys[i] != 0 && self.clock.wrapping_sub(self.stamps[i]) < STALE_PUBLISHES)
             .flat_map(move |i| self.orbs[i][..self.lens[i]].iter())
     }
+
+    /// The live orbs in the order the panes take them: every hitbox and grab box first, then every hurtbox, each in slot
+    /// order. When the panes run out the cut is deterministic and takes hurtboxes first (review HB-2).
+    pub fn in_draw_order(&self) -> impl Iterator<Item = &Orb> + '_ {
+        let first = self.live().filter(|o| o.kind != KIND_HURT);
+        first.chain(self.live().filter(|o| o.kind == KIND_HURT))
+    }
+}
+
+/// The orb panes' writes of one layout tick (review HB-1): `drawn` orbs were written into the panes `0..drawn`, and
+/// `shown` panes showed an orb after the last tick. The panes `hide.0..hide.1` that showed one and do not now are hidden,
+/// and the container shows only while one orb does. An inactive tick (the waiting room's practice ended while its
+/// layout stays, or Training's layout outside Training) draws nothing, so everything shown is hidden; `None` when there
+/// is nothing to write (nothing shown before or now).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PaneTick {
+    pub hide: (usize, usize),
+    pub container: bool,
+    pub shown: usize,
+}
+
+pub fn pane_tick(drawn: usize, shown: usize) -> Option<PaneTick> {
+    if drawn == 0 && shown == 0 {
+        return None;
+    }
+    Some(PaneTick { hide: (drawn, shown.max(drawn)), container: drawn != 0, shown: drawn })
 }
 
 // ---- projection to the layout ---------------------------------------------------------------------------------------
