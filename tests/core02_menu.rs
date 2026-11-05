@@ -79,6 +79,15 @@ fn press(m: &mut Menu, buttons: &[Button]) {
     }
 }
 
+/// The page's last line, *Reset page to defaults*, confirmed with A.
+fn reset_page(m: &mut Menu) {
+    let last = m.entry(m.page(), m.entry_count(m.page()) - 1).unwrap();
+    assert!(matches!(last, Entry::ResetPage(_)), "{last:?}");
+    goto_entry(m, last);
+    press(m, &[Button::A, Button::A]);
+    assert!(m.screen().is_none());
+}
+
 // ---- the factory table (SPEC-core-02 §2.7, §2.8, SPEC-core-04 §3.1) ------------------------------
 
 /// `(id, kind, len, indices set to 1 in the factory value)`, written from the spec tables.
@@ -341,14 +350,17 @@ fn core02_table_nav_wrap_skip() {
     let first = m.focused_row().expect("focus starts on a row, not a header");
     assert_eq!(ROWS[first].title, "Mash");
     m.press(Button::Up);
+    assert!(matches!(m.focus(), Some(Entry::ResetPage(_))), "wraps to the page's last line, Reset page to defaults");
+    m.press(Button::Up);
     let last = m.focused_row().unwrap();
-    assert_eq!(ROWS[last].title, "P1 CPU Level", "wraps to the last row of the page");
+    assert_eq!(ROWS[last].title, "P1 CPU Level", "the last row of the page is above it");
+    m.press(Button::Down);
     m.press(Button::Down);
     assert_eq!(m.focused_row(), Some(first));
     // Down never rests on a header of an ordinary group.
     for _ in 0..m.entry_count(Page::Cpu) {
         m.press(Button::Down);
-        assert!(m.focused_row().is_some());
+        assert!(!matches!(m.focus(), Some(Entry::Group(_)) | None));
     }
 }
 
@@ -1029,14 +1041,14 @@ fn core02_delay_row_reset_and_save_defaults() {
     let env = *m.env();
     m.reopen(s, env);
     goto(&mut m, "mash_state");
-    m.press(Button::ZR);
+    reset_page(&mut m);
     assert_eq!(get(&m, "aerial_delay_range"), [3, 8]);
     assert!(get(&m, "aerial_delay").iter().all(|v| *v == 0), "the checklist is restored with it");
     // Factory defaults: the range is empty after a reset.
     let mut m = menu();
     set(&mut m, "pummel_delay_range", &[0, 2]);
     goto(&mut m, "mash_state");
-    m.press(Button::ZR);
+    reset_page(&mut m);
     assert!(get(&m, "pummel_delay_range").is_empty());
 }
 
@@ -1059,7 +1071,7 @@ fn core02_delay_row_bulk_update_clears_range() {
 #[test]
 fn core02_defaults_and_reset() {
     let mut m = menu();
-    // Change several rows of the CPU page, then ZR returns the page to the defaults.
+    // Change several rows of the CPU page, then the confirmed reset line returns the page to the defaults.
     goto(&mut m, "sdi_strength");
     m.press(Button::Right);
     goto(&mut m, "stale_dodges");
@@ -1077,7 +1089,7 @@ fn core02_defaults_and_reset() {
     m.press(Button::L);
     m.press(Button::L);
     assert_eq!(m.page(), Page::Cpu);
-    m.press(Button::ZR);
+    reset_page(&mut m);
     let factory = Settings::factory();
     for id in ["sdi_strength", "stale_dodges", "mash_state", "di_state"] {
         assert_eq!(m.settings().menu.get(id), factory.menu.get(id), "{id}");
@@ -1089,7 +1101,7 @@ fn core02_defaults_and_reset() {
     m.press(Button::X);
     m.press(Button::A);
     assert_eq!(get(&m, "stale_dodges"), [1, 0]);
-    m.press(Button::ZR);
+    reset_page(&mut m);
     assert_eq!(get(&m, "stale_dodges"), [0, 1], "reset restores the saved default");
 }
 
@@ -1184,7 +1196,7 @@ fn core02_hidden_page_ring() {
     assert_eq!(m.page(), Page::DisplayControls);
     m.press(Button::R);
     assert_eq!(m.page(), Page::Developer, "the Developer page follows Display & Controls");
-    assert_eq!(m.entry_count(Page::Developer), 1 + 3, "a header and three rows");
+    assert_eq!(m.entry_count(Page::Developer), 1 + 3 + 1, "a header, three rows and the reset line");
     m.press(Button::R);
     assert_eq!(m.page(), Page::Cpu);
 }
@@ -1455,9 +1467,9 @@ fn menu_change_to_cpu_choices_emits_reroll_events() {
     goto(&mut m, "sdi_state");
     press(&mut m, &[Button::A, Button::A, Button::B]);
     let _ = m.take_outbox();
-    m.press(Button::ZR);
+    reset_page(&mut m);
     assert_eq!(m.take_outbox().rerolls, reroll::SDI_DIRECTION | reroll::LEDGE_OPTIONS | reroll::THROW_OPTIONS);
-    m.press(Button::ZR);
+    reset_page(&mut m);
     assert_eq!(m.take_outbox().rerolls, 0, "a reset that changes nothing re-rolls nothing");
 }
 
@@ -1571,7 +1583,7 @@ fn chords_ini_written_only_on_confirmed_change() {
     assert_eq!(m.take_outbox(), Default::default());
     // Resetting the page does not touch the INI-held shortcuts.
     goto(&mut m, "Menu shortcut 1");
-    m.press(Button::ZR);
+    reset_page(&mut m);
     assert_eq!(m.env().shortcuts[0], Chord::NONE);
     assert_eq!(m.take_outbox().button_config, None);
 }

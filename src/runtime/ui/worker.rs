@@ -296,7 +296,11 @@ fn press(button: Button, s: &mut Session) {
             m.press(button);
             // Eden reads where each press left the cursor (the section jump, the remembered place).
             #[cfg(feature = "diag")]
-            diagnostic(format_args!("[Ui] press {:?} page={} cursor={} depth={} screen={:?}", button, m.page().id(), m.cursor(), m.depth(), m.screen()));
+            diagnostic(format_args!("[Ui] press {:?} page={} cursor={} depth={} screen={:?} row={:?}", button, m.page().id(), m.cursor(), m.depth(), m.screen(), m.help_row().map(|r| r.title)));
+            // Shipped builds write it too: a page reset is the player's explicit, confirmed choice.
+            if let Some((page, changed)) = m.take_page_reset() {
+                diagnostic(format_args!("[TrainingRooms] page reset page={} rows={} changed={}", page.id(), changed.len(), changed.join(",")));
+            }
             if let Some(item) = m.take_give_item() {
                 requests::give_item(item);
             }

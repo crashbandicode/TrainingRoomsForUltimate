@@ -141,6 +141,9 @@ impl Grey {
 pub enum Entry {
     Group(usize),
     Row(usize),
+    /// The last line of every page, *Reset page to defaults*: A asks to confirm, then restores the page from the
+    /// saved defaults. It belongs to the page's last section (`usize` is that group).
+    ResetPage(usize),
 }
 
 /// A row's value as the renderer shows it.
@@ -224,6 +227,8 @@ pub enum Screen {
     Grid { layout: GridLayout, page: usize, cell: usize },
     /// A sub-screen whose content belongs to a later package.
     External(Editor),
+    /// *Reset page to defaults?*: A resets the page, B cancels.
+    ConfirmReset,
 }
 
 /// Where the menu was when it closed (`Menu::place`): kept by the runtime outside the model for the rest of the boot.
@@ -258,7 +263,7 @@ fn resumable(screen: Screen) -> Option<Screen> {
         | Screen::SwapGroups { .. }
         | Screen::Overrides { .. }
         | Screen::Chords { .. } => Some(screen),
-        Screen::ChordEntry { .. } | Screen::Grid { .. } | Screen::External(_) => None,
+        Screen::ChordEntry { .. } | Screen::Grid { .. } | Screen::External(_) | Screen::ConfirmReset => None,
     }
 }
 
@@ -275,7 +280,7 @@ pub const LIST_JUMP: usize = 12;
 /// The section an entry belongs to.
 fn group_of(entry: Entry) -> usize {
     match entry {
-        Entry::Group(g) => g,
+        Entry::Group(g) | Entry::ResetPage(g) => g,
         Entry::Row(r) => usize::from(ROWS[r].group),
     }
 }
@@ -303,6 +308,8 @@ pub struct Menu {
     /// The row ids, kept keys and top-level keys the player changed this menu session
     /// (decision MENU-CLOSE): what the close commits on top of the live settings.
     edits: Vec<String>,
+    /// The last confirmed page reset: the page and the rows it changed, for the runtime's log line.
+    page_reset: Option<(Page, Vec<&'static str>)>,
 }
 
 const SLIDER_SLOW: u8 = 1;
@@ -326,6 +333,7 @@ impl Menu {
             chord_capture: ChordCapture::Preview,
             chord_refusal: None,
             edits: Vec::new(),
+            page_reset: None,
         };
         menu.sync();
         menu
@@ -413,7 +421,7 @@ impl Menu {
             Screen::Chords { cursor } => {
                 matches!(control, Control::Editor(Editor::ButtonChords)) && cursor < CHORD_ROWS.len()
             }
-            Screen::ChordEntry { .. } | Screen::Grid { .. } | Screen::External(_) => false,
+            Screen::ChordEntry { .. } | Screen::Grid { .. } | Screen::External(_) | Screen::ConfirmReset => false,
         }
     }
 
@@ -467,13 +475,16 @@ impl Menu {
     }
 
     /// Visit the entries of `page` in order: a header for each group with a visible row, then its
-    /// rows unless the group is collapsed. `visit` returns `false` to stop.
+    /// rows unless the group is collapsed; last, the page's *Reset page to defaults* line. `visit` returns `false`
+    /// to stop.
     fn scan(&self, page: Page, mut visit: impl FnMut(usize, Entry) -> bool) {
         let mut n = 0;
+        let mut last = None;
         for (g, group) in GROUPS.iter().enumerate() {
             if group.page != page || !self.group_visible(g) {
                 continue;
             }
+            last = Some(g);
             if !visit(n, Entry::Group(g)) {
                 return;
             }
@@ -489,6 +500,9 @@ impl Menu {
                     n += 1;
                 }
             }
+        }
+        if let Some(g) = last {
+            visit(n, Entry::ResetPage(g));
         }
     }
 
@@ -518,7 +532,7 @@ impl Menu {
     /// A header can be focused only when it opens or closes an advanced group.
     fn focusable(&self, entry: Entry) -> bool {
         match entry {
-            Entry::Row(_) => true,
+            Entry::Row(_) | Entry::ResetPage(_) => true,
             Entry::Group(g) => GROUPS[g].advanced,
         }
     }
@@ -882,6 +896,16 @@ impl Menu {
                     self.stack.pop();
                 }
             }
+            Some(Screen::ConfirmReset) => match button {
+                Button::A => {
+                    self.stack.pop();
+                    self.reset_page();
+                }
+                Button::B => {
+                    self.stack.pop();
+                }
+                _ => {}
+            },
         }
     }
 
@@ -926,13 +950,13 @@ impl Menu {
             Button::Y => {
                 if let Some(row) = self.focused_row().and_then(|index| ROWS.get(index)) { self.reset_setting(row); }
             }
-            Button::ZR => self.reset_page(),
             Button::A => match self.focus() {
                 Some(Entry::Group(g)) => {
                     self.expanded ^= 1 << g;
                     self.clamp_cursor();
                 }
                 Some(Entry::Row(row)) => self.activate(row),
+                Some(Entry::ResetPage(_)) => self.stack.push(Screen::ConfirmReset),
                 None => {}
             },
             Button::Left | Button::Right => {
@@ -942,7 +966,9 @@ impl Menu {
             }
             Button::JumpUp => self.jump_section(false),
             Button::JumpDown => self.jump_section(true),
-            Button::ZL => {}
+            // ZR no longer resets the page (it is the role switch inside the roster grids, easy to hit by
+            // accident): the page's last line does, after a confirmation.
+            Button::ZL | Button::ZR => {}
         }
     }
 
@@ -1072,42 +1098,51 @@ impl Menu {
         }
     }
 
-    /// ZR on a page restores its saved defaults. INI-held shortcuts and
-    /// replay capture are not in the settings snapshots and stay unchanged.
+    /// The confirmed *Reset page to defaults* restores the page's saved defaults and notes which rows changed
+    /// (`take_page_reset`). INI-held shortcuts and replay capture are not in the settings snapshots and stay unchanged.
     fn reset_page(&mut self) {
+        let mut changed = Vec::new();
         for row in &ROWS {
-            if row.page() == self.page && row.visible(self.env.pilot_present) {
-                self.reset_setting(row);
+            if row.page() == self.page && row.visible(self.env.pilot_present) && self.reset_setting(row) {
+                changed.push(if row.id.is_empty() { row.title } else { row.id });
             }
         }
+        self.page_reset = Some((self.page, changed));
+    }
+
+    /// The page reset that ran since the last take: the page and the rows it changed (ids, or titles for rows
+    /// without one).
+    pub fn take_page_reset(&mut self) -> Option<(Page, Vec<&'static str>)> {
+        self.page_reset.take()
     }
 
     /// One visible row can own several stored keys (range/checklist, groups,
-    /// overrides, chords); a focused-row reset restores that complete value.
-    fn reset_setting(&mut self, row: &Row) {
+    /// overrides, chords); a focused-row reset restores that complete value. True when a value changed.
+    fn reset_setting(&mut self, row: &Row) -> bool {
+        let mut changed = false;
         if matches!(row.control, Control::SwapGroups) {
-            for id in SWAP_GROUP_IDS { self.reset_row(id); }
+            for id in SWAP_GROUP_IDS { changed |= self.reset_row(id); }
         }
         if matches!(row.control, Control::Editor(Editor::SituationOverrides)) {
-            for (_, id) in SITUATIONS { self.reset_row(id); }
+            for (_, id) in SITUATIONS { changed |= self.reset_row(id); }
         }
         if matches!(row.control, Control::Editor(Editor::ButtonChords)) {
-            for (_, id) in CHORD_ROWS { self.reset_row(id); }
+            for (_, id) in CHORD_ROWS { changed |= self.reset_row(id); }
         }
-        self.reset_row(row.id);
+        changed |= self.reset_row(row.id);
         if let Control::MultiSelectRange { range_id, .. } = row.control {
-            self.reset_row(range_id);
+            changed |= self.reset_row(range_id);
         }
+        changed
     }
 
-    fn reset_row(&mut self, id: &str) {
-        if id.is_empty() {
-            return;
-        }
-        if let Some(saved) = self.settings.defaults.get(id) {
-            let saved = saved.to_vec();
-            self.put(id, &saved);
-        }
+    fn reset_row(&mut self, id: &str) -> bool {
+        let Some(saved) = self.settings.defaults.get(id).filter(|_| !id.is_empty()).map(<[u8]>::to_vec) else {
+            return false;
+        };
+        let changed = saved != self.get(id);
+        self.put(id, &saved);
+        changed
     }
 
     fn press_list(&mut self, button: Button, row: usize, cursor: usize) {

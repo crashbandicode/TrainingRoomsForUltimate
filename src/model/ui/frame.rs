@@ -313,11 +313,13 @@ pub fn fade_alpha(count: u32) -> u8 {
         (255.0 / 16f32.log10() * ((remaining + 1) as f32).log10()).clamp(0.0, 255.0) as u8
     }
 }
-const HINT_PAGE: &str = "L/R page   Up/Down move   ZL+Up/Down section   Left/Right change   A open   X save defaults   Y reset row   ZR reset page   B close";
+/// The page's last line, and the title of its confirmation.
+pub const RESET_LABEL: &str = "Reset page to defaults";
+const HINT_PAGE: &str = "L/R page   Up/Down move   ZL+Up/Down section   Left/Right change   A open   X save defaults   Y reset row   B close";
 
 fn group_of(entry: Entry) -> usize {
     match entry {
-        Entry::Group(g) => g,
+        Entry::Group(g) | Entry::ResetPage(g) => g,
         Entry::Row(r) => usize::from(ROWS[r].group),
     }
 }
@@ -470,6 +472,10 @@ pub fn page_frame(menu: &Menu, frame: &mut Frame) {
                 line.value_tone = value_tone(menu, *r);
                 line.label_tone = if menu.grey(*r).is_some() { Tone::Off } else { Tone::Normal };
             }
+            Some(Entry::ResetPage(_)) => {
+                let _ = line.label.write_str(RESET_LABEL);
+                let _ = line.value.write_str(">");
+            }
             None => {}
         }
         frame.row_count += 1;
@@ -485,6 +491,10 @@ pub fn page_frame(menu: &Menu, frame: &mut Frame) {
                 frame.help[1].clear();
                 let _ = frame.help[1].write_str(Grey::text(grey));
             }
+        }
+        None if matches!(menu.focus(), Some(Entry::ResetPage(_))) => {
+            let _ = frame.help[0].write_str("Puts every setting of this page back to your saved defaults (X saves them).");
+            let _ = frame.help[1].write_str("A asks to confirm first.");
         }
         None => {
             let _ = frame.help[0].write_str("A opens or closes this section.");

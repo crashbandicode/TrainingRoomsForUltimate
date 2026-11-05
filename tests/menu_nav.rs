@@ -40,7 +40,7 @@ fn to_page(m: &mut Menu, page: Page) {
 
 fn group_of(entry: Entry) -> usize {
     match entry {
-        Entry::Group(g) => g,
+        Entry::Group(g) | Entry::ResetPage(g) => g,
         Entry::Row(r) => usize::from(ROWS[r].group),
     }
 }
@@ -280,6 +280,8 @@ fn a_runtime_owned_screen_falls_back_to_its_parent_row() {
 fn a_stale_place_is_clamped_when_the_table_changed() {
     // The CPU page's last row is a fallback row that exists only without the pilot plugin (Q11).
     let mut m = Menu::new(Settings::factory(), Env { pilot_present: false, ..Env::default() });
+    // Up wraps to the reset line, then to the last row.
+    m.press(Button::Up);
     m.press(Button::Up);
     let without = m.cursor();
     let fallback = m.focused_row().unwrap();
@@ -290,6 +292,106 @@ fn a_stale_place_is_clamped_when_the_table_changed() {
     assert!(m.focus().is_some(), "the clamped cursor is on an entry");
     assert_ne!(m.focused_row(), Some(fallback), "the hidden row is not focused");
     assert_eq!(m.screen(), None, "a screen of a row that is gone is not resumed");
+}
+
+// ---- Reset page to defaults (operator 2026-11-05: no hidden ZR reset; an explicit, confirmed line) ---------------
+
+/// Focus the page's last line, the reset line.
+fn goto_reset(m: &mut Menu) {
+    let last = m.entry_count(m.page()) - 1;
+    assert!(matches!(m.entry(m.page(), last), Some(Entry::ResetPage(_))));
+    while m.cursor() != last {
+        m.press(Button::Down);
+    }
+}
+
+#[test]
+fn zr_on_a_page_changes_nothing() {
+    // Rows changed on three pages: the old ZR would have put each back.
+    let mut m = menu();
+    goto_row(&mut m, row_of("sdi_strength"));
+    m.press(Button::Right);
+    for id in ["trio_practice", "hud"] {
+        goto_row(&mut m, row_of(id));
+        m.press(Button::A);
+    }
+    for page in [Page::Cpu, Page::Saves, Page::Recording, Page::FightersStages, Page::DisplayControls] {
+        to_page(&mut m, page);
+        let _ = m.take_outbox();
+        let (settings, cursor) = (m.settings().clone(), m.cursor());
+        m.press(Button::ZR);
+        assert_eq!(m.settings(), &settings, "{page:?}");
+        assert_eq!((m.cursor(), m.screen().copied()), (cursor, None));
+        assert!(!m.take_outbox().changed);
+        assert!(m.take_page_reset().is_none());
+    }
+}
+
+#[test]
+fn every_page_ends_with_the_reset_line_in_its_last_section() {
+    let env = Env { developer_page: true, ..Env::default() };
+    let mut m = Menu::new(Settings::factory(), env);
+    for page in [Page::Cpu, Page::Saves, Page::Recording, Page::FightersStages, Page::DisplayControls, Page::Developer] {
+        to_page(&mut m, page);
+        let last = m.entry(page, m.entry_count(page) - 1);
+        assert_eq!(last, Some(Entry::ResetPage(*sections(&m, page).last().unwrap())), "{page:?}");
+        // Up from the first section's first entry wraps to it.
+        for _ in 0..12 {
+            m.press(Button::JumpUp);
+        }
+        m.press(Button::Up);
+        assert_eq!(m.focus(), last);
+    }
+}
+
+#[test]
+fn the_reset_line_restores_the_page_after_a_confirm_and_reports_the_rows() {
+    let mut m = menu();
+    let swapping = row_of("trio_practice");
+    goto_row(&mut m, swapping);
+    let before = m.settings().menu.get("trio_practice").unwrap().to_vec();
+    m.press(Button::A);
+    assert_ne!(m.settings().menu.get("trio_practice").unwrap(), &before[..]);
+    // A row of another page keeps its change.
+    to_page(&mut m, Page::DisplayControls);
+    goto_row(&mut m, row_of("hud"));
+    m.press(Button::A);
+    let hud = m.settings().menu.get("hud").unwrap().to_vec();
+    to_page(&mut m, Page::FightersStages);
+    goto_reset(&mut m);
+    m.press(Button::A);
+    assert_eq!(m.screen(), Some(&Screen::ConfirmReset));
+    assert_ne!(m.settings().menu.get("trio_practice").unwrap(), &before[..], "nothing changes before the confirm");
+    m.press(Button::A);
+    assert_eq!(m.screen(), None);
+    assert_eq!(m.settings().menu.get("trio_practice").unwrap(), &before[..]);
+    assert_eq!(m.settings().menu.get("hud").unwrap(), &hud[..]);
+    assert_eq!(m.take_page_reset(), Some((Page::FightersStages, vec!["trio_practice"])));
+    // A reset that changes nothing still runs and reports no rows.
+    goto_reset(&mut m);
+    m.press(Button::A);
+    m.press(Button::A);
+    assert_eq!(m.take_page_reset(), Some((Page::FightersStages, vec![])));
+}
+
+#[test]
+fn b_cancels_the_reset() {
+    let mut m = menu();
+    goto_row(&mut m, row_of("trio_practice"));
+    m.press(Button::A);
+    let changed = m.settings().clone();
+    goto_reset(&mut m);
+    m.press(Button::A);
+    m.press(Button::B);
+    assert_eq!((m.screen(), m.is_closed()), (None, false), "B leaves the confirmation, not the menu");
+    assert!(matches!(m.focus(), Some(Entry::ResetPage(_))));
+    assert_eq!(m.settings(), &changed);
+    assert!(m.take_page_reset().is_none());
+    // The confirmation is not resumed at the next opening: its line is focused instead.
+    m.press(Button::A);
+    let m = reopened(&m, Env::default());
+    assert_eq!(m.screen(), None);
+    assert!(matches!(m.focus(), Some(Entry::ResetPage(_))));
 }
 
 #[test]

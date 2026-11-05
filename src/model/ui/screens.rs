@@ -6,7 +6,7 @@
 
 use core::fmt::Write;
 
-use super::frame::{page_frame, ChipVisual, Frame, RangeView, RowLine, Text, Tone, View};
+use super::frame::{page_frame, ChipVisual, RESET_LABEL, Frame, RangeView, RowLine, Text, Tone, View};
 use super::menu::chord::Chord;
 use super::menu::options::{ACTIONS, CHORD_ROWS, DIRECTIONS, SITUATIONS, SWAP_GROUPS, YES_NO_RANDOM};
 use super::catalog::ITEMS;
@@ -56,6 +56,7 @@ fn crumb(menu: &Menu, screen: &Screen, out: &mut Text<120>) {
         Screen::ChordEntry { target: ChordTarget::Shortcut(slot), .. } => write!(out, "  >  Menu shortcut {}", slot + 1),
         Screen::ChordEntry { target: ChordTarget::Row(i), .. } => write!(out, "  >  {}", CHORD_ROWS[usize::from(*i)].0),
         Screen::External(editor) => write!(out, "  >  {editor:?}"),
+        Screen::ConfirmReset => write!(out, "  >  {RESET_LABEL}"),
         Screen::Grid { .. } => Ok(()),
         _ => Ok(()),
     };
@@ -468,6 +469,17 @@ fn external_frame(menu: &Menu, screen: &Screen, frame: &mut Frame) {
     let _ = frame.hint.write_str("B back");
 }
 
+fn confirm_reset_frame(menu: &Menu, screen: &Screen, frame: &mut Frame) {
+    base(menu, screen, frame);
+    push(frame, "Reset this page to your saved defaults?", "", Tone::Normal);
+    push(frame, "A  reset", "", Tone::On);
+    push(frame, "B  cancel", "", Tone::Normal);
+    frame.focus = Some(1);
+    let _ = write!(frame.help[0], "Every setting on {} goes back to your saved defaults.", menu.page().title());
+    let _ = frame.help[1].write_str("Other pages are not changed.");
+    let _ = frame.hint.write_str("A reset   B cancel");
+}
+
 /// The frame of whatever the menu shows now. Grid screens (`Screen::Grid`) are drawn by `grids`.
 pub fn frame_of(menu: &Menu, frame: &mut Frame, stage: StageLabel) {
     let Some(screen) = menu.screen().copied() else {
@@ -486,6 +498,7 @@ pub fn frame_of(menu: &Menu, frame: &mut Frame, stage: StageLabel) {
         Screen::ChordEntry { captured, .. } => chord_entry_frame(menu, &screen, captured, frame),
         Screen::Grid { layout, page, cell } => grid_frame(menu, &screen, layout, page, cell, stage, frame),
         Screen::External(_) => external_frame(menu, &screen, frame),
+        Screen::ConfirmReset => confirm_reset_frame(menu, &screen, frame),
     }
 }
 #[cfg(test)]
@@ -524,6 +537,25 @@ mod tests {
             m.press(Button::Down);
         }
         panic!("could not reach {title}");
+    }
+
+    #[test]
+    fn the_reset_line_and_its_confirmation_are_drawn_and_the_footer_has_no_zr() {
+        let mut m = menu();
+        let f = frame(&m);
+        assert!(!f.hint.string_lossy().contains("ZR"), "{}", f.hint.string_lossy());
+        assert!(f.hint.string_lossy().contains("ZL+Up/Down section"));
+        m.press(Button::Up);
+        assert!(matches!(m.focus(), Some(Entry::ResetPage(_))));
+        let f = frame(&m);
+        let focus = usize::from(f.focus.expect("the line is focused"));
+        assert_eq!(f.rows[focus].label.string_lossy(), RESET_LABEL);
+        assert!(f.help[1].string_lossy().contains("confirm"));
+        m.press(Button::A);
+        let f = frame(&m);
+        assert!(f.crumb.string_lossy().ends_with(RESET_LABEL));
+        assert_eq!(f.hint.string_lossy(), "A reset   B cancel");
+        assert!(f.help[0].string_lossy().contains(Page::Cpu.title()));
     }
 
     #[test]
