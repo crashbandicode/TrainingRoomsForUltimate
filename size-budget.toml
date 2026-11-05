@@ -81,3 +81,11 @@ ceiling = 136473
 date = "2026-11-05"
 reason = "rc.2: PAUSE-HELPER (a) + Ally Round 8 fixes, Solo-S placement and HAT-REQUEST-END A; measured 136473 at 1dcbdf2 (tools/sloc.py), +404 over 136069"
 approved_by = "Operator 2026-11-05 via primary 35137355: 'raise the size limit if needed, ship rc.2 when ready'"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 136526
+date = "2026-11-05"
+reason = "rc.3 Change Stage (p23/change-stage b274144): the practice stage request served again (observer before the lobby stage hook) and the Change Stage row (stage grid without All, A goes there, Y form, request at menu close); measured 136526 at b274144 (tools/sloc.py), +53 over 136473"
+approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed' (rc.3 features)"
