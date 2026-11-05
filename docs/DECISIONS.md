@@ -1161,7 +1161,7 @@ writing the CharInfo into its live selector (slot 26) and publishing it (`main+0
 **Asked:** A, text (no writes); B, borrow selector slot 26 and restore it (offered also as Training-only); C, the HUD
 portrait (not workable); or capture-and-cache, which needs a new texture-upload capability.
 
-**Answered 2026-11-05 ~21:0xZ by the operator: "just keep the text".** Mii rows stay text, and Q15's "bust where one
+**Answered 2026-11-05 ~20:4xZ by the operator: "just keep the text".** Mii rows stay text, and Q15's "bust where one
 exists" is closed as not built.
 
 ### HOT-SLOTS-CEILING · Ten fighters plus five hats against Training's helper entries — answered (2026-11-05)
@@ -1183,7 +1183,7 @@ exists" is closed as not built.
   of CPUs is raised. A more complex F9.
 - In both, the memory guard decides heavy cases, with an on-screen notice, never silently.
 
-**Answered 2026-11-05 ~20:5xZ by the operator: "B".**
+**Answered 2026-11-05 ~20:4xZ by the operator: "B".**
 - Hats use entries 7, 6, 5 and 4 first. A fifth hat may take entry 3 only while the native CPU count is 1.
 - Raising the count retires that hat before the game activates entry 3. F9's promotion then takes the seat.
 - The ordering contract is in the hot-slots report §3.5 and the F9 design (`LANE-GROK-F9-REPORT.md`).
