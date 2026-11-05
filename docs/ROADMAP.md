@@ -1,17 +1,19 @@
 # Roadmap
 
-Deferred work after 0.2.0-rc.1. Folded from the former `NEXT-VERSION.md` (removed after v0.2.0-rc.1; see that tag)
+Deferred work after 0.2.0-rc.2. Folded from the former `NEXT-VERSION.md` (removed after v0.2.0-rc.1; see that tag)
 on 2026-11-05; no item was dropped.
 
-## Next: 0.2.0-rc.2 (decided 2026-11-05, not in rc.1)
+## Done: 0.2.0-rc.2 (2026-11-05)
+
+The three operator decisions of 2026-11-05 that rc.1 did not carry (code at `p23/rc2-pause-helper` `9b28ca0`; see
+[Differences from the fork](DIFFERENCES-FROM-THE-FORK.md#added-in-rc2)):
 
 - **Pause while a helper fighter loads** (decision PAUSE-HELPER, option a): when the pause opens while a preloaded
-  helper entry has no actor yet, the entry is retired through the native finalize path and created again after the
-  pause. In rc.1 this case makes the game write through a null pointer on Eden.
-- **Solo Popo marks** (decision SOLO-S-PLACEMENT): the marks may overlap the icon's lower corners, never the name
-  label.
-- **Kirby hat requests end** (decision HAT-REQUEST-END, option A): the timeout counts every game frame, and a role
-  that stops being Kirby ends its request.
+  helper entry has no actor yet, the entry is retired through the game's single-slot retire, creation waits until the
+  pause exits, and the helper is created again. In rc.1 this case made the game write through a null pointer on Eden.
+- **Solo Popo marks** (decision SOLO-S-PLACEMENT): the marks sit on the icon's lower corners, never over the name.
+- **Kirby hat requests end** (decision HAT-REQUEST-END, option A): a request ages every game frame and always ends,
+  and a role that stops being Kirby ends its request.
 
 ## Deferred (operator decision 2026-11-03)
 

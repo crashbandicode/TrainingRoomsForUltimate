@@ -2,8 +2,8 @@
 
 TrainingRooms re-specifies the features of this project's earlier Training Modpack fork (stage M5q) and keeps its
 behaviour unless an operator decision changed it ([DECISIONS.md](DECISIONS.md), [MENU-DRAFT.md](../MENU-DRAFT.md)).
-This page lists only the changes, each checked against the code of 0.2.0-rc.1 (`fbcaa69`). Clips are Eden footage of
-the rc.1 release NRO; see [MEDIA.md](MEDIA.md).
+This page lists only the changes, each checked against the code of the 0.2.0-rc.2 head `9b28ca0`
+(`p23/rc2-pause-helper`, 2026-11-05). Clips are Eden footage of the rc.1 release NRO; see [MEDIA.md](MEDIA.md).
 
 ## Install and files
 
@@ -53,14 +53,21 @@ the rc.1 release NRO; see [MEDIA.md](MEDIA.md).
 
 ![Record refused while the CPU pilot drives P1](media/record-refused.gif)
 
-## Decided after rc.1 (coming in rc.2)
+## Added in rc.2
 
-Approved 2026-11-05 (`origin/review/menu-proposal` `deccd62`), not in rc.1; details in [ROADMAP.md](ROADMAP.md):
+Operator decisions of 2026-11-05 (`origin/review/menu-proposal` `deccd62`); the fork keeps its own behaviour.
 
-- **PAUSE-HELPER (a):** a pause that opens while a preloaded helper fighter is still loading cancels that load and
-  redoes it after the pause. In rc.1 this case can crash.
-- **SOLO-S-PLACEMENT:** the Solo Popo marks may overlap the icon's lower corners, never the name label.
-- **HAT-REQUEST-END (A):** a Kirby hat request times out by game frames, and ends when the role stops being Kirby.
+| Change | Where in the code |
+| --- | --- |
+| A pause that opens while a preloaded helper fighter is still loading no longer crashes. At pause-open each helper entry the plugin created that has no actor yet is retired through the game's own single-slot retire, and helper creation waits until the pause exits; the helper is then created again (PAUSE-HELPER, option a). | `src/runtime/roster/character_sources.rs:277` (`pause_state`), `src/runtime/roster/native_source_capacity.rs:846` (`retire_at`) |
+| The Solo Popo "S" marks sit on the icon's lower corners, just above the fighter's name, never over it (SOLO-S-PLACEMENT). | `src/model/ui/panes.rs:220` (`roster_tile`) |
+| Every Kirby hat request ends: it ages each game frame and, if the hat never arrives, ends with "Kirby hat could not be loaded" (HAT-REQUEST-END, rule 1). | `src/runtime/roster/kirby_hats.rs:390` (`tick`) |
+| A swap away from Kirby ends that role's pending hat request (HAT-REQUEST-END, rule 2). | `src/runtime/roster/kirby_hats.rs:445` (`fighter_committed`) |
+
+![Solo Popo marks on the Ice Climbers icon, Player (red) and CPU (blue)](decisions/solo-s-placement-rc2.png)
+
+*Character Cycles, Player list: the red (Player) and blue (CPU) "S" marks on the Ice Climbers icon's lower corners,
+clear of the name. Eden run `tr-p23-surface-rc2c`, 2026-11-05, rc.2 candidate NRO `eb326db0`.*
 
 ## Kept from M5q
 
