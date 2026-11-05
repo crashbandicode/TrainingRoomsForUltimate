@@ -151,12 +151,20 @@ pub unsafe fn sample_frame(player: usize) {
     let inputs = unpack(INPUTS.load(Ordering::Acquire));
     let mut tracker = TRACKER.lock();
     #[cfg(feature = "diag")]
-    let check = tracker.stun_check;
+    let (check, advantage) = (tracker.stun_check, tracker.advantage());
     tracker.step(p1, cpu, inputs);
     #[cfg(feature = "diag")]
     {
-        let (check_now, link) = (tracker.stun_check, tracker.latest_link());
+        let (check_now, link, advantage_now) = (tracker.stun_check, tracker.latest_link(), tracker.advantage());
         drop(tracker);
+        if advantage_now != advantage {
+            if let Some(a) = advantage_now {
+                crate::runtime::diag_log::diagnostic(format_args!(
+                    "[FrameStrip] advantage value={} on_shield={} p1={} cpu={}",
+                    a.value, a.on_shield, a.p1, a.cpu
+                ));
+            }
+        }
         diag_frame(&cpu, check, check_now, link);
     }
 }
@@ -168,7 +176,7 @@ fn diag_frame(cpu: &Sample, before: Option<(u32, u32)>, now: Option<(u32, u32)>,
     use crate::runtime::diag_log::diagnostic;
     static LAST_LINK: Mutex<Option<crate::model::frame_strip::Link>> = Mutex::new(None);
     if let Some(r) = cpu.reaction {
-        diagnostic(format_args!("[FrameStrip] reaction r={r} stop={}", cpu.stop));
+        diagnostic(format_args!("[FrameStrip] reaction r={r} stop={} actionable={}", cpu.stop, cpu.actionable));
     }
     if now != before {
         if let Some((predicted, seen)) = now {
@@ -199,8 +207,19 @@ pub fn on_layout_registered() {
 
 /// One HUD tick: hand every pane write the strip needs to `apply`. Shown unless a menu is open, the row is Off or
 /// boot did not enable the display. Returns how many panes were written.
-pub fn hud_tick(menu_open: bool, apply: impl FnMut(usize, &Look, Changed)) -> usize {
+pub fn hud_tick(menu_open: bool, mut apply: impl FnMut(usize, &Look, Changed)) -> usize {
     let shown = !menu_open && sampling();
     let tracker = *TRACKER.lock();
-    RENDERER.lock().draw(&tracker, shown, apply)
+    RENDERER.lock().draw(&tracker, shown, |local, look, changed| {
+        // Diag build: every show or hide of the strip, with why (the menu, the vanilla pause, the row Off).
+        #[cfg(feature = "diag")]
+        if local == crate::model::frame_strip_plan::at::CONTAINER && changed.visible {
+            crate::runtime::diag_log::diagnostic(format_args!(
+                "[FrameStrip] shown={} menu_open={menu_open} on={}",
+                look.visible,
+                sampling()
+            ));
+        }
+        apply(local, look, changed)
+    })
 }

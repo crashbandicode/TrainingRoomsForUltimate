@@ -632,7 +632,7 @@ impl Settings {
     }
 
     pub fn from_snapshot(snapshot: &super::settings::Snapshot) -> Self {
-        let on = snapshot.get(ROW).and_then(|r| r.iter().position(|v| *v != 0)).map_or(true, |i| i == 1);
+        let on = snapshot.get(ROW).and_then(|r| r.iter().position(|v| *v != 0)).is_none_or(|i| i == 1);
         Self { on }
     }
 }

@@ -57,8 +57,8 @@ fn text_of(seen: &[(usize, Look, Changed)], i: usize) -> String {
 
 #[test]
 fn the_strip_stays_near_the_estimated_pane_count() {
+    // The input log it replaced had 271.
     assert_eq!(COUNT, 121);
-    assert!(COUNT < 271, "fewer panes than the input log it replaces");
 }
 
 #[test]
