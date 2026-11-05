@@ -113,3 +113,11 @@ ceiling = 136945
 date = "2026-11-05"
 reason = "rc.3: HB-OWN-ORBS option 1 (own orbs for every fighter sphere in release, decision 2026-11-05); measured 136945 at b9436b1 (tools/size_gate.py), +472 over 136473"
 approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed' (rc.3 features)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 137841
+date = "2026-11-05"
+reason = "rc.3 candidate (p23/rc3-candidate): frame strip + Change Stage + menu navigation + hitbox own orbs merged; measured 137841 at 888fdaa (tools/sloc.py), +1368 over 136473 at main 36d7f46, the sum of the four lane entries above"
+approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed' (rc.3 features)"
