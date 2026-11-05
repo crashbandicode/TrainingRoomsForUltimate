@@ -733,7 +733,15 @@ list. The host test `the_solo_marks_never_cover_the_tile_name` checks every rost
 
 ![Solo S after the fix](decisions/SOLO-S-PLACEMENT-after.png)
 
-### HB-OWN-ORBS · How TrainingRooms draws its own hitbox orbs (Route A) — open (2026-11-05)
+### HB-OWN-ORBS · How TrainingRooms draws its own hitbox orbs (Route A) — answered (2026-11-05)
+
+**Answered 2026-11-05 ~13:4xZ by the operator: "go with discs for all".** This is option 1.
+- Every fighter sphere (hurt, hit and grab) is drawn as the plugin's own disc, so none is refused.
+- Projectiles (articles) keep Route B for now.
+- The A/B picture `decisions/HB-OWN-ORBS-ab.png` shows the benefit: two Ridleys, with 22 of 55 refused every frame
+  under Route B against 0 with discs.
+- The diag-only prototype on `p23/hitbox-orbs` becomes the release route; the size raise is covered by
+  SIZE-BUDGET-RC (rc.3, "Raise as needed").
 
 The operator ordered the Route A research on 2026-11-05 ~03:05Z: "begin the hitbox research where we do our own orbs for
 characters like ridley". The work runs in lane `tr-lane-hitbox`, branch `p23/hitbox-orbs`, and the report is
