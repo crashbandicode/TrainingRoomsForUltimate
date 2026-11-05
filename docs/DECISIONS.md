@@ -1148,3 +1148,27 @@ the 2026-11-03 deferred list was still open. Each item was explained to the oper
 | 1 · F9 helper promotion, fixed seats, hat/item cutover | **Build after the items above.** Design and native facts may start in parallel; its code waits for the hot-fighter work (both use the parked CPU entries 2/3). |
 | 4 · State-destructor alternative | **Dropped.** |
 | Remaining feature/edge-case inventory | Not chosen. |
+
+### HOT-SLOTS-CEILING · Ten fighters plus five hats against Training's helper entries — answered (2026-11-05)
+
+**Measured:** run `tr-p23-hot-measure-1`, Yoga, rc.4 release NRO `031f1eae`, 26 PASS, 0 Unmapped
+(`artifacts/phase23/LANE-HOT-SLOTS-REPORT.md` §7).
+- The pool is not the limit: capacity 24, minus the 6 reserved, leaves 18 ≥ 15.
+- **A hat needs a whole helper entry.** The one hat that loaded was a count-1 install on a helper entry; no
+  copy-package load was seen.
+- Training has six helper entries: 2, 3, 4, 5, 6 and 7. F9's fixed seats keep 2 and 3 for the next CPUs, which leaves
+  4 for hats.
+- **Memory:** a 3285 MiB budget. About 2482 MiB is used with two fighters, about 66 MiB per extra body (an estimate),
+  and the peak seen was 3204 MiB. Ten fighters plus four hats come to about 3340 MiB, so the per-kind guard will refuse
+  some heavy kinds, with a notice.
+
+**Asked:**
+- **A.** 10 + 4: simple, with no conflict with F9. A fifth hat fits only when its kind is already hot.
+- **B.** 10 + 5 while there is one CPU: the fifth hat borrows entry 3 and unloads, going back to slow loading, when No.
+  of CPUs is raised. A more complex F9.
+- In both, the memory guard decides heavy cases, with an on-screen notice, never silently.
+
+**Answered 2026-11-05 ~20:5xZ by the operator: "B".**
+- Hats use entries 7, 6, 5 and 4 first. A fifth hat may take entry 3 only while the native CPU count is 1.
+- Raising the count retires that hat before the game activates entry 3. F9's promotion then takes the seat.
+- The ordering contract is in the hot-slots report §3.5 and the F9 design (`LANE-GROK-F9-REPORT.md`).
