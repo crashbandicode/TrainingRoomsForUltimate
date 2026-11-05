@@ -1211,8 +1211,16 @@ The new gate (playbook `0f0f533`, fixed `2276f7e`) flagged four product strings 
 All four are carried fork behaviour that reports missing data or a missing capability.
 
 **Approved 2026-11-05 ~21:3xZ by the operator: "approve all four".** They are registered in `docs/RESTRICTIONS.md` in
-rc.5. The three hot-slots status strings ("waiting for memory", "waiting for pool space", "N failed, N waiting for …")
-are not approved yet.
+rc.5.
+
+**Later the same evening:**
+- **~21:58Z, "yes to both":** approved the three hot-slots status strings ("waiting for memory", "waiting for pool
+  space", "N failed, N waiting for …"), for `p23/hot-slots`.
+- **~22:13Z, "yes to both":** the widened gate (playbook `cd605af`) found two more. The operator approved:
+  - "Wait for the practice fighters to finish loading";
+  - "Combos work in Training", **for rc.5 only**. The operator asked "and it will be enabled in the lobby as well
+    right?"; rc.6 enables combos in lobby practice (`p23/combos-lobby`) and removes the limit.
+- The same evening, the operator ordered rc.5 published once its test session passes, with no separate rc.4 release.
 
 ### INTRO-ONCE · The Training intro notices — ordered (2026-11-05)
 
