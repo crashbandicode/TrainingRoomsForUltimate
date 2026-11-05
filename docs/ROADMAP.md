@@ -1,7 +1,29 @@
 # Roadmap
 
-Deferred work after 0.2.0-rc.2. Folded from the former `NEXT-VERSION.md` (removed after v0.2.0-rc.1; see that tag)
+Deferred work after 0.2.0-rc.3. Folded from the former `NEXT-VERSION.md` (removed after v0.2.0-rc.1; see that tag)
 on 2026-11-05; no item was dropped.
+
+## Next batch
+
+- **Combo helper** (decision COMBO-HELPER, option A; `SPEC-input-07`, branch `p23/combo-helper`): record a combo, save
+  it with a name from the Switch keyboard, and have each attempt graded link by link in a bar under the frame strip.
+  Built and host-tested; its Eden rows run in the next grouped session.
+- **Mii editor**: the Mii editor batch, tested in the same grouped session.
+
+## Done: 0.2.0-rc.3 (2026-11-05)
+
+Four additions on top of rc.2 (candidate `p23/rc3-candidate` `3c8f5bc`; see
+[Differences from the fork](DIFFERENCES-FROM-THE-FORK.md#added-in-rc3)):
+
+- **Frame strip** (decision INPUT-VIZ, option A): the input display is a strip of the last 60 frames of Player 1 and
+  the CPU, with how each follow-up linked and the frame advantage. It replaces the 15-row input log.
+- **Change Stage**: a row under Fighters & Stages › Stages that goes to the picked stage when the menu closes, in
+  Training and in waiting-room practice. rc.2's Direct stage pick, which did nothing, works again.
+- **Menu navigation**: ZL + Up/Down jumps sections; the menu reopens where it was closed; ZR no longer resets a page
+  (decision SETTINGS-PERSIST), and each page ends with a confirmed *Reset page to defaults*.
+- **Own hitbox discs** (decision HB-OWN-ORBS, option 1): every fighter sphere is drawn as the plugin's own disc and
+  is never refused. Projectiles keep the game's effect spheres. Known limit: the discs trail the camera by one to two
+  frames while it pans.
 
 ## Done: 0.2.0-rc.2 (2026-11-05)
 
@@ -26,15 +48,15 @@ The RC is M5q parity plus the new UI and clean MIT provenance; this list is not 
 | Ten hot fighters plus five separate hot hats | Proven capacity behaviour kept; no separate 15-body feature. |
 | Setup Library / SaveSetup | Screen entries and transactions disabled; saved files left intact. |
 | Saved/replay Mii bust provider (Q15) | No new provider or hook; the native saved-Mii selection stays. |
-| Frame/status text backgrounds (UI22) | Reverted to the pre-UI22 state; the input log's light-background contrast is a known limitation. |
+| Frame/status text backgrounds (UI22) | Reverted to the pre-UI22 state. The input log and its light-background contrast are gone in rc.3 (the frame strip has its own backdrop). |
 | Named-macro library/preview extensions (F8 design C) | Exposed operations narrowed; basic capture and synchronization kept. |
 | State-destructor alternative | Never integrated. |
 | Further latency work (F6) | M5q cold-switch hitches kept; the zero-Unmapped and zero-allocation fixes stay. |
-| Hitbox sphere replacement | Large-fighter first-frame refusals observed; Phase 3 option A authorized. |
+| Hitbox sphere replacement | Done for fighter spheres in rc.3 (own discs, never refused). Projectiles keep the game's effect spheres. |
 | Remaining feature/edge-case inventory | Kept for later planning. |
 
-Timer-recording truncation and the input-log contrast are observed TrainingRooms limitations with no established M5q
-equivalence; they are not called inherited bugs.
+Timer-recording truncation is an observed TrainingRooms limitation with no established M5q equivalence; it is not
+called an inherited bug. (The input-log contrast went with the input log in rc.3.)
 
 ## Phase 2 N11: Lobby Items (operator order)
 
