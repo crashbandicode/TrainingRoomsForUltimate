@@ -878,7 +878,12 @@ Kong); the frame numbers are **illustrative**, a plausible Steve jab → up tilt
 **Recommendation:** A, the frame strip, with B's history as its LAST row (as drawn). Nothing is implemented until the
 operator picks.
 
-### COMBO-HELPER · Record a combo and have a helper grade your attempts — open (2026-11-05)
+### COMBO-HELPER · Record a combo and have a helper grade your attempts — answered (2026-11-05)
+
+**Answered 2026-11-05 ~13:10Z by the operator: "yep those mockups look good. go with A".**
+- A is the combo bar under the frame strip, with the Recording page's "Combos" group and the name taken on the Switch
+  keyboard, as in the mockups below.
+- It is implemented after the frame strip (INPUT-VIZ A) lands, because it reuses the strip's per-link measurements.
 
 The operator asked on 2026-11-05: "also not sure if this is posible but adding a new section under recording where you
 can record a combo and give it an optional name and enable "combo helper" which tells you whether you got the combo or
