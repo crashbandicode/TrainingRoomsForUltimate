@@ -71,7 +71,7 @@ fn every_index_the_renderer_can_write_is_inside_the_resolved_array() {
     for single in [p::IDX_TILE_HI, p::IDX_CHIP_HI, p::IDX_TAB_HI, p::IDX_MENU] {
         assert!(single < all.len());
     }
-    const { assert!(p::IDX_NOTICE >= p::MENU_COUNT && p::IDX_LOG >= p::MENU_COUNT, "the input package's panes stay outside") };
+    const { assert!(p::IDX_NOTICE >= p::MENU_COUNT && p::IDX_IV >= p::MENU_COUNT, "the input package's panes stay outside") };
 }
 
 /// The renderer itself, over a `Panes` of the real length: the hide-all path (no roster grid), the roster grid

@@ -37,7 +37,7 @@ pub static BUFFS: [&str; 18] = [
     "Accelerate", "Oomph", "Psyche Up", "Bounce", "Arsene", "Deep Breathing", "Limit", "KO Punch", "1-Winged Angel",
     "Jump", "Speed", "Shield", "Buster", "Smash", "Power Dragon", "Mini Waft", "Half Waft", "Full Waft",
 ];
-pub static INPUT_DISPLAY: [&str; 4] = ["Off", "Smash Inputs", "Raw Inputs", "Status Only"];
+pub static INPUT_DISPLAY: [&str; 2] = ["Off", "Frame strip"];
 pub static MACRO_SOURCE: [&str; 2] = ["Numbered Slots", "Named Library"];
 pub static CYCLE_SLOTS: [&str; 6] = ["Off", "1", "2", "3", "4", "5"];
 pub static SOURCES: [&str; 3] = ["Fighters", "Hats", "Both"];

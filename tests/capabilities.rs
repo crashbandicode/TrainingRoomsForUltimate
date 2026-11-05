@@ -69,6 +69,11 @@ const BOUNDARIES: &[Boundary] = &[
     Boundary { function: "hitbox::frame", owner: Some(Feature::Hitbox), gate: Gate::Flag("INSTALLED") },
     // The input display's reads in the input-delay hook: dormant until boot enables the display.
     Boundary { function: "input_display::on_p1_poll", owner: Some(Feature::InputDisplay), gate: Gate::Flag("ENABLED") },
+    // SPEC-input-06: the frame strip's frame, from the CPU core's player-entry frame: dormant until boot enables the display.
+    Boundary { function: "input_display::sample_frame", owner: Some(Feature::InputDisplay), gate: Gate::Flag("ENABLED") },
+    Boundary { function: "input_display::sampling", owner: Some(Feature::InputDisplay), gate: Gate::Flag("ENABLED") },
+    // Its hitstun-left read: the CPU tech unit's work_get_float row (boot sets the flag from that unit's closure).
+    Boundary { function: "input_display::reaction_left", owner: Some(Feature::CpuTech), gate: Gate::Flag("REACTION_ON") },
     // The recorder's entry points the other features call: dormant until boot enables the recorder.
     Boundary { function: "recorder::request_playback", owner: Some(Feature::Recording), gate: Gate::Flag("ENABLED") },
     Boundary { function: "recorder::on_state_restored", owner: Some(Feature::Recording), gate: Gate::Flag("ENABLED") },

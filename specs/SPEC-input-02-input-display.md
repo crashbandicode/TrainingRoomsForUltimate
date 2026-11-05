@@ -2,7 +2,8 @@
 
 - **Spec id:** `SPEC-input-02`
 - **Origin:** upstream (Training Modpack) — clean-room reimplementation required
-- **Status:** draft
+- **Status:** superseded by `SPEC-input-06-frame-strip.md` (operator decision INPUT-VIZ, option A, 2026-11-05). The
+  input log described here is no longer built; its menu rows are retired and migrate as SPEC-input-06 §3.1 says.
 - **Spec writer:** Claude (Fable 5.1), spec-writer for area `input`, 2026-11-01
 - **Upstream reference read (spec writer only):** `src/training/input_log.rs`, `src/training/ui/input_log.rs`, `src/training/ui/mod.rs` (draw dispatch and fade), `src/training/frame_counter.rs`, the `InputDisplay` option and the Misc tab rows in `training_mod_consts/src/{options,lib}.rs`, all at commit `97cbe9b9` (unchanged at `077a8e43`). Fork changes at `…/stages/m5i/stage/src/training/input_log.rs` lines 177, 187, 211, 312–318 and `…/stage/src/training/ui/input_log.rs` (the whole renderer, 341 fork-only lines), `…/stage/src/training/ui/mod.rs` lines 138–230 (UI anchor tick) and `…/stage/src/training/ui/anchors.rs` line 160 (cache invalidation), plus `docs/input-display-performance.md`, `docs/input-display-benchmark.md`, `docs/input-display-followup.md`.
 - **Implementers must not open the upstream paths above.** Everything an implementer needs is in this file and in the native reference tables it cites.

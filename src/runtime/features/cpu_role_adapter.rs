@@ -30,6 +30,13 @@ pub fn role(cpu: &mut Cpu, scene: Option<Scene>, accessor: usize) -> Option<Figh
 
 /// `fresh_cpu` came from the current manager, NOT by reading a stored accessor.
 /// Return a native-query plan; callers release the CPU lock before executing it.
+/// The frame strip's CPU (SPEC-input-06 §5.1): `fresh` when it is the primary CPU role's live accessor in `scene`, and
+/// not P1's. Unlike `measurement` it leaves the frame-advantage state alone.
+pub fn primary_cpu(cpu: &Cpu, scene: Scene, player: usize, fresh: usize) -> Option<usize> {
+    let key = FighterKey::new(if scene == Scene::Lobby { 4 } else { 1 }, false)?;
+    (fresh != player && cpu.roles.accessor_of(Some(scene), key) == Some(fresh)).then_some(fresh)
+}
+
 pub fn measurement(
     cpu: &mut Cpu,
     scene: Option<Scene>,

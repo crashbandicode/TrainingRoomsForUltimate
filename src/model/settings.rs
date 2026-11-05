@@ -35,7 +35,10 @@ pub const WEIGHT_MAX: u8 = 5;
 pub const SLIDER_MAX: u8 = 150;
 /// Keys older builds wrote that nothing reads any more (SPEC-core-01 §6, SPEC-core-02 question 4;
 /// `character_item` since decision N6, converted once by the first-boot import).
-pub const RETIRED: [&str; 3] = ["update_policy", "menu_open_start_press", "character_item"];
+/// `input_display` and `input_display_status` since the frame strip replaced the input log (SPEC-input-06 §3.1;
+/// `input_display` is migrated first).
+pub const RETIRED: [&str; 5] =
+    ["update_policy", "menu_open_start_press", "character_item", "input_display", "input_display_status"];
 
 /// How a row's array is read.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -457,6 +460,16 @@ fn snapshot_from(label: &'static str, nested: Option<Nested>, issues: &mut Vec<I
         }
         Some(Nested::Object(entries)) => entries,
     };
+    // SPEC-input-06 §3.1: a file from before the frame strip takes its row from the retired `input_display`.
+    let strip = super::frame_strip::ROW;
+    let migrated = (!entries.items.iter().any(|(id, _)| id == strip))
+        .then(|| entries.items.iter().find(|(id, _)| id == super::frame_strip::OLD_ROW))
+        .flatten()
+        .and_then(|(_, value)| value.as_array()?.iter().map(|v| v.as_u64().filter(|v| *v <= 1).map(|v| v as u8)).collect::<Option<Vec<u8>>>())
+        .and_then(|old| super::frame_strip::migrate(&old));
+    if let (Some(row), Some((index, _))) = (migrated, def(strip)) {
+        snapshot.rows[index] = row.to_vec();
+    }
     for (id, value) in entries.items {
         if RETIRED.contains(&id.as_str()) {
             continue;
