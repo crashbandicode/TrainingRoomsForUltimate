@@ -75,13 +75,18 @@ pub const fn layers(route: Route, view: View) -> (bool, bool) {
 }
 
 /// One diag request (`diag-hitbox-route.req`): words `route=effects|orbs|both`, `view=effects|orbs|both`, `joint=0|1`
-/// (the last argument of the joint position call), in any order; unknown words are ignored.
+/// (the last argument of the joint position call) and `orbtint=cyan|off` (every orb drawn cyan, so both layers of one
+/// frame can be told apart for the camera-lag measure), in any order; unknown words are ignored.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Request {
     pub route: Option<Route>,
     pub view: Option<View>,
     pub joint_flag: Option<bool>,
+    pub cyan: Option<bool>,
 }
+
+/// The colour every orb takes while `orbtint=cyan` is in force.
+pub const CYAN: [u8; 4] = [0, 255, 255, ORB_ALPHA];
 
 pub fn parse_request(text: &str) -> Request {
     let mut out = Request::default();
@@ -97,6 +102,7 @@ pub fn parse_request(text: &str) -> Request {
             ("route", Some(code)) => out.route = Some(Route::from_code(code)),
             ("view", Some(code)) => out.view = Some(View::from_code(code)),
             ("joint", _) if value == "0" || value == "1" => out.joint_flag = Some(value == "1"),
+            ("orbtint", _) if value == "cyan" || value == "off" => out.cyan = Some(value == "cyan"),
             _ => {}
         }
     }

@@ -15,12 +15,15 @@ fn sphere(key: u32, x: f32, size: f32) -> Sphere {
 
 #[test]
 fn requests_parse_route_view_and_joint_flag() {
-    assert_eq!(orbs::parse_request("route=orbs"), Request { route: Some(Route::Orbs), view: None, joint_flag: None });
+    assert_eq!(orbs::parse_request("route=orbs"), Request { route: Some(Route::Orbs), ..Request::default() });
     assert_eq!(
-        orbs::parse_request(" view=effects\nroute=both joint=1 junk route=nope"),
-        Request { route: Some(Route::Both), view: Some(View::Effects), joint_flag: Some(true) }
+        orbs::parse_request(" view=effects\nroute=both joint=1 junk route=nope orbtint=cyan"),
+        Request { route: Some(Route::Both), view: Some(View::Effects), joint_flag: Some(true), cyan: Some(true) }
     );
-    assert_eq!(orbs::parse_request("joint=0 view=orbs"), Request { route: None, view: Some(View::Orbs), joint_flag: Some(false) });
+    assert_eq!(
+        orbs::parse_request("joint=0 view=orbs orbtint=off orbtint=red"),
+        Request { route: None, view: Some(View::Orbs), joint_flag: Some(false), cyan: Some(false) }
+    );
     assert_eq!(orbs::parse_request(""), Request::default());
     for route in [Route::Effects, Route::Orbs, Route::Both] {
         assert_eq!(Route::from_code(route.code()), route);

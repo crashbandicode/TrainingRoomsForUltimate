@@ -203,15 +203,23 @@ pub fn set_request(request: orbs::Request) {
     if let Some(flag) = request.joint_flag {
         JOINT_FLAG.store(flag, Ordering::Release);
     }
+    if let Some(cyan) = request.cyan {
+        CYAN.store(cyan, Ordering::Release);
+    }
     let epoch = VIEW_EPOCH.fetch_add(1, Ordering::AcqRel) + 1;
     let passes = STORE.lock().passes;
     crate::runtime::diag_log::diagnostic(format_args!(
-        "[Hitbox] orbs request route={:?} view={:?} joint={} epoch={epoch} pass={passes}",
+        "[Hitbox] orbs request route={:?} view={:?} joint={} cyan={} epoch={epoch} pass={passes}",
         route(),
         view(),
-        JOINT_FLAG.load(Ordering::Acquire)
+        JOINT_FLAG.load(Ordering::Acquire),
+        CYAN.load(Ordering::Acquire)
     ));
 }
+
+/// Diag only: every orb drawn cyan (`orbtint=cyan`), for the camera-lag measure.
+#[cfg(feature = "diag")]
+static CYAN: AtomicBool = AtomicBool::new(false);
 
 /// Clear set `i` with the effects interface of the route it was filled under; its orbs go too.
 fn clear_set(store: &mut Store, i: usize, accessor: usize) -> Counts {
@@ -326,7 +334,7 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
                 pane::set_pos(target, plan.x, plan.y);
                 pane::set_width(target, plan.size);
                 pane::set_height(target, plan.size);
-                pane::set_rect_color(target, plan.color);
+                pane::set_rect_color(target, if CYAN.load(Ordering::Relaxed) { crate::model::panes::linear(orbs::CYAN) } else { plan.color });
                 pane::set_visible(target, true);
             }
             n += 1;
@@ -571,6 +579,12 @@ pub unsafe fn frame(fighter: usize) {
         let hits = wants[..len].iter().filter(|s| s.key >> 24 == hitbox::KIND_HIT).count() as u32;
         (hits, len as u32 - hits)
     };
+    // The held hit and grab spheres of this pass, for the A/B's frame pick (diag `orbs pass` line).
+    #[cfg(feature = "diag")]
+    let held_kinds = {
+        let kind = |k: u32| set.spheres().filter(|s| s.key >> 24 == k).count() as u32;
+        [kind(hitbox::KIND_HIT), kind(hitbox::KIND_GRAB)]
+    };
     #[cfg(feature = "diag")]
     stats::wanted(hits, hurts);
     #[cfg(not(feature = "diag"))]
@@ -588,7 +602,7 @@ pub unsafe fn frame(fighter: usize) {
     counts.failed += c.failed;
     counts.dropped += c.dropped;
     #[cfg(feature = "diag")]
-    stats::orbs_pass(i, route, placed as u32, held_now as u32, c.failed);
+    stats::orbs_pass(i, route, placed as u32, held_now as u32, c.failed, held_kinds, status);
     #[cfg(not(feature = "diag"))]
     let _ = placed;
     // The diag hurt census (decision HB1): a second HitModule read per fighter per frame over the pass's own read,
@@ -884,13 +898,22 @@ mod stats {
     static LAST_ORB_PASS: [AtomicU64; hitbox::FIGHTER_SETS] = [const { AtomicU64::new(u64::MAX) }; hitbox::FIGHTER_SETS];
     static LAST_DRAWN: AtomicU64 = AtomicU64::new(u64::MAX);
 
-    /// One fighter's (set `set`) pass: a line whenever its route, placed orbs, held spheres or refused requests change
-    /// (route B's `failed` of the same pass beside the orbs' placed count).
-    pub fn orbs_pass(set: usize, route: super::Route, placed: u32, held: u32, failed: u32) {
+    /// One fighter's (set `set`) pass: a line whenever its route, placed orbs, held spheres, held hit / grab spheres,
+    /// refused requests or status change (route B's `failed` of the same pass beside the orbs' placed count).
+    pub fn orbs_pass(set: usize, route: super::Route, placed: u32, held: u32, failed: u32, kinds: [u32; 2], status: i32) {
         let pass = PASS_NO.fetch_add(1, Ordering::Relaxed) + 1;
-        let key = (u64::from(route.code()) << 48) | (u64::from(placed) << 32) | (u64::from(held) << 16) | u64::from(failed);
+        let [hits, grabs] = kinds;
+        let key = (u64::from(route.code()) << 60)
+            | (u64::from(placed & 0xff) << 52)
+            | (u64::from(held & 0xff) << 44)
+            | (u64::from(failed & 0xff) << 36)
+            | (u64::from(hits & 0x3f) << 30)
+            | (u64::from(grabs & 0x3f) << 24)
+            | u64::from(status as u32 & 0xff_ffff);
         if LAST_ORB_PASS[set % hitbox::FIGHTER_SETS].swap(key, Ordering::Relaxed) != key && (route.orbs() || failed != 0) {
-            diagnostic(format_args!("[Hitbox] orbs pass set={set} route={route:?} placed={placed} held={held} failed={failed} pass={pass}"));
+            diagnostic(format_args!(
+                "[Hitbox] orbs pass set={set} route={route:?} placed={placed} held={held} failed={failed} hits={hits} grabs={grabs} status={status} pass={pass}"
+            ));
         }
     }
 
