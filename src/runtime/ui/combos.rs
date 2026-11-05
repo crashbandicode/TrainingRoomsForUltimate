@@ -122,6 +122,7 @@ impl Ui {
         let opened = match editor {
             Editor::ComboName => {
                 if !name_keyboard_opens() {
+                    // restriction: combo-name-online-default
                     Opened::Done("The next combo gets a Combo N name".into())
                 } else {
                     let initial = self.draft.clone().unwrap_or_default();
