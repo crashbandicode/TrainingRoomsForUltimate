@@ -1,7 +1,7 @@
 {
   "game_id": "01006A800016E000",
   "start": "boot",
-  "scope": "Hitbox own-orbs A/B (HB1 route A4 prototype, primary 03:56Z order) on the diag NRO e78ad90a of p23/hitbox-orbs 97d6b57: P1 Ridley + CPU Steve by in-fight pushes; route B first-frame refusals against own orbs; both layers on one paused frame per pair (standing, fsmash, grab); camera-motion clips; Off.",
+  "scope": "Hitbox own-orbs A/B run ab2 (HB1 route A4 prototype; primary 03:56Z and 11:38Z orders) on the diag NRO of p23/hitbox-orbs b771f08: P1 Ridley + CPU Steve by in-fight pushes; route B first-frame refusals against own orbs; both layers on one paused frame per pair with a repeat shot for frame identity (standing; fsmash in hitlag, accepted on held hit spheres; grab, accepted on a held grab sphere); camera-lag clips with cyan orbs; Off. Joint flag 0 from ab1 row 06.",
   "segments": {
     "main-stage": {
       "file": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/segments/main-stage.edenmacro.json",
@@ -53,29 +53,99 @@
       "sha256": "a1c8a8d96c0ba75dadffd5d83a2e859721798411f0d78a377a29bd39675acfe5",
       "cap": 20
     },
-    "hb-fsmash-p14": {
-      "file": "segments/hb-fsmash-p14.edenmacro.json",
-      "sha256": "ce6aeee3faf2e06f3c5ce4332b0c78d4a0c1f16f73d4fa5717b8d5057b4f0fca",
+    "hb-csmash-p10": {
+      "file": "segments/hb-csmash-p10.edenmacro.json",
+      "sha256": "285409df11ba8a515aeca182b2702d75bc9bfcdf10ac027543baf22aa22adeb1",
       "cap": 20
     },
-    "hb-fsmash-p18": {
-      "file": "segments/hb-fsmash-p18.edenmacro.json",
-      "sha256": "29b19a8863562172b76bfae419e987654dba23ff629f4e251454c896e56448b5",
+    "hb-csmash-p12": {
+      "file": "segments/hb-csmash-p12.edenmacro.json",
+      "sha256": "8e057423eb2a49ec308f9b5cb56ea2c48bf73c895110f6610a190c6a36badfd8",
       "cap": 20
     },
-    "hb-fsmash-p22": {
-      "file": "segments/hb-fsmash-p22.edenmacro.json",
-      "sha256": "da0cfc4336625707c82b50f23819fe0d81f539644401881a6b13b33d25db070c",
+    "hb-csmash-p14": {
+      "file": "segments/hb-csmash-p14.edenmacro.json",
+      "sha256": "406ef447aa01159ba37cee5c7ec5c68bd72037569a377088229f8e87ae60f578",
       "cap": 20
     },
-    "hb-fsmash-p26": {
-      "file": "segments/hb-fsmash-p26.edenmacro.json",
-      "sha256": "82c30894f297d037a125f8060ba901f1611b541f083aebf83d7364efc810f947",
+    "hb-csmash-p16": {
+      "file": "segments/hb-csmash-p16.edenmacro.json",
+      "sha256": "c5f1f336323f8e6b633403fac8524c2e7f4009251e37f5a10e6caed38b1e4b50",
       "cap": 20
     },
-    "hb-fsmash-p30": {
-      "file": "segments/hb-fsmash-p30.edenmacro.json",
-      "sha256": "20027345f56f917479a2a21c704cde001f7cf75c565b6b7b239665964bb4dbe6",
+    "hb-csmash-p18": {
+      "file": "segments/hb-csmash-p18.edenmacro.json",
+      "sha256": "5d7854c98075c9c77ffc91a426f059db9ade2b9f54a4bb49bc8baaa7194a90c6",
+      "cap": 20
+    },
+    "hb-csmash-p20": {
+      "file": "segments/hb-csmash-p20.edenmacro.json",
+      "sha256": "5aef77fe2a918524c727c7cabb0528b3f2ccc9265a295312efbb9bc3f32acb6b",
+      "cap": 20
+    },
+    "hb-csmash-p22": {
+      "file": "segments/hb-csmash-p22.edenmacro.json",
+      "sha256": "98134669bd9e3e7af93ce07dc218e522328b65c2183b53f531269c4f5f3bd3eb",
+      "cap": 20
+    },
+    "hb-csmash-p24": {
+      "file": "segments/hb-csmash-p24.edenmacro.json",
+      "sha256": "9ef4fe6e0726737466490c8457daf4492009e2488829a18cac6f8d16520d13cc",
+      "cap": 20
+    },
+    "hb-csmash-p26": {
+      "file": "segments/hb-csmash-p26.edenmacro.json",
+      "sha256": "88b70b82f7c94bc06fc1b32dc2104b8b704c72fa9e37b9b80804697a29417f87",
+      "cap": 20
+    },
+    "hb-csmash-p28": {
+      "file": "segments/hb-csmash-p28.edenmacro.json",
+      "sha256": "4c1dced47a70fc08e0ff215ca9de35d362322f2f88e2133760370efd41e90c99",
+      "cap": 20
+    },
+    "hb-csmash-p30": {
+      "file": "segments/hb-csmash-p30.edenmacro.json",
+      "sha256": "2fe44e2bc9f7d8361841a4263dfcb36c6488f898be3fe2e32b5290e9d15f5b83",
+      "cap": 20
+    },
+    "hb-csmash-p32": {
+      "file": "segments/hb-csmash-p32.edenmacro.json",
+      "sha256": "068dfd1d0b8735c0f817f3b652aa03360346812e7f26a1bd068d462bbe90166b",
+      "cap": 20
+    },
+    "hb-csmash-p34": {
+      "file": "segments/hb-csmash-p34.edenmacro.json",
+      "sha256": "60e1e15bb6a0ed8ac9e67b5edfa400721299d8bec413c9e63f36af855b9b42ac",
+      "cap": 20
+    },
+    "hb-csmash-p36": {
+      "file": "segments/hb-csmash-p36.edenmacro.json",
+      "sha256": "6ea5727db141dd34a98f5b04e0527d8f4c41988897c7a571907017b529fede12",
+      "cap": 20
+    },
+    "hb-csmash-p38": {
+      "file": "segments/hb-csmash-p38.edenmacro.json",
+      "sha256": "d9b6b1ecb42c0fe64a132679e2dcb4198ae6e88316e7ed936175907f8fececc7",
+      "cap": 20
+    },
+    "hb-csmash-p40": {
+      "file": "segments/hb-csmash-p40.edenmacro.json",
+      "sha256": "fa8079ea8c26248fb83f48d114483b71348711905457f8e01bb668adf8adfdfd",
+      "cap": 20
+    },
+    "hb-csmash-p42": {
+      "file": "segments/hb-csmash-p42.edenmacro.json",
+      "sha256": "942ec9e69d7dfcb21323d2384c0e2e2c3d84928f290362163888839f47bb5748",
+      "cap": 20
+    },
+    "hb-csmash-p44": {
+      "file": "segments/hb-csmash-p44.edenmacro.json",
+      "sha256": "b3ae90d3c93072b9ec214b2c611ec551f30bc4429896a5a5ca022c69c9f16b73",
+      "cap": 20
+    },
+    "hb-csmash-p8": {
+      "file": "segments/hb-csmash-p8.edenmacro.json",
+      "sha256": "965ac1ce58aae50fd47a46b41dd5c01a45c59d59e55e3587f2607684bc59196e",
       "cap": 20
     },
     "hb-grab-p10": {
@@ -83,9 +153,59 @@
       "sha256": "c15db18a1b07d3a940075fd307c8fb8ba36a90ac776830b22a9dbe5b2731ee48",
       "cap": 20
     },
+    "hb-grab-p11": {
+      "file": "segments/hb-grab-p11.edenmacro.json",
+      "sha256": "debd1e03f958af6c7664545541836c6eba9e5e04c32e4152fcac22481ef0efb3",
+      "cap": 20
+    },
     "hb-grab-p12": {
       "file": "segments/hb-grab-p12.edenmacro.json",
       "sha256": "0a5721da376597caddd3f447d82b9116a6e9c3c079a99ac253f7461bd2dc3e23",
+      "cap": 20
+    },
+    "hb-grab-p13": {
+      "file": "segments/hb-grab-p13.edenmacro.json",
+      "sha256": "ccf74cf7b2e3436d614af084f22fdfb9545187f1eeee8552df5e7bcc202f3523",
+      "cap": 20
+    },
+    "hb-grab-p14": {
+      "file": "segments/hb-grab-p14.edenmacro.json",
+      "sha256": "c98bfd86c315a3fefc765a80a5c5459cd5d44d103a8f7b2b70d9843c37618f27",
+      "cap": 20
+    },
+    "hb-grab-p15": {
+      "file": "segments/hb-grab-p15.edenmacro.json",
+      "sha256": "fb3cf3068a71ba41b601582922d3bf5bec35a02e020e3e6f1e2eaa078980400d",
+      "cap": 20
+    },
+    "hb-grab-p16": {
+      "file": "segments/hb-grab-p16.edenmacro.json",
+      "sha256": "ecabf8fb045911926301c7c91ce4e8658318172734932f37b524f59842e0e838",
+      "cap": 20
+    },
+    "hb-grab-p17": {
+      "file": "segments/hb-grab-p17.edenmacro.json",
+      "sha256": "af212c9edf975c75421b0479ef24ae41a826057ea157250e2280475d04e01648",
+      "cap": 20
+    },
+    "hb-grab-p18": {
+      "file": "segments/hb-grab-p18.edenmacro.json",
+      "sha256": "e8d49f5e4ea766fdeb86d790aca9eb0bfa4f678b944001c8f998a8a9ab16f100",
+      "cap": 20
+    },
+    "hb-grab-p3": {
+      "file": "segments/hb-grab-p3.edenmacro.json",
+      "sha256": "683744543c3b45d1eada902910c907b0576452fe561e2cc5f6ffbe1f4d5f734b",
+      "cap": 20
+    },
+    "hb-grab-p4": {
+      "file": "segments/hb-grab-p4.edenmacro.json",
+      "sha256": "e568a263927aa8d44ea313d81bfbae28b540dc2c38e614b01f0d29add6670a99",
+      "cap": 20
+    },
+    "hb-grab-p5": {
+      "file": "segments/hb-grab-p5.edenmacro.json",
+      "sha256": "92b006da4098d1fc5541034dbaf740fa6722ae9742e255c17c338bac8a69bf18",
       "cap": 20
     },
     "hb-grab-p6": {
@@ -319,7 +439,7 @@
     {
       "state": "Paused on a fixed game frame",
       "via": "segment",
-      "ref": "hb-plus, hb-fsmash-pK, hb-grab-pK (Plus at frame K)"
+      "ref": "hb-plus, hb-csmash-pK, hb-grab-pK (Plus at frame K)"
     }
   ],
   "rows": [
@@ -407,18 +527,6 @@
       ]
     },
     {
-      "id": "06-calibrate",
-      "start": "Training-settled",
-      "end": "Training-settled",
-      "budget_min": 2,
-      "steps": [
-        {
-          "run": "hb_steps.py:calibrate",
-          "check": true
-        }
-      ]
-    },
-    {
       "id": "07-ab-standing",
       "start": "Training-settled",
       "end": "Training-settled",
@@ -434,7 +542,7 @@
       "id": "08-ab-attack",
       "start": "Training-settled",
       "end": "Training-settled",
-      "budget_min": 6,
+      "budget_min": 8,
       "steps": [
         {
           "run": "hb_steps.py:ab_attack",
@@ -446,7 +554,7 @@
       "id": "09-ab-grab",
       "start": "Training-settled",
       "end": "Training-settled",
-      "budget_min": 6,
+      "budget_min": 8,
       "steps": [
         {
           "run": "hb_steps.py:ab_grab",

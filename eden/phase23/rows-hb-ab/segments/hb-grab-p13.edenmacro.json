@@ -11,7 +11,7 @@
  },
  "player": 0,
  "version": 1,
- "name": "hb-fsmash-p26",
+ "name": "hb-grab-p13",
  "events": [
   {
    "buttons": 0,
@@ -56,7 +56,7 @@
    ]
   },
   {
-   "buttons": 0,
+   "buttons": 513,
    "frame": 2,
    "motion": [
     {
@@ -87,91 +87,7 @@
     }
    ],
    "sticks": [
-    1.0,
     0.0,
-    0,
-    0
-   ],
-   "triggers": [
-    0,
-    0
-   ]
-  },
-  {
-   "buttons": 1,
-   "frame": 3,
-   "motion": [
-    {
-     "accel": [
-      0,
-      0,
-      0
-     ],
-     "delta_us": 10000,
-     "gyro": [
-      0,
-      0,
-      0
-     ]
-    },
-    {
-     "accel": [
-      0,
-      0,
-      0
-     ],
-     "delta_us": 10000,
-     "gyro": [
-      0,
-      0,
-      0
-     ]
-    }
-   ],
-   "sticks": [
-    1.0,
-    0.0,
-    0,
-    0
-   ],
-   "triggers": [
-    0,
-    0
-   ]
-  },
-  {
-   "buttons": 0,
-   "frame": 5,
-   "motion": [
-    {
-     "accel": [
-      0,
-      0,
-      0
-     ],
-     "delta_us": 10000,
-     "gyro": [
-      0,
-      0,
-      0
-     ]
-    },
-    {
-     "accel": [
-      0,
-      0,
-      0
-     ],
-     "delta_us": 10000,
-     "gyro": [
-      0,
-      0,
-      0
-     ]
-    }
-   ],
-   "sticks": [
-    1.0,
     0.0,
     0,
     0
@@ -225,7 +141,7 @@
   },
   {
    "buttons": 1024,
-   "frame": 29,
+   "frame": 15,
    "motion": [
     {
      "accel": [
@@ -267,7 +183,7 @@
   },
   {
    "buttons": 0,
-   "frame": 35,
+   "frame": 21,
    "motion": [
     {
      "accel": [
@@ -309,5 +225,5 @@
   }
  ],
  "markers": [],
- "duration_frames": 39
+ "duration_frames": 25
 }

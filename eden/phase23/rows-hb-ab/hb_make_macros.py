@@ -18,6 +18,11 @@ def event(frame, buttons=0, lx=0.0, ly=0.0):
     return {'buttons': buttons, 'frame': frame, 'motion': [zero, zero], 'sticks': [lx, ly, 0, 0], 'triggers': [0, 0]}
 
 
+def cstick(ev, rx):
+    ev['sticks'][2] = rx
+    return ev
+
+
 def macro(name, events, duration):
     return {'bindings': {'keyboard': '', 'gamepad': ''}, 'format': 'eden-input-macro', 'game_id': '01006A800016E000',
             'parent': {'name': '', 'marker': ''}, 'player': 0, 'version': 1, 'name': name, 'events': events,
@@ -34,13 +39,13 @@ def main():
     OUT.mkdir(exist_ok=True)
     # Reset positions (L+R+A, one frame).
     write('hb-lra', [event(0), event(5, L | R | A), event(19)], 40)
-    # Forward smash (stick right, A tapped the next frame), then Plus `k` frames after A.
-    for k in (14, 18, 22, 26, 30):
-        a = 3
-        write(f'hb-fsmash-p{k}', [event(0), event(2, 0, 1.0), event(a, A, 1.0), event(a + 2, 0, 1.0), event(a + 3),
-                                  event(a + k, PLUS), event(a + k + 6)], a + k + 10)
+    # Forward smash on the right stick (the smash stick: no charge, no dash), then Plus `k` frames after it.
+    for k in range(8, 46, 2):
+        c = 2
+        write(f'hb-csmash-p{k}', [event(0), cstick(event(c), 1.0), event(c + 4), event(c + k, PLUS), event(c + k + 6)],
+              c + k + 10)
     # Standing grab (shield + attack in one frame), then Plus `k` frames after it.
-    for k in (6, 7, 8, 9, 10, 12):
+    for k in range(3, 19):
         g = 2
         write(f'hb-grab-p{k}', [event(0), event(g, ZR | A), event(g + 4), event(g + k, PLUS), event(g + k + 6)], g + k + 10)
     # Pause, camera mode, back.

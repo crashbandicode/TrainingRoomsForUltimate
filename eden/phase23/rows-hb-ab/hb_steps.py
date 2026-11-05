@@ -1,4 +1,4 @@
-"""Hitbox own-orbs A/B (HB1 route A4 prototype, diag NRO e78ad90a, branch p23/hitbox-orbs 97d6b57).
+"""Hitbox own-orbs A/B (HB1 route A4 prototype, run ab2: diag NRO of p23/hitbox-orbs b771f08).
 
 Fighters come from in-fight settings pushes (diag-settings-next.json, the Ally gbc-04 route): P1 Ridley (catalog 63),
 CPU Steve (76), CPU Behavior Stop (Training's default). The route and the A/B view come from diag-hitbox-route.req.
@@ -13,7 +13,7 @@ import time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-ELF = '/home/intpa/smash-training-lobby/artifacts/phase23/hitbox-orbs/nro-97d6b57/diag/libtraining_rooms.so'
+ELF = '/home/intpa/smash-training-lobby/artifacts/phase23/hitbox-orbs/nro-b771f08/diag/libtraining_rooms.so'
 PUBLISH = 'libtraining_rooms.nro!_RNvNtNtNtCskE0RJeV9NF0_14training_rooms7runtime8features6hitbox12publish_orbs'
 DRAW = 'libtraining_rooms.nro!_RNvNtNtNtCskE0RJeV9NF0_14training_rooms7runtime8features6hitbox9draw_orbs'
 RIDLEY, STEVE, MARIO = 63, 76, 0
@@ -22,6 +22,8 @@ VIEW_NAMES = {'effects': 'Effects', 'orbs': 'Orbs', 'both': 'Both'}
 
 def save(ctx, name, value):
     (ctx.row_dir / (name + '.json')).write_text(json.dumps(value, indent=2, default=str) + '\n')
+    # The diag log keeps 2 x 128 KiB: a copy per row keeps the evidence.
+    (ctx.row_dir / 'diag-copy.log').write_text(diag_text(ctx))
     return value
 
 
@@ -86,7 +88,7 @@ def push(ctx, player, cpu, vis):
     menu['player_character'] = one_hot(player)
     menu['cpu_character'] = one_hot(cpu)
     menu['hitbox_vis'] = [1, 0] if vis else [0, 1]
-    menu['trio_practice'] = [0, 1]
+    menu['trio_practice'] = [1, 0]  # Player Swapping On: the Player role's swaps need it
     menu['cycle_preload_slots'] = [1, 0, 0, 0, 0, 0]
     menu['cycle_preload_group_swap'] = [0, 1]
     menu['cycle_preload_bank_members'] = [0, 1, 0]
@@ -125,7 +127,11 @@ def preload(ctx):
         dev.unlink()
     tdir = ctx.runner.out / 'trace'
     tdir.mkdir(parents=True, exist_ok=True)
-    got = {'configure': ctx.call('trace.configure', {'run_directory': str(tdir), 'label': 'hb', 'unmapped_access': 'log'})}
+    got = {'configure': ctx.call('trace.configure', {'run_directory': str(tdir), 'label': 'hb'})}
+    try:
+        got['unmapped_mode'] = ctx.call('trace.unmapped_access', {'mode': 'log'})
+    except RuntimeError as error:
+        got['unmapped_mode_error'] = repr(error)
     got['symbols'] = ctx.call('symbols.load', {'module': 'libtraining_rooms.nro', 'elf': ELF})
     got['publish'] = ctx.call('trace.arm', {'target': PUBLISH, 'mode': 'counters'})
     got['draw'] = ctx.call('trace.arm', {'target': DRAW, 'mode': 'counters'})
@@ -217,6 +223,13 @@ def _paused_views(ctx, tag, suffix):
         poll = wait_new(ctx, n0, r'\[Hitbox\] orbs view_poll view=%s' % VIEW_NAMES[view], 10)[-1]
         time.sleep(1.0)
         shots[view] = {'shot': str(ctx.shot(f'{tag}{suffix}-{view}')), 'poll': poll}
+    # Frame identity: the first view again, after the flips. Pixel-identical to the first shot means no game frame and
+    # no camera move happened in between (the plugin's per-fighter pass still runs in the pause; the bones do not move).
+    n0 = line_count(ctx)
+    route(ctx, 'view=effects')
+    wait_new(ctx, n0, r'\[Hitbox\] orbs view_poll view=Effects', 10)
+    time.sleep(1.0)
+    shots['effects_again'] = {'shot': str(ctx.shot(f'{tag}{suffix}-effects-again'))}
     return shots
 
 
@@ -233,11 +246,16 @@ def _resume(ctx):
     ctx.gate('training-hud-unpaused')
 
 
-def _last_placed(ctx):
-    """The last `orbs pass` state of every set (route Both): {set: placed}."""
+STATE = re.compile(r'\[Hitbox\] orbs pass set=(\d+) route=Both placed=(\d+) held=\d+ failed=\d+ hits=(\d+) grabs=(\d+) '
+                   r'status=(-?\d+) pass=(\d+)')
+
+
+def _last_state(ctx):
+    """The last `orbs pass` state of every set (route Both): {set: {placed, hits, grabs, status, pass}}."""
     last = {}
-    for l in re.findall(r'\[Hitbox\] orbs pass set=(\d+) route=Both placed=(\d+)', diag_text(ctx)):
-        last[int(l[0])] = int(l[1])
+    for m in STATE.finditer(diag_text(ctx)):
+        last[int(m.group(1))] = {'placed': int(m.group(2)), 'hits': int(m.group(3)), 'grabs': int(m.group(4)),
+                                 'status': int(m.group(5)), 'pass': int(m.group(6))}
     return last
 
 
@@ -246,85 +264,98 @@ def _ridley(ctx):
 
 
 def _pair(ctx, tag, segment, accept):
-    """Play `segment` (it pauses the game on its own frame), check `accept(Ridley's placed orbs)`, shoot the three
-    views in the pause menu and in camera mode, with trace counters before and after."""
+    """Play `segment` (it pauses the game on its own frame), check `accept(Ridley's last pass state)`, shoot the views in
+    the pause menu and in camera mode (each ends with a repeat of the first view: the frame-identity check), with trace
+    counters before and after."""
+    r = _ridley(ctx)
     n0 = line_count(ctx)
     ctx.play(segment)
     time.sleep(1.6)
-    placed = _last_placed(ctx)
-    if not accept(placed):
+    state = _last_state(ctx)
+    ridley = state.get(r['set'], {})
+    if not accept(ridley):
         _resume(ctx)
-        return None
+        return None, ridley
     before = counters(ctx)
     menu = _paused_views(ctx, tag, '')
     ctx.play('hb-y')
-    time.sleep(1.5)
+    time.sleep(4.0)  # the camera toggle's "Zoom" hint fades first
     cam = _paused_views(ctx, tag, '-cam')
     after = counters(ctx)
     lines = lines_after(ctx, n0, r'\[Hitbox\] (orbs|pass|command|refused)')
     _resume(ctx)
-    return {'segment': segment, 'placed': placed, 'counters_before': before, 'counters_after': after, 'menu': menu,
-            'camera': cam, 'lines': lines[-40:]}
+    return {'segment': segment, 'paused_state': state, 'counters_before': before, 'counters_after': after, 'menu': menu,
+            'camera': cam, 'lines': lines[-60:]}, ridley
 
 
 def ab_standing(ctx):
+    """Visualizer On (route Both, both layers), positions reset, then one pause: hurtboxes only."""
     route(ctx, 'route=both view=both ' + joint_word(ctx))
+    push(ctx, RIDLEY, STEVE, True)
     ctx.play('hb-lra')
     time.sleep(4)
-    last = _last_placed(ctx)
-    ridley_set = max(last, key=last.get)
+    last = _last_state(ctx)
+    ridley_set = max(last, key=lambda k: last[k]['placed'])
     (ctx.runner.out / 'ridley.json').write_text(json.dumps({'set': ridley_set, 'standing': last[ridley_set], 'all': last}))
-    return save(ctx, 'ab-standing', _pair(ctx, 'standing', 'hb-plus', lambda placed: True) | {'baseline': last})
+    got, state = _pair(ctx, 'standing', 'hb-plus', lambda st: st.get('hits') == 0 and st.get('grabs') == 0)
+    if not got:
+        raise RuntimeError(f'standing pause showed {state}')
+    return save(ctx, 'ab-standing', got | {'baseline': last})
+
+
+def _sweep(ctx, name, ks, seg, accept, what):
+    tries = []
+    for k in ks:
+        ctx.play('hb-lra')
+        time.sleep(2.5)
+        got, state = _pair(ctx, f'{name}-p{k}', f'{seg}{k}', accept)
+        tries.append({'k': k, 'got': bool(got), 'ridley_at_pause': state})
+        if got:
+            return save(ctx, name, got | {'tries': tries})
+    save(ctx, name, {'tries': tries})
+    raise RuntimeError(f'no {name} pause frame showed {what}; tries {tries}')
 
 
 def ab_attack(ctx):
-    tries = []
-    r = _ridley(ctx)
-    for k in (18, 22, 26, 14, 30):
-        ctx.play('hb-lra')
-        time.sleep(2.5)
-        got = _pair(ctx, f'fsmash-p{k}', f'hb-fsmash-p{k}', lambda placed: placed.get(r['set'], 0) > r['standing'])
-        tries.append({'k': k, 'got': bool(got)})
-        if got:
-            return save(ctx, 'ab-attack', got | {'tries': tries})
-    save(ctx, 'ab-attack', {'tries': tries})
-    raise RuntimeError('no fsmash pause frame showed Ridley with hit spheres')
+    """Ridley's right-stick forward smash connects on Steve from the reset spots: the hit spheres stay through the hitlag
+    freeze, so a pause K frames on lands on them for a wide band of K. Accepted only when Ridley's pass held hit spheres."""
+    ks = (24, 28, 32, 20, 36, 26, 30, 22, 34, 38, 18, 40, 16, 42, 14, 44, 12, 10, 8)
+    return _sweep(ctx, 'ab-attack', ks, 'hb-csmash-p', lambda st: st.get('hits', 0) > 0, 'hit spheres on Ridley')
 
 
 def ab_grab(ctx):
-    tries = []
-    r = _ridley(ctx)
-    for k in (8, 9, 7, 10, 6, 12):
-        ctx.play('hb-lra')
-        time.sleep(2.5)
-        got = _pair(ctx, f'grab-p{k}', f'hb-grab-p{k}', lambda placed: 0 < placed.get(r['set'], 0) < 20)
-        tries.append({'k': k, 'got': bool(got)})
-        if got:
-            return save(ctx, 'ab-grab', got | {'tries': tries})
-    save(ctx, 'ab-grab', {'tries': tries})
-    raise RuntimeError('no grab pause frame showed a grab box alone on Ridley')
+    """A standing grab (shield + attack): accepted only when Ridley's pass held a grab sphere."""
+    ks = (8, 9, 10, 7, 11, 6, 12, 13, 5, 14, 15, 4, 16, 17, 3, 18)
+    return _sweep(ctx, 'ab-grab', ks, 'hb-grab-p', lambda st: st.get('grabs', 0) > 0, 'a grab sphere on Ridley')
 
 
 def lag_clips(ctx):
-    """Both layers at once while the camera moves: P1 walks (unpaused), then the paused camera pans."""
-    route(ctx, 'view=both')
+    """Both layers on the same frames while the camera moves, the orbs drawn cyan so the layers part: P1 walks right and
+    back (the camera follows, unpaused; GIF plus a burst of shots), then the paused camera pans (GIF). The lag is the
+    offset between the two layers' centroids over the layers' own motion per frame."""
+    route(ctx, 'view=both orbtint=cyan')
     ctx.play('hb-lra')
     time.sleep(2.5)
     clips = {}
     walk = ctx.runner.out / f'{ctx.row_dir.name}-walk.gif'
-    ctx.call('recording.start', {'path': str(walk), 'fps': 15, 'width': 640, 'duration_ms': 7000})
+    ctx.call('recording.start', {'path': str(walk), 'fps': 30, 'width': 1280, 'duration_ms': 4500})
     time.sleep(0.3)
     ctx.play('hb-walk')
     clips['walk'] = _recording_done(ctx)
+    ctx.play('hb-lra')
+    time.sleep(2.5)
+    # The still reference: both layers with nothing moving (the centroid offset the lag is measured against).
+    clips['still_shots'] = [str(ctx.shot(f'still-{i}')) for i in range(2)]
     ctx.play('hb-plus')
     time.sleep(1.6)
     ctx.play('hb-y')
-    time.sleep(1.5)
+    time.sleep(4.0)
     pan = ctx.runner.out / f'{ctx.row_dir.name}-pan.gif'
-    ctx.call('recording.start', {'path': str(pan), 'fps': 15, 'width': 640, 'duration_ms': 5000})
+    ctx.call('recording.start', {'path': str(pan), 'fps': 30, 'width': 1280, 'duration_ms': 3500})
     time.sleep(0.3)
     ctx.play('hb-cam-pan')
     clips['pan'] = _recording_done(ctx)
+    route(ctx, 'orbtint=off')
     _resume(ctx)
     return save(ctx, 'lag-clips', {'walk': str(walk), 'pan': str(pan), 'status': clips})
 
@@ -355,3 +386,4 @@ def off_and_scan(ctx):
         got['unmapped_error'] = repr(error)
     got['counters'] = counters(ctx)
     return save(ctx, 'off-and-scan', got)
+
