@@ -225,7 +225,7 @@ Operator, 2026-11-06.
 
 ## Recording page
 
-The same stacked sections and the Links panel, inside the menu: the Links panel fits beside the sections in the menu's content area. The left column is Save states & Macros, Combos & Sequences, Replays, Options; it lists the groups, so the page has no tab switch. One role per view, as in the pop-up: the Player | CPU toggle sits above the sections, and ZR switches it, as in Character Cycles, because L / R change the menu page. The CPU view has only Save states & Macros. A opens the file's own screen; on a save, Bind to Save / Load is that screen's first row. ZL + Up / Down pages the section the cursor is in.
+The same stacked sections and the Links panel, inside the menu: the Links panel fits beside the sections in the menu's content area. The left column is Save states & Macros, Combos & Sequences, Replays, Options; it lists the groups, so the page has no tab switch. One role per view, as in the pop-up: the Player | CPU toggle sits above the sections, and ZR switches it, as in Character Cycles, because L / R change the menu page. The CPU view has only Save states & Macros. A opens the file's own screen; on a save, Bind to Save / Load is that screen's first row. X cycles the loop when the cursor is in MACROS, as in the pop-up. ZL + Up / Down pages the section the cursor is in.
 
 ### Save states and macros
 
@@ -246,6 +246,7 @@ The same stacked sections and the Links panel, inside the menu: the Links panel 
 | Button | What it does |
 | --- | --- |
 | A | Open the file's own screen. On a save, Bind to Save / Load there binds it |
+| X | Cycle the loop, when the cursor is in MACROS, as in the pop-up |
 | Left / Right | Move to the other section |
 | ZR | Player / CPU, as in Character Cycles |
 | ZL + Up / Down | Page the section the cursor is in |
@@ -384,6 +385,7 @@ Drilling one combo from a sequence's numbered rows uses that combo's own streak 
 - A macro's own screen, and a chain's, has one Set active row, for the role in view: "On · Player 1" (or "On · CPU" in the CPU view) or "Off". Left / Right turn it On or Off; On makes this file that role's active macro, replacing the one before, and that role's Play chord plays it. "go with your recommendations and redraw them". Operator, 2026-11-06.
 - A chain starts where its macro 1 starts: at macro 1's start save, shown on the chain row with the floppy chip. To change it, reorder, or save over that file; there is no new screen. If macro 1 has no start save, the chain has none and plays from where the fighters are ([Q12](#q12-where-a-chain-starts-decided-a)). The operator: "I agree with your answers to q12 and q13". Operator, 2026-11-06.
 - A chain cannot contain a chain. The chain picker lists recordings only, so nothing needs a loop check. This is a restriction, approved by the operator ([Q13](#q13-can-a-chain-contain-a-chain-decided-a)): "I agree with your answers to q12 and q13". Operator, 2026-11-06.
+- X cycles the loop on the Recording page too, when the cursor is in MACROS, as in the pop-up. The primary asked: "X on the Recording page: should X cycle the loop when the cursor is in MACROS, as it does in the pop-up?" The operator: "yes". Operator, 2026-11-06.
 
 ## Each file's screen, and the other rules
 
@@ -606,3 +608,4 @@ No other new sentence is added. A long chain, a missing combo, an empty chain, a
   - X on a save row, and Load starting anything.
 
   The new questions Q12 (where a chain starts) and Q13 (can a chain contain a chain) were decided A the same day: "I agree with your answers to q12 and q13".
+  X cycles the loop on the Recording page too, when the cursor is in MACROS, as in the pop-up; the primary asked "X on the Recording page: should X cycle the loop when the cursor is in MACROS, as it does in the pop-up?" and the operator answered "yes".

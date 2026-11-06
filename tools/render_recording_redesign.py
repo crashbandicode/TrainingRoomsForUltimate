@@ -2995,13 +2995,13 @@ def main():
         "Save (ZL + Down) writes this file. Load (ZL + Up) warps here and starts nothing.",
         {"Bind to Save / Load": ("On", "on")},
         [("Up/Down", "move"), ("Left/Right", "On / Off"), ("A", "do it"), ("B", "back")]), P + "save-actions")
-    save(action_screen4(menu, "Recording  >  Combos & Sequences  >  Corner to kill", [
+    save(action_screen4(menu, "Recording (Player view)  >  Combos & Sequences  >  Corner to kill", [
         ("Drill sequence", True), ("1  Ryu BnB", False), ("2  Nair loop combo", False), ("Edit combos", False),
         ("Rename", False), ("Delete", False),
     ], "Drill sequence grades the whole sequence. A on a numbered combo drills that combo alone.",
         "Edit combos is the numbered picker. Deleting the sequence keeps the combo files."),
         P + "sequence-actions")
-    save(action_screen4(menu, "Recording  >  Combos & Sequences  >  Nair loop combo", [
+    save(action_screen4(menu, "Recording (Player view)  >  Combos & Sequences  >  Nair loop combo", [
         ("Drill", True), ("Made from", False), ("Rename", False), ("Crop", False),
         ("Delete", False),
     ], "Drill makes this the one drill and clears a drilled sequence.",
