@@ -741,15 +741,13 @@ fn waiting_backend() -> Option<Backend> {
 /// later, on the target's own loader callback, and only when a request needs
 /// a new install.
 unsafe fn qualified_backend() -> Result<Backend, &'static str> {
-    if !cfg!(feature = "managed-sources") {
+    let training_closed = crate::runtime::compat::common::is_native_training_mode()
+        && !crate::model::parked_entries::training_quantity_open(native_source::training_cpu_quantity());
+    if !cfg!(feature = "managed-sources") || training_closed {
         return Err("Character resource loading is not available in this scene yet");
     }
     if crate::runtime::compat::common::is_native_training_mode() {
-        return if crate::model::parked_entries::training_quantity_open(native_source::training_cpu_quantity()) {
-            Ok(Backend::Training)
-        } else {
-            Err("Character resource loading is not available in this scene yet")
-        };
+        return Ok(Backend::Training);
     }
     waiting_backend().ok_or("Character resource loading is not available in this scene yet")
 }
