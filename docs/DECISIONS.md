@@ -1263,9 +1263,20 @@ answers for my review".
 - A recording's start is a named save-state file that the macro links to by id. The option rejected was embedding it.
 - The "Respawn on platform" row (formerly "Respawn invincibility") moves from Saves › Save states to Fighters & Stages ›
   Stages (`p23/respawn-label`).
-- Revision 2 is in progress.
+- Revision 2 was published as `c3e10ab`.
 
-Still open, in that document: how a recording remembers its start save, and whether save states have their own hot list.
+**Answered 2026-11-06 ~01:2xZ, on revision 2:** "1. Yes 2. Yes a new section under both 3. That message looks fine".
+- Save states have five hot, with pins, as macros do.
+- Save states are a section under both roles. The rejected alternative was a third "Saves" tab.
+- The notice "No start save. This macro plays from where the fighters are." is approved (a restriction string).
+
+**New in the same message:**
+- **A chain of macros:** "when a save state is chained to a macro that macro is numbered kind of like in our character
+  cycles and you can select multiple macros to automatically play one after the other".
+- **Conversions:** "combos for the combo helper can also be chained together in what we will call a conversion so that
+  [you] can practice combos individually and also chaining them together to get feedback".
+
+Revision 3 is in progress.
 
 **Revision 2** is the same document, updated. The start save is a file named "<macro name> · start" and the macro stores its id. Renaming that file keeps the link. The sentence for a deleted start save is proposed and not approved. Respawn on platform is drawn under Fighters & Stages › Stages. The pin is a tilted thumbtack. Save states stay a section on both role tabs; a third tab named Saves is the other option. Hot save states remain open.
 
