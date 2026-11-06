@@ -11,6 +11,11 @@ Files, unchanged except for the file name (downloaded 2026-11-05):
   link.svg                   <- symbols/web/link/materialsymbolsoutlined/link_24px.svg
   format_list_numbered.svg   <- symbols/web/format_list_numbered/materialsymbolsoutlined/format_list_numbered_24px.svg
 
+Added in revision 8 (downloaded 2026-11-06, unchanged):
+  save.svg                   <- symbols/web/save/materialsymbolsoutlined/save_24px.svg
+
 How the mockups use them: the renderer parses each path and fills it with Pillow at 8x size, then downsamples.
 The colour, the dot under the loop, and the count drawn inside the loop are added by the renderer.
 Revision 7 dropped pins, so the push_pin icon that revision 4 used was removed from this folder.
+Revision 8: save (the floppy disk) is the start-save chip and the SAVE STATES header mark, where link and an orange
+square were. link stays for one picture, q7-ab, where it marks a sequence's reference to a combo file.
