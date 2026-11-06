@@ -35,7 +35,8 @@ PANEL = (13, 13, 13, 236)
 SMALL = iv.font(13)
 TINY = iv.font(12)
 
-GROUPS = [("Macros", 8), ("Combos", 4), ("Conversions", 3), ("Save states", 5), ("Replays", 2), ("Options", 5)]
+# The Recording page's groups (revision 7.2 redraws revision 3's keyboard and crop screens with them).
+GROUPS = [("Save states & Macros", 14), ("Combos & Conversions", 7), ("Replays", 2), ("Options", 5)]
 RED = (232, 72, 72, 255)
 
 
@@ -52,11 +53,12 @@ def hints(d, line):
 
 
 def draw_groups(d, selected):
+    """The left column as the Recording page draws it (page6)."""
     for i, (name, count) in enumerate(GROUPS):
         y = ch.ROW_Y0 + i * ch.GROUP_STEP
         if i == selected:
             d.rectangle((33, y - 18, 307, y + 18), fill=ch.M_FOCUS)
-        iv.text(d, (48, y), "%s  (%d)" % (name, count), ch.MF,
+        iv.text(d, (44, y), "%s  (%d)" % (name, count), iv.font(14),
                 fill=ch.M_TEXT if i == selected else ch.M_GROUP, anchor="lm")
 
 
@@ -70,39 +72,29 @@ def page_base(bg, selected, help1, help2, hint):
     return img, d
 
 
-def library_rows(d, rows, c2, c3, y0=168, c2x=760, c3x=1040):
-    iv.text(d, (386, 140), "Name", SMALL, fill=ch.M_GROUP, anchor="lm")
-    iv.text(d, (c2x, 140), c2, SMALL, fill=ch.M_GROUP, anchor="lm")
-    iv.text(d, (c3x, 140), c3, SMALL, fill=ch.M_GROUP, anchor="lm")
-    hot = 0
-    for row in rows:
-        if row["hot"]:
-            hot += 1
-        else:
-            break
-    centers = []
-    y = y0
-    for i, row in enumerate(rows):
-        if hot and i == hot:
-            y += 16
+def crop_links(d, rows, kept, cursor, y0=180):
+    """A combo's crop screen, by links. The kept range is a bracket at the left labelled "kept" (the thin green
+    outline means the hot five everywhere else), and the links left out are dimmed. rows: (name, range, end)."""
+    x0, x1, nx, c2x, c3x = 410, 1236, 440, 760, 1040
+    iv.text(d, (nx, 144), "Link", SMALL, fill=ch.M_GROUP, anchor="lm")
+    iv.text(d, (c2x, 144), "Range", SMALL, fill=ch.M_GROUP, anchor="lm")
+    centres = []
+    for i, (name, rng, end) in enumerate(rows):
+        y = y0 + i * 36
         top, bot = y - 16, y + 16
-        on = row.get("active")
-        if on:
-            d.rectangle((330, top, 1236, bot), fill=GREEN_ROW)
-        elif row.get("cursor"):
-            d.rectangle((330, top, 1236, bot), fill=ch.M_FOCUS)
-        if row.get("cursor"):
-            d.rectangle((330, top, 334, bot), fill=WHITE)
-        name_col = ch.M_TEXT if not row.get("dim") else ch.M_GROUP
-        iv.text(d, (370, y), row["name"], ch.MF, fill=name_col, anchor="lm")
-        iv.text(d, (c2x, y), row.get("c2", ""), ch.MF, fill=ch.M_GROUP, anchor="lm")
-        iv.text(d, (c3x, y), row.get("c3", ""), ch.MF, fill=GREEN if row.get("c3_on") else ch.M_GROUP, anchor="lm")
-        centers.append(y)
-        y += 36
-    if hot:
-        d.rounded_rectangle((328, centers[0] - 20, 1238, centers[hot - 1] + 20),
-                            outline=GREEN, width=2, radius=8)
-    return y
+        if i == cursor:
+            d.rectangle((x0, top, x1, bot), fill=ch.M_FOCUS)
+            d.rectangle((x0, top, x1, bot), outline=WHITE, width=2)
+            d.rectangle((x0, top, x0 + 5, bot), fill=WHITE)
+        ink = ch.M_TEXT if i < kept else DIM
+        iv.text(d, (nx, y), name, ch.MF, fill=ink, anchor="lm")
+        iv.text(d, (c2x, y), rng, ch.MF, fill=ch.M_GROUP if i < kept else DIM, anchor="lm")
+        iv.text(d, (c3x, y), end, ch.MF, fill=ch.M_GROUP, anchor="lm")
+        centres.append(y)
+    top, bot = centres[0] - 14, centres[kept - 1] + 14
+    bx = x0 - 14
+    d.line([(bx + 8, top), (bx, top), (bx, bot), (bx + 8, bot)], fill=ch.M_TEXT, width=2)
+    iv.text(d, (bx - 10, (top + bot) / 2), "kept", iv.font(15, bold=True), fill=ch.M_TEXT, anchor="rm")
 
 
 def setting_rows(d, rows, y0=160):
@@ -213,13 +205,8 @@ def main_r3():
                        "Up/Down move    A save a copy    B back")
     # Replace the combo library with the crop list by painting the right pane first.
     d.rectangle((328, 130, 1240, 560), fill=ch.M_PANEL)
-    crop_rows = [
-        {"name": "1  aerial → aerial", "c2": "kept", "c3": "first", "hot": True},
-        {"name": "2  aerial → tilt", "c2": "kept", "c3": "", "hot": True},
-        {"name": "3  tilt → smash", "c2": "kept", "c3": "last", "hot": True, "cursor": True},
-        {"name": "4  smash → special", "c2": "left out", "c3": "", "hot": False, "dim": True},
-    ]
-    library_rows(d, crop_rows, "Range", "")
+    crop_links(d, [("1  aerial → aerial", "kept", "first"), ("2  aerial → tilt", "kept", ""),
+                   ("3  tilt → smash", "kept", "last"), ("4  smash → special", "left out", "")], kept=3, cursor=2)
     save(img, "RECORDING-REDESIGN-crop")
 
     img, d = page_base(menu, 0,
@@ -1242,9 +1229,9 @@ def loop_picture():
 PANEL_W, PANEL_H = 381, 330
 
 
-def frag_list(img, box, groups, focus=None, scroll=None, extra_rows=None):
+def frag_list(img, box, groups, focus=None, scroll=None, extra_rows=None, cols=None):
     width = box[2] - box[0]
-    lst, pos, _ = render_list(groups, width, COLS["frag"], focus, extra_rows)
+    lst, pos, _ = render_list(groups, width, cols or COLS["frag"], focus, extra_rows)
     view = box[3] - box[1]
     if lst.height <= view:
         img.alpha_composite(lst, (box[0], box[1]))
@@ -1317,12 +1304,20 @@ def frag_actions(img, box, crumb, rows, focus_i, values=None):
             d.rectangle((x0, y - 13, x0 + 5, y + 13), fill=WHITE)
         iv.text(d, (x0 + 16, y), label, fnt(14), fill=ch.M_TEXT, anchor="lm")
         if values and label in values:
-            v, is_link = values[label]
-            if is_link:
-                tw = d.textlength(v, font=fnt(13))
-                icon(img, "link", x1 - 10 - tw - 22, y - 9, 18, TYPES["save"][0])
+            v, kind = values[label]
+            if kind == "on":          # a value in the menu's green
+                iv.text(d, (x1 - 10, y), v, fnt(13), fill=GREEN, anchor="rm")
+            elif kind == "switch":    # a linked file and its On / Off switch, as on the macro's own screen
+                name, state = v
+                fb = fnt(13, bold=True)
+                iv.text(d, (x1 - 10, y), state, fb, fill=GREEN if state == "On" else DIM, anchor="rm")
+                nx = x1 - 10 - d.textlength(state, font=fb) - 6
+                iv.text(d, (nx, y), name + " ·", fnt(13), fill=ch.M_GROUP, anchor="rm")
+                icon(img, "link", nx - d.textlength(name + " ·", font=fnt(13)) - 22, y - 9, 18,
+                     TYPES["save"][0] if state == "On" else DIM)
                 d = ImageDraw.Draw(img)
-            iv.text(d, (x1 - 10, y), v, fnt(13), fill=ch.M_GROUP, anchor="rm")
+            else:
+                iv.text(d, (x1 - 10, y), v, fnt(13), fill=ch.M_GROUP, anchor="rm")
         y += 28
 
 
@@ -1376,6 +1371,23 @@ def strip_panel(img, i, step_title, caption):
         iv.text(d, (x, cy), line, fnt(14), fill=ch.M_TEXT, anchor="lm")
         cy += 20
     return (x + 10, y + 50, x + PANEL_W - 10, y + PANEL_H - 10)
+
+
+def section_group(title, typ, rows, count=None):
+    """One stacked section for a strip, as the revision 6 tabs have them: its own header and count."""
+    return {"title": title, "typ": typ, "count": len(rows) if count is None else count, "loop": None,
+            "sections": [(None, typ, rows)]}
+
+
+# The strips' columns for stacked sections. The conversion sequence keeps its place, without a header caption that
+# would run into "CONVERSIONS (n)".
+FRAG_STACK = dict(COLS["frag"], conv=[("seq", 162, "")])
+
+
+def tab_rows(focus, drill):
+    """The Combos & Conversions rows (the example data) with a given drill: (conversions, combos)."""
+    g = group_only("player", "combo", focus, overrides={"_drill": drill})
+    return g["sections"][1][2], g["sections"][0][2]
 
 
 def group_only(role, typ, focus, overrides=None, keep=None):
@@ -1437,8 +1449,8 @@ def flow_chain():
     frag_list(img, (b[0], b[1], b[2], b[3] - 34), [g], "pressure")
     keys_line(img, b[0], b[3] - 12, [("A", "bind"), ("+", "edit chain"), ("B", "close")], 14)
 
-    b = strip_panel(img, 1, "Number the macros", "A adds the next number. A again removes it and the later numbers "
-                    "close up. Y clears. The same gesture as Character Cycles.")
+    b = strip_panel(img, 1, "Number the macros", "A adds the next number. A again removes it, and the later numbers "
+                    "close up.")
     frag_tiles(img, b, "Edit chain · Corner pressure", [
         # The recorded fighter only: the role the save is bound under plays the whole chain.
         {"name": "Nair loop", "sub": "Recorded on Pikachu", "number": 1},
@@ -1447,7 +1459,7 @@ def flow_chain():
         {"name": "Macro 6", "sub": "Recorded on Lucina"},
         {"name": "Replay 86f", "sub": "Recorded on Pikachu"},
         {"name": "Slot 2", "sub": "Recorded on Steve"},
-    ], [("A", "add / remove"), ("Y", "clear"), ("B", "done")])
+    ], [("A", "add / remove number"), ("B", "done")])
 
     b = strip_panel(img, 2, "Linked", "Back in the list the row reads 3 On. The Links panel shows 1 → 2 → 3. "
                     "Chain On/Off is on the save's own screen.")
@@ -1462,11 +1474,13 @@ def flow_conversion():
     img = strip_canvas(3, "Make a conversion", "A conversion is a numbered list of combos, drilled as one chain.")
     b = strip_panel(img, 0, "New conversion", "Recording › Combos & Conversions. New conversion is the last row "
                     "under the conversions.")
-    g = group_only("page", "combo", "newconv")
-    secs = g["sections"]
+    # Revision 6's stacked tab: CONVERSIONS on top, COMBOS below. Corner to kill does not exist yet, so CONVERSIONS
+    # holds two files, then the + New conversion row with the cursor.
+    convs, combos = tab_rows("newconv", None)
+    convs = [r for r in convs if r["key"] != "corner"]
     newrow = dict(key="newconv", name="+ New conversion", seq=[], hot=False, cursor=True, action=True)
-    g = dict(g, sections=[secs[0], ("Conversions", "conv", secs[1][2] + [newrow])])
-    frag_list(img, b, [g], "newconv")
+    frag_list(img, b, [section_group("CONVERSIONS", "conv", convs + [newrow], count=len(convs)),
+                       section_group("COMBOS", "combo", combos)], "newconv", cols=FRAG_STACK)
 
     b = strip_panel(img, 1, "Number the combos", "The same numbered picker, with combos. Ryu BnB is 1, Nair loop "
                     "combo is 2.")
@@ -1475,7 +1489,7 @@ def flow_conversion():
         {"name": "Nair loop combo", "sub": "Pikachu → Mario", "number": 2, "cursor": True},
         {"name": "Combo 2", "sub": "Pikachu → Mario"},
         {"name": "Combo 4", "sub": "Steve → Pikachu"},
-    ], [("A", "add / remove"), ("Y", "clear"), ("B", "done, then name it")])
+    ], [("A", "add / remove number"), ("B", "done, then name it")])
 
     b = strip_panel(img, 2, "Name it", "OK on the Switch's own keyboard names it. The new row (gold: new) shows its "
                     "sequence, Ryu BnB → Nair loop combo.")
@@ -1492,11 +1506,12 @@ def flow_conversion():
 
 def flow_make_combo(game):
     img = strip_canvas(4, "Make combo from a macro", "A combo made from a macro remembers which macro it came from.")
-    b = strip_panel(img, 0, "Make combo", "Recording › Macros › Nair loop. A on Make combo. The first row is the "
-                    "start save it will load.")
-    frag_actions(img, b, "Macros  ›  Nair loop", ["Start save", "Set active for Player 1", "Set active for CPU",
-                                                   "Rename", "Crop", "Make combo", "Delete"], 5,
-                 {"Start save": ("Nair loop · start", True)})
+    b = strip_panel(img, 0, "Make combo", "Recording › Save states & Macros › Nair loop, in the Player view. A on "
+                    "Make combo. The first row is the start save it will load.")
+    # The macro's own screen (revision 7.2): one Set active row, for the role in view.
+    frag_actions(img, b, "Player view  ›  Save states & Macros  ›  Nair loop",
+                 ["Start save", "Set active", "Rename", "Crop", "Make combo", "Delete"], 4,
+                 {"Start save": (("Nair loop · start", "On"), "switch"), "Set active": ("On · Player 1", "on")})
 
     b = strip_panel(img, 1, "It plays from the start save", "The menu closes. Nair loop · start loads, Nair loop "
                     "plays once on Player 1, and the strip records the hits.")
@@ -1509,12 +1524,16 @@ def flow_make_combo(game):
     d = ImageDraw.Draw(img)
     iv.text(d, (b[0], bottom + 18), "The frame strip at the top is recording.", fnt(13), fill=ch.M_GROUP, anchor="lm")
 
-    b = strip_panel(img, 2, "The new combo", "Nair loop combo (gold: new) is hot and is the drill, one drill at a "
-                    "time. Its row says from Nair loop; its Links panel says made from.")
-    g = group_only("player", "combo", None, overrides={"_drill": "nairc"}, keep={"ryu", "nairc", "combo2"})
-    g["sections"][0][2][1]["new"] = True
-    frag_list(img, b, [g])
-    links_panel(img, (b[0], b[1] + 160, b[2], b[3]), {
+    b = strip_panel(img, 2, "The new combo", "Nair loop combo (gold: new) joins the hot five at the top. The drill "
+                    "does not change: Ryu BnB is still the drill. Its row says from Nair loop; its Links panel says "
+                    "made from.")
+    # The stacked tab with CONVERSIONS collapsed to its header. Ryu BnB is the drill in this strip, and the new combo,
+    # the most recently used, is at the top of the hot five without becoming the drill.
+    convs, combos = tab_rows(None, "ryu")
+    combos = [dict(r, new=True) for r in combos if r["key"] == "nairc"] + [r for r in combos if r["key"] != "nairc"]
+    frag_list(img, (b[0], b[1], b[2], b[1] + 152), [section_group("CONVERSIONS", "conv", [], count=len(convs)),
+                                                    section_group("COMBOS", "combo", combos)], cols=FRAG_STACK)
+    links_panel(img, (b[0], b[1] + 158, b[2], b[3]), {
         "self": ("combo", "Nair loop combo"),
         "branches": [{"label": "made from", "out": True, "nodes": [("macro", "Nair loop", None, None, False)],
                       "none": ""}],
@@ -1525,15 +1544,24 @@ def flow_make_combo(game):
 def flow_drill(game, bar_picture):
     img = strip_canvas(5, "Drill a conversion", "One drill at a time: drilling a conversion replaces a drilled combo.")
     b = strip_panel(img, 0, "Pick it", "In the pop-up, the cursor on Corner to kill. A drills it.")
-    g = group_only("player", "combo", "corner", overrides={"_drill": "nairc"})
-    frag_list(img, (b[0], b[1], b[2], b[3] - 34), [g], "corner")
-    keys_line(img, b[0], b[3] - 12, [("A", "drill"), ("ZL/ZR", "group"), ("B", "close")], 14)
+    # The pop-up's stacked tab: CONVERSIONS on top with the cursor on Corner to kill (not yet green), COMBOS below
+    # with the current drill, Nair loop combo, green. Each section scrolls on its own.
+    convs, combos = tab_rows("corner", "nairc")
+    frag_list(img, (b[0], b[1], b[2], b[1] + 102), [section_group("CONVERSIONS", "conv", convs)], "corner",
+              cols=FRAG_STACK)
+    frag_list(img, (b[0], b[1] + 110, b[2], b[1] + 212), [section_group("COMBOS", "combo", combos)], cols=FRAG_STACK)
+    foot = r5_foot("conv", "player")
+    keys_line(img, b[0], b[3] - 36, foot[:3], 13)
+    keys_line(img, b[0], b[3] - 14, foot[3:], 13)
 
-    b = strip_panel(img, 1, "It is the drill", "The row turns green. Its Links panel lists the combos in order, "
-                    "with the conversion's streak and best.")
-    row = [r for r in group_only("player", "combo", "corner")["sections"][1][2] if r["key"] == "corner"][0]
-    one_row(img, b[0], b[1], b[2] - b[0], row, "conv")
-    links_panel(img, (b[0], b[1] + 44, b[2], b[3]), links_spec("corner"), header=False)
+    b = strip_panel(img, 1, "It is the drill", "The row turns green, and Nair loop combo is no longer the drill. Its "
+                    "Links panel lists the combos in order, with the conversion's streak and best.")
+    convs, combos = tab_rows("corner", "corner")
+    one_row(img, b[0], b[1], b[2] - b[0], [r for r in convs if r["key"] == "corner"][0], "conv")
+    one_row(img, b[0], b[1] + 34, b[2] - b[0], [r for r in combos if r["key"] == "nairc"][0], "combo")
+    # The Links panel as in the pop-up, without its Drilled line: the green row says that, and the panel must fit.
+    spec = links_spec("corner")
+    links_panel(img, (b[0], b[1] + 76, b[2], b[3]), dict(spec, lines=spec["lines"][:1]), header=False)
 
     b = strip_panel(img, 2, "The bar, at the top", "The helper bar sits under the frame strip, where the combo bar "
                     "is today. Full size below.")
@@ -1809,8 +1837,9 @@ def r5_row(img, r, typ, top, bot, width, order_n, link_mark, slot=False):
         iv.text(d, (nx, sub_y), " → ".join(r["seq"]), fnt(11), fill=muted, anchor="lm")
 
 
-def r5_paste_sticky(img, section, box, scroll, header, positions):
-    """Header stays. Rows below it move by whole rows. A row that would be cut off is left out."""
+def r5_paste_sticky(img, section, box, scroll, header, positions, to_end=False):
+    """Header stays. Rows below it move by whole rows. A row that would be cut off is left out. With to_end, the
+    section is scrolled to its end: the first row is the earliest one from which every later row still fits."""
     x0, y0, x1, y1 = box
     header = min(int(header), section.height)
     img.alpha_composite(section.crop((0, 0, section.width, header)), (x0, y0))
@@ -1818,11 +1847,15 @@ def r5_paste_sticky(img, section, box, scroll, header, positions):
     content = section.height - header
     max_scroll = max(0, content - view)
     tops = sorted(p - header for p in positions.values())
-    snapped = 0
-    for top in tops:
-        if top <= scroll and top <= max_scroll:
-            snapped = top
-    scroll = snapped
+    if to_end:
+        last_bot = tops[-1] + 40
+        scroll = next(top for top in tops if last_bot - top <= view)
+    else:
+        snapped = 0
+        for top in tops:
+            if top <= scroll and top <= max_scroll:
+                snapped = top
+        scroll = snapped
     show = 0
     for top in tops:
         if top < scroll:
@@ -1845,7 +1878,7 @@ def r5_paste_sticky(img, section, box, scroll, header, positions):
         d.rounded_rectangle((x1 - 6, track_top, x1 - 2, track_bot), radius=2, fill=(40, 43, 52, 255))
         thumb = max(18, track_h * view / content)
         span = max(1, content - view)
-        ty = track_top + (track_h - thumb) * (scroll / span)
+        ty = track_top + (track_h - thumb) * (1 if to_end else scroll / span)
         d.rounded_rectangle((x1 - 6, ty, x1 - 2, ty + thumb), radius=2, fill=(150, 156, 170, 255))
     return scroll
 
@@ -1938,6 +1971,9 @@ def popup6(game, role, tab, focus, scrolls=(0, 0), extend=False):
     img = popup_chrome6(game, role, tab)
     upper, lower, sections, positions = r5_columns(role, tab, focus, 540, extend)
     for typ, box, scroll in ((upper, UPPER_BOX, scrolls[0]), (lower, LOWER_BOX, scrolls[1])):
+        if scroll == "end":   # scrolled to the end of the section
+            r5_paste_sticky(img, sections[typ], box, 0, HEAD_H + 2, positions[typ], to_end=True)
+            continue
         if scroll < 0:   # scrolled to the top of the library, the first row under the hairline
             rows = r5_rows(typ, role, focus, extend)
             scroll = next(positions[typ][r["key"]] - (HEAD_H + 2) for r in rows if not r.get("hot"))
@@ -2014,18 +2050,21 @@ def page6(menu, selected, tab, focus, help1, help2, role="player"):
     foot = [p for p in r5_foot(focus_typ, role) if p[0] not in ("ZL/ZR", "L/R")]
     at = [k for k, p in enumerate(foot) if p[0] == "ZL+Up/Down"][0]
     foot[at:at] = [("ZR", "role"), ("L/R", "page")]
+    # On the page, A opens the file's own screen (revision 7.2); binding, set active and drill are done there.
+    foot[0] = ("A", "open")
     keys_line(img, 53, 678, foot, 13)
     return img
 
 
 def macro_actions6(menu):
-    """A macro's own screen, redrawn in the current style, with the Start save switch (On by default)."""
-    return action_screen4(menu, "Recording  >  Save states & Macros  >  Nair loop", [
-        ("Start save", True), ("Set active for Player 1", False), ("Set active for CPU", False), ("Rename", False),
-        ("Crop", False), ("Make combo", False), ("Delete", False),
+    """A macro's own screen, with the Start save switch (On by default) and one Set active row, for the role in view
+    (revision 7.2)."""
+    return action_screen4(menu, "Recording (Player view)  >  Save states & Macros  >  Nair loop", [
+        ("Start save", True), ("Set active", False), ("Rename", False), ("Crop", False), ("Make combo", False),
+        ("Delete", False),
     ], "Start save On: its Play chord loads Nair loop · start, then plays. Off: it plays from where the fighters are.",
-        "Left / Right switch it, and the link stays. In a chain only the chain's save loads, whatever this says.",
-        {"Start save": (("Nair loop · start", "On"), "switch"), "Set active for Player 1": ("active", "on")},
+        "Set active works for the role in view: On makes this Player 1's active macro. Left / Right switch both rows.",
+        {"Start save": (("Nair loop · start", "On"), "switch"), "Set active": ("On · Player 1", "on")},
         [("Up/Down", "move"), ("Left/Right", "On / Off"), ("A", "do it"), ("B", "back")])
 
 
@@ -2033,8 +2072,9 @@ def main_r6(menu, game):
     P = "RECORDING-REDESIGN-r6-"
     # The example chain is bound under the CPU, so the main save picture is drawn with the CPU role selected.
     save(popup6(game, "cpu", "saves", "pressure"), P + "popup-save")
-    # Same window. MACROS has scrolled to its library; SAVE STATES has not. Headers stay, rows are whole.
-    save(popup6(game, "cpu", "saves", "pressure", scrolls=(0, -1), extend=True), P + "popup-scrolled")
+    # Same window and the same seven files. MACROS has scrolled to its end; SAVE STATES has not. Headers stay, rows
+    # are whole.
+    save(popup6(game, "cpu", "saves", "pressure", scrolls=(0, "end")), P + "popup-scrolled")
     save(popup6(game, "player", "saves", "nair"), P + "popup-macro")
     save(popup6(game, "player", "combos", "corner"), P + "popup-conversion")
     save(popup6(game, "player", "combos", "nairc"), P + "popup-combo")

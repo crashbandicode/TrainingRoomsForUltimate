@@ -1347,6 +1347,12 @@ Earlier the same day, on pins: "Are pins even helping with anything? they seem k
 - One role per view, as in Character Cycles. A view shows only its role's active macro, loop count and Links. The pop-up keeps L / R for the role; the Recording page switches role with ZR, because L / R change menu pages there. The CPU view has only Save states & Macros. There are no role chips.
 - The bound save is a green row in both role views, whichever role it is bound under; its Links panel says which role plays its chain. A on a save binds it under the role in view, and a binding under the other role moves to this one. On the save's own screen, Bind to Save / Load reads "On · CPU" or "Off", and Left / Right toggle it for the role in view.
 
+**Decided in revision 7.2** (the operator, on the primary's three recommendations: "go with your recommendations and redraw them"):
+- On the Recording page, A opens the file's own screen; on a save, Bind to Save / Load is that screen's first row. In the pop-up, A still binds, sets active, or drills. The page footers read "A open".
+- Make combo does not change the drill. The new combo joins the hot five at the top, and the current drill stays the drill.
+- A macro's own screen has one "Set active" row, for the role in view, like the save's Bind to Save / Load: "On · Player 1" (or "On · CPU" in the CPU view) or "Off". Left / Right turn it On or Off; On makes this file that role's active macro, replacing the one before, and that role's Play chord plays it.
+- Corrected, not a design change: Character Cycles removes a number with R, has no Y clear, and there A on a numbered fighter does nothing (`src/editors/roster.rs`, `src/model/swap/roster_grid.rs` `select_group` on `p23/rc5-candidate`). The recording picker keeps Q1 A: A gives the next number, A again takes it off.
+
 **Next:** implementation from `p23/rc5-candidate` `384e41f`, after the operator's sign-off.
 
 ### INTRO-ONCE · The Training intro notices — ordered (2026-11-05)
