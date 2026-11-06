@@ -385,3 +385,11 @@ ceiling = 142820
 date = "2026-11-06"
 reason = "rr-5 chords (p23/rr-5-chords): Play on Player 1 and the recording pop-up, with their request bits; measured 142820 at 20d14d2 (tools/size_gate.py), +14 over 142806"
 approved_by = "Operator 2026-11-06 via primary 35137355: 'Raise as needed'"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 143886
+date = "2026-11-06"
+reason = "rr integration (p23/rr-integration): rr-1, rr-2, rr-3, rr-5 and rr-8 merged on 384e41f; measured 143886 (tools/size_gate.py), +1080 over 142806"
+approved_by = "Operator 2026-11-05 standing order via primary 35137355: 'Raise as needed'"
