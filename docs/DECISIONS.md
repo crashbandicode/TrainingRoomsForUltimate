@@ -412,9 +412,10 @@ affected spec (its *Open questions* answer and §9 test-provenance rows) and the
 **Answered 2026-11-02 (~02:4xZ):** Q5 and B11 as recommended; the SDI ×2.0 stretch, the Developer page (N1) and the
 delay popup (N3, slot sets checklist only) as proposed; N5 extended to the stage grid. Nothing in this list is open.
 
-**Label, 2026-11-06:** the Saves › Save states row is labeled *Respawn on platform* (N2). The setting id stays
-`respawn_invincibility`. On still uses the game's revival platform and invincibility; Off is still the instant respawn.
-The row stays greyed while Auto-load on death is On. This does not change the 2026-11-01 behaviour.
+**Label and page, 2026-11-06:** the row is labeled *Respawn on platform* and sits on Fighters & Stages › Stages,
+after Lobby Items (N2). The setting id stays `respawn_invincibility`. On still uses the game's revival platform and
+invincibility; Off is still the instant respawn. The row stays greyed while Auto-load on death (Saves) is On. This
+does not change the 2026-11-01 behaviour.
 
 ## CPU ownership and hot-slot decisions — 2026-11-02
 

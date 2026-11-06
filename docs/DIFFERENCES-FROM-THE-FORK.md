@@ -44,7 +44,7 @@ This page lists only the changes, each checked against the code of 0.2.0-rc.3 (`
 | Change | Where in the code |
 | --- | --- |
 | Air dodge and shield tilt *In*/*Out* are relative to the opponent on both sides. | `src/model/cpu/defence.rs:64-71` |
-| *Respawn on platform* is a toggle; Off (default) is the fork's instant respawn. It is greyed while *Auto-load on death* is On. | `src/model/factory.rs:143`, `src/model/menu/mod.rs` (`respawn_invincibility`) |
+| *Respawn on platform* is a toggle on Fighters & Stages › Stages; Off (default) is the fork's instant respawn. It is greyed while *Auto-load on death* (Saves) is On. | `src/model/factory.rs:143`, `src/model/menu/table.rs`, `src/model/menu/mod.rs` (`respawn_invincibility`) |
 | Changing ledge or throw options in the menu re-rolls them at once, even for a CPU already on the ledge. | `src/model/cpu/state.rs:178-183` |
 | During input playback the recording wins over DI, SDI, air dodge, tech and throw. *Settings override playback* (default Off) restores the fork's rule. | `src/model/cpu/playback.rs:29-31` |
 | Ice Climbers keep one CPU state each for Popo and Nana. | `src/model/cpu/role.rs:32-52` |

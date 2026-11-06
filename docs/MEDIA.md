@@ -84,7 +84,7 @@ stay under 10 MB.
 | `di-up.gif`, `di-none.gif` | The same two forward smashes from the same damage (36% and 51%) with CPU DI Up and SDI Up/High, then with both reset: the DI Up launches go higher. 9.5 s each, step 2. |
 | `di-sdi-chips.gif` | CPU page: the DI Direction grid (the game's DI line on each chip, Up ×1 picked) and the SDI Direction grid (the game's SDI streaks). 8.0 s. |
 | `respawn-on.gif` | Respawn on platform On: P1 walks off, is KO'd and respawns on the game's platform at the top. 6.9 s, step 2. |
-| `respawn-off.gif` | Off (changed on the Saves page): the same KO, and P1 drops back in at once. 5.6 s, step 2. |
+| `respawn-off.gif` | Off: the same KO, and P1 drops back in at once. This 2026-11-05 clip changed the row on the Saves page; the row is now on Fighters & Stages › Stages. 5.6 s, step 2. |
 | `cpu-kirby-hat.gif` | P1's Special + R3 gives the CPU Kirby a hat (Mario's), with the "CPU Kirby Hats" notice. 4.2 s. |
 | `p1-kirby-hat.gif` | P1's own Special + L3 hat chord, with the "Kirby Hats" notice. 4.1 s. |
 | `cycle-badges.gif` | Fighters & Stages › Character Cycles: the game's stock icons with the order badges (red for Player 1, blue for the CPU); ZR switches role. 9.5 s. |

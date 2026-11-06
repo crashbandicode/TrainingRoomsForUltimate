@@ -297,8 +297,6 @@ pub static ROWS: [Row; 104] = [
       "Flips the loaded state left to right.\nAlternate flips every load; Random flips by chance."),
     r(STATES, "Auto-load on death", "save_state_autoload", TOGGLE,
       "On: a save state loads when anyone dies.\nOff: you load it yourself."),
-    r(STATES, "Respawn on platform", "respawn_invincibility", TOGGLE,
-      "On: after a death, back on the revival platform with the game's invincibility.\nOff: you respawn instantly. Greyed while Auto-load on death is On."),
     r(STATES, "Player damage on load", "save_damage_player", Control::Dropdown(&o::SAVE_DAMAGE),
       "Player 1's damage after a load: the default, the saved\nvalue, or a random value in the range below."),
     r(STATES, "Player damage range", "save_damage_limits_player", Control::Slider,
@@ -403,6 +401,8 @@ pub static ROWS: [Row; 104] = [
     // Phase 2 N11 (docs/ROADMAP.md): the waiting room's item spawner.
     r(STAGES, "Lobby Items", "lobby_items", TOGGLE,
       "On: items appear in the waiting room as usual.\nOff: no items appear there."),
+    r(STAGES, "Respawn on platform", "respawn_invincibility", TOGGLE,
+      "On: after a death, back on the revival platform with the game's invincibility.\nOff: you respawn instantly. Greyed while Auto-load on death is On (Saves)."),
     // Fighters & Stages > Loading (advanced)
     r(LOADING, "Cycle Preload", "cycle_preload_slots", Control::Dropdown(&o::CYCLE_SLOTS),
       "How many fighters per role are kept ready for swaps.\nOff loads each fighter when you swap."),
