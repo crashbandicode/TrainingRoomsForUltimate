@@ -12,10 +12,12 @@
 //! The pane inventory is `src/model/ui/panes.rs`, shared with the runtime. The layout is flat: one container
 //! under `RootPane` with text boxes cloned from a stock text box and flat rectangles cloned from a stock solid
 //! picture. The 38 provenance-recorded item icons are appended to the stock BNTX; stock textures are retained.
+//! The recording floppy and loop (`tr_icon_save`, `tr_icon_repeat`) are white glyphs appended the same way.
+//! rr-6 binds those material names and tints them with the pane's vertex colour.
 
 use nx_layout_toolbox::bflyt::{read_bflyt, write_bflyt, ClonePaneSpec, Color8, PaneEdit, BFLYT};
 use nx_layout_toolbox::sarc::{read_arc, write_arc};
-use nx_layout_toolbox::bntx::{read_bntx, write_bntx, TextureFormat, pipeline::{import_dds, import_png_file, ImportOptions}};
+use nx_layout_toolbox::bntx::{read_bntx, write_bntx, BntxFile, TextureFormat, pipeline::{import_dds, import_png_file, ImportOptions, ImportTextureFormat}};
 use nx_layout_toolbox::dds::Dds;
 
 #[path = "../../../src/model/archive_recipe.rs"]
@@ -212,6 +214,43 @@ fn add_waiting_text_material(layout: &mut BFLYT) -> Result<()> {
     Ok(())
 }
 
+/// rr-6 binds these material names. The glyphs stay white so the pane's vertex colour is the tint.
+const SAVE_TEXTURE: &str = "tr_icon_save";
+/// rr-6 binds this material for the loop mark. Off and on share the glyph; the dot and the count badge are separate.
+const REPEAT_TEXTURE: &str = "tr_icon_repeat";
+
+fn recording_icon_dir() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/recording-icons")
+}
+
+/// Append the floppy and the loop. Uncompressed RGBA8 keeps the glyph's edge, which a vertex colour then tints.
+fn import_recording_icons(bntx: &mut BntxFile) -> Result<()> {
+    let options = ImportOptions {
+        texture_format: ImportTextureFormat::Rgba8,
+        srgb: false,
+        mip_count: 1,
+        ..Default::default()
+    };
+    let dir = recording_icon_dir();
+    for (name, file) in [(SAVE_TEXTURE, "save.png"), (REPEAT_TEXTURE, "repeat.png")] {
+        import_png_file(bntx, name, &dir.join(file), &options).map_err(err("import recording icon"))?;
+    }
+    Ok(())
+}
+
+/// One material per icon, cloned from the stock white picture so the vertex colour is the only tint.
+fn add_recording_icon_materials(layout: &mut BFLYT, waiting: bool) -> Result<()> {
+    let template_pane = if waiting { "pic_bg_main_00" } else { RECT_TEMPLATE };
+    let index = layout.find_pane(template_pane).and_then(|pane| pane.picture.as_ref())
+        .ok_or("recording icon template missing")?.material_index;
+    let template = layout.materials.get(usize::from(index)).ok_or("recording icon template material missing")?.name.clone();
+    for name in [SAVE_TEXTURE, REPEAT_TEXTURE] {
+        layout.add_texture_ref(name);
+        layout.add_material_from_template(&template, name, Some(name)).map_err(err("recording icon material"))?;
+    }
+    Ok(())
+}
+
 fn build(stock_path: &str, out: &str, waiting: bool) -> Result<()> {
     let stock = std::fs::read(stock_path).map_err(err("read stock"))?;
     let mut arc = read_arc(&stock).map_err(err("read arc"))?;
@@ -275,6 +314,9 @@ fn build(stock_path: &str, out: &str, waiting: bool) -> Result<()> {
         layout.set_pane(name.as_str(), &PaneEdit { bind_material: Some(ORB_TEXTURE.into()), ..Default::default() })
             .map_err(err("orb picture material"))?;
     }
+    // The floppy and the loop. No pane yet: rr-6 binds `tr_icon_save` and `tr_icon_repeat` and sets the vertex colours.
+    import_recording_icons(&mut bntx)?;
+    add_recording_icon_materials(&mut layout, waiting)?;
     arc.files[textures].data = write_bntx(&bntx).map_err(err("write item textures"))?;
     arc.files[index].data = write_bflyt(&layout).map_err(err("write bflyt"))?;
     let target = write_arc(&arc).map_err(err("write arc"))?;
@@ -302,6 +344,7 @@ fn build(stock_path: &str, out: &str, waiting: bool) -> Result<()> {
         "recipe_bytes": recipe.len(),
         "panes_added": specs.len() + usize::from(waiting),
         "item_icons": panes::ITEM_ICONS,
+        "recording_icons": [SAVE_TEXTURE, REPEAT_TEXTURE],
     });
     std::fs::write(format!("{out}/report.json"), serde_json::to_string_pretty(&report).unwrap() + "\n")
         .map_err(err("write report"))?;
@@ -312,6 +355,68 @@ fn build(stock_path: &str, out: &str, waiting: bool) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use nx_layout_toolbox::bntx::decode::decode_texture_image;
+
+    /// Both glyphs land in a round-tripped archive under the names rr-6 binds, and the opaque texels are white.
+    #[test]
+    fn save_and_repeat_land_in_the_built_archive() {
+        let stock_dir = std::env::var("UI_STOCK_FIXTURE").unwrap_or_else(|_| {
+            "/home/intpa/smash-training-lobby/pkg5-scratch/stock".to_string()
+        });
+        let stock_path = std::path::Path::new(&stock_dir).join("info_training.arc");
+        let stock = std::fs::read(&stock_path).unwrap_or_else(|error| panic!("read {}: {error}", stock_path.display()));
+        let mut arc = read_arc(&stock).unwrap();
+        let textures = arc.position("timg/__Combined.bntx").unwrap();
+        let layout_at = arc.position(BFLYT_MEMBER).unwrap();
+        let mut bntx = read_bntx(&arc.files[textures].data).unwrap();
+        let before: Vec<u32> = bntx.textures.iter().map(|texture| texture.name_string_index).collect();
+        for index in before {
+            let name = &bntx.strings[index as usize];
+            let low = name.to_ascii_lowercase();
+            for word in ["save", "floppy", "loop", "repeat"] {
+                assert!(!low.contains(word), "stock texture {name} already matches the {word}; do not import over it");
+            }
+        }
+        import_recording_icons(&mut bntx).unwrap();
+        let mut layout = read_bflyt(&arc.files[layout_at].data).unwrap();
+        let template = layout.find_pane(RECT_TEMPLATE).unwrap().picture.as_ref().unwrap().material_index;
+        let template_colour = layout.materials[usize::from(template)].white_color;
+        add_recording_icon_materials(&mut layout, false).unwrap();
+        arc.files[textures].data = write_bntx(&bntx).unwrap();
+        arc.files[layout_at].data = write_bflyt(&layout).unwrap();
+        let built = write_arc(&arc).unwrap();
+        let arc = read_arc(&built).unwrap();
+        let bntx = read_bntx(&arc.files[arc.position("timg/__Combined.bntx").unwrap()].data).unwrap();
+        let layout = read_bflyt(&arc.files[arc.position(BFLYT_MEMBER).unwrap()].data).unwrap();
+        for name in [SAVE_TEXTURE, REPEAT_TEXTURE] {
+            let index = bntx.texture_index_by_name(name).unwrap_or_else(|| panic!("{name} missing from the archive"));
+            let texture = &bntx.textures[index];
+            assert_eq!(texture.format, TextureFormat::R8G8B8A8Unorm);
+            assert_eq!((texture.width, texture.height), (64u32, 64u32));
+            let image = decode_texture_image(&bntx, index, 0, 0, true).unwrap();
+            let mut opaque = 0;
+            let mut clear = 0;
+            for pixel in image.rgba.chunks_exact(4) {
+                if pixel[3] > 200 {
+                    opaque += 1;
+                    assert!(pixel[0] >= 240 && pixel[1] >= 240 && pixel[2] >= 240, "{name} baked a colour {pixel:?}");
+                } else if pixel[3] < 8 {
+                    clear += 1;
+                }
+            }
+            assert!(opaque > 100, "{name} has no glyph");
+            assert!(clear > 100, "{name} has no clear ground");
+            assert!(layout.textures.iter().any(|texture| texture == name), "{name} is not a texture ref");
+            let material = layout.materials.iter().find(|material| material.name == name).unwrap_or_else(|| panic!("{name} material missing"));
+            assert_eq!(material.white_color, template_colour, "{name} material carries its own tint");
+        }
+        let licence = std::fs::read_to_string(recording_icon_dir().join("LICENSE-Apache-2.0.txt")).unwrap();
+        assert!(licence.contains("Apache License"));
+        assert!(licence.contains("Version 2.0"));
+        let source = std::fs::read_to_string(recording_icon_dir().join("SOURCE.txt")).unwrap();
+        assert!(source.contains("symbols/web/save/materialsymbolsoutlined/save_24px.svg"));
+        assert!(source.contains("symbols/web/repeat/materialsymbolsoutlined/repeat_24px.svg"));
+    }
 
     #[test]
     #[ignore = "requires operator-owned stock arcs in UI_STOCK_FIXTURE"]
