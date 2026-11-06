@@ -101,7 +101,7 @@ def no_branch_test_lost(root):
 def switch_release_nro_recorded(path):
     """Print the release NRO's sha256 and byte length. Exit 0 when the file is a non-trivial NRO."""
     data = open(path, "rb").read()
-    if len(data) < 1024 or data[:4] != b"NRO0":
+    if len(data) < 0x14 or data[0x10:0x14] != b"NRO0":
         print(f"not an NRO: {path} ({len(data)} bytes)")
         return 1
     print(hashlib.sha256(data).hexdigest(), len(data), path)
