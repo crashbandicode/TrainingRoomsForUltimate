@@ -230,7 +230,7 @@ impl RecordingIndex {
 
     pub fn set_drill(&mut self, drill: Option<Drill>, at: u64) -> Result<(), Error> {
         if let Some(drill) = &drill {
-            check_ids(&[drill.id.clone()])?;
+            check_ids(std::slice::from_ref(&drill.id))?;
         }
         self.drill = drill.clone();
         if let Some(drill) = drill {
