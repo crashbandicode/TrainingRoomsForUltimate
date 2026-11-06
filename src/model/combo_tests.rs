@@ -116,6 +116,23 @@ impl Run {
         self.idle_until(until, settings);
     }
 
+    /// One frame with an explicit CPU sample. `step` derives the CPU from the last hit and cannot hit a shield.
+    fn step_with(&mut self, p1: Sample, cpu: Sample, inputs: MappedInputs) {
+        self.frame += 1;
+        self.tracker.step(p1, cpu, inputs);
+        self.outs.push(self.helper.step(&self.tracker, ON));
+    }
+
+    /// A follow-up that hits the CPU's shield: the exchange ends and the hit is not a link.
+    fn shield_hit(&mut self) {
+        for f in 0..STARTUP {
+            let cpu = cpu_after(self.last_hit, self.frame + 1);
+            self.step_with(attack(Move::UpTilt, ATTACK_HI3, f as f32), cpu, if f == 0 { UP_A } else { NONE });
+        }
+        let cpu = Sample { stop: true, shielding: true, ..Sample::default() };
+        self.step_with(Sample { stop: true, active: true, ..attack(Move::UpTilt, ATTACK_HI3, STARTUP as f32) }, cpu, NONE);
+    }
+
     fn resolved(&self) -> Vec<Summary> {
         self.outs.iter().filter_map(|o| o.resolved).collect()
     }
@@ -187,7 +204,12 @@ fn a_dropped_link_is_named_with_its_frames() {
     run.combo(JAB, &[(UP_TILT, 1), (UP_TILT, 5), (UP_TILT, 1)], ON);
     let summary = run.resolved()[0];
     assert_eq!((summary.outcome, summary.true_links, summary.total), (Outcome::Completed, 2, 3));
-    assert_eq!(summary.fault, Some((1, Reason::Drop(1))));
+    // The hit is still a DROP on the grade. It is also four frames late, and that press is the fault:
+    // TRUE is not required (operator 2026-11-06, answer 1).
+    let (_, dropped) = run.graded()[1];
+    assert_eq!(dropped.link.verdict, Verdict::Drop(1));
+    assert!(!summary.clean);
+    assert_eq!(summary.fault, Some((1, Reason::Off(Button::Attack, 4))));
     assert_eq!(run.helper.streak(), 0);
 }
 
@@ -386,4 +408,158 @@ fn a_combo_recorded_on_another_fighter_grades_whatever_fighter_p1_is() {
     let [summary] = run.resolved()[..] else { panic!("one result: {:?}", run.resolved()) };
     assert_eq!((summary.outcome, summary.true_links, summary.total, summary.clean), (Outcome::Completed, 3, 3, true));
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+fn link_with(verdict: Verdict, to: Move, offset: i32) -> LinkRec {
+    LinkRec {
+        from: Move::Aerial,
+        to,
+        verdict,
+        window: None,
+        steps: [Some(Step { button: Button::Attack, aim: Aim::Up, offset }), None, None, None],
+    }
+}
+
+fn summarized(reference: &LinkRec, attempt_link: &LinkRec, outcome: Outcome) -> Summary {
+    let g = grade(reference, attempt_link);
+    let mut grades = [None; LINKS];
+    grades[0] = Some(g);
+    let attempt = Attempt { exchange: 1, grades, len: 1, summary: None };
+    summarize(&attempt, 1, outcome, 1)
+}
+
+/// The second hit of `gap` frames after the CPU can act. `gap` 20 still links; 21 is a new exchange.
+fn play_gap(helper: Helper, gap: u32) -> Run {
+    let mut run = Run::new(helper);
+    let first = run.hit(JAB, 3, ON);
+    run.hit(UP_TILT, first + 22 + gap - STARTUP, ON);
+    run.settle(ON);
+    run
+}
+
+/// A true follow-up, then one more hit `gap` frames after that hit's free frame.
+fn play_true_then_gap(helper: Helper, gap: u32) -> Run {
+    let mut run = Run::new(helper);
+    let first = run.hit(JAB, 3, ON);
+    let second = run.hit(UP_TILT, first + RECOVERY + 1, ON);
+    run.hit(UP_TILT, second + 22 + gap - STARTUP, ON);
+    run.settle(ON);
+    run
+}
+
+#[test]
+fn clean_passes_a_non_true_link_inside_a_combo_and_a_sequence() {
+    let reference = link_with(Verdict::True(Some(-3)), Move::Aerial, 1);
+    let attempt = link_with(Verdict::Drop(4), Move::Aerial, 1);
+    let g = grade(&reference, &attempt);
+    assert!(!g.is_true() && !g.wrong_move);
+    assert_eq!(g.marks[0], Some(Mark::At(0)), "same button, direction and order");
+    assert!(g.clean(1));
+    let summary = summarized(&reference, &attempt, Outcome::Completed);
+    assert!(summary.clean && summary.fault.is_none() && summary.true_links == 0);
+
+    let mut walk = crate::model::drill::SequenceWalk::new(&["combo-a", "combo-b"]);
+    walk.note_summary(&summary);
+    assert_eq!(walk.cursor(), 1, "the sequence counts the non-true link");
+    assert_eq!((walk.streak(), walk.best()), (0, 0));
+}
+
+#[test]
+fn a_different_move_drops_even_when_the_presses_match() {
+    let reference = link_with(Verdict::True(None), Move::UpTilt, 1);
+    let attempt = link_with(Verdict::True(None), Move::DownTilt, 1);
+    let g = grade(&reference, &attempt);
+    assert!(g.wrong_move);
+    assert_eq!(g.marks[0], Some(Mark::At(0)));
+    assert_eq!(g.extra, 0);
+    assert!(!g.clean(1));
+    let summary = summarized(&reference, &attempt, Outcome::Completed);
+    assert!(!summary.clean);
+    assert_eq!(summary.fault, Some((0, Reason::WrongMove(Move::DownTilt))));
+}
+
+#[test]
+fn a_step_drops_on_a_missing_press_a_late_press_or_the_exchange_end() {
+    let reference = link_with(Verdict::True(None), Move::Jab, 0);
+    let missing = LinkRec { steps: [None; STEPS], ..reference };
+    let missed = grade(&reference, &missing);
+    assert_eq!(missed.marks[0], Some(Mark::Missing));
+    assert!(!missed.clean(1));
+    assert_eq!(summarized(&reference, &missing, Outcome::Completed).fault, Some((0, Reason::Missing(Button::Attack))));
+
+    let late = link_with(Verdict::True(None), Move::Jab, 3);
+    let late_grade = grade(&reference, &late);
+    assert_eq!(late_grade.worst(1), Some((0, 3)));
+    assert!(!late_grade.clean(1) && late_grade.clean(3));
+    assert_eq!(summarized(&reference, &late, Outcome::Completed).fault, Some((0, Reason::Off(Button::Attack, 3))));
+
+    let mut early = Run::new(with_target());
+    early.combo(JAB, &[(UP_TILT, 1)], ON);
+    assert!(early.resolved().is_empty(), "still in the exchange");
+    early.settle(ON);
+    let stopped = early.resolved()[0];
+    assert_eq!(stopped.outcome, Outcome::Stopped);
+    assert!(!stopped.clean);
+
+    let linked = play_gap(Helper::new(), 20);
+    assert_eq!(linked.tracker.exchange().0, 1, "20 frames after the CPU can act stays one exchange");
+    assert!(matches!(linked.tracker.latest_link().map(|l| l.verdict), Some(Verdict::Drop(_))));
+    let counted = {
+        let combo = linked.helper.last_combo().expect("the 20-frame follow-up is a link");
+        let mut helper = Helper::new();
+        helper.set_target(Some(combo));
+        play_gap(helper, 20)
+    };
+    let counted_summary = counted.resolved()[0];
+    assert!(counted_summary.clean, "the same 20-frame gap counts: {counted_summary:?}");
+    assert_eq!(counted_summary.true_links, 0);
+
+    let broken = play_gap(Helper::new(), 21);
+    assert_eq!(broken.tracker.exchange().0, 2, "21 frames opens a new exchange");
+    assert!(broken.tracker.latest_link().is_none());
+
+    let recorded_gap = play_true_then_gap(Helper::new(), 20);
+    let combo = recorded_gap.helper.last_combo().expect("two links");
+    assert_eq!(combo.len(), 2);
+    let mut helper = Helper::new();
+    helper.set_target(Some(combo));
+    let still = play_true_then_gap(helper, 20);
+    assert!(still.resolved()[0].clean, "{:?}", still.resolved());
+    let mut helper = Helper::new();
+    helper.set_target(Some(combo));
+    let dropped = play_true_then_gap(helper, 21);
+    let dropped_summary = dropped.resolved()[0];
+    assert_eq!(dropped_summary.outcome, Outcome::Stopped);
+    assert!(!dropped_summary.clean);
+
+    let mut shielded = Run::new(with_target());
+    shielded.combo(JAB, &[(UP_TILT, 1)], ON);
+    let links_before = shielded.tracker.history().count();
+    shielded.shield_hit();
+    assert_eq!(shielded.tracker.history().count(), links_before, "a shielded hit does not link");
+    let shield_summary = shielded.resolved()[0];
+    assert_eq!(shield_summary.outcome, Outcome::Stopped);
+    assert!(!shield_summary.clean);
+}
+
+#[test]
+fn a_single_combo_keeps_todays_best() {
+    let mut run = Run::new(with_target());
+    run.combo(JAB, &[(UP_TILT, 1), (UP_TILT, 1), (UP_TILT, 1)], ON);
+    run.settle(ON);
+    assert_eq!((run.helper.streak(), run.helper.best()), (1, 3));
+    run.combo(JAB, &[(UP_TILT, 1), (UP_TILT, 5), (UP_TILT, 1)], ON);
+    run.settle(ON);
+    assert_eq!((run.helper.streak(), run.helper.best()), (0, 3), "a miss clears the streak and keeps best");
+
+    let captured = play_gap(Helper::new(), 20);
+    let combo = captured.helper.last_combo().expect("linked");
+    let mut helper = Helper::new();
+    helper.set_target(Some(combo));
+    let once = play_gap(helper, 20);
+    assert!(once.resolved()[0].clean);
+    assert_eq!(once.resolved()[0].true_links, 0);
+    assert_eq!((once.helper.streak(), once.helper.best()), (1, 0));
+    let twice = play_gap(once.helper, 20);
+    assert_eq!((twice.helper.streak(), twice.helper.best()), (2, 0), "best stays the true-link count, not the streak");
 }

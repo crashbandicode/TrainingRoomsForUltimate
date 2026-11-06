@@ -353,3 +353,11 @@ ceiling = 143680
 date = "2026-11-06"
 reason = "rr-1 files (p23/rr-1-files at 00e7aab): start-save fields, chains, sequences, named saves, the recording index and migration; measured 143680 (tools/size_gate.py), +874 over 142806"
 approved_by = "Operator 2026-11-06 via the rr-1 brief: 'Raise as needed'"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 142926
+date = "2026-11-06"
+reason = "rr-2-grade: a non-true link counts, a sequence keeps its streak, and one drill ignores Make combo; measured 142926 (tools/size_gate.py), +120 over 142806"
+approved_by = "Operator 2026-11-06 via TASK-GROK-rr-wave1: 'Raise as needed'"
