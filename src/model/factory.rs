@@ -48,7 +48,7 @@ pub const LRA_RESET: usize = 1;
 pub const STAGE_HAZARDS: usize = 2;
 
 /// Number of rows.
-pub const COUNT: usize = 110;
+pub const COUNT: usize = 112;
 
 /// The rows this build knows, in menu order of their first appearance in SPEC-core-02 §2.7. The
 /// first three keep the indices the earlier packages use.
@@ -122,6 +122,9 @@ pub static DEFS: [Def; COUNT] = [
     row!("input_playback", Multiple, 16, [7, 8]),
     row!("cpu_cycle", Multiple, 16, [6, 10]),
     row!("player_cycle", Multiple, 16, [6, 11]),
+    // Play on Player 1 (ZR + Left) and the recording pop-up (ZR + Right).
+    row!("play_player", Multiple, 16, [7, 10]),
+    row!("recording_popup", Multiple, 16, [7, 11]),
     // Save States.
     row!("save_state_mirroring", Single, 3, [0]),
     row!("save_state_autoload", Single, 2, [1]),

@@ -148,6 +148,8 @@ const SPEC_TABLE: &[(&str, Kind, usize, &[usize])] = &[
     ("input_playback", Kind::Multiple, 16, &[7, 8]),
     ("cpu_cycle", Kind::Multiple, 16, &[6, 10]),
     ("player_cycle", Kind::Multiple, 16, &[6, 11]),
+    ("play_player", Kind::Multiple, 16, &[7, 10]),
+    ("recording_popup", Kind::Multiple, 16, &[7, 11]),
     ("save_state_mirroring", Kind::Single, 3, &[0]),
     ("save_state_autoload", Kind::Single, 2, &[1]),
     ("save_damage_cpu", Kind::Single, 3, &[0]),
@@ -1696,7 +1698,7 @@ fn button_chords_editor_writes_the_chord_setting() {
     assert_eq!(get(&m, "save_state_save"), [0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
     assert!(matches!(m.screen(), Some(Screen::Chords { cursor: 0 })), "back on the list");
     assert!(m.take_outbox().changed);
-    // The sixth row is Cycle CPU (`cpu_cycle`); cancelling leaves it.
+    // The last row is Cycle CPU (`cpu_cycle`); cancelling leaves it.
     m.press(Button::Up);
     m.press(Button::A);
     assert!(matches!(m.screen(), Some(Screen::ChordEntry { captured, .. }) if *captured == chord(&[6, 10])));

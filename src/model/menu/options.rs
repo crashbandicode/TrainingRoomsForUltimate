@@ -82,12 +82,14 @@ pub static SITUATIONS: [(&str, &str); 13] = [
     ("Ledge Trump", "trump_override"),
 ];
 
-/// The six chord rows of the *Button chords* editor, with their setting ids.
-pub static CHORD_ROWS: [(&str, &str); 6] = [
+/// The eight chord rows of the *Button chords* editor, with their setting ids.
+pub static CHORD_ROWS: [(&str, &str); 8] = [
     ("Save State Save", "save_state_save"),
     ("Save State Load", "save_state_load"),
-    ("Input Record", "input_record"),
-    ("Input Playback", "input_playback"),
+    ("Record", "input_record"),
+    ("Play on CPU", "input_playback"),
+    ("Play on Player 1", "play_player"),
+    ("Recording pop-up", "recording_popup"),
     ("Cycle Player", "player_cycle"),
     ("Cycle CPU", "cpu_cycle"),
 ];
