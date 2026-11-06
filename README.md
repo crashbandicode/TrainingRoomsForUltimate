@@ -138,7 +138,12 @@ The *Replay capture* row and the Online Deluxe overlay show the same setting.
 
 ## Status
 
-**0.2.0-rc.3** (2026-11-05) is the console test build. It adds to rc.2:
+**0.2.0-rc.3.1** (2026-11-06) is the console test build: rc.3 plus one fix. Waiting-room practice no longer stays on
+in an online battle when your console is station 1. Before the fix, a fighter of yours that lost a stock respawned
+early, with Training's timing, and the match desynced. Training behaviour now applies only in Training or in a live
+waiting room.
+
+**0.2.0-rc.3** (2026-11-05) adds to rc.2:
 - the **frame strip** input display, replacing the 15-row input log;
 - **Change Stage**: a row that switches the stage now, in Training and in waiting rooms;
 - **menu navigation**: ZL + Up/Down jumps sections, the menu reopens where you left it, ZR no longer resets a page by
@@ -148,7 +153,7 @@ The *Replay capture* row and the Online Deluxe overlay show the same setting.
 
 rc.2 added the pause-helper fix, the Solo Popo mark placement and the Kirby hat-request endings. Limitations kept from
 the fork are listed in [Differences from the fork](docs/DIFFERENCES-FROM-THE-FORK.md); planned work is in the
-[ROADMAP](docs/ROADMAP.md). 0.1.0 crashes at console boot; use the newest build, 0.2.0-rc.3.
+[ROADMAP](docs/ROADMAP.md). 0.1.0 crashes at console boot; use the newest build, 0.2.0-rc.3.1.
 
 ## Build
 
