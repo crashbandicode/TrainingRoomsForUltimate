@@ -2630,7 +2630,7 @@ def q8_decided():
     d.rectangle((s1[1] + 3, cpuy, s2[0] - 3, cpuy + 30), fill=idle)
     mid = (s1[1] + s2[0]) / 2
     d.line((mid, cpuy + 32, mid, cpuy + 42), fill=GREEN, width=2)
-    iv.text(d, (mid, cpuy + 56), "CPU could act: still counts", fnt(16, bold=True), fill=GREEN, anchor="mm")
+    iv.text(d, (mid, cpuy + 56), "CPU could act (up to 20 frames): still counts", fnt(16, bold=True), fill=GREEN, anchor="mm")
     # TRUE stays on the bar as information.
     tx = s2[1] + 40
     iv.tag(d, (tx, p1y + 4, tx + 64, p1y + 30), "TRUE", (110, 116, 130, 255), fnt(14, bold=True), fg=WHITE)

@@ -1370,6 +1370,7 @@ Earlier the same day, on pins: "Are pins even helping with anything? they seem k
   - **Q12** · Where a chain starts: A. At its macro 1's start save, shown on the chain row with the floppy chip. To change it, reorder or save over that file; there is no new screen. If macro 1 has no start save, the chain has none and plays from where the fighters are.
   - **Q13** · Can a chain contain a chain: A, no. The chain picker lists recordings only, so nothing needs a loop check. This is an operator-approved restriction (`chain-recordings-only`, no message).
 - X cycles the loop on the Recording page too, when the cursor is in MACROS, as in the pop-up; the primary asked "X on the Recording page: should X cycle the loop when the cursor is in MACROS, as it does in the pop-up?" and the operator answered "yes".
+- Q8's reading was confirmed, and the operator said "that sounds right".
 - Q1, Q3, Q4, Q5, Q6, Q7, Q9, Q11, Q12 and Q13 are A; Q8 is the operator's own answer; Q2 and Q10 are decided.
 
 **Next:** implementation from `p23/rc5-candidate` `384e41f`, after the operator's sign-off.
