@@ -121,6 +121,8 @@ fn run_inner() {
     // background).
     let (migration, captures) = import::start();
     let loaded = load_settings();
+    notices::arm_intro(loaded.file_existed, &loaded.settings);
+    let loaded = loaded.settings;
     // The CPU behaviours' state exists before the first publish and before any hook is installed. The
     // generator is the plugin's own (never the game's): seeded from the system tick and an address.
     cpu::init(
@@ -653,23 +655,29 @@ fn read_developer_ini() -> developer_ini::DeveloperIni {
 /// logs its notes.
 /// The settings come back boxed (stream/stack): `Settings` is about 8 KB, and moved by value it took two 8 KB slots of the boot
 /// frame on Skyline's 64 KiB thread.
-fn load_settings() -> Box<Settings> {
+struct BootLoad {
+    settings: Box<Settings>,
+    file_existed: bool,
+}
+
+fn load_settings() -> BootLoad {
     crate::runtime::threads::run_joined(ThreadId::SettingsLoad, load_settings_boxed).unwrap_or_else(|_| load_settings_boxed())
 }
 
 #[inline(never)] // stream/stack: its locals live only while it runs, not in boot's frame on Skyline's 64 KiB thread
-fn load_settings_inner() -> Settings {
+fn load_settings_inner() -> (Settings, bool) {
     let boot = settings_file::load(Path::new(storage::ROOT));
     for note in &boot.notes {
         diagnostic(format_args!("{note}"));
     }
-    boot.settings
+    (boot.settings, boot.file_existed)
 }
 
 /// The settings boxed where they are read (the loader thread, or this fallback's own frame), never in boot's frame.
 #[inline(never)]
-fn load_settings_boxed() -> Box<Settings> {
-    Box::new(load_settings_inner())
+fn load_settings_boxed() -> BootLoad {
+    let (settings, file_existed) = load_settings_inner();
+    BootLoad { settings: Box::new(settings), file_existed }
 }
 
 /// Package 6's roster cycle, Mii files and waiting-room engine (boot step 5): their inlined init state (two 8,040 B values in

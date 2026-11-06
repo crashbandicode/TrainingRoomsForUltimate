@@ -39,11 +39,14 @@ pub struct Boot {
     pub settings: Settings,
     /// One line per thing worth a diagnostics line, in order.
     pub notes: Vec<String>,
+    /// A current or legacy settings file was present, including one that could not be read.
+    /// False only when both names were absent. The Training intro uses this for an existing install.
+    pub file_existed: bool,
 }
 
 impl Boot {
-    fn factory(notes: Vec<String>) -> Self {
-        Self { settings: Settings::factory(), notes }
+    fn factory(notes: Vec<String>, file_existed: bool) -> Self {
+        Self { settings: Settings::factory(), notes, file_existed }
     }
 }
 
@@ -60,13 +63,13 @@ pub fn load(dir: &Path) -> Boot {
     let (source, path) = match storage::pick_settings_source(exists(&active), exists(&legacy)) {
         SettingsSource::Current => (SettingsSource::Current, active.clone()),
         SettingsSource::LegacyName => (SettingsSource::LegacyName, legacy),
-        SettingsSource::Missing => return Boot::factory(notes),
+        SettingsSource::Missing => return Boot::factory(notes, false),
     };
     let bytes = match fs::read(&path) {
         Ok(bytes) => bytes,
         Err(error) => {
             notes.push(format!("[TrainingRooms] settings unreadable: {error}; factory settings"));
-            return Boot::factory(notes);
+            return Boot::factory(notes, true);
         }
     };
     let loaded = settings::parse_bytes(&bytes);
@@ -84,7 +87,7 @@ pub fn load(dir: &Path) -> Boot {
             }
         }
     }
-    Boot { settings: loaded.settings, notes }
+    Boot { settings: loaded.settings, notes, file_existed: true }
 }
 
 /// A `settings.json.bak` without a `settings.json` is a crash inside the replace fallback: the backup

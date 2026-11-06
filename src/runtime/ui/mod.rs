@@ -114,6 +114,7 @@ pub fn clear_session_state() {
 }
 
 pub fn install(settings: &Settings, input_ready: bool, found: [GuardOutcome; UI_SITES.len()]) -> UiInstall {
+    worker::remember(settings.clone());
     state::PILOT_PRESENT.store(pilot_export().is_some(), std::sync::atomic::Ordering::Release);
     #[cfg(feature = "diag")]
     probe::install();

@@ -237,6 +237,14 @@ approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed'"
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
+ceiling = 140827
+date = "2026-11-05"
+reason = "intro notices show once (p23/intro-once): the intro_seen flag and the boot decision that a missing settings file posts the six reminders once; measured 140827 (tools/size_gate.py), +77 over 140750"
+approved_by = "Operator 2026-11-05 via primary 35137355 (BRIEF-GROK): 'Raise as needed'"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
 ceiling = 140843
 date = "2026-11-05"
 reason = "rc.6: switch P1 to a combo's recorded fighter with the named macros' Switch/Keep question, one explicit P1 load (p23/combo-switch, operator 2026-11-05 DEFERRED-LIST); measured 140843 at 5bdccb6 (tools/size_gate.py), +279 over the rc.5 candidate's 140564"

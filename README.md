@@ -36,6 +36,8 @@ flowchart LR
 | Kirby hat: Player 1 / CPU | Special + L3 / Special + R3 |
 | Reset the training room | L + R + A |
 
+The first time Training opens on a new install, TrainingRooms also shows six reminders: Welcome, Open Menu, Save State, Load State, Input Record and Input Playback. A later launch leaves those reminders off. The chords in the table stay available.
+
 In the menu: L/R change page, ZL + Up/Down jumps to the previous or next section, A edits, Y resets a row, X saves the
 current values as defaults, B goes back. Each page ends with *Reset page to defaults*, which asks first. The menu reopens
 where you left it. The chords are edited on Display & Controls › Button chords.

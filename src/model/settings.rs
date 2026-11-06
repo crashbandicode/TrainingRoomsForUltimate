@@ -273,6 +273,20 @@ impl Settings {
         self.extra.insert(LAST_PAGE_KEY.to_owned(), Value::from(page_id));
     }
 
+    /// Top-level flag set after the Training intro notices have been shown.
+    /// It is not a menu row: page reset restores snapshot rows only.
+    pub const INTRO_SEEN_KEY: &str = "intro_seen";
+
+    /// True when this file records that the intro notices were shown.
+    pub fn intro_seen(&self) -> bool {
+        self.extra.get(Self::INTRO_SEEN_KEY).and_then(Value::as_bool).unwrap_or(false)
+    }
+
+    /// Record that the intro notices were shown. A later save writes the key back with the other top-level keys.
+    pub fn mark_intro_seen(&mut self) {
+        self.extra.insert(Self::INTRO_SEEN_KEY.to_owned(), Value::Bool(true));
+    }
+
     /// The file's contents: pretty-printed JSON, for hand editing (SPEC-core-04 question 6). Key
     /// order is not part of the format.
     pub fn to_json(&self) -> String {
