@@ -337,3 +337,11 @@ ceiling = 142713
 date = "2026-11-06"
 reason = "rc.5 merge plus F9 (p23/rc5-merge at 3df24e0): the combined tree after fixed CPU seats, the open Training quantity, and CPU seats 2 and 3; measured 142713 (tools/size_gate.py), +487 over 142226"
 approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed'"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 142806
+date = "2026-11-06"
+reason = "rc.5 merge plus the waiting-room clock (p23/rc5-merge at 781318d): measured 142806 (tools/size_gate.py), +93 over 142713"
+approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed'"
