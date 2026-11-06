@@ -130,6 +130,11 @@ pub trait Record: Serialize + DeserializeOwned {
     /// Called with the file's id after a record was read and before it is validated: a record may take what its
     /// file left out from the file's name. Default: nothing.
     fn adopt(&mut self, _id: &str) {}
+    /// A file that belongs to another record type in the same directory. `list` omits it instead of
+    /// reporting it as corrupt. Default: every readable file is this record's.
+    fn owns(_bytes: &[u8]) -> bool {
+        true
+    }
 }
 
 /// A `.json` file that could not be used, and why.
@@ -222,14 +227,25 @@ impl<R: Record> Store<R> {
             let Some(id) = name.strip_suffix(".json") else {
                 continue;
             };
-            let result = check_id::<R>(id)
+            let data = match check_id::<R>(id)
                 .and_then(|()| read_bounded(&self.file(id, "json"), R::MAX_FILE_BYTES))
-                .map_err(lift::<R>)
-                .and_then(|data| decode::<R>(id, &data));
-            match result {
+            {
+                Ok(data) => data,
+                Err(err) => {
+                    listing.skipped.push(SkippedFile {
+                        file: name,
+                        reason: lift::<R>(err).to_string(),
+                    });
+                    continue;
+                }
+            };
+            if !R::owns(&data) {
+                continue;
+            }
+            match decode::<R>(id, &data) {
                 Ok(rec) => entries.push((rec.name().to_lowercase(), id.to_owned(), rec.summary(id))),
                 Err(err) => listing.skipped.push(SkippedFile {
-                    file: name.clone(),
+                    file: name,
                     reason: err.to_string(),
                 }),
             }
