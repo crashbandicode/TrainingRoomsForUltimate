@@ -87,9 +87,6 @@ pub mod migration_run;
 pub mod notify;
 #[path = "model/recording.rs"]
 pub mod recording;
-/// Named saves, chains, sequences, the recording index, and migration of today's slots.
-#[path = "model/library/mod.rs"]
-pub mod library;
 #[path = "model/pause_helper.rs"]
 pub mod pause_helper;
 #[path = "model/settings.rs"]
