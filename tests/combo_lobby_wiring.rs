@@ -79,8 +79,8 @@ fn combo_rows_open_in_waiting_room_practice() {
 /// is the same step Training uses.
 #[test]
 fn the_helper_grades_attempts_in_lobby_practice() {
-    let lobby = Facts { native_training: false, lobby_active: true, busy: false };
-    let training = Facts { native_training: true, lobby_active: false, busy: false };
+    let lobby = Facts { native_training: false, lobby_active: true, waiting_room: true, busy: false };
+    let training = Facts { native_training: true, lobby_active: false, waiting_room: false, busy: false };
     assert_eq!(scene(lobby).map(|s| format!("{s:?}")), Some("Lobby".into()));
     assert!(scene(training).is_some() && scene(lobby).is_some());
     assert!(model::panes::specs().iter().any(|spec| spec.name.as_str() == "TrCb"));

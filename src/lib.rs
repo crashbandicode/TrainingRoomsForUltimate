@@ -18,6 +18,10 @@ pub mod install_capacity;
 #[path = "../tests/common/preload_allocations.rs"]
 mod preload_allocation_tests;
 
+#[cfg(test)]
+#[path = "model/lobby_flag_tests.rs"]
+mod lobby_flag_tests;
+
 #[cfg(target_os = "switch")]
 mod runtime;
 

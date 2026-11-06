@@ -495,6 +495,8 @@ const FIGHTER_ENTRY_FIELD: usize = lra_reset::FIGHTER_ENTRY_ID_FIELD;
 const FIGHTER_ACCESSOR_FIELD: usize = 0x20;
 
 extern "C" fn on_frame(a0: usize, a1: usize, a2: usize, a3: usize, a4: usize, a5: usize, a6: usize, a7: usize) -> usize {
+    // The waiting-room clock, on every fighter frame and every station, before this frame reads the scene.
+    crate::runtime::lobby::update();
     // Revoke an ended scope BEFORE the original can enter role-based hooks.
     // A receipt captured now cannot register after destruction in a callback.
     let receipt = {
