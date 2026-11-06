@@ -243,7 +243,7 @@ Each strip is three steps in the menu's own style. The panels are drawn at full 
 
 ![Flow: chain a save](RECORDING-REDESIGN-r4-flow-chain.png)
 
-*+ on a save opens Edit chain. A adds the next number. R removes one, and the later numbers close up. The same buttons as Character Cycles. Back in the list, the row reads 3 On, and the Links panel shows 1 → 2 → 3, played by the CPU, the role Corner pressure is bound under.*
+*In the pop-up, Corner pressure is the bound save, and + on it opens Edit chain. A adds the next number. R removes one, and the later numbers close up. The same buttons as Character Cycles. Back in the list, the row reads 3 On, and the Links panel shows 1 → 2 → 3, played by the CPU, the role Corner pressure is bound under.*
 
 ### Q1 · How you number a chain or a conversion — decided: A
 
@@ -253,7 +253,15 @@ Operator, 2026-11-06. Amended the same day, so that R removes, as in Character C
 
 ![Q1, A (decided) and B (not chosen)](RECORDING-REDESIGN-q1-ab.png)
 
-### 3 · Make a conversion
+### 3 · Make combo from a macro
+
+![Flow: make combo from a macro](RECORDING-REDESIGN-r4-flow-make-combo.png)
+
+*Make combo loads the macro's start save and plays the macro once on Player 1 while the frame strip records. The new combo says "from Nair loop" in its row and "made from" in its Links panel. The new combo joins the hot five; the drill does not change.*
+
+If the start save was deleted, the load is skipped and the approved sentence shows: "No start save. This macro plays from where the fighters are." The sentence is only for a start save that was deleted. A macro that never had one, such as a replay or an old slot, plays from where the fighters are without it. No link uses the sentence that already exists: "No combo yet: land a hit and a follow-up first."
+
+### 4 · Make a conversion
 
 ![Flow: make a conversion](RECORDING-REDESIGN-r4-flow-conversion.png)
 
@@ -266,14 +274,6 @@ The conversion keeps a reference to each combo file, in order, the same kind of 
 Operator, 2026-11-06.
 
 ![Q7, A (decided) and B (not chosen)](RECORDING-REDESIGN-q7-ab.png)
-
-### 4 · Make combo from a macro
-
-![Flow: make combo from a macro](RECORDING-REDESIGN-r4-flow-make-combo.png)
-
-*Make combo loads the macro's start save and plays the macro once on Player 1 while the frame strip records. The new combo says "from Nair loop" in its row and "made from" in its Links panel. The new combo joins the hot five; the drill does not change.*
-
-If the start save was deleted, the load is skipped and the approved sentence shows: "No start save. This macro plays from where the fighters are." The sentence is only for a start save that was deleted. A macro that never had one, such as a replay or an old slot, plays from where the fighters are without it. No link uses the sentence that already exists: "No combo yet: land a hit and a follow-up first."
 
 ### 5 · Drill a conversion
 
@@ -513,7 +513,7 @@ No other new sentence is added. A long chain, a missing combo, and an empty chai
 - Match: `artifacts/phase23/overlay-investigation/frames/fix-tr-training.png`. The old Input Playback notice in that frame is painted over with the sky beside it.
 - Renderer: `tools/render_recording_redesign.py`. Its default run draws revision 6's pop-up, page and macro-screen pictures, revision 7.1's CPU page view, the questions' pictures, `r5-switch-keep`, and the revision 4 pictures this doc uses. With `--q52` it draws only the question pictures. With `--r3` it draws the revision 3 pictures the repo keeps.
 - Icons: Google Material Symbols (`repeat`, `link`, `format_list_numbered`), https://github.com/google/material-design-icons, Apache License 2.0. The copies and the licence are in [icons/](icons/). The renderer fills their path data with Pillow at 8× and downsamples. The colours, the dot, and the count badge are added by the renderer.
-- Changed in revision 7.2: strips 2 to 5 (no Y in the pickers; the stacked Combos & Conversions tab with CONVERSIONS on top; Make combo keeps the drill; Nair loop combo stops being the drill), the three Recording page pictures ("A open"), the macro's own screen (one Set active row), the scrolled pop-up (seven files, scrolled to the end), and revision 3's `keyboard`, `crop` and `crop-macro` (the current groups; the crop's kept range is a bracket; the keyboard's background no longer shows a settings page's hints). With the Q1 amendment: `q1-ab`'s A side and the pickers in strips 2 and 3 read "A add number", "R remove". From the sweep: the loop mark's note names the SAVE STATES, CONVERSIONS and COMBOS section headers, and strip 5's Links panel keeps its Drilled line. The revision 3 pictures are drawn by `--r3`.
+- Changed in revision 7.2: strips 2 to 5 (no Y in the pickers; the stacked Combos & Conversions tab with CONVERSIONS on top; Make combo keeps the drill; Nair loop combo stops being the drill), the three Recording page pictures ("A open"), the macro's own screen (one Set active row), the scrolled pop-up (seven files, scrolled to the end), and revision 3's `keyboard`, `crop` and `crop-macro` (the current groups; the crop's kept range is a bracket; the keyboard's background no longer shows a settings page's hints). With the Q1 amendment: `q1-ab`'s A side and the pickers in strips 2 and 4 read "A add number", "R remove". After review: the strips are reordered so that Make combo (now strip 3) comes before Make a conversion (now strip 4), which uses Nair loop combo; the file names stay. Strip 2's first panel is the pop-up, with its footer; the crop screens and the keyboard's background are file screens, full width with a breadcrumb. From the sweep: the loop mark's note names the SAVE STATES, CONVERSIONS and COMBOS section headers, and strip 5's Links panel keeps its Drilled line. The revision 3 pictures are drawn by `--r3`.
 - New in revision 7.1: `RECORDING-REDESIGN-r7-page-cpu.png`, the Recording page's CPU view. Changed in revision 7.1: the pop-ups and pages with a bound save or an active macro, the legend, strips 1 and 2, the link diagram, and the save's own screen (one role per view, no role chips, Bind to Save / Load On · CPU). Removed in revision 7.1: `RECORDING-REDESIGN-r7-proposed.png`, with its section.
 - New in revision 7: `RECORDING-REDESIGN-q8-decided.png`. Changed in revision 7: every picture with a list or an action screen (no thumbtack, no Pin row, no Y in the footers, the hot five by recency), and every question picture (the chips read "A · decided" and "B · not chosen"). Removed in revision 7: `RECORDING-REDESIGN-q8-ab.png`, which `q8-decided` replaces.
 - New in revision 6: every `RECORDING-REDESIGN-r6-*.png`. Removed in revision 6: the revision 5 pop-up and page pictures, `q2-ab`, `q10-ab`, and revision 3's `macro-actions`.
@@ -529,4 +529,4 @@ No other new sentence is added. A long chain, a missing combo, and an empty chai
 - **Revision 6.** The operator's 2026-11-06 answers: the stacked layout with the Links panel (Q10), the bound role plays the chain (Q2), one bound save at a time, and no chord for combos. The start save is explained, a macro gets a Start save On / Off switch, the order badges move to a row's left edge, and Q4's example is the operator's: the CPU is Palutena.
 - **Revision 7.** The operator's answers to every question (2026-11-06): pins dropped, the hot five are the most recently used, Q1, Q3, Q4, Q5, Q6, Q7, Q9 and Q11 are A, and Q8 is the operator's own answer: restart at combo 1, true not required. The combo helper's grading drops the TRUE condition. Two proposed details, the binding row on the Recording page and one chip per meaning, were drawn for confirmation.
 - **Revision 7.1.** The operator's answer to the proposed chips (2026-11-06): one role per view, as in Character Cycles, with ZR switching the role on the Recording page; the bound save is green in both views; no role chips. The proposal picture is removed, and the save's own screen binds with On · CPU or Off.
-- **Revision 7.2.** Stale pictures redrawn, Q1 amended so that the picker removes a number with R, as in Character Cycles, and three decisions (operator 2026-11-06): A on the Recording page opens the file's own screen, Make combo does not change the drill, and a macro's own screen has one Set active row for the role in view. The whole doc and every picture were checked against the decided list.
+- **Revision 7.2.** Stale pictures redrawn, Q1 amended so that the picker removes a number with R, as in Character Cycles, and three decisions (operator 2026-11-06): A on the Recording page opens the file's own screen, Make combo does not change the drill, and a macro's own screen has one Set active row for the role in view. The whole doc and every picture were checked against the decided list, and the strips now read in order: Make combo is strip 3 and Make a conversion strip 4.

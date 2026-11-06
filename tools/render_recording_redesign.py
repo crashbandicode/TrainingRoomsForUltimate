@@ -35,8 +35,6 @@ PANEL = (13, 13, 13, 236)
 SMALL = iv.font(13)
 TINY = iv.font(12)
 
-# The Recording page's groups (revision 7.2 redraws revision 3's keyboard and crop screens with them).
-GROUPS = [("Save states & Macros", 14), ("Combos & Conversions", 7), ("Replays", 2), ("Options", 5)]
 RED = (232, 72, 72, 255)
 
 
@@ -52,32 +50,24 @@ def hints(d, line):
     iv.text(d, (53, 678), line, iv.font(14), fill=ch.M_GROUP, anchor="lm")
 
 
-def draw_groups(d, selected):
-    """The left column as the Recording page draws it (page6)."""
-    for i, (name, count) in enumerate(GROUPS):
-        y = ch.ROW_Y0 + i * ch.GROUP_STEP
-        if i == selected:
-            d.rectangle((33, y - 18, 307, y + 18), fill=ch.M_FOCUS)
-        iv.text(d, (44, y), "%s  (%d)" % (name, count), iv.font(14),
-                fill=ch.M_TEXT if i == selected else ch.M_GROUP, anchor="lm")
-
-
-def page_base(bg, selected, help1, help2, hint):
+def file_screen(bg, crumb, help1, help2, hint):
+    """A file's own screen: full width, a breadcrumb, no group column (as r6-macro-actions and the r4 action
+    screens). Crop and Rename open from here."""
     img = bg.copy()
     d = ImageDraw.Draw(img)
-    ch.clear_content(d)
-    draw_groups(d, selected)
+    ch.clear_content(d, list_view=True)
+    iv.text(d, (53, 118), crumb, ch.MF, fill=ch.M_TEXT, anchor="lm")
     ch.help_lines(d, help1, help2)
     hints(d, hint)
     return img, d
 
 
-def crop_links(d, rows, kept, cursor, y0=180):
+def crop_links(d, rows, kept, cursor, y0=192):
     """A combo's crop screen, by links. The kept range is a bracket at the left labelled "kept" (the thin green
     outline means the hot five everywhere else), and the links left out are dimmed. rows: (name, range, end)."""
-    x0, x1, nx, c2x, c3x = 410, 1236, 440, 760, 1040
-    iv.text(d, (nx, 144), "Link", SMALL, fill=ch.M_GROUP, anchor="lm")
-    iv.text(d, (c2x, 144), "Range", SMALL, fill=ch.M_GROUP, anchor="lm")
+    x0, x1, nx, c2x, c3x = 110, 1236, 140, 760, 1040
+    iv.text(d, (nx, 156), "Link", SMALL, fill=ch.M_GROUP, anchor="lm")
+    iv.text(d, (c2x, 156), "Range", SMALL, fill=ch.M_GROUP, anchor="lm")
     centres = []
     for i, (name, rng, end) in enumerate(rows):
         y = y0 + i * 36
@@ -145,13 +135,9 @@ def status(game, title, lines):
     return img
 
 
-def keyboard(bg):
-    img = bg.copy()
-    d = ImageDraw.Draw(img)
-    ch.clear_content(d)
-    draw_groups(d, 0)
-    # The capture's own hint bar is a settings page's (X save defaults, Y reset row, ZR reset page): not this screen.
-    d.rectangle((44, 660, 1246, 698), fill=ch.M_PANEL)
+def keyboard(base):
+    """The Switch keyboard over the screen it opens from (base), dimmed."""
+    img = base.copy()
     o = iv.overlay()
     k = ImageDraw.Draw(o)
     k.rectangle((0, 0, W, H), fill=(6, 8, 12, 214))
@@ -193,7 +179,16 @@ def main_r3():
     screens the doc uses, and combo-from-macro and save-where."""
     menu = iv.background(MENU)
     game = iv.background(GAME)
-    save(keyboard(menu), "RECORDING-REDESIGN-keyboard")
+    # Rename opens the keyboard from the macro's own screen: that screen, dimmed, with the cursor on Rename and the
+    # help and footer area blank.
+    base = action_screen4(menu, "Recording (Player view)  >  Save states & Macros  >  Nair loop", [
+        ("Start save", False), ("Set active", False), ("Rename", True), ("Crop", False), ("Make combo", False),
+        ("Delete", False),
+    ], "", "", {"Start save": (("Nair loop · start", "On"), "switch"), "Set active": ("On · Player 1", "on")})
+    bd = ImageDraw.Draw(base)
+    bd.rectangle((44, 590, 1246, 656), fill=ch.M_PANEL)
+    bd.rectangle((44, 660, 1246, 698), fill=ch.M_PANEL)
+    save(keyboard(base), "RECORDING-REDESIGN-keyboard")
 
     save(status(game, "Make combo · step 1", [
         "Loaded the linked save, Nair loop · start.",
@@ -201,26 +196,27 @@ def main_r3():
         "The macro file is kept.",
     ]), "RECORDING-REDESIGN-combo-from-macro")
 
-    img, d = page_base(menu, 1,
-                       "Links 1 through 3 stay. Link 4 is left out.",
-                       "A saves a new combo. The original file stays.",
-                       "Up/Down move    A save a copy    B back")
-    # Replace the combo library with the crop list by painting the right pane first.
-    d.rectangle((328, 130, 1240, 560), fill=ch.M_PANEL)
+    img, d = file_screen(menu, "Recording (Player view)  >  Combos & Conversions  >  Nair loop combo  >  Crop",
+                         "Links 1 through 3 stay. Link 4 is left out.",
+                         "A saves a new combo. The original file stays.",
+                         "Up/Down move    A save a copy    B back")
     crop_links(d, [("1  aerial → aerial", "kept", "first"), ("2  aerial → tilt", "kept", ""),
                    ("3  tilt → smash", "kept", "last"), ("4  smash → special", "left out", "")], kept=3, cursor=2)
     save(img, "RECORDING-REDESIGN-crop")
 
-    img, d = page_base(menu, 0,
-                       "The same In and Out as the Replay window. L and R set them.",
-                       "A saves a new macro. Nair loop itself stays.",
-                       "L start    R end    Left/Right move    A save a copy    B back")
-    d.rectangle((328, 130, 1240, 560), fill=ch.M_PANEL)
-    setting_rows(d, [
-        ("In", "40", "pick", True),
-        ("Out", "210", "pick", False),
-    ], y0=180)
-    iv.text(d, (360, 280), "Pikachu · the frames between In and Out · a new file", SMALL, fill=ch.M_GROUP, anchor="lm")
+    img, d = file_screen(menu, "Recording (Player view)  >  Save states & Macros  >  Nair loop  >  Crop",
+                         "The same In and Out as the Replay window. L and R set them.",
+                         "A saves a new macro. Nair loop itself stays.",
+                         "L start    R end    Left/Right move    A save a copy    B back")
+    for i, (label, value) in enumerate((("In", "40"), ("Out", "210"))):
+        y = 168 + i * 36
+        if i == 0:
+            d.rectangle((47, y - 16, 1236, y + 16), fill=ch.M_FOCUS)
+            d.rectangle((47, y - 16, 1236, y + 16), outline=WHITE, width=2)
+            d.rectangle((47, y - 16, 52, y + 16), fill=WHITE)
+        iv.text(d, (70, y), label, ch.MF, fill=ch.M_TEXT, anchor="lm")
+        iv.text(d, (1210, y), "<  %s  >" % value, ch.MF, fill=ch.M_TEXT, anchor="rm")
+    iv.text(d, (70, 262), "Pikachu · the frames between In and Out · a new file", SMALL, fill=ch.M_GROUP, anchor="lm")
     save(img, "RECORDING-REDESIGN-crop-macro")
 
     img = action_screen(menu, "Recording  >  Options  >  Button chords", [
@@ -1444,12 +1440,14 @@ def flow_record(game):
 def flow_chain():
     img = strip_canvas(2, "Chain a save", "A save's chain is a numbered list of macros. Load plays them in order "
                        "while Chain is On.")
-    b = strip_panel(img, 0, "Focus a save, press +", "Corner pressure is the bound save (green) and the cursor. "
-                    "+ opens Edit chain.")
+    b = strip_panel(img, 0, "Focus a save, press +", "In the pop-up, Corner pressure is the bound save (green) and the "
+                    "cursor. + opens Edit chain.")
     g = group_only("player", "save", "pressure", overrides={"pressure": {"chain": [], "chain_on": False}},
                    keep={"pressure", "platform", "nairstart", "dashstart", "throwstart"})
-    frag_list(img, (b[0], b[1], b[2], b[3] - 34), [g], "pressure")
-    keys_line(img, b[0], b[3] - 12, [("A", "bind"), ("+", "edit chain"), ("B", "close")], 14)
+    frag_list(img, (b[0], b[1], b[2], b[3] - 56), [g], "pressure")
+    foot = r5_foot("save", "cpu")
+    keys_line(img, b[0], b[3] - 36, foot[:3], 13)
+    keys_line(img, b[0], b[3] - 14, foot[3:], 13)
 
     b = strip_panel(img, 1, "Number the macros", "A adds the next number. R removes one, and the later numbers "
                     "close up. The same buttons as Character Cycles.")
@@ -1473,13 +1471,15 @@ def flow_chain():
 
 
 def flow_conversion():
-    img = strip_canvas(3, "Make a conversion", "A conversion is a numbered list of combos, drilled as one chain.")
+    img = strip_canvas(4, "Make a conversion", "A conversion is a numbered list of combos, drilled as one chain.")
     b = strip_panel(img, 0, "New conversion", "Recording › Combos & Conversions. New conversion is the last row "
                     "under the conversions.")
     # Revision 6's stacked tab: CONVERSIONS on top, COMBOS below. Corner to kill does not exist yet, so CONVERSIONS
-    # holds two files, then the + New conversion row with the cursor.
-    convs, combos = tab_rows("newconv", None)
+    # holds two files, then the + New conversion row with the cursor. COMBOS is as strip 3 left it: Nair loop combo,
+    # the most recently used, at the top, and Ryu BnB still the drill.
+    convs, combos = tab_rows("newconv", "ryu")
     convs = [r for r in convs if r["key"] != "corner"]
+    combos = [r for r in combos if r["key"] == "nairc"] + [r for r in combos if r["key"] != "nairc"]
     newrow = dict(key="newconv", name="+ New conversion", seq=[], hot=False, cursor=True, action=True)
     frag_list(img, b, [section_group("CONVERSIONS", "conv", convs + [newrow], count=len(convs)),
                        section_group("COMBOS", "combo", combos)], "newconv", cols=FRAG_STACK)
@@ -1507,7 +1507,7 @@ def flow_conversion():
 
 
 def flow_make_combo(game):
-    img = strip_canvas(4, "Make combo from a macro", "A combo made from a macro remembers which macro it came from.")
+    img = strip_canvas(3, "Make combo from a macro", "A combo made from a macro remembers which macro it came from.")
     b = strip_panel(img, 0, "Make combo", "Recording › Save states & Macros › Nair loop, in the Player view. A on "
                     "Make combo. The first row is the start save it will load.")
     # The macro's own screen (revision 7.2): one Set active row, for the role in view.
@@ -1533,7 +1533,8 @@ def flow_make_combo(game):
     # the most recently used, is at the top of the hot five without becoming the drill.
     convs, combos = tab_rows(None, "ryu")
     combos = [dict(r, new=True) for r in combos if r["key"] == "nairc"] + [r for r in combos if r["key"] != "nairc"]
-    frag_list(img, (b[0], b[1], b[2], b[1] + 152), [section_group("CONVERSIONS", "conv", [], count=len(convs)),
+    made = [r for r in convs if r["key"] != "corner"]     # Corner to kill is made in strip 4, later
+    frag_list(img, (b[0], b[1], b[2], b[1] + 152), [section_group("CONVERSIONS", "conv", [], count=len(made)),
                                                     section_group("COMBOS", "combo", combos)], cols=FRAG_STACK)
     links_panel(img, (b[0], b[1] + 158, b[2], b[3]), {
         "self": ("combo", "Nair loop combo"),
