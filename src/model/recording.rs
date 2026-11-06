@@ -889,17 +889,15 @@ impl Recorder {
         }
     }
 
-    /// Both fighters finished restoring after a save-state load (§6.4): record if Recording Trigger
-    /// contains Save State Load; else play a weighted random Save State Playback slot unless the saved
-    /// situation is the ledge (ledge playbacks are a ledge option).
-    pub fn on_state_restored(s: &RecorderSettings, saved_on_ledge: bool, rng: &mut Rng) -> LoadAction {
-        if s.trigger_save_state {
-            LoadAction::Record
-        } else if !saved_on_ledge {
-            s.save_state_slots.pick(rng).map_or(LoadAction::None, |i| LoadAction::Play(i as u8))
-        } else {
-            LoadAction::None
-        }
+    /// Both fighters finished restoring after a save-state load. Revision 8.2 of the recording
+    /// redesign: the restore starts neither a recording nor a playback. Load only warps. The
+    /// arguments stay so the runtime call site does not change; rr-7 wires the playback machine.
+    pub fn on_state_restored(
+        _settings: &RecorderSettings,
+        _saved_on_ledge: bool,
+        _rng: &mut Rng,
+    ) -> LoadAction {
+        LoadAction::None
     }
 
     // ---- the mash trigger (§5.4) ---------------------------------------------------------------
