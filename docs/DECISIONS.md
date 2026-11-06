@@ -1309,6 +1309,42 @@ inline where applicable".
 
 **Revision 5.1** is the same document. The scrolled pop-up keeps the save pop-up's window. Section headers stay put while whole rows scroll, and each section keeps its scrollbar. The Switch / Keep picture uses the existing Fighter Mismatch words. This frame is Steve and Villager, so the prompt names Villager. The conversion strip says "Drilling now."
 
+### RECORDING-REDESIGN answers (operator 2026-11-06)
+
+**The operator, verbatim:**
+
+> drop pins and make the hot five the most recently used:
+> Q1: A
+> Q3: A
+> Q4: A
+> Q5: A
+> Q6: A
+> Q7: A
+> Q8: start from the beginning of the chain but the chain itself isn't necessarily true. this is more for drilling
+> things one after another. the combo itself also isn't necessarily true if that makes sense
+> Q9: A
+> Q11: A
+
+Earlier the same day, on pins: "Are pins even helping with anything? they seem kind of redundant and useless".
+
+**Decided in revision 6** ([RECORDING-REDESIGN.md](decisions/RECORDING-REDESIGN.md)):
+- Q10: the two sections of a tab are stacked, each with its own scroll, with the Links panel on the right.
+- Q2: a save state is bound under a role, Player or CPU, and that role plays its whole chain when the Load chord runs it. A macro's recorded role is information only.
+- One bound save at a time, carrying its role. The save list is shared by both roles.
+- No chord for combos or conversions. Selecting one (A, Drill) makes it the drill.
+- Start save On / Off on a macro, default On. Off plays the macro from where the fighters are and keeps the link.
+- A macro without a start save is normal: its Play chord plays it from where the fighters are. Replays and the old slots have none.
+
+**Decided in revision 7** (the same document, now the implementation spec):
+- Pins are dropped. Y is unused on these screens.
+- The hot five of each kind are the five most recently used, the most recent first. Used means selected (bound or set active), played, drilled or recorded. When a sixth is used, the least recently used leaves the outline and stays on the card.
+- Q1, Q3, Q4, Q5, Q6, Q7, Q9 and Q11: A. Q6's hot conversions follow the most-recently-used rule.
+- Q8, the operator's own answer: a drop sends you back to combo 1 of the conversion, the streak to 0, and best is kept. Neither the conversion nor a combo has to be a true combo.
+- The combo helper's grading changes: "clean" drops the TRUE condition (`src/model/combo.rs`, `Grade::clean`), for a combo drilled alone and for a conversion. A step counts when its recorded presses are there, with the same direction, in order and within the tolerance. TRUE stays on the bar as information.
+- Proposed, not yet confirmed, and drawn for review: a "Bind to Save / Load: Off / Player / CPU" row on the save's own screen for the Recording page, and one chip per meaning ("Load · CPU" for the bound save, "▶ P1" / "▶ CPU" for a role's active macro).
+
+**Next:** implementation from `p23/rc5-candidate` `384e41f`, after the operator's sign-off.
+
 ### INTRO-ONCE · The Training intro notices — ordered (2026-11-05)
 
 **Operator 2026-11-05 ~21:3xZ:** "please disable the intro tutorial messages when we enter training. they should only

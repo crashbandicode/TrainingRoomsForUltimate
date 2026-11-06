@@ -8,9 +8,9 @@ https://raw.githubusercontent.com/google/material-design-icons/master/LICENSE. T
 
 Files, unchanged except for the file name (downloaded 2026-11-05):
   repeat.svg                 <- symbols/web/repeat/materialsymbolsoutlined/repeat_24px.svg
-  push_pin_fill1.svg         <- symbols/web/push_pin/materialsymbolsoutlined/push_pin_fill1_24px.svg
   link.svg                   <- symbols/web/link/materialsymbolsoutlined/link_24px.svg
   format_list_numbered.svg   <- symbols/web/format_list_numbered/materialsymbolsoutlined/format_list_numbered_24px.svg
 
 How the mockups use them: the renderer parses each path and fills it with Pillow at 8x size, then downsamples.
-The colour, the tilt of the pin, the dot under the loop, and the count drawn inside the loop are added by the renderer.
+The colour, the dot under the loop, and the count drawn inside the loop are added by the renderer.
+Revision 7 dropped pins, so the push_pin icon that revision 4 used was removed from this folder.

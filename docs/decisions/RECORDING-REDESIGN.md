@@ -1,37 +1,37 @@
-# Recording redesign — revision 6
+# Recording redesign — revision 7
+
+Revision 7 records the operator's answers to every question (2026-11-06): pins are dropped, the hot five are the most recently used, and Q8 drills combos without requiring them to be true. This is the implementation spec.
 
 Phase 1 screens. Nothing here is built. The pop-up sits on a real Training frame, `artifacts/phase23/overlay-investigation/frames/fix-tr-training.png` (Steve and Villager on Battlefield). The menu pictures are redrawn on the real rc.1 Recording page (`eden-runs/tr-p23-docs-capture-03`). Names and lengths are examples, and every picture uses the same example files. The first picture shows them.
 
-Revision 6 applies the operator's 2026-11-06 answers: the stacked layout with the Links panel (Q10), the bound role plays the chain (Q2), one bound save at a time, and no chord for combos.
+Every question is decided, and the pictures use the decided answers. Each question keeps its A | B picture next to the picture it concerns, for the record. Two details the primary proposes are not yet confirmed; they are drawn in [Proposed, not yet confirmed](#proposed-not-yet-confirmed).
 
-Where a choice is still open, the pictures use the recommendation (A). Each open question sits next to the picture it concerns, with A and B drawn side by side. Q2 and Q10 are decided, and their blocks stay in the same places.
+## The eleven decisions
 
-## The eleven questions
-
-| Q | Question | Recommendation (A) | Link |
+| Q | Question | Answer | Link |
 | --- | --- | --- | --- |
-| 1 | How you number a chain or a conversion | Name tiles: A gives the next number, A again takes it off | [Q1](#q1-how-you-number-a-chain-or-a-conversion) |
+| 1 | How you number a chain or a conversion | A: name tiles; A gives the next number, A again takes it off | [Q1](#q1-how-you-number-a-chain-or-a-conversion-decided-a) |
 | 2 | Which role a chained macro plays | Decided: the role the save is bound under plays the whole chain | [Q2](#q2-which-role-a-chained-macro-plays-decided) |
-| 3 | What loop does with a chain | The whole chain repeats as one unit | [Q3](#q3-what-loop-does-with-a-chain) |
-| 4 | When Switch / Keep appears for a chain | Once, before the chain starts, for every mismatched macro | [Q4](#q4-when-switch-keep-appears-for-a-chain) |
-| 5 | How the two lists sit in the Combos & Conversions tab | Conversions on top, combos below, each with its own scroll | [Q5](#q5-how-the-two-lists-sit-in-the-combos-conversions-tab) |
-| 6 | Hot conversions | Five hot, pinned first, then the newest | [Q6](#q6-hot-conversions) |
-| 7 | What the conversion file stores | A reference to each combo file, in order | [Q7](#q7-what-the-conversion-file-stores) |
-| 8 | A drop, and what completes the chain | Restart at combo 1; complete only with the CPU in hitstun between the combos | [Q8](#q8-a-drop-and-what-completes-the-chain) |
-| 9 | One drill at a time | A conversion and a combo replace each other as the drill | [Q9](#q9-one-drill-at-a-time) |
+| 3 | What loop does with a chain | A: the whole chain repeats as one unit | [Q3](#q3-what-loop-does-with-a-chain-decided-a) |
+| 4 | When Switch / Keep appears for a chain | A: once, before the chain starts, for every mismatched macro | [Q4](#q4-when-switch-keep-appears-for-a-chain-decided-a) |
+| 5 | How the two lists sit in the Combos & Conversions tab | A: conversions on top, combos below, each with its own scroll | [Q5](#q5-how-the-two-lists-sit-in-the-combos-conversions-tab-decided-a) |
+| 6 | Hot conversions | A: five hot, the most recently used first | [Q6](#q6-hot-conversions-decided-a) |
+| 7 | What the conversion file stores | A: a reference to each combo file, in order | [Q7](#q7-what-the-conversion-file-stores-decided-a) |
+| 8 | A drop, and what completes the chain | Restart at combo 1; true not required | [Q8](#q8-a-drop-and-what-completes-the-chain-decided) |
+| 9 | One drill at a time | A: a conversion and a combo replace each other as the drill | [Q9](#q9-one-drill-at-a-time-decided-a) |
 | 10 | Side by side, or stacked | Decided: stacked, with the Links panel | [Q10](#q10-side-by-side-or-stacked-decided-stacked) |
-| 11 | Which buttons move | ZL / ZR change the tab; Left / Right move between the sections | [Q11](#q11-which-buttons-move) |
+| 11 | Which buttons move | A: ZL / ZR change the tab; Left / Right move between the sections | [Q11](#q11-which-buttons-move-decided-a) |
 
 ## What links to what
 
 ![The link diagram](RECORDING-REDESIGN-r4-links.png)
 
-*Top: the four kinds of file and the four links. Bottom: the example. Corner pressure is bound as CPU. Load it, and the save restores, then the CPU plays Nair loop, Dash grab and CPU throw, in that order. Nair loop starts from its own save when it is played on its own. Corner to kill drills Ryu BnB, then Nair loop combo, and Nair loop combo was made from Nair loop.*
+*Top: the four kinds of file and the four links. Bottom: the example. Corner pressure is bound as CPU: it wears the Load · CPU chip. Load it, and the save restores, then the CPU plays Nair loop, Dash grab and CPU throw, in that order. Nair loop starts from its own save when it is played on its own. Corner to kill drills Ryu BnB, then Nair loop combo, and Nair loop combo was made from Nair loop.*
 
 | Link | From → to | How it is made | Where you see it |
 | --- | --- | --- | --- |
 | Start save | macro → its save state, "Nair loop · start". Start save: where this macro begins when you play it on its own with its Play chord. Record makes it automatically. In a chain, only the chain's save is loaded; the macros then play one after another from where the fighters are, and their own start saves are not loaded. A macro without a start save is normal. Its Play chord plays it on that role from wherever the fighters are. Replays and the old slots have none. A macro's Start save switch, On by default, decides whether its Play chord loads the start save; Off plays from where the fighters are and keeps the link. | Automatic, when you record | The macro row: the link mark and the save's name, grey when the switch is Off. The Links panel. |
-| Chain | save state → an ordered list of macros 1, 2, 3 | The save's Edit chain (+), a numbered picker like Character Cycles. Chain On or Off on the save. A binds the save under the role you are on. | The save row: the chain mark, the count, On or Off, and the chip of the role it is bound under. The Links panel lists 1 → 2 → 3 and says that role plays them all. |
+| Chain | save state → an ordered list of macros 1, 2, 3 | The save's Edit chain (+), a numbered picker like Character Cycles. Chain On or Off on the save. A binds the save under the role you are on. | The save row: the chain mark, the count, On or Off, and the binding chip, Load · CPU or Load · P1. The Links panel lists 1 → 2 → 3 and says that role plays them all. |
 | Conversion | conversion → an ordered list of combos | Combos & Conversions › New conversion, the same numbered picker, then a name on the Switch keyboard | The conversion row: "Ryu BnB → Nair loop combo". The Links panel. |
 | Made from | combo ← the macro it was made from | A macro's Make combo | The combo row: a small "from Nair loop". The Links panel. |
 
@@ -41,17 +41,19 @@ Every link is a file id, so renaming either end keeps it.
 
 ![How to read a list](RECORDING-REDESIGN-r4-legend.png)
 
-*Green fill is active. A white border with a white bar on the left is the cursor. When the cursor is on the active row, both show. The thin green outline is the hot five. The blue CPU chip is the role the bound save is bound under. A red number sits at a row's left edge. The marks along the bottom are the pin, the start-save link (grey when its switch is Off), the chain, the order badge, the role chip, and the loop.*
+*Green fill is active. A white border with a white bar on the left is the cursor. When the cursor is on the active row, both show. The thin green outline is the hot five, the most recently used first. A red number sits at a row's left edge. The marks along the bottom are the start-save link (grey when its switch is Off), the chain, the order badge, the binding chip, the active-macro chip, and the loop.*
 
 - **Green fill: active.** The macro that plays for this role, the combo or conversion being drilled, or the save that Save and Load use.
 - **White border and bar: the cursor.** A acts on this row. It is a different mark from the green fill, so the two never look alike.
-- **Thin green outline: the hot set.** At most five per kind. Pins come first, then the newest.
+- **Thin green outline: the hot set.** At most five per kind: the five most recently used, the most recent first. Used means selected (bound or set active), played, drilled or recorded.
 - **Under the hairline, dimmer:** the rest of the library, on the card.
-- **Gold, tilted thumbtack:** pinned.
-- **Red number, at the row's left edge:** its place in the chain or the conversion under the cursor, the badge Character Cycles uses. It sits before the pin, never next to the chain mark or the link chip. In the picker, A adds the next number. A again removes it, and the later numbers close up.
-- **Blue CPU chip, or red P1:** the role the bound save is bound under. One save is bound at a time, and the chip shows on its row under both roles.
+- **Red number, at the row's left edge:** its place in the chain or the conversion under the cursor, the badge Character Cycles uses. It never sits next to the chain mark or the link chip. In the picker, A adds the next number. A again removes it, and the later numbers close up.
+- **Load · CPU chip, with the chain mark (Load · P1, red, for Player):** the save bound for Load, and the role that plays its chain. One save is bound at a time, and the chip shows on its row under both roles.
+- **▶ P1 and ▶ CPU chips:** a role's active macro, where both roles show, on the Recording page. Play on Player 1 and Play on CPU play them.
 - **Orange link chip: the start save.** Start save: where this macro begins when you play it on its own with its Play chord. Record makes it automatically. In a chain, only the chain's save is loaded; the macros then play one after another from where the fighters are, and their own start saves are not loaded. A macro without a start save is normal. Its Play chord plays it on that role from wherever the fighters are. Replays and the old slots have none. The chip is grey when the macro's Start save switch is Off.
 - **Gold outline** in the step-by-step strips only: a mockup mark for "new". It is not part of the product.
+
+The two role chips are one of the two details in [Proposed, not yet confirmed](#proposed-not-yet-confirmed); the pictures already draw them.
 
 ## The loop mark
 
@@ -63,7 +65,7 @@ The loop belongs to the role, not to a group and not to a file. Player and CPU e
 
 How the product would draw it: as a texture in our own layout archive. The layout builder can embed one. `tools/layout-builder` (branch `p23/rc5-candidate`) already appends textures to the stock `timg/__Combined.bntx`: the 38 item icons from `assets/item-icons` through `import_png_file`, and the generated hitbox orb disc through `import_dds`. Picture panes bind those textures, and the panes' vertex colours tint them, which covers white for off and green for on. The builder reads PNG and DDS, not SVG, so the SVG would be turned into a PNG first. A native game icon that fits: not checked.
 
-Icons: Google Material Symbols `repeat`, `push_pin` (filled), `link` and `format_list_numbered`, from https://github.com/google/material-design-icons, Apache License 2.0. The copies, their source paths, and the licence text are in [icons/](icons/).
+Icons: Google Material Symbols `repeat`, `link` and `format_list_numbered`, from https://github.com/google/material-design-icons, Apache License 2.0. The copies, their source paths, and the licence text are in [icons/](icons/).
 
 ## Pop-up
 
@@ -71,16 +73,16 @@ The pop-up is one window over the match, so its size can be judged against the f
 
 - **Top:** the title, then Player | CPU. L or R switches role. The selected role is the menu's red tab.
 - **Tabs, under the role:** Save states & Macros, and Combos & Conversions. CPU has only the first.
-- **Two sections, stacked.** Each scrolls on its own, by whole rows, and its header stays. The hot five stay in a green outline, pins first, and the library sits under a hairline.
+- **Two sections, stacked.** Each scrolls on its own, by whole rows, and its header stays. The hot five stay in a green outline, the most recently used first, and the library sits under a hairline.
 - **The Links panel, on the right,** spells out the links of the row under the cursor as a small diagram: the start save, the chains that number it, the combos made from it, or the order of a chain or a conversion, with the loop, the binding, and the streak and best.
-- **Binding:** A on a save binds it under the role you are on. Under Player, A on a save bound as CPU rebinds it as Player. One save is bound at a time; its row wears that role's chip under both roles, and that role plays its whole chain when the Load chord runs it.
+- **Binding:** A on a save binds it under the role you are on. Under Player, A on a save bound as CPU rebinds it as Player. One save is bound at a time; its row wears the binding chip, Load · CPU or Load · P1, under both roles, and that role plays its whole chain when the Load chord runs it.
 - **Footer:** the buttons for the section the cursor is in.
 
 ### A save under the cursor
 
 ![Pop-up, a save focused, stacked](RECORDING-REDESIGN-r6-popup-save.png)
 
-*The CPU role. Corner pressure is the bound save, bound as CPU (the blue chip), and its chain is On. The macros below wear 1, 2 and 3 at their left edge. The Links panel says the CPU plays the three in order, the CPU's loop ∞ repeats the whole chain, and the binding is the CPU's.*
+*The CPU role. Corner pressure is the bound save, bound as CPU (the Load · CPU chip), and its chain is On. The macros below wear 1, 2 and 3 at their left edge; the list itself is in the order they were last used. The Links panel says the CPU plays the three in order, the CPU's loop ∞ repeats the whole chain, and the binding is the CPU's.*
 
 ![The macros have scrolled. The saves have not](RECORDING-REDESIGN-r6-popup-scrolled.png)
 
@@ -90,7 +92,7 @@ The pop-up is one window over the match, so its size can be judged against the f
 
 ![Pop-up, a macro focused](RECORDING-REDESIGN-r6-popup-macro.png)
 
-*The Player role. Nair loop is Player 1's active macro, so its row is green with the white border. Corner pressure wears 1 at its left edge, because its chain plays this macro first, and its blue chip says it is bound as CPU. The Links panel: Nair loop starts from Nair loop · start, with the switch On, when it is played on its own; it is 1 in Corner pressure's chain; Nair loop combo was made from it; and the recorded fighter, Pikachu, is information only.*
+*The Player role. Nair loop is Player 1's active macro, so its row is green with the white border. Corner pressure wears 1 at its left edge, because its chain plays this macro first, and its Load · CPU chip says it is bound as CPU. The Links panel: Nair loop starts from Nair loop · start, with the switch On, when it is played on its own; it is 1 in Corner pressure's chain; Nair loop combo was made from it; and the recorded fighter, Pikachu, is information only.*
 
 A row with no start save, such as Replay 86f, has no link chip. That is normal: its Play chord plays it from where the fighters are, and its Links panel says "no start save · plays from where the fighters are".
 
@@ -100,17 +102,13 @@ A save state is bound under a role, Player or CPU, and the role it is bound unde
 
 Operator, 2026-11-06.
 
-### Q3 · What loop does with a chain
+### Q3 · What loop does with a chain — decided: A
 
-What the loop count repeats when a save with Chain On loads, shown with loop 2 and the chain 1 → 2 → 3.
+The chain is one unit. It plays 1, 2, 3, then starts again at 1, as many times as the loop count says; ∞ keeps going. That is the setup → follow-up → reset rhythm you practise. The count is the loop of the role the save is bound under.
 
-![Q3, A and B side by side](RECORDING-REDESIGN-q3-ab.png)
+Operator, 2026-11-06.
 
-| A · recommended | B |
-| --- | --- |
-| The chain is one unit. It plays 1, 2, 3, then starts again at 1, as many times as the loop count says; ∞ keeps going. That is the setup → follow-up → reset rhythm you practise. The count is the loop of the role the save is bound under. | Each macro repeats on its own before the next number starts: 1, 1, 2, 2, 3, 3, by the bound role's loop count. Good for drilling one piece at a time, but the full sequence only plays through once. |
-
-The pictures in this doc use A.
+![Q3, A (decided) and B (not chosen)](RECORDING-REDESIGN-q3-ab.png)
 
 ### Combos and conversions
 
@@ -122,35 +120,27 @@ The pictures in this doc use A.
 
 *The cursor is on Nair loop combo. Corner to kill wears 2 at its left edge, because that combo is its second step. The Links panel says Nair loop combo was made from Nair loop and is number 2 in Corner to kill. Recorded on names both fighters, and it does not hide the row.*
 
-### Q5 · How the two lists sit in the Combos & Conversions tab
+### Q5 · How the two lists sit in the Combos & Conversions tab — decided: A
 
-How the conversions and the combos share the Combos & Conversions tab.
+Conversions on top, combos below, each with its own scroll, hot outline and library. The Links panel lists the focused conversion's combos in order. Left and Right move between the two sections.
 
-![Q5, A and B side by side](RECORDING-REDESIGN-q5-ab.png)
+Operator, 2026-11-06.
 
-| A · recommended | B |
-| --- | --- |
-| Conversions on top, combos below, each with its own scroll, hot outline and library. The Links panel lists the focused conversion's combos in order. Left and Right move between the two sections. | One list: the combos, then the conversions under their own header, in a single scroll. Moving through it is Up and Down only. But a long combo library pushes the conversions down, past the bottom of the window. |
+![Q5, A (decided) and B (not chosen)](RECORDING-REDESIGN-q5-ab.png)
 
-The pictures in this doc use A.
+### Q6 · Hot conversions — decided: A
 
-### Q6 · Hot conversions
+Up to five conversions sit at the top in the green outline, the most recently used first, exactly like macros, combos and saves. The rest are under the hairline, on the card. Drilling a conversion moves it into the hot five. It works the same everywhere and costs a few kilobytes.
 
-Whether the CONVERSIONS section keeps a hot set with pins, as macros, combos and saves do.
+Operator, 2026-11-06.
 
-![Q6, A and B side by side](RECORDING-REDESIGN-q6-ab.png)
-
-| A · recommended | B |
-| --- | --- |
-| Up to five conversions sit at the top in the green outline, pinned first, then the newest, exactly like macros, combos and saves. The rest are under the hairline, on the card. Drilling a conversion moves it into the hot five. It works the same everywhere and costs a few kilobytes. | Conversions have no hot set: one plain list, newest first, and only the one being drilled is green. Fewer rules. But pin (Y) does nothing here, and a long list has no shortcut to your favourites. |
-
-The pictures in this doc use A.
+![Q6, A (decided) and B (not chosen)](RECORDING-REDESIGN-q6-ab.png)
 
 ### CPU
 
 ![Pop-up, CPU](RECORDING-REDESIGN-r6-popup-cpu.png)
 
-*One tab. CPU throw is the CPU's active macro, and the loop chip shows the CPU's own count, ∞. Corner pressure wears 3 at its left edge and its blue CPU chip. The footer has no tab button, because there is nothing to switch to. The save list is the same library as on Player, because a save is both fighters.*
+*One tab. CPU throw is the CPU's active macro, and the loop chip shows the CPU's own count, ∞. Corner pressure wears 3 at its left edge and its Load · CPU chip. The footer has no tab button, because there is nothing to switch to. The save list is the same library as on Player, because a save is both fighters.*
 
 ### Q10 · Side by side, or stacked — decided: stacked
 
@@ -164,26 +154,21 @@ Operator, 2026-11-06.
 
 *The existing Fighter Mismatch screen. This frame is Steve and Villager, so the prompt names Villager, the CPU on screen. The operator's example is the same screen for a Pikachu macro practised on Palutena. Asked once for the whole chain. Nothing is hidden or refused.*
 
-### Q4 · When Switch / Keep appears for a chain
+### Q4 · When Switch / Keep appears for a chain — decided: A
 
-When the Fighter Mismatch prompt asks Switch or Keep during a chain. Example: the CPU is Palutena; all three were recorded on other fighters.
+One Fighter Mismatch prompt appears before the chain starts. It lists every macro recorded on a different fighter, and your answer (Switch or Keep) covers the whole chain, so playback is never interrupted. Keep plays the inputs on the fighter you have now.
 
-![Q4, A and B side by side](RECORDING-REDESIGN-q4-ab.png)
+Operator, 2026-11-06.
 
-| A · recommended | B |
-| --- | --- |
-| One Fighter Mismatch prompt appears before the chain starts. It lists every macro recorded on a different fighter, and your answer (Switch or Keep) covers the whole chain, so playback is never interrupted. Keep plays the inputs on the fighter you have now. | The prompt appears each time the chain reaches a mismatched macro, so you can Switch for one and Keep for another. The chain pauses at every prompt, which breaks the timing of a chain that loops. |
+Option A's list of macros, one line each, is the only new text in the prompt. The picture's example: the CPU is Palutena; all three were recorded on other fighters.
 
-Option A's list of macros, one line each, is the only new text in the prompt.
-
-The pictures in this doc use A.
+![Q4, A (decided) and B (not chosen)](RECORDING-REDESIGN-q4-ab.png)
 
 ### Pop-up buttons
 
 | Button | Save states | Macros | Conversions and combos |
 | --- | --- | --- | --- |
 | A | Bind to Save / Load, under the role you are on | Set active for this role | Drill |
-| Y | Pin or unpin | Pin or unpin | Pin or unpin |
 | X | Cycle the loop, only when this save's chain is On | Cycle the loop | — |
 | + | Edit chain | — | — |
 | Left / Right | Move to the other section | Move to the other section | Move to the other section |
@@ -201,18 +186,15 @@ Checked against the current menu code (`src/model/menu/input.rs` and `mod.rs` on
 - L and R stay the role toggle here. On the Recording page they change the menu page, as they do on every other page.
 - The menu's button list has no + today, so Edit chain needs that one button added to the adapter.
 - Minus stays menu shortcut 1.
+- Y is unused on these screens.
 
-### Q11 · Which buttons move
+### Q11 · Which buttons move — decided: A
 
-Which buttons change the tab and which move between the upper and the lower section, in the pop-up.
+ZL / ZR change the tab. Left / Right jump between the upper and the lower section. Up / Down move inside a section, and ZL + Up / Down pages it. Each button has one job on this screen, and the footers show it.
 
-![Q11, A and B side by side](RECORDING-REDESIGN-q11-ab.png)
+Operator, 2026-11-06.
 
-| A · recommended | B |
-| --- | --- |
-| ZL / ZR change the tab. Left / Right jump between the upper and the lower section. Up / Down move inside a section, and ZL + Up / Down pages it. Each button has one job on this screen, and the footers show it. | ZL / ZR jump between the upper and the lower section, the way revision 4 jumped between groups. To change the tab, press Up from the top row of the upper section to reach the tab row, then Left / Right. Left / Right stay unused inside the lists, but the tab is one step further away. |
-
-The pictures in this doc use A.
+![Q11, A (decided) and B (not chosen)](RECORDING-REDESIGN-q11-ab.png)
 
 ## Recording page
 
@@ -222,7 +204,7 @@ The same stacked sections and the Links panel, inside the menu: the Links panel 
 
 ![Recording page, Save states and macros](RECORDING-REDESIGN-r6-page-saves-macros.png)
 
-*Saves on top, macros below, and Corner pressure's Links panel on the right. Corner pressure is bound as CPU and numbers the three macros at their left edge. Both roles' loop chips are in the MACROS header, because this page shows both roles at once.*
+*Saves on top, macros below, and Corner pressure's Links panel on the right. Corner pressure is bound as CPU (Load · CPU) and numbers the three macros at their left edge. Nair loop wears ▶ P1 and CPU throw ▶ CPU, the two roles' active macros. Both roles' loop chips are in the MACROS header, because this page shows both roles at once.*
 
 ### Combos and conversions
 
@@ -233,7 +215,6 @@ The same stacked sections and the Links panel, inside the menu: the Links panel 
 | Button | What it does |
 | --- | --- |
 | A | Open the file's own screen |
-| Y | Pin or unpin |
 | + | Edit chain, on a save |
 | Left / Right | Move to the other section |
 | ZL / ZR | The other tab, inside Save states & Macros or Combos & Conversions |
@@ -251,7 +232,7 @@ Each strip is three steps in the menu's own style. The panels are drawn at full 
 
 ![Flow: record, then the start save](RECORDING-REDESIGN-r4-flow-record.png)
 
-*Record also writes "Macro 7 · start" and links it. When the recording stops, Macro 7 joins the hot five after the pins. Its Links panel shows starts from Macro 7 · start, and the new save is listed in SAVE STATES.*
+*Record also writes "Macro 7 · start" and links it. When the recording stops, Macro 7 joins the hot five at the top, the most recently used. The least recently used hot macro leaves the outline. Its Links panel shows starts from Macro 7 · start, and the new save is listed in SAVE STATES, at the top of its hot five.*
 
 ### 2 · Chain a save
 
@@ -259,17 +240,13 @@ Each strip is three steps in the menu's own style. The panels are drawn at full 
 
 *+ on a save opens Edit chain. A numbers the macros, as Character Cycles does. Back in the list, the row reads 3 On, and the Links panel shows 1 → 2 → 3, played by the CPU, the role Corner pressure is bound under.*
 
-### Q1 · How you number a chain or a conversion
+### Q1 · How you number a chain or a conversion — decided: A
 
-How you put a save's chained macros in order in Edit chain, and a conversion's combos in order in New conversion.
+Every macro in the library is a tile. A on a tile gives it the next number. A again takes the number away, and the later numbers close up. It is exactly how Character Cycles orders fighters, so there is nothing new to learn. To change the order, take numbers off and put them back.
 
-![Q1, A and B side by side](RECORDING-REDESIGN-q1-ab.png)
+Operator, 2026-11-06.
 
-| A · recommended | B |
-| --- | --- |
-| Every macro in the library is a tile. A on a tile gives it the next number. A again takes the number away, and the later numbers close up. It is exactly how Character Cycles orders fighters, so there is nothing new to learn. To change the order, take numbers off and put them back. | Only the chained macros are listed, in order, with an Add row at the end. Y moves the selected macro one place later. Reordering a long chain takes fewer presses. But Y-to-move is a gesture no other screen uses, and choosing which macros go in needs a second picker behind Add. |
-
-The pictures in this doc use A.
+![Q1, A (decided) and B (not chosen)](RECORDING-REDESIGN-q1-ab.png)
 
 ### 3 · Make a conversion
 
@@ -277,17 +254,13 @@ The pictures in this doc use A.
 
 *New conversion is the last row under the conversions. The same numbered picker orders the combos. The Switch's own keyboard, drawn here as a labelled schematic, names it. The new row shows its sequence.*
 
-### Q7 · What the conversion file stores
+### Q7 · What the conversion file stores — decided: A
 
-What a conversion file keeps of its combos, which decides what renaming or deleting a combo does to the conversion.
+The conversion keeps a reference to each combo file, in order, the same kind of link a macro has to its start save. Rename a combo and the conversion shows the new name. Delete a combo and the conversion skips that step. The conversion file stays tiny.
 
-![Q7, A and B side by side](RECORDING-REDESIGN-q7-ab.png)
+Operator, 2026-11-06.
 
-| A · recommended | B |
-| --- | --- |
-| The conversion keeps a reference to each combo file, in order, the same kind of link a macro has to its start save. Rename a combo and the conversion shows the new name. Delete a combo and the conversion skips that step. The conversion file stays tiny. | The conversion keeps its own copy of each combo's links, frozen when you saved it. Later renames or deletes of the combo don't touch the conversion. It can never break. But it can quietly go out of date, and the same combo then exists twice. |
-
-The pictures in this doc use A.
+![Q7, A (decided) and B (not chosen)](RECORDING-REDESIGN-q7-ab.png)
 
 ### 4 · Make combo from a macro
 
@@ -309,33 +282,36 @@ If the start save was deleted, the load is skipped and the approved sentence sho
 
 *Under the frame strip, where today's combo bar sits. "CONVERSION · Corner to kill · combo 2 of 2". Ryu BnB is done, and Nair loop combo is the current combo. L1 is TRUE and L2 is now. The streak and best are the conversion's.*
 
-The bar is the combo helper's bar with a conversion header and a row for the combos in the chain. TRUE, the current link, and the links still to come use the helper's own marks. Streak and best count only a finished conversion. A drop is the helper's existing drop, on the link that failed. The picture restarts the conversion at combo 1, with the streak back to 0 and best kept.
+The bar is the combo helper's bar with a conversion header and a row for the combos in the chain. TRUE, the current link, and the links still to come use the helper's own marks. Streak and best count only a finished conversion. The picture restarts the conversion at combo 1, with the streak back to 0 and best kept.
 
-### Q8 · A drop, and what completes the chain
+**Grading, decided ([Q8](#q8-a-drop-and-what-completes-the-chain-decided)); this changes the existing combo helper.** Today a combo attempt is clean only when every link is TRUE, every press is there, and every press is within the tolerance (`src/model/combo.rs`: `Grade::clean`, `Reason`). Clean no longer needs TRUE, for a combo drilled alone and for a conversion. A step counts when its recorded presses are there, with the same direction, in order and within the tolerance. A step drops on a missing press, a press outside the tolerance, or the exchange ending before the step. TRUE stays on the bar as information.
 
-What a drop does while you drill a conversion, and what counts as completing it, shown with Corner to kill when combo 2 drops.
+### Q8 · A drop, and what completes the chain — decided
 
-![Q8, A and B side by side](RECORDING-REDESIGN-q8-ab.png)
+A drop sends you back to combo 1 of the conversion, and the streak to 0; best is kept. Neither the conversion nor a combo has to be a true combo: the CPU may be able to act between the combos, or between two hits of one combo. This is for drilling things one after another. A step counts when you press its recorded buttons, with the same direction, in order and within the timing tolerance. A step drops on a missing press, a press outside the tolerance, or the exchange ending before the step. TRUE still shows on the bar, as information. It no longer decides whether a combo or a conversion counts.
 
-| A · recommended | B |
-| --- | --- |
-| A drop sends you back to combo 1 and the streak to 0; best is kept. A conversion only counts when every combo lands in order and the CPU never leaves hitstun between them. It is a true combo from start to end, the way it would work in a match. | After a drop you retry from the combo that dropped, so you can grind the hard part. A conversion counts when all its combos land back to back, even if the CPU could have acted in between. It is easier to complete, but it can count a sequence that would not combo in a match. |
+Operator, 2026-11-06.
 
-The pictures in this doc use A.
+![Q8, decided](RECORDING-REDESIGN-q8-decided.png)
 
-### Q9 · One drill at a time
+### Q9 · One drill at a time — decided: A
 
-Whether the combo helper drills one thing at a time or a conversion and a combo together, which decides what the bar at the top shows.
+The helper drills one thing, a conversion or a single combo. A on one replaces the other, and the bar always shows what you are drilling. To work on one step, A on its numbered row inside the conversion drills that combo alone, with its own streak.
 
-![Q9, A and B side by side](RECORDING-REDESIGN-q9-ab.png)
+Operator, 2026-11-06.
 
-| A · recommended | B |
-| --- | --- |
-| The helper drills one thing, a conversion or a single combo. A on one replaces the other, and the bar always shows what you are drilling. To work on one step, A on its numbered row inside the conversion drills that combo alone, with its own streak. | A combo and a conversion can both be active, and a button flips which bar you see. It is handy for switching between the full conversion and its hardest step. But two streaks run at once, and one more button is needed on a screen that is already full. |
-
-The pictures in this doc use A.
+![Q9, A (decided) and B (not chosen)](RECORDING-REDESIGN-q9-ab.png)
 
 Drilling one combo from a conversion's numbered rows uses that combo's own streak and best and its normal bar, as today.
+
+## Proposed, not yet confirmed
+
+![Proposed, not yet confirmed](RECORDING-REDESIGN-r7-proposed.png)
+
+*Left: Corner pressure's own screen on the Recording page, with Bind to Save / Load as a value row set to CPU. Right: the Recording page's Save states & Macros sections, with one chip per meaning.*
+
+- **Binding a save on the Recording page.** The page shows both roles. The save's own screen gets the row "Bind to Save / Load: Off / Player / CPU", changed with Left / Right like the other value rows. Binding one save unbinds the previous one. In the pop-up, A binds under the role selected at the top.
+- **The role chips.** The bound save wears "Load · CPU" (red "Load · P1" for Player) with the chain mark: bound for Load, and its chain plays on that role. A role's active macro, where both roles show, wears "▶ P1" or "▶ CPU": Play on Player 1 or Play on CPU plays it. One chip, one meaning, so the two never read alike. The pictures in this doc already draw these chips.
 
 ## Already decided
 
@@ -343,13 +319,12 @@ Drilling one combo from a conversion's numbered rows uses that combo's own strea
 - Two tabs under the role toggle: Save states & Macros, and Combos & Conversions. CPU has only the first. The two sections in a tab are stacked and scroll on their own. **Decided.**
 - The recorded fighter is information. The column reads Recorded on. Nothing filters, hides, greys, or refuses by fighter. A mismatch raises Switch / Keep, and Keep plays the inputs on the current fighter. A conversion may mix fighters. **Decided.**
 - Hot memory is one minute resident per hot macro (3,600 frames, 28.8 KiB). Five hot macros are 144 KiB. A longer file still plays; the rest is read in 600-frame windows. The file cap stays 36,000 frames. No recording is refused for length. **Decided.**
-- A new recording takes a hot slot even when all five are pinned. The oldest pin leaves the hot list and stays on the card. The same rule covers saves. **Decided.**
 - Loop counts are ∞, 1, 2, 3, 5, 10. X cycles them. The list is the Options row. The loop belongs to the role. **Decided.**
 - Player 1 and the CPU may play at the same time. A chain does not use that: its macros play one after another. **Decided.**
 - Save states are named files that you bind for Save and Load. There is no slot number and no extra slot shortcut. **Decided.**
 - A save's chain is an ordered list of macros, numbered 1, 2, 3…, with Chain On or Off on the save. Off keeps the numbers and Load only restores. It replaces the old "play a recording because a state loaded" checklist. **Decided.**
 - A recording's start is its own save file, "<macro name> · start", and the macro stores that file's id. **Decided.**
-- Five hot saves, with the same pin and newest rules. **Decided.**
+- Five hot saves, the most recently used, by the same rule as every other kind. **Decided.**
 - Save states are a group under both roles. The third Saves tab is rejected. **Decided.**
 - The sentence "No start save. This macro plays from where the fighters are." is approved as `macro-start-save-missing`. It shows only when a macro's linked start save was deleted. **Decided.**
 - A conversion is a chain of saved combos. You can drill one combo, or the conversion. **Decided.**
@@ -362,6 +337,9 @@ Drilling one combo from a conversion's numbered rows uses that combo's own strea
 - What you select, the chords run: the bound save state for Save and Load, with its chain, and each role's active macro for that role's Play chord, with or without its start save. Links and conversions describe what happens when it runs. Operator, 2026-11-06.
 - A macro without a start save is normal. Its Play chord plays it on that role from wherever the fighters are. Replays and the old slots have none. Operator, 2026-11-06.
 - Start save On / Off on a macro, default On. On: its Play chord loads the start save, then plays. Off: it plays from where the fighters are, and the link stays. A macro with no start save has no switch. In a chain, only the chain's save loads, whatever each macro's switch says. Operator, 2026-11-06.
+- Pins are dropped. The hot five of each kind are the five most recently used, the most recent first. Used means selected (bound or set active), played, drilled or recorded. When a sixth is used, the least recently used leaves the outline and stays on the card under the hairline. Y is unused on these screens. Operator, 2026-11-06.
+- Q1, Q3, Q4, Q5, Q6, Q7, Q9 and Q11 are A; Q8 is the operator's own answer. Each block above says what it means. Operator, 2026-11-06.
+- A combo or a conversion counts when its recorded presses are there, with the same direction, in order and within the tolerance. TRUE is shown as information and is no longer a condition, for a combo drilled alone and for a conversion. This changes the existing combo helper (`Grade::clean`). Operator, 2026-11-06.
 
 ## Unchanged from revision 3
 
@@ -381,7 +359,6 @@ These screens and rules carry over. Where a picture is revision 3's, the left co
 | Rename | The Switch keyboard. Header "Name macro". Empty OK keeps the previous name. A new recording that was never renamed is Macro N. |
 | Crop | In and Out, then a new file. This file stays. |
 | Make combo | Play the file once on Player 1 from its start save, and keep the links as a new combo. This file stays. This is not a conversion. |
-| Pin | Thumbtack. Pins sort first inside the hot outline. |
 | Delete | Removes the file. A chain that numbered it closes the gap the next time that chain is opened. |
 
 ### A combo's own screen
@@ -392,11 +369,10 @@ These screens and rules carry over. Where a picture is revision 3's, the left co
 
 | Row | What it does |
 | --- | --- |
-| Drill | This becomes the one drill, and a drilled conversion is cleared |
+| Drill | This becomes the one drill, and a drilled conversion is cleared. An attempt counts when its recorded presses are there, in order and within the tolerance; TRUE is shown as information. |
 | Made from | The macro it was made from, when there is one |
 | Rename | Header "Name combo". Empty OK on a new combo is Combo N. Online, the keyboard stays closed and the name is Combo N. |
 | Crop | First link and last link. A saves a new combo. This file stays. |
-| Pin | Same hot rules as macros |
 | Delete | Removes the file. A conversion that numbered it skips that step. |
 
 ### A save state's own screen
@@ -412,7 +388,6 @@ These screens and rules carry over. Where a picture is revision 3's, the left co
 | Edit chain | The numbered picker. + opens it from the list and the pop-up too. |
 | Duplicate | A new save file, a copy of this one, including the numbers. This file stays bound. |
 | Rename | Header "Name save state". A new save that was never renamed is Save N. Online, the keyboard stays closed. |
-| Pin | Same hot rules as macros. |
 | Delete | Removes the file. If it was bound, Save and Load do nothing until another is bound. |
 
 The Save chord overwrites the bound file. If nothing is bound yet, Save creates a file named Save N, binds it, and puts it in the hot list. Saving over "Nair loop · start" moves that macro's remembered start, because that is the file the macro points at.
@@ -425,14 +400,13 @@ The Save chord overwrites the bound file. If nothing is bound yet, Save creates 
 
 | Row | What it does |
 | --- | --- |
-| Drill conversion | This becomes the one drill. The helper grades the whole chain. |
+| Drill conversion | This becomes the one drill. The helper grades the whole chain: each combo's presses, in order and within the tolerance; TRUE is not required. |
 | 1, 2… | A drills that combo alone. The conversion file stays. |
 | Edit combos | The numbered picker |
 | Rename | Header "Name conversion". A new one that was never renamed is Conversion N. Online, the keyboard stays closed. |
-| Pin | Same hot rules ([Q6](#q6-hot-conversions)) |
 | Delete | Removes the conversion file. The combo files stay. |
 
-A conversion stores combo ids in order ([Q7](#q7-what-the-conversion-file-stores)). Renaming a combo keeps it in the conversion. A missing combo is skipped, and the numbers close up the next time the picker opens. An empty conversion drills nothing. No new sentence is added for either case.
+A conversion stores combo ids in order ([Q7](#q7-what-the-conversion-file-stores-decided-a)). Renaming a combo keeps it in the conversion. A missing combo is skipped, and the numbers close up the next time the picker opens. An empty conversion drills nothing. No new sentence is added for either case. Conversions are hot by the same rule as every other kind ([Q6](#q6-hot-conversions-decided-a)).
 
 ### The keyboard
 
@@ -487,12 +461,12 @@ Menu shortcut 1 stays Minus. Open menu stays B + Up. Both Play chords may be on 
 
 ### Chain, on a load
 
-A Load of a save with Chain On restores the save, then the role the save is bound under plays its macros in order ([Q2](#q2-which-role-a-chained-macro-plays-decided)). The macros' own start saves are not loaded, whatever their Start save switches say. A macro recorded on a different fighter raises Switch / Keep, asked once when the chain starts ([Q4](#q4-when-switch-keep-appears-for-a-chain)). Keep plays the inputs on the current fighter. The list is stored on the save, not on the macros, and each save has its own list and its own On or Off.
+A Load of a save with Chain On restores the save, then the role the save is bound under plays its macros in order ([Q2](#q2-which-role-a-chained-macro-plays-decided)). The macros' own start saves are not loaded, whatever their Start save switches say. A macro recorded on a different fighter raises Switch / Keep, asked once when the chain starts ([Q4](#q4-when-switch-keep-appears-for-a-chain-decided-a)). Keep plays the inputs on the current fighter. The list is stored on the save, not on the macros, and each save has its own list and its own On or Off.
 
 ### Migration
 
-- Today's five recording slots become named macros, "Slot 1 (2026-11-05)" through "Slot 5". They are unpinned and start as the hot five. They have no start save, so they have no Start save switch, and they play from where the fighters are.
-- Today's five save slots are one slot index for both fighters. Each index becomes one file, "Slot N (2026-11-05)", holding both fighters. They start hot and unpinned. The slot the Save and Load chords were using becomes the bound save. None of them starts with a chain.
+- Today's five recording slots become named macros, "Slot 1 (2026-11-05)" through "Slot 5". They start as the hot five. They have no start save, so they have no Start save switch, and they play from where the fighters are.
+- Today's five save slots are one slot index for both fighters. Each index becomes one file, "Slot N (2026-11-05)", holding both fighters. They start hot. The slot the Save and Load chords were using becomes the bound save. None of them starts with a chain.
 - Conversions are new. There is nothing to migrate.
 - The old Input Record and Input Playback chords become the new Record and Play on CPU chords. One notice, once: "Record, Play on Player 1, Play on CPU, and the recording pop-up replace Input Record and Input Playback."
 
@@ -536,10 +510,11 @@ No other new sentence is added. A long chain, a missing combo, and an empty chai
 
 - Menu chrome: the rc.1 Recording page, `eden-runs/tr-p23-docs-capture-03/out/c15-q7/b-021632Z-877073-q7-row.png`.
 - Match: `artifacts/phase23/overlay-investigation/frames/fix-tr-training.png`. The old Input Playback notice in that frame is painted over with the sky beside it.
-- Renderer: `tools/render_recording_redesign.py`. Its default run draws revision 6's pop-up, page and macro-screen pictures, the open questions' pictures, `r5-switch-keep`, and the revision 4 pictures this doc uses. With `--q52` it draws only the question pictures. With `--r3` it draws revision 3's.
-- Icons: Google Material Symbols (`repeat`, `push_pin`, `link`, `format_list_numbered`), https://github.com/google/material-design-icons, Apache License 2.0. The copies and the licence are in [icons/](icons/). The renderer fills their path data with Pillow at 8× and downsamples. The tilt, the colours, the dot, and the count badge are added by the renderer.
-- New in revision 6: every `RECORDING-REDESIGN-r6-*.png`: the stacked pop-ups, the Recording page, and the macro's own screen with its Start save switch. Changed in revision 6: the link diagram, the legend, strips 1 and 2, the save's own screen, and the Q1, Q4, Q5 and Q11 pictures. Removed in revision 6: the revision 5 pop-up and page pictures (`r5-popup-*`, `r5-page-*`), `RECORDING-REDESIGN-q2-ab.png`, `RECORDING-REDESIGN-q10-ab.png`, and revision 3's `macro-actions`, which the revision 6 pictures replace.
-- New in revision 5.2: `RECORDING-REDESIGN-q1-ab.png` to `RECORDING-REDESIGN-q11-ab.png`, one per question, with A on the left and B on the right. Q5 and Q11 are 1920 pixels wide, so the whole pop-up fits; the others are 1280. Removed in revision 5.2: `RECORDING-REDESIGN-r4-choices.png` and `RECORDING-REDESIGN-r4-choices-ab.png`, which the question pictures replace.
+- Renderer: `tools/render_recording_redesign.py`. Its default run draws revision 6's pop-up, page and macro-screen pictures, revision 7's proposal picture, the questions' pictures, `r5-switch-keep`, and the revision 4 pictures this doc uses. With `--q52` it draws only the question pictures. With `--r3` it draws the revision 3 pictures the repo keeps.
+- Icons: Google Material Symbols (`repeat`, `link`, `format_list_numbered`), https://github.com/google/material-design-icons, Apache License 2.0. The copies and the licence are in [icons/](icons/). The renderer fills their path data with Pillow at 8× and downsamples. The colours, the dot, and the count badge are added by the renderer.
+- New in revision 7: `RECORDING-REDESIGN-q8-decided.png` and `RECORDING-REDESIGN-r7-proposed.png`. Changed in revision 7: every picture with a list or an action screen (no thumbtack, no Pin row, no Y in the footers, the hot five by recency, the Load · CPU and ▶ chips), and every question picture (the chips read "A · decided" and "B · not chosen"). Removed in revision 7: `RECORDING-REDESIGN-q8-ab.png`, which `q8-decided` replaces.
+- New in revision 6: every `RECORDING-REDESIGN-r6-*.png`. Removed in revision 6: the revision 5 pop-up and page pictures, `q2-ab`, `q10-ab`, and revision 3's `macro-actions`.
+- New in revision 5.2: the question pictures, `RECORDING-REDESIGN-qN-ab.png`, with A on the left and B on the right. Q5 and Q11 are 1920 pixels wide, so the whole pop-up fits; the others are 1280.
 - From revision 5, `r5-switch-keep` stays. Kept from revision 4: the link diagram, the legend, the loop mark, the five strips, the conversion bar, and the combo, save, and conversion action screens. Kept from revision 3: `keyboard`, `crop`, `crop-macro`, `shortcuts`, `respawn`. Two unreferenced revision 3 pictures that still match, `combo-from-macro` and `save-where`, are left in place.
 
 ## Revision history
@@ -549,3 +524,4 @@ No other new sentence is added. A long chain, a missing combo, and an empty chai
 - **Revision 5.1.** The primary's review: the scrolled pop-up keeps its headers and shows whole rows, Switch / Keep is the existing Fighter Mismatch screen, and the conversion strip says "Drilling now."
 - **Revision 5.2.** Every question shown as A | B side by side, with more detail per option (operator 2026-11-06).
 - **Revision 6.** The operator's 2026-11-06 answers: the stacked layout with the Links panel (Q10), the bound role plays the chain (Q2), one bound save at a time, and no chord for combos. The start save is explained, a macro gets a Start save On / Off switch, the order badges move to a row's left edge, and Q4's example is the operator's: the CPU is Palutena.
+- **Revision 7.** The operator's answers to every question (2026-11-06): pins dropped, the hot five are the most recently used, Q1, Q3, Q4, Q5, Q6, Q7, Q9 and Q11 are A, and Q8 is the operator's own answer: restart at combo 1, true not required. The combo helper's grading drops the TRUE condition. Two proposed details, the binding row on the Recording page and one chip per meaning, are drawn for confirmation.
