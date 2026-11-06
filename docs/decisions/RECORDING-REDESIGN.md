@@ -1,8 +1,17 @@
-# Recording redesign — revision 1
+# Recording redesign — revision 2
 
 Phase 1 screens. Nothing here is built. The menu pictures are redrawn on the real rc.1 Recording page (`eden-runs/tr-p23-docs-capture-03`, the same frame the combo-helper mockups used). The pop-up, the chain, and combo-from-macro sit on a real Training frame: `artifacts/phase23/overlay-investigation/frames/fix-tr-training.png` (Steve and Villager on Battlefield). Names and lengths are examples.
 
-Green is the recommendation on the two questions that are still open. Everything else in this file is decided, either by the operator or as the reading of those answers.
+Green is the recommendation on the one question that is still open. Everything else in this file is decided, either by the operator or as the reading of those answers.
+
+## Revision 2
+
+- **The start save is a link. Decided.** Record writes a save named "<macro name> · start" and the macro stores that file's id. Sharing the macro means sharing both files. Renaming the save keeps the link, because the link is the id. Saving over that same file moves the remembered start. Deleting it leaves the macro playable from where the fighters are.
+- **The delete notice is not approved.** The candidate sentence is "No start save. This macro plays from where the fighters are." It is a restriction string, so it waits for a yes. Until then, no new sentence is shown and the macro still plays.
+- **Respawn on platform** leaves Saves. It is a row under Fighters & Stages › Stages. `p23/respawn-label` implements the move. The setting id stays `respawn_invincibility`.
+- **The pin** is a tilted thumbtack: a flat head and a needle.
+- **Where a save sits.** The pictures use a Save states section on both the Player tab and the CPU tab. A save is both fighters, so it is not a third role. The other option, a third top tab named Saves, is below.
+- **Hot save states** stay open. The recommendation is still five, with the same pin and newest rules as macros.
 
 ## Already decided
 
@@ -17,12 +26,14 @@ Green is the recommendation on the two questions that are still open. Everything
 - Pins are a thumbtack. The active macro, the drilled combo, and the bound save are a green row. Hot items sit at the top inside an outline. Pinned items are first inside that outline.
 - R moves between sections. The sections are Macros, Combos, and Save states. Combos is only on the Player role, because the one drilled combo is the player's.
 - Names use the Switch's own keyboard, the one TrainingRooms and the fork already open. This document draws it as a labelled schematic.
+- A recording's start is its own save file, "<macro name> · start", and the macro stores that file's id. **Decided.**
+- Respawn on platform is under Fighters & Stages › Stages, not under save states. **Decided.** The move itself is `p23/respawn-label`.
 
 ## How to read a list
 
 - The **green row** is the one that is in force: the macro that plays, the combo being drilled, or the save Save and Load use.
 - The **blue-gray row** with the white bar is the cursor. It can sit on a different row from the green one.
-- A **gold thumbtack** is pinned.
+- A **gold thumbtack**, tilted, with a flat head and a needle, is pinned.
 - The **green outline** is the hot set: at most five, pins first, then the newest. Everything under the outline is the rest of the library, on the card.
 
 ## Pop-up
@@ -51,7 +62,7 @@ A on a combo row makes it the drill. There is one drill. It is the player's, on 
 
 ![Pop-up, Player, Save states](RECORDING-REDESIGN-popup-saves.png)
 
-Corner pressure is the bound save (green) and it is pinned. Its chain is on, so Load starts Nair loop. Platform is pinned, chain off, and it is the cursor. Slot 1 is hot. Slot 3 is on the card.
+Corner pressure is the bound save (green) and it is pinned. Its chain is on, so Load starts Nair loop. Platform is pinned, chain off, and it is the cursor. Slot 1 is hot. Under the outline, Nair loop · start and CPU throw · start are the files Record created. Slot 3 is the rest of the library.
 
 A binds the cursor's save. The Save chord then writes that file. The Load chord restores it, and starts the chained macro only when that row's chain is on.
 
@@ -83,6 +94,12 @@ X cycles ∞, 1, 2, 3, 5, 10. Off is the white loop with no dot. ∞ is the gree
 
 On the Recording page, R is the same section button (Macros, Combos, Save states, Replays, Options). L/R no longer change the top-level page while that page is open. Up onto the tabs, then Left or Right, leaves Recording. The other pages keep L/R as the page change.
 
+### Where the save list sits
+
+![Where a save sits](RECORDING-REDESIGN-save-where.png)
+
+The pop-up pictures use A. Save states are a section on both role tabs, and A on a row binds it. B, a third tab named Saves, would bind the same way. It is the other option, not the one these screens use, because that tab would read as a third role.
+
 ## Recording page
 
 The left column is the sections. R moves down that column from anywhere on the page. The right side is that section's list or its settings. The footer names R.
@@ -111,9 +128,9 @@ The outline is the hot five. Ryu BnB is pinned, so it is first. The green row is
 
 ![Recording page, Save states](RECORDING-REDESIGN-page-saves.png)
 
-The green row is the file Save and Load use. Chain is a column, so a chained save is visible without opening it.
+The green row is the file Save and Load use. Chain is a column, so a chained save is visible without opening it. Under the outline, "Nair loop · start" and "CPU throw · start" are the files Record created. Each macro links to its own by id. They are not the bound save unless you bind one.
 
-The Save chord overwrites the bound file. If nothing is bound yet, Save creates a file named Save N, binds it, and puts it in the hot list. Duplicate, on the file's own screen, writes a second file and leaves this one.
+The Save chord overwrites the bound file. If nothing is bound yet, Save creates a file named Save N, binds it, and puts it in the hot list. Duplicate, on the file's own screen, writes a second file and leaves this one. Saving Corner pressure does not change Nair loop · start. Saving over Nair loop · start does, because that is the file the macro points at.
 
 ### Replays
 
@@ -146,6 +163,7 @@ A replay export uses the snap the window already has: a mid-action In walks back
 
 | Row | What it does |
 | --- | --- |
+| Start save | The file Record created, "Nair loop · start". The macro stores its id. Renaming that save keeps the link. |
 | Set active for Player 1 | Play on Player 1 toggles this file |
 | Set active for CPU | Play on CPU toggles this file |
 | Rename | The Switch keyboard. Header "Name macro". Empty OK keeps the previous name. A new recording that was never renamed is Macro N. |
@@ -194,7 +212,7 @@ Online, in a waiting room, the keyboard is not opened. A new file keeps Macro N,
 
 Make combo is a row on that macro. It is not a conversion of the file into links. CPU playback writes the CPU's controller, and the combo strip only records Player 1 hitting the CPU, so the pass plays the frames on Player 1.
 
-1. If this macro has a start save and that file is still the one it linked, load it. The playable start is the macro's own start, which a replay export has already snapped to idle or fall.
+1. Load the linked save, "Nair loop · start", when that file is still there. The playable start is the macro's own start, which a replay export has already snapped to idle or fall. If the file was deleted, skip the load and play from where the fighters are. The notice for that case is the candidate sentence in Revision 2, and it is not approved yet.
 2. The menu closes. The file plays once on Player 1. The strip records the exchange that opens during the pass.
 3. If you want a shorter combo, Crop then asks for the first and last link and saves a copy. The new combo becomes the drill and enters the hot list. The macro file is not written.
 
@@ -272,9 +290,13 @@ A frame is 8 bytes.
 - Source. The named library is the only list.
 - Per-slot playback chords. They are not added.
 
-The Saves page keeps the rest: the on/off switch for the chords, mirroring, auto-load on death, damage on load, buffs, and the setup library. Setups stay a separate library from save states.
+The Saves page keeps the on/off switch for the chords, mirroring, auto-load on death, damage on load, buffs, and the setup library. Setups stay a separate library from save states.
 
-An empty recording still uses the existing "Recording was empty". No new sentence is added for a missing start save: the macro plays from where the fighters are.
+![Respawn on platform, under Stages](RECORDING-REDESIGN-respawn.png)
+
+Respawn on platform is not on that Saves page and not on Recording › Options. It is under Fighters & Stages › Stages. The setting id stays `respawn_invincibility`. `p23/respawn-label` implements the move. This document only records where the row goes.
+
+An empty recording still uses the existing "Recording was empty". A deleted start save does not yet have an approved sentence. The candidate, waiting for a yes, is "No start save. This macro plays from where the fighters are."
 
 Fighter mismatch keeps the Switch / Keep prompt, for macros and for combos.
 
@@ -282,29 +304,11 @@ Lobby practice matches Training. The "Combos work in Training" sentence stays go
 
 ## Still open
 
-![The two open questions](RECORDING-REDESIGN-choices.png)
+![Hot save states](RECORDING-REDESIGN-choices.png)
 
-### 1. What a recording remembers as its start save
+### Hot save states
 
-Record already remembers the situation it started from. Save states are files now, so the old "slot number and revision" choice does not fit. Two ways to keep that memory:
-
-**A, recommended.** When Record starts, it writes a new named save file and the macro stores that file's id.
-
-- Sharing the macro means sharing two files. A share copies both.
-- Every recording adds one save file.
-- If that save file is deleted, the macro still plays, from where the fighters are now. Combo-from-macro does the same: it skips the load and plays from the current positions.
-- If that save file is changed later, the remembered start moves, because the macro points at the file rather than at a frozen copy.
-- The chain is a different link. It lives on a save you bind, and it points at a macro. The start-save link lives on the macro, and it points at a save. They can be two files.
-
-**B.** The save is copied inside the macro file.
-
-- One file to share.
-- The macro's start does not move if you later edit or delete a file in the save library.
-- The file is larger, and the same situation can exist twice: once in the library and once inside the macro.
-
-### 2. Hot save states
-
-**A, recommended.** Five hot saves, with the same rules as macros: thumbtack pins first, then the newest, inside the outline. Binding a save puts it in the hot list. A new save takes a hot slot even when all five are pinned.
+**A, recommended.** Five hot saves, with the same rules as macros: thumbtack pins first, then the newest, inside the outline. Binding a save puts it in the hot list. A new save takes a hot slot even when all five are pinned. The auto-created "<macro name> · start" files stay under the outline unless you pin or bind them.
 
 **B.** No hot list for saves. The pop-up shows the whole library, and only the bound save is marked.
 

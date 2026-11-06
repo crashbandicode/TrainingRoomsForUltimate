@@ -35,9 +35,22 @@ GROUPS = [("Macros", 8), ("Combos", 4), ("Save states", 5), ("Replays", 2), ("Op
 
 
 def thumbtack(d, x, y, on_green=False):
-    d.ellipse((x - 1, y - 1, x + 15, y + 15), fill=DARK)
-    d.ellipse((x, y, x + 14, y + 14), fill=GOLD)
-    d.line((x + 7, y + 12, x + 7, y + 26), fill=GOLD, width=3)
+    """A tilted pushpin: a flat head and a needle, not a round map pin."""
+    import math
+    ang = math.radians(-36)
+    cx, cy = x + 9, y + 6
+    hw, hh = 8.5, 2.8
+    pts = []
+    for dx, dy in ((-hw, -hh), (hw, -hh), (hw, hh), (-hw, hh)):
+        pts.append((
+            cx + dx * math.cos(ang) - dy * math.sin(ang),
+            cy + dx * math.sin(ang) + dy * math.cos(ang),
+        ))
+    nx = cx + math.cos(math.radians(62)) * 13
+    ny = cy + math.sin(math.radians(62)) * 13
+    d.line((cx + 1, cy + 2, nx, ny), fill=DARK, width=3)
+    d.line((cx + 1, cy + 2, nx, ny), fill=GOLD, width=2)
+    d.polygon(pts, fill=GOLD, outline=DARK)
 
 
 def repeat_icon(d, x, y, mode, size=36):
@@ -102,7 +115,9 @@ def library_rows(d, rows, c2, c3, y0=168):
             break
     centers = []
     y = y0
-    for row in rows:
+    for i, row in enumerate(rows):
+        if hot and i == hot:
+            y += 16
         top, bot = y - 16, y + 16
         on = row.get("active")
         if on:
@@ -133,6 +148,8 @@ def setting_rows(d, rows, y0=160):
         iv.text(d, (360, y), label, ch.MF, fill=ch.M_TEXT, anchor="lm")
         if kind == "on":
             iv.text(d, (1220, y), value, ch.MF, fill=GREEN, anchor="rm")
+        elif kind == "off":
+            iv.text(d, (1220, y), value, ch.MF, fill=ch.M_GROUP, anchor="rm")
         elif kind == "pick":
             iv.text(d, (1220, y), "<  %s  >" % value, ch.MF, fill=ch.M_TEXT, anchor="rm")
         else:
@@ -198,7 +215,9 @@ def popup(game, role, section, sections, rows, loop, c2, c3):
             break
     y = 196
     centers = []
-    for row in rows:
+    for i, row in enumerate(rows):
+        if hot and i == hot:
+            y += 16
         top, bot = y - 15, y + 15
         on = row.get("active")
         if on:
@@ -283,11 +302,7 @@ def choices(bg):
     ch.clear_content(d, list_view=True)
     iv.text(d, (53, 112), "Still open. Green is the recommendation.", ch.MF, fill=ch.M_TEXT, anchor="lm")
     blocks = [
-        (True, "1  A recording's start save",
-         "A  Record writes a new named save file and the macro stores that file's id.",
-         "Sharing copies both files. Deleting the save leaves the macro playable from where the fighters are now. Changing that save file moves the remembered start.",
-         "B  The save is copied inside the macro file. One file to share. Later edits to the save library do not move this start."),
-        (True, "2  Hot save states",
+        (True, "Hot save states",
          "A  Five hot saves, same rules as macros: pinned first, then newest. Binding one makes it hot.",
          "The pop-up shows the five without opening the whole library. A save file is the two fighters, not an input log.",
          "B  No hot list. The pop-up is the whole library, and only the bound save is marked."),
@@ -323,6 +338,8 @@ SAVES = [
      "hot": True, "pin": True, "active": True},
     {"name": "Platform", "c2": "Pikachu · Mario", "c3": "chain off", "hot": True, "pin": True, "cursor": True},
     {"name": "Slot 1 (2026-11-05)", "c2": "Steve · Villager", "c3": "chain off", "hot": True},
+    {"name": "Nair loop · start", "c2": "Pikachu · Mario", "c3": "linked", "hot": False},
+    {"name": "CPU throw · start", "c2": "Mario · Pikachu", "c3": "linked", "hot": False},
     {"name": "Slot 3 (2026-11-05)", "c2": "Lucina · Cloud", "c3": "chain off", "hot": False, "dim": True},
 ]
 CPU_MACROS = [
@@ -374,7 +391,7 @@ def main():
 
     img, d = page_base(menu, 2,
                        "The green row is the save the Save and Load chords use.",
-                       "Chain on: loading Corner pressure starts Nair loop.",
+                       "Nair loop · start is the file Record created and the macro links to.",
                        "Up/Down move    A actions    Y pin    R section    B close")
     library_rows(d, SAVES, "Fighters", "Chain")
     save(img, "RECORDING-REDESIGN-page-saves")
@@ -402,7 +419,8 @@ def main():
     ])
     save(img, "RECORDING-REDESIGN-page-options")
 
-    save(action_screen(menu, "Recording  >  Macros  >  Nair loop", [
+    img = action_screen(menu, "Recording  >  Macros  >  Nair loop", [
+        ("Start save", False),
         ("Set active for Player 1", True),
         ("Set active for CPU", False),
         ("Rename", False),
@@ -410,9 +428,11 @@ def main():
         ("Make combo", False),
         ("Pin", False),
         ("Delete", False),
-    ], "Rename opens the Switch keyboard, the same one the fork uses.",
-       "Make combo plays this file on Player 1. Crop saves a new file."),
-         "RECORDING-REDESIGN-macro-actions")
+    ], "Record wrote Nair loop · start and this macro stores that file's id.",
+       "Renaming the save keeps the link. Make combo loads it, then plays on Player 1.")
+    d = ImageDraw.Draw(img)
+    iv.text(d, (1180, 168), "Nair loop · start", ch.MF, fill=ch.M_GROUP, anchor="rm")
+    save(img, "RECORDING-REDESIGN-macro-actions")
 
     save(action_screen(menu, "Recording  >  Combos  >  Nair loop", [
         ("Drill", True),
@@ -441,9 +461,9 @@ def main():
 
     save(keyboard(menu), "RECORDING-REDESIGN-keyboard")
 
-    save(status(game, "Make combo · Nair loop", [
-        "Playing on Player 1. The menu is closed.",
-        "Hits on the CPU become the combo.",
+    save(status(game, "Make combo · step 1", [
+        "Loaded the linked save, Nair loop · start.",
+        "Then Nair loop plays on Player 1.",
         "The macro file is kept.",
     ]), "RECORDING-REDESIGN-combo-from-macro")
 
@@ -497,6 +517,47 @@ def main():
     save(img, "RECORDING-REDESIGN-shortcuts")
 
     save(choices(menu), "RECORDING-REDESIGN-choices")
+
+    img = menu.copy()
+    d = ImageDraw.Draw(img)
+    ch.clear_content(d, list_view=True)
+    d.rectangle((36, 36, 1244, 108), fill=ch.M_PANEL)
+    x = 56
+    for i, name in enumerate(("CPU", "Saves", "Recording", "Fighters & Stages", "Display & Controls")):
+        f = iv.font(16, bold=True)
+        w = d.textlength(name, font=f) + 28
+        if i == 3:
+            d.rounded_rectangle((x, 52, x + w, 84), radius=3, fill=(176, 52, 42, 255))
+            iv.text(d, (x + 14, 68), name, f, fill=ch.M_TEXT, anchor="lm")
+        else:
+            iv.text(d, (x + 14, 68), name, f, fill=ch.M_GROUP, anchor="lm")
+        x += w + 16
+    iv.text(d, (53, 128), "Fighters & Stages  >  Stages", ch.MF, fill=ch.M_TEXT, anchor="lm")
+    setting_rows(d, [
+        ("Change Stage", "", "action", False),
+        ("Lobby Practice", "[ON]", "on", False),
+        ("Lobby Stages", "", "action", False),
+        ("Training Stage Rotation", "[OFF]", "off", False),
+        ("Respawn on platform", "[OFF]", "off", True),
+    ], y0=176)
+    ch.help_lines(d, "Respawn on platform moved here from Saves. It is not a save state.",
+                  "The row id stays respawn_invincibility. p23/respawn-label implements the move.")
+    hints(d, "Up/Down move    Left/Right change    B back")
+    save(img, "RECORDING-REDESIGN-respawn")
+
+    img = menu.copy()
+    d = ImageDraw.Draw(img)
+    ch.clear_content(d, list_view=True)
+    iv.text(d, (53, 112), "Where a save sits. The other pictures use the green one.", ch.MF, fill=ch.M_TEXT, anchor="lm")
+    d.rounded_rectangle((48, 150, 1232, 310), radius=8, outline=GREEN, width=2)
+    iv.text(d, (68, 166), "A  A section on both roles. Recommended.", iv.font(16, bold=True), fill=ch.M_TEXT, anchor="lm")
+    iv.text(d, (68, 206), "Player and CPU stay the role tabs. R opens Save states on either tab.", SMALL, fill=ch.M_TEXT, anchor="lm")
+    iv.text(d, (68, 236), "A save is both fighters, so it is not a third role. A still binds the row to Save and Load.", SMALL, fill=ch.M_GROUP, anchor="lm")
+    d.rounded_rectangle((48, 330, 1232, 470), radius=8, outline=ch.M_RULE, width=2)
+    iv.text(d, (68, 346), "B  A third top tab, Saves.", iv.font(16, bold=True), fill=ch.M_TEXT, anchor="lm")
+    iv.text(d, (68, 386), "Saves would sit beside Player and CPU. R would not be needed for it.", SMALL, fill=ch.M_GROUP, anchor="lm")
+    iv.text(d, (68, 416), "Binding would be the same. The tab would read as a third role, which a save is not.", SMALL, fill=ch.M_GROUP, anchor="lm")
+    save(img, "RECORDING-REDESIGN-save-where")
 
 
 if __name__ == "__main__":

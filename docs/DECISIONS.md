@@ -1267,6 +1267,8 @@ answers for my review".
 
 Still open, in that document: how a recording remembers its start save, and whether save states have their own hot list.
 
+**Revision 2** is the same document, updated. The start save is a file named "<macro name> · start" and the macro stores its id. Renaming that file keeps the link. The sentence for a deleted start save is proposed and not approved. Respawn on platform is drawn under Fighters & Stages › Stages. The pin is a tilted thumbtack. Save states stay a section on both role tabs; a third tab named Saves is the other option. Hot save states remain open.
+
 ### INTRO-ONCE · The Training intro notices — ordered (2026-11-05)
 
 **Operator 2026-11-05 ~21:3xZ:** "please disable the intro tutorial messages when we enter training. they should only
