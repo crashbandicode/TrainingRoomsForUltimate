@@ -340,7 +340,7 @@ pub static ROWS: [Row; 104] = [
     r(MACROS, "Source", "macro_source", Control::Dropdown(&o::MACRO_SOURCE),
       "Where the CPU's recordings come from:\nthe numbered slots or the named library."),
     r(MACROS, "Ask before switching fighter", "fighter_prompt", TOGGLE,
-      "On: a replay or named recording asks before it\nswitches the CPU's fighter."),
+      "On: a replay or named recording asks before it\nswitches the CPU, a combo before it switches P1."),
     r(MACROS, "Named library", "named_macro_library", Control::Editor(Editor::NamedLibrary),
       "The named recordings on the card.\nA loads one, Y copies it into the current slot."),
     r(MACROS, "Save slot to library...", "", Control::Editor(Editor::SaveSlotToLibrary),
@@ -369,7 +369,7 @@ pub static ROWS: [Row; 104] = [
       "Keep playing, or load the save state to retry\nfrom the same spot."),
     // Fighters & Stages > Player 1 and CPU
     r(PEOPLE, "Player Swapping", "trio_practice", TOGGLE,
-      "On: the Player 1 cycle chord changes your fighter.\nOff: only the CPU can be changed."),
+      "On: the Player 1 cycle chord changes your fighter.\nOff: only a combo's Switch changes Player 1."),
     r(PEOPLE, "Player Character", "player_character", Control::Editor(Editor::PortraitPlayer),
       "Pick Player 1's fighter from the portrait grid."),
     r(PEOPLE, "CPU Character", "cpu_character", Control::Editor(Editor::PortraitCpu),

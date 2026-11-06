@@ -217,3 +217,11 @@ ceiling = 140822
 date = "2026-11-05"
 reason = "rc.5 fixes2 (p23/rc5-fixes2): the notice slot sits below the frame strip, and Saved combos keeps the focused row's full label and posts the skipped-file notice only when that set changes; measured 140822 at 3b43069 (tools/size_gate.py), +72 over the P-CYCLE ceiling 140750"
 approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed'"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 140843
+date = "2026-11-05"
+reason = "rc.6: switch P1 to a combo's recorded fighter with the named macros' Switch/Keep question, one explicit P1 load (p23/combo-switch, operator 2026-11-05 DEFERRED-LIST); measured 140843 at 5bdccb6 (tools/size_gate.py), +279 over the rc.5 candidate's 140564"
+approved_by = "Operator 2026-11-05: 'Raise as needed' (standing; relayed by primary 35137355 in the P21 order ~17:55Z; the P22 order of 18:30Z did not restate it), own commit"

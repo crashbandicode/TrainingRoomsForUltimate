@@ -529,6 +529,8 @@ fn stage_press(m: &mut Menu, tile: u16, button: Button) -> Option<crate::engine:
 /// a notice; nothing is half-applied (the request is all or nothing, `practice_stage_request::queue`).
 fn close_session(s: &mut Session) {
     if let Some(menu) = s.menu.as_mut() { close(menu, &mut s.setups); }
+    // A combo's Switch (SPEC-input-07 §4a) goes to the roster loader once the menu has closed.
+    s.combos.after_close();
     let Some(selection) = s.stage_close.take() else { return };
     let result = s.stage_context.ok_or("no practice stage when this menu opened")
         .and_then(|context| crate::runtime::lobby::practice_stage_request::request_in(context, selection));

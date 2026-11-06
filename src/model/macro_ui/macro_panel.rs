@@ -150,6 +150,8 @@ pub enum Effect {
     /// Result of a prompt opened for a replay clip or track. `None` is Cancel.
     /// A named-library prompt is applied inside [`MacroUi`] and never reports here.
     ClipFighter(Option<FighterChoice>),
+    /// Result of a prompt opened for a chosen combo (Player 1's fighter). `None` is Cancel.
+    ComboFighter(Option<FighterChoice>),
 }
 
 /// Everything the runtime knows about the selection being loaded. The panel
@@ -1021,12 +1023,25 @@ impl MacroUi {
         recorded_label: String,
         current_label: String,
     ) -> bool {
-        if !matches!(self.screen, Screen::Closed) {
+        self.open_fighter_prompt_for(FighterOrigin::Clip, revision, recorded_label, current_label)
+    }
+
+    /// Prompt for a caller that keeps its own candidate: a replay clip or track
+    /// ([`Effect::ClipFighter`]) or a chosen combo ([`Effect::ComboFighter`]).
+    /// Refused while another panel is open.
+    pub fn open_fighter_prompt_for(
+        &mut self,
+        origin: FighterOrigin,
+        revision: u64,
+        recorded_label: String,
+        current_label: String,
+    ) -> bool {
+        if origin == FighterOrigin::Named || !matches!(self.screen, Screen::Closed) {
             return false;
         }
         self.playback_on = false;
         self.screen = Screen::Fighter(Box::new(FighterScreen {
-            prompt: fighter::Prompt::new(FighterOrigin::Clip, revision, recorded_label, current_label),
+            prompt: fighter::Prompt::new(origin, revision, recorded_label, current_label),
             cpu_kind: None,
             candidate: None,
             prior: None,
@@ -1100,6 +1115,7 @@ impl MacroUi {
         };
         match screen.prompt.origin() {
             FighterOrigin::Clip => Effect::ClipFighter(None),
+            FighterOrigin::Combo => Effect::ComboFighter(None),
             FighterOrigin::Named => {
                 // Back to the list the user picked from; the loaded macro never changed.
                 if let Some(page) = screen.prior {
@@ -1116,7 +1132,10 @@ impl MacroUi {
         };
         let FighterScreen { prompt, cpu_kind, candidate, .. } = *screen;
         let Some((id, recording)) = candidate.filter(|_| prompt.origin() == FighterOrigin::Named) else {
-            return Effect::ClipFighter(Some(choice));
+            return match prompt.origin() {
+                FighterOrigin::Combo => Effect::ComboFighter(Some(choice)),
+                _ => Effect::ClipFighter(Some(choice)),
+            };
         };
         self.prompt_commit = Some((id.clone(), recording.name.clone()));
         match choice {

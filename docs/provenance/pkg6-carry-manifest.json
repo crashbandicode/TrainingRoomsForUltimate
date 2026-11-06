@@ -2912,7 +2912,7 @@
    "dest": "src/runtime/roster/character_roster.rs",
    "crate": "root",
    "src_sha256": "07d282cdc6c5b4b080a5c0b3e4107a033f623ea3e5809783e0ff595afe759dd5",
-   "dest_sha256": "38cd36fa69dd634ee561b3d716635e5e6b931d534b610282fd3998edd2184467",
+   "dest_sha256": "872e3ac1974da2713f77559bfa76c46e373bdfd13bece551927b7fb5570a57fe",
    "edits": [
     {
      "old": "fn notify(role: Role, message: String) {",
@@ -3429,6 +3429,56 @@
      "old": "    let mut out = crate::engine::swap::ordered_roster::FighterList::new(TrioFighter::MARIO);\n    for f in fighters.iter().filter(|f| !(0x48..=0x4a).contains(&f.kind())) {\n        out.push(*f);\n    }\n    out\n",
      "new": "    crate::engine::swap::cycle_members::cycle_members_excluding(roster, crate::engine::swap::cycle_members::NO_MII, excluded)\n}\n\n/// The CPU cycle's Mii admission as the CPU Mii owner last computed it (`cycle_members::cpu_admission`, published from\n/// its service; none while it is not qualified). Every CPU cycle walker and the menu read this one answer (P-CYCLE).\npub(crate) fn cpu_cycle_admission() -> crate::engine::swap::cycle_members::MiiAdmission {\n    #[cfg(feature = \"mii-ordinary-cpu-alpha\")]\n    return mii_ordinary_cpu::published_admission();\n    #[cfg(not(feature = \"mii-ordinary-cpu-alpha\"))]\n    crate::engine::swap::cycle_members::NO_MII\n}\n\n/// What the portrait grid shows of the cycles (P-CYCLE): the CPU cycle's Mii admission, and each role's slot 0\n/// (`[Player, CPU]`: the scene's original kind, the fighter the cycle returns to) while a practice scene has one.\n/// Atomics only: the menu worker reads them, never an owner.\npub fn cycle_facts() -> (crate::engine::swap::cycle_members::MiiAdmission, [Option<u32>; 2]) {\n    (cpu_cycle_admission(), [original_kind(Role::Player), original_kind(Role::Cpu)])\n",
      "reason": "P-CYCLE (operator 2026-11-05: a Mii Gunner cycled for the CPU though the menu did not list it): every cycle walker walks engine::swap::cycle_members (the one list the portrait grid numbers); the CPU Mii owner computes its Mii admission (cycle_members::cpu_admission) under its own lock, walks it and publishes it; the menu reads it and each role's slot 0 (character_roster::cycle_facts)"
+    },
+    {
+     "old": "    state_for(Role::Cpu).lock().pending.is_some_and(\n        |request| matches!(request.selection, Selection::Direct(target) if target == fighter),\n",
+     "new": "    state_for(Role::Cpu).lock().pending.is_some_and(\n        |request| matches!(request.selection, Selection::Direct(target) if target == fighter),\n    )\n}\n\n/// Player 1's fighter may be changed: the Player role is enabled (Player Swapping On).\npub fn player_swapping() -> bool {\n    Role::Player.enabled()\n}\n\n/// Player 1's fighter kind as the loader last observed it (None before a practice entry).\npub fn player_kind() -> Option<u32> {\n    state_for(Role::Player).lock().observed.map(|(_, kind)| kind)\n}\n\n/// Ask the existing loader to change Player 1 to `kind` (a combo's recorded\n/// fighter, SPEC-input-07 \u00a74a): the Direct request a Player Character pick makes.\n/// False when nothing was queued; the loader's notice says why.\npub fn request_player_kind(kind: u32) -> bool {\n    let Some(fighter) = TrioFighter::from_kind(kind) else {\n        return false;\n    };\n    if !Role::Player.enabled() || state_for(Role::Player).lock().pending.is_some() {\n        return false;\n    }\n    queue(Role::Player, Selection::Direct(fighter));\n    state_for(Role::Player).lock().pending.is_some_and(\n        |request| matches!(request.selection, Selection::Direct(target) if target == fighter),\n",
+     "reason": "SPEC-input-07 \u00a74a (p23/combo-switch, operator 2026-11-05 DEFERRED-LIST): a combo's Switch asks the Player role with the Player Character pick's Direct request (request_player_kind; player_swapping, player_kind)"
+    },
+    {
+     "old": "    restoring: bool,\n}\n",
+     "new": "    restoring: bool,\n    /// One explicit Direct load the user chose outside the cycle (a combo's Switch,\n    /// `request_player_kind`): admitted even while the role's cycle is off.\n    once: bool,\n}\n",
+     "reason": "SPEC-input-07 \u00a74a, report \u00a72a (primary's (a) branch, 2026-11-05): a combo's Switch is one explicit Player load (Request.once, queue_admitted) that Player Swapping Off does not refuse; the cycle chord, the Player Character pick and the waiting restore keep the gate"
+    },
+    {
+     "old": "fn queue_request(role: Role, selection: Selection, restoring: bool) {\n    // FAIL 2: a user's request leaves one line on every path, including the ones that drop it.\n",
+     "new": "fn queue_request(role: Role, selection: Selection, restoring: bool) {\n    queue_admitted(role, selection, restoring, false);\n}\n\n/// `once`: one explicit Direct load outside the cycle; the role's cycle setting\n/// (Player Swapping) does not refuse it and is not changed by it.\nfn queue_admitted(role: Role, selection: Selection, restoring: bool, once: bool) {\n    // FAIL 2: a user's request leaves one line on every path, including the ones that drop it.\n",
+     "reason": "SPEC-input-07 \u00a74a, report \u00a72a (primary's (a) branch, 2026-11-05): a combo's Switch is one explicit Player load (Request.once, queue_admitted) that Player Swapping Off does not refuse; the cycle chord, the Player Character pick and the waiting restore keep the gate"
+    },
+    {
+     "old": "    if !role.enabled() && !matches!(selection, Selection::RefreshPartners) {\n",
+     "new": "    if !role.enabled() && !once && !matches!(selection, Selection::RefreshPartners) {\n",
+     "reason": "SPEC-input-07 \u00a74a, report \u00a72a (primary's (a) branch, 2026-11-05): a combo's Switch is one explicit Player load (Request.once, queue_admitted) that Player Swapping Off does not refuse; the cycle chord, the Player Character pick and the waiting restore keep the gate"
+    },
+    {
+     "old": "        restoring,\n    });\n",
+     "new": "        restoring,\n        once,\n    });\n",
+     "reason": "SPEC-input-07 \u00a74a, report \u00a72a (primary's (a) branch, 2026-11-05): a combo's Switch is one explicit Player load (Request.once, queue_admitted) that Player Swapping Off does not refuse; the cycle chord, the Player Character pick and the waiting restore keep the gate"
+    },
+    {
+     "old": "/// Player 1's fighter may be changed: the Player role is enabled (Player Swapping On).\npub fn player_swapping() -> bool {\n    Role::Player.enabled()\n}\n\n",
+     "new": "",
+     "reason": "SPEC-input-07 \u00a74a, report \u00a72a (primary's (a) branch, 2026-11-05): a combo's Switch is one explicit Player load (Request.once, queue_admitted) that Player Swapping Off does not refuse; the cycle chord, the Player Character pick and the waiting restore keep the gate"
+    },
+    {
+     "old": "/// fighter, SPEC-input-07 \u00a74a): the Direct request a Player Character pick makes.\n",
+     "new": "/// fighter, SPEC-input-07 \u00a74a): the Direct request a Player Character pick makes,\n/// as one explicit load the user chose, so Player Swapping Off does not refuse it\n/// (that setting keeps the plugin from cycling P1 on its own; it is not changed).\n",
+     "reason": "SPEC-input-07 \u00a74a, report \u00a72a (primary's (a) branch, 2026-11-05): a combo's Switch is one explicit Player load (Request.once, queue_admitted) that Player Swapping Off does not refuse; the cycle chord, the Player Character pick and the waiting restore keep the gate"
+    },
+    {
+     "old": "    if !Role::Player.enabled() || state_for(Role::Player).lock().pending.is_some() {\n",
+     "new": "    if state_for(Role::Player).lock().pending.is_some() {\n",
+     "reason": "SPEC-input-07 \u00a74a, report \u00a72a (primary's (a) branch, 2026-11-05): a combo's Switch is one explicit Player load (Request.once, queue_admitted) that Player Swapping Off does not refuse; the cycle chord, the Player Character pick and the waiting restore keep the gate"
+    },
+    {
+     "old": "    queue(Role::Player, Selection::Direct(fighter));\n",
+     "new": "    queue_admitted(Role::Player, Selection::Direct(fighter), false, true);\n",
+     "reason": "SPEC-input-07 \u00a74a, report \u00a72a (primary's (a) branch, 2026-11-05): a combo's Switch is one explicit Player load (Request.once, queue_admitted) that Player Swapping Off does not refuse; the cycle chord, the Player Character pick and the waiting restore keep the gate"
+    },
+    {
+     "old": "        || (!role.enabled() && !matches!(request.selection, Selection::RefreshPartners))\n",
+     "new": "        || (!role.enabled() && !request.once && !matches!(request.selection, Selection::RefreshPartners))\n",
+     "reason": "SPEC-input-07 \u00a74a, report \u00a72a (primary's (a) branch, 2026-11-05): a combo's Switch is one explicit Player load (Request.once, queue_admitted) that Player Swapping Off does not refuse; the cycle chord, the Player Character pick and the waiting restore keep the gate"
     }
    ]
   },

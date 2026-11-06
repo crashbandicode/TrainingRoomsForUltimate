@@ -58,7 +58,7 @@ One JSON object, at most 64 KiB:
 | --- | --- | --- |
 | `schema_version` | no (1 when left out) | The format's version. This document is version 1. A file with a larger number was made by a newer TrainingRooms and is skipped with a notice. |
 | `name` | no | Shown in the list, 1 to 48 characters. Left out or blank: the file name is used. A longer name is shortened in the list; the file is not changed. |
-| `recorded_on` | no | The fighter Player 1 was when the combo was saved, for example `"Ryu"`. A note only: the list shows "recorded on Ryu", and nothing checks it. |
+| `recorded_on` | no | The fighter Player 1 was when the combo was saved, for example `"Ryu"`, written as the menu names fighters (case does not matter). The list shows "recorded on Ryu". When you choose the combo while P1 is another fighter, the plugin can ask whether to switch P1 to it (see below). The helper grades any fighter either way. |
 | `links` | yes, 1 to 16 | The combo, link by link, in order. |
 
 Each link:
@@ -111,3 +111,21 @@ move, not one fighter's moves, so a combo recorded on one fighter can be practis
 2. Take the card out (or use FTP), and copy `sd:/ultimate/TrainingRooms/combos/<file>.json`.
 3. On the other card, put the file in the same folder and open Saved combos. Choose it with A to make it the target.
    Then do the combo on any fighter.
+
+## Practising on the recorded fighter
+
+When you choose a combo (A in Saved combos) whose `recorded_on` is not Player 1's fighter, the plugin asks the same
+question a named macro recorded on another fighter asks:
+
+- *Keep current fighter* (the default): the combo becomes the target, and you practise it on the fighter you have.
+- *Switch to recorded fighter*: the combo becomes the target, and Player 1 changes to that fighter when you close the
+  menu. This works with **Player Swapping** (Fighters & Stages) On or Off. Player Swapping stays as it is, and with it
+  Off the plugin still never changes Player 1 on its own.
+- B: nothing changes.
+
+The question is skipped in these cases:
+
+- **No question at all** when the combo has no `recorded_on` or when the fighter already matches.
+- **The current fighter is kept, without asking:**
+  - when **Ask before switching fighter** (Recording › Named macros) is Off;
+  - when `recorded_on` is not a fighter name the plugin knows; the notice says so.

@@ -65,7 +65,7 @@ fn the_list_names_bad_files_and_reports_its_counts() {
 fn the_trace_functions_are_exported_with_tags_of_their_own() {
     let text = include_str!("../src/runtime/features/combo.rs");
     let mut tags = Vec::new();
-    for name in ["tr_combo_link_v1", "tr_combo_attempt_v1", "tr_combo_saved_v1", "tr_combo_listed_v1"] {
+    for name in ["tr_combo_link_v1", "tr_combo_attempt_v1", "tr_combo_saved_v1", "tr_combo_listed_v1", "tr_combo_fighter_v1"] {
         let at = text.find(&format!("pub extern \"C\" fn {name}(")).unwrap_or_else(|| panic!("{name} missing"));
         let head = &text[text[..at].rfind("\n\n").unwrap_or(0)..at];
         assert!(head.contains("#[no_mangle]") && head.contains("#[inline(never)]"), "{name}: {head}");

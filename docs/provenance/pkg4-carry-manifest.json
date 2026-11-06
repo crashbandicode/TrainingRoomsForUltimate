@@ -431,7 +431,7 @@
    "dest": "src/model/macro_ui/macro_panel.rs",
    "crate": "tui",
    "src_sha256": "1b6e698f679029bc6fa83ff9cd43756302bd939debaad2d3eeeacd10fb166da1",
-   "dest_sha256": "8460cac276d5e6740f7da7deb5dbaeda7c80110a4a7bcefe88548bac2bc177ed",
+   "dest_sha256": "dc560294243ecccba40425884e5e99935b6bc6fe2d82d58de697ab8e6a11aaa4",
    "edits": [
     {
      "old": "    /// Facing, status, and frames for one playback. Empty when the fighter is not ready.\n    pub fn copy_playback(",
@@ -532,6 +532,31 @@
      "old": "            Pad::Extra => self.extra(),\n        }\n    }",
      "new": "            Pad::Extra => self.extra(),\n            Pad::Rename => self.rename(),\n        }\n    }\n\n    /// X on a caller-titled library that does not bind a slot: the row goes to the runtime to rename.\n    fn rename(&mut self) -> Effect {\n        let Screen::Library(page) = &self.screen else { return Effect::None };\n        if page.alternate.is_none() || page.binds_slot {\n            return Effect::None;\n        }\n        let Some(id) = page.rows.get(page.cursor).map(|row| row.id.clone()) else { return Effect::None };\n        self.screen = Screen::Closed;\n        Effect::Rename { id }\n    }",
      "reason": "SPEC-input-07 \u00a74 (combo helper, 2026-11-05): X renames a row of a caller-titled library (Pad::Rename -> Effect::Rename); other panels ignore it"
+    },
+    {
+     "old": "    ClipFighter(Option<FighterChoice>),\n}\n",
+     "new": "    ClipFighter(Option<FighterChoice>),\n    /// Result of a prompt opened for a chosen combo (Player 1's fighter). `None` is Cancel.\n    ComboFighter(Option<FighterChoice>),\n}\n",
+     "reason": "SPEC-input-07 \u00a74a (p23/combo-switch, operator 2026-11-05 DEFERRED-LIST): the shared fighter prompt for a chosen combo (origin Combo, Effect::ComboFighter, its stale arm, Player 1 in the footer)"
+    },
+    {
+     "old": "        if !matches!(self.screen, Screen::Closed) {\n",
+     "new": "        self.open_fighter_prompt_for(FighterOrigin::Clip, revision, recorded_label, current_label)\n    }\n\n    /// Prompt for a caller that keeps its own candidate: a replay clip or track\n    /// ([`Effect::ClipFighter`]) or a chosen combo ([`Effect::ComboFighter`]).\n    /// Refused while another panel is open.\n    pub fn open_fighter_prompt_for(\n        &mut self,\n        origin: FighterOrigin,\n        revision: u64,\n        recorded_label: String,\n        current_label: String,\n    ) -> bool {\n        if origin == FighterOrigin::Named || !matches!(self.screen, Screen::Closed) {\n",
+     "reason": "SPEC-input-07 \u00a74a (p23/combo-switch, operator 2026-11-05 DEFERRED-LIST): the shared fighter prompt for a chosen combo (origin Combo, Effect::ComboFighter, its stale arm, Player 1 in the footer)"
+    },
+    {
+     "old": "            prompt: fighter::Prompt::new(FighterOrigin::Clip, revision, recorded_label, current_label),\n",
+     "new": "            prompt: fighter::Prompt::new(origin, revision, recorded_label, current_label),\n",
+     "reason": "SPEC-input-07 \u00a74a (p23/combo-switch, operator 2026-11-05 DEFERRED-LIST): the shared fighter prompt for a chosen combo (origin Combo, Effect::ComboFighter, its stale arm, Player 1 in the footer)"
+    },
+    {
+     "old": "            FighterOrigin::Clip => Effect::ClipFighter(None),\n            FighterOrigin::Named => {\n",
+     "new": "            FighterOrigin::Clip => Effect::ClipFighter(None),\n            FighterOrigin::Combo => Effect::ComboFighter(None),\n            FighterOrigin::Named => {\n",
+     "reason": "SPEC-input-07 \u00a74a (p23/combo-switch, operator 2026-11-05 DEFERRED-LIST): the shared fighter prompt for a chosen combo (origin Combo, Effect::ComboFighter, its stale arm, Player 1 in the footer)"
+    },
+    {
+     "old": "            return Effect::ClipFighter(Some(choice));\n",
+     "new": "            return match prompt.origin() {\n                FighterOrigin::Combo => Effect::ComboFighter(Some(choice)),\n                _ => Effect::ClipFighter(Some(choice)),\n            };\n",
+     "reason": "SPEC-input-07 \u00a74a (p23/combo-switch, operator 2026-11-05 DEFERRED-LIST): the shared fighter prompt for a chosen combo (origin Combo, Effect::ComboFighter, its stale arm, Player 1 in the footer)"
     }
    ]
   },
@@ -540,12 +565,27 @@
    "dest": "src/model/macro_ui/macro_panel/fighter.rs",
    "crate": "tui",
    "src_sha256": "1a4e2da3199c28c0d66ad424b2d6cbdb38b9e9ed283e529dfbc8e29e01b50f69",
-   "dest_sha256": "8e4e45d47a509f28c922267c2fe30eb28e7867eb97133b5917a95fa98f0680a3",
+   "dest_sha256": "cda4e5f238bd56d969f4db3061e7ac1d74b44d3d1f053b0b20ce6ad73165c8c3",
    "edits": [
     {
      "old": "            Pad::Extra => {}",
      "new": "            Pad::Extra | Pad::Rename => {}",
      "reason": "SPEC-input-07 \u00a74 (combo helper, 2026-11-05): X renames a row of a caller-titled library (Pad::Rename -> Effect::Rename); other panels ignore it"
+    },
+    {
+     "old": "    Clip,\n}\n",
+     "new": "    Clip,\n    /// A chosen combo (SPEC-input-07 \u00a74a): the question is about Player 1's\n    /// fighter, and the combos UI keeps the candidate.\n    Combo,\n}\n",
+     "reason": "SPEC-input-07 \u00a74a (p23/combo-switch, operator 2026-11-05 DEFERRED-LIST): the shared fighter prompt for a chosen combo (origin Combo, Effect::ComboFighter, its stale arm, Player 1 in the footer)"
+    },
+    {
+     "old": "        View {\n            title: \"Fighter Mismatch\".to_owned(),\n            footer: format!(\n",
+     "new": "        let footer = match self.origin {\n            Origin::Combo => format!(\n                \"Recorded on {} \u00b7 P1 is {}\\nThe combo is graded the same on either. A chooses, B cancels.\",\n                self.recorded, self.current\n            ),\n            Origin::Named | Origin::Clip => format!(\n",
+     "reason": "SPEC-input-07 \u00a74a (p23/combo-switch, operator 2026-11-05 DEFERRED-LIST): the shared fighter prompt for a chosen combo (origin Combo, Effect::ComboFighter, its stale arm, Player 1 in the footer)"
+    },
+    {
+     "old": "            ),\n            labels,\n",
+     "new": "            ),\n        };\n        View {\n            title: \"Fighter Mismatch\".to_owned(),\n            footer,\n            labels,\n",
+     "reason": "SPEC-input-07 \u00a74a (p23/combo-switch, operator 2026-11-05 DEFERRED-LIST): the shared fighter prompt for a chosen combo (origin Combo, Effect::ComboFighter, its stale arm, Player 1 in the footer)"
     }
    ]
   },
@@ -721,7 +761,7 @@
    "dest": "src/runtime/macros/named_macros.rs",
    "crate": "root",
    "src_sha256": "737474479d5f05b064ab645d850ceb189cad3943097ae4fdb5fc74d2fcda0809",
-   "dest_sha256": "988095b94249e2eec6e917c21dff1df75645feecf553b274809da4407b8f663b",
+   "dest_sha256": "d8a32aa4d7dadd4e9d1ff3bab1f368983aef5921454d37150b6ab93ef09b5925",
    "edits": [
     {
      "old": "use training_mod_sync::*;",
@@ -1241,6 +1281,36 @@
      "old": "        Effect::Alternate { id } => *lock_write(&LIST_ACTION) = Some(id),\n",
      "new": "        Effect::Alternate { id } => *lock_write(&LIST_ACTION) = Some(id),\n        Effect::Rename { id } => *lock_write(&LIST_RENAME) = Some(id),\n",
      "reason": "SPEC-input-07 \u00a74-\u00a75 (combo helper, 2026-11-05): a caller-owned name with its own keyboard header (offer_external_name_titled), and X on a caller-titled library handed to the opener (take_list_rename)"
+    },
+    {
+     "old": "    Effect, FighterGate, FighterOrigin, LibraryRow, LoadContext, MacroUi,\n",
+     "new": "    Effect, FighterChoice, FighterGate, FighterOrigin, LibraryRow, LoadContext, MacroUi,\n",
+     "reason": "SPEC-input-07 \u00a74a (p23/combo-switch, operator 2026-11-05 DEFERRED-LIST): the shared fighter prompt for a chosen combo (origin Combo, Effect::ComboFighter, its stale arm, Player 1 in the footer)"
+    },
+    {
+     "old": "static LIST_CHOICE: RwLock<Option<String>> = RwLock::new(None);\nstatic LIST_RENAME: RwLock<Option<String>> = RwLock::new(None);\n",
+     "new": "static LIST_CHOICE: RwLock<Option<String>> = RwLock::new(None);\n/// The answer to a combo's fighter question (`None` inside: Cancel), for the combos UI (SPEC-input-07 \u00a74a).\nstatic COMBO_FIGHTER: RwLock<Option<Option<FighterChoice>>> = RwLock::new(None);\nstatic LIST_RENAME: RwLock<Option<String>> = RwLock::new(None);\n",
+     "reason": "SPEC-input-07 \u00a74a (p23/combo-switch, operator 2026-11-05 DEFERRED-LIST): the shared fighter prompt for a chosen combo (origin Combo, Effect::ComboFighter, its stale arm, Player 1 in the footer)"
+    },
+    {
+     "old": "    lock_write(&LIST_CHOICE).take()\n}\n",
+     "new": "    lock_write(&LIST_CHOICE).take()\n}\n\n/// The answer to the combo fighter question, once (`Some(None)`: cancelled).\npub fn take_combo_fighter_choice() -> Option<Option<FighterChoice>> {\n    lock_write(&COMBO_FIGHTER).take()\n}\n",
+     "reason": "SPEC-input-07 \u00a74a (p23/combo-switch, operator 2026-11-05 DEFERRED-LIST): the shared fighter prompt for a chosen combo (origin Combo, Effect::ComboFighter, its stale arm, Player 1 in the footer)"
+    },
+    {
+     "old": "        FighterOrigin::Clip=>crate::runtime::macros::replay_capture::selection_revision(),\n    };\n",
+     "new": "        FighterOrigin::Clip=>crate::runtime::macros::replay_capture::selection_revision(),\n        FighterOrigin::Combo=>crate::runtime::ui::combos::prompt_revision(),\n    };\n",
+     "reason": "SPEC-input-07 \u00a74a (p23/combo-switch, operator 2026-11-05 DEFERRED-LIST): the shared fighter prompt for a chosen combo (origin Combo, Effect::ComboFighter, its stale arm, Player 1 in the footer)"
+    },
+    {
+     "old": "    let opened=lock_write(&UI).open_fighter_prompt(revision,recorded,current);\n    if opened {assign(&menu::MENU_RECEIVED_INPUT,true);}\n",
+     "new": "    let opened=lock_write(&UI).open_fighter_prompt(revision,recorded,current);\n    if opened {assign(&menu::MENU_RECEIVED_INPUT,true);}\n    opened\n}\n/// Open the shared prompt for a chosen combo (Player 1's fighter). The combos UI\n/// owns the candidate and receives the answer through [`take_combo_fighter_choice`].\npub(crate) fn open_combo_fighter_prompt(revision:u64, recorded:String, current:String) -> bool {\n    *lock_write(&COMBO_FIGHTER)=None;\n    let opened=lock_write(&UI).open_fighter_prompt_for(FighterOrigin::Combo,revision,recorded,current);\n    if opened {assign(&menu::MENU_RECEIVED_INPUT,true);}\n",
+     "reason": "SPEC-input-07 \u00a74a (p23/combo-switch, operator 2026-11-05 DEFERRED-LIST): the shared fighter prompt for a chosen combo (origin Combo, Effect::ComboFighter, its stale arm, Player 1 in the footer)"
+    },
+    {
+     "old": "        Effect::ClipFighter(choice) => crate::runtime::macros::replay_capture::fighter_choice(choice),\n    }\n",
+     "new": "        Effect::ClipFighter(choice) => crate::runtime::macros::replay_capture::fighter_choice(choice),\n        Effect::ComboFighter(choice) => *lock_write(&COMBO_FIGHTER) = Some(choice),\n    }\n",
+     "reason": "SPEC-input-07 \u00a74a (p23/combo-switch, operator 2026-11-05 DEFERRED-LIST): the shared fighter prompt for a chosen combo (origin Combo, Effect::ComboFighter, its stale arm, Player 1 in the footer)"
     }
    ]
   },
