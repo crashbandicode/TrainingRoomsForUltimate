@@ -434,12 +434,14 @@ fn mash_interrupt_stops() {
 fn save_state_triggers_once() {
     let mut rng = Rng::new(5);
     let mut s = RecorderSettings::factory();
+    // Revision 8.2: a load starts neither recording nor slot playback. The trace is
+    // `load_starts_no_playback` on the per-role machine.
     assert_eq!(Recorder::on_state_restored(&s, false, &mut rng), LoadAction::None);
     s.save_state_slots = model::cpu::settings::Weights([0, 0, 2, 0, 0]);
-    assert_eq!(Recorder::on_state_restored(&s, false, &mut rng), LoadAction::Play(2));
-    assert_eq!(Recorder::on_state_restored(&s, true, &mut rng), LoadAction::None, "not on the ledge");
+    assert_eq!(Recorder::on_state_restored(&s, false, &mut rng), LoadAction::None);
+    assert_eq!(Recorder::on_state_restored(&s, true, &mut rng), LoadAction::None);
     s.trigger_save_state = true;
-    assert_eq!(Recorder::on_state_restored(&s, true, &mut rng), LoadAction::Record);
+    assert_eq!(Recorder::on_state_restored(&s, true, &mut rng), LoadAction::None);
 }
 
 #[test]
