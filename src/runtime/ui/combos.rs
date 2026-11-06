@@ -113,14 +113,16 @@ impl Ui {
     /// A row of the group was entered.
     pub fn open(&mut self, editor: Editor) -> Result<Opened, String> {
         self.load_target();
-        if crate::runtime::ui::facts::fact_waiting_scene() {
-            return Err("Combos work in Training".into()); // restriction: combos-training-only
-        }
         let opened = match editor {
             Editor::ComboName => {
-                let initial = self.draft.clone().unwrap_or_default();
-                self.offer(Naming::Draft, &initial, "The name of the next saved combo");
-                Opened::Panel
+                if !Self::name_keyboard_opens() {
+                    // restriction: combo-name-online-default
+                    Opened::Done("The next combo gets a Combo N name".into())
+                } else {
+                    let initial = self.draft.clone().unwrap_or_default();
+                    self.offer(Naming::Draft, &initial, "The name of the next saved combo");
+                    Opened::Panel
+                }
             }
             Editor::ComboSave => Opened::Done(self.save()?),
             Editor::ComboLibrary | Editor::ComboTarget => {
@@ -131,6 +133,13 @@ impl Ui {
         };
         self.active = matches!(opened, Opened::Panel).then_some(editor);
         Ok(opened)
+    }
+
+    /// Training and a local-wireless waiting room may name a combo. An online waiting room may not:
+    /// neither keyboard transport is shown safe there (`model::scene::combo_name_keyboard`).
+    fn name_keyboard_opens() -> bool {
+        let mode = crate::runtime::lobby::game_mode::current().map(|mode| mode.mode).unwrap_or(0);
+        crate::model::scene::combo_name_keyboard(crate::runtime::ui::facts::fact_waiting_scene(), mode)
     }
 
     fn offer(&mut self, naming: Naming, initial: &str, summary: &str) {
