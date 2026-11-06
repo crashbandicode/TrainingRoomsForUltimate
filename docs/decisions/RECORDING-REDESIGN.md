@@ -1,4 +1,4 @@
-# Recording redesign — revision 8.1
+# Recording redesign — revision 8.2
 
 Revision 7 records the operator's answers to every question (2026-11-06): pins are dropped, the hot five are the most recently used, and Q8 drills combos without requiring them to be true. This is the implementation spec.
 
@@ -10,6 +10,8 @@ Revision 8 applies the operator's answers of 2026-11-06. A save state only warps
 
 Revision 8.1 calls a connection between files a connection. The combo helper still says link for its hits, and the combo's panel lists each one with its two moves and whether it was recorded TRUE. The operator signed off: "yes have grok do both and then we are green to implement".
 
+Revision 8.2 records the operator's answers to the implementation questions. A different move does not count. R removes the last number, so a chain or a sequence may be empty. Switch / Keep for a chain is asked only for macro 1. Auto-load on death only warps to the bound save. The operator: "1. No. 2. agreed. 3. this should only apply to the first macro. if it's the second macro then it just keeps the same character. 4. agreed".
+
 Phase 1 screens. Nothing here is built. The pop-up sits on a real Training frame, `artifacts/phase23/overlay-investigation/frames/fix-tr-training.png` (Steve and Villager on Battlefield). The menu pictures are redrawn on the real rc.1 Recording page (`eden-runs/tr-p23-docs-capture-03`). Names and lengths are examples, and every picture uses the same example files. The first picture shows them.
 
 Every question is decided, and the pictures use the decided answers. Each question keeps its A | B picture next to the picture it concerns, for the record.
@@ -18,10 +20,10 @@ Every question is decided, and the pictures use the decided answers. Each questi
 
 | Q | Question | Answer | See |
 | --- | --- | --- | --- |
-| 1 | How you number a chain or a sequence | A: name tiles; A gives the next number, R takes it off, as in Character Cycles | [Q1](#q1-how-you-number-a-chain-or-a-sequence-decided-a) |
+| 1 | How you number a chain or a sequence | A: name tiles; A gives the next number, R takes it off, including the last, so the list may be empty | [Q1](#q1-how-you-number-a-chain-or-a-sequence-decided-a) |
 | 2 | Which role plays a chain | Decided: the role it is set active for, with that role's Play chord | [Q2](#q2-which-role-plays-a-chain-decided) |
 | 3 | What loop does with a chain | A: the whole chain repeats as one unit, and no pass warps back | [Q3](#q3-what-loop-does-with-a-chain-decided-a) |
-| 4 | When Switch / Keep appears for a chain | A: once, when its Play chord starts the chain, for every mismatched macro | [Q4](#q4-when-switch-keep-appears-for-a-chain-decided-a) |
+| 4 | When Switch / Keep appears for a chain | A, amended: once, when its Play chord starts the chain, and only for macro 1 | [Q4](#q4-when-switch-keep-appears-for-a-chain-decided-a) |
 | 5 | How the two lists sit in the Combos & Sequences tab | A: sequences on top, combos below, each with its own scroll | [Q5](#q5-how-the-two-lists-sit-in-the-combos-sequences-tab-decided-a) |
 | 6 | Hot sequences | A: five hot, the most recently used first | [Q6](#q6-hot-sequences-decided-a) |
 | 7 | What the sequence file stores | A: a reference to each combo file, in order | [Q7](#q7-what-the-sequence-file-stores-decided-a) |
@@ -59,7 +61,7 @@ Every connection is a file id, so renaming either end keeps it.
 - **White border and bar: the cursor.** A acts on this row. It is a different mark from the green fill, so the two never look alike.
 - **Thin green outline: the hot set.** At most five per kind: the five most recently used, the most recent first. Used means selected (bound or set active), played, drilled or recorded.
 - **Under the hairline, dimmer:** the rest of the library, on the card.
-- **Red number, at the row's left edge:** its place in the chain or the sequence under the cursor, the badge Character Cycles uses. With the cursor on a macro, every chain that plays it wears the macro's number. It never sits next to the chain mark or the floppy chip. In the picker, A adds the next number. R removes one, and the later numbers close up; A on a tile that already has a number does nothing.
+- **Red number, at the row's left edge:** its place in the chain or the sequence under the cursor, the badge Character Cycles uses. With the cursor on a macro, every chain that plays it wears the macro's number. It never sits next to the chain mark or the floppy chip. In the picker, A adds the next number. R removes one, including the last, and the later numbers close up; A on a tile that already has a number does nothing. A chain or a sequence may be empty. An empty chain plays nothing, and an empty sequence drills nothing, with no new sentence.
 - **Chain mark and count:** a chain, and how many macros it plays. Only a MACROS row has it.
 - **Orange floppy chip: the save state this macro starts at.** It is Material Symbols `save`. It sits before the start save's name on a macro or chain row, on a save row's "start save" tag, on the Start save row of a macro's and a chain's own screen, and in the Connections panel's "starts from" line. It is grey when the Start save switch is Off. The same orange floppy marks the SAVE STATES section header; the other headers keep their square.
 - **Gold outline** in the step-by-step strips only: a mockup mark for "new". It is not part of the product.
@@ -182,17 +184,17 @@ Operator, 2026-11-06.
 
 ![Switch or Keep](RECORDING-REDESIGN-r5-switch-keep.png)
 
-*The existing Fighter Mismatch screen. This frame is Steve and Villager, so the prompt names Villager, the CPU on screen. The operator's example is the same screen for a Pikachu macro practised on Palutena. Asked once for the whole chain. Nothing is hidden or refused.*
+*The existing Fighter Mismatch screen. This frame is Steve and Villager, so the prompt names Villager, the CPU on screen. The operator's example is the same screen for a Pikachu macro practised on Palutena. Asked once, for the chain's first macro. Nothing is hidden or refused.*
 
 ### Q4 · When Switch / Keep appears for a chain — decided: A
 
-One Fighter Mismatch prompt appears once, before the chain starts, when its role's Play chord starts it. Load never starts a chain, so Load never asks. The prompt lists every macro recorded on a different fighter, and your answer (Switch or Keep) covers the whole chain, so playback is never interrupted. Keep plays the inputs on the fighter you have now.
+One Fighter Mismatch prompt appears once, before the chain starts, when its role's Play chord starts it, and only if macro 1 was recorded on a different fighter. It is the existing single-macro prompt. Switch changes to macro 1's recorded fighter. Load never starts a chain, so Load never asks. Macros 2, 3 and later never ask and never switch. They play on the same character. The chain's prompt has no list of macros and no new text. Keep plays the inputs on the fighter you have now.
 
-Operator, 2026-11-06.
+Operator, 2026-11-06. Amended the same day. The primary asked: "Switch / Keep when a chain mixes fighters. The prompt has a single "Switch to recorded fighter" button. Which fighter should Switch pick?" The operator: "this should only apply to the first macro. if it's the second macro then it just keeps the same character".
 
-Option A's list of macros, one line each, is the only new text in the prompt. The picture's example: the CPU's Play chord (ZR + Up) starts the chain, the CPU is Palutena, and all three macros were recorded on other fighters.
+The picture's example: the CPU's Play chord (ZR + Up) starts the chain, the CPU is Palutena, and macro 1, Nair loop, was recorded on Pikachu. Macros 2 and 3 play on the same character; they never ask.
 
-![Q4, A (decided) and B (not chosen)](RECORDING-REDESIGN-q4-ab.png)
+![Q4, A (decided, amended) and B (not chosen)](RECORDING-REDESIGN-q4-ab.png)
 
 ### Pop-up buttons
 
@@ -271,13 +273,15 @@ Each strip is three steps in the menu's own style. The panels are drawn at full 
 
 ![Flow: make a chain](RECORDING-REDESIGN-r8-flow-chain.png)
 
-*Recording › Save states & Macros: + New chain is the last row under MACROS, as + New sequence is under SEQUENCES. The picker numbers Nair loop, Dash grab and CPU throw with the same buttons as Character Cycles: A adds the next number, R removes one, and B is done; the Switch keyboard then names it. The new row, Corner pressure (gold: new), shows the chain mark with 3 and the floppy chip with Nair loop · start, its macro 1's start save. Its Connections panel lists 1 → 2 → 3. Once it is set active for the CPU, on its own screen or with A in the pop-up's CPU view, the CPU's Play chord plays it.*
+*Recording › Save states & Macros: + New chain is the last row under MACROS, as + New sequence is under SEQUENCES. The picker numbers Nair loop, Dash grab and CPU throw with the same buttons as Character Cycles, except that R also removes the last number: A adds the next number, R removes one, and B is done; the Switch keyboard then names it. The new row, Corner pressure (gold: new), shows the chain mark with 3 and the floppy chip with Nair loop · start, its macro 1's start save. Its Connections panel lists 1 → 2 → 3. Once it is set active for the CPU, on its own screen or with A in the pop-up's CPU view, the CPU's Play chord plays it.*
 
 ### Q1 · How you number a chain or a sequence — decided: A
 
 Every recording in the library is a tile. A chain is not one ([Q13](#q13-can-a-chain-contain-a-chain-decided-a)). A on a tile gives it the next number. R takes a tile's number off, and the later numbers close up. A on a tile that already has a number does nothing, and B is done. It is exactly how Character Cycles orders fighters, so there is nothing new to learn. To change the order, take numbers off and put them back. The same picker numbers a sequence's combos.
 
 Operator, 2026-11-06. Amended the same day, so that R removes, as in Character Cycles: "when it's ambiguous I would keep it consistent. We want to minimize the number of chords and have context determine what they do. So in this case I would have R supercede A if that's more intuitive".
+
+Amended again in revision 8.2. R also removes the last number, so a chain or a sequence may be empty. The picker is Character Cycles' picker, except that it allows an empty list. An empty chain plays nothing, and an empty sequence drills nothing, with no new sentence. The primary asked: "R on the last number in the picker. Character Cycles won't let you remove its last fighter, because a cycle can't be empty. A chain or sequence can be empty (nothing plays), so I'd let R remove the last number too." The operator: "2. agreed".
 
 ![Q1, A (decided) and B (not chosen)](RECORDING-REDESIGN-q1-ab.png)
 
@@ -327,11 +331,11 @@ Operator, 2026-11-06.
 
 The bar is the combo helper's bar with a sequence header and a row for the sequence's combos. TRUE, the current link, and the links still to come use the helper's own marks. Streak and best count only a finished sequence. A drop restarts the sequence at combo 1, with the streak back to 0 and best kept; the Q8 picture shows it.
 
-**Grading, decided ([Q8](#q8-a-drop-and-what-completes-the-sequence-decided)); this changes the existing combo helper.** Today a combo attempt is clean only when every link is TRUE, every press is there, and every press is within the tolerance (`src/model/combo.rs`: `Grade::clean`, `Reason`). Clean no longer needs TRUE, for a combo drilled alone and for a sequence. A step counts when its recorded presses are there, with the same direction, in order and within the tolerance. A step drops on a missing press, a press outside the tolerance, or the exchange ending before the step. The exchange ends 20 frames after the CPU can act again, or on a shielded hit, so the CPU may act in a gap for up to 20 frames and a longer gap is a drop. TRUE stays on the bar as information.
+**Grading, decided ([Q8](#q8-a-drop-and-what-completes-the-sequence-decided)); this changes the existing combo helper.** Today a combo attempt is clean only when every link is TRUE, every press is there, and every press is within the tolerance (`src/model/combo.rs`: `Grade::clean`, `Reason`). Clean no longer needs TRUE, for a combo drilled alone and for a sequence. A step counts when its recorded presses are there, with the same direction, in order and within the tolerance, and the move that comes out is the recorded move. A step drops on a missing press, a press outside the tolerance, a different move, or the exchange ending before the step. The exchange ends 20 frames after the CPU can act again, or on a shielded hit, so the CPU may act in a gap for up to 20 frames and a longer gap is a drop. TRUE stays on the bar as information.
 
 ### Q8 · A drop, and what completes the sequence — decided
 
-A drop sends you back to combo 1 of the sequence, and the streak to 0; best is kept. Neither the sequence nor a combo has to be a true combo: the CPU may be able to act between the combos, or between two hits of one combo. This is for drilling things one after another. A step counts when you press its recorded buttons, with the same direction, in order and within the timing tolerance. A step drops on a missing press, a press outside the tolerance, or the exchange ending before the step. TRUE still shows on the bar, as information. It no longer decides whether a combo or a sequence counts. The exchange ends 20 frames after the CPU can act again, or on a shielded hit (the frame strip's `DROP_MAX`). So the CPU may act in a gap for up to 20 frames, and a longer gap is a drop. The primary asked: "Is that right? In particular: Should single combos also stop needing TRUE? Is a 20-frame allowance for the CPU acting the behaviour you want?" The operator: "that sounds right".
+A drop sends you back to combo 1 of the sequence, and the streak to 0; best is kept. Neither the sequence nor a combo has to be a true combo: the CPU may be able to act between the combos, or between two hits of one combo. This is for drilling things one after another. A step counts when you press its recorded buttons, with the same direction, in order and within the timing tolerance, and the move that comes out is the recorded move. A different move does not count, even when the presses match. A step drops on a missing press, a press outside the tolerance, a different move, or the exchange ending before the step. TRUE still shows on the bar, as information. It no longer decides whether a combo or a sequence counts. The exchange ends 20 frames after the CPU can act again, or on a shielded hit (the frame strip's `DROP_MAX`). So the CPU may act in a gap for up to 20 frames, and a longer gap is a drop. The primary asked: "Is that right? In particular: Should single combos also stop needing TRUE? Is a 20-frame allowance for the CPU acting the behaviour you want?" The operator: "that sounds right". The primary asked: "A different move with the same presses. Today the grader also fails a hit where the move came out different. Should that still count when the buttons, direction and timing are right?" The operator: "1. No."
 
 Operator, 2026-11-06.
 
@@ -353,7 +357,7 @@ Drilling one combo from a sequence's numbered rows uses that combo's own streak 
 - Two tabs under the role toggle: Save states & Macros, and Combos & Sequences. CPU has only the first. The two sections in a tab are stacked and scroll on their own. **Decided.**
 - The recorded fighter is information. The column reads Recorded on. Nothing filters, hides, greys, or refuses by fighter. A mismatch raises Switch / Keep, and Keep plays the inputs on the current fighter. A sequence may mix fighters. **Decided.**
 - Hot memory is one minute resident per hot macro (3,600 frames, 28.8 KiB). Five hot macros are 144 KiB. A longer file still plays; the rest is read in 600-frame windows. The file cap stays 36,000 frames. No recording is refused for length. **Decided.**
-- Loop counts are ∞, 1, 2, 3, 5, 10. X cycles them. The list is the Options row. The loop belongs to the role. **Decided.**
+- Loop counts are ∞, 1, 2, 3, 5, 10. X cycles them. The default is 1, and a loop that is On today becomes ∞. The list is the Options row. The loop belongs to the role. **Decided.**
 - Player 1 and the CPU may play at the same time. A chain does not use that: its macros play one after another. **Decided.**
 - Save states are named files that you bind for Save and Load. There is no slot number and no extra slot shortcut. **Decided.**
 - A chain is an ordered list of macros, numbered 1, 2, 3…, kept in its own file in MACROS. A macro's start save, started by the role's Play chord, replaces the old "play a recording because a state loaded" checklist. Operator, 2026-11-06.
@@ -381,7 +385,7 @@ Drilling one combo from a sequence's numbered rows uses that combo's own streak 
 - Pins are dropped. The hot five of each kind are the five most recently used, the most recent first. Used means selected (bound or set active), played, drilled or recorded. When a sixth is used, the least recently used leaves the outline and stays on the card under the hairline. Y is unused on these screens. Operator, 2026-11-06.
 - Q1, Q3, Q4, Q5, Q6, Q7, Q9, Q11, Q12 and Q13 are A; Q8 is the operator's own answer. Each block above says what it means. Operator, 2026-11-06.
 - When it is ambiguous, keep it consistent: few chords, with context deciding what they do. So the numbered picker (+ New chain, Edit chain, + New sequence, Edit combos) works as Character Cycles does: A gives the next number, R takes a number off and the later numbers close up, A on a numbered tile does nothing, and B is done. Inside the picker, R removes; the role toggle does not apply there, because the picker edits the file, whichever role it is active for. The operator: "when it's ambiguous I would keep it consistent. We want to minimize the number of chords and have context determine what they do. So in this case I would have R supercede A if that's more intuitive". Operator, 2026-11-06.
-- A combo or a sequence counts when its recorded presses are there, with the same direction, in order and within the tolerance. TRUE is shown as information and is no longer a condition, for a combo drilled alone and for a sequence. This changes the existing combo helper (`Grade::clean`). The exchange ends 20 frames after the CPU can act again, or on a shielded hit, so the CPU may act in a gap for up to 20 frames and a longer gap is a drop. Confirmed: 'that sounds right'. Operator, 2026-11-06.
+- A combo or a sequence counts when its recorded presses are there, with the same direction, in order and within the tolerance, and the move that comes out is the recorded move. A different move does not count, even when the presses match, and a different move is a drop. TRUE is shown as information and is no longer a condition, for a combo drilled alone and for a sequence. This changes the existing combo helper (`Grade::clean`). The exchange ends 20 frames after the CPU can act again, or on a shielded hit, so the CPU may act in a gap for up to 20 frames and a longer gap is a drop. Confirmed: 'that sounds right'. Operator, 2026-11-06. The primary asked: "A different move with the same presses. Today the grader also fails a hit where the move came out different. Should that still count when the buttons, direction and timing are right?" The operator: "1. No." Operator, 2026-11-06.
 - On the Recording page, A opens the file's own screen; on a save, Bind to Save / Load is that screen's first row. In the pop-up, A still binds, sets active, or drills. The page footers read "A open". The operator, on the primary's recommendations: "go with your recommendations and redraw them". Operator, 2026-11-06.
 - Make combo does not change the drill. The new combo joins the hot five at the top, because it was recorded, and the current drill stays the drill. "go with your recommendations and redraw them". Operator, 2026-11-06.
 - A macro's own screen, and a chain's, has one Set active row, for the role in view: "On · Player 1" (or "On · CPU" in the CPU view) or "Off". Left / Right turn it On or Off; On makes this file that role's active macro, replacing the one before, and that role's Play chord plays it. "go with your recommendations and redraw them". Operator, 2026-11-06.
@@ -390,6 +394,11 @@ Drilling one combo from a sequence's numbered rows uses that combo's own streak 
 - X cycles the loop on the Recording page too, when the cursor is in MACROS, as in the pop-up. The primary asked: "X on the Recording page: should X cycle the loop when the cursor is in MACROS, as it does in the pop-up?" The operator: "yes". Operator, 2026-11-06.
 - Connections between files are called connections. The combo helper still says link for its hits: L1, "N links", "link 1 of 4". The operator: "yes have grok do both and then we are green to implement". Operator, 2026-11-06.
 - The combo's Connections panel lists each link, its two moves, and whether it was recorded TRUE, for example "L1  aerial → aerial  TRUE". It reads the combo file's own `links`; nothing new is stored. The operator: "yes have grok do both and then we are green to implement". Operator, 2026-11-06.
+- A different move does not count, even when the presses match. A step counts when its recorded presses are there, with the same direction, in order and within the tolerance, and the move that comes out is the recorded move. A different move is a drop. TRUE is still not required. The primary asked: "A different move with the same presses. Today the grader also fails a hit where the move came out different. Should that still count when the buttons, direction and timing are right?" The operator: "1. No." Operator, 2026-11-06.
+- R removes the last number too, so a chain or a sequence may be empty. The picker is Character Cycles' picker, except that it allows an empty list. An empty chain plays nothing, and an empty sequence drills nothing, with no new sentence. The primary asked: "R on the last number in the picker. Character Cycles won't let you remove its last fighter, because a cycle can't be empty. A chain or sequence can be empty (nothing plays), so I'd let R remove the last number too." The operator: "2. agreed". Operator, 2026-11-06.
+- Switch / Keep for a chain is asked only for the chain's first macro. When a chain starts, the Fighter Mismatch prompt appears only if macro 1 was recorded on a different fighter. It is the existing single-macro prompt; Switch changes to macro 1's recorded fighter. Macros 2, 3 and later never ask and never switch. They play on the same character. The chain's prompt has no list of macros and no new text. The primary asked: "Switch / Keep when a chain mixes fighters. The prompt has a single "Switch to recorded fighter" button. Which fighter should Switch pick?" The operator: "this should only apply to the first macro. if it's the second macro then it just keeps the same character". Operator, 2026-11-06.
+- Auto-load on death only warps to the bound save. It does nothing when no save is bound. Mirroring, damage on load and buffs still apply to that warp. The primary asked: "Auto-load on death. Today it can start a recording. Since Load starts nothing, I'd make it only warp to the bound save, and do nothing if no save is bound." The operator: "4. agreed". Operator, 2026-11-06.
+- The primary recommended, and the operator did not object: migration skips empty slots, and the old slots' names use the date the migration runs; the loop's default is 1, and today's loop On becomes ∞; after the bound save is deleted, the next Save creates "Save N" and binds it; the current library selection (`macros/selected.txt`) becomes Player 1's active macro; a single combo's best stays as today. Primary's recommendation, 2026-11-06. No objection from the operator.
 
 ## Each file's screen, and the other rules
 
@@ -420,7 +429,7 @@ These screens and rules come from revision 3, updated to the decisions above.
 | --- | --- |
 | Start save | Its macro 1's start save, "Nair loop · start" ([Q12](#q12-where-a-chain-starts-decided-a)). To change it, reorder the chain or save over that file. The switch is On or Off, with Left and Right; On is the default. On: the Play chord warps there once, then plays 1, 2, 3; a loop never warps back. Off: the chain plays from where the fighters are. If macro 1 has no start save, the chain has none and no switch. |
 | Set active | On · <role> or Off, for the role in view, as on a macro's screen. On makes the chain that role's active macro, replacing the one before; that role's Play chord plays it. |
-| Edit chain | The numbered picker, as in Character Cycles: A gives the next number, R takes one off, B is done. It lists recordings only ([Q13](#q13-can-a-chain-contain-a-chain-decided-a)). |
+| Edit chain | The numbered picker, as in Character Cycles, except that R also removes the last number, so the chain may be empty: A gives the next number, R takes one off, B is done. An empty chain plays nothing, with no new sentence. It lists recordings only ([Q13](#q13-can-a-chain-contain-a-chain-decided-a)). |
 | Rename | Header "Name chain". A new chain that was never renamed is Chain N. Online, the keyboard stays closed. |
 | Make combo | Warp to the chain's start save, play the whole chain once on Player 1 while the frame strip records, and keep the links as a new combo. This file stays. |
 | Delete | Removes the chain file. Its macros stay. |
@@ -435,7 +444,7 @@ A chain has no Crop: it has no frames of its own. A deleted macro leaves a gap t
 
 | Row | What it does |
 | --- | --- |
-| Drill | This becomes the one drill, and a drilled sequence is cleared. An attempt counts when its recorded presses are there, in order and within the tolerance; TRUE is shown as information. |
+| Drill | This becomes the one drill, and a drilled sequence is cleared. An attempt counts when its recorded presses are there, in order and within the tolerance, and the move that comes out is the recorded move. A different move is a drop. TRUE is shown as information. A single combo's best stays as today. |
 | Made from | The macro it was made from, when there is one |
 | Rename | Header "Name combo". Empty OK on a new combo is Combo N. Online, the keyboard stays closed and the name is Combo N. |
 | Crop | First link and last link. A saves a new combo. This file stays. |
@@ -452,7 +461,7 @@ A chain has no Crop: it has no frames of its own. A deleted macro leaves a gap t
 | Bind to Save / Load | "On" or "Off": Left / Right turn it On or Off. On binds this save, and the one bound before is unbound; one save at a time, for both roles. The Save chord writes this file, and the Load chord warps here; Load starts nothing. The bound save is green in both views. |
 | Duplicate | A new save file, a copy of this one. This file stays bound. |
 | Rename | Header "Name save state". A new save that was never renamed is Save N. Online, the keyboard stays closed. |
-| Delete | Removes the file. If it was bound, Save and Load do nothing until another is bound. |
+| Delete | Removes the file. If it was bound, Load does nothing until a save is bound again. The next Save creates "Save N" and binds it. |
 
 The Save chord overwrites the bound file. If nothing is bound yet, Save creates a file named Save N, binds it, and puts it in the hot list. Saving over "Nair loop · start" moves that macro's remembered start, because that is the file the macro points at. It moves the chain Corner pressure's start too, because its macro 1 is Nair loop.
 
@@ -464,9 +473,9 @@ The Save chord overwrites the bound file. If nothing is bound yet, Save creates 
 
 | Row | What it does |
 | --- | --- |
-| Drill sequence | This becomes the one drill. The helper grades the whole sequence: each combo's presses, in order and within the tolerance; TRUE is not required. |
+| Drill sequence | This becomes the one drill. The helper grades the whole sequence: each combo's presses, in order and within the tolerance, and the move that comes out is the recorded move. A different move is a drop. TRUE is not required. |
 | 1, 2… | A drills that combo alone. The sequence file stays. |
-| Edit combos | The numbered picker: A gives the next number, R takes one off |
+| Edit combos | The numbered picker: A gives the next number, R takes one off, including the last, so the sequence may be empty |
 | Rename | Header "Name sequence". A new one that was never renamed is Sequence N. Online, the keyboard stays closed. |
 | Delete | Removes the sequence file. The combo files stay. |
 
@@ -525,12 +534,13 @@ Menu shortcut 1 stays Minus. Open menu stays B + Up. Both Play chords may be on 
 
 ### A chain, on its Play chord
 
-A role's Play chord starts that role's active macro. When it is a chain, the chord warps to the chain's start save once, when its Start save switch is On ([Q12](#q12-where-a-chain-starts-decided-a)). The role then plays the chain's macros in order, from where the fighters are ([Q2](#q2-which-role-plays-a-chain-decided)). The macros' own start saves are not used, whatever their switches say. With a loop count, the chain repeats as one unit, 1, 2, 3, then 1, and no pass warps back ([Q3](#q3-what-loop-does-with-a-chain-decided-a)). A macro recorded on a different fighter raises Switch / Keep, asked once when the chord starts the chain ([Q4](#q4-when-switch-keep-appears-for-a-chain-decided-a)). Keep plays the inputs on the current fighter. The chain file stores its macros' ids in order, and lists recordings only ([Q13](#q13-can-a-chain-contain-a-chain-decided-a)).
+A role's Play chord starts that role's active macro. When it is a chain, the chord warps to the chain's start save once, when its Start save switch is On ([Q12](#q12-where-a-chain-starts-decided-a)). The role then plays the chain's macros in order, from where the fighters are ([Q2](#q2-which-role-plays-a-chain-decided)). The macros' own start saves are not used, whatever their switches say. With a loop count, the chain repeats as one unit, 1, 2, 3, then 1, and no pass warps back ([Q3](#q3-what-loop-does-with-a-chain-decided-a)). Switch / Keep is asked only when macro 1 was recorded on a different fighter, once, when the chord starts the chain ([Q4](#q4-when-switch-keep-appears-for-a-chain-decided-a)). Switch changes to macro 1's recorded fighter. Macros 2 and later keep the same character and never ask. Keep plays the inputs on the current fighter. The chain file stores its macros' ids in order, and lists recordings only ([Q13](#q13-can-a-chain-contain-a-chain-decided-a)).
 
 ### Migration
 
-- Today's five recording slots become named macros, "Slot 1 (2026-11-05)" through "Slot 5". They start as the hot five. They have no start save, so they have no Start save switch, and they play from where the fighters are.
-- Today's five save slots are one slot index for both fighters. Each index becomes one file, "Slot N (2026-11-05)", holding both fighters. They start hot. The slot the Save and Load chords were using becomes the bound save. No save starts with a chain, because a save has none.
+- Migration skips empty slots. A recording slot that holds a recording becomes a named macro, "Slot N" plus the date the migration runs. The ones that remain start as the hot five. They have no start save, so they have no Start save switch, and they play from where the fighters are.
+- Today's save slots are one slot index for both fighters. Migration skips an empty index. Each index that holds a save becomes one file, "Slot N" plus the date the migration runs, holding both fighters. They start hot. The slot the Save and Load chords were using becomes the bound save. No save starts with a chain, because a save has none.
+- The current library selection (`macros/selected.txt`) becomes Player 1's active macro.
 - Today's "play a recording when a state loads" checklist leaves. A macro's start save does that job, started by the role's Play chord. Nothing is turned into a chain automatically.
 - Sequences and chains are new. There is nothing to migrate.
 - The old Input Record and Input Playback chords become the new Record and Play on CPU chords. One notice, once: "Record, Play on Player 1, Play on CPU, and the recording pop-up replace Input Record and Input Playback."
@@ -555,13 +565,13 @@ A role's Play chord starts that role's active macro. When it is a chain, the cho
 - Per-slot playback chords. They are not added.
 - A single chained macro. A chain is a macro made of macros, in MACROS.
 
-The Saves page keeps the on/off switch for the chords, mirroring, auto-load on death, damage on load, buffs, and the setup library. Setups stay a separate library from save states.
+The Saves page keeps the on/off switch for the chords, mirroring, auto-load on death, damage on load, buffs, and the setup library. Setups stay a separate library from save states. Auto-load on death only warps to the bound save. It does nothing when no save is bound. Mirroring, damage on load and buffs still apply to that warp. The primary asked: "Auto-load on death. Today it can start a recording. Since Load starts nothing, I'd make it only warp to the bound save, and do nothing if no save is bound." The operator: "4. agreed". Operator, 2026-11-06.
 
 ![Respawn on platform, under Stages](RECORDING-REDESIGN-respawn.png)
 
 *Respawn on platform is under Fighters & Stages › Stages. The setting id stays `respawn_invincibility`.*
 
-An empty recording still uses the existing "Recording was empty". Fighter mismatch keeps the Switch / Keep prompt, for macros, for combos, and once at the start of a chain. Lobby practice matches Training.
+An empty recording still uses the existing "Recording was empty". Fighter mismatch keeps the Switch / Keep prompt, for macros, for combos, and, for a chain, only when its first macro was recorded on a different fighter. Lobby practice matches Training.
 
 Only a deleted start save shows the approved sentence. A macro that never had a start save, or whose Start save switch is Off, plays from where the fighters are without it. Phase 2 adds these rows to `docs/RESTRICTIONS.md`, and marks the string `// restriction: macro-start-save-missing` and the chain picker's filter `// restriction: chain-recordings-only`:
 
@@ -579,6 +589,7 @@ No other new sentence is added. A long chain, a missing combo, an empty chain, a
 - Renderer: `tools/render_recording_redesign.py`. Its default run draws every picture this doc uses except revision 3's: the `r8-` pictures, the question pictures and `r5-switch-keep`. With `--q52` it draws only the question pictures. With `--r3` it draws the revision 3 pictures the repo keeps.
 - Icons: Google Material Symbols (`repeat`, `save`, `link`, `format_list_numbered`), https://github.com/google/material-design-icons, Apache License 2.0. The copies and the licence are in [icons/](icons/). The renderer fills their path data with Pillow at 8× and downsamples. The colours, the dot, and the count badge are added by the renderer. `save` is new in revision 8; `link` stays for `q7-ab`, where it marks a sequence's reference to a combo file.
 - Changed in revision 8.1: the panel header, the diagram, the strips and Q7's reference line say connection. Nair loop combo's four links are aerial → aerial, each recorded TRUE, on its Connections panel and on the crop screen.
+- Changed in revision 8.2: `q4-ab`'s A side is one prompt for macro 1, Nair loop recorded on Pikachu with the CPU on Palutena, labelled "A · decided, amended", with the note "Macros 2 and 3 play on the same character; they never ask." The B side is unchanged. `r5-switch-keep` stays byte for byte; its caption says the prompt is asked once, for the chain's first macro.
 - Revision 8 redrew every picture with a save row, a start-save mark, a chain, or the old word, under `r8-` names. Renamed with `git mv`: `r4-links`, `r4-legend`, `r4-loop`, `r4-flow-record`, `r4-flow-chain` (now Make a chain), `r4-flow-make-combo` and `r4-flow-drill` to the same names with `r8-`; `r4-flow-conversion` to `r8-flow-sequence`, `r4-conversion-bar` to `r8-sequence-bar`, `r4-save-actions` and `r4-combo-actions` to `r8-`, `r4-conversion-actions` to `r8-sequence-actions`, `r6-macro-actions`, `r6-page-saves-macros`, `r6-page-combos`, `r6-popup-save`, `r6-popup-scrolled`, `r6-popup-macro`, `r6-popup-combo` and `r6-popup-cpu` to `r8-`, `r6-popup-conversion` to `r8-popup-sequence`, and `r7-page-cpu` to `r8-page-cpu`. New: `r8-chain-actions` (also Q2's picture), `q12-ab` and `q13-ab`. Redrawn under their names: `q1-ab`, `q3-ab`, `q4-ab`, `q5-ab`, `q6-ab`, `q7-ab`, `q8-decided`, `q9-ab`, `q11-ab` and `crop`. Removed: revision 3's `save-where`, which no page used and which showed the revision 3 model. Unchanged, byte for byte: `r5-switch-keep`, `respawn`, `shortcuts`, `keyboard`, `crop-macro` and `combo-from-macro`.
 - Changed in revision 7.2: strips 2 to 5 (no Y in the pickers; the stacked Combos & Conversions tab with CONVERSIONS on top; Make combo keeps the drill; Nair loop combo stops being the drill), the three Recording page pictures ("A open"), the macro's own screen (one Set active row), the scrolled pop-up (seven files, scrolled to the end), and revision 3's `keyboard`, `crop` and `crop-macro` (the current groups; the crop's kept range is a bracket; the keyboard's background no longer shows a settings page's hints). With the Q1 amendment: `q1-ab`'s A side and the pickers in strips 2 and 4 read "A add number", "R remove". After review: the strips are reordered so that Make combo (now strip 3) comes before Make a conversion (now strip 4), which uses Nair loop combo; the file names stay. Strip 2's first panel is the pop-up, with its footer; the crop screens and the keyboard's background are file screens, full width with a breadcrumb. The five strips read as one story: each starts where the one before it ends (Corner pressure gets its chain in strip 2, SAVE STATES holds eight files after strip 1, and Ryu BnB is the drill until strip 5 drills Corner to kill). From the sweep: the loop mark's note names the SAVE STATES, CONVERSIONS and COMBOS section headers, and strip 5's Links panel keeps its Drilled line. The revision 3 pictures are drawn by `--r3`.
 - New in revision 7.1: `RECORDING-REDESIGN-r7-page-cpu.png`, the Recording page's CPU view. Changed in revision 7.1: the pop-ups and pages with a bound save or an active macro, the legend, strips 1 and 2, the link diagram, and the save's own screen (one role per view, no role chips, Bind to Save / Load On · CPU). Removed in revision 7.1: `RECORDING-REDESIGN-r7-proposed.png`, with its section.
@@ -616,3 +627,4 @@ No other new sentence is added. A long chain, a missing combo, an empty chain, a
   X cycles the loop on the Recording page too, when the cursor is in MACROS, as in the pop-up; the primary asked "X on the Recording page: should X cycle the loop when the cursor is in MACROS, as it does in the pop-up?" and the operator answered "yes".
   Q8's reading was confirmed, and the operator said "that sounds right".
 - **Revision 8.1.** The operator, 2026-11-06: "yes have grok do both and then we are green to implement". Connections between files are called connections. The combo helper still says link for its hits, and the combo's panel lists each link with its two moves and TRUE. This is the operator's sign-off of the redesign.
+- **Revision 8.2.** The operator, 2026-11-06, on the implementation questions: "1. No. 2. agreed. 3. this should only apply to the first macro. if it's the second macro then it just keeps the same character. 4. agreed". A different move does not count. R removes the last number, so a chain or a sequence may be empty. Switch / Keep for a chain is asked only for macro 1. Auto-load on death only warps to the bound save. The primary's five recommendations stand, with no objection: migration skips empty slots and names old slots with the date the migration runs; the loop's default is 1 and today's loop On becomes ∞; after the bound save is deleted, the next Save creates "Save N" and binds it; `macros/selected.txt` becomes Player 1's active macro; a single combo's best stays as today.

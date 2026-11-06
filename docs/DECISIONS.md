@@ -1378,6 +1378,13 @@ Earlier the same day, on pins: "Are pins even helping with anything? they seem k
 - The combo's Connections panel lists each link, its two moves, and whether it was recorded TRUE, for example "L1  aerial → aerial  TRUE". It reads the combo file's own `links`; nothing new is stored. Nair loop combo's four links are aerial → aerial, all recorded TRUE.
 - The operator's sign-off of the redesign, given with this revision: "then we are green to implement".
 
+**Decided in revision 8.2** (operator 2026-11-06: "1. No. 2. agreed. 3. this should only apply to the first macro. if it's the second macro then it just keeps the same character. 4. agreed"):
+- A different move does not count, even when the presses match. The move that comes out must be the recorded move. A different move is a drop. TRUE is still not required. The operator: "1. No."
+- R removes the last number too, so a chain or a sequence may be empty. The picker is Character Cycles' picker, except that it allows an empty list. An empty chain plays nothing, and an empty sequence drills nothing, with no new sentence. The operator: "2. agreed".
+- Q4 is amended. Switch / Keep is asked only for the chain's first macro. The prompt appears only if macro 1 was recorded on a different fighter, and it is the existing single-macro prompt; Switch changes to macro 1's recorded fighter. Macros 2, 3 and later never ask and never switch. They play on the same character. The chain's prompt has no list of macros and no new text. The operator: "this should only apply to the first macro. if it's the second macro then it just keeps the same character".
+- Auto-load on death only warps to the bound save. It does nothing when no save is bound. Mirroring, damage on load and buffs still apply to that warp. The operator: "4. agreed".
+- The primary's recommendations, to which the operator did not object: migration skips empty slots, and the old slots' names use the date the migration runs; the loop's default is 1, and today's loop On becomes ∞; after the bound save is deleted, the next Save creates "Save N" and binds it; the current library selection (`macros/selected.txt`) becomes Player 1's active macro; a single combo's best stays as today.
+
 **Next:** implementation from `p23/rc5-candidate` `384e41f`; the operator signed off ('…green to implement'), 2026-11-06.
 
 ### INTRO-ONCE · The Training intro notices — ordered (2026-11-05)

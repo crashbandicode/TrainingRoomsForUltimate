@@ -2076,7 +2076,7 @@ WIDE = 1920
 STACK_CROP = (128, 72, 1153, 649)      # the stacked pop-up's window (POP), its outline included
 
 
-def q_canvas(n, width, content_h, cap_a, cap_b, pad=None, note=None):
+def q_canvas(n, width, content_h, cap_a, cap_b, pad=None, note=None, label_a="A · decided"):
     """The title bar 'QN · question' (and an example line on its right, when given), then two panels: A · decided
     (green chip) and B · not chosen (grey chip). Each panel ends in its caption. Returns the image and the two
     content boxes."""
@@ -2097,7 +2097,7 @@ def q_canvas(n, width, content_h, cap_a, cap_b, pad=None, note=None):
     if note:
         iv.text(d, (width - margin - 18, 34), note, fnt(15), fill=ch.M_GROUP, anchor="rm")
     boxes = []
-    for i, (label, rec) in enumerate((("A · decided", True), ("B · not chosen", False))):
+    for i, (label, rec) in enumerate(((label_a, True), ("B · not chosen", False))):
         x = margin + i * (pw + gap)
         d.rounded_rectangle((x, top, x + pw, top + ph), radius=10, fill=WIN, outline=EDGE52, width=2)
         f = fnt(15, bold=True)
@@ -2384,14 +2384,15 @@ def mismatch_prompt(img, box, info, footer, chosen=0, inset=24):
 
 
 def q4():
-    # Revision 8: the chain is the CPU's active macro and the CPU is Palutena, so all three macros mismatch. The
-    # prompt appears when the CPU's Play chord starts the chain.
+    # Revision 8.2: one prompt, only because macro 1 mismatches. Macros 2 and 3 never ask. B stays the rejected
+    # per-macro prompts.
     img, (a, b) = q_canvas(4, W, 456,
-                           "Asked once, when the CPU's Play chord starts the chain. One answer covers 1, 2 and 3, and "
-                           "the chain then plays without a stop.",
+                           "Asked once, only because macro 1 mismatches. Macros 2 and 3 play on the same character and "
+                           "never ask.",
                            "Asked before 1, before 2 and before 3. The chain stops at each prompt, and the answers can "
                            "differ.",
-                           pad=12, note="Example: the CPU is Palutena; all three were recorded on other fighters.")
+                           pad=12, note="Example: the CPU is Palutena; all three were recorded on other fighters.",
+                           label_a="A · decided, amended")
     ask = lambda s: ("Switch or Keep?\n" + s, "save", "ask")
     arr = ("", "arrow", "")
     num = lambda n: (str(n), "macro", "")
@@ -2399,15 +2400,16 @@ def q4():
     footer = "Inputs are the same either way. A chooses, B cancels."
     lines = ["Recorded Pikachu · current CPU Palutena", "Recorded Pikachu · current CPU Palutena",
              "Recorded Mario · current CPU Palutena"]
-    names = ["Nair loop", "Dash grab", "CPU throw"]
     x0, y0, x1, _ = a
-    seq52(img, x0, y0, [("Play on CPU\nZR + Up", "macro", ""), arr, ask("names 1, 2 and 3"), arr, num(1), arr,
+    seq52(img, x0, y0, [("Play on CPU\nZR + Up", "macro", ""), arr, ask("macro 1"), arr, num(1), arr,
                         num(2), arr, num(3)], **sq)
     d = ImageDraw.Draw(img)
-    iv.text(d, (x0, y0 + 84), "The existing Fighter Mismatch screen, with one line per macro:", fnt(15),
+    iv.text(d, (x0, y0 + 84), "The existing screen, for macro 1 only. No list:", fnt(15),
             fill=ch.M_GROUP, anchor="lm")
-    mismatch_prompt(img, (x0, y0 + 104, x1, y0 + 376),
-                    ["%d %s · %s" % (i + 1, names[i], lines[i]) for i in range(3)], [footer])
+    mismatch_prompt(img, (x0, y0 + 104, x1, y0 + 328),
+                    ["Nair loop · Recorded Pikachu · current CPU Palutena"], [footer])
+    iv.text(d, (x0, y0 + 348), "Macros 2 and 3 play on the same character; they never ask.", fnt(15),
+            fill=ch.M_TEXT, anchor="lm")
     # B: a prompt before each macro, each with its own line; then the one screen, drawn once.
     x0, y0, x1, _ = b
     step = 70
