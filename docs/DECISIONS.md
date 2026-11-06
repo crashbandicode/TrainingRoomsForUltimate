@@ -1284,6 +1284,27 @@ Revision 3 is in progress.
 
 Revision 4 (by the primary's spec): the same document, redrawn after the operator's 2026-11-06 note. The link diagram comes first: four kinds of file, the four links, and how each is made. The pop-up is one big window with the groups stacked and a Links panel for the row under the cursor. Five step-by-step strips show how each link is made. The loop is only in the MACROS header and on a chained save's Links panel, drawn from the Material Symbols SVG (Apache-2.0, `docs/decisions/icons/`). The conversion bar is at the top, under the frame strip. ZL / ZR jump between groups.
 
+**Answered 2026-11-06 ~03:0xZ, on revision 4:** "getting closer. I like all the content and imagery in this version but
+it's a bit busy and needs to be broken up. Keeping the cpu/player view let's add two tabs "save states & macros" and
+"combos and conversions" since those go logically together. Break it up like that. The thumbtack, link chip and loop
+chips look good. if it's also possible to have the two sections within a tab scroll independently that would be
+helpful. combos, macros, and save states will be recorded with specific characters but that's only "information" that
+will sometimes prompt to switch to a character. I may record a nair loop with pikachu but practice the button presses
+with palutena. the reason is sometimes characters basically have the same mechanics and so they can be reused if that
+makes sense. It's playing back inputs at the end of the day." Also: "share the link for the new draft and questions
+inline where applicable".
+- **Decided:**
+  - Keep every piece of revision 4's content and imagery. The thumbtack, the link chip and the loop chips are approved.
+  - Keep the Player / CPU role view.
+  - Under it, add two tabs: **Save states & Macros** and **Combos & Conversions**.
+  - The two sections inside a tab scroll independently.
+- **The recorded fighter is information, never a filter or a block.**
+  - A macro, combo, conversion or save state may be used on any fighter. Example: a nair loop recorded on Pikachu,
+    practised on Palutena.
+  - A mismatch may prompt the existing Switch / Keep, and Keep plays the inputs on the current fighter.
+  - This answers revision 4's question about conversions mixing fighters: they may.
+- **Revision 5** goes to Grok, with a Keep list. Open questions sit inline, next to the picture they concern.
+
 ### INTRO-ONCE · The Training intro notices — ordered (2026-11-05)
 
 **Operator 2026-11-05 ~21:3xZ:** "please disable the intro tutorial messages when we enter training. they should only
