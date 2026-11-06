@@ -152,6 +152,11 @@ pub enum Possession {
     Cpu,
 }
 
+/// Light notice-body colours for the recording phases. Each clears 4.5:1 on `panes::NOTICE_PLATE`.
+pub const LOCKOUT_COLOR: [u8; 4] = [148, 176, 255, 255];
+pub const STANDBY_COLOR: [u8; 4] = [255, 156, 255, 255];
+pub const RECORDING_COLOR: [u8; 4] = [255, 132, 124, 255];
+
 /// The phase the player sees: the tint and the HUD notice (SPEC-input-01 §2.3).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Phase {
@@ -175,12 +180,14 @@ impl Phase {
     }
 
     /// The notice body and its RGBA text colour; the header is `NOTICE_HEADER`.
+    /// The colours are light enough to clear 4.5:1 on the dark notice plate. The hue stays
+    /// blue, magenta, and red for lockout, standby, and recording.
     pub const fn notice(self) -> Option<(&'static str, [u8; 4])> {
         match self {
-            Phase::Lockout => Some(("Lockout", [8, 8, 200, 255])),
-            Phase::Standby => Some(("Standby", [200, 8, 200, 255])),
-            Phase::Recording => Some(("Recording", [200, 8, 8, 255])),
-            Phase::Playback => Some(("Playback", [0, 0, 0, 255])),
+            Phase::Lockout => Some(("Lockout", LOCKOUT_COLOR)),
+            Phase::Standby => Some(("Standby", STANDBY_COLOR)),
+            Phase::Recording => Some(("Recording", RECORDING_COLOR)),
+            Phase::Playback => Some(("Playback", super::notify::DEFAULT_COLOR)),
             Phase::Idle => None,
         }
     }

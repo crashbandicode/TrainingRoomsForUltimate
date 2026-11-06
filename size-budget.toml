@@ -229,6 +229,14 @@ approved_by = "Operator 2026-11-05 via primary (P-TIMER order, 18:32Z; size rule
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
+ceiling = 140793
+date = "2026-11-05"
+reason = "rc.6 notice plates (p23/notice-plates): a dark plate behind each notice text and the light body colours that read on it; measured 140793 at c438cb5 (tools/size_gate.py), +43 over the rc.5 candidate's 140750"
+approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed'"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
 ceiling = 140843
 date = "2026-11-05"
 reason = "rc.6: switch P1 to a combo's recorded fighter with the named macros' Switch/Keep question, one explicit P1 load (p23/combo-switch, operator 2026-11-05 DEFERRED-LIST); measured 140843 at 5bdccb6 (tools/size_gate.py), +279 over the rc.5 candidate's 140564"

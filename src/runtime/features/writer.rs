@@ -26,6 +26,7 @@ use crate::model::ini_files::{self, FileRead};
 use crate::model::menu_shortcuts::{self, MenuShortcuts};
 use crate::model::storage::{self, FixedPath};
 use crate::runtime::diag_log::diagnostic;
+use crate::model::notify::DEFAULT_COLOR;
 use crate::runtime::features::notices;
 
 /// How often the thread looks at its slots.
@@ -151,7 +152,7 @@ fn write_shortcuts(shortcuts: MenuShortcuts) {
         Err(error) => {
             // The change stays in memory for the session (SPEC-input-04 question 6 (c)); say so once.
             diagnostic(format_args!("[TrainingRooms] button_config.ini not written: {error}; kept for this session"));
-            notices::post("Menu shortcuts", "Could not save button_config.ini", 120, [0, 0, 0, 255]);
+            notices::post("Menu shortcuts", "Could not save button_config.ini", 120, DEFAULT_COLOR);
         }
     }
 }
@@ -169,7 +170,7 @@ fn write_replay_capture(enabled: bool) {
         Ok(()) => diagnostic(format_args!("[TrainingRooms] replay_capture.ini written by the writer thread enabled={enabled}")),
         Err(error) => {
             diagnostic(format_args!("[TrainingRooms] replay_capture.ini not written: {error}; kept for this session"));
-            notices::post("Replay capture", "Could not save replay_capture.ini", 120, [0, 0, 0, 255]);
+            notices::post("Replay capture", "Could not save replay_capture.ini", 120, DEFAULT_COLOR);
         }
     }
 }
@@ -180,7 +181,7 @@ fn write_settings(json: &str) {
         Ok(()) => diagnostic(format_args!("[TrainingRooms] settings.json written by the writer thread")),
         Err(error) => {
             diagnostic(format_args!("[TrainingRooms] settings.json not written: {error}; kept for this session"));
-            notices::post("Settings", "Could not save settings.json", 120, [0, 0, 0, 255]);
+            notices::post("Settings", "Could not save settings.json", 120, DEFAULT_COLOR);
         }
     }
 }

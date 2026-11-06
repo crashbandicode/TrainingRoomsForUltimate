@@ -191,21 +191,24 @@ unsafe fn write_notice(container: *mut Pane, out: &TickOut) {
     pane::set_visible(container, out.visible);
     let Some(draw) = out.draw else { return };
     let header = find(container, p::IDX_NOTICE_HEADER);
+    let header_plate = find(container, p::IDX_NOTICE_HEADER_PLATE);
     let text = find(container, p::IDX_NOTICE_TEXT);
+    let text_plate = find(container, p::IDX_NOTICE_TEXT_PLATE);
     let long_text = find(container, p::IDX_NOTICE_LONG);
-    let base = find(container, p::IDX_NOTICE_BASE);
+    let long_plate = find(container, p::IDX_NOTICE_LONG_PLATE);
     if !header.is_null() {
         set_text(header, draw.header);
     }
     let mut buffer = [0u16; crate::model::notify::BODY_MAX];
     let len = crate::model::boot_notices::notice_units(draw.body.as_str(), &mut buffer);
     let long = len > crate::model::boot_notices::SHORT_UNITS;
-    if !text.is_null() { pane::set_visible(text, !long); }
-    if !long_text.is_null() { pane::set_visible(long_text, long); }
-    if !base.is_null() {
-        pane::set_pos(base, 0.0, if long { 355.0 } else { 405.0 });
-        pane::set_height(base, if long { 250.0 } else { 150.0 });
-    }
+    let face = p::notice_faces(out.visible, long);
+    if !header.is_null() { pane::set_visible(header, face.header); }
+    if !header_plate.is_null() { pane::set_visible(header_plate, face.header); }
+    if !text.is_null() { pane::set_visible(text, face.body); }
+    if !text_plate.is_null() { pane::set_visible(text_plate, face.body); }
+    if !long_text.is_null() { pane::set_visible(long_text, face.long_body); }
+    if !long_plate.is_null() { pane::set_visible(long_plate, face.long_body); }
     let target = if long { long_text } else { text };
     if !target.is_null() {
         pane::set_text(target, &buffer[..len]);
