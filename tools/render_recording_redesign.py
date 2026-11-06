@@ -8,8 +8,8 @@ Revision 4 draws the loop, the pin, the link and the numbered-list marks from th
 Material Symbols SVGs in docs/decisions/icons (Apache-2.0; see SOURCE.txt there).
 
 Run from the repo root:
-  /usr/bin/python3 -I tools/render_recording_redesign.py          (revisions 4, 5 and 5.2: every picture the doc uses)
-  /usr/bin/python3 -I tools/render_recording_redesign.py --q52    (only revision 5.2's RECORDING-REDESIGN-qN-ab.png)
+  /usr/bin/python3 -I tools/render_recording_redesign.py          (revisions 4 to 6: every picture the doc uses)
+  /usr/bin/python3 -I tools/render_recording_redesign.py --q52    (only the open questions' RECORDING-REDESIGN-qN-ab.png)
   /usr/bin/python3 -I tools/render_recording_redesign.py --r3     (revision 3's pictures)
 """
 import os
@@ -1052,8 +1052,13 @@ S4 = [
 MNAME = {m["key"]: m for m in M4}
 DRILL = "corner"
 BOUND = "pressure"
+# Revision 6: one bound save at a time, bound under a role; that role plays its whole chain. The example chain is
+# bound under the CPU, which loops it (∞) while you practise against it.
+BOUND_ROLE = "cpu"
+ROLE_TAG = {"player": "P1", "cpu": "CPU"}
+ROLE_NAME = {"player": "Player 1", "cpu": "the CPU"}
 ACTIVE = {"player": "nair", "cpu": "cputhrow"}
-LOOP = {"player": "on", "cpu": "1"}
+LOOP = {"player": "1", "cpu": "on"}
 
 # Column layouts: (field, x, caption). Pop-up list is 592 wide, the page list 530, a flow fragment 361.
 COLS = {
@@ -1095,6 +1100,7 @@ def groups_for(role, focus=None, overrides=None):
                 r["active"] = r["key"] == overrides.get("_drill", DRILL)
             else:
                 r["active"] = r["key"] == BOUND
+                r["role_tag"] = ROLE_TAG[BOUND_ROLE] if r["key"] == BOUND else None
             r["cursor"] = r["key"] == focus
             out.append(r)
         return out
@@ -1196,18 +1202,29 @@ def draw_row(img, r, typ, top, bot, width, cols):
         d.rectangle((box[0], box[1], box[0] + 5, box[3]), fill=WHITE)
     cy = (top + bot) / 2
     hot = r.get("hot")
+    # Revision 6: the order badge sits at the row's left edge, before the pin.
+    lx = 0
+    if r.get("order"):
+        badge(d, 22, cy, r["order"], 9)
+        lx = 22
     if r.get("pin"):
-        pin4(img, 12, cy - 11, 20)
+        pin4(img, 12 + lx, cy - 11, 20)
         d = ImageDraw.Draw(img)
     name_col = ch.M_TEXT if hot else ch.M_GROUP
     fn = fnt(15)
-    iv.text(d, (34, cy), r["name"], fn, fill=name_col, anchor="lm")
+    iv.text(d, (34 + lx, cy), r["name"], fn, fill=name_col, anchor="lm")
+    tx = 34 + lx + d.textlength(r["name"], font=fn) + 10
     if r.get("tag"):
-        tx = 34 + d.textlength(r["name"], font=fn) + 10
         ft = fnt(11, bold=True)
         tw = d.textlength(r["tag"], font=ft) + 14
         d.rounded_rectangle((tx, cy - 9, tx + tw, cy + 9), radius=9, fill=(196, 240, 214, 255))
         iv.text(d, (tx + tw / 2, cy + 0.5), r["tag"], ft, fill=INK, anchor="mm")
+        tx += tw + 6
+    if r.get("role_tag"):   # the role the bound save is bound under
+        ft = fnt(11, bold=True)
+        tw = d.textlength(r["role_tag"], font=ft) + 14
+        d.rounded_rectangle((tx, cy - 9, tx + tw, cy + 9), radius=9, fill=ROLE_FILL[r["role_tag"]])
+        iv.text(d, (tx + tw / 2, cy + 0.5), r["role_tag"], ft, fill=WHITE, anchor="mm")
     cell = ch.M_GROUP if hot else DIM
     fc = fnt(14)
     for field, x, _ in cols:
@@ -1218,7 +1235,9 @@ def draw_row(img, r, typ, top, bot, width, cols):
             iv.text(d, (x, cy), v, fc, fill=cell, anchor="lm")
         elif field == "start":
             if r.get("start"):
-                icon(img, "link", x, cy - 9, 18, TYPES["save"][0] if hot else DIM)
+                # Orange while the macro's Start save switch is On; grey when it is Off (the link is kept).
+                on = hot and r.get("start_on", True)
+                icon(img, "link", x, cy - 9, 18, TYPES["save"][0] if on else DIM)
                 d = ImageDraw.Draw(img)
                 iv.text(d, (x + 22, cy), r["start"], fc, fill=cell, anchor="lm")
             else:
@@ -1247,20 +1266,22 @@ def links_spec(key, role="player"):
         m = MNAME[key]
         played = [(s["name"], s["chain"].index(key) + 1) for s in S4 if key in s["chain"]]
         made = [c["name"] for c in C4 if c.get("src") == m["name"]]
+        switch = "· On" if m.get("start_on", True) else "· Off"
         return {
             "self": ("macro", m["name"]),
             "branches": [
-                {"label": "starts from", "out": True,
-                 "nodes": [("save", m["start"], None, None, True)] if m["start"] else [],
-                 "none": "no start save"},
-                {"label": "played by chains", "out": False,
-                 "nodes": [("save", n, None, "#%d" % i, False) for n, i in played], "none": "none"},
+                {"label": "starts from (when played on its own)", "out": True,
+                 "nodes": [("save", m["start"], None, switch, True)] if m["start"] else [],
+                 "none": "no start save · plays from where the fighters are"},
+                {"label": "in chains", "out": False,
+                 "nodes": [("save", n, None, "as %d" % i, False) for n, i in played], "none": "none"},
                 {"label": "combos made from it", "out": False,
                  "nodes": [("combo", n, None, None, False) for n in made],
                  "none": "none (Make combo plays on Player 1)" if m["role"] == "CPU" else "none"},
             ],
-            "lines": [("Recorded on", "%s%s · %s" % (m["fighter"], " · CPU" if m["role"] == "CPU" else "", m["length"]),
-                       ch.M_TEXT)],
+            # The recorded role, like the recorded fighter, is information only.
+            "lines": [("Recorded on", "%s%s · %s · information only" % (
+                m["fighter"], ", as CPU" if m["role"] == "CPU" else "", m["length"]), ch.M_TEXT)],
         }
     combo = {c["key"]: c for c in C4}.get(key)
     if combo:
@@ -1290,18 +1311,22 @@ def links_spec(key, role="player"):
         }
     s = {x["key"]: x for x in S4}[key]
     on = s.get("chain_on")
-    nodes = [("macro", MNAME[k]["name"], i + 1, "· " + MNAME[k]["role"], False) for i, k in enumerate(s["chain"])]
+    bound = key == BOUND
+    # Revision 6: the role the save is bound under plays its whole chain, so the macros carry no role of their own.
+    nodes = [("macro", MNAME[k]["name"], i + 1, None, False) for i, k in enumerate(s["chain"])]
     lines = []
     if s["chain"] and on:
-        lines.append(("LOOP", LOOP.get(role, "on"), None))
+        lines.append(("LOOP", LOOP[BOUND_ROLE] if bound else LOOP.get(role, "on"), None))
     elif s["chain"]:
         lines.append(("Chain Off", "Load only restores. The numbers stay.", ch.M_GROUP))
-    lines.append(("Bound to Save / Load", "yes" if key == BOUND else "no", GREEN if key == BOUND else ch.M_TEXT))
+    lines.append(("Bound to Save / Load", "yes, as " + ROLE_TAG[BOUND_ROLE] if bound else "no",
+                  GREEN if bound else ch.M_TEXT))
+    who = "on " + ROLE_NAME[BOUND_ROLE] if bound else "by the role it is bound under"
     return {
         "self": ("save", s["name"]),
         "branches": [
-            {"label": "plays on load, in order · Chain %s" % ("On" if on else "Off"), "out": True, "ordered": True,
-             "nodes": nodes, "none": "no chain: Load only restores", "dim": not on},
+            {"label": "plays on load, in order, %s · Chain %s" % (who, "On" if on else "Off"), "out": True,
+             "ordered": True, "nodes": nodes, "none": "no chain: Load only restores", "dim": not on},
         ],
         "lines": lines,
     }
@@ -1323,7 +1348,15 @@ def links_panel(img, box, spec, header=True):
     spine_bot = spine_top
     y += 38 + 6
     for br in spec["branches"]:
-        iv.text(d, (x0 + 34, y + 10), br["label"], fnt(13, bold=True), fill=ch.M_GROUP, anchor="lm")
+        # A label wider than the panel wraps onto a second line, at its last " · " when it has one.
+        lines = wrap(d, br["label"], fnt(13, bold=True), x1 - x0 - 34)
+        if len(lines) > 1 and " · " in br["label"]:
+            head, tail = br["label"].rsplit(" · ", 1)
+            lines = [head, "· " + tail]
+        for k, line in enumerate(lines):
+            if k:
+                y += 18
+            iv.text(d, (x0 + 34, y + 10), line, fnt(13, bold=True), fill=ch.M_GROUP, anchor="lm")
         y += 22
         if not br["nodes"]:
             iv.text(d, (x0 + 34, y + 9), br["none"], fnt(13), fill=DIM, anchor="lm")
@@ -1541,7 +1574,7 @@ def diagram():
     save_b, macro_b = (60, 150, 360, 250), (840, 150, 1140, 250)
     conv_b, combo_b = (60, 380, 360, 480), (840, 380, 1140, 480)
     big_node(img, save_b, "save", "Save state", "a named file: both fighters")
-    big_node(img, macro_b, "macro", "Macro", "recorded inputs, one role")
+    big_node(img, macro_b, "macro", "Macro", "recorded inputs; a role plays it")
     big_node(img, conv_b, "conv", "Conversion", "combos drilled as one chain")
     big_node(img, combo_b, "combo", "Combo", "the hits the helper grades")
     d = ImageDraw.Draw(img)
@@ -1549,7 +1582,8 @@ def diagram():
     # save -> macro (chain), above; macro -> save (start save), below
     arrow4(d, [(366, 180), (832, 180)], sc, width=3, head=13)
     link_label(d, 600, 164, "plays on load, in order", "made with the save's Edit chain (+), numbered like Character "
-               "Cycles.\nChain On or Off is set on the save.", sc, how_first=True, width=470)
+               "Cycles.\nChain On or Off is set on the save. The role it is bound under plays it.", sc,
+               how_first=True, width=470)
     arrow4(d, [(834, 222), (368, 222)], mc, width=3, head=13)
     link_label(d, 600, 240, "starts from", "automatic: Record writes \"<macro name> · start\" and links it", mc)
     # conversion -> combo
@@ -1562,8 +1596,8 @@ def diagram():
     # The loop note under the two save/macro arrows.
     loop4(img, 60, 296, "on", 26)
     d = ImageDraw.Draw(img)
-    iv.text(d, (96, 310), "Loop belongs to macros. On a chained save it repeats the whole chain.", fnt(13),
-            fill=ch.M_GROUP, anchor="lm")
+    iv.text(d, (96, 310), "Loop belongs to a role's macros. On a chained save, the bound role's loop repeats the "
+            "whole chain.", fnt(13), fill=ch.M_GROUP, anchor="lm")
 
     # ---- the example ----
     d.line((40, 520, 1240, 520), fill=ch.M_RULE, width=1)
@@ -1575,9 +1609,19 @@ def diagram():
     corner_b = (60, 836, 400, 878)
     combos = [(760, 806, 1100, 848), (760, 868, 1100, 910)]
     node4(img, start_b, "save", "Nair loop · start", link=True)
-    node4(img, press_b, "save", "Corner pressure", suffix="Chain On")
+    node4(img, press_b, "save", "Corner pressure")
+    # The role chip it is bound under, then Chain On, after the name.
+    d = ImageDraw.Draw(img)
+    cx = press_b[0] + 8 + d.textlength("SAVE STATE", font=fnt(10, bold=True)) + 12 + 8
+    cx += d.textlength("Corner pressure", font=fnt(14)) + 8
+    cy = (press_b[1] + press_b[3]) / 2
+    ft = fnt(11, bold=True)
+    tw = d.textlength("CPU", font=ft) + 14
+    d.rounded_rectangle((cx, cy - 9, cx + tw, cy + 9), radius=9, fill=ROLE_FILL["CPU"])
+    iv.text(d, (cx + tw / 2, cy + 0.5), "CPU", ft, fill=WHITE, anchor="mm")
+    iv.text(d, (cx + tw + 8, cy), "Chain On", fnt(13), fill=ch.M_GROUP, anchor="lm")
     for i, (b, k) in enumerate(zip(mac, ["nair", "dash", "cputhrow"])):
-        node4(img, b, "macro", MNAME[k]["name"], badge_n=i + 1, suffix="· " + MNAME[k]["role"])
+        node4(img, b, "macro", MNAME[k]["name"], badge_n=i + 1)
     node4(img, corner_b, "conv", "Corner to kill")
     node4(img, combos[0], "combo", "Ryu BnB", badge_n=1)
     node4(img, combos[1], "combo", "Nair loop combo", badge_n=2)
@@ -1588,8 +1632,8 @@ def diagram():
     # plays on load, in order: Corner pressure -> 1, 2, 3
     for k, b in enumerate(mac):
         cy = (b[1] + b[3]) / 2 + (8 if k == 0 else 0)
-        arrow4(d, [(406, 711), (630, 711), (670, cy), (752, cy)], sc, width=2, head=10)
-    iv.text(d, (516, 696), "plays on load, in order", fnt(13, bold=True), fill=sc, anchor="mm")
+        arrow4(d, [(406, 711), (680, 711), (716, cy), (752, cy)], sc, width=2, head=10)
+    iv.text(d, (420, 696), "plays on load, in order, on the CPU", fnt(13, bold=True), fill=sc, anchor="lm")
     # contains, in order: Corner to kill -> 1, 2
     for b in combos:
         cy = (b[1] + b[3]) / 2
@@ -1611,44 +1655,63 @@ def legend():
     groups = [{"title": "MACROS", "typ": "macro", "count": len(M4), "loop": [("", "on")],
                "sections": [(None, "macro", rows)]}]
     lst, pos, _ = render_list(groups, width, {"macro": COLS["pop"]["macro"]})
-    img = Image.new("RGBA", (W, 64 + lst.height + 96), WIN)
+    img = Image.new("RGBA", (W, 64 + lst.height + 176), WIN)
     d = ImageDraw.Draw(img)
     iv.text(d, (40, 30), "How to read a list", fnt(22, bold=True), fill=ch.M_TEXT, anchor="lm")
     img.alpha_composite(lst, (40, 64))
     both = Image.new("RGBA", (width, 40), WIN)
     draw_row(both, dict(name="Corner pressure", fighters="Pikachu · Mario", chain=["a", "b", "c"], chain_on=True,
-                        hot=True, pin=True, active=True, cursor=True), "save", 4, 34, width, COLS["pop"]["save"])
+                        hot=True, pin=True, active=True, cursor=True, role_tag=ROLE_TAG[BOUND_ROLE]),
+             "save", 4, 34, width, COLS["pop"]["save"])
     img.alpha_composite(both, (40, 64 + lst.height + 6))
+    # With that save under the cursor, its chain's macros wear their order at the left edge.
+    numbered = Image.new("RGBA", (width, 40), WIN)
+    draw_row(numbered, dict(M4[0], order=1), "macro", 4, 34, width, COLS["pop"]["macro"])
+    img.alpha_composite(numbered, (40, 64 + lst.height + 46))
     d = ImageDraw.Draw(img)
     notes = [
         (pos["a"], "Green fill: active. The macro that plays, the drill, or the bound save."),
         (pos["b"], "White border and bar: the cursor. A acts on this row."),
         (pos["c"], "Thin green outline: the hot five. Pins first, then the newest."),
         (pos["d"], "Under the hairline, dimmer: the rest of the library, on the card."),
-        ((lst.height + 10, lst.height + 40, None), "Both: the cursor sits on the active row."),
+        ((lst.height + 10, lst.height + 40, None), "Both: the cursor on the bound save. Blue CPU: bound as CPU."),
+        ((lst.height + 50, lst.height + 80, None), "Red number at the left edge: its place in that save's chain."),
     ]
     for (top, bot, _), text in notes:
         cy = 64 + (top + bot) / 2
         d.line((40 + width + 8, cy, 640, cy), fill=ch.M_RULE, width=1)
         iv.text(d, (650, cy), text, fnt(14), fill=ch.M_TEXT, anchor="lm")
-    y = 64 + lst.height + 64
-    x = 40
-    items = [("pin", "pinned"), ("link", "start save (a link)"), ("list", "chain: macros, count, On/Off"),
-             ("badge", "order, as Character Cycles"), ("loop", "loop (macros only)")]
-    for kind, label in items:
-        if kind == "pin":
-            pin4(img, x, y - 11, 22)
-        elif kind == "link":
-            icon(img, "link", x, y - 11, 22, TYPES["save"][0])
-        elif kind == "list":
-            icon(img, "format_list_numbered", x, y - 11, 22, ch.M_TEXT)
-        elif kind == "badge":
-            badge(ImageDraw.Draw(img), x + 11, y, 2)
-        else:
-            loop4(img, x, y - 14, "on", 26)
-        d = ImageDraw.Draw(img)
-        iv.text(d, (x + 30, y), label, fnt(14), fill=ch.M_GROUP, anchor="lm")
-        x += 34 + d.textlength(label, font=fnt(14)) + 30
+    rows_of_items = [
+        [("pin", "pinned"), ("link", "start save, grey when Off"), ("list", "chain: macros, count, On/Off")],
+        [("badge", "order, at the row's left edge"), ("role", "the role a save is bound under"),
+         ("loop", "loop (macros only)")],
+    ]
+    for line, items in enumerate(rows_of_items):
+        y = 64 + lst.height + 118 + line * 36
+        x = 40
+        for kind, label in items:
+            if kind == "pin":
+                pin4(img, x, y - 11, 22)
+            elif kind == "link":
+                icon(img, "link", x, y - 11, 22, TYPES["save"][0])
+                icon(img, "link", x + 26, y - 11, 22, DIM)
+                x += 26
+            elif kind == "list":
+                icon(img, "format_list_numbered", x, y - 11, 22, ch.M_TEXT)
+            elif kind == "badge":
+                badge(ImageDraw.Draw(img), x + 11, y, 2)
+            elif kind == "role":
+                rd = ImageDraw.Draw(img)
+                ft = fnt(11, bold=True)
+                tw = rd.textlength("CPU", font=ft) + 14
+                rd.rounded_rectangle((x, y - 9, x + tw, y + 9), radius=9, fill=ROLE_FILL["CPU"])
+                iv.text(rd, (x + tw / 2, y + 0.5), "CPU", ft, fill=WHITE, anchor="mm")
+                x += tw - 22
+            else:
+                loop4(img, x, y - 14, "on", 26)
+            d = ImageDraw.Draw(img)
+            iv.text(d, (x + 30, y), label, fnt(14), fill=ch.M_GROUP, anchor="lm")
+            x += 34 + d.textlength(label, font=fnt(14)) + 30
     return img
 
 
@@ -1874,12 +1937,13 @@ def flow_chain():
     b = strip_panel(img, 1, "Number the macros", "A adds the next number. A again removes it and the later numbers "
                     "close up. Y clears. The same gesture as Character Cycles.")
     frag_tiles(img, b, "Edit chain · Corner pressure", [
-        {"name": "Nair loop", "sub": "Player · Pikachu", "number": 1},
-        {"name": "Dash grab", "sub": "Player · Pikachu", "number": 2},
-        {"name": "CPU throw", "sub": "CPU · Mario", "number": 3, "cursor": True},
-        {"name": "Macro 6", "sub": "Player · Lucina"},
-        {"name": "Replay 86f", "sub": "Player · Pikachu"},
-        {"name": "Slot 2", "sub": "Player · Steve"},
+        # The recorded fighter only: the role the save is bound under plays the whole chain.
+        {"name": "Nair loop", "sub": "Recorded on Pikachu", "number": 1},
+        {"name": "Dash grab", "sub": "Recorded on Pikachu", "number": 2},
+        {"name": "CPU throw", "sub": "Recorded on Mario", "number": 3, "cursor": True},
+        {"name": "Macro 6", "sub": "Recorded on Lucina"},
+        {"name": "Replay 86f", "sub": "Recorded on Pikachu"},
+        {"name": "Slot 2", "sub": "Recorded on Steve"},
     ], [("A", "add / remove"), ("Y", "clear"), ("B", "done")])
 
     b = strip_panel(img, 2, "Linked", "Back in the list the row reads 3 On. The Links panel shows 1 → 2 → 3. "
@@ -2035,6 +2099,16 @@ def action_screen4(bg, crumb, rows, help1, help2, values=None, keys=None):
             v, kind = values[label]
             if kind == "on":
                 iv.text(d, (1210, y), v, ch.MF, fill=GREEN, anchor="rm")
+            elif kind == "switch":
+                # A linked file and its On / Off switch: the link icon and name grey, the state green (On) or grey.
+                name, state = v
+                fb = fnt(15, bold=True)
+                iv.text(d, (1210, y), state, fb, fill=GREEN if state == "On" else DIM, anchor="rm")
+                nx = 1210 - d.textlength(state, font=fb) - 12
+                iv.text(d, (nx, y), name + "  ·", ch.MF, fill=ch.M_GROUP, anchor="rm")
+                icon(img, "link", nx - d.textlength(name + "  ·", font=ch.MF) - 26, y - 10, 20,
+                     TYPES["save"][0] if state == "On" else DIM)
+                d = ImageDraw.Draw(img)
             else:
                 iv.text(d, (1210, y), v, ch.MF, fill=ch.M_GROUP, anchor="rm")
                 if kind == "link":
@@ -2073,10 +2147,11 @@ def r5_tail(typ):
                  ("slot11s", "Slot 11 (2026-11-05)", "Lucina · Cloud")]
         return [dict(key=k, name=n, fighters=f, chain=[], hot=False) for k, n, f in specs]
     if typ == "combo":
-        # Revision 5.2's Q5 only: two more combos, so that one column has to scroll to reach the conversions. Combo 5
-        # is the newest, so it is hot after the pin; Combo 1 is the oldest, and with five hot it is under the hairline.
-        return [dict(key="combo5", name="Combo 5", fighters="Pikachu → Mario", links="3 links", src=None, hot=True),
-                dict(key="combo1", name="Combo 1", fighters="Lucina → Cloud", links="3 links", src=None, hot=False)]
+        # Q5 only: two combos newer than Combo 4 and one older than Combo 2, so the one-list layout has to scroll to
+        # reach the conversions. Seven combos: five hot, and the two oldest under the hairline.
+        return [dict(key="combo6", name="Combo 6", fighters="Pikachu → Mario", links="3 links", src=None),
+                dict(key="combo5", name="Combo 5", fighters="Lucina → Cloud", links="3 links", src=None),
+                dict(key="combo1", name="Combo 1", fighters="Steve → Pikachu", links="2 links", src=None)]
     return []
 
 
@@ -2084,10 +2159,12 @@ def r5_rows(typ, role, focus, extend=False):
     data = {"macro": M4, "combo": C4, "conv": V4, "save": S4}[typ]
     if extend:
         tail = r5_tail(typ)
-        hot_tail = [r for r in tail if r.get("hot")]
-        pins = [r for r in data if r.get("pin")]
-        # A hot extra file is newer than the unpinned ones: it goes right after the pins.
-        data = pins + hot_tail + [r for r in data if not r.get("pin")] + [r for r in tail if not r.get("hot")]
+        if typ == "combo":
+            # Pins first, then the newest: Ryu BnB, Nair loop combo, Combo 6, Combo 5, Combo 4 | Combo 2, Combo 1.
+            data = list(data[:2]) + tail[:2] + list(data[2:]) + tail[2:]
+            data = [dict(r, hot=i < 5) for i, r in enumerate(data)]
+        else:
+            data = list(data) + tail      # the extra slots are the oldest files: under the hairline
     out = []
     for src in data:
         r = dict(src)
@@ -2101,6 +2178,7 @@ def r5_rows(typ, role, focus, extend=False):
             r["active"] = r["key"] == DRILL
         else:
             r["active"] = r["key"] == BOUND
+            r["role_tag"] = ROLE_TAG[BOUND_ROLE] if r["key"] == BOUND else None
         r["cursor"] = r["key"] == focus
         out.append(r)
     return out
@@ -2165,12 +2243,13 @@ def r5_section(title, typ, rows, width, loop=None, section_on=False, order=None,
     pos = {}
     hot = [r for r in rows if r.get("hot")]
     first = y
+    slot = any(r["key"] in order for r in rows)
     for i, r in enumerate(rows):
         if hot and i == len(hot):
             d.line((8, y + 4, width - 8, y + 4), fill=ch.M_RULE, width=1)
             y += 10
         top, bot = y, y + row_h
-        r5_row(img, r, typ, top, bot, width, order.get(r["key"]), r["key"] in link)
+        r5_row(img, r, typ, top, bot, width, order.get(r["key"]), r["key"] in link, slot)
         d = ImageDraw.Draw(img)
         pos[r["key"]] = top
         y = bot
@@ -2179,7 +2258,9 @@ def r5_section(title, typ, rows, width, loop=None, section_on=False, order=None,
     return img.crop((0, 0, width, y + 4)), pos
 
 
-def r5_row(img, r, typ, top, bot, width, order_n, link_mark):
+def r5_row(img, r, typ, top, bot, width, order_n, link_mark, slot=False):
+    """One two-line row. Revision 6: the red order badge sits at the left edge, before the pin (slot reserves that
+    place on every row of a section that shows badges, so the names line up). The bound save wears its role chip."""
     d = ImageDraw.Draw(img)
     box = (4, top + 1, width - 5, bot - 1)
     if r.get("active"):
@@ -2189,31 +2270,39 @@ def r5_row(img, r, typ, top, bot, width, order_n, link_mark):
     if r.get("cursor"):
         d.rectangle(box, outline=WHITE, width=2)
         d.rectangle((box[0], box[1], box[0] + 4, box[3]), fill=WHITE)
-    cy = (top + bot) / 2
     name_y = top + 12
     sub_y = top + 28
+    lx = 22 if slot else 0
+    if order_n:
+        badge(d, 18, (top + bot) / 2, order_n, 9)
     if r.get("pin"):
-        pin4(img, 8, name_y - 10, 18)
+        pin4(img, 8 + lx, name_y - 10, 18)
         d = ImageDraw.Draw(img)
     hot = r.get("hot")
     ink = ch.M_TEXT if hot else ch.M_GROUP
     muted = ch.M_GROUP if hot else DIM
-    iv.text(d, (30, name_y), r["name"], fnt(13), fill=ink, anchor="lm")
+    nx = 30 + lx
+    iv.text(d, (nx, name_y), r["name"], fnt(13), fill=ink, anchor="lm")
+    tx = nx + d.textlength(r["name"], font=fnt(13)) + 6
     if r.get("tag"):
-        tx = 30 + d.textlength(r["name"], font=fnt(13)) + 6
         ft = fnt(10, bold=True)
         tw = d.textlength(r["tag"], font=ft) + 10
         d.rounded_rectangle((tx, name_y - 8, tx + tw, name_y + 8), radius=8, fill=(196, 240, 214, 255))
         iv.text(d, (tx + tw / 2, name_y), r["tag"], ft, fill=INK, anchor="mm")
+        tx += tw + 5
+    if r.get("role_tag"):
+        ft = fnt(10, bold=True)
+        tw = d.textlength(r["role_tag"], font=ft) + 12
+        d.rounded_rectangle((tx, name_y - 8, tx + tw, name_y + 8), radius=8, fill=ROLE_FILL[r["role_tag"]])
+        iv.text(d, (tx + tw / 2, name_y), r["role_tag"], ft, fill=WHITE, anchor="mm")
     right = width - 12
-    if order_n:
-        badge(d, right - 8, name_y, order_n, 9)
-        right -= 24
     if typ == "macro":
-        iv.text(d, (30, sub_y), "Recorded on " + r["fighter"], fnt(11), fill=muted, anchor="lm")
+        iv.text(d, (nx, sub_y), "Recorded on " + r["fighter"], fnt(11), fill=muted, anchor="lm")
         if r.get("start"):
+            # Orange while the Start save switch is On; grey when it is Off. The name stays.
+            on = (hot or link_mark) and r.get("start_on", True)
             iv.text(d, (right - 22, sub_y), r["start"], fnt(11), fill=muted, anchor="rm")
-            icon(img, "link", right - 18, sub_y - 8, 16, TYPES["save"][0] if hot or link_mark else DIM)
+            icon(img, "link", right - 18, sub_y - 8, 16, TYPES["save"][0] if on else DIM)
     elif typ == "save":
         if r.get("chain"):
             icon(img, "format_list_numbered", right - 58, name_y - 8, 16, ch.M_TEXT if hot else DIM)
@@ -2223,29 +2312,14 @@ def r5_row(img, r, typ, top, bot, width, order_n, link_mark):
                     fill=GREEN if on else DIM, anchor="rm")
         else:
             iv.text(d, (right, name_y), "—", fnt(12), fill=DIM, anchor="rm")
-        iv.text(d, (30, sub_y), r["fighters"], fnt(11), fill=muted, anchor="lm")
+        iv.text(d, (nx, sub_y), r["fighters"], fnt(11), fill=muted, anchor="lm")
         if link_mark:
             iv.text(d, (right, sub_y), "start save", fnt(11), fill=TYPES["save"][0], anchor="rm")
             icon(img, "link", right - 78, sub_y - 8, 16, TYPES["save"][0])
     elif typ == "combo":
-        iv.text(d, (30, sub_y), "Recorded on " + r["fighters"], fnt(11), fill=muted, anchor="lm")
-    elif typ == "conv" and not order_n:
-        iv.text(d, (30, sub_y), " → ".join(r["seq"]), fnt(11), fill=muted, anchor="lm")
-
-
-def r5_paste(img, section, box, scroll):
-    x0, y0, x1, y1 = box
-    view = y1 - y0
-    scroll = max(0, min(int(scroll), max(0, section.height - view)))
-    img.alpha_composite(section.crop((0, scroll, section.width, min(section.height, scroll + view))), (x0, y0))
-    if section.height > view:
-        d = ImageDraw.Draw(img)
-        d.rounded_rectangle((x1 - 6, y0 + 2, x1 - 2, y1 - 2), radius=2, fill=(40, 43, 52, 255))
-        th = max(18, view * view / section.height)
-        span = section.height - view
-        ty = y0 + 2 + (view - 4 - th) * scroll / span
-        d.rounded_rectangle((x1 - 6, ty, x1 - 2, ty + th), radius=2, fill=(150, 156, 170, 255))
-    return scroll
+        iv.text(d, (nx, sub_y), "Recorded on " + r["fighters"], fnt(11), fill=muted, anchor="lm")
+    elif typ == "conv":
+        iv.text(d, (nx, sub_y), " → ".join(r["seq"]), fnt(11), fill=muted, anchor="lm")
 
 
 def r5_paste_sticky(img, section, box, scroll, header, positions):
@@ -2271,6 +2345,8 @@ def r5_paste_sticky(img, section, box, scroll, header, positions):
             show = bot - scroll
         else:
             break
+    if content <= view:
+        show = content   # the whole section fits: keep the hot outline's bottom edge too
     if show > 0:
         src = header + scroll
         img.alpha_composite(section.crop((0, src, section.width, src + show)), (x0, y0 + header))
@@ -2301,46 +2377,6 @@ def r5_tabs(d, x, y, tab, role):
         iv.text(d, (x + 14, y + 14), label, f, fill=ch.M_TEXT if on else ch.M_GROUP, anchor="lm")
         x += w + 10
     return x
-
-
-def r5_details(img, box, lines):
-    d = ImageDraw.Draw(img)
-    x0, y0, x1, y1 = box
-    d.rounded_rectangle((x0, y0, x1, y1), radius=6, fill=(22, 24, 30, 255), outline=ch.M_RULE, width=1)
-    y = y0 + 8
-    for line in lines:
-        iv.text(d, (x0 + 12, y), line, fnt(13), fill=ch.M_TEXT, anchor="lm")
-        y += 18
-
-
-def r5_detail_lines(focus, role):
-    if focus in MNAME:
-        m = MNAME[focus]
-        chains = ["%s as %d" % (s["name"], s["chain"].index(focus) + 1) for s in S4 if focus in s.get("chain", [])]
-        start = m["start"] or "no start save"
-        played = ", ".join(chains) if chains else "no chain"
-        who = m["fighter"] + (" · CPU" if m["role"] == "CPU" else "")
-        return ["Recorded on %s · %s. Information only." % (who, m["length"]),
-                "Starts from %s. Played by %s." % (start, played)]
-    if any(c["key"] == focus for c in C4):
-        c = next(x for x in C4 if x["key"] == focus)
-        convs = ["%s #%d" % (v["name"], v["seq"].index(c["name"]) + 1) for v in V4 if c["name"] in v["seq"]]
-        made = "from %s" % c["src"] if c.get("src") else "not made from a macro"
-        return ["Recorded on %s · %s · %s." % (c["fighters"], c["links"], made),
-                "In conversions: %s." % (", ".join(convs) if convs else "none")]
-    if any(v["key"] == focus for v in V4):
-        v = next(x for x in V4 if x["key"] == focus)
-        seq = " → ".join("%d %s" % (i + 1, n) for i, n in enumerate(v["seq"]))
-        drill = "Drilling now." if focus == DRILL else "Not drilling."
-        return ["Contains %s." % seq, "Streak 4 · best 9. %s" % drill]
-    s = next(x for x in S4 if x["key"] == focus)
-    if s.get("chain") and s.get("chain_on"):
-        names = " · ".join("%d %s" % (i + 1, MNAME[k]["name"]) for i, k in enumerate(s["chain"]))
-        bound = "yes" if focus == BOUND else "no"
-        return ["Chain On. Plays %s." % names, "Loop ∞, the whole chain. Bound to Save / Load: %s." % bound]
-    if s.get("chain"):
-        return ["Chain Off. Load only restores. The numbers stay.", "No loop on a chain that is Off."]
-    return ["No chain. Load only restores.", "Bound to Save / Load: %s." % ("yes" if focus == BOUND else "no")]
 
 
 def r5_pair(role, tab):
@@ -2384,56 +2420,43 @@ def r5_foot(typ, role="player"):
     return [("A", "drill"), ("Y", "PIN")] + common
 
 
-def popup5(game, role, tab, focus, scrolls=(0, 0), view_bottom=500, sticky=False, extend=False):
-    img = hide_notice4(game.copy())
-    d = ImageDraw.Draw(img)
-    frame = (POP[0], POP[1], POP[2], view_bottom + 118)
-    d.rounded_rectangle(frame, radius=12, fill=WIN, outline=(86, 92, 108, 255), width=2)
-    iv.text(d, (152, 98), "Recording", fnt(18, bold=True), fill=ch.M_TEXT, anchor="lm")
-    role_toggle(d, 820, 82, "cpu" if role == "cpu" else "player", 15)
-    r5_tabs(d, 152, 122, "saves" if role == "cpu" else tab, role)
-    left_t, right_t, sections, positions = r5_columns(role, tab, focus, 470, extend)
-    boxes = ((148, 158, 618, view_bottom), (640, 158, 1110, view_bottom))
-    for typ, box, scroll in ((left_t, boxes[0], scrolls[0]), (right_t, boxes[1], scrolls[1])):
-        if sticky:
-            if scroll < 0:
-                rows = r5_rows(typ, role, focus, extend)
-                header = HEAD_H + 2
-                for row in rows:
-                    if not row.get("hot"):
-                        scroll = positions[typ][row["key"]] - header
-                        break
-            r5_paste_sticky(img, sections[typ], box, scroll, HEAD_H + 2, positions[typ])
-        else:
-            r5_paste(img, sections[typ], box, scroll)
-    d = ImageDraw.Draw(img)
-    d.line((628, 164, 628, view_bottom), fill=ch.M_DIVIDER, width=2)
-    r5_details(img, (148, view_bottom + 12, 1110, view_bottom + 68),
-              r5_detail_lines(focus, role if role != "page" else "player"))
-    d.line((144, view_bottom + 76, 1136, view_bottom + 76), fill=ch.M_RULE, width=1)
-    focus_typ = left_t if focus in {r["key"] for r in r5_rows(left_t, role, focus) if r["cursor"]} else right_t
-    keys_line(img, 152, view_bottom + 90, r5_foot(focus_typ, role), 13)
-    return img
+# ---- Revision 6: layout B. The two sections of a tab stacked, each scrolling on its own by whole rows with its header
+# kept, and revision 4's Links panel on the right for the row under the cursor. --------------------------------------
+UPPER_BOX = (148, 158, 700, 360)
+LOWER_BOX = (148, 368, 700, 560)
+LINKS_BOX = (732, 164, 1130, 548)
 
 
-def popup5_stacked(game):
-    """B. The two sections of one tab, stacked, with revision 4's Links panel kept."""
+def popup_chrome6(game, role, tab):
+    """The window: the title, L / Player | CPU / R, and the tabs (CPU has only Save states & Macros)."""
     img = hide_notice4(game.copy())
     d = ImageDraw.Draw(img)
     d.rounded_rectangle(POP, radius=12, fill=WIN, outline=(86, 92, 108, 255), width=2)
     iv.text(d, (152, 98), "Recording", fnt(18, bold=True), fill=ch.M_TEXT, anchor="lm")
-    role_toggle(d, 820, 82, "player", 15)
-    r5_tabs(d, 152, 122, "saves", "player")
-    _left, _right, sections, positions = r5_columns("player", "saves", "pressure", 540)
-    # Whole rows only: a row that would be cut at the bottom of its section is left out, and the scrollbar shows more.
-    r5_paste_sticky(img, sections["save"], (148, 158, 700, 360), 0, HEAD_H + 2, positions["save"])
-    r5_paste_sticky(img, sections["macro"], (148, 368, 700, 560), 0, HEAD_H + 2, positions["macro"])
+    role_toggle(d, 820, 82, "cpu" if role == "cpu" else "player", 15)
+    r5_tabs(d, 152, 122, "saves" if role == "cpu" else tab, role)
+    return img
+
+
+def links_and_foot6(img, focus, role, keys):
     d = ImageDraw.Draw(img)
     d.line((716, 158, 716, 560), fill=ch.M_DIVIDER, width=2)
-    links_panel(img, (732, 164, 1130, 548), links_spec("pressure", "player"))
+    links_panel(img, LINKS_BOX, links_spec(focus, role))
     d = ImageDraw.Draw(img)
     d.line((144, 604, 1136, 604), fill=ch.M_RULE, width=1)
-    keys_line(img, 152, 624, r5_foot("save"), 13)
+    keys_line(img, 152, 624, keys, 13)
+
+
+def popup6(game, role, tab, focus, scrolls=(0, 0), extend=False):
+    img = popup_chrome6(game, role, tab)
+    upper, lower, sections, positions = r5_columns(role, tab, focus, 540, extend)
+    for typ, box, scroll in ((upper, UPPER_BOX, scrolls[0]), (lower, LOWER_BOX, scrolls[1])):
+        if scroll < 0:   # scrolled to the top of the library, the first row under the hairline
+            rows = r5_rows(typ, role, focus, extend)
+            scroll = next(positions[typ][r["key"]] - (HEAD_H + 2) for r in rows if not r.get("hot"))
+        r5_paste_sticky(img, sections[typ], box, scroll, HEAD_H + 2, positions[typ])
+    focus_typ = upper if any(r["cursor"] for r in r5_rows(upper, role, focus)) else lower
+    links_and_foot6(img, focus, role, r5_foot(focus_typ, role))
     return img
 
 
@@ -2459,7 +2482,8 @@ def prompt5(game):
     return img
 
 
-def page5(menu, selected, tab, focus, help1, help2):
+def page6(menu, selected, tab, focus, help1, help2):
+    """The Recording page with layout B: the two sections stacked in the content area, the Links panel beside them."""
     img = menu.copy()
     d = ImageDraw.Draw(img)
     ch.clear_content(d)
@@ -2472,14 +2496,16 @@ def page5(menu, selected, tab, focus, help1, help2):
             d.rectangle((33, y - 18, 307, y + 18), fill=ch.M_FOCUS)
         iv.text(d, (44, y), "%s  (%d)" % (name, count), fnt(14),
                 fill=ch.M_TEXT if i == selected else ch.M_GROUP, anchor="lm")
-    left_t, right_t, sections, _pos = r5_columns("page", tab, focus, 448)
-    r5_paste(img, sections[left_t], (328, 128, 776, 548), 0)
-    r5_paste(img, sections[right_t], (788, 128, 1236, 548), 0)
+    upper, lower, sections, positions = r5_columns("page", tab, focus, 490)
+    r5_paste_sticky(img, sections[upper], (330, 132, 820, 338), 0, HEAD_H + 2, positions[upper])
+    r5_paste_sticky(img, sections[lower], (330, 346, 820, 552), 0, HEAD_H + 2, positions[lower])
     d = ImageDraw.Draw(img)
-    d.line((776, 132, 776, 520), fill=ch.M_DIVIDER, width=2)
+    d.line((834, 132, 834, 552), fill=ch.M_DIVIDER, width=2)
+    links_panel(img, (848, 136, 1236, 552), links_spec(focus, "player"))
+    d = ImageDraw.Draw(img)
     ch.help_lines(d, help1, help2)
     d.rectangle((44, 660, 1246, 698), fill=ch.M_PANEL)
-    focus_typ = left_t if any(r["key"] == focus for r in r5_rows(left_t, "page", focus)) else right_t
+    focus_typ = upper if any(r["key"] == focus for r in r5_rows(upper, "page", focus)) else lower
     # On the menu page, L/R still change the page. The tab button is ZL/ZR, inside this page.
     foot = [p for p in r5_foot(focus_typ) if p[0] != "L/R"]
     foot.insert(-2, ("L/R", "page"))
@@ -2487,26 +2513,37 @@ def page5(menu, selected, tab, focus, help1, help2):
     return img
 
 
-def main_r5(menu, game):
-    P = "RECORDING-REDESIGN-r5-"
-    save(popup5(game, "player", "saves", "pressure"), P + "popup-save")
-    # Same window as the save picture. Headers stay. Macro rows move by whole rows.
-    save(popup5(game, "player", "saves", "pressure", scrolls=(0, -1), sticky=True, extend=True),
-         P + "popup-scrolled")
-    save(popup5(game, "player", "saves", "nair"), P + "popup-macro")
-    save(popup5(game, "player", "combos", "corner"), P + "popup-conversion")
-    save(popup5(game, "player", "combos", "nairc"), P + "popup-combo")
-    save(popup5(game, "cpu", "saves", "cputhrow"), P + "popup-cpu")
-    save(popup5_stacked(game), P + "popup-stacked")
-    save(prompt5(game), P + "switch-keep")
-    save(page5(menu, 0, "saves", "pressure",
-               "Save states on the left, macros on the right. Each list scrolls on its own.",
-               "Corner pressure is bound. Its chain numbers the macros in the other column."),
+def macro_actions6(menu):
+    """A macro's own screen, redrawn in the current style, with the Start save switch (On by default)."""
+    return action_screen4(menu, "Recording  >  Save states & Macros  >  Nair loop", [
+        ("Start save", True), ("Set active for Player 1", False), ("Set active for CPU", False), ("Rename", False),
+        ("Crop", False), ("Make combo", False), ("Pin", False), ("Delete", False),
+    ], "Start save On: its Play chord loads Nair loop · start, then plays. Off: it plays from where the fighters are.",
+        "Left / Right switch it, and the link stays. In a chain only the chain's save loads, whatever this says.",
+        {"Start save": (("Nair loop · start", "On"), "switch"), "Set active for Player 1": ("active", "on")},
+        [("Up/Down", "move"), ("Left/Right", "On / Off"), ("A", "do it"), ("B", "back")])
+
+
+def main_r6(menu, game):
+    P = "RECORDING-REDESIGN-r6-"
+    # The example chain is bound under the CPU, so the main save picture is drawn with the CPU role selected.
+    save(popup6(game, "cpu", "saves", "pressure"), P + "popup-save")
+    # Same window. MACROS has scrolled to its library; SAVE STATES has not. Headers stay, rows are whole.
+    save(popup6(game, "cpu", "saves", "pressure", scrolls=(0, -1), extend=True), P + "popup-scrolled")
+    save(popup6(game, "player", "saves", "nair"), P + "popup-macro")
+    save(popup6(game, "player", "combos", "corner"), P + "popup-conversion")
+    save(popup6(game, "player", "combos", "nairc"), P + "popup-combo")
+    save(popup6(game, "cpu", "saves", "cputhrow"), P + "popup-cpu")
+    save(prompt5(game), "RECORDING-REDESIGN-r5-switch-keep")
+    save(page6(menu, 0, "saves", "pressure",
+               "Save states on top, macros below. Each list scrolls on its own.",
+               "Corner pressure is bound as CPU. Its chain numbers the macros below."),
          P + "page-saves-macros")
-    save(page5(menu, 1, "combos", "corner",
-               "Conversions on the left, combos on the right. Corner to kill numbers its combos.",
+    save(page6(menu, 1, "combos", "corner",
+               "Conversions on top, combos below. Corner to kill numbers its combos.",
                "Ryu and Pikachu in one conversion is allowed. Recorded on is information."),
          P + "page-combos")
+    save(macro_actions6(menu), P + "macro-actions")
 
 
 # =====================================================================================================================
@@ -2531,13 +2568,12 @@ EDGE52 = (70, 76, 92, 255)
 CHIP_GREY = (88, 94, 108, 255)
 WIN_EDGE = (86, 92, 108, 255)
 WIDE = 1920
-POP_CROP = (128, 72, 1153, 619)        # popup5's window, its outline included
-STACK_CROP = (128, 72, 1153, 649)      # popup5_stacked's window (POP)
+STACK_CROP = (128, 72, 1153, 649)      # the stacked pop-up's window (POP), its outline included
 
 
-def q_canvas(n, width, content_h, cap_a, cap_b, pad=None):
-    """The title bar 'QN · question', then two panels: A · recommended (green chip) and B (grey chip). Each panel ends
-    in its caption. Returns the image and the two content boxes."""
+def q_canvas(n, width, content_h, cap_a, cap_b, pad=None, note=None):
+    """The title bar 'QN · question' (and an example line on its right, when given), then two panels: A · recommended
+    (green chip) and B (grey chip). Each panel ends in its caption. Returns the image and the two content boxes."""
     wide = width > W
     margin, gap, pad0 = (12, 12, 8) if wide else (24, 16, 16)
     pad = pad0 if pad is None else pad
@@ -2552,6 +2588,8 @@ def q_canvas(n, width, content_h, cap_a, cap_b, pad=None):
     d = ImageDraw.Draw(img)
     d.rounded_rectangle((margin, 12, width - margin, 56), radius=8, fill=HEAD_BG)
     iv.text(d, (margin + 18, 34), "Q%d · %s" % (n, Q52[n]), fnt(22, bold=True), fill=ch.M_TEXT, anchor="lm")
+    if note:
+        iv.text(d, (width - margin - 18, 34), note, fnt(15), fill=ch.M_GROUP, anchor="rm")
     boxes = []
     for i, (label, rec) in enumerate((("A · recommended", True), ("B", False))):
         x = margin + i * (pw + gap)
@@ -2699,9 +2737,9 @@ def q1_tiles(img, box):
     d = ImageDraw.Draw(img)
     x0, y0, x1, y1 = box
     iv.text(d, (x0, y0 + 12), "Edit chain · Corner pressure", fnt(16, bold=True), fill=ch.M_TEXT, anchor="lm")
-    tiles = [("Nair loop", "Player · Pikachu", 1), ("Dash grab", "Player · Pikachu", 2), ("CPU throw", "CPU · Mario", 3),
-             ("Ledge trap", "Player · Pikachu", None), ("Macro 7", "Player · Pikachu", None),
-             ("Replay 86f", "Player · Pikachu", None)]
+    tiles = [("Nair loop", "Recorded on Pikachu", 1), ("Dash grab", "Recorded on Pikachu", 2), ("CPU throw", "Recorded on Mario", 3),
+             ("Ledge trap", "Recorded on Pikachu", None), ("Macro 7", "Recorded on Pikachu", None),
+             ("Replay 86f", "Recorded on Pikachu", None)]
     tw, th = (x1 - x0 - 12) / 2, 62
     for i, (name, sub, num) in enumerate(tiles):
         tx = x0 + (i % 2) * (tw + 12)
@@ -2722,7 +2760,7 @@ def q1_list(img, box):
     d = ImageDraw.Draw(img)
     x0, y0, x1, y1 = box
     iv.text(d, (x0, y0 + 12), "Edit chain · Corner pressure", fnt(16, bold=True), fill=ch.M_TEXT, anchor="lm")
-    rows = [("Nair loop", "Player · Pikachu"), ("Dash grab", "Player · Pikachu"), ("CPU throw", "CPU · Mario")]
+    rows = [("Nair loop", "Recorded on Pikachu"), ("Dash grab", "Recorded on Pikachu"), ("CPU throw", "Recorded on Mario")]
     right = x1 - 84
     y = y0 + 36
     mids = []
@@ -2761,40 +2799,6 @@ def q1():
                            "Y on Dash grab moves it below CPU throw. Add a macro… opens a picker for more.")
     q1_tiles(img, a)
     q1_list(img, b)
-    return img
-
-
-# ---- Q2 ---------------------------------------------------------------------------------------------------------------
-CHAIN52 = (("Nair loop", "Player"), ("Dash grab", "Player"), ("CPU throw", "CPU"))
-
-
-def q2_panel(img, box, groups):
-    x0, y0, x1, y1 = box
-    qnode(img, (x0, y0, x1, y0 + 40), "save", "Corner pressure", suffix="· Chain On", fsize=17)
-    d = ImageDraw.Draw(img)
-    y = y0 + 58
-    for label, roles in groups:
-        iv.text(d, (x0, y + 10), label, fnt(15), fill=ch.M_GROUP, anchor="lm")
-        y += 26
-        for i, ((name, rec), role) in enumerate(zip(CHAIN52, roles)):
-            cy = y + 18
-            qnode(img, (x0, y, x1 - 112, y + 36), "macro", name, badge_n=i + 1, suffix="· recorded as " + rec)
-            d = ImageDraw.Draw(img)
-            arrow4(d, [(x1 - 104, cy), (x1 - 72, cy)], ch.M_GROUP, width=2, head=8)
-            role_chip(d, x1 - 64, cy, role)
-            y += 44
-        y += 8
-
-
-def q2():
-    img, (a, b) = q_canvas(2, W, 390,
-                           "Each macro plays on the role it was recorded for. Same result from the chord, the Player "
-                           "tab or the CPU tab.",
-                           "The open tab decides, for the whole chain.")
-    q2_panel(img, a, (("Loaded with the CPU tab open:", ("P1", "P1", "CPU")),
-                      ("Loaded by the Load chord or the Player tab:", ("P1", "P1", "CPU"))))
-    q2_panel(img, b, (("Loaded with the CPU tab open:", ("CPU", "CPU", "CPU")),
-                      ("Loaded by the Load chord or the Player tab:", ("P1", "P1", "P1"))))
     return img
 
 
@@ -2860,57 +2864,61 @@ def mismatch_prompt(img, box, info, footer, chosen=0, inset=24):
 
 
 def q4():
-    img, (a, b) = q_canvas(4, W, 352,
-                           "Asked once, before the chain starts. One answer covers 2 and 3, and the chain then plays "
+    # Revision 6: the chain is bound as CPU and the CPU is Palutena, so all three macros mismatch.
+    img, (a, b) = q_canvas(4, W, 456,
+                           "Asked once, before the chain starts. One answer covers 1, 2 and 3, and the chain then plays "
                            "without a stop.",
-                           "Asked at 2, then again at 3. The chain stops at each prompt, and the answers can differ.",
-                           pad=12)
+                           "Asked before 1, before 2 and before 3. The chain stops at each prompt, and the answers can "
+                           "differ.",
+                           pad=12, note="Example: the CPU is Palutena; all three were recorded on other fighters.")
     ask = lambda s: ("Switch or Keep?\n" + s, "save", "ask")
     arr = ("", "arrow", "")
     num = lambda n: (str(n), "macro", "")
     sq = dict(h=54, size=15, pad=20, minw=46, arrow=26)
     footer = "Inputs are the same either way. A chooses, B cancels."
+    lines = ["Recorded Pikachu · current CPU Palutena", "Recorded Pikachu · current CPU Palutena",
+             "Recorded Mario · current CPU Palutena"]
+    names = ["Nair loop", "Dash grab", "CPU throw"]
     x0, y0, x1, _ = a
-    seq52(img, x0, y0, [ask("names 2 and 3"), arr, num(1), arr, num(2), arr, num(3)], **sq)
+    seq52(img, x0, y0, [ask("names 1, 2 and 3"), arr, num(1), arr, num(2), arr, num(3)], **sq)
     d = ImageDraw.Draw(img)
     iv.text(d, (x0, y0 + 84), "The existing Fighter Mismatch screen, with one line per macro:", fnt(15),
             fill=ch.M_GROUP, anchor="lm")
-    mismatch_prompt(img, (x0, y0 + 104, x1, y0 + 352),
-                    ["2 Dash grab · Recorded Pikachu · P1 is Steve",
-                     "3 CPU throw · Recorded Mario · current CPU Villager"], [footer])
+    mismatch_prompt(img, (x0, y0 + 104, x1, y0 + 376),
+                    ["%d %s · %s" % (i + 1, names[i], lines[i]) for i in range(3)], [footer])
+    # B: a prompt before each macro, each with its own line; then the one screen, drawn once.
     x0, y0, x1, _ = b
-    seq52(img, x0, y0, [num(1), arr, ask("names 2"), arr, num(2), arr, ask("names 3"), arr, num(3)], **sq)
-    d = ImageDraw.Draw(img)
-    pw = (x1 - x0 - 10) / 2
-    # The same screen at each prompt, each with its own answer: Keep at 2, Switch at 3.
-    for k, (label, info, chosen) in enumerate((("At 2", "Recorded Pikachu · P1 is Steve", 0),
-                                               ("At 3", "Recorded Mario · current CPU Villager", 1))):
-        px = x0 + k * (pw + 10)
-        iv.text(d, (px + 2, y0 + 84), label, fnt(15, bold=True), fill=GOLD, anchor="lm")
-        # The narrower plate puts the same footer on two lines.
-        mismatch_prompt(img, (px, y0 + 104, px + pw, y0 + 352), [info],
-                        ["Inputs are the same either way.", "A chooses, B cancels."], chosen, inset=12)
+    step = 70
+    for i in range(3):
+        y = y0 + i * step
+        end = seq52(img, x0, y, [ask("names %d" % (i + 1)), arr, num(i + 1)], **sq)
         d = ImageDraw.Draw(img)
+        iv.text(d, (end + 16, y + 27), lines[i], fnt(14), fill=ch.M_TEXT, anchor="lm")
+        if i < 2:   # then the next prompt
+            nx = end - 23
+            ax = x0 + 80
+            d.line([(nx, y + 54), (nx, y + 60), (ax, y + 60)], fill=ch.M_GROUP, width=2)
+            arrow4(d, [(ax, y + 60), (ax, y + step)], ch.M_GROUP, width=2, head=7)
+    ly = y0 + 2 * step + 74
+    lead = "The same screen before each macro, "
+    iv.text(d, (x0, ly), lead, fnt(15), fill=ch.M_GROUP, anchor="lm")
+    iv.text(d, (x0 + d.textlength(lead, font=fnt(15)), ly), "×3, one per macro:", fnt(15, bold=True), fill=GOLD,
+            anchor="lm")
+    mismatch_prompt(img, (x0, ly + 18, x1, ly + 18 + 224), [lines[0]], [footer])
     return img
 
 
 # ---- Q5 ---------------------------------------------------------------------------------------------------------------
-def popup5_one_column(game, focus="corner"):
-    """B. The Combos & Conversions tab as one column: COMBOS, then CONVERSIONS, one scroll. The list scrolls by whole
-    rows until the cursor shows, and the header of the section at the top stays put."""
-    img = hide_notice4(game.copy())
-    d = ImageDraw.Draw(img)
-    view_top, view_bottom = 158, 500
-    d.rounded_rectangle((POP[0], POP[1], POP[2], view_bottom + 118), radius=12, fill=WIN, outline=WIN_EDGE, width=2)
-    iv.text(d, (152, 98), "Recording", fnt(18, bold=True), fill=ch.M_TEXT, anchor="lm")
-    role_toggle(d, 820, 82, "player", 15)
-    r5_tabs(d, 152, 122, "combos", "player")
-    width = 1110 - 148
+def popup6_one_list(game, focus="corner"):
+    """B. The Combos & Conversions tab as one list: COMBOS, then CONVERSIONS, one scroll, with the Links panel. The
+    list scrolls by whole rows until the cursor shows, and the header of the section at the top stays put."""
+    img = popup_chrome6(game, "player", "combos")
+    view_top, view_bottom = UPPER_BOX[1], LOWER_BOX[3]
+    width = UPPER_BOX[2] - UPPER_BOX[0] - 12
     order, link = r5_marks(focus)
-    rows_c = r5_rows("combo", "player", focus, extend=True)
-    rows_v = r5_rows("conv", "player", focus)
-    sec_c, pos_c = r5_section("COMBOS", "combo", rows_c, width, None, False, order, link)
-    sec_v, pos_v = r5_section("CONVERSIONS", "conv", rows_v, width, None, True, order, link)
+    sec_c, pos_c = r5_section("COMBOS", "combo", r5_rows("combo", "player", focus, extend=True), width, None, False,
+                              order, link)
+    sec_v, pos_v = r5_section("CONVERSIONS", "conv", r5_rows("conv", "player", focus), width, None, True, order, link)
     col = Image.new("RGBA", (width, sec_c.height + sec_v.height), WIN)
     col.alpha_composite(sec_c, (0, 0))
     col.alpha_composite(sec_v, (0, sec_c.height))
@@ -2920,42 +2928,41 @@ def popup5_one_column(game, focus="corner"):
                                                           for t in pos_v.values()])
     blocks = rows + [(sec_c.height, sec_c.height + header)]
     cursor = sec_c.height + pos_v[focus] if focus in pos_v else pos_c[focus]
-    # First whole-row scroll that shows the cursor; once scrolled, COMBOS stays at the top.
+    # The first whole-row scroll that shows the cursor; once scrolled, COMBOS stays at the top.
     starts = [0] + [t for t, _ in rows if t < sec_c.height]
     for start in starts:
         limit = start + (view if start == 0 else view - header)
         if cursor + 40 <= limit:
             break
-    end = max(b for t, b in blocks if t >= start and b <= limit)
+    end = max(bt for t, bt in blocks if t >= start and bt <= limit)
+    x = UPPER_BOX[0]
     if start == 0:
-        img.alpha_composite(col.crop((0, 0, width, end)), (148, view_top))
+        img.alpha_composite(col.crop((0, 0, width, end)), (x, view_top))
     else:
-        img.alpha_composite(col.crop((0, 0, width, header)), (148, view_top))
-        img.alpha_composite(col.crop((0, start, width, end)), (148, view_top + header))
+        img.alpha_composite(col.crop((0, 0, width, header)), (x, view_top))
+        img.alpha_composite(col.crop((0, start, width, end)), (x, view_top + header))
     d = ImageDraw.Draw(img)
     scroll = 0 if start == 0 else start - header
+    sx = UPPER_BOX[2] - 6
     track_top, track_bot = view_top + 2, view_bottom - 2
-    d.rounded_rectangle((1104, track_top, 1108, track_bot), radius=2, fill=(40, 43, 52, 255))
+    d.rounded_rectangle((sx, track_top, sx + 4, track_bot), radius=2, fill=(40, 43, 52, 255))
     thumb = max(18, (track_bot - track_top) * view / col.height)
     ty = track_top + (track_bot - track_top - thumb) * scroll / max(1, col.height - view)
-    d.rounded_rectangle((1104, ty, 1108, ty + thumb), radius=2, fill=(150, 156, 170, 255))
-    r5_details(img, (148, view_bottom + 12, 1110, view_bottom + 68), r5_detail_lines(focus, "player"))
-    d = ImageDraw.Draw(img)
-    d.line((144, view_bottom + 76, 1136, view_bottom + 76), fill=ch.M_RULE, width=1)
-    # One column: Up and Down move through it, so the footer has no Left / Right.
-    keys_line(img, 152, view_bottom + 90, [p for p in r5_foot("conv") if p[0] != "Left/Right"], 13)
+    d.rounded_rectangle((sx, ty, sx + 4, ty + thumb), radius=2, fill=(150, 156, 170, 255))
+    # One list: Up and Down move through it, so the footer has no Left / Right.
+    links_and_foot6(img, focus, "player", [p for p in r5_foot("conv") if p[0] != "Left/Right"])
     return img
 
 
 def q5(game):
     pw = (WIDE - 36) // 2 - 16
-    a_img = window_crop(popup5(game, "player", "combos", "corner", extend=True), POP_CROP, pw)
-    b_img = window_crop(popup5_one_column(game), POP_CROP, pw)
+    a_img = window_crop(popup6(game, "player", "combos", "corner", extend=True), STACK_CROP, pw)
+    b_img = window_crop(popup6_one_list(game), STACK_CROP, pw)
     img, (a, b) = q_canvas(5, WIDE, a_img.height,
-                           "Conversions on the left, combos on the right, each with its own scroll. Corner to kill "
-                           "numbers its combos 1 and 2.",
-                           "One column, one scroll. Corner to kill sits low, so Ryu BnB, its combo 1, has scrolled off "
-                           "the top.")
+                           "Conversions on top, combos below, each with its own scroll. The Links panel lists Corner "
+                           "to kill's combos in order.",
+                           "One list, one scroll. The combos push Corner to kill down, so the list has scrolled and Ryu "
+                           "BnB, its combo 1, is off the top.")
     img.alpha_composite(a_img, (a[0], a[1]))
     img.alpha_composite(b_img, (b[0], b[1]))
     return img
@@ -3183,21 +3190,6 @@ def q9():
     return img
 
 
-# ---- Q10 --------------------------------------------------------------------------------------------------------------
-def q10(game):
-    pw = (WIDE - 36) // 2 - 16
-    a_img = window_crop(popup5(game, "player", "saves", "pressure"), POP_CROP, pw)
-    b_img = window_crop(popup5_stacked(game), STACK_CROP, pw)
-    img, (a, b) = q_canvas(10, WIDE, max(a_img.height, b_img.height),
-                           "Side by side, each section with its own scroll. Corner pressure numbers its macros in the "
-                           "other column, and the strip above the footer says the rest.",
-                           "Stacked, each section with its own scroll. The Links panel on the right spells out Corner "
-                           "pressure's links.")
-    img.alpha_composite(a_img, (a[0], a[1]))
-    img.alpha_composite(b_img, (b[0], b[1]))
-    return img
-
-
 # ---- Q11 --------------------------------------------------------------------------------------------------------------
 def q11_label(d, x, y, key, desc, anchor="l"):
     """A button and what it does: the button bold and white, the job grey, on one line."""
@@ -3212,10 +3204,11 @@ def q11_label(d, x, y, key, desc, anchor="l"):
 
 
 def q11_window(img, box):
-    """The pop-up as a schematic: the title, Player | CPU, the tab row, two sections. Returns the tabs and columns."""
+    """Layout B as a schematic: the title, Player | CPU, the tab row, the two sections stacked, and the Links panel's
+    area on the right. Returns the tabs, the column, and the two sections' (header top, rows top, rows bottom)."""
     d = ImageDraw.Draw(img)
     x0, y0, x1, y1 = box
-    d.rounded_rectangle((x0, y0, x1, y0 + 500), radius=12, fill=WIN, outline=WIN_EDGE, width=2)
+    d.rounded_rectangle((x0, y0, x1, y0 + 630), radius=12, fill=WIN, outline=WIN_EDGE, width=2)
     iv.text(d, (x0 + 22, y0 + 36), "Recording", fnt(20, bold=True), fill=ch.M_TEXT, anchor="lm")
     role_toggle(d, x1 - 190, y0 + 18, "player", 16)
     tabs, tx = [], x0 + 22
@@ -3230,62 +3223,76 @@ def q11_window(img, box):
         iv.text(d, (tx + 15, y0 + 105), label, f, fill=ch.M_TEXT if i == 0 else ch.M_GROUP, anchor="lm")
         tabs.append(tb)
         tx += w + 12
-    cols = [(x0 + 22, x0 + 332), (x1 - 332, x1 - 22)]
-    data = (("SAVE STATES", "save", ("Corner pressure", "Platform", "Nair loop · start", "Dash grab · start")),
-            ("MACROS", "macro", ("Nair loop", "Dash grab", "CPU throw", "Macro 6")))
-    head_y = y0 + 196
-    for c, ((cx0, cx1), (title, typ, names)) in enumerate(zip(cols, data)):
-        d.rounded_rectangle((cx0, head_y, cx1, head_y + 38), radius=5, fill=HEAD_BG)
-        d.rectangle((cx0 + 10, head_y + 12, cx0 + 24, head_y + 26), fill=TYPES[typ][0])
-        iv.text(d, (cx0 + 34, head_y + 19), title, fnt(16, bold=True), fill=ch.M_TEXT, anchor="lm")
+    col = (x0 + 22, x0 + 322)
+    data = (("SAVE STATES", "save", ("Corner pressure", "Platform", "Nair loop · start"), y0 + 168),
+            ("MACROS", "macro", ("Nair loop", "Dash grab", "CPU throw"), y0 + 414))
+    sections = []
+    for title, typ, names, head_y in data:
+        d.rounded_rectangle((col[0], head_y, col[1], head_y + 38), radius=5, fill=HEAD_BG)
+        d.rectangle((col[0] + 10, head_y + 12, col[0] + 24, head_y + 26), fill=TYPES[typ][0])
+        iv.text(d, (col[0] + 34, head_y + 19), title, fnt(16, bold=True), fill=ch.M_TEXT, anchor="lm")
         for k, name in enumerate(names):
-            top = head_y + 44 + k * 46
-            if c == 0 and k == 0:
-                d.rectangle((cx0 + 2, top, cx1 - 2, top + 42), fill=ch.M_FOCUS)
-                d.rectangle((cx0 + 2, top, cx1 - 2, top + 42), outline=WHITE, width=2)
-                d.rectangle((cx0 + 2, top, cx0 + 7, top + 42), fill=WHITE)
-            iv.text(d, (cx0 + 20, top + 21), name, fnt(16), fill=ch.M_TEXT, anchor="lm")
-    return tabs, cols, head_y
+            top = head_y + 44 + k * 44
+            if typ == "save" and k == 0:
+                d.rectangle((col[0] + 2, top, col[1] - 2, top + 40), fill=ch.M_FOCUS)
+                d.rectangle((col[0] + 2, top, col[1] - 2, top + 40), outline=WHITE, width=2)
+                d.rectangle((col[0] + 2, top, col[0] + 7, top + 40), fill=WHITE)
+            iv.text(d, (col[0] + 20, top + 20), name, fnt(16), fill=ch.M_TEXT, anchor="lm")
+        sections.append((head_y, head_y + 44, head_y + 44 + len(names) * 44 - 4))
+    # The Links panel's area, marked.
+    lb = (x0 + 690, y0 + 168, x1 - 22, sections[1][2])
+    for yy in range(int(lb[1]), int(lb[3]), 12):
+        d.line((lb[0], yy, lb[0], min(yy + 6, lb[3])), fill=ch.M_GROUP, width=2)
+        d.line((lb[2], yy, lb[2], min(yy + 6, lb[3])), fill=ch.M_GROUP, width=2)
+    for xx in range(int(lb[0]), int(lb[2]), 12):
+        d.line((xx, lb[1], min(xx + 6, lb[2]), lb[1]), fill=ch.M_GROUP, width=2)
+        d.line((xx, lb[3], min(xx + 6, lb[2]), lb[3]), fill=ch.M_GROUP, width=2)
+    iv.text(d, (lb[0] + 16, lb[1] + 24), "Links panel", fnt(17, bold=True), fill=ch.M_TEXT, anchor="lm")
+    for k, line in enumerate(wrap(d, "the links of the row under the cursor", fnt(15), lb[2] - lb[0] - 32)):
+        iv.text(d, (lb[0] + 16, lb[1] + 52 + 20 * k), line, fnt(15), fill=ch.M_GROUP, anchor="lm")
+    for k in range(4):
+        top = lb[1] + 110 + k * 52
+        d.rounded_rectangle((lb[0] + 16 + (24 if k else 0), top, lb[2] - 16, top + 36), radius=6,
+                            outline=ch.M_RULE, width=1)
+    return tabs, col, sections
 
 
 def q11_panel(img, box, variant):
-    tabs, cols, head_y = q11_window(img, box)
+    tabs, col, sections = q11_window(img, box)
     d = ImageDraw.Draw(img)
     x0, y0 = box[0], box[1]
     t1 = (tabs[0][0] + tabs[0][2]) / 2
     t2 = (tabs[1][0] + tabs[1][2]) / 2
     ay = y0 + 70
     darrow(d, (t1, ay), (t2, ay))
-    gap_l, gap_r = cols[0][1] + 18, cols[1][0] - 18
-    row_y = head_y + 44 + 46 + 21
-    darrow(d, (gap_l, row_y), (gap_r, row_y))
-    mid = (gap_l + gap_r) / 2
-    bottom = head_y + 44 + 4 * 46
+    # Between the upper and the lower section: a vertical arrow in the gap between them.
+    cx = (col[0] + col[1]) / 2
+    gy0, gy1 = sections[0][2] + 6, sections[1][0] - 6
+    darrow(d, (cx, gy0), (cx, gy1))
+    gmid = (gy0 + gy1) / 2
     if variant == "a":
         q11_label(d, t2 + 22, ay, "ZL / ZR", "change the tab")
-        q11_label(d, mid, row_y - 28, "Left / Right", "", "m")
-        iv.text(d, (mid, row_y + 28), "the other section", fnt(17), fill=ch.M_GROUP, anchor="mm")
-        ux = cols[0][1] - 26
-        darrow(d, (ux, head_y + 44 + 46 + 6), (ux, bottom - 8))
-        q11_label(d, cols[0][1], bottom + 30, "Up / Down", "move inside a section", "r")
-        px = cols[1][1] - 26
-        darrow(d, (px, head_y + 52), (px, bottom - 8), width=6, head=15)
-        q11_label(d, cols[1][1], bottom + 30, "ZL + Up / Down", "page a section", "r")
+        q11_label(d, cx + 18, gmid, "Left / Right", "between the upper and the lower section")
+        ux = col[1] + 22
+        darrow(d, (ux, sections[0][1] + 2), (ux, sections[0][2] - 2))
+        q11_label(d, ux + 16, (sections[0][1] + sections[0][2]) / 2, "Up / Down", "move inside a section")
+        darrow(d, (ux, sections[1][1] + 2), (ux, sections[1][2] - 2), width=6, head=15)
+        q11_label(d, ux + 16, (sections[1][1] + sections[1][2]) / 2, "ZL + Up / Down", "page a section")
     else:
         q11_label(d, t2 + 22, ay, "Left / Right", "on the tab row: change the tab")
-        q11_label(d, mid, row_y - 28, "ZL / ZR", "", "m")
-        iv.text(d, (mid, row_y + 28), "the other section", fnt(17), fill=ch.M_GROUP, anchor="mm")
+        q11_label(d, cx + 18, gmid, "ZL / ZR", "between the upper and the lower section")
         ux = tabs[0][2] - 26
-        arrow4(d, [(ux, head_y + 44), (ux, tabs[0][3] + 4)], GREEN, width=3, head=11)
-        q11_label(d, ux + 16, (tabs[0][3] + head_y) / 2, "Up", "from the top row reaches the tab row")
+        arrow4(d, [(ux, sections[0][1]), (ux, tabs[0][3] + 4)], GREEN, width=3, head=11)
+        q11_label(d, ux + 16, (tabs[0][3] + sections[0][0]) / 2, "Up",
+                  "from the top row of the upper section reaches the tab row")
 
 
 def q11():
-    img, (a, b) = q_canvas(11, WIDE, 500,
-                           "ZL / ZR change the tab. Left / Right move between the sections. Up / Down move inside a "
-                           "section, and ZL + Up / Down pages it.",
-                           "ZL / ZR move between the sections. Up from the top row of a column reaches the tab row, "
-                           "where Left / Right change the tab.")
+    img, (a, b) = q_canvas(11, WIDE, 630,
+                           "ZL / ZR change the tab. Left / Right move between the upper and the lower section. Up / "
+                           "Down move inside a section, and ZL + Up / Down pages it.",
+                           "ZL / ZR move between the upper and the lower section. Up from the top row of the upper "
+                           "section reaches the tab row, where Left / Right change the tab.")
     q11_panel(img, a, "a")
     q11_panel(img, b, "b")
     return img
@@ -3294,7 +3301,6 @@ def q11():
 def main_q52(game):
     P = "RECORDING-REDESIGN-q%d-ab"
     save(q1(), P % 1)
-    save(q2(), P % 2)
     save(q3(), P % 3)
     save(q4(), P % 4)
     save(q5(game), P % 5)
@@ -3302,7 +3308,6 @@ def main_q52(game):
     save(q7(), P % 7)
     save(q8(), P % 8)
     save(q9(), P % 9)
-    save(q10(game), P % 10)
     save(q11(), P % 11)
 
 
@@ -3341,12 +3346,12 @@ def main():
     save(flow_drill(game, bar), P + "flow-drill")
     save(bar, P + "conversion-bar")
 
-    save(action_screen4(menu, "Recording  >  Save states  >  Corner pressure", [
+    save(action_screen4(menu, "Recording  >  Save states & Macros  >  Corner pressure", [
         ("Bind to Save / Load", False), ("Chain", False), ("Edit chain", True), ("Duplicate", False),
         ("Rename", False), ("Pin", False), ("Delete", False),
-    ], "Chain On: Load plays 1, then 2, then 3. Chain Off: Load only restores the save; the numbers stay.",
-        "Edit chain is the numbered picker. + opens the same picker from the list and the pop-up.",
-        {"Bind to Save / Load": ("bound", "on"), "Chain": ("[ON]", "on"),
+    ], "Bound as CPU, Chain On: Load restores the save, then the CPU plays 1, 2, 3. Chain Off: Load only restores.",
+        "Bind binds it under the role you are on; one save at a time. + opens Edit chain from the lists too.",
+        {"Bind to Save / Load": ("bound as CPU", "on"), "Chain": ("[ON]", "on"),
          "Edit chain": ("1 Nair loop  ·  2 Dash grab  ·  3 CPU throw  >", "text")}), P + "save-actions")
     save(action_screen4(menu, "Recording  >  Combos & Conversions  >  Corner to kill", [
         ("Drill conversion", True), ("1  Ryu BnB", False), ("2  Nair loop combo", False), ("Edit combos", False),
@@ -3360,7 +3365,7 @@ def main():
     ], "Drill makes this the one drill and clears a drilled conversion.",
         "Made from names the macro it came from. Crop asks for the first and last link and saves a copy.",
         {"Made from": ("Nair loop", "text")}), P + "combo-actions")
-    main_r5(menu, game)
+    main_r6(menu, game)
     main_q52(game)
 
 
