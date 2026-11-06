@@ -345,3 +345,11 @@ ceiling = 142806
 date = "2026-11-06"
 reason = "rc.5 merge plus the waiting-room clock (p23/rc5-merge at 781318d): measured 142806 (tools/size_gate.py), +93 over 142713"
 approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed'"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 142878
+date = "2026-11-06"
+reason = "rr-3-picker: numbered picker on the Character Cycles rank buffer, R clears the last number, chain catalog lists recordings only; measured 142878 (tools/size_gate.py), +72 over 142806"
+approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed'"
