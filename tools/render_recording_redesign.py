@@ -1565,12 +1565,16 @@ def flow_drill(game, bar_picture):
     keys_line(img, b[0], b[3] - 14, foot[3:], 13)
 
     b = strip_panel(img, 1, "It is the drill", "The row turns green, and Ryu BnB is no longer the drill. Its Links "
-                    "panel lists the combos in order, with the conversion's streak and best.")
+                    "panel lists the combos in order. The conversion is new, so its streak and best start at 0.")
     convs, combos = tab_rows("corner", "corner")
     one_row(img, b[0], b[1] - 4, b[2] - b[0], [r for r in convs if r["key"] == "corner"][0], "conv")
     one_row(img, b[0], b[1] + 27, b[2] - b[0], [r for r in combos if r["key"] == "ryu"][0], "combo")
     # The Links panel as in the pop-up, with its streak and its Drilled line; the two rows above sit close to fit it.
-    links_panel(img, (b[0], b[1] + 64, b[2], b[3]), links_spec("corner"), header=False)
+    # Strip 4 has just made Corner to kill, so it has no streak or best yet.
+    spec = links_spec("corner")
+    spec["lines"] = [("Streak", "0 · best 0, new", ch.M_TEXT) if line[0] == "Streak" else line
+                     for line in spec["lines"]]
+    links_panel(img, (b[0], b[1] + 64, b[2], b[3]), spec, header=False)
 
     b = strip_panel(img, 2, "The bar, at the top", "The helper bar sits under the frame strip, where the combo bar "
                     "is today. Full size below.")

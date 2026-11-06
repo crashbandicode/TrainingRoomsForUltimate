@@ -279,13 +279,13 @@ Operator, 2026-11-06.
 
 ![Flow: drill a conversion](RECORDING-REDESIGN-r4-flow-drill.png)
 
-*A on Corner to kill makes it the drill and replaces the drilled combo, so there is one drill at a time. The bar appears at the top of the screen. The next picture shows it at full size.*
+*A on Corner to kill makes it the drill and replaces the drilled combo, so there is one drill at a time. The bar appears at the top of the screen. Corner to kill is new, so its streak and best start at 0. The next picture shows the bar at full size, some attempts later.*
 
 ## The conversion drill bar
 
 ![Conversion bar, at the top](RECORDING-REDESIGN-r4-conversion-bar.png)
 
-*Under the frame strip, where today's combo bar sits. "CONVERSION · Corner to kill · combo 2 of 2". Ryu BnB is done, and Nair loop combo is the current combo. L1 is TRUE and L2 is now. The streak and best are the conversion's.*
+*Under the frame strip, where today's combo bar sits. "CONVERSION · Corner to kill · combo 2 of 2". Ryu BnB is done, and Nair loop combo is the current combo. L1 is TRUE and L2 is now. Some attempts after strip 5, the conversion's streak is 4 and its best 9.*
 
 The bar is the combo helper's bar with a conversion header and a row for the combos in the chain. TRUE, the current link, and the links still to come use the helper's own marks. Streak and best count only a finished conversion. A drop restarts the conversion at combo 1, with the streak back to 0 and best kept; the Q8 picture shows it.
 
