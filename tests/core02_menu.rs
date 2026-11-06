@@ -274,9 +274,10 @@ fn layout_row_counts_match_the_rc_freeze() {
     // 7 rows of the Combos group (SPEC-input-07 §6, 2026-11-05). The RC's four deferred editors ship again (operator
     // 2026-11-05): Saves has its Setup library rows, Recording Edit placement and the Replay window. Fighters & Stages
     // gained Lobby Items after Stage Hazards (Phase 2 N11, the primary's P-N11, 2026-11-05), then Ready Hats in Loading
-    // (P-HOT, LANE-HOT-SLOTS-REPORT.md §5.1).
-    assert_eq!(counts(false), [31, 13, 24, 23, 10, 3]);
-    assert_eq!(counts(true), [30, 13, 24, 23, 10, 3]);
+    // (P-HOT, LANE-HOT-SLOTS-REPORT.md §5.1). Respawn on platform moved from Saves to Fighters & Stages › Stages
+    // (2026-11-06): Saves is one row shorter and Fighters & Stages is one row longer.
+    assert_eq!(counts(false), [31, 12, 24, 24, 10, 3]);
+    assert_eq!(counts(true), [30, 12, 24, 24, 10, 3]);
     assert_eq!(counts(false)[..5].iter().sum::<usize>(), 101);
     assert_eq!(counts(true)[..5].iter().sum::<usize>(), 100);
     // Controls (MENU-DRAFT §2): 4 direction grids, 7 delay rows, 13 multi-selects (the 12 checklists,\n    // 3 of them slot sets, and Swap groups).
@@ -744,6 +745,61 @@ fn respawn_invincibility_is_greyed_while_auto_load_is_on() {
     goto(&mut m, "save_state_autoload");
     m.press(Button::A);
     assert_eq!(m.grey(respawn), None);
+}
+
+#[test]
+fn the_respawn_row_says_platform_or_instant() {
+    let row = ROWS.iter().find(|r| r.id == "respawn_invincibility").expect("row");
+    assert_eq!(row.title, "Respawn on platform");
+    let (first, second) = row.help_lines();
+    assert!(first.contains("revival platform"), "{first}");
+    assert!(first.contains("invincibility"), "{first}");
+    assert!(second.contains("instantly"), "{second}");
+    assert!(second.contains("Auto-load on death"), "{second}");
+    assert!(second.contains("Saves"), "{second}");
+    assert!(first.len() <= 80 && second.len() <= 80, "{first} / {second}");
+}
+
+#[test]
+fn respawn_setting_id_is_unchanged() {
+    let row = ROWS.iter().find(|r| r.title == "Respawn on platform").expect("row");
+    assert_eq!(row.id, "respawn_invincibility");
+    assert!(DEFS.iter().any(|def| def.id == "respawn_invincibility"));
+}
+
+#[test]
+fn the_respawn_row_is_in_the_stage_options() {
+    let row = ROWS.iter().position(|r| r.id == "respawn_invincibility").expect("row");
+    assert_eq!(ROWS[row].page(), Page::FightersStages);
+    assert_eq!(GROUPS[usize::from(ROWS[row].group)].title, "Stages");
+    let stages: Vec<&str> = ROWS.iter().filter(|r| r.group == ROWS[row].group).map(|r| r.title).collect();
+    let at = |title: &str| stages.iter().position(|t| *t == title).unwrap_or_else(|| panic!("{title} in {stages:?}"));
+    assert!(at("Stage Hazards") < at("Lobby Items") && at("Lobby Items") < at("Respawn on platform"), "{stages:?}");
+    assert!(ROWS[row].help_lines().1.contains("Saves"), "{}", ROWS[row].help);
+    let mut m = menu();
+    let saved = get(&m, "respawn_invincibility");
+    goto(&mut m, "respawn_invincibility");
+    m.press(Button::A);
+    let flipped = get(&m, "respawn_invincibility");
+    assert_ne!(flipped, saved);
+    for _ in 0..6 {
+        if m.page() == Page::Saves {
+            break;
+        }
+        m.press(Button::R);
+    }
+    assert_eq!(m.page(), Page::Saves);
+    reset_page(&mut m);
+    assert_eq!(get(&m, "respawn_invincibility"), flipped, "a Saves reset leaves the stage-options row");
+    for _ in 0..6 {
+        if m.page() == Page::FightersStages {
+            break;
+        }
+        m.press(Button::R);
+    }
+    assert_eq!(m.page(), Page::FightersStages);
+    reset_page(&mut m);
+    assert_eq!(get(&m, "respawn_invincibility"), saved, "a Fighters & Stages reset restores it");
 }
 
 #[test]

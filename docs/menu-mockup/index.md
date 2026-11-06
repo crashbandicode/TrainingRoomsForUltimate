@@ -5,7 +5,7 @@ Rendered by `tools/render_menu_mockup.py` from MENU-DRAFT.md §2. Pages show the
 Version 10 (2026-11-01): the SDI chips draw the spark's burst x2.0 longer along the SDI vector (screens 01, 16, 17; the stretches are compared on 21; method and measurements below, `DECISIONS.md` N10); the decided items are drawn (`DECISIONS.md` N1-N7): 02 Respawn invincibility added and Item on load gone, 03 the advanced row Settings override playback, 05 editable menu shortcuts, 11 and 18 the item grid docked (5x8, one page) and handheld (4x4, three pages), 19 the delay popup with checklist and range, 20 the hidden Developer page. Preload Samples left the Loading group (04, 14 and 15 now count 6 rows there).
 
 - `01-cpu.png` / `.svg` — page CPU (Defence group: direction grids; the DI and SDI rows preview their selected chips)
-- `02-saves.png` / `.svg` — page Saves (Save states group; Respawn invincibility focused, Item on load gone)
+- `02-saves.png` / `.svg` — page Saves (Save states group; the 2026-11-01 screen draws Respawn invincibility focused, Item on load gone). The in-game row is labeled Respawn on platform and sits on Fighters & Stages › Stages.
 - `03-recording.png` / `.svg` — page Recording (Playback group; the advanced row Settings override playback focused)
 - `04-fighters-stages.png` / `.svg` — page Fighters & Stages (Player 1 and CPU: portrait pickers, cycle preview, Solo Popo placeholder)
 - `05-display-controls.png` / `.svg` — page Display & Controls (Controls group; Menu shortcut 1 / 2 are editor rows, Permanent shortcut stays info)

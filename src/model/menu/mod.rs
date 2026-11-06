@@ -111,7 +111,7 @@ pub struct Outbox {
 /// Why a row or entry is greyed (it shows dimmed with this reason and ignores A).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Grey {
-    /// Respawn invincibility while Auto-load on death is On (N2): a save state loads instead.
+    /// Respawn on platform while Auto-load on death is On (N2): a save state loads instead.
     AutoLoadOn,
     /// A damage range while its damage setting is not Random Value.
     DamageNotRandom,

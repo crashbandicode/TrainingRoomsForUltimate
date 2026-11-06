@@ -84,10 +84,10 @@ relative to you, on either side of the CPU.
 
 ### Save states and respawn
 
-![Respawn invincibility On](docs/media/respawn-on.gif)
+![Respawn on platform](docs/media/respawn-on.gif)
 
-Save states with slots, mirroring and damage on load (Saves page). *Respawn invincibility* chooses between the game's
-respawn platform (above) and the instant respawn.
+Save states with slots, mirroring and damage on load (Saves page). *Respawn on platform* (Fighters & Stages ›
+Stages) chooses between the game's respawn platform (above) and the instant respawn.
 
 ### Recording and playback
 
