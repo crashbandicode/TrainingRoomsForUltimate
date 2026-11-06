@@ -221,6 +221,14 @@ approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed'"
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
+ceiling = 140156
+date = "2026-11-05"
+reason = "Timer-recording truncation fix (P-TIMER, p23/timer-recording) on the rc.4 candidate ff69e53: capture breaks in the capture model, the .smd/.tmrc formats and the clip editor; measured 140156 at 2f46449 (tools/size_gate.py), +174 over 139982"
+approved_by = "Operator 2026-11-05 via primary (P-TIMER order, 18:32Z; size rule as for P-N11): 'Raise as needed'"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
 ceiling = 140843
 date = "2026-11-05"
 reason = "rc.6: switch P1 to a combo's recorded fighter with the named macros' Switch/Keep question, one explicit P1 load (p23/combo-switch, operator 2026-11-05 DEFERRED-LIST); measured 140843 at 5bdccb6 (tools/size_gate.py), +279 over the rc.5 candidate's 140564"

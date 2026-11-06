@@ -24,9 +24,20 @@ pub struct ReplayTrack {
 pub struct ReplaySession {
     pub tracks: Vec<ReplayTrack>,
     pub truncated: bool,
+    /// Frame indices (shared by every track) where play resumed after a stretch of the
+    /// native record with no live play (the TIME! to sudden-death transition, a pause).
+    /// Ascending; the state is discontinuous across each one.
+    pub breaks: Vec<u32>,
 }
 
 impl ReplaySession {
+    /// The break that a selection of frames `start..=end` crosses, if any: a
+    /// recording made from it would play the inputs after the break from a state
+    /// before it.
+    pub fn break_within(&self, start: u32, end: u32) -> Option<u32> {
+        self.breaks.iter().copied().find(|&b| start < b && b <= end)
+    }
+
     /// Associate only values from the same immutable committed capture. Native
     /// CFMK row numbers and local live entry IDs are different namespaces.
     pub fn mii_for_track(&self, miis: &crate::engine::mii::replay::ReplayMiis,
@@ -148,7 +159,7 @@ mod tests {
         for frame in &mut brawler.frames { frame.start.fighter_kind = 0x48; }
         let mut mario = track(); mario.entry = 0;
         for frame in &mut mario.frames { frame.start.fighter_kind = 0; }
-        let mut session = ReplaySession {tracks: vec![mario, brawler], truncated: false};
+        let mut session = ReplaySession {tracks: vec![mario, brawler], truncated: false, breaks: Vec::new()};
         let associated = session.mii_for_track(&miis, 1, 0x48).unwrap();
         assert_eq!(associated.entry(), 0); // Native index never replaces the selected live entry.
         assert!(session.mii_for_track(&miis, 0, 0x48).is_err());

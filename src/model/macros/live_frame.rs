@@ -52,13 +52,38 @@ pub struct LiveTrack {
     pub frames: Vec<LiveFrame>,
 }
 
+/// A stretch of the native record with no live play at all (the TIME! to sudden-death
+/// transition, a pause): play resumes at `counter` with frame `index` of every track.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct CaptureBreak {
+    pub index: u32,
+    pub counter: u32,
+}
+
+/// At most this many breaks per record; one more seals the record as before.
+pub const MAX_BREAKS: usize = 16;
+
 #[derive(Clone, Debug, Default)]
 pub struct LiveSession {
     pub tracks: Vec<LiveTrack>,
     pub truncated: bool,
     /// Opaque native serializer counter, not a proven gameplay/input/replay clock.
-    /// Admitted tracks start together and advance contiguously without wrap.
+    /// Admitted tracks start together and advance contiguously without wrap, except
+    /// across `breaks`, where every track resumes at the break's counter.
     pub first_counter: Option<u32>,
+    /// Ascending by index and counter; empty for a record played without interruption.
+    pub breaks: Vec<CaptureBreak>,
+}
+
+impl LiveSession {
+    /// The native counter of frame `index` (the same for every track).
+    pub fn counter_at(&self, index: u32) -> Option<u32> {
+        let first = self.first_counter?;
+        match self.breaks.iter().rev().find(|b| b.index <= index) {
+            Some(b) => b.counter.checked_add(index - b.index),
+            None => first.checked_add(index),
+        }
+    }
 }
 
 #[cfg(test)]

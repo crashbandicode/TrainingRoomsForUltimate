@@ -53,7 +53,7 @@ pub use library::{Library, MacroEntry};
 pub use live_capture::{LiveCapturePool, NativeRecordKey, MAX_RETAINED_CAPTURES};
 #[cfg(any(feature = "diag", test))]
 pub use live_capture::{FirstSeal, SealReason};
-pub use live_frame::{LiveFrame, LiveInput, LiveSession, LiveTrack};
+pub use live_frame::{CaptureBreak, LiveFrame, LiveInput, LiveSession, LiveTrack, MAX_BREAKS};
 pub use recording::{
     InputFrame, MacroError, MacroRecording, MomentumMode, Placement, StartState, DEFAULT_FPS,
     MAX_FRAMES, MAX_GAME_VERSION_BYTES, MAX_NAME_CHARS, SCHEMA_VERSION,

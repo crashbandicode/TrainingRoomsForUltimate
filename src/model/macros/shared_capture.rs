@@ -43,6 +43,7 @@ const MAX_EVENTS: u64 = (3 * MAX_CAPTURE_TRACKS * MAX_FRAMES + MAX_FRAMES + 2 * 
 const LAYOUT: &str = "training_native_f32";
 const COUNTER: &str = "smash13_0_5_serializer_counter_u32le";
 const MII_REPLAY: &str = "training_mii_replay_v1";
+const BREAK_REASON: &str = "native record continued without live play (match phase change)";
 const PHASE_NOTE: &str = "State(Before) is the proposed pre-fighter-callback phase, NOT an acceptance claim; input application order and Effective inputs are pending runtime qualification.";
 static NEXT_TEMP: AtomicU64 = AtomicU64::new(0);
 
@@ -105,8 +106,19 @@ fn validate_session(session: &LiveSession) -> io::Result<usize> {
         }
     }
     if actors > MAX_ACTORS { return Err(bad("too many actor incarnations")); }
-    session.first_counter.ok_or_else(|| bad("missing serializer counter"))?
-        .checked_add((longest - 1) as u32).ok_or_else(|| bad("serializer counter wraps"))?;
+    session.first_counter.ok_or_else(|| bad("missing serializer counter"))?;
+    // Breaks (P-TIMER): ascending inside the frames, each resuming past the counter before it.
+    if session.breaks.len() > crate::engine::macros::MAX_BREAKS { return Err(bad("too many capture breaks")); }
+    let mut previous_index = 0;
+    for b in &session.breaks {
+        let before = b.index.checked_sub(1).and_then(|i| session.counter_at(i));
+        if b.index <= previous_index || b.index as usize >= longest
+            || before.is_none_or(|before| before.checked_add(1).is_none_or(|next| b.counter <= next)) {
+            return Err(bad("invalid capture break"));
+        }
+        previous_index = b.index;
+    }
+    session.counter_at((longest - 1) as u32).ok_or_else(|| bad("serializer counter wraps"))?;
     Ok(longest)
 }
 
@@ -175,7 +187,11 @@ impl SharedCaptureArchive {
         let mut active: [Option<(ActorId, ActorIdentity)>; 8] = std::array::from_fn(|_| None);
         let mut next_actor = 0;
         for index in 0..longest {
-            let counter = session.first_counter.ok_or_else(|| bad("missing counter"))? + index as u32;
+            let counter = session.counter_at(index as u32).ok_or_else(|| bad("missing counter"))?;
+            // P-TIMER: the native record went on without live play before this frame (sudden death).
+            if session.breaks.iter().any(|b| b.index as usize == index) {
+                emit(EventBody::Gap { actor: None, reason: Some(BREAK_REASON.into()) })?;
+            }
             emit(EventBody::Raw(RawUnit { raw: RawBytes::new(COUNTER, &counter.to_le_bytes()), source_offset: Some(0x200078) }))?;
             for track in &tracks {
                 let Some(frame) = track.frames.get(index) else { continue };
@@ -333,7 +349,7 @@ fn same_identity(saved: &SavedCapture, id: &str, name: &str, version: &str, miis
     Ok(())
 }
 fn same_projection(a: &ReplaySession, b: &ReplaySession) -> bool {
-    a.truncated == b.truncated && a.tracks.len() == b.tracks.len() && a.tracks.iter().zip(&b.tracks).all(|(a,b)| {
+    a.truncated == b.truncated && a.breaks == b.breaks && a.tracks.len() == b.tracks.len() && a.tracks.iter().zip(&b.tracks).all(|(a,b)| {
         a.entry == b.entry && a.quantized_analog == b.quantized_analog && a.frames.len() == b.frames.len()
             && a.frames.iter().zip(&b.frames).all(|(a,b)| a.input == b.input
                 && a.start.fighter_kind == b.start.fighter_kind && a.start.costume == b.start.costume
@@ -351,6 +367,8 @@ struct Projector {
     pending: Option<(ActorId, Kinematics, Situation)>,
     counter: Option<u32>, group: usize, last_entry: Option<u8>, group_samples: usize,
     started: bool, stopped: bool, ended: bool, seq: u64,
+    /// A global Gap was just read: the next counter may jump (P-TIMER).
+    gap: bool, breaks: Vec<u32>,
 }
 
 impl Projector {
@@ -364,7 +382,8 @@ impl Projector {
             tracks.push(ReplayTrack { entry: entry.entry as i32, frames: Vec::new(), quantized_analog: false });
         }
         Ok(Self { miis: None, tracks, slots, actors: BTreeMap::new(), active: [None; 8], pending: None,
-            counter: None, group: 0, last_entry: None, group_samples: 0, started: false, stopped: false, ended: false, seq: 0 })
+            counter: None, group: 0, last_entry: None, group_samples: 0, started: false, stopped: false, ended: false, seq: 0,
+            gap: false, breaks: Vec::new() })
     }
 
     fn consume(&mut self, e: &Event) -> io::Result<()> {
@@ -388,12 +407,23 @@ impl Projector {
                 let bytes: [u8;4] = raw.raw.bytes().map_err(bad)?.try_into().map_err(|_| bad("counter width"))?;
                 let value = u32::from_le_bytes(bytes);
                 if let Some(previous) = self.counter {
-                    if self.group_samples == 0 || previous.checked_add(1) != Some(value) { return Err(bad("counter gap/wrap or empty group")); }
+                    let next = previous.checked_add(1);
+                    let resumed = self.gap && next.is_some_and(|next| value > next);
+                    if self.group_samples == 0 || (next != Some(value) && !resumed) || (self.gap && !resumed) {
+                        return Err(bad("counter gap/wrap or empty group"));
+                    }
                     self.group += 1;
-                }
+                    if resumed {
+                        if self.breaks.len() >= crate::engine::macros::MAX_BREAKS { return Err(bad("too many capture breaks")); }
+                        self.breaks.push(self.group as u32);
+                    }
+                } else if self.gap { return Err(bad("gap before the first sample group")); }
+                self.gap = false;
                 if self.group >= MAX_FRAMES { return Err(bad("too many sample groups")); }
                 self.counter = Some(value); self.last_entry = None; self.group_samples = 0;
             }
+            EventBody::Gap { actor: None, reason: Some(reason) } if self.counter.is_some() && !self.stopped && !self.gap
+                && self.group_samples > 0 && reason == BREAK_REASON => self.gap = true,
             EventBody::Lifecycle { actor, event } if self.counter.is_some() && !self.stopped => {
                 match event {
                     LifecycleEvent::Spawn { identity, cause: SpawnCause::Unknown } => {
@@ -471,7 +501,8 @@ impl Projector {
 
     fn finish(self, truncated: bool) -> io::Result<(ReplaySession, Option<ReplayMiis>)> {
         if !self.ended || self.pending.is_some() || self.tracks.iter().any(|t| t.frames.is_empty()) { return Err(bad("empty or unfinished projection")); }
-        Ok((ReplaySession { tracks: self.tracks, truncated }, self.miis))
+        if self.gap { return Err(bad("gap without a following sample group")); }
+        Ok((ReplaySession { tracks: self.tracks, truncated, breaks: self.breaks }, self.miis))
     }
 }
 
@@ -519,7 +550,34 @@ mod tests {
         LiveSession { tracks: vec![LiveTrack { entry: 1, frames: vec![
             frame([-0.0, f32::from_bits(1), 0.49999997 / 120.0, 2.0]),
             frame([-2.0, -0.5 / 120.0, 0.5 / 120.0, f32::from_bits(0x80000001)]),
-        ] }], truncated: false, first_counter: Some(123) }
+        ] }], truncated: false, first_counter: Some(123), breaks: Vec::new() }
+    }
+
+    /// P-TIMER: regular time, a stretch with no live play, then sudden death. The `.smd` keeps the true counters with
+    /// one global Gap before the resumed frame; the cache and the canonical load both return the break, complete.
+    #[test]
+    fn a_sudden_death_break_round_trips_with_its_gap_and_true_counters() {
+        let mut s = session();
+        for _ in 0..2 { let f = s.tracks[0].frames[0]; s.tracks[0].frames.push(f); }
+        s.breaks = vec![crate::engine::macros::CaptureBreak { index: 2, counter: 123 + 2 + 300 }];
+        let fixture = Fixture::new();
+        let dir = fixture.publish(&s);
+        let timeline = fs::read_to_string(dir.join(TIMELINE_FILE)).unwrap();
+        assert_eq!(timeline.matches("\"gap\"").count() + timeline.matches("\"Gap\"").count(), 1, "one gap event");
+        let loaded = fixture.load().unwrap();
+        assert!(!loaded.session.truncated);
+        assert_eq!(loaded.session.breaks, vec![2]);
+        assert_eq!(loaded.session.tracks[0].frames.len(), 4);
+        let cache = CaptureArchive::new(&dir).load(&encode_file_id("native-id")).unwrap();
+        assert_eq!(cache.session.breaks, vec![2]);
+        // A break that does not jump, or sits outside the frames, is refused before publication.
+        for b in [crate::engine::macros::CaptureBreak { index: 2, counter: 125 },
+                  crate::engine::macros::CaptureBreak { index: 4, counter: 999 },
+                  crate::engine::macros::CaptureBreak { index: 0, counter: 999 }] {
+            let mut bad_break = s.clone();
+            bad_break.breaks = vec![b];
+            assert!(Fixture::new().archive().save_with_outcome("native-id", "Native title", "13.0.5", &bad_break).is_err(), "{b:?}");
+        }
     }
 
     #[test]

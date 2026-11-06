@@ -18,7 +18,7 @@ pub struct VaultArchive {
 impl Default for VaultArchive { fn default() -> Self { Self::new() } }
 impl VaultArchive {
     pub const fn new() -> Self {
-        Self { epoch: 0, session: crate::engine::macros::ReplaySession { tracks: Vec::new(), truncated: false }, previous: None }
+        Self { epoch: 0, session: crate::engine::macros::ReplaySession { tracks: Vec::new(), truncated: false, breaks: Vec::new() }, previous: None }
     }
     pub fn note_loss(&mut self, last_lost_epoch: u64) {
         if last_lost_epoch != 0 && self.epoch <= last_lost_epoch { self.session.truncated = true; }

@@ -61,12 +61,47 @@
    "dest": "src/model/macros/capture_archive.rs",
    "crate": "macros",
    "src_sha256": "dbfdf217e08fe1421c292b302ea58e60d541a817b7fc17b410b166e8c7458d5f",
-   "dest_sha256": "11367d7e007dd4faabb03fc4c3ff007f81e509becdfe4370caedc531686fc70b",
+   "dest_sha256": "bc8676878aab6a136d8b22b40c5df564b42caeea9556ff668a6169a65ae39f94",
    "edits": [
     {
      "old": "file_id.as_bytes().chunks_exact(2) {",
      "new": "file_id.as_bytes().as_chunks::<2>().0 {",
      "reason": "clippy 1.98 chunks_exact_to_as_chunks (zero warnings without an allow): the same pairs through as_chunks"
+    },
+    {
+     "old": "                tracks,\n                truncated: header.truncated,\n            },\n        })\n",
+     "new": "                tracks,\n                truncated: header.truncated,\n                breaks: header.breaks,\n            },\n        })\n",
+     "reason": "P-TIMER (primary 2026-11-05 18:32Z; DECISIONS DEFERRED-LIST item 7): a capture keeps going across a stretch of the native record with no live play (TIME! to sudden death) as a CaptureBreak, instead of sealing every track at the end of regular time"
+    },
+    {
+     "old": "            miis: miis.cloned(),\n            truncated: session.truncated,\n            tracks: session\n                .tracks\n",
+     "new": "            miis: miis.cloned(),\n            truncated: session.truncated,\n            breaks: session.breaks.clone(),\n            tracks: session\n                .tracks\n",
+     "reason": "P-TIMER (primary 2026-11-05 18:32Z; DECISIONS DEFERRED-LIST item 7): a capture keeps going across a stretch of the native record with no live play (TIME! to sudden death) as a CaptureBreak, instead of sealing every track at the end of regular time"
+    },
+    {
+     "old": "    truncated: bool,\n    tracks: Vec<TrackHeader>,\n}\n\n",
+     "new": "    truncated: bool,\n    tracks: Vec<TrackHeader>,\n    /// P-TIMER: frame indices where play resumed after a stretch with no live play (sudden death). Absent when\n    /// empty, so a capture without one keeps the original bytes and older files read as having none.\n    #[serde(default, skip_serializing_if = \"Vec::is_empty\")]\n    breaks: Vec<u32>,\n}\n\n",
+     "reason": "P-TIMER (primary 2026-11-05 18:32Z; DECISIONS DEFERRED-LIST item 7): a capture keeps going across a stretch of the native record with no live play (TIME! to sudden death) as a CaptureBreak, instead of sealing every track at the end of regular time"
+    },
+    {
+     "old": "            )));\n        }\n    }\n    Ok(())\n}\n\n",
+     "new": "            )));\n        }\n    }\n    let longest = header.tracks.iter().map(|track| track.frames).max().unwrap_or(0);\n    if header.breaks.len() > crate::engine::macros::MAX_BREAKS\n        || header.breaks.iter().any(|b| *b == 0 || *b >= longest)\n        || header.breaks.windows(2).any(|w| w[0] >= w[1])\n    {\n        return Err(invalid_data(\"capture breaks must ascend inside the frames, at most MAX_BREAKS\"));\n    }\n    Ok(())\n}\n\n",
+     "reason": "P-TIMER (primary 2026-11-05 18:32Z; DECISIONS DEFERRED-LIST item 7): a capture keeps going across a stretch of the native record with no live play (TIME! to sudden death) as a CaptureBreak, instead of sealing every track at the end of regular time"
+    },
+    {
+     "old": "            }\n        }\n    }\n    Ok(())\n",
+     "new": "            }\n        }\n    }\n    let longest = session.tracks.iter().map(|track| track.frames.len() as u32).max().unwrap_or(0);\n    if session.breaks.len() > crate::engine::macros::MAX_BREAKS\n        || session.breaks.iter().any(|b| *b == 0 || *b >= longest)\n        || session.breaks.windows(2).any(|w| w[0] >= w[1])\n    {\n        return Err(\"capture breaks must ascend inside the frames, at most MAX_BREAKS\".into());\n    }\n    Ok(())\n",
+     "reason": "P-TIMER (primary 2026-11-05 18:32Z; DECISIONS DEFERRED-LIST item 7): a capture keeps going across a stretch of the native record with no live play (TIME! to sudden death) as a CaptureBreak, instead of sealing every track at the end of regular time"
+    },
+    {
+     "old": "            ],\n            truncated: true,\n        }\n    }\n",
+     "new": "            ],\n            truncated: true,\n            breaks: Vec::new(),\n        }\n    }\n",
+     "reason": "P-TIMER (primary 2026-11-05 18:32Z; DECISIONS DEFERRED-LIST item 7): a capture keeps going across a stretch of the native record with no live play (TIME! to sudden death) as a CaptureBreak, instead of sealing every track at the end of regular time"
+    },
+    {
+     "old": "                truncated: false,\n                tracks: Vec::new(),\n            };\n            let bytes = capture_file(&serde_json::to_vec(&header).unwrap());\n",
+     "new": "                truncated: false,\n                tracks: Vec::new(),\n                breaks: Vec::new(),\n            };\n            let bytes = capture_file(&serde_json::to_vec(&header).unwrap());\n",
+     "reason": "P-TIMER (primary 2026-11-05 18:32Z; DECISIONS DEFERRED-LIST item 7): a capture keeps going across a stretch of the native record with no live play (TIME! to sudden death) as a CaptureBreak, instead of sealing every track at the end of regular time"
     }
    ]
   },
@@ -82,7 +117,7 @@
    "dest": "src/model/macros/live_capture.rs",
    "crate": "macros",
    "src_sha256": "61ae1a33ce4e788097f81761f12f0c86801b4f32a1ba273498b701ccc0f8bb91",
-   "dest_sha256": "bda82f18e63d9873a8b7f0751defc28827ffeb68bada1bef6070b18fa028aa4e",
+   "dest_sha256": "48cbf44733df492fc20b40ddfa3b385752513f839df38afe04e758b23a8f4966",
    "edits": [
     {
      "old": "    pub fn active_key(&self) -> Option<NativeRecordKey> { self.active }",
@@ -153,6 +188,26 @@
      "old": "#[cfg(test)]\nmod tests {",
      "new": "/// Pure worker facts, shared by every actual sealing branch. No native reads or allocation.\n#[cfg(any(feature = \"diag\", test))]\nfn observe_seal(out: &mut Option<FirstSeal>, live: &LiveRecord, key: NativeRecordKey,\n                reason: SealReason, flags: u8, entry: Option<i32>, next: Option<u32>) {\n    if live.session.truncated { return; }\n    let frames = live.session.tracks.iter().filter(|t| entry.is_none_or(|e| e == t.entry))\n        .map(|t| t.frames.len() as u32).sum();\n    *out = Some(FirstSeal { key, reason, flags, entry, frames, first: live.session.first_counter,\n        last: entry.and_then(|e| live.last_tick[e as usize]), next });\n}\n\n#[cfg(test)]\n#[path = \"worker_first_seal_tests.rs\"]\nmod worker_first_seal_tests;\n\n#[cfg(test)]\nmod tests {",
      "reason": "Approved worker-only first-truncation evidence; preserve capture decisions and bytes"
+    },
+    {
+     "old": "            live: Some(LiveRecord {\n                session: LiveSession { tracks: Vec::with_capacity(ENTRIES),\n                    truncated: false, first_counter: None },\n                last_tick: [None; ENTRIES],\n                sealed: [false; ENTRIES],\n",
+     "new": "            live: Some(LiveRecord {\n                session: LiveSession { tracks: Vec::with_capacity(ENTRIES),\n                    truncated: false, first_counter: None, breaks: Vec::new() },\n                last_tick: [None; ENTRIES],\n                sealed: [false; ENTRIES],\n",
+     "reason": "P-TIMER (primary 2026-11-05 18:32Z; DECISIONS DEFERRED-LIST item 7): a capture keeps going across a stretch of the native record with no live play (TIME! to sudden death) as a CaptureBreak, instead of sealing every track at the end of regular time"
+    },
+    {
+     "old": "        if live.sealed[slot] || live.last_tick[slot] == Some(tick) { return false; }\n        let gap = match live.last_tick[slot] {\n            Some(last) => last.checked_add(1) != Some(tick),\n            // The editor carries crop indexes across fighters. A late-starting\n            // track must not silently shift the selected match time.\n",
+     "new": "        if live.sealed[slot] || live.last_tick[slot] == Some(tick) { return false; }\n        let gap = match live.last_tick[slot] {\n            Some(last) => last.checked_add(1) != Some(tick)\n                && !(sample.is_valid() && resumes_after_break(live, slot, last, tick)),\n            // The editor carries crop indexes across fighters. A late-starting\n            // track must not silently shift the selected match time.\n",
+     "reason": "P-TIMER (primary 2026-11-05 18:32Z; DECISIONS DEFERRED-LIST item 7): a capture keeps going across a stretch of the native record with no live play (TIME! to sudden death) as a CaptureBreak, instead of sealing every track at the end of regular time"
+    },
+    {
+     "old": "}\n\n/// Pure worker facts, shared by every actual sealing branch. No native reads or allocation.\n#[cfg(any(feature = \"diag\", test))]\n",
+     "new": "}\n\n/// A forward jump from `last` to `tick` is a phase break, not a discontinuity, when the\n/// whole record went without live play in between: no admitted fighter was sampled at\n/// any counter inside the gap (the TIME! to sudden-death transition, a pause), and this\n/// fighter's track ends exactly where the timeline does. The first fighter to resume\n/// records the break; the others must resume at the same counter and frame index.\n/// Time is never compressed: the break keeps every later frame's true counter.\nfn resumes_after_break(live: &mut LiveRecord, slot: usize, last: u32, tick: u32) -> bool {\n    if tick <= last { return false; }\n    let Some(len) = live.session.tracks.iter().find(|t| t.entry == slot as i32)\n        .map(|t| t.frames.len() as u32) else { return false };\n    if let Some(b) = live.session.breaks.last() {\n        if b.counter == tick { return b.index == len; }\n        if b.counter > last { return false; }\n    }\n    // Every admitted, unsealed fighter stopped at the same counter, and there are at least two:\n    // a lone track cannot tell a stretch without play from its own dropped callbacks.\n    let mut stopped_together = 0;\n    for track in &live.session.tracks {\n        let other = track.entry as usize;\n        if live.sealed[other] { continue; }\n        if live.last_tick[other] != Some(last) { return false; }\n        stopped_together += 1;\n    }\n    let longest = live.session.tracks.iter().map(|t| t.frames.len() as u32).max().unwrap_or(0);\n    if stopped_together < 2 || len != longest || live.session.breaks.len() >= crate::engine::macros::MAX_BREAKS\n        || live.session.breaks.try_reserve(1).is_err() {\n        return false;\n    }\n    live.session.breaks.push(crate::engine::macros::CaptureBreak { index: len, counter: tick });\n    true\n}\n\n/// Pure worker facts, shared by every actual sealing branch. No native reads or allocation.\n#[cfg(any(feature = \"diag\", test))]\n",
+     "reason": "P-TIMER (primary 2026-11-05 18:32Z; DECISIONS DEFERRED-LIST item 7): a capture keeps going across a stretch of the native record with no live play (TIME! to sudden death) as a CaptureBreak, instead of sealing every track at the end of regular time"
+    },
+    {
+     "old": "    }\n\n    #[test]\n    fn late_fighter_cannot_shift_shared_crop_time() {\n",
+     "new": "    }\n\n    /// P-TIMER, the p4c-03 shape (Steve vs Byleth, 1:00, sudden death; native counter 4449): 3600 counters of\n    /// regular time, a stretch with no live sample for anyone (TIME! to the sudden-death GO), then sudden death.\n    /// Before the fix both tracks were sealed at 3600 and the capture said truncated.\n    #[test]\n    fn a_timer_match_continues_through_sudden_death() {\n        let mut pool = LiveCapturePool::new();\n        let key = pool.start_record(0);\n        for tick in 0..3600 {\n            for entry in 0..2 {\n                assert!(pool.push(key, entry, tick, sample(tick)));\n            }\n        }\n        let resume = 3600 + 300;\n        for tick in resume..4449 {\n            for entry in [1, 0] {\n                assert!(pool.push(key, entry, tick, sample(tick)), \"tick {tick} entry {entry}\");\n            }\n        }\n        let saved = pool.snapshot(key).unwrap();\n        assert!(!saved.truncated, \"complete: nothing was dropped\");\n        assert_eq!(saved.breaks, vec![crate::engine::macros::CaptureBreak { index: 3600, counter: resume }]);\n        for track in &saved.tracks {\n            assert_eq!(track.frames.len(), 3600 + (4449 - resume) as usize);\n            assert_eq!(track.frames[3600].input.buttons, resume, \"sudden death starts after the break\");\n        }\n        assert_eq!(saved.counter_at(3599), Some(3599));\n        assert_eq!(saved.counter_at(3600), Some(resume), \"true counters, time not compressed\");\n        assert_eq!(saved.counter_at(3600 + 10), Some(resume + 10));\n    }\n\n    /// A lone fighter's gap stays a discontinuity: one track cannot tell a stretch without play from its own drops.\n    #[test]\n    fn a_lone_track_gap_and_an_invalid_resume_still_seal() {\n        let mut pool = LiveCapturePool::new();\n        let key = pool.start_record(0);\n        assert!(pool.push(key, 0, 1, sample(1)));\n        assert!(!pool.push(key, 0, 9, sample(9)));\n        assert!(pool.snapshot(key).unwrap().truncated);\n        let key = pool.start_record(1);\n        for entry in 0..2 { assert!(pool.push(key, entry, 1, sample(1))); }\n        let mut invalid = sample(9);\n        invalid.y = f32::NAN;\n        assert!(!pool.push(key, 0, 9, invalid));\n        let saved = pool.snapshot(key).unwrap();\n        assert!(saved.truncated && saved.breaks.is_empty(), \"an invalid sample records no break\");\n    }\n\n    #[test]\n    fn a_gap_while_another_fighter_played_still_seals() {\n        let mut pool = LiveCapturePool::new();\n        let key = pool.start_record(0);\n        for tick in 0..10 {\n            assert!(pool.push(key, 1, tick, sample(tick)));\n            if tick < 5 { assert!(pool.push(key, 0, tick, sample(tick))); }\n        }\n        assert!(!pool.push(key, 0, 10, sample(10)), \"entry 0 missed ticks entry 1 played\");\n        assert!(pool.push(key, 1, 10, sample(10)));\n        let saved = pool.snapshot(key).unwrap();\n        assert!(saved.truncated && saved.breaks.is_empty());\n        assert_eq!(saved.tracks.iter().find(|t| t.entry == 0).unwrap().frames.len(), 5);\n    }\n\n    #[test]\n    fn a_fighter_resuming_elsewhere_or_backwards_seals_and_breaks_are_bounded() {\n        let mut pool = LiveCapturePool::new();\n        let key = pool.start_record(0);\n        for tick in 0..4 {\n            for entry in 0..2 { assert!(pool.push(key, entry, tick, sample(tick))); }\n        }\n        assert!(pool.push(key, 0, 20, sample(20)));\n        assert!(!pool.push(key, 1, 21, sample(21)), \"not the break's counter\");\n        assert!(!pool.push(key, 0, 19, sample(19)), \"backwards\");\n        let saved = pool.snapshot(key).unwrap();\n        assert!(saved.truncated);\n        assert_eq!(saved.breaks.len(), 1);\n\n        let mut pool = LiveCapturePool::new();\n        let key = pool.start_record(1);\n        let mut tick = 0;\n        for _ in 0..=crate::engine::macros::MAX_BREAKS {\n            for entry in 0..2 { assert!(pool.push(key, entry, tick, sample(tick))); }\n            tick += 5;\n        }\n        assert!(!pool.push(key, 0, tick, sample(tick)), \"one break more than MAX_BREAKS seals\");\n        let saved = pool.snapshot(key).unwrap();\n        assert!(saved.truncated);\n        assert_eq!(saved.breaks.len(), crate::engine::macros::MAX_BREAKS);\n    }\n\n    #[test]\n    fn late_fighter_cannot_shift_shared_crop_time() {\n",
+     "reason": "P-TIMER (primary 2026-11-05 18:32Z; DECISIONS DEFERRED-LIST item 7): a capture keeps going across a stretch of the native record with no live play (TIME! to sudden death) as a CaptureBreak, instead of sealing every track at the end of regular time"
     }
    ]
   },
@@ -161,7 +216,19 @@
    "dest": "src/model/macros/live_frame.rs",
    "crate": "macros",
    "src_sha256": "a4f6894336d120ba5d80d20e306f7817c1f6a836d787d809b395bb3c7bf4c471",
-   "dest_sha256": "d1da961f019dc3af1be99bf485c5629f533aa2a63c1d316d51126b1a03e8b8c3"
+   "dest_sha256": "73b1f11392cb292aadef2d9d84ee2fc76f8c7e6d2ffb1b1c096c83f429916fb4",
+   "edits": [
+    {
+     "old": "}\n\n#[derive(Clone, Debug, Default)]\npub struct LiveSession {\n",
+     "new": "}\n\n/// A stretch of the native record with no live play at all (the TIME! to sudden-death\n/// transition, a pause): play resumes at `counter` with frame `index` of every track.\n#[derive(Clone, Copy, Debug, Eq, PartialEq)]\npub struct CaptureBreak {\n    pub index: u32,\n    pub counter: u32,\n}\n\n/// At most this many breaks per record; one more seals the record as before.\npub const MAX_BREAKS: usize = 16;\n\n#[derive(Clone, Debug, Default)]\npub struct LiveSession {\n",
+     "reason": "P-TIMER (primary 2026-11-05 18:32Z; DECISIONS DEFERRED-LIST item 7): a capture keeps going across a stretch of the native record with no live play (TIME! to sudden death) as a CaptureBreak, instead of sealing every track at the end of regular time"
+    },
+    {
+     "old": "    pub truncated: bool,\n    /// Opaque native serializer counter, not a proven gameplay/input/replay clock.\n    /// Admitted tracks start together and advance contiguously without wrap.\n    pub first_counter: Option<u32>,\n}\n\n",
+     "new": "    pub truncated: bool,\n    /// Opaque native serializer counter, not a proven gameplay/input/replay clock.\n    /// Admitted tracks start together and advance contiguously without wrap, except\n    /// across `breaks`, where every track resumes at the break's counter.\n    pub first_counter: Option<u32>,\n    /// Ascending by index and counter; empty for a record played without interruption.\n    pub breaks: Vec<CaptureBreak>,\n}\n\nimpl LiveSession {\n    /// The native counter of frame `index` (the same for every track).\n    pub fn counter_at(&self, index: u32) -> Option<u32> {\n        let first = self.first_counter?;\n        match self.breaks.iter().rev().find(|b| b.index <= index) {\n            Some(b) => b.counter.checked_add(index - b.index),\n            None => first.checked_add(index),\n        }\n    }\n}\n\n",
+     "reason": "P-TIMER (primary 2026-11-05 18:32Z; DECISIONS DEFERRED-LIST item 7): a capture keeps going across a stretch of the native record with no live play (TIME! to sudden death) as a CaptureBreak, instead of sealing every track at the end of regular time"
+    }
+   ]
   },
   {
    "src": "training_mod_macros/src/move_start.rs",
@@ -182,14 +249,26 @@
    "dest": "src/model/macros/replay.rs",
    "crate": "macros",
    "src_sha256": "b04adf37bf6ab0c2419c9fb1699b13ae174b9fb3438eecc5792b0c1b0eac9721",
-   "dest_sha256": "db396b5d2d7bd0c5c6aaee5dac59c882aaf1a08082c9f864d337aecc33729b18"
+   "dest_sha256": "3a04ce9c94e0b07e9e356de8f9837238c04a7203c21b2b5cb2f8c25e4f0b65f4",
+   "edits": [
+    {
+     "old": "    pub tracks: Vec<ReplayTrack>,\n    pub truncated: bool,\n}\n\nimpl ReplaySession {\n    /// Associate only values from the same immutable committed capture. Native\n    /// CFMK row numbers and local live entry IDs are different namespaces.\n",
+     "new": "    pub tracks: Vec<ReplayTrack>,\n    pub truncated: bool,\n    /// Frame indices (shared by every track) where play resumed after a stretch of the\n    /// native record with no live play (the TIME! to sudden-death transition, a pause).\n    /// Ascending; the state is discontinuous across each one.\n    pub breaks: Vec<u32>,\n}\n\nimpl ReplaySession {\n    /// The break that a selection of frames `start..=end` crosses, if any: a\n    /// recording made from it would play the inputs after the break from a state\n    /// before it.\n    pub fn break_within(&self, start: u32, end: u32) -> Option<u32> {\n        self.breaks.iter().copied().find(|&b| start < b && b <= end)\n    }\n\n    /// Associate only values from the same immutable committed capture. Native\n    /// CFMK row numbers and local live entry IDs are different namespaces.\n",
+     "reason": "P-TIMER (primary 2026-11-05 18:32Z; DECISIONS DEFERRED-LIST item 7): a capture keeps going across a stretch of the native record with no live play (TIME! to sudden death) as a CaptureBreak, instead of sealing every track at the end of regular time"
+    },
+    {
+     "old": "        let mut mario = track(); mario.entry = 0;\n        for frame in &mut mario.frames { frame.start.fighter_kind = 0; }\n        let mut session = ReplaySession {tracks: vec![mario, brawler], truncated: false};\n        let associated = session.mii_for_track(&miis, 1, 0x48).unwrap();\n        assert_eq!(associated.entry(), 0); // Native index never replaces the selected live entry.\n",
+     "new": "        let mut mario = track(); mario.entry = 0;\n        for frame in &mut mario.frames { frame.start.fighter_kind = 0; }\n        let mut session = ReplaySession {tracks: vec![mario, brawler], truncated: false, breaks: Vec::new()};\n        let associated = session.mii_for_track(&miis, 1, 0x48).unwrap();\n        assert_eq!(associated.entry(), 0); // Native index never replaces the selected live entry.\n",
+     "reason": "P-TIMER (primary 2026-11-05 18:32Z; DECISIONS DEFERRED-LIST item 7): a capture keeps going across a stretch of the native record with no live play (TIME! to sudden death) as a CaptureBreak, instead of sealing every track at the end of regular time"
+    }
+   ]
   },
   {
    "src": "training_mod_macros/src/shared_capture.rs",
    "dest": "src/model/macros/shared_capture.rs",
    "crate": "macros",
    "src_sha256": "46093f8256ff444e9943ee4672cc6c348ddc46548a6108fc177a45fe65c208f0",
-   "dest_sha256": "2522d200491e6b1f41e00f2021d0e6e4cec778f7cf6d4f6917c223ade086b69b",
+   "dest_sha256": "f2bd480204be9cefcfd5638db73f9e1450278148c34be8a4c03d697407115a21",
    "edits": [
     {
      "old": "            }\n        }\n    }\n}\n",
@@ -210,6 +289,51 @@
      "old": "mod tests {\n    use super::*;\n    use crate::engine::macros::live_frame::LiveTrack;\n    use smash_match_data::{clip::{clip_context_for, ActorStatus, Resolved, SelectAt}, Recorder, RecorderOptions};\n    use std::io::{Seek, SeekFrom, Write};\n\n    struct Fixture(PathBuf);\n",
      "new": "mod tests {\n    use super::*;\n    use crate::engine::macros::live_frame::LiveTrack;\n    use smash_match_data_oracle::{clip::{clip_context_for, ActorStatus, Resolved, SelectAt}, validate_capture, CaptureExt, Recorder,\n        RecorderOptions};\n    use std::io::{Seek, SeekFrom, Write};\n\n    struct Fixture(PathBuf);\n",
      "reason": "Integrate approved Slim4b86500 retirement/scope and cold-owner/SDK roots into current composed source. Preserve current pkg6 const locks, F6 task ordering, Setup lifecycle and Deluxe persistence. Retired probe consumers removed with their features; shared host oracle retained. New exact composition requires fresh gates."
+    },
+    {
+     "old": "const COUNTER: &str = \"smash13_0_5_serializer_counter_u32le\";\nconst MII_REPLAY: &str = \"training_mii_replay_v1\";\nconst PHASE_NOTE: &str = \"State(Before) is the proposed pre-fighter-callback phase, NOT an acceptance claim; input application order and Effective inputs are pending runtime qualification.\";\nstatic NEXT_TEMP: AtomicU64 = AtomicU64::new(0);\n",
+     "new": "const COUNTER: &str = \"smash13_0_5_serializer_counter_u32le\";\nconst MII_REPLAY: &str = \"training_mii_replay_v1\";\nconst BREAK_REASON: &str = \"native record continued without live play (match phase change)\";\nconst PHASE_NOTE: &str = \"State(Before) is the proposed pre-fighter-callback phase, NOT an acceptance claim; input application order and Effective inputs are pending runtime qualification.\";\nstatic NEXT_TEMP: AtomicU64 = AtomicU64::new(0);\n",
+     "reason": "P-TIMER (primary 2026-11-05 18:32Z; DECISIONS DEFERRED-LIST item 7): a capture keeps going across a stretch of the native record with no live play (TIME! to sudden death) as a CaptureBreak, instead of sealing every track at the end of regular time"
+    },
+    {
+     "old": "    }\n    if actors > MAX_ACTORS { return Err(bad(\"too many actor incarnations\")); }\n    session.first_counter.ok_or_else(|| bad(\"missing serializer counter\"))?\n        .checked_add((longest - 1) as u32).ok_or_else(|| bad(\"serializer counter wraps\"))?;\n    Ok(longest)\n}\n",
+     "new": "    }\n    if actors > MAX_ACTORS { return Err(bad(\"too many actor incarnations\")); }\n    session.first_counter.ok_or_else(|| bad(\"missing serializer counter\"))?;\n    // Breaks (P-TIMER): ascending inside the frames, each resuming past the counter before it.\n    if session.breaks.len() > crate::engine::macros::MAX_BREAKS { return Err(bad(\"too many capture breaks\")); }\n    let mut previous_index = 0;\n    for b in &session.breaks {\n        let before = b.index.checked_sub(1).and_then(|i| session.counter_at(i));\n        if b.index <= previous_index || b.index as usize >= longest\n            || before.is_none_or(|before| before.checked_add(1).is_none_or(|next| b.counter <= next)) {\n            return Err(bad(\"invalid capture break\"));\n        }\n        previous_index = b.index;\n    }\n    session.counter_at((longest - 1) as u32).ok_or_else(|| bad(\"serializer counter wraps\"))?;\n    Ok(longest)\n}\n",
+     "reason": "P-TIMER (primary 2026-11-05 18:32Z; DECISIONS DEFERRED-LIST item 7): a capture keeps going across a stretch of the native record with no live play (TIME! to sudden death) as a CaptureBreak, instead of sealing every track at the end of regular time"
+    },
+    {
+     "old": "        let mut next_actor = 0;\n        for index in 0..longest {\n            let counter = session.first_counter.ok_or_else(|| bad(\"missing counter\"))? + index as u32;\n            emit(EventBody::Raw(RawUnit { raw: RawBytes::new(COUNTER, &counter.to_le_bytes()), source_offset: Some(0x200078) }))?;\n            for track in &tracks {\n",
+     "new": "        let mut next_actor = 0;\n        for index in 0..longest {\n            let counter = session.counter_at(index as u32).ok_or_else(|| bad(\"missing counter\"))?;\n            // P-TIMER: the native record went on without live play before this frame (sudden death).\n            if session.breaks.iter().any(|b| b.index as usize == index) {\n                emit(EventBody::Gap { actor: None, reason: Some(BREAK_REASON.into()) })?;\n            }\n            emit(EventBody::Raw(RawUnit { raw: RawBytes::new(COUNTER, &counter.to_le_bytes()), source_offset: Some(0x200078) }))?;\n            for track in &tracks {\n",
+     "reason": "P-TIMER (primary 2026-11-05 18:32Z; DECISIONS DEFERRED-LIST item 7): a capture keeps going across a stretch of the native record with no live play (TIME! to sudden death) as a CaptureBreak, instead of sealing every track at the end of regular time"
+    },
+    {
+     "old": "}\nfn same_projection(a: &ReplaySession, b: &ReplaySession) -> bool {\n    a.truncated == b.truncated && a.tracks.len() == b.tracks.len() && a.tracks.iter().zip(&b.tracks).all(|(a,b)| {\n        a.entry == b.entry && a.quantized_analog == b.quantized_analog && a.frames.len() == b.frames.len()\n            && a.frames.iter().zip(&b.frames).all(|(a,b)| a.input == b.input\n",
+     "new": "}\nfn same_projection(a: &ReplaySession, b: &ReplaySession) -> bool {\n    a.truncated == b.truncated && a.breaks == b.breaks && a.tracks.len() == b.tracks.len() && a.tracks.iter().zip(&b.tracks).all(|(a,b)| {\n        a.entry == b.entry && a.quantized_analog == b.quantized_analog && a.frames.len() == b.frames.len()\n            && a.frames.iter().zip(&b.frames).all(|(a,b)| a.input == b.input\n",
+     "reason": "P-TIMER (primary 2026-11-05 18:32Z; DECISIONS DEFERRED-LIST item 7): a capture keeps going across a stretch of the native record with no live play (TIME! to sudden death) as a CaptureBreak, instead of sealing every track at the end of regular time"
+    },
+    {
+     "old": "    counter: Option<u32>, group: usize, last_entry: Option<u8>, group_samples: usize,\n    started: bool, stopped: bool, ended: bool, seq: u64,\n}\n\n",
+     "new": "    counter: Option<u32>, group: usize, last_entry: Option<u8>, group_samples: usize,\n    started: bool, stopped: bool, ended: bool, seq: u64,\n    /// A global Gap was just read: the next counter may jump (P-TIMER).\n    gap: bool, breaks: Vec<u32>,\n}\n\n",
+     "reason": "P-TIMER (primary 2026-11-05 18:32Z; DECISIONS DEFERRED-LIST item 7): a capture keeps going across a stretch of the native record with no live play (TIME! to sudden death) as a CaptureBreak, instead of sealing every track at the end of regular time"
+    },
+    {
+     "old": "        }\n        Ok(Self { miis: None, tracks, slots, actors: BTreeMap::new(), active: [None; 8], pending: None,\n            counter: None, group: 0, last_entry: None, group_samples: 0, started: false, stopped: false, ended: false, seq: 0 })\n    }\n\n",
+     "new": "        }\n        Ok(Self { miis: None, tracks, slots, actors: BTreeMap::new(), active: [None; 8], pending: None,\n            counter: None, group: 0, last_entry: None, group_samples: 0, started: false, stopped: false, ended: false, seq: 0,\n            gap: false, breaks: Vec::new() })\n    }\n\n",
+     "reason": "P-TIMER (primary 2026-11-05 18:32Z; DECISIONS DEFERRED-LIST item 7): a capture keeps going across a stretch of the native record with no live play (TIME! to sudden death) as a CaptureBreak, instead of sealing every track at the end of regular time"
+    },
+    {
+     "old": "                let value = u32::from_le_bytes(bytes);\n                if let Some(previous) = self.counter {\n                    if self.group_samples == 0 || previous.checked_add(1) != Some(value) { return Err(bad(\"counter gap/wrap or empty group\")); }\n                    self.group += 1;\n                }\n                if self.group >= MAX_FRAMES { return Err(bad(\"too many sample groups\")); }\n                self.counter = Some(value); self.last_entry = None; self.group_samples = 0;\n            }\n            EventBody::Lifecycle { actor, event } if self.counter.is_some() && !self.stopped => {\n                match event {\n",
+     "new": "                let value = u32::from_le_bytes(bytes);\n                if let Some(previous) = self.counter {\n                    let next = previous.checked_add(1);\n                    let resumed = self.gap && next.is_some_and(|next| value > next);\n                    if self.group_samples == 0 || (next != Some(value) && !resumed) || (self.gap && !resumed) {\n                        return Err(bad(\"counter gap/wrap or empty group\"));\n                    }\n                    self.group += 1;\n                    if resumed {\n                        if self.breaks.len() >= crate::engine::macros::MAX_BREAKS { return Err(bad(\"too many capture breaks\")); }\n                        self.breaks.push(self.group as u32);\n                    }\n                } else if self.gap { return Err(bad(\"gap before the first sample group\")); }\n                self.gap = false;\n                if self.group >= MAX_FRAMES { return Err(bad(\"too many sample groups\")); }\n                self.counter = Some(value); self.last_entry = None; self.group_samples = 0;\n            }\n            EventBody::Gap { actor: None, reason: Some(reason) } if self.counter.is_some() && !self.stopped && !self.gap\n                && self.group_samples > 0 && reason == BREAK_REASON => self.gap = true,\n            EventBody::Lifecycle { actor, event } if self.counter.is_some() && !self.stopped => {\n                match event {\n",
+     "reason": "P-TIMER (primary 2026-11-05 18:32Z; DECISIONS DEFERRED-LIST item 7): a capture keeps going across a stretch of the native record with no live play (TIME! to sudden death) as a CaptureBreak, instead of sealing every track at the end of regular time"
+    },
+    {
+     "old": "    fn finish(self, truncated: bool) -> io::Result<(ReplaySession, Option<ReplayMiis>)> {\n        if !self.ended || self.pending.is_some() || self.tracks.iter().any(|t| t.frames.is_empty()) { return Err(bad(\"empty or unfinished projection\")); }\n        Ok((ReplaySession { tracks: self.tracks, truncated }, self.miis))\n    }\n}\n",
+     "new": "    fn finish(self, truncated: bool) -> io::Result<(ReplaySession, Option<ReplayMiis>)> {\n        if !self.ended || self.pending.is_some() || self.tracks.iter().any(|t| t.frames.is_empty()) { return Err(bad(\"empty or unfinished projection\")); }\n        if self.gap { return Err(bad(\"gap without a following sample group\")); }\n        Ok((ReplaySession { tracks: self.tracks, truncated, breaks: self.breaks }, self.miis))\n    }\n}\n",
+     "reason": "P-TIMER (primary 2026-11-05 18:32Z; DECISIONS DEFERRED-LIST item 7): a capture keeps going across a stretch of the native record with no live play (TIME! to sudden death) as a CaptureBreak, instead of sealing every track at the end of regular time"
+    },
+    {
+     "old": "            frame([-0.0, f32::from_bits(1), 0.49999997 / 120.0, 2.0]),\n            frame([-2.0, -0.5 / 120.0, 0.5 / 120.0, f32::from_bits(0x80000001)]),\n        ] }], truncated: false, first_counter: Some(123) }\n    }\n\n",
+     "new": "            frame([-0.0, f32::from_bits(1), 0.49999997 / 120.0, 2.0]),\n            frame([-2.0, -0.5 / 120.0, 0.5 / 120.0, f32::from_bits(0x80000001)]),\n        ] }], truncated: false, first_counter: Some(123), breaks: Vec::new() }\n    }\n\n    /// P-TIMER: regular time, a stretch with no live play, then sudden death. The `.smd` keeps the true counters with\n    /// one global Gap before the resumed frame; the cache and the canonical load both return the break, complete.\n    #[test]\n    fn a_sudden_death_break_round_trips_with_its_gap_and_true_counters() {\n        let mut s = session();\n        for _ in 0..2 { let f = s.tracks[0].frames[0]; s.tracks[0].frames.push(f); }\n        s.breaks = vec![crate::engine::macros::CaptureBreak { index: 2, counter: 123 + 2 + 300 }];\n        let fixture = Fixture::new();\n        let dir = fixture.publish(&s);\n        let timeline = fs::read_to_string(dir.join(TIMELINE_FILE)).unwrap();\n        assert_eq!(timeline.matches(\"\\\"gap\\\"\").count() + timeline.matches(\"\\\"Gap\\\"\").count(), 1, \"one gap event\");\n        let loaded = fixture.load().unwrap();\n        assert!(!loaded.session.truncated);\n        assert_eq!(loaded.session.breaks, vec![2]);\n        assert_eq!(loaded.session.tracks[0].frames.len(), 4);\n        let cache = CaptureArchive::new(&dir).load(&encode_file_id(\"native-id\")).unwrap();\n        assert_eq!(cache.session.breaks, vec![2]);\n        // A break that does not jump, or sits outside the frames, is refused before publication.\n        for b in [crate::engine::macros::CaptureBreak { index: 2, counter: 125 },\n                  crate::engine::macros::CaptureBreak { index: 4, counter: 999 },\n                  crate::engine::macros::CaptureBreak { index: 0, counter: 999 }] {\n            let mut bad_break = s.clone();\n            bad_break.breaks = vec![b];\n            assert!(Fixture::new().archive().save_with_outcome(\"native-id\", \"Native title\", \"13.0.5\", &bad_break).is_err(), \"{b:?}\");\n        }\n    }\n\n",
+     "reason": "P-TIMER (primary 2026-11-05 18:32Z; DECISIONS DEFERRED-LIST item 7): a capture keeps going across a stretch of the native record with no live play (TIME! to sudden death) as a CaptureBreak, instead of sealing every track at the end of regular time"
     }
    ]
   },
@@ -324,7 +448,7 @@
    "dest": "src/model/macros/mod.rs",
    "crate": "macros",
    "src_sha256": "561c0de012c6f235d735c9d956305c7aa98fe0cdf7a1c560552a0a6275abc4ad",
-   "dest_sha256": "305d049f5612a281b1898113c2834491f4f440a27395a7edcc82a0e558497edd",
+   "dest_sha256": "1dd00b86dc83c819c79501c1733eeb2e3a8d1a580b38ddf349226387e2f9e54b",
    "edits": [
     {
      "old": "mod capture_settings;\n",
@@ -369,6 +493,11 @@
      "old": "pub mod ui_anchor;\n",
      "new": "",
      "reason": "ui_anchor is not carried: no user (no module, test or tool references it; docs/SIZE-PLAN.md 'macros / recording' row 1); deleted 2026-11-04 on p23/size-cut, the cut option for the p23/candidate size budget (lead decision pending)"
+    },
+    {
+     "old": "#[cfg(any(feature = \"diag\", test))]\npub use live_capture::{FirstSeal, SealReason};\npub use live_frame::{LiveFrame, LiveInput, LiveSession, LiveTrack};\npub use recording::{\n    InputFrame, MacroError, MacroRecording, MomentumMode, Placement, StartState, DEFAULT_FPS,\n",
+     "new": "#[cfg(any(feature = \"diag\", test))]\npub use live_capture::{FirstSeal, SealReason};\npub use live_frame::{CaptureBreak, LiveFrame, LiveInput, LiveSession, LiveTrack, MAX_BREAKS};\npub use recording::{\n    InputFrame, MacroError, MacroRecording, MomentumMode, Placement, StartState, DEFAULT_FPS,\n",
+     "reason": "P-TIMER (primary 2026-11-05 18:32Z; DECISIONS DEFERRED-LIST item 7): a capture keeps going across a stretch of the native record with no live play (TIME! to sudden death) as a CaptureBreak, instead of sealing every track at the end of regular time"
     }
    ]
   },
@@ -403,12 +532,32 @@
    "dest": "src/model/macro_ui/clip_panel.rs",
    "crate": "tui",
    "src_sha256": "0064feed6e12daaa07f3881e49c930bb335458b4216f104a12373fd935db5ea0",
-   "dest_sha256": "76bd488dd80bdc93e659d75341fc41a2c7376b8d031192c8a2ddc73b2236469f",
+   "dest_sha256": "54368d29adfdbc5ebba2e4c362e4708dc2de1007238da04455f04ef1bd1cc504",
    "edits": [
     {
      "old": "            Pad::Extra => ClipAction::TogglePlay,\n        })",
      "new": "            Pad::Extra => ClipAction::TogglePlay,\n            Pad::Rename => return None,\n        })",
      "reason": "SPEC-input-07 \u00a74 (combo helper, 2026-11-05): X renames a row of a caller-titled library (Pad::Rename -> Effect::Rename); other panels ignore it"
+    },
+    {
+     "old": "    Export(Box<MacroRecording>), Error(String),\n}\n\n/// Frames of the same direction before held Left/Right starts repeating.\n",
+     "new": "    Export(Box<MacroRecording>), Error(String),\n}\n\n/// P-TIMER: a selection across a capture break (play resumed after a stretch with no live play: sudden death).\npub const BREAK_CROSSED: &str = \"The selection crosses the sudden-death restart. Keep it on one side.\";\n\n/// Frames of the same direction before held Left/Right starts repeating.\n",
+     "reason": "P-TIMER (primary 2026-11-05 18:32Z; DECISIONS DEFERRED-LIST item 7): a capture keeps going across a stretch of the native record with no live play (TIME! to sudden death) as a CaptureBreak, instead of sealing every track at the end of regular time"
+    },
+    {
+     "old": "\n    fn export_selection(&self, name: &str) -> Result<MacroRecording, String> {\n        match self.move_start.as_ref() {\n            Some(start) => self.track().export_move(&self.window, name, \"13.0.5\", start),\n",
+     "new": "\n    fn export_selection(&self, name: &str) -> Result<MacroRecording, String> {\n        // P-TIMER: the inputs after a break (sudden death) never play from a state before it.\n        if self.session.break_within(self.window.start(), self.window.end().saturating_sub(1)).is_some() {\n            return Err(BREAK_CROSSED.into());\n        }\n        match self.move_start.as_ref() {\n            Some(start) => self.track().export_move(&self.window, name, \"13.0.5\", start),\n",
+     "reason": "P-TIMER (primary 2026-11-05 18:32Z; DECISIONS DEFERRED-LIST item 7): a capture keeps going across a stretch of the native record with no live play (TIME! to sudden death) as a CaptureBreak, instead of sealing every track at the end of regular time"
+    },
+    {
+     "old": "        let wanted: Vec<_> = frames[27..38].iter().map(|f| f.input).collect();\n        let mut e = ClipEditor::new(ReplaySession { tracks: vec![ReplayTrack {\n            entry: 1, frames, quantized_analog: false }], truncated: false }, vec![0, 14]).unwrap()\n            .with_move_rules(MoveStartRules { families: vec![MoveFamily { fighter: None,\n                statuses: vec![45, 46, 47], buttons: 0 }], setup: vec![6, 7], ground: 0, air: 2,\n",
+     "new": "        let wanted: Vec<_> = frames[27..38].iter().map(|f| f.input).collect();\n        let mut e = ClipEditor::new(ReplaySession { tracks: vec![ReplayTrack {\n            entry: 1, frames, quantized_analog: false }], truncated: false, breaks: Vec::new() }, vec![0, 14]).unwrap()\n            .with_move_rules(MoveStartRules { families: vec![MoveFamily { fighter: None,\n                statuses: vec![45, 46, 47], buttons: 0 }], setup: vec![6, 7], ground: 0, air: 2,\n",
+     "reason": "P-TIMER (primary 2026-11-05 18:32Z; DECISIONS DEFERRED-LIST item 7): a capture keeps going across a stretch of the native record with no live play (TIME! to sudden death) as a CaptureBreak, instead of sealing every track at the end of regular time"
+    },
+    {
+     "old": "            x: i as f32, y: 0.0 }).collect();\n        ClipEditor::new(ReplaySession { tracks: vec![ReplayTrack { entry: 1, frames,\n            quantized_analog: false }], truncated: false }, vec![14]).unwrap()\n    }\n    #[test]\n",
+     "new": "            x: i as f32, y: 0.0 }).collect();\n        ClipEditor::new(ReplaySession { tracks: vec![ReplayTrack { entry: 1, frames,\n            quantized_analog: false }], truncated: false, breaks: Vec::new() }, vec![14]).unwrap()\n    }\n    /// P-TIMER: a capture with a break at frame 6 (sudden death). A window across it is refused for preview and save;\n    /// windows on either side preview, the one after the break starting at the resumed frame.\n    #[test]\n    fn a_window_across_the_sudden_death_break_is_refused_and_each_side_works() {\n        let frames: Vec<ReplayFrame> = (0..10).map(|i| ReplayFrame { input: InputFrame { buttons: i, ..InputFrame::default() },\n            start: StartState { status: 14, ..StartState::neutral(18, 0, 1.0) }, x: i as f32, y: 0.0 }).collect();\n        let mut e = ClipEditor::new(ReplaySession { tracks: vec![ReplayTrack { entry: 1, frames,\n            quantized_analog: false }], truncated: false, breaks: vec![6] }, vec![14]).unwrap();\n        let ClipEffect::Error(message) = e.on_action(ClipAction::TogglePlay) else { panic!(\"whole capture crosses\") };\n        assert_eq!(message, BREAK_CROSSED);\n        e.on_action(ClipAction::SelectOut); e.on_action(ClipAction::Nudge(-4));\n        assert_eq!((e.view().start, e.view().end), (0, 6));\n        let ClipEffect::Preview(before) = e.on_action(ClipAction::TogglePlay) else { panic!(\"regular time previews\") };\n        assert_eq!(before.frames.iter().map(|f| f.buttons).collect::<Vec<_>>(), [0, 1, 2, 3, 4, 5]);\n        e.on_action(ClipAction::TogglePlay);\n        e.on_action(ClipAction::SelectOut); e.on_action(ClipAction::Nudge(4));\n        e.on_action(ClipAction::SelectIn); e.on_action(ClipAction::Nudge(6));\n        assert_eq!((e.view().start, e.view().end), (6, 10));\n        let ClipEffect::Preview(after) = e.on_action(ClipAction::TogglePlay) else { panic!(\"sudden death previews\") };\n        assert_eq!(after.frames.iter().map(|f| f.buttons).collect::<Vec<_>>(), [6, 7, 8, 9]);\n    }\n    #[test]\n",
+     "reason": "P-TIMER (primary 2026-11-05 18:32Z; DECISIONS DEFERRED-LIST item 7): a capture keeps going across a stretch of the native record with no live play (TIME! to sudden death) as a CaptureBreak, instead of sealing every track at the end of regular time"
     }
    ]
   },
@@ -417,12 +566,17 @@
    "dest": "src/model/macro_ui/replay_panel.rs",
    "crate": "tui",
    "src_sha256": "7f2595db169a3703c99d74d4ed25a7247c01dfd601bfd5e5cfa19350ea98eef9",
-   "dest_sha256": "b6ae2d2c232cc7b7db8722edfff2da260ba3abad8867996c6e68cc2f7091e2b7",
+   "dest_sha256": "c1c716155c63f6556d740c60b626818ffc6b7a1351044426495f5115b6aed752",
    "edits": [
     {
      "old": "            Pad::Confirm => return self.confirm(),\n        }\n        Effect::None",
      "new": "            Pad::Confirm => return self.confirm(),\n            Pad::Rename => {}\n        }\n        Effect::None",
      "reason": "SPEC-input-07 \u00a74 (combo helper, 2026-11-05): X renames a row of a caller-titled library (Pad::Rename -> Effect::Rename); other panels ignore it"
+    },
+    {
+     "old": "            x: i as f32, y: 0.0 }).collect();\n        ReplayEditor::new(ReplaySession { tracks: vec![ReplayTrack { entry: 1, frames,\n            quantized_analog: false }], truncated: false }, vec![0, 14]).unwrap()\n    }\n\n",
+     "new": "            x: i as f32, y: 0.0 }).collect();\n        ReplayEditor::new(ReplaySession { tracks: vec![ReplayTrack { entry: 1, frames,\n            quantized_analog: false }], truncated: false, breaks: Vec::new() }, vec![0, 14]).unwrap()\n    }\n\n",
+     "reason": "P-TIMER (primary 2026-11-05 18:32Z; DECISIONS DEFERRED-LIST item 7): a capture keeps going across a stretch of the native record with no live play (TIME! to sudden death) as a CaptureBreak, instead of sealing every track at the end of regular time"
     }
    ]
   },

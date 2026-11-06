@@ -206,6 +206,7 @@ impl CaptureArchive {
             session: ReplaySession {
                 tracks,
                 truncated: header.truncated,
+                breaks: header.breaks,
             },
         })
     }
@@ -275,6 +276,7 @@ impl CaptureArchive {
             game_version: game_version.to_owned(),
             miis: miis.cloned(),
             truncated: session.truncated,
+            breaks: session.breaks.clone(),
             tracks: session
                 .tracks
                 .iter()
@@ -355,6 +357,10 @@ struct CaptureHeader {
     miis: Option<ReplayMiis>,
     truncated: bool,
     tracks: Vec<TrackHeader>,
+    /// P-TIMER: frame indices where play resumed after a stretch with no live play (sudden death). Absent when
+    /// empty, so a capture without one keeps the original bytes and older files read as having none.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    breaks: Vec<u32>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -482,6 +488,13 @@ fn validate_header(header: &CaptureHeader, file_id: &str) -> io::Result<()> {
             )));
         }
     }
+    let longest = header.tracks.iter().map(|track| track.frames).max().unwrap_or(0);
+    if header.breaks.len() > crate::engine::macros::MAX_BREAKS
+        || header.breaks.iter().any(|b| *b == 0 || *b >= longest)
+        || header.breaks.windows(2).any(|w| w[0] >= w[1])
+    {
+        return Err(invalid_data("capture breaks must ascend inside the frames, at most MAX_BREAKS"));
+    }
     Ok(())
 }
 
@@ -568,6 +581,13 @@ fn validate_session(session: &ReplaySession) -> Result<(), String> {
                 ));
             }
         }
+    }
+    let longest = session.tracks.iter().map(|track| track.frames.len() as u32).max().unwrap_or(0);
+    if session.breaks.len() > crate::engine::macros::MAX_BREAKS
+        || session.breaks.iter().any(|b| *b == 0 || *b >= longest)
+        || session.breaks.windows(2).any(|w| w[0] >= w[1])
+    {
+        return Err("capture breaks must ascend inside the frames, at most MAX_BREAKS".into());
     }
     Ok(())
 }
@@ -860,6 +880,7 @@ mod tests {
                 },
             ],
             truncated: true,
+            breaks: Vec::new(),
         }
     }
 
@@ -1030,6 +1051,7 @@ mod tests {
                 miis: None,
                 truncated: false,
                 tracks: Vec::new(),
+                breaks: Vec::new(),
             };
             let bytes = capture_file(&serde_json::to_vec(&header).unwrap());
             fs::write(
