@@ -526,11 +526,21 @@ pub(crate) fn cpu_cycle_admission() -> crate::engine::swap::cycle_members::MiiAd
     crate::engine::swap::cycle_members::NO_MII
 }
 
-/// What the portrait grid shows of the cycles (P-CYCLE): the CPU cycle's Mii admission, and each role's slot 0
+/// The Player cycle's Mii admission as the Player Mii owner last computed it (`cycle_members::player_admission`,
+/// published from its service; none while it is not qualified). Every Player cycle walker and the menu read this one
+/// answer (P1-CYCLE).
+pub(crate) fn player_cycle_admission() -> crate::engine::swap::cycle_members::MiiAdmission {
+    #[cfg(feature = "mii-ordinary-player-alpha")]
+    return mii_ordinary_player::published_admission();
+    #[cfg(not(feature = "mii-ordinary-player-alpha"))]
+    crate::engine::swap::cycle_members::NO_MII
+}
+
+/// What the portrait grid shows of the cycles (P-CYCLE, P1-CYCLE): each role's Mii admission, and each role's slot 0
 /// (`[Player, CPU]`: the scene's original kind, the fighter the cycle returns to) while a practice scene has one.
 /// Atomics only: the menu worker reads them, never an owner.
-pub fn cycle_facts() -> (crate::engine::swap::cycle_members::MiiAdmission, [Option<u32>; 2]) {
-    (cpu_cycle_admission(), [original_kind(Role::Player), original_kind(Role::Cpu)])
+pub fn cycle_facts() -> (crate::engine::swap::cycle_members::MiiAdmission, crate::engine::swap::cycle_members::MiiAdmission, [Option<u32>; 2]) {
+    (player_cycle_admission(), cpu_cycle_admission(), [original_kind(Role::Player), original_kind(Role::Cpu)])
 }
 
 /// Numbered slot of `kind`'s group in `role`'s current cycle.

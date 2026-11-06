@@ -52,15 +52,17 @@ pub struct RosterEditor {
 }
 
 /// What this opening admits per Mii class tile (`[Brawler, Swordfighter, Gunner]`) and where each role's cycle returns
-/// to. The picks, the Player cycle and the hats come from `CatalogMenu`'s checks (`editors::mii::MiiList::tiles`): the
-/// fork's `roster_excluded`, `mii_cycle_admitted`, `hat_cell_disabled` and `roster_slot_zero`
-/// (`training_mod_tui/src/containers/app.rs` 563-685). The CPU cycle's admission and both slot 0s are the runtime's own,
-/// published (`character_roster::cycle_facts`), so the grid numbers exactly what cycles (P-CYCLE). The default admits no
-/// Mii tile and knows no slot 0.
+/// to. The picks and the hats come from `CatalogMenu`'s checks (`editors::mii::MiiList::tiles`): the fork's
+/// `roster_excluded`, `mii_cycle_admitted`, `hat_cell_disabled` and `roster_slot_zero`
+/// (`training_mod_tui/src/containers/app.rs` 563-685). Each cycle's Mii admission and both slot 0s are the runtime's
+/// own, published (`character_roster::cycle_facts`), so the grid numbers exactly what cycles (P-CYCLE, P1-CYCLE). The
+/// default admits no Mii tile and knows no slot 0.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct MiiTiles {
-    /// `alpha_player_cycle`: Player picks and the Player cycle.
+    /// `alpha_player_cycle`: Player picks (a manual pick, not the cycle).
     pub player: [bool; 3],
+    /// The Player cycle's admission as the Player Mii owner walks it (`cycle_members::player_admission`, published).
+    pub player_cycle: [bool; 3],
     /// `alpha_cpu_cycle`: CPU picks (a manual pick, not the cycle).
     pub cpu: [bool; 3],
     /// The CPU cycle's admission as the CPU Mii owner walks it (`cycle_members::cpu_admission`, published).
@@ -82,7 +84,8 @@ impl MiiTiles {
         let k = mii_class(kind)?;
         Some(match (use_, role) {
             (RosterUse::Hats, _) => self.hat[k],
-            (RosterUse::PlayerPick, _) | (RosterUse::Cycles, Role::Player) => self.player[k],
+            (RosterUse::PlayerPick, _) => self.player[k],
+            (RosterUse::Cycles, Role::Player) => self.player_cycle[k],
             (RosterUse::CpuPick, _) => self.cpu[k],
             (RosterUse::Cycles, Role::Cpu) => self.cpu_cycle[k],
         })
@@ -94,7 +97,7 @@ impl MiiTiles {
         let Some(k) = mii_class(kind) else { return true };
         match role {
             Role::Cpu => !self.cpu_cycle[k],
-            Role::Player => !self.player[k],
+            Role::Player => !self.player_cycle[k],
         }
     }
 }
@@ -601,7 +604,7 @@ mod tests {
             assert_eq!(frame.tile_state[cell_of(0x07)], 0, "other fighters stay as they are");
         }
         // The Player cycle admits the Brawler: it can be added and takes its number; the CPU cycle still does not.
-        let mii = MiiTiles { player: [true, false, false], ..MiiTiles::default() };
+        let mii = MiiTiles { player: [true, false, false], player_cycle: [true, false, false], ..MiiTiles::default() };
         let mut editor = RosterEditor::new(RosterUse::Cycles);
         editor.set_mii(mii);
         let mut values = cycles_values(&[0x07]);

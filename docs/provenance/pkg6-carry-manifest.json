@@ -2912,7 +2912,7 @@
    "dest": "src/runtime/roster/character_roster.rs",
    "crate": "root",
    "src_sha256": "07d282cdc6c5b4b080a5c0b3e4107a033f623ea3e5809783e0ff595afe759dd5",
-   "dest_sha256": "872e3ac1974da2713f77559bfa76c46e373bdfd13bece551927b7fb5570a57fe",
+   "dest_sha256": "2b4399431e3cbfca1ccb2cfbe1b2bd3ac6e491dc08f477d8d98d8e6545b7ec6a",
    "edits": [
     {
      "old": "fn notify(role: Role, message: String) {",
@@ -3479,6 +3479,11 @@
      "old": "        || (!role.enabled() && !matches!(request.selection, Selection::RefreshPartners))\n",
      "new": "        || (!role.enabled() && !request.once && !matches!(request.selection, Selection::RefreshPartners))\n",
      "reason": "SPEC-input-07 \u00a74a, report \u00a72a (primary's (a) branch, 2026-11-05): a combo's Switch is one explicit Player load (Request.once, queue_admitted) that Player Swapping Off does not refuse; the cycle chord, the Player Character pick and the waiting restore keep the gate"
+    },
+    {
+     "old": "    crate::engine::swap::cycle_members::NO_MII\n}\n\n/// What the portrait grid shows of the cycles (P-CYCLE): the CPU cycle's Mii admission, and each role's slot 0\n/// (`[Player, CPU]`: the scene's original kind, the fighter the cycle returns to) while a practice scene has one.\n/// Atomics only: the menu worker reads them, never an owner.\npub fn cycle_facts() -> (crate::engine::swap::cycle_members::MiiAdmission, [Option<u32>; 2]) {\n    (cpu_cycle_admission(), [original_kind(Role::Player), original_kind(Role::Cpu)])\n}\n\n/// Numbered slot of `kind`'s group in `role`'s current cycle.\n",
+     "new": "    crate::engine::swap::cycle_members::NO_MII\n}\n\n/// The Player cycle's Mii admission as the Player Mii owner last computed it (`cycle_members::player_admission`,\n/// published from its service; none while it is not qualified). Every Player cycle walker and the menu read this one\n/// answer (P1-CYCLE).\npub(crate) fn player_cycle_admission() -> crate::engine::swap::cycle_members::MiiAdmission {\n    #[cfg(feature = \"mii-ordinary-player-alpha\")]\n    return mii_ordinary_player::published_admission();\n    #[cfg(not(feature = \"mii-ordinary-player-alpha\"))]\n    crate::engine::swap::cycle_members::NO_MII\n}\n\n/// What the portrait grid shows of the cycles (P-CYCLE, P1-CYCLE): each role's Mii admission, and each role's slot 0\n/// (`[Player, CPU]`: the scene's original kind, the fighter the cycle returns to) while a practice scene has one.\n/// Atomics only: the menu worker reads them, never an owner.\npub fn cycle_facts() -> (crate::engine::swap::cycle_members::MiiAdmission, crate::engine::swap::cycle_members::MiiAdmission, [Option<u32>; 2]) {\n    (player_cycle_admission(), cpu_cycle_admission(), [original_kind(Role::Player), original_kind(Role::Cpu)])\n}\n\n/// Numbered slot of `kind`'s group in `role`'s current cycle.\n",
+     "reason": "P1-CYCLE (operator 2026-11-05: a Mii class cycled on P1 though the P1 Cycles grid did not number it, and a missing roster key disagreed): the Player Mii owner publishes cycle_members::player_admission; the P1 Cycles grid and every Player walker use that one list"
     }
    ]
   },
@@ -3487,7 +3492,7 @@
    "dest": "src/runtime/roster/cycle_preload.rs",
    "crate": "root",
    "src_sha256": "ec95b169b5ec06064bc45222a48e3f7ab72a94db32bf9d3c3b619e87e50caac3",
-   "dest_sha256": "df1a28a792230dd57ad5c80486ce1dd4e634cc9ccbe7cf778ec1c707242c99f6",
+   "dest_sha256": "887b0bb5be6e4520f6e670ce67ffef844f0329d75cfaa56da4bfe04f5a9059aa",
    "edits": [
     {
      "old": "    let roster = if role == 0 {\n        menu.player_roster.fighters()\n    } else {\n        menu.cpu_roster.fighters()\n    };\n    let preferences = crate::runtime::compat::common::menu::mii_preferences();\n",
@@ -3618,6 +3623,11 @@
      "old": "        menu.cpu_roster.fighters_excluding_fixed(None)\n",
      "new": "        crate::engine::swap::cycle_members::cycle_members(menu.cpu_roster, crate::runtime::roster::character_roster::cpu_cycle_admission())\n",
      "reason": "P-CYCLE (operator 2026-11-05: a Mii Gunner cycled for the CPU though the menu did not list it): every cycle walker walks engine::swap::cycle_members (the one list the portrait grid numbers); the CPU Mii owner computes its Mii admission (cycle_members::cpu_admission) under its own lock, walks it and publishes it; the menu reads it and each role's slot 0 (character_roster::cycle_facts)"
+    },
+    {
+     "old": "    origin: Option<Configuration>,\n) -> [Option<Target>; MAX_TARGETS] {\n    use crate::engine::swap::mii_cycle::{self, Identity, Live};\n    // P-CYCLE: the one cycle list; the CPU's Mii admission is its owner's published one, the Player's is unchanged.\n    let roster = if role == 0 {\n        crate::engine::swap::cycle_members::cycle_members(menu.player_roster, crate::engine::swap::cycle_members::ALL_MII)\n    } else {\n        crate::engine::swap::cycle_members::cycle_members(menu.cpu_roster, crate::runtime::roster::character_roster::cpu_cycle_admission())\n    };\n",
+     "new": "    origin: Option<Configuration>,\n) -> [Option<Target>; MAX_TARGETS] {\n    use crate::engine::swap::mii_cycle::{self, Identity, Live};\n    // P-CYCLE / P1-CYCLE: the one cycle list. Each role's Mii admission is its owner's published one.\n    let roster = if role == 0 {\n        crate::engine::swap::cycle_members::cycle_members(menu.player_roster, crate::runtime::roster::character_roster::player_cycle_admission())\n    } else {\n        crate::engine::swap::cycle_members::cycle_members(menu.cpu_roster, crate::runtime::roster::character_roster::cpu_cycle_admission())\n    };\n",
+     "reason": "P1-CYCLE (operator 2026-11-05: a Mii class cycled on P1 though the P1 Cycles grid did not number it, and a missing roster key disagreed): the Player Mii owner publishes cycle_members::player_admission; the P1 Cycles grid and every Player walker use that one list"
     }
    ]
   },
@@ -5003,7 +5013,7 @@
    "dest": "src/runtime/roster/native_body_bank.rs",
    "crate": "root",
    "src_sha256": "ccf7ac678691fa0101a1eff5dbd9300a1b12fe64e9ebbde515697adfbb841c98",
-   "dest_sha256": "8044c07f82a8c745f5e6b21d61931cfedb7426e775613a83f5a00b0e58098358",
+   "dest_sha256": "e4c69aee04008dc1f7b60dff16744a51d10f4f2b9afd3087980065288ad67efa",
    "edits": [
     {
      "old": "unsafe fn finalize_entry(entry: *mut u8) -> u64 {\n",
@@ -5675,6 +5685,11 @@
      "old": "                let roster = if role == 0 { menu.player_roster.fighters_excluding_fixed(None) }\n                    else { menu.cpu_roster.fighters_excluding_fixed(None) };\n",
      "new": "                // P-CYCLE: the one cycle list, with the CPU owner's published Mii admission.\n                let roster = if role == 0 {\n                    crate::engine::swap::cycle_members::cycle_members(menu.player_roster, crate::engine::swap::cycle_members::ALL_MII)\n                } else {\n                    crate::engine::swap::cycle_members::cycle_members(menu.cpu_roster, super::cpu_cycle_admission())\n                };\n",
      "reason": "P-CYCLE (operator 2026-11-05: a Mii Gunner cycled for the CPU though the menu did not list it): every cycle walker walks engine::swap::cycle_members (the one list the portrait grid numbers); the CPU Mii owner computes its Mii admission (cycle_members::cpu_admission) under its own lock, walks it and publishes it; the menu reads it and each role's slot 0 (character_roster::cycle_facts)"
+    },
+    {
+     "old": "            // (Pyra, PT, IC, the Miis) must not give its share to helper sources, which stay resident for the scene\n            // (Yoga swoff2 steps 79-97).\n            if !grouped && lane.iter().any(Option::is_some) {\n                // P-CYCLE: the one cycle list, with the CPU owner's published Mii admission.\n                let roster = if role == 0 {\n                    crate::engine::swap::cycle_members::cycle_members(menu.player_roster, crate::engine::swap::cycle_members::ALL_MII)\n                } else {\n                    crate::engine::swap::cycle_members::cycle_members(menu.cpu_roster, super::cpu_cycle_admission())\n                };\n",
+     "new": "            // (Pyra, PT, IC, the Miis) must not give its share to helper sources, which stay resident for the scene\n            // (Yoga swoff2 steps 79-97).\n            if !grouped && lane.iter().any(Option::is_some) {\n                // P-CYCLE / P1-CYCLE: the one cycle list, with that role's published Mii admission.\n                let roster = if role == 0 {\n                    crate::engine::swap::cycle_members::cycle_members(menu.player_roster, super::player_cycle_admission())\n                } else {\n                    crate::engine::swap::cycle_members::cycle_members(menu.cpu_roster, super::cpu_cycle_admission())\n                };\n",
+     "reason": "P1-CYCLE (operator 2026-11-05: a Mii class cycled on P1 though the P1 Cycles grid did not number it, and a missing roster key disagreed): the Player Mii owner publishes cycle_members::player_admission; the P1 Cycles grid and every Player walker use that one list"
     }
    ]
   },
@@ -7849,7 +7864,7 @@
    "dest": "src/runtime/mii/mii_ordinary_player.rs",
    "crate": "root",
    "src_sha256": "73e84c925f3aaedd6c09fd082ba41364d160e8cca38cc604617d5fdc38431b8d",
-   "dest_sha256": "787b97ae185a12a7dddf0a046031ef14c2e865a2b75dee713b1b4a9976b32cda",
+   "dest_sha256": "44e3639c76488dc06e8d2aad1654527f8a50a0f69a0449c12978b761052b4d73",
    "edits": [
     {
      "old": "fn note(reason:&str) { trace!(\"[MiiOrdinaryPlayer] {reason}\"); }",
@@ -8065,6 +8080,31 @@
      "old": "    let has_mii=setting(&MENU).player_roster.fighters().iter()",
      "new": "    let has_mii=setting(&MENU).player_roster.fighters_excluding_fixed(None).iter()",
      "reason": "F6 roster_input allocation root: interrogate the same ordered roster in fixed storage inside intercept; preserve setting snapshots, membership and all transaction guards."
+    },
+    {
+     "old": "use crate::engine::mii::{\n    inventory::{MiiClass,Snapshot as Catalog}, lifetime::Configuration,\n    ordinary_player::{Gate,Phase,Request,SameClass,Ticket},\n    selection::{Action,PlayerLive,PlayerOrigin},\n    identity::Identity as TxnIdentity,\n    transition::{Outcome,ReadyReceipt,Refusal},\n};\n",
+     "new": "use crate::engine::mii::{\n    inventory::{MiiClass,Snapshot as Catalog}, lifetime::Configuration,\n    ordinary_player::{Gate,Phase,Request,SameClass,Ticket},\n    selection::{Action,Origin,PlayerLive,PlayerOrigin},\n    identity::Identity as TxnIdentity,\n    transition::{Outcome,ReadyReceipt,Refusal},\n};\n",
+     "reason": "P1-CYCLE (operator 2026-11-05: a Mii class cycled on P1 though the P1 Cycles grid did not number it, and a missing roster key disagreed): the Player Mii owner publishes cycle_members::player_admission; the P1 Cycles grid and every Player walker use that one list"
+    },
+    {
+     "old": "            && crate::engine::swap::body_bank::original_bankable(origin.original_kind)\n            && crate::runtime::roster::cycle_preload_config::snapshot().original_bank_enabled()))\n}\n#[inline(never)]\npub(super) unsafe fn service(entry:*mut u8,owner:u32)->bool {\n    #[cfg(feature = \"console-swap-trace\")]\n    let _swap_stack = crate::runtime::roster::practice_trace::scope(0x1080001);\n    if owner!=0 || !ENABLED.load(Ordering::Acquire) {return false;}\n    #[cfg(feature=\"native-body-bank-alpha\")]\n    {\n        let bank=STATE.lock().bank;\n",
+     "new": "            && crate::engine::swap::body_bank::original_bankable(origin.original_kind)\n            && crate::runtime::roster::cycle_preload_config::snapshot().original_bank_enabled()))\n}\n/// The Player cycle's Mii admission (`cycle_members::player_admission`) from the owner's state: qualified as `begin`\n/// serves the cycle (menu valid, capture finished, this epoch, a catalog), and the captured saved original is a Mii\n/// origin. The menu shows it (`publish_admission`) and every Player walker walks it (P1-CYCLE).\nfn cycle_admission(s:&State)->crate::engine::swap::cycle_members::MiiAdmission {\n    let (Some(o),Some(catalog))=(s.owner.as_ref(),s.catalog.as_ref()) else {return crate::engine::swap::cycle_members::NO_MII;};\n    let qualified=s.menu_valid && !s.capture && o.origin.binding.epoch==epoch();\n    if !qualified {return crate::engine::swap::cycle_members::NO_MII;}\n    let origin=match o.origin_saved {Some(c)=>PlayerOrigin::Mii(Origin(c.canonical())),None=>PlayerOrigin::NotMii};\n    crate::engine::swap::cycle_members::player_admission(catalog,origin)\n}\nstatic ADMISSION:core::sync::atomic::AtomicU8=core::sync::atomic::AtomicU8::new(0);\nfn publish_admission(admitted:crate::engine::swap::cycle_members::MiiAdmission) {\n    ADMISSION.store(admitted.iter().enumerate().fold(0u8,|acc,(i,on)|acc|(u8::from(*on)<<i)),Ordering::Release);\n}\npub(super) fn published_admission()->crate::engine::swap::cycle_members::MiiAdmission {\n    let bits=ADMISSION.load(Ordering::Acquire);\n    [bits&1!=0,bits&2!=0,bits&4!=0]\n}\n#[inline(never)]\npub(super) unsafe fn service(entry:*mut u8,owner:u32)->bool {\n    #[cfg(feature = \"console-swap-trace\")]\n    let _swap_stack = crate::runtime::roster::practice_trace::scope(0x1080001);\n    if owner!=0 || !ENABLED.load(Ordering::Acquire) {return false;}\n    // P1-CYCLE: the admission the menu shows is the one the walkers walk, refreshed every frame from this state.\n    publish_admission(cycle_admission(&STATE.lock()));\n    #[cfg(feature=\"native-body-bank-alpha\")]\n    {\n        let bank=STATE.lock().bank;\n",
+     "reason": "P1-CYCLE (operator 2026-11-05: a Mii class cycled on P1 though the P1 Cycles grid did not number it, and a missing roster key disagreed): the Player Mii owner publishes cycle_members::player_admission; the P1 Cycles grid and every Player walker use that one list"
+    },
+    {
+     "old": "    if !permitted() {return false;}\n    let pending={\n        let s=STATE.lock();\n        s.owner.as_ref().zip(s.request).map(|(o,request)|\n             (o.origin,o.origin_saved,o.expected,o.active,o.cursor,s.catalog.as_ref().map(Arc::clone),request,s.restore))\n    };\n    let Some((origin,origin_saved,expected,active,cursor,Some(catalog),request,restore))=pending else{return false;};\n    if !request.current(mii_saved_alpha::menu_epoch(),active.map(|c|c.canonical())) {\n        clear_request(request);note(\"menu-close request expired before preparation\");\n        if request.direct_kind().is_some() {notify(Role::Player,\"Character choice expired; select it again\".into());}\n",
+     "new": "    if !permitted() {return false;}\n    let pending={\n        let s=STATE.lock();\n        let admitted=cycle_admission(&s);\n        s.owner.as_ref().zip(s.request).map(|(o,request)|\n             (o.origin,o.origin_saved,o.expected,o.active,o.cursor,s.catalog.as_ref().map(Arc::clone),request,s.restore,admitted))\n    };\n    let Some((origin,origin_saved,expected,active,cursor,Some(catalog),request,restore,admitted))=pending else{return false;};\n    if !request.current(mii_saved_alpha::menu_epoch(),active.map(|c|c.canonical())) {\n        clear_request(request);note(\"menu-close request expired before preparation\");\n        if request.direct_kind().is_some() {notify(Role::Player,\"Character choice expired; select it again\".into());}\n",
+     "reason": "P1-CYCLE (operator 2026-11-05: a Mii class cycled on P1 though the P1 Cycles grid did not number it, and a missing roster key disagreed): the Player Mii owner publishes cycle_members::player_admission; the P1 Cycles grid and every Player walker use that one list"
+    },
+    {
+     "old": "        let live=if at_origin(&origin,&expected,active,origin_saved,cursor) {\n            Live::Original\n        } else {Live::Numbered{identity,cursor}};\n        mii_cycle::next_qualified_player_with_ice_climbers(&menu.player_roster.fighters(),&catalog,&menu::mii_preferences(),\n            origin_saved.map_or(Identity::Fighter(origin.original_kind),|c|Identity::Saved(c.canonical())),live,\n            menu.solo_popo_original!=menu.solo_popo_player_cycle,|step|match qualify(step) {\n                Ok(value)=>Some(value),\n",
+     "new": "        let live=if at_origin(&origin,&expected,active,origin_saved,cursor) {\n            Live::Original\n        } else {Live::Numbered{identity,cursor}};\n        // P1-CYCLE: the cycle the menu numbers (`cycle_members` with this owner's admission), not the unfiltered roster.\n        mii_cycle::next_qualified_player_with_ice_climbers(&crate::engine::swap::cycle_members::cycle_members(menu.player_roster,admitted),&catalog,&menu::mii_preferences(),\n            origin_saved.map_or(Identity::Fighter(origin.original_kind),|c|Identity::Saved(c.canonical())),live,\n            menu.solo_popo_original!=menu.solo_popo_player_cycle,|step|match qualify(step) {\n                Ok(value)=>Some(value),\n",
+     "reason": "P1-CYCLE (operator 2026-11-05: a Mii class cycled on P1 though the P1 Cycles grid did not number it, and a missing roster key disagreed): the Player Mii owner publishes cycle_members::player_admission; the P1 Cycles grid and every Player walker use that one list"
+    },
+    {
+     "old": "    }\n}\npub(super) fn scene_changed() {\n    let mut s=STATE.lock();s.capture=false;s.menu_valid=false;s.catalog=None;s.request=None;\n    s.generic=None;s.restore=None;\n    #[cfg(feature=\"native-body-bank-alpha\")]\n",
+     "new": "    }\n}\npub(super) fn scene_changed() {\n    publish_admission(crate::engine::swap::cycle_members::NO_MII);\n    let mut s=STATE.lock();s.capture=false;s.menu_valid=false;s.catalog=None;s.request=None;\n    s.generic=None;s.restore=None;\n    #[cfg(feature=\"native-body-bank-alpha\")]\n",
+     "reason": "P1-CYCLE (operator 2026-11-05: a Mii class cycled on P1 though the P1 Cycles grid did not number it, and a missing roster key disagreed): the Player Mii owner publishes cycle_members::player_admission; the P1 Cycles grid and every Player walker use that one list"
     }
    ]
   },

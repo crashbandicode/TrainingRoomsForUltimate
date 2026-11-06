@@ -1206,6 +1206,13 @@ impl Menu {
         if matches!(row.control, Control::Editor(Editor::ButtonChords)) {
             for (_, id) in CHORD_ROWS { changed |= self.reset_row(id); }
         }
+        // One row, two kept keys. The row id is the Player key; the CPU key is the sibling.
+        if matches!(row.control, Control::Editor(Editor::CharacterCycles)) {
+            changed |= self.reset_row("cpu_roster");
+        }
+        if matches!(row.control, Control::Editor(Editor::KirbyHats)) {
+            changed |= self.reset_row("cpu_kirby_hats");
+        }
         changed |= self.reset_row(row.id);
         if let Control::MultiSelectRange { range_id, .. } = row.control {
             changed |= self.reset_row(range_id);
@@ -1214,12 +1221,57 @@ impl Menu {
     }
 
     fn reset_row(&mut self, id: &str) -> bool {
-        let Some(saved) = self.settings.defaults.get(id).filter(|_| !id.is_empty()).map(<[u8]>::to_vec) else {
+        if id.is_empty() {
             return false;
+        }
+        if let Some(saved) = self.settings.defaults.get(id).map(<[u8]>::to_vec) {
+            let changed = saved != self.get(id);
+            self.put(id, &saved);
+            return changed;
+        }
+        // A kept key is not a DEFS row, so `Snapshot::get` never sees it. The defaults snapshot
+        // holds the player's saved value when they stored one (`save_defaults` copies `extra`).
+        // Otherwise the factory is what a missing key already means.
+        self.reset_kept(id)
+    }
+
+    // Choice counts: 89 with mii-saved-alpha, else 86. Lobby stages: STAGES.len() == 117.
+    const CYCLE_CHOICES: usize = if cfg!(feature = "mii-saved-alpha") { 89 } else { 86 };
+    const LOBBY_STAGES: usize = 117;
+
+    /// Factory JSON of a kept key. A missing key already means this. `None` when this menu does not own it.
+    fn kept_page_default(id: &str) -> Option<serde_json::Value> {
+        let values = match id {
+            "player_roster" | "cpu_roster" => Self::bytes(Self::CYCLE_CHOICES + 1, &[(0, 1)]),
+            "player_kirby_hats" | "cpu_kirby_hats" => Self::bytes(Self::CYCLE_CHOICES + 1, &[(1, 1)]),
+            "player_character" | "cpu_character" => Self::bytes(Self::CYCLE_CHOICES, &[(0, 1)]),
+            "lobby_stages" => Self::bytes(Self::LOBBY_STAGES + 1, &[(1, 1)]),
+            _ => return None,
         };
-        let changed = saved != self.get(id);
-        self.put(id, &saved);
-        changed
+        Some(serde_json::Value::Array(values))
+    }
+
+    fn bytes(len: usize, set: &[(usize, u8)]) -> Vec<serde_json::Value> {
+        let mut values = vec![serde_json::Value::from(0u8); len];
+        for (index, byte) in set {
+            values[*index] = serde_json::Value::from(*byte);
+        }
+        values
+    }
+
+    fn reset_kept(&mut self, id: &str) -> bool {
+        let saved = self.settings.defaults.extra().get(id).cloned();
+        let target = saved.clone().or_else(|| Self::kept_page_default(id));
+        let Some(target) = target else { return false };
+        // Absence is already the factory. Writing it would mark a reset that changed nothing.
+        if self.kept(id).is_none() && saved.is_none() {
+            return false;
+        }
+        if self.kept(id) == Some(&target) {
+            return false;
+        }
+        self.set_kept(id, target);
+        true
     }
 
     fn press_list(&mut self, button: Button, row: usize, cursor: usize) {
