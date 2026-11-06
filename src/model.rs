@@ -87,6 +87,8 @@ pub mod migration_run;
 pub mod notify;
 #[path = "model/recording.rs"]
 pub mod recording;
+#[path = "model/numbered_picker.rs"]
+pub mod numbered_picker;
 #[path = "model/pause_helper.rs"]
 pub mod pause_helper;
 #[path = "model/settings.rs"]

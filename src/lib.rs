@@ -87,3 +87,6 @@ mod clip_input_tests;
 
 #[cfg(test)]
 mod kirby_hat_cpu_tests;
+
+#[cfg(test)]
+mod numbered_picker_tests;
