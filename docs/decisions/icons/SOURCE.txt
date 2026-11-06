@@ -1,0 +1,16 @@
+Icons used by the RECORDING-REDESIGN revision 4 mockups (tools/render_recording_redesign.py).
+
+Source: Google Material Symbols, from the google/material-design-icons repository on GitHub
+(https://github.com/google/material-design-icons, directory symbols/web/<name>/materialsymbolsoutlined/).
+Licence: Apache License 2.0. The full text is LICENSE-Apache-2.0.txt in this folder, copied unchanged from
+https://raw.githubusercontent.com/google/material-design-icons/master/LICENSE. The repository README says:
+"We have made these icons available for you to incorporate into your products under the Apache License Version 2.0."
+
+Files, unchanged except for the file name (downloaded 2026-11-05):
+  repeat.svg                 <- symbols/web/repeat/materialsymbolsoutlined/repeat_24px.svg
+  push_pin_fill1.svg         <- symbols/web/push_pin/materialsymbolsoutlined/push_pin_fill1_24px.svg
+  link.svg                   <- symbols/web/link/materialsymbolsoutlined/link_24px.svg
+  format_list_numbered.svg   <- symbols/web/format_list_numbered/materialsymbolsoutlined/format_list_numbered_24px.svg
+
+How the mockups use them: the renderer parses each path and fills it with Pillow at 8x size, then downsamples.
+The colour, the tilt of the pin, the dot under the loop, and the count drawn inside the loop are added by the renderer.

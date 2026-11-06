@@ -1282,6 +1282,8 @@ Revision 3 is in progress.
 
 **Revision 3** is the same document, updated. Hot saves are five, with the same pin and newest rules. The third Saves tab is rejected. The sentence "No start save. This macro plays from where the fighters are." is approved as `macro-start-save-missing`. A save's chain is a numbered list of macros, and a conversion is a numbered list of combos. The remaining choices, each with a recommendation, are in that document.
 
+Revision 4 (by the primary's spec): the same document, redrawn after the operator's 2026-11-06 note. The link diagram comes first: four kinds of file, the four links, and how each is made. The pop-up is one big window with the groups stacked and a Links panel for the row under the cursor. Five step-by-step strips show how each link is made. The loop is only in the MACROS header and on a chained save's Links panel, drawn from the Material Symbols SVG (Apache-2.0, `docs/decisions/icons/`). The conversion bar is at the top, under the frame strip. ZL / ZR jump between groups.
+
 ### INTRO-ONCE · The Training intro notices — ordered (2026-11-05)
 
 **Operator 2026-11-05 ~21:3xZ:** "please disable the intro tutorial messages when we enter training. they should only
