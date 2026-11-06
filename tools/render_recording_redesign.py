@@ -1022,26 +1022,29 @@ M4 = [
     dict(key="macro6", name="Macro 6", fighter="Lucina", role="P1", length="0.8 s", start="Macro 6 · start", hot=False),
     dict(key="slot5", name="Slot 5 (2026-11-05)", fighter="Villager", role="P1", length="3.2 s", start=None, hot=False),
 ]
+# The hot rule, in every list: at most five hot per kind, pins first, then the newest. A file sits under the hairline
+# only when five are already hot, so a kind with five files or fewer is all hot and has no hairline.
 C4 = [
     dict(key="ryu", name="Ryu BnB", fighters="Ryu → Mario", links="6 links", src=None, hot=True, pin=True),
     dict(key="nairc", name="Nair loop combo", fighters="Pikachu → Mario", links="4 links", src="Nair loop", hot=True),
+    dict(key="combo4", name="Combo 4", fighters="Steve → Pikachu", links="3 links", src=None, hot=True),
     dict(key="combo2", name="Combo 2", fighters="Pikachu → Mario", links="2 links", src=None, hot=True),
-    dict(key="combo4", name="Combo 4", fighters="Steve → Pikachu", links="3 links", src=None, hot=False),
 ]
 V4 = [
     dict(key="corner", name="Corner to kill", seq=["Ryu BnB", "Nair loop combo"], hot=True, pin=True),
     dict(key="platstr", name="Platform strings", seq=["Combo 2", "Combo 4"], hot=True),
-    dict(key="conv3", name="Conversion 3", seq=["Combo 4"], hot=False),
+    dict(key="conv3", name="Conversion 3", seq=["Combo 4"], hot=True),
 ]
+# The three "· start" saves were written by Record after the 2026-11-05 migration, so they are newer than the slots.
 S4 = [
     dict(key="pressure", name="Corner pressure", fighters="Pikachu · Mario", chain=["nair", "dash", "cputhrow"],
          chain_on=True, hot=True, pin=True),
     dict(key="platform", name="Platform", fighters="Pikachu · Mario", chain=["dash", "replay"], chain_on=False,
          hot=True, pin=True),
-    dict(key="slot1", name="Slot 1 (2026-11-05)", fighters="Steve · Villager", chain=[], hot=True),
-    dict(key="nairstart", name="Nair loop · start", fighters="Pikachu · Mario", chain=[], hot=False),
-    dict(key="dashstart", name="Dash grab · start", fighters="Pikachu · Mario", chain=[], hot=False),
-    dict(key="throwstart", name="CPU throw · start", fighters="Pikachu · Mario", chain=[], hot=False),
+    dict(key="nairstart", name="Nair loop · start", fighters="Pikachu · Mario", chain=[], hot=True),
+    dict(key="dashstart", name="Dash grab · start", fighters="Pikachu · Mario", chain=[], hot=True),
+    dict(key="throwstart", name="CPU throw · start", fighters="Pikachu · Mario", chain=[], hot=True),
+    dict(key="slot1", name="Slot 1 (2026-11-05)", fighters="Steve · Villager", chain=[], hot=False),
     dict(key="slot3", name="Slot 3 (2026-11-05)", fighters="Lucina · Cloud", chain=[], hot=False),
 ]
 MNAME = {m["key"]: m for m in M4}
@@ -1162,7 +1165,8 @@ def render_list(groups, width, cols, focus=None, extra_rows=None):
             first_top = y
             for i, r in enumerate(rws):
                 if hot and i == len(hot):
-                    d.line((10, y + 6, width - 10, y + 6), fill=ch.M_RULE, width=1)
+                    if not r.get("action"):   # an action row (+ New conversion) is not a file: no hairline
+                        d.line((10, y + 6, width - 10, y + 6), fill=ch.M_RULE, width=1)
                     y += 12
                 top, bot = y, y + ROW_H
                 draw_row(img, r, typ, top, bot, width, cols[typ])
@@ -1597,21 +1601,17 @@ def diagram():
 
 # ---- A legend for the list, and the loop mark ----------------------------------------------------------------------
 def legend():
-    img = Image.new("RGBA", (W, 350), WIN)
-    d = ImageDraw.Draw(img)
-    iv.text(d, (40, 30), "How to read a list", fnt(22, bold=True), fill=ch.M_TEXT, anchor="lm")
     width = 560
-    rows = [
-        dict(key="a", name="Nair loop", fighter="Pikachu", role="P1", length="2.4 s", start="Nair loop · start",
-             hot=True, pin=True, active=True),
-        dict(key="b", name="Dash grab", fighter="Pikachu", role="P1", length="1.1 s", start="Dash grab · start",
-             hot=True, pin=True, cursor=True),
-        dict(key="c", name="Replay 86f", fighter="Pikachu", role="P1", length="1.4 s", start=None, hot=True),
-        dict(key="d", name="Macro 6", fighter="Lucina", role="P1", length="0.8 s", start="Macro 6 · start", hot=False),
-    ]
-    groups = [{"title": "MACROS", "typ": "macro", "count": 7, "loop": [("", "on")],
+    # The whole MACROS list: five hot (the pins, then the newest), and two under the hairline.
+    keys = {"nair": "a", "dash": "b", "replay": "c", "macro6": "d"}
+    rows = [dict(m, key=keys.get(m["key"], m["key"]), active=m["key"] == "nair", cursor=m["key"] == "dash")
+            for m in M4]
+    groups = [{"title": "MACROS", "typ": "macro", "count": len(M4), "loop": [("", "on")],
                "sections": [(None, "macro", rows)]}]
     lst, pos, _ = render_list(groups, width, {"macro": COLS["pop"]["macro"]})
+    img = Image.new("RGBA", (W, 64 + lst.height + 96), WIN)
+    d = ImageDraw.Draw(img)
+    iv.text(d, (40, 30), "How to read a list", fnt(22, bold=True), fill=ch.M_TEXT, anchor="lm")
     img.alpha_composite(lst, (40, 64))
     both = Image.new("RGBA", (width, 40), WIN)
     draw_row(both, dict(name="Corner pressure", fighters="Pikachu · Mario", chain=["a", "b", "c"], chain_on=True,
@@ -1686,7 +1686,10 @@ def frag_list(img, box, groups, focus=None, scroll=None, extra_rows=None):
             scroll = min(lst.height - view, pos[focus][1] + 8 - view)
             if scroll + view < lst.height and pos[focus][1] + 8 > scroll + view - ROW_H:
                 scroll = min(lst.height - view, scroll + ROW_H)
-    img.alpha_composite(lst.crop((0, scroll, width, scroll + view)), (box[0], box[1]))
+    # End on the last whole row (and its outline), so no row shows cut at the bottom.
+    whole = [bot for k, (top, bot, _) in pos.items() if not k.startswith("__group") and bot <= scroll + view]
+    end = min(scroll + view, max(whole) + 3) if whole else scroll + view
+    img.alpha_composite(lst.crop((0, scroll, width, end)), (box[0], box[1]))
     sticky_header(img, lst, pos, scroll, box[0], box[1])
     return pos
 
@@ -1835,7 +1838,7 @@ def flow_record(game):
     frag_list(img, b, [g])
 
     b = strip_panel(img, 2, "The link, both ends", "The Links panel shows starts from Macro 7 · start. The new save "
-                    "(gold outline, a mockup mark for new) is in SAVE STATES under the outline.")
+                    "(gold outline, a mockup mark for new) is hot in SAVE STATES, after the pins.")
     y = links_panel(img, (b[0], b[1], b[2], b[1] + 150), {
         "self": ("macro", "Macro 7"),
         "branches": [{"label": "starts from", "out": True, "nodes": [("save", "Macro 7 · start", None, None, True)],
@@ -1843,9 +1846,10 @@ def flow_record(game):
         "lines": []}, header=False)
     sg = group_only("player", "save", None)
     srows = sg["sections"][0][2]
-    new_save = dict(key="m7start", name="Macro 7 · start", fighters="Pikachu · Mario", chain=[], hot=False, new=True,
+    # The newest save, so it is hot right after the two pins (the top of the list; the rest is below this view).
+    new_save = dict(key="m7start", name="Macro 7 · start", fighters="Pikachu · Mario", chain=[], hot=True, new=True,
                     active=False, cursor=False)
-    sg = dict(sg, sections=[(None, "save", [dict(srows[0]), new_save, dict(srows[3])])], count=len(S4) + 1)
+    sg = dict(sg, sections=[(None, "save", [dict(srows[0]), dict(srows[1]), new_save])], count=len(S4) + 1)
     frag_list(img, (b[0], y + 8, b[2], b[3]), [sg])
     return img
 
@@ -1856,7 +1860,7 @@ def flow_chain():
     b = strip_panel(img, 0, "Focus a save, press +", "Corner pressure is the bound save (green) and the cursor. "
                     "+ opens Edit chain.")
     g = group_only("player", "save", "pressure", overrides={"pressure": {"chain": [], "chain_on": False}},
-                   keep={"pressure", "platform", "slot1"})
+                   keep={"pressure", "platform", "nairstart", "dashstart", "throwstart"})
     frag_list(img, (b[0], b[1], b[2], b[3] - 34), [g], "pressure")
     keys_line(img, b[0], b[3] - 12, [("A", "bind"), ("+", "edit chain"), ("B", "close")], 14)
 
@@ -1886,7 +1890,7 @@ def flow_conversion():
                     "under the conversions.")
     g = group_only("page", "combo", "newconv")
     secs = g["sections"]
-    newrow = dict(key="newconv", name="+ New conversion", seq=[], hot=False, cursor=True)
+    newrow = dict(key="newconv", name="+ New conversion", seq=[], hot=False, cursor=True, action=True)
     g = dict(g, sections=[secs[0], ("Conversions", "conv", secs[1][2] + [newrow])])
     frag_list(img, b, [g], "newconv")
 
@@ -2062,16 +2066,21 @@ def r5_tail(typ):
                  ("slot11s", "Slot 11 (2026-11-05)", "Lucina · Cloud")]
         return [dict(key=k, name=n, fighters=f, chain=[], hot=False) for k, n, f in specs]
     if typ == "combo":
-        # Revision 5.2's Q5 only: two more combos, so that one column has to scroll to reach the conversions.
-        specs = [("combo5", "Combo 5", "Pikachu → Mario"), ("combo6", "Combo 6", "Lucina → Cloud")]
-        return [dict(key=k, name=n, fighters=f, links="3 links", src=None, hot=False) for k, n, f in specs]
+        # Revision 5.2's Q5 only: two more combos, so that one column has to scroll to reach the conversions. Combo 5
+        # is the newest, so it is hot after the pin; Combo 1 is the oldest, and with five hot it is under the hairline.
+        return [dict(key="combo5", name="Combo 5", fighters="Pikachu → Mario", links="3 links", src=None, hot=True),
+                dict(key="combo1", name="Combo 1", fighters="Lucina → Cloud", links="3 links", src=None, hot=False)]
     return []
 
 
 def r5_rows(typ, role, focus, extend=False):
     data = {"macro": M4, "combo": C4, "conv": V4, "save": S4}[typ]
     if extend:
-        data = list(data) + r5_tail(typ)
+        tail = r5_tail(typ)
+        hot_tail = [r for r in tail if r.get("hot")]
+        pins = [r for r in data if r.get("pin")]
+        # A hot extra file is newer than the unpinned ones: it goes right after the pins.
+        data = pins + hot_tail + [r for r in data if not r.get("pin")] + [r for r in tail if not r.get("hot")]
     out = []
     for src in data:
         r = dict(src)
@@ -2408,9 +2417,10 @@ def popup5_stacked(game):
     iv.text(d, (152, 98), "Recording", fnt(18, bold=True), fill=ch.M_TEXT, anchor="lm")
     role_toggle(d, 820, 82, "player", 15)
     r5_tabs(d, 152, 122, "saves", "player")
-    _left, _right, sections, _pos = r5_columns("player", "saves", "pressure", 540)
-    r5_paste(img, sections["save"], (148, 158, 700, 360), 0)
-    r5_paste(img, sections["macro"], (148, 368, 700, 560), 0)
+    _left, _right, sections, positions = r5_columns("player", "saves", "pressure", 540)
+    # Whole rows only: a row that would be cut at the bottom of its section is left out, and the scrollbar shows more.
+    r5_paste_sticky(img, sections["save"], (148, 158, 700, 360), 0, HEAD_H + 2, positions["save"])
+    r5_paste_sticky(img, sections["macro"], (148, 368, 700, 560), 0, HEAD_H + 2, positions["macro"])
     d = ImageDraw.Draw(img)
     d.line((716, 158, 716, 560), fill=ch.M_DIVIDER, width=2)
     links_panel(img, (732, 164, 1130, 548), links_spec("pressure", "player"))
@@ -2518,11 +2528,12 @@ POP_CROP = (128, 72, 1153, 619)        # popup5's window, its outline included
 STACK_CROP = (128, 72, 1153, 649)      # popup5_stacked's window (POP)
 
 
-def q_canvas(n, width, content_h, cap_a, cap_b):
+def q_canvas(n, width, content_h, cap_a, cap_b, pad=None):
     """The title bar 'QN · question', then two panels: A · recommended (green chip) and B (grey chip). Each panel ends
     in its caption. Returns the image and the two content boxes."""
     wide = width > W
-    margin, gap, pad = (12, 12, 8) if wide else (24, 16, 16)
+    margin, gap, pad0 = (12, 12, 8) if wide else (24, 16, 16)
+    pad = pad0 if pad is None else pad
     pw = (width - 2 * margin - gap) // 2
     probe = ImageDraw.Draw(Image.new("RGBA", (4, 4)))
     fcap = fnt(15)
@@ -2818,48 +2829,60 @@ def q3():
 
 
 # ---- Q4 ---------------------------------------------------------------------------------------------------------------
-def mismatch_plate(img, box, chosen):
-    """The Fighter Mismatch screen (prompt5) at the same type sizes, narrower, with the answer under the cursor."""
+def mismatch_prompt(img, box, info, footer, chosen=0, inset=24):
+    """The Fighter Mismatch screen as prompt5 draws it, at the same type sizes: the title, Keep / Switch with the
+    answer under the cursor, a rule, the recorded lines, then the footer. The wording is macro_panel/fighter.rs's."""
     d = ImageDraw.Draw(img)
     x0, y0, x1, y1 = box
     d.rounded_rectangle(box, radius=10, fill=WIN, outline=WIN_EDGE, width=2)
-    iv.text(d, (x0 + 16, y0 + 24), "Fighter Mismatch", fnt(18, bold=True), fill=ch.M_TEXT, anchor="lm")
+    iv.text(d, (x0 + inset, y0 + 28), "Fighter Mismatch", fnt(18, bold=True), fill=ch.M_TEXT, anchor="lm")
+    row_in = 16 if inset >= 24 else 8
     for i, label in enumerate(("Keep current fighter", "Switch to recorded fighter")):
-        top = y0 + 48 + i * 42
-        b = (x0 + 10, top, x1 - 10, top + 34)
+        top = y0 + 58 + i * 44
+        b = (x0 + row_in, top, x1 - row_in, top + 36)
         if i == chosen:
             d.rectangle(b, fill=ch.M_FOCUS)
             d.rectangle(b, outline=WHITE, width=2)
             d.rectangle((b[0], b[1], b[0] + 4, b[3]), fill=WHITE)
-        iv.text(d, (x0 + 24, top + 17), label, fnt(16), fill=ch.M_TEXT, anchor="lm")
+        iv.text(d, (x0 + row_in + 20, top + 18), label, fnt(16), fill=ch.M_TEXT, anchor="lm")
+    d.line((x0 + row_in, y0 + 146, x1 - row_in, y0 + 146), fill=ch.M_RULE, width=1)
+    y = y0 + 172
+    for line, colour in [(t, ch.M_TEXT) for t in info] + [(t, ch.M_GROUP) for t in footer]:
+        iv.text(d, (x0 + inset, y), line, fnt(14), fill=colour, anchor="lm")
+        y += 24
 
 
-def q4(game):
-    img, (a, b) = q_canvas(4, W, 336,
+def q4():
+    img, (a, b) = q_canvas(4, W, 352,
                            "Asked once, before the chain starts. One answer covers 2 and 3, and the chain then plays "
                            "without a stop.",
-                           "Asked at 2, then again at 3. The chain stops at each prompt, and the answers can differ.")
+                           "Asked at 2, then again at 3. The chain stops at each prompt, and the answers can differ.",
+                           pad=12)
     ask = lambda s: ("Switch or Keep?\n" + s, "save", "ask")
     arr = ("", "arrow", "")
     num = lambda n: (str(n), "macro", "")
     sq = dict(h=54, size=15, pad=20, minw=46, arrow=26)
+    footer = "Inputs are the same either way. A chooses, B cancels."
     x0, y0, x1, _ = a
     seq52(img, x0, y0, [ask("names 2 and 3"), arr, num(1), arr, num(2), arr, num(3)], **sq)
     d = ImageDraw.Draw(img)
-    iv.text(d, (x0, y0 + 84), "The prompt is the existing Fighter Mismatch screen:", fnt(15), fill=ch.M_GROUP,
-            anchor="lm")
-    crop = rounded(prompt5(game).crop((360, 168, 921, 393)), 10)
-    img.alpha_composite(crop, (int(x0 + (x1 - x0 - crop.width) / 2), y0 + 104))
+    iv.text(d, (x0, y0 + 84), "The existing Fighter Mismatch screen, with one line per macro:", fnt(15),
+            fill=ch.M_GROUP, anchor="lm")
+    mismatch_prompt(img, (x0, y0 + 104, x1, y0 + 352),
+                    ["2 Dash grab · Recorded Pikachu · P1 is Steve",
+                     "3 CPU throw · Recorded Mario · current CPU Villager"], [footer])
     x0, y0, x1, _ = b
     seq52(img, x0, y0, [num(1), arr, ask("names 2"), arr, num(2), arr, ask("names 3"), arr, num(3)], **sq)
     d = ImageDraw.Draw(img)
-    iv.text(d, (x0, y0 + 84), "Each prompt is the same screen, with its own answer:", fnt(15), fill=ch.M_GROUP,
-            anchor="lm")
-    pw = (x1 - x0 - 16) / 2
-    for k, (label, chosen) in enumerate((("At 2", 0), ("At 3", 1))):
-        px = x0 + k * (pw + 16)
-        iv.text(d, (px + 2, y0 + 116), label, fnt(15, bold=True), fill=GOLD, anchor="lm")
-        mismatch_plate(img, (px, y0 + 132, px + pw, y0 + 270), chosen)
+    pw = (x1 - x0 - 10) / 2
+    # The same screen at each prompt, each with its own answer: Keep at 2, Switch at 3.
+    for k, (label, info, chosen) in enumerate((("At 2", "Recorded Pikachu · P1 is Steve", 0),
+                                               ("At 3", "Recorded Mario · current CPU Villager", 1))):
+        px = x0 + k * (pw + 10)
+        iv.text(d, (px + 2, y0 + 84), label, fnt(15, bold=True), fill=GOLD, anchor="lm")
+        # The narrower plate puts the same footer on two lines.
+        mismatch_prompt(img, (px, y0 + 104, px + pw, y0 + 352), [info],
+                        ["Inputs are the same either way.", "A chooses, B cancels."], chosen, inset=12)
         d = ImageDraw.Draw(img)
     return img
 
@@ -2933,19 +2956,23 @@ def q5(game):
 
 # ---- Q6 ---------------------------------------------------------------------------------------------------------------
 def q6():
-    img, (a, b) = q_canvas(6, W, 330,
+    img, (a, b) = q_canvas(6, W, 438,
                            "Up to five in the green outline: pinned first, then the newest. The rest sit dimmer under "
                            "the hairline.",
                            "One plain list, newest first, with no outline and no pins. Only the drilled conversion is "
                            "green.")
+    # Six conversions, newest first: Conversion 6, 5, 4, Corner to kill, Platform strings, Conversion 3.
     corner = dict(name="Corner to kill", sub="Ryu BnB → Nair loop combo", hot=True, pin=True, active=True,
                   cursor=True)
+    conv6 = dict(name="Conversion 6", sub="Combo 4 → Ryu BnB", hot=True)
+    conv5 = dict(name="Conversion 5", sub="Ryu BnB → Combo 2", hot=True)
     conv4 = dict(name="Conversion 4", sub="Combo 2 → Nair loop combo", hot=True)
     plat = dict(name="Platform strings", sub="Combo 2 → Combo 4", hot=True)
     conv3 = dict(name="Conversion 3", sub="Combo 4", hot=False)
-    big_rows(img, a[0], a[1], a[2] - a[0], "CONVERSIONS", "conv", [corner, conv4, plat, conv3])
+    big_rows(img, a[0], a[1], a[2] - a[0], "CONVERSIONS", "conv", [corner, conv6, conv5, conv4, plat, conv3])
     keys_line(img, a[0], a[3] - 12, [("A", "drill"), ("Y", "PIN"), ("B", "close")], 15)
-    big_rows(img, b[0], b[1], b[2] - b[0], "CONVERSIONS", "conv", [conv4, corner, plat, conv3], hot_set=False)
+    big_rows(img, b[0], b[1], b[2] - b[0], "CONVERSIONS", "conv", [conv6, conv5, conv4, corner, plat, conv3],
+             hot_set=False)
     keys_line(img, b[0], b[3] - 12, [("A", "drill"), ("B", "close")], 15)
     return img
 
@@ -3197,7 +3224,7 @@ def q11_window(img, box):
         tabs.append(tb)
         tx += w + 12
     cols = [(x0 + 22, x0 + 332), (x1 - 332, x1 - 22)]
-    data = (("SAVE STATES", "save", ("Corner pressure", "Platform", "Slot 1 (2026-11-05)", "Nair loop · start")),
+    data = (("SAVE STATES", "save", ("Corner pressure", "Platform", "Nair loop · start", "Dash grab · start")),
             ("MACROS", "macro", ("Nair loop", "Dash grab", "CPU throw", "Replay 86f")))
     head_y = y0 + 196
     for c, ((cx0, cx1), (title, typ, names)) in enumerate(zip(cols, data)):
@@ -3262,7 +3289,7 @@ def main_q52(game):
     save(q1(), P % 1)
     save(q2(), P % 2)
     save(q3(), P % 3)
-    save(q4(game), P % 4)
+    save(q4(), P % 4)
     save(q5(game), P % 5)
     save(q6(), P % 6)
     save(q7(), P % 7)

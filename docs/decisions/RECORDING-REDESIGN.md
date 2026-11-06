@@ -1,4 +1,4 @@
-# Recording redesign — revision 5
+# Recording redesign — revision 5.2
 
 Phase 1 screens. Nothing here is built. The pop-up sits on a real Training frame, `artifacts/phase23/overlay-investigation/frames/fix-tr-training.png` (Steve and Villager on Battlefield). The menu pictures are redrawn on the real rc.1 Recording page (`eden-runs/tr-p23-docs-capture-03`). Names and lengths are examples, and every picture uses the same example files. The first picture shows them.
 
@@ -188,6 +188,8 @@ When the Fighter Mismatch prompt asks Switch or Keep during a chain, shown with 
 | A · recommended | B |
 | --- | --- |
 | One Fighter Mismatch prompt appears before the chain starts. It lists every macro recorded on a different fighter, and your answer (Switch or Keep) covers the whole chain, so playback is never interrupted. Keep plays the inputs on the fighter you have now. | The prompt appears each time the chain reaches a mismatched macro, so you can Switch for one and Keep for another. The chain pauses at every prompt, which breaks the timing of a chain that loops. |
+
+Option A's list of macros, one line each, is the only new text in the prompt.
 
 The pictures in this doc use A.
 
