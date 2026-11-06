@@ -2407,7 +2407,7 @@ def q4():
     iv.text(d, (x0, y0 + 84), "The existing screen, for macro 1 only. No list:", fnt(15),
             fill=ch.M_GROUP, anchor="lm")
     mismatch_prompt(img, (x0, y0 + 104, x1, y0 + 328),
-                    ["Nair loop · Recorded Pikachu · current CPU Palutena"], [footer])
+                    ["Recorded Pikachu · current CPU Palutena"], [footer])
     iv.text(d, (x0, y0 + 348), "Macros 2 and 3 play on the same character; they never ask.", fnt(15),
             fill=ch.M_TEXT, anchor="lm")
     # B: a prompt before each macro, each with its own line; then the one screen, drawn once.
