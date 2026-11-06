@@ -19,4 +19,6 @@ pub mod ordered_roster;
 pub mod mii_cycle;
 // P-CYCLE: one role's cycle as the menu numbers it and every walker walks it (own code, not carried).
 pub mod cycle_members;
+// P-HOT step 2: the entry-time window (not carried; LANE-HOT-SLOTS-REPORT.md §10).
+pub mod entry_window;
 pub mod character_memory;

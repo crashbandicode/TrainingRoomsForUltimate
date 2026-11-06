@@ -735,3 +735,21 @@ only through the borrow), and the borrow record F9 reads is `character_sources::
 edits of `body_bank.rs`, `character_sources.rs`, `cycle_preload.rs`, `native_body_bank.rs`; `carry_pkg6.py verify`
 re-derives all 250 files. Tests: `hat_slots` (3), `hats_are_not_charged_against_ready_fighters`,
 `ready_hats_row_defaults_to_five`, `tests/hat_slots_wiring.rs` (2).
+
+### p23/hot-slots: the start-up window built into Training's own start (2026-11-06, P-HOT B)
+
+The fork builds a fighter's body bank only at a visible swap: Training starts every visible role with one body and the
+notice says "Swap once to load". The operator asked for the characters to be "just ready from the get go", as the
+game does for Pokémon Trainer, and chose B (2026-11-06). The research boot `tr-p23-hot-measure-3` measured the scene
+path (`artifacts/phase23/LANE-HOT-SLOTS-REPORT.md` §12.1). P-HOT B, behind a new seam row `body_bank.scene_header`
+(64 guarded bytes at `main+0x66de14`) and a Training-only scope contract:
+- H1 extends a visible role's resource header with its start-up window;
+- H2: the existing served `0x17e5bc0` requests the window's other members for the pending bank;
+- H3 rewrites the creation at the `0x678174` observer;
+- H4 binds the bank in `prepare_models`;
+- `scene_changed` keeps a window the new scene published.
+
+10 recorded manifest edits of `rows_a1.rs`, `swap_model/scope.rs`, `character_lifecycle.rs` and `native_body_bank.rs`;
+the values are a new clean-room model, `src/model/swap/entry_window.rs`. `carry_pkg6.py verify` re-derives all 250
+files. Tests: `entry_window` (6), `tests/startup_window_wiring.rs` (3). Eden proof: `rc6-combined/rows-hot-slots/`
+(grouped session).
