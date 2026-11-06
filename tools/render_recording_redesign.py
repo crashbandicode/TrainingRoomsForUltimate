@@ -191,7 +191,7 @@ def main_r3():
     save(keyboard(base), "RECORDING-REDESIGN-keyboard")
 
     save(status(game, "Make combo · step 1", [
-        "Loaded the linked save, Nair loop · start.",
+        "Loaded the connected save, Nair loop · start.",
         "Then Nair loop plays on Player 1.",
         "The macro file is kept.",
     ]), "RECORDING-REDESIGN-combo-from-macro")
@@ -200,8 +200,8 @@ def main_r3():
                          "Links 1 through 3 stay. Link 4 is left out.",
                          "A saves a new combo. The original file stays.",
                          "Up/Down move    A save a copy    B back")
-    crop_links(d, [("1  aerial → aerial", "kept", "first"), ("2  aerial → tilt", "kept", ""),
-                   ("3  tilt → smash", "kept", "last"), ("4  smash → special", "left out", "")], kept=3, cursor=2)
+    crop_links(d, [("1  aerial → aerial", "kept", "first"), ("2  aerial → aerial", "kept", ""),
+                   ("3  aerial → aerial", "kept", "last"), ("4  aerial → aerial", "left out", "")], kept=3, cursor=2)
     save(img, "RECORDING-REDESIGN-crop")
 
     img, d = file_screen(menu, "Recording (Player view)  >  Save states & Macros  >  Nair loop  >  Crop",
@@ -826,7 +826,11 @@ def links_spec(key, role="player"):
                 {"label": "in sequences", "out": False,
                  "nodes": [("conv", n, None, "#%d" % i, False) for n, i in convs], "none": "none"},
             ],
-            "lines": [("Its links", "", None), ("CHIPS", ["L1", "L2", "L3", "L4"], None),
+            "lines": [("Its links (4)", "", None),
+                      ("L1  aerial → aerial", "TRUE", GREEN),
+                      ("L2  aerial → aerial", "TRUE", GREEN),
+                      ("L3  aerial → aerial", "TRUE", GREEN),
+                      ("L4  aerial → aerial", "TRUE", GREEN),
                       ("Fighters", combo["fighters"], ch.M_TEXT)],
         }
     conv = {v["key"]: v for v in V4}.get(key)
@@ -860,9 +864,18 @@ def links_panel(img, box, spec, header=True):
     x0, y0, x1, y1 = box
     y = y0
     if header:
-        iv.text(d, (x0, y + 8), "LINKS", fnt(12, bold=True), fill=ch.M_GROUP, anchor="lm")
-        iv.text(d, (x0 + 46, y + 8), "of the row under the cursor", fnt(12), fill=DIM, anchor="lm")
-        y += 22
+        word = "CONNECTIONS"
+        fw, fs = fnt(12, bold=True), fnt(12)
+        iv.text(d, (x0, y + 8), word, fw, fill=ch.M_GROUP, anchor="lm")
+        sub = "of the row under the cursor"
+        sub_x = x0 + d.textlength(word, font=fw) + 8
+        if sub_x + d.textlength(sub, font=fs) <= x1:
+            iv.text(d, (sub_x, y + 8), sub, fs, fill=DIM, anchor="lm")
+            y += 22
+        else:
+            y += 18
+            iv.text(d, (x0, y + 8), sub, fs, fill=DIM, anchor="lm")
+            y += 22
     typ, name = spec["self"]
     node4(img, (x0, y, x1, y + 38), typ, name, fsize=15, width=3)
     d = ImageDraw.Draw(img)
@@ -997,9 +1010,12 @@ def link_label(d, x, y, label, how, col, anchor="mm", how_first=False, width=440
 def diagram():
     img = Image.new("RGBA", (W, 940), WIN)
     d = ImageDraw.Draw(img)
-    iv.text(d, (40, 30), "What links to what", fnt(24, bold=True), fill=ch.M_TEXT, anchor="lm")
-    iv.text(d, (40, 60), "Four kinds of file. Four kinds of link. Each arrow says what the link means; the grey line "
-            "says how you make it.", fnt(14), fill=ch.M_GROUP, anchor="lm")
+    iv.text(d, (40, 30), "What connects to what", fnt(24, bold=True), fill=ch.M_TEXT, anchor="lm")
+    # Kept to the left of the chain note, which sits above the Macro box.
+    sub = ("Four kinds of file. Four kinds of connection. Each arrow says what the connection means; the grey line "
+           "says how you make it.")
+    for k, line in enumerate(wrap(d, sub, fnt(14), 760)):
+        iv.text(d, (40, 60 + 18 * k), line, fnt(14), fill=ch.M_GROUP, anchor="lm")
     save_b, macro_b = (60, 150, 360, 250), (840, 150, 1140, 250)
     conv_b, combo_b = (60, 380, 360, 480), (840, 380, 1140, 480)
     big_node(img, save_b, "save", "Save state", "both fighters; Load only warps here")
@@ -1012,7 +1028,7 @@ def diagram():
     arrow4(d, [(834, 200), (368, 200)], mc, width=3, head=13)
     icon(img, "save", 585, 162, 26, sc)
     d = ImageDraw.Draw(img)
-    link_label(d, 600, 222, "starts from", "automatic: Record writes \"<macro name> · start\" and links it.\nA Play "
+    link_label(d, 600, 222, "starts from", "automatic: Record writes \"<macro name> · start\" and connects it.\nA Play "
                "chord warps there once, first, while the Start save switch is On.", mc, width=470)
     # chain -> macros: a loop on the Macro box
     arrow4(d, [(1100, 150), (1100, 112), (1180, 112), (1180, 200), (1146, 200)], mc, width=3, head=12)
@@ -1141,7 +1157,7 @@ def loop_picture():
     iv.text(d, (40, 200), "Where it appears:", fnt(15, bold=True), fill=ch.M_TEXT, anchor="lm")
     iv.text(d, (40, 228), "the MACROS section header, for the role in view (Player and CPU each keep their own count);",
             fnt(15), fill=ch.M_GROUP, anchor="lm")
-    iv.text(d, (40, 254), "a chain's Links panel, the count of the role it is active for: the whole chain repeats. "
+    iv.text(d, (40, 254), "a chain's Connections panel, the count of the role it is active for: the whole chain repeats. "
             "Never in the SAVE STATES, SEQUENCES or COMBOS headers.", fnt(15), fill=ch.M_GROUP, anchor="lm")
     return img
 
@@ -1268,7 +1284,7 @@ def frag_keyboard(img, box, header, typed):
 def strip_canvas(number, title, subtitle):
     img = Image.new("RGBA", (W, 500), WIN)
     d = ImageDraw.Draw(img)
-    iv.text(d, (24, 28), "How a link is made · %d · %s" % (number, title), fnt(20, bold=True), fill=ch.M_TEXT,
+    iv.text(d, (24, 28), "How a connection is made · %d · %s" % (number, title), fnt(20, bold=True), fill=ch.M_TEXT,
             anchor="lm")
     iv.text(d, (24, 54), subtitle, fnt(14), fill=ch.M_GROUP, anchor="lm")
     return img
@@ -1320,7 +1336,7 @@ def group_only(role, typ, focus, overrides=None, keep=None):
 
 
 def flow_record(game):
-    img = strip_canvas(1, "Record → start save", "A recording always writes its own start save and links to it.")
+    img = strip_canvas(1, "Record → start save", "A recording always writes its own start save and connects to it.")
     b = strip_panel(img, 0, "Record", "In the match, ZR + Down records. The pop-up's role, Player, says whose "
                     "inputs are recorded. ZR + Down again stops.")
     bottom = frag_game(img, b, hide_notice4(game.copy()))
@@ -1330,7 +1346,7 @@ def flow_record(game):
     iv.text(d, (b[0], bottom + 38), "that file becomes \"Macro 7 · start\".", fnt(13), fill=ch.M_GROUP, anchor="lm")
 
     b = strip_panel(img, 1, "Macro 7 is hot", "It stops. Macro 7 joins the hot five at the top, the most recently "
-                    "used, with its start save linked, and gets the cursor. The least recently used hot macro, "
+                    "used, with its start save connected, and gets the cursor. The least recently used hot macro, "
                     "Replay 86f, leaves the outline.")
     m7 = dict(key="m7", name="Macro 7", fighter="Pikachu", role="P1", length="3.0 s", start="Macro 7 · start",
               hot=True, new=True)
@@ -1343,7 +1359,7 @@ def flow_record(game):
     g = dict(g, sections=[(None, "macro", rows)], loop=[("", "1")], count=len(RECORDINGS) + 1)
     frag_list(img, b, [g])
 
-    b = strip_panel(img, 2, "The link, both ends", "The Links panel shows starts from Macro 7 · start. The new save "
+    b = strip_panel(img, 2, "The connection, both ends", "The Connections panel shows starts from Macro 7 · start. The new save "
                     "(gold outline, a mockup mark for new) is hot in SAVE STATES, at the top.")
     y = links_panel(img, (b[0], b[1], b[2], b[1] + 150), {
         "self": ("macro", "Macro 7"),
@@ -1455,7 +1471,7 @@ def flow_make_combo(game):
     iv.text(d, (b[0], bottom + 18), "The frame strip at the top is recording.", fnt(13), fill=ch.M_GROUP, anchor="lm")
 
     b = strip_panel(img, 2, "The new combo", "Nair loop combo (gold: new) joins the hot five at the top. The drill "
-                    "does not change: Ryu BnB is still the drill. Its row says from Nair loop; its Links panel says "
+                    "does not change: Ryu BnB is still the drill. Its row says from Nair loop; its Connections panel says "
                     "made from.")
     # The stacked tab with SEQUENCES collapsed to its header. Ryu BnB is the drill in this strip, and the new combo,
     # the most recently used, is at the top of the hot five without becoming the drill.
@@ -1486,7 +1502,7 @@ def flow_drill(game, bar_picture):
     keys_line(img, b[0], b[3] - 36, foot[:3], 13)
     keys_line(img, b[0], b[3] - 14, foot[3:], 13)
 
-    b = strip_panel(img, 1, "It is the drill", "The row turns green, and Ryu BnB is no longer the drill. Its Links "
+    b = strip_panel(img, 1, "It is the drill", "The row turns green, and Ryu BnB is no longer the drill. Its Connections "
                     "panel lists the combos in order. The sequence is new, so its streak and best start at 0.")
     convs, combos = tab_rows("corner", "corner")
     one_row(img, b[0], b[1] - 4, b[2] - b[0], [r for r in convs if r["key"] == "corner"][0], "conv")
@@ -2465,7 +2481,7 @@ def q5(game):
     a_img = window_crop(popup6(game, "player", "combos", "corner", extend=True), STACK_CROP, pw)
     b_img = window_crop(popup6_one_list(game), STACK_CROP, pw)
     img, (a, b) = q_canvas(5, WIDE, a_img.height,
-                           "Sequences on top, combos below, each with its own scroll. The Links panel lists Corner "
+                           "Sequences on top, combos below, each with its own scroll. The Connections panel lists Corner "
                            "to kill's combos in order.",
                            "One list, one scroll. The combos push Corner to kill down, so the list has scrolled and Ryu "
                            "BnB, its combo 1, is off the top.")
@@ -2537,7 +2553,7 @@ def q7_events(img, box, events):
 
 def q7():
     img, (a, b) = q_canvas(7, W, 362,
-                           "The sequence keeps a link to each combo file. A rename or a delete of the combo reaches "
+                           "The sequence keeps a connection to each combo file. A rename or a delete of the combo reaches "
                            "it.",
                            "The sequence keeps a frozen copy of each combo's links. Renames and deletes of the combo "
                            "don't reach it.")
@@ -2551,7 +2567,7 @@ def q7():
         icon(img, "link", ib[0] + 36, cy - 10, 20, cc)
         d = ImageDraw.Draw(img)
         iv.text(d, (ib[0] + 62, cy), name, fnt(16), fill=ch.M_TEXT, anchor="lm")
-        iv.text(d, (ib[0] + 62, cy + 24), "a link to the file", fnt(14), fill=ch.M_GROUP, anchor="lm")
+        iv.text(d, (ib[0] + 62, cy + 24), "a connection to the file", fnt(14), fill=ch.M_GROUP, anchor="lm")
 
     def copy(img, ib, n, name, links):
         d = ImageDraw.Draw(img)
@@ -2766,8 +2782,8 @@ def q11_window(img, box):
     for xx in range(int(lb[0]), int(lb[2]), 12):
         d.line((xx, lb[1], min(xx + 6, lb[2]), lb[1]), fill=ch.M_GROUP, width=2)
         d.line((xx, lb[3], min(xx + 6, lb[2]), lb[3]), fill=ch.M_GROUP, width=2)
-    iv.text(d, (lb[0] + 16, lb[1] + 24), "Links panel", fnt(17, bold=True), fill=ch.M_TEXT, anchor="lm")
-    for k, line in enumerate(wrap(d, "the links of the row under the cursor", fnt(15), lb[2] - lb[0] - 32)):
+    iv.text(d, (lb[0] + 16, lb[1] + 24), "Connections panel", fnt(17, bold=True), fill=ch.M_TEXT, anchor="lm")
+    for k, line in enumerate(wrap(d, "the connections of the row under the cursor", fnt(15), lb[2] - lb[0] - 32)):
         iv.text(d, (lb[0] + 16, lb[1] + 52 + 20 * k), line, fnt(15), fill=ch.M_GROUP, anchor="lm")
     for k in range(4):
         top = lb[1] + 110 + k * 52

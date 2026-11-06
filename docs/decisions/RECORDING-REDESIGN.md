@@ -1,4 +1,4 @@
-# Recording redesign — revision 8
+# Recording redesign — revision 8.1
 
 Revision 7 records the operator's answers to every question (2026-11-06): pins are dropped, the hot five are the most recently used, and Q8 drills combos without requiring them to be true. This is the implementation spec.
 
@@ -8,13 +8,15 @@ Revision 7.2 redraws the pictures that were stale, records three small decisions
 
 Revision 8 applies the operator's answers of 2026-11-06. A save state only warps. A chain is a compound macro, a file in MACROS, and each role has one active macro. The loop never warps back. An orange floppy chip marks the save state a macro starts at, and "conversion" is now called "sequence". Two new questions, Q12 and Q13, are decided: A.
 
+Revision 8.1 calls a connection between files a connection. The combo helper still says link for its hits, and the combo's panel lists each one with its two moves and whether it was recorded TRUE. The operator signed off: "yes have grok do both and then we are green to implement".
+
 Phase 1 screens. Nothing here is built. The pop-up sits on a real Training frame, `artifacts/phase23/overlay-investigation/frames/fix-tr-training.png` (Steve and Villager on Battlefield). The menu pictures are redrawn on the real rc.1 Recording page (`eden-runs/tr-p23-docs-capture-03`). Names and lengths are examples, and every picture uses the same example files. The first picture shows them.
 
 Every question is decided, and the pictures use the decided answers. Each question keeps its A | B picture next to the picture it concerns, for the record.
 
 ## The thirteen decisions
 
-| Q | Question | Answer | Link |
+| Q | Question | Answer | See |
 | --- | --- | --- | --- |
 | 1 | How you number a chain or a sequence | A: name tiles; A gives the next number, R takes it off, as in Character Cycles | [Q1](#q1-how-you-number-a-chain-or-a-sequence-decided-a) |
 | 2 | Which role plays a chain | Decided: the role it is set active for, with that role's Play chord | [Q2](#q2-which-role-plays-a-chain-decided) |
@@ -25,27 +27,27 @@ Every question is decided, and the pictures use the decided answers. Each questi
 | 7 | What the sequence file stores | A: a reference to each combo file, in order | [Q7](#q7-what-the-sequence-file-stores-decided-a) |
 | 8 | A drop, and what completes the sequence | Restart at combo 1; true not required | [Q8](#q8-a-drop-and-what-completes-the-sequence-decided) |
 | 9 | One drill at a time | A: a sequence and a combo replace each other as the drill | [Q9](#q9-one-drill-at-a-time-decided-a) |
-| 10 | Side by side, or stacked | Decided: stacked, with the Links panel | [Q10](#q10-side-by-side-or-stacked-decided-stacked) |
+| 10 | Side by side, or stacked | Decided: stacked, with the Connections panel | [Q10](#q10-side-by-side-or-stacked-decided-stacked) |
 | 11 | Which buttons move | A: ZL / ZR change the tab; Left / Right move between the sections | [Q11](#q11-which-buttons-move-decided-a) |
 | 12 | Where a chain starts | A: where its macro 1 starts, at macro 1's start save | [Q12](#q12-where-a-chain-starts-decided-a) |
 | 13 | Can a chain contain a chain | A: no; the chain picker lists recordings only | [Q13](#q13-can-a-chain-contain-a-chain-decided-a) |
 
-## What links to what
+## What connects to what
 
-![The link diagram](RECORDING-REDESIGN-r8-links.png)
+![The connection diagram](RECORDING-REDESIGN-r8-links.png)
 
-*Top: the four kinds of file and the four links. Bottom: the example. The chain Corner pressure is the CPU's active macro. The CPU's Play chord warps to its start save, Nair loop · start, then plays Nair loop, Dash grab and CPU throw, in that order. Nair loop starts from the same save when it is played on its own. Corner to kill drills Ryu BnB, then Nair loop combo, and Nair loop combo was made from Nair loop.*
+*Top: the four kinds of file and the four connections. Bottom: the example. The chain Corner pressure is the CPU's active macro. The CPU's Play chord warps to its start save, Nair loop · start, then plays Nair loop, Dash grab and CPU throw, in that order. Nair loop starts from the same save when it is played on its own. Corner to kill drills Ryu BnB, then Nair loop combo, and Nair loop combo was made from Nair loop.*
 
 There are four kinds of file: a save state, a macro (a recording, or a chain of macros), a combo, and a sequence.
 
-| Link | From → to | How it is made | Where you see it |
+| Connection | From → to | How it is made | Where you see it |
 | --- | --- | --- | --- |
-| Start save | macro → its save state, "Nair loop · start". Start save: the save state this macro starts at. Its Play chord warps there once, before the first pass, while its Start save switch is On, the default. Off plays from where the fighters are and keeps the link. A chain's start save is its macro 1's ([Q12](#q12-where-a-chain-starts-decided-a)); the macros in a chain do not use their own. A macro without a start save is normal: its Play chord plays it on that role from wherever the fighters are. Replays and the old slots have none. | Automatic, when you record | The macro row: the orange floppy chip before the save's name, grey when the switch is Off. The save row: a "start save" tag with the floppy, while a macro that starts there is under the cursor. The Links panel. |
-| Chain | chain → an ordered list of macros 1, 2, 3 | MACROS › + New chain, the last row under the macros: the numbered picker, as in Character Cycles, then a name on the Switch keyboard. Edit chain on the chain's own screen changes it. | The chain row: the chain mark with the count, and the floppy chip with its start save. With the cursor on the chain, its macros wear 1, 2, 3 at their left edge. The Links panel lists 1 → 2 → 3. |
-| Sequence | sequence → an ordered list of combos | Combos & Sequences › + New sequence, the same numbered picker, then a name on the Switch keyboard | The sequence row: "Ryu BnB → Nair loop combo". The Links panel. |
-| Made from | combo ← the macro it was made from | A macro's Make combo | The combo row: a small "from Nair loop". The Links panel. |
+| Start save | macro → its save state, "Nair loop · start". Start save: the save state this macro starts at. Its Play chord warps there once, before the first pass, while its Start save switch is On, the default. Off plays from where the fighters are and keeps the connection. A chain's start save is its macro 1's ([Q12](#q12-where-a-chain-starts-decided-a)); the macros in a chain do not use their own. A macro without a start save is normal: its Play chord plays it on that role from wherever the fighters are. Replays and the old slots have none. | Automatic, when you record | The macro row: the orange floppy chip before the save's name, grey when the switch is Off. The save row: a "start save" tag with the floppy, while a macro that starts there is under the cursor. The Connections panel. |
+| Chain | chain → an ordered list of macros 1, 2, 3 | MACROS › + New chain, the last row under the macros: the numbered picker, as in Character Cycles, then a name on the Switch keyboard. Edit chain on the chain's own screen changes it. | The chain row: the chain mark with the count, and the floppy chip with its start save. With the cursor on the chain, its macros wear 1, 2, 3 at their left edge. The Connections panel lists 1 → 2 → 3. |
+| Sequence | sequence → an ordered list of combos | Combos & Sequences › + New sequence, the same numbered picker, then a name on the Switch keyboard | The sequence row: "Ryu BnB → Nair loop combo". The Connections panel. |
+| Made from | combo ← the macro it was made from | A macro's Make combo | The combo row: a small "from Nair loop". The Connections panel. |
 
-Every link is a file id, so renaming either end keeps it.
+Every connection is a file id, so renaming either end keeps it.
 
 ## How to read a list
 
@@ -59,7 +61,7 @@ Every link is a file id, so renaming either end keeps it.
 - **Under the hairline, dimmer:** the rest of the library, on the card.
 - **Red number, at the row's left edge:** its place in the chain or the sequence under the cursor, the badge Character Cycles uses. With the cursor on a macro, every chain that plays it wears the macro's number. It never sits next to the chain mark or the floppy chip. In the picker, A adds the next number. R removes one, and the later numbers close up; A on a tile that already has a number does nothing.
 - **Chain mark and count:** a chain, and how many macros it plays. Only a MACROS row has it.
-- **Orange floppy chip: the save state this macro starts at.** It is Material Symbols `save`. It sits before the start save's name on a macro or chain row, on a save row's "start save" tag, on the Start save row of a macro's and a chain's own screen, and in the Links panel's "starts from" line. It is grey when the Start save switch is Off. The same orange floppy marks the SAVE STATES section header; the other headers keep their square.
+- **Orange floppy chip: the save state this macro starts at.** It is Material Symbols `save`. It sits before the start save's name on a macro or chain row, on a save row's "start save" tag, on the Start save row of a macro's and a chain's own screen, and in the Connections panel's "starts from" line. It is grey when the Start save switch is Off. The same orange floppy marks the SAVE STATES section header; the other headers keep their square.
 - **Gold outline** in the step-by-step strips only: a mockup mark for "new". It is not part of the product.
 
 ## The loop mark
@@ -68,7 +70,7 @@ Every link is a file id, so renaming either end keeps it.
 
 *Off is white. ∞ is green with a dot under it. A count is green with the number in a badge. X cycles ∞, 1, 2, 3, 5, 10. The list is the Options row.*
 
-The loop belongs to the role, not to a section and not to a file. Player and CPU each keep their own count. **Decided.** It appears in two places only: the MACROS section header, for the role in view, and a chain's Links panel, when the chain is active, as the count of the role it is active for. The chain repeats as one unit, and no pass warps back to the start save ([Q3](#q3-what-loop-does-with-a-chain-decided-a)).
+The loop belongs to the role, not to a section and not to a file. Player and CPU each keep their own count. **Decided.** It appears in two places only: the MACROS section header, for the role in view, and a chain's Connections panel, when the chain is active, as the count of the role it is active for. The chain repeats as one unit, and no pass warps back to the start save ([Q3](#q3-what-loop-does-with-a-chain-decided-a)).
 
 How the product would draw it: as a texture in our own layout archive. The layout builder can embed one. `tools/layout-builder` (branch `p23/rc5-candidate`) already appends textures to the stock `timg/__Combined.bntx`: the 38 item icons from `assets/item-icons` through `import_png_file`, and the generated hitbox orb disc through `import_dds`. Picture panes bind those textures, and the panes' vertex colours tint them, which covers white for off and green for on. The builder reads PNG and DDS, not SVG, so the SVG would be turned into a PNG first. A native game icon that fits: not checked. The floppy chip would be drawn the same way.
 
@@ -81,8 +83,8 @@ The pop-up is one window over the match, so its size can be judged against the f
 - **Top:** the title, then Player | CPU. L or R switches role. The selected role is the menu's red tab.
 - **Tabs, under the role:** Save states & Macros, and Combos & Sequences. CPU has only the first.
 - **Two sections, stacked.** Each scrolls on its own, by whole rows, and its header stays. The hot five stay in a green outline, the most recently used first, and the library sits under a hairline.
-- **The Links panel, on the right,** spells out the links of the row under the cursor as a small diagram: the start save, the macros of a chain, the chains that number a macro, the macros that start from a save, the combos made from it, or the order of a sequence, with the loop, the binding, and the streak and best.
-- **One role per view,** as in Character Cycles: a view shows only its role's active macro (the green row), its loop count (one loop chip in the MACROS header) and its Links.
+- **The Connections panel, on the right,** spells out the connections of the row under the cursor as a small diagram: the start save, the macros of a chain, the chains that number a macro, the macros that start from a save, the combos made from it, or the order of a sequence, with the loop, the binding, and the streak and best.
+- **One role per view,** as in Character Cycles: a view shows only its role's active macro (the green row), its loop count (one loop chip in the MACROS header) and its Connections.
 - **Binding:** A on a save binds it to Save / Load. A save has no role: one save is bound at a time, its row is green in both views, and Load only warps there. On the Recording page, A opens the save's screen instead, where Bind to Save / Load is the first row.
 - **Footer:** the buttons for the section the cursor is in.
 
@@ -90,7 +92,7 @@ The pop-up is one window over the match, so its size can be judged against the f
 
 ![Pop-up, a save focused, stacked](RECORDING-REDESIGN-r8-popup-save.png)
 
-*The Player view, with the cursor on Nair loop · start. Corner is the bound save, so its row is green. Load warps there and starts nothing. The Links panel says that Nair loop · start is the start save of Nair loop and of the chain Corner pressure, and "Bound to Save / Load: no". A save has no chain and no role.*
+*The Player view, with the cursor on Nair loop · start. Corner is the bound save, so its row is green. Load warps there and starts nothing. The Connections panel says that Nair loop · start is the start save of Nair loop and of the chain Corner pressure, and "Bound to Save / Load: no". A save has no chain and no role.*
 
 ![The macros have scrolled. The saves have not](RECORDING-REDESIGN-r8-popup-scrolled.png)
 
@@ -100,15 +102,15 @@ The pop-up is one window over the match, so its size can be judged against the f
 
 ![Pop-up, a macro focused](RECORDING-REDESIGN-r8-popup-macro.png)
 
-*The Player view. Nair loop is Player 1's active macro, so its row is green with the white border. The chain Corner pressure wears 1 at its left edge, because it plays this macro first. Nair loop · start wears the "start save" tag with the floppy chip. The Links panel: Nair loop starts from Nair loop · start, with the switch On, and warps there once, first. It is 1 in Corner pressure, Nair loop combo was made from it, and the recorded fighter, Pikachu, is information only.*
+*The Player view. Nair loop is Player 1's active macro, so its row is green with the white border. The chain Corner pressure wears 1 at its left edge, because it plays this macro first. Nair loop · start wears the "start save" tag with the floppy chip. The Connections panel: Nair loop starts from Nair loop · start, with the switch On, and warps there once, first. It is 1 in Corner pressure, Nair loop combo was made from it, and the recorded fighter, Pikachu, is information only.*
 
-A row with no start save, such as Replay 86f, has no floppy chip. That is normal: its Play chord plays it from where the fighters are, and its Links panel says "no start save · plays from where the fighters are".
+A row with no start save, such as Replay 86f, has no floppy chip. That is normal: its Play chord plays it from where the fighters are, and its Connections panel says "no start save · plays from where the fighters are".
 
 ### A chain under the cursor, in the CPU view
 
 ![Pop-up, CPU, the chain focused](RECORDING-REDESIGN-r8-popup-cpu.png)
 
-*The CPU view has one tab. The chain Corner pressure is the CPU's active macro, green, with the cursor on it. Its macros wear 1, 2 and 3 at their left edge; the list itself is in the order they were last used. Its row shows the chain mark with 3, and the floppy chip with Nair loop · start. The Links panel: it starts from Nair loop · start and warps there once, then plays Nair loop, Dash grab and CPU throw in order. The CPU's loop ∞ repeats the whole chain, and the CPU's Play chord plays it. Corner is green here too, the one bound save. The footer has no tab button, because there is nothing to switch to.*
+*The CPU view has one tab. The chain Corner pressure is the CPU's active macro, green, with the cursor on it. Its macros wear 1, 2 and 3 at their left edge; the list itself is in the order they were last used. Its row shows the chain mark with 3, and the floppy chip with Nair loop · start. The Connections panel: it starts from Nair loop · start and warps there once, then plays Nair loop, Dash grab and CPU throw in order. The CPU's loop ∞ repeats the whole chain, and the CPU's Play chord plays it. Corner is green here too, the one bound save. The footer has no tab button, because there is nothing to switch to.*
 
 A chain is a macro made of macros: a file in MACROS, with its macros in order. + New chain, the last row under MACROS, makes one with the numbered picker ([Q1](#q1-how-you-number-a-chain-or-a-sequence-decided-a)) and a name on the Switch keyboard. Like any macro, it has a start save with its Start save switch, On by default. It is set active for a role on its own screen, or with A in the pop-up, and that role's Play chord plays it. Its macros play one after another from where the fighters are; their own start saves are not used. It is hot by the same rule as every macro.
 
@@ -148,15 +150,15 @@ Operator, 2026-11-06: "I agree with your answers to q12 and q13".
 
 ![Pop-up, a sequence focused](RECORDING-REDESIGN-r8-popup-sequence.png)
 
-*Combos & Sequences, stacked: SEQUENCES on top, COMBOS below. Corner to kill is the drill. Its two combos wear 1 and 2 at their left edge. The Links panel lists them in order, with the streak and the best. Neither section has a loop mark.*
+*Combos & Sequences, stacked: SEQUENCES on top, COMBOS below. Corner to kill is the drill. Its two combos wear 1 and 2 at their left edge. The Connections panel lists them in order, with the streak and the best. Neither section has a loop mark.*
 
 ![Pop-up, a combo focused](RECORDING-REDESIGN-r8-popup-combo.png)
 
-*The cursor is on Nair loop combo. Corner to kill wears 2 at its left edge, because that combo is its second step. The Links panel says Nair loop combo was made from Nair loop and is number 2 in Corner to kill. Recorded on names both fighters, and it does not hide the row.*
+*The cursor is on Nair loop combo. Corner to kill wears 2 at its left edge, because that combo is its second step. The Connections panel says Nair loop combo was made from Nair loop and is number 2 in Corner to kill. The panel lists each link, its two moves, and whether it was recorded TRUE. It reads the combo file's own `links`; nothing new is stored. Recorded on names both fighters, and it does not hide the row.*
 
 ### Q5 · How the two lists sit in the Combos & Sequences tab — decided: A
 
-Sequences on top, combos below, each with its own scroll, hot outline and library. The Links panel lists the focused sequence's combos in order. Left and Right move between the two sections.
+Sequences on top, combos below, each with its own scroll, hot outline and library. The Connections panel lists the focused sequence's combos in order. Left and Right move between the two sections.
 
 Operator, 2026-11-06.
 
@@ -172,7 +174,7 @@ Operator, 2026-11-06.
 
 ### Q10 · Side by side, or stacked — decided: stacked
 
-The two sections of a tab sit one above the other, each with its own scroll, and the Links panel on the right spells out the links of the row under the cursor. The pop-up pictures in this doc are this layout.
+The two sections of a tab sit one above the other, each with its own scroll, and the Connections panel on the right spells out the connections of the row under the cursor. The pop-up pictures in this doc are this layout.
 
 Operator, 2026-11-06.
 
@@ -225,23 +227,23 @@ Operator, 2026-11-06.
 
 ## Recording page
 
-The same stacked sections and the Links panel, inside the menu: the Links panel fits beside the sections in the menu's content area. The left column is Save states & Macros, Combos & Sequences, Replays, Options; it lists the groups, so the page has no tab switch. One role per view, as in the pop-up: the Player | CPU toggle sits above the sections, and ZR switches it, as in Character Cycles, because L / R change the menu page. The CPU view has only Save states & Macros. A opens the file's own screen; on a save, Bind to Save / Load is that screen's first row. X cycles the loop when the cursor is in MACROS, as in the pop-up. ZL + Up / Down pages the section the cursor is in.
+The same stacked sections and the Connections panel, inside the menu: the Connections panel fits beside the sections in the menu's content area. The left column is Save states & Macros, Combos & Sequences, Replays, Options; it lists the groups, so the page has no tab switch. One role per view, as in the pop-up: the Player | CPU toggle sits above the sections, and ZR switches it, as in Character Cycles, because L / R change the menu page. The CPU view has only Save states & Macros. A opens the file's own screen; on a save, Bind to Save / Load is that screen's first row. X cycles the loop when the cursor is in MACROS, as in the pop-up. ZL + Up / Down pages the section the cursor is in.
 
 ### Save states and macros
 
 ![Recording page, Save states and macros](RECORDING-REDESIGN-r8-page-saves-macros.png)
 
-*The Player view. Saves on top, macros below, and the Links panel of Corner, the bound save, on the right. No macro starts there, and "Bound to Save / Load: yes · Load warps here". Nair loop, green, is Player 1's active macro, and the MACROS header has Player 1's loop chip only. The chain Corner pressure is not green here: it is the CPU's active macro.*
+*The Player view. Saves on top, macros below, and the Connections panel of Corner, the bound save, on the right. No macro starts there, and "Bound to Save / Load: yes · Load warps here". Nair loop, green, is Player 1's active macro, and the MACROS header has Player 1's loop chip only. The chain Corner pressure is not green here: it is the CPU's active macro.*
 
 ![Recording page, the CPU view](RECORDING-REDESIGN-r8-page-cpu.png)
 
-*The CPU view, after ZR. Only Save states & Macros. The chain Corner pressure, green, is the CPU's active macro, and the MACROS header has the CPU's loop chip, ∞. The cursor is on CPU throw, so Corner pressure wears 3 at its left edge, and the Links panel says CPU throw is 3 in Corner pressure. Corner is green here too: there is one bound save.*
+*The CPU view, after ZR. Only Save states & Macros. The chain Corner pressure, green, is the CPU's active macro, and the MACROS header has the CPU's loop chip, ∞. The cursor is on CPU throw, so Corner pressure wears 3 at its left edge, and the Connections panel says CPU throw is 3 in Corner pressure. Corner is green here too: there is one bound save.*
 
 ### Combos and sequences
 
 ![Recording page, Combos and sequences](RECORDING-REDESIGN-r8-page-combos.png)
 
-*The Player view. Sequences on top, combos below. Corner to kill numbers Ryu BnB and Nair loop combo, and its Links panel lists them in order. The two fighters in one sequence are allowed.*
+*The Player view. Sequences on top, combos below. Corner to kill numbers Ryu BnB and Nair loop combo, and its Connections panel lists them in order. The two fighters in one sequence are allowed.*
 
 | Button | What it does |
 | --- | --- |
@@ -255,7 +257,7 @@ The same stacked sections and the Links panel, inside the menu: the Links panel 
 
 Replays and Options keep revision 3's rows (see Each file's screen, and the other rules). The loop shows in Options only as the list of counts.
 
-## How linking happens
+## How connections are made
 
 Each strip is three steps in the menu's own style. The panels are drawn at full size, so the text stays readable.
 
@@ -263,13 +265,13 @@ Each strip is three steps in the menu's own style. The panels are drawn at full 
 
 ![Flow: record, then the start save](RECORDING-REDESIGN-r8-flow-record.png)
 
-*Record also writes "Macro 7 · start" and links it. When the recording stops, Macro 7 joins the hot five at the top, the most recently used. The least recently used hot macro, Replay 86f, leaves the outline. Its Links panel shows starts from Macro 7 · start, and the new save is listed in SAVE STATES, at the top of its hot five.*
+*Record also writes "Macro 7 · start" and connects it. When the recording stops, Macro 7 joins the hot five at the top, the most recently used. The least recently used hot macro, Replay 86f, leaves the outline. Its Connections panel shows starts from Macro 7 · start, and the new save is listed in SAVE STATES, at the top of its hot five.*
 
 ### 2 · Make a chain
 
 ![Flow: make a chain](RECORDING-REDESIGN-r8-flow-chain.png)
 
-*Recording › Save states & Macros: + New chain is the last row under MACROS, as + New sequence is under SEQUENCES. The picker numbers Nair loop, Dash grab and CPU throw with the same buttons as Character Cycles: A adds the next number, R removes one, and B is done; the Switch keyboard then names it. The new row, Corner pressure (gold: new), shows the chain mark with 3 and the floppy chip with Nair loop · start, its macro 1's start save. Its Links panel lists 1 → 2 → 3. Once it is set active for the CPU, on its own screen or with A in the pop-up's CPU view, the CPU's Play chord plays it.*
+*Recording › Save states & Macros: + New chain is the last row under MACROS, as + New sequence is under SEQUENCES. The picker numbers Nair loop, Dash grab and CPU throw with the same buttons as Character Cycles: A adds the next number, R removes one, and B is done; the Switch keyboard then names it. The new row, Corner pressure (gold: new), shows the chain mark with 3 and the floppy chip with Nair loop · start, its macro 1's start save. Its Connections panel lists 1 → 2 → 3. Once it is set active for the CPU, on its own screen or with A in the pop-up's CPU view, the CPU's Play chord plays it.*
 
 ### Q1 · How you number a chain or a sequence — decided: A
 
@@ -291,11 +293,11 @@ Operator, 2026-11-06: "I agree with your answers to q12 and q13".
 
 ![Flow: make combo from a macro](RECORDING-REDESIGN-r8-flow-make-combo.png)
 
-*Make combo loads the macro's start save and plays the macro once on Player 1 while the frame strip records. The new combo says "from Nair loop" in its row and "made from" in its Links panel. The new combo joins the hot five; the drill does not change.*
+*Make combo loads the macro's start save and plays the macro once on Player 1 while the frame strip records. The new combo says "from Nair loop" in its row and "made from" in its Connections panel. The new combo joins the hot five; the drill does not change.*
 
 Make combo on a chain works the same way, as on a recording: it warps to the chain's start save and plays the whole chain once on Player 1 while the frame strip records.
 
-If the start save was deleted, the load is skipped and the approved sentence shows: "No start save. This macro plays from where the fighters are." The sentence is only for a start save that was deleted. A macro that never had one, such as a replay or an old slot, plays from where the fighters are without it. No link uses the sentence that already exists: "No combo yet: land a hit and a follow-up first."
+If the start save was deleted, the load is skipped and the approved sentence shows: "No start save. This macro plays from where the fighters are." The sentence is only for a start save that was deleted. A macro that never had one, such as a replay or an old slot, plays from where the fighters are without it. No connection uses the sentence that already exists: "No combo yet: land a hit and a follow-up first."
 
 ### 4 · Make a sequence
 
@@ -305,7 +307,7 @@ If the start save was deleted, the load is skipped and the approved sentence sho
 
 ### Q7 · What the sequence file stores — decided: A
 
-The sequence keeps a reference to each combo file, in order, the same kind of link a macro has to its start save. Rename a combo and the sequence shows the new name. Delete a combo and the sequence skips that step. The sequence file stays tiny.
+The sequence keeps a reference to each combo file, in order, the same kind of connection a macro has to its start save. Rename a combo and the sequence shows the new name. Delete a combo and the sequence skips that step. The sequence file stays tiny.
 
 Operator, 2026-11-06.
 
@@ -358,24 +360,24 @@ Drilling one combo from a sequence's numbered rows uses that combo's own streak 
 - A recording's start is its own save file, "<macro name> · start", and the macro stores that file's id. **Decided.**
 - Five hot saves, the most recently used, by the same rule as every other kind. **Decided.**
 - Save states are a section of the Save states & Macros tab, under both roles. The third Saves tab is rejected. **Decided.**
-- The sentence "No start save. This macro plays from where the fighters are." is approved as `macro-start-save-missing`. It shows only when a macro's linked start save was deleted. **Decided.**
+- The sentence "No start save. This macro plays from where the fighters are." is approved as `macro-start-save-missing`. It shows only when a macro's connected start save was deleted. **Decided.**
 - A sequence is an ordered list of saved combos. You can drill one combo, or the sequence. **Decided.**
 - Respawn on platform is under Fighters & Stages › Stages, not under save states. `p23/respawn-label` implements the move. **Decided.**
 - Names use the Switch's own keyboard. **Decided.**
-- The pop-up and the Recording page use the stacked layout: the two sections of a tab one above the other, each with its own scroll, and the Links panel on the right for the row under the cursor ([Q10](#q10-side-by-side-or-stacked-decided-stacked)). Operator, 2026-11-06.
+- The pop-up and the Recording page use the stacked layout: the two sections of a tab one above the other, each with its own scroll, and the Connections panel on the right for the row under the cursor ([Q10](#q10-side-by-side-or-stacked-decided-stacked)). Operator, 2026-11-06.
 - A save state only warps. It restores both fighters, nothing more: Save (ZL + Down) writes the bound save, and Load (ZL + Up) warps to it. Load never starts a macro. A save has no role: Bind to Save / Load is On or Off. The operator: "So under this new proposal you have a save state that only warps. A macro/chain that optionally starts from one save state? And one chord for each since a chain is just a compound macro". Operator, 2026-11-06.
 - One save state is bound at a time. The save list is shared by both roles, because a save restores both fighters. A on a save in the pop-up binds it; on the Recording page, A opens the save's screen, where Bind to Save / Load is the first row. Operator, 2026-11-06.
 - A chain is a compound macro: a file in MACROS, made with + New chain, the last row under MACROS, and the numbered picker. Like any macro, it has a start save with its Start save switch, it is set active for a role on its own screen, and that role's Play chord plays it ([Q2](#q2-which-role-plays-a-chain-decided)). Its macros play one after another from where the fighters are; their own start saves are not used. Its own screen has Start save, Set active, Edit chain, Rename, Make combo and Delete, and no Crop. Its row has the name, the chain mark with the count, the floppy chip with its start save's name, and Recorded on with its macros' fighters. Operator, 2026-11-06.
 - One active macro per role, a recording or a chain. The CPU no longer has one thing on Load and another on its Play chord. The operator: "Yes to 1". Operator, 2026-11-06.
 - The loop never warps back. A Play chord warps to the start save once, before the first pass, when the switch is On; every later pass plays on from where the fighters are. One rule for a recording and a chain ([Q3](#q3-what-loop-does-with-a-chain-decided-a)). The operator: "no to 2". Operator, 2026-11-06.
-- One role per view, as in Character Cycles: the pop-up and the Recording page show one role at a time, with that role's active macro, loop count and Links. L / R switch the role in the pop-up; ZR switches it on the Recording page. The CPU view has only Save states & Macros. No role chips. The operator: "does it make more sense to show the CPU links, macros etc when the CPU view and the same for p1? Otherwise it's kind of confusing showing both at once. I think character cycles adopts this philosophy." Operator, 2026-11-06.
+- One role per view, as in Character Cycles: the pop-up and the Recording page show one role at a time, with that role's active macro, loop count and Connections. L / R switch the role in the pop-up; ZR switches it on the Recording page. The CPU view has only Save states & Macros. No role chips. The operator: "does it make more sense to show the CPU links, macros etc when the CPU view and the same for p1? Otherwise it's kind of confusing showing both at once. I think character cycles adopts this philosophy." Operator, 2026-11-06.
 - The bound save is a green row in both role views. The operator: "The save state could just be green and be visiblenin both views?" Operator, 2026-11-06.
-- The floppy chip, Material Symbols `save` in orange, means the save state this macro starts at. It sits before the start save's name on a macro or chain row, on a save row's "start save" tag, on the Start save row of a macro's and a chain's own screen, and in the Links panel's "starts from" line. It is grey when the Start save switch is Off. The SAVE STATES section header has the same orange floppy, where it had an orange square; the other headers and the kind pills are unchanged. The operator: "I would have the orange square next to the save states be an orange save icon (floppy disk chip). And then have the chain chips be the same orange floppy disk chip so it's clear that we're talking about what save state the macro will start at". Operator, 2026-11-06.
+- The floppy chip, Material Symbols `save` in orange, means the save state this macro starts at. It sits before the start save's name on a macro or chain row, on a save row's "start save" tag, on the Start save row of a macro's and a chain's own screen, and in the Connections panel's "starts from" line. It is grey when the Start save switch is Off. The SAVE STATES section header has the same orange floppy, where it had an orange square; the other headers and the kind pills are unchanged. The operator: "I would have the orange square next to the save states be an orange save icon (floppy disk chip). And then have the chain chips be the same orange floppy disk chip so it's clear that we're talking about what save state the macro will start at". Operator, 2026-11-06.
 - "Conversion" is now called "sequence", everywhere a player reads it. "Chain" means only the compound macro, and "sequence" means only the file kind: an ordered list of combos. The operator: "we should not use the word conversion and should call it sequence instead so we don't confuse people since "conversion" means other things in the gaming community". Operator, 2026-11-06.
 - There is no chord for combos or sequences. Selecting one (A, Drill) makes it the drill. Operator, 2026-11-06.
-- What you select, the chords run: the bound save state for Save and Load, and each role's active macro, a recording or a chain, for that role's Play chord, with or without its start save. Links and sequences describe what happens when it runs. Operator, 2026-11-06.
+- What you select, the chords run: the bound save state for Save and Load, and each role's active macro, a recording or a chain, for that role's Play chord, with or without its start save. Connections and sequences describe what happens when it runs. Operator, 2026-11-06.
 - A macro without a start save is normal. Its Play chord plays it on that role from wherever the fighters are. Replays and the old slots have none. Operator, 2026-11-06.
-- Start save On / Off on a macro and on a chain, default On. On: its Play chord warps to the start save once, then plays. Off: it plays from where the fighters are, and the link stays. A macro with no start save has no switch. In a chain, only the chain's start save is used, whatever each macro's switch says. Operator, 2026-11-06.
+- Start save On / Off on a macro and on a chain, default On. On: its Play chord warps to the start save once, then plays. Off: it plays from where the fighters are, and the connection stays. A macro with no start save has no switch. In a chain, only the chain's start save is used, whatever each macro's switch says. Operator, 2026-11-06.
 - Pins are dropped. The hot five of each kind are the five most recently used, the most recent first. Used means selected (bound or set active), played, drilled or recorded. When a sixth is used, the least recently used leaves the outline and stays on the card under the hairline. Y is unused on these screens. Operator, 2026-11-06.
 - Q1, Q3, Q4, Q5, Q6, Q7, Q9, Q11, Q12 and Q13 are A; Q8 is the operator's own answer. Each block above says what it means. Operator, 2026-11-06.
 - When it is ambiguous, keep it consistent: few chords, with context deciding what they do. So the numbered picker (+ New chain, Edit chain, + New sequence, Edit combos) works as Character Cycles does: A gives the next number, R takes a number off and the later numbers close up, A on a numbered tile does nothing, and B is done. Inside the picker, R removes; the role toggle does not apply there, because the picker edits the file, whichever role it is active for. The operator: "when it's ambiguous I would keep it consistent. We want to minimize the number of chords and have context determine what they do. So in this case I would have R supercede A if that's more intuitive". Operator, 2026-11-06.
@@ -386,6 +388,8 @@ Drilling one combo from a sequence's numbered rows uses that combo's own streak 
 - A chain starts where its macro 1 starts: at macro 1's start save, shown on the chain row with the floppy chip. To change it, reorder, or save over that file; there is no new screen. If macro 1 has no start save, the chain has none and plays from where the fighters are ([Q12](#q12-where-a-chain-starts-decided-a)). The operator: "I agree with your answers to q12 and q13". Operator, 2026-11-06.
 - A chain cannot contain a chain. The chain picker lists recordings only, so nothing needs a loop check. This is a restriction, approved by the operator ([Q13](#q13-can-a-chain-contain-a-chain-decided-a)): "I agree with your answers to q12 and q13". Operator, 2026-11-06.
 - X cycles the loop on the Recording page too, when the cursor is in MACROS, as in the pop-up. The primary asked: "X on the Recording page: should X cycle the loop when the cursor is in MACROS, as it does in the pop-up?" The operator: "yes". Operator, 2026-11-06.
+- Connections between files are called connections. The combo helper still says link for its hits: L1, "N links", "link 1 of 4". The operator: "yes have grok do both and then we are green to implement". Operator, 2026-11-06.
+- The combo's Connections panel lists each link, its two moves, and whether it was recorded TRUE, for example "L1  aerial → aerial  TRUE". It reads the combo file's own `links`; nothing new is stored. The operator: "yes have grok do both and then we are green to implement". Operator, 2026-11-06.
 
 ## Each file's screen, and the other rules
 
@@ -395,11 +399,11 @@ These screens and rules come from revision 3, updated to the decisions above.
 
 ![Macro actions](RECORDING-REDESIGN-r8-macro-actions.png)
 
-*The Player view. The first row is the start save the macro links to, with the floppy chip and its switch, On. Set active is one row, for the role in view: On · Player 1.*
+*The Player view. The first row is the start save the macro connects to, with the floppy chip and its switch, On. Set active is one row, for the role in view: On · Player 1.*
 
 | Row | What it does |
 | --- | --- |
-| Start save | The file Record created, "Nair loop · start". The macro stores its id. Renaming that save keeps the link. The switch is On or Off, with Left and Right, the same gesture as Set active; On is the default. On: the macro's Play chord warps to the start save once, then plays; a loop never warps back. Off: it plays from where the fighters are, and the link stays, so On brings it back. A macro with no start save has no switch. In a chain, only the chain's start save is used, whatever this says. |
+| Start save | The file Record created, "Nair loop · start". The macro stores its id. Renaming that save keeps the connection. The switch is On or Off, with Left and Right, the same gesture as Set active; On is the default. On: the macro's Play chord warps to the start save once, then plays; a loop never warps back. Off: it plays from where the fighters are, and the connection stays, so On brings it back. A macro with no start save has no switch. In a chain, only the chain's start save is used, whatever this says. |
 | Set active | On · <role> or Off: Left / Right set it for the role in view. On makes this file that role's active macro, replacing the one before; that role's Play chord plays it. |
 | Rename | The Switch keyboard. Header "Name macro". Empty OK keeps the previous name. A new recording that was never renamed is Macro N. |
 | Crop | In and Out, then a new file. This file stays. |
@@ -563,7 +567,7 @@ Only a deleted start save shows the approved sentence. A macro that never had a 
 
 | ID | Message | Why | Approved |
 | --- | --- | --- | --- |
-| `macro-start-save-missing` | No start save. This macro plays from where the fighters are. | The macro's linked start file was deleted. Playback continues from the current positions. | Operator, 2026-11-06, revision 3 answer 3 |
+| `macro-start-save-missing` | No start save. This macro plays from where the fighters are. | The macro's connected start file was deleted. Playback continues from the current positions. | Operator, 2026-11-06, revision 3 answer 3 |
 | `chain-recordings-only` | None: the chain picker does not list chains. | A chain inside a chain would need a loop check ([Q13](#q13-can-a-chain-contain-a-chain-decided-a)). | Operator, 2026-11-06, revision 8 Q13 |
 
 No other new sentence is added. A long chain, a missing combo, an empty chain, and a chain whose macros are all gone do not get one.
@@ -574,6 +578,7 @@ No other new sentence is added. A long chain, a missing combo, an empty chain, a
 - Match: `artifacts/phase23/overlay-investigation/frames/fix-tr-training.png`. The old Input Playback notice in that frame is painted over with the sky beside it.
 - Renderer: `tools/render_recording_redesign.py`. Its default run draws every picture this doc uses except revision 3's: the `r8-` pictures, the question pictures and `r5-switch-keep`. With `--q52` it draws only the question pictures. With `--r3` it draws the revision 3 pictures the repo keeps.
 - Icons: Google Material Symbols (`repeat`, `save`, `link`, `format_list_numbered`), https://github.com/google/material-design-icons, Apache License 2.0. The copies and the licence are in [icons/](icons/). The renderer fills their path data with Pillow at 8× and downsamples. The colours, the dot, and the count badge are added by the renderer. `save` is new in revision 8; `link` stays for `q7-ab`, where it marks a sequence's reference to a combo file.
+- Changed in revision 8.1: the panel header, the diagram, the strips and Q7's reference line say connection. Nair loop combo's four links are aerial → aerial, each recorded TRUE, on its Connections panel and on the crop screen.
 - Revision 8 redrew every picture with a save row, a start-save mark, a chain, or the old word, under `r8-` names. Renamed with `git mv`: `r4-links`, `r4-legend`, `r4-loop`, `r4-flow-record`, `r4-flow-chain` (now Make a chain), `r4-flow-make-combo` and `r4-flow-drill` to the same names with `r8-`; `r4-flow-conversion` to `r8-flow-sequence`, `r4-conversion-bar` to `r8-sequence-bar`, `r4-save-actions` and `r4-combo-actions` to `r8-`, `r4-conversion-actions` to `r8-sequence-actions`, `r6-macro-actions`, `r6-page-saves-macros`, `r6-page-combos`, `r6-popup-save`, `r6-popup-scrolled`, `r6-popup-macro`, `r6-popup-combo` and `r6-popup-cpu` to `r8-`, `r6-popup-conversion` to `r8-popup-sequence`, and `r7-page-cpu` to `r8-page-cpu`. New: `r8-chain-actions` (also Q2's picture), `q12-ab` and `q13-ab`. Redrawn under their names: `q1-ab`, `q3-ab`, `q4-ab`, `q5-ab`, `q6-ab`, `q7-ab`, `q8-decided`, `q9-ab`, `q11-ab` and `crop`. Removed: revision 3's `save-where`, which no page used and which showed the revision 3 model. Unchanged, byte for byte: `r5-switch-keep`, `respawn`, `shortcuts`, `keyboard`, `crop-macro` and `combo-from-macro`.
 - Changed in revision 7.2: strips 2 to 5 (no Y in the pickers; the stacked Combos & Conversions tab with CONVERSIONS on top; Make combo keeps the drill; Nair loop combo stops being the drill), the three Recording page pictures ("A open"), the macro's own screen (one Set active row), the scrolled pop-up (seven files, scrolled to the end), and revision 3's `keyboard`, `crop` and `crop-macro` (the current groups; the crop's kept range is a bracket; the keyboard's background no longer shows a settings page's hints). With the Q1 amendment: `q1-ab`'s A side and the pickers in strips 2 and 4 read "A add number", "R remove". After review: the strips are reordered so that Make combo (now strip 3) comes before Make a conversion (now strip 4), which uses Nair loop combo; the file names stay. Strip 2's first panel is the pop-up, with its footer; the crop screens and the keyboard's background are file screens, full width with a breadcrumb. The five strips read as one story: each starts where the one before it ends (Corner pressure gets its chain in strip 2, SAVE STATES holds eight files after strip 1, and Ryu BnB is the drill until strip 5 drills Corner to kill). From the sweep: the loop mark's note names the SAVE STATES, CONVERSIONS and COMBOS section headers, and strip 5's Links panel keeps its Drilled line. The revision 3 pictures are drawn by `--r3`.
 - New in revision 7.1: `RECORDING-REDESIGN-r7-page-cpu.png`, the Recording page's CPU view. Changed in revision 7.1: the pop-ups and pages with a bound save or an active macro, the legend, strips 1 and 2, the link diagram, and the save's own screen (one role per view, no role chips, Bind to Save / Load On · CPU). Removed in revision 7.1: `RECORDING-REDESIGN-r7-proposed.png`, with its section.
@@ -610,3 +615,4 @@ No other new sentence is added. A long chain, a missing combo, an empty chain, a
   The new questions Q12 (where a chain starts) and Q13 (can a chain contain a chain) were decided A the same day: "I agree with your answers to q12 and q13".
   X cycles the loop on the Recording page too, when the cursor is in MACROS, as in the pop-up; the primary asked "X on the Recording page: should X cycle the loop when the cursor is in MACROS, as it does in the pop-up?" and the operator answered "yes".
   Q8's reading was confirmed, and the operator said "that sounds right".
+- **Revision 8.1.** The operator, 2026-11-06: "yes have grok do both and then we are green to implement". Connections between files are called connections. The combo helper still says link for its hits, and the combo's panel lists each link with its two moves and TRUE. This is the operator's sign-off of the redesign.

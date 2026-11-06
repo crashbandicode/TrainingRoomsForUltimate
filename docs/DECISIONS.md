@@ -1373,7 +1373,12 @@ Earlier the same day, on pins: "Are pins even helping with anything? they seem k
 - Q8's reading was confirmed, and the operator said "that sounds right".
 - Q1, Q3, Q4, Q5, Q6, Q7, Q9, Q11, Q12 and Q13 are A; Q8 is the operator's own answer; Q2 and Q10 are decided.
 
-**Next:** implementation from `p23/rc5-candidate` `384e41f`, after the operator's sign-off.
+**Decided in revision 8.1** (operator 2026-11-06: "yes have grok do both and then we are green to implement"):
+- A connection between files is called a connection. The combo helper still says link for its hits: L1, "N links", "link 1 of 4".
+- The combo's Connections panel lists each link, its two moves, and whether it was recorded TRUE, for example "L1  aerial → aerial  TRUE". It reads the combo file's own `links`; nothing new is stored. Nair loop combo's four links are aerial → aerial, all recorded TRUE.
+- The operator's sign-off of the redesign, given with this revision: "then we are green to implement".
+
+**Next:** implementation from `p23/rc5-candidate` `384e41f`; the operator signed off ('…green to implement'), 2026-11-06.
 
 ### INTRO-ONCE · The Training intro notices — ordered (2026-11-05)
 
