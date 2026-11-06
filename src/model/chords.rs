@@ -180,11 +180,13 @@ pub enum Request {
     CpuCycle,
     PlayerCycle,
     OpenMenu,
+    PlayPlayer,
+    RecordingPopup,
 }
 
 impl Request {
-    const fn bit(self) -> u8 {
-        1 << self as u8
+    const fn bit(self) -> u16 {
+        1u16 << self as u8
     }
 }
 
@@ -197,12 +199,15 @@ pub struct ChordSet {
     pub input_playback: Chord,
     pub cpu_cycle: Chord,
     pub player_cycle: Chord,
+    pub play_player: Chord,
+    pub recording_popup: Chord,
     pub shortcuts: MenuShortcuts,
 }
 
 impl ChordSet {
-    /// The factory chords: ZL + D-pad Down/Up (save/load), ZR + D-pad Down/Up (record/playback),
-    /// ZL + D-pad Left/Right (cycle CPU/player), and the default shortcuts.
+    /// The factory chords: ZL + D-pad Down/Up (save/load), ZR + D-pad Down/Up (record/play on CPU),
+    /// ZL + D-pad Left/Right (cycle CPU/player), ZR + D-pad Left/Right (play on Player 1 / recording
+    /// pop-up), and the default shortcuts.
     pub const fn factory() -> Self {
         const fn two(a: u8, b: u8) -> Chord {
             Chord((1 << a) | (1 << b))
@@ -214,13 +219,15 @@ impl ChordSet {
             input_playback: two(logical::ZR, logical::DPAD_UP),
             cpu_cycle: two(logical::ZL, logical::DPAD_LEFT),
             player_cycle: two(logical::ZL, logical::DPAD_RIGHT),
+            play_player: two(logical::ZR, logical::DPAD_LEFT),
+            recording_popup: two(logical::ZR, logical::DPAD_RIGHT),
             shortcuts: super::menu_shortcuts::DEFAULT_SHORTCUTS,
         }
     }
 
-    /// The six chord rows of a settings snapshot (`save_state_save`, `save_state_load`, `input_record`,
-    /// `input_playback`, `cpu_cycle`, `player_cycle`); the shortcuts are kept from `self` (they live in
-    /// the INI, not the settings).
+    /// The eight chord rows of a settings snapshot. The shortcuts are kept from `self` (they live in
+    /// the INI, not the settings). A snapshot without `play_player` or `recording_popup` keeps those
+    /// two factory chords.
     pub fn with_rows(self, snapshot: &super::settings::Snapshot) -> Self {
         let row = |id: &str, fallback: Chord| snapshot.get(id).map_or(fallback, Chord::from_row);
         Self {
@@ -230,6 +237,8 @@ impl ChordSet {
             input_playback: row("input_playback", self.input_playback),
             cpu_cycle: row("cpu_cycle", self.cpu_cycle),
             player_cycle: row("player_cycle", self.player_cycle),
+            play_player: row("play_player", self.play_player),
+            recording_popup: row("recording_popup", self.recording_popup),
             shortcuts: self.shortcuts,
         }
     }
@@ -244,7 +253,7 @@ impl Default for ChordSet {
 /// The request flags and the detection step.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Detector {
-    pending: u8,
+    pending: u16,
 }
 
 impl Detector {
@@ -257,11 +266,11 @@ impl Detector {
     /// native waiting-room UI): no request is raised then, and requests already pending stay
     /// (SPEC-input-04 §5.3). Returns the set of chords that passed this poll as a bit set of
     /// `Request`s for the runtime's diagnostics.
-    pub fn poll(&mut self, chords: &ChordSet, sample: Sample, blocked: bool) -> u8 {
+    pub fn poll(&mut self, chords: &ChordSet, sample: Sample, blocked: bool) -> u16 {
         if blocked {
             return 0;
         }
-        let mut passed = 0u8;
+        let mut passed = 0u16;
         for (request, chord) in [
             (Request::SaveState, chords.save_state),
             (Request::LoadState, chords.load_state),
@@ -269,6 +278,8 @@ impl Detector {
             (Request::InputPlayback, chords.input_playback),
             (Request::CpuCycle, chords.cpu_cycle),
             (Request::PlayerCycle, chords.player_cycle),
+            (Request::PlayPlayer, chords.play_player),
+            (Request::RecordingPopup, chords.recording_popup),
         ] {
             if self.pending & request.bit() == 0 && passes(chord, sample) {
                 self.pending |= request.bit();
@@ -367,4 +378,134 @@ pub fn glyph(button: u8, style: u32) -> Option<u16> {
 /// Whether a chord cannot pass on this style (the menu greys the row: SPEC-input-04 question 3).
 pub fn unusable_on(chord: Chord, style: u32) -> bool {
     style == STYLE_GAMECUBE && chord.0 & ((1 << logical::L) | (1 << logical::MINUS)) != 0
+}
+
+#[cfg(test)]
+mod tests {
+    use super::logical::{self, A, B, DPAD_LEFT, DPAD_RIGHT, DPAD_UP, ZR};
+    use super::{passes, ChordSet, Detector, Request, Sample};
+    use crate::model::factory::DEFS;
+    use crate::model::menu::chord::Chord;
+    use crate::model::menu::options::CHORD_ROWS;
+    use crate::model::menu_shortcuts::{DEFAULT_OPEN_MENU_CONFIG, DEFAULT_SHORTCUTS};
+    use crate::model::settings::{self, Snapshot};
+
+    fn bits(buttons: &[u8]) -> u16 {
+        buttons.iter().fold(0u16, |set, button| set | (1 << button))
+    }
+
+    fn sample(held: &[u8], pressed: &[u8]) -> Sample {
+        Sample { held: bits(held), pressed: bits(pressed) }
+    }
+
+    fn row(at: &[usize]) -> [u8; 16] {
+        let mut out = [0u8; 16];
+        for index in at {
+            out[*index] = 1;
+        }
+        out
+    }
+
+    fn factory_row(id: &str) -> &[u8] {
+        DEFS.iter().find(|def| def.id == id).unwrap_or_else(|| panic!("{id} missing")).default
+    }
+
+    #[test]
+    fn the_eight_chords_keep_todays_defaults() {
+        let eight: [(&str, [usize; 2], &str); 8] = [
+            ("save_state_save", [6, 9], "Save State Save"),
+            ("save_state_load", [6, 8], "Save State Load"),
+            ("input_record", [7, 9], "Record"),
+            ("input_playback", [7, 8], "Play on CPU"),
+            ("play_player", [7, 10], "Play on Player 1"),
+            ("recording_popup", [7, 11], "Recording pop-up"),
+            ("player_cycle", [6, 11], "Cycle Player"),
+            ("cpu_cycle", [6, 10], "Cycle CPU"),
+        ];
+        for (id, at, label) in eight {
+            assert_eq!(factory_row(id), row(&at), "{id}");
+            let (shown, row_id) = CHORD_ROWS.into_iter().find(|(_, row_id)| *row_id == id).unwrap();
+            assert_eq!((shown, row_id), (label, id));
+        }
+        assert_eq!(CHORD_ROWS.len(), eight.len());
+        let set = ChordSet::factory();
+        assert_eq!(set.save_state, Chord::from_row(factory_row("save_state_save")));
+        assert_eq!(set.load_state, Chord::from_row(factory_row("save_state_load")));
+        assert_eq!(set.input_record, Chord::from_row(factory_row("input_record")));
+        assert_eq!(set.input_playback, Chord::from_row(factory_row("input_playback")));
+        assert_eq!(set.play_player, Chord::from_row(factory_row("play_player")));
+        assert_eq!(set.recording_popup, Chord::from_row(factory_row("recording_popup")));
+        assert_eq!(set.player_cycle, Chord::from_row(factory_row("player_cycle")));
+        assert_eq!(set.cpu_cycle, Chord::from_row(factory_row("cpu_cycle")));
+        assert_eq!(set.shortcuts, DEFAULT_SHORTCUTS);
+        assert_eq!(set.shortcuts.slots()[0], Chord::DEFAULT_SHORTCUT_1);
+        assert!(set.shortcuts.slots()[1].is_empty());
+        assert_eq!(DEFAULT_OPEN_MENU_CONFIG, Chord(bits(&[B, DPAD_UP])));
+        let mut detector = Detector::new();
+        detector.poll(&set, sample(&[B, DPAD_UP], &[B]), false);
+        assert!(detector.consume(Request::OpenMenu));
+        let mut detector = Detector::new();
+        detector.poll(&set, sample(&[logical::MINUS], &[logical::MINUS]), false);
+        assert!(detector.consume(Request::OpenMenu));
+    }
+
+    #[test]
+    fn old_settings_without_the_new_chords_still_load() {
+        let text = r#"{
+            "menu": {
+                "save_state_save": [0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0],
+                "save_state_load": [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                "input_record": [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                "input_playback": [0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                "cpu_cycle": [0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                "player_cycle": [0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0]
+            }
+        }"#;
+        let loaded = settings::parse(text);
+        assert!(loaded.issues.is_empty(), "{:?}", loaded.issues);
+        let factory = Snapshot::factory();
+        let menu = &loaded.settings.menu;
+        assert_eq!(menu.get("play_player"), factory.get("play_player"));
+        assert_eq!(menu.get("recording_popup"), factory.get("recording_popup"));
+        assert_eq!(menu.get("play_player"), Some(row(&[7usize, 10]).as_slice()));
+        assert_eq!(menu.get("recording_popup"), Some(row(&[7usize, 11]).as_slice()));
+        assert_eq!(menu.get("save_state_save"), Some(&[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0][..]));
+        assert_eq!(menu.get("save_state_load"), Some(&[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1][..]));
+        assert_eq!(menu.get("input_record"), Some(&[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0][..]));
+        assert_eq!(menu.get("input_playback"), Some(&[0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0][..]));
+        assert_eq!(menu.get("cpu_cycle"), Some(&[0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0][..]));
+        assert_eq!(menu.get("player_cycle"), Some(&[0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0][..]));
+        assert_eq!(loaded.settings.defaults.get("play_player"), factory.get("play_player"));
+        assert_eq!(loaded.settings.defaults.get("recording_popup"), factory.get("recording_popup"));
+        let chords = ChordSet::factory().with_rows(menu);
+        assert_eq!(chords.play_player, ChordSet::factory().play_player);
+        assert_eq!(chords.recording_popup, ChordSet::factory().recording_popup);
+        assert_eq!(chords.save_state, Chord::from_row(menu.get("save_state_save").unwrap()));
+        assert_ne!(chords.save_state, ChordSet::factory().save_state);
+    }
+
+    #[test]
+    fn the_new_chords_raise_their_requests() {
+        let set = ChordSet::factory();
+        let play = sample(&[ZR, DPAD_LEFT], &[DPAD_LEFT]);
+        let popup = sample(&[ZR, DPAD_RIGHT], &[DPAD_RIGHT]);
+        assert!(passes(set.play_player, play));
+        assert!(passes(set.recording_popup, popup));
+        assert!(!passes(set.play_player, popup));
+        assert!(!passes(set.input_playback, play), "ZR + Left is not Play on CPU");
+        assert!(!passes(set.input_record, popup), "ZR + Right is not Record");
+        assert!(!passes(set.play_player, sample(&[ZR, DPAD_LEFT], &[])));
+        assert!(!passes(set.play_player, sample(&[DPAD_LEFT], &[DPAD_LEFT])));
+        assert!(passes(set.play_player, sample(&[ZR, DPAD_LEFT, A], &[DPAD_LEFT])));
+        assert!(passes(set.recording_popup, sample(&[ZR, DPAD_RIGHT], &[ZR])));
+
+        let mut detector = Detector::new();
+        assert_eq!(detector.poll(&set, play, true), 0);
+        assert_eq!(detector.poll(&set, play, false), Request::PlayPlayer.bit());
+        assert!(detector.consume(Request::PlayPlayer));
+        assert!(!detector.consume(Request::PlayPlayer));
+        assert_eq!(detector.poll(&set, sample(&[ZR, DPAD_LEFT], &[]), false), 0);
+        assert_eq!(detector.poll(&set, popup, false), Request::RecordingPopup.bit());
+        assert!(detector.consume(Request::RecordingPopup));
+    }
 }

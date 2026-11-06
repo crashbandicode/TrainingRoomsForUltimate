@@ -719,7 +719,7 @@ mod tests {
         m.press(Button::R);
         open(&mut m, "Button chords");
         let f = frame(&m);
-        assert_eq!(f.row_count, 6);
+        assert_eq!(f.row_count, 8);
         m.press(Button::A);
         let f = frame(&m);
         assert!(f.crumb.string_lossy().contains("Save State Save"));
