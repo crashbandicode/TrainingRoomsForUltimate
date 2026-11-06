@@ -321,3 +321,11 @@ ceiling = 142226
 date = "2026-11-06"
 reason = "rc.5 merge (p23/rc5-merge): combo Switch/Keep, timer recording, notice plates, intro once, the player cycle, lobby combos, ten hot fighters and five hot hats, and Respawn on platform, together; measured 142226 at 302b729 (tools/size_gate.py), +758 over the hot-slots ceiling 141468"
 approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed'"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 142713
+date = "2026-11-06"
+reason = "rc.5 merge plus F9 (p23/rc5-merge at 3df24e0): the combined tree after fixed CPU seats, the open Training quantity, and CPU seats 2 and 3; measured 142713 (tools/size_gate.py), +487 over 142226"
+approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed'"
