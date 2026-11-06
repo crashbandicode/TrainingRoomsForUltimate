@@ -129,3 +129,11 @@ ceiling = 137977
 date = "2026-11-05"
 reason = "rc.3 review fixes (p23/rc3-fixes): IV-1..IV-4, HB-1..HB-5, MN-1, MN-2, MN-4 and the reset wording on p23/rc3-candidate 3c8f5bc; measured 137977 at 3a01f8b (tools/size_gate.py), +136 over 137841"
 approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed' (rc.3 features)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 138070
+date = "2026-11-06"
+reason = "online-flag: the waiting-room clock and the live-scene term of is_training; measured 138070 at da3dc9b (tools/size_gate.py), +93 over 137977"
+approved_by = "Operator 2026-11-06 via the online-flag brief: 'Raise as needed'"
