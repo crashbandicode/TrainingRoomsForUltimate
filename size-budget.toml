@@ -281,3 +281,27 @@ ceiling = 141042
 date = "2026-11-05"
 reason = "rc.6 p23/combos-lobby: Switch/Keep merged onto the rc.5 candidate, and the combo rows open in lobby practice; measured 141042 at f9dc80d (tools/size_gate.py), +199 over the previous ceiling 140843"
 approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed', own commit"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 140834
+date = "2026-11-05"
+reason = "P-HOT (p23/hot-slots on rc.5 6618de9): a capacity refusal holds an extra group instead of failing it (GroupState::Held, retry rotation, notice wording; primary 20:50Z root cause of Loaded 2/5 (3 failed)); measured 140834 (tools/size_gate.py), +84 over 140750"
+approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed' (P-HOT order 18:32Z: size entry)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 141132
+date = "2026-11-05"
+reason = "P-HOT section 5.1 (p23/hot-slots): the Ready Hats row and budget, hats off the Ready Fighters budget, Training helper entries by purpose and the entry-3 borrow record (operator decisions B and 1); measured 141132 (tools/size_gate.py), +298 over 140834"
+approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed' (P-HOT order 18:32Z: size entry)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 141468
+date = "2026-11-06"
+reason = "P-HOT B section 12 (p23/hot-slots; operator Yes pursue B): the start-up window built into Training's own start (entry_window model, H1 header hook at main+0x66de14 with its seam row and scope contract, pending bank, H3 creation rewrite, H4 binding, scene_changed order); measured 141468 (tools/size_gate.py), +336 over 141132"
+approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed' (P-HOT order 18:32Z: size entry)"

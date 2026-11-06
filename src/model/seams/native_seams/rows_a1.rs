@@ -39,6 +39,13 @@ pub const ROWS: &[Seam] = &[
            feature: "native-body-bank-alpha", scopes: Scopes::ALL, read_only: false, per_frame: false,
            sharing: Sharing::None,
            note: "mid-function (x23 = kind table pointer)" },
+    // P-HOT B H1 (LANE-HOT-SLOTS-REPORT.md §12): Training's scene configure, after the resource header stores.
+    Seam { label: "body_bank.scene_header", group: "native_body_bank", offset: 0x66de14,
+           kind: SeamKind::Hook { form: HookForm::Inline, placement: Placement::Mid },
+           guard: [0x8d, 0x82, 0x00, 0xb9, 0x4e, 0xdc, 0x45, 0x94, 0xe8, 0x03, 0x00, 0x32, 0x88, 0x52, 0x00, 0xb9, 0x88, 0x5a, 0x40, 0xb9, 0x1f, 0x2d, 0x01, 0x71, 0xc1, 0x00, 0x00, 0x54, 0x88, 0x5e, 0x40, 0xb9, 0x1f, 0x05, 0x00, 0x31, 0x60, 0x00, 0x00, 0x54, 0xe8, 0x03, 0x1f, 0x32, 0x88, 0x52, 0x00, 0xb9, 0x88, 0x4e, 0x40, 0xb9, 0x08, 0x01, 0x00, 0x32, 0xe0, 0x03, 0x14, 0xaa, 0x88, 0x4e, 0x00, 0xb9],
+           feature: "native-body-bank-alpha", scopes: Scopes::TRAINING, read_only: false, per_frame: false,
+           sharing: Sharing::None,
+           note: "mid-function inline hook on `str w13,[x20,#0x80]` (x20 = R, w13 = the object kind): the header kinds are stored, bit 0 is clear, 0x17e4f50 and 0x17e5bc0 have not run; writes R+0x5c/+0x60 only under its guards (entry_window::extendable)" },
     // body_bank:hook/inline:exact=20 body_bank_probe:hook/inline:exact=20
     Seam { label: "body_bank.select_context", group: "native_body_bank", offset: 0x64fbcc,
            kind: SeamKind::Hook { form: HookForm::Inline, placement: Placement::Mid },

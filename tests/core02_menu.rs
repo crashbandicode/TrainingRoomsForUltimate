@@ -180,7 +180,10 @@ const SPEC_TABLE: &[(&str, Kind, usize, &[usize])] = &[
     ("cycle_preload_slots", Kind::Single, 6, &[5]),
     ("cycle_preload_sources", Kind::Single, 3, &[2]),
     ("cycle_preload_bank_members", Kind::Single, 3, &[2]),
-    ("cycle_preload_ready_fighters", Kind::Single, 11, &[6]),
+    // P-HOT: Ready Fighters 2..=12 starts at 10 (index 8).
+    ("cycle_preload_ready_fighters", Kind::Single, 11, &[8]),
+    // P-HOT: Ready Hats 0..=5 starts at 5.
+    ("cycle_preload_ready_hats", Kind::Single, 6, &[5]),
     ("cycle_preload_group_swap", Kind::Single, 2, &[0]),
     ("cycle_preload_ic_pair_bank", Kind::Single, 2, &[0]),
     ("cycle_preload_original_bank", Kind::Single, 2, &[0]),
@@ -270,11 +273,12 @@ fn layout_row_counts_match_the_rc_freeze() {
     // Controls lost "Group inputs by status" to the frame strip (SPEC-input-06 §3.1, 2026-11-05); Recording gained the
     // 7 rows of the Combos group (SPEC-input-07 §6, 2026-11-05). The RC's four deferred editors ship again (operator
     // 2026-11-05): Saves has its Setup library rows, Recording Edit placement and the Replay window. Fighters & Stages
-    // gained Lobby Items after Stage Hazards (Phase 2 N11, the primary's P-N11, 2026-11-05).
-    assert_eq!(counts(false), [31, 13, 24, 22, 10, 3]);
-    assert_eq!(counts(true), [30, 13, 24, 22, 10, 3]);
-    assert_eq!(counts(false)[..5].iter().sum::<usize>(), 100);
-    assert_eq!(counts(true)[..5].iter().sum::<usize>(), 99);
+    // gained Lobby Items after Stage Hazards (Phase 2 N11, the primary's P-N11, 2026-11-05), then Ready Hats in Loading
+    // (P-HOT, LANE-HOT-SLOTS-REPORT.md §5.1).
+    assert_eq!(counts(false), [31, 13, 24, 23, 10, 3]);
+    assert_eq!(counts(true), [30, 13, 24, 23, 10, 3]);
+    assert_eq!(counts(false)[..5].iter().sum::<usize>(), 101);
+    assert_eq!(counts(true)[..5].iter().sum::<usize>(), 100);
     // Controls (MENU-DRAFT §2): 4 direction grids, 7 delay rows, 13 multi-selects (the 12 checklists,\n    // 3 of them slot sets, and Swap groups).
     let n = |f: &dyn Fn(&Control) -> bool| ROWS.iter().filter(|r| r.vis != model::menu::table::Vis::PilotPresent && f(&r.control)).count();
     assert_eq!(n(&|c| matches!(c, Control::DirectionGrid { .. })), 4);
@@ -282,8 +286,8 @@ fn layout_row_counts_match_the_rc_freeze() {
     assert_eq!(n(&|c| matches!(c, Control::MultiSelect(_) | Control::SwapGroups)), 13, "12 checklists and Swap groups");
     assert_eq!(n(&|c| matches!(c, Control::Slider)), 2);
     // Nothing is deferred any more (operator 2026-11-05): every editor has its row, and every group has rows.
-    // (104: Lobby Items, Phase 2 N11.)
-    assert_eq!(ROWS.len(), 104);
+    // (104: Lobby Items, Phase 2 N11; 105: Ready Hats, P-HOT.)
+    assert_eq!(ROWS.len(), 105);
     for editor in [Editor::SetupSave, Editor::SetupLibrary, Editor::EditPlacement, Editor::ReplayWindow] {
         assert_eq!(ROWS.iter().filter(|r| matches!(r.control, Control::Editor(e) if e == editor)).count(), 1, "{editor:?}");
     }
@@ -349,7 +353,7 @@ fn layout_advanced_group_is_collapsed_until_opened() {
     goto_entry(&mut m, Entry::Group(loading));
     m.press(Button::A);
     assert!(m.group_is_open(loading));
-    assert_eq!(m.entry_count(Page::FightersStages), closed + 6, "six Loading rows appear");
+    assert_eq!(m.entry_count(Page::FightersStages), closed + 7, "seven Loading rows appear (Ready Hats, P-HOT)");
     m.press(Button::A);
     assert_eq!(m.entry_count(Page::FightersStages), closed);
     // Other groups are always open, and their headers are not focus stops.
@@ -570,13 +574,32 @@ fn number_row_steps_and_clamps() {
     }
     m.press(Button::A);
     assert_eq!(m.settings().menu.input_delay(), 5);
-    // Ready Fighters runs 2..=12 and starts at 8.
+    // Ready Fighters runs 2..=12 and starts at 10 (P-HOT).
     goto(&mut m, "cycle_preload_ready_fighters");
-    assert_eq!(m.value(row_of("cycle_preload_ready_fighters")), RowValue::Number(Some(8)));
+    assert_eq!(m.value(row_of("cycle_preload_ready_fighters")), RowValue::Number(Some(10)));
     for _ in 0..10 {
         m.press(Button::Right);
     }
     assert_eq!(m.value(row_of("cycle_preload_ready_fighters")), RowValue::Number(Some(12)));
+}
+
+/// P-HOT (LANE-HOT-SLOTS-REPORT.md §3.2, §5.1): Ready Hats is its own row, 0..=5, starting at 5, and the typed menu
+/// reads the chosen count.
+#[test]
+fn ready_hats_row_defaults_to_five() {
+    let mut m = menu();
+    goto(&mut m, "cycle_preload_ready_hats");
+    assert_eq!(m.value(row_of("cycle_preload_ready_hats")), RowValue::Number(Some(5)));
+    m.press(Button::Right);
+    assert_eq!(m.value(row_of("cycle_preload_ready_hats")), RowValue::Number(Some(5)), "stops at five");
+    for _ in 0..3 {
+        m.press(Button::Left);
+    }
+    assert_eq!(m.value(row_of("cycle_preload_ready_hats")), RowValue::Number(Some(2)));
+    for _ in 0..5 {
+        m.press(Button::Left);
+    }
+    assert_eq!(m.value(row_of("cycle_preload_ready_hats")), RowValue::Number(Some(0)), "stops at none");
 }
 
 #[test]

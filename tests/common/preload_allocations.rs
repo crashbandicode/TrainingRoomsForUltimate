@@ -516,7 +516,7 @@ fn first_and_repeated_hat_and_group_plans_allocate_nothing() {
     // Duplicate forms, a second Mii and more ordinary candidates than native
     // output cells exercise uncapped input traversal as well as whole groups.
     let lane = [0x24, 0x25, 0x5a, 0x5b, 0x48, 0x49, 3, 4, 5, 7, 8, 9, 10, 11, 12, 13];
-    let budget = GroupBudget { ready_fighters: 20, hats_wanted: 2, pool_free: 20, special: SpecialPolicy::MII };
+    let budget = GroupBudget { ready_fighters: 20, pool_free: 20, special: SpecialPolicy::MII };
     let hats = [[Some(10), None, Some(11), None, None], [Some(20), None, None, None, None],
         [Some(30), None, None, None, None], [Some(40), Some(41), None, None, None]];
     let measurement = AllocationCount::start();

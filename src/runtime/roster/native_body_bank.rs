@@ -167,7 +167,7 @@ use crate::engine::swap::body_bank::{
     count_extra_groups_iter, dispatcher_array_header_ok, dispatcher_idle_words, native_group_request, original_bankable,
     pair_request, pair_resource_references, plan_extra_groups_with, prefetch_outcome,
     swap_commit_index_in, async_build_eligible, construction_task, TickGap,
-    GroupBudget, GroupExchange, GroupOwner, GroupPolicy, GroupState, Members, Phase, Special,
+    GroupBudget, GroupExchange, GroupOwner, GroupPolicy, GroupState, Hold, Members, Phase, Special,
     SpecialPolicy, BANK_FLAG, MAX_EXTRA_GROUPS, NANA, NATIVE_MEMBERS, PAIR_ACTIVE_FLAG, POOL_RESERVE, POPO,
     entry_bytes_of, mii_reuse_bytes_match, MiiEntryBytes, MiiIdentity, MII_ENTRY_START, RESOURCE_WORDS,
 };
@@ -604,9 +604,9 @@ fn window_lane(menu: &crate::engine::compat::menu::TrainingModpackMenu, role: us
 /// but report/filter only banks actually built. Construction is demand-driven:
 /// the first selected fighter loads its upcoming members; later hits reuse them.
 /// With group swap on, the shared budget is `ready_fighters` (bodies across both
-/// roles, active fighters included): window groups first, then Kirby-hat
-/// neighbours of a Kirby role, then extra groups by cycle depth; helper slots
-/// get what remains of that budget, capped by the saved slot count.
+/// roles, active fighters included): window groups first, then extra groups by
+/// cycle depth; fighter helper slots get what remains of that budget, capped by
+/// the saved slot count. Kirby hats have their own budget ("Ready Hats", P-HOT).
 pub(crate) fn plan_budget(menu: &crate::engine::compat::menu::TrainingModpackMenu,
     lanes: &[[Option<crate::runtime::roster::cycle_preload::Target>; crate::runtime::roster::cycle_preload::MAX_TARGETS]; 4])
     -> [Option<Members>; 2] {
@@ -763,7 +763,7 @@ fn plan_groups(settings: &crate::engine::preload::cycle_preload_config::Settings
         kinds
     });
     let planned = plan_extra_groups_with(policy, windows, [&existing[0], &existing[1]], [&upcoming[0], &upcoming[1]],
-        originals, GroupBudget { ready_fighters: usize::from(settings.ready_fighters), hats_wanted, pool_free, special });
+        originals, GroupBudget { ready_fighters: usize::from(settings.ready_fighters), pool_free, special });
     let mut bodies = 0usize;
     for role in 0..2 {
         let mut state = BANKS[role].lock();
@@ -832,6 +832,8 @@ pub(crate) fn progress() -> crate::engine::preload::cycle_preload_policy::BuiltF
         result.prefetched = result.prefetched.saturating_add(counts.prefetched);
         result.failed = result.failed.saturating_add(counts.failed);
         result.pending = result.pending.saturating_add(counts.pending);
+        result.held = result.held.saturating_add(counts.held);
+        result.hold = crate::engine::swap::body_bank::merge_hold(result.hold, counts.hold);
         // The Waiting text names the role whose own swap its unstarted fighters wait for.
         result.swap |= counts.swap_owed(role);
     }
@@ -1420,6 +1422,11 @@ struct Bank {
     construction: Option<Construction>,
     /// P3-0: the tick-gap meter of the swap in flight (armed at the request, read at Ready).
     tick: TickGap,
+    /// Advances at every held group's refused retry, so the retries rotate over the held groups.
+    held_turn: usize,
+    /// P-HOT B (§12): a window published by the scene's own configure (H1) carries the Training mode it was made in
+    /// (`(mode, melee)`); that scene's own `scene_changed` leaves it, its ledger and its copy holdings alone.
+    scene: Option<(u32, u32)>,
 }
 
 fn role(owner: u32) -> Option<usize> {
@@ -1603,7 +1610,7 @@ pub(super) unsafe fn build(entry: *const u8, owner: u32, members: Members) -> bo
         acknowledged: false, departed: false, failed: false,
         groups: storage.groups, alias: 0, exchange: None, swap: None, prefetch: None, swap_started: None,
         pair_logged: false, identity: None, activated: Default::default(),
-        construction: None, tick: TickGap::default(),
+        construction: None, tick: TickGap::default(), held_turn: 0, scene: None,
     });
     EXTRAS[role].store((members.count() - 1) as u8, Ordering::Release);
     GROUP_BODIES[role].store(0, Ordering::Release);
@@ -1613,6 +1620,106 @@ pub(super) unsafe fn build(entry: *const u8, owner: u32, members: Members) -> bo
             owner, entry, members.kinds(), members.kinds()[2]);
     }
     true
+}
+
+/// P-HOT B H1 (LANE-HOT-SLOTS-REPORT.md §12; operator "Yes pursue B"): Training's scene configure has stored a
+/// visible role's resource header (`main+0x66de14`, `str w13,[x20,#0x80]`: x20 = R, w13 = the object kind, bit 0
+/// still clear, nothing has read the header yet). With room in Ready Fighters and a bankable next member in the
+/// role's cycle, the header gets the role's start-up window (`+0x5c`/`+0x60`, the original staying `+0x58`, native's
+/// primary) and a pending bank (no entry yet) is published: the served `0x17e5bc0` requests the other members for it
+/// (H2), the creation descriptor is rewritten to it (H3) and `0x654dc0` binds it to the entry (H4). Any guard that
+/// fails leaves the scene as native built it (count 1, today's path).
+#[skyline::hook(offset = 0x66de14, inline)]
+unsafe fn scene_header(ctx: &mut InlineCtx) {
+    use crate::engine::swap::entry_window::{entry_window, extendable, extras_allowed, HeaderFacts};
+    let r = ctx.registers[20].x() as *mut u8;
+    if !ENABLED.load(Ordering::Acquire) || !aligned(r) { return; }
+    if !crate::runtime::roster::scope_gate::admitted("native_body_bank::scene_header") { return; }
+    let facts = HeaderFacts {
+        training: crate::runtime::compat::common::is_native_training_mode(),
+        owner: read(r, 0x54), flags: read(r, 0x4c), object: ctx.registers[13].w(),
+        kinds: [read(r, 0x58), read(r, 0x5c), read(r, 0x60)],
+    };
+    let Some(original) = extendable(facts) else { return; };
+    let settings = crate::runtime::roster::cycle_preload_config::snapshot();
+    if settings.slots == 0 || !settings.fighters { return; }
+    let menu = crate::runtime::compat::sync::read(&crate::runtime::compat::menu::MENU);
+    let roster = if facts.owner == 0 { menu.player_roster } else { menu.cpu_roster };
+    let cycle = crate::engine::swap::cycle_members::cycle_members(roster, crate::engine::swap::cycle_members::NO_MII);
+    let numbered = crate::engine::swap::cycle_members::numbered(&cycle, Some(original));
+    let Some(members) = entry_window(original, &numbered, extras_allowed(settings.ready_fighters, settings.bank_members), false)
+        else { return; };
+    let scene = crate::runtime::lobby::game_mode::current().map(|m| (m.mode, u32::from(m.melee)));
+    if !publish_pending(facts.owner, members, scene) { return; }
+    let kinds = members.kinds();
+    fields::write_unchecked(r as usize, 0x5c, if members.count() > 1 { kinds[1] } else { u32::MAX });
+    fields::write_unchecked(r as usize, 0x60, if members.count() > 2 { kinds[2] } else { u32::MAX });
+    trace!("[BodyBank] start-up window owner={} R={:p} kinds={:x?} (scene header)", facts.owner, r, &kinds[..members.count()]);
+}
+
+/// H1's bank record: entry unknown (0) until H4 binds it, Building, stamped with the scene it was made in.
+unsafe fn publish_pending(owner: u32, members: Members, scene: Option<(u32, u32)>) -> bool {
+    let Some(role) = role(owner) else { return false; };
+    let mut state = BANKS[role].lock();
+    if state.as_ref().is_some_and(|bank| matches!(bank.phase, Phase::Building | Phase::Changing)) { return false; }
+    let mut storage = match state.take() {
+        Some(bank) => BankStorage { members: bank.members, groups: bank.groups },
+        None => match BANK_STORAGE[role].lock().take() { Some(storage) => storage, None => return false },
+    };
+    *storage.members = members;
+    storage.groups.clear();
+    *state = Some(Bank {
+        entry: 0, owner, epoch: super::mii_saved_alpha::current_generation(role as u32),
+        members: storage.members, phase: Phase::Building,
+        bodies: [Body::default(); NATIVE_MEMBERS], observed: None, from: 0, target: 0,
+        acknowledged: false, departed: false, failed: false,
+        groups: storage.groups, alias: 0, exchange: None, swap: None, prefetch: None, swap_started: None,
+        pair_logged: false, identity: None, activated: Default::default(),
+        construction: None, tick: TickGap::default(), held_turn: 0, scene,
+    });
+    EXTRAS[role].store((members.count() - 1) as u8, Ordering::Release);
+    GROUP_BODIES[role].store(0, Ordering::Release);
+    true
+}
+
+/// P-HOT B H3: the creation `main+0x678174` (x1 = owner, x2 = the descriptor) of a role with a pending start-up
+/// window. Native's single form of the window's original becomes the window (count, kinds, actor count, active 0,
+/// as Pokémon Trainer's creation reads); any other shape retires the pending window and leaves the creation as it is.
+pub(crate) unsafe fn creation(owner: u32, descriptor: *mut u8) {
+    use crate::engine::swap::entry_window::{creation_matches, Words};
+    let Some(role) = role(owner) else { return; };
+    if !aligned(descriptor) { return; }
+    let mut state = BANKS[role].lock();
+    let Some(bank) = state.as_mut().filter(|bank| bank.entry == 0 && bank.owner == owner && bank.phase == Phase::Building)
+        else { return; };
+    let window = Words::of(&bank.members);
+    let native = Words { count: read(descriptor, 0x14), kinds: [read(descriptor, 0x18), read(descriptor, 0x1c), read(descriptor, 0x20)],
+        actor_count: read(descriptor, 0x28), active: read(descriptor, 0x43) };
+    if !creation_matches(native, window) {
+        bank.phase = Phase::Retired;
+        bank.departed = true;
+        EXTRAS[role].store(0, Ordering::Release);
+        trace!("[BodyBank] start-up window owner={} dropped: creation {:x?} is not {:x?}", owner, native, window.kinds);
+        return;
+    }
+    fields::write_unchecked(descriptor as usize, 0x14, window.count);
+    for (i, kind) in window.kinds.iter().enumerate() { fields::write_unchecked(descriptor as usize, 0x18 + i * 4, *kind); }
+    fields::write_unchecked(descriptor as usize, 0x28, window.actor_count);
+    fields::write_unchecked(descriptor as usize, 0x43, window.active);
+    trace!("[BodyBank] start-up window owner={} creation {:x?}", owner, window);
+}
+
+/// P-HOT B H4: the first constructed entry of a pending window's owner whose descriptor shows the window binds it.
+unsafe fn bind_pending(entry: *mut u8, role: usize) {
+    let mut state = BANKS[role].lock();
+    let Some(bank) = state.as_mut().filter(|bank| bank.entry == 0 && bank.phase == Phase::Building) else { return; };
+    if read::<u32>(entry, 0xe0) != bank.owner { return; }
+    let count = bank.members.count();
+    let words_match = read::<u32>(entry, 0x14) == count as u32 && read::<u32>(entry, 0x28) == bank.members.actor_count()
+        && (0..count).all(|i| read::<u32>(entry, 0x18 + i * 4) == bank.members.kinds()[i]);
+    if !words_match { return; }
+    bank.entry = entry as usize;
+    trace!("[BodyBank] start-up window owner={} bound entry={:p}", bank.owner, entry);
 }
 
 /// INSTALL and outgoing pose are already owned by the ordinary roster request.
@@ -1867,7 +1974,7 @@ unsafe fn service_locked(entry: *mut u8, owner: u32, role: usize) -> Action {
             // Keep their copy-package dependencies current before the next
             // requested registration, without restarting group lifecycle work.
             return if !idle { Action::None }
-                else if bank.prefetch.is_some() || bank.groups.iter().any(|g| g.state == GroupState::Planned) {
+                else if bank.prefetch.is_some() || bank.groups.iter().any(|g| g.state.startable()) {
                     Action::Lifecycle
                 } else { Action::SyncCopies };
         }
@@ -3377,8 +3484,11 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
             }
         // A Mii group's key request reads its CharInfo from the owner's record:
         // it starts only after the adapter published it (`pending_mii_publication`).
-        } else if let Some(group) = bank.groups.iter().position(|g| g.state == GroupState::Planned
-            && (g.identity.is_none() || g.charinfo_published)) {
+        // A group held for memory or pool space is started again, after every group not yet tried
+        // (a held group never blocks one the admission has not seen): the admission below decides on
+        // the capacity of this tick.
+        } else if let Some(group) = crate::engine::swap::body_bank::next_start(bank.groups.iter()
+            .map(|g| (g.state, g.identity.is_none() || g.charinfo_published)), bank.held_turn) {
             Step::Start(group, *bank.groups[group].members, bank.alias)
         } else { Step::Idle }
     };
@@ -3462,9 +3572,10 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
             let (capacity, live) = pool_counts(base).unwrap_or((0, 0));
             let pool_free = (capacity as usize).saturating_sub(usize::from(live)).saturating_sub(POOL_RESERVE);
             if pool_free < members.count() {
-                fail_group(role, group, "fighter pool reserve");
-                trace!("[GroupSwap] fallback owner={} group={} reason=fighter pool {}/{} reserve {} < {} bodies",
-                    owner, group, live, capacity, POOL_RESERVE, members.count());
+                if hold_group(role, group, Hold::Pool) {
+                    trace!("[GroupSwap] held owner={} group={} reason=fighter pool {}/{} reserve {} < {} bodies; retried",
+                        owner, group, live, capacity, POOL_RESERVE, members.count());
+                }
                 return;
             }
             // GS-PANIC: the group's measured cost (prefetch + build) against the headroom every other consumer has
@@ -3488,11 +3599,14 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
                     }
                     return;
                 }
+                // A refusal holds the group (nothing native was touched): the headroom moves as helper
+                // sources retarget and other groups settle, so its start is retried; it never fails here.
                 Admission::Refuse => {
-                    trace!("[GroupSwap] fallback owner={} group={} reason=process headroom {:?} < {} bytes kinds={:x?} outstanding={} prefetch={} build={}",
-                        owner, group, headroom, decision.need, &members.kinds()[..members.count()], decision.outstanding,
-                        cost.prefetch, cost.build);
-                    fail_group(role, group, "process headroom");
+                    if hold_group(role, group, Hold::Memory) {
+                        trace!("[GroupSwap] held owner={} group={} reason=process headroom {:?} < {} bytes kinds={:x?} outstanding={} prefetch={} build={}; retried",
+                            owner, group, headroom, decision.need, &members.kinds()[..members.count()], decision.outstanding,
+                            cost.prefetch, cost.build);
+                    }
                     return;
                 }
             }
@@ -3586,6 +3700,19 @@ fn log_memory(owner: u32, group: usize, kinds: &[u32], phase: &str, before: Opti
     trace!("[GroupSwap] memory owner={} group={} kinds={:x?} phase={} committed={:?}->{:?} delta={} estimate={} headroom={:?}",
         owner, group, kinds, phase, before, committed, delta.map_or_else(|| "na".to_string(), |d| d.to_string()), estimate,
         after.headroom());
+}
+
+/// A refused start holds the group for `hold` (`GroupState::Held`); a held group refused again
+/// passes the retry turn to the next held group. True the first time it is held for this reason
+/// (one log line per hold, not one per tick).
+fn hold_group(role: usize, group: usize, hold: Hold) -> bool {
+    let mut state = BANKS[role].lock();
+    let Some(bank) = state.as_mut() else { return false; };
+    let Some(g) = bank.groups.get_mut(group) else { return false; };
+    let first = g.state != GroupState::Held(hold);
+    if !first { bank.held_turn = group + 1; }
+    g.state = GroupState::Held(hold);
+    first
 }
 
 fn fail_group(role: usize, group: usize, _reason: &str) {
@@ -3817,12 +3944,21 @@ pub(super) fn scene_changed() {
     RESERVED.store(0, Ordering::Release);
     for value in &ROLE_BUDGET { value.store(0, Ordering::Release); }
     for value in &PLANNED_TARGETS { value.store(0, Ordering::Release); }
-    for state in &BANKS {
-        if let Some(bank) = state.lock().as_mut() { bank.departed = true; }
+    // P-HOT B (§12): a start-up window the new scene's own configure published before this callback saw the scene
+    // change belongs to the new scene; everything else departs as before.
+    let now = crate::runtime::lobby::game_mode::current().map(|m| (m.mode, u32::from(m.melee)));
+    let mut fresh = [false; 2];
+    for (role, state) in BANKS.iter().enumerate() {
+        if let Some(bank) = state.lock().as_mut() {
+            fresh[role] = bank.scene.is_some() && bank.scene == now && bank.phase != Phase::Retired;
+            if !fresh[role] { bank.departed = true; }
+        }
     }
-    for role in 0..2 { r_handle::reset(ledger_role(role), "scene changed"); }
+    for role in (0..2).filter(|role| !fresh[*role]) { r_handle::reset(ledger_role(role), "scene changed"); }
     // The scene loop resets every holder, G68 included: the copy holdings end without native calls.
-    for role in 0..2 { crate::runtime::roster::copy_packages::forget(role, role as u32, "scene changed"); }
+    for role in (0..2).filter(|role| !fresh[*role]) {
+        crate::runtime::roster::copy_packages::forget(role, role as u32, "scene changed");
+    }
 }
 
 pub(super) fn on_destroy(entry: *const u8) {
@@ -3853,6 +3989,8 @@ unsafe fn prepare_models(entry: *mut u8) {
     original!()(entry);
     if !aligned(entry) { return; }
     let Some(role) = role(read(entry, 0xe0)) else { return; };
+    // P-HOT B H4: a start-up window binds to its entry here, before the table hooks serve its cells.
+    bind_pending(entry, role);
     let state = BANKS[role].lock();
     if let Some(bank) = state.as_ref().filter(|bank| descriptor(entry, bank)) {
         // A pair-lead window (or pair group) is always constructed with the pair
@@ -4107,6 +4245,9 @@ const SEAM_GROUP: &str = "native_body_bank";
 const BANK_SEAMS: &[&str] = &["body_bank.prepare_models", "body_bank.prepare_resources",
     "body_bank.create_contexts", "body_bank.select_context"];
 const FINALIZE_SEAMS: &[&str] = &["body_bank.finalize_entry"];
+/// P-HOT B H1: the scene configure's `str w13,[x20,#0x80]` (§12).
+const SCENE_HEADER: usize = 0x66de14;
+const SCENE_HEADER_SEAMS: &[&str] = &["body_bank.scene_header"];
 const GROUP_SWAP_SEAMS: &[&str] = &["group_swap.dispatcher_destroy", "group_swap.sync_construct",
     "group_swap.destroy_body", "group_swap.select_control", "group_swap.release_kind", "group_swap.acquire_kind",
     "group_swap.prepare_entry", "group_swap.unprepare", "group_swap.roster_refresh",
@@ -4139,6 +4280,10 @@ pub(super) unsafe fn install(base: usize) {
     }
     skyline::install_hooks!(prepare_models, prepare_resources, create_contexts, select_context);
     ENABLED.store(true, Ordering::Release);
+    // P-HOT B H1 (§12): the scene configure's header site, on its own row; without it Training starts as today.
+    let scene_stock = fields::read_unchecked::<u32>(base, SCENE_HEADER) == 0xb900828d;
+    if !scene_stock { trace!("[BodyBank] fingerprint mismatch +0x{:x}; no start-up window", SCENE_HEADER); }
+    if gate(SEAM_GROUP, SCENE_HEADER_SEAMS, scene_stock) { skyline::install_hooks!(scene_header); }
     // WP-R: per-body identity view (all 18 selector exits or none; logs its own line).
     crate::runtime::roster::identity_view::install(base);
     // Both extensions and the attached window's route clear (D-PTA1c at finalize) tear down through the

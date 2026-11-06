@@ -16,6 +16,7 @@ use serde::{Deserialize, Serialize};
 use super::choice::byteflags;
 
 use crate::engine::preload::cycle_preload_config as preload;
+use crate::engine::preload::hat_slots as hats;
 use crate::engine::stages::lobby_stages::LobbyStageOrder;
 use crate::engine::swap::ordered_roster::{OrderedFighterRoster, DEFAULT_CPU_ROSTER, DEFAULT_KIRBY_HATS, DEFAULT_PLAYER_ROSTER};
 use crate::engine::swap::roster_grid::Role as RosterRole;
@@ -171,6 +172,9 @@ pub struct TrainingModpackMenu {
     /// Ready Fighters: 2..=12.
     #[serde(default = "preload::default_ready_fighters", deserialize_with = "preload::deserialize_ready_fighters")]
     pub cycle_preload_ready_fighters: preload::CyclePreloadReadyFighters,
+    /// Ready Hats: 0..=5, the hat budget apart from Ready Fighters (P-HOT).
+    #[serde(default = "hats::default_ready_hats", deserialize_with = "hats::deserialize_ready_hats")]
+    pub cycle_preload_ready_hats: hats::CyclePreloadReadyHats,
     /// Ice Climbers Pair Bank.
     #[serde(default = "preload::default_ic_pair_bank")]
     pub cycle_preload_ic_pair_bank: OnOff,
@@ -238,6 +242,7 @@ pub const BASE_MENU: TrainingModpackMenu = TrainingModpackMenu {
     cycle_preload_bank_members: preload::default_bank_members(),
     cycle_preload_group_swap: OnOff::ON,
     cycle_preload_ready_fighters: preload::default_ready_fighters(),
+    cycle_preload_ready_hats: hats::default_ready_hats(),
     cycle_preload_ic_pair_bank: OnOff::ON,
     cycle_preload_original_bank: OnOff::ON,
     cycle_preload_solo_popo_groups: OnOff::ON,
@@ -293,6 +298,12 @@ impl TrainingModpackMenu {
                 "cycle_preload_ready_fighters",
                 &preload::CyclePreloadReadyFighters::ALL_CONSTS,
                 BASE_MENU.cycle_preload_ready_fighters,
+            ),
+            cycle_preload_ready_hats: row_or(
+                snapshot,
+                "cycle_preload_ready_hats",
+                &hats::CyclePreloadReadyHats::ALL_CONSTS,
+                BASE_MENU.cycle_preload_ready_hats,
             ),
             cycle_preload_ic_pair_bank: on_off("cycle_preload_ic_pair_bank", BASE_MENU.cycle_preload_ic_pair_bank),
             cycle_preload_original_bank: on_off("cycle_preload_original_bank", BASE_MENU.cycle_preload_original_bank),
@@ -352,7 +363,7 @@ impl TrainingModpackMenu {
 
     /// Every row this view holds as (setting id, elements), in the order of the fields: the write-back of D1 (package 5's commit
     /// path persists them; `compat::menu::write_back(row_id, value)` is one of these pairs).
-    pub fn rows(&self) -> [(&'static str, Vec<u8>); 21] {
+    pub fn rows(&self) -> [(&'static str, Vec<u8>); 22] {
         [
             ("solo_popo_original", self.solo_popo_original.to_byte_vec()),
             ("solo_popo_player_cycle", self.solo_popo_player_cycle.to_byte_vec()),
@@ -363,6 +374,7 @@ impl TrainingModpackMenu {
             ("cycle_preload_bank_members", self.cycle_preload_bank_members.to_byte_vec()),
             ("cycle_preload_group_swap", self.cycle_preload_group_swap.to_byte_vec()),
             ("cycle_preload_ready_fighters", self.cycle_preload_ready_fighters.to_byte_vec()),
+            ("cycle_preload_ready_hats", self.cycle_preload_ready_hats.to_byte_vec()),
             ("cycle_preload_ic_pair_bank", self.cycle_preload_ic_pair_bank.to_byte_vec()),
             ("cycle_preload_original_bank", self.cycle_preload_original_bank.to_byte_vec()),
             ("cycle_preload_solo_popo_groups", self.cycle_preload_solo_popo_groups.to_byte_vec()),

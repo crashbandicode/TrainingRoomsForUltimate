@@ -178,7 +178,7 @@ checklists; the alternative is a three-value dropdown *Yes / No / Random*.
 | | Training Stage Rotation | toggle | Off | Misc |
 | Loading *(advanced, collapsed)* | Cycle Preload | dropdown | Off, 1–5 (built-in max) / max | Character Extras |
 | | Preload | dropdown | Fighters, Hats, Both / Both | Character Extras → Preload Sources |
-| | Ready Fighters | dropdown | total across roles / 8 | Character Extras |
+| | Ready Fighters | dropdown | total across roles / 10 | Character Extras |
 | | Ready Fighter Bodies | dropdown | Off, 1–3 / native max | Character Extras |
 | | Group Swap | toggle | On | Character Extras |
 | | Swap groups | checklist | Ice Climbers pair bank, Original fighter bank, Solo Popo groups, Ice Climbers pair groups, PT/Aegis groups, Ice Climbers pair group, Mii groups / all on | Character Extras (7 rows → 1) |

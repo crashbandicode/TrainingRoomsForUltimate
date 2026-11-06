@@ -701,3 +701,55 @@ menu's Latin face, `nintendoP_RodinNTLG` B003/EB003/UB003, has 8,612 characters 
 for their pick. Carried-file change: one recorded pkg6 edit of `src/model/mii_root/mii_menu.rs`; `carry_pkg6.py verify`
 re-derives all 250 files. `tests/ui_glyphs.rs` fails on any character in a non-test string or char literal under `src/`
 that is neither ASCII nor in its font-proven list (… · Ω — § é, each mapped by all three Rodin weights).
+## p23/hot-slots: a capacity refusal holds an extra group instead of failing it (2026-11-05, P-HOT)
+
+The fork fails an extra group when its prefetch start finds too little process headroom or too few free pool bodies
+(`fail_group`, `GroupState::Failed`: "never retried in this scene") and the Fighters notice reports it as "failed".
+Eden `tr-p23-hot-measure-1` (release `031f1eae`) showed "Loaded 2/5 (3 failed)" for the CPU group `[2,3,4]` refused
+for headroom (530.5 MiB needed, 477.6 MiB free) while helper sources still held the look-ahead loaded during a Mii
+stretch (`artifacts/phase23/LANE-HOT-SLOTS-REPORT.md` §8). Here the group is held (`GroupState::Held(Hold)`): it
+keeps its place in the plan and the body budget, holds no memory or keys, is started again by the lifecycle after every
+planned group (held retries rotate, `body_bank::next_start`), and the notice says "(N waiting for memory)" or "(N
+waiting for pool space)". A swap that reaches it is handled like a planned group. 36 recorded manifest edits of five
+pkg6 files (`cycle_preload_policy.rs`, `body_bank.rs`, `body_bank/memory.rs`, `swap_model/fallback.rs`,
+`native_body_bank.rs`); `carry_pkg6.py verify` re-derives all 250 files from stage m5q. Tests:
+`frame85_group_refused_by_headroom_then_admitted`, `held_group_counts_apart_from_failed`,
+`held_groups_retry_after_planned_and_rotate`, `held_fighters_read_waiting_not_failed`,
+`held_group_at_a_swap_is_disposed_like_planned`, `tests/group_hold_wiring.rs`.
+
+### p23/hot-slots: Ready Fighters defaults to 10 (2026-11-05, P-HOT §3.2)
+
+The fork defaults Ready Fighters to 8 (`cycle_preload_config.rs`, row 102 above). P-HOT sets 10, both active fighters
+included (DECISIONS 2026-11-02, the operator's "ten total hot fighters"): 3 recorded manifest edits of
+`cycle_preload_config.rs` (the constant and its test), `factory.rs` index 8, `tests/core02_menu.rs`. Saved settings keep
+their value; only a new or reset profile gets 10.
+
+### p23/hot-slots: Ready Hats, hats off the fighter budget, helper entries by purpose (2026-11-05, P-HOT §5.1)
+
+The fork charges Kirby-hat helpers against Ready Fighters (`GroupBudget::hats_wanted`) and lets any helper target take
+any helper entry. P-HOT (DECISIONS 2026-11-02: "Hat sources are not charged against the fighter budget"; operator
+decisions "B" and "1", 2026-11-05): `hats_wanted` is gone from `GroupBudget`; the helper plan is budgeted by
+`preload::hat_slots::budgeted` (Ready Hats, a new clean-room row, 0..=5, default 5); Training's helper entries take
+targets by purpose (`hat_slots::slot_view`: created 7/6/5/4 hats first, entry 2 fighters only, entry 3 the fifth hat
+only through the borrow), and the borrow record F9 reads is `character_sources::ENTRY3_BORROW`. 18 recorded manifest
+edits of `body_bank.rs`, `character_sources.rs`, `cycle_preload.rs`, `native_body_bank.rs`; `carry_pkg6.py verify`
+re-derives all 250 files. Tests: `hat_slots` (3), `hats_are_not_charged_against_ready_fighters`,
+`ready_hats_row_defaults_to_five`, `tests/hat_slots_wiring.rs` (2).
+
+### p23/hot-slots: the start-up window built into Training's own start (2026-11-06, P-HOT B)
+
+The fork builds a fighter's body bank only at a visible swap: Training starts every visible role with one body and the
+notice says "Swap once to load". The operator asked for the characters to be "just ready from the get go", as the
+game does for Pokémon Trainer, and chose B (2026-11-06). The research boot `tr-p23-hot-measure-3` measured the scene
+path (`artifacts/phase23/LANE-HOT-SLOTS-REPORT.md` §12.1). P-HOT B, behind a new seam row `body_bank.scene_header`
+(64 guarded bytes at `main+0x66de14`) and a Training-only scope contract:
+- H1 extends a visible role's resource header with its start-up window;
+- H2: the existing served `0x17e5bc0` requests the window's other members for the pending bank;
+- H3 rewrites the creation at the `0x678174` observer;
+- H4 binds the bank in `prepare_models`;
+- `scene_changed` keeps a window the new scene published.
+
+10 recorded manifest edits of `rows_a1.rs`, `swap_model/scope.rs`, `character_lifecycle.rs` and `native_body_bank.rs`;
+the values are a new clean-room model, `src/model/swap/entry_window.rs`. `carry_pkg6.py verify` re-derives all 250
+files. Tests: `entry_window` (6), `tests/startup_window_wiring.rs` (3). Eden proof: `rc6-combined/rows-hot-slots/`
+(grouped session).

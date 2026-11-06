@@ -87,7 +87,7 @@ pub const fn disposition(reason: Fallback, state: GroupState) -> Disposition {
         GroupState::Built | GroupState::Prefetching => Disposition::Keep,
         _ if reason.transient() => Disposition::Keep,
         GroupState::Prefetched => Disposition::FailReturningKeys,
-        GroupState::Planned | GroupState::Failed => Disposition::Fail,
+        GroupState::Planned | GroupState::Held(_) | GroupState::Failed => Disposition::Fail,
     }
 }
 
@@ -186,5 +186,17 @@ mod tests {
         // The chain's strings are unchanged (Eden rows grep them).
         assert_eq!(Fallback::PairResetWait.text(), "pair build waits for an exclusive reset batch");
         assert_eq!(Fallback::PoolFull.text(), "fighter pool has no room for the group");
+    }
+
+    /// A swap that reaches a group held for capacity (nothing native exists, like a planned one) is served
+    /// canonically by the same rule as a planned group: a transient reason keeps it, a permanent one fails it.
+    #[test]
+    fn held_group_at_a_swap_is_disposed_like_planned() {
+        use crate::engine::swap::body_bank::Hold;
+        for reason in Fallback::ALL {
+            for hold in [Hold::Memory, Hold::Pool] {
+                assert_eq!(disposition(reason, GroupState::Held(hold)), disposition(reason, GroupState::Planned), "{reason:?}");
+            }
+        }
     }
 }

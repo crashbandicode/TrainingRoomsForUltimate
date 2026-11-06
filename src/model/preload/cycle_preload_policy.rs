@@ -191,7 +191,8 @@ pub struct Readiness {
 /// or switching, a group planned or prefetching) and `unstarted()` the planned fighters whose
 /// window does not exist yet, which the first swap builds. `swap` names the roles with such
 /// fighters (`body_bank::SWAP_PLAYER`/`SWAP_CPU`, from `RoleCounts::swap_owed`): only that
-/// role's swap builds them.
+/// role's swap builds them. `held` fighters are planned groups whose start waits for process
+/// memory or free pool bodies (`hold` names which; memory first): retried, never `failed`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct BuiltFighters {
     pub planned: u8,
@@ -200,12 +201,14 @@ pub struct BuiltFighters {
     pub failed: u8,
     pub pending: u8,
     pub swap: u8,
+    pub held: u8,
+    pub hold: Option<crate::engine::swap::body_bank::Hold>,
 }
 
 impl BuiltFighters {
     pub fn unstarted(self) -> u8 {
         let accounted = u16::from(self.ready) + u16::from(self.prefetched)
-            + u16::from(self.failed) + u16::from(self.pending);
+            + u16::from(self.failed) + u16::from(self.pending) + u16::from(self.held);
         u16::from(self.planned).saturating_sub(accounted) as u8
     }
 
@@ -264,7 +267,21 @@ impl std::fmt::Display for CacheText {
             Progress::Done => return write!(f, "All loaded ({}/{}, {} instant)", loaded, planned, fighters.ready),
             Progress::Ready => return write!(f, "Ready {}/{}", fighters.ready, planned),
         }
-        if failed > 0 { write!(f, " ({} failed)", failed)?; }
+        use crate::engine::swap::body_bank::Hold;
+        let held = fighters.held;
+        match (failed > 0, fighters.hold.filter(|_| held > 0)) {
+            (true, Some(hold)) => {
+                let what = if hold == Hold::Memory { "memory" } else { "pool space" };
+                // restriction: preload-failed-and-waiting
+                write!(f, " ({} failed, {} waiting for {})", failed, held, what)?
+            }
+            (true, None) => write!(f, " ({} failed)", failed)?,
+            // restriction: preload-wait-memory
+            (false, Some(Hold::Memory)) => write!(f, " ({} waiting for memory)", held)?,
+            // restriction: preload-wait-pool
+            (false, Some(Hold::Pool)) => write!(f, " ({} waiting for pool space)", held)?,
+            (false, None) => {}
+        }
         Ok(())
     }
 }
@@ -283,7 +300,7 @@ impl CacheStatus {
     /// Hidden: Off or nothing planned. Loading: fighter work is owed and runs; Paused: it is owed
     /// and a visible operation defers it. Waiting: no fighter work is owed, but a window is not
     /// built and only that role's swap builds it, so a blocked loader cannot pause it. Otherwise
-    /// the plan is settled: Partial (a failure), Done (a prefetched group remains unbuilt), Ready
+    /// the plan is settled: Partial (a failure, or a group held for memory or pool space), Done (a prefetched group remains unbuilt), Ready
     /// (all built).
     pub fn progress(self) -> Progress {
         let fighters = self.fighters;
@@ -294,7 +311,7 @@ impl CacheStatus {
             if self.blocked { Progress::Paused } else { Progress::Loading }
         }
         else if fighters.unstarted() > 0 { Progress::Waiting }
-        else if fighters.failed > 0 { Progress::Partial }
+        else if fighters.failed > 0 || fighters.held > 0 { Progress::Partial }
         else if fighters.prefetched > 0 { Progress::Done }
         else { Progress::Ready }
     }
@@ -314,7 +331,7 @@ impl CacheStatus {
 
     /// What the notice shows, without what changes afterwards for no reader's benefit: a settled
     /// result is the same whether a prefetched group has since been built, so that is no change.
-    fn shown_key(self) -> (u8, u8, u8, u8, u8) {
+    fn shown_key(self) -> (u8, u8, u8, u8, u8, u8) {
         let (class, swap) = match self.progress() {
             Progress::Hidden => (0, 0),
             Progress::Loading => (1, 0),
@@ -323,7 +340,7 @@ impl CacheStatus {
             Progress::Waiting => (3, self.fighters.swap),
             Progress::Partial | Progress::Done | Progress::Ready => (4, 0),
         };
-        (class, self.fighters.loaded(), self.fighters.planned, self.fighters.failed, swap)
+        (class, self.fighters.loaded(), self.fighters.planned, self.fighters.failed, swap, self.fighters.held)
     }
 
     pub fn announce(self, shown: Option<Self>, paused_polls: u8) -> bool {
@@ -486,8 +503,31 @@ mod tests {
         assert_eq!(unstarted.progress(), Progress::Waiting);
     }
 
+    /// g03 frame 85 of tr-p23-hot-measure-1 read "Loaded 2/5 (3 failed)" for a group the memory admission
+    /// refused at its start. A held group is named for what it waits for, never as a failure, and a change
+    /// in the held count is a change shown.
+    #[test]
+    fn held_fighters_read_waiting_not_failed() {
+        use crate::engine::swap::body_bank::Hold;
+        let assets = readiness(5, 1, false, [Some(1)], NONE, ready_of(&[1]));
+        let memory = BuiltFighters { planned: 5, ready: 2, held: 3, hold: Some(Hold::Memory), ..BuiltFighters::default() };
+        let held = CacheStatus::new(assets, memory, false);
+        assert_eq!(memory.unstarted(), 0);
+        assert_eq!(held.progress(), Progress::Partial);
+        assert_eq!(held.text().to_string(), "Loaded 2/5 (3 waiting for memory)");
+        let pool = CacheStatus::new(assets, BuiltFighters { hold: Some(Hold::Pool), ..memory }, false);
+        assert_eq!(pool.text().to_string(), "Loaded 2/5 (3 waiting for pool space)");
+        let both = CacheStatus::new(assets, BuiltFighters { failed: 1, held: 2, ..memory }, false);
+        assert_eq!(both.text().to_string(), "Loaded 2/5 (1 failed, 2 waiting for memory)");
+        assert!(held.announce(Some(both), 0), "a change in what is held is shown");
+        let loading = CacheStatus::new(assets, BuiltFighters { pending: 1, held: 2, ..memory }, false);
+        assert_eq!(loading.text().to_string(), "Loading 2/5 (2 waiting for memory)");
+        let admitted = CacheStatus::new(assets, BuiltFighters { ready: 5, held: 0, hold: None, ..memory }, false);
+        assert_eq!(admitted.text().to_string(), "Ready 5/5");
+    }
+
     fn fighters(planned: u8, ready: u8, prefetched: u8, failed: u8, pending: u8) -> BuiltFighters {
-        BuiltFighters { planned, ready, prefetched, failed, pending, swap: 0 }
+        BuiltFighters { planned, ready, prefetched, failed, pending, ..BuiltFighters::default() }
     }
 
     fn status(fighters: BuiltFighters) -> CacheStatus {
@@ -501,11 +541,12 @@ mod tests {
         let mut total = BuiltFighters::default();
         for (role, f) in [player, cpu].iter().enumerate() {
             let counts = RoleCounts { planned: f.planned, ready: f.ready, prefetched: f.prefetched,
-                failed: f.failed, pending: f.pending };
+                failed: f.failed, pending: f.pending, held: f.held, hold: f.hold };
             assert_eq!(counts.unstarted(), f.unstarted());
             total = BuiltFighters { planned: total.planned + f.planned, ready: total.ready + f.ready,
                 prefetched: total.prefetched + f.prefetched, failed: total.failed + f.failed,
-                pending: total.pending + f.pending, swap: total.swap | counts.swap_owed(role) };
+                pending: total.pending + f.pending, swap: total.swap | counts.swap_owed(role),
+                held: total.held + f.held, hold: crate::engine::swap::body_bank::merge_hold(total.hold, f.hold) };
         }
         total
     }

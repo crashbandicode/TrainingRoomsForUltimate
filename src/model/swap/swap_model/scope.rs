@@ -89,6 +89,17 @@ const PRACTICE: Scopes = Scopes(Scopes::TRAINING.0 | Scopes::LOBBY_WAITING.0);
 
 pub const CALLBACKS: &[CallbackContract] = &[
     CallbackContract {
+        name: "native_body_bank::scene_header",
+        seam: "body_bank.scene_header",
+        scopes: Scopes::TRAINING,
+        read_only: false,
+        per_frame: false,
+        exception: Exception::None,
+        review: "P-HOT B H1 (LANE-HOT-SLOTS-REPORT.md §12): in native Training only, extends a visible role's resource \
+                 header with its start-up window and publishes a pending bank; outside Training it returns before any \
+                 write (entry_window::extendable needs native Training; src/runtime/roster/native_body_bank.rs)",
+    },
+    CallbackContract {
         name: "lobby::update",
         seam: "training.vtable_on_frame_slot",
         scopes: EVERYWHERE,
