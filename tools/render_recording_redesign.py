@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Revision 1 of the recording-redesign mockups.
+"""Revision 3 of the recording-redesign mockups.
 
 Menu screens are redrawn on the real rc.1 Recording page (the COMBO-HELPER method).
 The pop-up, the chain, and combo-from-macro sit on a real Eden Training frame from
@@ -31,7 +31,8 @@ PANEL = (13, 13, 13, 236)
 SMALL = iv.font(13)
 TINY = iv.font(12)
 
-GROUPS = [("Macros", 8), ("Combos", 4), ("Save states", 5), ("Replays", 2), ("Options", 5)]
+GROUPS = [("Macros", 8), ("Combos", 4), ("Conversions", 3), ("Save states", 5), ("Replays", 2), ("Options", 5)]
+RED = (232, 72, 72, 255)
 
 
 def thumbtack(d, x, y, on_green=False):
@@ -103,10 +104,10 @@ def page_base(bg, selected, help1, help2, hint):
     return img, d
 
 
-def library_rows(d, rows, c2, c3, y0=168):
+def library_rows(d, rows, c2, c3, y0=168, c2x=760, c3x=1040):
     iv.text(d, (386, 140), "Name", SMALL, fill=ch.M_GROUP, anchor="lm")
-    iv.text(d, (760, 140), c2, SMALL, fill=ch.M_GROUP, anchor="lm")
-    iv.text(d, (1040, 140), c3, SMALL, fill=ch.M_GROUP, anchor="lm")
+    iv.text(d, (c2x, 140), c2, SMALL, fill=ch.M_GROUP, anchor="lm")
+    iv.text(d, (c3x, 140), c3, SMALL, fill=ch.M_GROUP, anchor="lm")
     hot = 0
     for row in rows:
         if row["hot"]:
@@ -130,8 +131,8 @@ def library_rows(d, rows, c2, c3, y0=168):
             thumbtack(d, 346, y - 12, on_green=bool(on))
         name_col = ch.M_TEXT if not row.get("dim") else ch.M_GROUP
         iv.text(d, (370, y), row["name"], ch.MF, fill=name_col, anchor="lm")
-        iv.text(d, (760, y), row.get("c2", ""), ch.MF, fill=ch.M_GROUP, anchor="lm")
-        iv.text(d, (1040, y), row.get("c3", ""), ch.MF, fill=GREEN if row.get("c3_on") else ch.M_GROUP, anchor="lm")
+        iv.text(d, (c2x, y), row.get("c2", ""), ch.MF, fill=ch.M_GROUP, anchor="lm")
+        iv.text(d, (c3x, y), row.get("c3", ""), ch.MF, fill=GREEN if row.get("c3_on") else ch.M_GROUP, anchor="lm")
         centers.append(y)
         y += 36
     if hot:
@@ -188,7 +189,7 @@ def chip(d, x, y, label, on):
     return x + w + 10
 
 
-def popup(game, role, section, sections, rows, loop, c2, c3):
+def popup(game, role, section, sections, rows, loop, c2, c3, c2x=620, c3x=860):
     img = game.copy()
     d = ImageDraw.Draw(img)
     last = 196 + (len(rows) - 1) * 34
@@ -205,8 +206,8 @@ def popup(game, role, section, sections, rows, loop, c2, c3):
     iv.text(d, (888, 126), "Loop", TINY, fill=ch.M_GROUP, anchor="rm")
     # Shift the library into the panel by drawing rows with popup coordinates.
     iv.text(d, (268, 162), "Name", SMALL, fill=ch.M_GROUP, anchor="lm")
-    iv.text(d, (620, 162), c2, SMALL, fill=ch.M_GROUP, anchor="lm")
-    iv.text(d, (860, 162), c3, SMALL, fill=ch.M_GROUP, anchor="lm")
+    iv.text(d, (c2x, 162), c2, SMALL, fill=ch.M_GROUP, anchor="lm")
+    iv.text(d, (c3x, 162), c3, SMALL, fill=ch.M_GROUP, anchor="lm")
     hot = 0
     for row in rows:
         if row["hot"]:
@@ -229,8 +230,8 @@ def popup(game, role, section, sections, rows, loop, c2, c3):
         if row.get("pin"):
             thumbtack(d, 248, y - 12, on_green=bool(on))
         iv.text(d, (272, y), row["name"], ch.MF, fill=ch.M_TEXT, anchor="lm")
-        iv.text(d, (620, y), row.get("c2", ""), SMALL, fill=ch.M_GROUP, anchor="lm")
-        iv.text(d, (860, y), row.get("c3", ""), SMALL, fill=GREEN if row.get("c3_on") else ch.M_GROUP, anchor="lm")
+        iv.text(d, (c2x, y), row.get("c2", ""), SMALL, fill=ch.M_GROUP, anchor="lm")
+        iv.text(d, (c3x, y), row.get("c3", ""), SMALL, fill=GREEN if row.get("c3_on") else ch.M_GROUP, anchor="lm")
         centers.append(y)
         y += 34
         if y > 560:
@@ -296,26 +297,124 @@ def keyboard(bg):
     return img
 
 
-def choices(bg):
+def choices():
+    """The questions revision 3 still leaves open. Green is the recommendation."""
+    blocks = [
+        ("How you number them",
+         "A  Name tiles. A adds the next number. A again removes it, and the later numbers close up.",
+         "Same gesture as Character Cycles. A macro or a combo is a name, so the tile is the name, not a portrait.",
+         "B  A list, and Y moves that file one place later."),
+        ("Which role a chained macro plays",
+         "A  The role stored in the macro file. A Player macro plays on Player 1. A CPU macro plays on the CPU.",
+         "They play one after another. Starting both roles yourself is unchanged.",
+         "B  Every macro in the chain plays on the role tab that was open when the save loaded."),
+        ("What loop does with a chain",
+         "A  The chain is one unit. Each macro plays once, then the whole list repeats.",
+         "A chord Load uses the Player tab's count. A load from the CPU tab uses that tab's count.",
+         "B  Each macro repeats by its own role's count before the next number starts."),
+        ("A macro recorded on another fighter",
+         "A  Switch or Keep is asked once, when the chain starts, and the answer covers the whole chain.",
+         "The prompt names every mismatched macro. It is the prompt that already exists.",
+         "B  Ask again at each macro whose fighter does not match."),
+        ("Where a conversion lives",
+         "A  Its own section, Conversions, on the Recording page and on the Player pop-up.",
+         "R reaches it. The CPU tab skips it, the same way it skips Combos. The drill is the player's.",
+         "B  A sub-list inside Combos, with no section of its own."),
+        ("Hot conversions",
+         "A  Five hot conversions, same pin and newest rules as macros and saves.",
+         "Drilling one puts it in the hot list. A new one takes a slot even when all five are pinned.",
+         "B  No hot list. Only the conversion you are drilling is marked."),
+        ("What the conversion file stores",
+         "A  The combo files' ids, in order. The same kind of link as a macro's start save.",
+         "Renaming a combo keeps it. Editing the combo updates the conversion. A missing combo is skipped.",
+         "B  A copy of each combo's links, frozen when the conversion was saved."),
+        ("A drop, and what completes the chain",
+         "A  A drop restarts the conversion at combo 1. Complete means every combo, in order, while the CPU is still in hitstun between them.",
+         "The conversion streak and best count a finished conversion only. One combo drilled alone keeps that combo's own streak.",
+         "B  After a drop, continue from that combo. Anything landed back to back completes the chain, even if the CPU could act in between."),
+        ("One drill at a time",
+         "A  Drilling a conversion replaces the drilled combo, and drilling a combo replaces the conversion.",
+         "The helper has one bar. A on a numbered combo inside the conversion drills that combo alone.",
+         "B  A combo and a conversion can both be active, and a button chooses which bar you see."),
+    ]
+    height = 36 + len(blocks) * 168 + 24
+    img = Image.new("RGBA", (W, height), (13, 13, 13, 255))
+    d = ImageDraw.Draw(img)
+    iv.text(d, (48, 16), "Still open. Green is the recommendation.", iv.font(18, bold=True), fill=ch.M_TEXT, anchor="lm")
+    y = 48
+    for title, a, amid, b in blocks:
+        d.rounded_rectangle((40, y, 1240, y + 152), radius=8, outline=GREEN, width=2)
+        iv.text(d, (56, y + 10), title, iv.font(16, bold=True), fill=ch.M_TEXT, anchor="lm")
+        d.rectangle((56, y + 40, 1224, y + 72), fill=GREEN_ROW)
+        iv.text(d, (68, y + 56), a, SMALL, fill=ch.M_TEXT, anchor="lm")
+        iv.text(d, (68, y + 88), amid, TINY, fill=ch.M_GROUP, anchor="lm")
+        iv.text(d, (68, y + 116), b, TINY, fill=ch.M_GROUP, anchor="lm")
+        y += 168
+    return img
+
+
+def order_grid(bg, crumb, tiles, help1, help2, hint):
+    """Name tiles with Character Cycles numbers. A adds the next number; A again removes it."""
     img = bg.copy()
     d = ImageDraw.Draw(img)
     ch.clear_content(d, list_view=True)
-    iv.text(d, (53, 112), "Still open. Green is the recommendation.", ch.MF, fill=ch.M_TEXT, anchor="lm")
-    blocks = [
-        (True, "Hot save states",
-         "A  Five hot saves, same rules as macros: pinned first, then newest. Binding one makes it hot.",
-         "The pop-up shows the five without opening the whole library. A save file is the two fighters, not an input log.",
-         "B  No hot list. The pop-up is the whole library, and only the bound save is marked."),
-    ]
-    y = 150
-    for rec, title, a, amid, b in blocks:
-        d.rounded_rectangle((48, y, 1232, y + 188), radius=8, outline=GREEN if rec else ch.M_RULE, width=2)
-        iv.text(d, (68, y + 16), title, iv.font(16, bold=True), fill=ch.M_TEXT, anchor="lm")
-        d.rectangle((64, y + 48, 1216, y + 96), fill=GREEN_ROW)
-        iv.text(d, (80, y + 64), a, SMALL, fill=ch.M_TEXT, anchor="lm")
-        iv.text(d, (80, y + 112), amid, TINY, fill=ch.M_GROUP, anchor="lm")
-        iv.text(d, (80, y + 146), b, TINY, fill=ch.M_GROUP, anchor="lm")
-        y += 206
+    iv.text(d, (53, 118), crumb, ch.MF, fill=ch.M_TEXT, anchor="lm")
+    cols, tw, th, gapx, gapy = 4, 280, 72, 16, 14
+    x0, y0 = 56, 150
+    for i, tile in enumerate(tiles):
+        col, row = i % cols, i // cols
+        x = x0 + col * (tw + gapx)
+        y = y0 + row * (th + gapy)
+        cursor = tile.get("cursor")
+        d.rounded_rectangle((x, y, x + tw, y + th), radius=6,
+                            fill=ch.M_FOCUS if cursor else (28, 30, 38, 255),
+                            outline=WHITE if cursor else ch.M_RULE, width=3 if cursor else 1)
+        num = tile.get("number")
+        if num is not None:
+            d.ellipse((x + 10, y + 18, x + 36, y + 44), fill=RED)
+            iv.text(d, (x + 23, y + 31), str(num), iv.font(14, bold=True), fill=WHITE, anchor="mm")
+            nx = x + 48
+        else:
+            nx = x + 16
+        iv.text(d, (nx, y + 22), tile["name"], ch.MF, fill=ch.M_TEXT, anchor="lm")
+        iv.text(d, (nx, y + 46), tile.get("sub", ""), SMALL, fill=ch.M_GROUP, anchor="lm")
+    ch.help_lines(d, help1, help2)
+    hints(d, hint)
+    return img
+
+
+def hide_legacy_notice(img):
+    """The captured Training frame still prints the old Input Playback notice. Paint that panel out with the sky above it, text included."""
+    px = img.load()
+    for y in range(30, 150):
+        for x in range(300, 980):
+            px[x, y] = px[x, 6]
+    return img
+
+
+def conversion_hud(game, title, subtitle, links, result, streak):
+    img = hide_legacy_notice(game.copy())
+    d = ImageDraw.Draw(img)
+    x0, y0, x1, y1 = 40, 500, 1240, 692
+    d.rounded_rectangle((x0, y0, x1, y1), radius=10, fill=(14, 18, 27, 232), outline=(124, 92, 214, 255), width=2)
+    d.rounded_rectangle((x0 + 14, y0 + 12, x0 + 148, y0 + 36), radius=4, fill=(124, 92, 214, 255))
+    iv.text(d, (x0 + 81, y0 + 24), "CONVERSION", iv.font(12, bold=True), fill=WHITE, anchor="mm")
+    iv.text(d, (x0 + 162, y0 + 24), title, iv.font(16, bold=True), fill=WHITE, anchor="lm")
+    iv.text(d, (x1 - 18, y0 + 24), streak, iv.font(14, bold=True), fill=GREEN, anchor="rm")
+    iv.text(d, (x0 + 16, y0 + 52), subtitle, SMALL, fill=ch.M_GROUP, anchor="lm")
+    n = len(links)
+    gap = 8
+    cw = (x1 - x0 - 32 - (n - 1) * gap) / n
+    for i, (label, state) in enumerate(links):
+        cx = x0 + 16 + i * (cw + gap)
+        cy = y0 + 78
+        outline = {"true": GREEN, "drop": RED, "now": WHITE}.get(state, ch.M_RULE)
+        d.rounded_rectangle((cx, cy, cx + cw, cy + 52), radius=6, fill=(32, 38, 52, 255), outline=outline, width=2)
+        iv.text(d, (cx + 10, cy + 16), label, SMALL, fill=WHITE, anchor="lm")
+        word = {"true": "TRUE", "drop": "DROP", "now": "now", "wait": "—"}.get(state, "—")
+        col = GREEN if state == "true" else RED if state == "drop" else WHITE if state == "now" else ch.M_GROUP
+        iv.text(d, (cx + cw - 10, cy + 16), word, SMALL, fill=col, anchor="rm")
+    iv.text(d, (x0 + 16, y1 - 28), result, iv.font(15, bold=True), fill=WHITE, anchor="lm")
     return img
 
 
@@ -334,13 +433,19 @@ COMBOS = [
     {"name": "Combo 4", "c2": "Steve → Pikachu", "c3": "3 links", "hot": False},
 ]
 SAVES = [
-    {"name": "Corner pressure", "c2": "Steve · Villager", "c3": "chain · Nair loop", "c3_on": True,
+    {"name": "Corner pressure", "c2": "Steve · Villager", "c3": "1 Nair · 2 Grab · 3 Replay", "c3_on": True,
      "hot": True, "pin": True, "active": True},
     {"name": "Platform", "c2": "Pikachu · Mario", "c3": "chain off", "hot": True, "pin": True, "cursor": True},
     {"name": "Slot 1 (2026-11-05)", "c2": "Steve · Villager", "c3": "chain off", "hot": True},
     {"name": "Nair loop · start", "c2": "Pikachu · Mario", "c3": "linked", "hot": False},
     {"name": "CPU throw · start", "c2": "Mario · Pikachu", "c3": "linked", "hot": False},
     {"name": "Slot 3 (2026-11-05)", "c2": "Lucina · Cloud", "c3": "chain off", "hot": False, "dim": True},
+]
+CONVERSIONS = [
+    {"name": "Corner to kill", "c2": "Ryu → Mario", "c3": "1 Ryu · 2 Nair · 3 Combo 2", "c3_on": True,
+     "hot": True, "pin": True, "active": True},
+    {"name": "Platform strings", "c2": "Pikachu → Mario", "c3": "1 Nair · 2 Combo 4", "hot": True, "cursor": True},
+    {"name": "Conversion 3", "c2": "Steve → Pikachu", "c3": "1 Combo 4", "hot": False},
 ]
 CPU_MACROS = [
     {"name": "CPU throw", "c2": "Mario", "c3": "1.8 s", "hot": True, "pin": True, "active": True},
@@ -353,14 +458,16 @@ CPU_MACROS = [
 def main():
     menu = iv.background(MENU)
     game = iv.background(GAME)
-    sections_p = ("Macros", "Combos", "Save states")
+    sections_p = ("Macros", "Combos", "Conversions", "Save states")
     sections_c = ("Macros", "Save states")
 
     save(popup(game, "player", "Macros", sections_p, MACROS, "on", "Fighter", "Length"),
          "RECORDING-REDESIGN-popup-player")
     save(popup(game, "player", "Combos", sections_p, COMBOS, "on", "Fighters", "Links"),
          "RECORDING-REDESIGN-popup-combos")
-    save(popup(game, "player", "Save states", sections_p, SAVES, "on", "Fighters", "Chain"),
+    save(popup(game, "player", "Conversions", sections_p, CONVERSIONS, "on", "Fighters", "Combos", c2x=520, c3x=760),
+         "RECORDING-REDESIGN-popup-conversions")
+    save(popup(game, "player", "Save states", sections_p, SAVES, "on", "Fighters", "Chain", c2x=520, c3x=740),
          "RECORDING-REDESIGN-popup-saves")
     save(popup(game, "cpu", "Macros", sections_c, CPU_MACROS, "1", "Fighter", "Length"),
          "RECORDING-REDESIGN-popup-cpu")
@@ -390,13 +497,20 @@ def main():
     save(img, "RECORDING-REDESIGN-page-combos")
 
     img, d = page_base(menu, 2,
-                       "The green row is the save the Save and Load chords use.",
-                       "Nair loop · start is the file Record created and the macro links to.",
+                       "Corner to kill is the conversion you are drilling. The numbers are its combos.",
+                       "A on a combo inside it drills that combo alone. R moves to Save states.",
                        "Up/Down move    A actions    Y pin    R section    B close")
-    library_rows(d, SAVES, "Fighters", "Chain")
-    save(img, "RECORDING-REDESIGN-page-saves")
+    library_rows(d, CONVERSIONS, "Fighters", "Combos", c2x=640, c3x=900)
+    save(img, "RECORDING-REDESIGN-page-conversions")
 
     img, d = page_base(menu, 3,
+                       "The green row is the save the Save and Load chords use.",
+                       "Corner pressure plays 1, then 2, then 3. Nair loop · start stays under the outline.",
+                       "Up/Down move    A actions    Y pin    R section    B close")
+    library_rows(d, SAVES, "Fighters", "Chain", c2x=680, c3x=920)
+    save(img, "RECORDING-REDESIGN-page-saves")
+
+    img, d = page_base(menu, 4,
                        "Replay capture and the Replay window save into the same macro library.",
                        "The window's own crop is the macro. There is no second crop command there.",
                        "Up/Down move    A open    R section    B close")
@@ -406,7 +520,7 @@ def main():
     ])
     save(img, "RECORDING-REDESIGN-page-replays")
 
-    img, d = page_base(menu, 4,
+    img, d = page_base(menu, 5,
                        "Loop counts are the list X cycles on the pop-up.",
                        "Button chords is where Record, Play and the pop-up are edited.",
                        "Up/Down move    Left/Right change    A open    R section    B close")
@@ -447,16 +561,16 @@ def main():
     img = action_screen(menu, "Recording  >  Save states  >  Corner pressure", [
         ("Bind to Save / Load", False),
         ("Chain", False),
-        ("Chained macro", True),
+        ("Chain macros", True),
         ("Duplicate", False),
         ("Rename", False),
         ("Pin", False),
         ("Delete", False),
-    ], "The Save chord overwrites this file. Duplicate keeps it and writes a new one.",
-       "Left and Right on Chain turn it on and off. A on Chained macro picks the file.")
+    ], "Chain on: Load plays 1, then 2, then 3. Chain off: Load only restores the save.",
+       "A on Chain macros opens the numbered grid. The numbers stay when chain is off.")
     d = ImageDraw.Draw(img)
-    iv.text(d, (1100, 168 + 36), "[ON]", ch.MF, fill=GREEN, anchor="rm")
-    iv.text(d, (1100, 168 + 72), "Nair loop  >", ch.MF, fill=ch.M_TEXT, anchor="rm")
+    iv.text(d, (1180, 168 + 36), "[ON]", ch.MF, fill=GREEN, anchor="rm")
+    iv.text(d, (1180, 168 + 72), "1 Nair · 2 Grab · 3 Replay  >", ch.MF, fill=ch.M_TEXT, anchor="rm")
     save(img, "RECORDING-REDESIGN-save-actions")
 
     save(keyboard(menu), "RECORDING-REDESIGN-keyboard")
@@ -468,8 +582,9 @@ def main():
     ]), "RECORDING-REDESIGN-combo-from-macro")
 
     save(status(game, "Loaded Corner pressure", [
-        "Chain is on.",
-        "Playing Nair loop on Player 1.",
+        "Chain is on. Playing 1, then 2, then 3.",
+        "1 Nair loop on Player 1.",
+        "Then 2 Dash grab, then 3 Replay 86f.",
     ]), "RECORDING-REDESIGN-chain")
 
     img, d = page_base(menu, 1,
@@ -516,7 +631,7 @@ def main():
         iv.text(d, (1180, 168 + i * 36), chord, ch.MF, fill=ch.M_GROUP, anchor="rm")
     save(img, "RECORDING-REDESIGN-shortcuts")
 
-    save(choices(menu), "RECORDING-REDESIGN-choices")
+    save(choices(), "RECORDING-REDESIGN-choices")
 
     img = menu.copy()
     d = ImageDraw.Draw(img)
@@ -554,10 +669,73 @@ def main():
     iv.text(d, (68, 206), "Player and CPU stay the role tabs. R opens Save states on either tab.", SMALL, fill=ch.M_TEXT, anchor="lm")
     iv.text(d, (68, 236), "A save is both fighters, so it is not a third role. A still binds the row to Save and Load.", SMALL, fill=ch.M_GROUP, anchor="lm")
     d.rounded_rectangle((48, 330, 1232, 470), radius=8, outline=ch.M_RULE, width=2)
-    iv.text(d, (68, 346), "B  A third top tab, Saves.", iv.font(16, bold=True), fill=ch.M_TEXT, anchor="lm")
+    iv.text(d, (68, 346), "B  A third top tab, Saves. Rejected.", iv.font(16, bold=True), fill=ch.M_TEXT, anchor="lm")
     iv.text(d, (68, 386), "Saves would sit beside Player and CPU. R would not be needed for it.", SMALL, fill=ch.M_GROUP, anchor="lm")
     iv.text(d, (68, 416), "Binding would be the same. The tab would read as a third role, which a save is not.", SMALL, fill=ch.M_GROUP, anchor="lm")
     save(img, "RECORDING-REDESIGN-save-where")
+
+    chain_tiles = [
+        {"name": "Nair loop", "sub": "Player · Pikachu", "number": 1},
+        {"name": "Dash grab", "sub": "Player · Mario", "number": 2, "cursor": True},
+        {"name": "Replay 86f", "sub": "Player · Pikachu", "number": 3},
+        {"name": "CPU throw", "sub": "CPU · Mario"},
+        {"name": "Slot 2", "sub": "Player · Steve"},
+        {"name": "Macro 6", "sub": "Player · Lucina"},
+        {"name": "CPU tech", "sub": "CPU · Mario"},
+        {"name": "Slot 5", "sub": "Player · Villager"},
+    ]
+    save(order_grid(menu, "Recording  >  Save states  >  Corner pressure  >  Chain", chain_tiles,
+                    "Red numbers are the order. Load plays 1, then 2, then 3.",
+                    "A on a numbered tile removes it and the later numbers close up.",
+                    "A add or remove    Y clear    B back"),
+         "RECORDING-REDESIGN-chain-picker")
+
+    combo_tiles = [
+        {"name": "Ryu BnB", "sub": "Ryu → Mario · 6 links", "number": 1},
+        {"name": "Nair loop", "sub": "Pikachu → Mario · 4 links", "number": 2, "cursor": True},
+        {"name": "Combo 2", "sub": "Pikachu → Mario · 2 links", "number": 3},
+        {"name": "Combo 4", "sub": "Steve → Pikachu · 3 links"},
+    ]
+    save(order_grid(menu, "Recording  >  Conversions  >  Corner to kill", combo_tiles,
+                    "A conversion is numbered combos. Corner to kill is 1, then 2, then 3.",
+                    "Combo 4 has no number, so it is not in this conversion.",
+                    "A add or remove    Y clear    B back"),
+         "RECORDING-REDESIGN-conversion-picker")
+
+    save(action_screen(menu, "Recording  >  Conversions  >  Corner to kill", [
+        ("Drill conversion", True),
+        ("1  Ryu BnB", False),
+        ("2  Nair loop", False),
+        ("3  Combo 2", False),
+        ("Rename", False),
+        ("Pin", False),
+        ("Delete", False),
+    ], "Drill conversion is the whole chain. The helper then grades that chain.",
+       "A on a numbered combo drills that combo alone and leaves the conversion file as it is."),
+         "RECORDING-REDESIGN-conversion-actions")
+
+    save(conversion_hud(
+        game, "Corner to kill",
+        "combo 2 of 3  ·  Ryu BnB  ·  6 links  ·  tolerance ±1f",
+        [("L1", "true"), ("L2", "true"), ("L3", "now"), ("L4", "wait"), ("L5", "wait"), ("L6", "wait")],
+        "2 of 3 combos  ·  link 2 of 6 true",
+        "streak 4  ·  best 9",
+    ), "RECORDING-REDESIGN-conversion-bar")
+
+    dropped = conversion_hud(
+        game, "Corner to kill",
+        "combo 2 of 3  ·  Ryu BnB  ·  link 3 dropped",
+        [("L1", "true"), ("L2", "true"), ("L3", "drop"), ("L4", "wait"), ("L5", "wait"), ("L6", "wait")],
+        "Dropped. The conversion restarts at combo 1.",
+        "streak 0  ·  best 9",
+    )
+    dd = ImageDraw.Draw(dropped)
+    dd.rounded_rectangle((40, 28, 760, 168), radius=10, fill=(14, 18, 27, 232), outline=GREEN, width=2)
+    iv.text(dd, (60, 48), "Completed, the other outcome", iv.font(16, bold=True), fill=WHITE, anchor="lm")
+    iv.text(dd, (60, 84), "Every combo landed, in order, while the CPU was still in hitstun.", SMALL, fill=ch.M_GROUP, anchor="lm")
+    iv.text(dd, (60, 112), "Conversion complete. Streak 5. Best 9.", iv.font(15, bold=True), fill=GREEN, anchor="lm")
+    iv.text(dd, (60, 140), "The streak counts a finished conversion. A single combo keeps its own.", SMALL, fill=ch.M_GROUP, anchor="lm")
+    save(dropped, "RECORDING-REDESIGN-conversion-drop")
 
 
 if __name__ == "__main__":
