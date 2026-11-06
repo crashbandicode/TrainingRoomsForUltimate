@@ -15,7 +15,15 @@ The operator, 2026-11-06, on revision 4: keep what revision 4 got right, includi
 - **The Recording page uses the same split.** The left column is Save states & Macros, Combos & Conversions, Replays, Options.
 - Revision 4's link diagram, legend, loop mark, five strips, conversion bar, action screens, keyboard, crop, shortcuts, and respawn picture stay. Its pop-up and Recording-page pictures are replaced by the revision 5 ones.
 
-## Revision 4
+## Revision 5.1
+
+The primary's review: the layout, the tabs, the in-place numbers, and the inline questions stay. Three pictures change.
+
+- The scrolled pop-up is the same window as the save pop-up. The SAVE STATES and MACROS headers stay put, including the loop chip. Only the rows move, and a row is never cut in half. Each section keeps its scrollbar.
+- The Switch / Keep picture is the existing Fighter Mismatch screen: the title, *Keep current fighter*, *Switch to recorded fighter*, and the footer the named-macro and replay prompts already use. No Palutena Training frame is in the phase 23 frames, so this picture keeps Steve and Villager and the prompt names Villager, the CPU on screen. The operator's example, a Pikachu macro practised on Palutena, is the same screen. Asking once for a chain, and that nothing is hidden or refused, are caption notes.
+- The conversion strip says "Drilling now."
+
+
 
 The operator, 2026-11-06, on revision 3: "the menu is a good start … Its not clear from the images how linking happens, what's linked to what, and the loop is on pages where it doesnt apply. The first draft you gave had a bigger window with groups and seemed more intuitive." Then: "the loop icon … should be drawn from an svg or something similar or native."
 
@@ -89,7 +97,7 @@ The pop-up is one window over the match, so its size can be judged against the f
 
 ![The macros have scrolled. The saves have not](RECORDING-REDESIGN-r5-popup-scrolled.png)
 
-*Same cursor. The macro column has moved down to the library. The save column is still at Corner pressure.*
+*The same window as the picture above. The headers stay, including the loop chip. The macro rows have moved; the save rows have not. Both scrollbars stay, and every row that shows is whole.*
 
 ### A macro under the cursor
 
@@ -145,7 +153,7 @@ A row with no start save, such as Replay 86f, has no link chip.
 
 ![Switch or Keep](RECORDING-REDESIGN-r5-switch-keep.png)
 
-*Nair loop was recorded on Pikachu. The fighter now is Palutena. Keep plays the inputs on Palutena. Nothing is hidden or refused.*
+*The existing Fighter Mismatch screen. This frame is Steve and Villager, so the prompt names Villager, the CPU on screen. The operator's example is the same screen for a Pikachu macro practised on Palutena. Asked once for the whole chain. Nothing is hidden or refused.*
 
 ### Your call — Q4
 

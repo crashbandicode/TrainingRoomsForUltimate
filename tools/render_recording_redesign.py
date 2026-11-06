@@ -2165,8 +2165,31 @@ def action_screen4(bg, crumb, rows, help1, help2, values=None, keys=None):
 R5_TABS = (("saves", "Save states & Macros"), ("combos", "Combos & Conversions"))
 
 
-def r5_rows(typ, role, focus):
+def r5_tail(typ):
+    """Extra library rows so one picture can scroll. They are the same kind of file, and only that picture draws them."""
+    if typ == "macro":
+        specs = [("slot6", "Slot 6 (2026-11-05)", "Pikachu", "1.0 s"),
+                 ("slot7", "Slot 7 (2026-11-05)", "Lucina", "1.1 s"),
+                 ("slot8", "Slot 8 (2026-11-05)", "Steve", "0.9 s"),
+                 ("slot9", "Slot 9 (2026-11-05)", "Villager", "1.4 s"),
+                 ("slot10", "Slot 10 (2026-11-05)", "Pikachu", "1.2 s"),
+                 ("slot11", "Slot 11 (2026-11-05)", "Lucina", "0.7 s")]
+        return [dict(key=k, name=n, fighter=f, role="P1", length=length, start=None, hot=False) for k, n, f, length in specs]
+    if typ == "save":
+        specs = [("slot6s", "Slot 6 (2026-11-05)", "Pikachu · Mario"),
+                 ("slot7s", "Slot 7 (2026-11-05)", "Lucina · Cloud"),
+                 ("slot8s", "Slot 8 (2026-11-05)", "Steve · Villager"),
+                 ("slot9s", "Slot 9 (2026-11-05)", "Pikachu · Mario"),
+                 ("slot10s", "Slot 10 (2026-11-05)", "Steve · Villager"),
+                 ("slot11s", "Slot 11 (2026-11-05)", "Lucina · Cloud")]
+        return [dict(key=k, name=n, fighters=f, chain=[], hot=False) for k, n, f in specs]
+    return []
+
+
+def r5_rows(typ, role, focus, extend=False):
     data = {"macro": M4, "combo": C4, "conv": V4, "save": S4}[typ]
+    if extend:
+        data = list(data) + r5_tail(typ)
     out = []
     for src in data:
         r = dict(src)
@@ -2327,6 +2350,45 @@ def r5_paste(img, section, box, scroll):
     return scroll
 
 
+def r5_paste_sticky(img, section, box, scroll, header, positions):
+    """Header stays. Rows below it move by whole rows. A row that would be cut off is left out."""
+    x0, y0, x1, y1 = box
+    header = min(int(header), section.height)
+    img.alpha_composite(section.crop((0, 0, section.width, header)), (x0, y0))
+    view = max(0, y1 - (y0 + header))
+    content = section.height - header
+    max_scroll = max(0, content - view)
+    tops = sorted(p - header for p in positions.values())
+    snapped = 0
+    for top in tops:
+        if top <= scroll and top <= max_scroll:
+            snapped = top
+    scroll = snapped
+    show = 0
+    for top in tops:
+        if top < scroll:
+            continue
+        bot = top + 40
+        if bot <= scroll + view:
+            show = bot - scroll
+        else:
+            break
+    if show > 0:
+        src = header + scroll
+        img.alpha_composite(section.crop((0, src, section.width, src + show)), (x0, y0 + header))
+    if content > view:
+        d = ImageDraw.Draw(img)
+        track_top = y0 + header + 2
+        track_bot = y1 - 2
+        track_h = max(1, track_bot - track_top)
+        d.rounded_rectangle((x1 - 6, track_top, x1 - 2, track_bot), radius=2, fill=(40, 43, 52, 255))
+        thumb = max(18, track_h * view / content)
+        span = max(1, content - view)
+        ty = track_top + (track_h - thumb) * (scroll / span)
+        d.rounded_rectangle((x1 - 6, ty, x1 - 2, ty + thumb), radius=2, fill=(150, 156, 170, 255))
+    return scroll
+
+
 def r5_tabs(d, x, y, tab, role):
     """The two tabs. CPU draws only Save states & Macros: no greyed second tab and no text."""
     labels = R5_TABS if role != "cpu" else R5_TABS[:1]
@@ -2371,7 +2433,7 @@ def r5_detail_lines(focus, role):
     if any(v["key"] == focus for v in V4):
         v = next(x for x in V4 if x["key"] == focus)
         seq = " → ".join("%d %s" % (i + 1, n) for i, n in enumerate(v["seq"]))
-        drill = "The one drill." if focus == DRILL else "Not the drill."
+        drill = "Drilling now." if focus == DRILL else "Not drilling."
         return ["Contains %s." % seq, "Streak 4 · best 9. %s" % drill]
     s = next(x for x in S4 if x["key"] == focus)
     if s.get("chain") and s.get("chain_on"):
@@ -2398,14 +2460,14 @@ def r5_loop_for(typ, role):
     return [("", LOOP[role])]
 
 
-def r5_columns(role, tab, focus, width=470):
+def r5_columns(role, tab, focus, width=470, extend=False):
     left_t, right_t = r5_pair(role, tab)
     order, link = r5_marks(focus)
     sections = {}
     positions = {}
     for typ in (left_t, right_t):
         title = {"save": "SAVE STATES", "macro": "MACROS", "conv": "CONVERSIONS", "combo": "COMBOS"}[typ]
-        img, pos = r5_section(title, typ, r5_rows(typ, role, focus), width, r5_loop_for(typ, role),
+        img, pos = r5_section(title, typ, r5_rows(typ, role, focus, extend), width, r5_loop_for(typ, role),
                               section_on=any(r["cursor"] for r in r5_rows(typ, role, focus)),
                               order=order, link=link)
         sections[typ] = img
@@ -2424,7 +2486,7 @@ def r5_foot(typ, role="player"):
     return [("A", "drill"), ("Y", "PIN")] + common
 
 
-def popup5(game, role, tab, focus, scrolls=(0, 0), view_bottom=500):
+def popup5(game, role, tab, focus, scrolls=(0, 0), view_bottom=500, sticky=False, extend=False):
     img = hide_notice4(game.copy())
     d = ImageDraw.Draw(img)
     frame = (POP[0], POP[1], POP[2], view_bottom + 118)
@@ -2432,10 +2494,20 @@ def popup5(game, role, tab, focus, scrolls=(0, 0), view_bottom=500):
     iv.text(d, (152, 98), "Recording", fnt(18, bold=True), fill=ch.M_TEXT, anchor="lm")
     role_toggle(d, 820, 82, "cpu" if role == "cpu" else "player", 15)
     r5_tabs(d, 152, 122, "saves" if role == "cpu" else tab, role)
-    left_t, right_t, sections, _pos = r5_columns(role, tab, focus, 470)
+    left_t, right_t, sections, positions = r5_columns(role, tab, focus, 470, extend)
     boxes = ((148, 158, 618, view_bottom), (640, 158, 1110, view_bottom))
     for typ, box, scroll in ((left_t, boxes[0], scrolls[0]), (right_t, boxes[1], scrolls[1])):
-        r5_paste(img, sections[typ], box, scroll)
+        if sticky:
+            if scroll < 0:
+                rows = r5_rows(typ, role, focus, extend)
+                header = HEAD_H + 2
+                for row in rows:
+                    if not row.get("hot"):
+                        scroll = positions[typ][row["key"]] - header
+                        break
+            r5_paste_sticky(img, sections[typ], box, scroll, HEAD_H + 2, positions[typ])
+        else:
+            r5_paste(img, sections[typ], box, scroll)
     d = ImageDraw.Draw(img)
     d.line((628, 164, 628, view_bottom), fill=ch.M_DIVIDER, width=2)
     r5_details(img, (148, view_bottom + 12, 1110, view_bottom + 68),
@@ -2467,18 +2539,24 @@ def popup5_stacked(game):
 
 
 def prompt5(game):
+    """The shared Fighter Mismatch screen (macro_panel::fighter). Named and clip origins use this footer."""
     img = hide_notice4(game.copy())
     d = ImageDraw.Draw(img)
-    d.rounded_rectangle((300, 150, 980, 430), radius=12, fill=(250, 250, 252, 242), outline=GOLD, width=3)
-    iv.text(d, (330, 176), "Nair loop was recorded on Pikachu", fnt(20, bold=True), fill=INK, anchor="lm")
-    iv.text(d, (330, 214), "You are playing Palutena. The recording is the inputs.", fnt(16), fill=(40, 46, 58, 255), anchor="lm")
-    iv.text(d, (330, 246), "Keep plays those inputs on Palutena.", fnt(16), fill=(40, 46, 58, 255), anchor="lm")
-    d.rounded_rectangle((330, 300, 520, 352), radius=8, fill=(230, 232, 238, 255), outline=(120, 126, 140, 255), width=2)
-    iv.text(d, (425, 326), "Switch", fnt(18, bold=True), fill=INK, anchor="mm")
-    d.rounded_rectangle((550, 300, 760, 352), radius=8, fill=GREEN, outline=GREEN, width=2)
-    iv.text(d, (655, 326), "Keep", fnt(18, bold=True), fill=INK, anchor="mm")
-    iv.text(d, (330, 378), "Asked once for the whole chain. Nothing is hidden or refused.", fnt(14),
-            fill=(70, 76, 88, 255), anchor="lm")
+    x0, y0, x1, y1 = 360, 168, 920, 392
+    d.rounded_rectangle((x0, y0, x1, y1), radius=10, fill=WIN, outline=(86, 92, 108, 255), width=2)
+    iv.text(d, (x0 + 24, y0 + 28), "Fighter Mismatch", fnt(18, bold=True), fill=ch.M_TEXT, anchor="lm")
+    rows = ("Keep current fighter", "Switch to recorded fighter")
+    for i, label in enumerate(rows):
+        top = y0 + 58 + i * 44
+        box = (x0 + 16, top, x1 - 16, top + 36)
+        if i == 0:
+            d.rectangle(box, fill=ch.M_FOCUS)
+            d.rectangle(box, outline=WHITE, width=2)
+            d.rectangle((box[0], box[1], box[0] + 4, box[3]), fill=WHITE)
+        iv.text(d, (x0 + 36, top + 18), label, fnt(16), fill=ch.M_TEXT, anchor="lm")
+    d.line((x0 + 16, y1 - 78, x1 - 16, y1 - 78), fill=ch.M_RULE, width=1)
+    iv.text(d, (x0 + 24, y1 - 52), "Recorded Pikachu · current CPU Villager", fnt(14), fill=ch.M_TEXT, anchor="lm")
+    iv.text(d, (x0 + 24, y1 - 28), "Inputs are the same either way. A chooses, B cancels.", fnt(14), fill=ch.M_GROUP, anchor="lm")
     return img
 
 
@@ -2513,12 +2591,8 @@ def page5(menu, selected, tab, focus, help1, help2):
 def main_r5(menu, game):
     P = "RECORDING-REDESIGN-r5-"
     save(popup5(game, "player", "saves", "pressure"), P + "popup-save")
-    # Macros scrolled to the library; saves stay at the top.
-    macro_img, macro_pos = r5_section(
-        "MACROS", "macro", r5_rows("macro", "player", "pressure"), 470, r5_loop_for("macro", "player"),
-        section_on=False, order=r5_marks("pressure")[0], link=r5_marks("pressure")[1])
-    library_top = macro_pos["macro6"]
-    save(popup5(game, "player", "saves", "pressure", scrolls=(0, library_top - 4), view_bottom=340),
+    # Same window as the save picture. Headers stay. Macro rows move by whole rows.
+    save(popup5(game, "player", "saves", "pressure", scrolls=(0, -1), sticky=True, extend=True),
          P + "popup-scrolled")
     save(popup5(game, "player", "saves", "nair"), P + "popup-macro")
     save(popup5(game, "player", "combos", "corner"), P + "popup-conversion")
