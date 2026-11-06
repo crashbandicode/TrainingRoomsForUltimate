@@ -72,7 +72,7 @@ as above. Re-encoded the same way (step 2, 96 colours), each frame then given 16
 
 Run `tr-p23-docs-capture-03` on the Surface, 2026-11-05Z: one boot of the released 0.2.0-rc.1 NRO
 (`706c993ff885273206eee656cce1313ec8690b29176b3ebf66ae38ec28c64a46`), with the CPU pilot, Online Deluxe and tile-cursor
-plugins installed. A boot settings file set Hitbox Visualization On, Respawn invincibility On, DI Up, SDI Up/High, and
+plugins installed. A boot settings file set Hitbox Visualization On, Respawn on platform On, DI Up, SDI Up/High, and
 Kirby first in both cycle orders; the rest was changed in the menu on camera. P1 is Steve and the CPU Richter until
 the cycle chords switch both to Kirby. Clips marked *step 2* keep every second frame (each shown twice as long) to
 stay under 10 MB.
@@ -83,7 +83,7 @@ stay under 10 MB.
 | `hitbox-overlay.gif` | Hitbox Visualization On: the yellow hurtbox shapes on both fighters; P1's forward smash lands (CPU to 20.5%). 6.0 s. |
 | `di-up.gif`, `di-none.gif` | The same two forward smashes from the same damage (36% and 51%) with CPU DI Up and SDI Up/High, then with both reset: the DI Up launches go higher. 9.5 s each, step 2. |
 | `di-sdi-chips.gif` | CPU page: the DI Direction grid (the game's DI line on each chip, Up ×1 picked) and the SDI Direction grid (the game's SDI streaks). 8.0 s. |
-| `respawn-on.gif` | Respawn invincibility On: P1 walks off, is KO'd and respawns on the game's platform at the top. 6.9 s, step 2. |
+| `respawn-on.gif` | Respawn on platform On: P1 walks off, is KO'd and respawns on the game's platform at the top. 6.9 s, step 2. |
 | `respawn-off.gif` | Off (changed on the Saves page): the same KO, and P1 drops back in at once. 5.6 s, step 2. |
 | `cpu-kirby-hat.gif` | P1's Special + R3 gives the CPU Kirby a hat (Mario's), with the "CPU Kirby Hats" notice. 4.2 s. |
 | `p1-kirby-hat.gif` | P1's own Special + L3 hat chord, with the "Kirby Hats" notice. 4.1 s. |

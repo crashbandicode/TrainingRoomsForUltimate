@@ -509,6 +509,25 @@ fn state01_param_overrides() {
 }
 
 #[test]
+fn respawn_on_reaches_state_get_param_int() {
+    // Site: WorkModule::get_param_int at STATE_GET_PARAM_INT_OFFSET, hooked as
+    // state_get_param_int_hook in src/runtime/features/states.rs. That hook calls
+    // hooks::param_override. On leaves the game's rebirth frames (the platform path and
+    // invincibility). Off forces the instant values.
+    let src = include_str!("../src/runtime/features/states.rs");
+    let start = src.find("fn state_get_param_int_hook").expect("state_get_param_int_hook");
+    let window = &src[start.saturating_sub(120)..start + 700];
+    assert!(window.contains("STATE_GET_PARAM_INT_OFFSET"), "{window}");
+    assert!(window.contains("hooks::param_override"), "{window}");
+    let off = settings();
+    let on = StateSettings { respawn_invincibility: true, ..settings() };
+    assert_eq!(hooks::param_override(DeathParam::RebirthMoveFrame, &off, false, true), Some(0));
+    assert_eq!(hooks::param_override(DeathParam::RebirthInvincibleFrame, &off, false, true), Some(0));
+    assert_eq!(hooks::param_override(DeathParam::RebirthMoveFrame, &on, false, true), None, "On keeps the game's platform path");
+    assert_eq!(hooks::param_override(DeathParam::RebirthInvincibleFrame, &on, false, true), None, "On keeps the game's invincibility");
+}
+
+#[test]
 fn state01_respawn_on_overrides_only_while_loading() {
     let on = StateSettings { respawn_invincibility: true, ..settings() };
     for param in [

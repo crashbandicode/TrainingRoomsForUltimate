@@ -724,6 +724,25 @@ fn respawn_invincibility_is_greyed_while_auto_load_is_on() {
 }
 
 #[test]
+fn the_respawn_row_says_platform_or_instant() {
+    let row = ROWS.iter().find(|r| r.id == "respawn_invincibility").expect("row");
+    assert_eq!(row.title, "Respawn on platform");
+    let (first, second) = row.help_lines();
+    assert!(first.contains("revival platform"), "{first}");
+    assert!(first.contains("invincibility"), "{first}");
+    assert!(second.contains("instantly"), "{second}");
+    assert!(second.contains("Auto-load on death"), "{second}");
+    assert!(first.len() <= 80 && second.len() <= 80, "{first} / {second}");
+}
+
+#[test]
+fn respawn_setting_id_is_unchanged() {
+    let row = ROWS.iter().find(|r| r.title == "Respawn on platform").expect("row");
+    assert_eq!(row.id, "respawn_invincibility");
+    assert!(DEFS.iter().any(|def| def.id == "respawn_invincibility"));
+}
+
+#[test]
 fn swap_group_entries_grey_with_the_reason() {
     let mut m = menu();
     let r = goto(&mut m, "Swap groups");
