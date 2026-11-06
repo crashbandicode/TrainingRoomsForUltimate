@@ -1305,6 +1305,8 @@ inline where applicable".
   - This answers revision 4's question about conversions mixing fighters: they may.
 - **Revision 5** goes to Grok, with a Keep list. Open questions sit inline, next to the picture they concern.
 
+**Revision 5** is the same document, updated. Two tabs sit under the role toggle: Save states & Macros, and Combos & Conversions. CPU has only the first. The two sections scroll on their own. The pictures put them side by side, and one stacked picture keeps the Links panel as the other option. A focused row's links show as numbers and chips on the other column, and the remaining lines sit in a strip above the footer. Recorded on is plain information. A Pikachu macro practised on Palutena raises Switch / Keep, and Keep plays the inputs. The Recording page uses the same split. Q1–Q11 sit next to the pictures they concern. The link diagram, legend, icons, strips, conversion bar, and action screens stay.
+
 ### INTRO-ONCE · The Training intro notices — ordered (2026-11-05)
 
 **Operator 2026-11-05 ~21:3xZ:** "please disable the intro tutorial messages when we enter training. they should only

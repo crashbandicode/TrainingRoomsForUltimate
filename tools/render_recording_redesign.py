@@ -2158,6 +2158,384 @@ def action_screen4(bg, crumb, rows, help1, help2, values=None, keys=None):
     return img
 
 
+# =====================================================================================================================
+# Revision 5: two tabs under Player | CPU. Each tab is two sections, side by side, scrolling on their own.
+# The recorded fighter is information. Revision 4's drawing (icons, rows, hot outline) is reused.
+# =====================================================================================================================
+R5_TABS = (("saves", "Save states & Macros"), ("combos", "Combos & Conversions"))
+
+
+def r5_rows(typ, role, focus):
+    data = {"macro": M4, "combo": C4, "conv": V4, "save": S4}[typ]
+    out = []
+    for src in data:
+        r = dict(src)
+        if typ == "macro":
+            if role == "page":
+                r["active"] = r["key"] in (ACTIVE["player"], ACTIVE["cpu"])
+                r["tag"] = "P1" if r["key"] == ACTIVE["player"] else "CPU" if r["key"] == ACTIVE["cpu"] else None
+            else:
+                r["active"] = r["key"] == ACTIVE.get(role)
+        elif typ in ("combo", "conv"):
+            r["active"] = r["key"] == DRILL
+        else:
+            r["active"] = r["key"] == BOUND
+        r["cursor"] = r["key"] == focus
+        out.append(r)
+    return out
+
+
+def r5_marks(focus):
+    """Badges and link marks the other column draws for the focused row."""
+    order, link = {}, set()
+    if focus in MNAME:
+        m = MNAME[focus]
+        for s in S4:
+            if m["start"] and s["name"] == m["start"]:
+                link.add(s["key"])
+            if focus in s.get("chain", []):
+                order[s["key"]] = s["chain"].index(focus) + 1
+    elif any(c["key"] == focus for c in C4):
+        name = next(c["name"] for c in C4 if c["key"] == focus)
+        for v in V4:
+            if name in v["seq"]:
+                order[v["key"]] = v["seq"].index(name) + 1
+    elif any(v["key"] == focus for v in V4):
+        seq = next(v["seq"] for v in V4 if v["key"] == focus)
+        for c in C4:
+            if c["name"] in seq:
+                order[c["key"]] = seq.index(c["name"]) + 1
+    else:
+        s = next(x for x in S4 if x["key"] == focus)
+        for i, key in enumerate(s.get("chain", [])):
+            order[key] = i + 1
+        for m in M4:
+            if m["start"] and m["start"] == s["name"]:
+                link.add(m["key"])
+    return order, link
+
+
+def r5_section(title, typ, rows, width, loop=None, section_on=False, order=None, link=None):
+    """One section: header, hot outline, hairline, library. Returns the image and each row's top."""
+    order = order or {}
+    link = link or set()
+    row_h = 40
+    height = HEAD_H + 8 + row_h * len(rows) + 40
+    img = Image.new("RGBA", (width, height), WIN)
+    d = ImageDraw.Draw(img)
+    col = TYPES[typ][0]
+    d.rounded_rectangle((0, 2, width - 1, HEAD_H - 2), radius=5, fill=HEAD_FOCUS if section_on else HEAD_BG)
+    cy = HEAD_H / 2
+    d.rectangle((8, cy - 6, 20, cy + 6), fill=col)
+    ft = fnt(13, bold=True)
+    iv.text(d, (28, cy), title, ft, fill=ch.M_TEXT if section_on else ch.M_GROUP, anchor="lm")
+    iv.text(d, (28 + d.textlength(title, font=ft) + 8, cy), "(%d)" % len(rows), fnt(12), fill=DIM, anchor="lm")
+    if loop:
+        lx = width - 20
+        for label, mode in reversed(loop):
+            lx -= 26
+            loop4(img, lx, 5, mode, 24)
+            d = ImageDraw.Draw(img)
+            if label:
+                lx -= 4
+                iv.text(d, (lx, cy), label, fnt(11, bold=True), fill=ch.M_GROUP, anchor="rm")
+                lx -= d.textlength(label, font=fnt(11, bold=True)) + 8
+    y = HEAD_H + 2
+    pos = {}
+    hot = [r for r in rows if r.get("hot")]
+    first = y
+    for i, r in enumerate(rows):
+        if hot and i == len(hot):
+            d.line((8, y + 4, width - 8, y + 4), fill=ch.M_RULE, width=1)
+            y += 10
+        top, bot = y, y + row_h
+        r5_row(img, r, typ, top, bot, width, order.get(r["key"]), r["key"] in link)
+        d = ImageDraw.Draw(img)
+        pos[r["key"]] = top
+        y = bot
+        if hot and i == len(hot) - 1:
+            d.rounded_rectangle((2, first - 1, width - 3, bot + 1), radius=6, outline=GREEN, width=2)
+    return img.crop((0, 0, width, y + 4)), pos
+
+
+def r5_row(img, r, typ, top, bot, width, order_n, link_mark):
+    d = ImageDraw.Draw(img)
+    box = (4, top + 1, width - 5, bot - 1)
+    if r.get("active"):
+        d.rectangle(box, fill=GREEN_ROW)
+    elif r.get("cursor"):
+        d.rectangle(box, fill=ch.M_FOCUS)
+    if r.get("cursor"):
+        d.rectangle(box, outline=WHITE, width=2)
+        d.rectangle((box[0], box[1], box[0] + 4, box[3]), fill=WHITE)
+    cy = (top + bot) / 2
+    name_y = top + 12
+    sub_y = top + 28
+    if r.get("pin"):
+        pin4(img, 8, name_y - 10, 18)
+        d = ImageDraw.Draw(img)
+    hot = r.get("hot")
+    ink = ch.M_TEXT if hot else ch.M_GROUP
+    muted = ch.M_GROUP if hot else DIM
+    iv.text(d, (30, name_y), r["name"], fnt(13), fill=ink, anchor="lm")
+    if r.get("tag"):
+        tx = 30 + d.textlength(r["name"], font=fnt(13)) + 6
+        ft = fnt(10, bold=True)
+        tw = d.textlength(r["tag"], font=ft) + 10
+        d.rounded_rectangle((tx, name_y - 8, tx + tw, name_y + 8), radius=8, fill=(196, 240, 214, 255))
+        iv.text(d, (tx + tw / 2, name_y), r["tag"], ft, fill=INK, anchor="mm")
+    right = width - 12
+    if order_n:
+        badge(d, right - 8, name_y, order_n, 9)
+        right -= 24
+    if typ == "macro":
+        iv.text(d, (30, sub_y), "Recorded on " + r["fighter"], fnt(11), fill=muted, anchor="lm")
+        if r.get("start"):
+            iv.text(d, (right - 22, sub_y), r["start"], fnt(11), fill=muted, anchor="rm")
+            icon(img, "link", right - 18, sub_y - 8, 16, TYPES["save"][0] if hot or link_mark else DIM)
+    elif typ == "save":
+        if r.get("chain"):
+            icon(img, "format_list_numbered", right - 58, name_y - 8, 16, ch.M_TEXT if hot else DIM)
+            d = ImageDraw.Draw(img)
+            on = r.get("chain_on")
+            iv.text(d, (right, name_y), "%d %s" % (len(r["chain"]), "On" if on else "Off"), fnt(12, bold=True),
+                    fill=GREEN if on else DIM, anchor="rm")
+        else:
+            iv.text(d, (right, name_y), "—", fnt(12), fill=DIM, anchor="rm")
+        iv.text(d, (30, sub_y), r["fighters"], fnt(11), fill=muted, anchor="lm")
+        if link_mark:
+            iv.text(d, (right, sub_y), "start save", fnt(11), fill=TYPES["save"][0], anchor="rm")
+            icon(img, "link", right - 78, sub_y - 8, 16, TYPES["save"][0])
+    elif typ == "combo":
+        iv.text(d, (30, sub_y), "Recorded on " + r["fighters"], fnt(11), fill=muted, anchor="lm")
+    elif typ == "conv" and not order_n:
+        iv.text(d, (30, sub_y), " → ".join(r["seq"]), fnt(11), fill=muted, anchor="lm")
+
+
+def r5_paste(img, section, box, scroll):
+    x0, y0, x1, y1 = box
+    view = y1 - y0
+    scroll = max(0, min(int(scroll), max(0, section.height - view)))
+    img.alpha_composite(section.crop((0, scroll, section.width, min(section.height, scroll + view))), (x0, y0))
+    if section.height > view:
+        d = ImageDraw.Draw(img)
+        d.rounded_rectangle((x1 - 6, y0 + 2, x1 - 2, y1 - 2), radius=2, fill=(40, 43, 52, 255))
+        th = max(18, view * view / section.height)
+        span = section.height - view
+        ty = y0 + 2 + (view - 4 - th) * scroll / span
+        d.rounded_rectangle((x1 - 6, ty, x1 - 2, ty + th), radius=2, fill=(150, 156, 170, 255))
+    return scroll
+
+
+def r5_tabs(d, x, y, tab, role):
+    """The two tabs. CPU draws only Save states & Macros: no greyed second tab and no text."""
+    labels = R5_TABS if role != "cpu" else R5_TABS[:1]
+    for key, label in labels:
+        f = fnt(14, bold=True)
+        w = d.textlength(label, font=f) + 28
+        on = key == tab
+        if on:
+            d.rounded_rectangle((x, y, x + w, y + 28), radius=5, fill=ch.M_FOCUS, outline=GREEN, width=2)
+        else:
+            d.rounded_rectangle((x, y, x + w, y + 28), radius=5, outline=ch.M_RULE, width=1)
+        iv.text(d, (x + 14, y + 14), label, f, fill=ch.M_TEXT if on else ch.M_GROUP, anchor="lm")
+        x += w + 10
+    return x
+
+
+def r5_details(img, box, lines):
+    d = ImageDraw.Draw(img)
+    x0, y0, x1, y1 = box
+    d.rounded_rectangle((x0, y0, x1, y1), radius=6, fill=(22, 24, 30, 255), outline=ch.M_RULE, width=1)
+    y = y0 + 8
+    for line in lines:
+        iv.text(d, (x0 + 12, y), line, fnt(13), fill=ch.M_TEXT, anchor="lm")
+        y += 18
+
+
+def r5_detail_lines(focus, role):
+    if focus in MNAME:
+        m = MNAME[focus]
+        chains = ["%s as %d" % (s["name"], s["chain"].index(focus) + 1) for s in S4 if focus in s.get("chain", [])]
+        start = m["start"] or "no start save"
+        played = ", ".join(chains) if chains else "no chain"
+        who = m["fighter"] + (" · CPU" if m["role"] == "CPU" else "")
+        return ["Recorded on %s · %s. Information only." % (who, m["length"]),
+                "Starts from %s. Played by %s." % (start, played)]
+    if any(c["key"] == focus for c in C4):
+        c = next(x for x in C4 if x["key"] == focus)
+        convs = ["%s #%d" % (v["name"], v["seq"].index(c["name"]) + 1) for v in V4 if c["name"] in v["seq"]]
+        made = "from %s" % c["src"] if c.get("src") else "not made from a macro"
+        return ["Recorded on %s · %s · %s." % (c["fighters"], c["links"], made),
+                "In conversions: %s." % (", ".join(convs) if convs else "none")]
+    if any(v["key"] == focus for v in V4):
+        v = next(x for x in V4 if x["key"] == focus)
+        seq = " → ".join("%d %s" % (i + 1, n) for i, n in enumerate(v["seq"]))
+        drill = "The one drill." if focus == DRILL else "Not the drill."
+        return ["Contains %s." % seq, "Streak 4 · best 9. %s" % drill]
+    s = next(x for x in S4 if x["key"] == focus)
+    if s.get("chain") and s.get("chain_on"):
+        names = " · ".join("%d %s" % (i + 1, MNAME[k]["name"]) for i, k in enumerate(s["chain"]))
+        bound = "yes" if focus == BOUND else "no"
+        return ["Chain On. Plays %s." % names, "Loop ∞, the whole chain. Bound to Save / Load: %s." % bound]
+    if s.get("chain"):
+        return ["Chain Off. Load only restores. The numbers stay.", "No loop on a chain that is Off."]
+    return ["No chain. Load only restores.", "Bound to Save / Load: %s." % ("yes" if focus == BOUND else "no")]
+
+
+def r5_pair(role, tab):
+    """(left typ, right typ) for a tab. CPU has only the saves tab."""
+    if role == "cpu" or tab == "saves":
+        return ("save", "macro")
+    return ("conv", "combo")
+
+
+def r5_loop_for(typ, role):
+    if typ != "macro":
+        return None
+    if role == "page":
+        return [("P1", LOOP["player"]), ("CPU", LOOP["cpu"])]
+    return [("", LOOP[role])]
+
+
+def r5_columns(role, tab, focus, width=470):
+    left_t, right_t = r5_pair(role, tab)
+    order, link = r5_marks(focus)
+    sections = {}
+    positions = {}
+    for typ in (left_t, right_t):
+        title = {"save": "SAVE STATES", "macro": "MACROS", "conv": "CONVERSIONS", "combo": "COMBOS"}[typ]
+        img, pos = r5_section(title, typ, r5_rows(typ, role, focus), width, r5_loop_for(typ, role),
+                              section_on=any(r["cursor"] for r in r5_rows(typ, role, focus)),
+                              order=order, link=link)
+        sections[typ] = img
+        positions[typ] = pos
+    return left_t, right_t, sections, positions
+
+
+def r5_foot(typ, role="player"):
+    common = [("Left/Right", "section"), ("L/R", "role"), ("ZL+Up/Down", "page"), ("B", "close")]
+    if role != "cpu":
+        common.insert(1, ("ZL/ZR", "tab"))
+    if typ == "macro":
+        return [("A", "set active"), ("Y", "PIN"), ("X", "loop")] + common
+    if typ == "save":
+        return [("A", "bind"), ("Y", "PIN"), ("+", "edit chain")] + common
+    return [("A", "drill"), ("Y", "PIN")] + common
+
+
+def popup5(game, role, tab, focus, scrolls=(0, 0), view_bottom=500):
+    img = hide_notice4(game.copy())
+    d = ImageDraw.Draw(img)
+    frame = (POP[0], POP[1], POP[2], view_bottom + 118)
+    d.rounded_rectangle(frame, radius=12, fill=WIN, outline=(86, 92, 108, 255), width=2)
+    iv.text(d, (152, 98), "Recording", fnt(18, bold=True), fill=ch.M_TEXT, anchor="lm")
+    role_toggle(d, 820, 82, "cpu" if role == "cpu" else "player", 15)
+    r5_tabs(d, 152, 122, "saves" if role == "cpu" else tab, role)
+    left_t, right_t, sections, _pos = r5_columns(role, tab, focus, 470)
+    boxes = ((148, 158, 618, view_bottom), (640, 158, 1110, view_bottom))
+    for typ, box, scroll in ((left_t, boxes[0], scrolls[0]), (right_t, boxes[1], scrolls[1])):
+        r5_paste(img, sections[typ], box, scroll)
+    d = ImageDraw.Draw(img)
+    d.line((628, 164, 628, view_bottom), fill=ch.M_DIVIDER, width=2)
+    r5_details(img, (148, view_bottom + 12, 1110, view_bottom + 68),
+              r5_detail_lines(focus, role if role != "page" else "player"))
+    d.line((144, view_bottom + 76, 1136, view_bottom + 76), fill=ch.M_RULE, width=1)
+    focus_typ = left_t if focus in {r["key"] for r in r5_rows(left_t, role, focus) if r["cursor"]} else right_t
+    keys_line(img, 152, view_bottom + 90, r5_foot(focus_typ, role), 13)
+    return img
+
+
+def popup5_stacked(game):
+    """B. The two sections of one tab, stacked, with revision 4's Links panel kept."""
+    img = hide_notice4(game.copy())
+    d = ImageDraw.Draw(img)
+    d.rounded_rectangle(POP, radius=12, fill=WIN, outline=(86, 92, 108, 255), width=2)
+    iv.text(d, (152, 98), "Recording", fnt(18, bold=True), fill=ch.M_TEXT, anchor="lm")
+    role_toggle(d, 820, 82, "player", 15)
+    r5_tabs(d, 152, 122, "saves", "player")
+    _left, _right, sections, _pos = r5_columns("player", "saves", "pressure", 540)
+    r5_paste(img, sections["save"], (148, 158, 700, 360), 0)
+    r5_paste(img, sections["macro"], (148, 368, 700, 560), 0)
+    d = ImageDraw.Draw(img)
+    d.line((716, 158, 716, 560), fill=ch.M_DIVIDER, width=2)
+    links_panel(img, (732, 164, 1130, 548), links_spec("pressure", "player"))
+    d = ImageDraw.Draw(img)
+    d.line((144, 604, 1136, 604), fill=ch.M_RULE, width=1)
+    keys_line(img, 152, 624, r5_foot("save"), 13)
+    return img
+
+
+def prompt5(game):
+    img = hide_notice4(game.copy())
+    d = ImageDraw.Draw(img)
+    d.rounded_rectangle((300, 150, 980, 430), radius=12, fill=(250, 250, 252, 242), outline=GOLD, width=3)
+    iv.text(d, (330, 176), "Nair loop was recorded on Pikachu", fnt(20, bold=True), fill=INK, anchor="lm")
+    iv.text(d, (330, 214), "You are playing Palutena. The recording is the inputs.", fnt(16), fill=(40, 46, 58, 255), anchor="lm")
+    iv.text(d, (330, 246), "Keep plays those inputs on Palutena.", fnt(16), fill=(40, 46, 58, 255), anchor="lm")
+    d.rounded_rectangle((330, 300, 520, 352), radius=8, fill=(230, 232, 238, 255), outline=(120, 126, 140, 255), width=2)
+    iv.text(d, (425, 326), "Switch", fnt(18, bold=True), fill=INK, anchor="mm")
+    d.rounded_rectangle((550, 300, 760, 352), radius=8, fill=GREEN, outline=GREEN, width=2)
+    iv.text(d, (655, 326), "Keep", fnt(18, bold=True), fill=INK, anchor="mm")
+    iv.text(d, (330, 378), "Asked once for the whole chain. Nothing is hidden or refused.", fnt(14),
+            fill=(70, 76, 88, 255), anchor="lm")
+    return img
+
+
+def page5(menu, selected, tab, focus, help1, help2):
+    img = menu.copy()
+    d = ImageDraw.Draw(img)
+    ch.clear_content(d)
+    groups = [("Save states & Macros", len(S4) + len(M4)),
+              ("Combos & Conversions", len(C4) + len(V4)),
+              ("Replays", 2), ("Options", 5)]
+    for i, (name, count) in enumerate(groups):
+        y = ch.ROW_Y0 + i * ch.GROUP_STEP
+        if i == selected:
+            d.rectangle((33, y - 18, 307, y + 18), fill=ch.M_FOCUS)
+        iv.text(d, (44, y), "%s  (%d)" % (name, count), fnt(14),
+                fill=ch.M_TEXT if i == selected else ch.M_GROUP, anchor="lm")
+    left_t, right_t, sections, _pos = r5_columns("page", tab, focus, 448)
+    r5_paste(img, sections[left_t], (328, 128, 776, 548), 0)
+    r5_paste(img, sections[right_t], (788, 128, 1236, 548), 0)
+    d = ImageDraw.Draw(img)
+    d.line((776, 132, 776, 520), fill=ch.M_DIVIDER, width=2)
+    ch.help_lines(d, help1, help2)
+    d.rectangle((44, 660, 1246, 698), fill=ch.M_PANEL)
+    focus_typ = left_t if any(r["key"] == focus for r in r5_rows(left_t, "page", focus)) else right_t
+    # On the menu page, L/R still change the page. The tab button is ZL/ZR, inside this page.
+    foot = [p for p in r5_foot(focus_typ) if p[0] != "L/R"]
+    foot.insert(-2, ("L/R", "page"))
+    keys_line(img, 53, 678, foot, 13)
+    return img
+
+
+def main_r5(menu, game):
+    P = "RECORDING-REDESIGN-r5-"
+    save(popup5(game, "player", "saves", "pressure"), P + "popup-save")
+    # Macros scrolled to the library; saves stay at the top.
+    macro_img, macro_pos = r5_section(
+        "MACROS", "macro", r5_rows("macro", "player", "pressure"), 470, r5_loop_for("macro", "player"),
+        section_on=False, order=r5_marks("pressure")[0], link=r5_marks("pressure")[1])
+    library_top = macro_pos["macro6"]
+    save(popup5(game, "player", "saves", "pressure", scrolls=(0, library_top - 4), view_bottom=340),
+         P + "popup-scrolled")
+    save(popup5(game, "player", "saves", "nair"), P + "popup-macro")
+    save(popup5(game, "player", "combos", "corner"), P + "popup-conversion")
+    save(popup5(game, "player", "combos", "nairc"), P + "popup-combo")
+    save(popup5(game, "cpu", "saves", "cputhrow"), P + "popup-cpu")
+    save(popup5_stacked(game), P + "popup-stacked")
+    save(prompt5(game), P + "switch-keep")
+    save(page5(menu, 0, "saves", "pressure",
+               "Save states on the left, macros on the right. Each list scrolls on its own.",
+               "Corner pressure is bound. Its chain numbers the macros in the other column."),
+         P + "page-saves-macros")
+    save(page5(menu, 1, "combos", "corner",
+               "Conversions on the left, combos on the right. Corner to kill numbers its combos.",
+               "Ryu and Pikachu in one conversion is allowed. Recorded on is information."),
+         P + "page-combos")
+
+
 def main():
     menu = iv.background(MENU)
     game = iv.background(GAME)
@@ -2215,6 +2593,7 @@ def main():
     ], "Drill makes this the one drill and clears a drilled conversion.",
         "Made from names the macro it came from. Crop asks for the first and last link and saves a copy.",
         {"Made from": ("Nair loop", "text")}), P + "combo-actions")
+    main_r5(menu, game)
 
 
 if __name__ == "__main__":
