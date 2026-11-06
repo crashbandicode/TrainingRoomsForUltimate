@@ -7,7 +7,7 @@
 use crate::engine::seams::native_fields;
 
 unsafe fn animation_flag(hud: usize, owner: u32) -> Option<usize> {
-    if owner > 1 || !native_fields::object(hud) {
+    if owner > 3 || !native_fields::object(hud) {
         return None;
     }
     // The native owner-to-presentation mapping is independent of fighter kind.

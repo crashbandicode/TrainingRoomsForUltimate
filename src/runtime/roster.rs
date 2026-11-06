@@ -17,6 +17,8 @@ pub(crate) mod character_lifecycle;
 // entries: packages 2-4 hook those themselves). `heap_fields` (the fork's install-line field) is not carried: package 1's install
 // line owns `heap_allocations=`. `heap_metrics` is the diag meter's reader (the byte meter of package 1's allocator).
 pub(crate) mod character_roster;
+/// F9: the hold between a CPU-count change and the Reload that follows the activation frame.
+pub(crate) mod f9_gate;
 pub(crate) mod cycle_preload;
 pub(crate) mod cycle_preload_config;
 #[cfg(feature = "hang-trace")]

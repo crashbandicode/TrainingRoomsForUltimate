@@ -147,7 +147,7 @@ pub mod panes;
 pub mod version;
 #[path = "model/thread_stacks.rs"]
 pub mod thread_stacks;
-/// F9: Training's parked CPU entries and the roster cycle's helper sources (the give-back decision).
+/// F9: Training's parked CPU entries. A count change publishes a ready body and queues a later Reload.
 #[path = "model/parked_entries.rs"]
 pub mod parked_entries;
 /// F11: the running cell of a fighter entry's window (the game's active-cell index).

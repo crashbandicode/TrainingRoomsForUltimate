@@ -89,7 +89,9 @@ pub fn player_qualifying(
     automatic: bool,
     capture: bool,
 ) -> bool {
-    native_training && cpu_quantity == Some(1) && (automatic || capture)
+    // Same admission as `parked_entries::training_quantity_open`. This file is also compiled by path,
+    // where that module is not in scope.
+    native_training && matches!(cpu_quantity, Some(1..=3)) && (automatic || capture)
 }
 
 /// Until capture succeeds, consume Mii-related input without creating a request.
@@ -203,7 +205,9 @@ mod tests {
         };
         assert!(mixed_player(true, Some(1), init.pending(), false));
         assert!(!mixed_player(false, Some(1), init.pending(), false)); // Waiting scope.
-        assert!(!mixed_player(true, Some(2), init.pending(), false)); // Unsupported quantity.
+        assert!(mixed_player(true, Some(2), init.pending(), false));
+        assert!(mixed_player(true, Some(3), init.pending(), false));
+        assert!(!mixed_player(true, Some(4), init.pending(), false)); // Outside 1..=3.
         assert!(!mixed_player(true, None, init.pending(), true)); // Unknown native quantity.
         assert_eq!(init.observe(FIRST, 0, true), Some(FIRST));
         assert!(init.finish(FIRST, FIRST, true));

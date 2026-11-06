@@ -362,7 +362,7 @@ unsafe fn continue_saved_service(entry: *mut u8, owner: u32, i: usize) -> bool {
         }
     }
     if unified(i) || !permitted(i)
-        || native_source::training_cpu_quantity() != Some(1)
+        || !crate::model::parked_entries::training_quantity_open(native_source::training_cpu_quantity())
         || STATES.iter().any(|state| {
             let s = state.lock();
             s.active.is_some() || s.pending.is_some()

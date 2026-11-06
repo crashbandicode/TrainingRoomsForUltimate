@@ -496,6 +496,10 @@ pub unsafe fn on_frame(body: &mut smash::app::BattleObjectModuleAccessor) {
     // Keep physical seat identity before fighter_cache, bank filtering and the
     // hat-priority merge. Exact Mii payload and PT/Pyra member order matter.
     let cpu_rotation = crate::runtime::roster::character_roster::preload_targets(&menu, 1);
+    crate::runtime::roster::f9_gate::set_fixed_members(
+        cpu_rotation.iter().flatten().next().map(|target| target.kind),
+        cpu_rotation.iter().flatten().nth(1).map(|target| target.kind),
+    );
     let mut lanes = [[None; MAX_TARGETS]; 4];
     if settings.hats {
         lanes[0] = crate::runtime::roster::kirby_hats::preload_targets(&menu, 0);

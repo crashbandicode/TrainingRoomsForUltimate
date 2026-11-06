@@ -1013,7 +1013,8 @@ pub(crate) unsafe fn mii_saved_cpu_visible_ready(entry: *const u8, owner: u32, k
 /// Called before G lock; the current probe may already own INSTALL, never a roster replacement.
 #[cfg(feature="mii-saved-alpha")]
 pub(crate) unsafe fn mii_cpu_probe_roster_idle() -> bool {
-    native_source::training_cpu_quantity() == Some(1)
+    crate::model::parked_entries::training_quantity_open(native_source::training_cpu_quantity())
+        && !crate::runtime::roster::f9_gate::handover_pending()
         && STATES.iter().all(|state| {
             let state = state.lock();
             state.active.is_none() && state.pending.is_none() && state.loaded.is_none()
@@ -1701,7 +1702,7 @@ unsafe fn refresh_hud(entry: *const u8, owner: u32, kind: u32) {
     let role = if owner == 0 { Role::Player } else { Role::Cpu };
     let current_scope = scope(role);
     let waiting_cpu = owner == 4 && current_scope.is_some_and(|s| s.owner == owner);
-    let ordinary = owner <= 1 && current_scope.is_some_and(|s| s.mode == 0x04040000);
+    let ordinary = owner <= 3 && current_scope.is_some_and(|s| s.mode == 0x04040000);
     if !ordinary && !waiting_cpu {
         trace!(
             "[CharacterRoster] HUD skipped: owner={} scope={:?} game={:?}",

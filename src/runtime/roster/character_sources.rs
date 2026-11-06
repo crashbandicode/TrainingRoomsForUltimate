@@ -527,6 +527,35 @@ fn purpose_view(state:&State,slot:usize,targets:[Option<Want>;crate::runtime::ro
     use crate::engine::preload::hat_slots::{borrow_admitted,slot_view,Purpose,SlotFacts,BORROW_ENTRY};
     let training=unsafe{crate::runtime::compat::common::is_native_training_mode()};
     let record=if training {ENTRY3_BORROW.lock().current().filter(|b|state.book.is_current(b.epoch))} else {None};
+    // F9: a queued Reload owns entries 2 and 3. A live CPU is not a helper seat. A parked seat
+    // loads the CPU rotation's member, not whatever fighter the merged plan lists first.
+    if training {
+        if let Some(kind) = crate::runtime::roster::f9_gate::override_kind(slot as u32) {
+            let want = targets.iter().flatten().copied().find(|want| want.kind == kind).unwrap_or(Want {
+                epoch: state.book.epoch(),
+                kind,
+                configuration: None,
+                #[cfg(feature = "mii-hud-portrait-alpha")]
+                avoid: 0,
+            });
+            let mut only = [None; crate::runtime::roster::cycle_preload::MAX_TARGETS];
+            only[0] = Some(want);
+            return only;
+        }
+        let quantity = unsafe { native_source::training_cpu_quantity() };
+        if matches!(slot, 2 | 3) && quantity.is_some_and(|count| slot as u32 <= count) {
+            return [None; crate::runtime::roster::cycle_preload::MAX_TARGETS];
+        }
+        if matches!(slot, 2 | 3) && record.is_none() {
+            if let Some(kind) = crate::runtime::roster::f9_gate::fixed_member(slot as u32) {
+                if let Some(want) = targets.iter().flatten().copied().find(|want| want.kind == kind && want.configuration.is_none()) {
+                    let mut only = [None; crate::runtime::roster::cycle_preload::MAX_TARGETS];
+                    only[0] = Some(want);
+                    return only;
+                }
+            }
+        }
+    }
     let borrowed=record.and_then(|b|targets.iter().flatten().copied().find(|w|w.kind==b.kind&&w.configuration.is_none()));
     if slot==BORROW_ENTRY && record.is_some() && borrowed.is_none() {return [None;crate::runtime::roster::cycle_preload::MAX_TARGETS];}
     let plan=std::array::from_fn(|i|targets[i].map(|w|(w,state.preload_purpose[i].unwrap_or(Purpose::Fighter))));
@@ -716,10 +745,10 @@ unsafe fn qualified_backend() -> Result<Backend, &'static str> {
         return Err("Character resource loading is not available in this scene yet");
     }
     if crate::runtime::compat::common::is_native_training_mode() {
-        return if native_source::training_cpu_quantity() == Some(1) {
+        return if crate::model::parked_entries::training_quantity_open(native_source::training_cpu_quantity()) {
             Ok(Backend::Training)
         } else {
-            Err("Character resources currently need one visible CPU")
+            Err("Character resource loading is not available in this scene yet")
         };
     }
     waiting_backend().ok_or("Character resource loading is not available in this scene yet")
@@ -1256,9 +1285,154 @@ unsafe fn consumer_alive(consumer: Consumer, hats: &mut [HatObservation; 2]) -> 
     }
 }
 
+fn f9_hat_release(how: crate::model::parked_entries::Release) -> crate::engine::preload::hat_slots::Release {
+    match how {
+        crate::model::parked_entries::Release::Retired => crate::engine::preload::hat_slots::Release::Retired,
+        crate::model::parked_entries::Release::Promoted => crate::engine::preload::hat_slots::Release::Promoted,
+    }
+}
+
+/// HUD publication and a Promoted release. Not a Reload.
+unsafe fn f9_publish(decision: crate::model::parked_entries::Decision) {
+    for publish in decision.publish.into_iter().flatten() {
+        if let Some(entry) = native_source::entry(publish.owner) {
+            super::refresh_hud(entry, publish.owner, publish.kind);
+        }
+    }
+    #[cfg(feature = "managed-third-source-alpha")]
+    if let Some(how) = decision.release_now {
+        let _ = ENTRY3_BORROW.lock().release(f9_hat_release(how));
+    }
+}
+
+fn f9_thrown(slot: u32) -> Option<u32> {
+    let state = STATE.lock();
+    state.leases.iter().flatten().find_map(|live| {
+        if live.source.slot() as u32 != slot {
+            return None;
+        }
+        match live.consumer {
+            Consumer::Item { body, .. } => Some(body),
+            _ => None,
+        }
+    })
+}
+
+/// The parked body on `slot`, or empty when the entry is not readable.
+unsafe fn f9_body(slot: u32) -> crate::model::parked_entries::Body {
+    match native_source::entry(slot) {
+        Some(entry) => f9_body_of(entry, slot),
+        None => crate::model::parked_entries::Body::Empty,
+    }
+}
+
+/// `entry` is the fighter entry for `slot`, or null. Uses the same words as `parked_ready`.
+unsafe fn f9_body_of(entry: *const u8, slot: u32) -> crate::model::parked_entries::Body {
+    use crate::model::parked_entries::Body;
+    if !aligned(entry) {
+        return Body::Empty;
+    }
+    let body = read::<*const u8>(entry, 0x4160);
+    if !aligned(body) {
+        return if read::<u8>(entry, 0x591c) == 0 { Body::Empty } else { Body::Loading { id: None } };
+    }
+    let kind = read::<u32>(body, 0xc);
+    let id = read::<u32>(body, 8);
+    if native_source::parked_ready(entry, slot, kind) {
+        Body::Ready { id, kind }
+    } else {
+        Body::Loading { id: Some(id) }
+    }
+}
+
+/// One observation of No. of CPUs from the loader callback. The first change in a scene only
+/// records the count. A raise publishes when the pause menu is already closed, and always
+/// withholds a Reload of entry 2 or 3 until a later frame.
+unsafe fn f9_note() {
+    let quantity = native_source::training_cpu_quantity();
+    let seen = crate::runtime::roster::f9_gate::observe_quantity(quantity);
+    if !seen.changed || seen.previous.is_none() {
+        return;
+    }
+    let seats = match seen.fixed {
+        [Some(entry2), Some(entry3)] => Some(crate::model::parked_entries::Seats { entry2, entry3 }),
+        _ => None,
+    };
+    #[cfg(feature = "managed-third-source-alpha")]
+    let borrowed_kind = ENTRY3_BORROW.lock().current().map(|borrow| borrow.kind);
+    #[cfg(not(feature = "managed-third-source-alpha"))]
+    let borrowed_kind = None;
+    let kirby_has_copy = crate::runtime::compat::common::try_get_module_accessor(
+        crate::runtime::compat::common::consts::FighterId::Player,
+    )
+    .is_some_and(|body| WorkModule::is_flag(body, *FIGHTER_KIRBY_INSTANCE_WORK_ID_FLAG_COPY));
+    let facts = crate::model::parked_entries::CountFacts {
+        previous: seen.previous,
+        quantity,
+        borrowed_kind,
+        entry2: f9_body(2),
+        entry3: f9_body(3),
+        seats,
+        thrown_from_entry3: f9_thrown(3),
+        kirby_has_copy,
+    };
+    let decision = crate::model::parked_entries::on_count(facts);
+    let pause = crate::runtime::ui::state::PAUSE_ACTIVE.load(Ordering::Acquire);
+    crate::runtime::roster::f9_gate::begin_raise(decision, crate::runtime::roster::cycle_preload::frame(), pause);
+    if !pause {
+        f9_publish(decision);
+    }
+}
+
+unsafe fn f9_cutover(after: crate::model::parked_entries::After) {
+    let Some(cut) = after.cutover else { return };
+    if cut.clear_hat {
+        if let Some(body) = crate::runtime::compat::common::try_get_module_accessor(
+            crate::runtime::compat::common::consts::FighterId::Player,
+        ) {
+            if clear_hat_for_switch(body).is_ok() {
+                if let Some(kind) = cut.copy_kind {
+                    crate::runtime::state_natives::kirby_copy_setup(body as usize, after.slot as i32, kind as i32);
+                }
+            }
+        }
+    }
+    if let Some(id) = cut.item {
+        let manager = crate::runtime::state_natives::item_manager();
+        if manager != 0 {
+            crate::runtime::state_natives::item_remove(manager, id);
+        }
+    }
+}
+
+/// Player 1's frame, after the loader callbacks of the previous frame. Applies a paused raise's
+/// publication on the close, and arms the queued Reload only on a frame after that.
+unsafe fn f9_player_frame() {
+    let frame = crate::runtime::roster::cycle_preload::frame();
+    let pause = crate::runtime::ui::state::PAUSE_ACTIVE.load(Ordering::Acquire);
+    match crate::runtime::roster::f9_gate::poll(frame, pause) {
+        crate::runtime::roster::f9_gate::Step::Wait => {}
+        crate::runtime::roster::f9_gate::Step::Activate => f9_publish(crate::runtime::roster::f9_gate::decision()),
+        crate::runtime::roster::f9_gate::Step::Reload => {
+            for after in crate::runtime::roster::f9_gate::armed().into_iter().flatten() {
+                #[cfg(feature = "managed-third-source-alpha")]
+                if let Some(how) = after.release {
+                    let _ = ENTRY3_BORROW.lock().release(f9_hat_release(how));
+                }
+                f9_cutover(after);
+            }
+        }
+    }
+}
+
 /// Once on the current P1 frame, not once per helper or per fighter. Thrown
 /// items retain their lease until their actual native item object ends.
 pub unsafe fn on_frame(body: *mut app::BattleObjectModuleAccessor) {
+    if crate::runtime::compat::common::try_get_module_accessor(crate::runtime::compat::common::consts::FighterId::Player)
+        == Some(body)
+    {
+        f9_player_frame();
+    }
     if !HAS_CONSUMERS.load(Ordering::Acquire) { return; }
     if crate::runtime::compat::common::try_get_module_accessor(crate::runtime::compat::common::consts::FighterId::Player)
         != Some(body) { return; }
@@ -1281,6 +1455,7 @@ pub unsafe fn on_frame(body: *mut app::BattleObjectModuleAccessor) {
 }
 
 pub fn scene_changed() {
+    crate::runtime::roster::f9_gate::reset();
     #[cfg(feature="mii-managed-helper-alpha")]
     super::mii_managed_helper::depart();
     // LOG-REFUSED: refusal lines are bounded per scene.
@@ -1990,7 +2165,14 @@ pub unsafe fn service(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) {
     } else {
         None
     };
+    f9_note();
+    if let crate::model::parked_entries::Body::Ready { kind, .. } = f9_body_of(entry, slot) {
+        crate::runtime::roster::f9_gate::clear_armed_if(slot, kind);
+    }
     if service_owned(ctx, entry, slot) {
+        return;
+    }
+    if crate::runtime::roster::f9_gate::block_new_load(slot) {
         return;
     }
     // Ordinary demand can require additional capacity before the idle return.
