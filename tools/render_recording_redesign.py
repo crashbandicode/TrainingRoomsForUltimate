@@ -1427,7 +1427,8 @@ def flow_record(game):
         "branches": [{"label": "starts from", "out": True, "nodes": [("save", "Macro 7 · start", None, None, True)],
                       "none": ""}],
         "lines": []}, header=False)
-    sg = group_only("player", "save", None)
+    # Corner pressure has no chain yet: strip 2 makes it.
+    sg = group_only("player", "save", None, overrides={"pressure": {"chain": [], "chain_on": False}})
     srows = sg["sections"][0][2]
     # The most recently used save, so it is first in the hot five (the rest is below this view).
     new_save = dict(key="m7start", name="Macro 7 · start", fighters="Pikachu · Mario", chain=[], hot=True, new=True,
@@ -1442,9 +1443,14 @@ def flow_chain():
                        "while Chain is On.")
     b = strip_panel(img, 0, "Focus a save, press +", "In the pop-up, Corner pressure is the bound save (green) and the "
                     "cursor. + opens Edit chain.")
-    g = group_only("player", "save", "pressure", overrides={"pressure": {"chain": [], "chain_on": False}},
-                   keep={"pressure", "platform", "nairstart", "dashstart", "throwstart"})
-    frag_list(img, (b[0], b[1], b[2], b[3] - 56), [g], "pressure")
+    # The saves as strip 1 left them: eight files, Macro 7 · start the most recent, so CPU throw · start has left
+    # the hot five. Corner pressure has no chain yet.
+    srows = group_only("player", "save", "pressure",
+                       overrides={"pressure": {"chain": [], "chain_on": False}})["sections"][0][2]
+    m7start = dict(key="m7start", name="Macro 7 · start", fighters="Pikachu · Mario", chain=[], hot=True,
+                   active=False, cursor=False)
+    rows = [m7start] + [dict(r, hot=i < 4) for i, r in enumerate(srows)]
+    frag_list(img, (b[0], b[1], b[2], b[3] - 56), [section_group("SAVE STATES", "save", rows)], "pressure")
     foot = r5_foot("save", "cpu")
     keys_line(img, b[0], b[3] - 36, foot[:3], 13)
     keys_line(img, b[0], b[3] - 14, foot[3:], 13)
@@ -1458,7 +1464,7 @@ def flow_chain():
         {"name": "CPU throw", "sub": "Recorded on Mario", "number": 3, "cursor": True},
         {"name": "Macro 6", "sub": "Recorded on Lucina"},
         {"name": "Replay 86f", "sub": "Recorded on Pikachu"},
-        {"name": "Slot 2", "sub": "Recorded on Steve"},
+        {"name": "Macro 7", "sub": "Recorded on Pikachu"},
     ], [("A", "add number"), ("R", "remove"), ("B", "done")])
 
     b = strip_panel(img, 2, "Linked", "Back in the list the row reads 3 On. The Links panel shows 1 → 2 → 3. "
@@ -1547,9 +1553,10 @@ def flow_make_combo(game):
 def flow_drill(game, bar_picture):
     img = strip_canvas(5, "Drill a conversion", "One drill at a time: drilling a conversion replaces a drilled combo.")
     b = strip_panel(img, 0, "Pick it", "In the pop-up, the cursor on Corner to kill. A drills it.")
-    # The pop-up's stacked tab: CONVERSIONS on top with the cursor on Corner to kill (not yet green), COMBOS below
-    # with the current drill, Nair loop combo, green. Each section scrolls on its own.
-    convs, combos = tab_rows("corner", "nairc")
+    # The pop-up's stacked tab, as strip 4 left it: CONVERSIONS on top, Corner to kill (the newest) first with the
+    # cursor, not yet green; COMBOS below, Nair loop combo first and Ryu BnB, the current drill, green.
+    convs, combos = tab_rows("corner", "ryu")
+    combos = [r for r in combos if r["key"] == "nairc"] + [r for r in combos if r["key"] != "nairc"]
     frag_list(img, (b[0], b[1], b[2], b[1] + 102), [section_group("CONVERSIONS", "conv", convs)], "corner",
               cols=FRAG_STACK)
     frag_list(img, (b[0], b[1] + 110, b[2], b[1] + 212), [section_group("COMBOS", "combo", combos)], cols=FRAG_STACK)
@@ -1557,11 +1564,11 @@ def flow_drill(game, bar_picture):
     keys_line(img, b[0], b[3] - 36, foot[:3], 13)
     keys_line(img, b[0], b[3] - 14, foot[3:], 13)
 
-    b = strip_panel(img, 1, "It is the drill", "The row turns green, and Nair loop combo is no longer the drill. Its "
-                    "Links panel lists the combos in order, with the conversion's streak and best.")
+    b = strip_panel(img, 1, "It is the drill", "The row turns green, and Ryu BnB is no longer the drill. Its Links "
+                    "panel lists the combos in order, with the conversion's streak and best.")
     convs, combos = tab_rows("corner", "corner")
     one_row(img, b[0], b[1] - 4, b[2] - b[0], [r for r in convs if r["key"] == "corner"][0], "conv")
-    one_row(img, b[0], b[1] + 27, b[2] - b[0], [r for r in combos if r["key"] == "nairc"][0], "combo")
+    one_row(img, b[0], b[1] + 27, b[2] - b[0], [r for r in combos if r["key"] == "ryu"][0], "combo")
     # The Links panel as in the pop-up, with its streak and its Drilled line; the two rows above sit close to fit it.
     links_panel(img, (b[0], b[1] + 64, b[2], b[3]), links_spec("corner"), header=False)
 
