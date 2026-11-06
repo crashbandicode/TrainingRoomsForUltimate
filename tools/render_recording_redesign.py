@@ -1017,9 +1017,11 @@ M4 = [
          hot=True, pin=True),
     dict(key="cputhrow", name="CPU throw", fighter="Mario", role="CPU", length="1.8 s", start="CPU throw · start",
          hot=True, pin=True),
+    # After the pins, newest first. Macro 6 has a start save, so Record made it after the 2026-11-05 migration; the
+    # migrated slots are the oldest files and sit under the hairline.
+    dict(key="macro6", name="Macro 6", fighter="Lucina", role="P1", length="0.8 s", start="Macro 6 · start", hot=True),
     dict(key="replay", name="Replay 86f", fighter="Pikachu", role="P1", length="1.4 s", start=None, hot=True),
-    dict(key="slot2", name="Slot 2 (2026-11-05)", fighter="Steve", role="P1", length="4.0 s", start=None, hot=True),
-    dict(key="macro6", name="Macro 6", fighter="Lucina", role="P1", length="0.8 s", start="Macro 6 · start", hot=False),
+    dict(key="slot2", name="Slot 2 (2026-11-05)", fighter="Steve", role="P1", length="4.0 s", start=None, hot=False),
     dict(key="slot5", name="Slot 5 (2026-11-05)", fighter="Villager", role="P1", length="3.2 s", start=None, hot=False),
 ]
 # The hot rule, in every list: at most five hot per kind, pins first, then the newest. A file sits under the hairline
@@ -1603,7 +1605,7 @@ def diagram():
 def legend():
     width = 560
     # The whole MACROS list: five hot (the pins, then the newest), and two under the hairline.
-    keys = {"nair": "a", "dash": "b", "replay": "c", "macro6": "d"}
+    keys = {"nair": "a", "dash": "b", "replay": "c", "slot2": "d"}
     rows = [dict(m, key=keys.get(m["key"], m["key"]), active=m["key"] == "nair", cursor=m["key"] == "dash")
             for m in M4]
     groups = [{"title": "MACROS", "typ": "macro", "count": len(M4), "loop": [("", "on")],
@@ -1828,12 +1830,17 @@ def flow_record(game):
     iv.text(d, (b[0], bottom + 38), "that file becomes \"Macro 7 · start\".", fnt(13), fill=ch.M_GROUP, anchor="lm")
 
     b = strip_panel(img, 1, "Macro 7 is hot", "It stops. Macro 7 joins the hot five after the pins, with its start "
-                    "save linked, and gets the cursor. The oldest unpinned macro, Slot 2, leaves the outline.")
+                    "save linked, and gets the cursor. The oldest hot macro that is not pinned, Replay 86f, leaves "
+                    "the outline.")
     m7 = dict(key="m7", name="Macro 7", fighter="Pikachu", role="P1", length="3.0 s", start="Macro 7 · start",
               hot=True, new=True)
     g = group_only("player", "macro", "m7")
     rows = g["sections"][0][2]
-    rows = rows[:3] + [dict(m7, cursor=True, active=False)] + [dict(rows[3])] + [dict(r, hot=False) for r in rows[4:5]]
+    # Pins, then the newest: Macro 7 goes first after the pins, and the last (oldest) unpinned hot macro drops out.
+    # The older library below it (the migrated slots) is outside this view.
+    pins = [r for r in rows if r.get("hot") and r.get("pin")]
+    others = [r for r in rows if r.get("hot") and not r.get("pin")]
+    rows = pins + [dict(m7, cursor=True, active=False)] + others[:-1] + [dict(others[-1], hot=False)]
     g = dict(g, sections=[(None, "macro", rows)], loop=[("", "on")], count=len(M4) + 1)
     frag_list(img, b, [g])
 
@@ -1870,9 +1877,9 @@ def flow_chain():
         {"name": "Nair loop", "sub": "Player · Pikachu", "number": 1},
         {"name": "Dash grab", "sub": "Player · Pikachu", "number": 2},
         {"name": "CPU throw", "sub": "CPU · Mario", "number": 3, "cursor": True},
+        {"name": "Macro 6", "sub": "Player · Lucina"},
         {"name": "Replay 86f", "sub": "Player · Pikachu"},
         {"name": "Slot 2", "sub": "Player · Steve"},
-        {"name": "Macro 6", "sub": "Player · Lucina"},
     ], [("A", "add / remove"), ("Y", "clear"), ("B", "done")])
 
     b = strip_panel(img, 2, "Linked", "Back in the list the row reads 3 On. The Links panel shows 1 → 2 → 3. "
@@ -3225,7 +3232,7 @@ def q11_window(img, box):
         tx += w + 12
     cols = [(x0 + 22, x0 + 332), (x1 - 332, x1 - 22)]
     data = (("SAVE STATES", "save", ("Corner pressure", "Platform", "Nair loop · start", "Dash grab · start")),
-            ("MACROS", "macro", ("Nair loop", "Dash grab", "CPU throw", "Replay 86f")))
+            ("MACROS", "macro", ("Nair loop", "Dash grab", "CPU throw", "Macro 6")))
     head_y = y0 + 196
     for c, ((cx0, cx1), (title, typ, names)) in enumerate(zip(cols, data)):
         d.rounded_rectangle((cx0, head_y, cx1, head_y + 38), radius=5, fill=HEAD_BG)
