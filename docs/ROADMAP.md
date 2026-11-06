@@ -43,9 +43,9 @@ The RC is M5q parity plus the new UI and clean MIT provenance; this list is not 
 
 | Deferred work | State at rc.1 |
 | --- | --- |
-| F9 helper promotion, fixed-seat ownership, hat/item cutover | Removed from the RC; M5q count behaviour kept. Partial count/body/HUD/reset evidence only. |
+| F9 helper promotion, fixed-seat ownership, hat/item cutover | Done in rc.5 (`p23/f9`): fixed CPU seats, slow mode on live entries, hat and item cutover, and the option-1 same-close raise from 1 to 3. |
 | Hurtboxes (HB1) | Phase 3 work; see the hitbox visualizer's current state in the README. |
-| Ten hot fighters plus five separate hot hats | Proven capacity behaviour kept; no separate 15-body feature. |
+| Ten hot fighters plus five separate hot hats | Done in rc.5 (`p23/hot-slots`): ten hot fighters and five hot hats, hats off the fighter budget. No separate 15-body feature. |
 | Saved/replay Mii bust provider (Q15) | No new provider or hook; the native saved-Mii selection stays. |
 | Frame/status text backgrounds (UI22) | Done in rc.5: a dark plate behind each notice text (header, short body, long body). The input-log plates stay reverted. The frame strip keeps its own backdrop. |
 | Further latency work (F6) | M5q cold-switch hitches kept; the zero-Unmapped and zero-allocation fixes stay. |
@@ -78,15 +78,15 @@ alternative was dropped by the operator.
 
 In this order (`docs/DECISIONS.md` DEFERRED-LIST on `review/menu-proposal` `6d19902`):
 
-- Combo: switch P1 to the combo's recorded fighter, with the same Switch/Keep prompt as a named macro.
+- Combo: switch P1 to the combo's recorded fighter, with the same Switch/Keep prompt as a named macro. Done in rc.5 (`p23/combo-switch`).
 - Lobby Items (N11): now in rc.5 (`p23/lobby-items`, primary order 2026-11-05 18:58Z); see the N11 section below.
-- Ten hot fighters plus five hot hats (five while one CPU; operator decision HOT-SLOTS-CEILING); preloading starts on
-  entering Training; no hitch on the first switch to a fighter that is not preloaded yet (F6).
+- Ten hot fighters plus five hot hats (five while one CPU; operator decision HOT-SLOTS-CEILING): done in rc.5
+  (`p23/hot-slots`). Preloading starts on entering Training. The first-switch hitch stays with F6.
 - Replay/saved-Mii busts (Q15): not built; the Mii rows stay text (operator 2026-11-05; the game makes a Mii picture
   only through its live selector).
 - Backgrounds behind the plugin's notices and status texts (UI22): done in rc.5. A dark plate sits behind each notice text. The frame strip keeps its own backdrop.
-- Timer-recording truncation: root cause and fix.
-- Then F9 helper promotion, fixed seats and the hat/item cutover.
+- Timer-recording truncation: fixed in rc.5 (`p23/timer-recording`). See the section above.
+- F9 helper promotion, fixed seats and the hat/item cutover: done in rc.5 (`p23/f9`).
 
 ## Phase 2 N11: Lobby Items (operator order)
 
