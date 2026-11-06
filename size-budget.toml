@@ -305,3 +305,11 @@ ceiling = 141468
 date = "2026-11-06"
 reason = "P-HOT B section 12 (p23/hot-slots; operator Yes pursue B): the start-up window built into Training's own start (entry_window model, H1 header hook at main+0x66de14 with its seam row and scope contract, pending bank, H3 creation rewrite, H4 binding, scene_changed order); measured 141468 (tools/size_gate.py), +336 over 141132"
 approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed' (P-HOT order 18:32Z: size entry)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 142226
+date = "2026-11-06"
+reason = "rc.5 merge (p23/rc5-merge): combo Switch/Keep, timer recording, notice plates, intro once, the player cycle, lobby combos, ten hot fighters and five hot hats, and Respawn on platform, together; measured 142226 at 302b729 (tools/size_gate.py), +758 over the hot-slots ceiling 141468"
+approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed'"
