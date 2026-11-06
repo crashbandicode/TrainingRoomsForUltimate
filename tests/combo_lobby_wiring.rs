@@ -180,6 +180,7 @@ fn saved_combos_wait_for_the_practice_fighters() {
     assert!(names(&graph(), "combos::show_list", "panel_up"));
     let registry = include_str!("../docs/RESTRICTIONS.md");
     assert!(registry.contains("combo-save-wait-load"));
-    assert!(registry.contains("combos-training-only"));
-    assert!(registry.contains("removed in rc.6 (p23/combos-lobby)"));
+    let row = registry.lines().find(|line| line.contains("combos-training-only")).expect("the row stays");
+    assert!(row.contains("retired"), "{row}");
+    assert!(row.contains("superseded by combos-lobby in rc.5"), "{row}");
 }

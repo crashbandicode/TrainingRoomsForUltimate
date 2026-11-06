@@ -47,7 +47,7 @@ The RC is M5q parity plus the new UI and clean MIT provenance; this list is not 
 | Hurtboxes (HB1) | Phase 3 work; see the hitbox visualizer's current state in the README. |
 | Ten hot fighters plus five separate hot hats | Proven capacity behaviour kept; no separate 15-body feature. |
 | Saved/replay Mii bust provider (Q15) | No new provider or hook; the native saved-Mii selection stays. |
-| Frame/status text backgrounds (UI22) | Done in rc.6: a dark plate behind each notice text (header, short body, long body). The input-log plates stay reverted. The frame strip keeps its own backdrop. |
+| Frame/status text backgrounds (UI22) | Done in rc.5: a dark plate behind each notice text (header, short body, long body). The input-log plates stay reverted. The frame strip keeps its own backdrop. |
 | Further latency work (F6) | M5q cold-switch hitches kept; the zero-Unmapped and zero-allocation fixes stay. |
 | Hitbox sphere replacement | Done for fighter spheres in rc.3 (own discs, never refused). Projectiles keep the game's effect spheres. |
 | Remaining feature/edge-case inventory | Kept for later planning. |
@@ -84,7 +84,7 @@ In this order (`docs/DECISIONS.md` DEFERRED-LIST on `review/menu-proposal` `6d19
   entering Training; no hitch on the first switch to a fighter that is not preloaded yet (F6).
 - Replay/saved-Mii busts (Q15): not built; the Mii rows stay text (operator 2026-11-05; the game makes a Mii picture
   only through its live selector).
-- Backgrounds behind the plugin's notices and status texts (UI22): done in rc.6. A dark plate sits behind each notice text. The frame strip keeps its own backdrop.
+- Backgrounds behind the plugin's notices and status texts (UI22): done in rc.5. A dark plate sits behind each notice text. The frame strip keeps its own backdrop.
 - Timer-recording truncation: root cause and fix.
 - Then F9 helper promotion, fixed seats and the hat/item cutover.
 
