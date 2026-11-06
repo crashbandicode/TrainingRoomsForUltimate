@@ -39,16 +39,18 @@ fn core07_sdi_chip_streak_length() {
 
 /// `core07_no_portrait_pictures` (SPEC-core-07 :224, Q16 as amended 2026-11-03 for RC10): no portrait
 /// PNG in the repo or the built archive; the fork's 89 stock icons are not carried over. The runtime
-/// reads each grid's picture at run time through the mod-aware loader, so what ships is only the 38
-/// provenance-recorded item icons (`assets/item-icons/`, ASSET-REPRODUCTION-R15) plus the two archive
-/// recipes, whose literal bytes are the plugin's own additions to the player's stock archive: they
-/// must add no picture except those item textures. The review mockup (`docs/menu-mockup/`, SPEC-core-07
-/// section 4.6 "Review mockup only") and the Eden run evidence (`eden/`) hold pictures but never ship.
+/// reads each grid's picture at run time through the mod-aware loader, so what ships is the 38
+/// provenance-recorded item icons (`assets/item-icons/`, ASSET-REPRODUCTION-R15), the two white
+/// recording glyphs (`assets/recording-icons/`, Material Symbols `save` and `repeat`, Apache-2.0) and
+/// the two archive recipes. The recipes' literal bytes are the plugin's own additions to the player's
+/// stock archive: item textures and those two glyphs, and no portrait. The review mockup
+/// (`docs/menu-mockup/`, SPEC-core-07 section 4.6 "Review mockup only") and the Eden run evidence
+/// (`eden/`) hold pictures but never ship.
 #[test]
 fn core07_no_portrait_pictures() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
-    // (a) Every PNG in the repo lives in a folder that never ships: the 38 item icons, the review
-    // mockup and the decision pictures under docs/, or the Eden run evidence under eden/.
+    // (a) Every PNG in the repo lives in a folder that never ships, or in the two source-icon folders
+    // the builder bakes into the archive: the 38 item icons and the recording glyphs.
     let mut pngs = Vec::new();
     walk(root, &mut |path| {
         if path.extension().is_some_and(|e| e.eq_ignore_ascii_case("png")) {
@@ -63,7 +65,7 @@ fn core07_no_portrait_pictures() {
     assert!(offenders.is_empty(), "portrait or unblessed PNG outside the never-ships folders: {offenders:?}");
     // (b) The fork's roster-grid assets (its 89 stock icons) are not carried over.
     assert!(!root.join("scripts").join("roster-grid").exists(), "the fork's scripts/roster-grid is carried over");
-    // (c) `assets/` ships exactly the item icons and the two archive recipes - nothing portrait-sized. Beside them, the
+    // (c) `assets/` ships the item icons, the recording glyphs and the two archive recipes. Beside them, the
     // recipes' pane-table digest (`panes-recipe.sha256`, text, checked by tests/pane_recipe_guard.rs, never embedded).
     let assets = root.join("assets");
     let mut entries: Vec<String> = std::fs::read_dir(&assets)
@@ -73,8 +75,8 @@ fn core07_no_portrait_pictures() {
     entries.sort();
     assert_eq!(
         entries,
-        ["info_training.tra1", "info_waiting.tra1", "item-icons", "panes-recipe.sha256"],
-        "assets/ holds more than the item icons, the archive recipes and their pane-table digest"
+        ["info_training.tra1", "info_waiting.tra1", "item-icons", "panes-recipe.sha256", "recording-icons"],
+        "assets/ holds more than the item icons, the recording glyphs, the archive recipes and their pane-table digest"
     );
     let icons: Vec<String> = std::fs::read_dir(assets.join("item-icons"))
         .unwrap()
@@ -82,8 +84,14 @@ fn core07_no_portrait_pictures() {
         .collect();
     assert_eq!(icons.len(), 39, "38 item icons plus sources.json, found {icons:?}");
     assert!(icons.iter().all(|name| name == &"sources.json".to_owned() || is_item_icon(name)), "unexpected file in assets/item-icons: {icons:?}");
+    let mut marks: Vec<String> = std::fs::read_dir(assets.join("recording-icons"))
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    marks.sort();
+    assert_eq!(marks, ["LICENSE-Apache-2.0.txt", "SOURCE.txt", "repeat.png", "save.png"], "recording-icons: {marks:?}");
     // (d) The recipes' own bytes (what the built archive gains over the player's stock archive) carry
-    // no picture but the item textures: no PNG magic, and no portrait/roster/stock-icon texture name.
+    // no picture but the item textures and the two recording glyphs: no PNG magic, and no portrait/roster/stock-icon texture name.
     for recipe in ["info_training.tra1", "info_waiting.tra1"] {
         let bytes = std::fs::read(assets.join(recipe)).unwrap_or_else(|error| panic!("read {recipe}: {error}"));
         assert!(!contains(&bytes, b"\x89PNG"), "{recipe} embeds a PNG");
@@ -91,6 +99,8 @@ fn core07_no_portrait_pictures() {
             assert!(!contains_ignore_case(&bytes, name.as_bytes()), "{recipe} names a {name} texture");
         }
         assert!(contains(&bytes, b"tr_item_"), "{recipe} lost the item textures");
+        assert!(contains(&bytes, b"tr_icon_save"), "{recipe} lost the floppy");
+        assert!(contains(&bytes, b"tr_icon_repeat"), "{recipe} lost the loop");
     }
 }
 
@@ -103,7 +113,10 @@ fn picture_evidence_folder(path: &Path, root: &Path) -> bool {
         return true;
     }
     if top == "assets" {
-        return relative.components().nth(1).is_some_and(|part| part.as_os_str() == "item-icons");
+        return relative.components().nth(1).is_some_and(|part| {
+            let name = part.as_os_str();
+            name == "item-icons" || name == "recording-icons"
+        });
     }
     if top == "docs" {
         // The review mockup (never ships, SPEC-core-07 section 4.6) and the decision pictures.

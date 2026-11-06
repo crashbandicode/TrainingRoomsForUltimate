@@ -10,7 +10,7 @@ use std::fmt::Debug;
 
 /// The builder and the layout library it builds with. Change it with any builder change that alters the recipes'
 /// bytes for the same pane table and stock archives: the committed digest then asks for a rebuild too.
-pub const BUILDER: &str = "layout-builder 0.1.0; nx-layout-toolbox 9010ca890b6339346758fa68bb53075d24aa0f95";
+pub const BUILDER: &str = "layout-builder 0.1.1; nx-layout-toolbox 9010ca890b6339346758fa68bb53075d24aa0f95";
 
 /// SHA-256 (hex) of `BUILDER` and every pane spec in table order, one `Debug` line each.
 pub fn digest<T: Debug>(specs: &[T]) -> String {
