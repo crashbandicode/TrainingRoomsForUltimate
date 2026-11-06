@@ -1351,7 +1351,9 @@ Earlier the same day, on pins: "Are pins even helping with anything? they seem k
 - On the Recording page, A opens the file's own screen; on a save, Bind to Save / Load is that screen's first row. In the pop-up, A still binds, sets active, or drills. The page footers read "A open".
 - Make combo does not change the drill. The new combo joins the hot five at the top, and the current drill stays the drill.
 - A macro's own screen has one "Set active" row, for the role in view, like the save's Bind to Save / Load: "On · Player 1" (or "On · CPU" in the CPU view) or "Off". Left / Right turn it On or Off; On makes this file that role's active macro, replacing the one before, and that role's Play chord plays it.
-- Corrected, not a design change: Character Cycles removes a number with R, has no Y clear, and there A on a numbered fighter does nothing (`src/editors/roster.rs`, `src/model/swap/roster_grid.rs` `select_group` on `p23/rc5-candidate`). The recording picker keeps Q1 A: A gives the next number, A again takes it off.
+- Q1 amended (operator 2026-11-06, ~17:40Z): "when it's ambiguous I would keep it consistent. We want to minimize the number of chords and have context determine what they do. So in this case I would have R supercede A if that's more intuitive". The numbered picker (Edit chain, Edit combos, New conversion) now works exactly as Character Cycles does (`src/editors/roster.rs`, `src/model/swap/roster_grid.rs` `select_group` on `p23/rc5-candidate`): A gives the next number, R takes a number off and the later numbers close up, A on a numbered tile does nothing, B is done, and there is no Y. Q1 stays A, the name-tiles layout.
+- The principle, recorded as decided: when it is ambiguous, keep it consistent; few chords, with context deciding what they do.
+- The whole RECORDING-REDESIGN doc and every picture it references were checked for stale text and drawings (the operator: "Make sure this revision doesnt have any stale text or parts of images").
 
 **Next:** implementation from `p23/rc5-candidate` `384e41f`, after the operator's sign-off.
 

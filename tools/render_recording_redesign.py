@@ -150,6 +150,8 @@ def keyboard(bg):
     d = ImageDraw.Draw(img)
     ch.clear_content(d)
     draw_groups(d, 0)
+    # The capture's own hint bar is a settings page's (X save defaults, Y reset row, ZR reset page): not this screen.
+    d.rectangle((44, 660, 1246, 698), fill=ch.M_PANEL)
     o = iv.overlay()
     k = ImageDraw.Draw(o)
     k.rectangle((0, 0, W, H), fill=(6, 8, 12, 214))
@@ -1218,10 +1220,10 @@ def loop_picture():
         d = ImageDraw.Draw(img)
         iv.text(d, (x + 28, 158), label, fnt(16, bold=True), fill=ch.M_GROUP, anchor="mm")
     iv.text(d, (40, 200), "Where it appears:", fnt(15, bold=True), fill=ch.M_TEXT, anchor="lm")
-    iv.text(d, (40, 228), "the MACROS group header, for the role on screen (Player and CPU each keep their own count);",
+    iv.text(d, (40, 228), "the MACROS section header, for the role in view (Player and CPU each keep their own count);",
             fnt(15), fill=ch.M_GROUP, anchor="lm")
-    iv.text(d, (40, 254), "a chained save's Links panel, where it repeats the whole chain. Never in COMBOS & "
-            "CONVERSIONS or SAVE STATES headers.", fnt(15), fill=ch.M_GROUP, anchor="lm")
+    iv.text(d, (40, 254), "a chained save's Links panel, where it repeats the whole chain. Never in the SAVE STATES, "
+            "CONVERSIONS or COMBOS headers.", fnt(15), fill=ch.M_GROUP, anchor="lm")
     return img
 
 
@@ -1449,8 +1451,8 @@ def flow_chain():
     frag_list(img, (b[0], b[1], b[2], b[3] - 34), [g], "pressure")
     keys_line(img, b[0], b[3] - 12, [("A", "bind"), ("+", "edit chain"), ("B", "close")], 14)
 
-    b = strip_panel(img, 1, "Number the macros", "A adds the next number. A again removes it, and the later numbers "
-                    "close up.")
+    b = strip_panel(img, 1, "Number the macros", "A adds the next number. R removes one, and the later numbers "
+                    "close up. The same buttons as Character Cycles.")
     frag_tiles(img, b, "Edit chain · Corner pressure", [
         # The recorded fighter only: the role the save is bound under plays the whole chain.
         {"name": "Nair loop", "sub": "Recorded on Pikachu", "number": 1},
@@ -1459,7 +1461,7 @@ def flow_chain():
         {"name": "Macro 6", "sub": "Recorded on Lucina"},
         {"name": "Replay 86f", "sub": "Recorded on Pikachu"},
         {"name": "Slot 2", "sub": "Recorded on Steve"},
-    ], [("A", "add / remove number"), ("B", "done")])
+    ], [("A", "add number"), ("R", "remove"), ("B", "done")])
 
     b = strip_panel(img, 2, "Linked", "Back in the list the row reads 3 On. The Links panel shows 1 → 2 → 3. "
                     "Chain On/Off is on the save's own screen.")
@@ -1489,7 +1491,7 @@ def flow_conversion():
         {"name": "Nair loop combo", "sub": "Pikachu → Mario", "number": 2, "cursor": True},
         {"name": "Combo 2", "sub": "Pikachu → Mario"},
         {"name": "Combo 4", "sub": "Steve → Pikachu"},
-    ], [("A", "add / remove number"), ("B", "done, then name it")])
+    ], [("A", "add number"), ("R", "remove"), ("B", "done, then name it")])
 
     b = strip_panel(img, 2, "Name it", "OK on the Switch's own keyboard names it. The new row (gold: new) shows its "
                     "sequence, Ryu BnB → Nair loop combo.")
@@ -1557,11 +1559,10 @@ def flow_drill(game, bar_picture):
     b = strip_panel(img, 1, "It is the drill", "The row turns green, and Nair loop combo is no longer the drill. Its "
                     "Links panel lists the combos in order, with the conversion's streak and best.")
     convs, combos = tab_rows("corner", "corner")
-    one_row(img, b[0], b[1], b[2] - b[0], [r for r in convs if r["key"] == "corner"][0], "conv")
-    one_row(img, b[0], b[1] + 34, b[2] - b[0], [r for r in combos if r["key"] == "nairc"][0], "combo")
-    # The Links panel as in the pop-up, without its Drilled line: the green row says that, and the panel must fit.
-    spec = links_spec("corner")
-    links_panel(img, (b[0], b[1] + 76, b[2], b[3]), dict(spec, lines=spec["lines"][:1]), header=False)
+    one_row(img, b[0], b[1] - 4, b[2] - b[0], [r for r in convs if r["key"] == "corner"][0], "conv")
+    one_row(img, b[0], b[1] + 27, b[2] - b[0], [r for r in combos if r["key"] == "nairc"][0], "combo")
+    # The Links panel as in the pop-up, with its streak and its Drilled line; the two rows above sit close to fit it.
+    links_panel(img, (b[0], b[1] + 64, b[2], b[3]), links_spec("corner"), header=False)
 
     b = strip_panel(img, 2, "The bar, at the top", "The helper bar sits under the frame strip, where the combo bar "
                     "is today. Full size below.")
@@ -2063,7 +2064,8 @@ def macro_actions6(menu):
         ("Start save", True), ("Set active", False), ("Rename", False), ("Crop", False), ("Make combo", False),
         ("Delete", False),
     ], "Start save On: its Play chord loads Nair loop · start, then plays. Off: it plays from where the fighters are.",
-        "Set active works for the role in view: On makes this Player 1's active macro. Left / Right switch both rows.",
+        "Set active is for the role in view, here Player 1. In a chain, only the chain's save loads, whatever Start "
+        "save says.",
         {"Start save": (("Nair loop · start", "On"), "switch"), "Set active": ("On · Player 1", "on")},
         [("Up/Down", "move"), ("Left/Right", "On / Off"), ("A", "do it"), ("B", "back")])
 
@@ -2302,7 +2304,7 @@ def q1_tiles(img, box):
             nx = tx + 52
         iv.text(d, (nx, ty + 21), name, fnt(17), fill=ch.M_TEXT, anchor="lm")
         iv.text(d, (nx, ty + 43), sub, fnt(14), fill=ch.M_GROUP, anchor="lm")
-    keys_line(img, x0, y1 - 12, [("A", "add / remove number"), ("B", "done")], 15)
+    keys_line(img, x0, y1 - 12, [("A", "add number"), ("R", "remove number"), ("B", "done")], 15)
 
 
 def q1_list(img, box):
@@ -2344,7 +2346,7 @@ def q1_list(img, box):
 
 def q1():
     img, (a, b) = q_canvas(1, W, 292,
-                           "A on Ledge trap gives it 4. A again takes a number off, and the later numbers close up.",
+                           "A on Ledge trap gives it 4. R takes a number off, and the later numbers close up.",
                            "Y on Dash grab moves it below CPU throw. Add a macro… opens a picker for more.")
     q1_tiles(img, a)
     q1_list(img, b)
