@@ -233,3 +233,11 @@ ceiling = 141468
 date = "2026-11-06"
 reason = "P-HOT B section 12 (p23/hot-slots; operator Yes pursue B): the start-up window built into Training's own start (entry_window model, H1 header hook at main+0x66de14 with its seam row and scope contract, pending bank, H3 creation rewrite, H4 binding, scene_changed order); measured 141468 (tools/size_gate.py), +336 over 141132"
 approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed' (P-HOT order 18:32Z: size entry)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 141957
+date = "2026-11-06"
+reason = "F9 (p23/f9 on 53f6dec): promote a ready parked body, fixed CPU seats, slow mode on live entries, hat and item cutover, and the option-1 same-close raise from 1 to 3; measured 141957 (tools/size_gate.py), +489 over 141468"
+approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed' (F9 phase 2, BRIEF-GROK rule 7)"
