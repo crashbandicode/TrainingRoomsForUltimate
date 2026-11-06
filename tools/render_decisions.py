@@ -931,10 +931,220 @@ def d_hatrequest():
     c.save("HAT-REQUEST-END")
 
 
+def chip(c, x, y, text, on=False):
+    w = c.textlength(text, "b") + 16
+    c.rect(x, y, x + w, y + 24, fill=SEL if on else TILE, outline=OURS if on else LINE, width=2 if on else 1, radius=4)
+    c.text(x + 8, y + 4, text, "b", FG)
+    return x + w + 8
+
+
+def hot_row(c, x0, x1, y, label, marks, focus=False):
+    if focus:
+        c.rect(x0, y - 4, x1, y + 24, fill=HILITE)
+        c.rect(x0, y - 4, x0 + 4, y + 24, fill=SEL)
+    c.text(x0 + 12, y, label, "s", FG)
+    c.text(x1 - 10, y, marks, "s", OURS if focus else MUTED, "r")
+
+
+def d_rr_popup_player():
+    c = DCanvas(WIDE, 780)
+    c.text(24, 12, "Pop-up, Player tab — hot macros, hot combos, loop, page", "h", FG)
+    y = panel(c, 16, 44, WIDE - 16, 760, "Overlay", rec=True, note="B closes. ZL+Up/Down moves 12 rows, the menu's list jump.")
+    x = 32
+    x = chip(c, x, y, "Player", True)
+    chip(c, x, y, "CPU", False)
+    c.text(32, y + 40, "Loop", "s", MUTED)
+    x = 90
+    for text, on in (("∞", True), ("1", False), ("2", False)):
+        x = chip(c, x, y + 34, text, on)
+    c.text(x + 8, y + 38, "X cycles. The list is the INI.", "xs", MUTED)
+    c.text(32, y + 78, "Macros", "s", FG)
+    rows = [
+        (True, "Nair loop", "active   pin"),
+        (False, "Dash grab", "pin"),
+        (False, "Replay500f P1", ""),
+        (False, "Macro 4", ""),
+        (False, "Slot 2 (2026-11-05)", ""),
+    ]
+    yy = y + 106
+    for focus, label, marks in rows:
+        hot_row(c, 32, WIDE - 110, yy, label, marks, focus)
+        yy += 34
+    c.text(WIDE - 70, y + 160, "▲", "s", MUTED)
+    c.text(WIDE - 70, y + 250, "▼", "s", MUTED)
+    c.text(32, yy + 6, "Combos", "s", FG)
+    yy += 34
+    for focus, label, marks in (
+        (True, "Nair loop  ·  4 links", "drilling   pin"),
+        (False, "Combo 2  ·  2 links", ""),
+        (False, "Ryu BnB  ·  6 links", "pin"),
+    ):
+        hot_row(c, 32, WIDE - 80, yy, label, marks, focus)
+        yy += 34
+    c.text(32, yy + 10, "A sets the active macro, or starts drilling the combo. Y pins. L / R change tab.", "xs", FG)
+    c.save("RECORDING-REDESIGN-popup-player")
+
+
+def d_rr_popup_cpu():
+    c = DCanvas(WIDE, 520)
+    c.text(24, 12, "Pop-up, CPU tab — the CPU's active macro", "h", FG)
+    y = panel(c, 16, 44, WIDE - 16, 500, "Overlay", rec=True, note="No combo list on this tab. The one active combo stays the player's.")
+    x = 32
+    x = chip(c, x, y, "Player", False)
+    chip(c, x, y, "CPU", True)
+    c.text(32, y + 40, "Loop", "s", MUTED)
+    x = 90
+    x = chip(c, x, y + 34, "∞", False)
+    x = chip(c, x, y + 34, "1", True)
+    chip(c, x, y + 34, "2", False)
+    c.text(32, y + 78, "Macros", "s", FG)
+    yy = y + 106
+    for focus, label, marks in (
+        (True, "CPU throw", "active"),
+        (False, "CPU tech roll", "pin"),
+        (False, "Slot 1 (2026-11-05)", ""),
+    ):
+        hot_row(c, 32, WIDE - 32, yy, label, marks, focus)
+        yy += 36
+    c.text(32, yy + 16, "Record on this tab controls the CPU's fighter.", "xs", FG)
+    c.text(32, yy + 40, "Play on CPU toggles this active macro. Play on Player 1 is the other shortcut.", "xs", MUTED)
+    c.save("RECORDING-REDESIGN-popup-cpu")
+
+
+def d_rr_page():
+    c = DCanvas(WIDE, 640)
+    c.text(24, 12, "Recording page — one menu", "h", FG)
+    y = 48
+    names = ["Macros", "Combos", "Replays", "Options"]
+    # Draw the four groups as stacked bands; Macros is open.
+    titles = [
+        ("Macros", "The named files. A opens that file's actions.", True),
+        ("Combos", "Drill, rename, delete, crop, pin.", False),
+        ("Replays", "Capture on/off, and the Replay window into this library.", False),
+        ("Options", "Crop trailing neutral, hitstun, mash, loop counts, chords.", False),
+    ]
+    for title, note, open_ in titles:
+        h = 168 if open_ else 78
+        panel(c, 16, y, WIDE - 16, y + h, title, open_, note if not open_ else None)
+        if open_:
+            hot_row(c, 32, WIDE - 32, y + 52, "Nair loop", "active P1   pin", True)
+            hot_row(c, 32, WIDE - 32, y + 88, "CPU throw", "active CPU", False)
+            c.text(32, y + 128, "Source is gone. Slots are files named Slot N (date).", "xs", MUTED)
+        y += h + 10
+    c.save("RECORDING-REDESIGN-page")
+
+
+def d_rr_actions():
+    c = DCanvas(WIDE, 520)
+    c.text(24, 12, "One macro's actions", "h", FG)
+    y = panel(c, 16, 44, WIDE - 16, 500, "Nair loop", rec=True, note="The file stays. Make combo and Crop are separate.")
+    actions = [
+        (True, "Set active for Player 1"),
+        (False, "Set active for CPU"),
+        (False, "Rename"),
+        (False, "Crop"),
+        (False, "Make combo"),
+        (False, "Pin"),
+        (False, "Delete"),
+    ]
+    yy = y
+    for focus, label in actions:
+        hot_row(c, 32, WIDE - 32, yy, label, "A" if focus else "", focus)
+        yy += 36
+    c.text(32, yy + 8, "The same list exists for a combo, without the two Set active rows: Drill, Rename, Crop, Pin, Delete.", "xs", MUTED)
+    c.save("RECORDING-REDESIGN-macro-actions")
+
+
+def d_rr_flow():
+    c = DCanvas(WIDE, 460)
+    c.text(24, 12, "Combo from macro", "h", FG)
+    steps = [
+        ("1  Start", ["Load the remembered save", "state when it still matches.", "The replay snap is already", "the macro's start."]),
+        ("2  Play on Player 1", ["The strip records the hits.", "The CPU stays the practice CPU.", "The macro file is not changed."]),
+        ("3  Optional crop", ["Pick the first and last link.", "A saves a new combo.", "It becomes the active drill."]),
+    ]
+    w = (WIDE - 48) / 3
+    for i, (title, body) in enumerate(steps):
+        x0 = 16 + i * (w + 8)
+        y = panel(c, x0, 48, x0 + w, 400, title, False, None)
+        lines(c, x0 + 14, y, body, "s", FG, step=28)
+        if i < 2:
+            arrow(c, (x0 + w + 1, 220), (x0 + w + 8, 220))
+    c.text(24, 420, "No link uses the existing sentence: No combo yet: land a hit and a follow-up first.", "xs", MUTED)
+    c.save("RECORDING-REDESIGN-combo-from-macro")
+
+
+def d_rr_crop():
+    c = DCanvas(WIDE, 520)
+    c.text(24, 12, "Crop — links on a combo, frames on a macro", "h", FG)
+    (ax, ay, ax1), (bx, by, bx1) = two(
+        c, 500, "Combo: first link through last", "Macro: the replay window's crop", rec="a", y0=48,
+        na="A new combo file. The original stays.",
+        nb="A new named file. The original stays.")
+    for i, (label, mark, focus) in enumerate((
+        ("1  aerial → aerial", "start", True),
+        ("2  aerial → tilt", "kept", True),
+        ("3  tilt → smash", "end", True),
+        ("4  smash → special", "left out", False),
+    )):
+        hot_row(c, ax, ax1, ay + i * 36, label, mark, focus)
+    c.text(bx, by, "In  40     Out  210", "s", FG)
+    c.text(bx, by + 36, "L start    R end    Left/Right move", "xs", FG)
+    c.text(bx, by + 64, "Same handles as the Replay window.", "xs", MUTED)
+    c.text(bx, by + 96, "A replay is cropped there, then saved", "xs", MUTED)
+    c.text(bx, by + 116, "into this library. It does not grow", "xs", MUTED)
+    c.text(bx, by + 136, "a second crop command.", "xs", MUTED)
+    c.save("RECORDING-REDESIGN-crop")
+
+
+def d_rr_shortcuts():
+    c = DCanvas(WIDE, 560)
+    c.text(24, 12, "Shortcuts — four replace the slot chords", "h", FG)
+    y = panel(c, 16, 44, WIDE - 16, 500, "Button chords", rec=True, note="Save, load, and the menu shortcut stay.")
+    rows = [
+        ("Save State Save", "ZL + D-pad Down", False),
+        ("Save State Load", "ZL + D-pad Up", False),
+        ("Record", "ZR + D-pad Down", True),
+        ("Play on Player 1", "ZR + D-pad Left", True),
+        ("Play on CPU", "ZR + D-pad Up", True),
+        ("Recording pop-up", "ZR + D-pad Right", True),
+        ("Cycle Player", "ZL + D-pad Right", False),
+        ("Cycle CPU", "ZL + D-pad Left", False),
+    ]
+    yy = y
+    for label, chord, new in rows:
+        hot_row(c, 32, WIDE - 32, yy, label, chord, new)
+        yy += 34
+    c.text(32, yy + 8, "Menu shortcut 1 stays Minus. Open menu stays B + D-pad Up.", "xs", MUTED)
+    c.save("RECORDING-REDESIGN-shortcuts")
+
+
+def d_rr_choices():
+    c = DCanvas(WIDE, 760)
+    c.text(24, 12, "RECORDING-REDESIGN — open choices. Green is the recommendation.", "h", FG)
+    items = [
+        ("1  Hot memory", "A  one minute resident, longer files stream", "B  five full files, 1.44 MiB worst case"),
+        ("2  All five pinned", "A  a new recording still takes a hot slot", "B  it waits on disk until an unpin"),
+        ("3  Start save state", "A  slot number and revision; load if it matches", "B  copy the whole save into the file"),
+        ("4  Play after a load", "A  one toggle, the active CPU macro", "B  drop save-state playback"),
+        ("5  Loop counts", "A  ∞  1  2  3  5  10", "B  ∞  1  2  3"),
+        ("6  Record on load", "A  record only from the shortcut", "B  also start recording when a state loads"),
+        ("7  Both roles at once", "A  Player 1 and CPU may play together", "B  starting one stops the other"),
+    ]
+    y = 48
+    for title, a, b in items:
+        panel(c, 16, y, WIDE - 16, y + 92, title, True, None)
+        hot_row(c, 32, WIDE - 32, y + 46, a, "", True)
+        c.text(32, y + 70, b, "xs", MUTED)
+        y += 100
+    c.save("RECORDING-REDESIGN-choices")
+
+
 ALL = [d_pages, d_dropdown, d_delays, d_subscreens, d_firstpage, d_itemonload, d_replaycapture, d_preloadsamples,
        d_shortcuts, d_helptext, d_p1fallback, d_weights, d_paging, d_miirows, d_portraits, d_dichips, d_applychange,
        d_import, d_corrupt, d_name, d_panic, d_layoutmods, d_p1ai, d_playback, d_perfighter, d_inout, d_fixes,
-       d_devcode, d_readme, d_ledgechange, d_pausehelper, d_hatrequest]
+       d_devcode, d_readme, d_ledgechange, d_pausehelper, d_hatrequest,
+       d_rr_popup_player, d_rr_popup_cpu, d_rr_page, d_rr_actions, d_rr_flow, d_rr_crop, d_rr_shortcuts, d_rr_choices]
 
 
 def main():

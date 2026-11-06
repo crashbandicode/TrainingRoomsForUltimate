@@ -1254,7 +1254,49 @@ Earlier: convert macro to combo, and crop, as separate options on a particular m
 - **The redesign goes into rc.5** ("we can wait longer and get it right the first time").
 - The Source setting goes away, so the named-macro Switch issue (rw-01) is resolved by the redesign.
 
-**Next:** mockups for iteration (`tr-grok-convert`, `TASK-grok-recording-redesign.md`); then sign-off; then implementation.
+**Mockups** (phase 1, 2026-11-05). Nothing is built yet. Implementation waits for sign-off.
+
+![Pop-up, Player tab](decisions/RECORDING-REDESIGN-popup-player.png)
+
+![Pop-up, CPU tab](decisions/RECORDING-REDESIGN-popup-cpu.png)
+
+![Recording page](decisions/RECORDING-REDESIGN-page.png)
+
+![One macro's actions](decisions/RECORDING-REDESIGN-macro-actions.png)
+
+![Combo from macro](decisions/RECORDING-REDESIGN-combo-from-macro.png)
+
+![Crop](decisions/RECORDING-REDESIGN-crop.png)
+
+![Shortcuts](decisions/RECORDING-REDESIGN-shortcuts.png)
+
+![Open choices](decisions/RECORDING-REDESIGN-choices.png)
+
+**Pending.** Green is the recommendation. The design is `artifacts/phase23/LANE-GROK-RECORDING-REDESIGN-REPORT.md`.
+
+1. **How much of a hot macro stays in memory.** A frame is 8 bytes. The file cap is 36,000 frames, 288 KiB. Five of those are 1,440 KiB.
+   - **A (recommended).** Each hot macro keeps one minute (3,600 frames, 28.8 KiB) resident. Five are 144 KiB. A longer file still plays; the rest is read from the card in 600-frame windows. Five combos are a few kilobytes.
+   - **B.** Keep all five files fully resident, up to 1,440 KiB.
+2. **A new recording when all five hot macros are pinned.** Recording is supposed to take a memory slot by itself.
+   - **A (recommended).** It becomes hot. The oldest pin leaves the hot list and stays on the card.
+   - **B.** The new file waits on the card until something is unpinned.
+3. **What "remembers the save state" stores.**
+   - **A (recommended).** The slot number and that save's revision. Combo-from-macro and playback load it when the revision still matches. If the slot was overwritten, play from where the fighters are.
+   - **B.** Copy the whole save state into the macro file.
+4. **Playback after a save-state load.** Today's checklist of five slots goes away with the slots.
+   - **A (recommended).** One Options toggle: after a load, play the active CPU macro.
+   - **B.** Drop that behavior.
+5. **The loop counts X cycles.** They live in the INI.
+   - **A (recommended).** ∞, 1, 2, 3, 5, 10.
+   - **B.** ∞, 1, 2, 3.
+6. **Recording when a save state loads.** Today a trigger can start a recording on load.
+   - **A (recommended).** Record only from the Record shortcut.
+   - **B.** Keep "record when a state loads" as an Options toggle.
+7. **Play on Player 1 and Play on CPU.**
+   - **A (recommended).** They are independent. Both may play at the same time.
+   - **B.** Starting one stops the other.
+
+Defaults shown on the shortcuts picture, unless you change them: Record stays ZR + D-pad Down, Play on CPU stays ZR + D-pad Up, Play on Player 1 is ZR + D-pad Left, the pop-up is ZR + D-pad Right. Save, load, the cycle chords, Minus, and B + D-pad Up stay.
 
 ### INTRO-ONCE · The Training intro notices — ordered (2026-11-05)
 
