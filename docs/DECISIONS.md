@@ -1258,6 +1258,13 @@ Earlier: convert macro to combo, and crop, as separate options on a particular m
 
 Decided: one minute of a hot macro stays resident; a new recording takes a hot slot even when all five are pinned; the loop counts are ∞, 1, 2, 3, 5, 10; Player 1 and the CPU may play together; save states are named files you bind to Save and Load; a chain on a save starts its macro when that save loads.
 
+**Answered 2026-11-06 ~01:0xZ:** "Respawn should be moved to the stage options. Q3 yes link (A). Redraft with those
+answers for my review".
+- A recording's start is a named save-state file that the macro links to by id. The option rejected was embedding it.
+- The "Respawn on platform" row (formerly "Respawn invincibility") moves from Saves › Save states to Fighters & Stages ›
+  Stages (`p23/respawn-label`).
+- Revision 2 is in progress.
+
 Still open, in that document: how a recording remembers its start save, and whether save states have their own hot list.
 
 ### INTRO-ONCE · The Training intro notices — ordered (2026-11-05)
