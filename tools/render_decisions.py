@@ -931,6 +931,8 @@ def d_hatrequest():
     c.save("HAT-REQUEST-END")
 
 
+# The recording-redesign screens moved to tools/render_recording_redesign.py.
+# These leftovers are not in ALL. Running them would overwrite revision 1.
 def chip(c, x, y, text, on=False):
     w = c.textlength(text, "b") + 16
     c.rect(x, y, x + w, y + 24, fill=SEL if on else TILE, outline=OURS if on else LINE, width=2 if on else 1, radius=4)
@@ -1143,8 +1145,7 @@ def d_rr_choices():
 ALL = [d_pages, d_dropdown, d_delays, d_subscreens, d_firstpage, d_itemonload, d_replaycapture, d_preloadsamples,
        d_shortcuts, d_helptext, d_p1fallback, d_weights, d_paging, d_miirows, d_portraits, d_dichips, d_applychange,
        d_import, d_corrupt, d_name, d_panic, d_layoutmods, d_p1ai, d_playback, d_perfighter, d_inout, d_fixes,
-       d_devcode, d_readme, d_ledgechange, d_pausehelper, d_hatrequest,
-       d_rr_popup_player, d_rr_popup_cpu, d_rr_page, d_rr_actions, d_rr_flow, d_rr_crop, d_rr_shortcuts, d_rr_choices]
+       d_devcode, d_readme, d_ledgechange, d_pausehelper, d_hatrequest]
 
 
 def main():
