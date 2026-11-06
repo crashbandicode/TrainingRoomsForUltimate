@@ -309,6 +309,14 @@ approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed' (P-HO
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
+ceiling = 141957
+date = "2026-11-06"
+reason = "F9 (p23/f9 on 53f6dec): promote a ready parked body, fixed CPU seats, slow mode on live entries, hat and item cutover, and the option-1 same-close raise from 1 to 3; measured 141957 (tools/size_gate.py), +489 over 141468"
+approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed' (F9 phase 2, BRIEF-GROK rule 7)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
 ceiling = 142226
 date = "2026-11-06"
 reason = "rc.5 merge (p23/rc5-merge): combo Switch/Keep, timer recording, notice plates, intro once, the player cycle, lobby combos, ten hot fighters and five hot hats, and Respawn on platform, together; measured 142226 at 302b729 (tools/size_gate.py), +758 over the hot-slots ceiling 141468"

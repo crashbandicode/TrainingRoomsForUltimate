@@ -1607,7 +1607,7 @@ pub(super) mod managed {
         let shape = match layout {
             // Every slot 4..8 is null except an earlier registered creation, which
             // must still have exactly its registered roots and selection byte.
-            Layout::Training => scene.quantity == Some(1)
+            Layout::Training => crate::model::parked_entries::training_quantity_open(scene.quantity)
                 && (4..8).all(|owner| match registered_at(created, owner) {
                     Some(record) => roots(&scene, owner) == created_roots(record),
                     None => scene.primary[owner] == 0,
@@ -1839,7 +1839,7 @@ pub(super) mod managed {
             || read::<usize>(service, 0) != reservation.scene.service_inner
             || read::<u32>(internal, 0xa0) != 4 + live(created)
             || (reservation.scene.layout == Layout::Training
-                && native_source::training_cpu_quantity() != Some(1))
+                && !crate::model::parked_entries::training_quantity_open(native_source::training_cpu_quantity()))
             || [read::<u8>(internal, 0xea), read(internal, 0xeb)] != reservation.scene.rules
             || read::<u32>(internal, 0xf0) != reservation.scene.ratio_bits
         {

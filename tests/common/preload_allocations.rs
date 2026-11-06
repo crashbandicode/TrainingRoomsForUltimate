@@ -28,7 +28,7 @@ fn rc_freeze_removes_native_count_mutators_and_fixed_seat_authority() {
 fn rc_native_mii_scope_keeps_one_cpu_and_waiting_role_without_promoted_owners() {
     use crate::engine::mii::backend::Layout;
     for (quantity, expected) in [(None, false), (Some(0), false), (Some(1), true),
-        (Some(2), false), (Some(3), false), (Some(u32::MAX), false)] {
+        (Some(2), true), (Some(3), true), (Some(u32::MAX), false)] {
         assert_eq!(Layout::Training.quantity(quantity), expected);
     }
     assert_eq!(Layout::Training.logical(0), Some(0));

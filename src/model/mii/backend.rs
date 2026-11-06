@@ -71,7 +71,7 @@ impl Layout {
     }
     /// Native entry count of a `shape_with` map.
     pub fn count_with(self,extras:crate::engine::mii::capacity::Extras)->u32 {(self.owners().len()+extras.count()) as u32}
-    pub fn quantity(self,quantity:Option<u32>)->bool {match self {Self::Training=>quantity==Some(1),Self::Ldn|Self::Quickplay=>quantity.is_none()}}
+    pub fn quantity(self,quantity:Option<u32>)->bool {match self {Self::Training=>matches!(quantity,Some(1..=3)),Self::Ldn|Self::Quickplay=>quantity.is_none()}}
 }
 
 #[cfg(test)] mod tests {
