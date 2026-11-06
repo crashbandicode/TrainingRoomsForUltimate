@@ -353,3 +353,11 @@ ceiling = 143680
 date = "2026-11-06"
 reason = "rr-1 files (p23/rr-1-files at 00e7aab): start-save fields, chains, sequences, named saves, the recording index and migration; measured 143680 (tools/size_gate.py), +874 over 142806"
 approved_by = "Operator 2026-11-06 via the rr-1 brief: 'Raise as needed'"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 143923
+date = "2026-11-06"
+reason = "rr-4 playback (p23/rr-4-playback): the per-role machine, a load and an auto-load that only warp, and one start-save warp on entering play; measured 143923 (tools/size_gate.py), +243 over 143680"
+approved_by = "Operator 2026-11-06 via the rr-4 brief: 'Raise as needed'"
