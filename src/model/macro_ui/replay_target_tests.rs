@@ -188,7 +188,7 @@ fn write_replay_window_fixture() {
             .collect(),
         quantized_analog: false,
     };
-    let session = ReplaySession { tracks: vec![track(0, MARIO), track(1, 0x4a)], truncated: false };
+    let session = ReplaySession { tracks: vec![track(0, MARIO), track(1, 0x4a)], truncated: false, breaks: Vec::new() };
     let saved = CaptureArchive::new(dir.join("replay_captures"))
         .save_with_miis("rc4-replay-window-gunner", "RC4 replay window: Mario vs Mii Gunner", "13.0.5", &session, Some(&miis))
         .unwrap();
