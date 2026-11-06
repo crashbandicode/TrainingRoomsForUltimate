@@ -207,9 +207,10 @@ impl Grade {
         worst
     }
 
-    /// True, every reference step pressed, and each within the tolerance.
+    /// The recorded presses are there, with the same direction, in order and within the tolerance, and the move
+    /// that came out is the recorded move. TRUE is not required (operator 2026-11-06, answer 1).
     pub fn clean(&self, tolerance: u8) -> bool {
-        self.is_true() && self.missing().is_none() && self.worst(tolerance).is_none()
+        !self.wrong_move && self.missing().is_none() && self.worst(tolerance).is_none()
     }
 }
 
@@ -247,8 +248,9 @@ pub enum Outcome {
     Cleared,
 }
 
-/// Why an attempt was not clean: the first link that was not true, else the first missing press, else the first
-/// press outside the tolerance.
+/// Why an attempt was not clean: a different move, else the first missing press, else the first press outside the
+/// tolerance. A link that is not TRUE is not a fault by itself (operator 2026-11-06, answer 1). `Drop` stays so the
+/// bar can still name a verdict the summary no longer faults.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Reason {
     Drop(i32),
@@ -522,6 +524,8 @@ impl Helper {
         attempt.summary = Some(summary);
         self.results.copy_within(0..RESULTS - 1, 1);
         self.results[0] = Some(summary);
+        // Streak follows `clean`, so a non-true link still counts. Best stays the most true links in one
+        // attempt (operator 2026-11-06, question 2: a single combo's best stays as today).
         self.streak = if summary.clean { self.streak.saturating_add(1) } else { 0 };
         self.best = self.best.max(summary.true_links);
         if outcome != Outcome::Cleared && self.settings.load_after {
@@ -533,13 +537,8 @@ impl Helper {
 
 fn summarize(attempt: &Attempt, total: usize, outcome: Outcome, tolerance: u8) -> Summary {
     let grades = || attempt.grades().enumerate();
-    let not_true = grades().find(|(_, g)| !g.is_true()).map(|(i, g)| {
-        (i as u8, match g.link.verdict {
-            Verdict::Drop(n) if !g.wrong_move => Reason::Drop(n),
-            _ => Reason::WrongMove(g.link.to),
-        })
-    });
     let button = |g: &Grade, step: usize| g.reference.steps[step].map(|s| s.button);
+    let wrong_move = grades().find(|(_, g)| g.wrong_move).map(|(i, g)| (i as u8, Reason::WrongMove(g.link.to)));
     let missing = || {
         grades().find_map(|(i, g)| {
             let step = g.missing()?;
@@ -560,7 +559,7 @@ fn summarize(attempt: &Attempt, total: usize, outcome: Outcome, tolerance: u8) -
         true_links,
         total: total as u8,
         clean,
-        fault: not_true.or_else(missing).or_else(off),
+        fault: wrong_move.or_else(missing).or_else(off),
     }
 }
 

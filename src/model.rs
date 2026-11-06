@@ -61,6 +61,9 @@ pub mod frame_strip;
 pub mod frame_strip_plan;
 #[path = "model/combo.rs"]
 pub mod combo;
+/// One drill, and a sequence's streak. Make combo does not change the drill.
+#[path = "model/drill.rs"]
+pub mod drill;
 #[path = "model/combo_plan.rs"]
 pub mod combo_plan;
 #[path = "model/combo_record.rs"]
