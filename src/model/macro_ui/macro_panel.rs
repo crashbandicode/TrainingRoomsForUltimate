@@ -2151,6 +2151,8 @@ mod tests {
             mii: None,
             placement: Placement::default(),
             frames: Vec::new(),
+            start_save: None,
+            start_save_on: true,
         };
         assert!(ui.import_recording(empty, None).is_err());
         assert!(!ui.is_open());

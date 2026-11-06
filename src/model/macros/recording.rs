@@ -133,6 +133,12 @@ pub struct MacroRecording {
     pub mii: Option<crate::engine::mii::lifetime::Configuration>,
     pub placement: Placement,
     pub frames: Vec<InputFrame>,
+    /// Save id this macro starts from. Absent means the file never had one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub start_save: Option<String>,
+    /// With an id, On warps once and Off keeps the id. Default On. Omitted from JSON when On.
+    #[serde(default = "start_save_switch_on", skip_serializing_if = "is_switch_on")]
+    pub start_save_on: bool,
 }
 
 impl MacroRecording {
@@ -152,6 +158,8 @@ impl MacroRecording {
             mii: None,
             placement: Placement::default(),
             frames,
+            start_save: None,
+            start_save_on: true,
         };
         recording.validate()?;
         Ok(recording)
@@ -231,6 +239,47 @@ impl MacroRecording {
         self.name = name.to_owned();
         Ok(())
     }
+
+    /// Stores a start-save id and turns the switch On. `None` clears the id.
+    pub fn set_start_save(&mut self, id: Option<&str>) -> Result<(), MacroError> {
+        match id {
+            None => {
+                self.start_save = None;
+                self.start_save_on = true;
+            }
+            Some(id) => {
+                if !crate::model::store::default_id(id) {
+                    return Err(MacroError::InvalidId(id.to_owned()));
+                }
+                self.start_save = Some(id.to_owned());
+                self.start_save_on = true;
+            }
+        }
+        Ok(())
+    }
+
+    /// Off keeps the id. No id means there is no switch to flip.
+    pub fn set_start_save_on(&mut self, on: bool) {
+        if self.start_save.is_some() {
+            self.start_save_on = on;
+        }
+    }
+}
+
+fn start_save_switch_on() -> bool {
+    true
+}
+
+fn is_switch_on(on: &bool) -> bool {
+    *on
+}
+
+/// `macros/<id>.json` whose `kind` is `chain`. A recording list omits these.
+pub fn is_chain_document(bytes: &[u8]) -> bool {
+    serde_json::from_slice::<serde_json::Value>(bytes)
+        .ok()
+        .and_then(|value| value.get("kind").and_then(serde_json::Value::as_str).map(|kind| kind == "chain"))
+        .unwrap_or(false)
 }
 
 fn check_name(name: &str) -> Result<(), MacroError> {

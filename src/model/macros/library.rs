@@ -57,6 +57,10 @@ impl Record for MacroRecording {
         MacroRecording::validate(self)
     }
 
+    fn owns(bytes: &[u8]) -> bool {
+        !super::recording::is_chain_document(bytes)
+    }
+
     fn name(&self) -> &str {
         &self.name
     }

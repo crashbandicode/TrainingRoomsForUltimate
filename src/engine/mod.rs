@@ -41,6 +41,10 @@ pub mod stages;
 pub mod macro_ui;
 #[path = "../model/macros/mod.rs"]
 pub mod macros;
+/// Named saves, chains, sequences, the recording index, and migration. Mounted with the macros,
+/// not from `model.rs`: the by-path test crates compile `model.rs` and have no `engine` module.
+#[path = "../model/library/mod.rs"]
+pub mod library;
 // CPU-as-P1: the session helpers (the pilot core is a path child of cpu_pilot) are consumed by the Switch-only runtime::p1::cpu_pilot; on the host their tests run by path
 // from tests/p1_core.rs (the playbook's by-path include).
 #[cfg(target_os = "switch")]
