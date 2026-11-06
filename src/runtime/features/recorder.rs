@@ -342,7 +342,7 @@ pub unsafe fn ai_epilogue(ctx: &mut InlineCtx) {
 
 unsafe fn on_ai_frame(ai: usize) {
     // Native Training or an active lobby practice (the hot swap check below stops the recorder).
-    if ai == 0 || !(scene::is_native_training() || scene::lobby_active()) {
+    if ai == 0 || !(scene::is_native_training() || scene::lobby_term()) {
         return;
     }
     let controller = ((ai + AI_CONTROLLER_FIELD) as *const usize).read();

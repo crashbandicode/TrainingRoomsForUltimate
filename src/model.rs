@@ -71,6 +71,8 @@ pub mod menu_shortcuts;
 pub mod migration;
 #[path = "model/scene.rs"]
 pub mod scene;
+#[path = "model/lobby_flag.rs"]
+pub mod lobby_flag;
 #[path = "model/migration_run.rs"]
 pub mod migration_run;
 #[path = "model/notify.rs"]

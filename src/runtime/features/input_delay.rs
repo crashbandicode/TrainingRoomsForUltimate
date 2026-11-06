@@ -44,13 +44,11 @@ pub fn init() -> Result<(), u32> {
 /// `state` is the fourth argument of the call (x3): the controller holder, a struct whose field at +0x10 is
 /// the player's Controller. Package 5's menu keeps the holder itself, package 4 reads the Controller from it.
 fn note(out: usize, slot: i64, state: usize) {
+    // The waiting-room clock, for whichever slot this console maps, before this poll reads the scene.
+    crate::runtime::lobby::update();
     let Some(pending) = PENDING.get() else { return };
     pending.note(&NativeTls, out, slot, state);
     let controller = if state == 0 { 0 } else { unsafe { ((state + 0x10) as *const usize).read() } };
-    // Package 6: the waiting-room practice engine's once-per-frame step, before this frame's input processing (Player 1's poll).
-    if slot == 0 {
-        crate::runtime::lobby::update();
-    }
     pending.set_controller(&NativeTls, controller);
     // Chords read the raw controller before the delay, so they are never delayed (SPEC-input-04 §5).
     if slot == 0 && controller != 0 && scene::is_training() {

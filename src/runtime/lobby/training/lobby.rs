@@ -45,9 +45,14 @@ pub fn is_waiting_scene() -> bool {
     // The normal 0x0701xxxx match mapper never returns that value. Keep the proven
     // local family exact; online activation also needs the actual waiting UI graft.
     // LDN is runtime-tested; the online family is supported by static call paths.
-    matches!(game_mode::current(), Some(mode)
-        if mode.initialized && mode.melee == 0x0d
-            && (mode.mode == 0x02010000 || mode.mode & 0x7fff0000 == 0x07010000))
+    // The mask is `model::lobby_flag::is_waiting_room`, so this read and the host test stay one copy.
+    game_mode::current().is_some_and(|mode| {
+        crate::model::lobby_flag::is_waiting_room(crate::model::lobby_flag::Scene {
+            initialized: mode.initialized,
+            melee: mode.melee,
+            mode: mode.mode,
+        })
+    })
 }
 
 pub fn requested() -> bool {
@@ -73,14 +78,28 @@ pub fn entry_id(role: FighterId) -> i32 {
 /// Called before input processing and UI dispatch. Cleanup only touches plugin state;
 /// do not roll Smash RNG, dereference departing fighters or request a game status here.
 pub fn update() {
-    if let Some(mode) = game_mode::current() {
-        let key = u64::from(mode.mode)
-            | (u64::from(mode.melee) << 32)
-            | (u64::from(mode.initialized) << 40);
-        if LAST_MODE.swap(key, Ordering::Relaxed) != key {
+    let current = game_mode::current();
+    let observed = current.map(|mode| crate::model::lobby_flag::Scene {
+        initialized: mode.initialized,
+        melee: mode.melee,
+        mode: mode.mode,
+    });
+    let clock = crate::model::lobby_flag::FlagClock {
+        last_key: LAST_MODE.load(Ordering::Relaxed),
+        ui_ready: UI_READY.load(Ordering::Acquire),
+        was_active: WAS_ACTIVE.load(Ordering::Acquire),
+    };
+    let practice_on = read(&MENU).lobby_practice == OnOff::ON;
+    let (next, decision) = crate::model::lobby_flag::step(clock, observed, practice_on);
+    if decision.scene_changed {
+        // The new key is stored before the side effects, so a re-entrant tick does not tear the room down twice.
+        LAST_MODE.store(next.last_key, Ordering::Relaxed);
+        if let Some(mode) = current {
             // A native Training departure need not change lobby::active(). Drop
             // preview values and pending injection at the actual scene boundary.
-            if WAS_ACTIVE.load(Ordering::Acquire) { super::named_macros::suspend_waiting(); }
+            if decision.suspend_waiting {
+                super::named_macros::suspend_waiting();
+            }
             crate::runtime::roster::character_roster::scene_changed(mode);
             super::practice::scene_departed();
             #[cfg(feature = "practice-stage-request-alpha")]
@@ -98,11 +117,8 @@ pub fn update() {
             );
         }
     }
-    let requested_now = requested();
-    if !requested_now {
-        UI_READY.store(false, Ordering::Release);
-    }
-    let now = active();
+    UI_READY.store(next.ui_ready, Ordering::Release);
+    let now = decision.active;
     let previous = WAS_ACTIVE.swap(now, Ordering::AcqRel);
     if now != previous {
         SEEN_ENTRIES.store(0, Ordering::Relaxed);
