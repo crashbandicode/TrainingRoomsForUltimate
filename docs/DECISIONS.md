@@ -1341,7 +1341,11 @@ Earlier the same day, on pins: "Are pins even helping with anything? they seem k
 - Q1, Q3, Q4, Q5, Q6, Q7, Q9 and Q11: A. Q6's hot conversions follow the most-recently-used rule.
 - Q8, the operator's own answer: a drop sends you back to combo 1 of the conversion, the streak to 0, and best is kept. Neither the conversion nor a combo has to be a true combo.
 - The combo helper's grading changes: "clean" drops the TRUE condition (`src/model/combo.rs`, `Grade::clean`), for a combo drilled alone and for a conversion. A step counts when its recorded presses are there, with the same direction, in order and within the tolerance. TRUE stays on the bar as information.
-- Proposed, not yet confirmed, and drawn for review: a "Bind to Save / Load: Off / Player / CPU" row on the save's own screen for the Recording page, and one chip per meaning ("Load · CPU" for the bound save, "▶ P1" / "▶ CPU" for a role's active macro).
+- Proposed, not yet confirmed, and drawn for review: a "Bind to Save / Load: Off / Player / CPU" row on the save's own screen for the Recording page, and one chip per meaning ("Load · CPU" for the bound save, "▶ P1" / "▶ CPU" for a role's active macro). Superseded by revision 7.1, below.
+
+**Decided in revision 7.1** (the operator, after seeing the proposal picture): "does it make more sense to show the CPU links, macros etc when the CPU view and the same for p1? Otherwise it's kind of confusing showing both at once. I think character cycles adopts this philosophy. For example in the image you proposed it shows blue and red together which depicts both". Then: "The save state could just be green and be visiblenin both views?"
+- One role per view, as in Character Cycles. A view shows only its role's active macro, loop count and Links. The pop-up keeps L / R for the role; the Recording page switches role with ZR, because L / R change menu pages there. The CPU view has only Save states & Macros. There are no role chips.
+- The bound save is a green row in both role views, whichever role it is bound under; its Links panel says which role plays its chain. A on a save binds it under the role in view, and a binding under the other role moves to this one. On the save's own screen, Bind to Save / Load reads "On · CPU" or "Off", and Left / Right toggle it for the role in view.
 
 **Next:** implementation from `p23/rc5-candidate` `384e41f`, after the operator's sign-off.
 
