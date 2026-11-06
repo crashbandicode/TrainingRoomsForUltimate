@@ -345,3 +345,11 @@ ceiling = 142806
 date = "2026-11-06"
 reason = "rc.5 merge plus the waiting-room clock (p23/rc5-merge at 781318d): measured 142806 (tools/size_gate.py), +93 over 142713"
 approved_by = "Operator 2026-11-05 via primary 35137355: 'Raise as needed'"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 142926
+date = "2026-11-06"
+reason = "rr-2-grade: a non-true link counts, a sequence keeps its streak, and one drill ignores Make combo; measured 142926 (tools/size_gate.py), +120 over 142806"
+approved_by = "Operator 2026-11-06 via TASK-GROK-rr-wave1: 'Raise as needed'"
