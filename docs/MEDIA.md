@@ -4,6 +4,58 @@ Every GIF in [`media/`](media/) is actual Eden footage: whole screen, 1280×720,
 game-speed timing kept, trimmed at the ends (any cut inside a clip is listed with it). Frames were reviewed (start,
 action, result) before a clip was kept. The raw takes stay outside git with their runs.
 
+## rc.5 captures still needed
+
+The player docs already point at these paths. None of these files exist yet. Capture each one in the Eden session
+that boots the build named on the row. Do not keep a take where the "Must be visible" line is missing. Full screen,
+1280×720, one behaviour, game speed, under 10 s. Trim only the ends.
+
+Shared start, unless a row says otherwise:
+
+- Training mode, Battlefield, both fighters at 0%. Player 1 Mario, CPU Mario.
+- Display & Controls › Input Display = Frame strip. Hitbox Visualization = Off.
+- CPU › Shield = None, and DI Direction and SDI Direction cleared, unless the row changes one of them.
+- Menu closed before the timed part. The strip is at the top. Both fighters are standing, not in the intro demo.
+- Chords at their defaults: Save ZL+Down, Load ZL+Up, Record ZR+Down, Play on CPU ZR+Up, Play on Player 1 ZR+Left,
+  recording pop-up ZR+Right.
+
+`strip` means the frame strip already on this branch. `rr-11` means the stick-row build. `rr-6` means the pop-up and
+Recording page build. A row that says `rr-6` is not a capture of the old slot page.
+
+| File | Embedded in | Build | Length | Start, then the inputs | Must be visible |
+| --- | --- | --- | --- | --- | --- |
+| `media/rc5-frame-strip-lanes.gif` | FRAME-STRIP.md, Lanes and colours; README, Frame strip | strip | 6 s | Stand at centre. Dash (left stick right, past the walk threshold), then A for a forward smash into the CPU. Hold still until both can act. | P1 gold startup, red active, blue recovery. CPU light-grey hitlag, then purple hitstun. A run of 7 or more shows its length. Newest frame on the right. |
+| `media/rc5-frame-strip-chips.gif` | FRAME-STRIP.md, Chips | strip | 4 s | Left stick up-right (past both thresholds), then A once. Release the stick. | One green attack chip, an up-right arrow on it, and a white tick down to P1's lane. No second chip. |
+| `media/rc5-frame-strip-cstick.gif` | FRAME-STRIP.md, Chips | rr-11 | 4 s | Left stick neutral. C-stick right, one forward smash. Do not press A. | One attack chip with a right arrow. The left stick never left neutral. |
+| `media/rc5-frame-strip-stick-row.gif` | FRAME-STRIP.md, Stick row | rr-11 | 6 s | Hold left stick left for about half a second, return to neutral for about a quarter second, then hold down-right, then alternate left and right (a dash dance) for about two seconds. No buttons. | A row under P1's lane. A direction only while the stick is held. Blank cells while neutral. The row scrolls with the lanes. |
+| `media/rc5-frame-strip-freeze.gif` | FRAME-STRIP.md, Freeze | strip | 5 s | Jab the CPU with A, then both stand with the stick neutral and no buttons for a full second. Then A again. | The lanes stop moving while both stand, then move again on the second jab. |
+| `media/rc5-frame-strip-freeze-stick.gif` | FRAME-STRIP.md, Freeze | rr-11 | 5 s | After a jab, both can act. Do not press a button. Move the left stick from neutral to left, then to right, for about two seconds. | The strip keeps scrolling while the stick changes direction. It does not freeze. |
+| `media/rc5-frame-strip-advantage-hit.gif` | FRAME-STRIP.md, ADVANTAGE | strip | 5 s | A, one jab on the CPU, then both stand until the readout settles. | ADVANTAGE is a signed number, not a dash, and the line under it reads `on hit`. Plus is green. Minus is red. |
+| `media/rc5-frame-strip-advantage-shield.gif` | FRAME-STRIP.md, ADVANTAGE | strip | 6 s | Open the menu (B+Up). On CPU, ZL+Down until Shield. Right on the Shield row until it reads Hold. B closes. Jab the CPU's shield with A. Stand until the readout settles. | ADVANTAGE reads `on shield`. LINK does not become TRUE combo or DROP for that shield hit. |
+| `media/rc5-frame-strip-link.gif` | FRAME-STRIP.md, LINK | strip | 5 s | A, then A again as soon as the first jab can be cancelled, so the second jab hits before the CPU can act. | LINK shows a number of 0 or below and the words `TRUE combo`, in green. A green bar above P1's lane reads `window Nf`. |
+| `media/rc5-frame-strip-drop.gif` | FRAME-STRIP.md, LINK | strip | 6 s | Jab with A. Wait until the CPU can act, then jab again before one second has passed (inside 20 frames of the CPU being free). | LINK shows a positive number and the word `DROP`, in red. |
+| `media/rc5-frame-strip-input.gif` | FRAME-STRIP.md, INPUT | strip | 6 s | Same late jab as the drop clip: wait a few frames after you can act, then A. | INPUT shows `Nf late` or `on time` or `buffered Nf`, and then either `N spare` or `Nf past`. |
+| `media/rc5-frame-strip-last.gif` | FRAME-STRIP.md, LAST | strip | 7 s | Two jab follow-ups in a row (jab, jab, jab), then stand. | The LAST row shows up to four pills, newest first. A pill reads `TRUE` or `DROP` with its number, and the moves read like `Jab > Jab`. |
+| `media/rc5-frame-strip-exchange.gif` | FRAME-STRIP.md, The 20-frame exchange | strip | 8 s | Jab with A. Stand still for a full second (more than 20 frames after the CPU can act). Jab again. | The second hit does not turn LINK into a large DROP of the first exchange. After both can act, ADVANTAGE is the new exchange, `on hit`. |
+| `media/rc5-save-warp.gif` | RECORDING.md, Save states only warp | strip | 6 s | At centre, 0%, ZL+Down to save the current slot. Walk both fighters to the ledge. ZL+Up. | Both fighters return to the saved spot. No recording starts. The CPU does not play inputs. |
+| `media/rc5-record-start-save.gif` | RECORDING.md, Recording a macro | rr-6 | 8 s | Pop-up on Player. ZR+Down, walk forward and jab once, ZR+Down again to stop. Open the pop-up. | A new macro at the top of the hot five, an orange floppy, and a start save named with the macro. |
+| `media/rc5-play-chord.gif` | RECORDING.md, Set active; README, Recording | rr-6 | 8 s | Set that macro active for the CPU. Stand away from its start save. ZR+Up. | One warp to the start save, then the CPU plays the jab. A second press of ZR+Up stops it. |
+| `media/rc5-loop-no-warp.gif` | RECORDING.md, The loop | rr-6 | 8 s | Same macro, CPU loop set to 2 (X while the cursor is in Macros). ZR+Up and let both passes finish. | The first pass warps once. The second pass does not warp. It continues from where the first pass ended. |
+| `media/rc5-chain-play.gif` | RECORDING.md, Chains | rr-6 | 9 s | + New chain. Number two recordings, the first of which has a start save. Name it. Set it active for the CPU. ZR+Up. | One warp to macro 1's start save, then recording 1, then recording 2, with no warp between them. |
+| `media/rc5-grade-not-true.gif` | RECORDING.md, Combos | strip | 9 s | Save last combo on a jab into jab that the strip called a true combo. Load the same save. Attempt 1: the same two jabs, late enough that LINK says DROP, but within the tolerance and still a jab. Attempt 2: the follow-up is a forward tilt instead of a jab. Combo helper On. | Attempt 1 still counts (the bar does not require TRUE). Attempt 2 drops, and the bar says the move was wrong. |
+| `media/rc5-make-combo.gif` | RECORDING.md, Combos | rr-6 | 8 s | Drill some other combo first, so the bar is showing it. On the macro's screen, Make combo. | The macro plays once on Player 1 from its start save. A new combo appears. The drilled combo is still the drill when it finishes. |
+| `media/rc5-crop-combo.gif` | RECORDING.md, Combos | rr-6 | 7 s | Open a combo of at least two links. Crop. L and R set the range to drop the last link. A saves. | A new combo of the kept links. The original combo is still in the list. |
+| `media/rc5-sequence-drill.gif` | RECORDING.md, Sequences | rr-6 | 9 s | A sequence of two short combos, drilled, streak 0. Land combo 1 cleanly, then fail combo 2 with a different move. | The bar names the sequence and moves from combo 1 to combo 2. After the drop it is back on combo 1, streak 0. |
+| `media/rc5-popup.gif` | RECORDING.md, The pop-up | rr-6 | 8 s | In the match, ZR+Right. Cursor on a save that is not the bound save. Down onto a macro. B. | The window over the match. Player \| CPU at the top. Two stacked sections. Green fill on the bound save. White cursor. B closes it and the bound save is unchanged. |
+| `media/rc5-recording-page.gif` | RECORDING.md, The Recording page | rr-6 | 8 s | Open the menu, go to Recording. ZR once. Then ZR back. | Player view shows saves and macros, and Combos & Sequences in the left column. CPU view hides Combos & Sequences. The bound save is green in both. |
+| `media/rc5-macro-screen.gif` | RECORDING.md, A file's own screen | rr-6 | 6 s | On the Recording page, A on a macro that has a start save. | Breadcrumb with the role and the name. Start save with the floppy, switch On. Set active is one row for that role. |
+| `media/rc5-fighter-mismatch.gif` | RECORDING.md, Fighter Mismatch | rr-6, plus the chain prompt | 7 s | CPU is Mario. Active chain whose first macro was recorded on a different fighter (change P1 to Pikachu, record a jab, change P1 back to Mario, put that recording first in a chain, set the chain active for the CPU). ZR+Up. Choose Keep. | One Fighter Mismatch prompt, title `Fighter Mismatch`, rows Keep current fighter and Switch to recorded fighter. It names the first macro's fighter. No second prompt when the later macro plays. |
+| `media/rc5-migration.gif` | RECORDING.md, Migration | first boot of a card that still has the old slots | 8 s | Before boot, leave a non-empty recording in slot 1 and leave the other recording slots empty. Boot. Set nothing else active. ZR+Up if Player 1's active macro is that migrated slot; otherwise open the list and play `Slot 1 (YYYY-MM-DD)`. | The name uses `Slot 1` and the date. Play does not warp. Empty slots did not become files. |
+
+The redesign mockups in `docs/decisions/RECORDING-REDESIGN-*.png` are not on this branch. They are not a substitute
+for the rows above. The rc.3 clip `media/frame-strip.gif` remains the earlier take of the strip. The RC10 clip
+`media/menu-recording.gif` remains the slot recording.
+
 ## 0.2.0-rc.4 clips (2026-11-05)
 
 Run `tr-p23-rc4-docs-2` on the Yoga, 2026-11-05 19:32–20:05Z: the RELEASE NRO of `p23/rc4-candidate` `ff69e53`

@@ -31,7 +31,8 @@ flowchart LR
 | --- | --- |
 | Open the menu | B + D-pad Up (always), or Minus (menu shortcut 1, editable) |
 | Save state / load state | ZL + D-pad Down / ZL + D-pad Up |
-| Record / play back | ZR + D-pad Down / ZR + D-pad Up |
+| Record / Play on CPU | ZR + D-pad Down / ZR + D-pad Up |
+| Play on Player 1 / recording pop-up | ZR + D-pad Left / ZR + D-pad Right |
 | Cycle the CPU / Player 1 fighter | ZL + D-pad Left / ZL + D-pad Right |
 | Kirby hat: Player 1 / CPU | Special + L3 / Special + R3 |
 | Reset the training room | L + R + A |
@@ -57,9 +58,12 @@ the game's effect spheres, and the discs trail the camera by one to two frames w
 
 ### Frame strip
 
-The input display (Display & Controls › Input Display) is a strip at the top of the screen with the last second of
-Player 1's and the CPU's frames, each press, how the last follow-up linked (a true combo by N frames, or dropped) and the
-frame advantage. It replaces the 15-row input log. *No clip yet.*
+The input display (Display & Controls › Input Display) is a strip at the top of the screen: the last second of
+Player 1 and the CPU, a chip for each new button, and ADVANTAGE, LINK, and INPUT for the last exchange. ADVANTAGE is
+the CPU's first actionable frame minus yours. Plus means you act first. [docs/FRAME-STRIP.md](docs/FRAME-STRIP.md)
+is how to read the lanes, the stick row, and the readouts.
+
+![Both lanes after a forward smash](docs/media/rc5-frame-strip-lanes.gif)
 
 ### Combos
 
@@ -91,10 +95,18 @@ Stages) chooses between the game's respawn platform (above) and the instant resp
 
 ### Recording and playback
 
+A save state only warps, and Load starts nothing. The redesign gives each role one active macro, a recording
+or a chain, and that role's Play chord plays it without warping back on later loops.
+[docs/RECORDING.md](docs/RECORDING.md) is how to use it, including what the match does on this branch and what
+the new machine does. The pop-up and the Recording page are in that doc. The draft of what rc.5 changes is
+[docs/RELEASE-NOTES-rc5.md](docs/RELEASE-NOTES-rc5.md).
+
+![Play on CPU warps once, then plays the active macro](docs/media/rc5-play-chord.gif)
+
 ![Record and playback](docs/media/menu-recording.gif)
 
-Record Player 1 and play it back on the CPU, with slots, triggers and loop (Recording page). *RC10, 2026-11-04,
-NRO `50d95130`.*
+*The earlier slot recording: ZR + Down records, ZR + Up plays that slot. RC10, 2026-11-04, NRO `50d95130`. The
+redesign's Play on CPU chord is the same buttons, and it plays the CPU's active macro.*
 
 ![Record refused while the CPU pilot drives Player 1](docs/media/record-refused.gif)
 
