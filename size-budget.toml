@@ -489,3 +489,11 @@ ceiling = 148470
 date = "2026-11-07"
 reason = "rr-7 runtime (p23/rr-7-runtime): playback keeps ids in a fixed buffer so a hook does not allocate; measured 148470 (tools/size_gate.py), +48 over 148422"
 approved_by = "Operator 2026-11-05 standing order via primary 35137355: 'Raise as needed'"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 148490
+date = "2026-11-07"
+reason = "rr-7 runtime (p23/rr-7-runtime): the menu posts crop, rename, make-combo, and save duplicate and delete to the recording worker; measured 148490 (tools/size_gate.py), +20 over 148470"
+approved_by = "Operator 2026-11-05 standing order via primary 35137355: 'Raise as needed'"
