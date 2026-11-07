@@ -621,6 +621,18 @@ fn aims_merge_left_and_right() {
 }
 
 #[test]
+fn a_fresh_profile_grades_a_drill_without_touching_options() {
+    let fresh = Settings::factory();
+    assert!(fresh.on, "the factory helper is On");
+    assert_eq!(Settings::from_snapshot(&crate::model::settings::Snapshot::factory()), fresh);
+    let mut run = Run::new(with_target());
+    run.combo(JAB, &[(UP_TILT, 1)], fresh);
+    run.settle(fresh);
+    let summary = run.resolved()[0];
+    assert_eq!((summary.graded, summary.true_links), (1, 1));
+}
+
+#[test]
 fn settings_read_the_three_rows() {
     let mut snapshot = crate::model::settings::Snapshot::factory();
     assert_eq!(Settings::from_snapshot(&snapshot), Settings::factory());

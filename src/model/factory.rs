@@ -153,8 +153,9 @@ pub static DEFS: [Def; COUNT] = [
     // Player Swapping, Lobby Practice, Training Stage Rotation, Solo Popo (all Off).
     row!("macro_source", Single, 2, [0]),
     row!("fighter_prompt", Single, 2, [0]),
-    // SPEC-input-07 §6: the combo helper Off, 1 frame of tolerance, keep playing.
-    row!("combo_helper", Single, 2, [1]),
+    // Operator 2026-11-07: the combo helper is On by default (stored [1, 0]). Tolerance stays 1 frame,
+    // and an attempt keeps playing. SPEC-input-07 §6 had said Off.
+    row!("combo_helper", Single, 2, [0]),
     row!("combo_tolerance", Single, 3, [1]),
     row!("combo_after", Single, 2, [0]),
     row!("trio_practice", Single, 2, [1]),

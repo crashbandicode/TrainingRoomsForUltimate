@@ -128,7 +128,7 @@ the same logic that the replay macro uses where it prompts the user to swap and 
 | Name (optional) | editor | the keyboard, §5 |
 | Save last combo... | editor | §4; the saved combo becomes the target |
 | Saved combos | editor | the list: A target, X rename, Y delete, B back |
-| Combo helper | toggle | `combo_helper` (Off by default) |
+| Combo helper | toggle | `combo_helper` (On by default; operator 2026-11-07) |
 | Target combo | editor (shows the target's name) | opens the list |
 | On-time tolerance | dropdown | `combo_tolerance`: Exact / 1 frame / 2 frames (1 frame by default) |
 | After an attempt | dropdown | `combo_after`: Keep playing / Load save state (Keep playing by default) |

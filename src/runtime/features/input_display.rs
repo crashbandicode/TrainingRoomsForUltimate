@@ -185,13 +185,24 @@ pub unsafe fn sample_frame(player: usize) {
     let Some(ids) = ids() else { return };
     let p1 = sample(player, &ids, true);
     let cpu = sample(cpu, &ids, false);
-    // Diag build: P1's busy frames, to check the lane classification against the game.
+    // Diag build: P1's busy frames, once per classification. Motion frame changes every frame, so it
+    // is not part of the key; logging it each frame rotated practice-diagnostics.log about once a minute
+    // and the row gates lost their lines (rc.5 wire-fix, 2026-11-07).
     #[cfg(feature = "diag")]
-    if !p1.actionable || p1.active || p1.stop {
-        crate::runtime::diag_log::diagnostic(format_args!(
-            "[FrameStrip] p1 status={:#x} stop={} active={} actionable={} attack={:?} mf={}",
-            p1.status, p1.stop, p1.active, p1.actionable, p1.attack, p1.motion_frame
-        ));
+    {
+        static LAST: Mutex<Option<(i32, bool, bool, bool, Option<crate::model::frame_strip::Move>)>> =
+            Mutex::new(None);
+        let key = (p1.status, p1.stop, p1.active, p1.actionable, p1.attack);
+        let mut last = LAST.lock();
+        if *last != Some(key) {
+            *last = Some(key);
+            if !p1.actionable || p1.active || p1.stop {
+                crate::runtime::diag_log::diagnostic(format_args!(
+                    "[FrameStrip] p1 status={:#x} stop={} active={} actionable={} attack={:?} mf={}",
+                    p1.status, p1.stop, p1.active, p1.actionable, p1.attack, p1.motion_frame
+                ));
+            }
+        }
     }
     let inputs = unpack(INPUTS.load(Ordering::Acquire));
     // P1's fighter, for a saved combo's "recorded on" (metadata; the existing guarded read, no new native site).

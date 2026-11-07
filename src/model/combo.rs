@@ -481,7 +481,8 @@ impl Default for Settings {
 impl Settings {
     pub const fn factory() -> Self {
         Self {
-            on: false,
+            // Operator 2026-11-07: a fresh profile grades a drill without opening Options.
+            on: true,
             tolerance: 1,
             load_after: false,
         }

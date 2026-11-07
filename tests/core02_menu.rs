@@ -194,8 +194,8 @@ const SPEC_TABLE: &[(&str, Kind, usize, &[usize])] = &[
     ("cycle_preload_native_groups", Kind::Single, 2, &[0]),
     ("cycle_preload_pair_groups", Kind::Single, 2, &[0]),
     ("cycle_preload_mii_groups", Kind::Single, 2, &[0]),
-    // SPEC-input-07 §6 (combo helper, 2026-11-05): Off, 1 frame, keep playing.
-    ("combo_helper", Kind::Single, 2, &[1]),
+    // Operator 2026-11-07: Combo helper On, 1 frame, keep playing.
+    ("combo_helper", Kind::Single, 2, &[0]),
     ("combo_tolerance", Kind::Single, 3, &[1]),
     ("combo_after", Kind::Single, 2, &[0]),
 ];

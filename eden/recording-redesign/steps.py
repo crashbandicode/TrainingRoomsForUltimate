@@ -366,6 +366,19 @@ def boot_training(ctx):
     return {'css_tile': '0', 'pick': picked, 'cpu': cpu}
 
 
+def fresh_helper(ctx):
+    """A fresh profile stores Combo helper On. Nobody opens Options."""
+    path = Path(ctx.instance['settings'])
+    if not path.is_file():
+        raise RuntimeError('no settings file at %s' % path)
+    data = json.loads(path.read_text())
+    defaults = (data.get('defaults_menu') or {}).get('combo_helper')
+    menu = (data.get('menu') or {}).get('combo_helper')
+    if defaults != [1, 0] or menu not in (None, [1, 0]):
+        raise RuntimeError('fresh combo_helper is not On [1, 0]: defaults=%s menu=%s' % (defaults, menu))
+    return save(ctx, 'fresh-helper', {'defaults': defaults, 'menu': menu})
+
+
 # --- xps-a: migration boot, runtime rows ----------------------------------------------------------
 
 def rr_migrate(ctx):
@@ -418,8 +431,9 @@ def rr_record(ctx):
 
 
 def rr_record_cpu(ctx):
-    """Record while the pop-up role is CPU. The stop line names that role, and a macro file exists."""
+    """Record while possessing the CPU. The file must hold that input, and Play on CPU must start it."""
     settle(ctx)
+    before = time.time()
     popup(ctx)
     press(ctx, 'r', 0.5)
     press(ctx, 'b', 0.6)
@@ -429,10 +443,22 @@ def rr_record_cpu(ctx):
     ctx.play(RECORD)
     stop = diag(ctx, r'screen=recording role=cpu recording=0', cap=10)
     folder = Path(ctx.instance['diag_log']).parent / 'macros'
-    names = sorted(p.name for p in folder.glob('*')) if folder.is_dir() else []
-    if not names:
+    written = [p for p in folder.glob('*.json') if p.stat().st_mtime >= before - 1] if folder.is_dir() else []
+    if not written:
         raise RuntimeError('Record on CPU wrote no macro in %s' % folder)
-    return save(ctx, 'record-cpu', {'start': start, 'stop': stop, 'macros': names[:8]})
+    path = max(written, key=lambda item: item.stat().st_mtime)
+    frames = json.loads(path.read_text()).get('frames') or []
+    pressed = [frame.get('buttons') for frame in frames if frame.get('buttons') not in (None, 32768)]
+    if not pressed:
+        raise RuntimeError(
+            'CPU-role file %s holds only idle buttons 32768; the jab made while possessing the CPU was not stored'
+            % path.name)
+    ctx.play(PLAY_CPU)
+    time.sleep(1.5)
+    shot = ctx.shot('cpu-playing')
+    return save(ctx, 'record-cpu', {
+        'start': start, 'stop': stop, 'file': path.name, 'pressed': pressed[:8], 'shot': shot,
+    })
 
 
 def _open_file_row(ctx, downs):
@@ -1530,14 +1556,27 @@ def nro_build_id(path):
     return hashlib.sha256(image).hexdigest()
 
 
+def plugin_elf(ctx):
+    """The pinned training ELF. Lifecycle instances publish the trace file, not an elf key."""
+    elf = ctx.instance.get('elf') or ctx.instance.get('so')
+    if elf:
+        return elf
+    trace = ctx.instance.get('trace_jsonl')
+    if trace:
+        config = Path(trace).with_name('trace.json')
+        if config.is_file():
+            symbols = json.loads(config.read_text()).get('symbols') or []
+            if symbols and symbols[0].get('elf'):
+                return symbols[0]['elf']
+    raise RuntimeError('instance has no elf path; keys=%s' % sorted(ctx.instance))
+
+
 def plugin_module(ctx):
     """The training NRO Eden loaded, matched by the pinned ELF's build id.
 
     `modules.list` has many `nro:` entries. The first one is not this plugin.
     """
-    elf = ctx.instance.get('elf') or ctx.instance.get('so')
-    if not elf:
-        raise RuntimeError('instance has no elf path; keys=%s' % sorted(ctx.instance))
+    elf = plugin_elf(ctx)
     build_id = nro_build_id(elf)
     want = 'nro:' + build_id
     listed = ctx.call('modules.list') or {}
@@ -1559,9 +1598,7 @@ def f9_body_trace(ctx):
     """Arm f9_body_of on the module name this boot lists, then wait for its return."""
     entry = plugin_module(ctx)
     name = str(entry.get('name'))
-    elf = ctx.instance.get('elf') or ctx.instance.get('so')
-    if not elf:
-        raise RuntimeError('instance has no elf path for symbols.load; keys=%s' % sorted(ctx.instance))
+    elf = plugin_elf(ctx)
     loaded = ctx.call('symbols.load', {'module': name, 'elf': elf})
     symbol = 'training_rooms::runtime::roster::character_roster::sources::f9_body_of'
     target = '%s!<%s>' % (name, symbol)

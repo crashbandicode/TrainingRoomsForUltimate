@@ -2374,11 +2374,17 @@
           "run": "steps.py:boot_training",
           "check": true,
           "on": "surface-a"
+        },
+        {
+          "run": "steps.py:fresh_helper",
+          "check": true,
+          "on": "surface-a"
         }
       ],
       "evidence": [
         "TrainingRooms events.log result=installed",
-        "Training HUD settled"
+        "Training HUD settled",
+        "settings.json defaults_menu.combo_helper is On [1, 0]"
       ],
       "source": "rows-iv/rows-hb-ab boot route (library segments, L3+D-pad, steps.py hook)",
       "host": "surface",
