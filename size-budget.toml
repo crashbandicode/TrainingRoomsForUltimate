@@ -457,3 +457,11 @@ ceiling = 144752
 date = "2026-11-06"
 reason = "rr-12 input-display closure (p23/rr-12-combo-inputs): the strip's facing and airborne reads name state_lr and situation_kind; measured 144752 (tools/size_gate.py), +2 over 144750"
 approved_by = "Operator 2026-11-06 via the rr-12 brief: 'Raise as needed'"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 147134
+date = "2026-11-07"
+reason = "rr integration (p23/rr-integration): rr-12 combo input events merged onto 7b4b600 (rr-1..6, 8, 11, docs); measured 147134 (tools/size_gate.py), +4328 over 142806"
+approved_by = "Operator 2026-11-05 standing order via primary 35137355: 'Raise as needed'"
