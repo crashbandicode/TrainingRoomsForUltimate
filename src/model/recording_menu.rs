@@ -310,10 +310,8 @@ enum KeyKind {
 
 #[derive(Clone, Debug)]
 struct Keyboard {
-    header: &'static str,
     kind: KeyKind,
     ids: Vec<String>,
-    previous: String,
     target: Option<String>,
 }
 
@@ -804,10 +802,8 @@ impl RecordingScreens {
     }
 
     fn open_file(&mut self, id: String, kind: ItemKind) {
-        if kind == ItemKind::Recording {
-            if self.macro_by_id(&id).is_some_and(|file| file.chain) {
-                self.close_chain_gap(&id);
-            }
+        if kind == ItemKind::Recording && self.macro_by_id(&id).is_some_and(|file| file.chain) {
+            self.close_chain_gap(&id);
         }
         if kind == ItemKind::Sequence {
             self.close_sequence_gap(&id);
@@ -1005,8 +1001,8 @@ impl RecordingScreens {
             ItemKind::NewChain | ItemKind::NewSequence => return,
         };
         let previous = self.item_name(&Item { kind, id: id.to_string() });
-        self.last_effect = Effect::Keyboard { header, draft: previous.clone() };
-        self.keyboard = Some(Keyboard { header, kind: key, ids: Vec::new(), previous, target: Some(id.to_string()) });
+        self.last_effect = Effect::Keyboard { header, draft: previous };
+        self.keyboard = Some(Keyboard { kind: key, ids: Vec::new(), target: Some(id.to_string()) });
     }
 
     fn rename_id(&mut self, kind: KeyKind, id: &str, name: &str) {
@@ -1123,7 +1119,7 @@ impl RecordingScreens {
 
     fn open_keyboard(&mut self, kind: KeyKind, header: &'static str, ids: Vec<String>) {
         self.last_effect = Effect::Keyboard { header, draft: String::new() };
-        self.keyboard = Some(Keyboard { header, kind, ids, previous: String::new(), target: None });
+        self.keyboard = Some(Keyboard { kind, ids, target: None });
     }
 
     fn create_chain(&mut self, steps: &[String], name: &str) {
@@ -1872,8 +1868,8 @@ mod tests {
     fn paging_moves_one_section_by_twelve() {
         let mut screens = screens();
         open_popup(&mut screens);
-        screens.set_cursor(Face::Popup, SAVES_MACROS, 0, 0);
         screens.set_cursor(Face::Popup, SAVES_MACROS, 1, 1);
+        screens.set_cursor(Face::Popup, SAVES_MACROS, 0, 0);
         screens.press_popup(Button::JumpDown);
         assert_eq!(screens.section_cursor(Face::Popup, SAVES_MACROS, 0), 12);
         assert_eq!(screens.section_cursor(Face::Popup, SAVES_MACROS, 1), 1);
