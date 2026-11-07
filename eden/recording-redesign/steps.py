@@ -14,8 +14,10 @@ Facts a source did not give (menu cursor routes inside the new screens, the publ
 pages, the hook-stats line format) are marked in README.md, Open questions; the hooks bounded-try
 the documented inputs and raise with what they saw instead of passing on an unverified screen.
 """
+import hashlib
 import json
 import re
+import struct
 import time
 from pathlib import Path
 
@@ -1458,22 +1460,77 @@ def rr_drill(ctx):
                                'drill_shot': str(shot1), 'after_make_combo': str(shot2)})
 
 
+def nro_build_id(path):
+    """Build id Eden puts on `nro:<id>` for a note-less linkle ELF.
+
+    SHA-256 of the page-padded PT_LOAD image (flags 5, 4, 6, image base 0), not the file hash.
+    Matches core/debugger/trace_modules.cpp.
+    """
+    data = Path(path).read_bytes()
+    if len(data) < 64 or data[:4] != b'\x7fELF' or data[4] != 2 or data[5] != 1:
+        raise RuntimeError('not a little-endian ELF64: %s' % path)
+    phoff, = struct.unpack_from('<Q', data, 32)
+    phentsize, phnum = struct.unpack_from('<HH', data, 54)
+    if phentsize != 56 or phnum < 3:
+        raise RuntimeError('ELF program headers are not the linkle layout: %s' % path)
+
+    def read(at, size):
+        if at + size > len(data):
+            raise RuntimeError('ELF field past end: %s' % path)
+        return int.from_bytes(data[at:at + size], 'little')
+
+    offsets, sizes, padded = [], [], []
+    total = 0
+    for i in range(3):
+        ph = phoff + i * 56
+        if read(ph, 4) != 1 or read(ph + 4, 4) != (5, 4, 6)[i] or read(ph + 16, 8) != total:
+            raise RuntimeError('ELF load %s is not RX/R/RW at 0: %s' % (i, path))
+        offsets.append(read(ph + 8, 8))
+        sizes.append(read(ph + 32, 8))
+        pad = (sizes[-1] + 0xfff) & ~0xfff
+        if i < 2 or (phnum > 3 and read(ph + 56, 4) == 1):
+            nxt = read(ph + 56 + 16, 8)
+            if nxt < total or nxt - total < pad or nxt % 0x1000 != 0:
+                raise RuntimeError('ELF load padding is not page-aligned: %s' % path)
+            pad = nxt - total
+        padded.append(pad)
+        total += pad
+    for i in range(3, phnum):
+        ph = phoff + i * 56
+        if read(ph, 4) == 1 and (i != 3 or read(ph + 32, 8) != 0 or read(ph + 16, 8) != total):
+            raise RuntimeError('ELF has an unexpected extra load: %s' % path)
+    image = bytearray(total)
+    position = 0
+    for i in range(3):
+        start, size = offsets[i], sizes[i]
+        image[position:position + size] = data[start:start + size]
+        position += padded[i]
+    return hashlib.sha256(image).hexdigest()
+
+
 def plugin_module(ctx):
-    """The name Eden lists for this NRO. A RO-loaded plugin is nro:<build-id>, not a file name."""
+    """The training NRO Eden loaded, matched by the pinned ELF's build id.
+
+    `modules.list` has many `nro:` entries. The first one is not this plugin.
+    """
+    elf = ctx.instance.get('elf') or ctx.instance.get('so')
+    if not elf:
+        raise RuntimeError('instance has no elf path; keys=%s' % sorted(ctx.instance))
+    build_id = nro_build_id(elf)
+    want = 'nro:' + build_id
     listed = ctx.call('modules.list') or {}
     entries = listed.get('modules') if isinstance(listed, dict) else listed
     entries = entries or []
-    found = []
+    names = []
     for entry in entries:
         if not isinstance(entry, dict):
             continue
         name = str(entry.get('name') or '')
-        if name.startswith('nro:') or name.endswith('training_rooms.nro'):
-            found.append(entry)
-    if not found:
-        raise RuntimeError('modules.list has no training NRO: %s' % listed)
-    loaded = [entry for entry in found if str(entry.get('name') or '').startswith('nro:')]
-    return loaded[0] if loaded else found[0]
+        if name.startswith('nro:'):
+            names.append(name)
+        if name == want:
+            return entry
+    raise RuntimeError('modules.list has no %s; nro names: %s' % (want, names))
 
 
 def f9_body_trace(ctx):

@@ -218,6 +218,12 @@ fn migration_maps_the_loop() {
     assert_eq!(fresh.loop_count(Role::Player), LoopCount::Finite(1));
     assert_eq!(fresh.loop_count(Role::Cpu), LoopCount::Finite(1));
     assert!(!fresh.migrated());
+    let switch_missing = std::io::Error::other("Result code: 514");
+    assert!(super::hot::index_absent_error(&switch_missing));
+    let raw_missing = std::io::Error::from_raw_os_error(0x202);
+    assert!(super::hot::index_absent_error(&raw_missing));
+    let other = std::io::Error::other("Result code: 1");
+    assert!(!super::hot::index_absent_error(&other));
 }
 
 fn mapped(tag: &str, row: Option<Vec<u8>>) -> LoopCount {

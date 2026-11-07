@@ -281,23 +281,28 @@ impl fmt::Display for Gaps {
     }
 }
 
-/// Gaps above this between two ticks of one entry are reported by the always-on stall line (diag): about four displayed frames.
+/// A gap this far above the previous one is a stall (diag): about four displayed frames at 60 Hz.
+/// A steady run of slow frames, each about as long as the last, is not a stall.
 pub const STALL_US: u64 = 60_000;
 
-/// Every entry tick of one role, whatever the plugin does (diag): the gap since the role's previous tick, when it exceeds the
-/// threshold. The baseline for a stall the game makes itself (a native Reload building a fighter) next to the plugin's swaps.
+/// Every entry tick of one role, whatever the plugin does (diag): the gap since the role's previous tick.
+/// Reported when it exceeds the threshold and jumps by more than that threshold past the previous gap.
+/// The baseline for a stall the game makes itself (a native Reload building a fighter) next to the plugin's swaps.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct TickClock {
     last_us: u64,
+    last_gap: u64,
 }
 
 impl TickClock {
-    pub const IDLE: TickClock = TickClock { last_us: 0 };
+    pub const IDLE: TickClock = TickClock { last_us: 0, last_gap: 0 };
 
     pub fn tick(&mut self, now_us: u64, threshold_us: u64) -> Option<u64> {
         let last = std::mem::replace(&mut self.last_us, now_us);
         let gap = now_us.saturating_sub(last);
-        (last != 0 && gap > threshold_us).then_some(gap)
+        let previous = std::mem::replace(&mut self.last_gap, if last == 0 { 0 } else { gap });
+        let jumped = gap > previous.saturating_add(threshold_us);
+        (last != 0 && gap > threshold_us && jumped).then_some(gap)
     }
 }
 
@@ -313,6 +318,16 @@ mod tests {
         assert_eq!(c.tick(5_191_000, STALL_US), Some(175_000));
         assert_eq!(c.tick(5_191_000 + STALL_US, STALL_US), None, "exactly the threshold is not a stall");
         assert_eq!(c.tick(5_000_000, STALL_US), None, "a clock step back reports nothing");
+    }
+
+    #[test]
+    fn a_steady_slow_frame_rate_is_not_a_stall() {
+        let mut c = TickClock::IDLE;
+        assert_eq!(c.tick(1_000_000, STALL_US), None);
+        assert_eq!(c.tick(1_080_000, STALL_US), Some(80_000), "leaving the previous pace is one stall");
+        assert_eq!(c.tick(1_160_000, STALL_US), None, "the same pace again is not a stall");
+        assert_eq!(c.tick(1_250_000, STALL_US), None, "ten more milliseconds is still that pace");
+        assert_eq!(c.tick(1_500_000, STALL_US), Some(250_000), "a hitch past the pace by the threshold is a stall");
     }
 
     #[test]

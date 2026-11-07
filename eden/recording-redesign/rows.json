@@ -47,9 +47,7 @@
           "gap_frames": 10
         }
       ],
-      "note": "timing to be checked when recorded",
-      "sha256": "fd05baa42ae7353f6be4ef1fa861d55b958ad1de31e05229286ad18b52bbe56c",
-      "recorded": "2026-11-07T07:57:55Z"
+      "note": "timing to be checked when recorded"
     },
     "chord-load": {
       "file": "segments/chord-load.edenmacro.json",
@@ -61,9 +59,7 @@
           "gap_frames": 10
         }
       ],
-      "note": "timing to be checked when recorded",
-      "sha256": "1f1f8ca9d99c990e8fa6ae9348fc31f6ae36e7f2fa09c88d84485abfd2f0cb74",
-      "recorded": "2026-11-07T07:35:17Z"
+      "note": "timing to be checked when recorded"
     },
     "chord-record": {
       "file": "segments/chord-record.edenmacro.json",
@@ -111,9 +107,7 @@
           "gap_frames": 10
         }
       ],
-      "note": "timing to be checked when recorded",
-      "sha256": "d4f4376b8f2fc8821b8dbe795f2f0ca46902bb47ae6bc132ad0e117937433b97",
-      "recorded": "2026-11-07T07:35:23Z"
+      "note": "timing to be checked when recorded"
     },
     "menu-open": {
       "file": "segments/menu-open.edenmacro.json",
@@ -125,9 +119,7 @@
           "gap_frames": 10
         }
       ],
-      "note": "timing to be checked when recorded",
-      "sha256": "1185704f7b97f2981a8bae42fbe42166d5bc37aa2e9cba197bdf585a616f78ce",
-      "recorded": "2026-11-07T07:48:14Z"
+      "note": "timing to be checked when recorded"
     },
     "menu-close": {
       "file": "segments/menu-close.edenmacro.json",
@@ -144,9 +136,7 @@
           "gap_frames": 34
         }
       ],
-      "note": "timing to be checked when recorded",
-      "sha256": "b45ca532f18b9a3a7938a04b4a6b0513b7288ed584705fd042e40125bd5c4a89",
-      "recorded": "2026-11-07T07:35:16Z"
+      "note": "timing to be checked when recorded"
     },
     "x-press": {
       "file": "segments/x-press.edenmacro.json",
@@ -170,9 +160,7 @@
           "gap_frames": 70
         }
       ],
-      "note": "timing to be checked when recorded",
-      "sha256": "54e917aa28b0af97505e73a53fa991d3f79ed597b79ae8bc07f364c5fc6dbdd7",
-      "recorded": "2026-11-07T07:52:20Z"
+      "note": "timing to be checked when recorded"
     },
     "reset-walk": {
       "file": "segments/reset-walk.edenmacro.json",
@@ -205,9 +193,7 @@
           "gap_frames": 58
         }
       ],
-      "note": "timing to be checked when recorded",
-      "sha256": "12769777ca262a7e3515f8f81a72c7470e7dffa98d9bdfb56e1887dfc702f278",
-      "recorded": "2026-11-07T07:47:37Z"
+      "note": "timing to be checked when recorded"
     },
     "jab-link": {
       "file": "segments/jab-link.edenmacro.json",
@@ -224,9 +210,7 @@
           "gap_frames": 30
         }
       ],
-      "note": "timing to be checked when recorded",
-      "sha256": "21ca94ee0dcd158a2e6cf023a1c01e33ead9d5cdc275d837aefdde49c4c83567",
-      "recorded": "2026-11-07T07:57:01Z"
+      "note": "timing to be checked when recorded"
     },
     "jab-link-3": {
       "file": "segments/jab-link-3.edenmacro.json",
@@ -248,9 +232,7 @@
           "gap_frames": 40
         }
       ],
-      "note": "timing to be checked when recorded",
-      "sha256": "f98d36dbaaf88230c032d0abbd78d4162fa163d20490ed5cc6d9b052a4795693",
-      "recorded": "2026-11-07T07:57:33Z"
+      "note": "timing to be checked when recorded"
     },
     "jab-drop": {
       "file": "segments/jab-drop.edenmacro.json",
@@ -267,9 +249,7 @@
           "gap_frames": 30
         }
       ],
-      "note": "timing to be checked when recorded",
-      "sha256": "2fc00b3082547b40890db5a81dd92176d82a0ba5a1f0d7a5c34d5353c5102ea8",
-      "recorded": "2026-11-07T07:57:10Z"
+      "note": "timing to be checked when recorded"
     },
     "exchange-jabs": {
       "file": "segments/exchange-jabs.edenmacro.json",
@@ -286,9 +266,7 @@
           "gap_frames": 40
         }
       ],
-      "note": "timing to be checked when recorded",
-      "sha256": "8f963497aaee09e267b727055ee7ada6c2fc9fcd0d9fac37b8efd02c7a55739b",
-      "recorded": "2026-11-07T07:57:45Z"
+      "note": "timing to be checked when recorded"
     },
     "freeze-jabs": {
       "file": "segments/freeze-jabs.edenmacro.json",
@@ -305,9 +283,7 @@
           "gap_frames": 20
         }
       ],
-      "note": "timing to be checked when recorded",
-      "sha256": "becf267ba823fb4463341ec20c01ea864156132dc99154f60c7ef40585a257e7",
-      "recorded": "2026-11-07T07:56:17Z"
+      "note": "timing to be checked when recorded"
     },
     "chips-attack": {
       "file": "segments/chips-attack.edenmacro.json",
@@ -332,9 +308,7 @@
           "gap": 0.5
         }
       ],
-      "note": "timing to be checked when recorded",
-      "sha256": "2e7f39b5573ecd63907c35c6c56af5e29da502933b70f2e0b23515952561a0ff",
-      "recorded": "2026-11-07T07:56:07Z"
+      "note": "timing to be checked when recorded"
     },
     "lanes-smash": {
       "file": "segments/lanes-smash.edenmacro.json",
@@ -359,9 +333,7 @@
           "gap": 1.2
         }
       ],
-      "note": "timing to be checked when recorded",
-      "sha256": "e460c4590a770a3260f882c17cb7dfd10518ab40eeb83a93765eb262a9f075f3",
-      "recorded": "2026-11-07T07:55:55Z"
+      "note": "timing to be checked when recorded"
     },
     "walk-right": {
       "file": "segments/walk-right.edenmacro.json",
@@ -377,9 +349,7 @@
           "gap_frames": 10
         }
       ],
-      "note": "timing to be checked when recorded",
-      "sha256": "a300791efe0e53f6be166d2ced7aa1194f7b3758b1cef5defe7826f4688b2d3a",
-      "recorded": "2026-11-07T07:55:18Z"
+      "note": "timing to be checked when recorded"
     },
     "dash-dance": {
       "file": "segments/dash-dance.edenmacro.json",
@@ -467,9 +437,7 @@
           "gap_frames": 10
         }
       ],
-      "note": "timing to be checked when recorded",
-      "sha256": "d5cc9e4d98b5e5a5db5b5f2c4caf0ad81d06070ad4b4e66034632e2f2642894e",
-      "recorded": "2026-11-07T07:55:35Z"
+      "note": "timing to be checked when recorded"
     },
     "fsmash": {
       "file": "segments/fsmash.edenmacro.json",
@@ -494,9 +462,7 @@
           "gap": 0.8
         }
       ],
-      "note": "timing to be checked when recorded",
-      "sha256": "2a6f61ae325478ba8a005edef0012064069fde9c0a88d93ff242c8c736d2452f",
-      "recorded": "2026-11-07T07:53:22Z"
+      "note": "timing to be checked when recorded"
     },
     "tilted-a": {
       "file": "segments/tilted-a.edenmacro.json",
@@ -521,9 +487,7 @@
           "gap": 0.4
         }
       ],
-      "note": "timing to be checked when recorded",
-      "sha256": "451a6d9b165adef78b74bd795700e6b8cb0ed0d67cf7efd4e2be091456195350",
-      "recorded": "2026-11-07T07:52:53Z"
+      "note": "timing to be checked when recorded"
     },
     "nair-loop-clean": {
       "file": "segments/nair-loop-clean.edenmacro.json",
@@ -577,9 +541,7 @@
           "gap_frames": 10
         }
       ],
-      "note": "timing to be checked when recorded",
-      "sha256": "d2e4b61e4b7499dea18bd03d85d09d68396cd3045ac1e36203f9c946c1d9a775",
-      "recorded": "2026-11-07T07:53:52Z"
+      "note": "timing to be checked when recorded"
     },
     "nair-loop-full-hop": {
       "file": "segments/nair-loop-full-hop.edenmacro.json",

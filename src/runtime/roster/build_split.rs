@@ -74,8 +74,9 @@ mod meter {
     static CLOCKS: [Mutex<crate::model::build_split::TickClock>; 2] =
         [Mutex::new(crate::model::build_split::TickClock::IDLE), Mutex::new(crate::model::build_split::TickClock::IDLE)];
 
-    /// Every entry pre-service tick, whatever the plugin does: a gap above `STALL_US` is logged with the entry's loader state, so a
-    /// stall the game makes itself (a native Reload building a fighter) is measured the same way as the plugin's builds.
+    /// Every entry pre-service tick, whatever the plugin does: a gap that jumps by more than `STALL_US` past the previous
+    /// gap is logged with the entry's loader state. A steady slow frame rate does not log. A stall the game makes itself
+    /// (a native Reload building a fighter) is measured the same way as the plugin's builds.
     pub fn tick_any(role: usize, owner: u32, now_us: u64, e: &crate::engine::swap::character_forms::EntryState) {
         let gap = CLOCKS.get(role).and_then(|m| m.lock().tick(now_us, crate::model::build_split::STALL_US));
         if let Some(gap) = gap {

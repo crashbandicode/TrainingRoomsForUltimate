@@ -128,9 +128,16 @@ impl RecordingIndex {
     /// Reads the index. A missing file is a fresh index and is not created here.
     pub fn load(root: &Path) -> Result<Self, Error> {
         let path = root.join(INDEX_FILE);
+        // `fs::exists` goes through stat. On Switch that maps GetEntryType 0x202 to NotFound,
+        // so a missing file is `Ok(false)`. `fs::read` does not: File::open reports that same
+        // code as ErrorKind::Other, "Result code: 514". Treating only NotFound as "fresh"
+        // made every index load fail, so the file was never written and the catalog never loaded.
+        if index_path_absent(&path)? {
+            return Ok(Self::fresh());
+        }
         let bytes = match fs::read(&path) {
             Ok(bytes) => bytes,
-            Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(Self::fresh()),
+            Err(err) if index_absent_error(&err) => return Ok(Self::fresh()),
             Err(err) => return Err(err.into()),
         };
         if bytes.len() > MAX_INDEX_BYTES {
@@ -281,6 +288,21 @@ impl RecordingIndex {
 
 fn bool_is_false(value: &bool) -> bool {
     !*value
+}
+
+fn index_path_absent(path: &Path) -> Result<bool, Error> {
+    match path.try_exists() {
+        Ok(present) => Ok(!present),
+        Err(err) if index_absent_error(&err) => Ok(true),
+        Err(err) => Err(err.into()),
+    }
+}
+
+/// A missing index, including the Switch `fs::read` error that is not `NotFound`.
+pub(super) fn index_absent_error(err: &std::io::Error) -> bool {
+    err.kind() == std::io::ErrorKind::NotFound
+        || err.raw_os_error() == Some(0x202)
+        || (err.kind() == std::io::ErrorKind::Other && err.to_string() == "Result code: 514")
 }
 
 pub const INDEX_FILE: &str = "recording-index.json";

@@ -529,3 +529,11 @@ ceiling = 149855
 date = "2026-11-07"
 reason = "rc.5 wire-fix: the recording diag line is diag-only; measured 149855 (tools/size_gate.py), +1 over 149854"
 approved_by = "Operator 2026-11-07 via primary 35137355 (TASK-GROK-rc5-wire-fix): 'Raise as needed'"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 149876
+date = "2026-11-07"
+reason = "rc.5 wire-fix: a missing recording index is fresh on the Switch read error, and a stall is a jump past the previous gap; measured 149876 (tools/size_gate.py), +21 over 149855"
+approved_by = "Operator 2026-11-07 via primary 35137355 (TASK-GROK-rc5-wire-fix): 'Raise as needed'"
