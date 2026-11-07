@@ -61,16 +61,15 @@ the game's effect spheres, and the discs trail the camera by one to two frames w
 The input display (Display & Controls › Input Display) is a strip at the top of the screen: the last second of
 Player 1 and the CPU, a chip for each new button, and ADVANTAGE, LINK, and INPUT for the last exchange. ADVANTAGE is
 the CPU's first actionable frame minus yours. Plus means you act first. [docs/FRAME-STRIP.md](docs/FRAME-STRIP.md)
-is how to read the lanes, the stick row, and the readouts.
-
-![Both lanes after a forward smash](docs/media/rc5-frame-strip-lanes.gif)
+is how to read the lanes, the stick row, and the readouts. The rc.5 clips are listed in
+[docs/MEDIA.md](docs/MEDIA.md).
 
 ### Combos
 
 Recording › Combos saves a combo you landed, and the combo helper grades your next attempts against it, link by link.
 Each saved combo is a small JSON file in `sd:/ultimate/TrainingRooms/combos/`. You can edit it, copy it to another
-card or share it, and any fighter can practise it; [docs/COMBOS.md](docs/COMBOS.md) describes the format. *No clip
-yet.*
+card or share it, and any fighter can practise it; [docs/COMBOS.md](docs/COMBOS.md) describes the format. The
+clip is under Combos below.
 
 ### CPU reactions
 
@@ -95,13 +94,11 @@ Stages) chooses between the game's respawn platform (above) and the instant resp
 
 ### Recording and playback
 
-A save state only warps, and Load starts nothing. The redesign gives each role one active macro, a recording
-or a chain, and that role's Play chord plays it without warping back on later loops.
-[docs/RECORDING.md](docs/RECORDING.md) is how to use it, including what the match does on this branch and what
-the new machine does. The pop-up and the Recording page are in that doc. The draft of what rc.5 changes is
-[docs/RELEASE-NOTES-rc5.md](docs/RELEASE-NOTES-rc5.md).
-
-![Play on CPU warps once, then plays the active macro](docs/media/rc5-play-chord.gif)
+A save state only warps, and Load starts nothing. Each role has one active macro, a recording or a chain, and
+that role's Play chord plays it without warping back on later loops. On the Recording page, Y does nothing and
+X cycles the loop only while the cursor is in Macros.
+[docs/RECORDING.md](docs/RECORDING.md) is how to use it. The pop-up and the Recording page are in that doc.
+What rc.5 changes is [docs/RELEASE-NOTES-rc5.md](docs/RELEASE-NOTES-rc5.md).
 
 ![Record and playback](docs/media/menu-recording.gif)
 
@@ -186,7 +183,9 @@ The *Replay capture* row and the Online Deluxe overlay show the same setting.
 
 ## Status
 
-**0.2.0-rc.3** (2026-11-05) is the console test build. It adds to rc.2:
+**[0.2.0-rc.5](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases/tag/v0.2.0-rc.5)** is the newest build. There is no separate 0.2.0-rc.4. What it changes is [docs/RELEASE-NOTES-rc5.md](docs/RELEASE-NOTES-rc5.md).
+
+**0.2.0-rc.3** (2026-11-05) is the previous console test build. It adds to rc.2:
 - the **frame strip** input display, replacing the 15-row input log;
 - **Change Stage**: a row that switches the stage now, in Training and in waiting rooms;
 - **menu navigation**: ZL + Up/Down jumps sections, the menu reopens where you left it, ZR no longer resets a page by
@@ -196,7 +195,7 @@ The *Replay capture* row and the Online Deluxe overlay show the same setting.
 
 rc.2 added the pause-helper fix, the Solo Popo mark placement and the Kirby hat-request endings. Limitations kept from
 the fork are listed in [Differences from the fork](docs/DIFFERENCES-FROM-THE-FORK.md); planned work is in the
-[ROADMAP](docs/ROADMAP.md). 0.1.0 crashes at console boot; use the newest build, 0.2.0-rc.3.
+[ROADMAP](docs/ROADMAP.md). 0.1.0 crashes at console boot; use the newest build, [0.2.0-rc.5](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases/tag/v0.2.0-rc.5).
 
 ## Build
 

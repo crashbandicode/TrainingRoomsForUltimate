@@ -4,9 +4,9 @@ Recording is save states, macros, chains, combos, and sequences. A save state on
 
 Two layers are easy to mix up, so this page keeps them apart.
 
-What a press does in a match on this branch: Load warps the save and starts nothing. The runtime asks the recorder what a finished load should do, and that answer is nothing. Play on CPU (ZR + D-pad Up) is still the older playback chord. It plays a recording slot, or the named library when that source is selected. It does not call the new per-role machine. Record (ZR + D-pad Down) is still the older record chord. Play on Player 1 (ZR + D-pad Left) and the recording pop-up (ZR + D-pad Right) are recognized as chords. Nothing in the match consumes those two requests yet.
+What a press does in a match: Load warps the save and starts nothing. The runtime asks the recorder what a finished load should do, and that answer is nothing. Record (ZR + D-pad Down) captures Player 1 and, when you stop, writes a named macro. Play on Player 1 (ZR + D-pad Left) and Play on CPU (ZR + D-pad Up) play that role's active macro, or stop it. The recording pop-up (ZR + D-pad Right) opens and closes over the match.
 
-What the new machine does, in `src/model/playback.rs` and the library: the rest of this page, except the sentences marked as the pop-up, the Recording page, and the file screens. Those screens are still being built. The pictures are full-screen captures, 1280 wide, under 10 seconds, one behaviour each, and [MEDIA.md](MEDIA.md) is the list.
+The machine is `src/model/playback.rs` and the library. The pop-up, the Recording page, and the file screens are `src/model/recording_menu.rs`. The pictures are full-screen captures, 1280 wide, under 10 seconds, one behaviour each, and [MEDIA.md](MEDIA.md) is the list.
 
 Files live under `sd:/ultimate/TrainingRooms/`. A macro, a chain, a combo, a sequence, and a save state are separate files. Renaming either end of a connection keeps it, because the connection stores the file's id.
 
@@ -40,10 +40,10 @@ Each role has one active macro. It is either a recording or a chain. Set active 
 | --- | --- | --- |
 | Save | ZL + D-pad Down | Writes the bound save. |
 | Load | ZL + D-pad Up | Warps to the bound save. Starts nothing. |
-| Record | ZR + D-pad Down | Records. The pop-up's role says who is recorded, once that window exists. |
+| Record | ZR + D-pad Down | Records Player 1. The pop-up can show CPU, and that role is stored, but the recorder is not given it. |
 | Play on Player 1 | ZR + D-pad Left | Plays Player 1's active macro, or stops it if it is already playing. |
 | Play on CPU | ZR + D-pad Up | Plays the CPU's active macro, or stops it. This chord was Input Playback. |
-| Recording pop-up | ZR + D-pad Right | Opens the pop-up. The window itself is still being built. |
+| Recording pop-up | ZR + D-pad Right | Opens the pop-up. The same chord closes it. |
 
 Both Play chords may be on at once. They do not share a machine: Player 1 and the CPU can play at the same time. A chain does not use that. Its macros play one after another.
 
@@ -85,19 +85,15 @@ A different move does not count, even when the events match. That attempt drops.
 
 ![A follow-up that is not a true combo still counts, and a different move drops](media/rc5-grade-not-true.gif)
 
-Make combo, on a macro's or a chain's own screen, plays that file once on Player 1 from its start save and keeps the links as a new combo. <!-- verify: rr-6 -->
-The file you made it from stays. <!-- verify: rr-6 -->
-The new combo becomes one of the five most recently used, and the drill does not change. <!-- verify: rr-6 -->
-If that start save was deleted, the load is skipped and the missing-start sentence shows. <!-- verify: rr-6 -->
-A chain's Make combo warps to the chain's start save and plays the whole chain once. <!-- verify: rr-6 -->
+Make combo, on a macro's or a chain's own screen, does not save a combo and does not play the file under the cursor. It runs one pass of Player 1's active macro. The file on screen stays. The drill does not change, and the new pass is not added to the five most recently used.
+If that active macro is a chain with Start save On, the pass warps to the chain's first start save and plays the chain once.
+The missing-start sentence belongs to Play. Make combo does not show it. Play skips a deleted start save and shows "No start save. This macro plays from where the fighters are."
 
 ![Make combo plays the macro once and leaves the current drill in place](media/rc5-make-combo.gif)
 
-Crop on a combo keeps a range of links and saves a new combo. <!-- verify: rr-6 -->
-The original stays. <!-- verify: rr-6 -->
-Crop on a macro uses the replay window's In and Out and saves a new named macro. <!-- verify: rr-6 -->
-On that crop screen, L and R move the handles, and B returns to the file. <!-- verify: rr-6 -->
-A chain has no Crop, because it has no frames of its own. <!-- verify: rr-6 -->
+Crop on a combo or a macro asks the recording worker to save a new file from a window that is already stored. The original stays. The menu does not open a crop screen, and L and R do not move handles. With no stored window, Crop writes nothing.
+When a window is stored, a combo crop keeps that range of links as a new combo, and a macro crop keeps that range of frames as a new macro with no start save. The replay window is a separate row under Replays. It is not this Crop row.
+A chain has no Crop row, because it has no frames of its own.
 
 ![Crop keeps a range of links as a new combo](media/rc5-crop-combo.gif)
 
@@ -117,90 +113,55 @@ The picker is the same numbered picker as a chain, including R removing the last
 
 ## The pop-up
 
-The pop-up is one window over the match. <!-- verify: rr-6 -->
-It owns the buttons while it is open, and B closes it without changing the selection. <!-- verify: rr-6 -->
-The title is at the top, then Player | CPU, and L or R switches role. <!-- verify: rr-6 -->
-Under the role, two tabs switch with ZL or ZR: Save states & Macros, and Combos & Sequences. <!-- verify: rr-6 -->
-The CPU view has only Save states & Macros, and it has no tab control. <!-- verify: rr-6 -->
-Each tab is two stacked sections, and each section scrolls on its own while its header stays. <!-- verify: rr-6 -->
-ZL + Up or ZL + Down pages the section the cursor is in, by whole rows. <!-- verify: rr-6 -->
-Left and Right move between the two sections. <!-- verify: rr-6 -->
-The five most recently used sit in a thin green outline, most recent first, and the rest of the library is under a hairline. <!-- verify: rr-6 -->
-The Connections panel on the right spells out the connections of the row under the cursor. <!-- verify: rr-6 -->
-A view shows only that role's active macro, that role's loop, and that role's connections. <!-- verify: rr-6 -->
-The bound save is a green row in both views. <!-- verify: rr-6 -->
-A white border and a white bar are the cursor, which is a different mark from the green fill. <!-- verify: rr-6 -->
+The pop-up is one window over the match. While it is open it takes the menu's buttons. B closes it and leaves the bound save, the active macros, and the cursor as they were.
 
-A on a save binds it to Save and Load. <!-- verify: rr-6 -->
-A on a macro or a chain sets it active for the role in view. <!-- verify: rr-6 -->
-A on a combo or a sequence drills it. <!-- verify: rr-6 -->
-X cycles the loop, and only while the cursor is in Macros. <!-- verify: rr-6 -->
-Y does nothing on this window. <!-- verify: rr-6 -->
+The title reads `Recording (Player 1)` or `Recording (CPU)`. L sets Player 1. R sets the CPU.
+
+Player 1 has two tabs, Save states & Macros and Combos & Sequences. ZL and ZR switch those tabs. The CPU view has only Save states & Macros, and ZL and ZR do not change it.
+
+Each tab is two stacked sections. Each section shows four rows under a header that stays put, and that section's window follows its own cursor. ZL + Up or ZL + Down moves the section the cursor is in by 12 rows. Left and Right move between the two sections.
+
+The five most recently used of a kind are listed first, most recent first. The screen does not draw an outline around them or a line under the fifth.
+
+The connections of the row under the cursor are the menu's two help lines, headed CONNECTIONS. They are not a panel on the right. A chain that is the active macro of the role in view includes that role's loop on those lines. Other connection lines, such as a start save, a chain step, a combo made from the file, or the recorded fighter, are not limited to that role. The MACROS header shows the loop of the role in view.
+
+The bound save's name is green in both roles. The active macro of the role in view has a green name, and so does the drilled combo or sequence. Green is the name's colour. The cursor is the menu's dark highlight bar, a different mark from the green name.
+
+A on a save binds it to Save and Load. A on a macro or a chain sets it active for the role in view. A on a combo or a sequence drills it. X cycles the loop, and only while the cursor is in Macros. Y does nothing on this window.
 
 ![The pop-up over the match, Player view, cursor on a save](media/rc5-popup.gif)
 
-The orange floppy chip is the save state a macro starts at. <!-- verify: rr-6 -->
-It is grey when that macro's Start save switch is Off. <!-- verify: rr-6 -->
-The same orange floppy marks the Save states header. <!-- verify: rr-6 -->
-A chain row shows a chain mark and the count of its macros. <!-- verify: rr-6 -->
-With the cursor on a chain, its macros wear 1, 2, 3 at the left edge. <!-- verify: rr-6 -->
-+ New chain is the last row under Macros, and + New sequence is the last row under Sequences. <!-- verify: rr-6 -->
-Each opens the numbered picker and then the Switch keyboard. <!-- verify: rr-6 -->
+The orange floppy is the save state a macro starts at. It is grey when that macro's Start save switch is Off. The Save states header uses the same orange floppy. A chain row shows how many macros it contains. With the cursor on a chain, those macros show 1, 2, 3 in front of the name. + New chain is the last row under Macros, and + New sequence is the last row under Sequences. A opens the numbered picker. B on the picker opens the name step.
 
 ## The Recording page
 
-The Recording page in the menu uses the same stacked sections and the same Connections panel. <!-- verify: rr-6 -->
-The left column is Save states & Macros, Combos & Sequences, Replays, and Options. <!-- verify: rr-6 -->
-There is no tab switch on the page, because that column lists the groups. <!-- verify: rr-6 -->
-ZR switches Player and CPU, because L and R change the menu page, as they do on every other page. <!-- verify: rr-6 -->
-The CPU view hides Combos & Sequences. <!-- verify: rr-6 -->
-A opens the file's own screen. <!-- verify: rr-6 -->
-On a save, Bind to Save / Load is that screen's first row. <!-- verify: rr-6 -->
-X cycles the loop only when the cursor is in Macros, and X does not save defaults. <!-- verify: rr-6 -->
-B closes the menu. <!-- verify: rr-6 -->
+The Recording page uses the same stacked sections and the same CONNECTIONS help lines. The left column is Save states & Macros, Combos & Sequences, Replays, and Options. There is no tab switch on the page, because that column lists the groups. ZR switches Player 1 and CPU. L and R change the menu page, except while a file screen, the numbered picker, or the name step is open: then L and R stay on Recording. The CPU view hides Combos & Sequences. A opens the file's own screen. On a save, Bind to Save / Load is that screen's first row. X cycles the loop only when the cursor is in Macros, and on this page X does not save defaults. B closes the menu when no file screen is open. On a file screen, B goes back.
 
 ![The Recording page, Player view, saves above macros](media/rc5-recording-page.gif)
 
-The old Recording and Saves rows leave this page. <!-- verify: rr-6 -->
-Their setting ids stay, so an old settings file still loads. <!-- verify: rr-6 -->
-What leaves the page is the slot number, Randomize slots, Record Slot, Trigger, the Duration dropdown, button slots, the save-state playback checklist, Source, and per-slot playback. <!-- verify: rr-6 -->
-The file cap stays, and a long recording is not refused. <!-- verify: rr-6 -->
-Replays and Options keep Replay capture, the replay window, Crop trailing neutral, Hitstun timing, Mash interrupts playback, and the loop's list of counts. <!-- verify: rr-6 -->
-Respawn on platform stays under Fighters & Stages › Stages. <!-- verify: rr-6 -->
+The old Recording and Saves rows leave this page. Their setting ids stay, so an old settings file still loads. What leaves the page is the slot number, Randomize slots, Record Slot, Trigger, the Duration dropdown, button slots, the save-state playback checklist, Source, and per-slot playback. The file cap stays at 36,000 frames. The capture stops taking frames there. A recording of that length is kept. One frame more is not saved. Replays keeps Ask before switching fighter, Edit placement, Replay window, and Replay capture. Options keeps Crop trailing neutral, Hitstun timing, Mash interrupts playback, the loop's list of counts, Settings override playback, Combo helper, On-time tolerance, and After an attempt. Respawn on platform stays under Fighters & Stages › Stages.
 
 ### A file's own screen
 
-The breadcrumb reads Recording, then the role in view, then the file's name. <!-- verify: rr-6 -->
-Set active is one row, for the role in view: On for that role, or Off. <!-- verify: rr-6 -->
-Left and Right turn it On or Off. <!-- verify: rr-6 -->
-On makes this file that role's active macro. <!-- verify: rr-6 -->
+The breadcrumb reads `Recording (Player view)  >  Save states & Macros  >  name`, or Combos & Sequences for a combo or a sequence. The CPU view says `Recording (CPU view)`.
 
-A macro's rows are Start save, Set active, Rename, Crop, Make combo, and Delete. <!-- verify: rr-6 -->
-A chain's rows are Start save, Set active, Edit chain, Rename, Make combo, and Delete, and it has no Crop. <!-- verify: rr-6 -->
-A combo's rows are Drill, Made from, Rename, Crop, and Delete. <!-- verify: rr-6 -->
-A save's rows are Bind to Save / Load, Duplicate, Rename, and Delete. <!-- verify: rr-6 -->
-A sequence's rows are Drill sequence, a numbered row for each combo, Edit combos, Rename, and Delete. <!-- verify: rr-6 -->
-A on a numbered combo drills that combo alone. <!-- verify: rr-6 -->
+Set active is one row, for the role in view. Right sets On for that role. Left sets Off. On makes this file that role's active macro. Left on a row that is already Off does not clear the other role.
 
-Rename uses the Switch keyboard, with a 48-character limit. <!-- verify: rr-6 -->
-B cancels and keeps the old name. <!-- verify: rr-6 -->
-Empty OK on a new file keeps Macro N, Chain N, Combo N, Save N, or Sequence N. <!-- verify: rr-6 -->
-In a waiting room the keyboard stays closed, and a new file keeps that N name until you rename it in Training. <!-- verify: rr-6 -->
-The combo's Connections panel lists each link, its two moves, and whether it was recorded TRUE. <!-- verify: rr-6 -->
-The helper still says link for those hits. <!-- verify: rr-6 -->
-The word sequence is the file of combos, and the word chain is only the compound macro. <!-- verify: rr-6 -->
+A macro that has a start save lists Start save, then Set active, Rename, Crop, Make combo, and Delete. Without a start save, Start save is absent. A chain that has a start save on its first macro lists Start save first, then Set active, Edit chain, Rename, Make combo, and Delete. A chain has no Crop. A combo lists Drill, then Made from when it was made from a macro whose name is still there, then Rename, Crop, and Delete. A save lists Bind to Save / Load, Duplicate, Rename, and Delete. A sequence lists Drill sequence, a numbered row for each combo, Edit combos, Rename, and Delete. A on a numbered combo drills that combo alone.
+
+Rename opens the Switch keyboard. B, or an empty confirm, keeps the old name. A name the library stores may be at most 48 characters, and it may not be empty or contain a control character. An empty confirm on a new chain or sequence keeps Chain N or Sequence N. A recording stopped with no typed name is Macro N. Duplicate names the copy Save N. Save overwrites the bound save, and when nothing is bound it creates Save N. A combo saved with no typed name is Combo N. In an online waiting room the keyboard stays closed, and B on the name step keeps that N name. A local-wireless waiting room and Training open the keyboard.
+
+The combo's help lines list each link as the two moves and TRUE or not, then that link's input events, then its drift when it has one. The helper still says link for those hits. The word sequence is the file of combos, and the word chain is only the compound macro.
 
 ![A macro's own screen: Start save On, and Set active for Player 1](media/rc5-macro-screen.gif)
 
 ## Fighter Mismatch
 
-The prompt already exists. Its title is Fighter Mismatch. The cursor starts on Keep current fighter. The other row is Switch to recorded fighter. Keep plays the inputs on the fighter you have. Switch loads the recorded fighter. Nothing is hidden or refused because the fighter differs. The recorded fighter is information. A sequence may mix fighters.
+Fighter Mismatch is the prompt a replay clip or a combo can open before it switches a fighter. The title is Fighter Mismatch. The rows are Keep current fighter and Switch to recorded fighter. Nothing is hidden or refused because the fighter differs. A sequence may mix fighters.
 
-For a chain, that prompt is asked once, when the Play chord starts the chain, and only if macro 1 was recorded on a different fighter. Switch changes to macro 1's recorded fighter. Macros 2 and later never ask and never switch. They play on the character you have after that prompt. Load never asks, because Load never starts a chain. The chain's prompt has no list of macros.
+Play on a chain does not open those rows. When the chain's first macro was recorded on a different fighter, Play writes `screen=mismatch ask=macro1` and then plays on the fighter you have. Later macros are not checked and do not switch. Load does not write that line, because Load does not start a chain.
 
-The playback machine on this branch does not ask the prompt. The sentence above is the redesign's rule for when a chain starts. Confirm it on the build that wires the prompt into Play.
-
-![Fighter Mismatch for the chain's first macro only](media/rc5-fighter-mismatch.gif)
+![Play of a chain whose first macro was recorded on another fighter](media/rc5-fighter-mismatch.gif)
 
 ## Migration of the old slots
 
@@ -214,4 +175,4 @@ A save index that holds a save becomes one file, both fighters, with the same `S
 
 ## Where the rules come from
 
-The playback machine, the files, the grades, the chords, and the migration are `src/model/playback.rs`, `src/model/library/`, `src/model/combo.rs`, `src/model/drill.rs`, `src/model/chords.rs`, and `src/model/library/migrate.rs` on this branch. The screens are revision 8.2 of the recording redesign. Sentences marked `verify: rr-6` are the pop-up, the Recording page, and the file screens, written ahead of that slice.
+The playback machine, the files, the grades, the chords, and the migration are `src/model/playback.rs`, `src/model/library/`, `src/model/combo.rs`, `src/model/drill.rs`, `src/model/chords.rs`, and `src/model/library/migrate.rs`. The pop-up, the Recording page, and the file screens are `src/model/recording_menu.rs` and `src/model/ui/frame.rs`. Record, Play, and the pop-up chord are applied in `src/model/rr_host.rs`.

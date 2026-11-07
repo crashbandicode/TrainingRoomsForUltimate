@@ -50,27 +50,23 @@ The arrow on a chip is the left stick on that frame, binned to eight screen dire
 
 ![An attack chip with an up-right arrow from the left stick](media/rc5-frame-strip-chips.gif)
 
-A C-stick attack takes its arrow from the C-stick. <!-- verify: rr-11 -->
-A press whose C-stick is neutral keeps the left-stick arrow. <!-- verify: rr-11 -->
+A C-stick attack, the attack the game marks as coming from the C-stick, takes its chip arrow from the C-stick when that stick is outside the dead zone. A press that is not a C-stick attack keeps the left-stick arrow, even if the C-stick is held. A C-stick attack whose C-stick stays inside the dead zone also keeps the left-stick arrow.
 
 ![A forward smash from the C-stick, left stick neutral, with a right arrow on the attack chip](media/rc5-frame-strip-cstick.gif)
 
 ## Stick row
 
-Under Player 1's lane, every frame of the same 60 shows the left stick's held direction. <!-- verify: rr-11 -->
-The eight directions are the same bins as the chip arrow, and a neutral frame is blank. <!-- verify: rr-11 -->
-The row scrolls and freezes with the rest of the strip. <!-- verify: rr-11 -->
-A change of binned direction counts as an input change, so the strip does not freeze while the stick moves. <!-- verify: rr-11 -->
+Under Player 1's lane, every frame of the same 60 shows the left stick's held direction. The eight directions are the same bins as the chip arrow, and a neutral frame is blank. The row scrolls and freezes with the rest of the strip. A change of binned direction resets the quiet count, so the strip does not freeze across that change. Holding one direction can still freeze it.
 
 ![The stick row during a dash dance: held directions, and blanks while the stick is neutral](media/rc5-frame-strip-stick-row.gif)
 
 ## Freeze
 
-When both fighters can act, Player 1 has no new button press, and neither fighter is in hitlag, for 30 frames, the strip stops scrolling and keeps the last exchange on screen. It moves again on the next frame where that is no longer true: someone cannot act, a button goes down, or someone is in hitlag.
+When both fighters can act, Player 1 has no new button press, the left stick stays in the same bin, and neither fighter is in hitlag, for 30 frames, the strip stops scrolling and keeps the last exchange on screen. It moves again on the next frame where that is no longer true: someone cannot act, a button goes down, the left stick's bin changes, or someone is in hitlag.
 
 ![The strip holds still after the hit, then scrolls again when Player 1 jabs](media/rc5-frame-strip-freeze.gif)
 
-While the stick row is present, moving the left stick out of neutral also starts the strip scrolling again. <!-- verify: rr-11 -->
+A change from one held direction to another starts the strip scrolling again. Leaving neutral is one such change. Staying in the same direction does not.
 
 ![The strip keeps scrolling while the left stick changes direction and no button is pressed](media/rc5-frame-strip-freeze-stick.gif)
 
@@ -139,4 +135,4 @@ The same 20 frames are what the combo helper uses when it decides that an exchan
 
 ## Sources
 
-The lanes, chips, freeze, readouts, and the 20-frame rule are what `src/model/frame_strip.rs` and `src/model/frame_strip_plan.rs` draw, as specified in `specs/SPEC-input-06-frame-strip.md`. The stick row and the C-stick arrow are the in-flight stick-row slice. Sentences marked `verify: rr-11` are that slice, written ahead of it.
+The lanes, chips, freeze, readouts, the stick row, the C-stick arrow, and the 20-frame rule are what `src/model/frame_strip.rs` draws, as specified in `specs/SPEC-input-06-frame-strip.md`.
