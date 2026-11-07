@@ -827,10 +827,10 @@ def links_spec(key, role="player"):
                  "nodes": [("conv", n, None, "#%d" % i, False) for n, i in convs], "none": "none"},
             ],
             "lines": [("Its links (4)", "", None),
-                      ("L1  aerial → aerial", "TRUE", GREEN),
-                      ("L2  aerial → aerial", "TRUE", GREEN),
-                      ("L3  aerial → aerial", "TRUE", GREEN),
-                      ("L4  aerial → aerial", "TRUE", GREEN),
+                      ("L1  aerial → aerial", "TRUE", GREEN, "jump · release · ↓ flick · A", "drift →"),
+                      ("L2  aerial → aerial", "TRUE", GREEN, "jump · release · ↓ flick · A", "drift →"),
+                      ("L3  aerial → aerial", "TRUE", GREEN, "jump · release · ↓ flick · A", "drift →"),
+                      ("L4  aerial → aerial", "TRUE", GREEN, "jump · release · ↓ flick · A", "drift →"),
                       ("Fighters", combo["fighters"], ch.M_TEXT)],
         }
     conv = {v["key"]: v for v in V4}.get(key)
@@ -917,7 +917,10 @@ def links_panel(img, box, spec, header=True):
         y += 4
     d.line((stem_x, stem_top, stem_x, stem_bot), fill=(150, 156, 170, 255), width=2)
     y += 4
-    for label, value, colour in spec["lines"]:
+    for item in spec["lines"]:
+        label, value, colour = item[:3]
+        detail = item[3] if len(item) > 3 else None
+        drift = item[4] if len(item) > 4 else None
         if label == "LOOP":
             iv.text(d, (x0, y + 14), "Loop", fnt(13, bold=True), fill=ch.M_GROUP, anchor="lm")
             loop4(img, x0 + 40, y, value, 28)
@@ -938,7 +941,19 @@ def links_panel(img, box, spec, header=True):
             if value:
                 iv.text(d, (x0 + d.textlength(label, font=fl) + 10, y + 10), value, fnt(14),
                         fill=colour or ch.M_TEXT, anchor="lm")
-            y += 26
+            if detail:
+                fe = fnt(11)
+                ev_x = x0
+                # Stay inside the panel. A line that would pass the right edge is not drawn.
+                if ev_x + d.textlength(detail, font=fe) <= x1:
+                    iv.text(d, (ev_x, y + 26), detail, fe, fill=ch.M_TEXT, anchor="lm")
+                    if drift:
+                        dx = ev_x + d.textlength(detail, font=fe) + 10
+                        if dx + d.textlength(drift, font=fe) <= x1:
+                            iv.text(d, (dx, y + 26), drift, fe, fill=DIM, anchor="lm")
+                y += 40
+            else:
+                y += 26
     return y
 
 

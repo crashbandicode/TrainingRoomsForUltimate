@@ -1385,6 +1385,14 @@ Earlier the same day, on pins: "Are pins even helping with anything? they seem k
 - Auto-load on death only warps to the bound save. It does nothing when no save is bound. Mirroring, damage on load and buffs still apply to that warp. The operator: "4. agreed".
 - The primary's recommendations, to which the operator did not object: migration skips empty slots, and the old slots' names use the date the migration runs; the loop's default is 1, and today's loop On becomes ∞; after the bound save is deleted, the next Save creates "Save N" and binds it; the current library selection (`macros/selected.txt`) becomes Player 1's active macro; a single combo's best stays as today.
 
+**Decided in revision 8.3** (operator 2026-11-07: "yes do it, show drift as info only"). The operator asked: "if combos don't save inputs how do we know they were done properly? A nair loop for example that I record as a combo wouldn't that need the inputs? Otherwise it's just a glorified version of the combo counter in native training mode". The primary asked: "Should I do it? And should drift be shown only, as I suggest, or graded too?"
+- A combo link records input events, not only presses: button presses and releases, the C-stick, and stick flicks (fast-fall, dash, tap-jump). Each event has its timing, counted from the first frame you could act. A link holds up to 12 events. 16 links × 12 events is 192 events, still a few kilobytes.
+- Directions are relative to facing (forward or back, up, down, and the diagonals). Left and right are told apart, and a combo recorded facing right still grades facing left. That facing rule is the primary's design choice.
+- A step counts when its recorded input events are there, of the same kind and direction, in order and within the tolerance, and the move that comes out is the recorded move. TRUE is still not required. A missing or extra-late event is a drop.
+- Drift, the held stick between events, is recorded and shown as information. It is never graded.
+- Older combo files (presses only) still load and grade on their presses as before. Nothing new is required of a shared file.
+- Make combo and Save combo both record events. Save combo works from live play, because the strip already samples every frame.
+
 **Next:** implementation from `p23/rc5-candidate` `384e41f`; the operator signed off ('…green to implement'), 2026-11-06.
 
 ### INTRO-ONCE · The Training intro notices — ordered (2026-11-05)
