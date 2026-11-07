@@ -537,3 +537,19 @@ ceiling = 149876
 date = "2026-11-07"
 reason = "rc.5 wire-fix: a missing recording index is fresh on the Switch read error, and a stall is a jump past the previous gap; measured 149876 (tools/size_gate.py), +21 over 149855"
 approved_by = "Operator 2026-11-07 via primary 35137355 (TASK-GROK-rc5-wire-fix): 'Raise as needed'"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 149965
+date = "2026-11-07"
+reason = "rc.5 wire-fix: a recording drill stages the grade target for the frame hook, so the worker never takes HELPER; measured 149965 (tools/size_gate.py), +89 over 149876"
+approved_by = "Operator 2026-11-07 via primary 35137355 (TASK-GROK-rc5-wire-fix): 'Raise as needed'"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 149966
+date = "2026-11-07"
+reason = "rc.5 wire-fix: closing the recording pop-up clears the last diag line so the next open emits it again; measured 149966 (tools/size_gate.py), +1 over 149965"
+approved_by = "Operator 2026-11-07 via primary 35137355 (TASK-GROK-rc5-wire-fix): 'Raise as needed'"
