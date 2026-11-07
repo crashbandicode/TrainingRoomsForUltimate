@@ -457,7 +457,7 @@ def rr_record_cpu(ctx):
     time.sleep(1.5)
     shot = ctx.shot('cpu-playing')
     return save(ctx, 'record-cpu', {
-        'start': start, 'stop': stop, 'file': path.name, 'pressed': pressed[:8], 'shot': shot,
+        'start': start, 'stop': stop, 'file': path.name, 'pressed': pressed[:8], 'shot': str(shot),
     })
 
 
