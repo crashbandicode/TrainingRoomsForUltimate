@@ -465,3 +465,11 @@ ceiling = 147134
 date = "2026-11-07"
 reason = "rr integration (p23/rr-integration): rr-12 combo input events merged onto 7b4b600 (rr-1..6, 8, 11, docs); measured 147134 (tools/size_gate.py), +4328 over 142806"
 approved_by = "Operator 2026-11-05 standing order via primary 35137355: 'Raise as needed'"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 148310
+date = "2026-11-07"
+reason = "rr-7 runtime (p23/rr-7-runtime): the recording worker, start-save notices, and combo event lines; measured 148310 (tools/size_gate.py), +1176 over 147134"
+approved_by = "Operator 2026-11-05 standing order via primary 35137355: 'Raise as needed'"
