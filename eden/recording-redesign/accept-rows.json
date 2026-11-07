@@ -1,6 +1,6 @@
 {
   "game_id": "01006A800016E000",
-  "start": "training",
+  "start": "boot",
   "early_stop": false,
   "scope": "rc.5 acceptance. One self-contained row per checklist item. Docs GIFs are a separate media run.",
   "setup": [
@@ -90,6 +90,18 @@
       "file": "segments/fsmash.edenmacro.json",
       "sha256": "2a6f61ae325478ba8a005edef0012064069fde9c0a88d93ff242c8c736d2452f",
       "cap": 30
+    },
+    "attract-cancel": {
+      "library": "attract-cancel"
+    },
+    "main-stage": {
+      "library": "main-stage"
+    },
+    "stage-css": {
+      "library": "stage-css"
+    },
+    "enter-training": {
+      "library": "enter-training"
     }
   },
   "gates": {
@@ -102,6 +114,18 @@
       "source": "gates",
       "pattern": "screen=recording role=player recording=1",
       "cap": 15
+    },
+    "main": {
+      "library": "main",
+      "scale": "fit"
+    },
+    "stage": {
+      "library": "stage",
+      "scale": "fit"
+    },
+    "css": {
+      "library": "css",
+      "scale": "fit"
     }
   },
   "recover": [
@@ -111,6 +135,27 @@
     }
   ],
   "rows": [
+    {
+      "id": "acc-boot",
+      "start": "boot",
+      "end": "training",
+      "steps": [
+        {
+          "run": "accept.py:acc_boot",
+          "check": true,
+          "on": "release"
+        },
+        {
+          "run": "accept.py:acc_boot",
+          "check": true,
+          "on": "diag"
+        }
+      ],
+      "expect": "Both windows leave the intro and sit in Training on Mario before any checklist row. The shot is the check that Start was taken.",
+      "timed": false,
+      "build": "both",
+      "on": "release"
+    },
     {
       "id": "acc-record",
       "start": "training",

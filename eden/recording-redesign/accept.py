@@ -59,6 +59,14 @@ def _warps(ctx):
     return len(re.findall(r'playback .*warp=1', path.read_text(errors='replace')))
 
 
+def acc_boot(ctx):
+    """Leave the intro and enter Training. The shot is the proof Start was taken."""
+    out = steps.boot_training(ctx)
+    shot = ctx.shot('in-training')
+    out['shot'] = str(shot)
+    return out
+
+
 def prep(ctx, name):
     """Copy one fixture, reload the catalog, and center. Returns the card directory."""
     src = FIXTURES / name
