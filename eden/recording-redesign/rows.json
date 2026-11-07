@@ -1,17 +1,17 @@
 {
   "game_id": "01006A800016E000",
   "start": "boot",
-  "scope": "rc.5 grouped Eden session (cards 10a/10a2/10c): the recording-redesign rows from the stage-1 report, the rc.5 frame-advantage cases and heap/crash gates (EDEN-SESSION-PLAN-rc5), and every GIF docs/MEDIA.md still needs, across the operator's 7 instances (surface 2, yoga 2, ally 1, xps 2). Timed rows (frame advantage, strip timing, combo grading) run on the Surface and the Yoga only. Instance keys: xps-a, xps-b, ally-a, surface-a, surface-b, yoga-a, yoga-b. Every non-library segment is recorded from its recipe on its first play; the recipes' frame counts are best efforts, each marked \"timing to be checked when recorded\" (README, Open questions).",
+  "scope": "rc.5 confirming re-run on Surface and Yoga, two instances each. surface-a and yoga-a load the release NRO. surface-b and yoga-b load the diag NRO from the same commit. Ally and XPS rows moved here. Diag-line gates run on the diag instances. tr_combo_link_v1, tr_combo_attempt_v1 and f9_body_of are trace gates on release. Heap and crash run on all four instances. Media stays on release. Timed rows stay on the Surface and the Yoga.",
   "setup": [
     {
-      "state": "Instance xps-a boots with the migration fixture: a non-empty recording in slot 1, the other recording slots empty, legacy save slots live",
+      "state": "surface-b (diag) and yoga-a (release) boot with a non-empty recording in slot 1 and the other recording slots empty",
       "via": "fixture",
-      "ref": "RR-7 Eden row rr-migrate start state; media-rc5-migration start"
+      "ref": "RR-7 Eden row rr-migrate; media-rc5-migration"
     },
     {
-      "state": "Every instance: the rc.5 release NRO with all slices merged, plugins installed, Eden muted (core.volume=0 persisted)",
+      "state": "surface-a and yoga-a load the release NRO; surface-b and yoga-b load the diag NRO of the same commit. Eden muted (core.volume=0). Both windows of a host leave the intro before timed rows",
       "via": "fixture",
-      "ref": "EDEN-SESSION-PLAN-rc5; operator instruction 2026-10-09"
+      "ref": "EDEN-SESSION-PLAN-rc5; operator 2026-10-09 and 2026-10-26"
     },
     {
       "state": "Training, Battlefield, P1 Mario and CPU Mario at 0%, Input Display Frame strip, Hitbox Visualization Off, CPU Shield None and DI/SDI cleared unless the row says otherwise, menu closed",
@@ -150,6 +150,18 @@
       ],
       "note": "timing to be checked when recorded"
     },
+    "reset-center": {
+      "file": "segments/reset-center.edenmacro.json",
+      "cap": 30,
+      "recipe": [
+        {
+          "buttons": "l,r,a",
+          "frames": 4,
+          "gap_frames": 70
+        }
+      ],
+      "note": "timing to be checked when recorded"
+    },
     "reset-walk": {
       "file": "segments/reset-walk.edenmacro.json",
       "cap": 30,
@@ -179,6 +191,146 @@
           "buttons": "a",
           "frames": 2,
           "gap_frames": 58
+        }
+      ],
+      "note": "timing to be checked when recorded"
+    },
+    "jab-link": {
+      "file": "segments/jab-link.edenmacro.json",
+      "cap": 30,
+      "recipe": [
+        {
+          "buttons": "a",
+          "frames": 2,
+          "gap_frames": 14
+        },
+        {
+          "buttons": "a",
+          "frames": 2,
+          "gap_frames": 30
+        }
+      ],
+      "note": "timing to be checked when recorded"
+    },
+    "jab-link-3": {
+      "file": "segments/jab-link-3.edenmacro.json",
+      "cap": 30,
+      "recipe": [
+        {
+          "buttons": "a",
+          "frames": 2,
+          "gap_frames": 14
+        },
+        {
+          "buttons": "a",
+          "frames": 2,
+          "gap_frames": 14
+        },
+        {
+          "buttons": "a",
+          "frames": 2,
+          "gap_frames": 40
+        }
+      ],
+      "note": "timing to be checked when recorded"
+    },
+    "jab-drop": {
+      "file": "segments/jab-drop.edenmacro.json",
+      "cap": 30,
+      "recipe": [
+        {
+          "buttons": "a",
+          "frames": 2,
+          "gap_frames": 42
+        },
+        {
+          "buttons": "a",
+          "frames": 2,
+          "gap_frames": 30
+        }
+      ],
+      "note": "timing to be checked when recorded"
+    },
+    "exchange-jabs": {
+      "file": "segments/exchange-jabs.edenmacro.json",
+      "cap": 30,
+      "recipe": [
+        {
+          "buttons": "a",
+          "frames": 2,
+          "gap_frames": 90
+        },
+        {
+          "buttons": "a",
+          "frames": 2,
+          "gap_frames": 40
+        }
+      ],
+      "note": "timing to be checked when recorded"
+    },
+    "freeze-jabs": {
+      "file": "segments/freeze-jabs.edenmacro.json",
+      "cap": 30,
+      "recipe": [
+        {
+          "buttons": "a",
+          "frames": 2,
+          "gap_frames": 90
+        },
+        {
+          "buttons": "a",
+          "frames": 2,
+          "gap_frames": 20
+        }
+      ],
+      "note": "timing to be checked when recorded"
+    },
+    "chips-attack": {
+      "file": "segments/chips-attack.edenmacro.json",
+      "cap": 30,
+      "recipe": [
+        {
+          "stick": [
+            0.95,
+            0.95,
+            0
+          ],
+          "frames": 6,
+          "gap_frames": 0
+        },
+        {
+          "buttons": "a",
+          "with_stick": [
+            0.95,
+            0.95
+          ],
+          "hold": 80,
+          "gap": 0.5
+        }
+      ],
+      "note": "timing to be checked when recorded"
+    },
+    "lanes-smash": {
+      "file": "segments/lanes-smash.edenmacro.json",
+      "cap": 30,
+      "recipe": [
+        {
+          "stick": [
+            1,
+            0,
+            0
+          ],
+          "frames": 8,
+          "gap_frames": 0
+        },
+        {
+          "buttons": "a",
+          "with_stick": [
+            1,
+            0
+          ],
+          "hold": 80,
+          "gap": 1.2
         }
       ],
       "note": "timing to be checked when recorded"
@@ -297,7 +449,7 @@
             0,
             0
           ],
-          "frames": 8,
+          "frames": 6,
           "gap_frames": 0
         },
         {
@@ -306,8 +458,8 @@
             1,
             0
           ],
-          "frames": 2,
-          "gap_frames": 60
+          "hold": 60,
+          "gap": 0.8
         }
       ],
       "note": "timing to be checked when recorded"
@@ -319,20 +471,20 @@
         {
           "stick": [
             0,
-            0.6,
+            0.65,
             0
           ],
-          "frames": 2,
+          "frames": 3,
           "gap_frames": 0
         },
         {
           "buttons": "a",
           "with_stick": [
             0,
-            0.6
+            0.65
           ],
-          "frames": 2,
-          "gap_frames": 10
+          "hold": 60,
+          "gap": 0.4
         }
       ],
       "note": "timing to be checked when recorded"
@@ -506,8 +658,8 @@
             1,
             0
           ],
-          "frames": 2,
-          "gap_frames": 30
+          "hold": 50,
+          "gap": 0.5
         }
       ],
       "note": "timing to be checked when recorded"
@@ -536,19 +688,24 @@
     "main": {
       "library": "main",
       "recover": "attract-cancel",
-      "recover_times": 3
+      "recover_times": 3,
+      "scale": "fit"
     },
     "stage": {
-      "library": "stage"
+      "library": "stage",
+      "scale": "fit"
     },
     "css": {
-      "library": "css"
+      "library": "css",
+      "scale": "fit"
     },
     "ready": {
-      "library": "ready"
+      "library": "ready",
+      "scale": "fit"
     },
     "training-hud-unpaused": {
-      "library": "training-hud-unpaused"
+      "library": "training-hud-unpaused",
+      "scale": "fit"
     },
     "diag-migrate": {
       "kind": "log",
@@ -609,6 +766,48 @@
       "source": "diag",
       "pattern": "screen=playback mash=1",
       "cap": 10
+    },
+    "diag-adv-shield": {
+      "kind": "log",
+      "source": "diag",
+      "pattern": "\\[FrameStrip\\] advantage value=-?\\d+ on_shield=true",
+      "cap": 12
+    },
+    "diag-adv-hit": {
+      "kind": "log",
+      "source": "diag",
+      "pattern": "\\[FrameStrip\\] advantage value=-?\\d+ on_shield=false",
+      "cap": 12
+    },
+    "diag-drill-press": {
+      "kind": "log",
+      "source": "diag",
+      "pattern": "\\[Ui\\] press .*Drill",
+      "cap": 12
+    },
+    "diag-make-combo-press": {
+      "kind": "log",
+      "source": "diag",
+      "pattern": "\\[Ui\\] press .*Make combo",
+      "cap": 12
+    },
+    "trace-combo-link": {
+      "kind": "log",
+      "source": "trace_jsonl",
+      "pattern": "(?:\"event\":\"return\".*tr_combo_link_v1|tr_combo_link_v1.*\"event\":\"return\")",
+      "cap": 15
+    },
+    "trace-combo-attempt": {
+      "kind": "log",
+      "source": "trace_jsonl",
+      "pattern": "(?:\"event\":\"return\".*tr_combo_attempt_v1|tr_combo_attempt_v1.*\"event\":\"return\")",
+      "cap": 15
+    },
+    "trace-f9-body": {
+      "kind": "log",
+      "source": "trace_jsonl",
+      "pattern": "(?:\"event\":\"return\".*f9_body_of|f9_body_of.*\"event\":\"return\")",
+      "cap": 30
     }
   },
   "recover": [
@@ -628,11 +827,11 @@
         {
           "run": "steps.py:rr_migrate",
           "check": true,
-          "on": "xps-a"
+          "on": "surface-b"
         },
         {
           "gate": "diag-migrate",
-          "on": "xps-a"
+          "on": "surface-b"
         }
       ],
       "evidence": [
@@ -641,35 +840,12 @@
         "index migrated:true"
       ],
       "source": "RR-7 \u00a7Eden rows for rr-10 (row rr-migrate); LANE-GROK-RECORDING-REDESIGN-REPORT.md A13 and migration table",
-      "host": "xps",
+      "host": "surface",
       "expect": "diag line screen=migrate once=1 at the boot's worker tick; the migrated slot's name carries the boot date; a second tick does not rewrite the tree",
       "timed": false,
+      "build": "diag",
+      "on": "surface-b",
       "trace": "RR-7: migrate_at_boot; capture the slot name containing the boot date; a second tick does not rewrite the tree. Symbols only (README, Open questions)."
-    },
-    {
-      "id": "media-rc5-migration",
-      "start": "training",
-      "end": "training",
-      "steps": [
-        {
-          "run": "steps.py:media_migration",
-          "check": true,
-          "on": "xps-a"
-        }
-      ],
-      "evidence": [
-        "media/rc5-migration.gif",
-        "playback diag line warp=0"
-      ],
-      "source": "docs/MEDIA.md (rc.5 captures still needed), row media/rc5-migration.gif",
-      "host": "xps",
-      "expect": "The name uses Slot 1 and the date. Play does not warp. Empty slots did not become files.",
-      "timed": false,
-      "start_gate": "training-hud-unpaused",
-      "media": {
-        "gif": "media/rc5-migration.gif",
-        "seconds": 8
-      }
     },
     {
       "id": "rr-record",
@@ -679,15 +855,15 @@
         {
           "run": "steps.py:rr_record",
           "check": true,
-          "on": "xps-a"
+          "on": "surface-b"
         },
         {
           "gate": "diag-record-player",
-          "on": "xps-a"
+          "on": "surface-b"
         },
         {
           "gate": "diag-record-cpu",
-          "on": "xps-a"
+          "on": "surface-b"
         }
       ],
       "evidence": [
@@ -695,9 +871,11 @@
         "diag screen=recording role=cpu recording=0"
       ],
       "source": "RR-7 \u00a7Eden rows for rr-10 (rows rr-record); LANE-GROK-RECORDING-REDESIGN-REPORT.md line 166",
-      "host": "xps",
+      "host": "surface",
       "expect": "diag screen=recording role=player recording=1 on ZR+Down, then screen=recording role=cpu recording=0 on the second ZR+Down after the pop-up role moved to CPU",
       "timed": false,
+      "build": "diag",
+      "on": "surface-b",
       "trace": "RR-7: recording_host::on_chords when the record bit is set; capture the capture role and whether recording is on, and that the stop wrote the macro only when frames were stored. Symbols only (README, Open questions).",
       "start_gate": "training-hud-unpaused"
     },
@@ -709,11 +887,11 @@
         {
           "run": "steps.py:rr_notice",
           "check": true,
-          "on": "xps-a"
+          "on": "surface-b"
         },
         {
           "gate": "diag-notice-missing",
-          "on": "xps-a"
+          "on": "surface-b"
         }
       ],
       "evidence": [
@@ -721,9 +899,11 @@
         "diag screen=notice kind=macro-start-save-missing"
       ],
       "source": "RR-7 \u00a7Eden rows for rr-10 (rows rr-notice); LANE-GROK-RECORDING-REDESIGN-REPORT.md A15",
-      "host": "xps",
+      "host": "surface",
       "expect": "screen=notice kind=chord-once on the first Record or Play after boot (once), and screen=notice kind=macro-start-save-missing only when the macro's start-save file was deleted",
       "timed": false,
+      "build": "diag",
+      "on": "surface-b",
       "trace": "RR-7: start_save_notice for Deleted (a missing id with the switch off does not print this line); the chord-once flag is read and set by the worker, a second chord does not print it. Symbols only (README, Open questions).",
       "start_gate": "training-hud-unpaused"
     },
@@ -735,11 +915,11 @@
         {
           "run": "steps.py:rr_mismatch",
           "check": true,
-          "on": "xps-a"
+          "on": "surface-b"
         },
         {
           "gate": "diag-mismatch",
-          "on": "xps-a"
+          "on": "surface-b"
         }
       ],
       "evidence": [
@@ -747,9 +927,11 @@
         "prompt rows Keep current fighter / Switch to recorded fighter"
       ],
       "source": "RR-7 \u00a7Eden rows for rr-10 (row rr-mismatch); LANE-GROK-RECORDING-REDESIGN-REPORT.md line 326",
-      "host": "xps",
+      "host": "surface",
       "expect": "screen=mismatch ask=macro1 once at the chain's start; Switch names macro 1's fighter; no second prompt when the later macro plays",
       "timed": false,
+      "build": "diag",
+      "on": "surface-b",
       "trace": "RR-7: chain_mismatch; capture step 0 only, and that Switch names macro 1's fighter. Symbols only (README, Open questions).",
       "start_gate": "training-hud-unpaused"
     },
@@ -761,20 +943,22 @@
         {
           "run": "steps.py:rr_rename",
           "check": true,
-          "on": "xps-a"
+          "on": "surface-b"
         },
         {
           "gate": "diag-rename",
-          "on": "xps-a"
+          "on": "surface-b"
         }
       ],
       "evidence": [
         "diag screen=rename header=Name macro"
       ],
       "source": "RR-7 \u00a7Eden rows for rr-10 (row rr-rename)",
-      "host": "xps",
+      "host": "surface",
       "expect": "screen=rename header=Name macro after A on Rename, then the titled keyboard offer; with Online on, the offer is not made",
       "timed": false,
+      "build": "diag",
+      "on": "surface-b",
       "trace": "RR-7: Effect::Keyboard, then the titled keyboard offer; online captures the offer not made. Symbols only (README, Open questions).",
       "start_gate": "training-hud-unpaused"
     },
@@ -786,11 +970,11 @@
         {
           "run": "steps.py:rr_crop",
           "check": true,
-          "on": "xps-a"
+          "on": "surface-b"
         },
         {
           "gate": "diag-crop",
-          "on": "xps-a"
+          "on": "surface-b"
         }
       ],
       "evidence": [
@@ -798,73 +982,12 @@
         "original combo bytes unchanged"
       ],
       "source": "RR-7 \u00a7Eden rows for rr-10 (row rr-crop)",
-      "host": "xps",
+      "host": "surface",
       "expect": "screen=crop source=<id> combo=0 after A on Crop, then the new file write with the original bytes unchanged",
       "timed": false,
+      "build": "diag",
+      "on": "surface-b",
       "trace": "RR-7: Effect::Crop, then the new file write; capture the original bytes unchanged (a combo crops with combo=1). Symbols only (README, Open questions).",
-      "start_gate": "training-hud-unpaused"
-    },
-    {
-      "id": "rr-load",
-      "start": "training",
-      "end": "training",
-      "steps": [
-        {
-          "run": "steps.py:rr_load",
-          "check": true,
-          "on": "xps-a"
-        }
-      ],
-      "evidence": [
-        "no playback/load diag line after ZL+Up",
-        "both fighters at the saved spot"
-      ],
-      "source": "RR-4 requirement trace (A5, load_starts_no_playback); LANE-GROK-RECORDING-REDESIGN-REPORT.md line 182",
-      "host": "xps",
-      "expect": "Load (ZL+Up) warps both fighters to the bound save and starts nothing: no playback diag line, the active macros stay idle",
-      "timed": false,
-      "start_gate": "training-hud-unpaused"
-    },
-    {
-      "id": "rr-chain",
-      "start": "training",
-      "end": "training",
-      "steps": [
-        {
-          "run": "steps.py:rr_chain",
-          "check": true,
-          "on": "xps-a"
-        }
-      ],
-      "evidence": [
-        "one warp at chain start",
-        "no warp before macro 2"
-      ],
-      "source": "RR-4 requirement trace (A6, a_chain_warps_to_macro_1_start_save_only); LANE-GROK-RECORDING-REDESIGN-REPORT.md line 202",
-      "host": "xps",
-      "expect": "the chain warps once to macro 1's start save, then plays macro 1 then macro 2 with no warp between them; the inner macros' start saves are not used",
-      "timed": false,
-      "start_gate": "training-hud-unpaused"
-    },
-    {
-      "id": "rr-loop",
-      "start": "training",
-      "end": "training",
-      "steps": [
-        {
-          "run": "steps.py:rr_loop",
-          "check": true,
-          "on": "xps-a"
-        }
-      ],
-      "evidence": [
-        "diag screen=recording-popup role=player loop=2",
-        "second pass continues without a warp"
-      ],
-      "source": "RR-4 requirement trace (A7, the_loop_loads_the_start_save_once); RR-6 \u00a7Eden rows for rr-10 (row rr-loop)",
-      "host": "xps",
-      "expect": "with the loop at 2 and the cursor in MACROS, X shows 2; the first pass warps once and the second pass does not warp",
-      "timed": false,
       "start_gate": "training-hud-unpaused"
     },
     {
@@ -875,15 +998,15 @@
         {
           "run": "steps.py:rr_play",
           "check": true,
-          "on": "xps-a"
+          "on": "surface-b"
         },
         {
           "gate": "diag-play-player",
-          "on": "xps-a"
+          "on": "surface-b"
         },
         {
           "gate": "diag-play-cpu",
-          "on": "xps-a"
+          "on": "surface-b"
         }
       ],
       "evidence": [
@@ -892,9 +1015,11 @@
         "warps stay 1 across the loop"
       ],
       "source": "RR-7 \u00a7Eden rows for rr-10 (row rr-play, both cases)",
-      "host": "xps",
+      "host": "surface",
       "expect": "screen=playback role=player warp=1 on Play on Player 1 ([7,10]) when Player 1's active macro has a start save and the switch is on, with the warps count staying 1 across the loop; then screen=playback role=cpu warp=0 on Play on CPU (the old Input Playback chord) when the CPU's active macro has no start save",
       "timed": false,
+      "build": "diag",
+      "on": "surface-b",
       "trace": "RR-7: the worker drain into Playback::play_chord; capture Effect.warp and warps staying 1 across the loop; the CPU case is the same drain with Role::Cpu, capture no warp. Symbols only (README, Open questions).",
       "start_gate": "training-hud-unpaused"
     },
@@ -906,11 +1031,11 @@
         {
           "run": "steps.py:rr_mash",
           "check": true,
-          "on": "xps-a"
+          "on": "surface-b"
         },
         {
           "gate": "diag-mash",
-          "on": "xps-a"
+          "on": "surface-b"
         }
       ],
       "evidence": [
@@ -918,506 +1043,148 @@
         "playing false after the mash"
       ],
       "source": "RR-7 \u00a7Eden rows for rr-10 (row rr-mash)",
-      "host": "xps",
+      "host": "surface",
       "expect": "with a role playing and the Mash interrupt on, the mash that already calls interrupt_playback prints screen=playback mash=1 and stops the playing macro (playing false)",
       "timed": false,
+      "build": "diag",
+      "on": "surface-b",
       "trace": "RR-7: recording_host::note_mash, then Playback::mash; capture playing false. Symbols only (README, Open questions).",
       "start_gate": "training-hud-unpaused"
     },
     {
-      "id": "rr-combo",
+      "id": "adv-jab-shield",
       "start": "training",
       "end": "training",
       "steps": [
         {
-          "run": "steps.py:rr_combo",
+          "run": "steps.py:adv_jab_shield",
           "check": true,
-          "on": "xps-a"
-        }
-      ],
-      "evidence": [
-        "panel line jump \u00b7 release \u00b7 \u2193 flick \u00b7 A",
-        "drift \u2192 line under it",
-        "panel screenshot"
-      ],
-      "source": "RR-7 \u00a7Eden rows for rr-10 (row rr-combo)",
-      "host": "xps",
-      "expect": "the combo's Connections panel lists each link's events on a second line - jump \u00b7 release \u00b7 \u2193 flick \u00b7 A - then drift \u2192 on the next line; the published frame, not a new diag print",
-      "timed": false,
-      "trace": "RR-7: recording_menu::combo_link_lines reads the combo file; the draw hook paints the frame the UI worker already published. The panel line is the published frame, not a diag print, so this row has no log gate.",
-      "start_gate": "training-hud-unpaused"
-    },
-    {
-      "id": "setup-xps-b",
-      "start": "training",
-      "end": "training",
-      "steps": [
-        {
-          "gate": "installed",
-          "on": "xps-b"
+          "on": "surface-b"
         },
         {
-          "run": "steps.py:boot_training",
-          "check": true,
-          "on": "xps-b"
+          "gate": "diag-adv-shield",
+          "on": "surface-b"
         }
       ],
       "evidence": [
-        "install line cpu_common=installed",
-        "Training HUD settled"
+        "advantage readout value",
+        "published: to be filled by the session (jab on shield)"
       ],
-      "source": "rows-iv/rows-hb-ab boot route (library segments, steps.py hook)",
-      "host": "xps",
-      "expect": "the instance is back at Training, HUD unpaused",
-      "timed": false,
-      "start_gate": "training-hud-unpaused",
-      "recover": [
-        {
-          "run": "steps.py:boot_training",
-          "check": true,
-          "on": "xps-b"
-        }
-      ]
-    },
-    {
-      "id": "rr-chords",
-      "start": "training",
-      "end": "training",
-      "steps": [
-        {
-          "run": "steps.py:rr_chords",
-          "check": true,
-          "on": "xps-b"
-        }
-      ],
-      "evidence": [
-        "chord table screenshot",
-        "factory arrays [6,9] [6,8] [7,9] [7,8] [7,10] [7,11] [6,11] [6,10]"
-      ],
-      "source": "RR-5 Design factory-row table; LANE-GROK-RECORDING-REDESIGN-REPORT.md A14",
-      "host": "xps",
-      "expect": "the eight factory chords keep today's defaults: Save ZL+Down [6,9], Load ZL+Up [6,8], Record ZR+Down [7,9], Play on CPU ZR+Up [7,8], Play on Player 1 ZR+Left [7,10], Recording pop-up ZR+Right [7,11], Cycle Player ZL+Right [6,11], Cycle CPU ZL+Left [6,10]",
-      "timed": false,
+      "source": "EDEN-SESSION-PLAN-rc5.md (frame advantage, standard cases)",
+      "host": "surface",
+      "expect": "The strip's ADVANTAGE readout for the jab on the CPU's shield, compared with the published frame-data number for the move; on a mismatch, the first-actionable-frame tracepoints say which side is off",
+      "timed": true,
+      "build": "diag",
+      "on": "surface-b",
       "start_gate": "training-hud-unpaused"
     },
     {
-      "id": "rr-picker",
+      "id": "adv-tilt-shield",
       "start": "training",
       "end": "training",
       "steps": [
         {
-          "run": "steps.py:rr_picker",
+          "run": "steps.py:adv_tilt_shield",
           "check": true,
-          "on": "xps-b"
-        }
-      ],
-      "evidence": [
-        "picker screenshot sequence",
-        "chain picker lists no chain tile"
-      ],
-      "source": "RR-3 requirement trace (A1, A9); LANE-GROK-RECORDING-REDESIGN-REPORT.md lines 197, 203",
-      "host": "xps",
-      "expect": "the numbered picker works as Character Cycles: A gives the next number, R removes and later numbers close up, A on a numbered tile does nothing, R on the last remaining number does nothing, B is done; the chain picker lists recordings only",
-      "timed": false,
-      "start_gate": "training-hud-unpaused"
-    },
-    {
-      "id": "rr-hot",
-      "start": "training",
-      "end": "training",
-      "steps": [
-        {
-          "run": "steps.py:rr_hot",
-          "check": true,
-          "on": "xps-b"
-        }
-      ],
-      "evidence": [
-        "diag screen=recording-popup hot=5 hairline=5"
-      ],
-      "source": "RR-6 \u00a7Eden rows for rr-10 (row rr-hot); LANE-GROK-RECORDING-REDESIGN-REPORT.md A10",
-      "host": "xps",
-      "expect": "screen=recording-popup hot=5 hairline=5: five macros in the green outline, most recently used first, the hairline after the fifth",
-      "timed": false,
-      "start_gate": "training-hud-unpaused"
-    },
-    {
-      "id": "rr-icons",
-      "start": "training",
-      "end": "training",
-      "steps": [
-        {
-          "run": "steps.py:rr_icons",
-          "check": true,
-          "on": "xps-b"
-        }
-      ],
-      "evidence": [
-        "diag screen=recording-popup floppy=off header=on"
-      ],
-      "source": "RR-6 \u00a7Eden rows for rr-10 (row rr-icons); RR-8 Names rr-6 binds",
-      "host": "xps",
-      "expect": "screen=recording-popup floppy=off header=on: the row's floppy is grey (126,132,144) with the switch Off, the SAVE STATES header floppy stays orange (242,152,72)",
-      "timed": false,
-      "start_gate": "training-hud-unpaused"
-    },
-    {
-      "id": "rr-page",
-      "start": "training",
-      "end": "training",
-      "steps": [
-        {
-          "run": "steps.py:rr_page",
-          "check": true,
-          "on": "xps-b"
-        }
-      ],
-      "evidence": [
-        "diag screen=recording-page role=cpu group=saves-macros",
-        "retired rows absent from the page"
-      ],
-      "source": "RR-6 \u00a7Eden rows for rr-10 (row rr-page); LANE-GROK-RECORDING-REDESIGN-REPORT.md lines 243-249, 316-319",
-      "host": "xps",
-      "expect": "screen=recording-page role=cpu group=saves-macros after one ZR on the Recording page; L and R still change the menu page; the retired rows (Record Slot, Trigger, Duration, Source, Randomize slots) are gone",
-      "timed": false,
-      "start_gate": "training-hud-unpaused"
-    },
-    {
-      "id": "rr-popup",
-      "start": "training",
-      "end": "training",
-      "steps": [
-        {
-          "run": "steps.py:rr_popup",
-          "check": true,
-          "on": "xps-b"
-        }
-      ],
-      "evidence": [
-        "diag screen=recording-popup role=player tab=saves",
-        "B closes without changing the selection"
-      ],
-      "source": "RR-6 \u00a7Eden rows for rr-10 (row rr-popup); LANE-GROK-RECORDING-REDESIGN-REPORT.md line 167",
-      "host": "xps",
-      "expect": "screen=recording-popup role=player tab=saves on ZR+Right with the menu closed; B returns to the match and the bound save is unchanged",
-      "timed": false,
-      "start_gate": "training-hud-unpaused"
-    },
-    {
-      "id": "rr-active",
-      "start": "training",
-      "end": "training",
-      "steps": [
-        {
-          "run": "steps.py:rr_active",
-          "check": true,
-          "on": "xps-b"
-        }
-      ],
-      "evidence": [
-        "diag screen=recording-popup role=cpu active=pressure"
-      ],
-      "source": "RR-6 \u00a7Eden rows for rr-10 (row rr-active); LANE-GROK-RECORDING-REDESIGN-REPORT.md A8",
-      "host": "xps",
-      "expect": "screen=recording-popup role=cpu active=pressure after L or R to CPU: each role shows its own active macro, green only in that role's view",
-      "timed": false,
-      "start_gate": "training-hud-unpaused"
-    },
-    {
-      "id": "setup-ally-a",
-      "start": "training",
-      "end": "training",
-      "steps": [
-        {
-          "gate": "installed",
-          "on": "ally-a"
+          "on": "surface-b"
         },
         {
-          "run": "steps.py:boot_training",
-          "check": true,
-          "on": "ally-a"
+          "gate": "diag-adv-shield",
+          "on": "surface-b"
         }
       ],
       "evidence": [
-        "install line cpu_common=installed",
-        "Training HUD settled"
+        "advantage readout value",
+        "published: to be filled by the session (grounded tilt on shield)"
       ],
-      "source": "rows-iv/rows-hb-ab boot route (library segments, steps.py hook)",
-      "host": "ally",
-      "expect": "the instance is back at Training, HUD unpaused",
-      "timed": false,
-      "start_gate": "training-hud-unpaused",
-      "recover": [
-        {
-          "run": "steps.py:boot_training",
-          "check": true,
-          "on": "ally-a"
-        }
-      ]
+      "source": "EDEN-SESSION-PLAN-rc5.md (frame advantage, standard cases)",
+      "host": "surface",
+      "expect": "The strip's ADVANTAGE readout for a grounded tilt on the CPU's shield, compared with the published frame-data number for the move",
+      "timed": true,
+      "build": "diag",
+      "on": "surface-b",
+      "start_gate": "training-hud-unpaused"
     },
     {
-      "id": "media-rc5-record-start-save",
+      "id": "adv-smash-shield",
       "start": "training",
       "end": "training",
       "steps": [
         {
-          "run": "steps.py:media_record_start_save",
+          "run": "steps.py:adv_smash_shield",
           "check": true,
-          "on": "ally-a"
+          "on": "surface-b"
+        },
+        {
+          "gate": "diag-adv-shield",
+          "on": "surface-b"
         }
       ],
       "evidence": [
-        "media/rc5-record-start-save.gif"
+        "advantage readout value",
+        "published: to be filled by the session (smash attack on shield)"
       ],
-      "source": "docs/MEDIA.md (rc.5 captures still needed), row media/rc5-record-start-save.gif",
-      "host": "ally",
-      "expect": "A new macro at the top of the hot five, an orange floppy, and a start save named with the macro.",
-      "timed": false,
-      "start_gate": "training-hud-unpaused",
-      "media": {
-        "gif": "media/rc5-record-start-save.gif",
-        "seconds": 8
-      }
+      "source": "EDEN-SESSION-PLAN-rc5.md (frame advantage, standard cases)",
+      "host": "surface",
+      "expect": "The strip's ADVANTAGE readout for a smash attack on the CPU's shield, compared with the published frame-data number for the move",
+      "timed": true,
+      "build": "diag",
+      "on": "surface-b",
+      "start_gate": "training-hud-unpaused"
     },
     {
-      "id": "media-rc5-play-chord",
+      "id": "adv-aerial-shield",
       "start": "training",
       "end": "training",
       "steps": [
         {
-          "run": "steps.py:media_play_chord",
+          "run": "steps.py:adv_aerial_shield",
           "check": true,
-          "on": "ally-a"
+          "on": "surface-b"
+        },
+        {
+          "gate": "diag-adv-shield",
+          "on": "surface-b"
         }
       ],
       "evidence": [
-        "media/rc5-play-chord.gif"
+        "advantage readout value",
+        "published: to be filled by the session (aerial on shield, landing after)"
       ],
-      "source": "docs/MEDIA.md (rc.5 captures still needed), row media/rc5-play-chord.gif",
-      "host": "ally",
-      "expect": "One warp to the start save, then the CPU plays the jab. A second press of ZR+Up stops it.",
-      "timed": false,
-      "start_gate": "training-hud-unpaused",
-      "media": {
-        "gif": "media/rc5-play-chord.gif",
-        "seconds": 8
-      }
+      "source": "EDEN-SESSION-PLAN-rc5.md (frame advantage, standard cases)",
+      "host": "surface",
+      "expect": "The strip's ADVANTAGE readout for an aerial on the CPU's shield that lands after the aerial, compared with the published frame-data number for the move",
+      "timed": true,
+      "build": "diag",
+      "on": "surface-b",
+      "start_gate": "training-hud-unpaused"
     },
     {
-      "id": "media-rc5-loop-no-warp",
+      "id": "adv-move-hit",
       "start": "training",
       "end": "training",
       "steps": [
         {
-          "run": "steps.py:media_loop_no_warp",
+          "run": "steps.py:adv_move_hit",
           "check": true,
-          "on": "ally-a"
-        }
-      ],
-      "evidence": [
-        "media/rc5-loop-no-warp.gif"
-      ],
-      "source": "docs/MEDIA.md (rc.5 captures still needed), row media/rc5-loop-no-warp.gif",
-      "host": "ally",
-      "expect": "The first pass warps once. The second pass does not warp. It continues from where the first pass ended.",
-      "timed": false,
-      "start_gate": "training-hud-unpaused",
-      "media": {
-        "gif": "media/rc5-loop-no-warp.gif",
-        "seconds": 8
-      }
-    },
-    {
-      "id": "media-rc5-chain-play",
-      "start": "training",
-      "end": "training",
-      "steps": [
+          "on": "surface-b"
+        },
         {
-          "run": "steps.py:media_chain_play",
-          "check": true,
-          "on": "ally-a"
+          "gate": "diag-adv-hit",
+          "on": "surface-b"
         }
       ],
       "evidence": [
-        "media/rc5-chain-play.gif"
+        "advantage readout value",
+        "published: to be filled by the session (move on hit, CPU not mashing)"
       ],
-      "source": "docs/MEDIA.md (rc.5 captures still needed), row media/rc5-chain-play.gif",
-      "host": "ally",
-      "expect": "One warp to macro 1's start save, then recording 1, then recording 2, with no warp between them.",
-      "timed": false,
-      "start_gate": "training-hud-unpaused",
-      "media": {
-        "gif": "media/rc5-chain-play.gif",
-        "seconds": 9
-      }
-    },
-    {
-      "id": "media-rc5-popup",
-      "start": "training",
-      "end": "training",
-      "steps": [
-        {
-          "run": "steps.py:media_popup",
-          "check": true,
-          "on": "ally-a"
-        }
-      ],
-      "evidence": [
-        "media/rc5-popup.gif"
-      ],
-      "source": "docs/MEDIA.md (rc.5 captures still needed), row media/rc5-popup.gif",
-      "host": "ally",
-      "expect": "The window over the match. Player | CPU at the top. Two stacked sections. Green fill on the bound save. White cursor. B closes it and the bound save is unchanged.",
-      "timed": false,
-      "start_gate": "training-hud-unpaused",
-      "media": {
-        "gif": "media/rc5-popup.gif",
-        "seconds": 8
-      }
-    },
-    {
-      "id": "media-rc5-recording-page",
-      "start": "training",
-      "end": "training",
-      "steps": [
-        {
-          "run": "steps.py:media_recording_page",
-          "check": true,
-          "on": "ally-a"
-        }
-      ],
-      "evidence": [
-        "media/rc5-recording-page.gif"
-      ],
-      "source": "docs/MEDIA.md (rc.5 captures still needed), row media/rc5-recording-page.gif",
-      "host": "ally",
-      "expect": "Player view shows saves and macros, and Combos & Sequences in the left column. CPU view hides Combos & Sequences. The bound save is green in both.",
-      "timed": false,
-      "start_gate": "training-hud-unpaused",
-      "media": {
-        "gif": "media/rc5-recording-page.gif",
-        "seconds": 8
-      }
-    },
-    {
-      "id": "media-rc5-macro-screen",
-      "start": "training",
-      "end": "training",
-      "steps": [
-        {
-          "run": "steps.py:media_macro_screen",
-          "check": true,
-          "on": "ally-a"
-        }
-      ],
-      "evidence": [
-        "media/rc5-macro-screen.gif"
-      ],
-      "source": "docs/MEDIA.md (rc.5 captures still needed), row media/rc5-macro-screen.gif",
-      "host": "ally",
-      "expect": "Breadcrumb with the role and the name. Start save with the floppy, switch On. Set active is one row for that role.",
-      "timed": false,
-      "start_gate": "training-hud-unpaused",
-      "media": {
-        "gif": "media/rc5-macro-screen.gif",
-        "seconds": 6
-      }
-    },
-    {
-      "id": "media-rc5-fighter-mismatch",
-      "start": "training",
-      "end": "training",
-      "steps": [
-        {
-          "run": "steps.py:media_fighter_mismatch",
-          "check": true,
-          "on": "ally-a"
-        }
-      ],
-      "evidence": [
-        "media/rc5-fighter-mismatch.gif"
-      ],
-      "source": "docs/MEDIA.md (rc.5 captures still needed), row media/rc5-fighter-mismatch.gif",
-      "host": "ally",
-      "expect": "One Fighter Mismatch prompt, title Fighter Mismatch, rows Keep current fighter and Switch to recorded fighter. It names the first macro's fighter. No second prompt when the later macro plays.",
-      "timed": false,
-      "start_gate": "training-hud-unpaused",
-      "media": {
-        "gif": "media/rc5-fighter-mismatch.gif",
-        "seconds": 7
-      }
-    },
-    {
-      "id": "media-rc5-make-combo",
-      "start": "training",
-      "end": "training",
-      "steps": [
-        {
-          "run": "steps.py:media_make_combo",
-          "check": true,
-          "on": "ally-a"
-        }
-      ],
-      "evidence": [
-        "media/rc5-make-combo.gif"
-      ],
-      "source": "docs/MEDIA.md (rc.5 captures still needed), row media/rc5-make-combo.gif; RR-7 Make combo on a chain/macro",
-      "host": "ally",
-      "expect": "The macro plays once on Player 1 from its start save. A new combo appears. The drilled combo is still the drill when it finishes.",
-      "timed": false,
-      "start_gate": "training-hud-unpaused",
-      "media": {
-        "gif": "media/rc5-make-combo.gif",
-        "seconds": 8
-      }
-    },
-    {
-      "id": "media-rc5-crop-combo",
-      "start": "training",
-      "end": "training",
-      "steps": [
-        {
-          "run": "steps.py:media_crop_combo",
-          "check": true,
-          "on": "ally-a"
-        }
-      ],
-      "evidence": [
-        "media/rc5-crop-combo.gif"
-      ],
-      "source": "docs/MEDIA.md (rc.5 captures still needed), row media/rc5-crop-combo.gif",
-      "host": "ally",
-      "expect": "A new combo of the kept links. The original combo is still in the list.",
-      "timed": false,
-      "start_gate": "training-hud-unpaused",
-      "media": {
-        "gif": "media/rc5-crop-combo.gif",
-        "seconds": 7
-      }
-    },
-    {
-      "id": "media-rc5-save-warp",
-      "start": "training",
-      "end": "training",
-      "steps": [
-        {
-          "run": "steps.py:media_save_warp",
-          "check": true,
-          "on": "ally-a"
-        }
-      ],
-      "evidence": [
-        "media/rc5-save-warp.gif"
-      ],
-      "source": "docs/MEDIA.md (rc.5 captures still needed), row media/rc5-save-warp.gif",
-      "host": "ally",
-      "expect": "Both fighters return to the saved spot. No recording starts. The CPU does not play inputs.",
-      "timed": false,
-      "start_gate": "training-hud-unpaused",
-      "media": {
-        "gif": "media/rc5-save-warp.gif",
-        "seconds": 6
-      }
+      "source": "EDEN-SESSION-PLAN-rc5.md (frame advantage, standard cases)",
+      "host": "surface",
+      "expect": "The strip's ADVANTAGE readout for one move on hit with a CPU that is not mashing, compared with the published frame-data number for the move",
+      "timed": true,
+      "build": "diag",
+      "on": "surface-b",
+      "start_gate": "training-hud-unpaused"
     },
     {
       "id": "setup-surface-a",
@@ -1435,13 +1202,15 @@
         }
       ],
       "evidence": [
-        "install line cpu_common=installed",
+        "TrainingRooms events.log result=installed",
         "Training HUD settled"
       ],
-      "source": "rows-iv/rows-hb-ab boot route (library segments, steps.py hook)",
+      "source": "rows-iv/rows-hb-ab boot route (library segments, L3+D-pad, steps.py hook)",
       "host": "surface",
-      "expect": "the instance is back at Training, HUD unpaused",
+      "expect": "the instance is at Training, HUD unpaused, P1 on Mario",
       "timed": false,
+      "build": "release",
+      "on": "surface-a",
       "start_gate": "training-hud-unpaused",
       "recover": [
         {
@@ -1470,6 +1239,8 @@
       "host": "surface",
       "expect": "The stick row shows that direction on the frames it was held, and is blank on the neutral frames. No chip unless a button went down.",
       "timed": true,
+      "build": "release",
+      "on": "surface-a",
       "start_gate": "training-hud-unpaused"
     },
     {
@@ -1490,6 +1261,8 @@
       "host": "surface",
       "expect": "The row alternates left and right with the lanes. The strip does not freeze while the binned direction keeps changing.",
       "timed": true,
+      "build": "release",
+      "on": "surface-a",
       "start_gate": "training-hud-unpaused"
     },
     {
@@ -1510,6 +1283,8 @@
       "host": "surface",
       "expect": "The chip arrow matches the C-stick. The row matches the left stick.",
       "timed": true,
+      "build": "release",
+      "on": "surface-a",
       "start_gate": "training-hud-unpaused"
     },
     {
@@ -1530,112 +1305,269 @@
       "host": "surface",
       "expect": "The chip arrow matches the left stick. The row matches the left stick.",
       "timed": true,
+      "build": "release",
+      "on": "surface-a",
       "start_gate": "training-hud-unpaused"
     },
     {
-      "id": "adv-jab-shield",
+      "id": "media-rc5-frame-strip-lanes",
       "start": "training",
       "end": "training",
       "steps": [
         {
-          "run": "steps.py:adv_jab_shield",
+          "run": "steps.py:media_strip_lanes",
           "check": true,
           "on": "surface-a"
         }
       ],
       "evidence": [
-        "advantage readout value",
-        "published: to be filled by the session (jab on shield)"
+        "media/rc5-frame-strip-lanes.gif"
       ],
-      "source": "EDEN-SESSION-PLAN-rc5.md (frame advantage, standard cases)",
+      "source": "docs/MEDIA.md (rc.5 captures still needed), row media/rc5-frame-strip-lanes.gif",
       "host": "surface",
-      "expect": "The strip's ADVANTAGE readout for the jab on the CPU's shield, compared with the published frame-data number for the move; on a mismatch, the first-actionable-frame tracepoints say which side is off",
+      "expect": "P1 gold startup, red active, blue recovery. CPU light-grey hitlag, then purple hitstun. A run of 7 or more shows its length. Newest frame on the right.",
       "timed": true,
-      "start_gate": "training-hud-unpaused"
+      "build": "release",
+      "on": "surface-a",
+      "start_gate": "training-hud-unpaused",
+      "media": {
+        "gif": "media/rc5-frame-strip-lanes.gif",
+        "seconds": 6
+      }
     },
     {
-      "id": "adv-tilt-shield",
+      "id": "media-rc5-frame-strip-chips",
       "start": "training",
       "end": "training",
       "steps": [
         {
-          "run": "steps.py:adv_tilt_shield",
+          "run": "steps.py:media_strip_chips",
           "check": true,
           "on": "surface-a"
         }
       ],
       "evidence": [
-        "advantage readout value",
-        "published: to be filled by the session (grounded tilt on shield)"
+        "media/rc5-frame-strip-chips.gif"
       ],
-      "source": "EDEN-SESSION-PLAN-rc5.md (frame advantage, standard cases)",
+      "source": "docs/MEDIA.md (rc.5 captures still needed), row media/rc5-frame-strip-chips.gif",
       "host": "surface",
-      "expect": "The strip's ADVANTAGE readout for a grounded tilt on the CPU's shield, compared with the published frame-data number for the move",
+      "expect": "One green attack chip, an up-right arrow on it, and a white tick down to P1's lane. No second chip.",
       "timed": true,
-      "start_gate": "training-hud-unpaused"
+      "build": "release",
+      "on": "surface-a",
+      "start_gate": "training-hud-unpaused",
+      "media": {
+        "gif": "media/rc5-frame-strip-chips.gif",
+        "seconds": 4
+      }
     },
     {
-      "id": "adv-smash-shield",
+      "id": "media-rc5-frame-strip-freeze",
       "start": "training",
       "end": "training",
       "steps": [
         {
-          "run": "steps.py:adv_smash_shield",
+          "run": "steps.py:media_strip_freeze",
           "check": true,
           "on": "surface-a"
         }
       ],
       "evidence": [
-        "advantage readout value",
-        "published: to be filled by the session (smash attack on shield)"
+        "media/rc5-frame-strip-freeze.gif"
       ],
-      "source": "EDEN-SESSION-PLAN-rc5.md (frame advantage, standard cases)",
+      "source": "docs/MEDIA.md (rc.5 captures still needed), row media/rc5-frame-strip-freeze.gif",
       "host": "surface",
-      "expect": "The strip's ADVANTAGE readout for a smash attack on the CPU's shield, compared with the published frame-data number for the move",
+      "expect": "The lanes stop moving while both stand, then move again on the second jab.",
       "timed": true,
-      "start_gate": "training-hud-unpaused"
+      "build": "release",
+      "on": "surface-a",
+      "start_gate": "training-hud-unpaused",
+      "media": {
+        "gif": "media/rc5-frame-strip-freeze.gif",
+        "seconds": 5
+      }
     },
     {
-      "id": "adv-aerial-shield",
+      "id": "media-rc5-frame-strip-advantage-hit",
       "start": "training",
       "end": "training",
       "steps": [
         {
-          "run": "steps.py:adv_aerial_shield",
+          "run": "steps.py:media_strip_advantage_hit",
           "check": true,
           "on": "surface-a"
         }
       ],
       "evidence": [
-        "advantage readout value",
-        "published: to be filled by the session (aerial on shield, landing after)"
+        "media/rc5-frame-strip-advantage-hit.gif"
       ],
-      "source": "EDEN-SESSION-PLAN-rc5.md (frame advantage, standard cases)",
+      "source": "docs/MEDIA.md (rc.5 captures still needed), row media/rc5-frame-strip-advantage-hit.gif",
       "host": "surface",
-      "expect": "The strip's ADVANTAGE readout for an aerial on the CPU's shield that lands after the aerial, compared with the published frame-data number for the move",
+      "expect": "ADVANTAGE is a signed number, not a dash, and the line under it reads on hit. Plus is green. Minus is red.",
       "timed": true,
-      "start_gate": "training-hud-unpaused"
+      "build": "release",
+      "on": "surface-a",
+      "start_gate": "training-hud-unpaused",
+      "media": {
+        "gif": "media/rc5-frame-strip-advantage-hit.gif",
+        "seconds": 5
+      }
     },
     {
-      "id": "adv-move-hit",
+      "id": "media-rc5-frame-strip-advantage-shield",
       "start": "training",
       "end": "training",
       "steps": [
         {
-          "run": "steps.py:adv_move_hit",
+          "run": "steps.py:media_strip_advantage_shield",
           "check": true,
           "on": "surface-a"
         }
       ],
       "evidence": [
-        "advantage readout value",
-        "published: to be filled by the session (move on hit, CPU not mashing)"
+        "media/rc5-frame-strip-advantage-shield.gif"
       ],
-      "source": "EDEN-SESSION-PLAN-rc5.md (frame advantage, standard cases)",
+      "source": "docs/MEDIA.md (rc.5 captures still needed), row media/rc5-frame-strip-advantage-shield.gif",
       "host": "surface",
-      "expect": "The strip's ADVANTAGE readout for one move on hit with a CPU that is not mashing, compared with the published frame-data number for the move",
+      "expect": "ADVANTAGE reads on shield. LINK does not become TRUE combo or DROP for that shield hit.",
       "timed": true,
-      "start_gate": "training-hud-unpaused"
+      "build": "release",
+      "on": "surface-a",
+      "start_gate": "training-hud-unpaused",
+      "media": {
+        "gif": "media/rc5-frame-strip-advantage-shield.gif",
+        "seconds": 6
+      }
+    },
+    {
+      "id": "media-rc5-frame-strip-link",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "run": "steps.py:media_strip_link",
+          "check": true,
+          "on": "surface-a"
+        }
+      ],
+      "evidence": [
+        "media/rc5-frame-strip-link.gif"
+      ],
+      "source": "docs/MEDIA.md (rc.5 captures still needed), row media/rc5-frame-strip-link.gif",
+      "host": "surface",
+      "expect": "LINK shows a number of 0 or below and the words TRUE combo, in green. A green bar above P1's lane reads window Nf.",
+      "timed": true,
+      "build": "release",
+      "on": "surface-a",
+      "start_gate": "training-hud-unpaused",
+      "media": {
+        "gif": "media/rc5-frame-strip-link.gif",
+        "seconds": 5
+      }
+    },
+    {
+      "id": "media-rc5-frame-strip-drop",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "run": "steps.py:media_strip_drop",
+          "check": true,
+          "on": "surface-a"
+        }
+      ],
+      "evidence": [
+        "media/rc5-frame-strip-drop.gif"
+      ],
+      "source": "docs/MEDIA.md (rc.5 captures still needed), row media/rc5-frame-strip-drop.gif",
+      "host": "surface",
+      "expect": "LINK shows a positive number and the word DROP, in red.",
+      "timed": true,
+      "build": "release",
+      "on": "surface-a",
+      "start_gate": "training-hud-unpaused",
+      "media": {
+        "gif": "media/rc5-frame-strip-drop.gif",
+        "seconds": 6
+      }
+    },
+    {
+      "id": "media-rc5-frame-strip-input",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "run": "steps.py:media_strip_input",
+          "check": true,
+          "on": "surface-a"
+        }
+      ],
+      "evidence": [
+        "media/rc5-frame-strip-input.gif"
+      ],
+      "source": "docs/MEDIA.md (rc.5 captures still needed), row media/rc5-frame-strip-input.gif",
+      "host": "surface",
+      "expect": "INPUT shows Nf late or on time or buffered Nf, and then either N spare or Nf past.",
+      "timed": true,
+      "build": "release",
+      "on": "surface-a",
+      "start_gate": "training-hud-unpaused",
+      "media": {
+        "gif": "media/rc5-frame-strip-input.gif",
+        "seconds": 6
+      }
+    },
+    {
+      "id": "media-rc5-frame-strip-last",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "run": "steps.py:media_strip_last",
+          "check": true,
+          "on": "surface-a"
+        }
+      ],
+      "evidence": [
+        "media/rc5-frame-strip-last.gif"
+      ],
+      "source": "docs/MEDIA.md (rc.5 captures still needed), row media/rc5-frame-strip-last.gif",
+      "host": "surface",
+      "expect": "The LAST row shows up to four pills, newest first. A pill reads TRUE or DROP with its number, and the moves read like Jab > Jab.",
+      "timed": true,
+      "build": "release",
+      "on": "surface-a",
+      "start_gate": "training-hud-unpaused",
+      "media": {
+        "gif": "media/rc5-frame-strip-last.gif",
+        "seconds": 7
+      }
+    },
+    {
+      "id": "media-rc5-frame-strip-exchange",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "run": "steps.py:media_strip_exchange",
+          "check": true,
+          "on": "surface-a"
+        }
+      ],
+      "evidence": [
+        "media/rc5-frame-strip-exchange.gif"
+      ],
+      "source": "docs/MEDIA.md (rc.5 captures still needed), row media/rc5-frame-strip-exchange.gif",
+      "host": "surface",
+      "expect": "The second hit does not turn LINK into a large DROP of the first exchange. After both can act, ADVANTAGE is the new exchange, on hit.",
+      "timed": true,
+      "build": "release",
+      "on": "surface-a",
+      "start_gate": "training-hud-unpaused",
+      "media": {
+        "gif": "media/rc5-frame-strip-exchange.gif",
+        "seconds": 8
+      }
     },
     {
       "id": "media-rc5-grade-not-true",
@@ -1655,6 +1587,8 @@
       "host": "surface",
       "expect": "Attempt 1 still counts (the bar does not require TRUE). Attempt 2 drops, and the bar says the move was wrong.",
       "timed": true,
+      "build": "release",
+      "on": "surface-a",
       "start_gate": "training-hud-unpaused",
       "media": {
         "gif": "media/rc5-grade-not-true.gif",
@@ -1679,6 +1613,8 @@
       "host": "surface",
       "expect": "The bar names the sequence and moves from combo 1 to combo 2. After the drop it is back on combo 1, streak 0.",
       "timed": true,
+      "build": "release",
+      "on": "surface-a",
       "start_gate": "training-hud-unpaused",
       "media": {
         "gif": "media/rc5-sequence-drill.gif",
@@ -1686,276 +1622,31 @@
       }
     },
     {
-      "id": "setup-surface-b",
+      "id": "f9-body-trace",
       "start": "training",
       "end": "training",
       "steps": [
         {
-          "gate": "installed",
-          "on": "surface-b"
+          "run": "steps.py:f9_body_trace",
+          "check": true,
+          "on": "surface-a"
         },
         {
-          "run": "steps.py:boot_training",
-          "check": true,
-          "on": "surface-b"
+          "gate": "trace-f9-body",
+          "on": "surface-a"
         }
       ],
       "evidence": [
-        "install line cpu_common=installed",
-        "Training HUD settled"
+        "trace_jsonl return of f9_body_of"
       ],
-      "source": "rows-iv/rows-hb-ab boot route (library segments, steps.py hook)",
+      "source": "TASK-GROK-rc5-fix-f9.md tracepoint spec; LANE-GROK-RC5-FIX-F9-REPORT.md absent at row-fix time",
       "host": "surface",
-      "expect": "the instance is back at Training, HUD unpaused",
+      "expect": "placeholder: trace f9_body_of's return. LANE-GROK-RC5-FIX-F9-REPORT.md was not present; the arm spec is TASK-GROK-rc5-fix-f9.md (entry, [entry+0x4160], the state word, slot, on_return)",
       "timed": false,
-      "start_gate": "training-hud-unpaused",
-      "recover": [
-        {
-          "run": "steps.py:boot_training",
-          "check": true,
-          "on": "surface-b"
-        }
-      ]
-    },
-    {
-      "id": "media-rc5-frame-strip-lanes",
-      "start": "training",
-      "end": "training",
-      "steps": [
-        {
-          "run": "steps.py:media_strip_lanes",
-          "check": true,
-          "on": "surface-b"
-        }
-      ],
-      "evidence": [
-        "media/rc5-frame-strip-lanes.gif"
-      ],
-      "source": "docs/MEDIA.md (rc.5 captures still needed), row media/rc5-frame-strip-lanes.gif",
-      "host": "surface",
-      "expect": "P1 gold startup, red active, blue recovery. CPU light-grey hitlag, then purple hitstun. A run of 7 or more shows its length. Newest frame on the right.",
-      "timed": true,
-      "start_gate": "training-hud-unpaused",
-      "media": {
-        "gif": "media/rc5-frame-strip-lanes.gif",
-        "seconds": 6
-      }
-    },
-    {
-      "id": "media-rc5-frame-strip-chips",
-      "start": "training",
-      "end": "training",
-      "steps": [
-        {
-          "run": "steps.py:media_strip_chips",
-          "check": true,
-          "on": "surface-b"
-        }
-      ],
-      "evidence": [
-        "media/rc5-frame-strip-chips.gif"
-      ],
-      "source": "docs/MEDIA.md (rc.5 captures still needed), row media/rc5-frame-strip-chips.gif",
-      "host": "surface",
-      "expect": "One green attack chip, an up-right arrow on it, and a white tick down to P1's lane. No second chip.",
-      "timed": true,
-      "start_gate": "training-hud-unpaused",
-      "media": {
-        "gif": "media/rc5-frame-strip-chips.gif",
-        "seconds": 4
-      }
-    },
-    {
-      "id": "media-rc5-frame-strip-freeze",
-      "start": "training",
-      "end": "training",
-      "steps": [
-        {
-          "run": "steps.py:media_strip_freeze",
-          "check": true,
-          "on": "surface-b"
-        }
-      ],
-      "evidence": [
-        "media/rc5-frame-strip-freeze.gif"
-      ],
-      "source": "docs/MEDIA.md (rc.5 captures still needed), row media/rc5-frame-strip-freeze.gif",
-      "host": "surface",
-      "expect": "The lanes stop moving while both stand, then move again on the second jab.",
-      "timed": true,
-      "start_gate": "training-hud-unpaused",
-      "media": {
-        "gif": "media/rc5-frame-strip-freeze.gif",
-        "seconds": 5
-      }
-    },
-    {
-      "id": "media-rc5-frame-strip-advantage-hit",
-      "start": "training",
-      "end": "training",
-      "steps": [
-        {
-          "run": "steps.py:media_strip_advantage_hit",
-          "check": true,
-          "on": "surface-b"
-        }
-      ],
-      "evidence": [
-        "media/rc5-frame-strip-advantage-hit.gif"
-      ],
-      "source": "docs/MEDIA.md (rc.5 captures still needed), row media/rc5-frame-strip-advantage-hit.gif",
-      "host": "surface",
-      "expect": "ADVANTAGE is a signed number, not a dash, and the line under it reads on hit. Plus is green. Minus is red.",
-      "timed": true,
-      "start_gate": "training-hud-unpaused",
-      "media": {
-        "gif": "media/rc5-frame-strip-advantage-hit.gif",
-        "seconds": 5
-      }
-    },
-    {
-      "id": "media-rc5-frame-strip-advantage-shield",
-      "start": "training",
-      "end": "training",
-      "steps": [
-        {
-          "run": "steps.py:media_strip_advantage_shield",
-          "check": true,
-          "on": "surface-b"
-        }
-      ],
-      "evidence": [
-        "media/rc5-frame-strip-advantage-shield.gif"
-      ],
-      "source": "docs/MEDIA.md (rc.5 captures still needed), row media/rc5-frame-strip-advantage-shield.gif",
-      "host": "surface",
-      "expect": "ADVANTAGE reads on shield. LINK does not become TRUE combo or DROP for that shield hit.",
-      "timed": true,
-      "start_gate": "training-hud-unpaused",
-      "media": {
-        "gif": "media/rc5-frame-strip-advantage-shield.gif",
-        "seconds": 6
-      }
-    },
-    {
-      "id": "media-rc5-frame-strip-link",
-      "start": "training",
-      "end": "training",
-      "steps": [
-        {
-          "run": "steps.py:media_strip_link",
-          "check": true,
-          "on": "surface-b"
-        }
-      ],
-      "evidence": [
-        "media/rc5-frame-strip-link.gif"
-      ],
-      "source": "docs/MEDIA.md (rc.5 captures still needed), row media/rc5-frame-strip-link.gif",
-      "host": "surface",
-      "expect": "LINK shows a number of 0 or below and the words TRUE combo, in green. A green bar above P1's lane reads window Nf.",
-      "timed": true,
-      "start_gate": "training-hud-unpaused",
-      "media": {
-        "gif": "media/rc5-frame-strip-link.gif",
-        "seconds": 5
-      }
-    },
-    {
-      "id": "media-rc5-frame-strip-drop",
-      "start": "training",
-      "end": "training",
-      "steps": [
-        {
-          "run": "steps.py:media_strip_drop",
-          "check": true,
-          "on": "surface-b"
-        }
-      ],
-      "evidence": [
-        "media/rc5-frame-strip-drop.gif"
-      ],
-      "source": "docs/MEDIA.md (rc.5 captures still needed), row media/rc5-frame-strip-drop.gif",
-      "host": "surface",
-      "expect": "LINK shows a positive number and the word DROP, in red.",
-      "timed": true,
-      "start_gate": "training-hud-unpaused",
-      "media": {
-        "gif": "media/rc5-frame-strip-drop.gif",
-        "seconds": 6
-      }
-    },
-    {
-      "id": "media-rc5-frame-strip-input",
-      "start": "training",
-      "end": "training",
-      "steps": [
-        {
-          "run": "steps.py:media_strip_input",
-          "check": true,
-          "on": "surface-b"
-        }
-      ],
-      "evidence": [
-        "media/rc5-frame-strip-input.gif"
-      ],
-      "source": "docs/MEDIA.md (rc.5 captures still needed), row media/rc5-frame-strip-input.gif",
-      "host": "surface",
-      "expect": "INPUT shows Nf late or on time or buffered Nf, and then either N spare or Nf past.",
-      "timed": true,
-      "start_gate": "training-hud-unpaused",
-      "media": {
-        "gif": "media/rc5-frame-strip-input.gif",
-        "seconds": 6
-      }
-    },
-    {
-      "id": "media-rc5-frame-strip-last",
-      "start": "training",
-      "end": "training",
-      "steps": [
-        {
-          "run": "steps.py:media_strip_last",
-          "check": true,
-          "on": "surface-b"
-        }
-      ],
-      "evidence": [
-        "media/rc5-frame-strip-last.gif"
-      ],
-      "source": "docs/MEDIA.md (rc.5 captures still needed), row media/rc5-frame-strip-last.gif",
-      "host": "surface",
-      "expect": "The LAST row shows up to four pills, newest first. A pill reads TRUE or DROP with its number, and the moves read like Jab > Jab.",
-      "timed": true,
-      "start_gate": "training-hud-unpaused",
-      "media": {
-        "gif": "media/rc5-frame-strip-last.gif",
-        "seconds": 7
-      }
-    },
-    {
-      "id": "media-rc5-frame-strip-exchange",
-      "start": "training",
-      "end": "training",
-      "steps": [
-        {
-          "run": "steps.py:media_strip_exchange",
-          "check": true,
-          "on": "surface-b"
-        }
-      ],
-      "evidence": [
-        "media/rc5-frame-strip-exchange.gif"
-      ],
-      "source": "docs/MEDIA.md (rc.5 captures still needed), row media/rc5-frame-strip-exchange.gif",
-      "host": "surface",
-      "expect": "The second hit does not turn LINK into a large DROP of the first exchange. After both can act, ADVANTAGE is the new exchange, on hit.",
-      "timed": true,
-      "start_gate": "training-hud-unpaused",
-      "media": {
-        "gif": "media/rc5-frame-strip-exchange.gif",
-        "seconds": 8
-      }
+      "build": "release",
+      "on": "surface-a",
+      "trace": "Placeholder. Symbol training_rooms::runtime::roster::character_sources::f9_body_of (the task names character_roster::sources::f9_body_of; the source file is character_sources.rs). on_return, captures of entry, [entry+0x4160], the state word, and slot. Not a diag print.",
+      "start_gate": "training-hud-unpaused"
     },
     {
       "id": "setup-yoga-a",
@@ -1973,13 +1664,15 @@
         }
       ],
       "evidence": [
-        "install line cpu_common=installed",
+        "TrainingRooms events.log result=installed",
         "Training HUD settled"
       ],
-      "source": "rows-iv/rows-hb-ab boot route (library segments, steps.py hook)",
+      "source": "rows-iv/rows-hb-ab boot route (library segments, L3+D-pad, steps.py hook)",
       "host": "yoga",
-      "expect": "the instance is back at Training, HUD unpaused",
+      "expect": "the instance is at Training, HUD unpaused, P1 on Mario",
       "timed": false,
+      "build": "release",
+      "on": "yoga-a",
       "start_gate": "training-hud-unpaused",
       "recover": [
         {
@@ -1988,6 +1681,319 @@
           "on": "yoga-a"
         }
       ]
+    },
+    {
+      "id": "media-rc5-migration",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "run": "steps.py:media_migration",
+          "check": true,
+          "on": "yoga-a"
+        }
+      ],
+      "evidence": [
+        "media/rc5-migration.gif",
+        "playback diag line warp=0"
+      ],
+      "source": "docs/MEDIA.md (rc.5 captures still needed), row media/rc5-migration.gif",
+      "host": "yoga",
+      "expect": "The name uses Slot 1 and the date. Play does not warp. Empty slots did not become files.",
+      "timed": false,
+      "build": "release",
+      "on": "yoga-a",
+      "start_gate": "training-hud-unpaused",
+      "media": {
+        "gif": "media/rc5-migration.gif",
+        "seconds": 8
+      }
+    },
+    {
+      "id": "media-rc5-record-start-save",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "run": "steps.py:media_record_start_save",
+          "check": true,
+          "on": "yoga-a"
+        }
+      ],
+      "evidence": [
+        "media/rc5-record-start-save.gif"
+      ],
+      "source": "docs/MEDIA.md (rc.5 captures still needed), row media/rc5-record-start-save.gif",
+      "host": "yoga",
+      "expect": "A new macro at the top of the hot five, an orange floppy, and a start save named with the macro.",
+      "timed": false,
+      "build": "release",
+      "on": "yoga-a",
+      "start_gate": "training-hud-unpaused",
+      "media": {
+        "gif": "media/rc5-record-start-save.gif",
+        "seconds": 8
+      }
+    },
+    {
+      "id": "media-rc5-play-chord",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "run": "steps.py:media_play_chord",
+          "check": true,
+          "on": "yoga-a"
+        }
+      ],
+      "evidence": [
+        "media/rc5-play-chord.gif"
+      ],
+      "source": "docs/MEDIA.md (rc.5 captures still needed), row media/rc5-play-chord.gif",
+      "host": "yoga",
+      "expect": "One warp to the start save, then the CPU plays the jab. A second press of ZR+Up stops it.",
+      "timed": false,
+      "build": "release",
+      "on": "yoga-a",
+      "start_gate": "training-hud-unpaused",
+      "media": {
+        "gif": "media/rc5-play-chord.gif",
+        "seconds": 8
+      }
+    },
+    {
+      "id": "media-rc5-loop-no-warp",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "run": "steps.py:media_loop_no_warp",
+          "check": true,
+          "on": "yoga-a"
+        }
+      ],
+      "evidence": [
+        "media/rc5-loop-no-warp.gif"
+      ],
+      "source": "docs/MEDIA.md (rc.5 captures still needed), row media/rc5-loop-no-warp.gif",
+      "host": "yoga",
+      "expect": "The first pass warps once. The second pass does not warp. It continues from where the first pass ended.",
+      "timed": false,
+      "build": "release",
+      "on": "yoga-a",
+      "start_gate": "training-hud-unpaused",
+      "media": {
+        "gif": "media/rc5-loop-no-warp.gif",
+        "seconds": 8
+      }
+    },
+    {
+      "id": "media-rc5-chain-play",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "run": "steps.py:media_chain_play",
+          "check": true,
+          "on": "yoga-a"
+        }
+      ],
+      "evidence": [
+        "media/rc5-chain-play.gif"
+      ],
+      "source": "docs/MEDIA.md (rc.5 captures still needed), row media/rc5-chain-play.gif",
+      "host": "yoga",
+      "expect": "One warp to macro 1's start save, then recording 1, then recording 2, with no warp between them.",
+      "timed": false,
+      "build": "release",
+      "on": "yoga-a",
+      "start_gate": "training-hud-unpaused",
+      "media": {
+        "gif": "media/rc5-chain-play.gif",
+        "seconds": 9
+      }
+    },
+    {
+      "id": "media-rc5-popup",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "run": "steps.py:media_popup",
+          "check": true,
+          "on": "yoga-a"
+        }
+      ],
+      "evidence": [
+        "media/rc5-popup.gif"
+      ],
+      "source": "docs/MEDIA.md (rc.5 captures still needed), row media/rc5-popup.gif",
+      "host": "yoga",
+      "expect": "The window over the match. Player | CPU at the top. Two stacked sections. Green fill on the bound save. White cursor. B closes it and the bound save is unchanged.",
+      "timed": false,
+      "build": "release",
+      "on": "yoga-a",
+      "start_gate": "training-hud-unpaused",
+      "media": {
+        "gif": "media/rc5-popup.gif",
+        "seconds": 8
+      }
+    },
+    {
+      "id": "media-rc5-recording-page",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "run": "steps.py:media_recording_page",
+          "check": true,
+          "on": "yoga-a"
+        }
+      ],
+      "evidence": [
+        "media/rc5-recording-page.gif"
+      ],
+      "source": "docs/MEDIA.md (rc.5 captures still needed), row media/rc5-recording-page.gif",
+      "host": "yoga",
+      "expect": "Player view shows saves and macros, and Combos & Sequences in the left column. CPU view hides Combos & Sequences. The bound save is green in both.",
+      "timed": false,
+      "build": "release",
+      "on": "yoga-a",
+      "start_gate": "training-hud-unpaused",
+      "media": {
+        "gif": "media/rc5-recording-page.gif",
+        "seconds": 8
+      }
+    },
+    {
+      "id": "media-rc5-macro-screen",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "run": "steps.py:media_macro_screen",
+          "check": true,
+          "on": "yoga-a"
+        }
+      ],
+      "evidence": [
+        "media/rc5-macro-screen.gif"
+      ],
+      "source": "docs/MEDIA.md (rc.5 captures still needed), row media/rc5-macro-screen.gif",
+      "host": "yoga",
+      "expect": "Breadcrumb with the role and the name. Start save with the floppy, switch On. Set active is one row for that role.",
+      "timed": false,
+      "build": "release",
+      "on": "yoga-a",
+      "start_gate": "training-hud-unpaused",
+      "media": {
+        "gif": "media/rc5-macro-screen.gif",
+        "seconds": 6
+      }
+    },
+    {
+      "id": "media-rc5-fighter-mismatch",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "run": "steps.py:media_fighter_mismatch",
+          "check": true,
+          "on": "yoga-a"
+        }
+      ],
+      "evidence": [
+        "media/rc5-fighter-mismatch.gif"
+      ],
+      "source": "docs/MEDIA.md (rc.5 captures still needed), row media/rc5-fighter-mismatch.gif",
+      "host": "yoga",
+      "expect": "One Fighter Mismatch prompt, title Fighter Mismatch, rows Keep current fighter and Switch to recorded fighter. It names the first macro's fighter. No second prompt when the later macro plays.",
+      "timed": false,
+      "build": "release",
+      "on": "yoga-a",
+      "start_gate": "training-hud-unpaused",
+      "media": {
+        "gif": "media/rc5-fighter-mismatch.gif",
+        "seconds": 7
+      }
+    },
+    {
+      "id": "media-rc5-make-combo",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "run": "steps.py:media_make_combo",
+          "check": true,
+          "on": "yoga-a"
+        }
+      ],
+      "evidence": [
+        "media/rc5-make-combo.gif"
+      ],
+      "source": "docs/MEDIA.md (rc.5 captures still needed), row media/rc5-make-combo.gif; RR-7 Make combo on a chain/macro",
+      "host": "yoga",
+      "expect": "The macro plays once on Player 1 from its start save. A new combo appears. The drilled combo is still the drill when it finishes.",
+      "timed": false,
+      "build": "release",
+      "on": "yoga-a",
+      "start_gate": "training-hud-unpaused",
+      "media": {
+        "gif": "media/rc5-make-combo.gif",
+        "seconds": 8
+      }
+    },
+    {
+      "id": "media-rc5-crop-combo",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "run": "steps.py:media_crop_combo",
+          "check": true,
+          "on": "yoga-a"
+        }
+      ],
+      "evidence": [
+        "media/rc5-crop-combo.gif"
+      ],
+      "source": "docs/MEDIA.md (rc.5 captures still needed), row media/rc5-crop-combo.gif",
+      "host": "yoga",
+      "expect": "A new combo of the kept links. The original combo is still in the list.",
+      "timed": false,
+      "build": "release",
+      "on": "yoga-a",
+      "start_gate": "training-hud-unpaused",
+      "media": {
+        "gif": "media/rc5-crop-combo.gif",
+        "seconds": 7
+      }
+    },
+    {
+      "id": "media-rc5-save-warp",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "run": "steps.py:media_save_warp",
+          "check": true,
+          "on": "yoga-a"
+        }
+      ],
+      "evidence": [
+        "media/rc5-save-warp.gif"
+      ],
+      "source": "docs/MEDIA.md (rc.5 captures still needed), row media/rc5-save-warp.gif",
+      "host": "yoga",
+      "expect": "Both fighters return to the saved spot. No recording starts. The CPU does not play inputs.",
+      "timed": false,
+      "build": "release",
+      "on": "yoga-a",
+      "start_gate": "training-hud-unpaused",
+      "media": {
+        "gif": "media/rc5-save-warp.gif",
+        "seconds": 6
+      }
     },
     {
       "id": "media-rc5-frame-strip-cstick",
@@ -2007,6 +2013,8 @@
       "host": "yoga",
       "expect": "One attack chip with a right arrow. The left stick never left neutral.",
       "timed": true,
+      "build": "release",
+      "on": "yoga-a",
       "start_gate": "training-hud-unpaused",
       "media": {
         "gif": "media/rc5-frame-strip-cstick.gif",
@@ -2031,6 +2039,8 @@
       "host": "yoga",
       "expect": "A row under P1's lane. A direction only while the stick is held. Blank cells while neutral. The row scrolls with the lanes.",
       "timed": true,
+      "build": "release",
+      "on": "yoga-a",
       "start_gate": "training-hud-unpaused",
       "media": {
         "gif": "media/rc5-frame-strip-stick-row.gif",
@@ -2055,11 +2065,84 @@
       "host": "yoga",
       "expect": "The strip keeps scrolling while the stick changes direction. It does not freeze.",
       "timed": true,
+      "build": "release",
+      "on": "yoga-a",
       "start_gate": "training-hud-unpaused",
       "media": {
         "gif": "media/rc5-frame-strip-freeze-stick.gif",
         "seconds": 5
       }
+    },
+    {
+      "id": "rr-chords",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "run": "steps.py:rr_chords",
+          "check": true,
+          "on": "yoga-a"
+        }
+      ],
+      "evidence": [
+        "chord table screenshot",
+        "factory arrays [6,9] [6,8] [7,9] [7,8] [7,10] [7,11] [6,11] [6,10]"
+      ],
+      "source": "RR-5 Design factory-row table; LANE-GROK-RECORDING-REDESIGN-REPORT.md A14",
+      "host": "yoga",
+      "expect": "the eight factory chords keep today's defaults: Save ZL+Down [6,9], Load ZL+Up [6,8], Record ZR+Down [7,9], Play on CPU ZR+Up [7,8], Play on Player 1 ZR+Left [7,10], Recording pop-up ZR+Right [7,11], Cycle Player ZL+Right [6,11], Cycle CPU ZL+Left [6,10]",
+      "timed": false,
+      "build": "release",
+      "on": "yoga-a",
+      "start_gate": "training-hud-unpaused"
+    },
+    {
+      "id": "rr-picker",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "run": "steps.py:rr_picker",
+          "check": true,
+          "on": "yoga-a"
+        }
+      ],
+      "evidence": [
+        "picker screenshot sequence",
+        "chain picker lists no chain tile"
+      ],
+      "source": "RR-3 requirement trace (A1, A9); LANE-GROK-RECORDING-REDESIGN-REPORT.md lines 197, 203",
+      "host": "yoga",
+      "expect": "the numbered picker works as Character Cycles: A gives the next number, R removes and later numbers close up, A on a numbered tile does nothing, R on the last remaining number does nothing, B is done; the chain picker lists recordings only",
+      "timed": false,
+      "build": "release",
+      "on": "yoga-a",
+      "start_gate": "training-hud-unpaused"
+    },
+    {
+      "id": "rr-combo",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "run": "steps.py:rr_combo",
+          "check": true,
+          "on": "yoga-a"
+        }
+      ],
+      "evidence": [
+        "panel line jump \u00b7 release \u00b7 \u2193 flick \u00b7 A",
+        "drift \u2192 line under it",
+        "panel screenshot"
+      ],
+      "source": "RR-7 \u00a7Eden rows for rr-10 (row rr-combo)",
+      "host": "yoga",
+      "expect": "the combo's Connections panel lists each link's events on a second line - jump \u00b7 release \u00b7 \u2193 flick \u00b7 A - then drift \u2192 on the next line; the published frame, not a new diag print",
+      "timed": false,
+      "build": "release",
+      "on": "yoga-a",
+      "trace": "RR-7: recording_menu::combo_link_lines reads the combo file; the draw hook paints the frame the UI worker already published. The panel line is the published frame, not a diag print, so this row has no log gate.",
+      "start_gate": "training-hud-unpaused"
     },
     {
       "id": "combo-nair-loop-clean",
@@ -2070,16 +2153,23 @@
           "run": "steps.py:combo_nair_loop_clean",
           "check": true,
           "on": "yoga-a"
+        },
+        {
+          "gate": "trace-combo-link",
+          "on": "yoga-a"
         }
       ],
       "evidence": [
-        "bar verdict clean",
+        "trace return of tr_combo_link_v1 with the clean flag",
         "events jump press, jump release, attack press, fast-fall"
       ],
       "source": "RR-12 \u00a7Eden rows (row Nair loop, drilled clean)",
       "host": "yoga",
       "expect": "Clean. Events are jump press, jump release, attack press, fast-fall. Drift may show and does not change the verdict.",
       "timed": true,
+      "build": "release",
+      "on": "yoga-a",
+      "trace": "Release: tr_combo_link_v1 on_return (src/runtime/features/combo.rs). x0 index, x1 link, x2 flags (bit 1 clean), x3 offset. The diag \"drill \" line is not printed by the release NRO.",
       "start_gate": "training-hud-unpaused"
     },
     {
@@ -2091,6 +2181,10 @@
           "run": "steps.py:combo_nair_loop_full_hop",
           "check": true,
           "on": "yoga-a"
+        },
+        {
+          "gate": "trace-combo-link",
+          "on": "yoga-a"
         }
       ],
       "evidence": [
@@ -2101,6 +2195,9 @@
       "host": "yoga",
       "expect": "Drop. The bar names the late jump release.",
       "timed": true,
+      "build": "release",
+      "on": "yoga-a",
+      "trace": "Release: tr_combo_link_v1 on_return. x0 index, x1 link, x2 flags (bit 1 clean, bit 2 wrong move, bit 3 missing).",
       "start_gate": "training-hud-unpaused"
     },
     {
@@ -2112,6 +2209,10 @@
           "run": "steps.py:combo_nair_loop_no_fastfall",
           "check": true,
           "on": "yoga-a"
+        },
+        {
+          "gate": "trace-combo-link",
+          "on": "yoga-a"
         }
       ],
       "evidence": [
@@ -2122,6 +2223,9 @@
       "host": "yoga",
       "expect": "Drop. The bar names a missing fast-fall.",
       "timed": true,
+      "build": "release",
+      "on": "yoga-a",
+      "trace": "Release: tr_combo_link_v1 on_return. x0 index, x1 link, x2 flags (bit 1 clean, bit 2 wrong move, bit 3 missing).",
       "start_gate": "training-hud-unpaused"
     },
     {
@@ -2133,6 +2237,10 @@
           "run": "steps.py:combo_dash_attack",
           "check": true,
           "on": "yoga-a"
+        },
+        {
+          "gate": "trace-combo-link",
+          "on": "yoga-a"
         }
       ],
       "evidence": [
@@ -2142,6 +2250,37 @@
       "host": "yoga",
       "expect": "Clean when the dash flick and the attack press are both there, in order, facing-relative. A missing cross drops on the dash.",
       "timed": true,
+      "build": "release",
+      "on": "yoga-a",
+      "trace": "Release: tr_combo_link_v1 on_return. x0 index, x1 link, x2 flags (bit 1 clean, bit 2 wrong move, bit 3 missing).",
+      "start_gate": "training-hud-unpaused"
+    },
+    {
+      "id": "rr-grade-bar",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "run": "steps.py:rr_grade_bar",
+          "check": true,
+          "on": "yoga-a"
+        },
+        {
+          "gate": "trace-combo-attempt",
+          "on": "yoga-a"
+        }
+      ],
+      "evidence": [
+        "trace return of tr_combo_attempt_v1 for the four cases",
+        "streak 0 after the drop"
+      ],
+      "source": "RR-2 requirement trace (A2, A3, A4); LANE-GROK-RECORDING-REDESIGN-REPORT.md lines 147-149, 198",
+      "host": "yoga",
+      "expect": "a non-TRUE link inside the tolerance still counts; a missing press, a press outside the tolerance and a gap past 20 frames drop; a drop restarts the sequence at combo 1 with streak 0 and best kept; the bar still draws TRUE",
+      "timed": true,
+      "build": "release",
+      "on": "yoga-a",
+      "trace": "Release: tr_combo_attempt_v1 on_return. x0 outcome (1 completed, 2 stopped, 3 cleared), x1 true links, x2 total, x3 first bad. A screenshot alone does not pass the row.",
       "start_gate": "training-hud-unpaused"
     },
     {
@@ -2160,13 +2299,15 @@
         }
       ],
       "evidence": [
-        "install line cpu_common=installed",
+        "TrainingRooms events.log result=installed",
         "Training HUD settled"
       ],
-      "source": "rows-iv/rows-hb-ab boot route (library segments, steps.py hook)",
+      "source": "rows-iv/rows-hb-ab boot route (library segments, L3+D-pad, steps.py hook)",
       "host": "yoga",
-      "expect": "the instance is back at Training, HUD unpaused",
+      "expect": "the instance is at Training, HUD unpaused, P1 on Mario",
       "timed": false,
+      "build": "diag",
+      "on": "yoga-b",
       "start_gate": "training-hud-unpaused",
       "recover": [
         {
@@ -2177,24 +2318,184 @@
       ]
     },
     {
-      "id": "rr-grade-bar",
+      "id": "rr-load",
       "start": "training",
       "end": "training",
       "steps": [
         {
-          "run": "steps.py:rr_grade_bar",
+          "run": "steps.py:rr_load",
           "check": true,
           "on": "yoga-b"
         }
       ],
       "evidence": [
-        "bar screenshots of the four cases",
-        "streak 0 after the drop"
+        "no playback/load diag line after ZL+Up",
+        "both fighters at the saved spot"
       ],
-      "source": "RR-2 requirement trace (A2, A3, A4); LANE-GROK-RECORDING-REDESIGN-REPORT.md lines 147-149, 198",
+      "source": "RR-4 requirement trace (A5, load_starts_no_playback); LANE-GROK-RECORDING-REDESIGN-REPORT.md line 182",
       "host": "yoga",
-      "expect": "a non-TRUE link inside the tolerance still counts; a missing press, a press outside the tolerance and a gap past 20 frames drop; a drop restarts the sequence at combo 1 with streak 0 and best kept; the bar still draws TRUE",
-      "timed": true,
+      "expect": "Load (ZL+Up) warps both fighters to the bound save and starts nothing: no playback diag line, the active macros stay idle",
+      "timed": false,
+      "build": "diag",
+      "on": "yoga-b",
+      "start_gate": "training-hud-unpaused"
+    },
+    {
+      "id": "rr-chain",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "run": "steps.py:rr_chain",
+          "check": true,
+          "on": "yoga-b"
+        }
+      ],
+      "evidence": [
+        "one warp at chain start",
+        "no warp before macro 2"
+      ],
+      "source": "RR-4 requirement trace (A6, a_chain_warps_to_macro_1_start_save_only); LANE-GROK-RECORDING-REDESIGN-REPORT.md line 202",
+      "host": "yoga",
+      "expect": "the chain warps once to macro 1's start save, then plays macro 1 then macro 2 with no warp between them; the inner macros' start saves are not used",
+      "timed": false,
+      "build": "diag",
+      "on": "yoga-b",
+      "start_gate": "training-hud-unpaused"
+    },
+    {
+      "id": "rr-loop",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "run": "steps.py:rr_loop",
+          "check": true,
+          "on": "yoga-b"
+        }
+      ],
+      "evidence": [
+        "diag screen=recording-popup role=player loop=2",
+        "second pass continues without a warp"
+      ],
+      "source": "RR-4 requirement trace (A7, the_loop_loads_the_start_save_once); RR-6 \u00a7Eden rows for rr-10 (row rr-loop)",
+      "host": "yoga",
+      "expect": "with the loop at 2 and the cursor in MACROS, X shows 2; the first pass warps once and the second pass does not warp",
+      "timed": false,
+      "build": "diag",
+      "on": "yoga-b",
+      "start_gate": "training-hud-unpaused"
+    },
+    {
+      "id": "rr-hot",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "run": "steps.py:rr_hot",
+          "check": true,
+          "on": "yoga-b"
+        }
+      ],
+      "evidence": [
+        "diag screen=recording-popup hot=5 hairline=5"
+      ],
+      "source": "RR-6 \u00a7Eden rows for rr-10 (row rr-hot); LANE-GROK-RECORDING-REDESIGN-REPORT.md A10",
+      "host": "yoga",
+      "expect": "screen=recording-popup hot=5 hairline=5: five macros in the green outline, most recently used first, the hairline after the fifth",
+      "timed": false,
+      "build": "diag",
+      "on": "yoga-b",
+      "start_gate": "training-hud-unpaused"
+    },
+    {
+      "id": "rr-icons",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "run": "steps.py:rr_icons",
+          "check": true,
+          "on": "yoga-b"
+        }
+      ],
+      "evidence": [
+        "diag screen=recording-popup floppy=off header=on"
+      ],
+      "source": "RR-6 \u00a7Eden rows for rr-10 (row rr-icons); RR-8 Names rr-6 binds",
+      "host": "yoga",
+      "expect": "screen=recording-popup floppy=off header=on: the row's floppy is grey (126,132,144) with the switch Off, the SAVE STATES header floppy stays orange (242,152,72)",
+      "timed": false,
+      "build": "diag",
+      "on": "yoga-b",
+      "start_gate": "training-hud-unpaused"
+    },
+    {
+      "id": "rr-page",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "run": "steps.py:rr_page",
+          "check": true,
+          "on": "yoga-b"
+        }
+      ],
+      "evidence": [
+        "diag screen=recording-page role=cpu group=saves-macros",
+        "retired rows absent from the page"
+      ],
+      "source": "RR-6 \u00a7Eden rows for rr-10 (row rr-page); LANE-GROK-RECORDING-REDESIGN-REPORT.md lines 243-249, 316-319",
+      "host": "yoga",
+      "expect": "screen=recording-page role=cpu group=saves-macros after one ZR on the Recording page; L and R still change the menu page; the retired rows (Record Slot, Trigger, Duration, Source, Randomize slots) are gone",
+      "timed": false,
+      "build": "diag",
+      "on": "yoga-b",
+      "start_gate": "training-hud-unpaused"
+    },
+    {
+      "id": "rr-popup",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "run": "steps.py:rr_popup",
+          "check": true,
+          "on": "yoga-b"
+        }
+      ],
+      "evidence": [
+        "diag screen=recording-popup role=player tab=saves",
+        "B closes without changing the selection"
+      ],
+      "source": "RR-6 \u00a7Eden rows for rr-10 (row rr-popup); LANE-GROK-RECORDING-REDESIGN-REPORT.md line 167",
+      "host": "yoga",
+      "expect": "screen=recording-popup role=player tab=saves on ZR+Right with the menu closed; B returns to the match and the bound save is unchanged",
+      "timed": false,
+      "build": "diag",
+      "on": "yoga-b",
+      "start_gate": "training-hud-unpaused"
+    },
+    {
+      "id": "rr-active",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "run": "steps.py:rr_active",
+          "check": true,
+          "on": "yoga-b"
+        }
+      ],
+      "evidence": [
+        "diag screen=recording-popup role=cpu active=pressure"
+      ],
+      "source": "RR-6 \u00a7Eden rows for rr-10 (row rr-active); LANE-GROK-RECORDING-REDESIGN-REPORT.md A8",
+      "host": "yoga",
+      "expect": "screen=recording-popup role=cpu active=pressure after L or R to CPU: each role shows its own active macro, green only in that role's view",
+      "timed": false,
+      "build": "diag",
+      "on": "yoga-b",
       "start_gate": "training-hud-unpaused"
     },
     {
@@ -2206,16 +2507,27 @@
           "run": "steps.py:rr_drill",
           "check": true,
           "on": "yoga-b"
+        },
+        {
+          "gate": "diag-drill-press",
+          "on": "yoga-b"
+        },
+        {
+          "gate": "diag-make-combo-press",
+          "on": "yoga-b"
         }
       ],
       "evidence": [
-        "drill screenshots",
-        "Make combo leaves the drill"
+        "diag [Ui] press on row Drill",
+        "diag [Ui] press on row Make combo",
+        "the drill id is unchanged after Make combo"
       ],
       "source": "RR-2 requirement trace (A11); LANE-GROK-RECORDING-REDESIGN-REPORT.md lines 178, 191, 200, 259, 265, 267",
       "host": "yoga",
       "expect": "Drilling a combo or the sequence replaces the drill (A, no chord); Make combo plays the file once on Player 1 from its start save, adds the new combo to the hot five, and leaves the drill unchanged",
       "timed": true,
+      "build": "diag",
+      "on": "yoga-b",
       "start_gate": "training-hud-unpaused"
     },
     {
@@ -2223,21 +2535,6 @@
       "start": "training",
       "end": "training",
       "steps": [
-        {
-          "run": "steps.py:heap_crash",
-          "check": true,
-          "on": "xps-a"
-        },
-        {
-          "run": "steps.py:heap_crash",
-          "check": true,
-          "on": "xps-b"
-        },
-        {
-          "run": "steps.py:heap_crash",
-          "check": true,
-          "on": "ally-a"
-        },
         {
           "run": "steps.py:heap_crash",
           "check": true,
@@ -2260,14 +2557,16 @@
         }
       ],
       "evidence": [
-        "install line heap_allocations=0 on all 7 instances",
+        "TrainingRooms events.log result=installed heap_allocations=0 on surface-a, surface-b, yoga-a, yoga-b",
         "hook-stats snapshot",
         "console Unmapped/panic scan"
       ],
       "source": "EDEN-SESSION-PLAN-rc5.md (gates on every instance); playbook CHECKLIST (no heap in hooks)",
-      "host": "xps",
-      "expect": "on every instance: the install line says heap_allocations=0, the hook-stats snapshot shows no steady-state hook allocations after the whole session, and the console log has no Unmapped and no panic lines",
+      "host": "surface",
+      "expect": "on every re-run instance, release and diag: TrainingRooms' own events.log line plugin=training_rooms/ result=installed heap_allocations=0, the hook-stats snapshot shows no steady-state hook allocations, and the console log has no Unmapped and no panic lines",
       "timed": false,
+      "build": "release-and-diag",
+      "on": "surface-a",
       "start_gate": "training-hud-unpaused"
     }
   ]
