@@ -48,7 +48,10 @@ pub fn service() {
     let slots = if rr_host::migrated() {
         empty
     } else {
-        super::recorder::live_slots()
+        match super::recorder::copied_slots() {
+            Some(slots) => slots,
+            None => return,
+        }
     };
     let tick = rr_host::service_at(
         root,
@@ -58,6 +61,9 @@ pub fn service() {
         SavedState::never_saved(),
         keyboard_closed(),
     );
+    if rr_host::migrated() {
+        super::recorder::release_slot_image();
+    }
     apply(&tick);
 }
 

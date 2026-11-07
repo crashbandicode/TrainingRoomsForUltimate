@@ -21,7 +21,7 @@
 //!
 //! NOT YET SWITCH-RUN.
 
-use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU8, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI32, AtomicPtr, AtomicU8, Ordering};
 
 use hos_lock::Mutex;
 use skyline::hooks::InlineCtx;
@@ -87,35 +87,124 @@ fn rec() -> RecGuard {
     RecGuard(REC.lock())
 }
 
-/// The five live slots, copied so migration can write them without holding the recorder lock.
-pub(crate) fn live_slots() -> [Option<crate::engine::library::LegacySlot>; 5] {
-    let rec = rec();
+const SLOT_EMPTY: u8 = 0;
+const SLOT_OFFERED: u8 = 1;
+const SLOT_FILLING: u8 = 2;
+const SLOT_READY: u8 = 3;
+const SLOT_DONE: u8 = 4;
+
+struct SlotImage {
+    present: [bool; 5],
+    counts: [u32; 5],
+    kinds: [i32; 5],
+    costumes: [u32; 5],
+    facing: [f32; 5],
+    frames: Vec<crate::engine::macros::InputFrame>,
+}
+
+static SLOT_IMAGE: AtomicPtr<SlotImage> = AtomicPtr::new(std::ptr::null_mut());
+static SLOT_STAGE: AtomicU8 = AtomicU8::new(SLOT_EMPTY);
+
+/// The worker's copy of the five slots. The worker allocates the buffer and reads it; a hook fills it.
+/// `None` means the hook has not filled the buffer yet, so migration must wait.
+pub(crate) fn copied_slots() -> Option<[Option<crate::engine::library::LegacySlot>; 5]> {
+    match SLOT_STAGE.load(Ordering::Acquire) {
+        SLOT_EMPTY => {
+            offer_slot_image();
+            None
+        }
+        SLOT_READY => {
+            let ptr = SLOT_IMAGE.load(Ordering::Acquire);
+            if ptr.is_null() { None } else { Some(slots_from_image(unsafe { &*ptr })) }
+        }
+        _ => None,
+    }
+}
+
+pub(crate) fn release_slot_image() {
+    if SLOT_STAGE.swap(SLOT_DONE, Ordering::AcqRel) == SLOT_READY {
+        let ptr = SLOT_IMAGE.swap(std::ptr::null_mut(), Ordering::AcqRel);
+        if !ptr.is_null() {
+            unsafe { drop(Box::from_raw(ptr)) }
+        }
+    }
+}
+
+fn offer_slot_image() {
+    let image = Box::new(SlotImage {
+        present: [false; 5],
+        counts: [0; 5],
+        kinds: [0; 5],
+        costumes: [0; 5],
+        facing: [1.0; 5],
+        frames: vec![crate::engine::macros::InputFrame::default(); 5 * crate::engine::macros::MAX_FRAMES],
+    });
+    let ptr = Box::into_raw(image);
+    if SLOT_IMAGE.compare_exchange(std::ptr::null_mut(), ptr, Ordering::Release, Ordering::Acquire).is_err() {
+        unsafe { drop(Box::from_raw(ptr)) }
+        return;
+    }
+    SLOT_STAGE.store(SLOT_OFFERED, Ordering::Release);
+}
+
+/// Copy the live slots into the worker's buffer. Called from a hook: no allocation, and the lock ends before the worker reads.
+pub(crate) fn fill_slot_image() {
+    if SLOT_STAGE.compare_exchange(SLOT_OFFERED, SLOT_FILLING, Ordering::AcqRel, Ordering::Acquire).is_err() {
+        return;
+    }
+    let ptr = SLOT_IMAGE.load(Ordering::Acquire);
+    if ptr.is_null() {
+        SLOT_STAGE.store(SLOT_EMPTY, Ordering::Release);
+        return;
+    }
+    let image = unsafe { &mut *ptr };
+    {
+        let rec = rec();
+        let cap = crate::engine::macros::MAX_FRAMES;
+        for index in 0..5u8 {
+            let i = usize::from(index);
+            image.present[i] = false;
+            if !rec.is_recorded(index) {
+                continue;
+            }
+            let Some(frames) = rec.frames(index) else { continue };
+            if frames.is_empty() {
+                continue;
+            }
+            let n = frames.len().min(cap);
+            let origin = rec.origin(index);
+            image.present[i] = true;
+            image.counts[i] = n as u32;
+            image.kinds[i] = origin.map(|item| item.start.fighter_kind).unwrap_or(0);
+            image.costumes[i] = origin.map(|item| item.start.costume).unwrap_or(0);
+            image.facing[i] = f32::from(origin.map(|item| item.facing).unwrap_or(1));
+            for (k, frame) in frames.iter().take(n).enumerate() {
+                image.frames[i * cap + k] = crate::engine::macros::InputFrame {
+                    buttons: frame.buttons,
+                    lstick_x: frame.lstick_x,
+                    lstick_y: frame.lstick_y,
+                    rstick_x: frame.rstick_x,
+                    rstick_y: frame.rstick_y,
+                };
+            }
+        }
+    }
+    SLOT_STAGE.store(SLOT_READY, Ordering::Release);
+}
+
+fn slots_from_image(image: &SlotImage) -> [Option<crate::engine::library::LegacySlot>; 5] {
     let mut slots: [Option<crate::engine::library::LegacySlot>; 5] = [None, None, None, None, None];
-    for index in 0..5u8 {
-        if !rec.is_recorded(index) {
+    let cap = crate::engine::macros::MAX_FRAMES;
+    for i in 0..5 {
+        if !image.present[i] || image.counts[i] == 0 {
             continue;
         }
-        let Some(frames) = rec.frames(index) else { continue };
-        if frames.is_empty() {
-            continue;
-        }
-        let origin = rec.origin(index);
-        let start = crate::engine::macros::StartState::neutral(
-            origin.map(|item| item.start.fighter_kind).unwrap_or(0),
-            origin.map(|item| item.start.costume).unwrap_or(0),
-            f32::from(origin.map(|item| item.facing).unwrap_or(1)),
-        );
-        let copied = frames
-            .iter()
-            .map(|frame| crate::engine::macros::InputFrame {
-                buttons: frame.buttons,
-                lstick_x: frame.lstick_x,
-                lstick_y: frame.lstick_y,
-                rstick_x: frame.rstick_x,
-                rstick_y: frame.rstick_y,
-            })
-            .collect();
-        slots[usize::from(index)] = Some(crate::engine::library::LegacySlot { frames: copied, start });
+        let n = image.counts[i] as usize;
+        let start = crate::engine::macros::StartState::neutral(image.kinds[i], image.costumes[i], image.facing[i]);
+        slots[i] = Some(crate::engine::library::LegacySlot {
+            frames: image.frames[i * cap..i * cap + n].to_vec(),
+            start,
+        });
     }
     slots
 }/// The recorder's hook was installed with every row of its closure (`model::capabilities`, review R2-1): until
@@ -314,6 +403,7 @@ fn facing_of(lr: f32) -> i8 {
 /// # Safety
 /// `out` is the record the game just mapped.
 pub unsafe fn on_p1_poll(out: *mut MappedInputs) {
+    fill_slot_image();
     if !ENABLED.load(Ordering::Acquire) {
         return;
     }
@@ -375,6 +465,7 @@ pub unsafe fn ai_epilogue(ctx: &mut InlineCtx) {
 }
 
 unsafe fn on_ai_frame(ai: usize) {
+    fill_slot_image();
     // Native Training or an active lobby practice (the hot swap check below stops the recorder).
     if ai == 0 || !(scene::is_native_training() || scene::lobby_term()) {
         return;
