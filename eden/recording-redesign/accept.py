@@ -53,7 +53,7 @@ def _patch_settings(path):
 
 
 def _warps(ctx):
-    path = steps.gate_source(ctx)
+    path = Path(steps.gate_source(ctx))
     if not path.is_file():
         return 0
     return len(re.findall(r'playback .*warp=1', path.read_text(errors='replace')))
