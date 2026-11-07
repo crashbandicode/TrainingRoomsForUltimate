@@ -561,3 +561,11 @@ ceiling = 150049
 date = "2026-11-07"
 reason = "rc.5 CPU-role record (p23/rc5-cpu-record): the player's poll drives and is stored for a CPU-role recording; measured 150049 (tools/size_gate.py), +173 over 149876"
 approved_by = "Operator 2026-11-07 via primary 35137355 (TASK-GROK-rc5-cpu-record): 'Raise as needed'"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 150155
+date = "2026-11-07"
+reason = "rc.5 wire-fix merge of the CPU-role record path with the FrameStrip change-log and the combo helper default On; measured 150155 (tools/size_gate.py), +106 over 150049"
+approved_by = "Operator 2026-11-07 via primary 35137355 (TASK-GROK-rc5-wire-fix and TASK-GROK-rc5-cpu-record): 'Raise as needed'"
