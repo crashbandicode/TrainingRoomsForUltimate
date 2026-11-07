@@ -63,9 +63,14 @@ centred at (0, 420). From the top:
    button glyph from the game's font and, for a tilted stick, our own arrow (a shaft and a head). Up to 8 chips. A
    tick runs from the chip down to the P1 lane. The combo window of the latest follow-up is a green bar above the P1
    lane, with "combo window Nf".
-2. **P1 lane and CPU lane:** 60 frames, one cell column per frame, newest on the right, 13.5 units per frame. A lane
-   is drawn as runs of one state (one rectangle per run, up to 16 per lane). A run of 7 or more frames of recovery,
-   hitstun or shieldstun shows its length.
+2. **P1 lane, stick row and CPU lane:** 60 frames, one cell column per frame, newest on the right, 13.5 units per frame.
+   A lane is drawn as runs of one state (one rectangle per run, up to 16 per lane). A run of 7 or more frames of
+   recovery, hitstun or shieldstun shows its length. The stick row sits under the P1 lane, one mark per frame of the
+   same 60, scrolling and freezing with the lanes. It shows the left stick's binned direction that frame: a `>` rotated
+   45 degrees counter-clockwise per bin, so no rotation points right. A neutral frame is blank. Operator, 2026-11-06:
+   "I was talking about just the left stick movement though" and "go with b. I think it's more useful". Option B, the
+   one chosen: "every frame of the last second shows the held direction under your lane, so you can see exactly how
+   long each direction was held".
 3. **Brackets** under the CPU lane: `link −N` between the follow-up hit and the free frame it beat, and `adv +N` between
    P1's and the CPU's first actionable frames.
 4. **Readouts** on the right: ADVANTAGE, LINK, INPUT (§3.4).
@@ -89,8 +94,11 @@ The CPU lane uses the same rules without active and startup: a busy CPU frame th
 
 Chip colours: attack (A) green (72, 190, 110), special (B) red (226, 82, 76), jump (X/Y) blue (64, 170, 220), shield
 (L/R) slate (90, 110, 160), grab (Z) purple (140, 100, 210). A press of several buttons on one frame shows the first
-in that order. The stick arrow is shown when the left stick is binned to a direction on that frame (the thresholds of
-SPEC-input-02 §3.3, kept).
+in that order. The stick arrow is the left stick's bin on that frame (the thresholds of SPEC-input-02 §3.3, kept),
+except when the mapped record has `CSTICK_ON` (`0x80`, SPEC-input-01 §3.1) and the right stick bins: then the arrow is
+the C-stick's direction, binned the same way. A C-stick that does not bin keeps the left-stick arrow. A press without
+`CSTICK_ON` keeps the left-stick arrow even if the right stick is held. Operator, 2026-11-06: "c stick should be
+supported". The stick row under the P1 lane stays the left stick either way.
 
 ### 3.4 Readouts
 
@@ -105,8 +113,10 @@ The texts are ASCII: the game's font is not assumed to carry `−` or `→` (the
 ### 3.5 When it updates, freezes and hides
 
 - **Sampling:** once per game frame, on P1's entry callback, while the scene is Training or an active lobby practice.
-- **Freeze:** when both fighters have been actionable and P1's inputs unchanged for 30 frames, the strip stops
-  scrolling and keeps the last exchange on screen. It moves again on the next non-actionable frame or new press.
+- **Freeze:** when both fighters have been actionable, P1 has made no new press, and the binned left-stick direction
+  has not changed, for 30 frames, the strip stops scrolling and keeps the last exchange on screen. It moves again on
+  the next non-actionable frame, new press, or change of binned left-stick direction (including to or from neutral).
+  Holding one direction still freezes.
 - **Hidden:** while the TrainingRooms menu or the game's pause menu is open, when the row is Off, and outside Training
   and lobby practice. Sampling continues under the pause only on frames the game runs (none while paused).
 - **Cleared:** on a scene change, a hot swap, a save-state load, and whenever the game initialises a fighter again (a
@@ -163,7 +173,7 @@ was refused): a true combo shows "TRUE" without its number, and the link margin 
 **Hitlag left is not read.** `StopModule::is_stop` on every frame draws the hitlag cells and finds the hits; nothing
 in §2 needs how many hitlag frames remain, so `StopModule::get_hit_stop_real_frame` (`0x2089250`) is not called.
 
-**Diag lines** (diag build only): `[FrameStrip] constants resolved …`, `panes resolved found=N of 121`, `reaction r=…`
+**Diag lines** (diag build only): `[FrameStrip] constants resolved …`, `panes resolved found=N of 181`, `reaction r=…`
 on each CPU hitstun frame, `stun_check predicted=… seen=…` for each hit not followed up, `link …` for each link,
 `advantage …` for each exchange, `shown=… menu_open=… on=…` on each show or hide.
 
@@ -200,11 +210,12 @@ Pane pointers are resolved once per layout registration, by name, below the cont
 
 ## 7. Resources
 
-- About 120 panes, against the input log's 271 (`model/ui/panes.rs`).
-- No heap in hooks: fixed arrays (60 columns, 16 runs per lane, 8 chips, 4 links).
+- About 180 panes, against the input log's 271 (`model/ui/panes.rs`). The stick row is 60 of them, one text pane per
+  frame.
+- No heap in hooks: fixed arrays (60 columns, 16 runs per lane, 8 chips, 4 links, 60 stick marks).
 - Native calls per frame: about 24 (2 × status, 2 × 6 actionable, 2 × is_stop, 8 × is_attack, 1 × get_float while the
   CPU is in hitstun).
-- Pane writes per UI tick: 0 while frozen or hidden; up to about 70 while scrolling.
+- Pane writes per UI tick: 0 while frozen or hidden; up to about 130 while scrolling.
 
 ## 8. Test provenance
 
@@ -216,6 +227,9 @@ Pane pointers are resolved once per layout registration, by name, below the cont
 | Shield | `frame_strip::shield_is_not_a_link` | IV-3 |
 | Advantage on hit and on shield | `frame_strip::advantage_*` | IV-1, IV-3 |
 | Freeze and clear | `frame_strip::freeze_*`, `frame_strip::clear_*` | IV-1 |
+| Stick row: 8 directions, neutral, the same scroll and freeze | `the_stick_row_shows_the_held_direction_every_frame`, `the_stick_row_scrolls_and_freezes_with_the_strip` | grouped session, report only (no boot in this slice) |
+| C-stick arrow, and a left-stick press while the right stick is held | `a_c_stick_attack_takes_the_c_stick_arrow`, `a_left_stick_press_keeps_its_arrow` | grouped session, report only (no boot in this slice) |
+| Pane budget with the stick row and the recording pop-up | `the_pane_table_fits_with_the_stick_row` | — |
 | LAST history (4, newest first) | `frame_strip::history_*` | IV-2 |
 | Pane plan: names, the budget, writes only on change | `tests/frame_strip_plan.rs` | IV-1 |
 | Settings migration, defaults import and a round trip | `tests/frame_strip_settings.rs` | — |

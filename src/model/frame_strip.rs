@@ -184,12 +184,27 @@ pub fn bin_stick(x: i8, y: i8) -> Option<u8> {
     })
 }
 
-/// A new press on one frame.
+/// Mapped bit the game sets when the C-stick, rather than the left stick, caused the attack (SPEC-input-01 §3.1).
+pub const CSTICK_ON: u32 = 0x80;
+
+/// A new press on one frame. `stick` is the chip's arrow: the C-stick when [`CSTICK_ON`] is set and that stick bins,
+/// otherwise the left stick.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Press {
     pub frame: u32,
     pub button: Button,
     pub stick: Option<u8>,
+}
+
+/// The arrow on a chip. `CSTICK_ON` is how a C-stick press is told apart; its direction is the right stick, binned
+/// the same way as the left. A C-stick that does not bin keeps the left stick's arrow.
+pub fn arrow_stick(now: MappedInputs) -> Option<u8> {
+    if now.buttons & CSTICK_ON != 0 {
+        if let Some(dir) = bin_stick(now.rstick_x, now.rstick_y) {
+            return Some(dir);
+        }
+    }
+    bin_stick(now.lstick_x, now.lstick_y)
 }
 
 /// The press P1's mapped inputs show on this frame against the last frame's buttons: the first button in
@@ -199,7 +214,7 @@ pub fn press_of(now: MappedInputs, before: u32, frame: u32) -> Option<Press> {
     PRESS_BITS
         .iter()
         .find(|(bits, _)| down & bits != 0)
-        .map(|&(_, button)| Press { frame, button, stick: bin_stick(now.lstick_x, now.lstick_y) })
+        .map(|&(_, button)| Press { frame, button, stick: arrow_stick(now) })
 }
 
 /// How a follow-up linked (SPEC-input-06 §2).
@@ -257,6 +272,8 @@ pub struct Column {
     pub frame: u32,
     pub p1: Cell,
     pub cpu: Cell,
+    /// Left-stick bin for this frame (`bin_stick`), `None` inside the dead zone. The stick row, not the chip arrow.
+    pub stick: Option<u8>,
 }
 
 /// The last hit and what followed it.
@@ -284,6 +301,8 @@ pub struct Tracker {
     frame: u32,
     quiet: u16,
     buttons: u32,
+    /// Left-stick bin on the previous frame, including a frame that arrived while the strip was frozen.
+    stick: Option<u8>,
     // P1's action.
     p1_was_actionable: bool,
     action: u32,
@@ -312,7 +331,7 @@ impl Default for Tracker {
 impl Tracker {
     pub const fn new() -> Self {
         Self {
-            columns: [Column { frame: 0, p1: Cell::Actionable, cpu: Cell::Actionable }; WINDOW],
+            columns: [Column { frame: 0, p1: Cell::Actionable, cpu: Cell::Actionable, stick: None }; WINDOW],
             len: 0,
             head: 0,
             presses: [None; PRESSES],
@@ -322,6 +341,7 @@ impl Tracker {
             frame: 0,
             quiet: 0,
             buttons: 0,
+            stick: None,
             p1_was_actionable: true,
             action: 0,
             action_start: 0,
@@ -463,10 +483,13 @@ impl Tracker {
         }
         self.reaction = if cpu.hitstun && !cpu.actionable { cpu.reaction } else { None };
         // Freeze while nothing happens.
-        let quiet = p1.actionable && cpu.actionable && press.is_none() && !p1.stop && !cpu.stop;
+        let stick = bin_stick(inputs.lstick_x, inputs.lstick_y);
+        let stick_moved = stick != self.stick;
+        self.stick = stick;
+        let quiet = p1.actionable && cpu.actionable && press.is_none() && !stick_moved && !p1.stop && !cpu.stop;
         self.quiet = if quiet { self.quiet.saturating_add(1) } else { 0 };
         if !self.frozen() {
-            self.columns[self.head] = Column { frame, p1: p1_cell, cpu: cpu_cell };
+            self.columns[self.head] = Column { frame, p1: p1_cell, cpu: cpu_cell, stick };
             self.head = (self.head + 1) % WINDOW;
             self.len = (self.len + 1).min(WINDOW);
         }

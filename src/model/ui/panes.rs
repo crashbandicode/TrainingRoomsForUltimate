@@ -339,7 +339,7 @@ pub mod iv {
 
     /// The strip's pane indices (local: `IDX_IV + at::…` in the table).
     pub mod at {
-        use super::{CHIPS, HISTORY, RUNS, RUN_LABELS};
+        use super::{CHIPS, HISTORY, RUNS, RUN_LABELS, WINDOW};
         pub const CONTAINER: usize = 0;
         pub const BACKDROP: usize = 1;
         /// IN, P1, CPU.
@@ -369,7 +369,9 @@ pub mod iv {
         pub const PILL: usize = LAST_TEXT + 1;
         pub const PILL_TEXT: usize = PILL + HISTORY;
         pub const MOVE_TEXT: usize = PILL_TEXT + HISTORY;
-        pub const COUNT: usize = MOVE_TEXT + HISTORY;
+        /// One mark per frame of the stick row, under P1's lane (oldest at `STICK`).
+        pub const STICK: usize = MOVE_TEXT + HISTORY;
+        pub const COUNT: usize = STICK + WINDOW;
     }
 
     pub const COUNT: usize = at::COUNT;
@@ -384,9 +386,13 @@ pub mod iv {
     pub const NOW_X: f32 = FIRST_X + WINDOW as f32 * PITCH + 3.0;
     pub const LABEL_X: f32 = -606.0;
     pub const IN_Y: f32 = 73.5;
-    pub const P1_Y: f32 = 21.75;
-    pub const CPU_Y: f32 = -14.25;
-    pub const LANE_H: f32 = 28.5;
+    /// P1 sits just under the input ticks. The lane is shorter than it was so a stick row fits between it and the CPU
+    /// lane without moving the brackets, the LAST row or the combo bar.
+    pub const P1_Y: f32 = 27.0;
+    pub const CPU_Y: f32 = -21.0;
+    pub const LANE_H: f32 = 16.0;
+    /// Centre of the stick row, in the gap between the two lanes.
+    pub const STICK_Y: f32 = 3.0;
     pub const CHIP: f32 = 30.0;
     pub const TICK_Y: f32 = 47.25;
     pub const TICK_H: f32 = 22.5;
@@ -418,7 +424,7 @@ pub mod iv {
 /// The frame strip's pane names.
 const fn iv_name(local: usize) -> Name {
     use iv::at::*;
-    use iv::{CHIPS, HISTORY, RUNS, RUN_LABELS};
+    use iv::{CHIPS, RUNS, RUN_LABELS, WINDOW};
     match local {
         CONTAINER => Name::new("TrIv"),
         BACKDROP => Name::new("TrIvBg"),
@@ -448,9 +454,10 @@ const fn iv_name(local: usize) -> Name {
         LAST_TEXT => Name::new("TrIvLast"),
         i if i < PILL_TEXT => Name::indexed("TrIvPill", i - PILL),
         i if i < MOVE_TEXT => Name::indexed("TrIvPillT", i - PILL_TEXT),
-        i if i < MOVE_TEXT + HISTORY => Name::indexed("TrIvMove", i - MOVE_TEXT),
+        i if i < STICK => Name::indexed("TrIvMove", i - MOVE_TEXT),
+        i if i < COUNT => Name::indexed("TrIvSk", i - STICK),
         _ => {
-            let _ = (RUNS, RUN_LABELS);
+            let _ = (RUNS, RUN_LABELS, WINDOW);
             panic!("no such frame strip pane")
         }
     }
@@ -466,8 +473,8 @@ const fn iv_spec(local: usize, name: Name) -> Spec {
     use iv::at::*;
     use iv::{
         BACKDROP_COLOR, BAR_Y, BRACKET_TEXT_Y, CELL_W, CHIP, DIVIDER_X, FONT_SUB, FONT_TAG, FONT_VALUE, IN_Y, LABEL_X,
-        LANE_H, LAST_Y, LEG_H, LEG_Y, NOW_X, PILL_W, READ_SUB_X, READ_X, RULE_Y, STRIP_H, STRIP_W, STRIP_Y, TEXT_UNITS,
-        TICK_H, TICK_Y, WINDOW_H, WINDOW_Y,
+        LANE_H, LAST_Y, LEG_H, LEG_Y, NOW_X, PILL_W, READ_SUB_X, READ_X, RULE_Y, STICK_Y, STRIP_H, STRIP_W, STRIP_Y,
+        TEXT_UNITS, TICK_H, TICK_Y, WINDOW_H, WINDOW_Y,
     };
     let parent = Name::new("TrIv");
     match local {
@@ -496,7 +503,15 @@ const fn iv_spec(local: usize, name: Name) -> Spec {
         LAST_TEXT => iv_text(name, [LABEL_X, LAST_Y, 60.0], Align::Center, FONT_TAG),
         i if i < PILL_TEXT => under(rect(name, [0.0, LAST_Y, PILL_W, 24.0], TEXT, false), parent),
         i if i < MOVE_TEXT => iv_text(name, [0.0, LAST_Y, PILL_W], Align::Center, FONT_TAG),
-        _ => iv_text(name, [0.0, LAST_Y, 200.0], Align::Left, FONT_TAG),
+        i if i < STICK => iv_text(name, [0.0, LAST_Y, 200.0], Align::Left, FONT_TAG),
+        i if i < COUNT => Spec {
+            visible: false,
+            ..under(text(name, [0.0, STICK_Y, 16.0, 18.0], Align::Center, FONT_TAG, 2, TEXT), parent)
+        },
+        _ => {
+            let _ = TEXT_UNITS;
+            panic!("no such frame strip pane")
+        }
     }
 }
 
@@ -816,6 +831,36 @@ mod tests {
             assert!(!spec(i).visible);
         }
         assert_eq!(IDX_NOTICE, MENU_COUNT, "the input package's panes follow the menu's block");
+    }
+
+    #[test]
+    fn the_pane_table_fits_with_the_stick_row() {
+        let walk = include_str!("../../runtime/ui/pane.rs");
+        let limit = walk
+            .lines()
+            .find(|line| line.contains("const WALK_LIMIT"))
+            .and_then(|line| line.split('=').nth(1))
+            .and_then(|rest| rest.trim().trim_end_matches(';').parse::<usize>().ok())
+            .expect("WALK_LIMIT");
+        assert_eq!(limit, 4096);
+        assert_eq!(iv::at::COUNT - iv::at::STICK, iv::WINDOW, "one stick pane per frame");
+        assert_eq!(iv::COUNT, 181);
+        // rr-6 adds 12 icon panes in the menu block and reuses that container. The pop-up is not a child of TrIv.
+        // LANE-GROK-RR-6-REPORT.md pane budget, 2026-11-06: 1352 + 12 + 60 = 1424, 2672 free.
+        const RR6_ICON_PANES: usize = 12;
+        let together = COUNT + RR6_ICON_PANES;
+        assert!(together <= limit, "plugin table {together} plus the pop-up icons exceed the walk {limit}");
+        assert_eq!(together, 1424);
+        assert_eq!(limit - together, 2672);
+        let strip_tree = iv::COUNT + cb::COUNT;
+        assert!(strip_tree <= limit, "the strip walk, combo bar included, is {strip_tree}");
+        let first = spec(IDX_IV + iv::at::STICK);
+        let last = spec(IDX_IV + iv::at::COUNT - 1);
+        assert_eq!(first.name.as_str(), "TrIvSk00");
+        assert_eq!(last.name.as_str(), "TrIvSk59");
+        assert_eq!(first.parent.as_str(), "TrIv");
+        assert_eq!(last.parent.as_str(), "TrIv");
+        assert!(!first.visible);
     }
 
     #[test]
