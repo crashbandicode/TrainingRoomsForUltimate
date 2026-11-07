@@ -77,11 +77,11 @@ An empty chain plays nothing. A chain whose recordings have all been deleted pla
 
 ## Combos
 
-Save last combo, on today's Recording › Combos row, keeps the last combo the frame strip saw and makes it the drill. The file is the combo's links and presses. Any fighter can practise it. The format is in [COMBOS.md](COMBOS.md).
+Save last combo, on today's Recording › Combos row, keeps the last combo the frame strip saw and makes it the drill. The file is the combo's links and the input events of each follow-up: presses, releases, the C-stick, and the stick flicks (fast-fall, dash, tap-jump). Make combo records the same events, because it plays into the same strip. Any fighter can practise it. The format is in [COMBOS.md](COMBOS.md).
 
-A combo counts when its recorded presses are there, with the same direction, in order, and within the on-time tolerance, and the move that comes out is the recorded move. TRUE is not required. A link that is not a true combo still counts. TRUE stays on the helper bar as information.
+A combo counts when its recorded input events are there, the same kind and the same facing-relative direction, in order, and within the on-time tolerance, and the move that comes out is the recorded move. TRUE is not required. A link that is not a true combo still counts. TRUE stays on the helper bar as information. Drift is the held stick between those events. It is shown and it is not graded.
 
-A different move does not count, even when the buttons, the direction, and the timing match. That attempt drops. An attempt also drops on a missing press, a press outside the tolerance, or the exchange ending before the step. The exchange ends 20 frames after the CPU can act again, or on a shielded hit. A gap of 20 frames still belongs to the exchange. A gap of 21 opens a new one, so the step drops. A single combo's best stays the most true links in one attempt. The streak follows the count above, so a non-true link can still extend the streak.
+A different move does not count, even when the events match. That attempt drops. An attempt also drops on a missing event, an event outside the tolerance, a different direction, or the exchange ending before the step. An older file that has only presses is graded on those presses, with left and right still one direction. The exchange ends 20 frames after the CPU can act again, or on a shielded hit. A gap of 20 frames still belongs to the exchange. A gap of 21 opens a new one, so the step drops. A single combo's best stays the most true links in one attempt. The streak follows the count above, so a non-true link can still extend the streak.
 
 ![A follow-up that is not a true combo still counts, and a different move drops](media/rc5-grade-not-true.gif)
 
@@ -109,7 +109,7 @@ A sequence is an ordered list of combo files. It stores each combo's id. Rename 
 
 The helper drills one thing. Drilling a sequence replaces a drilled combo, and drilling a combo replaces a drilled sequence. A numbered row inside a sequence drills that combo alone, with that combo's own streak, and the sequence file stays.
 
-The bar under the frame strip is the combo helper's bar with a sequence header and a row for the sequence's combos. A finished sequence adds one to the streak, and best is the highest streak. A drop sends the sequence back to combo 1 and the streak to 0. Best is kept. TRUE is shown and is not required, including between the combos of a sequence. The same grade as a single combo decides each step: the presses, the direction, the order, the tolerance, and the move.
+The bar under the frame strip is the combo helper's bar with a sequence header and a row for the sequence's combos. A finished sequence adds one to the streak, and best is the highest streak. A drop sends the sequence back to combo 1 and the streak to 0. Best is kept. TRUE is shown and is not required, including between the combos of a sequence. The same grade as a single combo decides each step: the input events, the direction, the order, the tolerance, and the move. Drift is shown and is not graded.
 
 The picker is the same numbered picker as a chain, including R removing the last number.
 

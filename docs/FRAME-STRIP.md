@@ -133,7 +133,7 @@ If the previous hit was on hit, this hit is on hit, it comes from a different ac
 
 If the CPU has been able to act for more than 20 frames, the next hit is not a drop. It opens a new exchange. ADVANTAGE then waits until both fighters can act again after that new hit. A shielded hit also does not link. It can still set ADVANTAGE to on shield.
 
-The same 20 frames are what the combo helper uses when it decides that an exchange ended before the next step. A gap of 20 still belongs to the exchange. A gap of 21 does not.
+The same 20 frames are what the combo helper uses when it decides that an exchange ended before the next step. A gap of 20 still belongs to the exchange. A gap of 21 does not. The helper grades the follow-up's input events from these samples: presses, releases, the C-stick, and the fast-fall, dash, and tap-jump flicks, facing-relative. Drift is shown and is not graded. An older combo file that stored only presses is still graded on those presses.
 
 ![A hit more than 20 frames after the CPU can act, which does not become a DROP](media/rc5-frame-strip-exchange.gif)
 

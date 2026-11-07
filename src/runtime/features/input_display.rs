@@ -148,6 +148,8 @@ unsafe fn sample(accessor: usize, ids: &Table, p1: bool) -> Sample {
     } else {
         None
     };
+    let lr = natives::lr(accessor);
+    let situation = natives::situation_kind(accessor);
     Sample {
         stop: natives::is_stop(accessor),
         hitstun,
@@ -159,6 +161,8 @@ unsafe fn sample(accessor: usize, ids: &Table, p1: bool) -> Sample {
         shielding: ids.shielding(status),
         status,
         motion_frame: if p1 { natives::motion_frame(accessor) } else { 0.0 },
+        facing: if lr < 0.0 { -1 } else { 1 },
+        airborne: ids.resolved(C::SituationAir) && situation == ids.get(C::SituationAir),
     }
 }
 

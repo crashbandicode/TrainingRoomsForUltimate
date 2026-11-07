@@ -116,6 +116,12 @@ pub struct Sample {
     /// P1 only: the status kind and the motion frame (a new move starts when either goes back).
     pub status: i32,
     pub motion_frame: f32,
+    /// `PostureModule::lr`: negative faces left, anything else faces right. `0` (the default, and an ungranted
+    /// read) is right, so a sample that does not set it keeps the old left-stick bins.
+    pub facing: i8,
+    /// `StatusModule::situation_kind == SITUATION_KIND_AIR`. A fast-fall is recorded only while this is set;
+    /// the crouch line is the same stick value.
+    pub airborne: bool,
 }
 
 /// Which button a press was: the chip's colour and glyph.
@@ -187,6 +193,61 @@ pub fn bin_stick(x: i8, y: i8) -> Option<u8> {
 /// Mapped bit the game sets when the C-stick, rather than the left stick, caused the attack (SPEC-input-01 §3.1).
 pub const CSTICK_ON: u32 = 0x80;
 
+/// `FLICK_JUMP` (SPEC-input-01 §3.1). It is also inside the jump press group, so a rising edge is a jump press
+/// and, when the stick is high enough, a tap-jump flick.
+pub const FLICK_JUMP: u32 = 0x8000;
+
+/// Snaps kept for a link's events. The visible strip is 60 columns; a follow-up's inputs can start before that
+/// window, and 96 covers the exchange the helper grades.
+pub const SNAP_RING: usize = 96;
+
+/// Stick unit of SPEC-input-01 (decided 2026-11-02): `clamp(i8 / 120, ±1)`.
+pub fn stick_axis(axis: i8) -> f32 {
+    (f32::from(axis) / 120.0).clamp(-1.0, 1.0)
+}
+
+/// Stock 13.0.5 `fighter/common/param/common.prc`. The f32 bits are the file's; the integers are the flick windows
+/// (`get_flick_*() < window` in the status scripts). Age 0, the crossing frame, is inside every window here.
+pub const DASH_STICK_X: f32 = f32::from_bits(0x3f59_999a);
+pub const DASH_FLICK_X: i32 = 2;
+pub const JUMP_STICK_Y: f32 = f32::from_bits(0x3f33_3333);
+pub const JUMP_FLICK_Y: i32 = 3;
+pub const DIVE_CONT: f32 = f32::from_bits(0xbf28_f5c3);
+pub const DIVE_FLICK: i32 = 4;
+
+/// The game still accepts a fresh flick while its age is below `window`.
+pub const fn flick_fresh(age: i32, window: i32) -> bool {
+    age >= 0 && age < window
+}
+
+/// One frame of P1's mapped input, facing, and airborne flag. The combo helper reads a link's events from these.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Snap {
+    pub frame: u32,
+    pub buttons: u32,
+    pub lstick_x: i8,
+    pub lstick_y: i8,
+    pub rstick_x: i8,
+    pub rstick_y: i8,
+    pub facing: i8,
+    pub airborne: bool,
+}
+
+impl Snap {
+    pub const fn empty(frame: u32) -> Self {
+        Self {
+            frame,
+            buttons: 0,
+            lstick_x: 0,
+            lstick_y: 0,
+            rstick_x: 0,
+            rstick_y: 0,
+            facing: 0,
+            airborne: false,
+        }
+    }
+}
+
 /// A new press on one frame. `stick` is the chip's arrow: the C-stick when [`CSTICK_ON`] is set and that stick bins,
 /// otherwise the left stick.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -214,7 +275,11 @@ pub fn press_of(now: MappedInputs, before: u32, frame: u32) -> Option<Press> {
     PRESS_BITS
         .iter()
         .find(|(bits, _)| down & bits != 0)
-        .map(|&(_, button)| Press { frame, button, stick: arrow_stick(now) })
+        .map(|&(_, button)| Press {
+            frame,
+            button,
+            stick: arrow_stick(now),
+        })
 }
 
 /// How a follow-up linked (SPEC-input-06 §2).
@@ -320,6 +385,10 @@ pub struct Tracker {
     /// Exchanges started since the last clear, and the open one's first hit (SPEC-input-07 §2).
     exchange: u32,
     exchange_hit: u32,
+    /// Recent input snaps, oldest to newest through [`Self::snaps`]. Written on every step, including a frozen frame.
+    snaps: [Snap; SNAP_RING],
+    snap_head: usize,
+    snap_len: usize,
 }
 
 impl Default for Tracker {
@@ -331,7 +400,12 @@ impl Default for Tracker {
 impl Tracker {
     pub const fn new() -> Self {
         Self {
-            columns: [Column { frame: 0, p1: Cell::Actionable, cpu: Cell::Actionable, stick: None }; WINDOW],
+            columns: [Column {
+                frame: 0,
+                p1: Cell::Actionable,
+                cpu: Cell::Actionable,
+                stick: None,
+            }; WINDOW],
             len: 0,
             head: 0,
             presses: [None; PRESSES],
@@ -355,6 +429,9 @@ impl Tracker {
             stun_check: None,
             exchange: 0,
             exchange_hit: 0,
+            snaps: [Snap::empty(0); SNAP_RING],
+            snap_head: 0,
+            snap_len: 0,
         }
     }
 
@@ -371,8 +448,12 @@ impl Tracker {
 
     /// Whether a follow-up could still link to the last hit (the follow-up rule of `on_hit`).
     pub fn exchange_open(&self) -> bool {
-        self.last_hit
-            .is_some_and(|hit| !hit.on_shield && hit.cpu_free.is_none_or(|free| self.frame.saturating_sub(free) <= DROP_MAX))
+        self.last_hit.is_some_and(|hit| {
+            !hit.on_shield
+                && hit
+                    .cpu_free
+                    .is_none_or(|free| self.frame.saturating_sub(free) <= DROP_MAX)
+        })
     }
 
     /// The frames on screen, oldest first.
@@ -393,9 +474,20 @@ impl Tracker {
         (self.len > 0).then(|| self.columns[(self.head + WINDOW - 1) % WINDOW].frame)
     }
 
+    /// Input snaps, oldest first, including frames that arrived while the strip was frozen.
+    pub fn snaps(&self) -> impl Iterator<Item = Snap> + '_ {
+        let start = if self.snap_len == SNAP_RING {
+            self.snap_head
+        } else {
+            0
+        };
+        (0..self.snap_len).map(move |i| self.snaps[(start + i) % SNAP_RING])
+    }
+
     /// Presses, newest first.
     pub fn presses(&self) -> impl Iterator<Item = Press> + '_ {
-        (0..PRESSES).filter_map(move |i| self.presses[(self.press_head + PRESSES - 1 - i) % PRESSES])
+        (0..PRESSES)
+            .filter_map(move |i| self.presses[(self.press_head + PRESSES - 1 - i) % PRESSES])
     }
 
     /// Links, newest first.
@@ -424,6 +516,18 @@ impl Tracker {
     pub fn step(&mut self, p1: Sample, cpu: Sample, inputs: MappedInputs) {
         self.frame = self.frame.wrapping_add(1);
         let frame = self.frame;
+        self.snaps[self.snap_head] = Snap {
+            frame,
+            buttons: inputs.buttons,
+            lstick_x: inputs.lstick_x,
+            lstick_y: inputs.lstick_y,
+            rstick_x: inputs.rstick_x,
+            rstick_y: inputs.rstick_y,
+            facing: p1.facing,
+            airborne: p1.airborne,
+        };
+        self.snap_head = (self.snap_head + 1) % SNAP_RING;
+        self.snap_len = (self.snap_len + 1).min(SNAP_RING);
         let press = press_of(inputs, self.buttons, frame);
         self.buttons = inputs.buttons;
         if let Some(press) = press {
@@ -435,7 +539,9 @@ impl Tracker {
         let p1_busy = !p1.actionable && !p1.hitstun && !p1.shieldstun;
         let restarted = p1.attack.is_some_and(|m| {
             (m != self.action_move && self.action_move != Move::Other)
-                || (p1.status == self.p1_status && p1.motion_frame < self.p1_motion_frame && !p1.stop)
+                || (p1.status == self.p1_status
+                    && p1.motion_frame < self.p1_motion_frame
+                    && !p1.stop)
         });
         if p1_busy && (self.p1_was_actionable || restarted) {
             self.action = self.action.wrapping_add(1);
@@ -475,21 +581,45 @@ impl Tracker {
             }
             if let (Some(p), Some(c)) = (hit.p1_free, hit.cpu_free) {
                 let value = c as i32 - p as i32;
-                let advantage = Advantage { value, on_shield: hit.on_shield, p1: p, cpu: c };
-                if self.advantage != Some(advantage) && hit.p1_free.max(hit.cpu_free) == Some(frame) {
+                let advantage = Advantage {
+                    value,
+                    on_shield: hit.on_shield,
+                    p1: p,
+                    cpu: c,
+                };
+                if self.advantage != Some(advantage) && hit.p1_free.max(hit.cpu_free) == Some(frame)
+                {
                     self.advantage = Some(advantage);
                 }
             }
         }
-        self.reaction = if cpu.hitstun && !cpu.actionable { cpu.reaction } else { None };
+        self.reaction = if cpu.hitstun && !cpu.actionable {
+            cpu.reaction
+        } else {
+            None
+        };
         // Freeze while nothing happens.
         let stick = bin_stick(inputs.lstick_x, inputs.lstick_y);
         let stick_moved = stick != self.stick;
         self.stick = stick;
-        let quiet = p1.actionable && cpu.actionable && press.is_none() && !stick_moved && !p1.stop && !cpu.stop;
-        self.quiet = if quiet { self.quiet.saturating_add(1) } else { 0 };
+        let quiet = p1.actionable
+            && cpu.actionable
+            && press.is_none()
+            && !stick_moved
+            && !p1.stop
+            && !cpu.stop;
+        self.quiet = if quiet {
+            self.quiet.saturating_add(1)
+        } else {
+            0
+        };
         if !self.frozen() {
-            self.columns[self.head] = Column { frame, p1: p1_cell, cpu: cpu_cell, stick };
+            self.columns[self.head] = Column {
+                frame,
+                p1: p1_cell,
+                cpu: cpu_cell,
+                stick,
+            };
             self.head = (self.head + 1) % WINDOW;
             self.len = (self.len + 1).min(WINDOW);
         }
@@ -501,7 +631,9 @@ impl Tracker {
             !prev.on_shield
                 && !on_shield
                 && prev.action != self.action
-                && prev.cpu_free.is_none_or(|free| frame.saturating_sub(free) <= DROP_MAX)
+                && prev
+                    .cpu_free
+                    .is_none_or(|free| frame.saturating_sub(free) <= DROP_MAX)
         });
         if follow_up.is_none() && self.last_hit.is_none_or(|prev| prev.action != self.action) {
             self.exchange = self.exchange.wrapping_add(1);
@@ -509,17 +641,24 @@ impl Tracker {
         }
         if let Some(prev) = follow_up {
             // A buffered follow-up starts on the first frame P1 could act, without an actionable sample between.
-            let actionable = prev.p1_free.unwrap_or(self.action_start).min(self.action_start);
+            let actionable = prev
+                .p1_free
+                .unwrap_or(self.action_start)
+                .min(self.action_start);
             let (verdict, free) = match prev.cpu_free {
                 Some(free) if free < frame => (Verdict::Drop((frame - free) as i32), Some(free)),
                 _ => match self.reaction.and_then(|r| predicted_free(frame - 1, r)) {
-                    Some(free) if free >= frame => (Verdict::True(Some(frame as i32 - free as i32)), Some(free)),
+                    Some(free) if free >= frame => {
+                        (Verdict::True(Some(frame as i32 - free as i32)), Some(free))
+                    }
                     _ => (Verdict::True(None), None),
                 },
             };
             let press = self
                 .presses()
-                .find(|p| p.frame <= self.action_start && self.action_start - p.frame <= INPUT_LOOKBACK)
+                .find(|p| {
+                    p.frame <= self.action_start && self.action_start - p.frame <= INPUT_LOOKBACK
+                })
                 .map_or(self.action_start, |p| p.frame);
             let link = match verdict {
                 Verdict::True(link) => link,
@@ -612,21 +751,27 @@ pub mod ids {
         SpecialHi = "FIGHTER_STATUS_KIND_SPECIAL_HI",
         SpecialLw = "FIGHTER_STATUS_KIND_SPECIAL_LW",
         Final = "FIGHTER_STATUS_KIND_FINAL",
+        SituationAir = "SITUATION_KIND_AIR",
     }
 
     impl Table {
         fn within(&self, from: C, to: C, status: i32) -> bool {
-            self.resolved(from) && self.resolved(to) && (self.get(from)..=self.get(to)).contains(&status)
+            self.resolved(from)
+                && self.resolved(to)
+                && (self.get(from)..=self.get(to)).contains(&status)
         }
 
         /// Hitstun: `DAMAGE ..< DAMAGE_FALL` (the range of the CPU specs' predicate, tumble included).
         pub fn hitstun(&self, status: i32) -> bool {
-            self.resolved(C::Damage) && self.resolved(C::DamageFall) && (self.get(C::Damage)..self.get(C::DamageFall)).contains(&status)
+            self.resolved(C::Damage)
+                && self.resolved(C::DamageFall)
+                && (self.get(C::Damage)..self.get(C::DamageFall)).contains(&status)
         }
 
         /// Shieldstun: `GUARD_DAMAGE`, or `GUARD_OFF` right after it.
         pub fn shieldstun(&self, status: i32, prev: i32) -> bool {
-            self.is(C::GuardDamage, status) || (self.is(C::GuardOff, status) && self.is(C::GuardDamage, prev))
+            self.is(C::GuardDamage, status)
+                || (self.is(C::GuardOff, status) && self.is(C::GuardDamage, prev))
         }
 
         /// Holding or raising a shield: `GUARD_ON ..= GUARD_DAMAGE`.
@@ -683,7 +828,10 @@ impl Settings {
     }
 
     pub fn from_snapshot(snapshot: &super::settings::Snapshot) -> Self {
-        let on = snapshot.get(ROW).and_then(|r| r.iter().position(|v| *v != 0)).is_none_or(|i| i == 1);
+        let on = snapshot
+            .get(ROW)
+            .and_then(|r| r.iter().position(|v| *v != 0))
+            .is_none_or(|i| i == 1);
         Self { on }
     }
 }

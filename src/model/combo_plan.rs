@@ -3,7 +3,7 @@
 
 use core::fmt::Write as _;
 
-use super::combo::{Grade, Helper, LinkRec, Mark, Outcome, Reason, Summary};
+use super::combo::{Dir, Flick, Grade, Helper, Kind, LinkRec, Mark, Outcome, Reason, Summary};
 use super::frame_strip::{Button, Verdict};
 use super::frame_strip_plan::{Changed, Look, Text, BAD, GOOD, MUTED, RULE, TEXT, WARN};
 use super::panes::cb::*;
@@ -29,8 +29,24 @@ pub fn verdict_text(verdict: Verdict) -> Text {
     t
 }
 
-/// A reference step's mark: "on time", "Jump 2f late", "Jump 1f early", "Jump missing".
-pub fn mark_text(mark: Mark, button: Button, tolerance: u8) -> (Text, [u8; 4]) {
+/// The bar's name for one event. Press names stay the button alone, so an old fault still reads "Jump missing".
+pub fn event_label(kind: Kind) -> &'static str {
+    match kind {
+        Kind::Press(button) => button_name(button),
+        Kind::Release(Button::Attack) => "Attack release",
+        Kind::Release(Button::Special) => "Special release",
+        Kind::Release(Button::Jump) => "Jump release",
+        Kind::Release(Button::Shield) => "Shield release",
+        Kind::Release(Button::Grab) => "Grab release",
+        Kind::CStick => "C-stick",
+        Kind::Flick(Flick::FastFall) => "fast-fall",
+        Kind::Flick(Flick::Dash) => "dash",
+        Kind::Flick(Flick::TapJump) => "tap-jump",
+    }
+}
+
+/// A reference event's mark: "on time", "Jump 2f late", "Jump release missing", "C-stick wrong direction".
+pub fn mark_text(mark: Mark, name: &str, tolerance: u8) -> (Text, [u8; 4]) {
     let mut t = Text::EMPTY;
     let color = match mark {
         Mark::At(d) if d.unsigned_abs() <= u32::from(tolerance) => {
@@ -38,15 +54,42 @@ pub fn mark_text(mark: Mark, button: Button, tolerance: u8) -> (Text, [u8; 4]) {
             GOOD
         }
         Mark::At(d) => {
-            let _ = write!(t, "{} {}f {}", button_name(button), d.abs(), if d > 0 { "late" } else { "early" });
+            let _ = write!(
+                t,
+                "{name} {}f {}",
+                d.abs(),
+                if d > 0 { "late" } else { "early" }
+            );
             WARN
         }
         Mark::Missing => {
-            let _ = write!(t, "{} missing", button_name(button));
+            let _ = write!(t, "{name} missing");
+            BAD
+        }
+        Mark::WrongDir => {
+            let _ = write!(t, "{name} wrong direction");
             BAD
         }
     };
     (t, color)
+}
+
+/// Drift, shown and never graded. The font draws `>` and `<` for the two sideways holds.
+pub fn drift_text(dir: Dir) -> Text {
+    let mut t = Text::EMPTY;
+    let word = match dir {
+        Dir::Forward => ">",
+        Dir::Back => "<",
+        Dir::Up => "up",
+        Dir::Down => "down",
+        Dir::ForwardUp => "forward-up",
+        Dir::BackUp => "back-up",
+        Dir::ForwardDown => "forward-down",
+        Dir::BackDown => "back-down",
+        Dir::Neutral | Dir::Side => return t,
+    };
+    let _ = write!(t, "drift {word}");
+    t
 }
 
 /// "3 of 4 true", "stopped: 2 of 4", "cleared".
@@ -64,13 +107,51 @@ pub fn result_text(s: &Summary) -> Text {
 /// The first fault: "L3 DROP +1", "L2 wrong move: Aerial", "L1 Jump missing", "L2 Jump 2f late".
 pub fn reason_text(s: &Summary) -> Text {
     let mut t = Text::EMPTY;
-    let Some((link, reason)) = s.fault else { return t };
+    let Some((link, reason)) = s.fault else {
+        return t;
+    };
     let n = u32::from(link) + 1;
     let _ = match reason {
         Reason::Drop(d) => write!(t, "L{n} DROP +{d}"),
         Reason::WrongMove(m) => write!(t, "L{n} wrong move: {}", m.name()),
         Reason::Missing(b) => write!(t, "L{n} {} missing", button_name(b)),
-        Reason::Off(b, d) => write!(t, "L{n} {} {}f {}", button_name(b), d.abs(), if d > 0 { "late" } else { "early" }),
+        Reason::Off(b, d) => write!(
+            t,
+            "L{n} {} {}f {}",
+            button_name(b),
+            d.abs(),
+            if d > 0 { "late" } else { "early" }
+        ),
+        Reason::MissingRelease(b) => write!(t, "L{n} {} release missing", button_name(b)),
+        Reason::ReleaseOff(b, d) => {
+            write!(
+                t,
+                "L{n} {} release {}f {}",
+                button_name(b),
+                d.abs(),
+                if d > 0 { "late" } else { "early" }
+            )
+        }
+        Reason::MissingFlick(flick) => {
+            write!(t, "L{n} {} missing", event_label(Kind::Flick(flick)))
+        }
+        Reason::FlickOff(flick, d) => {
+            write!(
+                t,
+                "L{n} {} {}f {}",
+                event_label(Kind::Flick(flick)),
+                d.abs(),
+                if d > 0 { "late" } else { "early" }
+            )
+        }
+        Reason::MissingCStick => write!(t, "L{n} C-stick missing"),
+        Reason::CStickOff(d) => write!(
+            t,
+            "L{n} C-stick {}f {}",
+            d.abs(),
+            if d > 0 { "late" } else { "early" }
+        ),
+        Reason::WrongDir(kind) => write!(t, "L{n} {} wrong direction", event_label(kind)),
     };
     t
 }
@@ -92,7 +173,17 @@ pub fn ruler_x(cell: usize, frames: i32) -> f32 {
 
 /// The first link drawn: the newest graded links and the next ones of the reference, `CELLS` at a time.
 pub fn first_cell(graded: usize, total: usize) -> usize {
-    graded.saturating_sub(CELLS - 1).min(total.saturating_sub(CELLS))
+    graded
+        .saturating_sub(CELLS - 1)
+        .min(total.saturating_sub(CELLS))
+}
+
+fn shown_drift(helper: &Helper) -> Option<Dir> {
+    helper
+        .attempt()?
+        .grades()
+        .filter_map(|grade| grade.link.drift)
+        .last()
 }
 
 struct Plan<'a> {
@@ -107,7 +198,11 @@ impl Plan<'_> {
         let attempt = self.helper.attempt();
         let k = first_cell(attempt.map_or(0, |a| a.len()), target.len()) + c;
         let reference = *target.get(k)?;
-        Some((k, reference, attempt.and_then(|a| a.grades().nth(k).copied())))
+        Some((
+            k,
+            reference,
+            attempt.and_then(|a| a.grades().nth(k).copied()),
+        ))
     }
 
     fn look(&self, i: usize) -> Look {
@@ -115,19 +210,39 @@ impl Plan<'_> {
         let last = self.helper.attempt().and_then(|a| a.summary);
         let total = self.helper.target().map_or(0, |t| t.len());
         match i {
-            CONTAINER => Look { visible: true, x: 0.0, y: BAR_Y, ..Look::HIDDEN },
+            CONTAINER => Look {
+                visible: true,
+                x: 0.0,
+                y: BAR_Y,
+                ..Look::HIDDEN
+            },
             BACKDROP => Look::rect(0.0, 0.0, BAR_W, BACKDROP_COLOR),
             HEADER => {
-                let name = if self.name.units().is_empty() { Text::new("Combo") } else { *self.name };
+                let name = if self.name.units().is_empty() {
+                    Text::new("Combo")
+                } else {
+                    *self.name
+                };
                 Look::text(LEFT + 180.0, HEADER_Y, name, TEXT)
             }
             STREAK => {
                 let mut t = Text::EMPTY;
-                let _ = write!(t, "streak {}  best {}/{}", self.helper.streak(), self.helper.best(), total);
+                let _ = write!(
+                    t,
+                    "streak {}  best {}/{}",
+                    self.helper.streak(),
+                    self.helper.best(),
+                    total
+                );
                 Look::text(STREAK_X, HEADER_Y, t, MUTED)
             }
             RESULT => match (self.helper.attempt(), last) {
-                (_, Some(s)) => Look::text(LEFT + 120.0, FOOTER_Y, result_text(&s), if s.clean { GOOD } else { TEXT }),
+                (_, Some(s)) => Look::text(
+                    LEFT + 120.0,
+                    FOOTER_Y,
+                    result_text(&s),
+                    if s.clean { GOOD } else { TEXT },
+                ),
                 (Some(a), None) => {
                     let mut t = Text::EMPTY;
                     let _ = write!(t, "link {} of {}", a.len(), total);
@@ -140,11 +255,25 @@ impl Plan<'_> {
                 }
             },
             REASON => match last {
-                Some(s) if s.fault.is_some() => Look::text(LEFT + 460.0, FOOTER_Y, reason_text(&s), if s.clean { GOOD } else { WARN }),
+                Some(s) if s.fault.is_some() => Look::text(
+                    LEFT + 460.0,
+                    FOOTER_Y,
+                    reason_text(&s),
+                    if s.clean { GOOD } else { WARN },
+                ),
+                Some(s) if s.clean => match shown_drift(self.helper) {
+                    Some(dir) => Look::text(LEFT + 460.0, FOOTER_Y, drift_text(dir), MUTED),
+                    None => Look::HIDDEN,
+                },
                 _ => Look::HIDDEN,
             },
             i if i < CELL => match self.helper.results().nth(i - PILL) {
-                Some(s) => Look::rect(PILL_X0 + (i - PILL) as f32 * PILL_PITCH, HEADER_Y, PILL_SIZE, pill_color(s)),
+                Some(s) => Look::rect(
+                    PILL_X0 + (i - PILL) as f32 * PILL_PITCH,
+                    HEADER_Y,
+                    PILL_SIZE,
+                    pill_color(s),
+                ),
                 None => Look::HIDDEN,
             },
             _ => self.cell_look(i),
@@ -155,24 +284,44 @@ impl Plan<'_> {
         use at::*;
         let tolerance = self.helper.settings().tolerance;
         let c = (i - CELL) % CELLS;
-        let Some((k, reference, grade)) = self.cell(c) else { return Look::HIDDEN };
+        let Some((k, reference, grade)) = self.cell(c) else {
+            return Look::HIDDEN;
+        };
         let cx = CELL_X0 + c as f32 * CELL_PITCH;
-        let first_step = reference.steps[0];
+        let first_step = reference.events[0];
         match (i - CELL) / CELLS {
             0 => Look::rect(cx, CELL_Y, CELL_W, CELL_COLOR),
             1 => {
                 let mut t = Text::EMPTY;
-                let _ = write!(t, "{} {}>{}", k + 1, reference.from.name(), reference.to.name());
+                let _ = write!(
+                    t,
+                    "{} {}>{}",
+                    k + 1,
+                    reference.from.name(),
+                    reference.to.name()
+                );
                 Look::text(cx, CELL_Y + TITLE_DY, t, MUTED)
             }
             2 => match grade {
-                Some(g) if g.wrong_move => Look::text(cx - 48.0, CELL_Y + VERDICT_DY, Text::new("WRONG MOVE"), BAD),
-                Some(g) => Look::text(cx - 48.0, CELL_Y + VERDICT_DY, verdict_text(g.link.verdict), if g.is_true() { GOOD } else { BAD }),
-                None => Look::text(cx - 48.0, CELL_Y + VERDICT_DY, verdict_text(reference.verdict), RULE),
+                Some(g) if g.wrong_move => {
+                    Look::text(cx - 48.0, CELL_Y + VERDICT_DY, Text::new("WRONG MOVE"), BAD)
+                }
+                Some(g) => Look::text(
+                    cx - 48.0,
+                    CELL_Y + VERDICT_DY,
+                    verdict_text(g.link.verdict),
+                    if g.is_true() { GOOD } else { BAD },
+                ),
+                None => Look::text(
+                    cx - 48.0,
+                    CELL_Y + VERDICT_DY,
+                    verdict_text(reference.verdict),
+                    RULE,
+                ),
             },
             3 => match (grade.map(|g| g.marks[0]), first_step) {
                 (Some(Some(mark)), Some(step)) => {
-                    let (t, color) = mark_text(mark, step.button, tolerance);
+                    let (t, color) = mark_text(mark, event_label(step.kind), tolerance);
                     Look::text(cx + 50.0, CELL_Y + VERDICT_DY, t, color)
                 }
                 _ => Look::HIDDEN,
@@ -192,7 +341,11 @@ impl Plan<'_> {
             _ => match (grade, first_step) {
                 (Some(g), Some(step)) => match g.marks[0] {
                     Some(Mark::At(d)) => {
-                        let color = if d.unsigned_abs() <= u32::from(tolerance) { GOOD } else { WARN };
+                        let color = if d.unsigned_abs() <= u32::from(tolerance) {
+                            GOOD
+                        } else {
+                            WARN
+                        };
                         Look::rect(ruler_x(c, step.offset + d), CELL_Y + RULER_DY, 6.0, color)
                     }
                     _ => Look::HIDDEN,
@@ -216,7 +369,9 @@ impl Default for Renderer {
 
 impl Renderer {
     pub const fn new() -> Self {
-        Self { written: [None; COUNT] }
+        Self {
+            written: [None; COUNT],
+        }
     }
 
     pub fn invalidate(&mut self) {
@@ -225,13 +380,26 @@ impl Renderer {
 
     /// One UI tick (the strip's rule): hidden writes only the container, once; shown writes every pane that changed.
     /// Shown needs the strip shown, the helper On and a target. `name` is the target's name. Returns the writes.
-    pub fn draw(&mut self, helper: &Helper, name: &Text, strip_shown: bool, mut apply: impl FnMut(usize, &Look, Changed)) -> usize {
+    pub fn draw(
+        &mut self,
+        helper: &Helper,
+        name: &Text,
+        strip_shown: bool,
+        mut apply: impl FnMut(usize, &Look, Changed),
+    ) -> usize {
         let shown = strip_shown && helper.settings().on && helper.target().is_some();
         let mut writes = 0;
         if !shown {
             let hidden = Look::HIDDEN;
             if Changed::between(self.written[at::CONTAINER].as_ref(), &hidden).any() {
-                apply(at::CONTAINER, &hidden, Changed { visible: true, ..Changed::default() });
+                apply(
+                    at::CONTAINER,
+                    &hidden,
+                    Changed {
+                        visible: true,
+                        ..Changed::default()
+                    },
+                );
                 self.written[at::CONTAINER] = Some(hidden);
                 writes += 1;
             }
@@ -245,7 +413,14 @@ impl Renderer {
                 apply(i, &look, changed);
                 writes += 1;
             }
-            self.written[i] = Some(if look.visible { look } else { Look { visible: false, ..self.written[i].unwrap_or(look) } });
+            self.written[i] = Some(if look.visible {
+                look
+            } else {
+                Look {
+                    visible: false,
+                    ..self.written[i].unwrap_or(look)
+                }
+            });
         }
         writes
     }
