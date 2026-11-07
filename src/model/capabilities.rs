@@ -131,7 +131,7 @@ pub static CROSS_NEEDS: [(Feature, &[&str]); 10] = [
     (Feature::Hitbox, &["lua_const_lookup", "status_kind", "utility_get_category", "utility_get_kind", "work_get_int"]),
     (Feature::InputDisplay, &[
         "attack_is_attack", "cancel_is_enable", "fighter_manager_get_entry", "lua_const_lookup", "motion_frame", "prev_status_kind",
-        "status_kind", "stop_is_stop", "transition_term_hook",
+        "situation_kind", "state_lr", "status_kind", "stop_is_stop", "transition_term_hook",
     ]),
     (Feature::NamedMacros, &["fighter_information", "fighter_manager_get_entry", "is_operation_cpu", "state_lr", "ui_is_ready_go", "work_get_int"]),
     (Feature::P1Cpu, &["fighter_manager_get_entry", "situation_kind", "utility_get_category"]),

@@ -78,7 +78,7 @@ fn verdict_value(verdict: Verdict) -> i32 {
 }
 
 /// A link of an attempt was graded (SPEC-input-07 §8): its index, the verdict's link value (`i32::MIN` unknown), flags
-/// (bit 0 true, 1 clean, 2 wrong move, 3 a missing press) and the first press's offset (`i32::MIN` none).
+/// (bit 0 true, 1 clean, 2 wrong move, 3 a missing event) and the first event's offset (`i32::MIN` none).
 #[no_mangle]
 #[inline(never)]
 pub extern "C" fn tr_combo_link_v1(index: u32, link: i32, flags: u32, offset: i32) {

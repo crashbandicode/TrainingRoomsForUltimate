@@ -3,10 +3,13 @@
 use super::*;
 
 fn link(from: Move, to: Move, verdict: Verdict) -> LinkRec {
-    let mut steps = [None; STEPS];
-    steps[0] = Some(Step { button: Button::Jump, aim: Aim::Neutral, offset: 2 });
-    steps[1] = Some(Step { button: Button::Attack, aim: Aim::Neutral, offset: -1 });
-    LinkRec { from, to, verdict, window: Some((0, 4)), steps }
+    LinkRec::presses(
+        from,
+        to,
+        verdict,
+        Some((0, 4)),
+        &[Event::press(Button::Jump, Aim::Neutral, 2), Event::press(Button::Attack, Aim::Neutral, -1)],
+    )
 }
 
 fn record(name: &str) -> ComboRecord {

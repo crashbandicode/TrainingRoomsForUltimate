@@ -7,7 +7,7 @@ use serde_json::{json, Value};
 
 use super::*;
 use crate::engine::macros::{InputFrame, Library, MacroRecording, StartState};
-use crate::model::combo::{Aim, Combo, LinkRec, Step, STEPS};
+use crate::model::combo::{Aim, Combo, Event, LinkRec};
 use crate::model::combo_record::{ComboLibrary, ComboRecord};
 use crate::model::frame_strip::{Button, Move, Verdict};
 use crate::model::state::file::SaveFile;
@@ -39,9 +39,13 @@ fn live(kind: i32, buttons: u32) -> LegacySlot {
 }
 
 fn link() -> LinkRec {
-    let mut steps = [None; STEPS];
-    steps[0] = Some(Step { button: Button::Jump, aim: Aim::Neutral, offset: 2 });
-    LinkRec { from: Move::Aerial, to: Move::Aerial, verdict: Verdict::True(None), window: Some((0, 4)), steps }
+    LinkRec::presses(
+        Move::Aerial,
+        Move::Aerial,
+        Verdict::True(None),
+        Some((0, 4)),
+        &[Event::press(Button::Jump, Aim::Neutral, 2)],
+    )
 }
 
 fn combo(name: &str) -> ComboRecord {
