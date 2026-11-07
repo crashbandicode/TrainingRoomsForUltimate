@@ -432,11 +432,7 @@ fn press(button: Button, s: &mut Session) {
 /// The recording menu names the file work. This thread posts it and the pop-up's role.
 fn post_recording_effect(menu: &mut Menu) {
     let selection = menu.recording().selection();
-    let role = match selection.record_role {
-        crate::model::recording_menu::ViewRole::Cpu => crate::engine::library::Role::Cpu,
-        crate::model::recording_menu::ViewRole::Player => crate::engine::library::Role::Player,
-    };
-    crate::engine::rr_host::set_record_role(role);
+    crate::engine::rr_host::publish_menu_role(selection.record_role);
     let drill = selection.drill.clone();
     let kind = drill.as_ref().and_then(|id| {
         if menu.recording().catalog().combos.iter().any(|file| &file.id == id) {

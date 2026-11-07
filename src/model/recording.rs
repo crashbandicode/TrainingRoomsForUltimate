@@ -379,6 +379,113 @@ pub struct ControlCtx {
     pub shulk_dial: bool,
 }
 
+/// Menu CPU-role record. The numbered slot table holds 600 frames; a menu file holds up to
+/// `macros::MAX_FRAMES`, so this keeps the same lockout, standby, and CPU possession as
+/// [`Recorder::poll`] and [`Recorder::control`] and streams the stored frames out one at a time.
+///
+/// A press while the phase is still lockout is neutralised and dropped. The idle baseline
+/// (`FLICK_JUMP`) during standby is injected and not stored. The first non-neutral poll ends
+/// standby and is the first stored frame, which is also the frame the CPU performs.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CpuRoleDrive {
+    mode: Mode,
+    possession: Possession,
+    lockout: u16,
+    recorded_facing: i8,
+    live: MappedInputs,
+}
+
+impl CpuRoleDrive {
+    pub const fn idle() -> Self {
+        Self { mode: Mode::None, possession: Possession::Player, lockout: 0, recorded_facing: 1, live: MappedInputs::NEUTRAL }
+    }
+
+    pub const fn active(&self) -> bool {
+        !matches!(self.mode, Mode::None)
+    }
+
+    pub const fn phase(&self) -> Phase {
+        match (self.mode, self.possession) {
+            (Mode::Pause, _) => Phase::Lockout,
+            (Mode::Record, Possession::Standby) => Phase::Standby,
+            (Mode::Record, _) => Phase::Recording,
+            (Mode::Playback, _) => Phase::Playback,
+            (Mode::None, _) => Phase::Idle,
+        }
+    }
+
+    pub const fn possession(&self) -> Possession {
+        self.possession
+    }
+
+    /// The record chord. `facing` is the CPU's `lr` (+1 or -1).
+    pub fn begin(&mut self, facing: i8) {
+        self.mode = Mode::Pause;
+        self.possession = Possession::Lockout;
+        self.lockout = LOCKOUT_FRAMES;
+        self.recorded_facing = if facing < 0 { -1 } else { 1 };
+        self.live = MappedInputs::NEUTRAL;
+    }
+
+    pub fn stop(&mut self) {
+        *self = Self::idle();
+    }
+
+    /// P1's poll. Neutralises P1 while this drive owns the CPU. `Some` is the frame to store.
+    pub fn poll(&mut self, out: &mut MappedInputs) -> Option<MappedInputs> {
+        match (self.mode, self.possession) {
+            (Mode::Pause, _) => {
+                *out = MappedInputs::NEUTRAL;
+                None
+            }
+            (Mode::Record, Possession::Standby) => {
+                self.live = *out;
+                let stored = if !is_neutral(*out) {
+                    self.possession = Possession::Cpu;
+                    Some(*out)
+                } else {
+                    None
+                };
+                *out = MappedInputs::NEUTRAL;
+                stored
+            }
+            (Mode::Record, Possession::Cpu) => {
+                let stored = *out;
+                self.live = stored;
+                *out = MappedInputs::NEUTRAL;
+                Some(stored)
+            }
+            _ => None,
+        }
+    }
+
+    /// The CPU control frame after the AI wrote its controls.
+    pub fn control(&mut self, ctx: &ControlCtx) -> ControlOut {
+        let mut out = ControlOut { write: None, hold_cliff_timer: false };
+        match self.mode {
+            Mode::Pause => {
+                out.hold_cliff_timer = true;
+                if self.lockout > 0 {
+                    self.lockout -= 1;
+                }
+                if self.lockout == 0 {
+                    self.mode = Mode::Record;
+                    self.possession = Possession::Standby;
+                }
+            }
+            Mode::Record => {
+                let mirror = if ctx.shulk_dial { 1 } else { self.recorded_facing * ctx.facing };
+                if matches!(self.possession, Possession::Standby | Possession::Cpu) {
+                    out.hold_cliff_timer = self.possession == Possession::Standby;
+                    out.write = Some(inject_values(self.live, mirror));
+                }
+            }
+            Mode::None | Mode::Playback => {}
+        }
+        out
+    }
+}
+
 /// What the post-frame stage found.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub struct PostOut {
@@ -1066,6 +1173,44 @@ impl ExportRefusal {
         match self {
             ExportRefusal::SlotOutOfRange => "Record Slot is out of range",
             ExportRefusal::NotRecorded => "Record into this slot first",
+        }
+    }
+}
+
+#[cfg(test)]
+mod cpu_role_parity {
+    use super::*;
+
+    #[test]
+    fn cpu_role_drive_matches_the_slot_recorder_through_the_first_stored_frame() {
+        let settings = RecorderSettings { duration: 60, trigger_chord: true, ..RecorderSettings::factory() };
+        let mut slot = Recorder::new();
+        slot.start_recording(&settings, 1, StartSnapshot::NONE);
+        let mut drive = CpuRoleDrive::idle();
+        drive.begin(1);
+        let ctx = ControlCtx { facing: 1, shulk_dial: false };
+        let facts = PollFacts { cpu_status: 0 };
+        let mut inputs = vec![MappedInputs { buttons: 1, ..MappedInputs::NEUTRAL }; usize::from(LOCKOUT_FRAMES)];
+        inputs.extend(std::iter::repeat(MappedInputs { buttons: FLICK_JUMP, ..MappedInputs::NEUTRAL }).take(4));
+        inputs.push(MappedInputs { buttons: 36_872, ..MappedInputs::NEUTRAL });
+        inputs.push(MappedInputs { buttons: 33_281, ..MappedInputs::NEUTRAL });
+        for input in inputs {
+            let mut left = input;
+            let mut right = input;
+            slot.poll(&mut left, facts);
+            let stored = drive.poll(&mut right);
+            assert_eq!(left, right, "p1 output");
+            assert_eq!(slot.phase(), drive.phase());
+            assert_eq!(slot.possession(), drive.possession());
+            let slot_write = slot.control(&ctx).write.map(|write| write.buttons);
+            let drive_write = drive.control(&ctx).write.map(|write| write.buttons);
+            assert_eq!(slot_write, drive_write, "cpu inject");
+            let _ = slot.post_frame(&settings, &PostCtx { facing: 1, queue_head_is_playback: false });
+            if slot.possession() == Possession::Cpu {
+                assert_eq!(stored.map(|frame| frame.buttons), Some(input.buttons));
+            } else {
+                assert!(stored.is_none(), "lockout and standby are not stored");
+            }
         }
     }
 }

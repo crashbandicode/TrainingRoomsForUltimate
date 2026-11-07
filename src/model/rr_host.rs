@@ -20,7 +20,8 @@ use super::rr_runtime::{
 };
 use crate::model::combo::Combo;
 use crate::model::input_delay::MappedInputs;
-use crate::model::recording_menu::{Effect, LoopMark, Selection};
+use crate::model::recording::{inject_values, ControlCtx, ControlOut, CpuRoleDrive, Inject, Phase};
+use crate::model::recording_menu::{Effect, LoopMark, Selection, ViewRole};
 use crate::model::state::record::SavedState;
 use crate::model::store::Store;
 
@@ -60,6 +61,8 @@ static DRILL_ASK: Mutex<Option<String>> = Mutex::new(None);
 static PLAYER_LABEL: Mutex<String> = Mutex::new(String::new());
 static LAST_ASK: Mutex<Option<MismatchAsk>> = Mutex::new(None);
 static CATALOG_GEN: AtomicU64 = AtomicU64::new(0);
+static CPU_ROLE_ON: AtomicBool = AtomicBool::new(false);
+static CPU_DRIVE: Mutex<CpuRoleDrive> = Mutex::new(CpuRoleDrive::idle());
 
 struct MakeJob {
     source: String,
@@ -144,6 +147,84 @@ pub fn set_record_role(role: Role) {
         Role::Cpu => ROLE_CPU,
     };
     RECORD_ROLE.store(bits, Ordering::Release);
+}
+
+/// The pop-up's role, posted by the menu worker before the record chord.
+pub fn publish_menu_role(role: ViewRole) {
+    set_record_role(match role {
+        ViewRole::Cpu => Role::Cpu,
+        ViewRole::Player => Role::Player,
+    });
+}
+
+/// After the record chord updates `CAP_ROLE`. A CPU-role start enters lockout. A stop leaves it.
+pub fn cpu_role_after_chord(facing: i8) {
+    let mut drive = lock(&CPU_DRIVE);
+    let role = CAP_ROLE.load(Ordering::Acquire);
+    if drive.active() && role == 0 {
+        drive.stop();
+        CPU_ROLE_ON.store(false, Ordering::Release);
+    } else if role == ROLE_CPU && !drive.active() {
+        drive.begin(facing);
+        CPU_ROLE_ON.store(true, Ordering::Release);
+    }
+}
+
+/// P1's poll while a CPU-role recording owns the controller. `false` leaves the player path alone.
+pub fn cpu_role_poll(out: &mut MappedInputs) -> bool {
+    if !CPU_ROLE_ON.load(Ordering::Acquire) {
+        return false;
+    }
+    let stored = {
+        let mut drive = lock(&CPU_DRIVE);
+        if !drive.active() {
+            return false;
+        }
+        drive.poll(out)
+    };
+    if let Some(frame) = stored {
+        push_capture(
+            ROLE_CPU,
+            InputFrame {
+                buttons: frame.buttons,
+                lstick_x: frame.lstick_x,
+                lstick_y: frame.lstick_y,
+                rstick_x: frame.rstick_x,
+                rstick_y: frame.rstick_y,
+            },
+        );
+    }
+    true
+}
+
+/// The CPU control frame of a CPU-role recording. `write` is what replaces the AI's controls.
+pub fn cpu_role_control(ctx: &ControlCtx) -> ControlOut {
+    if !CPU_ROLE_ON.load(Ordering::Acquire) {
+        return ControlOut { write: None, hold_cliff_timer: false };
+    }
+    lock(&CPU_DRIVE).control(ctx)
+}
+
+pub fn cpu_role_phase() -> Option<Phase> {
+    if !CPU_ROLE_ON.load(Ordering::Acquire) {
+        return None;
+    }
+    let drive = lock(&CPU_DRIVE);
+    drive.active().then(|| drive.phase())
+}
+
+/// Play on CPU: the posted frame as the CPU controller word (`inject_values`, mirror +1).
+pub fn playback_controller(frame: InputFrame) -> Inject {
+    inject_values(
+        MappedInputs {
+            buttons: frame.buttons,
+            lstick_x: frame.lstick_x,
+            lstick_y: frame.lstick_y,
+            rstick_x: frame.rstick_x,
+            rstick_y: frame.rstick_y,
+        },
+        1,
+    )
 }
 
 /// The menu worker posts one effect. The recording worker applies it. A `None` does not clear a pending effect.
@@ -976,6 +1057,8 @@ fn reset_host() {
     DRILL_SEEN.store(false, Ordering::Release);
     DEFER_MIGRATE.store(false, Ordering::Release);
     CATALOG_GEN.store(0, Ordering::Release);
+    CPU_ROLE_ON.store(false, Ordering::Release);
+    *lock(&CPU_DRIVE) = CpuRoleDrive::idle();
     for slot in &ROLE_KIND {
         slot.store(-1, Ordering::Release);
     }
@@ -1368,6 +1451,144 @@ mod tests {
         let save = Store::<NamedSave>::new(root.join(SAVES_DIR)).load(&save_id).unwrap();
         assert_eq!(save.cpu.fighter_kind, 7);
         assert!(crate::engine::rr_runtime::load_catalog(&root).unwrap().catalog.macros.iter().any(|file| file.id == listed.entries[0].id));
+    }
+
+    fn press(buttons: u32) -> MappedInputs {
+        MappedInputs { buttons, ..MappedInputs::NEUTRAL }
+    }
+
+    fn cpu_menu_role() {
+        let mut screens = crate::model::recording_menu::RecordingScreens::new();
+        screens.toggle_popup();
+        screens.press_popup(crate::model::menu::input::Button::R);
+        assert_eq!(screens.selection().record_role, ViewRole::Cpu);
+        publish_menu_role(screens.selection().record_role);
+    }
+
+    fn player_menu_role() {
+        let mut screens = crate::model::recording_menu::RecordingScreens::new();
+        screens.toggle_popup();
+        screens.press_popup(crate::model::menu::input::Button::L);
+        assert_eq!(screens.selection().record_role, ViewRole::Player);
+        publish_menu_role(screens.selection().record_role);
+    }
+
+    fn drive_cpu(buttons: u32) -> Option<u32> {
+        let mut out = press(buttons);
+        assert!(cpu_role_poll(&mut out));
+        assert_eq!(out, MappedInputs::NEUTRAL);
+        cpu_role_control(&ControlCtx { facing: 1, shulk_dial: false }).write.map(|write| write.buttons)
+    }
+
+    #[test]
+    fn cpu_role_lockout_or_standby_press_is_not_stored() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("cpu-lockout");
+        cpu_menu_role();
+        on_chords(true, false, false);
+        cpu_role_after_chord(1);
+        let _ = service_at(&root, &none(), "2026-11-07", state(13), state(7), false);
+        for _ in 0..crate::model::recording::LOCKOUT_FRAMES {
+            assert!(drive_cpu(1).is_none());
+        }
+        assert_eq!(cpu_role_phase(), Some(Phase::Standby));
+        for _ in 0..4 {
+            assert_eq!(drive_cpu(0x8000), Some(0x8000));
+            assert_eq!(cpu_role_phase(), Some(Phase::Standby));
+        }
+        on_chords(true, false, false);
+        cpu_role_after_chord(1);
+        let _stopped = service_at(&root, &none(), "2026-11-07", state(13), state(7), false);
+        assert!(Library::new(root.join(MACROS_DIR)).list().unwrap().entries.is_empty());
+    }
+
+    #[test]
+    fn cpu_role_record_stores_the_jab_and_plays_it_on_the_cpu() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("cpu-jab");
+        cpu_menu_role();
+        on_chords(true, false, false);
+        cpu_role_after_chord(1);
+        let started = service_at(&root, &none(), "2026-11-07", state(13), state(7), false);
+        assert!(started.diags.iter().any(|line| line.contains("role=cpu") && line.contains("recording=1")));
+        for _ in 0..crate::model::recording::LOCKOUT_FRAMES {
+            assert!(drive_cpu(1).is_none());
+        }
+        for _ in 0..3 {
+            assert_eq!(drive_cpu(0x8000), Some(0x8000));
+        }
+        let jab = [36_872u32, 36_872, 36_872, 33_281];
+        let mut drove = Vec::new();
+        for buttons in jab {
+            drove.push(drive_cpu(buttons).expect("the player's frame drives the cpu"));
+        }
+        assert_eq!(drove, jab);
+        assert_eq!(cpu_role_phase(), Some(Phase::Recording));
+        on_chords(true, false, false);
+        cpu_role_after_chord(1);
+        assert!(cpu_role_phase().is_none());
+        let stopped = service_at(&root, &none(), "2026-11-07", state(13), state(7), false);
+        assert!(stopped.diags.iter().any(|line| line.contains("recording=0")));
+        let macros = Library::new(root.join(MACROS_DIR));
+        let listed = macros.list().unwrap();
+        assert_eq!(listed.entries.len(), 1);
+        let saved = macros.load(&listed.entries[0].id).unwrap();
+        let buttons: Vec<u32> = saved.frames.iter().map(|frame| frame.buttons).collect();
+        assert_eq!(buttons, jab);
+        assert!(!buttons.contains(&1));
+        assert!(!buttons.contains(&0x8000));
+        publish_selection(
+            &root,
+            &Selection {
+                bound: None,
+                active_player: None,
+                active_cpu: Some(listed.entries[0].id.clone()),
+                loop_player: LoopMark::Finite(1),
+                loop_cpu: LoopMark::Finite(1),
+                drill: None,
+                record_role: ViewRole::Cpu,
+            },
+            None,
+        );
+        on_chords(false, false, true);
+        let _ = service_at(&root, &none(), "2026-11-07", state(13), state(7), false);
+        for (index, expected) in jab.iter().enumerate() {
+            if index > 0 {
+                let _ = service_at(&root, &none(), "2026-11-07", state(13), state(7), false);
+            }
+            let frame = take_cpu_frame().expect("play on cpu posts the stored frame");
+            assert_eq!(frame.buttons, *expected);
+            assert_eq!(playback_controller(frame).buttons, *expected);
+        }
+    }
+
+    #[test]
+    fn cpu_role_player_path_still_stores_the_polls() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("player-jab");
+        player_menu_role();
+        on_chords(true, false, false);
+        cpu_role_after_chord(1);
+        assert!(cpu_role_phase().is_none());
+        let _ = service_at(&root, &none(), "2026-11-07", state(8), state(7), false);
+        let frames = [1u32, 36_872, 36_872, 36_872, 33_281];
+        for buttons in frames {
+            let mut out = press(buttons);
+            unsafe { on_player_poll(&mut out) };
+            assert_eq!(out.buttons, buttons);
+        }
+        on_chords(true, false, false);
+        cpu_role_after_chord(1);
+        let _ = service_at(&root, &none(), "2026-11-07", state(8), state(7), false);
+        let macros = Library::new(root.join(MACROS_DIR));
+        let listed = macros.list().unwrap();
+        assert_eq!(listed.entries.len(), 1);
+        let saved = macros.load(&listed.entries[0].id).unwrap();
+        let buttons: Vec<u32> = saved.frames.iter().map(|frame| frame.buttons).collect();
+        assert_eq!(buttons, frames);
     }
 
     #[test]

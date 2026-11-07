@@ -73,3 +73,36 @@ fn playback_makes_no_hook_allocations() {
     }
     assert_eq!(hook_allocations(), before, "play, step, load, auto-load and mash allocated inside the hook");
 }
+
+#[test]
+fn cpu_role_record_and_playback_frames_allocate_nothing() {
+    use model::input_delay::MappedInputs;
+    use model::recording::{inject_values, ControlCtx, CpuRoleDrive, Phase, FLICK_JUMP, LOCKOUT_FRAMES};
+
+    let mut drive = CpuRoleDrive::idle();
+    drive.begin(1);
+    let ctx = ControlCtx { facing: 1, shulk_dial: false };
+    let before = hook_allocations();
+    {
+        let _poll = HookScope::enter_hook(HookId::RecorderPoll);
+        let _ai = HookScope::enter_hook(HookId::RecorderAi);
+        for _ in 0..LOCKOUT_FRAMES {
+            let mut out = MappedInputs { buttons: 1, ..MappedInputs::NEUTRAL };
+            std::hint::black_box(drive.poll(&mut out));
+            std::hint::black_box(drive.control(&ctx).write);
+        }
+        let mut baseline = MappedInputs { buttons: FLICK_JUMP, ..MappedInputs::NEUTRAL };
+        std::hint::black_box(drive.poll(&mut baseline));
+        std::hint::black_box(drive.control(&ctx).write);
+        let jab = [36_872u32, 36_872, 36_872, 33_281];
+        for buttons in jab {
+            let mut out = MappedInputs { buttons, ..MappedInputs::NEUTRAL };
+            let stored = drive.poll(&mut out).unwrap_or(MappedInputs::NEUTRAL);
+            let write = drive.control(&ctx).write;
+            let playback = inject_values(stored, 1);
+            std::hint::black_box((write, playback.buttons));
+        }
+    }
+    assert_eq!(hook_allocations(), before, "cpu-role record and playback frames allocated inside the hook");
+    assert_eq!(drive.phase(), Phase::Recording);
+}

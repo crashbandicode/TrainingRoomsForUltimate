@@ -15,16 +15,37 @@ pub fn on_chords(record: bool, play_player: bool, play_cpu: bool) {
     rr_host::on_chords(record, play_player, play_cpu);
 }
 
+pub fn cpu_role_after_chord(facing: i8) {
+    rr_host::cpu_role_after_chord(facing);
+}
+
+/// # Safety
+/// `out` is null or the live mapped-input record for this poll.
+pub unsafe fn cpu_role_poll(out: *mut MappedInputs) -> bool {
+    if out.is_null() {
+        return false;
+    }
+    rr_host::cpu_role_poll(unsafe { &mut *out })
+}
+
+pub fn cpu_role_control(ctx: &crate::model::recording::ControlCtx) -> crate::model::recording::ControlOut {
+    rr_host::cpu_role_control(ctx)
+}
+
+pub fn cpu_role_phase() -> Option<crate::model::recording::Phase> {
+    rr_host::cpu_role_phase()
+}
+
+pub fn playback_controller(frame: InputFrame) -> crate::model::recording::Inject {
+    rr_host::playback_controller(frame)
+}
+
 pub fn note_mash() {
     rr_host::note_mash();
 }
 
 pub fn push_capture(side: u8, frame: InputFrame) {
     rr_host::push_capture(side, frame);
-}
-
-pub(crate) fn capture_role() -> u8 {
-    rr_host::capture_role()
 }
 
 pub(crate) fn take_cpu_frame() -> Option<InputFrame> {
