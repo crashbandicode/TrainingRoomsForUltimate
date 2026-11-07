@@ -1,6 +1,7 @@
 //! The diagnostics channel on the card (SPEC-core-01 §7): a size-capped ring, a drain that writes
 //! whole lines to `practice-diagnostics.log` (two files of at most 128 KiB, rotated) and to the
-//! kernel debug output, and the panic breadcrumb. The shipped build admits only the
+//! kernel debug output, and the panic breadcrumb. Lines a row gate waits for are also appended to
+//! `practice-gates.log`, which is truncated once at start and then never rotated. The shipped build admits only the
 //! `diag_ring::SHIPPED_TAGS`; a `diag` build writes every line. Formatting happens on the caller's
 //! stack and the ring is a fixed array, so enqueueing allocates nothing. The normal diagnostic
 //! API retains a synchronous filesystem drain before the writer starts; that drain may allocate.
@@ -158,6 +159,7 @@ pub fn init_diagnostics() {
         report_failure(storage::EVENTS_LOG_PATH, "data folder", &e);
     }
     init_at(storage::DIAGNOSTICS_PATH, storage::DIAGNOSTICS_PREVIOUS_PATH, storage::EVENTS_LOG_PATH);
+    init_gates(storage::GATES_PATH);
     // The game identity is not known yet here: the version guard logs it next, and the install
     // line carries it.
     diagnostic(format_args!(
@@ -245,6 +247,7 @@ pub fn drain() {
             let bytes = &chunk[..n];
             console_write(bytes);
             append(bytes);
+            mirror_gate_chunk(bytes);
         }
     });
     report_drops();
@@ -275,6 +278,73 @@ fn console_write(bytes: &[u8]) {
 
 #[cfg(not(target_arch = "aarch64"))]
 fn console_write(_bytes: &[u8]) {}
+
+/// Gate lines only. Two files of the rotating log can drop a `screen=` line while a stall flood is
+/// running; this file is truncated at start and then only appended, up to `GATES_LIMIT`.
+const GATES_LIMIT: u64 = 256 * 1024;
+
+struct GateFile {
+    path: String,
+    bytes: u64,
+    ready: bool,
+}
+
+static GATES: Mutex<GateFile> = Mutex::new(GateFile {
+    path: String::new(),
+    bytes: 0,
+    ready: false,
+});
+
+/// A line a recording or frame-strip row waits for. Per-frame flood lines are not included.
+fn is_gate_line(line: &str) -> bool {
+    line.contains("[PracticeRecording]")
+        || line.contains("[Ui] press")
+        || line.contains("[FrameStrip] advantage")
+        || line.contains("[FrameStrip] p1 ")
+}
+
+/// Truncate the gate file and append from zero. A later call replaces the path.
+pub fn init_gates(path: &str) {
+    let Ok(mut gates) = GATES.lock() else {
+        return;
+    };
+    gates.path = path.to_owned();
+    gates.bytes = 0;
+    gates.ready = OpenOptions::new().create(true).write(true).truncate(true).open(path).is_ok();
+}
+
+/// Append the gate lines in `bytes`. A chunk past the cap is dropped whole; the file is not rotated.
+pub fn mirror_gate_chunk(bytes: &[u8]) {
+    let Ok(mut gates) = GATES.try_lock() else {
+        return;
+    };
+    if !gates.ready {
+        return;
+    }
+    let path = gates.path.clone();
+    let mut file = match OpenOptions::new().append(true).open(&path) {
+        Ok(file) => file,
+        Err(_) => {
+            gates.ready = false;
+            return;
+        }
+    };
+    for line in bytes.split_inclusive(|&byte| byte == b'\n') {
+        let text = std::str::from_utf8(line).unwrap_or("");
+        if !is_gate_line(text) {
+            continue;
+        }
+        let next = gates.bytes.saturating_add(line.len() as u64);
+        if next > GATES_LIMIT {
+            return;
+        }
+        if file.write_all(line).is_err() {
+            gates.ready = false;
+            return;
+        }
+        gates.bytes = next;
+    }
+}
 
 /// Append whole lines to the current file, rotating at `DIAGNOSTIC_LIMIT`: open in append mode, write,
 /// close. The first failure turns the file off and is reported to the failures file.

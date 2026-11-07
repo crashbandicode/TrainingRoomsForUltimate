@@ -23,6 +23,8 @@ pub mod file {
     pub const EVENTS_LOG: &str = "events.log";
     pub const DIAGNOSTICS: &str = "practice-diagnostics.log";
     pub const DIAGNOSTICS_PREVIOUS: &str = "practice-diagnostics.previous.log";
+    /// Gate lines (`[PracticeRecording]`, and the other lines a row waits for). Not rotated.
+    pub const GATES: &str = "practice-gates.log";
     /// Decision N1: `developer_page=on` shows the Developer page.
     pub const DEVELOPER_INI: &str = "developer.ini";
     /// The import's marker and receipt (SPEC-core-08 §2).
@@ -37,6 +39,7 @@ pub mod file {
 pub const EVENTS_LOG_PATH: &str = "sd:/ultimate/TrainingRooms/events.log";
 pub const DIAGNOSTICS_PATH: &str = "sd:/ultimate/TrainingRooms/practice-diagnostics.log";
 pub const DIAGNOSTICS_PREVIOUS_PATH: &str = "sd:/ultimate/TrainingRooms/practice-diagnostics.previous.log";
+pub const GATES_PATH: &str = "sd:/ultimate/TrainingRooms/practice-gates.log";
 
 /// A path built in a fixed buffer. `N` is the capacity in bytes.
 #[derive(Clone, Copy)]

@@ -167,8 +167,9 @@ impl RecordStop {
     }
 }
 
-/// Stop. An empty buffer writes nothing. A recording writes `"<name> · start"`, stores that id, and
-/// becomes most recently used. The active macro is left as it was.
+/// Stop. An empty buffer writes nothing. A recording writes `"<name> · start"`, stores that id,
+/// becomes most recently used, and becomes that role's active macro. A CPU-role recording names
+/// the CPU's fighter, so Play on CPU compares the fighter who was being recorded.
 pub fn finish_recording(
     root: &Path,
     capture: &Capture,
@@ -190,7 +191,10 @@ pub fn finish_recording(
         .collect::<Vec<_>>();
     let name = unused_label("Macro", &macro_names);
     let start_name = format!("{name} · start");
-    let kind = player.fighter_kind;
+    let kind = match capture.role() {
+        Role::Cpu => cpu.fighter_kind,
+        Role::Player => player.fighter_kind,
+    };
     let start = NamedSave::new(start_name, player, cpu)?;
     let start_id = saves.save_new(&start)?;
     let mut recording = MacroRecording::new(
@@ -205,6 +209,7 @@ pub fn finish_recording(
     let mut index = RecordingIndex::load(root)?;
     index.note_use(Kind::Save, &start_id, Use::Recorded, at)?;
     index.note_use(Kind::Macro, &id, Use::Recorded, at.saturating_add(1))?;
+    index.set_active(capture.role(), Some(&id), at.saturating_add(2))?;
     index.save(root)?;
     Ok(RecordStop::Saved {
         id,
@@ -770,11 +775,32 @@ mod tests {
         let saves = Store::<NamedSave>::new(root.join(SAVES_DIR));
         assert_eq!(saves.load(&start_save).unwrap().name, "Macro 1 · start");
         let index = RecordingIndex::load(&root).unwrap();
-        assert_eq!(index.active(Role::Player), Some("old"));
+        assert_eq!(index.active(Role::Player), Some(id.as_str()));
+        assert_eq!(index.active(Role::Cpu), None);
         assert_eq!(
             index.hot(Kind::Macro).first().map(String::as_str),
             Some(id.as_str())
         );
+    }
+
+    #[test]
+    fn a_cpu_role_recording_becomes_the_cpu_active_macro_and_names_the_cpu() {
+        let root = scratch("cpu-active");
+        let mut index = RecordingIndex::fresh();
+        index.set_active(Role::Player, Some("keep-player"), 1).unwrap();
+        index.save(&root).unwrap();
+        let mut capture = Capture::idle();
+        toggle_record(&mut capture, Role::Cpu);
+        push_frame(&mut capture, Role::Cpu, frame(33_281));
+        let stop = finish_recording(&root, &capture, state(0), state(0x1d), 5).unwrap();
+        let RecordStop::Saved { id, .. } = stop else {
+            panic!("empty")
+        };
+        let saved = Library::new(root.join(MACROS_DIR)).load(&id).unwrap();
+        assert_eq!(saved.start.fighter_kind, 0x1d, "the CPU's fighter, not the player's");
+        let index = RecordingIndex::load(&root).unwrap();
+        assert_eq!(index.active(Role::Cpu), Some(id.as_str()));
+        assert_eq!(index.active(Role::Player), Some("keep-player"));
     }
 
     #[test]

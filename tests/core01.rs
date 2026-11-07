@@ -238,6 +238,7 @@ fn core01_paths() {
     assert_eq!(FixedPath::<128>::in_root(storage::file::EVENTS_LOG).unwrap().as_str(), storage::EVENTS_LOG_PATH);
     assert_eq!(FixedPath::<128>::in_root(storage::file::DIAGNOSTICS).unwrap().as_str(), storage::DIAGNOSTICS_PATH);
     assert_eq!(FixedPath::<128>::in_root(storage::file::DIAGNOSTICS_PREVIOUS).unwrap().as_str(), storage::DIAGNOSTICS_PREVIOUS_PATH);
+    assert_eq!(FixedPath::<128>::in_root(storage::file::GATES).unwrap().as_str(), storage::GATES_PATH);
 }
 
 #[test]

@@ -569,3 +569,11 @@ ceiling = 150155
 date = "2026-11-07"
 reason = "rc.5 wire-fix merge of the CPU-role record path with the FrameStrip change-log and the combo helper default On; measured 150155 (tools/size_gate.py), +106 over 150049"
 approved_by = "Operator 2026-11-07 via primary 35137355 (TASK-GROK-rc5-wire-fix and TASK-GROK-rc5-cpu-record): 'Raise as needed'"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 150224
+date = "2026-11-07"
+reason = "rc.5 wire-fix: a stopped recording becomes that role's active macro, a CPU-role file names the CPU, and gate lines go to an unrotated practice-gates.log; measured 150224 (tools/size_gate.py), +69 over 150155"
+approved_by = "Operator 2026-11-07 via primary 35137355 (TASK-GROK-rc5-wire-fix): 'Raise as needed'"

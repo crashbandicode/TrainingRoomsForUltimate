@@ -58,10 +58,20 @@ def close_menu(ctx):
     settle(ctx)
 
 
+def gate_source(ctx):
+    """The file that keeps the lines a row waits for.
+
+    practice-diagnostics.log rotates, so a stall line can push a screen= line out of the
+    window the gate reads. The diag build copies those lines into practice-gates.log and
+    does not rotate that file.
+    """
+    return str(Path(ctx.instance['diag_log']).with_name('practice-gates.log'))
+
+
 def popup(ctx):
     ctx.play(POPUP)
     try:
-        return ctx.wait_log('diag', r'screen=recording-popup\b', cap=10)
+        return ctx.wait_log(gate_source(ctx), r'screen=recording-popup\b', cap=10)
     except RuntimeError:
         popup_close(ctx)
         raise
@@ -82,7 +92,7 @@ def popup_close(ctx):
 
 def diag(ctx, pattern, cap=10):
     try:
-        return ctx.wait_log('diag', pattern, cap=cap)
+        return ctx.wait_log(gate_source(ctx), pattern, cap=cap)
     except RuntimeError:
         # A missed line often leaves the pop-up, the menu, or the keyboard up. Recovery checks the
         # training HUD on this instance and does not close it, so back out before the error propagates.

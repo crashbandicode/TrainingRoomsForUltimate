@@ -47,7 +47,7 @@ Each role has one active macro. It is either a recording or a chain. Set active 
 
 Both Play chords may be on at once. They do not share a machine: Player 1 and the CPU can play at the same time. A chain does not use that. Its macros play one after another.
 
-If that role has no active macro, its Play chord does nothing. With the Start save switch On, and the file still there, the chord warps to the start save once as it enters play, then plays the inputs. A later pass does not warp.
+Stopping Record selects the new file as that role's active macro, so the next Play on that role plays it. A recording made for the CPU names the CPU's fighter. If that role has no active macro, its Play chord does nothing. With the Start save switch On, and the file still there, the chord warps to the start save once as it enters play, then plays the inputs. A later pass does not warp.
 
 Mash interrupts playback, when that option is On, stops the macro that role is playing. A chain stops as that one macro.
 

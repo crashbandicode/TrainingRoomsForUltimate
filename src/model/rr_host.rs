@@ -1201,13 +1201,13 @@ mod tests {
         let macros = Library::new(root.join(MACROS_DIR));
         let listed = macros.list().unwrap();
         assert_eq!(listed.entries.len(), 1);
-        let saved = macros.load(&listed.entries[0].id).unwrap();
+        let id = listed.entries[0].id.clone();
+        let saved = macros.load(&id).unwrap();
         assert!(saved.start_save.is_some());
         assert_eq!(saved.frames[0].buttons, 4);
-        assert_eq!(
-            RecordingIndex::load(&root).unwrap().active(Role::Player),
-            None
-        );
+        let index = RecordingIndex::load(&root).unwrap();
+        assert_eq!(index.active(Role::Player), Some(id.as_str()));
+        assert_eq!(index.active(Role::Cpu), None);
     }
 
     #[test]

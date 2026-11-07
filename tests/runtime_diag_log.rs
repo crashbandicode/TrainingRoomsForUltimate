@@ -37,7 +37,28 @@ fn the_ring_reaches_the_file_rotates_and_reports_failures() {
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).unwrap();
     let (cur, prev, events) = (dir.join("d.log"), dir.join("d.previous.log"), dir.join("events.log"));
+    let gates = dir.join("practice-gates.log");
     let path = |p: &std::path::Path| p.to_str().unwrap().to_owned();
+    diag_log::init_gates(&path(&gates));
+    diag_log::mirror_gate_chunk(
+        b"1 #1 [PracticeRecording] screen=recording role=cpu recording=1\n\
+1 #2 [BuildSplit] stall owner=0 gap_us=80000\n\
+1 #3 [FrameStrip] reaction r=0 stop=false actionable=true\n\
+1 #4 [FrameStrip] advantage value=8 on_shield=true\n\
+1 #5 [Ui] press 3 Drill\n\
+1 #6 [FrameStrip] p1 status=1 stop=false active=true actionable=false attack=None mf=0\n",
+    );
+    let gates_text = read(&gates);
+    assert!(gates_text.contains("screen=recording role=cpu recording=1"), "{gates_text:?}");
+    assert!(gates_text.contains("[FrameStrip] advantage value=8"), "{gates_text:?}");
+    assert!(gates_text.contains("[Ui] press 3 Drill"), "{gates_text:?}");
+    assert!(gates_text.contains("[FrameStrip] p1 status=1"), "{gates_text:?}");
+    assert!(!gates_text.contains("BuildSplit"), "{gates_text:?}");
+    assert!(!gates_text.contains("reaction"), "{gates_text:?}");
+    let first_len = fs::metadata(&gates).unwrap().len();
+    diag_log::mirror_gate_chunk(b"2 #7 [PracticeRecording] screen=playback role=cpu warp=1\n");
+    assert!(read(&gates).contains("screen=playback role=cpu warp=1"));
+    assert!(fs::metadata(&gates).unwrap().len() > first_len, "the gate file appends; it does not rotate");
 
     // A shipped line reaches the file, a probe tag does not; lines carry "<ms> #<seq> ".
     diag_log::init_at(&path(&cur), &path(&prev), &path(&events));
