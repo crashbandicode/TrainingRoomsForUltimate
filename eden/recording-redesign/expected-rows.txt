@@ -1,0 +1,66 @@
+# rc.5 grouped Eden session: the rows rows.json must contain (contract for card 10a; primary 2026-11-07).
+# Format: <row id> <TAB> <source to read for the row's start state, inputs and expected result> [<TAB> media path]
+# Sources:
+#   REPORT = artifacts/phase23/LANE-GROK-RECORDING-REDESIGN-REPORT.md (Eden column and the trace rows naming the id)
+#   RR-n = artifacts/phase23/LANE-GROK-RR-n-REPORT.md
+#   PLAN = artifacts/phase23/EDEN-SESSION-PLAN-rc5.md
+#   MEDIA = docs/MEDIA.md on this branch (the row's line in the capture table)
+rr-migrate	REPORT, RR-1
+rr-grade-bar	REPORT, RR-2, RR-12
+rr-drill	REPORT, RR-2
+rr-picker	REPORT, RR-3
+rr-load	REPORT, RR-4
+rr-chain	REPORT, RR-4
+rr-loop	REPORT, RR-4, RR-6
+rr-chords	REPORT, RR-5
+rr-popup	REPORT, RR-6
+rr-page	REPORT, RR-6
+rr-active	REPORT, RR-6
+rr-hot	REPORT, RR-6
+rr-icons	REPORT, RR-6, RR-8
+rr-record	REPORT
+rr-notice	REPORT
+rr-mismatch	REPORT
+rr-rename	REPORT
+rr-crop	REPORT
+strip-walk	RR-11
+strip-dash-dance	RR-11
+strip-cstick-smash	RR-11
+strip-tilted-a	RR-11
+combo-nair-loop-clean	RR-12
+combo-nair-loop-full-hop	RR-12
+combo-nair-loop-no-fastfall	RR-12
+combo-dash-attack	RR-12
+adv-jab-shield	PLAN (frame advantage, standard cases)
+adv-tilt-shield	PLAN (frame advantage, standard cases)
+adv-smash-shield	PLAN (frame advantage, standard cases)
+adv-aerial-shield	PLAN (frame advantage, standard cases)
+adv-move-hit	PLAN (frame advantage, standard cases)
+heap-and-crash-check	PLAN (gates on every instance)
+media-rc5-frame-strip-lanes	MEDIA	media/rc5-frame-strip-lanes.gif
+media-rc5-frame-strip-chips	MEDIA	media/rc5-frame-strip-chips.gif
+media-rc5-frame-strip-cstick	MEDIA	media/rc5-frame-strip-cstick.gif
+media-rc5-frame-strip-stick-row	MEDIA	media/rc5-frame-strip-stick-row.gif
+media-rc5-frame-strip-freeze	MEDIA	media/rc5-frame-strip-freeze.gif
+media-rc5-frame-strip-freeze-stick	MEDIA	media/rc5-frame-strip-freeze-stick.gif
+media-rc5-frame-strip-advantage-hit	MEDIA	media/rc5-frame-strip-advantage-hit.gif
+media-rc5-frame-strip-advantage-shield	MEDIA	media/rc5-frame-strip-advantage-shield.gif
+media-rc5-frame-strip-link	MEDIA	media/rc5-frame-strip-link.gif
+media-rc5-frame-strip-drop	MEDIA	media/rc5-frame-strip-drop.gif
+media-rc5-frame-strip-input	MEDIA	media/rc5-frame-strip-input.gif
+media-rc5-frame-strip-last	MEDIA	media/rc5-frame-strip-last.gif
+media-rc5-frame-strip-exchange	MEDIA	media/rc5-frame-strip-exchange.gif
+media-rc5-save-warp	MEDIA	media/rc5-save-warp.gif
+media-rc5-record-start-save	MEDIA	media/rc5-record-start-save.gif
+media-rc5-play-chord	MEDIA	media/rc5-play-chord.gif
+media-rc5-loop-no-warp	MEDIA	media/rc5-loop-no-warp.gif
+media-rc5-chain-play	MEDIA	media/rc5-chain-play.gif
+media-rc5-grade-not-true	MEDIA	media/rc5-grade-not-true.gif
+media-rc5-make-combo	MEDIA	media/rc5-make-combo.gif
+media-rc5-crop-combo	MEDIA	media/rc5-crop-combo.gif
+media-rc5-sequence-drill	MEDIA	media/rc5-sequence-drill.gif
+media-rc5-popup	MEDIA	media/rc5-popup.gif
+media-rc5-recording-page	MEDIA	media/rc5-recording-page.gif
+media-rc5-macro-screen	MEDIA	media/rc5-macro-screen.gif
+media-rc5-fighter-mismatch	MEDIA	media/rc5-fighter-mismatch.gif
+media-rc5-migration	MEDIA	media/rc5-migration.gif
