@@ -26,6 +26,8 @@ use std::sync::atomic::{AtomicBool, AtomicI32, AtomicPtr, AtomicU8, Ordering};
 use hos_lock::Mutex;
 use skyline::hooks::InlineCtx;
 
+use super::recording_host;
+
 use crate::model::chords::Request;
 use crate::model::cpu::facts::PlaybackStart;
 use crate::model::cpu::ids::{C, UNRESOLVED};
