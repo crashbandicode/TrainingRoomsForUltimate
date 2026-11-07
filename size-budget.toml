@@ -397,6 +397,22 @@ approved_by = "Operator 2026-11-05 standing order via primary 35137355: 'Raise a
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
+ceiling = 143923
+date = "2026-11-06"
+reason = "rr-4 playback (p23/rr-4-playback): the per-role machine, a load and an auto-load that only warp, and one start-save warp on entering play; measured 143923 (tools/size_gate.py), +243 over 143680"
+approved_by = "Operator 2026-11-06 via the rr-4 brief: 'Raise as needed'"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 144129
+date = "2026-11-06"
+reason = "rr integration (p23/rr-integration): rr-1, rr-2, rr-3, rr-4, rr-5 and rr-8 merged on 384e41f; measured 144129 (tools/size_gate.py), +1323 over 142806"
+approved_by = "Operator 2026-11-05 standing order via primary 35137355: 'Raise as needed'"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
 ceiling = 146268
 date = "2026-11-06"
 reason = "rr-6-menu: the recording pop-up, the Recording page, the file screens and the twelve icon panes; measured 146268 (tools/size_gate.py), +2382 over 143886"
