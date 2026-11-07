@@ -2986,7 +2986,7 @@
    "dest": "src/runtime/roster/native_source.rs",
    "crate": "root",
    "src_sha256": "d2032bebfb4f473403e59ba25632d2000ba80efb17de006d9d13bff2dad4767b",
-   "dest_sha256": "efc82403e7ee25fe40fd4c0fcf1a90f26d0ef000f44fcbe8590d00e1eaf25ae5",
+   "dest_sha256": "6cca7bc7ba727427c3467e3cb75a54c7f29e6ceb00f5435ca45214b67aa7646a",
    "edits": [
     {
      "old": "pub unsafe fn training_cpu_quantity() -> Option<u32> {\n    if !crate::runtime::compat::common::is_native_training_mode() || BASE.load(Ordering::Acquire) == 0 {",
@@ -3047,6 +3047,11 @@
      "old": "pub unsafe fn install(current: *mut u8, kind: u32) {\n    install_with(current, kind, native_fighter_install::Flags::Parked);\n}\n\npub(super) unsafe fn reload(current: *mut u8, kind: u32) {\n    install_with(current, kind, native_fighter_install::Flags::Reload);\n}\n\nunsafe fn install_with(current: *mut u8, kind: u32, flags: native_fighter_install::Flags) {\n    let forms = Forms::starting(kind);\n    let mut descriptor = native_fighter_install::Descriptor::copy_from(current);\n    descriptor.request_group(native_fighter_install::Group {\n",
      "new": "pub unsafe fn install(current: *mut u8, kind: u32) {\n    install_with(current, kind, native_fighter_install::Flags::Parked);\n}\n\nunsafe fn install_with(current: *mut u8, kind: u32, flags: native_fighter_install::Flags) {\n    let forms = Forms::starting(kind);\n    let mut descriptor = native_fighter_install::Descriptor::copy_from(current);\n    descriptor.request_group(native_fighter_install::Group {\n",
      "reason": "RC reset lead composition: apply reviewed pkg6 cf161f5 F9/created-exact retirement after Slim 7950485 observer removal; preserve both closures and ordinary Mii/helper safety."
+    },
+    {
+     "old": "unsafe fn identity(current: *const u8, slot: u32, kind: u32, owner: *mut u8) -> ReadySource {\n    let forms = Forms::starting(kind);\n    let body = read::<*const u8>(current, 0x4160);\n    ReadySource { slot, entry: current as usize, kind,\n        costume: read(owner, 0x64), body_id: read(body, 8),\n        bodies: std::array::from_fn(|i| {\n            if i >= forms.count as usize { return (0, 0); }\n            let body = read::<*const u8>(current, 0x4160 + i * 8);\n            (body as usize, read(body, 8))\n        }), descriptor: read(current, 0xf8), resource: owner as usize }\n}",
+     "new": "/// A window cell is a body only when `installed` publishes that index\n/// (`entry_cells::active_cell`, the game's `b.ls`). An unpublished cell is not read.\nunsafe fn published_body(entry: *const u8, installed: u64, index: usize) -> Option<*const u8> {\n    let Ok(index) = u8::try_from(index) else { return None; };\n    if crate::model::entry_cells::active_cell(index, installed).is_none() {\n        return None;\n    }\n    let body = read::<*const u8>(entry, 0x4160 + usize::from(index) * 8);\n    if aligned(body) { Some(body) } else { None }\n}\n\nunsafe fn identity(current: *const u8, slot: u32, kind: u32, owner: *mut u8) -> ReadySource {\n    let forms = Forms::starting(kind);\n    let installed = read::<u64>(current, 0x4150);\n    let body_id = published_body(current, installed, 0).map(|body| read::<u32>(body, 8)).unwrap_or(0);\n    ReadySource { slot, entry: current as usize, kind,\n        costume: read(owner, 0x64), body_id,\n        bodies: std::array::from_fn(|i| {\n            if i >= forms.count as usize { return (0, 0); }\n            match published_body(current, installed, i) {\n                Some(body) => (body as usize, read::<u32>(body, 8)),\n                None => (0, 0),\n            }\n        }), descriptor: read(current, 0xf8), resource: owner as usize }\n}",
+     "reason": "rc.5: a fighter entry's body cell (+0x4160) is a live body only after the loader publishes it (installed count +0x4150, the game's b.ls at main+0x642c88). Alignment of the cell word is not that state. F6-30 captured count 0 with heap residue in the cells; dereferencing it is the unmapped read at f9_body_of."
     }
    ]
   },
@@ -4193,7 +4198,7 @@
    "dest": "src/runtime/roster/character_sources.rs",
    "crate": "root",
    "src_sha256": "6c3fe37031f02ee3c3891943600223546804839ee1ee6af103346710f4fb1514",
-   "dest_sha256": "50d913c3994adc18327b9d2e42fb2472db3d944133cefec9d0eaa3347cba40dc",
+   "dest_sha256": "91df95ca2a25a9d9c834f38c311a0f27d2d15b8003d4ce1dd2310cfcd3c547df",
    "edits": [
     {
      "delete_from": "/// Skip plugin automations for an owned helper body.",
@@ -5305,6 +5310,11 @@
      "old": "unsafe fn qualified_backend() -> Result<Backend, &'static str> {\n    if !cfg!(feature = \"managed-sources\") {\n        return Err(\"Character resource loading is not available in this scene yet\");\n    }\n    if crate::runtime::compat::common::is_native_training_mode() {\n        return if crate::model::parked_entries::training_quantity_open(native_source::training_cpu_quantity()) {\n            Ok(Backend::Training)\n        } else {\n            Err(\"Character resource loading is not available in this scene yet\")\n        };\n    }\n    waiting_backend().ok_or(\"Character resource loading is not available in this scene yet\")\n}\n",
      "new": "unsafe fn qualified_backend() -> Result<Backend, &'static str> {\n    let training_closed = crate::runtime::compat::common::is_native_training_mode()\n        && !crate::model::parked_entries::training_quantity_open(native_source::training_cpu_quantity());\n    if !cfg!(feature = \"managed-sources\") || training_closed {\n        return Err(\"Character resource loading is not available in this scene yet\");\n    }\n    if crate::runtime::compat::common::is_native_training_mode() {\n        return Ok(Backend::Training);\n    }\n    waiting_backend().ok_or(\"Character resource loading is not available in this scene yet\")\n}\n",
      "reason": "F9: a closed Training count reuses the existing scene refusal instead of a second string (BRIEF rule 3)"
+    },
+    {
+     "old": "/// `entry` is the fighter entry for `slot`, or null. Uses the same words as `parked_ready`.\nunsafe fn f9_body_of(entry: *const u8, slot: u32) -> crate::model::parked_entries::Body {\n    use crate::model::parked_entries::Body;\n    if !aligned(entry) {\n        return Body::Empty;\n    }\n    let body = read::<*const u8>(entry, 0x4160);\n    if !aligned(body) {\n        return if read::<u8>(entry, 0x591c) == 0 { Body::Empty } else { Body::Loading { id: None } };\n    }\n    let kind = read::<u32>(body, 0xc);\n    let id = read::<u32>(body, 8);\n    if native_source::parked_ready(entry, slot, kind) {\n        Body::Ready { id, kind }\n    } else {\n        Body::Loading { id: Some(id) }\n    }\n}",
+     "new": "/// `entry` is the fighter entry for `slot`, or null. The body cell is read only\n/// when `+0x4150` publishes cell 0; `parked_ready` then decides Ready.\nunsafe fn f9_body_of(entry: *const u8, slot: u32) -> crate::model::parked_entries::Body {\n    let (aligned_entry, installed, loader) = if aligned(entry) {\n        (true, read::<u64>(entry, 0x4150), read::<u8>(entry, 0x591c))\n    } else {\n        (false, 0, 0)\n    };\n    crate::model::parked_entries::classify_parked_body(aligned_entry, installed, loader, || unsafe {\n        let body = read::<*const u8>(entry, 0x4160);\n        if !aligned(body) {\n            return None;\n        }\n        let kind = read::<u32>(body, 0xc);\n        let id = read::<u32>(body, 8);\n        Some((id, kind, native_source::parked_ready(entry, slot, kind)))\n    })\n}",
+     "reason": "rc.5: a fighter entry's body cell (+0x4160) is a live body only after the loader publishes it (installed count +0x4150, the game's b.ls at main+0x642c88). Alignment of the cell word is not that state. F6-30 captured count 0 with heap residue in the cells; dereferencing it is the unmapped read at f9_body_of."
     }
    ]
   },

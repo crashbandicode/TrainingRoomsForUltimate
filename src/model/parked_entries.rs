@@ -237,6 +237,46 @@ pub fn on_count(facts: CountFacts) -> Decision {
 
 /// A ready body that already is the seat member stays. An in-flight body is not given a second install.
 /// An empty entry, or a ready body of another kind, is reloaded after the walk.
+/// One read of a published cell: body id (`+8`), kind (`+0xc`), and `parked_ready`.
+/// `None` means the cell word is not a native object, so the body is not read.
+pub type PublishedBody = Option<(u32, u32, bool)>;
+
+/// F9's view of one fighter entry.
+///
+/// The body read runs only when `installed` publishes cell 0
+/// (`entry_cells::active_cell`, the game's `b.ls` at `main+0x642c88`).
+/// State 0xb is what publishes that count (`650010.c:886-890`). A count of 0
+/// leaves heap residue in the cell (F6-30); alignment of that residue is not
+/// a body. An unpublished cell keeps the loader split already used for an
+/// unaligned pointer.
+pub fn classify_parked_body(
+    entry_aligned: bool,
+    installed: u64,
+    loader: u8,
+    deref_cell: impl FnOnce() -> PublishedBody,
+) -> Body {
+    if !entry_aligned {
+        return Body::Empty;
+    }
+    // Cell 0 is a body only after state 0xb publishes it (count at +0x4150).
+    if crate::model::entry_cells::active_cell(0, installed).is_none() {
+        return unpublished_body(loader);
+    }
+    match deref_cell() {
+        Some((id, kind, true)) => Body::Ready { id, kind },
+        Some((id, _, false)) => Body::Loading { id: Some(id) },
+        None => unpublished_body(loader),
+    }
+}
+
+fn unpublished_body(loader: u8) -> Body {
+    if loader == 0 {
+        Body::Empty
+    } else {
+        Body::Loading { id: None }
+    }
+}
+
 fn reload_if_needed(
     slot: u32,
     body: Body,
@@ -465,5 +505,48 @@ mod tests {
         assert!(!training_quantity_open(None));
         assert!(!training_quantity_open(Some(0)));
         assert!(!training_quantity_open(Some(4)));
+    }
+
+    #[test]
+    fn a_stale_entry_does_not_dereference_the_body() {
+        let body = classify_parked_body(true, 0, 0, || panic!("dereferenced an unpublished cell"));
+        assert_eq!(body, Body::Empty);
+        let body = classify_parked_body(true, 0, 6, || panic!("dereferenced an unpublished cell"));
+        assert_eq!(body, Body::Loading { id: None });
+    }
+
+    #[test]
+    fn a_published_body_is_ready_only_after_parked_ready() {
+        let mut reads = 0;
+        let ready = classify_parked_body(true, 1, 14, || {
+            reads += 1;
+            Some((7, 0x01, true))
+        });
+        assert_eq!(reads, 1);
+        assert_eq!(ready, Body::Ready { id: 7, kind: 0x01 });
+        let loading = classify_parked_body(true, 1, 6, || Some((7, 0x01, false)));
+        assert_eq!(loading, Body::Loading { id: Some(7) });
+    }
+
+    #[test]
+    fn an_unaligned_published_pointer_is_not_a_body() {
+        assert_eq!(
+            classify_parked_body(true, 1, 6, || None),
+            Body::Loading { id: None }
+        );
+        assert_eq!(classify_parked_body(true, 1, 0, || None), Body::Empty);
+        assert_eq!(
+            classify_parked_body(false, 9, 14, || panic!("read a null entry")),
+            Body::Empty
+        );
+    }
+
+    #[test]
+    fn the_f9_tracepoint_spec_names_the_stale_skip() {
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/eden/phase23/trace-rc5-f9.md");
+        let text = std::fs::read_to_string(path).expect(path);
+        for needle in ["f9_body_of", "0x4150", "0x4160", "on_return", "slot", "stale"] {
+            assert!(text.contains(needle), "missing {needle}");
+        }
     }
 }
