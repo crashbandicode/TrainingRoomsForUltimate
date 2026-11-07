@@ -1,7 +1,7 @@
 {
   "game_id": "01006A800016E000",
   "start": "boot",
-  "scope": "rc.5 grouped Eden session (cards 10a/10a2): the recording-redesign rows from the stage-1 report, the rc.5 frame-advantage cases and heap/crash gates (EDEN-SESSION-PLAN-rc5), and every GIF docs/MEDIA.md still needs, across the operator's 7 instances (surface 2, yoga 2, ally 1, xps 2). Timed rows (frame advantage, strip timing, combo grading) run on the Surface and the Yoga only. Instance keys: xps-a, xps-b, ally-a, surface-a, surface-b, yoga-a, yoga-b. Every non-library segment is recorded from its recipe on its first play; the recipes' frame counts are best efforts, each marked \"timing to be checked when recorded\" (README, Open questions).",
+  "scope": "rc.5 grouped Eden session (cards 10a/10a2/10c): the recording-redesign rows from the stage-1 report, the rc.5 frame-advantage cases and heap/crash gates (EDEN-SESSION-PLAN-rc5), and every GIF docs/MEDIA.md still needs, across the operator's 7 instances (surface 2, yoga 2, ally 1, xps 2). Timed rows (frame advantage, strip timing, combo grading) run on the Surface and the Yoga only. Instance keys: xps-a, xps-b, ally-a, surface-a, surface-b, yoga-a, yoga-b. Every non-library segment is recorded from its recipe on its first play; the recipes' frame counts are best efforts, each marked \"timing to be checked when recorded\" (README, Open questions).",
   "setup": [
     {
       "state": "Instance xps-a boots with the migration fixture: a non-empty recording in slot 1, the other recording slots empty, legacy save slots live",
@@ -549,6 +549,66 @@
     },
     "training-hud-unpaused": {
       "library": "training-hud-unpaused"
+    },
+    "diag-migrate": {
+      "kind": "log",
+      "source": "diag",
+      "pattern": "screen=migrate once=1",
+      "cap": 10
+    },
+    "diag-record-player": {
+      "kind": "log",
+      "source": "diag",
+      "pattern": "screen=recording role=player recording=1",
+      "cap": 10
+    },
+    "diag-record-cpu": {
+      "kind": "log",
+      "source": "diag",
+      "pattern": "screen=recording role=cpu recording=0",
+      "cap": 10
+    },
+    "diag-notice-missing": {
+      "kind": "log",
+      "source": "diag",
+      "pattern": "screen=notice kind=macro-start-save-missing",
+      "cap": 10
+    },
+    "diag-mismatch": {
+      "kind": "log",
+      "source": "diag",
+      "pattern": "screen=mismatch ask=macro1",
+      "cap": 10
+    },
+    "diag-rename": {
+      "kind": "log",
+      "source": "diag",
+      "pattern": "screen=rename header=Name macro",
+      "cap": 10
+    },
+    "diag-crop": {
+      "kind": "log",
+      "source": "diag",
+      "pattern": "screen=crop source=\\S+ combo=0",
+      "cap": 10
+    },
+    "diag-play-player": {
+      "kind": "log",
+      "source": "diag",
+      "pattern": "screen=playback role=player warp=1",
+      "cap": 10
+    },
+    "diag-play-cpu": {
+      "kind": "log",
+      "source": "diag",
+      "pattern": "screen=playback role=cpu warp=0",
+      "cap": 10
+    },
+    "diag-mash": {
+      "kind": "log",
+      "source": "diag",
+      "pattern": "screen=playback mash=1",
+      "cap": 10
     }
   },
   "recover": [
@@ -569,6 +629,10 @@
           "run": "steps.py:rr_migrate",
           "check": true,
           "on": "xps-a"
+        },
+        {
+          "gate": "diag-migrate",
+          "on": "xps-a"
         }
       ],
       "evidence": [
@@ -579,7 +643,8 @@
       "source": "RR-7 \u00a7Eden rows for rr-10 (row rr-migrate); LANE-GROK-RECORDING-REDESIGN-REPORT.md A13 and migration table",
       "host": "xps",
       "expect": "diag line screen=migrate once=1 at the boot's worker tick; the migrated slot's name carries the boot date; a second tick does not rewrite the tree",
-      "timed": false
+      "timed": false,
+      "trace": "RR-7: migrate_at_boot; capture the slot name containing the boot date; a second tick does not rewrite the tree. Symbols only (README, Open questions)."
     },
     {
       "id": "media-rc5-migration",
@@ -615,6 +680,14 @@
           "run": "steps.py:rr_record",
           "check": true,
           "on": "xps-a"
+        },
+        {
+          "gate": "diag-record-player",
+          "on": "xps-a"
+        },
+        {
+          "gate": "diag-record-cpu",
+          "on": "xps-a"
         }
       ],
       "evidence": [
@@ -625,6 +698,7 @@
       "host": "xps",
       "expect": "diag screen=recording role=player recording=1 on ZR+Down, then screen=recording role=cpu recording=0 on the second ZR+Down after the pop-up role moved to CPU",
       "timed": false,
+      "trace": "RR-7: recording_host::on_chords when the record bit is set; capture the capture role and whether recording is on, and that the stop wrote the macro only when frames were stored. Symbols only (README, Open questions).",
       "start_gate": "training-hud-unpaused"
     },
     {
@@ -636,6 +710,10 @@
           "run": "steps.py:rr_notice",
           "check": true,
           "on": "xps-a"
+        },
+        {
+          "gate": "diag-notice-missing",
+          "on": "xps-a"
         }
       ],
       "evidence": [
@@ -646,6 +724,7 @@
       "host": "xps",
       "expect": "screen=notice kind=chord-once on the first Record or Play after boot (once), and screen=notice kind=macro-start-save-missing only when the macro's start-save file was deleted",
       "timed": false,
+      "trace": "RR-7: start_save_notice for Deleted (a missing id with the switch off does not print this line); the chord-once flag is read and set by the worker, a second chord does not print it. Symbols only (README, Open questions).",
       "start_gate": "training-hud-unpaused"
     },
     {
@@ -657,6 +736,10 @@
           "run": "steps.py:rr_mismatch",
           "check": true,
           "on": "xps-a"
+        },
+        {
+          "gate": "diag-mismatch",
+          "on": "xps-a"
         }
       ],
       "evidence": [
@@ -667,6 +750,7 @@
       "host": "xps",
       "expect": "screen=mismatch ask=macro1 once at the chain's start; Switch names macro 1's fighter; no second prompt when the later macro plays",
       "timed": false,
+      "trace": "RR-7: chain_mismatch; capture step 0 only, and that Switch names macro 1's fighter. Symbols only (README, Open questions).",
       "start_gate": "training-hud-unpaused"
     },
     {
@@ -678,6 +762,10 @@
           "run": "steps.py:rr_rename",
           "check": true,
           "on": "xps-a"
+        },
+        {
+          "gate": "diag-rename",
+          "on": "xps-a"
         }
       ],
       "evidence": [
@@ -687,6 +775,7 @@
       "host": "xps",
       "expect": "screen=rename header=Name macro after A on Rename, then the titled keyboard offer; with Online on, the offer is not made",
       "timed": false,
+      "trace": "RR-7: Effect::Keyboard, then the titled keyboard offer; online captures the offer not made. Symbols only (README, Open questions).",
       "start_gate": "training-hud-unpaused"
     },
     {
@@ -698,6 +787,10 @@
           "run": "steps.py:rr_crop",
           "check": true,
           "on": "xps-a"
+        },
+        {
+          "gate": "diag-crop",
+          "on": "xps-a"
         }
       ],
       "evidence": [
@@ -708,6 +801,7 @@
       "host": "xps",
       "expect": "screen=crop source=<id> combo=0 after A on Crop, then the new file write with the original bytes unchanged",
       "timed": false,
+      "trace": "RR-7: Effect::Crop, then the new file write; capture the original bytes unchanged (a combo crops with combo=1). Symbols only (README, Open questions).",
       "start_gate": "training-hud-unpaused"
     },
     {
@@ -771,6 +865,86 @@
       "host": "xps",
       "expect": "with the loop at 2 and the cursor in MACROS, X shows 2; the first pass warps once and the second pass does not warp",
       "timed": false,
+      "start_gate": "training-hud-unpaused"
+    },
+    {
+      "id": "rr-play",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "run": "steps.py:rr_play",
+          "check": true,
+          "on": "xps-a"
+        },
+        {
+          "gate": "diag-play-player",
+          "on": "xps-a"
+        },
+        {
+          "gate": "diag-play-cpu",
+          "on": "xps-a"
+        }
+      ],
+      "evidence": [
+        "diag screen=playback role=player warp=1",
+        "diag screen=playback role=cpu warp=0",
+        "warps stay 1 across the loop"
+      ],
+      "source": "RR-7 \u00a7Eden rows for rr-10 (row rr-play, both cases)",
+      "host": "xps",
+      "expect": "screen=playback role=player warp=1 on Play on Player 1 ([7,10]) when Player 1's active macro has a start save and the switch is on, with the warps count staying 1 across the loop; then screen=playback role=cpu warp=0 on Play on CPU (the old Input Playback chord) when the CPU's active macro has no start save",
+      "timed": false,
+      "trace": "RR-7: the worker drain into Playback::play_chord; capture Effect.warp and warps staying 1 across the loop; the CPU case is the same drain with Role::Cpu, capture no warp. Symbols only (README, Open questions).",
+      "start_gate": "training-hud-unpaused"
+    },
+    {
+      "id": "rr-mash",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "run": "steps.py:rr_mash",
+          "check": true,
+          "on": "xps-a"
+        },
+        {
+          "gate": "diag-mash",
+          "on": "xps-a"
+        }
+      ],
+      "evidence": [
+        "diag screen=playback mash=1",
+        "playing false after the mash"
+      ],
+      "source": "RR-7 \u00a7Eden rows for rr-10 (row rr-mash)",
+      "host": "xps",
+      "expect": "with a role playing and the Mash interrupt on, the mash that already calls interrupt_playback prints screen=playback mash=1 and stops the playing macro (playing false)",
+      "timed": false,
+      "trace": "RR-7: recording_host::note_mash, then Playback::mash; capture playing false. Symbols only (README, Open questions).",
+      "start_gate": "training-hud-unpaused"
+    },
+    {
+      "id": "rr-combo",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "run": "steps.py:rr_combo",
+          "check": true,
+          "on": "xps-a"
+        }
+      ],
+      "evidence": [
+        "panel line jump \u00b7 release \u00b7 \u2193 flick \u00b7 A",
+        "drift \u2192 line under it",
+        "panel screenshot"
+      ],
+      "source": "RR-7 \u00a7Eden rows for rr-10 (row rr-combo)",
+      "host": "xps",
+      "expect": "the combo's Connections panel lists each link's events on a second line - jump \u00b7 release \u00b7 \u2193 flick \u00b7 A - then drift \u2192 on the next line; the published frame, not a new diag print",
+      "timed": false,
+      "trace": "RR-7: recording_menu::combo_link_lines reads the combo file; the draw hook paints the frame the UI worker already published. The panel line is the published frame, not a diag print, so this row has no log gate.",
       "start_gate": "training-hud-unpaused"
     },
     {

@@ -1,4 +1,4 @@
-"""Build eden/recording-redesign/rows.json (card 10a2, 2026-11-07).
+"""Build eden/recording-redesign/rows.json (card 10a2, 2026-11-07; card 10c adds rr-7's runtime rows).
 
 Copies the worked examples' patterns (eden/phase23/rows-iv/make_run.py, rows-hb-ab, rows-A):
 - every non-library segment is a RECIPE the runner records on its first play (playbook
@@ -126,9 +126,15 @@ LIBRARY_GATES = ('installed', 'main', 'stage', 'css', 'ready', 'training-hud-unp
 RECOVER = [{'play': 'menu-close'}, {'play': 'chord-load'}]
 
 
-def R(row_id, hook, host, timed, expect, source, evidence, media=None, start='training', end='training', args=None):
+def R(row_id, hook, host, timed, expect, source, evidence, media=None, start='training', end='training', args=None,
+      gates=None, trace=None):
+    # gates: plan gate names appended to the row's steps after the hook (a log gate on the diag
+    # source is the card's preferred form for a runtime row's exact diag line). trace: RR-7's
+    # tracepoint note, carried in the row because RR-7 names functions only and trace.arm needs a
+    # resolved address (README, Open questions).
     return {'id': row_id, 'hook': hook, 'host': host, 'timed': timed, 'start': start, 'end': end,
-            'expect': expect, 'source': source, 'evidence': evidence, 'media': media, 'args': args}
+            'expect': expect, 'source': source, 'evidence': evidence, 'media': media, 'args': args,
+            'gates': gates, 'trace': trace}
 
 
 STAGE1 = 'LANE-GROK-RECORDING-REDESIGN-REPORT.md'
@@ -141,7 +147,8 @@ ROWS = [
       "diag line screen=migrate once=1 at the boot's worker tick; the migrated slot's name carries the boot date; a second tick does not rewrite the tree",
       'RR-7 §Eden rows for rr-10 (row rr-migrate); %s A13 and migration table' % STAGE1,
       ['diag screen=migrate once=1', 'macro file names Slot N (YYYY-MM-DD)', 'index migrated:true'],
-      start='boot'),
+      start='boot', gates=('diag-migrate',),
+      trace='RR-7: migrate_at_boot; capture the slot name containing the boot date; a second tick does not rewrite the tree. Symbols only (README, Open questions).'),
     R('media-rc5-migration', 'media_migration', 'xps', False,
       "The name uses Slot 1 and the date. Play does not warp. Empty slots did not become files.",
       MEDIA + ', row media/rc5-migration.gif',
@@ -149,21 +156,31 @@ ROWS = [
     R('rr-record', 'rr_record', 'xps', False,
       "diag screen=recording role=player recording=1 on ZR+Down, then screen=recording role=cpu recording=0 on the second ZR+Down after the pop-up role moved to CPU",
       'RR-7 §Eden rows for rr-10 (rows rr-record); %s line 166' % STAGE1,
-      ['diag screen=recording role=player recording=1', 'diag screen=recording role=cpu recording=0']),
+      ['diag screen=recording role=player recording=1', 'diag screen=recording role=cpu recording=0'],
+      gates=('diag-record-player', 'diag-record-cpu'),
+      trace="RR-7: recording_host::on_chords when the record bit is set; capture the capture role and whether recording is on, and that the stop wrote the macro only when frames were stored. Symbols only (README, Open questions)."),
     R('rr-notice', 'rr_notice', 'xps', False,
       "screen=notice kind=chord-once on the first Record or Play after boot (once), and screen=notice kind=macro-start-save-missing only when the macro's start-save file was deleted",
       'RR-7 §Eden rows for rr-10 (rows rr-notice); %s A15' % STAGE1,
-      ['diag screen=notice kind=chord-once', 'diag screen=notice kind=macro-start-save-missing']),
+      ['diag screen=notice kind=chord-once', 'diag screen=notice kind=macro-start-save-missing'],
+      gates=('diag-notice-missing',),
+      trace="RR-7: start_save_notice for Deleted (a missing id with the switch off does not print this line); the chord-once flag is read and set by the worker, a second chord does not print it. Symbols only (README, Open questions)."),
     R('rr-mismatch', 'rr_mismatch', 'xps', False,
       "screen=mismatch ask=macro1 once at the chain's start; Switch names macro 1's fighter; no second prompt when the later macro plays",
       'RR-7 §Eden rows for rr-10 (row rr-mismatch); %s line 326' % STAGE1,
-      ['diag screen=mismatch ask=macro1', 'prompt rows Keep current fighter / Switch to recorded fighter']),
+      ['diag screen=mismatch ask=macro1', 'prompt rows Keep current fighter / Switch to recorded fighter'],
+      gates=('diag-mismatch',),
+      trace='RR-7: chain_mismatch; capture step 0 only, and that Switch names macro 1\'s fighter. Symbols only (README, Open questions).'),
     R('rr-rename', 'rr_rename', 'xps', False,
       "screen=rename header=Name macro after A on Rename, then the titled keyboard offer; with Online on, the offer is not made",
-      'RR-7 §Eden rows for rr-10 (row rr-rename)', ['diag screen=rename header=Name macro']),
+      'RR-7 §Eden rows for rr-10 (row rr-rename)', ['diag screen=rename header=Name macro'],
+      gates=('diag-rename',),
+      trace='RR-7: Effect::Keyboard, then the titled keyboard offer; online captures the offer not made. Symbols only (README, Open questions).'),
     R('rr-crop', 'rr_crop', 'xps', False,
       "screen=crop source=<id> combo=0 after A on Crop, then the new file write with the original bytes unchanged",
-      'RR-7 §Eden rows for rr-10 (row rr-crop)', ['diag screen=crop source= combo=0', 'original combo bytes unchanged']),
+      'RR-7 §Eden rows for rr-10 (row rr-crop)', ['diag screen=crop source= combo=0', 'original combo bytes unchanged'],
+      gates=('diag-crop',),
+      trace='RR-7: Effect::Crop, then the new file write; capture the original bytes unchanged (a combo crops with combo=1). Symbols only (README, Open questions).'),
     R('rr-load', 'rr_load', 'xps', False,
       "Load (ZL+Up) warps both fighters to the bound save and starts nothing: no playback diag line, the active macros stay idle",
       'RR-4 requirement trace (A5, load_starts_no_playback); %s line 182' % STAGE1,
@@ -176,6 +193,25 @@ ROWS = [
       "with the loop at 2 and the cursor in MACROS, X shows 2; the first pass warps once and the second pass does not warp",
       'RR-4 requirement trace (A7, the_loop_loads_the_start_save_once); RR-6 §Eden rows for rr-10 (row rr-loop)',
       ['diag screen=recording-popup role=player loop=2', 'second pass continues without a warp']),
+    # --- rr-7's runtime rows (card 10c; RR-7 §Eden rows for rr-10) ------------------------------------
+    R('rr-play', 'rr_play', 'xps', False,
+      "screen=playback role=player warp=1 on Play on Player 1 ([7,10]) when Player 1's active macro has a start save and the switch is on, with the warps count staying 1 across the loop; then screen=playback role=cpu warp=0 on Play on CPU (the old Input Playback chord) when the CPU's active macro has no start save",
+      'RR-7 §Eden rows for rr-10 (row rr-play, both cases)',
+      ['diag screen=playback role=player warp=1', 'diag screen=playback role=cpu warp=0',
+       'warps stay 1 across the loop'],
+      gates=('diag-play-player', 'diag-play-cpu'),
+      trace="RR-7: the worker drain into Playback::play_chord; capture Effect.warp and warps staying 1 across the loop; the CPU case is the same drain with Role::Cpu, capture no warp. Symbols only (README, Open questions)."),
+    R('rr-mash', 'rr_mash', 'xps', False,
+      "with a role playing and the Mash interrupt on, the mash that already calls interrupt_playback prints screen=playback mash=1 and stops the playing macro (playing false)",
+      'RR-7 §Eden rows for rr-10 (row rr-mash)',
+      ['diag screen=playback mash=1', 'playing false after the mash'],
+      gates=('diag-mash',),
+      trace='RR-7: recording_host::note_mash, then Playback::mash; capture playing false. Symbols only (README, Open questions).'),
+    R('rr-combo', 'rr_combo', 'xps', False,
+      "the combo's Connections panel lists each link's events on a second line - jump · release · ↓ flick · A - then drift → on the next line; the published frame, not a new diag print",
+      'RR-7 §Eden rows for rr-10 (row rr-combo)',
+      ['panel line jump · release · ↓ flick · A', 'drift → line under it', 'panel screenshot'],
+      trace='RR-7: recording_menu::combo_link_lines reads the combo file; the draw hook paints the frame the UI worker already published. The panel line is the published frame, not a diag print, so this row has no log gate.'),
 
     # --- xps-b: the menu rows (no timing) ---
     R('rr-chords', 'rr_chords', 'xps', False,
@@ -397,12 +433,31 @@ def main():
     gates = {name: {'library': name} for name in LIBRARY_GATES}
     gates['main']['recover'] = 'attract-cancel'
     gates['main']['recover_times'] = 3
+    # Card 10c: each runtime row's exact diag line (RR-7 §Eden rows for rr-10) as a log gate on the
+    # diag source. The row's run hook waits for the same line and raises without it; the gate step
+    # after the hook re-checks the line in this row's own log lines (the runner scopes log gates to
+    # the row). rr-combo has no gate: RR-7 says the Connections panel line is the published frame,
+    # not a diag print.
+    diag_gates = {
+        'diag-migrate': {'kind': 'log', 'source': 'diag', 'pattern': r'screen=migrate once=1', 'cap': 10},
+        'diag-record-player': {'kind': 'log', 'source': 'diag', 'pattern': r'screen=recording role=player recording=1', 'cap': 10},
+        'diag-record-cpu': {'kind': 'log', 'source': 'diag', 'pattern': r'screen=recording role=cpu recording=0', 'cap': 10},
+        'diag-notice-missing': {'kind': 'log', 'source': 'diag', 'pattern': r'screen=notice kind=macro-start-save-missing', 'cap': 10},
+        'diag-mismatch': {'kind': 'log', 'source': 'diag', 'pattern': r'screen=mismatch ask=macro1', 'cap': 10},
+        'diag-rename': {'kind': 'log', 'source': 'diag', 'pattern': r'screen=rename header=Name macro', 'cap': 10},
+        'diag-crop': {'kind': 'log', 'source': 'diag', 'pattern': r'screen=crop source=\S+ combo=0', 'cap': 10},
+        'diag-play-player': {'kind': 'log', 'source': 'diag', 'pattern': r'screen=playback role=player warp=1', 'cap': 10},
+        'diag-play-cpu': {'kind': 'log', 'source': 'diag', 'pattern': r'screen=playback role=cpu warp=0', 'cap': 10},
+        'diag-mash': {'kind': 'log', 'source': 'diag', 'pattern': r'screen=playback mash=1', 'cap': 10},
+    }
+    gates.update(diag_gates)
 
     rows = []
     # Instance keys: the operator's capacity is surface 2, yoga 2, ally 1, xps 2. Each host's rows
     # are contiguous in ROWS; the host's instances split at the counts below (xps-a then xps-b,
-    # surface-a then surface-b, yoga-a then yoga-b).
-    SPLIT = {'xps': 10, 'surface': 11, 'yoga': 7}
+    # surface-a then surface-b, yoga-a then yoga-b). Card 10c adds rr-7's three runtime rows to the
+    # xps-a block, so the split moves from 10 to 13 and the menu rows stay on xps-b.
+    SPLIT = {'xps': 13, 'surface': 11, 'yoga': 7}
     INSTANCES = {'xps': ('xps-a', 'xps-b'), 'surface': ('surface-a', 'surface-b'),
                  'yoga': ('yoga-a', 'yoga-b'), 'ally': ('ally-a',)}
     counts, previous_key = {}, None
@@ -419,6 +474,10 @@ def main():
         row = {'id': spec['id'], 'start': spec['start'], 'end': spec['end'], 'steps': steps,
                'evidence': spec['evidence'], 'source': spec['source'], 'host': spec['host'],
                'expect': spec['expect'], 'timed': spec['timed']}
+        if spec.get('trace'):
+            row['trace'] = spec['trace']
+        if spec.get('gates'):
+            row['steps'] = row['steps'] + [{'gate': name, 'on': key} for name in spec['gates']]
         # Playbook a37664e: a run continues past a failed row only when the next row has a start
         # gate and a recover list. Every row after rr-migrate starts at Training, so its start
         # gate is the library gate that proves that screen; the plan-level recover list returns it.
@@ -449,7 +508,7 @@ def main():
     plan = {
         'game_id': '01006A800016E000',
         'start': 'boot',
-        'scope': 'rc.5 grouped Eden session (cards 10a/10a2): the recording-redesign rows from the stage-1 '
+        'scope': 'rc.5 grouped Eden session (cards 10a/10a2/10c): the recording-redesign rows from the stage-1 '
                  'report, the rc.5 frame-advantage cases and heap/crash gates (EDEN-SESSION-PLAN-rc5), and every '
                  'GIF docs/MEDIA.md still needs, across the operator\'s 7 instances (surface 2, yoga 2, ally 1, '
                  'xps 2). Timed rows (frame advantage, strip timing, combo grading) run on the Surface and the '

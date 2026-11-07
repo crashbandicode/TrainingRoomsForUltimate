@@ -382,6 +382,96 @@ def rr_loop(ctx):
     return save(ctx, 'loop', {'x': line, 'first_warp': first})
 
 
+def rr_play(ctx):
+    """RR-7 row rr-play, both cases: Play on Player 1 warps once; Play on CPU with no start save does not.
+
+    Case 1 needs Player 1's active macro to have a start save with the switch on; case 2 needs the
+    CPU's active macro to have no start save. Which macro sits under the pop-up cursor when the row
+    runs is not in any source (README, Open questions): the hook sets the cursor's macro active for
+    each role, waits for the exact diag line RR-7 gives, and raises with the captured data when the
+    warp behaviour differs.
+    """
+    settle(ctx)
+
+    def warp_count():
+        path = Path(ctx.instance.get('diag_log') or ctx.instance['console_log'])
+        if not path.exists():
+            return 0
+        return len(re.findall(r'playback .*warp=1', path.read_text(errors='replace')))
+
+    # Case 1 (RR-7): Play on Player 1 ([7,10]), start save, switch on: warp=1, warps stay 1.
+    popup(ctx)
+    press(ctx, 'a', 0.6)              # A on the macro: set it active for Player 1
+    popup_close(ctx)
+    time.sleep(0.5)
+    before = warp_count()
+    ctx.play(PLAY_P1)
+    player = diag(ctx, r'screen=playback role=player warp=1', cap=15)
+    time.sleep(4.0)                   # the loop passes play out; the warps count must stay 1
+    warps = warp_count() - before
+    if warps != 1:
+        raise RuntimeError('the play warped %d times across the loop, expected 1' % warps)
+    ctx.shot('play-player')
+    # Case 2 (RR-7): Play on CPU (the old Input Playback chord), no start save: warp=0, no warp.
+    popup(ctx)
+    press(ctx, 'r', 0.5)              # CPU view
+    press(ctx, 'a', 0.6)              # set the CPU's active macro (no start save, Open questions)
+    popup_close(ctx)
+    time.sleep(0.5)
+    ctx.play(PLAY_CPU)
+    cpu = diag(ctx, r'screen=playback role=cpu warp=0', cap=15)
+    ctx.shot('play-cpu-no-warp')
+    return save(ctx, 'play', {'player': player, 'warps': warps, 'cpu': cpu})
+
+
+def rr_mash(ctx):
+    """RR-7 row rr-mash: a role is playing with the Mash interrupt on; the mash stops the playback.
+
+    "The mash that already calls interrupt_playback" is the CPU's own mash (the menu's Mash row);
+    the exact page route is not in any source (README, Open questions), so the hook sets a mash
+    action bounded, plays the CPU's macro, puts the CPU into hitstun so its mash trigger fires, and
+    waits for screen=playback mash=1 (playing false after it).
+    """
+    settle(ctx)
+    open_menu(ctx)
+    for _ in range(6):
+        press(ctx, 'r', 0.6)
+    press(ctx, 'a', 0.8)              # the CPU page's Mash row (README, Open questions)
+    press(ctx, 'a', 0.8)              # set a mash action
+    close_menu(ctx)
+    popup(ctx)
+    press(ctx, 'r', 0.5)              # CPU view
+    press(ctx, 'a', 0.6)              # set the macro active for the CPU
+    popup_close(ctx)
+    time.sleep(0.5)
+    ctx.play(PLAY_CPU)
+    time.sleep(1.0)
+    ctx.play(JAB)                     # the CPU enters hitstun; its mash trigger fires
+    line = diag(ctx, r'screen=playback mash=1', cap=15)
+    ctx.shot('mash-interrupt')
+    return save(ctx, 'mash', {'line': line})
+
+
+def rr_combo(ctx):
+    """RR-7 row rr-combo: the Connections panel lists each link's events, then the drift line.
+
+    The panel line (jump · release · down flick · A, then drift ->) is the published frame, not a
+    diag print (RR-7), so the evidence is the panel screenshot. The combo whose links store events,
+    including a down flick and a forward drift, is the session's fixture (README, Open questions).
+    """
+    settle(ctx)
+    open_menu(ctx)
+    for _ in range(6):
+        press(ctx, 'r', 0.6)
+    for _ in range(3):
+        press(ctx, 'down', 0.4)       # to the Combos & Sequences group
+    press(ctx, 'a', 0.8)              # open the combo
+    time.sleep(0.8)
+    shot = ctx.shot('combo-panel')
+    close_menu(ctx)
+    return save(ctx, 'combo', {'shot': str(shot)})
+
+
 # --- xps-b: the menu rows ------------------------------------------------------------------------
 
 def rr_chords(ctx):
