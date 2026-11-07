@@ -409,3 +409,11 @@ ceiling = 144129
 date = "2026-11-06"
 reason = "rr integration (p23/rr-integration): rr-1, rr-2, rr-3, rr-4, rr-5 and rr-8 merged on 384e41f; measured 144129 (tools/size_gate.py), +1323 over 142806"
 approved_by = "Operator 2026-11-05 standing order via primary 35137355: 'Raise as needed'"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 144189
+date = "2026-11-06"
+reason = "rr-11 stick row (p23/rr-11-stick-row): one mark per frame of the left stick under P1's lane, and a C-stick attack takes the C-stick's arrow; measured 144189 (tools/size_gate.py), +60 over 144129"
+approved_by = "Operator 2026-11-06 via the rr-11 brief: 'Raise as needed'"
