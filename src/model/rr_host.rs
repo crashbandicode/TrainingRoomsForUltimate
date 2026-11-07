@@ -278,8 +278,8 @@ fn play_role(root: &Path, machine: &mut Playback, book: &Book, role: Role, tick:
     } else {
         "cpu"
     };
-    if let Some(id) = effect.warp.clone() {
-        tick.warp = Some(id);
+    if let Some(id) = effect.warp {
+        tick.warp = Some(id.to_owned());
         tick.diags
             .push(format!("screen=playback role={word} warp=1"));
     }
@@ -317,7 +317,7 @@ fn resident_frame(root: &Path, played: &super::playback::Played) -> InputFrame {
         };
         let tape = Tape::load(&recording.frames);
         *slot = Some(Resident {
-            id: played.recording_id.clone(),
+            id: played.recording_id.to_owned(),
             frames: recording.frames,
             tape,
         });
@@ -845,7 +845,7 @@ mod tests {
             .save_new(&recording)
             .unwrap();
         let played = crate::engine::playback::Played {
-            recording_id: id.clone(),
+            recording_id: id.as_str(),
             frame_index: RESIDENT_FRAMES,
             frame: InputFrame::default(),
         };
@@ -854,7 +854,7 @@ mod tests {
             RESIDENT_FRAMES as u32
         );
         let later = crate::engine::playback::Played {
-            recording_id: id,
+            recording_id: id.as_str(),
             frame_index: RESIDENT_FRAMES + 50,
             frame: InputFrame::default(),
         };

@@ -403,10 +403,10 @@ fn facing_of(lr: f32) -> i8 {
 /// # Safety
 /// `out` is the record the game just mapped.
 pub unsafe fn on_p1_poll(out: *mut MappedInputs) {
-    fill_slot_image();
     if !ENABLED.load(Ordering::Acquire) {
         return;
     }
+    fill_slot_image();
     // Nested in the input hook that calls it, so an allocation of the poll stage is charged here (R5 attribution).
     let _scope = HookScope::enter_hook(HookId::RecorderPoll);
     bump(COUNT_POLL);

@@ -210,15 +210,15 @@ pub fn finish_recording(
     })
 }
 
-pub fn drive_play(machine: &mut Playback, role: Role, book: &Book) -> super::playback::Effect {
+pub fn drive_play<'a>(machine: &mut Playback, role: Role, book: &'a Book) -> super::playback::Effect<'a> {
     machine.play_chord(role, book)
 }
 
-pub fn drive_step(
+pub fn drive_step<'a>(
     machine: &mut Playback,
     role: Role,
-    book: &Book,
-) -> Option<super::playback::Played> {
+    book: &'a Book,
+) -> Option<super::playback::Played<'a>> {
     machine.step(role, book)
 }
 
@@ -226,19 +226,19 @@ pub fn drive_mash(machine: &mut Playback, role: Role, interrupt: bool) -> bool {
     machine.mash(role, interrupt)
 }
 
-pub fn drive_load(
+pub fn drive_load<'a>(
     machine: &Playback,
-    book: &Book,
+    book: &'a Book,
     settings: &crate::model::state::settings::StateSettings,
-) -> Option<super::playback::DeathWarp> {
+) -> Option<super::playback::DeathWarp<'a>> {
     machine.load(book, settings)
 }
 
-pub fn drive_auto_load(
+pub fn drive_auto_load<'a>(
     machine: &Playback,
-    book: &Book,
+    book: &'a Book,
     settings: &crate::model::state::settings::StateSettings,
-) -> Option<super::playback::DeathWarp> {
+) -> Option<super::playback::DeathWarp<'a>> {
     machine.auto_load_on_death(book, settings)
 }
 
@@ -386,7 +386,7 @@ pub fn make_combo(book: &Book) -> MakeComboPass {
         role: Role::Player,
         strip: true,
         drill,
-        warp: effect.warp,
+        warp: effect.warp.map(str::to_owned),
         buttons,
     }
 }
@@ -693,7 +693,7 @@ mod tests {
         book.add_save("slot");
         let mut machine = Playback::new();
         let player = drive_play(&mut machine, Role::Player, &book);
-        assert_eq!(player.warp.as_deref(), Some("start-p"));
+        assert_eq!(player.warp, Some("start-p"));
         assert_eq!(machine.warps(Role::Player), 1);
         let cpu = drive_play(&mut machine, Role::Cpu, &book);
         assert!(cpu.warp.is_none());

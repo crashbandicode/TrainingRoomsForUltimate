@@ -9,26 +9,28 @@ use super::macros::{InputFrame, MacroRecording};
 use crate::model::state::settings::StateSettings;
 
 /// What a Play chord, a mash, or a load did to the runs. `notice` stays empty: this slice adds none.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct Effect {
-    pub warp: Option<String>,
+/// The strings borrow the book, so a hook can return them without allocating.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Effect<'a> {
+    pub warp: Option<&'a str>,
     pub started: bool,
     pub stopped: bool,
     pub notice: Option<&'static str>,
 }
 
-/// One frame of the role that is playing.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Played {
-    pub recording_id: String,
+/// One frame of the role that is playing. `recording_id` borrows the book.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Played<'a> {
+    pub recording_id: &'a str,
     pub frame_index: usize,
     pub frame: InputFrame,
 }
 
 /// A warp to the bound save. Mirroring, damage and buffs are the settings the load already applies.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct DeathWarp {
-    pub save_id: String,
+/// `save_id` borrows the book.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct DeathWarp<'a> {
+    pub save_id: &'a str,
     pub mirroring: crate::model::state::settings::Mirroring,
     pub damage_player: crate::model::state::settings::DamageMode,
     pub damage_cpu: crate::model::state::settings::DamageMode,
@@ -46,14 +48,36 @@ pub struct Book {
     saves: BTreeSet<String>,
 }
 
-struct Plan {
-    steps: Vec<String>,
-    warp: Option<String>,
+struct Plan<'a> {
+    chain: bool,
+    warp: Option<&'a str>,
 }
 
-#[derive(Debug)]
+/// The active id, copied into a fixed buffer so the next step does not allocate.
+#[derive(Clone, Copy, Debug)]
+struct IdBuf {
+    bytes: [u8; crate::model::store::MAX_ID_CHARS],
+    len: u8,
+}
+
+impl IdBuf {
+    fn copy_from(id: &str) -> Self {
+        let raw = id.as_bytes();
+        let n = raw.len().min(crate::model::store::MAX_ID_CHARS);
+        let mut bytes = [0u8; crate::model::store::MAX_ID_CHARS];
+        bytes[..n].copy_from_slice(&raw[..n]);
+        Self { bytes, len: n as u8 }
+    }
+
+    fn as_str(&self) -> &str {
+        core::str::from_utf8(&self.bytes[..usize::from(self.len)]).unwrap_or("")
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
 struct Run {
-    steps: Vec<String>,
+    id: IdBuf,
+    chain: bool,
     step: usize,
     frame: usize,
     /// Passes still to play, including the one in progress. `None` plays until the chord stops it.
@@ -90,23 +114,23 @@ impl Book {
         self.saves.insert(id.into());
     }
 
-    fn plan(&self, id: &str) -> Option<Plan> {
+    fn plan(&self, id: &str) -> Option<Plan<'_>> {
         if let Some(chain) = self.chains.get(id) {
             let playable = chain
                 .recordings
                 .iter()
-                .any(|step| self.recordings.contains_key(step));
+                .any(|step| self.recordings.contains_key(step.as_str()));
             if !playable {
                 return None;
             }
             return Some(Plan {
-                steps: chain.recordings.clone(),
+                chain: true,
                 warp: chain_warp(chain, self),
             });
         }
         let recording = self.recordings.get(id)?;
         Some(Plan {
-            steps: vec![id.to_owned()],
+            chain: false,
             warp: recording_warp(recording, &self.saves),
         })
     }
@@ -127,8 +151,8 @@ impl Playback {
     }
 
     /// Toggle the role. No active id, or an id that is not a playable file, changes nothing.
-    pub fn play_chord(&mut self, role: Role, book: &Book) -> Effect {
-        let Some(id) = book.index.active(role).map(str::to_owned) else {
+    pub fn play_chord<'a>(&mut self, role: Role, book: &'a Book) -> Effect<'a> {
+        let Some(id) = book.index.active(role) else {
             return Effect::default();
         };
         let slot = role_slot(role);
@@ -139,7 +163,7 @@ impl Playback {
                 ..Effect::default()
             };
         }
-        let Some(plan) = book.plan(&id) else {
+        let Some(plan) = book.plan(id) else {
             return Effect::default();
         };
         if plan.warp.is_some() {
@@ -148,7 +172,8 @@ impl Playback {
         let remaining = passes(book.index.loop_count(role));
         let warp = plan.warp;
         self.roles[slot] = Some(Run {
-            steps: plan.steps,
+            id: IdBuf::copy_from(id),
+            chain: plan.chain,
             step: 0,
             frame: 0,
             remaining,
@@ -162,15 +187,27 @@ impl Playback {
     }
 
     /// The next frame of `role`, or nothing when that role is idle or has finished its count.
-    pub fn step(&mut self, role: Role, book: &Book) -> Option<Played> {
+    /// A missing chain id is skipped and left in the chain. The id is an index into the book, not a copy.
+    pub fn step<'a>(&mut self, role: Role, book: &'a Book) -> Option<Played<'a>> {
         let slot = role_slot(role);
         loop {
-            let pass_end = {
-                let run = self.roles[slot].as_ref()?;
-                (run.step >= run.steps.len()).then_some((run.emitted, run.remaining))
+            let Some(run) = self.roles[slot] else {
+                return None;
             };
-            if let Some((emitted, remaining)) = pass_end {
-                if !emitted || matches!(remaining, Some(0 | 1)) {
+            let id = run.id.as_str();
+            let step_count = if run.chain {
+                match book.chains.get(id) {
+                    Some(chain) => chain.recordings.len(),
+                    None => {
+                        self.roles[slot] = None;
+                        return None;
+                    }
+                }
+            } else {
+                1
+            };
+            if run.step >= step_count {
+                if !run.emitted || matches!(run.remaining, Some(0 | 1)) {
                     self.roles[slot] = None;
                     return None;
                 }
@@ -183,20 +220,27 @@ impl Playback {
                 run.emitted = false;
                 continue;
             }
-            let (id, at) = {
-                let run = self.roles[slot].as_ref().unwrap();
-                (run.steps[run.step].clone(), run.frame)
+            let step_name = if run.chain {
+                IdBuf::copy_from(&book.chains.get(id).unwrap().recordings[run.step])
+            } else {
+                run.id
             };
+            let at = run.frame;
             let frame = book
                 .recordings
-                .get(&id)
+                .get(step_name.as_str())
                 .and_then(|recording| recording.frames.get(at).copied());
             if let Some(frame) = frame {
+                let recording_id = book
+                    .recordings
+                    .get_key_value(step_name.as_str())
+                    .map(|(key, _)| key.as_str())
+                    .unwrap_or("");
                 let run = self.roles[slot].as_mut().unwrap();
                 run.frame = at + 1;
                 run.emitted = true;
                 return Some(Played {
-                    recording_id: id,
+                    recording_id,
                     frame_index: at,
                     frame,
                 });
@@ -219,12 +263,12 @@ impl Playback {
     }
 
     /// Load names the bound save and does not touch either run.
-    pub fn load(&self, book: &Book, settings: &StateSettings) -> Option<DeathWarp> {
+    pub fn load<'a>(&self, book: &'a Book, settings: &StateSettings) -> Option<DeathWarp<'a>> {
         bound_warp(book, settings)
     }
 
     /// Auto-load on death names the bound save when the row is on, and nothing when none is bound.
-    pub fn auto_load_on_death(&self, book: &Book, settings: &StateSettings) -> Option<DeathWarp> {
+    pub fn auto_load_on_death<'a>(&self, book: &'a Book, settings: &StateSettings) -> Option<DeathWarp<'a>> {
         if !settings.autoload {
             return None;
         }
@@ -246,7 +290,7 @@ fn passes(count: LoopCount) -> Option<u32> {
     }
 }
 
-fn bound_warp(book: &Book, settings: &StateSettings) -> Option<DeathWarp> {
+fn bound_warp<'a>(book: &'a Book, settings: &StateSettings) -> Option<DeathWarp<'a>> {
     if !settings.enable {
         return None;
     }
@@ -255,7 +299,7 @@ fn bound_warp(book: &Book, settings: &StateSettings) -> Option<DeathWarp> {
         return None;
     }
     Some(DeathWarp {
-        save_id: id.to_owned(),
+        save_id: id,
         mirroring: settings.mirroring,
         damage_player: settings.damage_player,
         damage_cpu: settings.damage_cpu,
@@ -265,7 +309,7 @@ fn bound_warp(book: &Book, settings: &StateSettings) -> Option<DeathWarp> {
     })
 }
 
-fn recording_warp(recording: &MacroRecording, saves: &BTreeSet<String>) -> Option<String> {
+fn recording_warp<'a>(recording: &'a MacroRecording, saves: &BTreeSet<String>) -> Option<&'a str> {
     let id = recording.start_save.as_deref()?;
     if !recording.start_save_on {
         return None;
@@ -273,19 +317,19 @@ fn recording_warp(recording: &MacroRecording, saves: &BTreeSet<String>) -> Optio
     linked(id, recording.start_save_on, saves)
 }
 
-fn chain_warp(chain: &Chain, book: &Book) -> Option<String> {
+fn chain_warp<'a>(chain: &Chain, book: &'a Book) -> Option<&'a str> {
     if !chain.start_save_on {
         return None;
     }
     let first = chain.recordings.first()?;
-    let recording = book.recordings.get(first)?;
+    let recording = book.recordings.get(first.as_str())?;
     let id = recording.start_save.as_deref()?;
     linked(id, true, &book.saves)
 }
 
-fn linked(id: &str, on: bool, saves: &BTreeSet<String>) -> Option<String> {
+fn linked<'a>(id: &'a str, on: bool, saves: &BTreeSet<String>) -> Option<&'a str> {
     if start_save_state(Some(id), on, saves.contains(id)) == StartSaveState::Linked {
-        Some(id.to_owned())
+        Some(id)
     } else {
         None
     }
@@ -336,7 +380,7 @@ mod tests {
         chain
     }
 
-    fn drain(machine: &mut Playback, role: Role, book: &Book) -> Vec<Played> {
+    fn drain<'a>(machine: &mut Playback, role: Role, book: &'a Book) -> Vec<Played<'a>> {
         let mut played = Vec::new();
         for _ in 0..64 {
             match machine.step(role, book) {
@@ -347,7 +391,7 @@ mod tests {
         panic!("playback did not finish");
     }
 
-    fn buttons_of(played: &[Played]) -> Vec<u32> {
+    fn buttons_of(played: &[Played<'_>]) -> Vec<u32> {
         played.iter().map(|played| played.frame.buttons).collect()
     }
 
@@ -395,7 +439,7 @@ mod tests {
 
         let mut playing = Playback::new();
         let started = playing.play_chord(Role::Player, &book);
-        assert_eq!(started.warp.as_deref(), Some("save-start"));
+        assert_eq!(started.warp, Some("save-start"));
         assert_eq!(playing.warps(Role::Player), 1);
         let during = playing.load(&book, &state).unwrap();
         assert_eq!(during.save_id, "save-a");
@@ -475,14 +519,14 @@ mod tests {
         book.add_save("save-2");
         let mut machine = Playback::new();
         let effect = machine.play_chord(Role::Player, &book);
-        assert_eq!(effect.warp.as_deref(), Some("save-1"));
+        assert_eq!(effect.warp, Some("save-1"));
         assert!(effect.notice.is_none());
         let played = drain(&mut machine, Role::Player, &book);
         assert_eq!(buttons_of(&played), vec![1, 2]);
         assert_eq!(
             played
                 .iter()
-                .map(|played| played.recording_id.as_str())
+                .map(|played| played.recording_id)
                 .collect::<Vec<_>>(),
             vec!["macro-1", "macro-2"]
         );
@@ -538,7 +582,7 @@ mod tests {
 
         let mut machine = Playback::new();
         assert_eq!(
-            machine.play_chord(Role::Player, &book).warp.as_deref(),
+            machine.play_chord(Role::Player, &book).warp,
             Some("save-a")
         );
         assert_eq!(
@@ -549,7 +593,7 @@ mod tests {
         assert_eq!(machine.warps(Role::Player), 1);
 
         assert_eq!(
-            machine.play_chord(Role::Cpu, &book).warp.as_deref(),
+            machine.play_chord(Role::Cpu, &book).warp,
             Some("save-b")
         );
         assert_eq!(
@@ -578,7 +622,7 @@ mod tests {
             .set_start_save_on(true);
         let mut forever = Playback::new();
         assert_eq!(
-            forever.play_chord(Role::Player, &book).warp.as_deref(),
+            forever.play_chord(Role::Player, &book).warp,
             Some("save-a")
         );
         for _ in 0..4 {
@@ -605,7 +649,7 @@ mod tests {
         let mut machine = Playback::new();
         assert!(machine.play_chord(Role::Player, &book).warp.is_none());
         assert_eq!(
-            machine.play_chord(Role::Cpu, &book).warp.as_deref(),
+            machine.play_chord(Role::Cpu, &book).warp,
             Some("save-b")
         );
         assert!(machine.playing(Role::Player) && machine.playing(Role::Cpu));
