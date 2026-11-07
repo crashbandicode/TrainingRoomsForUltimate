@@ -447,9 +447,40 @@ fn post_recording_effect(menu: &mut Menu) {
             None
         }
     });
-    crate::engine::rr_host::note_drill(drill);
+    crate::engine::rr_host::note_drill(drill.clone());
+    apply_grade_target(drill.as_deref(), kind);
     crate::engine::rr_host::publish_selection(std::path::Path::new(crate::model::storage::ROOT), &selection, kind);
     crate::engine::rr_host::post_effect(menu.recording_mut().take_effect());
+}
+
+/// A combo drill becomes the grade target. The same id is not applied twice,
+/// and a file that is not readable yet is retried on the next post.
+fn apply_grade_target(drill: Option<&str>, kind: Option<crate::engine::library::DrillKind>) {
+    use crate::engine::library::DrillKind;
+    use crate::engine::rr_host::{follow_grade, GradeFollow};
+
+    let combo_id = match kind {
+        Some(DrillKind::Combo) => drill,
+        _ if drill.is_none() => None,
+        _ => return,
+    };
+    static APPLIED: Mutex<Option<String>> = Mutex::new(None);
+    let mut applied = APPLIED.lock();
+    match follow_grade(applied.as_deref(), combo_id) {
+        GradeFollow::Same => {}
+        GradeFollow::Clear => {
+            *applied = None;
+            crate::runtime::features::combo::stage_target(None);
+        }
+        GradeFollow::Install(id) => {
+            let root = std::path::Path::new(crate::model::storage::ROOT);
+            let Ok(record) = crate::model::combo_record::ComboLibrary::new(root.join("combos")).load(id) else {
+                return;
+            };
+            crate::runtime::features::combo::stage_target(Some((record.combo, record.name.as_str())));
+            *applied = Some(id.to_owned());
+        }
+    }
 }
 
 /// Reload the pop-up after the recording worker writes a file, and return a typed name.
@@ -482,6 +513,9 @@ fn emit_recording_diag(menu: &Menu) {
     let popup = rec.popup_open();
     let on_page = menu.page() == Page::Recording;
     if !popup && !on_page {
+        // A closed pop-up forgets the last line, so the next open emits it again. The same line
+        // while it stays open is still one write.
+        LAST_DIAG.lock().clear();
         return;
     }
     let face = if popup { Face::Popup } else { Face::Page };

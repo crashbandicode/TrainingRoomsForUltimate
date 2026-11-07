@@ -8,7 +8,7 @@
 //! - Every graded link, resolved attempt and saved combo calls an exported trace function (§8): an Eden guest trace
 //!   point on it records the facts, with no log line.
 
-use core::sync::atomic::{AtomicI32, Ordering};
+use core::sync::atomic::{AtomicI32, AtomicU32, Ordering};
 
 use hos_lock::Mutex;
 
@@ -36,12 +36,24 @@ fn settings() -> Settings {
 /// fighter P1 is now: kept for the next save's `recorded_on` only; the helper grades whatever fighter P1 is.
 pub fn after_strip(tracker: &Tracker, p1_kind: Option<i32>) {
     P1_KIND.store(p1_kind.unwrap_or(-1), Ordering::Relaxed);
-    let (out, sample) = {
+    let (out, sample, names) = {
         let mut helper = HELPER.lock();
+        let names = pull_staged().map(|staged| {
+            let (combo, text, label) = match staged {
+                Some((combo, text, label)) => (Some(combo), text, label),
+                None => (None, Text::EMPTY, Label::EMPTY),
+            };
+            helper.set_target(combo);
+            (text, label)
+        });
         let out = helper.step(tracker, settings());
         let sample = helper.last_combo();
-        (out, sample)
+        (out, sample, names)
     };
+    if let Some((text, label)) = names {
+        *NAME.lock() = text;
+        LABELS.lock().0 = label;
+    }
     report(out);
     *SAMPLE.lock() = sample;
 }
@@ -163,6 +175,43 @@ pub fn set_target(target: Option<(Combo, &str)>) {
     HELPER.lock().set_target(target.map(|(combo, _)| combo));
     *NAME.lock() = Text::new(target.map_or("", |(_, name)| name));
     LABELS.lock().0 = Label::new(target.map_or("", |(_, name)| name));
+}
+
+/// A drill the menu worker staged for the frame hook. The hook holds `HELPER`; the worker must not.
+struct StagedTarget {
+    seq: AtomicU32,
+    value: core::cell::UnsafeCell<Option<(Combo, Text, Label)>>,
+}
+
+// The seqlock below is the synchronization. One menu worker writes; the frame hook reads.
+unsafe impl Sync for StagedTarget {}
+
+static STAGED: StagedTarget = StagedTarget {
+    seq: AtomicU32::new(0),
+    value: core::cell::UnsafeCell::new(None),
+};
+static STAGED_SEEN: AtomicU32 = AtomicU32::new(0);
+
+/// Publish a grade target without taking `HELPER`. The next `after_strip` installs it.
+pub fn stage_target(target: Option<(Combo, &str)>) {
+    let packed = target.map(|(combo, name)| (combo, Text::new(name), Label::new(name)));
+    let prev = STAGED.seq.fetch_add(1, Ordering::Relaxed);
+    unsafe { *STAGED.value.get() = packed; }
+    STAGED.seq.store(prev.wrapping_add(2), Ordering::Release);
+}
+
+/// `Some` when a staged target is ready: `Some(None)` clears, `Some(Some(_))` installs.
+fn pull_staged() -> Option<Option<(Combo, Text, Label)>> {
+    let seq = STAGED.seq.load(Ordering::Acquire);
+    if seq & 1 == 1 || seq == STAGED_SEEN.load(Ordering::Relaxed) {
+        return None;
+    }
+    let value = unsafe { *STAGED.value.get() };
+    if STAGED.seq.load(Ordering::Acquire) != seq {
+        return None;
+    }
+    STAGED_SEEN.store(seq, Ordering::Relaxed);
+    Some(value)
 }
 
 /// The draft name the next save uses (worker).

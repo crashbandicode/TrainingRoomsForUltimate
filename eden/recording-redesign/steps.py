@@ -49,13 +49,22 @@ def open_menu(ctx):
 
 def close_menu(ctx):
     ctx.play(MENU_CLOSE)
-    time.sleep(0.8)
+    time.sleep(0.3)
+    # The close chord is one B. A portrait grid or a confirm sits under the page, so two more
+    # B presses back out before the HUD check. Leaving the menu up makes the next gate miss.
+    press(ctx, 'b', 0.35)
+    press(ctx, 'b', 0.35)
+    time.sleep(0.4)
     settle(ctx)
 
 
 def popup(ctx):
     ctx.play(POPUP)
-    return ctx.wait_log('diag', r'screen=recording-popup\b', cap=10)
+    try:
+        return ctx.wait_log('diag', r'screen=recording-popup\b', cap=10)
+    except RuntimeError:
+        popup_close(ctx)
+        raise
 
 
 def show_popup(ctx):
@@ -65,11 +74,21 @@ def show_popup(ctx):
 
 
 def popup_close(ctx):
-    press(ctx, 'b', 0.6)
+    # A can open the file screen under the list. One B returns to the list and leaves it up,
+    # and the next row's training-HUD recovery then stops the run.
+    press(ctx, 'b', 0.45)
+    press(ctx, 'b', 0.45)
 
 
 def diag(ctx, pattern, cap=10):
-    return ctx.wait_log('diag', pattern, cap=cap)
+    try:
+        return ctx.wait_log('diag', pattern, cap=cap)
+    except RuntimeError:
+        # A missed line often leaves the pop-up, the menu, or the keyboard up. Recovery checks the
+        # training HUD on this instance and does not close it, so back out before the error propagates.
+        for _ in range(4):
+            press(ctx, 'b', 0.3)
+        raise
 
 
 def gif(ctx, name, seconds, do):
@@ -307,9 +326,12 @@ def boot_training(ctx):
     if status.get('running') and status.get('loading_complete'):
         try:
             ctx.gate('training-hud-unpaused')
-            return {'already': 'training', 'cpu': cpu_mario(ctx)}
         except RuntimeError:
             pass
+        else:
+            # Already in Training. A later miss inside cpu_mario must not fall through into the
+            # main-menu route: that route's Start presses leave the match.
+            return {'already': 'training', 'cpu': cpu_mario(ctx)}
     else:
         ctx.call('game.load', {'path': ctx.instance['game']}, job_cap=180)
         wait_loaded(ctx)

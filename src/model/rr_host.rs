@@ -401,6 +401,27 @@ pub fn publish_selection(root: &Path, selection: &Selection, drill_kind: Option<
     let _ = index.save(root);
 }
 
+/// What the grade helper should do when the recording drill id changes.
+/// The same id is not applied again: applying a target clears the open attempt.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GradeFollow<'a> {
+    Same,
+    Clear,
+    Install(&'a str),
+}
+
+/// The helper's target follows the recording drill. `applied` is the id already
+/// given to the helper. `None` clears it. A different id is installed once.
+pub fn follow_grade<'a>(applied: Option<&str>, drill: Option<&'a str>) -> GradeFollow<'a> {
+    if applied == drill {
+        GradeFollow::Same
+    } else if let Some(id) = drill {
+        GradeFollow::Install(id)
+    } else {
+        GradeFollow::Clear
+    }
+}
+
 /// The drill changed. A combo recorded on another fighter asks; the drill itself stays.
 pub fn note_drill(id: Option<String>) {
     let mut last = lock(&LAST_DRILL);
@@ -1552,5 +1573,14 @@ mod tests {
         let index = RecordingIndex::load(&root).unwrap();
         assert_eq!(index.loop_count(Role::Player), LoopCount::Finite(5));
         assert_eq!(index.loop_count(Role::Cpu), LoopCount::Infinite);
+    }
+
+    #[test]
+    fn a_changed_drill_installs_the_grade_target_once() {
+        assert_eq!(follow_grade(None, None), GradeFollow::Same);
+        assert_eq!(follow_grade(None, Some("combo-2")), GradeFollow::Install("combo-2"));
+        assert_eq!(follow_grade(Some("combo-2"), Some("combo-2")), GradeFollow::Same);
+        assert_eq!(follow_grade(Some("combo-2"), Some("combo-1")), GradeFollow::Install("combo-1"));
+        assert_eq!(follow_grade(Some("combo-2"), None), GradeFollow::Clear);
     }
 }
