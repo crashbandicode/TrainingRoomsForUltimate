@@ -49,9 +49,36 @@ RECIPES = {
     'x-press': [{"buttons": "x", "frames": 2, "gap_frames": 10}],                   # cycle the loop, cursor in MACROS
     # Training's position reset (L+R+A in one action), settle, then walk into the CPU (rows-iv's
     # iv-reset-walk shape).
+    # Position reset only. The old reset-walk then held right for 120 frames, so a "before"
+    # shot was already dashing and a following jab often missed (surface strip-walk, LAST, exchange).
+    'reset-center': [{"buttons": "l,r,a", "frames": 4, "gap_frames": 70}],
     'reset-walk': [{"buttons": "l,r,a", "frames": 4, "gap_frames": 66},
                    {"stick": [1, 0, 0], "frames": 120, "gap_frames": 14}],
     'jab': [{"buttons": "a", "frames": 2, "gap_frames": 58}],
+    # Two-hit link, then a third jab, then stand. Gaps are inside Mario jab's cancel window so LAST
+    # gets pills (docs/MEDIA.md last row; the first pass waited 0.5 s and the LAST row stayed empty).
+    'jab-link': [{"buttons": "a", "frames": 2, "gap_frames": 14},
+                 {"buttons": "a", "frames": 2, "gap_frames": 30}],
+    'jab-link-3': [{"buttons": "a", "frames": 2, "gap_frames": 14},
+                   {"buttons": "a", "frames": 2, "gap_frames": 14},
+                   {"buttons": "a", "frames": 2, "gap_frames": 40}],
+    # First jab, then a gap that lands the second jab after the CPU can act and inside 20 frames of
+    # that (MEDIA drop / input). 42 frames from the press: hit ~f6, stun ends ~f25, second press ~f42.
+    'jab-drop': [{"buttons": "a", "frames": 2, "gap_frames": 42},
+                 {"buttons": "a", "frames": 2, "gap_frames": 30}],
+    # A full second of neutral after the first jab (more than 20 frames after the CPU can act), then
+    # the second jab is a new exchange (MEDIA exchange / freeze).
+    'exchange-jabs': [{"buttons": "a", "frames": 2, "gap_frames": 90},
+                      {"buttons": "a", "frames": 2, "gap_frames": 40}],
+    'freeze-jabs': [{"buttons": "a", "frames": 2, "gap_frames": 90},
+                    {"buttons": "a", "frames": 2, "gap_frames": 20}],
+    # Stick held through the A press, past both thresholds, so the chip is one green up-right attack
+    # chip. "hold" not "frames" on the with_stick action: record() asks for lease_ms 10200 when a
+    # framed with_stick press is used (FRAME_LEASE_MS + 200), and Eden rejects that.
+    'chips-attack': [{"stick": [0.95, 0.95, 0], "frames": 6, "gap_frames": 0},
+                     {"buttons": "a", "with_stick": [0.95, 0.95], "hold": 80, "gap": 0.5}],
+    'lanes-smash': [{"stick": [1, 0, 0], "frames": 8, "gap_frames": 0},
+                    {"buttons": "a", "with_stick": [1, 0], "hold": 80, "gap": 1.2}],
     # A walk: the stick held below the dash threshold (rr-12: dash_stick_x 0.85), then neutral.
     'walk-right': [{"stick": [0.4, 0, 0], "frames": 30, "gap_frames": 10}],
     # A dash-dance: alternate left and right without pausing (rr-11, row Dash-dance).
@@ -65,12 +92,12 @@ RECIPES = {
                    {"stick": [-1, 0, 0], "frames": 12, "gap_frames": 0},
                    {"stick": [0, 0, 0], "frames": 2, "gap_frames": 10}],
     # A forward smash: dash right (past the walk threshold), then A (docs/MEDIA.md, lanes row).
-    'fsmash': [{"stick": [1, 0, 0], "frames": 8, "gap_frames": 0},
-               {"buttons": "a", "with_stick": [1, 0], "frames": 2, "gap_frames": 60}],
+    'fsmash': [{"stick": [1, 0, 0], "frames": 6, "gap_frames": 0},
+               {"buttons": "a", "with_stick": [1, 0], "hold": 60, "gap": 0.8}],
     # A tilted A: the left stick held at a tilt (below the dash threshold) through the A press
     # (rows-iv's combo shape: the tilt held, never a flick).
-    'tilted-a': [{"stick": [0, 0.6, 0], "frames": 2, "gap_frames": 0},
-                 {"buttons": "a", "with_stick": [0, 0.6], "frames": 2, "gap_frames": 10}],
+    'tilted-a': [{"stick": [0, 0.65, 0], "frames": 3, "gap_frames": 0},
+                 {"buttons": "a", "with_stick": [0, 0.65], "hold": 60, "gap": 0.4}],
     # A short-hop nair loop, drilled clean (rr-12, row "Nair loop, drilled clean"): jump press,
     # jump release (short hop), attack press, fast-fall (the stick crossing -0.66), repeated.
     'nair-loop-clean': [{"buttons": "x", "frames": 3, "gap_frames": 0},
@@ -99,7 +126,7 @@ RECIPES = {
                               {"stick": [0, 0, 0], "frames": 2, "gap_frames": 10}],
     # A dash-attack combo (rr-12, row "Dash-attack combo"): the stick crosses 0.85, then the attack.
     'dash-attack': [{"stick": [1, 0, 0], "frames": 2, "gap_frames": 0},
-                    {"buttons": "a", "with_stick": [1, 0], "frames": 2, "gap_frames": 30}],
+                    {"buttons": "a", "with_stick": [1, 0], "hold": 50, "gap": 0.5}],
     # The C-stick smash: the runner's recipe actions drive the LEFT stick only (record()'s stick
     # action), so a recipe cannot express this input. The recipe below is a placeholder that must
     # not be played as-is; the row's hook presses the right stick directly and captures what the
@@ -127,14 +154,14 @@ RECOVER = [{'play': 'menu-close'}, {'play': 'chord-load'}]
 
 
 def R(row_id, hook, host, timed, expect, source, evidence, media=None, start='training', end='training', args=None,
-      gates=None, trace=None):
+      gates=None, trace=None, build=None):
     # gates: plan gate names appended to the row's steps after the hook (a log gate on the diag
     # source is the card's preferred form for a runtime row's exact diag line). trace: RR-7's
     # tracepoint note, carried in the row because RR-7 names functions only and trace.arm needs a
-    # resolved address (README, Open questions).
+    # resolved address (README, Open questions). build: "diag" or "release" for the confirming re-run.
     return {'id': row_id, 'hook': hook, 'host': host, 'timed': timed, 'start': start, 'end': end,
             'expect': expect, 'source': source, 'evidence': evidence, 'media': media, 'args': args,
-            'gates': gates, 'trace': trace}
+            'gates': gates, 'trace': trace, 'build': build}
 
 
 STAGE1 = 'LANE-GROK-RECORDING-REDESIGN-REPORT.md'
@@ -393,7 +420,9 @@ ROWS = [
     R('combo-nair-loop-clean', 'combo_nair_loop_clean', 'yoga', True,
       "Clean. Events are jump press, jump release, attack press, fast-fall. Drift may show and does not change the verdict.",
       'RR-12 §Eden rows (row Nair loop, drilled clean)',
-      ['bar verdict clean', 'events jump press, jump release, attack press, fast-fall']),
+      ['trace return of tr_combo_link_v1 with the clean flag', 'events jump press, jump release, attack press, fast-fall'],
+      gates=('trace-combo-link',), build='release',
+      trace='Release: tr_combo_link_v1 on_return (src/runtime/features/combo.rs). x0 index, x1 link, x2 flags (bit 1 clean), x3 offset. The diag "drill " line is not printed by the release NRO.'),
     R('combo-nair-loop-full-hop', 'combo_nair_loop_full_hop', 'yoga', True,
       "Drop. The bar names the late jump release.",
       'RR-12 §Eden rows (row Same loop with a full hop)',
@@ -411,17 +440,28 @@ ROWS = [
     R('rr-grade-bar', 'rr_grade_bar', 'yoga', True,
       "a non-TRUE link inside the tolerance still counts; a missing press, a press outside the tolerance and a gap past 20 frames drop; a drop restarts the sequence at combo 1 with streak 0 and best kept; the bar still draws TRUE",
       'RR-2 requirement trace (A2, A3, A4); %s lines 147-149, 198' % STAGE1,
-      ['bar screenshots of the four cases', 'streak 0 after the drop']),
+      ['trace return of tr_combo_attempt_v1 for the four cases', 'streak 0 after the drop'],
+      gates=('trace-combo-attempt',), build='release',
+      trace='Release: tr_combo_attempt_v1 on_return. x0 outcome (1 completed, 2 stopped, 3 cleared), x1 true links, x2 total, x3 first bad. A screenshot alone does not pass the row.'),
     R('rr-drill', 'rr_drill', 'yoga', True,
       "Drilling a combo or the sequence replaces the drill (A, no chord); Make combo plays the file once on Player 1 from its start save, adds the new combo to the hot five, and leaves the drill unchanged",
       'RR-2 requirement trace (A11); %s lines 178, 191, 200, 259, 265, 267' % STAGE1,
-      ['drill screenshots', 'Make combo leaves the drill']),
+      ['diag [Ui] press on row Drill', 'diag [Ui] press on row Make combo', 'the drill id is unchanged after Make combo'],
+      gates=('diag-drill-press', 'diag-make-combo-press'), build='diag'),
 
     # --- the final row: the heap and crash gates on every instance ---
-    R('heap-and-crash-check', 'heap_crash', 'xps', False,
-      "on every instance: the install line says heap_allocations=0, the hook-stats snapshot shows no steady-state hook allocations after the whole session, and the console log has no Unmapped and no panic lines",
+    R('f9-body-trace', 'f9_body_trace', 'surface', False,
+      "placeholder: trace f9_body_of's return. LANE-GROK-RC5-FIX-F9-REPORT.md was not present; the arm spec is TASK-GROK-rc5-fix-f9.md (entry, [entry+0x4160], the state word, slot, on_return)",
+      'TASK-GROK-rc5-fix-f9.md tracepoint spec; LANE-GROK-RC5-FIX-F9-REPORT.md absent at row-fix time',
+      ['trace_jsonl return of f9_body_of'],
+      gates=('trace-f9-body',), build='release',
+      trace='Placeholder. Symbol training_rooms::runtime::roster::character_sources::f9_body_of (the task names character_roster::sources::f9_body_of; the source file is character_sources.rs). on_return, captures of entry, [entry+0x4160], the state word, and slot. Not a diag print.'),
+    R('heap-and-crash-check', 'heap_crash', 'surface', False,
+      "on every re-run instance, release and diag: TrainingRooms' own events.log line plugin=training_rooms/ result=installed heap_allocations=0, the hook-stats snapshot shows no steady-state hook allocations, and the console log has no Unmapped and no panic lines",
       PLAN + ' (gates on every instance); playbook CHECKLIST (no heap in hooks)',
-      ['install line heap_allocations=0 on all 7 instances', 'hook-stats snapshot', 'console Unmapped/panic scan']),
+      ['TrainingRooms events.log result=installed heap_allocations=0 on surface-a, surface-b, yoga-a, yoga-b',
+       'hook-stats snapshot', 'console Unmapped/panic scan'],
+      build='release'),
 ]
 
 
@@ -449,77 +489,130 @@ def main():
         'diag-play-player': {'kind': 'log', 'source': 'diag', 'pattern': r'screen=playback role=player warp=1', 'cap': 10},
         'diag-play-cpu': {'kind': 'log', 'source': 'diag', 'pattern': r'screen=playback role=cpu warp=0', 'cap': 10},
         'diag-mash': {'kind': 'log', 'source': 'diag', 'pattern': r'screen=playback mash=1', 'cap': 10},
+        'diag-adv-shield': {'kind': 'log', 'source': 'diag', 'pattern': r'\[FrameStrip\] advantage value=-?\d+ on_shield=true', 'cap': 12},
+        'diag-adv-hit': {'kind': 'log', 'source': 'diag', 'pattern': r'\[FrameStrip\] advantage value=-?\d+ on_shield=false', 'cap': 12},
+        'diag-drill-press': {'kind': 'log', 'source': 'diag', 'pattern': r'\[Ui\] press .*Drill', 'cap': 12},
+        'diag-make-combo-press': {'kind': 'log', 'source': 'diag', 'pattern': r'\[Ui\] press .*Make combo', 'cap': 12},
+        # Release still exports these (combo.rs, no_mangle, not cfg(diag)). sample_frame's advantage
+        # print is cfg(diag) and the function returns (), so advantage rows stay on the diag build.
+        'trace-combo-link': {'kind': 'log', 'source': 'trace_jsonl',
+                             'pattern': r'(?:"event":"return".*tr_combo_link_v1|tr_combo_link_v1.*"event":"return")',
+                             'cap': 15},
+        'trace-combo-attempt': {'kind': 'log', 'source': 'trace_jsonl',
+                                'pattern': r'(?:"event":"return".*tr_combo_attempt_v1|tr_combo_attempt_v1.*"event":"return")',
+                                'cap': 15},
+        'trace-f9-body': {'kind': 'log', 'source': 'trace_jsonl',
+                          'pattern': r'(?:"event":"return".*f9_body_of|f9_body_of.*"event":"return")',
+                          'cap': 30},
     }
     gates.update(diag_gates)
+    # Reference frames are 1280x674. A full-window grab is 1280x720; Ally's grab was 2560x1440.
+    # runner-fix2 accepts "scale": "fit". Tolerances and reference hashes stay as they are.
+    for name in ('main', 'stage', 'css', 'ready', 'training-hud-unpaused'):
+        gates[name]['scale'] = 'fit'
+
+    # Confirming re-run: Surface 2 + Yoga 2. surface-a and yoga-a are release. surface-b and yoga-b
+    # are diag. Ally and XPS never reached Training, so their rows move onto these four instances.
+    SURFACE_B = ['rr-migrate', 'rr-record', 'rr-notice', 'rr-mismatch', 'rr-rename', 'rr-crop',
+                 'rr-play', 'rr-mash', 'adv-jab-shield', 'adv-tilt-shield', 'adv-smash-shield',
+                 'adv-aerial-shield', 'adv-move-hit']
+    SURFACE_A = ['strip-walk', 'strip-dash-dance', 'strip-cstick-smash', 'strip-tilted-a',
+                 'media-rc5-frame-strip-lanes', 'media-rc5-frame-strip-chips', 'media-rc5-frame-strip-freeze',
+                 'media-rc5-frame-strip-advantage-hit', 'media-rc5-frame-strip-advantage-shield',
+                 'media-rc5-frame-strip-link', 'media-rc5-frame-strip-drop', 'media-rc5-frame-strip-input',
+                 'media-rc5-frame-strip-last', 'media-rc5-frame-strip-exchange',
+                 'media-rc5-grade-not-true', 'media-rc5-sequence-drill', 'f9-body-trace']
+    YOGA_A = ['media-rc5-migration', 'media-rc5-record-start-save', 'media-rc5-play-chord',
+              'media-rc5-loop-no-warp', 'media-rc5-chain-play', 'media-rc5-popup',
+              'media-rc5-recording-page', 'media-rc5-macro-screen', 'media-rc5-fighter-mismatch',
+              'media-rc5-make-combo', 'media-rc5-crop-combo', 'media-rc5-save-warp',
+              'media-rc5-frame-strip-cstick', 'media-rc5-frame-strip-stick-row',
+              'media-rc5-frame-strip-freeze-stick', 'rr-chords', 'rr-picker', 'rr-combo',
+              'combo-nair-loop-clean', 'combo-nair-loop-full-hop', 'combo-nair-loop-no-fastfall',
+              'combo-dash-attack', 'rr-grade-bar']
+    YOGA_B = ['rr-load', 'rr-chain', 'rr-loop', 'rr-hot', 'rr-icons', 'rr-page', 'rr-popup',
+              'rr-active', 'rr-drill']
+    INSTANCE = {}
+    for name in SURFACE_B:
+        INSTANCE[name] = ('surface-b', 'diag')
+    for name in SURFACE_A:
+        INSTANCE[name] = ('surface-a', 'release')
+    for name in YOGA_A:
+        INSTANCE[name] = ('yoga-a', 'release')
+    for name in YOGA_B:
+        INSTANCE[name] = ('yoga-b', 'diag')
+    INSTANCE['heap-and-crash-check'] = ('surface-a', 'release')
+    ORDER = SURFACE_B + SURFACE_A + YOGA_A + YOGA_B + ['heap-and-crash-check']
+    by_id = {spec['id']: spec for spec in ROWS}
+    missing = [name for name in ORDER if name not in by_id]
+    extra = [spec['id'] for spec in ROWS if spec['id'] not in INSTANCE]
+    if missing or extra:
+        raise SystemExit('row assignment mismatch missing=%s extra=%s' % (missing, extra))
+    ADV_GATE = {
+        'adv-jab-shield': 'diag-adv-shield', 'adv-tilt-shield': 'diag-adv-shield',
+        'adv-smash-shield': 'diag-adv-shield', 'adv-aerial-shield': 'diag-adv-shield',
+        'adv-move-hit': 'diag-adv-hit',
+    }
+    COMBO_TRACE = {'combo-nair-loop-full-hop', 'combo-nair-loop-no-fastfall', 'combo-dash-attack'}
 
     rows = []
-    # Instance keys: the operator's capacity is surface 2, yoga 2, ally 1, xps 2. Each host's rows
-    # are contiguous in ROWS; the host's instances split at the counts below (xps-a then xps-b,
-    # surface-a then surface-b, yoga-a then yoga-b). Card 10c adds rr-7's three runtime rows to the
-    # xps-a block, so the split moves from 10 to 13 and the menu rows stay on xps-b.
-    SPLIT = {'xps': 13, 'surface': 11, 'yoga': 7}
-    INSTANCES = {'xps': ('xps-a', 'xps-b'), 'surface': ('surface-a', 'surface-b'),
-                 'yoga': ('yoga-a', 'yoga-b'), 'ally': ('ally-a',)}
-    counts, previous_key = {}, None
-    # Group 1 boots instance xps-a itself (the migration boot), so its first row starts on boot.
-    # rr-migrate is xps's first row (the session's first); every other host's first row is its
-    # setup-<instance> row, which the loop below inserts with its own gate and recover already.
-    for i, spec in enumerate(ROWS):
-        counts[spec['host']] = counts.get(spec['host'], 0) + 1
-        keys = INSTANCES[spec['host']]
-        key = keys[0] if (counts[spec['host']] <= SPLIT.get(spec['host'], 0) or len(keys) == 1) else keys[1]
+    previous_key = None
+    for spec in (by_id[name] for name in ORDER):
+        key, build = INSTANCE[spec['id']]
+        host = 'surface' if key.startswith('surface') else 'yoga'
         steps = [{'run': 'steps.py:%s' % spec['hook'], 'check': True, 'on': key}]
         if spec['args']:
             steps[0]['args'] = spec['args']
+        gates_for = list(spec['gates'] or ())
+        if spec['id'] in ADV_GATE and ADV_GATE[spec['id']] not in gates_for:
+            gates_for.append(ADV_GATE[spec['id']])
+        if spec['id'] in COMBO_TRACE and 'trace-combo-link' not in gates_for:
+            gates_for.append('trace-combo-link')
         row = {'id': spec['id'], 'start': spec['start'], 'end': spec['end'], 'steps': steps,
-               'evidence': spec['evidence'], 'source': spec['source'], 'host': spec['host'],
-               'expect': spec['expect'], 'timed': spec['timed']}
+               'evidence': spec['evidence'], 'source': spec['source'], 'host': host,
+               'expect': spec['expect'], 'timed': spec['timed'],
+               'build': spec.get('build') or build, 'on': key}
         if spec.get('trace'):
             row['trace'] = spec['trace']
-        if spec.get('gates'):
-            row['steps'] = row['steps'] + [{'gate': name, 'on': key} for name in spec['gates']]
-        # Playbook a37664e: a run continues past a failed row only when the next row has a start
-        # gate and a recover list. Every row after rr-migrate starts at Training, so its start
-        # gate is the library gate that proves that screen; the plan-level recover list returns it.
+        elif spec['id'] in COMBO_TRACE:
+            row['trace'] = ('Release: tr_combo_link_v1 on_return. x0 index, x1 link, x2 flags '
+                            '(bit 1 clean, bit 2 wrong move, bit 3 missing).')
+        if gates_for:
+            row['steps'] = row['steps'] + [{'gate': name, 'on': key} for name in gates_for]
         if spec['id'] != 'rr-migrate':
             row['start_gate'] = 'training-hud-unpaused'
         if spec['media']:
             row['media'] = {'gif': spec['media'][0], 'seconds': spec['media'][1]}
-        # Before each group's first row (except the very first), re-establish that instance at
-        # Training: the installed gate, then the boot hook (game.load if needed, the library route,
-        # the Mario/Mario pick, enter Training). That row starts on its own instance, not a match
-        # screen, so its recover list is the boot hook on that instance, not the plan's list.
-        if spec['id'] not in ('rr-migrate', 'heap-and-crash-check') and i > 0 and previous_key != key:
+        if spec['id'] not in ('rr-migrate', 'heap-and-crash-check') and previous_key != key:
             rows.append({'id': 'setup-' + key, 'start': 'training', 'end': 'training',
                          'steps': [{'gate': 'installed', 'on': key},
                                    {'run': 'steps.py:boot_training', 'check': True, 'on': key}],
-                         'evidence': ['install line cpu_common=installed', 'Training HUD settled'],
-                         'source': 'rows-iv/rows-hb-ab boot route (library segments, steps.py hook)',
-                         'host': spec['host'], 'expect': 'the instance is back at Training, HUD unpaused',
-                         'timed': False, 'start_gate': 'training-hud-unpaused',
+                         'evidence': ['TrainingRooms events.log result=installed', 'Training HUD settled'],
+                         'source': 'rows-iv/rows-hb-ab boot route (library segments, L3+D-pad, steps.py hook)',
+                         'host': host, 'expect': 'the instance is at Training, HUD unpaused, P1 on Mario',
+                         'timed': False, 'build': build, 'on': key,
+                         'start_gate': 'training-hud-unpaused',
                          'recover': [{'run': 'steps.py:boot_training', 'check': True, 'on': key}]})
         previous_key = key
         rows.append(row)
-    # The heap row gains one hook step per instance, all in its last row.
     heap = rows[-1]
     heap['steps'] = [{'run': 'steps.py:heap_crash', 'check': True, 'on': key}
-                     for key in ('xps-a', 'xps-b', 'ally-a', 'surface-a', 'surface-b', 'yoga-a', 'yoga-b')]
+                     for key in ('surface-a', 'surface-b', 'yoga-a', 'yoga-b')]
+    heap['build'] = 'release-and-diag'
 
     plan = {
         'game_id': '01006A800016E000',
         'start': 'boot',
-        'scope': 'rc.5 grouped Eden session (cards 10a/10a2/10c): the recording-redesign rows from the stage-1 '
-                 'report, the rc.5 frame-advantage cases and heap/crash gates (EDEN-SESSION-PLAN-rc5), and every '
-                 'GIF docs/MEDIA.md still needs, across the operator\'s 7 instances (surface 2, yoga 2, ally 1, '
-                 'xps 2). Timed rows (frame advantage, strip timing, combo grading) run on the Surface and the '
-                 'Yoga only. Instance keys: xps-a, xps-b, ally-a, surface-a, surface-b, yoga-a, yoga-b. Every '
-                 'non-library segment is recorded from its recipe on its first play; the recipes\' frame counts '
-                 'are best efforts, each marked "timing to be checked when recorded" (README, Open questions).',
+        'scope': 'rc.5 confirming re-run on Surface and Yoga, two instances each. surface-a and yoga-a load the '
+                 'release NRO. surface-b and yoga-b load the diag NRO from the same commit. Ally and XPS rows moved '
+                 'here. Diag-line gates run on the diag instances. tr_combo_link_v1, tr_combo_attempt_v1 and '
+                 'f9_body_of are trace gates on release. Heap and crash run on all four instances. Media stays on '
+                 'release. Timed rows stay on the Surface and the Yoga.',
         'setup': [
-            {'state': 'Instance xps-a boots with the migration fixture: a non-empty recording in slot 1, the other recording slots empty, legacy save slots live',
-             'via': 'fixture', 'ref': 'RR-7 Eden row rr-migrate start state; media-rc5-migration start'},
-            {'state': 'Every instance: the rc.5 release NRO with all slices merged, plugins installed, Eden muted (core.volume=0 persisted)',
-             'via': 'fixture', 'ref': 'EDEN-SESSION-PLAN-rc5; operator instruction 2026-10-09'},
+            {'state': 'surface-b (diag) and yoga-a (release) boot with a non-empty recording in slot 1 and the other recording slots empty',
+             'via': 'fixture', 'ref': 'RR-7 Eden row rr-migrate; media-rc5-migration'},
+            {'state': 'surface-a and yoga-a load the release NRO; surface-b and yoga-b load the diag NRO of the same commit. Eden muted (core.volume=0). Both windows of a host leave the intro before timed rows',
+             'via': 'fixture', 'ref': 'EDEN-SESSION-PLAN-rc5; operator 2026-10-09 and 2026-10-26'},
             {'state': 'Training, Battlefield, P1 Mario and CPU Mario at 0%, Input Display Frame strip, Hitbox Visualization Off, CPU Shield None and DI/SDI cleared unless the row says otherwise, menu closed',
              'via': 'segment', 'ref': 'library segments attract-cancel, main-stage, stage-css, enter-training; steps.py:boot_training'},
             {'state': 'Shared menu facts: chords at their factory defaults (Save ZL+Down, Load ZL+Up, Record ZR+Down, Play on Player 1 ZR+Left, Play on CPU ZR+Up, Recording pop-up ZR+Right)',

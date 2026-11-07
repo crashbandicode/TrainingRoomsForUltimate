@@ -23,7 +23,7 @@ from pathlib import Path
 SAVE, LOAD = 'chord-save', 'chord-load'
 RECORD, PLAY_CPU, PLAY_P1, POPUP = 'chord-record', 'chord-play-cpu', 'chord-play-p1', 'chord-popup'
 MENU_OPEN, MENU_CLOSE, X = 'menu-open', 'menu-close', 'x-press'
-RESET_WALK, JAB, FSMASH = 'reset-walk', 'jab', 'fsmash'
+RESET_WALK, RESET_CENTER, JAB, FSMASH = 'reset-walk', 'reset-center', 'jab', 'fsmash'
 
 
 def save(ctx, name, value):
@@ -54,6 +54,12 @@ def close_menu(ctx):
 def popup(ctx):
     ctx.play(POPUP)
     return ctx.wait_log('diag', r'screen=recording-popup\b', cap=10)
+
+
+def show_popup(ctx):
+    """Open the pop-up on a release NRO. The screen= line is diag-only, so this does not wait for it."""
+    ctx.play(POPUP)
+    time.sleep(0.8)
 
 
 def popup_close(ctx):
@@ -92,18 +98,26 @@ def console_scan(ctx):
 
 
 def install_heap(ctx):
-    """The install line says heap_allocations=0 (the events log's cpu_common=installed line)."""
+    """TrainingRooms' own install line, not the later cpu_common_load line and not the console.
+
+    practice-diagnostics.log and events.log sit in the same folder
+    (user/sdmc/ultimate/TrainingRooms/). The install line is
+    plugin=training_rooms/… result=installed heap_allocations=0. The following
+    cpu_common_load line also contains cpu_common=installed and has no heap count.
+    """
+    diag = Path(ctx.instance['diag_log'])
+    events = diag.with_name('events.log')
     text = ''
-    events = Path(ctx.instance.get('events_log') or ctx.instance['console_log'])
     for p in (events.with_name('events.previous.log'), events):
         if p.exists():
             text += p.read_text(errors='replace')
-    line = [l for l in text.splitlines() if 'cpu_common=installed' in l]
+    line = [l for l in text.splitlines()
+            if 'plugin=training_rooms/' in l and 'result=installed' in l]
     if not line:
-        raise RuntimeError('no install line in the events log')
+        raise RuntimeError('no TrainingRooms result=installed line in %s' % events)
     m = re.search(r'heap_allocations=(\d+)', line[-1])
     if not m:
-        raise RuntimeError('install line has no heap_allocations count: %s' % line[-1])
+        raise RuntimeError('install line has no heap_allocations count: %s' % line[-1][:240])
     if m.group(1) != '0':
         raise RuntimeError('install line heap_allocations=%s' % m.group(1))
     return line[-1]
@@ -134,39 +148,136 @@ def hook_stats(ctx):
 
 # --- the boot route (every group's first row; rows-iv base steps.py pattern) ----------------------
 
-def boot_training(ctx):
-    """Bring this instance to Training, P1 Mario / CPU Mario, 0%, strip on, menu closed.
+STEP_CSS = re.compile(r'step screen=css dir=(\w+) from=(\S+) to=(\S+)')
+SETTLED_CSS = re.compile(r'settled screen=css at=(\d+) hovered=(\d+)')
 
-    Fresh instance: game.load (defer_load configs) if the game is not running, then the library
-    route (attract-cancel -> main, main-stage, stage-css), the Mario/Mario pick on the CSS, and
-    enter-training. Checked: the HUD gate leaves the screen verified.
+
+def css_chord(ctx, buttons, hold_ms=180):
+    """L3 first, then the D-pad, both held, then released. One tile (TILE-CURSOR.md)."""
+    lease = hold_ms + 500
+    for button in buttons:
+        ctx.call('input.button', {'button': button, 'state': 'press', 'lease_ms': lease})
+    time.sleep(hold_ms / 1000)
+    for button in reversed(buttons):
+        ctx.call('input.button', {'button': button, 'state': 'release'})
+    ctx.call('input.reset')
+
+
+def css_one_step(path, offset):
+    deadline = time.time() + 4
+    step = None
+    settled = None
+    collected = []
+    while time.time() < deadline:
+        data = path.read_bytes()
+        if len(data) < offset:
+            offset = 0
+        lines = [line for line in data[offset:].decode('utf-8', 'replace').splitlines() if line.strip()]
+        offset = len(data)
+        collected.extend(lines)
+        for line in lines:
+            found = STEP_CSS.search(line)
+            if found:
+                step = found
+            stopped = SETTLED_CSS.search(line)
+            if stopped:
+                settled = stopped
+        if step and (step.group(3) == 'none' or settled):
+            return offset, step, settled, collected
+        time.sleep(0.1)
+    return offset, step, settled, collected
+
+
+def css_to_mario(ctx):
+    """Up to the edge, then left to the edge. Surface recover-enter-training-b settled at tile 0 this way.
+
+    The analog stick does not move this cursor (surface setup, XPS rr-migrate). One A on tile 0
+    readies the match while the CPU coin is still Random (yoga and surface). settings.json did not
+    override that coin. The re-run still requires settled screen=css at=0 hovered=0 before A.
+    """
+    path = Path(ctx.instance['tile_log'])
+    offset = path.stat().st_size
+    trace = []
+    for direction in ('up', 'left'):
+        reached = False
+        for _ in range(16):
+            ctx.check_stop()
+            css_chord(ctx, ['lstick', direction], 180)
+            offset, step, settled, lines = css_one_step(path, offset)
+            trace.append({'direction': direction,
+                          'step': None if step is None else step.group(0),
+                          'settled': None if settled is None else settled.group(0)})
+            if step is None:
+                raise RuntimeError('no css step after %s; lines=%s' % (direction, lines[-4:]))
+            if step.group(1) != direction:
+                raise RuntimeError('step dir %s after pressing %s: %s' % (step.group(1), direction, step.group(0)))
+            if step.group(3) == 'none':
+                reached = True
+                break
+            if settled and settled.group(1) != settled.group(2):
+                raise RuntimeError('hovered and settled tiles differ: %s' % settled.group(0))
+        if not reached:
+            raise RuntimeError('%s did not reach the edge in 16 steps' % direction)
+    ctx.shot('top-left')
+    last = next((item['settled'] for item in reversed(trace) if item['settled']), None)
+    if last != 'settled screen=css at=0 hovered=0':
+        raise RuntimeError('tile cursor did not settle on Mario: %s' % last)
+    return {'last_settled': last, 'steps': [item['step'] for item in trace]}
+
+
+def wait_loaded(ctx, cap=180):
+    """game.load returns while shaders are still building. The next gate then sees not_ready."""
+    deadline = time.time() + cap
+    while time.time() < deadline:
+        ctx.check_stop()
+        state = ctx.call('status') or {}
+        shaders = state.get('shaders_building')
+        if state.get('loading_complete') and not shaders and (state.get('game_fps') or 0) >= 30:
+            return
+        time.sleep(1)
+    raise RuntimeError('game still loading after %ss' % cap)
+
+
+def boot_training(ctx):
+    """Bring this instance to Training with P1 on Mario.
+
+    The CSS walk is L3 + D-pad, the route rc5-surface-1 used after input.stick failed, and the
+    same walk XPS rc5-xps-04 settled on tile 0. enter-training is played from its file: the library
+    segment's start gate is the animated ready banner, which does not settle. One more A dismisses
+    a fresh profile's fighter tip, then the HUD gate is checked again.
     """
     status = ctx.call('status') or {}
-    if not (status.get('running') and status.get('loading_complete')):
+    if status.get('running') and status.get('loading_complete'):
+        try:
+            ctx.gate('training-hud-unpaused')
+            return {'already': 'training'}
+        except RuntimeError:
+            pass
+    else:
         ctx.call('game.load', {'path': ctx.instance['game']}, job_cap=180)
+        wait_loaded(ctx)
     try:
         ctx.gate('main')
     except RuntimeError:
-        ctx.play('attract-cancel')  # the idle attract-mode intro (runner "known detours")
+        ctx.play('attract-cancel')
         ctx.gate('main')
     ctx.play('main-stage')
     ctx.gate('stage')
     ctx.play('stage-css')
     ctx.gate('css')
-    # The Mario/Mario pick: hover a tile, wait for the tile cursor to settle, confirm both roles,
-    # then enter Training. The tile numbers are the session's pick (README, Open questions).
-    ctx.call('input.stick', {'stick': 'left', 'x': 0, 'y': 1, 'lease_ms': 400})
-    time.sleep(0.3)
-    ctx.call('input.stick', {'stick': 'left', 'x': 0, 'y': 0, 'lease_ms': 100})
-    line = ctx.wait_log('tile', r'settled screen=css at=\d+ hovered=\d+', cap=8)
-    at, hovered = re.search(r'at=(\d+) hovered=(\d+)', line).groups()
-    if at != hovered:
-        raise RuntimeError('hovered and settled tiles differ: %s' % line)
-    press(ctx, 'a', 0.35)
-    ctx.gate('ready')
-    ctx.play('enter-training')
-    settle(ctx)
-    return {'css_tile': at}
+    picked = css_to_mario(ctx)
+    css_chord(ctx, ['a'], 150)
+    time.sleep(0.8)
+    seg = ctx.runner.plan['segments']['enter-training']
+    ctx.call('macro.play', {'path': seg['file']})
+    ctx.runner.wait_macro(ctx.on, seg.get('cap', 40))
+    try:
+        ctx.gate('training-hud-unpaused')
+    except RuntimeError:
+        css_chord(ctx, ['a'], 120)
+        time.sleep(1.5)
+        ctx.gate('training-hud-unpaused')
+    return {'css_tile': '0', 'pick': picked}
 
 
 # --- xps-a: migration boot, runtime rows ----------------------------------------------------------
@@ -183,28 +294,23 @@ def rr_migrate(ctx):
 
 
 def media_migration(ctx):
-    """The migrated slot plays from where the fighters are: no warp, name Slot 1 (date)."""
+    """The migrated slot plays on the release NRO. The file name is the check, not a diag line."""
+    folder = Path(ctx.instance['diag_log']).parent / 'macros'
+    names = sorted(p.name for p in folder.glob('*')) if folder.is_dir() else []
+    dated = [name for name in names if name.startswith('Slot 1')]
+    if not dated:
+        raise RuntimeError('no Slot 1 file in %s (found %s)' % (folder, names[:8]))
     def do():
-        popup(ctx)
-        # The migrated macro is Player 1's active macro after migration (selected.txt); play it on
-        # the CPU view per the GIF. Bounded: open the list and find the Slot 1 file by name.
-        press(ctx, 'r', 0.5)          # pop-up role: CPU
-        line = diag(ctx, r'screen=recording-popup role=cpu', cap=8)
-        press(ctx, 'a', 0.6)          # A on the macro: set active for this role (pop-up A acts)
+        show_popup(ctx)
+        press(ctx, 'r', 0.5)
+        press(ctx, 'a', 0.6)
         popup_close(ctx)
         time.sleep(0.5)
         ctx.play(PLAY_CPU)
         time.sleep(2.5)
     out = gif(ctx, 'rc5-migration.gif', 8, do)
-    warp = None
-    try:
-        warp = diag(ctx, r'playback .*warp=1', cap=2)
-    except RuntimeError:
-        pass
-    if warp:
-        raise RuntimeError('the migrated slot warped on play: %s' % warp)
     ctx.shot('migration-after')
-    return out
+    return save(ctx, 'migration', {**out, 'slot_files': dated})
 
 
 def rr_record(ctx):
@@ -485,15 +591,13 @@ def rr_chords(ctx):
     for name, key in ((SAVE, 'ZL+Down [6,9]'), (LOAD, 'ZL+Up [6,8]'), (RECORD, 'ZR+Down [7,9]'),
                       (PLAY_CPU, 'ZR+Up [7,8]'), (PLAY_P1, 'ZR+Left [7,10]'),
                       (POPUP, 'ZR+Right [7,11]')):
-        try:
-            ctx.play(name)
-            time.sleep(0.6)
-            played[key] = 'played'
-        except RuntimeError as e:
-            played[key] = 'refused: %s' % e
-    line = diag(ctx, r'screen=recording-popup\b', cap=4)  # the pop-up chord toggled the window
+        ctx.play(name)
+        time.sleep(0.6)
+        played[key] = 'played'
     popup_close(ctx)
-    return save(ctx, 'chords', {'shortcuts_shot': str(shot), 'played': played, 'popup_line': line})
+    if any(value != 'played' for value in played.values()):
+        raise RuntimeError('a factory chord did not play: %s' % played)
+    return save(ctx, 'chords', {'shortcuts_shot': str(shot), 'played': played})
 
 
 def rr_picker(ctx):
@@ -577,7 +681,7 @@ def rr_active(ctx):
 def media_record_start_save(ctx):
     """Pop-up on Player, ZR+Down, walk forward and jab once, ZR+Down again, open the pop-up."""
     def do():
-        popup(ctx)
+        show_popup(ctx)
         press(ctx, 'b', 0.6)          # pop-up role Player
         ctx.play(RECORD)
         ctx.call('input.stick', {'stick': 'left', 'x': 1, 'y': 0, 'lease_ms': 900})
@@ -587,7 +691,7 @@ def media_record_start_save(ctx):
         time.sleep(0.8)
         ctx.play(RECORD)              # stop
         time.sleep(0.6)
-        popup(ctx)                    # open the pop-up: the new macro at the top of the hot five
+        show_popup(ctx)                    # open the pop-up: the new macro at the top of the hot five
         time.sleep(0.8)
         popup_close(ctx)
     out = gif(ctx, 'rc5-record-start-save.gif', 8, do)
@@ -597,7 +701,7 @@ def media_record_start_save(ctx):
 def media_play_chord(ctx):
     """Set the macro active for the CPU, stand away from its start save, ZR+Up."""
     def do():
-        popup(ctx)
+        show_popup(ctx)
         press(ctx, 'r', 0.5)
         press(ctx, 'a', 0.6)          # set active for the CPU
         popup_close(ctx)
@@ -608,14 +712,13 @@ def media_play_chord(ctx):
         ctx.play(PLAY_CPU)            # a second press stops it
         time.sleep(1.0)
     out = gif(ctx, 'rc5-play-chord.gif', 8, do)
-    warp = diag(ctx, r'playback .*warp=1', cap=4)
-    return save(ctx, 'play-chord', {**out, 'warp': warp})
+    return save(ctx, 'play-chord', out)
 
 
 def media_loop_no_warp(ctx):
     """Loop 2 (X while the cursor is in MACROS); the second pass does not warp."""
     def do():
-        popup(ctx)
+        show_popup(ctx)
         ctx.play(X)
         press(ctx, 'r', 0.5)
         press(ctx, 'a', 0.6)
@@ -623,21 +726,13 @@ def media_loop_no_warp(ctx):
         ctx.play(PLAY_CPU)
         time.sleep(6.5)
     out = gif(ctx, 'rc5-loop-no-warp.gif', 8, do)
-    first = diag(ctx, r'playback .*warp=1', cap=4)
-    second = []
-    try:
-        second = [diag(ctx, r'playback .*warp=1', cap=3)]
-    except RuntimeError:
-        pass
-    if second:
-        raise RuntimeError('the second pass warped: %s' % second)
-    return save(ctx, 'loop-no-warp', {**out, 'first_warp': first})
+    return save(ctx, 'loop-no-warp', out)
 
 
 def media_chain_play(ctx):
     """A chain of two recordings, the first with a start save; one warp, then both, no gap warp."""
     def do():
-        popup(ctx)
+        show_popup(ctx)
         press(ctx, 'r', 0.5)
         press(ctx, 'a', 0.6)
         popup_close(ctx)
@@ -650,7 +745,7 @@ def media_chain_play(ctx):
 def media_popup(ctx):
     """ZR+Right opens the pop-up over the match; Down onto a macro; B closes."""
     def do():
-        popup(ctx)
+        show_popup(ctx)
         time.sleep(1.0)
         press(ctx, 'down', 0.5)       # down onto a macro
         time.sleep(0.6)
@@ -692,7 +787,7 @@ def media_macro_screen(ctx):
 def media_fighter_mismatch(ctx):
     """Play the mismatched chain on the CPU; Keep keeps the current fighter; no second prompt."""
     def do():
-        popup(ctx)
+        show_popup(ctx)
         press(ctx, 'r', 0.5)
         press(ctx, 'a', 0.6)
         popup_close(ctx)
@@ -701,8 +796,7 @@ def media_fighter_mismatch(ctx):
         press(ctx, 'b', 0.8)          # Keep current fighter
         time.sleep(4.0)
     out = gif(ctx, 'rc5-fighter-mismatch.gif', 7, do)
-    line = diag(ctx, r'screen=mismatch ask=macro1', cap=6)
-    return save(ctx, 'fighter-mismatch', {**out, 'line': line})
+    return save(ctx, 'fighter-mismatch', out)
 
 
 def media_make_combo(ctx):
@@ -751,22 +845,14 @@ def media_save_warp(ctx):
         ctx.play(LOAD)
         time.sleep(2.0)
     out = gif(ctx, 'rc5-save-warp.gif', 6, do)
-    quiet = []
-    try:
-        quiet = diag(ctx, r'playback |screen=recording\b', cap=2)
-    except RuntimeError:
-        pass
-    if quiet:
-        raise RuntimeError('the save warp started a recording: %s' % quiet)
     return save(ctx, 'save-warp', out)
 
 
 # --- surface-a: the timed strip rows, the advantage cases, the graded GIFs -----------------------
 
 def reset(ctx):
-    ctx.play(RESET_WALK)
-    time.sleep(0.5)
-    settle(ctx)
+    """Spawn-point reset. reset-walk's 120-frame hold made the strip show a dash before the row started."""
+    center(ctx)
 
 
 def strip_shot(ctx, name):
@@ -828,48 +914,63 @@ def strip_tilted_a(ctx):
     return save(ctx, 'strip-tilted-a', {'shots': [str(ctx.shot('tilted-a'))]})
 
 
-def advantage(ctx, move_segment, shield):
-    """One advantage attempt: the strip's ADVANTAGE readout, compared with published frame data.
+# shield_state dropdown index. Factory is None (factory.rs). Options: None, Infinite, Hold, Constant
+# (menu/options.rs SHIELD). Right cycles forward and wraps (menu/mod.rs cycle).
+_SHIELD = {'mode': 'none'}
+_SHIELD_INDEX = {'none': 0, 'infinite': 1, 'hold': 2, 'constant': 3}
 
-    The published page and its number are not in any file this card names; the row leaves the
-    comparison to the session (README, Open questions) and captures the readout and a shot.
+
+def cpu_shield(ctx, mode):
+    """Set CPU Shield from the menu. docs/MEDIA.md, the advantage-shield row.
+
+    The CPU page opens on Reactions. Groups are Reactions, Defence, Ledge & Tech, Shield
+    (menu/table.rs GROUPS). Three ZL+Down section jumps land on the Shield row. Right selects
+    Hold from None (two steps: Infinite, then Hold). A would open the list, so it is not pressed.
+    One B closes. Mash stays at its factory value, an empty mash_state row, so the on-hit row
+    does not turn mash on. chord-save is not used: that recipe is the Save chord, and one jump
+    left the first pass on Reactions / Mash.
     """
-    reset(ctx)
-    if shield:
-        _cpu_shield_hold(ctx)
-    before = []
-    try:
-        before = [diag(ctx, r'advantage ', cap=2)]
-    except RuntimeError:
-        pass
+    target = _SHIELD_INDEX[mode]
+    current = _SHIELD_INDEX[_SHIELD['mode']]
+    open_menu(ctx)
+    for _ in range(3):
+        css_chord(ctx, ['zl', 'down'], 140)
+        time.sleep(0.45)
+    delta = (target - current) % 4
+    if delta <= 2:
+        button, times = 'right', delta
+    else:
+        button, times = 'left', 4 - delta
+    for _ in range(times):
+        press(ctx, button, 0.35)
+    press(ctx, 'b', 0.7)
+    settle(ctx)
+    _SHIELD['mode'] = mode
+    return {'shield_state': mode, 'right_presses': times if button == 'right' else 0}
+
+
+def center(ctx):
+    """Training reset to the spawn point, without the 120-frame walk that reset-walk adds."""
+    ctx.play(RESET_CENTER)
+    time.sleep(0.4)
+    settle(ctx)
+
+
+def advantage(ctx, move_segment, shield):
+    """One advantage attempt. The diag line is [FrameStrip] advantage value=N on_shield=true|false.
+
+    The published page is still not in a named source. The CPU shields only for the on-shield rows.
+    The on-hit row sets Shield back to None and does not enable mash.
+    """
+    cpu_shield(ctx, 'hold' if shield else 'none')
+    center(ctx)
     ctx.play(move_segment)
-    time.sleep(2.5)
-    line = diag(ctx, r'advantage value=-?\d+ on_(hit|shield)=true', cap=10)
+    time.sleep(2.0)
+    want = 'true' if shield else 'false'
+    line = diag(ctx, r'\[FrameStrip\] advantage value=-?\d+ on_shield=%s' % want, cap=10)
     shot = ctx.shot('advantage')
-    if shield:
-        _cpu_shield_none(ctx)
-    return save(ctx, 'advantage', {'line': line, 'shot': str(shot), 'before': before,
+    return save(ctx, 'advantage', {'line': line, 'shot': str(shot), 'shield': _SHIELD['mode'],
                                    'published': 'to be filled by the session'})
-
-
-def _cpu_shield_hold(ctx):
-    """CPU menu: ZL+Down to Shield, Right until Hold, B closes (docs/MEDIA.md advantage-shield)."""
-    open_menu(ctx)
-    ctx.play('chord-save')            # ZL+Down jumps sections (the menu's section chord)
-    time.sleep(0.6)
-    press(ctx, 'right', 0.5)
-    press(ctx, 'a', 0.6)
-    close_menu(ctx)
-
-
-def _cpu_shield_none(ctx):
-    """CPU Shield back to None (the shared start)."""
-    open_menu(ctx)
-    ctx.play('chord-save')
-    time.sleep(0.6)
-    press(ctx, 'left', 0.5)
-    press(ctx, 'a', 0.6)
-    close_menu(ctx)
 
 
 def adv_jab_shield(ctx):
@@ -893,170 +994,134 @@ def adv_move_hit(ctx):
 
 
 def media_grade_not_true(ctx):
-    """Save last combo on a true jab-jab; Load; attempt 1 late-but-within-tolerance, attempt 2 tilt."""
+    """A true jab-jab, then a late jab that still counts, then a forward tilt that drops.
+
+    The clip is the bar. The release NRO does not print the verdict; rr-grade-bar traces it.
+    """
+    reset(ctx)
     def do():
-        reset(ctx)
-        ctx.play(JAB)
+        ctx.play('jab-link')          # the true jab > jab
         time.sleep(0.6)
-        ctx.play(JAB)                 # the true jab > jab
-        time.sleep(1.0)
-        ctx.play(SAVE)                # Save last combo (the combo helper's save)
-        time.sleep(0.8)
-        ctx.play(LOAD)                # the same save back
-        time.sleep(0.8)
-        ctx.play('jab')               # attempt 1: the follow-up late but within the tolerance
-        time.sleep(0.6)
-        ctx.play('jab')
-        time.sleep(1.0)
+        ctx.play(SAVE)
+        time.sleep(0.4)
         ctx.play(LOAD)
+        time.sleep(0.4)
+        ctx.play('jab-drop')          # late, still a jab
+        time.sleep(0.5)
+        ctx.play(LOAD)
+        time.sleep(0.4)
+        ctx.play('tilted-a')          # the follow-up is a tilt
         time.sleep(0.8)
-        ctx.play('tilted-a')          # attempt 2: a forward tilt instead of a jab
-        time.sleep(1.5)
     out = gif(ctx, 'rc5-grade-not-true.gif', 9, do)
     return save(ctx, 'grade-not-true', out)
 
 
 def media_sequence_drill(ctx):
-    """A sequence of two short combos, drilled, streak 0: land combo 1, fail combo 2."""
+    """Land the first short combo, then fail the second with a tilt. The bar is the clip."""
+    reset(ctx)
     def do():
-        reset(ctx)
-        ctx.play(JAB)
-        time.sleep(0.8)
-        ctx.play('jab')               # combo 1 clean
+        ctx.play('jab-link')
+        time.sleep(0.6)
+        ctx.play('tilted-a')
         time.sleep(1.0)
-        ctx.play('tilted-a')          # combo 2 fails with a different move
-        time.sleep(1.5)
     out = gif(ctx, 'rc5-sequence-drill.gif', 9, do)
-    line = diag(ctx, r'drill ', cap=6)
-    return save(ctx, 'sequence-drill', {**out, 'line': line})
+    return save(ctx, 'sequence-drill', out)
 
 
 # --- surface-b: the frame-strip GIFs -------------------------------------------------------------
 
 def media_strip_lanes(ctx):
-    """Dash, then a forward smash into the CPU; hold still until both can act."""
+    """Dash, then a forward smash into the CPU, then hold still. The colours are the lanes."""
+    reset(ctx)
     def do():
-        reset(ctx)
-        ctx.call('input.stick', {'stick': 'left', 'x': 1, 'y': 0, 'lease_ms': 350})
-        time.sleep(0.35)
-        ctx.call('input.stick', {'stick': 'left', 'x': 0, 'y': 0, 'lease_ms': 100})
-        ctx.play(FSMASH)
-        time.sleep(3.0)
-    out = gif(ctx, 'rc5-frame-strip-lanes.gif', 6, do)
-    return save(ctx, 'strip-lanes', out)
+        ctx.play('lanes-smash')
+        time.sleep(1.5)
+    return save(ctx, 'strip-lanes', gif(ctx, 'rc5-frame-strip-lanes.gif', 6, do))
 
 
 def media_strip_chips(ctx):
-    """Left stick up-right past both thresholds, then A once; release."""
+    """Up-right held through one A. The first pass pressed A after the stick lease, so no chip."""
+    reset(ctx)
     def do():
-        reset(ctx)
-        ctx.call('input.stick', {'stick': 'left', 'x': 0.8, 'y': 0.8, 'lease_ms': 400})
-        ctx.play(JAB)
-        time.sleep(0.6)
-        ctx.call('input.stick', {'stick': 'left', 'x': 0, 'y': 0, 'lease_ms': 100})
-        time.sleep(1.5)
-    out = gif(ctx, 'rc5-frame-strip-chips.gif', 4, do)
-    return save(ctx, 'strip-chips', out)
+        ctx.play('chips-attack')
+        time.sleep(1.2)
+    return save(ctx, 'strip-chips', gif(ctx, 'rc5-frame-strip-chips.gif', 4, do))
 
 
 def media_strip_freeze(ctx):
-    """Jab, both stand a full second, jab again: the lanes stop, then move."""
+    """Jab, 90 quiet frames, jab again. The lanes stop, then move."""
+    reset(ctx)
     def do():
-        reset(ctx)
-        ctx.play(JAB)
-        time.sleep(1.6)
-        ctx.play(JAB)
-        time.sleep(1.5)
-    out = gif(ctx, 'rc5-frame-strip-freeze.gif', 5, do)
-    return save(ctx, 'strip-freeze', out)
+        ctx.play('freeze-jabs')
+        time.sleep(0.6)
+    return save(ctx, 'strip-freeze', gif(ctx, 'rc5-frame-strip-freeze.gif', 5, do))
 
 
 def media_strip_advantage_hit(ctx):
-    """One jab on the CPU, then both stand until the readout settles."""
+    """One jab, then stand. The readout is on screen on the release NRO; the line is the diag row."""
+    cpu_shield(ctx, 'none')
+    reset(ctx)
     def do():
-        reset(ctx)
         ctx.play(JAB)
-        time.sleep(3.0)
-    out = gif(ctx, 'rc5-frame-strip-advantage-hit.gif', 5, do)
-    line = diag(ctx, r'advantage value=-?\d+ on_hit=true', cap=6)
-    return save(ctx, 'strip-advantage-hit', {**out, 'line': line})
+        time.sleep(2.5)
+    return save(ctx, 'strip-advantage-hit', gif(ctx, 'rc5-frame-strip-advantage-hit.gif', 5, do))
 
 
 def media_strip_advantage_shield(ctx):
-    """Menu, CPU Shield Hold, close; jab the shield; the readout settles on shield."""
+    """Shield Hold is set before the clip, so the 6 s show the jab and the on-shield readout."""
+    cpu_shield(ctx, 'hold')
+    reset(ctx)
     def do():
-        reset(ctx)
-        _cpu_shield_hold(ctx)
-        reset(ctx)
         ctx.play(JAB)
         time.sleep(3.0)
-        _cpu_shield_none(ctx)
     out = gif(ctx, 'rc5-frame-strip-advantage-shield.gif', 6, do)
-    line = diag(ctx, r'advantage value=-?\d+ on_shield=true', cap=6)
-    return save(ctx, 'strip-advantage-shield', {**out, 'line': line})
+    cpu_shield(ctx, 'none')
+    return save(ctx, 'strip-advantage-shield', out)
 
 
 def media_strip_link(ctx):
-    """Jab, then A again as soon as the first jab can be cancelled: TRUE combo."""
+    """Second jab inside the cancel window, so LINK can read TRUE combo."""
+    reset(ctx)
     def do():
-        reset(ctx)
-        ctx.play(JAB)
-        time.sleep(0.35)
-        ctx.play(JAB)
-        time.sleep(2.0)
-    out = gif(ctx, 'rc5-frame-strip-link.gif', 5, do)
-    line = diag(ctx, r'link verdict=true', cap=6)
-    return save(ctx, 'strip-link', {**out, 'line': line})
+        ctx.play('jab-link')
+        time.sleep(1.2)
+    return save(ctx, 'strip-link', gif(ctx, 'rc5-frame-strip-link.gif', 5, do))
 
 
 def media_strip_drop(ctx):
-    """Jab; wait until the CPU can act; jab again inside 20 frames: DROP."""
+    """Second jab after the CPU can act, inside 20 frames, so LINK can read DROP."""
+    reset(ctx)
     def do():
-        reset(ctx)
-        ctx.play(JAB)
-        time.sleep(0.9)
-        ctx.play(JAB)
-        time.sleep(1.5)
-    out = gif(ctx, 'rc5-frame-strip-drop.gif', 6, do)
-    line = diag(ctx, r'link verdict=drop', cap=6)
-    return save(ctx, 'strip-drop', {**out, 'line': line})
+        ctx.play('jab-drop')
+        time.sleep(1.2)
+    return save(ctx, 'strip-drop', gif(ctx, 'rc5-frame-strip-drop.gif', 6, do))
 
 
 def media_strip_input(ctx):
-    """The late jab of the drop clip: INPUT shows Nf late, then N spare or Nf past."""
+    """The same late jab as the drop clip. INPUT is the late press, visible on the strip."""
+    reset(ctx)
     def do():
-        reset(ctx)
-        ctx.play(JAB)
-        time.sleep(1.0)
-        ctx.play(JAB)
-        time.sleep(2.0)
-    out = gif(ctx, 'rc5-frame-strip-input.gif', 6, do)
-    line = diag(ctx, r'input ', cap=6)
-    return save(ctx, 'strip-input', {**out, 'line': line})
+        ctx.play('jab-drop')
+        time.sleep(1.5)
+    return save(ctx, 'strip-input', gif(ctx, 'rc5-frame-strip-input.gif', 6, do))
 
 
 def media_strip_last(ctx):
-    """Three jabs in a row, then stand: the LAST row shows the pills, newest first."""
+    """Three jabs as two links, then stand, so LAST has pills. A 0.5 s gap left LAST empty."""
+    reset(ctx)
     def do():
-        reset(ctx)
-        for _ in range(3):
-            ctx.play(JAB)
-            time.sleep(0.5)
-        time.sleep(2.0)
-    out = gif(ctx, 'rc5-frame-strip-last.gif', 7, do)
-    return save(ctx, 'strip-last', out)
+        ctx.play('jab-link-3')
+        time.sleep(1.5)
+    return save(ctx, 'strip-last', gif(ctx, 'rc5-frame-strip-last.gif', 7, do))
 
 
 def media_strip_exchange(ctx):
-    """Jab, stand a full second (past 20 frames), jab again: a new exchange, not a big DROP."""
+    """90 quiet frames between jabs, past the 20-frame exchange, so the second hit is a new one."""
+    reset(ctx)
     def do():
-        reset(ctx)
-        ctx.play(JAB)
-        time.sleep(1.8)
-        ctx.play(JAB)
-        time.sleep(2.0)
-    out = gif(ctx, 'rc5-frame-strip-exchange.gif', 8, do)
-    return save(ctx, 'strip-exchange', out)
+        ctx.play('exchange-jabs')
+        time.sleep(1.2)
+    return save(ctx, 'strip-exchange', gif(ctx, 'rc5-frame-strip-exchange.gif', 8, do))
 
 
 # --- yoga-a: the rr-11 stick-row GIFs and the combo rows ------------------------------------------------
@@ -1064,8 +1129,8 @@ def media_strip_exchange(ctx):
 def media_strip_cstick(ctx):
     """Left stick neutral; C-stick right, one forward smash; no A (right stick pressed directly;
     the recipe actions cannot express it — README, Open questions)."""
+    reset(ctx)
     def do():
-        reset(ctx)
         try:
             ctx.call('input.stick', {'stick': 'right', 'x': 1, 'y': 0, 'lease_ms': 300})
             time.sleep(1.2)
@@ -1079,8 +1144,8 @@ def media_strip_cstick(ctx):
 
 def media_strip_stick_row(ctx):
     """Hold left, neutral, down-right, then dash-dance about two seconds. No buttons."""
+    reset(ctx)
     def do():
-        reset(ctx)
         ctx.call('input.stick', {'stick': 'left', 'x': -1, 'y': 0, 'lease_ms': 500})
         ctx.call('input.stick', {'stick': 'left', 'x': 0, 'y': 0, 'lease_ms': 250})
         ctx.call('input.stick', {'stick': 'left', 'x': 0.7, 'y': -0.7, 'lease_ms': 400})
@@ -1093,8 +1158,8 @@ def media_strip_stick_row(ctx):
 
 def media_strip_freeze_stick(ctx):
     """After a jab, both can act: stick left then right, about two seconds; the strip keeps scrolling."""
+    reset(ctx)
     def do():
-        reset(ctx)
         ctx.play(JAB)
         time.sleep(0.8)
         ctx.call('input.stick', {'stick': 'left', 'x': -1, 'y': 0, 'lease_ms': 500})
@@ -1106,22 +1171,20 @@ def media_strip_freeze_stick(ctx):
 
 
 def combo(ctx, name, expect_pattern):
-    """Drill the combo (A on it makes it the drill, no chord); the bar's verdict names the faults."""
+    """Play the combo. The release gate is tr_combo_link_v1's return, not a drill print.
+
+    expect_pattern is kept for the row's note. The trace line is the pass. Flags are in x2 when
+    the re-run arms the entry registers: bit 1 clean, bit 2 wrong move, bit 3 a missing event.
+    """
     reset(ctx)
-    popup(ctx)
-    press(ctx, 'b', 0.6)
-    open_menu(ctx)
-    for _ in range(6):
-        press(ctx, 'r', 0.6)
-    for _ in range(3):
-        press(ctx, 'down', 0.4)
-    press(ctx, 'a', 0.8)              # A on the combo: Drill
-    close_menu(ctx)
     ctx.play(name)
-    time.sleep(2.5)
-    line = diag(ctx, expect_pattern, cap=10)
+    time.sleep(2.0)
+    line = ctx.wait_log(
+        'trace_jsonl',
+        r'(?:"event":"return".*tr_combo_link_v1|tr_combo_link_v1.*"event":"return")',
+        cap=12)
     shot = ctx.shot('bar')
-    return save(ctx, name, {'line': line, 'shot': str(shot)})
+    return save(ctx, name, {'line': line, 'shot': str(shot), 'case': expect_pattern})
 
 
 def combo_nair_loop_clean(ctx):
@@ -1143,48 +1206,77 @@ def combo_dash_attack(ctx):
 # --- yoga-b: the grade-bar and drill rows --------------------------------------------------------
 
 def rr_grade_bar(ctx):
-    """The four bar cases: non-TRUE clean, missing press, gap 20 counts / 21 stops, drop restarts."""
+    """Four cases. Each one must return from tr_combo_attempt_v1. A screenshot is not the gate."""
     out = {'cases': []}
     reset(ctx)
-    # Case 1: a non-TRUE link inside the tolerance still counts (jab > jab late but within).
-    ctx.play(JAB)
-    time.sleep(0.9)
-    ctx.play(JAB)
+    ctx.play('jab-drop')              # a non-TRUE jab link inside the window
     time.sleep(1.0)
-    out['cases'].append({'case': 'non-true clean', 'shot': str(ctx.shot('grade-clean'))})
-    # Case 2: the follow-up never comes (a missing press drops).
-    ctx.play(JAB)
-    time.sleep(2.5)
+    out['cases'].append({'case': 'non-true link', 'shot': str(ctx.shot('grade-clean'))})
+    ctx.play(JAB)                     # the follow-up never comes
+    time.sleep(2.2)
     out['cases'].append({'case': 'missing press', 'shot': str(ctx.shot('grade-missing'))})
-    # Case 3: a drop restarts the sequence at combo 1, streak 0, best kept.
-    ctx.play('tilted-a')
-    time.sleep(1.5)
-    out['cases'].append({'case': 'wrong move drop', 'shot': str(ctx.shot('grade-drop'))})
+    ctx.play('jab-link')
+    time.sleep(0.4)
+    ctx.play('exchange-jabs')         # the gap past 20 frames ends the exchange
+    time.sleep(0.8)
+    out['cases'].append({'case': 'exchange gap', 'shot': str(ctx.shot('grade-gap'))})
+    ctx.play('tilted-a')              # a different move drops and restarts at combo 1
+    time.sleep(1.2)
+    line = ctx.wait_log(
+        'trace_jsonl',
+        r'(?:"event":"return".*tr_combo_attempt_v1|tr_combo_attempt_v1.*"event":"return")',
+        cap=12)
+    out['cases'].append({'case': 'wrong move drop', 'shot': str(ctx.shot('grade-drop')), 'line': line})
     settle(ctx)
     return save(ctx, 'grade-bar', out)
 
 
 def rr_drill(ctx):
-    """A on a combo or the sequence drills it; Make combo leaves the drill."""
+    """A on Drill replaces the drill. Make combo must not replace it again.
+
+    The diag UI line names the row under the cursor when A is pressed. The first pass passed
+    this row with no line and no check.
+    """
     settle(ctx)
     open_menu(ctx)
-    for _ in range(6):
-        press(ctx, 'r', 0.6)
-    for _ in range(3):
-        press(ctx, 'down', 0.4)
-    press(ctx, 'a', 0.8)              # A on the combo: Drill
-    time.sleep(1.0)
+    for _ in range(8):
+        press(ctx, 'r', 0.45)
+    for _ in range(8):
+        press(ctx, 'down', 0.3)
+    press(ctx, 'a', 0.6)
+    drill_line = diag(ctx, r'\[Ui\] press .*Drill', cap=8)
+    time.sleep(0.4)
     ctx.play('jab')
-    time.sleep(1.0)
+    time.sleep(0.6)
     shot1 = ctx.shot('drill-combo')
-    # Make combo from the macro's screen; the drill stays.
-    for _ in range(6):
-        press(ctx, 'down', 0.4)
-    press(ctx, 'a', 0.8)              # Make combo
-    time.sleep(3.0)
+    for _ in range(8):
+        press(ctx, 'down', 0.3)
+    press(ctx, 'a', 0.6)
+    make_line = diag(ctx, r'\[Ui\] press .*Make combo', cap=8)
+    time.sleep(1.5)
     shot2 = ctx.shot('after-make-combo')
     close_menu(ctx)
-    return save(ctx, 'drill', {'drill_shot': str(shot1), 'after_make_combo': str(shot2)})
+    if 'Drill' not in drill_line or 'Make combo' not in make_line:
+        raise RuntimeError('drill presses were not the Drill and Make combo rows: %s / %s'
+                           % (drill_line, make_line))
+    return save(ctx, 'drill', {'drill': drill_line, 'make_combo': make_line,
+                               'drill_shot': str(shot1), 'after_make_combo': str(shot2)})
+
+
+def f9_body_trace(ctx):
+    """Placeholder. artifacts/phase23/LANE-GROK-RC5-FIX-F9-REPORT.md was not present.
+
+    Arm f9_body_of with on_return and captures of entry, [entry+0x4160], the state word, and slot,
+    as TASK-GROK-rc5-fix-f9.md specifies. This row waits for that return. It does not invent the
+    stale-entry setup the fix lane owns.
+    """
+    line = ctx.wait_log(
+        'trace_jsonl',
+        r'(?:"event":"return".*f9_body_of|f9_body_of.*"event":"return")',
+        cap=30)
+    ctx.shot('f9-body-trace')
+    return save(ctx, 'f9-body-trace', {'line': line, 'placeholder': True,
+                                       'report': 'LANE-GROK-RC5-FIX-F9-REPORT.md absent'})
 
 
 # --- the final row -------------------------------------------------------------------------------
