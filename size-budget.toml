@@ -481,3 +481,11 @@ ceiling = 148422
 date = "2026-11-07"
 reason = "rr-7 runtime (p23/rr-7-runtime): the hook copies live slots into a worker buffer so migration does not take the recorder lock; measured 148422 (tools/size_gate.py), +112 over 148310"
 approved_by = "Operator 2026-11-05 standing order via primary 35137355: 'Raise as needed'"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 148470
+date = "2026-11-07"
+reason = "rr-7 runtime (p23/rr-7-runtime): playback keeps ids in a fixed buffer so a hook does not allocate; measured 148470 (tools/size_gate.py), +48 over 148422"
+approved_by = "Operator 2026-11-05 standing order via primary 35137355: 'Raise as needed'"
