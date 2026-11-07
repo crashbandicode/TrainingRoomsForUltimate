@@ -1671,10 +1671,11 @@ fn dir_arrow(dir: super::combo::Dir) -> &'static str {
         Dir::Back => "←",
         Dir::Up => "↑",
         Dir::Down => "↓",
-        Dir::ForwardUp => "↗",
-        Dir::BackUp => "↖",
-        Dir::ForwardDown => "↘",
-        Dir::BackDown => "↙",
+        // The UI font maps the four cardinal arrows and not the diagonals.
+        Dir::ForwardUp => "↑→",
+        Dir::BackUp => "↑←",
+        Dir::ForwardDown => "↓→",
+        Dir::BackDown => "↓←",
         Dir::Neutral | Dir::Side => "",
     }
 }

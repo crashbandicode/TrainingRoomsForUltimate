@@ -21,7 +21,10 @@ const FONT_SAFE: &[char] = &[
     '\u{2014}', // — EM DASH (the Mii list's title)
     '\u{00A7}', // § SECTION SIGN
     '\u{00E9}', // é
+    '\u{2190}', // ← LEFTWARDS ARROW. All three nintendoP_RodinNTLG weights map it (bfotf-2c46f6bb68, bfotf-2d24073d3a, bfotf-2d58bc0c11).
+    '\u{2191}', // ↑ UPWARDS ARROW. The same three weights map it.
     '\u{2192}', // → RIGHTWARDS ARROW. All three nintendoP_RodinNTLG weights map it (bfotf-2c46f6bb68, bfotf-2d24073d3a, bfotf-2d58bc0c11).
+    '\u{2193}', // ↓ DOWNWARDS ARROW. The same three weights map it.
     '\u{221E}', // ∞ INFINITY. The same three weights map it.
 ];
 
