@@ -2,24 +2,25 @@
 //! the save-restore request, and the keyboard offer this module names.
 
 use std::path::Path;
-use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicU8, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, AtomicU8, AtomicUsize, Ordering};
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::library::{
-    Chain, LegacySlot, NamedSave, RecordingIndex, Role, StartSaveState, MACROS_DIR, SAVES_DIR,
+    Chain, Drill, DrillKind, Kind, LegacySlot, LoopCount, NamedSave, RecordingIndex, Role, Sequence,
+    StartSaveState, Use, MACROS_DIR, SAVES_DIR, SEQUENCES_DIR,
 };
-use super::macros::{FrameSnapshot, InputFrame, Library, MAX_FRAMES};
-use super::playback::{Book, Playback};
+use super::macros::{FrameSnapshot, FrameWindow, InputFrame, Library, MAX_FRAMES};
+use super::playback::{Book, Playback, StartLink};
 use super::rr_runtime::{
-    chain_mismatch, chord_notice, civil_date, crop_combo_file, crop_macro_file, delete_save,
-    drive_mash, drive_play, drive_step, duplicate_save, finish_recording, make_combo,
-    migrate_at_boot, offer_keyboard, push_frame, start_save_notice, toggle_record, Capture,
-    KeyboardOffer, Tape, READ_WINDOW,
-    RESIDENT_FRAMES,
+    chord_notice, civil_date, crop_combo_file, crop_macro_file, delete_save,
+    drive_mash, drive_play, drive_step, duplicate_save, finish_recording, migrate_at_boot,
+    offer_keyboard, push_frame, save_made_combo, start_save_notice, toggle_record, Capture,
+    KeyboardOffer, Tape, EMPTY_COMBO, READ_WINDOW, RESIDENT_FRAMES,
 };
+use crate::model::combo::Combo;
 use crate::model::input_delay::MappedInputs;
-use crate::model::recording_menu::Effect;
+use crate::model::recording_menu::{Effect, LoopMark, Selection};
 use crate::model::state::record::SavedState;
 use crate::model::store::Store;
 
@@ -47,6 +48,23 @@ static MACHINE: Mutex<Option<Playback>> = Mutex::new(None);
 static RESIDENT: Mutex<Option<Resident>> = Mutex::new(None);
 static MENU_EFFECT: Mutex<Effect> = Mutex::new(Effect::None);
 static CROP: Mutex<Option<CropWindow>> = Mutex::new(None);
+static DEFER_MIGRATE: AtomicBool = AtomicBool::new(false);
+static ROLE_KIND: [AtomicI32; 2] = [const { AtomicI32::new(-1) }; 2];
+static STRIP: Mutex<Option<Combo>> = Mutex::new(None);
+static MAKE: Mutex<Option<MakeJob>> = Mutex::new(None);
+static HELD: Mutex<Option<Role>> = Mutex::new(None);
+static ANSWER: Mutex<Option<MismatchChoice>> = Mutex::new(None);
+static LAST_DRILL: Mutex<Option<String>> = Mutex::new(None);
+static DRILL_SEEN: AtomicBool = AtomicBool::new(false);
+static DRILL_ASK: Mutex<Option<String>> = Mutex::new(None);
+static PLAYER_LABEL: Mutex<String> = Mutex::new(String::new());
+static LAST_ASK: Mutex<Option<MismatchAsk>> = Mutex::new(None);
+static CATALOG_GEN: AtomicU64 = AtomicU64::new(0);
+
+struct MakeJob {
+    source: String,
+    ready: bool,
+}
 
 struct Resident {
     id: String,
@@ -70,6 +88,30 @@ pub struct Tick {
     pub notices: Vec<&'static str>,
     pub diags: Vec<String>,
     pub keyboard: Option<KeyboardOffer>,
+    pub mismatch: Option<MismatchAsk>,
+    /// Switch uses the existing exact-fighter route for this kind. Keep leaves it empty.
+    pub switch_kind: Option<i32>,
+    /// A combo records a fighter name. The wrapper resolves it to a kind.
+    pub switch_name: Option<String>,
+    pub switch_player: bool,
+}
+
+/// The existing Fighter Mismatch screen, named for the wrapper that opens it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MismatchAsk {
+    pub origin: &'static str,
+    pub recorded_kind: i32,
+    pub current_kind: i32,
+    pub recorded_label: String,
+    pub current_label: String,
+}
+
+/// The answer the prompt returns. Cancel plays nothing.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MismatchChoice {
+    Keep,
+    Switch,
+    Cancel,
 }
 
 pub fn migrated() -> bool {
@@ -219,13 +261,17 @@ pub fn service_at(
     online: bool,
 ) -> Tick {
     let mut tick = Tick::default();
-    if !MIGRATED.load(Ordering::Acquire) && migrate_at_boot(root, slots, date).is_ok() {
+    apply_waiting_answer(&mut tick);
+    if !DEFER_MIGRATE.load(Ordering::Acquire)
+        && !MIGRATED.load(Ordering::Acquire)
+        && migrate_at_boot(root, slots, date).is_ok()
+    {
         MIGRATED.store(true, Ordering::Release);
         tick.diags.push("screen=migrate once=1".to_string());
     }
     let edge = RECORD_EDGE.swap(0, Ordering::AcqRel);
-    let play_player = PLAY_PLAYER.swap(false, Ordering::AcqRel);
-    let play_cpu = PLAY_CPU.swap(false, Ordering::AcqRel);
+    let mut play_player = PLAY_PLAYER.swap(false, Ordering::AcqRel);
+    let mut play_cpu = PLAY_CPU.swap(false, Ordering::AcqRel);
     let mash = MASH.swap(false, Ordering::AcqRel);
     if edge == 1 {
         let role = if LAST_ROLE.load(Ordering::Acquire) == ROLE_CPU {
@@ -238,6 +284,13 @@ pub fn service_at(
         show_chord_notice(root, &mut tick);
     }
     if edge == 2 {
+        let role_now = if RECORD_ROLE.load(Ordering::Acquire) == ROLE_CPU {
+            "cpu"
+        } else {
+            "player"
+        };
+        tick.diags
+            .push(format!("screen=recording role={role_now} recording=0"));
         let (role, frames) = taken_frames();
         let mut capture = Capture::idle();
         toggle_record(&mut capture, role);
@@ -246,12 +299,22 @@ pub fn service_at(
         }
         if let Ok(stop) = finish_recording(root, &capture, player.clone(), cpu.clone(), unix_now())
         {
+            bump_catalog();
             if let Some(text) = stop.notice() {
                 tick.notices.push(text);
             }
         }
     }
-    if !(play_player || play_cpu || mash || menu_pending() || playing()) {
+    // A drill question and a finished Make combo are work even when no chord is waiting.
+    let busy = play_player
+        || play_cpu
+        || mash
+        || menu_pending()
+        || playing()
+        || lock(&DRILL_ASK).is_some()
+        || lock(&MAKE).is_some()
+        || (lock(&HELD).is_some() && lock(&ANSWER).is_some());
+    if !busy {
         return tick;
     }
     let Ok(book) = load_book(root) else {
@@ -266,6 +329,7 @@ pub fn service_at(
         RUN_CPU.store(false, Ordering::Release);
         tick.diags.push("screen=playback mash=1".to_string());
     }
+    release_held(&mut play_player, &mut play_cpu);
     if play_player {
         play_role(root, machine, &book, Role::Player, &mut tick);
     } else if RUN_PLAYER.load(Ordering::Acquire) {
@@ -277,13 +341,158 @@ pub fn service_at(
         step_role(root, machine, &book, Role::Cpu);
     }
     if menu_pending() {
-        apply_menu(root, &book, online, &mut tick);
+        apply_menu(root, machine, &book, online, &mut tick);
     }
+    ask_drill(root, &mut tick);
+    finish_make(root, &mut tick);
     tick
+}
+
+/// A record or a menu effect while the old slot image is still filling. Migration stays pending.
+pub fn service_pending(root: &Path, player: SavedState, cpu: SavedState, online: bool) -> Tick {
+    DEFER_MIGRATE.store(true, Ordering::Release);
+    let empty = [None, None, None, None, None];
+    let tick = service_at(root, &empty, "", player, cpu, online);
+    DEFER_MIGRATE.store(false, Ordering::Release);
+    tick
+}
+
+pub fn set_role_fighter(role: Role, kind: i32) {
+    ROLE_KIND[role_index(role)].store(kind, Ordering::Release);
+    if role == Role::Player {
+        CURRENT_KIND.store(kind as u32, Ordering::Release);
+    }
+}
+
+pub fn set_strip_sample(combo: Option<Combo>) {
+    *lock(&STRIP) = combo;
+}
+
+pub fn set_fighter_label(label: &str) {
+    *lock(&PLAYER_LABEL) = label.to_string();
+}
+
+pub fn answer_mismatch(choice: MismatchChoice) {
+    *lock(&ANSWER) = Some(choice);
+}
+
+pub fn catalog_generation() -> u64 {
+    CATALOG_GEN.load(Ordering::Acquire)
+}
+
+fn bump_catalog() {
+    CATALOG_GEN.fetch_add(1, Ordering::Release);
+}
+
+/// The menu's selection is what Play, Record, and the loop read. The index is that selection.
+pub fn publish_selection(root: &Path, selection: &Selection, drill_kind: Option<DrillKind>) {
+    let Ok(mut index) = RecordingIndex::load(root) else {
+        return;
+    };
+    let at = unix_now();
+    let _ = index.set_active(Role::Player, selection.active_player.as_deref(), at);
+    let _ = index.set_active(Role::Cpu, selection.active_cpu.as_deref(), at.saturating_add(1));
+    let _ = index.bind_save(selection.bound.as_deref(), at.saturating_add(2));
+    index.set_loop(Role::Player, loop_count(selection.loop_player));
+    index.set_loop(Role::Cpu, loop_count(selection.loop_cpu));
+    if let (Some(id), Some(kind)) = (selection.drill.as_deref(), drill_kind) {
+        let _ = index.set_drill(Some(Drill { kind, id: id.to_string() }), at.saturating_add(3));
+    }
+    let _ = index.save(root);
+}
+
+/// The drill changed. A combo recorded on another fighter asks; the drill itself stays.
+pub fn note_drill(id: Option<String>) {
+    let mut last = lock(&LAST_DRILL);
+    if !DRILL_SEEN.swap(true, Ordering::AcqRel) {
+        *last = id;
+        return;
+    }
+    if *last == id {
+        return;
+    }
+    *last = id.clone();
+    *lock(&DRILL_ASK) = id;
+}
+
+fn loop_count(mark: LoopMark) -> LoopCount {
+    match mark {
+        LoopMark::Infinite => LoopCount::Infinite,
+        LoopMark::Finite(count) => LoopCount::try_from(count).unwrap_or(LoopCount::Finite(1)),
+    }
+}
+
+fn role_index(role: Role) -> usize {
+    match role {
+        Role::Player => 0,
+        Role::Cpu => 1,
+    }
+}
+
+fn role_kind(role: Role) -> i32 {
+    let kind = ROLE_KIND[role_index(role)].load(Ordering::Acquire);
+    if kind >= 0 {
+        kind
+    } else if role == Role::Player {
+        let current = CURRENT_KIND.load(Ordering::Acquire);
+        if current == u32::MAX { -1 } else { current as i32 }
+    } else {
+        -1
+    }
+}
+
+fn apply_waiting_answer(tick: &mut Tick) {
+    if lock(&HELD).is_some() {
+        return;
+    }
+    let Some(choice) = lock(&ANSWER).take() else {
+        return;
+    };
+    let Some(ask) = lock(&LAST_ASK).take() else {
+        return;
+    };
+    if choice == MismatchChoice::Switch {
+        tick.switch_name = Some(ask.recorded_label);
+        tick.switch_player = true;
+    }
+}
+
+fn release_held(play_player: &mut bool, play_cpu: &mut bool) {
+    let Some(role) = *lock(&HELD) else {
+        return;
+    };
+    if lock(&ANSWER).is_none() {
+        return;
+    }
+    *lock(&HELD) = None;
+    match role {
+        Role::Player => *play_player = true,
+        Role::Cpu => *play_cpu = true,
+    }
 }
 
 fn play_role(root: &Path, machine: &mut Playback, book: &Book, role: Role, tick: &mut Tick) {
     show_chord_notice(root, tick);
+    if let Some(ask) = mismatch_for(book, role) {
+        match lock(&ANSWER).take() {
+            None => {
+                tick.diags.push(format!(
+                    "screen=mismatch ask={} rows=Keep current fighter|Switch to recorded fighter",
+                    ask.origin
+                ));
+                *lock(&LAST_ASK) = Some(ask.clone());
+                tick.mismatch = Some(ask);
+                *lock(&HELD) = Some(role);
+                return;
+            }
+            Some(MismatchChoice::Cancel) => return,
+            Some(MismatchChoice::Keep) => {}
+            Some(MismatchChoice::Switch) => {
+                tick.switch_kind = Some(ask.recorded_kind);
+                tick.switch_player = role == Role::Player;
+            }
+        }
+    }
     let effect = drive_play(machine, role, book);
     let word = if role == Role::Player {
         "player"
@@ -295,7 +504,6 @@ fn play_role(root: &Path, machine: &mut Playback, book: &Book, role: Role, tick:
         tick.diags
             .push(format!("screen=playback role={word} warp=1"));
     }
-    ask_mismatch(root, role, tick);
     note_missing_start(root, book, role, tick);
     if effect.stopped {
         run_flag(role).store(false, Ordering::Release);
@@ -384,35 +592,55 @@ fn note_missing_start(root: &Path, book: &Book, role: Role, tick: &mut Tick) {
     }
 }
 
-fn ask_mismatch(root: &Path, role: Role, tick: &mut Tick) {
-    let current = CURRENT_KIND.load(Ordering::Acquire);
-    if current == u32::MAX {
-        return;
+fn mismatch_for(book: &Book, role: Role) -> Option<MismatchAsk> {
+    let current = role_kind(role);
+    if current < 0 {
+        return None;
     }
-    let Some(id) = RecordingIndex::load(root)
-        .ok()
-        .and_then(|index| index.active(role).map(str::to_owned))
-    else {
-        return;
-    };
-    let Ok(chain) = Store::<Chain>::new(root.join(MACROS_DIR)).load(&id) else {
-        return;
-    };
-    let Some(first) = chain.recordings.first() else {
-        return;
-    };
-    let Ok(recording) = Library::new(root.join(MACROS_DIR)).load(first) else {
-        return;
-    };
-    let recorded = recording.start.fighter_kind.to_string();
-    let now = (current as i32).to_string();
-    let steps = [(first.as_str(), recorded.as_str())];
-    if chain_mismatch(&steps, &now, true, true).is_some() {
-        tick.diags.push("screen=mismatch ask=macro1".to_string());
+    let id = book.index.active(role)?;
+    let recorded = book.recorded_fighter(id)?;
+    if recorded < 0 || recorded == current {
+        return None;
     }
+    let origin = if book.is_chain(id) { "macro1" } else { "macro" };
+    Some(MismatchAsk {
+        origin,
+        recorded_kind: recorded,
+        current_kind: current,
+        recorded_label: recorded.to_string(),
+        current_label: current.to_string(),
+    })
 }
 
-fn apply_menu(root: &Path, book: &Book, online: bool, tick: &mut Tick) {
+fn ask_drill(root: &Path, tick: &mut Tick) {
+    let Some(id) = lock(&DRILL_ASK).take() else {
+        return;
+    };
+    let Ok(record) = crate::model::combo_record::ComboLibrary::new(root.join("combos")).load(&id) else {
+        return;
+    };
+    let Some(recorded) = record.recorded_on.filter(|name| !name.is_empty()) else {
+        return;
+    };
+    let current = lock(&PLAYER_LABEL).clone();
+    if current.is_empty() || current == recorded {
+        return;
+    }
+    tick.diags.push(
+        "screen=mismatch ask=combo rows=Keep current fighter|Switch to recorded fighter".to_string(),
+    );
+    let ask = MismatchAsk {
+        origin: "combo",
+        recorded_kind: -1,
+        current_kind: role_kind(Role::Player),
+        recorded_label: recorded,
+        current_label: current,
+    };
+    *lock(&LAST_ASK) = Some(ask.clone());
+    tick.mismatch = Some(ask);
+}
+
+fn apply_menu(root: &Path, machine: &mut Playback, book: &Book, online: bool, tick: &mut Tick) {
     let effect = std::mem::replace(&mut *lock(&MENU_EFFECT), Effect::None);
     match effect {
         Effect::None => {}
@@ -423,24 +651,185 @@ fn apply_menu(root: &Path, book: &Book, online: bool, tick: &mut Tick) {
                 tick.keyboard = Some(offer);
             }
         }
-        Effect::Crop { source, combo } => {
-            tick.diags.push(format!(
-                "screen=crop source={source} combo={}",
-                i32::from(combo)
-            ));
-            let _ = write_crop(root, &source, combo);
-        }
-        Effect::MakeCombo { .. } => {
-            if let Some(id) = make_combo(book).warp {
-                tick.warp = Some(id);
+        Effect::Crop { source, combo, start, end } => {
+            if write_crop_range(root, &source, combo, start, end).is_some() {
+                tick.diags.push(format!(
+                    "screen=crop source={source} combo={} saved=1",
+                    i32::from(combo)
+                ));
+                bump_catalog();
             }
         }
+        Effect::MakeCombo { source, chain } => {
+            begin_make(root, machine, book, &source, chain, online, tick)
+        }
         Effect::DuplicateSave { source } => {
-            let _ = duplicate_save(root, &source, unix_now());
+            if duplicate_save(root, &source, unix_now()).is_ok() {
+                bump_catalog();
+            }
         }
         Effect::DeleteSave { source } => {
-            let _ = delete_save(root, &source, unix_now());
+            if delete_save(root, &source, unix_now()).is_ok() {
+                bump_catalog();
+            }
         }
+        Effect::WriteChain { name, steps } => {
+            if let Ok(chain) = Chain::new(name, steps) {
+                if Store::<super::library::Chain>::new(root.join(MACROS_DIR)).save_new(&chain).is_ok() {
+                    bump_catalog();
+                }
+            }
+        }
+        Effect::WriteSequence { name, combos } => {
+            if let Ok(sequence) = Sequence::new(name, combos) {
+                if Store::<Sequence>::new(root.join(SEQUENCES_DIR)).save_new(&sequence).is_ok() {
+                    bump_catalog();
+                }
+            }
+        }
+        Effect::RenameSave { id, name } => rename_save(root, &id, name),
+        Effect::RenameMacro { id, name } => rename_macro(root, &id, name),
+        Effect::RenameChain { id, name } => rename_chain(root, &id, name),
+        Effect::RenameCombo { id, name } => rename_combo(root, &id, name),
+        Effect::RenameSequence { id, name } => rename_sequence(root, &id, name),
+    }
+}
+
+fn rename_save(root: &Path, id: &str, name: String) {
+    let store = Store::<NamedSave>::new(root.join(SAVES_DIR));
+    let Ok(mut save) = store.load(id) else { return };
+    save.name = name;
+    if store.overwrite(id, &save).is_ok() {
+        bump_catalog();
+    }
+}
+
+fn rename_macro(root: &Path, id: &str, name: String) {
+    let store = Library::new(root.join(MACROS_DIR));
+    let Ok(mut file) = store.load(id) else { return };
+    file.name = name;
+    if store.overwrite(id, &file).is_ok() {
+        bump_catalog();
+    }
+}
+
+fn rename_chain(root: &Path, id: &str, name: String) {
+    let store = Store::<Chain>::new(root.join(MACROS_DIR));
+    let Ok(mut file) = store.load(id) else { return };
+    file.name = name;
+    if store.overwrite(id, &file).is_ok() {
+        bump_catalog();
+    }
+}
+
+fn rename_combo(root: &Path, id: &str, name: String) {
+    let store = crate::model::combo_record::ComboLibrary::new(root.join("combos"));
+    let Ok(mut file) = store.load(id) else { return };
+    file.name = name;
+    if store.overwrite(id, &file).is_ok() {
+        bump_catalog();
+    }
+}
+
+fn rename_sequence(root: &Path, id: &str, name: String) {
+    let store = Store::<Sequence>::new(root.join(SEQUENCES_DIR));
+    let Ok(mut file) = store.load(id) else { return };
+    file.name = name;
+    if store.overwrite(id, &file).is_ok() {
+        bump_catalog();
+    }
+}
+
+fn begin_make(
+    root: &Path,
+    machine: &mut Playback,
+    book: &Book,
+    source: &str,
+    chain: bool,
+    online: bool,
+    tick: &mut Tick,
+) {
+    let _ = chain;
+    match book.start_link(source) {
+        StartLink::Deleted => {
+            if let Some(text) = start_save_notice(super::library::StartSaveState::Deleted) {
+                tick.notices.push(text);
+                tick.diags
+                    .push("screen=notice kind=macro-start-save-missing".to_string());
+            }
+        }
+        StartLink::Linked(id) => tick.warp = Some(id.to_string()),
+        StartLink::None => {}
+    }
+    let effect = machine.play_file(Role::Player, book, source);
+    if effect.started {
+        RUN_PLAYER.store(true, Ordering::Release);
+        step_role(root, machine, book, Role::Player);
+    }
+    *lock(&MAKE) = Some(MakeJob { source: source.to_string(), ready: true });
+    tick.diags.push(format!("screen=make-combo source={source} playing={}", i32::from(effect.started)));
+    if online {
+        tick.keyboard = None;
+    }
+}
+
+fn finish_make(root: &Path, tick: &mut Tick) {
+    let ready = lock(&MAKE).as_ref().is_some_and(|job| job.ready);
+    if !ready || RUN_PLAYER.load(Ordering::Acquire) {
+        return;
+    }
+    let Some(job) = lock(&MAKE).take() else {
+        return;
+    };
+    let sample = lock(&STRIP).take();
+    let Some(combo) = sample.filter(|combo| !combo.is_empty()) else {
+        tick.notices.push(EMPTY_COMBO);
+        tick.diags.push("screen=notice kind=combo-empty".to_string());
+        return;
+    };
+    if save_made_combo(root, &combo, &job.source, unix_now()).is_ok() {
+        tick.diags.push(format!("screen=make-combo source={} saved=1", job.source));
+        bump_catalog();
+    }
+}
+
+fn write_crop_range(root: &Path, source: &str, combo: bool, start: u32, end: u32) -> Option<String> {
+    if combo {
+        let library = crate::model::combo_record::ComboLibrary::new(root.join("combos"));
+        let original = library.load(source).ok()?;
+        let span = original.combo.len() as u32;
+        let (start, end) = clamp_range(start, end, span)?;
+        let names = library.list().ok()?.entries.into_iter().map(|entry| entry.name).collect::<Vec<_>>();
+        let name = super::rr_runtime::unused_name("Combo", &names);
+        let id = crop_combo_file(root, source, start, end, &name).ok()?;
+        note_hot(root, Kind::Combo, &id);
+        return Some(id);
+    }
+    let library = Library::new(root.join(MACROS_DIR));
+    let original = library.load(source).ok()?;
+    let span = original.frames.len() as u32;
+    let (start, end) = clamp_range(start, end, span)?;
+    let snapshot = super::macros::FrameSnapshot { frame: start, state: original.start };
+    let names = library.list().ok()?.entries.into_iter().map(|entry| entry.name).collect::<Vec<_>>();
+    let name = super::rr_runtime::unused_name("Macro", &names);
+    let id = crop_macro_file(root, source, start, end, &snapshot, &name).ok()?;
+    note_hot(root, Kind::Macro, &id);
+    Some(id)
+}
+
+fn clamp_range(start: u32, end: u32, span: u32) -> Option<(u32, u32)> {
+    let mut window = FrameWindow::new(span).ok()?;
+    window.set_in(start);
+    window.set_out(end);
+    Some((window.start(), window.end()))
+}
+
+fn note_hot(root: &Path, kind: Kind, id: &str) {
+    let Ok(mut index) = RecordingIndex::load(root) else {
+        return;
+    };
+    if index.note_use(kind, id, Use::Recorded, unix_now()).is_ok() {
+        let _ = index.save(root);
     }
 }
 
@@ -576,6 +965,20 @@ fn reset_host() {
     *lock(&RESIDENT) = None;
     *lock(&MENU_EFFECT) = Effect::None;
     *lock(&CROP) = None;
+    *lock(&STRIP) = None;
+    *lock(&MAKE) = None;
+    *lock(&HELD) = None;
+    *lock(&ANSWER) = None;
+    *lock(&LAST_ASK) = None;
+    *lock(&LAST_DRILL) = None;
+    *lock(&DRILL_ASK) = None;
+    *lock(&PLAYER_LABEL) = String::new();
+    DRILL_SEEN.store(false, Ordering::Release);
+    DEFER_MIGRATE.store(false, Ordering::Release);
+    CATALOG_GEN.store(0, Ordering::Release);
+    for slot in &ROLE_KIND {
+        slot.store(-1, Ordering::Release);
+    }
 }
 
 #[cfg(test)]
@@ -837,7 +1240,7 @@ mod tests {
             snapshot: FrameSnapshot { frame: 0, state: StartState::neutral(8, 0, 1.0) },
             name: "Nair crop".into(),
         });
-        post_effect(Effect::Crop { source: macro_id.clone(), combo: false });
+        post_effect(Effect::Crop { source: macro_id.clone(), combo: false, start: 0, end: 1 });
         let tick = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
         assert!(tick.diags.iter().any(|line| line.starts_with("screen=crop source=")));
         assert_eq!(Library::new(root.join(MACROS_DIR)).list().unwrap().entries.len(), 2);
@@ -915,5 +1318,239 @@ mod tests {
             (RESIDENT_FRAMES as u32) + 50
         );
         assert_eq!(lock(&RESIDENT).as_ref().unwrap().tape.reads().len(), 1);
+    }
+
+    fn one_macro(root: &std::path::Path, name: &str, buttons: u32, kind: i32, save: Option<&str>) -> String {
+        let mut recording = super::super::macros::MacroRecording::new(
+            name,
+            "13.0.5",
+            StartState::neutral(kind, 0, 1.0),
+            vec![InputFrame { buttons, ..InputFrame::default() }],
+        )
+        .unwrap();
+        if let Some(id) = save {
+            recording.set_start_save(Some(id)).unwrap();
+        }
+        Library::new(root.join(MACROS_DIR)).save_new(&recording).unwrap()
+    }
+
+    fn sample_combo() -> crate::model::combo::Combo {
+        crate::model::combo::Combo::from_links([crate::model::combo::LinkRec::presses(
+            crate::model::frame_strip::Move::Aerial,
+            crate::model::frame_strip::Move::Aerial,
+            crate::model::frame_strip::Verdict::True(None),
+            None,
+            &[],
+        )])
+        .unwrap()
+    }
+
+    #[test]
+    fn record_follows_the_published_cpu_role() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("cpu-role");
+        set_record_role(Role::Cpu);
+        on_chords(true, false, false);
+        let start = service_at(&root, &none(), "2026-11-06", state(13), state(7), false);
+        assert!(start.diags.iter().any(|line| line == "screen=recording role=cpu recording=1"));
+        push_capture(ROLE_CPU, InputFrame { buttons: 9, ..InputFrame::default() });
+        push_capture(ROLE_PLAYER, InputFrame { buttons: 1, ..InputFrame::default() });
+        on_chords(true, false, false);
+        let stop = service_at(&root, &none(), "2026-11-06", state(13), state(7), false);
+        assert!(stop.diags.iter().any(|line| line == "screen=recording role=cpu recording=0"));
+        let macros = Library::new(root.join(MACROS_DIR));
+        let listed = macros.list().unwrap();
+        assert_eq!(listed.entries.len(), 1);
+        let saved = macros.load(&listed.entries[0].id).unwrap();
+        assert_eq!(saved.frames[0].buttons, 9);
+        let save_id = saved.start_save.expect("start save");
+        let save = Store::<NamedSave>::new(root.join(SAVES_DIR)).load(&save_id).unwrap();
+        assert_eq!(save.cpu.fighter_kind, 7);
+        assert!(crate::engine::rr_runtime::load_catalog(&root).unwrap().catalog.macros.iter().any(|file| file.id == listed.entries[0].id));
+    }
+
+    #[test]
+    fn a_record_writes_before_migration_when_the_slot_image_is_absent() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("pending");
+        on_chords(true, false, false);
+        push_capture(ROLE_PLAYER, InputFrame { buttons: 4, ..InputFrame::default() });
+        on_chords(true, false, false);
+        let tick = service_pending(&root, state(8), state(7), false);
+        assert!(!migrated());
+        assert!(tick.diags.iter().any(|line| line.contains("recording=0")));
+        assert_eq!(Library::new(root.join(MACROS_DIR)).list().unwrap().entries.len(), 1);
+        let mut slots = none();
+        slots[0] = Some(LegacySlot {
+            frames: vec![InputFrame { buttons: 2, ..InputFrame::default() }],
+            start: StartState::neutral(3, 0, 1.0),
+        });
+        let migrated_tick = service_at(&root, &slots, "2026-11-06", state(8), state(7), false);
+        assert!(migrated());
+        assert!(migrated_tick.diags.iter().any(|line| line == "screen=migrate once=1"));
+    }
+
+    #[test]
+    fn make_combo_plays_the_named_file_and_keeps_the_drill() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("make");
+        let player = state(8);
+        let cpu = state(7);
+        let save_id = Store::<NamedSave>::new(root.join(SAVES_DIR))
+            .save_new(&NamedSave::new("Start", player, cpu).unwrap())
+            .unwrap();
+        let source = one_macro(&root, "Source", 11, 8, Some(&save_id));
+        let other = one_macro(&root, "Other", 22, 8, None);
+        let mut index = RecordingIndex::load(&root).unwrap();
+        index.set_active(Role::Player, Some(&other), 1).unwrap();
+        index.set_drill(Some(Drill { kind: DrillKind::Combo, id: "kept-drill".into() }), 2).unwrap();
+        index.save(&root).unwrap();
+        set_strip_sample(Some(sample_combo()));
+        post_effect(Effect::MakeCombo { source: source.clone(), chain: false });
+        let playing = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
+        assert_eq!(playing.warp.as_deref(), Some(save_id.as_str()));
+        assert_eq!(take_player_frame().expect("source frame").buttons, 11);
+        let saved = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
+        assert!(saved.diags.iter().any(|line| line.contains("screen=make-combo") && line.contains("saved=1")));
+        let combos = crate::model::combo_record::ComboLibrary::new(root.join("combos"));
+        let listed = combos.list().unwrap();
+        assert_eq!(listed.entries.len(), 1);
+        let made = combos.load(&listed.entries[0].id).unwrap();
+        assert_eq!(made.made_from.as_deref(), Some(source.as_str()));
+        assert!(made.name.starts_with("Combo "));
+        let index = RecordingIndex::load(&root).unwrap();
+        assert_eq!(index.drill().map(|drill| drill.id.as_str()), Some("kept-drill"));
+        assert_eq!(index.active(Role::Player), Some(other.as_str()));
+        assert!(index.hot(Kind::Combo).contains(&listed.entries[0].id));
+    }
+
+    #[test]
+    fn make_combo_failures_notice_and_skip_the_keyboard_online() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("make-fail");
+        let source = one_macro(&root, "Bare", 3, 8, None);
+        set_strip_sample(Some(crate::model::combo::Combo::default()));
+        post_effect(Effect::MakeCombo { source: source.clone(), chain: false });
+        let _ = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
+        let empty = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
+        assert!(empty.diags.iter().any(|line| line == "screen=notice kind=combo-empty"));
+        assert!(empty.notices.contains(&EMPTY_COMBO));
+        assert!(crate::model::combo_record::ComboLibrary::new(root.join("combos")).list().unwrap().entries.is_empty());
+
+        reset_host();
+        let gone = one_macro(&root, "Gone", 4, 8, Some("deleted-save"));
+        set_strip_sample(Some(sample_combo()));
+        post_effect(Effect::MakeCombo { source: gone, chain: false });
+        let missing = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
+        assert!(missing.warp.is_none());
+        assert!(missing.diags.iter().any(|line| line == "screen=notice kind=macro-start-save-missing"));
+        assert_eq!(take_player_frame().expect("plays anyway").buttons, 4);
+
+        reset_host();
+        let present = one_macro(&root, "Later", 6, 8, None);
+        let chain = Chain::new("Gap", vec!["missing-macro".into(), present]).unwrap();
+        let chain_id = Store::<Chain>::new(root.join(MACROS_DIR)).save_new(&chain).unwrap();
+        post_effect(Effect::MakeCombo { source: chain_id, chain: true });
+        let gap = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
+        assert!(gap.warp.is_none());
+        assert_eq!(take_player_frame().expect("skips the missing step").buttons, 6);
+
+        reset_host();
+        post_effect(Effect::Keyboard { header: "Name macro", draft: "Online".into() });
+        let online = service_at(&root, &none(), "2026-11-06", state(8), state(7), true);
+        assert!(online.keyboard.is_none());
+        assert!(online.diags.iter().all(|line| !line.contains("screen=rename")));
+    }
+
+    #[test]
+    fn mismatch_holds_playback_until_keep_or_switch() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("mismatch");
+        let first = one_macro(&root, "Recorded", 15, 13, None);
+        let later = one_macro(&root, "Later", 16, 1, None);
+        let chain = Chain::new("Mix", vec![first.clone(), later]).unwrap();
+        let chain_id = Store::<Chain>::new(root.join(MACROS_DIR)).save_new(&chain).unwrap();
+        let mut index = RecordingIndex::load(&root).unwrap();
+        index.set_active(Role::Player, Some(&first), 1).unwrap();
+        index.save(&root).unwrap();
+        set_role_fighter(Role::Player, 8);
+        on_chords(false, true, false);
+        let held = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
+        assert!(held.diags.iter().any(|line| line.contains("screen=mismatch ask=macro ")));
+        assert!(take_player_frame().is_none());
+        answer_mismatch(MismatchChoice::Keep);
+        let kept = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
+        assert!(kept.switch_kind.is_none());
+        assert_eq!(take_player_frame().expect("keep plays").buttons, 15);
+
+        reset_host();
+        let mut index = RecordingIndex::load(&root).unwrap();
+        index.set_active(Role::Player, Some(&first), 3).unwrap();
+        index.save(&root).unwrap();
+        set_role_fighter(Role::Player, 8);
+        on_chords(false, true, false);
+        let _ = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
+        answer_mismatch(MismatchChoice::Switch);
+        let switched = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
+        assert_eq!(switched.switch_kind, Some(13));
+        assert!(switched.switch_player);
+        assert_eq!(take_player_frame().expect("switch plays").buttons, 15);
+
+        reset_host();
+        let mut index = RecordingIndex::load(&root).unwrap();
+        index.set_active(Role::Player, Some(&chain_id), 4).unwrap();
+        index.save(&root).unwrap();
+        set_role_fighter(Role::Player, 8);
+        on_chords(false, true, false);
+        let chain_ask = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
+        assert!(chain_ask.diags.iter().any(|line| line.contains("ask=macro1")));
+        answer_mismatch(MismatchChoice::Cancel);
+        let cancelled = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
+        assert!(take_player_frame().is_none());
+        assert!(cancelled.switch_kind.is_none());
+    }
+
+    #[test]
+    fn a_changed_combo_drill_asks_and_switch_names_the_recorded_fighter() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("drill");
+        let record = crate::model::combo_record::ComboRecord::new("Drill".into(), sample_combo(), Some("Ryu".into()));
+        let id = crate::model::combo_record::ComboLibrary::new(root.join("combos")).save_new(&record).unwrap();
+        note_drill(Some("seed".into()));
+        note_drill(Some(id));
+        set_fighter_label("Mario");
+        let asked = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
+        assert!(asked.diags.iter().any(|line| line.contains("screen=mismatch ask=combo")));
+        assert!(asked.switch_name.is_none());
+        answer_mismatch(MismatchChoice::Switch);
+        let switched = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
+        assert_eq!(switched.switch_name.as_deref(), Some("Ryu"));
+        assert!(switched.switch_player);
+    }
+
+    #[test]
+    fn rc5wire_publish_selection_writes_the_loop() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("loop");
+        let selection = Selection {
+            bound: None,
+            active_player: None,
+            active_cpu: None,
+            loop_player: LoopMark::Finite(5),
+            loop_cpu: LoopMark::Infinite,
+            drill: None,
+            record_role: crate::model::recording_menu::ViewRole::Player,
+        };
+        publish_selection(&root, &selection, None);
+        let index = RecordingIndex::load(&root).unwrap();
+        assert_eq!(index.loop_count(Role::Player), LoopCount::Finite(5));
+        assert_eq!(index.loop_count(Role::Cpu), LoopCount::Infinite);
     }
 }

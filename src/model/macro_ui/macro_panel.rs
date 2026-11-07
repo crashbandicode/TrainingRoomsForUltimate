@@ -152,6 +152,8 @@ pub enum Effect {
     ClipFighter(Option<FighterChoice>),
     /// Result of a prompt opened for a chosen combo (Player 1's fighter). `None` is Cancel.
     ComboFighter(Option<FighterChoice>),
+    /// Result of a prompt opened for a recording, a combo drill, or a chain's macro 1. `None` is Cancel.
+    RecordingFighter(Option<FighterChoice>),
 }
 
 /// Everything the runtime knows about the selection being loaded. The panel
@@ -1116,6 +1118,7 @@ impl MacroUi {
         match screen.prompt.origin() {
             FighterOrigin::Clip => Effect::ClipFighter(None),
             FighterOrigin::Combo => Effect::ComboFighter(None),
+            FighterOrigin::Recording => Effect::RecordingFighter(None),
             FighterOrigin::Named => {
                 // Back to the list the user picked from; the loaded macro never changed.
                 if let Some(page) = screen.prior {
@@ -1134,6 +1137,7 @@ impl MacroUi {
         let Some((id, recording)) = candidate.filter(|_| prompt.origin() == FighterOrigin::Named) else {
             return match prompt.origin() {
                 FighterOrigin::Combo => Effect::ComboFighter(Some(choice)),
+                FighterOrigin::Recording => Effect::RecordingFighter(Some(choice)),
                 _ => Effect::ClipFighter(Some(choice)),
             };
         };

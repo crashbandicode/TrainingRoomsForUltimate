@@ -533,6 +533,11 @@ impl Menu {
         self.page
     }
 
+    /// The Recording page group under the cursor, for the pop-up's sibling diag line.
+    pub fn recording_page_group(&self) -> u8 {
+        self.focus().map(group_of).unwrap_or(usize::from(table::SAVES_MACROS)) as u8
+    }
+
     pub fn env(&self) -> &Env {
         &self.env
     }

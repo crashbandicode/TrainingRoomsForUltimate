@@ -62,6 +62,14 @@ fn playback_makes_no_hook_allocations() {
         assert!(machine.mash(Role::Player, true));
         assert!(!machine.playing(Role::Player));
         assert!(machine.step(Role::Player, &book).is_none());
+        let started = machine.play_file(Role::Player, &book, "macro-a");
+        std::hint::black_box(started.started);
+        if let Some(played) = machine.step(Role::Player, &book) {
+            std::hint::black_box(played.frame.buttons);
+        }
+        let mut window = engine::macros::FrameWindow::new(8).unwrap();
+        std::hint::black_box(window.set_in(2));
+        std::hint::black_box(window.set_out(6));
     }
     assert_eq!(hook_allocations(), before, "play, step, load, auto-load and mash allocated inside the hook");
 }

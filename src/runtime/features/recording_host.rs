@@ -6,7 +6,6 @@ use crate::engine::library::LegacySlot;
 use crate::engine::macros::InputFrame;
 use crate::engine::rr_host::{self, Tick};
 use crate::model::input_delay::MappedInputs;
-use crate::model::state::record::SavedState;
 
 const NAME_TOKEN: u64 = 1 << 62;
 const NOTICE_ID: u8 = 0x2C;
@@ -41,37 +40,98 @@ pub unsafe fn on_player_poll(out: *mut MappedInputs) {
 pub fn service() {
     let root = Path::new(crate::model::storage::ROOT);
     if !root.is_dir() {
-        return;
-    }
-    if rr_host::migrated() && !rr_host::pending() {
-        return;
-    }
-    let empty: [Option<LegacySlot>; 5] = [None, None, None, None, None];
-    let slots = if rr_host::migrated() {
-        empty
-    } else {
-        match super::recorder::copied_slots() {
-            Some(slots) => slots,
-            None => return,
+        let _ = std::fs::create_dir_all(root);
+        if !root.is_dir() {
+            return;
         }
-    };
-    let tick = rr_host::service_at(
-        root,
-        &slots,
-        &rr_host::today(),
-        SavedState::never_saved(),
-        SavedState::never_saved(),
-        keyboard_closed(),
-    );
-    if rr_host::migrated() {
-        super::recorder::release_slot_image();
     }
+    take_mismatch_answer();
+    let player = super::states::live_saved(0);
+    let cpu = super::states::live_saved(1);
+    if player.fighter_kind >= 0 {
+        rr_host::set_role_fighter(crate::engine::library::Role::Player, player.fighter_kind);
+    }
+    if cpu.fighter_kind >= 0 {
+        rr_host::set_role_fighter(crate::engine::library::Role::Cpu, cpu.fighter_kind);
+    }
+    rr_host::set_strip_sample(super::combo::strip_sample());
+    if player.fighter_kind >= 0 {
+        rr_host::set_fighter_label(&crate::runtime::macros::named_macros::fighter_label(player.fighter_kind));
+    }
+    let online = keyboard_closed();
+    // Migration waits for the old slot image. A record, a play, or a menu effect does not.
+    if !rr_host::migrated() {
+        if let Some(slots) = super::recorder::copied_slots() {
+            let tick = rr_host::service_at(root, &slots, &rr_host::today(), player, cpu, online);
+            if rr_host::migrated() {
+                super::recorder::release_slot_image();
+            }
+            apply(&tick);
+            return;
+        }
+    }
+    if !rr_host::pending() {
+        return;
+    }
+    let tick = rr_host::service_pending(root, player, cpu, online);
     apply(&tick);
 }
 
+fn take_mismatch_answer() {
+    let Some(choice) = crate::runtime::macros::named_macros::take_recording_fighter_choice() else {
+        return;
+    };
+    let answer = match choice {
+        Some(crate::engine::macro_ui::macro_panel::FighterChoice::Switch) => {
+            rr_host::MismatchChoice::Switch
+        }
+        Some(crate::engine::macro_ui::macro_panel::FighterChoice::Keep) => rr_host::MismatchChoice::Keep,
+        None => rr_host::MismatchChoice::Cancel,
+    };
+    rr_host::answer_mismatch(answer);
+}
+
 fn apply(tick: &Tick) {
-    if tick.warp.is_some() {
-        super::states::request_load();
+    if let Some(ask) = &tick.mismatch {
+        let recorded = if ask.recorded_kind >= 0 {
+            crate::runtime::macros::named_macros::fighter_label(ask.recorded_kind)
+        } else {
+            ask.recorded_label.clone()
+        };
+        let current = if ask.current_kind >= 0 {
+            crate::runtime::macros::named_macros::fighter_label(ask.current_kind)
+        } else {
+            ask.current_label.clone()
+        };
+        let _ = crate::runtime::macros::named_macros::open_recording_fighter_prompt(
+            crate::engine::macro_ui::macro_panel::FighterOrigin::Recording,
+            recorded,
+            current,
+        );
+    }
+    if let Some(kind) = tick.switch_kind {
+        let requested = if tick.switch_player {
+            crate::runtime::roster::character_roster::request_player_kind(kind as u32)
+        } else {
+            crate::runtime::roster::character_roster::request_cpu_kind(kind as u32)
+        };
+        let _ = requested;
+    }
+    if let Some(name) = &tick.switch_name {
+        if let Some(kind) = (0..128u32).find(|kind| {
+            crate::runtime::macros::named_macros::fighter_label(*kind as i32) == name.as_str()
+        }) {
+            let _ = crate::runtime::roster::character_roster::request_player_kind(kind);
+        }
+    }
+    if let Some(id) = &tick.warp {
+        let root = std::path::Path::new(crate::model::storage::ROOT);
+        let saves = crate::model::store::Store::<crate::engine::library::NamedSave>::new(
+            root.join(crate::engine::library::SAVES_DIR),
+        );
+        if let Ok(save) = saves.load(id) {
+            super::states::request_named_load([save.player, save.cpu]);
+        }
     }
     for text in &tick.notices {
         super::notices::upsert(NOTICE_ID, "Recording", text, 240, NOTICE_COLOR);
@@ -96,6 +156,14 @@ fn emit(lines: &[String]) {
     }
     #[cfg(not(feature = "diag"))]
     let _ = lines;
+}
+
+pub(crate) fn keyboard_is_closed() -> bool {
+    keyboard_closed()
+}
+
+pub(crate) fn take_typed_name() -> Option<String> {
+    crate::runtime::macros::named_macros::take_confirmed_name_for(NAME_TOKEN)
 }
 
 fn keyboard_closed() -> bool {

@@ -4,8 +4,8 @@
 use std::path::Path;
 
 use super::library::{
-    migrate, Error, Kind, LegacySlot, LoopCount, NamedSave, RecordingIndex, Role,
-    StartSaveState, Use, MACROS_DIR, SAVES_DIR,
+    migrate, Chain, Error, Kind, LegacySlot, LoopCount, NamedSave, RecordingIndex, Role, Sequence,
+    StartSaveState, Use, MACROS_DIR, SAVES_DIR, SEQUENCES_DIR,
 };
 use super::macro_ui::macro_panel::{fighter_gate, FighterGate, FighterOrigin};
 use super::macros::{
@@ -13,7 +13,7 @@ use super::macros::{
 };
 use super::playback::{Book, Playback};
 use crate::model::combo::{Combo, LinkRec};
-use crate::model::combo_record::{ComboLibrary, ComboRecord};
+use crate::model::combo_record::{default_name, ComboLibrary, ComboRecord};
 use crate::model::state::record::SavedState;
 use crate::model::store::Store;
 
@@ -25,6 +25,8 @@ pub const MISSING_START_SAVE: &str = "No start save. This macro plays from where
 pub const CHORD_NOTICE: &str =
     "Record, Play on Player 1, Play on CPU, and the recording pop-up replace Input Record and Input Playback.";
 pub const EMPTY_RECORDING: &str = "Recording was empty";
+/// The sentence Save last combo already uses when the strip has no link.
+pub const EMPTY_COMBO: &str = "No combo yet: land a hit and a follow-up first.";
 
 /// Frames the hook may index. The rest of a long file stays out of this struct until the worker reads a window.
 #[derive(Clone, Debug)]
@@ -368,6 +370,18 @@ pub struct MakeComboPass {
     pub buttons: Vec<u32>,
 }
 
+/// The strip's combo, named Combo N, marked made from `source`. The drill is not written.
+pub fn save_made_combo(root: &Path, combo: &Combo, source: &str, at: u64) -> Result<String, Error> {
+    let library = ComboLibrary::new(root.join("combos"));
+    let entries = library.list().map_err(record)?.entries;
+    let made = ComboRecord::new(default_name(&entries), *combo, None).with_made_from(source);
+    let id = library.save_new(&made).map_err(record)?;
+    let mut index = RecordingIndex::load(root)?;
+    index.note_use(Kind::Combo, &id, Use::Recorded, at)?;
+    index.save(root)?;
+    Ok(id)
+}
+
 /// One Player pass from the chain's start save. The drill id is not written.
 pub fn make_combo(book: &Book) -> MakeComboPass {
     let drill = book.index.drill().cloned();
@@ -495,6 +509,134 @@ pub fn civil_date(unix_secs: u64) -> String {
     let m = if mp < 10 { mp + 3 } else { mp - 9 };
     let y = if m <= 2 { y + 1 } else { y };
     format!("{y:04}-{m:02}-{d:02}")
+}
+
+pub fn unused_name(prefix: &str, names: &[String]) -> String {
+    unused_label(prefix, names)
+}
+
+/// The card, as the pop-up lists it. Hot lists and the selection come from the index.
+pub struct CatalogLoad {
+    pub catalog: crate::model::recording_menu::Catalog,
+    pub bound: Option<String>,
+    pub active: [Option<String>; 2],
+    pub loops: [crate::model::recording_menu::LoopMark; 2],
+    pub drill: Option<String>,
+}
+
+pub fn load_catalog(root: &Path) -> Result<CatalogLoad, Error> {
+    use crate::model::recording_menu::{Catalog, ComboFile, LoopMark, MacroFile, SaveFile, SequenceFile};
+    let index = RecordingIndex::load(root)?;
+    let mut catalog = Catalog::default();
+    let macros = Library::new(root.join(MACROS_DIR));
+    if let Ok(list) = macros.list() {
+        for entry in list.entries {
+            let Ok(file) = macros.load(&entry.id) else { continue };
+            catalog.macros.push(MacroFile {
+                id: entry.id,
+                name: file.name,
+                chain: false,
+                steps: Vec::new(),
+                start_save: file.start_save,
+                start_save_on: file.start_save_on,
+                recorded_on: fighter_name(file.start.fighter_kind),
+                span: file.frames.len() as u32,
+            });
+        }
+    }
+    let chains = Store::<Chain>::new(root.join(MACROS_DIR));
+    if let Ok(list) = chains.list() {
+        for entry in list.entries {
+            let Ok(file) = chains.load(&entry.id) else { continue };
+            catalog.macros.push(MacroFile {
+                id: entry.id,
+                name: file.name,
+                chain: true,
+                steps: file.recordings,
+                start_save: None,
+                start_save_on: file.start_save_on,
+                recorded_on: String::new(),
+                span: 0,
+            });
+        }
+    }
+    let saves = Store::<NamedSave>::new(root.join(SAVES_DIR));
+    if let Ok(list) = saves.list() {
+        for entry in list.entries {
+            let fighters = saves.load(&entry.id).ok().map(|save| {
+                let mut parts = Vec::new();
+                if save.player.is_saved() {
+                    parts.push(fighter_name(save.player.fighter_kind));
+                }
+                if save.cpu.is_saved() {
+                    parts.push(fighter_name(save.cpu.fighter_kind));
+                }
+                parts.retain(|part| !part.is_empty());
+                parts.join(" · ")
+            });
+            catalog.saves.push(SaveFile { id: entry.id, name: entry.name, fighters: fighters.unwrap_or_default() });
+        }
+    }
+    let combos = ComboLibrary::new(root.join("combos"));
+    if let Ok(list) = combos.list() {
+        for entry in list.entries {
+            let made_from = combos.load(&entry.id).ok().and_then(|file| file.made_from);
+            catalog.combos.push(ComboFile {
+                id: entry.id,
+                name: entry.name,
+                made_from,
+                links: Vec::new(),
+                span: entry.links as u32,
+            });
+        }
+    }
+    let sequences = Store::<Sequence>::new(root.join(SEQUENCES_DIR));
+    if let Ok(list) = sequences.list() {
+        for entry in list.entries {
+            let Ok(file) = sequences.load(&entry.id) else { continue };
+            catalog.sequences.push(SequenceFile {
+                id: entry.id,
+                name: file.name,
+                combos: file.combos,
+                streak: file.streak,
+                best: file.best,
+            });
+        }
+    }
+    catalog.hot_macros = index.hot(Kind::Macro).to_vec();
+    catalog.hot_saves = index.hot(Kind::Save).to_vec();
+    catalog.hot_combos = index.hot(Kind::Combo).to_vec();
+    catalog.hot_sequences = index.hot(Kind::Sequence).to_vec();
+    let mark = |count: LoopCount| match count {
+        LoopCount::Infinite => LoopMark::Infinite,
+        LoopCount::Finite(n) => LoopMark::Finite(n),
+    };
+    Ok(CatalogLoad {
+        catalog,
+        bound: index.bound().map(str::to_owned),
+        active: [
+            index.active(Role::Player).map(str::to_owned),
+            index.active(Role::Cpu).map(str::to_owned),
+        ],
+        loops: [mark(index.loop_count(Role::Player)), mark(index.loop_count(Role::Cpu))],
+        drill: index.drill().map(|drill| drill.id.clone()),
+    })
+}
+
+// The fighter table is the switch (and test) roster. A host library build has no names.
+#[cfg(any(test, target_os = "switch"))]
+fn fighter_name(kind: i32) -> String {
+    if kind < 0 {
+        return String::new();
+    }
+    crate::engine::swap::trio::TrioFighter::from_kind(kind as u32)
+        .map(|fighter| fighter.name().to_owned())
+        .unwrap_or_default()
+}
+
+#[cfg(not(any(test, target_os = "switch")))]
+fn fighter_name(_kind: i32) -> String {
+    String::new()
 }
 
 fn unused_label(prefix: &str, names: &[String]) -> String {
@@ -1001,6 +1143,7 @@ mod tests {
                     start_save: None,
                     start_save_on: true,
                     recorded_on: String::new(),
+                    span: 0,
                 },
                 MacroFile {
                     id: "pressure".into(),
@@ -1010,6 +1153,7 @@ mod tests {
                     start_save: None,
                     start_save_on: true,
                     recorded_on: String::new(),
+                    span: 0,
                 },
             ],
             combos: vec![ComboFile {
@@ -1017,6 +1161,7 @@ mod tests {
                 name: "One".into(),
                 made_from: None,
                 links: Vec::new(),
+                span: 0,
             }],
             sequences: vec![SequenceFile {
                 id: "seq".into(),

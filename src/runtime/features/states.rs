@@ -83,6 +83,8 @@ static RESPAWN_INVINCIBILITY: AtomicBool = AtomicBool::new(false);
 /// The chord latches: set by the chord engine, consumed once by the first eligible fighter callback.
 static SAVE_REQUEST: AtomicBool = AtomicBool::new(false);
 static LOAD_REQUEST: AtomicBool = AtomicBool::new(false);
+/// A recording's start save, applied as a temporary pair so a numbered slot is left alone.
+static NAMED_LOAD: Mutex<Option<[SavedState; 2]>> = Mutex::new(None);
 /// The slot file needs writing (the writer thread takes it).
 static DIRTY: AtomicBool = AtomicBool::new(false);
 
@@ -153,6 +155,14 @@ fn is_pokemon_kind(kind: i32) -> bool {
 /// The fighter objects of the two records (accessor and entry id), refreshed every frame: Kirby's hat
 /// restore reads the opponent's.
 static FIGHTER_ACC: [AtomicUsize; 2] = [const { AtomicUsize::new(0) }; 2];
+/// Pose of each role, written on the fighter frame and read by the recording worker.
+/// The worker never calls a native: the start save is this pose.
+static LIVE_KIND: [AtomicI32; 2] = [const { AtomicI32::new(-1) }; 2];
+static LIVE_SIT: [AtomicI32; 2] = [const { AtomicI32::new(0) }; 2];
+static LIVE_X: [AtomicU32; 2] = [const { AtomicU32::new(0) }; 2];
+static LIVE_Y: [AtomicU32; 2] = [const { AtomicU32::new(0) }; 2];
+static LIVE_DMG: [AtomicU32; 2] = [const { AtomicU32::new(0) }; 2];
+static LIVE_LR: [AtomicU32; 2] = [const { AtomicU32::new(0) }; 2];
 static FIGHTER_ENTRY: [AtomicI32; 2] = [const { AtomicI32::new(-1) }; 2];
 const H_COMMON: usize = 0;
 const H_DEAD_REBIRTH_WAIT: usize = 1;
@@ -357,6 +367,11 @@ pub fn request_load() {
     LOAD_REQUEST.store(true, Ordering::Release);
 }
 
+/// Warp to a named save's pair. The next player frame starts it as a temporary load.
+pub fn request_named_load(pair: [SavedState; 2]) {
+    *NAMED_LOAD.lock() = Some(pair);
+}
+
 /// Cancel every pending load (scene departure, hot swap: SPEC-state-01 §6.11).
 pub fn cancel_pending() {
     with(|state| {
@@ -387,6 +402,7 @@ pub(crate) fn clear_session() {
     preview::clear();
     SAVE_REQUEST.store(false, Ordering::Release);
     LOAD_REQUEST.store(false, Ordering::Release);
+    *NAMED_LOAD.lock() = None;
 }
 
 /// The roster's existing waiting-room lifetime decision, rather than a practice
@@ -617,6 +633,13 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
     if !nana {
         FIGHTER_ACC[role.index()].store(accessor, Ordering::Release);
         FIGHTER_ENTRY[role.index()].store(entry, Ordering::Release);
+        let slot = role.index();
+        LIVE_KIND[slot].store(raw.kind, Ordering::Release);
+        LIVE_SIT[slot].store(raw.situation, Ordering::Release);
+        LIVE_X[slot].store(natives::pos_x(accessor).to_bits(), Ordering::Release);
+        LIVE_Y[slot].store(natives::pos_y(accessor).to_bits(), Ordering::Release);
+        LIVE_DMG[slot].store(natives::damage(accessor, 0).to_bits(), Ordering::Release);
+        LIVE_LR[slot].store(natives::lr(accessor).to_bits(), Ordering::Release);
     }
     // The Pokemon dead test (SPEC-state-01 §3): the one switching frame the plain test misses.
     let switching = is_pokemon_kind(kind)
@@ -639,6 +662,25 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
     let save_chord = SAVE_REQUEST.swap(false, Ordering::AcqRel);
     // The Load chord is read only on a non-CPU-operated, non-Nana fighter's callback.
     let load_chord = !nana && !reset_hub::cpu_operated(fighter) && LOAD_REQUEST.swap(false, Ordering::AcqRel);
+    if !nana && !reset_hub::cpu_operated(fighter) {
+        if let Some(pair) = NAMED_LOAD.lock().take() {
+            let accepted = with(|state| {
+                let accepted = state.machine.begin_temporary(pair);
+                if accepted {
+                    LOADING.store(true, Ordering::Release);
+                    KILLING.store(true, Ordering::Release);
+                    TEMPORARY.store(true, Ordering::Release);
+                }
+                accepted
+            })
+            .unwrap_or(false);
+            if accepted {
+                recorder::on_load_request();
+                hud_load(Role::Player.index(), true);
+                hud_load(Role::Cpu.index(), true);
+            }
+        }
+    }
     let stage_id = natives::stage_id();
     let out = with(|state| {
         let ids = &state.ids;
@@ -1042,6 +1084,25 @@ unsafe fn apply_buff(raw: &Raw, role: Role) {
         with(|s| s.machine.finish_wait(role));
         state_diag!("[TrainingRooms] state buff_done entry={} kind={:?}", raw.entry, kind);
     }
+}
+
+/// The recording worker's start-save pose. Written by the fighter frame; this only reads atomics.
+pub fn live_saved(slot: usize) -> SavedState {
+    let mut state = SavedState::never_saved();
+    if slot >= 2 {
+        return state;
+    }
+    let kind = LIVE_KIND[slot].load(Ordering::Acquire);
+    if kind < 0 {
+        return state;
+    }
+    state.fighter_kind = kind;
+    state.situation_kind = LIVE_SIT[slot].load(Ordering::Acquire);
+    state.x = f32::from_bits(LIVE_X[slot].load(Ordering::Acquire));
+    state.y = f32::from_bits(LIVE_Y[slot].load(Ordering::Acquire));
+    state.percent = f32::from_bits(LIVE_DMG[slot].load(Ordering::Acquire));
+    state.lr = f32::from_bits(LIVE_LR[slot].load(Ordering::Acquire));
+    state
 }
 
 /// Read value-only fighter state without changing a numbered slot, requesting

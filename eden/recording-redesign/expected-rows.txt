@@ -19,6 +19,14 @@ rr-active	REPORT, RR-6
 rr-hot	REPORT, RR-6
 rr-icons	REPORT, RR-6, RR-8
 rr-record	REPORT
+rr-record-cpu	RECORDING.md Record follows the pop-up role
+rr-make-combo	RECORDING.md Make combo
+rr-make-combo-chain	RECORDING.md Make combo
+rr-crop-macro	RECORDING.md Crop
+rr-crop-combo	RECORDING.md Crop
+rr-mismatch-macro	RECORDING.md Fighter Mismatch
+rr-mismatch-chain	RECORDING.md Fighter Mismatch
+rr-visuals	RECORDING.md the hot five and the white cursor
 rr-notice	REPORT
 rr-mismatch	REPORT
 rr-rename	REPORT

@@ -505,3 +505,27 @@ ceiling = 148535
 date = "2026-11-07"
 reason = "rc.5 f9 body cell (p23/rc5-fix-f9): read entry+0x4160 only after the installed count publishes it, and gate identity the same way; measured 148535 (tools/size_gate.py), +45 over 148490"
 approved_by = "Operator 2026-11-07 via primary 35137355 (TASK-GROK-rc5-fix-f9): 'Raise as needed'"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 149849
+date = "2026-11-07"
+reason = "rc.5 wire-fix (p23/rc5-wire-fix): record follows the pop-up role, make combo, the crop screen, fighter mismatch, and the recording chrome; measured 149849 (tools/size_gate.py), +1314 over 148535"
+approved_by = "Operator 2026-11-07 via primary 35137355 (TASK-GROK-rc5-wire-fix): 'Raise as needed'"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 149854
+date = "2026-11-07"
+reason = "rc.5 wire-fix host compile: fighter names come from the switch roster only; measured 149854 (tools/size_gate.py), +5 over 149849"
+approved_by = "Operator 2026-11-07 via primary 35137355 (TASK-GROK-rc5-wire-fix): 'Raise as needed'"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 149855
+date = "2026-11-07"
+reason = "rc.5 wire-fix: the recording diag line is diag-only; measured 149855 (tools/size_gate.py), +1 over 149854"
+approved_by = "Operator 2026-11-07 via primary 35137355 (TASK-GROK-rc5-wire-fix): 'Raise as needed'"

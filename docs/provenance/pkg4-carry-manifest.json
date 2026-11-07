@@ -612,7 +612,7 @@
    "dest": "src/model/macro_ui/macro_panel.rs",
    "crate": "tui",
    "src_sha256": "1b6e698f679029bc6fa83ff9cd43756302bd939debaad2d3eeeacd10fb166da1",
-   "dest_sha256": "dc1588204c3687ed9f152e68c8aff4976ce7b134e1882b1689fe1e3f0b3e66c3",
+   "dest_sha256": "d8d306273a6c61117630b18b56729f5edfba58554a4db314fe29f60c5c39c093",
    "edits": [
     {
      "old": "    /// Facing, status, and frames for one playback. Empty when the fighter is not ready.\n    pub fn copy_playback(",
@@ -751,7 +751,7 @@
    "dest": "src/model/macro_ui/macro_panel/fighter.rs",
    "crate": "tui",
    "src_sha256": "1a4e2da3199c28c0d66ad424b2d6cbdb38b9e9ed283e529dfbc8e29e01b50f69",
-   "dest_sha256": "cda4e5f238bd56d969f4db3061e7ac1d74b44d3d1f053b0b20ce6ad73165c8c3",
+   "dest_sha256": "2fc97ae6505e458ba682b6ea467f6e34c655e5371e8b21dd4b325c863033a8a4",
    "edits": [
     {
      "old": "            Pad::Extra => {}",
@@ -947,7 +947,7 @@
    "dest": "src/runtime/macros/named_macros.rs",
    "crate": "root",
    "src_sha256": "737474479d5f05b064ab645d850ceb189cad3943097ae4fdb5fc74d2fcda0809",
-   "dest_sha256": "d8a32aa4d7dadd4e9d1ff3bab1f368983aef5921454d37150b6ab93ef09b5925",
+   "dest_sha256": "abf39d8aecafa84f665bf9b0a7292019fa24ee50122f75d5b9a4b7f5e291ceb6",
    "edits": [
     {
      "old": "use training_mod_sync::*;",

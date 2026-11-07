@@ -1,5 +1,7 @@
 # rc.5 grouped Eden session: the rows (card 10a)
 
+Wire-fix session: every row runs on the Surface. `surface-a` is the release NRO and `surface-b` is the diag NRO. The new rows are `rr-record-cpu`, `rr-make-combo`, `rr-make-combo-chain`, `rr-crop-macro`, `rr-crop-combo`, `rr-mismatch-macro`, `rr-mismatch-chain`, and `rr-visuals`. Each docs GIF waits for the line that proves its screen. CPU Shield rows pick Mario from the menu first, because a Random CSS coin does not follow Shield. `f9-body-trace` arms `f9_body_of` on the `nro:<build-id>` name `modules.list` actually shows.
+
 `rows.json` is the rc.5 grouped Eden session the recording-redesign slices (rr-1 … rr-9) built:
 the rows the stage-1 report's Eden column named, the rc.5 frame-advantage cases and the heap/crash
 gates from `artifacts/phase23/EDEN-SESSION-PLAN-rc5.md`, and every GIF `docs/MEDIA.md` still needs.

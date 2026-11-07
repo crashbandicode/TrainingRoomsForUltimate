@@ -44,6 +44,16 @@ pub fn take_confirmed_name() -> Option<NameConfirmation> {
     lock_write(&CONFIRMED_NAME).take()
 }
 
+/// The confirmed name only when this caller offered the keyboard. Another owner's answer stays put.
+pub fn take_confirmed_name_for(token: u64) -> Option<String> {
+    let mut slot = lock_write(&CONFIRMED_NAME);
+    if slot.as_ref().is_some_and(|found| found.context.token == token) {
+        slot.take().map(|found| found.name)
+    } else {
+        None
+    }
+}
+
 /// Y on a library opened through [`open_external_library`].
 pub fn take_list_action() -> Option<String> {
     lock_write(&LIST_ACTION).take()
@@ -52,6 +62,7 @@ pub fn take_list_action() -> Option<String> {
 static LIST_CHOICE: RwLock<Option<String>> = RwLock::new(None);
 /// The answer to a combo's fighter question (`None` inside: Cancel), for the combos UI (SPEC-input-07 §4a).
 static COMBO_FIGHTER: RwLock<Option<Option<FighterChoice>>> = RwLock::new(None);
+static RECORDING_FIGHTER: RwLock<Option<Option<FighterChoice>>> = RwLock::new(None);
 static LIST_RENAME: RwLock<Option<String>> = RwLock::new(None);
 
 /// X on a library opened through [`open_external_library`]: the opener renames the row.
@@ -68,6 +79,19 @@ pub fn take_list_choice() -> Option<String> {
 /// The answer to the combo fighter question, once (`Some(None)`: cancelled).
 pub fn take_combo_fighter_choice() -> Option<Option<FighterChoice>> {
     lock_write(&COMBO_FIGHTER).take()
+}
+
+/// The answer to a recording's fighter question, once (`Some(None)`: cancelled).
+pub fn take_recording_fighter_choice() -> Option<Option<FighterChoice>> {
+    lock_write(&RECORDING_FIGHTER).take()
+}
+
+/// Open the shared Fighter Mismatch screen for a recording, a combo drill, or a chain's macro 1.
+pub fn open_recording_fighter_prompt(origin: FighterOrigin, recorded: String, current: String) -> bool {
+    *lock_write(&RECORDING_FIGHTER) = None;
+    let opened = lock_write(&UI).open_fighter_prompt_for(origin, 0, recorded, current);
+    if opened { assign(&menu::MENU_RECEIVED_INPUT, true); }
+    opened
 }
 
 /// True while the caller-owned name draft for `token` is on the panel, open or
@@ -220,6 +244,7 @@ fn fighter_prompt_stale(origin:FighterOrigin, revision:u64) -> bool {
         FighterOrigin::Named=>selection_revision(),
         FighterOrigin::Clip=>crate::runtime::macros::replay_capture::selection_revision(),
         FighterOrigin::Combo=>crate::runtime::ui::combos::prompt_revision(),
+        FighterOrigin::Recording=>0,
     };
     revision!=current || suspended() || !crate::runtime::ui::facts::fact_scene_enabled()
 }
@@ -1398,6 +1423,7 @@ fn apply_effect(effect: Effect) {
         Effect::NeedCharacter(kind) => request_kind(kind),
         Effect::ClipFighter(choice) => crate::runtime::macros::replay_capture::fighter_choice(choice),
         Effect::ComboFighter(choice) => *lock_write(&COMBO_FIGHTER) = Some(choice),
+        Effect::RecordingFighter(choice) => *lock_write(&RECORDING_FIGHTER) = Some(choice),
     }
 }
 

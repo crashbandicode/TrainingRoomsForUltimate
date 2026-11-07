@@ -708,6 +708,7 @@ fn ordered_catalog() -> crate::model::recording_menu::Catalog {
             name: "One".into(),
             made_from: None,
             links: Vec::new(),
+            span: 0,
         }],
         sequences: vec![SequenceFile {
             id: "seq".into(),
@@ -734,6 +735,7 @@ fn recording_row(
         start_save: None,
         start_save_on: true,
         recorded_on: String::new(),
+        span: 0,
     }
 }
 

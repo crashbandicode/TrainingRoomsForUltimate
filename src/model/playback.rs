@@ -110,6 +110,39 @@ impl Book {
         self.chains.insert(id.into(), chain);
     }
 
+    /// The file's own start save: linked, deleted, or none. A chain uses macro 1.
+    pub fn start_link(&self, id: &str) -> StartLink<'_> {
+        if let Some(chain) = self.chains.get(id) {
+            if !chain.start_save_on {
+                return StartLink::None;
+            }
+            let Some(first) = chain.recordings.first() else {
+                return StartLink::None;
+            };
+            let Some(recording) = self.recordings.get(first.as_str()) else {
+                return StartLink::None;
+            };
+            return link_of(recording, &self.saves);
+        }
+        let Some(recording) = self.recordings.get(id) else {
+            return StartLink::None;
+        };
+        link_of(recording, &self.saves)
+    }
+
+    /// The fighter a play should compare. A chain uses macro 1 only.
+    pub fn recorded_fighter(&self, id: &str) -> Option<i32> {
+        if let Some(chain) = self.chains.get(id) {
+            let first = chain.recordings.first()?;
+            return self.recordings.get(first.as_str()).map(|recording| recording.start.fighter_kind);
+        }
+        self.recordings.get(id).map(|recording| recording.start.fighter_kind)
+    }
+
+    pub fn is_chain(&self, id: &str) -> bool {
+        self.chains.contains_key(id)
+    }
+
     pub fn add_save(&mut self, id: impl Into<String>) {
         self.saves.insert(id.into());
     }
@@ -177,6 +210,31 @@ impl Playback {
             step: 0,
             frame: 0,
             remaining,
+            emitted: false,
+        });
+        Effect {
+            warp,
+            started: true,
+            ..Effect::default()
+        }
+    }
+
+    /// Play one file once, whichever file the menu named. The role's active id and loop stay as they are.
+    pub fn play_file<'a>(&mut self, role: Role, book: &'a Book, id: &str) -> Effect<'a> {
+        let Some(plan) = book.plan(id) else {
+            return Effect::default();
+        };
+        let slot = role_slot(role);
+        if plan.warp.is_some() {
+            self.warps[slot] += 1;
+        }
+        let warp = plan.warp;
+        self.roles[slot] = Some(Run {
+            id: IdBuf::copy_from(id),
+            chain: plan.chain,
+            step: 0,
+            frame: 0,
+            remaining: Some(1),
             emitted: false,
         });
         Effect {
@@ -323,6 +381,28 @@ fn chain_warp<'a>(chain: &Chain, book: &'a Book) -> Option<&'a str> {
     let recording = book.recordings.get(first.as_str())?;
     let id = recording.start_save.as_deref()?;
     linked(id, true, &book.saves)
+}
+
+/// Where a named file's start save stands.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum StartLink<'a> {
+    None,
+    Linked(&'a str),
+    Deleted,
+}
+
+fn link_of<'a>(recording: &'a MacroRecording, saves: &BTreeSet<String>) -> StartLink<'a> {
+    let Some(id) = recording.start_save.as_deref() else {
+        return StartLink::None;
+    };
+    if !recording.start_save_on {
+        return StartLink::None;
+    }
+    if saves.contains(id) {
+        StartLink::Linked(id)
+    } else {
+        StartLink::Deleted
+    }
 }
 
 fn linked<'a>(id: &'a str, on: bool, saves: &BTreeSet<String>) -> Option<&'a str> {
@@ -709,5 +789,28 @@ mod tests {
         assert!(machine.playing(Role::Cpu));
         assert!(!machine.playing(Role::Player));
         assert_eq!(machine.step(Role::Cpu, &book).unwrap().frame.buttons, 7);
+    }
+
+    #[test]
+    fn rc5wire_chain_skips_a_missing_macro() {
+        let mut index = RecordingIndex::fresh();
+        index.set_active(Role::Player, Some("chain-a"), 1).unwrap();
+        let mut book = Book::new(index);
+        book.add_recording("macro-b", recording("B", &[10], None, true));
+        book.add_chain("chain-a", chain("Chain", &["gone", "macro-b"], true));
+        let mut machine = Playback::new();
+        assert!(machine.play_chord(Role::Player, &book).started);
+        let played = machine.step(Role::Player, &book).unwrap();
+        assert_eq!(played.recording_id, "macro-b");
+        assert_eq!(played.frame.buttons, 10);
+        assert!(machine.step(Role::Player, &book).is_none());
+
+        let mut empty = RecordingIndex::fresh();
+        empty.set_active(Role::Player, Some("chain-b"), 1).unwrap();
+        let mut gone = Book::new(empty);
+        gone.add_chain("chain-b", chain("Gone", &["missing"], true));
+        let mut stopped = Playback::new();
+        assert!(!stopped.play_chord(Role::Player, &gone).started);
+        assert!(!stopped.playing(Role::Player));
     }
 }

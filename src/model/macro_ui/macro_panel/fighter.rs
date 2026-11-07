@@ -52,6 +52,8 @@ pub enum Origin {
     /// A chosen combo (SPEC-input-07 §4a): the question is about Player 1's
     /// fighter, and the combos UI keeps the candidate.
     Combo,
+    /// A recording, a combo drill, or a chain's macro 1. The recording worker keeps the candidate.
+    Recording,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -115,7 +117,7 @@ impl Prompt {
                 "Recorded on {} · P1 is {}\nThe combo is graded the same on either. A chooses, B cancels.",
                 self.recorded, self.current
             ),
-            Origin::Named | Origin::Clip => format!(
+            Origin::Named | Origin::Clip | Origin::Recording => format!(
                 "Recorded {} · current CPU {}\nInputs are the same either way. A chooses, B cancels.",
                 self.recorded, self.current
             ),
@@ -175,5 +177,18 @@ mod tests {
         assert!(view.labels[2..].iter().all(String::is_empty));
         assert!(view.footer.contains("Kirby") && view.footer.contains("Hero"));
         assert!(view.footer.contains("A chooses") && view.footer.contains("B cancels"));
+    }
+
+    #[test]
+    fn a_recording_prompt_uses_the_same_rows_and_starts_on_keep() {
+        let prompt = Prompt::new(Origin::Recording, 0, "Pikachu".into(), "Mario".into());
+        let view = prompt.view();
+        assert_eq!(view.title, "Fighter Mismatch");
+        assert_eq!(view.labels[0], "Keep current fighter");
+        assert_eq!(view.labels[1], "Switch to recorded fighter");
+        assert_eq!(view.selected, 0);
+        assert_eq!(prompt.choice(), Choice::Keep);
+        assert!(view.footer.contains("Pikachu") && view.footer.contains("Mario"));
+        assert!(view.footer.contains("B cancels"));
     }
 }

@@ -154,10 +154,76 @@ impl Panes {
             None => self.show(p::IDX_ROW_HI, false),
         }
 
+        if frame.white_cursor {
+            self.show(p::IDX_ROW_HI, false);
+        }
+        self.draw_chrome(frame);
         self.text(p::IDX_HELP, frame.help[0].units(), p::TEXT);
         self.text(p::IDX_HELP + 1, frame.help[1].units(), p::TEXT);
         self.text(p::IDX_HINT, frame.hint.units(), p::TEXT_DIM);
         self.draw_marks(frame);
+    }
+
+    /// Green row plates, the hot outline, the hairline and the white cursor. Hidden until a recording screen asks.
+    unsafe fn draw_chrome(&self, frame: &Frame) {
+        for index in p::IDX_GREEN..p::IDX_ROW {
+            self.show(index, false);
+        }
+        for (i, on) in frame.green.iter().enumerate() {
+            if *on {
+                self.rect_at(
+                    p::IDX_GREEN + i,
+                    (p::ROW_LEFT + p::ROW_RIGHT) / 2.0,
+                    p::row_y(i),
+                    p::ROW_RIGHT - p::ROW_LEFT,
+                    p::ROW_H,
+                    p::GREEN_ROW,
+                );
+            }
+        }
+        if let Some(slot) = frame.hairline {
+            let y = p::row_y(usize::from(slot)) - p::ROW_H / 2.0;
+            self.rect_at(p::IDX_HAIRLINE, (p::ROW_LEFT + p::ROW_RIGHT) / 2.0, y, p::ROW_RIGHT - p::ROW_LEFT, 2.0, p::RULE);
+        }
+        for (n, block) in frame.outline.iter().enumerate() {
+            if let Some((first, count)) = *block {
+                self.stroke(p::IDX_OUTLINE + n * 4, first, count, p::TEXT_ON);
+            }
+        }
+        if frame.white_cursor {
+            if let Some(slot) = frame.focus {
+                let x = p::ROW_LEFT + 4.0;
+                self.rect_at(p::IDX_CURSOR, x, p::row_y(usize::from(slot)), 6.0, p::ROW_H, p::CURSOR_WHITE);
+                self.stroke(p::IDX_CURSOR + 1, slot, 1, p::CURSOR_WHITE);
+            }
+        }
+    }
+
+    unsafe fn stroke(&self, index: usize, first: u8, count: u8, color: [u8; 4]) {
+        let last = usize::from(first) + usize::from(count.saturating_sub(1));
+        let top = p::row_y(usize::from(first)) + p::ROW_H / 2.0;
+        let bottom = p::row_y(last) - p::ROW_H / 2.0;
+        let y = (top + bottom) / 2.0;
+        let h = (top - bottom).abs().max(p::ROW_H);
+        let x = (p::ROW_LEFT + p::ROW_RIGHT) / 2.0;
+        let w = p::ROW_RIGHT - p::ROW_LEFT;
+        let edge = 2.0;
+        self.rect_at(index, p::ROW_LEFT + edge / 2.0, y, edge, h, color);
+        self.rect_at(index + 1, p::ROW_RIGHT - edge / 2.0, y, edge, h, color);
+        self.rect_at(index + 2, x, top - edge / 2.0, w, edge, color);
+        self.rect_at(index + 3, x, bottom + edge / 2.0, w, edge, color);
+    }
+
+    unsafe fn rect_at(&self, index: usize, x: f32, y: f32, w: f32, h: f32, color: [u8; 4]) {
+        let pane = self.all[index];
+        if pane.is_null() {
+            return;
+        }
+        pane::set_visible(pane, true);
+        pane::set_pos(pane, x, y);
+        pane::set_width(pane, w);
+        pane::set_height(pane, h);
+        pane::set_rect_color(pane, p::linear(color));
     }
 
     /// Floppy and loop pictures, and the smaller pop-up background. Hidden marks stay hidden.

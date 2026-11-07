@@ -85,7 +85,43 @@ def gif(ctx, name, seconds, do):
         time.sleep(0.5)
     if not path.exists():
         raise RuntimeError('no GIF written: %s' % status)
-    return {'gif': str(path), 'seconds': seconds, 'bytes': path.stat().st_size, 'status': status}
+    screen = GIF_GATES.get(name)
+    line = None
+    if screen:
+        line = diag(ctx, screen, cap=12)
+    return {'gif': str(path), 'seconds': seconds, 'bytes': path.stat().st_size,
+            'status': status, 'screen': line}
+
+
+# A media row fails unless this line was written while its clip ran. The line is the screen the
+# docs say must be visible. Frame-strip clips use the strip's own diag line.
+GIF_GATES = {
+    'rc5-record-start-save.gif': r'screen=recording role=player recording=1',
+    'rc5-play-chord.gif': r'screen=playback role=',
+    'rc5-loop-no-warp.gif': r'screen=recording-popup role=player loop=2',
+    'rc5-chain-play.gif': r'screen=playback .*warp=1',
+    'rc5-popup.gif': r'screen=recording-popup',
+    'rc5-recording-page.gif': r'screen=recording-page',
+    'rc5-macro-screen.gif': r'screen=recording-page',
+    'rc5-fighter-mismatch.gif': r'screen=mismatch ask=macro1',
+    'rc5-make-combo.gif': r'screen=make-combo source=\S+',
+    'rc5-crop-combo.gif': r'screen=crop source=\S+ combo=1',
+    'rc5-grade-not-true.gif': r'\[FrameStrip\] link verdict=',
+    'rc5-sequence-drill.gif': r'\[Ui\] press .*Drill',
+    'rc5-frame-strip-lanes.gif': r'\[FrameStrip\] shown=true',
+    'rc5-frame-strip-chips.gif': r'\[FrameStrip\] shown=true',
+    'rc5-frame-strip-cstick.gif': r'\[FrameStrip\] shown=true',
+    'rc5-frame-strip-stick-row.gif': r'\[FrameStrip\] shown=true',
+    'rc5-frame-strip-freeze.gif': r'\[FrameStrip\] shown=true',
+    'rc5-frame-strip-freeze-stick.gif': r'\[FrameStrip\] shown=true',
+    'rc5-frame-strip-advantage-hit.gif': r'\[FrameStrip\] advantage value=-?\d+ on_shield=false',
+    'rc5-frame-strip-advantage-shield.gif': r'\[FrameStrip\] advantage value=-?\d+ on_shield=true',
+    'rc5-frame-strip-link.gif': r'\[FrameStrip\] link verdict=',
+    'rc5-frame-strip-drop.gif': r'\[FrameStrip\] link verdict=',
+    'rc5-frame-strip-input.gif': r'\[FrameStrip\] shown=true',
+    'rc5-frame-strip-last.gif': r'\[FrameStrip\] link verdict=',
+    'rc5-frame-strip-exchange.gif': r'\[FrameStrip\] link verdict=',
+}
 
 
 def console_scan(ctx):
@@ -238,6 +274,25 @@ def wait_loaded(ctx, cap=180):
     raise RuntimeError('game still loading after %ss' % cap)
 
 
+def cpu_mario(ctx):
+    """The Training CPU comes from the menu, not the CSS coin.
+
+    One A on tile 0 readies this CSS while the coin is still Random, and a Random coin does not
+    follow CPU Shield. Fighters & Stages is three pages from CPU. CPU Character is the third row
+    of Player 1 and CPU. The portrait grid opens on Mario. A selects it.
+    """
+    open_menu(ctx)
+    for _ in range(3):
+        press(ctx, 'r', 0.55)
+    press(ctx, 'down', 0.35)
+    press(ctx, 'down', 0.35)
+    press(ctx, 'a', 0.9)
+    time.sleep(0.8)
+    press(ctx, 'a', 0.6)
+    close_menu(ctx)
+    return {'cpu': 'mario', 'route': 'menu CPU Character'}
+
+
 def boot_training(ctx):
     """Bring this instance to Training with P1 on Mario.
 
@@ -250,7 +305,7 @@ def boot_training(ctx):
     if status.get('running') and status.get('loading_complete'):
         try:
             ctx.gate('training-hud-unpaused')
-            return {'already': 'training'}
+            return {'already': 'training', 'cpu': cpu_mario(ctx)}
         except RuntimeError:
             pass
     else:
@@ -271,13 +326,20 @@ def boot_training(ctx):
     seg = ctx.runner.plan['segments']['enter-training']
     ctx.call('macro.play', {'path': seg['file']})
     ctx.runner.wait_macro(ctx.on, seg.get('cap', 40))
-    try:
-        ctx.gate('training-hud-unpaused')
-    except RuntimeError:
-        css_chord(ctx, ['a'], 120)
-        time.sleep(1.5)
-        ctx.gate('training-hud-unpaused')
-    return {'css_tile': '0', 'pick': picked}
+    tip = None
+    for _ in range(4):
+        try:
+            ctx.gate('training-hud-unpaused')
+            tip = 'hud'
+            break
+        except RuntimeError as error:
+            tip = str(error)
+            css_chord(ctx, ['a'], 120)
+            time.sleep(1.2)
+    if tip != 'hud':
+        raise RuntimeError('fighter tip still up after four confirms: %s' % tip)
+    cpu = cpu_mario(ctx)
+    return {'css_tile': '0', 'pick': picked, 'cpu': cpu}
 
 
 # --- xps-a: migration boot, runtime rows ----------------------------------------------------------
@@ -329,6 +391,133 @@ def rr_record(ctx):
     ctx.play(RECORD)
     stop = diag(ctx, r'screen=recording role=cpu recording=0', cap=10)
     return save(ctx, 'record', {'start': line, 'stop': stop, 'seconds': round(time.time() - before, 1)})
+
+
+def rr_record_cpu(ctx):
+    """Record while the pop-up role is CPU. The stop line names that role, and a macro file exists."""
+    settle(ctx)
+    popup(ctx)
+    press(ctx, 'r', 0.5)
+    press(ctx, 'b', 0.6)
+    ctx.play(RECORD)
+    start = diag(ctx, r'screen=recording role=cpu recording=1', cap=10)
+    ctx.play(JAB)
+    ctx.play(RECORD)
+    stop = diag(ctx, r'screen=recording role=cpu recording=0', cap=10)
+    folder = Path(ctx.instance['diag_log']).parent / 'macros'
+    names = sorted(p.name for p in folder.glob('*')) if folder.is_dir() else []
+    if not names:
+        raise RuntimeError('Record on CPU wrote no macro in %s' % folder)
+    return save(ctx, 'record-cpu', {'start': start, 'stop': stop, 'macros': names[:8]})
+
+
+def _open_file_row(ctx, downs):
+    open_menu(ctx)
+    for _ in range(6):
+        press(ctx, 'r', 0.55)
+    for _ in range(downs):
+        press(ctx, 'down', 0.35)
+    press(ctx, 'a', 0.7)
+
+
+def rr_make_combo(ctx):
+    """Make combo plays the macro under the cursor and saves Combo N."""
+    settle(ctx)
+    _open_file_row(ctx, 0)
+    for _ in range(8):
+        press(ctx, 'down', 0.3)
+    press(ctx, 'a', 0.6)
+    line = diag(ctx, r'screen=make-combo source=\S+', cap=15)
+    close_menu(ctx)
+    return save(ctx, 'make-combo', {'line': line})
+
+
+def rr_make_combo_chain(ctx):
+    """Make combo on a chain plays that chain from macro 1's start save."""
+    settle(ctx)
+    popup(ctx)
+    press(ctx, 'down', 0.35)
+    press(ctx, 'a', 0.6)
+    popup_close(ctx)
+    _open_file_row(ctx, 1)
+    for _ in range(8):
+        press(ctx, 'down', 0.3)
+    press(ctx, 'a', 0.6)
+    line = diag(ctx, r'screen=make-combo source=\S+', cap=15)
+    close_menu(ctx)
+    return save(ctx, 'make-combo-chain', {'line': line})
+
+
+def rr_crop_macro(ctx):
+    """Crop a macro: the handle screen opens, A writes a new macro, the original stays."""
+    settle(ctx)
+    _open_file_row(ctx, 0)
+    for _ in range(10):
+        press(ctx, 'down', 0.3)
+    press(ctx, 'a', 0.6)
+    opened = diag(ctx, r'screen=crop source=\S+ combo=0', cap=10)
+    press(ctx, 'r', 0.4)
+    press(ctx, 'a', 0.6)
+    saved = diag(ctx, r'screen=crop source=\S+ combo=0 saved=1', cap=10)
+    close_menu(ctx)
+    return save(ctx, 'crop-macro', {'open': opened, 'saved': saved})
+
+
+def rr_crop_combo(ctx):
+    """Crop a combo by its links. A writes a new combo."""
+    settle(ctx)
+    open_menu(ctx)
+    for _ in range(6):
+        press(ctx, 'r', 0.55)
+    for _ in range(4):
+        press(ctx, 'down', 0.35)
+    press(ctx, 'a', 0.7)
+    for _ in range(8):
+        press(ctx, 'down', 0.3)
+    press(ctx, 'a', 0.6)
+    opened = diag(ctx, r'screen=crop source=\S+ combo=1', cap=10)
+    press(ctx, 'a', 0.6)
+    saved = diag(ctx, r'screen=crop source=\S+ combo=1 saved=1', cap=10)
+    close_menu(ctx)
+    return save(ctx, 'crop-combo', {'open': opened, 'saved': saved})
+
+
+def rr_mismatch_macro(ctx):
+    """Play a macro recorded on another fighter. Keep plays. B is not Keep."""
+    settle(ctx)
+    popup(ctx)
+    press(ctx, 'a', 0.6)
+    popup_close(ctx)
+    ctx.play(PLAY_P1)
+    line = diag(ctx, r'screen=mismatch ask=macro ', cap=12)
+    ctx.shot('mismatch-macro')
+    press(ctx, 'a', 0.6)
+    return save(ctx, 'mismatch-macro', {'line': line})
+
+
+def rr_mismatch_chain(ctx):
+    """A chain asks once, for macro 1. Keep plays on the current fighter."""
+    settle(ctx)
+    popup(ctx)
+    press(ctx, 'r', 0.5)
+    press(ctx, 'a', 0.6)
+    popup_close(ctx)
+    ctx.play(PLAY_CPU)
+    line = diag(ctx, r'screen=mismatch ask=macro1', cap=12)
+    ctx.shot('mismatch-chain')
+    press(ctx, 'a', 0.6)
+    return save(ctx, 'mismatch-chain', {'line': line})
+
+
+def rr_visuals(ctx):
+    """The hot five keep their outline token, and the cursor is the white bar."""
+    settle(ctx)
+    line = popup(ctx)
+    if 'hairline=' not in line and 'hot=' not in line:
+        line = diag(ctx, r'hot=\d+', cap=8)
+    ctx.shot('visuals')
+    press(ctx, 'b', 0.5)
+    return save(ctx, 'visuals', {'line': line})
 
 
 def rr_notice(ctx):
@@ -837,6 +1026,8 @@ def media_crop_combo(ctx):
 
 def media_save_warp(ctx):
     """ZL+Down at centre, walk both to the ledge, ZL+Up: both return, nothing plays."""
+    log = Path(ctx.instance['diag_log'])
+    start = log.stat().st_size if log.exists() else 0
     def do():
         ctx.play(SAVE)
         time.sleep(1.0)
@@ -845,6 +1036,10 @@ def media_save_warp(ctx):
         ctx.play(LOAD)
         time.sleep(2.0)
     out = gif(ctx, 'rc5-save-warp.gif', 6, do)
+    fresh = log.read_text(errors='replace')[start:] if log.exists() else ''
+    if 'screen=playback' in fresh or 'screen=recording role=' in fresh:
+        raise RuntimeError('Load started a recording or a playback: %s' % fresh[-400:])
+    out['screen'] = 'load started nothing'
     return save(ctx, 'save-warp', out)
 
 
@@ -1263,20 +1458,50 @@ def rr_drill(ctx):
                                'drill_shot': str(shot1), 'after_make_combo': str(shot2)})
 
 
-def f9_body_trace(ctx):
-    """Placeholder. artifacts/phase23/LANE-GROK-RC5-FIX-F9-REPORT.md was not present.
+def plugin_module(ctx):
+    """The name Eden lists for this NRO. A RO-loaded plugin is nro:<build-id>, not a file name."""
+    listed = ctx.call('modules.list') or {}
+    entries = listed.get('modules') if isinstance(listed, dict) else listed
+    entries = entries or []
+    found = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        name = str(entry.get('name') or '')
+        if name.startswith('nro:') or name.endswith('training_rooms.nro'):
+            found.append(entry)
+    if not found:
+        raise RuntimeError('modules.list has no training NRO: %s' % listed)
+    loaded = [entry for entry in found if str(entry.get('name') or '').startswith('nro:')]
+    return loaded[0] if loaded else found[0]
 
-    Arm f9_body_of with on_return and captures of entry, [entry+0x4160], the state word, and slot,
-    as TASK-GROK-rc5-fix-f9.md specifies. This row waits for that return. It does not invent the
-    stale-entry setup the fix lane owns.
-    """
+
+def f9_body_trace(ctx):
+    """Arm f9_body_of on the module name this boot lists, then wait for its return."""
+    entry = plugin_module(ctx)
+    name = str(entry.get('name'))
+    elf = ctx.instance.get('elf') or ctx.instance.get('so')
+    if not elf:
+        raise RuntimeError('instance has no elf path for symbols.load; keys=%s' % sorted(ctx.instance))
+    loaded = ctx.call('symbols.load', {'module': name, 'elf': elf})
+    symbol = 'training_rooms::runtime::roster::character_roster::sources::f9_body_of'
+    target = '%s!<%s>' % (name, symbol)
+    point = ctx.call('trace.arm', {
+        'target': target,
+        'registers': ['x0', 'x1'],
+        'captures': [
+            {'expression': 'x0+0x4150', 'type': 'u64'},
+            {'expression': 'x0+0x4160', 'type': 'u64'},
+            {'expression': 'x0+0x591c', 'type': 'u8'},
+        ],
+        'on_return': True,
+    })
     line = ctx.wait_log(
         'trace_jsonl',
         r'(?:"event":"return".*f9_body_of|f9_body_of.*"event":"return")',
         cap=30)
     ctx.shot('f9-body-trace')
-    return save(ctx, 'f9-body-trace', {'line': line, 'placeholder': True,
-                                       'report': 'LANE-GROK-RC5-FIX-F9-REPORT.md absent'})
+    return save(ctx, 'f9-body-trace', {'line': line, 'module': name, 'symbols': loaded, 'point': point})
 
 
 # --- the final row -------------------------------------------------------------------------------

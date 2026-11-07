@@ -17,12 +17,12 @@ Holding one direction long enough can freeze the strip. A new binned direction, 
 ## Recording
 
 - A save state only warps. Load does not start a recording. Auto-load on death only warps to the bound save, and it does nothing when none is bound.
-- Recording captures Player 1. Stopping writes a named macro and that macro's start save. The pop-up can show a CPU role, and the capture model can store a CPU recording, but the recorder is not given the pop-up's role.
+- Record follows the pop-up's role. It captures Player 1 until that role is CPU. Stopping writes a named macro and that macro's start save.
 - Each role has one active macro, a recording or a chain. Play on Player 1 and Play on CPU play that role's macro, or stop it if it is already playing.
 - The loop never warps back. Later passes continue from where the fighters are.
 - A chain starts at its first macro's start save, plays its recordings in order, and cannot contain a chain.
 - Save last combo still saves the combo you landed. A drilled combo counts without having to be a true combo. A different move drops.
-- Make combo does not save a combo. It plays one pass of Player 1's active macro. Crop does not open a handle screen. Both rows are on the file's screen; what they do is in [RECORDING.md](RECORDING.md).
+- Make combo plays the file under the cursor once on Player 1, from that file's own start save, and saves the links as a new combo named Combo N. Crop opens a handle screen and saves a new file. The original stays. Both rows are on the file's screen; what they do is in [RECORDING.md](RECORDING.md).
 - A sequence is an ordered list of combos, and the helper drills one thing at a time.
 - The pop-up and the Recording page are how you bind a save, set a macro active, and drill.
 
@@ -32,7 +32,7 @@ Holding one direction long enough can freeze the strip. A new binned direction, 
 | --- | --- | --- |
 | Save | ZL + D-pad Down | Writes the bound save. |
 | Load | ZL + D-pad Up | Warps to the bound save. Starts nothing. |
-| Record | ZR + D-pad Down | Same chord. Captures Player 1. |
+| Record | ZR + D-pad Down | Same chord. The pop-up's role says who is recorded. |
 | Play on CPU | ZR + D-pad Up | Was Input Playback. Plays the CPU's active macro. |
 | Play on Player 1 | ZR + D-pad Left | Plays Player 1's active macro. |
 | Recording pop-up | ZR + D-pad Right | Opens the pop-up over the match. Press it again to close. |

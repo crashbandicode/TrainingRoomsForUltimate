@@ -258,9 +258,14 @@ impl RecordingIndex {
     pub(crate) fn apply_migration(&mut self, receipt: &MigrationReceipt) {
         self.loops.player = receipt.loop_player;
         self.loops.cpu = receipt.loop_cpu;
-        self.active.player = receipt.active_player.clone();
+        // A legacy selected slot wins. A choice the menu already saved stays when the old slot had none.
+        if receipt.active_player.is_some() {
+            self.active.player = receipt.active_player.clone();
+        }
         self.active.cpu = None;
-        self.bound_save = receipt.bound_save.clone();
+        if receipt.bound_save.is_some() {
+            self.bound_save = receipt.bound_save.clone();
+        }
         self.migration = Some(receipt.clone());
         self.migrated = true;
     }

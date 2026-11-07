@@ -208,6 +208,46 @@ ROWS = [
       'RR-7 §Eden rows for rr-10 (row rr-crop)', ['diag screen=crop source= combo=0', 'original combo bytes unchanged'],
       gates=('diag-crop',),
       trace='RR-7: Effect::Crop, then the new file write; capture the original bytes unchanged (a combo crops with combo=1). Symbols only (README, Open questions).'),
+    R('rr-record-cpu', 'rr_record_cpu', 'surface', False,
+      "screen=recording role=cpu recording=1, then recording=0, and a macro file exists",
+      'RECORDING.md Record follows the pop-up role',
+      ['diag screen=recording role=cpu recording=1', 'a macro file on the card'],
+      gates=('diag-record-cpu-start',)),
+    R('rr-make-combo', 'rr_make_combo', 'surface', False,
+      "screen=make-combo while the named macro plays once on Player 1 and Combo N is saved",
+      'RECORDING.md Make combo',
+      ['diag screen=make-combo'],
+      gates=('diag-make-combo',)),
+    R('rr-make-combo-chain', 'rr_make_combo_chain', 'surface', False,
+      "Make combo on a chain plays that chain from macro 1 and saves Combo N",
+      'RECORDING.md Make combo on a chain',
+      ['diag screen=make-combo'],
+      gates=('diag-make-combo',)),
+    R('rr-crop-macro', 'rr_crop_macro', 'surface', False,
+      "The crop screen opens for a macro and A writes a new macro",
+      'RECORDING.md Crop',
+      ['diag screen=crop combo=0', 'diag screen=crop saved=1'],
+      gates=('diag-crop-saved',)),
+    R('rr-crop-combo', 'rr_crop_combo', 'surface', False,
+      "The crop screen opens for a combo and A writes a new combo",
+      'RECORDING.md Crop',
+      ['diag screen=crop combo=1'],
+      gates=('diag-crop-combo',)),
+    R('rr-mismatch-macro', 'rr_mismatch_macro', 'surface', False,
+      "screen=mismatch ask=macro and Keep plays on the current fighter",
+      'RECORDING.md Fighter Mismatch',
+      ['diag screen=mismatch ask=macro'],
+      gates=('diag-mismatch-macro',)),
+    R('rr-mismatch-chain', 'rr_mismatch_chain', 'surface', False,
+      "screen=mismatch ask=macro1 once, then Keep plays the chain",
+      'RECORDING.md Fighter Mismatch',
+      ['diag screen=mismatch ask=macro1'],
+      gates=('diag-mismatch',)),
+    R('rr-visuals', 'rr_visuals', 'surface', False,
+      "The pop-up line carries hot= and hairline=, and the shot shows the white cursor",
+      'RECORDING.md the hot five and the white cursor',
+      ['diag hot=', 'visuals shot'],
+      gates=('diag-visuals',)),
     R('rr-load', 'rr_load', 'xps', False,
       "Load (ZL+Up) warps both fighters to the bound save and starts nothing: no playback diag line, the active macros stay idle",
       'RR-4 requirement trace (A5, load_starts_no_playback); %s line 182' % STAGE1,
@@ -302,15 +342,18 @@ ROWS = [
     R('media-rc5-fighter-mismatch', 'media_fighter_mismatch', 'ally', False,
       "One Fighter Mismatch prompt, title Fighter Mismatch, rows Keep current fighter and Switch to recorded fighter. It names the first macro's fighter. No second prompt when the later macro plays.",
       MEDIA + ', row media/rc5-fighter-mismatch.gif',
-      ['media/rc5-fighter-mismatch.gif'], media=('media/rc5-fighter-mismatch.gif', 7)),
+      ['media/rc5-fighter-mismatch.gif'], media=('media/rc5-fighter-mismatch.gif', 7),
+      gates=('diag-mismatch',)),
     R('media-rc5-make-combo', 'media_make_combo', 'ally', False,
       "The macro plays once on Player 1 from its start save. A new combo appears. The drilled combo is still the drill when it finishes.",
       MEDIA + ', row media/rc5-make-combo.gif; RR-7 Make combo on a chain/macro',
-      ['media/rc5-make-combo.gif'], media=('media/rc5-make-combo.gif', 8)),
+      ['media/rc5-make-combo.gif'], media=('media/rc5-make-combo.gif', 8),
+      gates=('diag-make-combo',)),
     R('media-rc5-crop-combo', 'media_crop_combo', 'ally', False,
       "A new combo of the kept links. The original combo is still in the list.",
       MEDIA + ', row media/rc5-crop-combo.gif',
-      ['media/rc5-crop-combo.gif'], media=('media/rc5-crop-combo.gif', 7)),
+      ['media/rc5-crop-combo.gif'], media=('media/rc5-crop-combo.gif', 7),
+      gates=('diag-crop-combo',)),
     R('media-rc5-save-warp', 'media_save_warp', 'ally', False,
       "Both fighters return to the saved spot. No recording starts. The CPU does not play inputs.",
       MEDIA + ', row media/rc5-save-warp.gif',
@@ -486,6 +529,12 @@ def main():
         'diag-mismatch': {'kind': 'log', 'source': 'diag', 'pattern': r'screen=mismatch ask=macro1', 'cap': 10},
         'diag-rename': {'kind': 'log', 'source': 'diag', 'pattern': r'screen=rename header=Name macro', 'cap': 10},
         'diag-crop': {'kind': 'log', 'source': 'diag', 'pattern': r'screen=crop source=\S+ combo=0', 'cap': 10},
+        'diag-record-cpu-start': {'kind': 'log', 'source': 'diag', 'pattern': r'screen=recording role=cpu recording=1', 'cap': 10},
+        'diag-make-combo': {'kind': 'log', 'source': 'diag', 'pattern': r'screen=make-combo source=\S+', 'cap': 15},
+        'diag-crop-saved': {'kind': 'log', 'source': 'diag', 'pattern': r'screen=crop source=\S+ combo=0 saved=1', 'cap': 12},
+        'diag-crop-combo': {'kind': 'log', 'source': 'diag', 'pattern': r'screen=crop source=\S+ combo=1', 'cap': 12},
+        'diag-mismatch-macro': {'kind': 'log', 'source': 'diag', 'pattern': r'screen=mismatch ask=macro ', 'cap': 12},
+        'diag-visuals': {'kind': 'log', 'source': 'diag', 'pattern': r'hairline=', 'cap': 10},
         'diag-play-player': {'kind': 'log', 'source': 'diag', 'pattern': r'screen=playback role=player warp=1', 'cap': 10},
         'diag-play-cpu': {'kind': 'log', 'source': 'diag', 'pattern': r'screen=playback role=cpu warp=0', 'cap': 10},
         'diag-mash': {'kind': 'log', 'source': 'diag', 'pattern': r'screen=playback mash=1', 'cap': 10},
@@ -513,36 +562,38 @@ def main():
 
     # Confirming re-run: Surface 2 + Yoga 2. surface-a and yoga-a are release. surface-b and yoga-b
     # are diag. Ally and XPS never reached Training, so their rows move onto these four instances.
-    SURFACE_B = ['rr-migrate', 'rr-record', 'rr-notice', 'rr-mismatch', 'rr-rename', 'rr-crop',
-                 'rr-play', 'rr-mash', 'adv-jab-shield', 'adv-tilt-shield', 'adv-smash-shield',
-                 'adv-aerial-shield', 'adv-move-hit']
-    SURFACE_A = ['strip-walk', 'strip-dash-dance', 'strip-cstick-smash', 'strip-tilted-a',
-                 'media-rc5-frame-strip-lanes', 'media-rc5-frame-strip-chips', 'media-rc5-frame-strip-freeze',
-                 'media-rc5-frame-strip-advantage-hit', 'media-rc5-frame-strip-advantage-shield',
-                 'media-rc5-frame-strip-link', 'media-rc5-frame-strip-drop', 'media-rc5-frame-strip-input',
+    # This lane runs the whole set on the Surface. Diag lines, including the media clips, are on
+    # surface-b. Release behaviour rows and the f9 trace are on surface-a.
+    SURFACE_B = ['rr-migrate', 'rr-record', 'rr-record-cpu', 'rr-notice', 'rr-mismatch',
+                 'rr-mismatch-macro', 'rr-mismatch-chain', 'rr-rename', 'rr-crop', 'rr-crop-macro',
+                 'rr-crop-combo', 'rr-make-combo', 'rr-make-combo-chain', 'rr-visuals',
+                 'rr-play', 'rr-mash', 'rr-load', 'rr-chain', 'rr-loop', 'rr-hot', 'rr-icons',
+                 'rr-page', 'rr-popup', 'rr-active', 'rr-drill',
+                 'adv-jab-shield', 'adv-tilt-shield', 'adv-smash-shield', 'adv-aerial-shield',
+                 'adv-move-hit',
+                 'media-rc5-migration', 'media-rc5-record-start-save', 'media-rc5-play-chord',
+                 'media-rc5-loop-no-warp', 'media-rc5-chain-play', 'media-rc5-popup',
+                 'media-rc5-recording-page', 'media-rc5-macro-screen', 'media-rc5-fighter-mismatch',
+                 'media-rc5-make-combo', 'media-rc5-crop-combo', 'media-rc5-save-warp',
+                 'media-rc5-frame-strip-lanes', 'media-rc5-frame-strip-chips',
+                 'media-rc5-frame-strip-freeze', 'media-rc5-frame-strip-advantage-hit',
+                 'media-rc5-frame-strip-advantage-shield', 'media-rc5-frame-strip-link',
+                 'media-rc5-frame-strip-drop', 'media-rc5-frame-strip-input',
                  'media-rc5-frame-strip-last', 'media-rc5-frame-strip-exchange',
-                 'media-rc5-grade-not-true', 'media-rc5-sequence-drill', 'f9-body-trace']
-    YOGA_A = ['media-rc5-migration', 'media-rc5-record-start-save', 'media-rc5-play-chord',
-              'media-rc5-loop-no-warp', 'media-rc5-chain-play', 'media-rc5-popup',
-              'media-rc5-recording-page', 'media-rc5-macro-screen', 'media-rc5-fighter-mismatch',
-              'media-rc5-make-combo', 'media-rc5-crop-combo', 'media-rc5-save-warp',
-              'media-rc5-frame-strip-cstick', 'media-rc5-frame-strip-stick-row',
-              'media-rc5-frame-strip-freeze-stick', 'rr-chords', 'rr-picker', 'rr-combo',
-              'combo-nair-loop-clean', 'combo-nair-loop-full-hop', 'combo-nair-loop-no-fastfall',
-              'combo-dash-attack', 'rr-grade-bar']
-    YOGA_B = ['rr-load', 'rr-chain', 'rr-loop', 'rr-hot', 'rr-icons', 'rr-page', 'rr-popup',
-              'rr-active', 'rr-drill']
+                 'media-rc5-frame-strip-cstick', 'media-rc5-frame-strip-stick-row',
+                 'media-rc5-frame-strip-freeze-stick', 'media-rc5-grade-not-true',
+                 'media-rc5-sequence-drill']
+    SURFACE_A = ['strip-walk', 'strip-dash-dance', 'strip-cstick-smash', 'strip-tilted-a',
+                 'rr-chords', 'rr-picker', 'rr-combo', 'combo-nair-loop-clean',
+                 'combo-nair-loop-full-hop', 'combo-nair-loop-no-fastfall', 'combo-dash-attack',
+                 'rr-grade-bar', 'f9-body-trace']
     INSTANCE = {}
     for name in SURFACE_B:
         INSTANCE[name] = ('surface-b', 'diag')
     for name in SURFACE_A:
         INSTANCE[name] = ('surface-a', 'release')
-    for name in YOGA_A:
-        INSTANCE[name] = ('yoga-a', 'release')
-    for name in YOGA_B:
-        INSTANCE[name] = ('yoga-b', 'diag')
     INSTANCE['heap-and-crash-check'] = ('surface-a', 'release')
-    ORDER = SURFACE_B + SURFACE_A + YOGA_A + YOGA_B + ['heap-and-crash-check']
+    ORDER = SURFACE_B + SURFACE_A + ['heap-and-crash-check']
     by_id = {spec['id']: spec for spec in ROWS}
     missing = [name for name in ORDER if name not in by_id]
     extra = [spec['id'] for spec in ROWS if spec['id'] not in INSTANCE]
@@ -597,17 +648,15 @@ def main():
         rows.append(row)
     heap = rows[-1]
     heap['steps'] = [{'run': 'steps.py:heap_crash', 'check': True, 'on': key}
-                     for key in ('surface-a', 'surface-b', 'yoga-a', 'yoga-b')]
+                     for key in ('surface-a', 'surface-b')]
     heap['build'] = 'release-and-diag'
 
     plan = {
         'game_id': '01006A800016E000',
         'start': 'boot',
-        'scope': 'rc.5 confirming re-run on Surface and Yoga, two instances each. surface-a and yoga-a load the '
-                 'release NRO. surface-b and yoga-b load the diag NRO from the same commit. Ally and XPS rows moved '
-                 'here. Diag-line gates run on the diag instances. tr_combo_link_v1, tr_combo_attempt_v1 and '
-                 'f9_body_of are trace gates on release. Heap and crash run on all four instances. Media stays on '
-                 'release. Timed rows stay on the Surface and the Yoga.',
+        'scope': 'rc.5 wire-fix session on the Surface. surface-a loads the release NRO. surface-b loads the diag '
+                 'NRO of the same commit. Diag-line gates and the docs GIFs run on surface-b. Release behaviour rows '
+                 'and f9_body_of run on surface-a. Heap and crash run on both Surface instances.',
         'setup': [
             {'state': 'surface-b (diag) and yoga-a (release) boot with a non-empty recording in slot 1 and the other recording slots empty',
              'via': 'fixture', 'ref': 'RR-7 Eden row rr-migrate; media-rc5-migration'},

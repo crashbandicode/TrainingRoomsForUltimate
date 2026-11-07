@@ -3,7 +3,7 @@
 //! publishes each new frame for the layout tick to draw. The model allocates on input events, so that
 //! work lives here and never in a hook (R5: hooks allocate nothing).
 
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::OnceLock;
 use std::thread::Thread;
 
@@ -175,6 +175,9 @@ impl Session {
 
 /// How often the worker looks at a panel the layer may change on its own (a keyboard that returned, a clip's preview).
 const POLL: std::time::Duration = std::time::Duration::from_millis(33);
+static SEEN_CATALOG: AtomicU64 = AtomicU64::new(u64::MAX);
+#[cfg(feature = "diag")]
+static LAST_DIAG: Mutex<String> = Mutex::new(String::new());
 
 fn run() {
     let _ = WORKER.set(std::thread::current());
@@ -200,6 +203,9 @@ fn run() {
         crate::runtime::compat::menu::run_roster_change();
         // The named-macro layer's model is this thread's (design C): its worker tick runs before the panels are looked at.
         crate::runtime::macros::port::worker_tick();
+        if refresh_recording(&mut session) {
+            publish_frame(&session);
+        }
         sync_panels(&mut session);
         let developer_pending = developer_reload.step();
         if session.watching() || developer_pending {
@@ -291,9 +297,11 @@ fn toggle_popup(s: &mut Session) {
         let settings = SETTINGS.lock().clone().unwrap_or_else(Settings::factory);
         s.keeper.open(&mut s.menu, settings, env());
     }
+    refresh_recording(s);
     if let Some(menu) = s.menu.as_mut() {
         menu.on_request(crate::model::chords::Request::RecordingPopup);
         POPUP.store(menu.recording().popup_open(), Ordering::Release);
+        post_recording_effect(menu);
     }
     sync_popup_owner();
     publish_frame(s);
@@ -323,6 +331,7 @@ fn press(button: Button, s: &mut Session) {
     if s.menu.is_none() || s.phase == Phase::Clip || (!open && !popup) {
         return;
     }
+    refresh_recording(s);
     if popup && !open {
         if let Some(menu) = s.menu.as_mut() {
             menu.set_console(console_mode());
@@ -372,7 +381,16 @@ fn press(button: Button, s: &mut Session) {
             m.press(button);
             // Eden reads where each press left the cursor (the section jump, the remembered place).
             #[cfg(feature = "diag")]
-            diagnostic(format_args!("[Ui] press {:?} page={} cursor={} depth={} screen={:?} row={:?}", button, m.page().id(), m.cursor(), m.depth(), m.screen(), m.help_row().map(|r| r.title)));
+            diagnostic(format_args!(
+                "[Ui] press {:?} page={} cursor={} depth={} screen={:?} row={:?} recording={}",
+                button,
+                m.page().id(),
+                m.cursor(),
+                m.depth(),
+                m.screen(),
+                m.help_row().map(|r| r.title),
+                m.recording().focused_file_title().unwrap_or_default()
+            ));
             // Shipped builds write it too: a page reset is the player's explicit, confirmed choice.
             if let Some((page, changed)) = m.take_page_reset() {
                 diagnostic(format_args!("[TrainingRooms] page reset page={} rows={} changed={}", page.id(), changed.len(), changed.join(",")));
@@ -411,10 +429,73 @@ fn press(button: Button, s: &mut Session) {
     }
 }
 
-/// The recording menu names the file work. This thread only posts it; the recording worker writes the card.
+/// The recording menu names the file work. This thread posts it and the pop-up's role.
 fn post_recording_effect(menu: &mut Menu) {
+    let selection = menu.recording().selection();
+    let role = match selection.record_role {
+        crate::model::recording_menu::ViewRole::Cpu => crate::engine::library::Role::Cpu,
+        crate::model::recording_menu::ViewRole::Player => crate::engine::library::Role::Player,
+    };
+    crate::engine::rr_host::set_record_role(role);
+    let drill = selection.drill.clone();
+    let kind = drill.as_ref().and_then(|id| {
+        if menu.recording().catalog().combos.iter().any(|file| &file.id == id) {
+            Some(crate::engine::library::DrillKind::Combo)
+        } else if menu.recording().catalog().sequences.iter().any(|file| &file.id == id) {
+            Some(crate::engine::library::DrillKind::Sequence)
+        } else {
+            None
+        }
+    });
+    crate::engine::rr_host::note_drill(drill);
+    crate::engine::rr_host::publish_selection(std::path::Path::new(crate::model::storage::ROOT), &selection, kind);
     crate::engine::rr_host::post_effect(menu.recording_mut().take_effect());
 }
+
+/// Reload the pop-up after the recording worker writes a file, and return a typed name.
+fn refresh_recording(s: &mut Session) -> bool {
+    let Some(menu) = s.menu.as_mut() else { return false };
+    menu.recording_mut().set_keyboard_blocked(crate::runtime::features::recording_host::keyboard_is_closed());
+    let mut changed = false;
+    let gen = crate::engine::rr_host::catalog_generation();
+    if SEEN_CATALOG.swap(gen, Ordering::AcqRel) != gen {
+        if let Ok(loaded) = crate::engine::rr_runtime::load_catalog(std::path::Path::new(crate::model::storage::ROOT)) {
+            menu.recording_mut().set_catalog(loaded.catalog);
+            menu.recording_mut().adopt_once(loaded.bound, loaded.active, loaded.loops, loaded.drill);
+            changed = true;
+        }
+    }
+    if let Some(name) = crate::runtime::features::recording_host::take_typed_name() {
+        menu.recording_mut().submit_name(&name);
+        post_recording_effect(menu);
+        changed = true;
+    }
+    emit_recording_diag(menu);
+    changed
+}
+
+#[cfg(feature = "diag")]
+fn emit_recording_diag(menu: &Menu) {
+    use crate::model::menu::table::Page;
+    use crate::model::recording_menu::Face;
+    let rec = menu.recording();
+    let popup = rec.popup_open();
+    let on_page = menu.page() == Page::Recording;
+    if !popup && !on_page {
+        return;
+    }
+    let face = if popup { Face::Popup } else { Face::Page };
+    let line = rec.diag_line(face, menu.recording_page_group());
+    let mut last = LAST_DIAG.lock();
+    if *last == line {
+        return;
+    }
+    *last = line.clone();
+    diagnostic(format_args!("[PracticeRecording] {line}"));
+}
+
+#[cfg(not(feature = "diag"))]
+fn emit_recording_diag(_menu: &Menu) {}
 
 /// Editor confirmation, not whole-menu close, owns this immediate INI effect.
 fn apply_shortcuts(menu: &mut Menu) {

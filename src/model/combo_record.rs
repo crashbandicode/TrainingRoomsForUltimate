@@ -52,6 +52,8 @@ pub struct ComboRecord {
     pub combo: Combo,
     /// The name of P1's fighter when the combo was saved. Metadata only: the helper grades whatever fighter P1 is.
     pub recorded_on: Option<String>,
+    /// The recording or chain this combo was made from. Absent on a combo saved by hand.
+    pub made_from: Option<String>,
     /// The JSON object the record was read from. Writing it back (a rename) changes only `name` (and adds
     /// `schema_version` when the file had none), so fields someone added by hand stay.
     source: Option<Map<String, Value>>,
@@ -60,8 +62,8 @@ pub struct ComboRecord {
 /// Two records are the same combo when their name, links and recorded fighter are (not how their files are laid out).
 impl PartialEq for ComboRecord {
     fn eq(&self, other: &Self) -> bool {
-        (&self.name, &self.combo, &self.recorded_on)
-            == (&other.name, &other.combo, &other.recorded_on)
+        (&self.name, &self.combo, &self.recorded_on, &self.made_from)
+            == (&other.name, &other.combo, &other.recorded_on, &other.made_from)
     }
 }
 
@@ -118,8 +120,15 @@ impl ComboRecord {
             name,
             combo,
             recorded_on,
+            made_from: None,
             source: None,
         }
+    }
+
+    /// Made from a recording or a chain. The combo file keeps that id.
+    pub fn with_made_from(mut self, source: impl Into<String>) -> Self {
+        self.made_from = Some(source.into());
+        self
     }
 
     pub fn validate(&self) -> Result<(), ComboError> {
@@ -175,6 +184,9 @@ impl ComboRecord {
         if let Some(fighter) = &self.recorded_on {
             value["recorded_on"] = json!(fighter);
         }
+        if let Some(source) = &self.made_from {
+            value["made_from"] = json!(source);
+        }
         value
     }
 
@@ -198,6 +210,7 @@ impl ComboRecord {
             .get("recorded_on")
             .and_then(Value::as_str)
             .and_then(shown_name);
+        let made_from = object.get("made_from").and_then(Value::as_str).and_then(shown_name);
         let links = object
             .get("links")
             .and_then(Value::as_array)
@@ -211,6 +224,7 @@ impl ComboRecord {
             name,
             combo,
             recorded_on,
+            made_from,
             source: Some(object.clone()),
         })
     }

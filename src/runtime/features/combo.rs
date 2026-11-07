@@ -19,6 +19,8 @@ use crate::model::frame_strip_plan::{Changed, Look, Text};
 use crate::runtime::published;
 
 static HELPER: Mutex<Helper> = Mutex::new(Helper::new());
+/// The worker's copy of the last combo. The game thread publishes it after it has let go of HELPER.
+static SAMPLE: Mutex<Option<Combo>> = Mutex::new(None);
 static RENDERER: Mutex<Renderer> = Mutex::new(Renderer::new());
 /// The target's name for the bar, and the names the menu shows (target, draft).
 static NAME: Mutex<Text> = Mutex::new(Text::EMPTY);
@@ -34,14 +36,21 @@ fn settings() -> Settings {
 /// fighter P1 is now: kept for the next save's `recorded_on` only; the helper grades whatever fighter P1 is.
 pub fn after_strip(tracker: &Tracker, p1_kind: Option<i32>) {
     P1_KIND.store(p1_kind.unwrap_or(-1), Ordering::Relaxed);
-    let out = HELPER.lock().step(tracker, settings());
+    let (out, sample) = {
+        let mut helper = HELPER.lock();
+        let out = helper.step(tracker, settings());
+        let sample = helper.last_combo();
+        (out, sample)
+    };
     report(out);
+    *SAMPLE.lock() = sample;
 }
 
 /// The strip's session clear (leaving Training, a hot swap, a lobby change).
 pub fn session_clear() {
     let out = HELPER.lock().clear();
     report(out);
+    *SAMPLE.lock() = None;
 }
 
 fn report(out: Out) {
@@ -126,6 +135,11 @@ pub fn p1_kind() -> Option<i32> {
 /// *Save last combo* (worker): the open exchange when it has a link, else the one before.
 pub fn last_combo() -> Option<Combo> {
     HELPER.lock().last_combo()
+}
+
+/// The last combo published by the strip, without taking the helper lock the frame hook holds.
+pub fn strip_sample() -> Option<Combo> {
+    *SAMPLE.lock()
 }
 
 /// The worker read the saved-combo list (`tr_combo_listed_v1`).

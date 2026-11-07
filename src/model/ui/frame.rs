@@ -205,6 +205,16 @@ pub struct Frame {
     pub icons: [MarkIcon; super::panes::FLOPPIES + super::panes::LOOPS],
     /// The recording pop-up is the window. The background shrinks so the match HUD stays visible.
     pub popup: bool,
+    /// Green plate behind a recording row (the active file or the bound save).
+    pub green: [bool; ROW_LINES],
+    /// White cursor border and left bar, instead of the dark highlight, on a recording screen.
+    pub white_cursor: bool,
+    /// Row under which the hot-five hairline is drawn, when that boundary is on screen.
+    pub hairline: Option<u8>,
+    /// Visible hot block of each section: first row slot and how many rows it covers.
+    pub outline: [Option<(u8, u8)>; 2],
+    /// A chain row. The link glyph is drawn when the layout has imported it.
+    pub chain: [bool; ROW_LINES],
 }
 
 /// One floppy or loop mark. `color` is sRGB; the renderer converts it.
@@ -261,6 +271,11 @@ impl Frame {
         self.hint.clear();
         self.icons = [MarkIcon::HIDDEN; super::panes::FLOPPIES + super::panes::LOOPS];
         self.popup = false;
+        self.green = [false; ROW_LINES];
+        self.white_cursor = false;
+        self.hairline = None;
+        self.outline = [None; 2];
+        self.chain = [false; ROW_LINES];
     }
 
     pub const fn new() -> Frame {
@@ -308,6 +323,11 @@ impl Frame {
             hint: Text::new(),
             icons: [MarkIcon::HIDDEN; super::panes::FLOPPIES + super::panes::LOOPS],
             popup: false,
+            green: [false; ROW_LINES],
+            white_cursor: false,
+            hairline: None,
+            outline: [None; 2],
+            chain: [false; ROW_LINES],
         }
     }
 }
@@ -579,8 +599,11 @@ fn paint_recording(menu: &Menu, frame: &mut Frame) {
     frame.rows.fill(RowLine::default());
     frame.row_count = 0;
     frame.focus = None;
+    frame.white_cursor = true;
     if rec.picker_open() {
         paint_picker(rec, frame);
+    } else if rec.crop_open() {
+        paint_crop(rec, frame);
     } else if rec.file_open() && face == Face::Page {
         paint_file(rec, frame);
     } else {
@@ -603,6 +626,20 @@ fn paint_recording(menu: &Menu, frame: &mut Frame) {
         }
         let _ = frame.help[1].write_str(&joined);
     }
+}
+
+fn paint_crop(rec: &super::recording_menu::RecordingScreens, frame: &mut Frame) {
+    let rows = rec.crop_rows();
+    let cursor = rec.crop_cursor();
+    for (slot, row) in rows.iter().enumerate().take(ROW_LINES) {
+        let _ = frame.rows[slot].label.write_str(&row.title);
+        let _ = frame.rows[slot].value.write_str(&row.value);
+        frame.row_count += 1;
+        if slot == cursor {
+            frame.focus = Some(slot as u8);
+        }
+    }
+    let _ = frame.crumb.write_str("Crop");
 }
 
 fn paint_file(rec: &super::recording_menu::RecordingScreens, frame: &mut Frame) {
@@ -657,6 +694,8 @@ fn paint_sections(rec: &super::recording_menu::RecordingScreens, frame: &mut Fra
             let _ = write!(frame.rows[base].value, "{}", mark.label());
         }
         let start = window_start(view.cursor, view.rows.len(), SECTION_ROWS);
+        let mut hot_lo: Option<usize> = None;
+        let mut hot_hi: Option<usize> = None;
         for (offset, row) in view.rows.iter().enumerate().skip(start).take(SECTION_ROWS) {
             let slot = base + 1 + (offset - start);
             if slot >= ROW_LINES {
@@ -670,7 +709,16 @@ fn paint_sections(rec: &super::recording_menu::RecordingScreens, frame: &mut Fra
             if let Some(count) = row.chain_count {
                 let _ = write!(frame.rows[slot].value, "{count}");
             }
-            frame.rows[slot].label_tone = if row.green { Tone::On } else { Tone::Normal };
+            frame.rows[slot].label_tone = Tone::Normal;
+            frame.green[slot] = row.green;
+            frame.chain[slot] = row.chain_count.is_some();
+            if row.hot {
+                hot_lo.get_or_insert(slot);
+                hot_hi = Some(slot);
+            }
+            if view.hairline_after == Some(5) && offset + 1 == 5 {
+                frame.hairline = Some(slot as u8);
+            }
             frame.row_count = (slot + 1) as u8;
             if row.cursor {
                 frame.focus = Some(slot as u8);
@@ -679,6 +727,9 @@ fn paint_sections(rec: &super::recording_menu::RecordingScreens, frame: &mut Fra
                 let icon = 2 + usize::from(section) * SECTION_ROWS + (offset - start);
                 place_icon(frame, icon, p_row_x(), super::panes::row_y(slot), floppy);
             }
+        }
+        if let (Some(lo), Some(hi)) = (hot_lo, hot_hi) {
+            frame.outline[usize::from(section)] = Some((lo as u8, (hi - lo + 1) as u8));
         }
     }
 }
@@ -745,6 +796,60 @@ mod tests {
         assert_eq!(f.rows[0].label.string_lossy(), "Airdodge Direction");
         assert_eq!(f.focus, Some(0));
         assert_eq!(f.row_count, 6);
+    }
+
+    #[test]
+    fn recording_paint_uses_a_green_plate_a_white_cursor_and_the_visible_hot_rows() {
+        use crate::model::menu::table::SAVES_MACROS;
+        use crate::model::recording_menu::{Catalog, Face, LoopMark, MacroFile};
+        let mut menu = menu();
+        menu.press(Button::R);
+        menu.press(Button::R);
+        let mut macros = Vec::new();
+        for index in 0..6 {
+            macros.push(MacroFile {
+                id: format!("m{index}"),
+                name: format!("Macro {index}"),
+                chain: false,
+                steps: Vec::new(),
+                start_save: None,
+                start_save_on: true,
+                recorded_on: String::new(),
+                span: 4,
+            });
+        }
+        macros.push(MacroFile {
+            id: "ch".into(),
+            name: "Chain".into(),
+            chain: true,
+            steps: vec!["m0".into(), "m1".into()],
+            start_save: None,
+            start_save_on: true,
+            recorded_on: String::new(),
+            span: 0,
+        });
+        menu.recording_mut().set_catalog(Catalog {
+            macros,
+            hot_macros: vec!["m0".into(), "m1".into(), "ch".into(), "m2".into(), "m3".into()],
+            ..Catalog::default()
+        });
+        menu.recording_mut().adopt_once(
+            None,
+            [Some("m2".into()), None],
+            [LoopMark::Finite(1), LoopMark::Finite(1)],
+            None,
+        );
+        menu.recording_mut().set_cursor(Face::Page, SAVES_MACROS, 1, 4);
+        let mut frame = Frame::new();
+        page_frame(&menu, &mut frame);
+        assert!(frame.white_cursor);
+        assert!(frame.hairline.is_some(), "the fifth hot file is in this window");
+        assert!(frame.outline[1].is_some());
+        assert!(frame.green.iter().any(|on| *on));
+        assert!(frame.chain.iter().any(|on| *on));
+        let green = frame.green.iter().position(|on| *on).unwrap();
+        assert_eq!(frame.rows[green].label_tone, Tone::Normal);
+        assert_eq!(frame.rows[green].label.string_lossy(), "Macro 2");
     }
 
     #[test]

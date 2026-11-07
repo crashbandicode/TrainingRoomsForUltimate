@@ -134,9 +134,18 @@ pub enum Effect {
     None,
     Keyboard { header: &'static str, draft: String },
     MakeCombo { source: String, chain: bool },
-    Crop { source: String, combo: bool },
+    Crop { source: String, combo: bool, start: u32, end: u32 },
     DuplicateSave { source: String },
     DeleteSave { source: String },
+    /// A chain the menu just named. The host writes it; the local row is what the menu test sees first.
+    WriteChain { name: String, steps: Vec<String> },
+    /// A sequence the menu just named. The host writes it.
+    WriteSequence { name: String, combos: Vec<String> },
+    RenameSave { id: String, name: String },
+    RenameMacro { id: String, name: String },
+    RenameChain { id: String, name: String },
+    RenameCombo { id: String, name: String },
+    RenameSequence { id: String, name: String },
 }
 
 /// One named save in the snapshot the host loaded.
@@ -157,6 +166,8 @@ pub struct MacroFile {
     pub start_save: Option<String>,
     pub start_save_on: bool,
     pub recorded_on: String,
+    /// Frames in a macro, or links in a combo's sibling. A chain's crop is not offered.
+    pub span: u32,
 }
 
 /// A combo file. `links` are the lines [`combo_link_lines`] produces: the move, then its events, then drift.
@@ -166,6 +177,8 @@ pub struct ComboFile {
     pub name: String,
     pub made_from: Option<String>,
     pub links: Vec<String>,
+    /// Real links in the combo file. The crop handles step this, not the display lines.
+    pub span: u32,
 }
 
 /// A sequence file. Combo ids, in order.
@@ -342,6 +355,17 @@ struct BuiltRow {
     drill: Option<String>,
 }
 
+/// The crop screen's two handles. L and R move the focused one. A saves. B returns.
+#[derive(Clone, Debug)]
+struct CropDraft {
+    source: String,
+    combo: bool,
+    span: u32,
+    start: u32,
+    end: u32,
+    out: bool,
+}
+
 /// The pop-up and the Recording page.
 #[derive(Clone, Debug)]
 pub struct RecordingScreens {
@@ -362,6 +386,10 @@ pub struct RecordingScreens {
     drill: Option<String>,
     last_effect: Effect,
     serial: u32,
+    crop: Option<CropDraft>,
+    /// Online waiting room: the keyboard stays closed and an empty name keeps N.
+    keyboard_blocked: bool,
+    adopted: bool,
 }
 
 impl Default for RecordingScreens {
@@ -390,6 +418,9 @@ impl RecordingScreens {
             drill: None,
             last_effect: Effect::None,
             serial: 0,
+            crop: None,
+            keyboard_blocked: false,
+            adopted: false,
         }
     }
 
@@ -402,6 +433,7 @@ impl RecordingScreens {
         if !self.popup_open && self.overlay_face == Face::Popup {
             self.picker = None;
             self.keyboard = None;
+            self.crop = None;
         }
     }
 
@@ -587,21 +619,79 @@ impl RecordingScreens {
         }
     }
 
-    pub fn diag_line(&self, face: Face) -> String {
-        let role = self.role(face).diag();
-        let loop_label = self.loop_of(self.role(face)).label();
-        match face {
-            Face::Popup => {
-                let tab = if self.tab() == 0 { "saves" } else { "combos" };
-                format!("screen=recording-popup role={role} tab={tab} loop={loop_label}")
-            }
-            Face::Page => format!("screen=recording-page role={role} loop={loop_label}"),
+    pub fn set_keyboard_blocked(&mut self, blocked: bool) {
+        self.keyboard_blocked = blocked;
+    }
+
+    pub fn naming(&self) -> bool {
+        self.keyboard.is_some()
+    }
+
+    pub fn crop_open(&self) -> bool {
+        self.crop.is_some()
+    }
+
+    pub fn adopt_once(&mut self, bound: Option<String>, active: [Option<String>; 2], loops: [LoopMark; 2], drill: Option<String>) {
+        if self.adopted {
+            return;
         }
+        self.bound = bound;
+        self.active = active;
+        self.loops = loops;
+        self.drill = drill;
+        self.adopted = true;
+    }
+
+    pub fn focused_file_title(&self) -> Option<String> {
+        let cursor = self.file.as_ref()?.cursor;
+        self.built_file_rows().get(cursor).map(|row| row.title.clone())
+    }
+
+    pub fn diag_line(&self, face: Face, page_group: u8) -> String {
+        let role = self.role(face);
+        let group = match face {
+            Face::Popup => self.popup_group(),
+            Face::Page => page_group,
+        };
+        let view = self.section(face, group, self.current_section(face, group));
+        let hot = view.rows.iter().filter(|row| row.hot).count().min(5);
+        let hair = view.hairline_after.unwrap_or(0);
+        let floppy = match view.rows.iter().find(|row| row.cursor).and_then(|row| row.floppy) {
+            Some(Floppy::On) => "on",
+            _ => "off",
+        };
+        let header = if view.header_floppy == Some(Floppy::On) { "on" } else { "off" };
+        let active = self.active[role.index()].as_deref().unwrap_or("");
+        let group_name = if group == COMBOS_SEQ { "combos-sequences" } else { "saves-macros" };
+        let tab = if self.tab() == 0 { "saves" } else { "combos" };
+        let screen = match face {
+            Face::Popup => "recording-popup",
+            Face::Page => "recording-page",
+        };
+        let mut line = format!(
+            "screen={screen} role={} tab={tab} loop={} hot={hot} hairline={hair} floppy={floppy} header={header} active={active} group={group_name}",
+            role.diag(),
+            self.loop_of(role).label(),
+        );
+        if let Some(crop) = &self.crop {
+            line.push_str(&format!(
+                " screen=crop source={} combo={} open=1 in={} out={}",
+                crop.source,
+                i32::from(crop.combo),
+                crop.start,
+                crop.end
+            ));
+        }
+        line
     }
 
     /// One pop-up button. Always consumed while the pop-up is open.
     pub fn press_popup(&mut self, button: Button) {
         if !self.popup_open {
+            return;
+        }
+        if self.crop.is_some() {
+            self.press_crop(button);
             return;
         }
         if self.overlay_face == Face::Popup && self.overlay_open() {
@@ -631,6 +721,10 @@ impl RecordingScreens {
 
     /// One Recording-page button. L, R, and B pass through unless a file screen is open.
     pub fn handle_page(&mut self, button: Button, on_library: bool, group: u8) -> PageHit {
+        if self.crop.is_some() {
+            self.press_crop(button);
+            return PageHit::Consumed;
+        }
         if self.overlay_open() && self.overlay_face == Face::Page {
             self.press_overlay(button, Face::Page);
             return PageHit::Consumed;
@@ -685,7 +779,18 @@ impl RecordingScreens {
             KeyKind::NewChain => self.create_chain(&keyboard.ids, trimmed),
             KeyKind::NewSequence => self.create_sequence(&keyboard.ids, trimmed),
         }
-        self.last_effect = Effect::None;
+        if !matches!(
+            self.last_effect,
+            Effect::WriteChain { .. }
+                | Effect::WriteSequence { .. }
+                | Effect::RenameSave { .. }
+                | Effect::RenameMacro { .. }
+                | Effect::RenameChain { .. }
+                | Effect::RenameCombo { .. }
+                | Effect::RenameSequence { .. }
+        ) {
+            self.last_effect = Effect::None;
+        }
     }
 
     fn overlay_open(&self) -> bool {
@@ -918,9 +1023,7 @@ impl RecordingScreens {
                 }
             }
             Act::Rename => self.open_rename(kind, &id),
-            Act::Crop => {
-                self.last_effect = Effect::Crop { source: id, combo: kind == ItemKind::Combo };
-            }
+            Act::Crop => self.open_crop(kind, id),
             Act::MakeCombo => {
                 let chain = kind == ItemKind::Recording && self.macro_by_id(&id).is_some_and(|file| file.chain);
                 self.last_effect = Effect::MakeCombo { source: id, chain };
@@ -941,6 +1044,58 @@ impl RecordingScreens {
             }
             Act::Info => {}
         }
+    }
+
+    fn open_crop(&mut self, kind: ItemKind, id: String) {
+        let combo = kind == ItemKind::Combo;
+        let span = match kind {
+            ItemKind::Combo => self.catalog.combos.iter().find(|file| file.id == id).map(|file| file.span).unwrap_or(0),
+            ItemKind::Recording => self.macro_by_id(&id).map(|file| file.span).unwrap_or(0),
+            _ => 0,
+        };
+        let span = span.max(1);
+        self.crop = Some(CropDraft { source: id, combo, span, start: 0, end: span, out: false });
+    }
+
+    fn press_crop(&mut self, button: Button) {
+        let Some(crop) = self.crop.as_mut() else { return };
+        match button {
+            Button::L | Button::R => {
+                let delta = if button == Button::L { -1 } else { 1 };
+                if crop.out {
+                    let next = (crop.end as i32 + delta).clamp(crop.start as i32 + 1, crop.span as i32);
+                    crop.end = next as u32;
+                } else {
+                    let next = (crop.start as i32 + delta).clamp(0, crop.end as i32 - 1);
+                    crop.start = next as u32;
+                }
+            }
+            Button::Up | Button::Down => crop.out = !crop.out,
+            Button::A => {
+                let Some(crop) = self.crop.take() else { return };
+                self.last_effect = Effect::Crop {
+                    source: crop.source,
+                    combo: crop.combo,
+                    start: crop.start,
+                    end: crop.end,
+                };
+            }
+            Button::B => self.crop = None,
+            _ => {}
+        }
+    }
+
+    pub fn crop_cursor(&self) -> usize {
+        usize::from(self.crop.as_ref().is_some_and(|crop| crop.out))
+    }
+
+    pub fn crop_rows(&self) -> Vec<FileRow> {
+        let Some(crop) = &self.crop else { return Vec::new() };
+        vec![
+            FileRow { title: "In".into(), value: format!("{}", crop.start) },
+            FileRow { title: "Out".into(), value: format!("{}", crop.end) },
+            FileRow { title: "Save".into(), value: "A saves a new file".into() },
+        ]
     }
 
     fn set_bound(&mut self, id: &str, on: bool) {
@@ -1007,13 +1162,25 @@ impl RecordingScreens {
             ItemKind::NewChain | ItemKind::NewSequence => return,
         };
         let previous = self.item_name(&Item { kind, id: id.to_string() });
-        self.last_effect = Effect::Keyboard { header, draft: previous };
         self.keyboard = Some(Keyboard { kind: key, ids: Vec::new(), target: Some(id.to_string()) });
+        if self.keyboard_blocked {
+            self.submit_name("");
+            return;
+        }
+        self.last_effect = Effect::Keyboard { header, draft: previous };
     }
 
     fn rename_id(&mut self, kind: KeyKind, id: &str, name: &str) {
-        let Some(kind) = item_kind_of(kind) else { return };
-        self.slot_set_name(kind, id, name);
+        let Some(item) = item_kind_of(kind) else { return };
+        self.slot_set_name(item, id, name);
+        self.last_effect = match kind {
+            KeyKind::RenameSave => Effect::RenameSave { id: id.to_string(), name: name.to_string() },
+            KeyKind::RenameMacro => Effect::RenameMacro { id: id.to_string(), name: name.to_string() },
+            KeyKind::RenameChain => Effect::RenameChain { id: id.to_string(), name: name.to_string() },
+            KeyKind::RenameCombo => Effect::RenameCombo { id: id.to_string(), name: name.to_string() },
+            KeyKind::RenameSequence => Effect::RenameSequence { id: id.to_string(), name: name.to_string() },
+            KeyKind::NewChain | KeyKind::NewSequence => Effect::None,
+        };
     }
 
     fn open_picker(&mut self, kind: PickerKind, face: Face, editing: Option<String>) {
@@ -1106,14 +1273,19 @@ impl RecordingScreens {
     }
 
     fn open_keyboard(&mut self, kind: KeyKind, header: &'static str, ids: Vec<String>) {
-        self.last_effect = Effect::Keyboard { header, draft: String::new() };
         self.keyboard = Some(Keyboard { kind, ids, target: None });
+        if self.keyboard_blocked {
+            self.submit_name("");
+            return;
+        }
+        self.last_effect = Effect::Keyboard { header, draft: String::new() };
     }
 
     fn create_chain(&mut self, steps: &[String], name: &str) {
         let names: Vec<String> = self.catalog.macros.iter().filter(|file| file.chain).map(|file| file.name.clone()).collect();
         let n = unused_n("Chain", &names);
         let label = if name.is_empty() { format!("Chain {n}") } else { name.to_string() };
+        self.last_effect = Effect::WriteChain { name: label.clone(), steps: steps.to_vec() };
         self.serial += 1;
         let id = format!("chain-{}", self.serial);
         self.catalog.macros.push(MacroFile {
@@ -1124,6 +1296,7 @@ impl RecordingScreens {
             start_save: None,
             start_save_on: true,
             recorded_on: String::new(),
+            span: 0,
         });
         self.note_hot_macro(&id);
     }
@@ -1132,6 +1305,7 @@ impl RecordingScreens {
         let names: Vec<String> = self.catalog.sequences.iter().map(|file| file.name.clone()).collect();
         let n = unused_n("Sequence", &names);
         let label = if name.is_empty() { format!("Sequence {n}") } else { name.to_string() };
+        self.last_effect = Effect::WriteSequence { name: label.clone(), combos: combos.to_vec() };
         self.serial += 1;
         let id = format!("sequence-{}", self.serial);
         self.catalog.sequences.push(SequenceFile { id: id.clone(), name: label, combos: combos.to_vec(), streak: 0, best: 0 });
@@ -1731,6 +1905,7 @@ mod tests {
                     start_save: Some("nair-start".into()),
                     start_save_on: true,
                     recorded_on: "Pikachu".into(),
+                    span: 12,
                 },
                 MacroFile {
                     id: "dash".into(),
@@ -1740,6 +1915,7 @@ mod tests {
                     start_save: None,
                     start_save_on: true,
                     recorded_on: String::new(),
+                    span: 0,
                 },
                 MacroFile {
                     id: "throw".into(),
@@ -1749,6 +1925,7 @@ mod tests {
                     start_save: None,
                     start_save_on: true,
                     recorded_on: String::new(),
+                    span: 0,
                 },
                 MacroFile {
                     id: "pressure".into(),
@@ -1758,6 +1935,7 @@ mod tests {
                     start_save: None,
                     start_save_on: true,
                     recorded_on: String::new(),
+                    span: 0,
                 },
             ],
             combos: vec![ComboFile {
@@ -1765,6 +1943,7 @@ mod tests {
                 name: "Nair loop combo".into(),
                 made_from: Some("nair".into()),
                 links: combo_link_lines(&Combo::from_links([link(Move::Aerial, Move::Aerial, true)]).unwrap()),
+                span: 1,
             }],
             sequences: vec![SequenceFile {
                 id: "corner-seq".into(),
@@ -2253,6 +2432,62 @@ mod tests {
         screens.set_cursor(Face::Page, COMBOS_SEQ, 0, last);
         screens.handle_page(Button::A, true, COMBOS_SEQ);
         assert!(screens.picker_open());
+    }
+
+    #[test]
+    fn the_crop_screen_posts_a_new_range_and_b_returns() {
+        let mut screens = screens();
+        let row = screens.section(Face::Page, SAVES_MACROS, 1).rows.iter().position(|row| row.name == "Nair loop").unwrap();
+        screens.set_cursor(Face::Page, SAVES_MACROS, 1, row);
+        screens.handle_page(Button::A, true, SAVES_MACROS);
+        let crop = screens.file_rows().iter().position(|row| row.title == "Crop").unwrap();
+        screens.set_file_cursor(crop);
+        screens.handle_page(Button::A, true, SAVES_MACROS);
+        assert!(screens.crop_open());
+        assert!(matches!(screens.last_effect(), Effect::None));
+        assert!(screens.diag_line(Face::Page, SAVES_MACROS).contains("screen=crop source=nair combo=0"));
+        screens.handle_page(Button::R, true, SAVES_MACROS);
+        screens.handle_page(Button::Down, true, SAVES_MACROS);
+        screens.handle_page(Button::L, true, SAVES_MACROS);
+        screens.handle_page(Button::A, true, SAVES_MACROS);
+        match screens.last_effect() {
+            Effect::Crop { source, combo, start, end } => {
+                assert_eq!((source.as_str(), *combo, *start, *end), ("nair", false, 1, 11));
+            }
+            other => panic!("crop effect, got {other:?}"),
+        }
+        assert!(!screens.crop_open());
+        assert!(screens.catalog().macros.iter().any(|file| file.id == "nair" && file.name == "Nair loop"));
+        let _ = screens.take_effect();
+
+        screens.handle_page(Button::A, true, SAVES_MACROS);
+        assert!(screens.crop_open());
+        screens.handle_page(Button::B, true, SAVES_MACROS);
+        assert!(!screens.crop_open());
+        assert!(matches!(screens.take_effect(), Effect::None));
+    }
+
+    #[test]
+    fn the_waiting_room_names_chain_n_without_a_keyboard() {
+        let mut screens = screens();
+        screens.set_keyboard_blocked(true);
+        let last = screens.section(Face::Page, SAVES_MACROS, 1).rows.len() - 1;
+        screens.set_cursor(Face::Page, SAVES_MACROS, 1, last);
+        screens.handle_page(Button::A, true, SAVES_MACROS);
+        screens.handle_page(Button::B, true, SAVES_MACROS);
+        assert!(!screens.naming());
+        assert!(screens.has_chain_named("Chain 1"));
+        assert!(matches!(screens.last_effect(), Effect::WriteChain { .. }));
+    }
+
+    #[test]
+    fn the_popup_diag_names_the_hot_boundary() {
+        let mut screens = screens();
+        open_popup(&mut screens);
+        let line = screens.diag_line(Face::Popup, SAVES_MACROS);
+        assert!(line.contains("screen=recording-popup"));
+        assert!(line.contains("role=player"));
+        assert!(line.contains("loop="));
     }
 
     #[test]

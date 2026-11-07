@@ -172,8 +172,19 @@ pub const IDX_DIVIDER: usize = IDX_CRUMB + 1;
 pub const IDX_GROUP_HI: usize = IDX_DIVIDER + 1;
 pub const IDX_GROUP: usize = IDX_GROUP_HI + 1;
 pub const IDX_ROW_HI: usize = IDX_GROUP + GROUPS;
+/// Recording chrome, behind the row text: a green plate per row, the hot-five hairline,
+/// two section outlines (four edges each) and the white cursor (a left bar and four edges).
+pub const CHROME_GREENS: usize = ROWS;
+pub const CHROME_HAIR: usize = 1;
+pub const CHROME_OUTLINE: usize = 8;
+pub const CHROME_CURSOR: usize = 5;
+pub const CHROME: usize = CHROME_GREENS + CHROME_HAIR + CHROME_OUTLINE + CHROME_CURSOR;
+pub const IDX_GREEN: usize = IDX_ROW_HI + 1;
+pub const IDX_HAIRLINE: usize = IDX_GREEN + CHROME_GREENS;
+pub const IDX_OUTLINE: usize = IDX_HAIRLINE + CHROME_HAIR;
+pub const IDX_CURSOR: usize = IDX_OUTLINE + CHROME_OUTLINE;
 /// Row `i`'s label is `IDX_ROW + 2 * i` and its value `IDX_ROW + 2 * i + 1`.
-pub const IDX_ROW: usize = IDX_ROW_HI + 1;
+pub const IDX_ROW: usize = IDX_CURSOR + CHROME_CURSOR;
 pub const IDX_SEP_HELP: usize = IDX_ROW + 2 * ROWS;
 pub const IDX_HELP: usize = IDX_SEP_HELP + 1;
 pub const IDX_HINT: usize = IDX_HELP + 2;
@@ -639,6 +650,10 @@ pub const fn name_of(index: usize) -> Name {
         IDX_DIVIDER => Name::new("tr_div"),
         IDX_GROUP_HI => Name::new("tr_grp_hi"),
         IDX_ROW_HI => Name::new("tr_row_hi"),
+        i if i >= IDX_GREEN && i < IDX_HAIRLINE => Name::indexed("tr_grn_", i - IDX_GREEN),
+        IDX_HAIRLINE => Name::new("tr_hair"),
+        i if i >= IDX_OUTLINE && i < IDX_CURSOR => Name::indexed("tr_out_", i - IDX_OUTLINE),
+        i if i >= IDX_CURSOR && i < IDX_ROW => Name::indexed("tr_cur_", i - IDX_CURSOR),
         IDX_SEP_HELP => Name::new("tr_sep_help"),
         i if i == IDX_HELP => Name::new("tr_help_0"),
         i if i == IDX_HELP + 1 => Name::new("tr_help_1"),
@@ -689,6 +704,9 @@ pub const RULE: [u8; 4] = [60, 66, 78, 255];
 pub const TEXT: [u8; 4] = [236, 238, 242, 255];
 pub const TEXT_DIM: [u8; 4] = [150, 156, 168, 255];
 pub const TEXT_ON: [u8; 4] = [110, 210, 160, 255];
+/// The green row plate. Light text stays readable on it.
+pub const GREEN_ROW: [u8; 4] = [16, 72, 48, 255];
+pub const CURSOR_WHITE: [u8; 4] = [255, 255, 255, 255];
 pub const TEXT_OFF: [u8; 4] = [110, 116, 128, 255];
 /// Opaque dark plate behind each notice text. A white plate disappeared on a bright stage; black body text
 /// on this plate is the UI20 failure (about 1.06:1), so the body colours are the light ones.
@@ -782,6 +800,7 @@ pub const fn spec(index: usize) -> Spec {
         IDX_DIVIDER => rect(name, [DIVIDER_X, 20.0, 3.0, 650.0], RULE, true),
         IDX_GROUP_HI => rect(name, [GROUP_X, group_y(0), GROUP_W, GROUP_ROW_H], HIGHLIGHT, true),
         IDX_ROW_HI => rect(name, [(ROW_LEFT + ROW_RIGHT) / 2.0, row_y(0), ROW_RIGHT - ROW_LEFT + 30.0, ROW_H], HIGHLIGHT, true),
+        i if i >= IDX_GREEN && i < IDX_ROW => rect(name, [0.0, 0.0, 8.0, 8.0], GREEN_ROW, false),
         IDX_SEP_HELP => rect(name, [0.0, HELP_Y[0] + 48.0, 1760.0, 3.0], RULE, true),
         IDX_HINT => text(name, [HELP_X, HINT_Y, HELP_W, 44.0], Align::Left, FONT_SMALL, 160, TEXT_DIM),
         i if i == IDX_HELP => text(name, [HELP_X, HELP_Y[0], HELP_W, 48.0], Align::Left, FONT_SMALL, 160, TEXT),
@@ -859,16 +878,17 @@ mod tests {
         assert_eq!(limit, 4096);
         assert_eq!(iv::at::COUNT - iv::at::STICK, iv::WINDOW, "one stick pane per frame");
         assert_eq!(iv::COUNT, 181);
-        // The merged table already contains the stick row and the twelve recording icons.
-        // LANE-GROK-RR-6-REPORT.md pane budget, 2026-11-06: 1352 + 12 + 60 = 1424, 2672 free.
+        // The merged table already contains the stick row, the twelve recording icons and the
+        // recording chrome (green plates, hairline, outlines, white cursor).
         assert_eq!(FLOPPIES + LOOPS, 12);
+        assert_eq!(CHROME, 26);
         assert_eq!(name_of(IDX_FLOPPY).as_str(), "tr_floppy_00");
         assert_eq!(name_of(IDX_LOOP - 1).as_str(), "tr_floppy_09");
         assert_eq!(name_of(IDX_LOOP).as_str(), "tr_loop_00");
         assert_eq!(name_of(MENU_COUNT - 1).as_str(), "tr_loop_01");
         assert!(COUNT < limit, "plugin table {COUNT} exceeds the walk {limit}");
-        assert_eq!(COUNT, 1424);
-        assert_eq!(limit - COUNT, 2672);
+        assert_eq!(COUNT, 1424 + CHROME);
+        assert_eq!(limit - COUNT, 2672 - CHROME);
         let strip_tree = iv::COUNT + cb::COUNT;
         assert!(strip_tree <= limit, "the strip walk, combo bar included, is {strip_tree}");
         let first = spec(IDX_IV + iv::at::STICK);
