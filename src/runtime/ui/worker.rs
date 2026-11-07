@@ -327,6 +327,7 @@ fn press(button: Button, s: &mut Session) {
         if let Some(menu) = s.menu.as_mut() {
             menu.set_console(console_mode());
             menu.press(button);
+            post_recording_effect(menu);
         }
         return;
     }
@@ -396,7 +397,10 @@ fn press(button: Button, s: &mut Session) {
     // Cancellation/close invalidates every remaining poll (and the rest of this
     // poll), before it can publish an old editor's effect into a later opening.
     if INPUT.generation() != s.input_generation { return; }
-    if let Some(menu) = s.menu.as_mut() { apply_shortcuts(menu); }
+    if let Some(menu) = s.menu.as_mut() {
+        post_recording_effect(menu);
+        apply_shortcuts(menu);
+    }
     if closed {
         begin_close(s,
             #[cfg(feature = "mii-editor-alpha")]
@@ -405,6 +409,11 @@ fn press(button: Button, s: &mut Session) {
     } else {
         sync_panels(s);
     }
+}
+
+/// The recording menu names the file work. This thread only posts it; the recording worker writes the card.
+fn post_recording_effect(menu: &mut Menu) {
+    crate::engine::rr_host::post_effect(menu.recording_mut().take_effect());
 }
 
 /// Editor confirmation, not whole-menu close, owns this immediate INI effect.

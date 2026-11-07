@@ -12,13 +12,14 @@ use super::library::{
 use super::macros::{FrameSnapshot, InputFrame, Library, MAX_FRAMES};
 use super::playback::{Book, Playback};
 use super::rr_runtime::{
-    chain_mismatch, chord_notice, civil_date, crop_combo_file, crop_macro_file, drive_mash,
-    drive_play, drive_step, finish_recording, make_combo, migrate_at_boot, offer_keyboard,
-    push_frame, start_save_notice, toggle_record, Capture, KeyboardOffer, Tape, READ_WINDOW,
+    chain_mismatch, chord_notice, civil_date, crop_combo_file, crop_macro_file, delete_save,
+    drive_mash, drive_play, drive_step, duplicate_save, finish_recording, make_combo,
+    migrate_at_boot, offer_keyboard, push_frame, start_save_notice, toggle_record, Capture,
+    KeyboardOffer, Tape, READ_WINDOW,
     RESIDENT_FRAMES,
 };
 use crate::model::input_delay::MappedInputs;
-use crate::model::recording_menu::{Effect, RecordingScreens};
+use crate::model::recording_menu::Effect;
 use crate::model::state::record::SavedState;
 use crate::model::store::Store;
 
@@ -44,7 +45,7 @@ static RUN_PLAYER: AtomicBool = AtomicBool::new(false);
 static RUN_CPU: AtomicBool = AtomicBool::new(false);
 static MACHINE: Mutex<Option<Playback>> = Mutex::new(None);
 static RESIDENT: Mutex<Option<Resident>> = Mutex::new(None);
-static SCREENS: Mutex<Option<RecordingScreens>> = Mutex::new(None);
+static MENU_EFFECT: Mutex<Effect> = Mutex::new(Effect::None);
 static CROP: Mutex<Option<CropWindow>> = Mutex::new(None);
 
 struct Resident {
@@ -101,6 +102,14 @@ pub fn set_record_role(role: Role) {
         Role::Cpu => ROLE_CPU,
     };
     RECORD_ROLE.store(bits, Ordering::Release);
+}
+
+/// The menu worker posts one effect. The recording worker applies it. A `None` does not clear a pending effect.
+pub fn post_effect(effect: Effect) {
+    if matches!(effect, Effect::None) {
+        return;
+    }
+    *lock(&MENU_EFFECT) = effect;
 }
 
 pub fn set_current_fighter(kind: i32) {
@@ -404,13 +413,7 @@ fn ask_mismatch(root: &Path, role: Role, tick: &mut Tick) {
 }
 
 fn apply_menu(root: &Path, book: &Book, online: bool, tick: &mut Tick) {
-    let effect = {
-        let mut screens = lock(&SCREENS);
-        let Some(screens) = screens.as_mut() else {
-            return;
-        };
-        screens.take_effect()
-    };
+    let effect = std::mem::replace(&mut *lock(&MENU_EFFECT), Effect::None);
     match effect {
         Effect::None => {}
         Effect::Keyboard { header, draft } => {
@@ -431,6 +434,12 @@ fn apply_menu(root: &Path, book: &Book, online: bool, tick: &mut Tick) {
             if let Some(id) = make_combo(book).warp {
                 tick.warp = Some(id);
             }
+        }
+        Effect::DuplicateSave { source } => {
+            let _ = duplicate_save(root, &source, unix_now());
+        }
+        Effect::DeleteSave { source } => {
+            let _ = delete_save(root, &source, unix_now());
         }
     }
 }
@@ -515,9 +524,7 @@ fn take_frame(ready: &AtomicBool, bits: &AtomicU64) -> Option<InputFrame> {
 }
 
 fn menu_pending() -> bool {
-    lock(&SCREENS)
-        .as_ref()
-        .is_some_and(|screens| !matches!(screens.last_effect(), Effect::None))
+    !matches!(&*lock(&MENU_EFFECT), Effect::None)
 }
 
 fn unix_now() -> u64 {
@@ -567,7 +574,7 @@ fn reset_host() {
     RUN_CPU.store(false, Ordering::Release);
     *lock(&MACHINE) = None;
     *lock(&RESIDENT) = None;
-    *lock(&SCREENS) = None;
+    *lock(&MENU_EFFECT) = Effect::None;
     *lock(&CROP) = None;
 }
 
@@ -799,6 +806,47 @@ mod tests {
                 .len(),
             2
         );
+    }
+
+    #[test]
+    fn a_posted_menu_effect_reaches_the_worker() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("posted");
+        let _ = service_at(&root, &none(), "2026-11-06", state(1), state(1), false);
+        let id = super::super::rr_runtime::save_chord(&root, state(3), state(4), 1).unwrap();
+        post_effect(Effect::DuplicateSave { source: id.clone() });
+        let _ = service_at(&root, &none(), "2026-11-06", state(3), state(4), false);
+        let listed = Store::<NamedSave>::new(root.join(SAVES_DIR)).list().unwrap();
+        assert_eq!(listed.entries.len(), 2);
+        assert_eq!(RecordingIndex::load(&root).unwrap().bound(), Some(id.as_str()));
+        let recording = super::super::macros::MacroRecording::new(
+            "Nair",
+            "13.0.5",
+            StartState::neutral(8, 0, 1.0),
+            vec![
+                InputFrame { buttons: 1, ..InputFrame::default() },
+                InputFrame { buttons: 2, ..InputFrame::default() },
+            ],
+        )
+        .unwrap();
+        let macro_id = Library::new(root.join(MACROS_DIR)).save_new(&recording).unwrap();
+        set_crop_window(CropWindow {
+            start: 0,
+            end: 1,
+            snapshot: FrameSnapshot { frame: 0, state: StartState::neutral(8, 0, 1.0) },
+            name: "Nair crop".into(),
+        });
+        post_effect(Effect::Crop { source: macro_id.clone(), combo: false });
+        let tick = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
+        assert!(tick.diags.iter().any(|line| line.starts_with("screen=crop source=")));
+        assert_eq!(Library::new(root.join(MACROS_DIR)).list().unwrap().entries.len(), 2);
+        post_effect(Effect::Keyboard { header: "Name macro", draft: "Nair".into() });
+        let named = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
+        assert_eq!(named.keyboard.as_ref().map(|offer| offer.header), Some("Name macro"));
+        post_effect(Effect::DeleteSave { source: id });
+        let _ = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
+        assert!(RecordingIndex::load(&root).unwrap().bound().is_none());
     }
 
     #[test]

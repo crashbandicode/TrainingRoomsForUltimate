@@ -135,6 +135,8 @@ pub enum Effect {
     Keyboard { header: &'static str, draft: String },
     MakeCombo { source: String, chain: bool },
     Crop { source: String, combo: bool },
+    DuplicateSave { source: String },
+    DeleteSave { source: String },
 }
 
 /// One named save in the snapshot the host loaded.
@@ -909,7 +911,12 @@ impl RecordingScreens {
                 let on = !self.start_is_on(kind, &id);
                 self.set_start(kind, &id, on);
             }
-            Act::Duplicate => self.duplicate_save(&id),
+            Act::Duplicate => {
+                self.duplicate_save(&id);
+                if kind == ItemKind::Save {
+                    self.last_effect = Effect::DuplicateSave { source: id };
+                }
+            }
             Act::Rename => self.open_rename(kind, &id),
             Act::Crop => {
                 self.last_effect = Effect::Crop { source: id, combo: kind == ItemKind::Combo };
@@ -920,7 +927,12 @@ impl RecordingScreens {
             }
             Act::EditChain => self.open_picker(PickerKind::EditChain, Face::Page, Some(id)),
             Act::EditCombos => self.open_picker(PickerKind::EditSequence, Face::Page, Some(id)),
-            Act::Delete => self.delete_file(kind, &id),
+            Act::Delete => {
+                self.delete_file(kind, &id);
+                if kind == ItemKind::Save {
+                    self.last_effect = Effect::DeleteSave { source: id };
+                }
+            }
             Act::Drill => self.drill = Some(id),
             Act::DrillCombo => {
                 if let Some(combo) = drill {
