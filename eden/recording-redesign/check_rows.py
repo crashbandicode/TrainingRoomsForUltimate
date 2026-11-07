@@ -102,6 +102,11 @@ def main():
         recover = row.get('recover', plan_recover)
         if not isinstance(recover, list) or not recover:
             failures.append(f'row {row_id}: needs a "recover" list (or a plan-level one) that returns to its start state')
+    # RR-7's Eden table gives each runtime row its exact diag line (screen=...); the row must gate or expect on it.
+    for row_id in ('rr-record', 'rr-play', 'rr-mash', 'rr-notice', 'rr-mismatch', 'rr-rename', 'rr-crop', 'rr-migrate', 'rr-combo'):
+        row = by_id.get(row_id)
+        if row is not None and 'screen=' not in json.dumps(row) and 'jump' not in json.dumps(row):
+            failures.append(f'row {row_id}: must expect or gate on the diag line RR-7 gives (screen=...)')
     timed = [r for r in rows if r.get('timed') and r.get('host') == 'xps']
     if timed:
         failures.append(f'timed rows must not run on the XPS: {[r["id"] for r in timed]}')

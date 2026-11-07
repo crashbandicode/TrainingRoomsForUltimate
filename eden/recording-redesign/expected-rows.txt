@@ -23,6 +23,9 @@ rr-notice	REPORT
 rr-mismatch	REPORT
 rr-rename	REPORT
 rr-crop	REPORT
+rr-play	RR-7 (Eden rows table)
+rr-mash	RR-7 (Eden rows table)
+rr-combo	RR-7 (Eden rows table)
 strip-walk	RR-11
 strip-dash-dance	RR-11
 strip-cstick-smash	RR-11
