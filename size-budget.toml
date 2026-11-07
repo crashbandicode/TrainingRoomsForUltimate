@@ -417,3 +417,11 @@ ceiling = 144189
 date = "2026-11-06"
 reason = "rr-11 stick row (p23/rr-11-stick-row): one mark per frame of the left stick under P1's lane, and a C-stick attack takes the C-stick's arrow; measured 144189 (tools/size_gate.py), +60 over 144129"
 approved_by = "Operator 2026-11-06 via the rr-11 brief: 'Raise as needed'"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 144750
+date = "2026-11-06"
+reason = "rr-12 combo inputs (p23/rr-12-combo-inputs): a link records and grades presses, releases, the C-stick and stick flicks, facing-relative, and shows drift without grading it; measured 144750 (tools/size_gate.py), +561 over 144189"
+approved_by = "Operator 2026-11-06 via the rr-12 brief: 'Raise as needed'"
