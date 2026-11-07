@@ -1,7 +1,7 @@
 {
   "game_id": "01006A800016E000",
   "start": "boot",
-  "scope": "rc.5 grouped Eden session (card 10a): the recording-redesign rows from the stage-1 report, the rc.5 frame-advantage cases and heap/crash gates (EDEN-SESSION-PLAN-rc5), and every GIF docs/MEDIA.md still needs, across the operator's 7 instances (surface 2, yoga 2, ally 1, xps 2). Timed rows (frame advantage, strip timing, combo grading) run on the Surface and the Yoga only. Instance keys: xps-a, xps-b, ally-a, surface-a, surface-b, yoga-a, yoga-b.",
+  "scope": "rc.5 grouped Eden session (cards 10a/10a2): the recording-redesign rows from the stage-1 report, the rc.5 frame-advantage cases and heap/crash gates (EDEN-SESSION-PLAN-rc5), and every GIF docs/MEDIA.md still needs, across the operator's 7 instances (surface 2, yoga 2, ally 1, xps 2). Timed rows (frame advantage, strip timing, combo grading) run on the Surface and the Yoga only. Instance keys: xps-a, xps-b, ally-a, surface-a, surface-b, yoga-a, yoga-b. Every non-library segment is recorded from its recipe on its first play; the recipes' frame counts are best efforts, each marked \"timing to be checked when recorded\" (README, Open questions).",
   "setup": [
     {
       "state": "Instance xps-a boots with the migration fixture: a non-empty recording in slot 1, the other recording slots empty, legacy save slots live",
@@ -39,103 +39,494 @@
     },
     "chord-save": {
       "file": "segments/chord-save.edenmacro.json",
-      "sha256": "ce4821980dbe31726c1ea63df8d99ab48c5cb60560449fe1dd9f20c4ca02159c",
-      "cap": 30
+      "cap": 30,
+      "recipe": [
+        {
+          "buttons": "zl,down",
+          "frames": 2,
+          "gap_frames": 10
+        }
+      ],
+      "note": "timing to be checked when recorded"
     },
     "chord-load": {
       "file": "segments/chord-load.edenmacro.json",
-      "sha256": "bf2b9d837310bedfd8f80070bba90fdaf920c0c7a8e039fae10652525c0e6efe",
-      "cap": 30
+      "cap": 30,
+      "recipe": [
+        {
+          "buttons": "zl,up",
+          "frames": 2,
+          "gap_frames": 10
+        }
+      ],
+      "note": "timing to be checked when recorded"
     },
     "chord-record": {
       "file": "segments/chord-record.edenmacro.json",
-      "sha256": "0ce3b6c1f623d258b1b44ec22259a998f9b96d35a29bcb8f0d0cc34ad8ec66b1",
-      "cap": 30
+      "cap": 30,
+      "recipe": [
+        {
+          "buttons": "zr,down",
+          "frames": 2,
+          "gap_frames": 10
+        }
+      ],
+      "note": "timing to be checked when recorded"
     },
     "chord-play-cpu": {
       "file": "segments/chord-play-cpu.edenmacro.json",
-      "sha256": "8d7df38c63100768623c7391a69017ad52a5d279768c00a997973467eb1f33c0",
-      "cap": 30
+      "cap": 30,
+      "recipe": [
+        {
+          "buttons": "zr,up",
+          "frames": 2,
+          "gap_frames": 10
+        }
+      ],
+      "note": "timing to be checked when recorded"
     },
     "chord-play-p1": {
       "file": "segments/chord-play-p1.edenmacro.json",
-      "sha256": "3454c0aae3f065d1c2d54e03242523d69d80bfaa26558dead514ef4471ed565b",
-      "cap": 30
+      "cap": 30,
+      "recipe": [
+        {
+          "buttons": "zr,left",
+          "frames": 2,
+          "gap_frames": 10
+        }
+      ],
+      "note": "timing to be checked when recorded"
     },
     "chord-popup": {
       "file": "segments/chord-popup.edenmacro.json",
-      "sha256": "707b3a2cb8f6fe144e7c5d0ca680267b4486d0b4d06a6cd4b88c5eb72eeb6941",
-      "cap": 30
+      "cap": 30,
+      "recipe": [
+        {
+          "buttons": "zr,right",
+          "frames": 2,
+          "gap_frames": 10
+        }
+      ],
+      "note": "timing to be checked when recorded"
     },
     "menu-open": {
       "file": "segments/menu-open.edenmacro.json",
-      "sha256": "c7c723263b83881659113e50fa144cf4e818e2bf6a811e005d2e70b949d542fb",
-      "cap": 30
+      "cap": 30,
+      "recipe": [
+        {
+          "buttons": "b,up",
+          "frames": 2,
+          "gap_frames": 10
+        }
+      ],
+      "note": "timing to be checked when recorded"
     },
     "menu-close": {
       "file": "segments/menu-close.edenmacro.json",
-      "sha256": "6ee0b6efa92021b9737533afd17b74cbbe664772d401deeb7acdb54e40f77aa5",
-      "cap": 30
+      "cap": 30,
+      "recipe": [
+        {
+          "buttons": "b",
+          "frames": 2,
+          "gap_frames": 6
+        },
+        {
+          "buttons": "b",
+          "frames": 2,
+          "gap_frames": 34
+        }
+      ],
+      "note": "timing to be checked when recorded"
     },
     "x-press": {
       "file": "segments/x-press.edenmacro.json",
-      "sha256": "be6c0100bf791e139f8fdb3e1729f8c2dc99a1a2b542b2ff071ec5c6c50a9c86",
-      "cap": 30
+      "cap": 30,
+      "recipe": [
+        {
+          "buttons": "x",
+          "frames": 2,
+          "gap_frames": 10
+        }
+      ],
+      "note": "timing to be checked when recorded"
     },
     "reset-walk": {
       "file": "segments/reset-walk.edenmacro.json",
-      "sha256": "8b3408cabb6b2cd155df681b4bb079b74d7cccf0e9ac62459bb3ae269241ca84",
-      "cap": 30
+      "cap": 30,
+      "recipe": [
+        {
+          "buttons": "l,r,a",
+          "frames": 4,
+          "gap_frames": 66
+        },
+        {
+          "stick": [
+            1,
+            0,
+            0
+          ],
+          "frames": 120,
+          "gap_frames": 14
+        }
+      ],
+      "note": "timing to be checked when recorded"
     },
     "jab": {
       "file": "segments/jab.edenmacro.json",
-      "sha256": "d7b4c00f4f7b71e05c5a9874e4eb10bf33441c5755c18a5d6d12c32d9f495e72",
-      "cap": 30
+      "cap": 30,
+      "recipe": [
+        {
+          "buttons": "a",
+          "frames": 2,
+          "gap_frames": 58
+        }
+      ],
+      "note": "timing to be checked when recorded"
     },
     "walk-right": {
       "file": "segments/walk-right.edenmacro.json",
-      "sha256": "1cc6a59d283f35c5403bf664ff157cf31928d8b2fbf940a5094e3cf24fe13d01",
-      "cap": 30
+      "cap": 30,
+      "recipe": [
+        {
+          "stick": [
+            0.4,
+            0,
+            0
+          ],
+          "frames": 30,
+          "gap_frames": 10
+        }
+      ],
+      "note": "timing to be checked when recorded"
     },
     "dash-dance": {
       "file": "segments/dash-dance.edenmacro.json",
-      "sha256": "3108493768be2c89aebb309d973c5f8318726b72374abfbcb34211dcbfc60ede",
-      "cap": 30
-    },
-    "cstick-smash": {
-      "file": "segments/cstick-smash.edenmacro.json",
-      "sha256": "6d50e8159850d659d1734b0ce22d4298e122763ce91b3ae3cb8123ee93cba9c8",
-      "cap": 30
-    },
-    "tilted-a": {
-      "file": "segments/tilted-a.edenmacro.json",
-      "sha256": "c5e3a30912c49224261d5cfbf067f7c49acbb94f0e44ee4654cd7aec4917b300",
-      "cap": 30
+      "cap": 30,
+      "recipe": [
+        {
+          "stick": [
+            1,
+            0,
+            0
+          ],
+          "frames": 12,
+          "gap_frames": 0
+        },
+        {
+          "stick": [
+            -1,
+            0,
+            0
+          ],
+          "frames": 12,
+          "gap_frames": 0
+        },
+        {
+          "stick": [
+            1,
+            0,
+            0
+          ],
+          "frames": 12,
+          "gap_frames": 0
+        },
+        {
+          "stick": [
+            -1,
+            0,
+            0
+          ],
+          "frames": 12,
+          "gap_frames": 0
+        },
+        {
+          "stick": [
+            1,
+            0,
+            0
+          ],
+          "frames": 12,
+          "gap_frames": 0
+        },
+        {
+          "stick": [
+            -1,
+            0,
+            0
+          ],
+          "frames": 12,
+          "gap_frames": 0
+        },
+        {
+          "stick": [
+            1,
+            0,
+            0
+          ],
+          "frames": 12,
+          "gap_frames": 0
+        },
+        {
+          "stick": [
+            -1,
+            0,
+            0
+          ],
+          "frames": 12,
+          "gap_frames": 0
+        },
+        {
+          "stick": [
+            0,
+            0,
+            0
+          ],
+          "frames": 2,
+          "gap_frames": 10
+        }
+      ],
+      "note": "timing to be checked when recorded"
     },
     "fsmash": {
       "file": "segments/fsmash.edenmacro.json",
-      "sha256": "66b401e3fe5d55f447e591109fd8e97e752bdc279a1c024da59b85c0e0bcd6cf",
-      "cap": 30
+      "cap": 30,
+      "recipe": [
+        {
+          "stick": [
+            1,
+            0,
+            0
+          ],
+          "frames": 8,
+          "gap_frames": 0
+        },
+        {
+          "buttons": "a",
+          "with_stick": [
+            1,
+            0
+          ],
+          "frames": 2,
+          "gap_frames": 60
+        }
+      ],
+      "note": "timing to be checked when recorded"
+    },
+    "tilted-a": {
+      "file": "segments/tilted-a.edenmacro.json",
+      "cap": 30,
+      "recipe": [
+        {
+          "stick": [
+            0,
+            0.6,
+            0
+          ],
+          "frames": 2,
+          "gap_frames": 0
+        },
+        {
+          "buttons": "a",
+          "with_stick": [
+            0,
+            0.6
+          ],
+          "frames": 2,
+          "gap_frames": 10
+        }
+      ],
+      "note": "timing to be checked when recorded"
     },
     "nair-loop-clean": {
       "file": "segments/nair-loop-clean.edenmacro.json",
-      "sha256": "525c0ef0763d925a555c445293c92c9b69cc1f68acdf29494d1532683c44ad19",
-      "cap": 30
+      "cap": 30,
+      "recipe": [
+        {
+          "buttons": "x",
+          "frames": 3,
+          "gap_frames": 0
+        },
+        {
+          "buttons": "a",
+          "frames": 2,
+          "gap_frames": 20
+        },
+        {
+          "stick": [
+            0,
+            -1,
+            0
+          ],
+          "frames": 6,
+          "gap_frames": 34
+        },
+        {
+          "buttons": "x",
+          "frames": 3,
+          "gap_frames": 0
+        },
+        {
+          "buttons": "a",
+          "frames": 2,
+          "gap_frames": 20
+        },
+        {
+          "stick": [
+            0,
+            -1,
+            0
+          ],
+          "frames": 6,
+          "gap_frames": 34
+        },
+        {
+          "stick": [
+            0,
+            0,
+            0
+          ],
+          "frames": 2,
+          "gap_frames": 10
+        }
+      ],
+      "note": "timing to be checked when recorded"
     },
     "nair-loop-full-hop": {
       "file": "segments/nair-loop-full-hop.edenmacro.json",
-      "sha256": "4707c90dced4aaba097f9df25881a9c9d2c0ab008e7c13efbca0aab9255c3c1f",
-      "cap": 30
+      "cap": 30,
+      "recipe": [
+        {
+          "buttons": "x",
+          "frames": 14,
+          "gap_frames": 0
+        },
+        {
+          "buttons": "a",
+          "frames": 2,
+          "gap_frames": 20
+        },
+        {
+          "stick": [
+            0,
+            -1,
+            0
+          ],
+          "frames": 6,
+          "gap_frames": 34
+        },
+        {
+          "buttons": "x",
+          "frames": 14,
+          "gap_frames": 0
+        },
+        {
+          "buttons": "a",
+          "frames": 2,
+          "gap_frames": 20
+        },
+        {
+          "stick": [
+            0,
+            -1,
+            0
+          ],
+          "frames": 6,
+          "gap_frames": 34
+        },
+        {
+          "stick": [
+            0,
+            0,
+            0
+          ],
+          "frames": 2,
+          "gap_frames": 10
+        }
+      ],
+      "note": "timing to be checked when recorded"
     },
     "nair-loop-no-fastfall": {
       "file": "segments/nair-loop-no-fastfall.edenmacro.json",
-      "sha256": "7896f4e2e384b1ffff681e0ba54d2cb61be2587df7b37b8d49f6abb3e8ad4b9a",
-      "cap": 30
+      "cap": 30,
+      "recipe": [
+        {
+          "buttons": "x",
+          "frames": 3,
+          "gap_frames": 0
+        },
+        {
+          "buttons": "a",
+          "frames": 2,
+          "gap_frames": 20
+        },
+        {
+          "gap_frames": 40
+        },
+        {
+          "buttons": "x",
+          "frames": 3,
+          "gap_frames": 0
+        },
+        {
+          "buttons": "a",
+          "frames": 2,
+          "gap_frames": 20
+        },
+        {
+          "gap_frames": 40
+        },
+        {
+          "stick": [
+            0,
+            0,
+            0
+          ],
+          "frames": 2,
+          "gap_frames": 10
+        }
+      ],
+      "note": "timing to be checked when recorded"
     },
     "dash-attack": {
       "file": "segments/dash-attack.edenmacro.json",
-      "sha256": "a502dc6df27636a01dc5e22e13f9f6fc42adc5859468ee81af22f8b44ac0fb68",
-      "cap": 30
+      "cap": 30,
+      "recipe": [
+        {
+          "stick": [
+            1,
+            0,
+            0
+          ],
+          "frames": 2,
+          "gap_frames": 0
+        },
+        {
+          "buttons": "a",
+          "with_stick": [
+            1,
+            0
+          ],
+          "frames": 2,
+          "gap_frames": 30
+        }
+      ],
+      "note": "timing to be checked when recorded"
+    },
+    "cstick-smash": {
+      "file": "segments/cstick-smash.edenmacro.json",
+      "cap": 30,
+      "recipe": [
+        {
+          "stick": [
+            0,
+            0,
+            0
+          ],
+          "frames": 2,
+          "gap_frames": 40
+        }
+      ],
+      "note": "the recipe actions drive the left stick only; the C-stick input is pressed by the row hook (README, Open questions); timing to be checked when recorded"
     }
   },
   "gates": {

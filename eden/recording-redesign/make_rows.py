@@ -1,7 +1,9 @@
-"""Build eden/recording-redesign/rows.json and its authored chord macros (card 10a, 2026-11-07).
+"""Build eden/recording-redesign/rows.json (card 10a2, 2026-11-07).
 
 Copies the worked examples' patterns (eden/phase23/rows-iv/make_run.py, rows-hb-ab, rows-A):
-- chords are authored same-frame macros (playbook docs/MACROS.md rule 14), written to segments/;
+- every non-library segment is a RECIPE the runner records on its first play (playbook
+  docs/MACROS.md, "Test runs": recipe inputs are the only single inputs the runner ever sends);
+  no .edenmacro.json is written by hand and no segment carries a sha256 before it is recorded;
 - the route segments and gates that already exist come from the shared runner library
   (/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/index.json) by name;
 - every row is one project step hook (steps.py:<function>, "check": true), the rows-iv shape;
@@ -11,85 +13,104 @@ Copies the worked examples' patterns (eden/phase23/rows-iv/make_run.py, rows-hb-
 
 Run: /usr/bin/python3 -I eden/recording-redesign/make_rows.py   (from the repository root)
 
-The macro event encoding is make_run.py's: events are (frame, buttons, sticks) with the HID
-NpadButton bit per button, confirmed in that file for A, B, L, R and D-pad Up; ZL, ZR and the
-other D-pad directions follow the same standard HID layout (ZL=0x100, ZR=0x200, Left=0x1000,
-Right=0x4000, Down=0x8000). Frame numbers in the movement/combo macros are authored inputs for
-the session to tune, not measured facts (README, Open questions).
+Recipe syntax (runner.py docstring and record()): {"buttons": "a", "hold": 150, "gap": 0.6},
+{"buttons": "b", "with_stick": [0, -1]}, {"stick": [x, y, ms]}; "frames": N and "gap_frames": N
+hold for N game frames of the recording where timing matters. Button names are input.button's
+vocabulary (the runs' actions.jsonl shows zl, zr; the rc2d base steps.py shows up, down, left,
+right, a, b). Frame counts below are the recipe's best effort from the described behaviour, not
+measured timings: every recipe carries note "timing to be checked when recorded", and the facts
+no source gave are listed in README.md, Open questions.
 """
-import hashlib
 import json
 import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-SEG = HERE / 'segments'
 
-# HID NpadButton bits (make_run.py confirms A/B/L/R/Up; the rest is the same standard layout).
-A, B, X, Y = 0x1, 0x2, 0x4, 0x8
-L, R, ZL, ZR = 0x40, 0x80, 0x100, 0x200
-PLUS, MINUS = 0x400, 0x800
-DP_LEFT, DP_UP, DP_RIGHT, DP_DOWN = 0x1000, 0x2000, 0x4000, 0x8000
-Z = (0, 0, 0, 0)
-MOTION = [{"accel": [0, 0, -1], "delta_us": 1000, "gyro": [0, 0, 0]}] * 2
-
-
-def sha(p):
-    return hashlib.sha256(Path(p).read_bytes()).hexdigest()
-
-
-def macro(name, events, duration):
-    """events: (frame, buttons, (lx, ly[, rx, ry])). Same-frame chord macros per MACROS rule 14."""
-    out = {"bindings": {"gamepad": "", "keyboard": ""}, "duration_frames": duration, "events": [
-        {"buttons": b, "frame": f, "motion": MOTION, "sticks": list(s), "triggers": [0, 0]}
-        for f, b, s in events], "format": "eden-input-macro", "game_id": "01006A800016E000",
-        "markers": [], "name": name, "parent": {"marker": "", "name": ""}, "player": 0, "version": 1}
-    path = SEG / (name + '.edenmacro.json')
-    path.write_text(json.dumps(out) + '\n')
-    return name, {"file": "segments/%s.edenmacro.json" % name, "sha256": sha(path), "cap": 30}
-
-
-# --- authored same-frame macros -------------------------------------------------------------------
-# Chords (factory defaults, RR-5 design table / card): one frame, then release.
-CHORDS = [
-    ('chord-save', [(0, ZL | DP_DOWN, Z), (6, 0, Z)], 24),        # Save, ZL+Down [6,9]
-    ('chord-load', [(0, ZL | DP_UP, Z), (6, 0, Z)], 24),          # Load, ZL+Up [6,8]
-    ('chord-record', [(0, ZR | DP_DOWN, Z), (6, 0, Z)], 24),      # Record, ZR+Down [7,9]
-    ('chord-play-cpu', [(0, ZR | DP_UP, Z), (6, 0, Z)], 24),      # Play on CPU, ZR+Up [7,8]
-    ('chord-play-p1', [(0, ZR | DP_LEFT, Z), (6, 0, Z)], 24),     # Play on Player 1, ZR+Left [7,10]
-    ('chord-popup', [(0, ZR | DP_RIGHT, Z), (6, 0, Z)], 24),      # Recording pop-up, ZR+Right [7,11]
-    ('menu-open', [(0, B | DP_UP, Z), (8, 0, Z)], 60),            # Open menu, B+Up (permanent chord)
-    ('menu-close', [(0, B, Z), (6, 0, Z), (40, B, Z), (46, 0, Z)], 80),  # rows-iv iv-menu-close
-    ('x-press', [(0, X, Z), (6, 0, Z)], 24),                      # cycle the loop, cursor in MACROS
-    # Movement and attacks (frames authored; the session tunes them against the described behaviour).
-    ('reset-walk', [(0, L | R | A, Z), (4, 0, Z), (70, 0, (1, 0, 0, 0)), (190, 0, Z)], 205),  # rows-iv iv-reset-walk
-    ('jab', [(0, A, Z), (2, 0, Z)], 60),                                                        # rows-iv iv-jab
-    ('walk-right', [(0, 0, (0.4, 0, 0, 0)), (120, 0, Z)], 140),     # below the dash threshold, then neutral
-    ('dash-dance', [(0, 0, (1, 0, 0, 0)), (14, 0, (-1, 0, 0, 0)), (28, 0, (1, 0, 0, 0)),
-                    (42, 0, (-1, 0, 0, 0)), (56, 0, (1, 0, 0, 0)), (70, 0, (-1, 0, 0, 0)),
-                    (84, 0, (1, 0, 0, 0)), (98, 0, (-1, 0, 0, 0)), (112, 0, Z)], 130),
-    ('cstick-smash', [(0, 0, (0, 0, 1, 0)), (8, 0, Z)], 60),        # C-stick right, no A
-    ('tilted-a', [(0, 0, (0, 0.6, 0, 0)), (2, A, (0, 0.6, 0, 0)), (4, 0, (0, 0.6, 0, 0)),
-                  (12, 0, Z)], 60),                                  # rows-iv combo() shape, left stick tilt
-    ('fsmash', [(0, A, Z), (2, 0, Z), (10, 0, (1, 0, 0, 0)), (14, A, (1, 0, 0, 0)),
-                (16, 0, (1, 0, 0, 0)), (24, 0, Z)], 90),
-    ('nair-loop-clean', [(0, X, Z), (3, 0, Z), (16, A, Z), (18, 0, Z), (44, 0, (0, -1, 0, 0)),
-                         (50, 0, Z), (90, X, Z), (93, 0, Z), (106, A, Z), (108, 0, Z),
-                         (134, 0, (0, -1, 0, 0)), (140, 0, Z)], 180),
-    ('nair-loop-full-hop', [(0, X, Z), (14, 0, Z), (30, A, Z), (32, 0, Z), (60, 0, (0, -1, 0, 0)),
-                            (66, 0, Z), (110, X, Z), (124, 0, Z), (140, A, Z), (142, 0, Z),
-                            (170, 0, (0, -1, 0, 0)), (176, 0, Z)], 220),
-    ('nair-loop-no-fastfall', [(0, X, Z), (3, 0, Z), (16, A, Z), (18, 0, Z), (90, X, Z),
-                               (93, 0, Z), (106, A, Z), (108, 0, Z)], 180),
-    ('dash-attack', [(0, 0, (1, 0, 0, 0)), (6, A, (1, 0, 0, 0)), (8, 0, (1, 0, 0, 0)),
-                     (16, 0, Z)], 90),
-]
+# --- recipes (recorded on first play; no file is written by hand) ---------------------------------
+# Chords (factory defaults, RR-5 design table / card): the runner's recipe presses the action's
+# buttons together (each held on its lease through the hold, released together).
+# Timed gameplay recipes use the thresholds rr-12 measured in the stock 13.0.5 params
+# (dash_stick_x 0.85, dive_cont_value -0.66, jump_stick_y 0.7); the hold and gap frame counts are
+# the recipe's best effort, to be checked when recorded.
+NOTE = 'timing to be checked when recorded'
+RECIPES = {
+    'chord-save': [{"buttons": "zl,down", "frames": 2, "gap_frames": 10}],          # Save, ZL+Down [6,9]
+    'chord-load': [{"buttons": "zl,up", "frames": 2, "gap_frames": 10}],            # Load, ZL+Up [6,8]
+    'chord-record': [{"buttons": "zr,down", "frames": 2, "gap_frames": 10}],        # Record, ZR+Down [7,9]
+    'chord-play-cpu': [{"buttons": "zr,up", "frames": 2, "gap_frames": 10}],        # Play on CPU, ZR+Up [7,8]
+    'chord-play-p1': [{"buttons": "zr,left", "frames": 2, "gap_frames": 10}],       # Play on Player 1, ZR+Left [7,10]
+    'chord-popup': [{"buttons": "zr,right", "frames": 2, "gap_frames": 10}],        # Recording pop-up, ZR+Right [7,11]
+    'menu-open': [{"buttons": "b,up", "frames": 2, "gap_frames": 10}],              # Open menu, B+Up (permanent chord)
+    'menu-close': [{"buttons": "b", "frames": 2, "gap_frames": 6},                  # B, then B again to leave
+                   {"buttons": "b", "frames": 2, "gap_frames": 34}],
+    'x-press': [{"buttons": "x", "frames": 2, "gap_frames": 10}],                   # cycle the loop, cursor in MACROS
+    # Training's position reset (L+R+A in one action), settle, then walk into the CPU (rows-iv's
+    # iv-reset-walk shape).
+    'reset-walk': [{"buttons": "l,r,a", "frames": 4, "gap_frames": 66},
+                   {"stick": [1, 0, 0], "frames": 120, "gap_frames": 14}],
+    'jab': [{"buttons": "a", "frames": 2, "gap_frames": 58}],
+    # A walk: the stick held below the dash threshold (rr-12: dash_stick_x 0.85), then neutral.
+    'walk-right': [{"stick": [0.4, 0, 0], "frames": 30, "gap_frames": 10}],
+    # A dash-dance: alternate left and right without pausing (rr-11, row Dash-dance).
+    'dash-dance': [{"stick": [1, 0, 0], "frames": 12, "gap_frames": 0},
+                   {"stick": [-1, 0, 0], "frames": 12, "gap_frames": 0},
+                   {"stick": [1, 0, 0], "frames": 12, "gap_frames": 0},
+                   {"stick": [-1, 0, 0], "frames": 12, "gap_frames": 0},
+                   {"stick": [1, 0, 0], "frames": 12, "gap_frames": 0},
+                   {"stick": [-1, 0, 0], "frames": 12, "gap_frames": 0},
+                   {"stick": [1, 0, 0], "frames": 12, "gap_frames": 0},
+                   {"stick": [-1, 0, 0], "frames": 12, "gap_frames": 0},
+                   {"stick": [0, 0, 0], "frames": 2, "gap_frames": 10}],
+    # A forward smash: dash right (past the walk threshold), then A (docs/MEDIA.md, lanes row).
+    'fsmash': [{"stick": [1, 0, 0], "frames": 8, "gap_frames": 0},
+               {"buttons": "a", "with_stick": [1, 0], "frames": 2, "gap_frames": 60}],
+    # A tilted A: the left stick held at a tilt (below the dash threshold) through the A press
+    # (rows-iv's combo shape: the tilt held, never a flick).
+    'tilted-a': [{"stick": [0, 0.6, 0], "frames": 2, "gap_frames": 0},
+                 {"buttons": "a", "with_stick": [0, 0.6], "frames": 2, "gap_frames": 10}],
+    # A short-hop nair loop, drilled clean (rr-12, row "Nair loop, drilled clean"): jump press,
+    # jump release (short hop), attack press, fast-fall (the stick crossing -0.66), repeated.
+    'nair-loop-clean': [{"buttons": "x", "frames": 3, "gap_frames": 0},
+                        {"buttons": "a", "frames": 2, "gap_frames": 20},
+                        {"stick": [0, -1, 0], "frames": 6, "gap_frames": 34},
+                        {"buttons": "x", "frames": 3, "gap_frames": 0},
+                        {"buttons": "a", "frames": 2, "gap_frames": 20},
+                        {"stick": [0, -1, 0], "frames": 6, "gap_frames": 34},
+                        {"stick": [0, 0, 0], "frames": 2, "gap_frames": 10}],
+    # The same loop with the jump released later than the on-time tolerance (rr-12: Drop; the bar
+    # names the late jump release).
+    'nair-loop-full-hop': [{"buttons": "x", "frames": 14, "gap_frames": 0},
+                           {"buttons": "a", "frames": 2, "gap_frames": 20},
+                           {"stick": [0, -1, 0], "frames": 6, "gap_frames": 34},
+                           {"buttons": "x", "frames": 14, "gap_frames": 0},
+                           {"buttons": "a", "frames": 2, "gap_frames": 20},
+                           {"stick": [0, -1, 0], "frames": 6, "gap_frames": 34},
+                           {"stick": [0, 0, 0], "frames": 2, "gap_frames": 10}],
+    # The same loop without the fast-fall (rr-12: the down input never crosses -0.66 in the air).
+    'nair-loop-no-fastfall': [{"buttons": "x", "frames": 3, "gap_frames": 0},
+                              {"buttons": "a", "frames": 2, "gap_frames": 20},
+                              {"gap_frames": 40},
+                              {"buttons": "x", "frames": 3, "gap_frames": 0},
+                              {"buttons": "a", "frames": 2, "gap_frames": 20},
+                              {"gap_frames": 40},
+                              {"stick": [0, 0, 0], "frames": 2, "gap_frames": 10}],
+    # A dash-attack combo (rr-12, row "Dash-attack combo"): the stick crosses 0.85, then the attack.
+    'dash-attack': [{"stick": [1, 0, 0], "frames": 2, "gap_frames": 0},
+                    {"buttons": "a", "with_stick": [1, 0], "frames": 2, "gap_frames": 30}],
+    # The C-stick smash: the runner's recipe actions drive the LEFT stick only (record()'s stick
+    # action), so a recipe cannot express this input. The recipe below is a placeholder that must
+    # not be played as-is; the row's hook presses the right stick directly and captures what the
+    # control call answers (README, Open questions).
+    'cstick-smash': [{"stick": [0, 0, 0], "frames": 2, "gap_frames": 40}],
+}
+# The one segment whose recipe is a placeholder gets its own note.
+CSTICK_NOTE = ('the recipe actions drive the left stick only; the C-stick input is pressed by the '
+               'row hook (README, Open questions); timing to be checked when recorded')
 
 # Library segments and gates used by the boot route (proven routes; runner library index.json).
 LIBRARY_SEGMENTS = ('attract-cancel', 'main-stage', 'stage-css', 'enter-training')
 LIBRARY_GATES = ('installed', 'main', 'stage', 'css', 'ready', 'training-hud-unpaused')
-
-INSTANCE_SETUP = ('xps-b', 'ally-a', 'surface-a', 'surface-b', 'yoga-a', 'yoga-b')
 
 
 def R(row_id, hook, host, timed, expect, source, evidence, media=None, start='training', end='training', args=None):
@@ -356,10 +377,10 @@ ROWS = [
 
 
 def main():
-    SEG.mkdir(parents=True, exist_ok=True)
     segments = {name: {'library': name} for name in LIBRARY_SEGMENTS}
-    for name, events, duration in CHORDS:
-        segments[name] = macro(name, events, duration)[1]
+    for name, recipe in RECIPES.items():
+        segments[name] = {'file': 'segments/%s.edenmacro.json' % name, 'cap': 30, 'recipe': recipe,
+                          'note': CSTICK_NOTE if name == 'cstick-smash' else NOTE}
     gates = {name: {'library': name} for name in LIBRARY_GATES}
     gates['main']['recover'] = 'attract-cancel'
     gates['main']['recover_times'] = 3
@@ -406,11 +427,13 @@ def main():
     plan = {
         'game_id': '01006A800016E000',
         'start': 'boot',
-        'scope': 'rc.5 grouped Eden session (card 10a): the recording-redesign rows from the stage-1 report, '
-                 'the rc.5 frame-advantage cases and heap/crash gates (EDEN-SESSION-PLAN-rc5), and every GIF '
-                 'docs/MEDIA.md still needs, across the operator\'s 7 instances (surface 2, yoga 2, ally 1, xps 2). '
-                 'Timed rows (frame advantage, strip timing, combo grading) run on the Surface and the Yoga only. '
-                 'Instance keys: xps-a, xps-b, ally-a, surface-a, surface-b, yoga-a, yoga-b.',
+        'scope': 'rc.5 grouped Eden session (cards 10a/10a2): the recording-redesign rows from the stage-1 '
+                 'report, the rc.5 frame-advantage cases and heap/crash gates (EDEN-SESSION-PLAN-rc5), and every '
+                 'GIF docs/MEDIA.md still needs, across the operator\'s 7 instances (surface 2, yoga 2, ally 1, '
+                 'xps 2). Timed rows (frame advantage, strip timing, combo grading) run on the Surface and the '
+                 'Yoga only. Instance keys: xps-a, xps-b, ally-a, surface-a, surface-b, yoga-a, yoga-b. Every '
+                 'non-library segment is recorded from its recipe on its first play; the recipes\' frame counts '
+                 'are best efforts, each marked "timing to be checked when recorded" (README, Open questions).',
         'setup': [
             {'state': 'Instance xps-a boots with the migration fixture: a non-empty recording in slot 1, the other recording slots empty, legacy save slots live',
              'via': 'fixture', 'ref': 'RR-7 Eden row rr-migrate start state; media-rc5-migration start'},
@@ -426,7 +449,7 @@ def main():
         'rows': rows,
     }
     (HERE / 'rows.json').write_text(json.dumps(plan, indent=2) + '\n')
-    print('rows', len(rows), 'segments', len(segments), sha(HERE / 'rows.json')[:12])
+    print('rows', len(rows), 'segments', len(segments))
 
 
 if __name__ == '__main__':

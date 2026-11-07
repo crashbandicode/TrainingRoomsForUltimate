@@ -1,12 +1,14 @@
-"""rc.5 grouped-session step hooks (card 10a, 2026-11-07): one function per row of rows.json.
+"""rc.5 grouped-session step hooks (card 10a2, 2026-11-07): one function per row of rows.json.
 
 Copies the rows-iv pattern (iv_steps.py): every row is one {"run": "steps.py:<row>", "check": true}
-step. The hook reaches the row's start state, performs the row's documented inputs (chords are the
-authored same-frame macros in segments/), waits for the row's expected diag line or screen, saves
-its evidence into the row folder, and raises with the captured data when the expectation is not
-met. Diag lines come from the stage-1 report's Design section: screen=recording-popup,
-screen=recording-page, playback, load, drill, notice, migrate (plus the recording/pick/mismatch/
-rename/crop lines the RR-6/RR-7 Eden tables name).
+step. The hook reaches the row's start state, performs the row's documented inputs, waits for the
+row's expected diag line or screen, saves its evidence into the row folder, and raises with the
+captured data when the expectation is not met. Chords and the movement/attack inputs are recipe
+segments (recorded from their recipe on first play; MACROS, "Test runs"); the C-stick is the one
+input a recipe cannot express and is pressed by its row hook (README, Open questions). Diag lines
+come from the stage-1 report's Design section: screen=recording-popup, screen=recording-page,
+playback, load, drill, notice, migrate (plus the recording/pick/mismatch/rename/crop lines the
+RR-6/RR-7 Eden tables name).
 
 Facts a source did not give (menu cursor routes inside the new screens, the published frame-data
 pages, the hook-stats line format) are marked in README.md, Open questions; the hooks bounded-try
@@ -388,7 +390,7 @@ def rr_chords(ctx):
     open_menu(ctx)
     shot = ctx.shot('shortcuts')
     close_menu(ctx)
-    # Each chord macro exists and plays (the authored same-frame macros are the factory arrays).
+    # Each chord recipe exists and plays (recorded from its recipe on the first play).
     played = {}
     for name, key in ((SAVE, 'ZL+Down [6,9]'), (LOAD, 'ZL+Up [6,8]'), (RECORD, 'ZR+Down [7,9]'),
                       (PLAY_CPU, 'ZR+Up [7,8]'), (PLAY_P1, 'ZR+Left [7,10]'),
@@ -706,14 +708,23 @@ def strip_dash_dance(ctx):
 
 
 def strip_cstick_smash(ctx):
-    """Smash with the C-stick while the left stick is tilted another way."""
+    """Smash with the C-stick while the left stick is tilted another way.
+
+    The runner's recipe actions drive the left stick only, so the C-stick is pressed here directly;
+    the call's answer is captured (README, Open questions).
+    """
     reset(ctx)
     ctx.call('input.stick', {'stick': 'left', 'x': 0, 'y': 0.6, 'lease_ms': 1200})
     time.sleep(0.3)
-    ctx.play('cstick-smash')
-    time.sleep(1.5)
+    try:
+        ctx.call('input.stick', {'stick': 'right', 'x': 1, 'y': 0, 'lease_ms': 300})
+        time.sleep(1.2)
+        ctx.call('input.stick', {'stick': 'right', 'x': 0, 'y': 0, 'lease_ms': 100})
+    except RuntimeError as e:
+        return save(ctx, 'strip-cstick-smash', {'right_stick': 'refused: %s' % e,
+                                                'shot': str(ctx.shot('cstick-refused'))})
     ctx.call('input.stick', {'stick': 'left', 'x': 0, 'y': 0, 'lease_ms': 100})
-    return save(ctx, 'strip-cstick-smash', {'shots': [str(ctx.shot('cstick'))]})
+    return save(ctx, 'strip-cstick-smash', {'right_stick': 'accepted', 'shots': [str(ctx.shot('cstick'))]})
 
 
 def strip_tilted_a(ctx):
@@ -961,11 +972,17 @@ def media_strip_exchange(ctx):
 # --- yoga-a: the rr-11 stick-row GIFs and the combo rows ------------------------------------------------
 
 def media_strip_cstick(ctx):
-    """Left stick neutral; C-stick right, one forward smash; no A."""
+    """Left stick neutral; C-stick right, one forward smash; no A (right stick pressed directly;
+    the recipe actions cannot express it — README, Open questions)."""
     def do():
         reset(ctx)
-        ctx.play('cstick-smash')
-        time.sleep(2.0)
+        try:
+            ctx.call('input.stick', {'stick': 'right', 'x': 1, 'y': 0, 'lease_ms': 300})
+            time.sleep(1.2)
+            ctx.call('input.stick', {'stick': 'right', 'x': 0, 'y': 0, 'lease_ms': 100})
+        except RuntimeError as e:
+            raise RuntimeError('the right-stick call was refused (the C-stick needs another route): %s' % e)
+        time.sleep(1.0)
     out = gif(ctx, 'rc5-frame-strip-cstick.gif', 4, do)
     return save(ctx, 'strip-cstick', out)
 
