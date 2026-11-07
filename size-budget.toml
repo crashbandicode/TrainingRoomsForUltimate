@@ -417,3 +417,27 @@ ceiling = 144189
 date = "2026-11-06"
 reason = "rr-11 stick row (p23/rr-11-stick-row): one mark per frame of the left stick under P1's lane, and a C-stick attack takes the C-stick's arrow; measured 144189 (tools/size_gate.py), +60 over 144129"
 approved_by = "Operator 2026-11-06 via the rr-11 brief: 'Raise as needed'"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 146268
+date = "2026-11-06"
+reason = "rr-6-menu: the recording pop-up, the Recording page, the file screens and the twelve icon panes; measured 146268 (tools/size_gate.py), +2382 over 143886"
+approved_by = "Operator 2026-11-05 standing order via primary 35137355: 'Raise as needed'"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 146511
+date = "2026-11-06"
+reason = "rr-6-menu merged with rr-4 playback at f006f0c: measured 146511 (tools/size_gate.py), +243 over 146268"
+approved_by = "Operator 2026-11-05 standing order via primary 35137355: 'Raise as needed'"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 146571
+date = "2026-11-06"
+reason = "rr integration (p23/rr-integration): rr-6-menu merged onto the branch that already has the stick row; measured 146571 (tools/size_gate.py), +60 over 146511"
+approved_by = "Operator 2026-11-05 standing order via primary 35137355: 'Raise as needed'"

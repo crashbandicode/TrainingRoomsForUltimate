@@ -157,6 +157,45 @@ impl Panes {
         self.text(p::IDX_HELP, frame.help[0].units(), p::TEXT);
         self.text(p::IDX_HELP + 1, frame.help[1].units(), p::TEXT);
         self.text(p::IDX_HINT, frame.hint.units(), p::TEXT_DIM);
+        self.draw_marks(frame);
+    }
+
+    /// Floppy and loop pictures, and the smaller pop-up background. Hidden marks stay hidden.
+    unsafe fn draw_marks(&self, frame: &Frame) {
+        for i in 0..p::FLOPPIES {
+            let icon = frame.icons[i];
+            let index = p::IDX_FLOPPY + i;
+            self.show(index, icon.on);
+            if icon.on {
+                self.at(index, icon.x, icon.y);
+                let pane = self.all[index];
+                if !pane.is_null() {
+                    pane::set_rect_color(pane, p::linear(icon.color));
+                }
+            }
+        }
+        for i in 0..p::LOOPS {
+            let icon = frame.icons[p::FLOPPIES + i];
+            let index = p::IDX_LOOP + i;
+            self.show(index, icon.on);
+            if icon.on {
+                self.at(index, icon.x, icon.y);
+                let pane = self.all[index];
+                if !pane.is_null() {
+                    pane::set_rect_color(pane, p::linear(icon.color));
+                }
+            }
+        }
+        let bg = self.all[p::IDX_BG];
+        if !bg.is_null() {
+            if frame.popup {
+                pane::set_width(bg, 1280.0);
+                pane::set_height(bg, 760.0);
+            } else {
+                pane::set_width(bg, p::PANEL_W);
+                pane::set_height(bg, p::PANEL_H);
+            }
+        }
     }
 }
 

@@ -361,6 +361,8 @@ pub struct Menu {
     edits: Vec<String>,
     /// The last confirmed page reset: the page and the rows it changed, for the runtime's log line.
     page_reset: Option<(Page, Vec<&'static str>)>,
+    /// The recording pop-up and the Recording page's library. Not a settings row.
+    recording: super::recording_menu::RecordingScreens,
 }
 
 const SLIDER_SLOW: u8 = 1;
@@ -371,6 +373,23 @@ const RANGE_FAST: usize = 10;
 impl Menu {
     /// Open the menu on `settings`: on the page last used (`last_page`), CPU when there is none or
     /// the saved page is not in the ring (the Developer page with the flag off), Q5.
+    /// The recording pop-up and the Recording page's library.
+    pub fn recording(&self) -> &super::recording_menu::RecordingScreens {
+        &self.recording
+    }
+
+    /// The host loads a catalog here, and tests move the library cursor.
+    pub fn recording_mut(&mut self) -> &mut super::recording_menu::RecordingScreens {
+        &mut self.recording
+    }
+
+    /// A chord request. `RecordingPopup` toggles the pop-up. Other requests are not this screen's.
+    pub fn on_request(&mut self, request: super::chords::Request) {
+        if request == super::chords::Request::RecordingPopup {
+            self.recording.toggle_popup();
+        }
+    }
+
     pub fn new(settings: Settings, env: Env) -> Menu {
         let mut menu = Menu {
             settings,
@@ -385,6 +404,7 @@ impl Menu {
             chord_refusal: None,
             edits: Vec::new(),
             page_reset: None,
+            recording: super::recording_menu::RecordingScreens::new(),
         };
         menu.sync();
         menu
@@ -522,6 +542,12 @@ impl Menu {
     }
 
     fn group_visible(&self, group: usize) -> bool {
+        if group == usize::from(table::COMBOS_SEQ) && self.recording.page_role() == super::recording_menu::ViewRole::Cpu {
+            return false;
+        }
+        if group == usize::from(table::SAVES_MACROS) || group == usize::from(table::COMBOS_SEQ) {
+            return true;
+        }
         ROWS.iter().any(|row| usize::from(row.group) == group && row.visible(self.env.pilot_present))
     }
 
@@ -584,7 +610,7 @@ impl Menu {
     fn focusable(&self, entry: Entry) -> bool {
         match entry {
             Entry::Row(_) | Entry::ResetPage(_) => true,
-            Entry::Group(g) => GROUPS[g].advanced,
+            Entry::Group(g) => GROUPS[g].advanced || g == usize::from(table::SAVES_MACROS) || g == usize::from(table::COMBOS_SEQ),
         }
     }
 
@@ -955,6 +981,10 @@ impl Menu {
             Button::JumpDown if !self.takes_jumps() => Button::Down,
             other => other,
         };
+        if self.recording.popup_open() {
+            self.recording.press_popup(button);
+            return;
+        }
         match self.stack.last().copied() {
             None => self.press_page(button),
             Some(Screen::List { row, cursor }) => self.press_list(button, row, cursor),
@@ -1016,6 +1046,26 @@ impl Menu {
     }
 
     fn press_page(&mut self, button: Button) {
+        if self.page == Page::Recording {
+            let group = self.focus().map(group_of);
+            let on_library = group.is_some_and(|g| g == usize::from(table::SAVES_MACROS) || g == usize::from(table::COMBOS_SEQ));
+            let which = group.unwrap_or(usize::from(table::SAVES_MACROS)) as u8;
+            match self.recording.handle_page(button, on_library, which) {
+                super::recording_menu::PageHit::Consumed => {
+                    self.clamp_cursor();
+                    return;
+                }
+                super::recording_menu::PageHit::LeaveUp => {
+                    self.move_cursor(false);
+                    return;
+                }
+                super::recording_menu::PageHit::LeaveDown => {
+                    self.move_cursor(true);
+                    return;
+                }
+                super::recording_menu::PageHit::Passthrough => {}
+            }
+        }
         match button {
             Button::Up => self.move_cursor(false),
             Button::Down => self.move_cursor(true),
@@ -1138,6 +1188,10 @@ impl Menu {
             return;
         }
         let r = &ROWS[row];
+        if r.id == "playback_loop" {
+            self.recording.cycle_loop_row(forward);
+            return;
+        }
         match r.control {
             Control::Dropdown(labels) => {
                 let len = labels.len();

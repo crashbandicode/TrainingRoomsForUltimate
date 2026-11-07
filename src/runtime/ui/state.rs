@@ -9,6 +9,10 @@ use crate::model::frame::Frame;
 /// The menu owns Player 1's input and is showing (set by the input hook when a chord passes, cleared by
 /// the worker when the menu closes).
 pub static OPEN: AtomicBool = AtomicBool::new(false);
+/// The recording pop-up is showing. It does not set `OPEN`: B closes the pop-up and leaves a closed menu closed.
+pub static POPUP: AtomicBool = AtomicBool::new(false);
+/// The input hook saw RecordingPopup. The worker toggles the pop-up and clears this.
+pub static POPUP_REQ: AtomicBool = AtomicBool::new(false);
 /// The menu closed and the 15 real frames of discarded input and fade are running (SPEC-core-03 §2.3).
 pub static CLOSING: AtomicBool = AtomicBool::new(false);
 /// Real frames since the close, counted by the layout tick.

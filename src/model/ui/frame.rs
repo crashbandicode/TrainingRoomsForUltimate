@@ -201,6 +201,23 @@ pub struct Frame {
     pub focus: Option<u8>,
     pub help: [Text<160>; 2],
     pub hint: Text<160>,
+    /// Floppy panes, then the two loop panes. Hidden until a recording screen places one.
+    pub icons: [MarkIcon; super::panes::FLOPPIES + super::panes::LOOPS],
+    /// The recording pop-up is the window. The background shrinks so the match HUD stays visible.
+    pub popup: bool,
+}
+
+/// One floppy or loop mark. `color` is sRGB; the renderer converts it.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct MarkIcon {
+    pub on: bool,
+    pub x: f32,
+    pub y: f32,
+    pub color: [u8; 4],
+}
+
+impl MarkIcon {
+    pub const HIDDEN: MarkIcon = MarkIcon { on: false, x: 0.0, y: 0.0, color: [255, 255, 255, 255] };
 }
 
 impl Frame {
@@ -242,6 +259,8 @@ impl Frame {
         self.focus = None;
         self.help.fill(Text::new());
         self.hint.clear();
+        self.icons = [MarkIcon::HIDDEN; super::panes::FLOPPIES + super::panes::LOOPS];
+        self.popup = false;
     }
 
     pub const fn new() -> Frame {
@@ -287,6 +306,8 @@ impl Frame {
             focus: None,
             help: [Text::new(); 2],
             hint: Text::new(),
+            icons: [MarkIcon::HIDDEN; super::panes::FLOPPIES + super::panes::LOOPS],
+            popup: false,
         }
     }
 }
@@ -336,6 +357,10 @@ fn named(out: &mut Text<72>, name: &str) -> fmt::Result {
 /// How a row's value reads on the page (the mockups' right-hand column).
 pub fn write_value(menu: &Menu, row: usize, out: &mut Text<72>) {
     let r = &ROWS[row];
+    if r.id == "playback_loop" {
+        let _ = write!(out, "<  {}  >", menu.recording().loop_label(menu.recording().page_role()));
+        return;
+    }
     let cycles = matches!(r.control, Control::Dropdown(_) | Control::Number { .. } | Control::YesNoRandom);
     if cycles {
         let _ = out.write_str("<  ");
@@ -512,6 +537,172 @@ pub fn page_frame(menu: &Menu, frame: &mut Frame) {
         }
     }
     let _ = frame.hint.write_str(HINT_PAGE);
+    paint_recording(menu, frame);
+}
+
+/// Rows of one section the twelve row panes can show under a header.
+const SECTION_ROWS: usize = 4;
+
+fn paint_recording(menu: &Menu, frame: &mut Frame) {
+    use super::menu::table::{Page, COMBOS_SEQ, SAVES_MACROS};
+    use super::recording_menu::Face;
+    let rec = menu.recording();
+    let popup = rec.popup_open();
+    let on_page = menu.page() == Page::Recording && menu.screen().is_none();
+    if !popup && !on_page {
+        return;
+    }
+    let face = if popup { Face::Popup } else { Face::Page };
+    if popup {
+        frame.popup = true;
+        frame.group_count = 0;
+        frame.tabs.fill(Text::new());
+        frame.tab_count = 0;
+        for (i, name) in rec.tab_names().iter().enumerate().take(TABS) {
+            let _ = frame.tabs[i].write_str(name);
+            frame.tab_count = (i + 1) as u8;
+        }
+        frame.tab_active = rec.tab() as u8;
+        let _ = write!(frame.crumb, "Recording ({})", rec.role(face).label());
+    }
+    let _ = frame.hint.write_str(rec.hint(face));
+    let group_now = menu.focus().map(group_of);
+    let on_library = group_now.is_some_and(|g| g == usize::from(SAVES_MACROS) || g == usize::from(COMBOS_SEQ));
+    if !popup && !(on_library || rec.file_open() || rec.picker_open()) {
+        return;
+    }
+    let group = if popup {
+        if rec.tab() == 0 { SAVES_MACROS } else { COMBOS_SEQ }
+    } else {
+        group_now.unwrap_or(usize::from(SAVES_MACROS)) as u8
+    };
+    frame.rows.fill(RowLine::default());
+    frame.row_count = 0;
+    frame.focus = None;
+    if rec.picker_open() {
+        paint_picker(rec, frame);
+    } else if rec.file_open() && face == Face::Page {
+        paint_file(rec, frame);
+    } else {
+        paint_sections(rec, frame, face, group);
+    }
+    let lines = rec.connections(face, group);
+    if !lines.is_empty() {
+        frame.help[0].clear();
+        frame.help[1].clear();
+        let _ = frame.help[0].write_str("CONNECTIONS");
+        let mut joined = String::new();
+        for (i, line) in lines.iter().enumerate() {
+            if i > 0 {
+                joined.push_str(" | ");
+            }
+            if joined.len() + line.text.len() > 150 {
+                break;
+            }
+            joined.push_str(&line.text);
+        }
+        let _ = frame.help[1].write_str(&joined);
+    }
+}
+
+fn paint_file(rec: &super::recording_menu::RecordingScreens, frame: &mut Frame) {
+    let rows = rec.file_rows();
+    let cursor = rec.file_cursor();
+    let start = window_start(cursor, rows.len(), ROW_LINES);
+    for (offset, row) in rows.iter().enumerate().skip(start).take(ROW_LINES) {
+        let slot = offset - start;
+        let _ = frame.rows[slot].label.write_str(&row.title);
+        let _ = frame.rows[slot].value.write_str(&row.value);
+        frame.row_count += 1;
+        if offset == cursor {
+            frame.focus = Some(slot as u8);
+        }
+    }
+    let _ = frame.crumb.write_str(&rec.file_crumb());
+}
+
+fn paint_picker(rec: &super::recording_menu::RecordingScreens, frame: &mut Frame) {
+    let rows = rec.picker_rows();
+    let cursor = rows.iter().position(|row| row.cursor).unwrap_or(0);
+    let start = window_start(cursor, rows.len(), ROW_LINES);
+    for (offset, row) in rows.iter().enumerate().skip(start).take(ROW_LINES) {
+        let slot = offset - start;
+        let _ = if row.rank == 0 {
+            frame.rows[slot].label.write_str(&row.name)
+        } else {
+            write!(frame.rows[slot].label, "{} {}", row.rank, row.name)
+        };
+        frame.row_count += 1;
+        if row.cursor {
+            frame.focus = Some(slot as u8);
+        }
+    }
+}
+
+fn paint_sections(rec: &super::recording_menu::RecordingScreens, frame: &mut Frame, face: super::recording_menu::Face, group: u8) {
+    for section in 0..2u8 {
+        let view = rec.section(face, group, section);
+        let base = usize::from(section) * (SECTION_ROWS + 1);
+        if base >= ROW_LINES {
+            break;
+        }
+        let _ = frame.rows[base].label.write_str(view.header);
+        frame.rows[base].label_tone = Tone::Dim;
+        frame.row_count = (base + 1) as u8;
+        if let Some(floppy) = view.header_floppy {
+            place_icon(frame, usize::from(section), p_row_x(), super::panes::row_y(base), floppy);
+        }
+        if let Some(mark) = view.header_loop {
+            place_icon_color(frame, super::panes::FLOPPIES + usize::from(section), p_row_x() + 36.0, super::panes::row_y(base), [236, 238, 242, 255]);
+            let _ = write!(frame.rows[base].value, "{}", mark.label());
+        }
+        let start = window_start(view.cursor, view.rows.len(), SECTION_ROWS);
+        for (offset, row) in view.rows.iter().enumerate().skip(start).take(SECTION_ROWS) {
+            let slot = base + 1 + (offset - start);
+            if slot >= ROW_LINES {
+                break;
+            }
+            if let Some(order) = row.order {
+                let _ = write!(frame.rows[slot].label, "{order} {}", row.name);
+            } else {
+                let _ = frame.rows[slot].label.write_str(&row.name);
+            }
+            if let Some(count) = row.chain_count {
+                let _ = write!(frame.rows[slot].value, "{count}");
+            }
+            frame.rows[slot].label_tone = if row.green { Tone::On } else { Tone::Normal };
+            frame.row_count = (slot + 1) as u8;
+            if row.cursor {
+                frame.focus = Some(slot as u8);
+            }
+            if let Some(floppy) = row.floppy {
+                let icon = 2 + usize::from(section) * SECTION_ROWS + (offset - start);
+                place_icon(frame, icon, p_row_x(), super::panes::row_y(slot), floppy);
+            }
+        }
+    }
+}
+
+fn place_icon(frame: &mut Frame, index: usize, x: f32, y: f32, floppy: super::recording_menu::Floppy) {
+    place_icon_color(frame, index, x, y, floppy.color());
+}
+
+fn place_icon_color(frame: &mut Frame, index: usize, x: f32, y: f32, color: [u8; 4]) {
+    if let Some(slot) = frame.icons.get_mut(index) {
+        *slot = MarkIcon { on: true, x, y, color };
+    }
+}
+
+fn p_row_x() -> f32 {
+    super::panes::ROW_RIGHT - 40.0
+}
+
+fn window_start(cursor: usize, len: usize, shown: usize) -> usize {
+    if len <= shown {
+        0
+    } else {
+        cursor.saturating_sub(shown / 2).min(len - shown)
+    }
 }
 
 #[cfg(test)]

@@ -255,7 +255,15 @@ fn every_menu_row_with_an_id_binds_to_its_row_or_is_an_editor_key() {
     for row in &ROWS {
         let Some((_, def)) = settings::def(row.id) else { continue };
         match row.control {
-            Control::Dropdown(labels) | Control::MultiSelect(labels) => assert_eq!(labels.len(), def.len, "{}", row.title),
+            Control::Dropdown(labels) | Control::MultiSelect(labels) => {
+                // The loop row shows six counts. The factory value stays the old length-2 toggle.
+                if row.id == "playback_loop" {
+                    assert_eq!(labels.len(), 6);
+                    assert_eq!(def.len, 2);
+                } else {
+                    assert_eq!(labels.len(), def.len, "{}", row.title);
+                }
+            }
             Control::YesNoRandom => assert_eq!(def.len, 2),
             Control::DirectionGrid { .. } => assert_eq!(def.len, 11),
             _ => {}
@@ -278,31 +286,36 @@ fn layout_row_counts_match_the_rc_freeze() {
     // gained Lobby Items after Stage Hazards (Phase 2 N11, the primary's P-N11, 2026-11-05), then Ready Hats in Loading
     // (P-HOT, LANE-HOT-SLOTS-REPORT.md §5.1). Respawn on platform moved from Saves to Fighters & Stages › Stages
     // (2026-11-06): Saves is one row shorter and Fighters & Stages is one row longer.
-    assert_eq!(counts(false), [31, 12, 24, 24, 10, 3]);
-    assert_eq!(counts(true), [30, 12, 24, 24, 10, 3]);
-    assert_eq!(counts(false)[..5].iter().sum::<usize>(), 101);
-    assert_eq!(counts(true)[..5].iter().sum::<usize>(), 100);
+    // Recording redesign revision 8.2: Slot and Randomize leave Saves (12 → 10). Fourteen recording
+    // rows leave the menu (24 → 12). The two library groups have no setting rows.
+    assert_eq!(counts(false), [31, 10, 12, 24, 10, 3]);
+    assert_eq!(counts(true), [30, 10, 12, 24, 10, 3]);
+    assert_eq!(counts(false)[..5].iter().sum::<usize>(), 87);
+    assert_eq!(counts(true)[..5].iter().sum::<usize>(), 86);
     // Controls (MENU-DRAFT §2): 4 direction grids, 7 delay rows, 13 multi-selects (the 12 checklists,\n    // 3 of them slot sets, and Swap groups).
     let n = |f: &dyn Fn(&Control) -> bool| ROWS.iter().filter(|r| r.vis != model::menu::table::Vis::PilotPresent && f(&r.control)).count();
     assert_eq!(n(&|c| matches!(c, Control::DirectionGrid { .. })), 4);
     assert_eq!(n(&|c| matches!(c, Control::MultiSelectRange { .. })), 7);
-    assert_eq!(n(&|c| matches!(c, Control::MultiSelect(_) | Control::SwapGroups)), 13, "12 checklists and Swap groups");
+    // Randomize slots, Button slots and Save-state slots left the menu (revision 8.2).
+    assert_eq!(n(&|c| matches!(c, Control::MultiSelect(_) | Control::SwapGroups)), 10, "the checklists that stayed, and Swap groups");
     assert_eq!(n(&|c| matches!(c, Control::Slider)), 2);
     // Nothing is deferred any more (operator 2026-11-05): every editor has its row, and every group has rows.
     // (104: Lobby Items, Phase 2 N11; 105: Ready Hats, P-HOT.)
-    assert_eq!(ROWS.len(), 105);
+    assert_eq!(ROWS.len(), 91);
     for editor in [Editor::SetupSave, Editor::SetupLibrary, Editor::EditPlacement, Editor::ReplayWindow] {
         assert_eq!(ROWS.iter().filter(|r| matches!(r.control, Control::Editor(e) if e == editor)).count(), 1, "{editor:?}");
     }
     let replay = ROWS.iter().position(|r| matches!(r.control, Control::Editor(Editor::ReplayWindow))).expect("the Replay window row");
     let macros: Vec<&str> = ROWS.iter().filter(|r| r.group == ROWS[replay].group).map(|r| r.title).collect();
-    assert_eq!(macros, ["Source", "Ask before switching fighter", "Named library", "Save slot to library...", "Edit placement",
-        "Replay window", "Replay capture"], "the fork's order: Named Library, Save Slot to Library, Edit Placement, Replay Window");
+    assert_eq!(macros, ["Ask before switching fighter", "Edit placement", "Replay window", "Replay capture"], "Replays keeps the capture rows");
     assert_eq!(GROUPS[7].title, "Setup library");
     assert_eq!(GROUPS[7].page, Page::Saves);
     let setups: Vec<&str> = ROWS.iter().filter(|r| r.group == 7).map(|r| r.title).collect();
     assert_eq!(setups, ["Save setup to library...", "Setup library"]);
     for (g, group) in GROUPS.iter().enumerate() {
+        if g == usize::from(model::menu::table::SAVES_MACROS) || g == usize::from(model::menu::table::COMBOS_SEQ) {
+            continue;
+        }
         assert!(ROWS.iter().any(|r| usize::from(r.group) == g), "{}", group.title);
     }
     assert!(ROWS.iter().all(|r| usize::from(r.group) < GROUPS.len()));
@@ -310,8 +323,9 @@ fn layout_row_counts_match_the_rc_freeze() {
         let m = menu_with(Env { pilot_present, ..Env::default() });
         assert!((0..m.entry_count(Page::Saves)).any(|i| m.entry(Page::Saves, i) == Some(Entry::Group(7))), "the Setup library section shows");
     }
-    for title in ["Named library", "Save slot to library...", "Replay capture"] {
-        assert!(ROWS.iter().any(|r| r.title == title), "retained row {title}");
+    assert!(ROWS.iter().any(|r| r.title == "Replay capture"), "retained row Replay capture");
+    for title in ["Named library", "Save slot to library...", "Record Slot"] {
+        assert!(ROWS.iter().all(|r| r.title != title), "{title} left the menu");
     }
 }
 
@@ -1100,8 +1114,8 @@ fn delay_range_pick_is_uniform_over_the_step_values() {
 #[test]
 fn core02_slot_sets_have_no_range() {
     for id in ["randomize_slots", "playback_button_slots", "save_state_playback"] {
-        let r = row_of(id);
-        assert!(matches!(ROWS[r].control, Control::MultiSelect(_)), "{id} is a plain checklist");
+        assert!(ROWS.iter().all(|row| row.id != id), "{id} left the menu");
+        assert!(settings::def(id).is_some(), "{id} stays in the factory");
         assert!(settings::def(&format!("{id}_range")).is_none(), "{id} has no range row");
         assert!(menu().delay_spec(id).is_none(), "{id} is not a delay row");
     }
@@ -1345,7 +1359,8 @@ fn core02_open_on_last_page() {
     // Reopening, here or after a restart (through the file), lands on the same page.
     let mut m2 = Menu::new(settings.clone(), Env::default());
     assert_eq!(m2.page(), Page::Recording);
-    assert_eq!(ROWS[m2.focused_row().unwrap()].page(), Page::Recording);
+    assert_eq!(m2.page(), Page::Recording);
+    assert!(matches!(m2.focus(), Some(Entry::Group(g)) if GROUPS[g].page == Page::Recording));
     let text = m2.serialized();
     let restarted = Menu::new(settings::parse(&text).settings, Env::default());
     assert_eq!(restarted.page(), Page::Recording);
@@ -1931,7 +1946,8 @@ fn dropdown_options_are_unique_and_row_values_read_back() {
         }
     }
     assert_eq!(m.value(row_of("input_display_strip")), RowValue::Choice(Some(1)), "Frame strip");
-    assert_eq!(m.value(row_of("recording_duration")), RowValue::Choice(Some(3)), "150 frames");
+    assert!(ROWS.iter().all(|row| row.id != "recording_duration"), "Duration left the menu");
+    assert_eq!(m.value(row_of("hitstun_playback")), RowValue::Choice(Some(0)));
 }
 
 

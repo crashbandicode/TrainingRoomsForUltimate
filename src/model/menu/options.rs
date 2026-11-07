@@ -28,6 +28,8 @@ pub static MIRRORING: [&str; 3] = ["None", "Alternate", "Random"];
 pub static SAVE_DAMAGE: [&str; 3] = ["Default", "Save State", "Random Value"];
 pub static SLOTS: [&str; 5] = ["Slot 1", "Slot 2", "Slot 3", "Slot 4", "Slot 5"];
 pub static HITSTUN_PLAYBACK: [&str; 3] = ["As Hitstun Ends", "As Hitstop Ends", "As Hitstop Begins"];
+/// The loop counts X cycles, and the Options row shows. The factory row stays length 2.
+pub static LOOP_COUNTS: [&str; 6] = ["∞", "1", "2", "3", "5", "10"];
 pub static RECORD_TRIGGER: [&str; 2] = ["Button Combination", "Save State Load"];
 pub static DURATIONS: [&str; 19] = [
     "60", "90", "120", "150", "180", "210", "240", "270", "300", "330", "360", "390", "420", "450", "480", "510", "540",
