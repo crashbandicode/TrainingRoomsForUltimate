@@ -87,6 +87,21 @@ def main():
                 failures.append(f'row {row_id}: "media": {{"gif": "{media}", ...}} required')
         if row_id.startswith('adv-') and 'published' not in json.dumps(row).lower():
             failures.append(f'row {row_id}: must cite the published frame-data source it compares with')
+    # Playbook a37664e: a run continues past a failed row only when the next row has a start gate and a recover list.
+    plan_recover = plan.get('recover') if isinstance(plan.get('recover'), list) else None
+    first_on_host = {}
+    for row in rows:
+        first_on_host.setdefault(row.get('host'), row.get('id'))
+    for row in rows:
+        row_id = row.get('id')
+        if first_on_host.get(row.get('host')) == row_id:
+            continue
+        gate = row.get('start_gate') or (row.get('start') if row.get('start') in (plan.get('gates') or {}) else None)
+        if not gate:
+            failures.append(f'row {row_id}: needs a start gate ("start_gate", or "start" naming a gate) so a failure before it can recover')
+        recover = row.get('recover', plan_recover)
+        if not isinstance(recover, list) or not recover:
+            failures.append(f'row {row_id}: needs a "recover" list (or a plan-level one) that returns to its start state')
     timed = [r for r in rows if r.get('timed') and r.get('host') == 'xps']
     if timed:
         failures.append(f'timed rows must not run on the XPS: {[r["id"] for r in timed]}')
