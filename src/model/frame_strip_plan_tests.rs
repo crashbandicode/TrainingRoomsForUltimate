@@ -57,8 +57,8 @@ fn text_of(seen: &[(usize, Look, Changed)], i: usize) -> String {
 
 #[test]
 fn the_strip_stays_near_the_estimated_pane_count() {
-    // The input log it replaced had 271.
-    assert_eq!(COUNT, 121);
+    // The input log it replaced had 271. The stick row adds one pane per frame (60).
+    assert_eq!(COUNT, 181);
 }
 
 #[test]
@@ -157,4 +157,130 @@ fn input_lines() {
     assert_eq!(String::from_utf16(input_line(&l).units()).unwrap(), "on time, 2f past");
     l.verdict = crate::model::frame_strip::Verdict::True(None);
     assert_eq!(String::from_utf16(input_line(&l).units()).unwrap(), "on time");
+}
+
+fn look_at(seen: &[(usize, Look, Changed)], i: usize) -> Look {
+    seen.iter().find(|(at, ..)| *at == i).map(|(_, look, _)| *look).expect("pane written")
+}
+
+fn held(x: i8, y: i8) -> MappedInputs {
+    MappedInputs { lstick_x: x, lstick_y: y, ..NONE }
+}
+
+#[test]
+fn the_stick_row_shows_the_held_direction_every_frame() {
+    const DIRS: [(i8, i8, Option<u8>); 9] = [
+        (100, 0, Some(0)),
+        (100, 100, Some(1)),
+        (0, 100, Some(2)),
+        (-100, 100, Some(3)),
+        (-100, 0, Some(4)),
+        (-100, -100, Some(5)),
+        (0, -100, Some(6)),
+        (100, -100, Some(7)),
+        (0, 0, None),
+    ];
+    let mut t = Tracker::new();
+    for (x, y, _) in DIRS {
+        t.step(idle(), idle(), held(x, y));
+    }
+    let columns: Vec<_> = t.columns().map(|c| c.stick).collect();
+    assert_eq!(columns, DIRS.iter().map(|(_, _, dir)| *dir).collect::<Vec<_>>());
+    let mut r = Renderer::new();
+    let (_, seen) = draw_all(&mut r, &t, true);
+    let first = WINDOW - t.len();
+    for (i, dir) in columns.iter().enumerate() {
+        let look = look_at(&seen, at::STICK + first + i);
+        match dir {
+            None => assert!(!look.visible, "a neutral frame is blank"),
+            Some(dir) => {
+                assert!(look.visible);
+                assert_eq!(look.text, Text::new(">"));
+                assert_eq!(look.rot, f32::from(*dir) * 45.0, "dir {dir} is {dir} steps of 45 degrees from right");
+                assert_eq!(look.y, STICK_Y);
+            }
+        }
+    }
+}
+
+#[test]
+fn the_stick_row_scrolls_and_freezes_with_the_strip() {
+    use crate::model::frame_strip::FREEZE_AFTER;
+    let mut t = Tracker::new();
+    for frame in 1..=80u32 {
+        let (x, y) = if frame % 2 == 0 { (100, 0) } else { (0, 100) };
+        t.step(idle(), idle(), held(x, y));
+    }
+    assert!(!t.frozen(), "the freeze waits while the stick moves");
+    assert_eq!(t.len(), WINDOW);
+    let moving: Vec<_> = t.columns().map(|c| (c.frame, c.stick)).collect();
+    assert_eq!(moving.first().copied(), Some((21, Some(2))));
+    assert_eq!(moving.last().copied(), Some((80, Some(0))));
+    for (frame, stick) in &moving {
+        assert_eq!(*stick, if frame % 2 == 0 { Some(0) } else { Some(2) });
+    }
+    let mut r = Renderer::new();
+    let (_, moving_draw) = draw_all(&mut r, &t, true);
+    for (i, (_, stick)) in moving.iter().enumerate() {
+        let look = look_at(&moving_draw, at::STICK + i);
+        assert!(look.visible);
+        assert_eq!(look.rot, if *stick == Some(0) { 0.0 } else { 90.0 });
+    }
+    for _ in 0..u32::from(FREEZE_AFTER) {
+        t.step(idle(), idle(), held(100, 0));
+    }
+    assert!(t.frozen());
+    let newest = t.newest();
+    assert_eq!(newest, Some(80 + u32::from(FREEZE_AFTER) - 1));
+    let held_row: Vec<_> = t.columns().map(|c| (c.frame, c.stick)).collect();
+    let _ = draw_all(&mut r, &t, true);
+    for _ in 0..5 {
+        t.step(idle(), idle(), held(100, 0));
+    }
+    assert!(t.frozen());
+    assert_eq!(t.newest(), newest, "a held direction does not scroll the row");
+    assert_eq!(t.columns().map(|c| (c.frame, c.stick)).collect::<Vec<_>>(), held_row);
+    let (n, _) = draw_all(&mut r, &t, true);
+    assert_eq!(n, 0, "the frozen row is not rewritten");
+    t.step(idle(), idle(), held(0, 100));
+    assert!(!t.frozen());
+    assert_eq!(t.columns().last().map(|c| c.stick), Some(Some(2)));
+    let (_, moved) = draw_all(&mut r, &t, true);
+    let look = look_at(&moved, at::STICK + WINDOW - 1);
+    assert!(look.visible);
+    assert_eq!(look.rot, 90.0);
+}
+
+#[test]
+fn a_c_stick_attack_takes_the_c_stick_arrow() {
+    let attack = MappedInputs { buttons: 0x1 | 0x80, lstick_x: 0, lstick_y: 100, rstick_x: 100, rstick_y: 0 };
+    let mut t = Tracker::new();
+    t.step(idle(), idle(), attack);
+    assert_eq!(t.presses().next().map(|p| p.stick), Some(Some(0)));
+    let mut r = Renderer::new();
+    let (_, seen) = draw_all(&mut r, &t, true);
+    let shaft = look_at(&seen, at::CHIP_SHAFT);
+    assert!(shaft.visible);
+    assert_eq!(shaft.rot, -90.0, "the chip arrow is the C-stick's right, not the left stick's up");
+    let row = look_at(&seen, at::STICK + WINDOW - 1);
+    assert_eq!(row.rot, 90.0, "the row stays the left stick");
+    let neutral_c = MappedInputs { buttons: 0x1 | 0x80, lstick_x: 0, lstick_y: 100, rstick_x: 0, rstick_y: 0 };
+    assert_eq!(
+        crate::model::frame_strip::press_of(neutral_c, 0, 1).map(|p| p.stick),
+        Some(Some(2)),
+        "a C-stick that does not bin keeps the left-stick arrow"
+    );
+}
+
+#[test]
+fn a_left_stick_press_keeps_its_arrow() {
+    let attack = MappedInputs { buttons: 0x1, lstick_x: 0, lstick_y: 100, rstick_x: 100, rstick_y: 0 };
+    let mut t = Tracker::new();
+    t.step(idle(), idle(), attack);
+    assert_eq!(t.presses().next().map(|p| p.stick), Some(Some(2)));
+    let mut r = Renderer::new();
+    let (_, seen) = draw_all(&mut r, &t, true);
+    let shaft = look_at(&seen, at::CHIP_SHAFT);
+    assert!(shaft.visible);
+    assert_eq!(shaft.rot, 0.0, "up: the shaft stays vertical even while the right stick is held");
 }

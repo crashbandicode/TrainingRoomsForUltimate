@@ -135,6 +135,8 @@ struct Run {
 struct Layout<'a> {
     tracker: &'a Tracker,
     frames: [u32; WINDOW],
+    /// Left-stick bin in each slot, `None` for a neutral frame or a slot with no column.
+    sticks: [Option<u8>; WINDOW],
     first_slot: usize,
     runs: [[Option<Run>; RUNS]; 2],
 }
@@ -142,7 +144,12 @@ struct Layout<'a> {
 impl<'a> Layout<'a> {
     fn new(tracker: &'a Tracker) -> Self {
         let mut frames = [0u32; WINDOW];
+        let mut sticks = [None; WINDOW];
         let first_slot = WINDOW - tracker.len();
+        for (i, column) in tracker.columns().enumerate() {
+            frames[first_slot + i] = column.frame;
+            sticks[first_slot + i] = column.stick;
+        }
         let mut runs = [[None; RUNS]; 2];
         for (lane, out) in runs.iter_mut().enumerate() {
             // Newest runs first: walk the columns from the newest backwards.
@@ -180,7 +187,7 @@ impl<'a> Layout<'a> {
                 }
             }
         }
-        Self { tracker, frames, first_slot, runs }
+        Self { tracker, frames, sticks, first_slot, runs }
     }
 
     /// The slot a frame is drawn in; a frame after the newest counts on past the right edge (a predicted free frame).
@@ -244,8 +251,16 @@ impl<'a> Layout<'a> {
             i if (READ_VALUE..READ_SUB + 3).contains(&i) => self.readout((i - READ_VALUE) % 3, i >= READ_SUB),
             LAST_TEXT => Look::text(LABEL_X, LAST_Y, Text::new("LAST"), MUTED),
             i if (PILL..PILL + 3 * HISTORY).contains(&i) => self.last((i - PILL) / HISTORY, (i - PILL) % HISTORY),
+            i if (STICK..STICK + WINDOW).contains(&i) => self.stick_mark(i - STICK),
             _ => Look::HIDDEN,
         }
+    }
+
+    /// One `>` for this slot, rotated so rot 0 points right and each bin is 45 degrees counter-clockwise.
+    /// A neutral frame is hidden. One pane, not a shaft and a head: `>` is already in the font and is not symmetric.
+    fn stick_mark(&self, slot: usize) -> Look {
+        let Some(dir) = self.sticks[slot] else { return Look::HIDDEN };
+        Look { rot: f32::from(dir) * 45.0, ..Look::text(Self::centre(slot as f32), STICK_Y, Text::new(">"), TEXT) }
     }
 
     /// Chip part `part` (box, glyph, shaft, head, tick) of the `n`th newest press on screen.
