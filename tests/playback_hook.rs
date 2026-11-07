@@ -7,7 +7,7 @@ mod model;
 
 #[path = "support/playback_engine.rs"]
 #[allow(dead_code)]
-mod engine;
+pub mod engine;
 
 use model::hook_stats::{hook_allocations, CountingAllocator, HookId, HookScope};
 

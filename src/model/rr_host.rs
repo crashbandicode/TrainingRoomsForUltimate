@@ -9,7 +9,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use super::library::{
     Chain, LegacySlot, NamedSave, RecordingIndex, Role, StartSaveState, MACROS_DIR, SAVES_DIR,
 };
-use super::macros::{FrameSnapshot, InputFrame, Library, StartState, MAX_FRAMES};
+use super::macros::{FrameSnapshot, InputFrame, Library, MAX_FRAMES};
 use super::playback::{Book, Playback};
 use super::rr_runtime::{
     chain_mismatch, chord_notice, civil_date, crop_combo_file, crop_macro_file, drive_mash,
@@ -150,6 +150,7 @@ pub fn push_capture(side: u8, frame: InputFrame) {
     CAP_LEN.store(len + 1, Ordering::Release);
 }
 
+#[cfg(any(test, target_os = "switch"))]
 pub(crate) fn capture_role() -> u8 {
     CAP_ROLE.load(Ordering::Acquire)
 }
@@ -158,11 +159,15 @@ pub fn take_player_frame() -> Option<InputFrame> {
     take_frame(&PLAYER_READY, &PLAYER_BITS)
 }
 
+#[cfg(any(test, target_os = "switch"))]
 pub(crate) fn take_cpu_frame() -> Option<InputFrame> {
     take_frame(&CPU_READY, &CPU_BITS)
 }
 
 /// Player 1's poll. Injects one posted frame, then stores the output when Player 1 is the recorded role.
+///
+/// # Safety
+/// `out` is null or a live mapped-input record for this poll.
 pub unsafe fn on_player_poll(out: *mut MappedInputs) {
     if out.is_null() {
         return;
@@ -205,11 +210,9 @@ pub fn service_at(
     online: bool,
 ) -> Tick {
     let mut tick = Tick::default();
-    if !MIGRATED.load(Ordering::Acquire) {
-        if migrate_at_boot(root, slots, date).is_ok() {
-            MIGRATED.store(true, Ordering::Release);
-            tick.diags.push("screen=migrate once=1".to_string());
-        }
+    if !MIGRATED.load(Ordering::Acquire) && migrate_at_boot(root, slots, date).is_ok() {
+        MIGRATED.store(true, Ordering::Release);
+        tick.diags.push("screen=migrate once=1".to_string());
     }
     let edge = RECORD_EDGE.swap(0, Ordering::AcqRel);
     let play_player = PLAY_PLAYER.swap(false, Ordering::AcqRel);
@@ -312,7 +315,7 @@ fn resident_frame(root: &Path, played: &super::playback::Played) -> InputFrame {
         .as_ref()
         .is_some_and(|item| item.id == played.recording_id);
     if !same {
-        let Ok(recording) = Library::new(root.join(MACROS_DIR)).load(&played.recording_id) else {
+        let Ok(recording) = Library::new(root.join(MACROS_DIR)).load(played.recording_id) else {
             return played.frame;
         };
         let tape = Tape::load(&recording.frames);
@@ -570,6 +573,7 @@ fn reset_host() {
 
 #[cfg(test)]
 mod tests {
+    use super::super::macros::StartState;
     use super::*;
     use std::sync::Mutex as TestMutex;
 

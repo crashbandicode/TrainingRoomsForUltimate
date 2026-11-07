@@ -4,7 +4,7 @@
 use std::path::Path;
 
 use super::library::{
-    migrate, start_save_state, Error, Kind, LegacySlot, LoopCount, NamedSave, RecordingIndex, Role,
+    migrate, Error, Kind, LegacySlot, LoopCount, NamedSave, RecordingIndex, Role,
     StartSaveState, Use, MACROS_DIR, SAVES_DIR,
 };
 use super::macro_ui::macro_panel::{fighter_gate, FighterGate, FighterOrigin};
@@ -514,7 +514,7 @@ fn record(err: impl ToString) -> Error {
 
 #[cfg(test)]
 mod tests {
-    use super::super::library::{Drill, DrillKind};
+    use super::super::library::{start_save_state, Drill, DrillKind};
     use super::*;
     use crate::model::combo::{Aim, Event, LinkRec};
     use crate::model::frame_strip::{Button, Move, Verdict};

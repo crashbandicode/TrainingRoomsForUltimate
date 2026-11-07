@@ -191,9 +191,7 @@ impl Playback {
     pub fn step<'a>(&mut self, role: Role, book: &'a Book) -> Option<Played<'a>> {
         let slot = role_slot(role);
         loop {
-            let Some(run) = self.roles[slot] else {
-                return None;
-            };
+            let run = self.roles[slot]?;
             let id = run.id.as_str();
             let step_count = if run.chain {
                 match book.chains.get(id) {

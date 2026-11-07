@@ -32,6 +32,8 @@ pub(crate) fn take_cpu_frame() -> Option<InputFrame> {
     rr_host::take_cpu_frame()
 }
 
+/// # Safety
+/// `out` is null or a live mapped-input record for this poll.
 pub unsafe fn on_player_poll(out: *mut MappedInputs) {
     rr_host::on_player_poll(out);
 }
