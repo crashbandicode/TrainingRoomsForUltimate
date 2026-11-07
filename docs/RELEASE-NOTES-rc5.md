@@ -70,10 +70,11 @@ Pins are gone. The five most recently used of each kind are listed first. Y does
 
 Recording and the stick row are above. The same build also adds:
 
-- The combo helper under the frame strip, and combo files you can copy or share. Any fighter can practise one. Grading uses the recorded presses, releases, C-stick, and stick flicks. Drift is shown and is not graded. A link counts without being a true combo. Switch or Keep can change Player 1 to the combo's recorded fighter. Combos open in lobby practice. In an online waiting room a saved combo is named Combo N.
+- The combo helper under the frame strip, and combo files you can copy or share. Any fighter can practise one. Grading uses the recorded presses, releases, C-stick, and stick flicks. Drift is shown and is not graded. A link counts without being a true combo. Switch or Keep can change Player 1 to the combo's recorded fighter, and Player Swapping Off does not block that Switch. Combos open in lobby practice. In an online waiting room a saved combo is named Combo N. A saved combo's footer shows the recorded fighter. Notices sit under the frame strip.
 - Add New on a Mii class opens Smash's own Mii editor. Saving adds one Mii. Leaving without saving adds none.
 - Lobby Items, on Fighters & Stages › Stages. Off stops item spawning in the waiting room.
 - The replay window, edit placement, and the setup library. A timer match's replay capture continues through sudden death instead of stopping at the end of regular time.
 - The six intro reminders show once on a new install. Each notice has a dark plate. Respawn on platform is on the Stages page. The Player cycle numbers are the list that cycle loads, and the CPU cycle is one list.
-- Ready Fighters defaults to 10. Ready Hats are counted apart from those fighters.
+- Ready Fighters defaults to 10. Ready Hats are counted apart from those fighters. Raising the count promotes a parked CPU body. A Training count closes when that scene closes. A greyed Mii class is not in the CPU cycle.
+- A named macro can carry the exact Mii it was recorded on.
 - Waiting-room hitboxes resolve when the waiting room is the first practice of the boot.
