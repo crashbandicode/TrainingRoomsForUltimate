@@ -9,7 +9,9 @@ Copies the worked examples' patterns (eden/phase23/rows-iv/make_run.py, rows-hb-
 - every row is one project step hook (steps.py:<function>, "check": true), the rows-iv shape;
 - the screen chain is one label thread through the whole grouped session: the first row boots
   instance xps-a (boot -> training), every later group's first row re-establishes its own
-  instance at Training (the label carried from the previous group's last row).
+  instance at Training (the label carried from the previous group's last row);
+- playbook a37664e ("Test runs", rule 8): every row after a host's first carries a start gate and
+  the plan carries one recover list, so a failed row does not stop the run (card 10b).
 
 Run: /usr/bin/python3 -I eden/recording-redesign/make_rows.py   (from the repository root)
 
@@ -111,6 +113,17 @@ CSTICK_NOTE = ('the recipe actions drive the left stick only; the C-stick input 
 # Library segments and gates used by the boot route (proven routes; runner library index.json).
 LIBRARY_SEGMENTS = ('attract-cancel', 'main-stage', 'stage-css', 'enter-training')
 LIBRARY_GATES = ('installed', 'main', 'stage', 'css', 'ready', 'training-hud-unpaused')
+
+# Recovery (card 10b; playbook a37664e, "Test runs" rule 8: the run continues past a failed row
+# when the next row has a start gate and a recover list). One plan-level list fits every in-match
+# row, because they all start at the same screen (Training, menu closed): B closes the menu or the
+# pop-up that a failed row may have left open (the recipe's two B presses; with both already closed
+# the fighter's special plays, which the Load after it undoes), then Load (ZL+Up) warps both
+# fighters to the bound save and starts nothing (RR-4 A5), and nothing else plays. The start gate
+# that proves that screen is the library gate training-hud-unpaused; recover_to checks it after
+# the list. The setup rows start somewhere else (their own instance, not a match screen), so each
+# carries its own recover list: the boot hook their steps already run, on that instance.
+RECOVER = [{'play': 'menu-close'}, {'play': 'chord-load'}]
 
 
 def R(row_id, hook, host, timed, expect, source, evidence, media=None, start='training', end='training', args=None):
@@ -394,6 +407,8 @@ def main():
                  'yoga': ('yoga-a', 'yoga-b'), 'ally': ('ally-a',)}
     counts, previous_key = {}, None
     # Group 1 boots instance xps-a itself (the migration boot), so its first row starts on boot.
+    # rr-migrate is xps's first row (the session's first); every other host's first row is its
+    # setup-<instance> row, which the loop below inserts with its own gate and recover already.
     for i, spec in enumerate(ROWS):
         counts[spec['host']] = counts.get(spec['host'], 0) + 1
         keys = INSTANCES[spec['host']]
@@ -404,11 +419,17 @@ def main():
         row = {'id': spec['id'], 'start': spec['start'], 'end': spec['end'], 'steps': steps,
                'evidence': spec['evidence'], 'source': spec['source'], 'host': spec['host'],
                'expect': spec['expect'], 'timed': spec['timed']}
+        # Playbook a37664e: a run continues past a failed row only when the next row has a start
+        # gate and a recover list. Every row after rr-migrate starts at Training, so its start
+        # gate is the library gate that proves that screen; the plan-level recover list returns it.
+        if spec['id'] != 'rr-migrate':
+            row['start_gate'] = 'training-hud-unpaused'
         if spec['media']:
             row['media'] = {'gif': spec['media'][0], 'seconds': spec['media'][1]}
         # Before each group's first row (except the very first), re-establish that instance at
         # Training: the installed gate, then the boot hook (game.load if needed, the library route,
-        # the Mario/Mario pick, enter Training).
+        # the Mario/Mario pick, enter Training). That row starts on its own instance, not a match
+        # screen, so its recover list is the boot hook on that instance, not the plan's list.
         if spec['id'] not in ('rr-migrate', 'heap-and-crash-check') and i > 0 and previous_key != key:
             rows.append({'id': 'setup-' + key, 'start': 'training', 'end': 'training',
                          'steps': [{'gate': 'installed', 'on': key},
@@ -416,7 +437,8 @@ def main():
                          'evidence': ['install line cpu_common=installed', 'Training HUD settled'],
                          'source': 'rows-iv/rows-hb-ab boot route (library segments, steps.py hook)',
                          'host': spec['host'], 'expect': 'the instance is back at Training, HUD unpaused',
-                         'timed': False})
+                         'timed': False, 'start_gate': 'training-hud-unpaused',
+                         'recover': [{'run': 'steps.py:boot_training', 'check': True, 'on': key}]})
         previous_key = key
         rows.append(row)
     # The heap row gains one hook step per instance, all in its last row.
@@ -446,6 +468,7 @@ def main():
         ],
         'segments': segments,
         'gates': gates,
+        'recover': RECOVER,
         'rows': rows,
     }
     (HERE / 'rows.json').write_text(json.dumps(plan, indent=2) + '\n')
