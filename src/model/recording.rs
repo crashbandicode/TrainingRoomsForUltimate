@@ -1191,7 +1191,7 @@ mod cpu_role_parity {
         let ctx = ControlCtx { facing: 1, shulk_dial: false };
         let facts = PollFacts { cpu_status: 0 };
         let mut inputs = vec![MappedInputs { buttons: 1, ..MappedInputs::NEUTRAL }; usize::from(LOCKOUT_FRAMES)];
-        inputs.extend(std::iter::repeat(MappedInputs { buttons: FLICK_JUMP, ..MappedInputs::NEUTRAL }).take(4));
+        inputs.extend(std::iter::repeat_n(MappedInputs { buttons: FLICK_JUMP, ..MappedInputs::NEUTRAL }, 4));
         inputs.push(MappedInputs { buttons: 36_872, ..MappedInputs::NEUTRAL });
         inputs.push(MappedInputs { buttons: 33_281, ..MappedInputs::NEUTRAL });
         for input in inputs {
