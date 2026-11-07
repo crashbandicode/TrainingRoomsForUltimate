@@ -95,6 +95,9 @@ pub mod numbered_picker;
 /// The recording pop-up, the Recording page's library, and the file screens.
 #[path = "model/recording_menu.rs"]
 pub mod recording_menu;
+/// Ordered ids for chains and sequences. No engine import: a by-path test of this file has none.
+#[path = "model/ordered_ids.rs"]
+pub mod ordered_ids;
 #[path = "model/pause_helper.rs"]
 pub mod pause_helper;
 #[path = "model/settings.rs"]

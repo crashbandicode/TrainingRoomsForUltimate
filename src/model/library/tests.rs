@@ -473,6 +473,340 @@ fn old_recording_files_still_load() {
     assert!(loaded.start_save_on);
 }
 
+#[test]
+fn the_ordered_id_helper_serves_chains_and_sequences() {
+    use crate::model::menu::input::Button;
+    use crate::model::menu::table::{COMBOS_SEQ, SAVES_MACROS};
+    use crate::model::ordered_ids::{self, IdList};
+    use crate::model::recording_menu::{Effect, Face, RecordingScreens};
+
+    let ids = vec!["a".to_string(), "b".to_string(), "c".to_string()];
+    assert_eq!(
+        ordered_ids::write_back(&[0, 0, 2, 1], &ids),
+        vec!["c".to_string(), "b".to_string()]
+    );
+    assert_eq!(ordered_ids::step_line(0, "Nair"), "1 Nair");
+    let order = vec!["nair".to_string(), "dash".to_string()];
+    assert_eq!(ordered_ids::order_of(&order, "nair"), Some(1));
+    assert_eq!(ordered_ids::order_of(&order, "dash"), Some(2));
+
+    let mut chain = Chain::new("C", vec!["a".into(), "gone".into(), "b".into()]).unwrap();
+    let mut sequence = Sequence::new("S", vec!["a".into(), "gone".into(), "b".into()]).unwrap();
+    ordered_ids::retain_existing(chain.ids_mut(), |id| id != "gone");
+    ordered_ids::retain_existing(sequence.ids_mut(), |id| id != "gone");
+    assert_eq!(chain.ids(), sequence.ids());
+    assert_eq!(chain.ids(), ["a".to_string(), "b".to_string()]);
+
+    let mut screens = RecordingScreens::new();
+    screens.set_catalog(ordered_catalog());
+    let dash_before = macro_steps(&screens, "pressure");
+    assert_eq!(dash_before, ["nair", "gone", "dash"]);
+    focus(&mut screens, SAVES_MACROS, 1, "Corner");
+    let before = screens.section(Face::Page, SAVES_MACROS, 1);
+    assert_eq!(row_order(&before, "Nair"), Some(1));
+    assert_eq!(row_order(&before, "Dash"), Some(3));
+
+    open_named(&mut screens, SAVES_MACROS, 1, "Corner");
+    assert_eq!(macro_steps(&screens, "pressure"), ["nair", "dash"]);
+    let chain_rows = screens.file_rows();
+    assert!(chain_rows
+        .iter()
+        .any(|row| row.title == "Rename" && row.value.is_empty()));
+    assert!(chain_rows
+        .iter()
+        .any(|row| row.title == "Delete" && row.value.is_empty()));
+    let lines = screens.connections(Face::Page, SAVES_MACROS);
+    assert!(lines.iter().any(|line| line.text == "1 Nair"));
+    assert!(lines.iter().any(|line| line.text == "2 Dash"));
+    focus(&mut screens, SAVES_MACROS, 1, "Corner");
+    let closed = screens.section(Face::Page, SAVES_MACROS, 1);
+    assert_eq!(row_order(&closed, "Nair"), Some(1));
+    assert_eq!(row_order(&closed, "Dash"), Some(2));
+    focus(&mut screens, SAVES_MACROS, 1, "Nair");
+    let back = screens.section(Face::Page, SAVES_MACROS, 1);
+    assert_eq!(row_order(&back, "Corner"), Some(1));
+
+    let rename = chain_rows
+        .iter()
+        .position(|row| row.title == "Rename")
+        .unwrap();
+    screens.set_file_cursor(rename);
+    screens.handle_page(Button::A, true, SAVES_MACROS);
+    match screens.last_effect() {
+        Effect::Keyboard { header, .. } => assert_eq!(*header, "Name chain"),
+        other => panic!("chain rename effect {other:?}"),
+    }
+    screens.submit_name("Pressure");
+    assert_eq!(macro_name(&screens, "pressure"), "Pressure");
+    screens.handle_page(Button::B, true, SAVES_MACROS);
+    open_named(&mut screens, SAVES_MACROS, 1, "Pressure");
+    let rename = screens
+        .file_rows()
+        .iter()
+        .position(|row| row.title == "Rename")
+        .unwrap();
+    screens.set_file_cursor(rename);
+    screens.handle_page(Button::A, true, SAVES_MACROS);
+    screens.submit_name("");
+    assert_eq!(macro_name(&screens, "pressure"), "Pressure");
+    let edit = screens
+        .file_rows()
+        .iter()
+        .position(|row| row.title == "Edit chain")
+        .unwrap();
+    screens.set_file_cursor(edit);
+    screens.handle_page(Button::A, true, SAVES_MACROS);
+    assert!(screens.picker_open());
+    screens.handle_page(Button::B, true, SAVES_MACROS);
+    assert_eq!(macro_steps(&screens, "pressure"), ["nair", "dash"]);
+    screens.handle_page(Button::B, true, SAVES_MACROS);
+
+    focus(&mut screens, COMBOS_SEQ, 0, "Seq");
+    let combos = screens.section(Face::Page, COMBOS_SEQ, 1);
+    assert_eq!(row_order(&combos, "One"), Some(1));
+    focus(&mut screens, COMBOS_SEQ, 1, "One");
+    let sequences = screens.section(Face::Page, COMBOS_SEQ, 0);
+    assert_eq!(row_order(&sequences, "Seq"), Some(1));
+
+    open_named(&mut screens, COMBOS_SEQ, 0, "Seq");
+    assert_eq!(sequence_steps(&screens, "seq"), ["c1", "gone"]);
+    let sequence_rows = screens.file_rows();
+    assert!(sequence_rows.iter().any(|row| row.title == "2 gone"));
+    assert!(sequence_rows
+        .iter()
+        .any(|row| row.title == "Rename" && row.value.is_empty()));
+    assert!(sequence_rows
+        .iter()
+        .any(|row| row.title == "Delete" && row.value.is_empty()));
+    let rename = sequence_rows
+        .iter()
+        .position(|row| row.title == "Rename")
+        .unwrap();
+    screens.set_file_cursor(rename);
+    screens.handle_page(Button::A, true, COMBOS_SEQ);
+    match screens.last_effect() {
+        Effect::Keyboard { header, .. } => assert_eq!(*header, "Name sequence"),
+        other => panic!("sequence rename effect {other:?}"),
+    }
+    screens.submit_name("");
+    assert_eq!(sequence_name(&screens, "seq"), "Seq");
+    let edit = screens
+        .file_rows()
+        .iter()
+        .position(|row| row.title == "Edit combos")
+        .unwrap();
+    screens.set_file_cursor(edit);
+    screens.handle_page(Button::A, true, COMBOS_SEQ);
+    assert!(screens.picker_open());
+    assert_eq!(sequence_steps(&screens, "seq"), ["c1"]);
+    screens.handle_page(Button::B, true, COMBOS_SEQ);
+    screens.handle_page(Button::B, true, COMBOS_SEQ);
+
+    open_named(&mut screens, SAVES_MACROS, 0, "Slot");
+    let delete = screens
+        .file_rows()
+        .iter()
+        .position(|row| row.title == "Delete")
+        .unwrap();
+    screens.set_file_cursor(delete);
+    screens.handle_page(Button::A, true, SAVES_MACROS);
+    assert!(screens.catalog().saves.is_empty());
+    open_named(&mut screens, COMBOS_SEQ, 1, "One");
+    let delete = screens
+        .file_rows()
+        .iter()
+        .position(|row| row.title == "Delete")
+        .unwrap();
+    screens.set_file_cursor(delete);
+    screens.handle_page(Button::A, true, COMBOS_SEQ);
+    assert!(screens.catalog().combos.is_empty());
+    assert_eq!(sequence_steps(&screens, "seq"), ["c1"]);
+    open_named(&mut screens, COMBOS_SEQ, 0, "Seq");
+    assert_eq!(
+        sequence_steps(&screens, "seq"),
+        ["c1"],
+        "a sequence file does not close the gap"
+    );
+    let edit = screens
+        .file_rows()
+        .iter()
+        .position(|row| row.title == "Edit combos")
+        .unwrap();
+    screens.set_file_cursor(edit);
+    screens.handle_page(Button::A, true, COMBOS_SEQ);
+    assert!(sequence_steps(&screens, "seq").is_empty());
+}
+
+#[test]
+fn deleting_a_recording_closes_the_chain_gap_on_open() {
+    use crate::model::menu::input::Button;
+    use crate::model::menu::table::SAVES_MACROS;
+    use crate::model::recording_menu::RecordingScreens;
+
+    let mut screens = RecordingScreens::new();
+    screens.set_catalog(ordered_catalog());
+    open_named(&mut screens, SAVES_MACROS, 1, "Dash");
+    let delete = screens
+        .file_rows()
+        .iter()
+        .position(|row| row.title == "Delete")
+        .unwrap();
+    screens.set_file_cursor(delete);
+    screens.handle_page(Button::A, true, SAVES_MACROS);
+    assert_eq!(macro_steps(&screens, "pressure"), ["nair", "gone", "dash"]);
+    open_named(&mut screens, SAVES_MACROS, 1, "Corner");
+    assert_eq!(macro_steps(&screens, "pressure"), ["nair"]);
+}
+
+#[test]
+fn playback_keeps_a_missing_chain_id() {
+    use crate::engine::playback::{Book, Playback};
+    use crate::model::ordered_ids::IdList;
+
+    let kept = Chain::new("Corner", vec!["gone".into(), "nair".into()]).unwrap();
+    let mut index = RecordingIndex::fresh();
+    index.set_active(Role::Player, Some("pressure"), 1).unwrap();
+    let mut book = Book::new(index);
+    book.add_recording(
+        "nair",
+        MacroRecording::new("Nair", "13.0.5", start(1), frame(7)).unwrap(),
+    );
+    book.add_chain("pressure", kept.clone());
+    let mut machine = Playback::new();
+    let effect = machine.play_chord(Role::Player, &book);
+    assert!(effect.started);
+    let played = machine.step(Role::Player, &book).unwrap();
+    assert_eq!(played.recording_id, "nair");
+    assert_eq!(played.frame.buttons, 7);
+    assert_eq!(kept.ids(), ["gone".to_string(), "nair".to_string()]);
+}
+
+fn ordered_catalog() -> crate::model::recording_menu::Catalog {
+    use crate::model::recording_menu::{Catalog, ComboFile, SaveFile as MenuSave, SequenceFile};
+    Catalog {
+        saves: vec![MenuSave {
+            id: "slot".into(),
+            name: "Slot".into(),
+            fighters: String::new(),
+        }],
+        macros: vec![
+            recording_row("nair", "Nair", false, Vec::new()),
+            recording_row("dash", "Dash", false, Vec::new()),
+            recording_row(
+                "pressure",
+                "Corner",
+                true,
+                vec!["nair".into(), "gone".into(), "dash".into()],
+            ),
+        ],
+        combos: vec![ComboFile {
+            id: "c1".into(),
+            name: "One".into(),
+            made_from: None,
+            links: Vec::new(),
+        }],
+        sequences: vec![SequenceFile {
+            id: "seq".into(),
+            name: "Seq".into(),
+            combos: vec!["c1".into(), "gone".into()],
+            streak: 0,
+            best: 0,
+        }],
+        ..Catalog::default()
+    }
+}
+
+fn recording_row(
+    id: &str,
+    name: &str,
+    chain: bool,
+    steps: Vec<String>,
+) -> crate::model::recording_menu::MacroFile {
+    crate::model::recording_menu::MacroFile {
+        id: id.into(),
+        name: name.into(),
+        chain,
+        steps,
+        start_save: None,
+        start_save_on: true,
+        recorded_on: String::new(),
+    }
+}
+
+fn focus(
+    screens: &mut crate::model::recording_menu::RecordingScreens,
+    group: u8,
+    section: u8,
+    name: &str,
+) {
+    use crate::model::recording_menu::Face;
+    let view = screens.section(Face::Page, group, section);
+    let index = view.rows.iter().position(|row| row.name == name).unwrap();
+    screens.set_cursor(Face::Page, group, section, index);
+}
+
+fn open_named(
+    screens: &mut crate::model::recording_menu::RecordingScreens,
+    group: u8,
+    section: u8,
+    name: &str,
+) {
+    use crate::model::menu::input::Button;
+    focus(screens, group, section, name);
+    screens.handle_page(Button::A, true, group);
+}
+
+fn macro_steps(screens: &crate::model::recording_menu::RecordingScreens, id: &str) -> Vec<String> {
+    screens
+        .catalog()
+        .macros
+        .iter()
+        .find(|file| file.id == id)
+        .unwrap()
+        .steps
+        .clone()
+}
+
+fn macro_name(screens: &crate::model::recording_menu::RecordingScreens, id: &str) -> String {
+    screens
+        .catalog()
+        .macros
+        .iter()
+        .find(|file| file.id == id)
+        .unwrap()
+        .name
+        .clone()
+}
+
+fn sequence_steps(
+    screens: &crate::model::recording_menu::RecordingScreens,
+    id: &str,
+) -> Vec<String> {
+    screens
+        .catalog()
+        .sequences
+        .iter()
+        .find(|file| file.id == id)
+        .unwrap()
+        .combos
+        .clone()
+}
+
+fn sequence_name(screens: &crate::model::recording_menu::RecordingScreens, id: &str) -> String {
+    screens
+        .catalog()
+        .sequences
+        .iter()
+        .find(|file| file.id == id)
+        .unwrap()
+        .name
+        .clone()
+}
+
+fn row_order(view: &crate::model::recording_menu::SectionView, name: &str) -> Option<u8> {
+    view.rows.iter().find(|row| row.name == name).unwrap().order
+}
+
 fn exact_mii() -> crate::engine::mii::lifetime::Configuration {
     use crate::engine::mii::inventory::{classify, MiiClass, RawSlot, TaggedId, CHARINFO_LEN, TAG_CHARA, TAG_HAT, TAG_OUTFIT};
     let saved = classify(&RawSlot {

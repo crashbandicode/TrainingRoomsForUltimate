@@ -8,6 +8,7 @@ use super::combo::Combo;
 use super::menu::input::Button;
 use super::menu::table::{COMBOS_SEQ, SAVES_MACROS};
 use super::numbered_picker::{self, CatalogTile, NumberKey, TileKind};
+use super::ordered_ids;
 
 /// How far ZL+Up / ZL+Down moves a section. The menu's section jump uses the same distance.
 pub const PAGE: usize = 12;
@@ -417,6 +418,10 @@ impl RecordingScreens {
         self.catalog = catalog;
     }
 
+    pub fn catalog(&self) -> &Catalog {
+        &self.catalog
+    }
+
     pub fn selection(&self) -> Selection {
         Selection {
             bound: self.bound.clone(),
@@ -485,17 +490,10 @@ impl RecordingScreens {
     }
 
     fn name_of_id(&self, id: &str) -> String {
-        if let Some(file) = self.catalog.saves.iter().find(|file| file.id == id) {
-            return file.name.clone();
-        }
-        if let Some(file) = self.macro_by_id(id) {
-            return file.name.clone();
-        }
-        if let Some(file) = self.catalog.combos.iter().find(|file| file.id == id) {
-            return file.name.clone();
-        }
-        if let Some(file) = self.catalog.sequences.iter().find(|file| file.id == id) {
-            return file.name.clone();
+        for kind in [ItemKind::Save, ItemKind::Recording, ItemKind::Combo, ItemKind::Sequence] {
+            if let Some(name) = self.slot_name(kind, id) {
+                return name;
+            }
         }
         id.to_string()
     }
@@ -805,9 +803,6 @@ impl RecordingScreens {
         if kind == ItemKind::Recording && self.macro_by_id(&id).is_some_and(|file| file.chain) {
             self.close_chain_gap(&id);
         }
-        if kind == ItemKind::Sequence {
-            self.close_sequence_gap(&id);
-        }
         self.overlay_face = Face::Page;
         self.file = Some(FileScreen { id, kind, cursor: 0 });
         self.picker = None;
@@ -817,14 +812,14 @@ impl RecordingScreens {
     fn close_chain_gap(&mut self, id: &str) {
         let known: Vec<String> = self.catalog.macros.iter().filter(|file| !file.chain).map(|file| file.id.clone()).collect();
         if let Some(chain) = self.catalog.macros.iter_mut().find(|file| file.chain && file.id == id) {
-            chain.steps.retain(|step| known.iter().any(|id| id == step));
+            ordered_ids::retain_existing(&mut chain.steps, |step| known.iter().any(|id| id == step));
         }
     }
 
     fn close_sequence_gap(&mut self, id: &str) {
         let known: Vec<String> = self.catalog.combos.iter().map(|file| file.id.clone()).collect();
         if let Some(sequence) = self.catalog.sequences.iter_mut().find(|file| file.id == id) {
-            sequence.combos.retain(|step| known.iter().any(|id| id == step));
+            ordered_ids::retain_existing(&mut sequence.combos, |step| known.iter().any(|id| id == step));
         }
     }
 
@@ -970,13 +965,7 @@ impl RecordingScreens {
     }
 
     fn delete_file(&mut self, kind: ItemKind, id: &str) {
-        match kind {
-            ItemKind::Save => self.catalog.saves.retain(|file| file.id != id),
-            ItemKind::Recording => self.catalog.macros.retain(|file| file.id != id),
-            ItemKind::Combo => self.catalog.combos.retain(|file| file.id != id),
-            ItemKind::Sequence => self.catalog.sequences.retain(|file| file.id != id),
-            ItemKind::NewChain | ItemKind::NewSequence => {}
-        }
+        self.slot_remove(kind, id);
         if self.bound.as_deref() == Some(id) {
             self.bound = None;
         }
@@ -1006,32 +995,14 @@ impl RecordingScreens {
     }
 
     fn rename_id(&mut self, kind: KeyKind, id: &str, name: &str) {
-        match kind {
-            KeyKind::RenameSave => {
-                if let Some(file) = self.catalog.saves.iter_mut().find(|file| file.id == id) {
-                    file.name = name.to_string();
-                }
-            }
-            KeyKind::RenameMacro | KeyKind::RenameChain => {
-                if let Some(file) = self.catalog.macros.iter_mut().find(|file| file.id == id) {
-                    file.name = name.to_string();
-                }
-            }
-            KeyKind::RenameCombo => {
-                if let Some(file) = self.catalog.combos.iter_mut().find(|file| file.id == id) {
-                    file.name = name.to_string();
-                }
-            }
-            KeyKind::RenameSequence => {
-                if let Some(file) = self.catalog.sequences.iter_mut().find(|file| file.id == id) {
-                    file.name = name.to_string();
-                }
-            }
-            KeyKind::NewChain | KeyKind::NewSequence => {}
-        }
+        let Some(kind) = item_kind_of(kind) else { return };
+        self.slot_set_name(kind, id, name);
     }
 
     fn open_picker(&mut self, kind: PickerKind, face: Face, editing: Option<String>) {
+        if let Some(id) = editing.as_deref().filter(|_| matches!(kind, PickerKind::EditSequence)) {
+            self.close_sequence_gap(id);
+        }
         let ids = match kind {
             PickerKind::NewChain | PickerKind::EditChain => self.recording_ids(),
             PickerKind::NewSequence | PickerKind::EditSequence => self.catalog.combos.iter().map(|file| file.id.clone()).collect(),
@@ -1096,7 +1067,7 @@ impl RecordingScreens {
 
     fn finish_picker(&mut self) {
         let Some(picker) = self.picker.take() else { return };
-        let ordered = ordered_ids(&picker.values, &picker.ids);
+        let ordered = ordered_ids::write_back(&picker.values, &picker.ids);
         match picker.kind {
             PickerKind::EditChain => {
                 if let Some(id) = picker.editing {
@@ -1286,39 +1257,77 @@ impl RecordingScreens {
     }
 
     fn order_badge(&self, focus: &Item, item: &Item) -> Option<u8> {
-        if focus.kind == ItemKind::Recording {
+        if focus.kind == ItemKind::Recording && item.kind == ItemKind::Recording {
             if let Some(chain) = self.macro_by_id(&focus.id).filter(|file| file.chain) {
-                if item.kind == ItemKind::Recording {
-                    return chain.steps.iter().position(|step| step == &item.id).map(|index| (index + 1) as u8);
-                }
+                return ordered_ids::order_of(&chain.steps, &item.id);
             }
-        }
-        if item.kind == ItemKind::Recording {
             if let Some(chain) = self.macro_by_id(&item.id).filter(|file| file.chain) {
-                if focus.kind == ItemKind::Recording {
-                    return chain.steps.iter().position(|step| step == &focus.id).map(|index| (index + 1) as u8);
-                }
+                return ordered_ids::order_of(&chain.steps, &focus.id);
             }
+            return None;
         }
         if focus.kind == ItemKind::Sequence && item.kind == ItemKind::Combo {
             let sequence = self.catalog.sequences.iter().find(|file| file.id == focus.id)?;
-            return sequence.combos.iter().position(|step| step == &item.id).map(|index| (index + 1) as u8);
+            return ordered_ids::order_of(&sequence.combos, &item.id);
         }
         if focus.kind == ItemKind::Combo && item.kind == ItemKind::Sequence {
             let sequence = self.catalog.sequences.iter().find(|file| file.id == item.id)?;
-            return sequence.combos.iter().position(|step| step == &focus.id).map(|index| (index + 1) as u8);
+            return ordered_ids::order_of(&sequence.combos, &focus.id);
         }
         None
     }
 
     fn item_name(&self, item: &Item) -> String {
         match item.kind {
-            ItemKind::Save => self.catalog.saves.iter().find(|file| file.id == item.id).map(|file| file.name.clone()).unwrap_or_default(),
-            ItemKind::Recording => self.macro_by_id(&item.id).map(|file| file.name.clone()).unwrap_or_default(),
-            ItemKind::Combo => self.catalog.combos.iter().find(|file| file.id == item.id).map(|file| file.name.clone()).unwrap_or_default(),
-            ItemKind::Sequence => self.catalog.sequences.iter().find(|file| file.id == item.id).map(|file| file.name.clone()).unwrap_or_default(),
             ItemKind::NewChain => "+ New chain".to_string(),
             ItemKind::NewSequence => "+ New sequence".to_string(),
+            kind => self.slot_name(kind, &item.id).unwrap_or_default(),
+        }
+    }
+
+    fn slot_name(&self, kind: ItemKind, id: &str) -> Option<String> {
+        match kind {
+            ItemKind::Save => self.catalog.saves.iter().find(|file| file.id == id).map(|file| file.name.clone()),
+            ItemKind::Recording => self.macro_by_id(id).map(|file| file.name.clone()),
+            ItemKind::Combo => self.catalog.combos.iter().find(|file| file.id == id).map(|file| file.name.clone()),
+            ItemKind::Sequence => self.catalog.sequences.iter().find(|file| file.id == id).map(|file| file.name.clone()),
+            ItemKind::NewChain | ItemKind::NewSequence => None,
+        }
+    }
+
+    fn slot_set_name(&mut self, kind: ItemKind, id: &str, name: &str) {
+        match kind {
+            ItemKind::Save => {
+                if let Some(file) = self.catalog.saves.iter_mut().find(|file| file.id == id) {
+                    file.name = name.to_string();
+                }
+            }
+            ItemKind::Recording => {
+                if let Some(file) = self.catalog.macros.iter_mut().find(|file| file.id == id) {
+                    file.name = name.to_string();
+                }
+            }
+            ItemKind::Combo => {
+                if let Some(file) = self.catalog.combos.iter_mut().find(|file| file.id == id) {
+                    file.name = name.to_string();
+                }
+            }
+            ItemKind::Sequence => {
+                if let Some(file) = self.catalog.sequences.iter_mut().find(|file| file.id == id) {
+                    file.name = name.to_string();
+                }
+            }
+            ItemKind::NewChain | ItemKind::NewSequence => {}
+        }
+    }
+
+    fn slot_remove(&mut self, kind: ItemKind, id: &str) {
+        match kind {
+            ItemKind::Save => self.catalog.saves.retain(|file| file.id != id),
+            ItemKind::Recording => self.catalog.macros.retain(|file| file.id != id),
+            ItemKind::Combo => self.catalog.combos.retain(|file| file.id != id),
+            ItemKind::Sequence => self.catalog.sequences.retain(|file| file.id != id),
+            ItemKind::NewChain | ItemKind::NewSequence => {}
         }
     }
 
@@ -1368,7 +1377,7 @@ impl RecordingScreens {
             lines.push(ConnLine { text: format!("Plays {} steps", file.steps.len()), floppy: None });
             for (index, step) in file.steps.iter().enumerate() {
                 let name = self.macro_by_id(step).map(|file| file.name.clone()).unwrap_or_else(|| step.clone());
-                lines.push(ConnLine { text: format!("{} {name}", index + 1), floppy: None });
+                lines.push(ConnLine { text: ordered_ids::step_line(index, &name), floppy: None });
             }
             if self.active[role.index()].as_deref() == Some(id) {
                 lines.push(ConnLine { text: format!("Loop {}", self.loop_of(role).label()), floppy: None });
@@ -1415,7 +1424,7 @@ impl RecordingScreens {
         let mut lines = Vec::new();
         for (index, step) in sequence.combos.iter().enumerate() {
             let name = self.catalog.combos.iter().find(|file| file.id == step.as_str()).map(|file| file.name.clone()).unwrap_or_else(|| step.clone());
-            lines.push(ConnLine { text: format!("{} {name}", index + 1), floppy: None });
+            lines.push(ConnLine { text: ordered_ids::step_line(index, &name), floppy: None });
         }
         lines.push(ConnLine { text: format!("streak {} · best {}", sequence.streak, sequence.best), floppy: None });
         lines
@@ -1439,8 +1448,8 @@ impl RecordingScreens {
         vec![
             BuiltRow { title: "Bind to Save / Load".to_string(), value: if on { "On" } else { "Off" }.to_string(), act: Act::Bind, drill: None },
             BuiltRow { title: "Duplicate".to_string(), value: String::new(), act: Act::Duplicate, drill: None },
-            BuiltRow { title: "Rename".to_string(), value: String::new(), act: Act::Rename, drill: None },
-            BuiltRow { title: "Delete".to_string(), value: String::new(), act: Act::Delete, drill: None },
+            row_rename(),
+            row_delete(),
         ]
     }
 
@@ -1458,10 +1467,10 @@ impl RecordingScreens {
             }
         }
         rows.push(self.active_row(id));
-        rows.push(BuiltRow { title: "Rename".to_string(), value: String::new(), act: Act::Rename, drill: None });
+        rows.push(row_rename());
         rows.push(BuiltRow { title: "Crop".to_string(), value: String::new(), act: Act::Crop, drill: None });
         rows.push(BuiltRow { title: "Make combo".to_string(), value: String::new(), act: Act::MakeCombo, drill: None });
-        rows.push(BuiltRow { title: "Delete".to_string(), value: String::new(), act: Act::Delete, drill: None });
+        rows.push(row_delete());
         rows
     }
 
@@ -1479,9 +1488,9 @@ impl RecordingScreens {
         }
         rows.push(self.active_row(id));
         rows.push(BuiltRow { title: "Edit chain".to_string(), value: String::new(), act: Act::EditChain, drill: None });
-        rows.push(BuiltRow { title: "Rename".to_string(), value: String::new(), act: Act::Rename, drill: None });
+        rows.push(row_rename());
         rows.push(BuiltRow { title: "Make combo".to_string(), value: String::new(), act: Act::MakeCombo, drill: None });
-        rows.push(BuiltRow { title: "Delete".to_string(), value: String::new(), act: Act::Delete, drill: None });
+        rows.push(row_delete());
         rows
     }
 
@@ -1492,9 +1501,9 @@ impl RecordingScreens {
                 rows.push(BuiltRow { title: "Made from".to_string(), value: format!("from {source}"), act: Act::Info, drill: None });
             }
         }
-        rows.push(BuiltRow { title: "Rename".to_string(), value: String::new(), act: Act::Rename, drill: None });
+        rows.push(row_rename());
         rows.push(BuiltRow { title: "Crop".to_string(), value: String::new(), act: Act::Crop, drill: None });
-        rows.push(BuiltRow { title: "Delete".to_string(), value: String::new(), act: Act::Delete, drill: None });
+        rows.push(row_delete());
         rows
     }
 
@@ -1504,7 +1513,7 @@ impl RecordingScreens {
             for (index, step) in sequence.combos.iter().enumerate() {
                 let name = self.catalog.combos.iter().find(|file| file.id == step.as_str()).map(|file| file.name.clone()).unwrap_or_else(|| step.clone());
                 rows.push(BuiltRow {
-                    title: format!("{} {name}", index + 1),
+                    title: ordered_ids::step_line(index, &name),
                     value: "A drills this combo".to_string(),
                     act: Act::DrillCombo,
                     drill: Some(step.clone()),
@@ -1512,8 +1521,8 @@ impl RecordingScreens {
             }
         }
         rows.push(BuiltRow { title: "Edit combos".to_string(), value: String::new(), act: Act::EditCombos, drill: None });
-        rows.push(BuiltRow { title: "Rename".to_string(), value: String::new(), act: Act::Rename, drill: None });
-        rows.push(BuiltRow { title: "Delete".to_string(), value: String::new(), act: Act::Delete, drill: None });
+        rows.push(row_rename());
+        rows.push(row_delete());
         rows
     }
 
@@ -1569,16 +1578,22 @@ fn fill_ranks(ids: &[String], order: &[String]) -> Vec<u8> {
     values
 }
 
-fn ordered_ids(values: &[u8], ids: &[String]) -> Vec<String> {
-    let mut pairs: Vec<(u8, String)> = values
-        .iter()
-        .skip(1)
-        .zip(ids)
-        .filter(|(rank, _)| **rank != 0)
-        .map(|(rank, id)| (*rank, id.clone()))
-        .collect();
-    pairs.sort_by_key(|(rank, _)| *rank);
-    pairs.into_iter().map(|(_, id)| id).collect()
+fn row_rename() -> BuiltRow {
+    BuiltRow { title: "Rename".to_string(), value: String::new(), act: Act::Rename, drill: None }
+}
+
+fn row_delete() -> BuiltRow {
+    BuiltRow { title: "Delete".to_string(), value: String::new(), act: Act::Delete, drill: None }
+}
+
+fn item_kind_of(kind: KeyKind) -> Option<ItemKind> {
+    match kind {
+        KeyKind::RenameSave => Some(ItemKind::Save),
+        KeyKind::RenameMacro | KeyKind::RenameChain => Some(ItemKind::Recording),
+        KeyKind::RenameCombo => Some(ItemKind::Combo),
+        KeyKind::RenameSequence => Some(ItemKind::Sequence),
+        KeyKind::NewChain | KeyKind::NewSequence => None,
+    }
 }
 
 fn unused_n(prefix: &str, names: &[String]) -> u32 {

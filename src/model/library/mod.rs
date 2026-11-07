@@ -7,6 +7,7 @@
 mod chain;
 mod hot;
 mod migrate;
+mod ordered;
 mod save;
 mod sequence;
 

@@ -3,7 +3,8 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use super::{check_ids, check_label, Error};
+use super::Error;
+use crate::model::ordered_ids::IdList;
 use crate::model::store::Record;
 
 const SCHEMA: u32 = 1;
@@ -54,11 +55,16 @@ impl Chain {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ChainEntry {
-    pub id: String,
-    pub name: String,
-    pub steps: usize,
+pub type ChainEntry = super::ordered::OrderedEntry;
+
+impl IdList for Chain {
+    fn ids(&self) -> &[String] {
+        &self.recordings
+    }
+
+    fn ids_mut(&mut self) -> &mut Vec<String> {
+        &mut self.recordings
+    }
 }
 
 impl Record for Chain {
@@ -68,11 +74,11 @@ impl Record for Chain {
     const MAX_FILE_BYTES: u64 = MAX_FILE_BYTES;
 
     fn validate(&self) -> Result<(), Error> {
-        if self.schema_version != SCHEMA || self.kind != "chain" {
-            return Err(Error::Invalid("bad schema"));
-        }
-        check_label(&self.name)?;
-        check_ids(&self.recordings)
+        super::ordered::validate_ordered(
+            self.schema_version == SCHEMA && self.kind == "chain",
+            &self.name,
+            &self.recordings,
+        )
     }
 
     fn owns(bytes: &[u8]) -> bool {
@@ -84,6 +90,6 @@ impl Record for Chain {
     }
 
     fn summary(&self, id: &str) -> ChainEntry {
-        ChainEntry { id: id.to_owned(), name: self.name.clone(), steps: self.recordings.len() }
+        super::ordered::summary(id, &self.name, self.recordings.len())
     }
 }

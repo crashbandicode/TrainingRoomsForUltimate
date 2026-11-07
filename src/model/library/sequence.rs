@@ -2,8 +2,9 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::{check_ids, check_label, Error};
+use super::Error;
 use crate::model::combo_record::ComboLibrary;
+use crate::model::ordered_ids::IdList;
 use crate::model::store::Record;
 
 const SCHEMA: u32 = 1;
@@ -39,11 +40,16 @@ impl Sequence {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct SequenceEntry {
-    pub id: String,
-    pub name: String,
-    pub steps: usize,
+pub type SequenceEntry = super::ordered::OrderedEntry;
+
+impl IdList for Sequence {
+    fn ids(&self) -> &[String] {
+        &self.combos
+    }
+
+    fn ids_mut(&mut self) -> &mut Vec<String> {
+        &mut self.combos
+    }
 }
 
 impl Record for Sequence {
@@ -53,11 +59,7 @@ impl Record for Sequence {
     const MAX_FILE_BYTES: u64 = MAX_FILE_BYTES;
 
     fn validate(&self) -> Result<(), Error> {
-        if self.schema_version != SCHEMA {
-            return Err(Error::Invalid("bad schema"));
-        }
-        check_label(&self.name)?;
-        check_ids(&self.combos)
+        super::ordered::validate_ordered(self.schema_version == SCHEMA, &self.name, &self.combos)
     }
 
     fn name(&self) -> &str {
@@ -65,6 +67,6 @@ impl Record for Sequence {
     }
 
     fn summary(&self, id: &str) -> SequenceEntry {
-        SequenceEntry { id: id.to_owned(), name: self.name.clone(), steps: self.combos.len() }
+        super::ordered::summary(id, &self.name, self.combos.len())
     }
 }
