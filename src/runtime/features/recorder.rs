@@ -36,7 +36,7 @@ use crate::model::cpu::role::FighterKey;
 use crate::model::cpu::status;
 use crate::model::input_delay::{MappedInputs, Owners};
 use crate::model::recording::{
-    ControlCtx, ControlOut, Ended, LoadAction, MashCtx, Mode, Phase, PollFacts, PostCtx, RecordRefusal, Recorder,
+    ControlCtx, ControlOut, Ended, Inject, LoadAction, MashCtx, Mode, Phase, PollFacts, PostCtx, RecordRefusal, Recorder,
     RecorderSettings, StartSnapshot,
 };
 use crate::model::settings::Snapshot;
@@ -416,6 +416,10 @@ pub unsafe fn on_p1_poll(out: *mut MappedInputs) {
         SWALLOW.fetch_sub(1, Ordering::Relaxed);
         *out = MappedInputs::NEUTRAL;
     }
+    // CPU-role menu record owns this poll: lockout, standby, then the player's frame.
+    if recording_host::cpu_role_poll(out) {
+        return;
+    }
     let (mode, named) = {
         let rec = rec();
         (rec.mode(), rec.is_named())
@@ -531,7 +535,12 @@ unsafe fn on_ai_frame(ai: usize) {
         at(CTRL_CLAMPED_X).write(write.clamped_x.to_bits());
         at(CTRL_CLAMPED_Y).write(write.clamped_y.to_bits());
     }
-    if control.hold_cliff_timer {
+    let role = recording_host::cpu_role_control(&ctx);
+    if let Some(write) = role.write {
+        bump(COUNT_INJECT);
+        write_controller(controller, write);
+    }
+    if control.hold_cliff_timer || role.hold_cliff_timer {
         let rest = INT_CLIFF_REST.load(Ordering::Acquire);
         if rest != UNRESOLVED
             && game::natives::status_kind(body.accessor) == STATUS_CLIFF_WAIT.load(Ordering::Acquire)
@@ -567,7 +576,9 @@ unsafe fn on_ai_frame(ai: usize) {
     chord_step(&settings, body, facing);
 
     // The phase: tint every frame it lasts, the notice once per change.
-    let (phase, length) = {
+    let (phase, length) = if let Some(phase) = recording_host::cpu_role_phase() {
+        (phase, 0)
+    } else {
         let rec = rec();
         (rec.phase(), rec.length())
     };
@@ -586,38 +597,20 @@ unsafe fn on_ai_frame(ai: usize) {
     report_counts();
 }
 
-unsafe fn host_cpu(controller: usize) {
-    if recording_host::capture_role() == 2 {
-        let buttons = ((controller + CTRL_BUTTONS) as *const u32).read();
-        let stick_x = f32::from_bits(((controller + CTRL_STICK_X) as *const u32).read());
-        let stick_y = f32::from_bits(((controller + CTRL_STICK_Y) as *const u32).read());
-        let to_i8 = |value: f32| (value * crate::model::recording::STICK_FULL).round().clamp(i8::MIN as f32, i8::MAX as f32) as i8;
-        recording_host::push_capture(
-            2,
-            crate::engine::macros::InputFrame {
-                buttons,
-                lstick_x: to_i8(stick_x),
-                lstick_y: to_i8(stick_y),
-                rstick_x: 0,
-                rstick_y: 0,
-            },
-        );
-    }
-    let Some(frame) = recording_host::take_cpu_frame() else { return };
-    let mapped = MappedInputs {
-        buttons: frame.buttons,
-        lstick_x: frame.lstick_x,
-        lstick_y: frame.lstick_y,
-        rstick_x: frame.rstick_x,
-        rstick_y: frame.rstick_y,
-    };
-    let write = crate::model::recording::inject_values(mapped, 1);
+unsafe fn write_controller(controller: usize, write: Inject) {
     let at = |offset: usize| (controller + offset) as *mut u32;
     at(CTRL_BUTTONS).write(write.buttons);
     at(CTRL_STICK_X).write(write.stick_x.to_bits());
     at(CTRL_STICK_Y).write(write.stick_y.to_bits());
     at(CTRL_CLAMPED_X).write(write.clamped_x.to_bits());
     at(CTRL_CLAMPED_Y).write(write.clamped_y.to_bits());
+}
+
+unsafe fn host_cpu(controller: usize) {
+    // CPU-role record stores the player poll (`cpu_role_poll`), not this controller. The word
+    // here after the AI epilogue is the idle baseline (0x8000) until the player's frame is injected.
+    let Some(frame) = recording_host::take_cpu_frame() else { return };
+    write_controller(controller, recording_host::playback_controller(frame));
 }
 
 unsafe fn mash_start(settings: &RecorderSettings, key: FighterKey, body: Body, facing: i8) {
@@ -657,7 +650,7 @@ unsafe fn mash_start(settings: &RecorderSettings, key: FighterKey, body: Body, f
 }
 
 /// Record, Play on Player 1, and Play on CPU. The hook only posts the flags.
-unsafe fn chord_step(settings: &RecorderSettings, _body: Body, _facing: i8) {
+unsafe fn chord_step(settings: &RecorderSettings, _body: Body, facing: i8) {
     let play_player = chords::consume(Request::PlayPlayer);
     let playback = chords::consume(Request::InputPlayback);
     let record = chords::consume(Request::InputRecord);
@@ -669,6 +662,7 @@ unsafe fn chord_step(settings: &RecorderSettings, _body: Body, _facing: i8) {
     }
     let record = record && settings.trigger_chord;
     recording_host::on_chords(record, play_player, playback);
+    recording_host::cpu_role_after_chord(facing);
 }
 
 unsafe fn begin_playback(slot: u8, facing: i8, ledge: bool) {
