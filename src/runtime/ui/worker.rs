@@ -3,7 +3,7 @@
 //! publishes each new frame for the layout tick to draw. The model allocates on input events, so that
 //! work lives here and never in a hook (R5: hooks allocate nothing).
 
-use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::OnceLock;
 use std::thread::Thread;
 
@@ -143,6 +143,9 @@ struct Session {
     /// Where the menu was when its model was last dropped (every close resets the input generation, which drops the
     /// model): the next opening comes back here. Kept for the rest of the boot, across scenes and Training resets.
     keeper: crate::model::menu::PlaceKeeper,
+    /// The open menu already has this catalog generation. A close drops the menu,
+    /// so the watch reloads on the next open even when no file was written.
+    catalog_watch: crate::model::recording_menu::CatalogWatch,
     setups: super::setups::Ui,
     setup_note: Option<String>,
     combos: combos::Ui,
@@ -175,7 +178,6 @@ impl Session {
 
 /// How often the worker looks at a panel the layer may change on its own (a keyboard that returned, a clip's preview).
 const POLL: std::time::Duration = std::time::Duration::from_millis(33);
-static SEEN_CATALOG: AtomicU64 = AtomicU64::new(u64::MAX);
 #[cfg(feature = "diag")]
 static LAST_DIAG: Mutex<String> = Mutex::new(String::new());
 
@@ -221,6 +223,7 @@ fn sync_input_generation(s: &mut Session) {
     if generation != s.input_generation {
         s.input_generation = generation;
         s.keeper.drop_model(&mut s.menu);
+        s.catalog_watch = s.catalog_watch.on_menu_dropped();
         s.stage_context = None;
         s.stage_close = None;
         // Practice cleanup can suspend a same-lobby draft. The provider and
@@ -481,11 +484,16 @@ fn apply_grade_target(drill: Option<&str>, kind: Option<crate::engine::library::
 
 /// Reload the pop-up after the recording worker writes a file, and return a typed name.
 fn refresh_recording(s: &mut Session) -> bool {
+    if s.menu.is_none() {
+        return false;
+    }
+    let gen = crate::engine::rr_host::catalog_generation();
+    let (watch, due) = s.catalog_watch.take_load(gen);
+    s.catalog_watch = watch;
     let Some(menu) = s.menu.as_mut() else { return false };
     menu.recording_mut().set_keyboard_blocked(crate::runtime::features::recording_host::keyboard_is_closed());
     let mut changed = false;
-    let gen = crate::engine::rr_host::catalog_generation();
-    if SEEN_CATALOG.swap(gen, Ordering::AcqRel) != gen {
+    if due {
         if let Ok(loaded) = crate::engine::rr_runtime::load_catalog(std::path::Path::new(crate::model::storage::ROOT)) {
             menu.recording_mut().set_catalog(loaded.catalog);
             menu.recording_mut().adopt_once(loaded.bound, loaded.active, loaded.loops, loaded.drill);

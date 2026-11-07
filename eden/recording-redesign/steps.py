@@ -58,14 +58,393 @@ def close_menu(ctx):
     settle(ctx)
 
 
-def gate_source(ctx):
-    """The file that keeps the lines a row waits for.
+def _save_files(ctx):
+    folder = Path(ctx.instance['diag_log']).parent / 'saves'
+    if not folder.is_dir():
+        return {}
+    return {path.name: path.read_bytes() for path in folder.glob('*.json')}
 
-    practice-diagnostics.log rotates, so a stall line can push a screen= line out of the
-    window the gate reads. The diag build copies those lines into practice-gates.log and
-    does not rotate that file.
+
+def _restore_saves(ctx, backup):
+    """Put back a save file this row deleted. The macro keeps the start_save name."""
+    folder = Path(ctx.instance['diag_log']).parent / 'saves'
+    folder.mkdir(parents=True, exist_ok=True)
+    restored = []
+    for name, data in backup.items():
+        target = folder / name
+        if not target.exists():
+            target.write_bytes(data)
+            restored.append(name)
+    return restored
+
+
+def _shield_index(ctx):
+    """First set byte of menu.shield_state. None is 0, Hold is 2. Written on menu close."""
+    row = _menu_values(ctx).get('shield_state') or []
+    for index, value in enumerate(row):
+        if value:
+            return index
+    return 0
+
+
+def _menu_values(ctx):
+    path = Path(ctx.instance['diag_log']).parent / 'settings.json'
+    if not path.is_file():
+        return {}
+    try:
+        menu = json.loads(path.read_text()).get('menu') or {}
+    except json.JSONDecodeError:
+        return {}
+    return menu if isinstance(menu, dict) else {}
+
+
+def _focus_row(ctx, title):
+    """Up until the diag line names `title`. Up wraps, so one lap reaches any focusable row."""
+    path = Path(gate_source(ctx))
+    offset = path.stat().st_size if path.is_file() else 0
+    seen = []
+    for _ in range(24):
+        press(ctx, 'up', 0.28)
+        offset, match = _await_ui(ctx, offset, cap=1.2)
+        if match is None:
+            return False
+        if match.group('row') == title:
+            return True
+        cursor = int(match.group('cursor'))
+        if cursor in seen:
+            return False
+        seen.append(cursor)
+    return False
+
+
+def _display_wrong(ctx):
+    menu = _menu_values(ctx)
+    want = []
+    if menu.get('hud') == [0, 1]:
+        want.append('HUD')
+    if menu.get('hitbox_vis') == [1, 0]:
+        want.append('Hitbox Visualization')
+    return want
+
+
+def _apply_display(ctx, want):
+    """One A per row, then B. settings.json is written when the menu closes, so a second A
+    before that close flips the row back."""
+    open_menu(ctx)
+    goto_page(ctx, 'display_controls')
+    for title in want:
+        if not _focus_row(ctx, title):
+            press(ctx, 'b', 0.4)
+            raise RuntimeError('recover could not focus %s' % title)
+        press(ctx, 'a', 0.45)
+    press(ctx, 'b', 0.45)
+
+
+def _restore_display(ctx):
+    """Put the native HUD back and clear hitboxes when a row toggled them.
+
+    HUD off hides the native zero the start gate matches. Hitboxes on can cover that digit.
+    A is the toggle. Left and Right do not change it. A release build emits no row line, so
+    this leaves the page instead of pressing A on an unknown row.
     """
-    return str(Path(ctx.instance['diag_log']).with_name('practice-gates.log'))
+    want = _display_wrong(ctx)
+    if not want:
+        return
+    _apply_display(ctx, want)
+    deadline = time.time() + 2.0
+    while time.time() < deadline and _display_wrong(ctx):
+        time.sleep(0.1)
+    want = _display_wrong(ctx)
+    if not want:
+        return
+    _apply_display(ctx, want)
+    deadline = time.time() + 2.0
+    while time.time() < deadline and _display_wrong(ctx):
+        time.sleep(0.1)
+    want = _display_wrong(ctx)
+    if want:
+        raise RuntimeError('recover left %s' % ', '.join(want))
+
+
+def recover_training(ctx):
+    """Leave a menu, pop-up, crop screen, or prompt, then show the unpaused Training HUD.
+
+    B cancels a mismatch prompt and backs out of a crop screen, a file, a picker, and the
+    page. Eight presses cover a stack of those. The training reset then clears a hit flash
+    so the native zero is undimmed. The runner checks that gate on this same instance.
+    """
+    for _ in range(8):
+        press(ctx, 'b', 0.28)
+    _restore_display(ctx)
+    ctx.play(RESET_CENTER)
+    time.sleep(0.6)
+
+
+def gate_source(ctx):
+    """The file a scripted wait reads.
+
+    The diag window declares `gates` (practice-gates.log, which the diag build does not
+    rotate). The release window does not write that file, so a wait there reads
+    practice-diagnostics.log.
+    """
+    gates = ctx.instance.get('gates')
+    if gates:
+        return str(gates)
+    return str(ctx.instance['diag_log'])
+
+
+# Developer stays out of the ring unless developer.ini turns it on. Six R presses are one
+# past a full trip of this ring, so they do not stop on Recording.
+PAGES = ('cpu', 'saves', 'recording', 'fighters_stages', 'display_controls')
+_UI_PRESS = re.compile(
+    r'\[Ui\] press (?P<button>\w+) page=(?P<page>\S+) cursor=(?P<cursor>\d+)'
+    r' depth=(?P<depth>\d+) .*? row=(?:Some\("(?P<row>[^"]*)"\)|None)'
+    r' recording=(?P<recording>[^\n]*)'
+)
+
+
+def _menu_page(ctx):
+    path = Path(ctx.instance['diag_log']).parent / 'settings.json'
+    page = 'cpu'
+    if path.is_file():
+        try:
+            page = json.loads(path.read_text()).get('last_page') or 'cpu'
+        except json.JSONDecodeError:
+            page = 'cpu'
+    return page if page in PAGES else 'cpu'
+
+
+def _ui_since(ctx, offset):
+    path = Path(gate_source(ctx))
+    if not path.is_file():
+        return offset, []
+    data = path.read_bytes()
+    if len(data) < offset:
+        offset = 0
+    # A short read can end in the middle of a line. Advance only through the last complete match
+    # so the next poll still sees that line.
+    chunk = data[offset:].decode('utf-8', 'replace')
+    found = list(_UI_PRESS.finditer(chunk))
+    if not found:
+        return offset, []
+    return offset + found[-1].end(), found
+
+
+def _last_ui(ctx):
+    """The newest [Ui] press line, or None when this window has not written one."""
+    path = Path(gate_source(ctx))
+    if not path.is_file() or path.stat().st_size == 0:
+        return None
+    found = list(_UI_PRESS.finditer(path.read_bytes()[-16000:].decode('utf-8', 'replace')))
+    return found[-1] if found else None
+
+
+def _await_ui(ctx, offset, cap=2.0):
+    deadline = time.time() + cap
+    while time.time() < deadline:
+        offset, found = _ui_since(ctx, offset)
+        if found:
+            return offset, found[-1]
+        time.sleep(0.1)
+    return offset, None
+
+
+def goto_page(ctx, page):
+    """R until the diag line names `page`.
+
+    The menu reopens on last_page, and that file can lag the page actually open. A missing
+    line is not arrival: a fixed hop count then walks off the page and the next A hits
+    whatever row that page remembered. One R reveals the page after the press, and further
+    R presses stop when the line names the target.
+    """
+    if page not in PAGES:
+        raise RuntimeError('unknown menu page %s' % page)
+    path = Path(gate_source(ctx))
+    offset = path.stat().st_size if path.is_file() else 0
+    landed = None
+    misses = 0
+    for _ in range(len(PAGES) + 3):
+        if landed == page:
+            return offset
+        press(ctx, 'r', 0.45)
+        offset, match = _await_ui(ctx, offset, cap=1.5)
+        if match is None:
+            misses += 1
+            if misses >= 3:
+                break
+            continue
+        misses = 0
+        landed = match.group('page')
+    if landed != page:
+        raise RuntimeError('menu stayed on %s, wanted %s' % (landed, page))
+    return offset
+
+
+def _jump_top(ctx):
+    """Put the cursor on the first focusable row of this page.
+
+    ZL+Up stays put once it is already in the first section, so it does not reach that
+    section's first row. Up wraps. The diag line's cursor falls until it is 0, which is
+    the first focusable entry. A press that the log does not answer is sent again.
+    A release NRO does not emit the line.
+    """
+    path = Path(gate_source(ctx))
+    offset = path.stat().st_size if path.is_file() else 0
+    previous = None
+    misses = 0
+    for _ in range(20):
+        press(ctx, 'up', 0.3)
+        offset, match = _await_ui(ctx, offset, cap=1.2)
+        if match is None:
+            misses += 1
+            if misses >= 3:
+                return False
+            continue
+        misses = 0
+        cursor = int(match.group('cursor'))
+        if cursor == 0:
+            return True
+        if previous is not None and cursor > previous:
+            press(ctx, 'down', 0.3)
+            return True
+        previous = cursor
+    return True
+
+
+def _file_title(match):
+    return '' if match is None else (match.group('recording') or '').strip()
+
+
+def _gate_offset(ctx):
+    path = Path(gate_source(ctx))
+    return path.stat().st_size if path.is_file() else 0
+
+
+def _page_field(line, name):
+    match = re.search(r'(?:^|\s)%s=(\S+)' % re.escape(name), line)
+    return match.group(1) if match else ''
+
+
+def _last_page_line(ctx):
+    """Newest Recording-page line for the saves/macros group. The library index is not the page cursor."""
+    path = Path(gate_source(ctx))
+    if not path.is_file():
+        return ''
+    tail = path.read_bytes()[-65536:].decode('utf-8', 'replace')
+    line = ''
+    for row in tail.splitlines():
+        if 'screen=recording-page' in row and 'group=saves-macros' in row:
+            line = row
+    return line
+
+
+def _await_page_line(ctx, previous, cap=1.5):
+    deadline = time.time() + cap
+    while time.time() < deadline:
+        line = _last_page_line(ctx)
+        if line and line != previous:
+            return line
+        time.sleep(0.1)
+    return _last_page_line(ctx)
+
+
+def _library_index_zero(ctx):
+    """Leave the library upward, then re-enter it.
+
+    Up leaves the library only from its first item. The page cursor wraps, and Down
+    returns to that same first item. Right copies the source column's index, so this
+    has to happen on the saves column before the swap onto macros.
+    """
+    offset = _gate_offset(ctx)
+    left = False
+    for _ in range(30):
+        press(ctx, 'up', 0.28)
+        offset, match = _await_ui(ctx, offset, cap=1.0)
+        if match is None or match.group('page') != 'recording':
+            continue
+        if int(match.group('cursor')) != 0:
+            left = True
+            break
+    if not left:
+        raise RuntimeError('library did not leave its first item')
+    press(ctx, 'down', 0.35)
+    offset, match = _await_ui(ctx, offset, cap=1.2)
+    if match is None or match.group('page') != 'recording' or int(match.group('cursor')) != 0:
+        raise RuntimeError('library did not re-enter at its first item')
+
+
+def _macros_have_file(line):
+    if _page_field(line, 'header') != 'off':
+        return False
+    if _page_field(line, 'floppy') == 'on':
+        return True
+    return _page_field(line, 'hot') not in ('', '0') or _page_field(line, 'hairline') not in ('', '0')
+
+
+def _await_title(ctx, offset, cap=1.5):
+    deadline = time.time() + cap
+    while time.time() < deadline:
+        offset, match = _await_ui(ctx, offset, cap=0.4)
+        title = _file_title(match)
+        if title:
+            return offset, title
+        if match is None:
+            time.sleep(0.05)
+    return offset, ''
+
+
+def open_library_item(ctx, macros, downs=0):
+    """Open the first save, or a macro file. Menu must end closed by the caller.
+
+    Right swaps columns and copies the source index. The macro column lists files
+    first and "+ New chain" last, so a saves index that is not 0 lands on New chain.
+    A there opens the chain picker. B finishes that picker and opens the Name chain
+    keyboard; another B creates the chain. Neither B backs out, so this route never
+    presses B on an unopened file. It resets the saves index to 0, swaps, and presses
+    A only once the macro column shows a file.
+    """
+    open_menu(ctx)
+    goto_page(ctx, 'recording')
+    _jump_top(ctx)
+    if macros:
+        before = _last_page_line(ctx)
+        press(ctx, 'right', 0.4)
+        landed = _await_page_line(ctx, before)
+        if _page_field(landed, 'header') != 'on':
+            before = landed
+            press(ctx, 'right', 0.4)
+            landed = _await_page_line(ctx, before)
+        if _page_field(landed, 'header') != 'on':
+            raise RuntimeError('saves column not shown (%s)' % landed[-180:])
+        _library_index_zero(ctx)
+        before = _last_page_line(ctx)
+        press(ctx, 'right', 0.45)
+        line = _await_page_line(ctx, before)
+        if not _macros_have_file(line):
+            raise RuntimeError('macro column has no file (%s)' % line[-180:])
+        for _ in range(downs):
+            press(ctx, 'down', 0.35)
+        offset = _gate_offset(ctx)
+        press(ctx, 'a', 0.55)
+        offset, title = _await_title(ctx, offset)
+        if not title:
+            raise RuntimeError('macro file not opened (%s)' % line[-180:])
+        return offset, title
+    offset = _gate_offset(ctx)
+    press(ctx, 'a', 0.6)
+    offset, match = _await_ui(ctx, offset)
+    return offset, _file_title(match)
+
+
+def down_to_file_row(ctx, offset, current, title):
+    """Move the open file screen onto `title`. The diag line names that row after each press."""
+    for _ in range(8):
+        if current == title:
+            return offset
+        press(ctx, 'down', 0.35)
+        offset, match = _await_ui(ctx, offset)
+        current = _file_title(match)
+    raise RuntimeError('file row %s not reached (last %s)' % (title, current))
 
 
 def popup(ctx):
@@ -90,14 +469,44 @@ def popup_close(ctx):
     press(ctx, 'b', 0.45)
 
 
+# Screens that sit on top of Training. A missed gate backs out of these only.
+# Gameplay lines (playback, a FrameStrip) are not in this set: B there is Neutral Special.
+_OVERLAY_SCREENS = {
+    'recording-page', 'recording-popup', 'rename', 'crop', 'mismatch',
+    'notice', 'make-combo', 'migrate',
+}
+
+
+def _ui_press_seen(ctx):
+    """False on the release NRO: its practice-gates.log has no [Ui] press lines."""
+    path = Path(gate_source(ctx))
+    if not path.is_file():
+        return False
+    return b'[Ui] press' in path.read_bytes()
+
+
+def _overlay_open(ctx):
+    """True when the gates log's latest screen= is a menu, pop-up, or keyboard."""
+    path = Path(gate_source(ctx))
+    if not path.is_file() or path.stat().st_size == 0:
+        return False
+    screen = ''
+    for row in path.read_bytes()[-8192:].decode('utf-8', 'replace').splitlines():
+        found = re.search(r'screen=(\S+)', row)
+        if found:
+            screen = found.group(1)
+    return screen in _OVERLAY_SCREENS
+
+
 def diag(ctx, pattern, cap=10):
     try:
         return ctx.wait_log(gate_source(ctx), pattern, cap=cap)
     except RuntimeError:
-        # A missed line often leaves the pop-up, the menu, or the keyboard up. Recovery checks the
-        # training HUD on this instance and does not close it, so back out before the error propagates.
-        for _ in range(4):
-            press(ctx, 'b', 0.3)
+        # Back out only when a menu, pop-up, or keyboard is actually up. B during gameplay
+        # is Neutral Special and the next row inherits the damage.
+        if _overlay_open(ctx):
+            for _ in range(4):
+                press(ctx, 'b', 0.3)
         raise
 
 
@@ -139,17 +548,17 @@ GIF_GATES = {
     'rc5-crop-combo.gif': r'screen=crop source=\S+ combo=1',
     'rc5-grade-not-true.gif': r'\[FrameStrip\] link verdict=',
     'rc5-sequence-drill.gif': r'\[Ui\] press .*Drill',
-    'rc5-frame-strip-lanes.gif': r'\[FrameStrip\] shown=true',
-    'rc5-frame-strip-chips.gif': r'\[FrameStrip\] shown=true',
-    'rc5-frame-strip-cstick.gif': r'\[FrameStrip\] shown=true',
-    'rc5-frame-strip-stick-row.gif': r'\[FrameStrip\] shown=true',
-    'rc5-frame-strip-freeze.gif': r'\[FrameStrip\] shown=true',
-    'rc5-frame-strip-freeze-stick.gif': r'\[FrameStrip\] shown=true',
+    'rc5-frame-strip-lanes.gif': r'\[FrameStrip\] p1 ',
+    'rc5-frame-strip-chips.gif': r'\[FrameStrip\] p1 ',
+    'rc5-frame-strip-stick-row.gif': r'\[FrameStrip\] p1 ',
+    'rc5-frame-strip-cstick.gif': r'\[FrameStrip\] p1 ',
+    'rc5-frame-strip-freeze.gif': r'\[FrameStrip\] p1 ',
+    'rc5-frame-strip-freeze-stick.gif': r'\[FrameStrip\] p1 ',
     'rc5-frame-strip-advantage-hit.gif': r'\[FrameStrip\] advantage value=-?\d+ on_shield=false',
     'rc5-frame-strip-advantage-shield.gif': r'\[FrameStrip\] advantage value=-?\d+ on_shield=true',
     'rc5-frame-strip-link.gif': r'\[FrameStrip\] link verdict=',
     'rc5-frame-strip-drop.gif': r'\[FrameStrip\] link verdict=',
-    'rc5-frame-strip-input.gif': r'\[FrameStrip\] shown=true',
+    'rc5-frame-strip-input.gif': r'\[FrameStrip\] p1 ',
     'rc5-frame-strip-last.gif': r'\[FrameStrip\] link verdict=',
     'rc5-frame-strip-exchange.gif': r'\[FrameStrip\] link verdict=',
 }
@@ -305,23 +714,50 @@ def wait_loaded(ctx, cap=180):
     raise RuntimeError('game still loading after %ss' % cap)
 
 
+def _pick_fighter(ctx, downs, neighbor):
+    """A portrait on Fighters & Stages. The grid opens on Mario. One Right is the next fighter.
+
+    ZL+Up lands on Player Swapping. One Down is Player Character. Two Downs is CPU Character.
+    The page comes from last_page. Three R from CPU misses it once the menu has been opened elsewhere.
+    """
+    open_menu(ctx)
+    goto_page(ctx, 'fighters_stages')
+    _jump_top(ctx)
+    for _ in range(downs):
+        press(ctx, 'down', 0.35)
+    press(ctx, 'a', 0.8)
+    time.sleep(0.5)
+    if neighbor:
+        press(ctx, 'right', 0.4)
+    press(ctx, 'a', 0.6)
+    close_menu(ctx)
+
+
 def cpu_mario(ctx):
     """The Training CPU comes from the menu, not the CSS coin.
 
     One A on tile 0 readies this CSS while the coin is still Random, and a Random coin does not
-    follow CPU Shield. Fighters & Stages is three pages from CPU. CPU Character is the third row
-    of Player 1 and CPU. The portrait grid opens on Mario. A selects it.
+    follow CPU Shield. The portrait grid opens on Mario. A selects it.
     """
-    open_menu(ctx)
-    for _ in range(3):
-        press(ctx, 'r', 0.55)
-    press(ctx, 'down', 0.35)
-    press(ctx, 'down', 0.35)
-    press(ctx, 'a', 0.9)
-    time.sleep(0.8)
-    press(ctx, 'a', 0.6)
-    close_menu(ctx)
+    _pick_fighter(ctx, 2, False)
     return {'cpu': 'mario', 'route': 'menu CPU Character'}
+
+
+def cpu_neighbor(ctx):
+    """The fighter beside Mario, so a Mario recording is a different fighter."""
+    _pick_fighter(ctx, 2, True)
+    return {'cpu': 'neighbor', 'route': 'menu CPU Character right'}
+
+
+def player_mario(ctx):
+    _pick_fighter(ctx, 1, False)
+    return {'player': 'mario'}
+
+
+def player_neighbor(ctx):
+    """P1 beside Mario, so a Mario recording mismatches Play on P1."""
+    _pick_fighter(ctx, 1, True)
+    return {'player': 'neighbor'}
 
 
 def boot_training(ctx):
@@ -341,7 +777,10 @@ def boot_training(ctx):
         else:
             # Already in Training. A later miss inside cpu_mario must not fall through into the
             # main-menu route: that route's Start presses leave the match.
-            return {'already': 'training', 'cpu': cpu_mario(ctx)}
+            # The release NRO writes no [Ui] press lines, so goto_page cannot see the page.
+            if _ui_press_seen(ctx):
+                return {'already': 'training', 'cpu': cpu_mario(ctx)}
+            return {'already': 'training', 'cpu': 'left-as-set', 'ui_log': 'empty'}
     else:
         ctx.call('game.load', {'path': ctx.instance['game']}, job_cap=180)
         wait_loaded(ctx)
@@ -471,21 +910,34 @@ def rr_record_cpu(ctx):
     })
 
 
-def _open_file_row(ctx, downs):
-    open_menu(ctx)
+def _open_file_row(ctx, title, downs=0):
+    """Open a macro file and stop on `title`. The caller presses A for that row.
+
+    `downs` picks a later macro. A chain file has no Crop row. Close that file and open
+    the next library item. B is safe here because the file screen is already open;
+    B on the New-chain picker would create a chain instead.
+    """
+    offset, current = open_library_item(ctx, True, downs)
+    last = current
     for _ in range(6):
-        press(ctx, 'r', 0.55)
-    for _ in range(downs):
-        press(ctx, 'down', 0.35)
-    press(ctx, 'a', 0.7)
+        try:
+            return down_to_file_row(ctx, offset, current, title)
+        except RuntimeError:
+            last = current
+            press(ctx, 'b', 0.4)
+            press(ctx, 'down', 0.35)
+            offset = _gate_offset(ctx)
+            press(ctx, 'a', 0.55)
+            offset, current = _await_title(ctx, offset)
+            if not current:
+                break
+    raise RuntimeError('file row %s not reached (last %s)' % (title, last))
 
 
 def rr_make_combo(ctx):
     """Make combo plays the macro under the cursor and saves Combo N."""
     settle(ctx)
-    _open_file_row(ctx, 0)
-    for _ in range(8):
-        press(ctx, 'down', 0.3)
+    _open_file_row(ctx, 'Make combo')
     press(ctx, 'a', 0.6)
     line = diag(ctx, r'screen=make-combo source=\S+', cap=15)
     close_menu(ctx)
@@ -499,9 +951,7 @@ def rr_make_combo_chain(ctx):
     press(ctx, 'down', 0.35)
     press(ctx, 'a', 0.6)
     popup_close(ctx)
-    _open_file_row(ctx, 1)
-    for _ in range(8):
-        press(ctx, 'down', 0.3)
+    _open_file_row(ctx, 'Make combo', 1)
     press(ctx, 'a', 0.6)
     line = diag(ctx, r'screen=make-combo source=\S+', cap=15)
     close_menu(ctx)
@@ -511,9 +961,7 @@ def rr_make_combo_chain(ctx):
 def rr_crop_macro(ctx):
     """Crop a macro: the handle screen opens, A writes a new macro, the original stays."""
     settle(ctx)
-    _open_file_row(ctx, 0)
-    for _ in range(10):
-        press(ctx, 'down', 0.3)
+    _open_file_row(ctx, 'Crop')
     press(ctx, 'a', 0.6)
     opened = diag(ctx, r'screen=crop source=\S+ combo=0', cap=10)
     press(ctx, 'r', 0.4)
@@ -524,16 +972,20 @@ def rr_crop_macro(ctx):
 
 
 def rr_crop_combo(ctx):
-    """Crop a combo by its links. A writes a new combo."""
+    """Crop a combo by its links. A writes a new combo.
+
+    Combos & Sequences is the section after the macro library. Right swaps that group onto combos.
+    There is no combo until Make combo has saved one; an empty column does not invent a file.
+    """
     settle(ctx)
     open_menu(ctx)
-    for _ in range(6):
-        press(ctx, 'r', 0.55)
-    for _ in range(4):
-        press(ctx, 'down', 0.35)
-    press(ctx, 'a', 0.7)
-    for _ in range(8):
-        press(ctx, 'down', 0.3)
+    goto_page(ctx, 'recording')
+    _jump_top(ctx)
+    # css_chord presses ZL and Down on different frames, so the menu saw a plain Down.
+    # chord-save is ZL+Down on one frame: a section jump while the menu is open.
+    ctx.play(SAVE)
+    time.sleep(0.35)
+    press(ctx, 'right', 0.4)
     press(ctx, 'a', 0.6)
     opened = diag(ctx, r'screen=crop source=\S+ combo=1', cap=10)
     press(ctx, 'a', 0.6)
@@ -543,30 +995,46 @@ def rr_crop_combo(ctx):
 
 
 def rr_mismatch_macro(ctx):
-    """Play a macro recorded on another fighter. Keep plays. B is not Keep."""
+    """Play a macro recorded on another fighter. Keep plays. B is not Keep.
+
+    Both fighters are Mario until this row moves P1 one portrait to the right. The recorded file
+    stays Mario, so Play on P1 is the mismatch. P1 is put back on Mario either way.
+    """
     settle(ctx)
-    popup(ctx)
-    press(ctx, 'a', 0.6)
-    popup_close(ctx)
-    ctx.play(PLAY_P1)
-    line = diag(ctx, r'screen=mismatch ask=macro ', cap=12)
-    ctx.shot('mismatch-macro')
-    press(ctx, 'a', 0.6)
-    return save(ctx, 'mismatch-macro', {'line': line})
+    player_neighbor(ctx)
+    try:
+        popup(ctx)
+        press(ctx, 'a', 0.6)
+        popup_close(ctx)
+        ctx.play(PLAY_P1)
+        line = diag(ctx, r'screen=mismatch ask=macro ', cap=12)
+        ctx.shot('mismatch-macro')
+        press(ctx, 'a', 0.6)
+        return save(ctx, 'mismatch-macro', {'line': line})
+    finally:
+        player_mario(ctx)
 
 
 def rr_mismatch_chain(ctx):
-    """A chain asks once, for macro 1. Keep plays on the current fighter."""
+    """A chain asks once, for macro 1. Keep plays on the current fighter.
+
+    The CPU moves off Mario first. A chain is not invented: if the active item is a single macro
+    the line says ask=macro and this row's ask=macro1 pattern fails.
+    """
     settle(ctx)
-    popup(ctx)
-    press(ctx, 'r', 0.5)
-    press(ctx, 'a', 0.6)
-    popup_close(ctx)
-    ctx.play(PLAY_CPU)
-    line = diag(ctx, r'screen=mismatch ask=macro1', cap=12)
-    ctx.shot('mismatch-chain')
-    press(ctx, 'a', 0.6)
-    return save(ctx, 'mismatch-chain', {'line': line})
+    cpu_neighbor(ctx)
+    try:
+        popup(ctx)
+        press(ctx, 'r', 0.5)
+        press(ctx, 'a', 0.6)
+        popup_close(ctx)
+        ctx.play(PLAY_CPU)
+        line = diag(ctx, r'screen=mismatch ask=macro1', cap=12)
+        ctx.shot('mismatch-chain')
+        press(ctx, 'a', 0.6)
+        return save(ctx, 'mismatch-chain', {'line': line})
+    finally:
+        cpu_mario(ctx)
 
 
 def rr_visuals(ctx):
@@ -592,57 +1060,54 @@ def rr_notice(ctx):
         chord_lines.append(diag(ctx, r'screen=notice kind=chord-once', cap=4))
     except RuntimeError:
         pass
-    # macro-start-save-missing: delete the recorded macro's start save through its own screen
-    # (the plugin menu's Delete removes the file), then play the macro.
-    popup(ctx)
-    press(ctx, 'a', 0.6)              # A on a macro in the pop-up: open its file screen? No: pop-up
-    # A binds/sets active/drills (page A opens). Open the Recording page for the file screen.
-    popup_close(ctx)
-    open_menu(ctx)
-    for _ in range(6):                # step menu pages with R until the Recording page
-        press(ctx, 'r', 0.6)
-    press(ctx, 'a', 0.8)              # A on the macro row: open its own screen (page A opens)
-    for _ in range(10):               # walk to the Start save screen's Delete row
-        press(ctx, 'down', 0.4)
-    press(ctx, 'a', 0.8)              # Delete
-    press(ctx, 'a', 0.8)              # confirm
+    # Delete removes the save file. Active on the macro file sets the player macro, and Play
+    # then reports the missing start save. Delete is immediate; there is no confirm A.
+    # The file is put back afterwards: this boot left macro-2 pointing at a missing macro-2-start.
+    backup = _save_files(ctx)
+    offset, current = open_library_item(ctx, False)
+    down_to_file_row(ctx, offset, current, 'Delete')
+    press(ctx, 'a', 0.6)
+    close_menu(ctx)
+    offset, current = open_library_item(ctx, True)
+    down_to_file_row(ctx, offset, current, 'Set active')
+    press(ctx, 'a', 0.6)
     close_menu(ctx)
     ctx.play(PLAY_P1)
     missing = diag(ctx, r'screen=notice kind=macro-start-save-missing', cap=10)
+    restored = _restore_saves(ctx, backup)
     ctx.shot('notice')
-    return save(ctx, 'notice', {'chord_once': chord_lines, 'missing': missing})
+    return save(ctx, 'notice', {'chord_once': chord_lines, 'missing': missing, 'restored': restored})
 
 
 def rr_mismatch(ctx):
-    """A chain whose macro 1 fighter differs: one prompt at the chain start naming macro 1."""
+    """A chain whose macro 1 fighter differs: one prompt at the chain start naming macro 1.
+
+    The CPU moves off Mario first. No chain is written here. A single macro prompts ask=macro,
+    and this row keeps the ask=macro1 pattern.
+    """
     settle(ctx)
-    # Bounded build of the documented fixture: record a macro on P1, rename it, put it first in a
-    # chain, set the chain active for the CPU, play. The fighter change itself needs the CSS
-    # (README open question); this hook plays the chain and captures the prompt's line and rows.
-    popup(ctx)
-    press(ctx, 'r', 0.5)              # CPU view
-    press(ctx, 'a', 0.6)              # set the chain active for the CPU
-    popup_close(ctx)
-    time.sleep(0.5)
-    ctx.play(PLAY_CPU)
-    line = diag(ctx, r'screen=mismatch ask=macro1', cap=15)
-    shot = ctx.shot('mismatch-prompt')
-    press(ctx, 'b', 0.8)              # Keep current fighter (the GIF's choice)
-    time.sleep(2.0)
-    later = ctx.call('status')
-    return save(ctx, 'mismatch', {'line': line, 'shot': str(shot)})
+    cpu_neighbor(ctx)
+    try:
+        popup(ctx)
+        press(ctx, 'r', 0.5)              # CPU view
+        press(ctx, 'a', 0.6)              # set the chain active for the CPU
+        popup_close(ctx)
+        time.sleep(0.5)
+        ctx.play(PLAY_CPU)
+        line = diag(ctx, r'screen=mismatch ask=macro1', cap=15)
+        shot = ctx.shot('mismatch-prompt')
+        press(ctx, 'b', 0.8)              # Keep current fighter (the GIF's choice)
+        time.sleep(2.0)
+        return save(ctx, 'mismatch', {'line': line, 'shot': str(shot)})
+    finally:
+        cpu_mario(ctx)
 
 
 def rr_rename(ctx):
     """A on Rename opens the titled keyboard offer (Online off; with Online on it is not made)."""
     settle(ctx)
-    open_menu(ctx)
-    for _ in range(6):
-        press(ctx, 'r', 0.6)
-    press(ctx, 'a', 0.8)              # A on the macro row: the file screen (page A opens)
-    for _ in range(10):
-        press(ctx, 'down', 0.4)
-    press(ctx, 'a', 0.8)              # A on Rename
+    _open_file_row(ctx, 'Rename')
+    press(ctx, 'a', 0.6)
     line = diag(ctx, r'screen=rename header=Name macro', cap=10)
     ctx.shot('rename-offer')
     press(ctx, 'b', 0.8)              # leave the keyboard without renaming
@@ -653,13 +1118,8 @@ def rr_rename(ctx):
 def rr_crop(ctx):
     """A on Crop: screen=crop source=<id> combo=0, then the new file write, originals unchanged."""
     settle(ctx)
-    open_menu(ctx)
-    for _ in range(6):
-        press(ctx, 'r', 0.6)
-    press(ctx, 'a', 0.8)
-    for _ in range(12):
-        press(ctx, 'down', 0.4)
-    press(ctx, 'a', 0.8)              # A on Crop
+    _open_file_row(ctx, 'Crop')
+    press(ctx, 'a', 0.6)
     line = diag(ctx, r'screen=crop source=\S+ combo=0', cap=10)
     ctx.shot('crop')
     press(ctx, 'b', 0.8)
@@ -1179,18 +1639,33 @@ def cpu_shield(ctx, mode):
     """Set CPU Shield from the menu. docs/MEDIA.md, the advantage-shield row.
 
     The CPU page opens on Reactions. Groups are Reactions, Defence, Ledge & Tech, Shield
-    (menu/table.rs GROUPS). Three ZL+Down section jumps land on the Shield row. Right selects
-    Hold from None (two steps: Infinite, then Hold). A would open the list, so it is not pressed.
-    One B closes. Mash stays at its factory value, an empty mash_state row, so the on-hit row
-    does not turn mash on. chord-save is not used: that recipe is the Save chord, and one jump
-    left the first pass on Reactions / Mash.
+    (menu/table.rs GROUPS). chord-save is ZL+Down on one frame, which is a section jump
+    while this menu is open. Sequential presses are not: the confirming boot logged a plain
+    Down and opened the Mash checklist, and shield_state stayed None. The jump stops when
+    the UI line names the Shield row. Right cycles the dropdown. A would open the list, so
+    it is not pressed. One B closes, and the row reads shield_state back from settings.json.
     """
     target = _SHIELD_INDEX[mode]
-    current = _SHIELD_INDEX[_SHIELD['mode']]
+    # The file is the last committed value. The in-memory mode was left at None on the
+    # confirming boot while this route opened the Mash checklist instead of Shield.
+    current = _shield_index(ctx)
     open_menu(ctx)
-    for _ in range(3):
-        css_chord(ctx, ['zl', 'down'], 140)
-        time.sleep(0.45)
+    goto_page(ctx, 'cpu')
+    last = None
+    for _ in range(8):
+        last = _last_ui(ctx)
+        if (last and last.group('page') == 'cpu' and last.group('depth') == '0'
+                and last.group('row') == 'Shield'):
+            break
+        if last and last.group('depth') != '0':
+            press(ctx, 'b', 0.3)
+            time.sleep(0.3)
+            continue
+        ctx.play(SAVE)
+        time.sleep(0.4)
+    else:
+        seen = last.groupdict() if last else None
+        raise RuntimeError('CPU menu never showed the Shield row: %s' % seen)
     delta = (target - current) % 4
     if delta <= 2:
         button, times = 'right', delta
@@ -1200,8 +1675,18 @@ def cpu_shield(ctx, mode):
         press(ctx, button, 0.35)
     press(ctx, 'b', 0.7)
     settle(ctx)
+    found = current
+    deadline = time.time() + 2.0
+    while time.time() < deadline:
+        found = _shield_index(ctx)
+        if found == target:
+            break
+        time.sleep(0.2)
+    if found != target:
+        raise RuntimeError('shield_state index %s, wanted %s (%s)' % (found, target, mode))
     _SHIELD['mode'] = mode
-    return {'shield_state': mode, 'right_presses': times if button == 'right' else 0}
+    return {'shield_state': mode, 'shield_index': found,
+            'right_presses': times if button == 'right' else 0}
 
 
 def center(ctx):
@@ -1211,21 +1696,84 @@ def center(ctx):
     settle(ctx)
 
 
+def _fighter_gap(path):
+    """Pixels of empty stage between the two red bodies, or None when the shot has no pair.
+
+    The confirming jab-shield shot is 1280x674 and the two shirts sit at x 293-440 and
+    845-998, 405 px apart, which is why the jab whiffed. Portraits sit below this band.
+    """
+    from PIL import Image
+    im = Image.open(path).convert('RGB')
+    w, h = im.size
+    px = im.load()
+    y0, y1 = int(h * 0.28), int(h * 0.72)
+    cols = []
+    for x in range(w):
+        red = 0
+        for y in range(y0, y1, 2):
+            r, g, b = px[x, y]
+            if r > 140 and r > g + 40 and r > b + 40:
+                red += 1
+        cols.append(red)
+    runs = []
+    start = None
+    for x, n in enumerate(cols):
+        if n > 4:
+            if start is None:
+                start = x
+        elif start is not None:
+            if x - start > 20:
+                runs.append((start, x - 1))
+            start = None
+    if start is not None and w - start > 20:
+        runs.append((start, w - 1))
+    if len(runs) < 2:
+        return 0 if runs else None
+    return runs[-1][0] - runs[0][1]
+
+
+def _close_for_jab(ctx):
+    """Walk P1 toward the other body until a jab can reach, then stop.
+
+    Spawn leaves the pair hundreds of pixels apart. A full reset-walk paints a dash on the
+    strip, so this holds a walk stick and remeasures. A step that opens the gap reverses.
+    """
+    direction = 1
+    last = None
+    gap = None
+    for _ in range(8):
+        gap = _fighter_gap(ctx.shot('gap'))
+        if gap is None or gap <= 90:
+            return gap
+        if last is not None and gap > last + 20:
+            direction *= -1
+        last = gap
+        ctx.call('input.stick', {'stick': 'left', 'x': 0.5 * direction, 'y': 0, 'lease_ms': 220})
+        time.sleep(0.28)
+        ctx.call('input.stick', {'stick': 'left', 'x': 0, 'y': 0, 'lease_ms': 100})
+        time.sleep(0.2)
+    gap = _fighter_gap(ctx.shot('gap'))
+    if gap is None or gap <= 90:
+        return gap
+    raise RuntimeError('fighters still %s px apart; the move was not thrown' % gap)
+
+
 def advantage(ctx, move_segment, shield):
     """One advantage attempt. The diag line is [FrameStrip] advantage value=N on_shield=true|false.
 
     The published page is still not in a named source. The CPU shields only for the on-shield rows.
     The on-hit row sets Shield back to None and does not enable mash.
     """
-    cpu_shield(ctx, 'hold' if shield else 'none')
+    shield_set = cpu_shield(ctx, 'hold' if shield else 'none')
     center(ctx)
+    gap = _close_for_jab(ctx)
     ctx.play(move_segment)
     time.sleep(2.0)
     want = 'true' if shield else 'false'
     line = diag(ctx, r'\[FrameStrip\] advantage value=-?\d+ on_shield=%s' % want, cap=10)
     shot = ctx.shot('advantage')
-    return save(ctx, 'advantage', {'line': line, 'shot': str(shot), 'shield': _SHIELD['mode'],
-                                   'published': 'to be filled by the session'})
+    return save(ctx, 'advantage', {'line': line, 'shot': str(shot), 'shield': shield_set,
+                                   'gap_px': gap, 'published': 'to be filled by the session'})
 
 
 def adv_jab_shield(ctx):

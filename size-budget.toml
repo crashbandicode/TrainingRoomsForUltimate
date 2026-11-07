@@ -577,3 +577,11 @@ ceiling = 150224
 date = "2026-11-07"
 reason = "rc.5 wire-fix: a stopped recording becomes that role's active macro, a CPU-role file names the CPU, and gate lines go to an unrotated practice-gates.log; measured 150224 (tools/size_gate.py), +69 over 150155"
 approved_by = "Operator 2026-11-07 via primary 35137355 (TASK-GROK-rc5-wire-fix): 'Raise as needed'"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 150251
+date = "2026-11-07"
+reason = "rc.5 wire-fix: a reopened menu reloads the recording catalog after the model is dropped, even when no file write bumped the generation; measured 150251 (tools/size_gate.py), +27 over 150224"
+approved_by = "Operator 2026-11-07 via primary 35137355 (TASK-GROK-rc5-wire-fix): 'Raise as needed'"

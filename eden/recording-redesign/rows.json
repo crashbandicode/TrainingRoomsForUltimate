@@ -709,121 +709,122 @@
     },
     "diag-migrate": {
       "kind": "log",
-      "source": "diag",
+      "source": "gates",
       "pattern": "screen=migrate once=1",
-      "cap": 10
+      "cap": 10,
+      "whole_file": true
     },
     "diag-record-player": {
       "kind": "log",
-      "source": "diag",
+      "source": "gates",
       "pattern": "screen=recording role=player recording=1",
       "cap": 10
     },
     "diag-record-cpu": {
       "kind": "log",
-      "source": "diag",
+      "source": "gates",
       "pattern": "screen=recording role=cpu recording=0",
       "cap": 10
     },
     "diag-notice-missing": {
       "kind": "log",
-      "source": "diag",
+      "source": "gates",
       "pattern": "screen=notice kind=macro-start-save-missing",
       "cap": 10
     },
     "diag-mismatch": {
       "kind": "log",
-      "source": "diag",
+      "source": "gates",
       "pattern": "screen=mismatch ask=macro1",
       "cap": 10
     },
     "diag-rename": {
       "kind": "log",
-      "source": "diag",
+      "source": "gates",
       "pattern": "screen=rename header=Name macro",
       "cap": 10
     },
     "diag-crop": {
       "kind": "log",
-      "source": "diag",
+      "source": "gates",
       "pattern": "screen=crop source=\\S+ combo=0",
       "cap": 10
     },
     "diag-record-cpu-start": {
       "kind": "log",
-      "source": "diag",
+      "source": "gates",
       "pattern": "screen=recording role=cpu recording=1",
       "cap": 10
     },
     "diag-make-combo": {
       "kind": "log",
-      "source": "diag",
+      "source": "gates",
       "pattern": "screen=make-combo source=\\S+",
       "cap": 15
     },
     "diag-crop-saved": {
       "kind": "log",
-      "source": "diag",
+      "source": "gates",
       "pattern": "screen=crop source=\\S+ combo=0 saved=1",
       "cap": 12
     },
     "diag-crop-combo": {
       "kind": "log",
-      "source": "diag",
+      "source": "gates",
       "pattern": "screen=crop source=\\S+ combo=1",
       "cap": 12
     },
     "diag-mismatch-macro": {
       "kind": "log",
-      "source": "diag",
+      "source": "gates",
       "pattern": "screen=mismatch ask=macro ",
       "cap": 12
     },
     "diag-visuals": {
       "kind": "log",
-      "source": "diag",
+      "source": "gates",
       "pattern": "hairline=",
       "cap": 10
     },
     "diag-play-player": {
       "kind": "log",
-      "source": "diag",
+      "source": "gates",
       "pattern": "screen=playback role=player warp=1",
       "cap": 10
     },
     "diag-play-cpu": {
       "kind": "log",
-      "source": "diag",
+      "source": "gates",
       "pattern": "screen=playback role=cpu warp=0",
       "cap": 10
     },
     "diag-mash": {
       "kind": "log",
-      "source": "diag",
+      "source": "gates",
       "pattern": "screen=playback mash=1",
       "cap": 10
     },
     "diag-adv-shield": {
       "kind": "log",
-      "source": "diag",
+      "source": "gates",
       "pattern": "\\[FrameStrip\\] advantage value=-?\\d+ on_shield=true",
       "cap": 12
     },
     "diag-adv-hit": {
       "kind": "log",
-      "source": "diag",
+      "source": "gates",
       "pattern": "\\[FrameStrip\\] advantage value=-?\\d+ on_shield=false",
       "cap": 12
     },
     "diag-drill-press": {
       "kind": "log",
-      "source": "diag",
+      "source": "gates",
       "pattern": "\\[Ui\\] press .*Drill",
       "cap": 12
     },
     "diag-make-combo-press": {
       "kind": "log",
-      "source": "diag",
+      "source": "gates",
       "pattern": "\\[Ui\\] press .*Make combo",
       "cap": 12
     },
@@ -848,10 +849,8 @@
   },
   "recover": [
     {
-      "play": "menu-close"
-    },
-    {
-      "play": "chord-load"
+      "run": "steps.py:recover_training",
+      "check": true
     }
   ],
   "rows": [

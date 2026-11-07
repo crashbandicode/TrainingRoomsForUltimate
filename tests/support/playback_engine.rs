@@ -6,3 +6,13 @@ pub mod macros;
 pub mod library;
 #[path = "../../src/model/playback.rs"]
 pub mod playback;
+#[path = "compat.rs"]
+pub mod compat;
+#[path = "../../src/model/macro_ui/mod.rs"]
+pub mod macro_ui;
+#[path = "swap.rs"]
+pub mod swap;
+#[path = "../../src/model/rr_runtime.rs"]
+pub mod rr_runtime;
+#[path = "../../src/model/rr_host.rs"]
+pub mod rr_host;

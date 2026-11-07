@@ -1871,6 +1871,38 @@ fn drift_line(dir: Option<super::combo::Dir>) -> Option<String> {
     if arrow.is_empty() { None } else { Some(format!("drift {arrow}")) }
 }
 
+/// Which catalog generation the open menu already loaded.
+///
+/// Closing the menu drops the model, and the catalog with it. A file write is
+/// not the only reason to load: the next open has an empty catalog even when
+/// the generation did not change.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CatalogWatch {
+    seen: u64,
+}
+
+impl Default for CatalogWatch {
+    fn default() -> Self {
+        // Distinct from generation 0, so the first open loads.
+        Self { seen: u64::MAX }
+    }
+}
+
+impl CatalogWatch {
+    pub fn on_menu_dropped(self) -> Self {
+        Self { seen: u64::MAX }
+    }
+
+    /// `true` once, when `generation` is not the one already given to the open menu.
+    pub fn take_load(self, generation: u64) -> (Self, bool) {
+        if self.seen == generation {
+            (self, false)
+        } else {
+            (Self { seen: generation }, true)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1884,6 +1916,21 @@ mod tests {
 
     fn link(from: Move, to: Move, tru: bool) -> LinkRec {
         LinkRec::presses(from, to, if tru { Verdict::True(None) } else { Verdict::Drop(1) }, None, &[])
+    }
+
+    #[test]
+    fn a_reopened_menu_loads_the_catalog_without_a_new_file() {
+        let opened = CatalogWatch::default();
+        let (loaded, due) = opened.take_load(3);
+        assert!(due);
+        let (held, due) = loaded.take_load(3);
+        assert!(!due);
+        let (reopened, due) = held.on_menu_dropped().take_load(3);
+        assert!(due);
+        let (held, due) = reopened.take_load(3);
+        assert!(!due);
+        let (_, due) = held.take_load(4);
+        assert!(due);
     }
 
     fn example() -> Catalog {

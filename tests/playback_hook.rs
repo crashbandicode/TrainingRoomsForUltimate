@@ -106,3 +106,28 @@ fn cpu_role_record_and_playback_frames_allocate_nothing() {
     assert_eq!(hook_allocations(), before, "cpu-role record and playback frames allocated inside the hook");
     assert_eq!(drive.phase(), Phase::Recording);
 }
+
+/// The AI epilogue locks the CPU-role drive on the first training frame, before any worker.
+/// That lock is `hos_lock`: a `std::sync::Mutex` allocates one OnceBox on Switch and the hook
+/// counter charges it to `recorder_ai`.
+#[test]
+fn the_cpu_role_drive_lock_allocates_nothing_in_recorder_ai() {
+    use engine::library::Role;
+    use model::recording::ControlCtx;
+
+    let before = hook_allocations();
+    {
+        let _scope = HookScope::enter_hook(HookId::RecorderAi);
+        engine::rr_host::cpu_role_after_chord(1);
+        engine::rr_host::set_record_role(Role::Cpu);
+        engine::rr_host::on_chords(true, false, false);
+        engine::rr_host::cpu_role_after_chord(1);
+        let ctx = ControlCtx { facing: 1, shulk_dial: false };
+        std::hint::black_box(engine::rr_host::cpu_role_control(&ctx));
+        std::hint::black_box(engine::rr_host::cpu_role_phase());
+        engine::rr_host::on_chords(true, false, false);
+        engine::rr_host::cpu_role_after_chord(1);
+        engine::rr_host::set_record_role(Role::Player);
+    }
+    assert_eq!(hook_allocations(), before, "the AI hook's CPU-role lock allocated");
+}

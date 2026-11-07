@@ -62,7 +62,11 @@ static PLAYER_LABEL: Mutex<String> = Mutex::new(String::new());
 static LAST_ASK: Mutex<Option<MismatchAsk>> = Mutex::new(None);
 static CATALOG_GEN: AtomicU64 = AtomicU64::new(0);
 static CPU_ROLE_ON: AtomicBool = AtomicBool::new(false);
-static CPU_DRIVE: Mutex<CpuRoleDrive> = Mutex::new(CpuRoleDrive::idle());
+/// First locked from the AI epilogue (`cpu_role_after_chord`), before any worker touches it.
+/// Switch `std::sync::Mutex` allocates a OnceBox on that first lock, and the hook counter charges
+/// the one allocation to `recorder_ai` (`runtime::roster::build_split`, `docs/provenance/pkg6-owner-locks.md`).
+/// `hos_lock` is a const word and allocates nothing.
+static CPU_DRIVE: hos_lock::Mutex<CpuRoleDrive> = hos_lock::Mutex::new(CpuRoleDrive::idle());
 
 struct MakeJob {
     source: String,
@@ -159,7 +163,7 @@ pub fn publish_menu_role(role: ViewRole) {
 
 /// After the record chord updates `CAP_ROLE`. A CPU-role start enters lockout. A stop leaves it.
 pub fn cpu_role_after_chord(facing: i8) {
-    let mut drive = lock(&CPU_DRIVE);
+    let mut drive = CPU_DRIVE.lock();
     let role = CAP_ROLE.load(Ordering::Acquire);
     if drive.active() && role == 0 {
         drive.stop();
@@ -176,7 +180,7 @@ pub fn cpu_role_poll(out: &mut MappedInputs) -> bool {
         return false;
     }
     let stored = {
-        let mut drive = lock(&CPU_DRIVE);
+        let mut drive = CPU_DRIVE.lock();
         if !drive.active() {
             return false;
         }
@@ -202,14 +206,14 @@ pub fn cpu_role_control(ctx: &ControlCtx) -> ControlOut {
     if !CPU_ROLE_ON.load(Ordering::Acquire) {
         return ControlOut { write: None, hold_cliff_timer: false };
     }
-    lock(&CPU_DRIVE).control(ctx)
+    CPU_DRIVE.lock().control(ctx)
 }
 
 pub fn cpu_role_phase() -> Option<Phase> {
     if !CPU_ROLE_ON.load(Ordering::Acquire) {
         return None;
     }
-    let drive = lock(&CPU_DRIVE);
+    let drive = CPU_DRIVE.lock();
     drive.active().then(|| drive.phase())
 }
 
@@ -1079,7 +1083,7 @@ fn reset_host() {
     DEFER_MIGRATE.store(false, Ordering::Release);
     CATALOG_GEN.store(0, Ordering::Release);
     CPU_ROLE_ON.store(false, Ordering::Release);
-    *lock(&CPU_DRIVE) = CpuRoleDrive::idle();
+    *CPU_DRIVE.lock() = CpuRoleDrive::idle();
     for slot in &ROLE_KIND {
         slot.store(-1, Ordering::Release);
     }
