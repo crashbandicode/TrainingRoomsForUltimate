@@ -148,6 +148,8 @@ unsafe fn sample(accessor: usize, ids: &Table, p1: bool) -> Sample {
     } else {
         None
     };
+    // Facing and airborne are in the display's closure (`state_lr`, `situation_kind`). A rejected row turns the
+    // display off. A default here would record every combo as right-facing and grounded.
     let lr = natives::lr(accessor);
     let situation = natives::situation_kind(accessor);
     Sample {
