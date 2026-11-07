@@ -588,7 +588,7 @@ fn paint_recording(menu: &Menu, frame: &mut Frame) {
     let _ = frame.hint.write_str(rec.hint(face));
     let group_now = menu.focus().map(group_of);
     let on_library = group_now.is_some_and(|g| g == usize::from(SAVES_MACROS) || g == usize::from(COMBOS_SEQ));
-    if !popup && !(on_library || rec.file_open() || rec.picker_open()) {
+    if !(popup || on_library || rec.file_open() || rec.picker_open()) {
         return;
     }
     let group = if popup {
