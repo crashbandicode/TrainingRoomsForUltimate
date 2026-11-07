@@ -148,15 +148,29 @@ pub unsafe fn parked_ready(current: *const u8, slot: u32, kind: u32) -> bool {
     true
 }
 
+/// A window cell is a body only when `installed` publishes that index
+/// (`entry_cells::active_cell`, the game's `b.ls`). An unpublished cell is not read.
+unsafe fn published_body(entry: *const u8, installed: u64, index: usize) -> Option<*const u8> {
+    let Ok(index) = u8::try_from(index) else { return None; };
+    if crate::model::entry_cells::active_cell(index, installed).is_none() {
+        return None;
+    }
+    let body = read::<*const u8>(entry, 0x4160 + usize::from(index) * 8);
+    if aligned(body) { Some(body) } else { None }
+}
+
 unsafe fn identity(current: *const u8, slot: u32, kind: u32, owner: *mut u8) -> ReadySource {
     let forms = Forms::starting(kind);
-    let body = read::<*const u8>(current, 0x4160);
+    let installed = read::<u64>(current, 0x4150);
+    let body_id = published_body(current, installed, 0).map(|body| read::<u32>(body, 8)).unwrap_or(0);
     ReadySource { slot, entry: current as usize, kind,
-        costume: read(owner, 0x64), body_id: read(body, 8),
+        costume: read(owner, 0x64), body_id,
         bodies: std::array::from_fn(|i| {
             if i >= forms.count as usize { return (0, 0); }
-            let body = read::<*const u8>(current, 0x4160 + i * 8);
-            (body as usize, read(body, 8))
+            match published_body(current, installed, i) {
+                Some(body) => (body as usize, read::<u32>(body, 8)),
+                None => (0, 0),
+            }
         }), descriptor: read(current, 0xf8), resource: owner as usize }
 }
 

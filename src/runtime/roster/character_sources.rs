@@ -1324,23 +1324,23 @@ unsafe fn f9_body(slot: u32) -> crate::model::parked_entries::Body {
     }
 }
 
-/// `entry` is the fighter entry for `slot`, or null. Uses the same words as `parked_ready`.
+/// `entry` is the fighter entry for `slot`, or null. The body cell is read only
+/// when `+0x4150` publishes cell 0; `parked_ready` then decides Ready.
 unsafe fn f9_body_of(entry: *const u8, slot: u32) -> crate::model::parked_entries::Body {
-    use crate::model::parked_entries::Body;
-    if !aligned(entry) {
-        return Body::Empty;
-    }
-    let body = read::<*const u8>(entry, 0x4160);
-    if !aligned(body) {
-        return if read::<u8>(entry, 0x591c) == 0 { Body::Empty } else { Body::Loading { id: None } };
-    }
-    let kind = read::<u32>(body, 0xc);
-    let id = read::<u32>(body, 8);
-    if native_source::parked_ready(entry, slot, kind) {
-        Body::Ready { id, kind }
+    let (aligned_entry, installed, loader) = if aligned(entry) {
+        (true, read::<u64>(entry, 0x4150), read::<u8>(entry, 0x591c))
     } else {
-        Body::Loading { id: Some(id) }
-    }
+        (false, 0, 0)
+    };
+    crate::model::parked_entries::classify_parked_body(aligned_entry, installed, loader, || unsafe {
+        let body = read::<*const u8>(entry, 0x4160);
+        if !aligned(body) {
+            return None;
+        }
+        let kind = read::<u32>(body, 0xc);
+        let id = read::<u32>(body, 8);
+        Some((id, kind, native_source::parked_ready(entry, slot, kind)))
+    })
 }
 
 /// One observation of No. of CPUs from the loader callback. The first change in a scene only
