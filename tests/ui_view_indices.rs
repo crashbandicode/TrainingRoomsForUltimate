@@ -61,6 +61,8 @@ fn every_index_the_renderer_can_write_is_inside_the_resolved_array() {
         ("roster badges (Player, CPU)", p::IDX_TILE_BADGE, 2 * p::TILES),
         ("roster All-stripes (Player, CPU)", p::IDX_TILE_STRIPE, 2 * p::TILES),
         ("Solo Popo markers (Player, CPU)", p::IDX_TILE_SOLO, 2),
+        ("recording floppies", p::IDX_FLOPPY, p::FLOPPIES),
+        ("recording loops", p::IDX_LOOP, p::LOOPS),
     ];
     let panes = absent();
     assert!(panes.container.is_null());

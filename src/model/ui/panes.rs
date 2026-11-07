@@ -236,10 +236,16 @@ pub const IDX_ITEM_ICON: usize = IDX_TILE_LABEL + TILES;
 pub const IDX_TILE_BADGE: usize = IDX_ITEM_ICON + ITEM_ICONS;
 pub const IDX_TILE_STRIPE: usize = IDX_TILE_BADGE + 2 * TILES;
 pub const IDX_TILE_SOLO: usize = IDX_TILE_STRIPE + 2 * TILES;
+/// Floppy marks (`tr_icon_save`). Two section headers and four rows in each section.
+pub const FLOPPIES: usize = 10;
+/// Loop marks (`tr_icon_repeat`), one beside each section header. Only MACROS shows one.
+pub const LOOPS: usize = 2;
+pub const IDX_FLOPPY: usize = IDX_TILE_SOLO + 2;
+pub const IDX_LOOP: usize = IDX_FLOPPY + FLOPPIES;
 /// How many panes the menu itself owns and the runtime resolves at registration (`view::Panes::all`); every index
-/// the renderer writes is below it. The panes after these (the notification panel and the input log) belong to the
+/// the renderer writes is below it. The panes after these (the notification panel and the frame strip) belong to the
 /// input package, which finds them by name when it draws.
-pub const MENU_COUNT: usize = IDX_TILE_SOLO + 2;
+pub const MENU_COUNT: usize = IDX_LOOP + LOOPS;
 /// The notification panel (SPEC-input-05): its own container under `RootPane`. Each of its texts (header, short
 /// body, long body) has a dark plate drawn immediately before it. Written by the notices code of the input package.
 pub const IDX_NOTICE: usize = MENU_COUNT;
@@ -628,7 +634,9 @@ pub const fn name_of(index: usize) -> Name {
         i if i >= IDX_CHIP_BADGE && i < IDX_CHIP_BADGE + CHIPS => Name::indexed("tr_cb_", i - IDX_CHIP_BADGE),
         i if i >= IDX_TILE && i < IDX_TILE + TILES => Name::indexed("tr_ti_", i - IDX_TILE),
         i if i >= IDX_TILE_LABEL && i < IDX_TILE_LABEL + TILES => Name::indexed("tr_tl_", i - IDX_TILE_LABEL),
-        i if i >= IDX_TILE_BADGE && i < MENU_COUNT => mark_name(i - IDX_TILE_BADGE),
+        i if i >= IDX_FLOPPY && i < IDX_LOOP => Name::indexed("tr_floppy_", i - IDX_FLOPPY),
+        i if i >= IDX_LOOP && i < MENU_COUNT => Name::indexed("tr_loop_", i - IDX_LOOP),
+        i if i >= IDX_TILE_BADGE && i < IDX_FLOPPY => mark_name(i - IDX_TILE_BADGE),
         i if i >= IDX_TAB && i < IDX_TAB + TABS => Name::indexed("tr_tab_", i - IDX_TAB),
         i if i >= IDX_GROUP && i < IDX_GROUP + GROUPS => Name::indexed("tr_grp_", i - IDX_GROUP),
         i if i >= IDX_ROW && i < IDX_ROW + 2 * ROWS => {
@@ -750,7 +758,8 @@ pub const fn spec(index: usize) -> Spec {
         i if i >= IDX_TILE && i < IDX_TILE + TILES => rect(name, [0.0, 0.0, 100.0, 60.0], HIGHLIGHT, false),
         i if i >= IDX_TILE_LABEL && i < IDX_TILE_LABEL + TILES => Spec { visible: false, ..text(name, [0.0, 0.0, 100.0, TILE_LABEL_H], Align::Center, FONT_SMALL, 28, TEXT) },
         i if i >= IDX_TILE_STRIPE && i < IDX_TILE_SOLO => Spec { visible: false, ..rect(name, [0.0, 0.0, 4.0, 86.0], TEXT, false) },
-        i if i >= IDX_TILE_BADGE && i < MENU_COUNT => Spec { visible: false, ..text(name, [0.0, 0.0, 52.0, MARK_H], Align::Center, FONT_SMALL, 4, TEXT) },
+        i if i >= IDX_FLOPPY && i < MENU_COUNT => Spec { visible: false, ..rect(name, [0.0, 0.0, 28.0, 28.0], [255, 255, 255, 255], false) },
+        i if i >= IDX_TILE_BADGE && i < IDX_FLOPPY => Spec { visible: false, ..text(name, [0.0, 0.0, 52.0, MARK_H], Align::Center, FONT_SMALL, 4, TEXT) },
         IDX_TAB_HI => rect(name, [-740.0, TAB_Y, 200.0, TAB_H], ACCENT, true),
         IDX_TITLE => text(name, [600.0, TAB_Y, 560.0, TAB_H], Align::Right, FONT_SMALL, 40, TEXT_DIM),
         IDX_SEP => rect(name, [0.0, TAB_Y - 52.0, 1760.0, 3.0], RULE, true),
@@ -812,6 +821,11 @@ mod tests {
         // P0 2026-11-04: the roster grid's marks are drawn through the menu pointer array too.
         for i in IDX_TILE_BADGE..IDX_TILE_SOLO + 2 {
             assert!(i < MENU_COUNT, "roster mark {i} must be resolved in the menu pointer array");
+            assert_eq!(spec(i).parent, ROOT, "resolved under the menu container, by name");
+            assert!(!spec(i).visible);
+        }
+        for i in IDX_FLOPPY..MENU_COUNT {
+            assert!(i < MENU_COUNT, "recording mark {i} must be resolved in the menu pointer array");
             assert_eq!(spec(i).parent, ROOT, "resolved under the menu container, by name");
             assert!(!spec(i).visible);
         }

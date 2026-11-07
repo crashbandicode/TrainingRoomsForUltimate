@@ -25,7 +25,8 @@ use crate::runtime::features::{chords, notices, writer};
 use crate::runtime::published;
 use crate::runtime::macros::{named_macros, replay_capture};
 use crate::runtime::ui::{combos, external, requests};
-use crate::runtime::ui::state::{CLOSE_COUNT, CLOSING, EXT_SHOWN, FRAME, FRAME_SEQ, JUMPS, OPEN};
+use crate::model::input_delay::Owners;
+use crate::runtime::ui::state::{CLOSE_COUNT, CLOSING, EXT_SHOWN, FRAME, FRAME_SEQ, JUMPS, OPEN, POPUP, POPUP_REQ};
 
 static INPUT: Ring<64> = Ring::new();
 static WORKER: OnceLock<Thread> = OnceLock::new();
@@ -191,6 +192,9 @@ fn run() {
         if WRITEBACK.swap(false, Ordering::AcqRel) {
             crate::runtime::compat::menu::flush_writeback();
         }
+        if POPUP_REQ.swap(false, Ordering::AcqRel) {
+            toggle_popup(&mut session);
+        }
         // A settings publish (this thread's commit, or the diag reload) noted a roster re-plan: it runs here, on a thread, not in the
         // publish and never in a game hook (stream/stack).
         crate::runtime::compat::menu::run_roster_change();
@@ -225,6 +229,7 @@ fn sync_input_generation(s: &mut Session) {
         if s.phase == Phase::Clip {
             EXT_SHOWN.store(false, Ordering::Release);
         }
+        POPUP.store(false, Ordering::Release);
         s.phase = Phase::Menu;
         publish_jumps(s);
         diagnostic(format_args!("[Ui] menu session cleared"));
@@ -267,20 +272,62 @@ fn handle(event: Event, s: &mut Session) {
         if INPUT.generation() != s.input_generation { break; }
         press(button, s);
     }
+    if let Some(menu) = s.menu.as_ref() {
+        POPUP.store(menu.recording().popup_open(), Ordering::Release);
+        sync_popup_owner();
+    }
     // Release-only packets also advance capture and update its hint/preview.
-    if OPEN.load(Ordering::Acquire) { sync_panels(s); }
+    if OPEN.load(Ordering::Acquire) {
+        sync_panels(s);
+    } else if POPUP.load(Ordering::Acquire) {
+        publish_frame(s);
+    }
     publish_jumps(s);
+}
+
+/// RecordingPopup toggles the pop-up without setting `OPEN`. A closed menu stays closed.
+fn toggle_popup(s: &mut Session) {
+    if s.menu.is_none() {
+        let settings = SETTINGS.lock().clone().unwrap_or_else(Settings::factory);
+        s.keeper.open(&mut s.menu, settings, env());
+    }
+    if let Some(menu) = s.menu.as_mut() {
+        menu.on_request(crate::model::chords::Request::RecordingPopup);
+        POPUP.store(menu.recording().popup_open(), Ordering::Release);
+    }
+    sync_popup_owner();
+    publish_frame(s);
+    publish_jumps(s);
+}
+
+fn sync_popup_owner() {
+    let popup = POPUP.load(Ordering::Acquire);
+    let open = OPEN.load(Ordering::Acquire);
+    if popup && !open {
+        crate::runtime::published::INPUT_OWNERS.fetch_or(Owners::MENU.bits(), Ordering::AcqRel);
+    } else if !popup && !open && !CLOSING.load(Ordering::Acquire) {
+        crate::runtime::published::INPUT_OWNERS.fetch_and(!Owners::MENU.bits(), Ordering::AcqRel);
+    }
 }
 
 /// Tell the input hook whether ZL + Up / Down are jumps on what shows now (`Menu::takes_jumps`): only the menu's own
 /// pages and popup lists take them, never a layer panel or the clip editor (review MN-1).
 fn publish_jumps(s: &Session) {
-    let jumps = s.phase == Phase::Menu && s.menu.as_ref().is_none_or(Menu::takes_jumps);
+    let jumps = POPUP.load(Ordering::Acquire) || (s.phase == Phase::Menu && s.menu.as_ref().is_none_or(Menu::takes_jumps));
     JUMPS.store(jumps, Ordering::Release);
 }
 
 fn press(button: Button, s: &mut Session) {
-    if s.menu.is_none() || !OPEN.load(Ordering::Acquire) || s.phase == Phase::Clip {
+    let popup = POPUP.load(Ordering::Acquire);
+    let open = OPEN.load(Ordering::Acquire);
+    if s.menu.is_none() || s.phase == Phase::Clip || (!open && !popup) {
+        return;
+    }
+    if popup && !open {
+        if let Some(menu) = s.menu.as_mut() {
+            menu.set_console(console_mode());
+            menu.press(button);
+        }
         return;
     }
     #[cfg(feature = "mii-saved-alpha")]

@@ -74,13 +74,13 @@ of both recipes fails `cargo test`, with these commands in the message. 2026-11-
 table without a rebuild, and the candidate's menu never opened (`menu_panes=665 missing=354`). Bump `BUILDER` with
 any builder change that alters the recipes for the same table.
 
-Current recipes (rebuilt 2026-11-06 for the floppy and the loop: `tr_icon_save` and `tr_icon_repeat`, layout-builder 0.1.1; the stocks are unchanged):
+Current recipes (rebuilt 2026-11-06 for the recording screen's twelve icon panes, layout-builder 0.1.2; the stocks are unchanged):
 
 | File | SHA-256 | Bytes | Stock archive it applies to |
 | --- | --- | ---: | --- |
-| `assets/info_training.tra1` | `1a47bba82ff53b071ae2a51d13d2236db7dc1919a19dfa69a8e64f723ff0158f` | 345,638 | `info_training.arc` 451,604 B, SHA-256 `90a8dc81751efa9d4521f836be9ccf8a134cb24af9fb5b195211e58203f9317c`, FNV-1a `8833748e9518a461` (`runtime/ui/probe.rs:91`); target 902,036 B, fnv `511b69ef1cea6fb7` |
-| `assets/info_waiting.tra1` | `cb05302f8feb9347701d39472dd8196c87f4a2ee71229d9c5f6fdfee95cc3598` | 349,693 | `info_waiting.arc` 1,284,116 B, SHA-256 `7dcc45360bd84dadffcfe8b47771f5d6b40e44468c6a54cbd3dbb6b4142eea64`, fnv `f3d2cb3ec6a9f0de`; target 1,730,436 B, fnv `b6219f53ab5204b9` |
-| `assets/panes-recipe.sha256` | `b0b5d2caa8dfb81389e2a8c4b13c410ef9406795ef6b927f34145c0f66ed8949` (the digest) | | |
+| `assets/info_training.tra1` | `2ac5947a51c29591738a7e8a66c62c1cf05ee9a57c8aa42f3dab2b924f19a981` | 346,561 | `info_training.arc` 451,604 B, SHA-256 `90a8dc81751efa9d4521f836be9ccf8a134cb24af9fb5b195211e58203f9317c`, FNV-1a `8833748e9518a461` (`runtime/ui/probe.rs:91`); target 902,036 B, fnv `ec03cb5cf83ca9b5` |
+| `assets/info_waiting.tra1` | `19ed708626e361118cd0ff5be930694d9492e4f1cc49aca8e24cd76d2a2a3cf8` | 350,615 | `info_waiting.arc` 1,284,116 B, SHA-256 `7dcc45360bd84dadffcfe8b47771f5d6b40e44468c6a54cbd3dbb6b4142eea64`, fnv `f3d2cb3ec6a9f0de`; target 1,734,532 B, fnv `577ad48d0ce26eed` |
+| `assets/panes-recipe.sha256` | `f881c0bb78440d467dd20268f1767be2914505f3759a44192c89a8e3485d1a68` (the digest) | | |
 
 Both recipes are embedded in every NRO (`runtime/ui/archive.rs`), so their size is resident size too (the 354 roster
 mark panes added about 33 KB to each).

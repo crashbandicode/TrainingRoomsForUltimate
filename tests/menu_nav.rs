@@ -144,7 +144,10 @@ fn the_jump_works_on_every_page_and_never_leaves_it() {
             m.press(Button::JumpDown);
             assert_eq!(m.page(), page);
         }
-        assert_eq!(section(&m), *sections(&m, page).last().unwrap());
+        // On the Recording page ZL+Up/Down pages the library section by 12. It does not walk the left column.
+        if page != Page::Recording {
+            assert_eq!(section(&m), *sections(&m, page).last().unwrap());
+        }
         for _ in 0..12 {
             m.press(Button::JumpUp);
         }

@@ -74,9 +74,11 @@ pub static GROUPS: [Group; 19] = [
     g(Page::Cpu, "Player 1 control"),
     g(Page::Saves, "Save states"),
     g(Page::Saves, "Setup library"),
-    g(Page::Recording, "Recording"),
-    g(Page::Recording, "Playback"),
-    g(Page::Recording, "Named macros"),
+    // Recording redesign revision 8.2: the left column. The two library groups have no setting rows.
+    g(Page::Recording, "Save states & Macros"),
+    g(Page::Recording, "Combos & Sequences"),
+    g(Page::Recording, "Replays"),
+    g(Page::Recording, "Options"),
     g(Page::FightersStages, "Player 1 and CPU"),
     g(Page::FightersStages, "Extras"),
     g(Page::FightersStages, "Stages"),
@@ -84,8 +86,6 @@ pub static GROUPS: [Group; 19] = [
     g(Page::DisplayControls, "On screen"),
     g(Page::DisplayControls, "Controls"),
     g(Page::Developer, "Developer"),
-    // Appended so no other group's index moves; a page lists its groups in table order (SPEC-input-07 §6).
-    g(Page::Recording, "Combos"),
 ];
 
 // Group indices, for the rows below.
@@ -97,17 +97,19 @@ const ATTACKS: u8 = 4;
 const P1: u8 = 5;
 const STATES: u8 = 6;
 const SETUPS: u8 = 7;
-const RECORDING: u8 = 8;
-const PLAYBACK: u8 = 9;
-const MACROS: u8 = 10;
-const PEOPLE: u8 = 11;
-const EXTRAS: u8 = 12;
-const STAGES: u8 = 13;
-const LOADING: u8 = 14;
-const SCREEN: u8 = 15;
-const CONTROLS: u8 = 16;
-const DEV: u8 = 17;
-const COMBOS: u8 = 18;
+/// Save states & Macros. No setting rows: the library screen fills it.
+pub const SAVES_MACROS: u8 = 8;
+/// Combos & Sequences. Hidden in the CPU view. No setting rows.
+pub const COMBOS_SEQ: u8 = 9;
+const REPLAYS: u8 = 10;
+const OPTIONS: u8 = 11;
+const PEOPLE: u8 = 12;
+const EXTRAS: u8 = 13;
+const STAGES: u8 = 14;
+const LOADING: u8 = 15;
+const SCREEN: u8 = 16;
+const CONTROLS: u8 = 17;
+const DEV: u8 = 18;
 
 /// The sub-screens that edit something the model does not own the content of (the fork's grids,
 /// lists and panels arrive with package 6; the libraries and the replay window with package 4).
@@ -216,7 +218,7 @@ const fn delay(group: u8, title: &'static str, id: &'static str, step: u16, rang
 const TOGGLE: Control = Control::Toggle;
 
 /// The rows in page order, then group order, then the order they appear in (MENU-DRAFT §2).
-pub static ROWS: [Row; 105] = [
+pub static ROWS: [Row; 91] = [
     // CPU > Reactions
     r(REACT, "Mash", "mash_state", Control::MultiSelect(&o::ACTIONS),
       "Actions the CPU performs as soon as it can.\nWith several ticked it picks one at random."),
@@ -289,10 +291,6 @@ pub static ROWS: [Row; 105] = [
     // Saves > Save states
     r(STATES, "Save States", "save_state_enable", TOGGLE,
       "On: the save and load chords work.\nOff: they do nothing."),
-    r(STATES, "Slot", "save_state_slot", Control::Dropdown(&o::SLOTS),
-      "The slot the save and load chords use.\nEach slot holds its own state."),
-    r(STATES, "Randomize Slots", "randomize_slots", Control::MultiSelect(&o::SLOTS),
-      "Load picks one of the ticked slots at random.\nNone ticked: the chosen slot loads."),
     r(STATES, "Mirroring", "save_state_mirroring", Control::Dropdown(&o::MIRRORING),
       "Flips the loaded state left to right.\nAlternate flips every load; Random flips by chance."),
     r(STATES, "Auto-load on death", "save_state_autoload", TOGGLE,
@@ -312,58 +310,31 @@ pub static ROWS: [Row; 105] = [
       "Names the selected slot's setup and keeps it.\nIt can be restored later from the library."),
     r(SETUPS, "Setup library", "", Control::Editor(Editor::SetupLibrary),
       "The saved setups. A binds a setup to the slot and\nrestores it; Y binds it without restoring."),
-    // Recording > Recording
-    r(RECORDING, "Record Slot", "recording_slot", Control::Dropdown(&o::SLOTS),
-      "The slot a new recording goes to."),
-    r(RECORDING, "Trigger", "record_trigger", Control::Dropdown(&o::RECORD_TRIGGER),
-      "What starts recording: the record chord,\nor loading a save state."),
-    r(RECORDING, "Duration", "recording_duration", Control::Dropdown(&o::DURATIONS),
-      "How many frames a recording lasts."),
-    r(RECORDING, "Crop trailing neutral", "recording_crop", TOGGLE,
-      "On: idle frames at the end of a recording are dropped.\nOff: the recording keeps its full length."),
-    // Recording > Playback
-    r(PLAYBACK, "Button slots", "playback_button_slots", Control::MultiSelect(&o::SLOTS),
-      "The recordings the playback chord can play.\nWith several ticked it picks one at random."),
-    r(PLAYBACK, "Hitstun timing", "hitstun_playback", Control::Dropdown(&o::HITSTUN_PLAYBACK),
-      "When playback starts after the CPU is hit."),
-    r(PLAYBACK, "Save-state slots", "save_state_playback", Control::MultiSelect(&o::SLOTS),
-      "The recordings played after a save state loads.\nWith several ticked it picks one at random."),
-    r(PLAYBACK, "Mash interrupts playback", "playback_mash", TOGGLE,
-      "On: a mash action stops a playing recording.\nOff: the recording plays to its end."),
-    r(PLAYBACK, "Loop", "playback_loop", TOGGLE,
-      "On: a recording starts again when it ends.\nOff: it plays once."),
-    Row { advanced: true, ..r(PLAYBACK, "Settings override playback", "settings_override_playback", TOGGLE,
-      "Off: a playing recording wins over the DI, SDI, air-dodge,\ntech and throw settings. On: the settings override it.") },
-    // Recording > Named macros
-    r(MACROS, "Source", "macro_source", Control::Dropdown(&o::MACRO_SOURCE),
-      "Where the CPU's recordings come from:\nthe numbered slots or the named library."),
-    r(MACROS, "Ask before switching fighter", "fighter_prompt", TOGGLE,
+    // Recording > Replays. The library groups above have no rows (revision 8.2).
+    r(REPLAYS, "Ask before switching fighter", "fighter_prompt", TOGGLE,
       "On: a replay or named recording asks before it\nswitches the CPU, a combo before it switches P1."),
-    r(MACROS, "Named library", "named_macro_library", Control::Editor(Editor::NamedLibrary),
-      "The named recordings on the card.\nA loads one, Y copies it into the current slot."),
-    r(MACROS, "Save slot to library...", "", Control::Editor(Editor::SaveSlotToLibrary),
-      "Names the current slot's recording and keeps it."),
-    // Operator 2026-11-05: Edit placement and the replay window ship again, in the fork's order.
-    r(MACROS, "Edit placement", "", Control::Editor(Editor::EditPlacement),
+    r(REPLAYS, "Edit placement", "", Control::Editor(Editor::EditPlacement),
       "Nudges where a loaded recording starts."),
-    r(MACROS, "Replay window", "", Control::Editor(Editor::ReplayWindow),
+    r(REPLAYS, "Replay window", "", Control::Editor(Editor::ReplayWindow),
       "Saved match captures: pick a fighter and an input window\nto turn into a recording."),
-    r(MACROS, "Replay capture", "", Control::ReplayCapture,
+    r(REPLAYS, "Replay capture", "", Control::ReplayCapture,
       "On: capture match inputs when saving a replay.\nThis choice is saved automatically."),
-    // Recording > Combos (SPEC-input-07 §6)
-    r(COMBOS, "Name (optional)", "", Control::Editor(Editor::ComboName),
-      "Names the next saved combo with the Switch keyboard.\nLeft empty, it is saved as Combo 1, Combo 2..."),
-    r(COMBOS, "Save last combo...", "", Control::Editor(Editor::ComboSave),
-      "Keeps your last combo (its links and presses)\nand makes it the target."),
-    r(COMBOS, "Saved combos", "", Control::Editor(Editor::ComboLibrary),
-      "Your saved combos.\nA sets the target, X renames, Y deletes."),
-    r(COMBOS, "Combo helper", "combo_helper", TOGGLE,
+    // Recording > Options. The loop row shows the six counts; the factory value stays length 2.
+    r(OPTIONS, "Crop trailing neutral", "recording_crop", TOGGLE,
+      "On: idle frames at the end of a recording are dropped.\nOff: the recording keeps its full length."),
+    r(OPTIONS, "Hitstun timing", "hitstun_playback", Control::Dropdown(&o::HITSTUN_PLAYBACK),
+      "When playback starts after the CPU is hit."),
+    r(OPTIONS, "Mash interrupts playback", "playback_mash", TOGGLE,
+      "On: a mash action stops a playing recording.\nOff: the recording plays to its end."),
+    r(OPTIONS, "Loop", "playback_loop", Control::Dropdown(&o::LOOP_COUNTS),
+      "How many times the active macro plays.\nX cycles this while the cursor is in MACROS."),
+    Row { advanced: true, ..r(OPTIONS, "Settings override playback", "settings_override_playback", TOGGLE,
+      "Off: a playing recording wins over the DI, SDI, air-dodge,\ntech and throw settings. On: the settings override it.") },
+    r(OPTIONS, "Combo helper", "combo_helper", TOGGLE,
       "On: each attempt at the target is graded under the\nframe strip, link by link."),
-    r(COMBOS, "Target combo", "", Control::Editor(Editor::ComboTarget),
-      "The saved combo your attempts are measured against.\nA chooses another."),
-    r(COMBOS, "On-time tolerance", "combo_tolerance", Control::Dropdown(&o::COMBO_TOLERANCE),
+    r(OPTIONS, "On-time tolerance", "combo_tolerance", Control::Dropdown(&o::COMBO_TOLERANCE),
       "How many frames from the recorded press\nstill count as on time."),
-    r(COMBOS, "After an attempt", "combo_after", Control::Dropdown(&o::COMBO_AFTER),
+    r(OPTIONS, "After an attempt", "combo_after", Control::Dropdown(&o::COMBO_AFTER),
       "Keep playing, or load the save state to retry\nfrom the same spot."),
     // Fighters & Stages > Player 1 and CPU
     r(PEOPLE, "Player Swapping", "trio_practice", TOGGLE,

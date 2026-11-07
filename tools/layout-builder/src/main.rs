@@ -314,9 +314,19 @@ fn build(stock_path: &str, out: &str, waiting: bool) -> Result<()> {
         layout.set_pane(name.as_str(), &PaneEdit { bind_material: Some(ORB_TEXTURE.into()), ..Default::default() })
             .map_err(err("orb picture material"))?;
     }
-    // The floppy and the loop. No pane yet: rr-6 binds `tr_icon_save` and `tr_icon_repeat` and sets the vertex colours.
+    // The floppy and the loop. The panes are white; the runtime tints them.
     import_recording_icons(&mut bntx)?;
     add_recording_icon_materials(&mut layout, waiting)?;
+    for i in 0..panes::FLOPPIES {
+        let name = panes::name_of(panes::IDX_FLOPPY + i);
+        layout.set_pane(name.as_str(), &PaneEdit { bind_material: Some(SAVE_TEXTURE.into()), ..Default::default() })
+            .map_err(err("floppy material"))?;
+    }
+    for i in 0..panes::LOOPS {
+        let name = panes::name_of(panes::IDX_LOOP + i);
+        layout.set_pane(name.as_str(), &PaneEdit { bind_material: Some(REPEAT_TEXTURE.into()), ..Default::default() })
+            .map_err(err("loop material"))?;
+    }
     arc.files[textures].data = write_bntx(&bntx).map_err(err("write item textures"))?;
     arc.files[index].data = write_bflyt(&layout).map_err(err("write bflyt"))?;
     let target = write_arc(&arc).map_err(err("write arc"))?;

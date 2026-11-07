@@ -92,6 +92,9 @@ pub mod notify;
 pub mod recording;
 #[path = "model/numbered_picker.rs"]
 pub mod numbered_picker;
+/// The recording pop-up, the Recording page's library, and the file screens.
+#[path = "model/recording_menu.rs"]
+pub mod recording_menu;
 #[path = "model/pause_helper.rs"]
 pub mod pause_helper;
 #[path = "model/settings.rs"]

@@ -76,12 +76,17 @@ pub fn on_p1_poll(holder: usize) {
         return;
     }
     let open = OPEN.load(Ordering::Acquire);
+    let popup = state::POPUP.load(Ordering::Acquire);
     // A chord (the permanent one or an INI shortcut) opens the menu only while a renderer exists (R2-2, SPEC-core-05 question 1).
     let allowed = readiness::may_open(facts);
     let shortcuts = chords::shortcuts();
     // ZL + Up / Down are jumps only where the screen showing takes them (the worker publishes it, review MN-1).
     adapter.set_jumps(state::JUMPS.load(Ordering::Acquire));
-    let step = adapter.poll(buttons, style, open, allowed, shortcuts);
+    let step = adapter.poll(buttons, style, open || popup, allowed, shortcuts);
+    if allowed && chords::consume(crate::model::chords::Request::RecordingPopup) {
+        state::POPUP_REQ.store(true, Ordering::Release);
+        worker::wake();
+    }
     if step.open || (chord_open && allowed && !open) {
         adapter.resync(buttons, style);
         INPUT_OWNERS.fetch_or(Owners::MENU.bits(), Ordering::AcqRel);
@@ -92,7 +97,7 @@ pub fn on_p1_poll(holder: usize) {
         worker::wake();
         return;
     }
-    if open && (step.changed || step.presses().next().is_some()) {
+    if (open || popup) && (step.changed || step.presses().next().is_some()) {
         if !worker::push_poll(generation, Packet::from_step(&step)) {
             // A missing held/release edge cannot confirm a partial chord.
             state::release_menu();
