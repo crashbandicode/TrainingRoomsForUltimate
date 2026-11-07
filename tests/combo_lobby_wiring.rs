@@ -11,7 +11,7 @@ use std::collections::BTreeSet;
 use std::path::Path;
 
 use callgraph::{Graph, Tok};
-use model::combo::{Aim, Combo, Helper, LinkRec, Settings, Step, STEPS};
+use model::combo::{Aim, Combo, Event, Helper, LinkRec, Settings};
 use model::frame_strip::{Button, Move, Tracker, Verdict};
 use model::scene::{combo_name_keyboard, scene, Facts};
 
@@ -46,15 +46,13 @@ fn reachable(g: &Graph, key: &str) -> BTreeSet<String> {
 }
 
 fn reference() -> Combo {
-    let mut steps = [None; STEPS];
-    steps[0] = Some(Step { button: Button::Attack, aim: Aim::Up, offset: 1 });
-    let link = LinkRec {
-        from: Move::Jab,
-        to: Move::UpTilt,
-        verdict: Verdict::True(Some(-3)),
-        window: Some((0, 4)),
-        steps,
-    };
+    let link = LinkRec::presses(
+        Move::Jab,
+        Move::UpTilt,
+        Verdict::True(Some(-3)),
+        Some((0, 4)),
+        &[Event::press(Button::Attack, Aim::Up, 1)],
+    );
     Combo::from_links([link, LinkRec { from: Move::UpTilt, ..link }]).unwrap()
 }
 

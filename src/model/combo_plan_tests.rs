@@ -1,13 +1,17 @@
 //! SPEC-input-07 §7: what the bar shows, and the strip's write-on-change rule.
 
 use super::*;
-use crate::model::combo::{Aim, Combo, Settings, Step, STEPS};
+use crate::model::combo::{Aim, Combo, Event, Settings};
 use crate::model::frame_strip::Move;
 
 fn reference() -> Combo {
-    let mut steps = [None; STEPS];
-    steps[0] = Some(Step { button: Button::Attack, aim: Aim::Up, offset: 1 });
-    let link = LinkRec { from: Move::Jab, to: Move::UpTilt, verdict: Verdict::True(Some(-3)), window: Some((0, 4)), steps };
+    let link = LinkRec::presses(
+        Move::Jab,
+        Move::UpTilt,
+        Verdict::True(Some(-3)),
+        Some((0, 4)),
+        &[Event::press(Button::Attack, Aim::Up, 1)],
+    );
     Combo::from_links([link, LinkRec { from: Move::UpTilt, ..link }]).unwrap()
 }
 
@@ -65,10 +69,10 @@ fn texts_name_verdicts_marks_results_and_reasons() {
     assert_eq!(verdict_text(Verdict::True(Some(-2))), Text::new("TRUE -2"));
     assert_eq!(verdict_text(Verdict::True(None)), Text::new("TRUE"));
     assert_eq!(verdict_text(Verdict::Drop(1)), Text::new("DROP +1"));
-    assert_eq!(mark_text(Mark::At(1), Button::Jump, 1).0, Text::new("on time"));
-    assert_eq!(mark_text(Mark::At(2), Button::Jump, 1), (Text::new("Jump 2f late"), WARN));
-    assert_eq!(mark_text(Mark::At(-3), Button::Attack, 0).0, Text::new("Attack 3f early"));
-    assert_eq!(mark_text(Mark::Missing, Button::Jump, 2), (Text::new("Jump missing"), BAD));
+    assert_eq!(mark_text(Mark::At(1), "Jump", 1).0, Text::new("on time"));
+    assert_eq!(mark_text(Mark::At(2), "Jump", 1), (Text::new("Jump 2f late"), WARN));
+    assert_eq!(mark_text(Mark::At(-3), "Attack", 0).0, Text::new("Attack 3f early"));
+    assert_eq!(mark_text(Mark::Missing, "Jump", 2), (Text::new("Jump missing"), BAD));
     let s = |outcome, true_links, clean, fault| Summary { outcome, graded: 4, true_links, total: 4, clean, fault };
     assert_eq!(result_text(&s(Outcome::Completed, 4, true, None)), Text::new("clean, 4 of 4"));
     assert_eq!(result_text(&s(Outcome::Completed, 3, false, None)), Text::new("3 of 4 true"));

@@ -1,7 +1,8 @@
 //! One drill, and the walk over a sequence of combos (recording redesign, rr-2).
 //!
-//! A sequence step uses the combo helper's summary: `clean` already means the recorded presses were
-//! there, in order, within the tolerance, and the move matched. TRUE is not required. A drop returns
+//! A sequence step uses the combo helper's summary: `clean` already means the recorded input events were
+//! there, the same kind and direction, in order, within the tolerance, and the move matched. Drift is
+//! not part of that. TRUE is not required. A drop returns
 //! to combo 1, sets the streak to 0, and leaves best. Make combo records the new combo as used and
 //! does not change the drill. The hot five that "used" feeds is the index in rr-1.
 

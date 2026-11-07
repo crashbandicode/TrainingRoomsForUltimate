@@ -69,15 +69,27 @@ Each link:
 | `to` | yes | The follow-up move. The helper's attempt starts when its first link's `from` lands, and each link must use the same follow-up move. |
 | `verdict` | yes | What the frame strip measured when the combo was recorded: `{"kind": "true", "link": N}` for a true combo, where N ≤ 0 is the margin in frames (`null` when unknown), or `{"kind": "drop", "link": N}` where N ≥ 1 is how many frames the CPU was free. Shown for comparison only: an attempt is graded on its own verdict. |
 | `window` | no (`null`) | The combo window, `[first, last]`: the frames on which the follow-up's press would still have made a true combo. |
-| `steps` | yes, 0 to 4 | The presses of the follow-up, oldest first. |
+| `steps` | yes when `events` is absent, else the press subset | The presses of the follow-up, oldest first, at most 4. A file with no `events` is graded on these presses. A newer file still writes them so an older build can open it. |
+| `events` | no | The input events of the follow-up, oldest first, at most 12: presses, releases, the C-stick, and stick flicks. When this field is present, the combo is graded on it. |
+| `drift` | no | The held direction between the events, facing-relative. Shown only. It is not graded. |
 
 Each step:
 
 | Field | Meaning |
 | --- | --- |
 | `button` | `attack`, `special`, `jump`, `shield` or `grab`. |
-| `aim` | The stick when the button went down: `neutral`, `up`, `down` or `side`. Left and right are both `side`, so the facing does not matter. |
+| `aim` | The stick when the button went down: `neutral`, `up`, `down` or `side`. Left and right are both `side`. This is how a presses-only file is graded. |
 | `offset` | When the button went down, in frames from A₁. A negative number means it was buffered. The helper compares each attempt's press with this one: positive is late. |
+
+Each event, when `events` is present:
+
+| Field | Meaning |
+| --- | --- |
+| `kind` | `press`, `release`, `cstick` or `flick`. |
+| `button` | For a press or a release: `attack`, `special`, `jump`, `shield` or `grab`. |
+| `flick` | For a flick: `fast_fall`, `dash` or `tap_jump`. |
+| `dir` | Facing-relative: `neutral`, `forward`, `forward_up`, `up`, `back_up`, `back`, `back_down`, `down` or `forward_down`. The same combo facing the other way is the same direction. |
+| `offset` | The frame of the event, counted from A₁ the same way a press is. |
 
 **Frames and A₁.** All numbers are game frames (1/60 s). They count from **A₁**, the first frame after the first hit
 on which Player 1 could act. Every link starts again at its own A₁.
@@ -85,18 +97,18 @@ on which Player 1 could act. Every link starts again at its own A₁.
 **Moves** (`from`, `to`): `jab`, `dash_attack`, `side_tilt`, `up_tilt`, `down_tilt`, `side_smash`, `up_smash`,
 `down_smash`, `aerial`, `neutral_special`, `side_special`, `up_special`, `down_special`, `other`. These are kinds of
 move, not one fighter's moves, so a combo recorded on one fighter can be practised on any other. All aerials are
-`aerial`; the step's `aim` tells a forward air from a neutral air.
+`aerial`; a newer file's event direction tells a forward air from a neutral air, relative to the facing. An older file's `aim` still uses `side` for both left and right.
 
 ## Reading rules
 
-- **Unknown fields are ignored**, at the top and inside links and steps, so you can add your own notes. A rename keeps
+- **Unknown fields are ignored**, at the top and inside links, steps, and events, so you can add your own notes. A rename keeps
   them.
 - **A file that cannot be used** is skipped: the list shows the others. A notice names the first such file and the
   reason, for example `typo.json skipped: malformed file: bad combo field: to` (a misspelt follow-up move), and adds
   "(+N more)" when there are several. Reasons:
-  - a misspelt move, button or aim;
+  - a misspelt move, button, aim, event or direction;
   - a missing or empty `links`;
-  - more than 16 links or 4 steps;
+  - more than 16 links, more than 4 presses in `steps`, or more than 12 events;
   - broken JSON;
   - a newer `schema_version`;
   - a file over 64 KiB;
