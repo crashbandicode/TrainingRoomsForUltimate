@@ -153,6 +153,7 @@ pub(crate) fn worker_tick() {
     super::named_macros::run_deferred();
     super::named_macros::publish_queries();
     super::sync_owner();
+    crate::runtime::features::recording_host::service();
 }
 
 #[derive(Clone, Copy)]

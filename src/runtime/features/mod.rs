@@ -12,6 +12,7 @@ pub mod item_bridge;
 pub mod lra_reset;
 pub mod notices;
 pub mod recorder;
+pub mod recording_host;
 pub mod reset_hub;
 pub mod state_effects;
 pub mod state_restore;

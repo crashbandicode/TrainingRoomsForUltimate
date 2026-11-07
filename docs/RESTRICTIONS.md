@@ -16,3 +16,4 @@ the 3 above it (playbook `docs/CHECKLIST.md`, the "cites an approved restriction
 | `preload-wait-pool` | `" ({} waiting for pool space)"` (Cycle Preload notice, `cycle_preload_policy.rs` `CacheText`) | The same hold when the fighter pool has too few free bodies after its reserve (P-HOT §8) | operator 2026-11-05 ("yes to both") |
 | `preload-failed-and-waiting` | `" ({} failed, {} waiting for {})"` (Cycle Preload notice, `cycle_preload_policy.rs` `CacheText`) | Failed and held groups at once, in one bracket (P-HOT §8) | operator 2026-11-05 ("yes to both") |
 | `chain-recordings-only` | (none) | a chain inside a chain would need a loop check | operator 2026-11-06, revision 8 Q13 |
+| `macro-start-save-missing` | No start save. This macro plays from where the fighters are. | the connected start file was deleted | operator 2026-11-06, revision 3 answer 3 |

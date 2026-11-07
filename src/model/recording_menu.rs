@@ -157,7 +157,7 @@ pub struct MacroFile {
     pub recorded_on: String,
 }
 
-/// A combo file. `links` are the lines `combo_link_lines` produces.
+/// A combo file. `links` are the lines [`combo_link_lines`] produces: the move, then its events, then drift.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ComboFile {
     pub id: String,
@@ -436,6 +436,11 @@ impl RecordingScreens {
 
     pub fn last_effect(&self) -> &Effect {
         &self.last_effect
+    }
+
+    /// The host takes the effect once. A second read is [`Effect::None`].
+    pub fn take_effect(&mut self) -> Effect {
+        std::mem::replace(&mut self.last_effect, Effect::None)
     }
 
     pub fn loop_of(&self, role: ViewRole) -> LoopMark {
@@ -1607,16 +1612,76 @@ fn unused_n(prefix: &str, names: &[String]) -> u32 {
     }
 }
 
-/// "L1 aerial → aerial TRUE", from the combo file's own links.
+/// One link's move line, then its input events, then drift when the file recorded a hold.
+/// An older presses-only file shows its presses and no drift.
 pub fn combo_link_lines(combo: &Combo) -> Vec<String> {
-    combo
-        .links()
-        .enumerate()
-        .map(|(index, link)| {
-            let word = if link.is_true() { "TRUE" } else { "FALSE" };
-            format!("L{} {} → {} {word}", index + 1, link.from.name().to_ascii_lowercase(), link.to.name().to_ascii_lowercase())
-        })
-        .collect()
+    combo.links().enumerate().flat_map(|(index, link)| link_panel_lines(index, link)).collect()
+}
+
+fn link_panel_lines(index: usize, link: &super::combo::LinkRec) -> Vec<String> {
+    let word = if link.is_true() { "TRUE" } else { "FALSE" };
+    let mut lines = vec![format!(
+        "L{} {} → {} {word}",
+        index + 1,
+        link.from.name().to_ascii_lowercase(),
+        link.to.name().to_ascii_lowercase()
+    )];
+    if let Some(events) = event_line(link) {
+        lines.push(events);
+    }
+    if let Some(drift) = drift_line(link.drift) {
+        lines.push(drift);
+    }
+    lines
+}
+
+fn event_line(link: &super::combo::LinkRec) -> Option<String> {
+    let parts: Vec<String> = link.events().map(event_token).collect();
+    if parts.is_empty() { None } else { Some(parts.join(" · ")) }
+}
+
+fn event_token(event: super::combo::Event) -> String {
+    use super::combo::{Flick, Kind};
+    use super::frame_strip::Button;
+    match event.kind {
+        Kind::Press(Button::Jump) => "jump".to_string(),
+        Kind::Press(Button::Attack) => "A".to_string(),
+        Kind::Press(Button::Special) => "B".to_string(),
+        Kind::Press(Button::Shield) => "shield".to_string(),
+        Kind::Press(Button::Grab) => "grab".to_string(),
+        Kind::Release(_) => "release".to_string(),
+        Kind::CStick => with_dir(event.dir, "c-stick"),
+        Kind::Flick(Flick::FastFall) => with_dir(event.dir, "flick"),
+        Kind::Flick(Flick::Dash) => with_dir(event.dir, "dash"),
+        Kind::Flick(Flick::TapJump) => with_dir(event.dir, "tap"),
+    }
+}
+
+fn with_dir(dir: super::combo::Dir, word: &str) -> String {
+    match dir_arrow(dir) {
+        "" => word.to_string(),
+        arrow => format!("{arrow} {word}"),
+    }
+}
+
+fn dir_arrow(dir: super::combo::Dir) -> &'static str {
+    use super::combo::Dir;
+    match dir {
+        Dir::Forward => "→",
+        Dir::Back => "←",
+        Dir::Up => "↑",
+        Dir::Down => "↓",
+        Dir::ForwardUp => "↗",
+        Dir::BackUp => "↖",
+        Dir::ForwardDown => "↘",
+        Dir::BackDown => "↙",
+        Dir::Neutral | Dir::Side => "",
+    }
+}
+
+fn drift_line(dir: Option<super::combo::Dir>) -> Option<String> {
+    let arrow = dir_arrow(dir?);
+    if arrow.is_empty() { None } else { Some(format!("drift {arrow}")) }
 }
 
 #[cfg(test)]
@@ -1631,13 +1696,7 @@ mod tests {
     use crate::model::settings::{self, Settings};
 
     fn link(from: Move, to: Move, tru: bool) -> LinkRec {
-        LinkRec {
-            from,
-            to,
-            verdict: if tru { Verdict::True(None) } else { Verdict::Drop(1) },
-            window: None,
-            steps: [None; crate::model::combo::STEPS],
-        }
+        LinkRec::presses(from, to, if tru { Verdict::True(None) } else { Verdict::Drop(1) }, None, &[])
     }
 
     fn example() -> Catalog {
@@ -2051,6 +2110,55 @@ mod tests {
         screens.set_cursor(Face::Page, COMBOS_SEQ, 1, 0);
         let panel = screens.connections(Face::Page, COMBOS_SEQ);
         assert!(panel.iter().any(|line| line.text == "L1 aerial → aerial TRUE"));
+    }
+
+    #[test]
+    fn the_combo_panel_lists_each_links_events_and_drift() {
+        use crate::model::combo::{retain, Dir, Event, Flick, Kind};
+        use crate::model::frame_strip::Button;
+        let nair = |drift| {
+            let mut link = LinkRec::presses(Move::Aerial, Move::Aerial, Verdict::True(None), None, &[]);
+            link.presses_only = false;
+            link.events = retain([
+                Event::press(Button::Jump, crate::model::combo::Aim::Neutral, 0),
+                Event { kind: Kind::Release(Button::Jump), dir: Dir::Neutral, offset: 3 },
+                Event { kind: Kind::Flick(Flick::FastFall), dir: Dir::Down, offset: 8 },
+                Event::press(Button::Attack, crate::model::combo::Aim::Neutral, 10),
+            ]);
+            link.drift = drift;
+            link
+        };
+        let combo = Combo::from_links([nair(Some(Dir::Forward)), nair(Some(Dir::Back))]).unwrap();
+        let lines = combo_link_lines(&combo);
+        assert_eq!(lines[0], "L1 aerial → aerial TRUE");
+        assert_eq!(lines[1], "jump · release · ↓ flick · A");
+        assert_eq!(lines[2], "drift →");
+        assert_eq!(lines[3], "L2 aerial → aerial TRUE");
+        assert_eq!(lines[4], "jump · release · ↓ flick · A");
+        assert_eq!(lines[5], "drift ←");
+        let mut screens = screens();
+        screens.set_links("nairc", lines);
+        screens.set_cursor(Face::Page, COMBOS_SEQ, 1, 0);
+        let panel = screens.connections(Face::Page, COMBOS_SEQ);
+        let text: Vec<&str> = panel.iter().map(|line| line.text.as_str()).collect();
+        assert!(text.contains(&"jump · release · ↓ flick · A"));
+        assert!(text.contains(&"drift →"));
+        assert!(text.contains(&"drift ←"));
+
+        let old = Combo::from_links([LinkRec::presses(
+            Move::Aerial,
+            Move::Aerial,
+            Verdict::True(None),
+            None,
+            &[
+                Event::press(Button::Attack, crate::model::combo::Aim::Side, 1),
+                Event::press(Button::Jump, crate::model::combo::Aim::Up, 4),
+            ],
+        )])
+        .unwrap();
+        let old_lines = combo_link_lines(&old);
+        assert_eq!(old_lines, vec!["L1 aerial → aerial TRUE".to_string(), "A · jump".to_string()]);
+        assert!(old_lines.iter().all(|line| !line.contains("drift") && !line.contains("release") && !line.contains("flick")));
     }
 
     #[test]

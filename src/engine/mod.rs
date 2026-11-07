@@ -48,6 +48,13 @@ pub mod library;
 /// Per-role playback. Mounted with the library: a by-path test of `model.rs` has no `engine` module.
 #[path = "../model/playback.rs"]
 pub mod playback;
+/// Recording runtime: capture, windows, chords, crop, notices, saves, and migration.
+/// Mounted with playback so a by-path test of `model.rs` does not compile it.
+#[path = "../model/rr_runtime.rs"]
+pub mod rr_runtime;
+/// Hook atomics and the worker tick. No skyline, so the host tests compile it.
+#[path = "../model/rr_host.rs"]
+pub mod rr_host;
 // CPU-as-P1: the session helpers (the pilot core is a path child of cpu_pilot) are consumed by the Switch-only runtime::p1::cpu_pilot; on the host their tests run by path
 // from tests/p1_core.rs (the playbook's by-path include).
 #[cfg(target_os = "switch")]

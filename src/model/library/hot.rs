@@ -104,6 +104,9 @@ pub struct RecordingIndex {
     drill: Option<Drill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     migration: Option<MigrationReceipt>,
+    /// The one-time chord notice. Omitted when it has not been shown, so older indexes still load.
+    #[serde(default, skip_serializing_if = "bool_is_false")]
+    chord_notice_seen: bool,
 }
 
 impl RecordingIndex {
@@ -118,6 +121,7 @@ impl RecordingIndex {
             active: Actives::default(),
             drill: None,
             migration: None,
+            chord_notice_seen: false,
         }
     }
 
@@ -149,6 +153,14 @@ impl RecordingIndex {
 
     pub fn migrated(&self) -> bool {
         self.migrated
+    }
+
+    pub fn chord_notice_seen(&self) -> bool {
+        self.chord_notice_seen
+    }
+
+    pub fn mark_chord_notice_seen(&mut self) {
+        self.chord_notice_seen = true;
     }
 
     pub fn receipt(&self) -> Option<&MigrationReceipt> {
@@ -260,6 +272,10 @@ impl RecordingIndex {
         rows.sort_by(|left, right| right.1.cmp(&left.1).then(left.0.cmp(&right.0)));
         *self.hot.get_mut(kind) = rows.into_iter().take(5).map(|(id, _)| id).collect();
     }
+}
+
+fn bool_is_false(value: &bool) -> bool {
+    !*value
 }
 
 pub const INDEX_FILE: &str = "recording-index.json";

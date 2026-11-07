@@ -34,7 +34,7 @@ use crate::model::cpu::role::FighterKey;
 use crate::model::cpu::status;
 use crate::model::input_delay::{MappedInputs, Owners};
 use crate::model::recording::{
-    ChordAction, ControlCtx, ControlOut, Ended, LoadAction, MashCtx, Mode, Phase, PlayRefusal, PollFacts, PostCtx, RecordRefusal, Recorder,
+    ControlCtx, ControlOut, Ended, LoadAction, MashCtx, Mode, Phase, PollFacts, PostCtx, RecordRefusal, Recorder,
     RecorderSettings, StartSnapshot,
 };
 use crate::model::settings::Snapshot;
@@ -85,6 +85,39 @@ impl Drop for RecGuard {
 
 fn rec() -> RecGuard {
     RecGuard(REC.lock())
+}
+
+/// The five live slots, copied so migration can write them without holding the recorder lock.
+pub(crate) fn live_slots() -> [Option<crate::engine::library::LegacySlot>; 5] {
+    let rec = rec();
+    let mut slots: [Option<crate::engine::library::LegacySlot>; 5] = [None, None, None, None, None];
+    for index in 0..5u8 {
+        if !rec.is_recorded(index) {
+            continue;
+        }
+        let Some(frames) = rec.frames(index) else { continue };
+        if frames.is_empty() {
+            continue;
+        }
+        let origin = rec.origin(index);
+        let start = crate::engine::macros::StartState::neutral(
+            origin.map(|item| item.start.fighter_kind).unwrap_or(0),
+            origin.map(|item| item.start.costume).unwrap_or(0),
+            f32::from(origin.map(|item| item.facing).unwrap_or(1)),
+        );
+        let copied = frames
+            .iter()
+            .map(|frame| crate::engine::macros::InputFrame {
+                buttons: frame.buttons,
+                lstick_x: frame.lstick_x,
+                lstick_y: frame.lstick_y,
+                rstick_x: frame.rstick_x,
+                rstick_y: frame.rstick_y,
+            })
+            .collect();
+        slots[usize::from(index)] = Some(crate::engine::library::LegacySlot { frames: copied, start });
+    }
+    slots
 }/// The recorder's hook was installed with every row of its closure (`model::capabilities`, review R2-1): until
 /// boot says so, the entry points the other features call (`on_p1_poll`, `request_playback`,
 /// `on_state_restored`) do nothing and read no native.
@@ -296,6 +329,7 @@ pub unsafe fn on_p1_poll(out: *mut MappedInputs) {
         (rec.mode(), rec.is_named())
     };
     if mode == Mode::None {
+        recording_host::on_player_poll(out);
         return;
     }
     if named {
@@ -455,7 +489,42 @@ unsafe fn on_ai_frame(ai: usize) {
     let state = rec().playback_state(queue_head.is_some());
     cpu::set_playback(state);
     bump(COUNT_NOTICE);
+    host_cpu(controller);
     report_counts();
+}
+
+unsafe fn host_cpu(controller: usize) {
+    if recording_host::capture_role() == 2 {
+        let buttons = ((controller + CTRL_BUTTONS) as *const u32).read();
+        let stick_x = f32::from_bits(((controller + CTRL_STICK_X) as *const u32).read());
+        let stick_y = f32::from_bits(((controller + CTRL_STICK_Y) as *const u32).read());
+        let to_i8 = |value: f32| (value * crate::model::recording::STICK_FULL).round().clamp(i8::MIN as f32, i8::MAX as f32) as i8;
+        recording_host::push_capture(
+            2,
+            crate::engine::macros::InputFrame {
+                buttons,
+                lstick_x: to_i8(stick_x),
+                lstick_y: to_i8(stick_y),
+                rstick_x: 0,
+                rstick_y: 0,
+            },
+        );
+    }
+    let Some(frame) = recording_host::take_cpu_frame() else { return };
+    let mapped = MappedInputs {
+        buttons: frame.buttons,
+        lstick_x: frame.lstick_x,
+        lstick_y: frame.lstick_y,
+        rstick_x: frame.rstick_x,
+        rstick_y: frame.rstick_y,
+    };
+    let write = crate::model::recording::inject_values(mapped, 1);
+    let at = |offset: usize| (controller + offset) as *mut u32;
+    at(CTRL_BUTTONS).write(write.buttons);
+    at(CTRL_STICK_X).write(write.stick_x.to_bits());
+    at(CTRL_STICK_Y).write(write.stick_y.to_bits());
+    at(CTRL_CLAMPED_X).write(write.clamped_x.to_bits());
+    at(CTRL_CLAMPED_Y).write(write.clamped_y.to_bits());
 }
 
 unsafe fn mash_start(settings: &RecorderSettings, key: FighterKey, body: Body, facing: i8) {
@@ -494,39 +563,19 @@ unsafe fn mash_start(settings: &RecorderSettings, key: FighterKey, body: Body, f
     }
 }
 
-/// The record and playback chords (SPEC-input-01 §2.2): consumed on the CPU body's frame.
-unsafe fn chord_step(settings: &RecorderSettings, body: Body, facing: i8) {
+/// Record, Play on Player 1, and Play on CPU. The hook only posts the flags.
+unsafe fn chord_step(settings: &RecorderSettings, _body: Body, _facing: i8) {
+    let play_player = chords::consume(Request::PlayPlayer);
     let playback = chords::consume(Request::InputPlayback);
     let record = chords::consume(Request::InputRecord);
     if states::is_loading() {
-        // Both chords are consumed and ignored while a save state loads (§6.4).
-        if record || playback {
+        if record || playback || play_player {
             event("chord_ignored_loading", "record", i64::from(record), "playback", i64::from(playback));
         }
         return;
     }
     let record = record && settings.trigger_chord;
-    if crate::runtime::macros::named_active() {
-        // Macro Source = Named Library: the chords drive the named layer (SPEC-input-01 section 9). The record chord while a capture
-        // records was consumed by the poll (the stop chord); here it starts one.
-        if playback {
-            named_macros::request_playback();
-        } else if record && rec().mode() == Mode::None {
-            start_named_lockout();
-        }
-        return;
-    }
-    match Recorder::resolve_chords(record, playback) {
-        ChordAction::None => {}
-        ChordAction::Playback => {
-            let slot = Recorder::pick_chord_slot(settings, &mut RNG.lock());
-            match slot {
-                Some(slot) => begin_playback(slot, facing, false),
-                None => notices::refuse(PlayRefusal::SlotEmpty.text()),
-            }
-        }
-        ChordAction::Record => begin_recording(settings, body, facing),
-    }
+    recording_host::on_chords(record, play_player, playback);
 }
 
 unsafe fn begin_playback(slot: u8, facing: i8, ledge: bool) {
@@ -776,6 +825,7 @@ pub fn replay_capture_loading() -> bool {
 /// Playback Mash Interrupt (SPEC-cpu-01 §3, decision B5): the CPU's mash asked the running playback to stop. A
 /// recording in progress is not touched.
 pub fn interrupt_playback() {
+    recording_host::note_mash();
     let settings = settings();
     let (stopped, state) = {
         let mut rec = rec();
