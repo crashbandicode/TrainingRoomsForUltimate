@@ -40,6 +40,19 @@ def main():
         return 1
     if plan.get('game_id') != '01006A800016E000':
         failures.append('game_id must be 01006A800016E000')
+    # Playbook MACROS.md: a segment is recorded on its first play from its recipe (or comes from the shared library);
+    # nobody writes a .edenmacro.json by hand, because made-up timings aren't evidence of anything.
+    for name, seg in (plan.get('segments') or {}).items():
+        if isinstance(seg, dict) and 'library' in seg:
+            continue
+        if not isinstance(seg, dict) or not seg.get('recipe'):
+            failures.append(f'segment {name}: needs a "recipe" (it is recorded on its first play)')
+            continue
+        if seg.get('sha256'):
+            failures.append(f'segment {name}: no sha256 before it has been recorded')
+        seg_file = seg.get('file')
+        if seg_file and (HERE / seg_file).exists():
+            failures.append(f'segment {name}: {seg_file} exists; segments are recorded from their recipe, not written by hand')
     rows = plan.get('rows') or []
     ids = [row.get('id') for row in rows]
     duplicates = sorted({i for i in ids if ids.count(i) > 1})
