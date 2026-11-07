@@ -21,6 +21,8 @@ const FONT_SAFE: &[char] = &[
     '\u{2014}', // — EM DASH (the Mii list's title)
     '\u{00A7}', // § SECTION SIGN
     '\u{00E9}', // é
+    '\u{2192}', // → RIGHTWARDS ARROW. All three nintendoP_RodinNTLG weights map it (bfotf-2c46f6bb68, bfotf-2d24073d3a, bfotf-2d58bc0c11).
+    '\u{221E}', // ∞ INFINITY. The same three weights map it.
 ];
 
 fn files(dir: &Path, out: &mut Vec<PathBuf>) {
