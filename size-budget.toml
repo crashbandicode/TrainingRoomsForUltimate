@@ -681,3 +681,11 @@ ceiling = 151146
 date = "2026-11-08"
 reason = "rc.6 warm exit from a Mii group (p23/rc6-hot-slots 4f01c0a; operator decision 2026-11-08, INBOX-opus-rc6-hotslots 15:58Z): plan_mii_exit, mii_exit_bytes_match, and the adapters' kept publication and exit_settled; measured 151146 (tools/size_gate.py), +325 over 150821"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to this operator-chosen rc.6 item under TASK-OPUS-rc6-hot-slots (primary c07b3449, 2026-11-08: a raise goes in its own commit with approved_by)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 152195
+date = "2026-11-08"
+reason = "rc.6 item 3 (p23/rc6-hot-slots 91146f3; operator decisions 2026-11-08, INBOX-opus-rc6-hotslots 19:12Z and 19:21Z): groups built in the background after Training loads (native_body_bank start/settle/drain/finish_background, queue_detached, the scratch entry for the control init, background_skip) and a cycle change that releases groups whose members left (cycle_wanted, leave_group, Groups::next_slot, body_bank::group_left_cycle/reuse_slot/shown_state); measured 152195 (tools/size_gate.py), +1049 over 151146"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to this operator-chosen rc.6 item under TASK-OPUS-rc6-hot-slots (primary c07b3449, 2026-11-08: a raise goes in its own commit with approved_by)"
