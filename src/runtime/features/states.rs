@@ -1681,9 +1681,7 @@ fn take_captured(file: &mut SaveFile) {
     let mut written = None;
     for CapturedRecord { sequence, role, slot, mut state, mii } in taken.into_iter().flatten() {
         if binding.as_ref().is_some_and(|job| job.sequence() < sequence) {
-            let bind = binding.take().unwrap();
-            written = Some(bind.slot());
-            setups::apply_writer_bind(file, bind);
+            setups::apply_writer_bind(file, binding.take().unwrap());
         }
         written = Some(slot);
         state.marker = Marker::NoAction;
