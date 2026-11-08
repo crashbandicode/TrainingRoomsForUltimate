@@ -137,7 +137,7 @@ pub fn outstanding(state: GroupState, cost: GroupCost) -> u64 {
     match state {
         GroupState::Prefetching => with_margin(cost.total()),
         GroupState::Prefetched => with_margin(cost.build),
-        GroupState::Planned | GroupState::Held(_) | GroupState::Built | GroupState::Failed => 0,
+        GroupState::Planned | GroupState::Held(_) | GroupState::Built | GroupState::Failed | GroupState::Released => 0,
     }
 }
 

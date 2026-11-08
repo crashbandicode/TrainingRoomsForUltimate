@@ -59,7 +59,7 @@ fn the_scene_change_keeps_the_new_scenes_start_up_window() {
     assert!(changed.contains("if !fresh[role] { bank.departed = true; }"));
     assert!(changed.contains("for role in (0..2).filter(|role| !fresh[*role]) { r_handle::reset("));
     let publish = body(BANK, "unsafe fn publish_pending(");
-    assert!(publish.contains("construction: None, tick: TickGap::default(), held_turn: 0, scene,"), "{publish}");
+    assert!(publish.contains("construction: None, background: None, tick: TickGap::default(), held_turn: 0, scene,"), "{publish}");
 }
 
 /// rc6-hot-xps1 (2026-11-08, XPS): the first group exchange from either start-up window fell back with "group owner

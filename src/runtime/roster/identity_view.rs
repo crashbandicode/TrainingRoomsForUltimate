@@ -276,6 +276,12 @@ unsafe fn init_prepare_entry(ctx: &mut InlineCtx) {
         }
     }
     rekey(ctx, 9, r, 3, Scope::Body(kind));
+    // rc.6 item 3: a background build's body (`native_body_bank::start_background`) registers nothing: `0x17f1a60`
+    // returns at once for kind −1. Native passes the window's header kind here, and these registry slots are the
+    // live window's.
+    if object(r) && crate::runtime::roster::character_roster::body_bank::background_skip(word(r, 0x54)) {
+        ctx.registers[2].set_x(u64::from(u32::MAX));
+    }
 }
 
 /// Body setup V+0x18, construct-path costume: R x20, the body's kind w8 (`body+0xc`), costume w4.

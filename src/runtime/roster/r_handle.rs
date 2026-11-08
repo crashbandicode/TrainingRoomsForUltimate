@@ -223,6 +223,16 @@ pub(crate) fn construction_settled(role: Role, group: usize, kinds: &[u32]) {
     }
 }
 
+/// rc.6 mid-session cycle change: a released group's slot takes the next planned group, which must start its own batch.
+/// Forgets `group`'s batch when the ledger holds no token for it; returns how many it still holds (then the batch stays).
+pub(crate) fn forget_group(role: Role, group: usize) -> usize {
+    let mut slot = lock(role);
+    let Some(handle) = slot.as_mut() else { return 0; };
+    let held = handle.held.iter().filter(|(g, _)| *g == group).count();
+    if held == 0 { handle.batches.retain(|(g, _)| *g != group); }
+    held
+}
+
 /// Settle, with no native call, the tokens held for `group` whose kind is in `kinds`, because the
 /// owner's state proves native already freed their keys (the caller read `R+0x18 == 0`). Returns
 /// the settled kinds.

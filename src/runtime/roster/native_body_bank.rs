@@ -162,12 +162,13 @@ use super::{aligned, read, BASE};
 use crate::engine::seams::native_fields as fields;
 use skyline::hooks::InlineCtx;
 use std::convert::TryInto;
-use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU8, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU8, AtomicUsize, Ordering};
 use hos_lock::Mutex;
 use crate::engine::swap::body_bank::{
     count_extra_groups_iter, dispatcher_array_header_ok, dispatcher_idle_words, native_group_request, original_bankable,
     pair_request, pair_resource_references, plan_extra_groups_with, prefetch_outcome,
     swap_commit_index_in, async_build_eligible, construction_task, TickGap,
+    background_build_eligible, next_background, BACKGROUND_INFO_SPANS,
     GroupBudget, GroupExchange, GroupOwner, GroupPolicy, GroupState, Hold, Members, Phase, Special,
     SpecialPolicy, BANK_FLAG, MAX_EXTRA_GROUPS, NANA, NATIVE_MEMBERS, PAIR_ACTIVE_FLAG, POOL_RESERVE, POPO,
     entry_bytes_of, mii_exit_bytes_match, mii_reuse_bytes_match, MiiEntryBytes, MiiIdentity, MII_ENTRY_START, RESOURCE_WORDS,
@@ -206,6 +207,13 @@ static PAIR_ENABLED: AtomicBool = AtomicBool::new(false);
 static SPECIAL_ENABLED: AtomicBool = AtomicBool::new(false);
 /// Phase B′ fingerprints (the asynchronous construction path) and the functor vtable slot passed.
 static ASYNC_ENABLED: AtomicBool = AtomicBool::new(false);
+/// rc.6 item 3: the Phase B′ rows passed and the identity view's body-init site is hooked (its hook skips the
+/// worker's registration for a background build, `background_skip`).
+static BACKGROUND_ENABLED: AtomicBool = AtomicBool::new(false);
+/// One bit per owner whose background build is in flight.
+static BACKGROUND_OWNERS: AtomicU32 = AtomicU32::new(0);
+/// Registrations `background_skip` has skipped since boot (each settlement logs its own difference).
+static BACKGROUND_SKIPS: AtomicU32 = AtomicU32::new(0);
 static BANKS: [Mutex<Option<Bank>>; 2] = [Mutex::new(None), Mutex::new(None)];
 // Filled before the hooks are enabled; each role moves its storage into its
 // first bank and retains it through every subsequent native bank lifetime.
@@ -713,6 +721,20 @@ pub(crate) fn plan_budget(menu: &crate::engine::compat::menu::TrainingModpackMen
         .map(|bank| *bank.members))
 }
 
+/// The kinds a role's groups may hold (rc.6 mid-session cycle change, `body_bank::group_left_cycle`): its cycle's
+/// members, as the cycle list reads them now, and its original.
+fn cycle_wanted(menu: &crate::engine::compat::menu::TrainingModpackMenu, role: usize) -> crate::engine::swap::ordered_roster::KindList {
+    let roster = if role == 0 {
+        crate::engine::swap::cycle_members::cycle_members(menu.player_roster, super::player_cycle_admission())
+    } else {
+        crate::engine::swap::cycle_members::cycle_members(menu.cpu_roster, super::cpu_cycle_admission())
+    };
+    let mut wanted = crate::engine::swap::ordered_roster::KindList::new(0);
+    for fighter in roster.iter() { wanted.push(fighter.kind()); }
+    if let Some(kind) = super::original_kind(if role == 0 { super::Role::Player } else { super::Role::Cpu }) { wanted.push(kind); }
+    wanted
+}
+
 /// Value-only group planning on the sparse planner: appends `Planned` groups to
 /// a Ready window bank; never removes or touches a native object. Returns the
 /// extra-group bodies charged to the shared budget and the per-role UI targets.
@@ -732,11 +754,33 @@ fn plan_groups(settings: &crate::engine::preload::cycle_preload_config::Settings
     let mut windows = [None; 2];
     let mut existing = [crate::engine::compat::fixed::FixedList::<Members, MAX_EXTRA_GROUPS>::new(Members::pair_group()); 2];
     let mut alias = [0usize; 2];
+    // rc.6 mid-session cycle change (operator requirement 2026-11-08, inbox 19:21Z): a detached group with a member the
+    // role's cycle no longer has leaves. Nothing native exists for a planned, held or failed group: it is Released here.
+    // Any other is released on the entry tick (`leave_group`); until then it keeps its bodies in the budget and the role
+    // plans nothing new, so its kept members are planned again on the pass after. The window itself (on screen) stays
+    // until it is switched away.
+    let wanted = [cycle_wanted(menu, 0), cycle_wanted(menu, 1)];
+    let mut leaving = [false; 2];
     for role in 0..2 {
-        let state = BANKS[role].lock();
-        if let Some(bank) = state.as_ref().filter(|bank| bank.phase == Phase::Ready && !bank.departed) {
+        let mut state = BANKS[role].lock();
+        if let Some(bank) = state.as_mut().filter(|bank| bank.phase == Phase::Ready && !bank.departed) {
             windows[role] = Some(*bank.members);
             alias[role] = bank.alias;
+            let owner = bank.owner;
+            for (index, group) in bank.groups.iter_mut().enumerate() {
+                if group.state == GroupState::Released || group.leaving
+                    || !crate::engine::swap::body_bank::group_left_cycle(*group.members, &wanted[role]) { continue; }
+                let before = group.state;
+                if matches!(before, GroupState::Planned | GroupState::Held(_) | GroupState::Failed) {
+                    group.state = GroupState::Released;
+                } else {
+                    group.leaving = true;
+                }
+                trace!("[GroupSwap] left cycle owner={} group={} kinds={:x?} state={:?} {}", owner, index,
+                    &group.members.kinds()[..group.members.count()], before,
+                    if group.leaving { "leaving; the entry tick releases it" } else { "released (nothing native)" });
+            }
+            leaving[role] = bank.groups.iter().any(|g| g.leaving);
             for group in bank.groups.iter().filter(|g| g.state.counts_bodies()) {
                 existing[role].push(*group.members);
             }
@@ -770,8 +814,8 @@ fn plan_groups(settings: &crate::engine::preload::cycle_preload_config::Settings
         let mut state = BANKS[role].lock();
         let Some(bank) = state.as_mut().filter(|bank| bank.phase == Phase::Ready && !bank.departed) else { continue; };
         for members in planned[role].iter().flatten() {
-            if bank.groups.len() >= MAX_EXTRA_GROUPS { break; }
-            if bank.groups.iter().any(|g| g.members.index_of(members.kinds()[0]).is_some()) { continue; }
+            if leaving[role] || bank.groups.next_slot().is_none() { break; }
+            if bank.groups.iter().any(|g| g.state != GroupState::Released && g.members.index_of(members.kinds()[0]).is_some()) { continue; }
             let identity = if members.carries_identity() {
                 match mii_identity_for(bank, &lanes[2 + role], members.kinds()[0]) {
                     Some(identity) => Some(identity),
@@ -781,9 +825,9 @@ fn plan_groups(settings: &crate::engine::preload::cycle_preload_config::Settings
                     }
                 }
             } else { None };
-            bank.groups.plan(*members, identity);
+            let slot = bank.groups.plan(*members, identity);
             trace!("[GroupSwap] plan owner={} group={} kinds={:x?} special={:?} bodies={} ready_fighters={} pool={}/{} reserve={} hats={} alias={:#x} identity={:?}",
-                bank.owner, bank.groups.len() - 1, &members.kinds()[..members.count()], members.special(), members.count(),
+                bank.owner, slot, &members.kinds()[..members.count()], members.special(), members.count(),
                 settings.ready_fighters, live, capacity, POOL_RESERVE, hats_wanted, alias[role],
                 identity.map(|(i, _)| (i.index, i.tokens)));
         }
@@ -820,7 +864,9 @@ pub(crate) fn progress() -> crate::engine::preload::cycle_preload_policy::BuiltF
                 let (kinds, count) = bank.members.logical_kinds();
                 let active = bank.observed.map_or(bank.members.kinds()[usize::from(bank.target)], |(_, kind)| kind);
                 let extra = reusable_extras(&kinds[..count], active, originals[role]);
-                let groups = count_extra_groups_iter(bank.groups.iter().map(|g| (*g.members, g.state)));
+                // rc.6 item 3: a prefetched group a background build still owes is loading, not yet instant.
+                let groups = count_extra_groups_iter(bank.groups.iter().map(|g|
+                    (*g.members, crate::engine::swap::body_bank::shown_state(g.state, background_owed(bank, g, Some(active))))));
                 let window = if bank.failed { WindowStatus::Failed }
                     else if bank.phase == Phase::Ready && bank.observed.is_some() { WindowStatus::Built }
                     else { WindowStatus::Busy };
@@ -1350,6 +1396,12 @@ struct GroupData {
     charinfo_published: bool,
     /// The refusals of that publication so far, with the last reason (`body_bank::mii_publish`).
     publish: PublishAttempts,
+    /// rc.6 item 3: a background build of this group was refused (logged once); it stays Prefetched and its first
+    /// switch builds it, as before.
+    background_refused: bool,
+    /// rc.6 mid-session cycle change: a member left the role's cycle (`body_bank::group_left_cycle`); the entry tick
+    /// releases the group (`leave_group`) and it becomes Released.
+    leaving: bool,
 }
 
 impl GroupData {
@@ -1358,7 +1410,8 @@ impl GroupData {
         Self { state: GroupState::Planned, saved: None,
             bodies: [Body::default(); NATIVE_MEMBERS], since_us: 0, busy_logged: false, kirby_logged: false,
             memory_logged: false, prefetch_committed: None,
-            identity, configuration, charinfo_published: false, publish: PublishAttempts::new() }
+            identity, configuration, charinfo_published: false, publish: PublishAttempts::new(), background_refused: false,
+            leaving: false }
     }
 }
 
@@ -1383,12 +1436,19 @@ impl Groups {
         })), len: 0 }
     }
     fn clear(&mut self) { self.len = 0; }
-    fn plan(&mut self, members: Members, identity: Option<(MiiIdentity, Configuration)>) {
-        // The caller holds BANKS and has proved len < MAX_EXTRA_GROUPS.
-        let group = &mut self.slots[self.len];
+    /// The slot the next planned group takes: a Released one (rc.6 mid-session cycle change), else the next free one.
+    fn next_slot(&self) -> Option<usize> {
+        crate::engine::swap::body_bank::reuse_slot(self.iter().map(|g| g.state))
+            .or((self.len < MAX_EXTRA_GROUPS).then_some(self.len))
+    }
+    /// Returns the slot the group took. The caller holds BANKS and has proved `next_slot` is `Some`.
+    fn plan(&mut self, members: Members, identity: Option<(MiiIdentity, Configuration)>) -> usize {
+        let slot = self.next_slot().unwrap_or(self.len);
+        let group = &mut self.slots[slot];
         *group.members = members;
         group.data = GroupData::planned(identity);
-        self.len += 1;
+        if slot == self.len { self.len += 1; }
+        slot
     }
 }
 impl std::ops::Deref for Groups {
@@ -1451,6 +1511,9 @@ struct Bank {
     /// Phase B′: the construction tasks of the group whose words are in the (empty) window,
     /// settled on a later tick (`settle_construction`) or drained before a destroyer.
     construction: Option<Construction>,
+    /// rc.6 item 3: a Prefetched group's bodies under construction beside the live window
+    /// (`start_background`), settled on a later tick or drained before a destroyer.
+    background: Option<Background>,
     /// P3-0: the tick-gap meter of the swap in flight (armed at the request, read at Ready).
     tick: TickGap,
     /// Advances at every held group's refused retry, so the retries rotate over the held groups.
@@ -1641,7 +1704,7 @@ pub(super) unsafe fn build(entry: *const u8, owner: u32, members: Members) -> bo
         acknowledged: false, departed: false, failed: false,
         groups: storage.groups, alias: 0, exchange: None, swap: None, prefetch: None, swap_started: None,
         pair_logged: false, identity: None, activated: Default::default(),
-        construction: None, tick: TickGap::default(), held_turn: 0, scene: None,
+        construction: None, background: None, tick: TickGap::default(), held_turn: 0, scene: None,
     });
     EXTRAS[role].store((members.count() - 1) as u8, Ordering::Release);
     GROUP_BODIES[role].store(0, Ordering::Release);
@@ -1706,7 +1769,7 @@ unsafe fn publish_pending(owner: u32, members: Members, scene: Option<(u32, u32)
         acknowledged: false, departed: false, failed: false,
         groups: storage.groups, alias: 0, exchange: None, swap: None, prefetch: None, swap_started: None,
         pair_logged: false, identity: None, activated: Default::default(),
-        construction: None, tick: TickGap::default(), held_turn: 0, scene,
+        construction: None, background: None, tick: TickGap::default(), held_turn: 0, scene,
     });
     EXTRAS[role].store((members.count() - 1) as u8, Ordering::Release);
     GROUP_BODIES[role].store(0, Ordering::Release);
@@ -1864,7 +1927,7 @@ pub(super) unsafe fn switch(entry: *mut u8, owner: u32, kind: u32, forms: Forms)
     true
 }
 
-enum Action { None, Swap, Lifecycle, Construct, SyncCopies }
+enum Action { None, Swap, Lifecycle, Construct, SyncCopies, Background }
 
 /// Called before all normal roster/source/HUD work, never instead of that work.
 /// INSTALL completion remains owned by the original roster/Mii transaction.
@@ -1890,6 +1953,7 @@ pub(super) unsafe fn service(entry: *mut u8, owner: u32) {
         Action::Lifecycle => group_lifecycle(entry, owner, role),
         Action::SyncCopies => sync_copy_packages(entry, owner, role),
         Action::Construct => settle_construction(entry, owner, role),
+        Action::Background => settle_background(entry, owner, role),
     }
 }
 
@@ -2005,7 +2069,10 @@ unsafe fn service_locked(entry: *mut u8, owner: u32, role: usize) -> Action {
             // Keep their copy-package dependencies current before the next
             // requested registration, without restarting group lifecycle work.
             return if !idle { Action::None }
-                else if bank.prefetch.is_some() || bank.groups.iter().any(|g| g.state.startable()) {
+                // rc.6 item 3: a background build in flight settles on the window's ticks; one owed starts.
+                else if bank.background.is_some() { Action::Background }
+                else if bank.prefetch.is_some() || bank.groups.iter().any(|g| g.state.startable() || g.leaving)
+                    || background_candidate(bank, Some(members.kinds()[usize::from(index)])).is_some() {
                     Action::Lifecycle
                 } else { Action::SyncCopies };
         }
@@ -2901,6 +2968,485 @@ unsafe fn drain_construction(entry: *const u8, owner: u32, role: usize, reason: 
     }
 }
 
+// ----- rc.6 item 3: background builds (operator decision 2026-11-08, inbox 19:12Z) -----
+//
+// A Prefetched group's bodies are built while the window stays live, so its first switch is a warm exchange. Static RE
+// and the traced probe (LANE-OPUS-RC6-HOTSLOTS-REPORT 19:46Z, `artifacts/phase23/rc6-item3-re/`): today's build binds
+// to the entry while it runs, which is safe only because the window is empty then. Here:
+//  1. the entry-level third (`0x654dc0`, `0x655320`, and the control init `0x64f820` called directly, not queued as
+//     state 8's task) runs in one game-thread tick over the group's words, with the live window's fields, dispatcher
+//     arrays and entry-info bytes saved before and put back after; what it made becomes the group's saved window;
+//  2. body init's registration (`prepare_entry` at `0x607f30`, on the task worker, into the live cells' registry
+//     slots) is skipped for this owner (`background_skip`); a detached group holds none (U18) and its warm attach
+//     registers it;
+//  3. the bodies go into the group record, never into the entry's cells, and the loader is never parked;
+//  4. only `body_bank::background_build_eligible` groups; every other group keeps today's build at its first switch.
+// It holds INSTALL like a prefetch, so a cycle press meanwhile is held (`character_roster`'s pending request).
+
+fn owner_bit(owner: u32) -> u32 { if owner < 32 { 1 << owner } else { 0 } }
+
+/// `body+0xf816`: the body's cell in its window, written by body init (`0x607a84`, again at `0x60b5bc`) from the entry's
+/// descriptor (SPECIAL-GROUPS §0 X2).
+const BODY_CELL_BYTE: usize = 0xf816;
+
+/// The control init `0x64f820` (with its tail, the select `0x64fb70`) costs the game thread 22-151 ms (Eden
+/// `rc6-hot-xps9`: `models_contexts_control_us=[2299, 5053, 150913]`), so a background build queues it on the task worker
+/// as loader state 8 does, with this copy of the entry as its object: the entry's first 0x100 bytes with the group's words,
+/// the group's context words, index 0 and the group's flags (every field `0x64f820`/`0x64fb70` reads), so the live
+/// entry is never touched from the worker. The select's table hook (`table`) serves the group's table for it. One build
+/// at a time (INSTALL).
+#[repr(C, align(16))]
+struct Scratch(std::cell::UnsafeCell<[u8; SCRATCH_SIZE]>);
+// SAFETY: written on the game thread before the control task is queued and read after it settled; the worker reads it
+// only while the task runs.
+unsafe impl Sync for Scratch {}
+const SCRATCH_SIZE: usize = 0x5a00;
+static SCRATCH: Scratch = Scratch(std::cell::UnsafeCell::new([0; SCRATCH_SIZE]));
+/// The group's table (`Members::table`, stable in its boxed record) while the scratch's control init is queued.
+static BACKGROUND_TABLE: AtomicUsize = AtomicUsize::new(0);
+
+fn scratch_address() -> usize { SCRATCH.0.get() as usize }
+
+/// Body init's `prepare_entry` site (`identity_view::init_prepare_entry` at `0x607f24`, the call at `0x607f30`): true
+/// while `owner` has a background build in flight; the caller then passes kind −1, on which `0x17f1a60` returns at once
+/// (its first test). The call's result is unused (`x0` is reloaded at `0x607f48`).
+pub(crate) fn background_skip(owner: u32) -> bool {
+    let skip = BACKGROUND_OWNERS.load(Ordering::Acquire) & owner_bit(owner) != 0;
+    if skip { BACKGROUND_SKIPS.fetch_add(1, Ordering::Relaxed); }
+    skip
+}
+
+/// The group a background build starts next (`body_bank::next_background`) for the live kind `live`: none while a
+/// prefetch, a construction or a background build is in flight. A refused group is no candidate.
+fn background_candidate(bank: &Bank, live: Option<u32>) -> Option<usize> {
+    if !BACKGROUND_ENABLED.load(Ordering::Acquire) || bank.prefetch.is_some() || bank.construction.is_some()
+        || bank.background.is_some() { return None; }
+    next_background(bank.groups.iter().map(|g| (if g.background_refused || g.leaving { GroupState::Failed } else { g.state },
+        *g.members, g.identity.is_some())), *bank.members, bank.identity.is_some(), live == Some(KIRBY))
+}
+
+/// A Prefetched group a background build still owes: the notice counts it as loading (`progress`).
+fn background_owed(bank: &Bank, group: &Group, live: Option<u32>) -> bool {
+    BACKGROUND_ENABLED.load(Ordering::Acquire) && group.state == GroupState::Prefetched && !group.background_refused
+        && !group.leaving && background_build_eligible(*group.members, group.identity.is_some(), *bank.members,
+            bank.identity.is_some(), live == Some(KIRBY)).is_ok()
+}
+
+const INFO_BYTES: usize = BACKGROUND_INFO_SPANS[0].1 + BACKGROUND_INFO_SPANS[1].1;
+
+unsafe fn save_info(info: usize) -> [u8; INFO_BYTES] {
+    let mut out = [0u8; INFO_BYTES];
+    let mut at = 0;
+    for (offset, len) in BACKGROUND_INFO_SPANS {
+        for i in 0..len { out[at + i] = fields::read_unchecked::<u8>(info, offset + i); }
+        at += len;
+    }
+    out
+}
+
+unsafe fn restore_info(info: usize, saved: &[u8; INFO_BYTES]) {
+    let mut at = 0;
+    for (offset, len) in BACKGROUND_INFO_SPANS {
+        for i in 0..len { fields::write_unchecked(info, offset + i, saved[at + i]); }
+        at += len;
+    }
+}
+
+/// `info+0x3a0..0x3b0`: body init writes `+0x3a0..0x3ab` from the worker (`0x607eb4`, from `info+0x72`), so the live
+/// window's words are compared (and put back) when the build settles.
+unsafe fn info_words(info: usize) -> [u32; 4] {
+    std::array::from_fn(|i| fields::read_unchecked::<u32>(info, 0x3a0 + i * 4))
+}
+
+/// The listener count of each dispatcher array (`[arr]`, the ring size), for the build line.
+unsafe fn listener_counts(arrays: [usize; 2]) -> [i64; 2] {
+    arrays.map(|a| if a == 0 { -1 } else { fields::read::<u64>(a, 0).map_or(-1, |n| n as i64) })
+}
+
+/// A background build in flight: the group's bodies under construction on the task worker.
+struct Background {
+    group: usize,
+    members: Members,
+    token: super::InstallToken,
+    alias: usize,
+    lease: Lease,
+    /// The group's window fields as the entry-level third left them; its selected context comes from the scratch's
+    /// control init, its cells at the settlement.
+    window: Window,
+    /// The control init's task on the scratch entry (state 8) until it settled (state 9); then 0 and the bodies are
+    /// queued (state 10).
+    control: usize,
+    control_us: u64,
+    tasks: [usize; NATIVE_MEMBERS],
+    /// Members whose task was queued (fewer than `members.count()` only when a native allocation returned null).
+    queued: usize,
+    live_before: u16,
+    committed: Option<u64>,
+    /// The live window's `info+0x3a0..0x3b0` when the tick ended.
+    info_words: [u32; 4],
+    skips_before: u32,
+    started_us: u64,
+    setup_us: u64,
+    settled_us: [u64; NATIVE_MEMBERS],
+    ticks: u32,
+    waited_logged_us: u64,
+}
+
+fn refuse_background(role: usize, group: usize, owner: u32, why: &str) {
+    let mut state = BANKS[role].lock();
+    let Some(g) = state.as_mut().and_then(|bank| bank.groups.get_mut(group)) else { return; };
+    if !g.background_refused {
+        g.background_refused = true;
+        trace!("[GroupSwap] background refused owner={} group={} kinds={:x?} reason={}; its first switch builds it",
+            owner, group, &g.members.kinds()[..g.members.count()], why);
+    }
+}
+
+/// `queue_bodies` for a background build: the same allocations and tasks, never an entry cell. Returns the tasks and
+/// how many members were queued (fewer when a native allocation returned null; a body allocated without its task is
+/// reported and left).
+unsafe fn queue_detached(base: usize, owner: u32, members: Members) -> ([usize; NATIVE_MEMBERS], usize) {
+    let allocate: unsafe extern "C" fn(u8, u32, u32) -> usize = std::mem::transmute(base + BODY_ALLOC);
+    let mut tasks = [0usize; NATIVE_MEMBERS];
+    for (i, kind) in members.kinds().iter().copied().enumerate().take(members.count()) {
+        let body = allocate(0, kind, owner);
+        if body == 0 { return (tasks, i); }
+        let t = queue_task(base, body, CONSTRUCT_FUNCTOR_VTABLE, TASK_CALLBACK);
+        if t == 0 {
+            trace!("[GroupSwap] background build owner={} UNEXPECTED: task allocation returned null; body {:#x} left", owner, body);
+            return (tasks, i);
+        }
+        tasks[i] = t;
+    }
+    (tasks, members.count())
+}
+
+/// Start a background build of `group` (`background_candidate`) in this tick of the live window.
+unsafe fn start_background(entry: *mut u8, owner: u32, role: usize, group: usize) {
+    let base = BASE.load(Ordering::Acquire);
+    let settings = crate::runtime::roster::cycle_preload_config::snapshot();
+    if !groups_enabled(&settings) || super::INSTALL.active() { return; }
+    if !crate::runtime::roster::scope_gate::admitted("native_body_bank::group_prefetch") { return; }
+    let (members, alias, carries_records) = {
+        let state = BANKS[role].lock();
+        let Some(bank) = state.as_ref().filter(|bank| bank.entry == entry as usize && bank.owner == owner
+            && bank.phase == Phase::Ready && !bank.departed && bank.swap.is_none()) else { return; };
+        if background_candidate(bank, bank.observed.map(|(_, kind)| kind)) != Some(group) { return; }
+        (*bank.groups[group].members, bank.alias, bank.members.carries_records())
+    };
+    // Transient: retried on a later tick.
+    if alias == 0 || resource(base, owner) != Some(alias) || !resource_ready(alias)
+        || !window_shape_ok(base, entry as usize, owner, carries_records) { return; }
+    let Some(info) = entry_info(entry as usize) else { return; };
+    if pool_counts(base).is_none_or(|(capacity, live)| (capacity as usize).saturating_sub(usize::from(live)) < members.count()) {
+        refuse_background(role, group, owner, "fighter pool");
+        return;
+    }
+    let Some(token) = super::INSTALL.try_begin(false) else { return; };
+    let started = now_us();
+    let live_before = pool_counts(base).map_or(0, |(_, live)| live);
+    let committed = MemorySample::capture().committed.get();
+    let info_saved = save_info(info);
+    // The group's table into the window for the table hooks (`create_contexts`, `select_context`), as an exchange lends
+    // it; the live window's fields first.
+    let live = {
+        let mut state = BANKS[role].lock();
+        let Some(bank) = state.as_mut() else { super::finish_install(token, "background build: bank gone"); return; };
+        let live = save_window(entry as usize);
+        std::mem::swap(&mut bank.members, &mut bank.groups[group].members);
+        live
+    };
+    let lrole = ledger_role(role);
+    // `R+0x4c` bit 0 is the construction's (the path builder `0x17e99c0` gates on it), until the tasks settle (U19).
+    let (lease, _) = r_handle::request_bit(lrole, alias);
+    detach_dispatcher(entry as usize);
+    // `0x655320` writes only the group's context words: the others must not keep the live window's.
+    for offset in [0x4178usize, 0x4180, 0x4188, 0x4190, 0x4198] { fields::write_unchecked(entry as usize, offset, 0usize); }
+    write_group_words(entry as usize, members);
+    fields::write_unchecked(entry as usize, 0x5918, 0u8);
+    let models: unsafe extern "C" fn(*mut u8) = std::mem::transmute(base + MODELS_SETUP);
+    let contexts: unsafe extern "C" fn(*mut u8) = std::mem::transmute(base + COUNT_SETUP);
+    let t0 = now_us();
+    models(entry);
+    let t1 = now_us();
+    contexts(entry);
+    let t2 = now_us();
+    let steps_us = [t1.saturating_sub(t0), t2.saturating_sub(t1)];
+    let made = save_window(entry as usize);
+    // The control init's object: the entry as the group's third left it (`Scratch`).
+    let scratch = scratch_address();
+    std::ptr::copy_nonoverlapping(entry as *const u8, scratch as *mut u8, 0x100);
+    std::ptr::copy_nonoverlapping((entry as usize + 0x4178) as *const u8, (scratch + 0x4178) as *mut u8, 0x28);
+    fields::write_unchecked(scratch, 0x5918, 0u8);
+    fields::write_unchecked(scratch, 0x591f, made.flags);
+    let table = {
+        let mut state = BANKS[role].lock();
+        state.as_mut().map(|bank| {
+            std::mem::swap(&mut bank.members, &mut bank.groups[group].members);
+            bank.groups[group].members.table().as_ptr() as usize
+        })
+    };
+    restore_window(entry as usize, &live);
+    fields::write_unchecked(entry as usize, 0x5918, live.index);
+    fields::write_unchecked(entry as usize, 0x5919, live.previous);
+    fields::write_unchecked(entry as usize, 0x5910, live.old);
+    restore_info(info, &info_saved);
+    let setup_us = now_us().saturating_sub(started);
+    let count = members.count();
+    let contexts_ok = (0..NATIVE_MEMBERS).all(|i|
+        if i < count { valid_context(base, made.group_ctx[i], owner) } else { made.group_ctx[i] == 0 });
+    // `0x655320` leaves `+0x4178/+0x4180` zero; the select (`0x64fb70`) picks the context on the scratch, later.
+    let made_ok = contexts_ok && made.ctx == [0, 0] && made.flags == members.expected_flags(0)
+        && made.dispatch != live.dispatch && made.dispatch.iter().all(|a| dispatcher_array_ok(*a));
+    let live_ok = dispatcher_present(entry as usize) && dispatcher_arrays(entry as usize) == Some(live.dispatch)
+        && read::<usize>(entry, 0x4178) == live.ctx[0] && read::<u64>(entry, 0x4150) == live.installed;
+    let refuse = |why: &str, made: &Window| {
+        let (how, now, after) = r_handle::end_request(lrole, alias, lease);
+        super::finish_install(token, "background build refused");
+        trace!("[GroupSwap] background build owner={} group={} UNEXPECTED: {} made_ok={} live_ok={} contexts={:x?} ctx={:x?} flags={:#x} dispatch={:x?} live_dispatch={:x?} request_bit={:?} r4c={:#x}->{:#x}; contexts and arrays left (reported)",
+            owner, group, why, made_ok, live_ok, made.group_ctx, made.ctx, made.flags, made.dispatch, dispatcher_arrays(entry as usize), how, now, after);
+        refuse_background(role, group, owner, why);
+    };
+    let Some(table) = table.filter(|_| made_ok && live_ok) else { refuse("setup check failed", &made); return; };
+    BACKGROUND_TABLE.store(table, Ordering::Release);
+    let control = queue_task(base, scratch, CONTROL_FUNCTOR_VTABLE, CONTROL_CALLBACK);
+    if control == 0 {
+        BACKGROUND_TABLE.store(0, Ordering::Release);
+        refuse("control task allocation returned null", &made);
+        return;
+    }
+    let queued_us = now_us().saturating_sub(started);
+    let skips_before = BACKGROUND_SKIPS.load(Ordering::Acquire);
+    let mut state = BANKS[role].lock();
+    let Some(bank) = state.as_mut() else {
+        // Not reachable on the game thread; the task still runs on the scratch (reported).
+        super::finish_install(token, "background build: bank gone");
+        trace!("[GroupSwap] background build owner={} group={} UNEXPECTED: bank gone after queuing; control task {:#x} left", owner, group, control);
+        return;
+    };
+    bank.background = Some(Background { group, members, token, alias, lease, window: made, control, control_us: 0,
+        tasks: [0; NATIVE_MEMBERS], queued: 0, live_before, committed, info_words: info_words(info), skips_before,
+        started_us: started, setup_us, settled_us: [0; NATIVE_MEMBERS], ticks: 0, waited_logged_us: started });
+    trace!("[GroupSwap] background build owner={} group={} kinds={:x?} setup_us={} models_contexts_us={:?} us={} control={:#x} contexts={:x?} dispatch={:x?} listeners={:?} live_dispatch={:x?} live_listeners={:?} flags={:#x} R={:#x} map={} r4c={:#x} pool_live={}; the window stays live, the control init runs on the task worker",
+        owner, group, &members.kinds()[..count], setup_us, steps_us, queued_us, control, &made.group_ctx[..count], made.dispatch,
+        listener_counts(made.dispatch), live.dispatch, listener_counts(live.dispatch), made.flags, alias,
+        fields::read::<u64>(alias, 0x18).unwrap_or(0), fields::read::<u8>(alias, 0x4c).unwrap_or(0), live_before);
+}
+
+/// State 9 and 10 of a background build: once the scratch's control init settled, its selected context becomes the
+/// group window's and the bodies are allocated and queued (`queue_detached`), the owner's registrations skipped from
+/// then on. `false` when the selection is not the group's first context: the build is refused (nothing allocated).
+unsafe fn queue_background_bodies(base: usize, owner: u32, b: &mut Background) -> bool {
+    let selected = fields::read::<usize>(scratch_address(), 0x4178).unwrap_or(0);
+    BACKGROUND_TABLE.store(0, Ordering::Release);
+    if selected == 0 || selected != b.window.group_ctx[0] { return false; }
+    b.window.ctx[0] = selected;
+    b.skips_before = BACKGROUND_SKIPS.load(Ordering::Acquire);
+    BACKGROUND_OWNERS.fetch_or(owner_bit(owner), Ordering::AcqRel);
+    let (tasks, queued) = queue_detached(base, owner, b.members);
+    b.tasks = tasks;
+    b.queued = queued;
+    true
+}
+
+/// A background build's tasks, polled on the window's ticks (state 0xb's rule); settled once every pending count is 0.
+unsafe fn settle_background(entry: *mut u8, owner: u32, role: usize) {
+    use construction_task as task;
+    let base = BASE.load(Ordering::Acquire);
+    let now = now_us();
+    // State 9: the scratch's control init on the worker; once it settled, state 10 here (outside the bank lock, as the
+    // allocation runs native code that may reach the table hooks).
+    let control = {
+        let mut state = BANKS[role].lock();
+        let Some(bank) = state.as_mut().filter(|bank| bank.entry == entry as usize && bank.owner == owner) else { return; };
+        let Some(b) = bank.background.as_mut() else { return; };
+        if b.control == 0 {
+            None
+        } else {
+            b.ticks = b.ticks.saturating_add(1);
+            let pending = fields::read::<i32>(b.control, task::PENDING).unwrap_or(i32::MAX);
+            if pending > 0 {
+                if now.saturating_sub(b.waited_logged_us) >= 5_000_000 {
+                    b.waited_logged_us = now;
+                    trace!("[GroupSwap] background control init pending owner={} group={} pending={} us={} ticks={}",
+                        owner, b.group, pending, now.saturating_sub(b.started_us), b.ticks);
+                }
+                return;
+            }
+            let control = b.control;
+            b.control = 0;
+            b.control_us = now.saturating_sub(b.started_us);
+            Some((control, bank.background.take().unwrap()))
+        }
+    };
+    if let Some((control, mut b)) = control {
+        free_tasks(base, &[control]);
+        let queued = queue_background_bodies(base, owner, &mut b);
+        if !queued {
+            finish_background(entry, owner, role, b, "control init selected another context", 0);
+            return;
+        }
+        let mut state = BANKS[role].lock();
+        let (group, queued, tasks, control_us) = (b.group, b.queued, b.tasks, b.control_us);
+        match state.as_mut().filter(|bank| bank.entry == entry as usize && bank.owner == owner) {
+            Some(bank) => bank.background = Some(b),
+            None => {
+                drop(state);
+                trace!("[GroupSwap] background build owner={} group={} UNEXPECTED: bank gone after the control init; tasks {:x?} left", owner, group, &tasks[..queued]);
+                return;
+            }
+        }
+        trace!("[GroupSwap] background bodies queued owner={} group={} tasks={:x?} control_us={}", owner, group, &tasks[..queued], control_us);
+        return;
+    }
+    let background = {
+        let mut state = BANKS[role].lock();
+        let Some(bank) = state.as_mut().filter(|bank| bank.entry == entry as usize && bank.owner == owner) else { return; };
+        let Some(b) = bank.background.as_mut() else { return; };
+        b.ticks = b.ticks.saturating_add(1);
+        let mut pending = [0i32; NATIVE_MEMBERS];
+        for (i, t) in b.tasks.iter().enumerate().take(b.queued) {
+            pending[i] = fields::read::<i32>(*t, task::PENDING).unwrap_or(i32::MAX);
+            if pending[i] <= 0 && b.settled_us[i] == 0 { b.settled_us[i] = now.saturating_sub(b.started_us); }
+        }
+        if !task::settled(&pending[..b.queued]) {
+            if now.saturating_sub(b.waited_logged_us) >= 5_000_000 {
+                b.waited_logged_us = now;
+                trace!("[GroupSwap] background constructing owner={} group={} pending={:?} us={} ticks={}",
+                    owner, b.group, &pending[..b.queued], now.saturating_sub(b.started_us), b.ticks);
+            }
+            return;
+        }
+        bank.background.take().unwrap()
+    };
+    finish_background(entry, owner, role, background, "settled", 0);
+}
+
+/// A destroyer (finalize, reload, scene end) while a background build is in flight: wait for its tasks as
+/// `drain_construction` waits (`0x354ccd0`), then finish it into its group record, which the caller destroys.
+unsafe fn drain_background(entry: *const u8, owner: u32, role: usize, reason: &str) {
+    use construction_task as task;
+    let base = BASE.load(Ordering::Acquire);
+    let background = {
+        let mut state = BANKS[role].lock();
+        let Some(bank) = state.as_mut().filter(|bank| bank.entry == entry as usize && bank.owner == owner) else { return; };
+        match bank.background.take() { Some(background) => background, None => return }
+    };
+    let wait: unsafe extern "C" fn(u32, usize) = std::mem::transmute(base + TASK_WAIT);
+    let mut waited = 0usize;
+    let mut background = background;
+    // State 9 at a destroyer: wait for the scratch's control init, then state 10, so the wait below finishes the
+    // construction and the group record holds every body (`drain_construction`'s rule).
+    if background.control != 0 {
+        let control = std::mem::replace(&mut background.control, 0);
+        if fields::read::<i32>(control, task::PENDING).unwrap_or(0) > 0 {
+            let queue = fields::read::<u32>(control, task::QUEUE).unwrap_or(task::QUEUE_ID) as usize;
+            if let Some(handle) = fields::child(base, TASK_QUEUES + queue * 8).and_then(|q| fields::read::<u32>(q, 0x10)) {
+                wait(handle, control + task::PENDING);
+                waited += 1;
+            }
+        }
+        free_tasks(base, &[control]);
+        if !queue_background_bodies(base, owner, &mut background) {
+            finish_background(entry, owner, role, background, "drained: control init selected another context", waited);
+            return;
+        }
+    }
+    for &t in background.tasks.iter().take(background.queued) {
+        if fields::read::<i32>(t, task::PENDING).unwrap_or(0) > 0 {
+            let queue = fields::read::<u32>(t, task::QUEUE).unwrap_or(task::QUEUE_ID) as usize;
+            if let Some(handle) = fields::child(base, TASK_QUEUES + queue * 8).and_then(|q| fields::read::<u32>(q, 0x10)) {
+                wait(handle, t + task::PENDING);
+                waited += 1;
+            }
+        }
+    }
+    finish_background(entry, owner, role, background, reason, waited);
+}
+
+/// The settlement: the bodies into the group record (Built, with the window the tick made), the tasks freed, the
+/// request bit handed back, the ledger settled and INSTALL released. A body that fails its proof fails the group: its
+/// bodies, contexts and arrays are left and reported (leak rather than corrupt).
+unsafe fn finish_background(entry: *const u8, owner: u32, role: usize, b: Background, reason: &str, waited: usize) {
+    use construction_task as task;
+    let base = BASE.load(Ordering::Acquire);
+    BACKGROUND_OWNERS.fetch_and(!owner_bit(owner), Ordering::AcqRel);
+    let skips = BACKGROUND_SKIPS.load(Ordering::Acquire).wrapping_sub(b.skips_before);
+    let count = b.members.count();
+    let kinds = &b.members.kinds()[..count];
+    let mut bodies = [Body::default(); NATIVE_MEMBERS];
+    for i in 0..b.queued {
+        let address = fields::read::<usize>(b.tasks[i], task::BODY).unwrap_or(0);
+        bodies[i] = Body { address, id: fields::read::<u32>(address, 8).unwrap_or(0) };
+    }
+    free_tasks(base, &b.tasks[..b.queued]);
+    let valid = b.queued == count && (0..count).all(|i| valid_parked_body(base, bodies[i], kinds[i], owner)
+        && fields::child(bodies[i].address, 0x20).is_some());
+    // SPECIAL-GROUPS §0 X2: body init wrote each body's cell byte (`body+0xf816`, `0x607a84` and `0x60b5bc`) as the kind's
+    // index in the live window, or 0xff; native writes its index in its own window, which is what it gets here.
+    let mut cells_before = [0xffu8; NATIVE_MEMBERS];
+    if valid {
+        for (i, body) in bodies.iter().enumerate().take(count) {
+            cells_before[i] = fields::read_unchecked::<u8>(body.address, BODY_CELL_BYTE);
+            fields::write_unchecked(body.address, BODY_CELL_BYTE, i as u8);
+        }
+    }
+    // Body init wrote these from the worker (the same values for every ordinary kind); the window's go back.
+    let info = entry_info(entry as usize);
+    let info_now = info.map(|info| info_words(info));
+    let info_same = info_now == Some(b.info_words);
+    if let (false, Some(info)) = (info_same, info) {
+        for (i, word) in b.info_words.iter().enumerate() { fields::write_unchecked(info, 0x3a0 + i * 4, *word); }
+    }
+    let alias_ok = b.alias != 0 && resource(base, owner) == Some(b.alias);
+    let lrole = ledger_role(role);
+    let request = alias_ok.then(|| r_handle::end_request(lrole, b.alias, b.lease));
+    // Each queued body ran its construction tail (its kind's keys); a member never queued still holds its keys.
+    if alias_ok && b.queued > 0 { r_handle::construction_settled(lrole, b.group, &kinds[..b.queued]); }
+    if alias_ok && b.queued < count {
+        let occupancy = occupancy_snapshot(role, None);
+        release_group_keys(base, role, Some(b.group), Some(&kinds[b.queued..]), &occupancy, owner, "background build failed");
+    }
+    let live_after = pool_counts(base).map_or(0, |(_, live)| live);
+    let stored = {
+        let mut state = BANKS[role].lock();
+        match state.as_mut().filter(|bank| bank.entry == entry as usize && bank.owner == owner) {
+            Some(bank) => {
+                let stored = match bank.groups.get_mut(b.group) {
+                    Some(g) if g.state == GroupState::Prefetched && valid => {
+                        let mut window = b.window;
+                        window.installed = count as u64;
+                        for (cell, body) in window.cells.iter_mut().zip(bodies.iter()).take(count) { *cell = body.address; }
+                        g.saved = Some(window);
+                        g.bodies = bodies;
+                        g.state = GroupState::Built;
+                        true
+                    }
+                    Some(g) => { g.state = GroupState::Failed; g.background_refused = true; false }
+                    None => false,
+                };
+                GROUP_BODIES[role].store(bank.groups.iter().filter(|g| g.state.counts_bodies())
+                    .map(|g| g.members.count()).sum::<usize>().min(usize::from(u8::MAX)) as u8, Ordering::Release);
+                stored
+            }
+            None => false,
+        }
+    };
+    let released = super::finish_install(b.token, "background build settled");
+    if stored { log_memory(owner, b.group, kinds, "build", b.committed, MemorySample::capture(), memory::group_cost(kinds).build); }
+    let now = now_us();
+    trace!("[GroupSwap] background built owner={} group={} ok={} reason={} kinds={:x?} bodies={:?} cell_bytes_before={:x?} us={} setup_us={} control_us={} settled_us={:?} ticks={} waited={} registrations_skipped={} info_3a0_same={} info_3a0={:x?} pool_live={}->{} dispatch={:x?} listeners={:?} live_listeners={:?} request_bit={:?} map={} INSTALL_released={}",
+        owner, b.group, stored, reason, kinds, &bodies[..count], &cells_before[..count], now.saturating_sub(b.started_us), b.setup_us, b.control_us,
+        &b.settled_us[..b.queued], b.ticks, waited, skips, info_same, info_now, b.live_before, live_after, b.window.dispatch,
+        listener_counts(b.window.dispatch), listener_counts(dispatcher_arrays(entry as usize).unwrap_or([0, 0])), request,
+        if alias_ok { fields::read::<u64>(b.alias, 0x18).map_or(-1, |m| m as i64) } else { -1 }, released);
+    if !stored {
+        trace!("[GroupSwap] background built owner={} group={} UNEXPECTED: the group failed (queued {}/{}); its bodies, contexts {:x?} and arrays {:x?} are left (reported)",
+            owner, b.group, b.queued, count, &b.window.group_ctx[..count], b.window.dispatch);
+    }
+    if alias_ok { r_handle::reconcile(lrole, "background build"); }
+}
+
 /// Executes the committed cross-group request. Lock discipline: decide and
 /// write entry fields under the bank lock, release it for every native call
 /// (the table hooks take the same lock), then verify and acknowledge.
@@ -3492,7 +4038,7 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
     // RCA §3). A live Kirby defers Planned groups and hands Prefetched groups'
     // keys back; Built groups consumed their keys at construction.
     enum Step { Poll(usize, super::InstallToken, u64, Members, usize), Start(usize, Members, usize),
-        Release(usize, Members, Members, usize), Idle }
+        Release(usize, Members, Members, usize), Background(usize), Leave(usize), Idle }
     let step = {
         let mut state = BANKS[role].lock();
         let Some(bank) = state.as_mut().filter(|bank| bank.entry == entry as usize && bank.phase == Phase::Ready
@@ -3519,13 +4065,27 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
         // A group held for memory or pool space is started again, after every group not yet tried
         // (a held group never blocks one the admission has not seen): the admission below decides on
         // the capacity of this tick.
-        } else if let Some(group) = crate::engine::swap::body_bank::next_start(bank.groups.iter()
-            .map(|g| (g.state, g.identity.is_none() || g.charinfo_published)), bank.held_turn) {
-            Step::Start(group, *bank.groups[group].members, bank.alias)
-        } else { Step::Idle }
+        // rc.6 mid-session cycle change: a group whose member left the cycle is released before anything new starts.
+        } else if let Some(group) = bank.groups.iter().position(|g| g.leaving && g.state != GroupState::Prefetching) {
+            Step::Leave(group)
+        } else {
+            let start = crate::engine::swap::body_bank::next_start(bank.groups.iter()
+                .map(|g| (g.state, g.identity.is_none() || g.charinfo_published)), bank.held_turn);
+            // rc.6 item 3: every planned group's prefetch first, then the background builds of the prefetched ones;
+            // a group held for capacity is retried only when no background build is owed.
+            match (start, background_candidate(bank, live)) {
+                (Some(group), _) if bank.groups[group].state == GroupState::Planned =>
+                    Step::Start(group, *bank.groups[group].members, bank.alias),
+                (_, Some(group)) => Step::Background(group),
+                (Some(group), None) => Step::Start(group, *bank.groups[group].members, bank.alias),
+                (None, None) => Step::Idle,
+            }
+        }
     };
     match step {
         Step::Idle => {}
+        Step::Background(group) => start_background(entry, owner, role, group),
+        Step::Leave(group) => if !super::INSTALL.active() { leave_group(entry, owner, role, group) },
         Step::Release(group, members, window, alias) => {
             // Same preconditions as a prefetch: this R, idle. A freshly live Kirby
             // is hatless (Reloaded, or parked copy-free by `kirby_park_gate`); a
@@ -3730,8 +4290,15 @@ fn log_memory(owner: u32, group: usize, kinds: &[u32], phase: &str, before: Opti
     let committed = after.committed.get();
     let delta = before.zip(committed).map(|(b, a)| i128::from(a) - i128::from(b));
     trace!("[GroupSwap] memory owner={} group={} kinds={:x?} phase={} committed={:?}->{:?} delta={} estimate={} headroom={:?}",
-        owner, group, kinds, phase, before, committed, delta.map_or_else(|| "na".to_string(), |d| d.to_string()), estimate,
-        after.headroom());
+        owner, group, kinds, phase, before, committed, MemoryDelta(delta), estimate, after.headroom());
+}
+
+/// `delta=` of the memory line, formatted in place: it runs inside the entry hooks, where nothing may allocate.
+struct MemoryDelta(Option<i128>);
+impl std::fmt::Display for MemoryDelta {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.0 { Some(delta) => write!(f, "{delta}"), None => f.write_str("na") }
+    }
 }
 
 /// A refused start holds the group for `hold` (`GroupState::Held`); a held group refused again
@@ -3774,6 +4341,8 @@ unsafe fn retire_groups(entry: *const u8, owner: u32, reason: &str) {
     let base = BASE.load(Ordering::Acquire);
     // Phase B′: a construction in flight settles into the window first, so native's destroyer finds its bodies.
     drain_construction(entry, owner, role, reason);
+    // rc.6 item 3: a background build in flight finishes into its group record, which the destroys below then free.
+    drain_background(entry, owner, role, reason);
     // D-KIRBY1: the kind a live Kirby copies keeps its key (read before the lock).
     let window = BANKS[role].lock().as_ref()
         .filter(|bank| bank.entry == entry as usize && bank.owner == owner).map(|bank| *bank.members);
@@ -3925,6 +4494,118 @@ unsafe fn retire_groups(entry: *const u8, owner: u32, reason: &str) {
     if alias_ok { r_handle::reconcile(ledger_role(role), reason); }
 }
 
+/// rc.6 mid-session cycle change (operator requirement 2026-11-08, inbox 19:21Z): one detached group a member of which
+/// left the role's cycle, released while the window stays live, through the teardown protocol `retire_groups` runs for
+/// every group: a Prefetched group's keys go back through the ledger; a Built group's bodies, contexts, dispatcher arrays
+/// and records are destroyed under its own header, the window leaving the copy registry around them and registering
+/// again (U18). The group becomes Released and its slot takes the next planned group. Not while the live member is Kirby
+/// (`group_lifecycle` returns its keys first, D-KIRBY1) or a native install runs. Never under the bank lock.
+unsafe fn leave_group(entry: *const u8, owner: u32, role: usize, group: usize) {
+    let base = BASE.load(Ordering::Acquire);
+    let Some(window) = BANKS[role].lock().as_ref()
+        .filter(|bank| bank.entry == entry as usize && bank.owner == owner).map(|bank| *bank.members) else { return; };
+    let copy = live_kirby_copy_kind(entry, owner, window);
+    let mut owners = FixedVec::<(u32, Members), NATIVE_MEMBERS>::new();
+    let (bundle, identity, alias, members, before) = {
+        let state = BANKS[role].lock();
+        let Some(bank) = state.as_ref().filter(|bank| bank.entry == entry as usize && bank.owner == owner) else { return; };
+        let Some(g) = bank.groups.get(group).filter(|g| g.leaving && g.state != GroupState::Prefetching) else { return; };
+        let mut detached = DetachedSnapshot::new(owner);
+        match (g.state, g.saved) {
+            (GroupState::Built, Some(saved)) => {
+                for (i, kind) in g.members.kinds().iter().enumerate().take(g.members.count()) {
+                    let body = g.bodies[i];
+                    detached.bodies.push(BodyRef { id: body.id, kind: *kind, cell: i as u8,
+                        activated: bank.activated.contains(&(body.address, body.id)),
+                        valid: valid_parked_body(base, body, *kind, owner), registered: Some(*kind) });
+                    owners.push((body.id, *g.members));
+                }
+                for context in saved.group_ctx.iter().copied().filter(|c| *c != 0) {
+                    detached.contexts.push(graph::context_ref(context, valid_context(base, context, owner)));
+                }
+                detached.dispatch = Some(DispatcherRef { arrays: saved.dispatch,
+                    valid: saved.dispatch.iter().all(|a| *a == 0 || dispatcher_array_ok(*a)) });
+                if saved.records != [0, 0, 0] {
+                    detached.records = Some(RecordsRef { records: saved.records,
+                        valid: g.members.carries_records() && valid_special_object(base, saved.records[0], owner) });
+                }
+            }
+            (state, _) if state.holds_keys() => {
+                let (kinds, count) = g.members.prefetch_kinds();
+                for kind in kinds[..count].iter().copied() { detached.held_kinds.push(kind); }
+            }
+            _ => {}
+        }
+        (detached, g.identity, bank.alias, *g.members, g.state)
+    };
+    // Without the alias R nothing is touched (`retire_groups`' rule); the bank's own retirement follows.
+    if alias == 0 || resource(base, owner) != Some(alias) { return; }
+    let has_bodies = !bundle.bodies.is_empty();
+    let mut registry = if has_bodies { NativeRegistry::new(base, alias, owner) } else { None };
+    if has_bodies && registry.is_none() {
+        trace!("[Registry] leave owner={} group={} registry unreadable; the group stays leaving", owner, group);
+        return;
+    }
+    let cells = registry.as_mut().map(|registry| {
+        let before = registry.cells();
+        copy_registry::teardown_begin(registry, window);
+        (before, registry.cells())
+    });
+    let consumers = graph::probe_consumers(base, owner);
+    let views = [bundle.view()];
+    let plan = DetachedPlan { groups: &views, consumers: &consumers };
+    let keys = detached_keys(&plan);
+    let occupancy = occupancy_snapshot(role, copy);
+    let mii = identity.filter(|_| before.holds_keys());
+    let mut release = |_: &[u32]| {
+        let mut outcome = (0usize, 0usize);
+        with_mii_identity(alias, mii, || {
+            outcome = release_group_keys(base, role, Some(group), None, &occupancy, owner, "left the cycle");
+        });
+        outcome
+    };
+    let mut current: Option<Members> = None;
+    let receipt = {
+        let mut before_step = |body: Option<u32>| {
+            let Some(registry) = registry.as_mut() else { return; };
+            let wanted = match body {
+                Some(id) => owners.iter().find(|(body, _)| *body == id).map(|(_, group)| *group),
+                None => Some(window),
+            };
+            if let Some(members) = wanted.filter(|m| current != Some(*m)) {
+                copy_registry::teardown_group(registry, members);
+                current = Some(members);
+            }
+        };
+        graph::execute(base, &plan, &keys, owner, "left the cycle", &mut release, &mut before_step)
+    };
+    if let (Some(registry), Some((before_cells, emptied))) = (registry.as_mut(), cells) {
+        copy_registry::teardown_end(registry, window);
+        trace!("[Registry] leave owner={} group={} window={:x?} group={:x?} cells={:x?}->{:x?}->{:x?} header={:x?}",
+            owner, group, &window.kinds()[..window.count()], &members.kinds()[..members.count()], before_cells, emptied,
+            registry.cells(), registry.header());
+    }
+    let held = r_handle::forget_group(ledger_role(role), group);
+    {
+        let mut state = BANKS[role].lock();
+        if let Some(bank) = state.as_mut().filter(|bank| bank.entry == entry as usize && bank.owner == owner) {
+            if let Some(g) = bank.groups.get_mut(group) {
+                g.state = GroupState::Released;
+                g.leaving = false;
+                g.saved = None;
+                g.bodies = [Body::default(); NATIVE_MEMBERS];
+            }
+            GROUP_BODIES[role].store(bank.groups.iter().filter(|g| g.state.counts_bodies())
+                .map(|g| g.members.count()).sum::<usize>().min(usize::from(u8::MAX)) as u8, Ordering::Release);
+        }
+    }
+    trace!("[GroupSwap] left cycle owner={} group={} kinds={:x?} state={:?} released bodies={} contexts={} routes={} dispatchers={} records={} keys={:x?} skipped={} ledger_held={} map_after={} pool={:?}",
+        owner, group, &members.kinds()[..members.count()], before, receipt.bodies, receipt.contexts, receipt.routes_cleared,
+        receipt.dispatchers, receipt.records, &*keys, receipt.skipped, held,
+        fields::read::<u64>(alias, 0x18).map_or(-1i64, |m| m as i64), pool_counts(base));
+    r_handle::reconcile(ledger_role(role), "left the cycle");
+}
+
 /// Every mod-initiated Reload of a visible entry calls this first (§6.5 iii):
 /// pair flags, then the attached window's routes (D-PTA1c: states 1-3 free the
 /// window contexts and only activation re-points the route, which a refused
@@ -4022,6 +4703,13 @@ pub(super) fn on_destroy(entry: *const u8) {
                     trace!("[GroupSwap] destroy owner={} with {} group records remaining (leak reported)", bank.owner, bank.groups.len());
                     bank.groups.clear();
                     bank.prefetch = None;
+                }
+                if let Some(background) = bank.background.take() {
+                    // Finalize drains it; a record here is reported and its INSTALL token and skip bit end with the entry.
+                    BACKGROUND_OWNERS.fetch_and(!owner_bit(bank.owner), Ordering::AcqRel);
+                    super::finish_install(background.token, "background build: entry destroyed");
+                    trace!("[GroupSwap] background destroy owner={} group={} UNEXPECTED: record remaining; tasks {:x?} leak (reported)",
+                        bank.owner, background.group, &background.tasks[..background.members.count()]);
                 }
                 // Do not free the table before native teardown has returned.
                 // A subsequent build requires a ready current native entry.
@@ -4174,6 +4862,12 @@ unsafe fn park_nana(entry: *mut u8, owner: u32) -> Result<(u32, bool, u8), &'sta
 unsafe fn table(ctx: &mut InlineCtx, register: usize) {
     let entry = ctx.registers[19].x() as *const u8;
     if !aligned(entry) { return; }
+    // rc.6 item 3: a background build's control init selects on the scratch copy of the entry (worker thread).
+    let background = BACKGROUND_TABLE.load(Ordering::Acquire);
+    if background != 0 && entry as usize == scratch_address() {
+        ctx.registers[register].set_x(background as u64);
+        return;
+    }
     let Some(role) = role(read(entry, 0xe0)) else { return; };
     let state = BANKS[role].lock();
     if let Some(bank) = state.as_ref().filter(|bank| descriptor(entry, bank)) {
@@ -4331,7 +5025,7 @@ pub(super) unsafe fn install(base: usize) {
     if !scene_stock { trace!("[BodyBank] fingerprint mismatch +0x{:x}; no start-up window", SCENE_HEADER); }
     if gate(SEAM_GROUP, SCENE_HEADER_SEAMS, scene_stock) { skyline::install_hooks!(scene_header); }
     // WP-R: per-body identity view (all 18 selector exits or none; logs its own line).
-    crate::runtime::roster::identity_view::install(base);
+    let identity_view = crate::runtime::roster::identity_view::install(base);
     // Both extensions and the attached window's route clear (D-PTA1c at finalize) tear down through the
     // finalize hook, so it is installed on its own row (WP3). Every gate below is evaluated (gate first, no
     // short circuit) so the install line records each row once.
@@ -4408,6 +5102,10 @@ pub(super) unsafe fn install(base: usize) {
     trace!("[GroupSwap] async build {} functor_slot={:#x} expected={:#x} control_slot={:#x} expected={:#x}",
         if async_ok { "enabled" } else { "disabled by fingerprint; synchronous build" }, functor_slot, base + CONSTRUCT_FUNCTOR,
         control_slot, base + CONTROL_FUNCTOR);
+    // rc.6 item 3: background builds use the Phase B′ path and the identity view's body-init site (`background_skip`).
+    BACKGROUND_ENABLED.store(async_ok && identity_view, Ordering::Release);
+    trace!("[GroupSwap] background build {} async={} identity_view={}",
+        if async_ok && identity_view { "enabled" } else { "disabled; a group builds at its first switch" }, async_ok, identity_view);
     if groups_ok {
         // The `[GroupSwap] enabled` line follows the startup cycle-preload load
         // (`report_group_swap`), so it shows the switches this boot applies.

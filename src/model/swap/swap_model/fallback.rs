@@ -87,7 +87,7 @@ pub const fn disposition(reason: Fallback, state: GroupState) -> Disposition {
         GroupState::Built | GroupState::Prefetching => Disposition::Keep,
         _ if reason.transient() => Disposition::Keep,
         GroupState::Prefetched => Disposition::FailReturningKeys,
-        GroupState::Planned | GroupState::Held(_) | GroupState::Failed => Disposition::Fail,
+        GroupState::Planned | GroupState::Held(_) | GroupState::Failed | GroupState::Released => Disposition::Fail,
     }
 }
 

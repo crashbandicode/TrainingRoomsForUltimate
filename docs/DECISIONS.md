@@ -502,3 +502,24 @@ that going between groups is pretty slow".
    switch is a warm exchange. The cost is load time, logged per group.
 
 This records the decision only; the implementation, host tests and Eden proofs are recorded in `CARRY-OVER.md`.
+
+## 2026-11-08: Item 3 in rc.6 — groups built in the background (operator decisions)
+
+Relayed in `artifacts/phase23/INBOX-opus-rc6-hotslots.md`. They replace item 3 of "Group speed in rc.6" above
+(pre-built behind the loading screen).
+
+- **19:12Z:** "why can't we just load the rest automatically after training loads? So the first group is hot upon
+  loading training then the remaining load in the background so going between them is fast for both p1 and CPU?" After
+  Training loads, every remaining planned group's bodies are built in the background while the current fighters stay
+  live. Each group's first switch is then a warm exchange (about 50 ms). Feasibility came first, by static RE and a traced
+  probe; Training's load gate was the fallback.
+- **19:21Z:** "you'll also want to make sure changing the character cycles after works and loads things after the
+  fact." A P1 or CPU cycle change in Training re-plans on the menu's close:
+  - groups whose members left the cycle are released (memory back); the fighter on screen stays until switched away;
+  - new members load in the background the same way;
+  - the notice goes "Loading x/y" → "All loaded";
+  - a cycle press meanwhile is held or served, never failed.
+- **20:26Z:** "All groups in rc.6". Mii, Pokémon Trainer/Aegis and Ice Climbers pair groups are background-built too.
+  Their exclusion in the first build is temporary; each kind follows as its research (`SPECIAL-GROUPS.md`) lands.
+
+This records the decisions only; the implementation, host tests and Eden proofs are recorded in `CARRY-OVER.md`.

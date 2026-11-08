@@ -674,6 +674,27 @@ pub enum GroupState {
     /// bodies; nothing native was touched. It keeps its place in the plan (no helper duplicates
     /// its kinds) and its start is retried when the capacity returns.
     Held(Hold),
+    /// rc.6 mid-session cycle change (inbox 19:21Z): a member left the role's cycle (`group_left_cycle`) and the group
+    /// was released (keys back, bodies destroyed). It is no longer part of the plan; its slot takes the next planned
+    /// group (`reuse_slot`).
+    Released,
+}
+
+/// rc.6 mid-session cycle change (operator requirement 2026-11-08, inbox 19:21Z): a detached group holds a member the
+/// role's cycle no longer has. `wanted` is the cycle's kinds and the role's original. A pair group's Nana follows its
+/// Popo; a native group (Pokémon Trainer, Pyra/Mythra) is one cycle member, kept while any of its forms is wanted.
+pub fn group_left_cycle(members: Members, wanted: &[u32]) -> bool {
+    let kinds = &members.kinds()[..members.count()];
+    match members.special() {
+        Special::Native(_) => !kinds.iter().any(|kind| wanted.contains(kind)),
+        _ => kinds.iter().any(|kind| !(wanted.contains(kind) || (*kind == NANA && wanted.contains(&POPO)))),
+    }
+}
+
+/// The slot a newly planned group takes: the first Released one (its native objects and keys are gone), else none and
+/// the group is appended.
+pub fn reuse_slot(states: impl Iterator<Item = GroupState>) -> Option<usize> {
+    states.enumerate().find(|(_, state)| *state == GroupState::Released).map(|(i, _)| i)
 }
 
 /// The group whose prefetch starts next, from `(state, publishable)` in plan order: the first
@@ -712,7 +733,7 @@ impl GroupState {
     }
     /// Still part of the plan denominator and the body budget.
     pub fn counts_bodies(self) -> bool {
-        !matches!(self, Self::Failed)
+        !matches!(self, Self::Failed | Self::Released)
     }
 }
 
@@ -740,6 +761,46 @@ pub fn async_build_eligible(members: Members, identity: bool) -> Result<(), &'st
         Special::None => Ok(()),
     }
 }
+
+/// rc.6 item 3 (operator decision 2026-11-08): a Prefetched group's bodies built in the background, beside the live
+/// window, so its first switch is a warm exchange. The construction binds to the entry by index (body init's
+/// prepare_entry `0x17f1a60` at `0x607f30` writes the copy-registry slot of its cell from the worker), so only what the
+/// queued build already serves, minus what lives in `R` while it builds: an ordinary single-actor group
+/// (`async_build_eligible` without the Mii arm: a Mii group's identity is in `R` for its whole construction), while the
+/// window holds no Mii identity (the costume selectors at `0x607dfc`/`0x17e9ae0` key on `R+0x58`) and its live member
+/// is not Kirby (D-KIRBY1: no bank key rests on its R). The live window (`window`, the attached group) must be ordinary
+/// too: the body's construction tail reads the live cells 0/1 from the worker and takes the pair rule on R for `[Popo,
+/// Nana]`, which may reset the whole R mid-play (SPECIAL-GROUPS §0 X1, `0x60de60-0x60de78`), and construct picks its
+/// info wrapper from the live kinds (X4, `0x60d21c`); a pair or native window defers the build until it is switched
+/// away. Every other group keeps today's build at its first switch.
+pub fn background_build_eligible(members: Members, identity: bool, window: Members, window_identity: bool, live_kirby: bool)
+    -> Result<(), &'static str> {
+    if members.special() == Special::Mii { return Err("mii group"); }
+    async_build_eligible(members, identity)?;
+    if window_identity { return Err("mii window"); }
+    if live_kirby { return Err("live kirby"); }
+    if window.is_pair() || matches!(window.special(), Special::Native(_)) { return Err("special window"); }
+    Ok(())
+}
+
+/// The group a background build starts next: the first Prefetched group in plan order that is eligible
+/// (`background_build_eligible`) beside the live `window`, from `(state, members, identity)`.
+pub fn next_background(groups: impl Iterator<Item = (GroupState, Members, bool)>, window: Members, window_identity: bool,
+    live_kirby: bool) -> Option<usize> {
+    groups.enumerate().find(|(_, (state, members, identity))| *state == GroupState::Prefetched
+        && background_build_eligible(*members, *identity, window, window_identity, live_kirby).is_ok()).map(|(i, _)| i)
+}
+
+/// How the notice counts a group: a Prefetched group a background build still owes (`owed`) is pending work, as a
+/// prefetch in flight is, so the notice reads "Loading x/y" until it is built; every other state is shown as it is.
+pub fn shown_state(state: GroupState, owed: bool) -> GroupState {
+    if state == GroupState::Prefetched && owed { GroupState::Prefetching } else { state }
+}
+
+/// The entry-info bytes a background build's entry-level third rewrites (`0x654dc0`: the dispatcher at `+0x8..+0x20`,
+/// the descriptor copies `+0x28..+0x92`; body init's `+0x3a0..+0x3ac`), saved before it and put back after it, as
+/// `(offset, length)`. The window's own `Window` record covers every entry field.
+pub const BACKGROUND_INFO_SPANS: [(usize, usize); 2] = [(0x08, 0x90), (0x3a0, 0x10)];
 
 /// The game's construction task object (`native_entry_dispatch_6556b0.c:215-250`, loader state
 /// 10): 0x90 bytes from the heap `0x392e290(0x10, 0x90)`; `+0x00` the body `0x3ae5f0` returned;
@@ -1073,9 +1134,11 @@ pub fn count_extra_groups(groups: &[(Members, GroupState)]) -> GroupCounts {
 pub fn count_extra_groups_iter(groups: impl IntoIterator<Item = (Members, GroupState)>) -> GroupCounts {
     let mut counts = GroupCounts::default();
     for (members, state) in groups {
+        if state == GroupState::Released { continue; }
         let count = members.count() as u8;
         counts.planned += count;
         match state {
+            GroupState::Released => {}
             GroupState::Built => counts.ready += count,
             GroupState::Prefetched => counts.prefetched += count,
             GroupState::Failed => counts.failed += count,
@@ -1467,6 +1530,79 @@ mod tests {
         after.descriptor[0x18..0x24].copy_from_slice(&[10,0,0,0,11,0,0,0,21,0,0,0]);
         after.bodies = [(0x6000,393216),(0x7000,458752),(0x8000,524288)];
         (before, after, Members::new(&[10,11,21]).unwrap())
+    }
+
+    /// rc.6 item 3: only an ordinary single-actor group builds beside the live window, and only while the window holds
+    /// no Mii identity and its live member is not Kirby; the first Prefetched eligible group in plan order goes first.
+    /// rc.6 mid-session cycle change (inbox 19:21Z): a detached group leaves when one of its members is no longer in the
+    /// role's cycle (its kinds plus the original); a pair group's Nana follows Popo, and a native group is one cycle
+    /// member, kept while any of its forms is wanted. A Released group is nothing: not planned, not counted, no keys, no
+    /// bodies, never a target; its slot takes the next planned group.
+    #[test]
+    fn a_group_leaves_when_a_member_left_the_cycle_and_its_slot_is_reused() {
+        let wanted = [0x00, 0x01, 0x02, 0x03, 0x07, POPO, 0x25, 0x49];
+        assert!(!group_left_cycle(Members::new(&[0x03, 0x07]).unwrap(), &wanted));
+        assert!(group_left_cycle(Members::new(&[0x03, 0x05, 0x07]).unwrap(), &wanted), "Yoshi left");
+        assert!(group_left_cycle(Members::new(&[0x08]).unwrap(), &wanted));
+        assert!(!group_left_cycle(Members::pair_group(), &wanted), "Nana follows Popo");
+        assert!(group_left_cycle(Members::pair_group(), &wanted[..5]));
+        assert!(!group_left_cycle(Members::native_group(0x24).unwrap(), &wanted), "Ivysaur keeps the trainer");
+        assert!(group_left_cycle(Members::native_group(0x5a).unwrap(), &wanted));
+        assert!(!group_left_cycle(Members::mii_group(0x49).unwrap(), &wanted));
+        assert!(group_left_cycle(Members::mii_group(0x48).unwrap(), &wanted));
+        let released = GroupState::Released;
+        assert!(!released.startable() && !released.reachable() && !released.holds_keys() && !released.counts_bodies());
+        let counts = count_extra_groups_iter([(Members::new(&[0x08]).unwrap(), released), (Members::new(&[0x03]).unwrap(), GroupState::Built)]);
+        assert_eq!((counts.planned, counts.ready, counts.failed, counts.pending), (1, 1, 0, 0));
+        assert_eq!(memory::outstanding(released, memory::GroupCost { prefetch: 5, build: 7 }), 0);
+        assert_eq!(next_start([(released, true), (GroupState::Planned, true)].into_iter(), 0), Some(1));
+        assert_eq!(reuse_slot([GroupState::Built, released, GroupState::Released].into_iter()), Some(1));
+        assert_eq!(reuse_slot([GroupState::Built, GroupState::Failed].into_iter()), None);
+    }
+
+    /// rc.6 item 3: the notice counts a prefetched group a background build still owes as loading (pending), so it reads
+    /// "Loading x/y" until that group is built; every other state is shown as it is.
+    #[test]
+    fn a_group_owed_a_background_build_is_shown_loading() {
+        assert_eq!(shown_state(GroupState::Prefetched, true), GroupState::Prefetching);
+        assert_eq!(shown_state(GroupState::Prefetched, false), GroupState::Prefetched);
+        for state in [GroupState::Planned, GroupState::Prefetching, GroupState::Built, GroupState::Failed, GroupState::Held(Hold::Pool)] {
+            assert_eq!(shown_state(state, true), state);
+        }
+        let ordinary = Members::new(&[0x2d, 0x2c, 0x1c]).unwrap();
+        let owed = count_extra_groups_iter([(ordinary, shown_state(GroupState::Prefetched, true))]);
+        assert_eq!((owed.planned, owed.prefetched, owed.pending), (3, 0, 3));
+    }
+
+    #[test]
+    fn a_background_build_takes_an_ordinary_prefetched_group_beside_an_ordinary_window() {
+        let ordinary = Members::new(&[0x2d, 0x2c, 0x1c]).unwrap();
+        let window = Members::new(&[0x00, 0x01, 0x02]).unwrap();
+        assert_eq!(background_build_eligible(ordinary, false, window, false, false), Ok(()));
+        assert_eq!(background_build_eligible(Members::new(&[0x1c]).unwrap(), false, window, false, false), Ok(()));
+        assert_eq!(background_build_eligible(Members::mii_group(0x4a).unwrap(), true, window, false, false), Err("mii group"));
+        assert_eq!(background_build_eligible(ordinary, true, window, false, false), Err("identity"));
+        assert_eq!(background_build_eligible(Members::pair_group(), false, window, false, false), Err("pair group"));
+        assert_eq!(background_build_eligible(ordinary, false, window, true, false), Err("mii window"));
+        assert_eq!(background_build_eligible(ordinary, false, window, false, true), Err("live kirby"));
+        // SPECIAL-GROUPS §0 X1: a body's construction tail reads the live cells 0/1; `[Popo, Nana]` takes the pair rule
+        // (and may reset the whole R). X4: a native window picks another info wrapper. Both wait for an ordinary window.
+        for special in [Members::pair_group(), Members::pair_lead(0x02).unwrap(), Members::native_group(0x24).unwrap()] {
+            assert_eq!(background_build_eligible(ordinary, false, special, false, false), Err("special window"));
+        }
+        let groups = [(GroupState::Built, ordinary, false), (GroupState::Prefetched, Members::mii_group(0x48).unwrap(), true),
+            (GroupState::Planned, ordinary, false), (GroupState::Prefetched, Members::new(&[0x1c]).unwrap(), false),
+            (GroupState::Prefetched, ordinary, false)];
+        assert_eq!(next_background(groups.iter().copied(), window, false, false), Some(3));
+        assert_eq!(next_background(groups.iter().copied(), window, true, false), None);
+        assert_eq!(next_background(groups.iter().copied(), window, false, true), None);
+        assert_eq!(next_background(groups.iter().copied(), Members::pair_group(), false, false), None);
+        assert_eq!(next_background(groups[..3].iter().copied(), window, false, false), None);
+        // The saved info spans cover what `0x654dc0` writes: the dispatcher words, the descriptor copies, `+0x3ac`.
+        let covered = |at: usize| BACKGROUND_INFO_SPANS.iter().any(|(start, len)| (*start..start + len).contains(&at));
+        for at in [0x08, 0x10, 0x18, 0x20, 0x28, 0x2c, 0x30, 0x34, 0x50, 0x51, 0x6b, 0x72, 0x78, 0x84, 0x92, 0x3a0, 0x3aa, 0x3ac] {
+            assert!(covered(at), "info+{at:#x}");
+        }
     }
 
     /// Phase B′: an ordinary group without a Mii identity and a Mii group (operator decision
