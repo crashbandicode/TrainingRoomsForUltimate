@@ -739,7 +739,10 @@ fn paint_sections(rec: &super::recording_menu::RecordingScreens, frame: &mut Fra
             place_icon(frame, usize::from(section), p_row_x(face == super::recording_menu::Face::Popup), super::panes::row_y(base), floppy);
         }
         if let Some(mark) = view.header_loop {
-            place_icon_color(frame, super::panes::FLOPPIES + usize::from(section), p_row_x(face == super::recording_menu::Face::Popup) + 36.0, super::panes::row_y(base), [236, 238, 242, 255]);
+            // Left of the right-aligned count, as a start save's floppy sits left of its name (`paint_file`).
+            let right = super::panes::row_span(face == super::recording_menu::Face::Popup).1;
+            let x = right - super::panes::text_width(mark.label().encode_utf16().count()) - 22.0;
+            place_icon_color(frame, super::panes::FLOPPIES + usize::from(section), x, super::panes::row_y(base), [236, 238, 242, 255]);
             let _ = write!(frame.rows[base].value, "{}", mark.label());
         }
         let start = window_start(view.cursor, view.rows.len(), SECTION_ROWS);
@@ -1003,6 +1006,31 @@ mod tests {
         assert_eq!(lines.first().map(String::as_str), Some("Recorded on Pikachu → Mario"), "{lines:?}");
         assert!(lines.iter().any(|line| line == "In sequence Sequence 1"), "{lines:?}");
         assert!(!frame.help[0].string_lossy().contains("CONNECTIONS"), "the help keeps its own lines");
+    }
+
+    /// Eden rc6-covrec-diag3 `cov-popup-r8` (2026-11-08): the MACROS header's loop count "1" was hidden under the loop
+    /// icon; both sat at the column's right edge and the icon draws on top. Primary 13:05Z (#19): the loop count sits
+    /// inside the panel, as in the r8 mockup. The icon goes left of the count, on the page and in the pop-up.
+    #[test]
+    fn the_loop_icon_sits_left_of_the_macros_loop_count() {
+        use crate::model::menu::table::SAVES_MACROS;
+        use crate::model::recording_menu::Face;
+        for popup in [false, true] {
+            let mut menu = recording_menu_with_files();
+            menu.recording_mut().set_cursor(Face::Page, SAVES_MACROS, 1, 0);
+            if popup {
+                menu.recording_mut().toggle_popup();
+            }
+            let mut frame = Frame::new();
+            page_frame(&menu, &mut frame);
+            let header = (0..usize::from(frame.row_count)).find(|i| frame.rows[*i].label.string_lossy() == "MACROS").expect("MACROS");
+            let count = frame.rows[header].value.string_lossy();
+            assert!(!count.is_empty(), "the header carries the loop count");
+            let icon = frame.icons[super::super::panes::FLOPPIES + 1];
+            assert!(icon.on, "the loop icon is drawn");
+            let text_left = super::super::panes::row_span(popup).1 - super::super::panes::text_width(count.encode_utf16().count());
+            assert!(icon.x + 14.0 <= text_left, "popup={popup}: the icon ({}) covers the count from {text_left}", icon.x);
+        }
     }
 
     /// Eden `rc5-opus-floppy1` (2026-11-08): `Save states & Macros (0)` beside an open macro. The count was of settings
