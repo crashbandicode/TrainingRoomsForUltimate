@@ -118,6 +118,15 @@ P1_LANE = (288, 50, 792, 66)
 CPU_LANE = (288, 80, 792, 96)
 
 
+def _busy_cells(shot, lane):
+    """Recovery-blue cells ([82, 136, 232], `frame_strip::Cell::Recovery`). The CPU lane never shows
+    startup or active colours (`frame_strip::classify` keeps those for P1), so a CPU action is a blue bar."""
+    from PIL import Image
+    with Image.open(shot) as image:
+        pixels = list(image.convert('RGB').crop(lane).getdata())
+    return sum(1 for r, g, b in pixels if abs(r - 82) < 30 and abs(g - 136) < 30 and abs(b - 232) < 30)
+
+
 def _attack_cells(shot, lane):
     from PIL import Image
     with Image.open(shot) as image:
@@ -193,22 +202,27 @@ def acc_cpu_menu(ctx):
     time.sleep(1.5)
     counters_before = ctx.call('trace.counters', {})
     shots = [str(ctx.shot('cpu-before'))]
-    ctx.play(steps.PLAY_CPU)
-    for name, gap in (('cpu-t03', 0.3), ('cpu-t06', 0.3), ('cpu-t10', 0.4), ('cpu-t20', 1.0)):
-        time.sleep(gap)
-        shots.append(str(ctx.shot(name)))
-    time.sleep(1.0)
+
+    def play():
+        ctx.play(steps.PLAY_CPU)
+        for name, gap in (('cpu-t03', 0.3), ('cpu-t06', 0.3), ('cpu-t10', 0.4)):
+            time.sleep(gap)
+            shots.append(str(ctx.shot(name)))
+
+    clip = steps.gif(ctx, 'cpu-play.gif', 3, play)
+    shots.append(str(ctx.shot('cpu-t30')))
     counters_after = ctx.call('trace.counters', {})
     (ctx.row_dir / 'trace-counters-before.json').write_text(json.dumps(counters_before, indent=2) + '\n')
     (ctx.row_dir / 'trace-counters-after.json').write_text(json.dumps(counters_after, indent=2) + '\n')
-    attack = max(_attack_cells(shot, CPU_LANE) for shot in shots[1:])
+    busy_before = _busy_cells(shots[0], CPU_LANE)
+    busy = max(_busy_cells(shot, CPU_LANE) for shot in shots[1:])
     out = {'role': role, 'start': start, 'stop': stop, 'file': path.name, 'frames': len(frames),
-           'pressed': pressed[:8], 'active': index.get('active'), 'cpu_attack_cells': attack,
-           'shots': shots}
+           'pressed': pressed[:8], 'active': index.get('active'), 'cpu_busy_cells_before': busy_before,
+           'cpu_busy_cells_after': busy, 'gif': clip, 'shots': shots}
     steps.save(ctx, 'cpu-menu', out)
-    if attack < 20:
-        raise RuntimeError('no attack cells in the strip CPU lane after Play on CPU (%d): %s'
-                           % (attack, shots[2]))
+    if busy <= busy_before + 20:
+        raise RuntimeError('the strip CPU lane shows no new action after Play on CPU (%d, before %d): %s'
+                           % (busy, busy_before, shots[2]))
     return out
 
 
