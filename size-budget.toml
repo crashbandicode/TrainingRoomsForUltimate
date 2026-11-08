@@ -669,7 +669,63 @@ approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); card L1 by primar
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
+ceiling = 150839
+date = "2026-11-08"
+reason = "rc.6 coverage fixes (p23/rc6-cov-rec fd77245): the bound save drives Save, Load and Auto-load through the active slot, combo CONNECTIONS lines in the catalog, shared combo ids in the index and sequences, the recorder before the input display (Make combo events), and the mash sees a library macro playing on the CPU; measured 150839 (tools/size_gate.py), +189 over 150650"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to these root fixes under TASK-OPUS-rc6-cov-rec (primary c07b3449, 2026-11-08: a raise goes in its own commit with approved_by)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
 ceiling = 151701
 date = "2026-11-08"
 reason = "rc.6 sequence drilling (08de8d0): the sequence run on the frame hook, the staged plan and its saved streak and best, the sequence bar (header, combo row, footer), and the host writing Edit combos, Edit chain and Delete; measured 151701 at 08de8d0 (tools/size_gate.py), +989 over 150712"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); rc.6 sequence drilling by primary c07b3449, TASK-OPUS-rc6-seq-drill 2026-11-08"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 150966
+date = "2026-11-08"
+reason = "rc.6 coverage, second set (p23/rc6-cov-rec 4d387ff..f7371fa): Make combo saves only its own exchange, the operator's '+ Save last combo…' row at the top of COMBOS and a combo's recorded fighter in CONNECTIONS, a drill or bind puts that file first, and the Replay window's clip editor drawn after the hand-over; measured 150966 (tools/size_gate.py), +127 over 150839"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied under TASK-OPUS-rc6-cov-rec and the primary's inbox orders of 2026-11-08 13:08Z (Save last combo) and 13:31Z (Make combo), own commit"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 151475
+date = "2026-11-08"
+reason = "rc.6 coverage, third set (p23/rc6-cov-rec 37bf8d0..9897e8e): a setup restore writes no save file (#69 b), Edit placement edits the role's active macro and Play warps with its offset (#70 a), Switch asks for a CPU macro's exact Mii (#54 a), and the r8 pop-up's two columns and row lines (#19, #49); measured 151475 (tools/size_gate.py), +509 over 150966"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied under TASK-OPUS-rc6-cov-rec and the primary's inbox answers of 2026-11-08 ~14:20Z (#49, #19, #54, #70, #69), own commit"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 151479
+date = "2026-11-08"
+reason = "rc.6 coverage (p23/rc6-cov-rec 3c616db): Edit placement on an active chain edits its macro 1 instead of adding a refusal that the compliance check rejects (no approved restriction); measured 151479 (tools/size_gate.py), +4 over 151475"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied under TASK-OPUS-rc6-cov-rec and the primary's inbox answer #70 (a) of 2026-11-08 ~14:20Z, own commit"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 151481
+date = "2026-11-08"
+reason = "rc.6 coverage (p23/rc6-cov-rec 4ef504f): the MACROS loop icon sits left of its count, which it hid (#19, Eden rc6-covrec-diag3 cov-popup-r8); measured 151481 (tools/size_gate.py), +2 over 151479"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied under TASK-OPUS-rc6-cov-rec and the primary's #19 answer of 2026-11-08 13:05Z, own commit"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 152005
+date = "2026-11-08"
+reason = "rc.6 coverage (p23/rc6-cov-rec 57f65c0): the r8 pop-up as drawn, its title with the L/R role tabs, the section file counts, the CONNECTIONS boxes and tree, and the r8 footer (primary 2026-11-08 15:55Z); 2427fff reverted e276d0f (-43); measured 152005 (tools/size_gate.py), +524 over 151481"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied under TASK-OPUS-rc6-cov-rec and the primary's inbox order of 2026-11-08 15:55Z, own commit"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 152190
+date = "2026-11-08"
+reason = "rc.6 coverage (p23/rc6-cov-rec d3c5e1b): the r8 pop-up section header bands with kind marks, the red order badges and the boxed page tabs (primary 2026-11-08 16:51Z); measured 152190 (tools/size_gate.py), +185 over 152005"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied under TASK-OPUS-rc6-cov-rec and the primary's inbox order of 2026-11-08 16:51Z, own commit"

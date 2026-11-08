@@ -20,8 +20,9 @@ use crate::model::frame_strip_plan::{Changed, Look, Text};
 use crate::runtime::published;
 
 static HELPER: Mutex<Helper> = Mutex::new(Helper::new());
-/// The worker's copy of the last combo. The game thread publishes it after it has let go of HELPER.
-static SAMPLE: Mutex<Option<Combo>> = Mutex::new(None);
+/// The worker's copy of the last combo, with the helper's count of links captured (`Helper::seen`). The game thread
+/// publishes it after it has let go of HELPER.
+static SAMPLE: Mutex<(u32, Option<Combo>)> = Mutex::new((0, None));
 static RENDERER: Mutex<Renderer> = Mutex::new(Renderer::new());
 /// The target's name for the bar, and the names the menu shows (target, draft).
 static NAME: Mutex<Text> = Mutex::new(Text::EMPTY);
@@ -61,7 +62,7 @@ pub fn after_strip(tracker: &Tracker, p1_kind: Option<i32>) {
         };
         let stepped = stepped.map(|s| (s, plan.as_deref().map_or(0, |p| p.generation)));
         drop(plan);
-        let sample = helper.last_combo();
+        let sample = (helper.seen(), helper.last_combo());
         (out, sample, names, stepped)
     };
     if let Some((text, label)) = names {
@@ -91,10 +92,10 @@ fn sequence_run<'a>(run: &'a mut Option<(u32, SequenceRun)>, plan: &SequenceStag
 
 /// The strip's session clear (leaving Training, a hot swap, a lobby change).
 pub fn session_clear() {
-    let (out, stepped) = {
+    let (out, stepped, seen) = {
         let mut helper = HELPER.lock();
         let plan = PLAN.lock();
-        match plan.as_deref() {
+        let (out, stepped) = match plan.as_deref() {
             Some(plan) => {
                 let mut run = RUN.lock();
                 let run = sequence_run(&mut run, plan, &mut helper);
@@ -102,13 +103,14 @@ pub fn session_clear() {
                 (out, stepped.map(|s| (s, plan.generation)))
             }
             None => (helper.clear(), None),
-        }
+        };
+        (out, stepped, helper.seen())
     };
     report(out);
     if let Some((stepped, generation)) = stepped {
         report_step(stepped, generation);
     }
-    *SAMPLE.lock() = None;
+    *SAMPLE.lock() = (seen, None);
 }
 
 /// A step of the drilled sequence was graded: its trace point, and the streak and best for the worker to save.
@@ -320,8 +322,9 @@ pub fn last_combo() -> Option<Combo> {
     HELPER.lock().last_combo()
 }
 
-/// The last combo published by the strip, without taking the helper lock the frame hook holds.
-pub fn strip_sample() -> Option<Combo> {
+/// The last combo published by the strip and the count of links captured, without taking the helper lock the frame
+/// hook holds.
+pub fn strip_sample() -> (u32, Option<Combo>) {
     *SAMPLE.lock()
 }
 

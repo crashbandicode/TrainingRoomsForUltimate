@@ -236,15 +236,14 @@ fn sync_input_generation(s: &mut Session) {
         s.mii = None;
         #[cfg(feature = "mii-saved-alpha")]
         { s.pending_close = None; }
-        if s.phase == Phase::Clip {
-            EXT_SHOWN.store(false, Ordering::Release);
-        }
         if s.phase == Phase::Prompt {
             // The next `sync_panels` draws a question that is still up again, on a new model.
             hide_prompt();
         }
         POPUP.store(false, Ordering::Release);
-        s.phase = Phase::Menu;
+        // The clip editor outlives the menu (the hand-over's own close lands here) and keeps drawing; `sync_panels`
+        // hides it when the layer closes it.
+        s.phase = flow::after_session_reset(s.phase);
         publish_jumps(s);
         diagnostic(format_args!("[Ui] menu session cleared"));
     }
@@ -868,13 +867,19 @@ fn stage_label(i: usize) -> &'static str {
 /// Build the frame of what is on screen (the clip editor, a layer panel, or the menu's own page and sub-screen) and hand it to the tick
 /// when it differs from the last one.
 fn publish_frame(s: &Session) {
+    if !flow::frame_needs_menu(s.phase) {
+        // The clip editor: the hand-over closed the menu and the close dropped its model, so it draws from its own view.
+        let Some(view) = replay_capture::clip_view() else { return };
+        let mut next = NEXT_FRAME.lock();
+        next.reset();
+        clip_frame(&view, &named_macros::fighter_label(view.fighter_kind), replay_capture::scrub_pace(), &mut next);
+        hand_over(&next);
+        return;
+    }
     let Some(menu) = s.menu.as_ref() else { return };
     let mut next = NEXT_FRAME.lock();
     next.reset();
-    if s.phase == Phase::Clip {
-        let Some(view) = replay_capture::clip_view() else { return };
-        clip_frame(&view, &named_macros::fighter_label(view.fighter_kind), replay_capture::scrub_pace(), &mut next);
-    } else if s.phase == Phase::Panel || s.phase == Phase::Prompt {
+    if s.phase == Phase::Panel || s.phase == Phase::Prompt {
         // The layer's page may be between two views (a capture loading, a keyboard open): keep what is on screen.
         let Some(view) = (if s.panel.is_some_and(is_setup) {
             s.setups.view()
@@ -941,7 +946,12 @@ fn publish_frame(s: &Session) {
         next.help[1].clear();
         let _ = core::fmt::Write::write_str(&mut next.help[1], note);
     }
-    // The last frame handed over (only this thread takes it): an unchanged frame is not handed over again.
+    hand_over(&next);
+}
+
+/// Hand a built frame to the tick. The last frame handed over (only this thread takes it): an unchanged frame is not
+/// handed over again.
+fn hand_over(next: &Frame) {
     let mut last = LAST_FRAME.lock();
     if *last != *next {
         *last = *next;

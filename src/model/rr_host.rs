@@ -11,15 +11,16 @@ use super::library::{
     StartSaveState, Use, MACROS_DIR, SAVES_DIR, SEQUENCES_DIR,
 };
 use super::frame_queue::FrameQueue;
-use super::macros::{FrameSnapshot, FrameWindow, InputFrame, Library, MAX_FRAMES};
+use super::macros::{FrameSnapshot, FrameWindow, InputFrame, Library, MacroRecording, Placement, MAX_FRAMES};
 use super::playback::{Book, Playback, StartLink};
 use super::rr_runtime::{
     chord_notice, civil_date, crop_combo_file, crop_macro_file, delete_save,
     drive_mash, drive_play, drive_step, duplicate_save, finish_recording, migrate_at_boot,
-    offer_keyboard, push_frame, save_made_combo, start_save_notice, toggle_record, Capture,
+    offer_keyboard, push_frame, save_chord, save_made_combo, start_save_notice, toggle_record, Capture,
     KeyboardOffer, Tape, EMPTY_COMBO, READ_WINDOW, RESIDENT_FRAMES,
 };
 use crate::model::combo::Combo;
+use crate::model::cpu::playback::PlaybackState;
 use crate::model::input_delay::MappedInputs;
 use crate::model::recording::{inject_values, ControlCtx, ControlOut, CpuRoleDrive, Inject, Phase};
 use crate::model::recording_menu::{Effect, LoopMark, Selection, ViewRole};
@@ -53,7 +54,7 @@ static MENU_EFFECT: Mutex<Effect> = Mutex::new(Effect::None);
 static CROP: Mutex<Option<CropWindow>> = Mutex::new(None);
 static DEFER_MIGRATE: AtomicBool = AtomicBool::new(false);
 static ROLE_KIND: [AtomicI32; 2] = [const { AtomicI32::new(-1) }; 2];
-static STRIP: Mutex<Option<Combo>> = Mutex::new(None);
+static STRIP: Mutex<(u32, Option<Combo>)> = Mutex::new((0, None));
 static MAKE: Mutex<Option<MakeJob>> = Mutex::new(None);
 static HELD: Mutex<Option<Role>> = Mutex::new(None);
 static ANSWER: Mutex<Option<MismatchChoice>> = Mutex::new(None);
@@ -73,10 +74,29 @@ static WARP_HOLD: AtomicBool = AtomicBool::new(false);
 /// the one allocation to `recorder_ai` (`runtime::roster::build_split`, `docs/provenance/pkg6-owner-locks.md`).
 /// `hos_lock` is a const word and allocates nothing.
 static CPU_DRIVE: hos_lock::Mutex<CpuRoleDrive> = hos_lock::Mutex::new(CpuRoleDrive::idle());
+/// The binding or a library file changed since the save-state machine last took the bound save.
+static BOUND_DIRTY: AtomicBool = AtomicBool::new(true);
+/// What the machine's active slot was last given: the bound id and its pair.
+static BOUND_APPLIED: Mutex<Option<BoundCopy>> = Mutex::new(None);
+/// A Save the state writer captured, for the worker to write into the bound save.
+static SAVED_PAIR: Mutex<Option<[SavedState; 2]>> = Mutex::new(None);
+/// A setup restore moved the fighters through the active slot: the slot is given the bound save again.
+static SLOT_RESYNC: AtomicBool = AtomicBool::new(false);
+/// Edit placement's Keep: a file id and the offset Play uses for it instead of the file's.
+static KEPT_PLACEMENT: Mutex<Option<(String, Placement)>> = Mutex::new(None);
+
+/// The bound save as the save-state machine's active slot must hold it (RECORDING.md, "Save states only warp").
+#[derive(Clone, Debug, PartialEq)]
+struct BoundCopy {
+    id: Option<String>,
+    pair: Option<[SavedState; 2]>,
+}
 
 struct MakeJob {
     source: String,
     ready: bool,
+    /// The strip's count of links captured when the source began playing.
+    since: u32,
 }
 
 struct Resident {
@@ -98,6 +118,8 @@ pub struct CropWindow {
 #[derive(Clone, Debug, Default)]
 pub struct Tick {
     pub warp: Option<String>,
+    /// The playing role and the placement of the file that warps (`warp_pair`).
+    pub warp_place: Option<(Role, Placement)>,
     pub notices: Vec<&'static str>,
     pub diags: Vec<String>,
     pub keyboard: Option<KeyboardOffer>,
@@ -292,6 +314,15 @@ pub fn note_mash() {
     MASH.store(true, Ordering::Release);
 }
 
+/// What the CPU's behaviours see of playback (B5 / N4, Mash interrupts playback): the old recorder's state, with a
+/// library macro playing on the CPU counted as a running playback.
+pub fn cpu_playback(recorder: PlaybackState) -> PlaybackState {
+    PlaybackState {
+        running: recorder.running || role_playing(Role::Cpu),
+        ..recorder
+    }
+}
+
 /// The save-state restore a Play's warp asked for has placed both fighters (or the warp was
 /// not requested after all). The held runs step from their first frame on the next tick.
 pub fn warp_landed() {
@@ -377,6 +408,7 @@ pub fn service_at(
         && migrate_at_boot(root, slots, date).is_ok()
     {
         MIGRATED.store(true, Ordering::Release);
+        BOUND_DIRTY.store(true, Ordering::Release);
         tick.diags.push("screen=migrate once=1".to_string());
     }
     let edge = RECORD_EDGE.swap(0, Ordering::AcqRel);
@@ -431,11 +463,10 @@ pub fn service_at(
     let mut machine = lock(&MACHINE);
     let machine = machine.get_or_insert_with(Playback::new);
     if mash {
-        drive_mash(machine, Role::Player, true);
+        // The mash is the CPU's (Mash Toggles), so it stops the macro the CPU plays; Player 1's keeps playing
+        // (RECORDING.md: "stops the macro that role is playing"; primary 2026-11-08 13:05Z).
         drive_mash(machine, Role::Cpu, true);
-        RUN_PLAYER.store(false, Ordering::Release);
         RUN_CPU.store(false, Ordering::Release);
-        drop_frames(Role::Player);
         drop_frames(Role::Cpu);
         tick.diags.push("screen=playback mash=1".to_string());
     }
@@ -474,8 +505,9 @@ pub fn set_role_fighter(role: Role, kind: i32) {
     }
 }
 
-pub fn set_strip_sample(combo: Option<Combo>) {
-    *lock(&STRIP) = combo;
+/// The strip's last combo and its count of links captured (`combo::Helper::seen`), from the recording worker's tick.
+pub fn set_strip_sample((seen, combo): (u32, Option<Combo>)) {
+    *lock(&STRIP) = (seen, combo);
 }
 
 pub fn set_fighter_label(label: &str) {
@@ -492,6 +524,147 @@ pub fn catalog_generation() -> u64 {
 
 fn bump_catalog() {
     CATALOG_GEN.fetch_add(1, Ordering::Release);
+    BOUND_DIRTY.store(true, Ordering::Release);
+}
+
+/// What the save-state machine's active slot must hold now, when that changed since the last call or a setup restore
+/// used the slot (`setup_restored`): the bound save's pair, or `Some(None)` (an empty slot) when nothing is bound. Load and Auto-load warp to that slot, so they follow
+/// the binding (pop-up A on a save, the Bind row, Delete) and the bound file. Nothing before the library is built: the
+/// legacy slot stays until migration binds the slot the chords used.
+pub fn bound_sync(root: &Path) -> Option<Option<[SavedState; 2]>> {
+    if !BOUND_DIRTY.swap(false, Ordering::AcqRel) {
+        return None;
+    }
+    let index = match RecordingIndex::load(root) {
+        Ok(index) if index.migrated() => index,
+        _ => {
+            BOUND_DIRTY.store(true, Ordering::Release);
+            return None;
+        }
+    };
+    let id = index.bound().map(str::to_owned);
+    let pair = id
+        .as_deref()
+        .and_then(|id| Store::<NamedSave>::new(root.join(SAVES_DIR)).load(id).ok())
+        .map(|save| [save.player, save.cpu]);
+    let copy = BoundCopy { id, pair };
+    let mut applied = lock(&BOUND_APPLIED);
+    if !SLOT_RESYNC.swap(false, Ordering::AcqRel) && applied.as_ref() == Some(&copy) {
+        return None;
+    }
+    let pair = copy.pair.clone();
+    *applied = Some(copy);
+    Some(pair)
+}
+
+/// The state writer has a Save's two records for the active slot. The worker writes them into the bound save.
+pub fn save_captured(pair: [SavedState; 2]) {
+    *lock(&SAVED_PAIR) = Some(pair);
+}
+
+/// The state writer applied a setup restore (or a setup bound with Y) to the active slot. Setups stay a separate
+/// library from save states (LANE-GROK-RECORDING-REDESIGN-REPORT.md:322; primary 2026-11-08 #69 (b)): a restore only
+/// moves the fighters, so nothing is written into the bound save. The slot gets the bound save back; the post waits
+/// until the restore has landed (`states::apply_bound_post`).
+pub fn setup_restored() {
+    SLOT_RESYNC.store(true, Ordering::Release);
+    BOUND_DIRTY.store(true, Ordering::Release);
+}
+
+/// What Edit placement edits (primary 2026-11-08 #70 (a)): the page role's active macro, the file Play plays, and the
+/// position its start save gives that role. Play warps there and adds the offset (`warp_pair`).
+#[derive(Clone, Debug, PartialEq)]
+pub struct PlacementTarget {
+    pub role: Role,
+    pub id: String,
+    pub recording: MacroRecording,
+    pub anchor: (f32, f32),
+}
+
+/// The game's `SITUATION_KIND_AIR` (ground 0, cliff 1).
+const SITUATION_AIR: i32 = 2;
+
+pub const PLACE_NO_MACRO: &str = "Make a macro active for this role first";
+pub const PLACE_NO_START: &str = "Link a start save to the macro first";
+
+pub fn placement_target(root: &Path) -> Result<PlacementTarget, &'static str> {
+    let role = if RECORD_ROLE.load(Ordering::Acquire) == ROLE_CPU { Role::Cpu } else { Role::Player };
+    let index = RecordingIndex::load(root).map_err(|_| PLACE_NO_MACRO)?;
+    let active = index.active(role).ok_or(PLACE_NO_MACRO)?.to_owned();
+    // A chain warps to macro 1's start save and plays with macro 1's placement (`play_placement`), so it edits macro 1.
+    let (id, chain_on) = match Store::<Chain>::new(root.join(MACROS_DIR)).load(&active) {
+        Ok(chain) => (chain.recordings.first().cloned().ok_or(PLACE_NO_MACRO)?, Some(chain.start_save_on)),
+        Err(_) => (active, None),
+    };
+    let recording = Library::new(root.join(MACROS_DIR)).load(&id).map_err(|_| PLACE_NO_MACRO)?;
+    let start_on = chain_on.unwrap_or(recording.start_save_on);
+    let save = recording
+        .start_save
+        .as_deref()
+        .filter(|_| start_on)
+        .and_then(|save| Store::<NamedSave>::new(root.join(SAVES_DIR)).load(save).ok())
+        .ok_or(PLACE_NO_START)?;
+    let at = match role {
+        Role::Player => &save.player,
+        Role::Cpu => &save.cpu,
+    };
+    let anchor = (at.x, at.y);
+    let mut recording = recording;
+    if let Some(placement) = kept_placement(&id) {
+        recording.placement = placement;
+    }
+    Ok(PlacementTarget { role, id, recording, anchor })
+}
+
+/// Keep on Edit placement: Play uses this offset for that file until the game closes. The file is unchanged.
+pub fn keep_placement(id: &str, placement: Placement) {
+    *lock(&KEPT_PLACEMENT) = Some((id.to_owned(), placement));
+}
+
+/// Write over put an offset into the file: a kept one for that file no longer applies.
+pub fn placement_written(id: &str) {
+    let mut kept = lock(&KEPT_PLACEMENT);
+    if kept.as_ref().is_some_and(|(kept, _)| kept == id) {
+        *kept = None;
+    }
+}
+
+fn kept_placement(id: &str) -> Option<Placement> {
+    lock(&KEPT_PLACEMENT).as_ref().filter(|(kept, _)| kept == id).map(|(_, placement)| *placement)
+}
+
+/// The placement a Play of `id` warps with: a kept one, else the file's (a chain: macro 1's, whose start save it is).
+fn play_placement(book: &Book, id: &str) -> Placement {
+    let first = book.first_recording(id).unwrap_or(id);
+    kept_placement(first).unwrap_or_else(|| book.placement(first))
+}
+
+/// The pair a Play warps to: the start save, with the file's placement added to the playing role's saved position
+/// (`Placement::apply` on a fresh anchor every warp, so repeated trials never add it twice). A raised start on the
+/// ground is in the air, as the named layer's `restore_in_air` had it.
+pub fn warp_pair(save: NamedSave, place: Option<(Role, Placement)>) -> [SavedState; 2] {
+    let mut pair = [save.player, save.cpu];
+    if let Some((role, placement)) = place {
+        let record = &mut pair[role_index(role)];
+        (record.x, record.y) = placement.apply((record.x, record.y));
+        if placement.delta_y != 0.0 && record.situation_kind == 0 {
+            record.situation_kind = SITUATION_AIR;
+        }
+    }
+    pair
+}
+
+/// Save writes the one bound save, or a new bound Save N when none is bound (`rr_runtime::save_chord`). Worker side.
+pub fn write_saved(root: &Path) -> bool {
+    let Some([player, cpu]) = lock(&SAVED_PAIR).take() else {
+        return false;
+    };
+    let Ok(id) = save_chord(root, player.clone(), cpu.clone(), unix_now()) else {
+        return false;
+    };
+    *lock(&BOUND_APPLIED) = Some(BoundCopy { id: Some(id), pair: Some([player, cpu]) });
+    bump_catalog();
+    true
 }
 
 /// The menu's selection is what Play, Record, and the loop read. The index is that selection.
@@ -509,6 +682,7 @@ pub fn publish_selection(root: &Path, selection: &Selection, drill_kind: Option<
         let _ = index.set_drill(Some(Drill { kind, id: id.to_string() }), at.saturating_add(3));
     }
     let _ = index.save(root);
+    BOUND_DIRTY.store(true, Ordering::Release);
 }
 
 /// What the grade helper should do when the recording drill id changes.
@@ -761,6 +935,9 @@ fn play_role(root: &Path, machine: &mut Playback, book: &Book, role: Role, tick:
     };
     if let Some(id) = effect.warp {
         tick.warp = Some(id.to_owned());
+        if let Some(active) = book.index.active(role) {
+            tick.warp_place = Some((role, play_placement(book, active)));
+        }
         tick.diags
             .push(format!("screen=playback role={word} warp=1"));
         WARP_HOLD.store(true, Ordering::Release);
@@ -989,6 +1166,23 @@ fn apply_menu(root: &Path, machine: &mut Playback, book: &Book, online: bool, ti
                 }
             }
         }
+        Effect::SaveLastCombo { name } => save_last_combo(root, &name, tick),
+    }
+}
+
+/// *+ Save last combo…* (operator 2026-11-08; rc.4 COMBO-HELPER): the strip's latest exchange becomes a combo file
+/// named `name` (empty: Combo N), recorded on Player 1's fighter, hot, and the drill (RECORDING.md).
+fn save_last_combo(root: &Path, name: &str, tick: &mut Tick) {
+    let Some(combo) = lock(&STRIP).1.filter(|combo| !combo.is_empty()) else {
+        tick.notices.push(EMPTY_COMBO);
+        tick.diags.push("screen=notice kind=combo-empty".to_string());
+        return;
+    };
+    let label = lock(&PLAYER_LABEL).clone();
+    let recorded_on = (!label.is_empty()).then_some(label);
+    if let Ok(id) = super::rr_runtime::save_last_combo(root, &combo, name, recorded_on, unix_now()) {
+        tick.diags.push(format!("screen=save-last-combo saved={id} links={}", combo.len()));
+        bump_catalog();
     }
 }
 
@@ -1088,6 +1282,7 @@ fn begin_make(
         }
         StartLink::Linked(id) => {
             tick.warp = Some(id.to_string());
+            tick.warp_place = Some((Role::Player, play_placement(book, source)));
             WARP_HOLD.store(true, Ordering::Release);
         }
         StartLink::None => {}
@@ -1098,7 +1293,8 @@ fn begin_make(
         RUN_PLAYER.store(true, Ordering::Release);
         step_role(root, machine, book, Role::Player);
     }
-    *lock(&MAKE) = Some(MakeJob { source: source.to_string(), ready: true });
+    let since = lock(&STRIP).0;
+    *lock(&MAKE) = Some(MakeJob { source: source.to_string(), ready: true, since });
     tick.diags.push(format!("screen=make-combo source={source} playing={}", i32::from(effect.started)));
     if online {
         tick.keyboard = None;
@@ -1113,8 +1309,13 @@ fn finish_make(root: &Path, tick: &mut Tick) {
     let Some(job) = lock(&MAKE).take() else {
         return;
     };
-    let sample = lock(&STRIP).take();
-    let Some(combo) = sample.filter(|combo| !combo.is_empty()) else {
+    // Only an exchange the strip captured while the source played: a playback that lands no hit leaves the count
+    // where it was, and the earlier exchange the strip still shows is not this file's.
+    let (seen, sample) = {
+        let mut strip = lock(&STRIP);
+        (strip.0, strip.1.take())
+    };
+    let Some(combo) = sample.filter(|combo| seen != job.since && !combo.is_empty()) else {
         tick.notices.push(EMPTY_COMBO);
         tick.diags.push("screen=notice kind=combo-empty".to_string());
         return;
@@ -1305,7 +1506,7 @@ fn reset_host() {
     *lock(&RESIDENT) = None;
     *lock(&MENU_EFFECT) = Effect::None;
     *lock(&CROP) = None;
-    *lock(&STRIP) = None;
+    *lock(&STRIP) = (0, None);
     *lock(&MAKE) = None;
     *lock(&HELD) = None;
     *lock(&ANSWER) = None;
@@ -1319,6 +1520,11 @@ fn reset_host() {
     CPU_ROLE_ON.store(false, Ordering::Release);
     WARP_HOLD.store(false, Ordering::Release);
     *CPU_DRIVE.lock() = CpuRoleDrive::idle();
+    BOUND_DIRTY.store(true, Ordering::Release);
+    *lock(&BOUND_APPLIED) = None;
+    *lock(&SAVED_PAIR) = None;
+    SLOT_RESYNC.store(false, Ordering::Release);
+    *lock(&KEPT_PLACEMENT) = None;
     for slot in &ROLE_KIND {
         slot.store(-1, Ordering::Release);
     }
@@ -1422,7 +1628,8 @@ mod tests {
             .diags
             .iter()
             .any(|line| line == "screen=playback mash=1"));
-        assert!(take_player_frame().is_none());
+        // The CPU's mash stops only the CPU's macro: Player 1's keeps playing (primary 2026-11-08 13:05Z, #22 (a)).
+        assert_eq!(take_player_frame().expect("Player 1 plays on after the CPU's mash").buttons, 6);
     }
 
     #[test]
@@ -1888,6 +2095,32 @@ mod tests {
         assert_eq!(take_cpu_frame().expect("no warp, no wait").buttons, 33_281);
     }
 
+    /// Eden `rc6-covrec-diag1` (2026-11-08): Mash interrupts playback On, the CPU played its active macro,
+    /// Player 1's jab put it in hitstun, and no `screen=playback mash=1` came. The CPU's mash read only the
+    /// old recorder's playback, which was idle, so it never asked the library run to stop.
+    #[test]
+    fn a_library_macro_playing_on_the_cpu_is_the_playback_the_mash_and_covered_settings_see() {
+        use crate::model::cpu::playback::covered_setting_applies;
+        let _hold = hold();
+        reset_host();
+        let root = scratch("cpu-mash");
+        let idle = PlaybackState::default();
+        active_plain_macro(&root, Role::Cpu, 30);
+        assert!(!cpu_playback(idle).running, "nothing plays yet");
+        on_chords(false, false, true);
+        tick(&root);
+        assert!(take_cpu_frame().is_some());
+        let seen = cpu_playback(idle);
+        assert!(seen.possesses_cpu(), "the CPU's library run is a running playback: {seen:?}");
+        assert!(!covered_setting_applies(seen, false));
+        let recording = PlaybackState { recording: true, ..idle };
+        assert!(cpu_playback(recording).recording, "the recorder's own state is kept");
+        note_mash();
+        tick(&root);
+        assert!(take_cpu_frame().is_none(), "the mash stopped the CPU's run");
+        assert!(!cpu_playback(idle).running);
+    }
+
     /// A file of `n` distinct frames (buttons 1..=n), active on `role`, with no start save.
     fn active_plain_macro(root: &Path, role: Role, n: u32) -> Vec<u32> {
         let _ = service_at(root, &none(), "2026-11-08", state(8), state(7), false);
@@ -2051,7 +2284,8 @@ mod tests {
         index.set_active(Role::Player, Some(&other), 1).unwrap();
         index.set_drill(Some(Drill { kind: DrillKind::Combo, id: "kept-drill".into() }), 2).unwrap();
         index.save(&root).unwrap();
-        set_strip_sample(Some(sample_combo()));
+        // An earlier exchange is on the strip; the source's own link arrives while it plays.
+        set_strip_sample((0, Some(sample_combo())));
         post_effect(Effect::MakeCombo { source: source.clone(), chain: false });
         let playing = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
         assert_eq!(playing.warp.as_deref(), Some(save_id.as_str()));
@@ -2060,6 +2294,7 @@ mod tests {
         let fed = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
         assert!(fed.diags.iter().all(|line| !line.contains("saved=1")), "the combo is made after the source has played");
         assert_eq!(take_player_frame().expect("source frame").buttons, 11);
+        set_strip_sample((1, Some(sample_combo())));
         let saved = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
         assert!(saved.diags.iter().any(|line| line.contains("screen=make-combo") && line.contains("saved=1")));
         let combos = crate::model::combo_record::ComboLibrary::new(root.join("combos"));
@@ -2080,7 +2315,7 @@ mod tests {
         reset_host();
         let root = scratch("make-fail");
         let source = one_macro(&root, "Bare", 3, 8, None);
-        set_strip_sample(Some(crate::model::combo::Combo::default()));
+        set_strip_sample((0, Some(crate::model::combo::Combo::default())));
         post_effect(Effect::MakeCombo { source: source.clone(), chain: false });
         let _ = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
         assert_eq!(take_player_frame().expect("the source plays").buttons, 3);
@@ -2091,7 +2326,7 @@ mod tests {
 
         reset_host();
         let gone = one_macro(&root, "Gone", 4, 8, Some("deleted-save"));
-        set_strip_sample(Some(sample_combo()));
+        set_strip_sample((0, Some(sample_combo())));
         post_effect(Effect::MakeCombo { source: gone, chain: false });
         let missing = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
         assert!(missing.warp.is_none());
@@ -2112,6 +2347,61 @@ mod tests {
         let online = service_at(&root, &none(), "2026-11-06", state(8), state(7), true);
         assert!(online.keyboard.is_none());
         assert!(online.diags.iter().all(|line| !line.contains("screen=rename")));
+    }
+
+    /// Eden rc6-seq-explore1 `seq-make` (2026-11-08 12:28Z, primary inbox 13:31Z): a played macro that lands no hit was
+    /// saved as the strip's PREVIOUS exchange. RECORDING.md: Make combo records the exchange the file plays. Only a
+    /// link the strip captured after Make combo began counts; none gives the empty notice and no file.
+    #[test]
+    fn make_combo_with_no_hit_saves_nothing_not_the_previous_exchange() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("make-stale");
+        let source = one_macro(&root, "Whiff", 3, 8, None);
+        set_strip_sample((4, Some(sample_combo())));
+        post_effect(Effect::MakeCombo { source, chain: false });
+        let _ = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
+        assert_eq!(take_player_frame().expect("the source plays").buttons, 3);
+        set_strip_sample((4, Some(sample_combo())));
+        let done = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
+        assert!(done.diags.iter().any(|line| line == "screen=notice kind=combo-empty"), "{:?}", done.diags);
+        assert!(done.diags.iter().all(|line| !line.contains("saved=1")));
+        assert!(crate::model::combo_record::ComboLibrary::new(root.join("combos")).list().unwrap().entries.is_empty());
+    }
+
+    /// Operator 2026-11-08 (primary inbox 13:08Z): *+ Save last combo…* saves the latest exchange as a combo file, as
+    /// rc.4's COMBO-HELPER did (`combos/<id>.json` on the generic store): named as typed or Combo N, recorded on Player
+    /// 1's fighter, hot, and the drill (RECORDING.md). With no link on the strip it says so and writes nothing.
+    #[test]
+    fn save_last_combo_writes_the_latest_exchange_names_it_and_drills_it() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("save-last");
+        let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        set_fighter_label("Mario");
+        let combos = crate::model::combo_record::ComboLibrary::new(root.join("combos"));
+        set_strip_sample((0, None));
+        post_effect(Effect::SaveLastCombo { name: String::new() });
+        let empty = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        assert!(empty.diags.iter().any(|line| line == "screen=notice kind=combo-empty"), "{:?}", empty.diags);
+        assert!(empty.notices.contains(&EMPTY_COMBO));
+        assert!(combos.list().map(|listed| listed.entries.is_empty()).unwrap_or(true));
+        set_strip_sample((3, Some(sample_combo())));
+        post_effect(Effect::SaveLastCombo { name: "Ryu BnB".into() });
+        let saved = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        assert!(saved.diags.iter().any(|line| line.starts_with("screen=save-last-combo saved=")), "{:?}", saved.diags);
+        let listed = combos.list().unwrap();
+        assert_eq!(listed.entries.len(), 1);
+        let id = listed.entries[0].id.clone();
+        let file = combos.load(&id).unwrap();
+        assert_eq!((file.name.as_str(), file.combo, file.recorded_on.as_deref()), ("Ryu BnB", sample_combo(), Some("Mario")));
+        let index = RecordingIndex::load(&root).unwrap();
+        assert_eq!(index.drill().map(|drill| (drill.kind, drill.id.as_str())), Some((DrillKind::Combo, id.as_str())));
+        assert_eq!(index.hot(Kind::Combo).first(), Some(&id));
+        post_effect(Effect::SaveLastCombo { name: String::new() });
+        let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        let names: Vec<String> = combos.list().unwrap().entries.into_iter().map(|entry| entry.name).collect();
+        assert!(names.iter().any(|name| name == "Combo 1"), "{names:?}");
     }
 
     #[test]
@@ -2445,5 +2735,159 @@ mod tests {
         let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
         assert!(Library::new(root.join(MACROS_DIR)).load(&chain_macro).is_err(), "the macro is gone");
         assert!(RecordingIndex::load(&root).unwrap().active(Role::Player).is_none(), "and is no longer active");
+    }
+
+    fn at_x(x: f32) -> SavedState {
+        let mut state = state(0);
+        state.x = x;
+        state
+    }
+
+    /// RECORDING.md, "Save states only warp": Save writes the one bound save; Load warps both fighters to that save; A
+    /// on a save binds it to Save and Load. Eden rc6-covrec-diag1 cov-bind-load (2026-11-08): with Left bound, Load went
+    /// to the legacy slot, A on Right changed nothing, and Save wrote save_states.json. The machine's active slot is
+    /// the bound save: this is what the worker gives it, and what Save writes back.
+    #[test]
+    fn the_active_slot_follows_the_bound_save_and_save_writes_it() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("bound");
+        migrate_at_boot(&root, &none(), "2026-11-08").unwrap();
+        let saves = Store::<NamedSave>::new(root.join(SAVES_DIR));
+        let left = saves.save_new(&NamedSave::new("Left", at_x(-70.0), at_x(-40.0)).unwrap()).unwrap();
+        let right = saves.save_new(&NamedSave::new("Right", at_x(40.0), at_x(70.0)).unwrap()).unwrap();
+        let mut index = RecordingIndex::load(&root).unwrap();
+        index.bind_save(Some(&left), 1).unwrap();
+        index.save(&root).unwrap();
+        let first = bound_sync(&root).expect("the first sync").expect("Left is bound");
+        assert_eq!((first[0].x, first[1].x), (-70.0, -40.0));
+        assert!(bound_sync(&root).is_none(), "nothing changed");
+        let selection = Selection {
+            bound: Some(right.clone()),
+            active_player: None,
+            active_cpu: None,
+            loop_player: LoopMark::Finite(1),
+            loop_cpu: LoopMark::Finite(1),
+            drill: None,
+            record_role: ViewRole::Player,
+        };
+        publish_selection(&root, &selection, None);
+        assert_eq!(bound_sync(&root).unwrap().unwrap()[0].x, 40.0, "A on Right binds Right for Load");
+        save_captured([at_x(5.0), at_x(6.0)]);
+        assert!(write_saved(&root));
+        let written = saves.load(&right).unwrap();
+        assert_eq!((written.player.x, written.cpu.x), (5.0, 6.0), "Save writes the bound file");
+        assert!(bound_sync(&root).is_none(), "the slot already holds what Save wrote");
+        publish_selection(&root, &Selection { bound: None, ..selection }, None);
+        assert_eq!(bound_sync(&root), Some(None), "nothing bound empties the slot");
+        save_captured([at_x(1.0), at_x(2.0)]);
+        assert!(write_saved(&root));
+        let made = RecordingIndex::load(&root).unwrap().bound().unwrap().to_owned();
+        assert_eq!(saves.load(&made).unwrap().name, "Save 1");
+        assert_eq!(saves.load(&made).unwrap().player.x, 1.0);
+    }
+
+    /// Primary 2026-11-08 #70 (a): Edit placement edits the page role's active macro, the file Play plays. Eden
+    /// rc6-covrec-diag2 cov-edit-placement refused with a macro active, and Play never read a placement. The anchor is
+    /// where the start save puts the role; Play's warp adds the file's offset (or a kept one) to that role only.
+    #[test]
+    fn edit_placement_targets_the_active_macro_and_play_warps_with_its_offset() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("placement");
+        migrate_at_boot(&root, &none(), "2026-11-08").unwrap();
+        set_record_role(Role::Cpu);
+        assert_eq!(placement_target(&root), Err(PLACE_NO_MACRO));
+        let saves = Store::<NamedSave>::new(root.join(SAVES_DIR));
+        let mut cpu = at_x(30.0);
+        cpu.fighter_kind = 7;
+        cpu.y = 2.0;
+        let start = saves.save_new(&NamedSave::new("Start", at_x(-30.0), cpu).unwrap()).unwrap();
+        let macros = Library::new(root.join(MACROS_DIR));
+        let mut recording =
+            MacroRecording::new("Nair", "13.0.5", StartState::neutral(7, 0, 1.0), vec![InputFrame::default()]).unwrap();
+        let loose = macros.save_new(&recording).unwrap();
+        let mut index = RecordingIndex::load(&root).unwrap();
+        index.set_active(Role::Cpu, Some(&loose), 1).unwrap();
+        index.save(&root).unwrap();
+        assert_eq!(placement_target(&root), Err(PLACE_NO_START), "no warp, no anchor");
+        recording.set_start_save(Some(&start)).unwrap();
+        recording.set_placement(Placement { delta_x: 1.5, delta_y: 0.0, ..Placement::default() }).unwrap();
+        let id = macros.save_new(&recording).unwrap();
+        let mut index = RecordingIndex::load(&root).unwrap();
+        index.set_active(Role::Cpu, Some(&id), 2).unwrap();
+        index.save(&root).unwrap();
+        let target = placement_target(&root).expect("the CPU's active macro");
+        assert_eq!((target.role, target.id.as_str(), target.anchor), (Role::Cpu, id.as_str(), (30.0, 2.0)));
+        assert_eq!(target.recording.placement.delta_x, 1.5);
+
+        on_chords(false, false, true);
+        let tick = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        assert_eq!(tick.warp.as_deref(), Some(start.as_str()));
+        assert_eq!(tick.warp_place.map(|(role, place)| (role, place.delta_x)), Some((Role::Cpu, 1.5)));
+        let pair = warp_pair(saves.load(&start).unwrap(), tick.warp_place);
+        assert_eq!((pair[0].x, pair[1].x, pair[1].y), (-30.0, 31.5, 2.0), "only the playing role moves");
+        let lifted = warp_pair(
+            saves.load(&start).unwrap(),
+            Some((Role::Cpu, Placement { delta_x: 0.0, delta_y: 3.0, ..Placement::default() })),
+        );
+        assert_eq!((lifted[1].y, lifted[1].situation_kind), (5.0, SITUATION_AIR), "a raised start is in the air");
+
+        keep_placement(&id, Placement { delta_x: -2.0, delta_y: 0.0, ..Placement::default() });
+        warp_landed();
+        on_chords(false, false, true);
+        let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        on_chords(false, false, true);
+        let tick = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        assert_eq!(tick.warp_place.map(|(_, place)| place.delta_x), Some(-2.0), "Keep wins until the game closes");
+        assert_eq!(macros.load(&id).unwrap().placement.delta_x, 1.5, "Keep leaves the file alone");
+
+        // A chain warps to macro 1's start save and plays with macro 1's placement, so Edit placement edits macro 1.
+        let chain = Chain::new("Pressure", vec![id.clone(), loose.clone()]).unwrap();
+        let chain_id = Store::<Chain>::new(root.join(MACROS_DIR)).save_new(&chain).unwrap();
+        let mut index = RecordingIndex::load(&root).unwrap();
+        index.set_active(Role::Cpu, Some(&chain_id), 3).unwrap();
+        index.save(&root).unwrap();
+        let target = placement_target(&root).expect("a chain edits its macro 1");
+        assert_eq!((target.id.as_str(), target.anchor), (id.as_str(), (30.0, 2.0)));
+    }
+
+    /// Primary 2026-11-08 #69 (b): "Setups stay a separate library from save states"
+    /// (LANE-GROK-RECORDING-REDESIGN-REPORT.md:322). Eden rc6-covrec-diag2 cov-setup-restore: the restore moved the
+    /// fighters and also wrote them into the bound save. A restore only moves the fighters: the worker writes nothing,
+    /// the bound file keeps its pair, and the active slot gets the bound save back, so Load still warps to it.
+    #[test]
+    fn a_setup_restore_leaves_the_bound_save_and_the_slot_returns_to_it() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("setup-restore");
+        migrate_at_boot(&root, &none(), "2026-11-08").unwrap();
+        let saves = Store::<NamedSave>::new(root.join(SAVES_DIR));
+        let bound = saves.save_new(&NamedSave::new("Bound", at_x(-70.0), at_x(-40.0)).unwrap()).unwrap();
+        let before = saves.load(&bound).unwrap();
+        let mut index = RecordingIndex::load(&root).unwrap();
+        index.bind_save(Some(&bound), 1).unwrap();
+        index.save(&root).unwrap();
+        assert!(bound_sync(&root).is_some(), "the first sync");
+        assert!(bound_sync(&root).is_none(), "nothing changed");
+        setup_restored();
+        assert!(!write_saved(&root), "a setup restore hands the worker nothing to write");
+        assert_eq!(saves.load(&bound).unwrap(), before, "the bound save file is untouched");
+        let again = bound_sync(&root).expect("the slot is given the bound save again").expect("Bound is bound");
+        assert_eq!((again[0].x, again[1].x), (-70.0, -40.0));
+        assert!(bound_sync(&root).is_none(), "once per restore");
+        publish_selection(&root, &Selection {
+            bound: None,
+            active_player: None,
+            active_cpu: None,
+            loop_player: LoopMark::Finite(1),
+            loop_cpu: LoopMark::Finite(1),
+            drill: None,
+            record_role: ViewRole::Player,
+        }, None);
+        assert_eq!(bound_sync(&root), Some(None), "nothing bound");
+        setup_restored();
+        assert_eq!(bound_sync(&root), Some(None), "with nothing bound the restored slot is emptied again");
+        assert_eq!(RecordingIndex::load(&root).unwrap().bound(), None, "and no save is made for it");
     }
 }

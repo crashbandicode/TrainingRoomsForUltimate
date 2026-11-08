@@ -93,7 +93,10 @@ pub fn refusal_of(editor: Editor, slot: Option<usize>) -> &'static str {
         return "Finish the current practice action first";
     }
     match editor {
-        Editor::EditPlacement => "Load a macro and restore a Training state first",
+        // The active macro's own refusal (primary 2026-11-08 #70 (a): it edits the file Play plays).
+        Editor::EditPlacement => crate::engine::rr_host::placement_target(std::path::Path::new(crate::model::storage::ROOT))
+            .err()
+            .unwrap_or("Placement is not usable"),
         Editor::ReplayWindow => "Open the replay window in idle practice, with a saved replay capture",
         Editor::SaveSlotToLibrary => "Record into the slot first",
         _ => "Not available right now",

@@ -57,6 +57,18 @@ pub fn menu_owns_input(open: bool, popup: bool, closing: bool, prompt: bool) -> 
     open || popup || closing || prompt
 }
 
+/// Whether the frame of `phase` is built from the menu's model. The clip editor's is not: the hand-over closed the menu,
+/// and every close drops the model (`menu::PlaceKeeper`), so the editor draws from the layer's own view.
+pub fn frame_needs_menu(phase: Phase) -> bool {
+    phase != Phase::Clip
+}
+
+/// The phase after the menu's session is reset (every close moves the input generation). The clip editor outlives the
+/// menu on purpose (the hand-over closes it), so it keeps drawing until the layer closes it (`next`: `HideClip`).
+pub fn after_session_reset(phase: Phase) -> Phase {
+    if phase == Phase::Clip { Phase::Clip } else { Phase::Menu }
+}
+
 /// The next phase and the step to take, given the phase and what the layer reports.
 pub fn next(phase: Phase, seen: Seen) -> (Phase, Step) {
     match phase {
@@ -90,6 +102,32 @@ mod tests {
         assert_eq!(next(Phase::Prompt, asked), (Phase::Prompt, Step::Nothing));
         let answered = seen(false, false, false);
         assert_eq!(next(Phase::Prompt, answered), (Phase::Menu, Step::HidePrompt));
+    }
+
+    /// Eden rc6-covrec-diag1 and diag2 (2026-11-08): the Replay window's A opened the clip editor (status editor=true; the
+    /// game held on the clip), but no editor frame was ever drawn. The hand-over closes the menu, the close drops the
+    /// menu's model, and the worker built every frame only when it still held a model.
+    #[test]
+    fn the_clip_editor_draws_without_a_menu_model() {
+        let (phase, step) = next(Phase::Panel, seen(true, true, true));
+        assert_eq!((phase, step), (Phase::Clip, Step::HandOverToClip));
+        assert!(!frame_needs_menu(phase), "the editor's frame comes from the layer's view");
+        for phase in [Phase::Menu, Phase::Panel, Phase::Prompt] {
+            assert!(frame_needs_menu(phase), "{phase:?} is drawn from the menu's model");
+        }
+    }
+
+    /// The same runs: the hand-over's own close reset the menu session, and the reset put the worker back in Menu, so
+    /// the editor was never drawn although it held the game. The clip phase survives the reset; the layer closing the
+    /// editor ends it.
+    #[test]
+    fn the_hand_over_close_keeps_the_clip_editor_drawn() {
+        assert_eq!(after_session_reset(Phase::Clip), Phase::Clip);
+        assert_eq!(next(after_session_reset(Phase::Clip), seen(false, true, true)), (Phase::Clip, Step::Nothing));
+        assert_eq!(next(Phase::Clip, seen(false, false, false)), (Phase::Menu, Step::HideClip));
+        for phase in [Phase::Menu, Phase::Panel, Phase::Prompt] {
+            assert_eq!(after_session_reset(phase), Phase::Menu);
+        }
     }
 
     #[test]

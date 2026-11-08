@@ -532,6 +532,8 @@ struct Capture {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Helper {
     capture: Capture,
+    /// Links captured so far (wrapping; a clear keeps it): Make combo saves only an exchange captured after it began.
+    seen: u32,
     target: Option<Combo>,
     attempt: Option<Attempt>,
     results: [Option<Summary>; RESULTS],
@@ -558,6 +560,7 @@ impl Helper {
                 last_link: None,
                 frame: 0,
             },
+            seen: 0,
             target: None,
             attempt: None,
             results: [None; RESULTS],
@@ -609,6 +612,11 @@ impl Helper {
         [self.capture.current, self.capture.previous]
             .into_iter()
             .find(|c| !c.is_empty())
+    }
+
+    /// Links captured so far (wrapping). A change means `last_combo` holds a link captured since the count was read.
+    pub fn seen(&self) -> u32 {
+        self.seen
     }
 
     pub fn attempt(&self) -> Option<&Attempt> {
@@ -668,6 +676,7 @@ impl Helper {
             self.capture.after = link.hit;
             let first = self.capture.current.is_empty();
             self.capture.current.push(rec);
+            self.seen = self.seen.wrapping_add(1);
             self.on_link(rec, first, exchange, &mut out);
         }
         if !tracker.exchange_open() {

@@ -54,6 +54,12 @@ fn saved(x: f32, y: f32, lr: f32, situation: i32, kind: i32) -> SavedState {
     SavedState { x, y, lr, situation_kind: situation, fighter_kind: kind, percent: 42.0, ..SavedState::never_saved() }
 }
 
+/// A machine whose slot 0 holds a save. A never-saved slot is "nothing bound" and loads nothing (RECORDING.md, "Save
+/// states only warp"; `an_empty_slot_loads_nothing_on_the_chord_or_a_death`), so the load mechanics are tested on this.
+fn loaded() -> Machine {
+    machine_with(saved(0.0, 0.0, 1.0, GROUND, 7), saved(0.0, 0.0, 1.0, GROUND, 7), 0)
+}
+
 fn settings() -> StateSettings {
     StateSettings::default()
 }
@@ -184,7 +190,7 @@ fn waiting_state_role_is_entry_four_and_never_a_parked_native_cpu() {
 /// WaitForAlive frame for a Pokemon only, and the trainer's switch flag is raised once it is placed.
 #[test]
 fn state05_pt_predeath() {
-    let mut machine = Machine::default();
+    let mut machine = loaded();
     let mut rng = rng();
     let pokemon = |entry: i32| FrameIn { pokemon: true, ..input(entry) };
     request(&mut machine, &settings(), &mut rng);
@@ -209,7 +215,7 @@ fn state05_pt_predeath() {
 
 #[test]
 fn state01_load_request_marks_both() {
-    let mut machine = Machine::default();
+    let mut machine = loaded();
     let mut rng = rng();
     let out = request(&mut machine, &settings(), &mut rng);
     assert!(out.stop_playback);
@@ -217,7 +223,7 @@ fn state01_load_request_marks_both() {
     assert!(machine.is_loading() && machine.is_killing());
     // Nothing else happens on the request frame, and the request is read only by a non-Nana fighter.
     assert_eq!(out.placing, None);
-    let mut other = Machine::default();
+    let mut other = loaded();
     let nana = other.frame(&FrameIn { load_chord: true, nana: true, ..input(0) }, &settings(), &mut rng);
     assert!(!nana.stop_playback && !other.is_loading());
 }
@@ -355,16 +361,16 @@ fn state01_random_slot_latch() {
 fn state01_autoload_on_death() {
     let mut rng = rng();
     let on = StateSettings { autoload: true, ..settings() };
-    let mut machine = Machine::default();
+    let mut machine = loaded();
     machine.frame(&input(1), &on, &mut rng);
     assert!(!machine.is_loading(), "alive: nothing");
     let out = machine.frame(&FrameIn { dead: true, ..input(1) }, &on, &mut rng);
     assert!(out.stop_playback && machine.is_loading(), "a dead CPU loads");
-    let mut off = Machine::default();
+    let mut off = loaded();
     off.frame(&FrameIn { dead: true, ..input(0) }, &settings(), &mut rng);
     assert!(!off.is_loading(), "Auto Save States Off never loads on death");
     // A dead Nana never requests a load.
-    let mut nana = Machine::default();
+    let mut nana = loaded();
     nana.frame(&FrameIn { dead: true, nana: true, ..input(0) }, &on, &mut rng);
     assert!(!nana.is_loading());
 }
@@ -373,7 +379,7 @@ fn state01_autoload_on_death() {
 fn state01_ignore_request_mid_load() {
     let mut rng = rng();
     let s = StateSettings { mirroring: Mirroring::Alternate, ..settings() };
-    let mut machine = Machine::default();
+    let mut machine = loaded();
     assert!(request(&mut machine, &s, &mut rng).stop_playback);
     let sign = machine.mirror_sign;
     let again = request(&mut machine, &s, &mut rng);
@@ -384,7 +390,7 @@ fn state01_ignore_request_mid_load() {
 #[test]
 fn state01_disable_cancels() {
     let mut rng = rng();
-    let mut machine = Machine::default();
+    let mut machine = loaded();
     request(&mut machine, &settings(), &mut rng);
     machine.frame(&input(0), &settings(), &mut rng);
     assert!(machine.is_loading());
@@ -604,4 +610,24 @@ fn r2_4_loading_is_true_from_acceptance_to_completion_and_the_restore_is_reporte
     for entry in [0, 1] {
         assert_eq!(machine.frame(&input(entry), &settings(), &mut rng).restored, None, "never again");
     }
+}
+
+/// RECORDING.md, "Save states only warp": "Auto-load on death only warps to the bound save. If none is bound, it does
+/// nothing." The bound save is the active slot's pair (rc.6 coverage fix); with no save there, neither the Load chord
+/// nor a death starts a load (Eden rc6-covrec-diag1 cov-autoload: a death still loaded with nothing bound).
+#[test]
+fn an_empty_slot_loads_nothing_on_the_chord_or_a_death() {
+    let mut machine = Machine::default();
+    let settings = StateSettings { autoload: true, ..settings() };
+    let mut random = rng();
+    let chord = request(&mut machine, &settings, &mut random);
+    assert!(!chord.stop_playback, "the Load chord started a load of an empty slot");
+    assert!(!machine.is_loading());
+    let death = machine.frame(&FrameIn { dead: true, ..input(0) }, &settings, &mut random);
+    assert!(!death.stop_playback && !death.force_dead, "a death started a load of an empty slot");
+    assert!(!machine.is_loading());
+    // One saved record is a save: the chord loads it.
+    let mut machine = machine_with(saved(4.0, 0.0, 1.0, GROUND, 7), SavedState::never_saved(), 0);
+    assert!(request(&mut machine, &settings, &mut random).stop_playback);
+    assert!(machine.is_loading());
 }

@@ -59,7 +59,7 @@ impl Record for Sequence {
     const MAX_FILE_BYTES: u64 = MAX_FILE_BYTES;
 
     fn validate(&self) -> Result<(), Error> {
-        super::ordered::validate_ordered(self.schema_version == SCHEMA, &self.name, &self.combos)
+        super::ordered::validate_ordered_combos(self.schema_version == SCHEMA, &self.name, &self.combos)
     }
 
     fn name(&self) -> &str {

@@ -369,6 +369,11 @@ impl Machine {
             }
             None => usize::from(settings.slot).min(SLOTS - 1),
         };
+        // The active slot is the bound save: nothing bound leaves it empty, and an empty slot loads nothing
+        // (RECORDING.md: "If none is bound, it does nothing").
+        if !self.record(Role::Player, slot).is_saved() && !self.record(Role::Cpu, slot).is_saved() {
+            return false;
+        }
         self.start_load(slot, settings, rng);
         true
     }

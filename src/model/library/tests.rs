@@ -712,6 +712,7 @@ fn ordered_catalog() -> crate::model::recording_menu::Catalog {
         combos: vec![ComboFile {
             id: "c1".into(),
             name: "One".into(),
+            recorded_on: String::new(),
             made_from: None,
             links: Vec::new(),
             span: 0,
@@ -836,4 +837,34 @@ fn exact_mii() -> crate::engine::mii::lifetime::Configuration {
     })
     .unwrap();
     crate::engine::mii::lifetime::Configuration::from_saved(&saved).unwrap()
+}
+
+/// Eden rc6-covrec-diag1 (2026-11-08): a combo file copied onto the card as Shared nair.json was listed and drilled,
+/// but the index refused its id (only store slugs), so the drill was not kept. docs/COMBOS.md: "File names: any name
+/// works ... Choose it with A to make it the target." The combo store accepts that name (shareable_id); the index,
+/// the hot list and a sequence must accept the same ids, and still refuse a path.
+#[test]
+fn a_shared_combo_file_name_is_drilled_kept_and_sequenced() {
+    let root = scratch("shared-combo-id");
+    let combos = ComboLibrary::new(root.join("combos"));
+    std::fs::create_dir_all(root.join("combos")).unwrap();
+    std::fs::write(root.join("combos").join("Ryu BnB.json"), serde_json::to_vec(&json!({
+        "schema_version": 1, "name": "Ryu BnB",
+        "links": [{"from": "jab", "to": "jab", "verdict": {"kind": "true", "link": -3},
+                   "steps": [{"button": "attack", "aim": "neutral", "offset": 1}]}]
+    })).unwrap()).unwrap();
+    assert!(combos.load("Ryu BnB").is_ok(), "the combo store lists the shared file");
+    let mut index = RecordingIndex::load(&root).unwrap();
+    index.set_drill(Some(Drill { kind: DrillKind::Combo, id: "Ryu BnB".into() }), 5).unwrap();
+    index.save(&root).unwrap();
+    let back = RecordingIndex::load(&root).unwrap();
+    assert_eq!(back.drill().map(|drill| drill.id.as_str()), Some("Ryu BnB"));
+    assert_eq!(back.hot(Kind::Combo).first().map(String::as_str), Some("Ryu BnB"));
+    assert!(Sequence::new("Mixed", vec!["Ryu BnB".into(), "combo-1".into()]).is_ok());
+    let mut index = RecordingIndex::load(&root).unwrap();
+    assert!(index.set_drill(Some(Drill { kind: DrillKind::Combo, id: "../Ryu".into() }), 6).is_err());
+    assert!(index.note_use(Kind::Combo, "a/b", Use::Drilled, 6).is_err());
+    assert!(index.bind_save(Some("Ryu BnB"), 6).is_err(), "a save id stays a store slug");
+    assert!(index.set_active(Role::Player, Some("Ryu BnB"), 6).is_err(), "a macro id stays a store slug");
+    assert!(Sequence::new("Bad", vec!["../x".into()]).is_err());
 }

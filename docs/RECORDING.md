@@ -79,7 +79,7 @@ An empty chain plays nothing. A chain whose recordings have all been deleted pla
 
 ## Combos
 
-Save last combo, on today's Recording › Combos row, keeps the last combo the frame strip saw and makes it the drill. The file is the combo's links and the input events of each follow-up: presses, releases, the C-stick, and the stick flicks (fast-fall, dash, tap-jump). Make combo records the same events, because it plays into the same strip. Any fighter can practise it. The format is in [COMBOS.md](COMBOS.md).
+*+ Save last combo…*, the first row of COMBOS on the Recording page and in the pop-up's Combos & Sequences tab, keeps the last combo the frame strip saw and makes it the drill. A opens the keyboard for its name; an empty name, or a room where no keyboard can open, gives it the next Combo N name. With no link on the strip yet it says so and writes nothing. The file is the combo's links and the input events of each follow-up: presses, releases, the C-stick, and the stick flicks (fast-fall, dash, tap-jump). Make combo records the same events, because it plays into the same strip. Any fighter can practise it. The format is in [COMBOS.md](COMBOS.md).
 
 A combo counts when its recorded input events are there, the same kind and the same facing-relative direction, in order, and within the on-time tolerance, and the move that comes out is the recorded move. TRUE is not required. A link that is not a true combo still counts. TRUE stays on the helper bar as information. Drift is the held stick between those events. It is shown and it is not graded.
 
@@ -126,7 +126,35 @@ Each tab is two stacked sections. Each section shows four rows under a header th
 
 The five most recently used of a kind are listed first, most recent first. Those rows sit in a green outline. A hairline is drawn under the fifth when that boundary is in the four-row window. The status line still says hairline=5 when the fifth row is scrolled off this window.
 
-The connections of the row under the cursor are the menu's two help lines, headed CONNECTIONS. They are not a panel on the right. A chain that is the active macro of the role in view includes that role's loop on those lines. Other connection lines, such as a start save, a chain step, a combo made from the file, or the recorded fighter, are not limited to that role. The MACROS header shows the loop of the role in view.
+The lists are the left column, and the connections of the row under the cursor are the right column, headed CONNECTIONS, as the agreed r8 mockup draws them (`docs/decisions/RECORDING-REDESIGN-r8-popup-*.png` on `review/menu-proposal`).
+
+- The row under the cursor sits in a box with its kind's pill: SAVE STATE, MACRO, COMBO or SEQUENCE.
+- Under it, headings name what is joined to it:
+  - "start save of";
+  - "starts from (warps there once, first)";
+  - "in chains", "combos made from it";
+  - "made from", "in sequences";
+  - "combos".
+- Each joined file sits in its own box, hanging from a stem.
+- Plain lines follow: a combo's links, its fighters, whether a save is bound, and a macro's recorded fighter and length.
+
+Each section header shows how many files it lists. In the pop-up it sits on a dark band behind its kind's mark: the orange floppy for SAVE STATES, and a square for the others (blue for MACROS, purple for COMBOS, pink for SEQUENCES).
+
+A row's place in the chain or sequence under the cursor is a red number badge at the row's left edge in the pop-up; the page writes it before the name. The pop-up's page tabs are outlined boxes, and the active one is outlined in green.
+
+Each file row has a dim line under its name:
+
+- a save's fighters;
+- "Recorded on" and the fighter, for a macro or a combo;
+- the steps of a chain or a sequence.
+
+An action row such as + New chain has none. The title reads Recording, with the role tabs beside it: L Player, CPU R, the role in view lit. The footer names what A does in the section under the cursor, then the pop-up's keys:
+
+- "A bind" in Save states;
+- "A set active   X loop" in Macros;
+- "A drill" in Combos and Sequences.
+
+The CPU view leaves out ZL/ZR. Other connection lines, such as a start save, a chain step, a combo made from the file, or the recorded fighter, are not limited to that role. The MACROS header shows the loop of the role in view.
 
 The bound save, the active macro of the role in view, and the drilled combo or sequence are green rows. The name stays the ordinary light colour. The cursor on these screens is a white border and a white bar on the left. A row can be green and hold the cursor at the same time.
 
@@ -138,7 +166,7 @@ The orange floppy is the save state a macro starts at. It is grey when that macr
 
 ## The Recording page
 
-The Recording page uses the same stacked sections and the same CONNECTIONS help lines. The left column is Save states & Macros, Combos & Sequences, Replays, and Options. There is no tab switch on the page, because that column lists the groups. Each of the two library groups shows in brackets how many files it lists: saves and macros, or combos and sequences. ZR switches Player 1 and CPU. L and R change the menu page, except while a file screen, the crop screen, the numbered picker, or the name step is open: then L and R stay on Recording. The CPU view hides Combos & Sequences. A opens the file's own screen. On a save, Bind to Save / Load is that screen's first row. X cycles the loop only when the cursor is in Macros, and that count is written to the recording index. B closes the menu when no file screen is open. On a file screen, B goes back.
+The Recording page uses the same stacked sections, with the same line under each file row. Its CONNECTIONS are the menu's two help lines, because the page's left column lists the groups. That column is Save states & Macros, Combos & Sequences, Replays, and Options. There is no tab switch on the page, because that column lists the groups. Each of the two library groups shows in brackets how many files it lists: saves and macros, or combos and sequences. ZR switches Player 1 and CPU. L and R change the menu page, except while a file screen, the crop screen, the numbered picker, or the name step is open: then L and R stay on Recording. The CPU view hides Combos & Sequences. A opens the file's own screen. On a save, Bind to Save / Load is that screen's first row. X cycles the loop only when the cursor is in Macros, and that count is written to the recording index. B closes the menu when no file screen is open. On a file screen, B goes back.
 
 ![The Recording page, Player view, saves above macros](media/rc5-recording-page.gif)
 
