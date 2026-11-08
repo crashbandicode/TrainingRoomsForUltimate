@@ -126,6 +126,9 @@ pub struct Tick {
     pub mismatch: Option<MismatchAsk>,
     /// Switch uses the existing exact-fighter route for this kind. Keep leaves it empty.
     pub switch_kind: Option<i32>,
+    /// Switch for a CPU macro recorded on an exact Mii: the macro's `playback_target()`, for the existing replay-catalog
+    /// request (primary 2026-11-08 #54 (a)). The wrapper uses it instead of `switch_kind`.
+    pub switch_mii: Option<crate::engine::mii::replay::Target>,
     /// A combo records a fighter name. The wrapper resolves it to a kind.
     pub switch_name: Option<String>,
     pub switch_player: bool,
@@ -799,6 +802,10 @@ fn play_role(root: &Path, machine: &mut Playback, book: &Book, role: Role, tick:
                 tick.diags.push(format!("screen=mismatch ask={} answer=switch", ask.origin));
                 tick.switch_kind = Some(ask.recorded_kind);
                 tick.switch_player = role == Role::Player;
+                // Only the CPU loads an exact Mii (the ordinary CPU Mii loader); Player 1 keeps the kind route.
+                if role == Role::Cpu {
+                    tick.switch_mii = book.index.active(role).and_then(|id| book.exact_mii_target(id));
+                }
             }
         }
     } else {
@@ -2485,6 +2492,61 @@ mod tests {
         let tick = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
         assert_eq!(tick.warp_place.map(|(_, place)| place.delta_x), Some(-2.0), "Keep wins until the game closes");
         assert_eq!(macros.load(&id).unwrap().placement.delta_x, 1.5, "Keep leaves the file alone");
+    }
+
+    fn exact_brawler() -> crate::engine::mii::lifetime::Configuration {
+        use crate::engine::mii::inventory::{classify, MiiClass, RawSlot, TaggedId, CHARINFO_LEN, TAG_CHARA, TAG_HAT, TAG_OUTFIT};
+        let saved = classify(&RawSlot {
+            index: 0, slot_id: 13231, name_len: 1,
+            name_units: [65, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            charinfo: [7; CHARINFO_LEN], colour: 4, voice: 37, specials: [1, 0, 0, 0],
+            tag_outfit: TaggedId((u64::from(TAG_OUTFIT) << 56) | (1 << 40) | 0x1b_fef7_a5f7),
+            tag_hat: TaggedId((u64::from(TAG_HAT) << 56) | 0x0f_a9ef_a5ea),
+            tag_chara: TaggedId((u64::from(TAG_CHARA) << 56) | MiiClass::Brawler.chara_hash40()),
+        }).unwrap();
+        crate::engine::mii::lifetime::Configuration::from_saved(&saved).unwrap()
+    }
+
+    /// Primary 2026-11-08 #54 (a): Switch on a CPU macro recorded on an exact Mii hands the macro's `playback_target()`
+    /// to the existing replay-catalog request. Eden rc6-covrec-diag2 cov-named-mii: Switch loaded a default Mii of the
+    /// class (`Direct(TrioFighter(74))`, outfit 69 / hat 0 / colour 2 / specials 0000), not the recorded one.
+    #[test]
+    fn switch_on_an_exact_mii_macro_asks_for_that_mii() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("exact-mii");
+        migrate_at_boot(&root, &none(), "2026-11-08").unwrap();
+        let configuration = exact_brawler();
+        let mut recording =
+            MacroRecording::new("Brawler", "13.0.5", StartState::neutral(0x48, 0, 1.0), vec![InputFrame::default()]).unwrap();
+        recording.set_mii(configuration).unwrap();
+        let macros = Library::new(root.join(MACROS_DIR));
+        let id = macros.save_new(&recording).unwrap();
+        let plain = macros
+            .save_new(&MacroRecording::new("Mario", "13.0.5", StartState::neutral(1, 0, 1.0), vec![InputFrame::default()]).unwrap())
+            .unwrap();
+        let mut index = RecordingIndex::load(&root).unwrap();
+        index.set_active(Role::Cpu, Some(&id), 1).unwrap();
+        index.save(&root).unwrap();
+        set_role_fighter(Role::Cpu, 7);
+        on_chords(false, false, true);
+        let tick = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        assert!(tick.mismatch.is_some(), "the recorded fighter is asked about");
+        answer_mismatch(MismatchChoice::Switch);
+        let tick = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        assert_eq!(tick.switch_kind, Some(0x48));
+        assert_eq!(tick.switch_mii, Some(crate::engine::mii::replay::Target::mii(configuration)), "the recorded Mii");
+
+        reset_host();
+        let mut index = RecordingIndex::load(&root).unwrap();
+        index.set_active(Role::Cpu, Some(&plain), 2).unwrap();
+        index.save(&root).unwrap();
+        set_role_fighter(Role::Cpu, 7);
+        on_chords(false, false, true);
+        let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        answer_mismatch(MismatchChoice::Switch);
+        let tick = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        assert_eq!((tick.switch_kind, tick.switch_mii), (Some(1), None), "any other fighter keeps the kind route");
     }
 
     /// Primary 2026-11-08 #69 (b): "Setups stay a separate library from save states"
