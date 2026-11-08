@@ -77,8 +77,11 @@ fn every_notice_text_has_a_plate() {
         assert_eq!(plate.parent, parent);
         assert_eq!(text.parent, parent);
         let plate_at = specs.iter().position(|s| s.name == plate.name).unwrap();
-        let text_at = specs.iter().position(|s| s.name == text.name).unwrap();
-        assert_eq!(plate_at + 1, text_at, "{:?} is not drawn immediately before its text", plate.name);
+        // Every plate is drawn before every notice text, not only before its own (no_shown_plate_is_drawn_over_…).
+        for (_, other_text) in PAIRS {
+            let other_at = specs.iter().position(|s| s.name == panes::spec(other_text).name).unwrap();
+            assert!(plate_at < other_at, "{:?} is drawn after the text {:?}", plate.name, panes::name_of(other_text));
+        }
         assert!(matches!(plate.kind, Kind::Rect { .. }));
         assert!(matches!(text.kind, Kind::Text { .. }));
         assert_eq!(plate.x, text.x);
@@ -86,6 +89,42 @@ fn every_notice_text_has_a_plate() {
         assert!((plate.w - text.w - 2.0 * panes::NOTICE_PLATE_PAD).abs() < f32::EPSILON);
         assert!((plate.h - text.h - 2.0 * panes::NOTICE_PLATE_PAD).abs() < f32::EPSILON);
         assert_eq!(plate_color(plate_i), panes::NOTICE_PLATE);
+    }
+}
+
+/// `[left, bottom, right, top]` of a pane: `x`, `y` are its centre, `w`, `h` its size.
+fn bounds(index: usize) -> [f32; 4] {
+    let s = panes::spec(index);
+    [s.x - s.w / 2.0, s.y - s.h / 2.0, s.x + s.w / 2.0, s.y + s.h / 2.0]
+}
+
+fn overlap(a: [f32; 4], b: [f32; 4]) -> bool {
+    a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3]
+}
+
+/// A plate drawn after a notice text that is on screen with it covers that text: Eden covrest-02 (2026-11-08) showed
+/// the body's plate over the lower half of the "Save State" header. For each notice shape the container can show
+/// (`notice_faces`), no visible plate may come after a visible text it overlaps.
+#[test]
+fn no_shown_plate_is_drawn_over_a_shown_notice_text() {
+    let specs = panes::specs();
+    let at = |index: usize| specs.iter().position(|s| s.name == panes::spec(index).name).unwrap();
+    for long_body in [false, true] {
+        let face = panes::notice_faces(true, long_body);
+        let shown = [face.header, face.body, face.long_body];
+        for (text_slot, (_, text_i)) in PAIRS.iter().enumerate() {
+            for (plate_slot, (plate_i, _)) in PAIRS.iter().enumerate() {
+                if !shown[text_slot] || !shown[plate_slot] || plate_slot == text_slot {
+                    continue;
+                }
+                assert!(
+                    !(at(*plate_i) > at(*text_i) && overlap(bounds(*plate_i), bounds(*text_i))),
+                    "{:?} is drawn after {:?} and covers it (long_body={long_body})",
+                    panes::name_of(*plate_i),
+                    panes::name_of(*text_i)
+                );
+            }
+        }
     }
 }
 
