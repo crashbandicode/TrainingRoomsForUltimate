@@ -1011,8 +1011,8 @@ mod tests {
     /// between them, everything inside the panel and above the help; a row's subline stays inside its plate.
     #[test]
     fn the_popup_has_the_r8_two_columns() {
-        assert!(POP_ROW_RIGHT < CONN_DIVIDER_X && CONN_DIVIDER_X < CONN_LEFT, "the list, the rule, CONNECTIONS");
-        assert!(POP_ROW_LEFT >= -POPUP_W / 2.0 && CONN_RIGHT <= POPUP_W / 2.0);
+        const { assert!(POP_ROW_RIGHT < CONN_DIVIDER_X && CONN_DIVIDER_X < CONN_LEFT, "the list, the rule, CONNECTIONS") };
+        const { assert!(POP_ROW_LEFT >= -POPUP_W / 2.0 && CONN_RIGHT <= POPUP_W / 2.0) };
         let help_top = HELP_Y[0] + 48.0;
         for index in [IDX_CONN_HEAD, IDX_CONN, IDX_CONN + CONN_LINES - 1, IDX_CONN_DIV] {
             let s = spec(index);
