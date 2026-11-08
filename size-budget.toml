@@ -689,3 +689,11 @@ ceiling = 151479
 date = "2026-11-08"
 reason = "rc.6 coverage (p23/rc6-cov-rec 3c616db): Edit placement on an active chain edits its macro 1 instead of adding a refusal that the compliance check rejects (no approved restriction); measured 151479 (tools/size_gate.py), +4 over 151475"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied under TASK-OPUS-rc6-cov-rec and the primary's inbox answer #70 (a) of 2026-11-08 ~14:20Z, own commit"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 151481
+date = "2026-11-08"
+reason = "rc.6 coverage (p23/rc6-cov-rec 4ef504f): the MACROS loop icon sits left of its count, which it hid (#19, Eden rc6-covrec-diag3 cov-popup-r8); measured 151481 (tools/size_gate.py), +2 over 151479"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied under TASK-OPUS-rc6-cov-rec and the primary's #19 answer of 2026-11-08 13:05Z, own commit"
