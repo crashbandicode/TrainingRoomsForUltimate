@@ -23,7 +23,7 @@ pub enum Step {
     Prepare,
     /// Diagnostic lines formatted on the game thread (`[Registry]`, `[GroupSwap] build ... queued`).
     Log,
-    /// The Mii group's Phase B setup (`0x67e7d0`/`0x67ead0`; Mii groups only, synchronous path).
+    /// The Mii group's Phase B setup (`0x67e7d0`/`0x67ead0`; Mii groups only, on the game thread before either build mode).
     MiiSetup,
     /// `MemorySample::capture`: four `svcGetInfo` reads for the build's memory charge.
     Memory,

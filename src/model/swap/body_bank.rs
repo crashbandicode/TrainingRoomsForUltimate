@@ -720,15 +720,18 @@ impl GroupState {
 /// constructed the way the game's own Reload constructs them at loader state 10, on the task
 /// worker (`0x3ae5f0` allocation on the game thread, then init `0x6079d0` + construct `0x60b6b0`
 /// as a queued task), instead of the synchronous `0x658af0` loop that stops the game thread for
-/// the whole construction (console C116.2: 1.01 s). Three classes keep the synchronous build for
-/// now, an operator-approved restriction dated 2026-11-02 (a follow-up covers them): a Mii group
-/// (`R` carries its identity through the construction, after the Phase B Mii setup), a native
+/// the whole construction (console C116.2: 1.01 s). Two classes keep the synchronous build for
+/// now, an operator-approved restriction dated 2026-11-02 (a follow-up covers them): a native
 /// group (`0x658af0`'s PT/Aegis branches create the `+0x5a88` object) and the pair group or a
-/// pair-lead window (the `R+0x50` batch rule under an exclusive reset batch). `Err` names the
-/// reason the adapter logs with `mode=sync`.
+/// pair-lead window (the `R+0x50` batch rule under an exclusive reset batch). A Mii group left
+/// that restriction by the operator's decision of 2026-11-08 (rc.6 group-speed item 2; console
+/// F6: its synchronous build held the game thread 141 ms): its identity is written into `R`, the
+/// entry and the D mirror before either mode starts and stays while it is the window, and the
+/// Phase B Mii setup runs before the construction is queued, as state 6 runs before native's own
+/// queued states 8-10 for a canonical Mii. `Err` names the reason the adapter logs with `mode=sync`.
 pub fn async_build_eligible(members: Members, identity: bool) -> Result<(), &'static str> {
     match members.special() {
-        Special::Mii => Err("mii group"),
+        Special::Mii => Ok(()),
         Special::Native(_) => Err("native group"),
         Special::Pair => Err("pair group"),
         Special::None if members.is_pair() => Err("pair window"),
@@ -1466,17 +1469,20 @@ mod tests {
         (before, after, Members::new(&[10,11,21]).unwrap())
     }
 
-    /// Phase B′: only an ordinary group without a Mii identity builds asynchronously; the three
-    /// excluded classes (operator decision 2026-11-02) and a pair-lead window name their reason.
+    /// Phase B′: an ordinary group without a Mii identity and a Mii group (operator decision
+    /// 2026-11-08, rc.6 item 2: the 2026-11-02 restriction lifted for Mii groups; console F6: the
+    /// CPU's synchronous Mii build held the game thread 141 ms) build asynchronously; the two
+    /// remaining excluded classes (operator decision 2026-11-02) and a pair-lead window name their reason.
     #[test]
-    fn async_build_admits_ordinary_groups_and_names_each_exclusion() {
+    fn async_build_admits_ordinary_and_mii_groups_and_names_each_exclusion() {
         let ordinary = Members::new(&[0x2d, 0x2c, 0x1c]).unwrap();
         assert_eq!(async_build_eligible(ordinary, false), Ok(()));
         assert_eq!(async_build_eligible(Members::new(&[0x2d, 0x2c]).unwrap(), false), Ok(()));
         assert_eq!(async_build_eligible(Members::new(&[0x1c]).unwrap(), false), Ok(()));
         assert_eq!(async_build_eligible(ordinary, true), Err("identity"));
-        assert_eq!(async_build_eligible(Members::mii_group(0x4a).unwrap(), true), Err("mii group"));
-        assert_eq!(async_build_eligible(Members::mii_group(0x48).unwrap(), false), Err("mii group"));
+        for class in [0x48, 0x49, 0x4a] {
+            assert_eq!(async_build_eligible(Members::mii_group(class).unwrap(), true), Ok(()), "{class:#x}");
+        }
         assert_eq!(async_build_eligible(Members::native_group(0x24).unwrap(), false), Err("native group"));
         assert_eq!(async_build_eligible(Members::native_group(0x5a).unwrap(), false), Err("native group"));
         assert_eq!(async_build_eligible(Members::pair_group(), false), Err("pair group"));

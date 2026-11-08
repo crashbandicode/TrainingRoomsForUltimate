@@ -88,17 +88,18 @@
 //! constructs them on the task worker instead (loader state 10, `6556b0.c:215-250`): one 0x90-byte
 //! task per body, `0x3549720(task+0x10, 0x3cb190, 2, 1)`, functor `0x3cb2a0` = body vtable
 //! `+0x10` then `+0x18`; state 0xb polls `task+0x20 == 0`, installs the cells and frees the tasks.
-//! An ordinary group's build (`async_build_eligible`) now takes that path at the acknowledgement
+//! An ordinary or Mii group's build (`async_build_eligible`) now takes that path at the acknowledgement
 //! seam: the entry-level third of `0x658af0` (`0x654dc0`, `0x655320`, `0x64f820`) and the per-body
 //! `0x3ae5f0` allocation on the game thread, the init+construct as queued tasks, the entry parked
 //! at loader `0xc` with an empty window while frames run (the native shape of states 6-0xb; a
 //! request meanwhile is refused as busy), then on the settling tick the cell install, the request
 //! bit's return, the ordinary verification and the acknowledgement (`settle_construction`,
 //! `complete_exchange`). A destroyer that arrives first waits for the tasks as state 0xb's tail
-//! does and installs the bodies for native's own window destroyer (`drain_construction`). Mii,
-//! native (PT/Aegis) and pair groups keep the synchronous build: an operator-approved restriction
-//! dated 2026-11-02 (`R` identity through the construction; the `+0x5a88` object `0x658af0`'s
-//! branches create; the `R+0x50` batch rule). P3-0: `Bank.tick` measures the largest gap between
+//! does and installs the bodies for native's own window destroyer (`drain_construction`). Native
+//! (PT/Aegis) and pair groups keep the synchronous build: an operator-approved restriction dated
+//! 2026-11-02 (the `+0x5a88` object `0x658af0`'s branches create; the `R+0x50` batch rule). Mii
+//! groups left it by the operator's decision of 2026-11-08 (rc.6 item 2): their identity is in
+//! `R` before the construction is queued and stays while the group is the window. P3-0: `Bank.tick` measures the largest gap between
 //! two entry ticks over a swap (`[GroupSwap] swap … max_tick_gap_us=`), the stall the game thread took.
 //!
 //! The entry's identity follows the window (U18, `swap_model::copy_registry`):
@@ -3074,7 +3075,8 @@ unsafe fn perform_swap(entry: *mut u8, owner: u32, role: usize) {
                     (identity.header(owner), write_identity(entry as usize, alias, identity)));
                 let live_before = pool_counts(base).map_or(0, |(_, live)| live);
                 // Phase B′ (operator decision 2026-11-02): an ordinary group constructs through the
-                // game's queued tasks; Mii, native and pair groups keep the synchronous build (the
+                // game's queued tasks, and so does a Mii group (operator decision 2026-11-08); native and
+                // pair groups keep the synchronous build (the
                 // operator-approved restriction, `async_build_eligible`), as does every group while
                 // the path's fingerprints have not passed.
                 let eligibility = async_build_eligible(target_members, target_identity.is_some());
