@@ -172,6 +172,7 @@ use crate::engine::swap::body_bank::{
     GroupBudget, GroupExchange, GroupOwner, GroupPolicy, GroupState, Hold, Members, Phase, Special,
     SpecialPolicy, BANK_FLAG, MAX_EXTRA_GROUPS, NANA, NATIVE_MEMBERS, PAIR_ACTIVE_FLAG, POOL_RESERVE, POPO,
     entry_bytes_of, mii_exit_bytes_match, mii_reuse_bytes_match, MiiEntryBytes, MiiIdentity, MII_ENTRY_START, RESOURCE_WORDS,
+    baseline_words,
 };
 use crate::engine::swap::body_bank::memory::{self, Admission};
 use crate::engine::swap::body_bank::mii_publish::{PublishAttempts, PublishRefusal, PublishStep};
@@ -1071,14 +1072,15 @@ unsafe fn plan_in(entry: *const u8, owner: u32, descriptor: [u8; 0x70], upcoming
             // words, so a Mii request matches the live entry once its identity is
             // applied to it (`mii_reuse_bytes_match`); the group carries that identity
             // (`group_identity_matches` above). Every other request is byte-exact, except the warm exit
-            // (`plan_mii_exit`): the displaced window's saved entry bytes come back with it.
+            // (`plan_mii_exit`): the displaced window's saved entry bytes come back with it, or with any other Built
+            // ordinary group the owner's ordinary baseline (`mii_exit_saved`).
             let exit = (mii_exit && in_group && !(0x48..=0x4a).contains(&target)).then(|| mii_exit_saved(owner, target, forms)).flatten();
             let matches = live.is_some_and(|current| current == *physical.bytes()
                 || (in_group && (0x48..=0x4a).contains(&target) && mii_reuse_bytes_match(&current, &descriptor))
                 || exit.is_some_and(|saved| mii_exit_bytes_match(&current, physical.bytes(), &saved)));
             if matches {
                 if exit.is_some() {
-                    trace!("[GroupSwap] warm exit owner={} kind={:#x}: the window the live Mii group displaced", owner, target);
+                    trace!("[GroupSwap] warm exit owner={} kind={:#x}: a Built ordinary group, out of the live Mii group", owner, target);
                 }
                 result.descriptor = *physical.bytes(); result.members = Some(members); result.reuse = true;
                 result.cells = members.kinds(); result.active = members.index_of(target).unwrap_or(0);
@@ -1294,15 +1296,16 @@ fn group_reachable(owner: u32, kind: u32, forms: Forms) -> bool {
 }
 
 /// The entry bytes a warm exit from this role's live Mii group writes back for `kind`: the reachable group `switch`
-/// would take for it is Built, ordinary, and saved the identity move when the Mii displaced it. `None` for any other
-/// group: a Prefetched one would build under the Mii's `R`, and no other Built group holds the window's bytes.
+/// would take for it is Built and ordinary. The window the Mii displaced gives back what it saved; any other Built
+/// ordinary group the owner's ordinary baseline (inbox 21:27Z, `Bank::ordinary_identity`). `None` for a Prefetched
+/// group (it would build under the Mii's `R`) and when no ordinary window was ever displaced.
 fn mii_exit_saved(owner: u32, kind: u32, forms: Forms) -> Option<MiiEntryBytes> {
     let state = BANKS[role(owner)?].lock();
     let bank = state.as_ref()?;
     if bank.identity.is_none() { return None; }
     let group = bank.groups.iter().find(|g| g.state.reachable() && group_serves(*g.members, kind, forms).is_some())?;
     if group.state != GroupState::Built || group.identity.is_some() { return None; }
-    group.saved.as_ref()?.identity.map(|(_, saved)| saved.entry)
+    group.saved.as_ref()?.identity.or(bank.ordinary_identity).map(|(_, saved)| saved.entry)
 }
 
 /// The reachable Mii group holding `kind` carries exactly the identity this
@@ -1363,9 +1366,62 @@ struct Window {
     /// the exchange (MII-GROUPS-DESIGN §3.3); `None` keeps today's rule that an
     /// exchange leaves `R` and those bytes untouched.
     identity: Option<([u32; RESOURCE_WORDS], EntryIdentity)>,
+    /// rc.6 item 3 (SPECIAL-GROUPS §1 (c)): the Mii set `R` held while this group was the window (`MiiR`), taken at
+    /// every detach and put back at its attach, so each window keeps its own faces and resource object.
+    mii_r: Option<MiiR>,
     index: u8,
     previous: u8,
     old: u8,
+}
+
+/// What a Mii window owns in `R` besides its words: the face handles `R+0x90/+0x94` (`0x67ead0` builds them; the HUD
+/// portrait reads them, `0x341c6f8`) and the Mii resource object `R+0x98/+0xa0` (a pointer and its shared control
+/// block, built by body init at `0x607c94-0x607d20`). Zero for a window that is not a Mii.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+struct MiiR { faces: [u32; 2], object: [usize; 2] }
+
+/// `R`'s Mii set, zeroed in `R` (zero is native's own state after a Reload, `0x6502c0-0x650310`).
+unsafe fn take_mii_r(r: usize) -> MiiR {
+    let set = MiiR { faces: [fields::read_unchecked(r, 0x90), fields::read_unchecked(r, 0x94)],
+        object: [fields::read_unchecked(r, 0x98), fields::read_unchecked(r, 0xa0)] };
+    put_mii_r(r, MiiR::default());
+    set
+}
+
+unsafe fn put_mii_r(r: usize, set: MiiR) {
+    fields::write_unchecked(r, 0x90, set.faces[0]);
+    fields::write_unchecked(r, 0x94, set.faces[1]);
+    fields::write_unchecked(r, 0x98, set.object[0]);
+    fields::write_unchecked(r, 0xa0, set.object[1]);
+}
+
+/// The face holder `0x6502d0` releases them through (`*(main+0x5338f68)`).
+const FACE_HOLDER: usize = 0x5338f68;
+const FACE_RELEASE: usize = 0x371e010;
+/// libc++ `__shared_weak_count::__release_weak` (`0x607d54`).
+const RELEASE_WEAK: usize = 0x39c2670;
+
+/// Release a Mii set no `R` holds any more: each face handle as the Reload releases it (`0x6502c8-0x65030c`: a handle
+/// outside {-1, 0, 1} through `0x371e010(holder, handle)`), the object's control block as body init releases the
+/// previous one (`0x607d24-0x607d54`: decrement `+8`; at the last owner vtable `+0x10`, then `__release_weak`).
+unsafe fn release_mii_r(base: usize, set: MiiR) {
+    let holder = fields::read::<usize>(base, FACE_HOLDER).unwrap_or(0);
+    let release_face: unsafe extern "C" fn(usize, u32) = std::mem::transmute(base + FACE_RELEASE);
+    for handle in set.faces {
+        if handle != 0 && holder != 0 && handle.wrapping_add(1) >= 3 { release_face(holder, handle); }
+    }
+    let block = set.object[1];
+    if block != 0 && fields::object(block) {
+        let owners = &*((block + 8) as *const std::sync::atomic::AtomicI64);
+        if owners.fetch_sub(1, Ordering::AcqRel) == 0 {
+            if let Some(dispose) = fields::child(block, 0).and_then(|vtable| fields::read::<usize>(vtable, 0x10)) {
+                let dispose: unsafe extern "C" fn(usize) = std::mem::transmute(dispose);
+                dispose(block);
+            }
+            let release_weak: unsafe extern "C" fn(usize) = std::mem::transmute(base + RELEASE_WEAK);
+            release_weak(block);
+        }
+    }
 }
 
 struct Group {
@@ -1505,6 +1561,9 @@ struct Bank {
     pair_logged: bool,
     /// Mii identity of the window group when it is a Mii group (`R` holds it).
     identity: Option<MiiIdentity>,
+    /// rc.6 warm exit to any Built group (inbox 21:27Z): the `R` words and entry identity the first ordinary window a Mii
+    /// displaced left (owner-level besides the header kinds, `body_bank::baseline_words`).
+    ordinary_identity: Option<([u32; RESOURCE_WORDS], EntryIdentity)>,
     /// Activation follows exact current body identities across detach/attach.
     /// Retired identities cannot grow the history or mark a later reused ID.
     activated: crate::model::body_activation::History<(usize, u32), { (MAX_EXTRA_GROUPS + 1) * NATIVE_MEMBERS }>,
@@ -1703,7 +1762,7 @@ pub(super) unsafe fn build(entry: *const u8, owner: u32, members: Members) -> bo
         bodies: [Body::default(); NATIVE_MEMBERS], observed: None, from: 0, target: 0,
         acknowledged: false, departed: false, failed: false,
         groups: storage.groups, alias: 0, exchange: None, swap: None, prefetch: None, swap_started: None,
-        pair_logged: false, identity: None, activated: Default::default(),
+        pair_logged: false, identity: None, ordinary_identity: None, activated: Default::default(),
         construction: None, background: None, tick: TickGap::default(), held_turn: 0, scene: None,
     });
     EXTRAS[role].store((members.count() - 1) as u8, Ordering::Release);
@@ -1768,7 +1827,7 @@ unsafe fn publish_pending(owner: u32, members: Members, scene: Option<(u32, u32)
         bodies: [Body::default(); NATIVE_MEMBERS], observed: None, from: 0, target: 0,
         acknowledged: false, departed: false, failed: false,
         groups: storage.groups, alias: 0, exchange: None, swap: None, prefetch: None, swap_started: None,
-        pair_logged: false, identity: None, activated: Default::default(),
+        pair_logged: false, identity: None, ordinary_identity: None, activated: Default::default(),
         construction: None, background: None, tick: TickGap::default(), held_turn: 0, scene,
     });
     EXTRAS[role].store((members.count() - 1) as u8, Ordering::Release);
@@ -2419,6 +2478,7 @@ unsafe fn save_window(entry: usize) -> Window {
         dispatch: dispatcher_arrays(entry).unwrap_or([0, 0]),
         records: [rd(0x5a88), rd(0x5a90), rd(0x5a98)],
         identity: None,
+        mii_r: None,
         index: fields::read_unchecked(entry, 0x5918),
         previous: fields::read_unchecked(entry, 0x5919),
         old: fields::read_unchecked(entry, 0x5910),
@@ -2989,6 +3049,202 @@ fn owner_bit(owner: u32) -> u32 { if owner < 32 { 1 << owner } else { 0 } }
 /// descriptor (SPECIAL-GROUPS §0 X2).
 const BODY_CELL_BYTE: usize = 0xf816;
 
+// ----- rc.6 item 3, Mii groups (operator 20:26Z "All groups in rc.6"; SPECIAL-GROUPS §1) -----
+//
+// A Mii body's init and construct read the Mii identity from `R` on the worker, one to three frames after the tick,
+// while `R` holds the live window's words again (the game thread reads them for the live fighter, so `R` cannot keep the
+// group's across frames). The tick runs the native Mii setup with the identity in `R` for that one tick and copies
+// `R+0x40..+0xa8`, the group's words in it, into `SHADOW_R`. On the worker, hooks keyed on the build's real `R` and owner
+// (SPECIAL-GROUPS §1 (b), the 21:10Z intervals):
+// - body init reads the shadow from `0x607aac` (after its owner-table load) to `0x607e74` (prepare_entry's `R+0xb0` and
+//   `R+0x54` must be the real `R`), with the group's `FE+0x52` (`0x607d80`);
+// - construct reads it from `0x60b98c` (`x20`, spilled and reloaded inside the interval) to `0x60de68`, and at
+//   `0x60bf30` (`R` reloaded by owner), with the group's `D+0x72` (`0x60b7a8`, `0x60b834`) and `FE+0x41` (`0x60b98c`);
+// - the owner-indexed readers `0x33a05a8` (costume) and `0x344fcd0` (hat) read it on the worker thread building that
+//   body only (`MII_THREAD`; the game thread calls them for the live fighter), marked from each interval's start to its
+//   function's single epilogue. `0x6e655c`, `0x6e6ccc` and `0x33c3468` are counted there (M-bg2), not redirected.
+// The construction tail's per-kind release (`0x60dec4`) gets kind -1: it would key on the live words; the settlement
+// releases the group's keys with its identity in `R` (`release_group_keys_of`). The tail's pair test (`0x60de68`, X1)
+// is redirected for every background body to the per-kind release.
+
+#[repr(C, align(16))]
+struct ShadowR(std::cell::UnsafeCell<[u8; SHADOW_R_SIZE]>);
+// SAFETY: written on the game thread before the bodies are queued, read by the worker while they construct, read back
+// after they settled (INSTALL: one background build at a time).
+unsafe impl Sync for ShadowR {}
+const SHADOW_R_SIZE: usize = 0xb0;
+static SHADOW_R: ShadowR = ShadowR(std::cell::UnsafeCell::new([0; SHADOW_R_SIZE]));
+/// The background Mii build's real `R` (0: none in flight), its owner, and its values: the record index (bits 0-15),
+/// the costume byte `FE+0x41` (16-23) and `FE+0x52` (24-31).
+static MII_REAL_R: AtomicUsize = AtomicUsize::new(0);
+static MII_OWNER: AtomicU32 = AtomicU32::new(u32::MAX);
+static MII_VALUES: AtomicU32 = AtomicU32::new(0);
+/// The worker thread inside the background Mii body's init or construct (`GetCurrentThread`, 0: none).
+static MII_THREAD: AtomicUsize = AtomicUsize::new(0);
+/// The Mii hooks' seam rows passed and they are installed.
+static BACKGROUND_MII_ENABLED: AtomicBool = AtomicBool::new(false);
+/// Hits per Mii hook for the build line: init enter, flags, leave, index a, index b, construct enter, path, tail, the
+/// costume and hat readers, and the three counted readers.
+const MII_HIT_NAMES: [&str; 13] = ["init", "flags", "leave", "index_a", "index_b", "construct", "path", "tail", "costume",
+    "hat", "r6e655c", "r6e6ccc", "r33c3468"];
+static MII_HITS: [AtomicU32; 13] = [const { AtomicU32::new(0) }; 13];
+
+fn shadow_r_address() -> usize { SHADOW_R.0.get() as usize }
+
+#[inline(always)]
+fn mii_hit(i: usize) { MII_HITS[i].fetch_add(1, Ordering::Relaxed); }
+
+#[inline(always)]
+fn current_thread() -> usize { unsafe { skyline::nn::os::GetCurrentThread() as usize } }
+
+/// A body of the background Mii build: its owner, a Mii class.
+#[inline(always)]
+unsafe fn background_mii_body(body: usize) -> bool {
+    MII_REAL_R.load(Ordering::Acquire) != 0 && aligned(body as *const u8)
+        && fields::read::<u64>(body, 0x10) == Some(u64::from(MII_OWNER.load(Ordering::Acquire)))
+        && fields::read::<u32>(body, 0xc).is_some_and(|kind| (0x48..=0x4a).contains(&kind))
+}
+
+/// Any body of an owner whose background build is in flight (`background_skip`'s key): the live window is built, so a
+/// body that constructs for that owner meanwhile is the background build's.
+#[inline(always)]
+unsafe fn background_body(body: usize) -> bool {
+    BACKGROUND_OWNERS.load(Ordering::Acquire) != 0 && aligned(body as *const u8)
+        && fields::read::<u64>(body, 0x10).is_some_and(|owner| owner < 32
+            && BACKGROUND_OWNERS.load(Ordering::Acquire) & owner_bit(owner as u32) != 0)
+}
+
+/// The worker thread building the background Mii body, reading `R` (the register `r`) by owner.
+#[inline(always)]
+fn mii_worker_reads(r: usize) -> bool {
+    let real = MII_REAL_R.load(Ordering::Acquire);
+    real != 0 && r == real && MII_THREAD.load(Ordering::Acquire) == current_thread()
+}
+
+/// Body init after its owner-table load (`x19` body, `x24` R): the shadow until `0x607e74`, and the worker marked.
+#[skyline::hook(offset = 0x607aac, inline)]
+unsafe fn bg_mii_init_enter(ctx: &mut InlineCtx) {
+    let real = MII_REAL_R.load(Ordering::Acquire);
+    if real != 0 && ctx.registers[24].x() as usize == real && background_mii_body(ctx.registers[19].x() as usize) {
+        ctx.registers[24].set_x(shadow_r_address() as u64);
+        MII_THREAD.store(current_thread(), Ordering::Release);
+        mii_hit(0);
+    }
+}
+
+/// `ldrb w23, [x21, #0x52]` read the live `FE+0x52`; the group's byte inside the shadow interval.
+#[skyline::hook(offset = 0x607d80, inline)]
+unsafe fn bg_mii_init_flags(ctx: &mut InlineCtx) {
+    if ctx.registers[24].x() as usize == shadow_r_address() {
+        ctx.registers[23].set_x(u64::from(MII_VALUES.load(Ordering::Acquire) >> 24));
+        mii_hit(1);
+    }
+}
+
+/// `mov x20, x24` after the path builder at `0x607e70`: the real `R` back; the shadow keeps the resource object
+/// `0x607d18` stored.
+#[skyline::hook(offset = 0x607e74, inline)]
+unsafe fn bg_mii_init_leave(ctx: &mut InlineCtx) {
+    if ctx.registers[24].x() as usize == shadow_r_address() {
+        ctx.registers[24].set_x(MII_REAL_R.load(Ordering::Acquire) as u64);
+        mii_hit(2);
+    }
+}
+
+/// Body init's and construct's single epilogues: the worker marker ends with the function.
+unsafe fn bg_mii_exit() {
+    let thread = current_thread();
+    let _ = MII_THREAD.compare_exchange(thread, 0, Ordering::AcqRel, Ordering::Acquire);
+}
+#[skyline::hook(offset = 0x60b5c8, inline)]
+unsafe fn bg_mii_init_exit(_ctx: &mut InlineCtx) { bg_mii_exit(); }
+#[skyline::hook(offset = 0x60df04, inline)]
+unsafe fn bg_mii_construct_exit(_ctx: &mut InlineCtx) { bg_mii_exit(); }
+
+/// Construct's colour reads: `w8` = `D+0x72` of the live window; the group's record index.
+unsafe fn bg_mii_index(ctx: &mut InlineCtx, hit: usize) {
+    if background_mii_body(ctx.registers[19].x() as usize) {
+        ctx.registers[8].set_x(u64::from(MII_VALUES.load(Ordering::Acquire) & 0xffff));
+        mii_hit(hit);
+    }
+}
+#[skyline::hook(offset = 0x60b7a8, inline)]
+unsafe fn bg_mii_construct_index_a(ctx: &mut InlineCtx) { bg_mii_index(ctx, 3); }
+#[skyline::hook(offset = 0x60b834, inline)]
+unsafe fn bg_mii_construct_index_b(ctx: &mut InlineCtx) { bg_mii_index(ctx, 4); }
+
+/// `bl 0x17e99c0(out, R, kind, costume)`, straight-line from the owner-table load at `0x60b960` (whose only use so far is
+/// `mov x1, x20`): `x20` and `x1` the shadow until `0x60de68`, the group's costume byte, and the worker marked.
+#[skyline::hook(offset = 0x60b98c, inline)]
+unsafe fn bg_mii_construct_enter(ctx: &mut InlineCtx) {
+    let real = MII_REAL_R.load(Ordering::Acquire);
+    if real != 0 && ctx.registers[20].x() as usize == real && background_mii_body(ctx.registers[19].x() as usize) {
+        ctx.registers[20].set_x(shadow_r_address() as u64);
+        ctx.registers[1].set_x(shadow_r_address() as u64);
+        ctx.registers[3].set_x(u64::from((MII_VALUES.load(Ordering::Acquire) >> 16) & 0xff));
+        MII_THREAD.store(current_thread(), Ordering::Release);
+        mii_hit(5);
+    }
+}
+
+/// `R` reloaded by owner for the path builder `0x17e8890(…, kind, 0x14)` at `0x60bf3c`: the shadow.
+#[skyline::hook(offset = 0x60bf30, inline)]
+unsafe fn bg_mii_construct_path(ctx: &mut InlineCtx) {
+    let real = MII_REAL_R.load(Ordering::Acquire);
+    if real != 0 && ctx.registers[1].x() as usize == real && background_mii_body(ctx.registers[19].x() as usize) {
+        ctx.registers[1].set_x(shadow_r_address() as u64);
+        mii_hit(6);
+    }
+}
+
+/// The construction tail (`w8` = the live `FE+0x18`, X1): a background body takes the per-kind release at `0x60debc`,
+/// never the pair rule on `R` (which may reset the whole `R` mid-play); a background Mii body's `x20` is the real `R`
+/// again for the tail's lock, `R+0x50` and release.
+#[skyline::hook(offset = 0x60de68, inline)]
+unsafe fn bg_mii_construct_tail(ctx: &mut InlineCtx) {
+    if ctx.registers[20].x() as usize == shadow_r_address() {
+        ctx.registers[20].set_x(MII_REAL_R.load(Ordering::Acquire) as u64);
+        mii_hit(7);
+    }
+    if ctx.registers[8].w() == POPO && background_body(ctx.registers[19].x() as usize) {
+        ctx.registers[8].set_x(u64::from(u32::MAX));
+    }
+}
+
+/// The construction tail's `bl 0x17e8610(R, kind)`: kind -1 (`0x17e86e4` then only re-checks the map).
+#[skyline::hook(offset = 0x60dec4, inline)]
+unsafe fn bg_mii_tail_release(ctx: &mut InlineCtx) {
+    if background_mii_body(ctx.registers[19].x() as usize) {
+        ctx.registers[1].set_x(u64::from(u32::MAX));
+    }
+}
+
+/// The owner costume reader (`x8` = `R` by owner) on the background Mii worker: the shadow (B's class and costume).
+#[skyline::hook(offset = 0x33a05a8, inline)]
+unsafe fn bg_mii_reader_costume(ctx: &mut InlineCtx) {
+    if mii_worker_reads(ctx.registers[8].x() as usize) {
+        ctx.registers[8].set_x(shadow_r_address() as u64);
+        mii_hit(8);
+    }
+}
+
+/// The hat token reader (`w3` = `R+0x70`, `x21` = `R` by owner) on the background Mii worker: the shadow's token.
+#[skyline::hook(offset = 0x344fcd4, inline)]
+unsafe fn bg_mii_reader_hat(ctx: &mut InlineCtx) {
+    if mii_worker_reads(ctx.registers[21].x() as usize) {
+        ctx.registers[3].set_x(u64::from(fields::read_unchecked::<u32>(shadow_r_address(), 0x70)));
+        mii_hit(9);
+    }
+}
+
+/// Readers of the same shape not traced in SPECIAL-GROUPS §1: counted on the background Mii worker (M-bg2).
+#[skyline::hook(offset = 0x6e655c, inline)]
+unsafe fn bg_mii_reader_6e655c(ctx: &mut InlineCtx) { if mii_worker_reads(ctx.registers[21].x() as usize) { mii_hit(10); } }
+#[skyline::hook(offset = 0x6e6ccc, inline)]
+unsafe fn bg_mii_reader_6e6ccc(ctx: &mut InlineCtx) { if mii_worker_reads(ctx.registers[20].x() as usize) { mii_hit(11); } }
+#[skyline::hook(offset = 0x33c3468, inline)]
+unsafe fn bg_mii_reader_33c3468(ctx: &mut InlineCtx) { if mii_worker_reads(ctx.registers[21].x() as usize) { mii_hit(12); } }
+
 /// The control init `0x64f820` (with its tail, the select `0x64fb70`) costs the game thread 22-151 ms (Eden
 /// `rc6-hot-xps9`: `models_contexts_control_us=[2299, 5053, 150913]`), so a background build queues it on the task worker
 /// as loader state 8 does, with this copy of the entry as its object: the entry's first 0x100 bytes with the group's words,
@@ -3021,14 +3277,19 @@ pub(crate) fn background_skip(owner: u32) -> bool {
 fn background_candidate(bank: &Bank, live: Option<u32>) -> Option<usize> {
     if !BACKGROUND_ENABLED.load(Ordering::Acquire) || bank.prefetch.is_some() || bank.construction.is_some()
         || bank.background.is_some() { return None; }
-    next_background(bank.groups.iter().map(|g| (if g.background_refused || g.leaving { GroupState::Failed } else { g.state },
+    next_background(bank.groups.iter().map(|g| (if g.background_refused || g.leaving || !background_kind_ready(g) { GroupState::Failed } else { g.state },
         *g.members, g.identity.is_some())), *bank.members, bank.identity.is_some(), live == Some(KIRBY))
+}
+
+/// A Mii group builds in the background only with its hooks installed (`BACKGROUND_MII_ENABLED`).
+fn background_kind_ready(group: &Group) -> bool {
+    group.members.special() != Special::Mii || BACKGROUND_MII_ENABLED.load(Ordering::Acquire)
 }
 
 /// A Prefetched group a background build still owes: the notice counts it as loading (`progress`).
 fn background_owed(bank: &Bank, group: &Group, live: Option<u32>) -> bool {
     BACKGROUND_ENABLED.load(Ordering::Acquire) && group.state == GroupState::Prefetched && !group.background_refused
-        && !group.leaving && background_build_eligible(*group.members, group.identity.is_some(), *bank.members,
+        && !group.leaving && background_kind_ready(group) && background_build_eligible(*group.members, group.identity.is_some(), *bank.members,
             bank.identity.is_some(), live == Some(KIRBY)).is_ok()
 }
 
@@ -3090,7 +3351,12 @@ struct Background {
     settled_us: [u64; NATIVE_MEMBERS],
     ticks: u32,
     waited_logged_us: u64,
+    /// A Mii group's build (SPECIAL-GROUPS §1): the face handles its tick's setup made, and its values for the hooks.
+    mii: Option<MiiBuild>,
 }
+
+#[derive(Clone, Copy, Debug)]
+struct MiiBuild { faces: [u32; 2], values: u32 }
 
 fn refuse_background(role: usize, group: usize, owner: u32, why: &str) {
     let mut state = BANKS[role].lock();
@@ -3127,12 +3393,14 @@ unsafe fn start_background(entry: *mut u8, owner: u32, role: usize, group: usize
     let settings = crate::runtime::roster::cycle_preload_config::snapshot();
     if !groups_enabled(&settings) || super::INSTALL.active() { return; }
     if !crate::runtime::roster::scope_gate::admitted("native_body_bank::group_prefetch") { return; }
-    let (members, alias, carries_records) = {
+    let (members, alias, carries_records, mii) = {
         let state = BANKS[role].lock();
         let Some(bank) = state.as_ref().filter(|bank| bank.entry == entry as usize && bank.owner == owner
             && bank.phase == Phase::Ready && !bank.departed && bank.swap.is_none()) else { return; };
         if background_candidate(bank, bank.observed.map(|(_, kind)| kind)) != Some(group) { return; }
-        (*bank.groups[group].members, bank.alias, bank.members.carries_records())
+        let g = &bank.groups[group];
+        (*g.members, bank.alias, bank.members.carries_records(),
+            g.identity.zip(g.configuration).filter(|_| g.members.special() == Special::Mii))
     };
     // Transient: retried on a later tick.
     if alias == 0 || resource(base, owner) != Some(alias) || !resource_ready(alias)
@@ -3164,12 +3432,28 @@ unsafe fn start_background(entry: *mut u8, owner: u32, role: usize, group: usize
     for offset in [0x4178usize, 0x4180, 0x4188, 0x4190, 0x4198] { fields::write_unchecked(entry as usize, offset, 0usize); }
     write_group_words(entry as usize, members);
     fields::write_unchecked(entry as usize, 0x5918, 0u8);
+    // SPECIAL-GROUPS §1 (a): a Mii group's identity in `R`, the entry and the D mirror for this tick only, the live
+    // window's face handles held aside (the setup's bind releases `R+0x90/+0x94`, `0x67e9b0`), then the native setup
+    // (`0x67e7d0`, `0x67ead0`) as Phase B runs it before the construction.
+    let mii_tick = mii.map(|(identity, c)| {
+        let words = save_resource_words(alias);
+        let identity_bytes = save_entry_identity(entry as usize);
+        let live_faces: [u32; 2] = [fields::read_unchecked(alias, 0x90), fields::read_unchecked(alias, 0x94)];
+        fields::write_unchecked(alias, 0x90, 0u32);
+        fields::write_unchecked(alias, 0x94, 0u32);
+        write_identity(entry as usize, alias, identity);
+        let outcome = crate::runtime::roster::mii_setup::prepare_mii_background(base, entry as usize, owner, alias, &identity, &c);
+        let faces: [u32; 2] = [fields::read_unchecked(alias, 0x90), fields::read_unchecked(alias, 0x94)];
+        let values = u32::from(identity.index) | u32::from(read::<u8>(entry, 0x41)) << 16 | u32::from(read::<u8>(entry, 0x52)) << 24;
+        (words, identity_bytes, live_faces, outcome, faces, values)
+    });
+    let mii_prepared = mii_tick.as_ref().is_none_or(|t| matches!(t.3, crate::engine::mii::mii_setup::Outcome::Prepared { .. }));
     let models: unsafe extern "C" fn(*mut u8) = std::mem::transmute(base + MODELS_SETUP);
     let contexts: unsafe extern "C" fn(*mut u8) = std::mem::transmute(base + COUNT_SETUP);
     let t0 = now_us();
-    models(entry);
+    if mii_prepared { models(entry); }
     let t1 = now_us();
-    contexts(entry);
+    if mii_prepared { contexts(entry); }
     let t2 = now_us();
     let steps_us = [t1.saturating_sub(t0), t2.saturating_sub(t1)];
     let made = save_window(entry as usize);
@@ -3179,6 +3463,18 @@ unsafe fn start_background(entry: *mut u8, owner: u32, role: usize, group: usize
     std::ptr::copy_nonoverlapping((entry as usize + 0x4178) as *const u8, (scratch + 0x4178) as *mut u8, 0x28);
     fields::write_unchecked(scratch, 0x5918, 0u8);
     fields::write_unchecked(scratch, 0x591f, made.flags);
+    // The worker's `R` for the Mii body (SPECIAL-GROUPS §1 (b)): `R+0x40..+0xa8` with the group's words and the build's
+    // request bit, no resource object yet; then the live window's words, entry bytes, mirror and faces come back.
+    if let Some((words, identity_bytes, live_faces, ..)) = mii_tick.as_ref() {
+        let shadow = shadow_r_address();
+        std::ptr::copy_nonoverlapping((alias + 0x40) as *const u8, (shadow + 0x40) as *mut u8, 0x68);
+        fields::write_unchecked(shadow, 0x98, 0usize);
+        fields::write_unchecked(shadow, 0xa0, 0usize);
+        write_resource_words(alias, words);
+        write_entry_identity(entry as usize, identity_bytes);
+        fields::write_unchecked(alias, 0x90, live_faces[0]);
+        fields::write_unchecked(alias, 0x94, live_faces[1]);
+    }
     let table = {
         let mut state = BANKS[role].lock();
         state.as_mut().map(|bank| {
@@ -3207,11 +3503,23 @@ unsafe fn start_background(entry: *mut u8, owner: u32, role: usize, group: usize
             owner, group, why, made_ok, live_ok, made.group_ctx, made.ctx, made.flags, made.dispatch, dispatcher_arrays(entry as usize), how, now, after);
         refuse_background(role, group, owner, why);
     };
-    let Some(table) = table.filter(|_| made_ok && live_ok) else { refuse("setup check failed", &made); return; };
+    let mii_build = mii_tick.map(|(_, _, _, _, faces, values)| MiiBuild { faces, values });
+    if !mii_prepared {
+        // `[MiiSetup]` logged its reason; whatever faces the setup made go back.
+        if let Some(m) = mii_build { release_mii_r(base, MiiR { faces: m.faces, object: [0, 0] }); }
+        refuse("Mii setup not prepared", &made);
+        return;
+    }
+    let Some(table) = table.filter(|_| made_ok && live_ok) else {
+        if let Some(m) = mii_build { release_mii_r(base, MiiR { faces: m.faces, object: [0, 0] }); }
+        refuse("setup check failed", &made);
+        return;
+    };
     BACKGROUND_TABLE.store(table, Ordering::Release);
     let control = queue_task(base, scratch, CONTROL_FUNCTOR_VTABLE, CONTROL_CALLBACK);
     if control == 0 {
         BACKGROUND_TABLE.store(0, Ordering::Release);
+        if let Some(m) = mii_build { release_mii_r(base, MiiR { faces: m.faces, object: [0, 0] }); }
         refuse("control task allocation returned null", &made);
         return;
     }
@@ -3226,9 +3534,9 @@ unsafe fn start_background(entry: *mut u8, owner: u32, role: usize, group: usize
     };
     bank.background = Some(Background { group, members, token, alias, lease, window: made, control, control_us: 0,
         tasks: [0; NATIVE_MEMBERS], queued: 0, live_before, committed, info_words: info_words(info), skips_before,
-        started_us: started, setup_us, settled_us: [0; NATIVE_MEMBERS], ticks: 0, waited_logged_us: started });
-    trace!("[GroupSwap] background build owner={} group={} kinds={:x?} setup_us={} models_contexts_us={:?} us={} control={:#x} contexts={:x?} dispatch={:x?} listeners={:?} live_dispatch={:x?} live_listeners={:?} flags={:#x} R={:#x} map={} r4c={:#x} pool_live={}; the window stays live, the control init runs on the task worker",
-        owner, group, &members.kinds()[..count], setup_us, steps_us, queued_us, control, &made.group_ctx[..count], made.dispatch,
+        started_us: started, setup_us, settled_us: [0; NATIVE_MEMBERS], ticks: 0, waited_logged_us: started, mii: mii_build });
+    trace!("[GroupSwap] background build owner={} group={} kinds={:x?} special={:?} mii={:x?} setup_us={} models_contexts_us={:?} us={} control={:#x} contexts={:x?} dispatch={:x?} listeners={:?} live_dispatch={:x?} live_listeners={:?} flags={:#x} R={:#x} map={} r4c={:#x} pool_live={}; the window stays live, the control init runs on the task worker",
+        owner, group, &members.kinds()[..count], members.special(), mii_build, setup_us, steps_us, queued_us, control, &made.group_ctx[..count], made.dispatch,
         listener_counts(made.dispatch), live.dispatch, listener_counts(live.dispatch), made.flags, alias,
         fields::read::<u64>(alias, 0x18).unwrap_or(0), fields::read::<u8>(alias, 0x4c).unwrap_or(0), live_before);
 }
@@ -3243,6 +3551,13 @@ unsafe fn queue_background_bodies(base: usize, owner: u32, b: &mut Background) -
     b.window.ctx[0] = selected;
     b.skips_before = BACKGROUND_SKIPS.load(Ordering::Acquire);
     BACKGROUND_OWNERS.fetch_or(owner_bit(owner), Ordering::AcqRel);
+    if let Some(m) = b.mii {
+        // The Mii hooks key on these; the real R last, as the arming store.
+        for hit in &MII_HITS { hit.store(0, Ordering::Relaxed); }
+        MII_VALUES.store(m.values, Ordering::Release);
+        MII_OWNER.store(owner, Ordering::Release);
+        MII_REAL_R.store(b.alias, Ordering::Release);
+    }
     let (tasks, queued) = queue_detached(base, owner, b.members);
     b.tasks = tasks;
     b.queued = queued;
@@ -3371,6 +3686,19 @@ unsafe fn finish_background(entry: *const u8, owner: u32, role: usize, b: Backgr
     use construction_task as task;
     let base = BASE.load(Ordering::Acquire);
     BACKGROUND_OWNERS.fetch_and(!owner_bit(owner), Ordering::AcqRel);
+    // SPECIAL-GROUPS §1: the Mii hooks off (every task settled); the resource object body init stored in the shadow
+    // (`0x607d18`, with its reference) and the tick's faces are the group's Mii set.
+    let mii_hits: [u32; 13] = std::array::from_fn(|i| MII_HITS[i].load(Ordering::Relaxed));
+    let mii_set = b.mii.map(|m| {
+        MII_REAL_R.store(0, Ordering::Release);
+        MII_OWNER.store(u32::MAX, Ordering::Release);
+        MII_THREAD.store(0, Ordering::Release);
+        let shadow = shadow_r_address();
+        let object = [fields::read_unchecked::<usize>(shadow, 0x98), fields::read_unchecked::<usize>(shadow, 0xa0)];
+        fields::write_unchecked(shadow, 0x98, 0usize);
+        fields::write_unchecked(shadow, 0xa0, 0usize);
+        MiiR { faces: m.faces, object }
+    });
     let skips = BACKGROUND_SKIPS.load(Ordering::Acquire).wrapping_sub(b.skips_before);
     let count = b.members.count();
     let kinds = &b.members.kinds()[..count];
@@ -3401,11 +3729,18 @@ unsafe fn finish_background(entry: *const u8, owner: u32, role: usize, b: Backgr
     let alias_ok = b.alias != 0 && resource(base, owner) == Some(b.alias);
     let lrole = ledger_role(role);
     let request = alias_ok.then(|| r_handle::end_request(lrole, b.alias, b.lease));
-    // Each queued body ran its construction tail (its kind's keys); a member never queued still holds its keys.
-    if alias_ok && b.queued > 0 { r_handle::construction_settled(lrole, b.group, &kinds[..b.queued]); }
-    if alias_ok && b.queued < count {
+    // Each queued body ran its construction tail (its kind's keys); a member never queued still holds its keys. A Mii
+    // body's tail released nothing (`bg_mii_tail_release`): every key of the group goes here, its identity in R.
+    let mut mii_keys = None;
+    if alias_ok && b.mii.is_some() {
         let occupancy = occupancy_snapshot(role, None);
-        release_group_keys(base, role, Some(b.group), Some(&kinds[b.queued..]), &occupancy, owner, "background build failed");
+        mii_keys = Some(release_group_keys_of(base, role, b.alias, b.group, &occupancy, owner, "background Mii build"));
+    } else {
+        if alias_ok && b.queued > 0 { r_handle::construction_settled(lrole, b.group, &kinds[..b.queued]); }
+        if alias_ok && b.queued < count {
+            let occupancy = occupancy_snapshot(role, None);
+            release_group_keys(base, role, Some(b.group), Some(&kinds[b.queued..]), &occupancy, owner, "background build failed");
+        }
     }
     let live_after = pool_counts(base).map_or(0, |(_, live)| live);
     let stored = {
@@ -3417,6 +3752,7 @@ unsafe fn finish_background(entry: *const u8, owner: u32, role: usize, b: Backgr
                         let mut window = b.window;
                         window.installed = count as u64;
                         for (cell, body) in window.cells.iter_mut().zip(bodies.iter()).take(count) { *cell = body.address; }
+                        window.mii_r = mii_set;
                         g.saved = Some(window);
                         g.bodies = bodies;
                         g.state = GroupState::Built;
@@ -3434,6 +3770,11 @@ unsafe fn finish_background(entry: *const u8, owner: u32, role: usize, b: Backgr
     };
     let released = super::finish_install(b.token, "background build settled");
     if stored { log_memory(owner, b.group, kinds, "build", b.committed, MemorySample::capture(), memory::group_cost(kinds).build); }
+    if let (false, Some(set)) = (stored, mii_set) { release_mii_r(base, set); }
+    if b.mii.is_some() {
+        trace!("[GroupSwap] background Mii owner={} group={} ok={} mii_r={:x?} hooks {:?}={:?} keys_released_kept={:?}",
+            owner, b.group, stored, mii_set, MII_HIT_NAMES, mii_hits, mii_keys);
+    }
     let now = now_us();
     trace!("[GroupSwap] background built owner={} group={} ok={} reason={} kinds={:x?} bodies={:?} cell_bytes_before={:x?} us={} setup_us={} control_us={} settled_us={:?} ticks={} waited={} registrations_skipped={} info_3a0_same={} info_3a0={:x?} pool_live={}->{} dispatch={:x?} listeners={:?} live_listeners={:?} request_bit={:?} map={} INSTALL_released={}",
         owner, b.group, stored, reason, kinds, &bodies[..count], &cells_before[..count], now.saturating_sub(b.started_us), b.setup_us, b.control_us,
@@ -3552,7 +3893,10 @@ unsafe fn perform_swap(entry: *mut u8, owner: u32, role: usize) {
         let identity_moves = x_identity.is_some() || bank.identity.is_some();
         if identity_moves {
             saved_x.identity = Some((save_resource_words(bank.alias), save_entry_identity(entry as usize)));
+            if x_identity.is_none() { bank.ordinary_identity = saved_x.identity; }
         }
+        // Inbox 21:27Z: out of a Mii window, an ordinary group that saved no identity move takes the owner's baseline.
+        let baseline = bank.ordinary_identity.filter(|_| x_identity.is_some());
         let alias = bank.alias;
         let target_identity = bank.identity;
         // The window's previous active index the commit stored at `+0x5910` (`service` proved it).
@@ -3562,10 +3906,13 @@ unsafe fn perform_swap(entry: *mut u8, owner: u32, role: usize) {
         let prepared = match (group.state, group.saved.take()) {
             (GroupState::Built, Some(y)) => {
                 let x_bodies = std::mem::replace(&mut bank.bodies, group.bodies);
+                // SPECIAL-GROUPS §1 (c): each window keeps its own Mii set in R.
+                saved_x.mii_r = Some(take_mii_r(alias));
                 group.bodies = x_bodies; group.saved = Some(saved_x);
-                trace!("[GroupSwap] detach owner={} group={} kinds={:x?} bodies={:?}", owner, swap.group,
-                    &group.members.kinds()[..group.members.count()], x_bodies);
+                trace!("[GroupSwap] detach owner={} group={} kinds={:x?} bodies={:?} mii_r={:x?}", owner, swap.group,
+                    &group.members.kinds()[..group.members.count()], x_bodies, saved_x.mii_r);
                 restore_window(entry as usize, &y);
+                put_mii_r(alias, y.mii_r.unwrap_or_default());
                 set_active_index(entry as usize, swap.member);
                 set_previous_index(entry as usize, previous_cell_index(from, swap.member, target_members.count()));
                 // A warm return into a Mii group rewrites its identity (R, entry bytes,
@@ -3577,7 +3924,12 @@ unsafe fn perform_swap(entry: *mut u8, owner: u32, role: usize) {
                         write_entry_identity(entry as usize, &saved);
                         Some((header_of(owner, &words), saved.entry))
                     }
-                    (None, None) => None,
+                    (None, None) => baseline.map(|(words, saved)| {
+                        let words = baseline_words(words, target_members);
+                        write_resource_words(alias, &words);
+                        write_entry_identity(entry as usize, &saved);
+                        (header_of(owner, &words), saved.entry)
+                    }),
                 };
                 trace!("[GroupSwap] attach owner={} group={} member={} kinds={:x?} dispatch={:x?} identity={} header={:x?}", owner, swap.group, swap.member,
                     &target_members.kinds()[..target_members.count()], y.dispatch, target_identity.is_some(), identity_move.map(|m| m.0));
@@ -3586,6 +3938,9 @@ unsafe fn perform_swap(entry: *mut u8, owner: u32, role: usize) {
             }
             (GroupState::Prefetched, None) => {
                 let x_bodies = std::mem::replace(&mut bank.bodies, [Body::default(); NATIVE_MEMBERS]);
+                // The detaching window keeps its Mii set; the build starts from an empty one (the Mii setup builds the
+                // faces only into an empty `R+0x90`, `0x67ead0`, and its bind no longer releases another window's).
+                saved_x.mii_r = Some(take_mii_r(alias));
                 group.bodies = x_bodies; group.saved = Some(saved_x); group.state = GroupState::Built;
                 trace!("[GroupSwap] detach owner={} group={} kinds={:x?} bodies={:?}", owner, swap.group,
                     &group.members.kinds()[..group.members.count()], x_bodies);
@@ -3964,7 +4319,7 @@ unsafe fn complete_exchange(base: usize, entry: *mut u8, owner: u32, role: usize
         Prepared::Build { .. } => DispatchNote::Destroyed(receipt.dispatchers == 1, current),
         Prepared::Warm { dispatch, .. } => DispatchNote::Leaked(dispatch),
     };
-    let (failed, restored) = {
+    let (failed, restored, failed_set) = {
         let mut state = BANKS[role].lock();
         let Some(bank) = state.as_mut() else { return; };
         let target_identity = bank.identity;
@@ -3978,6 +4333,9 @@ unsafe fn complete_exchange(base: usize, entry: *mut u8, owner: u32, role: usize
         // D mirror get the previous window's values.
         bank.identity = std::mem::replace(&mut record.identity, target_identity);
         restore_window(entry as usize, &x);
+        // The failed group's Mii set (what its build or attach left in R) is released below; the window's comes back.
+        let failed_set = take_mii_r(alias);
+        put_mii_r(alias, x.mii_r.unwrap_or_default());
         if let Some((words, saved)) = x.identity {
             write_resource_words(alias, &words);
             write_entry_identity(entry as usize, &saved);
@@ -3993,8 +4351,9 @@ unsafe fn complete_exchange(base: usize, entry: *mut u8, owner: u32, role: usize
             .map(|g| g.members.count()).sum::<usize>().min(usize::from(u8::MAX)) as u8, Ordering::Release);
         trace!("[GroupSwap] fallback owner={} group={} reason=verification failed; destroyed={} contexts={} routes={} records={:x?} keys_released={:x?} map_after={} skipped={} {}; window restored, member {} activates",
             owner, group, receipt.bodies, receipt.contexts, receipt.routes_cleared, records, &*keys, map_after, receipt.skipped, dispatch_note, via);
-        (failed, *bank.members)
+        (failed, *bank.members, failed_set)
     };
+    release_mii_r(base, failed_set);
     // U18: whatever the failed group still registers leaves (its destroyed bodies' unloads already
     // emptied their cells) and the restored window registers again, under its own header and the
     // roster of its restored descriptor words.
@@ -4349,13 +4708,18 @@ unsafe fn retire_groups(entry: *const u8, owner: u32, reason: &str) {
     let copy = window.and_then(|members| live_kirby_copy_kind(entry, owner, members));
     // U18: each detached body's group, for the per-group header during the destroys.
     let mut owners = FixedVec::<(u32, Members), { MAX_EXTRA_GROUPS * NATIVE_MEMBERS }>::new();
-    let (mut bundles, identities, token, alias, groups) = {
+    let (mut bundles, identities, token, alias, groups, mii_sets) = {
         let mut state = BANKS[role].lock();
         let Some(bank) = state.as_mut().filter(|bank| bank.entry == entry as usize && bank.owner == owner) else { return; };
         if bank.groups.is_empty() && bank.prefetch.is_none() { return; }
         let token = bank.prefetch.take().map(|p| p.1);
         let (alias, groups, activated) = (bank.alias, bank.groups.len(), bank.activated);
         let mut bundles = FixedList::<DetachedSnapshot, MAX_EXTRA_GROUPS>::new(DetachedSnapshot::new(owner));
+        // SPECIAL-GROUPS §1 (c): each detached window's own Mii set, released after its bodies.
+        let mut mii_sets = FixedList::<MiiR, MAX_EXTRA_GROUPS>::new(MiiR::default());
+        for set in bank.groups.iter().filter(|g| g.state == GroupState::Built).filter_map(|g| g.saved.and_then(|w| w.mii_r)) {
+            if set != MiiR::default() { mii_sets.push(set); }
+        }
         // A Mii group's keys are released with its identity in `R` (the release selector
         // `0x17e8410` keys on `R+0x58` like the request did): each key-holding Mii group keeps
         // its index (the ledger's group of its tokens) and identity.
@@ -4399,7 +4763,7 @@ unsafe fn retire_groups(entry: *const u8, owner: u32, reason: &str) {
         bank.swap = None;
         bank.swap_started = None;
         GROUP_BODIES[role].store(0, Ordering::Release);
-        (bundles, identities, token, alias, groups)
+        (bundles, identities, token, alias, groups, mii_sets)
     };
     // Without the alias R (`0x3aeb50` and every key release read it) bodies and keys
     // are not touched: they are reported as skipped, as before.
@@ -4481,6 +4845,8 @@ unsafe fn retire_groups(entry: *const u8, owner: u32, reason: &str) {
             owner, reason, &window.kinds()[..window.count()], MemberSets(&detached), before, emptied, registry.cells(), registry.header(),
             fields::read::<u32>(alias, 0x4c).unwrap_or(0), task_pending(alias));
     }
+    for set in mii_sets.iter() { release_mii_r(base, *set); }
+    if !mii_sets.is_empty() { trace!("[GroupSwap] teardown owner={} reason={} mii_sets_released={:x?}", owner, reason, &*mii_sets); }
     if let Some(token) = token { super::finish_install(token, "group prefetch retired"); }
     let pool = pool_counts(base);
     // `map_after` = R's remaining key count (`R+0x18`) after the release: the last-line
@@ -4506,7 +4872,7 @@ unsafe fn leave_group(entry: *const u8, owner: u32, role: usize, group: usize) {
         .filter(|bank| bank.entry == entry as usize && bank.owner == owner).map(|bank| *bank.members) else { return; };
     let copy = live_kirby_copy_kind(entry, owner, window);
     let mut owners = FixedVec::<(u32, Members), NATIVE_MEMBERS>::new();
-    let (bundle, identity, alias, members, before) = {
+    let (bundle, identity, alias, members, before, mii_set) = {
         let state = BANKS[role].lock();
         let Some(bank) = state.as_ref().filter(|bank| bank.entry == entry as usize && bank.owner == owner) else { return; };
         let Some(g) = bank.groups.get(group).filter(|g| g.leaving && g.state != GroupState::Prefetching) else { return; };
@@ -4536,7 +4902,8 @@ unsafe fn leave_group(entry: *const u8, owner: u32, role: usize, group: usize) {
             }
             _ => {}
         }
-        (detached, g.identity, bank.alias, *g.members, g.state)
+        let mii_set = g.saved.filter(|_| g.state == GroupState::Built).and_then(|w| w.mii_r);
+        (detached, g.identity, bank.alias, *g.members, g.state, mii_set)
     };
     // Without the alias R nothing is touched (`retire_groups`' rule); the bank's own retirement follows.
     if alias == 0 || resource(base, owner) != Some(alias) { return; }
@@ -4585,6 +4952,8 @@ unsafe fn leave_group(entry: *const u8, owner: u32, role: usize, group: usize) {
             owner, group, &window.kinds()[..window.count()], &members.kinds()[..members.count()], before_cells, emptied,
             registry.cells(), registry.header());
     }
+    // SPECIAL-GROUPS §1 (c): the group's own Mii set goes with it.
+    if let Some(set) = mii_set { release_mii_r(base, set); }
     let held = r_handle::forget_group(ledger_role(role), group);
     {
         let mut state = BANKS[role].lock();
@@ -4707,6 +5076,7 @@ pub(super) fn on_destroy(entry: *const u8) {
                 if let Some(background) = bank.background.take() {
                     // Finalize drains it; a record here is reported and its INSTALL token and skip bit end with the entry.
                     BACKGROUND_OWNERS.fetch_and(!owner_bit(bank.owner), Ordering::AcqRel);
+                    if background.mii.is_some() { MII_REAL_R.store(0, Ordering::Release); }
                     super::finish_install(background.token, "background build: entry destroyed");
                     trace!("[GroupSwap] background destroy owner={} group={} UNEXPECTED: record remaining; tasks {:x?} leak (reported)",
                         bank.owner, background.group, &background.tasks[..background.members.count()]);
@@ -4997,6 +5367,13 @@ const GROUP_SWAP_SEAMS: &[&str] = &["group_swap.dispatcher_destroy", "group_swap
 const ASYNC_BUILD_SEAMS: &[&str] = &["group_swap.body_alloc", "group_swap.heap_alloc", "group_swap.functor_copy",
     "group_swap.task_schedule", "group_swap.task_callback", "group_swap.task_wait", "group_swap.control_init",
     "group_swap.construct_functor", "group_swap.control_callback", "group_swap.control_functor", "capacity.load_655320"];
+/// rc.6 item 3, Mii groups (SPECIAL-GROUPS §1 (b)): the worker hooks of a background Mii build.
+const BACKGROUND_MII_SEAMS: &[&str] = &["background_mii.init_enter", "background_mii.init_flags", "background_mii.init_leave",
+    "background_mii.init_exit", "background_mii.construct_index_a", "background_mii.construct_index_b",
+    "background_mii.construct_enter", "background_mii.construct_path", "background_mii.construct_tail",
+    "background_mii.tail_release", "background_mii.construct_exit", "background_mii.reader_costume",
+    "background_mii.reader_hat", "background_mii.reader_6e655c", "background_mii.reader_6e6ccc",
+    "background_mii.reader_33c3468"];
 const PAIR_SEAMS: &[&str] = &["ic_pair.partner_window", "ic_pair.pair_partner", "ic_pair.activate_entry",
     "ic_pair.commit_change", "ic_pair.outgoing_owner", "ic_pair.deactivate_body"];
 const SPECIAL_SEAMS: &[&str] = &["special_groups.object_release", "special_groups.heap_free",
@@ -5104,6 +5481,22 @@ pub(super) unsafe fn install(base: usize) {
         control_slot, base + CONTROL_FUNCTOR);
     // rc.6 item 3: background builds use the Phase B′ path and the identity view's body-init site (`background_skip`).
     BACKGROUND_ENABLED.store(async_ok && identity_view, Ordering::Release);
+    // SPECIAL-GROUPS §1: the Mii groups' worker hooks, all or none, their first 13.0.5 words owned.
+    let mii_sites: [(usize, u32); 16] = [(0x607aac, 0xd102c3a0), (0x607d80, 0x1a9f311a), (0x607e74, 0xaa1803f4),
+        (0x60b5c8, 0xa9577bfd), (0x60b7a8, 0x9343fd6b), (0x60b834, 0xcb0a016b), (0x60b98c, 0x9447780d),
+        (0x60bf30, 0x52800283), (0x60de68, 0x71012d1f), (0x60dec4, 0x944769d3), (0x60df04, 0xa9444ff4),
+        (0x33a05a8, 0xb9405909), (0x344fcd4, 0xf9404717), (0x6e655c, 0xb9405aa8), (0x6e6ccc, 0xb9405a88),
+        (0x33c3468, 0xb9405aa8)];
+    let mii_stock = mii_sites.iter().all(|&(offset, word)| fingerprint(base, offset, &[word], "BackgroundMii"));
+    let mii_ok = gate(SEAM_GROUP, BACKGROUND_MII_SEAMS, async_ok && identity_view && mii_stock) && async_ok && identity_view;
+    if mii_ok {
+        skyline::install_hooks!(bg_mii_init_enter, bg_mii_init_flags, bg_mii_init_leave, bg_mii_init_exit,
+            bg_mii_construct_index_a, bg_mii_construct_index_b, bg_mii_construct_enter, bg_mii_construct_path,
+            bg_mii_construct_tail, bg_mii_tail_release, bg_mii_construct_exit, bg_mii_reader_costume, bg_mii_reader_hat,
+            bg_mii_reader_6e655c, bg_mii_reader_6e6ccc, bg_mii_reader_33c3468);
+        BACKGROUND_MII_ENABLED.store(true, Ordering::Release);
+    }
+    trace!("[GroupSwap] background Mii builds {}", if mii_ok { "enabled" } else { "off; a Mii group builds at its first switch" });
     trace!("[GroupSwap] background build {} async={} identity_view={}",
         if async_ok && identity_view { "enabled" } else { "off; a group builds at its first switch" }, async_ok, identity_view);
     if groups_ok {

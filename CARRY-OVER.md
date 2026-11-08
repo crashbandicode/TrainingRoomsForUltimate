@@ -911,3 +911,52 @@ facts are in `rc6-item3-re/SPECIAL-GROUPS.md`.
 - Eden `rc6-hot-xps10` (`rows-item3-cc.json`): P1 and CPU cycle changes (add 2, remove 1) and a change during a load,
   each followed by a warm lap. That run found the cell-byte defect above.
 - Recorded manifest edits of the six carried files; `carry_pkg6.py carry/ledger/verify` re-derives all 250 files.
+
+### p23/rc6-hot-slots: Mii groups built in the background; the exit from a Mii warm to any Built group (2026-11-08)
+
+Operator 2026-11-08 20:26Z, "All groups in rc.6"; research `artifacts/phase23/rc6-item3-re/SPECIAL-GROUPS.md` §0–§1, with
+its 21:10Z intervals; inbox 21:27Z for the exit.
+
+**Tick (game thread, `start_background`):**
+- **Save, then install the group's identity for this tick only:**
+  - the live `R` words, entry bytes and D mirror are saved;
+  - the live face handles `R+0x90/+0x94` are set aside (the setup's bind would release them, `0x67e9b0`);
+  - the group's identity is written (`write_identity`).
+- **The native Mii setup** runs at the new `At::Background` seam (plan seam, identity installed;
+  `mii_setup::prepare_mii_background`). The entry-level third runs only when it prepared.
+- **The shadow:** `R+0x40..+0xa8` goes into `SHADOW_R` (the resource object zeroed).
+- **Restore:** everything live is put back in the same tick.
+
+**Worker (16 inline hooks, seam rows `background_mii.*` in `rows_a1.rs`):**
+- Body init reads the shadow from `0x607aac` to `0x607e74`, with the group's `FE+0x52` at `0x607d80`.
+- Construct reads it from `0x60b98c` (`x20` and `x1`, plus the group's costume) to `0x60de68`, and at `0x60bf30`. The
+  group's `D+0x72` comes in at `0x60b7a8` and `0x60b834`.
+- The construction tail's release gets kind −1 at `0x60dec4`. The settlement releases the group's keys with its
+  identity bracketed (`release_group_keys_of`).
+- Every background body's tail takes the per-kind release, never the pair rule (X1, `0x60de68`).
+- The owner-indexed readers `0x33a05a8` (costume) and `0x344fcd4` (hat) are redirected only on the worker thread that
+  builds the body (`MII_THREAD`, set at each interval's start and cleared at the single epilogues `0x60b5c8` and
+  `0x60df04`). `0x6e655c`, `0x6e6ccc` and `0x33c3468` are counted there (M-bg2).
+
+**Each window owns its Mii set in R** (`Window.mii_r`; faces `+0x90/+0x94`, resource object `+0x98/+0xa0`):
+- It is taken at every detach and put back at its attach.
+- A failed exchange releases what it left in R.
+- `retire_groups` and `leave_group` release each detached group's set (`release_mii_r`: the faces as the Reload releases
+  them, `0x6502c8`; the control block as body init releases the previous one, `0x607d24`).
+
+**Exit from a Mii to any Built group (inbox 21:27Z):**
+- The first identity move out of an ordinary window records the owner's ordinary baseline (`Bank::ordinary_identity`).
+- An ordinary group that saved no move of its own attaches out of a Mii window with that baseline and its own header
+  kinds (`body_bank::baseline_words`). `mii_exit_saved` serves it to the planner.
+
+**Gating:** a Mii group builds in the background only when its hooks installed (`BACKGROUND_MII_ENABLED`) and it carries
+its identity. A live Mii window still defers background builds.
+
+**Tests, each failed first:**
+- model: `a_background_build_takes_an_ordinary_prefetched_group_beside_an_ordinary_window` (Mii admitted),
+  `the_ordinary_baseline_takes_the_target_windows_header`;
+- `tests/background_mii_wiring.rs` (3);
+- `tests/mii_exit_wiring.rs` (`…_from_any_built_ordinary_group`, `the_exchange_writes_the_ordinary_baseline_…`);
+- `tests/background_build_wiring.rs` follows the teardown's new tuple.
+
+Recorded manifest edits of the four carried files; `carry_pkg6.py carry/ledger/verify` re-derives all 250 files.

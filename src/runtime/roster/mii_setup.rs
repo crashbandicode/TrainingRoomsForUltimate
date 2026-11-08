@@ -69,12 +69,19 @@ pub(crate) enum At {
     BeforeDetach,
     /// After the identity install, right before the two calls.
     IdentityInstalled,
+    /// rc.6 item 3 (SPECIAL-GROUPS §1 (a)): a background build's tick, the identity installed for that one tick while
+    /// the window stays live, so the entry is Ready (the plan seam; MII-PHASEB: neither call reads a loader byte or
+    /// `R+0x4c`).
+    Background,
 }
 impl At {
-    fn seam(self) -> Seam { if self == At::Plan { Seam::Plan } else { Seam::PhaseB } }
-    fn installed(self) -> bool { self == At::IdentityInstalled }
+    fn seam(self) -> Seam { if matches!(self, At::Plan | At::Background) { Seam::Plan } else { Seam::PhaseB } }
+    fn installed(self) -> bool { matches!(self, At::IdentityInstalled | At::Background) }
     fn label(self) -> &'static str {
-        match self { At::Plan => "plan", At::BeforeDetach => "before-detach", At::IdentityInstalled => "identity-installed" }
+        match self {
+            At::Plan => "plan", At::BeforeDetach => "before-detach", At::IdentityInstalled => "identity-installed",
+            At::Background => "background",
+        }
     }
 }
 
@@ -162,11 +169,23 @@ pub(crate) unsafe fn phase_b_admitted(base: usize, entry: usize, owner: u32, ali
 /// ran; `Failed` means a native effect crossed (the recovery path).
 pub(crate) unsafe fn prepare_mii_group(base: usize, entry: usize, owner: u32, alias: usize, identity: &MiiIdentity,
     c: &Configuration) -> Outcome {
-    let Some(reads) = read_preflight(base, entry, owner, alias, identity, c, At::IdentityInstalled) else {
+    prepare_at(base, entry, owner, alias, identity, c, At::IdentityInstalled)
+}
+
+/// rc.6 item 3: the same two calls in a background build's tick (`At::Background`), the identity installed for that
+/// tick and the window's face handles held aside (`native_body_bank::start_background`).
+pub(crate) unsafe fn prepare_mii_background(base: usize, entry: usize, owner: u32, alias: usize, identity: &MiiIdentity,
+    c: &Configuration) -> Outcome {
+    prepare_at(base, entry, owner, alias, identity, c, At::Background)
+}
+
+unsafe fn prepare_at(base: usize, entry: usize, owner: u32, alias: usize, identity: &MiiIdentity, c: &Configuration,
+    at: At) -> Outcome {
+    let Some(reads) = read_preflight(base, entry, owner, alias, identity, c, at) else {
         return Outcome::Refused("Mii setup: preflight reads failed");
     };
     if let Err(reason) = reads.preflight.check() {
-        trace_refused(&reads, At::IdentityInstalled, reason);
+        trace_refused(&reads, at, reason);
         return Outcome::Refused(reason);
     }
     let started = now_us();

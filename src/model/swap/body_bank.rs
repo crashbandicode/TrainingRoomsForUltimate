@@ -765,17 +765,21 @@ pub fn async_build_eligible(members: Members, identity: bool) -> Result<(), &'st
 /// rc.6 item 3 (operator decision 2026-11-08): a Prefetched group's bodies built in the background, beside the live
 /// window, so its first switch is a warm exchange. The construction binds to the entry by index (body init's
 /// prepare_entry `0x17f1a60` at `0x607f30` writes the copy-registry slot of its cell from the worker), so only what the
-/// queued build already serves, minus what lives in `R` while it builds: an ordinary single-actor group
-/// (`async_build_eligible` without the Mii arm: a Mii group's identity is in `R` for its whole construction), while the
+/// queued build already serves (`async_build_eligible`): an ordinary single-actor group or a Mii group, while the
 /// window holds no Mii identity (the costume selectors at `0x607dfc`/`0x17e9ae0` key on `R+0x58`) and its live member
 /// is not Kirby (D-KIRBY1: no bank key rests on its R). The live window (`window`, the attached group) must be ordinary
 /// too: the body's construction tail reads the live cells 0/1 from the worker and takes the pair rule on R for `[Popo,
 /// Nana]`, which may reset the whole R mid-play (SPECIAL-GROUPS §0 X1, `0x60de60-0x60de78`), and construct picks its
 /// info wrapper from the live kinds (X4, `0x60d21c`); a pair or native window defers the build until it is switched
-/// away. Every other group keeps today's build at its first switch.
+/// away. Native (Pokémon Trainer, Aegis) and pair groups keep today's build at their first switch until their research
+/// lands (operator 20:26Z, "All groups in rc.6").
+/// A Mii group (SPECIAL-GROUPS §1) builds in the background when it carries its identity: the tick brackets `R`'s
+/// words, the entry's Mii bytes and the D mirror and runs the native Mii setup, and the worker reads a shadow `R`
+/// (`native_body_bank` `SHADOW_R`). A live Mii window defers it (that window's faces and resource object in `R` are a
+/// case not built yet).
 pub fn background_build_eligible(members: Members, identity: bool, window: Members, window_identity: bool, live_kirby: bool)
     -> Result<(), &'static str> {
-    if members.special() == Special::Mii { return Err("mii group"); }
+    if members.special() == Special::Mii && !identity { return Err("mii without identity"); }
     async_build_eligible(members, identity)?;
     if window_identity { return Err("mii window"); }
     if live_kirby { return Err("live kirby"); }
@@ -1467,6 +1471,15 @@ impl MiiIdentity {
     }
 }
 
+/// rc.6 warm exit to any Built group (inbox 21:27Z): the `R+0x58..` words an ordinary `window` takes when it attaches out
+/// of a Mii window without its own saved identity move: the owner's ordinary `baseline` (what the first ordinary window a
+/// Mii displaced left in `R`) with that window's header kinds.
+pub fn baseline_words(baseline: [u32; RESOURCE_WORDS], window: Members) -> [u32; RESOURCE_WORDS] {
+    let mut words = baseline;
+    words[..NATIVE_MEMBERS].copy_from_slice(&window.kinds());
+    words
+}
+
 /// The identity-owned slice of a descriptor (what a Mii window must give back).
 pub fn entry_bytes_of(descriptor: &[u8; 0x70]) -> MiiEntryBytes {
     descriptor[MII_ENTRY_START..MII_ENTRY_END].try_into().unwrap()
@@ -1560,6 +1573,22 @@ mod tests {
         assert_eq!(reuse_slot([GroupState::Built, GroupState::Failed].into_iter()), None);
     }
 
+    /// rc.6 warm exit to any Built group (inbox 21:27Z): leaving a Mii group for an ordinary window that saved no identity
+    /// move writes the owner's ordinary baseline (the words the first ordinary window a Mii displaced left in `R`) with
+    /// that window's own header kinds; the costume, the Mii words and the flags stay the baseline's.
+    #[test]
+    fn the_ordinary_baseline_takes_the_target_windows_header() {
+        let baseline: [u32; RESOURCE_WORDS] = std::array::from_fn(|i| 0x100 + i as u32);
+        let window = Members::new(&[0x00, 0x01, 0x02]).unwrap();
+        let group = Members::new(&[0x03, 0x07]).unwrap();
+        let words = baseline_words(baseline, group);
+        assert_eq!(&words[..3], &[0x03, 0x07, u32::MAX]);
+        assert_eq!(&words[3..], &baseline[3..], "costume, record index, tokens and flags stay the baseline's");
+        assert_eq!(&baseline_words(baseline, window)[..3], &[0x00, 0x01, 0x02]);
+        let trainer = Members::native_group(0x24).unwrap();
+        assert_eq!(&baseline_words(baseline, trainer)[..3], &trainer.kinds());
+    }
+
     /// rc.6 item 3: the notice counts a prefetched group a background build still owes as loading (pending), so it reads
     /// "Loading x/y" until that group is built; every other state is shown as it is.
     #[test]
@@ -1580,7 +1609,11 @@ mod tests {
         let window = Members::new(&[0x00, 0x01, 0x02]).unwrap();
         assert_eq!(background_build_eligible(ordinary, false, window, false, false), Ok(()));
         assert_eq!(background_build_eligible(Members::new(&[0x1c]).unwrap(), false, window, false, false), Ok(()));
-        assert_eq!(background_build_eligible(Members::mii_group(0x4a).unwrap(), true, window, false, false), Err("mii group"));
+        // SPECIAL-GROUPS §1 (operator 20:26Z, "All groups in rc.6"): a Mii group with its identity builds in the
+        // background too (its R, entry and D words bracketed in the tick, shadow R on the worker); never without one.
+        assert_eq!(background_build_eligible(Members::mii_group(0x4a).unwrap(), true, window, false, false), Ok(()));
+        assert_eq!(background_build_eligible(Members::mii_group(0x4a).unwrap(), false, window, false, false), Err("mii without identity"));
+        assert_eq!(background_build_eligible(Members::mii_group(0x4a).unwrap(), true, window, true, false), Err("mii window"));
         assert_eq!(background_build_eligible(ordinary, true, window, false, false), Err("identity"));
         assert_eq!(background_build_eligible(Members::pair_group(), false, window, false, false), Err("pair group"));
         assert_eq!(background_build_eligible(ordinary, false, window, true, false), Err("mii window"));
@@ -1593,11 +1626,13 @@ mod tests {
         let groups = [(GroupState::Built, ordinary, false), (GroupState::Prefetched, Members::mii_group(0x48).unwrap(), true),
             (GroupState::Planned, ordinary, false), (GroupState::Prefetched, Members::new(&[0x1c]).unwrap(), false),
             (GroupState::Prefetched, ordinary, false)];
-        assert_eq!(next_background(groups.iter().copied(), window, false, false), Some(3));
+        assert_eq!(next_background(groups.iter().copied(), window, false, false), Some(1));
+        assert_eq!(next_background(groups[2..].iter().copied(), window, false, false).map(|i| i + 2), Some(3));
         assert_eq!(next_background(groups.iter().copied(), window, true, false), None);
         assert_eq!(next_background(groups.iter().copied(), window, false, true), None);
         assert_eq!(next_background(groups.iter().copied(), Members::pair_group(), false, false), None);
-        assert_eq!(next_background(groups[..3].iter().copied(), window, false, false), None);
+        assert_eq!(next_background(groups[..3].iter().copied(), window, false, false), Some(1));
+        assert_eq!(next_background([groups[0], groups[2]].into_iter(), window, false, false), None);
         // The saved info spans cover what `0x654dc0` writes: the dispatcher words, the descriptor copies, `+0x3ac`.
         let covered = |at: usize| BACKGROUND_INFO_SPANS.iter().any(|(start, len)| (*start..start + len).contains(&at));
         for at in [0x08, 0x10, 0x18, 0x20, 0x28, 0x2c, 0x30, 0x34, 0x50, 0x51, 0x6b, 0x72, 0x78, 0x84, 0x92, 0x3a0, 0x3aa, 0x3ac] {

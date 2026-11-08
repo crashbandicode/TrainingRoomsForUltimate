@@ -110,7 +110,7 @@ fn the_settlement_keeps_the_bodies_in_the_group_and_every_destroyer_drains_first
         "finish_background(entry, owner, role, background, reason, waited);"]);
     let retire = body(BANK, "unsafe fn retire_groups(");
     ordered(retire, &["drain_construction(entry, owner, role, reason);", "drain_background(entry, owner, role, reason);",
-        "let (mut bundles, identities, token, alias, groups) = {"]);
+        "let (mut bundles, identities, token, alias, groups, mii_sets) = {"]);
 }
 
 /// The window's ticks settle a build in flight; one owed starts from the group lifecycle after every planned prefetch.

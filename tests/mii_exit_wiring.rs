@@ -14,10 +14,11 @@ const PLAYER_NATIVE: &str = include_str!("../src/runtime/mii/mii_ordinary_native
 const CPU: &str = include_str!("../src/runtime/mii/mii_ordinary_cpu.rs");
 const CPU_NATIVE: &str = include_str!("../src/runtime/mii/mii_ordinary_cpu_native.rs");
 
-/// `plan()` keeps today's rule; only an adapter holding its Mii group's publication asks for the exit, and the exit
-/// is served only by the Built window the live Mii group displaced (its saved identity move).
+/// `plan()` keeps today's rule; only an adapter holding its Mii group's publication asks for the exit. Since inbox
+/// 21:27Z it is served by any Built ordinary group: the displaced window with its saved identity move, any other with
+/// the owner's ordinary baseline (`Bank::ordinary_identity`).
 #[test]
-fn the_planner_serves_the_exit_only_on_request_and_only_from_the_displaced_window() {
+fn the_planner_serves_the_exit_only_on_request_and_from_any_built_ordinary_group() {
     assert!(BANK.contains("pub(super) unsafe fn plan(entry: *const u8, owner: u32, descriptor: [u8; 0x70], upcoming: &[u32]) -> Plan {\n    plan_in(entry, owner, descriptor, upcoming, false)\n}"));
     assert!(BANK.contains("pub(super) unsafe fn plan_mii_exit(entry: *const u8, owner: u32, descriptor: [u8; 0x70], upcoming: &[u32]) -> Plan {\n    plan_in(entry, owner, descriptor, upcoming, true)\n}"));
     let plan = body(BANK, "unsafe fn plan_in(");
@@ -27,7 +28,32 @@ fn the_planner_serves_the_exit_only_on_request_and_only_from_the_displaced_windo
     assert!(saved.contains("if bank.identity.is_none() { return None; }"), "the window is a Mii group:\n{saved}");
     assert!(saved.contains("g.state.reachable() && group_serves(*g.members, kind, forms).is_some()"), "the group `switch` takes:\n{saved}");
     assert!(saved.contains("group.state != GroupState::Built || group.identity.is_some()"), "{saved}");
-    assert!(saved.contains("group.saved.as_ref()?.identity.map(|(_, saved)| saved.entry)"), "{saved}");
+    assert!(saved.contains("group.saved.as_ref()?.identity.or(bank.ordinary_identity).map(|(_, saved)| saved.entry)"), "{saved}");
+}
+
+/// The exchange: the first identity move out of an ordinary window records the owner's ordinary baseline; an attach of
+/// an ordinary group that saved no identity move, out of a Mii window, writes that baseline with its own header.
+#[test]
+fn the_exchange_writes_the_ordinary_baseline_for_any_ordinary_target() {
+    let swap = body(BANK, "unsafe fn perform_swap(");
+    let at = swap.find("let x_identity = std::mem::replace(&mut bank.identity, bank.groups[swap.group].identity);").expect("x_identity");
+    let tail = &swap[at..];
+    let mut from = 0;
+    for step in [
+        "saved_x.identity = Some((save_resource_words(bank.alias), save_entry_identity(entry as usize)));",
+        "if x_identity.is_none() { bank.ordinary_identity = saved_x.identity; }",
+        "let baseline = bank.ordinary_identity.filter(|_| x_identity.is_some());",
+        "(GroupState::Built, Some(y)) => {",
+        "(None, None) => baseline.map(|(words, saved)| {",
+        "let words = baseline_words(words, target_members);",
+        "write_resource_words(alias, &words);",
+        "write_entry_identity(entry as usize, &saved);",
+        "(header_of(owner, &words), saved.entry)",
+    ] {
+        let found = tail[from..].find(step).unwrap_or_else(|| panic!("missing or out of order: {step}\n{tail}"));
+        from += found + step.len();
+    }
+    assert!(BANK.contains("ordinary_identity: None,"), "every new bank starts without a baseline");
 }
 
 /// Both adapters: a settled Mii group switch keeps its publication; a request out of that live Mii plans the exit
