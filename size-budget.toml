@@ -633,3 +633,11 @@ ceiling = 150495
 date = "2026-11-08"
 reason = "rc.5 final: the merge of p23/rc5-mismatch-fix (c7f936d, +98 over 150251) into p23/rc5-wire-fix (150397); the two sides add up, nothing else changes; measured 150495 on the merged tree (tools/size_gate.py)"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); final ceiling = measured merged size per primary c07b3449, TASK-OPUS-rc5-merge-final 2026-11-08"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 150569
+date = "2026-11-08"
+reason = "rc.5 CPU playback fidelity (p23/rc5-cpu-fidelity): a played role hands its frames to Player 1's poll and the CPU's AI epilogue through a fixed 64-frame queue the worker fills ahead (model/frame_queue.rs), one frame per game frame, instead of one slot that dropped frames and left the AI's own controls in gaps (Eden rc5-fid-measure1); measured 150569 (tools/size_gate.py), +74 over 150495"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to this rc.5 root fix under TASK-OPUS-rc5-cpu-fidelity (primary c07b3449, 2026-11-08: a raise goes in its own commit with approved_by)"
