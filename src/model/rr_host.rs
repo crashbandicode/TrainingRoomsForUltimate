@@ -80,6 +80,8 @@ static BOUND_DIRTY: AtomicBool = AtomicBool::new(true);
 static BOUND_APPLIED: Mutex<Option<BoundCopy>> = Mutex::new(None);
 /// A Save the state writer captured, for the worker to write into the bound save.
 static SAVED_PAIR: Mutex<Option<[SavedState; 2]>> = Mutex::new(None);
+/// A setup restore moved the fighters through the active slot: the slot is given the bound save again.
+static SLOT_RESYNC: AtomicBool = AtomicBool::new(false);
 
 /// The bound save as the save-state machine's active slot must hold it (RECORDING.md, "Save states only warp").
 #[derive(Clone, Debug, PartialEq)]
@@ -521,8 +523,8 @@ fn bump_catalog() {
     BOUND_DIRTY.store(true, Ordering::Release);
 }
 
-/// What the save-state machine's active slot must hold now, when that changed since the last call: the bound save's
-/// pair, or `Some(None)` (an empty slot) when nothing is bound. Load and Auto-load warp to that slot, so they follow
+/// What the save-state machine's active slot must hold now, when that changed since the last call or a setup restore
+/// used the slot (`setup_restored`): the bound save's pair, or `Some(None)` (an empty slot) when nothing is bound. Load and Auto-load warp to that slot, so they follow
 /// the binding (pop-up A on a save, the Bind row, Delete) and the bound file. Nothing before the library is built: the
 /// legacy slot stays until migration binds the slot the chords used.
 pub fn bound_sync(root: &Path) -> Option<Option<[SavedState; 2]>> {
@@ -543,7 +545,7 @@ pub fn bound_sync(root: &Path) -> Option<Option<[SavedState; 2]>> {
         .map(|save| [save.player, save.cpu]);
     let copy = BoundCopy { id, pair };
     let mut applied = lock(&BOUND_APPLIED);
-    if applied.as_ref() == Some(&copy) {
+    if !SLOT_RESYNC.swap(false, Ordering::AcqRel) && applied.as_ref() == Some(&copy) {
         return None;
     }
     let pair = copy.pair.clone();
@@ -554,6 +556,15 @@ pub fn bound_sync(root: &Path) -> Option<Option<[SavedState; 2]>> {
 /// The state writer has a Save's two records for the active slot. The worker writes them into the bound save.
 pub fn save_captured(pair: [SavedState; 2]) {
     *lock(&SAVED_PAIR) = Some(pair);
+}
+
+/// The state writer applied a setup restore (or a setup bound with Y) to the active slot. Setups stay a separate
+/// library from save states (LANE-GROK-RECORDING-REDESIGN-REPORT.md:322; primary 2026-11-08 #69 (b)): a restore only
+/// moves the fighters, so nothing is written into the bound save. The slot gets the bound save back; the post waits
+/// until the restore has landed (`states::apply_bound_post`).
+pub fn setup_restored() {
+    SLOT_RESYNC.store(true, Ordering::Release);
+    BOUND_DIRTY.store(true, Ordering::Release);
 }
 
 /// Save writes the one bound save, or a new bound Save N when none is bound (`rr_runtime::save_chord`). Worker side.
@@ -1254,6 +1265,7 @@ fn reset_host() {
     BOUND_DIRTY.store(true, Ordering::Release);
     *lock(&BOUND_APPLIED) = None;
     *lock(&SAVED_PAIR) = None;
+    SLOT_RESYNC.store(false, Ordering::Release);
     for slot in &ROLE_KIND {
         slot.store(-1, Ordering::Release);
     }
@@ -2327,5 +2339,44 @@ mod tests {
         let made = RecordingIndex::load(&root).unwrap().bound().unwrap().to_owned();
         assert_eq!(saves.load(&made).unwrap().name, "Save 1");
         assert_eq!(saves.load(&made).unwrap().player.x, 1.0);
+    }
+
+    /// Primary 2026-11-08 #69 (b): "Setups stay a separate library from save states"
+    /// (LANE-GROK-RECORDING-REDESIGN-REPORT.md:322). Eden rc6-covrec-diag2 cov-setup-restore: the restore moved the
+    /// fighters and also wrote them into the bound save. A restore only moves the fighters: the worker writes nothing,
+    /// the bound file keeps its pair, and the active slot gets the bound save back, so Load still warps to it.
+    #[test]
+    fn a_setup_restore_leaves_the_bound_save_and_the_slot_returns_to_it() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("setup-restore");
+        migrate_at_boot(&root, &none(), "2026-11-08").unwrap();
+        let saves = Store::<NamedSave>::new(root.join(SAVES_DIR));
+        let bound = saves.save_new(&NamedSave::new("Bound", at_x(-70.0), at_x(-40.0)).unwrap()).unwrap();
+        let before = saves.load(&bound).unwrap();
+        let mut index = RecordingIndex::load(&root).unwrap();
+        index.bind_save(Some(&bound), 1).unwrap();
+        index.save(&root).unwrap();
+        assert!(bound_sync(&root).is_some(), "the first sync");
+        assert!(bound_sync(&root).is_none(), "nothing changed");
+        setup_restored();
+        assert!(!write_saved(&root), "a setup restore hands the worker nothing to write");
+        assert_eq!(saves.load(&bound).unwrap(), before, "the bound save file is untouched");
+        let again = bound_sync(&root).expect("the slot is given the bound save again").expect("Bound is bound");
+        assert_eq!((again[0].x, again[1].x), (-70.0, -40.0));
+        assert!(bound_sync(&root).is_none(), "once per restore");
+        publish_selection(&root, &Selection {
+            bound: None,
+            active_player: None,
+            active_cpu: None,
+            loop_player: LoopMark::Finite(1),
+            loop_cpu: LoopMark::Finite(1),
+            drill: None,
+            record_role: ViewRole::Player,
+        }, None);
+        assert_eq!(bound_sync(&root), Some(None), "nothing bound");
+        setup_restored();
+        assert_eq!(bound_sync(&root), Some(None), "with nothing bound the restored slot is emptied again");
+        assert_eq!(RecordingIndex::load(&root).unwrap().bound(), None, "and no save is made for it");
     }
 }

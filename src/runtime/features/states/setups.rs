@@ -287,10 +287,6 @@ impl WriterBind {
     pub(super) fn sequence(&self) -> u64 {
         self.job.sequence
     }
-
-    pub(super) fn slot(&self) -> usize {
-        self.job.target.slot
-    }
 }
 pub(super) fn take_writer_bind() -> Option<WriterBind> {
     JOBS.take_writer()

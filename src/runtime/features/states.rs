@@ -1678,12 +1678,14 @@ fn take_captured(file: &mut SaveFile) {
         }
     }
     taken.sort_by_key(|record| record.as_ref().map_or(u64::MAX, |record| record.sequence));
-    let mut written = None;
+    let mut saved = None;
+    let mut restored = false;
     for CapturedRecord { sequence, role, slot, mut state, mii } in taken.into_iter().flatten() {
         if binding.as_ref().is_some_and(|job| job.sequence() < sequence) {
             setups::apply_writer_bind(file, binding.take().unwrap());
+            restored = true;
         }
-        written = Some(slot);
+        saved = Some(slot);
         state.marker = Marker::NoAction;
         // Configuration serializes only validated integer/byte values. Its
         // allocation-bearing JSON representation stays on this writer thread.
@@ -1694,14 +1696,22 @@ fn take_captured(file: &mut SaveFile) {
         };
         records[slot.min(records.len() - 1)] = state;
     }
-    if let Some(binding) = binding {
-        written = Some(binding.slot());
-        setups::apply_writer_bind(file, binding);
-    }
-    // The slot is the bound save: what Save (or a setup restore) put there is written into that file on the worker
+    // The slot is the bound save: what Save put there is written into that file on the worker
     // (`rr_host::write_saved`), with the Mii identities just attached.
-    if let Some(slot) = written.map(|slot| slot.min(SLOTS - 1)) {
-        crate::engine::rr_host::save_captured([file.player[slot].clone(), file.cpu[slot].clone()]);
+    let saved_pair = saved.map(|slot| slot.min(SLOTS - 1)).map(|slot| [file.player[slot].clone(), file.cpu[slot].clone()]);
+    if let Some(binding) = binding {
+        setups::apply_writer_bind(file, binding);
+        restored = true;
+    }
+    if let Some(pair) = saved_pair {
+        crate::engine::rr_host::save_captured(pair);
+    }
+    // Setups stay a separate library from save states (#69 (b)): a setup restore only moves the fighters, and the slot
+    // gets the bound save back once the restore has landed.
+    if restored {
+        crate::engine::rr_host::setup_restored();
+    }
+    if saved.is_some() || restored {
         crate::runtime::ui::worker::wake();
     }
     let dropped = HANDOFF_DROPPED.swap(0, Ordering::Relaxed);
