@@ -673,3 +673,11 @@ ceiling = 150821
 date = "2026-11-08"
 reason = "rc.6 hot-slots root fix (p23/rc6-hot-slots dd69ea6, Eden rc6-hot-xps2): back to the original after a start-up window is native's single form (entry_window::original_request; the Player and CPU Mii adapters stage and recognise it), which stops the native thread crash on the return to the original; measured 150821 (tools/size_gate.py), +67 over 150754"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to this rc.6 root fix under TASK-OPUS-rc6-hot-slots (primary c07b3449, 2026-11-08: a raise goes in its own commit with approved_by)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 151146
+date = "2026-11-08"
+reason = "rc.6 warm exit from a Mii group (p23/rc6-hot-slots 4f01c0a; operator decision 2026-11-08, INBOX-opus-rc6-hotslots 15:58Z): plan_mii_exit, mii_exit_bytes_match, and the adapters' kept publication and exit_settled; measured 151146 (tools/size_gate.py), +325 over 150821"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to this operator-chosen rc.6 item under TASK-OPUS-rc6-hot-slots (primary c07b3449, 2026-11-08: a raise goes in its own commit with approved_by)"
