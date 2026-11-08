@@ -386,13 +386,15 @@ pub const IDX_TAB_BOX: usize = IDX_BADGE_NUM + BADGES;
 /// input package, which finds them by name when it draws.
 pub const MENU_COUNT: usize = IDX_TAB_BOX + 4 * TAB_BOXES;
 /// The notification panel (SPEC-input-05): its own container under `RootPane`. Each of its texts (header, short
-/// body, long body) has a dark plate drawn immediately before it. Written by the notices code of the input package.
+/// body, long body) has a dark plate behind it. The three plates come first and the three texts after them: a padded
+/// body plate reaches into the header's box, and drawn after the header it covered the header's lower half (Eden
+/// covrest-02, 2026-11-08). Written by the notices code of the input package.
 pub const IDX_NOTICE: usize = MENU_COUNT;
 pub const IDX_NOTICE_HEADER_PLATE: usize = IDX_NOTICE + 1;
-pub const IDX_NOTICE_HEADER: usize = IDX_NOTICE + 2;
-pub const IDX_NOTICE_TEXT_PLATE: usize = IDX_NOTICE + 3;
-pub const IDX_NOTICE_TEXT: usize = IDX_NOTICE + 4;
-pub const IDX_NOTICE_LONG_PLATE: usize = IDX_NOTICE + 5;
+pub const IDX_NOTICE_TEXT_PLATE: usize = IDX_NOTICE + 2;
+pub const IDX_NOTICE_LONG_PLATE: usize = IDX_NOTICE + 3;
+pub const IDX_NOTICE_HEADER: usize = IDX_NOTICE + 4;
+pub const IDX_NOTICE_TEXT: usize = IDX_NOTICE + 5;
 pub const IDX_NOTICE_LONG: usize = IDX_NOTICE + 6;
 /// Full startup chord text plus its terminator; checked against notify::BODY_MAX.
 pub const NOTICE_LONG_UNITS: u16 = 321;

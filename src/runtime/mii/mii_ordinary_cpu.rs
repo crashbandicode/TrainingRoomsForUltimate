@@ -492,7 +492,15 @@ unsafe fn begin_blocker()->Option<Blocker> {
     else if training::recording_or_playback() {Some(Blocker::Recording)}
     else if crate::runtime::compat::replay_preview::occupied() {Some(Blocker::ReplayPreview)}
     else if !STATES.iter().all(|s| {let s=s.lock();s.active.is_none()&&s.pending.is_none()}) {Some(Blocker::Roster)}
+    else if portrait_render_held() {Some(Blocker::Portrait)}
     else {None}
+}
+/// The CPU's HUD portrait render holds a helper (sequencing: the press runs after the render, never dropped).
+fn portrait_render_held()->bool {
+    #[cfg(feature="mii-hud-portrait-alpha")]
+    {super::mii_hud_portrait::render_holds_helper(1)}
+    #[cfg(not(feature="mii-hud-portrait-alpha"))]
+    {false}
 }
 unsafe fn permitted()->bool {begin_blocker().is_none()}
 

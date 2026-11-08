@@ -235,6 +235,82 @@ pub fn on_count(facts: CountFacts) -> Decision {
     decision
 }
 
+/// Two count observations before one close. The pause menu raises No. of CPUs one step per press, so a raise from
+/// one to three on one close is seen as 1→2 and then 2→3 (Eden covrest-07: `cpu_quantity=2`, then `=3`, both while
+/// paused). The later decision keeps what the earlier one decided for an entry it does not decide itself: entry 2's
+/// publication and seat Reload from the 1→2 step survive the 2→3 step.
+pub fn merge_paused(earlier: Decision, later: Decision) -> Decision {
+    Decision {
+        publish: [later.publish[0].or(earlier.publish[0]), later.publish[1].or(earlier.publish[1])],
+        release_now: later.release_now.or(earlier.release_now),
+        hold_installs: later.hold_installs || earlier.hold_installs,
+        after_entry2: later.after_entry2.or(earlier.after_entry2),
+        after_entry3: later.after_entry3.or(earlier.after_entry3),
+    }
+}
+
+/// What a seat Reload loads: the seat's kind with the seat member's exact-Mii configuration (F9 report §4.2: a member
+/// is the kind, the costume, and the exact-Mii configuration when the CPU target has one). `member` is the CPU
+/// rotation's member for that entry as (kind, configuration); its configuration counts only for the same kind.
+/// A Mii class (`0x48..=0x4a`) without one is not loaded: installed as a plain fighter it is a body the game reads
+/// null from once the entry activates (Eden covrest-08). The entry then keeps what it has.
+pub fn seat_load<C: Copy>(kind: u32, member: Option<(u32, Option<C>)>) -> Option<(u32, Option<C>)> {
+    if !(0x48..=0x4a).contains(&kind) {
+        return Some((kind, None));
+    }
+    let configuration = member.filter(|(member, _)| *member == kind).and_then(|(_, configuration)| configuration)?;
+    Some((kind, Some(configuration)))
+}
+
+/// The seat member a parked entry 2 or 3 holds, whether or not the merged plan lists it: the first raise after a scene
+/// start shows the seats (reading A, primary 2026-11-08 16:04Z; "F9's fixed seats keep 2 and 3 for the next CPUs").
+/// A body bank that covers the member does not free the seat. None on a live entry, on entry 3 while it holds the
+/// borrowed hat, without a member, and for a Mii member without its configuration (`seat_load`).
+pub fn parked_seat<C: Copy>(
+    slot: u32,
+    quantity: Option<u32>,
+    borrowed: bool,
+    member: Option<(u32, Option<C>)>,
+) -> Option<(u32, Option<C>)> {
+    if !helper_seat(slot, quantity, borrowed) {
+        return None;
+    }
+    let (kind, _) = member?;
+    seat_load(kind, member)
+}
+
+/// What F9 does with a promoted seat's recorded Mii proof (reading B, primary 2026-11-08 16:44Z). The game's activation
+/// of entry 2 or 3 as a CPU, and its parking again after a drop, change bytes of the seat's Mii record (Eden
+/// covrest-11: the helper `Proof` matched, the Mii record did not), and the Mii owners then refuse every snapshot.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Reproof {
+    /// The seat is not parked ready yet.
+    Wait,
+    /// The record and descriptor are the recorded ones.
+    Unchanged,
+    /// The identity is unchanged (source, configuration, binding, owner objects, scalars, charinfo, resource pair):
+    /// take the record and descriptor again from the parked row.
+    Rerecord,
+    /// Another Mii, row or owner: never re-recorded; the refusal stands.
+    Refuse,
+}
+
+pub fn reproof(parked: bool, identity_same: bool, state_same: bool) -> Reproof {
+    match (parked, identity_same, state_same) {
+        (false, _, _) => Reproof::Wait,
+        (true, false, _) => Reproof::Refuse,
+        (true, true, true) => Reproof::Unchanged,
+        (true, true, false) => Reproof::Rerecord,
+    }
+}
+
+/// Ordering (primary 2026-11-08 17:28Z, reading B; Eden covrest-12): an F9 seat load waits while a HUD portrait job
+/// wants a helper or holds one for its render, so the render is not pushed behind the seat's INSTALL into the role's
+/// next press. The seat loads once the render is done.
+pub fn seat_load_waits(portrait_job: bool) -> bool {
+    portrait_job
+}
+
 /// A ready body that already is the seat member stays. An in-flight body is not given a second install.
 /// An empty entry, or a ready body of another kind, is reloaded after the walk.
 /// One read of a published cell: body id (`+8`), kind (`+0xc`), and `parked_ready`.
@@ -247,12 +323,14 @@ pub type PublishedBody = Option<(u32, u32, bool)>;
 /// (`entry_cells::active_cell`, the game's `b.ls` at `main+0x642c88`).
 /// State 0xb is what publishes that count (`650010.c:886-890`). A count of 0
 /// leaves heap residue in the cell (F6-30); alignment of that residue is not
-/// a body. An unpublished cell keeps the loader split already used for an
-/// unaligned pointer.
+/// a body. The loader byte of such an entry is residue as well (Eden covrest-04/05:
+/// 6, then 88, on entries never installed), so an unpublished cell is in flight
+/// only when the plugin's own install on that entry is (`own_load_in_flight`,
+/// asked only for an unpublished cell); otherwise it is empty and its seat reloads.
 pub fn classify_parked_body(
     entry_aligned: bool,
     installed: u64,
-    loader: u8,
+    own_load_in_flight: impl FnOnce() -> bool,
     deref_cell: impl FnOnce() -> PublishedBody,
 ) -> Body {
     if !entry_aligned {
@@ -260,20 +338,20 @@ pub fn classify_parked_body(
     }
     // Cell 0 is a body only after state 0xb publishes it (count at +0x4150).
     if crate::model::entry_cells::active_cell(0, installed).is_none() {
-        return unpublished_body(loader);
+        return unpublished_body(own_load_in_flight());
     }
     match deref_cell() {
         Some((id, kind, true)) => Body::Ready { id, kind },
         Some((id, _, false)) => Body::Loading { id: Some(id) },
-        None => unpublished_body(loader),
+        None => unpublished_body(own_load_in_flight()),
     }
 }
 
-fn unpublished_body(loader: u8) -> Body {
-    if loader == 0 {
-        Body::Empty
-    } else {
+fn unpublished_body(own_load_in_flight: bool) -> Body {
+    if own_load_in_flight {
         Body::Loading { id: None }
+    } else {
+        Body::Empty
     }
 }
 
@@ -509,34 +587,156 @@ mod tests {
 
     #[test]
     fn a_stale_entry_does_not_dereference_the_body() {
-        let body = classify_parked_body(true, 0, 0, || panic!("dereferenced an unpublished cell"));
+        let body = classify_parked_body(true, 0, || false, || panic!("dereferenced an unpublished cell"));
         assert_eq!(body, Body::Empty);
-        let body = classify_parked_body(true, 0, 6, || panic!("dereferenced an unpublished cell"));
+        let body = classify_parked_body(true, 0, || true, || panic!("dereferenced an unpublished cell"));
         assert_eq!(body, Body::Loading { id: None });
+    }
+
+    /// Eden covrest-04/05/06 (2026-11-08): at one CPU entries 2 and 3 were never installed (count 0 every read) and
+    /// their loader byte held residue (6, then 88). Read as "in flight", it armed no seat Reload, and after a raise to
+    /// three CPUs 2 and 3 stayed copies of CPU 1 instead of the rotation's next and the one after. (This test failed
+    /// first in its loader-byte form, `classify_parked_body(true, 0, 6, ..)` returning `Loading { id: None }`.)
+    #[test]
+    fn an_unpublished_entry_with_a_residue_loader_byte_is_empty() {
+        let body = classify_parked_body(true, 0, || false, || panic!("dereferenced an unpublished cell"));
+        assert_eq!(body, Body::Empty);
+        // The raise to three then arms both seat Reloads after the walk: the rotation's next and the one after.
+        let decision = on_count(facts(1, 3, body, body, None));
+        assert_eq!(decision.after_entry2.map(|after| (after.slot, after.kind)), Some((ENTRY2, seats().entry2)));
+        assert_eq!(decision.after_entry3.map(|after| (after.slot, after.kind)), Some((ENTRY3, seats().entry3)));
+        assert!(decision.hold_installs);
+        // The plugin's own install on that entry is what is in flight; no second install then.
+        let own = classify_parked_body(true, 0, || true, || panic!("dereferenced an unpublished cell"));
+        let decision = on_count(facts(1, 3, own, own, None));
+        assert!(decision.after_entry2.is_none() && decision.after_entry3.is_none());
+    }
+
+    /// Eden covrest-07 (2026-11-08): the pause menu's two Right presses were seen as 1→2 and 2→3 before the close;
+    /// the 2→3 decision replaced the 1→2 one, so entry 2's seat Reload was lost and only entry 3 reloaded later.
+    #[test]
+    fn a_raise_seen_in_two_steps_before_the_close_keeps_both_seats() {
+        let first = on_count(facts(1, 2, Body::Empty, Body::Empty, None));
+        let second = on_count(facts(2, 3, Body::Ready { id: 5, kind: 0x41 }, Body::Empty, None));
+        assert!(second.after_entry2.is_none(), "2→3 alone decides entry 3 only");
+        let merged = merge_paused(first, second);
+        assert_eq!(merged.after_entry2.map(|after| (after.slot, after.kind)), Some((ENTRY2, seats().entry2)));
+        assert_eq!(merged.after_entry3.map(|after| (after.slot, after.kind)), Some((ENTRY3, seats().entry3)));
+        assert!(merged.hold_installs);
+        // The later step wins for the entry it decides itself.
+        let ready3 = on_count(facts(2, 3, Body::Empty, Body::Ready { id: 9, kind: seats().entry3 }, None));
+        let merged = merge_paused(first, ready3);
+        assert!(merged.after_entry3.is_none());
+        assert_eq!(merged.publish[1].map(|p| (p.owner, p.kind)), Some((ENTRY3, seats().entry3)));
+        assert_eq!(merged.after_entry2.map(|after| after.kind), Some(seats().entry2));
+        // The gate merges while the earlier step still waits for the close.
+        let gate = include_str!("../runtime/roster/f9_gate.rs");
+        assert!(gate.contains("merge_paused(gate.decision, decision)"));
+    }
+
+    /// Eden covrest-08 (2026-11-08, diag 888badce): the seat Reload installed the CPU rotation's Mii Gunner on entry 2
+    /// as a plain fighter (`install slot=2 kind=0x4a`, no Mii helper). When No. of CPUs rose to 2 the game read null
+    /// every frame (`Unmapped Read64 @ 0x0`, main+0x357bf34). A Mii seat loads with the member's own configuration.
+    #[test]
+    fn a_mii_seat_loads_with_its_member_configuration_or_not_at_all() {
+        assert_eq!(seat_load(0x4a, Some((0x4a, Some(7u8)))), Some((0x4a, Some(7))));
+        assert_eq!(seat_load::<u8>(0x4a, Some((0x4a, None))), None, "a Mii class is never a plain fighter");
+        assert_eq!(seat_load::<u8>(0x48, None), None);
+        assert_eq!(seat_load(0x49, Some((0x01, Some(7u8)))), None, "another member's configuration is not this seat's");
+        assert_eq!(seat_load::<u8>(0x01, Some((0x01, None))), Some((0x01, None)));
+        assert_eq!(seat_load::<u8>(0x01, None), Some((0x01, None)), "an ordinary fighter needs no configuration");
+        assert_eq!(seat_load(0x01, Some((0x4a, Some(7u8)))), Some((0x01, None)));
+        // The gate arms only a loadable seat, and the planner's seat branch loads what was armed.
+        let gate = include_str!("../runtime/roster/f9_gate.rs");
+        assert!(gate.contains("parked_entries::seat_load("));
+        let sources = include_str!("../runtime/roster/character_sources.rs");
+        assert!(sources.contains("f9_gate::override_seat(slot as u32)"));
+        assert!(!sources.contains("f9_gate::override_kind("));
+        let preload = include_str!("../runtime/roster/cycle_preload.rs");
+        assert!(preload.contains("cpu_rotation.iter().flatten().next().copied()"), "the members keep their configuration");
+    }
+
+    /// Eden covrest-07/08 (`cr-f9-raise`): the first raise after a scene start showed copies of CPU 1. At one CPU the
+    /// seat branch loaded a member only when the merged plan listed it, and the body bank covered Donkey Kong, so
+    /// entries 2 and 3 stayed empty until a drop armed their Reloads. Reading A: they park the members at one CPU.
+    #[test]
+    fn the_seats_park_at_one_cpu_whatever_the_plan_lists() {
+        let dk = Some((0x01u32, None::<u8>));
+        assert_eq!(parked_seat(ENTRY2, Some(1), false, dk), Some((0x01, None)));
+        assert_eq!(parked_seat(ENTRY3, Some(1), false, Some((0x4a, Some(7u8)))), Some((0x4a, Some(7))));
+        assert_eq!(parked_seat(ENTRY3, Some(2), false, dk), Some((0x01, None)), "entry 3 is parked at two CPUs");
+        assert_eq!(parked_seat(ENTRY2, Some(1), true, dk), Some((0x01, None)), "a borrow is entry 3's only");
+        assert_eq!(parked_seat(ENTRY2, Some(2), false, dk), None, "a live entry is not a seat");
+        assert_eq!(parked_seat(ENTRY3, Some(1), true, dk), None, "a borrowed entry 3 holds the hat");
+        assert_eq!(parked_seat::<u8>(ENTRY2, Some(1), false, None), None);
+        assert_eq!(parked_seat::<u8>(ENTRY2, Some(1), false, Some((0x4a, None))), None);
+        assert_eq!(parked_seat(ENTRY2, None, false, dk), None);
+        assert_eq!(parked_seat(4, Some(1), false, dk), None);
+        let sources = include_str!("../runtime/roster/character_sources.rs");
+        assert!(sources.contains("parked_entries::parked_seat("));
+        assert!(!sources.contains("want.kind == kind && want.configuration.is_none()"), "the seat waited for the plan");
+    }
+
+    /// Eden covrest-11 (2026-11-08, `[MiiHelperProof]`): after a raise promoted the Mii Gunner seat on entry 2 and a
+    /// drop parked it again, its helper `Proof` still matched but its Mii record did not, so both Mii owners refused
+    /// every snapshot ("helper row kind/provenance changed") and the Mii classes left both cycles. Reading B (primary
+    /// 16:44Z): once parked, re-record the seat's Mii proof, only when its identity is unchanged.
+    #[test]
+    fn a_promoted_seat_is_re_proved_once_parked_only_with_its_identity() {
+        assert_eq!(reproof(false, true, false), Reproof::Wait, "not parked yet");
+        assert_eq!(reproof(false, false, false), Reproof::Wait);
+        assert_eq!(reproof(true, true, true), Reproof::Unchanged);
+        assert_eq!(reproof(true, true, false), Reproof::Rerecord, "only the activation's state bytes changed");
+        assert_eq!(reproof(true, false, false), Reproof::Refuse, "another Mii, row or owner: never re-recorded");
+        assert_eq!(reproof(true, false, true), Reproof::Refuse);
+        let helper = include_str!("../runtime/mii/mii_managed_helper.rs");
+        assert!(helper.contains("crate::model::parked_entries::reproof("));
+        let sources = include_str!("../runtime/roster/character_sources.rs");
+        assert!(sources.contains("f9_gate::mark_promoted("), "a published seat is marked");
+        assert!(sources.contains("mii_managed_helper::reproof_parked("), "and re-proved once parked");
+    }
+
+    /// Eden covrest-12: after the CPU loaded the Mii Gunner, its HUD portrait leased the seat on entry 2 but its render
+    /// waited ~6 s behind seat 3's INSTALL and met the CPU's next press. Ordering (primary 17:28Z, reading B): an F9
+    /// seat load waits while a portrait job wants a helper or holds one for its render.
+    #[test]
+    fn a_seat_load_holds_back_while_a_portrait_render_waits() {
+        assert!(seat_load_waits(true));
+        assert!(!seat_load_waits(false));
+        let sources = include_str!("../runtime/roster/character_sources.rs");
+        assert!(sources.contains("parked_entries::seat_load_waits(portrait_waits(state))"));
+        assert!(sources.contains("matches!(live.consumer, Consumer::Portrait)"));
+    }
+
+    #[test]
+    fn the_in_flight_question_is_asked_only_for_an_unpublished_cell() {
+        let ready = classify_parked_body(true, 1, || panic!("asked for a published cell"), || Some((7, 0x01, true)));
+        assert_eq!(ready, Body::Ready { id: 7, kind: 0x01 });
+        assert_eq!(classify_parked_body(false, 0, || panic!("asked for a null entry"), || None), Body::Empty);
     }
 
     #[test]
     fn a_published_body_is_ready_only_after_parked_ready() {
         let mut reads = 0;
-        let ready = classify_parked_body(true, 1, 14, || {
+        let ready = classify_parked_body(true, 1, || false, || {
             reads += 1;
             Some((7, 0x01, true))
         });
         assert_eq!(reads, 1);
         assert_eq!(ready, Body::Ready { id: 7, kind: 0x01 });
-        let loading = classify_parked_body(true, 1, 6, || Some((7, 0x01, false)));
+        let loading = classify_parked_body(true, 1, || false, || Some((7, 0x01, false)));
         assert_eq!(loading, Body::Loading { id: Some(7) });
     }
 
     #[test]
     fn an_unaligned_published_pointer_is_not_a_body() {
         assert_eq!(
-            classify_parked_body(true, 1, 6, || None),
+            classify_parked_body(true, 1, || true, || None),
             Body::Loading { id: None }
         );
-        assert_eq!(classify_parked_body(true, 1, 0, || None), Body::Empty);
+        assert_eq!(classify_parked_body(true, 1, || false, || None), Body::Empty);
         assert_eq!(
-            classify_parked_body(false, 9, 14, || panic!("read a null entry")),
+            classify_parked_body(false, 9, || true, || panic!("read a null entry")),
             Body::Empty
         );
     }

@@ -134,18 +134,48 @@ pub(crate) unsafe fn helper_kind(view:helpers::View,id:usize,owner:Owner,kind:u3
     #[cfg(any(test, feature = "mii-managed-source-coexist-alpha"))]
     let parked=!managed || (rd::<u32>(owner.object,0x54)==id as u32
         && super::super::native_source::parked_ready(owner.entry as *const u8,id as u32,kind));
-    if !view.accepts(id,now, #[cfg(any(test, feature = "mii-managed-source-coexist-alpha"))] parked) {return false;}
+    #[cfg(not(any(test, feature = "mii-managed-source-coexist-alpha")))]
+    let parked=true;
+    if !view.accepts(id,now, #[cfg(any(test, feature = "mii-managed-source-coexist-alpha"))] parked) {
+        note_refused_proof(view,id,ordinal,now,parked,"proof");
+        return false;
+    }
     if let Some(Some(mii))=view.miis.get(ordinal) {
         let b=mii.binding;
         if b.epoch != super::super::mii_saved_alpha::current_generation(1)
             || rd::<usize>(super::base(),POOL_HOLDER)!=b.holder
             || !span(b.holder,8,false) || rd::<usize>(b.holder,0)!=b.manager
             || !span(b.manager,0x24e0,false) || rd::<usize>(b.manager,0x24d0)!=b.vector_begin
-            || rd::<usize>(b.manager,0x24d8)!=b.vector_end {return false;}
-        let Ok(at)=values::record_address(b,b) else {return false;};
-        if !span(at,values::RECORD_LEN,false) || !mii.matches(b,&rd(owner.entry,0),&rd(at,0),mirrors(owner)) {return false;}
+            || rd::<usize>(b.manager,0x24d8)!=b.vector_end {
+            note_refused_proof(view,id,ordinal,now,parked,"mii binding");
+            return false;
+        }
+        let Ok(at)=values::record_address(b,b) else {
+            note_refused_proof(view,id,ordinal,now,parked,"mii record address");
+            return false;
+        };
+        if !span(at,values::RECORD_LEN,false) || !mii.matches(b,&rd(owner.entry,0),&rd(at,0),mirrors(owner)) {
+            note_refused_proof(view,id,ordinal,now,parked,"mii record");
+            return false;
+        }
     }
     true
+}
+
+/// Diag builds: the recorded helper proof beside the row read now, for the first refusals of a boot (primary
+/// 2026-11-08 16:44Z: which fields an F9 promotion and re-park change).
+#[cfg(feature = "diag")]
+static REFUSED_PROOF_NOTES: core::sync::atomic::AtomicU8 = core::sync::atomic::AtomicU8::new(0);
+fn note_refused_proof(view:helpers::View,id:usize,ordinal:usize,now:helpers::Proof,parked:bool,why:&str) {
+    #[cfg(not(feature = "diag"))]
+    let _ = (view, id, ordinal, now, parked, why);
+    #[cfg(feature = "diag")]
+    {
+        if REFUSED_PROOF_NOTES.fetch_add(1,core::sync::atomic::Ordering::Relaxed)>=12 {return;}
+        crate::engine::compat::logging::diagnostic(format_args!(
+            "[MiiHelperProof] mismatch id={} why={} parked={} recorded={:?} now={:?} mii={:?}",
+            id,why,parked,view.slots.get(ordinal),now,view.miis.get(ordinal).copied().flatten().map(|m|m.binding)));
+    }
 }
 
 /// Created Miis require their separate committed SourceBook receipt. Ordinary

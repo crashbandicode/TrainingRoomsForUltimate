@@ -197,12 +197,16 @@ pub(crate) fn after_layout_draw() {
 pub(crate) fn sync_owner() {
     use crate::model::input_delay::Owners;
     let held = replay_capture::panel_visible() || replay_capture::browser_visible()
-        || replay_capture::loading()
         || (replay_preview::occupied() && !replay_preview::recovery_available());
-    if held {
-        published::INPUT_OWNERS.fetch_or(Owners::REPLAY_EDITOR.bits(), std::sync::atomic::Ordering::AcqRel);
-    } else {
-        published::INPUT_OWNERS.fetch_and(!Owners::REPLAY_EDITOR.bits(), std::sync::atomic::Ordering::AcqRel);
+    // The editor parked on its own load (a recorded Mii's import, then the CPU's install) keeps P1 neutral but must
+    // not hold the gates that load waits on (#68).
+    let loading = replay_capture::loading();
+    for (owner, on) in [(Owners::REPLAY_EDITOR, held), (Owners::REPLAY_LOADING, loading)] {
+        if on {
+            published::INPUT_OWNERS.fetch_or(owner.bits(), std::sync::atomic::Ordering::AcqRel);
+        } else {
+            published::INPUT_OWNERS.fetch_and(!owner.bits(), std::sync::atomic::Ordering::AcqRel);
+        }
     }
 }
 

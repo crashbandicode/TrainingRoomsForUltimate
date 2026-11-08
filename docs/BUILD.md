@@ -74,13 +74,13 @@ of both recipes fails `cargo test`, with these commands in the message. 2026-11-
 table without a rebuild, and the candidate's menu never opened (`menu_panes=665 missing=354`). Bump `BUILDER` with
 any builder change that alters the recipes for the same table.
 
-Current recipes (rebuilt 2026-11-08 at the rc.6 integration from the merged pane table: the rc.6 sequence bar's 35 panes (`p23/rc6-seq-drill`), and the r8 recording pop-up (`p23/rc6-cov-rec`): 12 sublines and the CONNECTIONS column, 28 panes; its CONNECTIONS boxes, pills and tree and the L/R role tabs, 50 panes; the section headers' squares, the order badges and the boxed page tabs, 26 panes. layout-builder 0.1.2; the stocks are unchanged). Neither lane's recipe is reused: `tools/layout-builder` wrote these bytes from the merged `panes::specs()`.
+Current recipes (rebuilt 2026-11-08 at the rc.6 integration from the merged pane table: the rc.6 sequence bar's 35 panes (`p23/rc6-seq-drill`); the r8 recording pop-up (`p23/rc6-cov-rec`): 12 sublines and the CONNECTIONS column, 28 panes; its CONNECTIONS boxes, pills and tree and the L/R role tabs, 50 panes; the section headers' squares, the order badges and the boxed page tabs, 26 panes; and the notice plates moved before the notice texts (`p23/rc6-cov-rest`). layout-builder 0.1.2; the stocks are unchanged). No lane's recipe is reused: `tools/layout-builder` wrote these bytes from the merged `panes::specs()`.
 
 | File | SHA-256 | Bytes | Stock archive it applies to |
 | --- | --- | ---: | --- |
-| `assets/info_training.tra1` | `6180473e52e4569dd1e18e1bb8e863af30cd45bbb3c9594bc8e4072b0331a2da` | 374,923 | `info_training.arc` 451,604 B, SHA-256 `90a8dc81751efa9d4521f836be9ccf8a134cb24af9fb5b195211e58203f9317c`, FNV-1a `8833748e9518a461` (`runtime/ui/probe.rs:91`); target 942,996 B, fnv `39e402aac77ed4e5` |
-| `assets/info_waiting.tra1` | `3822ad4a48972d3a8afe29bb2629d7bfb04d10dc10d4932048fedf0f2e655ebd` | 378,979 | `info_waiting.arc` 1,284,116 B, SHA-256 `7dcc45360bd84dadffcfe8b47771f5d6b40e44468c6a54cbd3dbb6b4142eea64`, fnv `f3d2cb3ec6a9f0de`; target 1,771,396 B, fnv `0264b9665939b4d1` |
-| `assets/panes-recipe.sha256` | `25436bb563389f7f1a54d9e97738558ba34e3e5795a4fb84cbc872d2306e20cb` (the digest) | | |
+| `assets/info_training.tra1` | `f96bdcfc061d609780df8101c40a589472a13f80f93a662f23d707997ac4c4ff` | 374,907 | `info_training.arc` 451,604 B, SHA-256 `90a8dc81751efa9d4521f836be9ccf8a134cb24af9fb5b195211e58203f9317c`, FNV-1a `8833748e9518a461` (`runtime/ui/probe.rs:91`); target 942,996 B, fnv `06e168e62a259025` |
+| `assets/info_waiting.tra1` | `f988800a9c087ec3adad0aa4f32d0ea974856d7aee2068341e0f76751a09b592` | 378,963 | `info_waiting.arc` 1,284,116 B, SHA-256 `7dcc45360bd84dadffcfe8b47771f5d6b40e44468c6a54cbd3dbb6b4142eea64`, fnv `f3d2cb3ec6a9f0de`; target 1,771,396 B, fnv `e0a59e01cf9c17d5` |
+| `assets/panes-recipe.sha256` | `a5bdc66cbb2802ab3e977e08ea0b6ff0a71232f8a2b1751a97275d07b7ba2ed3` (the digest) | | |
 
 Both recipes are embedded in every NRO (`runtime/ui/archive.rs`), so their size is resident size too (the 354 roster
 mark panes added about 33 KB to each).

@@ -101,6 +101,9 @@ impl Owners {
     pub const REPLAY_EDITOR: Owners = Owners(8);
     /// The game's own pause menu is open (SPEC-input-03 question 3, recommended).
     pub const VANILLA_PAUSE: Owners = Owners(16);
+    /// The replay editor is parked while a load it asked for runs (`replay_capture::loading()`: a recorded Mii's
+    /// import, then the CPU's install). P1 stays neutral, but the gameplay gates do not wait for it (#68).
+    pub const REPLAY_LOADING: Owners = Owners(32);
 
     /// The bits, for an atomic that other packages set (menu, chords, native UI, replay editor).
     pub const fn bits(self) -> u8 {
@@ -121,6 +124,13 @@ impl Owners {
 
     pub const fn any(self) -> bool {
         self.0 != 0
+    }
+
+    /// What the carried gameplay gates (`menu::captures_input`) wait for: every owner but the stop chord (a poll the
+    /// chord consumed) and the replay editor's own load. The fork's `captures_input` was the menu or a visible panel;
+    /// the Replay window waits in its load for the very work those gates hold (#68).
+    pub const fn holds_gameplay(self) -> bool {
+        self.0 & !(Self::STOP_CHORD.0 | Self::REPLAY_LOADING.0) != 0
     }
 }
 
@@ -280,6 +290,33 @@ mod tests {
         let mut q = DelayQueue::new();
         let out: Vec<_> = (1..=5).map(|n| q.step(2, rec(n)).buttons).collect();
         assert_eq!(out, [0, 0, 1, 2, 3]);
+    }
+
+    /// #68 (cov-rec diag2/diag3, 2026-11-08): the Replay window's Mii track stayed on "Reading recorded Mii..." for 15 s.
+    /// The window waits in `replay_capture::loading()` for the capture's Mii import, the import's service waits until
+    /// `menu::captures_input()` is false, and that read the replay editor's owner bit, which `sync_owner` set for the
+    /// load itself. The fork's `captures_input` was the menu or a visible panel; a parked editor waiting on its load was
+    /// neither. The load keeps P1 neutral (an owner) but is not one the gameplay gates wait for.
+    #[test]
+    fn a_replay_load_keeps_p1_neutral_but_does_not_hold_the_gameplay_gates() {
+        assert!(Owners::REPLAY_LOADING.any(), "P1 stays neutral while the editor waits");
+        let mut q = DelayQueue::new();
+        q.step(3, rec(1));
+        assert_eq!(q.poll(3, Owners::REPLAY_LOADING, rec(2)), MappedInputs::NEUTRAL);
+        assert!(!Owners::REPLAY_LOADING.holds_gameplay());
+        assert!(!Owners::STOP_CHORD.with(Owners::REPLAY_LOADING).holds_gameplay());
+        assert!(!Owners::NONE.holds_gameplay());
+        for owner in [Owners::MENU, Owners::NATIVE_UI_BUSY, Owners::REPLAY_EDITOR, Owners::VANILLA_PAUSE] {
+            assert!(owner.holds_gameplay(), "{owner:?}");
+            assert!(owner.with(Owners::REPLAY_LOADING).holds_gameplay(), "{owner:?}");
+        }
+        let common = include_str!("../runtime/compat/common.rs");
+        assert!(common.contains("published::input_owners().holds_gameplay()"));
+        let macros = include_str!("../runtime/macros/mod.rs");
+        assert!(macros.contains("let loading = replay_capture::loading();"));
+        assert!(macros.contains("Owners::REPLAY_LOADING"));
+        let recorder = include_str!("../runtime/features/recorder.rs");
+        assert!(recorder.contains("owners.contains(Owners::REPLAY_LOADING)"), "the chords stay modal while it loads");
     }
 
     #[test]

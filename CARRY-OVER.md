@@ -893,3 +893,96 @@ The fix:
 31 recorded manifest edits of `cpu_pilot.rs`; `carry_pkg6.py verify` re-derives all 250 files. Test (failed first on the
 pre-fix source, 19:39Z): `tests/p1_pilot_hooks.rs`. It covers the writers under the plugin's counting allocator, and the
 source wiring of every hook path (no `json!`, `format!`, `fs::`, `File::`, `with_capacity`, `.clone()` …).
+
+### p23/rc6-cov-rest: F9 fixed seats reload; a Mii Save that reuses a saved Mii says so (2026-11-08)
+
+**F9 (#58).** Eden covrest-04/05/06 (Ally; hot-slots diag `e025ad2c`, then `d20ead7b`): after a raise from one CPU to
+three on one close, CPUs 2 and 3 stayed copies of CPU 1 (Fox, Meta Knight, Byleth) for 30 s, instead of the CPU
+rotation's next fighter and the one after (Mii Gunner and Donkey Kong on the operator card). At one CPU entries 2 and 3
+were never installed (`f9_body_of` read count 0 every time) and their loader byte held residue (6, then 88).
+`classify_parked_body` read any non-zero loader byte on an unpublished cell as "in flight", so `reload_if_needed`
+armed no seat Reload. Now an unpublished cell is in flight only while this plugin's own install on that slot is (the
+source book's Loading phase); otherwise it is empty and both seats reload after the walk. `parked_entries` changes:
+`classify_parked_body` (its third argument is now that question, asked only for an unpublished cell) and
+`unpublished_body`; `on_count` and `reload_if_needed` are unchanged.
+
+**#52 (operator decision C).** A Save that matches a saved Mii keeps the reuse rule (docs/MII.md rows 4 and 12) and
+posts "Same as ‹saved name›, nothing new saved" with the matched saved Mii's own name (`model::notify::save_notice`,
+a fixed body; `features::notices::post_body`, the mailbox, after the session lock).
+
+2 recorded manifest edits: `character_sources.rs` (`f9_body_of`) and `mii_editor_bridge/mod.rs` (`edit_decide`);
+`carry_pkg6.py verify` re-derives all 250 files. Tests (failed first): `parked_entries`
+`an_unpublished_entry_with_a_residue_loader_byte_is_empty` (in its loader-byte form it returned `Loading`),
+`tests/mii_same_notice.rs` (did not compile: no `save_notice`).
+
+### p23/rc6-cov-rest: an F9 Mii seat loads with its own Mii configuration (2026-11-08)
+
+**F9 (#58).** Eden covrest-08 (Ally, diag `888badce` of `70617ba`): after a raise, a drop to one CPU and a raise, the
+seats parked and were promoted (Mii Gunner as CPU 2, Donkey Kong as CPU 3), but entry 2's Mii Gunner had been
+installed as a plain fighter (`install slot=2 kind=0x4a`, no Mii helper). From the moment No. of CPUs reached 2 the
+game read null every frame (`Unmapped Read64 @ 0x0`, `main+0x357bf34`; 315852 by the end of the boot). F9 kept a seat
+member as a kind only (`cycle_preload.rs` `set_fixed_members`, `f9_gate`), and `purpose_view`'s seat branch made a
+`Want` with no configuration when the plan did not list that kind. The members now keep the CPU rotation target whole
+(kind and exact-Mii configuration, F9 report §4.2); `f9_gate` arms a Reload with that configuration and arms no Mii
+seat without one (`parked_entries::seat_load`); the seat branch loads what was armed, so a Mii seat goes through the
+Mii helper as the CPU cycle's own Mii loads on entry 2 do.
+
+2 recorded manifest edits: `character_sources.rs` (`purpose_view`'s seat branch) and `cycle_preload.rs`
+(`set_fixed_members`); `carry_pkg6.py verify` re-derives all 250 files. Test (failed first: no `seat_load`):
+`parked_entries` `a_mii_seat_loads_with_its_member_configuration_or_not_at_all`.
+
+### p23/rc6-cov-rest: the first F9 raise shows the seats (2026-11-08)
+
+**F9 (#58), reading A (primary 16:04Z).** Eden covrest-07/08/09: the first raise after a scene start showed copies of
+CPU 1 on CPUs 2 and 3; the seats appeared only from the second raise. At one CPU `purpose_view`'s seat branch loaded a
+member on entry 2 or 3 only when the merged plan listed it with no configuration, and the body bank covered Donkey
+Kong. A parked, unborrowed seat now holds its member (kind and exact-Mii configuration, `parked_entries::parked_seat`)
+whether or not the plan lists it. The load is the same speculative helper load, so process-memory admission still
+holds it (`[ProcessMemory] refused … stays planned`, retried) when headroom refuses. Entry 3 while it holds the
+borrowed fifth hat is not a seat (unchanged); entry 2 no longer waits for that borrow.
+
+1 recorded manifest edit: `character_sources.rs` (`purpose_view`'s seat branch); `carry_pkg6.py verify` re-derives all
+250 files. Test (failed first: the seat branch did not call `parked_seat`):
+`parked_entries` `the_seats_park_at_one_cpu_whatever_the_plan_lists`.
+
+### p23/rc6-cov-rest: diag note of a refused helper proof (2026-11-08)
+
+Eden covrest-10: after an F9 raise and drop, both Mii owners refused their snapshot ("helper row kind/provenance
+changed"), which leaves the Mii classes out of both cycles. Diag builds now log the recorded helper proof beside the
+row read now (`[MiiHelperProof] refused id=… why=…`, first 12 per boot) in `mii_ordinary_native.rs` `helper_kind`; the
+acceptance itself is unchanged. 1 recorded manifest edit; `carry_pkg6.py verify` re-derives all 250 files.
+
+### p23/rc6-cov-rest: a promoted F9 seat's Mii proof is taken again once parked (2026-11-08)
+
+**F9 × Mii (reading B, primary 16:44Z).** Eden covrest-10/11: after a raise promoted the Mii Gunner seat on entry 2
+and a drop parked it again, both Mii owners refused every snapshot ("helper row kind/provenance changed") and the Mii
+classes left both cycles. The diag note (`[MiiHelperProof] refused id=2 why=mii record`) showed the helper `Proof`
+unchanged and the Mii record changed: the activation's state bytes, not the seat's identity. F9 now marks a published
+seat (`f9_publish` → `f9_gate::mark_promoted`); once the seat is parked again and parked ready, `f9_reproof` asks
+`mii_managed_helper::reproof_parked` to take the Mii proof (record and descriptor) again from the row, only when the
+identity is unchanged (the same ready source and configuration, binding, owner objects and scalars, the charinfo and
+a resource pair; `parked_entries::reproof`). Any identity change keeps the refusal.
+
+2 recorded manifest edits: `mii_managed_helper.rs` (`reproof_parked`, new) and `character_sources.rs` (`f9_publish`,
+`f9_player_frame`, `f9_reproof` new); `carry_pkg6.py verify` re-derives all 250 files. Test (failed first: no
+`reproof`): `parked_entries` `a_promoted_seat_is_re_proved_once_parked_only_with_its_identity`.
+
+### p23/rc6-cov-rest: the portrait race, a press waits for the render and the F9 seat load holds back (2026-11-08)
+
+**Mii portrait × F9 (primary 17:28Z, readings A and B).** Eden covrest-12: after the CPU loaded the card's Mii
+Gunner, its HUD portrait leased the F9 seat on entry 2 (the same exact Mii), but the render waited ~6 s behind seat 3's
+INSTALL and was issued in the frame of the CPU's next press. The press's snapshot refused the row mid-render, the
+portrait's after-render proof quarantined helper 2 for the scene, and presses 1-5 loaded nothing.
+- A (the race): a Mii owner's begin waits while that role's portrait job holds a helper lease or has its render
+  issued: `Blocker::Portrait` ("portrait render on a helper") in the CPU's `begin_blocker`, the same check in the
+  Player's `permitted`, through `mii_hud_portrait::render_holds_helper(logical)`. The press runs after the render; it
+  is never dropped.
+- B (ordering): F9's seat branch of `purpose_view` starts no seat load while a portrait job wants a helper or holds one
+  (`portrait_waits`: a portrait channel's request or a Portrait lease; `parked_entries::seat_load_waits`).
+
+5 recorded manifest edits: `source_load.rs` (`Blocker`, `reason`, the test), `mii_hud_portrait.rs`
+(`render_holds_helper`), `mii_ordinary_cpu.rs` (`begin_blocker`, `portrait_render_held`), `mii_ordinary_player.rs`
+(`permitted`, `portrait_render_held`), `character_sources.rs` (`purpose_view`'s F9 section, `portrait_waits`);
+`carry_pkg6.py verify` re-derives all 250 files. Tests (failed first: no `Blocker::Portrait`, no `seat_load_waits`):
+`source_load` `a_press_during_a_portrait_render_waits_and_then_applies`, `parked_entries`
+`a_seat_load_holds_back_while_a_portrait_render_waits`.
