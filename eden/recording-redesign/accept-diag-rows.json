@@ -2,7 +2,7 @@
   "game_id": "01006A800016E000",
   "start": "boot",
   "early_stop": false,
-  "scope": "rc.5 diag window, one instance. Generated from accept-rows.json (acc-boot, acc-cpu-menu, acc-floppy, acc-play-cpu, acc-loop, acc-grade).",
+  "scope": "rc.5 diag window, one instance. Generated from accept-rows.json (acc-boot, acc-cpu-menu, acc-floppy, acc-cstick-probe, acc-play-cpu, acc-loop, acc-grade).",
   "setup": [
     {
       "state": "Training, both fighters Mario, menu closed, volume 0. Each row copies its own fixture.",
@@ -195,6 +195,23 @@
         }
       ],
       "expect": "A macro's own screen: the Start save row shows the orange floppy before the start save's name.",
+      "timed": false,
+      "build": "diag",
+      "on": "diag",
+      "start_gate": "training-hud-unpaused"
+    },
+    {
+      "id": "acc-cstick-probe",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "run": "accept.py:acc_cstick_probe",
+          "check": true,
+          "on": "diag"
+        }
+      ],
+      "expect": "Probe, not a pass/fail of the product: the mapped record (trace on input_display's store) while a C-stick smash comes out, left stick neutral and left stick up.",
       "timed": false,
       "build": "diag",
       "on": "diag",

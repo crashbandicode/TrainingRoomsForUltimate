@@ -255,6 +255,57 @@ def acc_floppy(ctx):
     return out
 
 
+def _mapped_records(ctx, since):
+    """P1's mapped record as input_display stores it (the trace point on that store, x8): buttons, then the four
+    stick bytes. Only records written after `since` (a trace_jsonl byte offset)."""
+    path = Path(ctx.instance['trace_jsonl'])
+    with path.open('rb') as handle:
+        handle.seek(since)
+        lines = handle.read().decode('utf-8', 'replace').splitlines()
+    out = []
+    for line in lines:
+        try:
+            record = json.loads(line)
+        except ValueError:
+            continue
+        value = (record.get('registers') or {}).get('x8')
+        if value is None:
+            continue
+        word = int(value, 16) if isinstance(value, str) else int(value)
+        signed = lambda shift: ((word >> shift) & 0xff) - 256 if (word >> shift) & 0x80 else (word >> shift) & 0xff
+        out.append({'frame': int(record.get('frame', 0)), 'buttons': word & 0xffffffff, 'lx': signed(32),
+                    'ly': signed(40), 'rx': signed(48), 'ry': signed(56)})
+    return out
+
+
+def acc_cstick_probe(ctx):
+    """What the mapped record holds while a C-stick smash comes out: left stick neutral, then left stick up."""
+    cases = {}
+    for name, left_y in (('left-neutral', 0.0), ('left-up', 0.6)):
+        steps.reset(ctx)
+        time.sleep(0.8)
+        since = Path(ctx.instance['trace_jsonl']).stat().st_size
+        if left_y:
+            ctx.call('input.stick', {'stick': 'left', 'x': 0, 'y': left_y, 'lease_ms': 1500})
+            time.sleep(0.3)
+        ctx.call('input.stick', {'stick': 'right', 'x': 1, 'y': 0, 'lease_ms': 300})
+        time.sleep(0.25)
+        shot = ctx.shot('cstick-' + name)
+        time.sleep(1.0)
+        ctx.call('input.stick', {'stick': 'right', 'x': 0, 'y': 0, 'lease_ms': 100})
+        ctx.call('input.stick', {'stick': 'left', 'x': 0, 'y': 0, 'lease_ms': 100})
+        time.sleep(0.3)
+        records = _mapped_records(ctx, since)
+        marked = [r for r in records if r['buttons'] & 0x80]
+        first = marked[0]['frame'] if marked else None
+        window = [r for r in records if first is not None and first - 3 <= r['frame'] <= first + 8]
+        cases[name] = {'records': len(records), 'cstick_on_frames': len(marked), 'around': window, 'shot': str(shot)}
+    steps.save(ctx, 'cstick-probe', cases)
+    if not any(case['cstick_on_frames'] for case in cases.values()):
+        raise RuntimeError('no CSTICK_ON record in either case: %s' % {k: v['records'] for k, v in cases.items()})
+    return cases
+
+
 def acc_loop(ctx):
     """Loop 2 on Player 1, raised with X on the macro row; two passes, one warp.
 

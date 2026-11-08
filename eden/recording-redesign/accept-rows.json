@@ -272,6 +272,23 @@
       "start_gate": "training-hud-unpaused"
     },
     {
+      "id": "acc-cstick-probe",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "run": "accept.py:acc_cstick_probe",
+          "check": true,
+          "on": "diag"
+        }
+      ],
+      "expect": "Probe, not a pass/fail of the product: the mapped record (trace on input_display's store) while a C-stick smash comes out, left stick neutral and left stick up.",
+      "timed": false,
+      "build": "diag",
+      "on": "diag",
+      "start_gate": "training-hud-unpaused"
+    },
+    {
       "id": "acc-loop",
       "start": "training",
       "end": "training",
