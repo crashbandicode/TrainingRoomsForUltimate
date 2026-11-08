@@ -890,7 +890,12 @@ def rr_record_cpu(ctx):
     press(ctx, 'b', 0.6)
     ctx.play(RECORD)
     start = diag(ctx, r'screen=recording role=cpu recording=1', cap=10)
+    # The record chord starts a 30-frame lockout that drops presses (as in acc-cpu-menu). A jab sent with the start
+    # line lands in it; the file then only held the stop chord's buttons (36872 = GUARD | APPEAL_LW), which reached
+    # the game until task 7 hid a chord's buttons (Eden rc5-opus-t7-diag, 2026-11-08: no file at all).
+    time.sleep(1.2)
     ctx.play(JAB)
+    time.sleep(0.8)
     ctx.play(RECORD)
     stop = diag(ctx, r'screen=recording role=cpu recording=0', cap=10)
     folder = Path(ctx.instance['diag_log']).parent / 'macros'

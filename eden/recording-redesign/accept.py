@@ -73,6 +73,12 @@ def prep(ctx, name):
     if not src.is_dir():
         raise RuntimeError('missing fixture %s' % src)
     dest = _card(ctx)
+    # The recording menu's model writes its selection to recording-index.json whenever it posts (rr_host::
+    # publish_selection) and reloads the card only when the plugin itself wrote a file. A pop-up keeps that model
+    # alive, so a fixture copied under it was overwritten by the next close (Eden rc5-opus-t7-diag, 2026-11-08). A full
+    # menu close drops the model first; the open after the copy then builds one from the fixture.
+    steps.open_menu(ctx)
+    steps.close_menu(ctx)
     _replace_tree(src / 'macros', dest / 'macros')
     _replace_tree(src / 'saves', dest / 'saves')
     _replace_tree(src / 'combos', dest / 'combos')
