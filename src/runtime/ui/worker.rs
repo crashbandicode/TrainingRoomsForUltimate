@@ -572,7 +572,11 @@ fn sync_panels(s: &mut Session) {
         combo_note(s, &note);
     }
     // A keyboard name the frame wrapper confirmed: its library write is file I/O, done here.
-    if s.menu.is_none() {
+    // Drawn only where a renderer exists, so Player 1 is never held by a question nobody can see (R2-2).
+    let prompt_visible = named_macros::fighter_prompt_up() && LAYOUT_READY.load(Ordering::Acquire);
+    // A closed menu has dropped its model; a fighter question opened since then still needs the flow below (ShowPrompt
+    // builds the model it is drawn on).
+    if s.menu.is_none() && !(s.phase == Phase::Menu && prompt_visible && !OPEN.load(Ordering::Acquire)) {
         return;
     }
     #[cfg(feature = "mii-saved-alpha")]
@@ -633,8 +637,7 @@ fn sync_panels(s: &mut Session) {
         panel_visible: external::panel_up() || s.setups.panel_up(),
         clip_visible: external::clip_up(),
         clip_foreground: named_macros::clip_foreground(),
-        // Drawn only where a renderer exists, so Player 1 is never held by a question nobody can see (R2-2).
-        prompt_visible: named_macros::fighter_prompt_up() && LAYOUT_READY.load(Ordering::Acquire),
+        prompt_visible,
     };
     let (phase, step) = flow::next(s.phase, seen);
     s.phase = phase;
