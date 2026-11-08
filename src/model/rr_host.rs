@@ -532,13 +532,100 @@ pub fn follow_grade<'a>(applied: Option<&str>, drill: Option<&'a str>) -> GradeF
     }
 }
 
-/// A sequence drill starts at step 1 over the sequence's combos that still open. None when the file does not load.
+/// A sequence drill starts at step 1 over the sequence's combos that still open, going on from the streak and best
+/// saved in its file. None when the file does not load.
 pub fn start_sequence_drill(root: &Path, id: &str) -> Option<crate::model::drill::SequenceDrill> {
     let sequence = Store::<Sequence>::new(root.join(SEQUENCES_DIR)).load(id).ok()?;
     let combos = crate::model::combo_record::ComboLibrary::new(root.join("combos"));
     let present = sequence.present_ids(&combos);
     let ids = present.iter().map(String::as_str).collect::<Vec<_>>();
-    Some(crate::model::drill::SequenceDrill::new(id, &ids))
+    Some(crate::model::drill::SequenceDrill::resume(id, &ids, sequence.streak, sequence.best))
+}
+
+/// One combo of a drilled sequence: its id, its name and the links the helper grades.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SequenceStep {
+    pub id: String,
+    pub name: String,
+    pub combo: Combo,
+}
+
+/// What the frame hook drills for a sequence: its name, the combos that still open in file order, and the streak
+/// and best saved in its file.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SequencePlan {
+    pub id: String,
+    pub name: String,
+    pub steps: Vec<SequenceStep>,
+    pub streak: u32,
+    pub best: u32,
+}
+
+impl SequencePlan {
+    /// The same combos in the same order: a drill in progress goes on. A rename or a new streak is not a change.
+    pub fn same_steps(&self, other: &SequencePlan) -> bool {
+        self.id == other.id
+            && self.steps.len() == other.steps.len()
+            && self.steps.iter().zip(&other.steps).all(|(a, b)| a.id == b.id && a.combo == b.combo)
+    }
+}
+
+/// The plan of sequence `id`, read from the card. A deleted combo is skipped. None when the file does not load.
+pub fn sequence_plan(root: &Path, id: &str) -> Option<SequencePlan> {
+    let sequence = Store::<Sequence>::new(root.join(SEQUENCES_DIR)).load(id).ok()?;
+    let combos = crate::model::combo_record::ComboLibrary::new(root.join("combos"));
+    let steps = sequence
+        .combos
+        .iter()
+        .filter_map(|combo_id| {
+            let record = combos.load(combo_id).ok()?;
+            Some(SequenceStep { id: combo_id.clone(), name: record.name, combo: record.combo })
+        })
+        .collect();
+    Some(SequencePlan { id: id.to_owned(), name: sequence.name, steps, streak: sequence.streak, best: sequence.best })
+}
+
+/// The drilled sequence's streak and best go to its file. Nothing else in the file changes.
+pub fn save_sequence_progress(root: &Path, id: &str, streak: u32, best: u32) -> bool {
+    let store = Store::<Sequence>::new(root.join(SEQUENCES_DIR));
+    let Ok(mut sequence) = store.load(id) else { return false };
+    if (sequence.streak, sequence.best) == (streak, best) {
+        return true;
+    }
+    sequence.streak = streak;
+    sequence.best = best;
+    let saved = store.overwrite(id, &sequence).is_ok();
+    if saved {
+        bump_catalog();
+    }
+    saved
+}
+
+/// What the frame hook should drill when the menu's one drill changes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DrillFollow<'a> {
+    /// Already drilled, or a drill whose file the catalog does not list yet.
+    Same,
+    Clear,
+    Combo(&'a str),
+    Sequence(&'a str),
+}
+
+/// The one drill: a combo replaces a drilled sequence and a sequence replaces a drilled combo. `applied` is what the
+/// frame hook drills now. An id the catalog does not list yet is retried on a later post.
+pub fn follow_drill<'a>(
+    applied: Option<(DrillKind, &str)>,
+    kind: Option<DrillKind>,
+    drill: Option<&'a str>,
+) -> DrillFollow<'a> {
+    match (drill, kind) {
+        (None, _) if applied.is_none() => DrillFollow::Same,
+        (None, _) => DrillFollow::Clear,
+        (Some(_), None) => DrillFollow::Same,
+        (Some(id), Some(kind)) if applied == Some((kind, id)) => DrillFollow::Same,
+        (Some(id), Some(DrillKind::Combo)) => DrillFollow::Combo(id),
+        (Some(id), Some(DrillKind::Sequence)) => DrillFollow::Sequence(id),
+    }
 }
 
 /// What the helper grades for the recording drill. A combo drill grades itself. A sequence drill grades its current
@@ -879,7 +966,61 @@ fn apply_menu(root: &Path, machine: &mut Playback, book: &Book, online: bool, ti
         Effect::RenameChain { id, name } => rename_chain(root, &id, name),
         Effect::RenameCombo { id, name } => rename_combo(root, &id, name),
         Effect::RenameSequence { id, name } => rename_sequence(root, &id, name),
+        Effect::DeleteFile { kind, id } => {
+            if delete_file(root, kind, &id) {
+                bump_catalog();
+            }
+        }
+        Effect::WriteChainSteps { id, steps } => {
+            let store = Store::<Chain>::new(root.join(MACROS_DIR));
+            if let Ok(mut chain) = store.load(&id) {
+                chain.recordings = steps;
+                if store.overwrite(&id, &chain).is_ok() {
+                    bump_catalog();
+                }
+            }
+        }
+        Effect::WriteSequenceCombos { id, combos } => {
+            let store = Store::<Sequence>::new(root.join(SEQUENCES_DIR));
+            if let Ok(mut sequence) = store.load(&id) {
+                sequence.combos = combos;
+                if store.overwrite(&id, &sequence).is_ok() {
+                    bump_catalog();
+                }
+            }
+        }
     }
+}
+
+/// Delete on a macro, a chain, a combo or a sequence: the file goes, and the index no longer names it as a role's
+/// active macro or as the drill. A sequence that lists a deleted combo skips it.
+pub fn delete_file(root: &Path, kind: crate::model::recording_menu::FileKind, id: &str) -> bool {
+    use crate::model::recording_menu::FileKind;
+    let deleted = match kind {
+        FileKind::Macro => Library::new(root.join(MACROS_DIR)).delete(id).is_ok(),
+        FileKind::Chain => Store::<Chain>::new(root.join(MACROS_DIR)).delete(id).is_ok(),
+        FileKind::Combo => crate::model::combo_record::ComboLibrary::new(root.join("combos")).delete(id).is_ok(),
+        FileKind::Sequence => Store::<Sequence>::new(root.join(SEQUENCES_DIR)).delete(id).is_ok(),
+    };
+    if !deleted {
+        return false;
+    }
+    if let Ok(mut index) = RecordingIndex::load(root) {
+        let at = unix_now();
+        let mut changed = false;
+        for role in [Role::Player, Role::Cpu] {
+            if index.active(role) == Some(id) {
+                changed |= index.set_active(role, None, at).is_ok();
+            }
+        }
+        if index.drill().is_some_and(|drill| drill.id == id) {
+            changed |= index.set_drill(None, at).is_ok();
+        }
+        if changed {
+            let _ = index.save(root);
+        }
+    }
+    true
 }
 
 fn rename_save(root: &Path, id: &str, name: String) {
@@ -2117,5 +2258,192 @@ mod tests {
         assert_eq!(follow_grade(Some("combo-2"), Some("combo-2")), GradeFollow::Same);
         assert_eq!(follow_grade(Some("combo-2"), Some("combo-1")), GradeFollow::Install("combo-1"));
         assert_eq!(follow_grade(Some("combo-2"), None), GradeFollow::Clear);
+    }
+
+    // ---- rc.6: sequence drilling (docs/RECORDING.md § Sequences and the one drill) ---------------------------------
+
+    fn one_combo(root: &std::path::Path, name: &str, from: crate::model::frame_strip::Move) -> String {
+        use crate::model::combo::LinkRec;
+        use crate::model::frame_strip::{Move, Verdict};
+        let combo = Combo::from_links([LinkRec::presses(from, Move::Aerial, Verdict::True(None), None, &[])]).unwrap();
+        crate::model::combo_record::ComboLibrary::new(root.join("combos"))
+            .save_new(&crate::model::combo_record::ComboRecord::new(name.into(), combo, None))
+            .unwrap()
+    }
+
+    fn one_sequence(root: &std::path::Path, name: &str, combos: &[String]) -> String {
+        Store::<Sequence>::new(root.join(SEQUENCES_DIR)).save_new(&Sequence::new(name, combos.to_vec()).unwrap()).unwrap()
+    }
+
+    #[test]
+    fn a_sequence_plan_stages_its_combos_in_order_and_skips_a_deleted_one() {
+        use crate::model::frame_strip::Move;
+        let root = scratch("seq-plan");
+        let ryu = one_combo(&root, "Ryu BnB", Move::Jab);
+        let nair = one_combo(&root, "Nair loop combo", Move::Aerial);
+        let id = one_sequence(&root, "Corner to kill", &[ryu.clone(), "deleted-combo".into(), nair.clone()]);
+        let plan = sequence_plan(&root, &id).expect("the sequence file loads");
+        assert_eq!(plan.name, "Corner to kill");
+        assert_eq!(plan.steps.iter().map(|s| (s.id.as_str(), s.name.as_str())).collect::<Vec<_>>(), [
+            (ryu.as_str(), "Ryu BnB"),
+            (nair.as_str(), "Nair loop combo")
+        ]);
+        assert_eq!(plan.steps[0].combo.get(0).map(|l| l.from), Some(Move::Jab), "the combo the helper grades");
+        assert_eq!((plan.streak, plan.best), (0, 0));
+        assert!(sequence_plan(&root, "no-such-sequence").is_none());
+    }
+
+    #[test]
+    fn a_sequence_longer_than_sixteen_combos_drills_every_combo() {
+        use crate::model::frame_strip::Move;
+        let root = scratch("seq-long");
+        let ids: Vec<String> = (0..20).map(|n| one_combo(&root, &format!("Combo {n}"), Move::Jab)).collect();
+        let id = one_sequence(&root, "Long", &ids);
+        assert_eq!(sequence_plan(&root, &id).unwrap().steps.len(), 20);
+        let mut drill = start_sequence_drill(&root, &id).unwrap();
+        assert_eq!(drill.step(), (1, 20));
+        let clean = crate::model::combo::Summary {
+            outcome: crate::model::combo::Outcome::Completed,
+            graded: 1,
+            true_links: 1,
+            total: 1,
+            clean: true,
+            fault: None,
+        };
+        for id in &ids[1..] {
+            assert_eq!(drill.note_summary(&clean), Some(id.as_str()));
+        }
+        assert_eq!(drill.note_summary(&clean), Some(ids[0].as_str()));
+        assert_eq!((drill.streak(), drill.best()), (1, 1), "combo 20 finished the sequence");
+    }
+
+    #[test]
+    fn streak_and_best_are_saved_to_the_sequence_file_and_the_next_drill_goes_on_from_them() {
+        use crate::model::frame_strip::Move;
+        let _hold = hold();
+        let root = scratch("seq-progress");
+        let ryu = one_combo(&root, "Ryu BnB", Move::Jab);
+        let id = one_sequence(&root, "Corner to kill", std::slice::from_ref(&ryu));
+        let before = catalog_generation();
+        assert!(save_sequence_progress(&root, &id, 4, 9));
+        assert!(catalog_generation() > before, "the menu reloads the catalog");
+        let file = Store::<Sequence>::new(root.join(SEQUENCES_DIR)).load(&id).unwrap();
+        assert_eq!((file.streak, file.best, file.combos.clone()), (4, 9, vec![ryu.clone()]));
+        let drill = start_sequence_drill(&root, &id).unwrap();
+        assert_eq!((drill.streak(), drill.best()), (4, 9), "drilling it again goes on from the file");
+        let plan = sequence_plan(&root, &id).unwrap();
+        assert_eq!((plan.streak, plan.best), (4, 9));
+        let catalog = super::super::rr_runtime::load_catalog(&root).unwrap().catalog;
+        let shown = catalog.sequences.iter().find(|s| s.id == id).unwrap();
+        assert_eq!((shown.streak, shown.best), (4, 9), "the Connections panel reads the file");
+        assert!(!save_sequence_progress(&root, "no-such-sequence", 1, 1));
+    }
+
+    #[test]
+    fn a_rename_or_a_saved_streak_keeps_the_plan_and_a_new_order_does_not() {
+        use crate::model::frame_strip::Move;
+        let root = scratch("seq-same");
+        let ryu = one_combo(&root, "Ryu BnB", Move::Jab);
+        let nair = one_combo(&root, "Nair loop combo", Move::Aerial);
+        let id = one_sequence(&root, "Corner to kill", &[ryu.clone(), nair.clone()]);
+        let plan = sequence_plan(&root, &id).unwrap();
+        rename_combo(&root, &ryu, "Ryu opener".into());
+        assert!(save_sequence_progress(&root, &id, 2, 3));
+        let renamed = sequence_plan(&root, &id).unwrap();
+        assert_eq!(renamed.steps[0].name, "Ryu opener");
+        assert!(plan.same_steps(&renamed) && plan != renamed);
+        let store = Store::<Sequence>::new(root.join(SEQUENCES_DIR));
+        let mut file = store.load(&id).unwrap();
+        file.combos = vec![nair, ryu];
+        store.overwrite(&id, &file).unwrap();
+        assert!(!plan.same_steps(&sequence_plan(&root, &id).unwrap()));
+    }
+
+    #[test]
+    fn the_one_drill_replaces_a_combo_with_a_sequence_and_back() {
+        use DrillKind::{Combo as C, Sequence as S};
+        assert_eq!(follow_drill(None, None, None), DrillFollow::Same);
+        assert_eq!(follow_drill(None, Some(S), Some("seq-1")), DrillFollow::Sequence("seq-1"));
+        assert_eq!(follow_drill(Some((S, "seq-1")), Some(S), Some("seq-1")), DrillFollow::Same);
+        assert_eq!(follow_drill(Some((S, "seq-1")), Some(C), Some("combo-2")), DrillFollow::Combo("combo-2"), "a combo replaces it");
+        assert_eq!(follow_drill(Some((C, "combo-2")), Some(S), Some("seq-1")), DrillFollow::Sequence("seq-1"), "and back");
+        assert_eq!(follow_drill(Some((C, "combo-2")), Some(S), Some("seq-2")), DrillFollow::Sequence("seq-2"));
+        assert_eq!(follow_drill(Some((S, "seq-1")), None, Some("sequence-9")), DrillFollow::Same, "not listed yet: retried");
+        assert_eq!(follow_drill(Some((S, "seq-1")), None, None), DrillFollow::Clear);
+    }
+
+    #[test]
+    fn a_numbered_row_drills_that_combo_alone_with_its_own_target_and_the_sequence_file_stays() {
+        use crate::model::frame_strip::Move;
+        let _hold = hold();
+        reset_host();
+        let root = scratch("seq-row");
+        let ryu = one_combo(&root, "Ryu BnB", Move::Jab);
+        let nair = one_combo(&root, "Nair loop combo", Move::Aerial);
+        let id = one_sequence(&root, "Corner to kill", &[ryu.clone(), nair.clone()]);
+        assert!(save_sequence_progress(&root, &id, 4, 9));
+        let path = root.join(SEQUENCES_DIR).join(format!("{id}.json"));
+        let before = std::fs::read(&path).unwrap();
+        // The menu's numbered row makes the combo the drill (recording_menu tests); the index and the hook follow it.
+        let selection = Selection {
+            bound: None,
+            active_player: None,
+            active_cpu: None,
+            loop_player: LoopMark::Finite(1),
+            loop_cpu: LoopMark::Finite(1),
+            drill: Some(nair.clone()),
+            record_role: crate::model::recording_menu::ViewRole::Player,
+        };
+        publish_selection(&root, &selection, Some(DrillKind::Combo));
+        assert_eq!(
+            follow_drill(Some((DrillKind::Sequence, id.as_str())), Some(DrillKind::Combo), selection.drill.as_deref()),
+            DrillFollow::Combo(nair.as_str())
+        );
+        let drill = RecordingIndex::load(&root).unwrap().drill().cloned();
+        assert_eq!(drill, Some(Drill { kind: DrillKind::Combo, id: nair.clone() }));
+        assert_eq!(std::fs::read(&path).unwrap(), before, "the sequence file stays as it was");
+    }
+
+    #[test]
+    fn delete_and_edit_reach_the_card() {
+        use crate::model::frame_strip::Move;
+        use crate::model::recording_menu::FileKind;
+        let _hold = hold();
+        reset_host();
+        let root = scratch("seq-delete");
+        let ryu = one_combo(&root, "Ryu BnB", Move::Jab);
+        let nair = one_combo(&root, "Nair loop combo", Move::Aerial);
+        let id = one_sequence(&root, "Corner to kill", &[ryu.clone(), nair.clone()]);
+        post_effect(Effect::WriteSequenceCombos { id: id.clone(), combos: vec![nair.clone(), ryu.clone()] });
+        let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        let file = Store::<Sequence>::new(root.join(SEQUENCES_DIR)).load(&id).unwrap();
+        assert_eq!(file.combos, [nair.clone(), ryu.clone()], "Edit combos is saved");
+        post_effect(Effect::DeleteFile { kind: FileKind::Combo, id: ryu.clone() });
+        let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        assert!(crate::model::combo_record::ComboLibrary::new(root.join("combos")).load(&ryu).is_err(), "the combo is gone");
+        let plan = sequence_plan(&root, &id).unwrap();
+        assert_eq!(plan.steps.iter().map(|s| s.id.as_str()).collect::<Vec<_>>(), [nair.as_str()], "the sequence skips it");
+        let mut index = RecordingIndex::load(&root).unwrap();
+        index.set_drill(Some(Drill { kind: DrillKind::Sequence, id: id.clone() }), 1).unwrap();
+        index.save(&root).unwrap();
+        post_effect(Effect::DeleteFile { kind: FileKind::Sequence, id: id.clone() });
+        let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        assert!(sequence_plan(&root, &id).is_none(), "the sequence is gone");
+        assert!(RecordingIndex::load(&root).unwrap().drill().is_none(), "and is no longer the drill");
+        let chain_macro = one_macro(&root, "Jab", 1, 8, None);
+        let chain = Store::<Chain>::new(root.join(MACROS_DIR)).save_new(&Chain::new("Chain 1", vec![chain_macro.clone()]).unwrap()).unwrap();
+        post_effect(Effect::WriteChainSteps { id: chain.clone(), steps: vec![] });
+        let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        assert!(Store::<Chain>::new(root.join(MACROS_DIR)).load(&chain).unwrap().recordings.is_empty(), "Edit chain is saved");
+        post_effect(Effect::DeleteFile { kind: FileKind::Chain, id: chain.clone() });
+        let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        assert!(Store::<Chain>::new(root.join(MACROS_DIR)).load(&chain).is_err(), "the chain is gone");
+        let mut index = RecordingIndex::load(&root).unwrap();
+        index.set_active(Role::Player, Some(&chain_macro), 2).unwrap();
+        index.save(&root).unwrap();
+        post_effect(Effect::DeleteFile { kind: FileKind::Macro, id: chain_macro.clone() });
+        let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        assert!(Library::new(root.join(MACROS_DIR)).load(&chain_macro).is_err(), "the macro is gone");
+        assert!(RecordingIndex::load(&root).unwrap().active(Role::Player).is_none(), "and is no longer active");
     }
 }

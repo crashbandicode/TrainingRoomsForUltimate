@@ -298,9 +298,12 @@ pub mod cb {
     /// Link cells and result pills.
     pub const CELLS: usize = 4;
     pub const PILLS: usize = 8;
+    /// A drilled sequence's combos shown at once, and the arrows between them.
+    pub const CHIPS: usize = 4;
+    pub const ARROWS: usize = CHIPS - 1;
 
     pub mod at {
-        use super::{CELLS, PILLS};
+        use super::{ARROWS, CELLS, CHIPS, PILLS};
         pub const CONTAINER: usize = 0;
         pub const BACKDROP: usize = 1;
         pub const HEADER: usize = 2;
@@ -317,10 +320,62 @@ pub mod cb {
         pub const WINDOW: usize = RULER + CELLS;
         pub const RECORDED: usize = WINDOW + CELLS;
         pub const YOURS: usize = RECORDED + CELLS;
-        pub const COUNT: usize = YOURS + CELLS;
+        /// A drilled sequence (docs/RECORDING.md § Sequences and the one drill; mockup `r8-sequence-bar`): the band
+        /// above the bar for the sequence header and the row of its combos.
+        pub const SEQ_BACKDROP: usize = YOURS + CELLS;
+        /// The header: the SEQUENCE pill and its word, the name, "combo k of n ·", the combo, "· N links",
+        /// "· tolerance ±1f", and on the right "streak N" and "· best M".
+        pub const SEQ_PILL: usize = SEQ_BACKDROP + 1;
+        pub const SEQ_PILL_TEXT: usize = SEQ_PILL + 1;
+        pub const SEQ_NAME: usize = SEQ_PILL_TEXT + 1;
+        pub const SEQ_STEP: usize = SEQ_NAME + 1;
+        pub const SEQ_COMBO: usize = SEQ_STEP + 1;
+        pub const SEQ_LINKS: usize = SEQ_COMBO + 1;
+        pub const SEQ_TOLERANCE: usize = SEQ_LINKS + 1;
+        pub const SEQ_STREAK: usize = SEQ_TOLERANCE + 1;
+        pub const SEQ_BEST: usize = SEQ_STREAK + 1;
+        /// The footer's start: "Ryu BnB landed ·", and the current combo's name before the helper's own result.
+        pub const SEQ_LANDED: usize = SEQ_BEST + 1;
+        pub const SEQ_CURRENT: usize = SEQ_LANDED + 1;
+        /// Per combo chip, one block of `CHIPS` each: outline, fill, text, and the two strokes of the check mark
+        /// (the game's fonts have no ✓).
+        pub const SEQ_CHIP_EDGE: usize = SEQ_CURRENT + 1;
+        pub const SEQ_CHIP_FILL: usize = SEQ_CHIP_EDGE + CHIPS;
+        pub const SEQ_CHIP_TEXT: usize = SEQ_CHIP_FILL + CHIPS;
+        pub const SEQ_CHECK_SHORT: usize = SEQ_CHIP_TEXT + CHIPS;
+        pub const SEQ_CHECK_LONG: usize = SEQ_CHECK_SHORT + CHIPS;
+        /// The arrows between the chips.
+        pub const SEQ_ARROW: usize = SEQ_CHECK_LONG + CHIPS;
+        pub const COUNT: usize = SEQ_ARROW + ARROWS;
     }
 
     pub const COUNT: usize = at::COUNT;
+
+    /// Sequence mode (mockup `r8-sequence-bar`): the bar is as wide as the strip, with a band above the combo bar's
+    /// rows. The container moves down by the band, so the bar's top stays under the strip.
+    pub const SEQ_W: f32 = super::iv::STRIP_W;
+    pub const SEQ_EXTRA: f32 = 56.0;
+    pub const SEQ_BAR_Y: f32 = BAR_Y - SEQ_EXTRA;
+    pub const SEQ_LEFT: f32 = -SEQ_W / 2.0 + 18.0;
+    pub const SEQ_RIGHT: f32 = SEQ_W / 2.0 - 18.0;
+    pub const SEQ_BAND_Y: f32 = BAR_H / 2.0 + SEQ_EXTRA / 2.0;
+    pub const SEQ_HEADER_Y: f32 = BAR_H / 2.0 + SEQ_EXTRA - 20.0;
+    pub const SEQ_CHIP_Y: f32 = 56.0;
+    pub const SEQ_CHIP_H: f32 = 32.0;
+    pub const SEQ_PILL_W: f32 = 156.0;
+    pub const SEQ_PILL_H: f32 = 28.0;
+    /// The link cells spread over the wider bar: four cells, 8 units apart.
+    pub const SEQ_CELL_PITCH: f32 = (SEQ_W - 36.0 + 8.0) / CELLS as f32;
+    pub const SEQ_CELL_W: f32 = SEQ_CELL_PITCH - 8.0;
+    pub const SEQ_CELL_X0: f32 = SEQ_LEFT + SEQ_CELL_W / 2.0;
+    /// Text box widths of the sequence texts (a left-aligned box's text starts at its left edge).
+    pub const SEQ_NAME_BOX: f32 = 280.0;
+    pub const SEQ_TAG_BOX: f32 = 220.0;
+    pub const SEQ_SUB_BOX: f32 = 300.0;
+    pub const SEQ_CHIP_TEXT_BOX: f32 = 240.0;
+    pub const SEQ_PILL_COLOR: [u8; 4] = [236, 108, 176, 255];
+    pub const SEQ_PILL_TEXT_COLOR: [u8; 4] = [24, 18, 30, 255];
+    pub const SEQ_CHIP_COLOR: [u8; 4] = [32, 38, 52, 255];
 
     /// The bar's centre below the strip's, and its size (the mockup's 864 × 132).
     pub const BAR_Y: f32 = -184.0;
@@ -550,7 +605,30 @@ const fn cb_name(local: usize) -> Name {
         RESULT => Name::new("TrCbRes"),
         REASON => Name::new("TrCbWhy"),
         i if i < CELL => Name::indexed("TrCbPill", i - PILL),
-        i if i < COUNT => {
+        SEQ_BACKDROP => Name::new("TrCbSqBg"),
+        SEQ_PILL => Name::new("TrCbSqPill"),
+        SEQ_PILL_TEXT => Name::new("TrCbSqKind"),
+        SEQ_NAME => Name::new("TrCbSqName"),
+        SEQ_STEP => Name::new("TrCbSqStep"),
+        SEQ_COMBO => Name::new("TrCbSqCombo"),
+        SEQ_LINKS => Name::new("TrCbSqLinks"),
+        SEQ_TOLERANCE => Name::new("TrCbSqTol"),
+        SEQ_STREAK => Name::new("TrCbSqStrk"),
+        SEQ_BEST => Name::new("TrCbSqBest"),
+        SEQ_LANDED => Name::new("TrCbSqDone"),
+        SEQ_CURRENT => Name::new("TrCbSqNow"),
+        i if i >= SEQ_CHIP_EDGE && i < SEQ_ARROW => {
+            let n = (i - SEQ_CHIP_EDGE) % cb::CHIPS;
+            match (i - SEQ_CHIP_EDGE) / cb::CHIPS {
+                0 => Name::indexed("TrCbSqEdge", n),
+                1 => Name::indexed("TrCbSqFill", n),
+                2 => Name::indexed("TrCbSqChip", n),
+                3 => Name::indexed("TrCbSqTick", n),
+                _ => Name::indexed("TrCbSqCheck", n),
+            }
+        }
+        i if i >= SEQ_ARROW && i < COUNT => Name::indexed("TrCbSqArrow", i - SEQ_ARROW),
+        i if i < SEQ_BACKDROP => {
             let n = (i - CELL) % CELLS;
             match (i - CELL) / CELLS {
                 0 => Name::indexed("TrCbCell", n),
@@ -577,7 +655,9 @@ const fn cb_spec(local: usize, name: Name) -> Spec {
     use cb::at::*;
     use cb::{
         BAR_H, BAR_W, BAR_Y, CELLS, CELL_COLOR, CELL_H, CELL_W, CELL_Y, FOOTER_Y, HEADER_Y, LEFT, PILL_SIZE, RULER_DY,
-        RULER_W, STREAK_X, TITLE_DY, VERDICT_DY,
+        RULER_W, SEQ_BAND_Y, SEQ_CHIP_COLOR, SEQ_CHIP_H, SEQ_CHIP_TEXT_BOX, SEQ_CHIP_Y, SEQ_EXTRA, SEQ_HEADER_Y, SEQ_LEFT,
+        SEQ_NAME_BOX, SEQ_PILL_COLOR, SEQ_PILL_H, SEQ_PILL_TEXT_COLOR, SEQ_PILL_W, SEQ_SUB_BOX, SEQ_TAG_BOX, SEQ_W,
+        STREAK_X, TITLE_DY, VERDICT_DY,
     };
     use iv::{FONT_SUB, FONT_TAG};
     let parent = Name::new("TrCb");
@@ -596,7 +676,22 @@ const fn cb_spec(local: usize, name: Name) -> Spec {
         i if i < WINDOW => under(rect(name, [0.0, CELL_Y + RULER_DY, RULER_W, 3.0], RULE, false), parent),
         i if i < RECORDED => under(rect(name, [0.0, CELL_Y + RULER_DY, 6.0, 9.0], TEXT, false), parent),
         i if i < YOURS => under(rect(name, [0.0, CELL_Y + RULER_DY, 4.0, 16.0], TEXT, false), parent),
-        i if i < COUNT => under(rect(name, [0.0, CELL_Y + RULER_DY, 6.0, 12.0], TEXT, false), parent),
+        i if i < SEQ_BACKDROP => under(rect(name, [0.0, CELL_Y + RULER_DY, 6.0, 12.0], TEXT, false), parent),
+        SEQ_BACKDROP => under(rect(name, [0.0, SEQ_BAND_Y, SEQ_W, SEQ_EXTRA], cb::BACKDROP_COLOR, false), parent),
+        SEQ_PILL => under(rect(name, [SEQ_LEFT + SEQ_PILL_W / 2.0, SEQ_HEADER_Y, SEQ_PILL_W, SEQ_PILL_H], SEQ_PILL_COLOR, false), parent),
+        SEQ_PILL_TEXT => Spec {
+            visible: false,
+            ..under(text(name, [SEQ_LEFT + SEQ_PILL_W / 2.0, SEQ_HEADER_Y, SEQ_PILL_W, 26.0], Align::Center, FONT_TAG, cb::TEXT_UNITS, SEQ_PILL_TEXT_COLOR), parent)
+        },
+        SEQ_NAME => cb_text(name, [0.0, SEQ_HEADER_Y, SEQ_NAME_BOX], Align::Left, FONT_SUB),
+        SEQ_STEP | SEQ_COMBO | SEQ_LINKS | SEQ_TOLERANCE => cb_text(name, [0.0, SEQ_HEADER_Y, SEQ_TAG_BOX], Align::Left, FONT_TAG),
+        SEQ_STREAK | SEQ_BEST => cb_text(name, [0.0, SEQ_HEADER_Y, SEQ_TAG_BOX], Align::Right, FONT_SUB),
+        SEQ_LANDED | SEQ_CURRENT => cb_text(name, [0.0, FOOTER_Y, SEQ_SUB_BOX], Align::Left, FONT_SUB),
+        i if i < SEQ_CHIP_FILL => under(rect(name, [0.0, SEQ_CHIP_Y, 120.0, SEQ_CHIP_H], TEXT, false), parent),
+        i if i < SEQ_CHIP_TEXT => under(rect(name, [0.0, SEQ_CHIP_Y, 116.0, SEQ_CHIP_H - 4.0], SEQ_CHIP_COLOR, false), parent),
+        i if i < SEQ_CHECK_SHORT => cb_text(name, [0.0, SEQ_CHIP_Y, SEQ_CHIP_TEXT_BOX], Align::Left, FONT_SUB),
+        i if i < SEQ_ARROW => under(rect(name, [0.0, SEQ_CHIP_Y, 10.0, 3.0], TEXT, false), parent),
+        i if i < COUNT => cb_text(name, [0.0, SEQ_CHIP_Y, 40.0], Align::Center, FONT_SUB),
         _ => {
             let _ = CELLS;
             panic!("no such combo bar pane")
@@ -760,11 +855,12 @@ const fn under(mut spec: Spec, parent: Name) -> Spec {
 
 /// Centre of `TrModDisp0`, below the combo bar. The header box is the highest notice text
 /// (local y 445, height 50). Sixteen units are the plate padding `p23/notice-plates` draws
-/// around that text. The combo bar's bottom is `STRIP_Y + BAR_Y - BAR_H / 2`, and 8 units stay clear of it.
+/// around that text. The combo bar's lowest bottom is a drilled sequence's, `STRIP_Y + SEQ_BAR_Y - BAR_H / 2` (the
+/// sequence band moves the bar down), and 8 units stay clear of it.
 pub const NOTICE_ORIGIN_Y: f32 = {
     let header_top = 445.0 + 50.0 / 2.0;
     let plate_pad = 16.0;
-    let bar_bottom = iv::STRIP_Y + cb::BAR_Y - cb::BAR_H / 2.0;
+    let bar_bottom = iv::STRIP_Y + cb::SEQ_BAR_Y - cb::BAR_H / 2.0;
     let gap = 8.0;
     bar_bottom - gap - (header_top + plate_pad)
 };
@@ -893,8 +989,11 @@ mod tests {
         assert_eq!(name_of(IDX_LOOP).as_str(), "tr_loop_00");
         assert_eq!(name_of(MENU_COUNT - 1).as_str(), "tr_loop_01");
         assert!(COUNT < limit, "plugin table {COUNT} exceeds the walk {limit}");
-        assert_eq!(COUNT, 1424 + CHROME);
-        assert_eq!(limit - COUNT, 2672 - CHROME);
+        // rc.6: the sequence bar's header, chips and arrows (`cb::at::SEQ_BACKDROP..`).
+        let sequence_bar = cb::COUNT - cb::at::SEQ_BACKDROP;
+        assert_eq!(sequence_bar, 35);
+        assert_eq!(COUNT, 1424 + CHROME + sequence_bar);
+        assert_eq!(limit - COUNT, 2672 - CHROME - sequence_bar);
         let strip_tree = iv::COUNT + cb::COUNT;
         assert!(strip_tree <= limit, "the strip walk, combo bar included, is {strip_tree}");
         let first = spec(IDX_IV + iv::at::STICK);

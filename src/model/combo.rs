@@ -439,6 +439,9 @@ pub struct Attempt {
     grades: [Option<Grade>; LINKS],
     len: usize,
     pub summary: Option<Summary>,
+    /// A later combo of a sequence: the link from the combo before it is still to come. That link is shown on the
+    /// strip and not graded, and the move it lands must be this combo's first move.
+    junction: bool,
 }
 
 impl Attempt {
@@ -575,6 +578,28 @@ impl Helper {
         self.pending_load = false;
     }
 
+    /// The next combo of a sequence, inside the exchange the last one finished in. Its attempt is open now: the next
+    /// link joins the two combos and is not graded, and the move it lands must be `target`'s first move. A different
+    /// move, or the exchange closing first, ends the attempt not clean. A load asked for after an attempt still waits
+    /// for the exchange to close.
+    pub fn continue_with(&mut self, target: Combo) {
+        self.target = Some(target);
+        self.attempt = Some(Attempt {
+            exchange: self.capture.exchange,
+            grades: [None; LINKS],
+            len: 0,
+            summary: None,
+            junction: true,
+        });
+    }
+
+    /// Back to the first combo of a sequence. Its attempt starts on the first link of a later exchange, as a single
+    /// combo's does. A load asked for after an attempt still waits for the exchange to close.
+    pub fn restart_with(&mut self, target: Option<Combo>) {
+        self.target = target;
+        self.attempt = None;
+    }
+
     pub fn target(&self) -> Option<&Combo> {
         self.target.as_ref()
     }
@@ -684,11 +709,28 @@ impl Helper {
                 grades: [None; LINKS],
                 len: 0,
                 summary: None,
+                junction: false,
             });
         }
         let Some(attempt) = self.attempt.as_mut() else {
             return;
         };
+        if attempt.junction {
+            attempt.junction = false;
+            let first = target.get(0).map(|r| r.from);
+            if first != Some(rec.to) {
+                let summary = Summary {
+                    outcome: Outcome::Stopped,
+                    graded: 0,
+                    true_links: 0,
+                    total: target.len() as u8,
+                    clean: false,
+                    fault: Some((0, Reason::WrongMove(rec.to))),
+                };
+                self.record(summary, out);
+            }
+            return;
+        }
         let Some(reference) = target.get(attempt.len) else {
             return;
         };
@@ -707,11 +749,19 @@ impl Helper {
         let Some(total) = self.target.map(|t| t.len()) else {
             return;
         };
-        let Some(attempt) = self.attempt.as_mut().filter(|a| a.open()) else {
+        let Some(attempt) = self.attempt.as_ref().filter(|a| a.open()) else {
             return;
         };
         let summary = summarize(attempt, total, outcome, tolerance);
-        attempt.summary = Some(summary);
+        self.record(summary, out);
+    }
+
+    /// Closes the open attempt with `summary`: the history, the streak, best and the load after it.
+    fn record(&mut self, summary: Summary, out: &mut Out) {
+        let outcome = summary.outcome;
+        if let Some(attempt) = self.attempt.as_mut() {
+            attempt.summary = Some(summary);
+        }
         self.results.copy_within(0..RESULTS - 1, 1);
         self.results[0] = Some(summary);
         // Streak follows `clean`, so a non-true link still counts. Best stays the most true links in one

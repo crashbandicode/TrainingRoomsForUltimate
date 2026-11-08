@@ -146,6 +146,21 @@ pub enum Effect {
     RenameChain { id: String, name: String },
     RenameCombo { id: String, name: String },
     RenameSequence { id: String, name: String },
+    /// Delete on a macro, a chain, a combo or a sequence. The host removes the file.
+    DeleteFile { kind: FileKind, id: String },
+    /// Edit chain finished. The host writes the chain's new order.
+    WriteChainSteps { id: String, steps: Vec<String> },
+    /// Edit combos finished. The host writes the sequence's new order.
+    WriteSequenceCombos { id: String, combos: Vec<String> },
+}
+
+/// The file kinds Delete removes through [`Effect::DeleteFile`]. A save state has its own effect.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FileKind {
+    Macro,
+    Chain,
+    Combo,
+    Sequence,
 }
 
 /// One named save in the snapshot the host loaded.
@@ -1036,9 +1051,18 @@ impl RecordingScreens {
             Act::EditChain => self.open_picker(PickerKind::EditChain, Face::Page, Some(id)),
             Act::EditCombos => self.open_picker(PickerKind::EditSequence, Face::Page, Some(id)),
             Act::Delete => {
+                let file = match kind {
+                    ItemKind::Recording if self.macro_by_id(&id).is_some_and(|file| file.chain) => Some(FileKind::Chain),
+                    ItemKind::Recording => Some(FileKind::Macro),
+                    ItemKind::Combo => Some(FileKind::Combo),
+                    ItemKind::Sequence => Some(FileKind::Sequence),
+                    ItemKind::Save | ItemKind::NewChain | ItemKind::NewSequence => None,
+                };
                 self.delete_file(kind, &id);
                 if kind == ItemKind::Save {
                     self.last_effect = Effect::DeleteSave { source: id };
+                } else if let Some(kind) = file {
+                    self.last_effect = Effect::DeleteFile { kind, id };
                 }
             }
             Act::Drill => self.drill = Some(id),
@@ -1261,14 +1285,16 @@ impl RecordingScreens {
             PickerKind::EditChain => {
                 if let Some(id) = picker.editing {
                     if let Some(chain) = self.catalog.macros.iter_mut().find(|file| file.id == id) {
-                        chain.steps = ordered;
+                        chain.steps = ordered.clone();
+                        self.last_effect = Effect::WriteChainSteps { id, steps: ordered };
                     }
                 }
             }
             PickerKind::EditSequence => {
                 if let Some(id) = picker.editing {
                     if let Some(sequence) = self.catalog.sequences.iter_mut().find(|file| file.id == id) {
-                        sequence.combos = ordered;
+                        sequence.combos = ordered.clone();
+                        self.last_effect = Effect::WriteSequenceCombos { id, combos: ordered };
                     }
                 }
             }
@@ -2578,5 +2604,103 @@ mod tests {
         let titles: Vec<_> = GROUPS.iter().filter(|group| group.page == Page::Recording).map(|group| group.title).collect();
         assert_eq!(titles, ["Save states & Macros", "Combos & Sequences", "Replays", "Options"]);
         assert!(matches!(ROWS.iter().find(|row| row.id == "playback_loop").unwrap().control, Control::Dropdown(labels) if labels.len() == 6));
+    }
+
+    // ---- rc.6: sequences are drilled, edited and deleted on the card ------------------------------------------------
+
+    /// The example catalog with a second combo, Ryu BnB, first in Corner to kill.
+    fn two_combo_screens() -> RecordingScreens {
+        let mut screens = screens();
+        screens.catalog.combos.insert(
+            0,
+            ComboFile {
+                id: "ryu".into(),
+                name: "Ryu BnB".into(),
+                made_from: None,
+                links: combo_link_lines(&Combo::from_links([link(Move::Jab, Move::Aerial, true)]).unwrap()),
+                span: 1,
+            },
+        );
+        screens.catalog.sequences[0].combos = vec!["ryu".into(), "nairc".into()];
+        screens
+    }
+
+    fn open_sequence(screens: &mut RecordingScreens) {
+        let row = screens.section(Face::Page, COMBOS_SEQ, 0).rows.iter().position(|row| row.name == "Corner to kill").unwrap();
+        screens.set_cursor(Face::Page, COMBOS_SEQ, 0, row);
+        screens.handle_page(Button::A, true, COMBOS_SEQ);
+        assert!(screens.file_open());
+    }
+
+    fn press_file_row(screens: &mut RecordingScreens, title: &str) {
+        let row = screens.file_rows().iter().position(|row| row.title == title).unwrap_or_else(|| panic!("no {title:?}"));
+        screens.set_file_cursor(row);
+        screens.handle_page(Button::A, true, COMBOS_SEQ);
+    }
+
+    #[test]
+    fn a_numbered_row_drills_that_combo_and_drill_sequence_drills_the_sequence() {
+        let mut screens = two_combo_screens();
+        open_sequence(&mut screens);
+        let titles: Vec<_> = screens.file_rows().into_iter().map(|row| row.title).collect();
+        assert_eq!(&titles[..3], ["Drill sequence", "1 Ryu BnB", "2 Nair loop combo"]);
+        press_file_row(&mut screens, "2 Nair loop combo");
+        assert_eq!(screens.selection().drill.as_deref(), Some("nairc"), "the combo alone is the drill");
+        assert_eq!(screens.catalog().sequences[0].combos, ["ryu", "nairc"], "the sequence stays");
+        assert!(matches!(screens.last_effect(), Effect::None), "nothing is written to the sequence");
+        press_file_row(&mut screens, "Drill sequence");
+        assert_eq!(screens.selection().drill.as_deref(), Some("corner-seq"), "the sequence replaces the combo");
+    }
+
+    #[test]
+    fn edit_combos_writes_the_new_order_and_r_removes_the_last_number() {
+        let mut screens = two_combo_screens();
+        open_sequence(&mut screens);
+        press_file_row(&mut screens, "Edit combos");
+        assert!(screens.picker_open());
+        let ranks = |s: &RecordingScreens| s.picker_rows().iter().map(|row| (row.name.clone(), row.rank)).collect::<Vec<_>>();
+        assert_eq!(ranks(&screens), [("Ryu BnB".to_string(), 1), ("Nair loop combo".to_string(), 2)]);
+        // R on Ryu BnB takes its number off; Nair loop combo closes up to 1. A gives Ryu BnB the next number.
+        screens.handle_page(Button::R, true, COMBOS_SEQ);
+        assert_eq!(ranks(&screens), [("Ryu BnB".to_string(), 0), ("Nair loop combo".to_string(), 1)]);
+        screens.handle_page(Button::A, true, COMBOS_SEQ);
+        screens.handle_page(Button::B, true, COMBOS_SEQ);
+        assert_eq!(
+            screens.last_effect(),
+            &Effect::WriteSequenceCombos { id: "corner-seq".into(), combos: vec!["nairc".into(), "ryu".into()] }
+        );
+        assert_eq!(screens.catalog().sequences[0].combos, ["nairc", "ryu"]);
+        // R on every number leaves an empty sequence, which drills nothing. It is still written.
+        let _ = screens.take_effect();
+        press_file_row(&mut screens, "Edit combos");
+        screens.handle_page(Button::R, true, COMBOS_SEQ);
+        screens.handle_page(Button::Down, true, COMBOS_SEQ);
+        screens.handle_page(Button::R, true, COMBOS_SEQ);
+        assert!(ranks(&screens).iter().all(|(_, rank)| *rank == 0), "R removed the last number");
+        screens.handle_page(Button::B, true, COMBOS_SEQ);
+        assert_eq!(screens.last_effect(), &Effect::WriteSequenceCombos { id: "corner-seq".into(), combos: vec![] });
+    }
+
+    #[test]
+    fn delete_posts_the_file_for_the_host_to_remove() {
+        let mut screens = two_combo_screens();
+        open_sequence(&mut screens);
+        screens.drill = Some("corner-seq".into());
+        press_file_row(&mut screens, "Delete");
+        assert_eq!(screens.last_effect(), &Effect::DeleteFile { kind: FileKind::Sequence, id: "corner-seq".into() });
+        assert!(screens.catalog().sequences.is_empty());
+        assert_eq!(screens.selection().drill, None, "a deleted drill is no longer drilled");
+        let row = screens.section(Face::Page, COMBOS_SEQ, 1).rows.iter().position(|row| row.name == "Ryu BnB").unwrap();
+        screens.set_cursor(Face::Page, COMBOS_SEQ, 1, row);
+        screens.handle_page(Button::A, true, COMBOS_SEQ);
+        press_file_row(&mut screens, "Delete");
+        assert_eq!(screens.last_effect(), &Effect::DeleteFile { kind: FileKind::Combo, id: "ryu".into() });
+        let chain = screens.section(Face::Page, SAVES_MACROS, 1).rows.iter().position(|row| row.name == "Corner pressure").unwrap();
+        screens.set_cursor(Face::Page, SAVES_MACROS, 1, chain);
+        screens.handle_page(Button::A, true, SAVES_MACROS);
+        let delete = screens.file_rows().iter().position(|row| row.title == "Delete").unwrap();
+        screens.set_file_cursor(delete);
+        screens.handle_page(Button::A, true, SAVES_MACROS);
+        assert_eq!(screens.last_effect(), &Effect::DeleteFile { kind: FileKind::Chain, id: "pressure".into() });
     }
 }

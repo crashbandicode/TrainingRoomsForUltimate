@@ -2,6 +2,7 @@
 //! after it as the runtime does. Frame numbers are the tracker's (the first `step` is frame 1).
 
 use super::*;
+use crate::model::drill::{Advance, SequenceRun, SequenceWalk, Stepped};
 use crate::model::frame_strip::{Sample, K};
 use crate::model::input_delay::MappedInputs;
 
@@ -109,6 +110,9 @@ struct Run {
     outs: Vec<Out>,
     frame: u32,
     last_hit: Option<u32>,
+    /// A drilled sequence and its combos: the helper steps through `SequenceRun`, as the runtime does.
+    sequence: Option<(SequenceRun, Vec<Combo>)>,
+    stepped: Vec<Stepped>,
 }
 
 impl Run {
@@ -119,14 +123,52 @@ impl Run {
             outs: Vec::new(),
             frame: 0,
             last_hit: None,
+            sequence: None,
+            stepped: Vec::new(),
         }
+    }
+
+    /// A run that drills `steps` as a sequence, going on from `streak` and `best`.
+    fn drilling(steps: &[Combo], streak: u32, best: u32) -> Self {
+        let mut run = Self::new(Helper::new());
+        let walk = SequenceRun::new(SequenceWalk::resume(steps.len(), streak, best));
+        walk.start(&mut run.helper, steps);
+        run.sequence = Some((walk, steps.to_vec()));
+        run
     }
 
     fn step(&mut self, p1: Sample, inputs: MappedInputs, settings: Settings) {
         self.frame += 1;
         let cpu = cpu_after(self.last_hit, self.frame);
         self.tracker.step(p1, cpu, inputs);
-        self.outs.push(self.helper.step(&self.tracker, settings));
+        self.advance(settings);
+    }
+
+    fn advance(&mut self, settings: Settings) {
+        match self.sequence.as_mut() {
+            Some((run, steps)) => {
+                let (out, stepped) = run.step(&mut self.helper, steps, &self.tracker, settings);
+                self.outs.push(out);
+                self.stepped.extend(stepped);
+            }
+            None => self.outs.push(self.helper.step(&self.tracker, settings)),
+        }
+    }
+
+    /// The strip's session clear (a save-state load, a scene change).
+    fn clear(&mut self) {
+        match self.sequence.as_mut() {
+            Some((run, steps)) => {
+                let (out, stepped) = run.clear(&mut self.helper, steps);
+                self.outs.push(out);
+                self.stepped.extend(stepped);
+            }
+            None => self.outs.push(self.helper.clear()),
+        }
+    }
+
+    fn walk(&self) -> SequenceWalk {
+        self.sequence.as_ref().expect("a sequence run").0.walk()
     }
 
     fn idle_until(&mut self, frame: u32, settings: Settings) {
@@ -196,7 +238,7 @@ impl Run {
     fn step_with(&mut self, p1: Sample, cpu: Sample, inputs: MappedInputs) {
         self.frame += 1;
         self.tracker.step(p1, cpu, inputs);
-        self.outs.push(self.helper.step(&self.tracker, ON));
+        self.advance(ON);
     }
 
     /// A follow-up that hits the CPU's shield: the exchange ends and the hit is not a link.
@@ -704,6 +746,7 @@ fn summarized(reference: &LinkRec, attempt_link: &LinkRec, outcome: Outcome) -> 
         grades,
         len: 1,
         summary: None,
+        junction: false,
     };
     summarize(&attempt, 1, outcome, 1)
 }
@@ -742,7 +785,7 @@ fn clean_passes_a_non_true_link_inside_a_combo_and_a_sequence() {
     let summary = summarized(&reference, &attempt, Outcome::Completed);
     assert!(summary.clean && summary.fault.is_none() && summary.true_links == 0);
 
-    let mut walk = crate::model::drill::SequenceWalk::new(&["combo-a", "combo-b"]);
+    let mut walk = crate::model::drill::SequenceWalk::new(2);
     walk.note_summary(&summary);
     assert_eq!(walk.cursor(), 1, "the sequence counts the non-true link");
     assert_eq!((walk.streak(), walk.best()), (0, 0));
@@ -1261,4 +1304,232 @@ fn save_combo_from_live_play_records_events() {
         drill.current().is_none(),
         "Make combo stores the id and leaves the drill"
     );
+}
+
+// ---- sequences (docs/RECORDING.md § Sequences and the one drill; RECORDING-REDESIGN Q8 A) --------------------------
+
+/// A combo recorded from `opener` and `follow` (each follow-up pressed `delay` frames after P1 could act).
+fn record(opener: Hit, follow: &[(Hit, i32)]) -> Combo {
+    let mut run = Run::new(Helper::new());
+    run.combo(opener, follow, ON);
+    run.settle(ON);
+    run.helper.last_combo().expect("the exchange is kept")
+}
+
+/// Combo 1: jab, up tilt (one link). Combo 2: down tilt, up tilt, up tilt (two links).
+fn two_combos() -> Vec<Combo> {
+    vec![
+        record(JAB, &[(UP_TILT, 1)]),
+        record(DOWN_TILT, &[(UP_TILT, 1), (UP_TILT, 1)]),
+    ]
+}
+
+fn advances(run: &Run) -> Vec<(usize, Advance)> {
+    run.stepped.iter().map(|s| (s.step, s.advance)).collect()
+}
+
+#[test]
+fn a_sequence_goes_from_combo_one_to_combo_two_inside_one_exchange() {
+    let steps = two_combos();
+    let mut run = Run::drilling(&steps, 0, 0);
+    // Jab > up tilt is combo 1; up tilt > down tilt joins them and is not graded; then combo 2.
+    run.combo(
+        JAB,
+        &[(UP_TILT, 1), (DOWN_TILT, 1), (UP_TILT, 1), (UP_TILT, 1)],
+        ON,
+    );
+    assert_eq!(
+        advances(&run),
+        [(0, Advance::Next(1)), (1, Advance::Finished)]
+    );
+    assert!(run
+        .stepped
+        .iter()
+        .all(|s| s.summary.clean && s.summary.outcome == Outcome::Completed));
+    assert_eq!(
+        run.stepped[1].summary.graded, 2,
+        "combo 2's own two links, not the link between the combos"
+    );
+    assert_eq!(
+        run.graded()
+            .iter()
+            .map(|(i, g)| (*i, g.reference.from))
+            .collect::<Vec<_>>(),
+        [(0, Move::Jab), (0, Move::DownTilt), (1, Move::UpTilt)],
+        "the link between the combos is not graded"
+    );
+    let walk = run.walk();
+    assert_eq!(
+        (walk.cursor(), walk.streak(), walk.best()),
+        (0, 1, 1),
+        "a finished sequence adds one to the streak"
+    );
+    assert_eq!(run.helper.target(), Some(&steps[0]), "back at combo 1");
+}
+
+#[test]
+fn the_link_between_the_combos_need_not_be_true() {
+    let steps = two_combos();
+    let mut run = Run::drilling(&steps, 0, 0);
+    // Down tilt pressed 12 frames after P1 could act: the CPU was free first, a DROP link inside the strip's 20 frames.
+    run.combo(
+        JAB,
+        &[(UP_TILT, 1), (DOWN_TILT, 12), (UP_TILT, 1), (UP_TILT, 1)],
+        ON,
+    );
+    let joining = run
+        .tracker
+        .history()
+        .find(|link| link.to == Move::DownTilt)
+        .expect("the link between the combos");
+    assert!(
+        matches!(joining.verdict, Verdict::Drop(_)),
+        "{:?}",
+        joining.verdict
+    );
+    assert_eq!(
+        run.graded().len(),
+        3,
+        "combo 1's link and combo 2's two links are graded"
+    );
+    assert_eq!(
+        advances(&run),
+        [(0, Advance::Next(1)), (1, Advance::Finished)]
+    );
+}
+
+#[test]
+fn a_drop_in_combo_two_restarts_at_combo_one_with_the_streak_at_zero_and_best_kept() {
+    let steps = two_combos();
+    let mut run = Run::drilling(&steps, 4, 9);
+    run.combo(
+        JAB,
+        &[(UP_TILT, 1), (DOWN_TILT, 1), (UP_TILT, 1), (UP_TILT, 4)],
+        ON,
+    );
+    assert_eq!(
+        advances(&run),
+        [(0, Advance::Next(1)), (1, Advance::Dropped)]
+    );
+    assert_eq!(
+        run.stepped[1].summary.fault,
+        Some((1, Reason::Off(Button::Attack, 3)))
+    );
+    let walk = run.walk();
+    assert_eq!((walk.cursor(), walk.streak(), walk.best()), (0, 0, 9));
+    assert_eq!(run.helper.target(), Some(&steps[0]));
+    // Combo 1 starts again on the first link of a later exchange.
+    run.settle(ON);
+    run.combo(
+        JAB,
+        &[(UP_TILT, 1), (DOWN_TILT, 1), (UP_TILT, 1), (UP_TILT, 1)],
+        ON,
+    );
+    assert_eq!(
+        &advances(&run)[2..],
+        [(0, Advance::Next(1)), (1, Advance::Finished)]
+    );
+    assert_eq!((run.walk().streak(), run.walk().best()), (1, 9));
+}
+
+#[test]
+fn the_exchange_ending_before_the_next_combo_is_a_drop() {
+    let steps = two_combos();
+    let mut run = Run::drilling(&steps, 2, 2);
+    run.combo(JAB, &[(UP_TILT, 1)], ON);
+    run.settle(ON);
+    assert_eq!(
+        advances(&run),
+        [(0, Advance::Next(1)), (1, Advance::Dropped)]
+    );
+    let gap = run.stepped[1].summary;
+    assert_eq!(
+        (gap.outcome, gap.graded, gap.clean),
+        (Outcome::Stopped, 0, false)
+    );
+    let walk = run.walk();
+    assert_eq!((walk.cursor(), walk.streak(), walk.best()), (0, 0, 2));
+}
+
+#[test]
+fn a_different_first_move_for_the_next_combo_is_a_wrong_move() {
+    let steps = two_combos();
+    let mut run = Run::drilling(&steps, 0, 0);
+    run.combo(JAB, &[(UP_TILT, 1), (UP_TILT, 1), (UP_TILT, 1)], ON);
+    assert_eq!(
+        advances(&run),
+        [(0, Advance::Next(1)), (1, Advance::Dropped)]
+    );
+    assert_eq!(
+        run.stepped[1].summary.fault,
+        Some((0, Reason::WrongMove(Move::UpTilt)))
+    );
+    assert_eq!(run.helper.target(), Some(&steps[0]));
+}
+
+#[test]
+fn a_one_combo_sequence_counts_each_clean_attempt() {
+    let steps = vec![record(JAB, &[(UP_TILT, 1)])];
+    let mut run = Run::drilling(&steps, 0, 0);
+    run.combo(JAB, &[(UP_TILT, 1)], ON);
+    run.settle(ON);
+    run.combo(JAB, &[(UP_TILT, 1)], ON);
+    run.settle(ON);
+    assert_eq!(
+        advances(&run),
+        [(0, Advance::Finished), (0, Advance::Finished)]
+    );
+    assert_eq!((run.walk().streak(), run.walk().best()), (2, 2));
+}
+
+#[test]
+fn a_cleared_strip_between_the_combos_is_a_drop() {
+    let steps = two_combos();
+    let mut run = Run::drilling(&steps, 3, 3);
+    run.combo(JAB, &[(UP_TILT, 1)], ON);
+    run.clear();
+    assert_eq!(
+        advances(&run),
+        [(0, Advance::Next(1)), (1, Advance::Dropped)]
+    );
+    assert_eq!(run.stepped[1].summary.outcome, Outcome::Cleared);
+    assert_eq!((run.walk().streak(), run.walk().best()), (0, 3));
+}
+
+#[test]
+fn load_after_a_sequence_waits_for_its_exchange_to_close() {
+    let load = Settings {
+        load_after: true,
+        ..ON
+    };
+    let steps = two_combos();
+    let mut run = Run::drilling(&steps, 0, 0);
+    run.combo(
+        JAB,
+        &[(UP_TILT, 1), (DOWN_TILT, 1), (UP_TILT, 1), (UP_TILT, 1)],
+        load,
+    );
+    assert!(
+        !run.outs.iter().any(|o| o.load),
+        "combo 2 followed in the same exchange"
+    );
+    run.settle(load);
+    assert_eq!(
+        run.outs.iter().filter(|o| o.load).count(),
+        1,
+        "one load, after the sequence"
+    );
+    assert_eq!(
+        advances(&run),
+        [(0, Advance::Next(1)), (1, Advance::Finished)]
+    );
+}
+
+#[test]
+fn an_empty_sequence_drills_nothing() {
+    let mut run = Run::drilling(&[], 0, 0);
+    run.combo(JAB, &[(UP_TILT, 1)], ON);
+    run.settle(ON);
+    assert!(run.helper.target().is_none());
+    assert!(run.stepped.is_empty() && run.graded().is_empty());
 }
