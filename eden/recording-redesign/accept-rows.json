@@ -614,6 +614,21 @@
       "start_gate": "training-hud-unpaused"
     },
     {
+      "id": "acc-p2-control",
+      "start": "training",
+      "end": "training",
+      "start_gate": "training-hud-unpaused",
+      "steps": [
+        {
+          "run": "p2check.py:p2_control",
+          "check": true,
+          "on": "diag"
+        }
+      ],
+      "expect": "Native pause, CPU Behavior = Control; Player 2's stick moves the CPU and Player 2's ZL + D-pad Left changes the CPU fighter, and Player 2 still moves it after the change. Run last before acc-hook.",
+      "timed": false
+    },
+    {
       "id": "acc-hook",
       "start": "training",
       "end": "training",
