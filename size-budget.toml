@@ -673,3 +673,11 @@ ceiling = 150966
 date = "2026-11-08"
 reason = "rc.6 coverage, second set (p23/rc6-cov-rec 4d387ff..f7371fa): Make combo saves only its own exchange, the operator's '+ Save last combo…' row at the top of COMBOS and a combo's recorded fighter in CONNECTIONS, a drill or bind puts that file first, and the Replay window's clip editor drawn after the hand-over; measured 150966 (tools/size_gate.py), +127 over 150839"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied under TASK-OPUS-rc6-cov-rec and the primary's inbox orders of 2026-11-08 13:08Z (Save last combo) and 13:31Z (Make combo), own commit"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 151475
+date = "2026-11-08"
+reason = "rc.6 coverage, third set (p23/rc6-cov-rec 37bf8d0..9897e8e): a setup restore writes no save file (#69 b), Edit placement edits the role's active macro and Play warps with its offset (#70 a), Switch asks for a CPU macro's exact Mii (#54 a), and the r8 pop-up's two columns and row lines (#19, #49); measured 151475 (tools/size_gate.py), +509 over 150966"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied under TASK-OPUS-rc6-cov-rec and the primary's inbox answers of 2026-11-08 ~14:20Z (#49, #19, #54, #70, #69), own commit"
