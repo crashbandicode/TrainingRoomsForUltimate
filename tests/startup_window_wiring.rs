@@ -61,3 +61,24 @@ fn the_scene_change_keeps_the_new_scenes_start_up_window() {
     let publish = body(BANK, "unsafe fn publish_pending(");
     assert!(publish.contains("construction: None, tick: TickGap::default(), held_turn: 0, scene,"), "{publish}");
 }
+
+/// rc6-hot-xps1 (2026-11-08, XPS): the first group exchange from either start-up window fell back with "group owner
+/// receipt changed" and the player got the window's cell 0. H1 stamps the bank with the owner generation before the
+/// scene's own `scene_changed`, whose Mii adapter step then opens a new one, so `group_owner` saw a stale epoch. The
+/// window kept for the new scene joins that generation after the adapter's step.
+#[test]
+fn a_kept_start_up_window_joins_the_new_owner_generation() {
+    let roster = include_str!("../src/runtime/roster/character_roster.rs");
+    let changed = body(roster, "pub fn scene_changed(mode: game_mode::Mode) {");
+    let bank = changed.find("body_bank::scene_changed();").expect("the bank's step");
+    let mii = changed.find("mii_saved_alpha::scene_changed();").expect("the adapter's step");
+    let adopt = changed.find("body_bank::adopt_scene_generation();").expect("the kept window joins the generation");
+    assert!(bank < mii && mii < adopt, "{changed}");
+    let adopt = body(BANK, "pub(super) fn adopt_scene_generation(");
+    assert!(adopt.contains("let fresh = !bank.departed && bank.phase != Phase::Retired && bank.scene.is_some() && bank.scene == now;"),
+        "{adopt}");
+    assert!(adopt.contains("scene_generation(bank.epoch, super::mii_saved_alpha::current_generation(role as u32), fresh)"),
+        "{adopt}");
+    let owner = body(BANK, "unsafe fn group_owner(");
+    assert!(owner.contains("if epoch != bank.epoch || resource != bank.alias { return None; }"), "the proof it satisfies");
+}

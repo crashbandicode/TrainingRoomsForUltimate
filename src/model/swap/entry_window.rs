@@ -105,6 +105,14 @@ impl<E: Copy + PartialEq> Pending<E> {
     }
 }
 
+/// The owner generation a bank's group exchange must show. H1 stamps the window with the generation current while the
+/// new scene is configured; that scene's own scene change opens the next one after the bank's step. A window the bank
+/// step kept for the new scene (`kept`) takes the new generation; any other bank keeps its stamp, so a group exchange
+/// from an earlier scene stays refused.
+pub fn scene_generation(stamped: u64, current: u64, kept: bool) -> u64 {
+    if kept { current } else { stamped }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -199,5 +207,50 @@ mod tests {
         assert!(!pending.binds(0, window, 7), "another owner");
         assert!(!pending.binds(1, native, 7), "the native words");
         assert!(!pending.binds(1, window, 8), "a later scene");
+    }
+
+    /// rc6-hot-xps1 (2026-11-08, XPS): H1 stamps the owner generation of the scene being configured, and that scene's
+    /// own `scene_changed` advances it afterwards. A window kept for the new scene follows it; nothing else does.
+    #[test]
+    fn a_kept_start_up_window_joins_its_scenes_owner_generation() {
+        let (at_h1, after_the_change) = (4u64, 5u64);
+        assert_eq!(scene_generation(at_h1, after_the_change, true), after_the_change, "kept for the new scene");
+        assert_eq!(scene_generation(at_h1, after_the_change, false), at_h1,
+            "departed or retired: the old stamp, so an exchange from an earlier scene stays refused");
+        assert_eq!(scene_generation(after_the_change, after_the_change, true), after_the_change, "already current");
+    }
+
+    /// Primary 12:40Z (cov-rest `covrest-02`, rc.5 diag): the CPU cycle Mario, Mii Brawler, Swordfighter, Gunner, Link
+    /// fell back the same way on its first press, a Mii group exchange out of the CPU's start-up window (the Miis are
+    /// groups: `cycle_members` leaves them out of the window). Any group exchange starts from the receipt
+    /// `group_owner` mints only while the bank's stamp is the owner's current generation, and a Mii exchange keeps that
+    /// generation. With the stamp the kept window adopts, the Mii exchange is proven; with the stamp H1 left, there is
+    /// no receipt to start from.
+    #[test]
+    fn a_cpu_mii_group_exchange_out_of_a_kept_window_after_the_scene_change() {
+        use crate::engine::swap::body_bank::{GroupExchange, GroupOwner};
+        let (at_h1, after_the_change) = (1u64, 2u64);
+        let window = entry_window(MARIO, &[LINK, DK], 2, false).unwrap();
+        let receipt = |stamp: u64| (stamp == after_the_change).then(|| {
+            let mut descriptor = [0u8; 0x70];
+            descriptor[0x14..0x18].copy_from_slice(&(window.count() as u32).to_le_bytes());
+            for (i, kind) in window.kinds().iter().enumerate() {
+                descriptor[0x18 + i * 4..0x1c + i * 4].copy_from_slice(&kind.to_le_bytes());
+            }
+            descriptor[0x28] = 1;
+            GroupOwner { entry: 0x1000, owner: 1, epoch: after_the_change, resource: 0x2000,
+                header: [1, MARIO, LINK, DK, 0], descriptor, bodies: [(0x3000, 1), (0x4000, 262144), (0x5000, 327680)] }
+        });
+        assert!(receipt(at_h1).is_none(), "the stamp H1 left: no receipt, the fallback rc6-hot-xps1 and covrest-02 saw");
+        let before = receipt(scene_generation(at_h1, after_the_change, true)).expect("the kept window's receipt");
+        let brawler = Members::mii_group(0x48).unwrap();
+        let mii_header = [1, 0x48, NONE, NONE, 0];
+        let mut after = GroupOwner { header: mii_header, ..before };
+        after.descriptor[0x14..0x18].copy_from_slice(&1u32.to_le_bytes());
+        after.descriptor[0x18..0x24].copy_from_slice(&[0x48, 0, 0, 0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
+        after.descriptor[0x28..0x2c].copy_from_slice(&1u32.to_le_bytes());
+        assert!(GroupExchange::new_with_header(before, after, brawler, mii_header).is_some(), "the Mii group moves in");
+        assert!(GroupExchange::new_with_header(before, GroupOwner { epoch: at_h1, ..after }, brawler, mii_header).is_none(),
+            "a generation that differs across the exchange refuses");
     }
 }
