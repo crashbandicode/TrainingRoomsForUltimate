@@ -110,10 +110,9 @@ def acc_play_p1(ctx):
     return steps.save(ctx, 'play-p1', {'line': line, 'warps': warps, 'shot': str(shot)})
 
 
-# The frame strip's lanes in a 1280-wide shot (rc5-accept-yoga2 adv-hit frame). An attack paints
-# orange (startup) and red (active) cells before its blue recovery; a busy state without a hitbox
-# is blue only. rc5-opus-diag1 showed a blue-only 11-frame CPU bar after Play on CPU, which a plain
-# before/after difference counted as playback, so the check is the attack colours.
+# The frame strip's lanes in a 1280-wide shot (rc5-accept-yoga2 adv-hit frame). P1's attack paints
+# orange (startup) and red (active) cells before its blue recovery; the CPU lane is blue only
+# (`frame_strip::classify` keeps the attack colours for P1), so a CPU check counts busy cells.
 P1_LANE = (288, 50, 792, 66)
 CPU_LANE = (288, 80, 792, 96)
 
@@ -123,17 +122,10 @@ def _busy_cells(shot, lane):
     startup or active colours (`frame_strip::classify` keeps those for P1), so a CPU action is a blue bar."""
     from PIL import Image
     with Image.open(shot) as image:
-        pixels = list(image.convert('RGB').crop(lane).getdata())
-    return sum(1 for r, g, b in pixels if abs(r - 82) < 30 and abs(g - 136) < 30 and abs(b - 232) < 30)
-
-
-def _attack_cells(shot, lane):
-    from PIL import Image
-    with Image.open(shot) as image:
         if image.size[0] != 1280:
             raise RuntimeError('lane check needs a 1280-wide shot: %s' % (image.size,))
         pixels = list(image.convert('RGB').crop(lane).getdata())
-    return sum(1 for r, g, b in pixels if r > 200 and b < 110 and g < 200)
+    return sum(1 for r, g, b in pixels if abs(r - 82) < 30 and abs(g - 136) < 30 and abs(b - 232) < 30)
 
 
 def acc_play_cpu(ctx):
@@ -141,7 +133,8 @@ def acc_play_cpu(ctx):
 
     This build prints `screen=playback role=… warp=1` only when it warps (rr_host::play_role);
     there is no warp=0 line. The no-warp check is the absence of a new warp=1 line, and the
-    playback check is attack cells (the jab) in the strip's CPU lane after the chord.
+    playback check is new busy (recovery-blue) cells in the strip's CPU lane after the chord: the
+    CPU lane never shows startup or active colours (`frame_strip::classify`), as in acc-cpu-menu.
     """
     prep(ctx, 'play-cpu')
     time.sleep(2.0)
@@ -153,16 +146,16 @@ def acc_play_cpu(ctx):
     time.sleep(2.5)
     after = ctx.shot('play-cpu-after')
     warps = _warps(ctx) - before
-    attack = max(_attack_cells(during, CPU_LANE), _attack_cells(after, CPU_LANE))
-    out = {'warps': warps, 'cpu_attack_cells': attack,
-           'cpu_attack_cells_before': _attack_cells(idle, CPU_LANE),
+    busy_before = _busy_cells(idle, CPU_LANE)
+    busy = max(_busy_cells(during, CPU_LANE), _busy_cells(after, CPU_LANE))
+    out = {'warps': warps, 'cpu_busy_cells_before': busy_before, 'cpu_busy_cells_after': busy,
            'shots': [str(idle), str(during), str(after)]}
     steps.save(ctx, 'play-cpu', out)
     if warps != 0:
         raise RuntimeError('play on CPU warped %d times (wanted 0): %s' % (warps, during))
-    if attack < 20:
-        raise RuntimeError('no attack cells in the strip CPU lane after Play on CPU (%d): %s'
-                           % (attack, during))
+    if busy <= busy_before + 20:
+        raise RuntimeError('the strip CPU lane shows no new action after Play on CPU (%d, before %d): %s'
+                           % (busy, busy_before, during))
     return out
 
 

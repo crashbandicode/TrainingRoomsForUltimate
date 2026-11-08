@@ -221,6 +221,36 @@
       "start_gate": "training-hud-unpaused"
     },
     {
+      "id": "acc-play-p1-after-cpu",
+      "start": "training",
+      "end": "training",
+      "start_gate": "training-hud-unpaused",
+      "steps": [
+        {
+          "run": "playp1probe.py:after_record_cpu",
+          "check": true,
+          "on": "diag"
+        }
+      ],
+      "expect": "Run right after acc-record-cpu: the play-warp fixture index keeps active.player = jab through the menu open/close, and Play on Player 1 warps once.",
+      "timed": false
+    },
+    {
+      "id": "acc-menu-after-cpu",
+      "start": "training",
+      "end": "training",
+      "start_gate": "training-hud-unpaused",
+      "steps": [
+        {
+          "run": "playp1probe.py:menu_after_record_cpu",
+          "check": true,
+          "on": "diag"
+        }
+      ],
+      "expect": "Run right after acc-record-cpu, no fixture: opening and closing the menu keeps the recorded file as the CPU's active macro in recording-index.json.",
+      "timed": false
+    },
+    {
       "id": "acc-play-cpu",
       "start": "training",
       "end": "training",
