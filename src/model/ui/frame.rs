@@ -475,8 +475,7 @@ pub fn page_frame(menu: &Menu, frame: &mut Frame) {
         if at >= GROUP_LINES {
             break;
         }
-        let rows = ROWS.iter().filter(|row| usize::from(row.group) == g && row.visible(pilot)).count();
-        let _ = write!(frame.groups[at], "{}  ({rows})", GROUPS[g].title);
+        let _ = write!(frame.groups[at], "{}  ({})", GROUPS[g].title, group_rows(menu, g, pilot));
         if Some(g) == active {
             frame.group_active = at as u8;
         }
@@ -560,6 +559,18 @@ pub fn page_frame(menu: &Menu, frame: &mut Frame) {
     paint_recording(menu, frame);
 }
 
+/// The count beside a group title: the rows it lists. A recording library group lists files, not
+/// settings rows (it has none), so it counts the catalog's files.
+fn group_rows(menu: &Menu, g: usize, pilot: bool) -> usize {
+    use super::menu::table::{COMBOS_SEQ, SAVES_MACROS};
+    let files = menu.recording().catalog();
+    match u8::try_from(g) {
+        Ok(SAVES_MACROS) => files.saves.len() + files.macros.len(),
+        Ok(COMBOS_SEQ) => files.combos.len() + files.sequences.len(),
+        _ => ROWS.iter().filter(|row| usize::from(row.group) == g && row.visible(pilot)).count(),
+    }
+}
+
 /// Rows of one section the twelve row panes can show under a header.
 const SECTION_ROWS: usize = 4;
 
@@ -585,6 +596,8 @@ fn paint_recording(menu: &Menu, frame: &mut Frame) {
         frame.tab_active = rec.tab() as u8;
         let _ = write!(frame.crumb, "Recording ({})", rec.role(face).label());
     }
+    // The recording hint replaces the page hint page_frame wrote; appended, the two ran together.
+    frame.hint.clear();
     let _ = frame.hint.write_str(rec.hint(face));
     let group_now = menu.focus().map(group_of);
     let on_library = group_now.is_some_and(|g| g == usize::from(SAVES_MACROS) || g == usize::from(COMBOS_SEQ));
@@ -897,6 +910,73 @@ mod tests {
         let text_left = super::super::panes::ROW_RIGHT - super::super::panes::text_width(value.encode_utf16().count());
         assert!(chip.x < text_left, "the chip sits before the name, not over it");
         assert!(frame.icons.iter().enumerate().all(|(i, icon)| i == 2 || !icon.on), "one chip on a file screen");
+    }
+
+    fn recording_menu_with_files() -> Menu {
+        use crate::model::recording_menu::{Catalog, ComboFile, MacroFile, SaveFile, SequenceFile};
+        let mut menu = menu();
+        menu.press(Button::R);
+        menu.press(Button::R);
+        let save = SaveFile { id: "s1".into(), name: "Macro 1 · start".into(), fighters: String::new() };
+        let jab = MacroFile {
+            id: "m1".into(),
+            name: "Jab".into(),
+            chain: false,
+            steps: Vec::new(),
+            start_save: Some("s1".into()),
+            start_save_on: true,
+            recorded_on: "Mario".into(),
+            span: 25,
+        };
+        let combo = |id: &str| ComboFile { id: id.into(), name: id.into(), made_from: None, links: Vec::new(), span: 1 };
+        let sequence = SequenceFile { id: "q1".into(), name: "Sequence 1".into(), combos: vec!["c1".into()], streak: 0, best: 0 };
+        menu.recording_mut().set_catalog(Catalog {
+            saves: vec![save],
+            macros: vec![jab],
+            combos: vec![combo("c1"), combo("c2")],
+            sequences: vec![sequence],
+            hot_saves: vec!["s1".into()],
+            hot_macros: vec!["m1".into()],
+            hot_combos: vec!["c1".into(), "c2".into()],
+            hot_sequences: vec!["q1".into()],
+        });
+        menu
+    }
+
+    /// Eden `rc5-opus-floppy1` (2026-11-08): `Save states & Macros (0)` beside an open macro. The count was of settings
+    /// rows, and a library group has none; it lists files.
+    #[test]
+    fn a_recording_library_group_counts_its_files() {
+        let menu = recording_menu_with_files();
+        let mut frame = Frame::new();
+        page_frame(&menu, &mut frame);
+        let groups: Vec<String> = (0..usize::from(frame.group_count)).map(|i| frame.groups[i].string_lossy()).collect();
+        assert!(groups.contains(&"Save states & Macros  (2)".to_string()), "{groups:?}");
+        assert!(groups.contains(&"Combos & Sequences  (3)".to_string()), "{groups:?}");
+        let options = groups.iter().find(|line| line.starts_with("Options")).expect("Options group");
+        assert_ne!(options, "Options  (0)", "settings groups still count their rows");
+    }
+
+    /// The same shot's footer read `B closeUp/Down move`: the recording hint was appended to the page hint.
+    #[test]
+    fn the_recording_hint_replaces_the_page_hint() {
+        use crate::model::menu::table::SAVES_MACROS;
+        use crate::model::recording_menu::Face;
+        let mut menu = recording_menu_with_files();
+        let mut frame = Frame::new();
+        page_frame(&menu, &mut frame);
+        assert_eq!(frame.hint.string_lossy(), menu.recording().hint(Face::Page));
+        menu.recording_mut().set_cursor(Face::Page, SAVES_MACROS, 1, 0);
+        menu.press(Button::A);
+        assert!(menu.recording().file_open());
+        let mut frame = Frame::new();
+        page_frame(&menu, &mut frame);
+        assert_eq!(frame.hint.string_lossy(), "Up/Down move   Left/Right On/Off   A do it   B back");
+        let mut other = Menu::new(Settings::factory(), Env::default());
+        other.press(Button::Down);
+        let mut frame = Frame::new();
+        page_frame(&other, &mut frame);
+        assert_eq!(frame.hint.string_lossy(), HINT_PAGE, "pages without the recording screens keep the page hint");
     }
 
     #[test]
