@@ -168,7 +168,6 @@ pub(crate) unsafe fn frame_after(fighter: usize) {
             }
             identity::service();
             named_macros::service_character_request();
-            crate::runtime::features::recording_host::service_switch_request();
             replay_capture::service_reload_request();
             port::slots::service_slot_request();
         }

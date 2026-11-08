@@ -147,12 +147,7 @@ fn apply(tick: &Tick) {
             current,
         );
     }
-    if let Some(target) = tick.switch_mii {
-        if !SWITCH_MII.post(target) {
-            emit(&["screen=mismatch switch_mii=dropped".to_string()]);
-        }
-        crate::runtime::ui::worker::wake();
-    } else if let Some(kind) = tick.switch_kind {
+    if let Some(kind) = tick.switch_kind {
         let requested = if tick.switch_player {
             crate::runtime::roster::character_roster::request_player_kind(kind as u32)
         } else {
@@ -192,36 +187,6 @@ fn apply(tick: &Tick) {
         );
     }
     emit(&tick.diags);
-}
-
-/// A recording Switch for a CPU macro recorded on an exact Mii, waiting for the game callback.
-static SWITCH_MII: hos_lock::Mailbox<crate::engine::mii::replay::Target, 2> = hos_lock::Mailbox::new();
-
-/// Game callback only, beside `named_macros::service_character_request`: the Switch goes to the existing replay-catalog
-/// request with the macro's `playback_target()` (primary 2026-11-08 #54 (a)). The Mii machinery is used through its API
-/// only; it waits while the CPU cannot reload, and the newest Switch wins.
-pub fn service_switch_request() {
-    if !crate::runtime::roster::character_roster::cpu_reload_ready() {
-        return;
-    }
-    let mut newest = None;
-    SWITCH_MII.drain(|target| newest = Some(target));
-    let Some(target) = newest else { return };
-    #[cfg(feature = "mii-ordinary-cpu-alpha")]
-    let accepted = crate::runtime::roster::character_roster::mii_replay::request_named(target);
-    #[cfg(not(feature = "mii-ordinary-cpu-alpha"))]
-    let accepted = {
-        let _ = target;
-        false
-    };
-    #[cfg(feature = "diag")]
-    crate::runtime::diag_log::diagnostic(format_args!(
-        "[PracticeRecording] screen=mismatch switch_mii=1 kind={} accepted={}",
-        target.kind(),
-        u8::from(accepted)
-    ));
-    #[cfg(not(feature = "diag"))]
-    let _ = accepted;
 }
 
 fn emit(lines: &[String]) {
