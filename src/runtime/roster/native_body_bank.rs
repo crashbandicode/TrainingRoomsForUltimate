@@ -210,6 +210,9 @@ static ASYNC_ENABLED: AtomicBool = AtomicBool::new(false);
 /// rc.6 item 3: the Phase B′ rows passed and the identity view's body-init site is hooked (its hook skips the
 /// worker's registration for a background build, `background_skip`).
 static BACKGROUND_ENABLED: AtomicBool = AtomicBool::new(false);
+/// rc.6 item 3, Ice Climbers (SPECIAL-GROUPS §2): the construction tail's pair test is redirected for background bodies
+/// (`background_tail`), so a group may build beside a live `[Popo, Nana]` window.
+static BACKGROUND_PAIR_TAIL: AtomicBool = AtomicBool::new(false);
 /// One bit per owner whose background build is in flight.
 static BACKGROUND_OWNERS: AtomicU32 = AtomicU32::new(0);
 /// Registrations `background_skip` has skipped since boot (each settlement logs its own difference).
@@ -3016,20 +3019,45 @@ pub(crate) fn background_skip(owner: u32) -> bool {
     skip
 }
 
+/// The construction tail's pair test (`cmp w8, #0x4b` after `ldr w8, [x9, #0x18]`, x9 the entry, x19 the body).
+const BACKGROUND_TAIL: usize = 0x60de68;
+
+/// Any body of an owner whose background build is in flight (`background_skip`'s key): the live window is built, so a
+/// body that constructs for that owner meanwhile is the background build's.
+#[inline(always)]
+unsafe fn background_body(body: usize) -> bool {
+    BACKGROUND_OWNERS.load(Ordering::Acquire) != 0 && aligned(body as *const u8)
+        && fields::read::<u64>(body, 0x10).is_some_and(|owner| owner < 32
+            && BACKGROUND_OWNERS.load(Ordering::Acquire) & owner_bit(owner as u32) != 0)
+}
+
+/// SPECIAL-GROUPS §0 X1: the construction tail reads the **live** cells 0/1 (`0x60de64`, `0x60de70`) on the worker. Beside
+/// a live `[Popo, Nana]` window (a session that starts on Ice Climbers, or the pair group attached) a background body
+/// would take the pair rule: `R+0x50` decremented under the lock and, at 0 after the window's own build, the whole-R reset
+/// that drops every Prefetched group's keys. A background body sees no Popo in cell 0 instead, so its tail takes the
+/// per-kind release `0x17e8610(R, kind)` at `0x60debc`, which returns exactly the keys its group's prefetch registered.
+#[skyline::hook(offset = 0x60de68, inline)]
+unsafe fn background_tail(ctx: &mut InlineCtx) {
+    if ctx.registers[8].w() == POPO && background_body(ctx.registers[19].x() as usize) {
+        ctx.registers[8].set_x(u64::from(u32::MAX));
+    }
+}
+
 /// The group a background build starts next (`body_bank::next_background`) for the live kind `live`: none while a
 /// prefetch, a construction or a background build is in flight. A refused group is no candidate.
 fn background_candidate(bank: &Bank, live: Option<u32>) -> Option<usize> {
     if !BACKGROUND_ENABLED.load(Ordering::Acquire) || bank.prefetch.is_some() || bank.construction.is_some()
         || bank.background.is_some() { return None; }
     next_background(bank.groups.iter().map(|g| (if g.background_refused || g.leaving { GroupState::Failed } else { g.state },
-        *g.members, g.identity.is_some())), *bank.members, bank.identity.is_some(), live == Some(KIRBY))
+        *g.members, g.identity.is_some())), *bank.members, bank.identity.is_some(), live == Some(KIRBY),
+        BACKGROUND_PAIR_TAIL.load(Ordering::Acquire))
 }
 
 /// A Prefetched group a background build still owes: the notice counts it as loading (`progress`).
 fn background_owed(bank: &Bank, group: &Group, live: Option<u32>) -> bool {
     BACKGROUND_ENABLED.load(Ordering::Acquire) && group.state == GroupState::Prefetched && !group.background_refused
         && !group.leaving && background_build_eligible(*group.members, group.identity.is_some(), *bank.members,
-            bank.identity.is_some(), live == Some(KIRBY)).is_ok()
+            bank.identity.is_some(), live == Some(KIRBY), BACKGROUND_PAIR_TAIL.load(Ordering::Acquire)).is_ok()
 }
 
 const INFO_BYTES: usize = BACKGROUND_INFO_SPANS[0].1 + BACKGROUND_INFO_SPANS[1].1;
@@ -5001,6 +5029,8 @@ const PAIR_SEAMS: &[&str] = &["ic_pair.partner_window", "ic_pair.pair_partner", 
     "ic_pair.commit_change", "ic_pair.outgoing_owner", "ic_pair.deactivate_body"];
 const SPECIAL_SEAMS: &[&str] = &["special_groups.object_release", "special_groups.heap_free",
     "special_groups.release_key"];
+/// rc.6 item 3, Ice Climbers: the construction tail's pair test for background bodies (`background_tail`).
+const BACKGROUND_TAIL_SEAMS: &[&str] = &["background_build.construct_tail"];
 
 pub(super) unsafe fn install(base: usize) {
     use crate::runtime::seams::seam_install::gate;
@@ -5106,6 +5136,18 @@ pub(super) unsafe fn install(base: usize) {
     BACKGROUND_ENABLED.store(async_ok && identity_view, Ordering::Release);
     trace!("[GroupSwap] background build {} async={} identity_view={}",
         if async_ok && identity_view { "enabled" } else { "off; a group builds at its first switch" }, async_ok, identity_view);
+    // rc.6 item 3, Ice Climbers (SPECIAL-GROUPS §0 X1, §2): the tail's pair test for background bodies, its first four
+    // 13.0.5 words owned (`cmp w8, #0x4b; b.ne 0x60debc; ldr w8, [x9, #0x1c]; cmp w8, #0x4c`). Without it a live
+    // `[Popo, Nana]` window keeps deferring the background builds.
+    let tail_stock = fingerprint(base, BACKGROUND_TAIL, &[0x71012d1f, 0x54000281, 0xb9401d28, 0x7101311f], "GroupSwap");
+    let tail_ok = gate(SEAM_GROUP, BACKGROUND_TAIL_SEAMS, async_ok && identity_view && tail_stock)
+        && async_ok && identity_view && tail_stock;
+    if tail_ok {
+        skyline::install_hooks!(background_tail);
+        BACKGROUND_PAIR_TAIL.store(true, Ordering::Release);
+    }
+    trace!("[GroupSwap] background pair tail {}",
+        if tail_ok { "enabled; a live Ice Climbers pair window builds the other groups" } else { "off; a live Ice Climbers pair window waits" });
     if groups_ok {
         // The `[GroupSwap] enabled` line follows the startup cycle-preload load
         // (`report_group_swap`), so it shows the switches this boot applies.

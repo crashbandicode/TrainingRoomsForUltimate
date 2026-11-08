@@ -230,6 +230,13 @@ pub const ROWS: &[Seam] = &[
            feature: "native-body-bank-alpha", scopes: Scopes::ALL, read_only: false, per_frame: false,
            sharing: Sharing::None,
            note: "called through fighter vtable +0x48; the runtime slot check (FIGHTER_VTABLE+0x48 == base+0x60ffd0, :2451) stays (relocated data, no static bytes)" },
+    // background_build:hook/inline:exact=16
+    Seam { label: "background_build.construct_tail", group: "native_body_bank", offset: 0x60de68,
+           kind: SeamKind::Hook { form: HookForm::Inline, placement: Placement::Mid },
+           guard: [0x1f, 0x2d, 0x01, 0x71, 0x81, 0x02, 0x00, 0x54, 0x28, 0x1d, 0x40, 0xb9, 0x1f, 0x31, 0x01, 0x71, 0x21, 0x02, 0x00, 0x54, 0x95, 0xa2, 0x00, 0x91, 0xe0, 0x03, 0x15, 0xaa, 0xcf, 0xce, 0xce, 0x94, 0xf6, 0x03, 0x14, 0xaa, 0x94, 0x52, 0x40, 0xb9, 0x88, 0x06, 0x00, 0x71, 0xe0, 0x03, 0x15, 0xaa, 0xc8, 0x52, 0x00, 0xb9, 0xcd, 0xce, 0xce, 0x94, 0x9f, 0x06, 0x00, 0x71, 0x2c, 0x01, 0x00, 0x54],
+           feature: "native-body-bank-alpha", scopes: Scopes::ALL, read_only: false, per_frame: false,
+           sharing: Sharing::None,
+           note: "construction tail cmp w8,#0x4b (w8 = the live FE+0x18, x19 the body): a background body's w8 becomes -1, so its tail takes the per-kind release at 0x60debc, never the pair rule (SPECIAL-GROUPS §0 X1)" },
     // special_groups:called/fn:exact=0:today=16
     Seam { label: "special_groups.object_release", group: "native_body_bank", offset: 0x3a6b80,
            kind: SeamKind::Called,

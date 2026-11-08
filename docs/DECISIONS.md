@@ -521,5 +521,8 @@ Relayed in `artifacts/phase23/INBOX-opus-rc6-hotslots.md`. They replace item 3 o
   - a cycle press meanwhile is held or served, never failed.
 - **20:26Z:** "All groups in rc.6". Mii, Pokémon Trainer/Aegis and Ice Climbers pair groups are background-built too.
   Their exclusion in the first build is temporary; each kind follows as its research (`SPECIAL-GROUPS.md`) lands.
+- **22:32Z** (`TASK-OPUS-rc6-bg-special.md`): a session that starts on Ice Climbers or Pokémon Trainer still gets its
+  other groups built. A live pair or native window may defer a build only until the code for that window exists, never
+  for the whole session.
 
 This records the decisions only; the implementation, host tests and Eden proofs are recorded in `CARRY-OVER.md`.

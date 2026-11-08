@@ -911,3 +911,34 @@ facts are in `rc6-item3-re/SPECIAL-GROUPS.md`.
 - Eden `rc6-hot-xps10` (`rows-item3-cc.json`): P1 and CPU cycle changes (add 2, remove 1) and a change during a load,
   each followed by a warm lap. That run found the cell-byte defect above.
 - Recorded manifest edits of the six carried files; `carry_pkg6.py carry/ledger/verify` re-derives all 250 files.
+
+### p23/rc6-bg-ic: the Ice Climbers pair group built in the background, and a session that starts on Ice Climbers (2026-11-08, rc.6 item 3)
+
+Operator decision "All groups in rc.6" and the start-on-the-kind rule (`docs/DECISIONS.md` "Item 3 in rc.6", 20:26Z and
+22:32Z). Design: `artifacts/phase23/rc6-item3-re/SPECIAL-GROUPS.md` §0 X1 and §2 (static RE and Eden
+`rc6-special-re6`).
+
+- **The pair group builds in the background** (`body_bank::background_build_eligible` admits `Special::Pair`):
+  - Beside a window that is not `[Popo, Nana]` its two construction tails take the per-kind release `0x17e8610` on the
+    live cells. That returns exactly the keys its prefetch registered: no `R+0x50` reference and no reset-batch permit
+    are involved.
+  - In the tick the bank lends the group's members, so N1 gives Nana Popo's context and the flags are 6. On that path
+    the scratch control init reads only `+0x28`, `+0x5918` and `+0x4188..`.
+  - The settlement gives Popo cell 0 and Nana cell 1. The warm attach is today's (N2). The pair group's switch-time
+    build stays synchronous.
+- **A live pair window no longer defers the other groups** (at `182a785` it was "special window"):
+  - `native_body_bank::background_tail` (inline `0x60de68`, the tail's `cmp w8, #0x4b`) makes a background body
+    compare -1 instead of the live Popo. Its tail then takes the per-kind release and never the pair rule's whole-R
+    reset.
+  - It is installed with the background builds, guarded by four 13.0.5 words and the seam row
+    `background_build.construct_tail`. Without it a live pair window still defers (`pair_tail` false, "pair window").
+  - A native window still defers (the Pokémon Trainer and Pyra/Mythra lane).
+- **Merge note** (accepted by the primary, 22:52Z): `p23/rc6-hot-slots-mii` hooks `0x60de68` too. Integration keeps
+  one `background_tail`, which also restores the Mii shadow's `R`.
+
+**Proof:**
+- Host tests, each failed first: model `a_background_build_takes_the_pair_group_and_builds_beside_a_live_pair_window`;
+  `tests/background_pair_wiring.rs` (3).
+- Recorded manifest edits of `rows_a1.rs`, `body_bank.rs` and `native_body_bank.rs`; `carry_pkg6.py
+  carry/ledger/verify` re-derives all 250 files.
+- Eden: `artifacts/phase23/LANE-OPUS-RC6-BG-IC-REPORT.md`.

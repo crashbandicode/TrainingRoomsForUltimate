@@ -127,7 +127,7 @@ fn the_lifecycle_starts_and_settles_it_and_the_gate_needs_both_paths() {
     let candidate = body(BANK, "fn background_candidate(");
     assert!(candidate.contains("|| bank.background.is_some() { return None; }"), "{candidate}");
     // SPECIAL-GROUPS §0 X1/X4: the live window takes part in the rule.
-    assert!(candidate.contains("*g.members, g.identity.is_some())), *bank.members, bank.identity.is_some(), live == Some(KIRBY))"), "{candidate}");
+    assert!(candidate.contains("*g.members, g.identity.is_some())), *bank.members, bank.identity.is_some(), live == Some(KIRBY),"), "{candidate}");
     assert!(BANK.contains("const BODY_CELL_BYTE: usize = 0xf816;"));
     assert!(candidate.contains("bank.prefetch.is_some() || bank.construction.is_some()"), "{candidate}");
     let progress = body(BANK, "pub(crate) fn progress(");
