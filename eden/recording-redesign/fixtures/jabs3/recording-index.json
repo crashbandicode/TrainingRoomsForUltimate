@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "migrated": true,
+  "last_used": {
+    "macro": {},
+    "save": {},
+    "sequence": {},
+    "combo": {}
+  },
+  "hot": {
+    "macro": [
+      "jabs3"
+    ],
+    "save": [
+      "jab-start"
+    ],
+    "sequence": [],
+    "combo": []
+  },
+  "loop": {
+    "player": 1,
+    "cpu": 1
+  },
+  "active": {
+    "player": null,
+    "cpu": null
+  },
+  "chord_notice_seen": true,
+  "bound_save": "jab-start"
+}

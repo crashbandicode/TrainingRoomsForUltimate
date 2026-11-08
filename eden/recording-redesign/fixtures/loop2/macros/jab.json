@@ -1,0 +1,407 @@
+{
+  "schema_version": 1,
+  "name": "Walk jab",
+  "game_version": "13.0.5",
+  "start": {
+    "fighter_kind": 0,
+    "costume": 0,
+    "facing": 1.0,
+    "situation": 0,
+    "status": 0,
+    "speed_x": 0.0,
+    "speed_y": 0.0
+  },
+  "placement": {
+    "delta_x": 0.0,
+    "delta_y": 0.0,
+    "momentum": "preserve_recorded"
+  },
+  "frames": [
+    {
+      "buttons": 32768,
+      "lstick_x": -70,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": -70,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": -70,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": -70,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": -70,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": -70,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": -70,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": -70,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": -70,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": -70,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": -70,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": -70,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": -70,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": -70,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": -70,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": -70,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": -70,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": -70,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": -70,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": -70,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": -70,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": -70,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": -70,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": -70,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": -70,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": -70,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": -70,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": -70,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": -70,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": -70,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 36872,
+      "lstick_x": 0,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    }
+  ],
+  "start_save": "jab-start"
+}
