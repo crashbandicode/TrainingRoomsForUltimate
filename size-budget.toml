@@ -705,3 +705,11 @@ ceiling = 152302
 date = "2026-11-08"
 reason = "rc.6 item 3, a session that starts on Ice Climbers (p23/rc6-bg-ic ca8af47; TASK-OPUS-rc6-bg-special 22:32Z): the pair-lead start-up window (entry_window extendable/entry_window/creation_matches/original_request, native_body_bank scene_header gate); measured 152302 (tools/size_gate.py), +49 over 152253"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to this operator-chosen rc.6 item under TASK-OPUS-rc6-bg-special (primary c07b3449, 2026-11-08: a raise goes in its own commit with approved_by)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 152341
+date = "2026-11-08"
+reason = "rc.6 item 3, a session that starts on Ice Climbers (p23/rc6-bg-ic 04a823c; Eden rc6-bg-ic2 ic-start-loaded): the notice counts a live pair-lead window as it serves (body_bank::window_targets, native_body_bank plan_budget); measured 152341 (tools/size_gate.py), +39 over 152302"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to this operator-chosen rc.6 item under TASK-OPUS-rc6-bg-special (primary c07b3449, 2026-11-08: a raise goes in its own commit with approved_by)"
