@@ -117,6 +117,19 @@ pub fn helper_seat(slot: u32, quantity: Option<u32>, borrowed: bool) -> bool {
     !(slot == ENTRY3 && borrowed)
 }
 
+/// TASK-OPUS-rc6-open-fixes item 1, reading A (primary 2026-11-08 23:03Z): entry `slot` (2 or 3) is a live seat while
+/// the game plays it as a CPU: F9 promoted it (`promoted`, per entry 2 and 3: a published seat the game activated, until
+/// it is re-proved once parked) and the slot is within No. of CPUs. The Mii owners' snapshot then treats it as a CPU
+/// owner, not a parked helper row.
+pub fn live_seat(slot: u32, promoted: [bool; 2], quantity: Option<u32>) -> bool {
+    let index = match slot {
+        ENTRY2 => 0,
+        ENTRY3 => 1,
+        _ => return false,
+    };
+    promoted[index] && training_quantity_open(quantity) && quantity.is_some_and(|quantity| slot <= quantity)
+}
+
 /// Where a hat may be placed. Entries 7/6/5/4 at any open count. Entry 3 only as the fifth hat at one CPU.
 /// Entry 2 never.
 pub fn hat_may_use(slot: u32, quantity: Option<u32>, borrow_open: bool) -> bool {
@@ -694,6 +707,28 @@ mod tests {
         let sources = include_str!("../runtime/roster/character_sources.rs");
         assert!(sources.contains("f9_gate::mark_promoted("), "a published seat is marked");
         assert!(sources.contains("mii_managed_helper::reproof_parked("), "and re-proved once parked");
+    }
+
+    /// TASK-OPUS-rc6-open-fixes item 1 (cov-rest 17:14Z): at 2 or 3 CPUs a promoted seat plays as a CPU, so it is
+    /// never parked, and both Mii owners refused every snapshot: the Mii classes were greyed in both cycles. Eden
+    /// covrest-12 `[MiiHelperProof] ... id=2 why=proof parked=false`: the recorded proof equal to the row read now, only
+    /// `parked` false. Reading A (primary 2026-11-08 23:03Z): while live (slot <= No. of CPUs) entries 2/3 are CPU owners
+    /// for the Mii owners' snapshot, not parked helper rows.
+    #[test]
+    fn a_promoted_seat_within_the_cpu_count_is_a_live_cpu_owner() {
+        assert!(live_seat(ENTRY2, [true, false], Some(2)));
+        assert!(live_seat(ENTRY2, [true, true], Some(3)));
+        assert!(live_seat(ENTRY3, [true, true], Some(3)));
+        assert!(!live_seat(ENTRY3, [true, true], Some(2)), "entry 3 is parked at two CPUs");
+        assert!(!live_seat(ENTRY2, [true, false], Some(1)), "dropped: parked again, and re-proved by reading B");
+        assert!(!live_seat(ENTRY2, [false, false], Some(3)), "never promoted: its own row policy, unchanged");
+        assert!(!live_seat(ENTRY2, [true, true], None), "the count unknown");
+        assert!(!live_seat(1, [true, true], Some(3)) && !live_seat(4, [true, true], Some(3)), "only entries 2 and 3");
+        let gate = include_str!("../runtime/roster/f9_gate.rs");
+        assert!(gate.contains("crate::model::parked_entries::live_seat("), "F9 publishes its live seats");
+        let native = include_str!("../runtime/mii/mii_ordinary_native.rs");
+        assert!(native.contains("crate::runtime::roster::f9_gate::seat_live(id as u32)"), "the snapshot asks F9");
+        assert!(native.contains("(parked || owner_live)"), "a live seat need not be parked; its proof stays exact");
     }
 
     /// Eden covrest-12: after the CPU loaded the Mii Gunner, its HUD portrait leased the seat on entry 2 but its render

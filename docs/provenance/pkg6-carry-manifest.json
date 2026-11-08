@@ -8714,7 +8714,7 @@
    "dest": "src/runtime/mii/mii_ordinary_native.rs",
    "crate": "root",
    "src_sha256": "f359be35b161aa256850d33edc2f12d042927bbfb7e1fac4192e14876a8238d2",
-   "dest_sha256": "a317611bcbc3a8d75fcc9286a31e5deb5099d2a2946c8b432acfe7da432d5324",
+   "dest_sha256": "9ee0b6f32d5165b599e80649ed842a7de7742a49aab11c53a111a3125740f9e3",
    "edits": [
     {
      "old": "super::note(&format!(\"[MiiOrdinaryPlayer] bank settle diverged",
@@ -8865,6 +8865,11 @@
      "old": "        crate::engine::compat::logging::diagnostic(format_args!(\n            \"[MiiHelperProof] refused id={} why={} parked={} recorded={:?} now={:?} mii={:?}\",",
      "new": "        crate::engine::compat::logging::diagnostic(format_args!(\n            \"[MiiHelperProof] mismatch id={} why={} parked={} recorded={:?} now={:?} mii={:?}\",",
      "reason": "p23/rc6-cov-rest: the diag-only note of a helper proof that does not match the row reads \"[MiiHelperProof] mismatch\" (it is no user-facing refusal; the playbook compliance check reads the word refused as one)."
+    },
+    {
+     "old": "    if !view.accepts(id,now, #[cfg(any(test, feature = \"mii-managed-source-coexist-alpha\"))] parked) {\n",
+     "new": "    // TASK-OPUS-rc6-open-fixes item 1, reading A (primary 2026-11-08 23:03Z): a promoted F9 seat the game plays as a CPU\n    // (slot <= No. of CPUs) is a CPU owner for this snapshot, not a parked helper row. Its source must still be exactly\n    // the published one (the proof, key, token and Mii binding below); it is only not parked while it plays (Eden\n    // covrest-12: the recorded proof equal to the row read now, `parked=false`).\n    #[cfg(any(test, feature = \"mii-managed-source-coexist-alpha\"))]\n    let owner_live=crate::runtime::roster::f9_gate::seat_live(id as u32);\n    if !view.accepts(id,now, #[cfg(any(test, feature = \"mii-managed-source-coexist-alpha\"))] (parked || owner_live)) {\n",
+     "reason": "rc.6 TASK-OPUS-rc6-open-fixes item 1 (primary inbox 2026-11-08 23:03Z, reading A): a promoted F9 seat the game plays as a CPU (f9_gate::seat_live: slot <= No. of CPUs) is a CPU owner for the Mii owners' snapshot, not a parked helper row: helper_kind accepts its exactly unchanged published source without requiring it parked (Eden covrest-12: the recorded proof equal to the row read now, parked=false); every other check of the proof, key, token and Mii binding stays"
     }
    ]
   },

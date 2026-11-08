@@ -136,7 +136,13 @@ pub(crate) unsafe fn helper_kind(view:helpers::View,id:usize,owner:Owner,kind:u3
         && super::super::native_source::parked_ready(owner.entry as *const u8,id as u32,kind));
     #[cfg(not(any(test, feature = "mii-managed-source-coexist-alpha")))]
     let parked=true;
-    if !view.accepts(id,now, #[cfg(any(test, feature = "mii-managed-source-coexist-alpha"))] parked) {
+    // TASK-OPUS-rc6-open-fixes item 1, reading A (primary 2026-11-08 23:03Z): a promoted F9 seat the game plays as a CPU
+    // (slot <= No. of CPUs) is a CPU owner for this snapshot, not a parked helper row. Its source must still be exactly
+    // the published one (the proof, key, token and Mii binding below); it is only not parked while it plays (Eden
+    // covrest-12: the recorded proof equal to the row read now, `parked=false`).
+    #[cfg(any(test, feature = "mii-managed-source-coexist-alpha"))]
+    let owner_live=crate::runtime::roster::f9_gate::seat_live(id as u32);
+    if !view.accepts(id,now, #[cfg(any(test, feature = "mii-managed-source-coexist-alpha"))] (parked || owner_live)) {
         note_refused_proof(view,id,ordinal,now,parked,"proof");
         return false;
     }

@@ -55,6 +55,28 @@ impl Gate {
 
 static GATE: hos_lock::Mutex<Gate> = hos_lock::Mutex::new(Gate::empty());
 
+/// Entries 2/3 the game plays as CPUs right now (bit 0: entry 2, bit 1: entry 3), published from the gate on every
+/// change of the promotion flags or of No. of CPUs. The Mii owners read it under their G lock, so it is an atomic, not
+/// the gate's lock (TASK-OPUS-rc6-open-fixes item 1, reading A).
+static LIVE: core::sync::atomic::AtomicU8 = core::sync::atomic::AtomicU8::new(0);
+
+fn publish_live(gate: &Gate) {
+    let bits = [crate::model::parked_entries::ENTRY2, crate::model::parked_entries::ENTRY3]
+        .iter()
+        .enumerate()
+        .filter(|(_, slot)| crate::model::parked_entries::live_seat(**slot, gate.reproof, gate.previous))
+        .fold(0u8, |bits, (i, _)| bits | 1 << i);
+    LIVE.store(bits, core::sync::atomic::Ordering::Release);
+}
+
+/// Whether entry `slot` (2 or 3) is a promoted seat the game plays as a CPU now (`parked_entries::live_seat`).
+pub(crate) fn seat_live(slot: u32) -> bool {
+    match slot {
+        2 | 3 => LIVE.load(core::sync::atomic::Ordering::Acquire) & 1 << (slot - 2) != 0,
+        _ => false,
+    }
+}
+
 /// What the player frame should do with a stored raise.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Step {
@@ -116,9 +138,11 @@ pub(crate) fn override_seat(slot: u32) -> Option<(u32, Option<Configuration>)> {
 
 /// The game activated a published seat on `slot` (2 or 3).
 pub(crate) fn mark_promoted(slot: u32) {
-    if let Some(flag) = GATE.lock().reproof.get_mut((slot as usize).wrapping_sub(2)) {
+    let mut gate = GATE.lock();
+    if let Some(flag) = gate.reproof.get_mut((slot as usize).wrapping_sub(2)) {
         *flag = true;
     }
+    publish_live(&gate);
 }
 
 pub(crate) fn reproof_pending(slot: u32) -> bool {
@@ -126,9 +150,11 @@ pub(crate) fn reproof_pending(slot: u32) -> bool {
 }
 
 pub(crate) fn clear_reproof(slot: u32) {
-    if let Some(flag) = GATE.lock().reproof.get_mut((slot as usize).wrapping_sub(2)) {
+    let mut gate = GATE.lock();
+    if let Some(flag) = gate.reproof.get_mut((slot as usize).wrapping_sub(2)) {
         *flag = false;
     }
+    publish_live(&gate);
 }
 
 pub(crate) fn handover_pending() -> bool {
@@ -147,6 +173,7 @@ pub(crate) fn observe_quantity(quantity: Option<u32>) -> Seen {
     let changed = previous != quantity;
     if changed {
         gate.previous = quantity;
+        publish_live(&gate);
     }
     Seen {
         previous,
@@ -227,4 +254,5 @@ pub(crate) fn reset() {
     let members = gate.members;
     *gate = Gate::empty();
     gate.members = members;
+    publish_live(&gate);
 }
