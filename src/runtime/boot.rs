@@ -58,6 +58,8 @@ pub fn run() {
 fn run_inner() {
     diag_log::init_diagnostics();
     diag_log::set_tick(crate::runtime::seams::seam_install::report_late);
+    // The CPU-as-P1 fallback's file work (its request.json read and its receipts): on the heartbeat, never in its hooks.
+    diag_log::set_tick(p1::service);
     diag_log::start_drain_thread();
 
     // 1. The version guard: nothing else runs on another game.

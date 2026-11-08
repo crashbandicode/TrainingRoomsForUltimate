@@ -859,3 +859,37 @@ note in `perform_swap`; `build_split::Step::MiiSetup`.
 Test (failed first, 16:30Z): `async_build_admits_ordinary_and_mii_groups_and_names_each_exclusion` (was
 `async_build_admits_ordinary_groups_and_names_each_exclusion`). Recorded manifest edits of `body_bank.rs` and
 `native_body_bank.rs`; `carry_pkg6.py verify` re-derives all 250 files.
+
+### p23/rc6-integration: the CPU-as-P1 fallback allocates nothing in its hooks (2026-11-08)
+
+The integration smoke `rc6-int-smoke1` (Yoga, diag `0abe3f1b` of `7f3b028`) failed z-gates on
+`hook_stats allocations=5756 … allocs=input_caller_a_apply:2,cpu_frame:5754`. Its plugin set (hot-slots' `hot_config`
+rules) has no standalone CPU pilot, so the carried fallback `runtime/p1/cpu_pilot.rs` was installed. Its per-frame step
+runs inside the CPU core's `cpu_frame` scope (primary inbox 19:13Z: own the root fix).
+- **40 per 10 s at idle.** `poll_request` read `cpu_pilot/request.json` every 60 admitted frames. The skyline std's
+  `File::open` of a missing file (`library/std/src/sys/fs/switch.rs`) allocates the path `CString`, a
+  `format!("Result code: …")` and the two boxes of `io::Error::new`: 4 per poll, 10 polls per 10 s.
+- **About 500 per fighter switch.** A new binding resets the admission, and `gate` / `pair_diagnostic` built a
+  `serde_json::Value` (`json!`) for each `admission` and `first_pair` line.
+- **`input_caller_a_apply:2`.** `STATE` and `STAGE` were `std::sync::Mutex`. On this target std boxes the pthread mutex
+  at the first lock (`sys/sync/mutex/pthread.rs`, `OnceBox`), and `input` took the first locks.
+- **Not reached by the smoke, same rule.** A menu run's `arm` built `json!` arming flags and a `Vec`. A request run's
+  `plan` (`Vec::with_capacity(128)`), its per-frame command trace (`json!`, `format!`) and its receipts (`json!`,
+  `format!`, `fs::write` in `arm`, `finish` and `reject_pending`) all ran in the hook.
+
+The fix:
+- request.json is read, validated and planned on the heartbeat. `service` is registered with `diag_log::set_tick`,
+  which now holds up to four steps, each called through its own pointer. The hook asks at its old cadence
+  (`READ_WANTED`) and takes the planned request (`POSTED`, `try_lock`).
+- The receipts are posted to `OUTBOX` (`compat::fixed::FixedQueue`: 8 owned values; a full queue hands the value back
+  and counts it) and written there. Their JSON is the fork's, built off the hook.
+- The `admission` and `first_pair` lines are typed JSON written into the diag line (`compat::json_line`: `Json`, `Obj`,
+  `DebugStr`). They keep their keys; nested objects are in field order.
+- `STATE` and `STAGE` are `hos_lock::Mutex`. The run's first outputs are a `FixedList`, and the command trace is
+  reserved off the hook (`TRACE_LIMIT`).
+- `model::thread_stacks`: the heartbeat's static bound is 8,096 B (the drain closure's 2,928 B plus `p1::service`'s
+  5,168 B). The measured 11,184 B still decides the 32 KiB stack.
+
+31 recorded manifest edits of `cpu_pilot.rs`; `carry_pkg6.py verify` re-derives all 250 files. Test (failed first on the
+pre-fix source, 19:39Z): `tests/p1_pilot_hooks.rs`. It covers the writers under the plugin's counting allocator, and the
+source wiring of every hook path (no `json!`, `format!`, `fs::`, `File::`, `with_capacity`, `.clone()` …).
