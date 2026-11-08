@@ -588,21 +588,23 @@ pub struct PlacementTarget {
 const SITUATION_AIR: i32 = 2;
 
 pub const PLACE_NO_MACRO: &str = "Make a macro active for this role first";
-pub const PLACE_CHAIN: &str = "Edit placement works on one macro, not a chain";
 pub const PLACE_NO_START: &str = "Link a start save to the macro first";
 
 pub fn placement_target(root: &Path) -> Result<PlacementTarget, &'static str> {
     let role = if RECORD_ROLE.load(Ordering::Acquire) == ROLE_CPU { Role::Cpu } else { Role::Player };
     let index = RecordingIndex::load(root).map_err(|_| PLACE_NO_MACRO)?;
-    let id = index.active(role).ok_or(PLACE_NO_MACRO)?.to_owned();
-    if Store::<Chain>::new(root.join(MACROS_DIR)).load(&id).is_ok() {
-        return Err(PLACE_CHAIN);
-    }
+    let active = index.active(role).ok_or(PLACE_NO_MACRO)?.to_owned();
+    // A chain warps to macro 1's start save and plays with macro 1's placement (`play_placement`), so it edits macro 1.
+    let (id, chain_on) = match Store::<Chain>::new(root.join(MACROS_DIR)).load(&active) {
+        Ok(chain) => (chain.recordings.first().cloned().ok_or(PLACE_NO_MACRO)?, Some(chain.start_save_on)),
+        Err(_) => (active, None),
+    };
     let recording = Library::new(root.join(MACROS_DIR)).load(&id).map_err(|_| PLACE_NO_MACRO)?;
+    let start_on = chain_on.unwrap_or(recording.start_save_on);
     let save = recording
         .start_save
         .as_deref()
-        .filter(|_| recording.start_save_on)
+        .filter(|_| start_on)
         .and_then(|save| Store::<NamedSave>::new(root.join(SAVES_DIR)).load(save).ok())
         .ok_or(PLACE_NO_START)?;
     let at = match role {
@@ -2492,6 +2494,15 @@ mod tests {
         let tick = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
         assert_eq!(tick.warp_place.map(|(_, place)| place.delta_x), Some(-2.0), "Keep wins until the game closes");
         assert_eq!(macros.load(&id).unwrap().placement.delta_x, 1.5, "Keep leaves the file alone");
+
+        // A chain warps to macro 1's start save and plays with macro 1's placement, so Edit placement edits macro 1.
+        let chain = Chain::new("Pressure", vec![id.clone(), loose.clone()]).unwrap();
+        let chain_id = Store::<Chain>::new(root.join(MACROS_DIR)).save_new(&chain).unwrap();
+        let mut index = RecordingIndex::load(&root).unwrap();
+        index.set_active(Role::Cpu, Some(&chain_id), 3).unwrap();
+        index.save(&root).unwrap();
+        let target = placement_target(&root).expect("a chain edits its macro 1");
+        assert_eq!((target.id.as_str(), target.anchor), (id.as_str(), (30.0, 2.0)));
     }
 
     fn exact_brawler() -> crate::engine::mii::lifetime::Configuration {
