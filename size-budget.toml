@@ -689,3 +689,11 @@ ceiling = 150892
 date = "2026-11-08"
 reason = "rc.6 coverage root fix (p23/rc6-cov-rest 70617ba, Eden covrest-07): F9 keeps both seats' decisions when a raise reaches it in two steps before one close (parked_entries::merge_paused, f9_gate::begin_raise); measured 150892 (tools/size_gate.py), +16 over 150876"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to this rc.6 root fix under TASK-OPUS-rc6-cov-rest (a raise goes in its own commit with approved_by)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 151110
+date = "2026-11-08"
+reason = "rc.6 coverage root fixes on p23/rc6-cov-rest: an F9 Mii seat loads with its own configuration through the Mii helper (f98813b, Eden covrest-08 null reads), the seats park at one CPU so the first raise shows them (b6f4284), the Replay window's own load no longer holds the gates its Mii import waits on (#68, c097f1c, Owners::REPLAY_LOADING), a diag note of a refused helper proof (cf475cc), and a promoted seat's Mii proof taken again once parked (0b0f3ed, Eden covrest-11); measured 151110 (tools/size_gate.py), +218 over 150892"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to these rc.6 root fixes under TASK-OPUS-rc6-cov-rest (a raise goes in its own commit with approved_by)"
