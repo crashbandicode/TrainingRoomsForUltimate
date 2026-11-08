@@ -825,3 +825,11 @@ ceiling = 152195
 date = "2026-11-08"
 reason = "rc.6 item 3 (p23/rc6-hot-slots 91146f3; operator decisions 2026-11-08, INBOX-opus-rc6-hotslots 19:12Z and 19:21Z): groups built in the background after Training loads (native_body_bank start/settle/drain/finish_background, queue_detached, the scratch entry for the control init, background_skip) and a cycle change that releases groups whose members left (cycle_wanted, leave_group, Groups::next_slot, body_bank::group_left_cycle/reuse_slot/shown_state); measured 152195 (tools/size_gate.py), +1049 over 151146"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to this operator-chosen rc.6 item under TASK-OPUS-rc6-hot-slots (primary c07b3449, 2026-11-08: a raise goes in its own commit with approved_by)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 155572
+date = "2026-11-08"
+reason = "rc.6 integration (p23/rc6-integration 67f8028): the merge of p23/rc6-hot-slots item 3 (182a785, 152195: +1049 over its base d6a485f, 151146) into 8f24402 (154521); the sides add up to 155570, measured 155572 on the merged tree (tools/size_gate.py)"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); combined ceiling = measured merged size per primary c07b3449, INBOX-opus-rc6-integration 2026-11-08 19:13Z"
