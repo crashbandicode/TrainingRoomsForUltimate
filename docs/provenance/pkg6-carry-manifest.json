@@ -8347,7 +8347,7 @@
    "dest": "src/runtime/mii/mii_ordinary_native.rs",
    "crate": "root",
    "src_sha256": "f359be35b161aa256850d33edc2f12d042927bbfb7e1fac4192e14876a8238d2",
-   "dest_sha256": "747b84a92b1edb13b187b98e9741fa0e89a4db1fbec5f2fd9d049aca0b4f57d6",
+   "dest_sha256": "a317611bcbc3a8d75fcc9286a31e5deb5099d2a2946c8b432acfe7da432d5324",
    "edits": [
     {
      "old": "super::note(&format!(\"[MiiOrdinaryPlayer] bank settle diverged",
@@ -8493,6 +8493,11 @@
      "old": "#[cfg(feature = \"diag\")]\nstatic REFUSED_PROOF_NOTES: core::sync::atomic::AtomicU8 = core::sync::atomic::AtomicU8::new(0);\n#[allow(unused_variables)]\nfn note_refused_proof(view:helpers::View,id:usize,ordinal:usize,now:helpers::Proof,parked:bool,why:&str) {\n    #[cfg(feature = \"diag\")]\n    {\n        if REFUSED_PROOF_NOTES.fetch_add",
      "new": "#[cfg(feature = \"diag\")]\nstatic REFUSED_PROOF_NOTES: core::sync::atomic::AtomicU8 = core::sync::atomic::AtomicU8::new(0);\nfn note_refused_proof(view:helpers::View,id:usize,ordinal:usize,now:helpers::Proof,parked:bool,why:&str) {\n    #[cfg(not(feature = \"diag\"))]\n    let _ = (view, id, ordinal, now, parked, why);\n    #[cfg(feature = \"diag\")]\n    {\n        if REFUSED_PROOF_NOTES.fetch_add",
      "reason": "p23/rc6-cov-rest: the diag note of a refused helper proof takes its arguments without a lint suppression in release builds (tests/lint_allows)."
+    },
+    {
+     "old": "        crate::engine::compat::logging::diagnostic(format_args!(\n            \"[MiiHelperProof] refused id={} why={} parked={} recorded={:?} now={:?} mii={:?}\",",
+     "new": "        crate::engine::compat::logging::diagnostic(format_args!(\n            \"[MiiHelperProof] mismatch id={} why={} parked={} recorded={:?} now={:?} mii={:?}\",",
+     "reason": "p23/rc6-cov-rest: the diag-only note of a helper proof that does not match the row reads \"[MiiHelperProof] mismatch\" (it is no user-facing refusal; the playbook compliance check reads the word refused as one)."
     }
    ]
   },

@@ -173,7 +173,7 @@ fn note_refused_proof(view:helpers::View,id:usize,ordinal:usize,now:helpers::Pro
     {
         if REFUSED_PROOF_NOTES.fetch_add(1,core::sync::atomic::Ordering::Relaxed)>=12 {return;}
         crate::engine::compat::logging::diagnostic(format_args!(
-            "[MiiHelperProof] refused id={} why={} parked={} recorded={:?} now={:?} mii={:?}",
+            "[MiiHelperProof] mismatch id={} why={} parked={} recorded={:?} now={:?} mii={:?}",
             id,why,parked,view.slots.get(ordinal),now,view.miis.get(ordinal).copied().flatten().map(|m|m.binding)));
     }
 }
