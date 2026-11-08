@@ -166,8 +166,9 @@ pub(crate) unsafe fn helper_kind(view:helpers::View,id:usize,owner:Owner,kind:u3
 /// 2026-11-08 16:44Z: which fields an F9 promotion and re-park change).
 #[cfg(feature = "diag")]
 static REFUSED_PROOF_NOTES: core::sync::atomic::AtomicU8 = core::sync::atomic::AtomicU8::new(0);
-#[allow(unused_variables)]
 fn note_refused_proof(view:helpers::View,id:usize,ordinal:usize,now:helpers::Proof,parked:bool,why:&str) {
+    #[cfg(not(feature = "diag"))]
+    let _ = (view, id, ordinal, now, parked, why);
     #[cfg(feature = "diag")]
     {
         if REFUSED_PROOF_NOTES.fetch_add(1,core::sync::atomic::Ordering::Relaxed)>=12 {return;}
