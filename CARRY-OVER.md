@@ -986,3 +986,54 @@ portrait's after-render proof quarantined helper 2 for the scene, and presses 1-
 `carry_pkg6.py verify` re-derives all 250 files. Tests (failed first: no `Blocker::Portrait`, no `seat_load_waits`):
 `source_load` `a_press_during_a_portrait_render_waits_and_then_applies`, `parked_entries`
 `a_seat_load_holds_back_while_a_portrait_render_waits`.
+### p23/rc6-hot-slots: groups built in the background; a cycle change re-plans (2026-11-08, rc.6 item 3)
+
+The third group-speed item, as the operator re-decided it (`docs/DECISIONS.md` "Item 3 in rc.6"). It is built after
+Training loads, not behind its loading screen. Static RE, the traced probe and the verdict are in
+`artifacts/phase23/LANE-OPUS-RC6-HOTSLOTS-REPORT.md` 19:46Z (`artifacts/phase23/rc6-item3-re/`). The special kinds'
+facts are in `rc6-item3-re/SPECIAL-GROUPS.md`.
+
+**Background build** (`native_body_bank::start_background`, `settle_background`, `drain_background`,
+`finish_background`):
+- **Which group:** a Prefetched ordinary single-actor group, beside an ordinary live window with no Mii identity and no
+  live Kirby (`body_bank::background_build_eligible`, `next_background`). The group lifecycle starts it after every
+  planned prefetch. It holds INSTALL like a prefetch, so a cycle press meanwhile is held.
+- **The tick (game thread):** the live window's fields, its indices and the entry-info bytes (`BACKGROUND_INFO_SPANS`)
+  are saved. The group's table is lent to the table hooks. `0x654dc0` and `0x655320` run over the group's words, with the
+  dispatcher detached and every context word cleared. What they made is the group's saved window. Then everything live
+  is put back.
+- **The control init `0x64f820`** runs as state 8's queued task on the worker, not in the tick. Its object is a static
+  copy of the entry (`Scratch`: the first 0x100 bytes, the group's context words, index 0, the flags). `table` serves the
+  group's table for that copy. On the game thread it cost 22–151 ms (Eden `rc6-hot-xps9`); the tick now costs 0.1–8 ms.
+- **The bodies** (state 10, `queue_detached`) are allocated on the game thread and queued on the worker. Body init's
+  `prepare_entry` (`0x607f30`; those registry slots are the live window's) gets kind −1 for the owner: the
+  `identity_view::init_prepare_entry` site calls `background_skip`. They never enter a cell, and the loader is never
+  parked.
+- **The settlement:** each body gets its own cell byte (`BODY_CELL_BYTE`, `body+0xf816`). Body init wrote the kind's
+  index in the live window, or `0xff`, and the body unload passes that byte to unprepare (`0x6118c0-0x6118d4`). In
+  `rc6-hot-xps10` a destroyed background body unprepared slot −1 and corrupted the registry: 5,491,035 unmapped
+  accesses in `0x17f26c0`. Also at the settlement: the tasks are freed, the request bit is handed back and the ledger
+  settled. The group becomes Built with the window the tick made, and its first switch is a warm exchange.
+- **The notice** counts a group still owed a background build as loading (`body_bank::shown_state`).
+- **A live pair or native window defers it** (SPECIAL-GROUPS §0 X1/X4): a body's construction tail reads the live cells
+  0/1 and takes the pair rule for `[Popo, Nana]`.
+
+**Cycle change** (operator requirement 19:21Z):
+- **The planner** (on the menu's close, `cycle_preload::on_frame`) reads each role's cycle and original
+  (`cycle_wanted`). A detached group holding a member that left (`body_bank::group_left_cycle`) is handled by its state:
+  a planned, held or failed one becomes Released; any other is marked leaving.
+- **The entry tick** releases a leaving group (`leave_group`) with the teardown protocol `retire_groups` uses, for that
+  one group. A Prefetched group's keys go back. A Built group's bodies, contexts and arrays are destroyed under its own
+  header, with the window leaving the copy registry around them. The ledger forgets its batch.
+- **The new members** are planned into the freed slots (`Groups::next_slot`, `body_bank::reuse_slot`) and load the same
+  way. The window on screen is never released.
+
+**Proof:**
+- Host tests, each failed first: model `a_background_build_takes_an_ordinary_prefetched_group_beside_an_ordinary_window`,
+  `a_group_owed_a_background_build_is_shown_loading`, `a_group_leaves_when_a_member_left_the_cycle_and_its_slot_is_reused`;
+  `tests/background_build_wiring.rs` (4) and `tests/cycle_change_wiring.rs` (2).
+- Eden `rc6-hot-xps8` (`rows-item3-bg.json`): P1's and the CPU's groups built in the background with both fighters live.
+  Group exchanges took 49–70 ms request-to-Ready; the notice went "Loading 4/9" → "Ready 9/9".
+- Eden `rc6-hot-xps10` (`rows-item3-cc.json`): P1 and CPU cycle changes (add 2, remove 1) and a change during a load,
+  each followed by a warm lap. That run found the cell-byte defect above.
+- Recorded manifest edits of the six carried files; `carry_pkg6.py carry/ledger/verify` re-derives all 250 files.
