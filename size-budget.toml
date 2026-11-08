@@ -609,3 +609,11 @@ ceiling = 150294
 date = "2026-11-08"
 reason = "rc.5 wire-fix: a recording library group counts its files, and the recording hint replaces the page hint instead of being appended; measured 150294 (tools/size_gate.py), +14 over 150280"
 approved_by = "Operator 2026-11-07 via primary 35137355 (TASK-GROK-rc5-wire-fix): 'Raise as needed'; DECISIONS 2d27de7; confirmed for this campaign by the primary 2026-11-08"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 150397
+date = "2026-11-08"
+reason = "rc.5 wire-fix: P1's physical sticks are read from the raw Controller (guarded) and carried through the input-delay queue beside the record, so the stick row, the freeze, drift and the C-stick chip arrow read the physical sticks (operator decision A, 2026-11-08); measured 150397 (tools/size_gate.py), +103 over 150294"
+approved_by = "Operator 2026-11-07 via primary 35137355 (TASK-GROK-rc5-wire-fix): 'Raise as needed'; DECISIONS 2d27de7; confirmed for this campaign by the primary 2026-11-08"
