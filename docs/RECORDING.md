@@ -51,7 +51,7 @@ A chord's buttons do not reach the game while you hold them, so pressing Record 
 
 Stopping Record selects the new file as that role's active macro, so the next Play on that role plays it. A recording made for the CPU names the CPU's fighter. If that role has no active macro, its Play chord does nothing. With the Start save switch On, and the file still there, the chord warps to the start save once as it enters play, then plays the inputs. A later pass does not warp.
 
-Mash interrupts playback, when that option is On, stops the macro that role is playing. A chain stops as that one macro.
+Mash interrupts playback, when that option is On, stops the CPU's macro: the mash is the CPU's, so the macro the CPU plays stops, a library macro included, and Player 1's keeps playing (`src/model/rr_host.rs:465`). A chain stops as that one macro.
 
 The old per-slot playback chords are not added.
 
@@ -176,6 +176,14 @@ The Recording page uses the same stacked sections, with the same line under each
 
 The old Recording and Saves rows leave this page. Their setting ids stay, so an old settings file still loads. What leaves the page is the slot number, Randomize slots, Record Slot, Trigger, the Duration dropdown, button slots, the save-state playback checklist, Source, and per-slot playback. The file cap stays at 36,000 frames. The capture stops taking frames there. A recording of that length is kept. One frame more is not saved. Replays keeps Ask before switching fighter, Edit placement, Replay window, and Replay capture. Options keeps Crop trailing neutral, Hitstun timing, Mash interrupts playback, the loop's list of counts, Settings override playback, Combo helper, On-time tolerance, and After an attempt. Respawn on platform stays under Fighters & Stages › Stages.
 
+### Replays: Edit placement and the Replay window
+
+Edit placement edits the active macro of the role in view, the file that role's Play chord plays (`src/model/rr_host.rs:590`). For a chain it edits macro 1, whose start save the chain uses. The screen's anchor is where that macro's start save puts the role. X−/X+ and Y−/Y+ move the offset in steps four times the size of x−/x+ and y−/y+ (`src/model/macro_ui/macro_panel.rs:1698`), and the help line shows it. Write stores the offset in the macro file. Keep holds it for that file until the game closes and leaves the file as it is. New saves the offset into a copy. Back, or B, writes nothing. The next Play warps to the start save and adds the offset to the playing role only (`warp_pair`, `src/model/rr_host.rs:645`). Without an active macro the row says "Make a macro active for this role first". Without a start save, or with its switch Off, it says "Link a start save to the macro first". The Momentum key is on the screen, but Play does not apply a macro's recorded start speed (TODO-PROOF: cov-rec question #70, no recorded answer).
+
+The Replay window lists the saved match captures. A opens the clip editor on one: the fighter, the crop window, the playhead and the timeline. On a capture's Mii track it reads the recorded Mii, asks Fighter Mismatch, and Switch loads that exact Mii on the CPU (the capture's load no longer waits on the window: `Owners::REPLAY_LOADING`, `src/model/input_delay.rs`; the question and the exact install come with cov-rest `66a9a53`, `2891eaa` and `f2298ee`, TODO-PROOF: final pass after the cov-rest merge).
+
+A setup from the Saves page's Setup library only moves the fighters. Restoring one writes no save file, and the next Load goes back to the bound save (`setup_restored`, `src/model/rr_host.rs:569`). Setups stay a separate library from save states.
+
 ### A file's own screen
 
 The breadcrumb reads `Recording (Player view)  >  Save states & Macros  >  name`, or Combos & Sequences for a combo or a sequence. The CPU view says `Recording (CPU view)`.
@@ -194,7 +202,7 @@ The combo's help lines list each link as the two moves and TRUE or not, then tha
 
 Fighter Mismatch is the prompt a macro, a chain, a replay clip, or a combo can open before it switches a fighter. The title is Fighter Mismatch. The rows are Keep current fighter and Switch to recorded fighter. When Play opens it with the menu closed, it is drawn over the match on its own. While it is up the frame strip is hidden and Player 1's presses answer it instead of reaching the match: the D-pad moves, A chooses, and B cancels. Nothing is hidden or refused because the fighter differs. A sequence may mix fighters.
 
-Play holds until those rows are answered. The cursor starts on Keep. Keep plays on the fighter you have. Switch changes to the fighter the file was recorded on, then plays. B cancels and does not play. A macro asks when its recorded fighter differs. A chain asks only for its first macro, and the line is `screen=mismatch ask=macro1`. Later macros are not checked and do not switch. A combo drill asks when the drilled combo changes to one recorded on another fighter. The first time a saved drill is seen, it does not ask. Load does not ask.
+Play holds until those rows are answered. The cursor starts on Keep. Keep plays on the fighter you have. Switch changes to the fighter the file was recorded on, then plays. B cancels and does not play. A macro asks when its recorded fighter differs. For a CPU macro recorded on an exact Mii, Switch loads that Mii: its look, specials, colour, voice, outfit and hat. A Mii from a replay carries no ID and no name of its own, so it is installed as the saved Mii with the same look, or else with a made-up ID and the name "New Mii" (cov-rest `cbe961a` and `f2298ee`, `src/model/mii_install.rs` `installable`; TODO-PROOF: final pass after the cov-rest merge). A chain asks only for its first macro, and the line is `screen=mismatch ask=macro1`. Later macros are not checked and do not switch. A combo drill asks when the drilled combo changes to one recorded on another fighter. The first time a saved drill is seen, it does not ask. Load does not ask.
 
 ![Play of a chain whose first macro was recorded on another fighter](media/rc5-fighter-mismatch.gif)
 
