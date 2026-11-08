@@ -135,6 +135,12 @@ pub const VALUE_DROP: f32 = 8.0;
 pub const FONT: (f32, f32) = (22.0, 34.0);
 pub const FONT_SMALL: (f32, f32) = (18.0, 28.0);
 
+/// An estimate of a text's width in layout units (the game's font is proportional; a pane is only
+/// positioned from it, never clipped by it).
+pub fn text_width(units: usize) -> f32 {
+    units as f32 * FONT.0 * 0.56
+}
+
 pub const fn row_y(row: usize) -> f32 {
     ROW_FIRST_Y - ROW_PITCH * row as f32
 }

@@ -654,6 +654,11 @@ fn paint_file(rec: &super::recording_menu::RecordingScreens, frame: &mut Frame) 
         if offset == cursor {
             frame.focus = Some(slot as u8);
         }
+        // Before the start save's name: the value is right-aligned, so the chip sits left of its text.
+        if let Some(floppy) = row.floppy {
+            let x = super::panes::ROW_RIGHT - super::panes::text_width(row.value.encode_utf16().count()) - 22.0;
+            place_icon(frame, 2, x, super::panes::row_y(slot), floppy);
+        }
     }
     let _ = frame.crumb.write_str(&rec.file_crumb());
 }
@@ -850,6 +855,48 @@ mod tests {
         let green = frame.green.iter().position(|on| *on).unwrap();
         assert_eq!(frame.rows[green].label_tone, Tone::Normal);
         assert_eq!(frame.rows[green].label.string_lossy(), "Macro 2");
+    }
+
+    /// GIF evidence `macro-screen-1140.png` (2026-11-08): the macro's own screen drew "Macro 1 · start · On" and no
+    /// floppy. RECORDING-REDESIGN puts the chip before the start save's name on that row.
+    #[test]
+    fn a_macro_screen_draws_the_floppy_before_the_start_save_name() {
+        use crate::model::menu::table::SAVES_MACROS;
+        use crate::model::recording_menu::{Catalog, Face, Floppy, MacroFile, SaveFile};
+        let mut menu = menu();
+        menu.press(Button::R);
+        menu.press(Button::R);
+        menu.recording_mut().set_catalog(Catalog {
+            saves: vec![SaveFile { id: "m1-start".into(), name: "Macro 1 · start".into(), fighters: String::new() }],
+            macros: vec![MacroFile {
+                id: "m1".into(),
+                name: "Jab".into(),
+                chain: false,
+                steps: Vec::new(),
+                start_save: Some("m1-start".into()),
+                start_save_on: true,
+                recorded_on: "Mario".into(),
+                span: 25,
+            }],
+            hot_saves: vec!["m1-start".into()],
+            hot_macros: vec!["m1".into()],
+            ..Catalog::default()
+        });
+        menu.recording_mut().set_cursor(Face::Page, SAVES_MACROS, 1, 0);
+        menu.press(Button::A);
+        assert!(menu.recording().file_open(), "A opens the macro's own screen");
+        let mut frame = Frame::new();
+        page_frame(&menu, &mut frame);
+        assert_eq!(frame.rows[0].label.string_lossy(), "Start save");
+        let value = frame.rows[0].value.string_lossy();
+        assert_eq!(value, "Macro 1 · start · On");
+        let chip = frame.icons[2];
+        assert!(chip.on, "the Start save row has its floppy");
+        assert_eq!(chip.color, Floppy::On.color());
+        assert_eq!(chip.y, super::super::panes::row_y(0));
+        let text_left = super::super::panes::ROW_RIGHT - super::super::panes::text_width(value.encode_utf16().count());
+        assert!(chip.x < text_left, "the chip sits before the name, not over it");
+        assert!(frame.icons.iter().enumerate().all(|(i, icon)| i == 2 || !icon.on), "one chip on a file screen");
     }
 
     #[test]

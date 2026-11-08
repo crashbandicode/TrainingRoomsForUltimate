@@ -254,11 +254,13 @@ pub struct PickerRow {
     pub cursor: bool,
 }
 
-/// One row of a file screen.
+/// One row of a file screen. The Start save row of a macro or chain carries its floppy, the same
+/// chip as that file's library row (RECORDING-REDESIGN, floppy chip, operator 2026-11-06).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FileRow {
     pub title: String,
     pub value: String,
+    pub floppy: Option<Floppy>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -538,7 +540,11 @@ impl RecordingScreens {
     }
 
     pub fn file_rows(&self) -> Vec<FileRow> {
-        self.built_file_rows().into_iter().map(|row| FileRow { title: row.title, value: row.value }).collect()
+        let floppy = self.file.as_ref().and_then(|file| self.row_floppy(&Item { kind: file.kind, id: file.id.clone() }));
+        self.built_file_rows()
+            .into_iter()
+            .map(|row| FileRow { floppy: floppy.filter(|_| row.act == Act::StartSave), title: row.title, value: row.value })
+            .collect()
     }
 
     pub fn file_crumb(&self) -> String {
@@ -1092,9 +1098,9 @@ impl RecordingScreens {
     pub fn crop_rows(&self) -> Vec<FileRow> {
         let Some(crop) = &self.crop else { return Vec::new() };
         vec![
-            FileRow { title: "In".into(), value: format!("{}", crop.start) },
-            FileRow { title: "Out".into(), value: format!("{}", crop.end) },
-            FileRow { title: "Save".into(), value: "A saves a new file".into() },
+            FileRow { title: "In".into(), value: format!("{}", crop.start), floppy: None },
+            FileRow { title: "Out".into(), value: format!("{}", crop.end), floppy: None },
+            FileRow { title: "Save".into(), value: "A saves a new file".into(), floppy: None },
         ]
     }
 
@@ -2430,6 +2436,21 @@ mod tests {
         assert_eq!(row.floppy.unwrap().color(), [126, 132, 144, 255]);
         assert_eq!(screens.start_save_id("nair"), Some("nair-start"));
         assert_eq!(screens.section(Face::Page, SAVES_MACROS, 0).header_floppy, Some(Floppy::On));
+    }
+
+    #[test]
+    fn the_start_save_row_of_a_file_screen_carries_the_rows_floppy() {
+        let mut screens = screens();
+        let index = screens.section(Face::Page, SAVES_MACROS, 1).rows.iter().position(|row| row.name == "Nair loop").unwrap();
+        screens.set_cursor(Face::Page, SAVES_MACROS, 1, index);
+        screens.handle_page(Button::A, true, SAVES_MACROS);
+        let rows = screens.file_rows();
+        assert_eq!(rows[0].title, "Start save");
+        assert_eq!(rows[0].floppy, Some(Floppy::On));
+        assert!(rows[1..].iter().all(|row| row.floppy.is_none()));
+        screens.handle_page(Button::Left, true, SAVES_MACROS);
+        assert_eq!(screens.file_rows()[0].floppy, Some(Floppy::Off), "grey with the switch Off, like the list row");
+        assert!(screens.crop_rows().iter().all(|row| row.floppy.is_none()));
     }
 
     #[test]

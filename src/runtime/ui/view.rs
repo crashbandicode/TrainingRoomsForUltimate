@@ -33,12 +33,6 @@ fn tone_color(tone: Tone) -> [u8; 4] {
     }
 }
 
-/// An estimate of a text's width in layout units (the game's font is proportional; a pane is only
-/// positioned from it, never clipped by it).
-fn text_width(units: usize) -> f32 {
-    units as f32 * p::FONT.0 * 0.56
-}
-
 impl Panes {
     unsafe fn text(&self, index: usize, units: &[u16], color: [u8; 4]) {
         let pane = self.all[index];
@@ -83,7 +77,7 @@ impl Panes {
                 continue;
             }
             let units = frame.tabs[i].units();
-            let width = text_width(units.len());
+            let width = p::text_width(units.len());
             let active = i == usize::from(frame.tab_active);
             self.text(index, units, if active { p::TEXT } else { p::TEXT_DIM });
             self.at(index, left + p::TAB_BOX_W / 2.0, p::TAB_Y);
