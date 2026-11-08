@@ -118,7 +118,12 @@ pub(crate) fn begin_raise(decision: Decision, frame: u32, pause_open: bool) {
     }
     let mut gate = GATE.lock();
     gate.seen = frame;
-    gate.decision = decision;
+    // One raise seen in steps before the same close (1→2, then 2→3): keep what the earlier step decided.
+    gate.decision = if gate.phase == Phase::Paused {
+        crate::model::parked_entries::merge_paused(gate.decision, decision)
+    } else {
+        decision
+    };
     gate.phase = if pause_open {
         Phase::Paused
     } else {

@@ -235,6 +235,20 @@ pub fn on_count(facts: CountFacts) -> Decision {
     decision
 }
 
+/// Two count observations before one close. The pause menu raises No. of CPUs one step per press, so a raise from
+/// one to three on one close is seen as 1→2 and then 2→3 (Eden covrest-07: `cpu_quantity=2`, then `=3`, both while
+/// paused). The later decision keeps what the earlier one decided for an entry it does not decide itself: entry 2's
+/// publication and seat Reload from the 1→2 step survive the 2→3 step.
+pub fn merge_paused(earlier: Decision, later: Decision) -> Decision {
+    Decision {
+        publish: [later.publish[0].or(earlier.publish[0]), later.publish[1].or(earlier.publish[1])],
+        release_now: later.release_now.or(earlier.release_now),
+        hold_installs: later.hold_installs || earlier.hold_installs,
+        after_entry2: later.after_entry2.or(earlier.after_entry2),
+        after_entry3: later.after_entry3.or(earlier.after_entry3),
+    }
+}
+
 /// A ready body that already is the seat member stays. An in-flight body is not given a second install.
 /// An empty entry, or a ready body of another kind, is reloaded after the walk.
 /// One read of a published cell: body id (`+8`), kind (`+0xc`), and `parked_ready`.
@@ -534,6 +548,28 @@ mod tests {
         let own = classify_parked_body(true, 0, || true, || panic!("dereferenced an unpublished cell"));
         let decision = on_count(facts(1, 3, own, own, None));
         assert!(decision.after_entry2.is_none() && decision.after_entry3.is_none());
+    }
+
+    /// Eden covrest-07 (2026-11-08): the pause menu's two Right presses were seen as 1→2 and 2→3 before the close;
+    /// the 2→3 decision replaced the 1→2 one, so entry 2's seat Reload was lost and only entry 3 reloaded later.
+    #[test]
+    fn a_raise_seen_in_two_steps_before_the_close_keeps_both_seats() {
+        let first = on_count(facts(1, 2, Body::Empty, Body::Empty, None));
+        let second = on_count(facts(2, 3, Body::Ready { id: 5, kind: 0x41 }, Body::Empty, None));
+        assert!(second.after_entry2.is_none(), "2→3 alone decides entry 3 only");
+        let merged = merge_paused(first, second);
+        assert_eq!(merged.after_entry2.map(|after| (after.slot, after.kind)), Some((ENTRY2, seats().entry2)));
+        assert_eq!(merged.after_entry3.map(|after| (after.slot, after.kind)), Some((ENTRY3, seats().entry3)));
+        assert!(merged.hold_installs);
+        // The later step wins for the entry it decides itself.
+        let ready3 = on_count(facts(2, 3, Body::Empty, Body::Ready { id: 9, kind: seats().entry3 }, None));
+        let merged = merge_paused(first, ready3);
+        assert!(merged.after_entry3.is_none());
+        assert_eq!(merged.publish[1].map(|p| (p.owner, p.kind)), Some((ENTRY3, seats().entry3)));
+        assert_eq!(merged.after_entry2.map(|after| after.kind), Some(seats().entry2));
+        // The gate merges while the earlier step still waits for the close.
+        let gate = include_str!("../runtime/roster/f9_gate.rs");
+        assert!(gate.contains("merge_paused(gate.decision, decision)"));
     }
 
     #[test]
