@@ -239,14 +239,16 @@ def _orange_cells(shot):
 
 def acc_floppy(ctx):
     """A macro's own screen shows the orange floppy on its Start save row (RECORDING-REDESIGN floppy chip)."""
-    prep(ctx, 'play-warp')
+    dest = prep(ctx, 'play-warp')
+    files = len(list((dest / 'saves').glob('*.json'))) + len(list((dest / 'macros').glob('*.json')))
     _, title = steps.open_library_item(ctx, True, 0)
     time.sleep(0.8)
     shot = ctx.shot('file-screen')
     orange = _orange_cells(shot)
     steps.press(ctx, 'b', 0.6)
     steps.close_menu(ctx)
-    out = {'title': title, 'orange_cells': orange, 'shot': str(shot)}
+    # The shot is also the check of the left column (`Save states & Macros (<files>)`) and the footer hint.
+    out = {'title': title, 'orange_cells': orange, 'shot': str(shot), 'saves_and_macros_on_card': files}
     steps.save(ctx, 'floppy', out)
     if title != 'Start save' or orange < 30:
         raise RuntimeError('no floppy on the Start save row (title %r, orange %d): %s' % (title, orange, shot))
