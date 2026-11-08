@@ -150,7 +150,7 @@ unsafe fn raw_sticks(controller: usize) -> Option<Sticks> {
         static LAST: AtomicU8 = AtomicU8::new(0);
         let now = if sticks.is_some() { 1 } else { 2 };
         if LAST.swap(now, Ordering::Relaxed) != now {
-            diagnostic(format_args!("[FrameStrip] raw_sticks guard={} axes={axes:?}", if now == 1 { "ok" } else { "refused" }));
+            diagnostic(format_args!("[FrameStrip] raw_sticks guard={} axes={axes:?}", if now == 1 { "ok" } else { "record" }));
         }
     }
     sticks
