@@ -849,3 +849,11 @@ ceiling = 155695
 date = "2026-11-08"
 reason = "rc.6 integration (p23/rc6-integration f716f35): the merge of p23/rc6-cov-rest final (b722049, 154207: +474 over 153733, of which +349 is 1f6285c, already merged here in 7080363) into 9438039 (155572); the new part adds 125 (155697), measured 155695 on the merged tree (tools/size_gate.py)"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); combined ceiling = measured merged size per primary c07b3449, INBOX-opus-rc6-integration 2026-11-08 19:13Z"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 155774
+date = "2026-11-08"
+reason = "rc.6 integration (p23/rc6-integration 83cf3b6): TASK-OPUS-rc6-open-fixes items 1 and 2 over d17c2ca (155695): #54's exact-Mii comparison as Switch installs it (8f0df06: mii_install::installed_target, identity::installed, mii_replay::installed_target, replay_ready, recorded_target_matches) and the live F9 seat for the Mii owners' snapshot (1a466db: parked_entries::live_seat, f9_gate LIVE/publish_live/seat_live, helper_kind); the docs merge d676755 adds no src; measured 155774 (tools/size_gate.py), +79"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied under TASK-OPUS-rc6-open-fixes (primary c07b3449, INBOX-opus-rc6-integration 2026-11-08 23:03Z); a raise goes in its own commit with approved_by"
