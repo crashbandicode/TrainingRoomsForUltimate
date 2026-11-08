@@ -5475,7 +5475,7 @@
    "dest": "src/runtime/roster/native_body_bank.rs",
    "crate": "root",
    "src_sha256": "ccf7ac678691fa0101a1eff5dbd9300a1b12fe64e9ebbde515697adfbb841c98",
-   "dest_sha256": "1d7b576481d2a0883a53e0ba3687fb89d7735adeea413063bdac77618091d2fa",
+   "dest_sha256": "79fb93e821a3bb2d11c52740a0ac43d575def4f3a158847dbbf4f8815b5f3b9f",
    "edits": [
     {
      "old": "unsafe fn finalize_entry(entry: *mut u8) -> u64 {\n",
@@ -6462,6 +6462,11 @@
      "old": "        if async_ok && identity_view { \"enabled\" } else { \"off; a group builds at its first switch\" }, async_ok, identity_view);\n    if groups_ok {\n",
      "new": "        if async_ok && identity_view { \"enabled\" } else { \"off; a group builds at its first switch\" }, async_ok, identity_view);\n    // rc.6 item 3, Ice Climbers (SPECIAL-GROUPS \u00a70 X1, \u00a72): the tail's pair test for background bodies, its first four\n    // 13.0.5 words owned (`cmp w8, #0x4b; b.ne 0x60debc; ldr w8, [x9, #0x1c]; cmp w8, #0x4c`). Without it a live\n    // `[Popo, Nana]` window keeps deferring the background builds.\n    let tail_stock = fingerprint(base, BACKGROUND_TAIL, &[0x71012d1f, 0x54000281, 0xb9401d28, 0x7101311f], \"GroupSwap\");\n    let tail_ok = gate(SEAM_GROUP, BACKGROUND_TAIL_SEAMS, async_ok && identity_view && tail_stock)\n        && async_ok && identity_view && tail_stock;\n    if tail_ok {\n        skyline::install_hooks!(background_tail);\n        BACKGROUND_PAIR_TAIL.store(true, Ordering::Release);\n    }\n    trace!(\"[GroupSwap] background pair tail {}\",\n        if tail_ok { \"enabled; a live Ice Climbers pair window builds the other groups\" } else { \"off; a live Ice Climbers pair window waits\" });\n    if groups_ok {\n",
      "reason": "rc.6 item 3, Ice Climbers pair built in the background (p23/rc6-bg-ic; operator decision 2026-11-08 All groups in rc.6, TASK-OPUS-rc6-bg-special; SPECIAL-GROUPS \u00a70 X1, \u00a72): the pair group admitted, and a live pair window takes part once the construction tail pair test is redirected for background bodies (background_tail 0x60de68, BACKGROUND_PAIR_TAIL)"
+    },
+    {
+     "old": "    let menu = crate::runtime::compat::sync::read(&crate::runtime::compat::menu::MENU);\n    let roster = if facts.owner == 0 { menu.player_roster } else { menu.cpu_roster };\n",
+     "new": "    let menu = crate::runtime::compat::sync::read(&crate::runtime::compat::menu::MENU);\n    // rc.6 item 3, Ice Climbers (a session that starts on them gets its groups built): the pair start becomes the\n    // pair-lead window only with the pair bank on and the pair as the slot's requested form; Solo Popo stays native's.\n    let role = if facts.owner == 0 { super::Role::Player } else { super::Role::Cpu };\n    if original == POPO && !(pair_enabled(&settings)\n        && super::requested_forms_at(&menu, role, POPO, Some(0)) == Forms::starting(POPO)) { return; }\n    let roster = if facts.owner == 0 { menu.player_roster } else { menu.cpu_roster };\n",
+     "reason": "rc.6 item 3, a session that starts on Ice Climbers gets its groups built (p23/rc6-bg-ic; TASK-OPUS-rc6-bg-special 22:32Z; Eden rc6-bg-ic1): P-HOT B H1 gives the normal-pair start the pair-lead start-up window, only with the pair bank on and the pair as the slot requested form"
     }
    ]
   },

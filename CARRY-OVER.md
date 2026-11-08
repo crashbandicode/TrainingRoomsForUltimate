@@ -933,12 +933,23 @@ Operator decision "All groups in rc.6" and the start-on-the-kind rule (`docs/DEC
   - It is installed with the background builds, guarded by four 13.0.5 words and the seam row
     `background_build.construct_tail`. Without it a live pair window still defers (`pair_tail` false, "pair window").
   - A native window still defers (the Pokémon Trainer and Pyra/Mythra lane).
+- **A session that starts on Ice Climbers gets a bank** (Eden `rc6-bg-ic1`: P1 started on the pair had no start-up
+  window; P-HOT B H1 refused `0x4b`, so nothing was planned until the first switch, a Reload):
+  - `entry_window::extendable` accepts native's normal-pair header (Popo with Nana as its secondary), and
+    `entry_window` gives it the pair-lead window the Reload path builds for a pair target (`Members::from_pair`).
+  - `creation_matches` (H3) rewrites native's pair creation (2 bodies, 2 actors) to it. `original_request` maps a
+    pair-lead start-up window back to native's pair.
+  - `scene_header` extends a pair start only with the pair bank on and the pair as the slot's requested form; Solo Popo
+    stays native's one body.
+  - H2 (`prepare_resources`) already writes the pair's `R+0x50` = 3 for a pending pair-lead bank, H4 binds on count,
+    actors and kinds, and N1/N2/N3 serve the window as they serve a Reload-built one. Its other groups then build in
+    the background beside it (`background_tail`).
 - **Merge note** (accepted by the primary, 22:52Z): `p23/rc6-hot-slots-mii` hooks `0x60de68` too. Integration keeps
   one `background_tail`, which also restores the Mii shadow's `R`.
 
 **Proof:**
-- Host tests, each failed first: model `a_background_build_takes_the_pair_group_and_builds_beside_a_live_pair_window`;
-  `tests/background_pair_wiring.rs` (3).
+- Host tests, each failed first: model `a_background_build_takes_the_pair_group_and_builds_beside_a_live_pair_window`,
+  `an_ice_climbers_start_gets_a_pair_lead_window`; `tests/background_pair_wiring.rs` (4).
 - Recorded manifest edits of `rows_a1.rs`, `body_bank.rs` and `native_body_bank.rs`; `carry_pkg6.py
   carry/ledger/verify` re-derives all 250 files.
 - Eden: `artifacts/phase23/LANE-OPUS-RC6-BG-IC-REPORT.md`.

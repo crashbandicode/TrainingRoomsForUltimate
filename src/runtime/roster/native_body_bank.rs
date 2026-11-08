@@ -1741,6 +1741,11 @@ unsafe fn scene_header(ctx: &mut InlineCtx) {
     let settings = crate::runtime::roster::cycle_preload_config::snapshot();
     if settings.slots == 0 || !settings.fighters { return; }
     let menu = crate::runtime::compat::sync::read(&crate::runtime::compat::menu::MENU);
+    // rc.6 item 3, Ice Climbers (a session that starts on them gets its groups built): the pair start becomes the
+    // pair-lead window only with the pair bank on and the pair as the slot's requested form; Solo Popo stays native's.
+    let role = if facts.owner == 0 { super::Role::Player } else { super::Role::Cpu };
+    if original == POPO && !(pair_enabled(&settings)
+        && super::requested_forms_at(&menu, role, POPO, Some(0)) == Forms::starting(POPO)) { return; }
     let roster = if facts.owner == 0 { menu.player_roster } else { menu.cpu_roster };
     let cycle = crate::engine::swap::cycle_members::cycle_members(roster, crate::engine::swap::cycle_members::NO_MII);
     let numbered = crate::engine::swap::cycle_members::numbered(&cycle, Some(original));

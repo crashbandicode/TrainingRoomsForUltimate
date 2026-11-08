@@ -60,6 +60,26 @@ fn the_tail_hook_is_guarded_and_gates_the_live_pair_window() {
     }
 }
 
+/// A session that starts on Ice Climbers (TASK-OPUS-rc6-bg-special 22:32Z; Eden rc6-bg-ic1 had no start-up window for
+/// it): H1 extends the pair start (`entry_window::extendable`, the pair-lead window) only with the pair bank on and the
+/// pair as the slot's requested form; Solo Popo stays native's one body. H2 (`prepare_resources`) already writes the
+/// pair's `R+0x50` references for a pending pair-lead bank, H4 binds on count, actors and kinds.
+#[test]
+fn the_start_up_window_serves_an_ice_climbers_start_with_the_pair_bank() {
+    let h1 = body(BANK, "unsafe fn scene_header(");
+    ordered(h1, &["let Some(original) = extendable(facts) else { return; };",
+        "let role = if facts.owner == 0 { super::Role::Player } else { super::Role::Cpu };",
+        "if original == POPO && !(pair_enabled(&settings)",
+        "&& super::requested_forms_at(&menu, role, POPO, Some(0)) == Forms::starting(POPO)) { return; }",
+        "let Some(members) = entry_window(", "if !publish_pending(facts.owner, members, scene) { return; }"]);
+    let h2 = body(BANK, "unsafe fn prepare_resources(");
+    ordered(h2, &["let Some(bank) = state.as_ref().filter(|bank| bank.owner == owner && bank.phase != Phase::Retired) else { return; };",
+        "if let Some(references) = crate::engine::swap::body_bank::pair_resource_references(members) {",
+        "r_handle::set_pair_refs(lrole, resource as usize, r_handle::WINDOW, references as u8)"]);
+    let h4 = body(BANK, "unsafe fn bind_pending(");
+    assert!(h4.contains("read::<u32>(entry, 0x28) == bank.members.actor_count()"), "{h4}");
+}
+
 /// A background build writes no `R+0x50` and asks no reset-batch permit: its tails are per kind (beside an ordinary
 /// window natively, beside a pair window through `background_tail`).
 #[test]
