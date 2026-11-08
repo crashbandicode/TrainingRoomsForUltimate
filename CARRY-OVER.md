@@ -291,7 +291,7 @@ Carried `src/swap_native/seam_install.rs` as `src/runtime/seams/seam_install.rs`
 - **Guarded-call cross-check** `tests/pkg6_smash_calls.rs`: scans every source under `src/runtime` that uses `smash::` for calls on `*Module`, `FighterManager`, `FighterEntry`, `utility`, `sv_battle_object`, requires each in the `COVERED` call-to-row table and each row to exist in a site table. A re-sync that adds a call fails until the call is guarded.- Correction to the staging note above: `menu_session.rs` / `stage_session.rs` are not declared in `engine` yet (clippy `-D warnings` flags the never-constructed `stage_session::Invalid` without its consumer); their 7 tests run by path from `tests/p1_sessions.rs` (the playbook's by-path include with `allow(dead_code)`, the pattern the Mii tests already use). They are declared as `engine::p1_menu_session` / `engine::p1_stage_session` together with `cpu_pilot.rs`.
 ### pkg6 re-sync from stage m5q (D10, 2026-11-02)
 `python3 -I tools/carry_pkg6.py carry --stage m5q --update` (stage `…/parked-reuse175/refactor/stages/m5q/stage`, the fork's final stage, content sha 8b7df338…): the path lists of m5o and m5q are identical (897 files each, so no new ours-new file), and **three** carried files changed, all recorded edits re-applied cleanly: `training_mod_consts/src/native_seams/rows_a1.rs` (+51 lines: four `group_swap.*` called rows for the asynchronous group build, W20 F3, guards from the owned ELF, checked by the carried table tests), `training_mod_consts/src/body_bank.rs` (+162 lines, F3), `src/cycle_preload_policy.rs` (F2: `merge_player_hats_first`, hats first while P1 is Kirby). `cycle_preload_config.rs` and the notice queue are unchanged; the F1 notice wording and the F4 fork-side re-roll live in root files not carried yet (`cycle_preload.rs`, `character_roster.rs`: they arrive with the C7 cycle from m5q). `verify --stage m5q` reports 124 files identical to a fresh derivation. Host: `cargo test --no-fail-fast` passes except the wire stream's `every_row_matches_the_owned_elf`; clippy `-D warnings` 0.
-- **Approved restriction (operator decision 2026-11-02, both trees), for the compliance report's approved-workarounds table:** Mii, Pokémon Trainer / Aegis (native) and Ice Climbers pair groups stay **synchronous**, built on the first swap; only the other groups are built asynchronously (F3, phase B′). Date 2026-11-02.
+- **Approved restriction (operator decision 2026-11-02, both trees), for the compliance report's approved-workarounds table:** Pokémon Trainer / Aegis (native) and Ice Climbers pair groups stay **synchronous**, built on the first swap; only the other groups are built asynchronously (F3, phase B′). Date 2026-11-02. Mii groups were in this restriction until the operator lifted it for them on 2026-11-08 (`docs/DECISIONS.md`, "Group speed in rc.6"); they build asynchronously since `p23/rc6-hot-slots` item 2.
 - **Open operator decision D-DELAY-REROLL:** the ledge, throw and pummel delays keep the per-grab re-roll rule (recommendation A, the current behaviour); not a package 6 change.
 ### pkg6 C6: CPU-as-P1 fallback (Q11) compiled and wired (2026-11-02, after the merge of work/implementation a44b7ce)
 - **Carried and declared**: `src/runtime/p1/cpu_pilot.rs` (stage m5q `src/cpu_pilot.rs`) with four recorded edits: the three `#[path]` child modules (pilot core, menu session, stage session) now point at the carried files under `src/model/p1/` (the fork's own module structure, so its `pub(super)` items stay visible to `cpu_pilot`; the fork's approved `allow(dead_code)` on the pilot-core declaration is kept byte-identical), and `installed()` (added so package 1's install line can report the feature). The pure files run their 25 host tests by path from `tests/p1_core.rs`.
@@ -797,6 +797,68 @@ the original: `mii_ordinary_player::at_origin` and `player_context`, the CPU's F
 6 recorded manifest edits of `mii_ordinary_player.rs`, `mii_ordinary_cpu.rs` and `mii_ordinary_cpu_native.rs`;
 `carry_pkg6.py verify` re-derives all 250 files. Tests: `the_original_request_is_natives_single_form_of_a_start_up_window`,
 `tests/startup_window_wiring.rs` `back_to_the_original_stages_natives_single_form`.
+
+### p23/rc6-hot-slots: warm exit from a Mii group (2026-11-08)
+
+Operator decision 2026-11-08 (relayed in `artifacts/phase23/INBOX-opus-rc6-hotslots.md`, 15:58Z), the first of the three
+group-speed items.
+
+On the console (release `1e6c6a0e`, scene 1), the CPU went Fox → Mii Gunner (a Mii group exchange) → Pichu. That took a
+5.9 s Reload, `#106 reuse declined … descriptor bytes differ at [46, 48, 4a, 4e]`, although Pichu's body was built: the
+Mii exchange had detached the window `[Fox, Pichu, Diddy]` as a Built group. The Reload also tore that window and the
+Mii group down, so the next lap rebuilt both.
+- The bank's exchange could already put the displaced window back (`R` words, entry bytes and the D mirror it saved).
+- But `plan()` compared an ordinary request byte-exactly with the live Mii bytes, and both adapters refused to settle a
+  bank switch out of a live Mii. Only a Reload undid the Mii publication.
+
+Now:
+- **Planner** (`native_body_bank`): `plan` is unchanged (`plan_in(.., false)`). `plan_mii_exit` serves an ordinary
+  target in the Built window the live Mii group displaced (`mii_exit_saved`). The rule is
+  `body_bank::mii_exit_bytes_match`: the live entry with that window's saved bytes applied; all else exact, except
+  the group words and `+0x43`.
+- **Adapters** (`mii_ordinary_player`, `mii_ordinary_cpu`):
+  - `bank_settle` keeps an adopted Mii group switch's publication (`MiiExit`, in `State`) while the owner's receipt is
+    the one it adopted.
+  - `begin` asks for `plan_mii_exit` only then; the `BankTrack` carries `exit`.
+- **Settle** (`mii_ordinary_native::exit_settled`, `mii_ordinary_cpu_native::exit_settled`):
+  1. the bank's exchange receipt proves the descriptor (`group_rebaseline`);
+  2. `bank_restore` puts the publication back and reads it back against the receipt from before the Mii;
+  3. the owner adopts the window (the Player with no active configuration).
+
+Tests (failed first, 16:04Z): `an_ordinary_request_leaves_a_mii_window_for_the_window_it_displaced`,
+`tests/mii_exit_wiring.rs` (3). Recorded manifest edits of the six carried files; `carry_pkg6.py verify` re-derives all
+250 files.
+
+Eden `rc6-hot-xps5` (XPS, diag `dde68833`):
+- The Player's laps through a Mii group passed. The exit to Link took 85 and 54 ms; the second Mii visit was a warm
+  exchange; all 8 presses were `Applied`.
+- The CPU's exit settled `NativeSettledUnowned`, "CPU current index mirrors differ". Until the restore, the CPU's
+  `E+0x1a8` names the Mii's destination record while FE and D already name the window's index, so `exit_settled`'s
+  owner walk before `bank_restore` refused.
+- Fixed: the CPU's `exit_settled` reads the descriptor directly under G, as `bank_restore` reads its fields. Test
+  (failed first, 16:35Z): `tests/mii_exit_wiring.rs` `the_cpu_exit_reads_no_owner_walk_before_the_restore`.
+
+### p23/rc6-hot-slots: Mii groups build asynchronously (2026-11-08)
+
+The second of the three group-speed items (operator decision 2026-11-08, `docs/DECISIONS.md` "Group speed in rc.6").
+It lifts the 2026-11-02 restriction for Mii groups only. On the console, the CPU's first switch was a Mii group's
+synchronous build: `#95 mode=sync reason=mii group`, `#96 built us=106311`, max tick gap 141.6 ms. On Eden (covrest-06,
+diag `d20ead7b`), every Mii build took 111–140 ms on the game thread after the process's first.
+
+`body_bank::async_build_eligible` admits a Mii group. Nothing else changes, because the queued path already serves a
+Mii build:
+- its identity is written into `R`, the entry and the D mirror before either mode starts, and stays while the group is
+  the window;
+- the Phase B Mii setup (`prepare_mii_group`) runs on the game thread before the construction is queued, as state 6 runs
+  before native's own queued states 8–0xb for a canonical Mii;
+- no prefetch can start on `R` meanwhile, because it needs INSTALL, which the switch holds.
+
+Native and pair groups keep the synchronous build. Comments updated: the `native_body_bank.rs` header and the Phase B′
+note in `perform_swap`; `build_split::Step::MiiSetup`.
+
+Test (failed first, 16:30Z): `async_build_admits_ordinary_and_mii_groups_and_names_each_exclusion` (was
+`async_build_admits_ordinary_groups_and_names_each_exclusion`). Recorded manifest edits of `body_bank.rs` and
+`native_body_bank.rs`; `carry_pkg6.py verify` re-derives all 250 files.
 
 ### p23/rc6-cov-rest: F9 fixed seats reload; a Mii Save that reuses a saved Mii says so (2026-11-08)
 

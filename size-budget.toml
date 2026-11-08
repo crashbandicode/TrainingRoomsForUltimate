@@ -705,3 +705,11 @@ ceiling = 151111
 date = "2026-11-08"
 reason = "rc.6 coverage: the diag note of a refused helper proof takes its arguments without a lint suppression in release builds (p23/rc6-cov-rest, tests/lint_allows); measured 151111 (tools/size_gate.py), +1 over 151110"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied under TASK-OPUS-rc6-cov-rest (a raise goes in its own commit with approved_by)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 151146
+date = "2026-11-08"
+reason = "rc.6 warm exit from a Mii group (p23/rc6-hot-slots 4f01c0a; operator decision 2026-11-08, INBOX-opus-rc6-hotslots 15:58Z): plan_mii_exit, mii_exit_bytes_match, and the adapters' kept publication and exit_settled; measured 151146 (tools/size_gate.py), +325 over 150821"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to this operator-chosen rc.6 item under TASK-OPUS-rc6-hot-slots (primary c07b3449, 2026-11-08: a raise goes in its own commit with approved_by)"
