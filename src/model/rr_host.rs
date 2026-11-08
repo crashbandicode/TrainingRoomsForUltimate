@@ -11,7 +11,7 @@ use super::library::{
     StartSaveState, Use, MACROS_DIR, SAVES_DIR, SEQUENCES_DIR,
 };
 use super::frame_queue::FrameQueue;
-use super::macros::{FrameSnapshot, FrameWindow, InputFrame, Library, MAX_FRAMES};
+use super::macros::{FrameSnapshot, FrameWindow, InputFrame, Library, MacroRecording, Placement, MAX_FRAMES};
 use super::playback::{Book, Playback, StartLink};
 use super::rr_runtime::{
     chord_notice, civil_date, crop_combo_file, crop_macro_file, delete_save,
@@ -82,6 +82,8 @@ static BOUND_APPLIED: Mutex<Option<BoundCopy>> = Mutex::new(None);
 static SAVED_PAIR: Mutex<Option<[SavedState; 2]>> = Mutex::new(None);
 /// A setup restore moved the fighters through the active slot: the slot is given the bound save again.
 static SLOT_RESYNC: AtomicBool = AtomicBool::new(false);
+/// Edit placement's Keep: a file id and the offset Play uses for it instead of the file's.
+static KEPT_PLACEMENT: Mutex<Option<(String, Placement)>> = Mutex::new(None);
 
 /// The bound save as the save-state machine's active slot must hold it (RECORDING.md, "Save states only warp").
 #[derive(Clone, Debug, PartialEq)]
@@ -116,6 +118,8 @@ pub struct CropWindow {
 #[derive(Clone, Debug, Default)]
 pub struct Tick {
     pub warp: Option<String>,
+    /// The playing role and the placement of the file that warps (`warp_pair`).
+    pub warp_place: Option<(Role, Placement)>,
     pub notices: Vec<&'static str>,
     pub diags: Vec<String>,
     pub keyboard: Option<KeyboardOffer>,
@@ -567,6 +571,87 @@ pub fn setup_restored() {
     BOUND_DIRTY.store(true, Ordering::Release);
 }
 
+/// What Edit placement edits (primary 2026-11-08 #70 (a)): the page role's active macro, the file Play plays, and the
+/// position its start save gives that role. Play warps there and adds the offset (`warp_pair`).
+#[derive(Clone, Debug, PartialEq)]
+pub struct PlacementTarget {
+    pub role: Role,
+    pub id: String,
+    pub recording: MacroRecording,
+    pub anchor: (f32, f32),
+}
+
+/// The game's `SITUATION_KIND_AIR` (ground 0, cliff 1).
+const SITUATION_AIR: i32 = 2;
+
+pub const PLACE_NO_MACRO: &str = "Make a macro active for this role first";
+pub const PLACE_CHAIN: &str = "Edit placement works on one macro, not a chain";
+pub const PLACE_NO_START: &str = "Link a start save to the macro first";
+
+pub fn placement_target(root: &Path) -> Result<PlacementTarget, &'static str> {
+    let role = if RECORD_ROLE.load(Ordering::Acquire) == ROLE_CPU { Role::Cpu } else { Role::Player };
+    let index = RecordingIndex::load(root).map_err(|_| PLACE_NO_MACRO)?;
+    let id = index.active(role).ok_or(PLACE_NO_MACRO)?.to_owned();
+    if Store::<Chain>::new(root.join(MACROS_DIR)).load(&id).is_ok() {
+        return Err(PLACE_CHAIN);
+    }
+    let recording = Library::new(root.join(MACROS_DIR)).load(&id).map_err(|_| PLACE_NO_MACRO)?;
+    let save = recording
+        .start_save
+        .as_deref()
+        .filter(|_| recording.start_save_on)
+        .and_then(|save| Store::<NamedSave>::new(root.join(SAVES_DIR)).load(save).ok())
+        .ok_or(PLACE_NO_START)?;
+    let at = match role {
+        Role::Player => &save.player,
+        Role::Cpu => &save.cpu,
+    };
+    let anchor = (at.x, at.y);
+    let mut recording = recording;
+    if let Some(placement) = kept_placement(&id) {
+        recording.placement = placement;
+    }
+    Ok(PlacementTarget { role, id, recording, anchor })
+}
+
+/// Keep on Edit placement: Play uses this offset for that file until the game closes. The file is unchanged.
+pub fn keep_placement(id: &str, placement: Placement) {
+    *lock(&KEPT_PLACEMENT) = Some((id.to_owned(), placement));
+}
+
+/// Write over put an offset into the file: a kept one for that file no longer applies.
+pub fn placement_written(id: &str) {
+    let mut kept = lock(&KEPT_PLACEMENT);
+    if kept.as_ref().is_some_and(|(kept, _)| kept == id) {
+        *kept = None;
+    }
+}
+
+fn kept_placement(id: &str) -> Option<Placement> {
+    lock(&KEPT_PLACEMENT).as_ref().filter(|(kept, _)| kept == id).map(|(_, placement)| *placement)
+}
+
+/// The placement a Play of `id` warps with: a kept one, else the file's (a chain: macro 1's, whose start save it is).
+fn play_placement(book: &Book, id: &str) -> Placement {
+    let first = book.first_recording(id).unwrap_or(id);
+    kept_placement(first).unwrap_or_else(|| book.placement(first))
+}
+
+/// The pair a Play warps to: the start save, with the file's placement added to the playing role's saved position
+/// (`Placement::apply` on a fresh anchor every warp, so repeated trials never add it twice). A raised start on the
+/// ground is in the air, as the named layer's `restore_in_air` had it.
+pub fn warp_pair(save: NamedSave, place: Option<(Role, Placement)>) -> [SavedState; 2] {
+    let mut pair = [save.player, save.cpu];
+    if let Some((role, placement)) = place {
+        let record = &mut pair[role_index(role)];
+        (record.x, record.y) = placement.apply((record.x, record.y));
+        if placement.delta_y != 0.0 && record.situation_kind == 0 {
+            record.situation_kind = SITUATION_AIR;
+        }
+    }
+    pair
+}
+
 /// Save writes the one bound save, or a new bound Save N when none is bound (`rr_runtime::save_chord`). Worker side.
 pub fn write_saved(root: &Path) -> bool {
     let Some([player, cpu]) = lock(&SAVED_PAIR).take() else {
@@ -735,6 +820,9 @@ fn play_role(root: &Path, machine: &mut Playback, book: &Book, role: Role, tick:
     };
     if let Some(id) = effect.warp {
         tick.warp = Some(id.to_owned());
+        if let Some(active) = book.index.active(role) {
+            tick.warp_place = Some((role, play_placement(book, active)));
+        }
         tick.diags
             .push(format!("screen=playback role={word} warp=1"));
         WARP_HOLD.store(true, Ordering::Release);
@@ -1025,6 +1113,7 @@ fn begin_make(
         }
         StartLink::Linked(id) => {
             tick.warp = Some(id.to_string());
+            tick.warp_place = Some((Role::Player, play_placement(book, source)));
             WARP_HOLD.store(true, Ordering::Release);
         }
         StartLink::None => {}
@@ -1266,6 +1355,7 @@ fn reset_host() {
     *lock(&BOUND_APPLIED) = None;
     *lock(&SAVED_PAIR) = None;
     SLOT_RESYNC.store(false, Ordering::Release);
+    *lock(&KEPT_PLACEMENT) = None;
     for slot in &ROLE_KIND {
         slot.store(-1, Ordering::Release);
     }
@@ -2339,6 +2429,62 @@ mod tests {
         let made = RecordingIndex::load(&root).unwrap().bound().unwrap().to_owned();
         assert_eq!(saves.load(&made).unwrap().name, "Save 1");
         assert_eq!(saves.load(&made).unwrap().player.x, 1.0);
+    }
+
+    /// Primary 2026-11-08 #70 (a): Edit placement edits the page role's active macro, the file Play plays. Eden
+    /// rc6-covrec-diag2 cov-edit-placement refused with a macro active, and Play never read a placement. The anchor is
+    /// where the start save puts the role; Play's warp adds the file's offset (or a kept one) to that role only.
+    #[test]
+    fn edit_placement_targets_the_active_macro_and_play_warps_with_its_offset() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("placement");
+        migrate_at_boot(&root, &none(), "2026-11-08").unwrap();
+        set_record_role(Role::Cpu);
+        assert_eq!(placement_target(&root), Err(PLACE_NO_MACRO));
+        let saves = Store::<NamedSave>::new(root.join(SAVES_DIR));
+        let mut cpu = at_x(30.0);
+        cpu.fighter_kind = 7;
+        cpu.y = 2.0;
+        let start = saves.save_new(&NamedSave::new("Start", at_x(-30.0), cpu).unwrap()).unwrap();
+        let macros = Library::new(root.join(MACROS_DIR));
+        let mut recording =
+            MacroRecording::new("Nair", "13.0.5", StartState::neutral(7, 0, 1.0), vec![InputFrame::default()]).unwrap();
+        let loose = macros.save_new(&recording).unwrap();
+        let mut index = RecordingIndex::load(&root).unwrap();
+        index.set_active(Role::Cpu, Some(&loose), 1).unwrap();
+        index.save(&root).unwrap();
+        assert_eq!(placement_target(&root), Err(PLACE_NO_START), "no warp, no anchor");
+        recording.set_start_save(Some(&start)).unwrap();
+        recording.set_placement(Placement { delta_x: 1.5, delta_y: 0.0, ..Placement::default() }).unwrap();
+        let id = macros.save_new(&recording).unwrap();
+        let mut index = RecordingIndex::load(&root).unwrap();
+        index.set_active(Role::Cpu, Some(&id), 2).unwrap();
+        index.save(&root).unwrap();
+        let target = placement_target(&root).expect("the CPU's active macro");
+        assert_eq!((target.role, target.id.as_str(), target.anchor), (Role::Cpu, id.as_str(), (30.0, 2.0)));
+        assert_eq!(target.recording.placement.delta_x, 1.5);
+
+        on_chords(false, false, true);
+        let tick = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        assert_eq!(tick.warp.as_deref(), Some(start.as_str()));
+        assert_eq!(tick.warp_place.map(|(role, place)| (role, place.delta_x)), Some((Role::Cpu, 1.5)));
+        let pair = warp_pair(saves.load(&start).unwrap(), tick.warp_place);
+        assert_eq!((pair[0].x, pair[1].x, pair[1].y), (-30.0, 31.5, 2.0), "only the playing role moves");
+        let lifted = warp_pair(
+            saves.load(&start).unwrap(),
+            Some((Role::Cpu, Placement { delta_x: 0.0, delta_y: 3.0, ..Placement::default() })),
+        );
+        assert_eq!((lifted[1].y, lifted[1].situation_kind), (5.0, SITUATION_AIR), "a raised start is in the air");
+
+        keep_placement(&id, Placement { delta_x: -2.0, delta_y: 0.0, ..Placement::default() });
+        warp_landed();
+        on_chords(false, false, true);
+        let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        on_chords(false, false, true);
+        let tick = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        assert_eq!(tick.warp_place.map(|(_, place)| place.delta_x), Some(-2.0), "Keep wins until the game closes");
+        assert_eq!(macros.load(&id).unwrap().placement.delta_x, 1.5, "Keep leaves the file alone");
     }
 
     /// Primary 2026-11-08 #69 (b): "Setups stay a separate library from save states"

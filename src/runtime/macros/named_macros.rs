@@ -809,12 +809,22 @@ pub fn open_external_library(
     assign(&menu::MENU_RECEIVED_INPUT, true);
 }
 
+/// Edit placement edits the page role's active macro, the file Play plays (primary 2026-11-08 #70 (a)); the anchor
+/// is where that macro's start save puts the role (`rr_host::placement_target`).
 pub fn open_editor() {
     if !practice_ready() {
         return;
     }
-    if !lock_write(&UI).open_editor(None) {
-        notify("Load a macro and restore a Training state first");
+    let root = std::path::Path::new(crate::model::storage::ROOT);
+    let target = match crate::engine::rr_host::placement_target(root) {
+        Ok(target) => target,
+        Err(refusal) => {
+            notify(refusal);
+            return;
+        }
+    };
+    if !lock_write(&UI).open_placement(target.id, target.recording, target.anchor) {
+        notify("Placement is not usable");
         return;
     }
     assign(&menu::MENU_RECEIVED_INPUT, true);
@@ -1429,6 +1439,10 @@ fn apply_effect(effect: Effect) {
         Effect::ClipFighter(choice) => crate::runtime::macros::replay_capture::fighter_choice(choice),
         Effect::ComboFighter(choice) => *lock_write(&COMBO_FIGHTER) = Some(choice),
         Effect::RecordingFighter(choice) => *lock_write(&RECORDING_FIGHTER) = Some(choice),
+        Effect::KeepPlacement { id, placement } => {
+            crate::engine::rr_host::keep_placement(&id, placement);
+            notify("Placement kept for this session");
+        }
     }
 }
 
@@ -1486,7 +1500,10 @@ fn save_new(recording: MacroRecording) {
 
 fn overwrite(id: String, recording: MacroRecording) {
     match library().overwrite(&id, &recording) {
-        Ok(()) => notify("Placement written"),
+        Ok(()) => {
+            crate::engine::rr_host::placement_written(&id);
+            notify("Placement written");
+        }
         Err(err) => notify(&err.to_string()),
     }
 }

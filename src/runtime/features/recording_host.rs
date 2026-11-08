@@ -168,7 +168,8 @@ fn apply(tick: &Tick) {
             root.join(crate::engine::library::SAVES_DIR),
         );
         if let Ok(save) = saves.load(id) {
-            super::states::request_named_load([save.player, save.cpu]);
+            // Edit placement's offset for the playing role (primary 2026-11-08 #70 (a)).
+            super::states::request_named_load(rr_host::warp_pair(save, tick.warp_place));
         } else {
             // No restore was asked for, so none will land.
             rr_host::warp_landed();
