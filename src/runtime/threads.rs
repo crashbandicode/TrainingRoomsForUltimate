@@ -122,7 +122,6 @@ mod imp {
         REPLAY_SAVE = [ReplaySave];
         #[cfg(feature = "mii-saved-alpha")] MII_CATALOG = [MiiCatalog];
         #[cfg(feature = "console-practice-trace")] PRACTICE_TRACE = [PracticeTrace];
-        #[cfg(feature = "diag")] STALL_WATCH = [StallWatch];
     }
 
     /// Create `id`'s thread on its static stack, running `entry(argument)`, and name it. `busy` is held on success.

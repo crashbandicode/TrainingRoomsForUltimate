@@ -66,7 +66,7 @@ default = ["enhancements-alpha", "native-unlink-guard", "deluxe-sdk", "mii-hud-p
 
 # Eden-only diagnostics (stand-ins, per-event lines). The shipped NRO never enables it. Every probe,
 # observer, trace and meter below requires it (decision D11; the fork's diag taxonomy).
-diag = ["hos-lock/owners"]
+diag = []
 # Eden probes with no caller in a plain diag build, each behind its own feature so the diag NRO carries none of their code: the u4
 # texture helper's Eden proof (the stage grid's thumbnails replaced it in normal builds) and the playbook's hook-sharing drill on the
 # seam rows (`foreign=` in diag.txt, HOOK-SHARING "Testing the chain in Eden").

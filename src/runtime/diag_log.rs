@@ -279,17 +279,6 @@ fn console_write(bytes: &[u8]) {
 #[cfg(not(target_arch = "aarch64"))]
 fn console_write(_bytes: &[u8]) {}
 
-/// Diag builds: one line straight to the kernel debug output, past the ring and the file (the stall watchdog, which must
-/// be heard when the drain thread or the file system is what stopped).
-#[cfg(feature = "diag")]
-pub(crate) fn console_line(text: &[u8]) {
-    let mut buf = [0u8; 512];
-    let n = text.len().min(buf.len() - 1);
-    buf[..n].copy_from_slice(&text[..n]);
-    buf[n] = b'\n';
-    console_write(&buf[..=n]);
-}
-
 /// Gate lines only. Two files of the rotating log can drop a `screen=` line while a stall flood is
 /// running; this file is truncated at start and then only appended, up to `GATES_LIMIT`.
 const GATES_LIMIT: u64 = 256 * 1024;
@@ -416,8 +405,6 @@ pub fn start_drain_thread() {
         #[cfg(feature = "plugin-heap-meter")]
         let mut metered_calls = 0usize;
         loop {
-            #[cfg(feature = "diag")]
-            crate::runtime::stall_watch::drain_tick();
             drain();
             // A step the owner of a late report registered (`set_tick`): package 6's seam installer writes the seam outcomes that
             // settled after the install line (R-A0b) here, on this thread and never in a hook.

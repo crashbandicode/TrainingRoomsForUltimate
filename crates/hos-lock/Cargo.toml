@@ -16,10 +16,6 @@ path = "src/lib.rs"
 [dependencies]
 lock_api = "0.4"
 
-[features]
-# Diagnostic builds: a fixed table of held locks with their holders (`owners`), for a stall watchdog.
-owners = []
-
 # `target_os = "switch"` is the Skyline target's OS; rustc does not know the value, so declare it.
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("switch"))'] }
