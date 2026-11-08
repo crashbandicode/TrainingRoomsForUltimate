@@ -154,6 +154,53 @@ pub const fn group_y(group: usize) -> f32 {
     ROW_FIRST_Y - GROUP_ROW_H * group as f32
 }
 
+// ---- the r8 recording pop-up's two columns -------------------------------------------------------------
+//
+// The mockup puts the lists on the left and CONNECTIONS on the right of one panel. The pop-up has no group column,
+// so its list starts where the groups would be and stops short of the middle.
+
+/// The pop-up's list column (rows, plates, outlines, cursor, marks).
+pub const POP_ROW_LEFT: f32 = -860.0;
+pub const POP_ROW_RIGHT: f32 = 60.0;
+/// The CONNECTIONS column and the rule between the two.
+pub const CONN_DIVIDER_X: f32 = 110.0;
+pub const CONN_LEFT: f32 = 150.0;
+pub const CONN_RIGHT: f32 = 880.0;
+pub const CONN_PITCH: f32 = 42.0;
+pub const CONN_LINE_H: f32 = 40.0;
+/// A row with a line under it: the name rises and the line sits under it, both inside the row's plate.
+pub const SUB_RISE: f32 = 11.0;
+pub const SUB_DROP: f32 = 13.0;
+pub const SUB_H: f32 = 26.0;
+pub const FONT_SUBLINE: (f32, f32) = (15.0, 24.0);
+
+/// The list column's left and right edge: the page's, or the pop-up's left column.
+pub const fn row_span(popup: bool) -> (f32, f32) {
+    if popup { (POP_ROW_LEFT, POP_ROW_RIGHT) } else { (ROW_LEFT, ROW_RIGHT) }
+}
+
+/// A row's label width in the column: the page's, or what the pop-up's narrower column leaves beside a short value.
+pub const fn row_label_w(popup: bool) -> f32 {
+    if popup { POP_ROW_RIGHT - POP_ROW_LEFT - POP_LABEL_INSET - POP_VALUE_W - 16.0 } else { ROW_LABEL_W }
+}
+
+pub const fn row_value_w(popup: bool) -> f32 {
+    if popup { POP_VALUE_W } else { ROW_VALUE_W }
+}
+
+/// Where a row's name starts in its column: the page's at its left edge; the pop-up's after the order badge's room.
+pub const fn row_label_left(popup: bool) -> f32 {
+    if popup { POP_ROW_LEFT + POP_LABEL_INSET } else { ROW_LEFT }
+}
+
+pub const POP_LABEL_INSET: f32 = 24.0;
+pub const POP_VALUE_W: f32 = 200.0;
+
+/// Centre of CONNECTIONS line `line`; the header sits on the first row's line.
+pub const fn conn_y(line: usize) -> f32 {
+    ROW_FIRST_Y - CONN_PITCH * (line + 1) as f32
+}
+
 // ---- direction grid geometry ---------------------------------------------------------------------------
 
 /// Three rows of chips fit the content area (the tile grid's 620 units, y 320 down to -300): the pitch is a third of it.
@@ -264,10 +311,19 @@ pub const FLOPPIES: usize = 10;
 pub const LOOPS: usize = 2;
 pub const IDX_FLOPPY: usize = IDX_TILE_SOLO + 2;
 pub const IDX_LOOP: usize = IDX_FLOPPY + FLOPPIES;
+/// The r8 recording pop-up (`docs/decisions/RECORDING-REDESIGN-r8-popup-*.png` on `review/menu-proposal`; primary
+/// 2026-11-08 #19 and #49): a line under each list row ("Recorded on …"), and the CONNECTIONS column right of the list
+/// with its divider and header. Hidden until a recording screen draws them.
+pub const SUBS: usize = ROWS;
+pub const CONN_LINES: usize = 14;
+pub const IDX_SUB: usize = IDX_LOOP + LOOPS;
+pub const IDX_CONN_DIV: usize = IDX_SUB + SUBS;
+pub const IDX_CONN_HEAD: usize = IDX_CONN_DIV + 1;
+pub const IDX_CONN: usize = IDX_CONN_HEAD + 1;
 /// How many panes the menu itself owns and the runtime resolves at registration (`view::Panes::all`); every index
 /// the renderer writes is below it. The panes after these (the notification panel and the frame strip) belong to the
 /// input package, which finds them by name when it draws.
-pub const MENU_COUNT: usize = IDX_LOOP + LOOPS;
+pub const MENU_COUNT: usize = IDX_CONN + CONN_LINES;
 /// The notification panel (SPEC-input-05): its own container under `RootPane`. Each of its texts (header, short
 /// body, long body) has a dark plate drawn immediately before it. Written by the notices code of the input package.
 pub const IDX_NOTICE: usize = MENU_COUNT;
@@ -676,7 +732,11 @@ pub const fn name_of(index: usize) -> Name {
         i if i >= IDX_TILE && i < IDX_TILE + TILES => Name::indexed("tr_ti_", i - IDX_TILE),
         i if i >= IDX_TILE_LABEL && i < IDX_TILE_LABEL + TILES => Name::indexed("tr_tl_", i - IDX_TILE_LABEL),
         i if i >= IDX_FLOPPY && i < IDX_LOOP => Name::indexed("tr_floppy_", i - IDX_FLOPPY),
-        i if i >= IDX_LOOP && i < MENU_COUNT => Name::indexed("tr_loop_", i - IDX_LOOP),
+        i if i >= IDX_LOOP && i < IDX_SUB => Name::indexed("tr_loop_", i - IDX_LOOP),
+        i if i >= IDX_SUB && i < IDX_CONN_DIV => Name::indexed("tr_sub_", i - IDX_SUB),
+        IDX_CONN_DIV => Name::new("tr_conn_div"),
+        IDX_CONN_HEAD => Name::new("tr_conn_head"),
+        i if i >= IDX_CONN && i < MENU_COUNT => Name::indexed("tr_conn_", i - IDX_CONN),
         i if i >= IDX_TILE_BADGE && i < IDX_FLOPPY => mark_name(i - IDX_TILE_BADGE),
         i if i >= IDX_TAB && i < IDX_TAB + TABS => Name::indexed("tr_tab_", i - IDX_TAB),
         i if i >= IDX_GROUP && i < IDX_GROUP + GROUPS => Name::indexed("tr_grp_", i - IDX_GROUP),
@@ -802,7 +862,21 @@ pub const fn spec(index: usize) -> Spec {
         i if i >= IDX_TILE && i < IDX_TILE + TILES => rect(name, [0.0, 0.0, 100.0, 60.0], HIGHLIGHT, false),
         i if i >= IDX_TILE_LABEL && i < IDX_TILE_LABEL + TILES => Spec { visible: false, ..text(name, [0.0, 0.0, 100.0, TILE_LABEL_H], Align::Center, FONT_SMALL, 28, TEXT) },
         i if i >= IDX_TILE_STRIPE && i < IDX_TILE_SOLO => Spec { visible: false, ..rect(name, [0.0, 0.0, 4.0, 86.0], TEXT, false) },
-        i if i >= IDX_FLOPPY && i < MENU_COUNT => Spec { visible: false, ..rect(name, [0.0, 0.0, 28.0, 28.0], [255, 255, 255, 255], false) },
+        i if i >= IDX_FLOPPY && i < IDX_SUB => Spec { visible: false, ..rect(name, [0.0, 0.0, 28.0, 28.0], [255, 255, 255, 255], false) },
+        i if i >= IDX_SUB && i < IDX_CONN_DIV => Spec {
+            visible: false,
+            ..text(name, [row_label_left(true) + row_label_w(true) / 2.0, row_y(i - IDX_SUB) - SUB_DROP, row_label_w(true), SUB_H],
+                Align::Left, FONT_SUBLINE, 64, TEXT_DIM)
+        },
+        IDX_CONN_DIV => Spec { visible: false, ..rect(name, [CONN_DIVIDER_X, 15.0, 3.0, 640.0], RULE, false) },
+        IDX_CONN_HEAD => Spec {
+            visible: false,
+            ..text(name, [(CONN_LEFT + CONN_RIGHT) / 2.0, ROW_FIRST_Y, CONN_RIGHT - CONN_LEFT, CONN_LINE_H], Align::Left, FONT_SMALL, 48, TEXT_DIM)
+        },
+        i if i >= IDX_CONN && i < MENU_COUNT => Spec {
+            visible: false,
+            ..text(name, [(CONN_LEFT + CONN_RIGHT) / 2.0, conn_y(i - IDX_CONN), CONN_RIGHT - CONN_LEFT, CONN_LINE_H], Align::Left, FONT_SMALL, 72, TEXT)
+        },
         i if i >= IDX_TILE_BADGE && i < IDX_FLOPPY => Spec { visible: false, ..text(name, [0.0, 0.0, 52.0, MARK_H], Align::Center, FONT_SMALL, 4, TEXT) },
         IDX_TAB_HI => rect(name, [-740.0, TAB_Y, 200.0, TAB_H], ACCENT, true),
         IDX_TITLE => text(name, [600.0, TAB_Y, 560.0, TAB_H], Align::Right, FONT_SMALL, 40, TEXT_DIM),
@@ -913,10 +987,15 @@ mod tests {
         assert_eq!(name_of(IDX_FLOPPY).as_str(), "tr_floppy_00");
         assert_eq!(name_of(IDX_LOOP - 1).as_str(), "tr_floppy_09");
         assert_eq!(name_of(IDX_LOOP).as_str(), "tr_loop_00");
-        assert_eq!(name_of(MENU_COUNT - 1).as_str(), "tr_loop_01");
+        assert_eq!(name_of(IDX_SUB - 1).as_str(), "tr_loop_01");
+        // The r8 pop-up's sublines and CONNECTIONS column (primary 2026-11-08 #19, #49).
+        let r8 = SUBS + 2 + CONN_LINES;
+        assert_eq!(r8, 28);
+        assert_eq!(name_of(IDX_SUB).as_str(), "tr_sub_00");
+        assert_eq!(name_of(MENU_COUNT - 1).as_str(), "tr_conn_13");
         assert!(COUNT < limit, "plugin table {COUNT} exceeds the walk {limit}");
-        assert_eq!(COUNT, 1424 + CHROME);
-        assert_eq!(limit - COUNT, 2672 - CHROME);
+        assert_eq!(COUNT, 1424 + CHROME + r8);
+        assert_eq!(limit - COUNT, 2672 - CHROME - r8);
         let strip_tree = iv::COUNT + cb::COUNT;
         assert!(strip_tree <= limit, "the strip walk, combo bar included, is {strip_tree}");
         let first = spec(IDX_IV + iv::at::STICK);
@@ -926,6 +1005,28 @@ mod tests {
         assert_eq!(first.parent.as_str(), "TrIv");
         assert_eq!(last.parent.as_str(), "TrIv");
         assert!(!first.visible);
+    }
+
+    /// The r8 mockup (`RECORDING-REDESIGN-r8-popup-combo.png`): the lists on the left, CONNECTIONS on the right, a rule
+    /// between them, everything inside the panel and above the help; a row's subline stays inside its plate.
+    #[test]
+    fn the_popup_has_the_r8_two_columns() {
+        assert!(POP_ROW_RIGHT < CONN_DIVIDER_X && CONN_DIVIDER_X < CONN_LEFT, "the list, the rule, CONNECTIONS");
+        assert!(POP_ROW_LEFT >= -POPUP_W / 2.0 && CONN_RIGHT <= POPUP_W / 2.0);
+        let help_top = HELP_Y[0] + 48.0;
+        for index in [IDX_CONN_HEAD, IDX_CONN, IDX_CONN + CONN_LINES - 1, IDX_CONN_DIV] {
+            let s = spec(index);
+            assert!(s.x - s.w / 2.0 >= CONN_DIVIDER_X - 2.0 && s.x + s.w / 2.0 <= CONN_RIGHT, "{:?} is in the right column", s.name);
+            assert!(s.y - s.h / 2.0 > help_top && s.y + s.h / 2.0 <= ROW_FIRST_Y + ROW_H, "{:?} is above the help", s.name);
+        }
+        for row in 0..ROWS {
+            let sub = spec(IDX_SUB + row);
+            assert!(sub.x + sub.w / 2.0 <= POP_ROW_RIGHT, "a subline stays in the list column");
+            let plate_bottom = row_y(row) - ROW_H / 2.0;
+            assert!(sub.y - SUB_H / 2.0 >= plate_bottom - 2.0, "row {row}'s subline stays on its plate");
+        }
+        assert!(row_label_left(true) + row_label_w(true) <= POP_ROW_RIGHT - row_value_w(true), "the name ends before the value");
+        assert!(row_label_left(false) + row_label_w(false) <= ROW_RIGHT - row_value_w(false) + 1.0, "the page is unchanged");
     }
 
     #[test]

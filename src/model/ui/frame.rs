@@ -91,6 +91,8 @@ pub enum Tone {
 pub struct RowLine {
     pub label: Text<80>,
     pub value: Text<72>,
+    /// The r8 line under a recording row ("Recorded on …"); empty for any other row.
+    pub sub: Text<64>,
     pub label_tone: Tone,
     pub value_tone: Tone,
 }
@@ -215,6 +217,12 @@ pub struct Frame {
     pub outline: [Option<(u8, u8)>; 2],
     /// A chain row. The link glyph is drawn when the layout has imported it.
     pub chain: [bool; ROW_LINES],
+    /// The pop-up's CONNECTIONS column (r8 mockup): its header and lines, the row under the cursor first. Empty on the
+    /// page, which keeps CONNECTIONS in the help lines.
+    pub conn_head: Text<48>,
+    pub conn: [Text<72>; super::panes::CONN_LINES],
+    pub conn_tone: [Tone; super::panes::CONN_LINES],
+    pub conn_count: u8,
 }
 
 /// One floppy or loop mark. `color` is sRGB; the renderer converts it.
@@ -276,12 +284,17 @@ impl Frame {
         self.hairline = None;
         self.outline = [None; 2];
         self.chain = [false; ROW_LINES];
+        self.conn_head.clear();
+        self.conn.fill(Text::new());
+        self.conn_tone = [Tone::Normal; super::panes::CONN_LINES];
+        self.conn_count = 0;
     }
 
     pub const fn new() -> Frame {
         const EMPTY_ROW: RowLine = RowLine {
             label: Text::new(),
             value: Text::new(),
+            sub: Text::new(),
             label_tone: Tone::Normal,
             value_tone: Tone::Normal,
         };
@@ -328,6 +341,10 @@ impl Frame {
             hairline: None,
             outline: [None; 2],
             chain: [false; ROW_LINES],
+            conn_head: Text::new(),
+            conn: [Text::new(); super::panes::CONN_LINES],
+            conn_tone: [Tone::Normal; super::panes::CONN_LINES],
+            conn_count: 0,
         }
     }
 }
@@ -623,7 +640,21 @@ fn paint_recording(menu: &Menu, frame: &mut Frame) {
         paint_sections(rec, frame, face, group);
     }
     let lines = rec.connections(face, group);
-    if !lines.is_empty() {
+    if popup {
+        // The r8 pop-up has no help panel: the page row's help under it described a row the pop-up does not show.
+        frame.help[0].clear();
+        frame.help[1].clear();
+    }
+    if popup && !lines.is_empty() {
+        // The r8 pop-up's own column, right of the list: the header, then the row under the cursor and what it is
+        // connected to, one line each. The help keeps the row's own lines.
+        let _ = frame.conn_head.write_str("CONNECTIONS  of the row under the cursor");
+        for (slot, line) in lines.iter().take(super::panes::CONN_LINES).enumerate() {
+            let _ = frame.conn[slot].write_str(&line.text);
+            frame.conn_tone[slot] = Tone::Normal;
+            frame.conn_count = (slot + 1) as u8;
+        }
+    } else if !lines.is_empty() {
         frame.help[0].clear();
         frame.help[1].clear();
         let _ = frame.help[0].write_str("CONNECTIONS");
@@ -705,10 +736,10 @@ fn paint_sections(rec: &super::recording_menu::RecordingScreens, frame: &mut Fra
         frame.rows[base].label_tone = Tone::Dim;
         frame.row_count = (base + 1) as u8;
         if let Some(floppy) = view.header_floppy {
-            place_icon(frame, usize::from(section), p_row_x(), super::panes::row_y(base), floppy);
+            place_icon(frame, usize::from(section), p_row_x(face == super::recording_menu::Face::Popup), super::panes::row_y(base), floppy);
         }
         if let Some(mark) = view.header_loop {
-            place_icon_color(frame, super::panes::FLOPPIES + usize::from(section), p_row_x() + 36.0, super::panes::row_y(base), [236, 238, 242, 255]);
+            place_icon_color(frame, super::panes::FLOPPIES + usize::from(section), p_row_x(face == super::recording_menu::Face::Popup) + 36.0, super::panes::row_y(base), [236, 238, 242, 255]);
             let _ = write!(frame.rows[base].value, "{}", mark.label());
         }
         let start = window_start(view.cursor, view.rows.len(), SECTION_ROWS);
@@ -728,6 +759,7 @@ fn paint_sections(rec: &super::recording_menu::RecordingScreens, frame: &mut Fra
                 let _ = write!(frame.rows[slot].value, "{count}");
             }
             frame.rows[slot].label_tone = Tone::Normal;
+            let _ = frame.rows[slot].sub.write_str(&row.sub);
             frame.green[slot] = row.green;
             frame.chain[slot] = row.chain_count.is_some();
             if row.hot {
@@ -743,7 +775,7 @@ fn paint_sections(rec: &super::recording_menu::RecordingScreens, frame: &mut Fra
             }
             if let Some(floppy) = row.floppy {
                 let icon = 2 + usize::from(section) * SECTION_ROWS + (offset - start);
-                place_icon(frame, icon, p_row_x(), super::panes::row_y(slot), floppy);
+                place_icon(frame, icon, p_row_x(face == super::recording_menu::Face::Popup), super::panes::row_y(slot), floppy);
             }
         }
         if let (Some(lo), Some(hi)) = (hot_lo, hot_hi) {
@@ -762,8 +794,8 @@ fn place_icon_color(frame: &mut Frame, index: usize, x: f32, y: f32, color: [u8;
     }
 }
 
-fn p_row_x() -> f32 {
-    super::panes::ROW_RIGHT - 40.0
+fn p_row_x(popup: bool) -> f32 {
+    super::panes::row_span(popup).1 - 40.0
 }
 
 fn window_start(cursor: usize, len: usize, shown: usize) -> usize {
@@ -941,6 +973,36 @@ mod tests {
             hot_sequences: vec!["q1".into()],
         });
         menu
+    }
+
+    /// Primary 2026-11-08 (#19, #49): the r8 pop-up (`RECORDING-REDESIGN-r8-popup-combo.png`) has a line under each
+    /// row and CONNECTIONS in its own column on the right. Eden rc6-covrec-diag2: the pop-up drew one line per row and
+    /// joined CONNECTIONS into the help line at the bottom.
+    #[test]
+    fn the_popup_draws_sublines_and_a_connections_column() {
+        use crate::model::menu::table::COMBOS_SEQ;
+        use crate::model::recording_menu::Face;
+        let mut menu = recording_menu_with_files();
+        let mut catalog = menu.recording().catalog().clone();
+        catalog.combos[0].recorded_on = "Pikachu → Mario".into();
+        menu.recording_mut().set_catalog(catalog);
+        menu.recording_mut().toggle_popup();
+        menu.recording_mut().press_popup(Button::ZR);
+        let combos = menu.recording().section(Face::Popup, COMBOS_SEQ, 1);
+        let at = combos.rows.iter().position(|row| row.name == "c1").expect("c1 listed");
+        menu.recording_mut().set_cursor(Face::Popup, COMBOS_SEQ, 1, at);
+        let mut frame = Frame::new();
+        page_frame(&menu, &mut frame);
+        assert!(frame.popup);
+        let slot = (0..usize::from(frame.row_count)).find(|i| frame.rows[*i].label.string_lossy() == "c1").expect("c1 drawn");
+        assert_eq!(frame.rows[slot].sub.string_lossy(), "Recorded on Pikachu → Mario");
+        let header = (0..usize::from(frame.row_count)).find(|i| frame.rows[*i].label.string_lossy() == "COMBOS").expect("header");
+        assert!(frame.rows[header].sub.is_empty(), "a header has no subline");
+        assert_eq!(frame.conn_head.string_lossy(), "CONNECTIONS  of the row under the cursor");
+        let lines: Vec<String> = (0..usize::from(frame.conn_count)).map(|i| frame.conn[i].string_lossy()).collect();
+        assert_eq!(lines.first().map(String::as_str), Some("Recorded on Pikachu → Mario"), "{lines:?}");
+        assert!(lines.iter().any(|line| line == "In sequence Sequence 1"), "{lines:?}");
+        assert!(!frame.help[0].string_lossy().contains("CONNECTIONS"), "the help keeps its own lines");
     }
 
     /// Eden `rc5-opus-floppy1` (2026-11-08): `Save states & Macros (0)` beside an open macro. The count was of settings

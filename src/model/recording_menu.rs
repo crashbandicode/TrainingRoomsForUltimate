@@ -230,6 +230,9 @@ pub struct RowMark {
     pub floppy: Option<Floppy>,
     pub order: Option<u8>,
     pub chain_count: Option<u8>,
+    /// The r8 mockup's line under the name (`RECORDING-REDESIGN-r8-popup-*.png`): a save's fighters, a macro's or a
+    /// combo's "Recorded on …", a chain's or a sequence's steps. Empty for an action row.
+    pub sub: String,
 }
 
 /// One section, header included.
@@ -1454,6 +1457,36 @@ impl RecordingScreens {
             floppy: self.row_floppy(item),
             order: focused.and_then(|focus| self.order_badge(focus, item)),
             chain_count: self.macro_by_id(&item.id).filter(|file| file.chain).map(|file| file.steps.len() as u8),
+            sub: self.row_sub(item),
+        }
+    }
+
+    fn row_sub(&self, item: &Item) -> String {
+        let recorded = |on: &str| if on.is_empty() { String::new() } else { format!("Recorded on {on}") };
+        match item.kind {
+            ItemKind::Save => self.catalog.saves.iter().find(|file| file.id == item.id).map(|file| file.fighters.clone()).unwrap_or_default(),
+            ItemKind::Recording => match self.macro_by_id(&item.id) {
+                Some(file) if file.chain => {
+                    file.steps.iter().filter_map(|id| self.macro_by_id(id).map(|step| step.name.as_str())).collect::<Vec<_>>().join(" → ")
+                }
+                Some(file) => recorded(&file.recorded_on),
+                None => String::new(),
+            },
+            ItemKind::Combo => self.catalog.combos.iter().find(|file| file.id == item.id).map(|file| recorded(&file.recorded_on)).unwrap_or_default(),
+            ItemKind::Sequence => self
+                .catalog
+                .sequences
+                .iter()
+                .find(|file| file.id == item.id)
+                .map(|file| {
+                    file.combos
+                        .iter()
+                        .filter_map(|id| self.catalog.combos.iter().find(|combo| &combo.id == id).map(|combo| combo.name.as_str()))
+                        .collect::<Vec<_>>()
+                        .join(" → ")
+                })
+                .unwrap_or_default(),
+            ItemKind::NewChain | ItemKind::NewSequence | ItemKind::SaveLastCombo => String::new(),
         }
     }
 
@@ -2701,6 +2734,28 @@ mod tests {
         screens.set_cursor(Face::Page, COMBOS_SEQ, 1, 1);
         let lines = screens.connections(Face::Page, COMBOS_SEQ);
         assert_eq!(lines.first().map(|line| line.text.as_str()), Some("Recorded on Luigi"), "{lines:?}");
+    }
+
+    /// Primary 2026-11-08 (#49, #19): the r8 mockup's line under each row (`RECORDING-REDESIGN-r8-popup-combo.png`,
+    /// `-macro.png`): "Recorded on …" under a combo and a macro, the fighters under a save, the steps under a chain and
+    /// a sequence. An action row has none.
+    #[test]
+    fn rows_carry_the_r8_sublines() {
+        let mut screens = screens();
+        let mut catalog = example();
+        catalog.combos[0].recorded_on = "Pikachu → Mario".into();
+        screens.set_catalog(catalog);
+        let row = |screens: &RecordingScreens, group: u8, section: u8, name: &str| {
+            let view = screens.section(Face::Popup, group, section);
+            view.rows.iter().find(|row| row.name == name).map(|row| row.sub.clone()).unwrap_or_else(|| panic!("{name}: {view:?}"))
+        };
+        assert_eq!(row(&screens, COMBOS_SEQ, 1, "Nair loop combo"), "Recorded on Pikachu → Mario");
+        assert_eq!(row(&screens, COMBOS_SEQ, 1, "+ Save last combo…"), "");
+        assert_eq!(row(&screens, COMBOS_SEQ, 0, "Corner to kill"), "Nair loop combo");
+        assert_eq!(row(&screens, SAVES_MACROS, 0, "Corner"), "Pikachu · Mario");
+        assert_eq!(row(&screens, SAVES_MACROS, 1, "Nair loop"), "Recorded on Pikachu");
+        assert_eq!(row(&screens, SAVES_MACROS, 1, "Corner pressure"), "Nair loop → Dash grab → CPU throw");
+        assert_eq!(row(&screens, SAVES_MACROS, 1, "Dash grab"), "", "nothing recorded on file");
     }
 
     /// The typed name goes to the host with the save; an empty name lets the host pick Combo N. Where no keyboard can
