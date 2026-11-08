@@ -291,7 +291,9 @@ def acc_cstick_probe(ctx):
         ctx.call('input.stick', {'stick': 'right', 'x': 1, 'y': 0, 'lease_ms': 300})
         time.sleep(0.25)
         shot = ctx.shot('cstick-' + name)
-        time.sleep(1.0)
+        time.sleep(0.35)
+        later = ctx.shot('cstick-' + name + '-later')
+        time.sleep(0.65)
         ctx.call('input.stick', {'stick': 'right', 'x': 0, 'y': 0, 'lease_ms': 100})
         ctx.call('input.stick', {'stick': 'left', 'x': 0, 'y': 0, 'lease_ms': 100})
         time.sleep(0.3)
@@ -299,7 +301,8 @@ def acc_cstick_probe(ctx):
         marked = [r for r in records if r['buttons'] & 0x80]
         first = marked[0]['frame'] if marked else None
         window = [r for r in records if first is not None and first - 3 <= r['frame'] <= first + 8]
-        cases[name] = {'records': len(records), 'cstick_on_frames': len(marked), 'around': window, 'shot': str(shot)}
+        cases[name] = {'records': len(records), 'cstick_on_frames': len(marked), 'around': window,
+                       'shots': [str(shot), str(later)]}
     steps.save(ctx, 'cstick-probe', cases)
     if not any(case['cstick_on_frames'] for case in cases.values()):
         raise RuntimeError('no CSTICK_ON record in either case: %s' % {k: v['records'] for k, v in cases.items()})
