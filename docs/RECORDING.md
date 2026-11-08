@@ -55,11 +55,15 @@ Mash interrupts playback, when that option is On, stops the macro that role is p
 
 The old per-slot playback chords are not added.
 
+![Play on CPU warps once to the start save, then plays the active macro](media/rc5-play-chord.gif)
+
 ## The loop
 
 The loop belongs to the role, not to a file. Player 1 and the CPU each keep their own count. The counts are infinite, 1, 2, 3, 5, and 10. A new index uses 1. An old Loop On becomes infinite, and Loop Off, or a missing loop row, becomes 1.
 
 The Play chord warps to the start save once, before the first pass, when the switch is On. Every later pass plays on from where the fighters are. The loop never warps back. A recording and a chain follow the same rule. Infinite keeps going. A finite count plays the macro, or the whole chain, that many times.
+
+![The second pass of a loop continues from where the fighters are](media/rc5-loop-no-warp.gif)
 
 ## Chains
 
@@ -70,6 +74,8 @@ A chain starts where its first macro starts, at that macro's start save. The cha
 The role it is set active for is the role whose Play chord plays it. The macros play in order, from where the fighters are after that one warp. With a loop, the chain repeats as one unit: 1, 2, 3, then 1 again. No pass warps back.
 
 An empty chain plays nothing. A chain whose recordings have all been deleted plays nothing. There is no extra sentence for either case. R in the numbered picker removes a number, including the last one, so the list may be empty. A adds the next number. A on a tile that already has a number does nothing. B is done. It is the Character Cycles picker, except that the last number can come off.
+
+![The CPU's Play chord warps to macro 1's start save, then plays the chain in order](media/rc5-chain-play.gif)
 
 ## Combos
 

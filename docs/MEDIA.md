@@ -6,7 +6,7 @@ action, result) before a clip was kept. The raw takes stay outside git with thei
 
 ## rc.5 clips
 
-20 of the rows below are in [`media/`](media/), and the player docs embed them. They are Eden footage of
+23 of the rows below are in [`media/`](media/), and the player docs embed them. They are Eden footage of
 `p23/rc5-wire-fix` diag builds, which add log lines only (the screen draws the same):
 
 - The frame-strip clips other than the C-stick one: run `rc5-docs-gifs-xps2` on the XPS, 2026-11-08 00:30–00:56Z, diag NRO `6bbf2ecd`. The drop
@@ -15,12 +15,16 @@ action, result) before a clip was kept. The raw takes stay outside git with thei
   03:58–04:13Z, diag NRO `58a9f4de` (`614d9e8`). That C-stick take replaces an earlier one whose stick row showed the
   C-stick.
 - `rc5-fighter-mismatch.gif`: run `rc5-mismatch-xps3`, 2026-11-08, diag NRO `e9ccf373`.
+- `rc5-play-chord.gif`, `rc5-loop-no-warp.gif` and `rc5-chain-play.gif`: run `rc5-docs-gifs4-xps1`, 2026-11-08
+  05:35–05:46Z, diag NRO `e5120f8a` (`cf1fafb`, with the played-frame queue). Player 1 starts in reach of the
+  CPU's jab, so each clip shows the CPU's jabs landing.
 - `rc5-popup.gif`, `rc5-record-start-save.gif`, `rc5-recording-page.gif` and `rc5-save-warp.gif`: Surface run
   `out-confirm-2116Z`, 2026-11-07.
 
-Each was taken at 1280×720 and 15 fps by the runner's `gif` step. Five takes over 10 MB were re-encoded with one shared
+Each was taken at 1280×720 and 15 fps by the runner's `gif` step. Seven takes over 10 MB were re-encoded with one shared
 palette of 96 colours and no dither: `rc5-popup.gif` and `rc5-save-warp.gif` keep every frame, and
-`rc5-frame-strip-stick-row.gif`, `rc5-frame-strip-freeze-stick.gif` and `rc5-record-start-save.gif` keep every second
+`rc5-frame-strip-stick-row.gif`, `rc5-frame-strip-freeze-stick.gif`, `rc5-record-start-save.gif`,
+`rc5-loop-no-warp.gif` and `rc5-chain-play.gif` keep every second
 frame with the time of both, so they still play at game speed.
 
 The other rows are not captured yet, and their doc sections have no picture. Capture each one in the Eden session that
@@ -57,9 +61,9 @@ Recording page. A row that says `rr-6` is not a capture of the old slot page. Re
 | `media/rc5-frame-strip-exchange.gif` | `media-rc5-frame-strip-exchange` | surface | FRAME-STRIP.md, The 20-frame exchange | strip | 8 s | Jab with A. Stand still for a full second (more than 20 frames after the CPU can act). Jab again. | The second hit does not turn LINK into a large DROP of the first exchange. After both can act, ADVANTAGE is the new exchange, `on hit`. | yes |
 | `media/rc5-save-warp.gif` | `media-rc5-save-warp` | yoga | RECORDING.md, Save states only warp | strip | 6 s | At centre, 0%, ZL+Down to save the current slot. Walk both fighters to the ledge. ZL+Up. | Both fighters return to the saved spot. No recording starts. The CPU does not play inputs. | yes |
 | `media/rc5-record-start-save.gif` | `media-rc5-record-start-save` | yoga | RECORDING.md, Recording a macro | rr-6 | 8 s | Pop-up on Player. ZR+Down, walk forward and jab once, ZR+Down again to stop. Open the pop-up. | A new macro listed first, an orange floppy, and a start save named with the macro. | yes |
-| `media/rc5-play-chord.gif` | `media-rc5-play-chord` | yoga | RECORDING.md, Set active | rr-6 | 8 s | Set that macro active for the CPU. Stand away from its start save. ZR+Up. | One warp to the start save, then the CPU plays the jab. A second press of ZR+Up stops it. | not yet |
-| `media/rc5-loop-no-warp.gif` | `media-rc5-loop-no-warp` | yoga | RECORDING.md, The loop | rr-6 | 8 s | Same macro, CPU loop set to 2 (X while the cursor is in Macros). ZR+Up and let both passes finish. | The first pass warps once. The second pass does not warp. It continues from where the first pass ended. | not yet |
-| `media/rc5-chain-play.gif` | `media-rc5-chain-play` | yoga | RECORDING.md, Chains | rr-6 | 9 s | + New chain. Number two recordings, the first of which has a start save. Name it. Set it active for the CPU. ZR+Up. | One warp to macro 1's start save, then recording 1, then recording 2, with no warp between them. | not yet |
+| `media/rc5-play-chord.gif` | `media-rc5-play-chord` | yoga | RECORDING.md, Set active | rr-6 | 8 s | Set that macro active for the CPU. Stand away from its start save. ZR+Up. | One warp to the start save, then the CPU plays the jab. A second press of ZR+Up stops it. | yes |
+| `media/rc5-loop-no-warp.gif` | `media-rc5-loop-no-warp` | yoga | RECORDING.md, The loop | rr-6 | 8 s | Same macro, CPU loop set to 2 (X while the cursor is in Macros). ZR+Up and let both passes finish. | The first pass warps once. The second pass does not warp. It continues from where the first pass ended. | yes |
+| `media/rc5-chain-play.gif` | `media-rc5-chain-play` | yoga | RECORDING.md, Chains | rr-6 | 9 s | + New chain. Number two recordings, the first of which has a start save. Name it. Set it active for the CPU. ZR+Up. | One warp to macro 1's start save, then recording 1, then recording 2, with no warp between them. | yes |
 | `media/rc5-grade-not-true.gif` | `media-rc5-grade-not-true` | surface | RECORDING.md, Combos | strip | 9 s | Save last combo on a link the strip called `TRUE 0`. Combo helper On, On-time tolerance 1 frame. Load the same save. Attempt 1: the same follow-up pressed one frame later, so LINK reads `+1 DROP` while every event is inside the tolerance. Attempt 2: the same timing, but a different follow-up move. | Attempt 1 still counts (the bar does not require TRUE). Attempt 2 drops, and the bar says the move was wrong. | not yet |
 | `media/rc5-make-combo.gif` | `media-rc5-make-combo` | yoga | RECORDING.md, Combos | rr-6 | 8 s | Drill some other combo first, so the bar is showing it. On the macro's screen, Make combo. | That macro plays once on Player 1 from its own start save. A new combo named Combo N appears in the hot five, made from that macro. The drilled combo is still the drill when it finishes. | not yet |
 | `media/rc5-crop-combo.gif` | `media-rc5-crop-combo` | yoga | RECORDING.md, Combos | rr-6 | 7 s | Open a combo of at least two links. Crop. Move a handle with L or R. A saves. | The handle screen is open. A writes a new combo. The original combo is still in the list. | yes |
