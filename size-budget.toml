@@ -665,3 +665,11 @@ ceiling = 150839
 date = "2026-11-08"
 reason = "rc.6 coverage fixes (p23/rc6-cov-rec fd77245): the bound save drives Save, Load and Auto-load through the active slot, combo CONNECTIONS lines in the catalog, shared combo ids in the index and sequences, the recorder before the input display (Make combo events), and the mash sees a library macro playing on the CPU; measured 150839 (tools/size_gate.py), +189 over 150650"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to these root fixes under TASK-OPUS-rc6-cov-rec (primary c07b3449, 2026-11-08: a raise goes in its own commit with approved_by)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 150966
+date = "2026-11-08"
+reason = "rc.6 coverage, second set (p23/rc6-cov-rec 4d387ff..f7371fa): Make combo saves only its own exchange, the operator's '+ Save last combo…' row at the top of COMBOS and a combo's recorded fighter in CONNECTIONS, a drill or bind puts that file first, and the Replay window's clip editor drawn after the hand-over; measured 150966 (tools/size_gate.py), +127 over 150839"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied under TASK-OPUS-rc6-cov-rec and the primary's inbox orders of 2026-11-08 13:08Z (Save last combo) and 13:31Z (Make combo), own commit"
