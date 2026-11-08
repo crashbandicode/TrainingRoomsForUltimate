@@ -829,6 +829,15 @@ Tests (failed first, 16:04Z): `an_ordinary_request_leaves_a_mii_window_for_the_w
 `tests/mii_exit_wiring.rs` (3). Recorded manifest edits of the six carried files; `carry_pkg6.py verify` re-derives all
 250 files.
 
+Eden `rc6-hot-xps5` (XPS, diag `dde68833`):
+- The Player's laps through a Mii group passed. The exit to Link took 85 and 54 ms; the second Mii visit was a warm
+  exchange; all 8 presses were `Applied`.
+- The CPU's exit settled `NativeSettledUnowned`, "CPU current index mirrors differ". Until the restore, the CPU's
+  `E+0x1a8` names the Mii's destination record while FE and D already name the window's index, so `exit_settled`'s
+  owner walk before `bank_restore` refused.
+- Fixed: the CPU's `exit_settled` reads the descriptor directly under G, as `bank_restore` reads its fields. Test
+  (failed first, 16:35Z): `tests/mii_exit_wiring.rs` `the_cpu_exit_reads_no_owner_walk_before_the_restore`.
+
 ### p23/rc6-hot-slots: Mii groups build asynchronously (2026-11-08)
 
 The second of the three group-speed items (operator decision 2026-11-08, `docs/DECISIONS.md` "Group speed in rc.6").

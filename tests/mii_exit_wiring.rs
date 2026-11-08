@@ -57,15 +57,28 @@ fn both_adapters_keep_the_publication_and_settle_the_exit_through_it() {
 /// publication goes back through `bank_restore` against the receipt from before the Mii, then the owner adopts.
 #[test]
 fn the_exit_settle_proves_the_exchange_restores_the_publication_then_adopts() {
-    for (name, native, adopt) in [("Player", PLAYER_NATIVE, "owner.expected=now;owner.active=None;"),
-        ("CPU", CPU_NATIVE, "owner.live=bank.destination;owner.expected=now;")] {
+    for (name, native, adopt, receipt) in [
+        ("Player", PLAYER_NATIVE, "owner.expected=now;owner.active=None;", "before:Snapshot {descriptor:now.descriptor,"),
+        ("CPU", CPU_NATIVE, "owner.live=bank.destination;owner.expected=now;", "before:Snapshot {descriptor,control:before.control,"),
+    ] {
         let exit = body(native, "pub(super) unsafe fn exit_settled(");
         let proof = exit.find("group_rebaseline(").unwrap_or_else(|| panic!("{name}:\n{exit}"));
         let restore = exit.find("bank_restore(&restore,exit.configuration,exit.published)").unwrap_or_else(|| panic!("{name}:\n{exit}"));
         let adopted = exit.find(adopt).unwrap_or_else(|| panic!("{name}:\n{exit}"));
         assert!(proof < restore && restore < adopted, "{name}:\n{exit}");
-        assert!(exit.contains("before:Snapshot {descriptor:now.descriptor,"), "{name}: the read-back compares the receipt from before the Mii");
+        assert!(exit.contains(receipt), "{name}: the read-back compares the receipt from before the Mii");
         assert!(exit.contains("..exit.mii.before}"), "{name}");
         assert!(exit.contains("state.bank=None;state.mii_exit=None;"), "{name}");
     }
+}
+
+/// rc6-hot-xps5 (XPS, diag `dde68833`): the CPU's exit settled `NativeSettledUnowned` with `CPU current index mirrors
+/// differ`. Until the restore, `E+0x1a8` names the Mii's destination record while FE and D name the window's index, so
+/// an owner walk before `bank_restore` refuses; the descriptor is read directly under G, as `bank_restore` reads.
+#[test]
+fn the_cpu_exit_reads_no_owner_walk_before_the_restore() {
+    let exit = body(CPU_NATIVE, "pub(super) unsafe fn exit_settled(");
+    let restore = exit.find("bank_restore(&restore,").expect("the restore");
+    assert!(!exit[..restore].contains("current_locked("), "{exit}");
+    assert!(exit[..restore].contains("let descriptor=rd::<[u8;0x70]>(before.binding.entry,0);"), "{exit}");
 }

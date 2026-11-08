@@ -491,13 +491,15 @@ pub(super) unsafe fn bank_settled(bank:&super::BankTrack)->Result<Settled,BankRe
 /// settle tick the bank's exchange receipt proves the descriptor (`group_rebaseline`), the Mii switch's publication
 /// goes back through `bank_restore` (the window is no longer the published group), whose read-back proves the rest
 /// against the receipt from before the Mii with the descriptor and CPU control bytes as they are now; then the owner
-/// adopts the window. `helpers::BUSY` before any write retries on the next callback.
+/// adopts the window. Until the restore, `E+0x1a8` still names the Mii's destination record while FE and D name the
+/// window's index, so no owner walk can read that state (rc6-hot-xps5: `CPU current index mirrors differ`): the
+/// descriptor is read directly under G, as `bank_restore` reads its fields. `helpers::BUSY` before any write retries
+/// on the next callback.
 #[cfg(feature="native-body-bank-alpha")]
 pub(super) unsafe fn exit_settled(bank:&super::BankTrack,exit:Option<super::MiiExit>)->Result<Settled,BankRefusal> {
     let before=&bank.before;
     let exit=exit.filter(|x|x.mii.ticket.epoch==before.binding.epoch)
         .ok_or(BankRefusal::Diverged("CPU warm exit without its kept Mii publication"))?;
-    let m=map(before.binding.entry).map_err(BankRefusal::Diverged)?;
     let b=pool(before.binding.entry,before.binding.epoch).map_err(BankRefusal::Diverged)?;
     if b!=before.binding {return Err(BankRefusal::Diverged("CPU warm exit G identity changed"));}
     let helpers=match helper_snapshot() {
@@ -506,13 +508,13 @@ pub(super) unsafe fn exit_settled(bank:&super::BankTrack,exit:Option<super::MiiE
         Err(reason)=>return Err(BankRefusal::Kept(reason)),
     };
     let lock=PoolLock::acquire(super::base(),b.manager);
-    let now=current_locked(m,b,before.original_kind,None,helpers).map_err(BankRefusal::Diverged)?;
+    let descriptor=rd::<[u8;0x70]>(before.binding.entry,0);
     drop(lock);
-    if now.descriptor==before.descriptor || !super::super::body_bank::group_rebaseline(before.binding.entry,
-        before.binding.owner,before.binding.epoch,&before.descriptor,&now.descriptor) {
+    if descriptor==before.descriptor || !super::super::body_bank::group_rebaseline(before.binding.entry,
+        before.binding.owner,before.binding.epoch,&before.descriptor,&descriptor) {
         return Err(BankRefusal::Diverged("CPU warm exit without its group exchange"));
     }
-    let restore=super::BankTrack {before:Snapshot {descriptor:now.descriptor,control:before.control,..exit.mii.before},
+    let restore=super::BankTrack {before:Snapshot {descriptor,control:before.control,..exit.mii.before},
         descriptor:exit.mii.descriptor,..*bank};
     let now=match bank_restore(&restore,exit.configuration,exit.published) {
         Ok(restored)=>restored.now,
