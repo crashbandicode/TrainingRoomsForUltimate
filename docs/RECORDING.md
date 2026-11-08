@@ -1,6 +1,6 @@
 # Recording
 
-Recording is save states, macros, chains, combos, and sequences. A save state only warps. A macro is a recording of inputs, and a chain is a macro made of macros. Each role has one active macro, and that role's Play chord plays it. Combos and sequences are what you drill. They have no chord.
+Recording is save states, macros, chains, combos, and sequences. A save state only warps. A macro is a recording of inputs, and a chain is a macro made of macros. Each role has one active macro, and that role's Play chord plays it. Combos are what you drill, and a sequence is an ordered list of them. They have no chord.
 
 Two layers are easy to mix up, so this page keeps them apart.
 
@@ -53,15 +53,11 @@ Mash interrupts playback, when that option is On, stops the macro that role is p
 
 The old per-slot playback chords are not added.
 
-![Play on CPU warps once to the start save, then plays the active macro](media/rc5-play-chord.gif)
-
 ## The loop
 
 The loop belongs to the role, not to a file. Player 1 and the CPU each keep their own count. The counts are infinite, 1, 2, 3, 5, and 10. A new index uses 1. An old Loop On becomes infinite, and Loop Off, or a missing loop row, becomes 1.
 
 The Play chord warps to the start save once, before the first pass, when the switch is On. Every later pass plays on from where the fighters are. The loop never warps back. A recording and a chain follow the same rule. Infinite keeps going. A finite count plays the macro, or the whole chain, that many times.
-
-![The second pass of a loop continues from where the fighters are](media/rc5-loop-no-warp.gif)
 
 ## Chains
 
@@ -73,8 +69,6 @@ The role it is set active for is the role whose Play chord plays it. The macros 
 
 An empty chain plays nothing. A chain whose recordings have all been deleted plays nothing. There is no extra sentence for either case. R in the numbered picker removes a number, including the last one, so the list may be empty. A adds the next number. A on a tile that already has a number does nothing. B is done. It is the Character Cycles picker, except that the last number can come off.
 
-![The CPU's Play chord warps to macro 1's start save, then plays the chain in order](media/rc5-chain-play.gif)
-
 ## Combos
 
 Save last combo, on today's Recording › Combos row, keeps the last combo the frame strip saw and makes it the drill. The file is the combo's links and the input events of each follow-up: presses, releases, the C-stick, and the stick flicks (fast-fall, dash, tap-jump). Make combo records the same events, because it plays into the same strip. Any fighter can practise it. The format is in [COMBOS.md](COMBOS.md).
@@ -83,13 +77,9 @@ A combo counts when its recorded input events are there, the same kind and the s
 
 A different move does not count, even when the events match. That attempt drops. An attempt also drops on a missing event, an event outside the tolerance, a different direction, or the exchange ending before the step. An older file that has only presses is graded on those presses, with left and right still one direction. The exchange ends 20 frames after the CPU can act again, or on a shielded hit. A gap of 20 frames still belongs to the exchange. A gap of 21 opens a new one, so the step drops. A single combo's best stays the most true links in one attempt. The streak follows the count above, so a non-true link can still extend the streak.
 
-![A follow-up that is not a true combo still counts, and a different move drops](media/rc5-grade-not-true.gif)
-
 Make combo, on a macro's or a chain's own screen, plays that file once on Player 1 from the file's own start save. A chain uses its first macro's start save. The pass is stripped to its links and saved as a new combo named Combo N, with Made from set to the source. That combo joins the five most recently used. The file on screen stays. The drill does not change. A pass with no hit and no follow-up writes nothing and shows "No combo yet: land a hit and a follow-up first."
 If the connected start save was deleted, Make combo skips the warp, shows "No start save. This macro plays from where the fighters are.", and still plays. A switch that is Off, or a file that never had a start save, does not warp and does not show that sentence. A chain whose first macro is missing skips that step and plays the next one that is still there.
 Play skips a deleted start save and shows the same sentence. A macro that never had one does not show it.
-
-![Make combo plays the macro once and leaves the current drill in place](media/rc5-make-combo.gif)
 
 Crop on a combo or a macro opens a handle screen. Up and Down switch In and Out. L and R move the handle that is focused, and they do not change the menu page. A saves a new file under the next unused Macro N or Combo N and returns to the original. B returns without writing. The original stays. A macro crop keeps that range of frames. The new file keeps the original's one start state, stamped at the clamped start frame. It does not store a pose for every frame. A combo crop keeps the links from the first handle through the last. The replay window is a separate row under Replays. It is not this Crop row.
 A chain has no Crop row, because it has no frames of its own.
@@ -100,15 +90,11 @@ There is no chord for a combo. Choosing Drill makes it the one drill.
 
 ## Sequences and the one drill
 
-A sequence is an ordered list of combo files. It stores each combo's id. Rename a combo and the sequence shows the new name. Delete a combo and the sequence skips that step. An empty sequence drills nothing.
+A sequence is an ordered list of combo files. It stores each combo's id. Rename a combo and the sequence shows the new name. Delete a combo and the sequence skips that step.
 
-The helper drills one thing. Drilling a sequence replaces a drilled combo, and drilling a combo replaces a drilled sequence. A numbered row inside a sequence drills that combo alone, with that combo's own streak, and the sequence file stays.
-
-The bar under the frame strip is the combo helper's bar with a sequence header and a row for the sequence's combos. A finished sequence adds one to the streak, and best is the highest streak. A drop sends the sequence back to combo 1 and the streak to 0. Best is kept. TRUE is shown and is not required, including between the combos of a sequence. The same grade as a single combo decides each step: the input events, the direction, the order, the tolerance, and the move. Drift is shown and is not graded.
+In this build you can build and edit sequences, but drilling a sequence is not in it yet. It comes in the next build. Drill sequence, or A on a sequence, still makes it the green drilled row, but the bar keeps the combo it was drilling. The helper drills one combo. A numbered row inside a sequence drills that combo alone, with that combo's own streak, and the sequence file stays.
 
 The picker is the same numbered picker as a chain, including R removing the last number.
-
-![Drill a sequence: combo 2 of 2, then a drop back at combo 1](media/rc5-sequence-drill.gif)
 
 ## The pop-up
 
@@ -126,7 +112,7 @@ The connections of the row under the cursor are the menu's two help lines, heade
 
 The bound save, the active macro of the role in view, and the drilled combo or sequence are green rows. The name stays the ordinary light colour. The cursor on these screens is a white border and a white bar on the left. A row can be green and hold the cursor at the same time.
 
-A on a save binds it to Save and Load. A on a macro or a chain sets it active for the role in view. A on a combo or a sequence drills it. X cycles the loop, and only while the cursor is in Macros, and that count is written to the recording index. Y does nothing on this window.
+A on a save binds it to Save and Load. A on a macro or a chain sets it active for the role in view. A on a combo drills it. A on a sequence marks it, as described under Sequences. X cycles the loop, and only while the cursor is in Macros, and that count is written to the recording index. Y does nothing on this window.
 
 ![The pop-up over the match, Player view, cursor on a save](media/rc5-popup.gif)
 
@@ -134,7 +120,7 @@ The orange floppy is the save state a macro starts at. It is grey when that macr
 
 ## The Recording page
 
-The Recording page uses the same stacked sections and the same CONNECTIONS help lines. The left column is Save states & Macros, Combos & Sequences, Replays, and Options. There is no tab switch on the page, because that column lists the groups. ZR switches Player 1 and CPU. L and R change the menu page, except while a file screen, the crop screen, the numbered picker, or the name step is open: then L and R stay on Recording. The CPU view hides Combos & Sequences. A opens the file's own screen. On a save, Bind to Save / Load is that screen's first row. X cycles the loop only when the cursor is in Macros, and that count is written to the recording index. B closes the menu when no file screen is open. On a file screen, B goes back.
+The Recording page uses the same stacked sections and the same CONNECTIONS help lines. The left column is Save states & Macros, Combos & Sequences, Replays, and Options. There is no tab switch on the page, because that column lists the groups. Each of the two library groups shows in brackets how many files it lists: saves and macros, or combos and sequences. ZR switches Player 1 and CPU. L and R change the menu page, except while a file screen, the crop screen, the numbered picker, or the name step is open: then L and R stay on Recording. The CPU view hides Combos & Sequences. A opens the file's own screen. On a save, Bind to Save / Load is that screen's first row. X cycles the loop only when the cursor is in Macros, and that count is written to the recording index. B closes the menu when no file screen is open. On a file screen, B goes back.
 
 ![The Recording page, Player view, saves above macros](media/rc5-recording-page.gif)
 
@@ -146,7 +132,7 @@ The breadcrumb reads `Recording (Player view)  >  Save states & Macros  >  name`
 
 Set active is one row, for the role in view. Right sets On for that role. Left sets Off. On makes this file that role's active macro. Left on a row that is already Off does not clear the other role.
 
-A macro that has a start save lists Start save, then Set active, Rename, Crop, Make combo, and Delete. Without a start save, Start save is absent. A chain that has a start save on its first macro lists Start save first, then Set active, Edit chain, Rename, Make combo, and Delete. A chain has no Crop. A combo lists Drill, then Made from when it was made from a macro whose name is still there, then Rename, Crop, and Delete. A save lists Bind to Save / Load, Duplicate, Rename, and Delete. A sequence lists Drill sequence, a numbered row for each combo, Edit combos, Rename, and Delete. A on a numbered combo drills that combo alone.
+The Start save row of a macro or a chain shows the same floppy as its library row, orange when the switch is On and grey when it is Off. A macro that has a start save lists Start save, then Set active, Rename, Crop, Make combo, and Delete. Without a start save, Start save is absent. A chain that has a start save on its first macro lists Start save first, then Set active, Edit chain, Rename, Make combo, and Delete. A chain has no Crop. A combo lists Drill, then Made from when it was made from a macro whose name is still there, then Rename, Crop, and Delete. A save lists Bind to Save / Load, Duplicate, Rename, and Delete. A sequence lists Drill sequence, a numbered row for each combo, Edit combos, Rename, and Delete. A on a numbered combo drills that combo alone.
 
 Rename opens the Switch keyboard. B, or an empty confirm, keeps the old name. A name the library stores may be at most 48 characters, and it may not be empty or contain a control character. An empty confirm on a new chain or sequence keeps Chain N or Sequence N. A recording stopped with no typed name is Macro N. Duplicate names the copy Save N. Save overwrites the bound save, and when nothing is bound it creates Save N. A combo saved with no typed name is Combo N. In an online waiting room the keyboard stays closed, and B on the name step keeps that N name. A local-wireless waiting room and Training open the keyboard.
 
@@ -156,7 +142,7 @@ The combo's help lines list each link as the two moves and TRUE or not, then tha
 
 ## Fighter Mismatch
 
-Fighter Mismatch is the prompt a replay clip or a combo can open before it switches a fighter. The title is Fighter Mismatch. The rows are Keep current fighter and Switch to recorded fighter. Nothing is hidden or refused because the fighter differs. A sequence may mix fighters.
+Fighter Mismatch is the prompt a macro, a chain, a replay clip, or a combo can open before it switches a fighter. The title is Fighter Mismatch. The rows are Keep current fighter and Switch to recorded fighter. When Play opens it with the menu closed, it is drawn over the match on its own. While it is up the frame strip is hidden and Player 1's presses answer it instead of reaching the match: the D-pad moves, A chooses, and B cancels. Nothing is hidden or refused because the fighter differs. A sequence may mix fighters.
 
 Play holds until those rows are answered. The cursor starts on Keep. Keep plays on the fighter you have. Switch changes to the fighter the file was recorded on, then plays. B cancels and does not play. A macro asks when its recorded fighter differs. A chain asks only for its first macro, and the line is `screen=mismatch ask=macro1`. Later macros are not checked and do not switch. A combo drill asks when the drilled combo changes to one recorded on another fighter. The first time a saved drill is seen, it does not ask. Load does not ask.
 
@@ -164,13 +150,11 @@ Play holds until those rows are answered. The cursor starts on Keep. Keep plays 
 
 ## Migration of the old slots
 
-The first time this library is built, empty slots are skipped. A recording slot that holds inputs becomes a macro named `Slot N (YYYY-MM-DD)`, using the date the migration runs and the slot's number starting at 1. Those macros have no start save, so they have no Start save switch, and they play from where the fighters are. No chain is built from them.
+The first time this library is built, empty slots are skipped. A recording slot that holds inputs becomes a macro named `Slot N (YYYY-MM-DD)`, using the date the migration runs and the slot's number starting at 1. Those macros have no start save, so they have no Start save switch, and they play from where the fighters are. No chain is built from them. Recording slots were never kept between boots, so on a card updated from an earlier build they are empty when the library is first built, and no slot becomes a macro. The save indexes are what carry over.
 
 A save index that holds a save becomes one file, both fighters, with the same `Slot N (date)` name. The slot the Save and Load chords were using becomes the bound save. An empty index is skipped.
 
 `macros/selected.txt`, when it names a file that is there, becomes Player 1's active macro. The CPU has no active macro until you set one. The old "play a recording when a state loads" row is not turned into a chain.
-
-![Play on CPU runs a migrated slot from where the fighters are, with no warp](media/rc5-migration.gif)
 
 ## Where the rules come from
 

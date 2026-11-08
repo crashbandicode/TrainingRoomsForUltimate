@@ -4,7 +4,7 @@ The frame strip is the input display. Turn it on at Display & Controls › Input
 
 It keeps the last 60 game frames, about one second. The newest frame is on the right. Player 1 and the CPU each have a lane. Player 1's button presses are chips above the lanes. On the right, three readouts say who could act first after the last hit, whether the last follow-up was a true combo, and how the press was timed. A LAST row under the lanes keeps the last four follow-ups.
 
-The strip hides while the TrainingRooms menu or the game's pause menu is open, while Input Display is Off, and outside Training and lobby practice. It clears when the scene changes, when you hot-swap, when a save state loads, and when Training resets or replaces a fighter. The frames from before that did not happen. While the strip is on screen, the separate Frame Advantage notice stays down, because the ADVANTAGE readout is that number.
+The strip hides while the TrainingRooms menu, the recording pop-up, the Fighter Mismatch question, or the game's pause menu is open, while Input Display is Off, and outside Training and lobby practice. It clears when the scene changes, when you hot-swap, when a save state loads, and when Training resets or replaces a fighter. The frames from before that did not happen. While the strip is on screen, the separate Frame Advantage notice stays down, because the ADVANTAGE readout is that number.
 
 An older settings file that still says Smash Inputs, Raw Inputs, or Status Only becomes Frame strip. Off stays Off.
 
@@ -56,7 +56,7 @@ A C-stick attack, the attack the game marks as coming from the C-stick, takes it
 
 ## Stick row
 
-Under Player 1's lane, every frame of the same 60 shows the left stick's held direction. The eight directions are the same bins as the chip arrow, and a neutral frame is blank. The row scrolls and freezes with the rest of the strip. A change of binned direction resets the quiet count, so the strip does not freeze across that change. Holding one direction can still freeze it.
+Under Player 1's lane, every frame of the same 60 shows the left stick's held direction. It reads the physical left stick, so a C-stick attack with the left stick neutral leaves the row blank. The eight directions are the same bins as the chip arrow, and a neutral frame is blank. The row scrolls and freezes with the rest of the strip. A change of binned direction resets the quiet count, so the strip does not freeze across that change. Holding one direction can still freeze it.
 
 ![The stick row during a dash dance: held directions, and blanks while the stick is neutral](media/rc5-frame-strip-stick-row.gif)
 

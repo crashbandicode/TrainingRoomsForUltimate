@@ -10,7 +10,7 @@ ADVANTAGE is the CPU's first actionable frame minus yours after the last hit. Pl
 
 A follow-up more than 20 frames after the CPU can act is a new exchange, not a dropped link.
 
-Under Player 1's lane, a stick row shows the held direction on each frame. A C-stick attack, the attack the game marks as coming from the C-stick, takes its chip arrow from the C-stick when that stick is outside the dead zone. Any other press, including a C-stick that stays neutral, keeps the left-stick arrow. The stick row uses the left stick either way.
+Under Player 1's lane, a stick row shows the held direction on each frame. A C-stick attack, the attack the game marks as coming from the C-stick, takes its chip arrow from the C-stick when that stick is outside the dead zone. Any other press, including a C-stick that stays neutral, keeps the left-stick arrow. The stick row reads the physical left stick either way, so a C-stick attack with the left stick neutral leaves the row blank.
 
 Holding one direction long enough can freeze the strip. A new binned direction, including a move out of neutral, starts it scrolling again.
 
@@ -23,7 +23,8 @@ Holding one direction long enough can freeze the strip. A new binned direction, 
 - A chain starts at its first macro's start save, plays its recordings in order, and cannot contain a chain.
 - Save last combo still saves the combo you landed. A drilled combo counts without having to be a true combo. A different move drops.
 - Make combo plays the file under the cursor once on Player 1, from that file's own start save, and saves the links as a new combo named Combo N. Crop opens a handle screen and saves a new file. The original stays. Both rows are on the file's screen; what they do is in [RECORDING.md](RECORDING.md).
-- A sequence is an ordered list of combos, and the helper drills one thing at a time.
+- A sequence is an ordered list of combos. You can build and edit sequences in this build; drilling a sequence comes in the next build. The helper drills one combo.
+- Play on a macro or a chain whose first macro was recorded on another fighter asks Fighter Mismatch first: Keep, Switch, or B to cancel. The frame strip is hidden while it is up.
 - The pop-up and the Recording page are how you bind a save, set a macro active, and drill.
 
 ## Chords
@@ -48,7 +49,7 @@ The first time Training opens on a new install, the six reminders are still Welc
 On the first build of the new library:
 
 - Empty recording slots and empty save indexes are skipped.
-- A used recording slot becomes a macro named `Slot N (YYYY-MM-DD)`, with the date the migration runs. It has no start save, so Play runs it from where the fighters are.
+- A used recording slot becomes a macro named `Slot N (YYYY-MM-DD)`, with the date the migration runs. It has no start save, so Play runs it from where the fighters are. Recording slots were never kept between boots, so a card updated from an earlier build has none to migrate.
 - A used save index becomes one save file of both fighters, with the same kind of name. The slot Save and Load were using becomes the bound save.
 - The named library's selected file becomes Player 1's active macro.
 - Nothing is turned into a chain. Sequences and chains start empty.
