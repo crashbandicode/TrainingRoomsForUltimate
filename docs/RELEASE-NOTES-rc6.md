@@ -76,7 +76,8 @@ A drilled combo, like a bound save or an active macro, moves to the top of its l
   - TODO-PROOF: hot lane, Mii groups built in the background, and leaving a Mii warm to any built group
     (`p23/rc6-hot-slots-mii`).
 - TODO-PROOF: worker A and worker B, Ice Climbers, Pokémon Trainer and Pyra/Mythra groups built in the background,
-  including a session that starts on one of them (`p23/rc6-bg-ic`, `p23/rc6-bg-pt`).
+  including a session that starts on one of them (`p23/rc6-bg-ic`, `p23/rc6-bg-pt`). Until then the background build
+  waits while the fighter on screen is a Mii, Kirby, Ice Climbers, Pokémon Trainer or Pyra/Mythra.
 - The notice counts what is loading: "Loading 4/10", then "Ready 10/10" or "All loaded".
 - Fighters past the ready budget still load when you switch to them, as before.
 
