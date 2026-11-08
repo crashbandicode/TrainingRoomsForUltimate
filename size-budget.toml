@@ -705,3 +705,11 @@ ceiling = 152005
 date = "2026-11-08"
 reason = "rc.6 coverage (p23/rc6-cov-rec 57f65c0): the r8 pop-up as drawn, its title with the L/R role tabs, the section file counts, the CONNECTIONS boxes and tree, and the r8 footer (primary 2026-11-08 15:55Z); 2427fff reverted e276d0f (-43); measured 152005 (tools/size_gate.py), +524 over 151481"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied under TASK-OPUS-rc6-cov-rec and the primary's inbox order of 2026-11-08 15:55Z, own commit"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 152190
+date = "2026-11-08"
+reason = "rc.6 coverage (p23/rc6-cov-rec d3c5e1b): the r8 pop-up section header bands with kind marks, the red order badges and the boxed page tabs (primary 2026-11-08 16:51Z); measured 152190 (tools/size_gate.py), +185 over 152005"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied under TASK-OPUS-rc6-cov-rec and the primary's inbox order of 2026-11-08 16:51Z, own commit"
