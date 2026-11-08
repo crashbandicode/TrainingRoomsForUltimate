@@ -921,9 +921,9 @@ impl RecordingScreens {
     fn activate(&mut self, face: Face, group: u8) {
         let Some(item) = self.focused(face, group) else { return };
         match (face, item.kind) {
-            (Face::Popup, ItemKind::Save) => self.bound = Some(item.id),
+            (Face::Popup, ItemKind::Save) => self.set_bound(&item.id, true),
             (Face::Popup, ItemKind::Recording) => self.set_active(self.popup_role, &item.id, true),
-            (Face::Popup, ItemKind::Combo | ItemKind::Sequence) => self.drill = Some(item.id),
+            (Face::Popup, ItemKind::Combo | ItemKind::Sequence) => self.set_drill(item.kind, item.id),
             (Face::Popup, ItemKind::NewChain) => self.open_picker(PickerKind::NewChain, Face::Popup, None),
             (Face::Popup, ItemKind::NewSequence) => self.open_picker(PickerKind::NewSequence, Face::Popup, None),
             (Face::Page, ItemKind::NewChain) => self.open_picker(PickerKind::NewChain, Face::Page, None),
@@ -1061,10 +1061,10 @@ impl RecordingScreens {
                     self.last_effect = Effect::DeleteSave { source: id };
                 }
             }
-            Act::Drill => self.drill = Some(id),
+            Act::Drill => self.set_drill(kind, id),
             Act::DrillCombo => {
                 if let Some(combo) = drill {
-                    self.drill = Some(combo);
+                    self.set_drill(ItemKind::Combo, combo);
                 }
             }
             Act::Info => {}
@@ -1140,6 +1140,14 @@ impl RecordingScreens {
         } else if self.active[slot].as_deref() == Some(id) {
             self.active[slot] = None;
         }
+    }
+
+    /// A drill is a use (the index notes it): the file goes first in its kind's list now, as Set active and Bind do.
+    fn set_drill(&mut self, kind: ItemKind, id: String) {
+        let hot = if kind == ItemKind::Sequence { &mut self.catalog.hot_sequences } else { &mut self.catalog.hot_combos };
+        hot.retain(|hot| *hot != id);
+        hot.insert(0, id.clone());
+        self.drill = Some(id);
     }
 
     fn set_start(&mut self, _kind: ItemKind, id: &str, on: bool) {
@@ -2175,7 +2183,9 @@ mod tests {
         screens.press_popup(Button::B);
         assert_eq!(screens.selection().bound.as_deref(), Some("platform"));
         assert!(!screens.section(Face::Page, SAVES_MACROS, 0).rows.iter().find(|row| row.name == "Corner").unwrap().green);
-        screens.set_cursor(Face::Page, SAVES_MACROS, 0, 1);
+        // The bind was a use: Platform is now the most recently used save, the first row.
+        assert_eq!(screens.section(Face::Page, SAVES_MACROS, 0).rows[0].name, "Platform");
+        screens.set_cursor(Face::Page, SAVES_MACROS, 0, 0);
         screens.handle_page(Button::A, true, SAVES_MACROS);
         assert_eq!(screens.file_rows()[0].value, "On");
         screens.handle_page(Button::Left, true, SAVES_MACROS);
@@ -2646,6 +2656,37 @@ mod tests {
             }
             assert_eq!(screens.take_effect(), Effect::Keyboard { header: "Name combo", draft: String::new() }, "{face:?}");
         }
+    }
+
+    /// RECORDING.md: "The five most recently used of a kind are listed first, most recent first." A drill and a bind are
+    /// uses (the index notes them); the live list follows at once, as Set active already does, not only after the model
+    /// is rebuilt (Eden rc6-covrec-diag2 cov-combo-other-fighter: the pop-up kept Luigi first after Mario was drilled).
+    #[test]
+    fn a_drill_or_a_bind_in_the_popup_puts_that_file_first() {
+        let mut screens = screens();
+        let mut catalog = example();
+        catalog.combos.push(ComboFile {
+            id: "other".into(),
+            name: "Another combo".into(),
+            recorded_on: String::new(),
+            made_from: None,
+            links: Vec::new(),
+            span: 1,
+        });
+        screens.set_catalog(catalog);
+        open_popup(&mut screens);
+        screens.press_popup(Button::ZR);
+        // COMBOS: + Save last combo…, Nair loop combo (hot), Another combo.
+        screens.set_cursor(Face::Popup, COMBOS_SEQ, 1, 2);
+        screens.press_popup(Button::A);
+        let combos = screens.section(Face::Popup, COMBOS_SEQ, 1);
+        assert_eq!(combos.rows[1].name, "Another combo");
+        assert!(combos.rows[1].hot && combos.rows[1].green);
+        screens.press_popup(Button::ZR);
+        screens.set_cursor(Face::Popup, SAVES_MACROS, 0, 2);
+        let third = screens.section(Face::Popup, SAVES_MACROS, 0).rows[2].name.clone();
+        screens.press_popup(Button::A);
+        assert_eq!(screens.section(Face::Popup, SAVES_MACROS, 0).rows[0].name, third);
     }
 
     /// #49 in rc.6 terms: the COMBOS list replaces Saved combos, so a combo's CONNECTIONS name the fighter it was recorded
