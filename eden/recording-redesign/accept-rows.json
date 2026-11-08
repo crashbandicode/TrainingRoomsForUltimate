@@ -340,6 +340,46 @@
       "start_gate": "training-hud-unpaused"
     },
     {
+      "id": "mm-keep",
+      "start": "training",
+      "end": "training",
+      "start_gate": "training-hud-unpaused",
+      "steps": [
+        {
+          "run": "mismatchproof.py:keep",
+          "check": true,
+          "on": "diag"
+        },
+        {
+          "run": "docsgif.py:after",
+          "check": true,
+          "on": "diag"
+        }
+      ],
+      "expect": "The question is drawn over the match with the cursor on Keep; A logs answer=keep and the chain plays on Mario.",
+      "budget_min": 2
+    },
+    {
+      "id": "mm-switch",
+      "start": "training",
+      "end": "training",
+      "start_gate": "training-hud-unpaused",
+      "steps": [
+        {
+          "run": "mismatchproof.py:switch",
+          "check": true,
+          "on": "diag"
+        },
+        {
+          "run": "mismatchproof.py:cpu_back_to_mario",
+          "check": true,
+          "on": "diag"
+        }
+      ],
+      "expect": "Down then A logs answer=switch; the CPU becomes the recorded fighter.",
+      "budget_min": 2
+    },
+    {
       "id": "acc-rename",
       "start": "training",
       "end": "training",

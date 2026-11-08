@@ -743,6 +743,21 @@
      "old": "            frames: Vec::new(),\n        };\n        assert!(ui.import_recording(empty, None).is_err());",
      "new": "            frames: Vec::new(),\n            start_save: None,\n            start_save_on: true,\n        };\n        assert!(ui.import_recording(empty, None).is_err());",
      "reason": "Recording redesign rr-1: the empty-recording test literal includes the two start-save fields."
+    },
+    {
+     "old": "    ComboFighter(Option<FighterChoice>),\n}\n",
+     "new": "    ComboFighter(Option<FighterChoice>),\n    /// Result of a prompt opened for a recording, a combo drill, or a chain's macro 1. `None` is Cancel.\n    RecordingFighter(Option<FighterChoice>),\n}\n",
+     "reason": "rc.5 recording path (dc136e1): the Fighter Mismatch prompt's `Recording` origin answers through `Effect::RecordingFighter` (Keep/Switch/Cancel) for a recording, a combo drill or a chain's macro 1"
+    },
+    {
+     "old": "            FighterOrigin::Combo => Effect::ComboFighter(None),\n            FighterOrigin::Named => {\n",
+     "new": "            FighterOrigin::Combo => Effect::ComboFighter(None),\n            FighterOrigin::Recording => Effect::RecordingFighter(None),\n            FighterOrigin::Named => {\n",
+     "reason": "rc.5 recording path (dc136e1): the Fighter Mismatch prompt's `Recording` origin answers through `Effect::RecordingFighter` (Keep/Switch/Cancel) for a recording, a combo drill or a chain's macro 1"
+    },
+    {
+     "old": "                FighterOrigin::Combo => Effect::ComboFighter(Some(choice)),\n                _ => Effect::ClipFighter(Some(choice)),\n",
+     "new": "                FighterOrigin::Combo => Effect::ComboFighter(Some(choice)),\n                FighterOrigin::Recording => Effect::RecordingFighter(Some(choice)),\n                _ => Effect::ClipFighter(Some(choice)),\n",
+     "reason": "rc.5 recording path (dc136e1): the Fighter Mismatch prompt's `Recording` origin answers through `Effect::RecordingFighter` (Keep/Switch/Cancel) for a recording, a combo drill or a chain's macro 1"
     }
    ]
   },
@@ -772,6 +787,21 @@
      "old": "            ),\n            labels,\n",
      "new": "            ),\n        };\n        View {\n            title: \"Fighter Mismatch\".to_owned(),\n            footer,\n            labels,\n",
      "reason": "SPEC-input-07 \u00a74a (p23/combo-switch, operator 2026-11-05 DEFERRED-LIST): the shared fighter prompt for a chosen combo (origin Combo, Effect::ComboFighter, its stale arm, Player 1 in the footer)"
+    },
+    {
+     "old": "    Combo,\n}\n",
+     "new": "    Combo,\n    /// A recording, a combo drill, or a chain's macro 1. The recording worker keeps the candidate.\n    Recording,\n}\n",
+     "reason": "rc.5 recording path (dc136e1): `Origin::Recording` for a recording, a combo drill or a chain's macro 1, with the Named/Clip footer, and its host test"
+    },
+    {
+     "old": "            ),\n            Origin::Named | Origin::Clip => format!(\n                \"Recorded {} \u00b7 current CPU {}\\nInputs are the same either way. A chooses, B cancels.\",\n",
+     "new": "            ),\n            Origin::Named | Origin::Clip | Origin::Recording => format!(\n                \"Recorded {} \u00b7 current CPU {}\\nInputs are the same either way. A chooses, B cancels.\",\n",
+     "reason": "rc.5 recording path (dc136e1): `Origin::Recording` for a recording, a combo drill or a chain's macro 1, with the Named/Clip footer, and its host test"
+    },
+    {
+     "old": "        assert!(view.footer.contains(\"A chooses\") && view.footer.contains(\"B cancels\"));\n    }\n}\n",
+     "new": "        assert!(view.footer.contains(\"A chooses\") && view.footer.contains(\"B cancels\"));\n    }\n\n    #[test]\n    fn a_recording_prompt_uses_the_same_rows_and_starts_on_keep() {\n        let prompt = Prompt::new(Origin::Recording, 0, \"Pikachu\".into(), \"Mario\".into());\n        let view = prompt.view();\n        assert_eq!(view.title, \"Fighter Mismatch\");\n        assert_eq!(view.labels[0], \"Keep current fighter\");\n        assert_eq!(view.labels[1], \"Switch to recorded fighter\");\n        assert_eq!(view.selected, 0);\n        assert_eq!(prompt.choice(), Choice::Keep);\n        assert!(view.footer.contains(\"Pikachu\") && view.footer.contains(\"Mario\"));\n        assert!(view.footer.contains(\"B cancels\"));\n    }\n}\n",
+     "reason": "rc.5 recording path (dc136e1): `Origin::Recording` for a recording, a combo drill or a chain's macro 1, with the Named/Clip footer, and its host test"
     }
    ]
   },
@@ -947,7 +977,7 @@
    "dest": "src/runtime/macros/named_macros.rs",
    "crate": "root",
    "src_sha256": "737474479d5f05b064ab645d850ceb189cad3943097ae4fdb5fc74d2fcda0809",
-   "dest_sha256": "abf39d8aecafa84f665bf9b0a7292019fa24ee50122f75d5b9a4b7f5e291ceb6",
+   "dest_sha256": "1d2f6ad9b03d287dcbadc7fc4106d524e3aedf3d4843e5ab553f92cbf6faa5dd",
    "edits": [
     {
      "old": "use training_mod_sync::*;",
@@ -1497,6 +1527,36 @@
      "old": "        Effect::ClipFighter(choice) => crate::runtime::macros::replay_capture::fighter_choice(choice),\n    }\n",
      "new": "        Effect::ClipFighter(choice) => crate::runtime::macros::replay_capture::fighter_choice(choice),\n        Effect::ComboFighter(choice) => *lock_write(&COMBO_FIGHTER) = Some(choice),\n    }\n",
      "reason": "SPEC-input-07 \u00a74a (p23/combo-switch, operator 2026-11-05 DEFERRED-LIST): the shared fighter prompt for a chosen combo (origin Combo, Effect::ComboFighter, its stale arm, Player 1 in the footer)"
+    },
+    {
+     "old": "pub fn panel_view() -> Option<View> {",
+     "new": "/// The shared Fighter Mismatch question is up (any origin). With the menu closed the worker draws it alone (`flow::Phase::Prompt`).\npub fn fighter_prompt_up() -> bool {\n    !suspended() && lock_read(&UI).fighter_prompt().is_some()\n}\n\npub fn panel_view() -> Option<View> {",
+     "reason": "rc.5 Fighter Mismatch (p23/rc5-mismatch-fix): the menu worker asks whether the shared fighter question is up, so a question opened with the menu closed (Play on a recording made on another fighter) is drawn and answered (flow::Phase::Prompt) instead of holding the fighters with nothing on screen"
+    },
+    {
+     "old": "\n/// Y on a library opened through [`open_external_library`].\n",
+     "new": "\n/// The confirmed name only when this caller offered the keyboard. Another owner's answer stays put.\npub fn take_confirmed_name_for(token: u64) -> Option<String> {\n    let mut slot = lock_write(&CONFIRMED_NAME);\n    if slot.as_ref().is_some_and(|found| found.context.token == token) {\n        slot.take().map(|found| found.name)\n    } else {\n        None\n    }\n}\n\n/// Y on a library opened through [`open_external_library`].\n",
+     "reason": "rc.5 recording path (dc136e1): the recording worker opens the shared Fighter Mismatch prompt (`open_recording_fighter_prompt`) and takes its answer once (`take_recording_fighter_choice`); `take_confirmed_name_for` hands a keyboard answer only to the caller that offered it"
+    },
+    {
+     "old": "static COMBO_FIGHTER: RwLock<Option<Option<FighterChoice>>> = RwLock::new(None);\nstatic LIST_RENAME: RwLock<Option<String>> = RwLock::new(None);\n",
+     "new": "static COMBO_FIGHTER: RwLock<Option<Option<FighterChoice>>> = RwLock::new(None);\nstatic RECORDING_FIGHTER: RwLock<Option<Option<FighterChoice>>> = RwLock::new(None);\nstatic LIST_RENAME: RwLock<Option<String>> = RwLock::new(None);\n",
+     "reason": "rc.5 recording path (dc136e1): the recording worker opens the shared Fighter Mismatch prompt (`open_recording_fighter_prompt`) and takes its answer once (`take_recording_fighter_choice`); `take_confirmed_name_for` hands a keyboard answer only to the caller that offered it"
+    },
+    {
+     "old": "    lock_write(&COMBO_FIGHTER).take()\n}\n",
+     "new": "    lock_write(&COMBO_FIGHTER).take()\n}\n\n/// The answer to a recording's fighter question, once (`Some(None)`: cancelled).\npub fn take_recording_fighter_choice() -> Option<Option<FighterChoice>> {\n    lock_write(&RECORDING_FIGHTER).take()\n}\n\n/// Open the shared Fighter Mismatch screen for a recording, a combo drill, or a chain's macro 1.\npub fn open_recording_fighter_prompt(origin: FighterOrigin, recorded: String, current: String) -> bool {\n    *lock_write(&RECORDING_FIGHTER) = None;\n    let opened = lock_write(&UI).open_fighter_prompt_for(origin, 0, recorded, current);\n    if opened { assign(&menu::MENU_RECEIVED_INPUT, true); }\n    opened\n}\n",
+     "reason": "rc.5 recording path (dc136e1): the recording worker opens the shared Fighter Mismatch prompt (`open_recording_fighter_prompt`) and takes its answer once (`take_recording_fighter_choice`); `take_confirmed_name_for` hands a keyboard answer only to the caller that offered it"
+    },
+    {
+     "old": "        FighterOrigin::Combo=>crate::runtime::ui::combos::prompt_revision(),\n    };\n",
+     "new": "        FighterOrigin::Combo=>crate::runtime::ui::combos::prompt_revision(),\n        FighterOrigin::Recording=>0,\n    };\n",
+     "reason": "rc.5 recording path (dc136e1): the recording worker opens the shared Fighter Mismatch prompt (`open_recording_fighter_prompt`) and takes its answer once (`take_recording_fighter_choice`); `take_confirmed_name_for` hands a keyboard answer only to the caller that offered it"
+    },
+    {
+     "old": "        Effect::ComboFighter(choice) => *lock_write(&COMBO_FIGHTER) = Some(choice),\n    }\n",
+     "new": "        Effect::ComboFighter(choice) => *lock_write(&COMBO_FIGHTER) = Some(choice),\n        Effect::RecordingFighter(choice) => *lock_write(&RECORDING_FIGHTER) = Some(choice),\n    }\n",
+     "reason": "rc.5 recording path (dc136e1): the recording worker opens the shared Fighter Mismatch prompt (`open_recording_fighter_prompt`) and takes its answer once (`take_recording_fighter_choice`); `take_confirmed_name_for` hands a keyboard answer only to the caller that offered it"
     }
    ]
   },

@@ -76,7 +76,9 @@ pub fn on_p1_poll(holder: usize) {
         return;
     }
     let open = OPEN.load(Ordering::Acquire);
-    let popup = state::POPUP.load(Ordering::Acquire);
+    // A fighter question drawn with the menu closed takes Player 1's presses like the pop-up, and the menu does not open over it.
+    let prompt = state::PROMPT.load(Ordering::Acquire);
+    let popup = state::POPUP.load(Ordering::Acquire) || prompt;
     // A chord (the permanent one or an INI shortcut) opens the menu only while a renderer exists (R2-2, SPEC-core-05 question 1).
     let allowed = readiness::may_open(facts);
     let shortcuts = chords::shortcuts();
@@ -87,7 +89,7 @@ pub fn on_p1_poll(holder: usize) {
         state::POPUP_REQ.store(true, Ordering::Release);
         worker::wake();
     }
-    if step.open || (chord_open && allowed && !open) {
+    if !prompt && (step.open || (chord_open && allowed && !open)) {
         adapter.resync(buttons, style);
         INPUT_OWNERS.fetch_or(Owners::MENU.bits(), Ordering::AcqRel);
         OPEN.store(true, Ordering::Release);

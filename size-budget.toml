@@ -617,3 +617,19 @@ ceiling = 150397
 date = "2026-11-08"
 reason = "rc.5 wire-fix: P1's physical sticks are read from the raw Controller (guarded) and carried through the input-delay queue beside the record, so the stick row, the freeze, drift and the C-stick chip arrow read the physical sticks (operator decision A, 2026-11-08); measured 150397 (tools/size_gate.py), +103 over 150294"
 approved_by = "Operator 2026-11-07 via primary 35137355 (TASK-GROK-rc5-wire-fix): 'Raise as needed'; DECISIONS 2d27de7; confirmed for this campaign by the primary 2026-11-08"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 150349
+date = "2026-11-08"
+reason = "rc.5 Fighter Mismatch (p23/rc5-mismatch-fix): a fighter question opened with the menu closed is drawn and answered (flow::Phase::Prompt), keeps Player 1 and hides the frame strip while it is up, shows its own keys, and an answer wakes the recording service gate; measured 150349 (tools/size_gate.py), +98 over 150251"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7), applied to this root fix by primary c07b3449 in INBOX-opus-rc5-gifs 2026-11-08 01:35Z"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 150495
+date = "2026-11-08"
+reason = "rc.5 final: the merge of p23/rc5-mismatch-fix (c7f936d, +98 over 150251) into p23/rc5-wire-fix (150397); the two sides add up, nothing else changes; measured 150495 on the merged tree (tools/size_gate.py)"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); final ceiling = measured merged size per primary c07b3449, TASK-OPUS-rc5-merge-final 2026-11-08"

@@ -136,6 +136,14 @@ pub fn pending() -> bool {
         || MASH.load(Ordering::Acquire)
         || menu_pending()
         || playing()
+        || waiting_work()
+}
+
+/// Work that waits on no chord: a drill question, a running Make combo, or an answer to the fighter question. The service
+/// gate (`pending`) and the tick (`service_at`) read the same list; an answered question that `pending` left out was never
+/// applied once migration had finished, so the held play never resumed (rc.5 Fighter Mismatch).
+fn waiting_work() -> bool {
+    lock(&DRILL_ASK).is_some() || lock(&MAKE).is_some() || lock(&ANSWER).is_some()
 }
 
 fn playing() -> bool {
@@ -406,9 +414,7 @@ pub fn service_at(
         || mash
         || menu_pending()
         || playing()
-        || lock(&DRILL_ASK).is_some()
-        || lock(&MAKE).is_some()
-        || (lock(&HELD).is_some() && lock(&ANSWER).is_some());
+        || waiting_work();
     if !busy {
         return tick;
     }
@@ -601,13 +607,22 @@ fn play_role(root: &Path, machine: &mut Playback, book: &Book, role: Role, tick:
                 *lock(&HELD) = Some(role);
                 return;
             }
-            Some(MismatchChoice::Cancel) => return,
-            Some(MismatchChoice::Keep) => {}
+            Some(MismatchChoice::Cancel) => {
+                tick.diags.push(format!("screen=mismatch ask={} answer=cancel", ask.origin));
+                return;
+            }
+            Some(MismatchChoice::Keep) => {
+                tick.diags.push(format!("screen=mismatch ask={} answer=keep", ask.origin));
+            }
             Some(MismatchChoice::Switch) => {
+                tick.diags.push(format!("screen=mismatch ask={} answer=switch", ask.origin));
                 tick.switch_kind = Some(ask.recorded_kind);
                 tick.switch_player = role == Role::Player;
             }
         }
+    } else {
+        // The fighters match now: an answer to an earlier question applies to nothing and must not answer the next one.
+        lock(&ANSWER).take();
     }
     let effect = drive_play(machine, role, book);
     let word = if role == Role::Player {
@@ -1838,6 +1853,55 @@ mod tests {
         let cancelled = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
         assert!(take_player_frame().is_none());
         assert!(cancelled.switch_kind.is_none());
+    }
+
+    #[test]
+    fn an_answered_mismatch_wakes_the_service_gate_and_plays() {
+        // rc.5: after migration the Switch wrapper ticks only while `pending()`; the answer was not in it, so the held
+        // play never resumed. Each answer is logged once, and an answer the fighters no longer need is dropped.
+        let _hold = hold();
+        reset_host();
+        let root = scratch("mismatch-gate");
+        let first = one_macro(&root, "Recorded", 15, 13, None);
+        let later = one_macro(&root, "Later", 16, 0, None);
+        let chain = Chain::new("Mix", vec![first, later]).unwrap();
+        let chain_id = Store::<Chain>::new(root.join(MACROS_DIR)).save_new(&chain).unwrap();
+        let mut index = RecordingIndex::load(&root).unwrap();
+        index.set_active(Role::Cpu, Some(&chain_id), 1).unwrap();
+        index.save(&root).unwrap();
+        set_role_fighter(Role::Cpu, 0);
+        on_chords(false, false, true);
+        assert!(pending());
+        let held = service_pending(&root, state(0), state(0), false);
+        assert!(held.diags.iter().any(|line| line.contains("screen=mismatch ask=macro1 rows=")), "{:?}", held.diags);
+        assert!(held.mismatch.is_some());
+        assert!(!pending(), "a question waiting for its answer is not work");
+        answer_mismatch(MismatchChoice::Keep);
+        assert!(pending(), "the answer must reach the tick");
+        let kept = service_pending(&root, state(0), state(0), false);
+        assert!(kept.diags.iter().any(|line| line == "screen=mismatch ask=macro1 answer=keep"));
+        assert!(kept.switch_kind.is_none());
+        assert_eq!(take_cpu_frame().expect("keep plays macro 1 on the current fighter").buttons, 15);
+
+        reset_host();
+        set_role_fighter(Role::Cpu, 0);
+        on_chords(false, false, true);
+        let _ = service_pending(&root, state(0), state(0), false);
+        answer_mismatch(MismatchChoice::Switch);
+        assert!(pending());
+        let switched = service_pending(&root, state(0), state(0), false);
+        assert!(switched.diags.iter().any(|line| line == "screen=mismatch ask=macro1 answer=switch"));
+        assert_eq!(switched.switch_kind, Some(13));
+        assert!(!switched.switch_player, "the CPU's chain switches the CPU");
+
+        reset_host();
+        set_role_fighter(Role::Cpu, 0);
+        on_chords(false, false, true);
+        let _ = service_pending(&root, state(0), state(0), false);
+        set_role_fighter(Role::Cpu, 13);
+        answer_mismatch(MismatchChoice::Keep);
+        let _ = service_pending(&root, state(13), state(13), false);
+        assert!(lock(&ANSWER).is_none(), "an answer the fighters no longer need is dropped");
     }
 
     #[test]

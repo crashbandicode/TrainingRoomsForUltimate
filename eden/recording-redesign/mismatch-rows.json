@@ -1,0 +1,757 @@
+{
+  "game_id": "01006A800016E000",
+  "start": "boot",
+  "early_stop": false,
+  "on_failure": "continue",
+  "scope": "rc.5 Fighter Mismatch proof on the XPS diag window (p23/rc5-mismatch-fix): the question is visible, Keep and Switch each work, then the rc5-fighter-mismatch docs GIF.",
+  "setup": [
+    {
+      "state": "One XPS instance, diag NRO, volume 0, Res1X (eden_settings core.resolution_setup 3)",
+      "via": "fixture",
+      "ref": "config.json eden_settings and pinned settings.json (hitbox off, frame strip)"
+    },
+    {
+      "state": "Training, P1 Mario, CPU Mario",
+      "via": "segment",
+      "ref": "library attract-cancel (recover on gate main), main-stage, stage-css, enter-training; steps.py:boot_training"
+    },
+    {
+      "state": "Each GIF row copies its own recording fixture",
+      "via": "fixture",
+      "ref": "eden/recording-redesign/fixtures/{strip,play-chord,loop2,chain,mismatch,play-warp,jabs3}"
+    }
+  ],
+  "segments": {
+    "attract-cancel": {
+      "file": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/segments/attract-cancel.edenmacro.json",
+      "sha256": "1b506dbfc689e79e8bfca69b74274ab674b91ac8359219a1a4c95faa81aae70f",
+      "cap": 30,
+      "start_gate": null,
+      "end_gate": "main",
+      "from_run": "p4r-shared",
+      "row": "nav00-attract-cancel",
+      "library": "attract-cancel"
+    },
+    "main-stage": {
+      "file": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/segments/main-stage.edenmacro.json",
+      "sha256": "ce6714b44f34f04cacd0d17454e4773c8906d289e5a37e34c606c604e6e4acfb",
+      "cap": 60,
+      "start_gate": "main",
+      "end_gate": "stage",
+      "from_run": "lr-03",
+      "row": "02-stage",
+      "library": "main-stage"
+    },
+    "stage-css": {
+      "file": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/segments/stage-css.edenmacro.json",
+      "sha256": "240249606f15207106e4cc654cc3ee173efa97d51ea276586c82e6c7c438db74",
+      "cap": 30,
+      "start_gate": "stage",
+      "end_gate": "css",
+      "from_run": "lr-03",
+      "row": "03-css",
+      "library": "stage-css"
+    },
+    "enter-training": {
+      "file": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/segments/enter-training.edenmacro.json",
+      "sha256": "7cdd035473160fec1a0e8c601c05f599f5b21556ac1cb4479b358c629e05b5c1",
+      "cap": 30,
+      "start_gate": "ready",
+      "end_gate": "p1-original",
+      "from_run": "lr-03",
+      "row": "06-training",
+      "library": "enter-training"
+    },
+    "chord-save": {
+      "file": "segments/chord-save.edenmacro.json",
+      "sha256": "fd05baa42ae7353f6be4ef1fa861d55b958ad1de31e05229286ad18b52bbe56c",
+      "cap": 30
+    },
+    "chord-load": {
+      "file": "segments/chord-load.edenmacro.json",
+      "sha256": "1f1f8ca9d99c990e8fa6ae9348fc31f6ae36e7f2fa09c88d84485abfd2f0cb74",
+      "cap": 30
+    },
+    "chord-record": {
+      "file": "segments/chord-record.edenmacro.json",
+      "sha256": "f2fa1848d9988aea562b142421767175b60a3b836770c3f537b7473e9dd18e04",
+      "cap": 30
+    },
+    "chord-play-cpu": {
+      "file": "segments/chord-play-cpu.edenmacro.json",
+      "sha256": "56b9f03c84a8521c261b7cdee25702d379ecf4eabc556ccef98e7097fc3bb8f9",
+      "cap": 30
+    },
+    "chord-play-p1": {
+      "file": "segments/chord-play-p1.edenmacro.json",
+      "sha256": "0cde25d7bb1a6f68194603d41c2f0f6f125f33c15b73af117bc7440c0803fc6e",
+      "cap": 30
+    },
+    "chord-popup": {
+      "file": "segments/chord-popup.edenmacro.json",
+      "sha256": "d4f4376b8f2fc8821b8dbe795f2f0ca46902bb47ae6bc132ad0e117937433b97",
+      "cap": 30
+    },
+    "menu-open": {
+      "file": "segments/menu-open.edenmacro.json",
+      "sha256": "1185704f7b97f2981a8bae42fbe42166d5bc37aa2e9cba197bdf585a616f78ce",
+      "cap": 30
+    },
+    "menu-close": {
+      "file": "segments/menu-close.edenmacro.json",
+      "sha256": "b45ca532f18b9a3a7938a04b4a6b0513b7288ed584705fd042e40125bd5c4a89",
+      "cap": 30
+    },
+    "x-press": {
+      "file": "segments/x-press.edenmacro.json",
+      "sha256": "923b754c8578d4f76ca41874d7c0cb379cdb8107bd28031dcac90277183139dc",
+      "cap": 30
+    },
+    "reset-center": {
+      "file": "segments/reset-center.edenmacro.json",
+      "sha256": "54e917aa28b0af97505e73a53fa991d3f79ed597b79ae8bc07f364c5fc6dbdd7",
+      "cap": 30
+    },
+    "reset-walk": {
+      "file": "segments/reset-walk.edenmacro.json",
+      "cap": 30,
+      "recipe": [
+        {
+          "buttons": "l,r,a",
+          "frames": 4,
+          "gap_frames": 66
+        },
+        {
+          "stick": [
+            1,
+            0,
+            0
+          ],
+          "frames": 120,
+          "gap_frames": 14
+        }
+      ],
+      "note": "timing to be checked when recorded"
+    },
+    "jab": {
+      "file": "segments/jab.edenmacro.json",
+      "sha256": "12769777ca262a7e3515f8f81a72c7470e7dffa98d9bdfb56e1887dfc702f278",
+      "cap": 30
+    },
+    "jab-link": {
+      "file": "segments/jab-link.edenmacro.json",
+      "sha256": "21ca94ee0dcd158a2e6cf023a1c01e33ead9d5cdc275d837aefdde49c4c83567",
+      "cap": 30
+    },
+    "jab-link-3": {
+      "file": "segments/jab-link-3.edenmacro.json",
+      "cap": 30,
+      "recipe": [
+        {
+          "buttons": "a",
+          "frames": 2,
+          "gap_frames": 14
+        },
+        {
+          "buttons": "a",
+          "frames": 2,
+          "gap_frames": 14
+        },
+        {
+          "buttons": "a",
+          "frames": 2,
+          "gap_frames": 40
+        }
+      ],
+      "note": "timing to be checked when recorded",
+      "sha256": "f98d36dbaaf88230c032d0abbd78d4162fa163d20490ed5cc6d9b052a4795693",
+      "recorded": "2026-11-08T00:38:58Z"
+    },
+    "jab-drop": {
+      "file": "segments/jab-drop.edenmacro.json",
+      "sha256": "2fc00b3082547b40890db5a81dd92176d82a0ba5a1f0d7a5c34d5353c5102ea8",
+      "cap": 30
+    },
+    "exchange-jabs": {
+      "file": "segments/exchange-jabs.edenmacro.json",
+      "sha256": "8f963497aaee09e267b727055ee7ada6c2fc9fcd0d9fac37b8efd02c7a55739b",
+      "cap": 30
+    },
+    "freeze-jabs": {
+      "file": "segments/freeze-jabs.edenmacro.json",
+      "cap": 30,
+      "recipe": [
+        {
+          "buttons": "a",
+          "frames": 2,
+          "gap_frames": 90
+        },
+        {
+          "buttons": "a",
+          "frames": 2,
+          "gap_frames": 20
+        }
+      ],
+      "note": "timing to be checked when recorded"
+    },
+    "chips-attack": {
+      "file": "segments/chips-attack.edenmacro.json",
+      "cap": 30,
+      "recipe": [
+        {
+          "stick": [
+            0.95,
+            0.95,
+            0
+          ],
+          "frames": 6,
+          "gap_frames": 0
+        },
+        {
+          "buttons": "a",
+          "with_stick": [
+            0.95,
+            0.95
+          ],
+          "hold": 80,
+          "gap": 0.5
+        }
+      ],
+      "note": "timing to be checked when recorded",
+      "sha256": "959042160d6147d9c6d95e383f7be865eeb565e40f03b5d978e36145503dac3c",
+      "recorded": "2026-11-08T00:36:04Z"
+    },
+    "lanes-smash": {
+      "file": "segments/lanes-smash.edenmacro.json",
+      "cap": 30,
+      "recipe": [
+        {
+          "stick": [
+            1,
+            0,
+            0
+          ],
+          "frames": 8,
+          "gap_frames": 0
+        },
+        {
+          "buttons": "a",
+          "with_stick": [
+            1,
+            0
+          ],
+          "hold": 80,
+          "gap": 1.2
+        }
+      ],
+      "note": "timing to be checked when recorded",
+      "sha256": "48c0b699a49fd5579ebbadcaf6e8008c9202374470d7ded4264f59ff3de77f93",
+      "recorded": "2026-11-08T00:35:44Z"
+    },
+    "walk-right": {
+      "file": "segments/walk-right.edenmacro.json",
+      "cap": 30,
+      "recipe": [
+        {
+          "stick": [
+            0.4,
+            0,
+            0
+          ],
+          "frames": 30,
+          "gap_frames": 10
+        }
+      ],
+      "note": "timing to be checked when recorded"
+    },
+    "dash-dance": {
+      "file": "segments/dash-dance.edenmacro.json",
+      "cap": 30,
+      "recipe": [
+        {
+          "stick": [
+            1,
+            0,
+            0
+          ],
+          "frames": 12,
+          "gap_frames": 0
+        },
+        {
+          "stick": [
+            -1,
+            0,
+            0
+          ],
+          "frames": 12,
+          "gap_frames": 0
+        },
+        {
+          "stick": [
+            1,
+            0,
+            0
+          ],
+          "frames": 12,
+          "gap_frames": 0
+        },
+        {
+          "stick": [
+            -1,
+            0,
+            0
+          ],
+          "frames": 12,
+          "gap_frames": 0
+        },
+        {
+          "stick": [
+            1,
+            0,
+            0
+          ],
+          "frames": 12,
+          "gap_frames": 0
+        },
+        {
+          "stick": [
+            -1,
+            0,
+            0
+          ],
+          "frames": 12,
+          "gap_frames": 0
+        },
+        {
+          "stick": [
+            1,
+            0,
+            0
+          ],
+          "frames": 12,
+          "gap_frames": 0
+        },
+        {
+          "stick": [
+            -1,
+            0,
+            0
+          ],
+          "frames": 12,
+          "gap_frames": 0
+        },
+        {
+          "stick": [
+            0,
+            0,
+            0
+          ],
+          "frames": 2,
+          "gap_frames": 10
+        }
+      ],
+      "note": "timing to be checked when recorded",
+      "sha256": "70dbfe051325a78518535fcd2feff20d9e1183698a43dc88ff6b05dc733b0241",
+      "recorded": "2026-11-08T00:36:44Z"
+    },
+    "fsmash": {
+      "file": "segments/fsmash.edenmacro.json",
+      "sha256": "2a6f61ae325478ba8a005edef0012064069fde9c0a88d93ff242c8c736d2452f",
+      "cap": 30
+    },
+    "tilted-a": {
+      "file": "segments/tilted-a.edenmacro.json",
+      "sha256": "451a6d9b165adef78b74bd795700e6b8cb0ed0d67cf7efd4e2be091456195350",
+      "cap": 30
+    },
+    "nair-loop-clean": {
+      "file": "segments/nair-loop-clean.edenmacro.json",
+      "cap": 30,
+      "recipe": [
+        {
+          "buttons": "x",
+          "frames": 3,
+          "gap_frames": 0
+        },
+        {
+          "buttons": "a",
+          "frames": 2,
+          "gap_frames": 20
+        },
+        {
+          "stick": [
+            0,
+            -1,
+            0
+          ],
+          "frames": 6,
+          "gap_frames": 34
+        },
+        {
+          "buttons": "x",
+          "frames": 3,
+          "gap_frames": 0
+        },
+        {
+          "buttons": "a",
+          "frames": 2,
+          "gap_frames": 20
+        },
+        {
+          "stick": [
+            0,
+            -1,
+            0
+          ],
+          "frames": 6,
+          "gap_frames": 34
+        },
+        {
+          "stick": [
+            0,
+            0,
+            0
+          ],
+          "frames": 2,
+          "gap_frames": 10
+        }
+      ],
+      "note": "timing to be checked when recorded"
+    },
+    "nair-loop-full-hop": {
+      "file": "segments/nair-loop-full-hop.edenmacro.json",
+      "cap": 30,
+      "recipe": [
+        {
+          "buttons": "x",
+          "frames": 14,
+          "gap_frames": 0
+        },
+        {
+          "buttons": "a",
+          "frames": 2,
+          "gap_frames": 20
+        },
+        {
+          "stick": [
+            0,
+            -1,
+            0
+          ],
+          "frames": 6,
+          "gap_frames": 34
+        },
+        {
+          "buttons": "x",
+          "frames": 14,
+          "gap_frames": 0
+        },
+        {
+          "buttons": "a",
+          "frames": 2,
+          "gap_frames": 20
+        },
+        {
+          "stick": [
+            0,
+            -1,
+            0
+          ],
+          "frames": 6,
+          "gap_frames": 34
+        },
+        {
+          "stick": [
+            0,
+            0,
+            0
+          ],
+          "frames": 2,
+          "gap_frames": 10
+        }
+      ],
+      "note": "timing to be checked when recorded"
+    },
+    "nair-loop-no-fastfall": {
+      "file": "segments/nair-loop-no-fastfall.edenmacro.json",
+      "cap": 30,
+      "recipe": [
+        {
+          "buttons": "x",
+          "frames": 3,
+          "gap_frames": 0
+        },
+        {
+          "buttons": "a",
+          "frames": 2,
+          "gap_frames": 20
+        },
+        {
+          "gap_frames": 40
+        },
+        {
+          "buttons": "x",
+          "frames": 3,
+          "gap_frames": 0
+        },
+        {
+          "buttons": "a",
+          "frames": 2,
+          "gap_frames": 20
+        },
+        {
+          "gap_frames": 40
+        },
+        {
+          "stick": [
+            0,
+            0,
+            0
+          ],
+          "frames": 2,
+          "gap_frames": 10
+        }
+      ],
+      "note": "timing to be checked when recorded"
+    },
+    "dash-attack": {
+      "file": "segments/dash-attack.edenmacro.json",
+      "cap": 30,
+      "recipe": [
+        {
+          "stick": [
+            1,
+            0,
+            0
+          ],
+          "frames": 2,
+          "gap_frames": 0
+        },
+        {
+          "buttons": "a",
+          "with_stick": [
+            1,
+            0
+          ],
+          "hold": 50,
+          "gap": 0.5
+        }
+      ],
+      "note": "timing to be checked when recorded"
+    },
+    "cstick-smash": {
+      "file": "segments/cstick-smash.edenmacro.json",
+      "cap": 30,
+      "recipe": [
+        {
+          "stick": [
+            0,
+            0,
+            0
+          ],
+          "frames": 2,
+          "gap_frames": 40
+        }
+      ],
+      "note": "the recipe actions drive the left stick only; the C-stick input is pressed by the row hook (README, Open questions); timing to be checked when recorded"
+    },
+    "jab-drop2": {
+      "file": "segments/jab-drop2.edenmacro.json",
+      "cap": 30,
+      "recipe": [
+        {
+          "buttons": "a",
+          "frames": 2,
+          "gap_frames": 32
+        },
+        {
+          "buttons": "a",
+          "frames": 2,
+          "gap_frames": 40
+        }
+      ],
+      "note": "the second jab after the CPU is free and inside the 20-frame exchange (jab-drop was 42 frames)",
+      "sha256": "075ea43b3823c4c3d6301751786f59db2569fc456324ac603d0b82d1e6debd8a",
+      "recorded": "2026-11-08T00:48:54Z"
+    }
+  },
+  "gates": {
+    "main": {
+      "kind": "image",
+      "reference": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/refs/main.png",
+      "sha256": "902628cebd8620847be44e41a826046740f495ca0dfa7e78d8482c43c0da1bdc",
+      "roi": [
+        150,
+        265,
+        450,
+        335
+      ],
+      "tolerance": 8,
+      "cap": 45,
+      "reference_is_roi": true,
+      "from_run": "lr-03",
+      "library": "main",
+      "recover": "attract-cancel",
+      "recover_times": 4,
+      "scale": "fit",
+      "frame": [
+        1280,
+        720
+      ]
+    },
+    "stage": {
+      "kind": "image",
+      "reference": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/refs/stage.png",
+      "sha256": "99e7013e2be97b8173498e36a9b0e3b849c4e403bd239f1febda185470617033",
+      "roi": [
+        110,
+        445,
+        290,
+        495
+      ],
+      "tolerance": 8,
+      "cap": 45,
+      "reference_is_roi": true,
+      "from_run": "lr-03",
+      "library": "stage",
+      "scale": "fit",
+      "frame": [
+        1280,
+        720
+      ]
+    },
+    "css": {
+      "kind": "image",
+      "reference": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/refs/css.png",
+      "sha256": "a7a15642548952e4e263e42d467542b2877576cac4785061c21988e6cd7c0b76",
+      "roi": [
+        55,
+        55,
+        675,
+        155
+      ],
+      "tolerance": 8,
+      "cap": 60,
+      "reference_is_roi": true,
+      "from_run": "lr-03",
+      "library": "css",
+      "scale": "fit",
+      "frame": [
+        1280,
+        720
+      ]
+    },
+    "training-hud-unpaused": {
+      "kind": "image",
+      "reference": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/refs/training-hud-unpaused.png",
+      "sha256": "7ecf9a4258ace218ad179e2fe14dcaf9d3dd906c594dec2ec8216cb5e02a8d2c",
+      "roi": [
+        280,
+        580,
+        302,
+        615
+      ],
+      "tolerance": 8,
+      "cap": 10,
+      "scope": "Undimmed native zero digit, excluding changing faction emblem; applies only to this no-damage cycle lane.",
+      "reference_is_roi": true,
+      "from_run": "lr-03",
+      "library": "training-hud-unpaused",
+      "scale": "fit",
+      "frame": [
+        1280,
+        720
+      ]
+    }
+  },
+  "recover": [
+    {
+      "run": "steps.py:recover_training",
+      "check": true
+    }
+  ],
+  "rows": [
+    {
+      "id": "docs-boot",
+      "start": "boot",
+      "end": "training",
+      "steps": [
+        {
+          "gate": "main"
+        },
+        {
+          "run": "docsgif.py:boot",
+          "check": true
+        }
+      ],
+      "expect": "The first gate leaves the intro with attract-cancel; the library route enters Training on Mario."
+    },
+    {
+      "id": "mm-keep",
+      "start": "training",
+      "end": "training",
+      "start_gate": "training-hud-unpaused",
+      "steps": [
+        {
+          "run": "mismatchproof.py:keep",
+          "check": true
+        },
+        {
+          "run": "docsgif.py:after",
+          "check": true
+        }
+      ],
+      "expect": "The question is drawn over the match with the cursor on Keep; A logs answer=keep and the chain plays on Mario.",
+      "budget_min": 2
+    },
+    {
+      "id": "gif-fighter-mismatch",
+      "start": "training",
+      "end": "training",
+      "start_gate": "training-hud-unpaused",
+      "steps": [
+        {
+          "run": "mismatchproof.py:gif_setup",
+          "check": true
+        },
+        {
+          "gif": {
+            "name": "rc5-fighter-mismatch",
+            "preset": "docs",
+            "fps": 15,
+            "length": 7,
+            "steps": [
+              {
+                "run": "mismatchproof.py:gif_clip"
+              }
+            ]
+          }
+        },
+        {
+          "run": "docsgif.py:after",
+          "check": true
+        }
+      ],
+      "expect": "docs/MEDIA.md: the Fighter Mismatch rows open, cursor on Keep; Keep plays the chain on Mario; no second prompt.",
+      "budget_min": 2
+    },
+    {
+      "id": "mm-switch",
+      "start": "training",
+      "end": "training",
+      "start_gate": "training-hud-unpaused",
+      "steps": [
+        {
+          "run": "mismatchproof.py:switch",
+          "check": true
+        },
+        {
+          "run": "mismatchproof.py:cpu_back_to_mario",
+          "check": true
+        }
+      ],
+      "expect": "Down then A logs answer=switch; the CPU becomes the recorded fighter.",
+      "budget_min": 2
+    }
+  ]
+}
