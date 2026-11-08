@@ -673,3 +673,11 @@ ceiling = 150821
 date = "2026-11-08"
 reason = "rc.6 hot-slots root fix (p23/rc6-hot-slots dd69ea6, Eden rc6-hot-xps2): back to the original after a start-up window is native's single form (entry_window::original_request; the Player and CPU Mii adapters stage and recognise it), which stops the native thread crash on the return to the original; measured 150821 (tools/size_gate.py), +67 over 150754"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to this rc.6 root fix under TASK-OPUS-rc6-hot-slots (primary c07b3449, 2026-11-08: a raise goes in its own commit with approved_by)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 150876
+date = "2026-11-08"
+reason = "rc.6 coverage root fixes on p23/rc6-cov-rest over the merged hot-slots a1c59b7: the notice plates drawn before the notice texts (a28c252, pane order only), F9's seat Reload for a parked entry never installed (parked_entries::classify_parked_body asks whether this plugin's own install is in flight, character_sources::f9_body_of), and the Mii Save reuse notice of operator decision C (notify::Body::joined and save_notice, notices::post_body, the edit_decide reuse branch) (f5a73c0, Eden covrest-04/05/06); measured 150876 (tools/size_gate.py), +55 over 150821"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to these rc.6 root fixes under TASK-OPUS-rc6-cov-rest (a raise goes in its own commit with approved_by)"
