@@ -28,6 +28,8 @@ pub fn drain_tick() {
 /// Start the watchdog thread (diag boot).
 pub fn start() {
     let _ = crate::runtime::threads::spawn(crate::model::thread_stacks::ThreadId::StallWatch, || {
+        line(format_args!("[StallWatch] started stall_ms={} arm_entries={}", crate::model::stall_watch::STALL_MS,
+            crate::model::stall_watch::ARM_ENTRIES));
         let mut watch = Watch::new();
         loop {
             std::thread::sleep(std::time::Duration::from_millis(250));
