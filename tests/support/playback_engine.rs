@@ -16,3 +16,5 @@ pub mod swap;
 pub mod rr_runtime;
 #[path = "../../src/model/rr_host.rs"]
 pub mod rr_host;
+#[path = "../../src/model/frame_queue.rs"]
+pub mod frame_queue;

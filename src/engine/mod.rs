@@ -55,6 +55,9 @@ pub mod rr_runtime;
 /// Hook atomics and the worker tick. No skyline, so the host tests compile it.
 #[path = "../model/rr_host.rs"]
 pub mod rr_host;
+/// The frames a playing role hands from the recording worker to its hook.
+#[path = "../model/frame_queue.rs"]
+pub mod frame_queue;
 // CPU-as-P1: the session helpers (the pilot core is a path child of cpu_pilot) are consumed by the Switch-only runtime::p1::cpu_pilot; on the host their tests run by path
 // from tests/p1_core.rs (the playbook's by-path include).
 #[cfg(target_os = "switch")]
