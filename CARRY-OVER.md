@@ -952,3 +952,22 @@ portrait's after-render proof quarantined helper 2 for the scene, and presses 1-
 `carry_pkg6.py verify` re-derives all 250 files. Tests (failed first: no `Blocker::Portrait`, no `seat_load_waits`):
 `source_load` `a_press_during_a_portrait_render_waits_and_then_applies`, `parked_entries`
 `a_seat_load_holds_back_while_a_portrait_render_waits`.
+
+### p23/rc6-cov-rest: a CPU Mii install writes a whole CharInfo (#54, #68; 2026-11-08)
+
+**#54 / #68.** Eden covrest-yoga-03 (Yoga, probe `06f6dc3` with cov-rec's handoff `e276d0f`): Switch on a CPU macro
+recorded on an exact Mii (cov-rec's `cov-named-mii`, fixture `rc4-gunner-mii`) installed Mii Gunner with
+`resource_before` zero and stayed zero: `terminal ready comparison refusal ... reason=native resource pair absent`,
+INSTALL retained, 17 `Unmapped` console lines (cov-rec 16:08Z: `main+0x357a914`, reads at 0x0 and 0x288). The macro's
+Mii came from a replay: its CharInfo has no create ID and no name (bytes `0x00..0x26` zero; the replay window's capture
+is the same). The Reload's own Mii setup (`0x67e7d0`, `mii::mii_setup`) checks the record's CharInfo
+(`0x39c2930/0x39c2940`) before it binds the resource pair, so it bound none; the same canonical Mii from the catalog
+(covrest-14's native Gunner, with its create ID and name) bound its pair. The exact-Mii target of `begin` now installs
+`engine::mii_install::installable`: the saved native Mii with the same look (MII.md row 12), else the Mii with a
+create ID and the "New Mii" name filled in; the look, tokens and canonical identity are the Mii's.
+
+1 recorded manifest edit: `mii_ordinary_cpu.rs` (`begin`'s `mii_target`); `src/model/mii_install.rs` is new (not
+carried); `carry_pkg6.py verify` re-derives all 250 files. Tests (failed first against a stub that returned the
+configuration unchanged): `mii_install` `a_replay_mii_installs_the_saved_mii_with_the_same_look`,
+`a_replay_mii_with_no_saved_twin_gets_a_create_id_and_the_new_mii_name`,
+`a_mii_with_its_own_create_id_and_name_is_installed_as_it_is`, `the_cpu_install_writes_the_installable_configuration`.

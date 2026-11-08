@@ -833,6 +833,9 @@ unsafe fn begin(entry:*mut u8)->bool {
     // Only source/catalog/row target qualification can skip a cycle choice.
     // Current-owner, SameClass, INSTALL and publication checks remain below this resolver.
     let mii_target=|c:Configuration|->Result<(Target,[u8;0x70]),&'static str> {
+        // #54/#68: a replay's Mii has no create ID or name, and the game's Mii setup binds no resource pair to such a
+        // record. Install the saved Mii with this look, else this one with an identity filled in.
+        let c=crate::engine::mii_install::installable(c,&catalog.configs);
         if !crate::engine::mii::ordinary_cpu::supported_kind(c.canonical().class as u32) {
             return Err("CPU class not qualified");
         }
