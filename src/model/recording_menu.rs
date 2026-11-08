@@ -244,6 +244,8 @@ pub struct SectionView {
     pub hairline_after: Option<usize>,
     pub rows: Vec<RowMark>,
     pub cursor: usize,
+    /// Files in the section (action rows apart), beside its header in the r8 mockup.
+    pub files: usize,
 }
 
 /// One Connections line.
@@ -251,6 +253,35 @@ pub struct SectionView {
 pub struct ConnLine {
     pub text: String,
     pub floppy: Option<Floppy>,
+}
+
+/// The kind of library file a CONNECTIONS box names (its pill: SAVE STATE, MACRO, COMBO, SEQUENCE).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FileTag {
+    Save,
+    Macro,
+    Combo,
+    Sequence,
+}
+
+/// One line of the r8 pop-up's CONNECTIONS column (`RECORDING-REDESIGN-r8-popup-*.png`): the row under the cursor in
+/// its kind box, a heading over the files joined to it, each of those in its own box, and plain lines.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum ConnKind {
+    Head(FileTag),
+    Child(FileTag),
+    Heading,
+    #[default]
+    Detail,
+    /// A combo's link ("L1 jab → jab TRUE") and the line under it (its inputs and drift).
+    Link,
+    LinkSub,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ConnItem {
+    pub kind: ConnKind,
+    pub text: String,
 }
 
 /// One tile of the numbered picker.
@@ -592,6 +623,125 @@ impl RecordingScreens {
         self.connection_lines(face, &item)
     }
 
+    /// The r8 pop-up's CONNECTIONS of the row under the cursor, as boxes, headings and lines. The page keeps
+    /// [`Self::connections`] in its help lines.
+    pub fn connection_items(&self, face: Face, group: u8) -> Vec<ConnItem> {
+        let Some(item) = self.focused(face, group) else {
+            return Vec::new();
+        };
+        let line = |kind, text: String| ConnItem { kind, text };
+        let mut out = Vec::new();
+        match item.kind {
+            ItemKind::Save => {
+                let Some(save) = self.catalog.saves.iter().find(|file| file.id == item.id) else { return out };
+                out.push(line(ConnKind::Head(FileTag::Save), save.name.clone()));
+                let users: Vec<&MacroFile> = self
+                    .catalog
+                    .macros
+                    .iter()
+                    .filter(|file| {
+                        if file.chain {
+                            self.chain_start_id(file) == Some(item.id.as_str())
+                        } else {
+                            file.start_save.as_deref() == Some(item.id.as_str())
+                        }
+                    })
+                    .collect();
+                if !users.is_empty() {
+                    out.push(line(ConnKind::Heading, "start save of".to_string()));
+                    out.extend(users.iter().map(|file| line(ConnKind::Child(FileTag::Macro), file.name.clone())));
+                }
+                let bound = if self.bound.as_deref() == Some(item.id.as_str()) { "yes" } else { "no" };
+                out.push(line(ConnKind::Detail, format!("Bound to Save / Load  {bound}")));
+            }
+            ItemKind::Recording => {
+                let Some(file) = self.macro_by_id(&item.id) else { return out };
+                out.push(line(ConnKind::Head(FileTag::Macro), file.name.clone()));
+                let start = if file.chain { self.chain_start_id(file) } else { file.start_save.as_deref() };
+                if let Some(name) = start.and_then(|id| self.save_name(id)) {
+                    out.push(line(ConnKind::Heading, "starts from (warps there once, first)".to_string()));
+                    let on = if file.start_save_on { "On" } else { "Off" };
+                    out.push(line(ConnKind::Child(FileTag::Save), format!("{name} · {on}")));
+                }
+                if file.chain {
+                    out.push(line(ConnKind::Heading, "macros in order".to_string()));
+                    for (index, step) in file.steps.iter().enumerate() {
+                        let name = self.macro_by_id(step).map_or(step.as_str(), |step| step.name.as_str());
+                        out.push(line(ConnKind::Child(FileTag::Macro), format!("{} {name}", index + 1)));
+                    }
+                } else {
+                    let chains: Vec<(String, usize)> = self
+                        .catalog
+                        .macros
+                        .iter()
+                        .filter(|chain| chain.chain)
+                        .filter_map(|chain| chain.steps.iter().position(|step| *step == item.id).map(|at| (chain.name.clone(), at + 1)))
+                        .collect();
+                    if !chains.is_empty() {
+                        out.push(line(ConnKind::Heading, "in chains".to_string()));
+                        out.extend(chains.into_iter().map(|(name, at)| line(ConnKind::Child(FileTag::Macro), format!("{name} as {at}"))));
+                    }
+                }
+                let combos: Vec<&ComboFile> =
+                    self.catalog.combos.iter().filter(|combo| combo.made_from.as_deref() == Some(item.id.as_str())).collect();
+                if !combos.is_empty() {
+                    out.push(line(ConnKind::Heading, "combos made from it".to_string()));
+                    out.extend(combos.iter().map(|combo| line(ConnKind::Child(FileTag::Combo), combo.name.clone())));
+                }
+                if !file.chain && !file.recorded_on.is_empty() {
+                    let seconds = file.span as f32 / 60.0;
+                    out.push(line(ConnKind::Detail, format!("Recorded on  {} · {seconds:.1} s · information only", file.recorded_on)));
+                }
+            }
+            ItemKind::Combo => {
+                let Some(combo) = self.catalog.combos.iter().find(|file| file.id == item.id) else { return out };
+                out.push(line(ConnKind::Head(FileTag::Combo), combo.name.clone()));
+                if let Some(source) = combo.made_from.as_deref().and_then(|id| self.macro_by_id(id)) {
+                    out.push(line(ConnKind::Heading, "made from".to_string()));
+                    out.push(line(ConnKind::Child(FileTag::Macro), source.name.clone()));
+                }
+                let sequences: Vec<String> = self
+                    .catalog
+                    .sequences
+                    .iter()
+                    .filter_map(|sequence| {
+                        sequence.combos.iter().position(|step| *step == item.id).map(|at| format!("{} #{}", sequence.name, at + 1))
+                    })
+                    .collect();
+                if !sequences.is_empty() {
+                    out.push(line(ConnKind::Heading, "in sequences".to_string()));
+                    out.extend(sequences.into_iter().map(|text| line(ConnKind::Child(FileTag::Sequence), text)));
+                }
+                let links = combo.links.iter().filter(|text| link_head(text)).count();
+                if !combo.links.is_empty() {
+                    out.push(line(ConnKind::Heading, format!("Its links ({links})")));
+                    out.extend(combo.links.iter().map(|text| {
+                        line(if link_head(text) { ConnKind::Link } else { ConnKind::LinkSub }, text.clone())
+                    }));
+                }
+                if !combo.recorded_on.is_empty() {
+                    out.push(line(ConnKind::Detail, format!("Fighters  {}", combo.recorded_on)));
+                }
+            }
+            ItemKind::Sequence => {
+                let Some(sequence) = self.catalog.sequences.iter().find(|file| file.id == item.id) else { return out };
+                out.push(line(ConnKind::Head(FileTag::Sequence), sequence.name.clone()));
+                if !sequence.combos.is_empty() {
+                    out.push(line(ConnKind::Heading, "combos".to_string()));
+                    for (index, step) in sequence.combos.iter().enumerate() {
+                        let name = self.catalog.combos.iter().find(|combo| combo.id == *step).map_or(step.as_str(), |combo| combo.name.as_str());
+                        out.push(line(ConnKind::Child(FileTag::Combo), format!("{} {name}", index + 1)));
+                    }
+                }
+                out.push(line(ConnKind::Detail, format!("streak {} · best {}", sequence.streak, sequence.best)));
+            }
+            ItemKind::NewChain | ItemKind::NewSequence | ItemKind::SaveLastCombo => {
+                out.extend(self.connection_lines(face, &item).into_iter().map(|conn| line(ConnKind::Detail, conn.text)));
+            }
+        }
+        out
+    }
+
     pub fn set_cursor(&mut self, face: Face, group: u8, section: u8, index: usize) {
         let place = self.place_mut(face, group);
         let section = section.min(1);
@@ -634,7 +784,18 @@ impl RecordingScreens {
             return "Up/Down move   Left/Right On/Off   A do it   B back";
         }
         if face == Face::Popup {
-            "Up/Down move   A bind, set active or drill   B close   X loop   L/R role"
+            // The r8 footer: what A does in the section under the cursor, then the pop-up's keys. The CPU has one tab.
+            let group = if self.tab() == 0 { SAVES_MACROS } else { COMBOS_SEQ };
+            let cpu = self.popup_role == ViewRole::Cpu;
+            match (group, self.current_section(face, group), cpu) {
+                (SAVES_MACROS, 0, false) => "A bind   Left/Right section   ZL/ZR tab   L/R role   ZL+Up/Down page   B close",
+                (SAVES_MACROS, 0, true) => "A bind   Left/Right section   L/R role   ZL+Up/Down page   B close",
+                (SAVES_MACROS, _, false) => {
+                    "A set active   X loop   Left/Right section   ZL/ZR tab   L/R role   ZL+Up/Down page   B close"
+                }
+                (SAVES_MACROS, _, true) => "A set active   X loop   Left/Right section   L/R role   ZL+Up/Down page   B close",
+                _ => "A drill   Left/Right section   ZL/ZR tab   L/R role   ZL+Up/Down page   B close",
+            }
         } else {
             "A open   X loop in MACROS   ZR role   L/R page   B close"
         }
@@ -1444,6 +1605,7 @@ impl RecordingScreens {
             hairline_after: (file_count > 5).then_some(5 + lead),
             rows,
             cursor,
+            files: file_count,
         }
     }
 
@@ -1879,6 +2041,11 @@ fn unused_n(prefix: &str, names: &[String]) -> u32 {
         }
         n += 1;
     }
+}
+
+/// A link's move line ("L1 jab → jab TRUE"), not the events or drift line under it.
+fn link_head(line: &str) -> bool {
+    line.strip_prefix('L').and_then(|rest| rest.split_once(' ')).is_some_and(|(n, _)| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()))
 }
 
 /// One link's move line, then its input events, then drift when the file recorded a hold.
@@ -2734,6 +2901,102 @@ mod tests {
         screens.set_cursor(Face::Page, COMBOS_SEQ, 1, 1);
         let lines = screens.connections(Face::Page, COMBOS_SEQ);
         assert_eq!(lines.first().map(|line| line.text.as_str()), Some("Recorded on Luigi"), "{lines:?}");
+    }
+
+    /// Primary 2026-11-08 15:55Z: the r8 pop-up as drawn. Its CONNECTIONS are kind boxes in a tree
+    /// (`RECORDING-REDESIGN-r8-popup-combo.png`, `-macro.png`, `-save.png`): the row under the cursor, a heading, the
+    /// files joined to it, then plain lines.
+    #[test]
+    fn the_popup_connections_are_the_r8_boxes() {
+        use super::{ConnItem as I, ConnKind as K, FileTag as T};
+        let item = |kind, text: &str| I { kind, text: text.to_string() };
+        let mut screens = screens();
+        screens.set_cursor(Face::Popup, COMBOS_SEQ, 1, 1);
+        let combo = screens.connection_items(Face::Popup, COMBOS_SEQ);
+        assert_eq!(
+            combo[..6],
+            [
+                item(K::Head(T::Combo), "Nair loop combo"),
+                item(K::Heading, "made from"),
+                item(K::Child(T::Macro), "Nair loop"),
+                item(K::Heading, "in sequences"),
+                item(K::Child(T::Sequence), "Corner to kill #1"),
+                item(K::Heading, "Its links (1)"),
+            ]
+        );
+        assert_eq!(combo[6].kind, K::Link, "{combo:?}");
+        assert!(combo[6..].iter().all(|line| matches!(line.kind, K::Link | K::LinkSub)), "{combo:?}");
+
+        screens.set_cursor(Face::Popup, SAVES_MACROS, 1, 0);
+        assert_eq!(
+            screens.connection_items(Face::Popup, SAVES_MACROS),
+            [
+                item(K::Head(T::Macro), "Nair loop"),
+                item(K::Heading, "starts from (warps there once, first)"),
+                item(K::Child(T::Save), "Nair loop · start · On"),
+                item(K::Heading, "in chains"),
+                item(K::Child(T::Macro), "Corner pressure as 1"),
+                item(K::Heading, "combos made from it"),
+                item(K::Child(T::Combo), "Nair loop combo"),
+                item(K::Detail, "Recorded on  Pikachu · 0.2 s · information only"),
+            ]
+        );
+
+        screens.set_cursor(Face::Popup, SAVES_MACROS, 0, 2);
+        assert_eq!(
+            screens.connection_items(Face::Popup, SAVES_MACROS),
+            [
+                item(K::Head(T::Save), "Nair loop · start"),
+                item(K::Heading, "start save of"),
+                item(K::Child(T::Macro), "Nair loop"),
+                item(K::Child(T::Macro), "Corner pressure"),
+                item(K::Detail, "Bound to Save / Load  no"),
+            ]
+        );
+
+        screens.set_cursor(Face::Popup, COMBOS_SEQ, 0, 0);
+        assert_eq!(
+            screens.connection_items(Face::Popup, COMBOS_SEQ),
+            [
+                item(K::Head(T::Sequence), "Corner to kill"),
+                item(K::Heading, "combos"),
+                item(K::Child(T::Combo), "1 Nair loop combo"),
+                item(K::Detail, "streak 2 · best 6"),
+            ]
+        );
+    }
+
+    /// The r8 mockup counts each section's files beside its header ("SAVE STATES (7)"); action rows are not files.
+    #[test]
+    fn sections_count_their_files() {
+        let screens = screens();
+        let files = |group, section| screens.section(Face::Popup, group, section).files;
+        assert_eq!((files(SAVES_MACROS, 0), files(SAVES_MACROS, 1)), (16, 4));
+        assert_eq!((files(COMBOS_SEQ, 0), files(COMBOS_SEQ, 1)), (1, 1));
+    }
+
+    /// The r8 footer names what A does in the section under the cursor, then the pop-up's keys
+    /// (`RECORDING-REDESIGN-r8-popup-save.png`: "A bind", `-macro.png`: "A set active   X loop", `-combo.png`: "A drill").
+    #[test]
+    fn the_popup_footer_is_the_r8_footer() {
+        let mut screens = screens();
+        open_popup(&mut screens);
+        let keys = "   Left/Right section   ZL/ZR tab   L/R role   ZL+Up/Down page   B close";
+        screens.set_cursor(Face::Popup, SAVES_MACROS, 0, 0);
+        assert_eq!(screens.hint(Face::Popup), format!("A bind{keys}"));
+        screens.set_cursor(Face::Popup, SAVES_MACROS, 1, 0);
+        assert_eq!(screens.hint(Face::Popup), format!("A set active   X loop{keys}"));
+        screens.press_popup(Button::ZR);
+        screens.set_cursor(Face::Popup, COMBOS_SEQ, 1, 1);
+        assert_eq!(screens.hint(Face::Popup), format!("A drill{keys}"));
+        screens.press_popup(Button::R);
+        assert_eq!(screens.role(Face::Popup), ViewRole::Cpu);
+        screens.set_cursor(Face::Popup, SAVES_MACROS, 1, 0);
+        assert_eq!(
+            screens.hint(Face::Popup),
+            "A set active   X loop   Left/Right section   L/R role   ZL+Up/Down page   B close",
+            "the CPU has one tab"
+        );
     }
 
     /// Primary 2026-11-08 (#49, #19): the r8 mockup's line under each row (`RECORDING-REDESIGN-r8-popup-combo.png`,

@@ -116,7 +116,31 @@ Each tab is two stacked sections. Each section shows four rows under a header th
 
 The five most recently used of a kind are listed first, most recent first. Those rows sit in a green outline. A hairline is drawn under the fifth when that boundary is in the four-row window. The status line still says hairline=5 when the fifth row is scrolled off this window.
 
-The lists are the left column, and the connections of the row under the cursor are the right column, headed CONNECTIONS, as the agreed r8 mockup draws them (`docs/decisions/RECORDING-REDESIGN-r8-popup-*.png` on `review/menu-proposal`). Each file row has a dim line under its name: a save's fighters, "Recorded on" and the fighter for a macro or a combo, and the steps of a chain or a sequence. An action row such as + New chain has none. A chain that is the active macro of the role in view includes that role's loop on those lines. Other connection lines, such as a start save, a chain step, a combo made from the file, or the recorded fighter, are not limited to that role. The MACROS header shows the loop of the role in view.
+The lists are the left column, and the connections of the row under the cursor are the right column, headed CONNECTIONS, as the agreed r8 mockup draws them (`docs/decisions/RECORDING-REDESIGN-r8-popup-*.png` on `review/menu-proposal`).
+
+- The row under the cursor sits in a box with its kind's pill: SAVE STATE, MACRO, COMBO or SEQUENCE.
+- Under it, headings name what is joined to it:
+  - "start save of";
+  - "starts from (warps there once, first)";
+  - "in chains", "combos made from it";
+  - "made from", "in sequences";
+  - "combos".
+- Each joined file sits in its own box, hanging from a stem.
+- Plain lines follow: a combo's links, its fighters, whether a save is bound, and a macro's recorded fighter and length.
+
+Each section header shows how many files it lists. Each file row has a dim line under its name:
+
+- a save's fighters;
+- "Recorded on" and the fighter, for a macro or a combo;
+- the steps of a chain or a sequence.
+
+An action row such as + New chain has none. The title reads Recording, with the role tabs beside it: L Player, CPU R, the role in view lit. The footer names what A does in the section under the cursor, then the pop-up's keys:
+
+- "A bind" in Save states;
+- "A set active   X loop" in Macros;
+- "A drill" in Combos and Sequences.
+
+The CPU view leaves out ZL/ZR. Other connection lines, such as a start save, a chain step, a combo made from the file, or the recorded fighter, are not limited to that role. The MACROS header shows the loop of the role in view.
 
 The bound save, the active macro of the role in view, and the drilled combo or sequence are green rows. The name stays the ordinary light colour. The cursor on these screens is a white border and a white bar on the left. A row can be green and hold the cursor at the same time.
 

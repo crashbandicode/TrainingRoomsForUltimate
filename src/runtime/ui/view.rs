@@ -68,7 +68,9 @@ impl Panes {
 
     /// Write a frame.
     pub unsafe fn draw(&self, frame: &Frame) {
-        // Tabs: the active one on the accent bar.
+        // Tabs: the active one on the accent bar. In the r8 pop-up the title line ("Recording" and the role tabs) is on
+        // top and the tabs sit under it.
+        let tab_y = if frame.popup { p::POP_TAB_Y } else { p::TAB_Y };
         let mut left = -840.0;
         for i in 0..p::TABS {
             let index = p::tab_index(i);
@@ -80,9 +82,9 @@ impl Panes {
             let width = p::text_width(units.len());
             let active = i == usize::from(frame.tab_active);
             self.text(index, units, if active { p::TEXT } else { p::TEXT_DIM });
-            self.at(index, left + p::TAB_BOX_W / 2.0, p::TAB_Y);
+            self.at(index, left + p::TAB_BOX_W / 2.0, tab_y);
             if active {
-                self.at(p::IDX_TAB_HI, left + width / 2.0, p::TAB_Y);
+                self.at(p::IDX_TAB_HI, left + width / 2.0, tab_y);
                 let hi = self.all[p::IDX_TAB_HI];
                 if !hi.is_null() {
                     pane::set_width(hi, width + 36.0);
@@ -91,7 +93,11 @@ impl Panes {
             left += width + 64.0;
         }
         self.text(p::IDX_TITLE, frame.title.units(), p::TEXT_DIM);
+        self.show(p::IDX_TITLE, !frame.popup);
+        self.show(p::IDX_SEP, !frame.popup);
         self.text(p::IDX_CRUMB, frame.crumb.units(), p::TEXT);
+        self.at(p::IDX_CRUMB, 0.0, if frame.popup { p::TAB_Y } else { p::CRUMB_Y });
+        self.draw_role_tabs(frame);
 
         // Groups.
         for i in 0..p::GROUPS {
@@ -206,9 +212,32 @@ impl Panes {
         }
     }
 
-    /// The r8 pop-up's CONNECTIONS column: the rule, the header and the lines. Hidden on the page, which keeps them in
-    /// the help lines.
+    /// The r8 title's L/R role tabs: the plate, "Player" and "CPU" with the lit one on the accent, and the L and R
+    /// key caps. Only the pop-up has them.
+    unsafe fn draw_role_tabs(&self, frame: &Frame) {
+        const NAMES: [&[u16]; 2] = [&[80, 108, 97, 121, 101, 114], &[67, 80, 85]];
+        const KEYS: [&[u16]; 2] = [&[76], &[82]];
+        let Some(lit) = frame.role_tab.map(usize::from) else {
+            for index in p::IDX_ROLE_BG..p::IDX_ROLE_KEY + 2 {
+                self.hide(index);
+            }
+            return;
+        };
+        self.rect_at(p::IDX_ROLE_BG, p::ROLE_X, p::TAB_Y, 2.0 * p::ROLE_TAB_W + 8.0, p::ROLE_H + 8.0, p::HIGHLIGHT);
+        self.rect_at(p::IDX_ROLE_HI, p::role_tab_x(lit.min(1)), p::TAB_Y, p::ROLE_TAB_W, p::ROLE_H, p::ACCENT);
+        for tab in 0..2 {
+            let color = if tab == lit { p::TEXT } else { p::TEXT_DIM };
+            self.label(p::IDX_ROLE + tab, NAMES[tab], p::role_tab_x(tab), p::TAB_Y, p::ROLE_TAB_W, color);
+            self.rect_at(p::IDX_ROLE_CAP + tab, p::ROLE_CAP_X[tab], p::TAB_Y, p::ROLE_CAP, p::ROLE_CAP, p::RULE);
+            self.label(p::IDX_ROLE_KEY + tab, KEYS[tab], p::ROLE_CAP_X[tab], p::TAB_Y, p::ROLE_CAP, p::TEXT_DIM);
+        }
+    }
+
+    /// The r8 pop-up's CONNECTIONS column: the rule, the header, and the tree (`RECORDING-REDESIGN-r8-popup-*.png`): the
+    /// row under the cursor in its kind box, the headings over the files joined to it, each of those in its own box
+    /// with the stem's tick, and plain lines. Hidden on the page, which keeps them in the help lines.
     unsafe fn draw_connections(&self, frame: &Frame) {
+        use crate::model::recording_menu::{ConnKind, FileTag};
         let shown = frame.popup && frame.view == View::List;
         self.show(p::IDX_CONN_DIV, shown);
         let x = (p::CONN_LEFT + p::CONN_RIGHT) / 2.0;
@@ -218,12 +247,68 @@ impl Panes {
         } else {
             self.hide(p::IDX_CONN_HEAD);
         }
+        for index in p::IDX_CONN_BOX..p::IDX_ROLE_BG {
+            self.hide(index);
+        }
+        let mut boxes = 0;
+        let mut ticks = 0;
+        let mut last_child = None;
         for i in 0..p::CONN_LINES {
-            if shown && i < usize::from(frame.conn_count) {
-                self.label(p::IDX_CONN + i, frame.conn[i].units(), x, p::conn_y(i), w, tone_color(frame.conn_tone[i]));
-            } else {
+            if !(shown && i < usize::from(frame.conn_count)) {
                 self.hide(p::IDX_CONN + i);
+                continue;
             }
+            let y = p::conn_y(i);
+            let units = frame.conn[i].units();
+            let tone = tone_color(frame.conn_tone[i]);
+            let (tag, child) = match frame.conn_kind[i] {
+                ConnKind::Head(tag) => (Some(tag), false),
+                ConnKind::Child(tag) => (Some(tag), true),
+                ConnKind::Heading => {
+                    let left = p::CONN_LEFT + p::CONN_INDENT;
+                    self.label(p::IDX_CONN + i, units, (left + p::CONN_RIGHT) / 2.0, y, p::CONN_RIGHT - left, tone);
+                    continue;
+                }
+                ConnKind::Detail | ConnKind::Link | ConnKind::LinkSub => {
+                    self.label(p::IDX_CONN + i, units, x, y, w, tone);
+                    continue;
+                }
+            };
+            let (Some(tag), true) = (tag, boxes < p::CONN_BOXES) else {
+                self.label(p::IDX_CONN + i, units, x, y, w, tone);
+                continue;
+            };
+            let (pill, color): (&[u16], [u8; 4]) = match tag {
+                FileTag::Save => (&[83, 65, 86, 69, 32, 83, 84, 65, 84, 69], [240, 150, 60, 255]),
+                FileTag::Macro => (&[77, 65, 67, 82, 79], [92, 150, 240, 255]),
+                FileTag::Combo => (&[67, 79, 77, 66, 79], [170, 120, 240, 255]),
+                FileTag::Sequence => (&[83, 69, 81, 85, 69, 78, 67, 69], [235, 105, 170, 255]),
+            };
+            let left = if child { p::CONN_LEFT + p::CONN_INDENT } else { p::CONN_LEFT };
+            let (h, edge, mid) = (p::CONN_BOX_H, 2.0, (left + p::CONN_RIGHT) / 2.0);
+            let base = p::IDX_CONN_BOX + 4 * boxes;
+            self.rect_at(base, left + edge / 2.0, y, edge, h, color);
+            self.rect_at(base + 1, p::CONN_RIGHT - edge / 2.0, y, edge, h, color);
+            self.rect_at(base + 2, mid, y + h / 2.0 - edge / 2.0, p::CONN_RIGHT - left, edge, color);
+            self.rect_at(base + 3, mid, y - h / 2.0 + edge / 2.0, p::CONN_RIGHT - left, edge, color);
+            let pill_w = p::pill_w(pill.len());
+            let pill_x = left + 8.0 + pill_w / 2.0;
+            self.rect_at(p::IDX_CONN_PILL + boxes, pill_x, y, pill_w, p::PILL_H, color);
+            self.label(p::IDX_CONN_PILL_TEXT + boxes, pill, pill_x, y, pill_w, [16, 16, 20, 255]);
+            let name_left = pill_x + pill_w / 2.0 + 12.0;
+            self.label(p::IDX_CONN + i, units, (name_left + p::CONN_RIGHT - 8.0) / 2.0, y, p::CONN_RIGHT - 8.0 - name_left, p::TEXT);
+            boxes += 1;
+            if child && ticks + 1 < p::CONN_TREE {
+                ticks += 1;
+                let tick_w = left - p::CONN_STEM_X;
+                self.rect_at(p::IDX_CONN_TREE + ticks, p::CONN_STEM_X + tick_w / 2.0, y, tick_w, edge, color);
+                last_child = Some(y);
+            }
+        }
+        // The stem, from under the head box to the last joined file.
+        if let Some(bottom) = last_child {
+            let top = p::conn_y(0) - p::CONN_BOX_H / 2.0;
+            self.rect_at(p::IDX_CONN_TREE, p::CONN_STEM_X, (top + bottom) / 2.0, 2.0, top - bottom, p::RULE);
         }
     }
 

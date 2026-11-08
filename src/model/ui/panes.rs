@@ -201,6 +201,31 @@ pub const fn conn_y(line: usize) -> f32 {
     ROW_FIRST_Y - CONN_PITCH * (line + 1) as f32
 }
 
+/// A joined file's box, a heading and the tree's ticks start this far right of the head box.
+pub const CONN_INDENT: f32 = 50.0;
+/// The tree's stem, between the column's edge and a joined file's box.
+pub const CONN_STEM_X: f32 = CONN_LEFT + 24.0;
+pub const CONN_BOX_H: f32 = CONN_LINE_H - 4.0;
+pub const PILL_H: f32 = 24.0;
+pub const FONT_PILL: (f32, f32) = (14.0, 22.0);
+
+/// A pill's width for a label of `units` UTF-16 units.
+pub fn pill_w(units: usize) -> f32 {
+    units as f32 * FONT_PILL.0 * 0.62 + 20.0
+}
+
+/// The r8 role tabs on the title line, right of "Recording": the plate's centre, one tab's width, the key caps.
+pub const ROLE_X: f32 = 600.0;
+pub const ROLE_TAB_W: f32 = 176.0;
+pub const ROLE_H: f32 = 52.0;
+pub const ROLE_CAP: f32 = 40.0;
+pub const ROLE_CAP_X: [f32; 2] = [ROLE_X - ROLE_TAB_W - 40.0, ROLE_X + ROLE_TAB_W + 40.0];
+pub const fn role_tab_x(tab: usize) -> f32 {
+    ROLE_X + (tab as f32 - 0.5) * ROLE_TAB_W
+}
+/// In the pop-up the title line ("Recording" and the role tabs) is on top and the page tabs sit under it.
+pub const POP_TAB_Y: f32 = CRUMB_Y + 4.0;
+
 // ---- direction grid geometry ---------------------------------------------------------------------------
 
 /// Three rows of chips fit the content area (the tile grid's 620 units, y 320 down to -300): the pitch is a third of it.
@@ -320,10 +345,24 @@ pub const IDX_SUB: usize = IDX_LOOP + LOOPS;
 pub const IDX_CONN_DIV: usize = IDX_SUB + SUBS;
 pub const IDX_CONN_HEAD: usize = IDX_CONN_DIV + 1;
 pub const IDX_CONN: usize = IDX_CONN_HEAD + 1;
+/// The r8 CONNECTIONS tree (primary 2026-11-08 15:55Z, "as drawn"): a kind box per file (four edges, a pill and its
+/// label), the head box and up to five joined files, and the tree's stem and one tick per joined file.
+pub const CONN_BOXES: usize = 6;
+pub const IDX_CONN_BOX: usize = IDX_CONN + CONN_LINES;
+pub const IDX_CONN_PILL: usize = IDX_CONN_BOX + 4 * CONN_BOXES;
+pub const IDX_CONN_PILL_TEXT: usize = IDX_CONN_PILL + CONN_BOXES;
+pub const CONN_TREE: usize = CONN_BOXES;
+pub const IDX_CONN_TREE: usize = IDX_CONN_PILL_TEXT + CONN_BOXES;
+/// The r8 title's L/R role tabs: their plate, the lit half, "Player" and "CPU", and the L and R key caps.
+pub const IDX_ROLE_BG: usize = IDX_CONN_TREE + CONN_TREE;
+pub const IDX_ROLE_HI: usize = IDX_ROLE_BG + 1;
+pub const IDX_ROLE: usize = IDX_ROLE_HI + 1;
+pub const IDX_ROLE_CAP: usize = IDX_ROLE + 2;
+pub const IDX_ROLE_KEY: usize = IDX_ROLE_CAP + 2;
 /// How many panes the menu itself owns and the runtime resolves at registration (`view::Panes::all`); every index
 /// the renderer writes is below it. The panes after these (the notification panel and the frame strip) belong to the
 /// input package, which finds them by name when it draws.
-pub const MENU_COUNT: usize = IDX_CONN + CONN_LINES;
+pub const MENU_COUNT: usize = IDX_ROLE_KEY + 2;
 /// The notification panel (SPEC-input-05): its own container under `RootPane`. Each of its texts (header, short
 /// body, long body) has a dark plate drawn immediately before it. Written by the notices code of the input package.
 pub const IDX_NOTICE: usize = MENU_COUNT;
@@ -736,7 +775,16 @@ pub const fn name_of(index: usize) -> Name {
         i if i >= IDX_SUB && i < IDX_CONN_DIV => Name::indexed("tr_sub_", i - IDX_SUB),
         IDX_CONN_DIV => Name::new("tr_conn_div"),
         IDX_CONN_HEAD => Name::new("tr_conn_head"),
-        i if i >= IDX_CONN && i < MENU_COUNT => Name::indexed("tr_conn_", i - IDX_CONN),
+        i if i >= IDX_CONN && i < IDX_CONN_BOX => Name::indexed("tr_conn_", i - IDX_CONN),
+        i if i >= IDX_CONN_BOX && i < IDX_CONN_PILL => Name::indexed("tr_cbx_", i - IDX_CONN_BOX),
+        i if i >= IDX_CONN_PILL && i < IDX_CONN_PILL_TEXT => Name::indexed("tr_cpl_", i - IDX_CONN_PILL),
+        i if i >= IDX_CONN_PILL_TEXT && i < IDX_CONN_TREE => Name::indexed("tr_cpt_", i - IDX_CONN_PILL_TEXT),
+        i if i >= IDX_CONN_TREE && i < IDX_ROLE_BG => Name::indexed("tr_ctr_", i - IDX_CONN_TREE),
+        IDX_ROLE_BG => Name::new("tr_role_bg"),
+        IDX_ROLE_HI => Name::new("tr_role_hi"),
+        i if i >= IDX_ROLE && i < IDX_ROLE_CAP => Name::indexed("tr_role_", i - IDX_ROLE),
+        i if i >= IDX_ROLE_CAP && i < IDX_ROLE_KEY => Name::indexed("tr_rcap_", i - IDX_ROLE_CAP),
+        i if i >= IDX_ROLE_KEY && i < MENU_COUNT => Name::indexed("tr_rkey_", i - IDX_ROLE_KEY),
         i if i >= IDX_TILE_BADGE && i < IDX_FLOPPY => mark_name(i - IDX_TILE_BADGE),
         i if i >= IDX_TAB && i < IDX_TAB + TABS => Name::indexed("tr_tab_", i - IDX_TAB),
         i if i >= IDX_GROUP && i < IDX_GROUP + GROUPS => Name::indexed("tr_grp_", i - IDX_GROUP),
@@ -873,9 +921,30 @@ pub const fn spec(index: usize) -> Spec {
             visible: false,
             ..text(name, [(CONN_LEFT + CONN_RIGHT) / 2.0, ROW_FIRST_Y, CONN_RIGHT - CONN_LEFT, CONN_LINE_H], Align::Left, FONT_SMALL, 48, TEXT_DIM)
         },
-        i if i >= IDX_CONN && i < MENU_COUNT => Spec {
+        i if i >= IDX_CONN && i < IDX_CONN_BOX => Spec {
             visible: false,
             ..text(name, [(CONN_LEFT + CONN_RIGHT) / 2.0, conn_y(i - IDX_CONN), CONN_RIGHT - CONN_LEFT, CONN_LINE_H], Align::Left, FONT_SMALL, 72, TEXT)
+        },
+        i if i >= IDX_CONN_BOX && i < IDX_CONN_PILL_TEXT => {
+            Spec { visible: false, ..rect(name, [(CONN_LEFT + CONN_RIGHT) / 2.0, conn_y(0), 8.0, 8.0], TEXT, false) }
+        }
+        i if i >= IDX_CONN_PILL_TEXT && i < IDX_CONN_TREE => Spec {
+            visible: false,
+            ..text(name, [CONN_LEFT + 80.0, conn_y(0), 160.0, PILL_H + 4.0], Align::Center, FONT_PILL, 12, PANEL)
+        },
+        i if i >= IDX_CONN_TREE && i < IDX_ROLE_BG => Spec { visible: false, ..rect(name, [CONN_STEM_X, conn_y(1), 2.0, 2.0], RULE, false) },
+        IDX_ROLE_BG => Spec { visible: false, ..rect(name, [ROLE_X, TAB_Y, 2.0 * ROLE_TAB_W + 8.0, ROLE_H + 8.0], HIGHLIGHT, false) },
+        IDX_ROLE_HI => Spec { visible: false, ..rect(name, [role_tab_x(0), TAB_Y, ROLE_TAB_W, ROLE_H], ACCENT, false) },
+        i if i >= IDX_ROLE && i < IDX_ROLE_CAP => Spec {
+            visible: false,
+            ..text(name, [role_tab_x(i - IDX_ROLE), TAB_Y, ROLE_TAB_W, ROLE_H], Align::Center, FONT, 8, TEXT)
+        },
+        i if i >= IDX_ROLE_CAP && i < IDX_ROLE_KEY => {
+            Spec { visible: false, ..rect(name, [ROLE_CAP_X[i - IDX_ROLE_CAP], TAB_Y, ROLE_CAP, ROLE_CAP], RULE, false) }
+        }
+        i if i >= IDX_ROLE_KEY && i < MENU_COUNT => Spec {
+            visible: false,
+            ..text(name, [ROLE_CAP_X[i - IDX_ROLE_KEY], TAB_Y, ROLE_CAP, ROLE_CAP], Align::Center, FONT_SMALL, 2, TEXT)
         },
         i if i >= IDX_TILE_BADGE && i < IDX_FLOPPY => Spec { visible: false, ..text(name, [0.0, 0.0, 52.0, MARK_H], Align::Center, FONT_SMALL, 4, TEXT) },
         IDX_TAB_HI => rect(name, [-740.0, TAB_Y, 200.0, TAB_H], ACCENT, true),
@@ -992,10 +1061,14 @@ mod tests {
         let r8 = SUBS + 2 + CONN_LINES;
         assert_eq!(r8, 28);
         assert_eq!(name_of(IDX_SUB).as_str(), "tr_sub_00");
-        assert_eq!(name_of(MENU_COUNT - 1).as_str(), "tr_conn_13");
+        assert_eq!(name_of(IDX_CONN_BOX - 1).as_str(), "tr_conn_13");
+        // The r8 tree (boxes, pills, stem and ticks) and the role tabs (primary 2026-11-08 15:55Z).
+        let r8_drawn = 4 * CONN_BOXES + 2 * CONN_BOXES + CONN_TREE + 8;
+        assert_eq!(r8_drawn, 50);
+        assert_eq!(name_of(MENU_COUNT - 1).as_str(), "tr_rkey_01");
         assert!(COUNT < limit, "plugin table {COUNT} exceeds the walk {limit}");
-        assert_eq!(COUNT, 1424 + CHROME + r8);
-        assert_eq!(limit - COUNT, 2672 - CHROME - r8);
+        assert_eq!(COUNT, 1424 + CHROME + r8 + r8_drawn);
+        assert_eq!(limit - COUNT, 2672 - CHROME - r8 - r8_drawn);
         let strip_tree = iv::COUNT + cb::COUNT;
         assert!(strip_tree <= limit, "the strip walk, combo bar included, is {strip_tree}");
         let first = spec(IDX_IV + iv::at::STICK);
@@ -1026,6 +1099,16 @@ mod tests {
             assert!(sub.y - SUB_H / 2.0 >= plate_bottom - 2.0, "row {row}'s subline stays on its plate");
         }
         assert!(row_label_left(true) + row_label_w(true) <= POP_ROW_RIGHT - row_value_w(true), "the name ends before the value");
+        // The role tabs and their key caps sit on the title line inside the panel, right of "Recording".
+        for index in [IDX_ROLE_BG, IDX_ROLE_HI, IDX_ROLE, IDX_ROLE + 1, IDX_ROLE_CAP, IDX_ROLE_CAP + 1] {
+            let s = spec(index);
+            assert!(s.x - s.w / 2.0 >= 0.0 && s.x + s.w / 2.0 <= POPUP_W / 2.0, "{:?} sits right of the title", s.name);
+            assert!((s.y - TAB_Y).abs() < 1.0, "{:?} is on the title line", s.name);
+        }
+        // The page tabs go under the title line and stay clear of the first row.
+        assert!(POP_TAB_Y - TAB_H / 2.0 >= row_y(0) + ROW_H / 2.0 && POP_TAB_Y + TAB_H / 2.0 <= TAB_Y - ROLE_H / 2.0);
+        // A box's pill and a joined file's indent fit the column.
+        assert!(CONN_LEFT + CONN_INDENT + 8.0 + pill_w(10) + 120.0 <= CONN_RIGHT, "a SAVE STATE pill and a name fit");
         assert!(row_label_left(false) + row_label_w(false) <= ROW_RIGHT - row_value_w(false) + 1.0, "the page is unchanged");
     }
 

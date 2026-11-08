@@ -223,6 +223,10 @@ pub struct Frame {
     pub conn: [Text<72>; super::panes::CONN_LINES],
     pub conn_tone: [Tone; super::panes::CONN_LINES],
     pub conn_count: u8,
+    /// What each CONNECTIONS line is in the r8 tree: a kind box (with its pill), a heading, a link, a plain line.
+    pub conn_kind: [super::recording_menu::ConnKind; super::panes::CONN_LINES],
+    /// The pop-up's L/R role tabs in the title (r8): 0 Player, 1 CPU. `None` off the pop-up.
+    pub role_tab: Option<u8>,
 }
 
 /// One floppy or loop mark. `color` is sRGB; the renderer converts it.
@@ -288,6 +292,8 @@ impl Frame {
         self.conn.fill(Text::new());
         self.conn_tone = [Tone::Normal; super::panes::CONN_LINES];
         self.conn_count = 0;
+        self.conn_kind = [super::recording_menu::ConnKind::Detail; super::panes::CONN_LINES];
+        self.role_tab = None;
     }
 
     pub const fn new() -> Frame {
@@ -345,6 +351,8 @@ impl Frame {
             conn: [Text::new(); super::panes::CONN_LINES],
             conn_tone: [Tone::Normal; super::panes::CONN_LINES],
             conn_count: 0,
+            conn_kind: [super::recording_menu::ConnKind::Detail; super::panes::CONN_LINES],
+            role_tab: None,
         }
     }
 }
@@ -611,7 +619,9 @@ fn paint_recording(menu: &Menu, frame: &mut Frame) {
             frame.tab_count = (i + 1) as u8;
         }
         frame.tab_active = rec.tab() as u8;
-        let _ = write!(frame.crumb, "Recording ({})", rec.role(face).label());
+        // The r8 title: "Recording", with the role in the L/R tabs beside it.
+        let _ = frame.crumb.write_str("Recording");
+        frame.role_tab = Some(u8::from(rec.role(face) == super::recording_menu::ViewRole::Cpu));
     }
     // The recording hint replaces the page hint page_frame wrote; appended, the two ran together.
     frame.hint.clear();
@@ -639,19 +649,25 @@ fn paint_recording(menu: &Menu, frame: &mut Frame) {
     } else {
         paint_sections(rec, frame, face, group);
     }
-    let lines = rec.connections(face, group);
+    let lines = if popup { Vec::new() } else { rec.connections(face, group) };
     if popup {
         // The r8 pop-up has no help panel: the page row's help under it described a row the pop-up does not show.
         frame.help[0].clear();
         frame.help[1].clear();
-    }
-    if popup && !lines.is_empty() {
-        // The r8 pop-up's own column, right of the list: the header, then the row under the cursor and what it is
-        // connected to, one line each. The help keeps the row's own lines.
-        let _ = frame.conn_head.write_str("CONNECTIONS  of the row under the cursor");
-        for (slot, line) in lines.iter().take(super::panes::CONN_LINES).enumerate() {
-            let _ = frame.conn[slot].write_str(&line.text);
-            frame.conn_tone[slot] = Tone::Normal;
+        // Its own column, right of the list: the header, then the row under the cursor and the files joined to it in
+        // kind boxes, the headings over them, and plain lines.
+        let items = rec.connection_items(face, group);
+        if !items.is_empty() {
+            let _ = frame.conn_head.write_str("CONNECTIONS  of the row under the cursor");
+        }
+        for (slot, item) in items.iter().take(super::panes::CONN_LINES).enumerate() {
+            use super::recording_menu::ConnKind;
+            let _ = frame.conn[slot].write_str(&item.text);
+            frame.conn_kind[slot] = item.kind;
+            frame.conn_tone[slot] = match item.kind {
+                ConnKind::Heading | ConnKind::LinkSub => Tone::Dim,
+                _ => Tone::Normal,
+            };
             frame.conn_count = (slot + 1) as u8;
         }
     } else if !lines.is_empty() {
@@ -732,7 +748,8 @@ fn paint_sections(rec: &super::recording_menu::RecordingScreens, frame: &mut Fra
         if base >= ROW_LINES {
             break;
         }
-        let _ = frame.rows[base].label.write_str(view.header);
+        // The r8 header carries its file count ("SAVE STATES (7)").
+        let _ = write!(frame.rows[base].label, "{}  ({})", view.header, view.files);
         frame.rows[base].label_tone = Tone::Dim;
         frame.row_count = (base + 1) as u8;
         if let Some(floppy) = view.header_floppy {
@@ -999,13 +1016,46 @@ mod tests {
         assert!(frame.popup);
         let slot = (0..usize::from(frame.row_count)).find(|i| frame.rows[*i].label.string_lossy() == "c1").expect("c1 drawn");
         assert_eq!(frame.rows[slot].sub.string_lossy(), "Recorded on Pikachu → Mario");
-        let header = (0..usize::from(frame.row_count)).find(|i| frame.rows[*i].label.string_lossy() == "COMBOS").expect("header");
+        let header = (0..usize::from(frame.row_count)).find(|i| frame.rows[*i].label.string_lossy().starts_with("COMBOS")).expect("header");
         assert!(frame.rows[header].sub.is_empty(), "a header has no subline");
         assert_eq!(frame.conn_head.string_lossy(), "CONNECTIONS  of the row under the cursor");
         let lines: Vec<String> = (0..usize::from(frame.conn_count)).map(|i| frame.conn[i].string_lossy()).collect();
-        assert_eq!(lines.first().map(String::as_str), Some("Recorded on Pikachu → Mario"), "{lines:?}");
-        assert!(lines.iter().any(|line| line == "In sequence Sequence 1"), "{lines:?}");
+        assert_eq!(lines.first().map(String::as_str), Some("c1"), "{lines:?}");
+        assert!(lines.iter().any(|line| line == "Sequence 1 #1"), "{lines:?}");
+        assert_eq!(lines.last().map(String::as_str), Some("Fighters  Pikachu → Mario"), "{lines:?}");
         assert!(!frame.help[0].string_lossy().contains("CONNECTIONS"), "the help keeps its own lines");
+    }
+
+    /// Primary 2026-11-08 15:55Z, the r8 pop-up as drawn (`RECORDING-REDESIGN-r8-popup-combo.png`): the title
+    /// "Recording" with the L/R role tabs, each section header with its file count, CONNECTIONS as kind boxes in a tree,
+    /// and the r8 footer.
+    #[test]
+    fn the_popup_has_the_r8_title_counts_boxes_and_footer() {
+        use crate::model::menu::table::COMBOS_SEQ;
+        use crate::model::recording_menu::{ConnKind, Face, FileTag};
+        let mut menu = recording_menu_with_files();
+        menu.recording_mut().toggle_popup();
+        menu.recording_mut().press_popup(Button::ZR);
+        menu.recording_mut().set_cursor(Face::Popup, COMBOS_SEQ, 1, 1);
+        let mut frame = Frame::new();
+        page_frame(&menu, &mut frame);
+        assert_eq!(frame.crumb.string_lossy(), "Recording");
+        assert_eq!(frame.role_tab, Some(0), "Player 1's tab is lit");
+        let labels: Vec<String> = (0..usize::from(frame.row_count)).map(|i| frame.rows[i].label.string_lossy()).collect();
+        assert!(labels.contains(&"SEQUENCES  (1)".to_string()) && labels.contains(&"COMBOS  (2)".to_string()), "{labels:?}");
+        assert_eq!(frame.conn_kind[0], ConnKind::Head(FileTag::Combo));
+        assert_eq!(frame.conn[0].string_lossy(), "c1");
+        assert_eq!(frame.conn_kind[1], ConnKind::Heading);
+        assert_eq!(frame.conn_kind[2], ConnKind::Child(FileTag::Sequence));
+        assert!(frame.hint.string_lossy().starts_with("A drill   Left/Right section"));
+        menu.recording_mut().press_popup(Button::R);
+        let mut frame = Frame::new();
+        page_frame(&menu, &mut frame);
+        assert_eq!(frame.role_tab, Some(1), "R lights the CPU's tab");
+        let mut page = Frame::new();
+        menu.recording_mut().toggle_popup();
+        page_frame(&menu, &mut page);
+        assert_eq!(page.role_tab, None, "the page has no role tabs in its title");
     }
 
     /// Eden rc6-covrec-diag3 `cov-popup-r8` (2026-11-08): the MACROS header's loop count "1" was hidden under the loop
@@ -1023,7 +1073,7 @@ mod tests {
             }
             let mut frame = Frame::new();
             page_frame(&menu, &mut frame);
-            let header = (0..usize::from(frame.row_count)).find(|i| frame.rows[*i].label.string_lossy() == "MACROS").expect("MACROS");
+            let header = (0..usize::from(frame.row_count)).find(|i| frame.rows[*i].label.string_lossy().starts_with("MACROS")).expect("MACROS");
             let count = frame.rows[header].value.string_lossy();
             assert!(!count.is_empty(), "the header carries the loop count");
             let icon = frame.icons[super::super::panes::FLOPPIES + 1];
