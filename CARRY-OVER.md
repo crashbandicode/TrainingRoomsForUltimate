@@ -971,3 +971,10 @@ carried); `carry_pkg6.py verify` re-derives all 250 files. Tests (failed first a
 configuration unchanged): `mii_install` `a_replay_mii_installs_the_saved_mii_with_the_same_look`,
 `a_replay_mii_with_no_saved_twin_gets_a_create_id_and_the_new_mii_name`,
 `a_mii_with_its_own_create_id_and_name_is_installed_as_it_is`, `the_cpu_install_writes_the_installable_configuration`.
+
+### p23/rc6-cov-rest: the clip editor's question owns Player 1's presses (#68; 2026-11-08)
+
+`66a9a53` added one guard to the package-4 file `replay_capture.rs` (`on_input` returns while the clip editor's
+Fighter Mismatch question is up; Eden covrest-yoga-01: Down and A went to the editor instead of the question). The
+edit is recorded in `docs/provenance/pkg4-carry-manifest.json` (edit 59); `carry_pkg4.py carry`, `ledger`, `verify`
+(40 files against stage m5q, and dest-only) pass.
