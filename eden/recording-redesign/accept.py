@@ -226,6 +226,33 @@ def acc_cpu_menu(ctx):
     return out
 
 
+def _orange_cells(shot):
+    """Floppy-orange pixels ([242, 152, 72], `recording_menu::SAVE_ON`) in the first row band of a file
+    screen, right half (the value column), scaled from the 1280x720 frame to the shot's size."""
+    from PIL import Image
+    with Image.open(shot) as image:
+        width, height = image.size
+        box = (int(width * 0.45), int(height * 125 / 720), width, int(height * 180 / 720))
+        pixels = list(image.convert('RGB').crop(box).getdata())
+    return sum(1 for r, g, b in pixels if abs(r - 242) < 45 and abs(g - 152) < 45 and abs(b - 72) < 45)
+
+
+def acc_floppy(ctx):
+    """A macro's own screen shows the orange floppy on its Start save row (RECORDING-REDESIGN floppy chip)."""
+    prep(ctx, 'play-warp')
+    _, title = steps.open_library_item(ctx, True, 0)
+    time.sleep(0.8)
+    shot = ctx.shot('file-screen')
+    orange = _orange_cells(shot)
+    steps.press(ctx, 'b', 0.6)
+    steps.close_menu(ctx)
+    out = {'title': title, 'orange_cells': orange, 'shot': str(shot)}
+    steps.save(ctx, 'floppy', out)
+    if title != 'Start save' or orange < 30:
+        raise RuntimeError('no floppy on the Start save row (title %r, orange %d): %s' % (title, orange, shot))
+    return out
+
+
 def acc_loop(ctx):
     """Loop 2 on Player 1, raised with X on the macro row; two passes, one warp.
 

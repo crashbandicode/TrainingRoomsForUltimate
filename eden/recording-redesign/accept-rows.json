@@ -255,6 +255,23 @@
       "start_gate": "training-hud-unpaused"
     },
     {
+      "id": "acc-floppy",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "run": "accept.py:acc_floppy",
+          "check": true,
+          "on": "diag"
+        }
+      ],
+      "expect": "A macro's own screen: the Start save row shows the orange floppy before the start save's name.",
+      "timed": false,
+      "build": "diag",
+      "on": "diag",
+      "start_gate": "training-hud-unpaused"
+    },
+    {
       "id": "acc-loop",
       "start": "training",
       "end": "training",

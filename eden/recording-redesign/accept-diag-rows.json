@@ -2,7 +2,7 @@
   "game_id": "01006A800016E000",
   "start": "boot",
   "early_stop": false,
-  "scope": "rc.5 diag window, one instance. Generated from accept-rows.json (acc-boot, acc-cpu-menu, acc-play-cpu, acc-loop, acc-grade).",
+  "scope": "rc.5 diag window, one instance. Generated from accept-rows.json (acc-boot, acc-cpu-menu, acc-floppy, acc-play-cpu, acc-loop, acc-grade).",
   "setup": [
     {
       "state": "Training, both fighters Mario, menu closed, volume 0. Each row copies its own fixture.",
@@ -178,6 +178,23 @@
         }
       ],
       "expect": "CPU macro set through the menu (CPU view, record chord, jab); Play on CPU makes the CPU perform the jab: attack cells in the strip's CPU lane, shots, trace counters.",
+      "timed": false,
+      "build": "diag",
+      "on": "diag",
+      "start_gate": "training-hud-unpaused"
+    },
+    {
+      "id": "acc-floppy",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "run": "accept.py:acc_floppy",
+          "check": true,
+          "on": "diag"
+        }
+      ],
+      "expect": "A macro's own screen: the Start save row shows the orange floppy before the start save's name.",
       "timed": false,
       "build": "diag",
       "on": "diag",
