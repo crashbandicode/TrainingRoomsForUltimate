@@ -928,7 +928,7 @@ mod tests {
             recorded_on: "Mario".into(),
             span: 25,
         };
-        let combo = |id: &str| ComboFile { id: id.into(), name: id.into(), made_from: None, links: Vec::new(), span: 1 };
+        let combo = |id: &str| ComboFile { id: id.into(), name: id.into(), recorded_on: String::new(), made_from: None, links: Vec::new(), span: 1 };
         let sequence = SequenceFile { id: "q1".into(), name: "Sequence 1".into(), combos: vec!["c1".into()], streak: 0, best: 0 };
         menu.recording_mut().set_catalog(Catalog {
             saves: vec![save],

@@ -79,7 +79,7 @@ An empty chain plays nothing. A chain whose recordings have all been deleted pla
 
 ## Combos
 
-Save last combo, on today's Recording › Combos row, keeps the last combo the frame strip saw and makes it the drill. The file is the combo's links and the input events of each follow-up: presses, releases, the C-stick, and the stick flicks (fast-fall, dash, tap-jump). Make combo records the same events, because it plays into the same strip. Any fighter can practise it. The format is in [COMBOS.md](COMBOS.md).
+*+ Save last combo…*, the first row of COMBOS on the Recording page and in the pop-up's Combos & Sequences tab, keeps the last combo the frame strip saw and makes it the drill. A opens the keyboard for its name; an empty name, or a room where no keyboard can open, gives it the next Combo N name. With no link on the strip yet it says so and writes nothing. The file is the combo's links and the input events of each follow-up: presses, releases, the C-stick, and the stick flicks (fast-fall, dash, tap-jump). Make combo records the same events, because it plays into the same strip. Any fighter can practise it. The format is in [COMBOS.md](COMBOS.md).
 
 A combo counts when its recorded input events are there, the same kind and the same facing-relative direction, in order, and within the on-time tolerance, and the move that comes out is the recorded move. TRUE is not required. A link that is not a true combo still counts. TRUE stays on the helper bar as information. Drift is the held stick between those events. It is shown and it is not graded.
 

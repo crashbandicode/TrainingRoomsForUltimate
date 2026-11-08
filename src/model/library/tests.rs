@@ -712,6 +712,7 @@ fn ordered_catalog() -> crate::model::recording_menu::Catalog {
         combos: vec![ComboFile {
             id: "c1".into(),
             name: "One".into(),
+            recorded_on: String::new(),
             made_from: None,
             links: Vec::new(),
             span: 0,

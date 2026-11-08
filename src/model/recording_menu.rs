@@ -146,6 +146,8 @@ pub enum Effect {
     RenameChain { id: String, name: String },
     RenameCombo { id: String, name: String },
     RenameSequence { id: String, name: String },
+    /// *+ Save last combo…*: the host saves the strip's latest exchange under `name` (empty: Combo N) and drills it.
+    SaveLastCombo { name: String },
 }
 
 /// One named save in the snapshot the host loaded.
@@ -175,6 +177,8 @@ pub struct MacroFile {
 pub struct ComboFile {
     pub id: String,
     pub name: String,
+    /// The fighter the file says it was recorded on (empty: not recorded).
+    pub recorded_on: String,
     pub made_from: Option<String>,
     pub links: Vec<String>,
     /// Real links in the combo file. The crop handles step this, not the display lines.
@@ -271,6 +275,15 @@ enum ItemKind {
     Sequence,
     NewChain,
     NewSequence,
+    /// *+ Save last combo…*, the first row of COMBOS (operator 2026-11-08).
+    SaveLastCombo,
+}
+
+impl ItemKind {
+    /// A row that does something instead of naming a file.
+    const fn action(self) -> bool {
+        matches!(self, ItemKind::NewChain | ItemKind::NewSequence | ItemKind::SaveLastCombo)
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -324,6 +337,7 @@ enum KeyKind {
     RenameSequence,
     NewChain,
     NewSequence,
+    SaveLastCombo,
 }
 
 #[derive(Clone, Debug)]
@@ -783,11 +797,13 @@ impl RecordingScreens {
             }
             KeyKind::NewChain => self.create_chain(&keyboard.ids, trimmed),
             KeyKind::NewSequence => self.create_sequence(&keyboard.ids, trimmed),
+            KeyKind::SaveLastCombo => self.last_effect = Effect::SaveLastCombo { name: trimmed.to_string() },
         }
         if !matches!(
             self.last_effect,
             Effect::WriteChain { .. }
                 | Effect::WriteSequence { .. }
+                | Effect::SaveLastCombo { .. }
                 | Effect::RenameSave { .. }
                 | Effect::RenameMacro { .. }
                 | Effect::RenameChain { .. }
@@ -912,6 +928,10 @@ impl RecordingScreens {
             (Face::Popup, ItemKind::NewSequence) => self.open_picker(PickerKind::NewSequence, Face::Popup, None),
             (Face::Page, ItemKind::NewChain) => self.open_picker(PickerKind::NewChain, Face::Page, None),
             (Face::Page, ItemKind::NewSequence) => self.open_picker(PickerKind::NewSequence, Face::Page, None),
+            (face, ItemKind::SaveLastCombo) => {
+                self.overlay_face = face;
+                self.open_keyboard(KeyKind::SaveLastCombo, "Name combo", Vec::new());
+            }
             (Face::Page, kind) => self.open_file(item.id, kind),
         }
     }
@@ -1164,7 +1184,7 @@ impl RecordingScreens {
             ItemKind::Recording => (KeyKind::RenameMacro, "Name macro"),
             ItemKind::Combo => (KeyKind::RenameCombo, "Name combo"),
             ItemKind::Sequence => (KeyKind::RenameSequence, "Name sequence"),
-            ItemKind::NewChain | ItemKind::NewSequence => return,
+            ItemKind::NewChain | ItemKind::NewSequence | ItemKind::SaveLastCombo => return,
         };
         let previous = self.item_name(&Item { kind, id: id.to_string() });
         self.keyboard = Some(Keyboard { kind: key, ids: Vec::new(), target: Some(id.to_string()) });
@@ -1184,7 +1204,7 @@ impl RecordingScreens {
             KeyKind::RenameChain => Effect::RenameChain { id: id.to_string(), name: name.to_string() },
             KeyKind::RenameCombo => Effect::RenameCombo { id: id.to_string(), name: name.to_string() },
             KeyKind::RenameSequence => Effect::RenameSequence { id: id.to_string(), name: name.to_string() },
-            KeyKind::NewChain | KeyKind::NewSequence => Effect::None,
+            KeyKind::NewChain | KeyKind::NewSequence | KeyKind::SaveLastCombo => Effect::None,
         };
     }
 
@@ -1363,10 +1383,13 @@ impl RecordingScreens {
             rows.push(Item { kind: ItemKind::NewSequence, id: String::new() });
             return rows;
         }
-        self.ordered(&self.catalog.combos, &self.catalog.hot_combos, |file| &file.id, |file| &file.name)
-            .into_iter()
-            .map(|file| Item { kind: ItemKind::Combo, id: file.id.clone() })
-            .collect()
+        let mut rows = vec![Item { kind: ItemKind::SaveLastCombo, id: String::new() }];
+        rows.extend(
+            self.ordered(&self.catalog.combos, &self.catalog.hot_combos, |file| &file.id, |file| &file.name)
+                .into_iter()
+                .map(|file| Item { kind: ItemKind::Combo, id: file.id.clone() }),
+        );
+        rows
     }
 
     fn ordered<'a, T>(&'a self, files: &'a [T], hot: &[String], id: impl Fn(&T) -> &str, name: impl Fn(&T) -> &str) -> Vec<&'a T> {
@@ -1387,7 +1410,9 @@ impl RecordingScreens {
 
     fn section_view(&self, face: Face, group: u8, section: u8) -> SectionView {
         let items = self.items(group, section);
-        let file_count = items.iter().filter(|item| !matches!(item.kind, ItemKind::NewChain | ItemKind::NewSequence)).count();
+        let file_count = items.iter().filter(|item| !item.kind.action()).count();
+        // Action rows that head the list (+ Save last combo…): the hot marks and the hairline count files only.
+        let lead = items.iter().take_while(|item| item.kind.action()).count();
         let place = self.place(face, group);
         let cursor = place.at[usize::from(section)];
         let focused = self.focused(face, group);
@@ -1396,20 +1421,23 @@ impl RecordingScreens {
         let rows = items
             .iter()
             .enumerate()
-            .map(|(index, item)| self.row_mark(item, index, cursor == index && place.section == section, file_count, focused.as_ref(), role))
+            .map(|(index, item)| {
+                let file_index = index.saturating_sub(lead);
+                self.row_mark(item, file_index, cursor == index && place.section == section, file_count, focused.as_ref(), role)
+            })
             .collect();
         SectionView {
             header,
             header_floppy: (header == "SAVE STATES").then_some(Floppy::On),
             header_loop: (header == "MACROS").then_some(self.loop_of(role)),
-            hairline_after: (file_count > 5).then_some(5),
+            hairline_after: (file_count > 5).then_some(5 + lead),
             rows,
             cursor,
         }
     }
 
     fn row_mark(&self, item: &Item, index: usize, cursor: bool, file_count: usize, focused: Option<&Item>, role: ViewRole) -> RowMark {
-        let hot = !matches!(item.kind, ItemKind::NewChain | ItemKind::NewSequence) && index < 5 && file_count > 0 && self.is_hot(item);
+        let hot = !item.kind.action() && index < 5 && file_count > 0 && self.is_hot(item);
         RowMark {
             name: self.item_name(item),
             green: self.is_green(item, role),
@@ -1427,7 +1455,7 @@ impl RecordingScreens {
             ItemKind::Recording => &self.catalog.hot_macros,
             ItemKind::Combo => &self.catalog.hot_combos,
             ItemKind::Sequence => &self.catalog.hot_sequences,
-            ItemKind::NewChain | ItemKind::NewSequence => return false,
+            ItemKind::NewChain | ItemKind::NewSequence | ItemKind::SaveLastCombo => return false,
         };
         hot.iter().take(5).any(|id| id == &item.id)
     }
@@ -1437,7 +1465,7 @@ impl RecordingScreens {
             ItemKind::Save => self.bound.as_deref() == Some(item.id.as_str()),
             ItemKind::Recording => self.active[role.index()].as_deref() == Some(item.id.as_str()),
             ItemKind::Combo | ItemKind::Sequence => self.drill.as_deref() == Some(item.id.as_str()),
-            ItemKind::NewChain | ItemKind::NewSequence => false,
+            ItemKind::NewChain | ItemKind::NewSequence | ItemKind::SaveLastCombo => false,
         }
     }
 
@@ -1477,6 +1505,7 @@ impl RecordingScreens {
         match item.kind {
             ItemKind::NewChain => "+ New chain".to_string(),
             ItemKind::NewSequence => "+ New sequence".to_string(),
+            ItemKind::SaveLastCombo => "+ Save last combo…".to_string(),
             kind => self.slot_name(kind, &item.id).unwrap_or_default(),
         }
     }
@@ -1487,7 +1516,7 @@ impl RecordingScreens {
             ItemKind::Recording => self.macro_by_id(id).map(|file| file.name.clone()),
             ItemKind::Combo => self.catalog.combos.iter().find(|file| file.id == id).map(|file| file.name.clone()),
             ItemKind::Sequence => self.catalog.sequences.iter().find(|file| file.id == id).map(|file| file.name.clone()),
-            ItemKind::NewChain | ItemKind::NewSequence => None,
+            ItemKind::NewChain | ItemKind::NewSequence | ItemKind::SaveLastCombo => None,
         }
     }
 
@@ -1513,7 +1542,7 @@ impl RecordingScreens {
                     file.name = name.to_string();
                 }
             }
-            ItemKind::NewChain | ItemKind::NewSequence => {}
+            ItemKind::NewChain | ItemKind::NewSequence | ItemKind::SaveLastCombo => {}
         }
     }
 
@@ -1523,7 +1552,7 @@ impl RecordingScreens {
             ItemKind::Recording => self.catalog.macros.retain(|file| file.id != id),
             ItemKind::Combo => self.catalog.combos.retain(|file| file.id != id),
             ItemKind::Sequence => self.catalog.sequences.retain(|file| file.id != id),
-            ItemKind::NewChain | ItemKind::NewSequence => {}
+            ItemKind::NewChain | ItemKind::NewSequence | ItemKind::SaveLastCombo => {}
         }
     }
 
@@ -1536,6 +1565,10 @@ impl RecordingScreens {
             ItemKind::Sequence => self.sequence_lines(&item.id),
             ItemKind::NewChain => vec![ConnLine { text: "A new chain".to_string(), floppy: None }],
             ItemKind::NewSequence => vec![ConnLine { text: "A new sequence".to_string(), floppy: None }],
+            ItemKind::SaveLastCombo => vec![ConnLine {
+                text: "Saves the strip's latest exchange as a combo and drills it. A names it.".to_string(),
+                floppy: None,
+            }],
         }
     }
 
@@ -1601,6 +1634,10 @@ impl RecordingScreens {
     fn combo_lines(&self, id: &str) -> Vec<ConnLine> {
         let Some(combo) = self.catalog.combos.iter().find(|file| file.id == id) else { return Vec::new() };
         let mut lines = Vec::new();
+        // First: the help joins these lines into one, and a long list of links must not push the fighter out (#49).
+        if !combo.recorded_on.is_empty() {
+            lines.push(ConnLine { text: format!("Recorded on {}", combo.recorded_on), floppy: None });
+        }
         if let Some(source) = combo.made_from.as_ref().and_then(|id| self.macro_by_id(id).map(|file| file.name.clone())) {
             lines.push(ConnLine { text: format!("from {source}"), floppy: None });
         }
@@ -1635,7 +1672,7 @@ impl RecordingScreens {
             ItemKind::Recording => self.macro_file_rows(id),
             ItemKind::Combo => self.combo_file_rows(id),
             ItemKind::Sequence => self.sequence_file_rows(id),
-            ItemKind::NewChain | ItemKind::NewSequence => Vec::new(),
+            ItemKind::NewChain | ItemKind::NewSequence | ItemKind::SaveLastCombo => Vec::new(),
         }
     }
 
@@ -1788,7 +1825,7 @@ fn item_kind_of(kind: KeyKind) -> Option<ItemKind> {
         KeyKind::RenameMacro | KeyKind::RenameChain => Some(ItemKind::Recording),
         KeyKind::RenameCombo => Some(ItemKind::Combo),
         KeyKind::RenameSequence => Some(ItemKind::Sequence),
-        KeyKind::NewChain | KeyKind::NewSequence => None,
+        KeyKind::NewChain | KeyKind::NewSequence | KeyKind::SaveLastCombo => None,
     }
 }
 
@@ -1993,6 +2030,7 @@ mod tests {
             combos: vec![ComboFile {
                 id: "nairc".into(),
                 name: "Nair loop combo".into(),
+                recorded_on: String::new(),
                 made_from: Some("nair".into()),
                 links: combo_link_lines(&Combo::from_links([link(Move::Aerial, Move::Aerial, true)]).unwrap()),
                 span: 1,
@@ -2351,7 +2389,8 @@ mod tests {
         assert_eq!(lines[0], "L1 aerial → aerial TRUE");
         let mut screens = screens();
         screens.set_links("nairc", lines);
-        screens.set_cursor(Face::Page, COMBOS_SEQ, 1, 0);
+        // Row 0 of COMBOS is + Save last combo…; the combo is row 1.
+        screens.set_cursor(Face::Page, COMBOS_SEQ, 1, 1);
         let panel = screens.connections(Face::Page, COMBOS_SEQ);
         assert!(panel.iter().any(|line| line.text == "L1 aerial → aerial TRUE"));
     }
@@ -2382,7 +2421,8 @@ mod tests {
         assert_eq!(lines[5], "drift ←");
         let mut screens = screens();
         screens.set_links("nairc", lines);
-        screens.set_cursor(Face::Page, COMBOS_SEQ, 1, 0);
+        // Row 0 of COMBOS is + Save last combo…; the combo is row 1.
+        screens.set_cursor(Face::Page, COMBOS_SEQ, 1, 1);
         let panel = screens.connections(Face::Page, COMBOS_SEQ);
         let text: Vec<&str> = panel.iter().map(|line| line.text.as_str()).collect();
         assert!(text.contains(&"jump · release · ↓ flick · A"));
@@ -2578,5 +2618,66 @@ mod tests {
         let titles: Vec<_> = GROUPS.iter().filter(|group| group.page == Page::Recording).map(|group| group.title).collect();
         assert_eq!(titles, ["Save states & Macros", "Combos & Sequences", "Replays", "Options"]);
         assert!(matches!(ROWS.iter().find(|row| row.id == "playback_loop").unwrap().control, Control::Dropdown(labels) if labels.len() == 6));
+    }
+
+    /// Operator 2026-11-08 (primary inbox 13:08Z): "+ Save last combo…" heads the COMBOS list on the Recording page and in
+    /// the pop-up's Combos & Sequences tab. A opens the keyboard titled for a combo; the combos keep their hot marks.
+    #[test]
+    fn save_last_combo_heads_the_combos_list_and_opens_the_keyboard() {
+        for face in [Face::Page, Face::Popup] {
+            let mut screens = screens();
+            if face == Face::Popup {
+                open_popup(&mut screens);
+                screens.press_popup(Button::ZR);
+            }
+            let combos = screens.section(face, COMBOS_SEQ, 1);
+            assert_eq!(combos.rows[0].name, "+ Save last combo…", "{face:?}");
+            assert!(!combos.rows[0].hot && !combos.rows[0].green);
+            assert_eq!(combos.rows[1].name, "Nair loop combo");
+            assert!(combos.rows[1].hot, "a hot combo stays hot under the new row");
+            screens.set_cursor(face, COMBOS_SEQ, 1, 0);
+            let lines = screens.connections(face, COMBOS_SEQ);
+            assert!(lines.iter().any(|line| line.text.contains("latest exchange")), "{lines:?}");
+            match face {
+                Face::Page => {
+                    screens.handle_page(Button::A, true, COMBOS_SEQ);
+                }
+                Face::Popup => screens.press_popup(Button::A),
+            }
+            assert_eq!(screens.take_effect(), Effect::Keyboard { header: "Name combo", draft: String::new() }, "{face:?}");
+        }
+    }
+
+    /// #49 in rc.6 terms: the COMBOS list replaces Saved combos, so a combo's CONNECTIONS name the fighter it was recorded
+    /// on, first, as a macro's do (rc.5 fixes2 footer; r8 mockup "Fighters"). The help joins its lines into one, so the
+    /// fighter leads and a long list of links cannot push it out.
+    #[test]
+    fn a_combos_connections_name_its_recorded_fighter_first() {
+        let mut screens = screens();
+        let mut catalog = example();
+        catalog.combos[0].recorded_on = "Luigi".into();
+        screens.set_catalog(catalog);
+        screens.set_cursor(Face::Page, COMBOS_SEQ, 1, 1);
+        let lines = screens.connections(Face::Page, COMBOS_SEQ);
+        assert_eq!(lines.first().map(|line| line.text.as_str()), Some("Recorded on Luigi"), "{lines:?}");
+    }
+
+    /// The typed name goes to the host with the save; an empty name lets the host pick Combo N. Where no keyboard can
+    /// open (an online room), A saves at once under Combo N.
+    #[test]
+    fn save_last_combo_posts_the_typed_name_or_combo_n() {
+        let mut screens = screens();
+        screens.set_cursor(Face::Page, COMBOS_SEQ, 1, 0);
+        screens.handle_page(Button::A, true, COMBOS_SEQ);
+        let _ = screens.take_effect();
+        screens.submit_name("  Ryu BnB ");
+        assert_eq!(screens.take_effect(), Effect::SaveLastCombo { name: "Ryu BnB".into() });
+        screens.handle_page(Button::A, true, COMBOS_SEQ);
+        let _ = screens.take_effect();
+        screens.submit_name("");
+        assert_eq!(screens.take_effect(), Effect::SaveLastCombo { name: String::new() });
+        screens.set_keyboard_blocked(true);
+        screens.handle_page(Button::A, true, COMBOS_SEQ);
+        assert_eq!(screens.take_effect(), Effect::SaveLastCombo { name: String::new() });
     }
 }

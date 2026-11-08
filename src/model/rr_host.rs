@@ -929,6 +929,23 @@ fn apply_menu(root: &Path, machine: &mut Playback, book: &Book, online: bool, ti
         Effect::RenameChain { id, name } => rename_chain(root, &id, name),
         Effect::RenameCombo { id, name } => rename_combo(root, &id, name),
         Effect::RenameSequence { id, name } => rename_sequence(root, &id, name),
+        Effect::SaveLastCombo { name } => save_last_combo(root, &name, tick),
+    }
+}
+
+/// *+ Save last combo…* (operator 2026-11-08; rc.4 COMBO-HELPER): the strip's latest exchange becomes a combo file
+/// named `name` (empty: Combo N), recorded on Player 1's fighter, hot, and the drill (RECORDING.md).
+fn save_last_combo(root: &Path, name: &str, tick: &mut Tick) {
+    let Some(combo) = lock(&STRIP).1.filter(|combo| !combo.is_empty()) else {
+        tick.notices.push(EMPTY_COMBO);
+        tick.diags.push("screen=notice kind=combo-empty".to_string());
+        return;
+    };
+    let label = lock(&PLAYER_LABEL).clone();
+    let recorded_on = (!label.is_empty()).then_some(label);
+    if let Ok(id) = super::rr_runtime::save_last_combo(root, &combo, name, recorded_on, unix_now()) {
+        tick.diags.push(format!("screen=save-last-combo saved={id} links={}", combo.len()));
+        bump_catalog();
     }
 }
 
@@ -2079,6 +2096,41 @@ mod tests {
         assert!(done.diags.iter().any(|line| line == "screen=notice kind=combo-empty"), "{:?}", done.diags);
         assert!(done.diags.iter().all(|line| !line.contains("saved=1")));
         assert!(crate::model::combo_record::ComboLibrary::new(root.join("combos")).list().unwrap().entries.is_empty());
+    }
+
+    /// Operator 2026-11-08 (primary inbox 13:08Z): *+ Save last combo…* saves the latest exchange as a combo file, as
+    /// rc.4's COMBO-HELPER did (`combos/<id>.json` on the generic store): named as typed or Combo N, recorded on Player
+    /// 1's fighter, hot, and the drill (RECORDING.md). With no link on the strip it says so and writes nothing.
+    #[test]
+    fn save_last_combo_writes_the_latest_exchange_names_it_and_drills_it() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("save-last");
+        let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        set_fighter_label("Mario");
+        let combos = crate::model::combo_record::ComboLibrary::new(root.join("combos"));
+        set_strip_sample((0, None));
+        post_effect(Effect::SaveLastCombo { name: String::new() });
+        let empty = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        assert!(empty.diags.iter().any(|line| line == "screen=notice kind=combo-empty"), "{:?}", empty.diags);
+        assert!(empty.notices.contains(&EMPTY_COMBO));
+        assert!(combos.list().map(|listed| listed.entries.is_empty()).unwrap_or(true));
+        set_strip_sample((3, Some(sample_combo())));
+        post_effect(Effect::SaveLastCombo { name: "Ryu BnB".into() });
+        let saved = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        assert!(saved.diags.iter().any(|line| line.starts_with("screen=save-last-combo saved=")), "{:?}", saved.diags);
+        let listed = combos.list().unwrap();
+        assert_eq!(listed.entries.len(), 1);
+        let id = listed.entries[0].id.clone();
+        let file = combos.load(&id).unwrap();
+        assert_eq!((file.name.as_str(), file.combo, file.recorded_on.as_deref()), ("Ryu BnB", sample_combo(), Some("Mario")));
+        let index = RecordingIndex::load(&root).unwrap();
+        assert_eq!(index.drill().map(|drill| (drill.kind, drill.id.as_str())), Some((DrillKind::Combo, id.as_str())));
+        assert_eq!(index.hot(Kind::Combo).first(), Some(&id));
+        post_effect(Effect::SaveLastCombo { name: String::new() });
+        let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        let names: Vec<String> = combos.list().unwrap().entries.into_iter().map(|entry| entry.name).collect();
+        assert!(names.iter().any(|name| name == "Combo 1"), "{names:?}");
     }
 
     #[test]

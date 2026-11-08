@@ -13,7 +13,7 @@ use super::macros::{
 };
 use super::playback::{Book, Playback};
 use crate::model::combo::{Combo, LinkRec};
-use crate::model::combo_record::{default_name, ComboLibrary, ComboRecord};
+use crate::model::combo_record::{clean_name, default_name, ComboLibrary, ComboRecord};
 use crate::model::state::record::SavedState;
 use crate::model::store::Store;
 
@@ -387,6 +387,22 @@ pub fn save_made_combo(root: &Path, combo: &Combo, source: &str, at: u64) -> Res
     Ok(id)
 }
 
+/// *+ Save last combo…* (operator 2026-11-08; rc.4 COMBO-HELPER): the strip's latest exchange, named `name` (empty:
+/// Combo N), recorded on Player 1's fighter, hot, and the drill (RECORDING.md: "makes it the drill").
+pub fn save_last_combo(root: &Path, combo: &Combo, name: &str, recorded_on: Option<String>, at: u64) -> Result<String, Error> {
+    let library = ComboLibrary::new(root.join("combos"));
+    let name = match clean_name(name) {
+        Some(name) => name,
+        None => default_name(&library.list().map_err(record)?.entries),
+    };
+    let id = library.save_new(&ComboRecord::new(name, *combo, recorded_on)).map_err(record)?;
+    let mut index = RecordingIndex::load(root)?;
+    index.note_use(Kind::Combo, &id, Use::Recorded, at)?;
+    index.set_drill(Some(super::library::Drill { kind: super::library::DrillKind::Combo, id: id.clone() }), at)?;
+    index.save(root)?;
+    Ok(id)
+}
+
 /// One Player pass from the chain's start save. The drill id is not written.
 pub fn make_combo(book: &Book) -> MakeComboPass {
     let drill = book.index.drill().cloned();
@@ -593,6 +609,7 @@ pub fn load_catalog(root: &Path) -> Result<CatalogLoad, Error> {
             catalog.combos.push(ComboFile {
                 id: entry.id,
                 name: entry.name,
+                recorded_on: record.as_ref().and_then(|file| file.recorded_on.clone()).unwrap_or_default(),
                 made_from: record.and_then(|file| file.made_from),
                 links,
                 span: entry.links as u32,
@@ -1189,6 +1206,7 @@ mod tests {
             combos: vec![ComboFile {
                 id: "c1".into(),
                 name: "One".into(),
+                recorded_on: String::new(),
                 made_from: None,
                 links: Vec::new(),
                 span: 0,
