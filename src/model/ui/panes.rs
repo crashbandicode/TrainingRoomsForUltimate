@@ -193,15 +193,14 @@ pub const fn row_label_left(popup: bool) -> f32 {
     if popup { POP_ROW_LEFT + POP_LABEL_INSET } else { ROW_LEFT }
 }
 
-pub const POP_LABEL_INSET: f32 = 24.0;
+/// Room for the order badge, and for a section header's mark, before the names (r8: the names start past both).
+pub const POP_LABEL_INSET: f32 = 42.0;
 /// The pop-up's red order badges (RECORDING-REDESIGN.md "Red number, at the row's left edge"), one per list row of the
 /// two sections (four rows each).
 pub const BADGES: usize = 8;
-pub const BADGE_W: f32 = 22.0;
-pub const BADGE_X: f32 = POP_ROW_LEFT + 12.0;
-/// A pop-up section header's name moves right of its kind's mark (the floppy, or a square).
-pub const HEAD_INSET: f32 = 20.0;
-pub const HEAD_MARK_X: f32 = POP_ROW_LEFT + 18.0;
+pub const BADGE_W: f32 = 24.0;
+pub const BADGE_X: f32 = POP_ROW_LEFT + 20.0;
+pub const HEAD_MARK_X: f32 = POP_ROW_LEFT + 20.0;
 pub const HEAD_SQ: f32 = 16.0;
 /// The r8 kind colours: the CONNECTIONS pills and the section headers' squares.
 pub const KIND_SAVE: [u8; 4] = [240, 150, 60, 255];
@@ -1157,7 +1156,7 @@ mod tests {
         assert!(row_label_left(false) + row_label_w(false) <= ROW_RIGHT - row_value_w(false) + 1.0, "the page is unchanged");
         // A badge sits at the row's left edge, before the name; a header's mark sits before the header's name.
         const { assert!(BADGE_X + BADGE_W / 2.0 <= POP_ROW_LEFT + POP_LABEL_INSET && BADGE_X - BADGE_W / 2.0 >= POP_ROW_LEFT) };
-        const { assert!(HEAD_MARK_X + 14.0 <= POP_ROW_LEFT + POP_LABEL_INSET + HEAD_INSET && HEAD_MARK_X - 14.0 >= POP_ROW_LEFT) };
+        const { assert!(HEAD_MARK_X + 14.0 <= POP_ROW_LEFT + POP_LABEL_INSET && HEAD_MARK_X - 14.0 >= POP_ROW_LEFT) };
         for index in [IDX_HEAD_SQ, IDX_BADGE, IDX_BADGE_NUM] {
             assert!(!spec(index).visible, "{:?} is hidden until drawn", spec(index).name);
         }

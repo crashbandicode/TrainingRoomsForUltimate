@@ -84,8 +84,9 @@ impl Panes {
             self.text(index, units, if active { p::TEXT } else { p::TEXT_DIM });
             self.at(index, left + p::TAB_BOX_W / 2.0, tab_y);
             if frame.tab_boxes {
-                // r8: each page tab is an outlined box, the active one green on a lighter fill.
-                let (x, w, h) = (left + width / 2.0, width + 36.0, p::TAB_H - 8.0);
+                // r8: each page tab is an outlined box, the active one green on a lighter fill. `width` is an estimate
+                // for a proportional font, so the box leaves more room after the text than before it.
+                let (x, w, h) = (left + width / 2.0 + 8.0, width + 56.0, p::TAB_H - 8.0);
                 if active {
                     self.rect_at(p::IDX_TAB_HI, x, tab_y, w, h, p::BAND);
                 }
@@ -95,7 +96,7 @@ impl Panes {
             } else if active {
                 self.rect_at(p::IDX_TAB_HI, left + width / 2.0, tab_y, width + 36.0, p::TAB_H, p::ACCENT);
             }
-            left += width + 64.0;
+            left += width + if frame.tab_boxes { 84.0 } else { 64.0 };
         }
         for i in 0..p::TAB_BOXES {
             if !frame.tab_boxes || i >= usize::from(frame.tab_count) {
@@ -146,9 +147,6 @@ impl Panes {
             if list && i < usize::from(frame.row_count) {
                 let row = &frame.rows[i];
                 let rise = if sub { p::SUB_RISE } else { 0.0 };
-                // A pop-up header's name sits right of its kind's mark.
-                let inset = if frame.band[i] { p::HEAD_INSET } else { 0.0 };
-                let (label_left, label_w) = (label_left + inset, label_w - inset);
                 self.place(p::row_label_index(i), label_left + label_w / 2.0, p::row_y(i) + rise, label_w);
                 self.place(p::row_value_index(i), right - value_w / 2.0, p::row_y(i) - p::VALUE_DROP + rise, value_w);
                 self.text(p::row_label_index(i), row.label.units(), tone_color(row.label_tone));

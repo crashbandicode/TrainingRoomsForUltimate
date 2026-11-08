@@ -78,9 +78,9 @@ Current recipes (rebuilt 2026-11-08 from the pane table with the r8 recording po
 
 | File | SHA-256 | Bytes | Stock archive it applies to |
 | --- | --- | ---: | --- |
-| `assets/info_training.tra1` | `8e687f08908244968634b3e13adbae92ccc6ba8e25063231ad005d5f8b3ebd73` | 370,381 | `info_training.arc` 451,604 B, SHA-256 `90a8dc81751efa9d4521f836be9ccf8a134cb24af9fb5b195211e58203f9317c`, FNV-1a `8833748e9518a461` (`runtime/ui/probe.rs:91`); target 938,900 B, fnv `8fd86329c0c8f21a` |
-| `assets/info_waiting.tra1` | `747593d08529f24c74741f7e7a0e9894f1078c7fdf331bb45f91775b672aec53` | 374,419 | `info_waiting.arc` 1,284,116 B, SHA-256 `7dcc45360bd84dadffcfe8b47771f5d6b40e44468c6a54cbd3dbb6b4142eea64`, fnv `f3d2cb3ec6a9f0de`; target 1,767,300 B, fnv `97f6778cbd14bf8f` |
-| `assets/panes-recipe.sha256` | `2311dca6de1ee003818c146f0896d472a4edc2162062545c32cb21b7cf9edcf2` (the digest) | | |
+| `assets/info_training.tra1` | `8eb17338284afe33750252511cb8eb9ea24c080fcc0fce05a4fbb42d964178fb` | 370,381 | `info_training.arc` 451,604 B, SHA-256 `90a8dc81751efa9d4521f836be9ccf8a134cb24af9fb5b195211e58203f9317c`, FNV-1a `8833748e9518a461` (`runtime/ui/probe.rs:91`); target 938,900 B, fnv `137737fbea889a32` |
+| `assets/info_waiting.tra1` | `67ae6b4f27a887436a90f971ea6d70276f0fbfa8b2ae0728140122142e88c8d3` | 374,419 | `info_waiting.arc` 1,284,116 B, SHA-256 `7dcc45360bd84dadffcfe8b47771f5d6b40e44468c6a54cbd3dbb6b4142eea64`, fnv `f3d2cb3ec6a9f0de`; target 1,767,300 B, fnv `f92bf9069df4af7f` |
+| `assets/panes-recipe.sha256` | `6884df5bb1f2c4752bb35f776809fff142dfbc7aa9d77f924068ba42c05547a0` (the digest) | | |
 
 Both recipes are embedded in every NRO (`runtime/ui/archive.rs`), so their size is resident size too (the 354 roster
 mark panes added about 33 KB to each).
