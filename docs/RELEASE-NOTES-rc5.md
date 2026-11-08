@@ -18,7 +18,8 @@ Holding one direction long enough can freeze the strip. A new binned direction, 
 
 - A save state only warps. Load does not start a recording. Auto-load on death only warps to the bound save, and it does nothing when none is bound.
 - Record follows the pop-up's role. It captures Player 1 until that role is CPU. Stopping writes a named macro and that macro's start save.
-- Each role has one active macro, a recording or a chain. Play on Player 1 and Play on CPU play that role's macro, or stop it if it is already playing.
+- Each role has one active macro, a recording or a chain. Play on Player 1 and Play on CPU play that role's macro, or stop it if it is already playing. A macro plays back frame for frame, on either role.
+- The chords' buttons do not reach the game while held, so Record and Play do not make Player 1 shield, and a recording does not contain the Record chord.
 - The loop never warps back. Later passes continue from where the fighters are.
 - A chain starts at its first macro's start save, plays its recordings in order, and cannot contain a chain.
 - Save last combo still saves the combo you landed. A drilled combo counts without having to be a true combo. A different move drops.
