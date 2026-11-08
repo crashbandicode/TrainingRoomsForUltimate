@@ -834,3 +834,17 @@ Mii helper as the CPU cycle's own Mii loads on entry 2 do.
 2 recorded manifest edits: `character_sources.rs` (`purpose_view`'s seat branch) and `cycle_preload.rs`
 (`set_fixed_members`); `carry_pkg6.py verify` re-derives all 250 files. Test (failed first: no `seat_load`):
 `parked_entries` `a_mii_seat_loads_with_its_member_configuration_or_not_at_all`.
+
+### p23/rc6-cov-rest: the first F9 raise shows the seats (2026-11-08)
+
+**F9 (#58), reading A (primary 16:04Z).** Eden covrest-07/08/09: the first raise after a scene start showed copies of
+CPU 1 on CPUs 2 and 3; the seats appeared only from the second raise. At one CPU `purpose_view`'s seat branch loaded a
+member on entry 2 or 3 only when the merged plan listed it with no configuration, and the body bank covered Donkey
+Kong. A parked, unborrowed seat now holds its member (kind and exact-Mii configuration, `parked_entries::parked_seat`)
+whether or not the plan lists it. The load is the same speculative helper load, so process-memory admission still
+holds it (`[ProcessMemory] refused … stays planned`, retried) when headroom refuses. Entry 3 while it holds the
+borrowed fifth hat is not a seat (unchanged); entry 2 no longer waits for that borrow.
+
+1 recorded manifest edit: `character_sources.rs` (`purpose_view`'s seat branch); `carry_pkg6.py verify` re-derives all
+250 files. Test (failed first: the seat branch did not call `parked_seat`):
+`parked_entries` `the_seats_park_at_one_cpu_whatever_the_plan_lists`.

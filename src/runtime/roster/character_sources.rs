@@ -548,14 +548,20 @@ fn purpose_view(state:&State,slot:usize,targets:[Option<Want>;crate::runtime::ro
         if matches!(slot, 2 | 3) && quantity.is_some_and(|count| slot as u32 <= count) {
             return [None; crate::runtime::roster::cycle_preload::MAX_TARGETS];
         }
-        if matches!(slot, 2 | 3) && record.is_none() {
-            if let Some(kind) = crate::runtime::roster::f9_gate::fixed_member(slot as u32) {
-                if let Some(want) = targets.iter().flatten().copied().find(|want| want.kind == kind && want.configuration.is_none()) {
-                    let mut only = [None; crate::runtime::roster::cycle_preload::MAX_TARGETS];
-                    only[0] = Some(want);
-                    return only;
-                }
-            }
+        // A parked seat holds its member whether or not the plan lists it (reading A: the first raise shows the seats).
+        if let Some((kind, configuration)) = crate::model::parked_entries::parked_seat(slot as u32, quantity,
+            record.is_some(), crate::runtime::roster::f9_gate::seat_member(slot as u32)) {
+            let want = targets.iter().flatten().copied()
+                .find(|want| want.kind == kind && want.configuration == configuration).unwrap_or(Want {
+                epoch: state.book.epoch(),
+                kind,
+                configuration,
+                #[cfg(feature = "mii-hud-portrait-alpha")]
+                avoid: 0,
+            });
+            let mut only = [None; crate::runtime::roster::cycle_preload::MAX_TARGETS];
+            only[0] = Some(want);
+            return only;
         }
     }
     let borrowed=record.and_then(|b|targets.iter().flatten().copied().find(|w|w.kind==b.kind&&w.configuration.is_none()));

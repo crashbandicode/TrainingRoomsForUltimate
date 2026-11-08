@@ -262,6 +262,23 @@ pub fn seat_load<C: Copy>(kind: u32, member: Option<(u32, Option<C>)>) -> Option
     Some((kind, Some(configuration)))
 }
 
+/// The seat member a parked entry 2 or 3 holds, whether or not the merged plan lists it: the first raise after a scene
+/// start shows the seats (reading A, primary 2026-11-08 16:04Z; "F9's fixed seats keep 2 and 3 for the next CPUs").
+/// A body bank that covers the member does not free the seat. None on a live entry, on entry 3 while it holds the
+/// borrowed hat, without a member, and for a Mii member without its configuration (`seat_load`).
+pub fn parked_seat<C: Copy>(
+    slot: u32,
+    quantity: Option<u32>,
+    borrowed: bool,
+    member: Option<(u32, Option<C>)>,
+) -> Option<(u32, Option<C>)> {
+    if !helper_seat(slot, quantity, borrowed) {
+        return None;
+    }
+    let (kind, _) = member?;
+    seat_load(kind, member)
+}
+
 /// A ready body that already is the seat member stays. An in-flight body is not given a second install.
 /// An empty entry, or a ready body of another kind, is reloaded after the walk.
 /// One read of a published cell: body id (`+8`), kind (`+0xc`), and `parked_ready`.
@@ -605,6 +622,27 @@ mod tests {
         assert!(!sources.contains("f9_gate::override_kind("));
         let preload = include_str!("../runtime/roster/cycle_preload.rs");
         assert!(preload.contains("cpu_rotation.iter().flatten().next().copied()"), "the members keep their configuration");
+    }
+
+    /// Eden covrest-07/08 (`cr-f9-raise`): the first raise after a scene start showed copies of CPU 1. At one CPU the
+    /// seat branch loaded a member only when the merged plan listed it, and the body bank covered Donkey Kong, so
+    /// entries 2 and 3 stayed empty until a drop armed their Reloads. Reading A: they park the members at one CPU.
+    #[test]
+    fn the_seats_park_at_one_cpu_whatever_the_plan_lists() {
+        let dk = Some((0x01u32, None::<u8>));
+        assert_eq!(parked_seat(ENTRY2, Some(1), false, dk), Some((0x01, None)));
+        assert_eq!(parked_seat(ENTRY3, Some(1), false, Some((0x4a, Some(7u8)))), Some((0x4a, Some(7))));
+        assert_eq!(parked_seat(ENTRY3, Some(2), false, dk), Some((0x01, None)), "entry 3 is parked at two CPUs");
+        assert_eq!(parked_seat(ENTRY2, Some(1), true, dk), Some((0x01, None)), "a borrow is entry 3's only");
+        assert_eq!(parked_seat(ENTRY2, Some(2), false, dk), None, "a live entry is not a seat");
+        assert_eq!(parked_seat(ENTRY3, Some(1), true, dk), None, "a borrowed entry 3 holds the hat");
+        assert_eq!(parked_seat::<u8>(ENTRY2, Some(1), false, None), None);
+        assert_eq!(parked_seat::<u8>(ENTRY2, Some(1), false, Some((0x4a, None))), None);
+        assert_eq!(parked_seat(ENTRY2, None, false, dk), None);
+        assert_eq!(parked_seat(4, Some(1), false, dk), None);
+        let sources = include_str!("../runtime/roster/character_sources.rs");
+        assert!(sources.contains("parked_entries::parked_seat("));
+        assert!(!sources.contains("want.kind == kind && want.configuration.is_none()"), "the seat waited for the plan");
     }
 
     #[test]

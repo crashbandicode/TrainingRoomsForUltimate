@@ -73,18 +73,20 @@ impl Gate {
         self.members.map(|member| member.map(|member| member.kind))
     }
 
-    /// The Reload as armed: its kind's member configuration (`seat_load`). None when the seat cannot be loaded.
-    fn arm(&self, after: Option<After>) -> Option<(After, Option<Configuration>)> {
-        let after = after?;
-        let member = match after.slot {
+    fn member(&self, slot: u32) -> Option<(u32, Option<Configuration>)> {
+        let member = match slot {
             2 => self.members[0],
             3 => self.members[1],
             _ => None,
         };
-        let (_, configuration) = crate::model::parked_entries::seat_load(
-            after.kind,
-            member.map(|member| (member.kind, member.configuration)),
-        )?;
+        member.map(|member| (member.kind, member.configuration))
+    }
+
+    /// The Reload as armed: its kind's member configuration (`seat_load`). None when the seat cannot be loaded.
+    fn arm(&self, after: Option<After>) -> Option<(After, Option<Configuration>)> {
+        let after = after?;
+        let (_, configuration) =
+            crate::model::parked_entries::seat_load(after.kind, self.member(after.slot))?;
         Some((after, configuration))
     }
 }
@@ -94,13 +96,9 @@ pub(crate) fn set_fixed_members(first: Option<Target>, second: Option<Target>) {
     gate.members = [first, second];
 }
 
-pub(crate) fn fixed_member(slot: u32) -> Option<u32> {
-    let gate = GATE.lock();
-    match slot {
-        2 => gate.fixed()[0],
-        3 => gate.fixed()[1],
-        _ => None,
-    }
+/// The seat member of entry `slot` (2 or 3): the kind and the exact-Mii configuration.
+pub(crate) fn seat_member(slot: u32) -> Option<(u32, Option<Configuration>)> {
+    GATE.lock().member(slot)
 }
 
 /// The armed Reload of `slot`: the kind and the exact-Mii configuration it loads.
