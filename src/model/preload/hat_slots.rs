@@ -228,9 +228,64 @@ impl<T: Copy + PartialEq, E: Copy + PartialEq> BorrowBook<T, E> {
     }
 }
 
+/// F9-SEAT-NOTICE (primary 2026-11-08 23:03Z, reading A): the fighter status with Training's parked seats counted (entry
+/// 2 and entry 3 at one CPU, `parked_entries::seat_state`). Each one is one more planned fighter; a ready seat is ready,
+/// a held one waits for memory (the notice's "… waiting for memory"), and any other is pending. A live seat (2 or 3 CPUs)
+/// or an entry without a member is `None` and adds nothing, and so do the seats while the fighter status itself is hidden
+/// (nothing planned): they never raise a notice of their own. No new text.
+pub fn with_seats(
+    mut fighters: super::cycle_preload_policy::BuiltFighters,
+    seats: [Option<crate::model::parked_entries::SeatState>; 2],
+) -> super::cycle_preload_policy::BuiltFighters {
+    use crate::engine::swap::body_bank::{merge_hold, Hold};
+    use crate::model::parked_entries::SeatState;
+    if fighters.planned == 0 {
+        return fighters;
+    }
+    for seat in seats.into_iter().flatten() {
+        fighters.planned = fighters.planned.saturating_add(1);
+        match seat {
+            SeatState::Ready => fighters.ready = fighters.ready.saturating_add(1),
+            SeatState::Loading => fighters.pending = fighters.pending.saturating_add(1),
+            SeatState::HeldMemory => {
+                fighters.held = fighters.held.saturating_add(1);
+                fighters.hold = merge_hold(fighters.hold, Some(Hold::Memory));
+            }
+        }
+    }
+    fighters
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Primary 2026-11-08 23:03Z, F9-SEAT-NOTICE, reading A (cov-rest's question of 16:25Z): a seat held for memory
+    /// showed only in a diag line, because the fighter status counted the plan's targets and the bank groups. The two
+    /// seats count in the existing status, with no new text: a held seat is "waiting for memory".
+    #[test]
+    fn a_seat_held_for_memory_counts_in_the_fighter_status() {
+        use crate::engine::preload::cycle_preload_policy::{BuiltFighters, CacheStatus, Progress, Readiness};
+        use crate::engine::swap::body_bank::Hold;
+        use crate::model::parked_entries::{seat_state, SeatState};
+        let assets = Readiness { progress: Progress::Ready, ready: 0, planned: 0, configured: 10, limit: 10, failed: 0 };
+        let ten = BuiltFighters { planned: 10, ready: 10, ..BuiltFighters::default() };
+        let text = |seats| CacheStatus::new(assets, with_seats(ten, seats), false).text().to_string();
+        let gunner = (0x4a, Some(7u8));
+        let dk = (0x01, None::<u8>);
+        assert_eq!(seat_state(gunner, Some(gunner), None), SeatState::Ready);
+        assert_eq!(seat_state(dk, None, Some(0x01)), SeatState::HeldMemory, "refused for memory, and not loaded since");
+        assert_eq!(seat_state(dk, Some((0x02, None)), None), SeatState::Loading, "another body is still on the entry");
+        assert_eq!(seat_state(gunner, Some((0x4a, Some(8u8))), None), SeatState::Loading, "another Mii is not the seat");
+        assert_eq!(text([Some(SeatState::Ready), Some(SeatState::Ready)]), "Ready 12/12");
+        assert_eq!(text([Some(SeatState::Ready), Some(SeatState::HeldMemory)]), "Loaded 11/12 (1 waiting for memory)");
+        assert_eq!(text([Some(SeatState::Ready), Some(SeatState::Loading)]), "Loading 11/12");
+        assert_eq!(text([None, None]), "Ready 10/10", "no parked seat (2 or 3 CPUs, or no member): nothing added");
+        let hidden = with_seats(BuiltFighters::default(), [Some(SeatState::HeldMemory), Some(SeatState::Ready)]);
+        assert_eq!(hidden, BuiltFighters::default(), "the seats raise no notice of their own");
+        let held = with_seats(BuiltFighters { held: 1, hold: Some(Hold::Pool), ..ten }, [Some(SeatState::HeldMemory), None]);
+        assert_eq!((held.held, held.hold), (2, Some(Hold::Memory)), "memory is named first");
+    }
 
     const HAT: Purpose = Purpose::Hat;
     const FIGHTER: Purpose = Purpose::Fighter;
