@@ -54,7 +54,7 @@ static MENU_EFFECT: Mutex<Effect> = Mutex::new(Effect::None);
 static CROP: Mutex<Option<CropWindow>> = Mutex::new(None);
 static DEFER_MIGRATE: AtomicBool = AtomicBool::new(false);
 static ROLE_KIND: [AtomicI32; 2] = [const { AtomicI32::new(-1) }; 2];
-static STRIP: Mutex<Option<Combo>> = Mutex::new(None);
+static STRIP: Mutex<(u32, Option<Combo>)> = Mutex::new((0, None));
 static MAKE: Mutex<Option<MakeJob>> = Mutex::new(None);
 static HELD: Mutex<Option<Role>> = Mutex::new(None);
 static ANSWER: Mutex<Option<MismatchChoice>> = Mutex::new(None);
@@ -91,6 +91,8 @@ struct BoundCopy {
 struct MakeJob {
     source: String,
     ready: bool,
+    /// The strip's count of links captured when the source began playing.
+    since: u32,
 }
 
 struct Resident {
@@ -497,8 +499,9 @@ pub fn set_role_fighter(role: Role, kind: i32) {
     }
 }
 
-pub fn set_strip_sample(combo: Option<Combo>) {
-    *lock(&STRIP) = combo;
+/// The strip's last combo and its count of links captured (`combo::Helper::seen`), from the recording worker's tick.
+pub fn set_strip_sample((seen, combo): (u32, Option<Combo>)) {
+    *lock(&STRIP) = (seen, combo);
 }
 
 pub fn set_fighter_label(label: &str) {
@@ -1004,7 +1007,8 @@ fn begin_make(
         RUN_PLAYER.store(true, Ordering::Release);
         step_role(root, machine, book, Role::Player);
     }
-    *lock(&MAKE) = Some(MakeJob { source: source.to_string(), ready: true });
+    let since = lock(&STRIP).0;
+    *lock(&MAKE) = Some(MakeJob { source: source.to_string(), ready: true, since });
     tick.diags.push(format!("screen=make-combo source={source} playing={}", i32::from(effect.started)));
     if online {
         tick.keyboard = None;
@@ -1019,8 +1023,13 @@ fn finish_make(root: &Path, tick: &mut Tick) {
     let Some(job) = lock(&MAKE).take() else {
         return;
     };
-    let sample = lock(&STRIP).take();
-    let Some(combo) = sample.filter(|combo| !combo.is_empty()) else {
+    // Only an exchange the strip captured while the source played: a playback that lands no hit leaves the count
+    // where it was, and the earlier exchange the strip still shows is not this file's.
+    let (seen, sample) = {
+        let mut strip = lock(&STRIP);
+        (strip.0, strip.1.take())
+    };
+    let Some(combo) = sample.filter(|combo| seen != job.since && !combo.is_empty()) else {
         tick.notices.push(EMPTY_COMBO);
         tick.diags.push("screen=notice kind=combo-empty".to_string());
         return;
@@ -1211,7 +1220,7 @@ fn reset_host() {
     *lock(&RESIDENT) = None;
     *lock(&MENU_EFFECT) = Effect::None;
     *lock(&CROP) = None;
-    *lock(&STRIP) = None;
+    *lock(&STRIP) = (0, None);
     *lock(&MAKE) = None;
     *lock(&HELD) = None;
     *lock(&ANSWER) = None;
@@ -1987,7 +1996,8 @@ mod tests {
         index.set_active(Role::Player, Some(&other), 1).unwrap();
         index.set_drill(Some(Drill { kind: DrillKind::Combo, id: "kept-drill".into() }), 2).unwrap();
         index.save(&root).unwrap();
-        set_strip_sample(Some(sample_combo()));
+        // An earlier exchange is on the strip; the source's own link arrives while it plays.
+        set_strip_sample((0, Some(sample_combo())));
         post_effect(Effect::MakeCombo { source: source.clone(), chain: false });
         let playing = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
         assert_eq!(playing.warp.as_deref(), Some(save_id.as_str()));
@@ -1996,6 +2006,7 @@ mod tests {
         let fed = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
         assert!(fed.diags.iter().all(|line| !line.contains("saved=1")), "the combo is made after the source has played");
         assert_eq!(take_player_frame().expect("source frame").buttons, 11);
+        set_strip_sample((1, Some(sample_combo())));
         let saved = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
         assert!(saved.diags.iter().any(|line| line.contains("screen=make-combo") && line.contains("saved=1")));
         let combos = crate::model::combo_record::ComboLibrary::new(root.join("combos"));
@@ -2016,7 +2027,7 @@ mod tests {
         reset_host();
         let root = scratch("make-fail");
         let source = one_macro(&root, "Bare", 3, 8, None);
-        set_strip_sample(Some(crate::model::combo::Combo::default()));
+        set_strip_sample((0, Some(crate::model::combo::Combo::default())));
         post_effect(Effect::MakeCombo { source: source.clone(), chain: false });
         let _ = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
         assert_eq!(take_player_frame().expect("the source plays").buttons, 3);
@@ -2027,7 +2038,7 @@ mod tests {
 
         reset_host();
         let gone = one_macro(&root, "Gone", 4, 8, Some("deleted-save"));
-        set_strip_sample(Some(sample_combo()));
+        set_strip_sample((0, Some(sample_combo())));
         post_effect(Effect::MakeCombo { source: gone, chain: false });
         let missing = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
         assert!(missing.warp.is_none());
@@ -2048,6 +2059,26 @@ mod tests {
         let online = service_at(&root, &none(), "2026-11-06", state(8), state(7), true);
         assert!(online.keyboard.is_none());
         assert!(online.diags.iter().all(|line| !line.contains("screen=rename")));
+    }
+
+    /// Eden rc6-seq-explore1 `seq-make` (2026-11-08 12:28Z, primary inbox 13:31Z): a played macro that lands no hit was
+    /// saved as the strip's PREVIOUS exchange. RECORDING.md: Make combo records the exchange the file plays. Only a
+    /// link the strip captured after Make combo began counts; none gives the empty notice and no file.
+    #[test]
+    fn make_combo_with_no_hit_saves_nothing_not_the_previous_exchange() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("make-stale");
+        let source = one_macro(&root, "Whiff", 3, 8, None);
+        set_strip_sample((4, Some(sample_combo())));
+        post_effect(Effect::MakeCombo { source, chain: false });
+        let _ = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
+        assert_eq!(take_player_frame().expect("the source plays").buttons, 3);
+        set_strip_sample((4, Some(sample_combo())));
+        let done = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
+        assert!(done.diags.iter().any(|line| line == "screen=notice kind=combo-empty"), "{:?}", done.diags);
+        assert!(done.diags.iter().all(|line| !line.contains("saved=1")));
+        assert!(crate::model::combo_record::ComboLibrary::new(root.join("combos")).list().unwrap().entries.is_empty());
     }
 
     #[test]

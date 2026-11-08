@@ -19,8 +19,9 @@ use crate::model::frame_strip_plan::{Changed, Look, Text};
 use crate::runtime::published;
 
 static HELPER: Mutex<Helper> = Mutex::new(Helper::new());
-/// The worker's copy of the last combo. The game thread publishes it after it has let go of HELPER.
-static SAMPLE: Mutex<Option<Combo>> = Mutex::new(None);
+/// The worker's copy of the last combo, with the helper's count of links captured (`Helper::seen`). The game thread
+/// publishes it after it has let go of HELPER.
+static SAMPLE: Mutex<(u32, Option<Combo>)> = Mutex::new((0, None));
 static RENDERER: Mutex<Renderer> = Mutex::new(Renderer::new());
 /// The target's name for the bar, and the names the menu shows (target, draft).
 static NAME: Mutex<Text> = Mutex::new(Text::EMPTY);
@@ -47,7 +48,7 @@ pub fn after_strip(tracker: &Tracker, p1_kind: Option<i32>) {
             (text, label)
         });
         let out = helper.step(tracker, settings());
-        let sample = helper.last_combo();
+        let sample = (helper.seen(), helper.last_combo());
         (out, sample, names)
     };
     if let Some((text, label)) = names {
@@ -60,9 +61,12 @@ pub fn after_strip(tracker: &Tracker, p1_kind: Option<i32>) {
 
 /// The strip's session clear (leaving Training, a hot swap, a lobby change).
 pub fn session_clear() {
-    let out = HELPER.lock().clear();
+    let (out, seen) = {
+        let mut helper = HELPER.lock();
+        (helper.clear(), helper.seen())
+    };
     report(out);
-    *SAMPLE.lock() = None;
+    *SAMPLE.lock() = (seen, None);
 }
 
 fn report(out: Out) {
@@ -149,8 +153,9 @@ pub fn last_combo() -> Option<Combo> {
     HELPER.lock().last_combo()
 }
 
-/// The last combo published by the strip, without taking the helper lock the frame hook holds.
-pub fn strip_sample() -> Option<Combo> {
+/// The last combo published by the strip and the count of links captured, without taking the helper lock the frame
+/// hook holds.
+pub fn strip_sample() -> (u32, Option<Combo>) {
     *SAMPLE.lock()
 }
 
