@@ -83,14 +83,26 @@ impl Panes {
             let active = i == usize::from(frame.tab_active);
             self.text(index, units, if active { p::TEXT } else { p::TEXT_DIM });
             self.at(index, left + p::TAB_BOX_W / 2.0, tab_y);
-            if active {
-                self.at(p::IDX_TAB_HI, left + width / 2.0, tab_y);
-                let hi = self.all[p::IDX_TAB_HI];
-                if !hi.is_null() {
-                    pane::set_width(hi, width + 36.0);
+            if frame.tab_boxes {
+                // r8: each page tab is an outlined box, the active one green on a lighter fill.
+                let (x, w, h) = (left + width / 2.0, width + 36.0, p::TAB_H - 8.0);
+                if active {
+                    self.rect_at(p::IDX_TAB_HI, x, tab_y, w, h, p::BAND);
                 }
+                if i < p::TAB_BOXES {
+                    self.box_at(p::IDX_TAB_BOX + 4 * i, x, tab_y, w, h, if active { p::TEXT_ON } else { p::RULE });
+                }
+            } else if active {
+                self.rect_at(p::IDX_TAB_HI, left + width / 2.0, tab_y, width + 36.0, p::TAB_H, p::ACCENT);
             }
             left += width + 64.0;
+        }
+        for i in 0..p::TAB_BOXES {
+            if !frame.tab_boxes || i >= usize::from(frame.tab_count) {
+                for edge in 0..4 {
+                    self.hide(p::IDX_TAB_BOX + 4 * i + edge);
+                }
+            }
         }
         self.text(p::IDX_TITLE, frame.title.units(), p::TEXT_DIM);
         self.show(p::IDX_TITLE, !frame.popup);
@@ -134,6 +146,9 @@ impl Panes {
             if list && i < usize::from(frame.row_count) {
                 let row = &frame.rows[i];
                 let rise = if sub { p::SUB_RISE } else { 0.0 };
+                // A pop-up header's name sits right of its kind's mark.
+                let inset = if frame.band[i] { p::HEAD_INSET } else { 0.0 };
+                let (label_left, label_w) = (label_left + inset, label_w - inset);
                 self.place(p::row_label_index(i), label_left + label_w / 2.0, p::row_y(i) + rise, label_w);
                 self.place(p::row_value_index(i), right - value_w / 2.0, p::row_y(i) - p::VALUE_DROP + rise, value_w);
                 self.text(p::row_label_index(i), row.label.units(), tone_color(row.label_tone));
@@ -192,8 +207,12 @@ impl Panes {
         for (i, on) in frame.green.iter().enumerate() {
             if *on {
                 self.rect_at(p::IDX_GREEN + i, (left + right) / 2.0, p::row_y(i), right - left, p::ROW_H, p::GREEN_ROW);
+            } else if frame.band[i] {
+                // A pop-up section header's dark band (r8); a header row is never green.
+                self.rect_at(p::IDX_GREEN + i, (left + right) / 2.0, p::row_y(i), right - left, p::ROW_H, p::BAND);
             }
         }
+        self.draw_list_marks(frame);
         if let Some(slot) = frame.hairline {
             let y = p::row_y(usize::from(slot)) - p::ROW_H / 2.0;
             self.rect_at(p::IDX_HAIRLINE, (left + right) / 2.0, y, right - left, 2.0, p::RULE);
@@ -210,6 +229,42 @@ impl Panes {
                 self.stroke(p::IDX_CURSOR + 1, slot, 1, (left, right), p::CURSOR_WHITE);
             }
         }
+    }
+
+    /// The pop-up's section-header squares (the kind's colour; SAVE STATES has its floppy instead) and the red order
+    /// badges at a row's left edge (RECORDING-REDESIGN.md "How to read a list").
+    unsafe fn draw_list_marks(&self, frame: &Frame) {
+        use crate::model::recording_menu::FileTag;
+        for index in p::IDX_HEAD_SQ..p::IDX_TAB_BOX {
+            self.hide(index);
+        }
+        let headers = (0..p::ROWS).filter(|i| frame.band[*i]);
+        for (section, slot) in headers.take(2).enumerate() {
+            let color = match frame.head_tag[section] {
+                Some(FileTag::Macro) => p::KIND_MACRO,
+                Some(FileTag::Combo) => p::KIND_COMBO,
+                Some(FileTag::Sequence) => p::KIND_SEQUENCE,
+                Some(FileTag::Save) | None => continue,
+            };
+            self.rect_at(p::IDX_HEAD_SQ + section, p::HEAD_MARK_X, p::row_y(slot), p::HEAD_SQ, p::HEAD_SQ, color);
+        }
+        for (n, badge) in frame.badges.iter().enumerate() {
+            let Some((slot, number)) = *badge else { continue };
+            let y = p::row_y(usize::from(slot));
+            self.rect_at(p::IDX_BADGE + n, p::BADGE_X, y, p::BADGE_W, p::BADGE_W, p::ACCENT);
+            let digits = [u16::from(b'0' + number / 10 % 10), u16::from(b'0' + number % 10)];
+            let units = if number >= 10 { &digits[..] } else { &digits[1..] };
+            self.label(p::IDX_BADGE_NUM + n, units, p::BADGE_X, y, p::BADGE_W + 8.0, p::TEXT);
+        }
+    }
+
+    /// A box's four edges, `index` to `index + 3`.
+    unsafe fn box_at(&self, index: usize, x: f32, y: f32, w: f32, h: f32, color: [u8; 4]) {
+        let edge = 2.0;
+        self.rect_at(index, x - w / 2.0 + edge / 2.0, y, edge, h, color);
+        self.rect_at(index + 1, x + w / 2.0 - edge / 2.0, y, edge, h, color);
+        self.rect_at(index + 2, x, y + h / 2.0 - edge / 2.0, w, edge, color);
+        self.rect_at(index + 3, x, y - h / 2.0 + edge / 2.0, w, edge, color);
     }
 
     /// The r8 title's L/R role tabs: the plate, "Player" and "CPU" with the lit one on the accent, and the L and R

@@ -128,7 +128,11 @@ The lists are the left column, and the connections of the row under the cursor a
 - Each joined file sits in its own box, hanging from a stem.
 - Plain lines follow: a combo's links, its fighters, whether a save is bound, and a macro's recorded fighter and length.
 
-Each section header shows how many files it lists. Each file row has a dim line under its name:
+Each section header shows how many files it lists. In the pop-up it sits on a dark band behind its kind's mark: the orange floppy for SAVE STATES, and a square for the others (blue for MACROS, purple for COMBOS, pink for SEQUENCES).
+
+A row's place in the chain or sequence under the cursor is a red number badge at the row's left edge in the pop-up; the page writes it before the name. The pop-up's page tabs are outlined boxes, and the active one is outlined in green.
+
+Each file row has a dim line under its name:
 
 - a save's fighters;
 - "Recorded on" and the fighter, for a macro or a combo;

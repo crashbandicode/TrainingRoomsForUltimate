@@ -194,6 +194,22 @@ pub const fn row_label_left(popup: bool) -> f32 {
 }
 
 pub const POP_LABEL_INSET: f32 = 24.0;
+/// The pop-up's red order badges (RECORDING-REDESIGN.md "Red number, at the row's left edge"), one per list row of the
+/// two sections (four rows each).
+pub const BADGES: usize = 8;
+pub const BADGE_W: f32 = 22.0;
+pub const BADGE_X: f32 = POP_ROW_LEFT + 12.0;
+/// A pop-up section header's name moves right of its kind's mark (the floppy, or a square).
+pub const HEAD_INSET: f32 = 20.0;
+pub const HEAD_MARK_X: f32 = POP_ROW_LEFT + 18.0;
+pub const HEAD_SQ: f32 = 16.0;
+/// The r8 kind colours: the CONNECTIONS pills and the section headers' squares.
+pub const KIND_SAVE: [u8; 4] = [240, 150, 60, 255];
+pub const KIND_MACRO: [u8; 4] = [92, 150, 240, 255];
+pub const KIND_COMBO: [u8; 4] = [170, 120, 240, 255];
+pub const KIND_SEQUENCE: [u8; 4] = [235, 105, 170, 255];
+/// The pop-up's header band, and the fill of its active page tab.
+pub const BAND: [u8; 4] = [30, 33, 40, 255];
 pub const POP_VALUE_W: f32 = 200.0;
 
 /// Centre of CONNECTIONS line `line`; the header sits on the first row's line.
@@ -359,10 +375,17 @@ pub const IDX_ROLE_HI: usize = IDX_ROLE_BG + 1;
 pub const IDX_ROLE: usize = IDX_ROLE_HI + 1;
 pub const IDX_ROLE_CAP: usize = IDX_ROLE + 2;
 pub const IDX_ROLE_KEY: usize = IDX_ROLE_CAP + 2;
+/// The r8 lists (primary 2026-11-08 16:51Z): the two section headers' kind squares, the red order badges and their
+/// numbers, and the four edges of each of the pop-up's two page tabs.
+pub const IDX_HEAD_SQ: usize = IDX_ROLE_KEY + 2;
+pub const IDX_BADGE: usize = IDX_HEAD_SQ + 2;
+pub const IDX_BADGE_NUM: usize = IDX_BADGE + BADGES;
+pub const TAB_BOXES: usize = 2;
+pub const IDX_TAB_BOX: usize = IDX_BADGE_NUM + BADGES;
 /// How many panes the menu itself owns and the runtime resolves at registration (`view::Panes::all`); every index
 /// the renderer writes is below it. The panes after these (the notification panel and the frame strip) belong to the
 /// input package, which finds them by name when it draws.
-pub const MENU_COUNT: usize = IDX_ROLE_KEY + 2;
+pub const MENU_COUNT: usize = IDX_TAB_BOX + 4 * TAB_BOXES;
 /// The notification panel (SPEC-input-05): its own container under `RootPane`. Each of its texts (header, short
 /// body, long body) has a dark plate drawn immediately before it. Written by the notices code of the input package.
 pub const IDX_NOTICE: usize = MENU_COUNT;
@@ -784,7 +807,11 @@ pub const fn name_of(index: usize) -> Name {
         IDX_ROLE_HI => Name::new("tr_role_hi"),
         i if i >= IDX_ROLE && i < IDX_ROLE_CAP => Name::indexed("tr_role_", i - IDX_ROLE),
         i if i >= IDX_ROLE_CAP && i < IDX_ROLE_KEY => Name::indexed("tr_rcap_", i - IDX_ROLE_CAP),
-        i if i >= IDX_ROLE_KEY && i < MENU_COUNT => Name::indexed("tr_rkey_", i - IDX_ROLE_KEY),
+        i if i >= IDX_ROLE_KEY && i < IDX_HEAD_SQ => Name::indexed("tr_rkey_", i - IDX_ROLE_KEY),
+        i if i >= IDX_HEAD_SQ && i < IDX_BADGE => Name::indexed("tr_hsq_", i - IDX_HEAD_SQ),
+        i if i >= IDX_BADGE && i < IDX_BADGE_NUM => Name::indexed("tr_obg_", i - IDX_BADGE),
+        i if i >= IDX_BADGE_NUM && i < IDX_TAB_BOX => Name::indexed("tr_obn_", i - IDX_BADGE_NUM),
+        i if i >= IDX_TAB_BOX && i < MENU_COUNT => Name::indexed("tr_tbx_", i - IDX_TAB_BOX),
         i if i >= IDX_TILE_BADGE && i < IDX_FLOPPY => mark_name(i - IDX_TILE_BADGE),
         i if i >= IDX_TAB && i < IDX_TAB + TABS => Name::indexed("tr_tab_", i - IDX_TAB),
         i if i >= IDX_GROUP && i < IDX_GROUP + GROUPS => Name::indexed("tr_grp_", i - IDX_GROUP),
@@ -942,10 +969,21 @@ pub const fn spec(index: usize) -> Spec {
         i if i >= IDX_ROLE_CAP && i < IDX_ROLE_KEY => {
             Spec { visible: false, ..rect(name, [ROLE_CAP_X[i - IDX_ROLE_CAP], TAB_Y, ROLE_CAP, ROLE_CAP], RULE, false) }
         }
-        i if i >= IDX_ROLE_KEY && i < MENU_COUNT => Spec {
+        i if i >= IDX_ROLE_KEY && i < IDX_HEAD_SQ => Spec {
             visible: false,
             ..text(name, [ROLE_CAP_X[i - IDX_ROLE_KEY], TAB_Y, ROLE_CAP, ROLE_CAP], Align::Center, FONT_SMALL, 2, TEXT)
         },
+        i if i >= IDX_HEAD_SQ && i < IDX_BADGE => {
+            Spec { visible: false, ..rect(name, [HEAD_MARK_X, row_y(0), HEAD_SQ, HEAD_SQ], KIND_SEQUENCE, false) }
+        }
+        i if i >= IDX_BADGE && i < IDX_BADGE_NUM => {
+            Spec { visible: false, ..rect(name, [BADGE_X, row_y(1), BADGE_W, BADGE_W], ACCENT, false) }
+        }
+        i if i >= IDX_BADGE_NUM && i < IDX_TAB_BOX => Spec {
+            visible: false,
+            ..text(name, [BADGE_X, row_y(1), BADGE_W + 8.0, BADGE_W + 6.0], Align::Center, FONT_PILL, 2, TEXT)
+        },
+        i if i >= IDX_TAB_BOX && i < MENU_COUNT => Spec { visible: false, ..rect(name, [0.0, POP_TAB_Y, 2.0, 2.0], RULE, false) },
         i if i >= IDX_TILE_BADGE && i < IDX_FLOPPY => Spec { visible: false, ..text(name, [0.0, 0.0, 52.0, MARK_H], Align::Center, FONT_SMALL, 4, TEXT) },
         IDX_TAB_HI => rect(name, [-740.0, TAB_Y, 200.0, TAB_H], ACCENT, true),
         IDX_TITLE => text(name, [600.0, TAB_Y, 560.0, TAB_H], Align::Right, FONT_SMALL, 40, TEXT_DIM),
@@ -1065,10 +1103,17 @@ mod tests {
         // The r8 tree (boxes, pills, stem and ticks) and the role tabs (primary 2026-11-08 15:55Z).
         let r8_drawn = 4 * CONN_BOXES + 2 * CONN_BOXES + CONN_TREE + 8;
         assert_eq!(r8_drawn, 50);
-        assert_eq!(name_of(MENU_COUNT - 1).as_str(), "tr_rkey_01");
+        assert_eq!(name_of(IDX_ROLE_KEY + 1).as_str(), "tr_rkey_01");
+        // The header squares, the order badges and the boxed page tabs (primary 2026-11-08 16:51Z).
+        let r8_lists = 2 + 2 * BADGES + 4 * TAB_BOXES;
+        assert_eq!(r8_lists, 26);
+        assert_eq!(name_of(IDX_HEAD_SQ).as_str(), "tr_hsq_00");
+        assert_eq!(name_of(IDX_BADGE).as_str(), "tr_obg_00");
+        assert_eq!(name_of(IDX_BADGE_NUM + BADGES - 1).as_str(), "tr_obn_07");
+        assert_eq!(name_of(MENU_COUNT - 1).as_str(), "tr_tbx_07");
         assert!(COUNT < limit, "plugin table {COUNT} exceeds the walk {limit}");
-        assert_eq!(COUNT, 1424 + CHROME + r8 + r8_drawn);
-        assert_eq!(limit - COUNT, 2672 - CHROME - r8 - r8_drawn);
+        assert_eq!(COUNT, 1424 + CHROME + r8 + r8_drawn + r8_lists);
+        assert_eq!(limit - COUNT, 2672 - CHROME - r8 - r8_drawn - r8_lists);
         let strip_tree = iv::COUNT + cb::COUNT;
         assert!(strip_tree <= limit, "the strip walk, combo bar included, is {strip_tree}");
         let first = spec(IDX_IV + iv::at::STICK);
@@ -1110,6 +1155,12 @@ mod tests {
         // A box's pill and a joined file's indent fit the column.
         assert!(CONN_LEFT + CONN_INDENT + 8.0 + pill_w(10) + 120.0 <= CONN_RIGHT, "a SAVE STATE pill and a name fit");
         assert!(row_label_left(false) + row_label_w(false) <= ROW_RIGHT - row_value_w(false) + 1.0, "the page is unchanged");
+        // A badge sits at the row's left edge, before the name; a header's mark sits before the header's name.
+        const { assert!(BADGE_X + BADGE_W / 2.0 <= POP_ROW_LEFT + POP_LABEL_INSET && BADGE_X - BADGE_W / 2.0 >= POP_ROW_LEFT) };
+        const { assert!(HEAD_MARK_X + 14.0 <= POP_ROW_LEFT + POP_LABEL_INSET + HEAD_INSET && HEAD_MARK_X - 14.0 >= POP_ROW_LEFT) };
+        for index in [IDX_HEAD_SQ, IDX_BADGE, IDX_BADGE_NUM] {
+            assert!(!spec(index).visible, "{:?} is hidden until drawn", spec(index).name);
+        }
     }
 
     #[test]
