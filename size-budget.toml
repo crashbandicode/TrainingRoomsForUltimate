@@ -809,3 +809,11 @@ ceiling = 151495
 date = "2026-11-08"
 reason = "p23/rc6-cov-rest after merging p23/rc6-hot-slots d6a485f (its warm exit, 151146 on that branch) over the cov-rest fixes (151111): both together, plus the portrait race fix (dfe9b7c: Blocker::Portrait and mii_hud_portrait::render_holds_helper for the Mii owners' begin, F9 seat loads held back while a portrait job waits, Eden covrest-12); measured 151495 (tools/size_gate.py), +349 over 151146"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied under TASK-OPUS-rc6-cov-rest (a raise goes in its own commit with approved_by)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 154521
+date = "2026-11-08"
+reason = "rc.6 integration (p23/rc6-integration 7080363): the merge of p23/rc6-cov-rest (1f6285c, 151495: +349 over its base d6a485f, 151146) into 95675f0 (154170); the sides add up to 154519, measured 154521 on the merged tree (tools/size_gate.py)"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); combined ceiling = measured merged size per primary c07b3449, INBOX-opus-rc6-integration 2026-11-08 19:13Z"
