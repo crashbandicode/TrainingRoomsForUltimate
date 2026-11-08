@@ -863,6 +863,8 @@ pub fn scene_changed(mode: game_mode::Mode) {
     body_bank::scene_changed();
     #[cfg(feature="mii-saved-alpha")]
     mii_saved_alpha::scene_changed();
+    #[cfg(feature = "native-body-bank-alpha")]
+    body_bank::adopt_scene_generation();
     #[cfg(feature="mii-ldn-qualification-probe")]
     mii_ldn_qualification::scene_changed();
     sources::scene_changed();

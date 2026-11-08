@@ -485,3 +485,20 @@ Primary decision relayed in TRAININGROOMS-LEAD-INBOX.md under PRIMARY DECISION ~
 Mandatory acceptance remains zero hook allocations, at most two buffers, at least five seconds of hand-out grace, repeated-load correctness and measured headroom. Count the reserved capacity separately from NRO image residency and include it in the 10-fighter plus 5-hat hot-slot memory measurement. Logical payload lengths, requested allocation capacity, allocator residency and host RSS are different measurements; do not add the buffer cost again to a measured heap total that already includes it.
 
 Freeing between loads through qualified off-hook preparation becomes next-version memory work, not an RC blocker. core05.12 closes only on the corrected requirement plus actual runtime evidence; this decision alone is not a PASS.
+
+## 2026-11-08: Group speed in rc.6 — operator decision
+
+The operator chose all three group-speed items for rc.6. This was relayed in
+`artifacts/phase23/INBOX-opus-rc6-hotslots.md`, 2026-11-08, after the console F6 run of release `1e6c6a0e`: "It seems
+that going between groups is pretty slow".
+
+1. **Warm exit from a Mii group.** An ordinary fighter in the window a live Mii group displaced is reached by a warm
+   exchange instead of a Reload. The Mii switch's publication is put back in the settle tick.
+2. **Async Mii group build.** The 2026-11-02 restriction that kept Mii groups on the synchronous build is lifted for
+   Mii groups. They build through the queued construction like ordinary groups; on the console, the CPU's Mii build
+   had held the game thread 141 ms. Native (Pokémon Trainer, Aegis) and Ice Climbers pair groups keep the synchronous
+   build under the 2026-11-02 restriction.
+3. **Groups pre-built behind the Training loading screen.** Every planned group is built during the load, so its first
+   switch is a warm exchange. The cost is load time, logged per group.
+
+This records the decision only; the implementation, host tests and Eden proofs are recorded in `CARRY-OVER.md`.

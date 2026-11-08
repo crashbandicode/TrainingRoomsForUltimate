@@ -42,3 +42,25 @@ fn every_helper_request_goes_through_the_purpose_view_and_entry_3_publishes_its_
         "{plan}");
     assert!(src.contains("pub(crate) static ENTRY3_BORROW:"), "F9 reads and releases the record");
 }
+
+/// rc6-hot-xps1 hs06 (2026-11-08, XPS, P1 Kirby, Ready Fighters 10, groups on): no hat loaded in 40 s. The plan arrives
+/// budgeted (`hat_slots::budgeted`), but `set_preload_plan` cut it again to the fighter remainder (`helper_budget`, 0
+/// here), and creation was capped by the same remainder and waited for entries 2 and 3 to hold targets they may not
+/// load. The hats keep their own budget through planning, creation and the borrow.
+#[test]
+fn hats_are_planned_and_created_apart_from_the_fighter_remainder() {
+    let src = include_str!("../src/runtime/roster/character_sources.rs");
+    let limit = body(src, "fn preload_limit(");
+    assert!(!limit.contains("helper_budget"), "the plan is already budgeted:\n{limit}");
+    let intent = body(src, "fn creation_intent(");
+    let speculative = &intent[intent.find("if state.wants.iter().any(Option::is_some) {return None;}").expect("speculative")..];
+    assert!(speculative.contains(".take(created_allowance(state,backend))"), "{speculative}");
+    assert!(speculative.contains("hat_slots::holds_back_creation(helper_view(state,slot),filled)"), "{speculative}");
+    let allowance = body(src, "fn created_allowance(");
+    assert!(allowance.contains("hat_slots::created_allowance(fighters,hats,helpers.len(),created,backend==Backend::Training)"),
+        "{allowance}");
+    assert!(allowance.contains("state.creation_hold.filter("), "a refused creation ends the allowance:\n{allowance}");
+    let purpose = body(src, "fn purpose_view(");
+    assert!(purpose.contains("created_busy(extras.iter().map(|s|reservation_for(state,*s as u32).is_some()&&in_plan(*s)),"),
+        "the borrow waits for the allowed created entries:\n{purpose}");
+}

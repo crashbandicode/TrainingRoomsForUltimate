@@ -61,3 +61,48 @@ fn the_scene_change_keeps_the_new_scenes_start_up_window() {
     let publish = body(BANK, "unsafe fn publish_pending(");
     assert!(publish.contains("construction: None, tick: TickGap::default(), held_turn: 0, scene,"), "{publish}");
 }
+
+/// rc6-hot-xps1 (2026-11-08, XPS): the first group exchange from either start-up window fell back with "group owner
+/// receipt changed" and the player got the window's cell 0. H1 stamps the bank with the owner generation before the
+/// scene's own `scene_changed`, whose Mii adapter step then opens a new one, so `group_owner` saw a stale epoch. The
+/// window kept for the new scene joins that generation after the adapter's step.
+#[test]
+fn a_kept_start_up_window_joins_the_new_owner_generation() {
+    let roster = include_str!("../src/runtime/roster/character_roster.rs");
+    let changed = body(roster, "pub fn scene_changed(mode: game_mode::Mode) {");
+    let bank = changed.find("body_bank::scene_changed();").expect("the bank's step");
+    let mii = changed.find("mii_saved_alpha::scene_changed();").expect("the adapter's step");
+    let adopt = changed.find("body_bank::adopt_scene_generation();").expect("the kept window joins the generation");
+    assert!(bank < mii && mii < adopt, "{changed}");
+    let adopt = body(BANK, "pub(super) fn adopt_scene_generation(");
+    assert!(adopt.contains("let fresh = !bank.departed && bank.phase != Phase::Retired && bank.scene.is_some() && bank.scene == now;"),
+        "{adopt}");
+    assert!(adopt.contains("scene_generation(bank.epoch, super::mii_saved_alpha::current_generation(role as u32), fresh)"),
+        "{adopt}");
+    let owner = body(BANK, "unsafe fn group_owner(");
+    assert!(owner.contains("if epoch != bank.epoch || resource != bank.alias { return None; }"), "the proof it satisfies");
+}
+
+/// rc6-hot-xps2 (2026-11-08, XPS): the origin both Mii adapters capture is the live entry after H3, the start-up window.
+/// Staged as "back to the original" it reloaded three ordinary bodies natively and a construction thread died on an
+/// unloaded resource. Both adapters stage native's single form for the original (`entry_window::original_request`).
+#[test]
+fn back_to_the_original_stages_natives_single_form() {
+    let player = include_str!("../src/runtime/mii/mii_ordinary_player.rs");
+    let arm = &player[player.find("            mii_cycle::Target::Original=>{\n                if let Some(c)=origin_saved {native::target_rows(c)?;}")
+        .expect("the Player's Original staging")..];
+    assert!(arm[..400].contains("entry_window::original_request(origin.descriptor,origin.original_kind)"), "{}", &arm[..400]);
+    let cpu = include_str!("../src/runtime/mii/mii_ordinary_cpu.rs");
+    let arm = &cpu[cpu.find("            mii_cycle::Target::Original=>{\n                if let Some(c)=origin_saved {native::target_rows(c)?;}")
+        .expect("the CPU's Original staging")..];
+    assert!(arm[..400].contains("descriptor=crate::engine::swap::entry_window::original_request(descriptor,origin.original_kind);"),
+        "{}", &arm[..400]);
+    // The returned original is recognised as the original: the Player's `at_origin`, the CPU's Fighter staging and the
+    // CPU commit's `descriptor_equals_origin`.
+    let at_origin = body(player, "unsafe fn at_origin(");
+    assert!(at_origin.contains("expected.descriptor==crate::engine::swap::entry_window::original_request(origin.descriptor,origin.original_kind)"),
+        "{at_origin}");
+    assert!(cpu.contains("|| descriptor==crate::engine::swap::entry_window::original_request(live_origin,origin.original_kind)) {Target::ORIGINAL}"));
+    let native = include_str!("../src/runtime/mii/mii_ordinary_cpu_native.rs");
+    assert!(native.contains("|| now.descriptor==crate::engine::swap::entry_window::original_request(live_origin,owner.origin.original_kind),"));
+}

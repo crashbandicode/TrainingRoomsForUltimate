@@ -89,6 +89,38 @@ pub fn creation_matches(native: Words, window: Words) -> bool {
     native.count == 1 && native.kinds == [window.kinds[0], NONE, NONE]
 }
 
+/// The original's own request when its scene began with a start-up window. The origin both Mii adapters capture is the
+/// live entry after H3, so it carries the window's words; staged as "back to the original", native was asked to reload
+/// ordinary bodies whose resources only the start-up bank requests (rc6-hot-xps2: a construction read an unloaded
+/// resource and its thread died) and the bank planner could not serve the original warm. The request is native's
+/// single form H3 started from ([`creation_matches`]): count 1, `[original, −1, −1]`, one actor, active 0, every other
+/// byte as captured. Any other words are native's own (one body, PT, the IC pair, Aegis, a Mii) and stay.
+pub fn original_request(descriptor: [u8; 0x70], original: u32) -> [u8; 0x70] {
+    let word = |at: usize| u32::from_le_bytes([descriptor[at], descriptor[at + 1], descriptor[at + 2], descriptor[at + 3]]);
+    let words = Words { count: word(0x14), kinds: [word(0x18), word(0x1c), word(0x20)], actor_count: word(0x28),
+        active: descriptor[0x43] };
+    if !start_up_words(words, original) {
+        return descriptor;
+    }
+    let mut request = descriptor;
+    request[0x14..0x18].copy_from_slice(&1u32.to_le_bytes());
+    for (i, kind) in [original, NONE, NONE].iter().enumerate() {
+        request[0x18 + i * 4..0x1c + i * 4].copy_from_slice(&kind.to_le_bytes());
+    }
+    request[0x28..0x2c].copy_from_slice(&1u32.to_le_bytes());
+    request[0x43] = 0;
+    request
+}
+
+/// The words H3 writes for `original` ([`entry_window`], [`Words::of`]): two or three single-body bankable members
+/// (never the IC pair), the original at cell 0, one actor, active 0.
+fn start_up_words(words: Words, original: u32) -> bool {
+    let count = words.count as usize;
+    (2..=3).contains(&count) && words.kinds[0] == original && words.actor_count == 1 && words.active == 0
+        && words.kinds[..count].iter().all(|kind| *kind != NONE && bankable_kind(*kind) && !matches!(*kind, 0x4b | 0x4c))
+        && words.kinds[count..].iter().all(|kind| *kind == NONE)
+}
+
 /// A window published by H1, before the entry exists: keyed by owner and its words, for the scene epoch it was made
 /// in. H4 binds it to the first constructed entry of that owner whose descriptor shows exactly these words, in the
 /// same epoch.
@@ -103,6 +135,14 @@ impl<E: Copy + PartialEq> Pending<E> {
     pub fn binds(&self, owner: u32, words: Words, epoch: E) -> bool {
         self.owner == owner && self.words == words && self.epoch == epoch
     }
+}
+
+/// The owner generation a bank's group exchange must show. H1 stamps the window with the generation current while the
+/// new scene is configured; that scene's own scene change opens the next one after the bank's step. A window the bank
+/// step kept for the new scene (`kept`) takes the new generation; any other bank keeps its stamp, so a group exchange
+/// from an earlier scene stays refused.
+pub fn scene_generation(stamped: u64, current: u64, kept: bool) -> u64 {
+    if kept { current } else { stamped }
 }
 
 #[cfg(test)]
@@ -199,5 +239,90 @@ mod tests {
         assert!(!pending.binds(0, window, 7), "another owner");
         assert!(!pending.binds(1, native, 7), "the native words");
         assert!(!pending.binds(1, window, 8), "a later scene");
+    }
+
+    /// rc6-hot-xps1 (2026-11-08, XPS): H1 stamps the owner generation of the scene being configured, and that scene's
+    /// own `scene_changed` advances it afterwards. A window kept for the new scene follows it; nothing else does.
+    #[test]
+    fn a_kept_start_up_window_joins_its_scenes_owner_generation() {
+        let (at_h1, after_the_change) = (4u64, 5u64);
+        assert_eq!(scene_generation(at_h1, after_the_change, true), after_the_change, "kept for the new scene");
+        assert_eq!(scene_generation(at_h1, after_the_change, false), at_h1,
+            "departed or retired: the old stamp, so an exchange from an earlier scene stays refused");
+        assert_eq!(scene_generation(after_the_change, after_the_change, true), after_the_change, "already current");
+    }
+
+    /// rc6-hot-xps2 (2026-11-08, XPS): P1 lap switch 07, back to the original Mario from the group [Ness, Mario], staged
+    /// the origin's start-up window `(3, [0, 1, 2])` as the request; native reloaded three ordinary bodies, a
+    /// construction read an unloaded resource and its thread died. The original's request is native's single form H3
+    /// started from; every other byte stays, and native's own words (one body, PT, the IC pair, Aegis, a Mii) stay.
+    #[test]
+    fn the_original_request_is_natives_single_form_of_a_start_up_window() {
+        fn descriptor(count: u32, kinds: [u32; 3], actors: u32, active: u8) -> [u8; 0x70] {
+            let mut d = [0x5au8; 0x70];
+            d[0x14..0x18].copy_from_slice(&count.to_le_bytes());
+            for (i, kind) in kinds.iter().enumerate() {
+                d[0x18 + i * 4..0x1c + i * 4].copy_from_slice(&kind.to_le_bytes());
+            }
+            d[0x28..0x2c].copy_from_slice(&actors.to_le_bytes());
+            d[0x43] = active;
+            d
+        }
+        let window = descriptor(3, [MARIO, DK, LINK], 1, 0);
+        assert_eq!(original_request(window, MARIO), descriptor(1, [MARIO, NONE, NONE], 1, 0), "the start-up window");
+        assert_eq!(original_request(descriptor(2, [STEVE, MARIO, NONE], 1, 0), STEVE),
+            descriptor(1, [STEVE, NONE, NONE], 1, 0), "a two-body window");
+        assert_eq!(original_request(descriptor(3, [KIRBY, MARIO, DK], 1, 0), KIRBY),
+            descriptor(1, [KIRBY, NONE, NONE], 1, 0), "a Kirby original keeps cell 0");
+        // Primary 13:58Z (cov-rest `covrest-04`, `bc93b9f` diag): the CPU's return to slot 0, Fox, from its Mii groups
+        // reloaded the two-member window `(2, [7, 1])` and never settled.
+        const FOX: u32 = 0x7;
+        assert_eq!(original_request(descriptor(2, [FOX, DK, NONE], 1, 0), FOX), descriptor(1, [FOX, NONE, NONE], 1, 0),
+            "the CPU's two-member window");
+        for (words, original, why) in [
+            (descriptor(1, [MARIO, NONE, NONE], 1, 0), MARIO, "native's one body"),
+            (descriptor(3, [0x24, 0x25, 0x26], 1, 0), 0x24, "Pokémon Trainer"),
+            (descriptor(2, [0x4b, 0x4c, NONE], 2, 0), 0x4b, "the IC pair"),
+            (descriptor(2, [0x5a, 0x5b, NONE], 1, 0), 0x5a, "Aegis"),
+            (descriptor(1, [0x48, NONE, NONE], 1, 0), 0x48, "a Mii"),
+            (window, DK, "another fighter's window"),
+            (descriptor(3, [MARIO, DK, LINK], 1, 1), MARIO, "not the original's cell"),
+        ] {
+            assert_eq!(original_request(words, original), words, "{why}");
+        }
+    }
+
+    /// Primary 12:40Z (cov-rest `covrest-02`, rc.5 diag): the CPU cycle Mario, Mii Brawler, Swordfighter, Gunner, Link
+    /// fell back the same way on its first press, a Mii group exchange out of the CPU's start-up window (the Miis are
+    /// groups: `cycle_members` leaves them out of the window). Any group exchange starts from the receipt
+    /// `group_owner` mints only while the bank's stamp is the owner's current generation, and a Mii exchange keeps that
+    /// generation. With the stamp the kept window adopts, the Mii exchange is proven; with the stamp H1 left, there is
+    /// no receipt to start from.
+    #[test]
+    fn a_cpu_mii_group_exchange_out_of_a_kept_window_after_the_scene_change() {
+        use crate::engine::swap::body_bank::{GroupExchange, GroupOwner};
+        let (at_h1, after_the_change) = (1u64, 2u64);
+        let window = entry_window(MARIO, &[LINK, DK], 2, false).unwrap();
+        let receipt = |stamp: u64| (stamp == after_the_change).then(|| {
+            let mut descriptor = [0u8; 0x70];
+            descriptor[0x14..0x18].copy_from_slice(&(window.count() as u32).to_le_bytes());
+            for (i, kind) in window.kinds().iter().enumerate() {
+                descriptor[0x18 + i * 4..0x1c + i * 4].copy_from_slice(&kind.to_le_bytes());
+            }
+            descriptor[0x28] = 1;
+            GroupOwner { entry: 0x1000, owner: 1, epoch: after_the_change, resource: 0x2000,
+                header: [1, MARIO, LINK, DK, 0], descriptor, bodies: [(0x3000, 1), (0x4000, 262144), (0x5000, 327680)] }
+        });
+        assert!(receipt(at_h1).is_none(), "the stamp H1 left: no receipt, the fallback rc6-hot-xps1 and covrest-02 saw");
+        let before = receipt(scene_generation(at_h1, after_the_change, true)).expect("the kept window's receipt");
+        let brawler = Members::mii_group(0x48).unwrap();
+        let mii_header = [1, 0x48, NONE, NONE, 0];
+        let mut after = GroupOwner { header: mii_header, ..before };
+        after.descriptor[0x14..0x18].copy_from_slice(&1u32.to_le_bytes());
+        after.descriptor[0x18..0x24].copy_from_slice(&[0x48, 0, 0, 0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
+        after.descriptor[0x28..0x2c].copy_from_slice(&1u32.to_le_bytes());
+        assert!(GroupExchange::new_with_header(before, after, brawler, mii_header).is_some(), "the Mii group moves in");
+        assert!(GroupExchange::new_with_header(before, GroupOwner { epoch: at_h1, ..after }, brawler, mii_header).is_none(),
+            "a generation that differs across the exchange refuses");
     }
 }

@@ -24,6 +24,8 @@ static STATE:OwnerMutex<State>=OwnerMutex::new(State {
     generic:None,restore:None,
     #[cfg(feature="native-body-bank-alpha")]
     bank:None,
+    #[cfg(feature="native-body-bank-alpha")]
+    mii_exit:None,
 });
 struct Owner {
     origin:native::Snapshot,
@@ -80,7 +82,15 @@ struct BankTrack {
     /// record and scalars), recorded under G and STATE in the same critical section as the
     /// write. The one terminal arm (`bank_refused`) puts it back before INSTALL goes.
     published:Option<(Configuration,native::BankPublished)>,
+    /// rc.6 warm exit: this switch leaves the live Mii group for the window it displaced (`MiiExit`).
+    exit:bool,
 }
+/// rc.6 warm exit (operator decision 2026-11-08): a settled Mii group switch's publication, kept while the
+/// owner's receipt is the one that switch adopted, so the exit to the window it displaced can put it back
+/// (`native::exit_settled`).
+#[cfg(feature="native-body-bank-alpha")]
+#[derive(Clone,Copy)]
+struct MiiExit {mii:BankTrack,configuration:Configuration,published:native::BankPublished,adopted:native::Snapshot}
 /// Read-only receipt for an ordinary Player0 load kept on the generic roster path.
 /// It carries no authority; `generic_completed` re-proves everything against `before`.
 struct Generic {
@@ -93,6 +103,8 @@ struct State {
     restore:Option<WaitingValue>,
     #[cfg(feature="native-body-bank-alpha")]
     bank:Option<BankTrack>,
+    #[cfg(feature="native-body-bank-alpha")]
+    mii_exit:Option<MiiExit>,
 }
 impl State {
     /// An owned phase-6 transaction or bank member switch holds this adapter.
@@ -196,7 +208,8 @@ pub(super) fn player_context()->Option<(PlayerOrigin,PlayerLive)> {
     s.owner.as_ref().filter(|o|o.origin.binding.epoch==epoch()).map(|o| {
         let original=o.origin_saved.map_or(PlayerOrigin::NotMii,
             |c|PlayerOrigin::Mii(crate::engine::mii::selection::Origin(c.canonical())));
-        let live=if o.cursor.is_none() && o.expected.descriptor==o.origin.descriptor
+        let live=if o.cursor.is_none() && (o.expected.descriptor==o.origin.descriptor
+            || o.expected.descriptor==crate::engine::swap::entry_window::original_request(o.origin.descriptor,o.origin.original_kind))
             && o.active==o.origin_saved {PlayerLive::Origin}
             else {o.active.map_or(PlayerLive::Origin,|c|
                 PlayerLive::Cycled{class:c.canonical().class,canonical:c.canonical()})};
@@ -422,6 +435,7 @@ unsafe fn logical_kind(expected:&native::Snapshot)->u32 {descriptor_kind(&expect
 unsafe fn at_origin(origin:&native::Snapshot,expected:&native::Snapshot,active:Option<Configuration>,
     origin_saved:Option<Configuration>,cursor:Option<usize>)->bool {
     cursor.is_none() && active==origin_saved && (expected.descriptor==origin.descriptor
+        || expected.descriptor==crate::engine::swap::entry_window::original_request(origin.descriptor,origin.original_kind)
         || (origin.original_kind==0x4b && descriptor_kind(&expected.descriptor)==0x4b)
         || (origin_saved.is_none() && logical_kind(expected)==origin.original_kind
             // WORKAROUND-DECISIONS row 8 (operator-approved root fix): the banked original is
@@ -653,7 +667,8 @@ unsafe fn begin(entry:*mut u8)->bool {
         match step.target {
             mii_cycle::Target::Original=>{
                 if let Some(c)=origin_saved {native::target_rows(c)?;}
-                let mut descriptor=origin.descriptor;
+                // P-HOT B: an origin captured after H3 carries the start-up window; the original is its single form.
+                let mut descriptor=crate::engine::swap::entry_window::original_request(origin.descriptor,origin.original_kind);
                 if origin.original_kind==0x4b {
                     let forms=requested_forms_at(&menu,Role::Player,0x4b,None);
                     descriptor[0x14..0x18].copy_from_slice(&forms.count.to_le_bytes());
@@ -813,6 +828,11 @@ unsafe fn begin(entry:*mut u8)->bool {
     // phase-6 path. The bank planner owns eligibility (Miis and native groups stay
     // canonical; Kirby parks only copy-free) and budget; upcoming kinds come from
     // the real mixed cycle after this destination.
+    // rc.6 warm exit: out of a live Mii group whose publication this owner kept, the window it displaced is warm.
+    #[cfg(feature="native-body-bank-alpha")]
+    let exit=active.is_some() && publish.is_none()
+        && STATE.lock().mii_exit.is_some_and(|x|x.mii.ticket.epoch==current.binding.epoch
+            && x.adopted==expected);
     #[cfg(feature="native-body-bank-alpha")]
     let plan={
         let after=match destination.target {
@@ -845,7 +865,8 @@ unsafe fn begin(entry:*mut u8)->bool {
                 origin_saved.map_or(Identity::Fighter(origin.original_kind),|c|Identity::Saved(c.canonical())),
                 after,&catalog,origin_saved).iter().flatten()
                 .filter(|target|target.configuration.is_none()).map(|target|target.kind).collect();
-            super::body_bank::plan(entry,0,descriptor,&upcoming)
+            if exit {super::body_bank::plan_mii_exit(entry,0,descriptor,&upcoming)}
+            else {super::body_bank::plan(entry,0,descriptor,&upcoming)}
         })
     };
     // Physical bytes INSTALL copies (a bank build replaces the group words) and
@@ -887,7 +908,7 @@ unsafe fn begin(entry:*mut u8)->bool {
             // Published before the native request; settled only by bank_service.
             #[cfg(feature="native-body-bank-alpha")]
             {s.bank=Some(BankTrack {ticket,token,before:current,logical:descriptor_kind(&descriptor),
-                destination,departed:false,publish,descriptor,hat_change,published:None});}
+                destination,departed:false,publish,descriptor,hat_change,published:None,exit:exit && reuse});}
             drop(registry);None
         } else {
             let t=Track {ticket,gate:Gate::new(ticket).unwrap(),token,installing:true,retained_o:false,recovering:None,
@@ -1005,13 +1026,21 @@ unsafe fn bank_service(entry:*mut u8,b:BankTrack) {
 
 #[cfg(feature="native-body-bank-alpha")]
 unsafe fn bank_settle(entry:*mut u8,b:BankTrack) {
-    let settled=match native::bank_settled(&b) {
+    // rc.6 warm exit: a Mii group switch's publication, read before the settle drops its track, is kept for the
+    // exit to the window it displaced; that exit settles through the kept record.
+    let published=STATE.lock().bank.filter(|t|t.ticket==b.ticket && t.token==b.token).and_then(|t|t.published);
+    let exit=STATE.lock().mii_exit;
+    let settled=match if b.exit {native::exit_settled(&b,exit)} else {native::bank_settled(&b)} {
         Ok(settled)=>settled,
         Err(native::BankRefusal::Busy)=>return,
         Err(native::BankRefusal::Kept(reason))=>{bank_refused(b,reason,false);return;}
         Err(native::BankRefusal::Diverged(reason))=>{bank_refused(b,reason,true);return;}
     };
     let now=settled.now;let exact=settled.exact;
+    STATE.lock().mii_exit=match (exact,published) {
+        (Some(c),Some((published_c,published))) if published_c==c=>Some(MiiExit {mii:b,configuration:c,published,adopted:now}),
+        _=>None,
+    };
     let logical=b.logical;
     // A Mii group switch whose exact proof was adopted publishes its configuration
     // (the exact HUD portrait); an ordinary switch publishes the live kind. The intent

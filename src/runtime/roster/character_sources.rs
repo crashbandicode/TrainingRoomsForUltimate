@@ -562,10 +562,41 @@ fn purpose_view(state:&State,slot:usize,targets:[Option<Want>;crate::runtime::ro
     let extras=crate::engine::preload::cycle_preload_capacity::EXTRA_SLOTS;
     let in_plan=|s:usize|state.sources[s].filter(|source|state.book.is_current(source.token.epoch()))
         .is_some_and(|source|targets.iter().flatten().any(|w|w.kind==source.kind&&w.configuration==source.configuration));
-    let created_busy=extras.iter().all(|s|reservation_for(state,*s as u32).is_none()||in_plan(*s));
+    // §5.1: the borrow waits for the created entries the plan may use; one not created yet is not in use.
+    let created_busy=crate::engine::preload::hat_slots::created_busy(extras.iter().map(|s|reservation_for(state,*s as u32).is_some()&&in_plan(*s)),
+        if training {created_allowance(state,Backend::Training)} else {0});
     let borrow_open=training&&borrow_admitted(unsafe{native_source::training_cpu_quantity()},
         crate::runtime::ui::state::PAUSE_ACTIVE.load(Ordering::Acquire),state.book.can_replace(BORROW_ENTRY)==Ok(true));
     slot_view(plan,SlotFacts{training,slot,created:extras.contains(&slot),created_busy,borrow_open,borrowed})
+}
+
+/// The plan targets a helper request reads (`selected_request`'s filter: the Cycle Preload cap, no failed kind).
+#[cfg(feature="managed-third-source-alpha")]
+fn plan_targets(state:&State)->[Option<Want>;crate::runtime::roster::cycle_preload::MAX_TARGETS] {
+    let slots=usize::from(crate::runtime::roster::cycle_preload_config::snapshot().slots);
+    std::array::from_fn(|i|state.preload[i].filter(|w|i<slots && (state.preload_failed|state.failed)&(1u128<<w.kind)==0))
+}
+
+/// What the existing helper or created entry `slot` may load of the plan: its purpose view.
+#[cfg(feature="managed-third-source-alpha")]
+fn helper_view(state:&State,slot:u32)->[Option<Want>;crate::runtime::roster::cycle_preload::MAX_TARGETS] {
+    purpose_view(state,slot as usize,plan_targets(state))
+}
+
+/// The created entries this scene's plan may use (`hat_slots::created_allowance`), counted by the plan's purposes; a
+/// creation the preflight refused ends it at that entry while the hold stands (`creation_hold`).
+#[cfg(feature="managed-third-source-alpha")]
+fn created_allowance(state:&State,backend:Backend)->usize {
+    use crate::engine::preload::hat_slots::Purpose;
+    let helpers=backend.helpers();
+    let extras=crate::engine::preload::cycle_preload_capacity::extra_slots(backend);
+    let created=candidates(backend).iter().filter(|slot|!helpers.contains(*slot)&&extras.contains(&(**slot as usize))).count();
+    let (mut fighters,mut hats)=(0,0);
+    for (_,purpose) in plan_targets(state).iter().zip(state.preload_purpose.iter()).filter(|(want,_)|want.is_some()) {
+        if *purpose==Some(Purpose::Hat) {hats+=1;} else {fighters+=1;}
+    }
+    let allowance=crate::engine::preload::hat_slots::created_allowance(fighters,hats,helpers.len(),created,backend==Backend::Training);
+    state.creation_hold.filter(|(epoch,_)|state.book.is_current(*epoch)).map_or(allowance,|(_,position)|allowance.min(usize::from(position)))
 }
 
 /// P-HOT §3.5.1 rule 2: a speculative hat-only load admitted on Training's entry 3 publishes the borrow record.
@@ -623,10 +654,11 @@ fn candidates(backend: Backend) -> [u32; crate::engine::preload::cycle_preload_c
         cfg!(feature="cycle-preload-extended"),cfg!(feature="lobby-preload-extended"))
 }
 
+/// The plan arrives budgeted (`hat_slots::budgeted`: fighter look-ahead within `helper_budget`, hats within Ready
+/// Hats), so only the Cycle Preload cap and the scene's helper slots limit it here. Cutting it again to the fighter
+/// remainder dropped every hat when the windows and groups held the fighters (rc6-hot-xps1 hs06, 2026-11-08).
 fn preload_limit(backend: Backend) -> usize {
     let slots = crate::runtime::roster::cycle_preload_config::snapshot().slots;
-    #[cfg(feature = "native-body-bank-alpha")]
-    let slots = super::body_bank::helper_budget(slots);
     crate::engine::preload::cycle_preload_capacity::target_count_with_waiting(
         slots, backend,
         cfg!(feature="managed-third-source-alpha"),cfg!(feature="managed-ldn-third-source-alpha"),
@@ -1967,19 +1999,22 @@ fn creation_intent(state:&State,backend:Backend,speculative:bool)->Option<Creati
             .then_some(CreationIntent {extra,wanted,speculative});
     }
     if state.wants.iter().any(Option::is_some) {return None;}
+    // P-HOT §5.1: as many created entries as the plan needs by purpose; the hats are not cut to the fighter
+    // remainder that `limit` carries (rc6-hot-xps1 hs06).
     let (position,extra)=policy::extra_slots(backend).iter().copied().enumerate()
-        .take(limit.saturating_sub(backend.helpers().len()))
+        .take(created_allowance(state,backend))
         .find(|(_,slot)|state.capacities[capacity_index(*slot as u32)].reservation.is_none())?;
     let owner=&state.capacities[capacity_index(extra as u32)];
     if owner.attempted==Some(state.book.epoch()) {return None;}
     // Existing helpers must first be filled or actively leased. Never create a
     // new native owner merely because an existing free helper has not run yet.
+    // One whose purpose view admits no plan target can never be filled by it.
     for slot in candidates(backend).iter().copied().take(backend.helpers().len()+position) {
-        let source=state.sources[slot as usize]?;
-        if !state.book.is_current(source.token.epoch()) || state.book.phase(slot as usize)!=Ok(Phase::Ready) {return None;}
-        let targeted=state.preload.iter().flatten().any(|want|
-            want.kind==source.kind && want.configuration==source.configuration);
-        if !targeted && state.book.can_replace(slot as usize)==Ok(true) {return None;}
+        let filled=state.sources[slot as usize].is_some_and(|source|state.book.is_current(source.token.epoch())
+            && state.book.phase(slot as usize)==Ok(Phase::Ready)
+            && (state.preload.iter().flatten().any(|want|want.kind==source.kind && want.configuration==source.configuration)
+                || state.book.can_replace(slot as usize)!=Ok(true)));
+        if crate::engine::preload::hat_slots::holds_back_creation(helper_view(state,slot),filled) {return None;}
     }
     // Exact Miis use the separately qualified Training destination capability.
     let wanted=state.preload.iter().copied().flatten().find(|want|

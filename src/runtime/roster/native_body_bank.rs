@@ -88,17 +88,18 @@
 //! constructs them on the task worker instead (loader state 10, `6556b0.c:215-250`): one 0x90-byte
 //! task per body, `0x3549720(task+0x10, 0x3cb190, 2, 1)`, functor `0x3cb2a0` = body vtable
 //! `+0x10` then `+0x18`; state 0xb polls `task+0x20 == 0`, installs the cells and frees the tasks.
-//! An ordinary group's build (`async_build_eligible`) now takes that path at the acknowledgement
+//! An ordinary or Mii group's build (`async_build_eligible`) now takes that path at the acknowledgement
 //! seam: the entry-level third of `0x658af0` (`0x654dc0`, `0x655320`, `0x64f820`) and the per-body
 //! `0x3ae5f0` allocation on the game thread, the init+construct as queued tasks, the entry parked
 //! at loader `0xc` with an empty window while frames run (the native shape of states 6-0xb; a
 //! request meanwhile is refused as busy), then on the settling tick the cell install, the request
 //! bit's return, the ordinary verification and the acknowledgement (`settle_construction`,
 //! `complete_exchange`). A destroyer that arrives first waits for the tasks as state 0xb's tail
-//! does and installs the bodies for native's own window destroyer (`drain_construction`). Mii,
-//! native (PT/Aegis) and pair groups keep the synchronous build: an operator-approved restriction
-//! dated 2026-11-02 (`R` identity through the construction; the `+0x5a88` object `0x658af0`'s
-//! branches create; the `R+0x50` batch rule). P3-0: `Bank.tick` measures the largest gap between
+//! does and installs the bodies for native's own window destroyer (`drain_construction`). Native
+//! (PT/Aegis) and pair groups keep the synchronous build: an operator-approved restriction dated
+//! 2026-11-02 (the `+0x5a88` object `0x658af0`'s branches create; the `R+0x50` batch rule). Mii
+//! groups left it by the operator's decision of 2026-11-08 (rc.6 item 2): their identity is in
+//! `R` before the construction is queued and stays while the group is the window. P3-0: `Bank.tick` measures the largest gap between
 //! two entry ticks over a swap (`[GroupSwap] swap … max_tick_gap_us=`), the stall the game thread took.
 //!
 //! The entry's identity follows the window (U18, `swap_model::copy_registry`):
@@ -169,7 +170,7 @@ use crate::engine::swap::body_bank::{
     swap_commit_index_in, async_build_eligible, construction_task, TickGap,
     GroupBudget, GroupExchange, GroupOwner, GroupPolicy, GroupState, Hold, Members, Phase, Special,
     SpecialPolicy, BANK_FLAG, MAX_EXTRA_GROUPS, NANA, NATIVE_MEMBERS, PAIR_ACTIVE_FLAG, POOL_RESERVE, POPO,
-    entry_bytes_of, mii_reuse_bytes_match, MiiEntryBytes, MiiIdentity, MII_ENTRY_START, RESOURCE_WORDS,
+    entry_bytes_of, mii_exit_bytes_match, mii_reuse_bytes_match, MiiEntryBytes, MiiIdentity, MII_ENTRY_START, RESOURCE_WORDS,
 };
 use crate::engine::swap::body_bank::memory::{self, Admission};
 use crate::engine::swap::body_bank::mii_publish::{PublishAttempts, PublishRefusal, PublishStep};
@@ -932,6 +933,18 @@ fn form_label(forms: Forms) -> &'static str {
 /// Native-origin options/configuration bytes are preserved byte-for-byte.
 /// A target in a built or prefetched extra group is a reuse (group swap).
 pub(super) unsafe fn plan(entry: *const u8, owner: u32, descriptor: [u8; 0x70], upcoming: &[u32]) -> Plan {
+    plan_in(entry, owner, descriptor, upcoming, false)
+}
+
+/// [`plan`] for an adapter that kept its live Mii group's switch-time publication (rc.6 warm exit, operator decision
+/// 2026-11-08): an ordinary target in the window that Mii group displaced is a warm reuse. The exchange writes that
+/// window's saved `R` words, entry bytes and D mirror back (`perform_swap`); the adapter puts its publication back in
+/// the settle tick.
+pub(super) unsafe fn plan_mii_exit(entry: *const u8, owner: u32, descriptor: [u8; 0x70], upcoming: &[u32]) -> Plan {
+    plan_in(entry, owner, descriptor, upcoming, true)
+}
+
+unsafe fn plan_in(entry: *const u8, owner: u32, descriptor: [u8; 0x70], upcoming: &[u32], mii_exit: bool) -> Plan {
     let target = u32::from_le_bytes(descriptor[0x18..0x1c].try_into().unwrap());
     let mut result = Plan { descriptor, target, forms: Forms::starting(target), cells: [u32::MAX; NATIVE_MEMBERS], active: 0,
         reuse: false, members: None };
@@ -1011,10 +1024,16 @@ pub(super) unsafe fn plan(entry: *const u8, owner: u32, descriptor: [u8; 0x70], 
             // A Mii group's build rewrites exactly the identity bytes besides the group
             // words, so a Mii request matches the live entry once its identity is
             // applied to it (`mii_reuse_bytes_match`); the group carries that identity
-            // (`group_identity_matches` above). Every other request is byte-exact.
+            // (`group_identity_matches` above). Every other request is byte-exact, except the warm exit
+            // (`plan_mii_exit`): the displaced window's saved entry bytes come back with it.
+            let exit = (mii_exit && in_group && !(0x48..=0x4a).contains(&target)).then(|| mii_exit_saved(owner, target, forms)).flatten();
             let matches = live.is_some_and(|current| current == *physical.bytes()
-                || (in_group && (0x48..=0x4a).contains(&target) && mii_reuse_bytes_match(&current, &descriptor)));
+                || (in_group && (0x48..=0x4a).contains(&target) && mii_reuse_bytes_match(&current, &descriptor))
+                || exit.is_some_and(|saved| mii_exit_bytes_match(&current, physical.bytes(), &saved)));
             if matches {
+                if exit.is_some() {
+                    trace!("[GroupSwap] warm exit owner={} kind={:#x}: the window the live Mii group displaced", owner, target);
+                }
                 result.descriptor = *physical.bytes(); result.members = Some(members); result.reuse = true;
                 result.cells = members.kinds(); result.active = members.index_of(target).unwrap_or(0);
                 return result;
@@ -1226,6 +1245,18 @@ fn group_reachable(owner: u32, kind: u32, forms: Forms) -> bool {
     BANKS[role].lock().as_ref().is_some_and(|bank|
         bank.swap.is_none() && bank.prefetch.is_none() && !bank.departed
             && bank.groups.iter().any(|g| g.state.reachable() && group_serves(*g.members, kind, forms).is_some()))
+}
+
+/// The entry bytes a warm exit from this role's live Mii group writes back for `kind`: the reachable group `switch`
+/// would take for it is Built, ordinary, and saved the identity move when the Mii displaced it. `None` for any other
+/// group: a Prefetched one would build under the Mii's `R`, and no other Built group holds the window's bytes.
+fn mii_exit_saved(owner: u32, kind: u32, forms: Forms) -> Option<MiiEntryBytes> {
+    let state = BANKS[role(owner)?].lock();
+    let bank = state.as_ref()?;
+    if bank.identity.is_none() { return None; }
+    let group = bank.groups.iter().find(|g| g.state.reachable() && group_serves(*g.members, kind, forms).is_some())?;
+    if group.state != GroupState::Built || group.identity.is_some() { return None; }
+    group.saved.as_ref()?.identity.map(|(_, saved)| saved.entry)
 }
 
 /// The reachable Mii group holding `kind` carries exactly the identity this
@@ -3044,7 +3075,8 @@ unsafe fn perform_swap(entry: *mut u8, owner: u32, role: usize) {
                     (identity.header(owner), write_identity(entry as usize, alias, identity)));
                 let live_before = pool_counts(base).map_or(0, |(_, live)| live);
                 // Phase B′ (operator decision 2026-11-02): an ordinary group constructs through the
-                // game's queued tasks; Mii, native and pair groups keep the synchronous build (the
+                // game's queued tasks, and so does a Mii group (operator decision 2026-11-08); native and
+                // pair groups keep the synchronous build (the
                 // operator-approved restriction, `async_build_eligible`), as does every group while
                 // the path's fingerprints have not passed.
                 let eligibility = async_build_eligible(target_members, target_identity.is_some());
@@ -3958,6 +3990,20 @@ pub(super) fn scene_changed() {
     // The scene loop resets every holder, G68 included: the copy holdings end without native calls.
     for role in (0..2).filter(|role| !fresh[*role]) {
         crate::runtime::roster::copy_packages::forget(role, role as u32, "scene changed");
+    }
+}
+
+/// P-HOT B: called by `character_roster::scene_changed` after `mii_saved_alpha::scene_changed`, which opens the new
+/// scene's owner generation. A start-up window kept above was stamped at H1 with the generation before it, so
+/// `group_owner` refused its first group exchange (rc6-hot-xps1, 2026-11-08); it joins the new generation here. A
+/// departed or retired bank keeps its stamp.
+pub(super) fn adopt_scene_generation() {
+    let now = crate::runtime::lobby::game_mode::current().map(|m| (m.mode, u32::from(m.melee)));
+    for (role, state) in BANKS.iter().enumerate() {
+        if let Some(bank) = state.lock().as_mut() {
+            let fresh = !bank.departed && bank.phase != Phase::Retired && bank.scene.is_some() && bank.scene == now;
+            bank.epoch = crate::engine::swap::entry_window::scene_generation(bank.epoch, super::mii_saved_alpha::current_generation(role as u32), fresh);
+        }
     }
 }
 

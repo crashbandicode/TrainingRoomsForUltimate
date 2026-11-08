@@ -486,6 +486,58 @@ pub(super) unsafe fn bank_settled(bank:&super::BankTrack)->Result<Settled,BankRe
     Ok(Settled {now,exact,resource_pair})
 }
 
+/// rc.6 warm exit from a Mii group (operator decision 2026-11-08): the bank exchanged the live Mii group for the
+/// window it displaced and wrote that window's `R` words, entry bytes and D mirror back (`perform_swap`). In this
+/// settle tick the bank's exchange receipt proves the descriptor (`group_rebaseline`), the Mii switch's publication
+/// goes back through `bank_restore` (the window is no longer the published group), whose read-back proves the rest
+/// against the receipt from before the Mii with the descriptor and CPU control bytes as they are now; then the owner
+/// adopts the window. Until the restore, `E+0x1a8` still names the Mii's destination record while FE and D name the
+/// window's index, so no owner walk can read that state (rc6-hot-xps5: `CPU current index mirrors differ`): the
+/// descriptor is read directly under G, as `bank_restore` reads its fields. `helpers::BUSY` before any write retries
+/// on the next callback.
+#[cfg(feature="native-body-bank-alpha")]
+pub(super) unsafe fn exit_settled(bank:&super::BankTrack,exit:Option<super::MiiExit>)->Result<Settled,BankRefusal> {
+    let before=&bank.before;
+    let exit=exit.filter(|x|x.mii.ticket.epoch==before.binding.epoch)
+        .ok_or(BankRefusal::Diverged("CPU warm exit without its kept Mii publication"))?;
+    let b=pool(before.binding.entry,before.binding.epoch).map_err(BankRefusal::Diverged)?;
+    if b!=before.binding {return Err(BankRefusal::Diverged("CPU warm exit G identity changed"));}
+    let helpers=match helper_snapshot() {
+        Ok(view)=>view,
+        Err(reason) if reason==helpers::BUSY=>return Err(BankRefusal::Busy),
+        Err(reason)=>return Err(BankRefusal::Kept(reason)),
+    };
+    let lock=PoolLock::acquire(super::base(),b.manager);
+    let descriptor=rd::<[u8;0x70]>(before.binding.entry,0);
+    drop(lock);
+    if descriptor==before.descriptor || !super::super::body_bank::group_rebaseline(before.binding.entry,
+        before.binding.owner,before.binding.epoch,&before.descriptor,&descriptor) {
+        return Err(BankRefusal::Diverged("CPU warm exit without its group exchange"));
+    }
+    let restore=super::BankTrack {before:Snapshot {descriptor,control:before.control,..exit.mii.before},
+        descriptor:exit.mii.descriptor,..*bank};
+    let now=match bank_restore(&restore,exit.configuration,exit.published) {
+        Ok(restored)=>restored.now,
+        Err(why) if why==helpers::BUSY=>return Err(BankRefusal::Busy),
+        Err(why)=>return Err(BankRefusal::Diverged(why)),
+    };
+    let mut state=super::STATE.lock();
+    let current=!state.departed && state.bank.is_some_and(|t|t.ticket==bank.ticket && t.token==bank.token)
+        && super::epoch()==before.binding.epoch;
+    let Some(owner)=state.owner.as_mut().filter(|o|current && o.expected==exit.adopted && o.live.target.saved().is_some()) else {
+        return Err(BankRefusal::Diverged("CPU warm exit ticket/owner changed after the restore"));
+    };
+    let mut registry=final_registry(helpers,Some(bank.token)).map_err(BankRefusal::Diverged)?;
+    owner.live=bank.destination;owner.expected=now;
+    registry.commit(now.authority(),now.original_kind,super::descriptor_kind(&now.descriptor));
+    super::note("[GroupSwap] warm exit: CPU Mii publication restored; descriptor/header/body proof passed");
+    state.bank=None;state.mii_exit=None;
+    state.replay_result=bank.replay.filter(|r|r.current(super::epoch(),super::super::mii_replay::revision(r.source)))
+        .map(|selection|crate::engine::mii::replay::SelectionReceipt {selection,outcome:Ok(())});
+    drop(registry);drop(state);
+    Ok(Settled {now,exact:None,resource_pair:None})
+}
+
 /// Reuse the native before/after proof while the generic roster still holds INSTALL.
 pub(super) unsafe fn generic_completed(g:&super::Generic,kind:u32,cursor:Option<usize>)
     ->Result<Snapshot,&'static str> {
@@ -511,7 +563,9 @@ pub(super) unsafe fn generic_completed(g:&super::Generic,kind:u32,cursor:Option<
         reservation_held,transaction_busy,origin_is_saved:owner.origin_saved.is_some(),
         live_is_saved:owner.live.target.saved().is_some(),kind,origin_kind:owner.origin.original_kind,
         published_kind:published,index:now.index,
-        descriptor_equals_origin:now.descriptor==live_origin,roster_cursor:cursor,
+        descriptor_equals_origin:now.descriptor==live_origin
+            || now.descriptor==crate::engine::swap::entry_window::original_request(live_origin,owner.origin.original_kind),
+        roster_cursor:cursor,
     })?;
     let registry=final_registry(now.helpers,Some(g.token))?;
     owner.expected=now;owner.live=destination;

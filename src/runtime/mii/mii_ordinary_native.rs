@@ -934,6 +934,59 @@ pub(super) unsafe fn bank_settled(bank:&super::BankTrack) -> Result<Settled,Bank
     Ok(Settled {now,exact,resource_pair})
 }
 
+/// rc.6 warm exit from a Mii group (operator decision 2026-11-08): the bank exchanged the live Mii group for the
+/// window it displaced and wrote that window's `R` words, entry bytes and D mirror back (`perform_swap`). In this
+/// settle tick the bank's exchange receipt proves the descriptor (`group_rebaseline`), the Mii switch's publication
+/// goes back through `bank_restore` (the window is no longer the published group), whose read-back proves the rest
+/// against the receipt from before the Mii with the descriptor as it is now; then the owner adopts the window with no
+/// active configuration. `helpers::BUSY` before any write retries on the next callback.
+#[cfg(feature="native-body-bank-alpha")]
+pub(super) unsafe fn exit_settled(bank:&super::BankTrack,exit:Option<super::MiiExit>)->Result<Settled,BankRefusal> {
+    let before=&bank.before;
+    let exit=exit.filter(|x|x.mii.ticket.epoch==before.binding.epoch)
+        .ok_or(BankRefusal::Diverged("warm exit without its kept Mii publication"))?;
+    let base=super::base();
+    let m=map(before.binding.entry).map_err(BankRefusal::Diverged)?;
+    let b=pool(base,before.binding.entry,before.binding.epoch).map_err(BankRefusal::Diverged)?;
+    if b!=before.binding {return Err(BankRefusal::Diverged("warm exit G identity changed"));}
+    let helpers=match helper_snapshot() {
+        Ok(view)=>view,
+        Err(reason) if reason==helpers::BUSY=>return Err(BankRefusal::Busy),
+        Err(reason)=>return Err(BankRefusal::Kept(reason)),
+    };
+    let lock=PoolLock::acquire(base,b.manager);
+    let now=current_locked(base,m,b,before.original_kind,None,helpers).map_err(BankRefusal::Diverged)?;
+    drop(lock);
+    if now.protected!=before.protected || now.layout!=before.layout {
+        return Err(BankRefusal::Kept("warm exit protected owner state changed"));
+    }
+    if now.descriptor==before.descriptor || !super::super::body_bank::group_rebaseline(before.binding.entry,0,
+        before.binding.epoch,&before.descriptor,&now.descriptor) {
+        return Err(BankRefusal::Diverged("warm exit without its group exchange"));
+    }
+    let restore=super::BankTrack {before:Snapshot {descriptor:now.descriptor,..exit.mii.before},
+        descriptor:exit.mii.descriptor,..*bank};
+    let now=match bank_restore(&restore,exit.configuration,exit.published) {
+        Ok(restored)=>restored.now,
+        Err(why) if why==helpers::BUSY=>return Err(BankRefusal::Busy),
+        Err(why)=>return Err(BankRefusal::Diverged(why)),
+    };
+    let mut state=super::STATE.lock();
+    let current=state.bank.is_some_and(|t|t.ticket==bank.ticket && t.token==bank.token && !t.departed)
+        && super::epoch()==before.binding.epoch;
+    let Some(owner)=state.owner.as_mut().filter(|o|current && o.expected==exit.adopted && o.active==Some(exit.configuration)) else {
+        return Err(BankRefusal::Diverged("warm exit ticket/owner changed after the restore"));
+    };
+    let mut registry=final_registry(helpers,Some(bank.token)).map_err(BankRefusal::Diverged)?;
+    owner.cursor=bank.destination.cursor;
+    owner.expected=now;owner.active=None;
+    registry.commit(now.authority(),now.original_kind,super::descriptor_kind(&now.descriptor));
+    super::note("[GroupSwap] warm exit: Player Mii publication restored; descriptor/header/body proof passed");
+    state.bank=None;state.mii_exit=None;
+    drop(registry);drop(state);
+    Ok(Settled {now,exact:None,resource_pair:None})
+}
+
 /// Ready proof for the generic roster loader, which writes nothing here. Compares the fresh
 /// state only with the receipt's `before` snapshot and the staged generic descriptor; arbitrary
 /// current state is never adopted. Native may replace the O object, so O identity is not compared.
