@@ -6,8 +6,8 @@ carry records (`docs/provenance/pkg6-carry-manifest.json`, `pkg6-carry-ledger.md
 This page is the parity checklist of 2026-11-05 (branch `p23/mii-editor`). "Fork" paths are relative to the M5q
 stage; "Here" paths to this repository.
 
-The native editor ran on the fork's builds. In this repository its behaviour has passed host tests only; the Eden rows
-for it are in `artifacts/phase23/rc4-combined/rows-mii/` and have not run yet.
+The native editor ran on the fork's builds. In this repository the rows below have host tests, and the rc.6 Eden rows
+that ran them are listed under [Eden, rc.6](#eden-rc6).
 
 ## Checklist
 
@@ -41,13 +41,20 @@ for it are in `artifacts/phase23/rc4-combined/rows-mii/` and have not run yet.
   workflows (operator: "yes port enable the fork's Replay Window retry / exact-Mii named macros", then "Switch CPU to
   recorded fighter, Setup library, Edit placement"). The RC flag `ADVANCED_RECORDING_WORKFLOWS` and its gates are
   gone: the fork's code runs as it did.
-  - **Replay window** (Recording → Named macros): choosing a capture's Mii track retries a missed import (the track's
-    target is "not resolved" until the window resolves the recorded Mii,
+  - **Replay window** (Recording › Replays › Replay window): choosing a capture's Mii track retries a missed import (the
+    track's target is "not resolved" until the window resolves the recorded Mii,
     `engine::macro_ui::replay_target::clip_target`), then Switch loads that exact Mii on the CPU. An ordinary track's
-    Switch loads its fighter.
-  - **Named macros:** a macro carrying a Mii, or recorded with another ordinary fighter, offers Switch (load the recorded
-    fighter or exact Mii) or Keep (play on the current CPU).
-  - **Edit placement** and the **Setup library** (Saves → Setup library) are back.
+    Switch loads its fighter. rc.6: the capture's import runs while the window waits for it (`Owners::REPLAY_LOADING`,
+    `src/model/input_delay.rs`); the window's own Fighter Mismatch question is drawn (cov-rest `66a9a53`, `2891eaa`).
+  - **Recorded macros:** since rc.5 every macro is a named file ([RECORDING.md](RECORDING.md)). A CPU macro recorded on
+    an exact Mii asks Fighter Mismatch, and Switch loads that exact Mii (cov-rest `cbe961a`); one recorded on another
+    ordinary fighter loads that fighter. Keep plays on the current CPU.
+  - **A Mii without its own ID and name** (one from a replay keeps CharInfo bytes `0x00..0x26` zero): the CPU install
+    writes the saved native Mii with the same look (row 12), or else the Mii with an ID made from its look and the name
+    "New Mii". The game's own Mii setup binds no Mii resource for a CharInfo without them, and the body then read null
+    memory (cov-rest `f2298ee`, `src/model/mii_install.rs` `installable`).
+  - **Edit placement** and the **Setup library** (Saves › Setup library) are back. Edit placement edits the active
+    macro of the role in view ([RECORDING.md](RECORDING.md), Replays).
 - **Editor trace file** (`mii-editor-last.json`): diagnostic builds only; the fork wrote it in every build.
 - **Menu input gate:** the editor also waits while the game's pause or the native waiting-room menu is open (the
   shared `captures_input`), not only for the plugin menu.
@@ -67,3 +74,40 @@ Every game function the Mii code hooks or calls has an exact 64-byte row in `src
 `compared_rows_match_the_owned_elf`. The editor installs only when every row of its preflight passes
 (`install::run`). The port added `mii_editor_bridge.called_376d990`, the Colour selector the resume path calls, which
 had no guard in the fork.
+
+## Mii groups and seats in rc.6
+
+- **Async build:** a Mii group is constructed on the task worker like an ordinary group, not by the synchronous loop
+  on the game thread (`async_build_eligible`, `src/model/swap/body_bank.rs:753`). The 2026-11-02 restriction stays for
+  native groups (Pokémon Trainer, Aegis) and the Ice Climbers pair.
+- **Warm exit:** leaving a Mii group for the window it displaced is a warm exchange; the Mii switch's publication is
+  put back in the settle tick (`plan_mii_exit`, `src/runtime/roster/native_body_bank.rs:989`). TODO-PROOF: hot lane,
+  the exit to any built group, and Mii groups built in the background (`p23/rc6-hot-slots-mii`).
+- **No. of CPUs seats:** a seat member keeps its exact-Mii configuration, so a Mii seat loads through the Mii helper
+  (`seat_load`, `src/model/parked_entries.rs:257`), and the seats park at one CPU whatever the plan lists
+  (`parked_seat`, `:269`). A promoted seat parked again gets its Mii proof re-recorded only when its identity is
+  unchanged.
+- **Portrait first:** a Mii press waits while that role's HUD portrait renders on a helper, and a seat load holds back
+  while a portrait waits for one (`Blocker::Portrait`, `src/model/swap/source_load.rs:150`;
+  `seat_load_waits`, `src/model/parked_entries.rs:310`). The press runs after the render; it is not dropped.
+
+## Eden, rc.6
+
+Each run is a diag build of the named commit, 2026-11-08. Evidence is under `artifacts/phase23/rc6-eden/<run>/` and
+`artifacts/phase23/rc6-item3-re/`.
+
+| Rows above | Eden row | Run (build) | Result |
+| --- | --- | --- | --- |
+| 1, 2, 4, 7 | `cr-mii-exit`, `cr-mii-identical`, `cr-mii-changed`: no save on exit, the saved Mii reused, one new `mii_<id>.bin` | `covrest-16` (`1f6285c`) | pass |
+| 4 | `cr-mii-rename-same`: a rename-only Save reuses the saved Mii and shows "Same as ‹name›, nothing new saved" | `covrest-07` (`f5a73c0`) | pass |
+| 5 | `cr-mii-name-test`: the Name keyboard and Test | `covrest-07` (`f5a73c0`) | pass |
+| 6 | `p00`–`p07` and the resume rows: a match starts while the editor is open in a Local Wireless room; the editor comes back with the typed name | `covrest-pair-y3` (`8e50b22`) | pass |
+| 11, 12 | `cov-replay-window`: the capture's Mii track asks, and Switch loads the recorded Mii | `covrest-yoga-04` (`cbe961a`) | pass |
+| Recorded macros | `cov-named-mii`: a CPU macro recorded on an exact Mii, Switch loads it, 0 Unmapped | `covrest-yoga-04` (`cbe961a`) | pass |
+| 14, 17, 18 | `cr-cpu-cycle-list`, `cr-player-cycle-list`: the Mii classes load in both cycles | `covrest-16` (`1f6285c`) | pass |
+| 18, seats | `cr-f9-raise-again`, `cr-f9-mii-cycles`: a Mii seat loads the saved Mii; the classes stay in both cycles after a raise and a drop | `covrest-09` (`f98813b`), `covrest-14` (`0c4b48b`) | pass |
+| 20 | `cr-p2-lra-mii`: Player 2 controls a Mii CPU, after L+R+A too | `covrest-16` (`1f6285c`) | pass |
+| Async build, warm exit | `me-p1-lap`, `me-cpu-lap`: every press applied, one Mii build per role, the exit 50–114 ms | `rc6-hot-xps6` (`d6a485f`) | pass |
+
+The `covrest-yoga-04` and `covrest-pair-y3` builds carry cov-rest commits that reach the rc.6 candidate with the
+cov-rest merge (TODO-PROOF: final pass).
