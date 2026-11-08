@@ -89,6 +89,38 @@ pub fn creation_matches(native: Words, window: Words) -> bool {
     native.count == 1 && native.kinds == [window.kinds[0], NONE, NONE]
 }
 
+/// The original's own request when its scene began with a start-up window. The origin both Mii adapters capture is the
+/// live entry after H3, so it carries the window's words; staged as "back to the original", native was asked to reload
+/// ordinary bodies whose resources only the start-up bank requests (rc6-hot-xps2: a construction read an unloaded
+/// resource and its thread died) and the bank planner could not serve the original warm. The request is native's
+/// single form H3 started from ([`creation_matches`]): count 1, `[original, −1, −1]`, one actor, active 0, every other
+/// byte as captured. Any other words are native's own (one body, PT, the IC pair, Aegis, a Mii) and stay.
+pub fn original_request(descriptor: [u8; 0x70], original: u32) -> [u8; 0x70] {
+    let word = |at: usize| u32::from_le_bytes([descriptor[at], descriptor[at + 1], descriptor[at + 2], descriptor[at + 3]]);
+    let words = Words { count: word(0x14), kinds: [word(0x18), word(0x1c), word(0x20)], actor_count: word(0x28),
+        active: descriptor[0x43] };
+    if !start_up_words(words, original) {
+        return descriptor;
+    }
+    let mut request = descriptor;
+    request[0x14..0x18].copy_from_slice(&1u32.to_le_bytes());
+    for (i, kind) in [original, NONE, NONE].iter().enumerate() {
+        request[0x18 + i * 4..0x1c + i * 4].copy_from_slice(&kind.to_le_bytes());
+    }
+    request[0x28..0x2c].copy_from_slice(&1u32.to_le_bytes());
+    request[0x43] = 0;
+    request
+}
+
+/// The words H3 writes for `original` ([`entry_window`], [`Words::of`]): two or three single-body bankable members
+/// (never the IC pair), the original at cell 0, one actor, active 0.
+fn start_up_words(words: Words, original: u32) -> bool {
+    let count = words.count as usize;
+    (2..=3).contains(&count) && words.kinds[0] == original && words.actor_count == 1 && words.active == 0
+        && words.kinds[..count].iter().all(|kind| *kind != NONE && bankable_kind(*kind) && !matches!(*kind, 0x4b | 0x4c))
+        && words.kinds[count..].iter().all(|kind| *kind == NONE)
+}
+
 /// A window published by H1, before the entry exists: keyed by owner and its words, for the scene epoch it was made
 /// in. H4 binds it to the first constructed entry of that owner whose descriptor shows exactly these words, in the
 /// same epoch.
@@ -218,6 +250,41 @@ mod tests {
         assert_eq!(scene_generation(at_h1, after_the_change, false), at_h1,
             "departed or retired: the old stamp, so an exchange from an earlier scene stays refused");
         assert_eq!(scene_generation(after_the_change, after_the_change, true), after_the_change, "already current");
+    }
+
+    /// rc6-hot-xps2 (2026-11-08, XPS): P1 lap switch 07, back to the original Mario from the group [Ness, Mario], staged
+    /// the origin's start-up window `(3, [0, 1, 2])` as the request; native reloaded three ordinary bodies, a
+    /// construction read an unloaded resource and its thread died. The original's request is native's single form H3
+    /// started from; every other byte stays, and native's own words (one body, PT, the IC pair, Aegis, a Mii) stay.
+    #[test]
+    fn the_original_request_is_natives_single_form_of_a_start_up_window() {
+        fn descriptor(count: u32, kinds: [u32; 3], actors: u32, active: u8) -> [u8; 0x70] {
+            let mut d = [0x5au8; 0x70];
+            d[0x14..0x18].copy_from_slice(&count.to_le_bytes());
+            for (i, kind) in kinds.iter().enumerate() {
+                d[0x18 + i * 4..0x1c + i * 4].copy_from_slice(&kind.to_le_bytes());
+            }
+            d[0x28..0x2c].copy_from_slice(&actors.to_le_bytes());
+            d[0x43] = active;
+            d
+        }
+        let window = descriptor(3, [MARIO, DK, LINK], 1, 0);
+        assert_eq!(original_request(window, MARIO), descriptor(1, [MARIO, NONE, NONE], 1, 0), "the start-up window");
+        assert_eq!(original_request(descriptor(2, [STEVE, MARIO, NONE], 1, 0), STEVE),
+            descriptor(1, [STEVE, NONE, NONE], 1, 0), "a two-body window");
+        assert_eq!(original_request(descriptor(3, [KIRBY, MARIO, DK], 1, 0), KIRBY),
+            descriptor(1, [KIRBY, NONE, NONE], 1, 0), "a Kirby original keeps cell 0");
+        for (words, original, why) in [
+            (descriptor(1, [MARIO, NONE, NONE], 1, 0), MARIO, "native's one body"),
+            (descriptor(3, [0x24, 0x25, 0x26], 1, 0), 0x24, "Pokémon Trainer"),
+            (descriptor(2, [0x4b, 0x4c, NONE], 2, 0), 0x4b, "the IC pair"),
+            (descriptor(2, [0x5a, 0x5b, NONE], 1, 0), 0x5a, "Aegis"),
+            (descriptor(1, [0x48, NONE, NONE], 1, 0), 0x48, "a Mii"),
+            (window, DK, "another fighter's window"),
+            (descriptor(3, [MARIO, DK, LINK], 1, 1), MARIO, "not the original's cell"),
+        ] {
+            assert_eq!(original_request(words, original), words, "{why}");
+        }
     }
 
     /// Primary 12:40Z (cov-rest `covrest-02`, rc.5 diag): the CPU cycle Mario, Mii Brawler, Swordfighter, Gunner, Link

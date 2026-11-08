@@ -7773,7 +7773,7 @@
    "dest": "src/runtime/mii/mii_ordinary_cpu.rs",
    "crate": "root",
    "src_sha256": "db7e15715560db924eba68ba570e97540f1b445b1cf4989a172c0426dd32c6ce",
-   "dest_sha256": "e5823c1c9d252adb288a27c82d760dc1467900ebec2868e001dfb75cee4355a0",
+   "dest_sha256": "d06705277ff8440b61a78ed22a68e4b48c74b8ec67f9ad27d6acd5b4b3b7b6b7",
    "edits": [
     {
      "old": "fn note(reason:&str) { trace!(\"[MiiOrdinaryCpu] {reason}\"); }",
@@ -8049,6 +8049,16 @@
      "old": "pub(super) fn scene_changed() {\n    let mut s=STATE.lock();s.capture=false;s.menu_valid=false;s.catalog=None;s.request=None;s.replay_result=None;s.recapture_log=None;\n",
      "new": "pub(super) fn scene_changed() {\n    publish_admission(crate::engine::swap::cycle_members::NO_MII);\n    let mut s=STATE.lock();s.capture=false;s.menu_valid=false;s.catalog=None;s.request=None;s.replay_result=None;s.recapture_log=None;\n",
      "reason": "P-CYCLE (operator 2026-11-05: a Mii Gunner cycled for the CPU though the menu did not list it): every cycle walker walks engine::swap::cycle_members (the one list the portrait grid numbers); the CPU Mii owner computes its Mii admission (cycle_members::cpu_admission) under its own lock, walks it and publishes it; the menu reads it and each role's slot 0 (character_roster::cycle_facts)"
+    },
+    {
+     "old": "            mii_cycle::Target::Original=>{\n                if let Some(c)=origin_saved {native::target_rows(c)?;}\n                Target::ORIGINAL\n            },\n",
+     "new": "            mii_cycle::Target::Original=>{\n                if let Some(c)=origin_saved {native::target_rows(c)?;}\n                // P-HOT B: an origin captured after H3 carries the start-up window; the original is its single form.\n                descriptor=crate::engine::swap::entry_window::original_request(descriptor,origin.original_kind);\n                Target::ORIGINAL\n            },\n",
+     "reason": "P-HOT B (rc6-hot-xps2, 2026-11-08: P1 lap switch 07 back to the original Mario reloaded the start-up window (3, [0, 1, 2]) natively; a construction thread read an unloaded resource at main+0x35c2958 and died, every later swap was refused and Quit Training hung): the origin captured after H3 carries the start-up window, so the original is staged and recognised as native's single form (entry_window::original_request)"
+    },
+    {
+     "old": "                let index=if origin.layout.waiting() {origin.index}else{0};\n                descriptor[0x46..0x48].copy_from_slice(&index.to_le_bytes());\n                if kind==origin.original_kind && descriptor==live_origin {Target::ORIGINAL}\n                else {Target::fighter(kind)}\n            }\n",
+     "new": "                let index=if origin.layout.waiting() {origin.index}else{0};\n                descriptor[0x46..0x48].copy_from_slice(&index.to_le_bytes());\n                if kind==origin.original_kind && (descriptor==live_origin\n                    || descriptor==crate::engine::swap::entry_window::original_request(live_origin,origin.original_kind)) {Target::ORIGINAL}\n                else {Target::fighter(kind)}\n            }\n",
+     "reason": "P-HOT B (rc6-hot-xps2, 2026-11-08: P1 lap switch 07 back to the original Mario reloaded the start-up window (3, [0, 1, 2]) natively; a construction thread read an unloaded resource at main+0x35c2958 and died, every later swap was refused and Quit Training hung): the origin captured after H3 carries the start-up window, so the original is staged and recognised as native's single form (entry_window::original_request)"
     }
    ]
   },
@@ -8057,7 +8067,7 @@
    "dest": "src/runtime/mii/mii_ordinary_cpu_native.rs",
    "crate": "root",
    "src_sha256": "74f7f1c6dc08e35587866089d39528392008767e3ab20b6842c2e924e9d3a3dd",
-   "dest_sha256": "2db7643c97a1b9f43010b70596cc1b6baa431acff86912e5795f4b2c2596176c",
+   "dest_sha256": "3bbf69a699d020e31a6edfa99311d52ff32add203816fc11401c542f094a9c80",
    "edits": [
     {
      "old": "super::note(&format!(\"[MiiOrdinaryCpu] bank settle diverged",
@@ -8128,6 +8138,11 @@
      "old": "            let record=now.records.iter().flatten().find(|(index,_)|*index==id as u16)\n                .ok_or(\"CPU origin helper record absent\")?;\n            let original_kind=match now.helpers.slots[now.layout.helper(id).unwrap()] {\n                helpers::Helper::Ready {proof,..}=>i64::from(proof.original.kind),\n                helpers::Helper::Unmanaged=>i64::from(rd::<u32>(owner.entry,0x18)),\n                helpers::Helper::Unavailable {..}=>return Err(helpers::CaptureError::Refused(\"CPU helper authority unavailable\")),\n",
      "new": "            let record=now.records.iter().flatten().find(|(index,_)|*index==id as u16)\n                .ok_or(\"CPU origin helper record absent\")?;\n            let original_kind=match now.helpers.slots[now.layout.helper(id).unwrap()] {\n                #[cfg(any(test, feature = \"mii-managed-source-coexist-alpha\"))]\n                helpers::Helper::Ready {proof,..}=>i64::from(proof.original.kind),\n                helpers::Helper::Unmanaged=>i64::from(rd::<u32>(owner.entry,0x18)),\n                helpers::Helper::Unavailable {..}=>return Err(helpers::CaptureError::Refused(\"CPU helper authority unavailable\")),\n",
      "reason": "Integrate approved Slim4b86500 retirement/scope and cold-owner/SDK roots into current composed source. Preserve current pkg6 const locks, F6 task ordering, Setup lifecycle and Deluxe persistence. Retired probe consumers removed with their features; shared host oracle retained. New exact composition requires fresh gates."
+    },
+    {
+     "old": "        live_is_saved:owner.live.target.saved().is_some(),kind,origin_kind:owner.origin.original_kind,\n        published_kind:published,index:now.index,\n        descriptor_equals_origin:now.descriptor==live_origin,roster_cursor:cursor,\n    })?;\n    let registry=final_registry(now.helpers,Some(g.token))?;\n",
+     "new": "        live_is_saved:owner.live.target.saved().is_some(),kind,origin_kind:owner.origin.original_kind,\n        published_kind:published,index:now.index,\n        descriptor_equals_origin:now.descriptor==live_origin\n            || now.descriptor==crate::engine::swap::entry_window::original_request(live_origin,owner.origin.original_kind),\n        roster_cursor:cursor,\n    })?;\n    let registry=final_registry(now.helpers,Some(g.token))?;\n",
+     "reason": "P-HOT B (rc6-hot-xps2, 2026-11-08: P1 lap switch 07 back to the original Mario reloaded the start-up window (3, [0, 1, 2]) natively; a construction thread read an unloaded resource at main+0x35c2958 and died, every later swap was refused and Quit Training hung): the origin captured after H3 carries the start-up window, so the original is staged and recognised as native's single form (entry_window::original_request)"
     }
    ]
   },
@@ -8299,7 +8314,7 @@
    "dest": "src/runtime/mii/mii_ordinary_player.rs",
    "crate": "root",
    "src_sha256": "73e84c925f3aaedd6c09fd082ba41364d160e8cca38cc604617d5fdc38431b8d",
-   "dest_sha256": "44e3639c76488dc06e8d2aad1654527f8a50a0f69a0449c12978b761052b4d73",
+   "dest_sha256": "ad4d139f68e17f4ebb4eac3a2ac9ac4a3bcddbb90f328195a800236a581d1c87",
    "edits": [
     {
      "old": "fn note(reason:&str) { trace!(\"[MiiOrdinaryPlayer] {reason}\"); }",
@@ -8540,6 +8555,21 @@
      "old": "    }\n}\npub(super) fn scene_changed() {\n    let mut s=STATE.lock();s.capture=false;s.menu_valid=false;s.catalog=None;s.request=None;\n    s.generic=None;s.restore=None;\n    #[cfg(feature=\"native-body-bank-alpha\")]\n",
      "new": "    }\n}\npub(super) fn scene_changed() {\n    publish_admission(crate::engine::swap::cycle_members::NO_MII);\n    let mut s=STATE.lock();s.capture=false;s.menu_valid=false;s.catalog=None;s.request=None;\n    s.generic=None;s.restore=None;\n    #[cfg(feature=\"native-body-bank-alpha\")]\n",
      "reason": "P1-CYCLE (operator 2026-11-05: a Mii class cycled on P1 though the P1 Cycles grid did not number it, and a missing roster key disagreed): the Player Mii owner publishes cycle_members::player_admission; the P1 Cycles grid and every Player walker use that one list"
+    },
+    {
+     "old": "        let original=o.origin_saved.map_or(PlayerOrigin::NotMii,\n            |c|PlayerOrigin::Mii(crate::engine::mii::selection::Origin(c.canonical())));\n        let live=if o.cursor.is_none() && o.expected.descriptor==o.origin.descriptor\n            && o.active==o.origin_saved {PlayerLive::Origin}\n            else {o.active.map_or(PlayerLive::Origin,|c|\n",
+     "new": "        let original=o.origin_saved.map_or(PlayerOrigin::NotMii,\n            |c|PlayerOrigin::Mii(crate::engine::mii::selection::Origin(c.canonical())));\n        let live=if o.cursor.is_none() && (o.expected.descriptor==o.origin.descriptor\n            || o.expected.descriptor==crate::engine::swap::entry_window::original_request(o.origin.descriptor,o.origin.original_kind))\n            && o.active==o.origin_saved {PlayerLive::Origin}\n            else {o.active.map_or(PlayerLive::Origin,|c|\n",
+     "reason": "P-HOT B (rc6-hot-xps2, 2026-11-08: P1 lap switch 07 back to the original Mario reloaded the start-up window (3, [0, 1, 2]) natively; a construction thread read an unloaded resource at main+0x35c2958 and died, every later swap was refused and Quit Training hung): the origin captured after H3 carries the start-up window, so the original is staged and recognised as native's single form (entry_window::original_request)"
+    },
+    {
+     "old": "    origin_saved:Option<Configuration>,cursor:Option<usize>)->bool {\n    cursor.is_none() && active==origin_saved && (expected.descriptor==origin.descriptor\n        || (origin.original_kind==0x4b && descriptor_kind(&expected.descriptor)==0x4b)\n        || (origin_saved.is_none() && logical_kind(expected)==origin.original_kind\n",
+     "new": "    origin_saved:Option<Configuration>,cursor:Option<usize>)->bool {\n    cursor.is_none() && active==origin_saved && (expected.descriptor==origin.descriptor\n        || expected.descriptor==crate::engine::swap::entry_window::original_request(origin.descriptor,origin.original_kind)\n        || (origin.original_kind==0x4b && descriptor_kind(&expected.descriptor)==0x4b)\n        || (origin_saved.is_none() && logical_kind(expected)==origin.original_kind\n",
+     "reason": "P-HOT B (rc6-hot-xps2, 2026-11-08: P1 lap switch 07 back to the original Mario reloaded the start-up window (3, [0, 1, 2]) natively; a construction thread read an unloaded resource at main+0x35c2958 and died, every later swap was refused and Quit Training hung): the origin captured after H3 carries the start-up window, so the original is staged and recognised as native's single form (entry_window::original_request)"
+    },
+    {
+     "old": "            mii_cycle::Target::Original=>{\n                if let Some(c)=origin_saved {native::target_rows(c)?;}\n                let mut descriptor=origin.descriptor;\n                if origin.original_kind==0x4b {\n                    let forms=requested_forms_at(&menu,Role::Player,0x4b,None);\n",
+     "new": "            mii_cycle::Target::Original=>{\n                if let Some(c)=origin_saved {native::target_rows(c)?;}\n                // P-HOT B: an origin captured after H3 carries the start-up window; the original is its single form.\n                let mut descriptor=crate::engine::swap::entry_window::original_request(origin.descriptor,origin.original_kind);\n                if origin.original_kind==0x4b {\n                    let forms=requested_forms_at(&menu,Role::Player,0x4b,None);\n",
+     "reason": "P-HOT B (rc6-hot-xps2, 2026-11-08: P1 lap switch 07 back to the original Mario reloaded the start-up window (3, [0, 1, 2]) natively; a construction thread read an unloaded resource at main+0x35c2958 and died, every later swap was refused and Quit Training hung): the origin captured after H3 carries the start-up window, so the original is staged and recognised as native's single form (entry_window::original_request)"
     }
    ]
   },

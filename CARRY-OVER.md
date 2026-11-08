@@ -777,3 +777,23 @@ Tests: `a_kept_start_up_window_joins_its_scenes_owner_generation`,
 `a_cpu_mii_group_exchange_out_of_a_kept_window_after_the_scene_change` (the cov-rest CPU Mii cycle, primary 12:40Z),
 `a_hats_only_plan_creates_four_entries_before_the_borrow`, `tests/startup_window_wiring.rs` (+1),
 `tests/hat_slots_wiring.rs` (+1).
+
+### p23/rc6-hot-slots: back to the original after a start-up window is native's single form (2026-11-08)
+
+The re-prove boot `rc6-hot-xps2` (XPS, diag `e025ad2c`) crashed a native thread on P1 lap switch 07, back to the
+original Mario from the group [Ness, Mario]. Both Mii adapters capture their origin from the live entry once the
+scene is up, which since P-HOT B is the start-up window H3 wrote. "Back to the original" staged that window,
+`(3, [0, 1, 2])`, as the request:
+- the bank planner refused it as a multi-member request, so the original was never served warm;
+- native reloaded three ordinary bodies whose resources only the start-up bank requests. A construction job read an
+  unloaded resource (`main+0x35c2958`, null `+0x20`/`+0x40`, then a call through address 0); the reload never
+  settled, every later swap was refused, and Quit Training hung.
+
+Now the original's request is native's single form H3 started from (`entry_window::original_request`: count 1,
+`[original, −1, −1]`, one actor, active 0, every other byte as captured). The adapters also recognise that form as
+the original: `mii_ordinary_player::at_origin` and `player_context`, the CPU's Fighter staging, and the CPU commit's
+`descriptor_equals_origin`. Native's own words (one body, PT, the IC pair, Aegis, a Mii) stay as they are.
+
+6 recorded manifest edits of `mii_ordinary_player.rs`, `mii_ordinary_cpu.rs` and `mii_ordinary_cpu_native.rs`;
+`carry_pkg6.py verify` re-derives all 250 files. Tests: `the_original_request_is_natives_single_form_of_a_start_up_window`,
+`tests/startup_window_wiring.rs` `back_to_the_original_stages_natives_single_form`.

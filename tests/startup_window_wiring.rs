@@ -82,3 +82,27 @@ fn a_kept_start_up_window_joins_the_new_owner_generation() {
     let owner = body(BANK, "unsafe fn group_owner(");
     assert!(owner.contains("if epoch != bank.epoch || resource != bank.alias { return None; }"), "the proof it satisfies");
 }
+
+/// rc6-hot-xps2 (2026-11-08, XPS): the origin both Mii adapters capture is the live entry after H3, the start-up window.
+/// Staged as "back to the original" it reloaded three ordinary bodies natively and a construction thread died on an
+/// unloaded resource. Both adapters stage native's single form for the original (`entry_window::original_request`).
+#[test]
+fn back_to_the_original_stages_natives_single_form() {
+    let player = include_str!("../src/runtime/mii/mii_ordinary_player.rs");
+    let arm = &player[player.find("            mii_cycle::Target::Original=>{\n                if let Some(c)=origin_saved {native::target_rows(c)?;}")
+        .expect("the Player's Original staging")..];
+    assert!(arm[..400].contains("entry_window::original_request(origin.descriptor,origin.original_kind)"), "{}", &arm[..400]);
+    let cpu = include_str!("../src/runtime/mii/mii_ordinary_cpu.rs");
+    let arm = &cpu[cpu.find("            mii_cycle::Target::Original=>{\n                if let Some(c)=origin_saved {native::target_rows(c)?;}")
+        .expect("the CPU's Original staging")..];
+    assert!(arm[..400].contains("descriptor=crate::engine::swap::entry_window::original_request(descriptor,origin.original_kind);"),
+        "{}", &arm[..400]);
+    // The returned original is recognised as the original: the Player's `at_origin`, the CPU's Fighter staging and the
+    // CPU commit's `descriptor_equals_origin`.
+    let at_origin = body(player, "unsafe fn at_origin(");
+    assert!(at_origin.contains("expected.descriptor==crate::engine::swap::entry_window::original_request(origin.descriptor,origin.original_kind)"),
+        "{at_origin}");
+    assert!(cpu.contains("|| descriptor==crate::engine::swap::entry_window::original_request(live_origin,origin.original_kind)) {Target::ORIGINAL}"));
+    let native = include_str!("../src/runtime/mii/mii_ordinary_cpu_native.rs");
+    assert!(native.contains("|| now.descriptor==crate::engine::swap::entry_window::original_request(live_origin,owner.origin.original_kind),"));
+}
