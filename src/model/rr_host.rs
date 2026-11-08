@@ -10,6 +10,7 @@ use super::library::{
     Chain, Drill, DrillKind, Kind, LegacySlot, LoopCount, NamedSave, RecordingIndex, Role, Sequence,
     StartSaveState, Use, MACROS_DIR, SAVES_DIR, SEQUENCES_DIR,
 };
+use super::frame_queue::FrameQueue;
 use super::macros::{FrameSnapshot, FrameWindow, InputFrame, Library, MAX_FRAMES};
 use super::playback::{Book, Playback, StartLink};
 use super::rr_runtime::{
@@ -38,10 +39,11 @@ static PLAY_PLAYER: AtomicBool = AtomicBool::new(false);
 static PLAY_CPU: AtomicBool = AtomicBool::new(false);
 static MASH: AtomicBool = AtomicBool::new(false);
 static MIGRATED: AtomicBool = AtomicBool::new(false);
-static PLAYER_BITS: AtomicU64 = AtomicU64::new(0);
-static PLAYER_READY: AtomicBool = AtomicBool::new(false);
-static CPU_BITS: AtomicU64 = AtomicU64::new(0);
-static CPU_READY: AtomicBool = AtomicBool::new(false);
+/// Played frames, filled ahead by the worker and taken one per game frame by Player 1's poll and the
+/// CPU's AI epilogue. One slot lost frames: the worker is not tied to the game's frames (Eden
+/// `rc5-fid-measure1`, 2026-11-08: one CPU frame every three AI frames on a recorded play).
+static PLAYER_FRAMES: hos_lock::Mutex<FrameQueue> = hos_lock::Mutex::new(FrameQueue::new());
+static CPU_FRAMES: hos_lock::Mutex<FrameQueue> = hos_lock::Mutex::new(FrameQueue::new());
 static CURRENT_KIND: AtomicU32 = AtomicU32::new(u32::MAX);
 static RUN_PLAYER: AtomicBool = AtomicBool::new(false);
 static RUN_CPU: AtomicBool = AtomicBool::new(false);
@@ -147,7 +149,12 @@ fn waiting_work() -> bool {
 }
 
 fn playing() -> bool {
-    RUN_PLAYER.load(Ordering::Acquire) || RUN_CPU.load(Ordering::Acquire)
+    role_playing(Role::Player) || role_playing(Role::Cpu)
+}
+
+/// The machine still steps the role, or its hook still has frames of the run to play.
+fn role_playing(role: Role) -> bool {
+    run_flag(role).load(Ordering::Acquire) || !role_frames(role).lock().is_empty()
 }
 
 fn run_flag(role: Role) -> &'static AtomicBool {
@@ -310,12 +317,12 @@ pub(crate) fn capture_role() -> u8 {
 }
 
 pub fn take_player_frame() -> Option<InputFrame> {
-    take_frame(&PLAYER_READY, &PLAYER_BITS)
+    take_frame(&PLAYER_FRAMES)
 }
 
 #[cfg(any(test, target_os = "switch"))]
 pub(crate) fn take_cpu_frame() -> Option<InputFrame> {
-    take_frame(&CPU_READY, &CPU_BITS)
+    take_frame(&CPU_FRAMES)
 }
 
 /// Player 1's poll. Injects one posted frame, then stores the output when Player 1 is the recorded role.
@@ -428,6 +435,8 @@ pub fn service_at(
         drive_mash(machine, Role::Cpu, true);
         RUN_PLAYER.store(false, Ordering::Release);
         RUN_CPU.store(false, Ordering::Release);
+        drop_frames(Role::Player);
+        drop_frames(Role::Cpu);
         tick.diags.push("screen=playback mash=1".to_string());
     }
     release_held(&mut play_player, &mut play_cpu);
@@ -624,6 +633,13 @@ fn play_role(root: &Path, machine: &mut Playback, book: &Book, role: Role, tick:
         // The fighters match now: an answer to an earlier question applies to nothing and must not answer the next one.
         lock(&ANSWER).take();
     }
+    if !machine.playing(role) && !role_frames(role).lock().is_empty() {
+        // The machine has handed over its last frames but the hook is still playing them: the chord stops
+        // that run, as it does while the machine still steps.
+        drop_frames(role);
+        run_flag(role).store(false, Ordering::Release);
+        return;
+    }
     let effect = drive_play(machine, role, book);
     let word = if role == Role::Player {
         "player"
@@ -637,6 +653,9 @@ fn play_role(root: &Path, machine: &mut Playback, book: &Book, role: Role, tick:
         WARP_HOLD.store(true, Ordering::Release);
     }
     note_missing_start(root, book, role, tick);
+    if effect.stopped || effect.started {
+        drop_frames(role);
+    }
     if effect.stopped {
         run_flag(role).store(false, Ordering::Release);
     }
@@ -648,13 +667,20 @@ fn play_role(root: &Path, machine: &mut Playback, book: &Book, role: Role, tick:
     }
 }
 
+/// Fill the role's queue ahead of its hook, in file order. The hook takes one frame per game frame, so a
+/// late or doubled worker tick neither drops nor repeats one.
 fn step_role(root: &Path, machine: &mut Playback, book: &Book, role: Role) {
     if WARP_HOLD.load(Ordering::Acquire) {
         return;
     }
-    match drive_step(machine, role, book) {
-        Some(played) => publish(role, resident_frame(root, &played)),
-        None => run_flag(role).store(false, Ordering::Release),
+    while role_frames(role).lock().room() > 0 {
+        match drive_step(machine, role, book) {
+            Some(played) => publish(role, resident_frame(root, &played)),
+            None => {
+                run_flag(role).store(false, Ordering::Release);
+                return;
+            }
+        }
     }
 }
 
@@ -696,12 +722,12 @@ fn resident_frame(root: &Path, played: &super::playback::Played) -> InputFrame {
 }
 
 fn publish(role: Role, frame: InputFrame) {
-    let (ready, bits) = match role {
-        Role::Player => (&PLAYER_READY, &PLAYER_BITS),
-        Role::Cpu => (&CPU_READY, &CPU_BITS),
-    };
-    bits.store(pack(frame), Ordering::Release);
-    ready.store(true, Ordering::Release);
+    role_frames(role).lock().push(pack(frame));
+}
+
+/// A run started, stopped or was cut by a mash: what it buffered is not played.
+fn drop_frames(role: Role) {
+    role_frames(role).lock().clear();
 }
 
 fn note_missing_start(root: &Path, book: &Book, role: Role, tick: &mut Tick) {
@@ -893,11 +919,15 @@ fn begin_make(
                     .push("screen=notice kind=macro-start-save-missing".to_string());
             }
         }
-        StartLink::Linked(id) => tick.warp = Some(id.to_string()),
+        StartLink::Linked(id) => {
+            tick.warp = Some(id.to_string());
+            WARP_HOLD.store(true, Ordering::Release);
+        }
         StartLink::None => {}
     }
     let effect = machine.play_file(Role::Player, book, source);
     if effect.started {
+        drop_frames(Role::Player);
         RUN_PLAYER.store(true, Ordering::Release);
         step_role(root, machine, book, Role::Player);
     }
@@ -910,7 +940,7 @@ fn begin_make(
 
 fn finish_make(root: &Path, tick: &mut Tick) {
     let ready = lock(&MAKE).as_ref().is_some_and(|job| job.ready);
-    if !ready || RUN_PLAYER.load(Ordering::Acquire) {
+    if !ready || role_playing(Role::Player) {
         return;
     }
     let Some(job) = lock(&MAKE).take() else {
@@ -1039,11 +1069,19 @@ fn taken_frames() -> (Role, Vec<InputFrame>) {
     (role, frames)
 }
 
-fn take_frame(ready: &AtomicBool, bits: &AtomicU64) -> Option<InputFrame> {
-    if ready.swap(false, Ordering::AcqRel) {
-        Some(unpack(bits.load(Ordering::Acquire)))
-    } else {
-        None
+/// One frame for this game frame. Nothing while a warp's restore is pending: a frame fed before the
+/// restore is undone by it, so the run waits where it is.
+fn take_frame(frames: &hos_lock::Mutex<FrameQueue>) -> Option<InputFrame> {
+    if WARP_HOLD.load(Ordering::Acquire) {
+        return None;
+    }
+    frames.lock().pop().map(unpack)
+}
+
+fn role_frames(role: Role) -> &'static hos_lock::Mutex<FrameQueue> {
+    match role {
+        Role::Player => &PLAYER_FRAMES,
+        Role::Cpu => &CPU_FRAMES,
     }
 }
 
@@ -1091,8 +1129,8 @@ fn reset_host() {
     PLAY_CPU.store(false, Ordering::Release);
     MASH.store(false, Ordering::Release);
     MIGRATED.store(false, Ordering::Release);
-    PLAYER_READY.store(false, Ordering::Release);
-    CPU_READY.store(false, Ordering::Release);
+    PLAYER_FRAMES.lock().clear();
+    CPU_FRAMES.lock().clear();
     CURRENT_KIND.store(u32::MAX, Ordering::Release);
     RUN_PLAYER.store(false, Ordering::Release);
     RUN_CPU.store(false, Ordering::Release);
@@ -1683,6 +1721,104 @@ mod tests {
         assert_eq!(take_cpu_frame().expect("no warp, no wait").buttons, 33_281);
     }
 
+    /// A file of `n` distinct frames (buttons 1..=n), active on `role`, with no start save.
+    fn active_plain_macro(root: &Path, role: Role, n: u32) -> Vec<u32> {
+        let _ = service_at(root, &none(), "2026-11-08", state(8), state(7), false);
+        let buttons: Vec<u32> = (1..=n).collect();
+        let frames = buttons.iter().map(|&buttons| InputFrame { buttons, ..InputFrame::default() }).collect();
+        let recording =
+            super::super::macros::MacroRecording::new("Run", "13.0.5", StartState::neutral(7, 0, 1.0), frames).unwrap();
+        let id = Library::new(root.join(MACROS_DIR)).save_new(&recording).unwrap();
+        let mut index = RecordingIndex::load(root).unwrap();
+        index.set_active(role, Some(&id), 1).unwrap();
+        index.save(root).unwrap();
+        buttons
+    }
+
+    fn tick(root: &Path) {
+        let _ = service_at(root, &none(), "2026-11-08", state(8), state(7), false);
+    }
+
+    /// Eden `rc5-fid-measure1` (2026-11-08): the worker's ticks are not the game's frames. Two ticks
+    /// between two AI frames overwrote a frame in the single slot, and an AI frame with no tick before it
+    /// got no frame, so the AI's own controls stood inside the run. Every file frame reaches the CPU
+    /// once, in order, one per AI frame, whatever the worker's timing.
+    #[test]
+    fn cpu_frames_reach_the_ai_once_each_whatever_the_worker_timing() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("cpu-timing");
+        let file = active_plain_macro(&root, Role::Cpu, 8);
+        on_chords(false, false, true);
+        tick(&root);
+        tick(&root);
+        let mut fed = Vec::new();
+        // AI frames with the worker ticking twice, not at all, once, not at all...
+        for ticks in [0usize, 0, 2, 1, 0, 0, 1, 3] {
+            for _ in 0..ticks {
+                tick(&root);
+            }
+            fed.push(take_cpu_frame().map(|frame| frame.buttons));
+        }
+        assert_eq!(fed, file.iter().map(|&b| Some(b)).collect::<Vec<_>>(), "one frame per AI frame, none lost");
+        tick(&root);
+        assert!(take_cpu_frame().is_none(), "the run is over");
+    }
+
+    /// The same transfer for Player 1's poll.
+    #[test]
+    fn player_frames_reach_the_poll_once_each_whatever_the_worker_timing() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("player-timing");
+        let file = active_plain_macro(&root, Role::Player, 6);
+        on_chords(false, true, false);
+        tick(&root);
+        tick(&root);
+        tick(&root);
+        let mut fed = Vec::new();
+        for ticks in [0usize, 0, 1, 0, 2, 0] {
+            for _ in 0..ticks {
+                tick(&root);
+            }
+            fed.push(take_player_frame().map(|frame| frame.buttons));
+        }
+        assert_eq!(fed, file.iter().map(|&b| Some(b)).collect::<Vec<_>>());
+    }
+
+    /// The Play chord again stops the run: nothing buffered is fed after the stop.
+    #[test]
+    fn a_stopped_cpu_run_feeds_nothing_more() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("cpu-stop");
+        let _file = active_plain_macro(&root, Role::Cpu, 8);
+        on_chords(false, false, true);
+        tick(&root);
+        assert_eq!(take_cpu_frame().map(|frame| frame.buttons), Some(1));
+        on_chords(false, false, true);
+        tick(&root);
+        assert!(take_cpu_frame().is_none(), "stopped");
+    }
+
+    /// A Play that warps holds the other role's buffered frames too, until the restore lands.
+    #[test]
+    fn a_warp_holds_the_buffered_cpu_frames_until_the_restore() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("cpu-hold");
+        let _file = active_plain_macro(&root, Role::Cpu, 8);
+        on_chords(false, false, true);
+        tick(&root);
+        assert_eq!(take_cpu_frame().map(|frame| frame.buttons), Some(1));
+        WARP_HOLD.store(true, Ordering::Release);
+        tick(&root);
+        assert!(take_cpu_frame().is_none(), "a frame fed before the restore is undone by it");
+        warp_landed();
+        tick(&root);
+        assert_eq!(take_cpu_frame().map(|frame| frame.buttons), Some(2), "the run goes on where it was");
+    }
+
     #[test]
     fn cpu_role_player_path_still_stores_the_polls() {
         let _hold = hold();
@@ -1752,6 +1888,10 @@ mod tests {
         post_effect(Effect::MakeCombo { source: source.clone(), chain: false });
         let playing = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
         assert_eq!(playing.warp.as_deref(), Some(save_id.as_str()));
+        assert!(take_player_frame().is_none(), "the source waits for its start save's restore");
+        warp_landed();
+        let fed = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
+        assert!(fed.diags.iter().all(|line| !line.contains("saved=1")), "the combo is made after the source has played");
         assert_eq!(take_player_frame().expect("source frame").buttons, 11);
         let saved = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
         assert!(saved.diags.iter().any(|line| line.contains("screen=make-combo") && line.contains("saved=1")));
@@ -1776,6 +1916,7 @@ mod tests {
         set_strip_sample(Some(crate::model::combo::Combo::default()));
         post_effect(Effect::MakeCombo { source: source.clone(), chain: false });
         let _ = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
+        assert_eq!(take_player_frame().expect("the source plays").buttons, 3);
         let empty = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
         assert!(empty.diags.iter().any(|line| line == "screen=notice kind=combo-empty"));
         assert!(empty.notices.contains(&EMPTY_COMBO));
