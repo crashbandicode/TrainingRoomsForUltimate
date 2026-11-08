@@ -635,8 +635,9 @@ fn sync_panels(s: &mut Session) {
     // Drawn only where a renderer exists, so Player 1 is never held by a question nobody can see (R2-2).
     let prompt_visible = named_macros::fighter_prompt_up() && LAYOUT_READY.load(Ordering::Acquire);
     // A closed menu has dropped its model; a fighter question opened since then still needs the flow below (ShowPrompt
-    // builds the model it is drawn on).
-    if s.menu.is_none() && !(s.phase == Phase::Menu && prompt_visible && !OPEN.load(Ordering::Acquire)) {
+    // builds the model it is drawn on). The clip editor's own question too: the hand-over closed the menu (#68).
+    let prompt_phase = s.phase == Phase::Menu || s.phase == Phase::Clip;
+    if s.menu.is_none() && !(prompt_phase && prompt_visible && !OPEN.load(Ordering::Acquire)) {
         return;
     }
     #[cfg(feature = "mii-saved-alpha")]

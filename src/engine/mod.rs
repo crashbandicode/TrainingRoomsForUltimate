@@ -24,6 +24,10 @@ pub mod mii;
 #[cfg(any(test, target_os = "switch"))]
 #[path = "../model/mii_root/mod.rs"]
 pub mod mii_root;
+/// #54 / #68: the whole CharInfo a CPU Mii install writes (a replay's Mii has no create ID or name).
+#[cfg(any(test, target_os = "switch"))]
+#[path = "../model/mii_install.rs"]
+pub mod mii_install;
 #[cfg(test)]
 #[path = "../model/mii_fork_tests/mod.rs"]
 mod mii_fork_tests;

@@ -1764,7 +1764,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "6bf684570f6c271e0322622fa6d09b5588fb0f9c48a45a31523789fb98dab4a1",
+   "dest_sha256": "56269972a546a73bbfb441cffcade4fb1030fc98e28da001b656810686e89138",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -2061,6 +2061,11 @@
      "old": "        self.raw_for(view.entry,view.fighter_kind,view.previous_selected)\n    }\n    /// The recorded identity a Switch would load. `Ok(None)` is a Mii whose exact\n    /// configuration is not resolved yet. Preview and Keep never need either.\n    fn target_for(&self,entry:i32,kind:i32,previous:bool)->Result<Option<Target>,String> {\n        if MiiClass::from_kind(kind as u32).is_none() {\n            if crate::engine::swap::trio::TrioFighter::from_kind(kind as u32).is_none() {\n                return Err(\"Preview fighter is not available\".into());\n            }\n            return Ok(Some(Target::fighter(kind as u32)));\n        }\n        self.raw_for(entry,kind,previous)?;\n        if self.resolve_failed & (1 << entry as usize) != 0 { return Err(\"Recorded Mii metadata is unavailable\".into()); }\n        if !cfg!(feature=\"mii-ordinary-cpu-alpha\") {return Err(\"Replay Mii loading is unavailable in this build\".into());}\n        Ok(self.resolved[entry as usize].map(Target::mii))\n    }\n    fn target(&self)->Result<Option<Target>,String> {\n        let view=self.view();\n",
      "new": "        self.raw_for(view.entry,view.fighter_kind,view.previous_selected)\n    }\n    /// The recorded identity a Switch would load. `Ok(None)` is a Mii whose exact\n    /// configuration is not resolved yet. Preview and Keep never need either\n    /// (`engine::macro_ui::replay_target::clip_target`, host-tested).\n    fn target_for(&self,entry:i32,kind:i32,previous:bool)->Result<Option<Target>,String> {\n        let raw=self.raw_for(entry,kind,previous);\n        let index=usize::try_from(entry).ok().filter(|index|*index<self.resolved.len());\n        crate::engine::macro_ui::replay_target::clip_target(kind, raw.as_ref().map_err(String::as_str),\n            index.and_then(|index|self.resolved[index]), index.is_some_and(|index|self.resolve_failed & (1 << index) != 0),\n            cfg!(feature=\"mii-ordinary-cpu-alpha\"))\n    }\n    fn target(&self)->Result<Option<Target>,String> {\n        let view=self.view();\n",
      "reason": "Host-tested (operator 2026-11-05, the replay window ported): the fork's Editor::target_for body moved unchanged to engine::macro_ui::replay_target::clip_target"
+    },
+    {
+     "old": "    if crate::runtime::ui::state::OPEN.load(Ordering::Acquire) { return; }\n    if loading() {",
+     "new": "    if crate::runtime::ui::state::OPEN.load(Ordering::Acquire) { return; }\n    // The editor's Fighter Mismatch question owns Player 1's presses (the menu's pop-up route) until it is answered.\n    if crate::runtime::macros::named_macros::fighter_prompt_up() { return; }\n    if loading() {",
+     "reason": "rc.6 #68 (lane cov-rest, 2026-11-08, 66a9a53): the clip editor's own Fighter Mismatch question owns Player 1's presses while it is up (on_input returns while fighter_prompt_up()); Eden covrest-yoga-01: Down and A went to the editor instead of the question."
     }
    ]
   },
