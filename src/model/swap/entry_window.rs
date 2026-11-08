@@ -274,6 +274,11 @@ mod tests {
             descriptor(1, [STEVE, NONE, NONE], 1, 0), "a two-body window");
         assert_eq!(original_request(descriptor(3, [KIRBY, MARIO, DK], 1, 0), KIRBY),
             descriptor(1, [KIRBY, NONE, NONE], 1, 0), "a Kirby original keeps cell 0");
+        // Primary 13:58Z (cov-rest `covrest-04`, `bc93b9f` diag): the CPU's return to slot 0, Fox, from its Mii groups
+        // reloaded the two-member window `(2, [7, 1])` and never settled.
+        const FOX: u32 = 0x7;
+        assert_eq!(original_request(descriptor(2, [FOX, DK, NONE], 1, 0), FOX), descriptor(1, [FOX, NONE, NONE], 1, 0),
+            "the CPU's two-member window");
         for (words, original, why) in [
             (descriptor(1, [MARIO, NONE, NONE], 1, 0), MARIO, "native's one body"),
             (descriptor(3, [0x24, 0x25, 0x26], 1, 0), 0x24, "Pokémon Trainer"),
