@@ -797,3 +797,34 @@ the original: `mii_ordinary_player::at_origin` and `player_context`, the CPU's F
 6 recorded manifest edits of `mii_ordinary_player.rs`, `mii_ordinary_cpu.rs` and `mii_ordinary_cpu_native.rs`;
 `carry_pkg6.py verify` re-derives all 250 files. Tests: `the_original_request_is_natives_single_form_of_a_start_up_window`,
 `tests/startup_window_wiring.rs` `back_to_the_original_stages_natives_single_form`.
+
+### p23/rc6-hot-slots: warm exit from a Mii group (2026-11-08)
+
+Operator decision 2026-11-08 (relayed in `artifacts/phase23/INBOX-opus-rc6-hotslots.md`, 15:58Z), the first of the three
+group-speed items.
+
+On the console (release `1e6c6a0e`, scene 1), the CPU went Fox → Mii Gunner (a Mii group exchange) → Pichu. That took a
+5.9 s Reload, `#106 reuse declined … descriptor bytes differ at [46, 48, 4a, 4e]`, although Pichu's body was built: the
+Mii exchange had detached the window `[Fox, Pichu, Diddy]` as a Built group. The Reload also tore that window and the
+Mii group down, so the next lap rebuilt both.
+- The bank's exchange could already put the displaced window back (`R` words, entry bytes and the D mirror it saved).
+- But `plan()` compared an ordinary request byte-exactly with the live Mii bytes, and both adapters refused to settle a
+  bank switch out of a live Mii. Only a Reload undid the Mii publication.
+
+Now:
+- **Planner** (`native_body_bank`): `plan` is unchanged (`plan_in(.., false)`). `plan_mii_exit` serves an ordinary
+  target in the Built window the live Mii group displaced (`mii_exit_saved`). The rule is
+  `body_bank::mii_exit_bytes_match`: the live entry with that window's saved bytes applied; all else exact, except
+  the group words and `+0x43`.
+- **Adapters** (`mii_ordinary_player`, `mii_ordinary_cpu`):
+  - `bank_settle` keeps an adopted Mii group switch's publication (`MiiExit`, in `State`) while the owner's receipt is
+    the one it adopted.
+  - `begin` asks for `plan_mii_exit` only then; the `BankTrack` carries `exit`.
+- **Settle** (`mii_ordinary_native::exit_settled`, `mii_ordinary_cpu_native::exit_settled`):
+  1. the bank's exchange receipt proves the descriptor (`group_rebaseline`);
+  2. `bank_restore` puts the publication back and reads it back against the receipt from before the Mii;
+  3. the owner adopts the window (the Player with no active configuration).
+
+Tests (failed first, 16:04Z): `an_ordinary_request_leaves_a_mii_window_for_the_window_it_displaced`,
+`tests/mii_exit_wiring.rs` (3). Recorded manifest edits of the six carried files; `carry_pkg6.py verify` re-derives all
+250 files.

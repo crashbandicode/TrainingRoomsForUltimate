@@ -1424,6 +1424,18 @@ pub fn mii_reuse_bytes_match(live: &[u8; 0x70], request: &[u8; 0x70]) -> bool {
         .all(|i| expected[i] == request[i])
 }
 
+/// Warm exit from a Mii group (operator decision 2026-11-08, rc.6): the window the live Mii group displaced comes back
+/// with the entry bytes it saved at that exchange (`saved`). An ordinary request out of the Mii window matches the live
+/// entry with those bytes applied, the group words aside (the window's until the exchange) and `+0x43`, the restored
+/// window's own starting-form byte (an in-window reuse keeps the live one). Every other byte is exact.
+pub fn mii_exit_bytes_match(live: &[u8; 0x70], request: &[u8; 0x70], saved: &MiiEntryBytes) -> bool {
+    let mut expected = *live;
+    apply_entry_bytes(&mut expected, saved);
+    (0..0x70)
+        .filter(|i| !(0x14..0x24).contains(i) && !(0x28..0x2c).contains(i) && *i != 0x43)
+        .all(|i| expected[i] == request[i])
+}
+
 /// The one-member Mii bank window readiness rule beside the canonical
 /// [`EntryState::ready`]: count 1, `[mii, MAX, MAX]`, one actor, bank flags and
 /// the bank's ready index 0 (MII-GROUPS-DESIGN §4). The caller still proves the
@@ -2812,6 +2824,51 @@ mod tests {
         behavior[0x37] = 50;
         assert!(mii_reuse_bytes_match(&behavior, &{ let mut s = staged; s[0x37] = 50; s }));
         assert!(!mii_reuse_bytes_match(&behavior, &staged), "the reuse test is byte-exact outside the identity");
+    }
+
+    /// Warm exit from a Mii group (operator decision 2026-11-08, rc.6; console `#106`: Mii Gunner → Pichu took a 5.9 s
+    /// Reload with `descriptor bytes differ at [46, 48, 4a, 4e]`): an ordinary request out of the live Mii window is
+    /// served by the window the Mii displaced, whose exchange writes that window's saved entry bytes back.
+    #[test]
+    fn an_ordinary_request_leaves_a_mii_window_for_the_window_it_displaced() {
+        use crate::engine::mii::{backend::Layout, inventory::MiiClass, lifetime::{Configuration, Tokens},
+            native_values::RowIds, ordinary_cpu::staged_descriptor_for_owner};
+        let gunner = Configuration::from_observed(MiiClass::Gunner,
+            Tokens { outfit: 75, hat: 125, colour: 0, voice: 37, specials: [2, 2, 2, 1] }, [0x5a; 88],
+            RowIds { outfit: (0x13u64 << 56) | (75u64 << 40) | 0x1bfef7a5f7, hat: (0x5au64 << 56) | (125u64 << 40) | 0x0fa9efa5ea }).unwrap();
+        // The CPU's window [Fox, Pichu, Diddy] with option and flag bytes, started on cell 0.
+        let mut window = [0u8; 0x70];
+        window[0x14..0x18].copy_from_slice(&3u32.to_le_bytes());
+        window[0x18..0x24].copy_from_slice(&[7, 0, 0, 0, 0x13, 0, 0, 0, 0x27, 0, 0, 0]);
+        window[0x28] = 1; window[0x41] = 2; window[0x53] = 1; window[0x54] = 0x30; window[0x30] = 0x11;
+        let saved = entry_bytes_of(&window);
+        // The live entry after the Mii exchange: the Mii group words and the identity's entry bytes.
+        let staged = staged_descriptor_for_owner(Layout::Training, 1, window, Some(gunner)).unwrap();
+        let mut live = window;
+        live[0x14..0x18].copy_from_slice(&1u32.to_le_bytes());
+        live[0x18..0x24].copy_from_slice(&[0x4a, 0, 0, 0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
+        MiiIdentity::from_descriptor(&staged).unwrap().apply(&mut live);
+        // The ordinary request the adapter stages for Pichu, with the live group words `plan` gives every reuse.
+        let mut request = window;
+        request[0x14..0x24].copy_from_slice(&live[0x14..0x24]);
+        request[0x18..0x1c].copy_from_slice(&0x13u32.to_le_bytes());
+        request[0x43] = 0;
+        assert!(!(0..0x70).filter(|i| !(0x14..0x24).contains(i)).all(|i| live[i] == request[i]),
+            "byte-exact against the Mii's identity bytes, as today, it never matches");
+        assert!(mii_exit_bytes_match(&live, &request, &saved), "the displaced window's bytes come back");
+        // `+0x43` is the restored window's own starting-form byte, as an in-window reuse keeps the live one.
+        assert!(mii_exit_bytes_match(&live, &{ let mut r = request; r[0x43] = 9; r }, &saved));
+        // Anything else the request names must be exactly what comes back.
+        for at in [0x30usize, 0x41, 0x46, 0x48, 0x4e, 0x53, 0x60] {
+            let mut other = request;
+            other[at] ^= 1;
+            assert!(!mii_exit_bytes_match(&live, &other, &saved), "byte {at:#x}");
+        }
+        // A live behavior byte (CPU Behavior, FE+0x37) agrees on both sides or the request is not this exit.
+        let mut behavior = live;
+        behavior[0x37] = 50;
+        assert!(mii_exit_bytes_match(&behavior, &{ let mut r = request; r[0x37] = 50; r }, &saved));
+        assert!(!mii_exit_bytes_match(&behavior, &request, &saved));
     }
 
     #[test]
