@@ -1,0 +1,294 @@
+{
+  "game_id": "01006A800016E000",
+  "start": "boot",
+  "early_stop": false,
+  "scope": "rc.5 CPU playback fidelity, one diag instance (diag bf2132e1 (p23/rc5-cpu-fidelity 97b219c), ELF inputs-fidelity/diag/libtraining_rooms.so).",
+  "setup": [
+    {
+      "state": "Training, both fighters Mario, menu closed, volume 0. fid-fixture copies the fidelity fixture; fid-record records through the chords.",
+      "via": "fixture",
+      "ref": "fixtures/fidelity (make_fidelity.py), segments/multi-input"
+    }
+  ],
+  "segments": {
+    "chord-save": {
+      "file": "segments/chord-save.edenmacro.json",
+      "sha256": "fd05baa42ae7353f6be4ef1fa861d55b958ad1de31e05229286ad18b52bbe56c",
+      "cap": 30
+    },
+    "chord-load": {
+      "file": "segments/chord-load.edenmacro.json",
+      "sha256": "1f1f8ca9d99c990e8fa6ae9348fc31f6ae36e7f2fa09c88d84485abfd2f0cb74",
+      "cap": 30
+    },
+    "chord-record": {
+      "file": "segments/chord-record.edenmacro.json",
+      "sha256": "f2fa1848d9988aea562b142421767175b60a3b836770c3f537b7473e9dd18e04",
+      "cap": 30
+    },
+    "chord-play-cpu": {
+      "file": "segments/chord-play-cpu.edenmacro.json",
+      "sha256": "56b9f03c84a8521c261b7cdee25702d379ecf4eabc556ccef98e7097fc3bb8f9",
+      "cap": 30
+    },
+    "chord-play-p1": {
+      "file": "segments/chord-play-p1.edenmacro.json",
+      "sha256": "0cde25d7bb1a6f68194603d41c2f0f6f125f33c15b73af117bc7440c0803fc6e",
+      "cap": 30
+    },
+    "chord-popup": {
+      "file": "segments/chord-popup.edenmacro.json",
+      "sha256": "d4f4376b8f2fc8821b8dbe795f2f0ca46902bb47ae6bc132ad0e117937433b97",
+      "cap": 30
+    },
+    "jab": {
+      "file": "segments/jab.edenmacro.json",
+      "sha256": "12769777ca262a7e3515f8f81a72c7470e7dffa98d9bdfb56e1887dfc702f278",
+      "cap": 30
+    },
+    "reset-center": {
+      "file": "segments/reset-center.edenmacro.json",
+      "sha256": "54e917aa28b0af97505e73a53fa991d3f79ed597b79ae8bc07f364c5fc6dbdd7",
+      "cap": 30
+    },
+    "x-press": {
+      "file": "segments/x-press.edenmacro.json",
+      "sha256": "923b754c8578d4f76ca41874d7c0cb379cdb8107bd28031dcac90277183139dc",
+      "cap": 30
+    },
+    "menu-open": {
+      "file": "segments/menu-open.edenmacro.json",
+      "sha256": "1185704f7b97f2981a8bae42fbe42166d5bc37aa2e9cba197bdf585a616f78ce",
+      "cap": 30
+    },
+    "menu-close": {
+      "file": "segments/menu-close.edenmacro.json",
+      "sha256": "b45ca532f18b9a3a7938a04b4a6b0513b7288ed584705fd042e40125bd5c4a89",
+      "cap": 30
+    },
+    "jab-link": {
+      "file": "segments/jab-link.edenmacro.json",
+      "sha256": "21ca94ee0dcd158a2e6cf023a1c01e33ead9d5cdc275d837aefdde49c4c83567",
+      "cap": 30
+    },
+    "jab-drop": {
+      "file": "segments/jab-drop.edenmacro.json",
+      "sha256": "2fc00b3082547b40890db5a81dd92176d82a0ba5a1f0d7a5c34d5353c5102ea8",
+      "cap": 30
+    },
+    "exchange-jabs": {
+      "file": "segments/exchange-jabs.edenmacro.json",
+      "sha256": "8f963497aaee09e267b727055ee7ada6c2fc9fcd0d9fac37b8efd02c7a55739b",
+      "cap": 30
+    },
+    "tilted-a": {
+      "file": "segments/tilted-a.edenmacro.json",
+      "sha256": "451a6d9b165adef78b74bd795700e6b8cb0ed0d67cf7efd4e2be091456195350",
+      "cap": 30
+    },
+    "fsmash": {
+      "file": "segments/fsmash.edenmacro.json",
+      "sha256": "2a6f61ae325478ba8a005edef0012064069fde9c0a88d93ff242c8c736d2452f",
+      "cap": 30
+    },
+    "attract-cancel": {
+      "library": "attract-cancel"
+    },
+    "main-stage": {
+      "library": "main-stage"
+    },
+    "stage-css": {
+      "library": "stage-css"
+    },
+    "enter-training": {
+      "library": "enter-training"
+    },
+    "multi-input": {
+      "file": "segments/multi-input.edenmacro.json",
+      "sha256": "7c1682fa38fec4b26e25fda6c35c7074f2b30a69050a506f9f83595204a7907b",
+      "cap": 30
+    }
+  },
+  "gates": {
+    "training-hud-unpaused": {
+      "library": "training-hud-unpaused",
+      "scale": "fit",
+      "frame": [
+        1280,
+        720
+      ]
+    },
+    "diag-record-player": {
+      "kind": "log",
+      "source": "gates",
+      "pattern": "screen=recording role=player recording=1",
+      "cap": 15
+    },
+    "main": {
+      "library": "main",
+      "scale": "fit",
+      "cap": 8,
+      "recover": "attract-cancel",
+      "recover_times": 6
+    },
+    "stage": {
+      "library": "stage",
+      "scale": "fit",
+      "frame": [
+        1280,
+        720
+      ]
+    },
+    "css": {
+      "library": "css",
+      "scale": "fit",
+      "frame": [
+        1280,
+        720
+      ]
+    }
+  },
+  "recover": [
+    {
+      "run": "steps.py:recover_training",
+      "check": true
+    }
+  ],
+  "trace_points": {
+    "step_role": {
+      "target": "libtraining_rooms.nro+0xb277c",
+      "registers": [
+        "x3"
+      ]
+    },
+    "motion": {
+      "target": "main+0x205cb30",
+      "registers": [
+        "x0",
+        "x1"
+      ],
+      "rate_limit": 3000
+    },
+    "cpu": {
+      "apply": {
+        "target": "libtraining_rooms.nro+0x1f68ec",
+        "registers": [
+          "x8",
+          "x28"
+        ]
+      },
+      "register": "x8",
+      "tick": {
+        "target": "libtraining_rooms.nro+0x1f6958",
+        "registers": [
+          "x28"
+        ],
+        "captures": [
+          {
+            "expression": "x28",
+            "type": "bytes",
+            "size": 72
+          }
+        ]
+      },
+      "ai_own": {
+        "target": "main+0x2dbc38",
+        "registers": [
+          "x19"
+        ],
+        "captures": [
+          {
+            "expression": "[x19+8]",
+            "type": "bytes",
+            "size": 72
+          }
+        ]
+      }
+    },
+    "p1": {
+      "apply": {
+        "target": "libtraining_rooms.nro+0x12d3b4",
+        "registers": [
+          "x8",
+          "x9"
+        ]
+      },
+      "register": "x8+x9",
+      "tick": {
+        "target": "libtraining_rooms.nro+0x12d3b8",
+        "registers": [
+          "x8"
+        ]
+      }
+    }
+  },
+  "rows": [
+    {
+      "id": "acc-boot",
+      "start": "boot",
+      "end": "training",
+      "steps": [
+        {
+          "run": "accept.py:acc_boot",
+          "check": true,
+          "on": "diag"
+        }
+      ],
+      "expect": "The diag window leaves the intro and sits in Training on Mario. The shot is the check that Start was taken.",
+      "timed": false,
+      "build": "diag",
+      "on": "diag"
+    },
+    {
+      "id": "fid-fixture",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "run": "fid.py:fid_fixture_strict",
+          "check": true,
+          "on": "diag"
+        }
+      ],
+      "expect": "The fidelity fixture (jab, forward tilt, jump, held direction) played on P1, then on the CPU: every file frame reaches the controller once, one per frame, in order, and the CPU jabs (attack_11) with no smash motion.",
+      "timed": false,
+      "build": "diag",
+      "on": "diag",
+      "start_gate": "training-hud-unpaused"
+    },
+    {
+      "id": "fid-record",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "run": "fid.py:fid_record_strict",
+          "check": true,
+          "on": "diag"
+        }
+      ],
+      "expect": "The multi-input segment recorded on P1 and played on P1, then recorded on the CPU role and played on the CPU: the same frame-for-frame check against the recorded files.",
+      "timed": false,
+      "build": "diag",
+      "on": "diag",
+      "start_gate": "training-hud-unpaused"
+    },
+    {
+      "id": "fid-chord3",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "run": "fid.py:fid_chord3_strict",
+          "check": true,
+          "on": "diag"
+        }
+      ],
+      "expect": "The docs-GIF fixture of the reported smash (chord3: three one-frame 0x8201 presses, loop 5, a start save) played on the CPU: the CPU jabs (attack_11), no smash motion.",
+      "timed": false,
+      "build": "diag",
+      "on": "diag",
+      "start_gate": "training-hud-unpaused"
+    }
+  ]
+}

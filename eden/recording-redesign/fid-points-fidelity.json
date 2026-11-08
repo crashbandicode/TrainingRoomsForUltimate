@@ -1,0 +1,29 @@
+{
+  "build": "diag bf2132e1 (p23/rc5-cpu-fidelity 97b219c), ELF inputs-fidelity/diag/libtraining_rooms.so",
+  "notes": {
+    "step_role": "rr_host::step_role entry (symbol +0xb277c), x3 = role",
+    "cpu.apply": "ai_epilogue+0xd30 `str w8, [x28, #0xc]` after take_frame returned a frame: x8 = packed frame, x28 = controller",
+    "cpu.tick": "ai_epilogue+0xd9c, reached every CPU AI frame after host_cpu: x28 = controller, its first 72 bytes",
+    "cpu.ai_own": "the hooked AI epilogue instruction: x19 = AI object, the controller as the AI left it",
+    "p1.apply": "input_delay::apply+0x11c4 `stp w8, w9, [x22]` after take_frame returned a frame: w8 buttons, w9 the stick bytes",
+    "p1.tick": "input_delay::apply+0x11c8, reached every Player 1 poll the role path serves",
+    "motion": "MotionModule::change_motion (sites_pkg2::MOTION_CHANGE_HOOK_OFFSET): x0 accessor, x1 Hash40"
+  },
+  "points": {
+    "step_role": {"target": "libtraining_rooms.nro+0xb277c", "registers": ["x3"]},
+    "motion": {"target": "main+0x205cb30", "registers": ["x0", "x1"], "rate_limit": 3000},
+    "cpu": {
+      "apply": {"target": "libtraining_rooms.nro+0x1f68ec", "registers": ["x8", "x28"]},
+      "register": "x8",
+      "tick": {"target": "libtraining_rooms.nro+0x1f6958", "registers": ["x28"],
+               "captures": [{"expression": "x28", "type": "bytes", "size": 72}]},
+      "ai_own": {"target": "main+0x2dbc38", "registers": ["x19"],
+                 "captures": [{"expression": "[x19+8]", "type": "bytes", "size": 72}]}
+    },
+    "p1": {
+      "apply": {"target": "libtraining_rooms.nro+0x12d3b4", "registers": ["x8", "x9"]},
+      "register": "x8+x9",
+      "tick": {"target": "libtraining_rooms.nro+0x12d3b8", "registers": ["x8"]}
+    }
+  }
+}

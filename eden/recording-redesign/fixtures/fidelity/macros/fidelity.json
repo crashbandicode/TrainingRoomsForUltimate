@@ -1,0 +1,1659 @@
+{
+  "schema_version": 1,
+  "name": "Fidelity",
+  "game_version": "13.0.5",
+  "start": {
+    "fighter_kind": 0,
+    "costume": 0,
+    "facing": 1.0,
+    "situation": 0,
+    "status": 0,
+    "speed_x": 0.0,
+    "speed_y": 0.0
+  },
+  "placement": {
+    "delta_x": 0.0,
+    "delta_y": 0.0,
+    "momentum": "preserve_recorded"
+  },
+  "frames": [
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -20,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -19,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -18,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -17,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -16,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -15,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -14,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -13,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -12,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -11,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 33281,
+      "lstick_x": 0,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 33281,
+      "lstick_x": 0,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -8,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -7,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -6,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -5,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -4,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -3,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -2,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -1,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 1,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 2,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 3,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 4,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 5,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 6,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 7,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 8,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 9,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 10,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 11,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 12,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 13,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 14,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 15,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 16,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 17,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 18,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 19,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 20,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -20,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 60,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 60,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 60,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 33281,
+      "lstick_x": 60,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 33281,
+      "lstick_x": 60,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 60,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -13,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -12,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -11,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -10,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -9,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -8,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -7,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -6,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -5,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -4,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -3,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -2,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -1,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 1,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 2,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 3,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 4,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 5,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 6,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 7,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 8,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 9,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 10,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 11,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 12,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 13,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 14,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 15,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 16,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 17,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 18,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 19,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 20,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -20,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -19,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -18,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -17,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -16,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -15,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32772,
+      "lstick_x": 0,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32772,
+      "lstick_x": 0,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32772,
+      "lstick_x": 0,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32772,
+      "lstick_x": 0,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32772,
+      "lstick_x": 0,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32772,
+      "lstick_x": 0,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -8,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -7,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -6,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -5,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -4,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -3,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -2,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -1,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 1,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 2,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 3,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 4,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 5,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 6,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 7,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 8,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 9,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 10,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 11,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 12,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 13,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 14,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 15,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 16,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 17,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 18,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 19,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 20,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -20,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -19,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -18,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -17,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -16,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -15,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -14,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -13,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -12,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -11,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -10,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -9,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -8,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -7,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -6,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -5,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -4,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -3,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -2,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -1,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 1,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 2,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 3,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 4,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 5,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 6,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 7,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 8,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 9,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 10,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 11,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 12,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 13,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 14,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 15,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 16,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 17,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 18,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 19,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 20,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 30,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 31,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 32,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 33,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 34,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 35,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 36,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 37,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 38,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 39,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 40,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 41,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 42,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 43,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 44,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 45,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 46,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 47,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 48,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 49,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 50,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 51,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 52,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 53,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 54,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 55,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 56,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 57,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 58,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 59,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 60,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 61,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 62,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 63,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 64,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 65,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 66,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 67,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 68,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 69,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 20,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -20,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -19,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -18,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -17,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -16,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -15,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -14,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -13,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -12,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -11,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -10,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -9,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -8,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -7,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -6,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -5,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -4,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -3,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -2,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": -1,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 0,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 1,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 2,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 3,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 4,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 5,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 6,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 7,
+      "rstick_x": 0,
+      "rstick_y": 0
+    },
+    {
+      "buttons": 32768,
+      "lstick_x": 0,
+      "lstick_y": 8,
+      "rstick_x": 0,
+      "rstick_y": 0
+    }
+  ]
+}
