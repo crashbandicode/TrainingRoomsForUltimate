@@ -80,6 +80,19 @@ fn the_start_up_window_serves_an_ice_climbers_start_with_the_pair_bank() {
     assert!(h4.contains("read::<u32>(entry, 0x28) == bank.members.actor_count()"), "{h4}");
 }
 
+/// Eden rc6-bg-ic2 (`ic-start-loaded`, "Loaded 9/10 · swap P1 to load 1 more"): `plan_budget` plans a role's window
+/// targets through `body_bank::window_targets` with its live window and active member, the values `progress` reads,
+/// so a live pair-lead window counts what it serves.
+#[test]
+fn the_planner_counts_a_live_pair_lead_window_as_it_serves() {
+    let budget = body(BANK, "pub(crate) fn plan_budget(");
+    ordered(budget, &["let live: [Option<(Members, u32)>; 2] = std::array::from_fn(|role| BANKS[role].lock().as_ref()",
+        ".filter(|bank| bank.phase == Phase::Ready && !bank.departed)",
+        ".map(|bank| (*bank.members, bank.observed.map_or(bank.members.kinds()[usize::from(bank.target)], |(_, kind)| kind))));",
+        "let targets = crate::engine::swap::body_bank::window_targets(grouped, live[role], originals[role], next);",
+        "PLANNED_TARGETS[role].store(targets.saturating_add(group_targets[role]), Ordering::Release);"]);
+}
+
 /// A background build writes no `R+0x50` and asks no reset-batch permit: its tails are per kind (beside an ordinary
 /// window natively, beside a pair window through `background_tail`).
 #[test]

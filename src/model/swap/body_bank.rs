@@ -1238,6 +1238,21 @@ pub fn role_counts(planned_targets: u8, extra: u8, window: WindowStatus, groups:
     counts
 }
 
+/// The window part of a role's planned targets (`plan_budget`): `next`, the reusable extras of the window the lane's
+/// next kind would get, except for a live pair-lead window (`live`: its members and active kind) with groups on. That
+/// window stays while the role's groups build around it (rc.6 item 3, a session that starts on Ice Climbers), so it
+/// plans what it serves: its reusable extras, the count the notice reads (`role_counts`' `extra`), not the lane
+/// window's (which has one more member than the pair's single extra cell).
+pub fn window_targets(grouped: bool, live: Option<(Members, u32)>, original: Option<u32>, next: u8) -> u8 {
+    match live {
+        Some((members, active)) if grouped && members.is_pair_lead() => {
+            let (kinds, count) = members.logical_kinds();
+            crate::engine::preload::cycle_preload_capacity::reusable_extras(&kinds[..count], active, original)
+        }
+        _ => next,
+    }
+}
+
 /// Entry-info observer dispatcher words (`info+8`, `+0x20`, `+0x24`) that must hold
 /// between dispatches, exactly as `654dc0` leaves them: one list type, no dispatch
 /// in progress, no deferred removal pending (GROUP-SWAP-IMPL §14.1). A swap
@@ -3351,6 +3366,35 @@ mod tests {
             }
             assert!(bodies <= ready.saturating_sub(6), "{ready}: {:?}", plan);
         }
+    }
+
+    /// rc.6 item 3, a session that starts on Ice Climbers (Eden rc6-bg-ic2, `ic-start-loaded`): P1's live pair-lead
+    /// window `[Popo, Nana, DK]` and its built group `[Link, Samus, Yoshi]` are every P1 fighter, yet the notice stayed
+    /// "Loaded 9/10 · swap P1 to load 1 more". The planner counted the window the lane's next kind would get (`[DK, Link,
+    /// Samus]`, two extras) where the live pair-lead window serves one. With groups on that window stays while the
+    /// groups build around it, so it plans what it serves, the count the notice reads; with groups off, or for any
+    /// other window, the next swap still builds the lane's window.
+    #[test]
+    fn a_live_pair_lead_window_plans_what_it_serves() {
+        use crate::engine::preload::cycle_preload_capacity::reusable_extras;
+        let window = Members::pair_lead(DK).unwrap();
+        let group = count_extra_groups(&[(members(&[LINK, SAMUS, YOSHI]), GroupState::Built)]);
+        let next = reusable_extras(&[DK, LINK, SAMUS], DK, Some(POPO));
+        assert_eq!(next, 2);
+        for (active, served) in [(POPO, 1), (DK, 0)] {
+            let (kinds, count) = window.logical_kinds();
+            let extra = reusable_extras(&kinds[..count], active, Some(POPO));
+            assert_eq!(extra, served, "{active:#x}: Popo is the canonical original");
+            let planned = window_targets(true, Some((window, active)), Some(POPO), next) + group.planned;
+            let role = role_counts(planned, extra, WindowStatus::Built, group);
+            assert_eq!((role.planned, role.ready, role.unstarted()), (served + 3, served + 3, 0), "{active:#x}");
+            assert_eq!(role.swap_owed(0), 0);
+        }
+        assert_eq!(window_targets(true, Some((window, POPO)), None, next), 1, "an original that is not the pair");
+        assert_eq!(window_targets(false, Some((window, POPO)), Some(POPO), next), next, "groups off: the next swap builds it");
+        assert_eq!(window_targets(true, None, Some(POPO), next), next, "no live window");
+        let ordinary = members(&[MARIO, DK, LINK]);
+        assert_eq!(window_targets(true, Some((ordinary, MARIO)), None, next), next, "an ordinary window");
     }
 
     /// tr-p23-hot-measure-1, g03 frame 85 ("Loaded 2/5 (3 failed)"): the CPU window `[34,0,1]` built, its two

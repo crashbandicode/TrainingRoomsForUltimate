@@ -689,9 +689,13 @@ pub(crate) fn plan_budget(menu: &crate::engine::compat::menu::TrainingModpackMen
     if grouped {
         group_bodies = plan_groups(&settings, menu, lanes, originals, &mut group_targets);
     }
+    // rc.6 item 3: a live pair-lead window plans what it serves (`body_bank::window_targets`; the values `progress` reads).
+    let live: [Option<(Members, u32)>; 2] = std::array::from_fn(|role| BANKS[role].lock().as_ref()
+        .filter(|bank| bank.phase == Phase::Ready && !bank.departed)
+        .map(|bank| (*bank.members, bank.observed.map_or(bank.members.kinds()[usize::from(bank.target)], |(_, kind)| kind))));
     for (role, value) in reserved.iter().enumerate() {
         ROLE_BUDGET[role].store(*value as u8, Ordering::Release);
-        let targets = wanted_banks[role].map_or(0, |(members, target)| {
+        let next = wanted_banks[role].map_or(0, |(members, target)| {
             // A pair-lead bank plans one selectable extra (cell 2); Nana is not a target. The
             // target keeps its own cell (`CellRule::PinCell0` puts Kirby or Solo Popo at cell 0),
             // so the reserved members are the target plus its first `value` window neighbours,
@@ -705,6 +709,7 @@ pub(crate) fn plan_budget(menu: &crate::engine::compat::menu::TrainingModpackMen
             }
             crate::engine::preload::cycle_preload_capacity::reusable_extras(&shown, target, originals[role])
         });
+        let targets = crate::engine::swap::body_bank::window_targets(grouped, live[role], originals[role], next);
         PLANNED_TARGETS[role].store(targets.saturating_add(group_targets[role]), Ordering::Release);
     }
     let window_extras = reserved.iter().sum::<usize>();

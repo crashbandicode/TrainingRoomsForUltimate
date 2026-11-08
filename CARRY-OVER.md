@@ -944,12 +944,19 @@ Operator decision "All groups in rc.6" and the start-on-the-kind rule (`docs/DEC
   - H2 (`prepare_resources`) already writes the pair's `R+0x50` = 3 for a pending pair-lead bank, H4 binds on count,
     actors and kinds, and N1/N2/N3 serve the window as they serve a Reload-built one. Its other groups then build in
     the background beside it (`background_tail`).
+  - The notice counts the live pair-lead window as it serves (Eden `rc6-bg-ic2`: "Loaded 9/10 · swap P1 to load 1
+    more" with every P1 fighter built). With groups on, `plan_budget` plans its window targets through
+    `body_bank::window_targets`: a live pair-lead window counts its own reusable extras, the values `progress` reads,
+    not the lane window's two. With groups off, or for any other window, the lane's window is planned as before.
+  - The return to an Ice Climbers original is still the canonical Reload (`original_bankable(0x4b)` is false,
+    EXCLUSIONS §9); the Reload ends the bank, and the next switch out builds a window and its groups again.
 - **Merge note** (accepted by the primary, 22:52Z): `p23/rc6-hot-slots-mii` hooks `0x60de68` too. Integration keeps
   one `background_tail`, which also restores the Mii shadow's `R`.
 
 **Proof:**
 - Host tests, each failed first: model `a_background_build_takes_the_pair_group_and_builds_beside_a_live_pair_window`,
-  `an_ice_climbers_start_gets_a_pair_lead_window`; `tests/background_pair_wiring.rs` (4).
+  `an_ice_climbers_start_gets_a_pair_lead_window`, `a_live_pair_lead_window_plans_what_it_serves`;
+  `tests/background_pair_wiring.rs` (5).
 - Recorded manifest edits of `rows_a1.rs`, `body_bank.rs` and `native_body_bank.rs`; `carry_pkg6.py
   carry/ledger/verify` re-derives all 250 files.
 - Eden: `artifacts/phase23/LANE-OPUS-RC6-BG-IC-REPORT.md`.
