@@ -753,3 +753,11 @@ ceiling = 151146
 date = "2026-11-08"
 reason = "rc.6 warm exit from a Mii group (p23/rc6-hot-slots 4f01c0a; operator decision 2026-11-08, INBOX-opus-rc6-hotslots 15:58Z): plan_mii_exit, mii_exit_bytes_match, and the adapters' kept publication and exit_settled; measured 151146 (tools/size_gate.py), +325 over 150821"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to this operator-chosen rc.6 item under TASK-OPUS-rc6-hot-slots (primary c07b3449, 2026-11-08: a raise goes in its own commit with approved_by)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 153733
+date = "2026-11-08"
+reason = "rc.6 integration (p23/rc6-integration 85f85af): the merge of p23/rc6-seq-drill (583b694, 151701), p23/rc6-cov-rec (e1c6d0c, 152190) and p23/rc6-hot-slots (d6a485f, 151146) onto 34084a1 (150650); the three sides add up (+1051, +1540, +496 = 153737), the conflict resolutions save 4; measured 153733 on the merged tree (tools/size_gate.py)"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); combined ceiling = measured merged size per primary c07b3449, TASK-OPUS-rc6-integration 2026-11-08"
