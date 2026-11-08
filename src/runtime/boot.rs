@@ -154,6 +154,8 @@ fn run_inner() {
     crate::runtime::compat::menu::apply_kept(&*loaded);
     #[cfg(feature = "diag")]
     crate::runtime::diag_reload::start();
+    #[cfg(feature = "diag")]
+    crate::runtime::stall_watch::start();
 
     // 4. Compare every site window before anything is written (SPEC-core-01 §5.1 step 5b).
     let state_found = state_boot::check();

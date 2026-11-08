@@ -32,6 +32,8 @@ mod seams;
 mod state_boot;
 mod state_natives;
 #[cfg(feature = "diag")]
+mod stall_watch;
+#[cfg(feature = "diag")]
 mod sync_probe;
 pub(crate) mod threads;
 

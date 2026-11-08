@@ -129,6 +129,23 @@ static ALLOCS: [AtomicU64; HOOK_COUNT] = [const { AtomicU64::new(0) }; HOOK_COUN
 /// Allocations of the one-per-load kind inside a hook (per_load), counted apart from the steady-state ones.
 static LOAD_ALLOCATIONS: AtomicU64 = AtomicU64::new(0);
 static ENTRIES: [AtomicU64; HOOK_COUNT] = [const { AtomicU64::new(0) }; HOOK_COUNT];
+/// Diag builds: the hook entered last on any thread, and the hook scopes open now (the stall watchdog's report).
+#[cfg(feature = "diag")]
+static LAST_ENTERED: core::sync::atomic::AtomicUsize = core::sync::atomic::AtomicUsize::new(HookId::Other as usize);
+#[cfg(feature = "diag")]
+static OPEN_SCOPES: core::sync::atomic::AtomicIsize = core::sync::atomic::AtomicIsize::new(0);
+
+/// Every hook entry since boot, all hooks together (the stall watchdog's sample).
+pub fn total_entries() -> u64 {
+    ENTRIES.iter().map(|counter| counter.load(Ordering::Relaxed)).sum()
+}
+
+/// Diag builds: the hook entered last and the hook scopes open now, on all threads.
+#[cfg(feature = "diag")]
+pub fn last_entered() -> (&'static str, isize) {
+    let id = LAST_ENTERED.load(Ordering::Relaxed).min(HOOK_COUNT - 1);
+    (HookId::ALL[id].name(), OPEN_SCOPES.load(Ordering::Relaxed))
+}
 
 fn in_hook() -> bool {
     HOOK_DEPTH.try_with(|depth| depth.get() > 0).unwrap_or(false)
@@ -292,6 +309,11 @@ impl HookScope {
         let _ = HOOK_DEPTH.try_with(|depth| depth.set(depth.get() + 1));
         let previous = CURRENT.try_with(|current| current.replace(id as u8)).unwrap_or(HookId::Other as u8);
         #[cfg(feature = "diag")]
+        {
+            LAST_ENTERED.store(id as usize, Ordering::Relaxed);
+            OPEN_SCOPES.fetch_add(1, Ordering::Relaxed);
+        }
+        #[cfg(feature = "diag")]
         if let Some(probe) = ENTRY_PROBE.get() {
             probe(id.name());
         }
@@ -306,6 +328,8 @@ pub static ENTRY_PROBE: std::sync::OnceLock<fn(&'static str)> = std::sync::OnceL
 
 impl Drop for HookScope {
     fn drop(&mut self) {
+        #[cfg(feature = "diag")]
+        OPEN_SCOPES.fetch_sub(1, Ordering::Relaxed);
         let _ = HOOK_DEPTH.try_with(|depth| depth.set(depth.get().saturating_sub(1)));
         let _ = CURRENT.try_with(|current| current.set(self.previous));
     }

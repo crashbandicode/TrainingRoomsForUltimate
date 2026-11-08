@@ -211,6 +211,8 @@ fn run() {
         }
         sync_panels(&mut session);
         let developer_pending = developer_reload.step();
+        #[cfg(feature = "diag")]
+        crate::runtime::stall_watch::worker_step(0);
         if session.watching() || developer_pending {
             std::thread::park_timeout(POLL);
         } else {
@@ -333,6 +335,8 @@ fn publish_jumps(s: &Session) {
 }
 
 fn press(button: Button, s: &mut Session) {
+    #[cfg(feature = "diag")]
+    crate::runtime::stall_watch::worker_step(1);
     let popup = POPUP.load(Ordering::Acquire);
     let open = OPEN.load(Ordering::Acquire);
     if s.phase == Phase::Prompt && !open {
@@ -429,7 +433,11 @@ fn press(button: Button, s: &mut Session) {
     // poll), before it can publish an old editor's effect into a later opening.
     if INPUT.generation() != s.input_generation { return; }
     if let Some(menu) = s.menu.as_mut() {
+        #[cfg(feature = "diag")]
+        crate::runtime::stall_watch::worker_step(2);
         post_recording_effect(menu);
+        #[cfg(feature = "diag")]
+        crate::runtime::stall_watch::worker_step(3);
         apply_shortcuts(menu);
     }
     if closed {
@@ -622,6 +630,8 @@ fn apply_shortcuts(menu: &mut Menu) {
 /// Follow the layer's panels (`model::flow`): open the one the menu just entered, hand the menu over to the clip editor, step back out
 /// of a panel that closed, and publish the frame when it changed.
 fn sync_panels(s: &mut Session) {
+    #[cfg(feature = "diag")]
+    crate::runtime::stall_watch::worker_step(9);
     // Consume synchronous list/name effects before flow sees their closed panel,
     // and retire accepted jobs even after the disposable menu was reset.
     if let Some(note) = s.setups.tick() {
@@ -1027,6 +1037,8 @@ fn begin_close(
     #[cfg(feature = "mii-editor-alpha")]
     editor: Option<crate::engine::mii_root::mii_menu::EditorRequest>,
 ) {
+    #[cfg(feature = "diag")]
+    crate::runtime::stall_watch::worker_step(4);
     #[cfg(feature = "mii-saved-alpha")]
     if let Some(list) = s.mii.as_ref() {
         // A portrait pick this opening (its kept value differs from the live settings) resolves that role's choice itself.
@@ -1066,6 +1078,8 @@ fn retry_close(s: &mut Session) {
         crate::runtime::ui::state::release_menu();
         return;
     }
+    #[cfg(feature = "diag")]
+    crate::runtime::stall_watch::worker_step(5);
     match crate::runtime::mii::menu_handoff::post_close(intent) {
         Ok(()) => close_session(s),
         Err(intent) => s.pending_close = Some(intent),
@@ -1074,6 +1088,8 @@ fn retry_close(s: &mut Session) {
 
 /// B on the page: commit (SPEC-core-03 §2.3), then the 15 frames of discarded input and fade run.
 fn close(menu: &mut Menu, setups: &mut super::setups::Ui) {
+    #[cfg(feature = "diag")]
+    crate::runtime::stall_watch::worker_step(6);
     let outbox = menu.take_outbox();
     // Decision MENU-CLOSE (`review/menu-proposal` `9a9cc47`): the close commits only the rows the
     // player changed this session; every other row keeps its live value in `SETTINGS` — the D1
@@ -1082,6 +1098,8 @@ fn close(menu: &mut Menu, setups: &mut super::setups::Ui) {
         Some(live) => menu.commit_onto(&live),
         None => menu.commit().clone(),
     };
+    #[cfg(feature = "diag")]
+    crate::runtime::stall_watch::worker_step(7);
     published::publish(&settings.menu, outbox.rerolls);
     // The carried engines read the typed view of the committed settings (decision D1).
     crate::runtime::compat::menu::apply_kept(&settings);
@@ -1107,6 +1125,8 @@ fn close(menu: &mut Menu, setups: &mut super::setups::Ui) {
     crate::runtime::ui::menu_app::note_open();
     FRAME_SEQ.fetch_add(1, Ordering::Release);
     diagnostic(format_args!("[Ui] menu closed changed={} rerolls={:#x}", outbox.changed, outbox.rerolls));
+    #[cfg(feature = "diag")]
+    crate::runtime::stall_watch::worker_step(8);
 }
 
 
