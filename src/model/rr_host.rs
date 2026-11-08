@@ -455,11 +455,10 @@ pub fn service_at(
     let mut machine = lock(&MACHINE);
     let machine = machine.get_or_insert_with(Playback::new);
     if mash {
-        drive_mash(machine, Role::Player, true);
+        // The mash is the CPU's (Mash Toggles), so it stops the macro the CPU plays; Player 1's keeps playing
+        // (RECORDING.md: "stops the macro that role is playing"; primary 2026-11-08 13:05Z).
         drive_mash(machine, Role::Cpu, true);
-        RUN_PLAYER.store(false, Ordering::Release);
         RUN_CPU.store(false, Ordering::Release);
-        drop_frames(Role::Player);
         drop_frames(Role::Cpu);
         tick.diags.push("screen=playback mash=1".to_string());
     }
@@ -1332,7 +1331,8 @@ mod tests {
             .diags
             .iter()
             .any(|line| line == "screen=playback mash=1"));
-        assert!(take_player_frame().is_none());
+        // The CPU's mash stops only the CPU's macro: Player 1's keeps playing (primary 2026-11-08 13:05Z, #22 (a)).
+        assert_eq!(take_player_frame().expect("Player 1 plays on after the CPU's mash").buttons, 6);
     }
 
     #[test]
