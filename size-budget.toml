@@ -641,3 +641,19 @@ ceiling = 150576
 date = "2026-11-08"
 reason = "rc.5 task 7: the recording menu takes the index's selection with every catalog load, so a menu close never publishes a selection older than the index (Record on CPU then menu open/close kept active.cpu); a chord's buttons are hidden from the game's mapping while held; measured 150576 (tools/size_gate.py), +81 over 150495"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); task 7 ordered by primary c07b3449 (INBOX-opus-rc5-accept, 2026-11-08): 'size raise in its own commit'"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 150569
+date = "2026-11-08"
+reason = "rc.5 CPU playback fidelity (p23/rc5-cpu-fidelity): a played role hands its frames to Player 1's poll and the CPU's AI epilogue through a fixed 64-frame queue the worker fills ahead (model/frame_queue.rs), one frame per game frame, instead of one slot that dropped frames and left the AI's own controls in gaps (Eden rc5-fid-measure1); measured 150569 (tools/size_gate.py), +74 over 150495"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to this rc.5 root fix under TASK-OPUS-rc5-cpu-fidelity (primary c07b3449, 2026-11-08: a raise goes in its own commit with approved_by)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 150650
+date = "2026-11-08"
+reason = "rc.5 final: the merge of p23/rc5-cpu-fidelity (3cb7857, +74 over 150495) into p23/rc5-wire-fix (b4e0727, 150576); the two sides add up, nothing else changes; measured 150650 on the merged tree (tools/size_gate.py)"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); final ceiling = measured merged size per primary c07b3449, TASK-OPUS-rc5-merge-fidelity 2026-11-08"

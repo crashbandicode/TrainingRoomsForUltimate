@@ -41,7 +41,11 @@ def menu_after_record_cpu(ctx):
 def after_record_cpu(ctx):
     card = accept._card(ctx)
     src = accept.FIXTURES / 'play-warp'
-    out = {'before_copy': _active(card)}
+    out = {'after_record': _active(card)}
+    # As accept.prep: a full close drops the model the pop-up kept, so the fixture is not overwritten by it.
+    steps.open_menu(ctx)
+    steps.close_menu(ctx)
+    out['before_copy'] = _active(card)
     accept._replace_tree(src / 'macros', card / 'macros')
     accept._replace_tree(src / 'saves', card / 'saves')
     accept._replace_tree(src / 'combos', card / 'combos')
