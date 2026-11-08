@@ -697,3 +697,11 @@ ceiling = 151481
 date = "2026-11-08"
 reason = "rc.6 coverage (p23/rc6-cov-rec 4ef504f): the MACROS loop icon sits left of its count, which it hid (#19, Eden rc6-covrec-diag3 cov-popup-r8); measured 151481 (tools/size_gate.py), +2 over 151479"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied under TASK-OPUS-rc6-cov-rec and the primary's #19 answer of 2026-11-08 13:05Z, own commit"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 152005
+date = "2026-11-08"
+reason = "rc.6 coverage (p23/rc6-cov-rec 57f65c0): the r8 pop-up as drawn, its title with the L/R role tabs, the section file counts, the CONNECTIONS boxes and tree, and the r8 footer (primary 2026-11-08 15:55Z); 2427fff reverted e276d0f (-43); measured 152005 (tools/size_gate.py), +524 over 151481"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied under TASK-OPUS-rc6-cov-rec and the primary's inbox order of 2026-11-08 15:55Z, own commit"
