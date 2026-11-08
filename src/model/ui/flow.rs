@@ -213,6 +213,9 @@ mod tests {
         assert_eq!(next(Phase::Prompt, editor), (Phase::Clip, Step::HidePrompt), "answered: back to the editor");
         assert_eq!(next(Phase::Prompt, seen(false, false, false)), (Phase::Menu, Step::HidePrompt));
         assert_eq!(next(Phase::Clip, Seen { prompt_visible: true, ..seen(false, false, false) }), (Phase::Menu, Step::HideClip));
+        let worker = include_str!("../../runtime/ui/worker.rs");
+        assert!(worker.contains("let prompt_phase = s.phase == Phase::Menu || s.phase == Phase::Clip;"),
+            "a closed menu's model does not stop the clip editor's question from being shown");
         let clip = include_str!("../../runtime/macros/replay_capture.rs");
         assert!(clip.contains("if crate::runtime::macros::named_macros::fighter_prompt_up() { return; }"),
             "the question owns Player 1's presses, not the editor");
