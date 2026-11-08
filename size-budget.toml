@@ -804,3 +804,11 @@ ceiling = 151495
 date = "2026-11-08"
 reason = "p23/rc6-cov-rest after merging p23/rc6-hot-slots d6a485f (its warm exit, 151146 on that branch) over the cov-rest fixes (151111): both together, plus the portrait race fix (dfe9b7c: Blocker::Portrait and mii_hud_portrait::render_holds_helper for the Mii owners' begin, F9 seat loads held back while a portrait job waits, Eden covrest-12); measured 151495 (tools/size_gate.py), +349 over 151146"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied under TASK-OPUS-rc6-cov-rest (a raise goes in its own commit with approved_by)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 154207
+date = "2026-11-08"
+reason = "p23/rc6-cov-rest after merging p23/rc6-integration 7f3b028 (its own ceiling 153733) over the cov-rest code (151495), plus #68's clip-editor question (66a9a53, 2891eaa) and #54's whole CharInfo for a CPU Mii install (f2298ee, src/model/mii_install.rs) with cov-rec's handoff e276d0f re-applied (cbe961a); measured 154207 (tools/size_gate.py), +474 over 153733"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied under TASK-OPUS-rc6-cov-rest (a raise goes in its own commit with approved_by)"
