@@ -528,13 +528,15 @@ fn purpose_view(state:&State,slot:usize,targets:[Option<Want>;crate::runtime::ro
     let training=unsafe{crate::runtime::compat::common::is_native_training_mode()};
     let record=if training {ENTRY3_BORROW.lock().current().filter(|b|state.book.is_current(b.epoch))} else {None};
     // F9: a queued Reload owns entries 2 and 3. A live CPU is not a helper seat. A parked seat
-    // loads the CPU rotation's member, not whatever fighter the merged plan lists first.
+    // loads the CPU rotation's member, not whatever fighter the merged plan lists first. A Mii
+    // member loads with its own configuration, through the Mii helper (`f9_gate` arms no other).
     if training {
-        if let Some(kind) = crate::runtime::roster::f9_gate::override_kind(slot as u32) {
-            let want = targets.iter().flatten().copied().find(|want| want.kind == kind).unwrap_or(Want {
+        if let Some((kind, configuration)) = crate::runtime::roster::f9_gate::override_seat(slot as u32) {
+            let want = targets.iter().flatten().copied()
+                .find(|want| want.kind == kind && want.configuration == configuration).unwrap_or(Want {
                 epoch: state.book.epoch(),
                 kind,
-                configuration: None,
+                configuration,
                 #[cfg(feature = "mii-hud-portrait-alpha")]
                 avoid: 0,
             });

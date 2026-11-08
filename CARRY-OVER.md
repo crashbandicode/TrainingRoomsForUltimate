@@ -818,3 +818,19 @@ a fixed body; `features::notices::post_body`, the mailbox, after the session loc
 `carry_pkg6.py verify` re-derives all 250 files. Tests (failed first): `parked_entries`
 `an_unpublished_entry_with_a_residue_loader_byte_is_empty` (in its loader-byte form it returned `Loading`),
 `tests/mii_same_notice.rs` (did not compile: no `save_notice`).
+
+### p23/rc6-cov-rest: an F9 Mii seat loads with its own Mii configuration (2026-11-08)
+
+**F9 (#58).** Eden covrest-08 (Ally, diag `888badce` of `70617ba`): after a raise, a drop to one CPU and a raise, the
+seats parked and were promoted (Mii Gunner as CPU 2, Donkey Kong as CPU 3), but entry 2's Mii Gunner had been
+installed as a plain fighter (`install slot=2 kind=0x4a`, no Mii helper). From the moment No. of CPUs reached 2 the
+game read null every frame (`Unmapped Read64 @ 0x0`, `main+0x357bf34`; 315852 by the end of the boot). F9 kept a seat
+member as a kind only (`cycle_preload.rs` `set_fixed_members`, `f9_gate`), and `purpose_view`'s seat branch made a
+`Want` with no configuration when the plan did not list that kind. The members now keep the CPU rotation target whole
+(kind and exact-Mii configuration, F9 report §4.2); `f9_gate` arms a Reload with that configuration and arms no Mii
+seat without one (`parked_entries::seat_load`); the seat branch loads what was armed, so a Mii seat goes through the
+Mii helper as the CPU cycle's own Mii loads on entry 2 do.
+
+2 recorded manifest edits: `character_sources.rs` (`purpose_view`'s seat branch) and `cycle_preload.rs`
+(`set_fixed_members`); `carry_pkg6.py verify` re-derives all 250 files. Test (failed first: no `seat_load`):
+`parked_entries` `a_mii_seat_loads_with_its_member_configuration_or_not_at_all`.

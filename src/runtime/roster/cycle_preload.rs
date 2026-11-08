@@ -497,8 +497,8 @@ pub unsafe fn on_frame(body: &mut smash::app::BattleObjectModuleAccessor) {
     // hat-priority merge. Exact Mii payload and PT/Pyra member order matter.
     let cpu_rotation = crate::runtime::roster::character_roster::preload_targets(&menu, 1);
     crate::runtime::roster::f9_gate::set_fixed_members(
-        cpu_rotation.iter().flatten().next().map(|target| target.kind),
-        cpu_rotation.iter().flatten().nth(1).map(|target| target.kind),
+        cpu_rotation.iter().flatten().next().copied(),
+        cpu_rotation.iter().flatten().nth(1).copied(),
     );
     let mut lanes = [[None; MAX_TARGETS]; 4];
     if settings.hats {

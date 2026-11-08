@@ -3742,7 +3742,7 @@
    "dest": "src/runtime/roster/cycle_preload.rs",
    "crate": "root",
    "src_sha256": "ec95b169b5ec06064bc45222a48e3f7ab72a94db32bf9d3c3b619e87e50caac3",
-   "dest_sha256": "65a091198a648a02fe6027932574d37e64451fc3589ca943da1c44950ce6b63f",
+   "dest_sha256": "32bbe10350811d25d16edefe57dd6a5de9785cc49f9ca002f62b557e18596309",
    "edits": [
     {
      "old": "    let roster = if role == 0 {\n        menu.player_roster.fighters()\n    } else {\n        menu.cpu_roster.fighters()\n    };\n    let preferences = crate::runtime::compat::common::menu::mii_preferences();\n",
@@ -3888,6 +3888,11 @@
      "old": "    let cpu_rotation = crate::runtime::roster::character_roster::preload_targets(&menu, 1);\n",
      "new": "    let cpu_rotation = crate::runtime::roster::character_roster::preload_targets(&menu, 1);\n    crate::runtime::roster::f9_gate::set_fixed_members(\n        cpu_rotation.iter().flatten().next().map(|target| target.kind),\n        cpu_rotation.iter().flatten().nth(1).map(|target| target.kind),\n    );\n",
      "reason": "F9 records the next and following CPU cycle members as the fixed seats (p23/f9), after the rc.5 preload target list"
+    },
+    {
+     "old": "    crate::runtime::roster::f9_gate::set_fixed_members(\n        cpu_rotation.iter().flatten().next().map(|target| target.kind),\n        cpu_rotation.iter().flatten().nth(1).map(|target| target.kind),\n    );",
+     "new": "    crate::runtime::roster::f9_gate::set_fixed_members(\n        cpu_rotation.iter().flatten().next().copied(),\n        cpu_rotation.iter().flatten().nth(1).copied(),\n    );",
+     "reason": "p23/rc6-cov-rest #58 (Eden covrest-08, 2026-11-08): the F9 seat members keep the CPU rotation target whole (kind and exact-Mii configuration, F9 report section 4.2) instead of the kind alone, so a Mii seat is loaded with its own configuration."
     }
    ]
   },
@@ -4203,7 +4208,7 @@
    "dest": "src/runtime/roster/character_sources.rs",
    "crate": "root",
    "src_sha256": "6c3fe37031f02ee3c3891943600223546804839ee1ee6af103346710f4fb1514",
-   "dest_sha256": "9ebbbe5b53cfe782503fa59a6754f8e335a49b9b5930b054e034610768c44102",
+   "dest_sha256": "21435dd4df10472d664e9a2bc4660d31750bb9a75534b50a93b478267229c4ca",
    "edits": [
     {
      "delete_from": "/// Skip plugin automations for an owned helper body.",
@@ -5345,6 +5350,11 @@
      "old": "/// `entry` is the fighter entry for `slot`, or null. The body cell is read only\n/// when `+0x4150` publishes cell 0; `parked_ready` then decides Ready.\nunsafe fn f9_body_of(entry: *const u8, slot: u32) -> crate::model::parked_entries::Body {\n    let (aligned_entry, installed, loader) = if aligned(entry) {\n        (true, read::<u64>(entry, 0x4150), read::<u8>(entry, 0x591c))\n    } else {\n        (false, 0, 0)\n    };\n    crate::model::parked_entries::classify_parked_body(aligned_entry, installed, loader, || unsafe {",
      "new": "/// `entry` is the fighter entry for `slot`, or null. The body cell is read only\n/// when `+0x4150` publishes cell 0; `parked_ready` then decides Ready. An\n/// unpublished entry is in flight only while this plugin's own install on that\n/// slot is (the book's Loading phase), never from its loader byte, which is\n/// residue on an entry nothing installed (Eden covrest-04/05).\nunsafe fn f9_body_of(entry: *const u8, slot: u32) -> crate::model::parked_entries::Body {\n    let (aligned_entry, installed) = if aligned(entry) {\n        (true, read::<u64>(entry, 0x4150))\n    } else {\n        (false, 0)\n    };\n    let own_load_in_flight = || STATE.lock().book.phase(slot as usize) == Ok(Phase::Loading);\n    crate::model::parked_entries::classify_parked_body(aligned_entry, installed, own_load_in_flight, || unsafe {",
      "reason": "F9 fixed seats (#58; Eden covrest-04/05/06, 2026-11-08: after a 1->3 raise CPUs 2 and 3 stayed copies of CPU 1 instead of the CPU rotation's next and the one after): an unpublished parked entry is in flight only while this plugin's own install on that slot is (the source book's Loading phase), never from its loader byte, which is residue on an entry nothing installed (6, then 88); parked_entries::classify_parked_body asks that question only for an unpublished cell, so the seat Reload is armed after the walk"
+    },
+    {
+     "old": "    // F9: a queued Reload owns entries 2 and 3. A live CPU is not a helper seat. A parked seat\n    // loads the CPU rotation's member, not whatever fighter the merged plan lists first.\n    if training {\n        if let Some(kind) = crate::runtime::roster::f9_gate::override_kind(slot as u32) {\n            let want = targets.iter().flatten().copied().find(|want| want.kind == kind).unwrap_or(Want {\n                epoch: state.book.epoch(),\n                kind,\n                configuration: None,\n                #[cfg(feature = \"mii-hud-portrait-alpha\")]\n                avoid: 0,\n            });",
+     "new": "    // F9: a queued Reload owns entries 2 and 3. A live CPU is not a helper seat. A parked seat\n    // loads the CPU rotation's member, not whatever fighter the merged plan lists first. A Mii\n    // member loads with its own configuration, through the Mii helper (`f9_gate` arms no other).\n    if training {\n        if let Some((kind, configuration)) = crate::runtime::roster::f9_gate::override_seat(slot as u32) {\n            let want = targets.iter().flatten().copied()\n                .find(|want| want.kind == kind && want.configuration == configuration).unwrap_or(Want {\n                epoch: state.book.epoch(),\n                kind,\n                configuration,\n                #[cfg(feature = \"mii-hud-portrait-alpha\")]\n                avoid: 0,\n            });",
+     "reason": "p23/rc6-cov-rest #58 (Eden covrest-08, 2026-11-08): purpose_view's F9 seat branch made a Want with no configuration when the plan did not list the seat's kind, so the CPU rotation's Mii Gunner was installed on entry 2 as a plain fighter; once No. of CPUs rose to 2 the game read null every frame (Unmapped Read64 @ 0x0, main+0x357bf34). The branch now loads what f9_gate armed (override_seat): the kind with the member's own exact-Mii configuration, through the Mii helper; f9_gate arms no Mii seat without one (parked_entries::seat_load)."
     }
    ]
   },

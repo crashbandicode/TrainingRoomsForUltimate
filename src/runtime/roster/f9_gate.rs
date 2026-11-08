@@ -5,7 +5,9 @@
 //! open waits for the close, and the close's own frame still admits no new
 //! load on entries 2 and 3. The Reload is armed on a later frame.
 
+use crate::engine::mii::lifetime::Configuration;
 use crate::model::parked_entries::{After, Decision};
+use crate::runtime::roster::cycle_preload::Target;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Phase {
@@ -21,9 +23,11 @@ struct Gate {
     phase: Phase,
     seen: u32,
     decision: Decision,
-    fixed: [Option<u32>; 2],
-    armed2: Option<After>,
-    armed3: Option<After>,
+    /// The CPU rotation's next member and the one after, with an exact Mii's configuration.
+    members: [Option<Target>; 2],
+    /// A Reload is armed with the configuration it loads, taken from the member when it is armed.
+    armed2: Option<(After, Option<Configuration>)>,
+    armed3: Option<(After, Option<Configuration>)>,
 }
 
 impl Gate {
@@ -39,7 +43,7 @@ impl Gate {
                 after_entry2: None,
                 after_entry3: None,
             },
-            fixed: [None, None],
+            members: [None, None],
             armed2: None,
             armed3: None,
         }
@@ -64,27 +68,49 @@ pub(crate) struct Seen {
     pub fixed: [Option<u32>; 2],
 }
 
-pub(crate) fn set_fixed_members(first: Option<u32>, second: Option<u32>) {
+impl Gate {
+    fn fixed(&self) -> [Option<u32>; 2] {
+        self.members.map(|member| member.map(|member| member.kind))
+    }
+
+    /// The Reload as armed: its kind's member configuration (`seat_load`). None when the seat cannot be loaded.
+    fn arm(&self, after: Option<After>) -> Option<(After, Option<Configuration>)> {
+        let after = after?;
+        let member = match after.slot {
+            2 => self.members[0],
+            3 => self.members[1],
+            _ => None,
+        };
+        let (_, configuration) = crate::model::parked_entries::seat_load(
+            after.kind,
+            member.map(|member| (member.kind, member.configuration)),
+        )?;
+        Some((after, configuration))
+    }
+}
+
+pub(crate) fn set_fixed_members(first: Option<Target>, second: Option<Target>) {
     let mut gate = GATE.lock();
-    gate.fixed = [first, second];
+    gate.members = [first, second];
 }
 
 pub(crate) fn fixed_member(slot: u32) -> Option<u32> {
     let gate = GATE.lock();
     match slot {
-        2 => gate.fixed[0],
-        3 => gate.fixed[1],
+        2 => gate.fixed()[0],
+        3 => gate.fixed()[1],
         _ => None,
     }
 }
 
-pub(crate) fn override_kind(slot: u32) -> Option<u32> {
+/// The armed Reload of `slot`: the kind and the exact-Mii configuration it loads.
+pub(crate) fn override_seat(slot: u32) -> Option<(u32, Option<Configuration>)> {
     let gate = GATE.lock();
     [gate.armed2, gate.armed3]
         .into_iter()
         .flatten()
-        .find(|after| after.slot == slot)
-        .map(|after| after.kind)
+        .find(|(after, _)| after.slot == slot)
+        .map(|(after, configuration)| (after.kind, configuration))
 }
 
 pub(crate) fn handover_pending() -> bool {
@@ -107,7 +133,7 @@ pub(crate) fn observe_quantity(quantity: Option<u32>) -> Seen {
     Seen {
         previous,
         changed,
-        fixed: gate.fixed,
+        fixed: gate.fixed(),
     }
 }
 
@@ -152,27 +178,27 @@ pub(crate) fn poll(frame: u32, pause_open: bool) -> Step {
         return Step::Wait;
     }
     gate.phase = Phase::Idle;
-    gate.armed2 = gate.decision.after_entry2;
-    gate.armed3 = gate.decision.after_entry3;
+    gate.armed2 = gate.arm(gate.decision.after_entry2);
+    gate.armed3 = gate.arm(gate.decision.after_entry3);
     Step::Reload
 }
 
 pub(crate) fn armed() -> [Option<After>; 2] {
     let gate = GATE.lock();
-    [gate.armed2, gate.armed3]
+    [gate.armed2, gate.armed3].map(|armed| armed.map(|(after, _)| after))
 }
 
 pub(crate) fn clear_armed_if(slot: u32, kind: u32) {
     let mut gate = GATE.lock();
     if gate
         .armed2
-        .is_some_and(|after| after.slot == slot && after.kind == kind)
+        .is_some_and(|(after, _)| after.slot == slot && after.kind == kind)
     {
         gate.armed2 = None;
     }
     if gate
         .armed3
-        .is_some_and(|after| after.slot == slot && after.kind == kind)
+        .is_some_and(|(after, _)| after.slot == slot && after.kind == kind)
     {
         gate.armed3 = None;
     }
@@ -180,7 +206,7 @@ pub(crate) fn clear_armed_if(slot: u32, kind: u32) {
 
 pub(crate) fn reset() {
     let mut gate = GATE.lock();
-    let fixed = gate.fixed;
+    let members = gate.members;
     *gate = Gate::empty();
-    gate.fixed = fixed;
+    gate.members = members;
 }

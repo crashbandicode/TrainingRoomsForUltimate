@@ -249,6 +249,19 @@ pub fn merge_paused(earlier: Decision, later: Decision) -> Decision {
     }
 }
 
+/// What a seat Reload loads: the seat's kind with the seat member's exact-Mii configuration (F9 report §4.2: a member
+/// is the kind, the costume, and the exact-Mii configuration when the CPU target has one). `member` is the CPU
+/// rotation's member for that entry as (kind, configuration); its configuration counts only for the same kind.
+/// A Mii class (`0x48..=0x4a`) without one is not loaded: installed as a plain fighter it is a body the game reads
+/// null from once the entry activates (Eden covrest-08). The entry then keeps what it has.
+pub fn seat_load<C: Copy>(kind: u32, member: Option<(u32, Option<C>)>) -> Option<(u32, Option<C>)> {
+    if !(0x48..=0x4a).contains(&kind) {
+        return Some((kind, None));
+    }
+    let configuration = member.filter(|(member, _)| *member == kind).and_then(|(_, configuration)| configuration)?;
+    Some((kind, Some(configuration)))
+}
+
 /// A ready body that already is the seat member stays. An in-flight body is not given a second install.
 /// An empty entry, or a ready body of another kind, is reloaded after the walk.
 /// One read of a published cell: body id (`+8`), kind (`+0xc`), and `parked_ready`.
@@ -570,6 +583,28 @@ mod tests {
         // The gate merges while the earlier step still waits for the close.
         let gate = include_str!("../runtime/roster/f9_gate.rs");
         assert!(gate.contains("merge_paused(gate.decision, decision)"));
+    }
+
+    /// Eden covrest-08 (2026-11-08, diag 888badce): the seat Reload installed the CPU rotation's Mii Gunner on entry 2
+    /// as a plain fighter (`install slot=2 kind=0x4a`, no Mii helper). When No. of CPUs rose to 2 the game read null
+    /// every frame (`Unmapped Read64 @ 0x0`, main+0x357bf34). A Mii seat loads with the member's own configuration.
+    #[test]
+    fn a_mii_seat_loads_with_its_member_configuration_or_not_at_all() {
+        assert_eq!(seat_load(0x4a, Some((0x4a, Some(7u8)))), Some((0x4a, Some(7))));
+        assert_eq!(seat_load::<u8>(0x4a, Some((0x4a, None))), None, "a Mii class is never a plain fighter");
+        assert_eq!(seat_load::<u8>(0x48, None), None);
+        assert_eq!(seat_load(0x49, Some((0x01, Some(7u8)))), None, "another member's configuration is not this seat's");
+        assert_eq!(seat_load::<u8>(0x01, Some((0x01, None))), Some((0x01, None)));
+        assert_eq!(seat_load::<u8>(0x01, None), Some((0x01, None)), "an ordinary fighter needs no configuration");
+        assert_eq!(seat_load(0x01, Some((0x4a, Some(7u8)))), Some((0x01, None)));
+        // The gate arms only a loadable seat, and the planner's seat branch loads what was armed.
+        let gate = include_str!("../runtime/roster/f9_gate.rs");
+        assert!(gate.contains("parked_entries::seat_load("));
+        let sources = include_str!("../runtime/roster/character_sources.rs");
+        assert!(sources.contains("f9_gate::override_seat(slot as u32)"));
+        assert!(!sources.contains("f9_gate::override_kind("));
+        let preload = include_str!("../runtime/roster/cycle_preload.rs");
+        assert!(preload.contains("cpu_rotation.iter().flatten().next().copied()"), "the members keep their configuration");
     }
 
     #[test]
