@@ -87,13 +87,39 @@ pub unsafe fn on_poll(controller: usize) {
         }
         #[cfg(not(feature = "diag"))]
         let _ = passed;
-        !block && chords::plus_shortcut_accepted(set, sample)
+        (!block && chords::plus_shortcut_accepted(set, sample), chords::physical_mask(style, detector.hidden()))
     };
+    let (accepted, chord_bits) = accepted;
+    const FIELDS: [usize; 4] = [field::CURRENT_BUTTONS, field::PREVIOUS_BUTTONS, field::JUST_DOWN, field::JUST_RELEASE];
     if chords::clear_plus_bits(modal, accepted) {
-        for offset in [field::CURRENT_BUTTONS, field::PREVIOUS_BUTTONS, field::JUST_DOWN, field::JUST_RELEASE] {
+        for offset in FIELDS {
             let at = (controller + offset) as *mut u32;
             at.write_volatile(at.read_volatile() & !chords::bit::PLUS_MASK);
         }
+    }
+    // A chord's buttons do not reach the game while they are held (the Play chord's ZR was a 10-frame shield): they are
+    // cleared for this mapping call only and put back when it returns (`after_mapping`), so the controller's own
+    // previous/just-down bookkeeping, which the menu and the next poll read, is not changed.
+    if chord_bits != 0 {
+        let kept = FIELDS.map(|offset| ((controller + offset) as *const u32).read_volatile());
+        for (offset, value) in FIELDS.into_iter().zip(kept) {
+            ((controller + offset) as *mut u32).write_volatile(value & !chord_bits);
+        }
+        *HIDDEN.lock() = Some((controller, kept));
+    }
+}
+
+/// The controller fields `on_poll` changed for the mapping call, to put back when it returns.
+static HIDDEN: Mutex<Option<(usize, [u32; 4])>> = Mutex::new(None);
+
+/// The mapping call returned (the apply hook): the chord's buttons go back into the controller.
+///
+/// # Safety
+/// Runs right after the mapping call whose note ran `on_poll`, while that `Controller` is live.
+pub unsafe fn after_mapping() {
+    let Some((controller, kept)) = HIDDEN.lock().take() else { return };
+    for (offset, value) in [field::CURRENT_BUTTONS, field::PREVIOUS_BUTTONS, field::JUST_DOWN, field::JUST_RELEASE].into_iter().zip(kept) {
+        ((controller + offset) as *mut u32).write_volatile(value);
     }
 }
 

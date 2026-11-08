@@ -79,6 +79,8 @@ pub unsafe fn caller_b_note(ctx: &mut InlineCtx) {
 fn apply() {
     // A pass that made no call has no note.
     let Some(pending) = PENDING.get() else { return };
+    // SAFETY: this is the return of the mapping call whose note hid a chord's buttons; its Controller is live.
+    unsafe { chords::after_mapping() };
     let (out, slot, _holder) = pending.take(&NativeTls);
     // Package 6: the controller operating the CPU (native Behavior = Control) reaches the roster cycle's operator handlers.
     if out != 0 && slot == 1 && scene::is_training() {

@@ -145,6 +145,36 @@ pub fn logical_set(style: u32, bits: u32) -> u16 {
     out
 }
 
+/// The raw bits of `style` that hold the logical buttons `set`: the inverse of `logical_set`, for clearing a chord's
+/// buttons from the controller before the game maps it.
+pub fn physical_mask(style: u32, set: u16) -> u32 {
+    let gc = style == STYLE_GAMECUBE;
+    let has = |button: u8| set & (1 << button) != 0;
+    let mut out = 0u32;
+    let mut add = |button: u8, bits: u32| {
+        if has(button) {
+            out |= bits;
+        }
+    };
+    add(logical::A, bit::A);
+    add(logical::B, bit::B);
+    add(logical::X, bit::X);
+    add(logical::Y, bit::Y);
+    add(logical::L, if gc { 0 } else { bit::L });
+    add(logical::R, if gc { bit::ZR } else { bit::R });
+    add(logical::ZL, if gc { bit::L | bit::REAL_DIGITAL_L } else { bit::ZL | bit::LEFT_SL | bit::RIGHT_SL });
+    add(logical::ZR, if gc { bit::R | bit::REAL_DIGITAL_R } else { bit::ZR | bit::LEFT_SR | bit::RIGHT_SR });
+    add(logical::DPAD_UP, bit::DPAD_UP);
+    add(logical::DPAD_DOWN, bit::DPAD_DOWN);
+    add(logical::DPAD_LEFT, bit::DPAD_LEFT);
+    add(logical::DPAD_RIGHT, bit::DPAD_RIGHT);
+    add(logical::PLUS, bit::PLUS);
+    add(logical::MINUS, if gc { 0 } else { bit::MINUS });
+    add(logical::STICK_L, bit::STICK_L);
+    add(logical::STICK_R, bit::STICK_R);
+    out
+}
+
 /// One poll's controller sample in logical buttons.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Sample {
@@ -256,11 +286,27 @@ impl Default for ChordSet {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Detector {
     pending: u16,
+    /// The logical buttons of the chords that passed and are still held: the game does not see them.
+    swallow: u16,
+    /// What this poll keeps from the game: `swallow` with the buttons released on this poll (their release edge).
+    hidden: u16,
 }
 
 impl Detector {
     pub const fn new() -> Self {
-        Self { pending: 0 }
+        Self { pending: 0, swallow: 0, hidden: 0 }
+    }
+
+    /// The logical buttons this poll keeps from the game: those of a chord that passed, from the poll it passed until
+    /// the poll each is released (Eden rc5-opus-final-diag, 2026-11-08: the Play chord's ZR reached the game and P1
+    /// shielded for 10 frames). The runtime clears them from the controller before the game maps it.
+    pub fn hidden(&self) -> u16 {
+        self.hidden
+    }
+
+    fn hold_back(&mut self, fired: u16, sample: Sample) {
+        self.hidden = self.swallow | fired;
+        self.swallow = self.hidden & sample.held;
     }
 
     /// One P1 poll. `blocked` is true while any input owner other than this stage's own is active (the
@@ -270,9 +316,11 @@ impl Detector {
     /// `Request`s for the runtime's diagnostics.
     pub fn poll(&mut self, chords: &ChordSet, sample: Sample, blocked: bool) -> u16 {
         if blocked {
+            self.hold_back(0, sample);
             return 0;
         }
         let mut passed = 0u16;
+        let mut fired = 0u16;
         for (request, chord) in [
             (Request::SaveState, chords.save_state),
             (Request::LoadState, chords.load_state),
@@ -283,11 +331,16 @@ impl Detector {
             (Request::PlayPlayer, chords.play_player),
             (Request::RecordingPopup, chords.recording_popup),
         ] {
-            if self.pending & request.bit() == 0 && passes(chord, sample) {
+            if !passes(chord, sample) {
+                continue;
+            }
+            fired |= chord.0;
+            if self.pending & request.bit() == 0 {
                 self.pending |= request.bit();
                 passed |= request.bit();
             }
         }
+        self.hold_back(fired, sample);
         let open = chords.shortcuts.passes(|b| sample.held & (1 << b) != 0, |b| sample.pressed & (1 << b) != 0);
         if self.pending & Request::OpenMenu.bit() == 0 && open {
             self.pending |= Request::OpenMenu.bit();
@@ -509,5 +562,49 @@ mod tests {
         assert_eq!(detector.poll(&set, sample(&[ZR, DPAD_LEFT], &[]), false), 0);
         assert_eq!(detector.poll(&set, popup, false), Request::RecordingPopup.bit());
         assert!(detector.consume(Request::RecordingPopup));
+    }
+
+    /// Eden rc5-opus-final-diag (2026-11-08): the Play on Player 1 chord (ZR + D-pad Left, pressed together) reached
+    /// the game as ZR, and P1 shielded for 10 frames. The chord's buttons are hidden from the poll it passes until the
+    /// poll each one is released.
+    #[test]
+    fn a_chords_buttons_are_hidden_from_the_game_until_released() {
+        let set = ChordSet::factory();
+        let mut detector = Detector::new();
+        assert_eq!(detector.poll(&set, sample(&[ZR, DPAD_LEFT], &[ZR, DPAD_LEFT]), false), Request::PlayPlayer.bit());
+        assert_eq!(detector.hidden(), bits(&[ZR, DPAD_LEFT]));
+        assert!(detector.consume(Request::PlayPlayer));
+        // D-pad Left goes first: it stays hidden on its release poll; ZR is hidden until its own.
+        assert_eq!(detector.poll(&set, sample(&[ZR], &[]), false), 0);
+        assert_eq!(detector.hidden(), bits(&[ZR, DPAD_LEFT]));
+        assert_eq!(detector.poll(&set, sample(&[ZR], &[]), false), 0);
+        assert_eq!(detector.hidden(), bits(&[ZR]));
+        assert_eq!(detector.poll(&set, sample(&[], &[]), false), 0);
+        assert_eq!(detector.hidden(), bits(&[ZR]), "the release poll hides the release");
+        assert_eq!(detector.poll(&set, sample(&[], &[]), false), 0);
+        assert_eq!(detector.hidden(), 0);
+        // A plain ZR is no chord: the game sees the shield.
+        assert_eq!(detector.poll(&set, sample(&[ZR], &[ZR]), false), 0);
+        assert_eq!(detector.hidden(), 0);
+        // A held chord button stays hidden while an owner blocks the chords.
+        assert_eq!(detector.poll(&set, sample(&[ZR, DPAD_UP], &[ZR, DPAD_UP]), false), Request::InputPlayback.bit());
+        assert_eq!(detector.poll(&set, sample(&[ZR, DPAD_UP], &[]), true), 0);
+        assert_eq!(detector.hidden(), bits(&[ZR, DPAD_UP]));
+    }
+
+    #[test]
+    fn hidden_buttons_are_the_controllers_own_bits_for_its_style() {
+        use super::{bit, logical_set, physical_mask, STYLE_GAMECUBE};
+        let zr_left = bits(&[ZR, DPAD_LEFT]);
+        assert_eq!(physical_mask(5, zr_left), bit::ZR | bit::LEFT_SR | bit::RIGHT_SR | bit::DPAD_LEFT);
+        assert_eq!(physical_mask(STYLE_GAMECUBE, zr_left), bit::R | bit::REAL_DIGITAL_R | bit::DPAD_LEFT);
+        for style in [5, STYLE_GAMECUBE] {
+            for button in 0..16u8 {
+                let mask = physical_mask(style, 1 << button);
+                if mask != 0 {
+                    assert_eq!(logical_set(style, mask), 1 << button, "style {style} button {button}");
+                }
+            }
+        }
     }
 }
