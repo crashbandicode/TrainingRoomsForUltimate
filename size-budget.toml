@@ -761,3 +761,11 @@ ceiling = 153733
 date = "2026-11-08"
 reason = "rc.6 integration (p23/rc6-integration 85f85af): the merge of p23/rc6-seq-drill (583b694, 151701), p23/rc6-cov-rec (e1c6d0c, 152190) and p23/rc6-hot-slots (d6a485f, 151146) onto 34084a1 (150650); the three sides add up (+1051, +1540, +496 = 153737), the conflict resolutions save 4; measured 153733 on the merged tree (tools/size_gate.py)"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); combined ceiling = measured merged size per primary c07b3449, TASK-OPUS-rc6-integration 2026-11-08"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 154170
+date = "2026-11-08"
+reason = "rc.6 integration (p23/rc6-integration 6d6994e): the CPU-as-P1 fallback allocates nothing in its hooks (primary inbox 19:13Z, Eden rc6-int-smoke1 cpu_frame allocations): request.json and the receipts on the heartbeat, typed JSON diag lines (compat::json_line), FixedQueue, the hook-path wiring test; +437 over 153733, measured 154170 (tools/size_gate.py)"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the root fix ordered by primary c07b3449, INBOX-opus-rc6-integration 2026-11-08 19:13Z"
