@@ -30,8 +30,9 @@ struct Slot {
     pc: AtomicUsize,
 }
 
-static TABLE: [Slot; SLOTS] =
-    [const { Slot { lock: AtomicUsize::new(0), thread: AtomicUsize::new(0), pc: AtomicUsize::new(0) } }; SLOTS];
+#[allow(clippy::declare_interior_mutable_const)]
+const EMPTY: Slot = Slot { lock: AtomicUsize::new(0), thread: AtomicUsize::new(0), pc: AtomicUsize::new(0) };
+static TABLE: [Slot; SLOTS] = [EMPTY; SLOTS];
 static OVERFLOW: AtomicUsize = AtomicUsize::new(0);
 
 /// The calling thread.
