@@ -98,11 +98,21 @@ There is no chord for a combo. Choosing Drill makes it the one drill.
 
 ## Sequences and the one drill
 
-A sequence is an ordered list of combo files. It stores each combo's id. Rename a combo and the sequence shows the new name. Delete a combo and the sequence skips that step.
+A sequence is an ordered list of combo files. It stores each combo's id. Rename a combo and the sequence shows the new name. Delete a combo and the sequence skips that step. An empty sequence drills nothing. Every combo of a sequence is drilled, however many it has.
 
-In this build you can build and edit sequences, but drilling a sequence is not in it yet. It comes in the next build. Drill sequence, or A on a sequence, still makes it the green drilled row, but the bar keeps the combo it was drilling. The helper drills one combo. A numbered row inside a sequence drills that combo alone, with that combo's own streak, and the sequence file stays.
+The helper drills one thing. Drilling a sequence replaces a drilled combo, and drilling a combo replaces a drilled sequence. Drill sequence, or A on a sequence in the pop-up, makes it the drill. A numbered row inside a sequence drills that combo alone, with that combo's own streak, and the sequence file stays.
 
-The picker is the same numbered picker as a chain, including R removing the last number.
+The bar under the frame strip is the combo helper's bar with a sequence header and a row for the sequence's combos. The header reads SEQUENCE, the sequence's name, then combo k of n, the current combo's name, its links and the tolerance, and on the right the streak and the best. The row shows the sequence's combos in order: a done combo is green with a check, the current one is white, the later ones are grey, and arrows join them. Under them are the current combo's link cells, the helper's own. The footer names the combo that just landed and the current one.
+
+Combo 2 follows inside the same exchange as combo 1. The link from combo 1's last hit to combo 2's first hit joins them. It is shown on the strip and it is not graded, and the move it lands must be combo 2's first move. TRUE is shown and is not required, including between the combos of a sequence: the CPU may act for up to 20 frames between them. The same grade as a single combo decides each step: the input events, the direction, the order, the tolerance, and the move. Drift is shown and is not graded.
+
+A finished sequence adds one to the streak, and best is the highest streak. A drop sends the sequence back to combo 1 and the streak to 0. Best is kept. A step drops on a fault the single combo would drop on, on a different first move after the joining link, or when the exchange ends before the next combo. A save-state load or a scene change in the middle of a sequence is a drop too. After a drop the dropped combo is red and the footer names the fault, until combo 1 starts again in a new exchange.
+
+The streak and the best are written to the sequence file, so the CONNECTIONS panel shows the same numbers as the bar, after the menu closes and after you leave Training.
+
+![Drill a sequence: combo 1, then combo 2, then a drop back at combo 1](media/rc6-sequence-drill.gif)
+
+The picker is the same numbered picker as a chain, including R removing the last number. Edit combos, Rename and Delete are written to the card.
 
 ## The pop-up
 
@@ -120,7 +130,7 @@ The connections of the row under the cursor are the menu's two help lines, heade
 
 The bound save, the active macro of the role in view, and the drilled combo or sequence are green rows. The name stays the ordinary light colour. The cursor on these screens is a white border and a white bar on the left. A row can be green and hold the cursor at the same time.
 
-A on a save binds it to Save and Load. A on a macro or a chain sets it active for the role in view. A on a combo drills it. A on a sequence marks it, as described under Sequences. X cycles the loop, and only while the cursor is in Macros, and that count is written to the recording index. Y does nothing on this window.
+A on a save binds it to Save and Load. A on a macro or a chain sets it active for the role in view. A on a combo drills it. A on a sequence drills it, as described under Sequences. X cycles the loop, and only while the cursor is in Macros, and that count is written to the recording index. Y does nothing on this window.
 
 ![The pop-up over the match, Player view, cursor on a save](media/rc5-popup.gif)
 

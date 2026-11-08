@@ -4,6 +4,19 @@ Every GIF in [`media/`](media/) is actual Eden footage: whole screen, 1280×720,
 game-speed timing kept, trimmed at the ends (any cut inside a clip is listed with it). Frames were reviewed (start,
 action, result) before a clip was kept. The raw takes stay outside git with their runs.
 
+## rc.6 clips
+
+`rc6-sequence-drill.gif` comes from run `rc6-seq-diag1` on the Yoga, 2026-11-08, row `seq-gif`, 13:40:04–13:40:27Z,
+with the diag NRO `50c8a5df` of `p23/rc6-seq-drill` `e6ac460`. The diag build adds log lines only; the screen draws the
+same. The take is Eden's own recorder at 1280×720 and 15 fps, 6 s, 91 frames, 13.3 MB (raw take SHA-256
+`71d818e4…372d`, kept in `artifacts/phase23/rc6-eden/seq-diag1/out/seq-gif/`). It was re-encoded with the playbook's
+`tools/eden-solo/encode.py`: one shared palette of 96 colours, no dither, every second frame kept with the time of both,
+so it still plays at game speed (46 frames, 6.9 MB).
+
+| File | Re-run row | Host | Embedded in | Build | Length | Start, then the inputs | Must be visible | In `media/` |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `media/rc6-sequence-drill.gif` | `seq-gif` in `artifacts/phase23/rc6-eden/rows-seq/rows.json` | yoga | RECORDING.md, Sequences and the one drill; RELEASE-NOTES-rc6.md | rc.6 | 6 s | A sequence of three one-link combos (Pair 1, 2, 3: jab, jab), file streak 4 and best 9, is the drill. Load to a save with Player 1 in jab range. Jab, jab (Pair 1); walk forward a little; then an up tilt where Pair 2's jab should be. | The bar's SEQUENCE header, combo 1 of 3, and the row Pair 1 → Pair 2 → Pair 3. Pair 1 turns green with the check and the header reads combo 2 of 3, "Pair 1 landed". Then Pair 2 turns red, the footer reads "Pair 2 dropped · L1 wrong move: Up tilt · restart at combo 1", the header is back on combo 1, and the streak goes from 4 to 0 with best 9. | yes |
+
 ## rc.5 clips
 
 23 of the rows below are in [`media/`](media/), and the player docs embed them. They are Eden footage of
@@ -73,8 +86,8 @@ Recording page. A row that says `rr-6` is not a capture of the old slot page. Re
 | `media/rc5-fighter-mismatch.gif` | `media-rc5-fighter-mismatch` | yoga | RECORDING.md, Fighter Mismatch | rr-6 | 7 s | CPU is Mario. Active chain whose first macro was recorded on a different fighter (change P1 to Pikachu, record a jab, change P1 back to Mario, put that recording first in a chain, set the chain active for the CPU). ZR+Up. | The Fighter Mismatch rows open, cursor on Keep. Keep plays the chain on Mario. There is no second prompt when a later macro plays. | yes |
 | `media/rc5-migration.gif` | `media-rc5-migration` | yoga | RECORDING.md, Migration | first boot of a card that still has the old slots | 8 s | Before boot, leave a non-empty recording in slot 1 and leave the other recording slots empty. Boot. Set nothing else active. ZR+Up if Player 1's active macro is that migrated slot; otherwise open the list and play `Slot 1 (YYYY-MM-DD)`. | The name uses `Slot 1` and the date. Play does not warp. Empty slots did not become files. | not yet |
 
-There is no sequence-drill row: drilling a sequence is not in rc.5 ([RECORDING.md](RECORDING.md), Sequences). The
-migration row cannot be taken on a card updated from an earlier build, because recording slots were never kept between
+rc.5 has no sequence-drill row because rc.5 did not drill sequences. rc.6 drills them, and the clip is under rc.6
+clips above ([RECORDING.md](RECORDING.md), Sequences and the one drill). The migration row cannot be taken on a card updated from an earlier build, because recording slots were never kept between
 boots (`src/model/library/migrate.rs`).
 
 The redesign mockups named `docs/decisions/RECORDING-REDESIGN-*.png` are not in this tree. They are not a substitute
