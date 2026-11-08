@@ -851,7 +851,7 @@ mod tests {
             hot_macros: vec!["m0".into(), "m1".into(), "ch".into(), "m2".into(), "m3".into()],
             ..Catalog::default()
         });
-        menu.recording_mut().adopt_once(
+        menu.recording_mut().adopt(
             None,
             [Some("m2".into()), None],
             [LoopMark::Finite(1), LoopMark::Finite(1)],

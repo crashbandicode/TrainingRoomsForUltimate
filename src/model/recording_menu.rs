@@ -391,7 +391,6 @@ pub struct RecordingScreens {
     crop: Option<CropDraft>,
     /// Online waiting room: the keyboard stays closed and an empty name keeps N.
     keyboard_blocked: bool,
-    adopted: bool,
 }
 
 impl Default for RecordingScreens {
@@ -422,7 +421,6 @@ impl RecordingScreens {
             serial: 0,
             crop: None,
             keyboard_blocked: false,
-            adopted: false,
         }
     }
 
@@ -637,15 +635,16 @@ impl RecordingScreens {
         self.crop.is_some()
     }
 
-    pub fn adopt_once(&mut self, bound: Option<String>, active: [Option<String>; 2], loops: [LoopMark; 2], drill: Option<String>) {
-        if self.adopted {
-            return;
-        }
+    /// The index's selection, with every catalog load (`CatalogWatch::take_load`: a new opening or a file write). The
+    /// menu publishes its selection back to the index (`rr_host::publish_selection`), so it must never hold one older
+    /// than the index: a model the pop-up kept alive took the index once, and a later Record made a new active file, so
+    /// closing the menu put the old one back (Eden rc5-opus-final-trace2, 2026-11-08). The menu's own edits are already
+    /// in the index, published with the press that made them.
+    pub fn adopt(&mut self, bound: Option<String>, active: [Option<String>; 2], loops: [LoopMark; 2], drill: Option<String>) {
         self.bound = bound;
         self.active = active;
         self.loops = loops;
         self.drill = drill;
-        self.adopted = true;
     }
 
     pub fn focused_file_title(&self) -> Option<String> {

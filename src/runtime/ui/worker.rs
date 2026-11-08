@@ -506,7 +506,7 @@ fn refresh_recording(s: &mut Session) -> bool {
     if due {
         if let Ok(loaded) = crate::engine::rr_runtime::load_catalog(std::path::Path::new(crate::model::storage::ROOT)) {
             menu.recording_mut().set_catalog(loaded.catalog);
-            menu.recording_mut().adopt_once(loaded.bound, loaded.active, loaded.loops, loaded.drill);
+            menu.recording_mut().adopt(loaded.bound, loaded.active, loaded.loops, loaded.drill);
             changed = true;
         }
     }

@@ -1236,4 +1236,38 @@ mod tests {
             }
         }
     }
+
+    /// Eden rc5-opus-final-trace2 (2026-11-08): Record on CPU made `macro-1` the CPU's active file, then a menu open and
+    /// close wrote `active.cpu = null` back. The pop-up had kept its model alive with the selection it took before the
+    /// recording. The worker's steps (`worker::refresh_recording`, `post_recording_effect`) on a scratch card.
+    #[test]
+    fn a_menu_close_after_record_on_cpu_keeps_the_new_active_file() {
+        use crate::model::recording_menu::{CatalogWatch, RecordingScreens};
+        use super::super::rr_host::publish_selection;
+
+        let root = scratch("menu-adopt");
+        RecordingIndex::load(&root).unwrap().save(&root).unwrap();
+        let refresh = |screens: &mut RecordingScreens, watch: CatalogWatch, generation: u64| {
+            let (watch, due) = watch.take_load(generation);
+            if due {
+                let loaded = load_catalog(&root).unwrap();
+                screens.set_catalog(loaded.catalog);
+                screens.adopt(loaded.bound, loaded.active, loaded.loops, loaded.drill);
+            }
+            watch
+        };
+        // The pop-up: its model loads generation 0, and its press publishes the selection.
+        let mut screens = RecordingScreens::new();
+        let watch = refresh(&mut screens, CatalogWatch::default(), 0);
+        publish_selection(&root, &screens.selection(), None);
+        // Record on CPU stops: the new file is the CPU's active one, and the generation moves.
+        let mut index = RecordingIndex::load(&root).unwrap();
+        index.set_active(Role::Cpu, Some("macro-1"), 10).unwrap();
+        index.save(&root).unwrap();
+        // The menu opens on the same model and closes: the worker refreshes, then publishes.
+        refresh(&mut screens, watch, 1);
+        publish_selection(&root, &screens.selection(), None);
+        let after = RecordingIndex::load(&root).unwrap();
+        assert_eq!(after.active(Role::Cpu), Some("macro-1"), "the menu published a selection older than the index");
+    }
 }
