@@ -585,3 +585,11 @@ ceiling = 150251
 date = "2026-11-07"
 reason = "rc.5 wire-fix: a reopened menu reloads the recording catalog after the model is dropped, even when no file write bumped the generation; measured 150251 (tools/size_gate.py), +27 over 150224"
 approved_by = "Operator 2026-11-07 via primary 35137355 (TASK-GROK-rc5-wire-fix): 'Raise as needed'"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 150310
+date = "2026-11-08"
+reason = "rc.5 Fighter Mismatch (p23/rc5-mismatch-fix): a fighter question opened with the menu closed is drawn and answered (flow::Phase::Prompt), and an answer wakes the recording service gate; measured 150310 (tools/size_gate.py), +59 over 150251"
+approved_by = "Primary c07b3449 via TASK-OPUS-rc5-mismatch (2026-11-08): 'the budget may need a reviewed bump; say so'. Flagged for the primary's review in LANE-OPUS-RC5-GIFS-REPORT.md"

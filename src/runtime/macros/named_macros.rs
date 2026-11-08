@@ -536,6 +536,11 @@ pub fn publish_queries() {
     });
 }
 
+/// The shared Fighter Mismatch question is up (any origin). With the menu closed the worker draws it alone (`flow::Phase::Prompt`).
+pub fn fighter_prompt_up() -> bool {
+    !suspended() && lock_read(&UI).fighter_prompt().is_some()
+}
+
 pub fn panel_view() -> Option<View> {
     if suspended() { return None; }
     let ui = lock_read(&UI);

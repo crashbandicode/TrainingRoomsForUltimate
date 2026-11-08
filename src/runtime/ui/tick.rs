@@ -117,7 +117,7 @@ pub unsafe fn tick(layout: *mut Layout, registration: bool) {
     let open = OPEN.load(Ordering::Acquire);
     // A panel the menu does not own (the clip editor) is drawn with the menu closed.
     let ext = EXT_SHOWN.load(Ordering::Acquire);
-    let popup = state::POPUP.load(Ordering::Acquire);
+    let popup = state::POPUP.load(Ordering::Acquire) || state::PROMPT.load(Ordering::Acquire);
     let mut alpha = 255;
     let mut showing = open || ext || popup;
     if CLOSING.load(Ordering::Acquire) {

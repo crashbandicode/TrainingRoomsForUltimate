@@ -12,6 +12,9 @@ pub enum Phase {
     Panel,
     /// The clip editor: the menu is closed, the editor reads Player 1 and its frame is drawn alone.
     Clip,
+    /// A fighter question the layer opened with the menu closed (Play on a recording made on another fighter): it is drawn
+    /// alone, like the clip editor, and Player 1's presses answer it.
+    Prompt,
 }
 
 /// What the layer reports now.
@@ -25,6 +28,8 @@ pub struct Seen {
     pub clip_visible: bool,
     /// The layer permits physical clip input: no mismatch/name panel or native keyboard owns it.
     pub clip_foreground: bool,
+    /// The layer's fighter question is up and a renderer exists to draw it.
+    pub prompt_visible: bool,
 }
 
 /// What the worker does about it.
@@ -39,12 +44,19 @@ pub enum Step {
     HandOverToClip,
     /// The clip editor closed: stop drawing it.
     HideClip,
+    /// Draw the fighter question alone and give it Player 1's presses.
+    ShowPrompt,
+    /// The question was answered or retired: stop drawing it and give Player 1 back.
+    HidePrompt,
 }
 
 /// The next phase and the step to take, given the phase and what the layer reports.
 pub fn next(phase: Phase, seen: Seen) -> (Phase, Step) {
     match phase {
+        Phase::Menu if !seen.menu_open && seen.prompt_visible && !seen.clip_visible => (Phase::Prompt, Step::ShowPrompt),
         Phase::Menu => (Phase::Menu, Step::Nothing),
+        Phase::Prompt if !seen.prompt_visible || seen.menu_open => (Phase::Menu, Step::HidePrompt),
+        Phase::Prompt => (Phase::Prompt, Step::Nothing),
         Phase::Panel if !seen.menu_open => (Phase::Menu, Step::CloseLayer),
         Phase::Panel if seen.clip_visible && seen.clip_foreground => (Phase::Clip, Step::HandOverToClip),
         Phase::Panel if !seen.panel_visible => (Phase::Menu, Step::PopRow),
@@ -59,7 +71,31 @@ mod tests {
     use super::*;
 
     fn seen(menu_open: bool, panel_visible: bool, clip_visible: bool) -> Seen {
-        Seen { menu_open, panel_visible, clip_visible, clip_foreground: clip_visible }
+        Seen { menu_open, panel_visible, clip_visible, clip_foreground: clip_visible, prompt_visible: false }
+    }
+
+    #[test]
+    fn a_fighter_question_with_the_menu_closed_is_drawn_until_it_is_answered() {
+        // rc.5: Play on a recording made on another fighter opened the question with the menu closed; nothing drew it or
+        // gave it Player 1, and the held fighters stayed stopped.
+        let asked = Seen { prompt_visible: true, ..seen(false, true, false) };
+        assert_eq!(next(Phase::Menu, asked), (Phase::Prompt, Step::ShowPrompt));
+        assert_eq!(next(Phase::Prompt, asked), (Phase::Prompt, Step::Nothing));
+        let answered = seen(false, false, false);
+        assert_eq!(next(Phase::Prompt, answered), (Phase::Menu, Step::HidePrompt));
+    }
+
+    #[test]
+    fn a_fighter_question_inside_the_open_menu_stays_the_menu_panels() {
+        // The library and combo questions open from a menu row: Phase::Panel draws them, not Prompt.
+        let in_menu = Seen { prompt_visible: true, ..seen(true, true, false) };
+        assert_eq!(next(Phase::Menu, in_menu), (Phase::Menu, Step::Nothing));
+        assert_eq!(next(Phase::Panel, in_menu), (Phase::Panel, Step::Nothing));
+        // A clip editor's own question is the clip's.
+        let clip = Seen { prompt_visible: true, ..seen(false, true, true) };
+        assert_eq!(next(Phase::Menu, clip), (Phase::Menu, Step::Nothing));
+        // The menu opening over a question hides the closed-menu copy.
+        assert_eq!(next(Phase::Prompt, in_menu), (Phase::Menu, Step::HidePrompt));
     }
 
     #[test]

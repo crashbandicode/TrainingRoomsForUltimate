@@ -26,7 +26,7 @@ use crate::runtime::published;
 use crate::runtime::macros::{named_macros, replay_capture};
 use crate::runtime::ui::{combos, external, requests};
 use crate::model::input_delay::Owners;
-use crate::runtime::ui::state::{CLOSE_COUNT, CLOSING, EXT_SHOWN, FRAME, FRAME_SEQ, JUMPS, OPEN, POPUP, POPUP_REQ};
+use crate::runtime::ui::state::{CLOSE_COUNT, CLOSING, EXT_SHOWN, FRAME, FRAME_SEQ, JUMPS, LAYOUT_READY, OPEN, POPUP, POPUP_REQ, PROMPT};
 
 static INPUT: Ring<64> = Ring::new();
 static WORKER: OnceLock<Thread> = OnceLock::new();
@@ -238,6 +238,10 @@ fn sync_input_generation(s: &mut Session) {
         if s.phase == Phase::Clip {
             EXT_SHOWN.store(false, Ordering::Release);
         }
+        if s.phase == Phase::Prompt {
+            // The next `sync_panels` draws a question that is still up again, on a new model.
+            hide_prompt();
+        }
         POPUP.store(false, Ordering::Release);
         s.phase = Phase::Menu;
         publish_jumps(s);
@@ -331,6 +335,12 @@ fn publish_jumps(s: &Session) {
 fn press(button: Button, s: &mut Session) {
     let popup = POPUP.load(Ordering::Acquire);
     let open = OPEN.load(Ordering::Acquire);
+    if s.phase == Phase::Prompt && !open {
+        // The fighter question owns Player 1 until it is answered (A), cancelled (B) or retired.
+        external::press_panel(button);
+        sync_panels(s);
+        return;
+    }
     if s.menu.is_none() || s.phase == Phase::Clip || (!open && !popup) {
         return;
     }
@@ -623,6 +633,8 @@ fn sync_panels(s: &mut Session) {
         panel_visible: external::panel_up() || s.setups.panel_up(),
         clip_visible: external::clip_up(),
         clip_foreground: named_macros::clip_foreground(),
+        // Drawn only where a renderer exists, so Player 1 is never held by a question nobody can see (R2-2).
+        prompt_visible: named_macros::fighter_prompt_up() && LAYOUT_READY.load(Ordering::Acquire),
     };
     let (phase, step) = flow::next(s.phase, seen);
     s.phase = phase;
@@ -661,13 +673,40 @@ fn sync_panels(s: &mut Session) {
             EXT_SHOWN.store(false, Ordering::Release);
             FRAME_SEQ.fetch_add(1, Ordering::Release);
         }
+        Step::ShowPrompt => {
+            // The frame is built from a menu model (its panel frame); a closed menu has none, so open one as the pop-up does.
+            if s.menu.is_none() {
+                let settings = SETTINGS.lock().clone().unwrap_or_else(Settings::factory);
+                s.keeper.open(&mut s.menu, settings, env());
+            }
+            crate::runtime::published::INPUT_OWNERS.fetch_or(Owners::MENU.bits(), Ordering::AcqRel);
+            PROMPT.store(true, Ordering::Release);
+            diagnostic(format_args!("[Ui] fighter prompt shown"));
+        }
+        Step::HidePrompt => {
+            hide_prompt();
+            diagnostic(format_args!("[Ui] fighter prompt closed"));
+        }
     }
     if s.phase == Phase::Clip {
         EXT_SHOWN.store(true, Ordering::Release);
     }
-    if open || s.phase == Phase::Clip {
+    if open || s.phase == Phase::Clip || s.phase == Phase::Prompt {
         publish_frame(s);
     }
+}
+
+/// Stop drawing the closed-menu fighter question and give Player 1 back, unless the menu or the pop-up holds it.
+fn hide_prompt() {
+    if !PROMPT.swap(false, Ordering::AcqRel) {
+        return;
+    }
+    if !OPEN.load(Ordering::Acquire) && !POPUP.load(Ordering::Acquire) && !CLOSING.load(Ordering::Acquire) {
+        crate::runtime::published::INPUT_OWNERS.fetch_and(!Owners::MENU.bits(), Ordering::AcqRel);
+    }
+    // The A or B that answered is still held: it must not become a jab or a special in the match.
+    crate::runtime::features::recorder::swallow_p1(15);
+    FRAME_SEQ.fetch_add(1, Ordering::Release);
 }
 
 /// Take the owned catalog published by package 6; never inspect a native owner from the worker.
@@ -771,7 +810,7 @@ fn publish_frame(s: &Session) {
     if s.phase == Phase::Clip {
         let Some(view) = replay_capture::clip_view() else { return };
         clip_frame(&view, &named_macros::fighter_label(view.fighter_kind), replay_capture::scrub_pace(), &mut next);
-    } else if s.phase == Phase::Panel {
+    } else if s.phase == Phase::Panel || s.phase == Phase::Prompt {
         // The layer's page may be between two views (a capture loading, a keyboard open): keep what is on screen.
         let Some(view) = (if s.panel.is_some_and(is_setup) {
             s.setups.view()

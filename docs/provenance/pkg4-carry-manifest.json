@@ -947,7 +947,7 @@
    "dest": "src/runtime/macros/named_macros.rs",
    "crate": "root",
    "src_sha256": "737474479d5f05b064ab645d850ceb189cad3943097ae4fdb5fc74d2fcda0809",
-   "dest_sha256": "abf39d8aecafa84f665bf9b0a7292019fa24ee50122f75d5b9a4b7f5e291ceb6",
+   "dest_sha256": "1d2f6ad9b03d287dcbadc7fc4106d524e3aedf3d4843e5ab553f92cbf6faa5dd",
    "edits": [
     {
      "old": "use training_mod_sync::*;",
@@ -1497,6 +1497,11 @@
      "old": "        Effect::ClipFighter(choice) => crate::runtime::macros::replay_capture::fighter_choice(choice),\n    }\n",
      "new": "        Effect::ClipFighter(choice) => crate::runtime::macros::replay_capture::fighter_choice(choice),\n        Effect::ComboFighter(choice) => *lock_write(&COMBO_FIGHTER) = Some(choice),\n    }\n",
      "reason": "SPEC-input-07 \u00a74a (p23/combo-switch, operator 2026-11-05 DEFERRED-LIST): the shared fighter prompt for a chosen combo (origin Combo, Effect::ComboFighter, its stale arm, Player 1 in the footer)"
+    },
+    {
+     "old": "pub fn panel_view() -> Option<View> {",
+     "new": "/// The shared Fighter Mismatch question is up (any origin). With the menu closed the worker draws it alone (`flow::Phase::Prompt`).\npub fn fighter_prompt_up() -> bool {\n    !suspended() && lock_read(&UI).fighter_prompt().is_some()\n}\n\npub fn panel_view() -> Option<View> {",
+     "reason": "rc.5 Fighter Mismatch (p23/rc5-mismatch-fix): the menu worker asks whether the shared fighter question is up, so a question opened with the menu closed (Play on a recording made on another fighter) is drawn and answered (flow::Phase::Prompt) instead of holding the fighters with nothing on screen"
     }
    ]
   },
