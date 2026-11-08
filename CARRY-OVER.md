@@ -932,3 +932,23 @@ a resource pair; `parked_entries::reproof`). Any identity change keeps the refus
 2 recorded manifest edits: `mii_managed_helper.rs` (`reproof_parked`, new) and `character_sources.rs` (`f9_publish`,
 `f9_player_frame`, `f9_reproof` new); `carry_pkg6.py verify` re-derives all 250 files. Test (failed first: no
 `reproof`): `parked_entries` `a_promoted_seat_is_re_proved_once_parked_only_with_its_identity`.
+
+### p23/rc6-cov-rest: the portrait race, a press waits for the render and the F9 seat load holds back (2026-11-08)
+
+**Mii portrait × F9 (primary 17:28Z, readings A and B).** Eden covrest-12: after the CPU loaded the card's Mii
+Gunner, its HUD portrait leased the F9 seat on entry 2 (the same exact Mii), but the render waited ~6 s behind seat 3's
+INSTALL and was issued in the frame of the CPU's next press. The press's snapshot refused the row mid-render, the
+portrait's after-render proof quarantined helper 2 for the scene, and presses 1-5 loaded nothing.
+- A (the race): a Mii owner's begin waits while that role's portrait job holds a helper lease or has its render
+  issued: `Blocker::Portrait` ("portrait render on a helper") in the CPU's `begin_blocker`, the same check in the
+  Player's `permitted`, through `mii_hud_portrait::render_holds_helper(logical)`. The press runs after the render; it
+  is never dropped.
+- B (ordering): F9's seat branch of `purpose_view` starts no seat load while a portrait job wants a helper or holds one
+  (`portrait_waits`: a portrait channel's request or a Portrait lease; `parked_entries::seat_load_waits`).
+
+5 recorded manifest edits: `source_load.rs` (`Blocker`, `reason`, the test), `mii_hud_portrait.rs`
+(`render_holds_helper`), `mii_ordinary_cpu.rs` (`begin_blocker`, `portrait_render_held`), `mii_ordinary_player.rs`
+(`permitted`, `portrait_render_held`), `character_sources.rs` (`purpose_view`'s F9 section, `portrait_waits`);
+`carry_pkg6.py verify` re-derives all 250 files. Tests (failed first: no `Blocker::Portrait`, no `seat_load_waits`):
+`source_load` `a_press_during_a_portrait_render_waits_and_then_applies`, `parked_entries`
+`a_seat_load_holds_back_while_a_portrait_render_waits`.

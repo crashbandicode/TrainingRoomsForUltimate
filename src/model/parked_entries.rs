@@ -304,6 +304,13 @@ pub fn reproof(parked: bool, identity_same: bool, state_same: bool) -> Reproof {
     }
 }
 
+/// Ordering (primary 2026-11-08 17:28Z, reading B; Eden covrest-12): an F9 seat load waits while a HUD portrait job
+/// wants a helper or holds one for its render, so the render is not pushed behind the seat's INSTALL into the role's
+/// next press. The seat loads once the render is done.
+pub fn seat_load_waits(portrait_job: bool) -> bool {
+    portrait_job
+}
+
 /// A ready body that already is the seat member stays. An in-flight body is not given a second install.
 /// An empty entry, or a ready body of another kind, is reloaded after the walk.
 /// One read of a published cell: body id (`+8`), kind (`+0xc`), and `parked_ready`.
@@ -687,6 +694,18 @@ mod tests {
         let sources = include_str!("../runtime/roster/character_sources.rs");
         assert!(sources.contains("f9_gate::mark_promoted("), "a published seat is marked");
         assert!(sources.contains("mii_managed_helper::reproof_parked("), "and re-proved once parked");
+    }
+
+    /// Eden covrest-12: after the CPU loaded the Mii Gunner, its HUD portrait leased the seat on entry 2 but its render
+    /// waited ~6 s behind seat 3's INSTALL and met the CPU's next press. Ordering (primary 17:28Z, reading B): an F9
+    /// seat load waits while a portrait job wants a helper or holds one for its render.
+    #[test]
+    fn a_seat_load_holds_back_while_a_portrait_render_waits() {
+        assert!(seat_load_waits(true));
+        assert!(!seat_load_waits(false));
+        let sources = include_str!("../runtime/roster/character_sources.rs");
+        assert!(sources.contains("parked_entries::seat_load_waits(portrait_waits(state))"));
+        assert!(sources.contains("matches!(live.consumer, Consumer::Portrait)"));
     }
 
     #[test]

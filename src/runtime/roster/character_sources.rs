@@ -531,6 +531,10 @@ fn purpose_view(state:&State,slot:usize,targets:[Option<Want>;crate::runtime::ro
     // loads the CPU rotation's member, not whatever fighter the merged plan lists first. A Mii
     // member loads with its own configuration, through the Mii helper (`f9_gate` arms no other).
     if training {
+        // A HUD portrait render that wants or holds a helper goes first (covrest-12).
+        if matches!(slot, 2 | 3) && crate::model::parked_entries::seat_load_waits(portrait_waits(state)) {
+            return [None; crate::runtime::roster::cycle_preload::MAX_TARGETS];
+        }
         if let Some((kind, configuration)) = crate::runtime::roster::f9_gate::override_seat(slot as u32) {
             let want = targets.iter().flatten().copied()
                 .find(|want| want.kind == kind && want.configuration == configuration).unwrap_or(Want {
@@ -576,6 +580,21 @@ fn purpose_view(state:&State,slot:usize,targets:[Option<Want>;crate::runtime::ro
     let borrow_open=training&&borrow_admitted(unsafe{native_source::training_cpu_quantity()},
         crate::runtime::ui::state::PAUSE_ACTIVE.load(Ordering::Acquire),state.book.can_replace(BORROW_ENTRY)==Ok(true));
     slot_view(plan,SlotFacts{training,slot,created:extras.contains(&slot),created_busy,borrow_open,borrowed})
+}
+
+/// A HUD portrait job wants a helper (its channel's request) or holds one until its render is done (its lease).
+#[cfg(feature = "managed-third-source-alpha")]
+fn portrait_waits(state: &State) -> bool {
+    #[cfg(feature = "mii-hud-portrait-alpha")]
+    {
+        PORTRAIT_CHANNELS.iter().any(|channel| state.wants[*channel].is_some())
+            || state.leases.iter().flatten().any(|live| matches!(live.consumer, Consumer::Portrait))
+    }
+    #[cfg(not(feature = "mii-hud-portrait-alpha"))]
+    {
+        let _ = state;
+        false
+    }
 }
 
 /// The plan targets a helper request reads (`selected_request`'s filter: the Cycle Preload cap, no failed kind).
