@@ -1,0 +1,229 @@
+{
+  "game_id": "01006A800016E000",
+  "start": "boot",
+  "early_stop": false,
+  "scope": "rc.5 release window, one instance. Generated from accept-rows.json (acc-boot, acc-heap, acc-strip, acc-helper, acc-rel-record).",
+  "setup": [
+    {
+      "state": "Training, both fighters Mario, menu closed, volume 0. Each row copies its own fixture.",
+      "via": "fixture",
+      "ref": "INBOX 2026-11-07 22:16Z"
+    }
+  ],
+  "segments": {
+    "chord-save": {
+      "file": "segments/chord-save.edenmacro.json",
+      "sha256": "fd05baa42ae7353f6be4ef1fa861d55b958ad1de31e05229286ad18b52bbe56c",
+      "cap": 30
+    },
+    "chord-load": {
+      "file": "segments/chord-load.edenmacro.json",
+      "sha256": "1f1f8ca9d99c990e8fa6ae9348fc31f6ae36e7f2fa09c88d84485abfd2f0cb74",
+      "cap": 30
+    },
+    "chord-record": {
+      "file": "segments/chord-record.edenmacro.json",
+      "sha256": "f2fa1848d9988aea562b142421767175b60a3b836770c3f537b7473e9dd18e04",
+      "cap": 30
+    },
+    "chord-play-cpu": {
+      "file": "segments/chord-play-cpu.edenmacro.json",
+      "sha256": "56b9f03c84a8521c261b7cdee25702d379ecf4eabc556ccef98e7097fc3bb8f9",
+      "cap": 30
+    },
+    "chord-play-p1": {
+      "file": "segments/chord-play-p1.edenmacro.json",
+      "sha256": "0cde25d7bb1a6f68194603d41c2f0f6f125f33c15b73af117bc7440c0803fc6e",
+      "cap": 30
+    },
+    "chord-popup": {
+      "file": "segments/chord-popup.edenmacro.json",
+      "sha256": "d4f4376b8f2fc8821b8dbe795f2f0ca46902bb47ae6bc132ad0e117937433b97",
+      "cap": 30
+    },
+    "jab": {
+      "file": "segments/jab.edenmacro.json",
+      "sha256": "12769777ca262a7e3515f8f81a72c7470e7dffa98d9bdfb56e1887dfc702f278",
+      "cap": 30
+    },
+    "reset-center": {
+      "file": "segments/reset-center.edenmacro.json",
+      "sha256": "54e917aa28b0af97505e73a53fa991d3f79ed597b79ae8bc07f364c5fc6dbdd7",
+      "cap": 30
+    },
+    "x-press": {
+      "file": "segments/x-press.edenmacro.json",
+      "sha256": "923b754c8578d4f76ca41874d7c0cb379cdb8107bd28031dcac90277183139dc",
+      "cap": 30
+    },
+    "menu-open": {
+      "file": "segments/menu-open.edenmacro.json",
+      "sha256": "1185704f7b97f2981a8bae42fbe42166d5bc37aa2e9cba197bdf585a616f78ce",
+      "cap": 30
+    },
+    "menu-close": {
+      "file": "segments/menu-close.edenmacro.json",
+      "sha256": "b45ca532f18b9a3a7938a04b4a6b0513b7288ed584705fd042e40125bd5c4a89",
+      "cap": 30
+    },
+    "jab-link": {
+      "file": "segments/jab-link.edenmacro.json",
+      "sha256": "21ca94ee0dcd158a2e6cf023a1c01e33ead9d5cdc275d837aefdde49c4c83567",
+      "cap": 30
+    },
+    "jab-drop": {
+      "file": "segments/jab-drop.edenmacro.json",
+      "sha256": "2fc00b3082547b40890db5a81dd92176d82a0ba5a1f0d7a5c34d5353c5102ea8",
+      "cap": 30
+    },
+    "exchange-jabs": {
+      "file": "segments/exchange-jabs.edenmacro.json",
+      "sha256": "8f963497aaee09e267b727055ee7ada6c2fc9fcd0d9fac37b8efd02c7a55739b",
+      "cap": 30
+    },
+    "tilted-a": {
+      "file": "segments/tilted-a.edenmacro.json",
+      "sha256": "451a6d9b165adef78b74bd795700e6b8cb0ed0d67cf7efd4e2be091456195350",
+      "cap": 30
+    },
+    "fsmash": {
+      "file": "segments/fsmash.edenmacro.json",
+      "sha256": "2a6f61ae325478ba8a005edef0012064069fde9c0a88d93ff242c8c736d2452f",
+      "cap": 30
+    },
+    "attract-cancel": {
+      "library": "attract-cancel"
+    },
+    "main-stage": {
+      "library": "main-stage"
+    },
+    "stage-css": {
+      "library": "stage-css"
+    },
+    "enter-training": {
+      "library": "enter-training"
+    }
+  },
+  "gates": {
+    "training-hud-unpaused": {
+      "library": "training-hud-unpaused",
+      "scale": "fit"
+    },
+    "diag-record-player": {
+      "kind": "log",
+      "source": "gates",
+      "pattern": "screen=recording role=player recording=1",
+      "cap": 15
+    },
+    "main": {
+      "library": "main",
+      "scale": "fit",
+      "cap": 8,
+      "recover": "attract-cancel",
+      "recover_times": 6
+    },
+    "stage": {
+      "library": "stage",
+      "scale": "fit"
+    },
+    "css": {
+      "library": "css",
+      "scale": "fit"
+    }
+  },
+  "recover": [
+    {
+      "run": "steps.py:recover_training",
+      "check": true
+    }
+  ],
+  "rows": [
+    {
+      "id": "acc-boot",
+      "start": "boot",
+      "end": "training",
+      "steps": [
+        {
+          "run": "accept.py:acc_boot",
+          "args": {
+            "release": true
+          },
+          "check": true,
+          "on": "release"
+        }
+      ],
+      "expect": "The release window leaves the intro and sits in Training on Mario. The shot is the check that Start was taken.",
+      "timed": false,
+      "build": "release",
+      "on": "release"
+    },
+    {
+      "id": "acc-heap",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "run": "accept.py:acc_heap",
+          "check": true,
+          "on": "release"
+        }
+      ],
+      "expect": "The install line says heap_allocations=0 and the console has no unmapped or panic line.",
+      "timed": false,
+      "build": "release",
+      "on": "release",
+      "start_gate": "training-hud-unpaused"
+    },
+    {
+      "id": "acc-strip",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "run": "accept.py:acc_strip",
+          "check": true,
+          "on": "release"
+        }
+      ],
+      "expect": "The frame strip is visible in the shot. No shown= line is required.",
+      "timed": false,
+      "build": "release",
+      "on": "release",
+      "start_gate": "training-hud-unpaused"
+    },
+    {
+      "id": "acc-helper",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "run": "accept.py:acc_helper",
+          "check": true,
+          "on": "release"
+        }
+      ],
+      "expect": "After the menu closes, every combo_helper value in settings.json is On [1, 0].",
+      "timed": false,
+      "build": "release",
+      "on": "release",
+      "start_gate": "training-hud-unpaused"
+    },
+    {
+      "id": "acc-rel-record",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "run": "accept.py:acc_rel_record",
+          "check": true,
+          "on": "release"
+        }
+      ],
+      "expect": "Release window: Record on Player 1 writes a macro holding the jab and its start save; Play on P1 runs it (shots).",
+      "timed": false,
+      "build": "release",
+      "on": "release",
+      "start_gate": "training-hud-unpaused"
+    }
+  ]
+}

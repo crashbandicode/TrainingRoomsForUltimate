@@ -760,8 +760,10 @@ def player_neighbor(ctx):
     return {'player': 'neighbor'}
 
 
-def boot_training(ctx):
+def boot_training(ctx, release=False):
     """Bring this instance to Training with P1 on Mario.
+
+    `release`: the release NRO writes no [Ui] press lines, so the CPU is left as the CSS set it.
 
     The CSS walk is L3 + D-pad, the route rc5-surface-1 used after input.stick failed, and the
     same walk XPS rc5-xps-04 settled on tile 0. enter-training is played from its file: the library
@@ -784,11 +786,11 @@ def boot_training(ctx):
     else:
         ctx.call('game.load', {'path': ctx.instance['game']}, job_cap=180)
         wait_loaded(ctx)
-    try:
-        ctx.gate('main')
-    except RuntimeError:
-        ctx.play('attract-cancel')
-        ctx.gate('main')
+    # The plan's main gate carries "recover": "attract-cancel" with a short cap and several
+    # recover_times (MACROS "Idle game"): Start leaves the movie for the title, then the title
+    # or the demo for the main menu.
+    ctx.gate('main')
+    ctx.shot('main-menu')
     ctx.play('main-stage')
     ctx.gate('stage')
     ctx.play('stage-css')
@@ -811,7 +813,7 @@ def boot_training(ctx):
             time.sleep(1.2)
     if tip != 'hud':
         raise RuntimeError('fighter tip still up after four confirms: %s' % tip)
-    cpu = cpu_mario(ctx)
+    cpu = 'left-as-set' if release else cpu_mario(ctx)
     return {'css_tile': '0', 'pick': picked, 'cpu': cpu}
 
 

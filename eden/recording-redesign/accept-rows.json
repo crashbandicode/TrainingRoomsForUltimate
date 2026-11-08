@@ -117,7 +117,10 @@
     },
     "main": {
       "library": "main",
-      "scale": "fit"
+      "scale": "fit",
+      "cap": 8,
+      "recover": "attract-cancel",
+      "recover_times": 6
     },
     "stage": {
       "library": "stage",
@@ -142,6 +145,9 @@
       "steps": [
         {
           "run": "accept.py:acc_boot",
+          "args": {
+            "release": true
+          },
           "check": true,
           "on": "release"
         },
@@ -444,6 +450,23 @@
         }
       ],
       "expect": "After the menu closes, every combo_helper value in settings.json is On [1, 0].",
+      "timed": false,
+      "build": "release",
+      "on": "release",
+      "start_gate": "training-hud-unpaused"
+    },
+    {
+      "id": "acc-rel-record",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "run": "accept.py:acc_rel_record",
+          "check": true,
+          "on": "release"
+        }
+      ],
+      "expect": "Release window: Record on Player 1 writes a macro holding the jab and its start save; Play on P1 runs it (shots).",
       "timed": false,
       "build": "release",
       "on": "release",

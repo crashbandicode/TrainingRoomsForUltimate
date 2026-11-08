@@ -59,9 +59,9 @@ def _warps(ctx):
     return len(re.findall(r'playback .*warp=1', path.read_text(errors='replace')))
 
 
-def acc_boot(ctx):
+def acc_boot(ctx, release=False):
     """Leave the intro and enter Training. The shot is the proof Start was taken."""
-    out = steps.boot_training(ctx)
+    out = steps.boot_training(ctx, release=release)
     shot = ctx.shot('in-training')
     out['shot'] = str(shot)
     return out
@@ -75,6 +75,7 @@ def prep(ctx, name):
     dest = _card(ctx)
     _replace_tree(src / 'macros', dest / 'macros')
     _replace_tree(src / 'saves', dest / 'saves')
+    _replace_tree(src / 'combos', dest / 'combos')
     index = src / 'recording-index.json'
     if not index.is_file():
         raise RuntimeError('fixture %s has no recording-index.json' % name)
@@ -109,21 +110,80 @@ def acc_play_p1(ctx):
     return steps.save(ctx, 'play-p1', {'line': line, 'warps': warps, 'shot': str(shot)})
 
 
+# The frame strip's lanes in a 1280-wide shot (rc5-accept-yoga2 adv-hit frame). An attack paints
+# orange (startup) and red (active) cells before its blue recovery; a busy state without a hitbox
+# is blue only. rc5-opus-diag1 showed a blue-only 11-frame CPU bar after Play on CPU, which a plain
+# before/after difference counted as playback, so the check is the attack colours.
+P1_LANE = (288, 50, 792, 66)
+CPU_LANE = (288, 80, 792, 96)
+
+
+def _attack_cells(shot, lane):
+    from PIL import Image
+    with Image.open(shot) as image:
+        if image.size[0] != 1280:
+            raise RuntimeError('lane check needs a 1280-wide shot: %s' % (image.size,))
+        pixels = list(image.convert('RGB').crop(lane).getdata())
+    return sum(1 for r, g, b in pixels if r > 200 and b < 110 and g < 200)
+
+
 def acc_play_cpu(ctx):
+    """Play on CPU of a macro with no start save: the CPU plays it and nothing warps.
+
+    This build prints `screen=playback role=… warp=1` only when it warps (rr_host::play_role);
+    there is no warp=0 line. The no-warp check is the absence of a new warp=1 line, and the
+    playback check is attack cells (the jab) in the strip's CPU lane after the chord.
+    """
     prep(ctx, 'play-cpu')
+    time.sleep(2.0)
     before = _warps(ctx)
+    idle = ctx.shot('cpu-lane-before')
     ctx.play(steps.PLAY_CPU)
-    line = steps.diag(ctx, r'playback .*role=cpu .*warp=0', cap=15)
+    time.sleep(0.6)
+    during = ctx.shot('cpu-lane-during')
+    time.sleep(2.5)
+    after = ctx.shot('play-cpu-after')
     warps = _warps(ctx) - before
-    shot = ctx.shot('play-cpu')
+    attack = max(_attack_cells(during, CPU_LANE), _attack_cells(after, CPU_LANE))
+    out = {'warps': warps, 'cpu_attack_cells': attack,
+           'cpu_attack_cells_before': _attack_cells(idle, CPU_LANE),
+           'shots': [str(idle), str(during), str(after)]}
+    steps.save(ctx, 'play-cpu', out)
     if warps != 0:
-        raise RuntimeError('play on CPU warped %d times (wanted 0): %s' % (warps, shot))
-    return steps.save(ctx, 'play-cpu', {'line': line, 'warps': warps, 'shot': str(shot)})
+        raise RuntimeError('play on CPU warped %d times (wanted 0): %s' % (warps, during))
+    if attack < 20:
+        raise RuntimeError('no attack cells in the strip CPU lane after Play on CPU (%d): %s'
+                           % (attack, during))
+    return out
 
 
 def acc_loop(ctx):
+    """Loop 2 on Player 1, raised with X on the macro row; two passes, one warp.
+
+    The pop-up opens on the save-state row, so Down puts the cursor on the macro before X.
+    The line is `screen=recording-popup role=player tab=… loop=2 …`.
+    """
     prep(ctx, 'play-warp')
-    return steps.rr_loop(ctx)
+    steps.popup(ctx)
+    steps.press(ctx, 'down', 0.4)
+    ctx.play(steps.X)
+    line = steps.diag(ctx, r'screen=recording-popup role=player .*loop=2', cap=8)
+    shot_popup = ctx.shot('loop-2-popup')
+    steps.popup_close(ctx)
+    time.sleep(0.5)
+    before = _warps(ctx)
+    ctx.play(steps.PLAY_P1)
+    first = steps.diag(ctx, r'playback role=player warp=1', cap=15)
+    time.sleep(1.0)
+    pass_two = ctx.shot('loop-pass-2')
+    time.sleep(4.0)
+    warps = _warps(ctx) - before
+    out = {'x': line, 'first_warp': first, 'warps': warps,
+           'shots': [str(shot_popup), str(pass_two)]}
+    steps.save(ctx, 'loop', out)
+    if warps != 1:
+        raise RuntimeError('loop 2 warped %d times (wanted 1): %s' % (warps, pass_two))
+    return out
 
 
 def acc_chain(ctx):
@@ -187,7 +247,11 @@ def acc_migrated(ctx):
 
 
 def acc_grade(ctx):
-    prep(ctx, 'empty')
+    """The drill is Combo 1 (two jab links) from the fixture index; the helper grades the attempts.
+
+    The trace point on tr_combo_attempt_v1 comes from the run config (on_return).
+    """
+    prep(ctx, 'grade')
     return steps.rr_grade_bar(ctx)
 
 
@@ -202,24 +266,22 @@ def acc_adv_hit(ctx):
 
 
 def acc_strip(ctx):
-    """The strip is already on screen. The proof is the shot, not a visibility-change line."""
-    prep(ctx, 'empty')
+    """The strip sits at the top. The shot is the proof, not a visibility-change line."""
     shot = ctx.shot('strip')
     from PIL import Image
     image = Image.open(shot).convert('RGB')
     width, height = image.size
-    band = image.crop((0, int(height * 0.78), width, height))
+    band = image.crop((0, 0, width, max(1, int(height * 0.22))))
     colors = band.getcolors(maxcolors=80000)
     if not colors or len(colors) < 12:
-        raise RuntimeError('bottom band has no strip detail: %s' % shot)
+        raise RuntimeError('top band has no strip detail: %s' % shot)
     return steps.save(ctx, 'strip', {'shot': str(shot), 'colors': len(colors)})
 
 
 def acc_helper(ctx):
-    dest = prep(ctx, 'empty')
-    path = dest / 'settings.json'
-    if not path.is_file():
-        raise RuntimeError('no settings.json after the menu closed')
+    """On by default. A fresh settings.json omits combo_helper; the factory stores index 0, which is [1, 0]."""
+    shot = ctx.shot('helper-hud')
+    path = Path(ctx.instance['settings'])
     found = []
 
     def walk(node):
@@ -232,10 +294,55 @@ def acc_helper(ctx):
             for value in node:
                 walk(value)
 
-    walk(json.loads(path.read_text()))
-    if not found or any(item != [1, 0] for item in found):
+    if path.is_file():
+        walk(json.loads(path.read_text()))
+    if any(item != [1, 0] for item in found):
         raise RuntimeError('combo helper is not On in %s: %s' % (path, found))
-    return steps.save(ctx, 'helper', {'combo_helper': found})
+    return steps.save(ctx, 'helper', {
+        'shot': str(shot),
+        'combo_helper': found,
+        'code_default_index': 0,
+        'code_default_stored': [1, 0],
+        'source': 'src/model/factory.rs combo_helper Single [0]',
+    })
+
+
+def acc_rel_record(ctx):
+    """Release window: Record on Player 1 writes the jab and its start save, and Play on P1 runs it.
+
+    The release NRO prints no screen= lines, so the card files and the shots are the check.
+    """
+    dest = prep(ctx, 'empty')
+    before = time.time()
+    ctx.play(steps.RECORD)
+    time.sleep(0.6)
+    ctx.play(steps.JAB)
+    time.sleep(0.8)
+    ctx.play(steps.RECORD)
+    time.sleep(1.5)
+    macros = [p for p in (dest / 'macros').glob('*.json') if p.stat().st_mtime >= before - 1]
+    if not macros:
+        raise RuntimeError('Record on P1 wrote no macro in %s' % (dest / 'macros'))
+    path = max(macros, key=lambda item: item.stat().st_mtime)
+    frames = json.loads(path.read_text()).get('frames') or []
+    pressed = [frame.get('buttons') for frame in frames if frame.get('buttons') not in (None, 32768)]
+    if not pressed:
+        raise RuntimeError('%s holds only idle buttons 32768' % path.name)
+    saves = sorted(p.name for p in (dest / 'saves').glob('*.json') if p.stat().st_mtime >= before - 1)
+    ctx.play(steps.RESET_CENTER)
+    time.sleep(0.8)
+    idle = ctx.shot('before-play')
+    ctx.play(steps.PLAY_P1)
+    time.sleep(0.5)
+    during = ctx.shot('during-play')
+    time.sleep(1.5)
+    after = ctx.shot('after-play')
+    if not saves:
+        raise RuntimeError('Record on P1 wrote no start save in %s' % (dest / 'saves'))
+    return steps.save(ctx, 'rel-record', {
+        'file': path.name, 'frames': len(frames), 'pressed': pressed[:8], 'start_saves': saves,
+        'shots': [str(idle), str(during), str(after)],
+    })
 
 
 def acc_heap(ctx):
