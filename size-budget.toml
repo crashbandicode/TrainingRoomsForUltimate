@@ -585,3 +585,11 @@ ceiling = 150251
 date = "2026-11-07"
 reason = "rc.5 wire-fix: a reopened menu reloads the recording catalog after the model is dropped, even when no file write bumped the generation; measured 150251 (tools/size_gate.py), +27 over 150224"
 approved_by = "Operator 2026-11-07 via primary 35137355 (TASK-GROK-rc5-wire-fix): 'Raise as needed'"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 150263
+date = "2026-11-08"
+reason = "rc.5 wire-fix: Play holds every role until a warp's save-state restore lands, so a CPU-role file's first press (frame 0) is not undone by the restore; measured 150263 (tools/size_gate.py), +12 over 150251"
+approved_by = "Operator 2026-11-07 via primary 35137355 (TASK-GROK-rc5-wire-fix): 'Raise as needed'; applied by the Opus task-2 lane (TASK-OPUS-rc5-play-cpu), flagged in its report for the primary to confirm"

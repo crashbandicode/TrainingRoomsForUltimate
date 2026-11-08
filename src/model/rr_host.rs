@@ -62,6 +62,10 @@ static PLAYER_LABEL: Mutex<String> = Mutex::new(String::new());
 static LAST_ASK: Mutex<Option<MismatchAsk>> = Mutex::new(None);
 static CATALOG_GEN: AtomicU64 = AtomicU64::new(0);
 static CPU_ROLE_ON: AtomicBool = AtomicBool::new(false);
+/// A Play warped to its start save and the restore has not landed yet. No role steps until it
+/// does: a frame fed before the restore is undone by it. A CPU-role file begins on its first
+/// press, so its opening action was always lost (Eden `rc5-opus-cpu2`, 2026-11-08).
+static WARP_HOLD: AtomicBool = AtomicBool::new(false);
 /// First locked from the AI epilogue (`cpu_role_after_chord`), before any worker touches it.
 /// Switch `std::sync::Mutex` allocates a OnceBox on that first lock, and the hook counter charges
 /// the one allocation to `recorder_ai` (`runtime::roster::build_split`, `docs/provenance/pkg6-owner-locks.md`).
@@ -271,6 +275,12 @@ pub fn on_chords(record: bool, play_player: bool, play_cpu: bool) {
 
 pub fn note_mash() {
     MASH.store(true, Ordering::Release);
+}
+
+/// The save-state restore a Play's warp asked for has placed both fighters (or the warp was
+/// not requested after all). The held runs step from their first frame on the next tick.
+pub fn warp_landed() {
+    WARP_HOLD.store(false, Ordering::Release);
 }
 
 /// One captured frame. `side` is 1 for Player 1 and 2 for the CPU. A mismatch is ignored.
@@ -609,6 +619,7 @@ fn play_role(root: &Path, machine: &mut Playback, book: &Book, role: Role, tick:
         tick.warp = Some(id.to_owned());
         tick.diags
             .push(format!("screen=playback role={word} warp=1"));
+        WARP_HOLD.store(true, Ordering::Release);
     }
     note_missing_start(root, book, role, tick);
     if effect.stopped {
@@ -623,6 +634,9 @@ fn play_role(root: &Path, machine: &mut Playback, book: &Book, role: Role, tick:
 }
 
 fn step_role(root: &Path, machine: &mut Playback, book: &Book, role: Role) {
+    if WARP_HOLD.load(Ordering::Acquire) {
+        return;
+    }
     match drive_step(machine, role, book) {
         Some(played) => publish(role, resident_frame(root, &played)),
         None => run_flag(role).store(false, Ordering::Release),
@@ -1083,6 +1097,7 @@ fn reset_host() {
     DEFER_MIGRATE.store(false, Ordering::Release);
     CATALOG_GEN.store(0, Ordering::Release);
     CPU_ROLE_ON.store(false, Ordering::Release);
+    WARP_HOLD.store(false, Ordering::Release);
     *CPU_DRIVE.lock() = CpuRoleDrive::idle();
     for slot in &ROLE_KIND {
         slot.store(-1, Ordering::Release);
@@ -1174,6 +1189,9 @@ mod tests {
             .diags
             .iter()
             .any(|line| line == "screen=playback role=player warp=1"));
+        assert!(take_player_frame().is_none(), "no frame before the warp's restore lands");
+        warp_landed();
+        let _ = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
         assert_eq!(take_player_frame().expect("player frame").buttons, 4);
         let tick = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
         assert_eq!(take_player_frame().expect("next frame").buttons, 5);
@@ -1578,7 +1596,12 @@ mod tests {
             None,
         );
         on_chords(false, false, true);
-        let _ = service_at(&root, &none(), "2026-11-07", state(13), state(7), false);
+        let played = service_at(&root, &none(), "2026-11-07", state(13), state(7), false);
+        if played.warp.is_some() {
+            assert!(take_cpu_frame().is_none(), "no frame before the warp's restore lands");
+            warp_landed();
+            let _ = service_at(&root, &none(), "2026-11-07", state(13), state(7), false);
+        }
         for (index, expected) in jab.iter().enumerate() {
             if index > 0 {
                 let _ = service_at(&root, &none(), "2026-11-07", state(13), state(7), false);
@@ -1587,6 +1610,62 @@ mod tests {
             assert_eq!(frame.buttons, *expected);
             assert_eq!(playback_controller(frame).buttons, *expected);
         }
+    }
+
+    /// Eden `rc5-opus-cpu2` (2026-11-08): a CPU-role file begins on its first press (the jab).
+    /// Play on CPU warped to the start save and fed frame 0 at once; the restore landed four
+    /// frames later and undid the jab, so the CPU never acted. Frame 0 waits for the restore.
+    #[test]
+    fn a_warped_cpu_play_feeds_its_first_frame_after_the_restore() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("cpu-warp");
+        let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        let save = NamedSave::new("Jab start", state(8), state(7)).unwrap();
+        let save_id = Store::<NamedSave>::new(root.join(SAVES_DIR)).save_new(&save).unwrap();
+        let jab = [33_281u32, 33_281, 0x8000, 0x8000];
+        let frames = jab.iter().map(|&buttons| InputFrame { buttons, ..InputFrame::default() }).collect();
+        let mut recording =
+            super::super::macros::MacroRecording::new("Jab", "13.0.5", StartState::neutral(7, 0, 1.0), frames).unwrap();
+        recording.set_start_save(Some(&save_id)).unwrap();
+        let id = Library::new(root.join(MACROS_DIR)).save_new(&recording).unwrap();
+        let mut index = RecordingIndex::load(&root).unwrap();
+        index.set_active(Role::Cpu, Some(&id), 1).unwrap();
+        index.save(&root).unwrap();
+
+        on_chords(false, false, true);
+        let tick = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        assert_eq!(tick.warp.as_deref(), Some(save_id.as_str()));
+        assert!(take_cpu_frame().is_none(), "frame 0 must not be fed before the restore");
+        let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        assert!(take_cpu_frame().is_none(), "the run holds while the restore is pending");
+
+        warp_landed();
+        let mut fed = Vec::new();
+        for _ in 0..jab.len() {
+            let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+            fed.push(take_cpu_frame().expect("a frame after the restore").buttons);
+        }
+        assert_eq!(fed, jab, "the whole file, from its first press, reaches the CPU");
+    }
+
+    #[test]
+    fn a_cpu_play_without_a_start_save_feeds_at_once() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("cpu-nowarp");
+        let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        let frames = vec![InputFrame { buttons: 33_281, ..InputFrame::default() }];
+        let recording =
+            super::super::macros::MacroRecording::new("Jab", "13.0.5", StartState::neutral(7, 0, 1.0), frames).unwrap();
+        let id = Library::new(root.join(MACROS_DIR)).save_new(&recording).unwrap();
+        let mut index = RecordingIndex::load(&root).unwrap();
+        index.set_active(Role::Cpu, Some(&id), 1).unwrap();
+        index.save(&root).unwrap();
+        on_chords(false, false, true);
+        let tick = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        assert!(tick.warp.is_none());
+        assert_eq!(take_cpu_frame().expect("no warp, no wait").buttons, 33_281);
     }
 
     #[test]

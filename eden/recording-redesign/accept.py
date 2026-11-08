@@ -157,6 +157,61 @@ def acc_play_cpu(ctx):
     return out
 
 
+def acc_cpu_menu(ctx):
+    """Play on CPU with the CPU macro set through the menu, no fixture.
+
+    The pop-up's CPU view sets the record role, the record chord records a jab while
+    possessing the CPU, and the stopped file becomes the CPU's active macro. Then Play on CPU.
+    The shots and the strip's CPU lane are the effect; the trace points in the run config
+    (play_role, step_role, the AI-epilogue apply) are read back into the row folder.
+    """
+    steps.settle(ctx)
+    card = _card(ctx)
+    steps.popup(ctx)
+    steps.press(ctx, 'r', 0.5)
+    role = steps.diag(ctx, r'screen=recording-popup role=cpu\b', cap=6)
+    steps.press(ctx, 'b', 0.6)
+    before_record = time.time()
+    ctx.play(steps.RECORD)
+    start = steps.diag(ctx, r'screen=recording role=cpu recording=1', cap=10)
+    # The record chord starts a 30-frame lockout (recording::LOCKOUT_FRAMES) that drops presses,
+    # then standby until the first press. A jab sent with the start line lands in the lockout.
+    time.sleep(1.2)
+    ctx.play(steps.JAB)
+    time.sleep(0.8)
+    ctx.play(steps.RECORD)
+    stop = steps.diag(ctx, r'screen=recording role=cpu recording=0', cap=10)
+    time.sleep(1.0)
+    written = [p for p in (card / 'macros').glob('*.json') if p.stat().st_mtime >= before_record - 1]
+    if not written:
+        raise RuntimeError('Record on CPU wrote no macro in %s' % (card / 'macros'))
+    path = max(written, key=lambda item: item.stat().st_mtime)
+    frames = json.loads(path.read_text()).get('frames') or []
+    pressed = [f.get('buttons') for f in frames if f.get('buttons') not in (None, 32768)]
+    index = json.loads((card / 'recording-index.json').read_text())
+    ctx.play(steps.RESET_CENTER)
+    time.sleep(1.5)
+    counters_before = ctx.call('trace.counters', {})
+    shots = [str(ctx.shot('cpu-before'))]
+    ctx.play(steps.PLAY_CPU)
+    for name, gap in (('cpu-t03', 0.3), ('cpu-t06', 0.3), ('cpu-t10', 0.4), ('cpu-t20', 1.0)):
+        time.sleep(gap)
+        shots.append(str(ctx.shot(name)))
+    time.sleep(1.0)
+    counters_after = ctx.call('trace.counters', {})
+    (ctx.row_dir / 'trace-counters-before.json').write_text(json.dumps(counters_before, indent=2) + '\n')
+    (ctx.row_dir / 'trace-counters-after.json').write_text(json.dumps(counters_after, indent=2) + '\n')
+    attack = max(_attack_cells(shot, CPU_LANE) for shot in shots[1:])
+    out = {'role': role, 'start': start, 'stop': stop, 'file': path.name, 'frames': len(frames),
+           'pressed': pressed[:8], 'active': index.get('active'), 'cpu_attack_cells': attack,
+           'shots': shots}
+    steps.save(ctx, 'cpu-menu', out)
+    if attack < 20:
+        raise RuntimeError('no attack cells in the strip CPU lane after Play on CPU (%d): %s'
+                           % (attack, shots[2]))
+    return out
+
+
 def acc_loop(ctx):
     """Loop 2 on Player 1, raised with X on the macro row; two passes, one warp.
 

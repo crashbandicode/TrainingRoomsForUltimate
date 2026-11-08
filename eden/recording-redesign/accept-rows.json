@@ -107,7 +107,8 @@
   "gates": {
     "training-hud-unpaused": {
       "library": "training-hud-unpaused",
-      "scale": "fit"
+      "scale": "fit",
+      "frame": [1280, 720]
     },
     "diag-record-player": {
       "kind": "log",
@@ -124,11 +125,13 @@
     },
     "stage": {
       "library": "stage",
-      "scale": "fit"
+      "scale": "fit",
+      "frame": [1280, 720]
     },
     "css": {
       "library": "css",
-      "scale": "fit"
+      "scale": "fit",
+      "frame": [1280, 720]
     }
   },
   "recover": [
@@ -229,6 +232,23 @@
         }
       ],
       "expect": "Play on CPU with no start save does not warp.",
+      "timed": false,
+      "build": "diag",
+      "on": "diag",
+      "start_gate": "training-hud-unpaused"
+    },
+    {
+      "id": "acc-cpu-menu",
+      "start": "training",
+      "end": "training",
+      "steps": [
+        {
+          "run": "accept.py:acc_cpu_menu",
+          "check": true,
+          "on": "diag"
+        }
+      ],
+      "expect": "CPU macro set through the menu (CPU view, record chord, jab); Play on CPU makes the CPU perform the jab: attack cells in the strip's CPU lane, shots, trace counters.",
       "timed": false,
       "build": "diag",
       "on": "diag",

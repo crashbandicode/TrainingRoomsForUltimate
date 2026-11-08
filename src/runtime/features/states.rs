@@ -385,6 +385,8 @@ pub fn cancel_pending() {
     LOADING.store(false, Ordering::Release);
     KILLING.store(false, Ordering::Release);
     TEMPORARY.store(false, Ordering::Release);
+    // A cancelled load never lands; a Play held for it must not wait forever.
+    crate::engine::rr_host::warp_landed();
     MAC_PRESENT.store(false, Ordering::Release);
     for slot in &BUFF_ACC {
         slot.store(0, Ordering::Release);
@@ -802,6 +804,7 @@ unsafe fn apply(raw: &Raw, nana: bool, out: Out) {
         crate::runtime::features::notices::saved(slot);
     }
     if let Some(ledge) = out.restored {
+        crate::engine::rr_host::warp_landed();
         recorder::on_state_restored(ledge);
         // SPEC-core-06: the hitbox visualizer's held spheres go and come back from the restored state (no game call here).
         crate::runtime::features::hitbox::on_state_restored();

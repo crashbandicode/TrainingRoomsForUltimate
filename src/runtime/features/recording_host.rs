@@ -152,6 +152,9 @@ fn apply(tick: &Tick) {
         );
         if let Ok(save) = saves.load(id) {
             super::states::request_named_load([save.player, save.cpu]);
+        } else {
+            // No restore was asked for, so none will land.
+            rr_host::warp_landed();
         }
     }
     for text in &tick.notices {
