@@ -124,7 +124,9 @@ pub unsafe fn tick(layout: *mut Layout, registration: bool) {
         let count = CLOSE_COUNT.fetch_add(1, Ordering::AcqRel) + 1;
         if count >= CLOSE_FRAMES {
             CLOSING.store(false, Ordering::Release);
-            INPUT_OWNERS.fetch_and(!Owners::MENU.bits(), Ordering::AcqRel);
+            if !state::PROMPT.load(Ordering::Acquire) {
+                INPUT_OWNERS.fetch_and(!Owners::MENU.bits(), Ordering::AcqRel);
+            }
         } else {
             showing = true;
             alpha = if ext || popup { 255 } else { fade_alpha(count) };

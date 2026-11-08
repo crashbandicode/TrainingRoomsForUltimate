@@ -589,7 +589,7 @@ approved_by = "Operator 2026-11-07 via primary 35137355 (TASK-GROK-rc5-wire-fix)
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 150313
+ceiling = 150349
 date = "2026-11-08"
-reason = "rc.5 Fighter Mismatch (p23/rc5-mismatch-fix): a fighter question opened with the menu closed is drawn and answered (flow::Phase::Prompt), and an answer wakes the recording service gate; measured 150313 (tools/size_gate.py), +62 over 150251"
-approved_by = "Primary c07b3449 via TASK-OPUS-rc5-mismatch (2026-11-08): 'the budget may need a reviewed bump; say so'. Flagged for the primary's review in LANE-OPUS-RC5-GIFS-REPORT.md"
+reason = "rc.5 Fighter Mismatch (p23/rc5-mismatch-fix): a fighter question opened with the menu closed is drawn and answered (flow::Phase::Prompt), keeps Player 1 and hides the frame strip while it is up, shows its own keys, and an answer wakes the recording service gate; measured 150349 (tools/size_gate.py), +98 over 150251"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7), applied to this root fix by primary c07b3449 in INBOX-opus-rc5-gifs 2026-11-08 01:35Z"

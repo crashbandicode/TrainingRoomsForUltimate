@@ -50,6 +50,13 @@ pub enum Step {
     HidePrompt,
 }
 
+/// Whether the menu side still owns Player 1's input (the `Owners::MENU` bit): the open menu, its closing frames, the
+/// pop-up, or the closed-menu fighter question. Releasing on any one of them alone handed the question's presses to the
+/// match and let the frame strip draw over it (rc.5 XPS proof).
+pub fn menu_owns_input(open: bool, popup: bool, closing: bool, prompt: bool) -> bool {
+    open || popup || closing || prompt
+}
+
 /// The next phase and the step to take, given the phase and what the layer reports.
 pub fn next(phase: Phase, seen: Seen) -> (Phase, Step) {
     match phase {
@@ -83,6 +90,15 @@ mod tests {
         assert_eq!(next(Phase::Prompt, asked), (Phase::Prompt, Step::Nothing));
         let answered = seen(false, false, false);
         assert_eq!(next(Phase::Prompt, answered), (Phase::Menu, Step::HidePrompt));
+    }
+
+    #[test]
+    fn the_question_keeps_player_1_until_nothing_holds_it() {
+        // A press during the question used to release the bit (the pop-up's sync saw neither menu nor pop-up).
+        assert!(menu_owns_input(false, false, false, true));
+        assert!(!menu_owns_input(false, false, false, false));
+        assert!(menu_owns_input(true, false, false, false) && menu_owns_input(false, true, false, false));
+        assert!(menu_owns_input(false, false, true, false));
     }
 
     #[test]

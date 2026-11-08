@@ -390,6 +390,15 @@ pub fn panel_frame<S: AsRef<str>>(menu: &Menu, title: &str, footer: &str, labels
     let _ = frame.hint.write_str(HINT_PANEL);
 }
 
+const HINT_FIGHTER_QUESTION: &str = "D-pad move   A choose   B cancel";
+
+/// The shared Fighter Mismatch question: a panel whose keys are the question's own (it has no Y action).
+pub fn fighter_question_frame<S: AsRef<str>>(menu: &Menu, title: &str, footer: &str, labels: &[S], selected: usize, frame: &mut Frame) {
+    panel_frame(menu, title, footer, labels, selected, frame);
+    frame.hint.clear();
+    let _ = frame.hint.write_str(HINT_FIGHTER_QUESTION);
+}
+
 fn swap_frame(menu: &Menu, screen: &Screen, cursor: usize, frame: &mut Frame) {
     base(menu, screen, frame);
     lines_window(frame, cursor, SWAP_GROUPS.len(), |i, line| {
@@ -877,6 +886,18 @@ mod tests {
         let mut f = Frame::new();
         panel_frame(&m, "Name macro", "Recording · 12f · 0.20s\nA: system keyboard   B: return", &["Name and save"], 9, &mut f);
         assert_eq!((f.tile_count, f.tile_focus), (1, 0));
+    }
+
+    #[test]
+    fn the_fighter_question_shows_its_own_keys() {
+        // rc.5: the question has no Y action; the shared panel hint advertised "Y delete or other".
+        let m = menu();
+        let mut f = Frame::new();
+        fighter_question_frame(&m, "Fighter Mismatch", "Recorded Pikachu · current CPU Mario\nInputs are the same either way. A chooses, B cancels.",
+            &["Keep current fighter", "Switch to recorded fighter"], 0, &mut f);
+        assert_eq!(f.hint.string_lossy(), "D-pad move   A choose   B cancel");
+        assert_eq!((f.tile_count, f.tile_focus), (2, 0));
+        assert_eq!(f.tiles[1].string_lossy(), "Switch to recorded fighter");
     }
 
     #[test]

@@ -19,7 +19,7 @@ use crate::model::menu::table::Editor;
 use crate::model::menu::{Env, Menu, Screen};
 use crate::model::settings::Settings;
 use crate::model::ui_events::{Event, Packet, Ring};
-use crate::model::screens::{frame_of, panel_frame};
+use crate::model::screens::{fighter_question_frame, frame_of, panel_frame};
 use crate::runtime::diag_log::diagnostic;
 use crate::runtime::features::{chords, notices, writer};
 use crate::runtime::published;
@@ -320,7 +320,7 @@ fn sync_popup_owner() {
     let open = OPEN.load(Ordering::Acquire);
     if popup && !open {
         crate::runtime::published::INPUT_OWNERS.fetch_or(Owners::MENU.bits(), Ordering::AcqRel);
-    } else if !popup && !open && !CLOSING.load(Ordering::Acquire) {
+    } else if !flow::menu_owns_input(open, popup, CLOSING.load(Ordering::Acquire), PROMPT.load(Ordering::Acquire)) {
         crate::runtime::published::INPUT_OWNERS.fetch_and(!Owners::MENU.bits(), Ordering::AcqRel);
     }
 }
@@ -704,7 +704,7 @@ fn hide_prompt() {
     if !PROMPT.swap(false, Ordering::AcqRel) {
         return;
     }
-    if !OPEN.load(Ordering::Acquire) && !POPUP.load(Ordering::Acquire) && !CLOSING.load(Ordering::Acquire) {
+    if !flow::menu_owns_input(OPEN.load(Ordering::Acquire), POPUP.load(Ordering::Acquire), CLOSING.load(Ordering::Acquire), false) {
         crate::runtime::published::INPUT_OWNERS.fetch_and(!Owners::MENU.bits(), Ordering::AcqRel);
     }
     // The A or B that answered is still held: it must not become a jab or a special in the match.
@@ -820,7 +820,11 @@ fn publish_frame(s: &Session) {
         } else if s.panel.is_some_and(combos::is_combo) {
             s.combos.view()
         } else { external::panel_view_now() }) else { return };
-        panel_frame(menu, &view.title, &view.footer, &view.labels, view.selected, &mut next);
+        if named_macros::fighter_prompt_up() {
+            fighter_question_frame(menu, &view.title, &view.footer, &view.labels, view.selected, &mut next);
+        } else {
+            panel_frame(menu, &view.title, &view.footer, &view.labels, view.selected, &mut next);
+        }
     } else if matches!(menu.screen(), Some(Screen::External(Editor::MiiList(_)))) {
         if let Some(list) = s.mii.as_ref() {
             list.frame(menu, &mut next);
