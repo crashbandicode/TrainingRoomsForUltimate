@@ -85,9 +85,13 @@ A combo counts when its recorded input events are there, the same kind and the s
 
 A different move does not count, even when the events match. That attempt drops. An attempt also drops on a missing event, an event outside the tolerance, a different direction, or the exchange ending before the step. An older file that has only presses is graded on those presses, with left and right still one direction. The exchange ends 20 frames after the CPU can act again, or on a shielded hit. A gap of 20 frames still belongs to the exchange. A gap of 21 opens a new one, so the step drops. A single combo's best stays the most true links in one attempt. The streak follows the count above, so a non-true link can still extend the streak.
 
+![A drilled TRUE 0 link: one frame later reads +1 DROP and still counts; a different move drops](media/rc5-grade-not-true.gif)
+
 Make combo, on a macro's or a chain's own screen, plays that file once on Player 1 from the file's own start save. A chain uses its first macro's start save. The pass is stripped to its links and saved as a new combo named Combo N, with Made from set to the source. That combo joins the five most recently used. The file on screen stays. The drill does not change. A pass with no hit and no follow-up writes nothing and shows "No combo yet: land a hit and a follow-up first."
 If the connected start save was deleted, Make combo skips the warp, shows "No start save. This macro plays from where the fighters are.", and still plays. A switch that is Off, or a file that never had a start save, does not warp and does not show that sentence. A chain whose first macro is missing skips that step and plays the next one that is still there.
 Play skips a deleted start save and shows the same sentence. A macro that never had one does not show it.
+
+![Make combo plays the macro from its start save under the drilled combo, then lists Combo 2](media/rc5-make-combo.gif)
 
 Crop on a combo or a macro opens a handle screen. Up and Down switch In and Out. L and R move the handle that is focused, and they do not change the menu page. A saves a new file under the next unused Macro N or Combo N and returns to the original. B returns without writing. The original stays. A macro crop keeps that range of frames. The new file keeps the original's one start state, stamped at the clamped start frame. It does not store a pose for every frame. A combo crop keeps the links from the first handle through the last. The replay window is a separate row under Replays. It is not this Crop row.
 A chain has no Crop row, because it has no frames of its own.
@@ -201,6 +205,8 @@ The first time this library is built, empty slots are skipped. A recording slot 
 A save index that holds a save becomes one file, both fighters, with the same `Slot N (date)` name. The slot the Save and Load chords were using becomes the bound save. An empty index is skipped.
 
 `macros/selected.txt`, when it names a file that is there, becomes Player 1's active macro. The CPU has no active macro until you set one. The old "play a recording when a state loads" row is not turned into a chain.
+
+![The first boot of a card from before the library: two dated saves with Slot 2 bound, and Old jab active](media/rc5-migration.gif)
 
 ## Where the rules come from
 
