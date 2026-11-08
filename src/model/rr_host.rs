@@ -532,6 +532,32 @@ pub fn follow_grade<'a>(applied: Option<&str>, drill: Option<&'a str>) -> GradeF
     }
 }
 
+/// A sequence drill starts at step 1 over the sequence's combos that still open. None when the file does not load.
+pub fn start_sequence_drill(root: &Path, id: &str) -> Option<crate::model::drill::SequenceDrill> {
+    let sequence = Store::<Sequence>::new(root.join(SEQUENCES_DIR)).load(id).ok()?;
+    let combos = crate::model::combo_record::ComboLibrary::new(root.join("combos"));
+    let present = sequence.present_ids(&combos);
+    let ids = present.iter().map(String::as_str).collect::<Vec<_>>();
+    Some(crate::model::drill::SequenceDrill::new(id, &ids))
+}
+
+/// What the helper grades for the recording drill. A combo drill grades itself. A sequence drill grades its current
+/// step, but only when `sequence` is the drill of that same id. No drill, or an unknown kind, grades nothing.
+pub fn drill_grade_target<'a>(
+    kind: Option<DrillKind>,
+    drill: Option<&'a str>,
+    sequence: Option<&'a crate::model::drill::SequenceDrill>,
+) -> Option<&'a str> {
+    match kind {
+        Some(DrillKind::Combo) => drill,
+        Some(DrillKind::Sequence) => match (drill, sequence) {
+            (Some(id), Some(sequence)) if sequence.id() == id => sequence.target(),
+            _ => None,
+        },
+        None => None,
+    }
+}
+
 /// The drill changed. A combo recorded on another fighter asks; the drill itself stays.
 pub fn note_drill(id: Option<String>) {
     let mut last = lock(&LAST_DRILL);

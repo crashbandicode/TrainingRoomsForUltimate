@@ -657,3 +657,11 @@ ceiling = 150650
 date = "2026-11-08"
 reason = "rc.5 final: the merge of p23/rc5-cpu-fidelity (3cb7857, +74 over 150495) into p23/rc5-wire-fix (b4e0727, 150576); the two sides add up, nothing else changes; measured 150650 on the merged tree (tools/size_gate.py)"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); final ceiling = measured merged size per primary c07b3449, TASK-OPUS-rc5-merge-fidelity 2026-11-08"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 150712
+date = "2026-11-08"
+reason = "rc.6 card L1: drill::SequenceDrill, rr_host::start_sequence_drill and rr_host::drill_grade_target (sequence drill, model and host halves)"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); card L1 by primary c07b3449, 2026-11-08"

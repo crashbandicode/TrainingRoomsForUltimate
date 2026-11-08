@@ -110,6 +110,10 @@ impl SequenceWalk {
         self.at
     }
 
+    pub fn steps(&self) -> usize {
+        self.len
+    }
+
     pub fn current(&self) -> Option<&str> {
         (self.at < self.len).then(|| self.ids[self.at].as_str())
     }
@@ -143,6 +147,52 @@ impl SequenceWalk {
         } else {
             self.at += 1;
         }
+    }
+}
+
+/// A drilled sequence: its id and the walk over the combos that still open.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SequenceDrill {
+    id: DrillId,
+    walk: SequenceWalk,
+}
+
+impl SequenceDrill {
+    /// A drill of sequence `id` over `present` (its combo ids that still open, in file order), at step 1.
+    pub fn new(id: &str, present: &[&str]) -> Self {
+        Self { id: DrillId::new(id), walk: SequenceWalk::new(present) }
+    }
+
+    pub fn id(&self) -> &str {
+        self.id.as_str()
+    }
+
+    /// The combo the helper grades now. None when no combo is left.
+    pub fn target(&self) -> Option<&str> {
+        self.walk.current()
+    }
+
+    /// The current step counted from 1, and the number of steps. (0, 0) when no combo is left.
+    pub fn step(&self) -> (usize, usize) {
+        if self.target().is_some() {
+            (self.walk.cursor() + 1, self.walk.steps())
+        } else {
+            (0, 0)
+        }
+    }
+
+    pub fn streak(&self) -> u16 {
+        self.walk.streak()
+    }
+
+    pub fn best(&self) -> u16 {
+        self.walk.best()
+    }
+
+    /// One graded attempt of the current combo finished. Returns the combo to grade next.
+    pub fn note_summary(&mut self, summary: &Summary) -> Option<&str> {
+        self.walk.note_summary(summary);
+        self.target()
     }
 }
 
