@@ -901,7 +901,8 @@ pub fn recording_or_playback() -> bool {
 /// The replay editor holds the input (`Owners::REPLAY_EDITOR`; the editor is the named-macro layer, S4-4, so
 /// this is false until that layer exists and sets the owner bit).
 pub fn replay_editor_occupied() -> bool {
-    published::input_owners().contains(Owners::REPLAY_EDITOR)
+    let owners = published::input_owners();
+    owners.contains(Owners::REPLAY_EDITOR) || owners.contains(Owners::REPLAY_LOADING)
 }
 
 /// A replay capture is loading (S4-4's clip loader; false until that layer exists).
