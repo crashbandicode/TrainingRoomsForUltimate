@@ -91,6 +91,8 @@ pub enum Tone {
 pub struct RowLine {
     pub label: Text<80>,
     pub value: Text<72>,
+    /// The r8 line under a recording row ("Recorded on …"); empty for any other row.
+    pub sub: Text<64>,
     pub label_tone: Tone,
     pub value_tone: Tone,
 }
@@ -215,6 +217,24 @@ pub struct Frame {
     pub outline: [Option<(u8, u8)>; 2],
     /// A chain row. The link glyph is drawn when the layout has imported it.
     pub chain: [bool; ROW_LINES],
+    /// The pop-up's CONNECTIONS column (r8 mockup): its header and lines, the row under the cursor first. Empty on the
+    /// page, which keeps CONNECTIONS in the help lines.
+    pub conn_head: Text<48>,
+    pub conn: [Text<72>; super::panes::CONN_LINES],
+    pub conn_tone: [Tone; super::panes::CONN_LINES],
+    pub conn_count: u8,
+    /// What each CONNECTIONS line is in the r8 tree: a kind box (with its pill), a heading, a link, a plain line.
+    pub conn_kind: [super::recording_menu::ConnKind; super::panes::CONN_LINES],
+    /// The pop-up's L/R role tabs in the title (r8): 0 Player, 1 CPU. `None` off the pop-up.
+    pub role_tab: Option<u8>,
+    /// The pop-up's section headers sit on a dark band (r8), with their kind's mark before the name: the floppy for
+    /// SAVE STATES, a square for the others.
+    pub band: [bool; ROW_LINES],
+    pub head_tag: [Option<super::recording_menu::FileTag>; 2],
+    /// The pop-up's red order badges at a row's left edge (r8 "Red number"): row slot and number.
+    pub badges: [Option<(u8, u8)>; super::panes::BADGES],
+    /// The pop-up draws its page tabs as outlined boxes, the active one in green (r8), not on the red accent bar.
+    pub tab_boxes: bool,
 }
 
 /// One floppy or loop mark. `color` is sRGB; the renderer converts it.
@@ -276,12 +296,23 @@ impl Frame {
         self.hairline = None;
         self.outline = [None; 2];
         self.chain = [false; ROW_LINES];
+        self.conn_head.clear();
+        self.conn.fill(Text::new());
+        self.conn_tone = [Tone::Normal; super::panes::CONN_LINES];
+        self.conn_count = 0;
+        self.conn_kind = [super::recording_menu::ConnKind::Detail; super::panes::CONN_LINES];
+        self.role_tab = None;
+        self.band = [false; ROW_LINES];
+        self.head_tag = [None; 2];
+        self.badges = [None; super::panes::BADGES];
+        self.tab_boxes = false;
     }
 
     pub const fn new() -> Frame {
         const EMPTY_ROW: RowLine = RowLine {
             label: Text::new(),
             value: Text::new(),
+            sub: Text::new(),
             label_tone: Tone::Normal,
             value_tone: Tone::Normal,
         };
@@ -328,6 +359,16 @@ impl Frame {
             hairline: None,
             outline: [None; 2],
             chain: [false; ROW_LINES],
+            conn_head: Text::new(),
+            conn: [Text::new(); super::panes::CONN_LINES],
+            conn_tone: [Tone::Normal; super::panes::CONN_LINES],
+            conn_count: 0,
+            conn_kind: [super::recording_menu::ConnKind::Detail; super::panes::CONN_LINES],
+            role_tab: None,
+            band: [false; ROW_LINES],
+            head_tag: [None; 2],
+            badges: [None; super::panes::BADGES],
+            tab_boxes: false,
         }
     }
 }
@@ -594,7 +635,11 @@ fn paint_recording(menu: &Menu, frame: &mut Frame) {
             frame.tab_count = (i + 1) as u8;
         }
         frame.tab_active = rec.tab() as u8;
-        let _ = write!(frame.crumb, "Recording ({})", rec.role(face).label());
+        // The r8 title: "Recording", with the role in the L/R tabs beside it.
+        let _ = frame.crumb.write_str("Recording");
+        frame.role_tab = Some(u8::from(rec.role(face) == super::recording_menu::ViewRole::Cpu));
+        // The page tabs are outlined boxes under the title line; the red tab is the role's.
+        frame.tab_boxes = true;
     }
     // The recording hint replaces the page hint page_frame wrote; appended, the two ran together.
     frame.hint.clear();
@@ -622,8 +667,28 @@ fn paint_recording(menu: &Menu, frame: &mut Frame) {
     } else {
         paint_sections(rec, frame, face, group);
     }
-    let lines = rec.connections(face, group);
-    if !lines.is_empty() {
+    let lines = if popup { Vec::new() } else { rec.connections(face, group) };
+    if popup {
+        // The r8 pop-up has no help panel: the page row's help under it described a row the pop-up does not show.
+        frame.help[0].clear();
+        frame.help[1].clear();
+        // Its own column, right of the list: the header, then the row under the cursor and the files joined to it in
+        // kind boxes, the headings over them, and plain lines.
+        let items = rec.connection_items(face, group);
+        if !items.is_empty() {
+            let _ = frame.conn_head.write_str("CONNECTIONS  of the row under the cursor");
+        }
+        for (slot, item) in items.iter().take(super::panes::CONN_LINES).enumerate() {
+            use super::recording_menu::ConnKind;
+            let _ = frame.conn[slot].write_str(&item.text);
+            frame.conn_kind[slot] = item.kind;
+            frame.conn_tone[slot] = match item.kind {
+                ConnKind::Heading | ConnKind::LinkSub => Tone::Dim,
+                _ => Tone::Normal,
+            };
+            frame.conn_count = (slot + 1) as u8;
+        }
+    } else if !lines.is_empty() {
         frame.help[0].clear();
         frame.help[1].clear();
         let _ = frame.help[0].write_str("CONNECTIONS");
@@ -695,20 +760,39 @@ fn paint_picker(rec: &super::recording_menu::RecordingScreens, frame: &mut Frame
 }
 
 fn paint_sections(rec: &super::recording_menu::RecordingScreens, frame: &mut Frame, face: super::recording_menu::Face, group: u8) {
+    use super::recording_menu::FileTag;
+    let popup = face == super::recording_menu::Face::Popup;
+    let mut badges = 0;
     for section in 0..2u8 {
         let view = rec.section(face, group, section);
         let base = usize::from(section) * (SECTION_ROWS + 1);
         if base >= ROW_LINES {
             break;
         }
-        let _ = frame.rows[base].label.write_str(view.header);
+        // The r8 header carries its file count ("SAVE STATES (7)").
+        let _ = write!(frame.rows[base].label, "{}  ({})", view.header, view.files);
         frame.rows[base].label_tone = Tone::Dim;
         frame.row_count = (base + 1) as u8;
+        // In the pop-up it sits on a dark band with its kind's mark before the name (r8): the floppy for SAVE STATES.
+        if popup {
+            frame.band[base] = true;
+            frame.head_tag[usize::from(section)] = match view.header {
+                "SAVE STATES" => Some(FileTag::Save),
+                "MACROS" => Some(FileTag::Macro),
+                "COMBOS" => Some(FileTag::Combo),
+                "SEQUENCES" => Some(FileTag::Sequence),
+                _ => None,
+            };
+        }
         if let Some(floppy) = view.header_floppy {
-            place_icon(frame, usize::from(section), p_row_x(), super::panes::row_y(base), floppy);
+            let x = if popup { super::panes::HEAD_MARK_X } else { p_row_x(false) };
+            place_icon(frame, usize::from(section), x, super::panes::row_y(base), floppy);
         }
         if let Some(mark) = view.header_loop {
-            place_icon_color(frame, super::panes::FLOPPIES + usize::from(section), p_row_x() + 36.0, super::panes::row_y(base), [236, 238, 242, 255]);
+            // Left of the right-aligned count, as a start save's floppy sits left of its name (`paint_file`).
+            let right = super::panes::row_span(face == super::recording_menu::Face::Popup).1;
+            let x = right - super::panes::text_width(mark.label().encode_utf16().count()) - 22.0;
+            place_icon_color(frame, super::panes::FLOPPIES + usize::from(section), x, super::panes::row_y(base), [236, 238, 242, 255]);
             let _ = write!(frame.rows[base].value, "{}", mark.label());
         }
         let start = window_start(view.cursor, view.rows.len(), SECTION_ROWS);
@@ -719,15 +803,25 @@ fn paint_sections(rec: &super::recording_menu::RecordingScreens, frame: &mut Fra
             if slot >= ROW_LINES {
                 break;
             }
-            if let Some(order) = row.order {
-                let _ = write!(frame.rows[slot].label, "{order} {}", row.name);
-            } else {
-                let _ = frame.rows[slot].label.write_str(&row.name);
+            match row.order {
+                // The pop-up's red badge at the row's left edge (r8); the page keeps the number before the name.
+                Some(order) if popup && badges < super::panes::BADGES => {
+                    frame.badges[badges] = Some((slot as u8, order));
+                    badges += 1;
+                    let _ = frame.rows[slot].label.write_str(&row.name);
+                }
+                Some(order) => {
+                    let _ = write!(frame.rows[slot].label, "{order} {}", row.name);
+                }
+                None => {
+                    let _ = frame.rows[slot].label.write_str(&row.name);
+                }
             }
             if let Some(count) = row.chain_count {
                 let _ = write!(frame.rows[slot].value, "{count}");
             }
             frame.rows[slot].label_tone = Tone::Normal;
+            let _ = frame.rows[slot].sub.write_str(&row.sub);
             frame.green[slot] = row.green;
             frame.chain[slot] = row.chain_count.is_some();
             if row.hot {
@@ -743,7 +837,7 @@ fn paint_sections(rec: &super::recording_menu::RecordingScreens, frame: &mut Fra
             }
             if let Some(floppy) = row.floppy {
                 let icon = 2 + usize::from(section) * SECTION_ROWS + (offset - start);
-                place_icon(frame, icon, p_row_x(), super::panes::row_y(slot), floppy);
+                place_icon(frame, icon, p_row_x(face == super::recording_menu::Face::Popup), super::panes::row_y(slot), floppy);
             }
         }
         if let (Some(lo), Some(hi)) = (hot_lo, hot_hi) {
@@ -762,8 +856,8 @@ fn place_icon_color(frame: &mut Frame, index: usize, x: f32, y: f32, color: [u8;
     }
 }
 
-fn p_row_x() -> f32 {
-    super::panes::ROW_RIGHT - 40.0
+fn p_row_x(popup: bool) -> f32 {
+    super::panes::row_span(popup).1 - 40.0
 }
 
 fn window_start(cursor: usize, len: usize, shown: usize) -> usize {
@@ -928,7 +1022,7 @@ mod tests {
             recorded_on: "Mario".into(),
             span: 25,
         };
-        let combo = |id: &str| ComboFile { id: id.into(), name: id.into(), made_from: None, links: Vec::new(), span: 1 };
+        let combo = |id: &str| ComboFile { id: id.into(), name: id.into(), recorded_on: String::new(), made_from: None, links: Vec::new(), span: 1 };
         let sequence = SequenceFile { id: "q1".into(), name: "Sequence 1".into(), combos: vec!["c1".into()], streak: 0, best: 0 };
         menu.recording_mut().set_catalog(Catalog {
             saves: vec![save],
@@ -941,6 +1035,135 @@ mod tests {
             hot_sequences: vec!["q1".into()],
         });
         menu
+    }
+
+    /// Primary 2026-11-08 (#19, #49): the r8 pop-up (`RECORDING-REDESIGN-r8-popup-combo.png`) has a line under each
+    /// row and CONNECTIONS in its own column on the right. Eden rc6-covrec-diag2: the pop-up drew one line per row and
+    /// joined CONNECTIONS into the help line at the bottom.
+    #[test]
+    fn the_popup_draws_sublines_and_a_connections_column() {
+        use crate::model::menu::table::COMBOS_SEQ;
+        use crate::model::recording_menu::Face;
+        let mut menu = recording_menu_with_files();
+        let mut catalog = menu.recording().catalog().clone();
+        catalog.combos[0].recorded_on = "Pikachu → Mario".into();
+        menu.recording_mut().set_catalog(catalog);
+        menu.recording_mut().toggle_popup();
+        menu.recording_mut().press_popup(Button::ZR);
+        let combos = menu.recording().section(Face::Popup, COMBOS_SEQ, 1);
+        let at = combos.rows.iter().position(|row| row.name == "c1").expect("c1 listed");
+        menu.recording_mut().set_cursor(Face::Popup, COMBOS_SEQ, 1, at);
+        let mut frame = Frame::new();
+        page_frame(&menu, &mut frame);
+        assert!(frame.popup);
+        let slot = (0..usize::from(frame.row_count)).find(|i| frame.rows[*i].label.string_lossy() == "c1").expect("c1 drawn");
+        assert_eq!(frame.rows[slot].sub.string_lossy(), "Recorded on Pikachu → Mario");
+        let header = (0..usize::from(frame.row_count)).find(|i| frame.rows[*i].label.string_lossy().starts_with("COMBOS")).expect("header");
+        assert!(frame.rows[header].sub.is_empty(), "a header has no subline");
+        assert_eq!(frame.conn_head.string_lossy(), "CONNECTIONS  of the row under the cursor");
+        let lines: Vec<String> = (0..usize::from(frame.conn_count)).map(|i| frame.conn[i].string_lossy()).collect();
+        assert_eq!(lines.first().map(String::as_str), Some("c1"), "{lines:?}");
+        assert!(lines.iter().any(|line| line == "Sequence 1 #1"), "{lines:?}");
+        assert_eq!(lines.last().map(String::as_str), Some("Fighters  Pikachu → Mario"), "{lines:?}");
+        assert!(!frame.help[0].string_lossy().contains("CONNECTIONS"), "the help keeps its own lines");
+    }
+
+    /// Primary 2026-11-08 15:55Z, the r8 pop-up as drawn (`RECORDING-REDESIGN-r8-popup-combo.png`): the title
+    /// "Recording" with the L/R role tabs, each section header with its file count, CONNECTIONS as kind boxes in a tree,
+    /// and the r8 footer.
+    #[test]
+    fn the_popup_has_the_r8_title_counts_boxes_and_footer() {
+        use crate::model::menu::table::COMBOS_SEQ;
+        use crate::model::recording_menu::{ConnKind, Face, FileTag};
+        let mut menu = recording_menu_with_files();
+        menu.recording_mut().toggle_popup();
+        menu.recording_mut().press_popup(Button::ZR);
+        menu.recording_mut().set_cursor(Face::Popup, COMBOS_SEQ, 1, 1);
+        let mut frame = Frame::new();
+        page_frame(&menu, &mut frame);
+        assert_eq!(frame.crumb.string_lossy(), "Recording");
+        assert_eq!(frame.role_tab, Some(0), "Player 1's tab is lit");
+        let labels: Vec<String> = (0..usize::from(frame.row_count)).map(|i| frame.rows[i].label.string_lossy()).collect();
+        assert!(labels.contains(&"SEQUENCES  (1)".to_string()) && labels.contains(&"COMBOS  (2)".to_string()), "{labels:?}");
+        assert_eq!(frame.conn_kind[0], ConnKind::Head(FileTag::Combo));
+        assert_eq!(frame.conn[0].string_lossy(), "c1");
+        assert_eq!(frame.conn_kind[1], ConnKind::Heading);
+        assert_eq!(frame.conn_kind[2], ConnKind::Child(FileTag::Sequence));
+        assert!(frame.hint.string_lossy().starts_with("A drill   Left/Right section"));
+        menu.recording_mut().press_popup(Button::R);
+        let mut frame = Frame::new();
+        page_frame(&menu, &mut frame);
+        assert_eq!(frame.role_tab, Some(1), "R lights the CPU's tab");
+        let mut page = Frame::new();
+        menu.recording_mut().toggle_popup();
+        page_frame(&menu, &mut page);
+        assert_eq!(page.role_tab, None, "the page has no role tabs in its title");
+    }
+
+    /// Primary 2026-11-08 16:51Z, the r8 pop-up's remaining parts (`RECORDING-REDESIGN-r8-popup-combo.png`, `-macro.png`;
+    /// RECORDING-REDESIGN.md "How to read a list"): each section header on a dark band with its kind's mark (the floppy
+    /// for SAVE STATES, a square for the others), the red order badge at a row's left edge instead of a number before
+    /// the name, and the page tabs as outlined boxes. A drilled sequence is a green row in the hot outline and wears the
+    /// badge of the combo under the cursor. The page keeps its number before the name.
+    #[test]
+    fn the_popup_draws_header_bands_order_badges_and_boxed_tabs() {
+        use crate::model::menu::table::COMBOS_SEQ;
+        use crate::model::recording_menu::{Face, FileTag, LoopMark};
+        let mut menu = recording_menu_with_files();
+        menu.recording_mut().adopt(None, [None, None], [LoopMark::Finite(1), LoopMark::Finite(1)], Some("q1".into()));
+        menu.recording_mut().toggle_popup();
+        menu.recording_mut().press_popup(Button::ZR);
+        let combos = menu.recording().section(Face::Popup, COMBOS_SEQ, 1);
+        let at = combos.rows.iter().position(|row| row.name == "c1").expect("c1 listed");
+        menu.recording_mut().set_cursor(Face::Popup, COMBOS_SEQ, 1, at);
+        let mut frame = Frame::new();
+        page_frame(&menu, &mut frame);
+        assert_eq!(frame.band.iter().filter(|on| **on).count(), 2, "{:?}", frame.band);
+        assert!(frame.band[0] && frame.band[SECTION_ROWS + 1], "both headers sit on a band");
+        assert_eq!(frame.head_tag, [Some(FileTag::Sequence), Some(FileTag::Combo)]);
+        let labels: Vec<String> = (0..usize::from(frame.row_count)).map(|i| frame.rows[i].label.string_lossy()).collect();
+        let seq = labels.iter().position(|label| label.ends_with("Sequence 1")).expect("the sequence row");
+        assert_eq!(labels[seq], "Sequence 1", "no number before the name in the pop-up");
+        assert_eq!(frame.badges.iter().flatten().copied().collect::<Vec<_>>(), [(seq as u8, 1)], "c1 is its combo 1");
+        assert!(frame.green[seq], "the drilled sequence is green");
+        assert!(frame.outline[0].is_some_and(|(first, count)| usize::from(first) <= seq && seq < usize::from(first + count)));
+        assert!(frame.tab_boxes);
+        menu.recording_mut().press_popup(Button::ZL);
+        let mut frame = Frame::new();
+        page_frame(&menu, &mut frame);
+        assert_eq!(frame.head_tag, [Some(FileTag::Save), Some(FileTag::Macro)]);
+        menu.recording_mut().press_popup(Button::ZR);
+        menu.recording_mut().toggle_popup();
+        menu.recording_mut().set_cursor(Face::Page, COMBOS_SEQ, 1, at);
+        let mut page = Frame::new();
+        page_frame(&menu, &mut page);
+        assert!(!page.tab_boxes && page.band.iter().all(|on| !on) && page.badges.iter().all(Option::is_none));
+        assert!(page.head_tag.iter().all(Option::is_none));
+    }
+
+    /// Eden rc6-covrec-diag3 `cov-popup-r8` (2026-11-08): the MACROS header's loop count "1" was hidden under the loop
+    /// icon; both sat at the column's right edge and the icon draws on top. Primary 13:05Z (#19): the loop count sits
+    /// inside the panel, as in the r8 mockup. The icon goes left of the count, on the page and in the pop-up.
+    #[test]
+    fn the_loop_icon_sits_left_of_the_macros_loop_count() {
+        use crate::model::menu::table::SAVES_MACROS;
+        use crate::model::recording_menu::Face;
+        for popup in [false, true] {
+            let mut menu = recording_menu_with_files();
+            menu.recording_mut().set_cursor(Face::Page, SAVES_MACROS, 1, 0);
+            if popup {
+                menu.recording_mut().toggle_popup();
+            }
+            let mut frame = Frame::new();
+            page_frame(&menu, &mut frame);
+            let header = (0..usize::from(frame.row_count)).find(|i| frame.rows[*i].label.string_lossy().starts_with("MACROS")).expect("MACROS");
+            let count = frame.rows[header].value.string_lossy();
+            assert!(!count.is_empty(), "the header carries the loop count");
+            let icon = frame.icons[super::super::panes::FLOPPIES + 1];
+            assert!(icon.on, "the loop icon is drawn");
+            let text_left = super::super::panes::row_span(popup).1 - super::super::panes::text_width(count.encode_utf16().count());
+            assert!(icon.x + 14.0 <= text_left, "popup={popup}: the icon ({}) covers the count from {text_left}", icon.x);
+        }
     }
 
     /// Eden `rc5-opus-floppy1` (2026-11-08): `Save states & Macros (0)` beside an open macro. The count was of settings

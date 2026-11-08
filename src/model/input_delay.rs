@@ -67,6 +67,19 @@ impl Sticks {
     pub const fn onto(self, record: MappedInputs) -> MappedInputs {
         MappedInputs { buttons: record.buttons, lstick_x: self.lx, lstick_y: self.ly, rstick_x: self.rx, rstick_y: self.ry }
     }
+
+    /// What the strip and the combo helper read once the recorder has had P1's poll (`before` is the record it got,
+    /// `after` the record it left). Play writes the played frame into the record, so the fighter acts on that frame:
+    /// the strip reads it with its own sticks, and Make combo captures the macro's events as RECORDING.md says
+    /// ("Make combo records the same events, because it plays into the same strip"). An untouched poll keeps the
+    /// physical sticks.
+    pub fn after_recorder(self, before: MappedInputs, after: MappedInputs) -> (MappedInputs, Sticks) {
+        if after == before {
+            (after, self)
+        } else {
+            (after, Sticks::of_record(after))
+        }
+    }
 }
 
 /// What owns P1's input for a poll. Anything other than gameplay empties the queue and makes that
@@ -338,5 +351,19 @@ mod tests {
         let onto = Sticks { lx: 0, ly: 72, rx: 120, ry: 0 }.onto(record);
         assert_eq!((onto.buttons, onto.lstick_x, onto.lstick_y, onto.rstick_x), (0x80a1, 0, 72, 120));
         assert_eq!(Sticks::of_record(record).onto(record), record);
+    }
+
+    /// Eden rc6-covrec-diag1 (2026-11-08): Make combo saved its combo with no input events. The strip read P1's record
+    /// before Play wrote the played frame into it, so it saw the idle controller. The display now reads the record
+    /// the recorder left: a played jab is a press with the played sticks; an untouched poll keeps the physical sticks.
+    #[test]
+    fn the_display_reads_the_played_frame_and_keeps_the_physical_sticks_otherwise() {
+        let physical = Sticks { lx: 0, ly: 72, rx: 0, ry: 0 };
+        let idle = MappedInputs { buttons: 0x8000, lstick_x: 0, lstick_y: 0, rstick_x: 0, rstick_y: 0 };
+        let played = MappedInputs { buttons: 0x8201, lstick_x: 60, lstick_y: 0, rstick_x: 0, rstick_y: 0 };
+        let (record, sticks) = physical.after_recorder(idle, played);
+        assert_eq!(sticks.onto(record), played, "the strip reads the played frame");
+        let (record, sticks) = physical.after_recorder(idle, idle);
+        assert_eq!(sticks.onto(record), physical.onto(idle), "an untouched poll keeps the physical sticks");
     }
 }

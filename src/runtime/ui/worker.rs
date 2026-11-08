@@ -205,6 +205,7 @@ fn run() {
         crate::runtime::compat::menu::run_roster_change();
         // The named-macro layer's model is this thread's (design C): its worker tick runs before the panels are looked at.
         crate::runtime::macros::port::worker_tick();
+        sync_sequence_drill();
         if refresh_recording(&mut session) {
             publish_frame(&session);
         }
@@ -235,15 +236,14 @@ fn sync_input_generation(s: &mut Session) {
         s.mii = None;
         #[cfg(feature = "mii-saved-alpha")]
         { s.pending_close = None; }
-        if s.phase == Phase::Clip {
-            EXT_SHOWN.store(false, Ordering::Release);
-        }
         if s.phase == Phase::Prompt {
             // The next `sync_panels` draws a question that is still up again, on a new model.
             hide_prompt();
         }
         POPUP.store(false, Ordering::Release);
-        s.phase = Phase::Menu;
+        // The clip editor outlives the menu (the hand-over's own close lands here) and keeps drawing; `sync_panels`
+        // hides it when the layer closes it.
+        s.phase = flow::after_session_reset(s.phase);
         publish_jumps(s);
         diagnostic(format_args!("[Ui] menu session cleared"));
     }
@@ -462,33 +462,93 @@ fn post_recording_effect(menu: &mut Menu) {
     crate::engine::rr_host::post_effect(menu.recording_mut().take_effect());
 }
 
-/// A combo drill becomes the grade target. The same id is not applied twice,
-/// and a file that is not readable yet is retried on the next post.
-fn apply_grade_target(drill: Option<&str>, kind: Option<crate::engine::library::DrillKind>) {
-    use crate::engine::library::DrillKind;
-    use crate::engine::rr_host::{follow_grade, GradeFollow};
+/// What the frame hook drills: the kind and id, and for a sequence the plan it was given (to see a change on the card).
+struct Applied {
+    kind: crate::engine::library::DrillKind,
+    id: String,
+    plan: Option<crate::engine::rr_host::SequencePlan>,
+    /// The catalog generation the plan was read at, and the plan's generation on the frame hook.
+    catalog: u64,
+    generation: u32,
+}
 
-    let combo_id = match kind {
-        Some(DrillKind::Combo) => drill,
-        _ if drill.is_none() => None,
-        _ => return,
-    };
-    static APPLIED: Mutex<Option<String>> = Mutex::new(None);
+static APPLIED: Mutex<Option<Applied>> = Mutex::new(None);
+
+/// The one drill becomes what the frame hook grades: a combo drill its combo, a sequence drill its plan. Either
+/// replaces the other. The same drill is not applied twice, and a file that is not readable yet is retried on the next
+/// post.
+fn apply_grade_target(drill: Option<&str>, kind: Option<crate::engine::library::DrillKind>) {
+    use crate::engine::rr_host::{follow_drill, DrillFollow};
+    use crate::runtime::features::combo;
+
+    let root = std::path::Path::new(crate::model::storage::ROOT);
     let mut applied = APPLIED.lock();
-    match follow_grade(applied.as_deref(), combo_id) {
-        GradeFollow::Same => {}
-        GradeFollow::Clear => {
+    let now = applied.as_ref().map(|a| (a.kind, a.id.as_str()));
+    match follow_drill(now, kind, drill) {
+        DrillFollow::Same => {}
+        DrillFollow::Clear => {
             *applied = None;
-            crate::runtime::features::combo::stage_target(None);
+            combo::stage_sequence(None);
+            combo::stage_target(None);
         }
-        GradeFollow::Install(id) => {
-            let root = std::path::Path::new(crate::model::storage::ROOT);
+        DrillFollow::Combo(id) => {
             let Ok(record) = crate::model::combo_record::ComboLibrary::new(root.join("combos")).load(id) else {
                 return;
             };
-            crate::runtime::features::combo::stage_target(Some((record.combo, record.name.as_str())));
-            *applied = Some(id.to_owned());
+            combo::stage_sequence(None);
+            combo::stage_target(Some((record.combo, record.name.as_str())));
+            *applied = Some(Applied {
+                kind: crate::engine::library::DrillKind::Combo,
+                id: id.to_owned(),
+                plan: None,
+                catalog: 0,
+                generation: 0,
+            });
         }
+        DrillFollow::Sequence(id) => {
+            let catalog = crate::engine::rr_host::catalog_generation();
+            let Some(plan) = crate::engine::rr_host::sequence_plan(root, id) else {
+                return;
+            };
+            let generation = combo::stage_sequence(Some((&plan, false)));
+            *applied = Some(Applied {
+                kind: crate::engine::library::DrillKind::Sequence,
+                id: id.to_owned(),
+                plan: Some(plan),
+                catalog,
+                generation,
+            });
+        }
+    }
+}
+
+/// Every worker pass: a drilled sequence's streak and best go to its file, and a change on the card (a renamed,
+/// deleted or reordered combo, Edit combos) reaches the frame hook. A rename or the saved streak keeps the run going.
+fn sync_sequence_drill() {
+    use crate::runtime::features::combo;
+
+    let root = std::path::Path::new(crate::model::storage::ROOT);
+    let mut applied = APPLIED.lock();
+    let Some(drill) = applied.as_mut().filter(|a| a.plan.is_some()) else {
+        let _ = combo::take_progress();
+        return;
+    };
+    if let Some(progress) = combo::take_progress().filter(|p| p.generation == drill.generation) {
+        let saved = crate::engine::rr_host::save_sequence_progress(root, &drill.id, progress.streak, progress.best);
+        combo::tr_seq_saved_v1(u32::from(saved), progress.streak, progress.best, 0);
+    }
+    let catalog = crate::engine::rr_host::catalog_generation();
+    if catalog == drill.catalog {
+        return;
+    }
+    drill.catalog = catalog;
+    let Some(plan) = crate::engine::rr_host::sequence_plan(root, &drill.id) else {
+        return;
+    };
+    let same = drill.plan.as_ref().is_some_and(|old| old.same_steps(&plan));
+    if drill.plan.as_ref() != Some(&plan) {
+        drill.generation = combo::stage_sequence(Some((&plan, same)));
+        drill.plan = Some(plan);
     }
 }
 
@@ -807,13 +867,19 @@ fn stage_label(i: usize) -> &'static str {
 /// Build the frame of what is on screen (the clip editor, a layer panel, or the menu's own page and sub-screen) and hand it to the tick
 /// when it differs from the last one.
 fn publish_frame(s: &Session) {
+    if !flow::frame_needs_menu(s.phase) {
+        // The clip editor: the hand-over closed the menu and the close dropped its model, so it draws from its own view.
+        let Some(view) = replay_capture::clip_view() else { return };
+        let mut next = NEXT_FRAME.lock();
+        next.reset();
+        clip_frame(&view, &named_macros::fighter_label(view.fighter_kind), replay_capture::scrub_pace(), &mut next);
+        hand_over(&next);
+        return;
+    }
     let Some(menu) = s.menu.as_ref() else { return };
     let mut next = NEXT_FRAME.lock();
     next.reset();
-    if s.phase == Phase::Clip {
-        let Some(view) = replay_capture::clip_view() else { return };
-        clip_frame(&view, &named_macros::fighter_label(view.fighter_kind), replay_capture::scrub_pace(), &mut next);
-    } else if s.phase == Phase::Panel || s.phase == Phase::Prompt {
+    if s.phase == Phase::Panel || s.phase == Phase::Prompt {
         // The layer's page may be between two views (a capture loading, a keyboard open): keep what is on screen.
         let Some(view) = (if s.panel.is_some_and(is_setup) {
             s.setups.view()
@@ -880,7 +946,12 @@ fn publish_frame(s: &Session) {
         next.help[1].clear();
         let _ = core::fmt::Write::write_str(&mut next.help[1], note);
     }
-    // The last frame handed over (only this thread takes it): an unchanged frame is not handed over again.
+    hand_over(&next);
+}
+
+/// Hand a built frame to the tick. The last frame handed over (only this thread takes it): an unchanged frame is not
+/// handed over again.
+fn hand_over(next: &Frame) {
     let mut last = LAST_FRAME.lock();
     if *last != *next {
         *last = *next;

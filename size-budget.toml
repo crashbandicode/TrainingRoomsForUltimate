@@ -41,6 +41,7 @@ reason = "counter corrected to sloc4, primary 2026-11-02 (tools/sloc.py is now s
 #   pkg4       2d25cdf  +219    measured (design C, expected net about 0) (owner: pkg4 stream)
 #   pkg6       d517dab  +169    (owner: pkg6 stream)
 #   total pending about +4,318
+
 [[budget]]
 scope = "total"
 ceiling = 107900
@@ -53,6 +54,7 @@ scope = "total"
 ceiling = 105600
 date = "2026-11-02"
 reason = "cut: approved capacity/lifecycle probe and empty alias retirement; raw sloc4 101224 plus retained pending merge allowance4318 =105542, rounded up. Prior measured104350, slice reduction3126; no counting semantics or normalized-unit conversion."
+
 [[budget]]
 scope = "total"
 ceiling = 103300
@@ -66,6 +68,7 @@ date = "2026-11-02"
 reason = "cut: HookId and Feature declaration tables remove maintained duplicate mappings; raw sloc4 98865 plus unchanged pending merge allowance4318 =103183, rounded up. No counting/layout or behavior change."
 
 # Entries above are historical raw units (implicit basis=raw-sloc4), not comparable to this section.
+
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
@@ -661,6 +664,14 @@ approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); final ceiling = m
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
+ceiling = 150712
+date = "2026-11-08"
+reason = "rc.6 card L1: drill::SequenceDrill, rr_host::start_sequence_drill and rr_host::drill_grade_target (sequence drill, model and host halves)"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); card L1 by primary c07b3449, 2026-11-08"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
 ceiling = 150754
 date = "2026-11-08"
 reason = "rc.6 hot-slots root fixes (p23/rc6-hot-slots a1f1c4a, Eden rc6-hot-xps1): a kept start-up window joins the scene's owner generation (native_body_bank::adopt_scene_generation, entry_window::scene_generation); hats keep their own budget through planning and creation (character_sources::created_allowance/plan_targets/helper_view, hat_slots::created_allowance/created_busy/holds_back_creation); measured 150754 (tools/size_gate.py), +104 over 150650"
@@ -669,10 +680,90 @@ approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to these 
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
+ceiling = 150839
+date = "2026-11-08"
+reason = "rc.6 coverage fixes (p23/rc6-cov-rec fd77245): the bound save drives Save, Load and Auto-load through the active slot, combo CONNECTIONS lines in the catalog, shared combo ids in the index and sequences, the recorder before the input display (Make combo events), and the mash sees a library macro playing on the CPU; measured 150839 (tools/size_gate.py), +189 over 150650"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to these root fixes under TASK-OPUS-rc6-cov-rec (primary c07b3449, 2026-11-08: a raise goes in its own commit with approved_by)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
 ceiling = 150821
 date = "2026-11-08"
 reason = "rc.6 hot-slots root fix (p23/rc6-hot-slots dd69ea6, Eden rc6-hot-xps2): back to the original after a start-up window is native's single form (entry_window::original_request; the Player and CPU Mii adapters stage and recognise it), which stops the native thread crash on the return to the original; measured 150821 (tools/size_gate.py), +67 over 150754"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to this rc.6 root fix under TASK-OPUS-rc6-hot-slots (primary c07b3449, 2026-11-08: a raise goes in its own commit with approved_by)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 151701
+date = "2026-11-08"
+reason = "rc.6 sequence drilling (08de8d0): the sequence run on the frame hook, the staged plan and its saved streak and best, the sequence bar (header, combo row, footer), and the host writing Edit combos, Edit chain and Delete; measured 151701 at 08de8d0 (tools/size_gate.py), +989 over 150712"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); rc.6 sequence drilling by primary c07b3449, TASK-OPUS-rc6-seq-drill 2026-11-08"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 150966
+date = "2026-11-08"
+reason = "rc.6 coverage, second set (p23/rc6-cov-rec 4d387ff..f7371fa): Make combo saves only its own exchange, the operator's '+ Save last combo…' row at the top of COMBOS and a combo's recorded fighter in CONNECTIONS, a drill or bind puts that file first, and the Replay window's clip editor drawn after the hand-over; measured 150966 (tools/size_gate.py), +127 over 150839"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied under TASK-OPUS-rc6-cov-rec and the primary's inbox orders of 2026-11-08 13:08Z (Save last combo) and 13:31Z (Make combo), own commit"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 151475
+date = "2026-11-08"
+reason = "rc.6 coverage, third set (p23/rc6-cov-rec 37bf8d0..9897e8e): a setup restore writes no save file (#69 b), Edit placement edits the role's active macro and Play warps with its offset (#70 a), Switch asks for a CPU macro's exact Mii (#54 a), and the r8 pop-up's two columns and row lines (#19, #49); measured 151475 (tools/size_gate.py), +509 over 150966"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied under TASK-OPUS-rc6-cov-rec and the primary's inbox answers of 2026-11-08 ~14:20Z (#49, #19, #54, #70, #69), own commit"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 151479
+date = "2026-11-08"
+reason = "rc.6 coverage (p23/rc6-cov-rec 3c616db): Edit placement on an active chain edits its macro 1 instead of adding a refusal that the compliance check rejects (no approved restriction); measured 151479 (tools/size_gate.py), +4 over 151475"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied under TASK-OPUS-rc6-cov-rec and the primary's inbox answer #70 (a) of 2026-11-08 ~14:20Z, own commit"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 151481
+date = "2026-11-08"
+reason = "rc.6 coverage (p23/rc6-cov-rec 4ef504f): the MACROS loop icon sits left of its count, which it hid (#19, Eden rc6-covrec-diag3 cov-popup-r8); measured 151481 (tools/size_gate.py), +2 over 151479"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied under TASK-OPUS-rc6-cov-rec and the primary's #19 answer of 2026-11-08 13:05Z, own commit"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 152005
+date = "2026-11-08"
+reason = "rc.6 coverage (p23/rc6-cov-rec 57f65c0): the r8 pop-up as drawn, its title with the L/R role tabs, the section file counts, the CONNECTIONS boxes and tree, and the r8 footer (primary 2026-11-08 15:55Z); 2427fff reverted e276d0f (-43); measured 152005 (tools/size_gate.py), +524 over 151481"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied under TASK-OPUS-rc6-cov-rec and the primary's inbox order of 2026-11-08 15:55Z, own commit"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 152190
+date = "2026-11-08"
+reason = "rc.6 coverage (p23/rc6-cov-rec d3c5e1b): the r8 pop-up section header bands with kind marks, the red order badges and the boxed page tabs (primary 2026-11-08 16:51Z); measured 152190 (tools/size_gate.py), +185 over 152005"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied under TASK-OPUS-rc6-cov-rec and the primary's inbox order of 2026-11-08 16:51Z, own commit"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 151146
+date = "2026-11-08"
+reason = "rc.6 warm exit from a Mii group (p23/rc6-hot-slots 4f01c0a; operator decision 2026-11-08, INBOX-opus-rc6-hotslots 15:58Z): plan_mii_exit, mii_exit_bytes_match, and the adapters' kept publication and exit_settled; measured 151146 (tools/size_gate.py), +325 over 150821"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to this operator-chosen rc.6 item under TASK-OPUS-rc6-hot-slots (primary c07b3449, 2026-11-08: a raise goes in its own commit with approved_by)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 153733
+date = "2026-11-08"
+reason = "rc.6 integration (p23/rc6-integration 85f85af): the merge of p23/rc6-seq-drill (583b694, 151701), p23/rc6-cov-rec (e1c6d0c, 152190) and p23/rc6-hot-slots (d6a485f, 151146) onto 34084a1 (150650); the three sides add up (+1051, +1540, +496 = 153737), the conflict resolutions save 4; measured 153733 on the merged tree (tools/size_gate.py)"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); combined ceiling = measured merged size per primary c07b3449, TASK-OPUS-rc6-integration 2026-11-08"
 
 [[budget]]
 scope = "total"
@@ -705,14 +796,6 @@ ceiling = 151111
 date = "2026-11-08"
 reason = "rc.6 coverage: the diag note of a refused helper proof takes its arguments without a lint suppression in release builds (p23/rc6-cov-rest, tests/lint_allows); measured 151111 (tools/size_gate.py), +1 over 151110"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied under TASK-OPUS-rc6-cov-rest (a raise goes in its own commit with approved_by)"
-
-[[budget]]
-scope = "total"
-basis = "rustfmt-sloc4"
-ceiling = 151146
-date = "2026-11-08"
-reason = "rc.6 warm exit from a Mii group (p23/rc6-hot-slots 4f01c0a; operator decision 2026-11-08, INBOX-opus-rc6-hotslots 15:58Z): plan_mii_exit, mii_exit_bytes_match, and the adapters' kept publication and exit_settled; measured 151146 (tools/size_gate.py), +325 over 150821"
-approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to this operator-chosen rc.6 item under TASK-OPUS-rc6-hot-slots (primary c07b3449, 2026-11-08: a raise goes in its own commit with approved_by)"
 
 [[budget]]
 scope = "total"

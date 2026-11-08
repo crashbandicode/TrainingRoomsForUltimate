@@ -590,7 +590,7 @@ unsafe fn on_ai_frame(ai: usize) {
     if post.restarted.is_some() || LAST_PHASE.swap(phase as u8, Ordering::AcqRel) != phase as u8 {
         notices::post_phase(phase, length);
     }
-    let state = rec().playback_state(queue_head.is_some());
+    let state = recording_host::cpu_playback(rec().playback_state(queue_head.is_some()));
     cpu::set_playback(state);
     bump(COUNT_NOTICE);
     host_cpu(controller);
@@ -920,6 +920,7 @@ pub fn interrupt_playback() {
         let stopped = rec.interrupt_on_mash(&settings);
         (stopped, rec.playback_state(false))
     };
+    let state = recording_host::cpu_playback(state);
     if stopped {
         // The same bookkeeping as `stop`, and the CPU sees the playback gone before the next injection.
         LAST_PHASE.store(Phase::Idle as u8, Ordering::Release);

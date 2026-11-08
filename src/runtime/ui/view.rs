@@ -68,7 +68,9 @@ impl Panes {
 
     /// Write a frame.
     pub unsafe fn draw(&self, frame: &Frame) {
-        // Tabs: the active one on the accent bar.
+        // Tabs: the active one on the accent bar. In the r8 pop-up the title line ("Recording" and the role tabs) is on
+        // top and the tabs sit under it.
+        let tab_y = if frame.popup { p::POP_TAB_Y } else { p::TAB_Y };
         let mut left = -840.0;
         for i in 0..p::TABS {
             let index = p::tab_index(i);
@@ -80,18 +82,35 @@ impl Panes {
             let width = p::text_width(units.len());
             let active = i == usize::from(frame.tab_active);
             self.text(index, units, if active { p::TEXT } else { p::TEXT_DIM });
-            self.at(index, left + p::TAB_BOX_W / 2.0, p::TAB_Y);
-            if active {
-                self.at(p::IDX_TAB_HI, left + width / 2.0, p::TAB_Y);
-                let hi = self.all[p::IDX_TAB_HI];
-                if !hi.is_null() {
-                    pane::set_width(hi, width + 36.0);
+            self.at(index, left + p::TAB_BOX_W / 2.0, tab_y);
+            if frame.tab_boxes {
+                // r8: each page tab is an outlined box, the active one green on a lighter fill. `width` is an estimate
+                // for a proportional font, so the box leaves more room after the text than before it.
+                let (x, w, h) = (left + width / 2.0 + 8.0, width + 56.0, p::TAB_H - 8.0);
+                if active {
+                    self.rect_at(p::IDX_TAB_HI, x, tab_y, w, h, p::BAND);
+                }
+                if i < p::TAB_BOXES {
+                    self.box_at(p::IDX_TAB_BOX + 4 * i, x, tab_y, w, h, if active { p::TEXT_ON } else { p::RULE });
+                }
+            } else if active {
+                self.rect_at(p::IDX_TAB_HI, left + width / 2.0, tab_y, width + 36.0, p::TAB_H, p::ACCENT);
+            }
+            left += width + if frame.tab_boxes { 84.0 } else { 64.0 };
+        }
+        for i in 0..p::TAB_BOXES {
+            if !frame.tab_boxes || i >= usize::from(frame.tab_count) {
+                for edge in 0..4 {
+                    self.hide(p::IDX_TAB_BOX + 4 * i + edge);
                 }
             }
-            left += width + 64.0;
         }
         self.text(p::IDX_TITLE, frame.title.units(), p::TEXT_DIM);
+        self.show(p::IDX_TITLE, !frame.popup);
+        self.show(p::IDX_SEP, !frame.popup);
         self.text(p::IDX_CRUMB, frame.crumb.units(), p::TEXT);
+        self.at(p::IDX_CRUMB, 0.0, if frame.popup { p::TAB_Y } else { p::CRUMB_Y });
+        self.draw_role_tabs(frame);
 
         // Groups.
         for i in 0..p::GROUPS {
@@ -114,11 +133,22 @@ impl Panes {
         self.draw_clip(frame);
         // Rows; on the direction grid the same panes carry the "Selected (weight)" panel at the right of the chips.
         let panel = if frame.view == View::Chips { selected_panel(frame) } else { [None; p::ROWS] };
+        // The r8 pop-up's list column (left of CONNECTIONS); the page keeps its own.
+        let (_, right) = p::row_span(frame.popup);
+        let (label_left, label_w, value_w) = (p::row_label_left(frame.popup), p::row_label_w(frame.popup), p::row_value_w(frame.popup));
         for (i, line) in panel.into_iter().enumerate() {
+            let sub = list && i < usize::from(frame.row_count) && !frame.rows[i].sub.is_empty();
+            if sub {
+                // The name rises and its subline sits under it, both on the row's plate.
+                self.label(p::IDX_SUB + i, frame.rows[i].sub.units(), label_left + label_w / 2.0, p::row_y(i) - p::SUB_DROP, label_w, p::TEXT_DIM);
+            } else {
+                self.hide(p::IDX_SUB + i);
+            }
             if list && i < usize::from(frame.row_count) {
                 let row = &frame.rows[i];
-                self.place(p::row_label_index(i), p::ROW_LEFT + p::ROW_LABEL_W / 2.0, p::row_y(i), p::ROW_LABEL_W);
-                self.place(p::row_value_index(i), p::ROW_RIGHT - p::ROW_VALUE_W / 2.0, p::row_y(i) - p::VALUE_DROP, p::ROW_VALUE_W);
+                let rise = if sub { p::SUB_RISE } else { 0.0 };
+                self.place(p::row_label_index(i), label_left + label_w / 2.0, p::row_y(i) + rise, label_w);
+                self.place(p::row_value_index(i), right - value_w / 2.0, p::row_y(i) - p::VALUE_DROP + rise, value_w);
                 self.text(p::row_label_index(i), row.label.units(), tone_color(row.label_tone));
                 self.text(p::row_value_index(i), row.value.units(), tone_color(row.value_tone));
             } else if frame.view == View::Delay && i < 4 {
@@ -140,10 +170,15 @@ impl Panes {
                 self.text(p::row_value_index(i), &[], p::TEXT);
             }
         }
+        let (left, right) = p::row_span(frame.popup);
         match frame.focus.filter(|_| list) {
             Some(row) => {
                 self.show(p::IDX_ROW_HI, true);
-                self.at(p::IDX_ROW_HI, (p::ROW_LEFT + p::ROW_RIGHT) / 2.0, p::row_y(usize::from(row)));
+                self.at(p::IDX_ROW_HI, (left + right) / 2.0, p::row_y(usize::from(row)));
+                let hi = self.all[p::IDX_ROW_HI];
+                if !hi.is_null() {
+                    pane::set_width(hi, right - left + 30.0);
+                }
             }
             None => self.show(p::IDX_ROW_HI, false),
         }
@@ -151,7 +186,10 @@ impl Panes {
         if frame.white_cursor {
             self.show(p::IDX_ROW_HI, false);
         }
+        // The pop-up has no group column, so the page's divider would cut through its list.
+        self.show(p::IDX_DIVIDER, !frame.popup);
         self.draw_chrome(frame);
+        self.draw_connections(frame);
         self.text(p::IDX_HELP, frame.help[0].units(), p::TEXT);
         self.text(p::IDX_HELP + 1, frame.help[1].units(), p::TEXT);
         self.text(p::IDX_HINT, frame.hint.units(), p::TEXT_DIM);
@@ -163,47 +201,181 @@ impl Panes {
         for index in p::IDX_GREEN..p::IDX_ROW {
             self.show(index, false);
         }
+        let (left, right) = p::row_span(frame.popup);
         for (i, on) in frame.green.iter().enumerate() {
             if *on {
-                self.rect_at(
-                    p::IDX_GREEN + i,
-                    (p::ROW_LEFT + p::ROW_RIGHT) / 2.0,
-                    p::row_y(i),
-                    p::ROW_RIGHT - p::ROW_LEFT,
-                    p::ROW_H,
-                    p::GREEN_ROW,
-                );
+                self.rect_at(p::IDX_GREEN + i, (left + right) / 2.0, p::row_y(i), right - left, p::ROW_H, p::GREEN_ROW);
+            } else if frame.band[i] {
+                // A pop-up section header's dark band (r8); a header row is never green.
+                self.rect_at(p::IDX_GREEN + i, (left + right) / 2.0, p::row_y(i), right - left, p::ROW_H, p::BAND);
             }
         }
+        self.draw_list_marks(frame);
         if let Some(slot) = frame.hairline {
             let y = p::row_y(usize::from(slot)) - p::ROW_H / 2.0;
-            self.rect_at(p::IDX_HAIRLINE, (p::ROW_LEFT + p::ROW_RIGHT) / 2.0, y, p::ROW_RIGHT - p::ROW_LEFT, 2.0, p::RULE);
+            self.rect_at(p::IDX_HAIRLINE, (left + right) / 2.0, y, right - left, 2.0, p::RULE);
         }
         for (n, block) in frame.outline.iter().enumerate() {
             if let Some((first, count)) = *block {
-                self.stroke(p::IDX_OUTLINE + n * 4, first, count, p::TEXT_ON);
+                self.stroke(p::IDX_OUTLINE + n * 4, first, count, (left, right), p::TEXT_ON);
             }
         }
         if frame.white_cursor {
             if let Some(slot) = frame.focus {
-                let x = p::ROW_LEFT + 4.0;
+                let x = left + 4.0;
                 self.rect_at(p::IDX_CURSOR, x, p::row_y(usize::from(slot)), 6.0, p::ROW_H, p::CURSOR_WHITE);
-                self.stroke(p::IDX_CURSOR + 1, slot, 1, p::CURSOR_WHITE);
+                self.stroke(p::IDX_CURSOR + 1, slot, 1, (left, right), p::CURSOR_WHITE);
             }
         }
     }
 
-    unsafe fn stroke(&self, index: usize, first: u8, count: u8, color: [u8; 4]) {
+    /// The pop-up's section-header squares (the kind's colour; SAVE STATES has its floppy instead) and the red order
+    /// badges at a row's left edge (RECORDING-REDESIGN.md "How to read a list").
+    unsafe fn draw_list_marks(&self, frame: &Frame) {
+        use crate::model::recording_menu::FileTag;
+        for index in p::IDX_HEAD_SQ..p::IDX_TAB_BOX {
+            self.hide(index);
+        }
+        let headers = (0..p::ROWS).filter(|i| frame.band[*i]);
+        for (section, slot) in headers.take(2).enumerate() {
+            let color = match frame.head_tag[section] {
+                Some(FileTag::Macro) => p::KIND_MACRO,
+                Some(FileTag::Combo) => p::KIND_COMBO,
+                Some(FileTag::Sequence) => p::KIND_SEQUENCE,
+                Some(FileTag::Save) | None => continue,
+            };
+            self.rect_at(p::IDX_HEAD_SQ + section, p::HEAD_MARK_X, p::row_y(slot), p::HEAD_SQ, p::HEAD_SQ, color);
+        }
+        for (n, badge) in frame.badges.iter().enumerate() {
+            let Some((slot, number)) = *badge else { continue };
+            let y = p::row_y(usize::from(slot));
+            self.rect_at(p::IDX_BADGE + n, p::BADGE_X, y, p::BADGE_W, p::BADGE_W, p::ACCENT);
+            let digits = [u16::from(b'0' + number / 10 % 10), u16::from(b'0' + number % 10)];
+            let units = if number >= 10 { &digits[..] } else { &digits[1..] };
+            self.label(p::IDX_BADGE_NUM + n, units, p::BADGE_X, y, p::BADGE_W + 8.0, p::TEXT);
+        }
+    }
+
+    /// A box's four edges, `index` to `index + 3`.
+    unsafe fn box_at(&self, index: usize, x: f32, y: f32, w: f32, h: f32, color: [u8; 4]) {
+        let edge = 2.0;
+        self.rect_at(index, x - w / 2.0 + edge / 2.0, y, edge, h, color);
+        self.rect_at(index + 1, x + w / 2.0 - edge / 2.0, y, edge, h, color);
+        self.rect_at(index + 2, x, y + h / 2.0 - edge / 2.0, w, edge, color);
+        self.rect_at(index + 3, x, y - h / 2.0 + edge / 2.0, w, edge, color);
+    }
+
+    /// The r8 title's L/R role tabs: the plate, "Player" and "CPU" with the lit one on the accent, and the L and R
+    /// key caps. Only the pop-up has them.
+    unsafe fn draw_role_tabs(&self, frame: &Frame) {
+        const NAMES: [&[u16]; 2] = [&[80, 108, 97, 121, 101, 114], &[67, 80, 85]];
+        const KEYS: [&[u16]; 2] = [&[76], &[82]];
+        let Some(lit) = frame.role_tab.map(usize::from) else {
+            for index in p::IDX_ROLE_BG..p::IDX_ROLE_KEY + 2 {
+                self.hide(index);
+            }
+            return;
+        };
+        self.rect_at(p::IDX_ROLE_BG, p::ROLE_X, p::TAB_Y, 2.0 * p::ROLE_TAB_W + 8.0, p::ROLE_H + 8.0, p::HIGHLIGHT);
+        self.rect_at(p::IDX_ROLE_HI, p::role_tab_x(lit.min(1)), p::TAB_Y, p::ROLE_TAB_W, p::ROLE_H, p::ACCENT);
+        for tab in 0..2 {
+            let color = if tab == lit { p::TEXT } else { p::TEXT_DIM };
+            self.label(p::IDX_ROLE + tab, NAMES[tab], p::role_tab_x(tab), p::TAB_Y, p::ROLE_TAB_W, color);
+            self.rect_at(p::IDX_ROLE_CAP + tab, p::ROLE_CAP_X[tab], p::TAB_Y, p::ROLE_CAP, p::ROLE_CAP, p::RULE);
+            self.label(p::IDX_ROLE_KEY + tab, KEYS[tab], p::ROLE_CAP_X[tab], p::TAB_Y, p::ROLE_CAP, p::TEXT_DIM);
+        }
+    }
+
+    /// The r8 pop-up's CONNECTIONS column: the rule, the header, and the tree (`RECORDING-REDESIGN-r8-popup-*.png`): the
+    /// row under the cursor in its kind box, the headings over the files joined to it, each of those in its own box
+    /// with the stem's tick, and plain lines. Hidden on the page, which keeps them in the help lines.
+    unsafe fn draw_connections(&self, frame: &Frame) {
+        use crate::model::recording_menu::{ConnKind, FileTag};
+        let shown = frame.popup && frame.view == View::List;
+        self.show(p::IDX_CONN_DIV, shown);
+        let x = (p::CONN_LEFT + p::CONN_RIGHT) / 2.0;
+        let w = p::CONN_RIGHT - p::CONN_LEFT;
+        if shown && !frame.conn_head.is_empty() {
+            self.label(p::IDX_CONN_HEAD, frame.conn_head.units(), x, p::ROW_FIRST_Y, w, p::TEXT_DIM);
+        } else {
+            self.hide(p::IDX_CONN_HEAD);
+        }
+        for index in p::IDX_CONN_BOX..p::IDX_ROLE_BG {
+            self.hide(index);
+        }
+        let mut boxes = 0;
+        let mut ticks = 0;
+        let mut last_child = None;
+        for i in 0..p::CONN_LINES {
+            if !(shown && i < usize::from(frame.conn_count)) {
+                self.hide(p::IDX_CONN + i);
+                continue;
+            }
+            let y = p::conn_y(i);
+            let units = frame.conn[i].units();
+            let tone = tone_color(frame.conn_tone[i]);
+            let (tag, child) = match frame.conn_kind[i] {
+                ConnKind::Head(tag) => (Some(tag), false),
+                ConnKind::Child(tag) => (Some(tag), true),
+                ConnKind::Heading => {
+                    let left = p::CONN_LEFT + p::CONN_INDENT;
+                    self.label(p::IDX_CONN + i, units, (left + p::CONN_RIGHT) / 2.0, y, p::CONN_RIGHT - left, tone);
+                    continue;
+                }
+                ConnKind::Detail | ConnKind::Link | ConnKind::LinkSub => {
+                    self.label(p::IDX_CONN + i, units, x, y, w, tone);
+                    continue;
+                }
+            };
+            let (Some(tag), true) = (tag, boxes < p::CONN_BOXES) else {
+                self.label(p::IDX_CONN + i, units, x, y, w, tone);
+                continue;
+            };
+            let (pill, color): (&[u16], [u8; 4]) = match tag {
+                FileTag::Save => (&[83, 65, 86, 69, 32, 83, 84, 65, 84, 69], [240, 150, 60, 255]),
+                FileTag::Macro => (&[77, 65, 67, 82, 79], [92, 150, 240, 255]),
+                FileTag::Combo => (&[67, 79, 77, 66, 79], [170, 120, 240, 255]),
+                FileTag::Sequence => (&[83, 69, 81, 85, 69, 78, 67, 69], [235, 105, 170, 255]),
+            };
+            let left = if child { p::CONN_LEFT + p::CONN_INDENT } else { p::CONN_LEFT };
+            let (h, edge, mid) = (p::CONN_BOX_H, 2.0, (left + p::CONN_RIGHT) / 2.0);
+            let base = p::IDX_CONN_BOX + 4 * boxes;
+            self.rect_at(base, left + edge / 2.0, y, edge, h, color);
+            self.rect_at(base + 1, p::CONN_RIGHT - edge / 2.0, y, edge, h, color);
+            self.rect_at(base + 2, mid, y + h / 2.0 - edge / 2.0, p::CONN_RIGHT - left, edge, color);
+            self.rect_at(base + 3, mid, y - h / 2.0 + edge / 2.0, p::CONN_RIGHT - left, edge, color);
+            let pill_w = p::pill_w(pill.len());
+            let pill_x = left + 8.0 + pill_w / 2.0;
+            self.rect_at(p::IDX_CONN_PILL + boxes, pill_x, y, pill_w, p::PILL_H, color);
+            self.label(p::IDX_CONN_PILL_TEXT + boxes, pill, pill_x, y, pill_w, [16, 16, 20, 255]);
+            let name_left = pill_x + pill_w / 2.0 + 12.0;
+            self.label(p::IDX_CONN + i, units, (name_left + p::CONN_RIGHT - 8.0) / 2.0, y, p::CONN_RIGHT - 8.0 - name_left, p::TEXT);
+            boxes += 1;
+            if child && ticks + 1 < p::CONN_TREE {
+                ticks += 1;
+                let tick_w = left - p::CONN_STEM_X;
+                self.rect_at(p::IDX_CONN_TREE + ticks, p::CONN_STEM_X + tick_w / 2.0, y, tick_w, edge, color);
+                last_child = Some(y);
+            }
+        }
+        // The stem, from under the head box to the last joined file.
+        if let Some(bottom) = last_child {
+            let top = p::conn_y(0) - p::CONN_BOX_H / 2.0;
+            self.rect_at(p::IDX_CONN_TREE, p::CONN_STEM_X, (top + bottom) / 2.0, 2.0, top - bottom, p::RULE);
+        }
+    }
+
+    unsafe fn stroke(&self, index: usize, first: u8, count: u8, (left, right): (f32, f32), color: [u8; 4]) {
         let last = usize::from(first) + usize::from(count.saturating_sub(1));
         let top = p::row_y(usize::from(first)) + p::ROW_H / 2.0;
         let bottom = p::row_y(last) - p::ROW_H / 2.0;
         let y = (top + bottom) / 2.0;
         let h = (top - bottom).abs().max(p::ROW_H);
-        let x = (p::ROW_LEFT + p::ROW_RIGHT) / 2.0;
-        let w = p::ROW_RIGHT - p::ROW_LEFT;
+        let x = (left + right) / 2.0;
+        let w = right - left;
         let edge = 2.0;
-        self.rect_at(index, p::ROW_LEFT + edge / 2.0, y, edge, h, color);
-        self.rect_at(index + 1, p::ROW_RIGHT - edge / 2.0, y, edge, h, color);
+        self.rect_at(index, left + edge / 2.0, y, edge, h, color);
+        self.rect_at(index + 1, right - edge / 2.0, y, edge, h, color);
         self.rect_at(index + 2, x, top - edge / 2.0, w, edge, color);
         self.rect_at(index + 3, x, bottom + edge / 2.0, w, edge, color);
     }
@@ -248,13 +420,9 @@ impl Panes {
         }
         let bg = self.all[p::IDX_BG];
         if !bg.is_null() {
-            if frame.popup {
-                pane::set_width(bg, 1280.0);
-                pane::set_height(bg, 760.0);
-            } else {
-                pane::set_width(bg, p::PANEL_W);
-                pane::set_height(bg, p::PANEL_H);
-            }
+            let (w, h) = if frame.popup { (p::POPUP_W, p::POPUP_H) } else { (p::PANEL_W, p::PANEL_H) };
+            pane::set_width(bg, w);
+            pane::set_height(bg, h);
         }
     }
 }
