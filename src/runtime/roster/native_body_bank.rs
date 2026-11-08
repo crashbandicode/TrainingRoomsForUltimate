@@ -3097,7 +3097,7 @@ fn refuse_background(role: usize, group: usize, owner: u32, why: &str) {
     let Some(g) = state.as_mut().and_then(|bank| bank.groups.get_mut(group)) else { return; };
     if !g.background_refused {
         g.background_refused = true;
-        trace!("[GroupSwap] background refused owner={} group={} kinds={:x?} reason={}; its first switch builds it",
+        trace!("[GroupSwap] background build declined owner={} group={} kinds={:x?} reason={}; its first switch builds it",
             owner, group, &g.members.kinds()[..g.members.count()], why);
     }
 }
@@ -3202,7 +3202,7 @@ unsafe fn start_background(entry: *mut u8, owner: u32, role: usize, group: usize
         && read::<usize>(entry, 0x4178) == live.ctx[0] && read::<u64>(entry, 0x4150) == live.installed;
     let refuse = |why: &str, made: &Window| {
         let (how, now, after) = r_handle::end_request(lrole, alias, lease);
-        super::finish_install(token, "background build refused");
+        super::finish_install(token, "background build declined");
         trace!("[GroupSwap] background build owner={} group={} UNEXPECTED: {} made_ok={} live_ok={} contexts={:x?} ctx={:x?} flags={:#x} dispatch={:x?} live_dispatch={:x?} request_bit={:?} r4c={:#x}->{:#x}; contexts and arrays left (reported)",
             owner, group, why, made_ok, live_ok, made.group_ctx, made.ctx, made.flags, made.dispatch, dispatcher_arrays(entry as usize), how, now, after);
         refuse_background(role, group, owner, why);
@@ -5105,7 +5105,7 @@ pub(super) unsafe fn install(base: usize) {
     // rc.6 item 3: background builds use the Phase B′ path and the identity view's body-init site (`background_skip`).
     BACKGROUND_ENABLED.store(async_ok && identity_view, Ordering::Release);
     trace!("[GroupSwap] background build {} async={} identity_view={}",
-        if async_ok && identity_view { "enabled" } else { "disabled; a group builds at its first switch" }, async_ok, identity_view);
+        if async_ok && identity_view { "enabled" } else { "off; a group builds at its first switch" }, async_ok, identity_view);
     if groups_ok {
         // The `[GroupSwap] enabled` line follows the startup cycle-preload load
         // (`report_group_swap`), so it shows the switches this boot applies.

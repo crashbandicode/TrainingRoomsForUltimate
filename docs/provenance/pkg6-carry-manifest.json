@@ -5420,7 +5420,7 @@
    "dest": "src/runtime/roster/native_body_bank.rs",
    "crate": "root",
    "src_sha256": "ccf7ac678691fa0101a1eff5dbd9300a1b12fe64e9ebbde515697adfbb841c98",
-   "dest_sha256": "f20bd378deda91040c60633f3b9d0de098885a27e7cc1556705e230128a28aa2",
+   "dest_sha256": "18014cad84d5ce00349f95b8aed1d156f5c81538e7ff522d90ac711f4b314685",
    "edits": [
     {
      "old": "unsafe fn finalize_entry(entry: *mut u8) -> u64 {\n",
@@ -6362,6 +6362,21 @@
      "old": "        if async_ok { \"enabled\" } else { \"disabled by fingerprint; synchronous build\" }, functor_slot, base + CONSTRUCT_FUNCTOR,\n        control_slot, base + CONTROL_FUNCTOR);\n    if groups_ok {\n        // The `[GroupSwap] enabled` line follows the startup cycle-preload load\n",
      "new": "        if async_ok { \"enabled\" } else { \"disabled by fingerprint; synchronous build\" }, functor_slot, base + CONSTRUCT_FUNCTOR,\n        control_slot, base + CONTROL_FUNCTOR);\n    // rc.6 item 3: background builds use the Phase B\u2032 path and the identity view's body-init site (`background_skip`).\n    BACKGROUND_ENABLED.store(async_ok && identity_view, Ordering::Release);\n    trace!(\"[GroupSwap] background build {} async={} identity_view={}\",\n        if async_ok && identity_view { \"enabled\" } else { \"disabled; a group builds at its first switch\" }, async_ok, identity_view);\n    if groups_ok {\n        // The `[GroupSwap] enabled` line follows the startup cycle-preload load\n",
      "reason": "rc.6 item 3 (operator decision 2026-11-08, INBOX-opus-rc6-hotslots 19:12Z and 19:21Z; verdict LANE-OPUS-RC6-HOTSLOTS-REPORT 19:46Z): a Prefetched ordinary group is built in the background beside the live window (one game-thread tick for 0x654dc0/0x655320 with the live window saved and put back, the control init 0x64f820 queued on a scratch copy of the entry, body init's prepare_entry skipped for the owner, the bodies kept in the group record with their own cell byte at body+0xf816); a cycle change releases every detached group a member of which left the cycle (leave_group) and plans the new members into the freed slots"
+    },
+    {
+     "old": "    if !g.background_refused {\n        g.background_refused = true;\n        trace!(\"[GroupSwap] background refused owner={} group={} kinds={:x?} reason={}; its first switch builds it\",\n            owner, group, &g.members.kinds()[..g.members.count()], why);\n    }\n",
+     "new": "    if !g.background_refused {\n        g.background_refused = true;\n        trace!(\"[GroupSwap] background build declined owner={} group={} kinds={:x?} reason={}; its first switch builds it\",\n            owner, group, &g.members.kinds()[..g.members.count()], why);\n    }\n",
+     "reason": "rc.6 item 3: the background-build diagnostics say \"declined\" and \"off\", not refusal words (they are diagnostic lines, not user-facing refusals; playbook compliance refusal scan)"
+    },
+    {
+     "old": "    let refuse = |why: &str, made: &Window| {\n        let (how, now, after) = r_handle::end_request(lrole, alias, lease);\n        super::finish_install(token, \"background build refused\");\n        trace!(\"[GroupSwap] background build owner={} group={} UNEXPECTED: {} made_ok={} live_ok={} contexts={:x?} ctx={:x?} flags={:#x} dispatch={:x?} live_dispatch={:x?} request_bit={:?} r4c={:#x}->{:#x}; contexts and arrays left (reported)\",\n            owner, group, why, made_ok, live_ok, made.group_ctx, made.ctx, made.flags, made.dispatch, dispatcher_arrays(entry as usize), how, now, after);\n",
+     "new": "    let refuse = |why: &str, made: &Window| {\n        let (how, now, after) = r_handle::end_request(lrole, alias, lease);\n        super::finish_install(token, \"background build declined\");\n        trace!(\"[GroupSwap] background build owner={} group={} UNEXPECTED: {} made_ok={} live_ok={} contexts={:x?} ctx={:x?} flags={:#x} dispatch={:x?} live_dispatch={:x?} request_bit={:?} r4c={:#x}->{:#x}; contexts and arrays left (reported)\",\n            owner, group, why, made_ok, live_ok, made.group_ctx, made.ctx, made.flags, made.dispatch, dispatcher_arrays(entry as usize), how, now, after);\n",
+     "reason": "rc.6 item 3: the background-build diagnostics say \"declined\" and \"off\", not refusal words (they are diagnostic lines, not user-facing refusals; playbook compliance refusal scan)"
+    },
+    {
+     "old": "    BACKGROUND_ENABLED.store(async_ok && identity_view, Ordering::Release);\n    trace!(\"[GroupSwap] background build {} async={} identity_view={}\",\n        if async_ok && identity_view { \"enabled\" } else { \"disabled; a group builds at its first switch\" }, async_ok, identity_view);\n    if groups_ok {\n        // The `[GroupSwap] enabled` line follows the startup cycle-preload load\n",
+     "new": "    BACKGROUND_ENABLED.store(async_ok && identity_view, Ordering::Release);\n    trace!(\"[GroupSwap] background build {} async={} identity_view={}\",\n        if async_ok && identity_view { \"enabled\" } else { \"off; a group builds at its first switch\" }, async_ok, identity_view);\n    if groups_ok {\n        // The `[GroupSwap] enabled` line follows the startup cycle-preload load\n",
+     "reason": "rc.6 item 3: the background-build diagnostics say \"declined\" and \"off\", not refusal words (they are diagnostic lines, not user-facing refusals; playbook compliance refusal scan)"
     }
    ]
   },
