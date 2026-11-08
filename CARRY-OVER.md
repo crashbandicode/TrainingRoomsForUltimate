@@ -848,3 +848,10 @@ borrowed fifth hat is not a seat (unchanged); entry 2 no longer waits for that b
 1 recorded manifest edit: `character_sources.rs` (`purpose_view`'s seat branch); `carry_pkg6.py verify` re-derives all
 250 files. Test (failed first: the seat branch did not call `parked_seat`):
 `parked_entries` `the_seats_park_at_one_cpu_whatever_the_plan_lists`.
+
+### p23/rc6-cov-rest: diag note of a refused helper proof (2026-11-08)
+
+Eden covrest-10: after an F9 raise and drop, both Mii owners refused their snapshot ("helper row kind/provenance
+changed"), which leaves the Mii classes out of both cycles. Diag builds now log the recorded helper proof beside the
+row read now (`[MiiHelperProof] refused id=… why=…`, first 12 per boot) in `mii_ordinary_native.rs` `helper_kind`; the
+acceptance itself is unchanged. 1 recorded manifest edit; `carry_pkg6.py verify` re-derives all 250 files.
