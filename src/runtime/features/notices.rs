@@ -104,6 +104,11 @@ pub fn post(header: &'static str, body: &'static str, length: u16, color: [u8; 4
     send(Mail::Post { header, body, length, color });
 }
 
+/// Post a plain notice whose body was copied into its fixed buffer (`Body`). Allocation-free; any thread.
+pub fn post_body(header: &'static str, body: Body, length: u16, color: [u8; 4]) {
+    send(Mail::PostBody { header, body, length, color });
+}
+
 /// The standing notice `id` (package 6's Ready and hot-swap notices): created behind the plain notices or
 /// updated in place with this text, colour and a full `length`. `body` is copied (at most `BODY_MAX` bytes).
 /// Allocation-free; any thread (it goes through the mailbox, see `post`).
@@ -127,6 +132,7 @@ pub fn saved(slot: usize) {
 #[derive(Clone, Copy)]
 enum Mail {
     Post { header: &'static str, body: &'static str, length: u16, color: [u8; 4] },
+    PostBody { header: &'static str, body: Body, length: u16, color: [u8; 4] },
     Upsert { id: u8, header: &'static str, body: Body, length: u16, color: [u8; 4] },
     Clear(u8),
     Saved(usize),
@@ -143,6 +149,7 @@ fn send(mail: Mail) {
 fn take_mail(queue: &mut Queue) {
     MAILBOX.drain(|mail| match mail {
         Mail::Post { header, body, length, color } => queue.post_static(header, body, length, color),
+        Mail::PostBody { header, body, length, color } => queue.post(header, body, length, color),
         Mail::Upsert { id, header, body, length, color } => queue.upsert(id, header, body, length, color),
         Mail::Clear(id) => queue.clear_id(id),
         Mail::Saved(slot) => crate::model::boot_notices::saved(queue, slot),

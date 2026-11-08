@@ -39,9 +39,39 @@ impl Body {
         Body { bytes, len: end as u16 }
     }
 
+    /// `parts` one after another, copied as far as they fit (cut at a character boundary). No allocation.
+    pub fn joined(parts: &[&str]) -> Body {
+        let mut bytes = [0u8; BODY_MAX];
+        let mut len = 0;
+        for part in parts {
+            let mut end = part.len().min(BODY_MAX - len);
+            while !part.is_char_boundary(end) {
+                end -= 1;
+            }
+            bytes[len..len + end].copy_from_slice(&part.as_bytes()[..end]);
+            len += end;
+            if end < part.len() {
+                break;
+            }
+        }
+        Body { bytes, len: len as u16 }
+    }
+
     pub fn as_str(&self) -> &str {
         std::str::from_utf8(&self.bytes[..usize::from(self.len)]).unwrap_or("")
     }
+}
+
+/// The notice a Mii editor Save posts when it matches a saved Mii (operator decision C, 2026-11-08): the reuse rule
+/// stays (docs/MII.md rows 4 and 12), and the player is told which saved Mii it is.
+pub const SAME_AS_SAVED_HEADER: &str = "Mii Fighter";
+/// Five seconds of HUD ticks: the editor's return to Training is under way while it waits in the queue.
+pub const SAME_AS_SAVED_FRAMES: u16 = 300;
+
+/// `Some` for a Save that reused the saved Mii named `matched` ("Same as ‹saved name›, nothing new saved"), `None`
+/// for a new save. Copies into a fixed body: no allocation.
+pub fn save_notice(matched: Option<&str>) -> Option<Body> {
+    matched.map(|name| Body::joined(&["Same as ", name, ", nothing new saved"]))
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

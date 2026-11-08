@@ -797,3 +797,24 @@ the original: `mii_ordinary_player::at_origin` and `player_context`, the CPU's F
 6 recorded manifest edits of `mii_ordinary_player.rs`, `mii_ordinary_cpu.rs` and `mii_ordinary_cpu_native.rs`;
 `carry_pkg6.py verify` re-derives all 250 files. Tests: `the_original_request_is_natives_single_form_of_a_start_up_window`,
 `tests/startup_window_wiring.rs` `back_to_the_original_stages_natives_single_form`.
+
+### p23/rc6-cov-rest: F9 fixed seats reload; a Mii Save that reuses a saved Mii says so (2026-11-08)
+
+**F9 (#58).** Eden covrest-04/05/06 (Ally; hot-slots diag `e025ad2c`, then `d20ead7b`): after a raise from one CPU to
+three on one close, CPUs 2 and 3 stayed copies of CPU 1 (Fox, Meta Knight, Byleth) for 30 s, instead of the CPU
+rotation's next fighter and the one after (Mii Gunner and Donkey Kong on the operator card). At one CPU entries 2 and 3
+were never installed (`f9_body_of` read count 0 every time) and their loader byte held residue (6, then 88).
+`classify_parked_body` read any non-zero loader byte on an unpublished cell as "in flight", so `reload_if_needed`
+armed no seat Reload. Now an unpublished cell is in flight only while this plugin's own install on that slot is (the
+source book's Loading phase); otherwise it is empty and both seats reload after the walk. `parked_entries` changes:
+`classify_parked_body` (its third argument is now that question, asked only for an unpublished cell) and
+`unpublished_body`; `on_count` and `reload_if_needed` are unchanged.
+
+**#52 (operator decision C).** A Save that matches a saved Mii keeps the reuse rule (docs/MII.md rows 4 and 12) and
+posts "Same as ‹saved name›, nothing new saved" with the matched saved Mii's own name (`model::notify::save_notice`,
+a fixed body; `features::notices::post_body`, the mailbox, after the session lock).
+
+2 recorded manifest edits: `character_sources.rs` (`f9_body_of`) and `mii_editor_bridge/mod.rs` (`edit_decide`);
+`carry_pkg6.py verify` re-derives all 250 files. Tests (failed first): `parked_entries`
+`an_unpublished_entry_with_a_residue_loader_byte_is_empty` (in its loader-byte form it returned `Loading`),
+`tests/mii_same_notice.rs` (did not compile: no `save_notice`).

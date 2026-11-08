@@ -247,12 +247,14 @@ pub type PublishedBody = Option<(u32, u32, bool)>;
 /// (`entry_cells::active_cell`, the game's `b.ls` at `main+0x642c88`).
 /// State 0xb is what publishes that count (`650010.c:886-890`). A count of 0
 /// leaves heap residue in the cell (F6-30); alignment of that residue is not
-/// a body. An unpublished cell keeps the loader split already used for an
-/// unaligned pointer.
+/// a body. The loader byte of such an entry is residue as well (Eden covrest-04/05:
+/// 6, then 88, on entries never installed), so an unpublished cell is in flight
+/// only when the plugin's own install on that entry is (`own_load_in_flight`,
+/// asked only for an unpublished cell); otherwise it is empty and its seat reloads.
 pub fn classify_parked_body(
     entry_aligned: bool,
     installed: u64,
-    loader: u8,
+    own_load_in_flight: impl FnOnce() -> bool,
     deref_cell: impl FnOnce() -> PublishedBody,
 ) -> Body {
     if !entry_aligned {
@@ -260,20 +262,20 @@ pub fn classify_parked_body(
     }
     // Cell 0 is a body only after state 0xb publishes it (count at +0x4150).
     if crate::model::entry_cells::active_cell(0, installed).is_none() {
-        return unpublished_body(loader);
+        return unpublished_body(own_load_in_flight());
     }
     match deref_cell() {
         Some((id, kind, true)) => Body::Ready { id, kind },
         Some((id, _, false)) => Body::Loading { id: Some(id) },
-        None => unpublished_body(loader),
+        None => unpublished_body(own_load_in_flight()),
     }
 }
 
-fn unpublished_body(loader: u8) -> Body {
-    if loader == 0 {
-        Body::Empty
-    } else {
+fn unpublished_body(own_load_in_flight: bool) -> Body {
+    if own_load_in_flight {
         Body::Loading { id: None }
+    } else {
+        Body::Empty
     }
 }
 
@@ -509,34 +511,60 @@ mod tests {
 
     #[test]
     fn a_stale_entry_does_not_dereference_the_body() {
-        let body = classify_parked_body(true, 0, 0, || panic!("dereferenced an unpublished cell"));
+        let body = classify_parked_body(true, 0, || false, || panic!("dereferenced an unpublished cell"));
         assert_eq!(body, Body::Empty);
-        let body = classify_parked_body(true, 0, 6, || panic!("dereferenced an unpublished cell"));
+        let body = classify_parked_body(true, 0, || true, || panic!("dereferenced an unpublished cell"));
         assert_eq!(body, Body::Loading { id: None });
+    }
+
+    /// Eden covrest-04/05/06 (2026-11-08): at one CPU entries 2 and 3 were never installed (count 0 every read) and
+    /// their loader byte held residue (6, then 88). Read as "in flight", it armed no seat Reload, and after a raise to
+    /// three CPUs 2 and 3 stayed copies of CPU 1 instead of the rotation's next and the one after. (This test failed
+    /// first in its loader-byte form, `classify_parked_body(true, 0, 6, ..)` returning `Loading { id: None }`.)
+    #[test]
+    fn an_unpublished_entry_with_a_residue_loader_byte_is_empty() {
+        let body = classify_parked_body(true, 0, || false, || panic!("dereferenced an unpublished cell"));
+        assert_eq!(body, Body::Empty);
+        // The raise to three then arms both seat Reloads after the walk: the rotation's next and the one after.
+        let decision = on_count(facts(1, 3, body, body, None));
+        assert_eq!(decision.after_entry2.map(|after| (after.slot, after.kind)), Some((ENTRY2, seats().entry2)));
+        assert_eq!(decision.after_entry3.map(|after| (after.slot, after.kind)), Some((ENTRY3, seats().entry3)));
+        assert!(decision.hold_installs);
+        // The plugin's own install on that entry is what is in flight; no second install then.
+        let own = classify_parked_body(true, 0, || true, || panic!("dereferenced an unpublished cell"));
+        let decision = on_count(facts(1, 3, own, own, None));
+        assert!(decision.after_entry2.is_none() && decision.after_entry3.is_none());
+    }
+
+    #[test]
+    fn the_in_flight_question_is_asked_only_for_an_unpublished_cell() {
+        let ready = classify_parked_body(true, 1, || panic!("asked for a published cell"), || Some((7, 0x01, true)));
+        assert_eq!(ready, Body::Ready { id: 7, kind: 0x01 });
+        assert_eq!(classify_parked_body(false, 0, || panic!("asked for a null entry"), || None), Body::Empty);
     }
 
     #[test]
     fn a_published_body_is_ready_only_after_parked_ready() {
         let mut reads = 0;
-        let ready = classify_parked_body(true, 1, 14, || {
+        let ready = classify_parked_body(true, 1, || false, || {
             reads += 1;
             Some((7, 0x01, true))
         });
         assert_eq!(reads, 1);
         assert_eq!(ready, Body::Ready { id: 7, kind: 0x01 });
-        let loading = classify_parked_body(true, 1, 6, || Some((7, 0x01, false)));
+        let loading = classify_parked_body(true, 1, || false, || Some((7, 0x01, false)));
         assert_eq!(loading, Body::Loading { id: Some(7) });
     }
 
     #[test]
     fn an_unaligned_published_pointer_is_not_a_body() {
         assert_eq!(
-            classify_parked_body(true, 1, 6, || None),
+            classify_parked_body(true, 1, || true, || None),
             Body::Loading { id: None }
         );
-        assert_eq!(classify_parked_body(true, 1, 0, || None), Body::Empty);
+        assert_eq!(classify_parked_body(true, 1, || false, || None), Body::Empty);
         assert_eq!(
-            classify_parked_body(false, 9, 14, || panic!("read a null entry")),
+            classify_parked_body(false, 9, || true, || panic!("read a null entry")),
             Body::Empty
         );
     }

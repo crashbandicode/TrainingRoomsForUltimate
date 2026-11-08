@@ -1357,14 +1357,18 @@ unsafe fn f9_body(slot: u32) -> crate::model::parked_entries::Body {
 }
 
 /// `entry` is the fighter entry for `slot`, or null. The body cell is read only
-/// when `+0x4150` publishes cell 0; `parked_ready` then decides Ready.
+/// when `+0x4150` publishes cell 0; `parked_ready` then decides Ready. An
+/// unpublished entry is in flight only while this plugin's own install on that
+/// slot is (the book's Loading phase), never from its loader byte, which is
+/// residue on an entry nothing installed (Eden covrest-04/05).
 unsafe fn f9_body_of(entry: *const u8, slot: u32) -> crate::model::parked_entries::Body {
-    let (aligned_entry, installed, loader) = if aligned(entry) {
-        (true, read::<u64>(entry, 0x4150), read::<u8>(entry, 0x591c))
+    let (aligned_entry, installed) = if aligned(entry) {
+        (true, read::<u64>(entry, 0x4150))
     } else {
-        (false, 0, 0)
+        (false, 0)
     };
-    crate::model::parked_entries::classify_parked_body(aligned_entry, installed, loader, || unsafe {
+    let own_load_in_flight = || STATE.lock().book.phase(slot as usize) == Ok(Phase::Loading);
+    crate::model::parked_entries::classify_parked_body(aligned_entry, installed, own_load_in_flight, || unsafe {
         let body = read::<*const u8>(entry, 0x4160);
         if !aligned(body) {
             return None;
