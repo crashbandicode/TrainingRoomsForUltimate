@@ -2667,7 +2667,7 @@
    "dest": "src/runtime/p1/cpu_pilot.rs",
    "crate": "root",
    "src_sha256": "0bfe37e127df332d23e818bf2705fdf577fafbfbd5fd965a5b421d44ec35d9ed",
-   "dest_sha256": "bf097b61a778fe7637b8d2836c29ae3751b7d7a6bce44014add4d2d4db256752",
+   "dest_sha256": "e4df96b94a077a55a2a23cf953b97bd1a61173b21fab411854867fe37d5d2f93",
    "edits": [
     {
      "old": "pub(crate) fn thinking() -> bool {\n    THINKING.load(Ordering::Acquire)\n}\n",
@@ -2848,6 +2848,11 @@
      "old": "        if let Ok(mut state) = STATE.try_lock() {\n            reject_pending(&mut state, \"identity_changed\");\n            cancel_stage_initialization();\n            if let Some(run) = state.active.take() {\n                finish(run, None, \"identity_changed\");\n            }\n        }\n        return;\n    }\n    if menu_busy() {\n        clear_output();\n        if let Ok(mut state) = STATE.try_lock() {\n",
      "new": "        if let Some(mut state) = STATE.try_lock() {\n            reject_pending(&mut state, \"identity_changed\");\n            cancel_stage_initialization();\n            if let Some(run) = state.active.take() {\n                finish(run, None, \"identity_changed\");\n            }\n        }\n        return;\n    }\n    if menu_busy() {\n        clear_output();\n        if let Some(mut state) = STATE.try_lock() {\n",
      "reason": "rc.6 hook-allocation root fix (primary inbox 2026-11-08 19:13Z; Eden rc6-int-smoke1 read `hook_stats allocs=input_caller_a_apply:2,cpu_frame:5754` with the standalone pilot absent): the fallback's hooks allocate nothing and open no file. request.json is read, validated and planned on the heartbeat (`service`, registered by `boot` with `diag_log::set_tick`) and handed to the hook (`POSTED`; the skyline std's `File::open` of the missing file made 4 allocations per poll); the receipts are posted (`OUTBOX`, `compat::fixed::FixedQueue`) and written there; the `admission` and `first_pair` lines are typed JSON written into the diag line (`compat::json_line`) instead of a `serde_json::Value`; `STATE` and `STAGE` are `hos_lock::Mutex` (std's boxes its pthread mutex at the first lock, which `input` took); the run's first outputs are a `FixedList` and the command trace is reserved off the hook (`TRACE_LIMIT`). The receipt files are unchanged; the diag lines keep their keys (nested objects in field order). Test: tests/p1_pilot_hooks.rs"
+    },
+    {
+     "old": "    let refused = OUTBOX.lock().take_refused();\n    if refused > 0 {\n        crate::engine::compat::logging::diagnostic(format_args!(\"[CpuPilot] receipts_dropped={refused} (outbox full)\"));\n",
+     "new": "    let dropped = OUTBOX.lock().take_refused();\n    if dropped > 0 {\n        crate::engine::compat::logging::diagnostic(format_args!(\"[CpuPilot] receipts_dropped={dropped} (outbox full)\"));\n",
+     "reason": "rc.6 integration (primary inbox 2026-11-08 20:38Z): the outbox's dropped-receipt count is named `dropped` in its diag line (`receipts_dropped={dropped}`); the name `refused` read as a user-facing refusal to compliance.py's refusal row"
     }
    ]
   },

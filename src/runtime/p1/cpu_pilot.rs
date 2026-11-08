@@ -1223,9 +1223,9 @@ pub(crate) fn service() {
         return;
     }
     while write_next() {}
-    let refused = OUTBOX.lock().take_refused();
-    if refused > 0 {
-        crate::engine::compat::logging::diagnostic(format_args!("[CpuPilot] receipts_dropped={refused} (outbox full)"));
+    let dropped = OUTBOX.lock().take_refused();
+    if dropped > 0 {
+        crate::engine::compat::logging::diagnostic(format_args!("[CpuPilot] receipts_dropped={dropped} (outbox full)"));
     }
     if READ_WANTED.swap(false, Ordering::AcqRel) {
         read_request();
