@@ -106,6 +106,11 @@ pub const ROWS: usize = 12;
 
 pub const PANEL_W: f32 = 1840.0;
 pub const PANEL_H: f32 = 1000.0;
+/// The recording pop-up's panel over the match. The r8 mockup (`docs/decisions/RECORDING-REDESIGN-r8-popup-*.png` on
+/// `review/menu-proposal`) draws its tabs, rows, loop counts, highlight, help and hint inside the panel. The pop-up
+/// lays those out on the page's geometry, so its panel is the page's.
+pub const POPUP_W: f32 = PANEL_W;
+pub const POPUP_H: f32 = PANEL_H;
 
 pub const TAB_Y: f32 = 440.0;
 pub const TAB_H: f32 = 64.0;
@@ -870,6 +875,23 @@ mod tests {
             assert!(!spec(i).visible);
         }
         assert_eq!(IDX_NOTICE, MENU_COUNT, "the input package's panes follow the menu's block");
+    }
+
+    /// Eden rc6-covrec-diag1 (2026-11-08): the pop-up's black panel was narrower and shorter than what the pop-up
+    /// draws, so the row highlight and the MACROS loop count ran onto the stage, and the tabs, help and hint sat
+    /// outside it. Primary 2026-11-08 13:05Z: the r8 mockup decides, and there everything is inside the panel.
+    #[test]
+    fn the_popup_panel_encloses_its_tabs_rows_help_and_hint() {
+        let (half_w, half_h) = (POPUP_W / 2.0, POPUP_H / 2.0);
+        let drawn = [IDX_TAB_HI, IDX_TAB, IDX_TITLE, IDX_SEP, IDX_CRUMB, IDX_ROW_HI, IDX_ROW, IDX_ROW + 1,
+            IDX_ROW + 2 * (ROWS - 1), IDX_ROW + 2 * (ROWS - 1) + 1, IDX_SEP_HELP, IDX_HELP, IDX_HELP + 1, IDX_HINT];
+        for index in drawn {
+            let s = spec(index);
+            assert!(s.x - s.w / 2.0 >= -half_w && s.x + s.w / 2.0 <= half_w, "{} leaves the panel sideways", s.name.as_str());
+            assert!(s.y - s.h / 2.0 >= -half_h && s.y + s.h / 2.0 <= half_h, "{} leaves the panel", s.name.as_str());
+        }
+        // A loop count and a floppy are drawn left of the row's right end (`frame::p_row_x`), inside the highlight.
+        assert!(ROW_RIGHT <= half_w);
     }
 
     #[test]

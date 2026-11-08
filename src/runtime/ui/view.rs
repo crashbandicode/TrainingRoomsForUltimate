@@ -248,13 +248,9 @@ impl Panes {
         }
         let bg = self.all[p::IDX_BG];
         if !bg.is_null() {
-            if frame.popup {
-                pane::set_width(bg, 1280.0);
-                pane::set_height(bg, 760.0);
-            } else {
-                pane::set_width(bg, p::PANEL_W);
-                pane::set_height(bg, p::PANEL_H);
-            }
+            let (w, h) = if frame.popup { (p::POPUP_W, p::POPUP_H) } else { (p::PANEL_W, p::PANEL_H) };
+            pane::set_width(bg, w);
+            pane::set_height(bg, h);
         }
     }
 }
