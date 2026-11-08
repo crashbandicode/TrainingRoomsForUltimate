@@ -657,3 +657,11 @@ ceiling = 150650
 date = "2026-11-08"
 reason = "rc.5 final: the merge of p23/rc5-cpu-fidelity (3cb7857, +74 over 150495) into p23/rc5-wire-fix (b4e0727, 150576); the two sides add up, nothing else changes; measured 150650 on the merged tree (tools/size_gate.py)"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); final ceiling = measured merged size per primary c07b3449, TASK-OPUS-rc5-merge-fidelity 2026-11-08"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 150754
+date = "2026-11-08"
+reason = "rc.6 hot-slots root fixes (p23/rc6-hot-slots a1f1c4a, Eden rc6-hot-xps1): a kept start-up window joins the scene's owner generation (native_body_bank::adopt_scene_generation, entry_window::scene_generation); hats keep their own budget through planning and creation (character_sources::created_allowance/plan_targets/helper_view, hat_slots::created_allowance/created_busy/holds_back_creation); measured 150754 (tools/size_gate.py), +104 over 150650"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to these rc.6 root fixes under TASK-OPUS-rc6-hot-slots (primary c07b3449, 2026-11-08: a raise goes in its own commit with approved_by)"
