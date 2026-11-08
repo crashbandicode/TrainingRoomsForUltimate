@@ -279,6 +279,31 @@ pub fn parked_seat<C: Copy>(
     seat_load(kind, member)
 }
 
+/// What F9 does with a promoted seat's recorded Mii proof (reading B, primary 2026-11-08 16:44Z). The game's activation
+/// of entry 2 or 3 as a CPU, and its parking again after a drop, change bytes of the seat's Mii record (Eden
+/// covrest-11: the helper `Proof` matched, the Mii record did not), and the Mii owners then refuse every snapshot.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Reproof {
+    /// The seat is not parked ready yet.
+    Wait,
+    /// The record and descriptor are the recorded ones.
+    Unchanged,
+    /// The identity is unchanged (source, configuration, binding, owner objects, scalars, charinfo, resource pair):
+    /// take the record and descriptor again from the parked row.
+    Rerecord,
+    /// Another Mii, row or owner: never re-recorded; the refusal stands.
+    Refuse,
+}
+
+pub fn reproof(parked: bool, identity_same: bool, state_same: bool) -> Reproof {
+    match (parked, identity_same, state_same) {
+        (false, _, _) => Reproof::Wait,
+        (true, false, _) => Reproof::Refuse,
+        (true, true, true) => Reproof::Unchanged,
+        (true, true, false) => Reproof::Rerecord,
+    }
+}
+
 /// A ready body that already is the seat member stays. An in-flight body is not given a second install.
 /// An empty entry, or a ready body of another kind, is reloaded after the walk.
 /// One read of a published cell: body id (`+8`), kind (`+0xc`), and `parked_ready`.
@@ -643,6 +668,25 @@ mod tests {
         let sources = include_str!("../runtime/roster/character_sources.rs");
         assert!(sources.contains("parked_entries::parked_seat("));
         assert!(!sources.contains("want.kind == kind && want.configuration.is_none()"), "the seat waited for the plan");
+    }
+
+    /// Eden covrest-11 (2026-11-08, `[MiiHelperProof]`): after a raise promoted the Mii Gunner seat on entry 2 and a
+    /// drop parked it again, its helper `Proof` still matched but its Mii record did not, so both Mii owners refused
+    /// every snapshot ("helper row kind/provenance changed") and the Mii classes left both cycles. Reading B (primary
+    /// 16:44Z): once parked, re-record the seat's Mii proof, only when its identity is unchanged.
+    #[test]
+    fn a_promoted_seat_is_re_proved_once_parked_only_with_its_identity() {
+        assert_eq!(reproof(false, true, false), Reproof::Wait, "not parked yet");
+        assert_eq!(reproof(false, false, false), Reproof::Wait);
+        assert_eq!(reproof(true, true, true), Reproof::Unchanged);
+        assert_eq!(reproof(true, true, false), Reproof::Rerecord, "only the activation's state bytes changed");
+        assert_eq!(reproof(true, false, false), Reproof::Refuse, "another Mii, row or owner: never re-recorded");
+        assert_eq!(reproof(true, false, true), Reproof::Refuse);
+        let helper = include_str!("../runtime/mii/mii_managed_helper.rs");
+        assert!(helper.contains("crate::model::parked_entries::reproof("));
+        let sources = include_str!("../runtime/roster/character_sources.rs");
+        assert!(sources.contains("f9_gate::mark_promoted("), "a published seat is marked");
+        assert!(sources.contains("mii_managed_helper::reproof_parked("), "and re-proved once parked");
     }
 
     #[test]

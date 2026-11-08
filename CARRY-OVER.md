@@ -855,3 +855,18 @@ Eden covrest-10: after an F9 raise and drop, both Mii owners refused their snaps
 changed"), which leaves the Mii classes out of both cycles. Diag builds now log the recorded helper proof beside the
 row read now (`[MiiHelperProof] refused id=… why=…`, first 12 per boot) in `mii_ordinary_native.rs` `helper_kind`; the
 acceptance itself is unchanged. 1 recorded manifest edit; `carry_pkg6.py verify` re-derives all 250 files.
+
+### p23/rc6-cov-rest: a promoted F9 seat's Mii proof is taken again once parked (2026-11-08)
+
+**F9 × Mii (reading B, primary 16:44Z).** Eden covrest-10/11: after a raise promoted the Mii Gunner seat on entry 2
+and a drop parked it again, both Mii owners refused every snapshot ("helper row kind/provenance changed") and the Mii
+classes left both cycles. The diag note (`[MiiHelperProof] refused id=2 why=mii record`) showed the helper `Proof`
+unchanged and the Mii record changed: the activation's state bytes, not the seat's identity. F9 now marks a published
+seat (`f9_publish` → `f9_gate::mark_promoted`); once the seat is parked again and parked ready, `f9_reproof` asks
+`mii_managed_helper::reproof_parked` to take the Mii proof (record and descriptor) again from the row, only when the
+identity is unchanged (the same ready source and configuration, binding, owner objects and scalars, the charinfo and
+a resource pair; `parked_entries::reproof`). Any identity change keeps the refusal.
+
+2 recorded manifest edits: `mii_managed_helper.rs` (`reproof_parked`, new) and `character_sources.rs` (`f9_publish`,
+`f9_player_frame`, `f9_reproof` new); `carry_pkg6.py verify` re-derives all 250 files. Test (failed first: no
+`reproof`): `parked_entries` `a_promoted_seat_is_re_proved_once_parked_only_with_its_identity`.

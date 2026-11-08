@@ -1333,6 +1333,7 @@ fn f9_hat_release(how: crate::model::parked_entries::Release) -> crate::engine::
 /// HUD publication and a Promoted release. Not a Reload.
 unsafe fn f9_publish(decision: crate::model::parked_entries::Decision) {
     for publish in decision.publish.into_iter().flatten() {
+        crate::runtime::roster::f9_gate::mark_promoted(publish.owner);
         if let Some(entry) = native_source::entry(publish.owner) {
             super::refresh_hud(entry, publish.owner, publish.kind);
         }
@@ -1462,6 +1463,51 @@ unsafe fn f9_player_frame() {
                     let _ = ENTRY3_BORROW.lock().release(f9_hat_release(how));
                 }
                 f9_cutover(after);
+            }
+        }
+    }
+    #[cfg(feature = "mii-managed-helper-alpha")]
+    if !pause {
+        f9_reproof();
+    }
+}
+
+/// Reading B (primary 2026-11-08 16:44Z; Eden covrest-11): a seat the game activated and parked again keeps its
+/// identity but not its Mii record bytes, and the Mii owners refuse every snapshot until its Mii proof is taken again.
+/// Once a promoted seat is parked (its entry above No. of CPUs) and parked ready, re-record it. A seat with no exact
+/// Mii keeps its proof (its helper proof matched in covrest-11).
+#[cfg(feature = "mii-managed-helper-alpha")]
+unsafe fn f9_reproof() {
+    let quantity = native_source::training_cpu_quantity();
+    for slot in [2u32, 3] {
+        if !crate::runtime::roster::f9_gate::reproof_pending(slot) || quantity.is_none_or(|count| slot <= count) {
+            continue;
+        }
+        let seat = {
+            let state = STATE.lock();
+            state.sources[slot as usize]
+                .filter(|source| state.book.is_current(source.token.epoch()))
+                .and_then(|source| Some((state.book.ready(slot as usize).ok()?, source.configuration?)))
+        };
+        let Some((ready, configuration)) = seat else {
+            crate::runtime::roster::f9_gate::clear_reproof(slot);
+            continue;
+        };
+        match super::mii_managed_helper::reproof_parked(ready, configuration) {
+            Ok(None) => {}
+            Ok(Some((descriptor, record))) => {
+                crate::runtime::roster::f9_gate::clear_reproof(slot);
+                crate::engine::compat::logging::diagnostic(format_args!(
+                    "[CharacterSources] F9 seat proof slot={} descriptor_changed={} record_changed={}",
+                    slot, descriptor, record
+                ));
+            }
+            Err(reason) => {
+                crate::runtime::roster::f9_gate::clear_reproof(slot);
+                crate::engine::compat::logging::diagnostic(format_args!(
+                    "[CharacterSources] F9 seat proof kept slot={} reason={}",
+                    slot, reason
+                ));
             }
         }
     }

@@ -28,6 +28,8 @@ struct Gate {
     /// A Reload is armed with the configuration it loads, taken from the member when it is armed.
     armed2: Option<(After, Option<Configuration>)>,
     armed3: Option<(After, Option<Configuration>)>,
+    /// Entries 2/3 the game activated with a published seat: their Mii proof is taken again once parked.
+    reproof: [bool; 2],
 }
 
 impl Gate {
@@ -46,6 +48,7 @@ impl Gate {
             members: [None, None],
             armed2: None,
             armed3: None,
+            reproof: [false, false],
         }
     }
 }
@@ -109,6 +112,23 @@ pub(crate) fn override_seat(slot: u32) -> Option<(u32, Option<Configuration>)> {
         .flatten()
         .find(|(after, _)| after.slot == slot)
         .map(|(after, configuration)| (after.kind, configuration))
+}
+
+/// The game activated a published seat on `slot` (2 or 3).
+pub(crate) fn mark_promoted(slot: u32) {
+    if let Some(flag) = GATE.lock().reproof.get_mut((slot as usize).wrapping_sub(2)) {
+        *flag = true;
+    }
+}
+
+pub(crate) fn reproof_pending(slot: u32) -> bool {
+    GATE.lock().reproof.get((slot as usize).wrapping_sub(2)).copied().unwrap_or(false)
+}
+
+pub(crate) fn clear_reproof(slot: u32) {
+    if let Some(flag) = GATE.lock().reproof.get_mut((slot as usize).wrapping_sub(2)) {
+        *flag = false;
+    }
 }
 
 pub(crate) fn handover_pending() -> bool {
