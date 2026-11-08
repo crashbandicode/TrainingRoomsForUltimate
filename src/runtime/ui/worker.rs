@@ -205,6 +205,7 @@ fn run() {
         crate::runtime::compat::menu::run_roster_change();
         // The named-macro layer's model is this thread's (design C): its worker tick runs before the panels are looked at.
         crate::runtime::macros::port::worker_tick();
+        sync_sequence_drill();
         if refresh_recording(&mut session) {
             publish_frame(&session);
         }
@@ -462,33 +463,93 @@ fn post_recording_effect(menu: &mut Menu) {
     crate::engine::rr_host::post_effect(menu.recording_mut().take_effect());
 }
 
-/// A combo drill becomes the grade target. The same id is not applied twice,
-/// and a file that is not readable yet is retried on the next post.
-fn apply_grade_target(drill: Option<&str>, kind: Option<crate::engine::library::DrillKind>) {
-    use crate::engine::library::DrillKind;
-    use crate::engine::rr_host::{follow_grade, GradeFollow};
+/// What the frame hook drills: the kind and id, and for a sequence the plan it was given (to see a change on the card).
+struct Applied {
+    kind: crate::engine::library::DrillKind,
+    id: String,
+    plan: Option<crate::engine::rr_host::SequencePlan>,
+    /// The catalog generation the plan was read at, and the plan's generation on the frame hook.
+    catalog: u64,
+    generation: u32,
+}
 
-    let combo_id = match kind {
-        Some(DrillKind::Combo) => drill,
-        _ if drill.is_none() => None,
-        _ => return,
-    };
-    static APPLIED: Mutex<Option<String>> = Mutex::new(None);
+static APPLIED: Mutex<Option<Applied>> = Mutex::new(None);
+
+/// The one drill becomes what the frame hook grades: a combo drill its combo, a sequence drill its plan. Either
+/// replaces the other. The same drill is not applied twice, and a file that is not readable yet is retried on the next
+/// post.
+fn apply_grade_target(drill: Option<&str>, kind: Option<crate::engine::library::DrillKind>) {
+    use crate::engine::rr_host::{follow_drill, DrillFollow};
+    use crate::runtime::features::combo;
+
+    let root = std::path::Path::new(crate::model::storage::ROOT);
     let mut applied = APPLIED.lock();
-    match follow_grade(applied.as_deref(), combo_id) {
-        GradeFollow::Same => {}
-        GradeFollow::Clear => {
+    let now = applied.as_ref().map(|a| (a.kind, a.id.as_str()));
+    match follow_drill(now, kind, drill) {
+        DrillFollow::Same => {}
+        DrillFollow::Clear => {
             *applied = None;
-            crate::runtime::features::combo::stage_target(None);
+            combo::stage_sequence(None);
+            combo::stage_target(None);
         }
-        GradeFollow::Install(id) => {
-            let root = std::path::Path::new(crate::model::storage::ROOT);
+        DrillFollow::Combo(id) => {
             let Ok(record) = crate::model::combo_record::ComboLibrary::new(root.join("combos")).load(id) else {
                 return;
             };
-            crate::runtime::features::combo::stage_target(Some((record.combo, record.name.as_str())));
-            *applied = Some(id.to_owned());
+            combo::stage_sequence(None);
+            combo::stage_target(Some((record.combo, record.name.as_str())));
+            *applied = Some(Applied {
+                kind: crate::engine::library::DrillKind::Combo,
+                id: id.to_owned(),
+                plan: None,
+                catalog: 0,
+                generation: 0,
+            });
         }
+        DrillFollow::Sequence(id) => {
+            let catalog = crate::engine::rr_host::catalog_generation();
+            let Some(plan) = crate::engine::rr_host::sequence_plan(root, id) else {
+                return;
+            };
+            let generation = combo::stage_sequence(Some((&plan, false)));
+            *applied = Some(Applied {
+                kind: crate::engine::library::DrillKind::Sequence,
+                id: id.to_owned(),
+                plan: Some(plan),
+                catalog,
+                generation,
+            });
+        }
+    }
+}
+
+/// Every worker pass: a drilled sequence's streak and best go to its file, and a change on the card (a renamed,
+/// deleted or reordered combo, Edit combos) reaches the frame hook. A rename or the saved streak keeps the run going.
+fn sync_sequence_drill() {
+    use crate::runtime::features::combo;
+
+    let root = std::path::Path::new(crate::model::storage::ROOT);
+    let mut applied = APPLIED.lock();
+    let Some(drill) = applied.as_mut().filter(|a| a.plan.is_some()) else {
+        let _ = combo::take_progress();
+        return;
+    };
+    if let Some(progress) = combo::take_progress().filter(|p| p.generation == drill.generation) {
+        let saved = crate::engine::rr_host::save_sequence_progress(root, &drill.id, progress.streak, progress.best);
+        combo::tr_seq_saved_v1(u32::from(saved), progress.streak, progress.best, 0);
+    }
+    let catalog = crate::engine::rr_host::catalog_generation();
+    if catalog == drill.catalog {
+        return;
+    }
+    drill.catalog = catalog;
+    let Some(plan) = crate::engine::rr_host::sequence_plan(root, &drill.id) else {
+        return;
+    };
+    let same = drill.plan.as_ref().is_some_and(|old| old.same_steps(&plan));
+    if drill.plan.as_ref() != Some(&plan) {
+        drill.generation = combo::stage_sequence(Some((&plan, same)));
+        drill.plan = Some(plan);
     }
 }
 
