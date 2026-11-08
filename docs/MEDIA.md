@@ -6,8 +6,8 @@ action, result) before a clip was kept. The raw takes stay outside git with thei
 
 ## rc.5 clips
 
-25 of the rows below are in [`media/`](media/), and the player docs embed them. They are Eden footage of
-`p23/rc5-wire-fix` diag builds, and for the last two of `p23/rc6-hot-slots` diag builds, which add log lines only (the
+26 of the rows below are in [`media/`](media/), and the player docs embed them. They are Eden footage of
+`p23/rc5-wire-fix` diag builds, and for the last three of `p23/rc6-hot-slots` diag builds, which add log lines only (the
 screen draws the same):
 
 - The frame-strip clips other than the C-stick one: run `rc5-docs-gifs-xps2` on the XPS, 2026-11-08 00:30–00:56Z, diag NRO `6bbf2ecd`. The drop
@@ -29,6 +29,11 @@ screen draws the same):
   rc.5 `mk` fixture with its start save moved into reach, `make_mk6.py`). After the clip the row checked the card:
   `combo-2` written and hot, `combo-1` still the drill. The take is trimmed to 0.7–10.4 s and re-encoded the same way:
   6.1 MB, 9.7 s.
+- `rc5-grade-not-true.gif`: run `rc6-docs-gifs-xps9` on the XPS, 2026-11-08 18:58Z, the same diag NRO, row
+  `gif-gnt-f` (the plan's `gif-gnt-b`, renamed for the rerun). The strip logged the three links the row needs: Make combo
+  `TRUE 0` (input +4), attempt 1 `+1 DROP` (input +5), attempt 2 up tilt into up smash (input +4). The take is trimmed
+  at 0.8 s. It was re-encoded with one shared palette of 96 colours and no dither, keeping every second frame with the
+  time of both: 9.9 MB, 7.1 s.
 
 Each was taken at 1280×720 and 15 fps by the runner's `gif` step. Seven takes over 10 MB were re-encoded with one shared
 palette of 96 colours and no dither: `rc5-popup.gif` and `rc5-save-warp.gif` keep every frame, and
@@ -73,7 +78,7 @@ Recording page. A row that says `rr-6` is not a capture of the old slot page. Re
 | `media/rc5-play-chord.gif` | `media-rc5-play-chord` | yoga | RECORDING.md, Set active | rr-6 | 8 s | Set that macro active for the CPU. Stand away from its start save. ZR+Up. | One warp to the start save, then the CPU plays the jab. A second press of ZR+Up stops it. | yes |
 | `media/rc5-loop-no-warp.gif` | `media-rc5-loop-no-warp` | yoga | RECORDING.md, The loop | rr-6 | 8 s | Same macro, CPU loop set to 2 (X while the cursor is in Macros). ZR+Up and let both passes finish. | The first pass warps once. The second pass does not warp. It continues from where the first pass ended. | yes |
 | `media/rc5-chain-play.gif` | `media-rc5-chain-play` | yoga | RECORDING.md, Chains | rr-6 | 9 s | + New chain. Number two recordings, the first of which has a start save. Name it. Set it active for the CPU. ZR+Up. | One warp to macro 1's start save, then recording 1, then recording 2, with no warp between them. | yes |
-| `media/rc5-grade-not-true.gif` | `media-rc5-grade-not-true` | surface | RECORDING.md, Combos | strip | 9 s | Save last combo on a link the strip called `TRUE 0`. Combo helper On, On-time tolerance 1 frame. Load the same save. Attempt 1: the same follow-up pressed one frame later, so LINK reads `+1 DROP` while every event is inside the tolerance. Attempt 2: the same timing, but a different follow-up move. | Attempt 1 still counts (the bar does not require TRUE). Attempt 2 drops, and the bar says the move was wrong. | not yet |
+| `media/rc5-grade-not-true.gif` | `gif-gnt-b` after `gm-utilt-42` (`artifacts/phase23/rc6-combined/rows-docs-gifs`) | xps | RECORDING.md, Combos | strip | 7 s | A save with the CPU at 42% and Player 1 in reach, facing it. A macro from that save: up tilt, then up tilt 41 frames later, a link the strip calls `TRUE 0`. Make combo on it makes Combo 1; drill it. Combo helper On, On-time tolerance 1 frame. Attempt 1: Player 1's Play of the same inputs with the follow-up one frame later, so LINK reads `+1 DROP`. The CPU's Play warps both fighters back to the same save. Attempt 2: up tilt, then up smash with the same input timing (INPUT `+4`, as the reference). | Attempt 1 still counts (the bar does not require TRUE). Attempt 2 drops, and the bar says the move was wrong. | yes |
 | `media/rc5-make-combo.gif` | `gif-make-combo` (`artifacts/phase23/rc6-combined/rows-docs-gifs`) | xps | RECORDING.md, Combos | rr-6 | 10 s | Drill some other combo first, so the bar is showing it. The macro's start save must have Player 1 in reach of the CPU (the `mk6` fixture: x −12; at x −30 every jab misses and Make combo writes nothing). On the macro's screen, Make combo. Then the Recording page, Down to Combos & Sequences. | That macro plays once on Player 1 from its own start save. A new combo named Combo N appears in the hot five, made from that macro. The drilled combo is still the drill when it finishes. | yes |
 | `media/rc5-crop-combo.gif` | `media-rc5-crop-combo` | yoga | RECORDING.md, Combos | rr-6 | 7 s | Open a combo of at least two links. Crop. Move a handle with L or R. A saves. | The handle screen is open. A writes a new combo. The original combo is still in the list. | yes |
 | `media/rc5-popup.gif` | `media-rc5-popup` | yoga | RECORDING.md, The pop-up | rr-6 | 8 s | In the match, ZR+Right. Cursor on a save that is not the bound save. Down onto a macro. B. | The window over the match. The title reads Recording (Player 1). Two stacked sections, four rows under each header. The bound save's name is green. The cursor is the dark highlight bar. B closes it and the bound save is unchanged. | yes |
@@ -87,10 +92,19 @@ migration clip shows what a card updated from an earlier build carries over: its
 Recording slots were never kept between boots (`src/model/library/migrate.rs`), so no card reaches the library with a
 recording slot that becomes `Slot N (date)`.
 
-`rc5-grade-not-true.gif` is still missing. Its row needs a link the strip calls `TRUE 0`, and the rc.5 jab-into-jab
-segments do not make one. In run `rc6-docs-gifs-xps5`, the follow-up was buffered 2 frames and came out when Player 1
-could act (frame 181). It hit on 182, but the CPU was free from 176: `LINK +6 DROP`, and a one-frame-later press read
-the same. The take needs a true link, another move pair or spacing, found first by a measuring row.
+The grade-not-true row was measured before the take (runs `rc6-docs-gifs-xps8` and `-xps9`). Plugin macros played by
+Player 1's Play chord put the follow-up an exact number of frames after the first press, from the save; Eden's own
+inputs drifted by up to 6 frames between two presses. From the shared start (CPU at 0%), jab into jab reads `TRUE 0`
+with the second press 21 frames after the first, but any A in jab 1's window is jab 2, so no different move can follow at
+that timing. At 0%, up tilt into up tilt first links at a gap of 45 frames, `+15 DROP`, and down tilt into up tilt did
+not link at gaps of 19–37 frames. At the CPU's 42%, up tilt into up tilt
+reads `TRUE 0` at a gap of 41 frames (three plays) and `+1 DROP` at 42 (two plays), and up smash hits at those gaps.
+
+Two things this row could not show as written. *Save last combo* has no row on the rc.5 Recording page
+(`Editor::ComboSave` is in no menu table), so the drill was made with Make combo. A combo made from a macro has links
+but no input events (`"events": []`): the strip reads Player 1's poll before the macro's playback is written into it
+(`input_delay.rs`), so it never sees the macro's presses. Attempt 1 therefore counts because its move matches; the
+on-time tolerance has no event to test.
 
 The redesign mockups named `docs/decisions/RECORDING-REDESIGN-*.png` are not in this tree. They are not a substitute
 for the rows above. The rc.3 clip `media/frame-strip.gif` remains the earlier take of the strip. The RC10 clip
