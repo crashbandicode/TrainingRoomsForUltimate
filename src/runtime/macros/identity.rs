@@ -9,7 +9,9 @@ use crate::runtime::roster::character_roster as roster;
 struct Key { session: u64, named_revision: u64, clip_revision: u64, named: Option<Target>, clip: Option<Target> }
 #[derive(Clone, Copy)]
 struct Facts { key: Key, kind: Option<i32>, configuration: Option<Configuration>,
-    named_ready: bool, clip_ready: bool, named_refusal: Option<&'static str>, clip_refusal: Option<&'static str> }
+    named_ready: bool, clip_ready: bool, named_refusal: Option<&'static str>, clip_refusal: Option<&'static str>,
+    /// #54, reading B: the named and clip targets as Switch installs them (`mii_install::installed_target`).
+    named_installed: Option<Target>, clip_installed: Option<Target> }
 struct Worker { named: Option<Target>, clip: Option<Target>, facts: Option<Facts> }
 static WORKER: Mutex<Worker> = Mutex::new(Worker { named: None, clip: None, facts: None });
 static REQUEST: hos_lock::Mailbox<Key, 1> = hos_lock::Mailbox::new();
@@ -44,6 +46,14 @@ fn facts(worker: &Worker) -> Option<Facts> {
 
 pub fn current_configuration() -> Option<Configuration> {
     facts(&WORKER.lock().unwrap()).and_then(|facts| facts.configuration)
+}
+
+/// #54, reading B (primary 2026-11-08 23:03Z): `target` as Switch installs it, when the game callback has worked it out
+/// for the current named or clip selection. Reads the copy only; never asks for another target.
+pub fn installed(target: Target) -> Option<Target> {
+    let worker = WORKER.lock().unwrap();
+    facts(&worker).and_then(|facts| if facts.key.named == Some(target) {facts.named_installed}
+        else if facts.key.clip == Some(target) {facts.clip_installed} else {None})
 }
 
 pub fn named_ready(target: Target) -> bool {
@@ -88,11 +98,13 @@ pub fn service() {
         let kind = crate::runtime::ui::facts::fact_cpu_kind();
         let current = key.session == named_macros::session_revision();
         let mut facts = Facts { key, kind, configuration: None, named_ready: false, clip_ready: false,
-            named_refusal: None, clip_refusal: None };
+            named_refusal: None, clip_refusal: None, named_installed: None, clip_installed: None };
         if current {
             facts.configuration = roster::current_mii_configuration(1);
             #[cfg(feature = "mii-ordinary-cpu-alpha")]
             {
+                facts.named_installed = key.named.and_then(roster::mii_replay::installed_target);
+                facts.clip_installed = key.clip.and_then(roster::mii_replay::installed_target);
                 if key.named_revision == named_macros::selection_revision() {
                     if let Some(target) = key.named {
                         facts.named_ready = kind.is_some_and(|kind| roster::mii_replay::named_ready(target, kind as u32));

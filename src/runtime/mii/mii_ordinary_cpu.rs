@@ -307,10 +307,14 @@ pub(super) fn replay_current()->Option<Configuration> {
 }
 pub(super) fn replay_ready(selection:crate::engine::mii::replay::Selection,kind:u32)->bool {
     let s=STATE.lock();
+    // #54, reading B (primary 2026-11-08 23:03Z): the CPU holds what the install wrote (`mii_install::installable`), so
+    // the selection's target is compared, exactly, as Switch installs it.
+    let target=s.catalog.as_ref().filter(|c|c.is_complete())
+        .map_or(selection.target,|c|crate::engine::mii_install::installed_target(selection.target,&c.configs));
     s.replay_result.and_then(|receipt|receipt.for_selection(selection,epoch(),super::mii_replay::revision(selection.source)))==Some(Ok(()))
         && !s.departed && !s.busy() && s.request.is_none()
         && s.owner.as_ref().is_some_and(|o|o.origin.binding.epoch==epoch()
-            && selection.ready(kind,o.live.target.publish(o.origin_saved)))
+            && target.ready(kind,o.live.target.publish(o.origin_saved)))
 }
 pub(super) fn replay_refusal(selection:crate::engine::mii::replay::Selection)->Option<&'static str> {
     STATE.lock().replay_result

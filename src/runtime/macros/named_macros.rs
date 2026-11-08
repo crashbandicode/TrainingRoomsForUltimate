@@ -215,7 +215,10 @@ fn load_context(recording:&MacroRecording, prompt:bool, current:Option<i32>) -> 
 }
 /// Compare identities, not a previous loader request's acknowledgement. A
 /// manually selected exact Mii is already a match even without a replay receipt.
+/// #54, reading B (primary 2026-11-08 23:03Z): exactly, against the target as Switch installs it, which is what the
+/// CPU holds after a Switch (a replay Mii's filled create ID and name); until that is known, against the target.
 pub(crate) fn recorded_target_matches(target:crate::engine::mii::replay::Target,current:Option<i32>) -> bool {
+    let target=crate::runtime::macros::identity::installed(target).unwrap_or(target);
     current.is_some_and(|kind| target.ready(kind as u32,
         crate::runtime::macros::identity::current_configuration()))
 }

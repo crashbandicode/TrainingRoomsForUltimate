@@ -15,6 +15,7 @@
 
 use crate::engine::mii::inventory::{MiiConfig, TaggedId, CHARINFO_LEN, TAG_CHARA, TAG_HAT, TAG_OUTFIT};
 use crate::engine::mii::lifetime::Configuration;
+use crate::engine::mii::replay::Target;
 
 /// CharInfo layout (`inventory::CHARINFO_MASK_END`): create ID, ten UTF-16 name units, the name's terminator.
 const CREATE_ID: core::ops::Range<usize> = 0x00..0x10;
@@ -50,6 +51,16 @@ pub fn installable(c: Configuration, natives: &[MiiConfig]) -> Configuration {
         .filter_map(|native| Configuration::from_saved(native).ok())
         .find(|native| has_identity(native.charinfo()))
         .unwrap_or_else(|| filled(c))
+}
+
+/// #54, reading B (primary 2026-11-08 23:03Z): a recorded exact-Mii target as Switch installs it ([`installable`]), the
+/// configuration the CPU then holds. Comparisons stay exact, against this. A fighter target, and a Mii with its own
+/// create ID and name, are unchanged. Allocation-free (the game callback calls it).
+pub fn installed_target(target: Target, natives: &[MiiConfig]) -> Target {
+    match target.configuration() {
+        Some(c) => Target::mii(installable(c, natives)),
+        None => target,
+    }
 }
 
 /// `c` with the missing create ID and name written in; the look bytes and the tokens are untouched.
@@ -174,6 +185,31 @@ mod tests {
         let mut nameless = saved(0, LOOK, [7; 16], "x");
         nameless.charinfo[NAME].fill(0);
         assert!(!has_identity(&nameless.charinfo), "a create ID without a name is not whole");
+    }
+
+    /// TASK-OPUS-rc6-open-fixes item 2 (#54, cov-rest 20:22Z; Eden covrest-yoga-04): after a Switch the CPU holds what
+    /// the install wrote, `installable(c)` (a replay Mii's filled create ID and name), so comparing it with the recorded
+    /// `c` asked Fighter Mismatch again on the next Play. Reading B (primary 2026-11-08 23:03Z): exact equality, against
+    /// what Switch installs.
+    #[test]
+    fn a_switched_mii_matches_its_recorded_target_as_installed() {
+        let recorded = Target::mii(replay(LOOK));
+        let spook = saved(13348, LOOK, SPOOK, "Spook");
+        for natives in [Vec::new(), vec![spook]] {
+            let held = installable(replay(LOOK), &natives);
+            let kind = recorded.kind();
+            assert!(!recorded.ready(kind, Some(held)), "the recorded configuration has no create ID or name");
+            let target = installed_target(recorded, &natives);
+            assert!(target.ready(kind, Some(held)), "what Switch installed matches, exactly");
+            let mut look = LOOK;
+            look[0x40] ^= 1;
+            assert!(!target.ready(kind, Some(installable(replay(look), &natives))), "another look never matches");
+            assert!(!target.ready(kind, None), "no configuration is no match");
+        }
+        let fighter = Target::fighter(0x01);
+        assert_eq!(installed_target(fighter, &[]), fighter, "a fighter target is unchanged");
+        let own = Target::mii(Configuration::from_saved(&saved(4155, LOOK, [7; 16], "Mine")).unwrap());
+        assert_eq!(installed_target(own, &[saved(13348, LOOK, SPOOK, "Spook")]), own, "a whole Mii is installed as it is");
     }
 
     /// The CPU install (`mii_ordinary_cpu::begin`'s exact-Mii target) writes this module's configuration.
