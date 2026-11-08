@@ -831,6 +831,8 @@ unsafe fn begin(entry:*mut u8)->bool {
             }
             mii_cycle::Target::Original=>{
                 if let Some(c)=origin_saved {native::target_rows(c)?;}
+                // P-HOT B: an origin captured after H3 carries the start-up window; the original is its single form.
+                descriptor=crate::engine::swap::entry_window::original_request(descriptor,origin.original_kind);
                 Target::ORIGINAL
             },
             mii_cycle::Target::Fighter(kind)=>{
@@ -843,7 +845,8 @@ unsafe fn begin(entry:*mut u8)->bool {
                 descriptor[0x43]=0;
                 let index=if origin.layout.waiting() {origin.index}else{0};
                 descriptor[0x46..0x48].copy_from_slice(&index.to_le_bytes());
-                if kind==origin.original_kind && descriptor==live_origin {Target::ORIGINAL}
+                if kind==origin.original_kind && (descriptor==live_origin
+                    || descriptor==crate::engine::swap::entry_window::original_request(live_origin,origin.original_kind)) {Target::ORIGINAL}
                 else {Target::fighter(kind)}
             }
         };

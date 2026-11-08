@@ -196,7 +196,8 @@ pub(super) fn player_context()->Option<(PlayerOrigin,PlayerLive)> {
     s.owner.as_ref().filter(|o|o.origin.binding.epoch==epoch()).map(|o| {
         let original=o.origin_saved.map_or(PlayerOrigin::NotMii,
             |c|PlayerOrigin::Mii(crate::engine::mii::selection::Origin(c.canonical())));
-        let live=if o.cursor.is_none() && o.expected.descriptor==o.origin.descriptor
+        let live=if o.cursor.is_none() && (o.expected.descriptor==o.origin.descriptor
+            || o.expected.descriptor==crate::engine::swap::entry_window::original_request(o.origin.descriptor,o.origin.original_kind))
             && o.active==o.origin_saved {PlayerLive::Origin}
             else {o.active.map_or(PlayerLive::Origin,|c|
                 PlayerLive::Cycled{class:c.canonical().class,canonical:c.canonical()})};
@@ -422,6 +423,7 @@ unsafe fn logical_kind(expected:&native::Snapshot)->u32 {descriptor_kind(&expect
 unsafe fn at_origin(origin:&native::Snapshot,expected:&native::Snapshot,active:Option<Configuration>,
     origin_saved:Option<Configuration>,cursor:Option<usize>)->bool {
     cursor.is_none() && active==origin_saved && (expected.descriptor==origin.descriptor
+        || expected.descriptor==crate::engine::swap::entry_window::original_request(origin.descriptor,origin.original_kind)
         || (origin.original_kind==0x4b && descriptor_kind(&expected.descriptor)==0x4b)
         || (origin_saved.is_none() && logical_kind(expected)==origin.original_kind
             // WORKAROUND-DECISIONS row 8 (operator-approved root fix): the banked original is
@@ -653,7 +655,8 @@ unsafe fn begin(entry:*mut u8)->bool {
         match step.target {
             mii_cycle::Target::Original=>{
                 if let Some(c)=origin_saved {native::target_rows(c)?;}
-                let mut descriptor=origin.descriptor;
+                // P-HOT B: an origin captured after H3 carries the start-up window; the original is its single form.
+                let mut descriptor=crate::engine::swap::entry_window::original_request(origin.descriptor,origin.original_kind);
                 if origin.original_kind==0x4b {
                     let forms=requested_forms_at(&menu,Role::Player,0x4b,None);
                     descriptor[0x14..0x18].copy_from_slice(&forms.count.to_le_bytes());

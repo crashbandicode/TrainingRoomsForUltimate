@@ -3961,6 +3961,20 @@ pub(super) fn scene_changed() {
     }
 }
 
+/// P-HOT B: called by `character_roster::scene_changed` after `mii_saved_alpha::scene_changed`, which opens the new
+/// scene's owner generation. A start-up window kept above was stamped at H1 with the generation before it, so
+/// `group_owner` refused its first group exchange (rc6-hot-xps1, 2026-11-08); it joins the new generation here. A
+/// departed or retired bank keeps its stamp.
+pub(super) fn adopt_scene_generation() {
+    let now = crate::runtime::lobby::game_mode::current().map(|m| (m.mode, u32::from(m.melee)));
+    for (role, state) in BANKS.iter().enumerate() {
+        if let Some(bank) = state.lock().as_mut() {
+            let fresh = !bank.departed && bank.phase != Phase::Retired && bank.scene.is_some() && bank.scene == now;
+            bank.epoch = crate::engine::swap::entry_window::scene_generation(bank.epoch, super::mii_saved_alpha::current_generation(role as u32), fresh);
+        }
+    }
+}
+
 pub(super) fn on_destroy(entry: *const u8) {
     for (role, state) in BANKS.iter().enumerate() {
         if let Some(bank) = state.lock().as_mut() {

@@ -3147,7 +3147,7 @@
    "dest": "src/runtime/roster/character_roster.rs",
    "crate": "root",
    "src_sha256": "07d282cdc6c5b4b080a5c0b3e4107a033f623ea3e5809783e0ff595afe759dd5",
-   "dest_sha256": "2cbf7d5633c3fe2f06b75afc7cdf5afc9b572c202c085f7949dbbe715ee9d01a",
+   "dest_sha256": "f165bd74103f468bba0d0df44a3bfb1dc394abea76518cf9dd6b5cd924a4eefc",
    "edits": [
     {
      "old": "fn notify(role: Role, message: String) {",
@@ -3729,6 +3729,11 @@
      "old": "    let ordinary = owner <= 1 && current_scope.is_some_and(|s| s.mode == 0x04040000);\n",
      "new": "    let ordinary = owner <= 3 && current_scope.is_some_and(|s| s.mode == 0x04040000);\n",
      "reason": "F9 treats CPU seats 2 and 3 as ordinary Training owners for the HUD refresh (p23/f9)"
+    },
+    {
+     "old": "    #[cfg(feature=\"mii-saved-alpha\")]\n    mii_saved_alpha::scene_changed();\n    #[cfg(feature=\"mii-ldn-qualification-probe\")]\n    mii_ldn_qualification::scene_changed();\n",
+     "new": "    #[cfg(feature=\"mii-saved-alpha\")]\n    mii_saved_alpha::scene_changed();\n    #[cfg(feature = \"native-body-bank-alpha\")]\n    body_bank::adopt_scene_generation();\n    #[cfg(feature=\"mii-ldn-qualification-probe\")]\n    mii_ldn_qualification::scene_changed();\n",
+     "reason": "P-HOT B (rc6-hot-xps1, 2026-11-08, defect 2): a start-up window kept for the new scene joins the owner generation that scene change opens (entry_window::scene_generation), so its first group exchange passes group_owner instead of falling back with \"group owner receipt changed\""
     }
    ]
   },
@@ -4198,7 +4203,7 @@
    "dest": "src/runtime/roster/character_sources.rs",
    "crate": "root",
    "src_sha256": "6c3fe37031f02ee3c3891943600223546804839ee1ee6af103346710f4fb1514",
-   "dest_sha256": "91df95ca2a25a9d9c834f38c311a0f27d2d15b8003d4ce1dd2310cfcd3c547df",
+   "dest_sha256": "e4a7ef270768da0267422fc56775737ee921eda1ae4297b67ecc04d5c4624936",
    "edits": [
     {
      "delete_from": "/// Skip plugin automations for an owned helper body.",
@@ -5315,6 +5320,26 @@
      "old": "/// `entry` is the fighter entry for `slot`, or null. Uses the same words as `parked_ready`.\nunsafe fn f9_body_of(entry: *const u8, slot: u32) -> crate::model::parked_entries::Body {\n    use crate::model::parked_entries::Body;\n    if !aligned(entry) {\n        return Body::Empty;\n    }\n    let body = read::<*const u8>(entry, 0x4160);\n    if !aligned(body) {\n        return if read::<u8>(entry, 0x591c) == 0 { Body::Empty } else { Body::Loading { id: None } };\n    }\n    let kind = read::<u32>(body, 0xc);\n    let id = read::<u32>(body, 8);\n    if native_source::parked_ready(entry, slot, kind) {\n        Body::Ready { id, kind }\n    } else {\n        Body::Loading { id: Some(id) }\n    }\n}",
      "new": "/// `entry` is the fighter entry for `slot`, or null. The body cell is read only\n/// when `+0x4150` publishes cell 0; `parked_ready` then decides Ready.\nunsafe fn f9_body_of(entry: *const u8, slot: u32) -> crate::model::parked_entries::Body {\n    let (aligned_entry, installed, loader) = if aligned(entry) {\n        (true, read::<u64>(entry, 0x4150), read::<u8>(entry, 0x591c))\n    } else {\n        (false, 0, 0)\n    };\n    crate::model::parked_entries::classify_parked_body(aligned_entry, installed, loader, || unsafe {\n        let body = read::<*const u8>(entry, 0x4160);\n        if !aligned(body) {\n            return None;\n        }\n        let kind = read::<u32>(body, 0xc);\n        let id = read::<u32>(body, 8);\n        Some((id, kind, native_source::parked_ready(entry, slot, kind)))\n    })\n}",
      "reason": "rc.5: a fighter entry's body cell (+0x4160) is a live body only after the loader publishes it (installed count +0x4150, the game's b.ls at main+0x642c88). Alignment of the cell word is not that state. F6-30 captured count 0 with heap residue in the cells; dereferencing it is the unmapped read at f9_body_of."
+    },
+    {
+     "old": "    let in_plan=|s:usize|state.sources[s].filter(|source|state.book.is_current(source.token.epoch()))\n        .is_some_and(|source|targets.iter().flatten().any(|w|w.kind==source.kind&&w.configuration==source.configuration));\n    let created_busy=extras.iter().all(|s|reservation_for(state,*s as u32).is_none()||in_plan(*s));\n    let borrow_open=training&&borrow_admitted(unsafe{native_source::training_cpu_quantity()},\n        crate::runtime::ui::state::PAUSE_ACTIVE.load(Ordering::Acquire),state.book.can_replace(BORROW_ENTRY)==Ok(true));\n    slot_view(plan,SlotFacts{training,slot,created:extras.contains(&slot),created_busy,borrow_open,borrowed})\n}\n\n",
+     "new": "    let in_plan=|s:usize|state.sources[s].filter(|source|state.book.is_current(source.token.epoch()))\n        .is_some_and(|source|targets.iter().flatten().any(|w|w.kind==source.kind&&w.configuration==source.configuration));\n    // \u00a75.1: the borrow waits for the created entries the plan may use; one not created yet is not in use.\n    let created_busy=crate::engine::preload::hat_slots::created_busy(extras.iter().map(|s|reservation_for(state,*s as u32).is_some()&&in_plan(*s)),\n        if training {created_allowance(state,Backend::Training)} else {0});\n    let borrow_open=training&&borrow_admitted(unsafe{native_source::training_cpu_quantity()},\n        crate::runtime::ui::state::PAUSE_ACTIVE.load(Ordering::Acquire),state.book.can_replace(BORROW_ENTRY)==Ok(true));\n    slot_view(plan,SlotFacts{training,slot,created:extras.contains(&slot),created_busy,borrow_open,borrowed})\n}\n\n/// The plan targets a helper request reads (`selected_request`'s filter: the Cycle Preload cap, no failed kind).\n#[cfg(feature=\"managed-third-source-alpha\")]\nfn plan_targets(state:&State)->[Option<Want>;crate::runtime::roster::cycle_preload::MAX_TARGETS] {\n    let slots=usize::from(crate::runtime::roster::cycle_preload_config::snapshot().slots);\n    std::array::from_fn(|i|state.preload[i].filter(|w|i<slots && (state.preload_failed|state.failed)&(1u128<<w.kind)==0))\n}\n\n/// What the existing helper or created entry `slot` may load of the plan: its purpose view.\n#[cfg(feature=\"managed-third-source-alpha\")]\nfn helper_view(state:&State,slot:u32)->[Option<Want>;crate::runtime::roster::cycle_preload::MAX_TARGETS] {\n    purpose_view(state,slot as usize,plan_targets(state))\n}\n\n/// The created entries this scene's plan may use (`hat_slots::created_allowance`), counted by the plan's purposes; a\n/// creation the preflight refused ends it at that entry while the hold stands (`creation_hold`).\n#[cfg(feature=\"managed-third-source-alpha\")]\nfn created_allowance(state:&State,backend:Backend)->usize {\n    use crate::engine::preload::hat_slots::Purpose;\n    let helpers=backend.helpers();\n    let extras=crate::engine::preload::cycle_preload_capacity::extra_slots(backend);\n    let created=candidates(backend).iter().filter(|slot|!helpers.contains(*slot)&&extras.contains(&(**slot as usize))).count();\n    let (mut fighters,mut hats)=(0,0);\n    for (_,purpose) in plan_targets(state).iter().zip(state.preload_purpose.iter()).filter(|(want,_)|want.is_some()) {\n        if *purpose==Some(Purpose::Hat) {hats+=1;} else {fighters+=1;}\n    }\n    let allowance=crate::engine::preload::hat_slots::created_allowance(fighters,hats,helpers.len(),created,backend==Backend::Training);\n    state.creation_hold.filter(|(epoch,_)|state.book.is_current(*epoch)).map_or(allowance,|(_,position)|allowance.min(usize::from(position)))\n}\n\n",
+     "reason": "P-HOT section 5.1 (rc6-hot-xps1, 2026-11-08, hs06: no hat in 40 s with Ready Fighters 10): the hats keep their own budget through planning (preload_limit no longer cuts the budgeted plan to helper_budget), creation (hat_slots::created_allowance, holds_back_creation) and the entry-3 borrow (hat_slots::created_busy)"
+    },
+    {
+     "old": "}\n\nfn preload_limit(backend: Backend) -> usize {\n    let slots = crate::runtime::roster::cycle_preload_config::snapshot().slots;\n    #[cfg(feature = \"native-body-bank-alpha\")]\n    let slots = super::body_bank::helper_budget(slots);\n    crate::engine::preload::cycle_preload_capacity::target_count_with_waiting(\n        slots, backend,\n",
+     "new": "}\n\n/// The plan arrives budgeted (`hat_slots::budgeted`: fighter look-ahead within `helper_budget`, hats within Ready\n/// Hats), so only the Cycle Preload cap and the scene's helper slots limit it here. Cutting it again to the fighter\n/// remainder dropped every hat when the windows and groups held the fighters (rc6-hot-xps1 hs06, 2026-11-08).\nfn preload_limit(backend: Backend) -> usize {\n    let slots = crate::runtime::roster::cycle_preload_config::snapshot().slots;\n    crate::engine::preload::cycle_preload_capacity::target_count_with_waiting(\n        slots, backend,\n",
+     "reason": "P-HOT section 5.1 (rc6-hot-xps1, 2026-11-08, hs06: no hat in 40 s with Ready Fighters 10): the hats keep their own budget through planning (preload_limit no longer cuts the budgeted plan to helper_budget), creation (hat_slots::created_allowance, holds_back_creation) and the entry-3 borrow (hat_slots::created_busy)"
+    },
+    {
+     "old": "    }\n    if state.wants.iter().any(Option::is_some) {return None;}\n    let (position,extra)=policy::extra_slots(backend).iter().copied().enumerate()\n        .take(limit.saturating_sub(backend.helpers().len()))\n        .find(|(_,slot)|state.capacities[capacity_index(*slot as u32)].reservation.is_none())?;\n    let owner=&state.capacities[capacity_index(extra as u32)];\n",
+     "new": "    }\n    if state.wants.iter().any(Option::is_some) {return None;}\n    // P-HOT \u00a75.1: as many created entries as the plan needs by purpose; the hats are not cut to the fighter\n    // remainder that `limit` carries (rc6-hot-xps1 hs06).\n    let (position,extra)=policy::extra_slots(backend).iter().copied().enumerate()\n        .take(created_allowance(state,backend))\n        .find(|(_,slot)|state.capacities[capacity_index(*slot as u32)].reservation.is_none())?;\n    let owner=&state.capacities[capacity_index(extra as u32)];\n",
+     "reason": "P-HOT section 5.1 (rc6-hot-xps1, 2026-11-08, hs06: no hat in 40 s with Ready Fighters 10): the hats keep their own budget through planning (preload_limit no longer cuts the budgeted plan to helper_budget), creation (hat_slots::created_allowance, holds_back_creation) and the entry-3 borrow (hat_slots::created_busy)"
+    },
+    {
+     "old": "    // Existing helpers must first be filled or actively leased. Never create a\n    // new native owner merely because an existing free helper has not run yet.\n    for slot in candidates(backend).iter().copied().take(backend.helpers().len()+position) {\n        let source=state.sources[slot as usize]?;\n        if !state.book.is_current(source.token.epoch()) || state.book.phase(slot as usize)!=Ok(Phase::Ready) {return None;}\n        let targeted=state.preload.iter().flatten().any(|want|\n            want.kind==source.kind && want.configuration==source.configuration);\n        if !targeted && state.book.can_replace(slot as usize)==Ok(true) {return None;}\n    }\n    // Exact Miis use the separately qualified Training destination capability.\n",
+     "new": "    // Existing helpers must first be filled or actively leased. Never create a\n    // new native owner merely because an existing free helper has not run yet.\n    // One whose purpose view admits no plan target can never be filled by it.\n    for slot in candidates(backend).iter().copied().take(backend.helpers().len()+position) {\n        let filled=state.sources[slot as usize].is_some_and(|source|state.book.is_current(source.token.epoch())\n            && state.book.phase(slot as usize)==Ok(Phase::Ready)\n            && (state.preload.iter().flatten().any(|want|want.kind==source.kind && want.configuration==source.configuration)\n                || state.book.can_replace(slot as usize)!=Ok(true)));\n        if crate::engine::preload::hat_slots::holds_back_creation(helper_view(state,slot),filled) {return None;}\n    }\n    // Exact Miis use the separately qualified Training destination capability.\n",
+     "reason": "P-HOT section 5.1 (rc6-hot-xps1, 2026-11-08, hs06: no hat in 40 s with Ready Fighters 10): the hats keep their own budget through planning (preload_limit no longer cuts the budgeted plan to helper_budget), creation (hat_slots::created_allowance, holds_back_creation) and the entry-3 borrow (hat_slots::created_busy)"
     }
    ]
   },
@@ -5323,7 +5348,7 @@
    "dest": "src/runtime/roster/native_body_bank.rs",
    "crate": "root",
    "src_sha256": "ccf7ac678691fa0101a1eff5dbd9300a1b12fe64e9ebbde515697adfbb841c98",
-   "dest_sha256": "918ac1c63dc7e924d4950ee1d6f39abbcb6e0bb6e8b96958534d8997636b9495",
+   "dest_sha256": "29a69894af771b04a56c4c235fbec5adc12c17dcce6279b67f7763f70e69250c",
    "edits": [
     {
      "old": "unsafe fn finalize_entry(entry: *mut u8) -> u64 {\n",
@@ -6090,6 +6115,11 @@
      "old": "    }\n    skyline::install_hooks!(prepare_models, prepare_resources, create_contexts, select_context);\n    ENABLED.store(true, Ordering::Release);\n    // WP-R: per-body identity view (all 18 selector exits or none; logs its own line).\n    crate::runtime::roster::identity_view::install(base);\n    // Both extensions and the attached window's route clear (D-PTA1c at finalize) tear down through the\n",
      "new": "    }\n    skyline::install_hooks!(prepare_models, prepare_resources, create_contexts, select_context);\n    ENABLED.store(true, Ordering::Release);\n    // P-HOT B H1 (\u00a712): the scene configure's header site, on its own row; without it Training starts as today.\n    let scene_stock = fields::read_unchecked::<u32>(base, SCENE_HEADER) == 0xb900828d;\n    if !scene_stock { trace!(\"[BodyBank] fingerprint mismatch +0x{:x}; no start-up window\", SCENE_HEADER); }\n    if gate(SEAM_GROUP, SCENE_HEADER_SEAMS, scene_stock) { skyline::install_hooks!(scene_header); }\n    // WP-R: per-body identity view (all 18 selector exits or none; logs its own line).\n    crate::runtime::roster::identity_view::install(base);\n    // Both extensions and the attached window's route clear (D-PTA1c at finalize) tear down through the\n",
      "reason": "P-HOT B (LANE-HOT-SLOTS-REPORT section 12; operator 2026-11-06 \"Yes pursue B\"): the start-up window built into Training's own start: H1 header extension at main+0x66de14 (own seam row and scope contract), the pending bank, H3 creation rewrite at the 0x678174 observer, H4 binding in prepare_models, scene_changed keeps the new scene's window"
+    },
+    {
+     "old": "}\n\npub(super) fn on_destroy(entry: *const u8) {\n    for (role, state) in BANKS.iter().enumerate() {\n",
+     "new": "}\n\n/// P-HOT B: called by `character_roster::scene_changed` after `mii_saved_alpha::scene_changed`, which opens the new\n/// scene's owner generation. A start-up window kept above was stamped at H1 with the generation before it, so\n/// `group_owner` refused its first group exchange (rc6-hot-xps1, 2026-11-08); it joins the new generation here. A\n/// departed or retired bank keeps its stamp.\npub(super) fn adopt_scene_generation() {\n    let now = crate::runtime::lobby::game_mode::current().map(|m| (m.mode, u32::from(m.melee)));\n    for (role, state) in BANKS.iter().enumerate() {\n        if let Some(bank) = state.lock().as_mut() {\n            let fresh = !bank.departed && bank.phase != Phase::Retired && bank.scene.is_some() && bank.scene == now;\n            bank.epoch = crate::engine::swap::entry_window::scene_generation(bank.epoch, super::mii_saved_alpha::current_generation(role as u32), fresh);\n        }\n    }\n}\n\npub(super) fn on_destroy(entry: *const u8) {\n    for (role, state) in BANKS.iter().enumerate() {\n",
+     "reason": "P-HOT B (rc6-hot-xps1, 2026-11-08, defect 2): a start-up window kept for the new scene joins the owner generation that scene change opens (entry_window::scene_generation), so its first group exchange passes group_owner instead of falling back with \"group owner receipt changed\""
     }
    ]
   },
@@ -7743,7 +7773,7 @@
    "dest": "src/runtime/mii/mii_ordinary_cpu.rs",
    "crate": "root",
    "src_sha256": "db7e15715560db924eba68ba570e97540f1b445b1cf4989a172c0426dd32c6ce",
-   "dest_sha256": "e5823c1c9d252adb288a27c82d760dc1467900ebec2868e001dfb75cee4355a0",
+   "dest_sha256": "d06705277ff8440b61a78ed22a68e4b48c74b8ec67f9ad27d6acd5b4b3b7b6b7",
    "edits": [
     {
      "old": "fn note(reason:&str) { trace!(\"[MiiOrdinaryCpu] {reason}\"); }",
@@ -8019,6 +8049,16 @@
      "old": "pub(super) fn scene_changed() {\n    let mut s=STATE.lock();s.capture=false;s.menu_valid=false;s.catalog=None;s.request=None;s.replay_result=None;s.recapture_log=None;\n",
      "new": "pub(super) fn scene_changed() {\n    publish_admission(crate::engine::swap::cycle_members::NO_MII);\n    let mut s=STATE.lock();s.capture=false;s.menu_valid=false;s.catalog=None;s.request=None;s.replay_result=None;s.recapture_log=None;\n",
      "reason": "P-CYCLE (operator 2026-11-05: a Mii Gunner cycled for the CPU though the menu did not list it): every cycle walker walks engine::swap::cycle_members (the one list the portrait grid numbers); the CPU Mii owner computes its Mii admission (cycle_members::cpu_admission) under its own lock, walks it and publishes it; the menu reads it and each role's slot 0 (character_roster::cycle_facts)"
+    },
+    {
+     "old": "            mii_cycle::Target::Original=>{\n                if let Some(c)=origin_saved {native::target_rows(c)?;}\n                Target::ORIGINAL\n            },\n",
+     "new": "            mii_cycle::Target::Original=>{\n                if let Some(c)=origin_saved {native::target_rows(c)?;}\n                // P-HOT B: an origin captured after H3 carries the start-up window; the original is its single form.\n                descriptor=crate::engine::swap::entry_window::original_request(descriptor,origin.original_kind);\n                Target::ORIGINAL\n            },\n",
+     "reason": "P-HOT B (rc6-hot-xps2, 2026-11-08: P1 lap switch 07 back to the original Mario reloaded the start-up window (3, [0, 1, 2]) natively; a construction thread read an unloaded resource at main+0x35c2958 and died, every later swap was refused and Quit Training hung): the origin captured after H3 carries the start-up window, so the original is staged and recognised as native's single form (entry_window::original_request)"
+    },
+    {
+     "old": "                let index=if origin.layout.waiting() {origin.index}else{0};\n                descriptor[0x46..0x48].copy_from_slice(&index.to_le_bytes());\n                if kind==origin.original_kind && descriptor==live_origin {Target::ORIGINAL}\n                else {Target::fighter(kind)}\n            }\n",
+     "new": "                let index=if origin.layout.waiting() {origin.index}else{0};\n                descriptor[0x46..0x48].copy_from_slice(&index.to_le_bytes());\n                if kind==origin.original_kind && (descriptor==live_origin\n                    || descriptor==crate::engine::swap::entry_window::original_request(live_origin,origin.original_kind)) {Target::ORIGINAL}\n                else {Target::fighter(kind)}\n            }\n",
+     "reason": "P-HOT B (rc6-hot-xps2, 2026-11-08: P1 lap switch 07 back to the original Mario reloaded the start-up window (3, [0, 1, 2]) natively; a construction thread read an unloaded resource at main+0x35c2958 and died, every later swap was refused and Quit Training hung): the origin captured after H3 carries the start-up window, so the original is staged and recognised as native's single form (entry_window::original_request)"
     }
    ]
   },
@@ -8027,7 +8067,7 @@
    "dest": "src/runtime/mii/mii_ordinary_cpu_native.rs",
    "crate": "root",
    "src_sha256": "74f7f1c6dc08e35587866089d39528392008767e3ab20b6842c2e924e9d3a3dd",
-   "dest_sha256": "2db7643c97a1b9f43010b70596cc1b6baa431acff86912e5795f4b2c2596176c",
+   "dest_sha256": "3bbf69a699d020e31a6edfa99311d52ff32add203816fc11401c542f094a9c80",
    "edits": [
     {
      "old": "super::note(&format!(\"[MiiOrdinaryCpu] bank settle diverged",
@@ -8098,6 +8138,11 @@
      "old": "            let record=now.records.iter().flatten().find(|(index,_)|*index==id as u16)\n                .ok_or(\"CPU origin helper record absent\")?;\n            let original_kind=match now.helpers.slots[now.layout.helper(id).unwrap()] {\n                helpers::Helper::Ready {proof,..}=>i64::from(proof.original.kind),\n                helpers::Helper::Unmanaged=>i64::from(rd::<u32>(owner.entry,0x18)),\n                helpers::Helper::Unavailable {..}=>return Err(helpers::CaptureError::Refused(\"CPU helper authority unavailable\")),\n",
      "new": "            let record=now.records.iter().flatten().find(|(index,_)|*index==id as u16)\n                .ok_or(\"CPU origin helper record absent\")?;\n            let original_kind=match now.helpers.slots[now.layout.helper(id).unwrap()] {\n                #[cfg(any(test, feature = \"mii-managed-source-coexist-alpha\"))]\n                helpers::Helper::Ready {proof,..}=>i64::from(proof.original.kind),\n                helpers::Helper::Unmanaged=>i64::from(rd::<u32>(owner.entry,0x18)),\n                helpers::Helper::Unavailable {..}=>return Err(helpers::CaptureError::Refused(\"CPU helper authority unavailable\")),\n",
      "reason": "Integrate approved Slim4b86500 retirement/scope and cold-owner/SDK roots into current composed source. Preserve current pkg6 const locks, F6 task ordering, Setup lifecycle and Deluxe persistence. Retired probe consumers removed with their features; shared host oracle retained. New exact composition requires fresh gates."
+    },
+    {
+     "old": "        live_is_saved:owner.live.target.saved().is_some(),kind,origin_kind:owner.origin.original_kind,\n        published_kind:published,index:now.index,\n        descriptor_equals_origin:now.descriptor==live_origin,roster_cursor:cursor,\n    })?;\n    let registry=final_registry(now.helpers,Some(g.token))?;\n",
+     "new": "        live_is_saved:owner.live.target.saved().is_some(),kind,origin_kind:owner.origin.original_kind,\n        published_kind:published,index:now.index,\n        descriptor_equals_origin:now.descriptor==live_origin\n            || now.descriptor==crate::engine::swap::entry_window::original_request(live_origin,owner.origin.original_kind),\n        roster_cursor:cursor,\n    })?;\n    let registry=final_registry(now.helpers,Some(g.token))?;\n",
+     "reason": "P-HOT B (rc6-hot-xps2, 2026-11-08: P1 lap switch 07 back to the original Mario reloaded the start-up window (3, [0, 1, 2]) natively; a construction thread read an unloaded resource at main+0x35c2958 and died, every later swap was refused and Quit Training hung): the origin captured after H3 carries the start-up window, so the original is staged and recognised as native's single form (entry_window::original_request)"
     }
    ]
   },
@@ -8269,7 +8314,7 @@
    "dest": "src/runtime/mii/mii_ordinary_player.rs",
    "crate": "root",
    "src_sha256": "73e84c925f3aaedd6c09fd082ba41364d160e8cca38cc604617d5fdc38431b8d",
-   "dest_sha256": "44e3639c76488dc06e8d2aad1654527f8a50a0f69a0449c12978b761052b4d73",
+   "dest_sha256": "ad4d139f68e17f4ebb4eac3a2ac9ac4a3bcddbb90f328195a800236a581d1c87",
    "edits": [
     {
      "old": "fn note(reason:&str) { trace!(\"[MiiOrdinaryPlayer] {reason}\"); }",
@@ -8510,6 +8555,21 @@
      "old": "    }\n}\npub(super) fn scene_changed() {\n    let mut s=STATE.lock();s.capture=false;s.menu_valid=false;s.catalog=None;s.request=None;\n    s.generic=None;s.restore=None;\n    #[cfg(feature=\"native-body-bank-alpha\")]\n",
      "new": "    }\n}\npub(super) fn scene_changed() {\n    publish_admission(crate::engine::swap::cycle_members::NO_MII);\n    let mut s=STATE.lock();s.capture=false;s.menu_valid=false;s.catalog=None;s.request=None;\n    s.generic=None;s.restore=None;\n    #[cfg(feature=\"native-body-bank-alpha\")]\n",
      "reason": "P1-CYCLE (operator 2026-11-05: a Mii class cycled on P1 though the P1 Cycles grid did not number it, and a missing roster key disagreed): the Player Mii owner publishes cycle_members::player_admission; the P1 Cycles grid and every Player walker use that one list"
+    },
+    {
+     "old": "        let original=o.origin_saved.map_or(PlayerOrigin::NotMii,\n            |c|PlayerOrigin::Mii(crate::engine::mii::selection::Origin(c.canonical())));\n        let live=if o.cursor.is_none() && o.expected.descriptor==o.origin.descriptor\n            && o.active==o.origin_saved {PlayerLive::Origin}\n            else {o.active.map_or(PlayerLive::Origin,|c|\n",
+     "new": "        let original=o.origin_saved.map_or(PlayerOrigin::NotMii,\n            |c|PlayerOrigin::Mii(crate::engine::mii::selection::Origin(c.canonical())));\n        let live=if o.cursor.is_none() && (o.expected.descriptor==o.origin.descriptor\n            || o.expected.descriptor==crate::engine::swap::entry_window::original_request(o.origin.descriptor,o.origin.original_kind))\n            && o.active==o.origin_saved {PlayerLive::Origin}\n            else {o.active.map_or(PlayerLive::Origin,|c|\n",
+     "reason": "P-HOT B (rc6-hot-xps2, 2026-11-08: P1 lap switch 07 back to the original Mario reloaded the start-up window (3, [0, 1, 2]) natively; a construction thread read an unloaded resource at main+0x35c2958 and died, every later swap was refused and Quit Training hung): the origin captured after H3 carries the start-up window, so the original is staged and recognised as native's single form (entry_window::original_request)"
+    },
+    {
+     "old": "    origin_saved:Option<Configuration>,cursor:Option<usize>)->bool {\n    cursor.is_none() && active==origin_saved && (expected.descriptor==origin.descriptor\n        || (origin.original_kind==0x4b && descriptor_kind(&expected.descriptor)==0x4b)\n        || (origin_saved.is_none() && logical_kind(expected)==origin.original_kind\n",
+     "new": "    origin_saved:Option<Configuration>,cursor:Option<usize>)->bool {\n    cursor.is_none() && active==origin_saved && (expected.descriptor==origin.descriptor\n        || expected.descriptor==crate::engine::swap::entry_window::original_request(origin.descriptor,origin.original_kind)\n        || (origin.original_kind==0x4b && descriptor_kind(&expected.descriptor)==0x4b)\n        || (origin_saved.is_none() && logical_kind(expected)==origin.original_kind\n",
+     "reason": "P-HOT B (rc6-hot-xps2, 2026-11-08: P1 lap switch 07 back to the original Mario reloaded the start-up window (3, [0, 1, 2]) natively; a construction thread read an unloaded resource at main+0x35c2958 and died, every later swap was refused and Quit Training hung): the origin captured after H3 carries the start-up window, so the original is staged and recognised as native's single form (entry_window::original_request)"
+    },
+    {
+     "old": "            mii_cycle::Target::Original=>{\n                if let Some(c)=origin_saved {native::target_rows(c)?;}\n                let mut descriptor=origin.descriptor;\n                if origin.original_kind==0x4b {\n                    let forms=requested_forms_at(&menu,Role::Player,0x4b,None);\n",
+     "new": "            mii_cycle::Target::Original=>{\n                if let Some(c)=origin_saved {native::target_rows(c)?;}\n                // P-HOT B: an origin captured after H3 carries the start-up window; the original is its single form.\n                let mut descriptor=crate::engine::swap::entry_window::original_request(origin.descriptor,origin.original_kind);\n                if origin.original_kind==0x4b {\n                    let forms=requested_forms_at(&menu,Role::Player,0x4b,None);\n",
+     "reason": "P-HOT B (rc6-hot-xps2, 2026-11-08: P1 lap switch 07 back to the original Mario reloaded the start-up window (3, [0, 1, 2]) natively; a construction thread read an unloaded resource at main+0x35c2958 and died, every later swap was refused and Quit Training hung): the origin captured after H3 carries the start-up window, so the original is staged and recognised as native's single form (entry_window::original_request)"
     }
    ]
   },

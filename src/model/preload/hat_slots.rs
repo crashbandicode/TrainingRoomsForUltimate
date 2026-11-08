@@ -142,6 +142,30 @@ pub fn slot_view<T: Copy + PartialEq, const N: usize>(plan: [Option<(T, Purpose)
     result
 }
 
+/// How many created entries (7/6/5/4 in Training) a helper plan of `fighters` fighter targets and `hats` hat-only
+/// targets may use, of the `created` the scene supports, beside `seats` native helpers. Training (§5.1): the native
+/// helpers hold fighter targets only (entry 3 a hat only as the borrowed last one), so every other target needs a
+/// created entry. The waiting rooms keep one view: the helpers take any target first.
+pub fn created_allowance(fighters: usize, hats: usize, seats: usize, created: usize, training: bool) -> usize {
+    let needed = if training { fighters.saturating_sub(seats) + hats } else { (fighters + hats).saturating_sub(seats) };
+    needed.min(created)
+}
+
+/// §5.1, entry 3's borrow: "the created entries already hold or are loading plan targets". `in_use` lists the created
+/// entries in creation order, each true when it exists and holds or loads a current plan target; the first
+/// `allowance` ([`created_allowance`], less any a refused creation ended) must all be. With no created entry allowed
+/// the borrow is the only place left.
+pub fn created_busy(in_use: impl IntoIterator<Item = bool>, allowance: usize) -> bool {
+    in_use.into_iter().take(allowance).filter(|used| *used).count() == allowance
+}
+
+/// Fill what exists before creating: an existing helper (or an earlier created entry) holds the next created entry
+/// back while its `view` admits a plan target and it does not hold a Ready one (`filled`). An entry whose view admits
+/// nothing can never be filled by this plan (entries 2 and 3 under a hats-only plan).
+pub fn holds_back_creation<T, const N: usize>(view: [Option<T>; N], filled: bool) -> bool {
+    !filled && view.iter().any(Option::is_some)
+}
+
 /// §3.5.1 rule 1 (operator decisions "B" and "1"): entry 3 may be borrowed by a hat only while the native CPU count
 /// is 1, the pause is closed and entry 3 is replaceable. No hold or hook is needed.
 pub fn borrow_admitted(cpu_count: Option<u32>, pause_open: bool, replaceable: bool) -> bool {
@@ -256,6 +280,40 @@ mod tests {
         // The waiting rooms keep one view: entries 2/3 there are not F9 seats.
         let waiting = SlotFacts { training: false, ..facts(BORROW_ENTRY, false, false, false) };
         assert_eq!(slot_view(plan, waiting)[0], Some(0x18));
+    }
+
+    /// rc6-hot-xps1 hs06 (2026-11-08, XPS): P1 Kirby with Ready Fighters 10 and groups on, so the windows and groups
+    /// hold every fighter and the plan is five hats. No hat loaded in 40 s. Four created entries are allowed for five
+    /// hats (the fifth borrows entry 3); entries 2 and 3, which may load none of the hats, do not hold them back; the
+    /// borrow opens only once the allowed created entries are in use.
+    #[test]
+    fn a_hats_only_plan_creates_four_entries_before_the_borrow() {
+        assert_eq!(created_allowance(0, 5, 2, 4, true), 4, "five hats: 7/6/5/4, the fifth borrows entry 3");
+        assert_eq!(created_allowance(0, 3, 2, 4, true), 3);
+        assert_eq!(created_allowance(1, 4, 2, 4, true), 4, "entry 2 holds the fighter");
+        assert_eq!(created_allowance(2, 3, 2, 4, true), 3);
+        assert_eq!(created_allowance(5, 0, 2, 4, true), 3, "fighters only: five targets less the two helpers, as before");
+        assert_eq!(created_allowance(0, 5, 2, 1, true), 1, "one created entry supported");
+        assert_eq!(created_allowance(3, 2, 2, 3, false), 3, "waiting rooms: one view, the helpers first");
+        assert_eq!(created_allowance(1, 1, 2, 3, false), 0);
+
+        let hats_only = [Some((0x14, HAT)), Some((0x10, HAT)), Some((0x11, HAT)), Some((0x18, HAT)), Some((0x1a, HAT)), None];
+        let none_in_use = created_busy([false; 4], 4);
+        assert!(!none_in_use, "no created entry in use yet: the borrow stays closed");
+        for slot in [SEAT_ENTRY, BORROW_ENTRY] {
+            let view = slot_view(hats_only, facts(slot, false, none_in_use, true));
+            assert_eq!(view, [None; 6], "entry {slot}");
+            assert!(!holds_back_creation(view, false), "entry {slot} does not hold the created entries back");
+        }
+        let created = slot_view(hats_only, facts(7, true, none_in_use, true));
+        assert!(holds_back_creation(created, false), "a created entry with a target to load is filled first");
+        assert!(!holds_back_creation(created, true));
+        assert!(!created_busy([true, true, true, false], 4));
+        assert!(created_busy([true, true, true, true], 4));
+        assert_eq!(slot_view(hats_only, facts(BORROW_ENTRY, false, true, true))[0], Some(0x14),
+            "every allowed created entry in use: entry 3 may borrow");
+        assert!(created_busy([true, false, false, false], 1), "only the allowed ones count");
+        assert!(created_busy([false; 4], 0), "no created entry allowed: the borrow is the only place left");
     }
 
     /// Operator decision "1": the record is published at the hat's admission on entry 3, read by F9, kept until F9

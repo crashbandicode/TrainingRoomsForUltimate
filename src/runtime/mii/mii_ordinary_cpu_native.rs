@@ -511,7 +511,9 @@ pub(super) unsafe fn generic_completed(g:&super::Generic,kind:u32,cursor:Option<
         reservation_held,transaction_busy,origin_is_saved:owner.origin_saved.is_some(),
         live_is_saved:owner.live.target.saved().is_some(),kind,origin_kind:owner.origin.original_kind,
         published_kind:published,index:now.index,
-        descriptor_equals_origin:now.descriptor==live_origin,roster_cursor:cursor,
+        descriptor_equals_origin:now.descriptor==live_origin
+            || now.descriptor==crate::engine::swap::entry_window::original_request(live_origin,owner.origin.original_kind),
+        roster_cursor:cursor,
     })?;
     let registry=final_registry(now.helpers,Some(g.token))?;
     owner.expected=now;owner.live=destination;
