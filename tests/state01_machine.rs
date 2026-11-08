@@ -54,6 +54,12 @@ fn saved(x: f32, y: f32, lr: f32, situation: i32, kind: i32) -> SavedState {
     SavedState { x, y, lr, situation_kind: situation, fighter_kind: kind, percent: 42.0, ..SavedState::never_saved() }
 }
 
+/// A machine whose slot 0 holds a save. A never-saved slot is "nothing bound" and loads nothing (RECORDING.md, "Save
+/// states only warp"; `an_empty_slot_loads_nothing_on_the_chord_or_a_death`), so the load mechanics are tested on this.
+fn loaded() -> Machine {
+    machine_with(saved(0.0, 0.0, 1.0, GROUND, 7), saved(0.0, 0.0, 1.0, GROUND, 7), 0)
+}
+
 fn settings() -> StateSettings {
     StateSettings::default()
 }
@@ -184,7 +190,7 @@ fn waiting_state_role_is_entry_four_and_never_a_parked_native_cpu() {
 /// WaitForAlive frame for a Pokemon only, and the trainer's switch flag is raised once it is placed.
 #[test]
 fn state05_pt_predeath() {
-    let mut machine = Machine::default();
+    let mut machine = loaded();
     let mut rng = rng();
     let pokemon = |entry: i32| FrameIn { pokemon: true, ..input(entry) };
     request(&mut machine, &settings(), &mut rng);
@@ -209,7 +215,7 @@ fn state05_pt_predeath() {
 
 #[test]
 fn state01_load_request_marks_both() {
-    let mut machine = Machine::default();
+    let mut machine = loaded();
     let mut rng = rng();
     let out = request(&mut machine, &settings(), &mut rng);
     assert!(out.stop_playback);
@@ -217,7 +223,7 @@ fn state01_load_request_marks_both() {
     assert!(machine.is_loading() && machine.is_killing());
     // Nothing else happens on the request frame, and the request is read only by a non-Nana fighter.
     assert_eq!(out.placing, None);
-    let mut other = Machine::default();
+    let mut other = loaded();
     let nana = other.frame(&FrameIn { load_chord: true, nana: true, ..input(0) }, &settings(), &mut rng);
     assert!(!nana.stop_playback && !other.is_loading());
 }
@@ -355,16 +361,16 @@ fn state01_random_slot_latch() {
 fn state01_autoload_on_death() {
     let mut rng = rng();
     let on = StateSettings { autoload: true, ..settings() };
-    let mut machine = Machine::default();
+    let mut machine = loaded();
     machine.frame(&input(1), &on, &mut rng);
     assert!(!machine.is_loading(), "alive: nothing");
     let out = machine.frame(&FrameIn { dead: true, ..input(1) }, &on, &mut rng);
     assert!(out.stop_playback && machine.is_loading(), "a dead CPU loads");
-    let mut off = Machine::default();
+    let mut off = loaded();
     off.frame(&FrameIn { dead: true, ..input(0) }, &settings(), &mut rng);
     assert!(!off.is_loading(), "Auto Save States Off never loads on death");
     // A dead Nana never requests a load.
-    let mut nana = Machine::default();
+    let mut nana = loaded();
     nana.frame(&FrameIn { dead: true, nana: true, ..input(0) }, &on, &mut rng);
     assert!(!nana.is_loading());
 }
@@ -373,7 +379,7 @@ fn state01_autoload_on_death() {
 fn state01_ignore_request_mid_load() {
     let mut rng = rng();
     let s = StateSettings { mirroring: Mirroring::Alternate, ..settings() };
-    let mut machine = Machine::default();
+    let mut machine = loaded();
     assert!(request(&mut machine, &s, &mut rng).stop_playback);
     let sign = machine.mirror_sign;
     let again = request(&mut machine, &s, &mut rng);
@@ -384,7 +390,7 @@ fn state01_ignore_request_mid_load() {
 #[test]
 fn state01_disable_cancels() {
     let mut rng = rng();
-    let mut machine = Machine::default();
+    let mut machine = loaded();
     request(&mut machine, &settings(), &mut rng);
     machine.frame(&input(0), &settings(), &mut rng);
     assert!(machine.is_loading());
