@@ -89,6 +89,8 @@ Make combo, on a macro's or a chain's own screen, plays that file once on Player
 If the connected start save was deleted, Make combo skips the warp, shows "No start save. This macro plays from where the fighters are.", and still plays. A switch that is Off, or a file that never had a start save, does not warp and does not show that sentence. A chain whose first macro is missing skips that step and plays the next one that is still there.
 Play skips a deleted start save and shows the same sentence. A macro that never had one does not show it.
 
+![Make combo plays the macro from its start save under the drilled combo, then lists Combo 2](media/rc5-make-combo.gif)
+
 Crop on a combo or a macro opens a handle screen. Up and Down switch In and Out. L and R move the handle that is focused, and they do not change the menu page. A saves a new file under the next unused Macro N or Combo N and returns to the original. B returns without writing. The original stays. A macro crop keeps that range of frames. The new file keeps the original's one start state, stamped at the clamped start frame. It does not store a pose for every frame. A combo crop keeps the links from the first handle through the last. The replay window is a separate row under Replays. It is not this Crop row.
 A chain has no Crop row, because it has no frames of its own.
 
@@ -163,6 +165,8 @@ The first time this library is built, empty slots are skipped. A recording slot 
 A save index that holds a save becomes one file, both fighters, with the same `Slot N (date)` name. The slot the Save and Load chords were using becomes the bound save. An empty index is skipped.
 
 `macros/selected.txt`, when it names a file that is there, becomes Player 1's active macro. The CPU has no active macro until you set one. The old "play a recording when a state loads" row is not turned into a chain.
+
+![The first boot of a card from before the library: two dated saves with Slot 2 bound, and Old jab active](media/rc5-migration.gif)
 
 ## Where the rules come from
 
