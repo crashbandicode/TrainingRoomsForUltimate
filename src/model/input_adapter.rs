@@ -19,7 +19,7 @@
 
 use core::sync::atomic::{AtomicU8, Ordering};
 
-use super::input_delay::{Clear, DelayQueue, MappedInputs, Owners};
+use super::input_delay::{Clear, DelayQueue, MappedInputs, Owners, Sticks};
 
 /// Set `owner`'s bit in the mask.
 pub fn take(mask: &AtomicU8, owner: Owners) {
@@ -99,8 +99,15 @@ impl InputAdapter {
     /// than gameplay empty the queue and give neutral (`DelayQueue::poll`). The second value is the
     /// resume check, once, when the first `delay` polls after a resume are done.
     pub fn poll(&mut self, mask: &AtomicU8, delay: u8, actual: MappedInputs) -> (MappedInputs, Option<ResumeCheck>) {
+        let (out, _, check) = self.poll_with(mask, delay, actual, Sticks::of_record(actual));
+        (out, check)
+    }
+
+    /// `poll`, with the poll's physical sticks carried through the delay and returned with the record.
+    pub fn poll_with(&mut self, mask: &AtomicU8, delay: u8, actual: MappedInputs, sticks: Sticks)
+        -> (MappedInputs, Sticks, Option<ResumeCheck>) {
         let owners = owners(mask);
-        let out = self.queue.poll(delay, owners, actual);
+        let (out, sticks) = self.queue.poll_with(delay, owners, actual, sticks);
         if owners.contains(Owners::VANILLA_PAUSE) {
             self.report.owned_polls += 1;
             self.report.owned_non_neutral += u32::from(out != MappedInputs::NEUTRAL);
@@ -113,7 +120,7 @@ impl InputAdapter {
                 check = Some(ResumeCheck { delay: self.resume_delay, leaked: self.resume_leaked });
             }
         }
-        (out, check)
+        (out, sticks, check)
     }
 
     /// The pause flag as the UI tick samples it: an edge begins or ends the pause (a repeated sample

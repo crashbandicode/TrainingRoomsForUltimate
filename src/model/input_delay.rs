@@ -29,6 +29,46 @@ impl MappedInputs {
     pub const NEUTRAL: MappedInputs = MappedInputs { buttons: 0, lstick_x: 0, lstick_y: 0, rstick_x: 0, rstick_y: 0 };
 }
 
+/// P1's physical sticks, read from the game's raw `Controller` (SPEC-input-04 §3.1), in the record's stick unit. The
+/// mapped record is not the physical stick: on the first frames of a C-stick attack the game writes the C-stick's
+/// direction into the record's left stick and leaves its right stick 0 (Eden `rc5-opus-cstick1`, 2026-11-08). The
+/// frame strip and the combo helper read these instead, so the stick row is the left stick and the C-stick arrow is
+/// the C-stick (SPEC-input-06 §3.2, §3.3).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Sticks {
+    pub lx: i8,
+    pub ly: i8,
+    pub rx: i8,
+    pub ry: i8,
+}
+
+/// The record's stick unit: full deflection is 120 (SPEC-input-01 §3.1, `recording::STICK_FULL`).
+const STICK_UNIT: f32 = 120.0;
+
+impl Sticks {
+    pub const NEUTRAL: Sticks = Sticks { lx: 0, ly: 0, rx: 0, ry: 0 };
+
+    /// The raw axes `[left x, left y, right x, right y]` (f32, ±1). `None` when one is not a stick value (not finite,
+    /// or past ±1 by more than rounding): the layout guard, and the caller keeps the record's sticks.
+    pub fn from_axes(axes: [f32; 4]) -> Option<Sticks> {
+        if axes.iter().any(|v| !v.is_finite() || v.abs() > 1.001) {
+            return None;
+        }
+        let unit = |v: f32| (v * STICK_UNIT).round() as i8;
+        Some(Sticks { lx: unit(axes[0]), ly: unit(axes[1]), rx: unit(axes[2]), ry: unit(axes[3]) })
+    }
+
+    /// The record's own sticks, when the raw ones are not available.
+    pub const fn of_record(record: MappedInputs) -> Sticks {
+        Sticks { lx: record.lstick_x, ly: record.lstick_y, rx: record.rstick_x, ry: record.rstick_y }
+    }
+
+    /// What the strip and the combo helper read: the record's buttons with these sticks.
+    pub const fn onto(self, record: MappedInputs) -> MappedInputs {
+        MappedInputs { buttons: record.buttons, lstick_x: self.lx, lstick_y: self.ly, rstick_x: self.rx, rstick_y: self.ry }
+    }
+}
+
 /// What owns P1's input for a poll. Anything other than gameplay empties the queue and makes that
 /// poll neutral (SPEC-input-03 §5.1: "the queue is emptied whenever something other than gameplay
 /// owns P1's input, and on session clear").
@@ -90,6 +130,8 @@ pub enum Clear {
 #[derive(Clone, Copy, Debug)]
 pub struct DelayQueue {
     ring: [MappedInputs; SLOTS],
+    /// The physical sticks of the same poll as `ring`'s record, so they come out with it.
+    sticks: [Sticks; SLOTS],
     /// Index of the oldest record.
     head: usize,
     len: usize,
@@ -103,7 +145,7 @@ impl Default for DelayQueue {
 
 impl DelayQueue {
     pub const fn new() -> Self {
-        Self { ring: [MappedInputs::NEUTRAL; SLOTS], head: 0, len: 0 }
+        Self { ring: [MappedInputs::NEUTRAL; SLOTS], sticks: [Sticks::NEUTRAL; SLOTS], head: 0, len: 0 }
     }
 
     pub const fn len(&self) -> usize {
@@ -123,9 +165,10 @@ impl DelayQueue {
         held
     }
 
-    fn push_newest(&mut self, record: MappedInputs) {
+    fn push_newest(&mut self, record: MappedInputs, sticks: Sticks) {
         let at = (self.head + self.len) % SLOTS;
         self.ring[at] = record;
+        self.sticks[at] = sticks;
         self.len += 1;
     }
 
@@ -151,14 +194,23 @@ impl DelayQueue {
     /// state are discarded unplayed, and from the next poll the output is `b` polls old, so the
     /// output jumps forward in time by `a - b` frames (SPEC-input-03 §5, "Decreasing d").
     pub fn step(&mut self, delay: u8, actual: MappedInputs) -> MappedInputs {
+        self.step_with(delay, actual, Sticks::of_record(actual)).0
+    }
+
+    /// `step`, with the poll's physical sticks carried beside the record and returned with it.
+    pub fn step_with(&mut self, delay: u8, actual: MappedInputs, sticks: Sticks) -> (MappedInputs, Sticks) {
         let delay = usize::from(delay.min(MAX_DELAY));
         if delay == 0 {
             self.head = 0;
             self.len = 0;
-            return actual;
+            return (actual, sticks);
         }
-        let out = if self.len < delay { MappedInputs::NEUTRAL } else { self.ring[self.head] };
-        self.push_newest(actual);
+        let out = if self.len < delay {
+            (MappedInputs::NEUTRAL, Sticks::NEUTRAL)
+        } else {
+            (self.ring[self.head], self.sticks[self.head])
+        };
+        self.push_newest(actual, sticks);
         while self.len > delay {
             self.pop_oldest();
         }
@@ -168,11 +220,16 @@ impl DelayQueue {
     /// A poll while something other than gameplay owns P1's input: the queue is emptied and the
     /// poll outputs neutral (SPEC-input-03 §5.1). Otherwise `step`.
     pub fn poll(&mut self, delay: u8, owners: Owners, actual: MappedInputs) -> MappedInputs {
+        self.poll_with(delay, owners, actual, Sticks::of_record(actual)).0
+    }
+
+    /// `poll`, with the poll's physical sticks.
+    pub fn poll_with(&mut self, delay: u8, owners: Owners, actual: MappedInputs, sticks: Sticks) -> (MappedInputs, Sticks) {
         if owners.any() {
             self.clear(Clear::Session);
-            return MappedInputs::NEUTRAL;
+            return (MappedInputs::NEUTRAL, Sticks::NEUTRAL);
         }
-        self.step(delay, actual)
+        self.step_with(delay, actual, sticks)
     }
 }
 
@@ -218,5 +275,31 @@ mod tests {
         q.step(3, rec(1));
         assert_eq!(q.poll(3, Owners::MENU, rec(2)), MappedInputs::NEUTRAL);
         assert!(q.is_empty());
+    }
+
+    fn left(x: i8) -> Sticks {
+        Sticks { lx: x, ..Sticks::NEUTRAL }
+    }
+
+    #[test]
+    fn the_physical_sticks_come_out_with_their_own_record() {
+        let mut q = DelayQueue::new();
+        let out: Vec<_> = (1..=5).map(|n| q.poll_with(2, Owners::NONE, rec(n), left(n as i8 * 10))).collect();
+        assert_eq!(out.iter().map(|(r, _)| r.buttons).collect::<Vec<_>>(), [0, 0, 1, 2, 3]);
+        assert_eq!(out.iter().map(|(_, s)| s.lx).collect::<Vec<_>>(), [0, 0, 10, 20, 30], "the same delay as the record");
+        assert_eq!(q.poll_with(2, Owners::MENU, rec(6), left(60)), (MappedInputs::NEUTRAL, Sticks::NEUTRAL));
+        assert!(q.is_empty());
+        assert_eq!(q.poll_with(0, Owners::NONE, rec(7), left(70)), (rec(7), left(70)), "delay 0 passes both through");
+    }
+
+    #[test]
+    fn raw_axes_are_record_units_and_a_value_that_is_not_a_stick_is_refused() {
+        assert_eq!(Sticks::from_axes([0.0, 0.6, 1.0, -1.0]), Some(Sticks { lx: 0, ly: 72, rx: 120, ry: -120 }));
+        assert_eq!(Sticks::from_axes([f32::NAN, 0.0, 0.0, 0.0]), None);
+        assert_eq!(Sticks::from_axes([0.0, 0.0, 1.5, 0.0]), None);
+        let record = MappedInputs { buttons: 0x80a1, lstick_x: 100, lstick_y: 0, rstick_x: 0, rstick_y: 0 };
+        let onto = Sticks { lx: 0, ly: 72, rx: 120, ry: 0 }.onto(record);
+        assert_eq!((onto.buttons, onto.lstick_x, onto.lstick_y, onto.rstick_x), (0x80a1, 0, 72, 120));
+        assert_eq!(Sticks::of_record(record).onto(record), record);
     }
 }

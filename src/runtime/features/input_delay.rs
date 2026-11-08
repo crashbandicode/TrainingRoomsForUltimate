@@ -12,7 +12,9 @@ use hos_lock::Mutex;
 use skyline::hooks::InlineCtx;
 
 use crate::model::input_adapter::InputAdapter;
-use crate::model::input_delay::{self, Clear, MappedInputs, Owners};
+use crate::model::input_delay::{self, Clear, MappedInputs, Owners, Sticks};
+#[cfg(feature = "diag")]
+use std::sync::atomic::{AtomicU8, Ordering};
 use crate::model::sites;
 use crate::runtime::alloc::{HookId, HookScope};
 #[cfg(feature = "diag")]
@@ -100,9 +102,14 @@ fn apply() {
         unsafe { crate::runtime::roster::handle_p1_input(out as *mut MappedInputs, controller) };
     }
     let out = out as *mut MappedInputs;
+    // P1's physical sticks of this poll travel through the delay with its record (the record's own sticks are not
+    // physical on a C-stick attack's first frames). `applies` above already limits this to P1's poll.
+    let raw = pending.controller(&NativeTls);
+    // SAFETY: `raw` is the live Controller of this mapping call or 0; `out` is the record the game just wrote.
+    let sticks = unsafe { raw_sticks(raw) }.unwrap_or(Sticks::of_record(unsafe { *out }));
     let mut adapter = ADAPTER.lock();
     // SAFETY: `out` is the 8-byte record the game just wrote through the call.
-    let (record, check) = adapter.poll(&published::INPUT_OWNERS, published::input_delay(), unsafe { *out });
+    let (record, sticks, check) = adapter.poll_with(&published::INPUT_OWNERS, published::input_delay(), unsafe { *out }, sticks);
     // SAFETY: as above.
     unsafe { *out = record };
     drop(adapter);
@@ -119,12 +126,34 @@ fn apply() {
         let controller = pending.take_controller(&NativeTls);
         // The display first (it logs what P1 pressed), then the recorder (which may neutralise out).
         unsafe {
-            input_display::on_p1_poll(controller, out);
+            input_display::on_p1_poll(controller, out, sticks);
             // The Replay Window's own controls (nothing unless its editor is in the foreground).
             crate::runtime::macros::on_p1_input(controller, out);
             recorder::on_p1_poll(out);
         }
     }
+}
+
+/// The raw Controller's four stick axes (SPEC-input-04 §3.1), or `None` without a controller or when a value is not a
+/// stick value (the layout guard: `Sticks::from_axes`).
+///
+/// # Safety
+/// `controller` is 0 or the live Controller of this mapping call (0xD0 bytes).
+unsafe fn raw_sticks(controller: usize) -> Option<Sticks> {
+    if controller == 0 {
+        return None;
+    }
+    let axes = crate::model::chords::field::STICKS.map(|offset| ((controller + offset) as *const f32).read_volatile());
+    let sticks = Sticks::from_axes(axes);
+    #[cfg(feature = "diag")]
+    {
+        static LAST: AtomicU8 = AtomicU8::new(0);
+        let now = if sticks.is_some() { 1 } else { 2 };
+        if LAST.swap(now, Ordering::Relaxed) != now {
+            diagnostic(format_args!("[FrameStrip] raw_sticks guard={} axes={axes:?}", if now == 1 { "ok" } else { "refused" }));
+        }
+    }
+    sticks
 }
 
 /// Caller A, at the loop increment the call returns to.

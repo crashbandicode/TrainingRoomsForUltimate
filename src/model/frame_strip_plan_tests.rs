@@ -272,6 +272,42 @@ fn a_c_stick_attack_takes_the_c_stick_arrow() {
     );
 }
 
+/// Eden `rc5-opus-cstick1` (2026-11-08), P1's mapped record around a C-stick smash, frame by frame: buttons `0x80a1`
+/// (attack, smash, C-stick, flick-jump) for the hold; the left stick bytes are the C-stick's `(100, 0)` on the first 4
+/// frames; the right stick bytes stay 0. `left` is the physical left stick the record replaced on those 4 frames.
+fn c_stick_smash(left: (i8, i8)) -> Vec<(MappedInputs, crate::model::input_delay::Sticks)> {
+    use crate::model::input_delay::Sticks;
+    let mut frames = vec![(MappedInputs { buttons: 0x8000, lstick_x: left.0, lstick_y: left.1, ..NONE }, Sticks { lx: left.0, ly: left.1, rx: 0, ry: 0 })];
+    for f in 0..9 {
+        let copy = if f < 4 { (100, 0) } else { left };
+        let record = MappedInputs { buttons: 0x80a1, lstick_x: copy.0, lstick_y: copy.1, rstick_x: 0, rstick_y: 0 };
+        frames.push((record, Sticks { lx: left.0, ly: left.1, rx: 120, ry: 0 }));
+    }
+    frames
+}
+
+#[test]
+fn a_c_stick_smash_with_the_left_stick_neutral_leaves_the_stick_row_blank() {
+    let mut t = Tracker::new();
+    for (record, sticks) in c_stick_smash((0, 0)) {
+        t.step(idle(), idle(), sticks.onto(record));
+    }
+    let row: Vec<_> = t.columns().map(|c| c.stick).collect();
+    assert!(row.iter().all(Option::is_none), "the stick row is the left stick, which never moved: {row:?}");
+    assert_eq!(t.presses().next().map(|p| p.stick), Some(Some(0)), "the chip arrow is the C-stick's right");
+}
+
+#[test]
+fn a_left_stick_held_through_a_c_stick_attack_stays_in_the_stick_row() {
+    let mut t = Tracker::new();
+    for (record, sticks) in c_stick_smash((0, 72)) {
+        t.step(idle(), idle(), sticks.onto(record));
+    }
+    let row: Vec<_> = t.columns().map(|c| c.stick).collect();
+    assert!(row.iter().all(|dir| *dir == Some(2)), "up on every frame, also the 4 the record replaced: {row:?}");
+    assert_eq!(t.presses().next().map(|p| p.stick), Some(Some(0)), "the chip arrow is still the C-stick's right");
+}
+
 #[test]
 fn a_left_stick_press_keeps_its_arrow() {
     let attack = MappedInputs { buttons: 0x1, lstick_x: 0, lstick_y: 100, rstick_x: 100, rstick_y: 0 };

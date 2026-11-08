@@ -17,7 +17,7 @@ use hos_lock::Mutex;
 use crate::model::frame_strip::ids::{Table, C};
 use crate::model::frame_strip::{Sample, Settings, Tracker};
 use crate::model::frame_strip_plan::{Changed, Look, Renderer};
-use crate::model::input_delay::{MappedInputs, Owners};
+use crate::model::input_delay::{MappedInputs, Owners, Sticks};
 use crate::runtime::game::natives;
 use crate::runtime::published;
 
@@ -74,15 +74,16 @@ fn unpack(v: u64) -> MappedInputs {
     MappedInputs { buttons: v as u32, lstick_x: b(32), lstick_y: b(40), rstick_x: b(48), rstick_y: b(56) }
 }
 
-/// One P1 poll after the delay: keep the mapped record (what the fighter acts on).
+/// One P1 poll after the delay: keep the mapped record's buttons (what the fighter acts on) with the physical sticks
+/// of the same delayed poll (`Sticks`: the record's own sticks carry the C-stick on a C-stick attack's first frames).
 ///
 /// # Safety
 /// `out` is the delayed mapped record of the poll (or null).
-pub unsafe fn on_p1_poll(_controller: usize, out: *const MappedInputs) {
+pub unsafe fn on_p1_poll(_controller: usize, out: *const MappedInputs, sticks: Sticks) {
     if !ENABLED.load(Ordering::Acquire) || out.is_null() || published::input_owners().contains(Owners::MENU) {
         return;
     }
-    INPUTS.store(pack(*out), Ordering::Release);
+    INPUTS.store(pack(sticks.onto(*out)), Ordering::Release);
 }
 
 /// The constants, resolved through the game's own table on first use (`None` until the table answers anything).

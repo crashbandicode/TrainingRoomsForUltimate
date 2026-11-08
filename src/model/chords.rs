@@ -103,6 +103,8 @@ impl Buttons {
 pub mod field {
     pub const CURRENT_BUTTONS: usize = 0x8;
     pub const PREVIOUS_BUTTONS: usize = 0xc;
+    /// Left stick x, y, then right stick x, y: f32, ±1.0.
+    pub const STICKS: [usize; 4] = [0x10, 0x14, 0x20, 0x24];
     pub const JUST_DOWN: usize = 0x88;
     pub const JUST_RELEASE: usize = 0x8c;
     pub const STYLE: usize = 0x9c;
