@@ -1679,11 +1679,13 @@ fn take_captured(file: &mut SaveFile) {
     }
     taken.sort_by_key(|record| record.as_ref().map_or(u64::MAX, |record| record.sequence));
     let mut saved = None;
-    let mut restored = false;
+    // A setup bind applied in this batch, and whether it restored (A) or only bound (Y).
+    let mut setup: Option<bool> = None;
     for CapturedRecord { sequence, role, slot, mut state, mii } in taken.into_iter().flatten() {
         if binding.as_ref().is_some_and(|job| job.sequence() < sequence) {
-            setups::apply_writer_bind(file, binding.take().unwrap());
-            restored = true;
+            let job = binding.take().unwrap();
+            setup = Some(setup.unwrap_or(false) || job.restore());
+            setups::apply_writer_bind(file, job);
         }
         saved = Some(slot);
         state.marker = Marker::NoAction;
@@ -1700,18 +1702,19 @@ fn take_captured(file: &mut SaveFile) {
     // (`rr_host::write_saved`), with the Mii identities just attached.
     let saved_pair = saved.map(|slot| slot.min(SLOTS - 1)).map(|slot| [file.player[slot].clone(), file.cpu[slot].clone()]);
     if let Some(binding) = binding {
+        setup = Some(setup.unwrap_or(false) || binding.restore());
         setups::apply_writer_bind(file, binding);
-        restored = true;
     }
     if let Some(pair) = saved_pair {
         crate::engine::rr_host::save_captured(pair);
     }
     // Setups stay a separate library from save states (#69 (b)): a setup restore only moves the fighters, and the slot
-    // gets the bound save back once the restore has landed.
-    if restored {
-        crate::engine::rr_host::setup_restored();
+    // gets the bound save back once the restore has landed. A setup bound with Y stays in the slot as Load's target
+    // until the bound save changes (SETUP-Y-BIND).
+    if let Some(restore) = setup {
+        crate::engine::rr_host::setup_bound(restore);
     }
-    if saved.is_some() || restored {
+    if saved.is_some() || setup.is_some() {
         crate::runtime::ui::worker::wake();
     }
     let dropped = HANDOFF_DROPPED.swap(0, Ordering::Relaxed);

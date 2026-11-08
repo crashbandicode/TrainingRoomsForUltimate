@@ -287,6 +287,10 @@ impl WriterBind {
     pub(super) fn sequence(&self) -> u64 {
         self.job.sequence
     }
+    /// A in the Setup library binds and restores; Y binds only (`rr_host::setup_bound`).
+    pub(super) fn restore(&self) -> bool {
+        matches!(self.job.action, Action::Bind { restore: true, .. })
+    }
 }
 pub(super) fn take_writer_bind() -> Option<WriterBind> {
     JOBS.take_writer()

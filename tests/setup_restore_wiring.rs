@@ -35,7 +35,7 @@ fn body(g: &Graph, key: &str) -> Vec<String> {
 fn a_setup_restore_writes_no_save_file() {
     let g = graph();
     let take = body(&g, "states::take_captured");
-    assert!(take.iter().any(|t| t == "setup_restored"), "a setup bind asks for the bound save again");
+    assert!(take.iter().any(|t| t == "setup_bound"), "a setup bind tells the worker whether it restored");
     assert!(take.iter().any(|t| t == "save_captured"), "Save still writes the bound save");
     let text = include_str!("../src/runtime/features/states.rs");
     let start = text.find("fn take_captured(").expect("take_captured");
@@ -46,4 +46,17 @@ fn a_setup_restore_writes_no_save_file() {
     let pair = take_text.find("let saved_pair").expect("the Save pair is taken first");
     let trailing = take_text.find("if let Some(binding) = binding").expect("a setup bind after every record");
     assert!(pair < trailing, "the Save pair is read before the trailing setup bind is applied");
+}
+
+/// Primary 2026-11-08 23:03Z, SETUP-Y-BIND (cov-rec #69 (b)): Y binds a setup without restoring it, and the setup stays
+/// in the slot as Load's target. Only a restoring bind (A) gives the slot the bound save back. The writer passes the
+/// bind's own restore flag to the worker (`rr_host::setup_bound`), never a fixed "restored".
+#[test]
+fn a_setup_bound_with_y_keeps_the_setup_in_the_slot() {
+    let g = graph();
+    let take = body(&g, "states::take_captured");
+    assert!(!take.iter().any(|t| t == "setup_restored"), "take_captured does not resync the slot for every bind");
+    assert!(take.iter().any(|t| t == "restore"), "it reads the bind's restore flag");
+    let restore = body(&g, "setups::restore");
+    assert!(restore.iter().any(|t| t == "Bind"), "the flag is the bind action's own (A restores, Y binds only)");
 }

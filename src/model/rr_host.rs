@@ -571,6 +571,16 @@ pub fn setup_restored() {
     BOUND_DIRTY.store(true, Ordering::Release);
 }
 
+/// The state writer applied a setup bind from the Setup library to the active slot. A (`restore`) moves the fighters
+/// and the slot then gets the bound save back (`setup_restored`). Y binds without moving anyone: the setup stays in
+/// the slot, so Load returns to it, until the next bound-save change (primary 2026-11-08 23:03Z, SETUP-Y-BIND;
+/// cov-rec #69 (b)). Neither writes the bound save file.
+pub fn setup_bound(restore: bool) {
+    if restore {
+        setup_restored();
+    }
+}
+
 /// What Edit placement edits (primary 2026-11-08 #70 (a)): the page role's active macro, the file Play plays, and the
 /// position its start save gives that role. Play warps there and adds the offset (`warp_pair`).
 #[derive(Clone, Debug, PartialEq)]
@@ -2889,5 +2899,51 @@ mod tests {
         setup_restored();
         assert_eq!(bound_sync(&root), Some(None), "with nothing bound the restored slot is emptied again");
         assert_eq!(RecordingIndex::load(&root).unwrap().bound(), None, "and no save is made for it");
+    }
+
+    /// Primary 2026-11-08 23:03Z, SETUP-Y-BIND (cov-rec #69 (b)): Y in the Setup library binds a setup without
+    /// restoring it. The setup stays in the active slot, so Load returns to it, until the next bound-save change. It
+    /// never writes the bound save file. A (bind and restore) still gives the slot the bound save back.
+    #[test]
+    fn a_setup_bound_with_y_stays_loads_target_until_the_bound_save_changes() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("setup-y");
+        migrate_at_boot(&root, &none(), "2026-11-08").unwrap();
+        let saves = Store::<NamedSave>::new(root.join(SAVES_DIR));
+        let bound = saves.save_new(&NamedSave::new("Bound", at_x(-70.0), at_x(-40.0)).unwrap()).unwrap();
+        let other = saves.save_new(&NamedSave::new("Other", at_x(10.0), at_x(20.0)).unwrap()).unwrap();
+        let before = saves.load(&bound).unwrap();
+        let mut index = RecordingIndex::load(&root).unwrap();
+        index.bind_save(Some(&bound), 1).unwrap();
+        index.save(&root).unwrap();
+        assert!(bound_sync(&root).is_some(), "the first sync");
+
+        setup_bound(false);
+        assert!(bound_sync(&root).is_none(), "Y: the setup stays in the slot, so Load returns to it");
+        assert!(!write_saved(&root), "Y hands the worker nothing to write");
+        // A write elsewhere in the library (the menu close's index write) is not a bound-save change.
+        bump_catalog();
+        assert!(bound_sync(&root).is_none(), "the bound save did not change, so the setup stays");
+        assert!(bound_sync(&root).is_none(), "Load twice: still the setup");
+        assert_eq!(saves.load(&bound).unwrap(), before, "the bound save file is untouched");
+
+        let selection = Selection {
+            bound: Some(other.clone()),
+            active_player: None,
+            active_cpu: None,
+            loop_player: LoopMark::Finite(1),
+            loop_cpu: LoopMark::Finite(1),
+            drill: None,
+            record_role: ViewRole::Player,
+        };
+        publish_selection(&root, &selection, None);
+        let next = bound_sync(&root).expect("binding another save is a bound-save change").expect("Other is bound");
+        assert_eq!((next[0].x, next[1].x), (10.0, 20.0), "Load goes to the newly bound save");
+
+        setup_bound(true);
+        let back = bound_sync(&root).expect("A: the slot gets the bound save back").expect("Other is bound");
+        assert_eq!((back[0].x, back[1].x), (10.0, 20.0));
+        assert_eq!(saves.load(&bound).unwrap(), before, "no save file was written");
     }
 }
