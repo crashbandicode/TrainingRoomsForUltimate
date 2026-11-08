@@ -657,3 +657,11 @@ ceiling = 150650
 date = "2026-11-08"
 reason = "rc.5 final: the merge of p23/rc5-cpu-fidelity (3cb7857, +74 over 150495) into p23/rc5-wire-fix (b4e0727, 150576); the two sides add up, nothing else changes; measured 150650 on the merged tree (tools/size_gate.py)"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); final ceiling = measured merged size per primary c07b3449, TASK-OPUS-rc5-merge-fidelity 2026-11-08"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 150839
+date = "2026-11-08"
+reason = "rc.6 coverage fixes (p23/rc6-cov-rec fd77245): the bound save drives Save, Load and Auto-load through the active slot, combo CONNECTIONS lines in the catalog, shared combo ids in the index and sequences, the recorder before the input display (Make combo events), and the mash sees a library macro playing on the CPU; measured 150839 (tools/size_gate.py), +189 over 150650"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to these root fixes under TASK-OPUS-rc6-cov-rec (primary c07b3449, 2026-11-08: a raise goes in its own commit with approved_by)"
