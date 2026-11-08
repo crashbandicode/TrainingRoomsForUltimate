@@ -1699,7 +1699,7 @@ mod tests {
         assert_eq!([trainer_task::SIZE, trainer_task::HOLDER, trainer_task::OWNER, trainer_task::COSTUME, trainer_task::FLAG,
             trainer_task::BUILD, trainer_task::OBJECT_SIZE], [0xa0, 0, 8, 0x90, 0x91, 0x92, 1]);
         // It keeps the construction task's handle, pending count, queue id and functor offsets.
-        assert!(construction_task::CANCEL < trainer_task::COSTUME && construction_task::SIZE <= trainer_task::COSTUME);
+        const { assert!(construction_task::CANCEL < trainer_task::COSTUME && construction_task::SIZE <= trainer_task::COSTUME) };
     }
 
     /// Phase B′: an ordinary group without a Mii identity and a Mii group (operator decision
