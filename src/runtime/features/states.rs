@@ -29,7 +29,7 @@ use crate::model::lra_reset;
 use crate::model::sites_pkg3 as s;
 use crate::model::state::buff::{BuffFacts, BuffKind, BuffState};
 use crate::model::state::charge;
-use crate::model::state::file::SaveFile;
+use crate::model::state::file::{SaveFile, SLOTS};
 use crate::model::state::hooks::{self, DeathParam};
 use crate::model::state::ids::{self, Table, C, UNRESOLVED};
 use crate::model::state::machine::{Done, FrameIn, Machine, Out, Placing, Request, Role, StatusNow};
@@ -372,6 +372,55 @@ pub fn request_named_load(pair: [SavedState; 2]) {
     *NAMED_LOAD.lock() = Some(pair);
 }
 
+/// The bound save for the active slot, posted by the recording worker with its Mii identities split off (the worker
+/// may allocate and free; the frame step only moves them). A plugin thread never takes `STATE` (tests/hook_locks.rs),
+/// so the player's frame step applies the post under it.
+struct BoundPost {
+    pair: [SavedState; 2],
+    miis: [Option<crate::engine::mii::lifetime::Configuration>; 2],
+}
+
+static BOUND_POST: Mutex<Option<BoundPost>> = Mutex::new(None);
+static BOUND_PENDING: AtomicBool = AtomicBool::new(false);
+
+/// The bound save becomes the active slot (`rr_host::bound_sync`, on the recording worker): Load, Auto-load on death
+/// and their mirroring, damage and buffs act on that slot, so they act on the bound save. `None` (nothing bound)
+/// empties the slot, and an empty slot loads nothing (`Machine::begin_load`). A newer post replaces one not yet applied.
+pub fn post_bound(pair: Option<[SavedState; 2]>) {
+    let mut pair = pair.unwrap_or_else(|| [SavedState::never_saved(), SavedState::never_saved()]);
+    let miis = [setups::saved_identity(&pair[0]), setups::saved_identity(&pair[1])];
+    for record in &mut pair {
+        record.mii = None;
+    }
+    let previous = BOUND_POST.lock().replace(BoundPost { pair, miis });
+    BOUND_PENDING.store(true, Ordering::Release);
+    drop(previous);
+}
+
+/// The player's frame step: the posted bound save goes into the active slot, unless a save or a load holds the slot
+/// now (then it waits for a later frame).
+fn apply_bound_post() {
+    if !BOUND_PENDING.load(Ordering::Acquire) {
+        return;
+    }
+    with(|state| {
+        if state.machine.setup_busy() {
+            return;
+        }
+        let Some(post) = BOUND_POST.lock().take() else { return };
+        BOUND_PENDING.store(false, Ordering::Release);
+        let slot = usize::from(state.settings.slot).min(SLOTS - 1);
+        let settings = state.settings;
+        if !state.machine.bind_setup(slot, post.pair, false, &settings, &mut state.rng) {
+            return;
+        }
+        state.saved_miis[0][slot] = post.miis[0];
+        state.saved_miis[1][slot] = post.miis[1];
+        state_diag!("[TrainingRooms] state bound_slot slot={} player_x={} cpu_x={}", slot + 1,
+            state.machine.record(Role::Player, slot).x, state.machine.record(Role::Cpu, slot).x);
+    });
+}
+
 /// Cancel every pending load (scene departure, hot swap: SPEC-state-01 §6.11).
 pub fn cancel_pending() {
     with(|state| {
@@ -665,6 +714,7 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
     // The Load chord is read only on a non-CPU-operated, non-Nana fighter's callback.
     let load_chord = !nana && !reset_hub::cpu_operated(fighter) && LOAD_REQUEST.swap(false, Ordering::AcqRel);
     if !nana && !reset_hub::cpu_operated(fighter) {
+        apply_bound_post();
         if let Some(pair) = NAMED_LOAD.lock().take() {
             let accepted = with(|state| {
                 let accepted = state.machine.begin_temporary(pair);
@@ -1628,10 +1678,14 @@ fn take_captured(file: &mut SaveFile) {
         }
     }
     taken.sort_by_key(|record| record.as_ref().map_or(u64::MAX, |record| record.sequence));
+    let mut written = None;
     for CapturedRecord { sequence, role, slot, mut state, mii } in taken.into_iter().flatten() {
         if binding.as_ref().is_some_and(|job| job.sequence() < sequence) {
-            setups::apply_writer_bind(file, binding.take().unwrap());
+            let bind = binding.take().unwrap();
+            written = Some(bind.slot());
+            setups::apply_writer_bind(file, bind);
         }
+        written = Some(slot);
         state.marker = Marker::NoAction;
         // Configuration serializes only validated integer/byte values. Its
         // allocation-bearing JSON representation stays on this writer thread.
@@ -1642,7 +1696,16 @@ fn take_captured(file: &mut SaveFile) {
         };
         records[slot.min(records.len() - 1)] = state;
     }
-    if let Some(binding) = binding { setups::apply_writer_bind(file, binding); }
+    if let Some(binding) = binding {
+        written = Some(binding.slot());
+        setups::apply_writer_bind(file, binding);
+    }
+    // The slot is the bound save: what Save (or a setup restore) put there is written into that file on the worker
+    // (`rr_host::write_saved`), with the Mii identities just attached.
+    if let Some(slot) = written.map(|slot| slot.min(SLOTS - 1)) {
+        crate::engine::rr_host::save_captured([file.player[slot].clone(), file.cpu[slot].clone()]);
+        crate::runtime::ui::worker::wake();
+    }
     let dropped = HANDOFF_DROPPED.swap(0, Ordering::Relaxed);
     if dropped != 0 {
         diagnostic(format_args!("[TrainingRooms] save-state records dropped before the writer took them: {dropped}"));

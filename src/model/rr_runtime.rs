@@ -585,12 +585,16 @@ pub fn load_catalog(root: &Path) -> Result<CatalogLoad, Error> {
     let combos = ComboLibrary::new(root.join("combos"));
     if let Ok(list) = combos.list() {
         for entry in list.entries {
-            let made_from = combos.load(&entry.id).ok().and_then(|file| file.made_from);
+            let record = combos.load(&entry.id).ok();
+            let links = record
+                .as_ref()
+                .map(|file| crate::model::recording_menu::combo_link_lines(&file.combo))
+                .unwrap_or_default();
             catalog.combos.push(ComboFile {
                 id: entry.id,
                 name: entry.name,
-                made_from,
-                links: Vec::new(),
+                made_from: record.and_then(|file| file.made_from),
+                links,
                 span: entry.links as u32,
             });
         }
@@ -1269,5 +1273,28 @@ mod tests {
         publish_selection(&root, &screens.selection(), None);
         let after = RecordingIndex::load(&root).unwrap();
         assert_eq!(after.active(Role::Cpu), Some("macro-1"), "the menu published a selection older than the index");
+    }
+
+    /// Eden rc6-covrec-diag1 (2026-11-08): a combo under the cursor showed no CONNECTIONS lines, because the catalog
+    /// the worker loads gave every combo no link lines. RECORDING.md: "The combo's help lines list each link as the
+    /// two moves and TRUE or not, then that link's input events, then its drift".
+    #[test]
+    fn the_catalog_gives_each_combo_its_connection_lines() {
+        let root = scratch("combo-lines");
+        RecordingIndex::load(&root).unwrap().save(&root).unwrap();
+        let combo = Combo::from_links([link(Move::Jab, Move::Jab), link(Move::Jab, Move::SideTilt)]).unwrap();
+        let id = ComboLibrary::new(root.join("combos"))
+            .save_new(&ComboRecord::new("Jab jab".into(), combo, None))
+            .unwrap();
+        let loaded = load_catalog(&root).unwrap();
+        let file = loaded.catalog.combos.iter().find(|file| file.id == id).unwrap();
+        assert_eq!(file.links, crate::model::recording_menu::combo_link_lines(&combo));
+        assert!(file.links.iter().any(|line| line.starts_with("L2 ")), "{:?}", file.links);
+        let mut screens = RecordingScreens::new();
+        screens.set_catalog(loaded.catalog);
+        let index = screens.section(Face::Page, COMBOS_SEQ, 1).rows.iter().position(|row| row.name == "Jab jab").unwrap();
+        screens.set_cursor(Face::Page, COMBOS_SEQ, 1, index);
+        let lines: Vec<String> = screens.connections(Face::Page, COMBOS_SEQ).into_iter().map(|line| line.text).collect();
+        assert!(lines.iter().any(|line| line.starts_with("L1 jab → jab")), "{lines:?}");
     }
 }

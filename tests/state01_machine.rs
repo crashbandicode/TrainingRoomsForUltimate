@@ -605,3 +605,23 @@ fn r2_4_loading_is_true_from_acceptance_to_completion_and_the_restore_is_reporte
         assert_eq!(machine.frame(&input(entry), &settings(), &mut rng).restored, None, "never again");
     }
 }
+
+/// RECORDING.md, "Save states only warp": "Auto-load on death only warps to the bound save. If none is bound, it does
+/// nothing." The bound save is the active slot's pair (rc.6 coverage fix); with no save there, neither the Load chord
+/// nor a death starts a load (Eden rc6-covrec-diag1 cov-autoload: a death still loaded with nothing bound).
+#[test]
+fn an_empty_slot_loads_nothing_on_the_chord_or_a_death() {
+    let mut machine = Machine::default();
+    let settings = StateSettings { autoload: true, ..settings() };
+    let mut random = rng();
+    let chord = request(&mut machine, &settings, &mut random);
+    assert!(!chord.stop_playback, "the Load chord started a load of an empty slot");
+    assert!(!machine.is_loading());
+    let death = machine.frame(&FrameIn { dead: true, ..input(0) }, &settings, &mut random);
+    assert!(!death.stop_playback && !death.force_dead, "a death started a load of an empty slot");
+    assert!(!machine.is_loading());
+    // One saved record is a save: the chord loads it.
+    let mut machine = machine_with(saved(4.0, 0.0, 1.0, GROUND, 7), SavedState::never_saved(), 0);
+    assert!(request(&mut machine, &settings, &mut random).stop_playback);
+    assert!(machine.is_loading());
+}

@@ -44,6 +44,12 @@ pub fn note_mash() {
     rr_host::note_mash();
 }
 
+pub fn cpu_playback(
+    recorder: crate::model::cpu::playback::PlaybackState,
+) -> crate::model::cpu::playback::PlaybackState {
+    rr_host::cpu_playback(recorder)
+}
+
 pub fn push_capture(side: u8, frame: InputFrame) {
     rr_host::push_capture(side, frame);
 }
@@ -88,14 +94,25 @@ pub fn service() {
                 super::recorder::release_slot_image();
             }
             apply(&tick);
+            sync_bound(root);
             return;
         }
     }
+    sync_bound(root);
     if !rr_host::pending() {
         return;
     }
     let tick = rr_host::service_pending(root, player, cpu, online);
     apply(&tick);
+}
+
+/// Save writes the bound save; the save-state machine's active slot holds the bound save (RECORDING.md, "Save states
+/// only warp").
+fn sync_bound(root: &Path) {
+    rr_host::write_saved(root);
+    if let Some(pair) = rr_host::bound_sync(root) {
+        super::states::post_bound(pair);
+    }
 }
 
 fn take_mismatch_answer() {

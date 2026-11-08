@@ -16,10 +16,11 @@ use super::playback::{Book, Playback, StartLink};
 use super::rr_runtime::{
     chord_notice, civil_date, crop_combo_file, crop_macro_file, delete_save,
     drive_mash, drive_play, drive_step, duplicate_save, finish_recording, migrate_at_boot,
-    offer_keyboard, push_frame, save_made_combo, start_save_notice, toggle_record, Capture,
+    offer_keyboard, push_frame, save_chord, save_made_combo, start_save_notice, toggle_record, Capture,
     KeyboardOffer, Tape, EMPTY_COMBO, READ_WINDOW, RESIDENT_FRAMES,
 };
 use crate::model::combo::Combo;
+use crate::model::cpu::playback::PlaybackState;
 use crate::model::input_delay::MappedInputs;
 use crate::model::recording::{inject_values, ControlCtx, ControlOut, CpuRoleDrive, Inject, Phase};
 use crate::model::recording_menu::{Effect, LoopMark, Selection, ViewRole};
@@ -73,6 +74,19 @@ static WARP_HOLD: AtomicBool = AtomicBool::new(false);
 /// the one allocation to `recorder_ai` (`runtime::roster::build_split`, `docs/provenance/pkg6-owner-locks.md`).
 /// `hos_lock` is a const word and allocates nothing.
 static CPU_DRIVE: hos_lock::Mutex<CpuRoleDrive> = hos_lock::Mutex::new(CpuRoleDrive::idle());
+/// The binding or a library file changed since the save-state machine last took the bound save.
+static BOUND_DIRTY: AtomicBool = AtomicBool::new(true);
+/// What the machine's active slot was last given: the bound id and its pair.
+static BOUND_APPLIED: Mutex<Option<BoundCopy>> = Mutex::new(None);
+/// A Save the state writer captured, for the worker to write into the bound save.
+static SAVED_PAIR: Mutex<Option<[SavedState; 2]>> = Mutex::new(None);
+
+/// The bound save as the save-state machine's active slot must hold it (RECORDING.md, "Save states only warp").
+#[derive(Clone, Debug, PartialEq)]
+struct BoundCopy {
+    id: Option<String>,
+    pair: Option<[SavedState; 2]>,
+}
 
 struct MakeJob {
     source: String,
@@ -292,6 +306,15 @@ pub fn note_mash() {
     MASH.store(true, Ordering::Release);
 }
 
+/// What the CPU's behaviours see of playback (B5 / N4, Mash interrupts playback): the old recorder's state, with a
+/// library macro playing on the CPU counted as a running playback.
+pub fn cpu_playback(recorder: PlaybackState) -> PlaybackState {
+    PlaybackState {
+        running: recorder.running || role_playing(Role::Cpu),
+        ..recorder
+    }
+}
+
 /// The save-state restore a Play's warp asked for has placed both fighters (or the warp was
 /// not requested after all). The held runs step from their first frame on the next tick.
 pub fn warp_landed() {
@@ -377,6 +400,7 @@ pub fn service_at(
         && migrate_at_boot(root, slots, date).is_ok()
     {
         MIGRATED.store(true, Ordering::Release);
+        BOUND_DIRTY.store(true, Ordering::Release);
         tick.diags.push("screen=migrate once=1".to_string());
     }
     let edge = RECORD_EDGE.swap(0, Ordering::AcqRel);
@@ -492,6 +516,55 @@ pub fn catalog_generation() -> u64 {
 
 fn bump_catalog() {
     CATALOG_GEN.fetch_add(1, Ordering::Release);
+    BOUND_DIRTY.store(true, Ordering::Release);
+}
+
+/// What the save-state machine's active slot must hold now, when that changed since the last call: the bound save's
+/// pair, or `Some(None)` (an empty slot) when nothing is bound. Load and Auto-load warp to that slot, so they follow
+/// the binding (pop-up A on a save, the Bind row, Delete) and the bound file. Nothing before the library is built: the
+/// legacy slot stays until migration binds the slot the chords used.
+pub fn bound_sync(root: &Path) -> Option<Option<[SavedState; 2]>> {
+    if !BOUND_DIRTY.swap(false, Ordering::AcqRel) {
+        return None;
+    }
+    let index = match RecordingIndex::load(root) {
+        Ok(index) if index.migrated() => index,
+        _ => {
+            BOUND_DIRTY.store(true, Ordering::Release);
+            return None;
+        }
+    };
+    let id = index.bound().map(str::to_owned);
+    let pair = id
+        .as_deref()
+        .and_then(|id| Store::<NamedSave>::new(root.join(SAVES_DIR)).load(id).ok())
+        .map(|save| [save.player, save.cpu]);
+    let copy = BoundCopy { id, pair };
+    let mut applied = lock(&BOUND_APPLIED);
+    if applied.as_ref() == Some(&copy) {
+        return None;
+    }
+    let pair = copy.pair.clone();
+    *applied = Some(copy);
+    Some(pair)
+}
+
+/// The state writer has a Save's two records for the active slot. The worker writes them into the bound save.
+pub fn save_captured(pair: [SavedState; 2]) {
+    *lock(&SAVED_PAIR) = Some(pair);
+}
+
+/// Save writes the one bound save, or a new bound Save N when none is bound (`rr_runtime::save_chord`). Worker side.
+pub fn write_saved(root: &Path) -> bool {
+    let Some([player, cpu]) = lock(&SAVED_PAIR).take() else {
+        return false;
+    };
+    let Ok(id) = save_chord(root, player.clone(), cpu.clone(), unix_now()) else {
+        return false;
+    };
+    *lock(&BOUND_APPLIED) = Some(BoundCopy { id: Some(id), pair: Some([player, cpu]) });
+    bump_catalog();
+    true
 }
 
 /// The menu's selection is what Play, Record, and the loop read. The index is that selection.
@@ -509,6 +582,7 @@ pub fn publish_selection(root: &Path, selection: &Selection, drill_kind: Option<
         let _ = index.set_drill(Some(Drill { kind, id: id.to_string() }), at.saturating_add(3));
     }
     let _ = index.save(root);
+    BOUND_DIRTY.store(true, Ordering::Release);
 }
 
 /// What the grade helper should do when the recording drill id changes.
@@ -1152,6 +1226,9 @@ fn reset_host() {
     CPU_ROLE_ON.store(false, Ordering::Release);
     WARP_HOLD.store(false, Ordering::Release);
     *CPU_DRIVE.lock() = CpuRoleDrive::idle();
+    BOUND_DIRTY.store(true, Ordering::Release);
+    *lock(&BOUND_APPLIED) = None;
+    *lock(&SAVED_PAIR) = None;
     for slot in &ROLE_KIND {
         slot.store(-1, Ordering::Release);
     }
@@ -1721,6 +1798,32 @@ mod tests {
         assert_eq!(take_cpu_frame().expect("no warp, no wait").buttons, 33_281);
     }
 
+    /// Eden `rc6-covrec-diag1` (2026-11-08): Mash interrupts playback On, the CPU played its active macro,
+    /// Player 1's jab put it in hitstun, and no `screen=playback mash=1` came. The CPU's mash read only the
+    /// old recorder's playback, which was idle, so it never asked the library run to stop.
+    #[test]
+    fn a_library_macro_playing_on_the_cpu_is_the_playback_the_mash_and_covered_settings_see() {
+        use crate::model::cpu::playback::covered_setting_applies;
+        let _hold = hold();
+        reset_host();
+        let root = scratch("cpu-mash");
+        let idle = PlaybackState::default();
+        active_plain_macro(&root, Role::Cpu, 30);
+        assert!(!cpu_playback(idle).running, "nothing plays yet");
+        on_chords(false, false, true);
+        tick(&root);
+        assert!(take_cpu_frame().is_some());
+        let seen = cpu_playback(idle);
+        assert!(seen.possesses_cpu(), "the CPU's library run is a running playback: {seen:?}");
+        assert!(!covered_setting_applies(seen, false));
+        let recording = PlaybackState { recording: true, ..idle };
+        assert!(cpu_playback(recording).recording, "the recorder's own state is kept");
+        note_mash();
+        tick(&root);
+        assert!(take_cpu_frame().is_none(), "the mash stopped the CPU's run");
+        assert!(!cpu_playback(idle).running);
+    }
+
     /// A file of `n` distinct frames (buttons 1..=n), active on `role`, with no start save.
     fn active_plain_macro(root: &Path, role: Role, n: u32) -> Vec<u32> {
         let _ = service_at(root, &none(), "2026-11-08", state(8), state(7), false);
@@ -2091,5 +2194,55 @@ mod tests {
         assert_eq!(follow_grade(Some("combo-2"), Some("combo-2")), GradeFollow::Same);
         assert_eq!(follow_grade(Some("combo-2"), Some("combo-1")), GradeFollow::Install("combo-1"));
         assert_eq!(follow_grade(Some("combo-2"), None), GradeFollow::Clear);
+    }
+
+    fn at_x(x: f32) -> SavedState {
+        let mut state = state(0);
+        state.x = x;
+        state
+    }
+
+    /// RECORDING.md, "Save states only warp": Save writes the one bound save; Load warps both fighters to that save; A
+    /// on a save binds it to Save and Load. Eden rc6-covrec-diag1 cov-bind-load (2026-11-08): with Left bound, Load went
+    /// to the legacy slot, A on Right changed nothing, and Save wrote save_states.json. The machine's active slot is
+    /// the bound save: this is what the worker gives it, and what Save writes back.
+    #[test]
+    fn the_active_slot_follows_the_bound_save_and_save_writes_it() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("bound");
+        migrate_at_boot(&root, &none(), "2026-11-08").unwrap();
+        let saves = Store::<NamedSave>::new(root.join(SAVES_DIR));
+        let left = saves.save_new(&NamedSave::new("Left", at_x(-70.0), at_x(-40.0)).unwrap()).unwrap();
+        let right = saves.save_new(&NamedSave::new("Right", at_x(40.0), at_x(70.0)).unwrap()).unwrap();
+        let mut index = RecordingIndex::load(&root).unwrap();
+        index.bind_save(Some(&left), 1).unwrap();
+        index.save(&root).unwrap();
+        let first = bound_sync(&root).expect("the first sync").expect("Left is bound");
+        assert_eq!((first[0].x, first[1].x), (-70.0, -40.0));
+        assert!(bound_sync(&root).is_none(), "nothing changed");
+        let selection = Selection {
+            bound: Some(right.clone()),
+            active_player: None,
+            active_cpu: None,
+            loop_player: LoopMark::Finite(1),
+            loop_cpu: LoopMark::Finite(1),
+            drill: None,
+            record_role: ViewRole::Player,
+        };
+        publish_selection(&root, &selection, None);
+        assert_eq!(bound_sync(&root).unwrap().unwrap()[0].x, 40.0, "A on Right binds Right for Load");
+        save_captured([at_x(5.0), at_x(6.0)]);
+        assert!(write_saved(&root));
+        let written = saves.load(&right).unwrap();
+        assert_eq!((written.player.x, written.cpu.x), (5.0, 6.0), "Save writes the bound file");
+        assert!(bound_sync(&root).is_none(), "the slot already holds what Save wrote");
+        publish_selection(&root, &Selection { bound: None, ..selection }, None);
+        assert_eq!(bound_sync(&root), Some(None), "nothing bound empties the slot");
+        save_captured([at_x(1.0), at_x(2.0)]);
+        assert!(write_saved(&root));
+        let made = RecordingIndex::load(&root).unwrap().bound().unwrap().to_owned();
+        assert_eq!(saves.load(&made).unwrap().name, "Save 1");
+        assert_eq!(saves.load(&made).unwrap().player.x, 1.0);
     }
 }

@@ -55,6 +55,11 @@ fn decode(record: &SavedState) -> Result<Option<Configuration>, &'static str> {
     Ok(Some(config))
 }
 
+/// One record's saved Mii, as `saved_identities` reads a slot (`None` when it has none or it does not decode).
+pub(super) fn saved_identity(record: &SavedState) -> Option<Configuration> {
+    decode(record).ok().flatten()
+}
+
 pub(super) fn saved_identities(file: &SaveFile) -> [[Option<Configuration>; 5]; 2] {
     [&file.player, &file.cpu]
         .map(|records| std::array::from_fn(|i| decode(&records[i]).ok().flatten()))
@@ -281,6 +286,10 @@ pub(super) struct WriterBind {
 impl WriterBind {
     pub(super) fn sequence(&self) -> u64 {
         self.job.sequence
+    }
+
+    pub(super) fn slot(&self) -> usize {
+        self.job.target.slot
     }
 }
 pub(super) fn take_writer_bind() -> Option<WriterBind> {
