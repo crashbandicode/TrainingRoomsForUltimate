@@ -74,6 +74,8 @@ pub fn next(phase: Phase, seen: Seen) -> (Phase, Step) {
     match phase {
         Phase::Menu if !seen.menu_open && seen.prompt_visible && !seen.clip_visible => (Phase::Prompt, Step::ShowPrompt),
         Phase::Menu => (Phase::Menu, Step::Nothing),
+        // The clip editor's own question answered or retired: the editor is drawn again.
+        Phase::Prompt if !seen.prompt_visible && !seen.menu_open && seen.clip_visible => (Phase::Clip, Step::HidePrompt),
         Phase::Prompt if !seen.prompt_visible || seen.menu_open => (Phase::Menu, Step::HidePrompt),
         Phase::Prompt => (Phase::Prompt, Step::Nothing),
         Phase::Panel if !seen.menu_open => (Phase::Menu, Step::CloseLayer),
@@ -81,6 +83,8 @@ pub fn next(phase: Phase, seen: Seen) -> (Phase, Step) {
         Phase::Panel if !seen.panel_visible => (Phase::Menu, Step::PopRow),
         Phase::Panel => (Phase::Panel, Step::Nothing),
         Phase::Clip if !seen.clip_visible => (Phase::Menu, Step::HideClip),
+        // The editor asked its Fighter Mismatch question (a track or capture whose recorded fighter is not the CPU).
+        Phase::Clip if seen.prompt_visible => (Phase::Prompt, Step::ShowPrompt),
         Phase::Clip => (Phase::Clip, Step::Nothing),
     }
 }
@@ -193,6 +197,25 @@ mod tests {
         let naming = Seen { clip_foreground: false, ..seen(false, true, true) };
         assert_eq!(next(Phase::Clip, naming), (Phase::Clip, Step::Nothing));
         assert_eq!(next(Phase::Clip, seen(false, true, true)), (Phase::Clip, Step::Nothing));
+    }
+
+    /// Eden covrest-yoga-01 (2026-11-08, `p23/rc6-cov-rest` with the #68 fix): Down to the Mii track resolved the
+    /// recorded Mii and opened the clip editor's own Fighter Mismatch question (`[NamedMacroDiag] view title="Fighter
+    /// Mismatch"`), but the frames kept showing the editor: the Clip phase had no way to the question, so nothing drew
+    /// it and the editor kept Player 1's presses (Down and A went to the editor). The question is drawn alone and owns
+    /// the presses; once answered, the editor is drawn again.
+    #[test]
+    fn the_clip_editors_own_question_is_drawn_and_then_the_editor_again() {
+        let editor = seen(false, true, true);
+        let asked = Seen { prompt_visible: true, ..editor };
+        assert_eq!(next(Phase::Clip, asked), (Phase::Prompt, Step::ShowPrompt));
+        assert_eq!(next(Phase::Prompt, asked), (Phase::Prompt, Step::Nothing));
+        assert_eq!(next(Phase::Prompt, editor), (Phase::Clip, Step::HidePrompt), "answered: back to the editor");
+        assert_eq!(next(Phase::Prompt, seen(false, false, false)), (Phase::Menu, Step::HidePrompt));
+        assert_eq!(next(Phase::Clip, Seen { prompt_visible: true, ..seen(false, false, false) }), (Phase::Menu, Step::HideClip));
+        let clip = include_str!("../../runtime/macros/replay_capture.rs");
+        assert!(clip.contains("if crate::runtime::macros::named_macros::fighter_prompt_up() { return; }"),
+            "the question owns Player 1's presses, not the editor");
     }
 
     #[test]
