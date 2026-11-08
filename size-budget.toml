@@ -633,3 +633,11 @@ ceiling = 150495
 date = "2026-11-08"
 reason = "rc.5 final: the merge of p23/rc5-mismatch-fix (c7f936d, +98 over 150251) into p23/rc5-wire-fix (150397); the two sides add up, nothing else changes; measured 150495 on the merged tree (tools/size_gate.py)"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); final ceiling = measured merged size per primary c07b3449, TASK-OPUS-rc5-merge-final 2026-11-08"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 150576
+date = "2026-11-08"
+reason = "rc.5 task 7: the recording menu takes the index's selection with every catalog load, so a menu close never publishes a selection older than the index (Record on CPU then menu open/close kept active.cpu); a chord's buttons are hidden from the game's mapping while held; measured 150576 (tools/size_gate.py), +81 over 150495"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); task 7 ordered by primary c07b3449 (INBOX-opus-rc5-accept, 2026-11-08): 'size raise in its own commit'"
