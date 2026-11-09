@@ -66,10 +66,11 @@ is how to read the lanes, the stick row, and the readouts. The rc.5 clips are li
 
 ### Combos
 
-Recording › Combos saves a combo you landed, and the combo helper grades your next attempts against it, link by link.
-Each saved combo is a small JSON file in `sd:/ultimate/TrainingRooms/combos/`. You can edit it, copy it to another
-card or share it, and any fighter can practise it; [docs/COMBOS.md](docs/COMBOS.md) describes the format. The
-clip is under Combos below.
+*+ Save last combo…* (Recording › Combos & Sequences) saves a combo you landed, and the combo helper grades your next
+attempts against it, link by link. A sequence of combos is drilled the same way, one combo after another. Each saved
+combo is a small JSON file in `sd:/ultimate/TrainingRooms/combos/`. You can edit it, copy it to another card or share
+it, and any fighter can practise it; [docs/COMBOS.md](docs/COMBOS.md) describes the format. The clip is under Combos
+below.
 
 ### CPU reactions
 
@@ -98,7 +99,7 @@ A save state only warps, and Load starts nothing. Each role has one active macro
 that role's Play chord plays it without warping back on later loops. On the Recording page, Y does nothing and
 X cycles the loop only while the cursor is in Macros.
 [docs/RECORDING.md](docs/RECORDING.md) is how to use it. The pop-up and the Recording page are in that doc.
-What rc.5 changes is [docs/RELEASE-NOTES-rc5.md](docs/RELEASE-NOTES-rc5.md).
+What rc.6 changes is [docs/RELEASE-NOTES-rc6.md](docs/RELEASE-NOTES-rc6.md).
 
 ![Record and playback](docs/media/menu-recording.gif)
 
@@ -116,9 +117,15 @@ While the CPU pilot plugin plays Player 1, recording is refused with a notice.
 *The combo helper bar under the frame strip: the saved up tilt → up tilt (TRUE −4) attempted on time, then 3 frames
 early. Eden, 2026-11-05, `ff69e53` (release `031f1eae…`).*
 
-*Save last combo* (Recording › Combos) keeps your last combo as a file and makes it the target. With *Combo helper* On, a
-bar under the frame strip grades each attempt link by link: whether it linked, and whether you pressed on time, early or
-late. See [docs/MEDIA.md](docs/MEDIA.md).
+*+ Save last combo…*, the first row of COMBOS on the Recording page and in the recording pop-up, keeps your last combo
+as a file and makes it the drill. With *Combo helper* On, a bar under the frame strip grades each attempt link by link:
+whether the recorded inputs came, in order and on time, and whether the same move came out. A true combo is shown,
+not required. Drilling a sequence adds a header and a row of its combos to that bar.
+
+![Drill a sequence: combo 1, then combo 2, then a drop back at combo 1](docs/media/rc6-sequence-drill.gif)
+
+*Eden, 2026-11-08, `p23/rc6-seq-drill` `e6ac460` (diag NRO `50c8a5df`, log lines only): combo 1 lands, combo 2
+starts, then a wrong move drops the sequence back to combo 1.* See [docs/MEDIA.md](docs/MEDIA.md).
 
 ### Fighters, cycles and Kirby hats
 
@@ -126,6 +133,15 @@ late. See [docs/MEDIA.md](docs/MEDIA.md).
 
 Cycle chords step through your own order of fighters per role (red for Player 1, blue for the CPU), drawn with the
 game's stock icons.
+
+The fighters of your cycles load hot. Each role's first window of fighters is ready when Training starts, and the
+other groups are built in the background while you play; once the notice reads Ready or All loaded, a switch into a
+group took about 50–70 ms in Eden. Changing a cycle in Training releases the fighters that left it and builds the new
+ones the same way. Leaving a Mii for the fighters it replaced is a warm switch, not a reload. The background build
+waits while the fighter on screen is a Mii, Kirby, Ice Climbers, Pokémon Trainer or Pyra/Mythra
+(`background_build_eligible`, `src/model/swap/body_bank.rs:776`; TODO-PROOF: the special groups built in the
+background, hot lane and workers A and B). Raising No. of CPUs brings in the CPU cycle's next fighters, a saved Mii
+included.
 
 ![P1's hat chord on the CPU Kirby](docs/media/cpu-kirby-hat.gif)
 
@@ -145,7 +161,8 @@ Kirby hats change with a chord, for Player 1 or the CPU.
 
 Each Mii class (Fighters & Stages › Mii Brawler, Swordfighter, Gunner) lists your saved Miis per role (ZR switches
 Player and CPU). *Add New…* opens Smash's own Mii Fighter editor from Training. Saving creates a new Mii and leaves the
-others untouched, and leaving without saving creates nothing. See [docs/MII.md](docs/MII.md).
+others untouched, and leaving without saving creates nothing. Saving a Mii you already have saves nothing new and says
+"Same as ‹saved name›, nothing new saved". See [docs/MII.md](docs/MII.md).
 
 ### Stages
 
@@ -183,7 +200,10 @@ The *Replay capture* row and the Online Deluxe overlay show the same setting.
 
 ## Status
 
-**[0.2.0-rc.5](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases/tag/v0.2.0-rc.5)** is the newest build. There is no separate 0.2.0-rc.4. What it changes is [docs/RELEASE-NOTES-rc5.md](docs/RELEASE-NOTES-rc5.md).
+**[0.2.0-rc.6](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases/tag/v0.2.0-rc.6)** is the
+newest build (the release link resolves once it is published: TODO-FINAL-PASS). It follows 0.2.0-rc.3.1: 0.2.0-rc.5
+was withdrawn before players ran it, and there is no separate 0.2.0-rc.4. What it changes is
+[docs/RELEASE-NOTES-rc6.md](docs/RELEASE-NOTES-rc6.md), on top of [docs/RELEASE-NOTES-rc5.md](docs/RELEASE-NOTES-rc5.md).
 
 **0.2.0-rc.3** (2026-11-05) is the previous console test build. It adds to rc.2:
 - the **frame strip** input display, replacing the 15-row input log;
@@ -195,7 +215,7 @@ The *Replay capture* row and the Online Deluxe overlay show the same setting.
 
 rc.2 added the pause-helper fix, the Solo Popo mark placement and the Kirby hat-request endings. Limitations kept from
 the fork are listed in [Differences from the fork](docs/DIFFERENCES-FROM-THE-FORK.md); planned work is in the
-[ROADMAP](docs/ROADMAP.md). 0.1.0 crashes at console boot; use the newest build, [0.2.0-rc.5](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases/tag/v0.2.0-rc.5).
+[ROADMAP](docs/ROADMAP.md). 0.1.0 crashes at console boot; use the newest build, [0.2.0-rc.6](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases/tag/v0.2.0-rc.6).
 
 ## Build
 

@@ -57,11 +57,25 @@ pub fn menu_owns_input(open: bool, popup: bool, closing: bool, prompt: bool) -> 
     open || popup || closing || prompt
 }
 
+/// Whether the frame of `phase` is built from the menu's model. The clip editor's is not: the hand-over closed the menu,
+/// and every close drops the model (`menu::PlaceKeeper`), so the editor draws from the layer's own view.
+pub fn frame_needs_menu(phase: Phase) -> bool {
+    phase != Phase::Clip
+}
+
+/// The phase after the menu's session is reset (every close moves the input generation). The clip editor outlives the
+/// menu on purpose (the hand-over closes it), so it keeps drawing until the layer closes it (`next`: `HideClip`).
+pub fn after_session_reset(phase: Phase) -> Phase {
+    if phase == Phase::Clip { Phase::Clip } else { Phase::Menu }
+}
+
 /// The next phase and the step to take, given the phase and what the layer reports.
 pub fn next(phase: Phase, seen: Seen) -> (Phase, Step) {
     match phase {
         Phase::Menu if !seen.menu_open && seen.prompt_visible && !seen.clip_visible => (Phase::Prompt, Step::ShowPrompt),
         Phase::Menu => (Phase::Menu, Step::Nothing),
+        // The clip editor's own question answered or retired: the editor is drawn again.
+        Phase::Prompt if !seen.prompt_visible && !seen.menu_open && seen.clip_visible => (Phase::Clip, Step::HidePrompt),
         Phase::Prompt if !seen.prompt_visible || seen.menu_open => (Phase::Menu, Step::HidePrompt),
         Phase::Prompt => (Phase::Prompt, Step::Nothing),
         Phase::Panel if !seen.menu_open => (Phase::Menu, Step::CloseLayer),
@@ -69,6 +83,8 @@ pub fn next(phase: Phase, seen: Seen) -> (Phase, Step) {
         Phase::Panel if !seen.panel_visible => (Phase::Menu, Step::PopRow),
         Phase::Panel => (Phase::Panel, Step::Nothing),
         Phase::Clip if !seen.clip_visible => (Phase::Menu, Step::HideClip),
+        // The editor asked its Fighter Mismatch question (a track or capture whose recorded fighter is not the CPU).
+        Phase::Clip if seen.prompt_visible => (Phase::Prompt, Step::ShowPrompt),
         Phase::Clip => (Phase::Clip, Step::Nothing),
     }
 }
@@ -90,6 +106,32 @@ mod tests {
         assert_eq!(next(Phase::Prompt, asked), (Phase::Prompt, Step::Nothing));
         let answered = seen(false, false, false);
         assert_eq!(next(Phase::Prompt, answered), (Phase::Menu, Step::HidePrompt));
+    }
+
+    /// Eden rc6-covrec-diag1 and diag2 (2026-11-08): the Replay window's A opened the clip editor (status editor=true; the
+    /// game held on the clip), but no editor frame was ever drawn. The hand-over closes the menu, the close drops the
+    /// menu's model, and the worker built every frame only when it still held a model.
+    #[test]
+    fn the_clip_editor_draws_without_a_menu_model() {
+        let (phase, step) = next(Phase::Panel, seen(true, true, true));
+        assert_eq!((phase, step), (Phase::Clip, Step::HandOverToClip));
+        assert!(!frame_needs_menu(phase), "the editor's frame comes from the layer's view");
+        for phase in [Phase::Menu, Phase::Panel, Phase::Prompt] {
+            assert!(frame_needs_menu(phase), "{phase:?} is drawn from the menu's model");
+        }
+    }
+
+    /// The same runs: the hand-over's own close reset the menu session, and the reset put the worker back in Menu, so
+    /// the editor was never drawn although it held the game. The clip phase survives the reset; the layer closing the
+    /// editor ends it.
+    #[test]
+    fn the_hand_over_close_keeps_the_clip_editor_drawn() {
+        assert_eq!(after_session_reset(Phase::Clip), Phase::Clip);
+        assert_eq!(next(after_session_reset(Phase::Clip), seen(false, true, true)), (Phase::Clip, Step::Nothing));
+        assert_eq!(next(Phase::Clip, seen(false, false, false)), (Phase::Menu, Step::HideClip));
+        for phase in [Phase::Menu, Phase::Panel, Phase::Prompt] {
+            assert_eq!(after_session_reset(phase), Phase::Menu);
+        }
     }
 
     #[test]
@@ -155,6 +197,28 @@ mod tests {
         let naming = Seen { clip_foreground: false, ..seen(false, true, true) };
         assert_eq!(next(Phase::Clip, naming), (Phase::Clip, Step::Nothing));
         assert_eq!(next(Phase::Clip, seen(false, true, true)), (Phase::Clip, Step::Nothing));
+    }
+
+    /// Eden covrest-yoga-01 (2026-11-08, `p23/rc6-cov-rest` with the #68 fix): Down to the Mii track resolved the
+    /// recorded Mii and opened the clip editor's own Fighter Mismatch question (`[NamedMacroDiag] view title="Fighter
+    /// Mismatch"`), but the frames kept showing the editor: the Clip phase had no way to the question, so nothing drew
+    /// it and the editor kept Player 1's presses (Down and A went to the editor). The question is drawn alone and owns
+    /// the presses; once answered, the editor is drawn again.
+    #[test]
+    fn the_clip_editors_own_question_is_drawn_and_then_the_editor_again() {
+        let editor = seen(false, true, true);
+        let asked = Seen { prompt_visible: true, ..editor };
+        assert_eq!(next(Phase::Clip, asked), (Phase::Prompt, Step::ShowPrompt));
+        assert_eq!(next(Phase::Prompt, asked), (Phase::Prompt, Step::Nothing));
+        assert_eq!(next(Phase::Prompt, editor), (Phase::Clip, Step::HidePrompt), "answered: back to the editor");
+        assert_eq!(next(Phase::Prompt, seen(false, false, false)), (Phase::Menu, Step::HidePrompt));
+        assert_eq!(next(Phase::Clip, Seen { prompt_visible: true, ..seen(false, false, false) }), (Phase::Menu, Step::HideClip));
+        let worker = include_str!("../../runtime/ui/worker.rs");
+        assert!(worker.contains("let prompt_phase = s.phase == Phase::Menu || s.phase == Phase::Clip;"),
+            "a closed menu's model does not stop the clip editor's question from being shown");
+        let clip = include_str!("../../runtime/macros/replay_capture.rs");
+        assert!(clip.contains("if crate::runtime::macros::named_macros::fighter_prompt_up() { return; }"),
+            "the question owns Player 1's presses, not the editor");
     }
 
     #[test]

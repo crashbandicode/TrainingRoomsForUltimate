@@ -118,9 +118,80 @@ impl<T: Copy, const N: usize> std::ops::DerefMut for FixedList<T, N> {
     fn deref_mut(&mut self) -> &mut [T] { &mut self.items[..self.len] }
 }
 
+/// Up to `N` owned values in arrival order, held in an array (no heap): what a game callback hands to a plugin thread when the
+/// values are not `Copy` (hos-lock's `Mailbox` carries `Copy` messages). A full queue hands the value back and counts it.
+pub struct FixedQueue<T, const N: usize> {
+    items: [Option<T>; N],
+    head: usize,
+    len: usize,
+    refused: u32,
+}
+
+impl<T, const N: usize> FixedQueue<T, N> {
+    pub const fn new() -> Self {
+        Self { items: [const { None }; N], head: 0, len: 0, refused: 0 }
+    }
+
+    /// Append `item` after the others; a full queue hands it back.
+    pub fn push(&mut self, item: T) -> Result<(), T> {
+        if self.len == N {
+            self.refused = self.refused.saturating_add(1);
+            return Err(item);
+        }
+        self.items[(self.head + self.len) % N] = Some(item);
+        self.len += 1;
+        Ok(())
+    }
+
+    /// The oldest value.
+    pub fn pop(&mut self) -> Option<T> {
+        if self.len == 0 {
+            return None;
+        }
+        let item = self.items[self.head].take();
+        self.head = (self.head + 1) % N;
+        self.len -= 1;
+        item
+    }
+
+    pub const fn len(&self) -> usize {
+        self.len
+    }
+
+    pub const fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
+    /// Values handed back since the last call.
+    pub fn take_refused(&mut self) -> u32 {
+        std::mem::take(&mut self.refused)
+    }
+}
+
+impl<T, const N: usize> Default for FixedQueue<T, N> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_queue_gives_its_values_back_in_order_and_refuses_past_its_capacity() {
+        let mut queue = FixedQueue::<Vec<u8>, 3>::new();
+        assert!(queue.is_empty() && queue.pop().is_none());
+        for round in 0..4u8 {
+            assert!(queue.push(vec![round]).is_ok() && queue.push(vec![round, 1]).is_ok() && queue.push(vec![round, 2]).is_ok());
+            assert_eq!(queue.push(vec![9]), Err(vec![9]), "the fourth value is handed back");
+            assert_eq!((queue.len(), queue.take_refused(), queue.take_refused()), (3, 1, 0));
+            assert_eq!(queue.pop(), Some(vec![round]));
+            assert!(queue.push(vec![round, 3]).is_ok(), "a freed slot takes the next value");
+            let rest: Vec<_> = std::iter::from_fn(|| queue.pop()).collect();
+            assert_eq!(rest, [vec![round, 1], vec![round, 2], vec![round, 3]]);
+        }
+    }
 
     #[test]
     fn a_fixed_list_reads_as_the_slice_of_what_was_pushed() {

@@ -13,14 +13,16 @@ use core::sync::atomic::{AtomicI32, AtomicU32, Ordering};
 use hos_lock::Mutex;
 
 use crate::model::combo::{Combo, Helper, Label, Mark, Out, Outcome, Settings};
-use crate::model::combo_plan::Renderer;
+use crate::model::combo_plan::{Renderer, SeqView};
+use crate::model::drill::{Advance, SequenceRun, SequenceWalk, Stepped};
 use crate::model::frame_strip::{Tracker, Verdict};
 use crate::model::frame_strip_plan::{Changed, Look, Text};
 use crate::runtime::published;
 
 static HELPER: Mutex<Helper> = Mutex::new(Helper::new());
-/// The worker's copy of the last combo. The game thread publishes it after it has let go of HELPER.
-static SAMPLE: Mutex<Option<Combo>> = Mutex::new(None);
+/// The worker's copy of the last combo, with the helper's count of links captured (`Helper::seen`). The game thread
+/// publishes it after it has let go of HELPER.
+static SAMPLE: Mutex<(u32, Option<Combo>)> = Mutex::new((0, None));
 static RENDERER: Mutex<Renderer> = Mutex::new(Renderer::new());
 /// The target's name for the bar, and the names the menu shows (target, draft).
 static NAME: Mutex<Text> = Mutex::new(Text::EMPTY);
@@ -36,7 +38,7 @@ fn settings() -> Settings {
 /// fighter P1 is now: kept for the next save's `recorded_on` only; the helper grades whatever fighter P1 is.
 pub fn after_strip(tracker: &Tracker, p1_kind: Option<i32>) {
     P1_KIND.store(p1_kind.unwrap_or(-1), Ordering::Relaxed);
-    let (out, sample, names) = {
+    let (out, sample, names, stepped) = {
         let mut helper = HELPER.lock();
         let names = pull_staged().map(|staged| {
             let (combo, text, label) = match staged {
@@ -46,23 +48,194 @@ pub fn after_strip(tracker: &Tracker, p1_kind: Option<i32>) {
             helper.set_target(combo);
             (text, label)
         });
-        let out = helper.step(tracker, settings());
-        let sample = helper.last_combo();
-        (out, sample, names)
+        let plan = PLAN.lock();
+        let (out, stepped) = match plan.as_deref() {
+            Some(plan) => {
+                let mut run = RUN.lock();
+                let run = sequence_run(&mut run, plan, &mut helper);
+                run.step(&mut helper, &plan.steps, tracker, settings())
+            }
+            None => {
+                *RUN.lock() = None;
+                (helper.step(tracker, settings()), None)
+            }
+        };
+        let stepped = stepped.map(|s| (s, plan.as_deref().map_or(0, |p| p.generation)));
+        drop(plan);
+        let sample = (helper.seen(), helper.last_combo());
+        (out, sample, names, stepped)
     };
     if let Some((text, label)) = names {
         *NAME.lock() = text;
         LABELS.lock().0 = label;
     }
     report(out);
+    if let Some((stepped, generation)) = stepped {
+        report_step(stepped, generation);
+    }
     *SAMPLE.lock() = sample;
+}
+
+/// The run of the staged sequence: a new plan (another sequence, or its combos changed) starts over at combo 1 from
+/// the streak and best its file had.
+fn sequence_run<'a>(run: &'a mut Option<(u32, SequenceRun)>, plan: &SequenceStage, helper: &mut Helper) -> &'a mut SequenceRun {
+    if run.as_ref().is_none_or(|(generation, _)| *generation != plan.generation) {
+        let fresh = SequenceRun::new(SequenceWalk::resume(plan.steps.len(), plan.streak, plan.best));
+        fresh.start(helper, &plan.steps);
+        *run = Some((plan.generation, fresh));
+    }
+    match run {
+        Some((_, run)) => run,
+        None => unreachable!("set above"),
+    }
 }
 
 /// The strip's session clear (leaving Training, a hot swap, a lobby change).
 pub fn session_clear() {
-    let out = HELPER.lock().clear();
+    let (out, stepped, seen) = {
+        let mut helper = HELPER.lock();
+        let plan = PLAN.lock();
+        let (out, stepped) = match plan.as_deref() {
+            Some(plan) => {
+                let mut run = RUN.lock();
+                let run = sequence_run(&mut run, plan, &mut helper);
+                let (out, stepped) = run.clear(&mut helper, &plan.steps);
+                (out, stepped.map(|s| (s, plan.generation)))
+            }
+            None => (helper.clear(), None),
+        };
+        (out, stepped, helper.seen())
+    };
     report(out);
-    *SAMPLE.lock() = None;
+    if let Some((stepped, generation)) = stepped {
+        report_step(stepped, generation);
+    }
+    *SAMPLE.lock() = (seen, None);
+}
+
+/// A step of the drilled sequence was graded: its trace point, and the streak and best for the worker to save.
+fn report_step(stepped: Stepped, generation: u32) {
+    let (walk_streak, walk_best) = RUN.lock().map_or((0, 0), |(_, run)| (run.walk().streak(), run.walk().best()));
+    let advance = match stepped.advance {
+        Advance::Next(_) => 1,
+        Advance::Finished => 2,
+        Advance::Dropped => 3,
+        Advance::Idle => 0,
+    };
+    tr_seq_step_v1(stepped.step as u32, advance, walk_streak, walk_best);
+    if matches!(stepped.advance, Advance::Finished | Advance::Dropped) {
+        *PROGRESS.lock() = Some(Progress { generation, streak: walk_streak, best: walk_best });
+    }
+}
+
+/// A finished run or a drop changed the streak: the generation of the plan it belongs to, the streak and best.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Progress {
+    pub generation: u32,
+    pub streak: u32,
+    pub best: u32,
+}
+
+static PROGRESS: Mutex<Option<Progress>> = Mutex::new(None);
+
+/// The worker saves the drilled sequence's streak and best to its file (`rr_host::save_sequence_progress`).
+pub fn take_progress() -> Option<Progress> {
+    PROGRESS.lock().take()
+}
+
+/// A drilled sequence staged for the frame hook: the combos, their names, and the streak and best its file had. The
+/// worker builds and drops it; the frame hook only reads it under `PLAN`.
+pub struct SequenceStage {
+    pub generation: u32,
+    pub name: Text,
+    pub steps: Vec<Combo>,
+    pub names: Vec<Text>,
+    pub streak: u32,
+    pub best: u32,
+}
+
+static PLAN: Mutex<Option<Box<SequenceStage>>> = Mutex::new(None);
+/// The frame hook's run of the staged plan, by the plan's generation.
+static RUN: Mutex<Option<(u32, SequenceRun)>> = Mutex::new(None);
+static PLAN_GENERATION: AtomicU32 = AtomicU32::new(0);
+
+/// The worker stages a drilled sequence (or none). `same_steps` keeps the run going (a rename, a saved streak);
+/// otherwise the next frame starts the new plan at combo 1. Returns the plan's generation. The old plan is dropped
+/// here, on the worker, after the lock is let go.
+pub fn stage_sequence(plan: Option<(&crate::engine::rr_host::SequencePlan, bool)>) -> u32 {
+    let next = plan.map(|(plan, same_steps)| {
+        let generation = if same_steps {
+            PLAN_GENERATION.load(Ordering::Relaxed)
+        } else {
+            PLAN_GENERATION.fetch_add(1, Ordering::Relaxed).wrapping_add(1)
+        };
+        Box::new(SequenceStage {
+            generation,
+            name: Text::new(&plan.name),
+            steps: plan.steps.iter().map(|step| step.combo).collect(),
+            names: plan.steps.iter().map(|step| Text::new(&step.name)).collect(),
+            streak: plan.streak,
+            best: plan.best,
+        })
+    });
+    let generation = next.as_ref().map_or(0, |stage| stage.generation);
+    if let Some(stage) = next.as_deref() {
+        tr_seq_plan_v1(stage.generation, stage.steps.len() as u32, stage.streak, stage.best);
+        *NAME.lock() = stage.names.first().copied().unwrap_or(Text::EMPTY);
+        LABELS.lock().0 = Label::new(&plan.map_or(String::new(), |(plan, _)| plan.name.clone()));
+    }
+    let old = core::mem::replace(&mut *PLAN.lock(), next);
+    drop(old);
+    generation
+}
+
+/// The bar's view of the drilled sequence, copied under the locks (the HUD tick; nothing allocates).
+fn seq_view() -> Option<SeqView> {
+    let plan = PLAN.lock();
+    let plan = plan.as_deref()?;
+    let run = RUN.lock().filter(|(generation, _)| *generation == plan.generation).map(|(_, run)| run);
+    let walk = run.map_or(SequenceWalk::resume(plan.steps.len(), plan.streak, plan.best), |run| run.walk());
+    let steps = plan.steps.len();
+    let at = walk.cursor();
+    let first = SeqView::first_chip(at, steps);
+    let mut chips = [Text::EMPTY; crate::model::panes::cb::CHIPS];
+    for (c, chip) in chips.iter_mut().enumerate() {
+        *chip = plan.names.get(first + c).copied().unwrap_or(Text::EMPTY);
+    }
+    let last = run.and_then(|run| run.last());
+    Some(SeqView {
+        name: plan.name,
+        at,
+        steps,
+        streak: walk.streak(),
+        best: walk.best(),
+        first,
+        chips,
+        last,
+        last_name: last.and_then(|s| plan.names.get(s.step).copied()).unwrap_or(Text::EMPTY),
+    })
+}
+
+/// A drilled sequence's step was graded (`report_step`): the step (0-based), what it did (1 next, 2 finished, 3
+/// dropped), and the streak and best after it.
+#[no_mangle]
+#[inline(never)]
+pub extern "C" fn tr_seq_step_v1(step: u32, advance: u32, streak: u32, best: u32) {
+    core::hint::black_box((0x5345_5153_u32, step, advance, streak, best));
+}
+
+/// The worker staged a drilled sequence: the plan's generation, its combos, and the streak and best from its file.
+#[no_mangle]
+#[inline(never)]
+pub extern "C" fn tr_seq_plan_v1(generation: u32, steps: u32, streak: u32, best: u32) {
+    core::hint::black_box((0x504c_414e_u32, generation, steps, streak, best));
+}
+
+/// The worker saved the drilled sequence's streak and best to its file (`saved` 1) or could not (0).
+#[no_mangle]
+#[inline(never)]
+pub extern "C" fn tr_seq_saved_v1(saved: u32, streak: u32, best: u32, _reserved: u32) {
+    core::hint::black_box((0x5356_5351_u32, saved, streak, best));
 }
 
 fn report(out: Out) {
@@ -149,8 +322,9 @@ pub fn last_combo() -> Option<Combo> {
     HELPER.lock().last_combo()
 }
 
-/// The last combo published by the strip, without taking the helper lock the frame hook holds.
-pub fn strip_sample() -> Option<Combo> {
+/// The last combo published by the strip and the count of links captured, without taking the helper lock the frame
+/// hook holds.
+pub fn strip_sample() -> (u32, Option<Combo>) {
     *SAMPLE.lock()
 }
 
@@ -233,5 +407,6 @@ pub fn on_layout_registered() {
 pub fn hud_tick(strip_shown: bool, apply: impl FnMut(usize, &Look, Changed)) -> usize {
     let helper = *HELPER.lock();
     let name = *NAME.lock();
-    RENDERER.lock().draw(&helper, &name, strip_shown, apply)
+    let seq = seq_view();
+    RENDERER.lock().draw(&helper, &name, seq.as_ref(), strip_shown, apply)
 }

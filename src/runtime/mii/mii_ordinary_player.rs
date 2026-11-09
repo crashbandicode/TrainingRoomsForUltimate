@@ -372,6 +372,14 @@ unsafe fn permitted()->bool {
         && !training::save_states::is_loading() && !training::recording_or_playback()
         && !crate::runtime::compat::replay_preview::occupied()
         && STATES.iter().all(|s| {let s=s.lock();s.active.is_none()&&s.pending.is_none()})
+        && !portrait_render_held()
+}
+/// The Player's HUD portrait render holds a helper (sequencing: the press runs after the render, never dropped).
+fn portrait_render_held()->bool {
+    #[cfg(feature="mii-hud-portrait-alpha")]
+    {super::mii_hud_portrait::render_holds_helper(0)}
+    #[cfg(not(feature="mii-hud-portrait-alpha"))]
+    {false}
 }
 unsafe fn ready(entry:*const u8,kind:u32)->bool {
     if MiiClass::from_kind(kind).is_some() {ready_single_mii(entry,0)==Some(kind)}
@@ -839,10 +847,10 @@ unsafe fn begin(entry:*mut u8)->bool {
             mii_cycle::Target::Fighter(kind) if publish.is_none() && same_class.is_none()
                 && descriptor_kind(&descriptor)==kind =>
                 Some(Live::Numbered {identity:Identity::Fighter(kind),cursor:destination.cursor}),
+            // rc.6: the normal Ice Climbers pair original too, while the pair bank is on (`original_member`).
             mii_cycle::Target::Original if publish.is_none() && same_class.is_none() && origin_saved.is_none()
                 && descriptor_kind(&descriptor)==origin.original_kind
-                && crate::engine::swap::body_bank::original_bankable(origin.original_kind)
-                && crate::runtime::roster::cycle_preload_config::snapshot().original_bank_enabled() => Some(Live::Original),
+                && super::body_bank::original_member(origin.original_kind,&descriptor) => Some(Live::Original),
             // A saved/preset Mii with no same-class proof (another class, or a hat
             // change) may be served by its own one-member group (MII-GROUPS-DESIGN
             // §5.1 G10): the bank planner admits only a reachable group carrying

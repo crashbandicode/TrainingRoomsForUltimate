@@ -64,10 +64,12 @@ const KIB: usize = 1024;
 
 /// The table (one row per `ThreadId`, in its order).
 pub const THREADS: [ThreadStack; 17] = [
-    // Includes registered TICK -> report_late owned path5696; measured11184 dominates.
+    // Includes the registered TICK steps (indirect calls, outside the static walk): the drain closure's 2,928 B frame plus the
+    // deeper step, `p1::service` 5,168 B (diag ELF of the rc.6 hook-allocation fix; report_late's path was 5696 in all); measured11184 dominates.
     // See docs/SH01-MEASURED-STACK-REVIEW.md (removed after v0.2.0-rc.1; see that tag); margin and SDK reserve are unchanged.
-    // the diagnostics drain (open, append, close every 50 ms), the late seam report, diag hook_stats and stack reports
-    row(ThreadId::Heartbeat, c"tr-heartbeat", 32 * KIB, 5_696, 11_184, "Eden st-02..st-12, f6-37/sh-01", "diag_log::start_drain_thread::{closure#0}"),
+    // the diagnostics drain (open, append, close every 50 ms), the late seam report, the CPU-as-P1 fallback's request.json read
+    // and receipts, diag hook_stats and stack reports
+    row(ThreadId::Heartbeat, c"tr-heartbeat", 32 * KIB, 8_096, 11_184, "Eden st-02..st-12, f6-37/sh-01", "diag_log::start_drain_thread::{closure#0}"),
     // settings.json read, recovery and the JSON parse, joined by the boot thread
     row(ThreadId::SettingsLoad, c"tr-settings-load", 32 * KIB, 4_592, 9_904, "Eden st-02..st-12, f6-37/sh-01/s6-10", "boot::load_settings_boxed"),
     // save_states.json read and parse, joined by the boot thread

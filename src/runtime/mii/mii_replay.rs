@@ -179,6 +179,13 @@ pub(crate) fn reacknowledge_named(target: Target) {
 pub(crate) fn named_ready(target: Target, kind: u32) -> bool {
     mii_ordinary_cpu::replay_ready(named_selection(target), kind)
 }
+/// #54, reading B (primary 2026-11-08 23:03Z): `target` as the CPU Switch installs it, over the CPU catalog. None while
+/// the catalog is not there. Game callback only (it reads the CPU state).
+pub(crate) fn installed_target(target: Target) -> Option<Target> {
+    target.configuration()?;
+    let catalog = mii_ordinary_cpu::replay_catalog()?;
+    Some(crate::engine::mii_install::installed_target(target, &catalog.configs))
+}
 pub(crate) fn named_refusal(target: Target) -> Option<&'static str> {
     mii_ordinary_cpu::replay_refusal(named_selection(target))
 }

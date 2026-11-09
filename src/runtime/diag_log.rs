@@ -387,12 +387,13 @@ fn report_drops() {
 #[cfg(feature = "diag")]
 const HOOK_STATS_TICKS: u32 = 200;
 
-/// A step the drain thread runs on every tick (registered once at boot).
-static TICK: std::sync::OnceLock<fn()> = std::sync::OnceLock::new();
+/// The steps the drain thread runs on every tick, in registration order (registered at boot).
+static TICKS: [std::sync::OnceLock<fn()>; 4] = [const { std::sync::OnceLock::new() }; 4];
 
-/// Register the step the drain thread runs on every 50 ms tick, after the drain (the first registration wins).
-pub fn set_tick(step: fn()) {
-    let _ = TICK.set(step);
+/// Register a step the drain thread runs on every 50 ms tick, after the drain. Each step is its own call through its pointer, so
+/// the steps' frames never stack on this thread's stack. False when every slot is taken.
+pub fn set_tick(step: fn()) -> bool {
+    TICKS.iter().any(|slot| slot.set(step).is_ok())
 }
 
 /// The drain thread: every 50 ms it moves buffered lines to the card. Its stack is the table's
@@ -406,9 +407,9 @@ pub fn start_drain_thread() {
         let mut metered_calls = 0usize;
         loop {
             drain();
-            // A step the owner of a late report registered (`set_tick`): package 6's seam installer writes the seam outcomes that
-            // settled after the install line (R-A0b) here, on this thread and never in a hook.
-            if let Some(tick) = TICK.get() {
+            // The steps their owners registered (`set_tick`), here on this thread and never in a hook: package 6's seam installer
+            // writes the seam outcomes that settled after the install line (R-A0b); the CPU-as-P1 fallback does its file work.
+            for tick in TICKS.iter().filter_map(|slot| slot.get()) {
                 tick();
             }
             // Diag builds only (review R5): every `HOOK_STATS_TICKS` drains, one `hook_stats` line if

@@ -103,7 +103,7 @@ pub mod menu {
     /// Something other than gameplay owns Player 1's input (the plugin's menu, the replay editor, the native waiting-room UI,
     /// the game's pause menu). The stop chord's own bit is not an owner: it only marks a poll the chord consumed.
     pub fn captures_input() -> bool {
-        Owners::from_bits(published::input_owners().bits() & !Owners::STOP_CHORD.bits()).any()
+        published::input_owners().holds_gameplay()
     }
 
     /// The plugin's menu is open (or closed within its 15-frame window).

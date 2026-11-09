@@ -67,6 +67,19 @@ impl Sticks {
     pub const fn onto(self, record: MappedInputs) -> MappedInputs {
         MappedInputs { buttons: record.buttons, lstick_x: self.lx, lstick_y: self.ly, rstick_x: self.rx, rstick_y: self.ry }
     }
+
+    /// What the strip and the combo helper read once the recorder has had P1's poll (`before` is the record it got,
+    /// `after` the record it left). Play writes the played frame into the record, so the fighter acts on that frame:
+    /// the strip reads it with its own sticks, and Make combo captures the macro's events as RECORDING.md says
+    /// ("Make combo records the same events, because it plays into the same strip"). An untouched poll keeps the
+    /// physical sticks.
+    pub fn after_recorder(self, before: MappedInputs, after: MappedInputs) -> (MappedInputs, Sticks) {
+        if after == before {
+            (after, self)
+        } else {
+            (after, Sticks::of_record(after))
+        }
+    }
 }
 
 /// What owns P1's input for a poll. Anything other than gameplay empties the queue and makes that
@@ -88,6 +101,9 @@ impl Owners {
     pub const REPLAY_EDITOR: Owners = Owners(8);
     /// The game's own pause menu is open (SPEC-input-03 question 3, recommended).
     pub const VANILLA_PAUSE: Owners = Owners(16);
+    /// The replay editor is parked while a load it asked for runs (`replay_capture::loading()`: a recorded Mii's
+    /// import, then the CPU's install). P1 stays neutral, but the gameplay gates do not wait for it (#68).
+    pub const REPLAY_LOADING: Owners = Owners(32);
 
     /// The bits, for an atomic that other packages set (menu, chords, native UI, replay editor).
     pub const fn bits(self) -> u8 {
@@ -108,6 +124,13 @@ impl Owners {
 
     pub const fn any(self) -> bool {
         self.0 != 0
+    }
+
+    /// What the carried gameplay gates (`menu::captures_input`) wait for: every owner but the stop chord (a poll the
+    /// chord consumed) and the replay editor's own load. The fork's `captures_input` was the menu or a visible panel;
+    /// the Replay window waits in its load for the very work those gates hold (#68).
+    pub const fn holds_gameplay(self) -> bool {
+        self.0 & !(Self::STOP_CHORD.0 | Self::REPLAY_LOADING.0) != 0
     }
 }
 
@@ -269,6 +292,33 @@ mod tests {
         assert_eq!(out, [0, 0, 1, 2, 3]);
     }
 
+    /// #68 (cov-rec diag2/diag3, 2026-11-08): the Replay window's Mii track stayed on "Reading recorded Mii..." for 15 s.
+    /// The window waits in `replay_capture::loading()` for the capture's Mii import, the import's service waits until
+    /// `menu::captures_input()` is false, and that read the replay editor's owner bit, which `sync_owner` set for the
+    /// load itself. The fork's `captures_input` was the menu or a visible panel; a parked editor waiting on its load was
+    /// neither. The load keeps P1 neutral (an owner) but is not one the gameplay gates wait for.
+    #[test]
+    fn a_replay_load_keeps_p1_neutral_but_does_not_hold_the_gameplay_gates() {
+        assert!(Owners::REPLAY_LOADING.any(), "P1 stays neutral while the editor waits");
+        let mut q = DelayQueue::new();
+        q.step(3, rec(1));
+        assert_eq!(q.poll(3, Owners::REPLAY_LOADING, rec(2)), MappedInputs::NEUTRAL);
+        assert!(!Owners::REPLAY_LOADING.holds_gameplay());
+        assert!(!Owners::STOP_CHORD.with(Owners::REPLAY_LOADING).holds_gameplay());
+        assert!(!Owners::NONE.holds_gameplay());
+        for owner in [Owners::MENU, Owners::NATIVE_UI_BUSY, Owners::REPLAY_EDITOR, Owners::VANILLA_PAUSE] {
+            assert!(owner.holds_gameplay(), "{owner:?}");
+            assert!(owner.with(Owners::REPLAY_LOADING).holds_gameplay(), "{owner:?}");
+        }
+        let common = include_str!("../runtime/compat/common.rs");
+        assert!(common.contains("published::input_owners().holds_gameplay()"));
+        let macros = include_str!("../runtime/macros/mod.rs");
+        assert!(macros.contains("let loading = replay_capture::loading();"));
+        assert!(macros.contains("Owners::REPLAY_LOADING"));
+        let recorder = include_str!("../runtime/features/recorder.rs");
+        assert!(recorder.contains("owners.contains(Owners::REPLAY_LOADING)"), "the chords stay modal while it loads");
+    }
+
     #[test]
     fn an_owner_empties_the_queue() {
         let mut q = DelayQueue::new();
@@ -301,5 +351,19 @@ mod tests {
         let onto = Sticks { lx: 0, ly: 72, rx: 120, ry: 0 }.onto(record);
         assert_eq!((onto.buttons, onto.lstick_x, onto.lstick_y, onto.rstick_x), (0x80a1, 0, 72, 120));
         assert_eq!(Sticks::of_record(record).onto(record), record);
+    }
+
+    /// Eden rc6-covrec-diag1 (2026-11-08): Make combo saved its combo with no input events. The strip read P1's record
+    /// before Play wrote the played frame into it, so it saw the idle controller. The display now reads the record
+    /// the recorder left: a played jab is a press with the played sticks; an untouched poll keeps the physical sticks.
+    #[test]
+    fn the_display_reads_the_played_frame_and_keeps_the_physical_sticks_otherwise() {
+        let physical = Sticks { lx: 0, ly: 72, rx: 0, ry: 0 };
+        let idle = MappedInputs { buttons: 0x8000, lstick_x: 0, lstick_y: 0, rstick_x: 0, rstick_y: 0 };
+        let played = MappedInputs { buttons: 0x8201, lstick_x: 60, lstick_y: 0, rstick_x: 0, rstick_y: 0 };
+        let (record, sticks) = physical.after_recorder(idle, played);
+        assert_eq!(sticks.onto(record), played, "the strip reads the played frame");
+        let (record, sticks) = physical.after_recorder(idle, idle);
+        assert_eq!(sticks.onto(record), physical.onto(idle), "an untouched poll keeps the physical sticks");
     }
 }

@@ -1,6 +1,7 @@
 # Combo files: keep, edit and share combos
 
-The combo helper (Recording page › Combos; [SPEC-input-07](../specs/SPEC-input-07-combo-helper.md)) saves every combo
+The combo helper (Recording › Combos & Sequences, on the Recording page and in the pop-up;
+[SPEC-input-07](../specs/SPEC-input-07-combo-helper.md); [RECORDING.md](RECORDING.md), Combos) saves every combo
 as a small text file on the SD card. You can copy these files to another card, send them to a friend, or write one by
 hand. A combo is not tied to a fighter: the fighter it was recorded on is a note, and the helper grades whatever
 fighter Player 1 is.
@@ -12,11 +13,13 @@ sd:/ultimate/TrainingRooms/combos/
     combo-1.json        a combo the plugin saved ("Combo 1")
     nair-loop.json      a combo saved with the name "Nair loop"
     Ryu BnB.json        a file someone copied in
-    selected.txt        the id of the target combo (the file name without .json)
 ```
 
-- **Add a combo:** copy its `.json` file into this folder. It appears in **Saved combos** the next time you open the
-  list. No restart is needed.
+The drill, the one combo or sequence the helper grades, is kept in `sd:/ultimate/TrainingRooms/recording-index.json`
+with the rest of the recording index (`src/model/library/hot.rs:1`), not in this folder.
+
+- **Add a combo:** copy its `.json` file into this folder. It is listed under COMBOS the next time the menu opens; the
+  menu reads the card at every open (`src/model/recording_menu.rs:2152`). No restart is needed.
 - **File names:** any name works, up to 64 characters before `.json`, except that it must not:
   - contain `/ \ : * ? " < > |` or control characters;
   - start with a dot (hidden files, such as the `._` files a Mac writes, are never combos);
@@ -24,9 +27,9 @@ sd:/ultimate/TrainingRooms/combos/
 
   The plugin names its own files from the combo's name (`nair-loop.json`, `nair-loop-2.json`, …).
 - **The plugin never replaces a file it did not write unless you act:**
-  - *Save last combo* always makes a new file;
-  - *Rename* (X in the list) changes only the `name` field of that file;
-  - *Delete* (Y) removes it.
+  - *+ Save last combo…*, the first row of COMBOS, always makes a new file;
+  - *Rename*, on the combo's own screen, changes only the `name` field of that file;
+  - *Delete*, on the combo's own screen, removes it.
 - **Writes are atomic:** a `.tmp` file is written, then renamed over the old one. A card pulled out mid-write keeps the
   old file.
 
@@ -119,18 +122,20 @@ move, not one fighter's moves, so a combo recorded on one fighter can be practis
 
 ## Sharing a combo
 
-1. Open the list (Recording › Combos › Saved combos) to check the name.
+1. Open Recording › Combos & Sequences to check the name: COMBOS lists each file's name, with "Recorded on" and the
+   fighter under it.
 2. Take the card out (or use FTP), and copy `sd:/ultimate/TrainingRooms/combos/<file>.json`.
-3. On the other card, put the file in the same folder and open Saved combos. Choose it with A to make it the target.
-   Then do the combo on any fighter.
+3. On the other card, put the file in the same folder and open the menu. The combo is listed under COMBOS. Drill it
+   (A in the pop-up, or Drill on its own screen), then do the combo on any fighter. A shared file keeps its own file
+   name, and it stays the drill like any other combo.
 
 ## Practising on the recorded fighter
 
-When you choose a combo (A in Saved combos) whose `recorded_on` is not Player 1's fighter, the plugin asks the same
-question a named macro recorded on another fighter asks:
+When you drill a combo whose `recorded_on` is not Player 1's fighter, the plugin asks Fighter Mismatch, the same
+question a macro recorded on another fighter asks ([RECORDING.md](RECORDING.md), Fighter Mismatch):
 
-- *Keep current fighter* (the default): the combo becomes the target, and you practise it on the fighter you have.
-- *Switch to recorded fighter*: the combo becomes the target, and Player 1 changes to that fighter when you close the
+- *Keep current fighter* (the default): the combo becomes the drill, and you practise it on the fighter you have.
+- *Switch to recorded fighter*: the combo becomes the drill, and Player 1 changes to that fighter when you close the
   menu. This works with **Player Swapping** (Fighters & Stages) On or Off. Player Swapping stays as it is, and with it
   Off the plugin still never changes Player 1 on its own.
 - B: nothing changes.
@@ -139,5 +144,5 @@ The question is skipped in these cases:
 
 - **No question at all** when the combo has no `recorded_on` or when the fighter already matches.
 - **The current fighter is kept, without asking:**
-  - when **Ask before switching fighter** (Recording › Named macros) is Off;
+  - when **Ask before switching fighter** (Recording › Replays) is Off;
   - when `recorded_on` is not a fighter name the plugin knows; the notice says so.

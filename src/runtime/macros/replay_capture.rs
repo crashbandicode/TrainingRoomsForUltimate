@@ -910,6 +910,8 @@ pub fn on_input(controller: &crate::runtime::macros::port::input::Controller) {
     // While the menu is open its Pad route owns this same physical press.
     // Otherwise a copied B cancels loading before Pad::Back closes the restored crop.
     if crate::runtime::ui::state::OPEN.load(Ordering::Acquire) { return; }
+    // The editor's Fighter Mismatch question owns Player 1's presses (the menu's pop-up route) until it is answered.
+    if crate::runtime::macros::named_macros::fighter_prompt_up() { return; }
     if loading() {
         if controller.just_down.b() { cancel_reload(); }
         return;

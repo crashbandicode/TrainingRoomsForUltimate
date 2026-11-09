@@ -1,5 +1,8 @@
 # 0.2.0-rc.5
 
+0.2.0-rc.5 was withdrawn before players ran it. Its contents ship in 0.2.0-rc.6, with the changes and corrections in
+[RELEASE-NOTES-rc6.md](RELEASE-NOTES-rc6.md).
+
 Notes for players. This is the build after `0.2.0-rc.3.1`. There is no separate `0.2.0-rc.4`. How to read the frame strip is [FRAME-STRIP.md](FRAME-STRIP.md). How to use recording is [RECORDING.md](RECORDING.md). The pictures for those pages are the list in [MEDIA.md](MEDIA.md).
 
 ## Frame strip

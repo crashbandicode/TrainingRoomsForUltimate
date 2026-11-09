@@ -612,7 +612,7 @@
    "dest": "src/model/macro_ui/macro_panel.rs",
    "crate": "tui",
    "src_sha256": "1b6e698f679029bc6fa83ff9cd43756302bd939debaad2d3eeeacd10fb166da1",
-   "dest_sha256": "d8d306273a6c61117630b18b56729f5edfba58554a4db314fe29f60c5c39c093",
+   "dest_sha256": "b8239457a37d3bdf9e618c5b99dc3731e8fa0681bd7dcad3de27638a0cd87304",
    "edits": [
     {
      "old": "    /// Facing, status, and frames for one playback. Empty when the fighter is not ready.\n    pub fn copy_playback(",
@@ -758,6 +758,91 @@
      "old": "                FighterOrigin::Combo => Effect::ComboFighter(Some(choice)),\n                _ => Effect::ClipFighter(Some(choice)),\n",
      "new": "                FighterOrigin::Combo => Effect::ComboFighter(Some(choice)),\n                FighterOrigin::Recording => Effect::RecordingFighter(Some(choice)),\n                _ => Effect::ClipFighter(Some(choice)),\n",
      "reason": "rc.5 recording path (dc136e1): the Fighter Mismatch prompt's `Recording` origin answers through `Effect::RecordingFighter` (Keep/Switch/Cancel) for a recording, a combo drill or a chain's macro 1"
+    },
+    {
+     "old": "    RecordingFighter(Option<FighterChoice>),\n}\n",
+     "new": "    RecordingFighter(Option<FighterChoice>),\n    /// Keep on Edit placement for a role's active macro: Play uses this offset until the game closes; the file is\n    /// unchanged.\n    KeepPlacement { id: String, placement: Placement },\n}\n",
+     "reason": "Primary 2026-11-08 #70 (a), p23/rc6-cov-rec: Edit placement edits the role's active macro, the file Play plays (MacroUi::open_placement and Editing; Write over writes that file, Keep reports Effect::KeepPlacement, Save as starts from it; the named selection is not changed)"
+    },
+    {
+     "old": "\n/// A selection waiting for the user's fighter choice. Nothing is committed yet,\n",
+     "new": "\n/// The role's active macro on Edit placement, and where its start save puts that role.\nstruct Editing {\n    id: String,\n    recording: MacroRecording,\n}\n\n/// A selection waiting for the user's fighter choice. Nothing is committed yet,\n",
+     "reason": "Primary 2026-11-08 #70 (a), p23/rc6-cov-rec: Edit placement edits the role's active macro, the file Play plays (MacroUi::open_placement and Editing; Write over writes that file, Keep reports Effect::KeepPlacement, Save as starts from it; the named selection is not changed)"
+    },
+    {
+     "old": "    loaded: Option<Loaded>,\n    /// Library page the last A choice came from, for a Cancelled fighter prompt.\n",
+     "new": "    loaded: Option<Loaded>,\n    /// Edit placement's file while its page is open (primary 2026-11-08 #70 (a)); the named selection is not changed.\n    editing: Option<Editing>,\n    /// Library page the last A choice came from, for a Cancelled fighter prompt.\n",
+     "reason": "Primary 2026-11-08 #70 (a), p23/rc6-cov-rec: Edit placement edits the role's active macro, the file Play plays (MacroUi::open_placement and Editing; Write over writes that file, Keep reports Effect::KeepPlacement, Save as starts from it; the named selection is not changed)"
+    },
+    {
+     "old": "            loaded: None,\n            picked: None,\n",
+     "new": "            loaded: None,\n            editing: None,\n            picked: None,\n",
+     "reason": "Primary 2026-11-08 #70 (a), p23/rc6-cov-rec: Edit placement edits the role's active macro, the file Play plays (MacroUi::open_placement and Editing; Write over writes that file, Keep reports Effect::KeepPlacement, Save as starts from it; the named selection is not changed)"
+    },
+    {
+     "old": "                        \"Offset X {:.2}  Y {:.2}  {}\\nAnchor is the restored CPU position. Inputs stay recorded.\",\n",
+     "new": "                        \"Offset X {:.2}  Y {:.2}  {}\\nAnchor is {}. Inputs stay recorded.\",\n",
+     "reason": "Primary 2026-11-08 #70 (a), p23/rc6-cov-rec: Edit placement edits the role's active macro, the file Play plays (MacroUi::open_placement and Editing; Write over writes that file, Keep reports Effect::KeepPlacement, Save as starts from it; the named selection is not changed)"
+    },
+    {
+     "old": "                        momentum_label(draft.working.momentum)\n",
+     "new": "                        momentum_label(draft.working.momentum),\n                        if self.editing.is_some() { \"where the start save puts this role\" } else { \"the restored CPU position\" }\n",
+     "reason": "Primary 2026-11-08 #70 (a), p23/rc6-cov-rec: Edit placement edits the role's active macro, the file Play plays (MacroUi::open_placement and Editing; Write over writes that file, Keep reports Effect::KeepPlacement, Save as starts from it; the named selection is not changed)"
+    },
+    {
+     "old": "\n    pub fn on_pad(&mut self, pad: Pad) -> Effect {\n",
+     "new": "\n    /// Edit placement on a role's active macro, the file Play plays (primary 2026-11-08 #70 (a)). `anchor` is where the\n    /// macro's start save puts that role, the warp Play makes; the offset is added to it. The named selection and the\n    /// CPU are left alone.\n    pub fn open_placement(&mut self, id: String, recording: MacroRecording, anchor: (f32, f32)) -> bool {\n        if recording.validate().is_err() {\n            return false;\n        }\n        let working = recording.placement;\n        self.editing = Some(Editing { id, recording });\n        self.edit_anchor = Some(anchor);\n        self.playback_on = false;\n        self.held_save = None;\n        self.screen = Screen::Place(Box::new(PlaceDraft {\n            working,\n            cursor: 1,\n            from_save: false,\n        }));\n        true\n    }\n\n    pub fn on_pad(&mut self, pad: Pad) -> Effect {\n",
+     "reason": "Primary 2026-11-08 #70 (a), p23/rc6-cov-rec: Edit placement edits the role's active macro, the file Play plays (MacroUi::open_placement and Editing; Write over writes that file, Keep reports Effect::KeepPlacement, Save as starts from it; the named selection is not changed)"
+    },
+    {
+     "old": "        let anchor = self.anchor.or(self.edit_anchor)?;\n",
+     "new": "        let anchor = if self.editing.is_some() { self.edit_anchor } else { self.anchor.or(self.edit_anchor) }?;\n",
+     "reason": "Primary 2026-11-08 #70 (a), p23/rc6-cov-rec: Edit placement edits the role's active macro, the file Play plays (MacroUi::open_placement and Editing; Write over writes that file, Keep reports Effect::KeepPlacement, Save as starts from it; the named selection is not changed)"
+    },
+    {
+     "old": "    pub fn close_transient(&mut self) {\n        self.screen = Screen::Closed;\n        self.picked = None;\n        self.prompt_commit = None;\n",
+     "new": "    pub fn close_transient(&mut self) {\n        self.screen = Screen::Closed;\n        self.editing = None;\n        self.picked = None;\n        self.prompt_commit = None;\n",
+     "reason": "Primary 2026-11-08 #70 (a), p23/rc6-cov-rec: Edit placement edits the role's active macro, the file Play plays (MacroUi::open_placement and Editing; Write over writes that file, Keep reports Effect::KeepPlacement, Save as starts from it; the named selection is not changed)"
+    },
+    {
+     "old": "        }\n        if let Some(loaded) = self.loaded.as_mut() {\n",
+     "new": "        }\n        if let Some(editing) = self.editing.take() {\n            self.screen = Screen::Closed;\n            return Effect::KeepPlacement { id: editing.id, placement };\n        }\n        if let Some(loaded) = self.loaded.as_mut() {\n",
+     "reason": "Primary 2026-11-08 #70 (a), p23/rc6-cov-rec: Edit placement edits the role's active macro, the file Play plays (MacroUi::open_placement and Editing; Write over writes that file, Keep reports Effect::KeepPlacement, Save as starts from it; the named selection is not changed)"
+    },
+    {
+     "old": "        };\n        let Some(id) = self.loaded.as_ref().and_then(|loaded| loaded.id.clone()) else {\n",
+     "new": "        };\n        if let Some(editing) = self.editing.as_mut() {\n            if editing.recording.set_placement(placement).is_err() {\n                return Effect::Notify(\"Placement is not usable\".to_owned());\n            }\n            let Some(Editing { id, recording }) = self.editing.take() else { return Effect::None };\n            self.screen = Screen::Closed;\n            return Effect::Overwrite { id, recording: Box::new(recording) };\n        }\n        let Some(id) = self.loaded.as_ref().and_then(|loaded| loaded.id.clone()) else {\n",
+     "reason": "Primary 2026-11-08 #70 (a), p23/rc6-cov-rec: Edit placement edits the role's active macro, the file Play plays (MacroUi::open_placement and Editing; Write over writes that file, Keep reports Effect::KeepPlacement, Save as starts from it; the named selection is not changed)"
+    },
+    {
+     "old": "        let Some(source) = self.loaded.as_ref() else {\n",
+     "new": "        let editing = self.editing.take();\n        let Some(source) = editing.as_ref().map(|editing| &editing.recording).or(self.loaded.as_ref().map(|loaded| &loaded.recording)) else {\n",
+     "reason": "Primary 2026-11-08 #70 (a), p23/rc6-cov-rec: Edit placement edits the role's active macro, the file Play plays (MacroUi::open_placement and Editing; Write over writes that file, Keep reports Effect::KeepPlacement, Save as starts from it; the named selection is not changed)"
+    },
+    {
+     "old": "            name: source.recording.name.clone(),\n            native_cursor: source.recording.name.encode_utf16().count(),\n",
+     "new": "            name: source.name.clone(),\n            native_cursor: source.name.encode_utf16().count(),\n",
+     "reason": "Primary 2026-11-08 #70 (a), p23/rc6-cov-rec: Edit placement edits the role's active macro, the file Play plays (MacroUi::open_placement and Editing; Write over writes that file, Keep reports Effect::KeepPlacement, Save as starts from it; the named selection is not changed)"
+    },
+    {
+     "old": "                frames: source.recording.frames.clone(),\n                start: source.recording.start,\n",
+     "new": "                frames: source.frames.clone(),\n                start: source.start,\n",
+     "reason": "Primary 2026-11-08 #70 (a), p23/rc6-cov-rec: Edit placement edits the role's active macro, the file Play plays (MacroUi::open_placement and Editing; Write over writes that file, Keep reports Effect::KeepPlacement, Save as starts from it; the named selection is not changed)"
+    },
+    {
+     "old": "                version: source.recording.game_version.clone(),\n                mii: source.recording.mii,\n",
+     "new": "                version: source.game_version.clone(),\n                mii: source.mii,\n",
+     "reason": "Primary 2026-11-08 #70 (a), p23/rc6-cov-rec: Edit placement edits the role's active macro, the file Play plays (MacroUi::open_placement and Editing; Write over writes that file, Keep reports Effect::KeepPlacement, Save as starts from it; the named selection is not changed)"
+    },
+    {
+     "old": "        self.held_save = None;\n        self.screen = Screen::Closed;\n",
+     "new": "        self.held_save = None;\n        self.editing = None;\n        self.screen = Screen::Closed;\n",
+     "reason": "Primary 2026-11-08 #70 (a), p23/rc6-cov-rec: Edit placement edits the role's active macro, the file Play plays (MacroUi::open_placement and Editing; Write over writes that file, Keep reports Effect::KeepPlacement, Save as starts from it; the named selection is not changed)"
+    },
+    {
+     "old": "        assert!(!ui.open_editor(None));\n    }\n",
+     "new": "        assert!(!ui.open_editor(None));\n    }\n\n    /// Primary 2026-11-08 #70 (a): Edit placement edits the role's active macro, the file Play plays. Eden\n    /// rc6-covrec-diag2 cov-edit-placement: with a macro active the row refused \"Load a macro and restore a Training\n    /// state first\", because it looked for the retired named layer's macro.\n    #[test]\n    fn edit_placement_opens_on_the_active_macro_and_writes_that_file() {\n        let mut ui = MacroUi::new();\n        let original = sample(Placement::default());\n        assert!(ui.open_placement(\"active-1\".into(), original.clone(), (10.0, 0.0)));\n        assert!(ui.is_open());\n        assert_eq!(ui.marker(), Some((10.0, 0.0)), \"the marker starts on the start save's position\");\n        assert_eq!(ui.loaded_id(), None, \"the named selection is not changed\");\n        ui.on_pad(Pad::Confirm);\n        assert_eq!(ui.marker(), Some((11.0, 0.0)));\n        goto(&mut ui, 10);\n        let Effect::Overwrite { id, recording } = ui.on_pad(Pad::Confirm) else { panic!(\"Write over the active file\") };\n        assert_eq!(id, \"active-1\");\n        assert_eq!(recording.placement.delta_x, 1.0);\n        assert_eq!(recording.frames, original.frames, \"inputs stay recorded\");\n        assert!(!ui.is_open());\n        assert_eq!(ui.loaded_id(), None);\n\n        assert!(ui.open_placement(\"active-1\".into(), original.clone(), (10.0, 0.0)));\n        ui.on_pad(Pad::Confirm);\n        goto(&mut ui, 9);\n        let Effect::KeepPlacement { id, placement } = ui.on_pad(Pad::Confirm) else { panic!(\"Keep for this session\") };\n        assert_eq!((id.as_str(), placement.delta_x), (\"active-1\", 1.0));\n        assert!(!ui.is_open());\n\n        assert!(ui.open_placement(\"active-1\".into(), original, (10.0, 0.0)));\n        assert!(matches!(ui.on_pad(Pad::Back), Effect::None));\n        assert!(!ui.is_open());\n        assert_eq!(ui.marker(), None);\n    }\n",
+     "reason": "Primary 2026-11-08 #70 (a), p23/rc6-cov-rec: Edit placement edits the role's active macro, the file Play plays (MacroUi::open_placement and Editing; Write over writes that file, Keep reports Effect::KeepPlacement, Save as starts from it; the named selection is not changed)"
     }
    ]
   },
@@ -977,7 +1062,7 @@
    "dest": "src/runtime/macros/named_macros.rs",
    "crate": "root",
    "src_sha256": "737474479d5f05b064ab645d850ceb189cad3943097ae4fdb5fc74d2fcda0809",
-   "dest_sha256": "1d2f6ad9b03d287dcbadc7fc4106d524e3aedf3d4843e5ab553f92cbf6faa5dd",
+   "dest_sha256": "77db6b0574c9aec5b61f5c2b7430c526621c214d555a55001b34d9b9b3c7f9b7",
    "edits": [
     {
      "old": "use training_mod_sync::*;",
@@ -1557,6 +1642,31 @@
      "old": "        Effect::ComboFighter(choice) => *lock_write(&COMBO_FIGHTER) = Some(choice),\n    }\n",
      "new": "        Effect::ComboFighter(choice) => *lock_write(&COMBO_FIGHTER) = Some(choice),\n        Effect::RecordingFighter(choice) => *lock_write(&RECORDING_FIGHTER) = Some(choice),\n    }\n",
      "reason": "rc.5 recording path (dc136e1): the recording worker opens the shared Fighter Mismatch prompt (`open_recording_fighter_prompt`) and takes its answer once (`take_recording_fighter_choice`); `take_confirmed_name_for` hands a keyboard answer only to the caller that offered it"
+    },
+    {
+     "old": "\npub fn open_editor() {\n",
+     "new": "\n/// Edit placement edits the page role's active macro, the file Play plays (primary 2026-11-08 #70 (a)); the anchor\n/// is where that macro's start save puts the role (`rr_host::placement_target`).\npub fn open_editor() {\n",
+     "reason": "Primary 2026-11-08 #70 (a), p23/rc6-cov-rec: Edit placement opens on rr_host::placement_target (the page role's active macro and its start save's position); Keep goes to rr_host::keep_placement; Write over clears a kept offset"
+    },
+    {
+     "old": "    if !lock_write(&UI).open_editor(None) {\n        notify(\"Load a macro and restore a Training state first\");\n",
+     "new": "    let root = std::path::Path::new(crate::model::storage::ROOT);\n    let target = match crate::engine::rr_host::placement_target(root) {\n        Ok(target) => target,\n        Err(refusal) => {\n            notify(refusal);\n            return;\n        }\n    };\n    if !lock_write(&UI).open_placement(target.id, target.recording, target.anchor) {\n        notify(\"Placement is not usable\");\n",
+     "reason": "Primary 2026-11-08 #70 (a), p23/rc6-cov-rec: Edit placement opens on rr_host::placement_target (the page role's active macro and its start save's position); Keep goes to rr_host::keep_placement; Write over clears a kept offset"
+    },
+    {
+     "old": "        Effect::RecordingFighter(choice) => *lock_write(&RECORDING_FIGHTER) = Some(choice),\n    }\n",
+     "new": "        Effect::RecordingFighter(choice) => *lock_write(&RECORDING_FIGHTER) = Some(choice),\n        Effect::KeepPlacement { id, placement } => {\n            crate::engine::rr_host::keep_placement(&id, placement);\n            notify(\"Placement kept for this session\");\n        }\n    }\n",
+     "reason": "Primary 2026-11-08 #70 (a), p23/rc6-cov-rec: Edit placement opens on rr_host::placement_target (the page role's active macro and its start save's position); Keep goes to rr_host::keep_placement; Write over clears a kept offset"
+    },
+    {
+     "old": "        Ok(()) => notify(\"Placement written\"),\n",
+     "new": "        Ok(()) => {\n            crate::engine::rr_host::placement_written(&id);\n            notify(\"Placement written\");\n        }\n",
+     "reason": "Primary 2026-11-08 #70 (a), p23/rc6-cov-rec: Edit placement opens on rr_host::placement_target (the page role's active macro and its start save's position); Keep goes to rr_host::keep_placement; Write over clears a kept offset"
+    },
+    {
+     "old": "pub(crate) fn recorded_target_matches(target:crate::engine::mii::replay::Target,current:Option<i32>) -> bool {\n",
+     "new": "/// #54, reading B (primary 2026-11-08 23:03Z): exactly, against the target as Switch installs it, which is what the\n/// CPU holds after a Switch (a replay Mii's filled create ID and name); until that is known, against the target.\npub(crate) fn recorded_target_matches(target:crate::engine::mii::replay::Target,current:Option<i32>) -> bool {\n    let target=crate::runtime::macros::identity::installed(target).unwrap_or(target);\n",
+     "reason": "rc.6 TASK-OPUS-rc6-open-fixes item 2 (#54, primary inbox 2026-11-08 23:03Z, reading B): recorded_target_matches (the fighter prompt's match: a library load, the clip editor's track) compares a recorded exact-Mii target, exactly, as Switch installs it (identity::installed, the game callback's mii_install::installed_target over the CPU catalog: a replay Mii's filled create ID and name), so the next Play after a Switch asks no second Fighter Mismatch; until that copy exists, against the target as before"
     }
    ]
   },
@@ -1659,7 +1769,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "6bf684570f6c271e0322622fa6d09b5588fb0f9c48a45a31523789fb98dab4a1",
+   "dest_sha256": "56269972a546a73bbfb441cffcade4fb1030fc98e28da001b656810686e89138",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -1956,6 +2066,11 @@
      "old": "        self.raw_for(view.entry,view.fighter_kind,view.previous_selected)\n    }\n    /// The recorded identity a Switch would load. `Ok(None)` is a Mii whose exact\n    /// configuration is not resolved yet. Preview and Keep never need either.\n    fn target_for(&self,entry:i32,kind:i32,previous:bool)->Result<Option<Target>,String> {\n        if MiiClass::from_kind(kind as u32).is_none() {\n            if crate::engine::swap::trio::TrioFighter::from_kind(kind as u32).is_none() {\n                return Err(\"Preview fighter is not available\".into());\n            }\n            return Ok(Some(Target::fighter(kind as u32)));\n        }\n        self.raw_for(entry,kind,previous)?;\n        if self.resolve_failed & (1 << entry as usize) != 0 { return Err(\"Recorded Mii metadata is unavailable\".into()); }\n        if !cfg!(feature=\"mii-ordinary-cpu-alpha\") {return Err(\"Replay Mii loading is unavailable in this build\".into());}\n        Ok(self.resolved[entry as usize].map(Target::mii))\n    }\n    fn target(&self)->Result<Option<Target>,String> {\n        let view=self.view();\n",
      "new": "        self.raw_for(view.entry,view.fighter_kind,view.previous_selected)\n    }\n    /// The recorded identity a Switch would load. `Ok(None)` is a Mii whose exact\n    /// configuration is not resolved yet. Preview and Keep never need either\n    /// (`engine::macro_ui::replay_target::clip_target`, host-tested).\n    fn target_for(&self,entry:i32,kind:i32,previous:bool)->Result<Option<Target>,String> {\n        let raw=self.raw_for(entry,kind,previous);\n        let index=usize::try_from(entry).ok().filter(|index|*index<self.resolved.len());\n        crate::engine::macro_ui::replay_target::clip_target(kind, raw.as_ref().map_err(String::as_str),\n            index.and_then(|index|self.resolved[index]), index.is_some_and(|index|self.resolve_failed & (1 << index) != 0),\n            cfg!(feature=\"mii-ordinary-cpu-alpha\"))\n    }\n    fn target(&self)->Result<Option<Target>,String> {\n        let view=self.view();\n",
      "reason": "Host-tested (operator 2026-11-05, the replay window ported): the fork's Editor::target_for body moved unchanged to engine::macro_ui::replay_target::clip_target"
+    },
+    {
+     "old": "    if crate::runtime::ui::state::OPEN.load(Ordering::Acquire) { return; }\n    if loading() {",
+     "new": "    if crate::runtime::ui::state::OPEN.load(Ordering::Acquire) { return; }\n    // The editor's Fighter Mismatch question owns Player 1's presses (the menu's pop-up route) until it is answered.\n    if crate::runtime::macros::named_macros::fighter_prompt_up() { return; }\n    if loading() {",
+     "reason": "rc.6 #68 (lane cov-rest, 2026-11-08, 66a9a53): the clip editor's own Fighter Mismatch question owns Player 1's presses while it is up (on_input returns while fighter_prompt_up()); Eden covrest-yoga-01: Down and A went to the editor instead of the question."
     }
    ]
   },

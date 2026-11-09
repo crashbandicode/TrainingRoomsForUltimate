@@ -123,15 +123,19 @@ fn apply() {
     }
     #[cfg(not(feature = "diag"))]
     let _ = check;
-    // After the delay: the input display and the recorder see the delayed record (SPEC-input-03 §5.2).
+    // After the delay: the recorder, then the input display, see the delayed record (SPEC-input-03 §5.2).
     if slot == 0 {
         let controller = pending.take_controller(&NativeTls);
-        // The display first (it logs what P1 pressed), then the recorder (which may neutralise out).
         unsafe {
-            input_display::on_p1_poll(controller, out, sticks);
             // The Replay Window's own controls (nothing unless its editor is in the foreground).
             crate::runtime::macros::on_p1_input(controller, out);
+            // The recorder may write a played frame into the record or neutralise it. The display reads what the
+            // fighter acts on, so it goes after: a played macro shows on the strip and Make combo captures its
+            // events (Eden rc6-covrec-diag1: a made combo was saved with no events).
+            let before = *out;
             recorder::on_p1_poll(out);
+            let (record, sticks) = sticks.after_recorder(before, *out);
+            input_display::on_p1_poll(controller, &record, sticks);
         }
     }
 }

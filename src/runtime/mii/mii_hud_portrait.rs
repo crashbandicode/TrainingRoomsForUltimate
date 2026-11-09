@@ -636,6 +636,14 @@ pub(super) unsafe fn on_destroy(entry: *const u8, owner: u32) {
     }
 }
 
+/// The logical owner's (0 Player, 1 CPU) portrait job holds a helper lease or has its render issued. That owner's Mii
+/// `begin` waits for it (Eden covrest-12: a CPU press during the render refused the leased helper row mid-render, and
+/// the after-render proof then quarantined the helper for the scene). Values only.
+pub(crate) fn render_holds_helper(logical: u32) -> bool {
+    STATE.lock().jobs.get(logical as usize).copied().flatten()
+        .is_some_and(|job| matches!(job.stage, Stage::Leased | Stage::Issued))
+}
+
 /// After `sources::scene_changed()`. Leases were invalidated there; a queued render is kept
 /// (departed) until the native queue drains or the source object is gone. Nothing is reset
 /// on pointer change alone; batch teardown is detected from its nulled holder.

@@ -513,6 +513,60 @@ pub(super) unsafe fn created_ready_receipt(
     Ok(receipt)
 }
 
+/// F9 (Eden covrest-11, 2026-11-08): a helper seat the game activated as CPU 2 or 3 and parked again keeps its
+/// identity, but its Mii record differs from the recorded proof, so every Mii owner snapshot refused the row. Once
+/// the seat is parked ready, its Mii proof is taken again from the row, only when the identity is unchanged: the
+/// same ready source and configuration, the same binding, owner objects and scalars, and a record that still carries
+/// the configuration's charinfo and a resource pair (`parked_entries::reproof`). `Ok(None)`: not parked yet;
+/// `Ok(Some((descriptor_changed, record_changed)))`: the proof matches the row now.
+pub(super) unsafe fn reproof_parked(
+    ready: crate::engine::swap::source_lifetime::ReadyToken,
+    c: Configuration,
+) -> Result<Option<(bool, bool)>, &'static str> {
+    use crate::model::parked_entries::Reproof;
+    let source = ready.source();
+    let view = provenance::helper_snapshot()?;
+    let ordinal = view.ordinal(source.slot()).ok_or("helper backend differs")?;
+    let Some(helpers::Helper::Ready { ready: current, proof, .. }) = view.slots.get(ordinal).copied() else {
+        return Err("helper source is not ready");
+    };
+    let mii = view.miis[ordinal].ok_or("helper exact payload is absent")?;
+    let kind = c.canonical().class as u32;
+    let parked = native_source::parked_ready(source.entry().0 as *const u8, source.slot() as u32, kind);
+    if crate::model::parked_entries::reproof(parked, true, true) == Reproof::Wait {
+        return Ok(None);
+    }
+    let m = native::map(source.entry().0 as usize, source.slot())?;
+    let b = native::pool(source.entry().0 as usize, mii.binding.epoch, source.slot())?;
+    let g = crate::runtime::mii::mii_native_access::PoolLock::acquire(BASE.load(Ordering::Acquire), b.manager);
+    let now = native::current_locked(m, b, proof.original.kind as u32, None, view, None);
+    drop(g);
+    let now = now?;
+    let identity = current == ready
+        && mii.configuration == c
+        && now.binding == mii.binding
+        && now.owners[source.slot()] == Some(proof.owner)
+        && now.scalars == Scalars::saved(c)
+        && crate::model::parked_entries::mii_record_identity(&now.record, c.charinfo());
+    let changed = (now.descriptor != mii.descriptor, now.record != mii.record);
+    match crate::model::parked_entries::reproof(parked, identity, changed == (false, false)) {
+        Reproof::Wait => Ok(None),
+        Reproof::Unchanged => Ok(Some(changed)),
+        Reproof::Refuse => Err("promoted seat identity changed"),
+        Reproof::Rerecord => {
+            let mut registry = provenance::registry();
+            check(
+                registry.helpers.slots.get(ordinal).copied() == view.slots.get(ordinal).copied()
+                    && registry.helpers.miis[ordinal] == Some(mii),
+                "helper proof changed during the re-record",
+            )?;
+            registry.helpers.miis[ordinal] =
+                Some(helpers::MiiProof { descriptor: now.descriptor, record: now.record, ..mii });
+            Ok(Some(changed))
+        }
+    }
+}
+
 /// Preserve a transient shared-installer refusal for consumers that already hold
 /// a lease. Another helper loading does not invalidate this helper's payload.
 /// Callers must retry BUSY without releasing the lease; every other failure is

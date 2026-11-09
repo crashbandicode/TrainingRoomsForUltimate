@@ -190,5 +190,23 @@ pub(crate) fn check_ids(ids: &[String]) -> Result<(), Error> {
     }
 }
 
+/// Combo ids: the combo store lists any safe file name (`combo_record::shareable_id`, docs/COMBOS.md), so the index,
+/// its hot list and a sequence take the same ids.
+pub(crate) fn check_combo_ids(ids: &[String]) -> Result<(), Error> {
+    if ids.iter().all(|id| crate::model::combo_record::shareable_id(id)) {
+        Ok(())
+    } else {
+        Err(Error::Invalid("bad id"))
+    }
+}
+
+/// The id rule of one kind of file.
+pub(crate) fn id_ok(kind: Kind, id: &str) -> bool {
+    match kind {
+        Kind::Combo => crate::model::combo_record::shareable_id(id),
+        _ => crate::model::store::default_id(id),
+    }
+}
+
 #[cfg(test)]
 mod tests;

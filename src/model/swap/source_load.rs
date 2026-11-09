@@ -146,6 +146,8 @@ pub enum Blocker {
     Recording,
     ReplayPreview,
     Roster,
+    /// The role's HUD portrait job holds a helper lease or has its render issued (Eden covrest-12).
+    Portrait,
 }
 
 impl Blocker {
@@ -161,6 +163,7 @@ impl Blocker {
             Blocker::Recording => "recording or playback",
             Blocker::ReplayPreview => "replay preview",
             Blocker::Roster => "roster transaction",
+            Blocker::Portrait => "portrait render on a helper",
         }
     }
 }
@@ -197,6 +200,27 @@ impl<R: Copy + PartialEq> Default for Waiting<R> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Eden covrest-12 (2026-11-08): the CPU's next press was submitted in the frame the CPU's HUD portrait render was
+    /// issued on helper 2; the press's snapshot refused the row mid-render, and the portrait's after-render proof then
+    /// quarantined helper 2 for the scene, so presses 1-5 loaded nothing. A Mii owner's begin now waits while its
+    /// role's portrait job holds a helper lease or has a render issued, and the press applies after it.
+    #[test]
+    fn a_press_during_a_portrait_render_waits_and_then_applies() {
+        assert_eq!(Blocker::Portrait.reason(), "portrait render on a helper");
+        let mut waiting = Waiting::new();
+        let press = 7u32;
+        assert_eq!(waiting.note(press, Some(Blocker::Portrait)), Some(Blocker::Portrait), "the press waits");
+        assert_eq!(waiting.note(press, Some(Blocker::Portrait)), None, "noted once while it waits");
+        assert_eq!(waiting.note(press, None), None, "the render ended: the press applies");
+        let cpu = include_str!("../../runtime/mii/mii_ordinary_cpu.rs");
+        assert!(cpu.contains("else if portrait_render_held() {Some(Blocker::Portrait)}"));
+        assert!(cpu.contains("super::mii_hud_portrait::render_holds_helper(1)"));
+        let player = include_str!("../../runtime/mii/mii_ordinary_player.rs");
+        assert!(player.contains("super::mii_hud_portrait::render_holds_helper(0)"));
+        let portrait = include_str!("../../runtime/mii/mii_hud_portrait.rs");
+        assert!(portrait.contains("pub(crate) fn render_holds_helper(logical: u32) -> bool"));
+    }
 
     /// M5c's rule (`character_sources.rs` `service_owned` before this change): a created entry never failed.
     fn m5c_verdict(load: Unfinished) -> Verdict {

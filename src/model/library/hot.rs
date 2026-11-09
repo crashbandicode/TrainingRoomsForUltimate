@@ -6,8 +6,8 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
-use super::{check_ids, Drill, Error, Kind, LoopCount, Role, Use};
-use crate::model::store::{default_id, write_replace};
+use super::{check_combo_ids, check_ids, id_ok, Drill, Error, Kind, LoopCount, Role, Use};
+use crate::model::store::write_replace;
 
 const MAX_INDEX_BYTES: usize = 1024 * 1024;
 
@@ -202,7 +202,7 @@ impl RecordingIndex {
 
     /// Records a use and rebuilds that kind's five most recent ids. The sixth id leaves the list.
     pub fn note_use(&mut self, kind: Kind, id: &str, reason: Use, at: u64) -> Result<(), Error> {
-        if !default_id(id) {
+        if !id_ok(kind, id) {
             return Err(Error::Invalid("bad id"));
         }
         match reason {
@@ -249,7 +249,10 @@ impl RecordingIndex {
 
     pub fn set_drill(&mut self, drill: Option<Drill>, at: u64) -> Result<(), Error> {
         if let Some(drill) = &drill {
-            check_ids(std::slice::from_ref(&drill.id))?;
+            match drill.kind {
+                super::DrillKind::Combo => check_combo_ids(std::slice::from_ref(&drill.id))?,
+                super::DrillKind::Sequence => check_ids(std::slice::from_ref(&drill.id))?,
+            }
         }
         self.drill = drill.clone();
         if let Some(drill) = drill {

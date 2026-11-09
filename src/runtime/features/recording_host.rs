@@ -44,6 +44,12 @@ pub fn note_mash() {
     rr_host::note_mash();
 }
 
+pub fn cpu_playback(
+    recorder: crate::model::cpu::playback::PlaybackState,
+) -> crate::model::cpu::playback::PlaybackState {
+    rr_host::cpu_playback(recorder)
+}
+
 pub fn push_capture(side: u8, frame: InputFrame) {
     rr_host::push_capture(side, frame);
 }
@@ -88,14 +94,25 @@ pub fn service() {
                 super::recorder::release_slot_image();
             }
             apply(&tick);
+            sync_bound(root);
             return;
         }
     }
+    sync_bound(root);
     if !rr_host::pending() {
         return;
     }
     let tick = rr_host::service_pending(root, player, cpu, online);
     apply(&tick);
+}
+
+/// Save writes the bound save; the save-state machine's active slot holds the bound save (RECORDING.md, "Save states
+/// only warp").
+fn sync_bound(root: &Path) {
+    rr_host::write_saved(root);
+    if let Some(pair) = rr_host::bound_sync(root) {
+        super::states::post_bound(pair);
+    }
 }
 
 fn take_mismatch_answer() {
@@ -130,7 +147,12 @@ fn apply(tick: &Tick) {
             current,
         );
     }
-    if let Some(kind) = tick.switch_kind {
+    if let Some(target) = tick.switch_mii {
+        if !SWITCH_MII.post(target) {
+            emit(&["screen=mismatch switch_mii=dropped".to_string()]);
+        }
+        crate::runtime::ui::worker::wake();
+    } else if let Some(kind) = tick.switch_kind {
         let requested = if tick.switch_player {
             crate::runtime::roster::character_roster::request_player_kind(kind as u32)
         } else {
@@ -151,7 +173,8 @@ fn apply(tick: &Tick) {
             root.join(crate::engine::library::SAVES_DIR),
         );
         if let Ok(save) = saves.load(id) {
-            super::states::request_named_load([save.player, save.cpu]);
+            // Edit placement's offset for the playing role (primary 2026-11-08 #70 (a)).
+            super::states::request_named_load(rr_host::warp_pair(save, tick.warp_place));
         } else {
             // No restore was asked for, so none will land.
             rr_host::warp_landed();
@@ -169,6 +192,36 @@ fn apply(tick: &Tick) {
         );
     }
     emit(&tick.diags);
+}
+
+/// A recording Switch for a CPU macro recorded on an exact Mii, waiting for the game callback.
+static SWITCH_MII: hos_lock::Mailbox<crate::engine::mii::replay::Target, 2> = hos_lock::Mailbox::new();
+
+/// Game callback only, beside `named_macros::service_character_request`: the Switch goes to the existing replay-catalog
+/// request with the macro's `playback_target()` (primary 2026-11-08 #54 (a)). The Mii machinery is used through its API
+/// only; it waits while the CPU cannot reload, and the newest Switch wins.
+pub fn service_switch_request() {
+    if !crate::runtime::roster::character_roster::cpu_reload_ready() {
+        return;
+    }
+    let mut newest = None;
+    SWITCH_MII.drain(|target| newest = Some(target));
+    let Some(target) = newest else { return };
+    #[cfg(feature = "mii-ordinary-cpu-alpha")]
+    let accepted = crate::runtime::roster::character_roster::mii_replay::request_named(target);
+    #[cfg(not(feature = "mii-ordinary-cpu-alpha"))]
+    let accepted = {
+        let _ = target;
+        false
+    };
+    #[cfg(feature = "diag")]
+    crate::runtime::diag_log::diagnostic(format_args!(
+        "[PracticeRecording] screen=mismatch switch_mii=1 kind={} accepted={}",
+        target.kind(),
+        u8::from(accepted)
+    ));
+    #[cfg(not(feature = "diag"))]
+    let _ = accepted;
 }
 
 fn emit(lines: &[String]) {

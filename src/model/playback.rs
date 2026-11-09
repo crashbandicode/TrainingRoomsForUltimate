@@ -143,6 +143,23 @@ impl Book {
         self.chains.contains_key(id)
     }
 
+    /// A chain's macro 1 (whose start save the chain warps to); `None` for anything else.
+    pub fn first_recording(&self, id: &str) -> Option<&str> {
+        self.chains.get(id)?.recordings.first().map(String::as_str)
+    }
+
+    /// The exact Mii a play of `id` was recorded on (a chain: macro 1's), for Switch; `None` for any other fighter.
+    pub fn exact_mii_target(&self, id: &str) -> Option<crate::engine::mii::replay::Target> {
+        let first = self.first_recording(id).unwrap_or(id);
+        let target = self.recordings.get(first)?.playback_target().ok()?;
+        target.configuration().map(|_| target)
+    }
+
+    /// The file's placement (Edit placement); the default for a missing file.
+    pub fn placement(&self, id: &str) -> super::macros::Placement {
+        self.recordings.get(id).map(|recording| recording.placement).unwrap_or_default()
+    }
+
     pub fn add_save(&mut self, id: impl Into<String>) {
         self.saves.insert(id.into());
     }
