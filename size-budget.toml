@@ -697,3 +697,11 @@ ceiling = 152565
 date = "2026-11-08"
 reason = "rc.6 item 3, worker B (p23/rc6-bg-pt 314c2bd; operator decision 2026-11-08 'All groups in rc.6', TASK-OPUS-rc6-bg-special, SPECIAL-GROUPS section 3): Pokemon Trainer and Pyra/Mythra groups built in the background (native_body_bank start_holder, init_holder, partner_guards, queue_trainer, schedule_task, background_partner X5 hook; body_bank holder_step/partner_cell/trainer_task); measured 152565 (tools/size_gate.py), +370 over 152195"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to this operator-chosen rc.6 item under TASK-OPUS-rc6-bg-special (primary c07b3449, 2026-11-08: a raise goes in its own commit with approved_by)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 152783
+date = "2026-11-09"
+reason = "worker B, inbox INBOX-opus-rc6-bg-pt 00:17Z item 1 (p23/rc6-bg-pt 6f5fed1): the Pokemon Trainer article fix (a detached PT group takes its object kind 0x72 again before its rebuild: native_body_bank rearm_candidate, detached_pool, return_object_key, the Rearm/RearmPoll lifecycle steps; body_bank object_rearm_due/object_ready); measured 152783 (tools/size_gate.py), +218 over 152565"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to this operator-chosen rc.6 item under TASK-OPUS-rc6-bg-special (primary c07b3449, 2026-11-09 00:17Z: a raise goes in its own commit with approved_by)"
