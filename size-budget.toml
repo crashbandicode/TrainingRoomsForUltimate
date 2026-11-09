@@ -857,3 +857,11 @@ ceiling = 155774
 date = "2026-11-08"
 reason = "rc.6 integration (p23/rc6-integration 83cf3b6): TASK-OPUS-rc6-open-fixes items 1 and 2 over d17c2ca (155695): #54's exact-Mii comparison as Switch installs it (8f0df06: mii_install::installed_target, identity::installed, mii_replay::installed_target, replay_ready, recorded_target_matches) and the live F9 seat for the Mii owners' snapshot (1a466db: parked_entries::live_seat, f9_gate LIVE/publish_live/seat_live, helper_kind); the docs merge d676755 adds no src; measured 155774 (tools/size_gate.py), +79"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied under TASK-OPUS-rc6-open-fixes (primary c07b3449, INBOX-opus-rc6-integration 2026-11-08 23:03Z); a raise goes in its own commit with approved_by"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 155878
+date = "2026-11-09"
+reason = "rc.6 integration (p23/rc6-integration df71299): TASK-OPUS-rc6-open-fixes item 1, option 1 over 3faecd3 (155774): a live F9 seat keeps its Mii by reading B's identity (parked_entries::mii_record_identity, MiiProof::holds, helper_kind's live flag) and the diag-only note of a live seat's differing descriptor and record offsets (note_live_bytes, ByteRanges); measured 155878 (tools/size_gate.py), +104"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied under TASK-OPUS-rc6-open-fixes (primary c07b3449, INBOX-opus-rc6-integration 2026-11-09 00:09Z/00:23Z); a raise goes in its own commit with approved_by"
