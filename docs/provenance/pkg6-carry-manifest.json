@@ -6368,7 +6368,7 @@
    "dest": "src/runtime/roster/native_body_bank.rs",
    "crate": "root",
    "src_sha256": "ccf7ac678691fa0101a1eff5dbd9300a1b12fe64e9ebbde515697adfbb841c98",
-   "dest_sha256": "fcfcb392f48f2f5ee92035308106ecde4f2ecb2f2b726b8f54bea3c05cc59bf8",
+   "dest_sha256": "d30e63b5e1e9c8964584634d5ed312d48ab6cac09d3983869af72dedc7422240",
    "edits": [
     {
      "old": "unsafe fn finalize_entry(entry: *mut u8) -> u64 {\n",
@@ -8450,6 +8450,21 @@
      "old": "    for value in &WAITING_PAUSE { value.store(0, Ordering::Release); }\n",
      "new": "    for value in &RELEASE_MEMBERS { value.store(0, Ordering::Release); }\n",
      "reason": "Merge of p23/rc6-preload-priority (c4487ded) into p23/rc6-integration: new members load at once and a parked group goes now when they need its room (d922ad3e, c4487ded), recorded over p23/rc6-window-admission's edits"
+    },
+    {
+     "old": "static BANKS: [Mutex<Option<Bank>>; 2] = [Mutex::new(None), Mutex::new(None)];\n",
+     "new": "static BANKS: [MirroredMutex<Option<Bank>>; 2] = [MirroredMutex::new(0, None), MirroredMutex::new(1, None)];\n\n/// A role's bank behind its lock, plus the ready observation [`cached_kind`] needs, mirrored in [`READY`] whenever a guard drops: the\n/// menu worker's roster re-plan reads that without the lock. The bank's own hooks run on the game's task workers (`allocation_trace`,\n/// hot-slots hook-thread table 2026-11-09), so a plugin thread holding `BANKS` could stall them while the game starves it (rc.6 freeze\n/// class, `tests/lock_order.rs`).\nstruct MirroredMutex<T> {\n    role: usize,\n    lock: Mutex<T>,\n}\n\nimpl<T> MirroredMutex<T> {\n    const fn new(role: usize, value: T) -> Self {\n        Self { role, lock: Mutex::new(value) }\n    }\n}\n\nimpl MirroredMutex<Option<Bank>> {\n    fn lock(&self) -> BankGuard<'_> {\n        BankGuard { role: self.role, guard: self.lock.lock() }\n    }\n}\n\nstruct BankGuard<'a> {\n    role: usize,\n    guard: hos_lock::MutexGuard<'a, Option<Bank>>,\n}\n\nimpl std::ops::Deref for BankGuard<'_> {\n    type Target = Option<Bank>;\n    fn deref(&self) -> &Option<Bank> {\n        &self.guard\n    }\n}\n\nimpl std::ops::DerefMut for BankGuard<'_> {\n    fn deref_mut(&mut self) -> &mut Option<Bank> {\n        &mut self.guard\n    }\n}\n\nimpl Drop for BankGuard<'_> {\n    fn drop(&mut self) {\n        // Still under the bank's lock: the one writer of this role's mirror.\n        READY[self.role].write(&ready_words(&self.guard));\n    }\n}\n\n/// `[ready, entry, owner, kind, physical descriptor (0x70 bytes)]`, all zero unless the bank is Ready, not departed and observed.\nconst READY_WORDS: usize = 4 + 0x70 / 8;\nstatic READY: [crate::model::seq_cell::SeqCell<READY_WORDS>; 2] =\n    [crate::model::seq_cell::SeqCell::new(), crate::model::seq_cell::SeqCell::new()];\n\nfn ready_words(bank: &Option<Bank>) -> [u64; READY_WORDS] {\n    let mut words = [0; READY_WORDS];\n    if let Some(bank) = bank.as_ref().filter(|bank| !bank.departed && bank.phase == Phase::Ready) {\n        if let Some((physical, kind)) = bank.observed {\n            words[..4].copy_from_slice(&[1, bank.entry as u64, u64::from(bank.owner), u64::from(kind)]);\n            for (word, bytes) in words[4..].iter_mut().zip(physical.chunks_exact(8)) {\n                *word = u64::from_le_bytes(bytes.try_into().expect(\"8 bytes\"));\n            }\n        }\n    }\n    words\n}\n",
+     "reason": "rc.6 freeze class (primary 2026-11-09 20:32Z; tests/lock_order.rs): BANKS is a MirroredMutex whose guard mirrors the Ready observation into a SeqCell on drop, and cached_kind (reached by the menu worker's roster re-plan) reads the mirror instead of the lock; allocation_trace and the group-build hooks waiting on BANKS run on the game's task workers (hot-slots hook-thread table)"
+    },
+    {
+     "old": "    let state = BANKS[role(owner)?].lock();\n    let bank = state.as_ref()?;\n    if bank.entry != entry || bank.owner != owner || bank.departed || bank.phase != Phase::Ready {\n",
+     "new": "    // The mirror of the Ready bank (`READY`), never the bank's lock: the menu worker's re-plan reads this. A read that keeps meeting a\n    // write in progress gives up (no cached kind; the caller falls back to the descriptor's own kind).\n    let words = READY[role(owner)?].read(64)?;\n    if words[0] != 1 || words[1] != entry as u64 || words[2] != u64::from(owner) {\n",
+     "reason": "rc.6 freeze class (primary 2026-11-09 20:32Z; tests/lock_order.rs): BANKS is a MirroredMutex whose guard mirrors the Ready observation into a SeqCell on drop, and cached_kind (reached by the menu worker's roster re-plan) reads the mirror instead of the lock; allocation_trace and the group-build hooks waiting on BANKS run on the game's task workers (hot-slots hook-thread table)"
+    },
+    {
+     "old": "    bank.observed\n        .filter(|(physical, _)| crate::engine::mii::identity::verify_descriptor(physical, descriptor,\n            crate::engine::mii::identity::ExpectedMutation::NativeBehavior).is_ok())\n        .map(|(_, kind)| kind)\n",
+     "new": "    let mut physical = [0u8; 0x70];\n    for (bytes, word) in physical.chunks_exact_mut(8).zip(&words[4..]) {\n        bytes.copy_from_slice(&word.to_le_bytes());\n    }\n    crate::engine::mii::identity::verify_descriptor(&physical, descriptor,\n        crate::engine::mii::identity::ExpectedMutation::NativeBehavior).ok().map(|_| words[3] as u32)\n",
+     "reason": "rc.6 freeze class (primary 2026-11-09 20:32Z; tests/lock_order.rs): BANKS is a MirroredMutex whose guard mirrors the Ready observation into a SeqCell on drop, and cached_kind (reached by the menu worker's roster re-plan) reads the mirror instead of the lock; allocation_trace and the group-build hooks waiting on BANKS run on the game's task workers (hot-slots hook-thread table)"
     }
    ]
   },

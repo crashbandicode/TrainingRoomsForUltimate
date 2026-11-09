@@ -296,7 +296,71 @@ static BACKGROUND_CELLS: [AtomicU64; 2] = [AtomicU64::new(0), AtomicU64::new(0)]
 /// `+0x100` (both reported at settlement).
 static BACKGROUND_INFO_KEPT: AtomicU32 = AtomicU32::new(0);
 static BACKGROUND_INFO_OWN: AtomicU32 = AtomicU32::new(0);
-static BANKS: [Mutex<Option<Bank>>; 2] = [Mutex::new(None), Mutex::new(None)];
+static BANKS: [MirroredMutex<Option<Bank>>; 2] = [MirroredMutex::new(0, None), MirroredMutex::new(1, None)];
+
+/// A role's bank behind its lock, plus the ready observation [`cached_kind`] needs, mirrored in [`READY`] whenever a guard drops: the
+/// menu worker's roster re-plan reads that without the lock. The bank's own hooks run on the game's task workers (`allocation_trace`,
+/// hot-slots hook-thread table 2026-11-09), so a plugin thread holding `BANKS` could stall them while the game starves it (rc.6 freeze
+/// class, `tests/lock_order.rs`).
+struct MirroredMutex<T> {
+    role: usize,
+    lock: Mutex<T>,
+}
+
+impl<T> MirroredMutex<T> {
+    const fn new(role: usize, value: T) -> Self {
+        Self { role, lock: Mutex::new(value) }
+    }
+}
+
+impl MirroredMutex<Option<Bank>> {
+    fn lock(&self) -> BankGuard<'_> {
+        BankGuard { role: self.role, guard: self.lock.lock() }
+    }
+}
+
+struct BankGuard<'a> {
+    role: usize,
+    guard: hos_lock::MutexGuard<'a, Option<Bank>>,
+}
+
+impl std::ops::Deref for BankGuard<'_> {
+    type Target = Option<Bank>;
+    fn deref(&self) -> &Option<Bank> {
+        &self.guard
+    }
+}
+
+impl std::ops::DerefMut for BankGuard<'_> {
+    fn deref_mut(&mut self) -> &mut Option<Bank> {
+        &mut self.guard
+    }
+}
+
+impl Drop for BankGuard<'_> {
+    fn drop(&mut self) {
+        // Still under the bank's lock: the one writer of this role's mirror.
+        READY[self.role].write(&ready_words(&self.guard));
+    }
+}
+
+/// `[ready, entry, owner, kind, physical descriptor (0x70 bytes)]`, all zero unless the bank is Ready, not departed and observed.
+const READY_WORDS: usize = 4 + 0x70 / 8;
+static READY: [crate::model::seq_cell::SeqCell<READY_WORDS>; 2] =
+    [crate::model::seq_cell::SeqCell::new(), crate::model::seq_cell::SeqCell::new()];
+
+fn ready_words(bank: &Option<Bank>) -> [u64; READY_WORDS] {
+    let mut words = [0; READY_WORDS];
+    if let Some(bank) = bank.as_ref().filter(|bank| !bank.departed && bank.phase == Phase::Ready) {
+        if let Some((physical, kind)) = bank.observed {
+            words[..4].copy_from_slice(&[1, bank.entry as u64, u64::from(bank.owner), u64::from(kind)]);
+            for (word, bytes) in words[4..].iter_mut().zip(physical.chunks_exact(8)) {
+                *word = u64::from_le_bytes(bytes.try_into().expect("8 bytes"));
+            }
+        }
+    }
+    words
+}
 // Filled before the hooks are enabled; each role moves its storage into its
 // first bank and retains it through every subsequent native bank lifetime.
 static BANK_STORAGE: [Mutex<Option<BankStorage>>; 2] = [Mutex::new(None), Mutex::new(None)];
@@ -2172,15 +2236,18 @@ unsafe fn pair_window(entry: *const u8) -> Option<(u32, Members)> {
 /// receipt, so a native CPU Behavior change keeps the active member's identity
 /// for the next cycle instead of falling back to the group's first kind.
 pub(crate) fn cached_kind(entry: usize, owner: u32, descriptor: &[u8; 0x70]) -> Option<u32> {
-    let state = BANKS[role(owner)?].lock();
-    let bank = state.as_ref()?;
-    if bank.entry != entry || bank.owner != owner || bank.departed || bank.phase != Phase::Ready {
+    // The mirror of the Ready bank (`READY`), never the bank's lock: the menu worker's re-plan reads this. A read that keeps meeting a
+    // write in progress gives up (no cached kind; the caller falls back to the descriptor's own kind).
+    let words = READY[role(owner)?].read(64)?;
+    if words[0] != 1 || words[1] != entry as u64 || words[2] != u64::from(owner) {
         return None;
     }
-    bank.observed
-        .filter(|(physical, _)| crate::engine::mii::identity::verify_descriptor(physical, descriptor,
-            crate::engine::mii::identity::ExpectedMutation::NativeBehavior).is_ok())
-        .map(|(_, kind)| kind)
+    let mut physical = [0u8; 0x70];
+    for (bytes, word) in physical.chunks_exact_mut(8).zip(&words[4..]) {
+        bytes.copy_from_slice(&word.to_le_bytes());
+    }
+    crate::engine::mii::identity::verify_descriptor(&physical, descriptor,
+        crate::engine::mii::identity::ExpectedMutation::NativeBehavior).ok().map(|_| words[3] as u32)
 }
 
 /// True only after native settlement disproved the operation's identity.
