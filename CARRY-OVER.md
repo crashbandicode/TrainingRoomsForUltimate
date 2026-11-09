@@ -1237,6 +1237,92 @@ Inbox `INBOX-opus-rc6-bg-pt.md` 00:17Z item 1 (worker B; item 2, the start on PT
   frames), 48 ms (the next scene's first attach). The PT group left the cycle holding the kind: `keys=[72]
   ledger_held=0 map_after=0`. The scene end with the kind held: `rc6-bg-pt5` (same teardown code) `reconcile owner=0
   phase=finalize map=0`.
+
+### p23/rc6-bg-pt: a Pokémon Trainer exit retires its article pool over the next ticks (2026-11-09)
+
+Inbox `INBOX-opus-rc6-bg-pt.md` 02:00Z (worker A measured leaving PT at 114.9–118.5 ms with a 5-frame gap). On top of
+integration's `62e7c85` (merge `d1fd8dd`, ceiling `da86a68`); commits `3b9b4895`, size raise `9a7ea5c0`.
+
+- **Root cause** (Eden `rc6-bg-ptx1`/`ptx2`: guest trace points in the owned 13.0.5 code, no plugin change; evidence
+  `bg-pt-evidence/rc6-bg-ptx1`, `ptx2`, with the probe tools): the exit's setup tick ran `special_articles::retire_saved`'s
+  `0x3a6b80(holder)` whole, 28–57 ms. Pass 1 (each article deactivated; the trainer's `vt+0x48` = `0x33a1c90` clears
+  `bo+0x61` and switches its modules off) is 0.1–0.7 ms. Pass 2's `0x3aeb50(id)` runs the trainer weapon's teardown
+  (`vt+0x50` = `0x33a1fc0`): 15–33 ms of its own, plus its own article pool (eight sub-weapons), which it releases
+  through `0x3d3a90` at `[[bo+0x20]+0x98]+0x240`, 13–26 ms. The larger numbers are the boot's first exit.
+- **The split** (model `swap_model::special_articles::RetireStage`, `remaining`, `attachable`). Nothing moves off the
+  game thread, since it destroys live battle objects:
+  - the exit's tick runs pass 1 only (`deactivate_saved`): the trainer leaves the world at once;
+  - the next lifecycle tick releases the trainer's own pools through `0x3a6b80` (`release_sub_pools`). Only a pool of
+    the holder class `0x4f626e8` goes, the one the article module's constructor stores at `0x33b98d4`;
+  - the tick after runs pass 2 and the tail as native does (`destroy_saved`), except that an id `0x3ac560` no longer
+    finds is not handed to `0x3aeb50`, which reads the slot without a null check.
+- **The bank:**
+  - `Bank.retiring` and `group_lifecycle`'s Retire step, after the in-flight polls and before anything new, under
+    INSTALL, so a press meanwhile waits;
+  - `retire_step` / `retire_stage` / `finish_retirement`;
+  - `group_reachable` never attaches a retiring group;
+  - `retire_groups`, `leave_group`, the swap rollback and a following exit finish the stages first.
+- **Gate:** three seam rows (`special_groups.object_lookup` `0x3ac560`, `.object_destroy` `0x3aeb50`, `.static_init`
+  `0x3a9ab0`) and the guard pair's words (`EXIT_SPLIT`). Without them the exit keeps native's whole release.
+- **Proof:** host tests, each failed first: model `a_pt_exit_retires_its_pool_one_stage_per_tick`,
+  `a_retiring_pool_is_finished_before_anything_else_reads_it`; `tests/background_native_wiring.rs`
+  `a_pt_exit_retires_its_pool_over_later_ticks`. Recorded manifest edits of the four carried files.
+- **Eden `rc6-bg-ptx3`** (diag `a6045772` of `9a7ea5c0`; rows `rows-bg-pt/rows-ptexit.json`, `make_bn_rows7.py`;
+  evidence `bg-pt-evidence/rc6-bg-ptx3`): P1's cycle DK, Squirtle, Fox, Pyra, three laps, every switch judged at ≤ 4
+  frames. Unmapped 0, no `main+0x35609c0` read, `z-unmapped` passed (hook allocations included).
+  - PT → Fox: 54.6 ms, 3 frames (the boot's first exit); then 51.3 and 50.5 ms, 2 frames.
+  - Pyra → Mario: 46.7–48.5 ms, 1 frame; CPU lap ≤ 2 frames.
+  - The stages ran on their own ticks after Ready: SubPools 12.3–12.4 ms, Destroy 15.3–19.4 ms, `gone=0`; then the
+    0x72 re-acquisition, 105–114 ms.
+  - Failed only: the PT attach with the boot's first article rebuild (237 ms, 13 frames; the first-rebuild cost, not an
+    exit), and the cycle-change row's Fighters notice ("swap P1 to load 1 more" while every P1 group was built).
+    The notice row passes on integration `d5db7387`, which has worker A's notice fix (`rc6-bg-ptx4`).
+
+### p23/rc6-bg-pt: a detached PT group's retired pool is built on the task worker before its attach (2026-11-09)
+
+Inbox `INBOX-opus-rc6-bg-pt.md` 02:42Z (hot-slots `rc6-hot-xps22`: the first attach's rebuild 382 ms, then 62 ms). On top
+of integration `d5db7387` (merge `2fa9a951`, ceiling `cdd2d1ec`, the merged step name `1a7096a0`); commits `d94e6562`, raise
+`7b4859f2`; the diag trace fix `4c50807d`, raise `bc4784ea`.
+
+- **Measured:** the attach's `special_articles::rebuild_current` (`0x3a6270`) ran inside the switch's setup tick on
+  the game thread: 209 ms the boot's first time, then 62.8 ms (Eden `rc6-bg-ptx3`).
+- **Fix:** native state 11 runs the same `0x3a6270` on the task worker (the trainer functor `0x651a30` at `0x651b4c`).
+  Once a detached PT group's pool is retired and the group holds 0x72 again (item 1), the bank queues state 11's
+  trainer task for that holder with a plugin functor (`PREPARE_VTABLE`):
+  - the trainer functor vtable `0x4f81498` copied; its call runs only `special_articles::build_pool` (the call
+    `rebuild_current` makes; no `0x17e8890` lookup, no G68 registration `0x17eeaa0`);
+  - its two clones (`0x651970`, `0x6519f0`) write the native vtable, so they are replaced;
+  - install checks the three relocated slots and the clones' words, or the attach keeps its own rebuild.
+- **Lifecycle:** INSTALL is held while the task runs, so a press waits, as for the re-acquisition. A filled pool returns
+  0x72, as after an attach's rebuild; the attach then rebuilds nothing and claims the trainer, as after a background
+  build. An empty pool keeps the kind and is not prepared again. `retire_groups` and `leave_group` wait for the task
+  (`TASK_WAIT`). `schedule_task` now takes the functor vtable as an address.
+- **The merged step name (`1a7096a0`):** integration's `slow_step` (`8b551c5d`) names every lifecycle step; the exit's
+  `Step::Retire` and the new Prepare steps are named. Only the switch build compiles the runtime, so host test and
+  clippy don't show a missing arm.
+- **The diag trace (`4c50807d`):** `d38fd025`'s attach-tick trace read cell `+0x4170` of a two-body entry, which native
+  never wrote: Unmapped Read8 @ `0x4274e9664a9b2a12` at `body_bank::service` 17 times in `rc6-bg-ptx4`. It now reads only
+  the installed cells (`+0x4150`). Diag only.
+- **Proof:** host tests, each failed first: model `a_retired_pt_pool_is_built_again_on_the_worker_before_its_attach`
+  (`prepare_due`); `tests/background_native_wiring.rs` `a_retired_pt_pool_is_prepared_on_the_worker_before_its_attach`.
+- **Eden `rc6-bg-ptx4`** (diag `89651eb2` of `7b4859f2`; rows `rows-bg-pt/rows-ptexit2.json`, `make_bn_rows7.py 2`;
+  evidence `bg-pt-evidence/rc6-bg-ptx4`):
+  - ordinary → PT (DK → Squirtle): 68.4 ms, 2 frames (the first attach, a background-built pool); then 51.4 and
+    49.4 ms, 1 frame. Lap 2 is the attach that used to rebuild the boot's first time (237 ms, 13 frames).
+  - PT → Fox: 50.5 ms, 3 frames (first); then 48.8 and 50.0 ms, 2 frames. Pyra → Mario: 49.7–50.5 ms, 1 frame.
+  - After each exit: the stages (SubPools 10.9–35.9 ms, Destroy 16.8–26.2 ms, `gone=0`), the re-acquisition
+    (105–119 ms), then the worker's build (`pool=0->1` in 66–85 ms, no game-thread stall), and 0x72 back. No
+    `articles rebuilt` line in laps 2–3.
+  - No `main+0x35609c0` read; the 17 Unmapped reads were all the diag trace above.
+- **Eden `rc6-bg-ptx6`** (diag `90eaf8f2` of `bc4784ea`, the same rows), 9/10 PASS: Unmapped 0, `z-unmapped` passed (hook
+  allocations included), `bn-loaded` and `ex-cycle` passed.
+  - DK → PT 87.8 ms / 3 frames (first), then 50.1 and 49.8 ms / 1.
+  - PT → Fox 50.2 ms / 3 (first), then 50.0 and 49.3 ms / 2.
+  - Pyra → Mario 49.1–50.0 ms / 1; CPU lap 1 frame.
+  - The one failure: Fox → Pyra, the boot's first attach of the background-built Aegis group (ordinary → Aegis, outside
+    the item): 89.6 ms, tick 57 ms, 5 frames, as the first PT attach's tick; 3 and 4 frames in `ptx3`/`ptx4`, 2 and 1
+    later.
+
 ### p23/rc6-hot-slots: Mii groups built in the background; the exit from a Mii warm to any Built group (2026-11-08)
 
 Operator 2026-11-08 20:26Z, "All groups in rc.6"; research `artifacts/phase23/rc6-item3-re/SPECIAL-GROUPS.md` §0–§1, with
