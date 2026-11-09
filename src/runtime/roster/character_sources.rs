@@ -2131,12 +2131,17 @@ fn creation_intent(state:&State,backend:Backend,speculative:bool)->Option<Creati
     // Existing helpers must first be filled or actively leased. Never create a
     // new native owner merely because an existing free helper has not run yet.
     // One whose purpose view admits no plan target can never be filled by it.
+    // Primary 2026-11-09 09:47Z (Eden final-xps-hot hs06): a parked F9 seat holding its own seat member is filled too
+    // (`hat_slots::creation_filled`); reading A keeps that member outside a hats-only plan.
     for slot in candidates(backend).iter().copied().take(backend.helpers().len()+position) {
-        let filled=state.sources[slot as usize].is_some_and(|source|state.book.is_current(source.token.epoch())
-            && state.book.phase(slot as usize)==Ok(Phase::Ready)
-            && (state.preload.iter().flatten().any(|want|want.kind==source.kind && want.configuration==source.configuration)
-                || state.book.can_replace(slot as usize)!=Ok(true)));
-        if crate::engine::preload::hat_slots::holds_back_creation(helper_view(state,slot),filled) {return None;}
+        let view=helper_view(state,slot);
+        let filled=state.sources[slot as usize].is_some_and(|source|crate::engine::preload::hat_slots::creation_filled(
+            state.book.is_current(source.token.epoch()) && state.book.phase(slot as usize)==Ok(Phase::Ready),
+            state.preload.iter().flatten().any(|want|want.kind==source.kind && want.configuration==source.configuration),
+            state.book.can_replace(slot as usize)==Ok(true),
+            parked_seat_view(state,slot,&view)
+                && view.iter().flatten().any(|want|want.kind==source.kind && want.configuration==source.configuration)));
+        if crate::engine::preload::hat_slots::holds_back_creation(view,filled) {return None;}
     }
     // Exact Miis use the separately qualified Training destination capability.
     let wanted=state.preload.iter().copied().flatten().find(|want|

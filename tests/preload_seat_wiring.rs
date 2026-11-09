@@ -46,3 +46,24 @@ fn a_parked_seat_is_judged_on_its_own_entry() {
         "let member=crate::runtime::roster::f9_gate::override_seat(slot).or_else(||crate::model::parked_entries::parked_seat(",
         "slot,quantity,borrowed,crate::runtime::roster::f9_gate::seat_member(slot)))?;"]);
 }
+
+/// Primary 2026-11-09 09:47Z (Eden final-xps-hot hs06): a parked seat's view admits its own seat member, which a
+/// hats-only plan never lists, so the creation walk counted it unfilled and held the created entries 7/6/5/4 back for
+/// good. The rule is host-tested (`hat_slots` `parked_seats_on_their_members_let_a_hats_only_plan_create_its_entries`);
+/// here `creation_intent` asks it for every entry before the next created one, with the seat judged by
+/// `parked_seat_view` on the same view that `holds_back_creation` reads.
+#[test]
+fn a_parked_seat_on_its_member_does_not_hold_back_creation() {
+    let creation = body(SOURCES, "fn creation_intent(");
+    ordered(creation, &[
+        "for slot in candidates(backend).iter().copied().take(backend.helpers().len()+position) {",
+        "let view=helper_view(state,slot);",
+        "crate::engine::preload::hat_slots::creation_filled(",
+        "state.book.is_current(source.token.epoch()) && state.book.phase(slot as usize)==Ok(Phase::Ready),",
+        "state.preload.iter().flatten().any(|want|want.kind==source.kind && want.configuration==source.configuration),",
+        "state.book.can_replace(slot as usize)==Ok(true),",
+        "parked_seat_view(state,slot,&view)",
+        "&& view.iter().flatten().any(|want|want.kind==source.kind && want.configuration==source.configuration)));",
+        "if crate::engine::preload::hat_slots::holds_back_creation(view,filled) {return None;}",
+    ]);
+}
