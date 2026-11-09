@@ -1475,6 +1475,14 @@ unsafe fn rearm_candidate(base: usize, bank: &Bank) -> Option<usize> {
         && object_rearm_due(g.state, *g.members, detached_pool(base, owner, g), g.object_held))
 }
 
+/// [`rearm_candidate`] under the D-KIRBY1 gate: the group whose object kind the live member admits
+/// (`body_bank::object_rearm_admitted`: the trainer's object kind under a live Kirby; primary 2026-11-09 05:38Z).
+unsafe fn kirby_rearm(base: usize, bank: &Bank, live: Option<u32>) -> Option<usize> {
+    let group = rearm_candidate(base, bank)?;
+    let kind = bank.groups[group].members.object_kind()?;
+    crate::engine::swap::body_bank::object_rearm_admitted(live, kind).ok().map(|()| group)
+}
+
 /// Inbox 02:00Z: the next stage of the PT pool the last exit left retiring (`RetireStage`), on this tick. The group
 /// lifecycle takes INSTALL for the first later stage (a press meanwhile waits for it, as for a prefetch) and gives it
 /// back after the last; a teardown, a leave or a rollback passes `blocking` and runs the stage with whatever INSTALL
@@ -5233,17 +5241,22 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
             Step::Prepare(group, bank.groups[group].saved.map_or(0, |w| w.records[0]))
         } else if let Err(reason) = crate::engine::swap::body_bank::prefetch_admitted(live) {
             let (window, alias) = (*bank.members, bank.alias);
+            // Primary 2026-11-09 05:38Z: after the key returns, a detached PT group's object re-arm runs here too (its
+            // object kind is no fighter a Kirby copy takes); fighter keys keep waiting.
             match bank.groups.iter().position(|g| g.state == GroupState::Prefetched) {
                 Some(group) => Step::Release(group, *bank.groups[group].members, window, alias),
-                None => {
-                    for (group, g) in bank.groups.iter_mut().enumerate()
-                        .filter(|(_, g)| g.state == GroupState::Planned && !g.kirby_logged) {
-                        g.kirby_logged = true;
-                        trace!("[GroupSwap] prefetch deferred owner={} group={} kinds={:x?} reason={} (D-KIRBY1)",
-                            owner, group, &g.members.kinds()[..g.members.count()], reason);
+                None => match kirby_rearm(base, bank, live) {
+                    Some(group) => Step::Rearm(group, *bank.groups[group].members, alias),
+                    None => {
+                        for (group, g) in bank.groups.iter_mut().enumerate()
+                            .filter(|(_, g)| g.state == GroupState::Planned && !g.kirby_logged) {
+                            g.kirby_logged = true;
+                            trace!("[GroupSwap] prefetch deferred owner={} group={} kinds={:x?} reason={} (D-KIRBY1)",
+                                owner, group, &g.members.kinds()[..g.members.count()], reason);
+                        }
+                        Step::Idle
                     }
-                    Step::Idle
-                }
+                },
             }
         // A Mii group's key request reads its CharInfo from the owner's record:
         // it starts only after the adapter published it (`pending_mii_publication`).

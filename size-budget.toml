@@ -1100,3 +1100,19 @@ ceiling = 158905
 date = "2026-11-09"
 reason = "rc.6 integration (p23/rc6-integration c9e62f33): the merge of p23/rc6-pt-start a5c3ef84 (158317: +42 over d5db7387's 158275, the PT/Aegis start and X5) into c0e14b63 (158863, worker B's PT exit and first attach); measured 158905 on the merged tree (tools/size_gate.py), +42"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); combined ceiling = measured merged size per primary c07b3449, INBOX-opus-rc6-integration 2026-11-08 19:13Z"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 158923
+date = "2026-11-09"
+reason = "rc.6, a detached PT group's object re-arm under a live Kirby (p23/rc6-kirby-rearm; primary 2026-11-09 05:38Z): body_bank object_rearm_admitted, native_body_bank kirby_rearm and its D-KIRBY1 branch; measured 158923 (tools/size_gate.py), +18 over 158905"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to this approved rc.6 item (primary 2026-11-09 05:38Z; a raise goes in its own commit with approved_by, primary c07b3449)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 158926
+date = "2026-11-09"
+reason = "rc.6, the ledger admits a bank object kind under a live Kirby (p23/rc6-kirby-rearm; primary 2026-11-09 05:38Z; Eden rc6-kr1): occupancy conflicts, capabilities bank_object_kind; measured 158926 (tools/size_gate.py), +3 over 158923"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to this approved rc.6 item (primary 2026-11-09 05:38Z; a raise goes in its own commit with approved_by, primary c07b3449)"

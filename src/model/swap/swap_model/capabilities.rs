@@ -585,6 +585,22 @@ pub fn prefetch_admitted(live_kind: Option<u32>) -> Result<(), &'static str> {
     }
 }
 
+/// A detached Pokémon Trainer group's object re-arm (`object_rearm_due`: its object kind taken again before its next
+/// attach) under the role's live member. D-KIRBY1 ([`prefetch_admitted`]) is about the keys a live Kirby copy can share
+/// on its R, and a copy registers a fighter kind there (`[KirbyProbe] request owner=R kind=…`; a copy of a Pokémon takes
+/// the Pokémon, `0x24..=0x26`). The object kinds the bank holds keys for (the trainer's `PT_OBJECT_KIND`, the Aegis
+/// partner's `AEGIS_OBJECT_KIND`) are no fighter a copy takes, so their re-arm runs under a live Kirby too, through the
+/// same ledger path (primary 2026-11-09 05:38Z: Kirby > PT warm again). Any other kind waits as a prefetch does:
+/// D-KIRBY1 stays for every fighter key.
+pub fn object_rearm_admitted(live_kind: Option<u32>, kind: u32) -> Result<(), &'static str> {
+    if bank_object_kind(kind) { Ok(()) } else { prefetch_admitted(live_kind) }
+}
+
+/// The object kinds the bank holds keys for (no fighter kind, so no Kirby copy registers one on R).
+pub fn bank_object_kind(kind: u32) -> bool {
+    matches!(kind, PT_OBJECT_KIND | AEGIS_OBJECT_KIND)
+}
+
 /// A prefetch key may be released unless the live Kirby copies exactly that kind
 /// (`live_copy_kind`: `INT_COPY_CHARA` while `FLAG_COPY`, else `None`): the D-KIRBY1 last-line
 /// guard (`Conflict::LiveCopySharesRegistry` in WP4's occupancy terms). The reason text is read by

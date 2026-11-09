@@ -25,7 +25,8 @@ pub const KIRBY: u32 = 0x06;
 // caller (`body_bank::member_forms_in`, `body_bank::prefetch_admitted`, …).
 pub use crate::engine::swap::swap_model::capabilities::{
     group_member_kind, key_release_admitted, kirby_parkable, member_forms, member_forms_in,
-    native_group_request, original_bankable, original_form_bankable, pair_lead_extra, pair_request, prefetch_admitted,
+    native_group_request, object_rearm_admitted, original_bankable, original_form_bankable, pair_lead_extra, pair_request,
+    prefetch_admitted,
     single_member_request, special_group_kind, swap_commit_index, swap_commit_index_in,
     swappable_kind, window_swappable, window_swappable_with,
 };
@@ -2035,6 +2036,30 @@ mod tests {
         assert!(!object_ready(pt, 0, false), "its attach would rebuild without the files");
         assert!(object_ready(pt, 0, true) && object_ready(pt, 1, false));
         assert!(object_ready(aegis, 0, false) && object_ready(ordinary, 0, false));
+    }
+
+    /// Primary 2026-11-09 05:38Z: a detached PT group's object re-arm runs under a live Kirby. D-KIRBY1 is about the keys
+    /// a Kirby copy can share on `R`, and a copy registers a fighter kind; the trainer's object kind `0x72` is none. So
+    /// PT > … > Kirby > PT is warm again. Every fighter-kind prefetch still waits for the live Kirby (D-KIRBY1 stays for
+    /// fighter keys), and every other live member admits the re-arm as before.
+    #[test]
+    fn a_trainer_object_rearm_is_admitted_under_a_live_kirby_and_a_fighter_prefetch_is_not() {
+        let pt = Members::native_group(0x24).unwrap();
+        let kind = pt.object_kind().unwrap();
+        assert_eq!(kind, PT_OBJECT_KIND);
+        assert_eq!(object_rearm_admitted(Some(KIRBY), kind), Ok(()), "the trainer's object kind under a live Kirby");
+        for live in [None, Some(0x01), Some(0x24), Some(0x4b), Some(0x48)] {
+            assert_eq!(object_rearm_admitted(live, kind), Ok(()), "{live:?}");
+        }
+        // D-KIRBY1 is unchanged for fighter keys.
+        assert!(prefetch_admitted(Some(KIRBY)).is_err());
+        for fighter in [0x24, 0x25, 0x26, 0x01, 0x4b] {
+            assert!(object_rearm_admitted(Some(KIRBY), fighter).is_err(), "{fighter:#x} is a fighter kind a copy takes");
+        }
+        // A copy never names the object kind, so the ledger's last-line guard admits its release under any copy.
+        for copy in [None, Some(0x24), Some(0x25), Some(0x26), Some(0x00)] {
+            assert_eq!(key_release_admitted(kind, copy), Ok(()), "{copy:?}");
+        }
     }
 
     /// Phase B′: an ordinary group without a Mii identity and a Mii group (operator decision
