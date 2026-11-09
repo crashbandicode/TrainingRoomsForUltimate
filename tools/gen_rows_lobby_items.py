@@ -25,6 +25,22 @@ ROWS = [
     ("lobby_items.spawner_thunk", 0x1358680, "SeamKind::Relied",
      "`adrp x8; ldr x0,[x8,#0x70]; cbz x0; b 0x15d99b0`: the per-frame update table's entry (.rodata 0x3c89390) calls the spawner "
      "with the ItemManager singleton main+0x52c4070, the manager the removal step reads."),
+    ("lobby_items.drop_lot", 0x15499B4, "SeamKind::Hook { form: HookForm::Inline, placement: Placement::Mid }",
+     "Mid-function inline hook on `tbz w0, #0, 0x15499fc`, the timed item generator's test of the item lottery's verdict "
+     "(the generator F = 0x1549930 is reached only indirectly, from a timer; `bl 0x15dc450` at 0x15499b0 draws the lottery; a "
+     "win falls through to the creation `bl 0x15beaa0` with w1 = 0x36a at 0x15499c8; 0x15499fc re-arms the timer from the game "
+     "RNG either way). The spawner's switch (`lobby_items.spawn_switch`) doesn't gate F: Eden rc6-bg-qp5 (#62) saw F make "
+     "every item of a 61 s Off window in Quickplay's waiting area. In a qualified waiting scene with Lobby Items Off the "
+     "callback sets x0 = 0, the native's own declined path; elsewhere it leaves the context alone. 4 past an 8-byte "
+     "boundary: a far form (nop + 16 bytes) replaces 0x15499b4..0x15499c8 (tbz, relocated; ldr x8,[x20]; ldr x0,[x8]; "
+     "mov w1,#0x36a; mov x2,sp). No direct branch in .text targets 0x15499b8..0x15499c8, F has no x16/x17 operand, NZCV is "
+     "dead here (the bl before it clobbers the flags; both successors set them with cmp before a read). Card scan "
+     "2026-11-09 over the card copies of 2026-11-05 20:24 and 2026-11-03 13:06: no plugin refers to it."),
+    ("lobby_items.drop_gate", 0x154997C, "SeamKind::Relied",
+     "The timed generator's gates and lottery call that `lobby_items.drop_lot` relies on: `ldr x20,[x20,#0xa0]` (control = "
+     "[[ItemManager+0xa0]], the singleton main+0x52c4070 loaded at 0x154994c), `ldrb w8,[x8,#0x8]; cbz w8` (the control's "
+     "generator byte; the spawner tests +0x30), the game-state byte main+0x52b8550 (`cmp w8,#2; b.ne` when set), then "
+     "`mov x0,sp; stp xzr,xzr,[sp]; bl 0x15dc450` (the item lottery, the spawner's too) and the hooked tbz."),
 ]
 
 
