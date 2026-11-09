@@ -916,3 +916,11 @@ ceiling = 152381
 date = "2026-11-09"
 reason = "rc.6 item 3, the return to an Ice Climbers original is warm (p23/rc6-bg-ic 3bd9db4; primary 2026-11-09 00:23Z): capabilities original_form_bankable and the IcPair row, native_body_bank original_member and excluded_original, both Mii adapters' Original gates; measured 152381 (tools/size_gate.py), +40 over 152341"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to this operator-chosen rc.6 item under TASK-OPUS-rc6-bg-special (primary c07b3449, 2026-11-08: a raise goes in its own commit with approved_by)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 156436
+date = "2026-11-09"
+reason = "rc.6 integration (p23/rc6-integration 81a7454): the merge of p23/rc6-bg-ic (a46c6b3, 152381: +186 over 152195, the Ice Climbers background builds) into efa63b2 (156248), with both branches' eligibility rules as the interim of primary 2026-11-09 00:52Z; measured 156436 on the merged tree (tools/size_gate.py), +188"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); combined ceiling = measured merged size per primary c07b3449, INBOX-opus-rc6-integration 2026-11-08 19:13Z"
