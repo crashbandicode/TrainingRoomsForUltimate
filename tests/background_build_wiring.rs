@@ -49,7 +49,9 @@ fn the_tick_builds_the_group_window_and_puts_the_live_window_back() {
         "write_group_words(entry as usize, members);",
         "fields::write_unchecked(entry as usize, 0x5918, 0u8);",
         "models(entry);", "contexts(entry);",
-        "let made = save_window(entry as usize);",
+        "let mut made = save_window(entry as usize);",
+        // SPECIAL-GROUPS §3: a live native window's records stay with it.
+        "made.records = [0; 3];",
         "let scratch = scratch_address();",
         "std::ptr::copy_nonoverlapping(entry as *const u8, scratch as *mut u8, 0x100);",
         "std::ptr::copy_nonoverlapping((entry as usize + 0x4178) as *const u8, (scratch + 0x4178) as *mut u8, 0x28);",
@@ -97,7 +99,8 @@ fn the_settlement_keeps_the_bodies_in_the_group_and_every_destroyer_drains_first
         "fields::write_unchecked(body.address, BODY_CELL_BYTE, i as u8);",
         "r_handle::end_request(lrole, b.alias, b.lease)",
         "r_handle::construction_settled(lrole, b.group, &kinds[..b.queued]);",
-        "Some(g) if g.state == GroupState::Prefetched && valid => {",
+        // SPECIAL-GROUPS §3: a native group's holder step is proven too (`holder_ok` is true for every other group).
+        "Some(g) if g.state == GroupState::Prefetched && valid && holder_ok => {",
         "window.installed = count as u64;",
         "g.saved = Some(window);",
         "g.state = GroupState::Built;",

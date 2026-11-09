@@ -701,6 +701,14 @@ approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to this o
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
+ceiling = 152565
+date = "2026-11-08"
+reason = "rc.6 item 3, worker B (p23/rc6-bg-pt 314c2bd; operator decision 2026-11-08 'All groups in rc.6', TASK-OPUS-rc6-bg-special, SPECIAL-GROUPS section 3): Pokemon Trainer and Pyra/Mythra groups built in the background (native_body_bank start_holder, init_holder, partner_guards, queue_trainer, schedule_task, background_partner X5 hook; body_bank holder_step/partner_cell/trainer_task); measured 152565 (tools/size_gate.py), +370 over 152195"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to this operator-chosen rc.6 item under TASK-OPUS-rc6-bg-special (primary c07b3449, 2026-11-08: a raise goes in its own commit with approved_by)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
 ceiling = 153299
 date = "2026-11-09"
 reason = "rc.6 item 3, groups that left the cycle freed under the pause (operator decision 2026-11-08 23:42Z, INBOX-opus-rc6-hotslots; p23/rc6-hot-slots-mii): body_bank::leaves_at_pause/kept_members/waiting_for_pause/window_targets, native_body_bank pause_opening and the second plan without the parked groups, the pause hook call, the live pad-controller restore (restore_live_pads), the Mii adapters adopting a background record change (adopt_background_record, Snapshot::adopt_record), the identity and configuration moves and the slow-step diagnostics; measured 153299 (tools/size_gate.py), +467 over 152832"

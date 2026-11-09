@@ -1026,3 +1026,41 @@ allocation's `alloc_us`, and pad-controller changes.
 - `tests/background_build_wiring.rs` follows the named entry steps; `tests/group_hold_wiring.rs` follows the parked rule.
 
 Recorded manifest edits of the nine carried files; `carry_pkg6.py carry/ledger/verify` re-derives all 250 files.
+### p23/rc6-bg-pt: Pokémon Trainer and Pyra/Mythra groups built in the background (2026-11-08, rc.6 item 3)
+
+Worker B of the special-group split (`artifacts/phase23/TASK-OPUS-rc6-bg-special.md`); design
+`rc6-item3-re/SPECIAL-GROUPS.md` §3 (and §0 X5); report `LANE-OPUS-RC6-BG-PT-REPORT.md`.
+
+- **Which groups** (`body_bank::background_build_eligible`): a native group (no identity) is admitted, and a live
+  native window no longer defers a build; only a pair window does (X1). A native window is one actor, its cells 0/1 are
+  never `[Popo, Nana]`, and only an Ice Climbers body picks its info wrapper from the live cells (X4, `0x60d1f0`). The
+  switch-time build of a native group stays `0x658af0`'s (`async_build_eligible`).
+- **The tick** (`start_background`): the group's window takes no records from the live window (`made.records`), since
+  a live native window's holder is in the entry while the tick runs. A native group needs the rows below
+  (`NATIVE_BACKGROUND`); without them it is declined and its first switch builds it.
+- **X5** (`background_partner`, inline `0x607bac`): a background Pyra/Mythra body reads its group's cell 1
+  (`Members::partner_cell`, set in `queue_background_bodies`) instead of the live `FE+0x1c`, which is −1 beside a
+  one-member window and would give model kind `0x73`/`0x74`.
+- **The holder step** (`start_holder`, once every body settled; native loader state 11, `0x650010` case 0xb): the
+  0x238-byte holder with state 11's words (`init_holder`); Pyra/Mythra: the table guards (`partner_guards`) and
+  `0x3a6270(holder, main+0x52b94c8, 0, -1, owner, 0)` on the game thread; Pokémon Trainer: the 1-byte object and state
+  11's 0xa0-byte task (`queue_trainer`, functor `0x4f81498`, callback `0x651770`, `body_bank::trainer_task`) on the
+  worker, polled by `settle_background` and waited for by `drain_background`. The records go straight into the group's
+  saved window (`finish_background`, proven as `window_shape_ok` proves them at the warm attach), never onto the live
+  entry; `0x658af0` is never called. The pool stays filled (§3 change 4): the warm attach skips the rebuild and the
+  activation claims the trainer.
+- **The object keys** (`0x72`; `0x75` with the orphan `0x1338`) go back only after the holder step, as
+  `complete_exchange` returns them after a switch-time build.
+- `queue_task`'s functor and scheduling moved into `schedule_task`, shared with `queue_trainer`; unchanged.
+- **Seam rows** (`rows_a1`): `background_build.aegis_partner` (hook), `.trainer_functor`, `.trainer_callback`,
+  `.guard_acquire`, `.guard_release`, `.pool_build` (called).
+- **Proof:** host tests, each failed first: model
+  `a_background_build_takes_native_groups_and_builds_beside_a_live_native_window`; `tests/background_native_wiring.rs`
+  (3); `tests/background_build_wiring.rs` pins follow `made.records` and `holder_ok`. Recorded manifest edits of the
+  three carried files; `carry_pkg6.py carry/ledger/verify` re-derives all 250 files.
+- Eden (Yoga, diag `75750a11`; rows `artifacts/phase23/rc6-eden/rows-bg-pt/`; evidence `rc6-eden/bg-pt-evidence/`):
+  `rc6-bg-pt2` and `rc6-bg-pt3`. Every native group built in the background with its holder settled and the live
+  records 0; first switches: CPU into PT and Pyra 49–51 ms, P1 into PT 64–92 ms and into Pyra 87–115 ms (the base
+  `182a785` built them at the switch: 1158 ms and 939 ms, `rc6-bg-pt-base1`). Unmapped 0 when no PT group attaches a
+  second time. Open: every later PT attach's article rebuild (`special_articles::rebuild_current`) logs Unmapped
+  Read8 @ 0 at `main+0x35609c0`, at the base too (`rc6-bg-pt-base1`, 2 of 2).

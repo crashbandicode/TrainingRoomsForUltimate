@@ -168,7 +168,7 @@ use crate::engine::swap::body_bank::{
     dispatcher_array_header_ok, dispatcher_idle_words, native_group_request, original_bankable,
     pair_request, pair_resource_references, plan_extra_groups_with, prefetch_outcome,
     swap_commit_index_in, async_build_eligible, construction_task, TickGap,
-    background_build_eligible, next_background, BACKGROUND_INFO_SPANS,
+    background_build_eligible, next_background, BACKGROUND_INFO_SPANS, trainer_task, HolderStep,
     GroupBudget, GroupExchange, GroupOwner, GroupPolicy, GroupState, Hold, Members, Phase, Special,
     SpecialPolicy, BANK_FLAG, MAX_EXTRA_GROUPS, NANA, NATIVE_MEMBERS, PAIR_ACTIVE_FLAG, POOL_RESERVE, POPO,
     entry_bytes_of, mii_exit_bytes_match, mii_reuse_bytes_match, MiiEntryBytes, MiiIdentity, MII_ENTRY_START, RESOURCE_WORDS,
@@ -216,6 +216,11 @@ static BACKGROUND_ENABLED: AtomicBool = AtomicBool::new(false);
 static BACKGROUND_OWNERS: AtomicU32 = AtomicU32::new(0);
 /// Registrations `background_skip` has skipped since boot (each settlement logs its own difference).
 static BACKGROUND_SKIPS: AtomicU32 = AtomicU32::new(0);
+/// rc.6 item 3, SPECIAL-GROUPS §3: Pokémon Trainer and Pyra/Mythra groups build in the background too (the X5 site is
+/// hooked and native state 11's holder step passed its rows).
+static NATIVE_BACKGROUND: AtomicBool = AtomicBool::new(false);
+/// The cell 1 a Pyra/Mythra group's background bodies read at the X5 site (`background_partner`); `u32::MAX` otherwise.
+static BACKGROUND_PARTNER: AtomicU32 = AtomicU32::new(u32::MAX);
 static BANKS: [Mutex<Option<Bank>>; 2] = [Mutex::new(None), Mutex::new(None)];
 // Filled before the hooks are enabled; each role moves its storage into its
 // first bank and retains it through every subsequent native bank lifetime.
@@ -2908,8 +2913,6 @@ unsafe fn start_async_construction(base: usize, entry: *mut u8) -> Result<(usize
 unsafe fn queue_task(base: usize, object: usize, vtable: usize, callback: usize) -> usize {
     use construction_task as task;
     let heap_alloc: unsafe extern "C" fn(usize, usize) -> usize = std::mem::transmute(base + HEAP_ALLOC);
-    let functor_swap: unsafe extern "C" fn(*mut [usize; 5], usize) = std::mem::transmute(base + FUNCTOR_COPY);
-    let schedule: unsafe extern "C" fn(usize, usize, u32, u32) = std::mem::transmute(base + TASK_SCHEDULE);
     split::mark(split::Step::Plugin);
     let t = heap_alloc(task::ALIGN, task::SIZE);
     split::mark(split::Step::TaskAlloc);
@@ -2919,6 +2922,17 @@ unsafe fn queue_task(base: usize, object: usize, vtable: usize, callback: usize)
     std::ptr::write_bytes(t as *mut u8, 0, task::SIZE);
     fields::write_unchecked(t, task::BODY, object);
     fields::write_unchecked(t, task::QUEUE, task::QUEUE_ID);
+    schedule_task(base, t, vtable, callback);
+    t
+}
+
+/// The functor `{vtable, task, _, _, self}` built on the stack and swapped into `task+0x50` by `0x3cb050`, the emptied
+/// local destroyed as native does, then `0x3549720(task+0x10, callback, 2, 1)` (`queue_task`, and state 11's Pokémon
+/// Trainer task, `queue_trainer`).
+unsafe fn schedule_task(base: usize, t: usize, vtable: usize, callback: usize) {
+    use construction_task as task;
+    let functor_swap: unsafe extern "C" fn(*mut [usize; 5], usize) = std::mem::transmute(base + FUNCTOR_COPY);
+    let schedule: unsafe extern "C" fn(usize, usize, u32, u32) = std::mem::transmute(base + TASK_SCHEDULE);
     let mut functor = [base + vtable, t, 0, 0, 0];
     functor[4] = functor.as_ptr() as usize;
     functor_swap(&mut functor, t + task::FUNCTOR);
@@ -2933,7 +2947,6 @@ unsafe fn queue_task(base: usize, object: usize, vtable: usize, callback: usize)
     split::mark(split::Step::Functor);
     schedule(t + task::HANDLE, base + callback, task::SCHEDULE_ARGS.0, task::SCHEDULE_ARGS.1);
     split::mark(split::Step::Schedule);
-    t
 }
 
 /// Phase B′, loader state 10 (`6556b0.c:215-250`), once the control init settled: per kind `0x3ae5f0(0, kind, owner)` pops the
@@ -3398,6 +3411,128 @@ pub(crate) fn background_skip(owner: u32) -> bool {
     skip
 }
 
+/// SPECIAL-GROUPS §0 X5 (`cmn w8, #-1` after `ldr w8, [x21, #0x1c]`): body init reads the live window's cell 1 for a
+/// Pyra/Mythra body (x24 = R, `R+0x54` its owner). Beside a one-member live window that is −1 and the body takes model
+/// kind `0x73`/`0x74` (`0x607c20`), files the group never prefetched. A body of the owner's background build of a
+/// Pyra/Mythra group reads the group's own cell 1, as its synchronous build does (Eden re6: `0x5b` for both bodies).
+/// Atomics only; it runs on the task worker.
+#[skyline::hook(offset = 0x607bac, inline)]
+unsafe fn background_partner(ctx: &mut InlineCtx) {
+    let cell = BACKGROUND_PARTNER.load(Ordering::Acquire);
+    if cell == u32::MAX { return; }
+    let r = ctx.registers[24].x() as usize;
+    if fields::object(r) && BACKGROUND_OWNERS.load(Ordering::Acquire) & owner_bit(fields::read_unchecked::<u32>(r, 0x54)) != 0 {
+        ctx.registers[8].set_x(u64::from(cell));
+    }
+}
+
+/// rc.6 item 3, SPECIAL-GROUPS §3: native loader state 11's holder step (`0x650010` case 0xb) for a native group built in
+/// the background. The X5 site; the 0x238-byte holder `+0x5a88` (16-aligned, `0x6509f0`, `0x650f38`).
+const PARTNER_SITE: usize = 0x607bac;
+const HOLDER_SIZE: usize = 0x238;
+const HOLDER_ALIGN: usize = 0x10;
+/// Pokémon Trainer's pool task: its functor's vtable (relocated data, the `+0x30` slot checked live), the functor the
+/// worker runs and the callback state 11 schedules it with (`0x6512b0`).
+const TRAINER_FUNCTOR_VTABLE: usize = 0x4f81498;
+const TRAINER_FUNCTOR: usize = 0x651a30;
+const TRAINER_CALLBACK: usize = 0x651770;
+/// Pyra/Mythra's pool table, its entry and the two lazy-init guards state 11 takes before the pool (`0x650a88-0x650a9c`,
+/// the inits at `0x651504-0x651580`), through `__cxa_guard_acquire`/`__cxa_guard_release`.
+const PARTNER_TABLE: usize = 0x52b94c8;
+const PARTNER_ENTRY: usize = 0x52b94a0;
+const PARTNER_ENTRY_CALLBACK: usize = 0x6517a0;
+const PARTNER_GUARDS: [usize; 2] = [0x52b9498, 0x52b94c0];
+const GUARD_ACQUIRE: usize = 0x39c06b0;
+const GUARD_RELEASE: usize = 0x39c06c0;
+
+/// State 11's holder words (`0x650a4c-0x650a80`, `0x650f38-0x650f6c`) over a zeroed holder: the vtable, capacity 0x40 at
+/// `+0x08`, an empty list at `+0x10`/`+0x18` (`+0x18 = holder+0x20`), `+0x220 = 0`, the table `0x3a6270` records at
+/// `+0x228` (0 until then), the slot it records at `+0x230` (−1 until then), `+0x234 = 6`.
+unsafe fn init_holder(base: usize, holder: usize) {
+    std::ptr::write_bytes(holder as *mut u8, 0, HOLDER_SIZE);
+    fields::write_unchecked(holder, 0x00, base + SPECIAL_OBJECT_VTABLE);
+    fields::write_unchecked(holder, 0x08, 0x40u64);
+    fields::write_unchecked(holder, 0x18, holder + 0x20);
+    fields::write_unchecked(holder, 0x230, u32::MAX);
+    fields::write_unchecked(holder, 0x234, 6u8);
+}
+
+/// State 11's lazy init of the Pyra/Mythra pool table before `0x3a6270` (`0x651504-0x651580`): while a guard's bit 0 is
+/// clear it is taken, its words written and released, exactly as native does.
+unsafe fn partner_guards(base: usize) {
+    let acquire: unsafe extern "C" fn(usize) -> i32 = std::mem::transmute(base + GUARD_ACQUIRE);
+    let release: unsafe extern "C" fn(usize) = std::mem::transmute(base + GUARD_RELEASE);
+    let [first, second] = PARTNER_GUARDS;
+    if fields::read_unchecked::<u8>(base, first) & 1 == 0 && acquire(base + first) != 0 {
+        fields::write_unchecked(base, PARTNER_ENTRY, 0x1_0000_01cfu64);
+        fields::write_unchecked(base, PARTNER_ENTRY + 0x08, base + PARTNER_ENTRY_CALLBACK);
+        fields::write_unchecked(base, PARTNER_ENTRY + 0x10, 0u64);
+        fields::write_unchecked(base, PARTNER_ENTRY + 0x18, 0u32);
+        release(base + first);
+    }
+    if fields::read_unchecked::<u8>(base, second) & 1 == 0 && acquire(base + second) != 0 {
+        fields::write_unchecked(base, PARTNER_TABLE, base + PARTNER_ENTRY);
+        fields::write_unchecked(base, PARTNER_TABLE + 0x08, 1u32);
+        release(base + second);
+    }
+}
+
+/// State 11's Pokémon Trainer task (`0x650fc4-0x6512c8`, `body_bank::trainer_task`): zeroed, with the holder, the
+/// owner, queue id 1, the role's costume byte `FE+0x41` and the `FE+0x52`/`+0x53` flag (the live entry's: the role's
+/// bytes, which the tick leaves as they are) and `+0x92 = 1`; its functor `{0x4f81498, task}` and the callback
+/// `0x651770` scheduled as a body's are (`schedule_task`). Returns the task, or 0 (nothing queued).
+unsafe fn queue_trainer(base: usize, entry: usize, owner: u32, holder: usize) -> usize {
+    use construction_task as task;
+    let heap_alloc: unsafe extern "C" fn(usize, usize) -> usize = std::mem::transmute(base + HEAP_ALLOC);
+    let t = heap_alloc(task::ALIGN, trainer_task::SIZE);
+    if t == 0 { return 0; }
+    std::ptr::write_bytes(t as *mut u8, 0, trainer_task::SIZE);
+    fields::write_unchecked(t, trainer_task::HOLDER, holder);
+    fields::write_unchecked(t, trainer_task::OWNER, owner);
+    fields::write_unchecked(t, task::QUEUE, task::QUEUE_ID);
+    fields::write_unchecked(t, trainer_task::COSTUME, fields::read_unchecked::<u8>(entry, 0x41));
+    fields::write_unchecked(t, trainer_task::FLAG,
+        trainer_task::flag(fields::read_unchecked::<u8>(entry, 0x52), fields::read_unchecked::<u8>(entry, 0x53)));
+    fields::write_unchecked(t, trainer_task::BUILD, 1u8);
+    schedule_task(base, t, TRAINER_FUNCTOR_VTABLE, TRAINER_CALLBACK);
+    t
+}
+
+/// SPECIAL-GROUPS §3, native loader state 11 for a native group built in the background, once its bodies settled: the
+/// holder with state 11's words, then for Pyra/Mythra the table guards and `0x3a6270(holder, main+0x52b94c8, 0, -1,
+/// owner, 0)` here on the game thread (`0x6509e8-0x650abc`; about 2 ms on Eden), for Pokémon Trainer the 1-byte object
+/// and the pool task on the worker (`queue_trainer`; its 196 ms ran on the game thread inside `0x658af0`, which is never
+/// called here). The records go into the build and from there into the group's saved window, never onto the live entry,
+/// whose `+0x5a88..+0x5a98` stay its own window's. A null allocation leaves its record 0 and the settlement fails the
+/// group (reported).
+unsafe fn start_holder(base: usize, entry: usize, owner: u32, b: &mut Background, step: HolderStep) {
+    let heap_alloc: unsafe extern "C" fn(usize, usize) -> usize = std::mem::transmute(base + HEAP_ALLOC);
+    let started = now_us();
+    b.holder_due = true;
+    let holder = heap_alloc(HOLDER_ALIGN, HOLDER_SIZE);
+    if holder == 0 {
+        trace!("[GroupSwap] background holder owner={} group={} UNEXPECTED: the holder allocation returned null", owner, b.group);
+        return;
+    }
+    init_holder(base, holder);
+    match step {
+        HolderStep::Partner => {
+            partner_guards(base);
+            let build: unsafe extern "C" fn(usize, usize, u32, u64, u32, u32) = std::mem::transmute(base + articles::POOL_BUILD);
+            // `mov w3, #-1` (x3 = 0xffff_ffff) and the entry id in w4 (`0x650aa0-0x650abc`).
+            build(holder, base + PARTNER_TABLE, 0, u64::from(u32::MAX), owner, 0);
+            b.records = [holder, 0, 0];
+        }
+        HolderStep::Trainer => {
+            let object = heap_alloc(HOLDER_ALIGN, trainer_task::OBJECT_SIZE);
+            b.records = [holder, 0, object];
+            b.trainer = queue_trainer(base, entry, owner, holder);
+        }
+    }
+    trace!("[GroupSwap] background holder owner={} group={} step={:?} records={:x?} articles={} trainer_task={:#x} us={}",
+        owner, b.group, step, b.records, fields::read::<u64>(holder, 0x10).unwrap_or(0), b.trainer, now_us().saturating_sub(started));
+}
+
 /// The group a background build starts next (`body_bank::next_background`) for the live kind `live`: none while a
 /// prefetch, a construction or a background build is in flight. A refused group is no candidate.
 fn background_candidate(bank: &Bank, live: Option<u32>) -> Option<usize> {
@@ -3481,6 +3616,11 @@ struct Background {
     mii: Option<MiiBuild>,
     /// The pad manager's per-slot controllers when the build started (diagnostics, `pad_controllers`).
     pads: [usize; 16],
+    /// SPECIAL-GROUPS §3: a native group's holder step ran once its bodies settled (`start_holder`); the records it made
+    /// go into the group's saved window, and Pokémon Trainer's pool task runs on the worker until it settled (0 otherwise).
+    holder_due: bool,
+    records: [usize; 3],
+    trainer: usize,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -3530,6 +3670,12 @@ unsafe fn start_background(entry: *mut u8, owner: u32, role: usize, group: usize
         (*g.members, bank.alias, bank.members.carries_records(),
             g.identity.zip(g.configuration).filter(|_| g.members.special() == Special::Mii))
     };
+    // SPECIAL-GROUPS §3: a native group needs the X5 hook and state 11's holder step (`install`); without them its first
+    // switch builds it, as before.
+    if members.carries_records() && !NATIVE_BACKGROUND.load(Ordering::Acquire) {
+        refuse_background(role, group, owner, "native rows off");
+        return;
+    }
     // Transient: retried on a later tick.
     if alias == 0 || resource(base, owner) != Some(alias) || !resource_ready(alias)
         || !window_shape_ok(base, entry as usize, owner, carries_records) { return; }
@@ -3599,7 +3745,10 @@ unsafe fn start_background(entry: *mut u8, owner: u32, role: usize, group: usize
     if mii_prepared { contexts(entry); }
     let t2 = now_us();
     let steps_us = [t1.saturating_sub(t0), t2.saturating_sub(t1)];
-    let made = save_window(entry as usize);
+    // A live native window's records stay in the entry through the tick: the group's window takes none from it (a native
+    // group's own come from its holder step, `start_holder`).
+    let mut made = save_window(entry as usize);
+    made.records = [0; 3];
     // The control init's object: the entry as the group's third left it (`Scratch`).
     let scratch = scratch_address();
     std::ptr::copy_nonoverlapping(entry as *const u8, scratch as *mut u8, 0x100);
@@ -3678,7 +3827,7 @@ unsafe fn start_background(entry: *mut u8, owner: u32, role: usize, group: usize
     bank.background = Some(Background { group, members, token, alias, lease, window: made, control, control_us: 0,
         tasks: [0; NATIVE_MEMBERS], queued: 0, live_before, committed, info_words: info_words(info), skips_before,
         started_us: started, setup_us, settled_us: [0; NATIVE_MEMBERS], ticks: 0, waited_logged_us: started, mii: mii_build,
-        pads: pad_before });
+        pads: pad_before, holder_due: false, records: [0; 3], trainer: 0 });
     trace!("[GroupSwap] background build owner={} group={} kinds={:x?} special={:?} mii={:x?} setup_us={} models_contexts_us={:?} us={} control={:#x} contexts={:x?} dispatch={:x?} listeners={:?} live_dispatch={:x?} live_listeners={:?} flags={:#x} R={:#x} map={} r4c={:#x} pool_live={}; the window stays live, the control init runs on the task worker",
         owner, group, &members.kinds()[..count], members.special(), mii_build, setup_us, steps_us, queued_us, control, &made.group_ctx[..count], made.dispatch,
         listener_counts(made.dispatch), live.dispatch, listener_counts(live.dispatch), made.flags, alias,
@@ -3694,6 +3843,8 @@ unsafe fn queue_background_bodies(base: usize, owner: u32, b: &mut Background) -
     if selected == 0 || selected != b.window.group_ctx[0] { return false; }
     b.window.ctx[0] = selected;
     b.skips_before = BACKGROUND_SKIPS.load(Ordering::Acquire);
+    // SPECIAL-GROUPS §0 X5: a Pyra/Mythra group's bodies read its cell 1 (`background_partner`).
+    BACKGROUND_PARTNER.store(b.members.partner_cell().unwrap_or(u32::MAX), Ordering::Release);
     BACKGROUND_OWNERS.fetch_or(owner_bit(owner), Ordering::AcqRel);
     if let Some(m) = b.mii {
         // The Mii hooks key on these; the real R last, as the arming store.
@@ -3765,21 +3916,53 @@ unsafe fn settle_background(entry: *mut u8, owner: u32, role: usize) {
         let Some(bank) = state.as_mut().filter(|bank| bank.entry == entry as usize && bank.owner == owner) else { return; };
         let Some(b) = bank.background.as_mut() else { return; };
         b.ticks = b.ticks.saturating_add(1);
-        let mut pending = [0i32; NATIVE_MEMBERS];
-        for (i, t) in b.tasks.iter().enumerate().take(b.queued) {
-            pending[i] = fields::read::<i32>(*t, task::PENDING).unwrap_or(i32::MAX);
-            if pending[i] <= 0 && b.settled_us[i] == 0 { b.settled_us[i] = now.saturating_sub(b.started_us); }
-        }
-        if !task::settled(&pending[..b.queued]) {
-            if now.saturating_sub(b.waited_logged_us) >= 5_000_000 {
-                b.waited_logged_us = now;
-                trace!("[GroupSwap] background constructing owner={} group={} pending={:?} us={} ticks={}",
-                    owner, b.group, &pending[..b.queued], now.saturating_sub(b.started_us), b.ticks);
+        // SPECIAL-GROUPS §3: Pokémon Trainer's pool task, polled as the bodies are (state 11's `task+0x20`).
+        if b.trainer != 0 {
+            let pending = fields::read::<i32>(b.trainer, task::PENDING).unwrap_or(i32::MAX);
+            if pending > 0 {
+                if now.saturating_sub(b.waited_logged_us) >= 5_000_000 {
+                    b.waited_logged_us = now;
+                    trace!("[GroupSwap] background trainer pool pending owner={} group={} pending={} us={} ticks={}",
+                        owner, b.group, pending, now.saturating_sub(b.started_us), b.ticks);
+                }
+                return;
             }
-            return;
+        } else {
+            let mut pending = [0i32; NATIVE_MEMBERS];
+            for (i, t) in b.tasks.iter().enumerate().take(b.queued) {
+                pending[i] = fields::read::<i32>(*t, task::PENDING).unwrap_or(i32::MAX);
+                if pending[i] <= 0 && b.settled_us[i] == 0 { b.settled_us[i] = now.saturating_sub(b.started_us); }
+            }
+            if !task::settled(&pending[..b.queued]) {
+                if now.saturating_sub(b.waited_logged_us) >= 5_000_000 {
+                    b.waited_logged_us = now;
+                    trace!("[GroupSwap] background constructing owner={} group={} pending={:?} us={} ticks={}",
+                        owner, b.group, &pending[..b.queued], now.saturating_sub(b.started_us), b.ticks);
+                }
+                return;
+            }
         }
         bank.background.take().unwrap()
     };
+    let mut background = background;
+    // SPECIAL-GROUPS §3: every body settled; a native group takes native state 11's holder step now (outside the bank
+    // lock). Pokémon Trainer's pool task then runs on the worker and settles on a later tick.
+    if let Some(step) = background.members.holder_step()
+        .filter(|_| !background.holder_due && background.queued == background.members.count()) {
+        start_holder(base, entry as usize, owner, &mut background, step);
+        if background.trainer != 0 {
+            let mut state = BANKS[role].lock();
+            if let Some(bank) = state.as_mut().filter(|bank| bank.entry == entry as usize && bank.owner == owner) {
+                bank.background = Some(background);
+                return;
+            }
+            drop(state);
+            // Not reachable on the game thread (as after the control init); the task still runs on its holder.
+            trace!("[GroupSwap] background holder owner={} UNEXPECTED: bank gone with the trainer task {:#x} queued; left (reported)",
+                owner, background.trainer);
+            return;
+        }
+    }
     finish_background(entry, owner, role, background, "settled", 0);
 }
 
@@ -3822,6 +4005,16 @@ unsafe fn drain_background(entry: *const u8, owner: u32, role: usize, reason: &s
             }
         }
     }
+    // SPECIAL-GROUPS §3: Pokémon Trainer's pool task, once queued, finishes too; its holder goes with the group record the
+    // caller destroys. A native group whose bodies settle only here takes no holder step: the teardown that follows
+    // returns its object keys with the rest.
+    if background.trainer != 0 && fields::read::<i32>(background.trainer, task::PENDING).unwrap_or(0) > 0 {
+        let queue = fields::read::<u32>(background.trainer, task::QUEUE).unwrap_or(task::QUEUE_ID) as usize;
+        if let Some(handle) = fields::child(base, TASK_QUEUES + queue * 8).and_then(|q| fields::read::<u32>(q, 0x10)) {
+            wait(handle, background.trainer + task::PENDING);
+            waited += 1;
+        }
+    }
     finish_background(entry, owner, role, background, reason, waited);
 }
 
@@ -3832,6 +4025,7 @@ unsafe fn finish_background(entry: *const u8, owner: u32, role: usize, b: Backgr
     use construction_task as task;
     let base = BASE.load(Ordering::Acquire);
     BACKGROUND_OWNERS.fetch_and(!owner_bit(owner), Ordering::AcqRel);
+    BACKGROUND_PARTNER.store(u32::MAX, Ordering::Release);
     // SPECIAL-GROUPS §1: the Mii hooks off (every task settled); the resource object body init stored in the shadow
     // (`0x607d18`, with its reference) and the tick's faces are the group's Mii set.
     let mii_hits: [u32; 13] = std::array::from_fn(|i| MII_HITS[i].load(Ordering::Relaxed));
@@ -3854,8 +4048,14 @@ unsafe fn finish_background(entry: *const u8, owner: u32, role: usize, b: Backgr
         bodies[i] = Body { address, id: fields::read::<u32>(address, 8).unwrap_or(0) };
     }
     free_tasks(base, &b.tasks[..b.queued]);
+    free_tasks(base, &[b.trainer]);
     let valid = b.queued == count && (0..count).all(|i| valid_parked_body(base, bodies[i], kinds[i], owner)
         && fields::child(bodies[i].address, 0x20).is_some());
+    // SPECIAL-GROUPS §3: the holder step's records, proven as `window_shape_ok` proves them at the warm attach (PT's pool
+    // task recorded the owner at `+0x230`, `0x3a6270`); a native group drained before its step keeps none, and the
+    // teardown that drained it follows. A holder that fails fails the group (left and reported).
+    let holder_ok = !b.holder_due || (valid_special_object(base, b.records[0], owner)
+        && (b.members.holder_step() != Some(HolderStep::Trainer) || b.records[2] != 0));
     // SPECIAL-GROUPS §0 X2: body init wrote each body's cell byte (`body+0xf816`, `0x607a84` and `0x60b5bc`) as the kind's
     // index in the live window, or 0xff; native writes its index in its own window, which is what it gets here.
     let mut cells_before = [0xffu8; NATIVE_MEMBERS];
@@ -3895,13 +4095,14 @@ unsafe fn finish_background(entry: *const u8, owner: u32, role: usize, b: Backgr
         match state.as_mut().filter(|bank| bank.entry == entry as usize && bank.owner == owner) {
             Some(bank) => {
                 let stored = match bank.groups.get_mut(b.group) {
-                    Some(g) if g.state == GroupState::Prefetched && valid => {
+                    Some(g) if g.state == GroupState::Prefetched && valid && holder_ok => {
                         let mut window = b.window;
                         window.installed = count as u64;
                         for (cell, body) in window.cells.iter_mut().zip(bodies.iter()).take(count) { *cell = body.address; }
                         window.mii_r = mii_set;
                         // What its body init wrote into `D+0x3a0` is the group's; its attach puts it back.
                         window.info_3a0 = info_now.map(|w| [w[0], w[1], w[2]]);
+                        window.records = b.records;
                         g.saved = Some(window);
                         g.bodies = bodies;
                         g.state = GroupState::Built;
@@ -3917,6 +4118,27 @@ unsafe fn finish_background(entry: *const u8, owner: u32, role: usize, b: Backgr
             None => false,
         }
     };
+    // N-bg: the object kind the prefetch registered (PT `0x72`; Aegis `0x75`, its orphan `0x1338` first) goes back only
+    // now, after the holder step: the PT task and the Aegis pool read their files through it. As `complete_exchange`
+    // returns it after a switch-time build; with the map already empty native freed it (settled, no native call).
+    if let Some(kind) = b.members.object_kind().filter(|_| stored && b.holder_due && alias_ok) {
+        let object = [kind];
+        if fields::read::<u64>(b.alias, 0x18).unwrap_or(0) != 0 {
+            let receipt = r_handle::release(base, lrole, Some(b.group), Some(&object[..]), &Occupancy::default(), "background object release");
+            trace!("[GroupSwap] keys returned owner={} group={} object_kind={:#x} orphan_keys={:x?} map={} reason=background holder made",
+                owner, b.group, kind, receipt.keys, fields::read::<u64>(b.alias, 0x18).unwrap_or(0));
+        } else {
+            let settled = r_handle::settle(lrole, b.group, &object, "background object freed by native (map=0)");
+            trace!("[GroupSwap] settled owner={} group={} object_kind={:#x} map=0 settled={:x?}", owner, b.group, kind, settled);
+        }
+    }
+    if b.holder_due {
+        let holder = b.records[0];
+        trace!("[GroupSwap] background holder settled owner={} group={} ok={} records={:x?} table=+{:#x} slot={} articles={} live_records={:x?}",
+            owner, b.group, holder_ok, b.records, fields::read::<usize>(holder, 0x228).unwrap_or(0).wrapping_sub(base),
+            fields::read::<i32>(holder, 0x230).unwrap_or(-2), fields::read::<u64>(holder, 0x10).unwrap_or(0),
+            [0x5a88usize, 0x5a90, 0x5a98].map(|o| fields::read::<usize>(entry as usize, o).unwrap_or(0)));
+    }
     let released = super::finish_install(b.token, "background build settled");
     if stored { log_memory(owner, b.group, kinds, "build", b.committed, MemorySample::capture(), memory::group_cost(kinds).build); }
     if let (false, Some(set)) = (stored, mii_set) { release_mii_r(base, set); }
@@ -5609,6 +5831,10 @@ const PAIR_SEAMS: &[&str] = &["ic_pair.partner_window", "ic_pair.pair_partner", 
     "ic_pair.commit_change", "ic_pair.outgoing_owner", "ic_pair.deactivate_body"];
 const SPECIAL_SEAMS: &[&str] = &["special_groups.object_release", "special_groups.heap_free",
     "special_groups.release_key"];
+/// rc.6 item 3, SPECIAL-GROUPS §3: the X5 hook and native state 11's holder step.
+const NATIVE_BACKGROUND_SEAMS: &[&str] = &["background_build.aegis_partner", "background_build.trainer_functor",
+    "background_build.trainer_callback", "background_build.guard_acquire", "background_build.guard_release",
+    "background_build.pool_build"];
 
 pub(super) unsafe fn install(base: usize) {
     use crate::runtime::seams::seam_install::gate;
@@ -5730,6 +5956,22 @@ pub(super) unsafe fn install(base: usize) {
     trace!("[GroupSwap] background Mii builds {}", if mii_ok { "enabled" } else { "off; a Mii group builds at its first switch" });
     trace!("[GroupSwap] background build {} async={} identity_view={}",
         if async_ok && identity_view { "enabled" } else { "off; a group builds at its first switch" }, async_ok, identity_view);
+    // SPECIAL-GROUPS §3: Pokémon Trainer and Pyra/Mythra groups in the background need the X5 site (`background_partner`)
+    // and native state 11's holder step: the trainer functor through its relocated vtable slot, its callback, the guard
+    // functions of the Pyra/Mythra table's lazy init and the pool build (in `special_ok`). Without them a native group
+    // builds at its first switch, as before.
+    let trainer_slot = fields::read_unchecked::<usize>(base, TRAINER_FUNCTOR_VTABLE + 0x30) == base + TRAINER_FUNCTOR;
+    let native_ok = gate(SEAM_GROUP, NATIVE_BACKGROUND_SEAMS, async_ok && identity_view && special_ok && trainer_slot
+        && fingerprint(base, PARTNER_SITE - 4, &[0xb9401ea8, 0x3100051f, 0x54000380, 0x52800ea2], "GroupSwap")
+        && fingerprint(base, TRAINER_FUNCTOR, &[0xd10143ff, 0xf9000bf7, 0xa90257f6, 0xa9034ff4, 0xa9047bfd, 0x910103fd, 0xf9400415, 0x39424aa8], "GroupSwap")
+        && fingerprint(base, TRAINER_CALLBACK, &[0x3941c008, 0x34000048, 0xd65f03c0, 0xf9403000, 0xb4000080, 0xf9400008, 0xf9401901, 0xd61f0020], "GroupSwap")
+        && fingerprint(base, GUARD_ACQUIRE, &[0xf000c6f0, 0xf9411e11, 0x9108e210, 0xd61f0220], "GroupSwap")
+        && fingerprint(base, GUARD_RELEASE, &[0xf000c6f0, 0xf9412211, 0x91090210, 0xd61f0220], "GroupSwap"))
+        && async_ok && identity_view && special_ok && trainer_slot;
+    if native_ok { skyline::install_hooks!(background_partner); }
+    NATIVE_BACKGROUND.store(native_ok, Ordering::Release);
+    trace!("[GroupSwap] background build of Pokémon Trainer and Pyra/Mythra groups {} trainer_slot={}",
+        if native_ok { "enabled" } else { "off; they build at their first switch" }, trainer_slot);
     if groups_ok {
         // The `[GroupSwap] enabled` line follows the startup cycle-preload load
         // (`report_group_swap`), so it shows the switches this boot applies.

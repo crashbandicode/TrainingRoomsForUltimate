@@ -74,6 +74,16 @@ pub const PT_OBJECT_KIND: u32 = 0x72;
 /// Pyra/Mythra partner object kind (`0x17e5bc0` Aegis branch: keys `0x1332/0x1333`, NRO `0x75`).
 pub const AEGIS_OBJECT_KIND: u32 = 0x75;
 
+/// The holder `+0x5a88` native loader state 11 makes for a native group (SPECIAL-GROUPS §3).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum HolderStep {
+    /// Pokémon Trainer (`0x650f38-0x6512c8`): the holder and the 1-byte object `+0x5a98` on the game thread, the pool
+    /// task (`trainer_task`) on the worker.
+    Trainer,
+    /// Pyra/Mythra (`0x6509e8-0x650abc`): the holder, the partner table's guards and the pool, on the game thread.
+    Partner,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Members {
     kinds: [u32; NATIVE_MEMBERS],
@@ -267,6 +277,23 @@ impl Members {
 
     /// The entry records `+0x5a88/+0x5a90/+0x5a98` belong to this group's window.
     pub fn carries_records(self) -> bool { matches!(self.special, Special::Native(_)) }
+
+    /// SPECIAL-GROUPS §3: the holder step native loader state 11 runs once a native group's bodies settled
+    /// (`0x650010` case 0xb), which its background build mirrors.
+    pub fn holder_step(self) -> Option<HolderStep> {
+        match self.special {
+            Special::Native(flags) if flags & 1 != 0 => Some(HolderStep::Trainer),
+            Special::Native(flags) if flags & 0x20 != 0 => Some(HolderStep::Partner),
+            _ => None,
+        }
+    }
+
+    /// SPECIAL-GROUPS §0 X5: the cell 1 body init reads (`FE+0x1c`, `0x607ba8`) for a Pyra/Mythra body. `-1` (a
+    /// one-member window) turns the body's model kind into `0x73`/`0x74`, files the group never prefetched; the
+    /// group's own cell 1 keeps its kind, as its synchronous build does.
+    pub fn partner_cell(self) -> Option<u32> {
+        (self.holder_step() == Some(HolderStep::Partner)).then_some(self.kinds[1])
+    }
 
     /// The shared resource owner must hold this group's Mii identity while it is
     /// the window, and the previous window's words while it is detached.
@@ -775,23 +802,27 @@ pub fn async_build_eligible(members: Members, identity: bool) -> Result<(), &'st
 /// prepare_entry `0x17f1a60` at `0x607f30` writes the copy-registry slot of its cell from the worker), so only what the
 /// queued build already serves (`async_build_eligible`): an ordinary single-actor group or a Mii group, while the
 /// window holds no Mii identity (the costume selectors at `0x607dfc`/`0x17e9ae0` key on `R+0x58`) and its live member
-/// is not Kirby (D-KIRBY1: no bank key rests on its R). The live window (`window`, the attached group) must be ordinary
-/// too: the body's construction tail reads the live cells 0/1 from the worker and takes the pair rule on R for `[Popo,
-/// Nana]`, which may reset the whole R mid-play (SPECIAL-GROUPS §0 X1, `0x60de60-0x60de78`), and construct picks its
-/// info wrapper from the live kinds (X4, `0x60d21c`); a pair or native window defers the build until it is switched
-/// away. Native (Pokémon Trainer, Aegis) and pair groups keep today's build at their first switch until their research
-/// lands (operator 20:26Z, "All groups in rc.6").
+/// is not Kirby (D-KIRBY1: no bank key rests on its R). The live window (`window`, the attached group) must not be the
+/// pair: the body's construction tail reads the live cells 0/1 from the worker and takes the pair rule on R for `[Popo,
+/// Nana]`, which may reset the whole R mid-play (SPECIAL-GROUPS §0 X1, `0x60de60-0x60de78`); a pair window defers the
+/// build until it is switched away. A native window (Pokémon Trainer, Pyra/Mythra) does not: one actor, its cells 0/1
+/// never `[Popo, Nana]`, and only an Ice Climbers body picks its info wrapper from the live kinds (X4, `0x60d1f0`).
+/// A native group (SPECIAL-GROUPS §3) builds as an ordinary group does; its holder records come from native loader
+/// state 11's step after its bodies settled (the adapter's settlement), straight into its saved window, and its
+/// switch-time build stays `0x658af0`'s (`async_build_eligible`).
 /// A Mii group (SPECIAL-GROUPS §1) builds in the background when it carries its identity: the tick brackets `R`'s
 /// words, the entry's Mii bytes and the D mirror and runs the native Mii setup, and the worker reads a shadow `R`
 /// (`native_body_bank` `SHADOW_R`). A live Mii window defers it (that window's faces and resource object in `R` are a
-/// case not built yet).
+/// case not built yet), and so does a live native window until a Mii body beside one is proven. Every other group keeps
+/// today's build at its first switch.
 pub fn background_build_eligible(members: Members, identity: bool, window: Members, window_identity: bool, live_kirby: bool)
     -> Result<(), &'static str> {
     if members.special() == Special::Mii && !identity { return Err("mii without identity"); }
-    async_build_eligible(members, identity)?;
+    if members.special() == Special::Mii && matches!(window.special(), Special::Native(_)) { return Err("special window"); }
+    if identity || !matches!(members.special(), Special::Native(_)) { async_build_eligible(members, identity)?; }
     if window_identity { return Err("mii window"); }
     if live_kirby { return Err("live kirby"); }
-    if window.is_pair() || matches!(window.special(), Special::Native(_)) { return Err("special window"); }
+    if window.is_pair() { return Err("special window"); }
     Ok(())
 }
 
@@ -838,6 +869,25 @@ pub mod construction_task {
     /// Every queued construction ran its init and construct: the callback cleared each pending count.
     pub fn settled(pending: &[i32]) -> bool {
         pending.iter().all(|p| *p <= 0)
+    }
+}
+
+/// Native loader state 11's Pokémon Trainer task (`0x650fc4-0x6512c8`): `construction_task`'s layout (handle, pending
+/// count, queue id, functor, cancel byte) in 0xa0 bytes, with the holder at `+0x00`, the owner at `+0x08`, the role's
+/// costume byte `FE+0x41` at `+0x90`, [`trainer_task::flag`] at `+0x91` and `+0x92 = 1` (the build; 0 is the teardown
+/// variant). Its functor (`0x651a30`, vtable `0x4f81498`) reads only the task, `R` by owner and globals.
+pub mod trainer_task {
+    pub const SIZE: usize = 0xa0;
+    pub const HOLDER: usize = 0x00;
+    pub const OWNER: usize = 0x08;
+    pub const COSTUME: usize = 0x90;
+    pub const FLAG: usize = 0x91;
+    pub const BUILD: usize = 0x92;
+    /// The 1-byte object state 11 allocates for `+0x5a98` (`0x650f74`).
+    pub const OBJECT_SIZE: usize = 1;
+    /// `+0x91`: `FE+0x52 != 0 || FE+0x53 == 0` (`0x651028-0x651040`).
+    pub fn flag(fe52: u8, fe53: u8) -> u8 {
+        u8::from(fe52 != 0 || fe53 == 0)
     }
 }
 
@@ -1773,8 +1823,8 @@ mod tests {
         assert_eq!(background_build_eligible(ordinary, false, window, true, false), Err("mii window"));
         assert_eq!(background_build_eligible(ordinary, false, window, false, true), Err("live kirby"));
         // SPECIAL-GROUPS §0 X1: a body's construction tail reads the live cells 0/1; `[Popo, Nana]` takes the pair rule
-        // (and may reset the whole R). X4: a native window picks another info wrapper. Both wait for an ordinary window.
-        for special in [Members::pair_group(), Members::pair_lead(0x02).unwrap(), Members::native_group(0x24).unwrap()] {
+        // (and may reset the whole R). It waits for another window.
+        for special in [Members::pair_group(), Members::pair_lead(0x02).unwrap()] {
             assert_eq!(background_build_eligible(ordinary, false, special, false, false), Err("special window"));
         }
         let groups = [(GroupState::Built, ordinary, false), (GroupState::Prefetched, Members::mii_group(0x48).unwrap(), true),
@@ -1792,6 +1842,56 @@ mod tests {
         for at in [0x08, 0x10, 0x18, 0x20, 0x28, 0x2c, 0x30, 0x34, 0x50, 0x51, 0x6b, 0x72, 0x78, 0x84, 0x92, 0x3a0, 0x3aa, 0x3ac] {
             assert!(covered(at), "info+{at:#x}");
         }
+    }
+
+    /// rc.6 item 3, SPECIAL-GROUPS §3 (operator 2026-11-08 "All groups in rc.6"): a Pokémon Trainer or Pyra/Mythra group
+    /// builds in the background beside an ordinary window, and every group builds beside a live native window, so a
+    /// session that starts on Pokémon Trainer still gets its groups built (inbox 21:27Z). §0: a native window is one
+    /// actor whose cells 0/1 are never `[Popo, Nana]` (X1), and only an Ice Climbers body picks its info wrapper from
+    /// the live cells (X4, `0x60d1f0`). The holder step each native group takes after its bodies, and the X5 cell.
+    #[test]
+    fn a_background_build_takes_native_groups_and_builds_beside_a_live_native_window() {
+        let ordinary = Members::new(&[0x2d, 0x2c, 0x1c]).unwrap();
+        let window = Members::new(&[0x00, 0x01, 0x02]).unwrap();
+        let pt = Members::native_group(0x25).unwrap();
+        let aegis = Members::native_group(0x5b).unwrap();
+        for native in [pt, aegis] {
+            assert_eq!(background_build_eligible(native, false, window, false, false), Ok(()));
+            assert_eq!(background_build_eligible(ordinary, false, native, false, false), Ok(()));
+            assert_eq!(background_build_eligible(Members::new(&[0x1c]).unwrap(), false, native, false, false), Ok(()));
+            assert_eq!(background_build_eligible(native, false, window, true, false), Err("mii window"));
+            assert_eq!(background_build_eligible(native, false, window, false, true), Err("live kirby"));
+            assert_eq!(background_build_eligible(native, false, Members::pair_group(), false, false), Err("special window"));
+            assert_eq!(background_build_eligible(native, true, window, false, false), Err("native group"));
+            // Its switch-time build stays `0x658af0`'s.
+            assert_eq!(async_build_eligible(native, false), Err("native group"));
+        }
+        assert_eq!(background_build_eligible(pt, false, aegis, false, false), Ok(()));
+        assert_eq!(background_build_eligible(aegis, false, pt, false, false), Ok(()));
+        // A Mii group (with its identity) builds in the background beside an ordinary window (p23/rc6-hot-slots-mii), and
+        // still defers beside a live native window until a Mii body beside one is proven.
+        assert_eq!(background_build_eligible(Members::mii_group(0x48).unwrap(), true, pt, false, false), Err("special window"));
+        assert_eq!(background_build_eligible(Members::mii_group(0x48).unwrap(), true, window, false, false), Ok(()));
+        let groups = [(GroupState::Built, ordinary, false), (GroupState::Prefetched, pt, false),
+            (GroupState::Prefetched, aegis, false)];
+        assert_eq!(next_background(groups.iter().copied(), window, false, false), Some(1));
+        assert_eq!(next_background(groups[2..].iter().copied(), pt, false, false), Some(0));
+        assert_eq!(next_background([(GroupState::Prefetched, ordinary, false)].into_iter(), pt, false, false), Some(0));
+        assert_eq!(next_background(groups.iter().copied(), Members::pair_group(), false, false), None);
+        // Native loader state 11's step: PT's pool task on the worker, Aegis's pool on the game thread.
+        assert_eq!((pt.holder_step(), aegis.holder_step()), (Some(HolderStep::Trainer), Some(HolderStep::Partner)));
+        for other in [ordinary, Members::pair_group(), Members::mii_group(0x4a).unwrap()] {
+            assert_eq!((other.holder_step(), other.partner_cell()), (None, None));
+        }
+        // X5: the group's cell 1, as its synchronous build reads it (Eden re6: `FE+0x1c = 0x5b` for both bodies).
+        assert_eq!((aegis.partner_cell(), pt.partner_cell()), (Some(0x5b), None));
+        assert_eq!(Members::native_group(0x5a).unwrap().partner_cell(), Some(0x5b));
+        // State 11's PT task (`0x651020-0x651080`).
+        assert_eq!([(0, 0), (0, 1), (1, 0), (1, 1)].map(|(a, b)| trainer_task::flag(a, b)), [1, 0, 1, 1]);
+        assert_eq!([trainer_task::SIZE, trainer_task::HOLDER, trainer_task::OWNER, trainer_task::COSTUME, trainer_task::FLAG,
+            trainer_task::BUILD, trainer_task::OBJECT_SIZE], [0xa0, 0, 8, 0x90, 0x91, 0x92, 1]);
+        // It keeps the construction task's handle, pending count, queue id and functor offsets.
+        const { assert!(construction_task::CANCEL < trainer_task::COSTUME && construction_task::SIZE <= trainer_task::COSTUME) };
     }
 
     /// Phase B′: an ordinary group without a Mii identity and a Mii group (operator decision
