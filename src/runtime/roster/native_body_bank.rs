@@ -166,14 +166,14 @@ use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU8, AtomicUsize, Ordering};
 use hos_lock::Mutex;
 use crate::engine::swap::body_bank::{
     dispatcher_array_header_ok, dispatcher_idle_words, native_group_request, original_bankable,
-    pair_request, pair_resource_references, plan_extra_groups_with, prefetch_outcome,
+    original_form_bankable, pair_request, pair_resource_references, plan_extra_groups_with, prefetch_outcome,
     swap_commit_index_in, async_build_eligible, construction_task, TickGap,
     background_build_eligible, next_background, BACKGROUND_INFO_SPANS, trainer_task, HolderStep,
     GroupBudget, GroupExchange, GroupOwner, GroupPolicy, GroupState, Hold, Members, Phase, Special,
     SpecialPolicy, BANK_FLAG, MAX_EXTRA_GROUPS, NANA, NATIVE_MEMBERS, PAIR_ACTIVE_FLAG, POOL_RESERVE, POPO,
     entry_bytes_of, mii_exit_bytes_match, mii_reuse_bytes_match, MiiEntryBytes, MiiIdentity, MII_ENTRY_START, RESOURCE_WORDS,
     baseline_words, identity_move, IdentityMove, leaves_at_pause, count_group_members, kept_members, waiting_for_pause,
-    window_targets,
+    lane_window_targets,
 };
 use crate::engine::swap::body_bank::memory::{self, Admission};
 use crate::engine::swap::body_bank::mii_publish::{PublishAttempts, PublishRefusal, PublishStep};
@@ -212,6 +212,9 @@ static ASYNC_ENABLED: AtomicBool = AtomicBool::new(false);
 /// rc.6 item 3: the Phase B′ rows passed and the identity view's body-init site is hooked (its hook skips the
 /// worker's registration for a background build, `background_skip`).
 static BACKGROUND_ENABLED: AtomicBool = AtomicBool::new(false);
+/// rc.6 item 3, Ice Climbers (SPECIAL-GROUPS §2): the construction tail's pair test is redirected for background bodies
+/// (`background_tail`), so a group may build beside a live `[Popo, Nana]` window.
+static BACKGROUND_PAIR_TAIL: AtomicBool = AtomicBool::new(false);
 /// One bit per owner whose background build is in flight.
 static BACKGROUND_OWNERS: AtomicU32 = AtomicU32::new(0);
 /// Registrations `background_skip` has skipped since boot (each settlement logs its own difference).
@@ -368,9 +371,26 @@ fn canonical_original(menu: &crate::engine::compat::menu::TrainingModpackMenu, r
 /// from the reusable count. With `original_bank` on, an ordinary single-body
 /// original is an ordinary member instead (EXCLUSIONS §9): the adapters then plan
 /// `Target::Original` through `plan()` like a numbered fighter, and nothing is
-/// excluded. Ice Climbers, Miis and native-group originals stay canonical.
+/// excluded. So is the normal Ice Climbers pair while the pair bank is on (rc.6,
+/// `original_form_bankable`; its window or pair group serves it). Solo Popo, Miis and
+/// native-group originals stay canonical.
 fn excluded_original(settings: &Settings, menu: &crate::engine::compat::menu::TrainingModpackMenu, role: usize) -> Option<u32> {
-    canonical_original(menu, role).filter(|kind| !(settings.original_bank_enabled() && original_bankable(*kind)))
+    let logical = if role == 0 { super::Role::Player } else { super::Role::Cpu };
+    canonical_original(menu, role).filter(|kind| !(settings.original_bank_enabled()
+        && original_form_bankable(*kind, super::requested_forms_at(menu, logical, *kind, None), pair_enabled(settings))))
+}
+
+/// The Mii adapters' gate for a return to the role's slot-0 original (EXCLUSIONS §9 with rc.6's pair original): may
+/// the bank serve it, so the return is a warm switch and never the Reload that retires the bank? `original_bank` on and,
+/// for Ice Climbers, `original_form_bankable` for the form the staged request's words spell (the pair needs the pair
+/// bank). Every other kind keeps `original_bankable(kind)`.
+pub(crate) fn original_member(kind: u32, descriptor: &[u8; 0x70]) -> bool {
+    let settings = crate::runtime::roster::cycle_preload_config::snapshot();
+    if !settings.original_bank_enabled() { return false; }
+    if kind != POPO { return original_bankable(kind); }
+    let word = |at: usize| u32::from_le_bytes([descriptor[at], descriptor[at + 1], descriptor[at + 2], descriptor[at + 3]]);
+    crate::engine::swap::swap_model::capabilities::request_forms(word(0x14), [word(0x18), word(0x1c), word(0x20)], word(0x28))
+        .is_some_and(|forms| original_form_bankable(kind, forms, pair_enabled(&settings)))
 }
 
 fn groups_enabled(settings: &crate::engine::preload::cycle_preload_config::Settings) -> bool {
@@ -607,9 +627,10 @@ fn members_for(settings: &crate::engine::preload::cycle_preload_config::Settings
 /// (`requested_forms_at`, the form every numbered slot of the role takes; the pair is never a cell
 /// 1–2 member, `Members::from_pair` builds its own window), and the entry is not the role's
 /// canonical-only original: with equal original and cycle forms the cycle roster excludes Ice
-/// Climbers (`roster_grid::cycle_exclusion`), so that entry is the slot-0 original, whose return is
-/// the canonical Reload (`original_bankable(0x4b)` is false). The form of every kept `0x4b` is still
-/// re-proven per request (`group_serves`). No allocation.
+/// Climbers (`roster_grid::cycle_exclusion`), so that entry is the slot-0 original, never a single-body
+/// member: its return is served by the pair-lead window or a pair group (`original_member`, rc.6) or
+/// is the canonical Reload. The form of every kept `0x4b` is still re-proven per request
+/// (`group_serves`). No allocation.
 fn window_lane(menu: &crate::engine::compat::menu::TrainingModpackMenu, role: usize, upcoming: &[u32])
     -> ([u32; crate::runtime::roster::cycle_preload::MAX_TARGETS], usize) {
     let logical = if role == 0 { super::Role::Player } else { super::Role::Cpu };
@@ -696,9 +717,13 @@ pub(crate) fn plan_budget(menu: &crate::engine::compat::menu::TrainingModpackMen
     if grouped {
         group_bodies = plan_groups(&settings, menu, lanes, originals, &mut group_targets);
     }
+    // rc.6 item 3: a live pair-lead window plans what it serves (`body_bank::window_targets`; the values `progress` reads).
+    let live: [Option<(Members, u32)>; 2] = std::array::from_fn(|role| BANKS[role].lock().as_ref()
+        .filter(|bank| bank.phase == Phase::Ready && !bank.departed)
+        .map(|bank| (*bank.members, bank.observed.map_or(bank.members.kinds()[usize::from(bank.target)], |(_, kind)| kind))));
     for (role, value) in reserved.iter().enumerate() {
         ROLE_BUDGET[role].store(*value as u8, Ordering::Release);
-        let targets = wanted_banks[role].map_or(0, |(members, target)| {
+        let next = wanted_banks[role].map_or(0, |(members, target)| {
             // A pair-lead bank plans one selectable extra (cell 2); Nana is not a target. The
             // target keeps its own cell (`CellRule::PinCell0` puts Kirby or Solo Popo at cell 0),
             // so the reserved members are the target plus its first `value` window neighbours,
@@ -711,10 +736,11 @@ pub(crate) fn plan_budget(menu: &crate::engine::compat::menu::TrainingModpackMen
                 shown.push(kind);
             }
             // rc6-hot-xps19: a detached record that holds them (the window a Mii group displaced) counts with the groups.
-            let grouped = |kind: u32| BANKS[role].lock().as_ref().is_some_and(|bank| !bank.departed
+            let held_by_group = |kind: u32| BANKS[role].lock().as_ref().is_some_and(|bank| !bank.departed
                 && bank.groups.iter().any(|g| g.state != GroupState::Released && g.members.index_of(kind).is_some()));
-            window_targets(&shown, target, originals[role], grouped)
+            lane_window_targets(&shown, target, originals[role], held_by_group)
         });
+        let targets = crate::engine::swap::body_bank::window_targets(grouped, live[role], originals[role], next);
         PLANNED_TARGETS[role].store(targets.saturating_add(group_targets[role]), Ordering::Release);
     }
     let window_extras = reserved.iter().sum::<usize>();
@@ -1912,6 +1938,11 @@ unsafe fn scene_header(ctx: &mut InlineCtx) {
     let settings = crate::runtime::roster::cycle_preload_config::snapshot();
     if settings.slots == 0 || !settings.fighters { return; }
     let menu = crate::runtime::compat::sync::read(&crate::runtime::compat::menu::MENU);
+    // rc.6 item 3, Ice Climbers (a session that starts on them gets its groups built): the pair start becomes the
+    // pair-lead window only with the pair bank on and the pair as the slot's requested form; Solo Popo stays native's.
+    let role = if facts.owner == 0 { super::Role::Player } else { super::Role::Cpu };
+    if original == POPO && !(pair_enabled(&settings)
+        && super::requested_forms_at(&menu, role, POPO, Some(0)) == Forms::starting(POPO)) { return; }
     let roster = if facts.owner == 0 { menu.player_roster } else { menu.cpu_roster };
     let cycle = crate::engine::swap::cycle_members::cycle_members(roster, crate::engine::swap::cycle_members::NO_MII);
     let numbered = crate::engine::swap::cycle_members::numbered(&cycle, Some(original));
@@ -3325,11 +3356,16 @@ unsafe fn bg_mii_construct_path(ctx: &mut InlineCtx) {
     }
 }
 
-/// The construction tail (`w8` = the live `FE+0x18`, X1): a background body takes the per-kind release at `0x60debc`,
-/// never the pair rule on `R` (which may reset the whole `R` mid-play); a background Mii body's `x20` is the real `R`
-/// again for the tail's lock, `R+0x50` and release.
+/// The construction tail's pair test (`cmp w8, #0x4b` after `ldr w8, [x9, #0x18]`, x9 the entry, x19 the body), one
+/// shared hook (primary 2026-11-08 22:52Z; worker A's `background_tail` with the Mii build's shadow restore):
+/// - SPECIAL-GROUPS §1: a background Mii body's `x20` is the real `R` again for the tail's lock, `R+0x50` and release.
+/// - SPECIAL-GROUPS §0 X1: the tail reads the **live** cells 0/1 (`0x60de64`, `0x60de70`) on the worker. Beside a live
+///   `[Popo, Nana]` window (a session that starts on Ice Climbers, or the pair group attached) a background body would
+///   take the pair rule: `R+0x50` decremented under the lock and, at 0 after the window's own build, the whole-R reset
+///   that drops every Prefetched group's keys. A background body sees no Popo in cell 0 instead, so its tail takes the
+///   per-kind release `0x17e8610(R, kind)` at `0x60debc`, which returns exactly the keys its group's prefetch registered.
 #[skyline::hook(offset = 0x60de68, inline)]
-unsafe fn bg_mii_construct_tail(ctx: &mut InlineCtx) {
+unsafe fn background_tail(ctx: &mut InlineCtx) {
     if ctx.registers[20].x() as usize == shadow_r_address() {
         ctx.registers[20].set_x(MII_REAL_R.load(Ordering::Acquire) as u64);
         mii_hit(7);
@@ -3533,13 +3569,17 @@ unsafe fn start_holder(base: usize, entry: usize, owner: u32, b: &mut Background
         owner, b.group, step, b.records, fields::read::<u64>(holder, 0x10).unwrap_or(0), b.trainer, now_us().saturating_sub(started));
 }
 
+/// The construction tail's pair test (`cmp w8, #0x4b` after `ldr w8, [x9, #0x18]`, x9 the entry, x19 the body).
+const BACKGROUND_TAIL: usize = 0x60de68;
+
 /// The group a background build starts next (`body_bank::next_background`) for the live kind `live`: none while a
 /// prefetch, a construction or a background build is in flight. A refused group is no candidate.
 fn background_candidate(bank: &Bank, live: Option<u32>) -> Option<usize> {
     if !BACKGROUND_ENABLED.load(Ordering::Acquire) || bank.prefetch.is_some() || bank.construction.is_some()
         || bank.background.is_some() { return None; }
     next_background(bank.groups.iter().map(|g| (if g.background_refused || g.leaving || !background_kind_ready(g) { GroupState::Failed } else { g.state },
-        *g.members, g.identity.is_some())), *bank.members, bank.identity.is_some(), live == Some(KIRBY))
+        *g.members, g.identity.is_some())), *bank.members, bank.identity.is_some(), live == Some(KIRBY),
+        BACKGROUND_PAIR_TAIL.load(Ordering::Acquire))
 }
 
 /// A Mii group builds in the background only with its hooks installed (`BACKGROUND_MII_ENABLED`).
@@ -3551,7 +3591,7 @@ fn background_kind_ready(group: &Group) -> bool {
 fn background_owed(bank: &Bank, group: &Group, live: Option<u32>) -> bool {
     BACKGROUND_ENABLED.load(Ordering::Acquire) && group.state == GroupState::Prefetched && !group.background_refused
         && !group.leaving && background_kind_ready(group) && background_build_eligible(*group.members, group.identity.is_some(), *bank.members,
-            bank.identity.is_some(), live == Some(KIRBY)).is_ok()
+            bank.identity.is_some(), live == Some(KIRBY), BACKGROUND_PAIR_TAIL.load(Ordering::Acquire)).is_ok()
 }
 
 const INFO_BYTES: usize = BACKGROUND_INFO_SPANS[0].1 + BACKGROUND_INFO_SPANS[1].1;
@@ -5823,8 +5863,7 @@ const ASYNC_BUILD_SEAMS: &[&str] = &["group_swap.body_alloc", "group_swap.heap_a
 /// rc.6 item 3, Mii groups (SPECIAL-GROUPS §1 (b)): the worker hooks of a background Mii build.
 const BACKGROUND_MII_SEAMS: &[&str] = &["background_mii.init_enter", "background_mii.init_flags", "background_mii.init_leave",
     "background_mii.init_exit", "background_mii.construct_index_a", "background_mii.construct_index_b",
-    "background_mii.construct_enter", "background_mii.construct_path", "background_mii.construct_tail",
-    "background_mii.tail_release", "background_mii.construct_exit", "background_mii.reader_costume",
+    "background_mii.construct_enter", "background_mii.construct_path", "background_mii.tail_release", "background_mii.construct_exit", "background_mii.reader_costume",
     "background_mii.reader_hat", "background_mii.reader_6e655c", "background_mii.reader_paths",
     "background_mii.reader_33c3468"];
 const PAIR_SEAMS: &[&str] = &["ic_pair.partner_window", "ic_pair.pair_partner", "ic_pair.activate_entry",
@@ -5835,6 +5874,8 @@ const SPECIAL_SEAMS: &[&str] = &["special_groups.object_release", "special_group
 const NATIVE_BACKGROUND_SEAMS: &[&str] = &["background_build.aegis_partner", "background_build.trainer_functor",
     "background_build.trainer_callback", "background_build.guard_acquire", "background_build.guard_release",
     "background_build.pool_build"];
+/// rc.6 item 3, Ice Climbers: the construction tail's pair test for background bodies (`background_tail`).
+const BACKGROUND_TAIL_SEAMS: &[&str] = &["background_build.construct_tail"];
 
 pub(super) unsafe fn install(base: usize) {
     use crate::runtime::seams::seam_install::gate;
@@ -5938,18 +5979,32 @@ pub(super) unsafe fn install(base: usize) {
         control_slot, base + CONTROL_FUNCTOR);
     // rc.6 item 3: background builds use the Phase B′ path and the identity view's body-init site (`background_skip`).
     BACKGROUND_ENABLED.store(async_ok && identity_view, Ordering::Release);
-    // SPECIAL-GROUPS §1: the Mii groups' worker hooks, all or none, their first 13.0.5 words owned.
-    let mii_sites: [(usize, u32); 16] = [(0x607aac, 0xd102c3a0), (0x607d80, 0x1a9f311a), (0x607e74, 0xaa1803f4),
+    // rc.6 item 3 (SPECIAL-GROUPS §0 X1, §1, §2): the construction tail's one shared hook (`background_tail`), its first
+    // four 13.0.5 words owned (`cmp w8, #0x4b; b.ne 0x60debc; ldr w8, [x9, #0x1c]; cmp w8, #0x4c`). Without it a live
+    // `[Popo, Nana]` window keeps deferring the background builds, and a Mii group builds at its first switch.
+    let tail_stock = fingerprint(base, BACKGROUND_TAIL, &[0x71012d1f, 0x54000281, 0xb9401d28, 0x7101311f], "GroupSwap");
+    let tail_ok = gate(SEAM_GROUP, BACKGROUND_TAIL_SEAMS, async_ok && identity_view && tail_stock)
+        && async_ok && identity_view && tail_stock;
+    if tail_ok {
+        skyline::install_hooks!(background_tail);
+        BACKGROUND_PAIR_TAIL.store(true, Ordering::Release);
+    }
+    trace!("[GroupSwap] background pair tail {}",
+        if tail_ok { "enabled; a live Ice Climbers pair window builds the other groups" } else { "off; a live Ice Climbers pair window waits" });
+    // SPECIAL-GROUPS §1: the Mii groups' worker hooks, all or none, their first 13.0.5 words owned; the tail's shadow
+    // restore is `background_tail`'s.
+    let mii_sites: [(usize, u32); 15] = [(0x607aac, 0xd102c3a0), (0x607d80, 0x1a9f311a), (0x607e74, 0xaa1803f4),
         (0x60b5c8, 0xa9577bfd), (0x60b7a8, 0x9343fd6b), (0x60b834, 0xcb0a016b), (0x60b98c, 0x9447780d),
-        (0x60bf30, 0x52800283), (0x60de68, 0x71012d1f), (0x60dec4, 0x944769d3), (0x60df04, 0xa9444ff4),
+        (0x60bf30, 0x52800283), (0x60dec4, 0x944769d3), (0x60df04, 0xa9444ff4),
         (0x33a05a8, 0xb9405909), (0x344fcd4, 0xf9404717), (0x6e655c, 0xb9405aa8), (0x6e6bc4, 0xb9401262),
         (0x33c3468, 0xb9405aa8)];
     let mii_stock = mii_sites.iter().all(|&(offset, word)| fingerprint(base, offset, &[word], "BackgroundMii"));
-    let mii_ok = gate(SEAM_GROUP, BACKGROUND_MII_SEAMS, async_ok && identity_view && mii_stock) && async_ok && identity_view;
+    let mii_ok = gate(SEAM_GROUP, BACKGROUND_MII_SEAMS, async_ok && identity_view && mii_stock && tail_ok)
+        && async_ok && identity_view && tail_ok;
     if mii_ok {
         skyline::install_hooks!(bg_mii_init_enter, bg_mii_init_flags, bg_mii_init_leave, bg_mii_init_exit,
             bg_mii_construct_index_a, bg_mii_construct_index_b, bg_mii_construct_enter, bg_mii_construct_path,
-            bg_mii_construct_tail, bg_mii_tail_release, bg_mii_construct_exit, bg_mii_reader_costume, bg_mii_reader_hat,
+            bg_mii_tail_release, bg_mii_construct_exit, bg_mii_reader_costume, bg_mii_reader_hat,
             bg_mii_reader_6e655c, bg_mii_reader_paths, bg_mii_reader_33c3468);
         BACKGROUND_MII_ENABLED.store(true, Ordering::Release);
     }

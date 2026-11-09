@@ -864,10 +864,10 @@ unsafe fn begin(entry:*mut u8)->bool {
             mii_cycle::Target::Fighter(kind) if publish.is_none() && same_class.is_none()
                 && descriptor_kind(&descriptor)==kind =>
                 Some(Live::Numbered {identity:Identity::Fighter(kind),cursor:destination.cursor}),
+            // rc.6: the normal Ice Climbers pair original too, while the pair bank is on (`original_member`).
             mii_cycle::Target::Original if publish.is_none() && same_class.is_none() && origin_saved.is_none()
                 && descriptor_kind(&descriptor)==origin.original_kind
-                && crate::engine::swap::body_bank::original_bankable(origin.original_kind)
-                && crate::runtime::roster::cycle_preload_config::snapshot().original_bank_enabled() => Some(Live::Original),
+                && super::body_bank::original_member(origin.original_kind,&descriptor) => Some(Live::Original),
             // A saved/preset Mii with no same-class proof (another class, or a hat
             // change) may be served by its own one-member group (MII-GROUPS-DESIGN
             // §5.1 G10): the bank planner admits only a reachable group carrying

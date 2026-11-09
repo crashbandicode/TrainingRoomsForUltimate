@@ -8,6 +8,8 @@ use super::character_forms::Forms;
 use super::swap_model::capabilities::{bankable_kind, pins_cell0};
 
 const NONE: u32 = u32::MAX;
+const POPO: u32 = 0x4b;
+const NANA: u32 = 0x4c;
 
 /// What H1 reads of a fighter's resource owner R at `0x66de18`, after the scene's configure stored its header.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -25,13 +27,15 @@ pub struct HeaderFacts {
 }
 
 /// The original H1 may extend (§12.2 H1's guards): a visible role (owner 0 or 1) in native Training, R not yet
-/// requested (bit 0 clear), one ordinary body (no object kind, `+0x5c`/`+0x60` −1) of a bankable kind (not a Mii,
-/// not the IC pair or Solo Popo, not PT/Aegis).
+/// requested (bit 0 clear), no object kind, `+0x60` −1, and either one ordinary body (`+0x5c` −1) of a bankable kind
+/// (not a Mii, not Solo Popo, not PT/Aegis) or the normal Ice Climbers pair (rc.6 item 3: native's header is Popo with
+/// Nana as its secondary; [`entry_window`] makes it the pair-lead window).
 pub fn extendable(facts: HeaderFacts) -> Option<u32> {
     let [original, second, third] = facts.kinds;
-    (facts.training && facts.owner <= 1 && facts.flags & 1 == 0 && facts.object == NONE && second == NONE
-        && third == NONE && original != NONE && bankable_kind(original) && !matches!(original, 0x4b | 0x4c))
-        .then_some(original)
+    let fresh = facts.training && facts.owner <= 1 && facts.flags & 1 == 0 && facts.object == NONE && third == NONE;
+    let one_body = second == NONE && original != NONE && bankable_kind(original) && !matches!(original, POPO | NANA);
+    let pair = original == POPO && second == NANA;
+    (fresh && (one_body || pair)).then_some(original)
 }
 
 /// Extra bodies a role's start-up window may take from the Ready Fighters budget: both roles share it evenly, the
@@ -45,9 +49,15 @@ pub fn extras_allowed(ready_fighters: u8, bank_members: u8) -> usize {
 
 /// The window for a role whose scene header names `original` (its slot 0): the original at cell 0 (native's own
 /// primary request, `R+0x58`) and the next members of the role's numbered cycle, at most `extras`. A member that pins
-/// cell 0 (Kirby, Solo Popo) ahead of a non-pinned original is skipped, and the next one is taken. None (the scene
-/// stays native's one body): no extra member, or an original that is not one ordinary bankable body.
+/// cell 0 (Kirby, Solo Popo) ahead of a non-pinned original is skipped, and the next one is taken. The Ice Climbers
+/// pair (`original` Popo, from [`extendable`]'s pair header) gets the pair-lead window the Reload path builds for a
+/// pair target (`Members::from_pair`: Nana and the first eligible member, two extra bodies). None (the scene stays
+/// native's): no room or no eligible member, or an original that is neither one ordinary bankable body nor the pair.
 pub fn entry_window(original: u32, numbered: &[u32], extras: usize, solo_popo_member: bool) -> Option<Members> {
+    if original == POPO {
+        let (lane, count) = member_lane(numbered, solo_popo_member);
+        return Members::from_pair(&lane[..count], extras);
+    }
     if extras == 0 || !bankable_kind(original) {
         return None;
     }
@@ -82,34 +92,54 @@ impl Words {
     }
 }
 
-/// H3: the creation descriptor is rewritten only when it is native's single form of the window's original:
-/// `(1, [members[0], −1, −1])`. Anything else (another caller's kind −1 creates, a group, an already-rewritten
-/// window, another fighter) is left as it is and the pending window is dropped.
+/// H3: the creation descriptor is rewritten only when it is native's own form of the window's original: the single
+/// form `(1, [members[0], −1, −1])`, or for a pair-lead window native's pair (`PAIR`, two actors, active 0). Anything
+/// else (another caller's kind −1 creates, a group, an already-rewritten window, another fighter, Solo Popo) is left
+/// as it is and the pending window is dropped.
 pub fn creation_matches(native: Words, window: Words) -> bool {
+    if window.kinds[..2] == [POPO, NANA] {
+        return native == PAIR;
+    }
     native.count == 1 && native.kinds == [window.kinds[0], NONE, NONE]
 }
+
+/// Native's normal Ice Climbers creation: Popo and Nana, two actors, Popo active.
+const PAIR: Words = Words { count: 2, kinds: [POPO, NANA, NONE], actor_count: 2, active: 0 };
 
 /// The original's own request when its scene began with a start-up window. The origin both Mii adapters capture is the
 /// live entry after H3, so it carries the window's words; staged as "back to the original", native was asked to reload
 /// ordinary bodies whose resources only the start-up bank requests (rc6-hot-xps2: a construction read an unloaded
 /// resource and its thread died) and the bank planner could not serve the original warm. The request is native's
 /// single form H3 started from ([`creation_matches`]): count 1, `[original, −1, −1]`, one actor, active 0, every other
-/// byte as captured. Any other words are native's own (one body, PT, the IC pair, Aegis, a Mii) and stay.
+/// byte as captured. A pair-lead start-up window `[Popo, Nana, X]` goes back to native's pair (`PAIR`). Any other
+/// words are native's own (one body, PT, the IC pair, Aegis, a Mii) and stay.
 pub fn original_request(descriptor: [u8; 0x70], original: u32) -> [u8; 0x70] {
     let word = |at: usize| u32::from_le_bytes([descriptor[at], descriptor[at + 1], descriptor[at + 2], descriptor[at + 3]]);
     let words = Words { count: word(0x14), kinds: [word(0x18), word(0x1c), word(0x20)], actor_count: word(0x28),
         active: descriptor[0x43] };
-    if !start_up_words(words, original) {
+    let form = if start_up_words(words, original) {
+        Words { count: 1, kinds: [original, NONE, NONE], actor_count: 1, active: 0 }
+    } else if original == POPO && pair_lead_words(words) {
+        PAIR
+    } else {
         return descriptor;
-    }
+    };
     let mut request = descriptor;
-    request[0x14..0x18].copy_from_slice(&1u32.to_le_bytes());
-    for (i, kind) in [original, NONE, NONE].iter().enumerate() {
+    request[0x14..0x18].copy_from_slice(&form.count.to_le_bytes());
+    for (i, kind) in form.kinds.iter().enumerate() {
         request[0x18 + i * 4..0x1c + i * 4].copy_from_slice(&kind.to_le_bytes());
     }
-    request[0x28..0x2c].copy_from_slice(&1u32.to_le_bytes());
-    request[0x43] = 0;
+    request[0x28..0x2c].copy_from_slice(&form.actor_count.to_le_bytes());
+    request[0x43] = form.active;
     request
+}
+
+/// The words H3 writes for a pair-lead window ([`entry_window`] for Popo): Popo, Nana and one bankable extra, two
+/// actors, Popo active.
+fn pair_lead_words(words: Words) -> bool {
+    let extra = words.kinds[2];
+    words == Words { count: 3, kinds: [POPO, NANA, extra], actor_count: 2, active: 0 }
+        && extra != NONE && bankable_kind(extra) && !matches!(extra, POPO | NANA)
 }
 
 /// The words H3 writes for `original` ([`entry_window`], [`Words::of`]): two or three single-body bankable members
@@ -168,7 +198,7 @@ mod tests {
         assert_eq!(extendable(facts(0, [STEVE, NONE, NONE])), Some(STEVE));
         assert_eq!(extendable(HeaderFacts { object: 0x24, ..facts(0, [0x24, 0x25, 0x26]) }), None, "Pokémon Trainer");
         assert_eq!(extendable(HeaderFacts { object: 0x5a, ..facts(0, [0x5a, 0x5b, NONE]) }), None, "Aegis");
-        assert_eq!(extendable(facts(0, [0x4b, 0x4c, NONE])), None, "the IC pair");
+        // The IC pair start: `an_ice_climbers_start_gets_a_pair_lead_window`.
         assert_eq!(extendable(facts(0, [0x4b, NONE, NONE])), None, "Solo Popo");
         for mii in [0x48, 0x49, 0x4a] {
             assert_eq!(extendable(facts(1, [mii, NONE, NONE])), None, "{mii:#x}");
@@ -219,9 +249,56 @@ mod tests {
         assert_eq!(entry_window(MARIO, &[DK, LINK], 0, false), None, "no room");
         assert_eq!(entry_window(MARIO, &[], 2, false), None, "no next member");
         assert_eq!(entry_window(MARIO, &[0x48, 0x49], 2, false), None, "Miis are never window members");
-        for original in [0x48, 0x24, 0x5a, 0x4b] {
+        for original in [0x48, 0x24, 0x5a, 0x4c] {
             assert_eq!(entry_window(original, &[MARIO, DK], 2, false), None, "{original:#x}");
         }
+    }
+
+    /// rc.6 item 3 (TASK-OPUS-rc6-bg-special, 22:32Z: a session that starts on Ice Climbers still gets its groups built;
+    /// Eden rc6-bg-ic1: P1 started on the pair had no start-up window, so no bank, and its first switch was a Reload).
+    /// Native's header for a normal-pair start is Popo with Nana as its secondary. H1 makes it the pair-lead window
+    /// `[Popo, Nana, X]` the Reload path builds for a pair target (`Members::from_pair`: Nana and one extra, two actors),
+    /// H3 rewrites native's pair creation to it, and the original's own request is native's pair again. Solo Popo stays
+    /// native's one body.
+    #[test]
+    fn an_ice_climbers_start_gets_a_pair_lead_window() {
+        const POPO: u32 = 0x4b;
+        const NANA: u32 = 0x4c;
+        for owner in [0, 1] {
+            assert_eq!(extendable(facts(owner, [POPO, NANA, NONE])), Some(POPO));
+        }
+        assert_eq!(extendable(facts(0, [POPO, NONE, NONE])), None, "Solo Popo");
+        assert_eq!(extendable(facts(0, [NANA, POPO, NONE])), None);
+        assert_eq!(extendable(facts(0, [POPO, NANA, MARIO])), None, "already extended");
+        assert_eq!(extendable(HeaderFacts { flags: 1, ..facts(0, [POPO, NANA, NONE]) }), None, "already requested");
+        assert_eq!(extendable(HeaderFacts { training: false, ..facts(0, [POPO, NANA, NONE]) }), None, "not Training");
+        let window = entry_window(POPO, &[MARIO, DK, LINK], 2, false).unwrap();
+        assert!(window.is_pair_lead());
+        assert_eq!(window.kinds(), [POPO, NANA, MARIO]);
+        assert_eq!(entry_window(POPO, &[KIRBY, DK], 2, false).unwrap().kinds(), [POPO, NANA, DK], "Kirby is no pair extra");
+        assert_eq!(entry_window(POPO, &[MARIO, DK], 1, false), None, "Nana and the extra are two bodies");
+        assert_eq!(entry_window(POPO, &[], 2, false), None, "no extra");
+        let words = Words::of(&window);
+        assert_eq!((words.count, words.kinds, words.actor_count, words.active), (3, [POPO, NANA, MARIO], 2, 0));
+        let pair = Words { count: 2, kinds: [POPO, NANA, NONE], actor_count: 2, active: 0 };
+        assert!(creation_matches(pair, words), "native's pair creation");
+        assert!(!creation_matches(Words { count: 1, kinds: [POPO, NONE, NONE], actor_count: 1, active: 0 }, words), "Solo Popo");
+        assert!(!creation_matches(words, words), "already a window");
+        assert!(!creation_matches(pair, Words::of(&entry_window(MARIO, &[DK, LINK], 2, false).unwrap())), "another original");
+        fn descriptor(words: Words) -> [u8; 0x70] {
+            let mut d = [0x5au8; 0x70];
+            d[0x14..0x18].copy_from_slice(&words.count.to_le_bytes());
+            for (i, kind) in words.kinds.iter().enumerate() {
+                d[0x18 + i * 4..0x1c + i * 4].copy_from_slice(&kind.to_le_bytes());
+            }
+            d[0x28..0x2c].copy_from_slice(&words.actor_count.to_le_bytes());
+            d[0x43] = words.active;
+            d
+        }
+        assert_eq!(original_request(descriptor(words), POPO), descriptor(pair), "back to native's pair");
+        assert_eq!(original_request(descriptor(pair), POPO), descriptor(pair), "native's pair stays");
+        let extra_active = Words { active: 2, ..words };
+        assert_eq!(original_request(descriptor(extra_active), POPO), descriptor(extra_active), "not the original's cell");
     }
 
     /// H3: only native's single form of the window's original is rewritten; H4: the window binds only to the same

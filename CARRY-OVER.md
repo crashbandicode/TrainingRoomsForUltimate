@@ -1064,3 +1064,61 @@ Worker B of the special-group split (`artifacts/phase23/TASK-OPUS-rc6-bg-special
   `182a785` built them at the switch: 1158 ms and 939 ms, `rc6-bg-pt-base1`). Unmapped 0 when no PT group attaches a
   second time. Open: every later PT attach's article rebuild (`special_articles::rebuild_current`) logs Unmapped
   Read8 @ 0 at `main+0x35609c0`, at the base too (`rc6-bg-pt-base1`, 2 of 2).
+### p23/rc6-bg-ic: the Ice Climbers pair group built in the background, and a session that starts on Ice Climbers (2026-11-08, rc.6 item 3)
+
+Operator decision "All groups in rc.6" and the start-on-the-kind rule (`docs/DECISIONS.md` "Item 3 in rc.6", 20:26Z and
+22:32Z). Design: `artifacts/phase23/rc6-item3-re/SPECIAL-GROUPS.md` §0 X1 and §2 (static RE and Eden
+`rc6-special-re6`).
+
+- **The pair group builds in the background** (`body_bank::background_build_eligible` admits `Special::Pair`):
+  - Beside a window that is not `[Popo, Nana]` its two construction tails take the per-kind release `0x17e8610` on the
+    live cells. That returns exactly the keys its prefetch registered: no `R+0x50` reference and no reset-batch permit
+    are involved.
+  - In the tick the bank lends the group's members, so N1 gives Nana Popo's context and the flags are 6. On that path
+    the scratch control init reads only `+0x28`, `+0x5918` and `+0x4188..`.
+  - The settlement gives Popo cell 0 and Nana cell 1. The warm attach is today's (N2). The pair group's switch-time
+    build stays synchronous.
+- **A live pair window no longer defers the other groups** (at `182a785` it was "special window"):
+  - `native_body_bank::background_tail` (inline `0x60de68`, the tail's `cmp w8, #0x4b`) makes a background body
+    compare -1 instead of the live Popo. Its tail then takes the per-kind release and never the pair rule's whole-R
+    reset.
+  - It is installed with the background builds, guarded by four 13.0.5 words and the seam row
+    `background_build.construct_tail`. Without it a live pair window still defers (`pair_tail` false, "pair window").
+  - A native window still defers (the Pokémon Trainer and Pyra/Mythra lane).
+- **A session that starts on Ice Climbers gets a bank** (Eden `rc6-bg-ic1`: P1 started on the pair had no start-up
+  window; P-HOT B H1 refused `0x4b`, so nothing was planned until the first switch, a Reload):
+  - `entry_window::extendable` accepts native's normal-pair header (Popo with Nana as its secondary), and
+    `entry_window` gives it the pair-lead window the Reload path builds for a pair target (`Members::from_pair`).
+  - `creation_matches` (H3) rewrites native's pair creation (2 bodies, 2 actors) to it. `original_request` maps a
+    pair-lead start-up window back to native's pair.
+  - `scene_header` extends a pair start only with the pair bank on and the pair as the slot's requested form; Solo Popo
+    stays native's one body.
+  - H2 (`prepare_resources`) already writes the pair's `R+0x50` = 3 for a pending pair-lead bank, H4 binds on count,
+    actors and kinds, and N1/N2/N3 serve the window as they serve a Reload-built one. Its other groups then build in
+    the background beside it (`background_tail`).
+  - The notice counts the live pair-lead window as it serves (Eden `rc6-bg-ic2`: "Loaded 9/10 · swap P1 to load 1
+    more" with every P1 fighter built). With groups on, `plan_budget` plans its window targets through
+    `body_bank::window_targets`: a live pair-lead window counts its own reusable extras, the values `progress` reads,
+    not the lane window's two. With groups off, or for any other window, the lane's window is planned as before.
+- **The return to an Ice Climbers original is warm** (primary 2026-11-09 00:23Z; `docs/DECISIONS.md`). Eden
+  `rc6-bg-ic2/3` showed it Reloading (6–7 frames), which ended P1's bank; the next switch out rebuilt everything.
+  - The IcPair capability row's `original_bankable` is now true (EXCLUSIONS §9 lifted for the pair original). New
+    `capabilities::original_form_bankable(kind, forms, pair_bank)`: the pair original, in the pair form and while the
+    pair bank is on. Every other kind answers `original_bankable(kind)`, which is unchanged (0x4b stays outside
+    `swappable_kind`: the pair is never a single-body cell).
+  - `native_body_bank::original_member(kind, descriptor)` is both Mii adapters' Original gate: `original_bank` on, the
+    form the staged request spells (`request_forms`), and the pair bank's state. `excluded_original` asks the same rule
+    with the slot-0 setting's form, so the planner and the notice count the pair original as served.
+  - `plan_in` then serves the return like a numbered pair target: the live pair-lead window is a reuse, a detached
+    one or a pair group is a group swap (`group_serves`), and a request whose non-group bytes differ still takes the
+    Reload with `reuse declined … bytes differ at`. The player's `at_origin` already recognises any live `0x4b`.
+- **Merge note** (accepted by the primary, 22:52Z): `p23/rc6-hot-slots-mii` hooks `0x60de68` too. Integration keeps
+  one `background_tail`, which also restores the Mii shadow's `R`.
+
+**Proof:**
+- Host tests, each failed first: model `a_background_build_takes_the_pair_group_and_builds_beside_a_live_pair_window`,
+  `an_ice_climbers_start_gets_a_pair_lead_window`, `a_live_pair_lead_window_plans_what_it_serves`,
+  `an_ice_climbers_pair_original_is_a_bank_member_while_the_pair_bank_is_on`; `tests/background_pair_wiring.rs` (6).
+- Recorded manifest edits of `rows_a1.rs`, `body_bank.rs` and `native_body_bank.rs`; `carry_pkg6.py
+  carry/ledger/verify` re-derives all 250 files.
+- Eden: `artifacts/phase23/LANE-OPUS-RC6-BG-IC-REPORT.md`.
