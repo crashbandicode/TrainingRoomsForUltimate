@@ -956,3 +956,11 @@ ceiling = 152783
 date = "2026-11-09"
 reason = "worker B, inbox INBOX-opus-rc6-bg-pt 00:17Z item 1 (p23/rc6-bg-pt 6f5fed1): the Pokemon Trainer article fix (a detached PT group takes its object kind 0x72 again before its rebuild: native_body_bank rearm_candidate, detached_pool, return_object_key, the Rearm/RearmPoll lifecycle steps; body_bank object_rearm_due/object_ready); measured 152783 (tools/size_gate.py), +218 over 152565"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to this operator-chosen rc.6 item under TASK-OPUS-rc6-bg-special (primary c07b3449, 2026-11-09 00:17Z: a raise goes in its own commit with approved_by)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 157175
+date = "2026-11-09"
+reason = "rc.6 integration (p23/rc6-integration 196b0686): the merge 0c53391d of p23/rc6-x4 (44c9dfa, 156556: +120 over 62e7c85's 156436, the X4 root fix lifting the interim's two cells) and the merge 196b0686 of p23/rc6-bg-pt b37efd8 (152783: +218 over 152565, the Pokemon Trainer object kind before its rebuild) into 041e924b (156837); measured 157175 on the merged tree (tools/size_gate.py), +338"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); combined ceiling = measured merged size per primary c07b3449, INBOX-opus-rc6-integration 2026-11-08 19:13Z"
