@@ -160,10 +160,20 @@ pub fn created_busy(in_use: impl IntoIterator<Item = bool>, allowance: usize) ->
 }
 
 /// Fill what exists before creating: an existing helper (or an earlier created entry) holds the next created entry
-/// back while its `view` admits a plan target and it does not hold a Ready one (`filled`). An entry whose view admits
-/// nothing can never be filled by this plan (entries 2 and 3 under a hats-only plan).
+/// back while its `view` admits a plan target and it does not hold a Ready one (`filled`, [`creation_filled`]). An entry
+/// whose view admits nothing can never be filled by this plan (entries 2 and 3 under a hats-only plan, unless parked
+/// as F9 seats: then they hold their seat members).
 pub fn holds_back_creation<T, const N: usize>(view: [Option<T>; N], filled: bool) -> bool {
     !filled && view.iter().any(Option::is_some)
+}
+
+/// [`holds_back_creation`]'s `filled` for an existing helper or an earlier created entry: it holds a `ready` source
+/// that the plan lists (`in_plan`) or that may not be replaced. Primary 2026-11-09 09:47Z (Eden final-xps-hot hs06): a
+/// parked F9 seat (entry 2 or 3) holding its own seat member (`own_seat_member`) is filled as well. F9 reading A keeps
+/// that member whether or not the plan lists it, so under a hats-only plan the seat's view admits it while the plan
+/// never does; without this the created entries are held back for good (P-HOT 5.1 undone).
+pub fn creation_filled(ready: bool, in_plan: bool, replaceable: bool, own_seat_member: bool) -> bool {
+    ready && (in_plan || !replaceable || own_seat_member)
 }
 
 /// §3.5.1 rule 1 (operator decisions "B" and "1"): entry 3 may be borrowed by a hat only while the native CPU count
@@ -369,6 +379,57 @@ mod tests {
             "every allowed created entry in use: entry 3 may borrow");
         assert!(created_busy([true, false, false, false], 1), "only the allowed ones count");
         assert!(created_busy([false; 4], 0), "no created entry allowed: the borrow is the only place left");
+    }
+
+    /// Primary 2026-11-09 09:47Z (Eden final-xps-hot hs06; it passed in rc6-hot-xps1/3): P1 Kirby, one native CPU, a
+    /// hats-only plan. F9 reading A parks entries 2 and 3 on the CPU rotation's seat members (`parked_seat`) whether or
+    /// not the plan lists them, so their views (`character_sources::purpose_view`) admit those members. A parked seat
+    /// holding its own member Ready is filled: the created entries 7/6/5/4 are created in turn (the walk of
+    /// `character_sources::creation_intent`) and each loads a hat. A seat still loading its member holds them back.
+    #[test]
+    fn parked_seats_on_their_members_let_a_hats_only_plan_create_its_entries() {
+        use crate::model::parked_entries::parked_seat;
+        let hats_only = [Some((0x14, HAT)), Some((0x10, HAT)), Some((0x11, HAT)), Some((0x18, HAT)), Some((0x1a, HAT)), None];
+        let seats = [(SEAT_ENTRY, 0x0du32), (BORROW_ENTRY, 0x0f)];
+        for (slot, member) in seats {
+            assert_eq!(parked_seat::<u8>(slot as u32, Some(1), false, Some((member, None))), Some((member, None)),
+                "entry {slot} is a parked seat on {member:#x}");
+        }
+        let seat_view = |member: u32| {
+            let mut view = [None; 6];
+            view[0] = Some(member);
+            view
+        };
+        // Each step: earlier loads have completed; the next created entry is made unless an entry before it holds it
+        // back, and it loads the first hat no entry holds.
+        let walk = |seat_ready: bool| {
+            let allowance = created_allowance(0, 5, 2, 4, true);
+            let mut created: Vec<(usize, u32)> = Vec::new();
+            for _ in 0..8 {
+                if created.len() == allowance {
+                    break;
+                }
+                let seats_back = seats.iter().any(|(_, member)| holds_back_creation(seat_view(*member),
+                    creation_filled(seat_ready, hats_only.iter().flatten().any(|(k, _)| k == member), true, true)));
+                let created_back = created.iter().any(|(slot, _)| holds_back_creation(
+                    slot_view(hats_only, facts(*slot, true, false, false)), creation_filled(true, true, true, false)));
+                if seats_back || created_back {
+                    break;
+                }
+                let slot = [7, 6, 5, 4][created.len()];
+                let hat = slot_view(hats_only, facts(slot, true, false, false)).into_iter().flatten()
+                    .find(|kind| !created.iter().any(|(_, held)| held == kind)).expect("a hat to load");
+                created.push((slot, hat));
+            }
+            created
+        };
+        assert_eq!(walk(true), [(7, 0x14), (6, 0x10), (5, 0x11), (4, 0x18)], "four created entries, four hats");
+        assert_eq!(walk(false), [], "a seat still loading its member is filled first");
+        // The rule's other clauses stand: a plan target, a source that may not be replaced, nothing Ready.
+        assert!(creation_filled(true, true, true, false));
+        assert!(creation_filled(true, false, false, false));
+        assert!(!creation_filled(true, false, true, false), "another kind on a free helper: not filled");
+        assert!(!creation_filled(false, true, true, true));
     }
 
     /// Operator decision "1": the record is published at the hat's admission on entry 3, read by F9, kept until F9

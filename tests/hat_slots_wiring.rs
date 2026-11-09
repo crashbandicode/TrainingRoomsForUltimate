@@ -55,7 +55,10 @@ fn hats_are_planned_and_created_apart_from_the_fighter_remainder() {
     let intent = body(src, "fn creation_intent(");
     let speculative = &intent[intent.find("if state.wants.iter().any(Option::is_some) {return None;}").expect("speculative")..];
     assert!(speculative.contains(".take(created_allowance(state,backend))"), "{speculative}");
-    assert!(speculative.contains("hat_slots::holds_back_creation(helper_view(state,slot),filled)"), "{speculative}");
+    // Primary 2026-11-09 09:47Z: the view is read once, so a parked seat is judged filled on the same view
+    // (`preload_seat_wiring` `a_parked_seat_on_its_member_does_not_hold_back_creation`).
+    assert!(speculative.contains("let view=helper_view(state,slot);")
+        && speculative.contains("hat_slots::holds_back_creation(view,filled)"), "{speculative}");
     let allowance = body(src, "fn created_allowance(");
     assert!(allowance.contains("hat_slots::created_allowance(fighters,hats,helpers.len(),created,backend==Backend::Training)"),
         "{allowance}");
