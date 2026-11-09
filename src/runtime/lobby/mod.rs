@@ -135,6 +135,10 @@ pub(crate) unsafe fn frame(fighter: usize) {
                 crate::runtime::roster::kirby_hats::tick();
             }
             let _items = HookScope::enter_hook(HookId::RosterItems);
+            // The Give item grid's item (the menu worker's request, `ui::requests`): queued here, on the game frame.
+            if let Some(choice) = crate::runtime::ui::requests::take_give_item() {
+                crate::runtime::roster::character_items::request(choice);
+            }
             // Diag build: an item grant Eden asked for in `diag-item.req` (the Give item screen is not built yet).
             #[cfg(feature = "diag")]
             if let Some(choice) = crate::runtime::diag_reload::take_item_request() {

@@ -52,6 +52,14 @@ fn ident(t: Option<&Tok>) -> Option<&str> {
     }
 }
 
+/// The runtime's call graph, a bare imported name resolved as Rust does (`Graph::precise_imports`): `lobby_persist`'s `restore` is
+/// `model::lobby_persist::restore`, not `kirby_hats::restore` (which made `entry_applied` look like it waits on the source lock).
+fn runtime_graph() -> Graph {
+    let mut graph = Graph::scan(&Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime"), &[]);
+    graph.precise_imports = true;
+    graph
+}
+
 /// Every `static NAME: …Mutex<…>` / `…RwLock<…>` of `root` (the scan of `hook_locks.rs`).
 fn static_locks(root: &Path) -> Vec<(String, String)> {
     fn walk(dir: &Path, root: &Path, out: &mut Vec<(String, String)>) {
@@ -179,6 +187,8 @@ impl<'g> Ctx<'g> {
                         !local || callee.file == f.file
                     }
                     Some("self" | "Self" | "super" | "crate") => callee.file == f.file,
+                    // A `#[path]` module declared under another name (`body_bank` is `native_body_bank.rs`).
+                    Some(q) if self.graph.declared_module(&f.file, q).is_some() => self.graph.declared_module(&f.file, q) == Some(callee.module.as_str()),
                     Some(q) if q == callee.module => true,
                     Some(q) => !all.iter().any(|&o| self.graph.funcs[o].module == q),
                 }
@@ -396,6 +406,27 @@ fn accessor_take(ctx: &Ctx, f: usize, dot: usize) -> Vec<usize> {
         .collect()
 }
 
+/// The token that ends the name at `i`: the `]` of an index right after it (`NAME[role]`), else `i` itself.
+fn index_end(body: &[Tok], i: usize) -> usize {
+    if !punct(body.get(i + 1), '[') {
+        return i;
+    }
+    let mut depth = 0;
+    for (k, t) in body.iter().enumerate().skip(i + 1) {
+        match t {
+            Tok::Punct('[') => depth += 1,
+            Tok::Punct(']') => {
+                depth -= 1;
+                if depth == 0 {
+                    return k;
+                }
+            }
+            _ => {}
+        }
+    }
+    i
+}
+
 fn takes(ctx: &Ctx, f: usize) -> Vec<Take> {
     let body = &ctx.graph.funcs[f].body;
     let mut out = Vec::new();
@@ -428,9 +459,11 @@ fn takes(ctx: &Ctx, f: usize) -> Vec<Take> {
     }
     for i in 0..body.len() {
         let Some(lock) = ctx.lock_at(f, i) else { continue };
-        let method = punct(body.get(i + 1), '.')
-            && ident(body.get(i + 2)).is_some_and(|m| LOCK_METHODS.contains(&m))
-            && punct(body.get(i + 3), '(');
+        // `NAME.lock()`, or one lock of a static array, `NAME[role].lock()` (native_body_bank's `BANKS`).
+        let dot = index_end(body, i) + 1;
+        let method = punct(body.get(dot), '.')
+            && ident(body.get(dot + 1)).is_some_and(|m| LOCK_METHODS.contains(&m))
+            && punct(body.get(dot + 2), '(');
         let head = if i >= 2 && body[i - 1] == Tok::PathSep { i - 2 } else { i };
         let helper = head >= 3
             && punct(body.get(head - 1), '&')
@@ -443,7 +476,7 @@ fn takes(ctx: &Ctx, f: usize) -> Vec<Take> {
         let s = statement_start(body, at);
         let arm = s >= 2 && punct(body.get(s - 1), '>') && punct(body.get(s - 2), '=');
         // `let [mut] name = NAME.lock()[.unwrap()|.expect(..)];` binds the guard.
-        let call_close = if helper { i + 1 } else { i + 4 };
+        let call_close = if helper { i + 1 } else { dot + 3 };
         let mut after = call_close + 1;
         if punct(body.get(after), '.') && matches!(ident(body.get(after + 1)), Some("unwrap" | "expect")) {
             let open = after + 2;
@@ -664,7 +697,7 @@ fn roles_of(ctx: &Ctx, s: &Scan, key: &str) -> BTreeSet<String> {
 
 #[test]
 fn report_the_lock_table_and_the_order_edges() {
-    let graph = Graph::scan(&Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime"), &[]);
+    let graph = runtime_graph();
     let (ctx, s) = scan(&graph);
     // The lock table: each lock, the roles that take it (and from which functions).
     let mut table: BTreeMap<usize, BTreeMap<String, BTreeSet<String>>> = BTreeMap::new();
@@ -717,7 +750,7 @@ const WINDOW: &[&str] =
 
 #[test]
 fn no_two_locks_are_taken_in_both_orders_and_no_lock_is_retaken_while_held() {
-    let graph = Graph::scan(&Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime"), &[]);
+    let graph = runtime_graph();
     let (ctx, s) = scan(&graph);
     let (edges, _) = edges(&ctx, &s);
     let mut problems = Vec::new();
@@ -734,6 +767,310 @@ fn no_two_locks_are_taken_in_both_orders_and_no_lock_is_retaken_while_held() {
         problems.push(format!("{} retaken while held in {} via {}", lock_name(&ctx, e.held), e.func, e.via));
     }
     assert!(problems.is_empty(), "lock-order problems:\n{}", problems.join("\n"));
+}
+
+// ---- rc.6 QP freeze, the class (primary 2026-11-09 19:07Z) ----------------------------------------------------------------
+//
+// `rc6-qpf3` (Eden's GDB stub on a frozen b): the game's MainThread busy-joined the UI task group on core 0; the group's task on
+// TaskWorker1 waited in our hook for `compat::menu::EDITED`; `tr-menu`, the menu worker, held it on core 0 and never ran again.
+// Any lock a game-thread hook takes with a blocking call, and a plugin thread can hold, is the same hazard: the game can starve
+// the holder while it waits on the hook. A plugin thread holds a lock it takes blocking or with a successful `try_*`; a game-side
+// `try_*` never waits and is not a hazard.
+
+const TRY_METHODS: &[&str] = &["try_lock", "try_read", "try_write"];
+
+/// The carried code's typed statics (`hook_locks.rs` `TYPED_STATIC_CALLS`): a helper handed `&STATIC` runs the static's trait
+/// impl, which the text does not show. `read`/`setting` and `lock_write` run `Menu::read_value` (the guard is built from it), the
+/// guard's drop and `assign_value` run `store`. A function that branches on `on_plugin_thread()` (`callgraph::thread_dispatch`)
+/// is followed into the walking thread's branch only.
+const TYPED_STATIC_CALLS: &[(&str, &str, &str)] = &[
+    ("MENU", "read", "menu::read_value"),
+    ("MENU", "setting", "menu::read_value"),
+    ("MENU", "lock_write", "menu::read_value"),
+    ("MENU", "lock_write", "menu::store"),
+    ("MENU", "assign", "menu::store"),
+];
+
+/// Shared locks the code shares on purpose, each with the reason it is not the hazard (read in the source). Empty: every row
+/// needs the reason a starved plugin holder cannot stall a game hook that waits for it.
+const SHARED_ON_PURPOSE: &[(&str, &str)] = &[];
+
+/// The runs that measured the hooks' threads (primary 2026-11-09 19:44Z/20:32Z, OPERATOR "measure first, fix exactly"; playbook
+/// CHECKLIST M row, main 87b3de0): hot-slots' two trace points per hook on its game address, a `thread == main` counter and a
+/// `thread != main` record point, on `b04856b2` diag (`artifacts/phase23/hook-threads/TABLE.md`).
+const MEASURED_RUNS: &str = "final-yoga-ht-mii-b04856b2 + final-yoga-ht-kr-b04856b2 + final-yoga-ht-pair-b04856b2-r2 (a and b, an LDN \
+                             pair: the waiting rooms and a match) + final-yoga-ht-reset-b04856b2 (four native resets)";
+
+/// Game hooks measured on MainThread only: `(hook, calls, calls on MainThread)`, all runs together, exact counters. A hook that runs
+/// on MainThread cannot deadlock this way: while it waits, MainThread is not busy-joining a task group, so the core it leaves free
+/// lets the starved holder run (`rc6-qpf3`'s cycle needs the waiter on a task worker). A lock leaves the failing set only when every
+/// hook that waits on it is here; a hook seen on a worker thread, or never reached, never is.
+const MEASURED_ON_MAIN_THREAD: &[(&str, u64, u64)] = &[
+    ("input_delay::caller_a_note", 73_937, 73_937),
+    ("input_delay::caller_a_apply", 358_224, 358_224),
+    ("input_delay::caller_b_note", 914, 914),
+    ("input_delay::caller_b_apply", 914, 914),
+    ("character_lifecycle::destruction_trace", 30, 30),
+    ("character_lifecycle::refresh_entry_portrait", 8, 8),
+    ("character_lifecycle::refresh_ordinal_portrait", 32, 32),
+    ("states::state_kirby_opff_hook", 3_001, 3_001),
+    ("native_source_capacity::owner_cleanup_complete", 30, 30),
+    ("native_source_capacity::listener_removed", 30, 30),
+    ("native_source_capacity::actor_cleanup", 97, 97),
+    ("native_source_capacity::pause_state_exit", 2, 2),
+    ("mii_hud_portrait::pipeline_before_tick", 93_041, 93_041),
+    ("mii_hud_portrait::pipeline_after_tick", 93_041, 93_041),
+];
+
+/// The impl functions `f` runs through `helper(&STATIC ..)`, with the token position of the helper.
+fn typed_static_callees(graph: &Graph, f: usize) -> Vec<(usize, usize)> {
+    let body = &graph.funcs[f].body;
+    let mut out = Vec::new();
+    for i in 0..body.len() {
+        let Some(helper) = ident(body.get(i)) else { continue };
+        if !TYPED_STATIC_CALLS.iter().any(|(_, h, _)| *h == helper) || !punct(body.get(i + 1), '(') || !punct(body.get(i + 2), '&') {
+            continue;
+        }
+        let mut k = i + 3;
+        while ident(body.get(k)).is_some() && body.get(k + 1) == Some(&Tok::PathSep) {
+            k += 2;
+        }
+        let Some(name) = ident(body.get(k)) else { continue };
+        for (s, h, callee) in TYPED_STATIC_CALLS {
+            if *s == name && *h == helper {
+                out.extend(graph.find(callee).into_iter().filter(|&c| c != f).map(|c| (i, c)));
+            }
+        }
+    }
+    out
+}
+
+/// Whether token `at` of `f` runs on the walking thread: outside a `thread_dispatch` branch, or in its own branch.
+fn on_this_thread(graph: &Graph, f: usize, at: usize, plugin: bool) -> bool {
+    match callgraph::thread_dispatch(&graph.funcs[f].body) {
+        Some((p, g)) => !(if plugin { g.contains(&at) } else { p.contains(&at) }),
+        None => true,
+    }
+}
+
+/// The locks `f` takes with `try_*` (`NAME.try_lock()`): never a wait, but a successful one holds the lock.
+fn try_takes(ctx: &Ctx, f: usize) -> BTreeSet<usize> {
+    let body = &ctx.graph.funcs[f].body;
+    (0..body.len())
+        .filter(|&i| {
+            let dot = index_end(body, i) + 1;
+            punct(body.get(dot), '.') && ident(body.get(dot + 1)).is_some_and(|m| TRY_METHODS.contains(&m)) && punct(body.get(dot + 2), '(')
+        })
+        .filter_map(|i| ctx.lock_at(f, i))
+        .collect()
+}
+
+/// Per lock: the game-hook functions that take it blocking, and the plugin-thread functions (with their thread) that hold it.
+/// Per function: the plugin threads that reach it.
+struct Shared {
+    game_waits: BTreeMap<usize, BTreeSet<String>>,
+    /// Per lock: the hooks (keys) whose reach waits on it.
+    game_hooks: BTreeMap<usize, BTreeSet<String>>,
+    plugin_holds: BTreeMap<usize, BTreeSet<String>>,
+    plugin_reached: BTreeMap<usize, BTreeSet<String>>,
+}
+
+fn shared_locks(ctx: &Ctx, s: &Scan) -> Shared {
+    let graph = ctx.graph;
+    let n = graph.funcs.len();
+    // Per function: (token position, callee) for path and method calls and typed-static helpers.
+    let callees: Vec<Vec<(usize, usize)>> = (0..n)
+        .map(|f| {
+            let mut out: Vec<(usize, usize)> =
+                calls(&graph.funcs[f].body).iter().flat_map(|c| ctx.resolve(f, c).into_iter().map(move |t| (c.at, t))).collect();
+            out.extend(typed_static_callees(graph, f));
+            out
+        })
+        .collect();
+    let walk = |starts: Vec<usize>, plugin: bool| -> BTreeSet<usize> {
+        let mut seen = BTreeSet::new();
+        let mut stack = starts;
+        while let Some(f) = stack.pop() {
+            if seen.insert(f) {
+                stack.extend(callees[f].iter().filter(|(at, _)| on_this_thread(graph, f, *at, plugin)).map(|(_, c)| *c));
+            }
+        }
+        seen
+    };
+    let hooks: Vec<usize> = (0..n).filter(|&f| graph.funcs[f].attrs.contains("skyline::hook")).collect();
+    let mut out = Shared {
+        game_waits: BTreeMap::new(),
+        game_hooks: BTreeMap::new(),
+        plugin_holds: BTreeMap::new(),
+        plugin_reached: BTreeMap::new(),
+    };
+    for hook in hooks {
+        for f in walk(vec![hook], false) {
+            for t in s.takes[f].iter().filter(|t| on_this_thread(graph, f, t.at, false)) {
+                out.game_waits.entry(t.lock).or_default().insert(format!("{} (hook {})", graph.funcs[f].key(), graph.funcs[hook].key()));
+                out.game_hooks.entry(t.lock).or_default().insert(graph.funcs[hook].key());
+            }
+        }
+    }
+    for (key, name) in plugin_entries() {
+        let starts = graph.find(&key);
+        for f in walk(starts, true) {
+            out.plugin_reached.entry(f).or_default().insert(name.clone());
+            let held: BTreeSet<usize> = s.takes[f]
+                .iter()
+                .filter(|t| on_this_thread(graph, f, t.at, true))
+                .map(|t| t.lock)
+                .chain(try_takes(ctx, f))
+                .collect();
+            for lock in held {
+                out.plugin_holds.entry(lock).or_default().insert(format!("{} ({name})", graph.funcs[f].key()));
+            }
+        }
+    }
+    out
+}
+
+#[test]
+fn no_lock_a_game_hook_waits_on_is_held_by_a_plugin_thread() {
+    let graph = runtime_graph();
+    let (ctx, s) = scan(&graph);
+    let shared = shared_locks(&ctx, &s);
+    let measured = |hook: &str| MEASURED_ON_MAIN_THREAD.iter().any(|(h, _, _)| *h == hook);
+    let mut problems = Vec::new();
+    let mut used = BTreeSet::new();
+    for (lock, waits) in &shared.game_waits {
+        let Some(holds) = shared.plugin_holds.get(lock) else { continue };
+        let name = lock_name(&ctx, *lock);
+        if SHARED_ON_PURPOSE.iter().any(|(l, _)| *l == name) {
+            println!("SHARED-ON-PURPOSE {name}");
+            continue;
+        }
+        let hooks = &shared.game_hooks[lock];
+        used.extend(hooks.iter().filter(|h| measured(h)).cloned());
+        let open: Vec<&String> = hooks.iter().filter(|h| !measured(h)).collect();
+        if open.is_empty() {
+            println!("MEASURED {name}: every waiting hook ran on MainThread only ({MEASURED_RUNS}): {hooks:?}");
+            continue;
+        }
+        problems.push(format!(
+            "{name}\n    hooks not measured MainThread-only: {}\n    game hooks wait: {}\n    plugin threads hold: {}",
+            open.iter().map(|h| h.as_str()).collect::<Vec<_>>().join(", "),
+            waits.iter().cloned().collect::<Vec<_>>().join(", "),
+            holds.iter().cloned().collect::<Vec<_>>().join(", ")
+        ));
+    }
+    for (hook, calls, on_main) in MEASURED_ON_MAIN_THREAD {
+        assert_eq!(calls, on_main, "{hook}: {calls} calls but {on_main} on MainThread: it ran on a worker thread; fix its locks");
+        assert!(*calls > 0, "{hook}: never reached; an unreached hook is not measured");
+        let found = graph.find(hook);
+        assert!(found.iter().any(|&f| graph.funcs[f].attrs.contains("skyline::hook")), "{hook} is not a game hook any more");
+        assert!(used.contains(*hook), "{hook} waits on no shared lock now: delete its MEASURED_ON_MAIN_THREAD row");
+    }
+    for p in &problems {
+        println!("SHARED {p}");
+    }
+    assert!(problems.is_empty(), "locks a game hook waits on that a plugin thread can hold ({}):\n{}", problems.len(), problems.join("\n"));
+}
+
+/// The saved-Mii catalog read is the one plugin-thread job behind the Training-entry freeze (`yoga-i3-final`, primary 2026-11-09
+/// 19:30Z/19:44Z): the writer (`replay-capture-save`) or the fallback reader (`mii-catalog`) reads the files and sends the owned
+/// snapshot back through `model::catalog_reply` (a `try_send`, no lock). The game thread polls it in the roster callback
+/// (`mii_catalog_request::service` -> `poll` -> `apply`) and hands it to the role states; `menu_handoff::service` (game thread
+/// only) opens, closes and retires requests. So the broker and its consumers must stay off plugin threads: these functions take
+/// the locks the game's Mii and Training hooks take (`mii_auto_init::STATE`, `mii_saved_alpha::ALPHA`, the bridge's `STATE`).
+const CATALOG_GAME_SIDE: &[&str] = &[
+    "mii_catalog_request::service",
+    "mii_catalog_request::apply",
+    "mii_catalog_request::abandon_auto",
+    "mii_catalog_request::request",
+    "mii_catalog_request::close_opening",
+    "mii_catalog_request::retire",
+    "mii_catalog_request::retain_editor",
+    "mii_auto_init::deliver",
+    "mii_auto_init::abandon",
+    "mii_auto_init::reset",
+    "mii_auto_init::cancel",
+    "mii_saved_alpha::accept_catalog",
+    "mii_editor_bridge::catalog_read",
+];
+
+#[test]
+fn the_mii_catalog_reply_is_consumed_on_the_game_thread_only() {
+    let graph = runtime_graph();
+    let (ctx, s) = scan(&graph);
+    let shared = shared_locks(&ctx, &s);
+    let mut problems = Vec::new();
+    for key in CATALOG_GAME_SIDE {
+        let found = graph.find(key);
+        assert!(!found.is_empty(), "{key} is gone: update CATALOG_GAME_SIDE");
+        for f in found {
+            if let Some(threads) = shared.plugin_reached.get(&f) {
+                problems.push(format!("{key} is reached from {}", threads.iter().cloned().collect::<Vec<_>>().join(", ")));
+            }
+        }
+    }
+    assert!(problems.is_empty(), "the catalog's game-side consumers run on a plugin thread:\n{}", problems.join("\n"));
+}
+
+/// A bare name a `use` imports from outside the runtime is that item (`runtime_graph`): `lobby_persist::entry_applied` calls the
+/// model's `restore`, so it reaches neither `kirby_hats::restore` nor `character_items::restore`, which the over-approximating graph
+/// (`Graph::scan` as the capability scan uses it) follows.
+#[test]
+fn an_imported_model_function_is_not_a_runtime_call() {
+    let precise = runtime_graph();
+    let loose = Graph::scan(&Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime"), &[]);
+    let reaches = |graph: &Graph, to: &str| {
+        let from = graph.find("lobby_persist::entry_applied");
+        assert_eq!(from.len(), 1);
+        let callees = graph.callees(from[0]);
+        graph.find(to).iter().any(|c| callees.contains(c))
+    };
+    for to in ["kirby_hats::restore", "character_items::restore"] {
+        assert!(reaches(&loose, to), "{to}: the control lost its edge");
+        assert!(!reaches(&precise, to), "{to}: an imported model function resolved to a runtime one");
+    }
+}
+
+/// Two scan blind spots (rc.6, hot-slots hook-thread table 2026-11-09: `allocation_trace` runs on the game's task workers): a call
+/// through a `#[path]` module declared under another name (`character_roster::body_bank::creation` is `native_body_bank.rs`), and
+/// one lock of a static array (`BANKS[role].lock()`). Both are followed now.
+#[test]
+fn a_path_module_call_and_an_indexed_take_are_seen() {
+    assert_eq!(
+        callgraph::path_modules("#[cfg(feature = \"x\")]\n#[path = \"native_body_bank.rs\"]\npub(crate) mod body_bank;\n#[path = \"../mii/a.rs\"] mod a;\n"),
+        [("body_bank".to_owned(), "native_body_bank".to_owned())]
+    );
+    let graph = runtime_graph();
+    let (ctx, s) = scan(&graph);
+    let one = |key: &str| {
+        let found = graph.find(key);
+        assert_eq!(found.len(), 1, "{key}");
+        found[0]
+    };
+    let (hook, creation) = (one("character_lifecycle::allocation_trace"), one("native_body_bank::creation"));
+    assert!(graph.callees(hook).contains(&creation), "allocation_trace -> body_bank::creation not followed");
+    let taken: Vec<String> = s.takes[creation].iter().map(|t| lock_name(&ctx, t.lock)).collect();
+    assert!(taken.iter().any(|l| l.ends_with("native_body_bank.rs::BANKS")), "BANKS[role].lock() not seen: {taken:?}");
+}
+
+/// The class check on a fixture: a hook that waits on a lock a plugin thread holds (blocking, and with a `try_lock`), a hook
+/// that only `try_lock`s one, and a typed static read whose impl differs by thread.
+#[test]
+fn the_shared_lock_check_sees_a_seeded_hazard() {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/lock_order_shared");
+    let graph = Graph::scan(&dir, &[]);
+    let ctx = Ctx::new(&graph, static_locks(&dir));
+    let s = Scan { takes: (0..graph.funcs.len()).map(|f| takes(&ctx, f)).collect(), ..Scan::default() };
+    let shared = shared_locks(&ctx, &s);
+    let name = |l: &usize| ctx.locks[*l].1.clone();
+    let hazards: BTreeSet<String> =
+        shared.game_waits.keys().filter(|l| shared.plugin_holds.contains_key(l)).map(name).collect();
+    assert!(hazards.contains("HELD"), "a blocking take on both sides: {hazards:?}");
+    assert!(hazards.contains("TRIED"), "a plugin try_lock holds it too: {hazards:?}");
+    assert!(!hazards.contains("POLLED"), "a game-side try_lock never waits: {hazards:?}");
+    assert!(hazards.contains("EDITED"), "the game-thread impl of a typed read waits on EDITED, the plugin one holds it: {hazards:?}");
+    assert!(!hazards.contains("PUBLISHING"), "only the plugin impl takes PUBLISHING: {hazards:?}");
+    assert!(hazards.contains("ROLES"), "one lock of a static array, taken by index on both sides: {hazards:?}");
 }
 
 /// The scan on a small fixture: a guard bound by `let` and held over a call, a temporary held over its statement, a

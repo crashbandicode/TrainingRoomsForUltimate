@@ -39,7 +39,7 @@ mod connected_editor_tests {
     #[test]
     fn waiting_catalog_exposes_seed_without_fighter_role_permissions() {
         let mut preferences = Preferences::default();
-        let before = preferences.clone();
+        let before = preferences;
         let mut menu = CatalogMenu::editor_only(catalog(), 9, &preferences).unwrap();
         menu.open_class(MiiClass::Swordfighter);
         for direction in [-4, -1, 1, 4] {
@@ -216,7 +216,7 @@ impl CatalogMenu {
             context,
             editor_only: false,
             editor_available: true,
-            before: preferences.clone(),
+            before: *preferences,
             class: MiiClass::Brawler,
             role: None,
             list_mode: false,
@@ -384,7 +384,7 @@ impl CatalogMenu {
         if let Some(role) = self.role {
             if let Some(row) = self.rows.get(self.cursor).filter(|row| !row.greyed) {
                 // Names and save IDs are never the selection identity.
-                if let Ok(next) = preferences.clone().with(role, self.class, Some(row.canonical)) {
+                if let Ok(next) = (*preferences).with(role, self.class, Some(row.canonical)) {
                     *preferences = next;
                     if self.list_mode {
                         self.set_list_role(role, preferences);

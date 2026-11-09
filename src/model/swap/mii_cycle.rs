@@ -456,7 +456,7 @@ mod tests {
         let preferences = Preferences::default()
             .with(Role::Player, MiiClass::Brawler, Some(id(&catalog, 4200))).unwrap()
             .with(Role::Cpu, MiiClass::Brawler, Some(id(&catalog, 4300))).unwrap();
-        let before = preferences.clone();
+        let before = preferences;
         let original = Identity::Fighter(0);
         let ordered = roster(&[6, 0x48, 8]);
         let player_request = crate::engine::mii::ordinary_player::Request::direct(7, 0x48).unwrap();

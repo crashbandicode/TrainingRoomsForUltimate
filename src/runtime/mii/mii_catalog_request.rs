@@ -127,6 +127,10 @@ pub(super) fn service() {
         retain_editor(snapshot, opening);
     }
     if let Some((verdict, snapshot)) = ready {
+        // Every completed read, whatever its verdict: the editor checks its saved Mii here, on the game thread, never on the
+        // reader thread (the bridge's STATE is taken by game hooks; rc.6 Training-entry freeze class).
+        #[cfg(feature = "mii-editor-alpha")]
+        crate::runtime::mii::mii_editor_bridge::catalog_read(&snapshot);
         apply(verdict, snapshot);
     }
 }

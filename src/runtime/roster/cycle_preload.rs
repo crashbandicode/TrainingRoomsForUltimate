@@ -396,7 +396,7 @@ pub(crate) fn mixed_targets(
     } else {
         crate::engine::swap::cycle_members::cycle_members(menu.cpu_roster, crate::runtime::roster::character_roster::cpu_cycle_admission())
     };
-    let preferences = crate::runtime::compat::menu::mii_preferences_view();
+    let preferences = crate::runtime::compat::menu::mii_preferences();
     let qualify = |step: mii_cycle::Step| match step.target {
         mii_cycle::Target::Fighter(kind) => Some(Target::fighter(kind)),
         mii_cycle::Target::Original => Some(match original {

@@ -17,8 +17,8 @@ pub mod catalog;
 pub mod archive_name;
 #[path = "model/archive_recipe.rs"]
 pub mod archive_recipe;
-#[path = "model/archive_retire.rs"]
-pub mod archive_retire;
+#[path = "model/archive_slots.rs"]
+pub mod archive_slots;
 #[path = "model/build_split.rs"]
 pub mod build_split;
 #[path = "model/cpu/mod.rs"]
@@ -201,6 +201,8 @@ pub mod close_handoff;
 
 #[path = "model/scalar_tls.rs"]
 pub mod scalar_tls;
+#[path = "model/seq_cell.rs"]
+pub mod seq_cell;
 
 #[path = "model/boot_notices.rs"]
 pub mod boot_notices;

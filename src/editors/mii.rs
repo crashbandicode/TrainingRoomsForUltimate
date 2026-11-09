@@ -76,7 +76,7 @@ impl MiiList {
             Button::A => {
                 self.catalog.confirm(&mut self.preferences);
                 // Preferences has a canonical, infallible JSON representation.
-                if let Ok(value) = serde_json::to_value(&self.preferences) {
+                if let Ok(value) = serde_json::to_value(self.preferences) {
                     menu.set_top_extra("mii_preferences", value);
                 }
             }

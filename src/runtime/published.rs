@@ -66,8 +66,9 @@ pub(crate) fn take_rerolls() -> u8 {
 /// Make `snapshot` the live settings. `rerolls` is the menu outbox's re-roll bits (decisions Q18 A,
 /// B11); the first publish at boot has none. Runs where a thread may wait (boot, the menu worker, the diag reload), never in a
 /// hook, and takes no lock a hook takes: hooks get the values through [`Live`], the flags below are atomics.
-/// One publish at a time (boot, the menu worker, the diag reload: never a game thread): the publishing path is the one reader of the
-/// typed menu's edit handoff (`compat::menu`).
+/// One publish at a time (boot, the menu worker, the diag reload: never a game thread). Whoever holds it is the one reader of the typed
+/// menu's edit handoff (`compat::menu`): the publishing path, or `read(&MENU)` on a plugin thread. A publish never reads `MENU` while it
+/// holds this (hos-lock locks are not reentrant).
 pub(crate) static PUBLISHING: hos_lock::Mutex<()> = hos_lock::Mutex::new(());
 
 pub fn publish(snapshot: &Snapshot, rerolls: u8) {

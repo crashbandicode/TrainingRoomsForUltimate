@@ -98,7 +98,7 @@ pub struct Outbox {
     /// The Replay capture toggle changed: write `replay_capture.ini` (Q7).
     pub replay_capture: Option<bool>,
     /// A on a tile of the Give item grid: the item (index of `ITEM_NAMES`) to give Player 1 now. Taken at once with
-    /// `Menu::take_give_item` (the request is made from the game-synchronized tick, not at close).
+    /// `Menu::take_give_item` (the request is made on Player 1's next game frame, not at close).
     pub give_item: Option<u8>,
     /// A, X or Y on a tile of the Lobby Stages grid (tile 0 is All): the stage editor (ditors::stages, which knows the carried
     /// stage catalog) applies it. Taken at once with Menu::take_stage_press.

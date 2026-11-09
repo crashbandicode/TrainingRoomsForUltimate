@@ -1170,7 +1170,39 @@
    "dest": "src/model/mii/selection.rs",
    "crate": "mii",
    "src_sha256": "f20f5a2389b4035988e7d61b8fcf86afa7aafe056e839f54d0903719430a9215",
-   "dest_sha256": "66abd3ec01562e7fc3e6bb8209e98fefdbee5c73fbcc843254895442b9e530ed"
+   "dest_sha256": "717a99edac34f28310dbeb54ef26fe06a37289f51ca939c57d2008ceb34e2fdb",
+   "edits": [
+    {
+     "old": "#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]\n",
+     "new": "#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]\n",
+     "reason": "rc.6 freeze class (primary 2026-11-09 19:44Z; rc6-qpf3, tests/lock_order.rs): compat::menu::KEPT is a hos_lock::Published copy hooks read without waiting; mii::selection::Preferences is Copy (six Option<Canonical>), so its clones are copies and the preload planner copies it instead of holding a read guard"
+    },
+    {
+     "old": "        let prefs = Preferences::default().with(Role::Player, MiiClass::Swordfighter, Some(origin.0)).unwrap();\n        let before = prefs.clone();\n",
+     "new": "        let prefs = Preferences::default().with(Role::Player, MiiClass::Swordfighter, Some(origin.0)).unwrap();\n        let before = prefs;\n",
+     "reason": "rc.6 freeze class (primary 2026-11-09 19:44Z; rc6-qpf3, tests/lock_order.rs): compat::menu::KEPT is a hos_lock::Published copy hooks read without waiting; mii::selection::Preferences is Copy (six Option<Canonical>), so its clones are copies and the preload planner copies it instead of holding a read guard"
+    },
+    {
+     "old": "        let before = prefs.clone();\n",
+     "new": "        let before = prefs;\n",
+     "reason": "rc.6 freeze class (primary 2026-11-09 19:44Z; rc6-qpf3, tests/lock_order.rs): compat::menu::KEPT is a hos_lock::Published copy hooks read without waiting; mii::selection::Preferences is Copy (six Option<Canonical>), so its clones are copies and the preload planner copies it instead of holding a read guard"
+    },
+    {
+     "old": "        let unrelated = before.clone().with(Role::Cpu, MiiClass::Gunner, Some(canonical_of(&snap, 3137))).unwrap();\n",
+     "new": "        let unrelated = before.with(Role::Cpu, MiiClass::Gunner, Some(canonical_of(&snap, 3137))).unwrap();\n",
+     "reason": "rc.6 freeze class (primary 2026-11-09 19:44Z; rc6-qpf3, tests/lock_order.rs): compat::menu::KEPT is a hos_lock::Published copy hooks read without waiting; mii::selection::Preferences is Copy (six Option<Canonical>), so its clones are copies and the preload planner copies it instead of holding a read guard"
+    },
+    {
+     "old": "        let selected = unrelated.clone().with(Role::Cpu, MiiClass::Swordfighter, Some(canonical_of(&snap, 2622))).unwrap();\n",
+     "new": "        let selected = unrelated.with(Role::Cpu, MiiClass::Swordfighter, Some(canonical_of(&snap, 2622))).unwrap();\n",
+     "reason": "rc.6 freeze class (primary 2026-11-09 19:44Z; rc6-qpf3, tests/lock_order.rs): compat::menu::KEPT is a hos_lock::Published copy hooks read without waiting; mii::selection::Preferences is Copy (six Option<Canonical>), so its clones are copies and the preload planner copies it instead of holding a read guard"
+    },
+    {
+     "old": "        let mut bad = serde_json::to_value(&prefs).unwrap();\n",
+     "new": "        let mut bad = serde_json::to_value(prefs).unwrap();\n",
+     "reason": "rc.6 freeze class (primary 2026-11-09 19:44Z; rc6-qpf3, tests/lock_order.rs): compat::menu::KEPT is a hos_lock::Published copy hooks read without waiting; mii::selection::Preferences is Copy (six Option<Canonical>), so its clones are copies and the preload planner copies it instead of holding a read guard"
+    }
+   ]
   },
   {
    "src": "training_mod_mii/src/transition.rs",
@@ -2501,7 +2533,7 @@
    "dest": "src/model/swap/mii_cycle.rs",
    "crate": "consts",
    "src_sha256": "c413a3b1fe5ea1eadc36be20913a55a780bcbac58bf81dded0f0c278d4eb0fe2",
-   "dest_sha256": "eda738c0e0000cf8a4fc125e333cab839beb36660e21b6d65883df77cc62a588",
+   "dest_sha256": "cfeeb1e24d7828c590211f67df0468ffbcea5fbea2f06b6ec76fb3aa45bee980",
    "edits": [
     {
      "old": "    let mut choices = Vec::with_capacity(ordered.len());\n",
@@ -2570,6 +2602,11 @@
      "old": "#[path = \"../../../tests/support/mii_cycle_compact.rs\"]\nmod compact_regressions;",
      "new": "#[path = \"../../../tests/support/mii_cycle_compact.rs\"]\npub(crate) mod compact_regressions;",
      "reason": "Lead22:27 authorizes sharing one host-test System allocator and scoped counter across compact-planner and pkg6 preload regressions; visibility only under existing cfg(test)/host, no product change."
+    },
+    {
+     "old": "        let before = preferences.clone();\n",
+     "new": "        let before = preferences;\n",
+     "reason": "rc.6 freeze class (primary 2026-11-09 19:44Z; rc6-qpf3, tests/lock_order.rs): compat::menu::KEPT is a hos_lock::Published copy hooks read without waiting; mii::selection::Preferences is Copy (six Option<Canonical>), so its clones are copies and the preload planner copies it instead of holding a read guard"
     }
    ]
   },
@@ -4675,7 +4712,7 @@
    "dest": "src/runtime/roster/cycle_preload.rs",
    "crate": "root",
    "src_sha256": "ec95b169b5ec06064bc45222a48e3f7ab72a94db32bf9d3c3b619e87e50caac3",
-   "dest_sha256": "66a48787bf38e7b1dc3253cf0e51e55a19f531b1ac5b52071b75c01371917c51",
+   "dest_sha256": "3eb8f030513e3ef46b2d0c24205dec0e991f9fd1cd2061d983b8e9320be3cc15",
    "edits": [
     {
      "old": "    let roster = if role == 0 {\n        menu.player_roster.fighters()\n    } else {\n        menu.cpu_roster.fighters()\n    };\n    let preferences = crate::runtime::compat::common::menu::mii_preferences();\n",
@@ -4846,6 +4883,11 @@
      "old": "    if ui_blocked || crate::runtime::roster::character_roster::preload_blocked() {\n",
      "new": "    let blocked = if ui_blocked { Some(\"ui\") } else { crate::runtime::roster::character_roster::preload_blocked_reason() };\n    #[cfg(feature = \"diag\")]\n    note_blocked(blocked);\n    if blocked.is_some() {\n",
      "reason": "Merge of p23/rc6-planner-fixes (b3cabf74) into p23/rc6-integration: rc.6 planner fix, primary inbox 2026-11-09 06:16Z (hot rc6-hot-xps26 x6-align): after a CPU switch the two parked F9 seats' members sat swapped and missing() found each on the other entry, so both stayed idle and the notice never settled. A parked seat is judged on its own entry (seat_missing, parked_seat_view); diag-only reason lines ([PreloadBlocked], [CharacterSources] service slot, [PreloadPlan]) and preload_blocked_reason. Host tests a_parked_seat_loads_its_member_even_when_the_other_seat_holds_it, tests/preload_seat_wiring.rs; Eden rc6-bg-pf5."
+    },
+    {
+     "old": "    let preferences = crate::runtime::compat::menu::mii_preferences_view();\n",
+     "new": "    let preferences = crate::runtime::compat::menu::mii_preferences();\n",
+     "reason": "rc.6 freeze class (primary 2026-11-09 19:44Z; rc6-qpf3, tests/lock_order.rs): compat::menu::KEPT is a hos_lock::Published copy hooks read without waiting; mii::selection::Preferences is Copy (six Option<Canonical>), so its clones are copies and the preload planner copies it instead of holding a read guard"
     }
    ]
   },
@@ -6386,7 +6428,7 @@
    "dest": "src/runtime/roster/native_body_bank.rs",
    "crate": "root",
    "src_sha256": "ccf7ac678691fa0101a1eff5dbd9300a1b12fe64e9ebbde515697adfbb841c98",
-   "dest_sha256": "94aef97d37dc80a8dc7e50c365757db95b35f5e3c7aecd79424f286d3d48e5a2",
+   "dest_sha256": "9b2f7c49c8c9ce71e55cd023bb33ef30f1c2ce43a480a9adb53cb42d8952c816",
    "edits": [
     {
      "old": "unsafe fn finalize_entry(entry: *mut u8) -> u64 {\n",
@@ -8583,6 +8625,21 @@
      "old": "        GROUPS_ENABLED.store(true, Ordering::Release);\n    } else {\n",
      "new": "        GROUPS_ENABLED.store(true, Ordering::Release);\n        // Operator option C: the release watch's rows (`res_unload`); without them a free never holds the planner.\n        res_unload::install(base, gate(\"res_unload\", res_unload::SEAMS, false));\n    } else {\n",
      "reason": "rc.6 preload priority, operator option C (inbox 17:57Z) with the primary's purge (19:47Z): the release watch settles when the game has unloaded what a free queued and one jemalloc arena.4096.purge requested after that has run on MainThread (F6, Eden pp-re-trace-1/2), replacing the reverted two-quiet-pass count (589c70eb); res_unload rows group"
+    },
+    {
+     "old": "static BANKS: [Mutex<Option<Bank>>; 2] = [Mutex::new(None), Mutex::new(None)];\n",
+     "new": "static BANKS: [MirroredMutex<Option<Bank>>; 2] = [MirroredMutex::new(0, None), MirroredMutex::new(1, None)];\n\n/// A role's bank behind its lock, plus the ready observation [`cached_kind`] needs, mirrored in [`READY`] whenever a guard drops: the\n/// menu worker's roster re-plan reads that without the lock. The bank's own hooks run on the game's task workers (`allocation_trace`,\n/// hot-slots hook-thread table 2026-11-09), so a plugin thread holding `BANKS` could stall them while the game starves it (rc.6 freeze\n/// class, `tests/lock_order.rs`).\nstruct MirroredMutex<T> {\n    role: usize,\n    lock: Mutex<T>,\n}\n\nimpl<T> MirroredMutex<T> {\n    const fn new(role: usize, value: T) -> Self {\n        Self { role, lock: Mutex::new(value) }\n    }\n}\n\nimpl MirroredMutex<Option<Bank>> {\n    fn lock(&self) -> BankGuard<'_> {\n        BankGuard { role: self.role, guard: self.lock.lock() }\n    }\n}\n\nstruct BankGuard<'a> {\n    role: usize,\n    guard: hos_lock::MutexGuard<'a, Option<Bank>>,\n}\n\nimpl std::ops::Deref for BankGuard<'_> {\n    type Target = Option<Bank>;\n    fn deref(&self) -> &Option<Bank> {\n        &self.guard\n    }\n}\n\nimpl std::ops::DerefMut for BankGuard<'_> {\n    fn deref_mut(&mut self) -> &mut Option<Bank> {\n        &mut self.guard\n    }\n}\n\nimpl Drop for BankGuard<'_> {\n    fn drop(&mut self) {\n        // Still under the bank's lock: the one writer of this role's mirror.\n        READY[self.role].write(&ready_words(&self.guard));\n    }\n}\n\n/// `[ready, entry, owner, kind, physical descriptor (0x70 bytes)]`, all zero unless the bank is Ready, not departed and observed.\nconst READY_WORDS: usize = 4 + 0x70 / 8;\nstatic READY: [crate::model::seq_cell::SeqCell<READY_WORDS>; 2] =\n    [crate::model::seq_cell::SeqCell::new(), crate::model::seq_cell::SeqCell::new()];\n\nfn ready_words(bank: &Option<Bank>) -> [u64; READY_WORDS] {\n    let mut words = [0; READY_WORDS];\n    if let Some(bank) = bank.as_ref().filter(|bank| !bank.departed && bank.phase == Phase::Ready) {\n        if let Some((physical, kind)) = bank.observed {\n            words[..4].copy_from_slice(&[1, bank.entry as u64, u64::from(bank.owner), u64::from(kind)]);\n            for (word, bytes) in words[4..].iter_mut().zip(physical.chunks_exact(8)) {\n                *word = u64::from_le_bytes(bytes.try_into().expect(\"8 bytes\"));\n            }\n        }\n    }\n    words\n}\n",
+     "reason": "rc.6 integration: p23/rc6-qp-respawn-freeze (8d9d8901) merged on p23/rc6-preload-priority (06afa00d) over b04856b2"
+    },
+    {
+     "old": "    let state = BANKS[role(owner)?].lock();\n    let bank = state.as_ref()?;\n    if bank.entry != entry || bank.owner != owner || bank.departed || bank.phase != Phase::Ready {\n",
+     "new": "    // The mirror of the Ready bank (`READY`), never the bank's lock: the menu worker's re-plan reads this. A read that keeps meeting a\n    // write in progress gives up (no cached kind; the caller falls back to the descriptor's own kind).\n    let words = READY[role(owner)?].read(64)?;\n    if words[0] != 1 || words[1] != entry as u64 || words[2] != u64::from(owner) {\n",
+     "reason": "rc.6 integration: p23/rc6-qp-respawn-freeze (8d9d8901) merged on p23/rc6-preload-priority (06afa00d) over b04856b2"
+    },
+    {
+     "old": "    bank.observed\n        .filter(|(physical, _)| crate::engine::mii::identity::verify_descriptor(physical, descriptor,\n            crate::engine::mii::identity::ExpectedMutation::NativeBehavior).is_ok())\n        .map(|(_, kind)| kind)\n",
+     "new": "    let mut physical = [0u8; 0x70];\n    for (bytes, word) in physical.chunks_exact_mut(8).zip(&words[4..]) {\n        bytes.copy_from_slice(&word.to_le_bytes());\n    }\n    crate::engine::mii::identity::verify_descriptor(&physical, descriptor,\n        crate::engine::mii::identity::ExpectedMutation::NativeBehavior).ok().map(|_| words[3] as u32)\n",
+     "reason": "rc.6 integration: p23/rc6-qp-respawn-freeze (8d9d8901) merged on p23/rc6-preload-priority (06afa00d) over b04856b2"
     }
    ]
   },
@@ -9460,7 +9517,7 @@
    "dest": "src/runtime/mii/mii_catalog_request.rs",
    "crate": "root",
    "src_sha256": "87a0062a0ef9cb6c0078409ff3ac876dd35d85d5e40aac6236eaed6f36482602",
-   "dest_sha256": "1f18b830bc14f8d43b9b9175ef7cff3ddf68d07c3905d13063e11e529da4490d",
+   "dest_sha256": "1273eef5190d91899271ce3ebcb915f7fad4e50bf90e68f7991ca49ed9fe6c37",
    "edits": [
     {
      "old": "use std::sync::{mpsc, Arc, Mutex};",
@@ -9623,6 +9680,11 @@
      "old": "    super::menu_handoff::init();",
      "new": "    crate::runtime::mii::menu_handoff::init();",
      "reason": "Catalog request is path-declared under roster, so boot close-handoff initialization uses its canonical runtime::mii module path."
+    },
+    {
+     "old": "    if let Some((verdict, snapshot)) = ready {\n",
+     "new": "    if let Some((verdict, snapshot)) = ready {\n        // Every completed read, whatever its verdict: the editor checks its saved Mii here, on the game thread, never on the\n        // reader thread (the bridge's STATE is taken by game hooks; rc.6 Training-entry freeze class).\n        #[cfg(feature = \"mii-editor-alpha\")]\n        crate::runtime::mii::mii_editor_bridge::catalog_read(&snapshot);\n",
+     "reason": "rc.6 freeze class (primary 2026-11-09 19:44Z; rc6-qpf3, tests/lock_order.rs): the saved-Mii catalog check runs on the game thread when the broker receives the snapshot (mii_catalog_request::service), never on the reader thread, because game hooks take the editor bridge's STATE"
     }
    ]
   },
@@ -12402,7 +12464,7 @@
    "dest": "src/runtime/mii/mii_editor_bridge/mod.rs",
    "crate": "root",
    "src_sha256": "469dd011585d19e4999c25d02c9ea2faa6c9f1c1743686b55adbdadd09ce33ca",
-   "dest_sha256": "069021ed7d5719bcc583ec422fd525a2e60d2b63601fbdec74b777a0e46bc69c",
+   "dest_sha256": "5c24e223d95b2a397e76a1720f7ce20f498690a0f08163c18b09b304f7000c96",
    "edits": [
     {
      "old": "pub(crate) struct Trace {\n    events: Vec<Event>,\n    input_checks: Vec<(&'static str, [native::InputChange; 3])>,\n}",
@@ -12730,6 +12792,11 @@
      "old": "    let mut reused = false;\n    {\n        let mut state = STATE.lock();\n        // Every owned explicit Save starts closed; only a qualified fresh\n        // draft reaches the game's native allocator. Existing IDs cannot enter.\n        native::write(context, 0x168, 2i32);\n        if let Some(s) = state.as_mut().filter(|s| s.phase == Phase::Editing\n            && s.thread == current_thread() && EDIT_CONTEXT.load(Ordering::Acquire) == context\n            && !s.interrupted) {\n            if let Ok((_, configuration)) = parsed {\n                let canonical = configuration.canonical();\n                if let Some(existing) = s.catalog.configs.iter().find(|c| c.canonical == canonical) {\n                    let id = existing.slot_id;\n                    s.explicit_save_finished = true;\n                    s.event(\"native_save_reused\", [u64::from(id), 0, 0, 0]);\n                    reused = true;\n                } else if fresh && s.catalog.is_complete()\n                    && s.catalog.slots_seen < crate::engine::mii::saved::MAX_FILES {\n                    // This is the existing catalog reader's supported ceiling,\n                    // not an assertion about Smash's native maximum.\n                    native::write(context, 0x168, 1i32);\n                    create = Some(canonical);\n                    s.event(\"native_save_requested\", [inventory::fnv1a64(&row), mode, 0, 0]);\n                } else { s.event(\"native_save_guard_refused\", [u64::from(fresh), s.catalog.slots_seen as u64, 0, 0]); }\n            } else { s.event(\"native_save_invalid_draft\", [0; 4]); }\n        }\n    }\n    if reused { ui_resume::discard(); }\n    let result = original!()(context);\n    if let Some(canonical) = create {",
      "new": "    let mut reused = false;\n    let mut notice = None;\n    {\n        let mut state = STATE.lock();\n        // Every owned explicit Save starts closed; only a qualified fresh\n        // draft reaches the game's native allocator. Existing IDs cannot enter.\n        native::write(context, 0x168, 2i32);\n        if let Some(s) = state.as_mut().filter(|s| s.phase == Phase::Editing\n            && s.thread == current_thread() && EDIT_CONTEXT.load(Ordering::Acquire) == context\n            && !s.interrupted) {\n            if let Ok((_, configuration)) = parsed {\n                let canonical = configuration.canonical();\n                if let Some(existing) = s.catalog.configs.iter().find(|c| c.canonical == canonical) {\n                    let id = existing.slot_id;\n                    // Operator decision C (2026-11-08): the reuse stays, and the player is told which saved Mii.\n                    notice = crate::model::notify::save_notice(Some(&existing.name));\n                    s.explicit_save_finished = true;\n                    s.event(\"native_save_reused\", [u64::from(id), 0, 0, 0]);\n                    reused = true;\n                } else if fresh && s.catalog.is_complete()\n                    && s.catalog.slots_seen < crate::engine::mii::saved::MAX_FILES {\n                    // This is the existing catalog reader's supported ceiling,\n                    // not an assertion about Smash's native maximum.\n                    native::write(context, 0x168, 1i32);\n                    create = Some(canonical);\n                    s.event(\"native_save_requested\", [inventory::fnv1a64(&row), mode, 0, 0]);\n                } else { s.event(\"native_save_guard_refused\", [u64::from(fresh), s.catalog.slots_seen as u64, 0, 0]); }\n            } else { s.event(\"native_save_invalid_draft\", [0; 4]); }\n        }\n    }\n    if reused { ui_resume::discard(); }\n    if let Some(body) = notice {\n        crate::runtime::features::notices::post_body(crate::model::notify::SAME_AS_SAVED_HEADER, body,\n            crate::model::notify::SAME_AS_SAVED_FRAMES, crate::model::notify::DEFAULT_COLOR);\n    }\n    let result = original!()(context);\n    if let Some(canonical) = create {",
      "reason": "Operator decision C (#52, 2026-11-08): a Save that matches a saved Mii keeps the reuse rule (docs/MII.md rows 4 and 12: that saved Mii is used, nothing is stored) and is no longer silent: the reuse branch builds \"Same as <saved name>, nothing new saved\" from the matched saved Mii's own name into a fixed notice body (model::notify::save_notice, no allocation) and posts it through the notice mailbox after the session lock is released"
+    },
+    {
+     "old": "/// new native ID and canonical values there, after the writer-idle return gate.\n/// This callback uses owned values only and performs no native memory access.\n",
+     "new": "/// new native ID and canonical values in each completed read, after the writer-idle return gate.\n/// Game thread only: the catalog broker calls this when it receives the owned snapshot\n/// (`mii_catalog_request::service`), never the reader thread, because game hooks take `STATE`\n/// (rc.6 freeze class, `tests/lock_order.rs`). The preset merge does not change `configs`,\n/// `slots_seen` or completeness. Owned values only, no native memory access.\n",
+     "reason": "rc.6 freeze class (primary 2026-11-09 19:44Z; rc6-qpf3, tests/lock_order.rs): the saved-Mii catalog check runs on the game thread when the broker receives the snapshot (mii_catalog_request::service), never on the reader thread, because game hooks take the editor bridge's STATE"
     }
    ]
   },
@@ -13149,7 +13216,7 @@
    "dest": "src/model/mii_root/mii_menu.rs",
    "crate": "tui",
    "src_sha256": "94d7a41fe2ff5d3c4dcaed6ff0e87df4c96d64bd927a99e4550a198784cb761c",
-   "dest_sha256": "44de705fdd76df64cb4078ced1d9911e75e59939d7965c28092449b5597beddd",
+   "dest_sha256": "278956b85d5852d2eb211c0313d2d7252c1b635b792d6ff936296e3e65a8a823",
    "edits": [
     {
      "old": "use {crate::macro_panel, crate::StatefulTable, crate::SubMenu, crate::SubMenuType, crate::engine::compat::grid::NX_SUBMENU_COLUMNS, crate::NX_SUBMENU_ROWS};",
@@ -13260,6 +13327,21 @@
      "old": "if row.selected { \"\u2713 \" } else { \"\" }",
      "new": "if row.selected { \"> \" } else { \"\" }",
      "reason": "rc.5 review (primary 2026-11-05 ~20:10Z): the picked-Mii marker U+2713 is in none of the game's 14 fonts (nintendoP_RodinNTLG B/EB/UB cmaps, read from data.arc), so the menu drew an empty box (docs/media/mii-editor-list.gif); \"> \" as the roster editor, the combo list and the Direct stage mark their pick; tests/ui_glyphs.rs guards every literal"
+    },
+    {
+     "old": "        let before = preferences.clone();\n",
+     "new": "        let before = preferences;\n",
+     "reason": "rc.6 freeze class (primary 2026-11-09 19:44Z; rc6-qpf3, tests/lock_order.rs): compat::menu::KEPT is a hos_lock::Published copy hooks read without waiting; mii::selection::Preferences is Copy (six Option<Canonical>), so its clones are copies and the preload planner copies it instead of holding a read guard"
+    },
+    {
+     "old": "            before: preferences.clone(),\n",
+     "new": "            before: *preferences,\n",
+     "reason": "rc.6 freeze class (primary 2026-11-09 19:44Z; rc6-qpf3, tests/lock_order.rs): compat::menu::KEPT is a hos_lock::Published copy hooks read without waiting; mii::selection::Preferences is Copy (six Option<Canonical>), so its clones are copies and the preload planner copies it instead of holding a read guard"
+    },
+    {
+     "old": "                if let Ok(next) = preferences.clone().with(role, self.class, Some(row.canonical)) {\n",
+     "new": "                if let Ok(next) = (*preferences).with(role, self.class, Some(row.canonical)) {\n",
+     "reason": "rc.6 freeze class (primary 2026-11-09 19:44Z; rc6-qpf3, tests/lock_order.rs): compat::menu::KEPT is a hos_lock::Published copy hooks read without waiting; mii::selection::Preferences is Copy (six Option<Canonical>), so its clones are copies and the preload planner copies it instead of holding a read guard"
     }
    ]
   },

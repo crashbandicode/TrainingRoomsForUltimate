@@ -1680,7 +1680,7 @@
    "dest": "src/runtime/macros/replay_store.rs",
    "crate": "root",
    "src_sha256": "2324718b32e3b8dc6ab512ab723818cd68add8a709953bbb0c03752689966ac6",
-   "dest_sha256": "3dd01e33f744236dce5bd798ab4596442841aee187bf859f03da51177b89fe22",
+   "dest_sha256": "4bd8ed1b4d8b407830443610816e36c4fe1cd95c56d56a8434056baddf192ba2",
    "edits": [
     {
      "old": "std::thread::Builder::new().name(\"replay-capture-save\".into()).stack_size(0x20000)\n        .spawn(move || {",
@@ -1766,6 +1766,16 @@
      "old": "//! The INI is the single startup authority: it seeds the runtime preference once\n//! and is never read while sampling. With the `deluxe-sdk` feature and a Deluxe\n//! host present, the Plugins page changes the in-memory preference at runtime\n//! and the host rewrites the same INI after accepted edits when its layout is\n//! persistence-compatible. Native save success supplies the replay identity;\n//! this module never guesses it from a filename appearing on disk or a\n//! controller button press.\n\n",
      "new": "//! The INI is the single startup authority: it seeds the runtime preference once\n//! and is never read while sampling. With the `deluxe-sdk` feature and a Deluxe\n//! host present, the Plugins page changes the in-memory preference at runtime\n//! (`runtime::deluxe_row`); the plugin's own writer thread rewrites the INI from\n//! that preference (`features::writer`). Native save success supplies the replay identity;\n//! this module never guesses it from a filename appearing on disk or a\n//! controller button press.\n\n",
      "reason": "Integrate approved Deluxe e4432ad into current pkg4 design C: one atomic capture preference and plugin-owned INI writer, SDK row registration; retain current worker ownership, hook retirement and resident live adapter."
+    },
+    {
+     "old": "                        #[cfg(feature = \"mii-editor-alpha\")]\n                        crate::runtime::mii::mii_editor_bridge::catalog_read(&native);\n",
+     "new": "",
+     "reason": "rc.6 freeze class (primary 2026-11-09 19:44Z; rc6-qpf3, tests/lock_order.rs): the saved-Mii catalog check runs on the game thread when the broker receives the snapshot (mii_catalog_request::service), never on the reader thread, because game hooks take the editor bridge's STATE"
+    },
+    {
+     "old": "                    #[cfg(feature = \"mii-editor-alpha\")]\n                    crate::runtime::mii::mii_editor_bridge::catalog_read(&native);\n",
+     "new": "",
+     "reason": "rc.6 freeze class (primary 2026-11-09 19:44Z; rc6-qpf3, tests/lock_order.rs): the saved-Mii catalog check runs on the game thread when the broker receives the snapshot (mii_catalog_request::service), never on the reader thread, because game hooks take the editor bridge's STATE"
     }
    ]
   },

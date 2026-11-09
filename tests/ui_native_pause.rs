@@ -118,7 +118,6 @@ pub mod runtime {
             }
         }
         pub mod texture { pub fn tick() {} }
-        pub mod requests { pub fn run_menu_requests() {} }
         pub mod thumbs {
             pub fn note_frame(_: &crate::model::frame::Frame) {}
             /// # Safety
