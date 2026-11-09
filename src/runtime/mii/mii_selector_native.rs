@@ -55,6 +55,19 @@ pub(crate) struct Snapshot {
     pub(crate) records: [Option<(u16, [u8; values::RECORD_LEN])>; 8],
 }
 impl Snapshot {
+    /// rc.6 item 3 (a Mii group built in the background, `body_bank::start_background`): the bank's Mii setup changed
+    /// selector record `index` from `before` to `after` (its pair) while this owner was idle. The destination, the
+    /// current record and the protected owners' records, when they are that record and still hold `before`, take
+    /// `after`. Returns how many changed.
+    pub(crate) fn adopt_record(&mut self, index: u16, before: &[u8; values::RECORD_LEN], after: &[u8; values::RECORD_LEN]) -> usize {
+        let mut changed = 0;
+        if self.binding.record_index == index && self.record == *before { self.record = *after; changed += 1; }
+        if self.index == index && self.current_record == *before { self.current_record = *after; changed += 1; }
+        for (other, record) in self.records.iter_mut().flatten() {
+            if *other == index && *record == *before { *record = *after; changed += 1; }
+        }
+        changed
+    }
     #[cfg(feature = "mii-managed-helper-alpha")]
     pub(crate) fn helper_hats(&self) -> Option<[u16; 2]> {
         let hat = |id: usize| self.protected[id].map(|p| u16::from_le_bytes([p.e[4], p.e[5]]));

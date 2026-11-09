@@ -896,6 +896,14 @@ approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to this o
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
+ceiling = 152832
+date = "2026-11-08"
+reason = "rc.6 item 3, Mii groups built in the background (p23/rc6-hot-slots d5584dc; operator 2026-11-08 20:26Z All groups in rc.6, SPECIAL-GROUPS 1): the tick's identity bracket and native setup (mii_setup::prepare_mii_background), the shadow R and 16 worker hooks, each window's Mii set (take/put/release_mii_r), and the exit from a Mii to any Built group (baseline_words, Bank::ordinary_identity; inbox 21:27Z); measured 152832 (tools/size_gate.py), +637 over 152195"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to this operator-chosen rc.6 item under TASK-OPUS-rc6-hot-slots (primary c07b3449, 2026-11-08: a raise goes in its own commit with approved_by)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
 ceiling = 155878
 date = "2026-11-09"
 reason = "rc.6 integration (p23/rc6-integration df71299): TASK-OPUS-rc6-open-fixes item 1, option 1 over 3faecd3 (155774): a live F9 seat keeps its Mii by reading B's identity (parked_entries::mii_record_identity, MiiProof::holds, helper_kind's live flag) and the diag-only note of a live seat's differing descriptor and record offsets (note_live_bytes, ByteRanges); measured 155878 (tools/size_gate.py), +104"
@@ -964,3 +972,11 @@ ceiling = 157175
 date = "2026-11-09"
 reason = "rc.6 integration (p23/rc6-integration 196b0686): the merge 0c53391d of p23/rc6-x4 (44c9dfa, 156556: +120 over 62e7c85's 156436, the X4 root fix lifting the interim's two cells) and the merge 196b0686 of p23/rc6-bg-pt b37efd8 (152783: +218 over 152565, the Pokemon Trainer object kind before its rebuild) into 041e924b (156837); measured 157175 on the merged tree (tools/size_gate.py), +338"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); combined ceiling = measured merged size per primary c07b3449, INBOX-opus-rc6-integration 2026-11-08 19:13Z"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 153299
+date = "2026-11-09"
+reason = "rc.6 item 3, groups that left the cycle freed under the pause (operator decision 2026-11-08 23:42Z, INBOX-opus-rc6-hotslots; p23/rc6-hot-slots-mii): body_bank::leaves_at_pause/kept_members/waiting_for_pause/window_targets, native_body_bank pause_opening and the second plan without the parked groups, the pause hook call, the live pad-controller restore (restore_live_pads), the Mii adapters adopting a background record change (adopt_background_record, Snapshot::adopt_record), the identity and configuration moves and the slow-step diagnostics; measured 153299 (tools/size_gate.py), +467 over 152832"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to this operator-chosen rc.6 item under TASK-OPUS-rc6-hot-slots (primary c07b3449, 2026-11-08: a raise goes in its own commit with approved_by)"
