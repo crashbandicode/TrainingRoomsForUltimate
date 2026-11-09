@@ -19,6 +19,10 @@ pub mod install_capacity;
 mod preload_allocation_tests;
 
 #[cfg(test)]
+#[path = "../tests/common/res_unload_host.rs"]
+mod res_unload_host;
+
+#[cfg(test)]
 #[path = "model/lobby_flag_tests.rs"]
 mod lobby_flag_tests;
 

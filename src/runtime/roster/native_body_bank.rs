@@ -174,7 +174,7 @@ use crate::engine::swap::body_bank::{
     SpecialPolicy, BANK_FLAG, MAX_EXTRA_GROUPS, NANA, NATIVE_MEMBERS, PAIR_ACTIVE_FLAG, POOL_RESERVE, POPO,
     entry_bytes_of, mii_exit_bytes_match, mii_reuse_bytes_match, MiiEntryBytes, MiiIdentity, MII_ENTRY_START, RESOURCE_WORDS,
     baseline_words, identity_move, IdentityMove, leaves_at_pause, count_group_members, kept_members,
-    release_for_new_members, capacity_release, leaves_now, ReleaseWatch, arriving_room,
+    release_for_new_members, capacity_release, leaves_now, ReleaseWatch, arriving_room, room_coming, still_short,
     next_window_targets, own_words, shadow_values, LiveIdentity, speculative_step_admitted, serving_step, Serving,
 };
 use crate::engine::swap::body_bank::memory::{self, Admission};
@@ -193,6 +193,7 @@ use crate::engine::swap::swap_model::ledger::{native_window_requests_fixed as na
 use crate::engine::swap::swap_model::occupancy::{KindOccupancy, Occupancy, Rules};
 use crate::runtime::roster::body_graph::{self as graph, DESTROY_BODY, DISPATCHER_DESTROY, HEAP_FREE, SPECIAL_OBJECT_RELEASE};
 use crate::runtime::roster::r_handle;
+use crate::runtime::roster::res_unload;
 use crate::runtime::roster::special_articles as articles;
 use crate::engine::swap::swap_model::special_articles::{attachable, prepare_due, RetireStage};
 use crate::runtime::roster::build_split as split;
@@ -878,15 +879,21 @@ fn plan_groups(settings: &crate::engine::preload::cycle_preload_config::Settings
     menu: &crate::engine::compat::menu::TrainingModpackMenu,
     lanes: &[[Option<crate::runtime::roster::cycle_preload::Target>; crate::runtime::roster::cycle_preload::MAX_TARGETS]; 4],
     originals: [Option<u32>; 2], targets: &mut [u8; 2]) -> usize {
-    // Operator rule 2026-11-09 16:06Z: each pass samples the committed charge for a free whose room is still arriving.
+    // Operator rule 2026-11-09 16:06Z and option C (17:57Z, primary 19:47Z): a free's room is arriving until the game has
+    // unloaded what the frees queued (`res_unload`, read each pass) and then a purge requested after that has run on
+    // MainThread (`purge_on_main_thread`); the pass that sees it settles.
+    let unloading = res_unload::waiting();
     let (before, after) = {
         let mut watch = RELEASE_WATCH.lock();
         let before = *watch;
-        *watch = watch.pass(MemorySample::capture().committed.get());
+        *watch = watch.pass(unloading.map(|(u, _)| u.waiting()), res_unload::purges(), res_unload::base().is_some());
         (before, *watch)
     };
+    if let Some(ticket) = after.requested() { res_unload::request_purge(ticket); }
     if before != after {
-        trace!("[GroupSwap] released room {:?} -> {:?}", before, after);
+        if let Some((_, generation)) = unloading.filter(|_| after.settled()) { res_unload::settled(generation); }
+        trace!("[GroupSwap] released room {:?} -> {:?} unloading={:?} committed={:?}", before, after,
+            unloading.map(|(u, _)| u), MemorySample::capture().committed.get());
     }
     let capacity = POOL_CAPACITY.load(Ordering::Acquire) as usize;
     let live = POOL_LIVE.load(Ordering::Acquire) as usize;
@@ -1029,7 +1036,28 @@ fn plan_groups(settings: &crate::engine::preload::cycle_preload_config::Settings
         }
         targets[role] = targets[role].saturating_add(release.members[role]);
     }
+    // Operator rule 2026-11-09 17:13Z: once the watch settles, the planner decides a held group's capacity release in
+    // this pass, before `cycle_preload::on_frame` publishes the notice, so a release in progress shows "Loading".
+    if after.settled() {
+        for role in 0..2 {
+            let held = BANKS[role].lock().as_ref().filter(|bank| bank.phase == Phase::Ready && !bank.departed)
+                .and_then(|bank| bank.groups.iter().enumerate().find(|(_, g)| matches!(g.state, GroupState::Held(_)))
+                    .map(|(group, g)| (bank.owner, group, *g.members, g.state)));
+            let Some((owner, group, members, state)) = held else { continue; };
+            let refused = state == GroupState::Held(Hold::Memory) && matches!(
+                super::process_memory::admit(memory::group_cost(&members.kinds()[..members.count()])).0.admission,
+                Admission::Refuse);
+            if let Some(reason) = still_short(state, refused, pool_free, members.count()) {
+                release_for_capacity(owner, group, reason);
+            }
+        }
+    }
     bodies
+}
+
+/// Whether a parked group of `role` is marked to go now (a release in progress, `room_coming`).
+fn releasing(role: usize) -> bool {
+    BANKS[role].lock().as_ref().is_some_and(|bank| !bank.departed && bank.groups.iter().any(|g| g.leaving && g.release_now))
 }
 
 /// The members of `group` the notice and the planner count: a group that left the cycle (parked until the pause, or a
@@ -1055,8 +1083,10 @@ pub(crate) fn progress() -> crate::engine::preload::cycle_preload_policy::BuiltF
     // Read roster metadata before BANKS; never acquire a roster lock inside it.
     let originals = [excluded_original(&settings, &menu, 0), excluded_original(&settings, &menu, 1)];
     let wanted = [cycle_wanted(&menu, 0), cycle_wanted(&menu, 1)];
-    // Operator rule 2026-11-09 16:06Z: while a free's room is arriving, a prefetch held for memory is loading.
-    let arriving = !RELEASE_WATCH.lock().settled();
+    // Operator rule 2026-11-09 16:06Z and 17:13Z: a prefetch held for memory is loading while a free's room is arriving
+    // or a release decided for it is in progress; "waiting for memory" means nothing more can be freed.
+    let settled = RELEASE_WATCH.lock().settled();
+    let coming = room_coming(settled, (0..2).any(releasing));
     for (role, state) in BANKS.iter().enumerate() {
         let planned = PLANNED_TARGETS[role].load(Ordering::Acquire);
         let releasing = RELEASE_MEMBERS[role].load(Ordering::Acquire);
@@ -1071,7 +1101,7 @@ pub(crate) fn progress() -> crate::engine::preload::cycle_preload_policy::BuiltF
                 // it still serves warm (rc6-hot-xps18), and the new members a parked group freed now makes room for
                 // show as loading (operator rule 2026-11-09 13:21Z).
                 let groups = count_group_members(bank.groups.iter().map(|g| (shown_members(g, &wanted[role]),
-                    crate::engine::swap::body_bank::shown_state(arriving_room(g.state, arriving), background_owed(bank, g, Some(active))))))
+                    crate::engine::swap::body_bank::shown_state(arriving_room(g.state, coming), background_owed(bank, g, Some(active))))))
                     .with_release(releasing);
                 let window = if bank.failed { WindowStatus::Failed }
                     else if bank.phase == Phase::Ready && bank.observed.is_some() { WindowStatus::Built }
@@ -2502,6 +2532,8 @@ enum Action { None, Swap, Lifecycle, Construct, SyncCopies, Background }
 /// Called before all normal roster/source/HUD work, never instead of that work.
 /// INSTALL completion remains owned by the original roster/Mii transaction.
 pub(super) unsafe fn service(entry: *mut u8, owner: u32) {
+    // Operator option C (primary 19:47Z): the release watch's purge runs here, at the top of this hook, under no lock.
+    if let Some(ticket) = res_unload::owed_purge() { purge_on_main_thread(ticket); }
     let Some(role) = role(owner) else { return; };
     let observed = snapshot(entry);
     split::tick_any(role, owner, now_us(), &observed);
@@ -2527,6 +2559,41 @@ pub(super) unsafe fn service(entry: *mut u8, owner: u32) {
         Action::Background => { settle_background(entry, owner, role); "background settle" }
     };
     slow_step(owner, step, started);
+}
+
+/// Logged once: the service hook ran on a thread other than MainThread while a purge was owed (it waits for one that is).
+static PURGE_OFF_MAIN: AtomicBool = AtomicBool::new(false);
+
+/// Operator option C, the primary's 19:47Z conditions: the release watch's purge, `mallctl("arena.4096.purge", 0, 0, 0,
+/// 0)` (`main+0x392ec40`; F6), runs only here, on the game's MainThread, and never on a plugin thread: a purge holds
+/// jemalloc's arena and decay locks, which the game's workers take to allocate, and a plugin thread pinned to core 0
+/// holding them while MainThread busy-joins is the deadlock class (`rc6-qpf3`, `lock_order.rs`). The caller holds no
+/// lock. The line records the thread, the time the call took (the frame it lands in pays it) and the charge it returned.
+unsafe fn purge_on_main_thread(ticket: u32) {
+    let Some(base) = res_unload::base() else { return; };
+    // SAFETY: the calling thread's own object and its name (a static C string the SDK keeps); nothing is written.
+    let name = skyline::nn::os::GetThreadNamePointer(skyline::nn::os::GetCurrentThread());
+    let main = !name.is_null() && core::ffi::CStr::from_ptr(name as *const core::ffi::c_char).to_bytes() == b"MainThread";
+    if !main || crate::runtime::threads::on_plugin_thread() {
+        if !PURGE_OFF_MAIN.swap(true, Ordering::AcqRel) {
+            trace!("[GroupSwap] purge waits: the service hook ran off MainThread (plugin={})", crate::runtime::threads::on_plugin_thread());
+        }
+        return;
+    }
+    debug_assert!(!crate::runtime::threads::on_plugin_thread(), "the purge never runs on a plugin thread");
+    type Mallctl = unsafe extern "C" fn(*const u8, *mut u8, *mut usize, *mut u8, usize) -> i32;
+    // SAFETY: rows `res_unload.mallctl*`, `purge_ctl`, `arena_decay` guard jemalloc's `mallctl` and its
+    // `arena.<i>.purge` handler; the name is a static C string and nothing is read or written back.
+    let mallctl: Mallctl = core::mem::transmute(base + crate::engine::swap::res_unload::MALLCTL);
+    let before = MemorySample::capture();
+    let started = now_us();
+    let rc = mallctl(crate::engine::swap::res_unload::PURGE_ALL.as_ptr(), core::ptr::null_mut(), core::ptr::null_mut(),
+        core::ptr::null_mut(), 0);
+    let us = now_us().saturating_sub(started);
+    let after = MemorySample::capture();
+    res_unload::purged(ticket);
+    trace!("[GroupSwap] purge ticket={} rc={} thread=MainThread us={} committed={:?}->{:?} headroom={:?}->{:?}",
+        ticket, rc, us, before.committed.get(), after.committed.get(), before.headroom(), after.headroom());
 }
 
 unsafe fn service_locked(entry: *mut u8, owner: u32, role: usize) -> Action {
@@ -5644,7 +5711,7 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
                     owner, group, &members.kinds()[..members.count()], now_us().saturating_sub(started), before.headroom(),
                     after.headroom(), before.committed.get(), after.committed.get(), !still,
                     if still { "; the pause frees it" } else { "" });
-                if !still { let mut watch = RELEASE_WATCH.lock(); *watch = watch.freed(after.committed.get()); }
+                if !still { let mut watch = RELEASE_WATCH.lock(); *watch = watch.freed(); }
             }
         },
         Step::Release(group, members, window, alias) => {
@@ -6161,7 +6228,7 @@ pub(super) unsafe fn pause_opening() {
             trace!("[GroupSwap] pause frees owner={} group={} kinds={:x?} us={} headroom={:?}->{:?} committed={:?}->{:?} freed={}",
                 owner, group, &members.kinds()[..members.count()], us, before.headroom(), after.headroom(),
                 before.committed.get(), after.committed.get(), !still);
-            if !still { let mut watch = RELEASE_WATCH.lock(); *watch = watch.freed(after.committed.get()); }
+            if !still { let mut watch = RELEASE_WATCH.lock(); *watch = watch.freed(); }
             if still { break; }
         }
     }
@@ -6304,6 +6371,13 @@ unsafe fn leave_group(entry: *const u8, owner: u32, role: usize, group: usize) {
         fields::read::<u64>(alias, 0x18).map_or(-1i64, |m| m as i64), pool_counts(base),
         execute_ended.saturating_sub(execute_started), &step_us[..marks.len()], now_us().saturating_sub(leave_started));
     r_handle::reconcile(ledger_role(role), "left the cycle");
+    // Operator option C (F6): what this free left queued for the game's unload; the release watch waits for it, then
+    // for a purge (`res_unload`). A Built group's bodies released their own handles above.
+    let scan_started = now_us();
+    if let Some((directories, files, complete)) = res_unload::capture() {
+        trace!("[GroupSwap] release queued owner={} group={} directories={} files={} complete={} scan_us={}",
+            owner, group, directories, files, complete, now_us().saturating_sub(scan_started));
+    }
 }
 
 /// Every mod-initiated Reload of a visible entry calls this first (§6.5 iii):
@@ -6359,6 +6433,7 @@ pub(super) fn scene_changed() {
     for value in &PLANNED_TARGETS { value.store(0, Ordering::Release); }
     for value in &RELEASE_MEMBERS { value.store(0, Ordering::Release); }
     *RELEASE_WATCH.lock() = ReleaseWatch::Settled;
+    res_unload::clear();
     // P-HOT B (§12): a start-up window the new scene's own configure published before this callback saw the scene
     // change belongs to the new scene; everything else departs as before.
     let now = crate::runtime::lobby::game_mode::current().map(|m| (m.mode, u32::from(m.melee)));
@@ -6925,6 +7000,8 @@ pub(super) unsafe fn install(base: usize) {
         // The `[GroupSwap] enabled` line follows the startup cycle-preload load
         // (`report_group_swap`), so it shows the switches this boot applies.
         GROUPS_ENABLED.store(true, Ordering::Release);
+        // Operator option C: the release watch's rows (`res_unload`); without them a free never holds the planner.
+        res_unload::install(base, gate("res_unload", res_unload::SEAMS, false));
     } else {
         trace!("[GroupSwap] disabled by fingerprint; window bank active");
     }
