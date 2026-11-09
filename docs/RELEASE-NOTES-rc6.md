@@ -101,6 +101,10 @@ Raising No. of CPUs from 1 to 3 brings in the CPU cycle's next two fighters as C
 raise. A Mii in those seats is the exact saved Mii, outfit and hat included. After a raise and a drop the Mii classes
 stay in both cycles and load.
 
+The two seats count in the Fighters notice. A seat that waits for memory shows as "… waiting for memory" there, and
+it loads once memory is free (in Eden, "Loaded 1/5 · swap both to load 3 more (1 waiting for memory)", then
+"Loaded 2/5 …").
+
 ### Mii editor: "Same as ‹name›, nothing new saved"
 
 A Save in the Mii editor that matches a Mii you already saved still saves nothing new and uses that Mii, as before.
