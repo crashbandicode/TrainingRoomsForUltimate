@@ -1179,6 +1179,30 @@ mod tests {
         assert_eq!(faults.first(), Some(&Fault::Spin { role: 0, hazard: G68Hazard::MirrorReleaseUnderLiveCopy }), "without the key return the mirror release still poisons: {:?}", faults);
     }
 
+    /// Primary 2026-11-09 05:38Z (D-KIRBY1 stays for fighter keys): the K1 hazard is per kind. `0x17e8610(R, k)` drops
+    /// R's G68 mirror for `(k, costume)`, which a live copy of `k` shares. A Kirby copy takes a fighter kind (of a
+    /// Pokémon too, `0x24..=0x26`), never the trainer's object kind `0x72`, so a PT group's object key held and released
+    /// under a live copy leaves the copy's record whole; the copied fighter kind's own key does not.
+    #[test]
+    fn the_trainer_object_key_released_under_a_live_kirby_copy_leaves_the_registry_whole() {
+        let table = kind_table();
+        for copy in [0x24u32, 0x25, 0x26, 0x00, 0x07] {
+            let mut g68 = G68::default();
+            let mut r = RModel::default();
+            r.acquire(PT_OBJECT_KIND, &table);
+            r.flags4c = 4;
+            r.mirror.insert((copy, r.header[4]));
+            r.release_kind(PT_OBJECT_KIND, Some(copy), &mut g68);
+            assert_eq!(g68.poisoned, None, "object key under a copy of {copy:#x}");
+            let mut r = RModel::default();
+            r.acquire(copy, &table);
+            r.flags4c = 4;
+            r.mirror.insert((copy, r.header[4]));
+            r.release_kind(copy, Some(copy), &mut g68);
+            assert_eq!(g68.poisoned, Some(G68Hazard::MirrorReleaseUnderLiveCopy), "the copied kind {copy:#x}");
+        }
+    }
+
     #[test]
     fn d_pta1c_old_policy_leaves_the_pad_route_dangling_through_the_reload() {
         let faults = run("d-pta1c-pad-route", &OldPolicy);

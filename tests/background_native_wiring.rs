@@ -230,6 +230,28 @@ fn a_retired_trainer_group_takes_its_object_kind_again_and_returns_it_after_the_
     assert!(service.contains("else if bank.object_fetch.is_some() || rearm_candidate(BASE.load(Ordering::Acquire), bank).is_some() { Action::Lifecycle }"), "{service}");
 }
 
+/// Primary 2026-11-09 05:38Z: under a live Kirby the D-KIRBY1 branch still hands back every Prefetched group's keys
+/// first and defers every Planned group (fighter keys), but a detached PT group's object re-arm
+/// (`body_bank::object_rearm_admitted`) runs there, as the same `Step::Rearm` with its ledger call unchanged (the
+/// occupancy names the live copy; the token is the group's `Holder::Prefetch`).
+#[test]
+fn a_trainer_object_rearm_runs_under_a_live_kirby_through_the_same_ledger_path() {
+    let lifecycle = body(BANK, "unsafe fn group_lifecycle(");
+    ordered(lifecycle, &["} else if let Err(reason) = crate::engine::swap::body_bank::prefetch_admitted(live) {",
+        "match bank.groups.iter().position(|g| g.state == GroupState::Prefetched) {",
+        "Some(group) => Step::Release(group, *bank.groups[group].members, window, alias),",
+        "None => match kirby_rearm(base, bank, live) {", "Some(group) => Step::Rearm(group, *bank.groups[group].members, alias),",
+        "prefetch deferred owner={} group={} kinds={:x?} reason={} (D-KIRBY1)",
+        "} else if let Some(group) = rearm_candidate(base, bank) {", "Step::Rearm(group, *bank.groups[group].members, bank.alias)",
+        "Step::Rearm(group, members, alias) => {",
+        "let copy = ready_members(entry, owner).and_then(|window| live_kirby_copy_kind(entry, owner, window));",
+        "let occupancy = occupancy_snapshot(role, copy);",
+        "r_handle::acquire(base, lrole, group, kind, Holder::Prefetch(GroupId(group as u8)), member_recipe(members, kind), &occupancy)"]);
+    let gate = body(BANK, "unsafe fn kirby_rearm(");
+    ordered(gate, &["let group = rearm_candidate(base, bank)?;", "bank.groups[group].members.object_kind()",
+        "crate::engine::swap::body_bank::object_rearm_admitted(live, kind)"]);
+}
+
 /// The gate: the X5 site's words, the trainer functor through its relocated vtable slot, its callback and the guard
 /// functions, all or nothing, after the background build's own gate.
 #[test]

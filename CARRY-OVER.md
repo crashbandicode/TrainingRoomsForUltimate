@@ -1719,3 +1719,23 @@ group does there. A diag line at the tick names the live window and its `R+0x50`
 
 **Tests:** `body_bank::a_mii_group_builds_beside_a_live_native_or_pair_window` (failed first); the native test's Mii row
 follows.
+
+### p23/rc6-kirby-rearm: a detached PT group's object re-arm runs under a live Kirby (2026-11-09)
+
+Inbox `INBOX-opus-rc6-bg-ic.md` 05:38Z (moved from the hot-slots lane; its report's 05:20Z "The live Kirby column").
+- **Before:** `group_lifecycle` checked the D-KIRBY1 gate (`prefetch_admitted`) before `rearm_candidate`. So a detached
+  PT group whose pool retired at its detach never took `0x72` again while the role's live member was Kirby.
+  `group_reachable` needs it (`object_ready`), so PT > … > Kirby > PT took the Reload path.
+- **The rule** (`body_bank::object_rearm_admitted`, in `swap_model::capabilities`): D-KIRBY1 covers the keys a Kirby
+  copy can share on R, and a copy registers a fighter kind. The bank's object kinds (`PT_OBJECT_KIND`,
+  `AEGIS_OBJECT_KIND`) are not fighter kinds, so their re-arm is admitted under a live Kirby. Any other kind waits as a
+  prefetch does: D-KIRBY1 is unchanged for every fighter key.
+- **The runtime** (`native_body_bank`): in the D-KIRBY1 branch, after the Prefetched groups' key returns and before the
+  Planned groups' deferral, `kirby_rearm` (`rearm_candidate` + `object_rearm_admitted`) yields the same `Step::Rearm`.
+  Its ledger call is unchanged: `r_handle::acquire` with `Holder::Prefetch` and the occupancy that names the live copy
+  kind.
+- **Tests:**
+  - Failed first: `body_bank::a_trainer_object_rearm_is_admitted_under_a_live_kirby_and_a_fighter_prefetch_is_not` and
+    `tests/background_native_wiring.rs::a_trainer_object_rearm_runs_under_a_live_kirby_through_the_same_ledger_path`.
+  - `native_model::the_trainer_object_key_released_under_a_live_kirby_copy_leaves_the_registry_whole` pins the
+    per-kind K1 hazard the rule rests on.
