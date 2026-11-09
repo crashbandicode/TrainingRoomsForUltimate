@@ -1212,3 +1212,11 @@ ceiling = 160047
 date = "2026-11-09"
 reason = "rc.6 p23/rc6-menu-freeze (e66e6443) over integration e39479df: the menu-close freeze work. It carries cov-rest's diag stall watchdog (d45d8d2, 8e50b22, 31b5df2, cherry-picked) with its held-lock table behind hang-trace, the worker and game-thread step markers, and the named-macro keyboard lock-order fix; measured 160047 (tools/size_gate.py), +368 over 159679 (e39479df)"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to the rc.6 defect the primary ordered (INBOX-opus-rc6-bg-ic 2026-11-09 12:28Z: the menu-close freeze; a raise goes in its own commit with approved_by)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 160448
+date = "2026-11-09"
+reason = "rc.6 integration bdf509d3: p23/rc6-qp-pilot (+4), p23/rc6-qp-items (+22), p23/rc6-lobby-persist (+375) and p23/rc6-menu-freeze (+368) merged on e39479df (159679); each branch raised its own ceiling with approved_by (159683, 159701, 160054, 160047; the earlier combined 159705); measured on the merge 160448 (tools/size_gate.py), +401 over 160047"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the combined ceiling of the rc.6 product fixes and the operator feature ordered by the primary (2026-11-09 11:20Z, 12:28Z, 12:48Z, 12:53Z), each already raised with approved_by in its own branch; a raise goes in its own commit with approved_by"
