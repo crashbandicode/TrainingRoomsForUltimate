@@ -223,6 +223,32 @@ fn no_hook_path_of_the_fallback_allocates_or_opens_a_file() {
     assert!(PILOT.contains("use hos_lock::Mutex;") && !PILOT.contains("std::sync::Mutex"), "no lazily boxed std mutex in a hook");
 }
 
+/// Primary 2026-11-09 12:48Z (B's `rc6-bg-qp4` M5: `admission … scope lan_online_1v1 … "fim_mask":0,
+/// "gate":"fim_slot_not_unique"`, P1 stood still): the fallback's online 1v1 admission needs the local slot in its FIM mask,
+/// and only `cpu_pilot::input` sets it. The input stage returned before that call on every poll the delay does not act on
+/// (`input_delay::applies` is P1's poll in a Training scene only), so in an online match the mask stayed 0. The stage reaches
+/// the fallback on every poll that has a record: P1's Training poll after the delay (its pad goes in after the delay), and
+/// every other poll (any slot, any scene) before the stage returns.
+#[test]
+fn the_fallback_sees_every_mapped_poll() {
+    let stage = body(include_str!("../src/runtime/features/input_delay.rs"), "fn apply(");
+    let call = "crate::runtime::p1::input(slot as i32, out";
+    assert_eq!(stage.matches(call).count(), 2, "the delayed poll's call and the other polls' call:\n{stage}");
+    let gate = stage.find("if !input_delay::applies(slot as i32, scene::is_training()) {").expect("the delay's own gate");
+    let branch = &stage[gate..gate + stage[gate..].find("        return;\n    }").expect("the branch's return")];
+    assert!(branch.contains(call), "a poll the delay does not act on still reaches the fallback:\n{branch}");
+    assert!(!stage.contains("|| !input_delay::applies("), "no return before the fallback on a poll that has a record");
+    // The fallback itself decides per scene and slot; nothing in between filters the slot or the scene.
+    // `p1::input` is that file's last function (no newline after its brace, so `body` cannot cut it): its text is matched whole.
+    let p1 = include_str!("../src/runtime/p1/mod.rs");
+    assert!(
+        p1.contains("pub(crate) unsafe fn input(slot: i32, out: *mut MappedInputs) {\n    if cpu_pilot::installed() {\n        cpu_pilot::input(slot, out.cast());\n    }\n}"),
+        "p1::input passes every poll to the fallback"
+    );
+    let input = body(PILOT, "pub(crate) unsafe fn input(");
+    assert!(input.contains("FIM_MASK.fetch_or(1usize << player_idx, Ordering::AcqRel);"), "{input}");
+}
+
 #[test]
 fn the_file_work_runs_on_the_heartbeat() {
     // request.json is read and planned only by the heartbeat's `read_request`; the hook asks at its old cadence and takes it.

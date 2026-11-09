@@ -1172,3 +1172,11 @@ ceiling = 159679
 date = "2026-11-09"
 reason = "rc.6 p23/rc6-hat-holdback (7c19e19) over integration 646a5f0d: a parked F9 seat holding its own seat member is filled for the hat creation hold-back (hat_slots::creation_filled, character_sources::creation_intent) and its host and wiring tests; measured 159679 (tools/size_gate.py), +15 over 159664 (646a5f0d)"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to the rc.6 final pass's product fix ordered by the primary (RC6-HOLD-ORDER.md addendum 09:47Z; a raise goes in its own commit with approved_by)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 159683
+date = "2026-11-09"
+reason = "rc.6 p23/rc6-qp-pilot (c563c219) over integration e39479df: every mapped poll reaches the CPU-as-P1 fallback, so it arms in an online match (features::input_delay::apply); measured 159683 (tools/size_gate.py), +4 over 159679 (e39479df)"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to the rc.6 product fix ordered by the primary 2026-11-09 12:48Z (operator: the cpu pilot should still work in an online match; a raise goes in its own commit with approved_by, primary c07b3449)"
