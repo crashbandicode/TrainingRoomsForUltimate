@@ -8,6 +8,7 @@ pub(crate) mod automation_helper;
 pub(crate) mod game_mode;
 #[cfg(feature = "practice-stage")]
 pub(crate) mod lobby_items;
+pub(crate) mod lobby_persist;
 pub(crate) mod lobby_stage;
 #[cfg(feature = "practice-stage")]
 pub(crate) mod practice_stage;
@@ -35,6 +36,8 @@ pub(crate) fn init() {
     // Lobby Items (N11) compares the observer's item-gate rows too; its own hook site is nobody else's.
     #[cfg(feature = "practice-stage")]
     lobby_items::init();
+    // The waiting room's practice panel: saved Training partners and behavior (rc.6). Its sites are nobody else's.
+    lobby_persist::init();
     lobby_stage::init();
 }
 

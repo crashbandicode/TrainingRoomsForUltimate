@@ -81,12 +81,16 @@ pub fn remember(settings: Settings) {
     *SETTINGS.lock() = Some(settings);
 }
 
-/// The text the writer thread stores. When `mark_intro` is set, the intro flag is recorded first.
-pub fn settings_json_for_write(mark_intro: bool) -> Option<String> {
+/// The text the writer thread stores. When `mark_intro` is set, the intro flag is recorded first; a `pair` is the waiting
+/// room's saved Training partners and behavior (`lobby_persist`), recorded the same way.
+pub fn settings_json_for_write(mark_intro: bool, pair: Option<crate::model::lobby_persist::Saved>) -> Option<String> {
     let mut guard = SETTINGS.lock();
     let settings = guard.as_mut()?;
     if mark_intro {
         settings.mark_intro_seen();
+    }
+    if let Some(saved) = pair {
+        settings.set_lobby_practice_panel(saved);
     }
     Some(settings.to_json())
 }

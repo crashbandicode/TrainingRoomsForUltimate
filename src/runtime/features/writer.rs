@@ -114,12 +114,14 @@ fn run() {
         }
         let due = SETTINGS_DUE.swap(false, Ordering::AcqRel);
         let intro = notices::intro_store_due();
-        if due || intro {
-            match crate::runtime::ui::worker::settings_json_for_write(intro) {
+        let pair = crate::runtime::lobby::lobby_persist::store_due();
+        if due || intro || pair.is_some() {
+            match crate::runtime::ui::worker::settings_json_for_write(intro, pair) {
                 Some(json) => {
                     if intro {
                         notices::clear_intro_store();
                     }
+                    crate::runtime::lobby::lobby_persist::clear_store(pair);
                     write_settings(&json);
                 }
                 None => {

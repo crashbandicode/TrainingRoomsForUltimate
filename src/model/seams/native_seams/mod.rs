@@ -26,6 +26,8 @@ pub mod rows_identity;
 pub mod rows_q15;
 /// Phase 2 N11: Lobby Items' spawner switch hook and the instructions it relies on (`src/runtime/lobby/lobby_items.rs`).
 pub mod rows_lobby_items;
+/// rc.6: the waiting room's practice panel, saved Training partners and behavior (`src/runtime/lobby/lobby_persist.rs`).
+pub mod rows_lobby_persist;
 /// The installer's outcome-slot bits and its late report (`[TrainingSeams] late …`, R-A0b).
 pub mod report;
 /// The hook-sharing drill's setting and sites (the diagnostic build's stand-ins).
@@ -188,9 +190,9 @@ impl Site {
 
 /// Every row file, in table order: the one list a new row file joins (`COUNT`, `SITES`, and the host
 /// tests' `all()` read it).
-const TABLES: [&[Seam]; 8] = [
+const TABLES: [&[Seam]; 9] = [
     rows_a1::ROWS, rows_a2::ROWS, rows_a3::ROWS, rows_a4::ROWS, rows_a5::ROWS, rows_identity::ROWS, rows_q15::ROWS,
-    rows_lobby_items::ROWS,
+    rows_lobby_items::ROWS, rows_lobby_persist::ROWS,
 ];
 
 const fn total(tables: &[&[Seam]]) -> usize {
