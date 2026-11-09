@@ -168,7 +168,8 @@ use crate::engine::swap::body_bank::{
     count_extra_groups_iter, dispatcher_array_header_ok, dispatcher_idle_words, native_group_request, original_bankable,
     pair_request, pair_resource_references, plan_extra_groups_with, prefetch_outcome,
     swap_commit_index_in, async_build_eligible, construction_task, TickGap,
-    background_build_eligible, next_background, BACKGROUND_INFO_SPANS, trainer_task, HolderStep,
+    background_build_eligible, next_background, BACKGROUND_INFO_SPANS, trainer_task, HolderStep, object_rearm_due, object_ready,
+    PT_OBJECT_KIND,
     GroupBudget, GroupExchange, GroupOwner, GroupPolicy, GroupState, Hold, Members, Phase, Special,
     SpecialPolicy, BANK_FLAG, MAX_EXTRA_GROUPS, NANA, NATIVE_MEMBERS, PAIR_ACTIVE_FLAG, POOL_RESERVE, POPO,
     entry_bytes_of, mii_exit_bytes_match, mii_reuse_bytes_match, MiiEntryBytes, MiiIdentity, MII_ENTRY_START, RESOURCE_WORDS,
@@ -1293,9 +1294,49 @@ fn member_recipe(members: Members, kind: u32) -> ReleaseRecipe {
 /// prefetch is in flight for this role.
 fn group_reachable(owner: u32, kind: u32, forms: Forms) -> bool {
     let Some(role) = role(owner) else { return false; };
+    let base = BASE.load(Ordering::Acquire);
     BANKS[role].lock().as_ref().is_some_and(|bank|
-        bank.swap.is_none() && bank.prefetch.is_none() && !bank.departed
-            && bank.groups.iter().any(|g| g.state.reachable() && group_serves(*g.members, kind, forms).is_some()))
+        bank.swap.is_none() && bank.prefetch.is_none() && bank.object_fetch.is_none() && !bank.departed
+            && bank.groups.iter().any(|g| g.state.reachable() && group_serves(*g.members, kind, forms).is_some()
+                // Inbox 00:18Z: a PT group whose attach rebuilds its articles holds its object kind first; without it
+                // (a drain, a refused re-acquire) the request takes the Reload path rather than read unloaded files.
+                // SAFETY: `detached_pool` reads the group's own saved holder, proven by `valid_special_object`.
+                && object_ready(*g.members, unsafe { detached_pool(base, owner, g) }, g.object_held)))
+}
+
+/// The article count of a detached group's saved holder (`holder+0x10`); `u64::MAX` when it keeps none to rebuild.
+unsafe fn detached_pool(base: usize, owner: u32, g: &Group) -> u64 {
+    g.saved.map(|w| w.records[0]).filter(|holder| *holder != 0 && valid_special_object(base, *holder, owner))
+        .and_then(|holder| fields::read::<u64>(holder, 0x10)).unwrap_or(u64::MAX)
+}
+
+/// The detached Pokémon Trainer group that must take its object kind again before its next attach
+/// (`body_bank::object_rearm_due`): none while a prefetch, a construction, a background build or another
+/// re-acquisition is in flight.
+unsafe fn rearm_candidate(base: usize, bank: &Bank) -> Option<usize> {
+    if bank.prefetch.is_some() || bank.construction.is_some() || bank.background.is_some() || bank.object_fetch.is_some() {
+        return None;
+    }
+    let owner = bank.owner;
+    bank.groups.iter().position(|g| !g.object_refused && !g.leaving
+        && object_rearm_due(g.state, *g.members, detached_pool(base, owner, g), g.object_held))
+}
+
+/// Inbox 00:18Z: the object kind a detached Pokémon Trainer group took again (`group_lifecycle`) goes back once its
+/// attach rebuilt the article pool, or at a drain, so no object token outlives the detached time (IC-PAIR-STALL). The
+/// slot keeps the flag across the exchange (the group that attached left it). No bank lock is held across the release.
+unsafe fn return_object_key(base: usize, role: usize, owner: u32, group: usize, why: &str) {
+    let kind = PT_OBJECT_KIND;
+    {
+        let mut state = BANKS[role].lock();
+        let Some(g) = state.as_mut().and_then(|bank| bank.groups.get_mut(group)) else { return; };
+        let held = std::mem::replace(&mut g.object_held, false);
+        if !held { return; }
+    }
+    let alias = BANKS[role].lock().as_ref().map_or(0, |bank| bank.alias);
+    let receipt = r_handle::release(base, ledger_role(role), Some(group), Some(&[kind][..]), &Occupancy::default(), why);
+    trace!("[GroupSwap] keys returned owner={} group={} object_kind={:#x} released={} kept={} map={} reason={}",
+        owner, group, kind, receipt.released, receipt.kept.len(), fields::read::<u64>(alias, 0x18).map_or(-1, |m| m as i64), why);
 }
 
 /// The entry bytes a warm exit from this role's live Mii group writes back for `kind`: the reachable group `switch`
@@ -1407,6 +1448,11 @@ struct GroupData {
     /// rc.6 mid-session cycle change: a member left the role's cycle (`body_bank::group_left_cycle`); the entry tick
     /// releases the group (`leave_group`) and it becomes Released.
     leaving: bool,
+    /// Inbox 00:18Z: this slot's Pokémon Trainer group holds its object kind `0x72` again (re-acquired while detached,
+    /// returned right after its attach's rebuild, `return_object_key`).
+    object_held: bool,
+    /// Its re-acquisition was refused by the ledger (logged once; not retried; the group then takes the Reload path).
+    object_refused: bool,
 }
 
 impl GroupData {
@@ -1416,7 +1462,7 @@ impl GroupData {
             bodies: [Body::default(); NATIVE_MEMBERS], since_us: 0, busy_logged: false, kirby_logged: false,
             memory_logged: false, prefetch_committed: None,
             identity, configuration, charinfo_published: false, publish: PublishAttempts::new(), background_refused: false,
-            leaving: false }
+            leaving: false, object_held: false, object_refused: false }
     }
 }
 
@@ -1526,6 +1572,9 @@ struct Bank {
     /// P-HOT B (§12): a window published by the scene's own configure (H1) carries the Training mode it was made in
     /// (`(mode, melee)`); that scene's own `scene_changed` leaves it, its ledger and its copy holdings alone.
     scene: Option<(u32, u32)>,
+    /// Inbox 00:18Z: the object kind a detached Pokémon Trainer group takes again before its rebuild
+    /// (`body_bank::object_rearm_due`), in flight: group, INSTALL token, start time.
+    object_fetch: Option<(usize, super::InstallToken, u64)>,
 }
 
 fn role(owner: u32) -> Option<usize> {
@@ -1710,6 +1759,7 @@ pub(super) unsafe fn build(entry: *const u8, owner: u32, members: Members) -> bo
         groups: storage.groups, alias: 0, exchange: None, swap: None, prefetch: None, swap_started: None,
         pair_logged: false, identity: None, activated: Default::default(),
         construction: None, background: None, tick: TickGap::default(), held_turn: 0, scene: None,
+        object_fetch: None,
     });
     EXTRAS[role].store((members.count() - 1) as u8, Ordering::Release);
     GROUP_BODIES[role].store(0, Ordering::Release);
@@ -1775,6 +1825,7 @@ unsafe fn publish_pending(owner: u32, members: Members, scene: Option<(u32, u32)
         groups: storage.groups, alias: 0, exchange: None, swap: None, prefetch: None, swap_started: None,
         pair_logged: false, identity: None, activated: Default::default(),
         construction: None, background: None, tick: TickGap::default(), held_turn: 0, scene,
+        object_fetch: None,
     });
     EXTRAS[role].store((members.count() - 1) as u8, Ordering::Release);
     GROUP_BODIES[role].store(0, Ordering::Release);
@@ -1884,6 +1935,30 @@ pub(super) unsafe fn switch(entry: *mut u8, owner: u32, kind: u32, forms: Forms)
                     owner, group, &g.members.kinds()[..g.members.count()], released, kept, why,
                     fields::read::<u64>(alias, 0x18).unwrap_or(0));
             }
+        }
+    }
+    // Inbox 00:18Z: a detached PT group's re-acquired object kind goes back at the same drain (IC-PAIR-STALL: no object
+    // token in a pair build's reset batch; D-KIRBY1: none under a live Kirby). Its next attach then takes the Reload path
+    // unless it takes the kind again first (`group_reachable`).
+    let held = {
+        let state = BANKS[role].lock();
+        state.as_ref().map(|bank| {
+            let target = bank.groups.iter().position(|g| g.state.reachable() && group_serves(*g.members, kind, forms).is_some());
+            let kirby = !capabilities(form_class(kind, forms)).prefetch_while_live;
+            let pair = target.is_some_and(|g| bank.groups[g].state == GroupState::Prefetched
+                && pair_resource_references(*bank.groups[g].members).is_some());
+            let why = if kirby { "Kirby target (drain before live)" } else { "pair build needs an exclusive reset batch" };
+            let mut held = FixedList::<usize, MAX_EXTRA_GROUPS>::new(0);
+            for (i, g) in bank.groups.iter().enumerate() {
+                if (kirby || pair) && g.object_held && Some(i) != target { held.push(i); }
+            }
+            (held, why)
+        })
+    };
+    if let Some((held, why)) = held {
+        let base = BASE.load(Ordering::Acquire);
+        for group in held.iter().copied() {
+            return_object_key(base, role, owner, group, why);
         }
     }
     let mut state = BANKS[role].lock();
@@ -2076,6 +2151,7 @@ unsafe fn service_locked(entry: *mut u8, owner: u32, role: usize) -> Action {
             return if !idle { Action::None }
                 // rc.6 item 3: a background build in flight settles on the window's ticks; one owed starts.
                 else if bank.background.is_some() { Action::Background }
+                else if bank.object_fetch.is_some() || rearm_candidate(BASE.load(Ordering::Acquire), bank).is_some() { Action::Lifecycle }
                 else if bank.prefetch.is_some() || bank.groups.iter().any(|g| g.state.startable() || g.leaving)
                     || background_candidate(bank, Some(members.kinds()[usize::from(index)])).is_some() {
                     Action::Lifecycle
@@ -2586,6 +2662,8 @@ unsafe fn exchange_articles(base: usize, role: usize, entry: usize, owner: u32, 
     }
     if activates && matches!(prepared, Prepared::Warm { .. }) {
         articles::rebuild_current(base, owner, entry, current_holder_valid(base, entry, owner), "warm attach");
+        // Inbox 00:18Z: the rebuild read the trainer article's files through the re-acquired object kind; it goes back.
+        return_object_key(base, role, owner, group, "warm attach rebuilt its articles");
     }
 }
 
@@ -4261,13 +4339,18 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
     // RCA §3). A live Kirby defers Planned groups and hands Prefetched groups'
     // keys back; Built groups consumed their keys at construction.
     enum Step { Poll(usize, super::InstallToken, u64, Members, usize), Start(usize, Members, usize),
-        Release(usize, Members, Members, usize), Background(usize), Leave(usize), Idle }
+        Release(usize, Members, Members, usize), Background(usize), Leave(usize), Idle,
+        Rearm(usize, Members, usize), RearmPoll(usize, super::InstallToken, u64, u32, usize) }
     let step = {
         let mut state = BANKS[role].lock();
         let Some(bank) = state.as_mut().filter(|bank| bank.entry == entry as usize && bank.phase == Phase::Ready
             && !bank.departed && bank.swap.is_none()) else { return; };
         let live = bank.members.ready_live(snapshot(entry)).map(|(_, kind)| kind);
-        if let Some((group, token, since)) = bank.prefetch {
+        // Inbox 00:18Z: a PT group's object re-acquisition in flight.
+        if let Some((group, token, since)) = bank.object_fetch {
+            let kind = bank.groups[group].members.object_kind().unwrap_or(PT_OBJECT_KIND);
+            Step::RearmPoll(group, token, since, kind, bank.alias)
+        } else if let Some((group, token, since)) = bank.prefetch {
             Step::Poll(group, token, since, *bank.groups[group].members, bank.alias)
         } else if let Err(reason) = crate::engine::swap::body_bank::prefetch_admitted(live) {
             let (window, alias) = (*bank.members, bank.alias);
@@ -4288,6 +4371,10 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
         // A group held for memory or pool space is started again, after every group not yet tried
         // (a held group never blocks one the admission has not seen): the admission below decides on
         // the capacity of this tick.
+        // Inbox 00:18Z: a detached PT group with a retired pool takes its object kind again before anything new starts
+        // (right after its detach, so it is resident by its next attach).
+        } else if let Some(group) = rearm_candidate(base, bank) {
+            Step::Rearm(group, *bank.groups[group].members, bank.alias)
         // rc.6 mid-session cycle change: a group whose member left the cycle is released before anything new starts.
         } else if let Some(group) = bank.groups.iter().position(|g| g.leaving && g.state != GroupState::Prefetching) {
             Step::Leave(group)
@@ -4307,6 +4394,53 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
     };
     match step {
         Step::Idle => {}
+        Step::Rearm(group, members, alias) => {
+            // As a prefetch starts (`Step::Start`): this R, idle, Training; INSTALL held until it settles, so a press
+            // meanwhile waits for it (`character_roster`'s pending request) instead of rebuilding without the files.
+            let Some(kind) = members.object_kind() else { return; };
+            if !groups_enabled(&settings) || super::INSTALL.active() { return; }
+            let Some(r) = resource(base, owner).filter(|r| *r == alias && alias != 0) else { return; };
+            if !resource_ready(r) { return; }
+            if !crate::runtime::roster::scope_gate::admitted("native_body_bank::group_prefetch") { return; }
+            let Some(token) = super::INSTALL.try_begin(false) else { return; };
+            let lrole = ledger_role(role);
+            r_handle::bind(lrole, owner, r, crate::runtime::roster::observe::owner_flags(r));
+            let copy = ready_members(entry, owner).and_then(|window| live_kirby_copy_kind(entry, owner, window));
+            let occupancy = occupancy_snapshot(role, copy);
+            if let Err(why) = r_handle::acquire(base, lrole, group, kind, Holder::Prefetch(GroupId(group as u8)), member_recipe(members, kind), &occupancy) {
+                super::finish_install(token, "object kind re-acquire refused");
+                if let Some(g) = BANKS[role].lock().as_mut().and_then(|bank| bank.groups.get_mut(group)) { g.object_refused = true; }
+                trace!("[GroupSwap] object kind NOT re-acquired owner={} group={} kind={:#x} reason={:?}; its next attach takes the Reload path",
+                    owner, group, kind, why);
+                return;
+            }
+            let mut state = BANKS[role].lock();
+            let Some(bank) = state.as_mut() else { super::finish_install(token, "object kind re-acquire: bank gone"); return; };
+            bank.object_fetch = Some((group, token, now));
+            trace!("[GroupSwap] object kind re-acquire owner={} group={} kind={:#x} R={:#x} map={} task_pending={}; the group's next attach rebuilds its trainer articles",
+                owner, group, kind, r, fields::read::<u64>(r, 0x18).unwrap_or(0), task_pending(r));
+        }
+        Step::RearmPoll(group, token, since, kind, alias) => {
+            let r = resource(base, owner).filter(|r| *r == alias);
+            let ready = r.is_some_and(|r| resource_ready(r));
+            let outcome = prefetch_outcome(ready, now.saturating_sub(since), PREFETCH_TIMEOUT_US);
+            if outcome == GroupState::Prefetching { return; }
+            if outcome == GroupState::Failed && r.is_some() {
+                let occupancy = occupancy_snapshot(role, None);
+                release_group_keys(base, role, Some(group), Some(&[kind]), &occupancy, owner, "object kind re-acquire timed out");
+            }
+            let mut state = BANKS[role].lock();
+            let Some(bank) = state.as_mut() else { return; };
+            bank.object_fetch = None;
+            if let Some(g) = bank.groups.get_mut(group) {
+                g.object_held = outcome == GroupState::Prefetched;
+                g.object_refused |= outcome == GroupState::Failed;
+            }
+            let released = super::finish_install(token, "object kind re-acquired");
+            trace!("[GroupSwap] object kind re-acquired owner={} group={} kind={:#x} ok={} us={} map={} INSTALL_released={}",
+                owner, group, kind, outcome == GroupState::Prefetched, now.saturating_sub(since),
+                fields::read::<u64>(alias, 0x18).unwrap_or(0), released);
+        }
         Step::Background(group) => start_background(entry, owner, role, group),
         Step::Leave(group) => if !super::INSTALL.active() { leave_group(entry, owner, role, group) },
         Step::Release(group, members, window, alias) => {
@@ -4577,6 +4711,9 @@ unsafe fn retire_groups(entry: *const u8, owner: u32, reason: &str) {
         let Some(bank) = state.as_mut().filter(|bank| bank.entry == entry as usize && bank.owner == owner) else { return; };
         if bank.groups.is_empty() && bank.prefetch.is_none() { return; }
         let token = bank.prefetch.take().map(|p| p.1);
+        // Inbox 00:18Z: an object re-acquisition in flight ends here; its token goes with every other below.
+        let rearm = bank.object_fetch.take().map(|f| f.1);
+        if let Some(token) = rearm { super::finish_install(token, "object re-acquire retired"); }
         let (alias, groups, activated) = (bank.alias, bank.groups.len(), bank.activated);
         let mut bundles = FixedList::<DetachedSnapshot, MAX_EXTRA_GROUPS>::new(DetachedSnapshot::new(owner));
         // A Mii group's keys are released with its identity in `R` (the release selector
@@ -4608,6 +4745,9 @@ unsafe fn retire_groups(entry: *const u8, owner: u32, reason: &str) {
                         detached.records = Some(RecordsRef { records: saved.records,
                             valid: group.members.carries_records() && valid_special_object(base, saved.records[0], owner) });
                     }
+                    // Inbox 00:18Z: a re-acquired object kind is a held key: the plan's key step returns it (rc6-bg-pt4:
+                    // left on R, the next Reload's state 7 refused on `R+0x18 == 2`).
+                    if group.object_held { detached.held_kinds.push(PT_OBJECT_KIND); }
                 }
                 (state, _) if state.holds_keys() => {
                     let (kinds, count) = group.members.prefetch_kinds();
@@ -4752,6 +4892,8 @@ unsafe fn leave_group(entry: *const u8, owner: u32, role: usize, group: usize) {
                     detached.records = Some(RecordsRef { records: saved.records,
                         valid: g.members.carries_records() && valid_special_object(base, saved.records[0], owner) });
                 }
+                // Inbox 00:18Z: its re-acquired object kind goes with it (the plan's key step).
+                if g.object_held { detached.held_kinds.push(PT_OBJECT_KIND); }
             }
             (state, _) if state.holds_keys() => {
                 let (kinds, count) = g.members.prefetch_kinds();
@@ -4815,6 +4957,8 @@ unsafe fn leave_group(entry: *const u8, owner: u32, role: usize, group: usize) {
             if let Some(g) = bank.groups.get_mut(group) {
                 g.state = GroupState::Released;
                 g.leaving = false;
+                // Its re-acquired object kind went with the group's other tokens above.
+                g.object_held = false;
                 g.saved = None;
                 g.bodies = [Body::default(); NATIVE_MEMBERS];
             }

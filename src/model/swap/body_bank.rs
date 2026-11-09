@@ -822,6 +822,21 @@ pub fn next_background(groups: impl Iterator<Item = (GroupState, Members, bool)>
         && background_build_eligible(*members, *identity, window, window_identity, live_kirby).is_ok()).map(|(i, _)| i)
 }
 
+/// Inbox 00:18Z (a console-crash class, at the base too): a Pokémon Trainer group's article pool is retired at its detach
+/// (`swap_model::special_articles`) and rebuilt at its next warm attach (`0x3a6270`), and the trainer article reads its
+/// file through the object kind `0x72` (`0x355fea0(…, 0x372, …)`; Eden rc6-bg-pt-base1: Unmapped Read8 @ 0 at
+/// main+0x35609c0), which the bank returned after the build. A Built PT group whose pool (`pool` articles in its saved
+/// holder) was retired takes the kind again while it is detached, unless it holds it already (`held`).
+pub fn object_rearm_due(state: GroupState, members: Members, pool: u64, held: bool) -> bool {
+    state == GroupState::Built && members.holder_step() == Some(HolderStep::Trainer) && pool == 0 && !held
+}
+
+/// [`object_rearm_due`]'s other half: such a group is reachable warm only while it holds its object kind (its attach
+/// rebuilds the pool); a filled pool, an Aegis holder (never retired) and every other group need nothing.
+pub fn object_ready(members: Members, pool: u64, held: bool) -> bool {
+    members.holder_step() != Some(HolderStep::Trainer) || pool > 0 || held
+}
+
 /// How the notice counts a group: a Prefetched group a background build still owes (`owed`) is pending work, as a
 /// prefetch in flight is, so the notice reads "Loading x/y" until it is built; every other state is shown as it is.
 pub fn shown_state(state: GroupState, owed: bool) -> GroupState {
@@ -1700,6 +1715,29 @@ mod tests {
             trainer_task::BUILD, trainer_task::OBJECT_SIZE], [0xa0, 0, 8, 0x90, 0x91, 0x92, 1]);
         // It keeps the construction task's handle, pending count, queue id and functor offsets.
         const { assert!(construction_task::CANCEL < trainer_task::COSTUME && construction_task::SIZE <= trainer_task::COSTUME) };
+    }
+
+    /// Inbox 00:18Z (a console-crash class, at the base too): a later warm attach of a Pokémon Trainer group rebuilds its
+    /// article pool (`special_articles::rebuild_current`, `0x3a6270`), and the trainer article reads its file through the
+    /// object kind `0x72`, which the bank returned after the build (Eden rc6-bg-pt-base1: Unmapped Read8 @ 0 at
+    /// main+0x35609c0 on 2 of 2 rebuilds). A detached PT group whose pool was retired takes the kind again, and it is
+    /// reachable warm only while it holds it; nothing else needs it.
+    #[test]
+    fn a_retired_trainer_group_takes_its_object_kind_again_before_its_rebuild() {
+        let pt = Members::native_group(0x24).unwrap();
+        let aegis = Members::native_group(0x5a).unwrap();
+        let ordinary = Members::new(&[0x2d, 0x2c]).unwrap();
+        assert!(object_rearm_due(GroupState::Built, pt, 0, false));
+        assert!(!object_rearm_due(GroupState::Built, pt, 1, false), "a filled pool (the first attach) needs nothing");
+        assert!(!object_rearm_due(GroupState::Built, pt, 0, true), "already held");
+        for state in [GroupState::Planned, GroupState::Prefetching, GroupState::Prefetched, GroupState::Failed, GroupState::Released] {
+            assert!(!object_rearm_due(state, pt, 0, false), "{state:?}");
+        }
+        assert!(!object_rearm_due(GroupState::Built, aegis, 0, false), "an Aegis holder is never retired");
+        assert!(!object_rearm_due(GroupState::Built, ordinary, 0, false));
+        assert!(!object_ready(pt, 0, false), "its attach would rebuild without the files");
+        assert!(object_ready(pt, 0, true) && object_ready(pt, 1, false));
+        assert!(object_ready(aegis, 0, false) && object_ready(ordinary, 0, false));
     }
 
     /// Phase B′: an ordinary group without a Mii identity and a Mii group (operator decision
