@@ -944,3 +944,9 @@ Worker B of the special-group split (`artifacts/phase23/TASK-OPUS-rc6-bg-special
   `a_background_build_takes_native_groups_and_builds_beside_a_live_native_window`; `tests/background_native_wiring.rs`
   (3); `tests/background_build_wiring.rs` pins follow `made.records` and `holder_ok`. Recorded manifest edits of the
   three carried files; `carry_pkg6.py carry/ledger/verify` re-derives all 250 files.
+- Eden (Yoga, diag `75750a11`; rows `artifacts/phase23/rc6-eden/rows-bg-pt/`; evidence `rc6-eden/bg-pt-evidence/`):
+  `rc6-bg-pt2` and `rc6-bg-pt3`. Every native group built in the background with its holder settled and the live
+  records 0; first switches: CPU into PT and Pyra 49–51 ms, P1 into PT 64–92 ms and into Pyra 87–115 ms (the base
+  `182a785` built them at the switch: 1158 ms and 939 ms, `rc6-bg-pt-base1`). Unmapped 0 when no PT group attaches a
+  second time. Open: every later PT attach's article rebuild (`special_articles::rebuild_current`) logs Unmapped
+  Read8 @ 0 at `main+0x35609c0`, at the base too (`rc6-bg-pt-base1`, 2 of 2).
