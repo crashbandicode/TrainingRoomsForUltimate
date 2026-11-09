@@ -876,3 +876,11 @@ ceiling = 155878
 date = "2026-11-09"
 reason = "rc.6 integration (p23/rc6-integration df71299): TASK-OPUS-rc6-open-fixes item 1, option 1 over 3faecd3 (155774): a live F9 seat keeps its Mii by reading B's identity (parked_entries::mii_record_identity, MiiProof::holds, helper_kind's live flag) and the diag-only note of a live seat's differing descriptor and record offsets (note_live_bytes, ByteRanges); measured 155878 (tools/size_gate.py), +104"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied under TASK-OPUS-rc6-open-fixes (primary c07b3449, INBOX-opus-rc6-integration 2026-11-09 00:09Z/00:23Z); a raise goes in its own commit with approved_by"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 156248
+date = "2026-11-09"
+reason = "rc.6 integration (p23/rc6-integration 33da5a6): the merge of p23/rc6-bg-pt (6d497e5, 152565: +370 over 152195, the PT and Pyra/Mythra background builds) into 4ad39e5 (155878); measured 156248 on the merged tree (tools/size_gate.py), +370"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); combined ceiling = measured merged size per primary c07b3449, INBOX-opus-rc6-integration 2026-11-08 19:13Z"
