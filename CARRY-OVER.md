@@ -1159,3 +1159,28 @@ Operator decision "All groups in rc.6" and the start-on-the-kind rule (`docs/DEC
 - Recorded manifest edits of `rows_a1.rs`, `body_bank.rs` and `native_body_bank.rs`; `carry_pkg6.py
   carry/ledger/verify` re-derives all 250 files.
 - Eden: `artifacts/phase23/LANE-OPUS-RC6-BG-IC-REPORT.md`.
+### p23/rc6-open-fixes: a seat held for memory counts in the readiness notice (2026-11-08, F9-SEAT-NOTICE)
+
+**Primary 23:03Z, reading A** (cov-rest's question of 16:25Z; `docs/DECISIONS.md` F9-SEAT-NOTICE on
+`review/menu-proposal`). When process memory refuses a parked seat, the seat is held and retried, but the readiness
+notice counted only the plan's targets and the bank's groups, so the hold showed only in a diag line. The two seats
+now count in the existing fighter status, with no new text: a held seat reads "… waiting for memory".
+- `parked_entries::seat_state` (model) and `hat_slots::with_seats` (engine, not carried: the by-path test crates that
+  include `model.rs` have no `crate::engine`): each parked seat is one more planned fighter, counted ready, pending, or
+  held with `Hold::Memory`. Nothing is added while the status itself is hidden, or for a live seat.
+- `f9_gate::note_seat_memory` and `seat_held`: the kind the last speculative load on entry 2 or 3 was refused for,
+  cleared when a load on it is admitted and at `reset`.
+- `character_sources::service` notes each seat admission before the refusal returns; `character_sources::seat_states`
+  (new) reads each seat's target as `purpose_view` does (an armed Reload, else the parked member) against the entry's
+  Ready source. `cycle_preload::poll_status` applies `with_seats` to the fighter status.
+
+3 recorded manifest edits: `character_sources.rs` (`seat_states`, the note in `service`) and `cycle_preload.rs`
+(`poll_status`); `carry_pkg6.py carry/ledger/verify` re-derives all 250 files. Tests (failed first: no `with_seats`;
+the runtime named neither `with_seats` nor `note_seat_memory`): `hat_slots`
+`a_seat_held_for_memory_counts_in_the_fighter_status`, `tests/seat_notice_wiring.rs` (2).
+
+**Its Eden row's instrument (diag build only).** A row cannot count on the console running out of memory, so the diag
+build's `process_memory::admit` takes `DIAG_RESERVE` bytes (written through `diag-memory-reserve.req`, read by the
+states diag thread) from the headroom of every discretionary admission; 0, the default, changes nothing, and the release
+build has neither. One recorded manifest edit (`process_memory.rs`). `f9_gate::note_seat_memory` logs each change of a
+seat's hold (`[F9Seat] memory slot=N held=… kind=…`).

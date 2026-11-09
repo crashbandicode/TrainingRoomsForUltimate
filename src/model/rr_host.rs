@@ -11,7 +11,7 @@ use super::library::{
     StartSaveState, Use, MACROS_DIR, SAVES_DIR, SEQUENCES_DIR,
 };
 use super::frame_queue::FrameQueue;
-use super::macros::{FrameSnapshot, FrameWindow, InputFrame, Library, MacroRecording, Placement, MAX_FRAMES};
+use super::macros::{FrameSnapshot, FrameWindow, InputFrame, Library, MacroRecording, MomentumMode, Placement, MAX_FRAMES};
 use super::playback::{Book, Playback, StartLink};
 use super::rr_runtime::{
     chord_notice, civil_date, crop_combo_file, crop_macro_file, delete_save,
@@ -69,6 +69,13 @@ static CPU_ROLE_ON: AtomicBool = AtomicBool::new(false);
 /// does: a frame fed before the restore is undone by it. A CPU-role file begins on its first
 /// press, so its opening action was always lost (Eden `rc5-opus-cpu2`, 2026-11-08).
 static WARP_HOLD: AtomicBool = AtomicBool::new(false);
+/// Both fighters at the last record chord that started a recording (`note_record_start`). Values only: the game thread
+/// writes it, the worker takes it when the recording stops.
+static RECORD_START: hos_lock::Mutex<Option<RecordStart>> = hos_lock::Mutex::new(None);
+/// Per role (Player, CPU): the start speed a Play's warp owes the run's first input (`take_start_speed`).
+static START_SPEED: hos_lock::Mutex<[Option<StartSpeed>; 2]> = hos_lock::Mutex::new([None; 2]);
+/// The roles with a `START_SPEED` entry, so the per-frame check takes no lock while nothing is owed.
+static START_OWED: AtomicU8 = AtomicU8::new(0);
 /// First locked from the AI epilogue (`cpu_role_after_chord`), before any worker touches it.
 /// Switch `std::sync::Mutex` allocates a OnceBox on that first lock, and the hook counter charges
 /// the one allocation to `recorder_ai` (`runtime::roster::build_split`, `docs/provenance/pkg6-owner-locks.md`).
@@ -332,6 +339,91 @@ pub fn warp_landed() {
     WARP_HOLD.store(false, Ordering::Release);
 }
 
+/// One fighter at a record chord: the live values the start save keeps (`StartPose::saved`).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct StartPose {
+    pub fighter_kind: i32,
+    pub situation_kind: i32,
+    pub x: f32,
+    pub y: f32,
+    pub percent: f32,
+    pub lr: f32,
+}
+
+impl StartPose {
+    /// The saved record of this pose; a fighter never seen (kind −1) is a never-saved record.
+    pub fn saved(self) -> SavedState {
+        let mut state = SavedState::never_saved();
+        if self.fighter_kind < 0 {
+            return state;
+        }
+        state.fighter_kind = self.fighter_kind;
+        state.situation_kind = self.situation_kind;
+        state.x = self.x;
+        state.y = self.y;
+        state.percent = self.percent;
+        state.lr = self.lr;
+        state
+    }
+}
+
+/// Both fighters when Record started, with each one's summed speed (world units per frame, x then y). The start save is
+/// this pair ("Start save: the save state this macro starts at"); the macro keeps its recorded role's speed (PLAY-MOMENTUM).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct RecordStart {
+    pub poses: [StartPose; 2],
+    pub speeds: [(f32, f32); 2],
+}
+
+/// The speed a Play gives the playing role on its first input after the warp: the macro's recorded start speed with
+/// "Keep recorded speed", zero with "Start at rest". `facing` is the facing it was recorded with; x is applied relative
+/// to it, as the recorder's inputs are.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct StartSpeed {
+    pub speed: (f32, f32),
+    pub facing: f32,
+}
+
+/// The game thread, at a record chord that starts a recording (`capture_role() == 0`), before `on_chords`: both fighters'
+/// live pose and speeds. Values only; no allocation.
+pub fn note_record_start(start: RecordStart) {
+    *RECORD_START.lock() = Some(start);
+}
+
+/// PLAY-MOMENTUM (primary 2026-11-08 23:03Z, reading (b)): what the role's run owes its first input, taken once by the
+/// game frame that injected that input. `None` when nothing is owed (no warp, or already given).
+pub fn take_start_speed(role: Role) -> Option<StartSpeed> {
+    let bit = 1u8 << role_index(role);
+    // While the warp's restore is pending no input is fed, and the restore would undo a speed set now.
+    if START_OWED.load(Ordering::Acquire) & bit == 0 || WARP_HOLD.load(Ordering::Acquire) {
+        return None;
+    }
+    START_OWED.fetch_and(!bit, Ordering::AcqRel);
+    START_SPEED.lock()[role_index(role)].take()
+}
+
+fn owe_start_speed(role: Role, owed: Option<StartSpeed>) {
+    let bit = 1u8 << role_index(role);
+    START_SPEED.lock()[role_index(role)] = owed;
+    if owed.is_some() {
+        START_OWED.fetch_or(bit, Ordering::AcqRel);
+    } else {
+        START_OWED.fetch_and(!bit, Ordering::AcqRel);
+    }
+}
+
+/// The start speed a Play of `id` owes after its warp: the recorded start speed of the file (a chain: macro 1, whose start
+/// save it warps to) under the placement it warps with.
+fn play_start_speed(book: &Book, id: &str, placement: Placement) -> Option<StartSpeed> {
+    let first = book.first_recording(id).unwrap_or(id);
+    let start = book.start_state(first)?;
+    let speed = match placement.momentum {
+        MomentumMode::PreserveRecorded => (start.speed_x, start.speed_y),
+        MomentumMode::AtRest => (0.0, 0.0),
+    };
+    Some(StartSpeed { speed, facing: start.facing })
+}
+
 /// One captured frame. `side` is 1 for Player 1 and 2 for the CPU. A mismatch is ignored.
 pub fn push_capture(side: u8, frame: InputFrame) {
     if CAP_ROLE.load(Ordering::Acquire) != side {
@@ -359,15 +451,17 @@ pub(crate) fn take_cpu_frame() -> Option<InputFrame> {
     take_frame(&CPU_FRAMES)
 }
 
-/// Player 1's poll. Injects one posted frame, then stores the output when Player 1 is the recorded role.
+/// Player 1's poll. Injects one posted frame, then stores the output when Player 1 is the recorded role. Returns whether
+/// a frame of a Player run was injected (its first one may owe a start speed, `take_start_speed`).
 ///
 /// # Safety
 /// `out` is null or a live mapped-input record for this poll.
-pub unsafe fn on_player_poll(out: *mut MappedInputs) {
+pub unsafe fn on_player_poll(out: *mut MappedInputs) -> bool {
     if out.is_null() {
-        return;
+        return false;
     }
-    if let Some(frame) = take_player_frame() {
+    let injected = take_player_frame();
+    if let Some(frame) = injected {
         (*out).buttons = frame.buttons;
         (*out).lstick_x = frame.lstick_x;
         (*out).lstick_y = frame.lstick_y;
@@ -387,6 +481,7 @@ pub unsafe fn on_player_poll(out: *mut MappedInputs) {
             },
         );
     }
+    injected.is_some()
 }
 
 pub fn today() -> String {
@@ -442,7 +537,14 @@ pub fn service_at(
         for frame in frames {
             push_frame(&mut capture, role, frame);
         }
-        if let Ok(stop) = finish_recording(root, &capture, player.clone(), cpu.clone(), unix_now())
+        // The start save is where Record started, and the macro keeps the recorded role's speed then (PLAY-MOMENTUM).
+        // Without a posted start (only a host test drives the chord without the game thread) the worker's live pose
+        // stands in, at rest, as before.
+        let (player, cpu, speeds) = match RECORD_START.lock().take() {
+            Some(start) => (start.poses[0].saved(), start.poses[1].saved(), start.speeds),
+            None => (player.clone(), cpu.clone(), [(0.0, 0.0); 2]),
+        };
+        if let Ok(stop) = finish_recording(root, &capture, player, cpu, speeds[role_index(role)], unix_now())
         {
             bump_catalog();
             if let Some(text) = stop.notice() {
@@ -572,6 +674,16 @@ pub fn save_captured(pair: [SavedState; 2]) {
 pub fn setup_restored() {
     SLOT_RESYNC.store(true, Ordering::Release);
     BOUND_DIRTY.store(true, Ordering::Release);
+}
+
+/// The state writer applied a setup bind from the Setup library to the active slot. A (`restore`) moves the fighters
+/// and the slot then gets the bound save back (`setup_restored`). Y binds without moving anyone: the setup stays in
+/// the slot, so Load returns to it, until the next bound-save change (primary 2026-11-08 23:03Z, SETUP-Y-BIND;
+/// cov-rec #69 (b)). Neither writes the bound save file.
+pub fn setup_bound(restore: bool) {
+    if restore {
+        setup_restored();
+    }
 }
 
 /// What Edit placement edits (primary 2026-11-08 #70 (a)): the page role's active macro, the file Play plays, and the
@@ -940,18 +1052,35 @@ fn play_role(root: &Path, machine: &mut Playback, book: &Book, role: Role, tick:
     } else {
         "cpu"
     };
+    let mut owed = None;
     if let Some(id) = effect.warp {
         tick.warp = Some(id.to_owned());
         if let Some(active) = book.index.active(role) {
-            tick.warp_place = Some((role, play_placement(book, active)));
+            let placement = play_placement(book, active);
+            tick.warp_place = Some((role, placement));
+            owed = play_start_speed(book, active, placement).map(|speed| (speed, placement.momentum));
         }
         tick.diags
             .push(format!("screen=playback role={word} warp=1"));
+        if let Some((speed, mode)) = owed {
+            let mode = match mode {
+                MomentumMode::PreserveRecorded => "keep",
+                MomentumMode::AtRest => "rest",
+            };
+            tick.diags.push(format!(
+                "screen=playback role={word} momentum={mode} speed_x={} speed_y={} facing={}",
+                speed.speed.0, speed.speed.1, speed.facing
+            ));
+        }
         WARP_HOLD.store(true, Ordering::Release);
     }
     note_missing_start(root, book, role, tick);
     if effect.stopped || effect.started {
         drop_frames(role);
+    }
+    // PLAY-MOMENTUM: the warp's start speed waits for the run's first input (after `drop_frames`, which clears it).
+    if let Some((speed, _)) = owed {
+        owe_start_speed(role, Some(speed));
     }
     if effect.stopped {
         run_flag(role).store(false, Ordering::Release);
@@ -1022,9 +1151,11 @@ fn publish(role: Role, frame: InputFrame) {
     role_frames(role).lock().push(pack(frame));
 }
 
-/// A run started, stopped or was cut by a mash: what it buffered is not played.
+/// A run started, stopped or was cut by a mash: what it buffered is not played, and a start speed it still owed is not
+/// given.
 fn drop_frames(role: Role) {
     role_frames(role).lock().clear();
+    owe_start_speed(role, None);
 }
 
 fn note_missing_start(root: &Path, book: &Book, role: Role, tick: &mut Tick) {
@@ -1526,6 +1657,9 @@ fn reset_host() {
     CATALOG_GEN.store(0, Ordering::Release);
     CPU_ROLE_ON.store(false, Ordering::Release);
     WARP_HOLD.store(false, Ordering::Release);
+    *RECORD_START.lock() = None;
+    *START_SPEED.lock() = [None; 2];
+    START_OWED.store(0, Ordering::Release);
     *CPU_DRIVE.lock() = CpuRoleDrive::idle();
     BOUND_DIRTY.store(true, Ordering::Release);
     *lock(&BOUND_APPLIED) = None;
@@ -2951,5 +3085,142 @@ mod tests {
         setup_restored();
         assert_eq!(bound_sync(&root), Some(None), "with nothing bound the restored slot is emptied again");
         assert_eq!(RecordingIndex::load(&root).unwrap().bound(), None, "and no save is made for it");
+    }
+
+    /// Primary 2026-11-08 23:03Z, SETUP-Y-BIND (cov-rec #69 (b)): Y in the Setup library binds a setup without
+    /// restoring it. The setup stays in the active slot, so Load returns to it, until the next bound-save change. It
+    /// never writes the bound save file. A (bind and restore) still gives the slot the bound save back.
+    #[test]
+    fn a_setup_bound_with_y_stays_loads_target_until_the_bound_save_changes() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("setup-y");
+        migrate_at_boot(&root, &none(), "2026-11-08").unwrap();
+        let saves = Store::<NamedSave>::new(root.join(SAVES_DIR));
+        let bound = saves.save_new(&NamedSave::new("Bound", at_x(-70.0), at_x(-40.0)).unwrap()).unwrap();
+        let other = saves.save_new(&NamedSave::new("Other", at_x(10.0), at_x(20.0)).unwrap()).unwrap();
+        let before = saves.load(&bound).unwrap();
+        let mut index = RecordingIndex::load(&root).unwrap();
+        index.bind_save(Some(&bound), 1).unwrap();
+        index.save(&root).unwrap();
+        assert!(bound_sync(&root).is_some(), "the first sync");
+
+        setup_bound(false);
+        assert!(bound_sync(&root).is_none(), "Y: the setup stays in the slot, so Load returns to it");
+        assert!(!write_saved(&root), "Y hands the worker nothing to write");
+        // A write elsewhere in the library (the menu close's index write) is not a bound-save change.
+        bump_catalog();
+        assert!(bound_sync(&root).is_none(), "the bound save did not change, so the setup stays");
+        assert!(bound_sync(&root).is_none(), "Load twice: still the setup");
+        assert_eq!(saves.load(&bound).unwrap(), before, "the bound save file is untouched");
+
+        let selection = Selection {
+            bound: Some(other.clone()),
+            active_player: None,
+            active_cpu: None,
+            loop_player: LoopMark::Finite(1),
+            loop_cpu: LoopMark::Finite(1),
+            drill: None,
+            record_role: ViewRole::Player,
+        };
+        publish_selection(&root, &selection, None);
+        let next = bound_sync(&root).expect("binding another save is a bound-save change").expect("Other is bound");
+        assert_eq!((next[0].x, next[1].x), (10.0, 20.0), "Load goes to the newly bound save");
+
+        setup_bound(true);
+        let back = bound_sync(&root).expect("A: the slot gets the bound save back").expect("Other is bound");
+        assert_eq!((back[0].x, back[1].x), (10.0, 20.0));
+        assert_eq!(saves.load(&bound).unwrap(), before, "no save file was written");
+    }
+
+    fn pose(kind: i32, x: f32, lr: f32) -> StartPose {
+        StartPose { fighter_kind: kind, situation_kind: 0, x, y: 0.0, percent: 0.0, lr }
+    }
+
+    /// RECORDING-REDESIGN "Start save: the save state this macro starts at", and PLAY-MOMENTUM (primary 2026-11-08
+    /// 23:03Z, reading (b)): the start save is where Record started, not where it stopped (the worker wrote the live pose
+    /// of the stop), and the macro keeps the recorded role's speed and facing at that moment (it stored zero and 1.0).
+    #[test]
+    fn a_recording_keeps_where_and_how_fast_it_started() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("rec-start");
+        set_record_role(Role::Player);
+        note_record_start(RecordStart { poses: [pose(13, -30.0, -1.0), pose(7, 40.0, 1.0)], speeds: [(-1.75, 0.0), (9.0, 9.0)] });
+        on_chords(true, false, false);
+        push_capture(ROLE_PLAYER, InputFrame { buttons: 4, ..InputFrame::default() });
+        on_chords(true, false, false);
+        let mut stopped = state(13);
+        stopped.x = 25.0;
+        let _ = service_at(&root, &none(), "2026-11-08", stopped, state(7), false);
+        let macros = Library::new(root.join(MACROS_DIR));
+        let saves = Store::<NamedSave>::new(root.join(SAVES_DIR));
+        let id = macros.list().unwrap().entries[0].id.clone();
+        let recording = macros.load(&id).unwrap();
+        assert_eq!((recording.start.fighter_kind, recording.start.speed_x, recording.start.speed_y), (13, -1.75, 0.0));
+        assert_eq!(recording.start.facing, -1.0, "the recorded role's facing, which the speed is relative to");
+        let save = saves.load(recording.start_save.as_deref().expect("a start save")).unwrap();
+        assert_eq!((save.player.x, save.player.lr, save.cpu.x), (-30.0, -1.0, 40.0), "the start save is where Record started");
+
+        // A CPU-role recording keeps the CPU's speed.
+        set_record_role(Role::Cpu);
+        note_record_start(RecordStart { poses: [pose(13, -5.0, 1.0), pose(7, 5.0, -1.0)], speeds: [(9.0, 9.0), (2.5, -1.0)] });
+        on_chords(true, false, false);
+        push_capture(ROLE_CPU, InputFrame { buttons: 8, ..InputFrame::default() });
+        on_chords(true, false, false);
+        let _ = service_at(&root, &none(), "2026-11-08", state(13), state(7), false);
+        let cpu = macros.list().unwrap().entries.iter().map(|e| macros.load(&e.id).unwrap()).find(|r| r.start.fighter_kind == 7)
+            .expect("the CPU's macro");
+        assert_eq!((cpu.start.speed_x, cpu.start.speed_y, cpu.start.facing), (2.5, -1.0, -1.0));
+        let save = saves.load(cpu.start_save.as_deref().unwrap()).unwrap();
+        assert_eq!((save.player.x, save.cpu.x), (-5.0, 5.0));
+    }
+
+    /// Plays the Player's active macro (recorded with `start`, kept `placement` if any) once and returns the start speed
+    /// the role gets on the game frame that takes its first input, checking it is given only once.
+    fn momentum_play(tag: &str, start: StartState, placement: Option<Placement>, start_save: bool) -> Option<StartSpeed> {
+        reset_host();
+        let root = scratch(tag);
+        let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        let save = Store::<NamedSave>::new(root.join(SAVES_DIR)).save_new(&NamedSave::new("Run", state(8), state(7)).unwrap()).unwrap();
+        let frames = vec![InputFrame { buttons: 4, ..InputFrame::default() }, InputFrame { buttons: 5, ..InputFrame::default() }];
+        let mut recording = MacroRecording::new("Run", "13.0.5", start, frames).unwrap();
+        if start_save {
+            recording.set_start_save(Some(&save)).unwrap();
+        }
+        let id = Library::new(root.join(MACROS_DIR)).save_new(&recording).unwrap();
+        let mut index = RecordingIndex::load(&root).unwrap();
+        index.set_active(Role::Player, Some(&id), 1).unwrap();
+        index.save(&root).unwrap();
+        if let Some(placement) = placement {
+            keep_placement(&id, placement);
+        }
+        on_chords(false, true, false);
+        let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        assert!(take_start_speed(Role::Player).is_none(), "{tag}: nothing before the run's first input");
+        warp_landed();
+        let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        assert_eq!(take_player_frame().expect("the first input").buttons, 4);
+        let given = take_start_speed(Role::Player);
+        assert!(take_start_speed(Role::Player).is_none(), "{tag}: once per Play");
+        assert_eq!(take_player_frame().expect("the second input").buttons, 5);
+        assert!(take_start_speed(Role::Player).is_none(), "{tag}: not again on a later frame");
+        given
+    }
+
+    /// PLAY-MOMENTUM (primary 2026-11-08 23:03Z, reading (b); cov-rec #70): Play applies the macro's recorded start
+    /// speeds when the Placement screen's Momentum key reads "Keep recorded speed", and starts at rest with "Start at rest"
+    /// (an explicit zero, as the named layer's `ready_velocity`: drift during the restore is not kept). It goes with the
+    /// warp to the start save, as the placement offset does; with no start save Play plays from where the fighters are.
+    #[test]
+    fn play_gives_the_recorded_start_speed_only_with_momentum_kept() {
+        let _hold = hold();
+        let mut running = StartState::neutral(8, 0, -1.0);
+        running.speed_x = 1.6;
+        running.speed_y = 0.4;
+        assert_eq!(momentum_play("momentum-keep", running, None, true), Some(StartSpeed { speed: (1.6, 0.4), facing: -1.0 }));
+        let rest = Placement { momentum: super::super::macros::MomentumMode::AtRest, ..Placement::default() };
+        assert_eq!(momentum_play("momentum-rest", running, Some(rest), true), Some(StartSpeed { speed: (0.0, 0.0), facing: -1.0 }));
+        assert_eq!(momentum_play("momentum-nowarp", running, None, false), None, "no start save, no warp: nothing is set");
     }
 }

@@ -404,6 +404,26 @@ pub(crate) fn preload_readiness(blocked:bool,
         |(kind,_)|failed&(1u128<<kind)!=0,ready)
 }
 
+/// F9-SEAT-NOTICE (primary 2026-11-08 23:03Z, reading A): Training's seats 2 and 3 for the readiness notice, with the
+/// targets `purpose_view` gives them (an armed Reload, else the parked member) against the current Ready source on
+/// each entry, and a standing memory refusal (`f9_gate::seat_held`). A live seat, an entry without a member and every
+/// other scene are `None`. Lock order as `purpose_view`: STATE, then the borrow record and the F9 gate.
+#[cfg(feature="managed-third-source-alpha")]
+pub(crate) unsafe fn seat_states()->[Option<crate::model::parked_entries::SeatState>;2] {
+    if !crate::runtime::compat::common::is_native_training_mode() {return [None;2];}
+    let quantity=native_source::training_cpu_quantity();
+    let state=STATE.lock();
+    let borrowed=ENTRY3_BORROW.lock().current().filter(|b|state.book.is_current(b.epoch)).is_some();
+    [2u32,3].map(|slot|{
+        if quantity.is_some_and(|count|slot<=count) {return None;}
+        let member=crate::runtime::roster::f9_gate::override_seat(slot).or_else(||crate::model::parked_entries::parked_seat(
+            slot,quantity,borrowed,crate::runtime::roster::f9_gate::seat_member(slot)))?;
+        let ready=state.sources[slot as usize].filter(|s|state.book.is_current(s.token.epoch())
+            && state.book.phase(slot as usize)==Ok(Phase::Ready)).map(|s|(s.kind,s.configuration));
+        Some(crate::model::parked_entries::seat_state(member,ready,crate::runtime::roster::f9_gate::seat_held(slot)))
+    })
+}
+
 /// The readiness line's capacity (lobby-preload D). While a creation preflight refusal stands in
 /// this scene, the extras from the refused one on cannot be created, so the line counts what the
 /// scene holds (`limited`) instead of reporting `Loading` for the whole visit. Planning, metrics
@@ -2416,6 +2436,9 @@ pub unsafe fn service(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) {
     let memory_cost = crate::engine::swap::body_bank::memory::helper_cost(wanted.kind);
     let memory_committed = if speculative {
         let (decision, sample) = super::process_memory::admit(memory_cost);
+        // F9-SEAT-NOTICE: a seat held for memory counts in the readiness notice until a load on it is admitted.
+        crate::runtime::roster::f9_gate::note_seat_memory(slot, wanted.kind,
+            decision.admission != crate::engine::swap::body_bank::memory::Admission::Admit);
         if decision.admission != crate::engine::swap::body_bank::memory::Admission::Admit {
             memory_refused(slot, wanted.kind, decision, memory_cost, "preload");
             return;

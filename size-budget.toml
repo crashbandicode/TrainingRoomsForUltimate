@@ -924,3 +924,11 @@ ceiling = 156436
 date = "2026-11-09"
 reason = "rc.6 integration (p23/rc6-integration 81a7454): the merge of p23/rc6-bg-ic (a46c6b3, 152381: +186 over 152195, the Ice Climbers background builds) into efa63b2 (156248), with both branches' eligibility rules as the interim of primary 2026-11-09 00:52Z; measured 156436 on the merged tree (tools/size_gate.py), +188"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); combined ceiling = measured merged size per primary c07b3449, INBOX-opus-rc6-integration 2026-11-08 19:13Z"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 155973
+date = "2026-11-09"
+reason = "rc.6 open fixes (p23/rc6-open-fixes 8894449 on 9438039; primary readings 2026-11-08 23:03Z, TASK-OPUS-rc6-open-fixes): SETUP-Y-BIND (rr_host::setup_bound, WriterBind::restore), F9-SEAT-NOTICE (parked_entries::seat_state, hat_slots::with_seats, sources::seat_states, f9_gate seat holds, the diag memory reserve), PLAY-MOMENTUM (rr_host StartPose/RecordStart/StartSpeed, note_record_start, take_start_speed, play_start_speed, recording_host record_start/live_speed/apply_start_speed); measured 155973 (tools/size_gate.py), +401 over 155572"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied under TASK-OPUS-rc6-open-fixes (primary c07b3449: a raise goes in its own commit with approved_by)"

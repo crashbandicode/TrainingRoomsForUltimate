@@ -167,14 +167,17 @@ impl RecordStop {
     }
 }
 
-/// Stop. An empty buffer writes nothing. A recording writes `"<name> · start"`, stores that id,
-/// becomes most recently used, and becomes that role's active macro. A CPU-role recording names
-/// the CPU's fighter, so Play on CPU compares the fighter who was being recorded.
+/// Stop. An empty buffer writes nothing. A recording writes `"<name> · start"` from `player` and `cpu` (where Record
+/// started), stores that id, becomes most recently used, and becomes that role's active macro. A CPU-role recording names
+/// the CPU's fighter, so Play on CPU compares the fighter who was being recorded. The macro's start state keeps the
+/// recorded role's facing and its `speed` when Record started (x, y), which Play applies with "Keep recorded speed"
+/// (PLAY-MOMENTUM).
 pub fn finish_recording(
     root: &Path,
     capture: &Capture,
     player: SavedState,
     cpu: SavedState,
+    speed: (f32, f32),
     at: u64,
 ) -> Result<RecordStop, Error> {
     if capture.frames.is_empty() {
@@ -191,19 +194,19 @@ pub fn finish_recording(
         .collect::<Vec<_>>();
     let name = unused_label("Macro", &macro_names);
     let start_name = format!("{name} · start");
-    let kind = match capture.role() {
-        Role::Cpu => cpu.fighter_kind,
-        Role::Player => player.fighter_kind,
+    let recorded = match capture.role() {
+        Role::Cpu => &cpu,
+        Role::Player => &player,
+    };
+    let start_state = StartState {
+        situation: recorded.situation_kind,
+        speed_x: speed.0,
+        speed_y: speed.1,
+        ..StartState::neutral(recorded.fighter_kind, 0, recorded.lr)
     };
     let start = NamedSave::new(start_name, player, cpu)?;
     let start_id = saves.save_new(&start)?;
-    let mut recording = MacroRecording::new(
-        &name,
-        "13.0.5",
-        StartState::neutral(kind, 0, 1.0),
-        capture.frames.clone(),
-    )
-    .map_err(record)?;
+    let mut recording = MacroRecording::new(&name, "13.0.5", start_state, capture.frames.clone()).map_err(record)?;
     recording.set_start_save(Some(&start_id)).map_err(record)?;
     let id = macros.save_new(&recording).map_err(record)?;
     let mut index = RecordingIndex::load(root)?;
@@ -778,7 +781,7 @@ mod tests {
         let mut capture = Capture::idle();
         toggle_record(&mut capture, Role::Player);
         push_frame(&mut capture, Role::Player, frame(4));
-        let stop = finish_recording(&root, &capture, state(13), state(7), 5).unwrap();
+        let stop = finish_recording(&root, &capture, state(13), state(7), (0.0, 0.0), 5).unwrap();
         let RecordStop::Saved {
             ref id,
             ref start_save,
@@ -813,7 +816,7 @@ mod tests {
         let mut capture = Capture::idle();
         toggle_record(&mut capture, Role::Cpu);
         push_frame(&mut capture, Role::Cpu, frame(33_281));
-        let stop = finish_recording(&root, &capture, state(0), state(0x1d), 5).unwrap();
+        let stop = finish_recording(&root, &capture, state(0), state(0x1d), (0.0, 0.0), 5).unwrap();
         let RecordStop::Saved { id, .. } = stop else {
             panic!("empty")
         };
@@ -1071,7 +1074,7 @@ mod tests {
     fn the_empty_recording_notice_stays() {
         let root = scratch("empty");
         let capture = Capture::idle();
-        let stop = finish_recording(&root, &capture, state(1), state(2), 1).unwrap();
+        let stop = finish_recording(&root, &capture, state(1), state(2), (0.0, 0.0), 1).unwrap();
         assert_eq!(stop.notice(), Some("Recording was empty"));
         assert!(stop.cursor().is_none());
         assert!(!root.join(MACROS_DIR).exists());

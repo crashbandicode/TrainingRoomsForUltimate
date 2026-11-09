@@ -221,6 +221,11 @@ fn poll_status(blocked: bool, notice_blocked: bool, desired: Option<[Option<Targ
     let fighters = crate::runtime::roster::character_roster::body_bank::progress();
     #[cfg(not(feature = "native-body-bank-alpha"))]
     let fighters = crate::engine::preload::cycle_preload_policy::BuiltFighters::default();
+    // F9-SEAT-NOTICE: Training's two parked seats count in the fighter status (a seat held for memory included).
+    #[cfg(feature = "managed-third-source-alpha")]
+    // SAFETY: the visible Player's frame; the seat read is the guarded pause-menu count and the source book.
+    let fighters = crate::engine::preload::hat_slots::with_seats(fighters,
+        unsafe { crate::runtime::roster::character_roster::sources::seat_states() });
     show_status(crate::engine::preload::cycle_preload_policy::CacheStatus::new(readiness, fighters, notice_blocked), blocked);
 }
 
