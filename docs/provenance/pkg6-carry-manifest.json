@@ -5982,7 +5982,7 @@
    "dest": "src/runtime/roster/native_body_bank.rs",
    "crate": "root",
    "src_sha256": "ccf7ac678691fa0101a1eff5dbd9300a1b12fe64e9ebbde515697adfbb841c98",
-   "dest_sha256": "1d72514973a704ec989eb73957229b12f3b2132a696503655058289524a86ee6",
+   "dest_sha256": "3f4225403f45792959341d465e8cccac7270b56927c871052597ecea2d67f00b",
    "edits": [
     {
      "old": "unsafe fn finalize_entry(entry: *mut u8) -> u64 {\n",
@@ -7589,6 +7589,11 @@
      "old": "    SPECIAL_ENABLED.store(special_ok, Ordering::Release);\n    // Phase B\u2032 (operator decision 2026-11-02): the game's asynchronous construction path, owned 13.0.5\n",
      "new": "    SPECIAL_ENABLED.store(special_ok, Ordering::Release);\n    // Inbox 02:00Z: pass 2's own calls, which a staged PT exit makes itself (`special_articles::destroy_saved`).\n    let split_ok = gate(SEAM_GROUP, EXIT_SPLIT_SEAMS, special_ok\n        && fingerprint(base, articles::OBJECT_LOOKUP, &articles::OBJECT_LOOKUP_WORDS, \"SpecialGroups\")\n        && fingerprint(base, articles::OBJECT_DESTROY, &articles::OBJECT_DESTROY_WORDS, \"SpecialGroups\")\n        && fingerprint(base, articles::STATIC_INIT, &articles::STATIC_INIT_WORDS, \"SpecialGroups\")\n        && fingerprint(base, articles::GUARD_ACQUIRE, &[0xf000c6f0, 0xf9411e11, 0x9108e210, 0xd61f0220], \"SpecialGroups\")\n        && fingerprint(base, articles::GUARD_RELEASE, &[0xf000c6f0, 0xf9412211, 0x91090210, 0xd61f0220], \"SpecialGroups\"))\n        && special_ok;\n    EXIT_SPLIT.store(split_ok, Ordering::Release);\n    trace!(\"[SpecialGroups] PT exit split {}\", if split_ok { \"enabled; the pool retires over the next ticks\" } else { \"off; the exit's tick releases the whole pool\" });\n    // Phase B\u2032 (operator decision 2026-11-02): the game's asynchronous construction path, owned 13.0.5\n",
      "reason": "Merge of p23/rc6-integration (d5db7387) into p23/rc6-bg-pt: Merge of p23/rc6-integration (62e7c85) into p23/rc6-bg-pt: Inbox 00:17Z item 1 (worker B): the Pok\u00e9mon Trainer trainer-article null read at a later warm attach (a console-crash class, pre-existing) fixed by taking the object kind 0x72 again while the group is detached and returning it after the attach's rebuild (never held across the detach; returned at every drain and teardown); Inbox 00:17Z item 1 (worker B): the object re-acquire's INSTALL release label (diagnostics only, not user-facing) says \"declined by the ledger\", as this file's \"background build declined\"; compliance.py's refusal heuristic read \"refused\" in the internal label as a user-facing refusal; Inbox 02:00Z (worker B): leaving a Pok\u00e9mon Trainer group held the game thread 28-57 ms in one tick (the pool release 0x3a6b80: pass 2 is the trainer's teardown and its own article pools; Eden rc6-bg-ptx1/ptx2 guest trace); the exit's tick now runs pass 1 only (the trainer deactivated) and the group lifecycle releases the trainer's own pools, then destroys it, one stage per later tick under INSTALL, gated on the new seam rows special_groups.object_lookup/object_destroy/static_init"
+    },
+    {
+     "old": "        Step::Rearm(..) => \"object re-arm\", Step::RearmPoll(..) => \"object re-arm poll\",\n    };\n",
+     "new": "        Step::Rearm(..) => \"object re-arm\", Step::RearmPoll(..) => \"object re-arm poll\",\n        Step::Retire(..) => \"articles retire stage\",\n    };\n",
+     "reason": "Merge of p23/rc6-integration (d5db7387): integration's slow_step names every group lifecycle step (8b551c5d); the PT exit's Retire step (3b9b4895) gets its name, so the switch build's match is exhaustive"
     }
    ]
   },
