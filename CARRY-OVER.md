@@ -1392,7 +1392,9 @@ Operator decision 2026-11-08 23:42Z ("free under the pause menu", inbox); Eden `
 - **Members held for the pause:** the planner runs a second, value-only plan without the parked groups (their bodies
   added back to the pool). Members it places that no group holds now are counted as held for memory, so the notice
   reads "(N waiting for memory)" (`body_bank::waiting_for_pause`, `WAITING_PAUSE`). The pass after the pause plans them
-  and the background build loads them (`xps18`: the CPU's Marth was planned nowhere and never named).
+  and the background build loads them (`xps18`: the CPU's Marth was planned nowhere and never named). Superseded
+  2026-11-09 by the operator's 13:21Z rule: they load now, and parked groups go now for their room
+  (`p23/rc6-preload-priority`, below).
 
 - **Not built:** the destroy runs whole as the pause opens: 3 bodies took 304 ms before the pause screen took input
   (`xps19`). Splitting it one body per paused frame needs a per-frame game-thread hook in the pause, which this code
@@ -1745,3 +1747,42 @@ Inbox `INBOX-opus-rc6-bg-ic.md` 05:38Z (moved from the hot-slots lane; its repor
     runs the re-arm's own ledger acquisition (`failfirst-2`, the Eden refusal).
   - `native_model::the_trainer_object_key_released_under_a_live_kirby_copy_leaves_the_registry_whole` pins the
     per-kind K1 hazard the rule rests on.
+
+### p23/rc6-preload-priority: new members load at once; a parked group goes now when they need its room (2026-11-09)
+
+Operator rule 2026-11-09 13:21Z (`INBOX-opus-rc6-docs.md`): "If it's already full it should just release so that it
+takes effect accepting the hitch." It replaces the pause wait in "groups that left the cycle are freed under the
+pause" above. Eden `final-surface-i3-pf-r2` `x6-cc` on `e39479df` stopped at "Loaded 10/12 (2 waiting for memory)": the
+Ice Climbers waited for a pause while two parked groups held the budget and P1's last group slot
+(`LANE-OPUS-RC6-PRELOAD-PRIORITY-REPORT.md`, F1).
+- **Unchanged:** a Built group that leaves the cycle is parked and serves its kept members warm; the pause frees every
+  parked group (`pause_opening`).
+- **The new members** are what the plan with every parked body free places that no group holds now
+  (`waiting_for_pause`). When the plan beside the parked groups leaves any of them out,
+  `body_bank::release_for_new_members` chooses the parked groups to free now. It takes the set beside which the plan
+  places them all, with the fewest members the new cycle keeps (`kept_members`), then the fewest bodies (75–134 ms of
+  game thread each), then the fewest groups. The budget is shared, so either role's parked groups qualify. Freeing all
+  of them always works, so nothing waits for a pause; when they fit, nothing is freed.
+- **The planner** (`plan_groups`) marks those groups `release_now` (`[GroupSwap] release now … reason=the new members
+  need its room`). It counts their members as loading (`GroupCounts::with_release`: planned and pending;
+  `RELEASE_MEMBERS` replaces `WAITING_PAUSE`, `with_waiting` is gone). The pass after the release plans them.
+- **The entry tick** (`group_lifecycle`) frees a marked parked group (`body_bank::leaves_now`), never one a committed
+  switch targets and never while a native install runs (`Step::Leave`). It logs `[GroupSwap] frees now … us=…
+  headroom=…->… freed=…`, and `leave_group`'s `left cycle … execute_us=…` line has the destroy's hold. A group that could
+  not go loses the mark, so the pause frees it (no retry every tick). `service_locked` keeps the lifecycle running for a
+  marked group. An exchange into a parked group clears the mark with `leaving`.
+- **Guest memory and the pool:** a prefetch refused for process headroom or fighter-pool bodies
+  (`Admission::Refuse`, the pool hold) while groups are parked calls `release_for_capacity`. That marks one parked group
+  (`body_bank::capacity_release`: fewest kept members, then fewest bodies) unless one is going already. The refused
+  group is retried after it, so parked groups go one at a time while refusals last. With nothing parked the hold stays
+  "waiting for memory".
+
+2 files, 21 recorded manifest edits (`body_bank.rs` 5, `native_body_bank.rs` 16, recorded hunk by hunk);
+`carry_pkg6.py carry/ledger/verify` re-derives all 250 files. Tests failed first (stubs that kept the pause rule:
+`FAIL-FIRST-release-model.log`, `FAIL-FIRST-release-wiring.log` in `tmp-p23/rc6-preload-priority-gates/`):
+- `body_bank`: `a_change_that_does_not_fit_frees_just_enough_parked_bodies` (the x6-cc shape, plus fewest kept
+  members, fewest bodies, both needed, across roles), `a_change_that_fits_releases_nothing`,
+  `nothing_parked_and_a_real_shortage_still_waits_for_memory`, `a_parked_group_leaves_on_the_entry_tick_only_when_marked`;
+- `tests/cycle_change_wiring.rs`: `new_members_load_now_and_parked_groups_go_only_for_their_room`,
+  `a_refused_prefetch_frees_a_parked_group_now`, and the entry-tick test;
+- `tests/group_hold_wiring.rs`: the lifecycle's leaving rule.

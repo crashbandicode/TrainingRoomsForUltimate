@@ -81,31 +81,61 @@ fn the_window_targets_skip_what_a_group_holds() {
 }
 
 /// Operator decision 2026-11-08 23:42Z, rc6-hot-xps18: a parked group counts only the members its cycle keeps, in the
-/// planner's targets and in the notice (`mb-p1-change` showed kept Samus as "swap P1 to load"). New members that only the
-/// plan without the parked groups places wait for the pause and show as held for memory (`mb-cpu-change`: Marth was
-/// planned nowhere and the notice never named it); the pass after the pause plans them.
+/// planner's targets and in the notice (`mb-p1-change` showed kept Samus as "swap P1 to load").
+/// Operator rule 2026-11-09 (inbox 13:21Z; Eden `final-surface-i3-pf-r2` `x6-cc` stopped at "Loaded 10/12 (2 waiting for
+/// memory)" because the Ice Climbers waited for a pause): new members never wait for the pause. When parked groups hold
+/// the room they need, the planner marks the fewest of them to go now and counts those members as loading; nothing is
+/// shown waiting for the pause.
 #[test]
-fn new_members_wait_for_the_pause_and_parked_groups_count_their_kept_members() {
+fn new_members_load_now_and_parked_groups_go_only_for_their_room() {
     let plan = body(BANK, "fn plan_groups(");
     ordered(plan, &[
         "let budget = GroupBudget { ready_fighters: usize::from(settings.ready_fighters), pool_free, special };",
         "let counts = count_group_members(bank.groups.iter().map(|g| (shown_members(g, &wanted[role]), g.state)));",
-        "if group.leaving { parked_bodies += group.members.count(); } else { kept[role].push(*group.members); }",
-        "if parked_bodies > 0 {",
-        "let after = plan_extra_groups_with(policy, windows, [&kept[0], &kept[1]], [&upcoming[0], &upcoming[1]], originals,",
-        "GroupBudget { pool_free: pool_free.saturating_add(parked_bodies), ..budget });",
-        "waiting[role] = waiting_for_pause(&after[role], |kind| bank.groups.iter()",
-        "WAITING_PAUSE[role].swap(waiting[role], Ordering::AcqRel)",
-        "targets[role] = targets[role].saturating_add(waiting[role]);",
+        "if group.leaving && leaves_at_pause(group.state) {",
+        "group.parked_kept = kept_members(*group.members, &wanted[role]);",
+        "if !group.leaving && group.state.counts_bodies() { kept[role].push(*group.members); }",
+        "let release = release_for_new_members([&kept[0], &kept[1]], [&parked[0], &parked[1]], |role, kind| held[role].contains(&kind),",
+        "|existing, freed| plan_extra_groups_with(policy, windows, existing, [&upcoming[0], &upcoming[1]], originals,",
+        "GroupBudget { pool_free: pool_free.saturating_add(freed), ..budget }));",
+        "group.release_now = true;",
+        "trace!(\"[GroupSwap] release now owner={} group={} kinds={:x?} kept={} reason=the new members need its room",
+        "RELEASE_MEMBERS[role].swap(release.members[role], Ordering::AcqRel)",
+        "targets[role] = targets[role].saturating_add(release.members[role]);",
     ]);
+    assert!(!plan.contains("waiting_for_pause") && !plan.contains("WAITING_PAUSE"), "nothing waits for the pause:\n{plan}");
     let shown = body(BANK, "fn shown_members(");
     assert!(shown.contains("if group.leaving { kept_members(*group.members, wanted) } else { group.members.count() as u8 }"), "{shown}");
     let progress = body(BANK, "pub(crate) fn progress(");
     ordered(progress, &["let wanted = [cycle_wanted(&menu, 0), cycle_wanted(&menu, 1)];",
-        "for (role, state) in BANKS.iter().enumerate() {", "let waiting = WAITING_PAUSE[role].load(Ordering::Acquire);",
-        "count_group_members(bank.groups.iter().map(|g| (shown_members(g, &wanted[role]),", ".with_waiting(waiting);"]);
+        "for (role, state) in BANKS.iter().enumerate() {", "let releasing = RELEASE_MEMBERS[role].load(Ordering::Acquire);",
+        "count_group_members(bank.groups.iter().map(|g| (shown_members(g, &wanted[role]),", ".with_release(releasing);"]);
+    assert!(!progress.contains("with_waiting"), "{progress}");
     let scene = body(BANK, "pub(super) fn scene_changed(");
-    assert!(scene.contains("for value in &WAITING_PAUSE { value.store(0, Ordering::Release); }"), "{scene}");
+    assert!(scene.contains("for value in &RELEASE_MEMBERS { value.store(0, Ordering::Release); }"), "{scene}");
+}
+
+/// Operator rule 2026-11-09 (inbox 13:21Z), the room in guest memory and the fighter pool: a prefetch refused for either
+/// while parked groups hold bodies frees one parked group now (the one the cycle serves least, then the smallest; never
+/// one a committed switch targets; one at a time) and the refused group is retried after it. A switch into a parked
+/// group makes it the window, and nothing frees it then.
+#[test]
+fn a_refused_prefetch_frees_a_parked_group_now() {
+    let lifecycle = body(BANK, "unsafe fn group_lifecycle(");
+    ordered(lifecycle, &[
+        "if hold_group(role, group, Hold::Pool) {", "release_for_capacity(owner, group, \"fighter pool\");",
+        "Admission::Refuse => {", "if hold_group(role, group, Hold::Memory) {",
+        "release_for_capacity(owner, group, \"process headroom\");",
+    ]);
+    let capacity = body(BANK, "fn release_for_capacity(");
+    ordered(capacity, &[
+        "if !g.leaving || !leaves_at_pause(g.state) { continue; }", "if g.release_now { return; }",
+        "if bank.swap.is_none_or(|s| s.group != index) { parked.push(((role, index), *g.members, g.parked_kept)); }",
+        "let Some((role, index)) = capacity_release(parked.iter().copied()) else { return; };",
+        "g.release_now = true;", "trace!(\"[GroupSwap] release now owner={} group={} kinds={:x?} kept={} reason={} refused",
+    ]);
+    let swap = body(BANK, "unsafe fn perform_swap(");
+    ordered(swap, &["group.leaving = false;", "group.release_now = false;"]);
 }
 
 /// The sparse planner (run on the menu's close, `cycle_preload::on_frame`) reads each role's cycle as it is now: a
@@ -142,11 +172,15 @@ fn the_entry_tick_releases_a_leaving_group_through_the_teardown_protocol() {
     let lifecycle = body(BANK, "unsafe fn group_lifecycle(");
     ordered(lifecycle, &[
         "if let Some((group, token, since)) = bank.prefetch {",
-        "} else if let Some(group) = bank.groups.iter().position(|g| g.leaving && g.state != GroupState::Prefetching",
-        "&& !leaves_at_pause(g.state)) {",
+        "} else if let Some(group) = bank.groups.iter().enumerate().position(|(i, g)| g.leaving",
+        "&& leaves_now(g.state, g.release_now && bank.swap.is_none_or(|s| s.group != i))) {",
         "Step::Leave(group)",
         "let start = crate::engine::swap::body_bank::next_start(",
-        "Step::Leave(group) => if !super::INSTALL.active() { leave_group(entry, owner, role, group) },",
+        "Step::Leave(group) => if !super::INSTALL.active() {",
+        "let before = parked.map(|_| MemorySample::capture());",
+        "leave_group(entry, owner, role, group);",
+        // Operator rule 2026-11-09 13:21Z: a parked group freed now logs its game-thread hold, as the pause's free does.
+        "trace!(\"[GroupSwap] frees now owner={} group={} kinds={:x?} us={} headroom={:?}->{:?}",
     ]);
     let leave = body(BANK, "unsafe fn leave_group(");
     ordered(leave, &[
@@ -165,7 +199,7 @@ fn the_entry_tick_releases_a_leaving_group_through_the_teardown_protocol() {
     ]);
     assert!(!leave.contains("bank.groups.clear()"), "only this group leaves:\n{leave}");
     let service = body(BANK, "unsafe fn service_locked(");
-    assert!(service.contains("bank.groups.iter().any(|g| g.state.startable() || (g.leaving && !leaves_at_pause(g.state)))"), "{service}");
+    assert!(service.contains("bank.groups.iter().any(|g| g.state.startable() || (g.leaving && (!leaves_at_pause(g.state) || g.release_now)))"), "{service}");
     for (name, f) in [("candidate", body(BANK, "fn background_candidate(")), ("owed", body(BANK, "fn background_owed("))] {
         assert!(f.contains("leaving"), "{name}: a leaving group is never built in the background:\n{f}");
     }
