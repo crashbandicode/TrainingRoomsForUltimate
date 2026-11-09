@@ -87,6 +87,8 @@ had no guard in the fork.
     CPU's took 47 ms.
   - Every exit from the Mii was `warm-exit`, in 47–51 ms: to P1's original (Mario), to Fox's built group, and to the
     CPU's original.
+  - Beside the live Mii window, `final-yoga-i3-x6-b04856b2-r2` 14/14 built Pokémon Trainer, Samus and (once Samus's
+    group slot was freed) the Ice Climbers pair in the background. Its lap left the Mii warm in 80 ms, to Link.
 - **No. of CPUs seats:** a seat member keeps its exact-Mii configuration, so a Mii seat loads through the Mii helper
   (`seat_load`, `src/model/parked_entries.rs:270`), and the seats park at one CPU whatever the plan lists
   (`parked_seat`, `:269`). A promoted seat parked again gets its Mii proof re-recorded only when its identity is

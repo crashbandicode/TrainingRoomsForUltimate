@@ -140,8 +140,8 @@ group took about 50–70 ms in Eden. Changing a cycle in Training builds the new
 fighters that left it are freed when you next open the pause menu, or right away if the new ones need their room (a
 brief pause). Leaving a Mii for the fighters it replaced is a warm switch, not a reload. The background build
 waits only while Kirby is on screen, and for a second Mii group while a Mii is on screen
-(`background_build_eligible`, `src/model/swap/body_bank.rs:852`; TODO-PROOF: the special groups built in the
-background, hot lane and workers A and B, from the final pass's item-3 sessions). Raising No. of CPUs brings in the CPU cycle's next fighters, a saved Mii
+(`background_build_eligible`, `src/model/swap/body_bank.rs:852`; TODO-PROOF: the sessions that start on Ice Climbers
+or Kirby, workers A and B, from the final pass's item-3 sessions). Raising No. of CPUs brings in the CPU cycle's next fighters, a saved Mii
 included.
 
 ![P1's hat chord on the CPU Kirby](docs/media/cpu-kirby-hat.gif)
