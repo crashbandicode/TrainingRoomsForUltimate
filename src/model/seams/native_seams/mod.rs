@@ -31,6 +31,8 @@ pub mod rows_lobby_persist;
 /// rc.6: the mod's CPU level, the rank setter it calls and the native rank writers it follows
 /// (`src/runtime/features/cpu_level.rs`).
 pub mod rows_cpu_level;
+/// rc.6, operator option C: the release watch's read of the game's resource unload (`src/runtime/roster/res_unload.rs`).
+pub mod rows_res_unload;
 /// The installer's outcome-slot bits and its late report (`[TrainingSeams] late …`, R-A0b).
 pub mod report;
 /// The hook-sharing drill's setting and sites (the diagnostic build's stand-ins).
@@ -193,9 +195,9 @@ impl Site {
 
 /// Every row file, in table order: the one list a new row file joins (`COUNT`, `SITES`, and the host
 /// tests' `all()` read it).
-const TABLES: [&[Seam]; 10] = [
+const TABLES: [&[Seam]; 11] = [
     rows_a1::ROWS, rows_a2::ROWS, rows_a3::ROWS, rows_a4::ROWS, rows_a5::ROWS, rows_identity::ROWS, rows_q15::ROWS,
-    rows_lobby_items::ROWS, rows_lobby_persist::ROWS, rows_cpu_level::ROWS,
+    rows_lobby_items::ROWS, rows_lobby_persist::ROWS, rows_cpu_level::ROWS, rows_res_unload::ROWS,
 ];
 
 const fn total(tables: &[&[Seam]]) -> usize {

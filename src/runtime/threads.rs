@@ -36,6 +36,13 @@ where
     imp::run_joined(id, f)
 }
 
+/// Whether the calling thread is one this module started (a plugin thread), not a game thread or Skyline's boot thread. A plugin
+/// thread must never take a lock game-thread hooks take (stream/sync): the game's MainThread can starve it while it holds one, and a
+/// hook in a game task then waits for it (rc.6 QP freeze, `rc6-qpf3`). No allocation, no lock: hooks may call it.
+pub fn on_plugin_thread() -> bool {
+    imp::on_plugin_thread()
+}
+
 #[cfg(target_os = "switch")]
 mod imp {
     use core::cell::UnsafeCell;
@@ -123,6 +130,13 @@ mod imp {
         #[cfg(feature = "mii-saved-alpha")] MII_CATALOG = [MiiCatalog];
         #[cfg(feature = "console-practice-trace")] PRACTICE_TRACE = [PracticeTrace];
         #[cfg(feature = "diag")] STALL_WATCH = [StallWatch];
+    }
+
+    /// The calling thread's object is one of the static thread objects above.
+    pub fn on_plugin_thread() -> bool {
+        // SAFETY: GetCurrentThread reads the calling thread's own object pointer (its TLS); nothing is written.
+        let me = unsafe { nn::os::GetCurrentThread() };
+        thread_stacks::THREADS.iter().any(|row| parts(row.id).is_some_and(|(parts, _)| core::ptr::eq(parts.object, me)))
     }
 
     /// Create `id`'s thread on its static stack, running `entry(argument)`, and name it. `busy` is held on success.
@@ -227,15 +241,29 @@ mod imp {
 
     use crate::model::thread_stacks::{self, ThreadId};
 
+    std::thread_local! {
+        static PLUGIN: core::cell::Cell<bool> = const { core::cell::Cell::new(false) };
+    }
+
+    pub fn on_plugin_thread() -> bool {
+        PLUGIN.with(|plugin| plugin.get())
+    }
+
     pub fn spawn<F: FnOnce() + Send + 'static>(id: ThreadId, f: F) -> io::Result<()> {
         let row = thread_stacks::of(id);
-        std::thread::Builder::new().name(row.name.into()).stack_size(row.bytes).spawn(f).map(|_| ())
+        std::thread::Builder::new().name(row.name.into()).stack_size(row.bytes).spawn(move || {
+            PLUGIN.with(|plugin| plugin.set(true));
+            f()
+        }).map(|_| ())
     }
 
     pub fn run_joined<F: FnOnce() -> T + Send, T: Send>(id: ThreadId, f: F) -> io::Result<T> {
         let row = thread_stacks::of(id);
         std::thread::scope(|scope| {
-            std::thread::Builder::new().name(row.name.into()).stack_size(row.bytes).spawn_scoped(scope, f)?.join()
+            std::thread::Builder::new().name(row.name.into()).stack_size(row.bytes).spawn_scoped(scope, move || {
+                PLUGIN.with(|plugin| plugin.set(true));
+                f()
+            })?.join()
                 .map_err(|_| io::Error::other("the joined thread panicked"))
         })
     }

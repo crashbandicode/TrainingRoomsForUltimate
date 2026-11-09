@@ -22,3 +22,5 @@ pub mod cycle_members;
 // P-HOT step 2: the entry-time window (not carried; LANE-HOT-SLOTS-REPORT.md §10).
 pub mod entry_window;
 pub mod character_memory;
+// Operator option C (2026-11-09 17:57Z): the game's resource unload a freed group waits for (own code, not carried).
+pub mod res_unload;
