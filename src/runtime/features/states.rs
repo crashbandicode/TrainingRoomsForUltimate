@@ -1139,23 +1139,36 @@ unsafe fn apply_buff(raw: &Raw, role: Role) {
     }
 }
 
-/// The recording worker's start-save pose. Written by the fighter frame; this only reads atomics.
+/// The recording worker's live pose of a fighter. Written by the fighter frame; this only reads atomics.
 pub fn live_saved(slot: usize) -> SavedState {
-    let mut state = SavedState::never_saved();
+    live_pose(slot).saved()
+}
+
+/// A fighter's live pose (the record chord's start save, `recording_host::record_start`). Atomics only, no allocation;
+/// a slot never seen is kind −1.
+pub fn live_pose(slot: usize) -> crate::engine::rr_host::StartPose {
+    let unseen = crate::engine::rr_host::StartPose { fighter_kind: -1, situation_kind: 0, x: 0.0, y: 0.0, percent: 0.0, lr: 1.0 };
     if slot >= 2 {
-        return state;
+        return unseen;
     }
     let kind = LIVE_KIND[slot].load(Ordering::Acquire);
     if kind < 0 {
-        return state;
+        return unseen;
     }
-    state.fighter_kind = kind;
-    state.situation_kind = LIVE_SIT[slot].load(Ordering::Acquire);
-    state.x = f32::from_bits(LIVE_X[slot].load(Ordering::Acquire));
-    state.y = f32::from_bits(LIVE_Y[slot].load(Ordering::Acquire));
-    state.percent = f32::from_bits(LIVE_DMG[slot].load(Ordering::Acquire));
-    state.lr = f32::from_bits(LIVE_LR[slot].load(Ordering::Acquire));
-    state
+    crate::engine::rr_host::StartPose {
+        fighter_kind: kind,
+        situation_kind: LIVE_SIT[slot].load(Ordering::Acquire),
+        x: f32::from_bits(LIVE_X[slot].load(Ordering::Acquire)),
+        y: f32::from_bits(LIVE_Y[slot].load(Ordering::Acquire)),
+        percent: f32::from_bits(LIVE_DMG[slot].load(Ordering::Acquire)),
+        lr: f32::from_bits(LIVE_LR[slot].load(Ordering::Acquire)),
+    }
+}
+
+/// The fighter's module accessor its last frame ran with (0 before one ran, and after a scene departure or hot swap,
+/// `cancel_pending`). Game thread only.
+pub fn fighter_accessor(slot: usize) -> usize {
+    FIGHTER_ACC.get(slot).map_or(0, |cell| cell.load(Ordering::Acquire))
 }
 
 /// Read value-only fighter state without changing a numbered slot, requesting
