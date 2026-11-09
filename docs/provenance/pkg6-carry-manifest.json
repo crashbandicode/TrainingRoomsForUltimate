@@ -6266,7 +6266,7 @@
    "dest": "src/runtime/roster/native_body_bank.rs",
    "crate": "root",
    "src_sha256": "ccf7ac678691fa0101a1eff5dbd9300a1b12fe64e9ebbde515697adfbb841c98",
-   "dest_sha256": "f2c67f4350d1e2fc29a0f4fbfd82eef753908ab737505df366570cd771d5236d",
+   "dest_sha256": "0572ecb84c897313b4ab6d31a70c037fb4bd369f14f2af6433625a416e74cc72",
    "edits": [
     {
      "old": "unsafe fn finalize_entry(entry: *mut u8) -> u64 {\n",
@@ -8303,6 +8303,11 @@
      "old": "    for value in &WAITING_PAUSE { value.store(0, Ordering::Release); }\n",
      "new": "    for value in &RELEASE_MEMBERS { value.store(0, Ordering::Release); }\n",
      "reason": "rc.6 preload priority (operator rule 2026-11-09 13:21Z, INBOX-opus-rc6-docs; Eden final-surface-i3-pf-r2 x6-cc): new members load at once; parked groups whose room they need are freed now (release_for_new_members, capacity_release, leaves_now), not at the pause"
+    },
+    {
+     "old": "        trace!(\"[GroupSwap] release now owner={} group={} kinds={:x?} kept={} reason={} refused owner={} group={}; the entry tick frees it\",\n",
+     "new": "        trace!(\"[GroupSwap] release now owner={} group={} kinds={:x?} kept={} reason={} held prefetch owner={} group={}; the entry tick frees it\",\n",
+     "reason": "rc.6 preload priority: the release_for_capacity diag line says which held prefetch it frees room for (no refusal wording; playbook compliance)"
     }
    ]
   },

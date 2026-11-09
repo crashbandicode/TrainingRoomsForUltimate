@@ -132,7 +132,7 @@ fn a_refused_prefetch_frees_a_parked_group_now() {
         "if !g.leaving || !leaves_at_pause(g.state) { continue; }", "if g.release_now { return; }",
         "if bank.swap.is_none_or(|s| s.group != index) { parked.push(((role, index), *g.members, g.parked_kept)); }",
         "let Some((role, index)) = capacity_release(parked.iter().copied()) else { return; };",
-        "g.release_now = true;", "trace!(\"[GroupSwap] release now owner={} group={} kinds={:x?} kept={} reason={} refused",
+        "g.release_now = true;", "trace!(\"[GroupSwap] release now owner={} group={} kinds={:x?} kept={} reason={} held prefetch",
     ]);
     let swap = body(BANK, "unsafe fn perform_swap(");
     ordered(swap, &["group.leaving = false;", "group.release_now = false;"]);

@@ -6062,7 +6062,7 @@ fn release_for_capacity(owner: u32, group: usize, reason: &str) {
     let parked_owner = bank.owner;
     if let Some(g) = bank.groups.get_mut(index).filter(|g| g.leaving && leaves_at_pause(g.state)) {
         g.release_now = true;
-        trace!("[GroupSwap] release now owner={} group={} kinds={:x?} kept={} reason={} refused owner={} group={}; the entry tick frees it",
+        trace!("[GroupSwap] release now owner={} group={} kinds={:x?} kept={} reason={} held prefetch owner={} group={}; the entry tick frees it",
             parked_owner, index, &g.members.kinds()[..g.members.count()], g.parked_kept, reason, owner, group);
     }
 }
