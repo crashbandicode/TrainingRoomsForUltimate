@@ -162,7 +162,7 @@ It now says so: "Same as ‹saved name›, nothing new saved". A changed name al
   the normal (slower) way.
 - **Kirby.** While Player 1 or the CPU is Kirby, groups that aren't built yet wait; built groups stay ready. A session
   that starts on Kirby builds its other groups after the first switch away from Kirby. Leaving a Kirby that holds a
-  copy ability reloads, as in rc.3.1. TODO-PROOF: pending the operator's row 38 (D-KIRBY1).
+  copy ability reloads, as in rc.3.1.
 - **Two Mii groups for one player.** The game keeps one Mii per player. With two Mii groups in one player's cycle, the
   second is built in the background only after that player leaves the first Mii.
 - **A Training reset can pause for a moment.** Now and then a Training reset pauses the game for 0.14–0.23 s (seen in
