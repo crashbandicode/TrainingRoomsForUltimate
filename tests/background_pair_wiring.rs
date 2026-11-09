@@ -92,12 +92,13 @@ const CPU: &str = include_str!("../src/runtime/mii/mii_ordinary_cpu.rs");
 fn the_ice_climbers_original_is_served_by_its_bank() {
     let member = body(BANK, "pub(crate) fn original_member(");
     ordered(member, &["if !settings.original_bank_enabled() { return false; }",
-        "if kind != POPO { return original_bankable(kind); }",
+        "if kind != POPO && Members::native_group(kind).is_none() { return original_bankable(kind); }",
         "request_forms(word(0x14), [word(0x18), word(0x1c), word(0x20)], word(0x28))",
-        ".is_some_and(|forms| original_form_bankable(kind, forms, pair_enabled(&settings)))"]);
+        ".is_some_and(|forms| original_form_bankable(kind, forms, pair_enabled(&settings), special_policy(&settings).native))"]);
     let excluded = body(BANK, "fn excluded_original(");
     assert!(excluded.contains(
-        "original_form_bankable(*kind, super::requested_forms_at(menu, logical, *kind, None), pair_enabled(settings))"), "{excluded}");
+        "original_form_bankable(*kind, super::requested_forms_at(menu, logical, *kind, None), pair_enabled(settings),"), "{excluded}");
+    assert!(excluded.contains("special_policy(settings).native)))"), "{excluded}");
     for (name, src, kept) in [("player", PLAYER, 1), ("cpu", CPU, 0)] {
         assert!(src.contains("&& super::body_bank::original_member(origin.original_kind,&descriptor) => Some(Live::Original),"), "{name}");
         assert_eq!(src.matches("original_bankable(origin.original_kind)").count(), kept, "{name}: only the player's at_origin");

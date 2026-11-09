@@ -528,5 +528,10 @@ Relayed in `artifacts/phase23/INBOX-opus-rc6-hotslots.md`. They replace item 3 o
   The IC original can't Reload and destroy the role's bank, so the EXCLUSIONS §9 row is lifted for the normal pair
   original while the pair bank is on (a capability expansion, not a narrowing). Solo Popo, Mii and native-group
   originals keep the canonical Reload.
+- **2026-11-09 01:09Z** (primary, INBOX-opus-rc6-hotslots, applying "All groups in rc.6"): a session that starts on
+  Pokémon Trainer or Pyra/Mythra gets P1's other groups built in the background, and the return to that original is
+  warm, keeping P1's bank. H1 accepts the native group as the window lead, and lifting the EXCLUSIONS §9
+  PT/Aegis-original row is approved: the native-group original is a bank member while native groups are on (a
+  capability expansion). Solo Popo and Mii originals keep the canonical Reload.
 
 This records the decisions only; the implementation, host tests and Eden proofs are recorded in `CARRY-OVER.md`.

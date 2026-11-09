@@ -1350,13 +1350,13 @@ pub fn role_counts(planned_targets: u8, extra: u8, window: WindowStatus, groups:
 }
 
 /// The window part of a role's planned targets (`plan_budget`): `next`, the reusable extras of the window the lane's
-/// next kind would get, except for a live pair-lead window (`live`: its members and active kind) with groups on. That
-/// window stays while the role's groups build around it (rc.6 item 3, a session that starts on Ice Climbers), so it
-/// plans what it serves: its reusable extras, the count the notice reads (`role_counts`' `extra`), not the lane
-/// window's (which has one more member than the pair's single extra cell).
+/// next kind would get, except for a live pair-lead or native-group window (`live`: its members and active kind) with
+/// groups on. That window stays while the role's groups build around it (rc.6 item 3, a session that starts on Ice
+/// Climbers, Pokémon Trainer or Pyra/Mythra), so it plans what it serves: its reusable extras, the count the notice
+/// reads (`role_counts`' `extra`), not the lane window's.
 pub fn window_targets(grouped: bool, live: Option<(Members, u32)>, original: Option<u32>, next: u8) -> u8 {
     match live {
-        Some((members, active)) if grouped && members.is_pair_lead() => {
+        Some((members, active)) if grouped && (members.is_pair_lead() || matches!(members.special(), Special::Native(_))) => {
             let (kinds, count) = members.logical_kinds();
             crate::engine::preload::cycle_preload_capacity::reusable_extras(&kinds[..count], active, original)
         }
@@ -3659,6 +3659,26 @@ mod tests {
                 }
             }
             assert!(bodies <= ready.saturating_sub(6), "{ready}: {:?}", plan);
+        }
+    }
+
+    /// rc.6 item 3, a session that starts on Pokémon Trainer or Pyra/Mythra (inbox 01:09Z): the live window is the
+    /// native group H1 made the lead, and it stays while the role's groups build around it, as the pair-lead window
+    /// does. It plans what it serves, the count the notice reads (`role_counts`' `extra`: its forms beside the active
+    /// one), not the window the lane's next kind would get.
+    #[test]
+    fn a_live_native_window_plans_what_it_serves() {
+        use crate::engine::preload::cycle_preload_capacity::reusable_extras;
+        for (lead, forms) in [(0x24, 2u8), (0x5a, 1)] {
+            let window = Members::native_group(lead).unwrap();
+            let (kinds, count) = window.logical_kinds();
+            assert_eq!(reusable_extras(&kinds[..count], lead, None), forms);
+            assert_eq!(window_targets(true, Some((window, lead)), None, 3), forms, "{lead:#x}");
+            assert_eq!(window_targets(false, Some((window, lead)), None, 3), 3, "{lead:#x}: groups off");
+            let group = count_extra_groups(&[(members(&[MARIO, DK]), GroupState::Built)]);
+            let planned = window_targets(true, Some((window, lead)), None, 3) + group.planned;
+            let role = role_counts(planned, forms, WindowStatus::Built, group);
+            assert_eq!((role.planned, role.ready, role.unstarted()), (forms + 2, forms + 2, 0), "{lead:#x}");
         }
     }
 

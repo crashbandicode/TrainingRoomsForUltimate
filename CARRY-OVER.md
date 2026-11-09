@@ -1122,3 +1122,62 @@ Operator decision "All groups in rc.6" and the start-on-the-kind rule (`docs/DEC
 - Recorded manifest edits of `rows_a1.rs`, `body_bank.rs` and `native_body_bank.rs`; `carry_pkg6.py
   carry/ledger/verify` re-derives all 250 files.
 - Eden: `artifacts/phase23/LANE-OPUS-RC6-BG-IC-REPORT.md`.
+
+### p23/rc6-pt-start: a session that starts on Pokémon Trainer or Pyra/Mythra (2026-11-09, rc.6 item 3)
+
+Primary 2026-11-09 01:09Z (INBOX-opus-rc6-hotslots), applying the operator's "All groups in rc.6". This is the
+native-group equivalent of worker A's Ice Climbers start (`ca8af47`, `04a823c`, `3bd9db4`). Branch base: `b027703`
+plus the merges of `p23/rc6-bg-pt` `6d497e5` and `p23/rc6-bg-ic` `a46c6b3`. The merges' own resolutions are in their
+commit messages; the shared hook at `0x60de68` is worker A's `background_tail`, which does the Mii shadow restore and
+then X1.
+
+**H1:**
+- `entry_window::extendable` accepts native's header for a native-group start: the whole group in its own order
+  (`Members::native_group`), with its lead as the object kind. That is PT `[24, 25, 26]` with object `0x24`, and Aegis
+  `[5a, 5b]` with object `0x5a`.
+- `entry_window` makes that group its own window lead: no extra cell, whatever room Ready Fighters leaves (its bodies
+  are native's own).
+- `scene_header` does this only with native groups on, the original bank on, and the group as slot 0's requested form.
+- A start on another form (Ivysaur, Charizard, Mythra-first) stays native's: its header is a rotation.
+
+**H3** keeps native's creation as it is (`keeps_native_creation`): same count, kinds and actor count, and the active
+form stays native's starting form. Nothing is written. **H4** binds on those words, and **H2** records native's own
+requests (every form and the object key), so nothing is supplemental.
+
+**The return to the original is warm.**
+- EXCLUSIONS §9 is lifted for the native-group original, as approved. The PT and Aegis rows' `original_bankable` is
+  true, and `original_form_bankable(kind, forms, pair_bank, native_bank)` has a native arm (native groups on).
+- `original_member` (both Mii adapters' Original gate) and `excluded_original` ask that rule. The return is then a group
+  swap to the record holding the native window, never the Reload that retires the bank.
+- The kind-only `original_bankable` is unchanged: a native group is never a single-body cell.
+
+**The notice:** worker A's `body_bank::window_targets` counts a live native window like the pair-lead window; it plans
+what it serves.
+
+**Eden `rc6-hot-xps22`** (diag `559f4965`, ubuntu-xps, Res1X, volume 0):
+- **PT start** (tile 37, P1 cycle DK Link Samus Yoshi):
+  - P1's window lead was `[24, 25, 26]` (H1, creation kept, bound, Ready).
+  - `[DK, Link]` and `[Samus, Yoshi]` were built in the background beside the live PT window; the notice settled at
+    Ready 8/8.
+  - Two laps from the PT original: every switch warm and every return to PT a group exchange, with the bank kept.
+    Request-to-Ready times: first lap 192 / 62 / 432 ms; second lap 93 / 51 / 92 ms.
+- **Pyra/Mythra start** (tile 80): P1's window lead was `[5a, 5b]`, and the laps passed with every switch warm.
+  Request-to-Ready times: Aegis → DK 62 ms, return 82 ms, then 51 ms.
+- **The first PT exchange each way is dominated by the trainer articles:** retiring them on detach took about 90 ms the
+  first time; rebuilding them on attach (`special_articles::rebuild_current`) took 382 ms the first time and 62 ms the
+  second.
+- **The run's two unmapped reads** (`Read8 @ 0x0`, `main+0x35609c0` under `0x3a6270`, called from `rebuild_current`)
+  are the PT trainer-article null read that worker B is fixing. They came on the two returns to PT.
+- **The loaded rows' frame gaps** were 9 frames in the first frames of the PT scene, and 6 frames with no bank step at or
+  above 4 ms. No cycle change is involved.
+
+**Tests, each failed first:**
+- `entry_window::a_native_group_start_is_its_own_window_lead`;
+- `swap_model::a_native_group_original_is_a_bank_member_while_native_groups_are_on` (worker A's IC test takes the
+  fourth argument);
+- `body_bank::a_live_native_window_plans_what_it_serves`;
+- `tests/background_native_wiring.rs` `the_start_up_window_serves_a_native_group_start` (worker A's pinned texts in
+  `tests/background_pair_wiring.rs` follow the native arm).
+
+Recorded manifest edits of the four carried files; `carry_pkg6.py carry/ledger/verify` re-derives all 250 files.
+`docs/DECISIONS.md` records the 01:09Z decision.

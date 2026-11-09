@@ -371,26 +371,28 @@ fn canonical_original(menu: &crate::engine::compat::menu::TrainingModpackMenu, r
 /// from the reusable count. With `original_bank` on, an ordinary single-body
 /// original is an ordinary member instead (EXCLUSIONS §9): the adapters then plan
 /// `Target::Original` through `plan()` like a numbered fighter, and nothing is
-/// excluded. So is the normal Ice Climbers pair while the pair bank is on (rc.6,
-/// `original_form_bankable`; its window or pair group serves it). Solo Popo, Miis and
-/// native-group originals stay canonical.
+/// excluded. So are the normal Ice Climbers pair while the pair bank is on, and a
+/// native-group original while native groups are on (rc.6, `original_form_bankable`;
+/// its window or group serves it). Solo Popo and Miis stay canonical.
 fn excluded_original(settings: &Settings, menu: &crate::engine::compat::menu::TrainingModpackMenu, role: usize) -> Option<u32> {
     let logical = if role == 0 { super::Role::Player } else { super::Role::Cpu };
     canonical_original(menu, role).filter(|kind| !(settings.original_bank_enabled()
-        && original_form_bankable(*kind, super::requested_forms_at(menu, logical, *kind, None), pair_enabled(settings))))
+        && original_form_bankable(*kind, super::requested_forms_at(menu, logical, *kind, None), pair_enabled(settings),
+            special_policy(settings).native)))
 }
 
-/// The Mii adapters' gate for a return to the role's slot-0 original (EXCLUSIONS §9 with rc.6's pair original): may
-/// the bank serve it, so the return is a warm switch and never the Reload that retires the bank? `original_bank` on and,
-/// for Ice Climbers, `original_form_bankable` for the form the staged request's words spell (the pair needs the pair
-/// bank). Every other kind keeps `original_bankable(kind)`.
+/// The Mii adapters' gate for a return to the role's slot-0 original (EXCLUSIONS §9 with rc.6's pair and native-group
+/// originals): may the bank serve it, so the return is a warm switch and never the Reload that retires the bank?
+/// `original_bank` on and, for Ice Climbers, Pokémon Trainer and Pyra/Mythra, `original_form_bankable` for the form the
+/// staged request's words spell (the pair needs the pair bank, a native group native groups). Every other kind keeps
+/// `original_bankable(kind)`.
 pub(crate) fn original_member(kind: u32, descriptor: &[u8; 0x70]) -> bool {
     let settings = crate::runtime::roster::cycle_preload_config::snapshot();
     if !settings.original_bank_enabled() { return false; }
-    if kind != POPO { return original_bankable(kind); }
+    if kind != POPO && Members::native_group(kind).is_none() { return original_bankable(kind); }
     let word = |at: usize| u32::from_le_bytes([descriptor[at], descriptor[at + 1], descriptor[at + 2], descriptor[at + 3]]);
     crate::engine::swap::swap_model::capabilities::request_forms(word(0x14), [word(0x18), word(0x1c), word(0x20)], word(0x28))
-        .is_some_and(|forms| original_form_bankable(kind, forms, pair_enabled(&settings)))
+        .is_some_and(|forms| original_form_bankable(kind, forms, pair_enabled(&settings), special_policy(&settings).native))
 }
 
 fn groups_enabled(settings: &crate::engine::preload::cycle_preload_config::Settings) -> bool {
@@ -1943,6 +1945,11 @@ unsafe fn scene_header(ctx: &mut InlineCtx) {
     let role = if facts.owner == 0 { super::Role::Player } else { super::Role::Cpu };
     if original == POPO && !(pair_enabled(&settings)
         && super::requested_forms_at(&menu, role, POPO, Some(0)) == Forms::starting(POPO)) { return; }
+    // rc.6 item 3, Pokémon Trainer and Pyra/Mythra (inbox 01:09Z): the native group becomes its own window lead only with
+    // native groups on, the group as the slot's requested form, and the original's return served by the bank
+    // (`original_form_bankable`): otherwise the role's first switch back to it would Reload and retire the bank.
+    if Members::native_group(original).is_some() && !(special_policy(&settings).native && settings.original_bank_enabled()
+        && super::requested_forms_at(&menu, role, original, Some(0)) == Forms::starting(original)) { return; }
     let roster = if facts.owner == 0 { menu.player_roster } else { menu.cpu_roster };
     let cycle = crate::engine::swap::cycle_members::cycle_members(roster, crate::engine::swap::cycle_members::NO_MII);
     let numbered = crate::engine::swap::cycle_members::numbered(&cycle, Some(original));
@@ -1985,7 +1992,7 @@ unsafe fn publish_pending(owner: u32, members: Members, scene: Option<(u32, u32)
 /// window. Native's single form of the window's original becomes the window (count, kinds, actor count, active 0,
 /// as Pokémon Trainer's creation reads); any other shape retires the pending window and leaves the creation as it is.
 pub(crate) unsafe fn creation(owner: u32, descriptor: *mut u8) {
-    use crate::engine::swap::entry_window::{creation_matches, Words};
+    use crate::engine::swap::entry_window::{creation_matches, keeps_native_creation, Words};
     let Some(role) = role(owner) else { return; };
     if !aligned(descriptor) { return; }
     let mut state = BANKS[role].lock();
@@ -1999,6 +2006,11 @@ pub(crate) unsafe fn creation(owner: u32, descriptor: *mut u8) {
         bank.departed = true;
         EXTRAS[role].store(0, Ordering::Release);
         trace!("[BodyBank] start-up window owner={} dropped: creation {:x?} is not {:x?}", owner, native, window.kinds);
+        return;
+    }
+    // rc.6 item 3: a native-group lead is native's own creation, its starting form included; nothing is written.
+    if keeps_native_creation(window) {
+        trace!("[BodyBank] start-up window owner={} creation {:x?} kept (native group lead)", owner, native);
         return;
     }
     fields::write_unchecked(descriptor as usize, 0x14, window.count);

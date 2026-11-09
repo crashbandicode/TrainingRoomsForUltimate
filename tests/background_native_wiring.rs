@@ -124,3 +124,31 @@ fn native_groups_build_in_the_background_only_with_their_rows() {
     assert!(BANK.contains("const TRAINER_CALLBACK: usize = 0x651770;"));
     assert!(BANK.contains("const PARTNER_TABLE: usize = 0x52b94c8;"));
 }
+
+/// rc.6 item 3, a session that starts on Pokémon Trainer or Pyra/Mythra (INBOX-opus-rc6-hotslots 01:09Z; model rules
+/// `entry_window::a_native_group_start_is_its_own_window_lead`, `a_native_group_original_is_a_bank_member_while_native_groups_are_on`,
+/// `body_bank::a_live_native_window_plans_what_it_serves`). H1 makes the native group its own window lead only with
+/// native groups on, the original bank on and the group as slot 0's requested form; H3 keeps native's creation (its
+/// starting form included) and writes nothing; H4 binds on its words. Both Mii adapters' Original gates and the planner's
+/// canonical-original exclusion ask the native arm of `original_form_bankable`, so the return to that original is a warm
+/// switch, never the Reload that retires the role's bank.
+#[test]
+fn the_start_up_window_serves_a_native_group_start() {
+    let h1 = body(BANK, "unsafe fn scene_header(");
+    ordered(h1, &["let Some(original) = extendable(facts) else { return; };",
+        "if Members::native_group(original).is_some() && !(special_policy(&settings).native && settings.original_bank_enabled()",
+        "&& super::requested_forms_at(&menu, role, original, Some(0)) == Forms::starting(original)) { return; }",
+        "let Some(members) = entry_window(", "if !publish_pending(facts.owner, members, scene) { return; }"]);
+    let h3 = body(BANK, "pub(crate) unsafe fn creation(");
+    ordered(h3, &["if !creation_matches(native, window) {", "if keeps_native_creation(window) {", "return;",
+        "fields::write_unchecked(descriptor as usize, 0x14, window.count);"]);
+    let h4 = body(BANK, "unsafe fn bind_pending(");
+    assert!(h4.contains("read::<u32>(entry, 0x28) == bank.members.actor_count()"), "{h4}");
+    let member = body(BANK, "pub(crate) fn original_member(");
+    ordered(member, &["if kind != POPO && Members::native_group(kind).is_none() { return original_bankable(kind); }",
+        "original_form_bankable(kind, forms, pair_enabled(&settings), special_policy(&settings).native)"]);
+    let excluded = body(BANK, "fn excluded_original(");
+    assert!(excluded.contains("special_policy(settings).native)))"), "{excluded}");
+    let budget = body(BANK, "pub(crate) fn plan_budget(");
+    assert!(budget.contains("crate::engine::swap::body_bank::window_targets(grouped, live[role], originals[role], next)"), "{budget}");
+}
