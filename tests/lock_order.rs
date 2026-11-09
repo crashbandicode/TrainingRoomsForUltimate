@@ -190,7 +190,7 @@ impl<'g> Ctx<'g> {
     fn lock_at(&self, f: usize, i: usize) -> Option<usize> {
         let func = &self.graph.funcs[f];
         let body = &func.body;
-        let Some(name) = ident(body.get(i)) else { return None };
+        let name = ident(body.get(i))?;
         let qualified = i >= 2 && body[i - 1] == Tok::PathSep;
         self.locks.iter().position(|(file, lock)| {
             if lock != name {
@@ -213,7 +213,6 @@ struct Take {
     lock: usize,
     at: usize,
     end: usize,
-    bound: bool,
 }
 
 /// Start of the statement holding token `k` (just after a `;`, `{`, `}` or `=>` at its own depth).
@@ -423,7 +422,7 @@ fn takes(ctx: &Ctx, f: usize) -> Vec<Take> {
                 } else {
                     statement_end(body, s, i, arm)
                 };
-                out.push(Take { lock, at: i, end, bound });
+                out.push(Take { lock, at: i, end });
             }
         }
     }
@@ -472,22 +471,22 @@ fn takes(ctx: &Ctx, f: usize) -> Vec<Take> {
         let bound_name = (simple && punct(body.get(after), ';')).then(|| ident(body.get(name_at)).unwrap().to_owned());
         // `let Ok(mut g) = NAME.lock() else {…};` binds it too.
         let else_bound = lets && ident(body.get(after)) == Some("else");
-        let (end, bound) = if let Some(close) = closure_end(body, s, at) {
-            (close, false)
+        let end = if let Some(close) = closure_end(body, s, at) {
+            close
         } else if let Some(open) = condition_end(body, s, at) {
-            (open, false)
+            open
         } else if let Some(name) = bound_name {
             let block = block_end(body, at);
             let dropped = (at..block).find(|&j| {
                 ident(body.get(j)) == Some("drop") && punct(body.get(j + 1), '(') && ident(body.get(j + 2)) == Some(name.as_str())
             });
-            (dropped.unwrap_or(block), true)
+            dropped.unwrap_or(block)
         } else if else_bound {
-            (block_end(body, at), true)
+            block_end(body, at)
         } else {
-            (statement_end(body, s, at, arm), false)
+            statement_end(body, s, at, arm)
         };
-        out.push(Take { lock, at, end, bound });
+        out.push(Take { lock, at, end });
     }
     out
 }
@@ -534,8 +533,8 @@ fn scan(graph: &Graph) -> (Ctx<'_>, Scan) {
     s.reach = s.takes.iter().map(|t| t.iter().map(|t| t.lock).collect()).collect();
     loop {
         let mut changed = false;
-        for f in 0..n {
-            let add: BTreeSet<usize> = callees[f].iter().flat_map(|&c| s.reach[c].iter().copied()).collect();
+        for (f, out) in callees.iter().enumerate() {
+            let add: BTreeSet<usize> = out.iter().flat_map(|&c| s.reach[c].iter().copied()).collect();
             let before = s.reach[f].len();
             s.reach[f].extend(add);
             changed |= s.reach[f].len() != before;
@@ -750,8 +749,8 @@ fn the_scan_sees_an_inversion_a_relock_and_a_dropped_guard() {
         (0..n).map(|f| calls(&graph.funcs[f].body).iter().flat_map(|c| ctx.resolve(f, c)).collect()).collect();
     s.reach = s.takes.iter().map(|t| t.iter().map(|t| t.lock).collect()).collect();
     for _ in 0..n {
-        for f in 0..n {
-            let add: BTreeSet<usize> = callees[f].iter().flat_map(|&c| s.reach[c].iter().copied()).collect();
+        for (f, out) in callees.iter().enumerate() {
+            let add: BTreeSet<usize> = out.iter().flat_map(|&c| s.reach[c].iter().copied()).collect();
             s.reach[f].extend(add);
         }
     }

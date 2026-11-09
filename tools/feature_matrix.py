@@ -49,6 +49,18 @@ def read_features(manifest_text):
     return table
 
 
+def path_crate_feature(root, dep):
+    """`<crate>/<feature>` names a feature declared in the path crate crates/<crate>/Cargo.toml."""
+    if "/" not in dep:
+        return False
+    crate, feature = dep.split("/", 1)
+    try:
+        with open(os.path.join(root, "crates", crate, "Cargo.toml"), encoding="utf-8") as f:
+            return feature in read_features(f.read())
+    except OSError:
+        return False
+
+
 CORE = [
     ("default", []),
     ("no-default-features", ["--no-default-features"]),
@@ -119,8 +131,9 @@ def main():
         table = read_features(f.read())
     for name, deps in table.items():
         for dep in deps:
-            # `dep:<crate>` enables an optional dependency (deluxe-sdk's SDK), not a feature of this table.
-            if not dep.startswith("dep:") and dep not in table:
+            # `dep:<crate>` enables an optional dependency (deluxe-sdk's SDK), not a feature of this table;
+            # `<crate>/<feature>` a feature of a path crate under crates/ (hang-trace's hos-lock/owners).
+            if not dep.startswith("dep:") and dep not in table and not path_crate_feature(args.root, dep):
                 raise SystemExit(f"feature {name} requires undeclared {dep}")
     combos = [c for c in combinations(table, args.set) if args.only in c[0]]
     if args.list or not args.run:

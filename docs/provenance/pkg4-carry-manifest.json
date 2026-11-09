@@ -1062,7 +1062,7 @@
    "dest": "src/runtime/macros/named_macros.rs",
    "crate": "root",
    "src_sha256": "737474479d5f05b064ab645d850ceb189cad3943097ae4fdb5fc74d2fcda0809",
-   "dest_sha256": "77db6b0574c9aec5b61f5c2b7430c526621c214d555a55001b34d9b9b3c7f9b7",
+   "dest_sha256": "dd3da29556cec89cbfc150201726d76ede3c61dc4d7d6baca1e5eca8885981cd",
    "edits": [
     {
      "old": "use training_mod_sync::*;",
@@ -1667,6 +1667,11 @@
      "old": "pub(crate) fn recorded_target_matches(target:crate::engine::mii::replay::Target,current:Option<i32>) -> bool {\n",
      "new": "/// #54, reading B (primary 2026-11-08 23:03Z): exactly, against the target as Switch installs it, which is what the\n/// CPU holds after a Switch (a replay Mii's filled create ID and name); until that is known, against the target.\npub(crate) fn recorded_target_matches(target:crate::engine::mii::replay::Target,current:Option<i32>) -> bool {\n    let target=crate::runtime::macros::identity::installed(target).unwrap_or(target);\n",
      "reason": "rc.6 TASK-OPUS-rc6-open-fixes item 2 (#54, primary inbox 2026-11-08 23:03Z, reading B): recorded_target_matches (the fighter prompt's match: a library load, the clip editor's track) compares a recorded exact-Mii target, exactly, as Switch installs it (identity::installed, the game callback's mii_install::installed_target over the CPU catalog: a replay Mii's filled create ID and name), so the next Play after a Switch asks no second Fighter Mismatch; until that copy exists, against the target as before"
+    },
+    {
+     "old": "pub fn clip_foreground() -> bool {\n    !suspended() && !lock_read(&UI).is_open() && crate::runtime::macros::replay_capture::panel_visible()\n        && !naming_pending() && !crate::runtime::mii::native_keyboard::busy()\n",
+     "new": "pub fn clip_foreground() -> bool {\n    // UI's guard ends with this statement: the keyboard service holds NAME_JOB while it takes UI, so UI is never held\n    // while NAME_JOB is taken (tests/lock_order.rs).\n    let open = lock_read(&UI).is_open();\n    !suspended() && !open && crate::runtime::macros::replay_capture::panel_visible()\n        && !naming_pending() && !crate::runtime::mii::native_keyboard::busy()\n",
+     "reason": "rc.6 menu-close freeze audit (primary 2026-11-09 12:28Z; tests/lock_order.rs): clip_foreground reads UI open flag in its own statement, so UI is never held while NAME_JOB is taken (the keyboard service holds NAME_JOB while it takes UI)"
     }
    ]
   },
