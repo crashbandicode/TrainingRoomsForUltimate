@@ -122,6 +122,12 @@ It now says so: "Same as ‹saved name›, nothing new saved". A changed name al
 - **Edit placement** edits the active macro of the role in view, or a chain's first macro. Write over stores the
   offset in that file, Keep holds it until the game closes, and New saves a copy. Play warps to the start save with
   the offset. In rc.5 the row refused with "Load a macro and restore a Training state first".
+- **Momentum** on Edit placement works. With "Keep recorded speed" Play starts the playing role with the speed it had
+  when Record started; with "Start at rest" it starts from standstill. Play used to ignore the key.
+- **A start save is where the recording started.** It used to hold the fighters where the recording stopped
+  (`rr_host::service_at` at `9438039`), so a moving macro warped to its end.
+- **Y in the Setup library** binds a setup without restoring it, and Load then goes to the setup until another save is
+  bound or the bound save changes. Neither A nor Y writes a save file.
 - **Edit combos, Edit chain and Delete** are written to the card. In rc.5 only a save state's Delete was.
 - **The exact Mii.** Switch on a CPU macro recorded on an exact Mii loads that Mii: its look, specials, colour, voice,
   outfit and hat. rc.5 loaded the class's default Mii. A Mii from a replay has no ID and no name of its own; it is
