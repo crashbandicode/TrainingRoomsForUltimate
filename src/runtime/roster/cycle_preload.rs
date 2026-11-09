@@ -141,6 +141,17 @@ pub(crate) fn frame() -> u32 {
     FRAME.load(Ordering::Relaxed)
 }
 
+/// Inbox 06:16Z (diag): what holds the planner's poll, one line per change.
+#[cfg(feature = "diag")]
+fn note_blocked(reason: Option<&'static str>) {
+    static SEEN: Mutex<Option<&str>> = Mutex::new(None);
+    let mut seen = SEEN.lock();
+    if *seen != reason {
+        *seen = reason;
+        crate::engine::compat::logging::diagnostic(format_args!("[PreloadBlocked] {}", reason.unwrap_or("clear")));
+    }
+}
+
 pub(crate) fn settings_changed() {
     reset_admission_grace();
     crate::runtime::roster::character_roster::sources::pause_preload();
@@ -202,6 +213,16 @@ fn poll_status(blocked: bool, notice_blocked: bool, desired: Option<[Option<Targ
         }
         status.desired
     };
+    #[cfg(feature = "diag")]
+    {
+        static SEEN: Mutex<Option<[Option<u32>; MAX_TARGETS]>> = Mutex::new(None);
+        let kinds = desired.map(|t| t.map(|t| t.kind));
+        let mut seen = SEEN.lock();
+        if *seen != Some(kinds) {
+            *seen = Some(kinds);
+            crate::engine::compat::logging::diagnostic(format_args!("[PreloadPlan] desired={:x?}", kinds));
+        }
+    }
     let readiness = crate::runtime::roster::character_roster::sources::preload_readiness(blocked, &desired);
     if crate::runtime::roster::cycle_preload_config::snapshot().measurements {
         let changed = {
@@ -455,7 +476,10 @@ pub unsafe fn on_frame(body: &mut smash::app::BattleObjectModuleAccessor) {
         || crate::runtime::lobby::training::save_states::is_loading()
         || crate::runtime::lobby::training::recording_or_playback()
         || crate::runtime::compat::replay_preview::occupied();
-    if ui_blocked || crate::runtime::roster::character_roster::preload_blocked() {
+    let blocked = if ui_blocked { Some("ui") } else { crate::runtime::roster::character_roster::preload_blocked_reason() };
+    #[cfg(feature = "diag")]
+    note_blocked(blocked);
+    if blocked.is_some() {
         poll_status(true, ui_blocked || crate::runtime::roster::character_roster::notice_blocked(), None);
         return;
     }

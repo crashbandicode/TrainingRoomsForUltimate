@@ -107,6 +107,24 @@ pub fn missing<T: Copy + Eq, const N:usize>(
     current_priority.is_none_or(|current| priority < current).then_some(target)
 }
 
+/// [`missing`] for a parked F9 seat (entry 2 or 3 at fewer CPUs), whose one target is its own member. Only its own entry
+/// can hold that member: the member on the other seat's entry doesn't count for it (primary inbox 2026-11-09 06:16Z, Eden
+/// rc6-bg-pf4: after a CPU switch the two seats' members sat swapped, each entry idle, the notice at "Loading 4/6" and
+/// the preload grace unasked until a P1 switch, 160 s).
+pub fn seat_missing<T: Copy + Eq, const N:usize>(
+    targets: [Option<T>; N],
+    sources: [Option<T>; 8],
+    slot: usize,
+    replaceable: bool,
+    demand_pending: bool,
+) -> Option<T> {
+    let mut own = [None; 8];
+    if let (Some(cell), Some(source)) = (own.get_mut(slot), sources.get(slot)) {
+        *cell = *source;
+    }
+    missing(targets, own, slot, replaceable, demand_pending)
+}
+
 /// An exact Mii fits only the native pair. A configuration is exact even when
 /// the kind alone would look ordinary; Mii class kinds are exact either way.
 pub fn exact_mii(kind: u32, configured: bool) -> bool {
@@ -450,6 +468,31 @@ mod tests {
         }
         ready
     }
+    /// Primary inbox 06:16Z (Eden rc6-bg-pf4): with one CPU, entries 2 and 3 are parked seats for the CPU rotation's next
+    /// two members. After the CPU's switch to 0xd its seats wanted 0x5c (entry 2) and 0xb (entry 3), while entry 2 held
+    /// 0xb and entry 3 held 0x5c. `missing` found each target on the other entry and both stayed idle. A seat counts only
+    /// its own entry, so each loads its own member; an ordinary helper still finds a target anywhere.
+    #[test]
+    fn a_parked_seat_loads_its_member_even_when_the_other_seat_holds_it() {
+        let (first, second) = (0x5c, 0x0b);
+        let mut sources = [None; 8];
+        sources[2] = Some(second);
+        sources[3] = Some(first);
+        let mut seat2 = [None; 1];
+        seat2[0] = Some(first);
+        let mut seat3 = [None; 1];
+        seat3[0] = Some(second);
+        assert_eq!(seat_missing(seat2, sources, 2, true, false), Some(first), "entry 2 loads its member");
+        assert_eq!(seat_missing(seat3, sources, 3, true, false), Some(second), "entry 3 loads its member");
+        assert_eq!(missing(seat2, sources, 2, true, false), None, "an ordinary helper finds it on entry 3");
+        // A seat that holds its member stays; the seat rules for a protected or busy entry are unchanged.
+        let mut own = sources;
+        own[2] = Some(first);
+        assert_eq!(seat_missing(seat2, own, 2, true, false), None);
+        assert_eq!(seat_missing(seat3, sources, 3, false, false), None, "not replaceable");
+        assert_eq!(seat_missing(seat3, sources, 3, true, true), None, "a demand pending");
+    }
+
     #[test]
     fn warm_assets_never_claim_fighters_are_ready() {
         let assets = readiness(5, 2, false, [Some(1), Some(2)], NONE, ready_of(&[1, 2]));

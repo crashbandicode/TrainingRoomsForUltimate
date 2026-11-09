@@ -529,12 +529,37 @@ fn selected_request(state:&State,slot:u32,menu_open:bool)->Option<(Want,bool)> {
     // P-HOT (LANE-HOT-SLOTS-REPORT.md §5.1, §3.5.1): Training's helper entries by purpose.
     #[cfg(feature="managed-third-source-alpha")]
     let targets=purpose_view(state,slot as usize,targets);
+    #[cfg(feature="managed-third-source-alpha")]
+    let seat=parked_seat_view(state,slot,&targets);
+    #[cfg(not(feature="managed-third-source-alpha"))]
+    let seat=false;
     // Scheduling grants no native admission; the created destination must still
     // pass its full registration, protected-record and source-lifetime checks.
     let targets=crate::engine::preload::cycle_preload_policy::schedulable(targets,exact_supported,want_exact);
-    crate::engine::preload::cycle_preload_policy::missing(targets,sources,slot as usize,
-        state.book.can_replace(slot as usize)==Ok(true),state.wants.iter().any(Option::is_some))
-        .map(|want|(want,true))
+    let (replaceable,demand)=(state.book.can_replace(slot as usize)==Ok(true),state.wants.iter().any(Option::is_some));
+    if seat {
+        crate::engine::preload::cycle_preload_policy::seat_missing(targets,sources,slot as usize,replaceable,demand)
+    } else {
+        crate::engine::preload::cycle_preload_policy::missing(targets,sources,slot as usize,replaceable,demand)
+    }.map(|want|(want,true))
+}
+
+/// Inbox 06:16Z (Eden rc6-bg-pf4): `purpose_view` gave Training's entry `slot` its seat's member alone (an armed Reload,
+/// else the parked member, in `purpose_view`'s order; `seat_states` counts the parked one). That seat is judged on its own entry
+/// (`cycle_preload_policy::seat_missing`): its member on the other seat's entry doesn't count for it. Lock order as
+/// `purpose_view`: STATE (held by the caller), then the borrow record and the F9 gate.
+#[cfg(feature="managed-third-source-alpha")]
+fn parked_seat_view(state:&State,slot:u32,view:&[Option<Want>;crate::runtime::roster::cycle_preload::MAX_TARGETS])->bool {
+    if !matches!(slot,2|3) || !unsafe{crate::runtime::compat::common::is_native_training_mode()} {return false;}
+    let mut wants=view.iter().flatten();
+    let (Some(only),None)=(wants.next(),wants.next()) else {return false;};
+    let member=crate::runtime::roster::f9_gate::override_seat(slot).or_else(||{
+        let quantity=unsafe{native_source::training_cpu_quantity()};
+        if quantity.is_some_and(|count|slot<=count) {return None;}
+        let borrowed=ENTRY3_BORROW.lock().current().filter(|b|state.book.is_current(b.epoch)).is_some();
+        crate::model::parked_entries::parked_seat(slot,quantity,borrowed,crate::runtime::roster::f9_gate::seat_member(slot))
+    });
+    member==Some((only.kind,only.configuration))
 }
 
 /// P-HOT §5.1: the targets Training's helper `slot` may load, by purpose (`hat_slots::slot_view`): the created entries
@@ -2271,6 +2296,19 @@ unsafe fn capacity_preflight_for(ctx: &ServiceEntryContext, entry: *const u8,
     capacity::load_preflight_checked(ctx, entry, owner, previous.map(|source| source.kind))
 }
 
+/// Inbox 06:16Z (diag): why helper entries 2 and 3 took no load, one line per change of reason.
+#[cfg(feature = "diag")]
+fn note_skip(slot: u32, reason: &'static str) {
+    static SEEN: Mutex<[&str; 2]> = Mutex::new(["", ""]);
+    if !matches!(slot, 2 | 3) { return; }
+    let mut seen = SEEN.lock();
+    let i = (slot - 2) as usize;
+    if seen[i] != reason {
+        seen[i] = reason;
+        crate::engine::compat::logging::diagnostic(format_args!("[CharacterSources] service slot={} {}", slot, reason));
+    }
+}
+
 pub unsafe fn service(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) {
     // Diag (F9 research): one line per change of No. of CPUs seen by the native loader callback, with the slot it served, so an
     // Eden row tells whether this callback runs while the pause menu is open (before the game activates a parked entry).
@@ -2300,9 +2338,11 @@ pub unsafe fn service(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) {
         crate::runtime::roster::f9_gate::clear_armed_if(slot, kind);
     }
     if service_owned(ctx, entry, slot) {
+        #[cfg(feature = "diag")] note_skip(slot, "owned");
         return;
     }
     if crate::runtime::roster::f9_gate::block_new_load(slot) {
+        #[cfg(feature = "diag")] note_skip(slot, "F9 handover");
         return;
     }
     // Ordinary demand can require additional capacity before the idle return.
@@ -2327,6 +2367,7 @@ pub unsafe fn service(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) {
         // Idle: no native snapshots, log formatting, or allocation.
         // Per-slot: a want this helper may take is not hidden by an earlier avoided want.
         let Some(request) = selected_request(&state, slot, false) else {
+            #[cfg(feature = "diag")] note_skip(slot, "idle");
             return;
         };
         (
@@ -2345,17 +2386,28 @@ pub unsafe fn service(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) {
         (request, !ready_still_requested(&state, index) && state.book.can_replace(index) == Ok(true),
             state.sources[index])
     } else { initial };
-    if speculative && super::preload_blocked() { return; }
+    if speculative {
+        if let Some(_reason) = super::preload_blocked_reason() {
+            #[cfg(feature = "diag")] note_skip(slot, _reason);
+            return;
+        }
+    }
     let grace = if speculative {
-        let Some(generation) = crate::runtime::roster::cycle_preload::speculative_admission() else { return; };
+        let Some(generation) = crate::runtime::roster::cycle_preload::speculative_admission() else {
+            #[cfg(feature = "diag")] note_skip(slot, "grace deferred");
+            return;
+        };
         Some(generation)
     } else { None };
     if !replaceable {
+        #[cfg(feature = "diag")] note_skip(slot, "not replaceable");
         return;
     }
     if admission_blocker().is_some() {
+        #[cfg(feature = "diag")] note_skip(slot, "admission blocker");
         return;
     }
+    #[cfg(feature = "diag")] note_skip(slot, "load");
     let Ok(backend) = qualified_backend() else {
         return;
     };
