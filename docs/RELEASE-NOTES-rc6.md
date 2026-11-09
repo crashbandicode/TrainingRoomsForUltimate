@@ -153,6 +153,13 @@ It now says so: "Same as ‹saved name›, nothing new saved". A changed name al
     the character swap to finish".
 - **No heap use in the game's hooks** when the CPU-as-Player 1 fallback runs, that is, without the standalone pilot
   plugin. rc.5 allocated there.
+- **P1 CPU Control in an online match.** Without the standalone pilot plugin, P1 CPU Control now plays Player 1 in an
+  online match. Before, it worked only in Training: in a Quickplay match Player 1 stood still, and the game dropped the
+  console for inactivity. TODO-PROOF: the merged candidate's final Quickplay boot (branch proof `rc6-bg-qp6`).
+- **Lobby Items Off in Quickplay's waiting area.** Off now also stops the waiting room's timed item drops. In rc.5 they
+  kept coming with the row Off, one every 10–13 s. Items already out are still removed once when you turn it Off, and
+  On brings items back. In local-wireless rooms the game spawns no items at all. TODO-PROOF: the merged candidate's
+  final Quickplay boot (branch proof `rc6-bg-qp7`), and the console test.
 
 ## Known issues
 
@@ -169,10 +176,6 @@ It now says so: "Same as ‹saved name›, nothing new saved". A changed name al
   second is built in the background only after that player leaves the first Mii.
 - **A Training reset can pause for a moment.** Now and then a Training reset pauses the game for 0.14–0.23 s (seen in
   Eden). The pause is in the game's own reset, not in this mod's loading.
-- **Lobby Items.** Off stops the waiting room's item spawner, and On starts it again. TODO-PROOF: confirmed on console
-  (the operator's test in an online arena: On drops items, Off doesn't), and the Quickplay waiting-area session
-  `rc6-bg-qp1` (primary 10:22Z, 10:24Z). Until then: in the emulator's local-wireless rooms the game spawns no items at
-  all, so no item was seen on screen yet.
 
 ## Corrections to the rc.5 notes
 
