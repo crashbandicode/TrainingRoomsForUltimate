@@ -572,18 +572,43 @@ fn previous_cell_index_names_a_cell_the_attached_group_has() {
 fn an_ice_climbers_pair_original_is_a_bank_member_while_the_pair_bank_is_on() {
     use capabilities::{original_bankable, original_form_bankable, FormClass};
     assert!(capabilities::capabilities(FormClass::IcPair).original_bankable);
-    assert!(original_form_bankable(POPO, Forms::starting(POPO), true));
-    assert!(!original_form_bankable(POPO, Forms::starting(POPO), false), "pair bank off");
-    assert!(!original_form_bankable(POPO, Forms::solo_popo(), true), "Solo Popo");
+    assert!(original_form_bankable(POPO, Forms::starting(POPO), true, false));
+    assert!(!original_form_bankable(POPO, Forms::starting(POPO), false, false), "pair bank off");
+    assert!(!original_form_bankable(POPO, Forms::solo_popo(), true, false), "Solo Popo");
     assert!(!original_bankable(POPO) && !original_bankable(NANA), "the kind-only predicate is unchanged");
     for kind in kinds().filter(|kind| *kind != POPO) {
         for pair_bank in [false, true] {
-            assert_eq!(original_form_bankable(kind, Forms::starting(kind), pair_bank), original_bankable(kind), "{kind:#x}");
+            assert_eq!(original_form_bankable(kind, Forms::starting(kind), pair_bank, false), original_bankable(kind), "{kind:#x}");
         }
     }
-    assert!(original_form_bankable(0x00, Forms::starting(0x00), false));
-    assert!(original_form_bankable(KIRBY, Forms::starting(KIRBY), false));
+    assert!(original_form_bankable(0x00, Forms::starting(0x00), false, false));
+    assert!(original_form_bankable(KIRBY, Forms::starting(KIRBY), false, false));
     for kind in [0x24, 0x5a, 0x48] {
-        assert!(!original_form_bankable(kind, Forms::starting(kind), true), "{kind:#x}: native group or Mii");
+        assert!(!original_form_bankable(kind, Forms::starting(kind), true, false), "{kind:#x}: native group or Mii");
     }
+}
+
+/// rc.6 item 3, a session that starts on Pokémon Trainer or Pyra/Mythra (INBOX-opus-rc6-hotslots 01:09Z: the operator
+/// decided "All groups in rc.6", and lifting the EXCLUSIONS §9 PT/Aegis-original row is approved). The start-up window is
+/// the native group itself (`entry_window`), so the return to that original must not be the canonical Reload that
+/// retires the role's bank: while native groups are on, the native group original is a bank member, served by the
+/// window or by the detached record holding it (`group_serves`). The kind-only `original_bankable` is unchanged for every
+/// caller (a native group is never a single-body cell), and every other kind answers as before.
+#[test]
+fn a_native_group_original_is_a_bank_member_while_native_groups_are_on() {
+    use capabilities::{original_bankable, original_form_bankable, FormClass};
+    assert!(capabilities::capabilities(FormClass::PokemonTrainer).original_bankable);
+    assert!(capabilities::capabilities(FormClass::Aegis).original_bankable);
+    for kind in [0x24, 0x25, 0x26, 0x5a, 0x5b] {
+        assert!(original_form_bankable(kind, Forms::starting(kind), false, true), "{kind:#x}");
+        assert!(!original_form_bankable(kind, Forms::starting(kind), true, false), "{kind:#x}: native groups off");
+        assert!(!original_bankable(kind), "{kind:#x}: the kind-only predicate is unchanged");
+    }
+    for kind in kinds().filter(|kind| !matches!(*kind, 0x24..=0x26 | 0x5a | 0x5b | POPO)) {
+        for native_bank in [false, true] {
+            assert_eq!(original_form_bankable(kind, Forms::starting(kind), false, native_bank), original_bankable(kind), "{kind:#x}");
+        }
+    }
+    assert!(original_form_bankable(POPO, Forms::starting(POPO), true, true), "the pair keeps its own rule");
+    assert!(!original_form_bankable(0x48, Forms::starting(0x48), true, true), "a Mii");
 }

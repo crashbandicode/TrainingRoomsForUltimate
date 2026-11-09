@@ -808,20 +808,30 @@ pub fn async_build_eligible(members: Members, identity: bool) -> Result<(), &'st
 /// live window's actor count (X4, `0x60d21c-0x60d270`: in re6 one-actor windows gave every body `FE+0xf0`; only the
 /// pair's Nana took `FE+0x100`).
 ///
-/// A native group (Pokémon Trainer, Pyra/Mythra; SPECIAL-GROUPS §3) builds as an ordinary group does; its holder records
-/// come from native loader state 11's step after its bodies settled (the adapter's settlement), straight into its saved
-/// window, and its switch-time build stays `0x658af0`'s (`async_build_eligible`). A live native window (one actor, its
-/// cells 0/1 never `[Popo, Nana]`) takes part.
+/// The live window (`window`, the attached group):
+/// - a pair window (`window.is_pair()`: the pair-lead window or the pair group attached; a session that starts on Ice
+///   Climbers) takes part when the construction tail's pair test is redirected for background bodies (`pair_tail`,
+///   `0x60de68`, SPECIAL-GROUPS §0 X1), so their tails take the per-kind release instead of the pair rule on R (which may
+///   reset the whole R mid-play); otherwise it defers the build ("pair window").
+/// - a native window (Pokémon Trainer, Pyra/Mythra; a session that starts on one) takes part: one actor, its cells 0/1
+///   never `[Popo, Nana]`; only an Ice Climbers body picks its info wrapper from the live kinds (X4, `0x60d1f0`), so the
+///   pair group needs the X4 hook there (the cross cells below).
 ///
-/// Ice Climbers (rc.6 item 3, SPECIAL-GROUPS §2; a session that starts on them still gets its groups built):
-/// - the pair group builds here too. Beside a window that is not `[Popo, Nana]` its two tails take the per-kind release
-///   `0x17e8610` on the live cells, which returns exactly the keys its prefetch registered, so no `R+0x50` reference and
-///   no reset-batch permit are involved. N1 gives Nana Popo's context in the tick (the bank lends the group's members
-///   there), the control init serves flags 6, and its warm attach is today's (N2). The switch-time build stays
-///   synchronous (`async_build_eligible`).
-/// - a live pair window (`window.is_pair()`: the pair-lead window or the pair group attached) takes part when the
-///   construction tail's pair test is redirected for background bodies (`pair_tail`, `0x60de68`), so their tails take
-///   the per-kind release instead of the pair rule; otherwise it defers the build ("pair window").
+/// The groups:
+/// - a native group (SPECIAL-GROUPS §3) builds as an ordinary group does; its holder records come from native loader
+///   state 11's step after its bodies settled (the adapter's settlement), straight into its saved window, and its
+///   switch-time build stays `0x658af0`'s (`async_build_eligible`).
+/// - the pair group (SPECIAL-GROUPS §2) builds here too. Beside a window that is not `[Popo, Nana]` its two tails take
+///   the per-kind release `0x17e8610` on the live cells, which returns exactly the keys its prefetch registered, so no
+///   `R+0x50` reference and no reset-batch permit are involved. N1 gives Nana Popo's context in the tick (the bank lends
+///   the group's members there), the control init serves flags 6, and its warm attach is today's (N2). The switch-time
+///   build stays synchronous (`async_build_eligible`).
+/// - a Mii group (SPECIAL-GROUPS §1) builds when it carries its identity: the tick brackets `R`'s words, the entry's Mii
+///   bytes and the D mirror and runs the native Mii setup, and the worker reads a shadow `R` (`native_body_bank`
+///   `SHADOW_R`). A live Mii window defers it (that window's faces and resource object in `R` are a case not built yet).
+///   A live native or pair window takes part (X5, primary 2026-11-09 02:42Z): of §0's live reads, the Mii body's costume
+///   and paths read the shadow (X3), its cell byte is the group's (X2), its tail is the shared hook's (X1), and X4 and X5
+///   touch only Ice Climbers and Aegis bodies; a pair window still needs the redirected tail, as every group does.
 ///
 /// The two cross cells (primary 2026-11-09 00:52Z: "All groups in rc.6", so both must work; SPECIAL-GROUPS §0):
 /// - a native group beside a live pair window needs only the redirected tail above (X1). X4 never applies to its kinds
@@ -843,7 +853,6 @@ pub fn background_build_eligible(members: Members, identity: bool, window: Membe
     let native = |m: Members| matches!(m.special(), Special::Native(_));
     if members.special() == Special::Mii && !identity { return Err("mii without identity"); }
     if members.special() != Special::Pair && (identity || !native(members)) { async_build_eligible(members, identity)?; }
-    if members.special() == Special::Mii && (window.is_pair() || native(window)) { return Err("special window"); }
     if window_identity { return Err("mii window"); }
     if live_kirby { return Err("live kirby"); }
     if window.is_pair() && !pair_tail { return Err("pair window"); }
@@ -1271,8 +1280,8 @@ impl GroupCounts {
     }
 }
 
-/// The window's planned targets: the reusable extras of the window the planner wants for its next lane kind `target`
-/// (`shown`, target first). A group that holds the target already is that window (an exchange left it detached, e.g.
+/// The lane window's planned targets (`next` for [`window_targets`]): the reusable extras of the window the planner wants
+/// for its next lane kind `target` (`shown`, target first). A group that holds the target already is that window (an exchange left it detached, e.g.
 /// while a Mii group is live) and counts with the groups; a member a group holds counts there too (rc6-hot-xps19).
 pub fn next_window_targets(shown: &[u32], target: u32, original: Option<u32>, grouped: impl Fn(u32) -> bool) -> u8 {
     if grouped(target) { return 0; }
@@ -1886,24 +1895,18 @@ mod tests {
         assert_eq!(background_build_eligible(Members::mii_group(0x4a).unwrap(), false, window, false, false, false, false),
             Err("mii without identity"));
         assert_eq!(background_build_eligible(Members::mii_group(0x4a).unwrap(), true, window, true, false, false, false), Err("mii window"));
-        // Never beside a live pair or native window: the Mii branch kept the base's refusal, and no Eden run built one there.
-        for special in [Members::pair_group(), Members::pair_lead(0x02).unwrap(), Members::native_group(0x24).unwrap()] {
-            assert_eq!(background_build_eligible(Members::mii_group(0x4a).unwrap(), true, special, false, false, true, true),
-                Err("special window"));
-        }
         assert_eq!(background_build_eligible(ordinary, true, window, false, false, false, false), Err("identity"));
         // SPECIAL-GROUPS §2: the pair group builds in the background (`a_background_build_takes_the_pair_group_…`).
         assert_eq!(background_build_eligible(Members::pair_group(), false, window, false, false, false, false), Ok(()));
         assert_eq!(background_build_eligible(ordinary, false, window, true, false, false, false), Err("mii window"));
         assert_eq!(background_build_eligible(ordinary, false, window, false, true, false, false), Err("live kirby"));
         // SPECIAL-GROUPS §0 X1: a body's construction tail reads the live cells 0/1; `[Popo, Nana]` takes the pair rule
-        // (and may reset the whole R) unless the tail is redirected (`pair_tail`); without it the build waits.
+        // (and may reset the whole R) unless the tail is redirected (`pair_tail`).
         for pair in [Members::pair_group(), Members::pair_lead(0x02).unwrap()] {
             assert_eq!(background_build_eligible(ordinary, false, pair, false, false, false, false), Err("pair window"));
         }
         // A one-actor native window (X4: every body `FE+0xf0` in re6) takes part (`p23/rc6-bg-pt`, Eden rc6-bg-pt3).
-        assert_eq!(background_build_eligible(ordinary, false, Members::native_group(0x24).unwrap(), false, false, false, false),
-            Ok(()));
+        assert_eq!(background_build_eligible(ordinary, false, Members::native_group(0x24).unwrap(), false, false, false, false), Ok(()));
         let groups = [(GroupState::Built, ordinary, false), (GroupState::Prefetched, Members::mii_group(0x48).unwrap(), true),
             (GroupState::Planned, ordinary, false), (GroupState::Prefetched, Members::new(&[0x1c]).unwrap(), false),
             (GroupState::Prefetched, ordinary, false)];
@@ -1948,8 +1951,9 @@ mod tests {
         }
         assert_eq!(background_build_eligible(pt, false, aegis, false, false, false, false), Ok(()));
         assert_eq!(background_build_eligible(aegis, false, pt, false, false, false, false), Ok(()));
-        // A Mii group (with its identity, since the Mii branch) still never builds beside a live native window.
-        assert_eq!(background_build_eligible(Members::mii_group(0x48).unwrap(), true, pt, false, false, false, false), Err("special window"));
+        // A Mii group (with its identity) builds beside an ordinary window and, with X5, beside a live native window.
+        assert_eq!(background_build_eligible(Members::mii_group(0x48).unwrap(), true, pt, false, false, false, false), Ok(()));
+        assert_eq!(background_build_eligible(Members::mii_group(0x48).unwrap(), true, window, false, false, false, false), Ok(()));
         let groups = [(GroupState::Built, ordinary, false), (GroupState::Prefetched, pt, false),
             (GroupState::Prefetched, aegis, false)];
         assert_eq!(next_background(groups.iter().copied(), window, false, false, false, false), Some(1));
@@ -3729,6 +3733,51 @@ mod tests {
             }
             assert!(bodies <= ready.saturating_sub(6), "{ready}: {:?}", plan);
         }
+    }
+
+    /// rc.6 item 3, a session that starts on Pokémon Trainer or Pyra/Mythra (inbox 01:09Z): the live window is the
+    /// native group H1 made the lead, and it stays while the role's groups build around it, as the pair-lead window
+    /// does. It plans what it serves, the count the notice reads (`role_counts`' `extra`: its forms beside the active
+    /// one), not the window the lane's next kind would get.
+    #[test]
+    fn a_live_native_window_plans_what_it_serves() {
+        use crate::engine::preload::cycle_preload_capacity::reusable_extras;
+        for (lead, forms) in [(0x24, 2u8), (0x5a, 1)] {
+            let window = Members::native_group(lead).unwrap();
+            let (kinds, count) = window.logical_kinds();
+            assert_eq!(reusable_extras(&kinds[..count], lead, None), forms);
+            assert_eq!(window_targets(true, Some((window, lead)), None, 3), forms, "{lead:#x}");
+            assert_eq!(window_targets(false, Some((window, lead)), None, 3), 3, "{lead:#x}: groups off");
+            let group = count_extra_groups(&[(members(&[MARIO, DK]), GroupState::Built)]);
+            let planned = window_targets(true, Some((window, lead)), None, 3) + group.planned;
+            let role = role_counts(planned, forms, WindowStatus::Built, group);
+            assert_eq!((role.planned, role.ready, role.unstarted()), (forms + 2, forms + 2, 0), "{lead:#x}");
+        }
+    }
+
+    /// X5 (primary 2026-11-09 02:42Z, "All groups in rc.6"): a Mii group with its identity builds in the background
+    /// beside a live native window (a session that starts on Pokémon Trainer or Pyra/Mythra) and beside a live pair window
+    /// (Ice Climbers) with the redirected tail, as every group does there. SPECIAL-GROUPS §0's live reads for a Mii body:
+    /// X1 the shared tail, X2 the group's cell byte, X3 the shadow `R`; X4 and X5 touch only Ice Climbers and Aegis bodies.
+    /// A live Mii window and a Mii group without its identity still wait.
+    #[test]
+    fn a_mii_group_builds_beside_a_live_native_or_pair_window() {
+        let mii = Members::mii_group(0x4a).unwrap();
+        for native in [Members::native_group(0x24).unwrap(), Members::native_group(0x5a).unwrap()] {
+            for x4 in [false, true] {
+                assert_eq!(background_build_eligible(mii, true, native, false, false, false, x4), Ok(()), "{native:?}");
+            }
+        }
+        for pair in [Members::pair_group(), Members::pair_lead(0x02).unwrap()] {
+            assert_eq!(background_build_eligible(mii, true, pair, false, false, true, false), Ok(()), "{pair:?}");
+            assert_eq!(background_build_eligible(mii, true, pair, false, false, false, false), Err("pair window"));
+        }
+        let pt = Members::native_group(0x24).unwrap();
+        assert_eq!(background_build_eligible(mii, false, pt, false, false, false, false), Err("mii without identity"));
+        assert_eq!(background_build_eligible(mii, true, pt, true, false, false, false), Err("mii window"));
+        assert_eq!(next_background([(GroupState::Prefetched, mii, true)].into_iter(), pt, false, false, false, false), Some(0));
+        assert_eq!(next_background([(GroupState::Prefetched, mii, true)].into_iter(), Members::pair_lead(0x02).unwrap(),
+            false, false, true, false), Some(0));
     }
 
     /// The notice rule (primary 2026-11-09 02:00Z, approved for every kind): with groups on, the live attached window

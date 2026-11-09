@@ -1052,3 +1052,43 @@ ceiling = 158863
 date = "2026-11-09"
 reason = "worker B (p23/rc6-bg-pt 4c50807d): the diag attach-tick trace reads only the entry's installed cells (d38fd025's trace logged Unmapped Read8 in Eden rc6-bg-ptx4); measured 158863 (tools/size_gate.py), +5 over 158858"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied under TASK-OPUS-rc6-bg-special (primary c07b3449, inbox 02:00Z: 0 Unmapped in the rows; a raise goes in its own commit with approved_by)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 153837
+date = "2026-11-09"
+reason = "rc.6 p23/rc6-pt-start combined ceiling after merging p23/rc6-bg-pt 6d497e5 (5d6cf0f) and p23/rc6-bg-ic a46c6b3 (f06d568) into b027703: the three branches together, the shared construction tail; measured 153837 (tools/size_gate.py), +538 over 153299 (b027703)"
+approved_by = "Operator Raise as needed (DECISIONS 2d27de7); applied to the operator-chosen rc.6 items under TASK-OPUS-rc6-hot-slots (primary c07b3449, 2026-11-08: a raise goes in its own commit with approved_by)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 153882
+date = "2026-11-09"
+reason = "rc.6 item 3, a session that starts on Pokemon Trainer or Pyra/Mythra (p23/rc6-pt-start; INBOX-opus-rc6-hotslots 01:09Z): entry_window native_lead/keeps_native_creation, the native arm of original_form_bankable and original_member, the scene_header gate; measured 153882 (tools/size_gate.py), +45 over 153837"
+approved_by = "Operator Raise as needed (DECISIONS 2d27de7); applied to the operator-chosen rc.6 item under TASK-OPUS-rc6-hot-slots (primary c07b3449, 2026-11-08: a raise goes in its own commit with approved_by)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 158306
+date = "2026-11-09"
+reason = "rc.6 p23/rc6-pt-start over integration 2f54db4 (1d0c93d): the Mii groups built in the background and their exit, freeing under the pause, the shared construction tail and the PT/Aegis start-up window on top of integration; measured 158306 (tools/size_gate.py), +1131 over 157175 (2f54db4)"
+approved_by = "Operator Raise as needed (DECISIONS 2d27de7); applied to the operator-chosen rc.6 items under TASK-OPUS-rc6-hot-slots (primary c07b3449, 2026-11-08: a raise goes in its own commit with approved_by)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 158308
+date = "2026-11-09"
+reason = "rc.6 p23/rc6-pt-start (0f8415a): the slow-step names of integration object re-arm steps; measured 158308 (tools/size_gate.py), +2 over 158306"
+approved_by = "Operator Raise as needed (DECISIONS 2d27de7); applied to the operator-chosen rc.6 items under TASK-OPUS-rc6-hot-slots (primary c07b3449, 2026-11-08: a raise goes in its own commit with approved_by)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 158317
+date = "2026-11-09"
+reason = "rc.6 p23/rc6-pt-start over integration d5db7387 (2c5e957): the PT/Aegis start-up window and X5 on top of integration; measured 158317 (tools/size_gate.py), +42 over 158275 (d5db7387)"
+approved_by = "Operator Raise as needed (DECISIONS 2d27de7); applied to the operator-chosen rc.6 items under TASK-OPUS-rc6-hot-slots (primary c07b3449, 2026-11-08: a raise goes in its own commit with approved_by)"

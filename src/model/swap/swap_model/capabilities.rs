@@ -324,17 +324,20 @@ pub const fn capabilities(class: FormClass) -> Capabilities {
         },
         // SPECIAL-GROUPS §2: flags 0x05, trainer object `+0x5a88/+0x5a98`, kind 0x72 through R
         // (`0x658bb4`), completion by the native script.
+        // EXCLUSIONS §9 lifted for the native-group original (INBOX-opus-rc6-hotslots 01:09Z: "All groups in rc.6"; a
+        // session that starts on PT/Aegis keeps its bank): the start-up window or the record holding it serves it, while
+        // native groups are on (`original_form_bankable`).
         FormClass::PokemonTrainer => Capabilities {
             bodies: 3, native_flags: 0x05, grouping: Grouping::OwnGroupOnly(SpecialSwitch::Native),
             object_kind: Some(PT_OBJECT_KIND), carries_records: true, completion: Completion::NativeScript,
-            original_bankable: false, presentation: PresentationRule { native_form_follow: true, ..KIND }, ..ORDINARY
+            original_bankable: true, presentation: PresentationRule { native_form_follow: true, ..KIND }, ..ORDINARY
         },
         // SPECIAL-GROUPS §3: flags 0x64, no third cell (Down+B modulo `+0x4150`), kind 0x75 from the
         // `0x17e5bc0` Aegis branch; D-SG1: its `0x1338` key is the bank's to release.
         FormClass::Aegis => Capabilities {
             bodies: 2, native_flags: 0x64, grouping: Grouping::OwnGroupOnly(SpecialSwitch::Native),
             object_kind: Some(AEGIS_OBJECT_KIND), carries_records: true, completion: Completion::NativeScript,
-            original_bankable: false, presentation: PresentationRule { native_form_follow: true, ..KIND }, ..ORDINARY
+            original_bankable: true, presentation: PresentationRule { native_form_follow: true, ..KIND }, ..ORDINARY
         },
         // C122: `R+0x50` pair rule on cells 0/1 (one reference per body); ICE-CLIMBERS addendum:
         // pair-lead window, commit pair ↔ extra (never Nana), N1/N2/N3; SPECIAL-GROUPS §5: the pair
@@ -455,13 +458,15 @@ pub fn original_bankable(kind: u32) -> bool {
 }
 
 /// The role's slot-0 original in its requested form `forms` may be a bank/group member, so its return is a warm switch:
-/// an ordinary original ([`original_bankable`]), or the normal Ice Climbers pair while the pair bank is on
-/// (`pair_bank`). The IcPair row's `original_bankable` cites the operator decision; the return is served by a
-/// pair-lead window or a pair group (`group_serves`) and never by a single-body cell, which is why the pair stays out
-/// of [`original_bankable`]. Solo Popo, the Miis and the native groups keep the canonical original Reload.
-pub fn original_form_bankable(kind: u32, forms: Forms, pair_bank: bool) -> bool {
+/// an ordinary original ([`original_bankable`]), the normal Ice Climbers pair while the pair bank is on (`pair_bank`),
+/// or a native group (Pokémon Trainer, Pyra/Mythra) while native groups are on (`native_bank`; rc.6, a session that
+/// starts on one). Those rows' `original_bankable` cite the operator decisions; the return is served by the window
+/// or by a group (`group_serves`) and never by a single-body cell, which is why they stay out of
+/// [`original_bankable`]. Solo Popo and the Miis keep the canonical original Reload.
+pub fn original_form_bankable(kind: u32, forms: Forms, pair_bank: bool, native_bank: bool) -> bool {
     match form_class(kind, forms) {
         FormClass::IcPair => forms == Forms::starting(POPO) && pair_bank && capabilities(FormClass::IcPair).original_bankable,
+        class @ (FormClass::PokemonTrainer | FormClass::Aegis) => native_bank && capabilities(class).original_bankable,
         _ => original_bankable(kind),
     }
 }

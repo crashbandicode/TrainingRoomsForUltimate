@@ -27,15 +27,26 @@ pub struct HeaderFacts {
 }
 
 /// The original H1 may extend (§12.2 H1's guards): a visible role (owner 0 or 1) in native Training, R not yet
-/// requested (bit 0 clear), no object kind, `+0x60` −1, and either one ordinary body (`+0x5c` −1) of a bankable kind
-/// (not a Mii, not Solo Popo, not PT/Aegis) or the normal Ice Climbers pair (rc.6 item 3: native's header is Popo with
-/// Nana as its secondary; [`entry_window`] makes it the pair-lead window).
+/// requested (bit 0 clear), and either:
+/// - no object kind, `+0x60` −1, and one ordinary body (`+0x5c` −1) of a bankable kind (not a Mii, not Solo Popo), or
+///   the normal Ice Climbers pair (rc.6 item 3: native's header is Popo with Nana as its secondary; [`entry_window`]
+///   makes it the pair-lead window);
+/// - or a whole native group in its own order with its lead as the object kind (rc.6 item 3, a session that starts on
+///   Pokémon Trainer or Pyra/Mythra: [`entry_window`] makes the group its own window lead).
 pub fn extendable(facts: HeaderFacts) -> Option<u32> {
     let [original, second, third] = facts.kinds;
-    let fresh = facts.training && facts.owner <= 1 && facts.flags & 1 == 0 && facts.object == NONE && third == NONE;
-    let one_body = second == NONE && original != NONE && bankable_kind(original) && !matches!(original, POPO | NANA);
-    let pair = original == POPO && second == NANA;
-    (fresh && (one_body || pair)).then_some(original)
+    let fresh = facts.training && facts.owner <= 1 && facts.flags & 1 == 0;
+    let plain = facts.object == NONE && third == NONE;
+    let one_body = plain && second == NONE && original != NONE && bankable_kind(original) && !matches!(original, POPO | NANA);
+    let pair = plain && original == POPO && second == NANA;
+    let native = native_lead(original).is_some_and(|group| group.kinds() == facts.kinds && facts.object == original);
+    (fresh && (one_body || pair || native)).then_some(original)
+}
+
+/// The native group `original` leads in its own order (`Members::native_group`: Pokémon Trainer from Squirtle,
+/// Pyra/Mythra from Pyra), or None.
+fn native_lead(original: u32) -> Option<Members> {
+    Members::native_group(original).filter(|group| group.kinds()[0] == original)
 }
 
 /// Extra bodies a role's start-up window may take from the Ready Fighters budget: both roles share it evenly, the
@@ -54,6 +65,10 @@ pub fn extras_allowed(ready_fighters: u8, bank_members: u8) -> usize {
 /// pair target (`Members::from_pair`: Nana and the first eligible member, two extra bodies). None (the scene stays
 /// native's): no room or no eligible member, or an original that is neither one ordinary bankable body nor the pair.
 pub fn entry_window(original: u32, numbered: &[u32], extras: usize, solo_popo_member: bool) -> Option<Members> {
+    // A native group lead is its own window: no extra cell, and its bodies are native's own.
+    if let Some(group) = native_lead(original) {
+        return Some(group);
+    }
     if original == POPO {
         let (lane, count) = member_lane(numbered, solo_popo_member);
         return Members::from_pair(&lane[..count], extras);
@@ -100,7 +115,16 @@ pub fn creation_matches(native: Words, window: Words) -> bool {
     if window.kinds[..2] == [POPO, NANA] {
         return native == PAIR;
     }
+    if keeps_native_creation(window) {
+        return Words { active: 0, ..native } == window;
+    }
     native.count == 1 && native.kinds == [window.kinds[0], NONE, NONE]
+}
+
+/// A native-group lead window ([`entry_window`]): H3 leaves native's creation as it is (its words are the window's,
+/// and its active byte is native's starting form), so nothing is written.
+pub fn keeps_native_creation(window: Words) -> bool {
+    native_lead(window.kinds[0]).is_some_and(|group| Words::of(&group) == window)
 }
 
 /// Native's normal Ice Climbers creation: Popo and Nana, two actors, Popo active.
@@ -196,8 +220,7 @@ mod tests {
     fn h1_extends_only_one_ordinary_body_of_a_visible_role_in_training() {
         assert_eq!(extendable(facts(1, [0x40, NONE, NONE])), Some(0x40));
         assert_eq!(extendable(facts(0, [STEVE, NONE, NONE])), Some(STEVE));
-        assert_eq!(extendable(HeaderFacts { object: 0x24, ..facts(0, [0x24, 0x25, 0x26]) }), None, "Pokémon Trainer");
-        assert_eq!(extendable(HeaderFacts { object: 0x5a, ..facts(0, [0x5a, 0x5b, NONE]) }), None, "Aegis");
+        // Pokémon Trainer and Pyra/Mythra starts: `a_native_group_start_is_its_own_window_lead`.
         // The IC pair start: `an_ice_climbers_start_gets_a_pair_lead_window`.
         assert_eq!(extendable(facts(0, [0x4b, NONE, NONE])), None, "Solo Popo");
         for mii in [0x48, 0x49, 0x4a] {
@@ -249,9 +272,51 @@ mod tests {
         assert_eq!(entry_window(MARIO, &[DK, LINK], 0, false), None, "no room");
         assert_eq!(entry_window(MARIO, &[], 2, false), None, "no next member");
         assert_eq!(entry_window(MARIO, &[0x48, 0x49], 2, false), None, "Miis are never window members");
-        for original in [0x48, 0x24, 0x5a, 0x4c] {
+        for original in [0x48, 0x25, 0x5b, 0x4c] {
             assert_eq!(entry_window(original, &[MARIO, DK], 2, false), None, "{original:#x}");
         }
+    }
+
+    /// rc.6 item 3, a session that starts on Pokémon Trainer or Pyra/Mythra (INBOX-opus-rc6-hotslots 01:09Z, the native-group
+    /// equivalent of the Ice Climbers start): native's header for the start is the whole native group with its object kind
+    /// (tr-p23-hot-measure-3: PT `{owner 0, [24, 25, 26], object 0x24}`). H1 accepts the native group as the window lead:
+    /// the window is that group itself (`Members::native_group`, no extra cell, whatever room Ready Fighters leaves; its
+    /// bodies are native's own), so the role gets a bank and its other groups build in the background beside it. H3 keeps
+    /// native's creation as it is (same count, kinds and actor count; the active form stays native's), H4 binds on those
+    /// words, and the original's own request is native's words again. Only the group's own order is a lead (a header that
+    /// starts on another form, such as Ivysaur `[25, 26, 24]`, stays native's), and the object kind must be its lead.
+    #[test]
+    fn a_native_group_start_is_its_own_window_lead() {
+        const PT: [u32; 3] = [0x24, 0x25, 0x26];
+        const AEGIS: [u32; 3] = [0x5a, 0x5b, NONE];
+        for owner in [0, 1] {
+            assert_eq!(extendable(HeaderFacts { object: 0x24, ..facts(owner, PT) }), Some(0x24), "Pokémon Trainer");
+            assert_eq!(extendable(HeaderFacts { object: 0x5a, ..facts(owner, AEGIS) }), Some(0x5a), "Pyra/Mythra");
+        }
+        assert_eq!(extendable(facts(0, PT)), None, "no object kind");
+        assert_eq!(extendable(HeaderFacts { object: 0x25, ..facts(0, [0x25, 0x26, 0x24]) }), None, "another starting form");
+        assert_eq!(extendable(HeaderFacts { object: 0x5b, ..facts(0, [0x5b, 0x5a, NONE]) }), None, "another starting form");
+        assert_eq!(extendable(HeaderFacts { object: 0x5a, ..facts(0, PT) }), None, "another object kind");
+        assert_eq!(extendable(HeaderFacts { object: 0x24, flags: 1, ..facts(0, PT) }), None, "already requested");
+        assert_eq!(extendable(HeaderFacts { object: 0x24, training: false, ..facts(0, PT) }), None, "not Training");
+        assert_eq!(extendable(HeaderFacts { object: 0x24, ..facts(2, PT) }), None, "a parked helper");
+        for (original, kinds) in [(0x24, PT), (0x5a, AEGIS)] {
+            for extras in [0, 2] {
+                let window = entry_window(original, &[MARIO, DK], extras, false).expect("the native group");
+                assert_eq!(window, Members::native_group(original).unwrap(), "{original:#x}");
+                assert_eq!(window.kinds(), kinds);
+            }
+            let words = Words::of(&Members::native_group(original).unwrap());
+            assert_eq!((words.count, words.kinds, words.actor_count), (window_count(original), kinds, 1));
+            assert!(creation_matches(words, words), "{original:#x}: native's own creation");
+            assert!(creation_matches(Words { active: 1, ..words }, words), "{original:#x}: native's starting form stays");
+            assert!(!creation_matches(Words { count: 1, kinds: [original, NONE, NONE], actor_count: 1, active: 0 }, words),
+                "{original:#x}: not the group");
+            assert!(!keeps_native_creation(Words::of(&entry_window(MARIO, &[DK, LINK], 2, false).unwrap())));
+            assert!(keeps_native_creation(words), "{original:#x}");
+        }
+        fn window_count(original: u32) -> u32 { if original == 0x24 { 3 } else { 2 } }
+        assert_eq!(entry_window(0x25, &[MARIO, DK], 2, false), None, "not the lead");
     }
 
     /// rc.6 item 3 (TASK-OPUS-rc6-bg-special, 22:32Z: a session that starts on Ice Climbers still gets its groups built;
