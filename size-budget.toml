@@ -1108,3 +1108,11 @@ ceiling = 159103
 date = "2026-11-09"
 reason = "rc.6 p23/rc6-pt-start X6 (8cbc58b) over integration 7da9c4dd: every group but a Mii builds beside a live Mii window with the owner's ordinary baseline (the shadow hooks for every body, two Pokemon Trainer pool-task hooks with seam rows, the group's own words for every key request and release, LiveIdentity) and its host and wiring tests; measured 159103 (tools/size_gate.py), +198 over 158905 (7da9c4dd)"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to the operator-chosen rc.6 items under TASK-OPUS-rc6-hot-slots (primary c07b3449, 2026-11-08: a raise goes in its own commit with approved_by)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 159120
+date = "2026-11-09"
+reason = "rc.6 p23/rc6-pt-start X6 follow-up (2c116ba): the owner reader 0x33c3370 takes the shadow on the worker (one inline hook, its seam row and wiring pin); measured 159120 (tools/size_gate.py), +17 over 159103 (aa9fb9f)"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to the operator-chosen rc.6 items under TASK-OPUS-rc6-hot-slots (primary c07b3449, 2026-11-08: a raise goes in its own commit with approved_by)"
