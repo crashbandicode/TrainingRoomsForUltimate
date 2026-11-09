@@ -1236,3 +1236,11 @@ ceiling = 160223
 date = "2026-11-09"
 reason = "rc.6 p23/rc6-lobby-cpu (481173cf) over integration e39479df: the mod's CPU Level (TASK-OPUS-rc6-lobby-cpu-settings.md requirement 2): model::cpu::level and its host tests, the factory row and menu row, runtime::features::cpu_level (the session clock, the notice, the rank step and its diag lines) and the 11 generated cpu_level seam rows; measured 160223 (tools/size_gate.py), +544 over 159679 (e39479df)"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to the operator's rc.6 order of 2026-11-09 11:17Z (TASK-OPUS-rc6-lobby-cpu-settings.md; design accepted by the primary 12:26Z; a raise goes in its own commit with approved_by, primary c07b3449)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 159907
+date = "2026-11-09"
+reason = "rc.6 p23/rc6-preload-priority (d922ad3e) over integration e39479df: new members load at once and a parked group goes now when they need its room (body_bank::release_for_new_members, leaves_now, capacity_release, GroupCounts::with_release; native_body_bank plan_groups, group_lifecycle, release_for_capacity) and its host and wiring tests; measured 159907 (tools/size_gate.py), +228 over 159679 (e39479df)"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to the product fix ordered by the primary under the operator's 13:21Z rule (INBOX-opus-rc6-docs 13:21Z; a raise goes in its own commit with approved_by)"
