@@ -110,4 +110,6 @@ Each run is a diag build of the named commit, 2026-11-08. Evidence is under `art
 | Async build, warm exit | `me-p1-lap`, `me-cpu-lap`: every press applied, one Mii build per role, the exit 50–114 ms | `rc6-hot-xps6` (`d6a485f`) | pass |
 
 The `covrest-yoga-04` and `covrest-pair-y3` builds carry cov-rest commits that reach the rc.6 candidate with the
-cov-rest merge (TODO-PROOF: final pass).
+cov-rest merge. The final pass ran these rows again on the candidate `646a5f0d` (2026-11-09), and they passed:
+`cov-replay-window` and `cov-named-mii` in `yoga-cov` (41/41), and `p00`–`p07` with the editor and resume rows
+(`p07-guest-editor`, `p11-guest-resume`, `p12-guest-leave-editor`) in `yoga-pair` (17/17).

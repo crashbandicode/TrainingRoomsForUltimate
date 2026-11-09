@@ -138,9 +138,9 @@ The fighters of your cycles load hot. Each role's first window of fighters is re
 other groups are built in the background while you play; once the notice reads Ready or All loaded, a switch into a
 group took about 50–70 ms in Eden. Changing a cycle in Training releases the fighters that left it and builds the new
 ones the same way. Leaving a Mii for the fighters it replaced is a warm switch, not a reload. The background build
-waits while the fighter on screen is a Mii, Kirby, Ice Climbers, Pokémon Trainer or Pyra/Mythra
-(`background_build_eligible`, `src/model/swap/body_bank.rs:776`; TODO-PROOF: the special groups built in the
-background, hot lane and workers A and B). Raising No. of CPUs brings in the CPU cycle's next fighters, a saved Mii
+waits only while Kirby is on screen, and for a second Mii group while a Mii is on screen
+(`background_build_eligible`, `src/model/swap/body_bank.rs:851`; TODO-PROOF: the special groups built in the
+background, hot lane and workers A and B, from the final pass's item-3 sessions). Raising No. of CPUs brings in the CPU cycle's next fighters, a saved Mii
 included.
 
 ![P1's hat chord on the CPU Kirby](docs/media/cpu-kirby-hat.gif)
