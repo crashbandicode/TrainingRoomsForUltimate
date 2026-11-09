@@ -17,6 +17,7 @@ pub mod facts;
 pub mod hash;
 pub mod ids;
 pub mod ledge;
+pub mod level;
 pub mod mash;
 pub mod playback;
 pub mod rng;

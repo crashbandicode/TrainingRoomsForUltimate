@@ -106,6 +106,9 @@ hook_ids! {
     /// Phase 2 N11: the item spawner's switch test (Lobby Items), and its one removal on Player 1's frame.
     LobbyItems => "lobby_items",
     LobbyItemsRemove => "lobby_items_remove",
+    /// rc.6 CPU level: the Training session clock (on the waiting-room poll) and the rank step on Player 1's frame.
+    CpuLevelClock => "cpu_level_clock",
+    CpuLevel => "cpu_level",
     /// Every hook that has no name of its own yet (`HookScope::enter()`): allocations inside them are
     /// still counted, their invocations are counted together.
     Other => "other",

@@ -14,6 +14,8 @@ static DEVELOPER_PAGE: AtomicBool = AtomicBool::new(false);
 static HUD: AtomicBool = AtomicBool::new(true);
 /// Lobby Items (N11): On, the native behaviour, until the first publish.
 static LOBBY_ITEMS: AtomicBool = AtomicBool::new(true);
+/// CPU Level (rc.6): 0 = Off (the game's own level, also before the first publish), else Lv 1..=9.
+static CPU_LEVEL: AtomicU8 = AtomicU8::new(0);
 
 /// Every feature's settings as a game-thread hook reads them: computed from a snapshot by the publishing thread (boot, the
 /// menu worker, the diag reload) and read wait-free by the hooks (stream/sync: a hook never waits on a lock another thread
@@ -98,6 +100,8 @@ pub fn publish(snapshot: &Snapshot, rerolls: u8) {
     STAGE_HAZARDS.store(snapshot.stage_hazards(), Ordering::Release);
     HUD.store(snapshot.hud(), Ordering::Release);
     LOBBY_ITEMS.store(snapshot.lobby_items(), Ordering::Release);
+    let cpu_level = crate::model::cpu::level::CpuLevel::from_row(snapshot.get(crate::model::cpu::level::ROW_ID).unwrap_or(&[]));
+    CPU_LEVEL.store(match cpu_level { crate::model::cpu::level::CpuLevel::Lv(level) => level, _ => 0 }, Ordering::Release);
     crate::runtime::developer::publish(snapshot);
     crate::runtime::developer_reload::publish(snapshot);
 }
@@ -122,6 +126,14 @@ pub fn stage_hazards() -> bool {
 /// The Lobby Items row (Phase 2 N11): the spawner hook and the removal step read it.
 pub fn lobby_items() -> bool {
     LOBBY_ITEMS.load(Ordering::Acquire)
+}
+
+/// The CPU Level row (rc.6): the CPU level step reads it every frame.
+pub fn cpu_level() -> crate::model::cpu::level::CpuLevel {
+    match CPU_LEVEL.load(Ordering::Acquire) {
+        level @ 1..=9 => crate::model::cpu::level::CpuLevel::Lv(level),
+        _ => crate::model::cpu::level::CpuLevel::Off,
+    }
 }
 
 /// Decision N1: whether `developer.ini` said `developer_page=on` at boot (the menu reads it in a
