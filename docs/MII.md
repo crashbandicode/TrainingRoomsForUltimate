@@ -81,7 +81,7 @@ had no guard in the fork.
   on the game thread (`async_build_eligible`, `src/model/swap/body_bank.rs:790`). The 2026-11-02 restriction stays for
   native groups (Pokémon Trainer, Aegis) and the Ice Climbers pair.
 - **Warm exit:** leaving a Mii group for the window it displaced is a warm exchange; the Mii switch's publication is
-  put back in the settle tick (`plan_mii_exit`, `src/runtime/roster/native_body_bank.rs:1209`). TODO-PROOF: hot lane,
+  put back in the settle tick (`plan_mii_exit`, `src/runtime/roster/native_body_bank.rs:1224`). TODO-PROOF: hot lane,
   the exit to any built group, and Mii groups built in the background (`p23/rc6-hot-slots-mii`).
 - **No. of CPUs seats:** a seat member keeps its exact-Mii configuration, so a Mii seat loads through the Mii helper
   (`seat_load`, `src/model/parked_entries.rs:270`), and the seats park at one CPU whatever the plan lists
