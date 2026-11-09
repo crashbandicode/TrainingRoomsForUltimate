@@ -5948,7 +5948,7 @@
    "dest": "src/runtime/roster/native_body_bank.rs",
    "crate": "root",
    "src_sha256": "ccf7ac678691fa0101a1eff5dbd9300a1b12fe64e9ebbde515697adfbb841c98",
-   "dest_sha256": "7ddb584dc07e684d220ec8c85bf26dda6d9f2925184034c4509b68d92c130604",
+   "dest_sha256": "eeb6dc82f59a31cbf49fa41e3eecd735f30ae6a644c56d59d4c9337945293efc",
    "edits": [
     {
      "old": "unsafe fn finalize_entry(entry: *mut u8) -> u64 {\n",
@@ -7470,6 +7470,11 @@
      "old": "        original!()(entry, status);\n        fields::write_unchecked(entry as usize, 0x591f, PAIR_ACTIVE_FLAG);\n        trace!(\"[IcPair] N2 activate pair owner={} status={:#x} flags {:#x}->2->6 popo_ctx={:#x} nana_ctx={:#x} +0x4178={:#x} +0x4180={:#x} states=[{:?},{:?}]\",\n            owner, status, before, read::<usize>(entry, 0x4188), nana, read::<usize>(entry, 0x4178),\n",
      "new": "        let started = now_us();\n        original!()(entry, status);\n        let native_us = now_us().saturating_sub(started);\n        fields::write_unchecked(entry as usize, 0x591f, PAIR_ACTIVE_FLAG);\n        trace!(\"[IcPair] N2 activate pair owner={} status={:#x} native_us={} flags {:#x}->2->6 popo_ctx={:#x} nana_ctx={:#x} +0x4178={:#x} +0x4180={:#x} states=[{:?},{:?}]\",\n            owner, status, native_us, before, read::<usize>(entry, 0x4188), nana, read::<usize>(entry, 0x4178),\n",
      "reason": "Merge of p23/rc6-x4 (67d2e846) into p23/rc6-integration: rc.6 item 3, the notice rule (primary 2026-11-09 02:00Z, every kind): with groups on the live attached window plans its own reusable extras (body_bank window_targets); diag: each tick of a switch in flight and N2 native_us (P1 pair attach)"
+    },
+    {
+     "old": "        Step::Poll(..) => \"prefetch poll\", Step::Start(..) => \"prefetch start\",\n    };\n",
+     "new": "        Step::Poll(..) => \"prefetch poll\", Step::Start(..) => \"prefetch start\",\n        Step::Rearm(..) => \"object re-arm\", Step::RearmPoll(..) => \"object re-arm poll\",\n    };\n",
+     "reason": "rc.6 integration, the Mii branch merge (d659f0f5): the Mii branchs slow_step names each lifecycle step in a match that p23/rc6-bg-pts two new steps (Rearm, RearmPoll: the PT object kind re-arm, b37efd8) did not reach; the Switch build refused it (E0004, gates i16 release and diag); the match names them"
     }
    ]
   },
