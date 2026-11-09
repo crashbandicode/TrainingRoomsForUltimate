@@ -872,6 +872,38 @@ pub fn next_background(groups: impl Iterator<Item = (GroupState, Members, bool)>
         .map(|(i, _)| i)
 }
 
+/// Primary 2026-11-09 07:17Z (item 3 is about fast switching, and right after Training loads is when the builds run)
+/// and 07:34Z (no timeout: exactly the steps that serve the press go first): a foreground request that waits for INSTALL
+/// and for nothing else (a P1 or CPU press with the roster or a Mii owner, a hat request's source load) is served next.
+/// A speculative step that would take INSTALL (a prefetch, a background build, an object re-arm, a pool preparation)
+/// does not start while one waits, except the one that serves it ([`serving_step`]); the step in flight keeps INSTALL
+/// until it ends, and the polls that end it still run. A request its owner keeps for anything else (the menu open, a
+/// recording, a Kirby not yet idle) is no foreground request, so nothing waits on it.
+pub fn speculative_step_admitted(foreground: bool) -> Result<(), &'static str> {
+    if foreground { Err("a foreground request is pending") } else { Ok(()) }
+}
+
+/// The speculative step a waiting press needs on its target's group ([`serving_step`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Serving {
+    Prefetch,
+    ObjectRearm,
+}
+
+/// [`Serving`] for the group holding the press's target, in `state`. Its prefetch while it is planned or held for
+/// capacity and publishable (a Mii group's CharInfo is on the owner's record): a target in no reachable group takes the
+/// canonical Reload, which destroys the window and every group. Its object re-arm while a built Pokémon Trainer group
+/// lacks its object kind (`rearm_due`, [`object_rearm_due`]): without it [`object_ready`] fails and so does the warm
+/// attach. Nothing for a prefetching group (its poll ends it) or a prefetched or built one (reachable already: its
+/// background build or pool preparation would only make the press wait longer).
+pub fn serving_step(state: GroupState, publishable: bool, rearm_due: bool) -> Option<Serving> {
+    match state {
+        _ if state.startable() => publishable.then_some(Serving::Prefetch),
+        GroupState::Built if rearm_due => Some(Serving::ObjectRearm),
+        _ => None,
+    }
+}
+
 /// The live window's Mii identity as a background build sees it (X6, `background_build_eligible`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LiveIdentity {
@@ -3996,6 +4028,92 @@ mod tests {
         assert_eq!((answers[0].2[4] & 0xffff, answers[1].2[4] & 0xffff), (0, 1));
         assert_eq!((answers[0].3 & 0xffff, answers[1].3 & 0xffff), (0, 1));
         assert_eq!(&answers[0].2[..4], &[0x49, u32::MAX, u32::MAX, 2], "the Swordfighter header with the role's costume byte");
+    }
+
+    /// Primary 2026-11-09 07:17Z (Eden `rc6-hot-xps31`/`32`: a P1 press made while background builds ran waited for each
+    /// build in turn, 2-3 s): INSTALL serializes the bank's speculative steps and the roster's requests, and each entry
+    /// tick the group lifecycle may take it first. A press that arrives during a build is served when that build ends,
+    /// before the next one starts; the rest follow it in their order.
+    #[test]
+    fn a_queued_press_is_served_before_the_next_background_build() {
+        #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+        enum Work { Build(u8), Press }
+        // A build takes INSTALL for 3 ticks, a press for 1; the first build is in flight at tick 0, the press arrives at
+        // tick 1, and three more builds are owed. Worst case: the lifecycle runs before the roster on every tick.
+        let run = |admitted: &dyn Fn(bool) -> bool| {
+            let (mut held_until, mut owed, mut press, mut served) = (3, vec![1u8, 2, 3], false, Vec::new());
+            for tick in 0..32 {
+                press |= tick == 1;
+                if tick < held_until { continue; }
+                if !owed.is_empty() && admitted(press) {
+                    served.push((tick, Work::Build(owed.remove(0))));
+                    held_until = tick + 3;
+                } else if press {
+                    served.push((tick, Work::Press));
+                    press = false;
+                    held_until = tick + 1;
+                }
+            }
+            served
+        };
+        let served = run(&|pending| speculative_step_admitted(pending).is_ok());
+        assert_eq!(served[0], (3, Work::Press), "served when the build in flight ends: {served:?}");
+        assert_eq!(served[1..].iter().map(|(_, w)| *w).collect::<Vec<_>>(), [Work::Build(1), Work::Build(2), Work::Build(3)]);
+        // Without the rule the press waits behind every owed build (the rc6-hot-xps31/32 shape).
+        let before = run(&|_| true);
+        assert_eq!(before.last().map(|(_, w)| *w), Some(Work::Press));
+        assert_eq!(speculative_step_admitted(false), Ok(()));
+        // A prefetched target is reachable: its background build does not serve the press, it only delays it.
+        assert_eq!(serving_step(GroupState::Prefetched, true, false), None);
+    }
+
+    /// Primary 2026-11-09 07:34Z (the 5 s release was a timeout guard; exactly the steps that serve the press go first):
+    /// a press made during the prefetches, whose target's group is still planned, is served warm after that group's own
+    /// prefetch, before the other groups'. Held back as well, the target would be in no reachable group: the canonical
+    /// Reload, which destroys the window and every group. Each state of the target group, and the PT re-arm.
+    #[test]
+    fn a_waiting_press_lets_its_targets_prefetch_through() {
+        #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+        enum Work { Prefetch(usize), Press { warm: bool } }
+        // Groups 0..3 planned; group 0's prefetch in flight at tick 0 (3 ticks); a press for group 2 at tick 1. The
+        // lifecycle runs before the press each tick (`character_roster::service`), the worst case.
+        let run = |serving: &dyn Fn(GroupState) -> Option<Serving>| {
+            let mut states = [GroupState::Prefetching, GroupState::Planned, GroupState::Planned, GroupState::Planned];
+            let (mut held_until, mut in_flight, mut press, mut served) = (3, Some(0), false, Vec::new());
+            for tick in 0..40 {
+                press |= tick == 1;
+                if tick < held_until { continue; }
+                if let Some(g) = in_flight.take() { states[g] = GroupState::Prefetched; }
+                let next = states.iter().position(|s| *s == GroupState::Planned);
+                let step = match speculative_step_admitted(press) {
+                    Ok(()) => next,
+                    Err(_) => (serving(states[2]) == Some(Serving::Prefetch)).then_some(2),
+                };
+                if let Some(g) = step {
+                    states[g] = GroupState::Prefetching;
+                    served.push((tick, Work::Prefetch(g)));
+                    (held_until, in_flight) = (tick + 3, Some(g));
+                } else if press {
+                    served.push((tick, Work::Press { warm: states[2].reachable() }));
+                    (press, held_until) = (false, tick + 1);
+                }
+            }
+            served
+        };
+        let served = run(&|state| serving_step(state, true, false));
+        assert_eq!(&served[..2], &[(3, Work::Prefetch(2)), (6, Work::Press { warm: true })], "{served:?}");
+        assert_eq!(served[2..].iter().map(|(_, w)| *w).collect::<Vec<_>>(), [Work::Prefetch(1), Work::Prefetch(3)]);
+        // Nothing let through (the cap-era rule): the press is served at once into no reachable group.
+        assert_eq!(run(&|_| None)[0], (3, Work::Press { warm: false }));
+        // Each state of the target's group.
+        assert_eq!(serving_step(GroupState::Planned, true, false), Some(Serving::Prefetch));
+        assert_eq!(serving_step(GroupState::Held(Hold::Memory), true, false), Some(Serving::Prefetch));
+        assert_eq!(serving_step(GroupState::Planned, false, false), None, "a Mii group's CharInfo is published first");
+        for state in [GroupState::Prefetching, GroupState::Prefetched, GroupState::Built, GroupState::Failed] {
+            assert_eq!(serving_step(state, true, false), None, "{state:?}");
+        }
+        // A built PT group without its object kind: its re-arm makes it reachable (`object_ready`).
+        assert_eq!(serving_step(GroupState::Built, true, true), Some(Serving::ObjectRearm));
     }
 
     /// The notice rule (primary 2026-11-09 02:00Z, approved for every kind): with groups on, the live attached window

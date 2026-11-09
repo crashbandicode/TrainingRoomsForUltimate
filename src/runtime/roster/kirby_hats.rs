@@ -139,6 +139,13 @@ unsafe fn equipped(body: *mut app::BattleObjectModuleAccessor) -> Option<u32> {
 
 pub(crate) fn preload_pending() -> bool { PENDING_ROLES.load(Ordering::Acquire)!=0 }
 
+/// Primary 2026-11-09 07:34Z (`character_roster::foreground`): a hat request waits for INSTALL alone while its source
+/// load is queued (`sources::prepare` answered "not yet") and it holds no lease; before that it waits for its Kirby to
+/// idle, after it for the native copy.
+pub(crate) fn foreground_pending() -> bool {
+    preload_pending() && STATES.iter().any(|s| s.lock().pending.is_some_and(|p| p.leases_released && p.lease.is_none() && !p.started))
+}
+
 /// Predict with a copy of the real hat cursor. No shortcut or equipped state changes.
 pub(crate) unsafe fn preload_targets(menu: &crate::engine::compat::menu::TrainingModpackMenu,
     role: usize) -> [Option<crate::runtime::roster::cycle_preload::Target>;crate::runtime::roster::cycle_preload::MAX_TARGETS] {

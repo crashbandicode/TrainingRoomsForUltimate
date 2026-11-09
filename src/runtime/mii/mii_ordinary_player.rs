@@ -161,6 +161,41 @@ pub(super) fn preload_pending_reason()->Option<&'static str> {
     if s.busy() {return Some("player Mii owner busy");}
     None
 }
+/// Primary 2026-11-09 07:34Z: a press (not the partner refresh) this owner keeps while INSTALL is the only `begin`
+/// blocker left (`character_roster::foreground`) and, with `resolve`, its target as `begin` resolves it before the
+/// qualification: a restore's value, a direct pick's step (`mii_cycle::direct`), a menu choice's configuration, a cycle
+/// press's next target as the preloader plans it (`mixed_targets`, as `preload_targets`). `Some(None)`: unresolved.
+pub(super) unsafe fn foreground(resolve:bool)->Option<Option<crate::runtime::roster::cycle_preload::Target>> {
+    use crate::runtime::roster::cycle_preload::Target;
+    let request=STATE.lock().request.filter(|r|!r.refresh_partners())?;
+    if !permitted_but_install() {return None;}
+    // `begin` serves a press only with its owner and catalog captured; without them it waits for those, not INSTALL.
+    let (original,origin_kind,origin_saved,live,catalog,restore,cursor)={
+        let s=STATE.lock();
+        let (Some(o),Some(catalog))=(s.owner.as_ref(),s.catalog.as_ref()) else {return None;};
+        let identity=o.active.map_or(Identity::Fighter(logical_kind(&o.expected)),|c|Identity::Saved(c.canonical()));
+        let live=if at_origin(&o.origin,&o.expected,o.active,o.origin_saved,o.cursor) {Live::Original}
+            else {Live::Numbered {identity,cursor:o.cursor}};
+        (o.origin_saved.map_or(Identity::Fighter(o.origin.original_kind),|c|Identity::Saved(c.canonical())),
+            o.origin.original_kind,o.origin_saved,live,Arc::clone(catalog),s.restore,o.cursor)
+    };
+    if !resolve {return Some(None);}
+    if let Some(value)=restore {return Some(Some(Target {kind:value.fighter.kind(),configuration:value.configuration}));}
+    let menu=setting(&MENU);
+    let step=if let Some(kind)=request.direct_kind() {
+        mii_cycle::direct(kind,&catalog,&menu::mii_preferences(),crate::engine::mii::selection::Role::Player,original)
+    } else if let Some(choice)=request.choice() {
+        Some(mii_cycle::Step {target:mii_cycle::Target::Saved(choice),cursor})
+    } else {
+        return Some(crate::runtime::roster::cycle_preload::mixed_targets(&menu,0,original,live,&catalog,origin_saved)[0]);
+    };
+    Some(step.and_then(|step|match step.target {
+        mii_cycle::Target::Original=>Some(Target {kind:origin_kind,configuration:origin_saved}),
+        mii_cycle::Target::Saved(choice)=>catalog.configuration(choice)
+            .map(|c|Target {kind:c.canonical().class as u32,configuration:Some(c)}),
+        mii_cycle::Target::Fighter(kind)=>Some(Target::fighter(kind)),
+    }))
+}
 pub(super) fn preload_targets(menu:&TrainingModpackMenu)->Option<[Option<crate::runtime::roster::cycle_preload::Target>;crate::runtime::roster::cycle_preload::MAX_TARGETS]> {
     let (original,live,catalog,saved)={
         let s=STATE.lock();
@@ -396,12 +431,14 @@ pub(super) fn intercept(role:Role,selection:Selection,user_request:bool)->Option
     Some(true)
 }
 
-unsafe fn permitted()->bool {
+unsafe fn permitted()->bool {permitted_but_install() && !INSTALL.active()}
+/// [`permitted`] but for INSTALL: what keeps a request for anything else (`foreground`).
+unsafe fn permitted_but_install()->bool {
     #[cfg(feature="mii-ordinary-cpu-alpha")]
     if super::mii_ordinary_cpu::writers_reserved(0,0) {return false;}
     mii_backend::ready() && crate::runtime::compat::common::is_ready_go()
         && !menu::captures_input() && !lobby::native_ui_busy()
-        && !button_config::has_pending_request() && !INSTALL.active()
+        && !button_config::has_pending_request()
         && !training::save_states::is_loading() && !training::recording_or_playback()
         && !crate::runtime::compat::replay_preview::occupied()
         && STATES.iter().all(|s| {let s=s.lock();s.active.is_none()&&s.pending.is_none()})
@@ -548,8 +585,10 @@ pub(super) unsafe fn service(entry:*mut u8,owner:u32)->bool {
     }
     let needs_capture=STATE.lock().capture;
     if needs_capture {capture(entry);}
+    // Primary 2026-11-09 07:34Z: a press waits the tick a group's CharInfo goes on the record, so the bank's next
+    // lifecycle tick can start that group's prefetch first when it serves the press (`body_bank::serving_step`).
     #[cfg(feature="native-body-bank-alpha")]
-    mii_group_record_publication(entry);
+    if mii_group_record_publication(entry) {return false;}
     if STATE.lock().request.is_none() {return false;}
     begin(entry)
 }
@@ -562,18 +601,20 @@ pub(super) unsafe fn service(entry:*mut u8,owner:u32)->bool {
 /// (`crate::engine::swap::body_bank::mii_publish`). The refusal reason is noted once.
 #[cfg(feature="native-body-bank-alpha")]
 #[inline(never)] // stream/stack: its own frame, not `service`'s
-unsafe fn mii_group_record_publication(entry:*mut u8) {
+unsafe fn mii_group_record_publication(entry:*mut u8)->bool {
     use crate::engine::swap::body_bank::mii_publish::PublishRefusal;
-    let Some((group,identity,c))=super::body_bank::pending_mii_publication(0) else {return;};
-    if INSTALL.active() || !mii_backend::ready() {return;}
+    let Some((group,identity,c))=super::body_bank::pending_mii_publication(0) else {return false;};
+    if INSTALL.active() || !mii_backend::ready() {return false;}
     let outcome=native::prefetch_publish(entry as usize,c,identity);
     match outcome {
         Ok(())=>trace!("[MiiOrdinaryPlayer] Mii group record published group={} kind={:#x} index={} hat={}",
             group,identity.kind(),identity.index,identity.hat()),
-        Err(PublishRefusal::Busy)=>return,
+        Err(PublishRefusal::Busy)=>return false,
         Err(_)=>{}
     }
+    let published=outcome.is_ok();
     if let Some(reason)=super::body_bank::mii_charinfo_published(0,group,identity,outcome) {note(reason);}
+    published
 }
 
 #[inline(never)]
