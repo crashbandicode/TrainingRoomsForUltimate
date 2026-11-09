@@ -948,3 +948,11 @@ ceiling = 156556
 date = "2026-11-09"
 reason = "rc.6 item 3, SPECIAL-GROUPS X4 and the two cross cells on the merged head (p23/rc6-x4 e0d0705, dfdef14 over p23/rc6-integration 62e7c85; primary 2026-11-09 00:52Z): body_bank info_wrapper and the info_x4 rule, native_body_bank background_info and its seam row; measured 156556 (tools/size_gate.py), +120 over 156436"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to this operator-chosen rc.6 item under TASK-OPUS-rc6-bg-special (primary c07b3449, 2026-11-08: a raise goes in its own commit with approved_by)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 152783
+date = "2026-11-09"
+reason = "worker B, inbox INBOX-opus-rc6-bg-pt 00:17Z item 1 (p23/rc6-bg-pt 6f5fed1): the Pokemon Trainer article fix (a detached PT group takes its object kind 0x72 again before its rebuild: native_body_bank rearm_candidate, detached_pool, return_object_key, the Rearm/RearmPoll lifecycle steps; body_bank object_rearm_due/object_ready); measured 152783 (tools/size_gate.py), +218 over 152565"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to this operator-chosen rc.6 item under TASK-OPUS-rc6-bg-special (primary c07b3449, 2026-11-09 00:17Z: a raise goes in its own commit with approved_by)"

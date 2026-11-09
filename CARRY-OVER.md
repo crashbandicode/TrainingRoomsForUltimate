@@ -1201,3 +1201,36 @@ build's `process_memory::admit` takes `DIAG_RESERVE` bytes (written through `dia
 states diag thread) from the headroom of every discretionary admission; 0, the default, changes nothing, and the release
 build has neither. One recorded manifest edit (`process_memory.rs`). `f9_gate::note_seat_memory` logs each change of a
 seat's hold (`[F9Seat] memory slot=N held=… kind=…`).
+  Read8 @ 0 at `main+0x35609c0`, at the base too (`rc6-bg-pt-base1`, 2 of 2). Fixed by the next section.
+
+### p23/rc6-bg-pt: a Pokémon Trainer group takes its object kind again before its article rebuild (2026-11-09)
+
+Inbox `INBOX-opus-rc6-bg-pt.md` 00:17Z item 1 (worker B; item 2, the start on PT, moved to the hot-slots worker at
+01:09Z, my start of it is on `p23/rc6-bg-pt-start` `072345f`). Commits `6f5fed1`, size raise `52af61d`, label `d0a79c2`.
+
+- **The defect** (pre-existing, a console-crash class): a detached PT group's article pool is retired at its detach and
+  rebuilt at its next warm attach (`special_articles::rebuild_current`, `0x3a6270`); the trainer article reads its file
+  (`0x372`, `0x355fea0`) through the object kind `0x72`, which the bank had returned after the build. Unmapped Read8 @ 0
+  at `main+0x35609c0` at every later attach (`rc6-bg-pt-base1` at `182a785`, `rc6-bg-pt2`).
+- **The rule** (`body_bank::object_rearm_due` / `object_ready`): a Built PT group whose saved holder's pool is empty takes
+  `0x72` again while it is detached, and is reachable warm only while it holds it. A filled pool (the first attach), an
+  Aegis holder (never retired) and every other group need nothing.
+- **The runtime** (`native_body_bank`): `group_lifecycle`'s `Rearm` / `RearmPoll` steps take the kind as a prefetch does
+  (this R, idle, Training, INSTALL held until R is ready, so a press meanwhile waits); `rearm_candidate`,
+  `detached_pool`. `exchange_articles` returns it right after the attach's rebuild (`return_object_key`); `switch()`'s
+  Kirby/pair drain returns it too (IC-PAIR-STALL, D-KIRBY1); `retire_groups` and `leave_group` name it a held kind, so
+  their key step returns it (`rc6-bg-pt4`: left on R, the next Reload's state 7 refused on `R+0x18 == 2`).
+  `group_reachable` requires it; a group whose re-acquisition the ledger declined (`object_refused`) or that a drain
+  emptied takes the Reload path. Never held across the detach: taken after it, returned at the attach.
+- **Proof:** host tests, each failed first: model `a_retired_trainer_group_takes_its_object_kind_again_before_its_rebuild`;
+  `tests/background_native_wiring.rs` `a_retired_trainer_group_takes_its_object_kind_again_and_returns_it_after_the_rebuild`
+  (its teardown pins failed again on their own). Recorded manifest edits of the two carried files; `carry_pkg6.py
+  carry/ledger/verify` 250 files.
+- Eden `rc6-bg-pt7` (Yoga, diag `b1962d0c` of `52af61d`; rows `rows-bg-pt/rows-item3-native5.json`; evidence
+  `bg-pt-evidence/rc6-bg-pt7`): P1's PT group attached four times in two scenes. The second and third attach each
+  rebuilt the pool (`pool=0->1`) and returned the kind (`object_kind=0x72 released=1 kept=0 map=0`); every detach took it
+  again (153–241 ms, INSTALL released). Unmapped 0, no `main+0x35609c0` read. Request to Ready: 63 ms (first attach),
+  315 ms (first rebuild, 17 frames, Eden first-run on a Yoga shared with another Eden), 76 ms (second rebuild, 4
+  frames), 48 ms (the next scene's first attach). The PT group left the cycle holding the kind: `keys=[72]
+  ledger_held=0 map_after=0`. The scene end with the kind held: `rc6-bg-pt5` (same teardown code) `reconcile owner=0
+  phase=finalize map=0`.
