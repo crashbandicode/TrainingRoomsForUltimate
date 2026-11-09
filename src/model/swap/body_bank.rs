@@ -1274,7 +1274,7 @@ impl GroupCounts {
 /// The window's planned targets: the reusable extras of the window the planner wants for its next lane kind `target`
 /// (`shown`, target first). A group that holds the target already is that window (an exchange left it detached, e.g.
 /// while a Mii group is live) and counts with the groups; a member a group holds counts there too (rc6-hot-xps19).
-pub fn window_targets(shown: &[u32], target: u32, original: Option<u32>, grouped: impl Fn(u32) -> bool) -> u8 {
+pub fn next_window_targets(shown: &[u32], target: u32, original: Option<u32>, grouped: impl Fn(u32) -> bool) -> u8 {
     if grouped(target) { return 0; }
     shown.iter().filter(|&&kind| kind != target && Some(kind) != original && !grouped(kind)).count() as u8
 }
@@ -1832,12 +1832,12 @@ mod tests {
     #[test]
     fn a_window_target_a_group_holds_is_counted_once() {
         let none = |_: u32| false;
-        assert_eq!(window_targets(&[0x0d, 0x0b], 0x0d, None, none), 1);
-        assert_eq!(window_targets(&[0x0d, 0x0b], 0x0d, Some(0x0b), none), 0);
+        assert_eq!(next_window_targets(&[0x0d, 0x0b], 0x0d, None, none), 1);
+        assert_eq!(next_window_targets(&[0x0d, 0x0b], 0x0d, Some(0x0b), none), 0);
         let displaced = |kind: u32| [0x0d, 0x0b].contains(&kind);
-        assert_eq!(window_targets(&[0x0d, 0x0b], 0x0d, None, displaced), 0);
-        assert_eq!(window_targets(&[0x01, 0x00, 0x02], 0x01, None, |kind| [0x00, 0x01, 0x02].contains(&kind)), 0);
-        assert_eq!(window_targets(&[0x01, 0x00, 0x02], 0x01, None, |kind| kind == 0x02), 1);
+        assert_eq!(next_window_targets(&[0x0d, 0x0b], 0x0d, None, displaced), 0);
+        assert_eq!(next_window_targets(&[0x01, 0x00, 0x02], 0x01, None, |kind| [0x00, 0x01, 0x02].contains(&kind)), 0);
+        assert_eq!(next_window_targets(&[0x01, 0x00, 0x02], 0x01, None, |kind| kind == 0x02), 1);
     }
 
     /// Operator decision 2026-11-08 23:42Z: a new member the shared budget or a free group slot cannot take while a
@@ -1947,7 +1947,8 @@ mod tests {
         }
         assert_eq!(background_build_eligible(pt, false, aegis, false, false, false, false), Ok(()));
         assert_eq!(background_build_eligible(aegis, false, pt, false, false, false, false), Ok(()));
-        assert_eq!(background_build_eligible(Members::mii_group(0x48).unwrap(), true, pt, false, false, false, false), Err("mii group"));
+        // A Mii group (with its identity, since the Mii branch) still never builds beside a live native window.
+        assert_eq!(background_build_eligible(Members::mii_group(0x48).unwrap(), true, pt, false, false, false, false), Err("special window"));
         let groups = [(GroupState::Built, ordinary, false), (GroupState::Prefetched, pt, false),
             (GroupState::Prefetched, aegis, false)];
         assert_eq!(next_background(groups.iter().copied(), window, false, false, false, false), Some(1));

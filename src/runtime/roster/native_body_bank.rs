@@ -174,7 +174,7 @@ use crate::engine::swap::body_bank::{
     SpecialPolicy, BANK_FLAG, MAX_EXTRA_GROUPS, NANA, NATIVE_MEMBERS, PAIR_ACTIVE_FLAG, POOL_RESERVE, POPO,
     entry_bytes_of, mii_exit_bytes_match, mii_reuse_bytes_match, MiiEntryBytes, MiiIdentity, MII_ENTRY_START, RESOURCE_WORDS,
     baseline_words, identity_move, IdentityMove, leaves_at_pause, count_group_members, kept_members, waiting_for_pause,
-    window_targets,
+    next_window_targets,
 };
 use crate::engine::swap::body_bank::memory::{self, Admission};
 use crate::engine::swap::body_bank::mii_publish::{PublishAttempts, PublishRefusal, PublishStep};
@@ -748,7 +748,7 @@ pub(crate) fn plan_budget(menu: &crate::engine::compat::menu::TrainingModpackMen
             // rc6-hot-xps19: a detached record that holds them (the window a Mii group displaced) counts with the groups.
             let grouped = |kind: u32| BANKS[role].lock().as_ref().is_some_and(|bank| !bank.departed
                 && bank.groups.iter().any(|g| g.state != GroupState::Released && g.members.index_of(kind).is_some()));
-            window_targets(&shown, target, originals[role], grouped)
+            next_window_targets(&shown, target, originals[role], grouped)
         });
         let targets = crate::engine::swap::body_bank::window_targets(grouped, live[role], originals[role], next);
         PLANNED_TARGETS[role].store(targets.saturating_add(group_targets[role]), Ordering::Release);
