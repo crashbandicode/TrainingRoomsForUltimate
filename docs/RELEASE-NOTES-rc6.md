@@ -76,8 +76,6 @@ A drilled combo, like a bound save or an active macro, moves to the top of its l
 - Ice Climbers, Pokémon Trainer and Pyra/Mythra groups are built in the background too, also while a Mii is on screen
   and in a session that starts on one of them. Switching into them then took 64–82 ms in Eden. The background build
   now waits only while Kirby is on screen, and for a second Mii group while a Mii is on screen (see Known issues).
-  TODO-PROOF: workers A and B, the candidate's item-3 sessions that start on Ice Climbers or Kirby
-  (`surface-i3-ic`, `-kr`, `-native4`, `-ptexit2`; `p23/rc6-bg-ic`, `p23/rc6-bg-pt`).
 - Going back to an Ice Climbers (normal pair), Pokémon Trainer or Pyra/Mythra original while its group is on is a warm
   switch now; it used to reload. Going back to a Solo Popo or Mii original still reloads.
 - The notice counts what is loading: "Loading 4/10", then "Ready 10/10" or "All loaded".
