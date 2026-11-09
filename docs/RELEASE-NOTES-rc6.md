@@ -93,8 +93,7 @@ also after a second change made while the first was still loading.
 - **Fighters that left the cycle** stay loaded until you next open Training's pause menu, which frees them. Until then,
   a fighter loaded with them that the new cycle still has stays warm to switch to.
 - **If the new fighters need their room,** the old ones are freed at once instead: only as many as needed, and first
-  those the new cycle no longer has. The game pauses for a moment while they go (0.15–0.26 s for two fighters in
-  Eden). The memory they free comes back over the next second or two, and the new fighters wait for it rather than
+  those the new cycle no longer has. The game pauses for a moment while they go (0.04–0.27 s in Eden). The memory they free comes back over the next second or two, and the new fighters wait for it rather than
   free more. Fighters the new cycle still uses are freed only if there still isn't room after that. You never need to
   open the pause menu for a change to load.
 - The CPU seats that No. of CPUs raises (below) follow the new CPU cycle too.
@@ -102,10 +101,11 @@ also after a second change made while the first was still loading.
   rule: `x6-fit` frees nothing; `x6-cc` frees `[3, 5]`, waits for its memory, and frees the group that keeps DK and
   Link warm only if the room still lacks, never showing "waiting for memory"). Branch proofs `pp-rel-2`,
   `pp-settle-1`; `p23/rc6-preload-priority` `2c4774cd`, whose two-quiet-pass settle awaits the operator.
-- TODO-PROOF: hot lane, the longest pause while the background build runs after a cycle change (the target is at most
-  4 frames), from the final pass's item-3 sessions.
-- TODO-PROOF: hot lane, a cycle press made while that build runs is held or served, never refused; and the fighter on
-  screen stays when it leaves the cycle, until you switch away (the final pass's item-3 sessions).
+- While the new fighters build in the background, the game keeps running: its longest pause was 4 frames (about
+  67 ms) in Eden, at the start of a Mii build, and 1–3 frames for the others.
+- A switch you press while the new fighters build waits for that build to end and then goes through. It is never
+  refused (in Eden it went through 0.12 s after the build finished).
+- TODO-PROOF: hot lane, the fighter on screen stays when it leaves the cycle, until you switch away (`yoga-i3-live`).
 
 ### No. of CPUs: the seats are the next fighters
 
