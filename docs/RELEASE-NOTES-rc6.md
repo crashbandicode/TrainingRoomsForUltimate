@@ -71,9 +71,8 @@ A drilled combo, like a bound save or an active macro, moves to the top of its l
   every Mii build, 141 ms on the console. Leaving a Mii for the fighters it replaced takes about 45–115 ms; in rc.5 it
   was a full reload of 4–6 seconds, and the next visit to the Mii built it again. Going back to the Mii is a warm
   switch too, about 50 ms.
-  - Mii groups are built in the background too, so the first switch into a Mii is warm, and leaving a Mii is warm to
-    any built group. TODO-PROOF: hot lane, the final pass's item-3 Mii session (`xps-i3-mii`); until it reports, the
-    rc.6 candidate's text was "the first switch into a Mii still builds it: 0.3–1.1 s in Eden".
+  - Mii groups are built in the background too, so the first switch into a Mii is warm (47–72 ms in Eden, for Player 1
+    and for the CPU), and leaving a Mii is warm to any built group (47–51 ms).
 - Ice Climbers, Pokémon Trainer and Pyra/Mythra groups are built in the background too, also in a session that starts
   on one of them. The background build now waits only while Kirby is on screen, and for a second Mii group while a Mii
   is on screen (see Known issues). TODO-PROOF: workers A and B, the final pass's item-3 sessions on the Surface and the
