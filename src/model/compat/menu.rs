@@ -127,7 +127,7 @@ pub fn mii_preferences_of(value: Option<&serde_json::Value>) -> crate::engine::m
         if let Some(selectors) = value.get(key).and_then(serde_json::Value::as_array) {
             for (class, selector) in CLASSES.iter().zip(selectors) {
                 if let Ok(identity) = serde_json::from_value::<Canonical>(selector.clone()) {
-                    if let Ok(updated) = preferences.clone().with(role, *class, Some(identity)) {
+                    if let Ok(updated) = preferences.with(role, *class, Some(identity)) {
                         preferences = updated;
                     }
                 }
@@ -559,7 +559,7 @@ mod tests {
         let stored = MiiPreferences::default()
             .with(Role::Player, MiiClass::Brawler, Some(first)).unwrap()
             .with(Role::Cpu, MiiClass::Brawler, Some(second)).unwrap();
-        let mut value = serde_json::to_value(&stored).unwrap();
+        let mut value = serde_json::to_value(stored).unwrap();
         assert_eq!(mii_preferences_of(Some(&value)), stored, "a valid value reads back whole");
         value["cpu"][0] = serde_json::json!("not a canonical");
         value["note"] = serde_json::json!("a field this build does not know");

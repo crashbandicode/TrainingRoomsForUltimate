@@ -11,7 +11,7 @@
 
 use std::ops::{Deref, DerefMut};
 
-use hos_lock::{Mutex, RwLock};
+use hos_lock::Mutex;
 
 use crate::engine::compat::menu::{TrainingModpackMenu, BASE_MENU};
 use crate::engine::mii::selection::Preferences as MiiPreferences;
@@ -19,14 +19,16 @@ use crate::engine::stages::stage_menu::Preferences as StagePreferences;
 use crate::model::settings::Settings;
 use crate::runtime::compat::sync::{Assignable, Lockable, Readable};
 
-/// What a `Snapshot` does not carry: the kept keys. Written by the publishing thread (`apply_kept`) as one
-/// assignment (computed before the lock is taken), read by hooks for a copy.
+/// What a `Snapshot` does not carry: the kept keys. Published by the publishing path (`apply_kept`, plugin threads only), read by
+/// hooks and plugin threads as a copy that never waits. It was an `RwLock` that hooks read blocking while the menu worker held it
+/// (its preload planner read it in place): the rc.6 freeze class (`rc6-qpf3`, `tests/lock_order.rs`).
+#[derive(Clone, Copy)]
 struct Kept {
     stage: StagePreferences,
     mii: MiiPreferences,
 }
 
-static KEPT: RwLock<Option<Kept>> = RwLock::new(None);
+static KEPT: hos_lock::Published<Option<Kept>> = hos_lock::Published::new(None);
 
 /// A game-side edit of the typed menu (`assign(&MENU, ..)`, the guard of `lock_write(&MENU)`): the value and the publish generation it
 /// was made against. It is what readers get until the next publish, which already carries it (the worker writes it back into the
@@ -217,30 +219,21 @@ pub(crate) fn run_roster_change() {
     }
 }
 /// The settings-only part of the typed view: the two kept keys (`stage_preferences`, `mii_preferences`), which
-/// a `Snapshot` does not carry. Called after the publish at boot, at every commit and by the diag reload (never in a hook). The values
-/// are computed first; the lock is held for the assignment only. The menu rows reach `MENU` through `published::Live` (one path).
+/// a `Snapshot` does not carry. Called after the publish at boot, at every commit and by the diag reload (never in a hook): the
+/// values are computed first, then published (`KEPT`). The menu rows reach `MENU` through `published::Live` (one path).
 pub fn apply_kept(settings: &Settings) {
-    let kept = Kept {
+    KEPT.publish(Some(Kept {
         stage: kept(settings, "stage_preferences"),
         mii: crate::engine::compat::menu::mii_preferences_of(settings.extra.get("mii_preferences")),
-    };
-    // The previous value is dropped after the guard (end of this statement), outside the lock.
-    let _previous = KEPT.write().replace(kept);
+    }));
 }
 
-/// The stage preferences (direct stage, rotation forms) of the Lobby Stages screen.
+/// The stage preferences (direct stage, rotation forms) of the Lobby Stages screen. Never waits.
 pub fn stage_preferences() -> StagePreferences {
-    KEPT.read().as_ref().map_or_else(StagePreferences::default, |kept| kept.stage)
+    KEPT.read().map_or_else(StagePreferences::default, |kept| kept.stage)
 }
 
-/// The saved Mii picks per role and class.
-/// The saved Mii picks read in place (no clone, R5: the preload planner reads them on every planning tick inside a hook scope);
-/// hold the view only for the read.
-pub fn mii_preferences_view() -> hos_lock::MappedRwLockReadGuard<'static, MiiPreferences> {
-    static EMPTY: std::sync::LazyLock<MiiPreferences> = std::sync::LazyLock::new(MiiPreferences::default);
-    hos_lock::RwLockReadGuard::map(KEPT.read(), |kept| kept.as_ref().map_or(&*EMPTY, |kept| &kept.mii))
-}
-
+/// The saved Mii picks per role and class: a copy (no heap, never waits; the preload planner reads them on every planning tick).
 pub fn mii_preferences() -> MiiPreferences {
-    KEPT.read().as_ref().map_or_else(MiiPreferences::default, |kept| kept.mii.clone())
+    KEPT.read().map_or_else(MiiPreferences::default, |kept| kept.mii)
 }

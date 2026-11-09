@@ -42,7 +42,7 @@ fn class_index(class: MiiClass) -> usize {
 
 /// Persisted per-role, per-class preferences (identity = `Canonical`, stored by the menu layer as
 /// its hex form). This module only reads them; `with` exists for the menu layer and tests.
-#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(try_from = "StoredPreferences")]
 pub struct Preferences {
     player: [Option<Canonical>; 3],
@@ -382,7 +382,7 @@ mod tests {
         let snap = example();
         let origin = Origin(canonical_of(&snap, 2622));
         let prefs = Preferences::default().with(Role::Player, MiiClass::Swordfighter, Some(origin.0)).unwrap();
-        let before = prefs.clone();
+        let before = prefs;
         let choice = resolve(&snap, &prefs, Role::Player, MiiClass::Swordfighter, PlayerOrigin::Mii(origin)).unwrap();
         assert_eq!((choice.slot_id.unwrap(), choice.source), (2700, Source::FirstEligible(Fallback::PreferenceIsOrigin)));
         assert_eq!(prefs, before);
@@ -392,7 +392,7 @@ mod tests {
             canonical_of(&foreign, 9999)
         };
         let prefs = Preferences::default().with(Role::Player, MiiClass::Swordfighter, Some(stale)).unwrap();
-        let before = prefs.clone();
+        let before = prefs;
         let choice = resolve(&snap, &prefs, Role::Player, MiiClass::Swordfighter, PlayerOrigin::Mii(origin)).unwrap();
         assert_eq!((choice.slot_id.unwrap(), choice.source), (2700, Source::FirstEligible(Fallback::PreferenceUnavailable)));
         assert_eq!(prefs, before);
@@ -463,9 +463,9 @@ mod tests {
             cpu: Some((MiiClass::Swordfighter, canonical_of(&snap, 2700))),
         };
         assert!(on_menu_close(&snap, &before, &before, PlayerOrigin::NotMii, active).is_empty());
-        let unrelated = before.clone().with(Role::Cpu, MiiClass::Gunner, Some(canonical_of(&snap, 3137))).unwrap();
+        let unrelated = before.with(Role::Cpu, MiiClass::Gunner, Some(canonical_of(&snap, 3137))).unwrap();
         assert!(on_menu_close(&snap, &before, &unrelated, PlayerOrigin::NotMii, active).is_empty());
-        let selected = unrelated.clone().with(Role::Cpu, MiiClass::Swordfighter, Some(canonical_of(&snap, 2622))).unwrap();
+        let selected = unrelated.with(Role::Cpu, MiiClass::Swordfighter, Some(canonical_of(&snap, 2622))).unwrap();
         let actions = on_menu_close(&snap, &unrelated, &selected, PlayerOrigin::NotMii, active);
         assert_eq!(actions, vec![Action::ReloadCpu(Choice {
             canonical: canonical_of(&snap, 2622), slot_id: Some(2622), source: Source::Preference,
@@ -527,7 +527,7 @@ mod tests {
         }
         let bytes = serde_json::to_vec(&prefs).unwrap();
         assert_eq!(serde_json::from_slice::<Preferences>(&bytes).unwrap(), prefs);
-        let mut bad = serde_json::to_value(&prefs).unwrap();
+        let mut bad = serde_json::to_value(prefs).unwrap();
         bad["cpu"][0] = bad["cpu"][1].clone();
         assert!(serde_json::from_value::<Preferences>(bad).is_err());
         assert!(prefs.with(Role::Cpu, MiiClass::Gunner, Some(canonical_of(&snap, 2622))).is_err());
