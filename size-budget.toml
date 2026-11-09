@@ -41,6 +41,7 @@ reason = "counter corrected to sloc4, primary 2026-11-02 (tools/sloc.py is now s
 #   pkg4       2d25cdf  +219    measured (design C, expected net about 0) (owner: pkg4 stream)
 #   pkg6       d517dab  +169    (owner: pkg6 stream)
 #   total pending about +4,318
+
 [[budget]]
 scope = "total"
 ceiling = 107900
@@ -53,6 +54,7 @@ scope = "total"
 ceiling = 105600
 date = "2026-11-02"
 reason = "cut: approved capacity/lifecycle probe and empty alias retirement; raw sloc4 101224 plus retained pending merge allowance4318 =105542, rounded up. Prior measured104350, slice reduction3126; no counting semantics or normalized-unit conversion."
+
 [[budget]]
 scope = "total"
 ceiling = 103300
@@ -66,6 +68,7 @@ date = "2026-11-02"
 reason = "cut: HookId and Feature declaration tables remove maintained duplicate mappings; raw sloc4 98865 plus unchanged pending merge allowance4318 =103183, rounded up. No counting/layout or behavior change."
 
 # Entries above are historical raw units (implicit basis=raw-sloc4), not comparable to this section.
+
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
@@ -857,6 +860,14 @@ ceiling = 155774
 date = "2026-11-08"
 reason = "rc.6 integration (p23/rc6-integration 83cf3b6): TASK-OPUS-rc6-open-fixes items 1 and 2 over d17c2ca (155695): #54's exact-Mii comparison as Switch installs it (8f0df06: mii_install::installed_target, identity::installed, mii_replay::installed_target, replay_ready, recorded_target_matches) and the live F9 seat for the Mii owners' snapshot (1a466db: parked_entries::live_seat, f9_gate LIVE/publish_live/seat_live, helper_kind); the docs merge d676755 adds no src; measured 155774 (tools/size_gate.py), +79"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied under TASK-OPUS-rc6-open-fixes (primary c07b3449, INBOX-opus-rc6-integration 2026-11-08 23:03Z); a raise goes in its own commit with approved_by"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 152565
+date = "2026-11-08"
+reason = "rc.6 item 3, worker B (p23/rc6-bg-pt 314c2bd; operator decision 2026-11-08 'All groups in rc.6', TASK-OPUS-rc6-bg-special, SPECIAL-GROUPS section 3): Pokemon Trainer and Pyra/Mythra groups built in the background (native_body_bank start_holder, init_holder, partner_guards, queue_trainer, schedule_task, background_partner X5 hook; body_bank holder_step/partner_cell/trainer_task); measured 152565 (tools/size_gate.py), +370 over 152195"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to this operator-chosen rc.6 item under TASK-OPUS-rc6-bg-special (primary c07b3449, 2026-11-08: a raise goes in its own commit with approved_by)"
 
 [[budget]]
 scope = "total"
