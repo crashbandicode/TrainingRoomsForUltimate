@@ -1004,3 +1004,11 @@ ceiling = 158306
 date = "2026-11-09"
 reason = "rc.6 p23/rc6-pt-start over integration 2f54db4 (1d0c93d): the Mii groups built in the background and their exit, freeing under the pause, the shared construction tail and the PT/Aegis start-up window on top of integration; measured 158306 (tools/size_gate.py), +1131 over 157175 (2f54db4)"
 approved_by = "Operator Raise as needed (DECISIONS 2d27de7); applied to the operator-chosen rc.6 items under TASK-OPUS-rc6-hot-slots (primary c07b3449, 2026-11-08: a raise goes in its own commit with approved_by)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 158308
+date = "2026-11-09"
+reason = "rc.6 p23/rc6-pt-start (0f8415a): the slow-step names of integration object re-arm steps; measured 158308 (tools/size_gate.py), +2 over 158306"
+approved_by = "Operator Raise as needed (DECISIONS 2d27de7); applied to the operator-chosen rc.6 items under TASK-OPUS-rc6-hot-slots (primary c07b3449, 2026-11-08: a raise goes in its own commit with approved_by)"
