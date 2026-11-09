@@ -1132,3 +1132,11 @@ ceiling = 159120
 date = "2026-11-09"
 reason = "rc.6 p23/rc6-pt-start X6 follow-up (2c116ba): the owner reader 0x33c3370 takes the shadow on the worker (one inline hook, its seam row and wiring pin); measured 159120 (tools/size_gate.py), +17 over 159103 (aa9fb9f)"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to the operator-chosen rc.6 items under TASK-OPUS-rc6-hot-slots (primary c07b3449, 2026-11-08: a raise goes in its own commit with approved_by)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 159141
+date = "2026-11-09"
+reason = "rc.6 integration (p23/rc6-integration 9ed837eb): the merge of p23/rc6-pt-start e595f93b (159120: +215 over 7da9c4dd's 158905, X6) into 8482fb65 (158926, worker A's Kirby re-arm); measured 159141 on the merged tree (tools/size_gate.py), +215"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); combined ceiling = measured merged size per primary c07b3449, INBOX-opus-rc6-integration 2026-11-08 19:13Z"
