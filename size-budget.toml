@@ -932,3 +932,11 @@ ceiling = 155973
 date = "2026-11-09"
 reason = "rc.6 open fixes (p23/rc6-open-fixes 8894449 on 9438039; primary readings 2026-11-08 23:03Z, TASK-OPUS-rc6-open-fixes): SETUP-Y-BIND (rr_host::setup_bound, WriterBind::restore), F9-SEAT-NOTICE (parked_entries::seat_state, hat_slots::with_seats, sources::seat_states, f9_gate seat holds, the diag memory reserve), PLAY-MOMENTUM (rr_host StartPose/RecordStart/StartSpeed, note_record_start, take_start_speed, play_start_speed, recording_host record_start/live_speed/apply_start_speed); measured 155973 (tools/size_gate.py), +401 over 155572"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied under TASK-OPUS-rc6-open-fixes (primary c07b3449: a raise goes in its own commit with approved_by)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 156837
+date = "2026-11-09"
+reason = "rc.6 integration (p23/rc6-integration 3f250b6): the merge 2338eee of p23/rc6-open-fixes (184635c, 155973: +401 over 155572, TASK-OPUS-rc6-open-fixes items 3-5) into 62e7c85 (156436), then the docs merge 3f250b6 (no src); measured 156837 on the merged tree (tools/size_gate.py), +401"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); combined ceiling = measured merged size per primary c07b3449, INBOX-opus-rc6-integration 2026-11-08 19:13Z"
