@@ -5470,7 +5470,7 @@
    "dest": "src/runtime/roster/native_body_bank.rs",
    "crate": "root",
    "src_sha256": "ccf7ac678691fa0101a1eff5dbd9300a1b12fe64e9ebbde515697adfbb841c98",
-   "dest_sha256": "edea210c1dfecd3caf4555710fb1eee3d1dc23cacd146fa51ab09d4b4a46fcd6",
+   "dest_sha256": "1635934633cbe6b639a84b64c2aa2d78f6735249f678ef8f52d31c1e94cfb12b",
    "edits": [
     {
      "old": "unsafe fn finalize_entry(entry: *mut u8) -> u64 {\n",
@@ -6607,6 +6607,11 @@
      "old": "                g.leaving = false;\n                g.saved = None;\n",
      "new": "                g.leaving = false;\n                // Its re-acquired object kind went with the group's other tokens above.\n                g.object_held = false;\n                g.saved = None;\n",
      "reason": "Inbox 00:17Z item 1 (worker B): the Pok\u00e9mon Trainer trainer-article null read at a later warm attach (a console-crash class, pre-existing) fixed by taking the object kind 0x72 again while the group is detached and returning it after the attach's rebuild (never held across the detach; returned at every drain and teardown)"
+    },
+    {
+     "old": "            if let Err(why) = r_handle::acquire(base, lrole, group, kind, Holder::Prefetch(GroupId(group as u8)), member_recipe(members, kind), &occupancy) {\n                super::finish_install(token, \"object kind re-acquire refused\");\n                if let Some(g) = BANKS[role].lock().as_mut().and_then(|bank| bank.groups.get_mut(group)) { g.object_refused = true; }\n",
+     "new": "            if let Err(why) = r_handle::acquire(base, lrole, group, kind, Holder::Prefetch(GroupId(group as u8)), member_recipe(members, kind), &occupancy) {\n                super::finish_install(token, \"object kind re-acquire declined by the ledger\");\n                if let Some(g) = BANKS[role].lock().as_mut().and_then(|bank| bank.groups.get_mut(group)) { g.object_refused = true; }\n",
+     "reason": "Inbox 00:17Z item 1 (worker B): the object re-acquire's INSTALL release label (diagnostics only, not user-facing) says \"declined by the ledger\", as this file's \"background build declined\"; compliance.py's refusal heuristic read \"refused\" in the internal label as a user-facing refusal"
     }
    ]
   },

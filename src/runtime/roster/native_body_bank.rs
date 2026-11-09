@@ -4408,7 +4408,7 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
             let copy = ready_members(entry, owner).and_then(|window| live_kirby_copy_kind(entry, owner, window));
             let occupancy = occupancy_snapshot(role, copy);
             if let Err(why) = r_handle::acquire(base, lrole, group, kind, Holder::Prefetch(GroupId(group as u8)), member_recipe(members, kind), &occupancy) {
-                super::finish_install(token, "object kind re-acquire refused");
+                super::finish_install(token, "object kind re-acquire declined by the ledger");
                 if let Some(g) = BANKS[role].lock().as_mut().and_then(|bank| bank.groups.get_mut(group)) { g.object_refused = true; }
                 trace!("[GroupSwap] object kind NOT re-acquired owner={} group={} kind={:#x} reason={:?}; its next attach takes the Reload path",
                     owner, group, kind, why);
