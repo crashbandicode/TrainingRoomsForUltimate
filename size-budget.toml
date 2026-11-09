@@ -1252,3 +1252,11 @@ ceiling = 161326
 date = "2026-11-09"
 reason = "rc.6 integration bd8ddcb5 (the candidate): p23/rc6-window-admission (+106), p23/rc6-lobby-cpu (+544) and p23/rc6-preload-priority (+228) merged on 0e97f41d (160448); each branch raised its own ceiling over 159679 with approved_by (159785, 160223, 159907); measured on the merge 161326 (tools/size_gate.py), exactly 160448 + 106 + 544 + 228"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the combined ceiling of the rc.6 product fixes and the operator feature the primary ordered merged (2026-11-09 14:54Z), each already raised with approved_by in its own branch; a raise goes in its own commit with approved_by"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 161387
+date = "2026-11-09"
+reason = "rc.6 p23/rc6-preload-priority (4ab948fe) over candidate 1261f56c: a free is room on its way until a planner pass finds it settled, and a kept group is freed only as the last resort (body_bank::ReleaseWatch, arriving_room, capacity_release's settled argument; native_body_bank RELEASE_WATCH in plan_groups, progress, the entry tick, pause_opening, release_for_capacity, scene_changed) and its host and wiring tests; measured 161387 (tools/size_gate.py), +61 over 161326 (1261f56c)"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to the product fix ordered by the primary (INBOX-opus-rc6-docs 16:06Z; a raise goes in its own commit with approved_by)"

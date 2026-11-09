@@ -1814,3 +1814,29 @@ Ice Climbers waited for a pause while two parked groups held the budget and P1's
 - `tests/cycle_change_wiring.rs`: `new_members_load_now_and_parked_groups_go_only_for_their_room`,
   `a_refused_prefetch_frees_a_parked_group_now`, and the entry-tick test;
 - `tests/group_hold_wiring.rs`: the lifecycle's leaving rule.
+
+### p23/rc6-preload-priority: a free is room on its way until it settles; a kept group goes last (2026-11-09)
+
+Primary 2026-11-09 16:06Z (integration's `final-surface-i3-pf-1261f56c` `x6-cc` on `1261f56c`).
+- **What happened:** `[3, 5]` was freed for the Ice Climbers (`#805`, headroom 224 → 264 MB). One second later the
+  pair's prefetch was refused at 289 MB, so `release_for_capacity` freed the kept `[0, 1, 2]` (`#817`), and DK and
+  Link went cold.
+- **Why:** a free's memory keeps arriving after `frees now`. The release's own steps are synchronous (destroy, keys,
+  `[Ledger] reconcile … task_pending=0`), but the committed charge falls for another second or two (`pp-rel-2`:
+  293 → 335 → 367 MB), and no native event marks the end.
+- **`body_bank::ReleaseWatch`:**
+  - a free (`frees now` at the entry tick, `pause frees` at the pause) starts it with the charge after the free;
+  - each planner pass (`plan_groups`) samples the charge. The first pass only records it; the release has settled at
+    the first pass that finds the charge no lower than the pass before;
+  - unreadable counters settle it, and a scene change clears it (`RELEASE_WATCH`, taken alone).
+- **While a release is in flight:**
+  - `capacity_release` (now `capacity_release(settled, …)`) frees nothing;
+  - `arriving_room` shows a prefetch held for memory as loading in `progress`, because its room is on its way.
+- **After it settles,** the fewest kept members still go first. A group that keeps members of the new cycle goes only
+  when nothing unneeded is parked and the room still lacks after the earlier releases settled.
+
+13 recorded manifest edits (`body_bank.rs` 3, `native_body_bank.rs` 10). Tests failed first
+(`FAIL-FIRST-settle-model.log`, `FAIL-FIRST-settle-wiring.log`):
+- `body_bank::a_release_in_flight_is_room_on_its_way`;
+- `tests/cycle_change_wiring.rs::a_free_is_room_on_its_way_until_a_planner_pass_finds_it_settled`, and
+  `a_refused_prefetch_frees_a_parked_group_now` (the settled argument).

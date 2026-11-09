@@ -129,13 +129,36 @@ fn a_refused_prefetch_frees_a_parked_group_now() {
     ]);
     let capacity = body(BANK, "fn release_for_capacity(");
     ordered(capacity, &[
+        "let settled = RELEASE_WATCH.lock().settled();",
         "if !g.leaving || !leaves_at_pause(g.state) { continue; }", "if g.release_now { return; }",
         "if bank.swap.is_none_or(|s| s.group != index) { parked.push(((role, index), *g.members, g.parked_kept)); }",
-        "let Some((role, index)) = capacity_release(parked.iter().copied()) else { return; };",
+        "let Some((role, index)) = capacity_release(settled, parked.iter().copied()) else { return; };",
         "g.release_now = true;", "trace!(\"[GroupSwap] release now owner={} group={} kinds={:x?} kept={} reason={} held prefetch",
     ]);
     let swap = body(BANK, "unsafe fn perform_swap(");
     ordered(swap, &["group.leaving = false;", "group.release_now = false;"]);
+}
+
+/// Operator rule 2026-11-09 16:06Z (Eden `final-surface-i3-pf-1261f56c` `x6-cc`: the kept `[0, 1, 2]` was freed while
+/// `[3, 5]`'s room was still arriving): a free starts the release watch, at the entry tick and at the pause; each
+/// planner pass samples the committed charge into it; while it is in flight a refused prefetch frees nothing more and
+/// a prefetch held for memory shows as loading; a scene change clears it.
+#[test]
+fn a_free_is_room_on_its_way_until_a_planner_pass_finds_it_settled() {
+    let freed = "if !still { let mut watch = RELEASE_WATCH.lock(); *watch = watch.freed(after.committed.get()); }";
+    let lifecycle = body(BANK, "unsafe fn group_lifecycle(");
+    ordered(lifecycle, &["leave_group(entry, owner, role, group);", "trace!(\"[GroupSwap] frees now", freed]);
+    let pause = body(BANK, "pub(super) unsafe fn pause_opening()");
+    ordered(pause, &["trace!(\"[GroupSwap] pause frees", freed, "if still { break; }"]);
+    let plan = body(BANK, "fn plan_groups(");
+    ordered(plan, &["*watch = watch.pass(MemorySample::capture().committed.get());",
+        "trace!(\"[GroupSwap] released room {:?} -> {:?}",
+        "let budget = GroupBudget { ready_fighters: usize::from(settings.ready_fighters), pool_free, special };"]);
+    let progress = body(BANK, "pub(crate) fn progress(");
+    ordered(progress, &["let arriving = !RELEASE_WATCH.lock().settled();", "for (role, state) in BANKS.iter().enumerate() {",
+        "arriving_room(g.state, arriving)"]);
+    let scene = body(BANK, "pub(super) fn scene_changed(");
+    assert!(scene.contains("*RELEASE_WATCH.lock() = ReleaseWatch::Settled;"), "{scene}");
 }
 
 /// The sparse planner (run on the menu's close, `cycle_preload::on_frame`) reads each role's cycle as it is now: a
