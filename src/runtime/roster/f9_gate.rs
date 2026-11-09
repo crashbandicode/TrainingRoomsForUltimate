@@ -65,7 +65,15 @@ static SEAT_HELD: [core::sync::atomic::AtomicU32; 2] =
 /// not seats and are ignored.
 pub(crate) fn note_seat_memory(slot: u32, kind: u32, held: bool) {
     if let Some(cell) = SEAT_HELD.get((slot as usize).wrapping_sub(2)) {
-        cell.store(if held { kind.saturating_add(1) } else { 0 }, core::sync::atomic::Ordering::Release);
+        let now = if held { kind.saturating_add(1) } else { 0 };
+        let was = cell.swap(now, core::sync::atomic::Ordering::AcqRel);
+        if was != now {
+            crate::engine::compat::logging::diagnostic(format_args!(
+                "[F9Seat] memory slot={slot} held={} kind=0x{:x}",
+                held,
+                if held { kind } else { was.saturating_sub(1) }
+            ));
+        }
     }
 }
 

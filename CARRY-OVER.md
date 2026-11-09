@@ -1057,3 +1057,9 @@ now count in the existing fighter status, with no new text: a held seat reads "�
 (`poll_status`); `carry_pkg6.py carry/ledger/verify` re-derives all 250 files. Tests (failed first: no `with_seats`;
 the runtime named neither `with_seats` nor `note_seat_memory`): `hat_slots`
 `a_seat_held_for_memory_counts_in_the_fighter_status`, `tests/seat_notice_wiring.rs` (2).
+
+**Its Eden row's instrument (diag build only).** A row cannot count on the console running out of memory, so the diag
+build's `process_memory::admit` takes `DIAG_RESERVE` bytes (written through `diag-memory-reserve.req`, read by the
+states diag thread) from the headroom of every discretionary admission; 0, the default, changes nothing, and the release
+build has neither. One recorded manifest edit (`process_memory.rs`). `f9_gate::note_seat_memory` logs each change of a
+seat's hold (`[F9Seat] memory slot=N held=… kind=…`).

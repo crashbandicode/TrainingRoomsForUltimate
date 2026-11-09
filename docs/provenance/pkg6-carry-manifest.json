@@ -11255,7 +11255,14 @@
    "dest": "src/runtime/roster/process_memory.rs",
    "crate": "root",
    "src_sha256": "ec5971f8d90cdb2081fc1a3129a14762629d5542a7522cc1c2e5a20df4db192d",
-   "dest_sha256": "78e25e4a303944e2f49559bac35b8e1eebe689299902b13fc7d82b6d611c3d55"
+   "dest_sha256": "458ae49af380432a2d2a054e8c2064aaa4f3b7541336d6b1f5d106e01cef7926",
+   "edits": [
+    {
+     "old": "/// One discretionary admission against the current headroom less [`outstanding`], with the sample it used.\npub(crate) fn admit(cost: GroupCost) -> (Decision, MemorySample) {\n    let sample = MemorySample::capture();\n    (memory::admit(sample.headroom(), outstanding(), cost), sample)\n",
+     "new": "/// Diag build only: process memory an Eden row holds back (`diag-memory-reserve.req`, bytes), so the discretionary\n/// admissions refuse as on a console with less headroom (F9-SEAT-NOTICE's row). 0, the default, changes nothing.\n#[cfg(feature = \"diag\")]\npub(crate) static DIAG_RESERVE: core::sync::atomic::AtomicU64 = core::sync::atomic::AtomicU64::new(0);\n\n/// One discretionary admission against the current headroom less [`outstanding`], with the sample it used.\npub(crate) fn admit(cost: GroupCost) -> (Decision, MemorySample) {\n    let sample = MemorySample::capture();\n    #[cfg(feature = \"diag\")]\n    let headroom = sample.headroom().map(|headroom| {\n        headroom.saturating_sub(DIAG_RESERVE.load(core::sync::atomic::Ordering::Acquire))\n    });\n    #[cfg(not(feature = \"diag\"))]\n    let headroom = sample.headroom();\n    (memory::admit(headroom, outstanding(), cost), sample)\n",
+     "reason": "p23/rc6-open-fixes F9-SEAT-NOTICE's Eden row (primary 2026-11-08 23:03Z, reading A): in the diag build only, process memory an Eden row holds back (DIAG_RESERVE, set by diag-memory-reserve.req) is taken from the headroom of every discretionary admission, so a parked seat's load is refused as on a console with less headroom. 0, the default, changes nothing; the release build is unchanged."
+    }
+   ]
   },
   {
    "src": "src/native_keyboard/inline_keyboard.rs",

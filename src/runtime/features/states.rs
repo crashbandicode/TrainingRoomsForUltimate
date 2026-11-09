@@ -1800,6 +1800,16 @@ pub fn start_diag_triggers() {
                 diagnostic(format_args!("[TrainingRooms] state diag_settings applied issues={}", loaded.issues.len()));
             }
         }
+        // Process memory held back from the discretionary admissions, in bytes (`process_memory::DIAG_RESERVE`).
+        if let Some(path) = FixedPath::<128>::in_root("diag-memory-reserve.req") {
+            if let Ok(text) = std::fs::read_to_string(path.as_str()) {
+                let _ = std::fs::remove_file(path.as_str());
+                let bytes = text.trim().parse::<u64>().unwrap_or(0);
+                crate::runtime::roster::character_roster::process_memory::DIAG_RESERVE
+                    .store(bytes, Ordering::Release);
+                diagnostic(format_args!("[TrainingRooms] state diag_memory_reserve bytes={bytes}"));
+            }
+        }
         for (name, action) in [
             ("diag-save.req", request_save as fn()),
             ("diag-load.req", request_load as fn()),
