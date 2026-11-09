@@ -71,9 +71,10 @@ fn the_window_targets_skip_what_a_group_holds() {
     let budget = body(BANK, "pub(crate) fn plan_budget(");
     ordered(budget, &[
         "let next = wanted_banks[role].map_or(0, |(members, target)| {",
-        "let held_by_group = |kind: u32| BANKS[role].lock().as_ref().is_some_and(|bank| !bank.departed",
+        "let grouped = |kind: u32| BANKS[role].lock().as_ref().is_some_and(|bank| !bank.departed",
         "&& bank.groups.iter().any(|g| g.state != GroupState::Released && g.members.index_of(kind).is_some()));",
-        "next_window_targets(&shown, target, originals[role], held_by_group)",
+        "next_window_targets(&shown, target, originals[role], grouped)",
+        // A live attached window then plans what it serves (p23/rc6-bg-ic `window_targets`); integration merge 2026-11-09.
         "let targets = crate::engine::swap::body_bank::window_targets(grouped, live[role], originals[role], next);",
         "PLANNED_TARGETS[role].store(targets.saturating_add(group_targets[role]), Ordering::Release);",
     ]);

@@ -165,7 +165,7 @@ use std::convert::TryInto;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicU8, AtomicUsize, Ordering};
 use hos_lock::Mutex;
 use crate::engine::swap::body_bank::{
-    dispatcher_array_header_ok, dispatcher_idle_words, native_group_request, original_bankable,
+    count_extra_groups_iter, dispatcher_array_header_ok, dispatcher_idle_words, native_group_request, original_bankable,
     original_form_bankable, pair_request, pair_resource_references, plan_extra_groups_with, prefetch_outcome, info_wrapper,
     swap_commit_index_in, async_build_eligible, construction_task, TickGap,
     background_build_eligible, next_background, BACKGROUND_INFO_SPANS, trainer_task, HolderStep, object_rearm_due, object_ready,
@@ -729,7 +729,8 @@ pub(crate) fn plan_budget(menu: &crate::engine::compat::menu::TrainingModpackMen
     if grouped {
         group_bodies = plan_groups(&settings, menu, lanes, originals, &mut group_targets);
     }
-    // rc.6 item 3: a live pair-lead window plans what it serves (`body_bank::window_targets`; the values `progress` reads).
+    // rc.6 item 3: with groups on, the live attached window plans what it serves (`body_bank::window_targets`; the values
+    // `progress` reads).
     let live: [Option<(Members, u32)>; 2] = std::array::from_fn(|role| BANKS[role].lock().as_ref()
         .filter(|bank| bank.phase == Phase::Ready && !bank.departed)
         .map(|bank| (*bank.members, bank.observed.map_or(bank.members.kinds()[usize::from(bank.target)], |(_, kind)| kind))));
@@ -748,9 +749,9 @@ pub(crate) fn plan_budget(menu: &crate::engine::compat::menu::TrainingModpackMen
                 shown.push(kind);
             }
             // rc6-hot-xps19: a detached record that holds them (the window a Mii group displaced) counts with the groups.
-            let held_by_group = |kind: u32| BANKS[role].lock().as_ref().is_some_and(|bank| !bank.departed
+            let grouped = |kind: u32| BANKS[role].lock().as_ref().is_some_and(|bank| !bank.departed
                 && bank.groups.iter().any(|g| g.state != GroupState::Released && g.members.index_of(kind).is_some()));
-            next_window_targets(&shown, target, originals[role], held_by_group)
+            next_window_targets(&shown, target, originals[role], grouped)
         });
         let targets = crate::engine::swap::body_bank::window_targets(grouped, live[role], originals[role], next);
         PLANNED_TARGETS[role].store(targets.saturating_add(group_targets[role]), Ordering::Release);
@@ -2269,6 +2270,16 @@ unsafe fn service_locked(entry: *mut u8, owner: u32, role: usize) -> Action {
     // P3-0: one tick of this entry's pre-service; the meter is armed by a request and read at Ready.
     bank.tick.observe(now_us());
     split::observe(role, now_us());
+    // Diag: each pre-service tick of a switch in flight, the entry's native progress (P1's attach into the pair group
+    // took a frame more than the CPU's between its acknowledgement and N2; primary 2026-11-09 02:00Z).
+    #[cfg(feature = "diag")]
+    if bank.phase == Phase::Changing {
+        let s = snapshot(entry);
+        let state = |cell: usize| fields::child(entry as usize, cell).and_then(|b| fields::read::<u8>(b, 0x3a));
+        trace!("[GroupSwap] attach tick owner={} target={} acknowledged={} index={} pending={} previous={} flags={:#x} outer={} loader={} changing={} guard={} states=[{:?},{:?},{:?}]",
+            owner, bank.target, bank.acknowledged, s.index, s.pending, s.previous_or_next, s.flags, s.outer, s.loader, s.changing,
+            s.guard, state(0x4160), state(0x4168), state(0x4170));
+    }
     // A former Ready receipt must not survive a callback observing an unfinished
     // native reset/replacement. Publish it again only after today's full proof.
     bank.observed = None;
@@ -3365,15 +3376,6 @@ unsafe fn background_mii_body(body: usize) -> bool {
         && fields::read::<u32>(body, 0xc).is_some_and(|kind| (0x48..=0x4a).contains(&kind))
 }
 
-/// Any body of an owner whose background build is in flight (`background_skip`'s key): the live window is built, so a
-/// body that constructs for that owner meanwhile is the background build's.
-#[inline(always)]
-unsafe fn background_body(body: usize) -> bool {
-    BACKGROUND_OWNERS.load(Ordering::Acquire) != 0 && aligned(body as *const u8)
-        && fields::read::<u64>(body, 0x10).is_some_and(|owner| owner < 32
-            && BACKGROUND_OWNERS.load(Ordering::Acquire) & owner_bit(owner as u32) != 0)
-}
-
 /// The worker thread building the background Mii body, reading `R` (the register `r`) by owner.
 #[inline(always)]
 fn mii_worker_reads(r: usize) -> bool {
@@ -3454,25 +3456,6 @@ unsafe fn bg_mii_construct_path(ctx: &mut InlineCtx) {
     if real != 0 && ctx.registers[1].x() as usize == real && background_mii_body(ctx.registers[19].x() as usize) {
         ctx.registers[1].set_x(shadow_r_address() as u64);
         mii_hit(6);
-    }
-}
-
-/// The construction tail's pair test (`cmp w8, #0x4b` after `ldr w8, [x9, #0x18]`, x9 the entry, x19 the body), one
-/// shared hook (primary 2026-11-08 22:52Z; worker A's `background_tail` with the Mii build's shadow restore):
-/// - SPECIAL-GROUPS §1: a background Mii body's `x20` is the real `R` again for the tail's lock, `R+0x50` and release.
-/// - SPECIAL-GROUPS §0 X1: the tail reads the **live** cells 0/1 (`0x60de64`, `0x60de70`) on the worker. Beside a live
-///   `[Popo, Nana]` window (a session that starts on Ice Climbers, or the pair group attached) a background body would
-///   take the pair rule: `R+0x50` decremented under the lock and, at 0 after the window's own build, the whole-R reset
-///   that drops every Prefetched group's keys. A background body sees no Popo in cell 0 instead, so its tail takes the
-///   per-kind release `0x17e8610(R, kind)` at `0x60debc`, which returns exactly the keys its group's prefetch registered.
-#[skyline::hook(offset = 0x60de68, inline)]
-unsafe fn background_tail(ctx: &mut InlineCtx) {
-    if ctx.registers[20].x() as usize == shadow_r_address() {
-        ctx.registers[20].set_x(MII_REAL_R.load(Ordering::Acquire) as u64);
-        mii_hit(7);
-    }
-    if ctx.registers[8].w() == POPO && background_body(ctx.registers[19].x() as usize) {
-        ctx.registers[8].set_x(u64::from(u32::MAX));
     }
 }
 
@@ -3673,6 +3656,36 @@ unsafe fn start_holder(base: usize, entry: usize, owner: u32, b: &mut Background
 /// The construction tail's pair test (`cmp w8, #0x4b` after `ldr w8, [x9, #0x18]`, x9 the entry, x19 the body).
 const BACKGROUND_TAIL: usize = 0x60de68;
 
+/// Any body of an owner whose background build is in flight (`background_skip`'s key): the live window is built, so a
+/// body that constructs for that owner meanwhile is the background build's.
+#[inline(always)]
+unsafe fn background_body(body: usize) -> bool {
+    BACKGROUND_OWNERS.load(Ordering::Acquire) != 0 && aligned(body as *const u8)
+        && fields::read::<u64>(body, 0x10).is_some_and(|owner| owner < 32
+            && BACKGROUND_OWNERS.load(Ordering::Acquire) & owner_bit(owner as u32) != 0)
+}
+
+/// SPECIAL-GROUPS §0 X1: the construction tail reads the **live** cells 0/1 (`0x60de64`, `0x60de70`) on the worker. Beside
+/// a live `[Popo, Nana]` window (a session that starts on Ice Climbers, or the pair group attached) a background body
+/// would take the pair rule: `R+0x50` decremented under the lock and, at 0 after the window's own build, the whole-R reset
+/// that drops every Prefetched group's keys. A background body sees no Popo in cell 0 instead, so its tail takes the
+/// per-kind release `0x17e8610(R, kind)` at `0x60debc`, which returns exactly the keys its group's prefetch registered.
+///
+/// The one hook at `0x60de68` for every background body (primary 2026-11-08 22:52Z, 2026-11-09 02:24Z: `p23/rc6-bg-ic`
+/// and `p23/rc6-hot-slots-mii` both hooked it): a background Mii body's `x20` is the shadow `R` from `0x60b98c`
+/// (`bg_mii_construct_enter`), so it gets the real `R` back first, for the tail's lock, `R+0x50` and release
+/// (SPECIAL-GROUPS §1 (b)); then the X1 rule.
+#[skyline::hook(offset = 0x60de68, inline)]
+unsafe fn background_tail(ctx: &mut InlineCtx) {
+    if ctx.registers[20].x() as usize == shadow_r_address() {
+        ctx.registers[20].set_x(MII_REAL_R.load(Ordering::Acquire) as u64);
+        mii_hit(7);
+    }
+    if ctx.registers[8].w() == POPO && background_body(ctx.registers[19].x() as usize) {
+        ctx.registers[8].set_x(u64::from(u32::MAX));
+    }
+}
+
 /// The construction's info wrapper load (`ldr x9, [x9, #8]`, SPECIAL-GROUPS §0 X4).
 const BACKGROUND_INFO: usize = 0x60d270;
 
@@ -3794,15 +3807,15 @@ struct Background {
     settled_us: [u64; NATIVE_MEMBERS],
     ticks: u32,
     waited_logged_us: u64,
-    /// A Mii group's build (SPECIAL-GROUPS §1): the face handles its tick's setup made, and its values for the hooks.
-    mii: Option<MiiBuild>,
-    /// The pad manager's per-slot controllers when the build started (diagnostics, `pad_controllers`).
-    pads: [usize; 16],
     /// SPECIAL-GROUPS §3: a native group's holder step ran once its bodies settled (`start_holder`); the records it made
     /// go into the group's saved window, and Pokémon Trainer's pool task runs on the worker until it settled (0 otherwise).
     holder_due: bool,
     records: [usize; 3],
     trainer: usize,
+    /// A Mii group's build (SPECIAL-GROUPS §1): the face handles its tick's setup made, and its values for the hooks.
+    mii: Option<MiiBuild>,
+    /// The pad manager's per-slot controllers when the build started (diagnostics, `pad_controllers`).
+    pads: [usize; 16],
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -4013,7 +4026,7 @@ unsafe fn start_background(entry: *mut u8, owner: u32, role: usize, group: usize
     bank.background = Some(Background { group, members, token, alias, lease, window: made, control, control_us: 0,
         tasks: [0; NATIVE_MEMBERS], queued: 0, live_before, committed, info_words: info_words(info), skips_before,
         started_us: started, setup_us, settled_us: [0; NATIVE_MEMBERS], ticks: 0, waited_logged_us: started, mii: mii_build,
-        pads: pad_before, holder_due: false, records: [0; 3], trainer: 0 });
+        holder_due: false, records: [0; 3], trainer: 0, pads: pad_before });
     trace!("[GroupSwap] background build owner={} group={} kinds={:x?} special={:?} mii={:x?} setup_us={} models_contexts_us={:?} us={} control={:#x} contexts={:x?} dispatch={:x?} listeners={:?} live_dispatch={:x?} live_listeners={:?} flags={:#x} R={:#x} map={} r4c={:#x} pool_live={}; the window stays live, the control init runs on the task worker",
         owner, group, &members.kinds()[..count], members.special(), mii_build, setup_us, steps_us, queued_us, control, &made.group_ctx[..count], made.dispatch,
         listener_counts(made.dispatch), live.dispatch, listener_counts(live.dispatch), made.flags, alias,
@@ -4213,6 +4226,11 @@ unsafe fn finish_background(entry: *const u8, owner: u32, role: usize, b: Backgr
     let base = BASE.load(Ordering::Acquire);
     BACKGROUND_OWNERS.fetch_and(!owner_bit(owner), Ordering::AcqRel);
     BACKGROUND_PARTNER.store(u32::MAX, Ordering::Release);
+    let (own, kept) = (BACKGROUND_INFO_OWN.swap(0, Ordering::AcqRel), BACKGROUND_INFO_KEPT.swap(0, Ordering::AcqRel));
+    if own != 0 || kept != 0 {
+        trace!("[GroupSwap] background info owner={} kinds={:x?} nana_own_wrapper={} kept_no_info={}", owner,
+            &b.members.kinds()[..b.members.count()], own, kept);
+    }
     // SPECIAL-GROUPS §1: the Mii hooks off (every task settled); the resource object body init stored in the shadow
     // (`0x607d18`, with its reference) and the tick's faces are the group's Mii set.
     let mii_hits: [u32; 13] = std::array::from_fn(|i| MII_HITS[i].load(Ordering::Relaxed));
@@ -4226,11 +4244,6 @@ unsafe fn finish_background(entry: *const u8, owner: u32, role: usize, b: Backgr
         fields::write_unchecked(shadow, 0xa0, 0usize);
         MiiR { faces: m.faces, object }
     });
-    let (own, kept) = (BACKGROUND_INFO_OWN.swap(0, Ordering::AcqRel), BACKGROUND_INFO_KEPT.swap(0, Ordering::AcqRel));
-    if own != 0 || kept != 0 {
-        trace!("[GroupSwap] background info owner={} kinds={:x?} nana_own_wrapper={} kept_no_info={}", owner,
-            &b.members.kinds()[..b.members.count()], own, kept);
-    }
     let skips = BACKGROUND_SKIPS.load(Ordering::Acquire).wrapping_sub(b.skips_before);
     let count = b.members.count();
     let kinds = &b.members.kinds()[..count];
@@ -4291,10 +4304,10 @@ unsafe fn finish_background(entry: *const u8, owner: u32, role: usize, b: Backgr
                         let mut window = b.window;
                         window.installed = count as u64;
                         for (cell, body) in window.cells.iter_mut().zip(bodies.iter()).take(count) { *cell = body.address; }
+                        window.records = b.records;
                         window.mii_r = mii_set;
                         // What its body init wrote into `D+0x3a0` is the group's; its attach puts it back.
                         window.info_3a0 = info_now.map(|w| [w[0], w[1], w[2]]);
-                        window.records = b.records;
                         g.saved = Some(window);
                         g.bodies = bodies;
                         g.state = GroupState::Built;
@@ -5036,7 +5049,7 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
         Step::Idle => return,
         Step::Background(_) => "background start", Step::Leave(_) => "leave", Step::Release(..) => "key release",
         Step::Poll(..) => "prefetch poll", Step::Start(..) => "prefetch start",
-        Step::Rearm(..) => "object rearm", Step::RearmPoll(..) => "object rearm poll",
+        Step::Rearm(..) => "object re-arm", Step::RearmPoll(..) => "object re-arm poll",
     };
     // `slow_step` names the step for a frame gap (inbox 22:17Z); every early return below is a cheap refusal.
     struct Timed(u32, &'static str, u64);
@@ -5853,10 +5866,12 @@ unsafe fn activate_entry(entry: *mut u8, status: i32) {
         let nana = read::<usize>(entry, 0x4190);
         fields::write_unchecked(entry as usize, 0x4180, nana);
         fields::write_unchecked(entry as usize, 0x591f, PAIR_ACTIVE_FLAG & !BANK_FLAG);
+        let started = now_us();
         original!()(entry, status);
+        let native_us = now_us().saturating_sub(started);
         fields::write_unchecked(entry as usize, 0x591f, PAIR_ACTIVE_FLAG);
-        trace!("[IcPair] N2 activate pair owner={} status={:#x} flags {:#x}->2->6 popo_ctx={:#x} nana_ctx={:#x} +0x4178={:#x} +0x4180={:#x} states=[{:?},{:?}]",
-            owner, status, before, read::<usize>(entry, 0x4188), nana, read::<usize>(entry, 0x4178),
+        trace!("[IcPair] N2 activate pair owner={} status={:#x} native_us={} flags {:#x}->2->6 popo_ctx={:#x} nana_ctx={:#x} +0x4178={:#x} +0x4180={:#x} states=[{:?},{:?}]",
+            owner, status, native_us, before, read::<usize>(entry, 0x4188), nana, read::<usize>(entry, 0x4178),
             read::<usize>(entry, 0x4180),
             fields::child(entry as usize, 0x4160).and_then(|b| fields::read::<u8>(b, 0x3a)),
             fields::child(entry as usize, 0x4168).and_then(|b| fields::read::<u8>(b, 0x3a)));
@@ -6200,9 +6215,10 @@ pub(super) unsafe fn install(base: usize) {
         control_slot, base + CONTROL_FUNCTOR);
     // rc.6 item 3: background builds use the Phase B′ path and the identity view's body-init site (`background_skip`).
     BACKGROUND_ENABLED.store(async_ok && identity_view, Ordering::Release);
-    // rc.6 item 3 (SPECIAL-GROUPS §0 X1, §1, §2): the construction tail's one shared hook (`background_tail`), its first
-    // four 13.0.5 words owned (`cmp w8, #0x4b; b.ne 0x60debc; ldr w8, [x9, #0x1c]; cmp w8, #0x4c`). Without it a live
-    // `[Popo, Nana]` window keeps deferring the background builds, and a Mii group builds at its first switch.
+    // rc.6 item 3, Ice Climbers (SPECIAL-GROUPS §0 X1, §2), and the one tail hook a background Mii body's `x20` restore
+    // also needs (22:52Z): the tail's pair test for background bodies, its first four
+    // 13.0.5 words owned (`cmp w8, #0x4b; b.ne 0x60debc; ldr w8, [x9, #0x1c]; cmp w8, #0x4c`). Without it a live
+    // `[Popo, Nana]` window keeps deferring the background builds.
     let tail_stock = fingerprint(base, BACKGROUND_TAIL, &[0x71012d1f, 0x54000281, 0xb9401d28, 0x7101311f], "GroupSwap");
     let tail_ok = gate(SEAM_GROUP, BACKGROUND_TAIL_SEAMS, async_ok && identity_view && tail_stock)
         && async_ok && identity_view && tail_stock;
@@ -6212,14 +6228,15 @@ pub(super) unsafe fn install(base: usize) {
     }
     trace!("[GroupSwap] background pair tail {}",
         if tail_ok { "enabled; a live Ice Climbers pair window builds the other groups" } else { "off; a live Ice Climbers pair window waits" });
-    // SPECIAL-GROUPS §1: the Mii groups' worker hooks, all or none, their first 13.0.5 words owned; the tail's shadow
-    // restore is `background_tail`'s.
+    // SPECIAL-GROUPS §1: the Mii groups' worker hooks, all or none, their first 13.0.5 words owned.
+    // `0x60de68` is `background_tail`'s (row `background_build.construct_tail`, checked and installed above).
     let mii_sites: [(usize, u32); 15] = [(0x607aac, 0xd102c3a0), (0x607d80, 0x1a9f311a), (0x607e74, 0xaa1803f4),
         (0x60b5c8, 0xa9577bfd), (0x60b7a8, 0x9343fd6b), (0x60b834, 0xcb0a016b), (0x60b98c, 0x9447780d),
         (0x60bf30, 0x52800283), (0x60dec4, 0x944769d3), (0x60df04, 0xa9444ff4),
         (0x33a05a8, 0xb9405909), (0x344fcd4, 0xf9404717), (0x6e655c, 0xb9405aa8), (0x6e6bc4, 0xb9401262),
         (0x33c3468, 0xb9405aa8)];
     let mii_stock = mii_sites.iter().all(|&(offset, word)| fingerprint(base, offset, &[word], "BackgroundMii"));
+    // A background Mii body's `x20` is restored by `background_tail`, so the Mii hooks need it installed.
     let mii_ok = gate(SEAM_GROUP, BACKGROUND_MII_SEAMS, async_ok && identity_view && mii_stock && tail_ok)
         && async_ok && identity_view && tail_ok;
     if mii_ok {

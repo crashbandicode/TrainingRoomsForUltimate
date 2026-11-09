@@ -802,7 +802,11 @@ pub fn async_build_eligible(members: Members, identity: bool) -> Result<(), &'st
 /// prepare_entry `0x17f1a60` at `0x607f30` writes the copy-registry slot of its cell from the worker), so only what the
 /// queued build already serves (`async_build_eligible`): an ordinary single-actor group or a Mii group, while the
 /// window holds no Mii identity (the costume selectors at `0x607dfc`/`0x17e9ae0` key on `R+0x58`) and its live member
-/// is not Kirby (D-KIRBY1: no bank key rests on its R).
+/// is not Kirby (D-KIRBY1: no bank key rests on its R). The live window (`window`, the attached group): the body's
+/// construction tail reads the live cells 0/1 from the worker and takes the pair rule on R for `[Popo, Nana]`, which may
+/// reset the whole R mid-play (SPECIAL-GROUPS §0 X1, `0x60de60-0x60de78`), and construct picks its info wrapper from the
+/// live window's actor count (X4, `0x60d21c-0x60d270`: in re6 one-actor windows gave every body `FE+0xf0`; only the
+/// pair's Nana took `FE+0x100`).
 ///
 /// The live window (`window`, the attached group):
 /// - a pair window (`window.is_pair()`: the pair-lead window or the pair group attached; a session that starts on Ice
@@ -836,6 +840,12 @@ pub fn async_build_eligible(members: Members, identity: bool) -> Result<(), &'st
 /// - the pair group beside a live native window needs the X4 hook (`info_x4`, `native_body_bank::background_info`): the
 ///   wrapper a background Popo or Nana body takes comes from its building group's words (`info_wrapper`), so Nana gets
 ///   her own `+0x100` as in her synchronous build; without it the build waits for another window.
+///
+/// A Mii group (SPECIAL-GROUPS §1; `p23/rc6-hot-slots-mii`) builds in the background when it carries its identity: the
+/// tick brackets `R`'s words, the entry's Mii bytes and the D mirror and runs the native Mii setup, and the worker reads
+/// a shadow `R` (`native_body_bank` `SHADOW_R`). A live Mii window defers it (that window's faces and resource object in
+/// `R` are a case not built yet), and so does a live pair or native window: the Mii branch kept the base's "special
+/// window" refusal, and no Eden run has built a Mii group beside one (integration merge, 2026-11-09).
 ///
 /// Every other group keeps today's build at its first switch.
 pub fn background_build_eligible(members: Members, identity: bool, window: Members, window_identity: bool, live_kirby: bool,
@@ -1382,14 +1392,15 @@ pub fn info_wrapper(kind: u32, count: u32, cells: [u32; 2]) -> usize {
     if matches!(kind, POPO | NANA) && count >= 2 && cell1 != u32::MAX && cell0 != kind && cell1 == kind { 0x100 } else { 0xf0 }
 }
 
-/// The window part of a role's planned targets (`plan_budget`): `next`, the reusable extras of the window the lane's
-/// next kind would get, except for a live pair-lead or native-group window (`live`: its members and active kind) with
-/// groups on. That window stays while the role's groups build around it (rc.6 item 3, a session that starts on Ice
-/// Climbers, Pokémon Trainer or Pyra/Mythra), so it plans what it serves: its reusable extras, the count the notice
-/// reads (`role_counts`' `extra`), not the lane window's.
+/// The window part of a role's planned targets (`plan_budget`). With groups on, the live attached window (`live`: its
+/// members and active kind; the start-up or a Reload-built window, a pair-lead window or any group switched in) stays
+/// while the role's other groups build around it, so it plans what it serves: its reusable extras, the count the notice
+/// reads (`role_counts`' `extra`). The window the lane's next kind would get (`next`) counted two extras where a
+/// one-member or pair group serves none ("swap P1 to load 2 more" with everything built; primary 2026-11-09 02:00Z,
+/// every kind). With groups off, or without a live window, the next swap builds the lane's window (`next`).
 pub fn window_targets(grouped: bool, live: Option<(Members, u32)>, original: Option<u32>, next: u8) -> u8 {
     match live {
-        Some((members, active)) if grouped && (members.is_pair_lead() || matches!(members.special(), Special::Native(_))) => {
+        Some((members, active)) if grouped => {
             let (kinds, count) = members.logical_kinds();
             crate::engine::preload::cycle_preload_capacity::reusable_extras(&kinds[..count], active, original)
         }
@@ -1881,7 +1892,8 @@ mod tests {
         // SPECIAL-GROUPS §1 (operator 20:26Z, "All groups in rc.6"): a Mii group with its identity builds in the
         // background too (its R, entry and D words bracketed in the tick, shadow R on the worker); never without one.
         assert_eq!(background_build_eligible(Members::mii_group(0x4a).unwrap(), true, window, false, false, false, false), Ok(()));
-        assert_eq!(background_build_eligible(Members::mii_group(0x4a).unwrap(), false, window, false, false, false, false), Err("mii without identity"));
+        assert_eq!(background_build_eligible(Members::mii_group(0x4a).unwrap(), false, window, false, false, false, false),
+            Err("mii without identity"));
         assert_eq!(background_build_eligible(Members::mii_group(0x4a).unwrap(), true, window, true, false, false, false), Err("mii window"));
         assert_eq!(background_build_eligible(ordinary, true, window, false, false, false, false), Err("identity"));
         // SPECIAL-GROUPS §2: the pair group builds in the background (`a_background_build_takes_the_pair_group_…`).
@@ -3766,6 +3778,34 @@ mod tests {
         assert_eq!(next_background([(GroupState::Prefetched, mii, true)].into_iter(), pt, false, false, false, false), Some(0));
         assert_eq!(next_background([(GroupState::Prefetched, mii, true)].into_iter(), Members::pair_lead(0x02).unwrap(),
             false, false, true, false), Some(0));
+    }
+
+    /// The notice rule (primary 2026-11-09 02:00Z, approved for every kind): with groups on, the live attached window
+    /// stays while the role's other groups are built around it, so it plans its own reusable extras. Eden rc6-bg-ic5 and
+    /// rc6-xc2/3 showed "swap P1 to load 2 more" on a one-member group (Samus: "Loaded 10/12"), on the pair group
+    /// ("Loaded 8/10") and for the CPU on its small groups, with everything planned built: the planner counted the
+    /// window the lane's next kind would get (two extras) where the attached group serves none.
+    #[test]
+    fn a_live_attached_group_plans_what_it_serves() {
+        use crate::engine::preload::cycle_preload_capacity::reusable_extras;
+        let next = reusable_extras(&[DK, LINK, SAMUS], DK, None);
+        assert_eq!(next, 2);
+        // P1 on Samus (one-member group) with the window [Mario, DK, Link] and the pair group detached and built.
+        let detached = count_extra_groups(&[(members(&[MARIO, DK, LINK]), GroupState::Built),
+            (Members::pair_group(), GroupState::Built)]);
+        for (live, active) in [(members(&[SAMUS]), SAMUS), (Members::pair_group(), POPO), (members(&[0x0f]), 0x0f)] {
+            let (kinds, count) = live.logical_kinds();
+            let extra = reusable_extras(&kinds[..count], active, None);
+            assert_eq!(extra, 0, "{active:#x}: a one-member group serves only its active member");
+            let planned = window_targets(true, Some((live, active)), None, next) + detached.planned;
+            let role = role_counts(planned, extra, WindowStatus::Built, detached);
+            assert_eq!((role.planned, role.ready, role.unstarted(), role.swap_owed(0)), (detached.planned, detached.ready, 0, 0),
+                "{active:#x}: the notice reads Ready");
+        }
+        // A three-member group or window serves its two extras either way.
+        assert_eq!(window_targets(true, Some((members(&[LINK, SAMUS, YOSHI]), LINK)), None, next), 2);
+        // Groups off: the next swap builds the lane's window, as before.
+        assert_eq!(window_targets(false, Some((members(&[SAMUS]), SAMUS)), None, next), next);
     }
 
     /// The two cross cells (primary 2026-11-09 00:52Z: "All groups in rc.6", so both must work; SPECIAL-GROUPS §0):

@@ -136,16 +136,19 @@ fn the_worker_reads_the_shadow_and_the_groups_values() {
         "ctx.registers[3].set_x(", "MII_THREAD.store(current_thread(), Ordering::Release);"]);
     let path = body(BANK, "unsafe fn bg_mii_construct_path(");
     assert!(path.contains("ctx.registers[1].set_x(shadow_r_address() as u64);"), "{path}");
-    // The construction tail is one shared hook (primary 22:52Z, worker A's `background_tail`): the shadow restore first,
-    // then X1. The Mii hooks need it installed.
-    assert!(BANK.contains("#[skyline::hook(offset = 0x60de68, inline)]\nunsafe fn background_tail("));
-    assert_eq!(BANK.matches("#[skyline::hook(offset = 0x60de68, inline)]").count(), 1, "one hook at the tail");
+    // One hook at `0x60de68` for every background body (primary 2026-11-08 22:52Z, 2026-11-09 02:24Z): the Mii `x20`
+    // restore first, then the X1 rule; it is the background builds' `background_tail` (row
+    // `background_build.construct_tail`), installed before the Mii hooks, which need it.
     let tail = body(BANK, "unsafe fn background_tail(");
-    ordered(tail, &["ctx.registers[20].set_x(MII_REAL_R.load(Ordering::Acquire) as u64);",
+    ordered(tail, &["if ctx.registers[20].x() as usize == shadow_r_address() {",
+        "ctx.registers[20].set_x(MII_REAL_R.load(Ordering::Acquire) as u64);",
         "if ctx.registers[8].w() == POPO && background_body(ctx.registers[19].x() as usize) {",
         "ctx.registers[8].set_x(u64::from(u32::MAX));"]);
-    ordered(install, &["let tail_ok = gate(SEAM_GROUP, BACKGROUND_TAIL_SEAMS,", "skyline::install_hooks!(background_tail);",
-        "let mii_ok = gate(SEAM_GROUP, BACKGROUND_MII_SEAMS, async_ok && identity_view && mii_stock && tail_ok)"]);
+    assert_eq!(BANK.matches("#[skyline::hook(offset = 0x60de68, inline)]").count(), 1, "one hook at the tail");
+    assert_eq!(BANK.matches("unsafe fn background_body(").count(), 1, "one background_body");
+    assert!(!BANK.contains("background_mii.construct_tail") && !ROWS.contains("background_mii.construct_tail"));
+    ordered(install, &["skyline::install_hooks!(background_tail);", "&& async_ok && identity_view && tail_ok;",
+        "skyline::install_hooks!(bg_mii_init_enter,"]);
     let release = body(BANK, "unsafe fn bg_mii_tail_release(");
     assert!(release.contains("ctx.registers[1].set_x(u64::from(u32::MAX));"), "{release}");
     let exit = body(BANK, "unsafe fn bg_mii_exit(");
