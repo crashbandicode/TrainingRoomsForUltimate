@@ -56,6 +56,7 @@ use crate::model::version as model;
 const AUTHORITATIVE: &[&str] = &[
     "lobby_items",
     "lobby_persist",
+    "cpu_level",
     "native_body_bank",
     "character_roster",
     "character_lifecycle",

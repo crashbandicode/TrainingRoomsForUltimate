@@ -39,6 +39,8 @@ pub(crate) fn init() {
     // The waiting room's practice panel: saved Training partners and behavior (rc.6). Its sites are nobody else's.
     lobby_persist::init();
     lobby_stage::init();
+    // rc.6 CPU level: no hook, only its rows (the clock rides `update`, the step rides `frame`).
+    crate::runtime::features::cpu_level::init();
 }
 
 /// Once per game frame, before the input processing (the input poll's note for Player 1).
@@ -51,6 +53,9 @@ pub(crate) fn update() {
     if active != WAS_ACTIVE.swap(active, std::sync::atomic::Ordering::AcqRel) {
         training::practice::forget();
     }
+    // The CPU level's Training session clock: it runs in every scene, so the character select between two Training entries
+    // ends a session.
+    crate::runtime::features::cpu_level::poll();
 }
 
 /// A fighter's on-init has run (the reset hub's wrapper): the practice engine records the entry.
@@ -143,6 +148,9 @@ pub(crate) unsafe fn frame(fighter: usize) {
             lobby_items::frame();
             let _preload = HookScope::enter_hook(HookId::RosterPreload);
             crate::runtime::roster::cycle_preload::on_frame(&mut *body);
+            drop(_preload);
+            // rc.6 CPU level: the session's notice and the CPUs' rank, after the roster's steps of this frame.
+            crate::runtime::features::cpu_level::frame();
         }
     }
     // Diag build: the character-item table's constants as the game resolves them (once).
