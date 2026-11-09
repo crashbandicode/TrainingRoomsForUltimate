@@ -142,8 +142,8 @@ leaves the game's own level everywhere.
   Lv N, with no notice.
 - **In a match,** nothing changes.
 
-TODO-PROOF: the candidate's CPU-level rows (branch proofs `lc-xps-02`, `lc-xps-04`) and the final Quickplay session
-(partners at the level, nothing written in the match).
+TODO-PROOF: the waiting-room part, from the candidate's final Quickplay session (partners at the level, nothing written
+in the match). The Training part passed on the candidate (`surface-lc` 11/11).
 
 ## Fixed
 

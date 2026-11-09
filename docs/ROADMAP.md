@@ -21,7 +21,7 @@ rc.6 build; the final pass is TODO-FINAL-PASS. The player notes are [RELEASE-NOT
 | A switch's window takes only the fighters that fit in memory (the `hs08b` abort) | `p23/rc6-window-admission` | Eden `wa-79cc-xps-hot` 21/21, no abort. TODO-PROOF: the candidate's `xps-hot` |
 | Lock-order audit: the macro-naming freeze fixed; the stall watchdog (diag) | `p23/rc6-menu-freeze` | Eden `ally-hang1` 5/5 (40 menu closes, no stall); it doesn't cover the menu-close freeze (`rc6-qpf1`, below) |
 | The waiting room remembers its partners | `p23/rc6-lobby-persist` | Eden `rc6-lp-qp1` 13/13, `rc6-lp-ldn2` 14/14. TODO-PROOF: the final Quickplay session |
-| CPU Level (Off, Lv 1–9) for Training and the waiting room's practice | `p23/rc6-lobby-cpu` | Eden `lc-xps-02`, `lc-xps-04` 6/6. TODO-PROOF: the candidate's CPU-level rows and the final Quickplay session |
+| CPU Level (Off, Lv 1–9) for Training and the waiting room's practice | `p23/rc6-lobby-cpu` | Eden `lc-xps-02`, `lc-xps-04` 6/6; on the candidate `surface-lc` 11/11 (Training). TODO-PROOF: the waiting room, from the final Quickplay session |
 | Lobby Items Off stops the timed drops in Quickplay's waiting area (#62) | `p23/rc6-qp-items` | Eden `rc6-bg-qp7`, `rc6-bg-ldn62`. TODO-PROOF: the final Quickplay session |
 | P1 CPU Control in an online match | `p23/rc6-qp-pilot` | Eden `rc6-bg-qp6` 10/10. TODO-PROOF: the final Quickplay session |
 | No. of CPUs seats: the first raise, a Mii seat's configuration, the proof of a promoted seat, the portrait race, the seats after a cycle change | `p23/rc6-cov-rest` | Eden `covrest-10`, `-14`, `covrest-yoga-06` |
