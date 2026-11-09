@@ -1164,3 +1164,11 @@ ceiling = 159664
 date = "2026-11-09"
 reason = "rc.6 p23/rc6-pt-start (84d8a1c) over integration a1f379f4: a waiting press holds every speculative step but the one serving it, no timeout (body_bank::speculative_step_admitted and serving_step, native_body_bank::serving_group, character_roster::foreground, the Mii owners' and kirby_hats' foreground) and its host and wiring tests; measured 159664 (tools/size_gate.py), +348 over 159316 (a1f379f4)"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to the operator-chosen rc.6 items under TASK-OPUS-rc6-hot-slots (primary c07b3449, 2026-11-08: a raise goes in its own commit with approved_by)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 159679
+date = "2026-11-09"
+reason = "rc.6 p23/rc6-hat-holdback (7c19e19) over integration 646a5f0d: a parked F9 seat holding its own seat member is filled for the hat creation hold-back (hat_slots::creation_filled, character_sources::creation_intent) and its host and wiring tests; measured 159679 (tools/size_gate.py), +15 over 159664 (646a5f0d)"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to the rc.6 final pass's product fix ordered by the primary (RC6-HOLD-ORDER.md addendum 09:47Z; a raise goes in its own commit with approved_by)"
