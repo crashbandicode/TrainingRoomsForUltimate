@@ -1028,3 +1028,11 @@ ceiling = 157006
 date = "2026-11-09"
 reason = "worker B, inbox INBOX-opus-rc6-bg-pt 02:00Z (p23/rc6-bg-pt 3b9b4895): the PT exit's staged pool retirement (special_articles deactivate_saved / release_sub_pools / destroy_saved; native_body_bank Retiring, retire_step, finish_retirement, the EXIT_SPLIT gate; three seam rows); measured 157006 (tools/size_gate.py), +351 over 156655"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to this operator-chosen rc.6 item under TASK-OPUS-rc6-bg-special (primary c07b3449, 2026-11-09 02:00Z: a raise goes in its own commit with approved_by)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 158626
+date = "2026-11-09"
+reason = "worker B (p23/rc6-bg-pt 2fa9a951): the merge of p23/rc6-integration (d5db7387, 158275) into the PT exit's staged retirement (9a7ea5c0, 157006: +351 over 156655); measured 158626 on the merged tree (+351 over 158275) (tools/size_gate.py)"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); combined ceiling = measured merged size, as integration records it (primary c07b3449, INBOX-opus-rc6-integration 2026-11-08 19:13Z); inbox INBOX-opus-rc6-bg-pt 02:42Z: base on integration's newest head"
