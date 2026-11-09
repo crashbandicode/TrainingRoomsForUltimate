@@ -101,6 +101,10 @@ Raising No. of CPUs from 1 to 3 brings in the CPU cycle's next two fighters as C
 raise. A Mii in those seats is the exact saved Mii, outfit and hat included. After a raise and a drop the Mii classes
 stay in both cycles and load.
 
+The two seats count in the Fighters notice. A seat that waits for memory shows as "… waiting for memory" there, and
+it loads once memory is free (in Eden, "Loaded 1/5 · swap both to load 3 more (1 waiting for memory)", then
+"Loaded 2/5 …").
+
 ### Mii editor: "Same as ‹name›, nothing new saved"
 
 A Save in the Mii editor that matches a Mii you already saved still saves nothing new and uses that Mii, as before.
@@ -122,6 +126,12 @@ It now says so: "Same as ‹saved name›, nothing new saved". A changed name al
 - **Edit placement** edits the active macro of the role in view, or a chain's first macro. Write over stores the
   offset in that file, Keep holds it until the game closes, and New saves a copy. Play warps to the start save with
   the offset. In rc.5 the row refused with "Load a macro and restore a Training state first".
+- **Momentum** on Edit placement works. With "Keep recorded speed" Play starts the playing role with the speed it had
+  when Record started; with "Start at rest" it starts from standstill. Play used to ignore the key.
+- **A start save is where the recording started.** It used to hold the fighters where the recording stopped
+  (`rr_host::service_at` at `9438039`), so a moving macro warped to its end.
+- **Y in the Setup library** binds a setup without restoring it, and Load then goes to the setup until another save is
+  bound or the bound save changes. Neither A nor Y writes a save file.
 - **Edit combos, Edit chain and Delete** are written to the card. In rc.5 only a save state's Delete was.
 - **The exact Mii.** Switch on a CPU macro recorded on an exact Mii loads that Mii: its look, specials, colour, voice,
   outfit and hat. rc.5 loaded the class's default Mii. A Mii from a replay has no ID and no name of its own; it is
