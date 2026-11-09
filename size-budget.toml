@@ -1260,3 +1260,11 @@ ceiling = 161387
 date = "2026-11-09"
 reason = "rc.6 p23/rc6-preload-priority (4ab948fe) over candidate 1261f56c: a free is room on its way until a planner pass finds it settled, and a kept group is freed only as the last resort (body_bank::ReleaseWatch, arriving_room, capacity_release's settled argument; native_body_bank RELEASE_WATCH in plan_groups, progress, the entry tick, pause_opening, release_for_capacity, scene_changed) and its host and wiring tests; measured 161387 (tools/size_gate.py), +61 over 161326 (1261f56c)"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to the product fix ordered by the primary (INBOX-opus-rc6-docs 16:06Z; a raise goes in its own commit with approved_by)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 161439
+date = "2026-11-09"
+reason = "rc.6 p23/rc6-preload-priority (84734f7b) over 4480ff1d (candidate b04856b2): the planner decides a held group's capacity release in the pass the watch settles, before the notice, and a release in progress shows Loading (body_bank::room_coming, still_short; native_body_bank plan_groups, releasing, progress) and its host and wiring tests; measured 161439 (tools/size_gate.py), +52 over 161387 (b04856b2)"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to the product fix ordered by the primary (INBOX-opus-rc6-docs 17:13Z; a raise goes in its own commit with approved_by)"
