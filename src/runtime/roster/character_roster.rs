@@ -326,18 +326,27 @@ pub fn busy() -> bool {
 
 /// Speculation cannot take the installer ahead of an accepted visible operation.
 pub(crate) fn preload_blocked() -> bool {
+    preload_blocked_reason().is_some()
+}
+
+/// `preload_blocked`'s first holding clause, named for the diag lines (inbox 06:16Z).
+pub(crate) fn preload_blocked_reason() -> Option<&'static str> {
     // Capture the immutable visible origins before speculative loads can take
     // INSTALL. The same native backend qualification serves Training and waiting.
     #[cfg(feature="mii-ordinary-cpu-alpha")]
-    if mii_auto_init::initializing() && unsafe {mii_backend::ready()} {return true;}
-    if INSTALL.active() || crate::runtime::roster::kirby_hats::preload_pending()
-        || STATES.iter().any(|s| {let s=s.lock();
-            s.pending.is_some() || s.active.is_some()}) {return true;}
+    if mii_auto_init::initializing() && unsafe {mii_backend::ready()} {return Some("mii auto-init");}
+    if INSTALL.active() {return Some("INSTALL");}
+    if crate::runtime::roster::kirby_hats::preload_pending() {return Some("kirby hats");}
+    for (role,s) in STATES.iter().enumerate() {
+        let s=s.lock();
+        if s.pending.is_some() {return Some(if role==0 {"player request pending"} else {"cpu request pending"});}
+        if s.active.is_some() {return Some(if role==0 {"player request active"} else {"cpu request active"});}
+    }
     #[cfg(feature="mii-ordinary-player-alpha")]
-    if mii_ordinary_player::preload_pending() {return true;}
+    if let Some(reason)=mii_ordinary_player::preload_pending_reason() {return Some(reason);}
     #[cfg(feature="mii-ordinary-cpu-alpha")]
-    if mii_ordinary_cpu::preload_pending() {return true;}
-    false
+    if let Some(reason)=mii_ordinary_cpu::preload_pending_reason() {return Some(reason);}
+    None
 }
 
 /// What may pause the Fighters notice: the accepted visible operations of `preload_blocked` only.

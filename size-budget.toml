@@ -1140,3 +1140,11 @@ ceiling = 159141
 date = "2026-11-09"
 reason = "rc.6 integration (p23/rc6-integration 9ed837eb): the merge of p23/rc6-pt-start e595f93b (159120: +215 over 7da9c4dd's 158905, X6) into 8482fb65 (158926, worker A's Kirby re-arm); measured 159141 on the merged tree (tools/size_gate.py), +215"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); combined ceiling = measured merged size per primary c07b3449, INBOX-opus-rc6-integration 2026-11-08 19:13Z"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 159080
+date = "2026-11-09"
+reason = "rc.6 p23/rc6-planner-fixes over integration 7da9c4dd (primary inbox 2026-11-09 06:16Z): a live Mii window plans its role's new groups (d999d7ad) and a parked F9 seat loads its member on its own entry (ce623c38), with the diag-only reason lines; measured 159080 (tools/size_gate.py), +175 over 158905 (7da9c4dd)"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); a raise goes in its own commit with approved_by (primary c07b3449, 2026-11-08)"

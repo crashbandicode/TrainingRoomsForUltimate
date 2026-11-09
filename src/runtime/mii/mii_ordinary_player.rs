@@ -153,6 +153,14 @@ pub(super) fn adopt_background_record(index:u16,before:&[u8;crate::engine::mii::
 pub(super) fn preload_pending()->bool {
     let s=STATE.lock(); s.capture || s.request.is_some() || s.busy()
 }
+/// `preload_pending`'s clause, named for the diag lines (inbox 06:16Z).
+pub(super) fn preload_pending_reason()->Option<&'static str> {
+    let s=STATE.lock();
+    if s.capture {return Some("player Mii owner capture");}
+    if s.request.is_some() {return Some("player Mii owner request");}
+    if s.busy() {return Some("player Mii owner busy");}
+    None
+}
 pub(super) fn preload_targets(menu:&TrainingModpackMenu)->Option<[Option<crate::runtime::roster::cycle_preload::Target>;crate::runtime::roster::cycle_preload::MAX_TARGETS]> {
     let (original,live,catalog,saved)={
         let s=STATE.lock();

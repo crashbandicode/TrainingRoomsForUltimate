@@ -1104,7 +1104,9 @@ pub fn plan_extra_groups_with(
             if !eligible(role, kind) { return None; }
             let group = Members::special_group(kind, budget.special)?;
             let is_mii = group.special() == Special::Mii;
-            if (is_mii && existing[role].iter().any(|held| held.special() == Special::Mii))
+            // One Mii group per role, the live Mii window included (inbox 06:16Z).
+            if (is_mii && (existing[role].iter().any(|held| held.special() == Special::Mii)
+                    || windows[role].is_some_and(|window| window.special() == Special::Mii)))
                 || upcoming[role][..depth].iter().copied()
                     .filter(|&prior| eligible(role, prior))
                     .filter_map(|prior| Members::special_group(prior, budget.special))
@@ -3332,6 +3334,30 @@ mod tests {
         assert_eq!(kinds_of(&plan[0]), vec![vec![POPO, FOX, PIKACHU]]);
     }
 
+    /// Inbox 06:16Z (hot rc6-hot-xps26): P1 sits on a Mii group when a cycle change adds Link, Pokémon Trainer and the
+    /// Ice Climbers. The planner plans them beside the live Mii window; it planned nothing until P1 left the Mii (M0). A
+    /// second Mii group stays out while a Mii is the window: an owner has one Mii record.
+    #[test]
+    fn a_live_mii_window_plans_its_roles_new_groups() {
+        const MARIO: u32 = 0x00;
+        const LINK: u32 = 0x02;
+        const FOX: u32 = 0x07;
+        let window = Members::mii_group(0x4a).unwrap();
+        let lane: &[u32] = &[LINK, 0x24, POPO, 0x48];
+        let plan = plan_extra_groups([Some(window), None], [&[], &[]], [lane, &[]], [None, None],
+            GroupBudget { ready_fighters: 12, pool_free: 16, special: SpecialPolicy::ALL });
+        let kinds = kinds_of(&plan[0]);
+        assert!(kinds.contains(&vec![0x24, 0x25, 0x26]), "Pokémon Trainer: {kinds:?}");
+        assert!(kinds.contains(&vec![POPO, NANA]), "the Ice Climbers: {kinds:?}");
+        assert!(kinds.iter().any(|g| g.contains(&LINK)), "Link: {kinds:?}");
+        assert!(!kinds.iter().any(|g| g.contains(&0x48)), "no second Mii group beside a Mii window: {kinds:?}");
+        // The CPU role beside it is unchanged by P1's window.
+        let cpu: &[u32] = &[FOX];
+        let plan = plan_extra_groups([Some(window), Some(Members::new(&[MARIO, LINK]).unwrap())], [&[], &[]], [lane, cpu],
+            [None, None], GroupBudget { ready_fighters: 12, pool_free: 16, special: SpecialPolicy::ALL });
+        assert!(kinds_of(&plan[1]).iter().any(|g| g.contains(&FOX)), "{:?}", kinds_of(&plan[1]));
+    }
+
     #[test]
     fn mii_groups_are_one_member_bank_windows_with_one_identity_per_role() {
         for kind in [0x48u32, 0x49, 0x4a] {
@@ -3345,8 +3371,9 @@ mod tests {
             assert_eq!(mii.forms_of(kind), Forms::starting(kind));
             assert_eq!(mii.prefetch_kinds(), ([kind, u32::MAX, u32::MAX, u32::MAX], 1));
             assert_eq!(mii.object_kind(), None);
-            // A one-member window: entered warm, left by its self-commit; owns nothing new.
-            assert!(!window_swappable(mii));
+            // A one-member window: entered warm, left by its self-commit; it plans its role's new groups like any
+            // window (inbox 06:16Z, `a_live_mii_window_plans_its_roles_new_groups`).
+            assert!(window_swappable(mii));
             assert_eq!((swap_commit_index_in(mii, 0), mii.swap_commit_index_for(0)), (Some(0), Some(0)));
             assert!(mii.awaiting_completion(EntryState { count: 1, kinds: [kind, u32::MAX, u32::MAX], actor_count: 1,
                 installed: 1, index: 0, previous_or_next: 0, pending: 0xff, flags: BANK_FLAG, outer: 3, loader: 12,
@@ -3380,11 +3407,15 @@ mod tests {
         let gunner = Members::mii_group(0x4a).unwrap();
         let plan = plan_extra_groups(windows, [&[gunner], &[]], [&[0x48, FOX, PIKACHU], &[]], [None, None], budget_special(11, SpecialPolicy::MII));
         assert_eq!(kinds_of(&plan[0]), vec![vec![FOX, PIKACHU]]);
-        // A Mii window plans nothing new (one-member window); its budget charge is one body.
+        // A Mii window plans its role's new groups like any one-member window (inbox 06:16Z; it planned nothing before);
+        // its budget charge is one body, and a second Mii group stays out beside it.
         let plan = plan_extra_groups([Some(gunner), windows[1]], [&[], &[]], [&[FOX, PIKACHU], &[FALCON, 0x15]], [None, None],
             budget_special(10, SpecialPolicy::MII));
-        assert_eq!(kinds_of(&plan[0]), Vec::<Vec<u32>>::new());
+        assert_eq!(kinds_of(&plan[0]), vec![vec![FOX, PIKACHU]]);
         assert_eq!(kinds_of(&plan[1]), vec![vec![FALCON, 0x15]]);
+        let plan = plan_extra_groups([Some(gunner), windows[1]], [&[], &[]], [&[0x48, FOX, PIKACHU], &[]], [None, None],
+            budget_special(10, SpecialPolicy::MII));
+        assert_eq!(kinds_of(&plan[0]), vec![vec![FOX, PIKACHU]]);
         // The exchange receipt: a Mii build leaves the Mii header, not the window's.
         let (before, mut after, _) = exchanged_owner(0);
         after.descriptor[0x14..0x18].copy_from_slice(&1u32.to_le_bytes());
