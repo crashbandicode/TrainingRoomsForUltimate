@@ -51,17 +51,28 @@ fn report(entries: u64, quiet_ms: u64, now: u64) {
     let drain = now.saturating_sub(DRAIN_TICK.load(Ordering::Relaxed));
     line(format_args!(
         "[StallWatch] stalled entries={entries} quiet_ms={quiet_ms} last_hook={hook} open_scopes={open} worker_step={}:{} \
-         drain_ms_ago={drain} lock_overflow={}",
+         drain_ms_ago={drain}",
         step,
         WORKER_STEPS.get(step).copied().unwrap_or("?"),
-        hos_lock::owners::overflow()
     ));
+    held_locks();
+}
+
+/// Every plugin lock held, with its holder and the return address of the call that took it. The lock table is
+/// hos-lock's `owners` feature, on with `hang-trace` (`diag` itself stays an empty umbrella, tests/pkg6_features.rs).
+#[cfg(feature = "hang-trace")]
+fn held_locks() {
     let mut held = [hos_lock::owners::Held::default(); 32];
     let n = hos_lock::owners::snapshot(&mut held);
     for (i, h) in held[..n].iter().enumerate() {
         line(format_args!("[StallWatch] held {i} lock={:#x} thread={:#x} pc={:#x}", h.lock, h.thread, h.pc));
     }
-    line(format_args!("[StallWatch] held count={n}"));
+    line(format_args!("[StallWatch] held count={n} overflow={}", hos_lock::owners::overflow()));
+}
+
+#[cfg(not(feature = "hang-trace"))]
+fn held_locks() {
+    line(format_args!("[StallWatch] held untracked (build with --features diag,hang-trace)"));
 }
 
 /// A line of at most `LINE` bytes, formatted on the stack (longer text is cut).
