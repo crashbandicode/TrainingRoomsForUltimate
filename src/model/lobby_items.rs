@@ -1,7 +1,9 @@
 //! Lobby Items (Phase 2 N11, `docs/ROADMAP.md`): the waiting-room practice's item spawner, pure half.
 //!
-//! The runtime hooks the spawner's own switch test (`main+0x15d9a80`, `cbz w8` on the spawner control's `+0x30` byte): in a
-//! qualified waiting scene with the row Off it hands the native a zero, so the native takes its own "off" path for that frame.
+//! The runtime hooks the spawner's own switch test (`main+0x15d9a80`, `cbz w8` on the spawner control's `+0x30` byte) and the
+//! timed generator's lottery test (`main+0x15499b4`, `tbz w0,#0`; the spawner's switch doesn't gate that generator, #62): in a
+//! qualified waiting scene with the row Off each hands the native a zero, so the native takes its own "off" or "lottery
+//! declined" path.
 //! Nothing is written to the game and nothing is restored: On is "leave the native alone". Items already on the stage are removed
 //! once per Off edge, through the native removal, from Player 1's frame (never per frame, never inside the item manager's update).
 

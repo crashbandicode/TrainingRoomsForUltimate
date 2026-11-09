@@ -1180,3 +1180,11 @@ ceiling = 159683
 date = "2026-11-09"
 reason = "rc.6 p23/rc6-qp-pilot (c563c219) over integration e39479df: every mapped poll reaches the CPU-as-P1 fallback, so it arms in an online match (features::input_delay::apply); measured 159683 (tools/size_gate.py), +4 over 159679 (e39479df)"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to the rc.6 product fix ordered by the primary 2026-11-09 12:48Z (operator: the cpu pilot should still work in an online match; a raise goes in its own commit with approved_by, primary c07b3449)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 159701
+date = "2026-11-09"
+reason = "rc.6 p23/rc6-qp-items (777aa8cc) over integration e39479df: #62, Lobby Items Off also declines the waiting room's timed item generator (lobby_items::drop_lot on main+0x15499b4, HookId::LobbyItemsDrop, seam rows drop_lot and drop_gate); measured 159701 (+22 over 159679)"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to the rc.6 final pass's product fix ordered by the primary (INBOX-opus-rc6-bg-pt 2026-11-09 12:28Z; a raise goes in its own commit with approved_by)"
