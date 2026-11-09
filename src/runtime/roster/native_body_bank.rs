@@ -3262,14 +3262,15 @@ fn background_candidate(bank: &Bank, live: Option<u32>) -> Option<usize> {
         || bank.background.is_some() { return None; }
     next_background(bank.groups.iter().map(|g| (if g.background_refused || g.leaving { GroupState::Failed } else { g.state },
         *g.members, g.identity.is_some())), *bank.members, bank.identity.is_some(), live == Some(KIRBY),
-        BACKGROUND_PAIR_TAIL.load(Ordering::Acquire))
+        BACKGROUND_PAIR_TAIL.load(Ordering::Acquire), BACKGROUND_X4.load(Ordering::Acquire))
 }
 
 /// A Prefetched group a background build still owes: the notice counts it as loading (`progress`).
 fn background_owed(bank: &Bank, group: &Group, live: Option<u32>) -> bool {
     BACKGROUND_ENABLED.load(Ordering::Acquire) && group.state == GroupState::Prefetched && !group.background_refused
         && !group.leaving && background_build_eligible(*group.members, group.identity.is_some(), *bank.members,
-            bank.identity.is_some(), live == Some(KIRBY), BACKGROUND_PAIR_TAIL.load(Ordering::Acquire)).is_ok()
+            bank.identity.is_some(), live == Some(KIRBY), BACKGROUND_PAIR_TAIL.load(Ordering::Acquire), BACKGROUND_X4.load(Ordering::Acquire))
+            .is_ok()
 }
 
 const INFO_BYTES: usize = BACKGROUND_INFO_SPANS[0].1 + BACKGROUND_INFO_SPANS[1].1;

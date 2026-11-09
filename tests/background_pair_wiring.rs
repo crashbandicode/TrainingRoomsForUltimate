@@ -57,6 +57,9 @@ fn the_tail_hook_is_guarded_and_gates_the_live_pair_window() {
     assert!(row.starts_with("label: \"background_build.construct_tail\", group: \"native_body_bank\", offset: 0x60de68,"));
     for planner in [body(BANK, "fn background_candidate("), body(BANK, "fn background_owed(")] {
         assert!(planner.contains("BACKGROUND_PAIR_TAIL.load(Ordering::Acquire)"), "{planner}");
+        // Cross cell (b), the pair group beside a live native window, needs the X4 hook (primary 2026-11-09 00:52Z).
+        assert!(planner.contains("BACKGROUND_PAIR_TAIL.load(Ordering::Acquire), BACKGROUND_X4.load(Ordering::Acquire))"),
+            "{planner}");
     }
 }
 

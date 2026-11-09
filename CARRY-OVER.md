@@ -1161,6 +1161,11 @@ Operator decision "All groups in rc.6" and the start-on-the-kind rule (`docs/DEC
   - Atomics only on the worker. Each settlement logs `[GroupSwap] background info … nana_own_wrapper= kept_no_info=`.
     Installed with the background builds, guarded by four 13.0.5 words and the seam row
     `background_build.info_wrapper`; `BACKGROUND_X4` reports it to the planner.
+  - **The two cross cells** (the merge's interim refusals lifted): `background_build_eligible` takes a native group
+    beside a live pair window with the redirected tail (X1; X4 never applies to its kinds, X5 is bg-pt's
+    `background_partner`), and the pair group beside a live native window with the X4 hook (`info_x4`, from
+    `BACKGROUND_X4` in `background_candidate`/`background_owed`; without it "pair group beside a native window without
+    X4"). Model test `the_cross_cells_build_beside_each_other`.
 - **Merge note** (accepted by the primary, 22:52Z): `p23/rc6-hot-slots-mii` hooks `0x60de68` too. Integration keeps
   one `background_tail`, which also restores the Mii shadow's `R`.
 
