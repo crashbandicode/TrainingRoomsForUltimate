@@ -1383,14 +1383,15 @@ pub fn info_wrapper(kind: u32, count: u32, cells: [u32; 2]) -> usize {
     if matches!(kind, POPO | NANA) && count >= 2 && cell1 != u32::MAX && cell0 != kind && cell1 == kind { 0x100 } else { 0xf0 }
 }
 
-/// The window part of a role's planned targets (`plan_budget`): `next`, the reusable extras of the window the lane's
-/// next kind would get, except for a live pair-lead window (`live`: its members and active kind) with groups on. That
-/// window stays while the role's groups build around it (rc.6 item 3, a session that starts on Ice Climbers), so it
-/// plans what it serves: its reusable extras, the count the notice reads (`role_counts`' `extra`), not the lane
-/// window's (which has one more member than the pair's single extra cell).
+/// The window part of a role's planned targets (`plan_budget`). With groups on, the live attached window (`live`: its
+/// members and active kind; the start-up or a Reload-built window, a pair-lead window or any group switched in) stays
+/// while the role's other groups build around it, so it plans what it serves: its reusable extras, the count the notice
+/// reads (`role_counts`' `extra`). The window the lane's next kind would get (`next`) counted two extras where a
+/// one-member or pair group serves none ("swap P1 to load 2 more" with everything built; primary 2026-11-09 02:00Z,
+/// every kind). With groups off, or without a live window, the next swap builds the lane's window (`next`).
 pub fn window_targets(grouped: bool, live: Option<(Members, u32)>, original: Option<u32>, next: u8) -> u8 {
     match live {
-        Some((members, active)) if grouped && members.is_pair_lead() => {
+        Some((members, active)) if grouped => {
             let (kinds, count) = members.logical_kinds();
             crate::engine::preload::cycle_preload_capacity::reusable_extras(&kinds[..count], active, original)
         }
@@ -3728,6 +3729,34 @@ mod tests {
             }
             assert!(bodies <= ready.saturating_sub(6), "{ready}: {:?}", plan);
         }
+    }
+
+    /// The notice rule (primary 2026-11-09 02:00Z, approved for every kind): with groups on, the live attached window
+    /// stays while the role's other groups are built around it, so it plans its own reusable extras. Eden rc6-bg-ic5 and
+    /// rc6-xc2/3 showed "swap P1 to load 2 more" on a one-member group (Samus: "Loaded 10/12"), on the pair group
+    /// ("Loaded 8/10") and for the CPU on its small groups, with everything planned built: the planner counted the
+    /// window the lane's next kind would get (two extras) where the attached group serves none.
+    #[test]
+    fn a_live_attached_group_plans_what_it_serves() {
+        use crate::engine::preload::cycle_preload_capacity::reusable_extras;
+        let next = reusable_extras(&[DK, LINK, SAMUS], DK, None);
+        assert_eq!(next, 2);
+        // P1 on Samus (one-member group) with the window [Mario, DK, Link] and the pair group detached and built.
+        let detached = count_extra_groups(&[(members(&[MARIO, DK, LINK]), GroupState::Built),
+            (Members::pair_group(), GroupState::Built)]);
+        for (live, active) in [(members(&[SAMUS]), SAMUS), (Members::pair_group(), POPO), (members(&[0x0f]), 0x0f)] {
+            let (kinds, count) = live.logical_kinds();
+            let extra = reusable_extras(&kinds[..count], active, None);
+            assert_eq!(extra, 0, "{active:#x}: a one-member group serves only its active member");
+            let planned = window_targets(true, Some((live, active)), None, next) + detached.planned;
+            let role = role_counts(planned, extra, WindowStatus::Built, detached);
+            assert_eq!((role.planned, role.ready, role.unstarted(), role.swap_owed(0)), (detached.planned, detached.ready, 0, 0),
+                "{active:#x}: the notice reads Ready");
+        }
+        // A three-member group or window serves its two extras either way.
+        assert_eq!(window_targets(true, Some((members(&[LINK, SAMUS, YOSHI]), LINK)), None, next), 2);
+        // Groups off: the next swap builds the lane's window, as before.
+        assert_eq!(window_targets(false, Some((members(&[SAMUS]), SAMUS)), None, next), next);
     }
 
     /// The two cross cells (primary 2026-11-09 00:52Z: "All groups in rc.6", so both must work; SPECIAL-GROUPS §0):

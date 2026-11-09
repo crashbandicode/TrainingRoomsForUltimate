@@ -988,3 +988,11 @@ ceiling = 158261
 date = "2026-11-09"
 reason = "rc.6 integration (p23/rc6-integration d659f0f5): the merge of p23/rc6-hot-slots-mii (b027703, 153299: +1104 over 152195, Mii groups built in the background, the warm exit from a Mii, groups freed under the pause) into 2f54db44 (157175), with one background_tail at 0x60de68 and one background_body (the 22:52Z rule; -18 against the sum); measured 158261 on the merged tree (tools/size_gate.py), +1086"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); combined ceiling = measured merged size per primary c07b3449, INBOX-opus-rc6-integration 2026-11-08 19:13Z"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 156568
+date = "2026-11-09"
+reason = "rc.6 item 3, the notice rule for every live attached window and the diag attach ticks (p23/rc6-x4; primary 2026-11-09 02:00Z): body_bank window_targets, native_body_bank service_locked/activate_entry diag lines; measured 156568 (tools/size_gate.py), +12 over 156556"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to this operator-chosen rc.6 item under TASK-OPUS-rc6-bg-special (primary c07b3449, 2026-11-08: a raise goes in its own commit with approved_by)"
