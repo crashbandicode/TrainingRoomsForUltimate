@@ -2209,9 +2209,10 @@ unsafe fn create_capacity(ctx:&ServiceEntryContext,entry:*const u8,slot:u32,inte
     if !stable {return;}
     // GS-PANIC (`process_memory`): a helper owner created for a speculative target exists only to host that load,
     // so it is admitted with that load's measured cost; a creation for a demand load is not refused here.
+    // rc.6 window admission (primary 2026-11-09 13:28Z): it also leaves what the cycle waits for (`admit_created`).
     if intent.speculative {
         let cost = crate::engine::swap::body_bank::memory::helper_cost(wanted.kind);
-        let (decision, _) = super::process_memory::admit(cost);
+        let (decision, _) = super::process_memory::admit_created(cost);
         if decision.admission != crate::engine::swap::body_bank::memory::Admission::Admit {
             memory_refused(intent.extra, wanted.kind, decision, cost, "capacity creation");
             return;
@@ -2490,9 +2491,10 @@ pub unsafe fn service(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) {
     // is discretionary: it starts only when the headroom covers its measured cost beside what every other consumer
     // still holds; otherwise it stays in the plan and a later callback tries again. A demand load (a visible request
     // waits for it) is not refused here. Both hold their cost while in flight (`helper_outstanding`).
+    // rc.6 window admission (primary 2026-11-09 13:28Z): a created entry's load also leaves what the cycle waits for.
     let memory_cost = crate::engine::swap::body_bank::memory::helper_cost(wanted.kind);
     let memory_committed = if speculative {
-        let (decision, sample) = super::process_memory::admit(memory_cost);
+        let (decision, sample) = if is_capacity { super::process_memory::admit_created(memory_cost) } else { super::process_memory::admit(memory_cost) };
         // F9-SEAT-NOTICE: a seat held for memory counts in the readiness notice until a load on it is admitted.
         crate::runtime::roster::f9_gate::note_seat_memory(slot, wanted.kind,
             decision.admission != crate::engine::swap::body_bank::memory::Admission::Admit);

@@ -8,8 +8,10 @@
 //! | --- | --- | --- |
 //! | group prefetch (`body_bank`, `Step::Start`) | discretionary: Admit / Defer / Refuse (group fails, canonical) | prefetching: all; prefetched: its build |
 //! | helper source load (`sources::service`), speculative | discretionary: refused = stays planned, retried | in flight: all |
-//! | helper owner creation for a speculative target (`sources::create_capacity`) | with the load it hosts | (that load) |
+//! | helper owner creation for a speculative target (`sources::create_capacity`) | with the load it hosts, beside what the cycle waits for | (that load) |
+//! | speculative load on a created entry (`sources::service`) | discretionary, beside what the cycle waits for ([`admit_created`]) | in flight: all |
 //! | helper source load for a visible request (demand) | not refused here | in flight: all |
+//! | a switch's new window, its supplemental members (`body_bank::proposed`) | the planner's prefix that fits ([`admit_window`]); the target is never refused | built under the switch's INSTALL |
 //! | Kirby copy packages (`swap_native::copy_packages`) | inside the admitted group (first tick of its prefetch) | the group's |
 //!
 //! Never call with a bank lock or the source lock held: [`outstanding`] takes each in turn.
@@ -31,14 +33,44 @@ pub(crate) fn outstanding() -> u64 {
 #[cfg(feature = "diag")]
 pub(crate) static DIAG_RESERVE: core::sync::atomic::AtomicU64 = core::sync::atomic::AtomicU64::new(0);
 
-/// One discretionary admission against the current headroom less [`outstanding`], with the sample it used.
-pub(crate) fn admit(cost: GroupCost) -> (Decision, MemorySample) {
-    let sample = MemorySample::capture();
+/// The headroom an admission reads from `sample` (less [`DIAG_RESERVE`] in the diag build).
+fn headroom(sample: &MemorySample) -> Option<u64> {
     #[cfg(feature = "diag")]
-    let headroom = sample.headroom().map(|headroom| {
+    return sample.headroom().map(|headroom| {
         headroom.saturating_sub(DIAG_RESERVE.load(core::sync::atomic::Ordering::Acquire))
     });
     #[cfg(not(feature = "diag"))]
-    let headroom = sample.headroom();
-    (memory::admit(headroom, outstanding(), cost), sample)
+    sample.headroom()
+}
+
+/// One discretionary admission against the current headroom less [`outstanding`], with the sample it used.
+pub(crate) fn admit(cost: GroupCost) -> (Decision, MemorySample) {
+    let sample = MemorySample::capture();
+    (memory::admit(headroom(&sample), outstanding(), cost), sample)
+}
+
+/// rc.6 window admission (hs08b): how many of a switch's new window's supplemental members, in the planner's order, the
+/// process holds now (`memory::window_extras`), and the decision that stopped the count. Called where the switch plans
+/// the window (`body_bank::proposed`, the request's preflight), never in a hook.
+#[cfg(feature = "native-body-bank-alpha")]
+pub(crate) fn admit_window(supplements: &[u32]) -> (usize, Option<Decision>) {
+    let sample = MemorySample::capture();
+    let headroom = headroom(&sample);
+    memory::window_extras(headroom, outstanding(), supplements)
+}
+
+/// What the cycle waits for: the supplements its windows were refused and its groups held for memory.
+pub(crate) fn cycle_waiting() -> u64 {
+    #[cfg(not(feature = "native-body-bank-alpha"))]
+    return 0;
+    #[cfg(feature = "native-body-bank-alpha")]
+    super::body_bank::cycle_waiting()
+}
+
+/// A created entry's creation or speculative load: [`admit`] that also leaves [`cycle_waiting`]
+/// (`memory::created_admission`).
+pub(crate) fn admit_created(cost: GroupCost) -> (Decision, MemorySample) {
+    let sample = MemorySample::capture();
+    let headroom = headroom(&sample);
+    (memory::created_admission(headroom, outstanding(), cycle_waiting(), cost), sample)
 }

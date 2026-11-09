@@ -1095,6 +1095,10 @@ pub(super) unsafe fn group_rebaseline(entry: usize, owner: u32, epoch: u64,
 
 pub(crate) fn helper_budget(slots: u8) -> u8 { slots.saturating_sub(RESERVED.load(Ordering::Acquire)) }
 
+/// rc.6 window admission: per role, what the supplements its last window plan refused for memory need
+/// (`memory::window_waiting`). Created entries leave it ([`cycle_waiting`]).
+static WINDOW_WAITING: [AtomicU64; 2] = [AtomicU64::new(0), AtomicU64::new(0)];
+
 pub(super) fn proposed(owner: u32, target: Forms, upcoming: &[u32]) -> Option<Members> {
     let role = role(owner)?;
     let settings = crate::runtime::roster::cycle_preload_config::snapshot();
@@ -1115,7 +1119,32 @@ pub(super) fn proposed(owner: u32, target: Forms, upcoming: &[u32]) -> Option<Me
     let budget = budget.min(pool.saturating_sub(planned_other + (other_total - other)));
     let menu = crate::runtime::compat::sync::read(&crate::runtime::compat::menu::MENU);
     let (lane, count) = window_lane(&menu, role, upcoming);
-    members_for(&settings, target, &lane[..count], budget)
+    let Some(members) = members_for(&settings, target, &lane[..count], budget) else {
+        WINDOW_WAITING[role].store(0, Ordering::Release);
+        return None;
+    };
+    // rc.6 window admission (primary 2026-11-09 13:28Z; Eden final-e39-xps-hot hs08b: the window `[42, 44, 1c]` was
+    // planned at 27.6 MB of headroom, `prepare_resources` acquired both supplements and the game's page commit aborted in
+    // the build). The members beyond the target's own form are admitted here, in the planner's order, against the
+    // process headroom like a group prefetch (`memory::window_extras`); the planner runs again with the count admitted,
+    // so `prepare_resources` acquires only those. The target is the visible request and is never refused.
+    let mut supplements = FixedList::<u32, NATIVE_MEMBERS>::new(0);
+    for kind in lane[..count].iter().copied() {
+        if members.kinds()[..members.count()].contains(&kind)
+            && !target.kinds[..target.count as usize].contains(&kind) && !supplements.contains(&kind) {
+            supplements.push(kind);
+        }
+    }
+    let (admitted, stopped) = super::process_memory::admit_window(&supplements);
+    WINDOW_WAITING[role].store(memory::window_waiting(&supplements, admitted), Ordering::Release);
+    let Some(decision) = stopped else { return Some(members); };
+    // The pair-lead window's Nana is the target's form, not a supplement: the body budget counts it.
+    let admitted_budget = admitted + (members.count() - 1).saturating_sub(supplements.len());
+    crate::engine::compat::logging::diagnostic(format_args!(
+        "[ProcessMemory] window owner={} target={:#x} members={:x?} admitted={} of supplements={:x?} admission={:?} headroom={:?} outstanding={} need={}; the rest waits for a later window",
+        owner, target.kinds[0], &members.kinds()[..members.count()], admitted, &*supplements, decision.admission,
+        decision.headroom, decision.outstanding, decision.need));
+    members_for(&settings, target, &lane[..count], admitted_budget)
 }
 
 /// Actual native descriptor plus the selected logical fighter. Exact-Mii
@@ -5757,6 +5786,18 @@ pub(super) fn group_outstanding() -> u64 {
         .fold(0u64, u64::saturating_add)
 }
 
+/// rc.6 window admission: what the cycle waits for, which a created entry leaves (`process_memory::admit_created`): the
+/// supplements each role's last window plan refused for memory (`WINDOW_WAITING`) and every group held for memory, its
+/// cost with the margin. Takes each role's bank lock in turn; never call it with a bank lock held.
+pub(super) fn cycle_waiting() -> u64 {
+    let windows = WINDOW_WAITING.iter().map(|waiting| waiting.load(Ordering::Acquire)).fold(0u64, u64::saturating_add);
+    BANKS.iter().map(|state| state.lock().as_ref().map_or(0, |bank| bank.groups.iter()
+        .filter(|g| g.state == GroupState::Held(Hold::Memory))
+        .map(|g| memory::with_margin(memory::group_cost(&g.members.kinds()[..g.members.count()]).total()))
+        .fold(0u64, u64::saturating_add)))
+        .fold(windows, u64::saturating_add)
+}
+
 /// `[GroupSwap] memory`: the committed process charge one phase of a group took, next to the estimate the
 /// admission used (`tools/group_memory_costs.py` reads these lines as exact observations).
 fn log_memory(owner: u32, group: usize, kinds: &[u32], phase: &str, before: Option<u64>, after: MemorySample, estimate: u64) {
@@ -6266,6 +6307,7 @@ pub(super) fn on_destroy(entry: *const u8) {
                 crate::runtime::roster::copy_packages::forget(role, bank.owner, "entry destroyed");
                 EXTRAS[role].store(0, Ordering::Release);
                 GROUP_BODIES[role].store(0, Ordering::Release);
+                WINDOW_WAITING[role].store(0, Ordering::Release);
                 if !bank.groups.is_empty() || bank.prefetch.is_some() {
                     // Finalize ran before this destructor hook; the groups should be gone.
                     trace!("[GroupSwap] destroy owner={} with {} group records remaining (leak reported)", bank.owner, bank.groups.len());
