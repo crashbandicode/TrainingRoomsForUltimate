@@ -33,6 +33,8 @@ ROWS = [
     ("kinetic_get_sum_speed_y", 0x2043A10, "NamedMacros", "Called", "KineticModule::get_sum_speed_y (lua_bind thunk): the start state's and the capture's y speed."),
     ("stop_is_special_stop", 0x2089200, "NamedMacros", "Called", "StopModule::is_special_stop (lua_bind thunk): whether the panel already holds a fighter still."),
     ("stop_set_special_stop", 0x2089290, "NamedMacros", "Called", "StopModule::set_special_stop (lua_bind thunk): holds a practice fighter still while the named panel or the clip editor is open."),
+    ("kinetic_energy_normal_set_speed", 0x20F8320, "NamedMacros", "Called", "KineticEnergyNormal::set_speed (lua_bind thunk): the x start speed Play gives the playing role (PLAY-MOMENTUM) and the named start pose's. Symbol _ZN3app8lua_bind35KineticEnergyNormal__set_speed_implEPNS_19KineticEnergyNormalERKN3phx8Vector2fE."),
+    ("kinetic_energy_gravity_set_speed", 0x2120230, "NamedMacros", "Called", "FighterKineticEnergyGravity::set_speed (lua_bind thunk): the y start speed of an aerial start (PLAY-MOMENTUM, the named start pose). Symbol _ZN3app8lua_bind43FighterKineticEnergyGravity__set_speed_implEPNS_27FighterKineticEnergyGravityEf."),
 ]
 
 # Called rows other streams name by offset constant (kept from the hand-edited file of S4-1).

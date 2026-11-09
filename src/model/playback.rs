@@ -160,6 +160,11 @@ impl Book {
         self.recordings.get(id).map(|recording| recording.placement).unwrap_or_default()
     }
 
+    /// The recording's start state (its recorded start speeds and facing); `None` for anything else.
+    pub fn start_state(&self, id: &str) -> Option<super::macros::StartState> {
+        self.recordings.get(id).map(|recording| recording.start)
+    }
+
     pub fn add_save(&mut self, id: impl Into<String>) {
         self.saves.insert(id.into());
     }

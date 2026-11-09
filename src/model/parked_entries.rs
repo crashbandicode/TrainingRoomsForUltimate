@@ -329,6 +329,30 @@ pub fn mii_record_identity(record: &[u8], charinfo: &[u8]) -> bool {
         && record[96..104] != [0u8; 8]
 }
 
+/// What a parked seat (entry 2 or 3 at one CPU) holds, for the readiness notice (primary 2026-11-08 23:03Z,
+/// F9-SEAT-NOTICE, reading A: the two seats count in the existing fighter status, with no new text).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SeatState {
+    /// The seat member's body is ready on the entry.
+    Ready,
+    /// The member is still to load, or loading.
+    Loading,
+    /// The member's load waits for process memory: held and retried, never skipped (cov-rest 16:25Z).
+    HeldMemory,
+}
+
+/// A seat's state from the seat member, the current Ready source on its entry (`ready`, kind and configuration) and
+/// the kind whose last speculative load on that entry process memory refused (`held`; cleared when one is admitted).
+pub fn seat_state<C: Copy + PartialEq>(member: (u32, Option<C>), ready: Option<(u32, Option<C>)>, held: Option<u32>) -> SeatState {
+    if ready == Some(member) {
+        SeatState::Ready
+    } else if held == Some(member.0) {
+        SeatState::HeldMemory
+    } else {
+        SeatState::Loading
+    }
+}
+
 /// Ordering (primary 2026-11-08 17:28Z, reading B; Eden covrest-12): an F9 seat load waits while a HUD portrait job
 /// wants a helper or holds one for its render, so the render is not pushed behind the seat's INSTALL into the role's
 /// next press. The seat loads once the render is done.

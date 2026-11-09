@@ -793,6 +793,9 @@ unsafe fn verify_pause_retire(base: usize) -> Result<(), usize> {
 unsafe fn pause_state_exit(_ctx: &InlineCtx) {
     crate::runtime::threads::headroom("pause_state_exit");
     super::sources::pause_opening();
+    // Operator decision 2026-11-08 23:42Z: groups that left the cycle are destroyed as the pause opens.
+    #[cfg(feature = "native-body-bank-alpha")]
+    super::body_bank::pause_opening();
 }
 
 /// The FighterManager entry pointer in `slot` (1-7), or 0. Values only; game thread.

@@ -77,6 +77,34 @@ pub(crate) fn seat_live(slot: u32) -> bool {
     }
 }
 
+/// F9-SEAT-NOTICE (primary 2026-11-08 23:03Z): per seat (entry 2, entry 3), the kind plus one whose last speculative
+/// load on that entry process memory refused; 0 when none is refused now. Written by the loader callback, read by the
+/// readiness notice (`sources::seat_states`).
+static SEAT_HELD: [core::sync::atomic::AtomicU32; 2] =
+    [core::sync::atomic::AtomicU32::new(0), core::sync::atomic::AtomicU32::new(0)];
+
+/// A speculative helper load of `kind` on entry `slot` was refused for memory (`held`), or admitted. Other entries are
+/// not seats and are ignored.
+pub(crate) fn note_seat_memory(slot: u32, kind: u32, held: bool) {
+    if let Some(cell) = SEAT_HELD.get((slot as usize).wrapping_sub(2)) {
+        let now = if held { kind.saturating_add(1) } else { 0 };
+        let was = cell.swap(now, core::sync::atomic::Ordering::AcqRel);
+        if was != now {
+            crate::engine::compat::logging::diagnostic(format_args!(
+                "[F9Seat] memory slot={slot} held={} kind=0x{:x}",
+                held,
+                if held { kind } else { was.saturating_sub(1) }
+            ));
+        }
+    }
+}
+
+/// The kind a seat's last load was refused for memory, if that refusal still stands.
+pub(crate) fn seat_held(slot: u32) -> Option<u32> {
+    let held = SEAT_HELD.get((slot as usize).wrapping_sub(2))?.load(core::sync::atomic::Ordering::Acquire);
+    held.checked_sub(1)
+}
+
 /// What the player frame should do with a stored raise.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Step {
@@ -255,4 +283,8 @@ pub(crate) fn reset() {
     *gate = Gate::empty();
     gate.members = members;
     publish_live(&gate);
+    drop(gate);
+    for slot in [2, 3] {
+        note_seat_memory(slot, 0, false);
+    }
 }

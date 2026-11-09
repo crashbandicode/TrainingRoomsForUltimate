@@ -1100,6 +1100,110 @@ Worker B of the special-group split (`artifacts/phase23/TASK-OPUS-rc6-bg-special
   records 0; first switches: CPU into PT and Pyra 49–51 ms, P1 into PT 64–92 ms and into Pyra 87–115 ms (the base
   `182a785` built them at the switch: 1158 ms and 939 ms, `rc6-bg-pt-base1`). Unmapped 0 when no PT group attaches a
   second time. Open: every later PT attach's article rebuild (`special_articles::rebuild_current`) logs Unmapped
+  Read8 @ 0 at `main+0x35609c0`, at the base too (`rc6-bg-pt-base1`, 2 of 2).
+### p23/rc6-bg-ic: the Ice Climbers pair group built in the background, and a session that starts on Ice Climbers (2026-11-08, rc.6 item 3)
+
+Operator decision "All groups in rc.6" and the start-on-the-kind rule (`docs/DECISIONS.md` "Item 3 in rc.6", 20:26Z and
+22:32Z). Design: `artifacts/phase23/rc6-item3-re/SPECIAL-GROUPS.md` §0 X1 and §2 (static RE and Eden
+`rc6-special-re6`).
+
+- **The pair group builds in the background** (`body_bank::background_build_eligible` admits `Special::Pair`):
+  - Beside a window that is not `[Popo, Nana]` its two construction tails take the per-kind release `0x17e8610` on the
+    live cells. That returns exactly the keys its prefetch registered: no `R+0x50` reference and no reset-batch permit
+    are involved.
+  - In the tick the bank lends the group's members, so N1 gives Nana Popo's context and the flags are 6. On that path
+    the scratch control init reads only `+0x28`, `+0x5918` and `+0x4188..`.
+  - The settlement gives Popo cell 0 and Nana cell 1. The warm attach is today's (N2). The pair group's switch-time
+    build stays synchronous.
+- **A live pair window no longer defers the other groups** (at `182a785` it was "special window"):
+  - `native_body_bank::background_tail` (inline `0x60de68`, the tail's `cmp w8, #0x4b`) makes a background body
+    compare -1 instead of the live Popo. Its tail then takes the per-kind release and never the pair rule's whole-R
+    reset.
+  - It is installed with the background builds, guarded by four 13.0.5 words and the seam row
+    `background_build.construct_tail`. Without it a live pair window still defers (`pair_tail` false, "pair window").
+  - A native window still defers (the Pokémon Trainer and Pyra/Mythra lane).
+- **A session that starts on Ice Climbers gets a bank** (Eden `rc6-bg-ic1`: P1 started on the pair had no start-up
+  window; P-HOT B H1 refused `0x4b`, so nothing was planned until the first switch, a Reload):
+  - `entry_window::extendable` accepts native's normal-pair header (Popo with Nana as its secondary), and
+    `entry_window` gives it the pair-lead window the Reload path builds for a pair target (`Members::from_pair`).
+  - `creation_matches` (H3) rewrites native's pair creation (2 bodies, 2 actors) to it. `original_request` maps a
+    pair-lead start-up window back to native's pair.
+  - `scene_header` extends a pair start only with the pair bank on and the pair as the slot's requested form; Solo Popo
+    stays native's one body.
+  - H2 (`prepare_resources`) already writes the pair's `R+0x50` = 3 for a pending pair-lead bank, H4 binds on count,
+    actors and kinds, and N1/N2/N3 serve the window as they serve a Reload-built one. Its other groups then build in
+    the background beside it (`background_tail`).
+  - The notice counts the live pair-lead window as it serves (Eden `rc6-bg-ic2`: "Loaded 9/10 · swap P1 to load 1
+    more" with every P1 fighter built). With groups on, `plan_budget` plans its window targets through
+    `body_bank::window_targets`: a live pair-lead window counts its own reusable extras, the values `progress` reads,
+    not the lane window's two.
+  - Since the primary's 2026-11-09 02:00Z decision (every kind), the same holds for any live attached window with groups
+    on: a one-member group, the pair group, a native group. Eden `rc6-bg-ic5` and `rc6-xc2/3` showed "swap P1 to load 2
+    more" on them with everything built. With groups off the lane's window is planned as before.
+- **The return to an Ice Climbers original is warm** (primary 2026-11-09 00:23Z; `docs/DECISIONS.md`). Eden
+  `rc6-bg-ic2/3` showed it Reloading (6–7 frames), which ended P1's bank; the next switch out rebuilt everything.
+  - The IcPair capability row's `original_bankable` is now true (EXCLUSIONS §9 lifted for the pair original). New
+    `capabilities::original_form_bankable(kind, forms, pair_bank)`: the pair original, in the pair form and while the
+    pair bank is on. Every other kind answers `original_bankable(kind)`, which is unchanged (0x4b stays outside
+    `swappable_kind`: the pair is never a single-body cell).
+  - `native_body_bank::original_member(kind, descriptor)` is both Mii adapters' Original gate: `original_bank` on, the
+    form the staged request spells (`request_forms`), and the pair bank's state. `excluded_original` asks the same rule
+    with the slot-0 setting's form, so the planner and the notice count the pair original as served.
+  - `plan_in` then serves the return like a numbered pair target: the live pair-lead window is a reuse, a detached
+    one or a pair group is a group swap (`group_serves`), and a request whose non-group bytes differ still takes the
+    Reload with `reuse declined … bytes differ at`. The player's `at_origin` already recognises any live `0x4b`.
+- **X4, a background Ice Climbers body's info wrapper** (primary 2026-11-09 00:52Z, the cross cells; read from the
+  disassembly `rc6-item3-re/special/asm/6079d0-60df60.s` `0x60d1ec-0x60d270`):
+  - Construct picks the wrapper whose `info+0x94` gate it reads. Only a Popo or Nana body looks at the entry's words:
+    with two cells, the cell-1 kind gets `+0x100` (Nana's own); everything else `+0xf0`. Native reads the live entry,
+    so a pair group built beside a one-actor window (ordinary or native) gave its Nana `+0xf0`.
+  - `body_bank::info_wrapper` is that rule. `native_body_bank::background_info` (inline `0x60d270`, x9 the chosen
+    wrapper) gives a background Popo/Nana body the wrapper its building group's words choose (`BACKGROUND_CELLS`,
+    stored before the owner's background bit). Nana's `+0x100` is used only while the entry holds that wrapper's info
+    (`+0x108`); otherwise native's choice stays and is counted.
+  - Atomics only on the worker. Each settlement logs `[GroupSwap] background info … nana_own_wrapper= kept_no_info=`.
+    Installed with the background builds, guarded by four 13.0.5 words and the seam row
+    `background_build.info_wrapper`; `BACKGROUND_X4` reports it to the planner.
+  - **The two cross cells** (the merge's interim refusals lifted): `background_build_eligible` takes a native group
+    beside a live pair window with the redirected tail (X1; X4 never applies to its kinds, X5 is bg-pt's
+    `background_partner`), and the pair group beside a live native window with the X4 hook (`info_x4`, from
+    `BACKGROUND_X4` in `background_candidate`/`background_owed`; without it "pair group beside a native window without
+    X4"). Model test `the_cross_cells_build_beside_each_other`.
+- **Merge note** (accepted by the primary, 22:52Z): `p23/rc6-hot-slots-mii` hooks `0x60de68` too. Integration keeps
+  one `background_tail`, which also restores the Mii shadow's `R`.
+
+**Proof:**
+- Host tests, each failed first: model `a_background_build_takes_the_pair_group_and_builds_beside_a_live_pair_window`,
+  `an_ice_climbers_start_gets_a_pair_lead_window`, `a_live_pair_lead_window_plans_what_it_serves`,
+  `an_ice_climbers_pair_original_is_a_bank_member_while_the_pair_bank_is_on`; `tests/background_pair_wiring.rs` (6).
+- Recorded manifest edits of `rows_a1.rs`, `body_bank.rs` and `native_body_bank.rs`; `carry_pkg6.py
+  carry/ledger/verify` re-derives all 250 files.
+- Eden: `artifacts/phase23/LANE-OPUS-RC6-BG-IC-REPORT.md`.
+### p23/rc6-open-fixes: a seat held for memory counts in the readiness notice (2026-11-08, F9-SEAT-NOTICE)
+
+**Primary 23:03Z, reading A** (cov-rest's question of 16:25Z; `docs/DECISIONS.md` F9-SEAT-NOTICE on
+`review/menu-proposal`). When process memory refuses a parked seat, the seat is held and retried, but the readiness
+notice counted only the plan's targets and the bank's groups, so the hold showed only in a diag line. The two seats
+now count in the existing fighter status, with no new text: a held seat reads "… waiting for memory".
+- `parked_entries::seat_state` (model) and `hat_slots::with_seats` (engine, not carried: the by-path test crates that
+  include `model.rs` have no `crate::engine`): each parked seat is one more planned fighter, counted ready, pending, or
+  held with `Hold::Memory`. Nothing is added while the status itself is hidden, or for a live seat.
+- `f9_gate::note_seat_memory` and `seat_held`: the kind the last speculative load on entry 2 or 3 was refused for,
+  cleared when a load on it is admitted and at `reset`.
+- `character_sources::service` notes each seat admission before the refusal returns; `character_sources::seat_states`
+  (new) reads each seat's target as `purpose_view` does (an armed Reload, else the parked member) against the entry's
+  Ready source. `cycle_preload::poll_status` applies `with_seats` to the fighter status.
+
+3 recorded manifest edits: `character_sources.rs` (`seat_states`, the note in `service`) and `cycle_preload.rs`
+(`poll_status`); `carry_pkg6.py carry/ledger/verify` re-derives all 250 files. Tests (failed first: no `with_seats`;
+the runtime named neither `with_seats` nor `note_seat_memory`): `hat_slots`
+`a_seat_held_for_memory_counts_in_the_fighter_status`, `tests/seat_notice_wiring.rs` (2).
+
+**Its Eden row's instrument (diag build only).** A row cannot count on the console running out of memory, so the diag
+build's `process_memory::admit` takes `DIAG_RESERVE` bytes (written through `diag-memory-reserve.req`, read by the
+states diag thread) from the headroom of every discretionary admission; 0, the default, changes nothing, and the release
+build has neither. One recorded manifest edit (`process_memory.rs`). `f9_gate::note_seat_memory` logs each change of a
+seat's hold (`[F9Seat] memory slot=N held=… kind=…`).
   Read8 @ 0 at `main+0x35609c0`, at the base too (`rc6-bg-pt-base1`, 2 of 2). Fixed by the next section.
 
 ### p23/rc6-bg-pt: a Pokémon Trainer group takes its object kind again before its article rebuild (2026-11-09)
@@ -1173,61 +1277,117 @@ integration's `62e7c85` (merge `d1fd8dd`, ceiling `da86a68`); commits `3b9b4895`
   - Failed only: the PT attach with the boot's first article rebuild (237 ms, 13 frames; the first-rebuild cost, not an
     exit), and the cycle-change row's Fighters notice ("swap P1 to load 1 more" while every P1 group was built).
 
-### p23/rc6-bg-ic: the Ice Climbers pair group built in the background, and a session that starts on Ice Climbers (2026-11-08, rc.6 item 3)
+### p23/rc6-hot-slots: Mii groups built in the background; the exit from a Mii warm to any Built group (2026-11-08)
 
-Operator decision "All groups in rc.6" and the start-on-the-kind rule (`docs/DECISIONS.md` "Item 3 in rc.6", 20:26Z and
-22:32Z). Design: `artifacts/phase23/rc6-item3-re/SPECIAL-GROUPS.md` §0 X1 and §2 (static RE and Eden
-`rc6-special-re6`).
+Operator 2026-11-08 20:26Z, "All groups in rc.6"; research `artifacts/phase23/rc6-item3-re/SPECIAL-GROUPS.md` §0–§1, with
+its 21:10Z intervals; inbox 21:27Z for the exit.
 
-- **The pair group builds in the background** (`body_bank::background_build_eligible` admits `Special::Pair`):
-  - Beside a window that is not `[Popo, Nana]` its two construction tails take the per-kind release `0x17e8610` on the
-    live cells. That returns exactly the keys its prefetch registered: no `R+0x50` reference and no reset-batch permit
-    are involved.
-  - In the tick the bank lends the group's members, so N1 gives Nana Popo's context and the flags are 6. On that path
-    the scratch control init reads only `+0x28`, `+0x5918` and `+0x4188..`.
-  - The settlement gives Popo cell 0 and Nana cell 1. The warm attach is today's (N2). The pair group's switch-time
-    build stays synchronous.
-- **A live pair window no longer defers the other groups** (at `182a785` it was "special window"):
-  - `native_body_bank::background_tail` (inline `0x60de68`, the tail's `cmp w8, #0x4b`) makes a background body
-    compare -1 instead of the live Popo. Its tail then takes the per-kind release and never the pair rule's whole-R
-    reset.
-  - It is installed with the background builds, guarded by four 13.0.5 words and the seam row
-    `background_build.construct_tail`. Without it a live pair window still defers (`pair_tail` false, "pair window").
-  - A native window still defers (the Pokémon Trainer and Pyra/Mythra lane).
-- **A session that starts on Ice Climbers gets a bank** (Eden `rc6-bg-ic1`: P1 started on the pair had no start-up
-  window; P-HOT B H1 refused `0x4b`, so nothing was planned until the first switch, a Reload):
-  - `entry_window::extendable` accepts native's normal-pair header (Popo with Nana as its secondary), and
-    `entry_window` gives it the pair-lead window the Reload path builds for a pair target (`Members::from_pair`).
-  - `creation_matches` (H3) rewrites native's pair creation (2 bodies, 2 actors) to it. `original_request` maps a
-    pair-lead start-up window back to native's pair.
-  - `scene_header` extends a pair start only with the pair bank on and the pair as the slot's requested form; Solo Popo
-    stays native's one body.
-  - H2 (`prepare_resources`) already writes the pair's `R+0x50` = 3 for a pending pair-lead bank, H4 binds on count,
-    actors and kinds, and N1/N2/N3 serve the window as they serve a Reload-built one. Its other groups then build in
-    the background beside it (`background_tail`).
-  - The notice counts the live pair-lead window as it serves (Eden `rc6-bg-ic2`: "Loaded 9/10 · swap P1 to load 1
-    more" with every P1 fighter built). With groups on, `plan_budget` plans its window targets through
-    `body_bank::window_targets`: a live pair-lead window counts its own reusable extras, the values `progress` reads,
-    not the lane window's two. With groups off, or for any other window, the lane's window is planned as before.
-- **The return to an Ice Climbers original is warm** (primary 2026-11-09 00:23Z; `docs/DECISIONS.md`). Eden
-  `rc6-bg-ic2/3` showed it Reloading (6–7 frames), which ended P1's bank; the next switch out rebuilt everything.
-  - The IcPair capability row's `original_bankable` is now true (EXCLUSIONS §9 lifted for the pair original). New
-    `capabilities::original_form_bankable(kind, forms, pair_bank)`: the pair original, in the pair form and while the
-    pair bank is on. Every other kind answers `original_bankable(kind)`, which is unchanged (0x4b stays outside
-    `swappable_kind`: the pair is never a single-body cell).
-  - `native_body_bank::original_member(kind, descriptor)` is both Mii adapters' Original gate: `original_bank` on, the
-    form the staged request spells (`request_forms`), and the pair bank's state. `excluded_original` asks the same rule
-    with the slot-0 setting's form, so the planner and the notice count the pair original as served.
-  - `plan_in` then serves the return like a numbered pair target: the live pair-lead window is a reuse, a detached
-    one or a pair group is a group swap (`group_serves`), and a request whose non-group bytes differ still takes the
-    Reload with `reuse declined … bytes differ at`. The player's `at_origin` already recognises any live `0x4b`.
-- **Merge note** (accepted by the primary, 22:52Z): `p23/rc6-hot-slots-mii` hooks `0x60de68` too. Integration keeps
-  one `background_tail`, which also restores the Mii shadow's `R`.
+**Tick (game thread, `start_background`):**
+- **Save, then install the group's identity for this tick only:**
+  - the live `R` words, entry bytes and D mirror are saved;
+  - the live face handles `R+0x90/+0x94` are set aside (the setup's bind would release them, `0x67e9b0`);
+  - the group's identity is written (`write_identity`).
+- **The native Mii setup** runs at the new `At::Background` seam (plan seam, identity installed;
+  `mii_setup::prepare_mii_background`). The entry-level third runs only when it prepared.
+- **The shadow:** `R+0x40..+0xa8` goes into `SHADOW_R` (the resource object zeroed).
+- **Restore:** everything live is put back in the same tick.
 
-**Proof:**
-- Host tests, each failed first: model `a_background_build_takes_the_pair_group_and_builds_beside_a_live_pair_window`,
-  `an_ice_climbers_start_gets_a_pair_lead_window`, `a_live_pair_lead_window_plans_what_it_serves`,
-  `an_ice_climbers_pair_original_is_a_bank_member_while_the_pair_bank_is_on`; `tests/background_pair_wiring.rs` (6).
-- Recorded manifest edits of `rows_a1.rs`, `body_bank.rs` and `native_body_bank.rs`; `carry_pkg6.py
-  carry/ledger/verify` re-derives all 250 files.
-- Eden: `artifacts/phase23/LANE-OPUS-RC6-BG-IC-REPORT.md`.
+**Worker (16 inline hooks, seam rows `background_mii.*` in `rows_a1.rs`):**
+- Body init reads the shadow from `0x607aac` to `0x607e74`, with the group's `FE+0x52` at `0x607d80`.
+- Construct reads it from `0x60b98c` (`x20` and `x1`, plus the group's costume) to `0x60de68`, and at `0x60bf30`. The
+  group's `D+0x72` comes in at `0x60b7a8` and `0x60b834`.
+- The construction tail's release gets kind −1 at `0x60dec4`. The settlement releases the group's keys with its
+  identity bracketed (`release_group_keys_of`).
+- Every background body's tail takes the per-kind release, never the pair rule (X1, `0x60de68`).
+- The owner-indexed readers `0x33a05a8` (costume) and `0x344fcd4` (hat) are redirected only on the worker thread that
+  builds the body (`MII_THREAD`, set at each interval's start and cleared at the single epilogues `0x60b5c8` and
+  `0x60df04`). `0x6e655c`, `0x6e6ccc` and `0x33c3468` are counted there (M-bg2).
+
+**Each window owns its Mii set in R** (`Window.mii_r`; faces `+0x90/+0x94`, resource object `+0x98/+0xa0`):
+- It is taken at every detach and put back at its attach.
+- A failed exchange releases what it left in R.
+- `retire_groups` and `leave_group` release each detached group's set (`release_mii_r`: the faces as the Reload releases
+  them, `0x6502c8`; the control block as body init releases the previous one, `0x607d24`).
+
+**Exit from a Mii to any Built group (inbox 21:27Z):**
+- The first identity move out of an ordinary window records the owner's ordinary baseline (`Bank::ordinary_identity`).
+- An ordinary group that saved no move of its own attaches out of a Mii window with that baseline and its own header
+  kinds (`body_bank::baseline_words`). `mii_exit_saved` serves it to the planner.
+
+**Gating:** a Mii group builds in the background only when its hooks installed (`BACKGROUND_MII_ENABLED`) and it carries
+its identity. A live Mii window still defers background builds.
+
+**Tests, each failed first:**
+- model: `a_background_build_takes_an_ordinary_prefetched_group_beside_an_ordinary_window` (Mii admitted),
+  `the_ordinary_baseline_takes_the_target_windows_header`;
+- `tests/background_mii_wiring.rs` (3);
+- `tests/mii_exit_wiring.rs` (`…_from_any_built_ordinary_group`, `the_exchange_writes_the_ordinary_baseline_…`);
+- `tests/background_build_wiring.rs` follows the teardown's new tuple.
+
+Recorded manifest edits of the four carried files; `carry_pkg6.py carry/ledger/verify` re-derives all 250 files.
+
+### p23/rc6-hot-slots: groups that left the cycle are freed under the pause; Mii background fixes (2026-11-08)
+
+Operator decision 2026-11-08 23:42Z ("free under the pause menu", inbox); Eden `rc6-hot-xps14`..`xps20`.
+
+**Release under the pause.**
+- **Why:** native's body destroy holds the game thread 75–134 ms per body. A Built group that left the cycle,
+  destroyed mid-play, gave 12–19-frame gaps (`xps16`/`xps17`, measured by the new `[GroupSwap] slow step` lines).
+- **Rule:** such a group is parked (`body_bank::leaves_at_pause`). It stays reachable for its still-wanted members,
+  the notice counts it out of the plan, and the planner plans new members beside it into free slots.
+- **When the pause opens,** `native_source_capacity::pause_state_exit` (`0x1558f4c`) calls `body_bank::pause_opening`,
+  which destroys every parked group with `leave_group`, logging the headroom before and after. It skips a group a
+  committed switch targets, and defers to the next pause while a native install runs.
+- **Prefetched groups** return their keys on the entry tick. **Scene end** (`retire_groups`) frees anything left.
+- **Exchanges:** an exchange clears the record's `leaving` flag; the record then holds another window.
+- **Counting:** a parked group counts only the members its cycle keeps (`body_bank::kept_members`), in the planner's
+  targets and in the notice (`xps18`: the kept Samus read "swap P1 to load", and a whole-group count would show the
+  departed Fox as planned).
+- **Members held for the pause:** the planner runs a second, value-only plan without the parked groups (their bodies
+  added back to the pool). Members it places that no group holds now are counted as held for memory, so the notice
+  reads "(N waiting for memory)" (`body_bank::waiting_for_pause`, `WAITING_PAUSE`). The pass after the pause plans them
+  and the background build loads them (`xps18`: the CPU's Marth was planned nowhere and never named).
+
+- **Not built:** the destroy runs whole as the pause opens: 3 bodies took 304 ms before the pause screen took input
+  (`xps19`). Splitting it one body per paused frame needs a per-frame game-thread hook in the pause, which this code
+  does not have yet.
+
+**Mii-window notice count.** While a Mii group is the live window, the window the planner wants for the next lane kind
+is the one the exchange left in a detached record. It was counted twice, once as window targets and once with the
+groups, so the notice read "Loaded 7/8 · swap the CPU to load 1 more" with every member built (`xps16`, `xps17`,
+`xps19`). A window target a group holds now counts only with the groups (`body_bank::window_targets`).
+
+**Pad controller.** Destroying a detached group's contexts cleared the live fighter's pad-slot controller `S[slot]`
+(`S = *(*(main+0x52b6fd8))`). Native reads that word with no null test (`0x631984`): 16 unmapped reads in `xps16`.
+`restore_live_pads` writes the live window's selected controller back to a slot that held it and is 0 after a release
+or a background build (`xps17`: `live restored`, Unmapped 0).
+
+**Mii background build fixes:**
+- **The Mii adapters adopt the record change.** The setup publishes the group's selector-record pair, which both
+  adapters snapshot, so they refused every later switch (`xps14`). A Mii group now builds only while both are idle, and
+  both then adopt the change into every stored snapshot by record index (`adopt_background_record`,
+  `Snapshot::adopt_record`).
+- **Readers:** `0x6e6bc0`'s owner reader (paths and costume) takes the shadow on the worker, and the hat reader's path
+  build takes it too (`x21`).
+- **An identity moves only into or out of a Mii window** (`body_bank::identity_move`, host test). A stale saved move
+  between ordinary windows made the Player adapter settle unowned (`xps15`).
+- **The window's lane configuration moves with its identity** (`Bank::configuration`). After an exit through the
+  baseline, `reachable_mii_group` stopped matching (`xps16`).
+- **Each window keeps `D+0x3a0..+0x3ac`** (`Window::info_3a0`); a Mii body init writes `0x69` at `+0x3a8`.
+
+**Diagnostics:** the `slow step` lines (any bank step ≥ 4 ms), `leave_group`'s step durations, the background
+allocation's `alloc_us`, and pad-controller changes.
+
+**Tests, each failed first:**
+- model: `a_built_group_that_left_the_cycle_is_freed_under_the_pause`, `an_identity_moves_only_into_or_out_of_a_mii_window`,
+  `a_parked_group_counts_only_the_members_its_cycle_keeps`,
+  `a_new_member_waits_for_the_pause_when_parked_groups_hold_the_budget`, `a_window_target_a_group_holds_is_counted_once`;
+- `tests/cycle_change_wiring.rs`: `a_parked_group_is_freed_when_the_pause_opens`,
+  `a_release_puts_the_live_pad_controller_back`, `new_members_wait_for_the_pause_and_parked_groups_count_their_kept_members`,
+  `the_window_targets_skip_what_a_group_holds`, and two updated;
+- `tests/background_mii_wiring.rs`: `both_adapters_adopt_the_record_change_of_a_background_setup`,
+  `every_window_keeps_its_own_info_3a0_words`, and the worker test updated;
+- `tests/mii_exit_wiring.rs`: `the_configuration_moves_with_its_identity`, and the exchange test updated;
+- `tests/background_build_wiring.rs` follows the named entry steps; `tests/group_hold_wiring.rs` follows the parked rule.
+
+Recorded manifest edits of the nine carried files; `carry_pkg6.py carry/ledger/verify` re-derives all 250 files.

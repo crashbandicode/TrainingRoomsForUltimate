@@ -104,7 +104,8 @@ fn the_holder_step_follows_the_bodies_and_its_records_go_into_the_group_window()
         "refuse_background(role, group, owner, \"native rows off\");",
         "let mut made = save_window(entry as usize);", "made.records = [0; 3];",
         "restore_window(entry as usize, &live);",
-        "holder_due: false, records: [0; 3], trainer: 0 });"]);
+        // The Mii branch's `pads` field follows in the same initialiser (integration merge 2026-11-09).
+        "holder_due: false, records: [0; 3], trainer: 0"]);
     let settle = body(BANK, "unsafe fn settle_background(");
     ordered(settle, &["if b.trainer != 0 {", "let pending = fields::read::<i32>(b.trainer, task::PENDING).unwrap_or(i32::MAX);",
         "if !task::settled(&pending[..b.queued]) {", "bank.background.take().unwrap()",

@@ -125,6 +125,31 @@ pub(super) unsafe fn visible_exact(current:*const u8,kind:u32)->Result<native::V
 }
 fn note(reason:impl std::fmt::Display) { trace!("[MiiOrdinaryPlayer] {reason}"); }
 
+/// rc.6 item 3 (Mii groups built in the background): no transaction holds this adapter, so a background Mii setup's
+/// record change (`adopt_background_record`) is the only change between its snapshots and native.
+#[cfg(feature="native-body-bank-alpha")]
+pub(super) fn background_idle()->bool {
+    let s=STATE.lock();
+    !s.busy() && s.generic.is_none()
+}
+
+/// rc.6 item 3: the bank's background Mii setup changed selector record `index` from `before` to `after` (the pair
+/// `0x3759500` publishes) while this adapter was idle. Every stored snapshot takes it (`Snapshot::adopt_record`), as a
+/// switch-time build's settle adopts the owner's new snapshot. Returns how many record copies changed.
+#[cfg(feature="native-body-bank-alpha")]
+pub(super) fn adopt_background_record(index:u16,before:&[u8;crate::engine::mii::native_values::RECORD_LEN],
+    after:&[u8;crate::engine::mii::native_values::RECORD_LEN])->usize {
+    let mut s=STATE.lock();
+    let mut changed=0;
+    if let Some(o)=s.owner.as_mut() {
+        changed+=o.origin.adopt_record(index,before,after)+o.expected.adopt_record(index,before,after);
+    }
+    if let Some(x)=s.mii_exit.as_mut() {
+        changed+=x.adopted.adopt_record(index,before,after)+x.mii.before.adopt_record(index,before,after);
+    }
+    changed
+}
+
 pub(super) fn preload_pending()->bool {
     let s=STATE.lock(); s.capture || s.request.is_some() || s.busy()
 }

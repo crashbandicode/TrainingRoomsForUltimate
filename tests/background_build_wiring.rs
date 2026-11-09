@@ -113,7 +113,7 @@ fn the_settlement_keeps_the_bodies_in_the_group_and_every_destroyer_drains_first
         "finish_background(entry, owner, role, background, reason, waited);"]);
     let retire = body(BANK, "unsafe fn retire_groups(");
     ordered(retire, &["drain_construction(entry, owner, role, reason);", "drain_background(entry, owner, role, reason);",
-        "let (mut bundles, identities, token, alias, groups) = {"]);
+        "let (mut bundles, identities, token, alias, groups, mii_sets) = {"]);
 }
 
 /// The window's ticks settle a build in flight; one owed starts from the group lifecycle after every planned prefetch.
@@ -123,7 +123,8 @@ fn the_lifecycle_starts_and_settles_it_and_the_gate_needs_both_paths() {
     let service = body(BANK, "unsafe fn service_locked(");
     ordered(service, &["else if bank.background.is_some() { Action::Background }",
         "|| background_candidate(bank, Some(members.kinds()[usize::from(index)])).is_some() {"]);
-    assert!(BANK.contains("Action::Background => settle_background(entry, owner, role),"));
+    // Inbox 22:17Z: each entry step names itself for its `slow step` line.
+    assert!(BANK.contains("Action::Background => { settle_background(entry, owner, role); \"background settle\" }"));
     let lifecycle = body(BANK, "unsafe fn group_lifecycle(");
     ordered(lifecycle, &["(Some(group), _) if bank.groups[group].state == GroupState::Planned =>",
         "(_, Some(group)) => Step::Background(group),", "Step::Background(group) => start_background(entry, owner, role, group),"]);
