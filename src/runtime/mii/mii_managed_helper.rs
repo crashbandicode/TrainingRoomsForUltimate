@@ -547,9 +547,7 @@ pub(super) unsafe fn reproof_parked(
         && now.binding == mii.binding
         && now.owners[source.slot()] == Some(proof.owner)
         && now.scalars == Scalars::saved(c)
-        && now.record[..88] == *c.charinfo()
-        && now.record[88..96] != [0; 8]
-        && now.record[96..104] != [0; 8];
+        && crate::model::parked_entries::mii_record_identity(&now.record, c.charinfo());
     let changed = (now.descriptor != mii.descriptor, now.record != mii.record);
     match crate::model::parked_entries::reproof(parked, identity, changed == (false, false)) {
         Reproof::Wait => Ok(None),

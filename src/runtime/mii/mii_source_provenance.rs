@@ -41,9 +41,17 @@ impl MiiProof {
     pub fn matches(self,binding:crate::engine::mii::lifetime::Binding,
         descriptor:&[u8;0x70],record:&[u8;crate::engine::mii::native_values::RECORD_LEN],
         mirrors:crate::engine::mii::native_values::Mirrors)->bool {
-        self.binding==binding && self.descriptor==*descriptor && self.record==*record
-            && record[..88]==*self.configuration.charinfo()
-            && record[88..96]!=[0;8] && record[96..104]!=[0;8]
+        self.holds(binding,descriptor,record,mirrors,false)
+    }
+    /// TASK-OPUS-rc6-open-fixes item 1 (primary 2026-11-09 00:09Z, 00:23Z): a live F9 seat (slot <= No. of CPUs) is the
+    /// same Mii by reading B's identity predicate in place of byte equality of both the descriptor and the record: going
+    /// live rewrites them (every re-proof logged `descriptor_changed=true`). Binding and mirrors' tokens stay exact.
+    pub fn holds(self,binding:crate::engine::mii::lifetime::Binding,
+        descriptor:&[u8;0x70],record:&[u8;crate::engine::mii::native_values::RECORD_LEN],
+        mirrors:crate::engine::mii::native_values::Mirrors,live:bool)->bool {
+        self.binding==binding
+            && (live || (self.descriptor==*descriptor && self.record==*record))
+            && crate::model::parked_entries::mii_record_identity(record,self.configuration.charinfo())
             && mirrors.validate(binding.record_index,self.configuration.tokens()).is_ok()
     }
 }
@@ -434,6 +442,57 @@ mod mii_tests {
     use crate::engine::swap::source_lifetime::{SourceBook,NativeEntry,Holder};
     use crate::engine::mii::{inventory::{build_snapshot,RawSlot,MiiClass,TaggedId},
         lifetime::{Binding,Configuration},native_values::Mirrors};
+    /// TASK-OPUS-rc6-open-fixes item 1 (primary 2026-11-09 00:09Z, 00:23Z): a live F9 seat (slot <= No. of CPUs) keeps
+    /// its Mii by reading B's identity, not by bytes. Every re-proof in the rc.6 Eden evidence logged
+    /// `descriptor_changed=true record_changed=false`: going live rewrites the seat's descriptor. The `Proof`, the
+    /// binding and the mirrors' tokens stay exact, and the record must still carry the configuration's charinfo and a
+    /// resource pair, the predicate `mii_managed_helper::reproof_parked` checks before it re-records both.
+    #[test]
+    fn a_live_seat_keeps_its_mii_by_identity_not_bytes() {
+        let raw=RawSlot {index:0,slot_id:4155,name_len:1,name_units:[65,0,0,0,0,0,0,0,0,0],
+            colour:4,voice:37,specials:[0;4],tag_outfit:TaggedId(0x1300291bfef7a5f7),
+            tag_hat:TaggedId(0x5a00000fa9efa5ea),
+            tag_chara:TaggedId(0xc100000000000000|MiiClass::Gunner.chara_hash40()),charinfo:[0;88]};
+        let catalog=build_snapshot(vec![raw]);let c=Configuration::from_saved(&catalog.configs[0]).unwrap();
+        let mut draft=crate::engine::mii::draft::Draft::from_template(&catalog.configs[0]).unwrap();
+        draft.set_specials([1,0,0,0]).unwrap();let alt=draft.configuration().unwrap();
+        let b=Binding {epoch:2,owner:2,entry:0x1200,row:0x2200,holder:0x5000,manager:0x6000,
+            vector_begin:0x7000,vector_end:0x7000+4*104,record_index:2};
+        let mut record=[0u8;104];record[..88].copy_from_slice(c.charinfo());
+        record[88..96].copy_from_slice(&0x8000u64.to_le_bytes());record[96..].copy_from_slice(&0x9000u64.to_le_bytes());
+        let descriptor=crate::engine::mii::ordinary_cpu::staged_descriptor_for(2,[0;0x70],Some(c)).unwrap();
+        let t=c.tokens();
+        let mirrors=Mirrors {index:2,tokens:t,fe:[2,t.outfit,t.hat,t.colour,t.voice],
+            d:[2,t.outfit,t.hat,t.colour],d_specials:t.specials.map(u32::from),owner_index:2,
+            owner:[t.outfit,t.hat,t.colour,t.voice].map(u32::from)};
+        let mii=MiiProof {binding:b,configuration:c,record,descriptor};
+        let mut active=descriptor;active[0x10]^=1;active[0x34]^=1;active[0x5f]^=0x80;
+        let mut pair=record;pair[96]^=1;
+        // Parked (not live): byte equality of both, exactly as `matches`.
+        assert!(mii.holds(b,&descriptor,&record,mirrors,false));
+        assert_eq!(mii.holds(b,&active,&record,mirrors,false),mii.matches(b,&active,&record,mirrors));
+        assert!(!mii.holds(b,&active,&record,mirrors,false),"a parked row's descriptor is exact");
+        assert!(!mii.holds(b,&descriptor,&pair,mirrors,false),"a parked row's record is exact");
+        // Live: the activation's bytes may change, the Mii may not.
+        assert!(mii.holds(b,&active,&record,mirrors,true),"the activation rewrote the descriptor");
+        assert!(mii.holds(b,&active,&pair,mirrors,true),"a present resource pair, rewritten");
+        let mut other=record;other[0x10]^=1;
+        assert!(!mii.holds(b,&active,&other,mirrors,true),"another charinfo is another Mii");
+        for half in [88..96,96..104] {
+            let mut absent=record;absent[half].fill(0);
+            assert!(!mii.holds(b,&active,&absent,mirrors,true),"no resource pair");
+        }
+        assert!(!mii.holds(Binding {vector_end:b.vector_end+104,..b},&active,&record,mirrors,true),"another binding");
+        assert!(!mii.holds(b,&active,&record,Mirrors {index:3,..mirrors},true),"the mirrors");
+        assert!(!MiiProof {configuration:alt,..mii}.holds(b,&active,&record,mirrors,true),"the tokens");
+        // The record identity is the one reading B's re-proof checks, and the owners' snapshot asks it.
+        assert!(crate::model::parked_entries::mii_record_identity(&record,c.charinfo()));
+        assert!(!crate::model::parked_entries::mii_record_identity(&other,c.charinfo()));
+        assert!(include_str!("mii_managed_helper.rs")
+            .contains("crate::model::parked_entries::mii_record_identity(&now.record, c.charinfo())"),"reproof_parked");
+        assert!(include_str!("mii_ordinary_native.rs").contains("mii.holds(b,&descriptor,&record,mirrors(owner),live)"),
+            "the owners' snapshot");
+    }
     #[test]
     fn ordinary_helper_mii_exact_payload_resources_and_generation_are_independent_of_class() {
         let raw=RawSlot {index:0,slot_id:4155,name_len:1,name_units:[65,0,0,0,0,0,0,0,0,0],

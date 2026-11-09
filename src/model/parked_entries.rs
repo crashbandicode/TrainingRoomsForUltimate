@@ -317,6 +317,18 @@ pub fn reproof(parked: bool, identity_same: bool, state_same: bool) -> Reproof {
     }
 }
 
+/// The Mii record part of reading B's identity: the record still carries the configuration's charinfo (`0x00..0x58`)
+/// and a resource pair (`0x58..0x68`, both halves present). The re-proof of a parked seat
+/// (`mii_managed_helper::reproof_parked`) and a live seat's snapshot (`MiiProof::holds`, TASK-OPUS-rc6-open-fixes item
+/// 1, primary 2026-11-09 00:23Z) check this one predicate in place of byte equality.
+pub fn mii_record_identity(record: &[u8], charinfo: &[u8]) -> bool {
+    record.len() >= 104
+        && charinfo.len() == 88
+        && record[..88] == *charinfo
+        && record[88..96] != [0u8; 8]
+        && record[96..104] != [0u8; 8]
+}
+
 /// Ordering (primary 2026-11-08 17:28Z, reading B; Eden covrest-12): an F9 seat load waits while a HUD portrait job
 /// wants a helper or holds one for its render, so the render is not pushed behind the seat's INSTALL into the role's
 /// next press. The seat loads once the render is done.

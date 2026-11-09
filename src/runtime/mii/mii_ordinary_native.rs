@@ -146,6 +146,13 @@ pub(crate) unsafe fn helper_kind(view:helpers::View,id:usize,owner:Owner,kind:u3
         note_refused_proof(view,id,ordinal,now,parked,"proof");
         return false;
     }
+    // Item 1 (primary 2026-11-09 00:09Z, 00:23Z): going live rewrites the seat's descriptor (every re-proof logged
+    // `descriptor_changed=true`), so a live seat keeps its Mii by reading B's identity in place of byte equality of the
+    // descriptor and the record (`MiiProof::holds`). The binding checks below and the mirrors' tokens stay exact.
+    #[cfg(any(test, feature = "mii-managed-source-coexist-alpha"))]
+    let live=owner_live && !parked;
+    #[cfg(not(any(test, feature = "mii-managed-source-coexist-alpha")))]
+    let live=false;
     if let Some(Some(mii))=view.miis.get(ordinal) {
         let b=mii.binding;
         if b.epoch != super::super::mii_saved_alpha::current_generation(1)
@@ -160,12 +167,66 @@ pub(crate) unsafe fn helper_kind(view:helpers::View,id:usize,owner:Owner,kind:u3
             note_refused_proof(view,id,ordinal,now,parked,"mii record address");
             return false;
         };
-        if !span(at,values::RECORD_LEN,false) || !mii.matches(b,&rd(owner.entry,0),&rd(at,0),mirrors(owner)) {
+        if !span(at,values::RECORD_LEN,false) {
+            note_refused_proof(view,id,ordinal,now,parked,"mii record");
+            return false;
+        }
+        let (descriptor,record):([u8;0x70],[u8;values::RECORD_LEN])=(rd(owner.entry,0),rd(at,0));
+        if live {note_live_bytes(id,*mii,&descriptor,&record);}
+        if !mii.holds(b,&descriptor,&record,mirrors(owner),live) {
             note_refused_proof(view,id,ordinal,now,parked,"mii record");
             return false;
         }
     }
     true
+}
+
+/// Diag builds (primary 2026-11-09 00:23Z): the descriptor and record offsets of a live seat that differ from its
+/// recorded Mii proof, and whether reading B's identity still holds, for the first live snapshots of a boot.
+#[cfg(feature = "diag")]
+static LIVE_BYTE_NOTES: core::sync::atomic::AtomicU8 = core::sync::atomic::AtomicU8::new(0);
+fn note_live_bytes(id:usize,mii:helpers::MiiProof,descriptor:&[u8;0x70],record:&[u8;values::RECORD_LEN]) {
+    #[cfg(not(feature = "diag"))]
+    let _ = (id, mii, descriptor, record);
+    #[cfg(feature = "diag")]
+    {
+        if mii.descriptor==*descriptor && mii.record==*record {return;}
+        if LIVE_BYTE_NOTES.fetch_add(1,core::sync::atomic::Ordering::Relaxed)>=12 {return;}
+        crate::engine::compat::logging::diagnostic(format_args!(
+            "[MiiHelperProof] live id={} descriptor_offsets={:?} record_offsets={:?} identity={}",
+            id,ByteRanges::of(&mii.descriptor,descriptor),ByteRanges::of(&mii.record,record),
+            crate::model::parked_entries::mii_record_identity(record,mii.configuration.charinfo())));
+    }
+}
+/// Up to eight differing byte ranges of two equal-length arrays, printed without allocating.
+#[cfg(feature = "diag")]
+struct ByteRanges {spans:[(usize,usize);8],len:usize,more:usize}
+#[cfg(feature = "diag")]
+impl ByteRanges {
+    fn of(a:&[u8],b:&[u8])->Self {
+        let mut r=ByteRanges {spans:[(0,0);8],len:0,more:0};
+        let n=a.len().min(b.len());
+        let mut i=0;
+        while i<n {
+            if a[i]==b[i] {i+=1;continue;}
+            let start=i;
+            while i<n && a[i]!=b[i] {i+=1;}
+            if r.len<r.spans.len() {r.spans[r.len]=(start,i);r.len+=1;} else {r.more+=1;}
+        }
+        r
+    }
+}
+#[cfg(feature = "diag")]
+impl core::fmt::Debug for ByteRanges {
+    fn fmt(&self,f:&mut core::fmt::Formatter<'_>)->core::fmt::Result {
+        f.write_str("[")?;
+        for (n,(start,end)) in self.spans[..self.len].iter().enumerate() {
+            if n>0 {f.write_str(",")?;}
+            write!(f,"{start:#x}..{end:#x}")?;
+        }
+        if self.more>0 {write!(f,",+{}",self.more)?;}
+        f.write_str("]")
+    }
 }
 
 /// Diag builds: the recorded helper proof beside the row read now, for the first refusals of a boot (primary
