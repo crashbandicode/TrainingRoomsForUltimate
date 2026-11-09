@@ -816,31 +816,33 @@ pub fn async_build_eligible(members: Members, identity: bool) -> Result<(), &'st
 ///   construction tail's pair test is redirected for background bodies (`pair_tail`, `0x60de68`), so their tails take
 ///   the per-kind release instead of the pair rule; otherwise it defers the build ("pair window").
 ///
-/// **Interim** (primary 2026-11-09 00:52Z; the merge of `p23/rc6-bg-pt` and `p23/rc6-bg-ic`): each pairing is allowed
-/// only where an Eden run proved it. Two are not yet: a native group beside a live pair window, and the pair group
-/// beside a live native window (X4 with a window of the other actor count). Worker A's X4 root fix (the info wrapper
-/// takes the building group's actor count) and its Eden rows for both cells lift these two refusals.
+/// The two cross cells (primary 2026-11-09 00:52Z: "All groups in rc.6", so both must work; SPECIAL-GROUPS §0):
+/// - a native group beside a live pair window needs only the redirected tail above (X1). X4 never applies to its kinds
+///   (construct `0x60d1f0`: only a Popo or Nana body chooses an info wrapper), and X5 reads the group's own cell 1
+///   (`background_partner`).
+/// - the pair group beside a live native window needs the X4 hook (`info_x4`, `native_body_bank::background_info`): the
+///   wrapper a background Popo or Nana body takes comes from its building group's words (`info_wrapper`), so Nana gets
+///   her own `+0x100` as in her synchronous build; without it the build waits for another window.
 ///
 /// Every other group keeps today's build at its first switch.
 pub fn background_build_eligible(members: Members, identity: bool, window: Members, window_identity: bool, live_kirby: bool,
-    pair_tail: bool) -> Result<(), &'static str> {
+    pair_tail: bool, info_x4: bool) -> Result<(), &'static str> {
     let native = |m: Members| matches!(m.special(), Special::Native(_));
     if members.special() == Special::Mii { return Err("mii group"); }
     if members.special() != Special::Pair && (identity || !native(members)) { async_build_eligible(members, identity)?; }
     if window_identity { return Err("mii window"); }
     if live_kirby { return Err("live kirby"); }
     if window.is_pair() && !pair_tail { return Err("pair window"); }
-    if window.is_pair() && native(members) { return Err("native group beside a pair window (interim)"); }
-    if native(window) && members.special() == Special::Pair { return Err("pair group beside a native window (interim)"); }
+    if native(window) && members.special() == Special::Pair && !info_x4 { return Err("pair group beside a native window without X4"); }
     Ok(())
 }
 
 /// The group a background build starts next: the first Prefetched group in plan order that is eligible
 /// (`background_build_eligible`) beside the live `window`, from `(state, members, identity)`.
 pub fn next_background(groups: impl Iterator<Item = (GroupState, Members, bool)>, window: Members, window_identity: bool,
-    live_kirby: bool, pair_tail: bool) -> Option<usize> {
+    live_kirby: bool, pair_tail: bool, info_x4: bool) -> Option<usize> {
     groups.enumerate().find(|(_, (state, members, identity))| *state == GroupState::Prefetched
-        && background_build_eligible(*members, *identity, window, window_identity, live_kirby, pair_tail).is_ok())
+        && background_build_eligible(*members, *identity, window, window_identity, live_kirby, pair_tail, info_x4).is_ok())
         .map(|(i, _)| i)
 }
 
@@ -1297,6 +1299,16 @@ pub fn role_counts(planned_targets: u8, extra: u8, window: WindowStatus, groups:
     counts
 }
 
+/// SPECIAL-GROUPS §0 X4 (construct `0x60d1ec-0x60d26c`): the entry info wrapper (`entry+0xf0`, or Nana's own
+/// `entry+0x100`) whose `info+0x94` gate a body's construction reads, from the entry words `count` (`+0x14`) and cells
+/// 0/1 (`+0x18`, `+0x1c`). Only a Popo or Nana body chooses: with two cells, the cell-1 kind gets `+0x100`; every other
+/// case is `+0xf0`. Native reads the live entry's words; a background body is given its building group's
+/// (`native_body_bank::background_info`), as its synchronous build would read them.
+pub fn info_wrapper(kind: u32, count: u32, cells: [u32; 2]) -> usize {
+    let [cell0, cell1] = cells;
+    if matches!(kind, POPO | NANA) && count >= 2 && cell1 != u32::MAX && cell0 != kind && cell1 == kind { 0x100 } else { 0xf0 }
+}
+
 /// The window part of a role's planned targets (`plan_budget`): `next`, the reusable extras of the window the lane's
 /// next kind would get, except for a live pair-lead window (`live`: its members and active kind) with groups on. That
 /// window stays while the role's groups build around it (rc.6 item 3, a session that starts on Ice Climbers), so it
@@ -1665,30 +1677,30 @@ mod tests {
     fn a_background_build_takes_an_ordinary_prefetched_group_beside_an_ordinary_window() {
         let ordinary = Members::new(&[0x2d, 0x2c, 0x1c]).unwrap();
         let window = Members::new(&[0x00, 0x01, 0x02]).unwrap();
-        assert_eq!(background_build_eligible(ordinary, false, window, false, false, false), Ok(()));
-        assert_eq!(background_build_eligible(Members::new(&[0x1c]).unwrap(), false, window, false, false, false), Ok(()));
-        assert_eq!(background_build_eligible(Members::mii_group(0x4a).unwrap(), true, window, false, false, false), Err("mii group"));
-        assert_eq!(background_build_eligible(ordinary, true, window, false, false, false), Err("identity"));
+        assert_eq!(background_build_eligible(ordinary, false, window, false, false, false, false), Ok(()));
+        assert_eq!(background_build_eligible(Members::new(&[0x1c]).unwrap(), false, window, false, false, false, false), Ok(()));
+        assert_eq!(background_build_eligible(Members::mii_group(0x4a).unwrap(), true, window, false, false, false, false), Err("mii group"));
+        assert_eq!(background_build_eligible(ordinary, true, window, false, false, false, false), Err("identity"));
         // SPECIAL-GROUPS §2: the pair group builds in the background (`a_background_build_takes_the_pair_group_…`).
-        assert_eq!(background_build_eligible(Members::pair_group(), false, window, false, false, false), Ok(()));
-        assert_eq!(background_build_eligible(ordinary, false, window, true, false, false), Err("mii window"));
-        assert_eq!(background_build_eligible(ordinary, false, window, false, true, false), Err("live kirby"));
+        assert_eq!(background_build_eligible(Members::pair_group(), false, window, false, false, false, false), Ok(()));
+        assert_eq!(background_build_eligible(ordinary, false, window, true, false, false, false), Err("mii window"));
+        assert_eq!(background_build_eligible(ordinary, false, window, false, true, false, false), Err("live kirby"));
         // SPECIAL-GROUPS §0 X1: a body's construction tail reads the live cells 0/1; `[Popo, Nana]` takes the pair rule
         // (and may reset the whole R) unless the tail is redirected (`pair_tail`); without it the build waits.
         for pair in [Members::pair_group(), Members::pair_lead(0x02).unwrap()] {
-            assert_eq!(background_build_eligible(ordinary, false, pair, false, false, false), Err("pair window"));
+            assert_eq!(background_build_eligible(ordinary, false, pair, false, false, false, false), Err("pair window"));
         }
         // A one-actor native window (X4: every body `FE+0xf0` in re6) takes part (`p23/rc6-bg-pt`, Eden rc6-bg-pt3).
-        assert_eq!(background_build_eligible(ordinary, false, Members::native_group(0x24).unwrap(), false, false, false),
+        assert_eq!(background_build_eligible(ordinary, false, Members::native_group(0x24).unwrap(), false, false, false, false),
             Ok(()));
         let groups = [(GroupState::Built, ordinary, false), (GroupState::Prefetched, Members::mii_group(0x48).unwrap(), true),
             (GroupState::Planned, ordinary, false), (GroupState::Prefetched, Members::new(&[0x1c]).unwrap(), false),
             (GroupState::Prefetched, ordinary, false)];
-        assert_eq!(next_background(groups.iter().copied(), window, false, false, false), Some(3));
-        assert_eq!(next_background(groups.iter().copied(), window, true, false, false), None);
-        assert_eq!(next_background(groups.iter().copied(), window, false, true, false), None);
-        assert_eq!(next_background(groups.iter().copied(), Members::pair_group(), false, false, false), None);
-        assert_eq!(next_background(groups[..3].iter().copied(), window, false, false, false), None);
+        assert_eq!(next_background(groups.iter().copied(), window, false, false, false, false), Some(3));
+        assert_eq!(next_background(groups.iter().copied(), window, true, false, false, false), None);
+        assert_eq!(next_background(groups.iter().copied(), window, false, true, false, false), None);
+        assert_eq!(next_background(groups.iter().copied(), Members::pair_group(), false, false, false, false), None);
+        assert_eq!(next_background(groups[..3].iter().copied(), window, false, false, false, false), None);
         // The saved info spans cover what `0x654dc0` writes: the dispatcher words, the descriptor copies, `+0x3ac`.
         let covered = |at: usize| BACKGROUND_INFO_SPANS.iter().any(|(start, len)| (*start..start + len).contains(&at));
         for at in [0x08, 0x10, 0x18, 0x20, 0x28, 0x2c, 0x30, 0x34, 0x50, 0x51, 0x6b, 0x72, 0x78, 0x84, 0x92, 0x3a0, 0x3aa, 0x3ac] {
@@ -1708,28 +1720,28 @@ mod tests {
         let pt = Members::native_group(0x25).unwrap();
         let aegis = Members::native_group(0x5b).unwrap();
         for native in [pt, aegis] {
-            assert_eq!(background_build_eligible(native, false, window, false, false, false), Ok(()));
-            assert_eq!(background_build_eligible(ordinary, false, native, false, false, false), Ok(()));
-            assert_eq!(background_build_eligible(Members::new(&[0x1c]).unwrap(), false, native, false, false, false), Ok(()));
-            assert_eq!(background_build_eligible(native, false, window, true, false, false), Err("mii window"));
-            assert_eq!(background_build_eligible(native, false, window, false, true, false), Err("live kirby"));
-            assert_eq!(background_build_eligible(native, false, Members::pair_group(), false, false, false), Err("pair window"));
-            // Interim (primary 2026-11-09 00:52Z): not yet proved beside a live pair window, even with the redirect.
-            assert_eq!(background_build_eligible(native, false, Members::pair_group(), false, false, true),
-                Err("native group beside a pair window (interim)"));
-            assert_eq!(background_build_eligible(native, true, window, false, false, false), Err("native group"));
+            assert_eq!(background_build_eligible(native, false, window, false, false, false, false), Ok(()));
+            assert_eq!(background_build_eligible(ordinary, false, native, false, false, false, false), Ok(()));
+            assert_eq!(background_build_eligible(Members::new(&[0x1c]).unwrap(), false, native, false, false, false, false), Ok(()));
+            assert_eq!(background_build_eligible(native, false, window, true, false, false, false), Err("mii window"));
+            assert_eq!(background_build_eligible(native, false, window, false, true, false, false), Err("live kirby"));
+            assert_eq!(background_build_eligible(native, false, Members::pair_group(), false, false, false, false), Err("pair window"));
+            // Cross cell (a): beside a live pair window with the redirected tail (X1; X4 does not apply to its kinds).
+            assert_eq!(background_build_eligible(native, false, Members::pair_group(), false, false, true, false),
+                Ok(()));
+            assert_eq!(background_build_eligible(native, true, window, false, false, false, false), Err("native group"));
             // Its switch-time build stays `0x658af0`'s.
             assert_eq!(async_build_eligible(native, false), Err("native group"));
         }
-        assert_eq!(background_build_eligible(pt, false, aegis, false, false, false), Ok(()));
-        assert_eq!(background_build_eligible(aegis, false, pt, false, false, false), Ok(()));
-        assert_eq!(background_build_eligible(Members::mii_group(0x48).unwrap(), true, pt, false, false, false), Err("mii group"));
+        assert_eq!(background_build_eligible(pt, false, aegis, false, false, false, false), Ok(()));
+        assert_eq!(background_build_eligible(aegis, false, pt, false, false, false, false), Ok(()));
+        assert_eq!(background_build_eligible(Members::mii_group(0x48).unwrap(), true, pt, false, false, false, false), Err("mii group"));
         let groups = [(GroupState::Built, ordinary, false), (GroupState::Prefetched, pt, false),
             (GroupState::Prefetched, aegis, false)];
-        assert_eq!(next_background(groups.iter().copied(), window, false, false, false), Some(1));
-        assert_eq!(next_background(groups[2..].iter().copied(), pt, false, false, false), Some(0));
-        assert_eq!(next_background([(GroupState::Prefetched, ordinary, false)].into_iter(), pt, false, false, false), Some(0));
-        assert_eq!(next_background(groups.iter().copied(), Members::pair_group(), false, false, false), None);
+        assert_eq!(next_background(groups.iter().copied(), window, false, false, false, false), Some(1));
+        assert_eq!(next_background(groups[2..].iter().copied(), pt, false, false, false, false), Some(0));
+        assert_eq!(next_background([(GroupState::Prefetched, ordinary, false)].into_iter(), pt, false, false, false, false), Some(0));
+        assert_eq!(next_background(groups.iter().copied(), Members::pair_group(), false, false, false, false), None);
         // Native loader state 11's step: PT's pool task on the worker, Aegis's pool on the game thread.
         assert_eq!((pt.holder_step(), aegis.holder_step()), (Some(HolderStep::Trainer), Some(HolderStep::Partner)));
         for other in [ordinary, Members::pair_group(), Members::mii_group(0x4a).unwrap()] {
@@ -1750,36 +1762,38 @@ mod tests {
     /// (its tails then take the per-kind release `0x17e8610` on the live cells, which returns exactly its own keys). A
     /// live `[Popo, Nana]` window (a session that starts on Ice Climbers, or the pair group attached) no longer defers
     /// every other group, once the construction tail's pair test is redirected for background bodies (`pair_tail`, X1).
-    /// Beside a live native window an ordinary group builds (`p23/rc6-bg-pt`); the pair group waits there (interim,
-    /// primary 2026-11-09 00:52Z: X4 with a one-actor window is not yet proved for Nana).
+    /// Beside a live native window an ordinary group builds (`p23/rc6-bg-pt`), and the pair group does with the X4 hook
+    /// (`info_x4`; cross cell (b), `the_cross_cells_build_beside_each_other`).
     #[test]
     fn a_background_build_takes_the_pair_group_and_builds_beside_a_live_pair_window() {
         let ordinary = Members::new(&[0x2d, 0x2c, 0x1c]).unwrap();
         let window = Members::new(&[0x00, 0x01, 0x02]).unwrap();
         for pair_tail in [false, true] {
-            assert_eq!(background_build_eligible(Members::pair_group(), false, window, false, false, pair_tail), Ok(()));
-            assert_eq!(background_build_eligible(Members::pair_group(), false, window, true, false, pair_tail), Err("mii window"));
-            assert_eq!(background_build_eligible(Members::pair_group(), false, window, false, true, pair_tail), Err("live kirby"));
-            assert_eq!(background_build_eligible(ordinary, false, Members::native_group(0x24).unwrap(), false, false, pair_tail),
+            assert_eq!(background_build_eligible(Members::pair_group(), false, window, false, false, pair_tail, false), Ok(()));
+            assert_eq!(background_build_eligible(Members::pair_group(), false, window, true, false, pair_tail, false), Err("mii window"));
+            assert_eq!(background_build_eligible(Members::pair_group(), false, window, false, true, pair_tail, false), Err("live kirby"));
+            assert_eq!(background_build_eligible(ordinary, false, Members::native_group(0x24).unwrap(), false, false, pair_tail, false),
                 Ok(()));
             assert_eq!(background_build_eligible(Members::pair_group(), false, Members::native_group(0x24).unwrap(), false, false,
-                pair_tail), Err("pair group beside a native window (interim)"));
+                pair_tail, false), Err("pair group beside a native window without X4"));
+            assert_eq!(background_build_eligible(Members::pair_group(), false, Members::native_group(0x24).unwrap(), false, false,
+                pair_tail, true), Ok(()));
         }
         for live_pair in [Members::pair_group(), Members::pair_lead(0x02).unwrap()] {
             assert!(live_pair.is_pair());
-            assert_eq!(background_build_eligible(ordinary, false, live_pair, false, false, true), Ok(()));
-            assert_eq!(background_build_eligible(Members::new(&[0x1c]).unwrap(), false, live_pair, false, false, true), Ok(()));
-            assert_eq!(background_build_eligible(ordinary, false, live_pair, false, false, false), Err("pair window"));
+            assert_eq!(background_build_eligible(ordinary, false, live_pair, false, false, true, false), Ok(()));
+            assert_eq!(background_build_eligible(Members::new(&[0x1c]).unwrap(), false, live_pair, false, false, true, false), Ok(()));
+            assert_eq!(background_build_eligible(ordinary, false, live_pair, false, false, false, false), Err("pair window"));
         }
         // The switch-time build of the pair group stays synchronous (`mode=sync reason=pair group`).
         assert_eq!(async_build_eligible(Members::pair_group(), false), Err("pair group"));
         // A session that starts on Ice Climbers: its other groups get built.
         let groups = [(GroupState::Prefetched, ordinary, false), (GroupState::Prefetched, Members::new(&[0x1c]).unwrap(), false)];
-        assert_eq!(next_background(groups.iter().copied(), Members::pair_lead(0x02).unwrap(), false, false, true), Some(0));
-        assert_eq!(next_background(groups.iter().copied(), Members::pair_lead(0x02).unwrap(), false, false, false), None);
+        assert_eq!(next_background(groups.iter().copied(), Members::pair_lead(0x02).unwrap(), false, false, true, false), Some(0));
+        assert_eq!(next_background(groups.iter().copied(), Members::pair_lead(0x02).unwrap(), false, false, false, false), None);
         // The pair group as the next build beside an ordinary window.
         let with_pair = [(GroupState::Built, ordinary, false), (GroupState::Prefetched, Members::pair_group(), false)];
-        assert_eq!(next_background(with_pair.iter().copied(), window, false, false, false), Some(1));
+        assert_eq!(next_background(with_pair.iter().copied(), window, false, false, false, false), Some(1));
     }
 
     /// Phase B′: an ordinary group without a Mii identity and a Mii group (operator decision
@@ -3477,6 +3491,56 @@ mod tests {
                 }
             }
             assert!(bodies <= ready.saturating_sub(6), "{ready}: {:?}", plan);
+        }
+    }
+
+    /// The two cross cells (primary 2026-11-09 00:52Z: "All groups in rc.6", so both must work; SPECIAL-GROUPS §0):
+    /// - (a) a native group beside a live pair window needs only the redirected construction tail (X1, `pair_tail`).
+    ///   X4 never applies to its kinds (only a Popo or Nana body chooses a wrapper), and X5 reads the group's own cell 1
+    ///   (`background_partner`).
+    /// - (b) the pair group beside a live native window needs the info wrapper hook (X4, `info_x4`), so its Nana gets
+    ///   her own `+0x100` as in her synchronous build.
+    #[test]
+    fn the_cross_cells_build_beside_each_other() {
+        let pt = Members::native_group(0x25).unwrap();
+        let aegis = Members::native_group(0x5b).unwrap();
+        for native in [pt, aegis] {
+            for pair in [Members::pair_group(), Members::pair_lead(0x02).unwrap()] {
+                assert_eq!(background_build_eligible(native, false, pair, false, false, true, false), Ok(()), "(a)");
+                assert_eq!(background_build_eligible(native, false, pair, false, false, false, true), Err("pair window"));
+            }
+            assert_eq!(background_build_eligible(Members::pair_group(), false, native, false, false, false, true), Ok(()), "(b)");
+            assert_eq!(background_build_eligible(Members::pair_group(), false, native, false, false, true, false),
+                Err("pair group beside a native window without X4"));
+        }
+        assert_eq!(next_background([(GroupState::Prefetched, pt, false)].into_iter(), Members::pair_lead(0x02).unwrap(),
+            false, false, true, false), Some(0));
+        let pair = [(GroupState::Prefetched, Members::pair_group(), false)];
+        assert_eq!(next_background(pair.iter().copied(), aegis, false, false, false, true), Some(0));
+        assert_eq!(next_background(pair.iter().copied(), aegis, false, false, true, false), None);
+    }
+
+    /// SPECIAL-GROUPS §0 X4 (primary 2026-11-09 00:52Z, the cross cells), from the disassembly
+    /// `rc6-item3-re/special/asm/6079d0-60df60.s` `0x60d1ec-0x60d26c`. The construction picks the entry info wrapper whose
+    /// `info+0x94` gate it reads. Only a Popo or Nana body looks at the entry's words: with two cells (count ≥ 2, cell 1
+    /// not −1) cell 0 == kind gives `+0xf0`, cell 1 == kind gives `+0x100` (Nana's own), anything else `+0xf0`. Every
+    /// other kind gives `+0xf0`. Native reads the live entry; a background body is given its building group's words, so
+    /// Nana of a pair group built beside a one-actor window (an ordinary or native window) gets her own wrapper, as in her
+    /// synchronous build (Eden re6: only the pair's Nana used `+0x100`).
+    #[test]
+    fn the_info_wrapper_follows_the_words_it_is_given() {
+        let pair = [POPO, NANA];
+        assert_eq!((info_wrapper(POPO, 2, pair), info_wrapper(NANA, 2, pair)), (0xf0, 0x100), "the pair group");
+        assert_eq!((info_wrapper(POPO, 3, pair), info_wrapper(NANA, 3, pair)), (0xf0, 0x100), "a pair-lead window");
+        for (count, cells) in [(3, [MARIO, DK]), (3, [0x24, 0x25]), (2, [0x5a, 0x5b]), (1, [MARIO, u32::MAX])] {
+            assert_eq!((info_wrapper(POPO, count, cells), info_wrapper(NANA, count, cells)), (0xf0, 0xf0),
+                "a live one-actor window {cells:x?}: Nana is in neither cell");
+        }
+        assert_eq!(info_wrapper(NANA, 1, pair), 0xf0, "one cell");
+        assert_eq!(info_wrapper(NANA, 2, [POPO, u32::MAX]), 0xf0, "cell 1 empty");
+        assert_eq!(info_wrapper(POPO, 1, [POPO, u32::MAX]), 0xf0, "Solo Popo");
+        for kind in [MARIO, 0x24, 0x25, 0x5b, 0x48] {
+            assert_eq!(info_wrapper(kind, 2, [POPO, kind]), 0xf0, "{kind:#x}: only Ice Climbers bodies choose");
         }
     }
 
