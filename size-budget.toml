@@ -1172,3 +1172,11 @@ ceiling = 159679
 date = "2026-11-09"
 reason = "rc.6 p23/rc6-hat-holdback (7c19e19) over integration 646a5f0d: a parked F9 seat holding its own seat member is filled for the hat creation hold-back (hat_slots::creation_filled, character_sources::creation_intent) and its host and wiring tests; measured 159679 (tools/size_gate.py), +15 over 159664 (646a5f0d)"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to the rc.6 final pass's product fix ordered by the primary (RC6-HOLD-ORDER.md addendum 09:47Z; a raise goes in its own commit with approved_by)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 160223
+date = "2026-11-09"
+reason = "rc.6 p23/rc6-lobby-cpu (481173cf) over integration e39479df: the mod's CPU Level (TASK-OPUS-rc6-lobby-cpu-settings.md requirement 2): model::cpu::level and its host tests, the factory row and menu row, runtime::features::cpu_level (the session clock, the notice, the rank step and its diag lines) and the 11 generated cpu_level seam rows; measured 160223 (tools/size_gate.py), +544 over 159679 (e39479df)"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to the operator's rc.6 order of 2026-11-09 11:17Z (TASK-OPUS-rc6-lobby-cpu-settings.md; design accepted by the primary 12:26Z; a raise goes in its own commit with approved_by, primary c07b3449)"
