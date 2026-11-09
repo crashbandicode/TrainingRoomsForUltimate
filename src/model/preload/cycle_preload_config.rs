@@ -44,6 +44,8 @@ const MAX_LINE: usize = 160;
 /// `original_bank` lets a role's slot-0 original (the CSS pick) be an ordinary
 /// bank/group member, so returning to it is a warm switch instead of the
 /// canonical Reload that retires every bank and group (EXCLUSIONS-AUDIT §9).
+/// Since rc.6 a normal Ice Climbers original counts too while `ic_pair_bank` is
+/// on: its pair-lead window or pair group serves the return.
 /// `solo_popo_groups` admits Solo Popo as the first member of a detached swap
 /// group (§4b) and `ic_pair_groups` lets a pair-lead window own swap groups
 /// (§4c); both default on (B123-pre Eden rows 3 and 4 passed). `group_swap` is

@@ -872,6 +872,30 @@ approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to this o
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
+ceiling = 152253
+date = "2026-11-08"
+reason = "rc.6 item 3, Ice Climbers pair (p23/rc6-bg-ic 4bd556b; operator decision 2026-11-08 All groups in rc.6, TASK-OPUS-rc6-bg-special, SPECIAL-GROUPS §2): the pair group built in the background and a live pair window that no longer defers the other groups (body_bank::background_build_eligible pair_tail, native_body_bank background_tail/background_body and its guarded install, the seam row background_build.construct_tail); measured 152253 (tools/size_gate.py), +58 over 152195"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to this operator-chosen rc.6 item under TASK-OPUS-rc6-bg-special (primary c07b3449, 2026-11-08: a raise goes in its own commit with approved_by)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 152302
+date = "2026-11-08"
+reason = "rc.6 item 3, a session that starts on Ice Climbers (p23/rc6-bg-ic ca8af47; TASK-OPUS-rc6-bg-special 22:32Z): the pair-lead start-up window (entry_window extendable/entry_window/creation_matches/original_request, native_body_bank scene_header gate); measured 152302 (tools/size_gate.py), +49 over 152253"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to this operator-chosen rc.6 item under TASK-OPUS-rc6-bg-special (primary c07b3449, 2026-11-08: a raise goes in its own commit with approved_by)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 152341
+date = "2026-11-08"
+reason = "rc.6 item 3, a session that starts on Ice Climbers (p23/rc6-bg-ic 04a823c; Eden rc6-bg-ic2 ic-start-loaded): the notice counts a live pair-lead window as it serves (body_bank::window_targets, native_body_bank plan_budget); measured 152341 (tools/size_gate.py), +39 over 152302"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to this operator-chosen rc.6 item under TASK-OPUS-rc6-bg-special (primary c07b3449, 2026-11-08: a raise goes in its own commit with approved_by)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
 ceiling = 155878
 date = "2026-11-09"
 reason = "rc.6 integration (p23/rc6-integration df71299): TASK-OPUS-rc6-open-fixes item 1, option 1 over 3faecd3 (155774): a live F9 seat keeps its Mii by reading B's identity (parked_entries::mii_record_identity, MiiProof::holds, helper_kind's live flag) and the diag-only note of a live seat's differing descriptor and record offsets (note_live_bytes, ByteRanges); measured 155878 (tools/size_gate.py), +104"
@@ -884,3 +908,11 @@ ceiling = 156248
 date = "2026-11-09"
 reason = "rc.6 integration (p23/rc6-integration 33da5a6): the merge of p23/rc6-bg-pt (6d497e5, 152565: +370 over 152195, the PT and Pyra/Mythra background builds) into 4ad39e5 (155878); measured 156248 on the merged tree (tools/size_gate.py), +370"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); combined ceiling = measured merged size per primary c07b3449, INBOX-opus-rc6-integration 2026-11-08 19:13Z"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 152381
+date = "2026-11-09"
+reason = "rc.6 item 3, the return to an Ice Climbers original is warm (p23/rc6-bg-ic 3bd9db4; primary 2026-11-09 00:23Z): capabilities original_form_bankable and the IcPair row, native_body_bank original_member and excluded_original, both Mii adapters' Original gates; measured 152381 (tools/size_gate.py), +40 over 152341"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to this operator-chosen rc.6 item under TASK-OPUS-rc6-bg-special (primary c07b3449, 2026-11-08: a raise goes in its own commit with approved_by)"

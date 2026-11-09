@@ -521,5 +521,12 @@ Relayed in `artifacts/phase23/INBOX-opus-rc6-hotslots.md`. They replace item 3 o
   - a cycle press meanwhile is held or served, never failed.
 - **20:26Z:** "All groups in rc.6". Mii, Pokémon Trainer/Aegis and Ice Climbers pair groups are background-built too.
   Their exclusion in the first build is temporary; each kind follows as its research (`SPECIAL-GROUPS.md`) lands.
+- **22:32Z** (`TASK-OPUS-rc6-bg-special.md`): a session that starts on Ice Climbers or Pokémon Trainer still gets its
+  other groups built. A live pair or native window may defer a build only until the code for that window exists, never
+  for the whole session.
+- **2026-11-09 00:23Z** (primary, applying the two decisions above): the return to an Ice Climbers original is warm.
+  The IC original can't Reload and destroy the role's bank, so the EXCLUSIONS §9 row is lifted for the normal pair
+  original while the pair bank is on (a capability expansion, not a narrowing). Solo Popo, Mii and native-group
+  originals keep the canonical Reload.
 
 This records the decisions only; the implementation, host tests and Eden proofs are recorded in `CARRY-OVER.md`.
