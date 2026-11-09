@@ -1204,3 +1204,11 @@ ceiling = 160054
 date = "2026-11-09"
 reason = "rc.6 p23/rc6-lobby-persist (f8549f6b) over integration e39479df: the waiting room's Training partners and CPU action persist (model::lobby_persist, runtime::lobby::lobby_persist with its two inline hooks and its 7 seam rows, the settings key, the writer) and its host and wiring tests; measured 160054 (tools/size_gate.py), +375 over 159679 (e39479df)"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to the operator's rc.6 lobby feature (TASK-OPUS-rc6-lobby-cpu-settings requirement 1, primary 2026-11-09 11:36Z; a raise goes in its own commit with approved_by)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 160047
+date = "2026-11-09"
+reason = "rc.6 p23/rc6-menu-freeze (e66e6443) over integration e39479df: the menu-close freeze work. It carries cov-rest's diag stall watchdog (d45d8d2, 8e50b22, 31b5df2, cherry-picked) with its held-lock table behind hang-trace, the worker and game-thread step markers, and the named-macro keyboard lock-order fix; measured 160047 (tools/size_gate.py), +368 over 159679 (e39479df)"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to the rc.6 defect the primary ordered (INBOX-opus-rc6-bg-ic 2026-11-09 12:28Z: the menu-close freeze; a raise goes in its own commit with approved_by)"

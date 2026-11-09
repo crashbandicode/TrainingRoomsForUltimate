@@ -257,13 +257,30 @@ fn rc_retired_observation_features_and_modules_cannot_be_reenabled() {
     }
 }
 
+/// `<crate>/<feature>` on one of this repository's path crates (`crates/<crate>`): the feature is declared in that crate's
+/// `[features]` (`hang-trace` turns on `hos-lock/owners`, the diag stall watchdog's lock table).
+fn path_crate_feature_declared(dep: &str) -> bool {
+    let Some((krate, feature)) = dep.split_once('/') else { return false };
+    let manifest = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("crates").join(krate).join("Cargo.toml");
+    let Ok(text) = std::fs::read_to_string(manifest) else { return false };
+    let mut inside = false;
+    text.lines().any(|line| {
+        if line.starts_with('[') {
+            inside = line.trim() == "[features]";
+            return false;
+        }
+        inside && line.split_once('=').is_some_and(|(name, _)| name.trim() == feature)
+    })
+}
+
 #[test]
 fn every_feature_dependency_is_declared() {
     let map = features();
     for (name, deps) in &map {
         // `dep:<crate>` names an optional dependency, not a feature (the manifest test above checks `deluxe-sdk`'s).
         for d in deps.iter().filter(|d| !d.starts_with("dep:")) {
-            assert!(map.contains_key(d), "{name} requires undeclared feature {d}");
+            assert!(map.contains_key(d) || path_crate_feature_declared(d), "{name} requires undeclared feature {d}");
         }
     }
+    assert!(path_crate_feature_declared("hos-lock/owners") && !path_crate_feature_declared("hos-lock/no-such"));
 }

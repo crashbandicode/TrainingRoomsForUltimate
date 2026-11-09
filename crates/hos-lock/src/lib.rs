@@ -11,6 +11,8 @@
 #![forbid(unsafe_op_in_unsafe_fn)]
 
 pub mod mailbox;
+#[cfg(feature = "owners")]
+pub mod owners;
 pub mod snapshot;
 pub mod triple;
 pub mod word;
@@ -31,6 +33,24 @@ use host::HostFutex as Sys;
 
 use word::{MutexWord, RwLockWord};
 
+/// Feature `owners`: enter an acquisition of the lock at `lock` in the held-lock table.
+#[inline(always)]
+fn took(lock: *const u8) {
+    #[cfg(feature = "owners")]
+    owners::acquired(lock as usize, owners::caller());
+    #[cfg(not(feature = "owners"))]
+    let _ = lock;
+}
+
+/// Feature `owners`: remove this thread's entry for the lock at `lock`.
+#[inline(always)]
+fn left(lock: *const u8) {
+    #[cfg(feature = "owners")]
+    owners::released(lock as usize);
+    #[cfg(not(feature = "owners"))]
+    let _ = lock;
+}
+
 /// A mutual-exclusion lock word (0 unlocked, 1 locked, 2 locked with sleepers).
 pub struct RawMutex(MutexWord);
 
@@ -43,15 +63,21 @@ unsafe impl lock_api::RawMutex for RawMutex {
     #[inline]
     fn lock(&self) {
         self.0.lock::<Sys>();
+        took(self as *const Self as *const u8);
     }
 
     #[inline]
     fn try_lock(&self) -> bool {
-        self.0.try_lock()
+        let taken = self.0.try_lock();
+        if taken {
+            took(self as *const Self as *const u8);
+        }
+        taken
     }
 
     #[inline]
     unsafe fn unlock(&self) {
+        left(self as *const Self as *const u8);
         // SAFETY: lock_api's contract: the caller holds the lock.
         unsafe { self.0.unlock::<Sys>() }
     }
@@ -75,15 +101,21 @@ unsafe impl lock_api::RawRwLock for RawRwLock {
     #[inline]
     fn lock_shared(&self) {
         self.0.read::<Sys>();
+        took(self as *const Self as *const u8);
     }
 
     #[inline]
     fn try_lock_shared(&self) -> bool {
-        self.0.try_read()
+        let taken = self.0.try_read();
+        if taken {
+            took(self as *const Self as *const u8);
+        }
+        taken
     }
 
     #[inline]
     unsafe fn unlock_shared(&self) {
+        left(self as *const Self as *const u8);
         // SAFETY: the caller holds a read lock.
         unsafe { self.0.read_unlock::<Sys>() }
     }
@@ -91,15 +123,21 @@ unsafe impl lock_api::RawRwLock for RawRwLock {
     #[inline]
     fn lock_exclusive(&self) {
         self.0.write::<Sys>();
+        took(self as *const Self as *const u8);
     }
 
     #[inline]
     fn try_lock_exclusive(&self) -> bool {
-        self.0.try_write()
+        let taken = self.0.try_write();
+        if taken {
+            took(self as *const Self as *const u8);
+        }
+        taken
     }
 
     #[inline]
     unsafe fn unlock_exclusive(&self) {
+        left(self as *const Self as *const u8);
         // SAFETY: the caller holds the write lock.
         unsafe { self.0.write_unlock::<Sys>() }
     }

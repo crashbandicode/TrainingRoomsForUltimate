@@ -39,6 +39,7 @@ pub enum ThreadId {
     ReplaySave,
     MiiCatalog,
     PracticeTrace,
+    StallWatch,
 }
 
 /// One row: what runs on the thread and the numbers its size is checked against.
@@ -63,7 +64,7 @@ pub struct ThreadStack {
 const KIB: usize = 1024;
 
 /// The table (one row per `ThreadId`, in its order).
-pub const THREADS: [ThreadStack; 17] = [
+pub const THREADS: [ThreadStack; 18] = [
     // Includes the registered TICK steps (indirect calls, outside the static walk): the drain closure's 2,928 B frame plus the
     // deeper step, `p1::service` 5,168 B (diag ELF of the rc.6 hook-allocation fix; report_late's path was 5696 in all); measured11184 dominates.
     // See docs/SH01-MEASURED-STACK-REVIEW.md (removed after v0.2.0-rc.1; see that tag); margin and SDK reserve are unchanged.
@@ -103,6 +104,8 @@ pub const THREADS: [ThreadStack; 17] = [
     row(ThreadId::MiiCatalog, c"mii-catalog", 28 * KIB, 5_872, 8_016, "Eden f6-31/f6-37/sh-01", "replay_store::init_catalog_fallback::{closure#0}::{closure#0}"),
     // console-practice-trace builds only: the practice trace file writer
     row(ThreadId::PracticeTrace, c"tr-practice-trace", 128 * KIB, 0, 0, "", "practice_trace::writer"),
+    // diag: the stall watchdog (samples the hooks' entry count, prints held locks through svcOutputDebugString)
+    row(ThreadId::StallWatch, c"tr-stall-watch", 48 * KIB, 0, 0, "", "stall_watch::start::{closure#0}"),
 ];
 
 const fn row(
