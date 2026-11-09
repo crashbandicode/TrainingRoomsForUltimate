@@ -1429,9 +1429,7 @@ pub fn capacity_release<K: Copy>(settled: bool, parked: impl Iterator<Item = (K,
 /// after it (`pp-rel-2`: 293 MB of headroom at the free, 335 MB a second later, 367 MB at 1.5 s), and no native event
 /// marks the end. Until it stops, the room is on its way: nothing more is freed for capacity, and a prefetch held for
 /// memory shows as loading ([`arriving_room`]). Each planner pass samples the charge: the first pass after a free only
-/// records it, and the release has settled after [`QUIET_PASSES`] passes in a row find it no lower than the lowest
-/// seen. The group's files come back in a later burst than its bodies (Eden `final-surface-i3-pf-b04856b2`: one quiet
-/// pass settled the watch about 0.2 s before `[Samus, Yoshi]`'s files returned some 113 MB).
+/// records it, and the release has settled at the first pass that finds the charge no lower than the pass before.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum ReleaseWatch {
     /// Nothing freed is still arriving.
@@ -1439,12 +1437,9 @@ pub enum ReleaseWatch {
     Settled,
     /// Freed; no planner pass has sampled it yet. `committed`: the charge right after the free.
     Freed { committed: Option<u64> },
-    /// The lowest charge a pass has seen since the free, and how many passes in a row since then found nothing lower.
-    Arriving { committed: Option<u64>, quiet: u8 },
+    /// The charge the last pass saw, lower than the one before it (or the first pass's sample).
+    Arriving { committed: Option<u64> },
 }
-
-/// Planner passes in a row with no fall in the committed charge before a free's room counts as arrived.
-pub const QUIET_PASSES: u8 = 2;
 
 impl ReleaseWatch {
     /// A parked group was freed: its room is on its way (a free during another restarts the watch).
@@ -1455,10 +1450,9 @@ impl ReleaseWatch {
     pub fn pass(self, committed: Option<u64>) -> Self {
         match self {
             ReleaseWatch::Settled => ReleaseWatch::Settled,
-            ReleaseWatch::Freed { .. } => ReleaseWatch::Arriving { committed, quiet: 0 },
-            ReleaseWatch::Arriving { committed: last, quiet } => match (last, committed) {
-                (Some(last), Some(now)) if now < last => ReleaseWatch::Arriving { committed: Some(now), quiet: 0 },
-                (Some(_), Some(_)) if quiet + 1 < QUIET_PASSES => ReleaseWatch::Arriving { committed: last, quiet: quiet + 1 },
+            ReleaseWatch::Freed { .. } => ReleaseWatch::Arriving { committed },
+            ReleaseWatch::Arriving { committed: last } => match (last, committed) {
+                (Some(last), Some(now)) if now < last => ReleaseWatch::Arriving { committed: Some(now) },
                 _ => ReleaseWatch::Settled,
             },
         }
@@ -2233,10 +2227,7 @@ mod tests {
         assert!(!watch.settled(), "still falling");
         assert_eq!(capacity_release(watch.settled(), kept_only()), None);
         let watch = watch.pass(Some(3_155_275_776));
-        assert!(!watch.settled(), "one quiet pass is not enough: the files' share comes in a later burst");
-        assert_eq!(capacity_release(watch.settled(), kept_only()), None);
-        let watch = watch.pass(Some(3_155_275_776));
-        assert!(watch.settled(), "two quiet passes in a row: settled");
+        assert!(watch.settled(), "stopped falling: settled");
         assert_eq!(capacity_release(watch.settled(), kept_only()), Some((0, 2)), "the last resort, after it settled");
         assert_eq!(capacity_release(true, [((0, 2), mario_dk_link, 3), ((0, 0), samus_yoshi, 0)].into_iter()), Some((0, 0)));
         assert!(!watch.freed(Some(1)).settled(), "another free restarts the watch");
@@ -2249,27 +2240,6 @@ mod tests {
         assert_eq!(arriving_room(GroupState::Built, true), GroupState::Built);
         let counts = count_group_members([(2, arriving_room(GroupState::Held(Hold::Memory), true))]);
         assert_eq!((counts.planned, counts.pending, counts.held, counts.hold), (2, 2, 0, None));
-    }
-
-    /// Eden `final-surface-i3-pf-b04856b2` `x6-cc` (Yoga): `[Samus, Yoshi]` freed at #787 (committed 3,172,380,672 after);
-    /// the first pass (#793) saw 3,155,341,312 and the second (#798) the same, so the watch settled and the kept
-    /// `[Mario, DK, Link]` went 17 ms later (#804). That free returned 162 MB (#810), about 113 MB more than the same
-    /// three bodies freed alone (`pp-x6cc-1` #805: 49 MB): `[Samus, Yoshi]`'s files, unloaded about 2 s after its free in
-    /// one burst with no log line (`pp-settle-1`: −101 MB between #848 and #857). The watch settles only after two quiet
-    /// passes in a row, and a fall in between starts the count again.
-    #[test]
-    fn a_release_settles_only_after_two_quiet_passes() {
-        let watch = ReleaseWatch::Settled.freed(Some(3_172_380_672)).pass(Some(3_155_341_312));
-        let watch = watch.pass(Some(3_155_341_312));
-        assert!(!watch.settled(), "#798: one quiet pass, the files are still to come");
-        let watch = watch.pass(Some(3_042_000_000));
-        assert!(!watch.settled(), "the files' burst");
-        let watch = watch.pass(Some(3_042_000_000));
-        assert!(!watch.settled(), "quiet 1 after the burst");
-        let watch = watch.pass(Some(3_042_000_000));
-        assert!(watch.settled(), "quiet 2: settled");
-        let rising = ReleaseWatch::Settled.freed(Some(10)).pass(Some(9)).pass(Some(12)).pass(Some(12));
-        assert!(rising.settled(), "a charge that rises (a load meanwhile) is quiet too");
     }
 
     /// Operator rule 2026-11-09 17:13Z (Eden `final-surface-i3-pf-b04856b2` `x6-cc`, #798–#804): the watch settled under
