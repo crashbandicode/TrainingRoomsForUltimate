@@ -593,7 +593,12 @@ pub fn prefetch_admitted(live_kind: Option<u32>) -> Result<(), &'static str> {
 /// same ledger path (primary 2026-11-09 05:38Z: Kirby > PT warm again). Any other kind waits as a prefetch does:
 /// D-KIRBY1 stays for every fighter key.
 pub fn object_rearm_admitted(live_kind: Option<u32>, kind: u32) -> Result<(), &'static str> {
-    if matches!(kind, PT_OBJECT_KIND | AEGIS_OBJECT_KIND) { Ok(()) } else { prefetch_admitted(live_kind) }
+    if bank_object_kind(kind) { Ok(()) } else { prefetch_admitted(live_kind) }
+}
+
+/// The object kinds the bank holds keys for (no fighter kind, so no Kirby copy registers one on R).
+pub fn bank_object_kind(kind: u32) -> bool {
+    matches!(kind, PT_OBJECT_KIND | AEGIS_OBJECT_KIND)
 }
 
 /// A prefetch key may be released unless the live Kirby copies exactly that kind

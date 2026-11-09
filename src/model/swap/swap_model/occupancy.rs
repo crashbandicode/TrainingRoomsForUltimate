@@ -10,7 +10,8 @@
 //!   `(k, costume)`; acquiring or releasing the copied kind on that R is refused.
 //! - `PrefetchDebtUnderLiveKirby` (FACT K1 §0/§5.1, Astra §4.3): no bank prefetch key may rest on
 //!   R while a member whose row has `prefetch_while_live: false` (Kirby) is live — *suspend*:
-//!   no acquisition while it is live; *drain*: a transition whose target is such a member must
+//!   no acquisition of a fighter kind while it is live (the bank's object kinds are no fighter a copy
+//!   takes: primary 2026-11-09 05:38Z); *drain*: a transition whose target is such a member must
 //!   first return every prefetched key (the planner drains Prefetched groups to Planned before the
 //!   commit, so a freshly live Kirby, hatless by `kirby_park_gate`, finds an empty debt).
 //! - `HatSourceLive` (HYP, K1 §6 K2): a hat-source kind built into the incoming window while a copy
@@ -18,7 +19,7 @@
 //! - `OtherRoleLive` (disproved for the mirror shape: D-HANG1-SEPARATION §1 S-A 3/3 completed; the
 //!   hang is the parked never-activated Kirby, WP3/WP-K): off in `Rules::C116_1`.
 
-use super::capabilities::{capabilities, form_class, Capabilities};
+use super::capabilities::{bank_object_kind, capabilities, form_class, Capabilities};
 #[cfg(any(test, feature = "simulator"))]
 use super::capabilities::{can_window_member_of, member_forms, pins_cell0, FormClass, Grouping};
 use super::ledger::{Conflict, KindSet64, LiveConsumers, ReleaseFootprint, ResidentDependencies, Role, Use, NO_KIND};
@@ -94,7 +95,9 @@ impl KindOccupancy {
         if self.kirby_copy[i] == Some(kind) && matches!(usage, Use::Acquire | Use::Release) {
             return Some(Conflict::LiveCopySharesRegistry);
         }
-        if usage == Use::Acquire && self.prefetch_suspended(role) {
+        // The suspend covers the fighter kinds a copy can share on R; the bank's object kinds are none (a detached PT
+        // group's object re-arm runs under a live Kirby: primary 2026-11-09 05:38Z, `object_rearm_admitted`).
+        if usage == Use::Acquire && self.prefetch_suspended(role) && !bank_object_kind(kind) {
             return Some(Conflict::PrefetchDebtUnderLiveKirby);
         }
         if usage == Use::TargetKind && self.debt_blocks_target(role, kind) {
@@ -305,6 +308,36 @@ mod tests {
         // Through the ledger's trait.
         let consumers = Occupancy { kinds: KindOccupancy { live: [Some(KIRBY), None], ..occupancy() }, rules };
         assert_eq!(consumers.conflict(Role::Player, 0x07, Use::Acquire), Some(Conflict::PrefetchDebtUnderLiveKirby));
+    }
+
+    /// Primary 2026-11-09 05:38Z: a detached PT group's object re-arm runs under a live Kirby through the ledger. The
+    /// suspend rule covers the fighter kinds a Kirby copy can share on R; the trainer's object kind (and the Aegis
+    /// partner's) is admitted, every fighter kind still is not, and the live copy's guard is unchanged. Eden rc6-kr1
+    /// (the gate lifted, the ledger not): `object kind NOT re-acquired … reason=Conflict(PrefetchDebtUnderLiveKirby)`.
+    #[test]
+    fn an_object_kind_is_acquired_under_a_live_kirby_and_a_fighter_kind_is_not() {
+        use super::super::ledger::{GroupId, Holder, Ledger, ReleaseRecipe, AEGIS_OBJECT_KIND, PT_OBJECT_KIND};
+        let rules = Rules::C116_1;
+        let mut occ = occupancy();
+        occ.live[0] = Some(KIRBY);
+        for copy in [None, Some(0x24), Some(0x00)] {
+            occ.kirby_copy[0] = copy;
+            assert_eq!(occ.conflicts(Role::Player, PT_OBJECT_KIND, Use::Acquire, &rules), None, "{copy:?}");
+            assert_eq!(occ.conflicts(Role::Player, AEGIS_OBJECT_KIND, Use::Acquire, &rules), None, "{copy:?}");
+            assert_eq!(occ.conflicts(Role::Player, PT_OBJECT_KIND, Use::Release, &rules), None, "{copy:?}");
+            let squirtle = if copy == Some(0x24) { Conflict::LiveCopySharesRegistry } else { Conflict::PrefetchDebtUnderLiveKirby };
+            assert_eq!(occ.conflicts(Role::Player, 0x24, Use::Acquire, &rules), Some(squirtle), "{copy:?}");
+            assert_eq!(occ.conflicts(Role::Player, 0x07, Use::Acquire, &rules), Some(Conflict::PrefetchDebtUnderLiveKirby));
+        }
+        // The re-arm's own acquisition through the ledger (`r_handle::acquire`: `Holder::Prefetch`, the occupancy that
+        // names the live copy).
+        let consumers = Occupancy { kinds: occ, rules };
+        let mut ledger = Ledger::new(RFlags::TRAINING);
+        let batch = ledger.new_batch();
+        assert!(ledger.acquire(PT_OBJECT_KIND, Holder::Prefetch(GroupId(1)), ReleaseRecipe::OwnedPerKind, batch, &consumers,
+            Role::Player).is_ok());
+        assert!(ledger.acquire(0x07, Holder::Prefetch(GroupId(2)), ReleaseRecipe::OwnedPerKind, batch, &consumers,
+            Role::Player).is_err(), "a fighter kind's prefetch still waits for the live Kirby");
     }
 
     #[test]

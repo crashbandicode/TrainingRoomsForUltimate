@@ -1653,7 +1653,7 @@
    "dest": "src/model/swap/swap_model/capabilities.rs",
    "crate": "consts",
    "src_sha256": "f8c65743dd5f2bf8762896822d14fa72edcd97d9070a26d921dd4701d84783cb",
-   "dest_sha256": "d68cffbe8adb69dc2c908de55141918ba55b49c7bf244609055ce329a8b0cad7",
+   "dest_sha256": "1594fccf0df2efa819810fa1414847a1f1259e0f20a1afe82363a8a9885f18ce",
    "edits": [
     {
      "old": "        FormClass::IcPair => Capabilities {\n            bodies: 2, actors: 2, native_flags: 0x02, window_cell: CellRule::PairLead,\n            grouping: Grouping::OwnGroupOnly(SpecialSwitch::Pair), pair_rule: true, park_gate: ParkGate::PairAlive,\n            exit_commit: ExitRule::PairExtraOnly, original_bankable: false,\n",
@@ -1679,6 +1679,11 @@
      "old": "\n/// A prefetch key may be released unless the live Kirby copies exactly that kind\n",
      "new": "\n/// A detached Pok\u00e9mon Trainer group's object re-arm (`object_rearm_due`: its object kind taken again before its next\n/// attach) under the role's live member. D-KIRBY1 ([`prefetch_admitted`]) is about the keys a live Kirby copy can share\n/// on its R, and a copy registers a fighter kind there (`[KirbyProbe] request owner=R kind=\u2026`; a copy of a Pok\u00e9mon takes\n/// the Pok\u00e9mon, `0x24..=0x26`). The object kinds the bank holds keys for (the trainer's `PT_OBJECT_KIND`, the Aegis\n/// partner's `AEGIS_OBJECT_KIND`) are no fighter a copy takes, so their re-arm runs under a live Kirby too, through the\n/// same ledger path (primary 2026-11-09 05:38Z: Kirby > PT warm again). Any other kind waits as a prefetch does:\n/// D-KIRBY1 stays for every fighter key.\npub fn object_rearm_admitted(live_kind: Option<u32>, kind: u32) -> Result<(), &'static str> {\n    if matches!(kind, PT_OBJECT_KIND | AEGIS_OBJECT_KIND) { Ok(()) } else { prefetch_admitted(live_kind) }\n}\n\n/// A prefetch key may be released unless the live Kirby copies exactly that kind\n",
      "reason": "rc.6, the object re-arm under a live Kirby (primary 2026-11-09 05:38Z): a detached PT group takes its object kind 0x72 again while the live member is Kirby (body_bank object_rearm_admitted; native_body_bank kirby_rearm); D-KIRBY1 unchanged for fighter keys"
+    },
+    {
+     "old": "pub fn object_rearm_admitted(live_kind: Option<u32>, kind: u32) -> Result<(), &'static str> {\n    if matches!(kind, PT_OBJECT_KIND | AEGIS_OBJECT_KIND) { Ok(()) } else { prefetch_admitted(live_kind) }\n}\n",
+     "new": "pub fn object_rearm_admitted(live_kind: Option<u32>, kind: u32) -> Result<(), &'static str> {\n    if bank_object_kind(kind) { Ok(()) } else { prefetch_admitted(live_kind) }\n}\n\n/// The object kinds the bank holds keys for (no fighter kind, so no Kirby copy registers one on R).\npub fn bank_object_kind(kind: u32) -> bool {\n    matches!(kind, PT_OBJECT_KIND | AEGIS_OBJECT_KIND)\n}\n",
+     "reason": "rc.6, the object re-arm under a live Kirby through the ledger (primary 2026-11-09 05:38Z; Eden rc6-kr1: Conflict(PrefetchDebtUnderLiveKirby)): the occupancy suspend rule covers fighter kinds, the bank object kinds are admitted (capabilities bank_object_kind)"
     }
    ]
   },
@@ -1883,7 +1888,29 @@
    "dest": "src/model/swap/swap_model/occupancy.rs",
    "crate": "consts",
    "src_sha256": "e190e95a1db710a75729ba9c1b82798483e7d8cc7107bbed32d9fcfd0373da0a",
-   "dest_sha256": "bc56d91474616d0aaff6c0c42ea7278276e454d0ed3d599a6bc4c1656c6f85c2"
+   "dest_sha256": "840f4cac57266eac119f37079d5c9e652fe90bee391d567fdacf13bf5c62b681",
+   "edits": [
+    {
+     "old": "//!   R while a member whose row has `prefetch_while_live: false` (Kirby) is live \u2014 *suspend*:\n//!   no acquisition while it is live; *drain*: a transition whose target is such a member must\n//!   first return every prefetched key (the planner drains Prefetched groups to Planned before the\n",
+     "new": "//!   R while a member whose row has `prefetch_while_live: false` (Kirby) is live \u2014 *suspend*:\n//!   no acquisition of a fighter kind while it is live (the bank's object kinds are no fighter a copy\n//!   takes: primary 2026-11-09 05:38Z); *drain*: a transition whose target is such a member must\n//!   first return every prefetched key (the planner drains Prefetched groups to Planned before the\n",
+     "reason": "rc.6, the object re-arm under a live Kirby through the ledger (primary 2026-11-09 05:38Z; Eden rc6-kr1: Conflict(PrefetchDebtUnderLiveKirby)): the occupancy suspend rule covers fighter kinds, the bank object kinds are admitted (capabilities bank_object_kind)"
+    },
+    {
+     "old": "\nuse super::capabilities::{capabilities, form_class, Capabilities};\n#[cfg(any(test, feature = \"simulator\"))]\n",
+     "new": "\nuse super::capabilities::{bank_object_kind, capabilities, form_class, Capabilities};\n#[cfg(any(test, feature = \"simulator\"))]\n",
+     "reason": "rc.6, the object re-arm under a live Kirby through the ledger (primary 2026-11-09 05:38Z; Eden rc6-kr1: Conflict(PrefetchDebtUnderLiveKirby)): the occupancy suspend rule covers fighter kinds, the bank object kinds are admitted (capabilities bank_object_kind)"
+    },
+    {
+     "old": "        }\n        if usage == Use::Acquire && self.prefetch_suspended(role) {\n            return Some(Conflict::PrefetchDebtUnderLiveKirby);\n",
+     "new": "        }\n        // The suspend covers the fighter kinds a copy can share on R; the bank's object kinds are none (a detached PT\n        // group's object re-arm runs under a live Kirby: primary 2026-11-09 05:38Z, `object_rearm_admitted`).\n        if usage == Use::Acquire && self.prefetch_suspended(role) && !bank_object_kind(kind) {\n            return Some(Conflict::PrefetchDebtUnderLiveKirby);\n",
+     "reason": "rc.6, the object re-arm under a live Kirby through the ledger (primary 2026-11-09 05:38Z; Eden rc6-kr1: Conflict(PrefetchDebtUnderLiveKirby)): the occupancy suspend rule covers fighter kinds, the bank object kinds are admitted (capabilities bank_object_kind)"
+    },
+    {
+     "old": "    }\n\n    #[test]\n    fn footprint_admission_keeps_a_copied_kinds_registry_and_residents_name_the_copy() {\n",
+     "new": "    }\n\n    /// Primary 2026-11-09 05:38Z: a detached PT group's object re-arm runs under a live Kirby through the ledger. The\n    /// suspend rule covers the fighter kinds a Kirby copy can share on R; the trainer's object kind (and the Aegis\n    /// partner's) is admitted, every fighter kind still is not, and the live copy's guard is unchanged. Eden rc6-kr1\n    /// (the gate lifted, the ledger not): `object kind NOT re-acquired \u2026 reason=Conflict(PrefetchDebtUnderLiveKirby)`.\n    #[test]\n    fn an_object_kind_is_acquired_under_a_live_kirby_and_a_fighter_kind_is_not() {\n        use super::super::ledger::{GroupId, Holder, Ledger, ReleaseRecipe, AEGIS_OBJECT_KIND, PT_OBJECT_KIND};\n        let rules = Rules::C116_1;\n        let mut occ = occupancy();\n        occ.live[0] = Some(KIRBY);\n        for copy in [None, Some(0x24), Some(0x00)] {\n            occ.kirby_copy[0] = copy;\n            assert_eq!(occ.conflicts(Role::Player, PT_OBJECT_KIND, Use::Acquire, &rules), None, \"{copy:?}\");\n            assert_eq!(occ.conflicts(Role::Player, AEGIS_OBJECT_KIND, Use::Acquire, &rules), None, \"{copy:?}\");\n            assert_eq!(occ.conflicts(Role::Player, PT_OBJECT_KIND, Use::Release, &rules), None, \"{copy:?}\");\n            let squirtle = if copy == Some(0x24) { Conflict::LiveCopySharesRegistry } else { Conflict::PrefetchDebtUnderLiveKirby };\n            assert_eq!(occ.conflicts(Role::Player, 0x24, Use::Acquire, &rules), Some(squirtle), \"{copy:?}\");\n            assert_eq!(occ.conflicts(Role::Player, 0x07, Use::Acquire, &rules), Some(Conflict::PrefetchDebtUnderLiveKirby));\n        }\n        // The re-arm's own acquisition through the ledger (`r_handle::acquire`: `Holder::Prefetch`, the occupancy that\n        // names the live copy).\n        let consumers = Occupancy { kinds: occ, rules };\n        let mut ledger = Ledger::new(RFlags::TRAINING);\n        let batch = ledger.new_batch();\n        assert!(ledger.acquire(PT_OBJECT_KIND, Holder::Prefetch(GroupId(1)), ReleaseRecipe::OwnedPerKind, batch, &consumers,\n            Role::Player).is_ok());\n        assert!(ledger.acquire(0x07, Holder::Prefetch(GroupId(2)), ReleaseRecipe::OwnedPerKind, batch, &consumers,\n            Role::Player).is_err(), \"a fighter kind's prefetch still waits for the live Kirby\");\n    }\n\n    #[test]\n    fn footprint_admission_keeps_a_copied_kinds_registry_and_residents_name_the_copy() {\n",
+     "reason": "rc.6, the object re-arm under a live Kirby through the ledger (primary 2026-11-09 05:38Z; Eden rc6-kr1: Conflict(PrefetchDebtUnderLiveKirby)): the occupancy suspend rule covers fighter kinds, the bank object kinds are admitted (capabilities bank_object_kind)"
+    }
+   ]
   },
   {
    "src": "training_mod_consts/src/swap_model/order_replay.rs",

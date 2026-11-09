@@ -1734,8 +1734,14 @@ Inbox `INBOX-opus-rc6-bg-ic.md` 05:38Z (moved from the hot-slots lane; its repor
   Planned groups' deferral, `kirby_rearm` (`rearm_candidate` + `object_rearm_admitted`) yields the same `Step::Rearm`.
   Its ledger call is unchanged: `r_handle::acquire` with `Holder::Prefetch` and the occupancy that names the live copy
   kind.
+- **The ledger** (`occupancy::KindOccupancy::conflicts`): Eden `rc6-kr1` showed the lifted gate's re-arm refused by
+  the ledger's suspend rule (`object kind NOT re-acquired … reason=Conflict(PrefetchDebtUnderLiveKirby)`). The suspend
+  now covers the fighter kinds a copy can share on R, with `capabilities::bank_object_kind` (the same predicate as the
+  gate). The drain rule (`debt_blocks_target`) and the live copy's guard are unchanged.
 - **Tests:**
   - Failed first: `body_bank::a_trainer_object_rearm_is_admitted_under_a_live_kirby_and_a_fighter_prefetch_is_not` and
-    `tests/background_native_wiring.rs::a_trainer_object_rearm_runs_under_a_live_kirby_through_the_same_ledger_path`.
+    `tests/background_native_wiring.rs::a_trainer_object_rearm_runs_under_a_live_kirby_through_the_same_ledger_path`
+    (`failfirst-1`); `occupancy::an_object_kind_is_acquired_under_a_live_kirby_and_a_fighter_kind_is_not`, which also
+    runs the re-arm's own ledger acquisition (`failfirst-2`, the Eden refusal).
   - `native_model::the_trainer_object_key_released_under_a_live_kirby_copy_leaves_the_registry_whole` pins the
     per-kind K1 hazard the rule rests on.
