@@ -221,7 +221,8 @@ fn a_group_beside_a_live_mii_window_takes_the_ordinary_baseline() {
         "the colour reads: Mii bodies only");
     let install = body(BANK, "pub(super) unsafe fn install(");
     for (offset, name, label) in [("0x651a70", "bg_trainer_enter", "background_mii.trainer_enter"),
-        ("0x651b50", "bg_trainer_exit", "background_mii.trainer_exit")] {
+        ("0x651b50", "bg_trainer_exit", "background_mii.trainer_exit"),
+        ("0x33c33a8", "bg_mii_reader_33c3370", "background_mii.reader_33c3370")] {
         assert!(BANK.contains(&format!("#[skyline::hook(offset = {offset}, inline)]\nunsafe fn {name}(")), "{name}");
         assert!(ROWS.contains(&format!("label: \"{label}\", group: \"native_body_bank\", offset: {offset},")), "{name}: seam row");
         assert!(install.contains(&format!("({offset}, 0x")) && install.contains(name), "{name}: checked and installed");
@@ -231,6 +232,10 @@ fn a_group_beside_a_live_mii_window_takes_the_ordinary_baseline() {
     ordered(trainer, &["ctx.registers[1].x() as usize == real", "ctx.registers[1].set_x(shadow_r_address() as u64);",
         "MII_THREAD.store(current_thread(), Ordering::Release);"]);
     assert!(body(BANK, "unsafe fn bg_trainer_exit(").contains("bg_mii_exit();"));
+    // Eden rc6-hot-xps28: `0x33c3468`'s counter fired on the worker for PT's bodies beside a live Mii window; its function
+    // takes the shadow from its `R` load on, so its path builds and costume read do.
+    ordered(body(BANK, "unsafe fn bg_mii_reader_33c3370("), &["if mii_worker_reads(ctx.registers[21].x() as usize) {",
+        "ctx.registers[21].set_x(shadow_r_address() as u64);"]);
     let holder = body(BANK, "unsafe fn start_holder(");
     ordered(holder, &["let words = b.baseline.map(|_| save_resource_words(shadow_r_address()));", "with_words(b.alias, words, || {",
         "build(holder, base + PARTNER_TABLE, 0, u64::from(u32::MAX), owner, 0);", "write_entry_identity(entry, &ordinary);",

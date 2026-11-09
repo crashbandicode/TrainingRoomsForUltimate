@@ -3566,10 +3566,10 @@ static MII_THREAD: AtomicUsize = AtomicUsize::new(0);
 /// The Mii hooks' seam rows passed and they are installed.
 static BACKGROUND_MII_ENABLED: AtomicBool = AtomicBool::new(false);
 /// Hits per Mii hook for the build line: init enter, flags, leave, index a, index b, construct enter, path, tail, the
-/// costume and hat readers, the three counted readers, and Pokémon Trainer's pool task (X6).
-const MII_HIT_NAMES: [&str; 14] = ["init", "flags", "leave", "index_a", "index_b", "construct", "path", "tail", "costume",
-    "hat", "r6e655c", "paths", "r33c3468", "trainer"];
-static MII_HITS: [AtomicU32; 14] = [const { AtomicU32::new(0) }; 14];
+/// costume and hat readers, the three counted readers, Pokémon Trainer's pool task and the reader at `0x33c3370` (X6).
+const MII_HIT_NAMES: [&str; 15] = ["init", "flags", "leave", "index_a", "index_b", "construct", "path", "tail", "costume",
+    "hat", "r6e655c", "paths", "r33c3468", "trainer", "r33c3370"];
+static MII_HITS: [AtomicU32; 15] = [const { AtomicU32::new(0) }; 15];
 
 fn shadow_r_address() -> usize { SHADOW_R.0.get() as usize }
 
@@ -3726,6 +3726,19 @@ unsafe fn bg_mii_reader_paths(ctx: &mut InlineCtx) {
 unsafe fn bg_mii_reader_6e655c(ctx: &mut InlineCtx) { if mii_worker_reads(ctx.registers[21].x() as usize) { mii_hit(10); } }
 #[skyline::hook(offset = 0x33c3468, inline)]
 unsafe fn bg_mii_reader_33c3468(ctx: &mut InlineCtx) { if mii_worker_reads(ctx.registers[21].x() as usize) { mii_hit(12); } }
+
+/// X6 (Eden `rc6-hot-xps28`: `0x33c3468` counted 4 hits on the worker while Pokémon Trainer's bodies built beside a live
+/// Mii window): its function `0x33c3370` loads `R` by owner into `x21` at `0x33c33a4`, and every use of `x21` until it is
+/// reassigned at `0x33c37b4` is a `0x17e8890` path build (`0x33c33b8`, `0x33c33f8`, `0x33c3430`, `0x33c3694`,
+/// `0x33c36d0`, `0x33c370c`) or the `+0x58`/`+0x64` costume read (`0x33c3468`-`0x33c34b8`) it stores at `x19+0x7ec`. On
+/// the worker building the armed build's body, the shadow from its load (the counter at `0x33c3468` then stays 0).
+#[skyline::hook(offset = 0x33c33a8, inline)]
+unsafe fn bg_mii_reader_33c3370(ctx: &mut InlineCtx) {
+    if mii_worker_reads(ctx.registers[21].x() as usize) {
+        ctx.registers[21].set_x(shadow_r_address() as u64);
+        mii_hit(14);
+    }
+}
 
 /// X6: Pokémon Trainer's pool task (native state 11's functor `0x651a48-0x651b84`, `x21` the task) for a PT group built
 /// beside a live Mii window, after `ldr x1, [x8, #0xe8]` loaded the owner's `R` for the trainer parameters' path
@@ -4538,7 +4551,7 @@ unsafe fn finish_background(entry: *const u8, owner: u32, role: usize, b: Backgr
     }
     // SPECIAL-GROUPS §1: the Mii hooks off (every task settled); the resource object body init stored in the shadow
     // (`0x607d18`, with its reference) and the tick's faces are the group's Mii set.
-    let mii_hits: [u32; 14] = std::array::from_fn(|i| MII_HITS[i].load(Ordering::Relaxed));
+    let mii_hits: [u32; 15] = std::array::from_fn(|i| MII_HITS[i].load(Ordering::Relaxed));
     // X6: a group built beside a live Mii window disarms them too; its bodies stored no Mii object in the shadow.
     if b.baseline.is_some() {
         MII_REAL_R.store(0, Ordering::Release);
@@ -6496,7 +6509,8 @@ const BACKGROUND_MII_SEAMS: &[&str] = &["background_mii.init_enter", "background
     "background_mii.init_exit", "background_mii.construct_index_a", "background_mii.construct_index_b",
     "background_mii.construct_enter", "background_mii.construct_path", "background_mii.tail_release", "background_mii.construct_exit", "background_mii.reader_costume",
     "background_mii.reader_hat", "background_mii.reader_6e655c", "background_mii.reader_paths",
-    "background_mii.reader_33c3468", "background_mii.trainer_enter", "background_mii.trainer_exit"];
+    "background_mii.reader_33c3468", "background_mii.trainer_enter", "background_mii.trainer_exit",
+    "background_mii.reader_33c3370"];
 const PAIR_SEAMS: &[&str] = &["ic_pair.partner_window", "ic_pair.pair_partner", "ic_pair.activate_entry",
     "ic_pair.commit_change", "ic_pair.outgoing_owner", "ic_pair.deactivate_body"];
 const SPECIAL_SEAMS: &[&str] = &["special_groups.object_release", "special_groups.heap_free",
@@ -6641,11 +6655,11 @@ pub(super) unsafe fn install(base: usize) {
     // SPECIAL-GROUPS §1: the Mii groups' worker hooks, all or none, their first 13.0.5 words owned.
     // `0x60de68` is `background_tail`'s (row `background_build.construct_tail`, checked and installed above).
     // X6: Pokémon Trainer's pool task (`bg_trainer_enter`/`bg_trainer_exit`) takes the shadow beside a live Mii window.
-    let mii_sites: [(usize, u32); 17] = [(0x607aac, 0xd102c3a0), (0x607d80, 0x1a9f311a), (0x607e74, 0xaa1803f4),
+    let mii_sites: [(usize, u32); 18] = [(0x607aac, 0xd102c3a0), (0x607d80, 0x1a9f311a), (0x607e74, 0xaa1803f4),
         (0x60b5c8, 0xa9577bfd), (0x60b7a8, 0x9343fd6b), (0x60b834, 0xcb0a016b), (0x60b98c, 0x9447780d),
         (0x60bf30, 0x52800283), (0x60dec4, 0x944769d3), (0x60df04, 0xa9444ff4),
         (0x33a05a8, 0xb9405909), (0x344fcd4, 0xf9404717), (0x6e655c, 0xb9405aa8), (0x6e6bc4, 0xb9401262),
-        (0x33c3468, 0xb9405aa8), (0x651a70, 0x52800e42), (0x651b50, 0xb9400be1)];
+        (0x33c3468, 0xb9405aa8), (0x651a70, 0x52800e42), (0x651b50, 0xb9400be1), (0x33c33a8, 0x2a0103f4)];
     let mii_stock = mii_sites.iter().all(|&(offset, word)| fingerprint(base, offset, &[word], "BackgroundMii"));
     // A background Mii body's `x20` is restored by `background_tail`, so the Mii hooks need it installed.
     let mii_ok = gate(SEAM_GROUP, BACKGROUND_MII_SEAMS, async_ok && identity_view && mii_stock && tail_ok)
@@ -6654,7 +6668,8 @@ pub(super) unsafe fn install(base: usize) {
         skyline::install_hooks!(bg_mii_init_enter, bg_mii_init_flags, bg_mii_init_leave, bg_mii_init_exit,
             bg_mii_construct_index_a, bg_mii_construct_index_b, bg_mii_construct_enter, bg_mii_construct_path,
             bg_mii_tail_release, bg_mii_construct_exit, bg_mii_reader_costume, bg_mii_reader_hat,
-            bg_mii_reader_6e655c, bg_mii_reader_paths, bg_mii_reader_33c3468, bg_trainer_enter, bg_trainer_exit);
+            bg_mii_reader_6e655c, bg_mii_reader_paths, bg_mii_reader_33c3468, bg_trainer_enter, bg_trainer_exit,
+            bg_mii_reader_33c3370);
         BACKGROUND_MII_ENABLED.store(true, Ordering::Release);
     }
     trace!("[GroupSwap] background Mii builds {}", if mii_ok { "enabled" } else { "off; a Mii group builds at its first switch" });
