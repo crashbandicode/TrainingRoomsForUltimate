@@ -167,9 +167,10 @@ It now says so: "Same as ‹saved name›, nothing new saved". A changed name al
   second is built in the background only after that player leaves the first Mii.
 - **A Training reset can pause for a moment.** Now and then a Training reset pauses the game for 0.14–0.23 s (seen in
   Eden). The pause is in the game's own reset, not in this mod's loading.
-- **Lobby Items.** Off stops the waiting room's item spawner. An item appearing with the row On, and an item already
-  out disappearing when it turns Off, were not seen in testing: in the emulator's local-wireless rooms the game spawns
-  no items at all.
+- **Lobby Items.** Off stops the waiting room's item spawner, and On starts it again. TODO-PROOF: confirmed on console
+  (the operator's test in an online arena: On drops items, Off doesn't), and the Quickplay waiting-area session
+  `rc6-bg-qp1` (primary 10:22Z, 10:24Z). Until then: in the emulator's local-wireless rooms the game spawns no items at
+  all, so no item was seen on screen yet.
 
 ## Corrections to the rc.5 notes
 
