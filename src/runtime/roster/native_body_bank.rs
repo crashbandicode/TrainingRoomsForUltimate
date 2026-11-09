@@ -193,7 +193,7 @@ use crate::engine::swap::swap_model::occupancy::{KindOccupancy, Occupancy, Rules
 use crate::runtime::roster::body_graph::{self as graph, DESTROY_BODY, DISPATCHER_DESTROY, HEAP_FREE, SPECIAL_OBJECT_RELEASE};
 use crate::runtime::roster::r_handle;
 use crate::runtime::roster::special_articles as articles;
-use crate::engine::swap::swap_model::special_articles::{attachable, RetireStage};
+use crate::engine::swap::swap_model::special_articles::{attachable, prepare_due, RetireStage};
 use crate::runtime::roster::build_split as split;
 
 macro_rules! trace {
@@ -222,6 +222,52 @@ struct Retiring {
     holder: usize,
     stage: RetireStage,
     token: Option<super::InstallToken>,
+}
+
+/// Inbox 02:42Z: the prepared pool build's functor checks passed (`install`), so a detached PT group's retired pool is
+/// built on the task worker ahead of its attach (`special_articles::prepare_due`); otherwise the attach rebuilds it.
+static PREPARE_ENABLED: AtomicBool = AtomicBool::new(false);
+/// Native state 11's trainer functor vtable (`0x4f81498`, seven relocated slots) with its call (`+0x30`) and its two
+/// clones (`+0x10` heap, `+0x18` in place: they write the native vtable, `0x6519c8`, `0x6519f0`) replaced, filled once
+/// at install. The scheduler keeps a clone of the functor, so the clones must keep this vtable.
+static PREPARE_VTABLE: [AtomicUsize; 7] = [const { AtomicUsize::new(0) }; 7];
+/// The trainer functor's two clones (`0x651970`, `0x6519f0`).
+const TRAINER_CLONE_HEAP: usize = 0x651970;
+const TRAINER_CLONE_INTO: usize = 0x6519f0;
+
+/// Inbox 02:42Z: a detached PT group's pool being built on the task worker (`queue_prepare`), under INSTALL.
+#[derive(Clone, Copy, Debug)]
+struct Preparing {
+    group: usize,
+    holder: usize,
+    task: usize,
+    since: u64,
+    token: super::InstallToken,
+}
+
+/// The prepared build's call (`PREPARE_VTABLE + 0x30`), on the task worker: `0x3a6270` on the task's holder with its
+/// owner as the slot, exactly what `special_articles::rebuild_current` runs at an attach (`build_pool`). Nothing else of
+/// the trainer functor runs (no `0x17e8890` lookup, no G68 registration `0x17eeaa0`).
+unsafe extern "C" fn prepare_call(functor: usize) {
+    let base = BASE.load(Ordering::Acquire);
+    let Some(task) = fields::child(functor, 8) else { return; };
+    let Some(holder) = fields::child(task, trainer_task::HOLDER) else { return; };
+    let slot = fields::read::<u32>(task, trainer_task::OWNER).unwrap_or(u32::MAX);
+    articles::build_pool(base, holder, slot);
+}
+
+/// `PREPARE_VTABLE + 0x18`: the in-place clone, as `0x6519f0` with this vtable.
+unsafe extern "C" fn prepare_clone_into(src: usize, dst: usize) {
+    fields::write_unchecked(dst, 0, PREPARE_VTABLE.as_ptr() as usize);
+    fields::write_unchecked(dst, 8, fields::read_unchecked::<usize>(src, 8));
+}
+
+/// `PREPARE_VTABLE + 0x10`: the heap clone, as `0x651970` (`0x392e290(0x10, 0x10)`) with this vtable.
+unsafe extern "C" fn prepare_clone_heap(src: usize) -> usize {
+    let heap_alloc: unsafe extern "C" fn(usize, usize) -> usize = std::mem::transmute(BASE.load(Ordering::Acquire) + HEAP_ALLOC);
+    let dst = heap_alloc(0x10, 0x10);
+    if dst != 0 { prepare_clone_into(src, dst); }
+    dst
 }
 /// Phase B′ fingerprints (the asynchronous construction path) and the functor vtable slot passed.
 static ASYNC_ENABLED: AtomicBool = AtomicBool::new(false);
@@ -1399,7 +1445,7 @@ fn group_reachable(owner: u32, kind: u32, forms: Forms) -> bool {
     let Some(role) = role(owner) else { return false; };
     let base = BASE.load(Ordering::Acquire);
     BANKS[role].lock().as_ref().is_some_and(|bank|
-        bank.swap.is_none() && bank.prefetch.is_none() && bank.object_fetch.is_none() && !bank.departed
+        bank.swap.is_none() && bank.prefetch.is_none() && bank.object_fetch.is_none() && bank.preparing.is_none() && !bank.departed
             && bank.groups.iter().enumerate().any(|(i, g)| g.state.reachable() && group_serves(*g.members, kind, forms).is_some()
                 // Inbox 02:00Z: a pool still retiring is neither live nor empty.
                 && attachable(bank.retiring.filter(|r| r.group == i).map(|r| r.stage))
@@ -1477,6 +1523,55 @@ unsafe fn retire_stage(base: usize, role: usize, owner: u32, r: Retiring, why: &
     };
     trace!("[GroupSwap] articles retire stage owner={} group={} holder={:#x} stage={:?} us={} sub_pools={} sub_articles={} gone={} blocking={} INSTALL_released={}",
         owner, r.group, r.holder, stage, us, pools, articles, gone, blocking, released);
+}
+
+/// Inbox 02:42Z: the detached PT group whose retired pool is built next on the task worker
+/// (`special_articles::prepare_due`): none while anything else is in flight on the bank.
+unsafe fn prepare_candidate(base: usize, bank: &Bank) -> Option<usize> {
+    if !PREPARE_ENABLED.load(Ordering::Acquire) || bank.prefetch.is_some() || bank.construction.is_some()
+        || bank.background.is_some() || bank.object_fetch.is_some() || bank.retiring.is_some() || bank.preparing.is_some() {
+        return None;
+    }
+    let owner = bank.owner;
+    bank.groups.iter().position(|g| !g.leaving && !g.prepare_refused
+        && prepare_due(g.members.holder_step() == Some(HolderStep::Trainer), g.state == GroupState::Built,
+            detached_pool(base, owner, g), g.object_held, false))
+}
+
+/// Inbox 02:42Z: a prepared pool build finished on the worker (or a teardown waited for it): the task freed, INSTALL
+/// back; with the pool filled the object kind goes back, as after an attach's rebuild. An empty pool keeps the kind for
+/// the attach's own rebuild and is not prepared again. No bank lock is held across the native calls.
+unsafe fn prepare_settled(base: usize, role: usize, owner: u32, p: Preparing, why: &str) {
+    let us = now_us().saturating_sub(p.since);
+    free_tasks(base, &[p.task]);
+    let pool = if valid_special_object(base, p.holder, owner) { fields::read::<u64>(p.holder, 0x10).unwrap_or(0) } else { 0 };
+    if let Some(bank) = BANKS[role].lock().as_mut() {
+        bank.preparing = None;
+        if pool == 0 {
+            if let Some(g) = bank.groups.get_mut(p.group) { g.prepare_refused = true; }
+        }
+    }
+    let released = super::finish_install(p.token, "articles prepared");
+    trace!("[GroupSwap] articles prepared owner={} group={} holder={:#x} pool=0->{} us={} why={} INSTALL_released={}{}",
+        owner, p.group, p.holder, pool, us, why, released, if pool == 0 { "; NOT filled, the attach rebuilds it" } else { "" });
+    if pool != 0 {
+        return_object_key(base, role, owner, p.group, "articles prepared on the worker");
+    }
+}
+
+/// A prepared pool build in flight finishes first (`TASK_WAIT`, as `drain_background` waits): before a teardown or a
+/// leave destroys its holder.
+unsafe fn finish_preparation(base: usize, role: usize, owner: u32, why: &str) {
+    use construction_task as task;
+    let Some(p) = BANKS[role].lock().as_ref().and_then(|bank| bank.preparing) else { return; };
+    if fields::read::<i32>(p.task, task::PENDING).unwrap_or(0) > 0 {
+        let wait: unsafe extern "C" fn(u32, usize) = std::mem::transmute(base + TASK_WAIT);
+        let queue = fields::read::<u32>(p.task, task::QUEUE).unwrap_or(task::QUEUE_ID) as usize;
+        if let Some(handle) = fields::child(base, TASK_QUEUES + queue * 8).and_then(|q| fields::read::<u32>(q, 0x10)) {
+            wait(handle, p.task + task::PENDING);
+        }
+    }
+    prepare_settled(base, role, owner, p, why);
 }
 
 /// Every stage still due (`special_articles::remaining`), now, in order: before a teardown, a leave or a rollback
@@ -1688,6 +1783,9 @@ struct GroupData {
     object_held: bool,
     /// Its re-acquisition was refused by the ledger (logged once; not retried; the group then takes the Reload path).
     object_refused: bool,
+    /// Inbox 02:42Z: its prepared pool build left the pool empty or was not queued (logged; not retried; its attach
+    /// rebuilds the pool itself).
+    prepare_refused: bool,
 }
 
 impl GroupData {
@@ -1697,7 +1795,7 @@ impl GroupData {
             bodies: [Body::default(); NATIVE_MEMBERS], since_us: 0, busy_logged: false, kirby_logged: false,
             memory_logged: false, prefetch_committed: None,
             identity, configuration, charinfo_published: false, publish: PublishAttempts::new(), background_refused: false,
-            leaving: false, object_held: false, object_refused: false }
+            leaving: false, object_held: false, object_refused: false, prepare_refused: false }
     }
 }
 
@@ -1819,6 +1917,8 @@ struct Bank {
     object_fetch: Option<(usize, super::InstallToken, u64)>,
     /// Inbox 02:00Z: the PT pool the last exit left retiring (`Retiring`).
     retiring: Option<Retiring>,
+    /// Inbox 02:42Z: a detached PT group's pool being built on the task worker (`Preparing`).
+    preparing: Option<Preparing>,
 }
 
 fn role(owner: u32) -> Option<usize> {
@@ -2044,7 +2144,7 @@ pub(super) unsafe fn build(entry: *const u8, owner: u32, members: Members) -> bo
         groups: storage.groups, alias: 0, exchange: None, swap: None, prefetch: None, swap_started: None,
         pair_logged: false, identity: None, configuration: None, ordinary_identity: None, activated: Default::default(),
         construction: None, background: None, tick: TickGap::default(), held_turn: 0, scene: None,
-        object_fetch: None, retiring: None,
+        object_fetch: None, retiring: None, preparing: None,
     });
     EXTRAS[role].store((members.count() - 1) as u8, Ordering::Release);
     GROUP_BODIES[role].store(0, Ordering::Release);
@@ -2115,7 +2215,7 @@ unsafe fn publish_pending(owner: u32, members: Members, scene: Option<(u32, u32)
         groups: storage.groups, alias: 0, exchange: None, swap: None, prefetch: None, swap_started: None,
         pair_logged: false, identity: None, configuration: None, ordinary_identity: None, activated: Default::default(),
         construction: None, background: None, tick: TickGap::default(), held_turn: 0, scene,
-        object_fetch: None, retiring: None,
+        object_fetch: None, retiring: None, preparing: None,
     });
     EXTRAS[role].store((members.count() - 1) as u8, Ordering::Release);
     GROUP_BODIES[role].store(0, Ordering::Release);
@@ -2453,7 +2553,8 @@ unsafe fn service_locked(entry: *mut u8, owner: u32, role: usize) -> Action {
             return if !idle { Action::None }
                 // rc.6 item 3: a background build in flight settles on the window's ticks; one owed starts.
                 else if bank.background.is_some() { Action::Background }
-                else if bank.retiring.is_some() { Action::Lifecycle }
+                else if bank.retiring.is_some() || bank.preparing.is_some()
+                    || prepare_candidate(BASE.load(Ordering::Acquire), bank).is_some() { Action::Lifecycle }
                 else if bank.object_fetch.is_some() || rearm_candidate(BASE.load(Ordering::Acquire), bank).is_some() { Action::Lifecycle }
                 else if bank.prefetch.is_some()
                     || bank.groups.iter().any(|g| g.state.startable() || (g.leaving && !leaves_at_pause(g.state)))
@@ -3146,7 +3247,7 @@ unsafe fn queue_task(base: usize, object: usize, vtable: usize, callback: usize)
     std::ptr::write_bytes(t as *mut u8, 0, task::SIZE);
     fields::write_unchecked(t, task::BODY, object);
     fields::write_unchecked(t, task::QUEUE, task::QUEUE_ID);
-    schedule_task(base, t, vtable, callback);
+    schedule_task(base, t, base + vtable, callback);
     t
 }
 
@@ -3154,10 +3255,11 @@ unsafe fn queue_task(base: usize, object: usize, vtable: usize, callback: usize)
 /// local destroyed as native does, then `0x3549720(task+0x10, callback, 2, 1)` (`queue_task`, and state 11's Pokémon
 /// Trainer task, `queue_trainer`).
 unsafe fn schedule_task(base: usize, t: usize, vtable: usize, callback: usize) {
+    // `vtable` is an address: a native one (`base + offset`) or the prepared build's `PREPARE_VTABLE`.
     use construction_task as task;
     let functor_swap: unsafe extern "C" fn(*mut [usize; 5], usize) = std::mem::transmute(base + FUNCTOR_COPY);
     let schedule: unsafe extern "C" fn(usize, usize, u32, u32) = std::mem::transmute(base + TASK_SCHEDULE);
-    let mut functor = [base + vtable, t, 0, 0, 0];
+    let mut functor = [vtable, t, 0, 0, 0];
     functor[4] = functor.as_ptr() as usize;
     functor_swap(&mut functor, t + task::FUNCTOR);
     let holder = functor[4];
@@ -3695,7 +3797,23 @@ unsafe fn queue_trainer(base: usize, entry: usize, owner: u32, holder: usize) ->
     fields::write_unchecked(t, trainer_task::FLAG,
         trainer_task::flag(fields::read_unchecked::<u8>(entry, 0x52), fields::read_unchecked::<u8>(entry, 0x53)));
     fields::write_unchecked(t, trainer_task::BUILD, 1u8);
-    schedule_task(base, t, TRAINER_FUNCTOR_VTABLE, TRAINER_CALLBACK);
+    schedule_task(base, t, base + TRAINER_FUNCTOR_VTABLE, TRAINER_CALLBACK);
+    t
+}
+
+/// Inbox 02:42Z: state 11's Pokémon Trainer task for a detached group's retired holder, run with the prepared build's
+/// functor (`PREPARE_VTABLE`: `0x3a6270` only) and state 11's callback; the owner is the slot `0x3a6270` records, as the
+/// trainer functor passes it (`ldr w4, [x21, #0x8]`). Returns the task, or 0 (nothing queued).
+unsafe fn queue_prepare(base: usize, owner: u32, holder: usize) -> usize {
+    use construction_task as task;
+    let heap_alloc: unsafe extern "C" fn(usize, usize) -> usize = std::mem::transmute(base + HEAP_ALLOC);
+    let t = heap_alloc(task::ALIGN, trainer_task::SIZE);
+    if t == 0 { return 0; }
+    std::ptr::write_bytes(t as *mut u8, 0, trainer_task::SIZE);
+    fields::write_unchecked(t, trainer_task::HOLDER, holder);
+    fields::write_unchecked(t, trainer_task::OWNER, owner);
+    fields::write_unchecked(t, task::QUEUE, task::QUEUE_ID);
+    schedule_task(base, t, PREPARE_VTABLE.as_ptr() as usize, TRAINER_CALLBACK);
     t
 }
 
@@ -5070,7 +5188,8 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
     // keys back; Built groups consumed their keys at construction.
     enum Step { Poll(usize, super::InstallToken, u64, Members, usize), Start(usize, Members, usize),
         Release(usize, Members, Members, usize), Background(usize), Leave(usize), Idle,
-        Rearm(usize, Members, usize), RearmPoll(usize, super::InstallToken, u64, u32, usize), Retire(Retiring) }
+        Rearm(usize, Members, usize), RearmPoll(usize, super::InstallToken, u64, u32, usize), Retire(Retiring),
+        Prepare(usize, usize), PreparePoll(Preparing) }
     let step = {
         let mut state = BANKS[role].lock();
         let Some(bank) = state.as_mut().filter(|bank| bank.entry == entry as usize && bank.phase == Phase::Ready
@@ -5085,6 +5204,11 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
         // Inbox 02:00Z: the PT pool the last exit left retiring, one stage per tick, before anything new starts.
         } else if let Some(r) = bank.retiring {
             Step::Retire(r)
+        // Inbox 02:42Z: a detached PT group's retired pool built on the task worker, ahead of its attach.
+        } else if let Some(p) = bank.preparing {
+            Step::PreparePoll(p)
+        } else if let Some(group) = prepare_candidate(base, bank) {
+            Step::Prepare(group, bank.groups[group].saved.map_or(0, |w| w.records[0]))
         } else if let Err(reason) = crate::engine::swap::body_bank::prefetch_admitted(live) {
             let (window, alias) = (*bank.members, bank.alias);
             match bank.groups.iter().position(|g| g.state == GroupState::Prefetched) {
@@ -5133,7 +5257,8 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
         Step::Background(_) => "background start", Step::Leave(_) => "leave", Step::Release(..) => "key release",
         Step::Poll(..) => "prefetch poll", Step::Start(..) => "prefetch start",
         Step::Rearm(..) => "object re-arm", Step::RearmPoll(..) => "object re-arm poll",
-        Step::Retire(..) => "articles retire stage",
+        Step::Retire(..) => "articles retire stage", Step::Prepare(..) => "articles prepare",
+        Step::PreparePoll(..) => "articles prepare poll",
     };
     // `slow_step` names the step for a frame gap (inbox 22:17Z); every early return below is a cheap refusal.
     struct Timed(u32, &'static str, u64);
@@ -5142,6 +5267,36 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
     match step {
         Step::Idle => {}
         Step::Retire(r) => retire_step(base, role, owner, r, "detach"),
+        Step::Prepare(group, holder) => {
+            // As a prefetch starts: INSTALL held until the build settles, so a press meanwhile waits for it.
+            if holder == 0 || !valid_special_object(base, holder, owner) || super::INSTALL.active() { return; }
+            let Some(token) = super::INSTALL.try_begin(false) else { return; };
+            let t = queue_prepare(base, owner, holder);
+            let queued = match BANKS[role].lock().as_mut() {
+                Some(bank) if t != 0 => {
+                    bank.preparing = Some(Preparing { group, holder, task: t, since: now, token });
+                    true
+                }
+                Some(bank) => {
+                    if let Some(g) = bank.groups.get_mut(group) { g.prepare_refused = true; }
+                    false
+                }
+                None => false,
+            };
+            if !queued {
+                super::finish_install(token, "articles prepare: not queued");
+                trace!("[GroupSwap] articles prepare UNEXPECTED owner={} group={} holder={:#x} task={:#x}; the attach rebuilds the pool",
+                    owner, group, holder, t);
+                return;
+            }
+            trace!("[GroupSwap] articles prepare owner={} group={} holder={:#x} task={:#x}; the pool is built on the task worker",
+                owner, group, holder, t);
+        }
+        Step::PreparePoll(p) => {
+            use construction_task as task;
+            if fields::read::<i32>(p.task, task::PENDING).unwrap_or(0) > 0 { return; }
+            prepare_settled(base, role, owner, p, "settled");
+        }
         Step::Rearm(group, members, alias) => {
             // As a prefetch starts (`Step::Start`): this R, idle, Training; INSTALL held until it settles, so a press
             // meanwhile waits for it (`character_roster`'s pending request) instead of rebuilding without the files.
@@ -5450,6 +5605,8 @@ unsafe fn retire_groups(entry: *const u8, owner: u32, reason: &str) {
     drain_background(entry, owner, role, reason);
     // Inbox 02:00Z: a PT pool still retiring is emptied before its holder is destroyed below.
     finish_retirement(base, role, owner, reason);
+    // Inbox 02:42Z: a prepared pool build in flight finishes before its holder is destroyed below.
+    finish_preparation(base, role, owner, reason);
     // D-KIRBY1: the kind a live Kirby copies keeps its key (read before the lock).
     let window = BANKS[role].lock().as_ref()
         .filter(|bank| bank.entry == entry as usize && bank.owner == owner).map(|bank| *bank.members);
@@ -5659,6 +5816,7 @@ unsafe fn leave_group(entry: *const u8, owner: u32, role: usize, group: usize) {
     let base = BASE.load(Ordering::Acquire);
     // Inbox 02:00Z: a PT pool still retiring is emptied before its holder is destroyed below.
     finish_retirement(base, role, owner, "left the cycle");
+    finish_preparation(base, role, owner, "left the cycle");
     let Some(window) = BANKS[role].lock().as_ref()
         .filter(|bank| bank.entry == entry as usize && bank.owner == owner).map(|bank| *bank.members) else { return; };
     let copy = live_kirby_copy_kind(entry, owner, window);
@@ -6367,6 +6525,28 @@ pub(super) unsafe fn install(base: usize) {
     NATIVE_BACKGROUND.store(native_ok, Ordering::Release);
     trace!("[GroupSwap] background build of Pokémon Trainer and Pyra/Mythra groups {} trainer_slot={}",
         if native_ok { "enabled" } else { "off; they build at their first switch" }, trainer_slot);
+    // Inbox 02:42Z: the prepared pool build's functor. The trainer functor vtable's relocated slots must be the clones it
+    // replaces (`0x651970`, `0x6519f0`: they write the native vtable) and the functor (`+0x30`); the others are copied.
+    let prepare_ok = native_ok
+        && fields::read::<usize>(base, TRAINER_FUNCTOR_VTABLE + 0x10) == Some(base + TRAINER_CLONE_HEAP)
+        && fields::read::<usize>(base, TRAINER_FUNCTOR_VTABLE + 0x18) == Some(base + TRAINER_CLONE_INTO)
+        && fields::read::<usize>(base, TRAINER_FUNCTOR_VTABLE + 0x30) == Some(base + TRAINER_FUNCTOR)
+        && fingerprint(base, TRAINER_CLONE_HEAP, &[0xd100c3ff, 0xf9000bf3, 0xa9027bfd, 0x910083fd], "GroupSwap")
+        && fingerprint(base, TRAINER_CLONE_INTO, &[0x90024988, 0x91126108, 0xf9000028, 0xf9400408], "GroupSwap");
+    if prepare_ok {
+        for (i, slot) in PREPARE_VTABLE.iter().enumerate() {
+            let value = match i * 8 {
+                0x10 => prepare_clone_heap as *const () as usize,
+                0x18 => prepare_clone_into as *const () as usize,
+                0x30 => prepare_call as *const () as usize,
+                offset => fields::read_unchecked::<usize>(base, TRAINER_FUNCTOR_VTABLE + offset),
+            };
+            slot.store(value, Ordering::Release);
+        }
+    }
+    PREPARE_ENABLED.store(prepare_ok, Ordering::Release);
+    trace!("[GroupSwap] prepared Pokémon Trainer pools {}",
+        if prepare_ok { "enabled; a detached group's retired pool is built on the task worker" } else { "off; the attach rebuilds the pool" });
     let info_stock = fingerprint(base, BACKGROUND_INFO, &[0xf9400529, 0x39425129, 0x35001da9, 0xf945bd08], "GroupSwap");
     let info_ok = gate(SEAM_GROUP, BACKGROUND_INFO_SEAMS, async_ok && identity_view && info_stock)
         && async_ok && identity_view && info_stock;

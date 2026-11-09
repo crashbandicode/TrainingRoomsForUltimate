@@ -232,15 +232,28 @@ pub(crate) unsafe fn rebuild_current(base: usize, owner: u32, entry: usize, vali
     let holder = fields::read::<usize>(entry, HOLDER).unwrap_or(0);
     let count = if valid { pool_count(holder) } else { 0 };
     if model::on_attach(flags, valid, count) != Some(ArticleStep::Rebuild) { return false; }
-    // The build initialized the table before it built this holder; a clear guard would mean that never happened.
-    if !PT_TABLE_GUARDS.iter().all(|guard| fields::read::<u8>(base, *guard).is_some_and(|g| g & 1 != 0)) {
+    let slot = fields::read::<u32>(entry, SLOT).unwrap_or(u32::MAX);
+    if !build_pool(base, holder, slot) {
         trace!("[GroupSwap] articles NOT rebuilt owner={} holder={:#x} why={} reason=trainer table not initialized", owner, holder, why);
         return false;
     }
-    let slot = fields::read::<u32>(entry, SLOT).unwrap_or(u32::MAX);
+    trace!("[GroupSwap] articles rebuilt owner={} holder={:#x} pool=0->{} slot={} why={}", owner, holder, pool_count(holder), slot, why);
+    true
+}
+
+/// `0x3a6270(holder, main+0x52b9488, 0, -1, slot, 0)`, the build's own arguments, once the trainer table's lazy inits ran
+/// (the build initialized the table before it built this holder; a clear guard would mean that never happened). Returns
+/// whether it ran. Inbox 02:42Z: also on the task worker, where native state 11's trainer functor runs the same call
+/// (`0x651b4c`), for a detached group's retired holder (`native_body_bank::prepare_call`).
+///
+/// # Safety
+/// `holder` is a valid PT holder with an empty pool that nothing else touches until this returns.
+pub(crate) unsafe fn build_pool(base: usize, holder: usize, slot: u32) -> bool {
+    if !PT_TABLE_GUARDS.iter().all(|guard| fields::read::<u8>(base, *guard).is_some_and(|g| g & 1 != 0)) {
+        return false;
+    }
     let build: unsafe extern "C" fn(usize, usize, u32, u64, u32, u32) = std::mem::transmute(base + POOL_BUILD);
     // `mov w3, #-1` in both native callers: x3 = 0x0000_0000_ffff_ffff (`0x3a6270` moves the full x3 on).
     build(holder, base + PT_ARTICLE_TABLE, 0, u64::from(u32::MAX), slot, 0);
-    trace!("[GroupSwap] articles rebuilt owner={} holder={:#x} pool=0->{} slot={} why={}", owner, holder, pool_count(holder), slot, why);
     true
 }

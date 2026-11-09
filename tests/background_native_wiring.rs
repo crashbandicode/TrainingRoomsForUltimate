@@ -22,6 +22,39 @@ const BANK: &str = include_str!("../src/runtime/roster/native_body_bank.rs");
 const ROWS: &str = include_str!("../src/model/seams/native_seams/rows_a1.rs");
 const SPECIAL: &str = include_str!("../src/runtime/roster/special_articles.rs");
 
+/// Inbox 02:42Z (the attach's own rebuild: 209-382 ms the first time, 43-63 ms after, in the switch's setup tick): once a
+/// detached PT group's pool is retired and the group holds its object kind again, its pool is built on the task worker
+/// (native state 11's trainer task with the plugin's functor: only `0x3a6270`, no G68 registration, and clones that keep
+/// the plugin's vtable), under INSTALL; when it settles the kind goes back, as after an attach's rebuild. The attach then
+/// rebuilds nothing. Teardowns wait for the task; without the checked slots the attach keeps its own rebuild.
+#[test]
+fn a_retired_pt_pool_is_prepared_on_the_worker_before_its_attach() {
+    let lifecycle = body(BANK, "unsafe fn group_lifecycle(");
+    ordered(lifecycle, &["} else if let Some(r) = bank.retiring {", "} else if let Some(p) = bank.preparing {", "Step::PreparePoll(p)",
+        "} else if let Some(group) = prepare_candidate(base, bank) {", "Step::Prepare(group",
+        "Step::Prepare(group, holder) => {", "super::INSTALL.try_begin(false)", "queue_prepare(base, owner, holder)",
+        "bank.preparing = Some(Preparing {", "Step::PreparePoll(p) => {", "fields::read::<i32>(p.task, task::PENDING)",
+        "prepare_settled(base, role, owner, p, \"settled\")"]);
+    let settled = body(BANK, "unsafe fn prepare_settled(");
+    ordered(settled, &["free_tasks(base, &[p.task]);", "super::finish_install(p.token, \"articles prepared\")",
+        "return_object_key(base, role, owner, p.group, \"articles prepared on the worker\");"]);
+    assert!(body(BANK, "unsafe fn prepare_candidate(").contains("prepare_due("));
+    let call = body(BANK, "unsafe extern \"C\" fn prepare_call(");
+    ordered(call, &["let Some(task) = fields::child(functor, 8) else { return; };", "articles::build_pool(base, holder, slot);"]);
+    assert!(body(BANK, "unsafe extern \"C\" fn prepare_clone_into(").contains("PREPARE_VTABLE.as_ptr() as usize"));
+    assert!(body(BANK, "unsafe extern \"C\" fn prepare_clone_heap(").contains("prepare_clone_into(src, dst);"));
+    let reachable = body(BANK, "fn group_reachable(");
+    assert!(reachable.contains("bank.preparing.is_none()"), "{reachable}");
+    ordered(body(BANK, "unsafe fn retire_groups("), &["finish_retirement(base, role, owner, reason);", "finish_preparation(base, role, owner, reason);"]);
+    ordered(body(BANK, "unsafe fn leave_group("), &["finish_retirement(base, role, owner, \"left the cycle\");",
+        "finish_preparation(base, role, owner, \"left the cycle\");"]);
+    ordered(body(BANK, "pub(super) unsafe fn install(base: usize) {"), &["let prepare_ok = native_ok",
+        "TRAINER_FUNCTOR_VTABLE + 0x10", "TRAINER_FUNCTOR_VTABLE + 0x18", "slot.store(value, Ordering::Release);",
+        "PREPARE_ENABLED.store(prepare_ok, Ordering::Release);"]);
+    let rebuild = body(SPECIAL, "pub(crate) unsafe fn rebuild_current(");
+    assert!(rebuild.contains("build_pool(base, holder, slot)"), "{rebuild}");
+}
+
 /// Inbox 02:00Z (leaving a PT group: 114.9-118.5 ms, a 5-frame gap; Eden rc6-bg-ptx1/ptx2 put all of it in pass 2 of
 /// `0x3a6b80`, the trainer's teardown and its own pools): the exit's tick runs pass 1 only (`deactivate_saved`); the
 /// group lifecycle's Retire step then releases the trainer's own pools and destroys it, one stage per later tick under
@@ -55,7 +88,7 @@ fn a_pt_exit_retires_its_pool_over_later_ticks() {
     ordered(body(BANK, "unsafe fn complete_exchange("), &["let Some((group, via)) = rollback else { return; };",
         "finish_retirement(base, role, owner, \"swap rollback\");", "restore_window(entry as usize, &x);"]);
     ordered(body(BANK, "unsafe fn service_locked("), &["else if bank.background.is_some() { Action::Background }",
-        "else if bank.retiring.is_some() { Action::Lifecycle }"]);
+        "else if bank.retiring.is_some() || bank.preparing.is_some()"]);
     // Pass 2 as native runs it, except that an id `0x3ac560` no longer finds is never handed to `0x3aeb50`.
     ordered(body(SPECIAL, "pub(crate) unsafe fn destroy_saved("), &["let found = lookup(base, id);",
         "if found == 0 || fields::read::<u8>(found, 0x3a).unwrap_or(0) <= 3 { static_init(base); }",
@@ -130,7 +163,7 @@ fn the_holder_step_follows_the_bodies_and_its_records_go_into_the_group_window()
         "fields::write_unchecked(t, trainer_task::COSTUME, fields::read_unchecked::<u8>(entry, 0x41));",
         "trainer_task::flag(fields::read_unchecked::<u8>(entry, 0x52), fields::read_unchecked::<u8>(entry, 0x53))",
         "fields::write_unchecked(t, trainer_task::BUILD, 1u8);",
-        "schedule_task(base, t, TRAINER_FUNCTOR_VTABLE, TRAINER_CALLBACK);"]);
+        "schedule_task(base, t, base + TRAINER_FUNCTOR_VTABLE, TRAINER_CALLBACK);"]);
     let guards = body(BANK, "unsafe fn partner_guards(");
     ordered(guards, &["acquire(base + first) != 0", "release(base + first);", "acquire(base + second) != 0",
         "fields::write_unchecked(base, PARTNER_TABLE, base + PARTNER_ENTRY);", "release(base + second);"]);
@@ -153,9 +186,9 @@ fn the_holder_step_follows_the_bodies_and_its_records_go_into_the_group_window()
     // The body task's scheduling is shared with the trainer task, unchanged.
     let queue = body(BANK, "unsafe fn queue_task(");
     ordered(queue, &["let t = heap_alloc(task::ALIGN, task::SIZE);", "fields::write_unchecked(t, task::BODY, object);",
-        "schedule_task(base, t, vtable, callback);"]);
+        "schedule_task(base, t, base + vtable, callback);"]);
     let schedule = body(BANK, "unsafe fn schedule_task(");
-    ordered(schedule, &["let mut functor = [base + vtable, t, 0, 0, 0];", "functor_swap(&mut functor, t + task::FUNCTOR);",
+    ordered(schedule, &["let mut functor = [vtable, t, 0, 0, 0];", "functor_swap(&mut functor, t + task::FUNCTOR);",
         "schedule(t + task::HANDLE, base + callback, task::SCHEDULE_ARGS.0, task::SCHEDULE_ARGS.1);"]);
 }
 

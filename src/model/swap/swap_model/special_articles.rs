@@ -103,6 +103,14 @@ pub fn remaining(done: RetireStage) -> impl Iterator<Item = RetireStage> {
     std::iter::successors(done.next(), |stage| stage.next())
 }
 
+/// Inbox 02:42Z: a detached PT group's pool is built again on the task worker, ahead of its attach, when it is a built
+/// `trainer` group whose pool (`pool` articles) is empty, it holds its object kind again (`held`: the files resident,
+/// body_bank's item 1) and the pool is not still `retiring`. Its attach then finds the pool filled ([`on_attach`]: no
+/// rebuild on the game thread) and claims the trainer, as after a background build.
+pub fn prepare_due(trainer: bool, built: bool, pool: u64, held: bool, retiring: bool) -> bool {
+    trainer && built && pool == 0 && held && !retiring
+}
+
 /// A group whose pool is still retiring is not attached warm: its pool is neither live (deactivated) nor empty (the
 /// rebuild needs count 0), so the activation would claim a deactivated trainer.
 pub fn attachable(retiring: Option<RetireStage>) -> bool {
@@ -270,6 +278,29 @@ mod tests {
         // Aegis and ordinary windows have nothing to retire, so nothing is staged.
         assert_eq!(on_detach(AEGIS_FLAGS, true, 3), None);
         assert_eq!(on_detach(ORDINARY_FLAGS, false, 0), None);
+    }
+
+    /// Inbox 02:42Z: the attach's own rebuild (`0x3a6270` inside the switch's setup tick) took 209 ms the boot's first
+    /// time and 43-63 ms after it (Eden rc6-bg-ptx3; hot-slots rc6-hot-xps22: 382 ms, then 62 ms). A detached PT group's
+    /// retired pool is built again on the task worker once the group holds its object kind again (item 1), so the attach
+    /// finds it filled, as after a background build, and claims it without a rebuild.
+    #[test]
+    fn a_retired_pt_pool_is_built_again_on_the_worker_before_its_attach() {
+        assert!(prepare_due(true, true, 0, true, false));
+        assert!(!prepare_due(true, true, 0, false, false), "the files are not resident yet: item 1's re-acquisition first");
+        assert!(!prepare_due(true, true, 0, true, true), "still retiring");
+        assert!(!prepare_due(true, true, PT_POOL, true, false), "already filled (a background build's, or prepared)");
+        assert!(!prepare_due(false, true, 0, true, false), "Aegis and ordinary holders are never retired");
+        assert!(!prepare_due(true, false, 0, true, false), "only a built group");
+        let mut pt = Holder::built(PT_FLAGS);
+        pt.activate();
+        pt.detach();
+        assert_eq!(pt.articles, 0, "retired at the exit");
+        pt.articles = PT_POOL; // the worker's 0x3a6270 on the detached holder
+        assert!(!pt.trainer_drawn(), "a prepared pool draws nothing until its attach claims it");
+        assert_eq!(on_attach(PT_FLAGS, true, pt.articles), None, "the attach rebuilds nothing");
+        pt.attach();
+        assert!(pt.trainer_drawn(), "and claims the prepared trainer");
     }
 
     #[test]
