@@ -9285,7 +9285,7 @@
    "dest": "src/runtime/mii/mii_catalog_request.rs",
    "crate": "root",
    "src_sha256": "87a0062a0ef9cb6c0078409ff3ac876dd35d85d5e40aac6236eaed6f36482602",
-   "dest_sha256": "1f18b830bc14f8d43b9b9175ef7cff3ddf68d07c3905d13063e11e529da4490d",
+   "dest_sha256": "1273eef5190d91899271ce3ebcb915f7fad4e50bf90e68f7991ca49ed9fe6c37",
    "edits": [
     {
      "old": "use std::sync::{mpsc, Arc, Mutex};",
@@ -9448,6 +9448,11 @@
      "old": "    super::menu_handoff::init();",
      "new": "    crate::runtime::mii::menu_handoff::init();",
      "reason": "Catalog request is path-declared under roster, so boot close-handoff initialization uses its canonical runtime::mii module path."
+    },
+    {
+     "old": "    if let Some((verdict, snapshot)) = ready {\n",
+     "new": "    if let Some((verdict, snapshot)) = ready {\n        // Every completed read, whatever its verdict: the editor checks its saved Mii here, on the game thread, never on the\n        // reader thread (the bridge's STATE is taken by game hooks; rc.6 Training-entry freeze class).\n        #[cfg(feature = \"mii-editor-alpha\")]\n        crate::runtime::mii::mii_editor_bridge::catalog_read(&snapshot);\n",
+     "reason": "rc.6 freeze class (primary 2026-11-09 19:44Z; rc6-qpf3, tests/lock_order.rs): the saved-Mii catalog check runs on the game thread when the broker receives the snapshot (mii_catalog_request::service), never on the reader thread, because game hooks take the editor bridge's STATE"
     }
    ]
   },
@@ -12227,7 +12232,7 @@
    "dest": "src/runtime/mii/mii_editor_bridge/mod.rs",
    "crate": "root",
    "src_sha256": "469dd011585d19e4999c25d02c9ea2faa6c9f1c1743686b55adbdadd09ce33ca",
-   "dest_sha256": "069021ed7d5719bcc583ec422fd525a2e60d2b63601fbdec74b777a0e46bc69c",
+   "dest_sha256": "5c24e223d95b2a397e76a1720f7ce20f498690a0f08163c18b09b304f7000c96",
    "edits": [
     {
      "old": "pub(crate) struct Trace {\n    events: Vec<Event>,\n    input_checks: Vec<(&'static str, [native::InputChange; 3])>,\n}",
@@ -12555,6 +12560,11 @@
      "old": "    let mut reused = false;\n    {\n        let mut state = STATE.lock();\n        // Every owned explicit Save starts closed; only a qualified fresh\n        // draft reaches the game's native allocator. Existing IDs cannot enter.\n        native::write(context, 0x168, 2i32);\n        if let Some(s) = state.as_mut().filter(|s| s.phase == Phase::Editing\n            && s.thread == current_thread() && EDIT_CONTEXT.load(Ordering::Acquire) == context\n            && !s.interrupted) {\n            if let Ok((_, configuration)) = parsed {\n                let canonical = configuration.canonical();\n                if let Some(existing) = s.catalog.configs.iter().find(|c| c.canonical == canonical) {\n                    let id = existing.slot_id;\n                    s.explicit_save_finished = true;\n                    s.event(\"native_save_reused\", [u64::from(id), 0, 0, 0]);\n                    reused = true;\n                } else if fresh && s.catalog.is_complete()\n                    && s.catalog.slots_seen < crate::engine::mii::saved::MAX_FILES {\n                    // This is the existing catalog reader's supported ceiling,\n                    // not an assertion about Smash's native maximum.\n                    native::write(context, 0x168, 1i32);\n                    create = Some(canonical);\n                    s.event(\"native_save_requested\", [inventory::fnv1a64(&row), mode, 0, 0]);\n                } else { s.event(\"native_save_guard_refused\", [u64::from(fresh), s.catalog.slots_seen as u64, 0, 0]); }\n            } else { s.event(\"native_save_invalid_draft\", [0; 4]); }\n        }\n    }\n    if reused { ui_resume::discard(); }\n    let result = original!()(context);\n    if let Some(canonical) = create {",
      "new": "    let mut reused = false;\n    let mut notice = None;\n    {\n        let mut state = STATE.lock();\n        // Every owned explicit Save starts closed; only a qualified fresh\n        // draft reaches the game's native allocator. Existing IDs cannot enter.\n        native::write(context, 0x168, 2i32);\n        if let Some(s) = state.as_mut().filter(|s| s.phase == Phase::Editing\n            && s.thread == current_thread() && EDIT_CONTEXT.load(Ordering::Acquire) == context\n            && !s.interrupted) {\n            if let Ok((_, configuration)) = parsed {\n                let canonical = configuration.canonical();\n                if let Some(existing) = s.catalog.configs.iter().find(|c| c.canonical == canonical) {\n                    let id = existing.slot_id;\n                    // Operator decision C (2026-11-08): the reuse stays, and the player is told which saved Mii.\n                    notice = crate::model::notify::save_notice(Some(&existing.name));\n                    s.explicit_save_finished = true;\n                    s.event(\"native_save_reused\", [u64::from(id), 0, 0, 0]);\n                    reused = true;\n                } else if fresh && s.catalog.is_complete()\n                    && s.catalog.slots_seen < crate::engine::mii::saved::MAX_FILES {\n                    // This is the existing catalog reader's supported ceiling,\n                    // not an assertion about Smash's native maximum.\n                    native::write(context, 0x168, 1i32);\n                    create = Some(canonical);\n                    s.event(\"native_save_requested\", [inventory::fnv1a64(&row), mode, 0, 0]);\n                } else { s.event(\"native_save_guard_refused\", [u64::from(fresh), s.catalog.slots_seen as u64, 0, 0]); }\n            } else { s.event(\"native_save_invalid_draft\", [0; 4]); }\n        }\n    }\n    if reused { ui_resume::discard(); }\n    if let Some(body) = notice {\n        crate::runtime::features::notices::post_body(crate::model::notify::SAME_AS_SAVED_HEADER, body,\n            crate::model::notify::SAME_AS_SAVED_FRAMES, crate::model::notify::DEFAULT_COLOR);\n    }\n    let result = original!()(context);\n    if let Some(canonical) = create {",
      "reason": "Operator decision C (#52, 2026-11-08): a Save that matches a saved Mii keeps the reuse rule (docs/MII.md rows 4 and 12: that saved Mii is used, nothing is stored) and is no longer silent: the reuse branch builds \"Same as <saved name>, nothing new saved\" from the matched saved Mii's own name into a fixed notice body (model::notify::save_notice, no allocation) and posts it through the notice mailbox after the session lock is released"
+    },
+    {
+     "old": "/// new native ID and canonical values there, after the writer-idle return gate.\n/// This callback uses owned values only and performs no native memory access.\n",
+     "new": "/// new native ID and canonical values in each completed read, after the writer-idle return gate.\n/// Game thread only: the catalog broker calls this when it receives the owned snapshot\n/// (`mii_catalog_request::service`), never the reader thread, because game hooks take `STATE`\n/// (rc.6 freeze class, `tests/lock_order.rs`). The preset merge does not change `configs`,\n/// `slots_seen` or completeness. Owned values only, no native memory access.\n",
+     "reason": "rc.6 freeze class (primary 2026-11-09 19:44Z; rc6-qpf3, tests/lock_order.rs): the saved-Mii catalog check runs on the game thread when the broker receives the snapshot (mii_catalog_request::service), never on the reader thread, because game hooks take the editor bridge's STATE"
     }
    ]
   },

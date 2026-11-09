@@ -749,8 +749,11 @@ unsafe fn save_ready_for_return(base: usize) -> bool {
 }
 
 /// Existing menu/catalog workers already read native saved files. Verify the
-/// new native ID and canonical values there, after the writer-idle return gate.
-/// This callback uses owned values only and performs no native memory access.
+/// new native ID and canonical values in each completed read, after the writer-idle return gate.
+/// Game thread only: the catalog broker calls this when it receives the owned snapshot
+/// (`mii_catalog_request::service`), never the reader thread, because game hooks take `STATE`
+/// (rc.6 freeze class, `tests/lock_order.rs`). The preset merge does not change `configs`,
+/// `slots_seen` or completeness. Owned values only, no native memory access.
 pub(crate) fn catalog_read(catalog: &Snapshot) {
     if !crate::engine::mii_root::mii_menu::NATIVE_EDITOR_AVAILABLE { return; }
     let mut state = STATE.lock();

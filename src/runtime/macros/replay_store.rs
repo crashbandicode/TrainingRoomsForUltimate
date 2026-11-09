@@ -111,8 +111,6 @@ pub fn start_writer() -> Result<(), String> {
                         // Stable native header reads stay in saved::read_catalog. Preset merge stays
                         // on this writer, after any import already queued ahead of this job.
                         let mut native = read_saved_mii_catalog();
-                        #[cfg(feature = "mii-editor-alpha")]
-                        crate::runtime::mii::mii_editor_bridge::catalog_read(&native);
                         match &presets {
                             Ok(store) => native = native.with_library(store.library()),
                             Err(error) => native.findings.push(crate::engine::mii::inventory::Finding::PresetSource {
@@ -207,8 +205,6 @@ fn init_catalog_fallback() {
         let _ = crate::runtime::threads::spawn(crate::model::thread_stacks::ThreadId::MiiCatalog, move || {
                 while let Ok(reply) = receiver.recv() {
                     let native = read_saved_mii_catalog();
-                    #[cfg(feature = "mii-editor-alpha")]
-                    crate::runtime::mii::mii_editor_bridge::catalog_read(&native);
                     #[cfg(feature = "mii-ordinary-cpu-alpha")]
                     let native = {
                         let mut native = native;
