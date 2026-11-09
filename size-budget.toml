@@ -1100,3 +1100,11 @@ ceiling = 158905
 date = "2026-11-09"
 reason = "rc.6 integration (p23/rc6-integration c9e62f33): the merge of p23/rc6-pt-start a5c3ef84 (158317: +42 over d5db7387's 158275, the PT/Aegis start and X5) into c0e14b63 (158863, worker B's PT exit and first attach); measured 158905 on the merged tree (tools/size_gate.py), +42"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); combined ceiling = measured merged size per primary c07b3449, INBOX-opus-rc6-integration 2026-11-08 19:13Z"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 159103
+date = "2026-11-09"
+reason = "rc.6 p23/rc6-pt-start X6 (8cbc58b) over integration 7da9c4dd: every group but a Mii builds beside a live Mii window with the owner's ordinary baseline (the shadow hooks for every body, two Pokemon Trainer pool-task hooks with seam rows, the group's own words for every key request and release, LiveIdentity) and its host and wiring tests; measured 159103 (tools/size_gate.py), +198 over 158905 (7da9c4dd)"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to the operator-chosen rc.6 items under TASK-OPUS-rc6-hot-slots (primary c07b3449, 2026-11-08: a raise goes in its own commit with approved_by)"
