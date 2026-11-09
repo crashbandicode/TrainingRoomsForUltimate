@@ -1745,3 +1745,31 @@ Inbox `INBOX-opus-rc6-bg-ic.md` 05:38Z (moved from the hot-slots lane; its repor
     runs the re-arm's own ledger acquisition (`failfirst-2`, the Eden refusal).
   - `native_model::the_trainer_object_key_released_under_a_live_kirby_copy_leaves_the_registry_whole` pins the
     per-kind K1 hazard the rule rests on.
+
+### p23/rc6-lobby-persist: the waiting room's Training partners and CPU action persist (2026-11-09, rc.6)
+
+Primary 11:36Z, `TASK-OPUS-rc6-lobby-cpu-settings.md` requirement 1. Design and requirement trace:
+`artifacts/phase23/rc6-lobby-persist/DESIGN.md`. Requirement 2 (the mod's CPU level) is the hot-slots lane's
+(`p23/rc6-lobby-cpu`); it hooks neither function below.
+- **The rule** (`model::lobby_persist`): the saved pair uses the game's own encoding (partners `0..=3` or Automatic `4`,
+  behavior Attack `7` or Stop `1`). It is stored as the top-level `settings.json` key `lobby_practice_panel` (like
+  `intro_seen`, not a menu row). A missing or bad field reads as not saved, and nothing saved leaves the game's defaults.
+  `chosen` maps the row handler's `(row, index)` to a value. `restore` gives the saved partners only when the room
+  offers them, and the saved behavior always.
+- **The runtime** (`runtime::lobby::lobby_persist`, group `lobby_persist`, authoritative):
+  - entry hook `main+0x13ce1b4`: after `FUN_013cdd00`'s last default, it writes each saved value into the panel. Then
+    it calls the game's row handler `FUN_01bc83a0` with a ctx whose `+8` is the panel, so the handler takes its
+    equal-value path (label only).
+  - save hook `main+0x1bc83b4`, after the handler's prologue: it publishes a changed value, and the writer thread stores
+    it (`settings_json_for_write(intro, pair)`). Its own call is marked (`APPLYING`) and skipped.
+  - Both hooks act only in the LDN and Quickplay waiting families (`lobby_stage_cycle::family`). Boot publishes the
+    loaded pair.
+- **Rows:** `rows_lobby_persist.rs` (7, from `tools/gen_rows_lobby_persist.py`): both hook sites, the called handler and
+  behavior helper, and the entry defaults and equal-value path the apply relies on. Card scan
+  `card-20261105T131402Z/plugins`: no plugin refers to these sites.
+- **Manifest:** 2 recorded edits: `native_seams/mod.rs` (the table) and `seam_install.rs` (`AUTHORITATIVE`).
+  `carry_pkg6.py carry/ledger/verify` re-derives all 250 files.
+- **Tests:**
+  - Failed first: 5 `model::lobby_persist` tests on the stubs (`failfirst-1`), then the 4 wiring tests in
+    `tests/lobby_persist_wiring.rs` (`failfirst-2`).
+  - The writer's key goes through the real settings code (`the_writer_stores_the_saved_pair`).

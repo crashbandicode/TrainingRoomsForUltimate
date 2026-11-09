@@ -108,6 +108,10 @@ hook_ids! {
     LobbyItems => "lobby_items",
     LobbyItemsRemove => "lobby_items_remove",
     LobbyItemsDrop => "lobby_items_drop",
+    /// rc.6: the waiting room's practice panel, saved Training partners and behavior applied at entry, and the player's
+    /// change saved (`lobby_persist`).
+    LobbyPersistEntry => "lobby_persist_entry",
+    LobbyPersistSave => "lobby_persist_save",
     /// Every hook that has no name of its own yet (`HookScope::enter()`): allocations inside them are
     /// still counted, their invocations are counted together.
     Other => "other",

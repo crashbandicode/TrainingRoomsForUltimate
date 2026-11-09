@@ -124,6 +124,8 @@ fn run_inner() {
     let (migration, captures) = import::start();
     let loaded = load_settings();
     notices::arm_intro(loaded.file_existed, &loaded.settings);
+    // The waiting room's saved Training partners and behavior, for the entry hook (`lobby_persist`).
+    crate::runtime::lobby::lobby_persist::publish(loaded.settings.lobby_practice_panel());
     let loaded = loaded.settings;
     // The CPU behaviours' state exists before the first publish and before any hook is installed. The
     // generator is the plugin's own (never the game's): seeded from the system tick and an address.

@@ -1196,3 +1196,11 @@ ceiling = 159705
 date = "2026-11-09"
 reason = "rc.6 integration f950b25e: p23/rc6-qp-pilot (c563c219, +4) and p23/rc6-qp-items (777aa8cc, +22) merged on e39479df; each branch raised its own ceiling over 159679 (159683, 159701); measured on the merge 159705 (tools/size_gate.py), +4 over 159701"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the combined ceiling of two product fixes ordered by the primary (2026-11-09 12:48Z, 12:28Z), each already raised with approved_by in its own branch; a raise goes in its own commit with approved_by"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 160054
+date = "2026-11-09"
+reason = "rc.6 p23/rc6-lobby-persist (f8549f6b) over integration e39479df: the waiting room's Training partners and CPU action persist (model::lobby_persist, runtime::lobby::lobby_persist with its two inline hooks and its 7 seam rows, the settings key, the writer) and its host and wiring tests; measured 160054 (tools/size_gate.py), +375 over 159679 (e39479df)"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to the operator's rc.6 lobby feature (TASK-OPUS-rc6-lobby-cpu-settings requirement 1, primary 2026-11-09 11:36Z; a raise goes in its own commit with approved_by)"

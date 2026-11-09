@@ -140,6 +140,8 @@ pub mod sites_pkg2;
 pub mod stage_hazards;
 #[path = "model/lobby_items.rs"]
 pub mod lobby_items;
+#[path = "model/lobby_persist.rs"]
+pub mod lobby_persist;
 #[path = "model/store.rs"]
 pub mod store;
 #[path = "model/state/mod.rs"]
