@@ -2443,7 +2443,11 @@ unsafe fn service_locked(entry: *mut u8, owner: u32, role: usize) -> Action {
     #[cfg(feature = "diag")]
     if bank.phase == Phase::Changing {
         let s = snapshot(entry);
-        let state = |cell: usize| fields::child(entry as usize, cell).and_then(|b| fields::read::<u8>(b, 0x3a));
+        // Only the entry's installed cells (`+0x4150`): a two-body entry never wrote `+0x4170`, and reading through it
+        // logged Unmapped Read8 (Eden rc6-bg-ptx4, 17 times).
+        let installed = fields::read::<u64>(entry as usize, 0x4150).unwrap_or(0);
+        let state = |cell: usize| ((cell - 0x4160) as u64 / 8 < installed).then(|| fields::child(entry as usize, cell)
+            .and_then(|b| fields::read::<u8>(b, 0x3a))).flatten();
         trace!("[GroupSwap] attach tick owner={} target={} acknowledged={} index={} pending={} previous={} flags={:#x} outer={} loader={} changing={} guard={} states=[{:?},{:?},{:?}]",
             owner, bank.target, bank.acknowledged, s.index, s.pending, s.previous_or_next, s.flags, s.outer, s.loader, s.changing,
             s.guard, state(0x4160), state(0x4168), state(0x4170));
