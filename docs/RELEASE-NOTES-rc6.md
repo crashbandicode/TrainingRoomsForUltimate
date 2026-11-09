@@ -80,6 +80,8 @@ A drilled combo, like a bound save or an active macro, moves to the top of its l
   on one of them. The background build now waits only while Kirby is on screen, and for a second Mii group while a Mii
   is on screen (see Known issues). TODO-PROOF: workers A and B, the final pass's item-3 sessions on the Surface and the
   XPS (`p23/rc6-bg-ic`, `p23/rc6-bg-pt`, X6).
+- Going back to an Ice Climbers (normal pair), Pokémon Trainer or Pyra/Mythra original while its group is on is a warm
+  switch now; it used to reload. Going back to a Solo Popo or Mii original still reloads.
 - The notice counts what is loading: "Loading 4/10", then "Ready 10/10" or "All loaded".
 - Fighters past the ready budget still load when you switch to them, as before.
 
