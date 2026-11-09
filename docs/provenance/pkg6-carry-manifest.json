@@ -5963,7 +5963,7 @@
    "dest": "src/runtime/roster/native_body_bank.rs",
    "crate": "root",
    "src_sha256": "ccf7ac678691fa0101a1eff5dbd9300a1b12fe64e9ebbde515697adfbb841c98",
-   "dest_sha256": "b000a27fe0bc9686bd391796d0f0d857e92f64c5ea57ddd53ee4b3f3ddccc3d5",
+   "dest_sha256": "7f7d92dba0eb2a0d516c9a23ba16ce9fdb68ac435829d9694a3d158ee0483563",
    "edits": [
     {
      "old": "unsafe fn finalize_entry(entry: *mut u8) -> u64 {\n",
@@ -7575,6 +7575,11 @@
      "old": "    trace!(\"[GroupSwap] background build of Pok\u00e9mon Trainer and Pyra/Mythra groups {} trainer_slot={}\",\n        if native_ok { \"enabled\" } else { \"off; they build at their first switch\" }, trainer_slot);\n    // rc.6 item 3, Ice Climbers (SPECIAL-GROUPS \u00a70 X1, \u00a72): the tail's pair test for background bodies, its first four\n    // 13.0.5 words owned (`cmp w8, #0x4b; b.ne 0x60debc; ldr w8, [x9, #0x1c]; cmp w8, #0x4c`). Without it a live\n    // `[Popo, Nana]` window keeps deferring the background builds.\n    let tail_stock = fingerprint(base, BACKGROUND_TAIL, &[0x71012d1f, 0x54000281, 0xb9401d28, 0x7101311f], \"GroupSwap\");\n    let tail_ok = gate(SEAM_GROUP, BACKGROUND_TAIL_SEAMS, async_ok && identity_view && tail_stock)\n        && async_ok && identity_view && tail_stock;\n    if tail_ok {\n        skyline::install_hooks!(background_tail);\n        BACKGROUND_PAIR_TAIL.store(true, Ordering::Release);\n    }\n    trace!(\"[GroupSwap] background pair tail {}\",\n        if tail_ok { \"enabled; a live Ice Climbers pair window builds the other groups\" } else { \"off; a live Ice Climbers pair window waits\" });\n    let info_stock = fingerprint(base, BACKGROUND_INFO, &[0xf9400529, 0x39425129, 0x35001da9, 0xf945bd08], \"GroupSwap\");\n    let info_ok = gate(SEAM_GROUP, BACKGROUND_INFO_SEAMS, async_ok && identity_view && info_stock)\n",
      "new": "    trace!(\"[GroupSwap] background build of Pok\u00e9mon Trainer and Pyra/Mythra groups {} trainer_slot={}\",\n        if native_ok { \"enabled\" } else { \"off; they build at their first switch\" }, trainer_slot);\n    let info_stock = fingerprint(base, BACKGROUND_INFO, &[0xf9400529, 0x39425129, 0x35001da9, 0xf945bd08], \"GroupSwap\");\n    let info_ok = gate(SEAM_GROUP, BACKGROUND_INFO_SEAMS, async_ok && identity_view && info_stock)\n",
      "reason": "Merge of p23/rc6-integration 2f54db4 into p23/rc6-pt-start: this branch over integration's manifest, i.e. the Mii groups built in the background with the exit from a Mii warm to any Built group (d5584dc), groups that left the cycle freed under the pause and the Mii background fixes (c5251c8), the shared construction tail background_tail (f06d568) and the PT/Aegis start-up window (de452e2); background_build_eligible keeps integration's X4 rule (info_x4) and adds the Mii rules (identity; a Mii group waits beside a live native or pair window)"
+    },
+    {
+     "old": "        Step::Background(_) => \"background start\", Step::Leave(_) => \"leave\", Step::Release(..) => \"key release\",\n        Step::Poll(..) => \"prefetch poll\", Step::Start(..) => \"prefetch start\",\n    };\n    // `slow_step` names the step for a frame gap (inbox 22:17Z); every early return below is a cheap refusal.\n",
+     "new": "        Step::Background(_) => \"background start\", Step::Leave(_) => \"leave\", Step::Release(..) => \"key release\",\n        Step::Poll(..) => \"prefetch poll\", Step::Start(..) => \"prefetch start\",\n        Step::Rearm(..) => \"object rearm\", Step::RearmPoll(..) => \"object rearm poll\",\n    };\n    // `slow_step` names the step for a frame gap (inbox 22:17Z); every early return below is a cheap refusal.\n",
+     "reason": "Merge follow-up (1d0c93d): the slow-step names of integration's object re-arm steps (Step::Rearm, Step::RearmPoll) in group_lifecycle; the release build refused the non-exhaustive match"
     }
    ]
   },

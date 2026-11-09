@@ -5030,6 +5030,7 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
         Step::Idle => return,
         Step::Background(_) => "background start", Step::Leave(_) => "leave", Step::Release(..) => "key release",
         Step::Poll(..) => "prefetch poll", Step::Start(..) => "prefetch start",
+        Step::Rearm(..) => "object rearm", Step::RearmPoll(..) => "object rearm poll",
     };
     // `slow_step` names the step for a frame gap (inbox 22:17Z); every early return below is a cheap refusal.
     struct Timed(u32, &'static str, u64);
