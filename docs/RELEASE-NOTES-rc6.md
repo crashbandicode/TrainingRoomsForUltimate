@@ -98,10 +98,10 @@ also after a second change made while the first was still loading.
   free more. Fighters the new cycle still uses are freed only if there still isn't room after that. You never need to
   open the pause menu for a change to load.
 - The CPU seats that No. of CPUs raises (below) follow the new CPU cycle too.
-- TODO-PROOF: the next candidate's `x6` session with the docs lane's rows (`rows-pf-x6-settle`: `x6-fit` frees
-  nothing; `x6-cc` frees one group, waits for its memory, and keeps DK and Link warm). Branch proofs `pp-rel-2` and
-  `pp-settle-1` (`p23/rc6-preload-priority` `4480ff1d`); on `1261f56c` `x6-cc` also freed the group that kept DK and
-  Link warm, which `4480ff1d` fixes.
+- TODO-PROOF: the last candidate's `surface-i3-pf` with the docs lane's rows (`rows-pf-x6-settle`, judged by the
+  rule: `x6-fit` frees nothing; `x6-cc` frees `[3, 5]`, waits for its memory, and frees the group that keeps DK and
+  Link warm only if the room still lacks, never showing "waiting for memory"). Branch proofs `pp-rel-2`,
+  `pp-settle-1`; `p23/rc6-preload-priority` `2c4774cd`, whose two-quiet-pass settle awaits the operator.
 - TODO-PROOF: hot lane, the longest pause while the background build runs after a cycle change (the target is at most
   4 frames), from the final pass's item-3 sessions.
 - TODO-PROOF: hot lane, a cycle press made while that build runs is held or served, never refused; and the fighter on
@@ -195,9 +195,10 @@ leaves the game's own level everywhere.
 
 ## Known issues
 
-- **The game can freeze when the menu closes (rare).** In Eden it happened three times: once in Training after a
-  diagnostic CPU-cycle reload with Cycle Preload Off, and twice in Quickplay's waiting area while paging through the
-  menu, the second time after 38 clean closes in a row. Other loops of the same steps closed the menu cleanly. The
+- **The game can freeze when the menu closes (rare).** In Eden it happened four times: once in Training after a
+  diagnostic CPU-cycle reload with Cycle Preload Off, and three times in Quickplay's waiting area while paging through
+  the menu (in the two longest loops, after 36 and 38 clean closes in a row). Other loops of the same steps closed the
+  menu cleanly. While the game was frozen, none of this mod's code was running; the game's own code was busy. The
   cause isn't found yet. The macro-naming freeze fixed above is a different problem.
 - **Waiting for memory.** When memory is short, a group or a CPU seat can stay "waiting for memory". The Fighters
   notice says so, for example "Loaded 9/10 (1 waiting for memory)". That fighter still loads when you switch to it,

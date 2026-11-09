@@ -31,9 +31,10 @@ rc.6 build; the final pass is TODO-FINAL-PASS. The player notes are [RELEASE-NOT
 | No heap in the CPU-as-P1 fallback's hooks | `p23/rc6-integration` `6d6994e` | Eden `rc6-int-smoke2` 11/11 |
 | rc.5 features first proven in Eden: P2 L+R+A and Mii swaps, respawn, intro once, the online flag, the Lobby Items online smoke, the timer capture through sudden death, the Mii editor's interrupt and resume, combos in a local-wireless room | the lane branches | Eden `covrest-16`, `-04`, `-13`/`-15`, `covrest-pair-02`/`-03`, `rc6-int-vs3`, `covrest-pair-y3`/`-y1`. Lobby Items #62: PASS on the spawner-level proof (`rc6-int-li1` li-02/li-04, `rc6-int-lipair1`; decided 2026-11-08 23:43Z); the game spawns no item in Eden's local-wireless rooms |
 
-The menu-close freeze is open: Eden saw it in `covrest-yoga-05` (Training, a diag reload path), `rc6-bg-qp3` and
-`rc6-qpf1` (Quickplay's waiting area, paging the menu; on the `p23/rc6-menu-freeze` build, after 38 clean closes, with
-one guest core spinning and no watchdog line). Its cause isn't found.
+The menu-close freeze is open: Eden saw it in `covrest-yoga-05` (Training, a diag reload path), `rc6-bg-qp3`,
+`rc6-qpf1` and `rc6-qpf2` (Quickplay's waiting area, paging the menu; after 38 and 36 clean closes, one guest core
+spinning). In `rc6-qpf2` (`1261f56c`, `diag,hang-trace`) no TrainingRooms code ran while frozen (0 hits on its import
+stubs, loop heads and function entries); the spinner is in game or SDK code. Its cause isn't found.
 
 ## Done: 0.2.0-rc.3 (2026-11-05)
 
