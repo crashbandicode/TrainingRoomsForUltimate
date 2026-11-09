@@ -824,8 +824,10 @@ pub fn async_build_eligible(members: Members, identity: bool) -> Result<(), &'st
 ///   build stays synchronous (`async_build_eligible`).
 /// - a Mii group (SPECIAL-GROUPS §1) builds when it carries its identity: the tick brackets `R`'s words, the entry's Mii
 ///   bytes and the D mirror and runs the native Mii setup, and the worker reads a shadow `R` (`native_body_bank`
-///   `SHADOW_R`). A live Mii window defers it (that window's faces and resource object in `R` are a case not built yet),
-///   and so do a live native or pair window until a Mii body beside one is proven.
+///   `SHADOW_R`). A live Mii window defers it (that window's faces and resource object in `R` are a case not built yet).
+///   A live native or pair window takes part (X5, primary 2026-11-09 02:42Z): of §0's live reads, the Mii body's costume
+///   and paths read the shadow (X3), its cell byte is the group's (X2), its tail is the shared hook's (X1), and X4 and X5
+///   touch only Ice Climbers and Aegis bodies; a pair window still needs the redirected tail, as every group does.
 ///
 /// The two cross cells (primary 2026-11-09 00:52Z: "All groups in rc.6", so both must work; SPECIAL-GROUPS §0):
 /// - a native group beside a live pair window needs only the redirected tail above (X1). X4 never applies to its kinds
@@ -840,7 +842,6 @@ pub fn background_build_eligible(members: Members, identity: bool, window: Membe
     pair_tail: bool, info_x4: bool) -> Result<(), &'static str> {
     let native = |m: Members| matches!(m.special(), Special::Native(_));
     if members.special() == Special::Mii && !identity { return Err("mii without identity"); }
-    if members.special() == Special::Mii && (window.is_pair() || native(window)) { return Err("special window"); }
     if members.special() != Special::Pair && (identity || !native(members)) { async_build_eligible(members, identity)?; }
     if window_identity { return Err("mii window"); }
     if live_kirby { return Err("live kirby"); }
@@ -1938,9 +1939,8 @@ mod tests {
         }
         assert_eq!(background_build_eligible(pt, false, aegis, false, false, false, false), Ok(()));
         assert_eq!(background_build_eligible(aegis, false, pt, false, false, false, false), Ok(()));
-        // A Mii group (with its identity) builds in the background beside an ordinary window (p23/rc6-hot-slots-mii), and
-        // still defers beside a live native window until a Mii body beside one is proven.
-        assert_eq!(background_build_eligible(Members::mii_group(0x48).unwrap(), true, pt, false, false, false, false), Err("special window"));
+        // A Mii group (with its identity) builds beside an ordinary window and, with X5, beside a live native window.
+        assert_eq!(background_build_eligible(Members::mii_group(0x48).unwrap(), true, pt, false, false, false, false), Ok(()));
         assert_eq!(background_build_eligible(Members::mii_group(0x48).unwrap(), true, window, false, false, false, false), Ok(()));
         let groups = [(GroupState::Built, ordinary, false), (GroupState::Prefetched, pt, false),
             (GroupState::Prefetched, aegis, false)];
@@ -3741,6 +3741,31 @@ mod tests {
             let role = role_counts(planned, forms, WindowStatus::Built, group);
             assert_eq!((role.planned, role.ready, role.unstarted()), (forms + 2, forms + 2, 0), "{lead:#x}");
         }
+    }
+
+    /// X5 (primary 2026-11-09 02:42Z, "All groups in rc.6"): a Mii group with its identity builds in the background
+    /// beside a live native window (a session that starts on Pokémon Trainer or Pyra/Mythra) and beside a live pair window
+    /// (Ice Climbers) with the redirected tail, as every group does there. SPECIAL-GROUPS §0's live reads for a Mii body:
+    /// X1 the shared tail, X2 the group's cell byte, X3 the shadow `R`; X4 and X5 touch only Ice Climbers and Aegis bodies.
+    /// A live Mii window and a Mii group without its identity still wait.
+    #[test]
+    fn a_mii_group_builds_beside_a_live_native_or_pair_window() {
+        let mii = Members::mii_group(0x4a).unwrap();
+        for native in [Members::native_group(0x24).unwrap(), Members::native_group(0x5a).unwrap()] {
+            for x4 in [false, true] {
+                assert_eq!(background_build_eligible(mii, true, native, false, false, false, x4), Ok(()), "{native:?}");
+            }
+        }
+        for pair in [Members::pair_group(), Members::pair_lead(0x02).unwrap()] {
+            assert_eq!(background_build_eligible(mii, true, pair, false, false, true, false), Ok(()), "{pair:?}");
+            assert_eq!(background_build_eligible(mii, true, pair, false, false, false, false), Err("pair window"));
+        }
+        let pt = Members::native_group(0x24).unwrap();
+        assert_eq!(background_build_eligible(mii, false, pt, false, false, false, false), Err("mii without identity"));
+        assert_eq!(background_build_eligible(mii, true, pt, true, false, false, false), Err("mii window"));
+        assert_eq!(next_background([(GroupState::Prefetched, mii, true)].into_iter(), pt, false, false, false, false), Some(0));
+        assert_eq!(next_background([(GroupState::Prefetched, mii, true)].into_iter(), Members::pair_lead(0x02).unwrap(),
+            false, false, true, false), Some(0));
     }
 
     /// The two cross cells (primary 2026-11-09 00:52Z: "All groups in rc.6", so both must work; SPECIAL-GROUPS §0):

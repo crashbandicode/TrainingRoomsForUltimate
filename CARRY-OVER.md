@@ -1407,3 +1407,30 @@ Inbox `INBOX-opus-rc6-bg-pt.md` 00:17Z item 1 (worker B; item 2, the start on PT
   frames), 48 ms (the next scene's first attach). The PT group left the cycle holding the kind: `keys=[72]
   ledger_held=0 map_after=0`. The scene end with the kind held: `rc6-bg-pt5` (same teardown code) `reconcile owner=0
   phase=finalize map=0`.
+
+### p23/rc6-pt-start: X5, a Mii group built beside a live native or pair window (2026-11-09, rc.6 item 3)
+
+Primary 2026-11-09 02:42Z item 3 (the operator's "All groups in rc.6").
+
+**Root cause.** SPECIAL-GROUPS §0's live-window reads, applied to a Mii body built on the worker:
+- X1 (the tail's cells 0/1): the shared `background_tail` redirects every background body.
+- X2 (the cell byte): the group's own.
+- X3 (costume and paths through `R`): the Mii hooks give the worker the shadow `R`.
+- X4 (the info wrapper) touches only Popo and Nana bodies; X5 (the partner cell) only Aegis bodies.
+
+The shadow copies the live `R+0x40..+0xa8`, so beside PT it carries PT's object kind (`R+0x80` = `0x24`). The
+owner-loaded `R` scan of the construction ranges (`rc6-item3-re/special/r-users.txt`) finds no read of `R+0x80` on that
+path; the only access is H1's store at `0x66de14`. Nothing further was needed, and the refusal is lifted: a Mii group
+with its identity builds beside a live native window, and beside a live pair window with the redirected tail, as every
+group does there. A diag line at the tick names the live window and its `R+0x50`/`R+0x80` and the shadow's `+0x80`.
+
+**Eden `rc6-hot-xps24`** (diag `89486ed4`): every row passed.
+- **P1 starts on PT** with a Mii Gunner in its cycle: the Mii group built in the background beside the live PT window
+  (`live_window=[24, 25, 26] r80=0x24 shadow_r80=0x24`, `ok=true`); setup prepared, every worker hook fired, no untraced
+  reader. The lap was warm (the Mii exchange 114 ms; the PT exchanges carry the trainer articles).
+- **P1 re-enters on Ice Climbers**: the Mii group built beside the live pair-lead window `[4b, 4c, 1]`. The lap was warm
+  at 52–63 ms per switch, the Mii exchange 54 ms.
+- Unmapped total 0, allocations 0.
+
+**Tests:** `body_bank::a_mii_group_builds_beside_a_live_native_or_pair_window` (failed first); the native test's Mii row
+follows.

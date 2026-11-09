@@ -3331,6 +3331,8 @@ struct ShadowR(std::cell::UnsafeCell<[u8; SHADOW_R_SIZE]>);
 // after they settled (INSTALL: one background build at a time).
 unsafe impl Sync for ShadowR {}
 const SHADOW_R_SIZE: usize = 0xb0;
+/// `R+0x50`: the pair rule's references (read for the X5 diag line only; a background build writes none).
+const R_PAIR_REFERENCES: usize = 0x50;
 static SHADOW_R: ShadowR = ShadowR(std::cell::UnsafeCell::new([0; SHADOW_R_SIZE]));
 /// The background Mii build's real `R` (0: none in flight), its owner, and its values: the record index (bits 0-15),
 /// the costume byte `FE+0x41` (16-23) and `FE+0x52` (24-31).
@@ -3942,6 +3944,10 @@ unsafe fn start_background(entry: *mut u8, owner: u32, role: usize, group: usize
         std::ptr::copy_nonoverlapping((alias + 0x40) as *const u8, (shadow + 0x40) as *mut u8, 0x68);
         fields::write_unchecked(shadow, 0x98, 0usize);
         fields::write_unchecked(shadow, 0xa0, 0usize);
+        // X5 (primary 2026-11-09 02:42Z): the live window beside which the Mii body builds, and what its `R` lends the
+        // shadow (the pair references, `R_PAIR_REFERENCES`; the object kind `R+0x80`).
+        trace!("[GroupSwap] background Mii owner={} live_window={:x?} r50={:#x} r80={:#x} shadow_r80={:#x}", owner, &words[..3],
+            fields::read_unchecked::<u32>(alias, R_PAIR_REFERENCES), words[10], fields::read_unchecked::<u32>(shadow, 0x80));
         write_resource_words(alias, words);
         write_entry_identity(entry as usize, identity_bytes);
         fields::write_unchecked(alias, 0x90, live_faces[0]);
