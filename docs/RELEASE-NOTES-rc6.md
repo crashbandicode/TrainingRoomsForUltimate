@@ -114,6 +114,27 @@ it loads once memory is free (in Eden, "Loaded 1/5 · swap both to load 3 more (
 A Save in the Mii editor that matches a Mii you already saved still saves nothing new and uses that Mii, as before.
 It now says so: "Same as ‹saved name›, nothing new saved". A changed name alone counts as the same Mii.
 
+### The waiting room remembers its partners
+
+In a local-wireless room or Quickplay's waiting area, the game's own menu sets Training partners (how many CPUs) and the
+CPU action. When you change them, they're saved with the mod's settings. The next time you enter a waiting room, they're
+set before the CPUs appear. With nothing saved, the game's defaults stand (Automatic, Attack). TODO-PROOF: worker A's
+lobby-persist runs and the merged candidate's final Quickplay session (`rc6-bg-final1`).
+
+### CPU Level
+
+CPU › Level › **CPU Level**: Off (the default) or Lv 1–9. Off leaves the game's own level.
+- **In Training,** Lv N replaces Training's own CPU level.
+  - If Training's menu shows another level when Training starts, a small notice says so once, for example "CPU level:
+    Lv 7 from TrainingRooms (Training menu: Lv 3)".
+  - It doesn't show again in that session, even if you change Training's level. The next entry into Training checks
+    again.
+- **In the waiting room,** the practice partners play at Lv N, with no notice.
+- **In a match,** nothing changes.
+
+TODO-PROOF: hot's CPU-level rows and the merged candidate's final Quickplay session (partners at the level, the step
+stopping at the match).
+
 ## Fixed
 
 - **Save, Load and Auto-load use the bound save.** In rc.5 they used the old save-state slot file, whatever the pop-up
