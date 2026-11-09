@@ -19,7 +19,7 @@ rc.6 build; the final pass is TODO-FINAL-PASS. The player notes are [RELEASE-NOT
 | A cycle change makes things hot (decision CYCLE-CHANGE-HOT) | `p23/rc6-hot-slots` | Eden `rc6-hot-xps13`. TODO-PROOF: the reload pause (target 4 frames), from the final pass's item-3 sessions |
 | A cycle change takes effect at once: groups that left the cycle free at the next pause, or at once when the new fighters need their room | `p23/rc6-preload-priority` | Eden `pp-rel-2` 8/8 (`x6-fit`, `x6-cc`); `pp-base-1` reproduced the old wait on `e39479df`. TODO-PROOF: the candidate's `x6` session |
 | A switch's window takes only the fighters that fit in memory (the `hs08b` abort) | `p23/rc6-window-admission` | Eden `wa-79cc-xps-hot` 21/21, no abort. TODO-PROOF: the candidate's `xps-hot` |
-| Lock-order audit: the macro-naming freeze fixed; the stall watchdog (diag) | `p23/rc6-menu-freeze` | Eden `ally-hang1` 5/5 (40 menu closes, no stall) |
+| Lock-order audit: the macro-naming freeze fixed; the stall watchdog (diag) | `p23/rc6-menu-freeze` | Eden `ally-hang1` 5/5 (40 menu closes, no stall); it doesn't cover the menu-close freeze (`rc6-qpf1`, below) |
 | The waiting room remembers its partners | `p23/rc6-lobby-persist` | Eden `rc6-lp-qp1` 13/13, `rc6-lp-ldn2` 14/14. TODO-PROOF: the final Quickplay session |
 | CPU Level (Off, Lv 1–9) for Training and the waiting room's practice | `p23/rc6-lobby-cpu` | Eden `lc-xps-02`, `lc-xps-04` 6/6. TODO-PROOF: the candidate's CPU-level rows and the final Quickplay session |
 | Lobby Items Off stops the timed drops in Quickplay's waiting area (#62) | `p23/rc6-qp-items` | Eden `rc6-bg-qp7`, `rc6-bg-ldn62`. TODO-PROOF: the final Quickplay session |
@@ -31,7 +31,9 @@ rc.6 build; the final pass is TODO-FINAL-PASS. The player notes are [RELEASE-NOT
 | No heap in the CPU-as-P1 fallback's hooks | `p23/rc6-integration` `6d6994e` | Eden `rc6-int-smoke2` 11/11 |
 | rc.5 features first proven in Eden: P2 L+R+A and Mii swaps, respawn, intro once, the online flag, the Lobby Items online smoke, the timer capture through sudden death, the Mii editor's interrupt and resume, combos in a local-wireless room | the lane branches | Eden `covrest-16`, `-04`, `-13`/`-15`, `covrest-pair-02`/`-03`, `rc6-int-vs3`, `covrest-pair-y3`/`-y1`. Lobby Items #62: PASS on the spawner-level proof (`rc6-int-li1` li-02/li-04, `rc6-int-lipair1`; decided 2026-11-08 23:43Z); the game spawns no item in Eden's local-wireless rooms |
 
-The once-seen game-thread stop of `covrest-yoga-05` (Eden only, a diag reload path) is noted as open and unreproduced.
+The menu-close freeze is open: Eden saw it in `covrest-yoga-05` (Training, a diag reload path), `rc6-bg-qp3` and
+`rc6-qpf1` (Quickplay's waiting area, paging the menu; on the `p23/rc6-menu-freeze` build, after 38 clean closes, with
+one guest core spinning and no watchdog line). Its cause isn't found.
 
 ## Done: 0.2.0-rc.3 (2026-11-05)
 

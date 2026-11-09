@@ -199,10 +199,10 @@ TODO-PROOF: the candidate's CPU-level rows (branch proofs `lc-xps-02`, `lc-xps-0
 
 ## Known issues
 
-- Once, in Eden only, the game thread stopped at a menu close after a diagnostic CPU-cycle reload with Cycle Preload
-  Off. It was not seen again in four later boots with 38 menu closes, nor in a later loop of 40 closes on the rc.6
-  code. It is not reproduced, and it is noted rather than explained. The macro-naming freeze fixed above needs a
-  macro being named, which this stop didn't have, so that fix isn't known to be its cause.
+- **The game can freeze when the menu closes (rare).** In Eden it happened three times: once in Training after a
+  diagnostic CPU-cycle reload with Cycle Preload Off, and twice in Quickplay's waiting area while paging through the
+  menu, the second time after 38 clean closes in a row. Other loops of the same steps closed the menu cleanly. The
+  cause isn't found yet. The macro-naming freeze fixed above is a different problem.
 - **Waiting for memory.** When memory is short, a group or a CPU seat can stay "waiting for memory". The Fighters
   notice says so, for example "Loaded 9/10 (1 waiting for memory)". That fighter still loads when you switch to it,
   the normal (slower) way.
