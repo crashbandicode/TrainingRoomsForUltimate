@@ -4,27 +4,26 @@
 //! bytes and x1, x23 and x24 their size; the game allocates that size next and copies from x21. For the
 //! Training or waiting HUD archive (found by its directory only, never by parsing the payloads) the hook swaps in
 //! the plugin's archive, rebuilt from the stock one by the recipe (`model::archive_recipe`), and sets the
-//! size registers to match. The rebuilt archive is parked and handed back to the pool five seconds later by a small
+//! size registers to match. The rebuilt archive is parked and handed back to the free buffers five seconds later by a small
 //! thread: the game copies it during the hooked call sequence and never reads the pointer again.
 //!
 //! No heap in the hook (R2-7, playbook): the two working buffers are made once at boot (`prepare`, sized from the
-//! recipe headers, using the larger layout) and reused for every load; the retire thread and the parked list are made there
-//! too. A load that finds no free buffer keeps the game's archive (the menu then cannot open, R2-2). The vanilla base of
+//! recipe headers, using the larger layout) and reused for every load; the retire thread is made there too. The hook runs on the
+//! game's task workers, so the buffers pass between it and the retire thread with no lock (`model::archive_slots`, rc.6 freeze
+//! class). A load that finds no free buffer keeps the game's archive (the menu then cannot open, R2-2). The vanilla base of
 //! decision B3 is read once into the second buffer (`build_on_vanilla`: no seek on an `arc:` file), so B3 needs both buffers
 //! free: a load within the grace of the previous one keeps the game's archive.
 //!
 //! The diag build also writes the stock archive to `sd:/ultimate/TrainingRooms/stock/` so the host
 //! builder can derive the recipe from the player's own copy (never shipped in the release NRO).
 
-use std::sync::{Mutex, OnceLock};
-use std::thread::Thread;
 use std::time::Duration;
 
 use skyline::hooks::InlineCtx;
 
 use crate::model::archive_name;
 use crate::model::archive_recipe;
-use crate::model::archive_retire::retire_expired;
+use crate::model::archive_slots::{Claim, Slots};
 use crate::model::hook_stats::{load_allocations, per_load, HookId, HookScope};
 use crate::model::sites_ui::UI_ARCHIVE_ALLOC_OFFSET;
 use crate::runtime::clock;
@@ -68,73 +67,34 @@ static LAYOUTS: [Layout; 2] = [
     },
 ];
 
-struct Parked {
-    name: &'static str,
-    handed_out_ms: u64,
-    bytes: Vec<u8>,
-}
-
-static PARKED: Mutex<Vec<Parked>> = Mutex::new(Vec::new());
-/// The free working buffers (made by `prepare`, each with the recipe's output size as capacity).
-static POOL: Mutex<Vec<Vec<u8>>> = Mutex::new(Vec::new());
-/// The retire thread (made by `prepare`).
-static RETIRER: OnceLock<Thread> = OnceLock::new();
+/// The working buffers (made by `prepare`, each with the larger recipe's size as capacity), handed between the hook and the retire
+/// thread without a lock (`model::archive_slots`): the hook runs on the game's task workers, so it must never wait on the retire
+/// thread (rc.6 freeze class).
+static SLOTS: Slots<BUFFERS> = Slots::new();
 
 pub fn install() {
     skyline::install_hook!(archive_alloc);
 }
 
-/// Boot (not a hook): everything a hand-out would otherwise allocate: the working buffers, the parked list and the thread
-/// that returns a parked archive to the pool after its grace. The thread sleeps until a hand-out wakes it.
+/// Boot (not a hook): everything a hand-out would otherwise allocate: the working buffers and the thread that returns a handed-out
+/// archive to the free buffers after its grace. The thread looks once a second; the hook never wakes it (waking a thread can wait).
 pub fn prepare() {
     let capacity = LAYOUTS.iter().filter_map(|layout| archive_recipe::header(layout.recipe).ok())
         .map(|head| head.output_len.max(head.stock_len)).max().unwrap_or(0);
-    if let Ok(mut pool) = POOL.lock() {
-        pool.reserve_exact(BUFFERS);
-        for _ in 0..BUFFERS {
-            pool.push(Vec::with_capacity(capacity));
-        }
-    }
-    if let Ok(mut parked) = PARKED.lock() {
-        parked.reserve_exact(BUFFERS);
-    }
+    SLOTS.prepare(capacity);
     diagnostic(format_args!("[LayoutArchive] boot buffers {BUFFERS} x {capacity} B"));
-    let spawned = crate::runtime::threads::spawn(crate::model::thread_stacks::ThreadId::Archive, || {
-        let _ = RETIRER.set(std::thread::current());
-        loop {
-            retire_expired(&PARKED, clock::uptime_ms(), GRACE_MS, |p| p.handed_out_ms, |p| {
-                diagnostic(format_args!(
-                    "[LayoutArchive] released {} bytes={} after={}ms",
-                    p.name,
-                    p.bytes.len(),
-                    clock::uptime_ms().saturating_sub(p.handed_out_ms)
-                ));
-                give_back(p.bytes);
-            });
-            if PARKED.lock().map(|parked| parked.is_empty()).unwrap_or(true) {
-                std::thread::park();
-            } else {
-                std::thread::sleep(Duration::from_secs(1));
-            }
-        }
+    let spawned = crate::runtime::threads::spawn(crate::model::thread_stacks::ThreadId::Archive, || loop {
+        SLOTS.retire_expired(clock::uptime_ms(), GRACE_MS, |layout, len, handed_out_ms| {
+            diagnostic(format_args!(
+                "[LayoutArchive] released {} bytes={len} after={}ms",
+                LAYOUTS[layout].name,
+                clock::uptime_ms().saturating_sub(handed_out_ms)
+            ));
+        });
+        std::thread::sleep(Duration::from_secs(1));
     });
     if let Err(error) = spawned {
         diagnostic(format_args!("[LayoutArchive] retire thread did not start: {error}"));
-    }
-}
-
-/// A free working buffer, empty, with its boot capacity.
-fn take_buffer() -> Option<Vec<u8>> {
-    let mut buffer = POOL.lock().ok()?.pop()?;
-    buffer.clear();
-    Some(buffer)
-}
-
-/// Return a buffer to the pool (the room was reserved at boot: no allocation).
-fn give_back(mut buffer: Vec<u8>) {
-    buffer.clear();
-    if let Ok(mut pool) = POOL.lock() {
-        pool.push(buffer);
     }
 }
 
@@ -149,13 +109,15 @@ unsafe fn archive_alloc(ctx: &mut InlineCtx) {
     }
     // SAFETY: the game decompressed `size` bytes at `src` and reads them again right after this hook.
     let stock = std::slice::from_raw_parts(src, size);
-    let Some(layout) = LAYOUTS.iter().find(|layout| archive_name::contains(stock, layout.member) == Some(true)) else { return };
+    let Some(index) = LAYOUTS.iter().position(|layout| archive_name::contains(stock, layout.member) == Some(true)) else { return };
+    let layout = &LAYOUTS[index];
     #[cfg(feature = "diag")]
     crate::model::hook_stats::uncounted(|| dump_stock(stock, layout));
     // `per_load` is the measuring section: the goal is that nothing inside it allocates (`load_allocations=0`).
-    let Some((built, base, via)) = per_load(|| rebuilt(stock, size, layout)) else { return };
-    let (pointer, len) = (built.as_ptr() as u64, built.len() as u64);
-    park(built, layout.name);
+    let Some((mut built, base, via)) = per_load(|| rebuilt(stock, size, layout)) else { return };
+    let (pointer, len) = (built.bytes().as_ptr() as u64, built.bytes().len() as u64);
+    // Parked until its grace is over: the game copies it during the hooked call sequence and never reads the pointer again.
+    built.park(clock::uptime_ms(), index);
     ctx.registers[21].set_x(pointer);
     ctx.registers[1].set_x(len);
     ctx.registers[23].set_x(len);
@@ -165,31 +127,30 @@ unsafe fn archive_alloc(ctx: &mut InlineCtx) {
 
 /// The plugin's archive for the one the game just decompressed: from the stock archive, or (B3: another mod replaced
 /// it) from the vanilla archive read through `arc:/`. `None` leaves the game's archive in place (the menu then cannot open).
-fn rebuilt(stock: &[u8], size: usize, layout: &'static Layout) -> Option<(Vec<u8>, usize, &'static str)> {
+fn rebuilt(stock: &[u8], size: usize, layout: &'static Layout) -> Option<(Claim<'static, BUFFERS>, usize, &'static str)> {
     #[cfg(feature = "diag")]
     if crate::model::hook_stats::uncounted(refusal_forced) {
         diagnostic(format_args!("[LayoutArchive] refusal forced by refuse-archive.flag (diag): stock {} kept (layout_arc=skipped)", layout.name));
         return None;
     }
-    let Some(mut out) = take_buffer() else {
+    let Some(mut out) = SLOTS.claim() else {
         diagnostic(format_args!("[LayoutArchive] no free archive buffer: stock {} kept (layout_arc=skipped)", layout.name));
         return None;
     };
     let mut source = stock;
-    let reason = match archive_recipe::build_into(&mut source, layout.recipe, &mut out) {
+    let reason = match archive_recipe::build_into(&mut source, layout.recipe, out.bytes()) {
         Ok(()) => return Some((out, size, "stock")),
         Err(reason) => reason,
     };
     // B3 (decided 2026-11-01): another mod replaced the layout archive. Inject anyway on the vanilla archive,
     // read through ARCropolis's arc:/ view (the vanilla view, SPEC-core-07 U2); the other mod's HUD does not show
     // while this plugin is installed.
-    match build_on_vanilla(&mut out, layout) {
+    match build_on_vanilla(out.bytes(), layout) {
         Ok(len) => {
             diagnostic(format_args!("[LayoutArchive] stock {} differs ({reason}); injected on the vanilla archive read through arc:/ bytes={len} (layout=other-mod)", layout.name));
             Some((out, len, "vanilla"))
         }
         Err(why) => {
-            give_back(out);
             diagnostic(format_args!("[LayoutArchive] stock {} kept: {reason}; {why} (layout_arc=skipped)", layout.name));
             None
         }
@@ -201,13 +162,10 @@ fn rebuilt(stock: &[u8], size: usize, layout: &'static Layout) -> Option<(Vec<u8
 /// 128 and 430 times, after those calls on an `arc:` file). The vanilla length is the recipe's own stock length.
 fn build_on_vanilla(out: &mut Vec<u8>, layout: &Layout) -> Result<usize, &'static str> {
     let len = archive_recipe::header(layout.recipe)?.stock_len;
-    let Some(mut scratch) = take_buffer() else { return Err("no free second archive buffer") };
-    let result = read_vanilla(&mut scratch, len, layout.vanilla_path).and_then(|()| {
-        let mut source: &[u8] = &scratch;
-        archive_recipe::build_into(&mut source, layout.recipe, out)
-    });
-    give_back(scratch);
-    result.map(|()| len)
+    let Some(mut scratch) = SLOTS.claim() else { return Err("no free second archive buffer") };
+    read_vanilla(scratch.bytes(), len, layout.vanilla_path)?;
+    let mut source: &[u8] = scratch.bytes();
+    archive_recipe::build_into(&mut source, layout.recipe, out).map(|()| len)
 }
 
 /// Fill `buffer` with the first `len` bytes of the vanilla archive (it never grows: `len` is within its boot capacity).
@@ -241,18 +199,6 @@ fn read_vanilla(buffer: &mut Vec<u8>, len: usize, path: &'static [u8]) -> Result
     // SAFETY: `handle` was opened above and is closed once.
     unsafe { skyline::nn::fs::CloseFile(handle) };
     result
-}
-
-/// Park the rebuilt archive until its grace is over. No allocation: the list's room and the retire thread were made at
-/// boot (`prepare`).
-fn park(bytes: Vec<u8>, name: &'static str) {
-    if let Ok(mut parked) = PARKED.lock() {
-        // At most `BUFFERS` archives exist, so the room made at boot always suffices.
-        parked.push(Parked { name, handed_out_ms: clock::uptime_ms(), bytes });
-    }
-    if let Some(thread) = RETIRER.get() {
-        thread.unpark();
-    }
 }
 
 /// Diag only: write the stock archive for the host builder.
