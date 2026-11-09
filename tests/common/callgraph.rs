@@ -471,6 +471,10 @@ pub struct Graph {
     aliases: BTreeMap<String, BTreeMap<String, String>>,
     /// `file -> names it imports by `use`` (any identifier in a `use` statement).
     imports: BTreeMap<String, BTreeSet<String>>,
+    /// `#[path = "native_body_bank.rs"] mod body_bank;`: per declaring file, the declared module name -> the module its file is
+    /// scanned as; and the same for every file when no scanned module has the declared name (`body_bank`, not `native`).
+    path_mods_local: BTreeMap<String, BTreeMap<String, String>>,
+    path_mods: BTreeMap<String, String>,
     by_name: BTreeMap<String, Vec<usize>>,
     /// Extra edges for calls the text cannot show (a function pointer table): `(from key, to key)`.
     pub dynamic: Vec<(String, String)>,
@@ -486,6 +490,38 @@ fn rust_files(dir: &Path, out: &mut Vec<PathBuf>) {
             out.push(path);
         }
     }
+}
+
+/// The `#[path = "file.rs"] mod name;` declarations of `src` whose name differs from the file's module: `(name, module)`. A call
+/// `name::f` means the function scanned under the file's module (`character_roster::body_bank::creation` is in
+/// `native_body_bank.rs`); without this the edge was dropped (rc.6: `allocation_trace` -> `native_body_bank::creation`).
+pub fn path_modules(src: &str) -> Vec<(String, String)> {
+    let mut out = Vec::new();
+    let mut pending: Option<String> = None;
+    for line in src.lines().map(str::trim) {
+        let mut rest = line;
+        if let Some(after) = line.strip_prefix("#[path = \"") {
+            let (target, tail) = after.split_once("\"]").unwrap_or((after, ""));
+            pending = Some(module_of_file(target));
+            rest = tail.trim();
+            if rest.is_empty() {
+                continue;
+            }
+        }
+        let Some(module) = pending.take() else { continue };
+        if rest.starts_with("#[") && !rest.contains(" mod ") {
+            pending = Some(module);
+            continue;
+        }
+        let words: Vec<&str> = rest.split_whitespace().collect();
+        if let Some(k) = words.iter().position(|w| *w == "mod") {
+            let name = words.get(k + 1).map(|w| w.trim_end_matches([';', '{'])).unwrap_or("");
+            if !name.is_empty() && name != module {
+                out.push((name.to_owned(), module));
+            }
+        }
+    }
+    out
 }
 
 fn module_of_file(rel: &str) -> String {
@@ -521,8 +557,12 @@ impl Graph {
         let mut funcs = Vec::new();
         let mut aliases: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();
         let mut imports: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+        let mut path_mods_local: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();
         for path in files {
             let rel = path.strip_prefix(runtime_dir).unwrap().to_string_lossy().replace('\\', "/");
+            for (name, module) in path_modules(&fs::read_to_string(&path).unwrap()) {
+                path_mods_local.entry(rel.clone()).or_default().insert(name, module);
+            }
             let toks = lex(&fs::read_to_string(&path).unwrap());
             // use statements: aliases and imported names.
             let mut i = 0;
@@ -580,7 +620,19 @@ impl Graph {
         for (i, f) in funcs.iter().enumerate() {
             by_name.entry(f.name.clone()).or_default().push(i);
         }
-        Graph { funcs, aliases, imports, by_name, dynamic: Vec::new() }
+        let modules: BTreeSet<&str> = funcs.iter().map(|f: &Func| f.module.as_str()).collect();
+        let path_mods: BTreeMap<String, String> = path_mods_local
+            .values()
+            .flatten()
+            .filter(|(name, _)| !modules.contains(name.as_str()))
+            .map(|(name, module)| (name.clone(), module.clone()))
+            .collect();
+        Graph { funcs, aliases, imports, path_mods_local, path_mods, by_name, dynamic: Vec::new() }
+    }
+
+    /// The module a `name::` qualifier in `file` means when `name` is a `#[path]` module declared under another name.
+    pub fn declared_module(&self, file: &str, name: &str) -> Option<&str> {
+        self.path_mods_local.get(file).and_then(|m| m.get(name)).or_else(|| self.path_mods.get(name)).map(String::as_str)
     }
 
     pub fn find(&self, key: &str) -> Vec<usize> {
@@ -603,6 +655,7 @@ impl Graph {
             if module == "self" || module == "Self" || module == "super" || module == "crate" {
                 return candidates.iter().copied().filter(|&c| self.funcs[c].file == from.file).collect();
             }
+            let module = self.declared_module(&from.file, module).unwrap_or(module);
             return candidates.iter().copied().filter(|&c| self.funcs[c].module == module).collect();
         }
         let local: Vec<usize> = candidates.iter().copied().filter(|&c| self.funcs[c].file == from.file).collect();
@@ -769,7 +822,15 @@ mod receiver_tests {
         for (index, func) in parser.funcs.iter().enumerate() {
             by_name.entry(func.name.clone()).or_default().push(index);
         }
-        Graph { funcs: parser.funcs, aliases: BTreeMap::new(), imports: BTreeMap::new(), by_name, dynamic: Vec::new() }
+        Graph {
+            funcs: parser.funcs,
+            aliases: BTreeMap::new(),
+            imports: BTreeMap::new(),
+            path_mods_local: BTreeMap::new(),
+            path_mods: BTreeMap::new(),
+            by_name,
+            dynamic: Vec::new(),
+        }
     }
 
     fn reachable_names(graph: &Graph, entry: &str) -> BTreeSet<String> {

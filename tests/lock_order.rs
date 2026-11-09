@@ -179,6 +179,8 @@ impl<'g> Ctx<'g> {
                         !local || callee.file == f.file
                     }
                     Some("self" | "Self" | "super" | "crate") => callee.file == f.file,
+                    // A `#[path]` module declared under another name (`body_bank` is `native_body_bank.rs`).
+                    Some(q) if self.graph.declared_module(&f.file, q).is_some() => self.graph.declared_module(&f.file, q) == Some(callee.module.as_str()),
                     Some(q) if q == callee.module => true,
                     Some(q) => !all.iter().any(|&o| self.graph.funcs[o].module == q),
                 }
@@ -396,6 +398,27 @@ fn accessor_take(ctx: &Ctx, f: usize, dot: usize) -> Vec<usize> {
         .collect()
 }
 
+/// The token that ends the name at `i`: the `]` of an index right after it (`NAME[role]`), else `i` itself.
+fn index_end(body: &[Tok], i: usize) -> usize {
+    if !punct(body.get(i + 1), '[') {
+        return i;
+    }
+    let mut depth = 0;
+    for (k, t) in body.iter().enumerate().skip(i + 1) {
+        match t {
+            Tok::Punct('[') => depth += 1,
+            Tok::Punct(']') => {
+                depth -= 1;
+                if depth == 0 {
+                    return k;
+                }
+            }
+            _ => {}
+        }
+    }
+    i
+}
+
 fn takes(ctx: &Ctx, f: usize) -> Vec<Take> {
     let body = &ctx.graph.funcs[f].body;
     let mut out = Vec::new();
@@ -428,9 +451,11 @@ fn takes(ctx: &Ctx, f: usize) -> Vec<Take> {
     }
     for i in 0..body.len() {
         let Some(lock) = ctx.lock_at(f, i) else { continue };
-        let method = punct(body.get(i + 1), '.')
-            && ident(body.get(i + 2)).is_some_and(|m| LOCK_METHODS.contains(&m))
-            && punct(body.get(i + 3), '(');
+        // `NAME.lock()`, or one lock of a static array, `NAME[role].lock()` (native_body_bank's `BANKS`).
+        let dot = index_end(body, i) + 1;
+        let method = punct(body.get(dot), '.')
+            && ident(body.get(dot + 1)).is_some_and(|m| LOCK_METHODS.contains(&m))
+            && punct(body.get(dot + 2), '(');
         let head = if i >= 2 && body[i - 1] == Tok::PathSep { i - 2 } else { i };
         let helper = head >= 3
             && punct(body.get(head - 1), '&')
@@ -443,7 +468,7 @@ fn takes(ctx: &Ctx, f: usize) -> Vec<Take> {
         let s = statement_start(body, at);
         let arm = s >= 2 && punct(body.get(s - 1), '>') && punct(body.get(s - 2), '=');
         // `let [mut] name = NAME.lock()[.unwrap()|.expect(..)];` binds the guard.
-        let call_close = if helper { i + 1 } else { i + 4 };
+        let call_close = if helper { i + 1 } else { dot + 3 };
         let mut after = call_close + 1;
         if punct(body.get(after), '.') && matches!(ident(body.get(after + 1)), Some("unwrap" | "expect")) {
             let open = after + 2;
@@ -798,7 +823,8 @@ fn try_takes(ctx: &Ctx, f: usize) -> BTreeSet<usize> {
     let body = &ctx.graph.funcs[f].body;
     (0..body.len())
         .filter(|&i| {
-            punct(body.get(i + 1), '.') && ident(body.get(i + 2)).is_some_and(|m| TRY_METHODS.contains(&m)) && punct(body.get(i + 3), '(')
+            let dot = index_end(body, i) + 1;
+            punct(body.get(dot), '.') && ident(body.get(dot + 1)).is_some_and(|m| TRY_METHODS.contains(&m)) && punct(body.get(dot + 2), '(')
         })
         .filter_map(|i| ctx.lock_at(f, i))
         .collect()
@@ -926,6 +952,28 @@ fn the_mii_catalog_reply_is_consumed_on_the_game_thread_only() {
     assert!(problems.is_empty(), "the catalog's game-side consumers run on a plugin thread:\n{}", problems.join("\n"));
 }
 
+/// Two scan blind spots (rc.6, hot-slots hook-thread table 2026-11-09: `allocation_trace` runs on the game's task workers): a call
+/// through a `#[path]` module declared under another name (`character_roster::body_bank::creation` is `native_body_bank.rs`), and
+/// one lock of a static array (`BANKS[role].lock()`). Both are followed now.
+#[test]
+fn a_path_module_call_and_an_indexed_take_are_seen() {
+    assert_eq!(
+        callgraph::path_modules("#[cfg(feature = \"x\")]\n#[path = \"native_body_bank.rs\"]\npub(crate) mod body_bank;\n#[path = \"../mii/a.rs\"] mod a;\n"),
+        [("body_bank".to_owned(), "native_body_bank".to_owned())]
+    );
+    let graph = Graph::scan(&Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime"), &[]);
+    let (ctx, s) = scan(&graph);
+    let one = |key: &str| {
+        let found = graph.find(key);
+        assert_eq!(found.len(), 1, "{key}");
+        found[0]
+    };
+    let (hook, creation) = (one("character_lifecycle::allocation_trace"), one("native_body_bank::creation"));
+    assert!(graph.callees(hook).contains(&creation), "allocation_trace -> body_bank::creation not followed");
+    let taken: Vec<String> = s.takes[creation].iter().map(|t| lock_name(&ctx, t.lock)).collect();
+    assert!(taken.iter().any(|l| l.ends_with("native_body_bank.rs::BANKS")), "BANKS[role].lock() not seen: {taken:?}");
+}
+
 /// The class check on a fixture: a hook that waits on a lock a plugin thread holds (blocking, and with a `try_lock`), a hook
 /// that only `try_lock`s one, and a typed static read whose impl differs by thread.
 #[test]
@@ -943,6 +991,7 @@ fn the_shared_lock_check_sees_a_seeded_hazard() {
     assert!(!hazards.contains("POLLED"), "a game-side try_lock never waits: {hazards:?}");
     assert!(hazards.contains("EDITED"), "the game-thread impl of a typed read waits on EDITED, the plugin one holds it: {hazards:?}");
     assert!(!hazards.contains("PUBLISHING"), "only the plugin impl takes PUBLISHING: {hazards:?}");
+    assert!(hazards.contains("ROLES"), "one lock of a static array, taken by index on both sides: {hazards:?}");
 }
 
 /// The scan on a small fixture: a guard bound by `let` and held over a call, a temporary held over its statement, a

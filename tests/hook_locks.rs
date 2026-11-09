@@ -129,7 +129,24 @@ fn takes_lock(graph: &Graph, index: usize, file: &str, name: &str) -> bool {
         if f.file != file && !qualified {
             continue;
         }
-        let method = punct(i + 1, '.') && LOCK_METHODS.iter().any(|m| ident(i + 2, m)) && punct(i + 3, '(');
+        // `NAME.lock()`, or one lock of a static array, `NAME[role].lock()`.
+        let mut dot = i + 1;
+        if punct(dot, '[') {
+            let mut depth = 0;
+            while dot < toks.len() {
+                if punct(dot, '[') {
+                    depth += 1;
+                } else if punct(dot, ']') {
+                    depth -= 1;
+                    if depth == 0 {
+                        break;
+                    }
+                }
+                dot += 1;
+            }
+            dot += 1;
+        }
+        let method = punct(dot, '.') && LOCK_METHODS.iter().any(|m| ident(dot + 1, m)) && punct(dot + 2, '(');
         let start = if qualified { i - 2 } else { i };
         let by_ref = start >= 1 && punct(start - 1, '&');
         if method || by_ref {
@@ -239,6 +256,8 @@ fn edges(graph: &Graph, index: usize, by_name: &BTreeMap<String, Vec<usize>>, am
             };
             match qualifier {
                 "self" | "Self" | "super" | "crate" => callee.file == from.file,
+                // A `#[path]` module declared under another name (`body_bank` is `native_body_bank.rs`).
+                q if graph.declared_module(&from.file, q).is_some() => graph.declared_module(&from.file, q) == Some(callee.module.as_str()),
                 q if q == callee.module => true,
                 q => !by_name.get(&callee.name).is_some_and(|all| all.iter().any(|&o| graph.funcs[o].module == q)),
             }

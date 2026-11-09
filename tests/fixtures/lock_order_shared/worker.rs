@@ -7,4 +7,6 @@ pub fn run() {
     *hook::POLLED.lock() = 2;
     let _ = read(&MENU);
     assign(&MENU, 3);
+    let role = 0;
+    let _g = hook::ROLES[role].lock();
 }
