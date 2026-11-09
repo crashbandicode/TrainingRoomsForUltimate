@@ -787,6 +787,29 @@ const TYPED_STATIC_CALLS: &[(&str, &str, &str)] = &[
 /// needs the reason a starved plugin holder cannot stall a game hook that waits for it.
 const SHARED_ON_PURPOSE: &[(&str, &str)] = &[];
 
+/// The runs that measured the hooks' threads (primary 2026-11-09 19:44Z/20:32Z, OPERATOR "measure first, fix exactly"; playbook
+/// CHECKLIST M row, main 87b3de0): hot-slots' two trace points per hook on its game address, a `thread == main` counter and a
+/// `thread != main` record point, on `b04856b2` diag (`artifacts/phase23/hook-threads/TABLE.md`).
+const MEASURED_RUNS: &str = "final-yoga-ht-mii-b04856b2 + final-yoga-ht-kr-b04856b2";
+
+/// Game hooks measured on MainThread only: `(hook, calls, calls on MainThread)`, both runs together, exact counters. A hook that runs
+/// on MainThread cannot deadlock this way: while it waits, MainThread is not busy-joining a task group, so the core it leaves free
+/// lets the starved holder run (`rc6-qpf3`'s cycle needs the waiter on a task worker). A lock leaves the failing set only when every
+/// hook that waits on it is here; a hook seen on a worker thread, or never reached, never is.
+const MEASURED_ON_MAIN_THREAD: &[(&str, u64, u64)] = &[
+    ("input_delay::caller_a_note", 59_841, 59_841),
+    ("input_delay::caller_a_apply", 243_528, 243_528),
+    ("character_lifecycle::destruction_trace", 8, 8),
+    ("character_lifecycle::refresh_ordinal_portrait", 12, 12),
+    ("states::state_kirby_opff_hook", 3_001, 3_001),
+    ("native_source_capacity::owner_cleanup_complete", 8, 8),
+    ("native_source_capacity::listener_removed", 8, 8),
+    ("native_source_capacity::actor_cleanup", 73, 73),
+    ("native_source_capacity::pause_state_exit", 2, 2),
+    ("mii_hud_portrait::pipeline_before_tick", 46_437, 46_437),
+    ("mii_hud_portrait::pipeline_after_tick", 46_437, 46_437),
+];
+
 /// The impl functions `f` runs through `helper(&STATIC ..)`, with the token position of the helper.
 fn typed_static_callees(graph: &Graph, f: usize) -> Vec<(usize, usize)> {
     let body = &graph.funcs[f].body;
@@ -834,6 +857,8 @@ fn try_takes(ctx: &Ctx, f: usize) -> BTreeSet<usize> {
 /// Per function: the plugin threads that reach it.
 struct Shared {
     game_waits: BTreeMap<usize, BTreeSet<String>>,
+    /// Per lock: the hooks (keys) whose reach waits on it.
+    game_hooks: BTreeMap<usize, BTreeSet<String>>,
     plugin_holds: BTreeMap<usize, BTreeSet<String>>,
     plugin_reached: BTreeMap<usize, BTreeSet<String>>,
 }
@@ -861,11 +886,17 @@ fn shared_locks(ctx: &Ctx, s: &Scan) -> Shared {
         seen
     };
     let hooks: Vec<usize> = (0..n).filter(|&f| graph.funcs[f].attrs.contains("skyline::hook")).collect();
-    let mut out = Shared { game_waits: BTreeMap::new(), plugin_holds: BTreeMap::new(), plugin_reached: BTreeMap::new() };
+    let mut out = Shared {
+        game_waits: BTreeMap::new(),
+        game_hooks: BTreeMap::new(),
+        plugin_holds: BTreeMap::new(),
+        plugin_reached: BTreeMap::new(),
+    };
     for hook in hooks {
         for f in walk(vec![hook], false) {
             for t in s.takes[f].iter().filter(|t| on_this_thread(graph, f, t.at, false)) {
                 out.game_waits.entry(t.lock).or_default().insert(format!("{} (hook {})", graph.funcs[f].key(), graph.funcs[hook].key()));
+                out.game_hooks.entry(t.lock).or_default().insert(graph.funcs[hook].key());
             }
         }
     }
@@ -892,7 +923,9 @@ fn no_lock_a_game_hook_waits_on_is_held_by_a_plugin_thread() {
     let graph = Graph::scan(&Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime"), &[]);
     let (ctx, s) = scan(&graph);
     let shared = shared_locks(&ctx, &s);
+    let measured = |hook: &str| MEASURED_ON_MAIN_THREAD.iter().any(|(h, _, _)| *h == hook);
     let mut problems = Vec::new();
+    let mut used = BTreeSet::new();
     for (lock, waits) in &shared.game_waits {
         let Some(holds) = shared.plugin_holds.get(lock) else { continue };
         let name = lock_name(&ctx, *lock);
@@ -900,11 +933,26 @@ fn no_lock_a_game_hook_waits_on_is_held_by_a_plugin_thread() {
             println!("SHARED-ON-PURPOSE {name}");
             continue;
         }
+        let hooks = &shared.game_hooks[lock];
+        used.extend(hooks.iter().filter(|h| measured(h)).cloned());
+        let open: Vec<&String> = hooks.iter().filter(|h| !measured(h)).collect();
+        if open.is_empty() {
+            println!("MEASURED {name}: every waiting hook ran on MainThread only ({MEASURED_RUNS}): {hooks:?}");
+            continue;
+        }
         problems.push(format!(
-            "{name}\n    game hooks wait: {}\n    plugin threads hold: {}",
+            "{name}\n    hooks not measured MainThread-only: {}\n    game hooks wait: {}\n    plugin threads hold: {}",
+            open.iter().map(|h| h.as_str()).collect::<Vec<_>>().join(", "),
             waits.iter().cloned().collect::<Vec<_>>().join(", "),
             holds.iter().cloned().collect::<Vec<_>>().join(", ")
         ));
+    }
+    for (hook, calls, on_main) in MEASURED_ON_MAIN_THREAD {
+        assert_eq!(calls, on_main, "{hook}: {calls} calls but {on_main} on MainThread: it ran on a worker thread; fix its locks");
+        assert!(*calls > 0, "{hook}: never reached; an unreached hook is not measured");
+        let found = graph.find(hook);
+        assert!(found.iter().any(|&f| graph.funcs[f].attrs.contains("skyline::hook")), "{hook} is not a game hook any more");
+        assert!(used.contains(*hook), "{hook} waits on no shared lock now: delete its MEASURED_ON_MAIN_THREAD row");
     }
     for p in &problems {
         println!("SHARED {p}");
