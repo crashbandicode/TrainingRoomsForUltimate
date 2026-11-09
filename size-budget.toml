@@ -1164,3 +1164,91 @@ ceiling = 159664
 date = "2026-11-09"
 reason = "rc.6 p23/rc6-pt-start (84d8a1c) over integration a1f379f4: a waiting press holds every speculative step but the one serving it, no timeout (body_bank::speculative_step_admitted and serving_step, native_body_bank::serving_group, character_roster::foreground, the Mii owners' and kirby_hats' foreground) and its host and wiring tests; measured 159664 (tools/size_gate.py), +348 over 159316 (a1f379f4)"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to the operator-chosen rc.6 items under TASK-OPUS-rc6-hot-slots (primary c07b3449, 2026-11-08: a raise goes in its own commit with approved_by)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 159679
+date = "2026-11-09"
+reason = "rc.6 p23/rc6-hat-holdback (7c19e19) over integration 646a5f0d: a parked F9 seat holding its own seat member is filled for the hat creation hold-back (hat_slots::creation_filled, character_sources::creation_intent) and its host and wiring tests; measured 159679 (tools/size_gate.py), +15 over 159664 (646a5f0d)"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to the rc.6 final pass's product fix ordered by the primary (RC6-HOLD-ORDER.md addendum 09:47Z; a raise goes in its own commit with approved_by)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 159683
+date = "2026-11-09"
+reason = "rc.6 p23/rc6-qp-pilot (c563c219) over integration e39479df: every mapped poll reaches the CPU-as-P1 fallback, so it arms in an online match (features::input_delay::apply); measured 159683 (tools/size_gate.py), +4 over 159679 (e39479df)"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to the rc.6 product fix ordered by the primary 2026-11-09 12:48Z (operator: the cpu pilot should still work in an online match; a raise goes in its own commit with approved_by, primary c07b3449)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 159701
+date = "2026-11-09"
+reason = "rc.6 p23/rc6-qp-items (777aa8cc) over integration e39479df: #62, Lobby Items Off also declines the waiting room's timed item generator (lobby_items::drop_lot on main+0x15499b4, HookId::LobbyItemsDrop, seam rows drop_lot and drop_gate); measured 159701 (+22 over 159679)"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to the rc.6 final pass's product fix ordered by the primary (INBOX-opus-rc6-bg-pt 2026-11-09 12:28Z; a raise goes in its own commit with approved_by)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 159705
+date = "2026-11-09"
+reason = "rc.6 integration f950b25e: p23/rc6-qp-pilot (c563c219, +4) and p23/rc6-qp-items (777aa8cc, +22) merged on e39479df; each branch raised its own ceiling over 159679 (159683, 159701); measured on the merge 159705 (tools/size_gate.py), +4 over 159701"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the combined ceiling of two product fixes ordered by the primary (2026-11-09 12:48Z, 12:28Z), each already raised with approved_by in its own branch; a raise goes in its own commit with approved_by"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 160054
+date = "2026-11-09"
+reason = "rc.6 p23/rc6-lobby-persist (f8549f6b) over integration e39479df: the waiting room's Training partners and CPU action persist (model::lobby_persist, runtime::lobby::lobby_persist with its two inline hooks and its 7 seam rows, the settings key, the writer) and its host and wiring tests; measured 160054 (tools/size_gate.py), +375 over 159679 (e39479df)"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to the operator's rc.6 lobby feature (TASK-OPUS-rc6-lobby-cpu-settings requirement 1, primary 2026-11-09 11:36Z; a raise goes in its own commit with approved_by)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 160047
+date = "2026-11-09"
+reason = "rc.6 p23/rc6-menu-freeze (e66e6443) over integration e39479df: the menu-close freeze work. It carries cov-rest's diag stall watchdog (d45d8d2, 8e50b22, 31b5df2, cherry-picked) with its held-lock table behind hang-trace, the worker and game-thread step markers, and the named-macro keyboard lock-order fix; measured 160047 (tools/size_gate.py), +368 over 159679 (e39479df)"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to the rc.6 defect the primary ordered (INBOX-opus-rc6-bg-ic 2026-11-09 12:28Z: the menu-close freeze; a raise goes in its own commit with approved_by)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 160448
+date = "2026-11-09"
+reason = "rc.6 integration bdf509d3: p23/rc6-qp-pilot (+4), p23/rc6-qp-items (+22), p23/rc6-lobby-persist (+375) and p23/rc6-menu-freeze (+368) merged on e39479df (159679); each branch raised its own ceiling with approved_by (159683, 159701, 160054, 160047; the earlier combined 159705); measured on the merge 160448 (tools/size_gate.py), +401 over 160047"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the combined ceiling of the rc.6 product fixes and the operator feature ordered by the primary (2026-11-09 11:20Z, 12:28Z, 12:48Z, 12:53Z), each already raised with approved_by in its own branch; a raise goes in its own commit with approved_by"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 159785
+date = "2026-11-09"
+reason = "rc.6 p23/rc6-window-admission (8c51af73) over integration e39479df: a switch window takes only the supplements the process can hold (proposed, process_memory::admit_window, memory::window_extras) and created entries leave what the cycle waits for (admit_created, cycle_waiting), the hs08b allocator abort; measured 159785 (tools/size_gate.py), +106 over 159679 (e39479df)"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to the rc.6 product fix ordered by the primary 2026-11-09 13:28Z (the hs08b allocator abort; a raise goes in its own commit with approved_by, primary c07b3449)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 160223
+date = "2026-11-09"
+reason = "rc.6 p23/rc6-lobby-cpu (481173cf) over integration e39479df: the mod's CPU Level (TASK-OPUS-rc6-lobby-cpu-settings.md requirement 2): model::cpu::level and its host tests, the factory row and menu row, runtime::features::cpu_level (the session clock, the notice, the rank step and its diag lines) and the 11 generated cpu_level seam rows; measured 160223 (tools/size_gate.py), +544 over 159679 (e39479df)"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to the operator's rc.6 order of 2026-11-09 11:17Z (TASK-OPUS-rc6-lobby-cpu-settings.md; design accepted by the primary 12:26Z; a raise goes in its own commit with approved_by, primary c07b3449)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 159907
+date = "2026-11-09"
+reason = "rc.6 p23/rc6-preload-priority (d922ad3e) over integration e39479df: new members load at once and a parked group goes now when they need its room (body_bank::release_for_new_members, leaves_now, capacity_release, GroupCounts::with_release; native_body_bank plan_groups, group_lifecycle, release_for_capacity) and its host and wiring tests; measured 159907 (tools/size_gate.py), +228 over 159679 (e39479df)"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to the product fix ordered by the primary under the operator's 13:21Z rule (INBOX-opus-rc6-docs 13:21Z; a raise goes in its own commit with approved_by)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 161326
+date = "2026-11-09"
+reason = "rc.6 integration bd8ddcb5 (the candidate): p23/rc6-window-admission (+106), p23/rc6-lobby-cpu (+544) and p23/rc6-preload-priority (+228) merged on 0e97f41d (160448); each branch raised its own ceiling over 159679 with approved_by (159785, 160223, 159907); measured on the merge 161326 (tools/size_gate.py), exactly 160448 + 106 + 544 + 228"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the combined ceiling of the rc.6 product fixes and the operator feature the primary ordered merged (2026-11-09 14:54Z), each already raised with approved_by in its own branch; a raise goes in its own commit with approved_by"

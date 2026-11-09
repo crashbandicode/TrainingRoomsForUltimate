@@ -177,6 +177,38 @@ pub fn admit(headroom: Option<u64>, outstanding: u64, cost: GroupCost) -> Decisi
     Decision { admission, headroom, outstanding, available, need }
 }
 
+/// rc.6 window admission (primary 2026-11-09 13:28Z; Eden `final-e39-xps-hot` hs08b on `e39479df`: the window
+/// `[42, 44, 1c]` was planned at 27.6 MB of headroom, both supplements were acquired and the page commit aborted in the
+/// build). How many of a switch's new window's supplemental members, in the planner's order, the process can hold, and
+/// the decision that stopped the count, if one did. The prefix `supplements[..k]` is admitted while [`admit`] admits
+/// its [`group_cost`] against the headroom less what every other consumer still holds: a group prefetch's rule and
+/// margin. A `Defer` stops it too: the window is built at this request and cannot wait. The target is not charged: it is
+/// the visible request, never refused, and its Reload destroys the outgoing window first.
+pub fn window_extras(headroom: Option<u64>, outstanding: u64, supplements: &[u32]) -> (usize, Option<Decision>) {
+    for k in 1..=supplements.len() {
+        let decision = admit(headroom, outstanding, group_cost(&supplements[..k]));
+        if decision.admission != Admission::Admit {
+            return (k - 1, Some(decision));
+        }
+    }
+    (supplements.len(), None)
+}
+
+/// What a window that [`window_extras`] cut waits for: the refused supplements' cost with the margin, 0 when every one
+/// was admitted. Created entries leave it ([`created_admission`]).
+pub fn window_waiting(supplements: &[u32], admitted: usize) -> u64 {
+    supplements.get(admitted..).filter(|refused| !refused.is_empty())
+        .map_or(0, |refused| with_margin(group_cost(refused).total()))
+}
+
+/// A created entry's creation or speculative load (primary 2026-11-09 13:28Z: created entries give way to a window or a
+/// group that needs the room; operator 13:20Z: what the player's cycle needs gets memory first). It is admitted only
+/// when the headroom also leaves `waiting`, what the cycle's refused window supplements and memory-held groups need
+/// ([`window_waiting`]); otherwise it is deferred and stays planned. With nothing waiting it is [`admit`].
+pub fn created_admission(headroom: Option<u64>, outstanding: u64, waiting: u64, cost: GroupCost) -> Decision {
+    admit(headroom, outstanding.saturating_add(waiting), cost)
+}
+
 #[cfg(test)]
 mod tests {
     //! Replays of the logged sequences. Headroom values are the `[GroupSwap] prefetch … headroom=` admission samples
@@ -373,5 +405,90 @@ mod tests {
         }
         assert_eq!(admit(Some(need), 0, group).admission, Admission::Admit);
         assert_eq!(outstanding(GroupState::Held(super::super::Hold::Memory), group), 0, "a held group holds no memory");
+    }
+
+    /// Eden `final-e39-xps-hot` hs08b (`e39479df`, 2026-11-09 13:03:52Z): the CPU's switch to `0x42` planned the window
+    /// `[42, 44, 1c]` (`#3404`) with 27,611,136 bytes of headroom (`#3391`, the last sample before it), acquired both
+    /// supplements unconditionally (`#3421 supplemental=[44, 1c]`) and the game's page commit aborted in the build.
+    /// Simon (65.2 + 35.1 MiB) and Game & Watch (53.1 + 98.4 MiB) each need more than that: the window keeps neither,
+    /// and the switch is the canonical single-body Reload of the target.
+    #[test]
+    fn hs08b_window_keeps_no_supplement_at_its_headroom() {
+        let (admitted, stopped) = window_extras(Some(27_611_136), 0, &[0x44, 0x1c]);
+        assert_eq!(admitted, 0);
+        let stopped = stopped.expect("the decision that refused Simon");
+        assert_eq!(stopped.admission, Admission::Refuse, "{stopped:?}");
+        assert_eq!(stopped.need, with_margin(cost(&[0x44]).total()) + FLOOR);
+    }
+
+    /// The same rule at the headrooms the window planner met in the two `xps-hot` runs: the supplements are the
+    /// planner's prefix that fits (`[5c, 53, 45]`, `#3257` on `e39479df` at 73,420,800 and `#3138` on `646a5f0d` at
+    /// 79,646,720, keep the target alone), and more of them fit as the headroom grows.
+    #[test]
+    fn window_supplements_shrink_as_the_headroom_falls() {
+        let both = with_margin(cost(&[0x53, 0x45]).total()) + FLOOR;
+        let first = with_margin(cost(&[0x53]).total()) + FLOOR;
+        assert!(first < both);
+        assert_eq!(window_extras(Some(both), 0, &[0x53, 0x45]).0, 2);
+        assert_eq!(window_extras(Some(both - 1), 0, &[0x53, 0x45]).0, 1);
+        assert_eq!(window_extras(Some(first), 0, &[0x53, 0x45]).0, 1);
+        assert_eq!(window_extras(Some(first - 1), 0, &[0x53, 0x45]).0, 0);
+        for headroom in [73_420_800u64, 79_646_720] {
+            assert_eq!(window_extras(Some(headroom), 0, &[0x53, 0x45]).0, 0, "{headroom}");
+        }
+        assert_eq!(window_extras(None, 0, &[0x53]).0, 0, "an unread headroom admits nothing");
+        assert_eq!(window_extras(Some(0), 0, &[]), (0, None), "a window with no supplement asks nothing");
+    }
+
+    /// `e39479df` `#3015`: the CPU's window `[0, 58, 59]` at 310,005,760 bytes (`#2937`) keeps both supplements: with room
+    /// the windows are what they were.
+    #[test]
+    fn a_window_at_ample_headroom_keeps_both_supplements() {
+        assert_eq!(window_extras(Some(310_005_760), 0, &[0x58, 0x59]), (2, None));
+    }
+
+    /// What admitted groups have not spent yet (a prefetched group's build) is not the window's: it takes the
+    /// supplements the rest admits, as a group prefetch or a helper preload does.
+    #[test]
+    fn admitted_groups_still_hold_their_part_against_a_window() {
+        let both = with_margin(cost(&[0x53, 0x45]).total()) + FLOOR;
+        let held = outstanding(GroupState::Prefetched, cost(&[0x42, 0x45]));
+        assert!(held > 0);
+        assert_eq!(window_extras(Some(both), 0, &[0x53, 0x45]).0, 2);
+        let (admitted, stopped) = window_extras(Some(both), held, &[0x53, 0x45]);
+        assert_eq!(admitted, 1);
+        assert_eq!(stopped.map(|d| d.admission), Some(Admission::Defer), "the headroom covers it once the group builds");
+    }
+
+    /// Primary 2026-11-09 13:28Z ("created entries … must yield to a window or group that needs the room"; operator
+    /// 13:20Z: what the player's cycle needs gets memory first). A created entry's hat load (Falco, the hs06 plan's first
+    /// hat) that today's admission takes is not admitted while the supplements a window was refused wait for the room:
+    /// it would take the memory the cycle's next window needs. It is deferred, not refused: it stays planned.
+    #[test]
+    fn a_created_entry_gives_way_to_what_the_cycle_waits_for() {
+        let hat = helper_cost(0x14);
+        let room = with_margin(hat.total()) + FLOOR;
+        assert_eq!(admit(Some(room), 0, hat).admission, Admission::Admit);
+        let (admitted, _) = window_extras(Some(room), 0, &[0x44, 0x1c]);
+        let waiting = window_waiting(&[0x44, 0x1c], admitted);
+        assert_eq!(waiting, with_margin(cost(&[0x44, 0x1c]).total()), "both refused supplements wait");
+        let decision = created_admission(Some(room), 0, waiting, hat);
+        assert_eq!(decision.admission, Admission::Defer, "{decision:?}");
+        assert_eq!(created_admission(Some(room + waiting), 0, waiting, hat).admission, Admission::Admit,
+            "with room for both, the hat loads beside the window's wait");
+        assert_eq!(window_waiting(&[0x44, 0x1c], 2), 0, "an admitted window leaves nothing waiting");
+    }
+
+    /// "Hats still preload when there's room": with nothing waiting, a created entry is admitted exactly as before.
+    #[test]
+    fn a_created_entry_loads_as_before_when_nothing_waits() {
+        for kind in [0x14u32, 0x10, 0x11, 0x18, 0x1a] {
+            let hat = helper_cost(kind);
+            for headroom in [None, Some(0), Some(with_margin(hat.total()) + FLOOR - 1), Some(with_margin(hat.total()) + FLOOR), Some(800 * MIB)] {
+                for held in [0, 40 * MIB] {
+                    assert_eq!(created_admission(headroom, held, 0, hat), admit(headroom, held, hat), "{kind:#x} {headroom:?} {held}");
+                }
+            }
+        }
     }
 }

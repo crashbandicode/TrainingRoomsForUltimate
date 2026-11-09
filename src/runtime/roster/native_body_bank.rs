@@ -173,7 +173,8 @@ use crate::engine::swap::body_bank::{
     GroupBudget, GroupExchange, GroupOwner, GroupPolicy, GroupState, Hold, Members, Phase, Special,
     SpecialPolicy, BANK_FLAG, MAX_EXTRA_GROUPS, NANA, NATIVE_MEMBERS, PAIR_ACTIVE_FLAG, POOL_RESERVE, POPO,
     entry_bytes_of, mii_exit_bytes_match, mii_reuse_bytes_match, MiiEntryBytes, MiiIdentity, MII_ENTRY_START, RESOURCE_WORDS,
-    baseline_words, identity_move, IdentityMove, leaves_at_pause, count_group_members, kept_members, waiting_for_pause,
+    baseline_words, identity_move, IdentityMove, leaves_at_pause, count_group_members, kept_members,
+    release_for_new_members, capacity_release, leaves_now,
     next_window_targets, own_words, shadow_values, LiveIdentity, speculative_step_admitted, serving_step, Serving,
 };
 use crate::engine::swap::body_bank::memory::{self, Admission};
@@ -304,8 +305,9 @@ static ROLE_BUDGET: [AtomicU8; 2] = [AtomicU8::new(0), AtomicU8::new(0)];
 // Display targets are not resource reservations: canonical-only original
 // restoration still occupies a body cell but cannot promise a reuse hit.
 static PLANNED_TARGETS: [AtomicU8; 2] = [AtomicU8::new(0), AtomicU8::new(0)];
-/// New members per role the planner places only once the pause frees the parked groups (`body_bank::waiting_for_pause`).
-static WAITING_PAUSE: [AtomicU8; 2] = [AtomicU8::new(0), AtomicU8::new(0)];
+/// New members per role that load once the parked groups marked to go now are freed (operator rule 2026-11-09 13:21Z,
+/// `body_bank::release_for_new_members`).
+static RELEASE_MEMBERS: [AtomicU8; 2] = [AtomicU8::new(0), AtomicU8::new(0)];
 static EXTRAS: [AtomicU8; 2] = [AtomicU8::new(0), AtomicU8::new(0)];
 /// Extra-group bodies per role (planned, prefetched or built; failed excluded).
 static GROUP_BODIES: [AtomicU8; 2] = [AtomicU8::new(0), AtomicU8::new(0)];
@@ -889,8 +891,9 @@ fn plan_groups(settings: &crate::engine::preload::cycle_preload_config::Settings
     // role's cycle no longer has leaves. Nothing native exists for a planned, held or failed group: it is Released here.
     // A Prefetched one returns its keys on the entry tick (`leave_group`). A Built one stays parked until Training's pause
     // opens (operator decision 23:42Z, `body_bank::leaves_at_pause`, `pause_opening`): it keeps its bodies in the budget
-    // and serves its still-wanted members meanwhile, and new members are planned beside it into free slots. The window
-    // itself (on screen) stays until it is switched away.
+    // and serves its still-wanted members meanwhile, and new members are planned beside it into free slots, or it goes
+    // now when they need its room (operator rule 2026-11-09 13:21Z, below). The window itself (on screen) stays until it
+    // is switched away.
     let wanted = [cycle_wanted(menu, 0), cycle_wanted(menu, 1)];
     for role in 0..2 {
         let mut state = BANKS[role].lock();
@@ -970,34 +973,48 @@ fn plan_groups(settings: &crate::engine::preload::cycle_preload_config::Settings
         GROUP_BODIES[role].store(role_bodies.min(usize::from(u8::MAX)) as u8, Ordering::Release);
         bodies += role_bodies;
     }
-    // Operator decision 2026-11-08 23:42Z: the parked groups keep their bodies in the shared budget and their slots until
-    // the pause. What the plan without them would place beyond what any group holds now waits for the pause, shown
-    // "(N waiting for memory)"; the pass after the pause plans it and the background build loads it.
+    // Operator rule 2026-11-09 (inbox 13:21Z; it replaces the pause wait of the 23:42Z decision): the new members load
+    // at once. The parked groups keep their bodies and slots until the pause unless the new members need their room:
+    // then the fewest of them are marked to go now (`release_for_new_members`), the entry tick frees them (`leaves_now`)
+    // and the members they make room for show as loading; the pass after the release plans them. A leaving group that
+    // is not parked goes on the entry tick anyway and is neither kept nor parked here.
     let mut kept = [crate::engine::compat::fixed::FixedList::<Members, MAX_EXTRA_GROUPS>::new(Members::pair_group()); 2];
-    let mut parked_bodies = 0usize;
+    let mut parked = [crate::engine::compat::fixed::FixedList::<(Members, u8), MAX_EXTRA_GROUPS>::new((Members::pair_group(), 0)); 2];
+    let mut parked_slots = [crate::engine::compat::fixed::FixedList::<usize, MAX_EXTRA_GROUPS>::new(0); 2];
+    let mut held = [crate::engine::compat::fixed::FixedList::<u32, { MAX_EXTRA_GROUPS * NATIVE_MEMBERS }>::new(0); 2];
     for role in 0..2 {
-        if let Some(bank) = BANKS[role].lock().as_ref().filter(|bank| bank.phase == Phase::Ready && !bank.departed) {
-            for group in bank.groups.iter().filter(|g| g.state.counts_bodies()) {
-                if group.leaving { parked_bodies += group.members.count(); } else { kept[role].push(*group.members); }
+        let mut state = BANKS[role].lock();
+        let Some(bank) = state.as_mut().filter(|bank| bank.phase == Phase::Ready && !bank.departed) else { continue; };
+        for (index, group) in bank.groups.iter_mut().enumerate().filter(|(_, g)| g.state != GroupState::Released) {
+            if group.leaving && leaves_at_pause(group.state) {
+                group.parked_kept = kept_members(*group.members, &wanted[role]);
+                parked[role].push((*group.members, group.parked_kept));
+                parked_slots[role].push(index);
+                continue;
             }
+            for kind in &group.members.kinds()[..group.members.count()] { held[role].push(*kind); }
+            if !group.leaving && group.state.counts_bodies() { kept[role].push(*group.members); }
         }
     }
-    let mut waiting = [0u8; 2];
-    if parked_bodies > 0 {
-        let after = plan_extra_groups_with(policy, windows, [&kept[0], &kept[1]], [&upcoming[0], &upcoming[1]], originals,
-            GroupBudget { pool_free: pool_free.saturating_add(parked_bodies), ..budget });
-        for role in 0..2 {
-            if let Some(bank) = BANKS[role].lock().as_ref().filter(|bank| bank.phase == Phase::Ready && !bank.departed) {
-                waiting[role] = waiting_for_pause(&after[role], |kind| bank.groups.iter()
-                    .any(|g| g.state != GroupState::Released && g.members.index_of(kind).is_some()));
+    let release = release_for_new_members([&kept[0], &kept[1]], [&parked[0], &parked[1]], |role, kind| held[role].contains(&kind),
+        |existing, freed| plan_extra_groups_with(policy, windows, existing, [&upcoming[0], &upcoming[1]], originals,
+            GroupBudget { pool_free: pool_free.saturating_add(freed), ..budget }));
+    for role in 0..2 {
+        if let Some(bank) = BANKS[role].lock().as_mut().filter(|bank| bank.phase == Phase::Ready && !bank.departed) {
+            let owner = bank.owner;
+            for (bit, (slot, (members, kept))) in parked_slots[role].iter().zip(parked[role].iter()).enumerate() {
+                if release.groups[role] & (1 << bit) == 0 { continue; }
+                let Some(group) = bank.groups.get_mut(*slot)
+                    .filter(|g| g.leaving && leaves_at_pause(g.state) && !g.release_now && *g.members == *members) else { continue; };
+                group.release_now = true;
+                trace!("[GroupSwap] release now owner={} group={} kinds={:x?} kept={} reason=the new members need its room; the entry tick frees it",
+                    owner, slot, &members.kinds()[..members.count()], kept);
             }
         }
-    }
-    for role in 0..2 {
-        if WAITING_PAUSE[role].swap(waiting[role], Ordering::AcqRel) != waiting[role] {
-            trace!("[GroupSwap] waiting for the pause role={} members={} parked_bodies={}", role, waiting[role], parked_bodies);
+        if RELEASE_MEMBERS[role].swap(release.members[role], Ordering::AcqRel) != release.members[role] {
+            trace!("[GroupSwap] loading after a release role={} members={} parked={:#b}", role, release.members[role], release.groups[role]);
         }
-        targets[role] = targets[role].saturating_add(waiting[role]);
+        targets[role] = targets[role].saturating_add(release.members[role]);
     }
     bodies
 }
@@ -1027,7 +1044,7 @@ pub(crate) fn progress() -> crate::engine::preload::cycle_preload_policy::BuiltF
     let wanted = [cycle_wanted(&menu, 0), cycle_wanted(&menu, 1)];
     for (role, state) in BANKS.iter().enumerate() {
         let planned = PLANNED_TARGETS[role].load(Ordering::Acquire);
-        let waiting = WAITING_PAUSE[role].load(Ordering::Acquire);
+        let releasing = RELEASE_MEMBERS[role].load(Ordering::Acquire);
         let counts = match state.lock().as_ref()
             .filter(|bank| bank.phase != Phase::Retired && !bank.departed) {
             Some(bank) => {
@@ -1036,10 +1053,11 @@ pub(crate) fn progress() -> crate::engine::preload::cycle_preload_policy::BuiltF
                 let extra = reusable_extras(&kinds[..count], active, originals[role]);
                 // rc.6 item 3: a prefetched group a background build still owes is loading, not yet instant.
                 // A parked group (left the cycle, freed at the next pause) counts the members its cycle keeps, which
-                // it still serves warm (rc6-hot-xps18), and the new members waiting for the pause show as held.
+                // it still serves warm (rc6-hot-xps18), and the new members a parked group freed now makes room for
+                // show as loading (operator rule 2026-11-09 13:21Z).
                 let groups = count_group_members(bank.groups.iter().map(|g| (shown_members(g, &wanted[role]),
                     crate::engine::swap::body_bank::shown_state(g.state, background_owed(bank, g, Some(active))))))
-                    .with_waiting(waiting);
+                    .with_release(releasing);
                 let window = if bank.failed { WindowStatus::Failed }
                     else if bank.phase == Phase::Ready && bank.observed.is_some() { WindowStatus::Built }
                     else { WindowStatus::Busy };
@@ -1095,6 +1113,10 @@ pub(super) unsafe fn group_rebaseline(entry: usize, owner: u32, epoch: u64,
 
 pub(crate) fn helper_budget(slots: u8) -> u8 { slots.saturating_sub(RESERVED.load(Ordering::Acquire)) }
 
+/// rc.6 window admission: per role, what the supplements its last window plan refused for memory need
+/// (`memory::window_waiting`). Created entries leave it ([`cycle_waiting`]).
+static WINDOW_WAITING: [AtomicU64; 2] = [AtomicU64::new(0), AtomicU64::new(0)];
+
 pub(super) fn proposed(owner: u32, target: Forms, upcoming: &[u32]) -> Option<Members> {
     let role = role(owner)?;
     let settings = crate::runtime::roster::cycle_preload_config::snapshot();
@@ -1115,7 +1137,32 @@ pub(super) fn proposed(owner: u32, target: Forms, upcoming: &[u32]) -> Option<Me
     let budget = budget.min(pool.saturating_sub(planned_other + (other_total - other)));
     let menu = crate::runtime::compat::sync::read(&crate::runtime::compat::menu::MENU);
     let (lane, count) = window_lane(&menu, role, upcoming);
-    members_for(&settings, target, &lane[..count], budget)
+    let Some(members) = members_for(&settings, target, &lane[..count], budget) else {
+        WINDOW_WAITING[role].store(0, Ordering::Release);
+        return None;
+    };
+    // rc.6 window admission (primary 2026-11-09 13:28Z; Eden final-e39-xps-hot hs08b: the window `[42, 44, 1c]` was
+    // planned at 27.6 MB of headroom, `prepare_resources` acquired both supplements and the game's page commit aborted in
+    // the build). The members beyond the target's own form are admitted here, in the planner's order, against the
+    // process headroom like a group prefetch (`memory::window_extras`); the planner runs again with the count admitted,
+    // so `prepare_resources` acquires only those. The target is the visible request and is never refused.
+    let mut supplements = FixedList::<u32, NATIVE_MEMBERS>::new(0);
+    for kind in lane[..count].iter().copied() {
+        if members.kinds()[..members.count()].contains(&kind)
+            && !target.kinds[..target.count as usize].contains(&kind) && !supplements.contains(&kind) {
+            supplements.push(kind);
+        }
+    }
+    let (admitted, stopped) = super::process_memory::admit_window(&supplements);
+    WINDOW_WAITING[role].store(memory::window_waiting(&supplements, admitted), Ordering::Release);
+    let Some(decision) = stopped else { return Some(members); };
+    // The pair-lead window's Nana is the target's form, not a supplement: the body budget counts it.
+    let admitted_budget = admitted + (members.count() - 1).saturating_sub(supplements.len());
+    crate::engine::compat::logging::diagnostic(format_args!(
+        "[ProcessMemory] window owner={} target={:#x} members={:x?} admitted={} of supplements={:x?} admission={:?} headroom={:?} outstanding={} need={}; the rest waits for a later window",
+        owner, target.kinds[0], &members.kinds()[..members.count()], admitted, &*supplements, decision.admission,
+        decision.headroom, decision.outstanding, decision.need));
+    members_for(&settings, target, &lane[..count], admitted_budget)
 }
 
 /// Actual native descriptor plus the selected logical fighter. Exact-Mii
@@ -1801,6 +1848,11 @@ struct GroupData {
     /// parked and released when the pause opens (`pause_opening`), any other on the entry tick (`leave_group`); it then
     /// becomes Released.
     leaving: bool,
+    /// Operator rule 2026-11-09 (inbox 13:21Z): a parked group the new members need the room of (the planner's
+    /// `release_for_new_members`, or a refused prefetch's `release_for_capacity`); the entry tick frees it now.
+    release_now: bool,
+    /// The members of a parked group its role's cycle still has (`body_bank::kept_members`), as of the planner's last pass.
+    parked_kept: u8,
     /// Inbox 00:18Z: this slot's Pokémon Trainer group holds its object kind `0x72` again (re-acquired while detached,
     /// returned right after its attach's rebuild, `return_object_key`).
     object_held: bool,
@@ -1818,7 +1870,7 @@ impl GroupData {
             bodies: [Body::default(); NATIVE_MEMBERS], since_us: 0, busy_logged: false, kirby_logged: false,
             memory_logged: false, prefetch_committed: None,
             identity, configuration, charinfo_published: false, publish: PublishAttempts::new(), background_refused: false,
-            leaving: false, object_held: false, object_refused: false, prepare_refused: false }
+            leaving: false, release_now: false, parked_kept: 0, object_held: false, object_refused: false, prepare_refused: false }
     }
 }
 
@@ -2594,7 +2646,7 @@ unsafe fn service_locked(entry: *mut u8, owner: u32, role: usize) -> Action {
                     || prepare_candidate(BASE.load(Ordering::Acquire), bank).is_some() { Action::Lifecycle }
                 else if bank.object_fetch.is_some() || rearm_candidate(BASE.load(Ordering::Acquire), bank).is_some() { Action::Lifecycle }
                 else if bank.prefetch.is_some()
-                    || bank.groups.iter().any(|g| g.state.startable() || (g.leaving && !leaves_at_pause(g.state)))
+                    || bank.groups.iter().any(|g| g.state.startable() || (g.leaving && (!leaves_at_pause(g.state) || g.release_now)))
                     || background_candidate(bank, Some(members.kinds()[usize::from(index)])).is_some() {
                     Action::Lifecycle
                 } else { Action::SyncCopies };
@@ -4839,6 +4891,7 @@ unsafe fn perform_swap(entry: *mut u8, owner: u32, role: usize) {
         // The record now holds the outgoing window; a parked group switched to is the window (never released). The
         // planner marks the record again on its next pass if what it holds left the cycle.
         group.leaving = false;
+        group.release_now = false;
         let prepared = match (group.state, group.saved.take()) {
             (GroupState::Built, Some(y)) => {
                 let x_bodies = std::mem::replace(&mut bank.bodies, group.bodies);
@@ -5425,9 +5478,10 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
         } else if let Some(group) = rearm_candidate(base, bank) {
             Step::Rearm(group, *bank.groups[group].members, bank.alias)
         // rc.6 mid-session cycle change: a group whose member left the cycle is released before anything new starts.
-        // A Built one stays parked until the pause opens (`pause_opening`).
-        } else if let Some(group) = bank.groups.iter().position(|g| g.leaving && g.state != GroupState::Prefetching
-            && !leaves_at_pause(g.state)) {
+        // A Built one stays parked until the pause opens (`pause_opening`), unless it is marked to go now because the new
+        // members need its room (operator rule 2026-11-09 13:21Z); never one a committed switch targets.
+        } else if let Some(group) = bank.groups.iter().enumerate().position(|(i, g)| g.leaving
+            && leaves_now(g.state, g.release_now && bank.swap.is_none_or(|s| s.group != i))) {
             Step::Leave(group)
         } else {
             let start = crate::engine::swap::body_bank::next_start(bank.groups.iter()
@@ -5557,7 +5611,26 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
                 fields::read::<u64>(alias, 0x18).unwrap_or(0), released);
         }
         Step::Background(group) => start_background(entry, owner, role, group),
-        Step::Leave(group) => if !super::INSTALL.active() { leave_group(entry, owner, role, group) },
+        Step::Leave(group) => if !super::INSTALL.active() {
+            // Operator rule 2026-11-09 13:21Z: a parked group freed now logs its game-thread hold and the headroom it gave
+            // back, as the pause's free does. If it could not go, the pause frees it (no retry on every tick).
+            let parked = BANKS[role].lock().as_ref().and_then(|bank| bank.groups.get(group))
+                .filter(|g| leaves_at_pause(g.state)).map(|g| *g.members);
+            let before = parked.map(|_| MemorySample::capture());
+            leave_group(entry, owner, role, group);
+            if let (Some(members), Some(before)) = (parked, before) {
+                let after = MemorySample::capture();
+                let still = match BANKS[role].lock().as_mut().and_then(|bank| bank.groups.get_mut(group))
+                    .filter(|g| g.leaving && leaves_at_pause(g.state)) {
+                    Some(g) => { g.release_now = false; true }
+                    None => false,
+                };
+                trace!("[GroupSwap] frees now owner={} group={} kinds={:x?} us={} headroom={:?}->{:?} committed={:?}->{:?} freed={}{}",
+                    owner, group, &members.kinds()[..members.count()], now_us().saturating_sub(started), before.headroom(),
+                    after.headroom(), before.committed.get(), after.committed.get(), !still,
+                    if still { "; the pause frees it" } else { "" });
+            }
+        },
         Step::Release(group, members, window, alias) => {
             // Same preconditions as a prefetch: this R, idle. A freshly live Kirby
             // is hatless (Reloaded, or parked copy-free by `kirby_park_gate`); a
@@ -5641,6 +5714,7 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
                     trace!("[GroupSwap] held owner={} group={} reason=fighter pool {}/{} reserve {} < {} bodies; retried",
                         owner, group, live, capacity, POOL_RESERVE, members.count());
                 }
+                release_for_capacity(owner, group, "fighter pool");
                 return;
             }
             // GS-PANIC: the group's measured cost (prefetch + build) against the headroom every other consumer has
@@ -5672,6 +5746,7 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
                             owner, group, headroom, decision.need, &members.kinds()[..members.count()], decision.outstanding,
                             cost.prefetch, cost.build);
                     }
+                    release_for_capacity(owner, group, "process headroom");
                     return;
                 }
             }
@@ -5755,6 +5830,18 @@ pub(super) fn group_outstanding() -> u64 {
         .map(|g| memory::outstanding(g.state, memory::group_cost(&g.members.kinds()[..g.members.count()])))
         .fold(0u64, u64::saturating_add)))
         .fold(0u64, u64::saturating_add)
+}
+
+/// rc.6 window admission: what the cycle waits for, which a created entry leaves (`process_memory::admit_created`): the
+/// supplements each role's last window plan refused for memory (`WINDOW_WAITING`) and every group held for memory, its
+/// cost with the margin. Takes each role's bank lock in turn; never call it with a bank lock held.
+pub(super) fn cycle_waiting() -> u64 {
+    let windows = WINDOW_WAITING.iter().map(|waiting| waiting.load(Ordering::Acquire)).fold(0u64, u64::saturating_add);
+    BANKS.iter().map(|state| state.lock().as_ref().map_or(0, |bank| bank.groups.iter()
+        .filter(|g| g.state == GroupState::Held(Hold::Memory))
+        .map(|g| memory::with_margin(memory::group_cost(&g.members.kinds()[..g.members.count()]).total()))
+        .fold(0u64, u64::saturating_add)))
+        .fold(windows, u64::saturating_add)
 }
 
 /// `[GroupSwap] memory`: the committed process charge one phase of a group took, next to the estimate the
@@ -5994,6 +6081,33 @@ unsafe fn retire_groups(entry: *const u8, owner: u32, reason: &str) {
     if alias_ok { r_handle::reconcile(ledger_role(role), reason); }
 }
 
+/// Operator rule 2026-11-09 (inbox 13:21Z): a prefetch refused for process memory or fighter-pool bodies while groups are
+/// parked frees one of them now (`body_bank::capacity_release`: the fewest members the cycle keeps, then the fewest
+/// bodies; never one a committed switch targets), unless one is going already. The refused group is retried after it, so
+/// parked groups go one at a time and only while refusals last; a refusal with nothing parked stays "waiting for memory".
+/// Value-only (the entry tick frees the group, `leaves_now`); never under the bank lock.
+fn release_for_capacity(owner: u32, group: usize, reason: &str) {
+    let mut parked = FixedList::<((usize, usize), Members, u8), { 2 * MAX_EXTRA_GROUPS }>::new(((0, 0), Members::pair_group(), 0));
+    for role in 0..2 {
+        let state = BANKS[role].lock();
+        let Some(bank) = state.as_ref().filter(|bank| bank.phase == Phase::Ready && !bank.departed) else { continue; };
+        for (index, g) in bank.groups.iter().enumerate() {
+            if !g.leaving || !leaves_at_pause(g.state) { continue; }
+            if g.release_now { return; }
+            if bank.swap.is_none_or(|s| s.group != index) { parked.push(((role, index), *g.members, g.parked_kept)); }
+        }
+    }
+    let Some((role, index)) = capacity_release(parked.iter().copied()) else { return; };
+    let mut state = BANKS[role].lock();
+    let Some(bank) = state.as_mut() else { return; };
+    let parked_owner = bank.owner;
+    if let Some(g) = bank.groups.get_mut(index).filter(|g| g.leaving && leaves_at_pause(g.state)) {
+        g.release_now = true;
+        trace!("[GroupSwap] release now owner={} group={} kinds={:x?} kept={} reason={} held prefetch owner={} group={}; the entry tick frees it",
+            parked_owner, index, &g.members.kinds()[..g.members.count()], g.parked_kept, reason, owner, group);
+    }
+}
+
 /// rc.6 mid-session cycle change (operator requirement 2026-11-08, inbox 19:21Z): one detached group a member of which
 /// left the role's cycle, released while the window stays live, through the teardown protocol `retire_groups` runs for
 /// every group: a Prefetched group's keys go back through the ledger; a Built group's bodies, contexts, dispatcher arrays
@@ -6224,7 +6338,7 @@ pub(super) fn scene_changed() {
     RESERVED.store(0, Ordering::Release);
     for value in &ROLE_BUDGET { value.store(0, Ordering::Release); }
     for value in &PLANNED_TARGETS { value.store(0, Ordering::Release); }
-    for value in &WAITING_PAUSE { value.store(0, Ordering::Release); }
+    for value in &RELEASE_MEMBERS { value.store(0, Ordering::Release); }
     // P-HOT B (§12): a start-up window the new scene's own configure published before this callback saw the scene
     // change belongs to the new scene; everything else departs as before.
     let now = crate::runtime::lobby::game_mode::current().map(|m| (m.mode, u32::from(m.melee)));
@@ -6266,6 +6380,7 @@ pub(super) fn on_destroy(entry: *const u8) {
                 crate::runtime::roster::copy_packages::forget(role, bank.owner, "entry destroyed");
                 EXTRAS[role].store(0, Ordering::Release);
                 GROUP_BODIES[role].store(0, Ordering::Release);
+                WINDOW_WAITING[role].store(0, Ordering::Release);
                 if !bank.groups.is_empty() || bank.prefetch.is_some() {
                     // Finalize ran before this destructor hook; the groups should be gone.
                     trace!("[GroupSwap] destroy owner={} with {} group records remaining (leak reported)", bank.owner, bank.groups.len());

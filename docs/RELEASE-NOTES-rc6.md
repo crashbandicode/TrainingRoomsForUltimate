@@ -109,6 +109,20 @@ The two seats count in the Fighters notice. A seat that waits for memory shows a
 it loads once memory is free (in Eden, "Loaded 1/5 · swap both to load 3 more (1 waiting for memory)", then
 "Loaded 2/5 …").
 
+### CPU Level
+
+CPU › Level › CPU Level sets the CPUs' level to Off or Lv 1–9. It's saved with the other settings. Off is the default,
+and the game's own level then applies everywhere.
+
+- **In Training,** Lv N replaces Training's own level wherever Training uses it, that is, for the CPU (Lv. n)
+  behavior. The pause menu still shows Training's own level.
+  - If the two differ when Training starts, a notice says so once, for example "CPU level: Lv 7 from TrainingRooms
+    (Training menu: Lv 3)".
+  - Changing either level later in that session shows no second notice. The next entry into Training checks again.
+- **In the waiting room's practice** (local wireless rooms and the Quickplay lobby), Lv N is the training partners'
+  level. There's no notice there.
+- **In matches,** the setting does nothing.
+
 ### Mii editor: "Same as ‹name›, nothing new saved"
 
 A Save in the Mii editor that matches a Mii you already saved still saves nothing new and uses that Mii, as before.

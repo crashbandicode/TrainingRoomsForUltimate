@@ -103,9 +103,18 @@ hook_ids! {
     MacroPanel => "macro_panel",
     DeveloperFloat => "developer_float",
     DeveloperBackshield => "developer_backshield",
-    /// Phase 2 N11: the item spawner's switch test (Lobby Items), and its one removal on Player 1's frame.
+    /// Phase 2 N11: the item spawner's switch test (Lobby Items), its one removal on Player 1's frame, and the timed
+    /// generator's lottery test (#62).
     LobbyItems => "lobby_items",
     LobbyItemsRemove => "lobby_items_remove",
+    LobbyItemsDrop => "lobby_items_drop",
+    /// rc.6: the waiting room's practice panel, saved Training partners and behavior applied at entry, and the player's
+    /// change saved (`lobby_persist`).
+    LobbyPersistEntry => "lobby_persist_entry",
+    LobbyPersistSave => "lobby_persist_save",
+    /// rc.6 CPU level: the Training session clock (on the waiting-room poll) and the rank step on Player 1's frame.
+    CpuLevelClock => "cpu_level_clock",
+    CpuLevel => "cpu_level",
     /// Every hook that has no name of its own yet (`HookScope::enter()`): allocations inside them are
     /// still counted, their invocations are counted together.
     Other => "other",
@@ -129,6 +138,23 @@ static ALLOCS: [AtomicU64; HOOK_COUNT] = [const { AtomicU64::new(0) }; HOOK_COUN
 /// Allocations of the one-per-load kind inside a hook (per_load), counted apart from the steady-state ones.
 static LOAD_ALLOCATIONS: AtomicU64 = AtomicU64::new(0);
 static ENTRIES: [AtomicU64; HOOK_COUNT] = [const { AtomicU64::new(0) }; HOOK_COUNT];
+/// Diag builds: the hook entered last on any thread, and the hook scopes open now (the stall watchdog's report).
+#[cfg(feature = "diag")]
+static LAST_ENTERED: core::sync::atomic::AtomicUsize = core::sync::atomic::AtomicUsize::new(HookId::Other as usize);
+#[cfg(feature = "diag")]
+static OPEN_SCOPES: core::sync::atomic::AtomicIsize = core::sync::atomic::AtomicIsize::new(0);
+
+/// Every hook entry since boot, all hooks together (the stall watchdog's sample).
+pub fn total_entries() -> u64 {
+    ENTRIES.iter().map(|counter| counter.load(Ordering::Relaxed)).sum()
+}
+
+/// Diag builds: the hook entered last and the hook scopes open now, on all threads.
+#[cfg(feature = "diag")]
+pub fn last_entered() -> (&'static str, isize) {
+    let id = LAST_ENTERED.load(Ordering::Relaxed).min(HOOK_COUNT - 1);
+    (HookId::ALL[id].name(), OPEN_SCOPES.load(Ordering::Relaxed))
+}
 
 fn in_hook() -> bool {
     HOOK_DEPTH.try_with(|depth| depth.get() > 0).unwrap_or(false)
@@ -292,6 +318,11 @@ impl HookScope {
         let _ = HOOK_DEPTH.try_with(|depth| depth.set(depth.get() + 1));
         let previous = CURRENT.try_with(|current| current.replace(id as u8)).unwrap_or(HookId::Other as u8);
         #[cfg(feature = "diag")]
+        {
+            LAST_ENTERED.store(id as usize, Ordering::Relaxed);
+            OPEN_SCOPES.fetch_add(1, Ordering::Relaxed);
+        }
+        #[cfg(feature = "diag")]
         if let Some(probe) = ENTRY_PROBE.get() {
             probe(id.name());
         }
@@ -306,6 +337,8 @@ pub static ENTRY_PROBE: std::sync::OnceLock<fn(&'static str)> = std::sync::OnceL
 
 impl Drop for HookScope {
     fn drop(&mut self) {
+        #[cfg(feature = "diag")]
+        OPEN_SCOPES.fetch_sub(1, Ordering::Relaxed);
         let _ = HOOK_DEPTH.try_with(|depth| depth.set(depth.get().saturating_sub(1)));
         let _ = CURRENT.try_with(|current| current.set(self.previous));
     }

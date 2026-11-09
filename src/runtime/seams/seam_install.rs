@@ -55,6 +55,8 @@ use crate::model::version as model;
 /// `console_map_probe`, `native_unlink_probe`, `practice_trace`, `source_lifecycle_probe`).
 const AUTHORITATIVE: &[&str] = &[
     "lobby_items",
+    "lobby_persist",
+    "cpu_level",
     "native_body_bank",
     "character_roster",
     "character_lifecycle",

@@ -175,7 +175,7 @@ fn every_thread_has_one_static_stack_from_the_table() {
     assert!(text.contains("const { thread_stacks::of(ThreadId::$id).c_name }"));
     // The diag-only and feature-only threads have their stacks only in those builds.
     for (slot, gate) in [("STATE_DIAG", "diag"), ("DIAG_RELOAD", "diag"), ("PROBE", "diag"), ("MACRO_DIAG", "diag"),
-        ("PRACTICE_TRACE", "console-practice-trace")]
+        ("PRACTICE_TRACE", "console-practice-trace"), ("STALL_WATCH", "diag")]
     {
         assert!(block.contains(&format!("#[cfg(feature = \"{gate}\")] {slot} = [")), "{slot} must be behind `{gate}`");
     }

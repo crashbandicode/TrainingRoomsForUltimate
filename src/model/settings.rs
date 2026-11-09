@@ -287,6 +287,20 @@ impl Settings {
         self.extra.insert(Self::INTRO_SEEN_KEY.to_owned(), Value::Bool(true));
     }
 
+    /// The waiting room's saved Training partners and behavior (`lobby_persist::KEY`, a top-level key like
+    /// `intro_seen`, not a menu row).
+    pub fn lobby_practice_panel(&self) -> super::lobby_persist::Saved {
+        super::lobby_persist::Saved::from_value(self.extra.get(super::lobby_persist::KEY))
+    }
+
+    /// Record the waiting room's pair; a later save writes it with the other top-level keys.
+    pub fn set_lobby_practice_panel(&mut self, saved: super::lobby_persist::Saved) {
+        match saved.to_value() {
+            Some(value) => self.extra.insert(super::lobby_persist::KEY.to_owned(), value),
+            None => self.extra.remove(super::lobby_persist::KEY),
+        };
+    }
+
     /// The file's contents: pretty-printed JSON, for hand editing (SPEC-core-04 question 6). Key
     /// order is not part of the format.
     pub fn to_json(&self) -> String {

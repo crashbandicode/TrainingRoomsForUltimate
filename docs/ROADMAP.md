@@ -120,6 +120,10 @@ allocations; one Eden batch (Off no-spawn window, existing-item removal, On spaw
 - **Spawning:** one inline hook on the item spawner's own switch test (`main+0x15d9a80`, the `cbz` after
   `ldrb w8,[c,#0x30]`). In a qualified waiting scene with the row Off, the native takes its own off path; elsewhere the
   hook leaves everything alone. Nothing is written to the game, so nothing needs restoring.
+- **Timed drops (#62, rc.6):** the waiting room has a second source, a timer-driven generator (`main+0x1549930`) that
+  the spawner's switch doesn't gate; Eden `rc6-bg-qp5` saw it make every item of a 61 s Off window in Quickplay's
+  waiting area. A second inline hook, on its lottery test (`main+0x15499b4`, `tbz w0,#0`), hands it a lost lottery under
+  the same rule, so it re-arms its timer and makes nothing (`artifacts/phase23/DESIGN-RC6-62-QP-ITEMS.md`).
 - **Existing items:** removed once per Off edge through `ItemManager::remove_item_from_id`, from Player 1's frame, and
   only after the practice ItemGate allows it.
 - **Code:** the policy is in `src/model/lobby_items.rs`, the runtime in `src/runtime/lobby/lobby_items.rs`, and the

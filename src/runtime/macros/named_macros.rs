@@ -553,7 +553,10 @@ pub fn panel_view() -> Option<View> {
 }
 
 pub fn clip_foreground() -> bool {
-    !suspended() && !lock_read(&UI).is_open() && crate::runtime::macros::replay_capture::panel_visible()
+    // UI's guard ends with this statement: the keyboard service holds NAME_JOB while it takes UI, so UI is never held
+    // while NAME_JOB is taken (tests/lock_order.rs).
+    let open = lock_read(&UI).is_open();
+    !suspended() && !open && crate::runtime::macros::replay_capture::panel_visible()
         && !naming_pending() && !crate::runtime::mii::native_keyboard::busy()
 }
 

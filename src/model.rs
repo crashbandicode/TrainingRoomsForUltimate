@@ -140,6 +140,8 @@ pub mod sites_pkg2;
 pub mod stage_hazards;
 #[path = "model/lobby_items.rs"]
 pub mod lobby_items;
+#[path = "model/lobby_persist.rs"]
+pub mod lobby_persist;
 #[path = "model/store.rs"]
 pub mod store;
 #[path = "model/state/mod.rs"]
@@ -163,6 +165,9 @@ pub mod thread_stacks;
 /// F9: Training's parked CPU entries. A count change publishes a ready body and queues a later Reload.
 #[path = "model/parked_entries.rs"]
 pub mod parked_entries;
+/// Diag: when the hooks' entry count's silence is a stalled game thread (the stall watchdog).
+#[path = "model/stall_watch.rs"]
+pub mod stall_watch;
 /// F11: the running cell of a fighter entry's window (the game's active-cell index).
 #[path = "model/entry_cells.rs"]
 pub mod entry_cells;

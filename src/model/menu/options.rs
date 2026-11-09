@@ -48,6 +48,8 @@ pub static CYCLE_SLOTS: [&str; 6] = ["Off", "1", "2", "3", "4", "5"];
 pub static SOURCES: [&str; 3] = ["Fighters", "Hats", "Both"];
 pub static BODIES: [&str; 3] = ["Off", "2", "3"];
 pub static LEVELS: [&str; 9] = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
+/// CPU Level: Off (the game's own level), then the nine levels of `LEVELS`.
+pub static CPU_LEVELS: [&str; 10] = ["Off", "1", "2", "3", "4", "5", "6", "7", "8", "9"];
 /// Yes / No / Random over a `[True, False]` weighted row: `Random` is both set.
 pub static YES_NO_RANDOM: [&str; 3] = ["Yes", "No", "Random"];
 

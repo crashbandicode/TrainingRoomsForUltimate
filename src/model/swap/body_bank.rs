@@ -722,7 +722,8 @@ pub fn group_left_cycle(members: Members, wanted: &[u32]) -> bool {
 /// Operator decision 2026-11-08 23:42Z ("free under the pause menu"): a Built group that left the cycle stays parked,
 /// out of the plan, and is destroyed when Training's pause screen opens, because native's body destroy holds the game
 /// thread 75-134 ms per body (Eden `rc6-hot-xps16`). Its still-wanted members stay reachable until then. A Prefetched
-/// group returns its keys at once (it costs nothing); every other state holds nothing native.
+/// group returns its keys at once (it costs nothing); every other state holds nothing native. Operator rule 2026-11-09
+/// 13:21Z: a parked group the new members need the room of goes now ([`leaves_now`]).
 pub fn leaves_at_pause(state: GroupState) -> bool {
     state == GroupState::Built
 }
@@ -1312,9 +1313,10 @@ pub fn kept_members(members: Members, wanted: &[u32]) -> u8 {
     }
 }
 
-/// Operator decision 2026-11-08 23:42Z: the new members waiting for the pause. `after_pause` is what the planner places
-/// with the parked groups gone; `held` says whether any group (parked ones included) holds a kind now. Every member it
-/// places that nothing holds is planned nowhere until the pause frees the parked bodies.
+/// Operator decision 2026-11-08 23:42Z: the new members the parked groups' room is for. `after_pause` is what the planner
+/// places with the parked groups gone; `held` says whether any group (parked ones included) holds a kind now. Every
+/// member it places that nothing holds is new. Since the operator rule of 2026-11-09 13:21Z they never wait for the
+/// pause: [`release_for_new_members`] frees parked groups now when the plan beside them leaves these out.
 pub fn waiting_for_pause(after_pause: &[Option<Members>], held: impl Fn(u32) -> bool) -> u8 {
     after_pause.iter().flatten()
         .flat_map(|members| { let kinds = members.kinds(); (0..members.count()).map(move |i| kinds[i]) })
@@ -1322,15 +1324,100 @@ pub fn waiting_for_pause(after_pause: &[Option<Members>], held: impl Fn(u32) -> 
 }
 
 impl GroupCounts {
-    /// `waiting` members held until the pause frees the parked groups' bodies: planned, and shown as waiting for memory.
-    pub fn with_waiting(mut self, waiting: u8) -> GroupCounts {
-        if waiting > 0 {
-            self.planned = self.planned.saturating_add(waiting);
-            self.held = self.held.saturating_add(waiting);
-            self.hold = merge_hold(self.hold, Some(Hold::Memory));
-        }
+    /// Operator rule 2026-11-09 (inbox 13:21Z): `members` new members that load once the parked groups marked to go now
+    /// are freed ([`release_for_new_members`]): planned, and shown loading, never waiting.
+    pub fn with_release(mut self, members: u8) -> GroupCounts {
+        self.planned = self.planned.saturating_add(members);
+        self.pending = self.pending.saturating_add(members);
         self
     }
+}
+
+/// Operator rule 2026-11-09 (inbox 13:21Z, "If it's already full it should just release so that it takes effect
+/// accepting the hitch"; it replaces the pause wait of the 2026-11-08 23:42Z decision): after a cycle change the new
+/// members load at once. The groups parked for the pause stay until it, unless the new members need their room (the
+/// shared Ready Fighters budget, the fighter pool, a group slot).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct ReleaseNow {
+    /// Per role, one bit per `parked` index: the parked groups to free now.
+    pub groups: [u8; 2],
+    /// Per role, the new members that load once they are freed (shown loading).
+    pub members: [u8; 2],
+}
+
+fn group_kinds(groups: &[Option<Members>]) -> impl Iterator<Item = u32> + '_ {
+    groups.iter().flatten().flat_map(|members| { let kinds = members.kinds(); (0..members.count()).map(move |i| kinds[i]) })
+}
+
+/// [`ReleaseNow`] for `parked` (each role's parked groups with their [`kept_members`]) beside `kept` (the groups that
+/// stay, the ones this pass planned included); `held(role, kind)`: a group that is not parked holds `kind`.
+/// `plan(existing, freed)` is the planner's [`plan_extra_groups_with`] with `existing` for the groups already there and
+/// `freed` parked bodies added to the pool it has while they are live.
+///
+/// The members to load are the ones the plan with every parked body free places that no group holds now
+/// ([`waiting_for_pause`]). When the plan beside the parked groups leaves some of them out, the parked groups to free
+/// are the set beside which the plan places them all, with the fewest members the new cycle still has (served warm
+/// until the pause), then the fewest bodies (native's destroy holds the game thread 75-134 ms per body), then the
+/// fewest groups. Freeing them all always does, so nothing waits for a pause.
+pub fn release_for_new_members(
+    kept: [&[Members]; 2],
+    parked: [&[(Members, u8)]; 2],
+    held: impl Fn(usize, u32) -> bool,
+    plan_with: impl Fn([&[Members]; 2], usize) -> [[Option<Members>; MAX_EXTRA_GROUPS]; 2],
+) -> ReleaseNow {
+    use crate::engine::compat::fixed::FixedList;
+    let freed = |mask: [u8; 2], role: usize, index: usize| mask[role] & (1 << index) != 0;
+    let plan = |mask: [u8; 2]| {
+        let mut existing = [FixedList::<Members, { 2 * MAX_EXTRA_GROUPS }>::new(Members::pair_group()); 2];
+        let mut bodies = 0usize;
+        for role in 0..2 {
+            for members in kept[role] { existing[role].push(*members); }
+            for (index, (members, _)) in parked[role].iter().enumerate() {
+                if freed(mask, role, index) { bodies += members.count(); } else { existing[role].push(*members); }
+            }
+        }
+        plan_with([&existing[0], &existing[1]], bodies)
+    };
+    let all = [0, 1].map(|role: usize| ((1u16 << parked[role].len().min(8)) - 1) as u8);
+    if all == [0, 0] { return ReleaseNow::default(); }
+    let after = plan(all);
+    let holds = |mask: [u8; 2], role: usize, kind: u32| held(role, kind)
+        || parked[role].iter().enumerate().any(|(index, (members, _))| !freed(mask, role, index) && members.index_of(kind).is_some());
+    let waiting = |mask: [u8; 2]| -> usize {
+        let placed = plan(mask);
+        (0..2).map(|role| group_kinds(&after[role])
+            .filter(|kind| !holds(mask, role, *kind) && !group_kinds(&placed[role]).any(|k| k == *kind)).count()).sum()
+    };
+    let members = [0, 1].map(|role: usize| waiting_for_pause(&after[role], |kind| holds([0, 0], role, kind)));
+    if members == [0, 0] || waiting([0, 0]) == 0 { return ReleaseNow::default(); }
+    let mut best: Option<((usize, usize, u32), [u8; 2])> = None;
+    for m0 in 0..=all[0] {
+        for m1 in 0..=all[1] {
+            let mask = [m0, m1];
+            if mask == [0, 0] { continue; }
+            let cost = (0..2).flat_map(|role| parked[role].iter().enumerate().filter(move |(index, _)| freed(mask, role, *index)))
+                .fold((0usize, 0usize, 0u32), |(keeps, bodies, groups), (_, (members, kept))|
+                    (keeps + usize::from(*kept), bodies + members.count(), groups + 1));
+            if best.is_some_and(|(least, _)| least <= cost) || waiting(mask) != 0 { continue; }
+            best = Some((cost, mask));
+        }
+    }
+    ReleaseNow { groups: best.map_or(all, |(_, mask)| mask), members }
+}
+
+/// Operator rule 2026-11-09 (inbox 13:21Z): whether the entry tick frees a leaving group now. A parked one
+/// ([`leaves_at_pause`]) waits for the pause unless `release_now` (the new members need its room,
+/// [`release_for_new_members`], or a prefetch was refused for the memory or pool bodies it holds, [`capacity_release`]);
+/// a prefetch in flight settles first; the rest hold keys at most and go at once.
+pub fn leaves_now(state: GroupState, release_now: bool) -> bool {
+    state != GroupState::Prefetching && (!leaves_at_pause(state) || release_now)
+}
+
+/// Operator rule 2026-11-09 (inbox 13:21Z): a prefetch refused for process memory or fighter-pool bodies while groups are
+/// parked frees one of them now, the one with the fewest members its cycle keeps, then the fewest bodies, the first of
+/// equals. `parked` yields `(key, members, kept)`. None: the refusal is a real shortage, shown "waiting for memory".
+pub fn capacity_release<K: Copy>(parked: impl Iterator<Item = (K, Members, u8)>) -> Option<K> {
+    parked.min_by_key(|(_, members, kept)| (*kept, members.count())).map(|(key, _, _)| key)
 }
 
 /// The lane window's planned targets (`next` for [`window_targets`]): the reusable extras of the window the planner wants
@@ -1925,13 +2012,11 @@ mod tests {
         assert_eq!(next_window_targets(&[0x01, 0x00, 0x02], 0x01, None, |kind| kind == 0x02), 1);
     }
 
-    /// Operator decision 2026-11-08 23:42Z: a new member the shared budget or a free group slot cannot take while a
-    /// parked group still holds them waits for the pause, shown as "(N waiting for memory)"; it is planned and built
-    /// in the background once the pause has freed the parked bodies. rc6-hot-xps18 `mb-cpu-change`: the CPU's Marth
-    /// was planned nowhere while its parked Mii group and P1's parked pair held the budget, and the notice never
-    /// named it. The count is the members the plan without the parked groups places that no group holds now.
+    /// rc6-hot-xps18 `mb-cpu-change`: the CPU's Marth was planned nowhere while its parked Mii group and P1's parked pair
+    /// held the budget, and the notice never named it. The new members are the ones the plan without the parked groups
+    /// places that no group holds now (operator rule 2026-11-09 13:21Z: they load now, `release_for_new_members`).
     #[test]
-    fn a_new_member_waits_for_the_pause_when_parked_groups_hold_the_budget() {
+    fn the_new_members_are_what_the_plan_without_the_parked_groups_places_that_nothing_holds() {
         let newcomer = Members::new(&[0x16]).unwrap();
         let samus = Members::new(&[0x03]).unwrap();
         let held = |kind: u32| [0x03, 0x07, 0x4a].contains(&kind);
@@ -1939,9 +2024,132 @@ mod tests {
         assert_eq!(waiting_for_pause(&[Some(samus), None, None], held), 0);
         assert_eq!(waiting_for_pause(&[Some(Members::new(&[0x03, 0x16]).unwrap()), None, None], held), 1);
         assert_eq!(waiting_for_pause(&[None, None, None], held), 0);
-        let counts = count_group_members([(2, GroupState::Built)]).with_waiting(1);
-        assert_eq!((counts.planned, counts.ready, counts.held, counts.hold), (3, 2, 1, Some(Hold::Memory)));
-        assert_eq!(count_group_members([(2, GroupState::Built)]).with_waiting(0), count_group_members([(2, GroupState::Built)]));
+        assert_eq!(count_group_members([(2, GroupState::Built)]).with_release(0), count_group_members([(2, GroupState::Built)]));
+    }
+
+    fn choose(windows: [Option<Members>; 2], kept: [&[Members]; 2], parked: [&[(Members, u8)]; 2], lanes: [&[u32]; 2],
+        budget: GroupBudget) -> ReleaseNow {
+        release_for_new_members(kept, parked, held_by(kept), |existing, freed| plan_extra_groups_with(GroupPolicy::DEFAULT,
+            windows, existing, lanes, [None, None], GroupBudget { pool_free: budget.pool_free + freed, ..budget }))
+    }
+
+    fn held_by<'a>(groups: [&'a [Members]; 2]) -> impl Fn(usize, u32) -> bool + 'a {
+        move |role: usize, kind: u32| groups[role].iter().any(|group| group.index_of(kind).is_some())
+    }
+
+    /// Operator rule 2026-11-09 (inbox 13:21Z), Eden `final-surface-i3-pf-r2` `x6-cc`: P1 on the Gunner (a Mii window)
+    /// changes its cycle to DK, Link, PT and the Ice Climbers. PT fits beside the two parked groups (`[Samus, Yoshi]`,
+    /// which the cycle no longer has, and `[Mario, DK, Link]`, which still serves DK and Link), the pair does not: the
+    /// shared budget and P1's last group slot are theirs. Freeing `[Samus, Yoshi]` alone (2 bodies, no member the cycle
+    /// keeps) lets the pair load now; `[Mario, DK, Link]` stays parked for the pause, serving DK and Link warm.
+    #[test]
+    fn a_change_that_does_not_fit_frees_just_enough_parked_bodies() {
+        let mii = Members::mii_group(0x4a).unwrap();
+        let cpu = Members::new(&[0x0b, 0x0d]).unwrap();
+        let pt = Members::native_group(0x24).unwrap();
+        let samus_yoshi = Members::new(&[0x03, 0x05]).unwrap();
+        let mario_dk_link = Members::new(&[0x00, 0x01, 0x02]).unwrap();
+        let kept: [&[Members]; 2] = [&[pt], &[]];
+        let parked: [&[(Members, u8)]; 2] = [&[(samus_yoshi, 0), (mario_dk_link, 2)], &[]];
+        let lanes: [&[u32]; 2] = [&[0x01, 0x02, 0x24, POPO], &[0x0b, 0x0d]];
+        let budget = GroupBudget { ready_fighters: 12, pool_free: 7, special: SpecialPolicy::ALL };
+        let release = choose([Some(mii), Some(cpu)], kept, parked, lanes, budget);
+        assert_eq!(release, ReleaseNow { groups: [0b01, 0], members: [2, 0] });
+
+        // Equal bodies: the group whose members the new cycle no longer has goes first.
+        let p1 = Members::new(&[0x01]).unwrap();
+        let unserved = Members::new(&[0x03, 0x05]).unwrap();
+        let serves_pikachu = Members::new(&[0x07, 0x08]).unwrap();
+        let tight = GroupBudget { ready_fighters: 6, pool_free: 8, special: SpecialPolicy::NONE };
+        let release = choose([Some(p1), None], [&[], &[]],
+            [&[(serves_pikachu, 1), (unserved, 0)], &[]], [&[0x07, 0x16], &[]], tight);
+        assert_eq!(release, ReleaseNow { groups: [0b10, 0], members: [1, 0] });
+
+        // Equally unserved: the fewest bodies.
+        let one = Members::new(&[0x09]).unwrap();
+        let five = GroupBudget { ready_fighters: 5, pool_free: 8, special: SpecialPolicy::NONE };
+        let release = choose([Some(p1), None], [&[], &[]],
+            [&[(unserved, 0), (one, 0)], &[]], [&[0x16], &[]], five);
+        assert_eq!(release, ReleaseNow { groups: [0b10, 0], members: [1, 0] });
+
+        // Two new members need both parked singles.
+        let samus = Members::new(&[0x03]).unwrap();
+        let four = GroupBudget { ready_fighters: 4, pool_free: 8, special: SpecialPolicy::NONE };
+        let release = choose([Some(p1), None], [&[], &[]],
+            [&[(samus, 0), (one, 0)], &[]], [&[0x16, 0x17], &[]], four);
+        assert_eq!(release, ReleaseNow { groups: [0b11, 0], members: [2, 0] });
+
+        // The budget is shared: a CPU group parked for the pause makes room for a new P1 member.
+        let falcon = Members::new(&[0x0b]).unwrap();
+        let ganon = Members::new(&[0x0c]).unwrap();
+        let three = GroupBudget { ready_fighters: 3, pool_free: 8, special: SpecialPolicy::NONE };
+        let release = choose([Some(p1), Some(falcon)], [&[], &[]],
+            [&[], &[(ganon, 0)]], [&[0x16], &[0x0b]], three);
+        assert_eq!(release, ReleaseNow { groups: [0, 0b1], members: [1, 0] });
+    }
+
+    /// Operator rule 2026-11-09 (inbox 13:21Z), point 1: what fits beside the parked groups loads at once and nothing is
+    /// freed; they stay parked until the pause (point 2).
+    #[test]
+    fn a_change_that_fits_releases_nothing() {
+        let mii = Members::mii_group(0x4a).unwrap();
+        let cpu = Members::new(&[0x0b, 0x0d]).unwrap();
+        let pt = Members::native_group(0x24).unwrap();
+        let samus_yoshi = Members::new(&[0x03, 0x05]).unwrap();
+        // The cycle changes to PT and the Ice Climbers; `[Samus, Yoshi]` is parked and one group slot is free.
+        let lanes: [&[u32]; 2] = [&[0x24, POPO], &[0x0b, 0x0d]];
+        let budget = GroupBudget { ready_fighters: 12, pool_free: 7, special: SpecialPolicy::ALL };
+        // The planner's first pass has placed PT and the pair beside the parked group already.
+        let kept: [&[Members]; 2] = [&[pt, Members::pair_group()], &[]];
+        let parked: [&[(Members, u8)]; 2] = [&[(samus_yoshi, 0)], &[]];
+        assert_eq!(choose([Some(mii), Some(cpu)], kept, parked, lanes, budget), ReleaseNow::default());
+        // Before that pass, too: the plan beside the parked group places every new member.
+        let kept: [&[Members]; 2] = [&[pt], &[]];
+        assert_eq!(choose([Some(mii), Some(cpu)], kept, parked, lanes, budget), ReleaseNow::default());
+        // Only what the plan with every parked body free places counts: a member beyond the budget even then frees nothing.
+        let p1 = Members::new(&[0x01]).unwrap();
+        let tight = GroupBudget { ready_fighters: 4, pool_free: 8, special: SpecialPolicy::NONE };
+        assert_eq!(choose([Some(p1), None], [&[], &[]],
+            [&[(samus_yoshi, 0)], &[]], [&[0x16, 0x17, 0x18], &[]], tight),
+            ReleaseNow { groups: [0b1, 0], members: [2, 0] });
+        let tighter = GroupBudget { ready_fighters: 2, pool_free: 8, special: SpecialPolicy::NONE };
+        assert_eq!(choose([Some(p1), None], [&[], &[]],
+            [&[(samus_yoshi, 0)], &[]], [&[0x16], &[]], tighter), ReleaseNow::default());
+    }
+
+    /// Operator rule 2026-11-09 (inbox 13:21Z), point 4: with nothing parked a real shortage keeps "waiting for memory";
+    /// the members a release makes room for show as loading, never as waiting.
+    #[test]
+    fn nothing_parked_and_a_real_shortage_still_waits_for_memory() {
+        let p1 = Members::new(&[0x01]).unwrap();
+        let none = GroupBudget { ready_fighters: 2, pool_free: 0, special: SpecialPolicy::NONE };
+        assert_eq!(choose([Some(p1), None], [&[], &[]], [&[], &[]],
+            [&[0x16], &[]], none), ReleaseNow::default());
+        assert_eq!(capacity_release(std::iter::empty::<(usize, Members, u8)>()), None);
+        let held = count_group_members([(2, GroupState::Built), (3, GroupState::Held(Hold::Memory))]).with_release(0);
+        assert_eq!((held.planned, held.ready, held.pending, held.held, held.hold), (5, 2, 0, 3, Some(Hold::Memory)));
+        let freeing = count_group_members([(2, GroupState::Built)]).with_release(2);
+        assert_eq!((freeing.planned, freeing.ready, freeing.pending, freeing.held, freeing.hold), (4, 2, 2, 0, None));
+        // A prefetch refused for memory or pool bodies with parked groups present frees one now (the one the cycle
+        // serves least, then the smallest), and the refused group is retried before another goes.
+        let samus_yoshi = Members::new(&[0x03, 0x05]).unwrap();
+        let mario_dk_link = Members::new(&[0x00, 0x01, 0x02]).unwrap();
+        let one = Members::new(&[0x09]).unwrap();
+        assert_eq!(capacity_release([((0, 2), mario_dk_link, 2), ((0, 0), samus_yoshi, 0), ((1, 1), one, 0)].into_iter()),
+            Some((1, 1)));
+        assert_eq!(capacity_release([((0, 2), mario_dk_link, 2), ((0, 0), samus_yoshi, 0)].into_iter()), Some((0, 0)));
+    }
+
+    /// The entry tick frees a parked group only when the planner (or a refused prefetch) marked it to go now; any other
+    /// leaving group goes at once, a prefetch in flight settles first.
+    #[test]
+    fn a_parked_group_leaves_on_the_entry_tick_only_when_marked() {
+        assert!(!leaves_now(GroupState::Built, false));
+        assert!(leaves_now(GroupState::Built, true));
+        assert!(!leaves_now(GroupState::Prefetching, false) && !leaves_now(GroupState::Prefetching, true));
+        for state in [GroupState::Planned, GroupState::Prefetched, GroupState::Failed, GroupState::Held(Hold::Memory)] {
+            assert!(leaves_now(state, false) && leaves_now(state, true), "{state:?}");
+        }
     }
 
     /// rc.6 item 3: the notice counts a prefetched group a background build still owes as loading (pending), so it reads

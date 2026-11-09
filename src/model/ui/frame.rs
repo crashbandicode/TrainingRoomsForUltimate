@@ -887,8 +887,10 @@ mod tests {
         assert_eq!(f.tabs[0].string_lossy(), "CPU");
         assert_eq!(f.tab_count, 5);
         assert_eq!(f.tab_active, 0);
-        assert_eq!(f.group_count, 6);
+        // rc.6: the CPU page's seventh group is Level (CPU Level), after Player 1 control.
+        assert_eq!(f.group_count, 7);
         assert_eq!(f.groups[0].string_lossy(), "Reactions  (4)");
+        assert_eq!(f.groups[6].string_lossy(), "Level  (1)");
         assert_eq!(f.group_active, 0);
         assert_eq!(f.rows[0].label.string_lossy(), "Mash");
         assert_eq!(f.row_count, 4);

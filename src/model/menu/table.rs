@@ -65,7 +65,7 @@ const fn g(page: Page, title: &'static str) -> Group {
     Group { page, title, advanced: false }
 }
 
-pub static GROUPS: [Group; 19] = [
+pub static GROUPS: [Group; 20] = [
     g(Page::Cpu, "Reactions"),
     g(Page::Cpu, "Defence"),
     g(Page::Cpu, "Ledge & Tech"),
@@ -86,6 +86,8 @@ pub static GROUPS: [Group; 19] = [
     g(Page::DisplayControls, "On screen"),
     g(Page::DisplayControls, "Controls"),
     g(Page::Developer, "Developer"),
+    // rc.6: appended so no group index moves; the menu shows a page's groups in index order, so it follows "Player 1 control".
+    g(Page::Cpu, "Level"),
 ];
 
 // Group indices, for the rows below.
@@ -110,6 +112,7 @@ const LOADING: u8 = 15;
 const SCREEN: u8 = 16;
 const CONTROLS: u8 = 17;
 const DEV: u8 = 18;
+const LEVEL: u8 = 19;
 
 /// The sub-screens that edit something the model does not own the content of (the fork's grids,
 /// lists and panels arrive with package 6; the libraries and the replay window with package 4).
@@ -218,7 +221,7 @@ const fn delay(group: u8, title: &'static str, id: &'static str, step: u16, rang
 const TOGGLE: Control = Control::Toggle;
 
 /// The rows in page order, then group order, then the order they appear in (MENU-DRAFT §2).
-pub static ROWS: [Row; 91] = [
+pub static ROWS: [Row; 92] = [
     // CPU > Reactions
     r(REACT, "Mash", "mash_state", Control::MultiSelect(&o::ACTIONS),
       "Actions the CPU performs as soon as it can.\nWith several ticked it picks one at random."),
@@ -416,6 +419,9 @@ pub static ROWS: [Row; 91] = [
       "While on, holding L+R+A on Player 1 re-reads the\ndeveloper config file every frame."),
     r(DEV, "Debug hooks", "dev_debug_hooks", TOGGLE,
       "Turns on the debug watch on the Kirby backshield\nwork float."),
+    // CPU > Level (rc.6; its group is the last in `GROUPS`, so its row is the last here)
+    r(LEVEL, "CPU Level", "cpu_level", Control::Dropdown(&o::CPU_LEVELS),
+      "The level of the CPUs in Training and the lobby.\nOff: the game's own level."),
 ];
 
 /// Number of `ROWS` of a page that are visible with the pilot absent (and with it present, minus

@@ -29,8 +29,9 @@ fn held_groups_are_started_again_and_counted() {
     assert!(body.contains("bank.held_turn)"), "held retries rotate");
     let src = include_str!("../src/runtime/roster/native_body_bank.rs");
     // rc.6 mid-session cycle change: a leaving group keeps it running too, except a parked one (operator decision
-    // 2026-11-08 23:42Z: the pause frees it, not the lifecycle).
-    assert!(src.contains("bank.groups.iter().any(|g| g.state.startable() || (g.leaving && !leaves_at_pause(g.state)))"),
+    // 2026-11-08 23:42Z: the pause frees it, not the lifecycle) that the new members don't need the room of (operator
+    // rule 2026-11-09 13:21Z: one marked to go now is freed by the lifecycle).
+    assert!(src.contains("bank.groups.iter().any(|g| g.state.startable() || (g.leaving && (!leaves_at_pause(g.state) || g.release_now)))"),
         "a held group keeps the lifecycle running");
     let progress = &src[src.find("pub(crate) fn progress()").expect("progress")..];
     let progress = &progress[..progress.find("\n}\n").expect("end of progress")];
