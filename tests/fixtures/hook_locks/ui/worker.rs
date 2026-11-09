@@ -18,6 +18,11 @@ pub fn direct() {
     crate::runtime::features::chords::free_only();
 }
 
+/// The carried code's typed static: `read(&MENU)` runs `Menu`'s trait impl, which the text does not show.
+pub fn reads_menu() {
+    let _ = read(&crate::runtime::compat::menu::MENU);
+}
+
 fn store(value: u8) {
     let _ = value;
 }

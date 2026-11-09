@@ -33,9 +33,9 @@ static KEPT: RwLock<Option<Kept>> = RwLock::new(None);
 /// settings before it commits, `ui::worker`). Taken by game threads only.
 static EDITED: Mutex<Option<(u32, TrainingModpackMenu)>> = Mutex::new(None);
 
-/// The game-side edit as the publishing path sees it (stream/sync slice 3: a plugin thread never takes `EDITED`, which game threads
-/// take): a wait-free triple buffer whose one writer is `store` (serialised by `EDITED`) and whose one reader is the publishing path
-/// (serialised by `published::PUBLISHING`).
+/// The game-side edit as plugin threads see it (stream/sync slice 3: a plugin thread never takes `EDITED`, which game threads
+/// take): a wait-free triple buffer whose one writer is `store` (serialised by `EDITED`) and whose one reader is a plugin thread
+/// under `published::PUBLISHING` (the publishing path, and `read(&MENU)` on a plugin thread: [`plugin_view`]).
 static EDIT_HANDOFF: hos_lock::TripleBuffer<Option<(u32, TrainingModpackMenu)>> = hos_lock::TripleBuffer::new(None);
 
 /// The carried code's `MENU`: `read(&MENU)` is the current typed menu.
@@ -54,10 +54,28 @@ fn current_menu() -> TrainingModpackMenu {
     crate::runtime::published::live().map_or(BASE_MENU, |live| live.menu)
 }
 
+/// The typed menu on a plugin thread: the view [`current_menu`] gives, read the way the publishing path reads it (the edit handoff and
+/// the live menu, under `published::PUBLISHING`, which only plugin threads take), never through `EDITED`. rc.6 QP freeze (`rc6-qpf3`,
+/// 2026-11-09): the menu worker took `EDITED` here through `read(&MENU)` (named macros, the lobby flag, the roster), the game's
+/// MainThread preempted it on core 0 and spun in a task join, and the layout task on another core waited in its hook for `EDITED`.
+fn plugin_view() -> TrainingModpackMenu {
+    let _turn = crate::runtime::published::PUBLISHING.lock();
+    let generation = crate::runtime::published::live_generation();
+    match EDIT_HANDOFF.read().0 {
+        Some((at, menu)) if at == generation => menu,
+        _ => crate::runtime::published::live().map_or(BASE_MENU, |live| live.menu),
+    }
+}
+
 impl Readable for Menu {
     type Value = TrainingModpackMenu;
     fn read_value(&self) -> TrainingModpackMenu {
-        current_menu()
+        // Game threads (hooks) take `EDITED`; plugin threads never do (stream/sync slice 3).
+        if crate::runtime::threads::on_plugin_thread() {
+            plugin_view()
+        } else {
+            current_menu()
+        }
     }
 }
 

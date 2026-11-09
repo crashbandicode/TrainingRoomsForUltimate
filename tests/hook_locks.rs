@@ -139,6 +139,72 @@ fn takes_lock(graph: &Graph, index: usize, file: &str, name: &str) -> bool {
     false
 }
 
+/// The carried code's typed statics: a helper handed `&STATIC` (`read(&MENU)`, `setting(&MENU)`, `lock_write(&MENU)`,
+/// `assign(&MENU, ..)`) calls the static's trait impl, which the text cannot show (a trait method). Each row is `(static, helper,
+/// the function the impl runs on a plugin thread)`: `Menu`'s `read_value` (and so `lock_write`) runs `plugin_view` there
+/// (`threads::on_plugin_thread()`; game threads run `current_menu`, which takes `EDITED`), and the guard's drop and `assign_value`
+/// run `store`, which takes `EDITED` on any thread. `menu_read_dispatches_on_the_thread` holds the impl to this table.
+/// rc.6 QP freeze (`rc6-qpf3`, 2026-11-09): without these edges the scan did not see the menu worker (`macros::port::worker_tick`
+/// -> `named_macros` -> `read(&MENU)` -> `current_menu`) take `EDITED`; the game's MainThread starved the worker on core 0 while it
+/// held it, and the layout task on another core waited in its hook for `EDITED`.
+const TYPED_STATIC_CALLS: &[(&str, &str, &str)] = &[
+    ("MENU", "read", "menu::plugin_view"),
+    ("MENU", "setting", "menu::plugin_view"),
+    ("MENU", "lock_write", "menu::plugin_view"),
+    ("MENU", "lock_write", "menu::store"),
+    ("MENU", "assign", "menu::store"),
+];
+
+/// `TYPED_STATIC_CALLS` is what `compat/menu.rs` does: `Menu::read_value` sends a plugin thread to `plugin_view` and only a game
+/// thread to `current_menu`; `plugin_view` never names `EDITED`, and `current_menu` is the one reader that does.
+#[test]
+fn menu_read_dispatches_on_the_thread() {
+    let runtime = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");
+    let graph = Graph::scan(&runtime, &[]);
+    let body = |key: &str| -> String {
+        let found: Vec<usize> = graph.find(key).into_iter().filter(|&i| graph.funcs[i].file == "compat/menu.rs").collect();
+        assert_eq!(found.len(), 1, "{key} in compat/menu.rs: {} functions", found.len());
+        graph.funcs[found[0]].body.iter().map(|t| format!("{t:?}")).collect::<Vec<_>>().join(" ")
+    };
+    let read = body("menu::read_value");
+    let (plugin, game) = (read.find("plugin_view").expect("read_value calls plugin_view"), read.find("current_menu").expect("read_value calls current_menu"));
+    assert!(read.contains("on_plugin_thread") && read.find("on_plugin_thread").unwrap() < plugin && plugin < game,
+            "read_value must take plugin threads to plugin_view and the rest to current_menu: {read}");
+    assert!(!body("menu::plugin_view").contains("EDITED"), "plugin_view names EDITED");
+    assert!(body("menu::current_menu").contains("EDITED"), "current_menu no longer takes EDITED: update TYPED_STATIC_CALLS");
+    let runtime_files = std::fs::read_to_string(runtime.join("threads.rs")).unwrap();
+    assert!(runtime_files.contains("pub fn on_plugin_thread() -> bool"), "threads::on_plugin_thread is gone");
+}
+
+/// The impl functions `from`'s body reaches through `helper(&STATIC ..)` / `helper(&path::STATIC ..)` (TYPED_STATIC_CALLS).
+fn typed_static_callees(graph: &Graph, from: usize) -> BTreeSet<usize> {
+    let toks = &graph.funcs[from].body;
+    let ident = |k: usize| match toks.get(k) {
+        Some(Tok::Ident(t)) => Some(t.as_str()),
+        _ => None,
+    };
+    let punct = |k: usize, c: char| matches!(toks.get(k), Some(Tok::Punct(p)) if *p == c);
+    let mut out = BTreeSet::new();
+    for i in 0..toks.len() {
+        let Some(helper) = ident(i) else { continue };
+        if !TYPED_STATIC_CALLS.iter().any(|(_, h, _)| *h == helper) || !punct(i + 1, '(') || !punct(i + 2, '&') {
+            continue;
+        }
+        // `&MENU` or `&a::b::MENU`: the last segment of the path after `&`.
+        let mut k = i + 3;
+        while ident(k).is_some() && toks.get(k + 1) == Some(&Tok::PathSep) {
+            k += 2;
+        }
+        let Some(name) = ident(k) else { continue };
+        for (static_name, h, callee) in TYPED_STATIC_CALLS {
+            if *static_name == name && *h == helper {
+                out.extend(graph.find(callee));
+            }
+        }
+    }
+    out
+}
+
 /// Callees of `index`: path calls, plus method calls whose name is unique among scanned receiver methods. Ambiguous method names
 /// are recorded in `ambiguous` (name -> how many functions carry it).
 fn edges(graph: &Graph, index: usize, by_name: &BTreeMap<String, Vec<usize>>, ambiguous: &mut BTreeMap<String, usize>) -> BTreeSet<usize> {
@@ -166,6 +232,7 @@ fn edges(graph: &Graph, index: usize, by_name: &BTreeMap<String, Vec<usize>>, am
         })
     };
     let mut out: BTreeSet<usize> = graph.callees(index).into_iter().filter(|&c| path_match(c)).collect();
+    out.extend(typed_static_callees(graph, index).into_iter().filter(|&c| c != index));
     for (segments, method) in &refs {
         if !method {
             continue;
@@ -261,6 +328,14 @@ fn the_scan_catches_a_seeded_violation() {
     assert!(!text.contains("named_macros::store"), "a local call or an atomic method resolved to another module's function:\n{text}");
     assert!(!text.contains("free_only"), "a model method resolved to a same-named free function:\n{text}");
     assert_eq!(result.ambiguous.get("tick"), Some(&2), "ambiguous names must be listed: {:?}", result.ambiguous);
+}
+
+#[test]
+fn a_typed_static_read_reaches_its_impl() {
+    let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/hook_locks");
+    let result = scan(&fixture, &["worker::reads_menu"], &[("compat/menu.rs", "EDITED")], &[]);
+    assert!(result.violations.iter().any(|line| line.contains("menu::plugin_view takes compat/menu.rs::EDITED")),
+            "read(&MENU) not followed to the impl: {:?}", result.violations);
 }
 
 #[test]
