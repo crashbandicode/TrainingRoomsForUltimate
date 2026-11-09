@@ -1297,6 +1297,16 @@ pub fn role_counts(planned_targets: u8, extra: u8, window: WindowStatus, groups:
     counts
 }
 
+/// SPECIAL-GROUPS §0 X4 (construct `0x60d1ec-0x60d26c`): the entry info wrapper (`entry+0xf0`, or Nana's own
+/// `entry+0x100`) whose `info+0x94` gate a body's construction reads, from the entry words `count` (`+0x14`) and cells
+/// 0/1 (`+0x18`, `+0x1c`). Only a Popo or Nana body chooses: with two cells, the cell-1 kind gets `+0x100`; every other
+/// case is `+0xf0`. Native reads the live entry's words; a background body is given its building group's
+/// (`native_body_bank::background_info`), as its synchronous build would read them.
+pub fn info_wrapper(kind: u32, count: u32, cells: [u32; 2]) -> usize {
+    let [cell0, cell1] = cells;
+    if matches!(kind, POPO | NANA) && count >= 2 && cell1 != u32::MAX && cell0 != kind && cell1 == kind { 0x100 } else { 0xf0 }
+}
+
 /// The window part of a role's planned targets (`plan_budget`): `next`, the reusable extras of the window the lane's
 /// next kind would get, except for a live pair-lead window (`live`: its members and active kind) with groups on. That
 /// window stays while the role's groups build around it (rc.6 item 3, a session that starts on Ice Climbers), so it
@@ -3477,6 +3487,30 @@ mod tests {
                 }
             }
             assert!(bodies <= ready.saturating_sub(6), "{ready}: {:?}", plan);
+        }
+    }
+
+    /// SPECIAL-GROUPS §0 X4 (primary 2026-11-09 00:52Z, the cross cells), from the disassembly
+    /// `rc6-item3-re/special/asm/6079d0-60df60.s` `0x60d1ec-0x60d26c`. The construction picks the entry info wrapper whose
+    /// `info+0x94` gate it reads. Only a Popo or Nana body looks at the entry's words: with two cells (count ≥ 2, cell 1
+    /// not −1) cell 0 == kind gives `+0xf0`, cell 1 == kind gives `+0x100` (Nana's own), anything else `+0xf0`. Every
+    /// other kind gives `+0xf0`. Native reads the live entry; a background body is given its building group's words, so
+    /// Nana of a pair group built beside a one-actor window (an ordinary or native window) gets her own wrapper, as in her
+    /// synchronous build (Eden re6: only the pair's Nana used `+0x100`).
+    #[test]
+    fn the_info_wrapper_follows_the_words_it_is_given() {
+        let pair = [POPO, NANA];
+        assert_eq!((info_wrapper(POPO, 2, pair), info_wrapper(NANA, 2, pair)), (0xf0, 0x100), "the pair group");
+        assert_eq!((info_wrapper(POPO, 3, pair), info_wrapper(NANA, 3, pair)), (0xf0, 0x100), "a pair-lead window");
+        for (count, cells) in [(3, [MARIO, DK]), (3, [0x24, 0x25]), (2, [0x5a, 0x5b]), (1, [MARIO, u32::MAX])] {
+            assert_eq!((info_wrapper(POPO, count, cells), info_wrapper(NANA, count, cells)), (0xf0, 0xf0),
+                "a live one-actor window {cells:x?}: Nana is in neither cell");
+        }
+        assert_eq!(info_wrapper(NANA, 1, pair), 0xf0, "one cell");
+        assert_eq!(info_wrapper(NANA, 2, [POPO, u32::MAX]), 0xf0, "cell 1 empty");
+        assert_eq!(info_wrapper(POPO, 1, [POPO, u32::MAX]), 0xf0, "Solo Popo");
+        for kind in [MARIO, 0x24, 0x25, 0x5b, 0x48] {
+            assert_eq!(info_wrapper(kind, 2, [POPO, kind]), 0xf0, "{kind:#x}: only Ice Climbers bodies choose");
         }
     }
 

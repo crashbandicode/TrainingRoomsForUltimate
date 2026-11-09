@@ -162,11 +162,11 @@ use super::{aligned, read, BASE};
 use crate::engine::seams::native_fields as fields;
 use skyline::hooks::InlineCtx;
 use std::convert::TryInto;
-use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU8, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicU8, AtomicUsize, Ordering};
 use hos_lock::Mutex;
 use crate::engine::swap::body_bank::{
     count_extra_groups_iter, dispatcher_array_header_ok, dispatcher_idle_words, native_group_request, original_bankable,
-    original_form_bankable, pair_request, pair_resource_references, plan_extra_groups_with, prefetch_outcome,
+    original_form_bankable, pair_request, pair_resource_references, plan_extra_groups_with, prefetch_outcome, info_wrapper,
     swap_commit_index_in, async_build_eligible, construction_task, TickGap,
     background_build_eligible, next_background, BACKGROUND_INFO_SPANS, trainer_task, HolderStep,
     GroupBudget, GroupExchange, GroupOwner, GroupPolicy, GroupState, Hold, Members, Phase, Special,
@@ -222,6 +222,15 @@ static BACKGROUND_SKIPS: AtomicU32 = AtomicU32::new(0);
 static NATIVE_BACKGROUND: AtomicBool = AtomicBool::new(false);
 /// The cell 1 a Pyra/Mythra group's background bodies read at the X5 site (`background_partner`); `u32::MAX` otherwise.
 static BACKGROUND_PARTNER: AtomicU32 = AtomicU32::new(u32::MAX);
+/// rc.6 item 3, SPECIAL-GROUPS §0 X4: a background Popo or Nana body takes the info wrapper its building group's words
+/// choose (`background_info`), so a pair group may build beside a live one-actor window as its synchronous build does.
+static BACKGROUND_X4: AtomicBool = AtomicBool::new(false);
+/// Per owner, the building group's words for X4 (`pack_cells`), stored before the owner's background bit is set.
+static BACKGROUND_CELLS: [AtomicU64; 2] = [AtomicU64::new(0), AtomicU64::new(0)];
+/// Background Nana bodies left on native's wrapper because the entry held no `+0x108` info, and those given their own
+/// `+0x100` (both reported at settlement).
+static BACKGROUND_INFO_KEPT: AtomicU32 = AtomicU32::new(0);
+static BACKGROUND_INFO_OWN: AtomicU32 = AtomicU32::new(0);
 static BANKS: [Mutex<Option<Bank>>; 2] = [Mutex::new(None), Mutex::new(None)];
 // Filled before the hooks are enabled; each role moves its storage into its
 // first bank and retains it through every subsequent native bank lifetime.
@@ -3206,6 +3215,46 @@ unsafe fn background_tail(ctx: &mut InlineCtx) {
     }
 }
 
+/// The construction's info wrapper load (`ldr x9, [x9, #8]`, SPECIAL-GROUPS §0 X4).
+const BACKGROUND_INFO: usize = 0x60d270;
+
+/// A group's X4 words: count, cell 0 and cell 1 (each kind as 16 bits, `0xffff` for none), with a presence bit.
+fn pack_cells(members: Members) -> u64 {
+    let kinds = members.kinds();
+    let word = |kind: u32| u64::from(kind.min(0xffff));
+    1 << 48 | (members.count() as u64) << 32 | word(kinds[0]) << 16 | word(kinds[1])
+}
+
+/// The words `pack_cells` stored for `owner`'s building group.
+fn background_cells(owner: u32) -> Option<(u32, [u32; 2])> {
+    let packed = BACKGROUND_CELLS.get(owner as usize)?.load(Ordering::Acquire);
+    if packed >> 48 == 0 { return None; }
+    let kind = |word: u64| if word == 0xffff { u32::MAX } else { word as u32 };
+    Some(((packed >> 32 & 0xffff) as u32, [kind(packed >> 16 & 0xffff), kind(packed & 0xffff)]))
+}
+
+/// SPECIAL-GROUPS §0 X4: construct (`0x60d1ec-0x60d26c`) picks a Popo or Nana body's info wrapper from the **live**
+/// entry's count and cells, and `0x60d270` loads the info whose `+0x94` gate it reads. Beside a live one-actor window (an
+/// ordinary or native window) a background pair group's Nana would get `entry+0xf0`. The building group's words choose
+/// instead (`body_bank::info_wrapper`), as in her synchronous build: Nana gets her own `entry+0x100`, but only while
+/// the entry holds that wrapper's info (`+0x108`); otherwise native's choice stays and is counted. x9 is the chosen
+/// wrapper, x8 the manager, x23 the owner, w21 the kind, x19 the body. Atomics only: no allocation on the worker.
+#[skyline::hook(offset = 0x60d270, inline)]
+unsafe fn background_info(ctx: &mut InlineCtx) {
+    let kind = ctx.registers[21].w();
+    if !matches!(kind, POPO | NANA) || !background_body(ctx.registers[19].x() as usize) { return; }
+    let owner = ctx.registers[23].x() as u32;
+    let Some((count, cells)) = background_cells(owner) else { return; };
+    let offset = info_wrapper(kind, count, cells);
+    let Some(entry) = fields::read::<usize>(ctx.registers[8].x() as usize, 0x20 + 8 * owner as usize) else { return; };
+    if offset == 0x100 && !fields::read::<usize>(entry, 0x108).is_some_and(|info| info != 0 && info % 8 == 0) {
+        BACKGROUND_INFO_KEPT.fetch_add(1, Ordering::Relaxed);
+        return;
+    }
+    if offset == 0x100 { BACKGROUND_INFO_OWN.fetch_add(1, Ordering::Relaxed); }
+    ctx.registers[9].set_x((entry + offset) as u64);
+}
+
 /// The group a background build starts next (`body_bank::next_background`) for the live kind `live`: none while a
 /// prefetch, a construction or a background build is in flight. A refused group is no candidate.
 fn background_candidate(bank: &Bank, live: Option<u32>) -> Option<usize> {
@@ -3450,6 +3499,7 @@ unsafe fn queue_background_bodies(base: usize, owner: u32, b: &mut Background) -
     b.skips_before = BACKGROUND_SKIPS.load(Ordering::Acquire);
     // SPECIAL-GROUPS §0 X5: a Pyra/Mythra group's bodies read its cell 1 (`background_partner`).
     BACKGROUND_PARTNER.store(b.members.partner_cell().unwrap_or(u32::MAX), Ordering::Release);
+    if let Some(cells) = BACKGROUND_CELLS.get(owner as usize) { cells.store(pack_cells(b.members), Ordering::Release); }
     BACKGROUND_OWNERS.fetch_or(owner_bit(owner), Ordering::AcqRel);
     let (tasks, queued) = queue_detached(base, owner, b.members);
     b.tasks = tasks;
@@ -3622,6 +3672,11 @@ unsafe fn finish_background(entry: *const u8, owner: u32, role: usize, b: Backgr
     let base = BASE.load(Ordering::Acquire);
     BACKGROUND_OWNERS.fetch_and(!owner_bit(owner), Ordering::AcqRel);
     BACKGROUND_PARTNER.store(u32::MAX, Ordering::Release);
+    let (own, kept) = (BACKGROUND_INFO_OWN.swap(0, Ordering::AcqRel), BACKGROUND_INFO_KEPT.swap(0, Ordering::AcqRel));
+    if own != 0 || kept != 0 {
+        trace!("[GroupSwap] background info owner={} kinds={:x?} nana_own_wrapper={} kept_no_info={}", owner,
+            &b.members.kinds()[..b.members.count()], own, kept);
+    }
     let skips = BACKGROUND_SKIPS.load(Ordering::Acquire).wrapping_sub(b.skips_before);
     let count = b.members.count();
     let kinds = &b.members.kinds()[..count];
@@ -5286,6 +5341,8 @@ const NATIVE_BACKGROUND_SEAMS: &[&str] = &["background_build.aegis_partner", "ba
     "background_build.pool_build"];
 /// rc.6 item 3, Ice Climbers: the construction tail's pair test for background bodies (`background_tail`).
 const BACKGROUND_TAIL_SEAMS: &[&str] = &["background_build.construct_tail"];
+/// rc.6 item 3, X4: the construction's info wrapper for background Ice Climbers bodies (`background_info`).
+const BACKGROUND_INFO_SEAMS: &[&str] = &["background_build.info_wrapper"];
 
 pub(super) unsafe fn install(base: usize) {
     use crate::runtime::seams::seam_install::gate;
@@ -5419,6 +5476,15 @@ pub(super) unsafe fn install(base: usize) {
     }
     trace!("[GroupSwap] background pair tail {}",
         if tail_ok { "enabled; a live Ice Climbers pair window builds the other groups" } else { "off; a live Ice Climbers pair window waits" });
+    let info_stock = fingerprint(base, BACKGROUND_INFO, &[0xf9400529, 0x39425129, 0x35001da9, 0xf945bd08], "GroupSwap");
+    let info_ok = gate(SEAM_GROUP, BACKGROUND_INFO_SEAMS, async_ok && identity_view && info_stock)
+        && async_ok && identity_view && info_stock;
+    if info_ok {
+        skyline::install_hooks!(background_info);
+        BACKGROUND_X4.store(true, Ordering::Release);
+    }
+    trace!("[GroupSwap] background info wrapper {}",
+        if info_ok { "enabled; a background Ice Climbers body takes its group's wrapper" } else { "off" });
     if groups_ok {
         // The `[GroupSwap] enabled` line follows the startup cycle-preload load
         // (`report_group_swap`), so it shows the switches this boot applies.

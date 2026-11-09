@@ -1149,6 +1149,18 @@ Operator decision "All groups in rc.6" and the start-on-the-kind rule (`docs/DEC
   - `plan_in` then serves the return like a numbered pair target: the live pair-lead window is a reuse, a detached
     one or a pair group is a group swap (`group_serves`), and a request whose non-group bytes differ still takes the
     Reload with `reuse declined … bytes differ at`. The player's `at_origin` already recognises any live `0x4b`.
+- **X4, a background Ice Climbers body's info wrapper** (primary 2026-11-09 00:52Z, the cross cells; read from the
+  disassembly `rc6-item3-re/special/asm/6079d0-60df60.s` `0x60d1ec-0x60d270`):
+  - Construct picks the wrapper whose `info+0x94` gate it reads. Only a Popo or Nana body looks at the entry's words:
+    with two cells, the cell-1 kind gets `+0x100` (Nana's own); everything else `+0xf0`. Native reads the live entry,
+    so a pair group built beside a one-actor window (ordinary or native) gave its Nana `+0xf0`.
+  - `body_bank::info_wrapper` is that rule. `native_body_bank::background_info` (inline `0x60d270`, x9 the chosen
+    wrapper) gives a background Popo/Nana body the wrapper its building group's words choose (`BACKGROUND_CELLS`,
+    stored before the owner's background bit). Nana's `+0x100` is used only while the entry holds that wrapper's info
+    (`+0x108`); otherwise native's choice stays and is counted.
+  - Atomics only on the worker. Each settlement logs `[GroupSwap] background info … nana_own_wrapper= kept_no_info=`.
+    Installed with the background builds, guarded by four 13.0.5 words and the seam row
+    `background_build.info_wrapper`; `BACKGROUND_X4` reports it to the planner.
 - **Merge note** (accepted by the primary, 22:52Z): `p23/rc6-hot-slots-mii` hooks `0x60de68` too. Integration keeps
   one `background_tail`, which also restores the Mii shadow's `R`.
 
