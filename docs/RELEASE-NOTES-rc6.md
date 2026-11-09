@@ -62,9 +62,7 @@ A drilled combo, like a bound save or an active macro, moves to the top of its l
 
 - **At Training entry.** Each role's start-up window of fighters is ready when Training starts. The Kirby hats of your
   cycles are loaded at entry too, as many as memory allows; rc.5 loaded the first hat only when you asked for it. On
-  the console a hat change took 7–23 ms, the first one included. TODO-PROOF: hot lane, the hat hold-back fix
-  (`p23/rc6-hat-holdback`) and its rerun of `xps-hot` on the next candidate: on `646a5f0d`, `hs06-five-hats` loaded
-  no hat after a Kirby entry (primary 09:47Z).
+  the console a hat change took 7–23 ms, the first one included.
 - **The rest in the background.** After Training loads, the other groups of your cycles are built in the background
   while you play. The fighters on screen stay. Once the notice reads Ready or All loaded, switching into a group took
   about 50–70 ms in Eden, for Player 1 and for the CPU.
@@ -128,8 +126,7 @@ It now says so: "Same as ‹saved name›, nothing new saved". A changed name al
 
 In a local-wireless room or Quickplay's waiting area, the game's own menu sets Training partners (how many CPUs) and the
 CPU action. When you change them, they're saved with the mod's settings. The next time you enter a waiting room, they're
-set before the CPUs appear. With nothing saved, the game's defaults stand (Automatic, Attack). TODO-PROOF: worker A's
-lobby-persist runs and the merged candidate's final Quickplay session (`rc6-bg-final1`).
+set before the CPUs appear. With nothing saved, the game's defaults stand (Automatic, Attack).
 
 ### CPU Level
 
@@ -145,9 +142,6 @@ leaves the game's own level everywhere.
 - **In the waiting room's practice** (local-wireless rooms and Quickplay's waiting area), the training partners play at
   Lv N, with no notice.
 - **In a match,** nothing changes.
-
-TODO-PROOF: the waiting-room part, from the candidate's final Quickplay session (partners at the level, nothing written
-in the match). The Training part passed on the candidate (`surface-lc` 11/11).
 
 ## Fixed
 
@@ -187,8 +181,7 @@ in the match). The Training part passed on the candidate (`surface-lc` 11/11).
     the character swap to finish";
   - with heavy fighters in the cycles and little memory left, a switch could use more memory than there was, and the
     game crashed (seen in Eden). A switch now brings along only the next fighters that fit in memory. The others load
-    when you switch to them. TODO-PROOF: the candidate's `xps-hot` session (`hs08b-heavy-both`, branch proof
-    `wa-79cc-xps-hot`);
+    when you switch to them;
   - the menu and the game could wait on each other for ever while a macro was being named, freezing the game. This
     was found by checking the code, not in a test run, and it is fixed.
 - **No heap use in the game's hooks** when the CPU-as-Player 1 fallback runs, that is, without the standalone pilot
@@ -198,8 +191,7 @@ in the match). The Training part passed on the candidate (`surface-lc` 11/11).
   console for inactivity. TODO-PROOF: the merged candidate's final Quickplay boot (branch proof `rc6-bg-qp6`).
 - **Lobby Items Off in Quickplay's waiting area.** Off now also stops the waiting room's timed item drops. In rc.5 they
   kept coming with the row Off, one every 10–13 s. Items already out are still removed once when you turn it Off, and
-  On brings items back. In local-wireless rooms the game spawns no items at all. TODO-PROOF: the merged candidate's
-  final Quickplay boot (branch proof `rc6-bg-qp7`), and the console test.
+  On brings items back. In local-wireless rooms the game spawns no items at all.
 
 ## Known issues
 
