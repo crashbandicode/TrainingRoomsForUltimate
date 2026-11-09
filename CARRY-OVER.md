@@ -1840,3 +1840,19 @@ Primary 2026-11-09 16:06Z (integration's `final-surface-i3-pf-1261f56c` `x6-cc` 
 - `body_bank::a_release_in_flight_is_room_on_its_way`;
 - `tests/cycle_change_wiring.rs::a_free_is_room_on_its_way_until_a_planner_pass_finds_it_settled`, and
   `a_refused_prefetch_frees_a_parked_group_now` (the settled argument).
+
+**Follow-up, primary 2026-11-09 17:13Z** (Eden `final-surface-i3-pf-b04856b2` `x6-cc`). On the Yoga the watch settled
+under the pair's need, so the kept group went as the last resort, which is correct by the rule. But for the 17 ms
+between the settle (`#798`) and that release (`#804`), the notice read "Loaded 10/12 (2 waiting for memory)" and was
+raised for 3 s.
+- **The decision moves earlier.** In the pass where the watch settles, `plan_groups` checks each held group
+  (`body_bank::still_short`): the admission refuses its cost now, or the pool is short. If so, it decides the capacity
+  release there (`release_for_capacity`). That is before `cycle_preload::on_frame` publishes the notice, because
+  `plan_budget` comes before `poll_status`.
+- **The notice:** `progress` shows a prefetch held for memory as loading while the room is arriving or a release
+  decided for it is in progress (`body_bank::room_coming`; `releasing`). "Waiting for memory" means nothing more can
+  be freed.
+- 6 recorded manifest edits. Tests failed first (`FAIL-FIRST-notice-model.log`, `FAIL-FIRST-notice-wiring.log`):
+  - `body_bank::a_release_in_progress_shows_loading_never_waiting`;
+  - `tests/cycle_change_wiring.rs::the_planner_decides_the_release_before_the_notice`;
+  - and the `progress` pins in `cycle_change_wiring` and `background_build_wiring`.

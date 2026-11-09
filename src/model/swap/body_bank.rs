@@ -1468,6 +1468,25 @@ pub fn arriving_room(state: GroupState, arriving: bool) -> GroupState {
     if arriving && state == GroupState::Held(Hold::Memory) { GroupState::Planned } else { state }
 }
 
+/// Operator rule 2026-11-09 17:13Z (13:21Z point 4): whether a held group's room is coming, so the notice shows it as
+/// loading ([`arriving_room`]): a free's room is still arriving (`settled` false), or a release decided for it is in
+/// progress (`releasing`: a parked group marked to go now). Otherwise its hold shows as it is: "waiting for memory"
+/// means nothing more can be freed.
+pub fn room_coming(settled: bool, releasing: bool) -> bool {
+    !settled || releasing
+}
+
+/// Operator rule 2026-11-09 17:13Z: the planner's check, in the pass where the watch settles, of a held group: the
+/// reason a capacity release is still needed (`memory_refused`: the admission refuses its cost now; or fewer free pool
+/// bodies than its members), or None when it fits now (its next start is admitted) or it isn't held.
+pub fn still_short(state: GroupState, memory_refused: bool, pool_free: usize, members: usize) -> Option<&'static str> {
+    match state {
+        GroupState::Held(Hold::Memory) if memory_refused => Some("process headroom"),
+        GroupState::Held(Hold::Pool) if pool_free < members => Some("fighter pool"),
+        _ => None,
+    }
+}
+
 /// The lane window's planned targets (`next` for [`window_targets`]): the reusable extras of the window the planner wants
 /// for its next lane kind `target` (`shown`, target first). A group that holds the target already is that window (an exchange left it detached, e.g.
 /// while a Mii group is live) and counts with the groups; a member a group holds counts there too (rc6-hot-xps19).
@@ -2221,6 +2240,31 @@ mod tests {
         assert_eq!(arriving_room(GroupState::Built, true), GroupState::Built);
         let counts = count_group_members([(2, arriving_room(GroupState::Held(Hold::Memory), true))]);
         assert_eq!((counts.planned, counts.pending, counts.held, counts.hold), (2, 2, 0, None));
+    }
+
+    /// Operator rule 2026-11-09 17:13Z (Eden `final-surface-i3-pf-b04856b2` `x6-cc`, #798–#804): the watch settled under
+    /// the pair's need, and for the 17 ms before the last-resort release the notice read "Loaded 10/12 (2 waiting for
+    /// memory)", raised for 3 s. The planner decides that release in the pass that settles, before the notice is
+    /// published; a held prefetch shows "Loading" while its room is arriving or being freed, and "waiting for memory"
+    /// only when nothing can be freed.
+    #[test]
+    fn a_release_in_progress_shows_loading_never_waiting() {
+        assert_eq!(still_short(GroupState::Held(Hold::Memory), true, 9, 2), Some("process headroom"));
+        assert_eq!(still_short(GroupState::Held(Hold::Memory), false, 9, 2), None, "it fits now");
+        assert_eq!(still_short(GroupState::Held(Hold::Pool), false, 1, 2), Some("fighter pool"));
+        assert_eq!(still_short(GroupState::Held(Hold::Pool), false, 2, 2), None);
+        for state in [GroupState::Planned, GroupState::Prefetching, GroupState::Prefetched, GroupState::Built] {
+            assert_eq!(still_short(state, true, 0, 2), None, "{state:?}");
+        }
+        let shown = |settled: bool, releasing: bool| {
+            let held = arriving_room(GroupState::Held(Hold::Memory), room_coming(settled, releasing));
+            let counts = count_group_members([(10, GroupState::Built), (2, held)]);
+            (counts.pending, counts.held, counts.hold)
+        };
+        assert_eq!(shown(false, false), (2, 0, None), "the room is arriving");
+        assert_eq!(shown(true, true), (2, 0, None), "a release decided for it is in progress");
+        assert_eq!(shown(false, true), (2, 0, None));
+        assert_eq!(shown(true, false), (0, 2, Some(Hold::Memory)), "nothing can be freed: waiting for memory");
     }
 
     /// The entry tick frees a parked group only when the planner (or a refused prefetch) marked it to go now; any other

@@ -155,10 +155,28 @@ fn a_free_is_room_on_its_way_until_a_planner_pass_finds_it_settled() {
         "trace!(\"[GroupSwap] released room {:?} -> {:?}",
         "let budget = GroupBudget { ready_fighters: usize::from(settings.ready_fighters), pool_free, special };"]);
     let progress = body(BANK, "pub(crate) fn progress(");
-    ordered(progress, &["let arriving = !RELEASE_WATCH.lock().settled();", "for (role, state) in BANKS.iter().enumerate() {",
-        "arriving_room(g.state, arriving)"]);
+    ordered(progress, &["let settled = RELEASE_WATCH.lock().settled();", "let coming = room_coming(settled, (0..2).any(releasing));",
+        "for (role, state) in BANKS.iter().enumerate() {", "arriving_room(g.state, coming)"]);
     let scene = body(BANK, "pub(super) fn scene_changed(");
     assert!(scene.contains("*RELEASE_WATCH.lock() = ReleaseWatch::Settled;"), "{scene}");
+}
+
+/// Operator rule 2026-11-09 17:13Z (Eden `final-surface-i3-pf-b04856b2` `x6-cc`: "Loaded 10/12 (2 waiting for memory)"
+/// raised for 3 s in the 17 ms between the watch's settle and the last-resort release): the planner decides a held
+/// group's capacity release in the pass that settles, before `cycle_preload` publishes the notice (`plan_budget` comes
+/// before `poll_status`), and the notice shows a held prefetch as loading while a release is in progress.
+#[test]
+fn the_planner_decides_the_release_before_the_notice() {
+    let plan = body(BANK, "fn plan_groups(");
+    ordered(plan, &["*watch = watch.pass(MemorySample::capture().committed.get());",
+        "RELEASE_MEMBERS[role].swap(release.members[role], Ordering::AcqRel)",
+        "if after.settled() {", "super::process_memory::admit(memory::group_cost(", "still_short(state, refused, pool_free, members.count())",
+        "release_for_capacity(owner, group, reason);"]);
+    let releasing = body(BANK, "fn releasing(");
+    assert!(releasing.contains("bank.groups.iter().any(|g| g.leaving && g.release_now)"), "{releasing}");
+    let preload = include_str!("../src/runtime/roster/cycle_preload.rs");
+    let on_frame = body(preload, "pub unsafe fn on_frame(");
+    ordered(on_frame, &["body_bank::plan_budget(&menu, &lanes);", "poll_status(false, false, Some(desired));"]);
 }
 
 /// The sparse planner (run on the menu's close, `cycle_preload::on_frame`) reads each role's cycle as it is now: a

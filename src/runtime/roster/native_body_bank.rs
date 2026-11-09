@@ -174,7 +174,7 @@ use crate::engine::swap::body_bank::{
     SpecialPolicy, BANK_FLAG, MAX_EXTRA_GROUPS, NANA, NATIVE_MEMBERS, PAIR_ACTIVE_FLAG, POOL_RESERVE, POPO,
     entry_bytes_of, mii_exit_bytes_match, mii_reuse_bytes_match, MiiEntryBytes, MiiIdentity, MII_ENTRY_START, RESOURCE_WORDS,
     baseline_words, identity_move, IdentityMove, leaves_at_pause, count_group_members, kept_members,
-    release_for_new_members, capacity_release, leaves_now, ReleaseWatch, arriving_room,
+    release_for_new_members, capacity_release, leaves_now, ReleaseWatch, arriving_room, room_coming, still_short,
     next_window_targets, own_words, shadow_values, LiveIdentity, speculative_step_admitted, serving_step, Serving,
 };
 use crate::engine::swap::body_bank::memory::{self, Admission};
@@ -1029,7 +1029,28 @@ fn plan_groups(settings: &crate::engine::preload::cycle_preload_config::Settings
         }
         targets[role] = targets[role].saturating_add(release.members[role]);
     }
+    // Operator rule 2026-11-09 17:13Z: once the watch settles, the planner decides a held group's capacity release in
+    // this pass, before `cycle_preload::on_frame` publishes the notice, so a release in progress shows "Loading".
+    if after.settled() {
+        for role in 0..2 {
+            let held = BANKS[role].lock().as_ref().filter(|bank| bank.phase == Phase::Ready && !bank.departed)
+                .and_then(|bank| bank.groups.iter().enumerate().find(|(_, g)| matches!(g.state, GroupState::Held(_)))
+                    .map(|(group, g)| (bank.owner, group, *g.members, g.state)));
+            let Some((owner, group, members, state)) = held else { continue; };
+            let refused = state == GroupState::Held(Hold::Memory) && matches!(
+                super::process_memory::admit(memory::group_cost(&members.kinds()[..members.count()])).0.admission,
+                Admission::Refuse);
+            if let Some(reason) = still_short(state, refused, pool_free, members.count()) {
+                release_for_capacity(owner, group, reason);
+            }
+        }
+    }
     bodies
+}
+
+/// Whether a parked group of `role` is marked to go now (a release in progress, `room_coming`).
+fn releasing(role: usize) -> bool {
+    BANKS[role].lock().as_ref().is_some_and(|bank| !bank.departed && bank.groups.iter().any(|g| g.leaving && g.release_now))
 }
 
 /// The members of `group` the notice and the planner count: a group that left the cycle (parked until the pause, or a
@@ -1055,8 +1076,10 @@ pub(crate) fn progress() -> crate::engine::preload::cycle_preload_policy::BuiltF
     // Read roster metadata before BANKS; never acquire a roster lock inside it.
     let originals = [excluded_original(&settings, &menu, 0), excluded_original(&settings, &menu, 1)];
     let wanted = [cycle_wanted(&menu, 0), cycle_wanted(&menu, 1)];
-    // Operator rule 2026-11-09 16:06Z: while a free's room is arriving, a prefetch held for memory is loading.
-    let arriving = !RELEASE_WATCH.lock().settled();
+    // Operator rule 2026-11-09 16:06Z and 17:13Z: a prefetch held for memory is loading while a free's room is arriving
+    // or a release decided for it is in progress; "waiting for memory" means nothing more can be freed.
+    let settled = RELEASE_WATCH.lock().settled();
+    let coming = room_coming(settled, (0..2).any(releasing));
     for (role, state) in BANKS.iter().enumerate() {
         let planned = PLANNED_TARGETS[role].load(Ordering::Acquire);
         let releasing = RELEASE_MEMBERS[role].load(Ordering::Acquire);
@@ -1071,7 +1094,7 @@ pub(crate) fn progress() -> crate::engine::preload::cycle_preload_policy::BuiltF
                 // it still serves warm (rc6-hot-xps18), and the new members a parked group freed now makes room for
                 // show as loading (operator rule 2026-11-09 13:21Z).
                 let groups = count_group_members(bank.groups.iter().map(|g| (shown_members(g, &wanted[role]),
-                    crate::engine::swap::body_bank::shown_state(arriving_room(g.state, arriving), background_owed(bank, g, Some(active))))))
+                    crate::engine::swap::body_bank::shown_state(arriving_room(g.state, coming), background_owed(bank, g, Some(active))))))
                     .with_release(releasing);
                 let window = if bank.failed { WindowStatus::Failed }
                     else if bank.phase == Phase::Ready && bank.observed.is_some() { WindowStatus::Built }

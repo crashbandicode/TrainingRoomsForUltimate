@@ -138,7 +138,7 @@ fn the_lifecycle_starts_and_settles_it_and_the_gate_needs_both_paths() {
     assert!(candidate.contains("bank.prefetch.is_some() || bank.construction.is_some()"), "{candidate}");
     let progress = body(BANK, "pub(crate) fn progress(");
     // Primary 2026-11-09 16:06Z: a prefetch held for memory shows as loading while a free's room is on its way.
-    assert!(progress.contains("shown_state(arriving_room(g.state, arriving), background_owed(bank, g, Some(active)))"), "{progress}");
+    assert!(progress.contains("shown_state(arriving_room(g.state, coming), background_owed(bank, g, Some(active)))"), "{progress}");
     let install = body(BANK, "pub(super) unsafe fn install(");
     ordered(install, &["let identity_view = crate::runtime::roster::identity_view::install(base);",
         "BACKGROUND_ENABLED.store(async_ok && identity_view, Ordering::Release);"]);
