@@ -88,7 +88,14 @@ fn apply() {
         // SAFETY: `out` is the 8-byte record the game just wrote through the call; `controller` is the live Controller or 0.
         unsafe { crate::runtime::roster::handle_operator_input(out as *mut MappedInputs, controller) };
     }
-    if out == 0 || !input_delay::applies(slot as i32, scene::is_training()) {
+    if out == 0 {
+        return;
+    }
+    if !input_delay::applies(slot as i32, scene::is_training()) {
+        // Package 6: the CPU-as-P1 fallback sees every poll the delay does not act on (any slot, any scene). Its online 1v1
+        // admission marks the local slot here (the FIM mask), and in an online match it writes that slot's pad here; it
+        // decides per scene and slot itself. Before, this poll returned first and the fallback never armed online.
+        unsafe { crate::runtime::p1::input(slot as i32, out as *mut MappedInputs) };
         return;
     }
     // The raw menu stage ran before the mapping call, before modal Plus
