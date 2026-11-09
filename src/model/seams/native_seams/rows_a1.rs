@@ -237,6 +237,13 @@ pub const ROWS: &[Seam] = &[
            feature: "native-body-bank-alpha", scopes: Scopes::ALL, read_only: false, per_frame: false,
            sharing: Sharing::None,
            note: "construction tail cmp w8,#0x4b (w8 = the live FE+0x18, x19 the body), one shared hook: a background Mii body's x20 is the real R again (SPECIAL-GROUPS §1), and a background body's w8 becomes -1, so its tail takes the per-kind release at 0x60debc, never the pair rule (§0 X1)" },
+    // background_build:hook/inline:exact=16
+    Seam { label: "background_build.info_wrapper", group: "native_body_bank", offset: 0x60d270,
+           kind: SeamKind::Hook { form: HookForm::Inline, placement: Placement::Mid },
+           guard: [0x29, 0x05, 0x40, 0xf9, 0x29, 0x51, 0x42, 0x39, 0xa9, 0x1d, 0x00, 0x35, 0x08, 0xbd, 0x45, 0xf9, 0x16, 0x01, 0x40, 0xf9, 0xe0, 0x03, 0x15, 0x2a, 0xba, 0x42, 0x01, 0x94, 0x00, 0x1d, 0x00, 0x36, 0xc8, 0x26, 0x40, 0xa9, 0x3f, 0x01, 0x08, 0xeb, 0x00, 0x02, 0x00, 0x54, 0x0a, 0x01, 0x40, 0xb9, 0xbf, 0x02, 0x0a, 0x6b, 0xa0, 0x00, 0x00, 0x54, 0x08, 0x21, 0x00, 0x91, 0x3f, 0x01, 0x08, 0xeb],
+           feature: "native-body-bank-alpha", scopes: Scopes::ALL, read_only: false, per_frame: false,
+           sharing: Sharing::None,
+           note: "construct ldr x9,[x9,#8] (x9 = the info wrapper the live FE+0x14/+0x18/+0x1c chose for a Popo or Nana body, x8 the manager, x23 the owner, w21 the kind, x19 the body): a background body takes the wrapper its building group's words choose (SPECIAL-GROUPS 0 X4)" },
     // special_groups:called/fn:exact=0:today=16
     Seam { label: "special_groups.object_release", group: "native_body_bank", offset: 0x3a6b80,
            kind: SeamKind::Called,

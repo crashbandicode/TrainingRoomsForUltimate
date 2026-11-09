@@ -13,7 +13,7 @@ use super::macros::{
 };
 use super::playback::{Book, Playback};
 use crate::model::combo::{Combo, LinkRec};
-use crate::model::combo_record::{default_name, ComboLibrary, ComboRecord};
+use crate::model::combo_record::{clean_name, default_name, ComboLibrary, ComboRecord};
 use crate::model::state::record::SavedState;
 use crate::model::store::Store;
 
@@ -167,14 +167,17 @@ impl RecordStop {
     }
 }
 
-/// Stop. An empty buffer writes nothing. A recording writes `"<name> · start"`, stores that id,
-/// becomes most recently used, and becomes that role's active macro. A CPU-role recording names
-/// the CPU's fighter, so Play on CPU compares the fighter who was being recorded.
+/// Stop. An empty buffer writes nothing. A recording writes `"<name> · start"` from `player` and `cpu` (where Record
+/// started), stores that id, becomes most recently used, and becomes that role's active macro. A CPU-role recording names
+/// the CPU's fighter, so Play on CPU compares the fighter who was being recorded. The macro's start state keeps the
+/// recorded role's facing and its `speed` when Record started (x, y), which Play applies with "Keep recorded speed"
+/// (PLAY-MOMENTUM).
 pub fn finish_recording(
     root: &Path,
     capture: &Capture,
     player: SavedState,
     cpu: SavedState,
+    speed: (f32, f32),
     at: u64,
 ) -> Result<RecordStop, Error> {
     if capture.frames.is_empty() {
@@ -191,19 +194,19 @@ pub fn finish_recording(
         .collect::<Vec<_>>();
     let name = unused_label("Macro", &macro_names);
     let start_name = format!("{name} · start");
-    let kind = match capture.role() {
-        Role::Cpu => cpu.fighter_kind,
-        Role::Player => player.fighter_kind,
+    let recorded = match capture.role() {
+        Role::Cpu => &cpu,
+        Role::Player => &player,
+    };
+    let start_state = StartState {
+        situation: recorded.situation_kind,
+        speed_x: speed.0,
+        speed_y: speed.1,
+        ..StartState::neutral(recorded.fighter_kind, 0, recorded.lr)
     };
     let start = NamedSave::new(start_name, player, cpu)?;
     let start_id = saves.save_new(&start)?;
-    let mut recording = MacroRecording::new(
-        &name,
-        "13.0.5",
-        StartState::neutral(kind, 0, 1.0),
-        capture.frames.clone(),
-    )
-    .map_err(record)?;
+    let mut recording = MacroRecording::new(&name, "13.0.5", start_state, capture.frames.clone()).map_err(record)?;
     recording.set_start_save(Some(&start_id)).map_err(record)?;
     let id = macros.save_new(&recording).map_err(record)?;
     let mut index = RecordingIndex::load(root)?;
@@ -383,6 +386,22 @@ pub fn save_made_combo(root: &Path, combo: &Combo, source: &str, at: u64) -> Res
     let id = library.save_new(&made).map_err(record)?;
     let mut index = RecordingIndex::load(root)?;
     index.note_use(Kind::Combo, &id, Use::Recorded, at)?;
+    index.save(root)?;
+    Ok(id)
+}
+
+/// *+ Save last combo…* (operator 2026-11-08; rc.4 COMBO-HELPER): the strip's latest exchange, named `name` (empty:
+/// Combo N), recorded on Player 1's fighter, hot, and the drill (RECORDING.md: "makes it the drill").
+pub fn save_last_combo(root: &Path, combo: &Combo, name: &str, recorded_on: Option<String>, at: u64) -> Result<String, Error> {
+    let library = ComboLibrary::new(root.join("combos"));
+    let name = match clean_name(name) {
+        Some(name) => name,
+        None => default_name(&library.list().map_err(record)?.entries),
+    };
+    let id = library.save_new(&ComboRecord::new(name, *combo, recorded_on)).map_err(record)?;
+    let mut index = RecordingIndex::load(root)?;
+    index.note_use(Kind::Combo, &id, Use::Recorded, at)?;
+    index.set_drill(Some(super::library::Drill { kind: super::library::DrillKind::Combo, id: id.clone() }), at)?;
     index.save(root)?;
     Ok(id)
 }
@@ -585,12 +604,17 @@ pub fn load_catalog(root: &Path) -> Result<CatalogLoad, Error> {
     let combos = ComboLibrary::new(root.join("combos"));
     if let Ok(list) = combos.list() {
         for entry in list.entries {
-            let made_from = combos.load(&entry.id).ok().and_then(|file| file.made_from);
+            let record = combos.load(&entry.id).ok();
+            let links = record
+                .as_ref()
+                .map(|file| crate::model::recording_menu::combo_link_lines(&file.combo))
+                .unwrap_or_default();
             catalog.combos.push(ComboFile {
                 id: entry.id,
                 name: entry.name,
-                made_from,
-                links: Vec::new(),
+                recorded_on: record.as_ref().and_then(|file| file.recorded_on.clone()).unwrap_or_default(),
+                made_from: record.and_then(|file| file.made_from),
+                links,
                 span: entry.links as u32,
             });
         }
@@ -757,7 +781,7 @@ mod tests {
         let mut capture = Capture::idle();
         toggle_record(&mut capture, Role::Player);
         push_frame(&mut capture, Role::Player, frame(4));
-        let stop = finish_recording(&root, &capture, state(13), state(7), 5).unwrap();
+        let stop = finish_recording(&root, &capture, state(13), state(7), (0.0, 0.0), 5).unwrap();
         let RecordStop::Saved {
             ref id,
             ref start_save,
@@ -792,7 +816,7 @@ mod tests {
         let mut capture = Capture::idle();
         toggle_record(&mut capture, Role::Cpu);
         push_frame(&mut capture, Role::Cpu, frame(33_281));
-        let stop = finish_recording(&root, &capture, state(0), state(0x1d), 5).unwrap();
+        let stop = finish_recording(&root, &capture, state(0), state(0x1d), (0.0, 0.0), 5).unwrap();
         let RecordStop::Saved { id, .. } = stop else {
             panic!("empty")
         };
@@ -1050,7 +1074,7 @@ mod tests {
     fn the_empty_recording_notice_stays() {
         let root = scratch("empty");
         let capture = Capture::idle();
-        let stop = finish_recording(&root, &capture, state(1), state(2), 1).unwrap();
+        let stop = finish_recording(&root, &capture, state(1), state(2), (0.0, 0.0), 1).unwrap();
         assert_eq!(stop.notice(), Some("Recording was empty"));
         assert!(stop.cursor().is_none());
         assert!(!root.join(MACROS_DIR).exists());
@@ -1185,6 +1209,7 @@ mod tests {
             combos: vec![ComboFile {
                 id: "c1".into(),
                 name: "One".into(),
+                recorded_on: String::new(),
                 made_from: None,
                 links: Vec::new(),
                 span: 0,
@@ -1269,5 +1294,28 @@ mod tests {
         publish_selection(&root, &screens.selection(), None);
         let after = RecordingIndex::load(&root).unwrap();
         assert_eq!(after.active(Role::Cpu), Some("macro-1"), "the menu published a selection older than the index");
+    }
+
+    /// Eden rc6-covrec-diag1 (2026-11-08): a combo under the cursor showed no CONNECTIONS lines, because the catalog
+    /// the worker loads gave every combo no link lines. RECORDING.md: "The combo's help lines list each link as the
+    /// two moves and TRUE or not, then that link's input events, then its drift".
+    #[test]
+    fn the_catalog_gives_each_combo_its_connection_lines() {
+        let root = scratch("combo-lines");
+        RecordingIndex::load(&root).unwrap().save(&root).unwrap();
+        let combo = Combo::from_links([link(Move::Jab, Move::Jab), link(Move::Jab, Move::SideTilt)]).unwrap();
+        let id = ComboLibrary::new(root.join("combos"))
+            .save_new(&ComboRecord::new("Jab jab".into(), combo, None))
+            .unwrap();
+        let loaded = load_catalog(&root).unwrap();
+        let file = loaded.catalog.combos.iter().find(|file| file.id == id).unwrap();
+        assert_eq!(file.links, crate::model::recording_menu::combo_link_lines(&combo));
+        assert!(file.links.iter().any(|line| line.starts_with("L2 ")), "{:?}", file.links);
+        let mut screens = RecordingScreens::new();
+        screens.set_catalog(loaded.catalog);
+        let index = screens.section(Face::Page, COMBOS_SEQ, 1).rows.iter().position(|row| row.name == "Jab jab").unwrap();
+        screens.set_cursor(Face::Page, COMBOS_SEQ, 1, index);
+        let lines: Vec<String> = screens.connections(Face::Page, COMBOS_SEQ).into_iter().map(|line| line.text).collect();
+        assert!(lines.iter().any(|line| line.starts_with("L1 jab → jab")), "{lines:?}");
     }
 }

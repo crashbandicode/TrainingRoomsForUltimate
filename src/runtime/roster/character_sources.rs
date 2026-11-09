@@ -404,6 +404,26 @@ pub(crate) fn preload_readiness(blocked:bool,
         |(kind,_)|failed&(1u128<<kind)!=0,ready)
 }
 
+/// F9-SEAT-NOTICE (primary 2026-11-08 23:03Z, reading A): Training's seats 2 and 3 for the readiness notice, with the
+/// targets `purpose_view` gives them (an armed Reload, else the parked member) against the current Ready source on
+/// each entry, and a standing memory refusal (`f9_gate::seat_held`). A live seat, an entry without a member and every
+/// other scene are `None`. Lock order as `purpose_view`: STATE, then the borrow record and the F9 gate.
+#[cfg(feature="managed-third-source-alpha")]
+pub(crate) unsafe fn seat_states()->[Option<crate::model::parked_entries::SeatState>;2] {
+    if !crate::runtime::compat::common::is_native_training_mode() {return [None;2];}
+    let quantity=native_source::training_cpu_quantity();
+    let state=STATE.lock();
+    let borrowed=ENTRY3_BORROW.lock().current().filter(|b|state.book.is_current(b.epoch)).is_some();
+    [2u32,3].map(|slot|{
+        if quantity.is_some_and(|count|slot<=count) {return None;}
+        let member=crate::runtime::roster::f9_gate::override_seat(slot).or_else(||crate::model::parked_entries::parked_seat(
+            slot,quantity,borrowed,crate::runtime::roster::f9_gate::seat_member(slot)))?;
+        let ready=state.sources[slot as usize].filter(|s|state.book.is_current(s.token.epoch())
+            && state.book.phase(slot as usize)==Ok(Phase::Ready)).map(|s|(s.kind,s.configuration));
+        Some(crate::model::parked_entries::seat_state(member,ready,crate::runtime::roster::f9_gate::seat_held(slot)))
+    })
+}
+
 /// The readiness line's capacity (lobby-preload D). While a creation preflight refusal stands in
 /// this scene, the extras from the refused one on cannot be created, so the line counts what the
 /// scene holds (`limited`) instead of reporting `Loading` for the whole visit. Planning, metrics
@@ -528,13 +548,19 @@ fn purpose_view(state:&State,slot:usize,targets:[Option<Want>;crate::runtime::ro
     let training=unsafe{crate::runtime::compat::common::is_native_training_mode()};
     let record=if training {ENTRY3_BORROW.lock().current().filter(|b|state.book.is_current(b.epoch))} else {None};
     // F9: a queued Reload owns entries 2 and 3. A live CPU is not a helper seat. A parked seat
-    // loads the CPU rotation's member, not whatever fighter the merged plan lists first.
+    // loads the CPU rotation's member, not whatever fighter the merged plan lists first. A Mii
+    // member loads with its own configuration, through the Mii helper (`f9_gate` arms no other).
     if training {
-        if let Some(kind) = crate::runtime::roster::f9_gate::override_kind(slot as u32) {
-            let want = targets.iter().flatten().copied().find(|want| want.kind == kind).unwrap_or(Want {
+        // A HUD portrait render that wants or holds a helper goes first (covrest-12).
+        if matches!(slot, 2 | 3) && crate::model::parked_entries::seat_load_waits(portrait_waits(state)) {
+            return [None; crate::runtime::roster::cycle_preload::MAX_TARGETS];
+        }
+        if let Some((kind, configuration)) = crate::runtime::roster::f9_gate::override_seat(slot as u32) {
+            let want = targets.iter().flatten().copied()
+                .find(|want| want.kind == kind && want.configuration == configuration).unwrap_or(Want {
                 epoch: state.book.epoch(),
                 kind,
-                configuration: None,
+                configuration,
                 #[cfg(feature = "mii-hud-portrait-alpha")]
                 avoid: 0,
             });
@@ -546,14 +572,20 @@ fn purpose_view(state:&State,slot:usize,targets:[Option<Want>;crate::runtime::ro
         if matches!(slot, 2 | 3) && quantity.is_some_and(|count| slot as u32 <= count) {
             return [None; crate::runtime::roster::cycle_preload::MAX_TARGETS];
         }
-        if matches!(slot, 2 | 3) && record.is_none() {
-            if let Some(kind) = crate::runtime::roster::f9_gate::fixed_member(slot as u32) {
-                if let Some(want) = targets.iter().flatten().copied().find(|want| want.kind == kind && want.configuration.is_none()) {
-                    let mut only = [None; crate::runtime::roster::cycle_preload::MAX_TARGETS];
-                    only[0] = Some(want);
-                    return only;
-                }
-            }
+        // A parked seat holds its member whether or not the plan lists it (reading A: the first raise shows the seats).
+        if let Some((kind, configuration)) = crate::model::parked_entries::parked_seat(slot as u32, quantity,
+            record.is_some(), crate::runtime::roster::f9_gate::seat_member(slot as u32)) {
+            let want = targets.iter().flatten().copied()
+                .find(|want| want.kind == kind && want.configuration == configuration).unwrap_or(Want {
+                epoch: state.book.epoch(),
+                kind,
+                configuration,
+                #[cfg(feature = "mii-hud-portrait-alpha")]
+                avoid: 0,
+            });
+            let mut only = [None; crate::runtime::roster::cycle_preload::MAX_TARGETS];
+            only[0] = Some(want);
+            return only;
         }
     }
     let borrowed=record.and_then(|b|targets.iter().flatten().copied().find(|w|w.kind==b.kind&&w.configuration.is_none()));
@@ -568,6 +600,21 @@ fn purpose_view(state:&State,slot:usize,targets:[Option<Want>;crate::runtime::ro
     let borrow_open=training&&borrow_admitted(unsafe{native_source::training_cpu_quantity()},
         crate::runtime::ui::state::PAUSE_ACTIVE.load(Ordering::Acquire),state.book.can_replace(BORROW_ENTRY)==Ok(true));
     slot_view(plan,SlotFacts{training,slot,created:extras.contains(&slot),created_busy,borrow_open,borrowed})
+}
+
+/// A HUD portrait job wants a helper (its channel's request) or holds one until its render is done (its lease).
+#[cfg(feature = "managed-third-source-alpha")]
+fn portrait_waits(state: &State) -> bool {
+    #[cfg(feature = "mii-hud-portrait-alpha")]
+    {
+        PORTRAIT_CHANNELS.iter().any(|channel| state.wants[*channel].is_some())
+            || state.leases.iter().flatten().any(|live| matches!(live.consumer, Consumer::Portrait))
+    }
+    #[cfg(not(feature = "mii-hud-portrait-alpha"))]
+    {
+        let _ = state;
+        false
+    }
 }
 
 /// The plan targets a helper request reads (`selected_request`'s filter: the Cycle Preload cap, no failed kind).
@@ -1325,6 +1372,7 @@ fn f9_hat_release(how: crate::model::parked_entries::Release) -> crate::engine::
 /// HUD publication and a Promoted release. Not a Reload.
 unsafe fn f9_publish(decision: crate::model::parked_entries::Decision) {
     for publish in decision.publish.into_iter().flatten() {
+        crate::runtime::roster::f9_gate::mark_promoted(publish.owner);
         if let Some(entry) = native_source::entry(publish.owner) {
             super::refresh_hud(entry, publish.owner, publish.kind);
         }
@@ -1357,14 +1405,18 @@ unsafe fn f9_body(slot: u32) -> crate::model::parked_entries::Body {
 }
 
 /// `entry` is the fighter entry for `slot`, or null. The body cell is read only
-/// when `+0x4150` publishes cell 0; `parked_ready` then decides Ready.
+/// when `+0x4150` publishes cell 0; `parked_ready` then decides Ready. An
+/// unpublished entry is in flight only while this plugin's own install on that
+/// slot is (the book's Loading phase), never from its loader byte, which is
+/// residue on an entry nothing installed (Eden covrest-04/05).
 unsafe fn f9_body_of(entry: *const u8, slot: u32) -> crate::model::parked_entries::Body {
-    let (aligned_entry, installed, loader) = if aligned(entry) {
-        (true, read::<u64>(entry, 0x4150), read::<u8>(entry, 0x591c))
+    let (aligned_entry, installed) = if aligned(entry) {
+        (true, read::<u64>(entry, 0x4150))
     } else {
-        (false, 0, 0)
+        (false, 0)
     };
-    crate::model::parked_entries::classify_parked_body(aligned_entry, installed, loader, || unsafe {
+    let own_load_in_flight = || STATE.lock().book.phase(slot as usize) == Ok(Phase::Loading);
+    crate::model::parked_entries::classify_parked_body(aligned_entry, installed, own_load_in_flight, || unsafe {
         let body = read::<*const u8>(entry, 0x4160);
         if !aligned(body) {
             return None;
@@ -1450,6 +1502,51 @@ unsafe fn f9_player_frame() {
                     let _ = ENTRY3_BORROW.lock().release(f9_hat_release(how));
                 }
                 f9_cutover(after);
+            }
+        }
+    }
+    #[cfg(feature = "mii-managed-helper-alpha")]
+    if !pause {
+        f9_reproof();
+    }
+}
+
+/// Reading B (primary 2026-11-08 16:44Z; Eden covrest-11): a seat the game activated and parked again keeps its
+/// identity but not its Mii record bytes, and the Mii owners refuse every snapshot until its Mii proof is taken again.
+/// Once a promoted seat is parked (its entry above No. of CPUs) and parked ready, re-record it. A seat with no exact
+/// Mii keeps its proof (its helper proof matched in covrest-11).
+#[cfg(feature = "mii-managed-helper-alpha")]
+unsafe fn f9_reproof() {
+    let quantity = native_source::training_cpu_quantity();
+    for slot in [2u32, 3] {
+        if !crate::runtime::roster::f9_gate::reproof_pending(slot) || quantity.is_none_or(|count| slot <= count) {
+            continue;
+        }
+        let seat = {
+            let state = STATE.lock();
+            state.sources[slot as usize]
+                .filter(|source| state.book.is_current(source.token.epoch()))
+                .and_then(|source| Some((state.book.ready(slot as usize).ok()?, source.configuration?)))
+        };
+        let Some((ready, configuration)) = seat else {
+            crate::runtime::roster::f9_gate::clear_reproof(slot);
+            continue;
+        };
+        match super::mii_managed_helper::reproof_parked(ready, configuration) {
+            Ok(None) => {}
+            Ok(Some((descriptor, record))) => {
+                crate::runtime::roster::f9_gate::clear_reproof(slot);
+                crate::engine::compat::logging::diagnostic(format_args!(
+                    "[CharacterSources] F9 seat proof slot={} descriptor_changed={} record_changed={}",
+                    slot, descriptor, record
+                ));
+            }
+            Err(reason) => {
+                crate::runtime::roster::f9_gate::clear_reproof(slot);
+                crate::engine::compat::logging::diagnostic(format_args!(
+                    "[CharacterSources] F9 seat proof kept slot={} reason={}",
+                    slot, reason
+                ));
             }
         }
     }
@@ -2339,6 +2436,9 @@ pub unsafe fn service(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) {
     let memory_cost = crate::engine::swap::body_bank::memory::helper_cost(wanted.kind);
     let memory_committed = if speculative {
         let (decision, sample) = super::process_memory::admit(memory_cost);
+        // F9-SEAT-NOTICE: a seat held for memory counts in the readiness notice until a load on it is admitted.
+        crate::runtime::roster::f9_gate::note_seat_memory(slot, wanted.kind,
+            decision.admission != crate::engine::swap::body_bank::memory::Admission::Admit);
         if decision.admission != crate::engine::swap::body_bank::memory::Admission::Admit {
             memory_refused(slot, wanted.kind, decision, memory_cost, "preload");
             return;

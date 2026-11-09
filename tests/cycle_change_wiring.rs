@@ -73,7 +73,7 @@ fn the_window_targets_skip_what_a_group_holds() {
         "let next = wanted_banks[role].map_or(0, |(members, target)| {",
         "let held_by_group = |kind: u32| BANKS[role].lock().as_ref().is_some_and(|bank| !bank.departed",
         "&& bank.groups.iter().any(|g| g.state != GroupState::Released && g.members.index_of(kind).is_some()));",
-        "lane_window_targets(&shown, target, originals[role], held_by_group)",
+        "next_window_targets(&shown, target, originals[role], held_by_group)",
         "let targets = crate::engine::swap::body_bank::window_targets(grouped, live[role], originals[role], next);",
         "PLANNED_TARGETS[role].store(targets.saturating_add(group_targets[role]), Ordering::Release);",
     ]);

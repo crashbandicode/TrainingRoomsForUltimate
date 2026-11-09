@@ -3,12 +3,28 @@
 Deferred work after 0.2.0-rc.3. Folded from the former `NEXT-VERSION.md` (removed after v0.2.0-rc.1; see that tag)
 on 2026-11-05; no item was dropped.
 
-## Next batch
+## Done: 0.2.0-rc.6 (release date: TODO-FINAL-PASS)
 
-- **Combo helper** (decision COMBO-HELPER, option A; `SPEC-input-07`, branch `p23/combo-helper`): record a combo, save
-  it with a name from the Switch keyboard, and have each attempt graded link by link in a bar under the frame strip.
-  Built and host-tested; its Eden rows run in the next grouped session.
-- **Mii editor**: the Mii editor batch, tested in the same grouped session.
+rc.5 was withdrawn before it reached players. rc.6 ships only when every feature since rc.3 has passed in Eden on the
+rc.6 build; the final pass is TODO-FINAL-PASS. The player notes are [RELEASE-NOTES-rc6.md](RELEASE-NOTES-rc6.md).
+
+| Item | Where | State |
+| --- | --- | --- |
+| Sequence drilling: the sequence bar, the joining link, streak and best in the file | `p23/rc6-seq-drill` | Eden `rc6-seq-diag1` 18/18, `rc6-seq-rel1` 5/5 |
+| *+ Save last combo…* at the top of COMBOS (decision SAVE-LAST-COMBO) | `p23/rc6-cov-rec` | Eden `rc6-covrec-diag10` 12/12; a local-wireless room `covrest-pair-y1` |
+| The r8 recording pop-up: role and page tabs, counts, CONNECTIONS column, lines, badges, footer | `p23/rc6-cov-rec` | Eden `rc6-covrec-diag10`, `-rel7` 3/3 |
+| Recording fixes: the bound save drives Save, Load and Auto-load; CONNECTIONS; Make combo events; mash; setup restore; Edit placement; Edit and Delete written | `p23/rc6-cov-rec`, `p23/rc6-seq-drill` | Eden `rc6-covrec-diag3` 32/35 then `-diag10`; `rc6-seq-diag1` |
+| Hot fighters at Training entry (start-up windows, hats at entry), the group-receipt and back-to-the-original fixes | `p23/rc6-hot-slots` | Eden `rc6-hot-xps3` 21/21; console F6 on the test card |
+| Group speed (decision GROUP-SPEED): warm exit from a Mii, async Mii build, groups built in the background | `p23/rc6-hot-slots` | Eden `rc6-hot-xps6` 5/5, `rc6-hot-xps8`, `rc6-hot-xps13` 13/14 (the 14th is the fallback allocation, fixed in integration). TODO-PROOF: Mii, Ice Climbers and Pokémon Trainer/Pyra-Mythra groups built in the background |
+| A cycle change makes things hot (decision CYCLE-CHANGE-HOT) | `p23/rc6-hot-slots` | Eden `rc6-hot-xps13`. TODO-PROOF: the reload pause (23 frames, target 4) |
+| No. of CPUs seats: the first raise, a Mii seat's configuration, the proof of a promoted seat, the portrait race, the seats after a cycle change | `p23/rc6-cov-rest` | Eden `covrest-10`, `-14`, `covrest-yoga-06` |
+| The "Same as ‹name›, nothing new saved" notice (decision MII-SAME-NOTICE) | `p23/rc6-cov-rest` | Eden `covrest-07` |
+| Open readings (decisions SETUP-Y-BIND, PLAY-MOMENTUM, F9-SEAT-NOTICE): Y on a setup, Play's Momentum, the start save at Record's start, a seat held for memory in the notice | `p23/rc6-open-fixes` | Eden `rc6-openfix-2` (`of-setup-y`, `of-momentum`), `rc6-openfix-5` (`of-seat-notice`); z-gates clean on both |
+| The exact Mii on a recorded macro (#54), the Replay window's Mii track (#68), the notice plates (#64) | `p23/rc6-cov-rest` | Eden `covrest-yoga-04`, `covrest-07`; `rc6-int-smoke2` for the plates |
+| No heap in the CPU-as-P1 fallback's hooks | `p23/rc6-integration` `6d6994e` | Eden `rc6-int-smoke2` 11/11 |
+| rc.5 features first proven in Eden: P2 L+R+A and Mii swaps, respawn, intro once, the online flag, the Lobby Items online smoke, the timer capture through sudden death, the Mii editor's interrupt and resume, combos in a local-wireless room | the lane branches | Eden `covrest-16`, `-04`, `-13`/`-15`, `covrest-pair-02`/`-03`, `rc6-int-vs3`, `covrest-pair-y3`/`-y1`. TODO-PROOF: Lobby Items li-01..03 (no item spawns in Eden's host-only room) |
+
+The once-seen game-thread stop of `covrest-yoga-05` (Eden only, a diag reload path) is noted as open and unreproduced.
 
 ## Done: 0.2.0-rc.3 (2026-11-05)
 
@@ -48,7 +64,7 @@ The RC is M5q parity plus the new UI and clean MIT provenance; this list is not 
 | Ten hot fighters plus five separate hot hats | Done in rc.5 (`p23/hot-slots`): ten hot fighters and five hot hats, hats off the fighter budget. No separate 15-body feature. |
 | Saved/replay Mii bust provider (Q15) | No new provider or hook; the native saved-Mii selection stays. |
 | Frame/status text backgrounds (UI22) | Done in rc.5: a dark plate behind each notice text (header, short body, long body). The input-log plates stay reverted. The frame strip keeps its own backdrop. |
-| Further latency work (F6) | M5q cold-switch hitches kept; the zero-Unmapped and zero-allocation fixes stay. |
+| Further latency work (F6) | rc.6, console test of 2026-11-08 (release `1e6c6a0e`): Player 1's first switch 53 ms and hats 7–23 ms, the first included, with no hitch. The slow group switches it found became the rc.6 group-speed work (decision GROUP-SPEED). |
 | Hitbox sphere replacement | Done for fighter spheres in rc.3 (own discs, never refused). Projectiles keep the game's effect spheres. |
 | Remaining feature/edge-case inventory | Kept for later planning. |
 
@@ -81,7 +97,9 @@ In this order (`docs/DECISIONS.md` DEFERRED-LIST on `review/menu-proposal` `6d19
 - Combo: switch P1 to the combo's recorded fighter, with the same Switch/Keep prompt as a named macro. Done in rc.5 (`p23/combo-switch`).
 - Lobby Items (N11): now in rc.5 (`p23/lobby-items`, primary order 2026-11-05 18:58Z); see the N11 section below.
 - Ten hot fighters plus five hot hats (five while one CPU; operator decision HOT-SLOTS-CEILING): done in rc.5
-  (`p23/hot-slots`). Preloading starts on entering Training. The first-switch hitch stays with F6.
+  (`p23/hot-slots`). Preloading starts on entering Training. Its Eden rows first ran in rc.6 (`rc6-hot-xps3`), which
+  fixed the hats at entry and the group exchanges from a start-up window; the first switch on the console is in the
+  F6 row above.
 - Replay/saved-Mii busts (Q15): not built; the Mii rows stay text (operator 2026-11-05; the game makes a Mii picture
   only through its live selector).
 - Backgrounds behind the plugin's notices and status texts (UI22): done in rc.5. A dark plate sits behind each notice text. The frame strip keeps its own backdrop.

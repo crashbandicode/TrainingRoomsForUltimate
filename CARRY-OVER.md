@@ -860,6 +860,132 @@ Test (failed first, 16:30Z): `async_build_admits_ordinary_and_mii_groups_and_nam
 `async_build_admits_ordinary_groups_and_names_each_exclusion`). Recorded manifest edits of `body_bank.rs` and
 `native_body_bank.rs`; `carry_pkg6.py verify` re-derives all 250 files.
 
+### p23/rc6-integration: the CPU-as-P1 fallback allocates nothing in its hooks (2026-11-08)
+
+The integration smoke `rc6-int-smoke1` (Yoga, diag `0abe3f1b` of `7f3b028`) failed z-gates on
+`hook_stats allocations=5756 … allocs=input_caller_a_apply:2,cpu_frame:5754`. Its plugin set (hot-slots' `hot_config`
+rules) has no standalone CPU pilot, so the carried fallback `runtime/p1/cpu_pilot.rs` was installed. Its per-frame step
+runs inside the CPU core's `cpu_frame` scope (primary inbox 19:13Z: own the root fix).
+- **40 per 10 s at idle.** `poll_request` read `cpu_pilot/request.json` every 60 admitted frames. The skyline std's
+  `File::open` of a missing file (`library/std/src/sys/fs/switch.rs`) allocates the path `CString`, a
+  `format!("Result code: …")` and the two boxes of `io::Error::new`: 4 per poll, 10 polls per 10 s.
+- **About 500 per fighter switch.** A new binding resets the admission, and `gate` / `pair_diagnostic` built a
+  `serde_json::Value` (`json!`) for each `admission` and `first_pair` line.
+- **`input_caller_a_apply:2`.** `STATE` and `STAGE` were `std::sync::Mutex`. On this target std boxes the pthread mutex
+  at the first lock (`sys/sync/mutex/pthread.rs`, `OnceBox`), and `input` took the first locks.
+- **Not reached by the smoke, same rule.** A menu run's `arm` built `json!` arming flags and a `Vec`. A request run's
+  `plan` (`Vec::with_capacity(128)`), its per-frame command trace (`json!`, `format!`) and its receipts (`json!`,
+  `format!`, `fs::write` in `arm`, `finish` and `reject_pending`) all ran in the hook.
+
+The fix:
+- request.json is read, validated and planned on the heartbeat. `service` is registered with `diag_log::set_tick`,
+  which now holds up to four steps, each called through its own pointer. The hook asks at its old cadence
+  (`READ_WANTED`) and takes the planned request (`POSTED`, `try_lock`).
+- The receipts are posted to `OUTBOX` (`compat::fixed::FixedQueue`: 8 owned values; a full queue hands the value back
+  and counts it) and written there. Their JSON is the fork's, built off the hook.
+- The `admission` and `first_pair` lines are typed JSON written into the diag line (`compat::json_line`: `Json`, `Obj`,
+  `DebugStr`). They keep their keys; nested objects are in field order.
+- `STATE` and `STAGE` are `hos_lock::Mutex`. The run's first outputs are a `FixedList`, and the command trace is
+  reserved off the hook (`TRACE_LIMIT`).
+- `model::thread_stacks`: the heartbeat's static bound is 8,096 B (the drain closure's 2,928 B plus `p1::service`'s
+  5,168 B). The measured 11,184 B still decides the 32 KiB stack.
+
+31 recorded manifest edits of `cpu_pilot.rs`; `carry_pkg6.py verify` re-derives all 250 files. Test (failed first on the
+pre-fix source, 19:39Z): `tests/p1_pilot_hooks.rs`. It covers the writers under the plugin's counting allocator, and the
+source wiring of every hook path (no `json!`, `format!`, `fs::`, `File::`, `with_capacity`, `.clone()` …).
+
+### p23/rc6-cov-rest: F9 fixed seats reload; a Mii Save that reuses a saved Mii says so (2026-11-08)
+
+**F9 (#58).** Eden covrest-04/05/06 (Ally; hot-slots diag `e025ad2c`, then `d20ead7b`): after a raise from one CPU to
+three on one close, CPUs 2 and 3 stayed copies of CPU 1 (Fox, Meta Knight, Byleth) for 30 s, instead of the CPU
+rotation's next fighter and the one after (Mii Gunner and Donkey Kong on the operator card). At one CPU entries 2 and 3
+were never installed (`f9_body_of` read count 0 every time) and their loader byte held residue (6, then 88).
+`classify_parked_body` read any non-zero loader byte on an unpublished cell as "in flight", so `reload_if_needed`
+armed no seat Reload. Now an unpublished cell is in flight only while this plugin's own install on that slot is (the
+source book's Loading phase); otherwise it is empty and both seats reload after the walk. `parked_entries` changes:
+`classify_parked_body` (its third argument is now that question, asked only for an unpublished cell) and
+`unpublished_body`; `on_count` and `reload_if_needed` are unchanged.
+
+**#52 (operator decision C).** A Save that matches a saved Mii keeps the reuse rule (docs/MII.md rows 4 and 12) and
+posts "Same as ‹saved name›, nothing new saved" with the matched saved Mii's own name (`model::notify::save_notice`,
+a fixed body; `features::notices::post_body`, the mailbox, after the session lock).
+
+2 recorded manifest edits: `character_sources.rs` (`f9_body_of`) and `mii_editor_bridge/mod.rs` (`edit_decide`);
+`carry_pkg6.py verify` re-derives all 250 files. Tests (failed first): `parked_entries`
+`an_unpublished_entry_with_a_residue_loader_byte_is_empty` (in its loader-byte form it returned `Loading`),
+`tests/mii_same_notice.rs` (did not compile: no `save_notice`).
+
+### p23/rc6-cov-rest: an F9 Mii seat loads with its own Mii configuration (2026-11-08)
+
+**F9 (#58).** Eden covrest-08 (Ally, diag `888badce` of `70617ba`): after a raise, a drop to one CPU and a raise, the
+seats parked and were promoted (Mii Gunner as CPU 2, Donkey Kong as CPU 3), but entry 2's Mii Gunner had been
+installed as a plain fighter (`install slot=2 kind=0x4a`, no Mii helper). From the moment No. of CPUs reached 2 the
+game read null every frame (`Unmapped Read64 @ 0x0`, `main+0x357bf34`; 315852 by the end of the boot). F9 kept a seat
+member as a kind only (`cycle_preload.rs` `set_fixed_members`, `f9_gate`), and `purpose_view`'s seat branch made a
+`Want` with no configuration when the plan did not list that kind. The members now keep the CPU rotation target whole
+(kind and exact-Mii configuration, F9 report §4.2); `f9_gate` arms a Reload with that configuration and arms no Mii
+seat without one (`parked_entries::seat_load`); the seat branch loads what was armed, so a Mii seat goes through the
+Mii helper as the CPU cycle's own Mii loads on entry 2 do.
+
+2 recorded manifest edits: `character_sources.rs` (`purpose_view`'s seat branch) and `cycle_preload.rs`
+(`set_fixed_members`); `carry_pkg6.py verify` re-derives all 250 files. Test (failed first: no `seat_load`):
+`parked_entries` `a_mii_seat_loads_with_its_member_configuration_or_not_at_all`.
+
+### p23/rc6-cov-rest: the first F9 raise shows the seats (2026-11-08)
+
+**F9 (#58), reading A (primary 16:04Z).** Eden covrest-07/08/09: the first raise after a scene start showed copies of
+CPU 1 on CPUs 2 and 3; the seats appeared only from the second raise. At one CPU `purpose_view`'s seat branch loaded a
+member on entry 2 or 3 only when the merged plan listed it with no configuration, and the body bank covered Donkey
+Kong. A parked, unborrowed seat now holds its member (kind and exact-Mii configuration, `parked_entries::parked_seat`)
+whether or not the plan lists it. The load is the same speculative helper load, so process-memory admission still
+holds it (`[ProcessMemory] refused … stays planned`, retried) when headroom refuses. Entry 3 while it holds the
+borrowed fifth hat is not a seat (unchanged); entry 2 no longer waits for that borrow.
+
+1 recorded manifest edit: `character_sources.rs` (`purpose_view`'s seat branch); `carry_pkg6.py verify` re-derives all
+250 files. Test (failed first: the seat branch did not call `parked_seat`):
+`parked_entries` `the_seats_park_at_one_cpu_whatever_the_plan_lists`.
+
+### p23/rc6-cov-rest: diag note of a refused helper proof (2026-11-08)
+
+Eden covrest-10: after an F9 raise and drop, both Mii owners refused their snapshot ("helper row kind/provenance
+changed"), which leaves the Mii classes out of both cycles. Diag builds now log the recorded helper proof beside the
+row read now (`[MiiHelperProof] refused id=… why=…`, first 12 per boot) in `mii_ordinary_native.rs` `helper_kind`; the
+acceptance itself is unchanged. 1 recorded manifest edit; `carry_pkg6.py verify` re-derives all 250 files.
+
+### p23/rc6-cov-rest: a promoted F9 seat's Mii proof is taken again once parked (2026-11-08)
+
+**F9 × Mii (reading B, primary 16:44Z).** Eden covrest-10/11: after a raise promoted the Mii Gunner seat on entry 2
+and a drop parked it again, both Mii owners refused every snapshot ("helper row kind/provenance changed") and the Mii
+classes left both cycles. The diag note (`[MiiHelperProof] refused id=2 why=mii record`) showed the helper `Proof`
+unchanged and the Mii record changed: the activation's state bytes, not the seat's identity. F9 now marks a published
+seat (`f9_publish` → `f9_gate::mark_promoted`); once the seat is parked again and parked ready, `f9_reproof` asks
+`mii_managed_helper::reproof_parked` to take the Mii proof (record and descriptor) again from the row, only when the
+identity is unchanged (the same ready source and configuration, binding, owner objects and scalars, the charinfo and
+a resource pair; `parked_entries::reproof`). Any identity change keeps the refusal.
+
+2 recorded manifest edits: `mii_managed_helper.rs` (`reproof_parked`, new) and `character_sources.rs` (`f9_publish`,
+`f9_player_frame`, `f9_reproof` new); `carry_pkg6.py verify` re-derives all 250 files. Test (failed first: no
+`reproof`): `parked_entries` `a_promoted_seat_is_re_proved_once_parked_only_with_its_identity`.
+
+### p23/rc6-cov-rest: the portrait race, a press waits for the render and the F9 seat load holds back (2026-11-08)
+
+**Mii portrait × F9 (primary 17:28Z, readings A and B).** Eden covrest-12: after the CPU loaded the card's Mii
+Gunner, its HUD portrait leased the F9 seat on entry 2 (the same exact Mii), but the render waited ~6 s behind seat 3's
+INSTALL and was issued in the frame of the CPU's next press. The press's snapshot refused the row mid-render, the
+portrait's after-render proof quarantined helper 2 for the scene, and presses 1-5 loaded nothing.
+- A (the race): a Mii owner's begin waits while that role's portrait job holds a helper lease or has its render
+  issued: `Blocker::Portrait` ("portrait render on a helper") in the CPU's `begin_blocker`, the same check in the
+  Player's `permitted`, through `mii_hud_portrait::render_holds_helper(logical)`. The press runs after the render; it
+  is never dropped.
+- B (ordering): F9's seat branch of `purpose_view` starts no seat load while a portrait job wants a helper or holds one
+  (`portrait_waits`: a portrait channel's request or a Portrait lease; `parked_entries::seat_load_waits`).
+
+5 recorded manifest edits: `source_load.rs` (`Blocker`, `reason`, the test), `mii_hud_portrait.rs`
+(`render_holds_helper`), `mii_ordinary_cpu.rs` (`begin_blocker`, `portrait_render_held`), `mii_ordinary_player.rs`
+(`permitted`, `portrait_render_held`), `character_sources.rs` (`purpose_view`'s F9 section, `portrait_waits`);
+`carry_pkg6.py verify` re-derives all 250 files. Tests (failed first: no `Blocker::Portrait`, no `seat_load_waits`):
+`source_load` `a_press_during_a_portrait_render_waits_and_then_applies`, `parked_entries`
+`a_seat_load_holds_back_while_a_portrait_render_waits`.
 ### p23/rc6-hot-slots: groups built in the background; a cycle change re-plans (2026-11-08, rc.6 item 3)
 
 The third group-speed item, as the operator re-decided it (`docs/DECISIONS.md` "Item 3 in rc.6"). It is built after
@@ -1026,6 +1152,31 @@ allocation's `alloc_us`, and pad-controller changes.
 - `tests/background_build_wiring.rs` follows the named entry steps; `tests/group_hold_wiring.rs` follows the parked rule.
 
 Recorded manifest edits of the nine carried files; `carry_pkg6.py carry/ledger/verify` re-derives all 250 files.
+### p23/rc6-cov-rest: a CPU Mii install writes a whole CharInfo (#54, #68; 2026-11-08)
+
+**#54 / #68.** Eden covrest-yoga-03 (Yoga, probe `06f6dc3` with cov-rec's handoff `e276d0f`): Switch on a CPU macro
+recorded on an exact Mii (cov-rec's `cov-named-mii`, fixture `rc4-gunner-mii`) installed Mii Gunner with
+`resource_before` zero and stayed zero: `terminal ready comparison refusal ... reason=native resource pair absent`,
+INSTALL retained, 17 `Unmapped` console lines (cov-rec 16:08Z: `main+0x357a914`, reads at 0x0 and 0x288). The macro's
+Mii came from a replay: its CharInfo has no create ID and no name (bytes `0x00..0x26` zero; the replay window's capture
+is the same). The Reload's own Mii setup (`0x67e7d0`, `mii::mii_setup`) checks the record's CharInfo
+(`0x39c2930/0x39c2940`) before it binds the resource pair, so it bound none; the same canonical Mii from the catalog
+(covrest-14's native Gunner, with its create ID and name) bound its pair. The exact-Mii target of `begin` now installs
+`engine::mii_install::installable`: the saved native Mii with the same look (MII.md row 12), else the Mii with a
+create ID and the "New Mii" name filled in; the look, tokens and canonical identity are the Mii's.
+
+1 recorded manifest edit: `mii_ordinary_cpu.rs` (`begin`'s `mii_target`); `src/model/mii_install.rs` is new (not
+carried); `carry_pkg6.py verify` re-derives all 250 files. Tests (failed first against a stub that returned the
+configuration unchanged): `mii_install` `a_replay_mii_installs_the_saved_mii_with_the_same_look`,
+`a_replay_mii_with_no_saved_twin_gets_a_create_id_and_the_new_mii_name`,
+`a_mii_with_its_own_create_id_and_name_is_installed_as_it_is`, `the_cpu_install_writes_the_installable_configuration`.
+
+### p23/rc6-cov-rest: the clip editor's question owns Player 1's presses (#68; 2026-11-08)
+
+`66a9a53` added one guard to the package-4 file `replay_capture.rs` (`on_input` returns while the clip editor's
+Fighter Mismatch question is up; Eden covrest-yoga-01: Down and A went to the editor instead of the question). The
+edit is recorded in `docs/provenance/pkg4-carry-manifest.json` (edit 59); `carry_pkg4.py carry`, `ledger`, `verify`
+(40 files against stage m5q, and dest-only) pass.
 ### p23/rc6-bg-pt: Pokémon Trainer and Pyra/Mythra groups built in the background (2026-11-08, rc.6 item 3)
 
 Worker B of the special-group split (`artifacts/phase23/TASK-OPUS-rc6-bg-special.md`); design
@@ -1112,6 +1263,23 @@ Operator decision "All groups in rc.6" and the start-on-the-kind rule (`docs/DEC
   - `plan_in` then serves the return like a numbered pair target: the live pair-lead window is a reuse, a detached
     one or a pair group is a group swap (`group_serves`), and a request whose non-group bytes differ still takes the
     Reload with `reuse declined … bytes differ at`. The player's `at_origin` already recognises any live `0x4b`.
+- **X4, a background Ice Climbers body's info wrapper** (primary 2026-11-09 00:52Z, the cross cells; read from the
+  disassembly `rc6-item3-re/special/asm/6079d0-60df60.s` `0x60d1ec-0x60d270`):
+  - Construct picks the wrapper whose `info+0x94` gate it reads. Only a Popo or Nana body looks at the entry's words:
+    with two cells, the cell-1 kind gets `+0x100` (Nana's own); everything else `+0xf0`. Native reads the live entry,
+    so a pair group built beside a one-actor window (ordinary or native) gave its Nana `+0xf0`.
+  - `body_bank::info_wrapper` is that rule. `native_body_bank::background_info` (inline `0x60d270`, x9 the chosen
+    wrapper) gives a background Popo/Nana body the wrapper its building group's words choose (`BACKGROUND_CELLS`,
+    stored before the owner's background bit). Nana's `+0x100` is used only while the entry holds that wrapper's info
+    (`+0x108`); otherwise native's choice stays and is counted.
+  - Atomics only on the worker. Each settlement logs `[GroupSwap] background info … nana_own_wrapper= kept_no_info=`.
+    Installed with the background builds, guarded by four 13.0.5 words and the seam row
+    `background_build.info_wrapper`; `BACKGROUND_X4` reports it to the planner.
+  - **The two cross cells** (the merge's interim refusals lifted): `background_build_eligible` takes a native group
+    beside a live pair window with the redirected tail (X1; X4 never applies to its kinds, X5 is bg-pt's
+    `background_partner`), and the pair group beside a live native window with the X4 hook (`info_x4`, from
+    `BACKGROUND_X4` in `background_candidate`/`background_owed`; without it "pair group beside a native window without
+    X4"). Model test `the_cross_cells_build_beside_each_other`.
 - **Merge note** (accepted by the primary, 22:52Z): `p23/rc6-hot-slots-mii` hooks `0x60de68` too. Integration keeps
   one `background_tail`, which also restores the Mii shadow's `R`.
 
@@ -1181,3 +1349,61 @@ what it serves.
 
 Recorded manifest edits of the four carried files; `carry_pkg6.py carry/ledger/verify` re-derives all 250 files.
 `docs/DECISIONS.md` records the 01:09Z decision.
+### p23/rc6-open-fixes: a seat held for memory counts in the readiness notice (2026-11-08, F9-SEAT-NOTICE)
+
+**Primary 23:03Z, reading A** (cov-rest's question of 16:25Z; `docs/DECISIONS.md` F9-SEAT-NOTICE on
+`review/menu-proposal`). When process memory refuses a parked seat, the seat is held and retried, but the readiness
+notice counted only the plan's targets and the bank's groups, so the hold showed only in a diag line. The two seats
+now count in the existing fighter status, with no new text: a held seat reads "… waiting for memory".
+- `parked_entries::seat_state` (model) and `hat_slots::with_seats` (engine, not carried: the by-path test crates that
+  include `model.rs` have no `crate::engine`): each parked seat is one more planned fighter, counted ready, pending, or
+  held with `Hold::Memory`. Nothing is added while the status itself is hidden, or for a live seat.
+- `f9_gate::note_seat_memory` and `seat_held`: the kind the last speculative load on entry 2 or 3 was refused for,
+  cleared when a load on it is admitted and at `reset`.
+- `character_sources::service` notes each seat admission before the refusal returns; `character_sources::seat_states`
+  (new) reads each seat's target as `purpose_view` does (an armed Reload, else the parked member) against the entry's
+  Ready source. `cycle_preload::poll_status` applies `with_seats` to the fighter status.
+
+3 recorded manifest edits: `character_sources.rs` (`seat_states`, the note in `service`) and `cycle_preload.rs`
+(`poll_status`); `carry_pkg6.py carry/ledger/verify` re-derives all 250 files. Tests (failed first: no `with_seats`;
+the runtime named neither `with_seats` nor `note_seat_memory`): `hat_slots`
+`a_seat_held_for_memory_counts_in_the_fighter_status`, `tests/seat_notice_wiring.rs` (2).
+
+**Its Eden row's instrument (diag build only).** A row cannot count on the console running out of memory, so the diag
+build's `process_memory::admit` takes `DIAG_RESERVE` bytes (written through `diag-memory-reserve.req`, read by the
+states diag thread) from the headroom of every discretionary admission; 0, the default, changes nothing, and the release
+build has neither. One recorded manifest edit (`process_memory.rs`). `f9_gate::note_seat_memory` logs each change of a
+seat's hold (`[F9Seat] memory slot=N held=… kind=…`).
+  Read8 @ 0 at `main+0x35609c0`, at the base too (`rc6-bg-pt-base1`, 2 of 2). Fixed by the next section.
+
+### p23/rc6-bg-pt: a Pokémon Trainer group takes its object kind again before its article rebuild (2026-11-09)
+
+Inbox `INBOX-opus-rc6-bg-pt.md` 00:17Z item 1 (worker B; item 2, the start on PT, moved to the hot-slots worker at
+01:09Z, my start of it is on `p23/rc6-bg-pt-start` `072345f`). Commits `6f5fed1`, size raise `52af61d`, label `d0a79c2`.
+
+- **The defect** (pre-existing, a console-crash class): a detached PT group's article pool is retired at its detach and
+  rebuilt at its next warm attach (`special_articles::rebuild_current`, `0x3a6270`); the trainer article reads its file
+  (`0x372`, `0x355fea0`) through the object kind `0x72`, which the bank had returned after the build. Unmapped Read8 @ 0
+  at `main+0x35609c0` at every later attach (`rc6-bg-pt-base1` at `182a785`, `rc6-bg-pt2`).
+- **The rule** (`body_bank::object_rearm_due` / `object_ready`): a Built PT group whose saved holder's pool is empty takes
+  `0x72` again while it is detached, and is reachable warm only while it holds it. A filled pool (the first attach), an
+  Aegis holder (never retired) and every other group need nothing.
+- **The runtime** (`native_body_bank`): `group_lifecycle`'s `Rearm` / `RearmPoll` steps take the kind as a prefetch does
+  (this R, idle, Training, INSTALL held until R is ready, so a press meanwhile waits); `rearm_candidate`,
+  `detached_pool`. `exchange_articles` returns it right after the attach's rebuild (`return_object_key`); `switch()`'s
+  Kirby/pair drain returns it too (IC-PAIR-STALL, D-KIRBY1); `retire_groups` and `leave_group` name it a held kind, so
+  their key step returns it (`rc6-bg-pt4`: left on R, the next Reload's state 7 refused on `R+0x18 == 2`).
+  `group_reachable` requires it; a group whose re-acquisition the ledger declined (`object_refused`) or that a drain
+  emptied takes the Reload path. Never held across the detach: taken after it, returned at the attach.
+- **Proof:** host tests, each failed first: model `a_retired_trainer_group_takes_its_object_kind_again_before_its_rebuild`;
+  `tests/background_native_wiring.rs` `a_retired_trainer_group_takes_its_object_kind_again_and_returns_it_after_the_rebuild`
+  (its teardown pins failed again on their own). Recorded manifest edits of the two carried files; `carry_pkg6.py
+  carry/ledger/verify` 250 files.
+- Eden `rc6-bg-pt7` (Yoga, diag `b1962d0c` of `52af61d`; rows `rows-bg-pt/rows-item3-native5.json`; evidence
+  `bg-pt-evidence/rc6-bg-pt7`): P1's PT group attached four times in two scenes. The second and third attach each
+  rebuilt the pool (`pool=0->1`) and returned the kind (`object_kind=0x72 released=1 kept=0 map=0`); every detach took it
+  again (153–241 ms, INSTALL released). Unmapped 0, no `main+0x35609c0` read. Request to Ready: 63 ms (first attach),
+  315 ms (first rebuild, 17 frames, Eden first-run on a Yoga shared with another Eden), 76 ms (second rebuild, 4
+  frames), 48 ms (the next scene's first attach). The PT group left the cycle holding the kind: `keys=[72]
+  ledger_held=0 map_after=0`. The scene end with the kind held: `rc6-bg-pt5` (same teardown code) `reconcile owner=0
+  phase=finalize map=0`.

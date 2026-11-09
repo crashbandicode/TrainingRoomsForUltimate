@@ -80,6 +80,11 @@ pub(crate) unsafe fn frame(fighter: usize) {
     }
 }
 
+/// The pilot's file work (its request.json read and its receipts), on the heartbeat thread: never in a hook.
+pub(crate) fn service() {
+    cpu_pilot::service();
+}
+
 /// P1's mapped input record after the delay: the pilot writes its pad here.
 ///
 /// # Safety

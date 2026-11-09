@@ -332,10 +332,14 @@ pub(super) fn replay_current()->Option<Configuration> {
 }
 pub(super) fn replay_ready(selection:crate::engine::mii::replay::Selection,kind:u32)->bool {
     let s=STATE.lock();
+    // #54, reading B (primary 2026-11-08 23:03Z): the CPU holds what the install wrote (`mii_install::installable`), so
+    // the selection's target is compared, exactly, as Switch installs it.
+    let target=s.catalog.as_ref().filter(|c|c.is_complete())
+        .map_or(selection.target,|c|crate::engine::mii_install::installed_target(selection.target,&c.configs));
     s.replay_result.and_then(|receipt|receipt.for_selection(selection,epoch(),super::mii_replay::revision(selection.source)))==Some(Ok(()))
         && !s.departed && !s.busy() && s.request.is_none()
         && s.owner.as_ref().is_some_and(|o|o.origin.binding.epoch==epoch()
-            && selection.ready(kind,o.live.target.publish(o.origin_saved)))
+            && target.ready(kind,o.live.target.publish(o.origin_saved)))
 }
 pub(super) fn replay_refusal(selection:crate::engine::mii::replay::Selection)->Option<&'static str> {
     STATE.lock().replay_result
@@ -517,7 +521,15 @@ unsafe fn begin_blocker()->Option<Blocker> {
     else if training::recording_or_playback() {Some(Blocker::Recording)}
     else if crate::runtime::compat::replay_preview::occupied() {Some(Blocker::ReplayPreview)}
     else if !STATES.iter().all(|s| {let s=s.lock();s.active.is_none()&&s.pending.is_none()}) {Some(Blocker::Roster)}
+    else if portrait_render_held() {Some(Blocker::Portrait)}
     else {None}
+}
+/// The CPU's HUD portrait render holds a helper (sequencing: the press runs after the render, never dropped).
+fn portrait_render_held()->bool {
+    #[cfg(feature="mii-hud-portrait-alpha")]
+    {super::mii_hud_portrait::render_holds_helper(1)}
+    #[cfg(not(feature="mii-hud-portrait-alpha"))]
+    {false}
 }
 unsafe fn permitted()->bool {begin_blocker().is_none()}
 
@@ -850,6 +862,9 @@ unsafe fn begin(entry:*mut u8)->bool {
     // Only source/catalog/row target qualification can skip a cycle choice.
     // Current-owner, SameClass, INSTALL and publication checks remain below this resolver.
     let mii_target=|c:Configuration|->Result<(Target,[u8;0x70]),&'static str> {
+        // #54/#68: a replay's Mii has no create ID or name, and the game's Mii setup binds no resource pair to such a
+        // record. Install the saved Mii with this look, else this one with an identity filled in.
+        let c=crate::engine::mii_install::installable(c,&catalog.configs);
         if !crate::engine::mii::ordinary_cpu::supported_kind(c.canonical().class as u32) {
             return Err("CPU class not qualified");
         }

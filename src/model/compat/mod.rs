@@ -11,6 +11,8 @@ pub mod logging;
 #[cfg(any(test, target_os = "switch"))]
 pub mod fixed;
 #[cfg(any(test, target_os = "switch"))]
+pub mod json_line;
+#[cfg(any(test, target_os = "switch"))]
 pub mod menu;
 #[cfg(any(test, target_os = "switch"))]
 pub mod menu_json;

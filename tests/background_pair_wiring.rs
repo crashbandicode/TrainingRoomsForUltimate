@@ -57,6 +57,9 @@ fn the_tail_hook_is_guarded_and_gates_the_live_pair_window() {
     assert!(row.starts_with("label: \"background_build.construct_tail\", group: \"native_body_bank\", offset: 0x60de68,"));
     for planner in [body(BANK, "fn background_candidate("), body(BANK, "fn background_owed(")] {
         assert!(planner.contains("BACKGROUND_PAIR_TAIL.load(Ordering::Acquire)"), "{planner}");
+        // Cross cell (b), the pair group beside a live native window, needs the X4 hook (primary 2026-11-09 00:52Z).
+        assert!(planner.contains("BACKGROUND_PAIR_TAIL.load(Ordering::Acquire), BACKGROUND_X4.load(Ordering::Acquire))"),
+            "{planner}");
     }
 }
 
@@ -78,6 +81,36 @@ fn the_start_up_window_serves_an_ice_climbers_start_with_the_pair_bank() {
         "r_handle::set_pair_refs(lrole, resource as usize, r_handle::WINDOW, references as u8)"]);
     let h4 = body(BANK, "unsafe fn bind_pending(");
     assert!(h4.contains("read::<u32>(entry, 0x28) == bank.members.actor_count()"), "{h4}");
+}
+
+/// SPECIAL-GROUPS §0 X4 (primary 2026-11-09 00:52Z, cross cell (b): a pair group built beside a live native window).
+/// The construction picks a Popo or Nana body's info wrapper from the live words (`0x60d1f0-0x60d26c`). At `0x60d270`
+/// (x9 the chosen wrapper, x8 the manager, x23 the owner, w21 the kind, x19 the body) a background body gets the wrapper
+/// its building group's words choose (`body_bank::info_wrapper`). Nana's `+0x100` is used only while the entry holds
+/// its info (`+0x108`). The hook counts with atomics only (no allocation on the worker) and is installed with the
+/// background builds behind its four 13.0.5 words and its seam row.
+#[test]
+fn a_background_ice_climbers_body_takes_its_groups_info_wrapper() {
+    let hook = body(BANK, "unsafe fn background_info(");
+    ordered(hook, &["let kind = ctx.registers[21].w();",
+        "if !matches!(kind, POPO | NANA) || !background_body(ctx.registers[19].x() as usize) { return; }",
+        "let owner = ctx.registers[23].x() as u32;",
+        "let Some((count, cells)) = background_cells(owner) else { return; };",
+        "let offset = info_wrapper(kind, count, cells);",
+        "let Some(entry) = fields::read::<usize>(ctx.registers[8].x() as usize, 0x20 + 8 * owner as usize) else { return; };",
+        "if offset == 0x100 && !fields::read::<usize>(entry, 0x108).is_some_and(|info| info != 0 && info % 8 == 0) {",
+        "BACKGROUND_INFO_KEPT.fetch_add(1, Ordering::Relaxed);",
+        "ctx.registers[9].set_x((entry + offset) as u64);"]);
+    assert!(!hook.contains("trace!"), "no logging inside the worker hook");
+    let start = BANK.find("BACKGROUND_OWNERS.fetch_or(owner_bit(owner), Ordering::AcqRel);").expect("start");
+    let cells = BANK.find("if let Some(cells) = BACKGROUND_CELLS.get(owner as usize) { cells.store(pack_cells(b.members), Ordering::Release); }")
+        .expect("cells");
+    assert!(cells < start, "the group's words are stored before the owner bit");
+    let install = body(BANK, "pub(super) unsafe fn install(");
+    ordered(install, &["fingerprint(base, BACKGROUND_INFO, &[0xf9400529, 0x39425129, 0x35001da9, 0xf945bd08], \"GroupSwap\")",
+        "gate(SEAM_GROUP, BACKGROUND_INFO_SEAMS, async_ok && identity_view && info_stock)",
+        "skyline::install_hooks!(background_info);", "BACKGROUND_X4.store(true, Ordering::Release);"]);
+    assert!(ROWS.contains("label: \"background_build.info_wrapper\"") && ROWS.contains("offset: 0x60d270"), "seam row");
 }
 
 const PLAYER: &str = include_str!("../src/runtime/mii/mii_ordinary_player.rs");

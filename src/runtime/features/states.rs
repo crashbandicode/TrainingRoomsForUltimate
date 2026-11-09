@@ -29,7 +29,7 @@ use crate::model::lra_reset;
 use crate::model::sites_pkg3 as s;
 use crate::model::state::buff::{BuffFacts, BuffKind, BuffState};
 use crate::model::state::charge;
-use crate::model::state::file::SaveFile;
+use crate::model::state::file::{SaveFile, SLOTS};
 use crate::model::state::hooks::{self, DeathParam};
 use crate::model::state::ids::{self, Table, C, UNRESOLVED};
 use crate::model::state::machine::{Done, FrameIn, Machine, Out, Placing, Request, Role, StatusNow};
@@ -372,6 +372,55 @@ pub fn request_named_load(pair: [SavedState; 2]) {
     *NAMED_LOAD.lock() = Some(pair);
 }
 
+/// The bound save for the active slot, posted by the recording worker with its Mii identities split off (the worker
+/// may allocate and free; the frame step only moves them). A plugin thread never takes `STATE` (tests/hook_locks.rs),
+/// so the player's frame step applies the post under it.
+struct BoundPost {
+    pair: [SavedState; 2],
+    miis: [Option<crate::engine::mii::lifetime::Configuration>; 2],
+}
+
+static BOUND_POST: Mutex<Option<BoundPost>> = Mutex::new(None);
+static BOUND_PENDING: AtomicBool = AtomicBool::new(false);
+
+/// The bound save becomes the active slot (`rr_host::bound_sync`, on the recording worker): Load, Auto-load on death
+/// and their mirroring, damage and buffs act on that slot, so they act on the bound save. `None` (nothing bound)
+/// empties the slot, and an empty slot loads nothing (`Machine::begin_load`). A newer post replaces one not yet applied.
+pub fn post_bound(pair: Option<[SavedState; 2]>) {
+    let mut pair = pair.unwrap_or_else(|| [SavedState::never_saved(), SavedState::never_saved()]);
+    let miis = [setups::saved_identity(&pair[0]), setups::saved_identity(&pair[1])];
+    for record in &mut pair {
+        record.mii = None;
+    }
+    let previous = BOUND_POST.lock().replace(BoundPost { pair, miis });
+    BOUND_PENDING.store(true, Ordering::Release);
+    drop(previous);
+}
+
+/// The player's frame step: the posted bound save goes into the active slot, unless a save or a load holds the slot
+/// now (then it waits for a later frame).
+fn apply_bound_post() {
+    if !BOUND_PENDING.load(Ordering::Acquire) {
+        return;
+    }
+    with(|state| {
+        if state.machine.setup_busy() {
+            return;
+        }
+        let Some(post) = BOUND_POST.lock().take() else { return };
+        BOUND_PENDING.store(false, Ordering::Release);
+        let slot = usize::from(state.settings.slot).min(SLOTS - 1);
+        let settings = state.settings;
+        if !state.machine.bind_setup(slot, post.pair, false, &settings, &mut state.rng) {
+            return;
+        }
+        state.saved_miis[0][slot] = post.miis[0];
+        state.saved_miis[1][slot] = post.miis[1];
+        state_diag!("[TrainingRooms] state bound_slot slot={} player_x={} cpu_x={}", slot + 1,
+            state.machine.record(Role::Player, slot).x, state.machine.record(Role::Cpu, slot).x);
+    });
+}
+
 /// Cancel every pending load (scene departure, hot swap: SPEC-state-01 §6.11).
 pub fn cancel_pending() {
     with(|state| {
@@ -665,6 +714,7 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
     // The Load chord is read only on a non-CPU-operated, non-Nana fighter's callback.
     let load_chord = !nana && !reset_hub::cpu_operated(fighter) && LOAD_REQUEST.swap(false, Ordering::AcqRel);
     if !nana && !reset_hub::cpu_operated(fighter) {
+        apply_bound_post();
         if let Some(pair) = NAMED_LOAD.lock().take() {
             let accepted = with(|state| {
                 let accepted = state.machine.begin_temporary(pair);
@@ -1089,23 +1139,36 @@ unsafe fn apply_buff(raw: &Raw, role: Role) {
     }
 }
 
-/// The recording worker's start-save pose. Written by the fighter frame; this only reads atomics.
+/// The recording worker's live pose of a fighter. Written by the fighter frame; this only reads atomics.
 pub fn live_saved(slot: usize) -> SavedState {
-    let mut state = SavedState::never_saved();
+    live_pose(slot).saved()
+}
+
+/// A fighter's live pose (the record chord's start save, `recording_host::record_start`). Atomics only, no allocation;
+/// a slot never seen is kind −1.
+pub fn live_pose(slot: usize) -> crate::engine::rr_host::StartPose {
+    let unseen = crate::engine::rr_host::StartPose { fighter_kind: -1, situation_kind: 0, x: 0.0, y: 0.0, percent: 0.0, lr: 1.0 };
     if slot >= 2 {
-        return state;
+        return unseen;
     }
     let kind = LIVE_KIND[slot].load(Ordering::Acquire);
     if kind < 0 {
-        return state;
+        return unseen;
     }
-    state.fighter_kind = kind;
-    state.situation_kind = LIVE_SIT[slot].load(Ordering::Acquire);
-    state.x = f32::from_bits(LIVE_X[slot].load(Ordering::Acquire));
-    state.y = f32::from_bits(LIVE_Y[slot].load(Ordering::Acquire));
-    state.percent = f32::from_bits(LIVE_DMG[slot].load(Ordering::Acquire));
-    state.lr = f32::from_bits(LIVE_LR[slot].load(Ordering::Acquire));
-    state
+    crate::engine::rr_host::StartPose {
+        fighter_kind: kind,
+        situation_kind: LIVE_SIT[slot].load(Ordering::Acquire),
+        x: f32::from_bits(LIVE_X[slot].load(Ordering::Acquire)),
+        y: f32::from_bits(LIVE_Y[slot].load(Ordering::Acquire)),
+        percent: f32::from_bits(LIVE_DMG[slot].load(Ordering::Acquire)),
+        lr: f32::from_bits(LIVE_LR[slot].load(Ordering::Acquire)),
+    }
+}
+
+/// The fighter's module accessor its last frame ran with (0 before one ran, and after a scene departure or hot swap,
+/// `cancel_pending`). Game thread only.
+pub fn fighter_accessor(slot: usize) -> usize {
+    FIGHTER_ACC.get(slot).map_or(0, |cell| cell.load(Ordering::Acquire))
 }
 
 /// Read value-only fighter state without changing a numbered slot, requesting
@@ -1628,10 +1691,16 @@ fn take_captured(file: &mut SaveFile) {
         }
     }
     taken.sort_by_key(|record| record.as_ref().map_or(u64::MAX, |record| record.sequence));
+    let mut saved = None;
+    // A setup bind applied in this batch, and whether it restored (A) or only bound (Y).
+    let mut setup: Option<bool> = None;
     for CapturedRecord { sequence, role, slot, mut state, mii } in taken.into_iter().flatten() {
         if binding.as_ref().is_some_and(|job| job.sequence() < sequence) {
-            setups::apply_writer_bind(file, binding.take().unwrap());
+            let job = binding.take().unwrap();
+            setup = Some(setup.unwrap_or(false) || job.restore());
+            setups::apply_writer_bind(file, job);
         }
+        saved = Some(slot);
         state.marker = Marker::NoAction;
         // Configuration serializes only validated integer/byte values. Its
         // allocation-bearing JSON representation stays on this writer thread.
@@ -1642,7 +1711,25 @@ fn take_captured(file: &mut SaveFile) {
         };
         records[slot.min(records.len() - 1)] = state;
     }
-    if let Some(binding) = binding { setups::apply_writer_bind(file, binding); }
+    // The slot is the bound save: what Save put there is written into that file on the worker
+    // (`rr_host::write_saved`), with the Mii identities just attached.
+    let saved_pair = saved.map(|slot| slot.min(SLOTS - 1)).map(|slot| [file.player[slot].clone(), file.cpu[slot].clone()]);
+    if let Some(binding) = binding {
+        setup = Some(setup.unwrap_or(false) || binding.restore());
+        setups::apply_writer_bind(file, binding);
+    }
+    if let Some(pair) = saved_pair {
+        crate::engine::rr_host::save_captured(pair);
+    }
+    // Setups stay a separate library from save states (#69 (b)): a setup restore only moves the fighters, and the slot
+    // gets the bound save back once the restore has landed. A setup bound with Y stays in the slot as Load's target
+    // until the bound save changes (SETUP-Y-BIND).
+    if let Some(restore) = setup {
+        crate::engine::rr_host::setup_bound(restore);
+    }
+    if saved.is_some() || setup.is_some() {
+        crate::runtime::ui::worker::wake();
+    }
     let dropped = HANDOFF_DROPPED.swap(0, Ordering::Relaxed);
     if dropped != 0 {
         diagnostic(format_args!("[TrainingRooms] save-state records dropped before the writer took them: {dropped}"));
@@ -1711,6 +1798,16 @@ pub fn start_diag_triggers() {
                 crate::runtime::published::publish(&loaded.settings.menu, 0);
                 crate::runtime::compat::menu::apply_kept(&loaded.settings);
                 diagnostic(format_args!("[TrainingRooms] state diag_settings applied issues={}", loaded.issues.len()));
+            }
+        }
+        // Process memory held back from the discretionary admissions, in bytes (`process_memory::DIAG_RESERVE`).
+        if let Some(path) = FixedPath::<128>::in_root("diag-memory-reserve.req") {
+            if let Ok(text) = std::fs::read_to_string(path.as_str()) {
+                let _ = std::fs::remove_file(path.as_str());
+                let bytes = text.trim().parse::<u64>().unwrap_or(0);
+                crate::runtime::roster::character_roster::process_memory::DIAG_RESERVE
+                    .store(bytes, Ordering::Release);
+                diagnostic(format_args!("[TrainingRooms] state diag_memory_reserve bytes={bytes}"));
             }
         }
         for (name, action) in [

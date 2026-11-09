@@ -2,13 +2,18 @@
 //! No operation-CPU change persists beyond the synchronous native initialization.
 //! Inert when the standalone ssbu-cpu-pilot plugin is installed (see `init`).
 use std::convert::TryFrom;
+use std::fmt;
 use std::fs::{self, File};
 use std::io::Read;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
-use std::sync::Mutex;
 
+// hos-lock's Mutex: std's boxes its pthread mutex at the first lock, which the hooks below take (no heap in hooks).
+use hos_lock::Mutex;
 use serde::Deserialize;
 use serde_json::json;
+
+use crate::engine::compat::fixed::{FixedList, FixedQueue};
+use crate::engine::compat::json_line::{DebugStr, Json, Obj};
 use skyline::hooks::{getRegionAddress, Region};
 use smash::app::{lua_bind::*, BattleObjectModuleAccessor};
 use smash::lib::lua_const::*;
@@ -48,7 +53,6 @@ static EMIT_SLOT: AtomicUsize = AtomicUsize::new(usize::MAX);
 static EMIT_SCENE: AtomicU64 = AtomicU64::new(0);
 static STATE: Mutex<State> = Mutex::new(State {
     polls: 0,
-    seen: String::new(),
     active: None,
     pending_request: None,
     scene: None,
@@ -60,6 +64,66 @@ static STATE: Mutex<State> = Mutex::new(State {
     input_logged: false,
     menu: menu_session::Arbitration::new(),
 });
+
+// The fallback's file work runs on the heartbeat (`service`), never in a hook (no heap in hooks): the hook asks for a read of
+// request.json at its old cadence and takes what the heartbeat parsed and planned; it posts its receipts to the heartbeat.
+static READ_WANTED: AtomicBool = AtomicBool::new(false);
+static POSTED: Mutex<Option<Posted>> = Mutex::new(None);
+/// The run id of the last request posted: an old request cannot re-arm a new match (the heartbeat's own).
+static SEEN: Mutex<Option<RunId>> = Mutex::new(None);
+static OUTBOX: Mutex<FixedQueue<Outgoing, 8>> = Mutex::new(FixedQueue::new());
+
+/// A request read, validated and planned off the hook.
+struct Posted {
+    request: RequestFacts,
+    planned: Result<(u8, Option<u32>, Option<CommandRun>), &'static str>,
+}
+
+/// What the hook hands the heartbeat to write.
+enum Outgoing {
+    /// A request run's receipt, `armed` or its end; `trace` is the command trace at its end.
+    Receipt { facts: ReceiptFacts, reason: &'static str, trace: Vec<TraceRow> },
+    /// A request that ended before it armed; its planned command is freed off the hook.
+    Rejected { request: RequestFacts, reason: &'static str, stage: Option<StageSession>, command: Option<CommandRun> },
+    /// A planned command the hook did not take up.
+    Discard(CommandRun),
+}
+
+fn post(outgoing: Outgoing) {
+    let _ = OUTBOX.lock().push(outgoing);
+}
+
+/// A request's run id: `Request::kind` admits exactly 32 hex digits, kept without a heap string.
+#[derive(Clone, Copy, PartialEq, Eq)]
+struct RunId([u8; 32]);
+impl RunId {
+    fn of(run: &str) -> Option<Self> {
+        run.as_bytes().try_into().ok().map(Self)
+    }
+    fn as_str(&self) -> &str {
+        std::str::from_utf8(&self.0).unwrap_or("")
+    }
+}
+impl fmt::Display for RunId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl serde::Serialize for RunId {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+/// What the hook keeps of a request.
+#[derive(Clone, Copy)]
+struct RequestFacts {
+    run: RunId,
+    emit: bool,
+    pilot: Option<pilot_core::config::JsonConfig>,
+    scope: Scope,
+    local_slot: Option<u8>,
+}
 
 #[derive(Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -148,7 +212,6 @@ impl Request {
 
 struct State {
     polls: u32,
-    seen: String,
     active: Option<Run>,
     // Online only: validated requests must be visible before the phase-2 gate.
     pending_request: Option<RunPlan>,
@@ -162,8 +225,9 @@ struct State {
     menu: menu_session::Arbitration,
 }
 
+#[derive(Clone, Copy)]
 enum RunSource {
-    Request(Request),
+    Request(RequestFacts),
     Menu { level: u8 },
 }
 impl RunSource {
@@ -192,8 +256,8 @@ struct Run {
     source: RunSource,
     binding: Binding,
     observed_fim_mask: u8,
-    arming_cpu_flags: serde_json::Value,
-    stage_initialization: Option<serde_json::Value>,
+    arming_cpu_flags: ArmingFlags,
+    stage_initialization: Option<StageSession>,
     native_rank: u8,
     raw_frames: Option<u32>,
     command: Option<CommandRun>,
@@ -205,7 +269,7 @@ struct Run {
     random: [u8; 20],
     samples: u32,
     nonneutral: u32,
-    first_outputs: Vec<u64>,
+    first_outputs: FixedList<u64, 24>,
     start: Snapshot,
     end: Snapshot,
     flag_samples: u32,
@@ -222,8 +286,109 @@ struct CommandRun {
     direction: WalkDirection,
     first_command_frame: Option<u64>,
     last_status: Option<i32>,
-    trace: Vec<serde_json::Value>,
+    /// Reserved for `TRACE_LIMIT` rows when the request is planned (off the hook): a push never grows it.
+    trace: Vec<TraceRow>,
     trace_dropped: u32,
+}
+
+const TRACE_LIMIT: usize = 128;
+
+/// One command-trace row, kept as values; the receipt's JSON is built from it on the heartbeat.
+#[derive(Clone, Copy)]
+struct TraceRow {
+    game_frame: u64,
+    status: i32,
+    prev0: i32,
+    events: pilot_core::move_observer::Events,
+    phase: pilot_core::Phase,
+    output: pilot_core::Output,
+    p1_damage: f32,
+    cpu_damage: f32,
+}
+impl TraceRow {
+    fn value(&self) -> serde_json::Value {
+        let events = self.events;
+        json!({"game_frame":self.game_frame,"status":self.status,
+            "prev0":self.prev0,
+            "active_family":events.active_family.map(|f| format!("{f:?}")),
+            "completed":events.completed.map(|f| format!("{f:?}")),
+            "interrupted":events.interrupted.map(|f| format!("{f:?}")),
+            "phase":format!("{:?}",self.phase),
+            "output":format!("{:?}",self.output),"p1_damage":self.p1_damage,"cpu_damage":self.cpu_damage})
+    }
+}
+
+/// A request run's receipt facts (the run at arming or at its end), written to its file on the heartbeat.
+#[derive(Clone, Copy)]
+struct ReceiptFacts {
+    request: RequestFacts,
+    binding: Binding,
+    observed_fim_mask: u8,
+    arming_cpu_flags: ArmingFlags,
+    native_rank: u8,
+    stage_initialization: Option<StageSession>,
+    samples: u32,
+    nonneutral: u32,
+    first_outputs: FixedList<u64, 24>,
+    start: Snapshot,
+    end: Snapshot,
+    p1_id: u32,
+    cpu_id: u32,
+    flag_samples: u32,
+    flags_zero: bool,
+    last_ctrl_operation: u8,
+    last_service_operation: u8,
+    rank_restore_attempted: Option<bool>,
+    command: Option<CommandFacts>,
+}
+
+#[derive(Clone, Copy)]
+struct CommandFacts {
+    elapsed_game_frames: u64,
+    moves: u64,
+    hits: u64,
+    damage_dealt: f32,
+    phase: pilot_core::Phase,
+    tick: u64,
+    first_command_frame: Option<u64>,
+    direction: WalkDirection,
+    trace_dropped: u32,
+}
+
+impl ReceiptFacts {
+    fn of(run: &Run, request: RequestFacts) -> Self {
+        Self {
+            request,
+            binding: run.binding,
+            observed_fim_mask: run.observed_fim_mask,
+            arming_cpu_flags: run.arming_cpu_flags,
+            native_rank: run.native_rank,
+            stage_initialization: run.stage_initialization,
+            samples: run.samples,
+            nonneutral: run.nonneutral,
+            first_outputs: run.first_outputs,
+            start: run.start,
+            end: run.end,
+            p1_id: run.p1_id,
+            cpu_id: run.cpu_id,
+            flag_samples: run.flag_samples,
+            flags_zero: run.flags_zero,
+            last_ctrl_operation: run.last_ctrl_operation,
+            last_service_operation: run.last_service_operation,
+            rank_restore_attempted: run.rank_restore_attempted,
+            command: run.command.as_ref().map(|command| CommandFacts {
+                elapsed_game_frames: command.pilot.elapsed_game_frames(),
+                moves: command.pilot.completed_moves(),
+                hits: command.pilot.damaging_hits(),
+                damage_dealt: command.pilot.damage_dealt(),
+                phase: command.pilot.phase(),
+                tick: command.tick,
+                first_command_frame: command.first_command_frame,
+                direction: command.direction,
+                trace_dropped: command.trace_dropped,
+            }),
+        }
+    }
 }
 
 #[derive(Clone, Copy, serde::Serialize)]
@@ -320,23 +485,33 @@ struct StageSession {
     progress: stage_session::Session,
     intent: StageIntent,
 }
-impl StageSession {
-    fn evidence(self) -> serde_json::Value {
-        json!({"before":self.initial,"after_phase":self.last_phase,
-            "activation_binding":self.binding,
-            "status":format!("{:?}",self.progress.status),
-            "analysis_game_frames":self.progress.frames,"frame_limit":stage_session::LIMIT,
-            "shared_rng_restored_each_call":true,"d0_restored_each_call":true})
+/// A stage session's evidence: written straight into a hook's diag line, or converted for a receipt on the heartbeat. The fields
+/// are the sorted keys the fork's `json!` wrote.
+#[derive(Clone, Copy)]
+struct Evidence(StageSession);
+impl serde::Serialize for Evidence {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let s = self.0;
+        serde::Serialize::serialize(&Obj((
+            ("activation_binding", s.binding),
+            ("after_phase", s.last_phase),
+            ("analysis_game_frames", s.progress.frames),
+            ("before", s.initial),
+            ("d0_restored_each_call", true),
+            ("frame_limit", stage_session::LIMIT),
+            ("shared_rng_restored_each_call", true),
+            ("status", DebugStr(s.progress.status)),
+        )), serializer)
     }
 }
 
 fn clear_stage() {
     STAGE_GENERATION.fetch_add(1, Ordering::AcqRel);
-    *STAGE.lock().unwrap() = None;
+    *STAGE.lock() = None;
 }
 
 fn cancel_stage_initialization() {
-    let mut guard = STAGE.lock().unwrap();
+    let mut guard = STAGE.lock();
     // Losing pilot identity must not expose the extra phase-2 manager body to
     // shared RNG. A timeout also remains refused until the actual scene ends.
     if let Some(session) = guard.as_mut() {
@@ -346,13 +521,9 @@ fn cancel_stage_initialization() {
     }
 }
 
-fn stage_evidence(binding: Binding) -> Option<serde_json::Value> {
-    STAGE
-        .lock()
-        .unwrap()
-        .as_ref()
-        .filter(|s| s.binding.scene == binding.scene)
-        .map(|s| s.evidence())
+fn stage_evidence(binding: Binding) -> Option<StageSession> {
+    let stage = *STAGE.lock();
+    stage.filter(|s| s.binding.scene == binding.scene)
 }
 
 unsafe fn random_address() -> Option<usize> {
@@ -389,7 +560,7 @@ unsafe fn stage_admission(
     }
     let snapshot = stage_snapshot(n.service);
     let humans = human_only(local, peer, n.service);
-    let mut guard = STAGE.lock().unwrap();
+    let mut guard = STAGE.lock();
     if let Some(session) = guard.as_mut() {
         if session.progress.status == stage_session::Status::Invalid
             || session.binding.scene != binding.scene
@@ -468,7 +639,7 @@ unsafe fn stage_live(session: StageSession, svc: usize) -> Option<(usize, usize)
 }
 
 fn invalidate_stage(generation: u64) {
-    let mut guard = STAGE.lock().unwrap();
+    let mut guard = STAGE.lock();
     if let Some(session) = guard.as_mut().filter(|s| s.generation == generation) {
         session.progress.status = stage_session::Status::Invalid;
     }
@@ -482,7 +653,7 @@ unsafe fn ai_process_begin(svc: usize) {
         original!()(svc);
         return;
     }
-    let session = *STAGE.lock().unwrap();
+    let session = *STAGE.lock();
     let Some(session) = session else {
         original!()(svc);
         STAGE_CALLING.store(false, Ordering::Release);
@@ -513,7 +684,7 @@ unsafe fn ai_process_begin(svc: usize) {
     }
     let paused = menu_busy();
     let action = {
-        let mut guard = STAGE.lock().unwrap();
+        let mut guard = STAGE.lock();
         guard
             .as_mut()
             .filter(|s| s.generation == session.generation)
@@ -550,7 +721,7 @@ unsafe fn ai_process_begin(svc: usize) {
         completed.progress.status = stage_session::Status::Ready;
     }
     if same_service && same_random && stage_live(completed, svc).is_some() {
-        let mut guard = STAGE.lock().unwrap();
+        let mut guard = STAGE.lock();
         if let Some(s) = guard
             .as_mut()
             .filter(|s| s.generation == session.generation)
@@ -788,28 +959,66 @@ unsafe fn pair(
 
 // Diagnostics are inside the existing default-off cpu-pilot-probe feature.
 // State changes only, <=32 rows per scene, no per-frame filesystem writes.
-fn gate(state: &mut State, name: &'static str, detail: impl FnOnce() -> serde_json::Value) {
-    // Reserve one row for the first valid pair snapshot; no JSON allocation
-    // or formatting occurs for an unchanged gate or an exhausted cap.
+// The line is typed JSON written into the diag ring (`Json`): no `serde_json::Value`, no heap in the hook.
+fn gate<D: serde::Serialize>(state: &mut State, name: &'static str, detail: impl FnOnce() -> D) {
+    // Reserve one row for the first valid pair snapshot; no JSON
+    // formatting occurs for an unchanged gate or an exhausted cap.
     if name == state.last_gate || state.diagnostic_rows >= 31 {
         return;
     }
     state.last_gate = name;
     state.diagnostic_rows += 1;
-    let value = json!({"gate": name, "detail": detail()});
-    crate::engine::compat::logging::diagnostic(format_args!("[CpuPilot] admission {value}"));
+    crate::engine::compat::logging::diagnostic(format_args!(
+        "[CpuPilot] admission {}",
+        Json(Obj((("detail", detail()), ("gate", name))))
+    ));
 }
 
-unsafe fn entry_details(value: Entry) -> serde_json::Value {
+/// An entry's controller and AI reads, kept as values (the keys the fork's `json!` wrote, sorted).
+#[derive(Clone, Copy, serde::Serialize)]
+struct EntryDetails {
+    ai: Option<usize>,
+    ai_flags: Option<u32>,
+    ai_mode: Option<u8>,
+    ai_rank: Option<i32>,
+    ai_slot: Option<i32>,
+    boid: u32,
+    ctrl: usize,
+    ctrl_loaded: u8,
+    ctrl_operation: u8,
+    entry: i32,
+    info_operation: u8,
+    kind: i32,
+    mirror_slot: i32,
+    slot: i32,
+}
+
+/// The pair's details at arming, for a request run's receipts.
+#[derive(Clone, Copy, serde::Serialize)]
+struct ArmingFlags {
+    local: EntryDetails,
+    peer: EntryDetails,
+    service_slot_operation: u8,
+}
+
+unsafe fn entry_details(value: Entry) -> EntryDetails {
     let ai = ptr(value.ctrl + 0x58);
-    json!({"entry":value.index,"boid":value.boid,"kind":value.kind,
-        "slot":value.slot,"mirror_slot":value.mirror_slot,"ctrl":value.ctrl,
-        "ctrl_loaded":read::<u8>(value.ctrl+0x69),"ctrl_operation":read::<u8>(value.ctrl+0x70),
-        "info_operation":read::<u8>(value.info+0x92),"ai":ai,
-        "ai_slot":ai.map(|ai|read::<i32>(ai+0x160)),
-        "ai_mode":ai.map(|ai|read::<u8>(ai+0xc08)),
-        "ai_rank":ai.map(|ai|read::<i32>(ai+0xc0c)),
-        "ai_flags":ai.map(|ai|read::<u32>(ai+0xc44))})
+    EntryDetails {
+        ai,
+        ai_flags: ai.map(|ai| read::<u32>(ai + 0xc44)),
+        ai_mode: ai.map(|ai| read::<u8>(ai + 0xc08)),
+        ai_rank: ai.map(|ai| read::<i32>(ai + 0xc0c)),
+        ai_slot: ai.map(|ai| read::<i32>(ai + 0x160)),
+        boid: value.boid,
+        ctrl: value.ctrl,
+        ctrl_loaded: read::<u8>(value.ctrl + 0x69),
+        ctrl_operation: read::<u8>(value.ctrl + 0x70),
+        entry: value.index,
+        info_operation: read::<u8>(value.info + 0x92),
+        kind: value.kind,
+        mirror_slot: value.mirror_slot,
+        slot: value.slot,
+    }
 }
 
 unsafe fn pair_diagnostic(
@@ -835,20 +1044,28 @@ unsafe fn pair_diagnostic(
             .map(|p| (*p).battle_object_id);
     let legacy_cpu = crate::runtime::compat::common::try_get_module_accessor(crate::runtime::compat::consts::FighterId::CPU)
         .map(|p| (*p).battle_object_id);
-    let value = json!({"read_only":true,"binding":binding,"callback_boid":callback_boid,
-        "legacy_accessor_pair":{"player":legacy_player,"cpu":legacy_cpu},
-        "observed_fim_mask":FIM_MASK.load(Ordering::Acquire),
-        "manager_ready_go":FighterManager::is_ready_go(manager),
-        "manager_result":FighterManager::is_result_mode(manager),
-        "entry_count":FighterManager::entry_count(manager),
-        "local":entry_details(local),"peer":entry_details(peer),
-        "service_slot_operation":service.map(|p|read::<u8>(p+0x80+usize::from(binding.slot&7))),
-        "service_mode":service.map(|p|read::<i32>(p+0x1fc)),
-        "stage_ai":service.map(|p|stage_snapshot(p)),
-        "configured_css_entry1":{"byte78":read::<u8>(base+0x52c5730+0x260+0x78),
-            "byte79":read::<u8>(base+0x52c5730+0x260+0x79)},
-        "level9":"unmeasured_mode0_candidate100_not_admitted","level1":"refused_unmeasured"});
-    crate::engine::compat::logging::diagnostic(format_args!("[CpuPilot] first_pair {value}"));
+    let value = Obj((
+        ("binding", binding),
+        ("callback_boid", callback_boid),
+        ("configured_css_entry1", Obj((
+            ("byte78", read::<u8>(base + 0x52c5730 + 0x260 + 0x78)),
+            ("byte79", read::<u8>(base + 0x52c5730 + 0x260 + 0x79)),
+        ))),
+        ("entry_count", FighterManager::entry_count(manager)),
+        ("legacy_accessor_pair", Obj((("cpu", legacy_cpu), ("player", legacy_player)))),
+        ("level1", "refused_unmeasured"),
+        ("level9", "unmeasured_mode0_candidate100_not_admitted"),
+        ("local", entry_details(local)),
+        ("manager_ready_go", FighterManager::is_ready_go(manager)),
+        ("manager_result", FighterManager::is_result_mode(manager)),
+        ("observed_fim_mask", FIM_MASK.load(Ordering::Acquire)),
+        ("peer", entry_details(peer)),
+        ("read_only", true),
+        ("service_mode", service.map(|p| read::<i32>(p + 0x1fc))),
+        ("service_slot_operation", service.map(|p| read::<u8>(p + 0x80 + usize::from(binding.slot & 7)))),
+        ("stage_ai", service.map(|p| stage_snapshot(p))),
+    ));
+    crate::engine::compat::logging::diagnostic(format_args!("[CpuPilot] first_pair {}", Json(value)));
 }
 
 fn reset_admission(state: &mut State, scene: Option<Scene>, result: bool) {
@@ -926,7 +1143,7 @@ unsafe fn plan(
                     direction,
                     first_command_frame: None,
                     last_status: None,
-                    trace: Vec::with_capacity(128),
+                    trace: Vec::with_capacity(TRACE_LIMIT),
                     trace_dropped: 0,
                 }),
             ))
@@ -934,17 +1151,19 @@ unsafe fn plan(
     }
 }
 
-fn command_metrics(command: &CommandRun) -> serde_json::Value {
-    json!({"elapsed_game_frames":command.pilot.elapsed_game_frames(),
-        "moves":command.pilot.completed_moves(),"hits":command.pilot.damaging_hits(),
-        "damage_dealt":command.pilot.damage_dealt(),"phase":format!("{:?}",command.pilot.phase()),
+fn command_metrics(command: &CommandFacts, trace: &[TraceRow]) -> serde_json::Value {
+    json!({"elapsed_game_frames":command.elapsed_game_frames,
+        "moves":command.moves,"hits":command.hits,
+        "damage_dealt":command.damage_dealt,"phase":format!("{:?}",command.phase),
         "simulation_tick":command.tick,"first_command_frame":command.first_command_frame,
         "walk_direction":command.direction.name(),
-        "trace":command.trace,"trace_limit":128,"trace_dropped":command.trace_dropped})
+        "trace":trace.iter().map(TraceRow::value).collect::<Vec<_>>(),"trace_limit":TRACE_LIMIT,"trace_dropped":command.trace_dropped})
 }
 
-fn publish(run: &Run, reason: &str) {
-    let request = match &run.source {
+/// A run's receipt. A menu run writes its diagnostic line here; a request run's receipt goes to the heartbeat (`service` writes
+/// the file and the line), with the command trace when the run has ended.
+fn publish(run: &Run, reason: &'static str, trace: Vec<TraceRow>) {
+    let request = match run.source {
         RunSource::Request(request) => request,
         RunSource::Menu { level } => {
             // Menu sessions are not synthetic automation requests or receipts.
@@ -956,11 +1175,18 @@ fn publish(run: &Run, reason: &str) {
             return;
         }
     };
-    let value = json!({"run":request.run,"event":reason,
+    post(Outgoing::Receipt { facts: ReceiptFacts::of(run, request), reason, trace });
+}
+
+/// A request run's receipt as the fork wrote it (on the heartbeat).
+#[inline(never)] // stream/stack: the receipt's locals live only while it is built, not under the file write
+fn receipt_value(run: &ReceiptFacts, reason: &str, trace: &[TraceRow]) -> serde_json::Value {
+    let request = run.request;
+    json!({"run":request.run,"event":reason,
         "scope":request.scope,"binding":run.binding,"observed_fim_mask":run.observed_fim_mask,
         "arming_cpu_flags":run.arming_cpu_flags,"emit":request.emit,"native_rank":run.native_rank,
-        "stage_initialization":run.stage_initialization,
-        "samples":run.samples,"nonneutral":run.nonneutral,"first_outputs":run.first_outputs,
+        "stage_initialization":run.stage_initialization.map(Evidence),
+        "samples":run.samples,"nonneutral":run.nonneutral,"first_outputs":&*run.first_outputs,
         "start_x":run.start.p1_x,"end_x":run.end.p1_x,
         "start_damage":run.start.p1_damage,"end_damage":run.end.p1_damage,
         "start":run.start,"end":run.end,"p1_id":run.p1_id,"cpu_id":run.cpu_id,
@@ -973,15 +1199,90 @@ fn publish(run: &Run, reason: &str) {
         "shared_rng_restored_each_call":true,"pilot":request.pilot,
         "rank_restore_attempted":run.rank_restore_attempted,
         "termination_class":if reason == "replaced" {"cancel"} else {reason},
-        "command":run.command.as_ref().map(command_metrics)});
-    let path = format!("{ROOT}/{}-{reason}.json", request.run);
+        "command":run.command.as_ref().map(|command| command_metrics(command, trace))})
+}
+
+#[inline(never)] // stream/stack, as `receipt_value`
+fn rejected_value(request: RequestFacts, reason: &str, stage: Option<StageSession>) -> serde_json::Value {
+    json!({"run":request.run,"event":reason,"scope":request.scope,
+        "armed":false,"samples":0,"stage_initialization":stage.map(Evidence)})
+}
+
+fn write_receipt(run: RunId, reason: &str, value: &serde_json::Value) {
+    let path = format!("{ROOT}/{run}-{reason}.json");
     if let Err(error) = fs::write(path, value.to_string()) {
         crate::engine::compat::logging::diagnostic(format_args!("[CpuPilot] result_write_failed {error}"));
     }
     crate::engine::compat::logging::diagnostic(format_args!("[CpuPilot] {value}"));
 }
 
-unsafe fn finish(mut run: Run, native: Option<Native>, reason: &str) {
+/// The fallback's file work, on the heartbeat (every 50 ms; never in a hook): the receipts the hook posted, then a read of
+/// request.json when the hook asked for one (its old cadence: a scene's first admitted frame, then every 60th).
+pub(crate) fn service() {
+    if !installed() {
+        return;
+    }
+    while write_next() {}
+    let dropped = OUTBOX.lock().take_refused();
+    if dropped > 0 {
+        crate::engine::compat::logging::diagnostic(format_args!("[CpuPilot] receipts_dropped={dropped} (outbox full)"));
+    }
+    if READ_WANTED.swap(false, Ordering::AcqRel) {
+        read_request();
+    }
+}
+
+/// Write the oldest receipt the hook posted; false when there is none.
+fn write_next() -> bool {
+    let Some((run, reason, value)) = next_receipt() else { return false };
+    write_receipt(run, reason, &value);
+    true
+}
+
+/// The oldest receipt the hook posted, as its JSON; what it held is freed here, off the hook.
+#[inline(never)] // stream/stack: a receipt's facts live only in this frame, never under the file write
+fn next_receipt() -> Option<(RunId, &'static str, serde_json::Value)> {
+    loop {
+        let next = OUTBOX.lock().pop();
+        match next? {
+            Outgoing::Receipt { facts, reason, trace } => {
+                return Some((facts.request.run, reason, receipt_value(&facts, reason, &trace)));
+            }
+            Outgoing::Rejected { request, reason, stage, command } => {
+                drop(command);
+                return Some((request.run, reason, rejected_value(request, reason, stage)));
+            }
+            Outgoing::Discard(command) => drop(command),
+        }
+    }
+}
+
+/// Read, validate and plan a new request (one whose run id differs from the last one posted) for the hook to take.
+#[inline(never)] // stream/stack, as `receipt_value`
+fn read_request() {
+    let Some((request, kind)) = request() else { return };
+    let Some(run) = RunId::of(&request.run) else { return };
+    {
+        let mut seen = SEEN.lock();
+        if *seen == Some(run) {
+            return;
+        }
+        *seen = Some(run);
+    }
+    let facts = RequestFacts {
+        run,
+        emit: request.emit,
+        pilot: request.pilot,
+        scope: request.scope,
+        local_slot: request.local_slot,
+    };
+    // SAFETY: `plan` reads the game's rank table under the main base `init` validated (static data, any thread).
+    let planned = unsafe { plan(kind, &request.run) };
+    let replaced = POSTED.lock().replace(Posted { request: facts, planned });
+    drop(replaced);
+}
+
+unsafe fn finish(mut run: Run, native: Option<Native>, reason: &'static str) {
     clear_output();
     if let Some(command) = run.command.as_mut() {
         if reason == "identity_changed" || reason == "scene_exit" || reason == "match_ended" {
@@ -1002,7 +1303,8 @@ unsafe fn finish(mut run: Run, native: Option<Native>, reason: &str) {
     } else {
         run.rank_restore_attempted = Some(false);
     }
-    publish(&run, reason);
+    let trace = run.command.as_mut().map_or_else(Vec::new, |command| std::mem::take(&mut command.trace));
+    publish(&run, reason, trace);
 }
 
 fn pause(run: &mut Run) {
@@ -1042,43 +1344,39 @@ fn request() -> Option<(Request, RequestKind)> {
     Some((request, kind))
 }
 
-fn reject_pending(state: &mut State, reason: &str) {
+fn reject_pending(state: &mut State, reason: &'static str) {
     if let Some(RunPlan {
         source: RunSource::Request(request),
+        command,
         ..
     }) = state.pending_request.take()
     {
-        let evidence = state.observed_binding.and_then(stage_evidence);
-        let value = json!({"run":request.run,"event":reason,"scope":request.scope,
-            "armed":false,"samples":0,"stage_initialization":evidence});
-        if let Err(error) = fs::write(
-            format!("{ROOT}/{}-{reason}.json", request.run),
-            value.to_string(),
-        ) {
-            crate::engine::compat::logging::diagnostic(format_args!("[CpuPilot] result_write_failed {error}"));
-        }
-        crate::engine::compat::logging::diagnostic(format_args!("[CpuPilot] {value}"));
+        let stage = state.observed_binding.and_then(stage_evidence);
+        post(Outgoing::Rejected { request, reason, stage, command });
     }
 }
 
 unsafe fn poll_request(state: &mut State, binding: Binding, n: Native) {
     state.polls = state.polls.wrapping_add(1);
-    if state.polls % 60 != 1 {
-        return;
+    if state.polls % 60 == 1 {
+        // The heartbeat reads the file (`service`); the hook takes what it planned.
+        READ_WANTED.store(true, Ordering::Release);
     }
-    let Some((request, kind)) = request().filter(|(r, _)| r.run != state.seen) else {
+    let Some(Posted { request, planned }) = POSTED.try_lock().and_then(|mut posted| posted.take()) else {
         return;
     };
-    state.seen = request.run.clone();
     if request.scope != binding.scene.scope
         || request.local_slot.is_some_and(|slot| slot != binding.slot)
     {
+        if let Ok((_, _, Some(command))) = planned {
+            post(Outgoing::Discard(command));
+        }
         gate(
             state,
             "request_scope_or_slot_mismatch",
-            || json!({"run":request.run,"scope":request.scope,"expected_slot":request.local_slot,"binding":binding}),
+            || Obj((("binding", binding), ("expected_slot", request.local_slot), ("run", request.run), ("scope", request.scope))),
         );
-    } else if let Ok((rank, raw_frames, command)) = plan(kind, &request.run) {
+    } else if let Ok((rank, raw_frames, command)) = planned {
         if let Some(previous) = state.active.take() {
             finish(previous, Some(n), "replaced");
         }
@@ -1094,7 +1392,11 @@ unsafe fn poll_request(state: &mut State, binding: Binding, n: Native) {
         gate(
             state,
             "command_level_or_table_refused",
-            || json!({"run":request.run,"level":request.pilot.map(|p|p.level),"rank_mapping":"verified_css_mode0_endpoints_and_native_ladder"}),
+            || Obj((
+                ("level", request.pilot.map(|p| p.level)),
+                ("rank_mapping", "verified_css_mode0_endpoints_and_native_ladder"),
+                ("run", request.run),
+            )),
         );
     }
 }
@@ -1156,14 +1458,17 @@ unsafe fn command_output(
         || events.interrupted.is_some()
         || previous_phase != command.pilot.phase()
     {
-        if command.trace.len() < 128 {
-            command.trace.push(json!({"game_frame":command.tick,"status":status,
-                "prev0":StatusModule::prev_status_kind(module,0),
-                "active_family":events.active_family.map(|f| format!("{f:?}")),
-                "completed":events.completed.map(|f| format!("{f:?}")),
-                "interrupted":events.interrupted.map(|f| format!("{f:?}")),
-                "phase":format!("{:?}",command.pilot.phase()),
-                "output":format!("{output:?}"),"p1_damage":end.p1_damage,"cpu_damage":end.cpu_damage}));
+        if command.trace.len() < TRACE_LIMIT {
+            command.trace.push(TraceRow {
+                game_frame: command.tick,
+                status,
+                prev0: StatusModule::prev_status_kind(module, 0),
+                events,
+                phase: command.pilot.phase(),
+                output,
+                p1_damage: end.p1_damage,
+                cpu_damage: end.cpu_damage,
+            });
         } else {
             command.trace_dropped = command.trace_dropped.saturating_add(1);
         }
@@ -1197,8 +1502,11 @@ unsafe fn arm(
         source,
         binding,
         observed_fim_mask: mask,
-        arming_cpu_flags: json!({"local":entry_details(local),"peer":entry_details(peer),
-            "service_slot_operation":read::<u8>(n.service+0x80+usize::from(n.slot&7))}),
+        arming_cpu_flags: ArmingFlags {
+            local: entry_details(local),
+            peer: entry_details(peer),
+            service_slot_operation: read::<u8>(n.service + 0x80 + usize::from(n.slot & 7)),
+        },
         stage_initialization: stage_evidence(binding),
         native_rank: rank,
         raw_frames,
@@ -1211,7 +1519,7 @@ unsafe fn arm(
         random,
         samples: 0,
         nonneutral: 0,
-        first_outputs: Vec::with_capacity(24),
+        first_outputs: FixedList::new(0),
         start,
         end: start,
         flag_samples: 0,
@@ -1221,7 +1529,7 @@ unsafe fn arm(
         rank_restore_attempted: None,
     };
     sample_flags(&mut run, n);
-    publish(&run, "armed");
+    publish(&run, "armed", Vec::new());
     run
 }
 
@@ -1230,19 +1538,19 @@ pub(crate) unsafe fn on_frame(module: &mut BattleObjectModuleAccessor) {
         return;
     }
     let scene = current_scene();
-    let mut state = STATE.lock().unwrap();
+    let mut state = STATE.lock();
     let result = scene.is_some() && result_mode() == Some(true);
     reset_admission(&mut state, scene, result);
     let Some(scene) = scene else {
         gate(
             &mut state,
             "scope_exit",
-            || json!({"mode":format!("{:?}",crate::runtime::lobby::game_mode::current())}),
+            || Obj((("mode", DebugStr(crate::runtime::lobby::game_mode::current())),)),
         );
         return;
     };
     if result {
-        gate(&mut state, "manager_result", || json!({"scene":scene}));
+        gate(&mut state, "manager_result", || Obj((("scene", scene),)));
         return;
     }
     if !crate::runtime::compat::common::is_fighter(module) {
@@ -1259,7 +1567,7 @@ pub(crate) unsafe fn on_frame(module: &mut BattleObjectModuleAccessor) {
         } else {
             clear_output();
         }
-        gate(&mut state, "menu_busy", || json!({"scene":scene}));
+        gate(&mut state, "menu_busy", || Obj((("scene", scene),)));
         return;
     }
     let Some(manager) = manager() else {
@@ -1269,7 +1577,7 @@ pub(crate) unsafe fn on_frame(module: &mut BattleObjectModuleAccessor) {
         if let Some(run) = state.active.take() {
             finish(run, None, "identity_changed");
         }
-        gate(&mut state, "manager_pointer", || json!({"scene":scene}));
+        gate(&mut state, "manager_pointer", || Obj((("scene", scene),)));
         return;
     };
     let mask = FIM_MASK.load(Ordering::Acquire) as u8;
@@ -1286,7 +1594,7 @@ pub(crate) unsafe fn on_frame(module: &mut BattleObjectModuleAccessor) {
             gate(
                 &mut state,
                 reason,
-                || json!({"scene":scene,"fim_mask":mask}),
+                || Obj((("fim_mask", mask), ("scene", scene))),
             );
             return;
         }
@@ -1313,7 +1621,7 @@ pub(crate) unsafe fn on_frame(module: &mut BattleObjectModuleAccessor) {
         gate(
             &mut state,
             "pair_identity_changed",
-            || json!({"binding":binding}),
+            || Obj((("binding", binding),)),
         );
         return;
     }
@@ -1340,7 +1648,7 @@ pub(crate) unsafe fn on_frame(module: &mut BattleObjectModuleAccessor) {
             gate(
                 &mut state,
                 "binding_changed",
-                || json!({"binding":binding,"fim_mask":mask}),
+                || Obj((("binding", binding), ("fim_mask", mask))),
             );
             return;
         }
@@ -1354,7 +1662,7 @@ pub(crate) unsafe fn on_frame(module: &mut BattleObjectModuleAccessor) {
             gate(
                 &mut state,
                 "current_object_filter",
-                || json!({"actual":module.battle_object_id,"expected":binding.local_boid}),
+                || Obj((("actual", module.battle_object_id), ("expected", binding.local_boid))),
             );
         }
         return;
@@ -1365,7 +1673,7 @@ pub(crate) unsafe fn on_frame(module: &mut BattleObjectModuleAccessor) {
             clear_output();
             reject_pending(&mut state, "identity_changed");
             cancel_stage_initialization();
-            gate(&mut state, reason, || json!({"binding":binding}));
+            gate(&mut state, reason, || Obj((("binding", binding),)));
             return;
         }
     };
@@ -1402,7 +1710,7 @@ pub(crate) unsafe fn on_frame(module: &mut BattleObjectModuleAccessor) {
         gate(
             &mut state,
             "manager_not_ready_go",
-            || json!({"binding":binding}),
+            || Obj((("binding", binding),)),
         );
         return;
     }
@@ -1424,7 +1732,7 @@ pub(crate) unsafe fn on_frame(module: &mut BattleObjectModuleAccessor) {
             match measured_ranks(level) {
                 Ok(_) => StageIntent::Menu,
                 Err(reason) => {
-                    gate(&mut state, reason, || json!({"menu_level":level}));
+                    gate(&mut state, reason, || Obj((("menu_level", level),)));
                     StageIntent::None
                 }
             }
@@ -1435,7 +1743,7 @@ pub(crate) unsafe fn on_frame(module: &mut BattleObjectModuleAccessor) {
             Ok(Some(session)) if session.progress.status == stage_session::Status::Failed => {
                 clear_output();
                 reject_pending(&mut state, "stage_ai_not_ready");
-                gate(&mut state, "stage_ai_not_ready", || session.evidence());
+                gate(&mut state, "stage_ai_not_ready", || Evidence(session));
                 return;
             }
             Err(reason) => {
@@ -1445,12 +1753,12 @@ pub(crate) unsafe fn on_frame(module: &mut BattleObjectModuleAccessor) {
                 }
                 clear_stage();
                 clear_output();
-                gate(&mut state, reason, || json!({"binding":binding}));
+                gate(&mut state, reason, || Obj((("binding", binding),)));
                 return;
             }
             Ok(Some(session)) if session.progress.status == stage_session::Status::Pending => {
                 clear_output();
-                gate(&mut state, "stage_ai_pending", || session.evidence());
+                gate(&mut state, "stage_ai_pending", || Evidence(session));
                 return;
             }
             // ready() below remains the sole native AI readiness gate. This
@@ -1492,13 +1800,13 @@ pub(crate) unsafe fn on_frame(module: &mut BattleObjectModuleAccessor) {
         } else {
             clear_output();
         }
-        gate(&mut state, reason, || json!({"binding":binding}));
+        gate(&mut state, reason, || Obj((("binding", binding),)));
         return;
     }
     gate(
         &mut state,
         "admission_ready",
-        || json!({"binding":binding,"fim_mask":mask,"stage_initialization":stage_evidence(binding)}),
+        || Obj((("binding", binding), ("fim_mask", mask), ("stage_initialization", stage_evidence(binding).map(Evidence)))),
     );
     if scene.scope == Scope::OfflineTraining {
         // Preserve offline request polling after every original ready gate.
@@ -1528,7 +1836,7 @@ pub(crate) unsafe fn on_frame(module: &mut BattleObjectModuleAccessor) {
                         module,
                     ));
                 }
-                Err(reason) => gate(&mut state, reason, || json!({"menu_level":level})),
+                Err(reason) => gate(&mut state, reason, || Obj((("menu_level", level),))),
             }
         }
     }
@@ -1593,7 +1901,7 @@ pub(crate) unsafe fn input(player_idx: i32, out: *mut MappedInputs) {
     }
     let scene = current_scene();
     let result = scene.is_some() && result_mode() == Some(true);
-    let mut state_guard = STATE.try_lock().ok();
+    let mut state_guard = STATE.try_lock();
     if let Some(state) = state_guard.as_mut() {
         reset_admission(state, scene, result);
     }
@@ -1628,7 +1936,7 @@ pub(crate) unsafe fn input(player_idx: i32, out: *mut MappedInputs) {
     let mask = FIM_MASK.load(Ordering::Acquire);
     if scene.scope == Scope::LanOnline1v1 && mask.count_ones() != 1 {
         clear_output();
-        if let Ok(mut state) = STATE.try_lock() {
+        if let Some(mut state) = STATE.try_lock() {
             reject_pending(&mut state, "identity_changed");
             cancel_stage_initialization();
             if let Some(run) = state.active.take() {
@@ -1639,7 +1947,7 @@ pub(crate) unsafe fn input(player_idx: i32, out: *mut MappedInputs) {
     }
     if menu_busy() {
         clear_output();
-        if let Ok(mut state) = STATE.try_lock() {
+        if let Some(mut state) = STATE.try_lock() {
             if let Some(run) = state.active.as_mut() {
                 pause(run);
             }

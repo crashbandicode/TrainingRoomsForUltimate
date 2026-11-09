@@ -12,7 +12,139 @@ const NOTICE_ID: u8 = 0x2C;
 const NOTICE_COLOR: [u8; 4] = [255, 255, 255, 255];
 
 pub fn on_chords(record: bool, play_player: bool, play_cpu: bool) {
+    // A Record that starts keeps both fighters as they are now: the start save is where the macro starts
+    // (RECORDING-REDESIGN, "Start save"), and the macro keeps the recorded role's speed (PLAY-MOMENTUM).
+    if record && rr_host::capture_role() == 0 {
+        // SAFETY: the chord step runs on the game thread (the AI epilogue), where the fighters' accessors are live.
+        rr_host::note_record_start(unsafe { record_start() });
+    }
     rr_host::on_chords(record, play_player, play_cpu);
+}
+
+/// Both fighters' live pose and summed speed. Atomics and kinetic reads only; no allocation.
+///
+/// # Safety
+/// Game thread.
+unsafe fn record_start() -> rr_host::RecordStart {
+    rr_host::RecordStart {
+        poses: [super::states::live_pose(0), super::states::live_pose(1)],
+        speeds: [live_speed(0), live_speed(1)],
+    }
+}
+
+/// A fighter's summed speed (`KineticModule::get_sum_speed_x/y`, the named layer's `snapshot_start` reading); at rest
+/// before its first frame. The kinetic rows are the named-macro unit's (R2-1): read only once that unit's closure passed.
+///
+/// # Safety
+/// Game thread.
+unsafe fn live_speed(slot: usize) -> (f32, f32) {
+    use smash::app::{lua_bind::KineticModule, BattleObjectModuleAccessor};
+    use smash::lib::lua_const::KINETIC_ENERGY_RESERVE_ATTRIBUTE_MAIN;
+    let accessor = super::states::fighter_accessor(slot);
+    if !crate::runtime::macros::ready() || accessor == 0 {
+        return (0.0, 0.0);
+    }
+    let module = accessor as *mut BattleObjectModuleAccessor;
+    let x = KineticModule::get_sum_speed_x(module, *KINETIC_ENERGY_RESERVE_ATTRIBUTE_MAIN);
+    let y = KineticModule::get_sum_speed_y(module, *KINETIC_ENERGY_RESERVE_ATTRIBUTE_MAIN);
+    // A start state must be finite (`StartState::validate`), or the whole recording is refused.
+    let finite = |v: f32| if v.is_finite() { v } else { 0.0 };
+    (finite(x), finite(y))
+}
+
+/// PLAY-MOMENTUM (primary 2026-11-08 23:03Z, reading (b)): on the game frame a run's first input after its warp is
+/// injected, the playing role gets the start speed it is owed (`rr_host::take_start_speed`): the recorded speed with
+/// "Keep recorded speed", zero with "Start at rest". As the named layer's `apply_ready_speed`: x relative to the facing it
+/// was recorded with; in the air the control energy's x and the gravity's y, on the ground the motion energy's x.
+///
+/// # Safety
+/// Game thread.
+unsafe fn apply_start_speed(role: crate::engine::library::Role) {
+    use smash::app::{lua_bind::*, BattleObjectModuleAccessor};
+    use smash::lib::lua_const::*;
+    let Some(start) = rr_host::take_start_speed(role) else { return };
+    // The kinetic rows (kinetic_get_energy and the two set_speed thunks) are the named-macro unit's (R2-1).
+    if !crate::runtime::macros::ready() {
+        return;
+    }
+    let slot = match role {
+        crate::engine::library::Role::Player => 0,
+        crate::engine::library::Role::Cpu => 1,
+    };
+    let accessor = super::states::fighter_accessor(slot);
+    if accessor == 0 {
+        return;
+    }
+    let module = accessor as *mut BattleObjectModuleAccessor;
+    let x = start.speed.0 * start.facing * PostureModule::lr(module);
+    let air = StatusModule::situation_kind(module) == *SITUATION_KIND_AIR;
+    if air {
+        set_normal_speed(module, *FIGHTER_KINETIC_ENERGY_ID_CONTROL, x);
+        let gravity = KineticModule::get_energy(module, *FIGHTER_KINETIC_ENERGY_ID_GRAVITY)
+            as *mut smash::app::FighterKineticEnergyGravity;
+        if !gravity.is_null() {
+            FighterKineticEnergyGravity::set_speed(gravity, start.speed.1);
+        }
+    } else {
+        set_normal_speed(module, *FIGHTER_KINETIC_ENERGY_ID_MOTION, x);
+    }
+    #[cfg(feature = "diag")]
+    {
+        crate::runtime::diag_log::diagnostic(format_args!(
+            "[RecordingHost] start_speed slot={slot} air={air} x={x} y={} pos_x={} sum_x={} sum_y={}",
+            start.speed.1,
+            PostureModule::pos_x(module),
+            KineticModule::get_sum_speed_x(module, *KINETIC_ENERGY_RESERVE_ATTRIBUTE_MAIN),
+            KineticModule::get_sum_speed_y(module, *KINETIC_ENERGY_RESERVE_ATTRIBUTE_MAIN)
+        ));
+        OBSERVE[slot].store(8, core::sync::atomic::Ordering::Relaxed);
+    }
+}
+
+/// Diag build: how many more injected frames of each role log their motion after a start speed (the PLAY-MOMENTUM Eden
+/// row compares "Keep recorded speed" with "Start at rest").
+#[cfg(feature = "diag")]
+static OBSERVE: [core::sync::atomic::AtomicU8; 2] = [const { core::sync::atomic::AtomicU8::new(0) }; 2];
+
+/// Diag build: one motion line of the role's run while `OBSERVE` lasts.
+///
+/// # Safety
+/// Game thread.
+#[cfg(feature = "diag")]
+unsafe fn observe_start(role: crate::engine::library::Role) {
+    use smash::app::{lua_bind::*, BattleObjectModuleAccessor};
+    use smash::lib::lua_const::KINETIC_ENERGY_RESERVE_ATTRIBUTE_MAIN;
+    let slot = match role {
+        crate::engine::library::Role::Player => 0,
+        crate::engine::library::Role::Cpu => 1,
+    };
+    let left = OBSERVE[slot].load(core::sync::atomic::Ordering::Relaxed);
+    let accessor = super::states::fighter_accessor(slot);
+    if left == 0 || accessor == 0 || !crate::runtime::macros::ready() {
+        return;
+    }
+    OBSERVE[slot].store(left - 1, core::sync::atomic::Ordering::Relaxed);
+    let module = accessor as *mut BattleObjectModuleAccessor;
+    crate::runtime::diag_log::diagnostic(format_args!(
+        "[RecordingHost] start_observed slot={slot} n={} pos_x={} sum_x={} status={}",
+        9 - left,
+        PostureModule::pos_x(module),
+        KineticModule::get_sum_speed_x(module, *KINETIC_ENERGY_RESERVE_ATTRIBUTE_MAIN),
+        StatusModule::status_kind(module)
+    ));
+}
+
+#[cfg(not(feature = "diag"))]
+unsafe fn observe_start(_role: crate::engine::library::Role) {}
+
+/// # Safety
+/// Game thread; `module` is a live fighter's accessor.
+unsafe fn set_normal_speed(module: *mut smash::app::BattleObjectModuleAccessor, energy_id: i32, x: f32) {
+    use smash::app::lua_bind::{KineticEnergyNormal, KineticModule};
+    let energy = KineticModule::get_energy(module, energy_id) as *mut smash::app::KineticEnergyNormal;
+    if !energy.is_null() {
+        KineticEnergyNormal::set_speed(energy, &smash::phx::Vector2f { x, y: 0.0 });
+    }
 }
 
 pub fn cpu_role_after_chord(facing: i8) {
@@ -44,18 +176,36 @@ pub fn note_mash() {
     rr_host::note_mash();
 }
 
+pub fn cpu_playback(
+    recorder: crate::model::cpu::playback::PlaybackState,
+) -> crate::model::cpu::playback::PlaybackState {
+    rr_host::cpu_playback(recorder)
+}
+
 pub fn push_capture(side: u8, frame: InputFrame) {
     rr_host::push_capture(side, frame);
 }
 
+/// The CPU run's frame for this game frame (the AI epilogue, game thread); its first one after a warp gets the start speed.
 pub(crate) fn take_cpu_frame() -> Option<InputFrame> {
-    rr_host::take_cpu_frame()
+    let frame = rr_host::take_cpu_frame();
+    if frame.is_some() {
+        // SAFETY: called from the AI epilogue on the game thread (`recorder::host_cpu`).
+        unsafe {
+            observe_start(crate::engine::library::Role::Cpu);
+            apply_start_speed(crate::engine::library::Role::Cpu);
+        }
+    }
+    frame
 }
 
 /// # Safety
 /// `out` is null or a live mapped-input record for this poll.
 pub unsafe fn on_player_poll(out: *mut MappedInputs) {
-    rr_host::on_player_poll(out);
+    if rr_host::on_player_poll(out) {
+        observe_start(crate::engine::library::Role::Player);
+        apply_start_speed(crate::engine::library::Role::Player);
+    }
 }
 
 pub fn service() {
@@ -88,14 +238,25 @@ pub fn service() {
                 super::recorder::release_slot_image();
             }
             apply(&tick);
+            sync_bound(root);
             return;
         }
     }
+    sync_bound(root);
     if !rr_host::pending() {
         return;
     }
     let tick = rr_host::service_pending(root, player, cpu, online);
     apply(&tick);
+}
+
+/// Save writes the bound save; the save-state machine's active slot holds the bound save (RECORDING.md, "Save states
+/// only warp").
+fn sync_bound(root: &Path) {
+    rr_host::write_saved(root);
+    if let Some(pair) = rr_host::bound_sync(root) {
+        super::states::post_bound(pair);
+    }
 }
 
 fn take_mismatch_answer() {
@@ -130,7 +291,12 @@ fn apply(tick: &Tick) {
             current,
         );
     }
-    if let Some(kind) = tick.switch_kind {
+    if let Some(target) = tick.switch_mii {
+        if !SWITCH_MII.post(target) {
+            emit(&["screen=mismatch switch_mii=dropped".to_string()]);
+        }
+        crate::runtime::ui::worker::wake();
+    } else if let Some(kind) = tick.switch_kind {
         let requested = if tick.switch_player {
             crate::runtime::roster::character_roster::request_player_kind(kind as u32)
         } else {
@@ -151,7 +317,8 @@ fn apply(tick: &Tick) {
             root.join(crate::engine::library::SAVES_DIR),
         );
         if let Ok(save) = saves.load(id) {
-            super::states::request_named_load([save.player, save.cpu]);
+            // Edit placement's offset for the playing role (primary 2026-11-08 #70 (a)).
+            super::states::request_named_load(rr_host::warp_pair(save, tick.warp_place));
         } else {
             // No restore was asked for, so none will land.
             rr_host::warp_landed();
@@ -169,6 +336,36 @@ fn apply(tick: &Tick) {
         );
     }
     emit(&tick.diags);
+}
+
+/// A recording Switch for a CPU macro recorded on an exact Mii, waiting for the game callback.
+static SWITCH_MII: hos_lock::Mailbox<crate::engine::mii::replay::Target, 2> = hos_lock::Mailbox::new();
+
+/// Game callback only, beside `named_macros::service_character_request`: the Switch goes to the existing replay-catalog
+/// request with the macro's `playback_target()` (primary 2026-11-08 #54 (a)). The Mii machinery is used through its API
+/// only; it waits while the CPU cannot reload, and the newest Switch wins.
+pub fn service_switch_request() {
+    if !crate::runtime::roster::character_roster::cpu_reload_ready() {
+        return;
+    }
+    let mut newest = None;
+    SWITCH_MII.drain(|target| newest = Some(target));
+    let Some(target) = newest else { return };
+    #[cfg(feature = "mii-ordinary-cpu-alpha")]
+    let accepted = crate::runtime::roster::character_roster::mii_replay::request_named(target);
+    #[cfg(not(feature = "mii-ordinary-cpu-alpha"))]
+    let accepted = {
+        let _ = target;
+        false
+    };
+    #[cfg(feature = "diag")]
+    crate::runtime::diag_log::diagnostic(format_args!(
+        "[PracticeRecording] screen=mismatch switch_mii=1 kind={} accepted={}",
+        target.kind(),
+        u8::from(accepted)
+    ));
+    #[cfg(not(feature = "diag"))]
+    let _ = accepted;
 }
 
 fn emit(lines: &[String]) {

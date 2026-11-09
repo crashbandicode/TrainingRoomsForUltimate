@@ -642,6 +642,7 @@ unsafe fn edit_decide(context: usize) -> usize {
         native::read::<u32>(base, native::DRAFT + offset) == 0);
     let mut create = None;
     let mut reused = false;
+    let mut notice = None;
     {
         let mut state = STATE.lock();
         // Every owned explicit Save starts closed; only a qualified fresh
@@ -654,6 +655,8 @@ unsafe fn edit_decide(context: usize) -> usize {
                 let canonical = configuration.canonical();
                 if let Some(existing) = s.catalog.configs.iter().find(|c| c.canonical == canonical) {
                     let id = existing.slot_id;
+                    // Operator decision C (2026-11-08): the reuse stays, and the player is told which saved Mii.
+                    notice = crate::model::notify::save_notice(Some(&existing.name));
                     s.explicit_save_finished = true;
                     s.event("native_save_reused", [u64::from(id), 0, 0, 0]);
                     reused = true;
@@ -669,6 +672,10 @@ unsafe fn edit_decide(context: usize) -> usize {
         }
     }
     if reused { ui_resume::discard(); }
+    if let Some(body) = notice {
+        crate::runtime::features::notices::post_body(crate::model::notify::SAME_AS_SAVED_HEADER, body,
+            crate::model::notify::SAME_AS_SAVED_FRAMES, crate::model::notify::DEFAULT_COLOR);
+    }
     let result = original!()(context);
     if let Some(canonical) = create {
         let id = native::read::<u32>(base, native::DRAFT);

@@ -397,6 +397,14 @@ unsafe fn permitted()->bool {
         && !training::save_states::is_loading() && !training::recording_or_playback()
         && !crate::runtime::compat::replay_preview::occupied()
         && STATES.iter().all(|s| {let s=s.lock();s.active.is_none()&&s.pending.is_none()})
+        && !portrait_render_held()
+}
+/// The Player's HUD portrait render holds a helper (sequencing: the press runs after the render, never dropped).
+fn portrait_render_held()->bool {
+    #[cfg(feature="mii-hud-portrait-alpha")]
+    {super::mii_hud_portrait::render_holds_helper(0)}
+    #[cfg(not(feature="mii-hud-portrait-alpha"))]
+    {false}
 }
 unsafe fn ready(entry:*const u8,kind:u32)->bool {
     if MiiClass::from_kind(kind).is_some() {ready_single_mii(entry,0)==Some(kind)}
