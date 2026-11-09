@@ -1416,8 +1416,56 @@ pub fn leaves_now(state: GroupState, release_now: bool) -> bool {
 /// Operator rule 2026-11-09 (inbox 13:21Z): a prefetch refused for process memory or fighter-pool bodies while groups are
 /// parked frees one of them now, the one with the fewest members its cycle keeps, then the fewest bodies, the first of
 /// equals. `parked` yields `(key, members, kept)`. None: the refusal is a real shortage, shown "waiting for memory".
-pub fn capacity_release<K: Copy>(parked: impl Iterator<Item = (K, Members, u8)>) -> Option<K> {
+/// Operator rule 2026-11-09 16:06Z: nothing is freed while an earlier free's room is still arriving (`settled` false,
+/// [`ReleaseWatch`]), so a group that keeps members of the new cycle goes only when nothing unneeded is parked and the
+/// room still lacks after the earlier releases settled.
+pub fn capacity_release<K: Copy>(settled: bool, parked: impl Iterator<Item = (K, Members, u8)>) -> Option<K> {
+    if !settled { return None; }
     parked.min_by_key(|(_, members, kept)| (*kept, members.count())).map(|(key, _, _)| key)
+}
+
+/// Operator rule 2026-11-09 16:06Z (Eden `final-surface-i3-pf-1261f56c` `x6-cc`): a parked group freed now gives its
+/// memory back over the next second or two. `frees now` shows part of it; the process's committed charge keeps falling
+/// after it (`pp-rel-2`: 293 MB of headroom at the free, 335 MB a second later, 367 MB at 1.5 s), and no native event
+/// marks the end. Until it stops, the room is on its way: nothing more is freed for capacity, and a prefetch held for
+/// memory shows as loading ([`arriving_room`]). Each planner pass samples the charge: the first pass after a free only
+/// records it, and the release has settled at the first pass that finds the charge no lower than the pass before.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum ReleaseWatch {
+    /// Nothing freed is still arriving.
+    #[default]
+    Settled,
+    /// Freed; no planner pass has sampled it yet. `committed`: the charge right after the free.
+    Freed { committed: Option<u64> },
+    /// The charge the last pass saw, lower than the one before it (or the first pass's sample).
+    Arriving { committed: Option<u64> },
+}
+
+impl ReleaseWatch {
+    /// A parked group was freed: its room is on its way (a free during another restarts the watch).
+    pub fn freed(self, committed: Option<u64>) -> Self {
+        ReleaseWatch::Freed { committed }
+    }
+    /// A planner pass's sample of the committed charge. Unreadable counters settle it: they never hold a release.
+    pub fn pass(self, committed: Option<u64>) -> Self {
+        match self {
+            ReleaseWatch::Settled => ReleaseWatch::Settled,
+            ReleaseWatch::Freed { .. } => ReleaseWatch::Arriving { committed },
+            ReleaseWatch::Arriving { committed: last } => match (last, committed) {
+                (Some(last), Some(now)) if now < last => ReleaseWatch::Arriving { committed: Some(now) },
+                _ => ReleaseWatch::Settled,
+            },
+        }
+    }
+    pub fn settled(self) -> bool {
+        self == ReleaseWatch::Settled
+    }
+}
+
+/// The state the notice shows for a group while a free's room is `arriving` ([`ReleaseWatch`]): a prefetch held for
+/// memory is loading, not waiting. A pool hold is not memory and shows as it is.
+pub fn arriving_room(state: GroupState, arriving: bool) -> GroupState {
+    if arriving && state == GroupState::Held(Hold::Memory) { GroupState::Planned } else { state }
 }
 
 /// The lane window's planned targets (`next` for [`window_targets`]): the reusable extras of the window the planner wants
@@ -2125,7 +2173,7 @@ mod tests {
         let none = GroupBudget { ready_fighters: 2, pool_free: 0, special: SpecialPolicy::NONE };
         assert_eq!(choose([Some(p1), None], [&[], &[]], [&[], &[]],
             [&[0x16], &[]], none), ReleaseNow::default());
-        assert_eq!(capacity_release(std::iter::empty::<(usize, Members, u8)>()), None);
+        assert_eq!(capacity_release(true, std::iter::empty::<(usize, Members, u8)>()), None);
         let held = count_group_members([(2, GroupState::Built), (3, GroupState::Held(Hold::Memory))]).with_release(0);
         assert_eq!((held.planned, held.ready, held.pending, held.held, held.hold), (5, 2, 0, 3, Some(Hold::Memory)));
         let freeing = count_group_members([(2, GroupState::Built)]).with_release(2);
@@ -2135,9 +2183,44 @@ mod tests {
         let samus_yoshi = Members::new(&[0x03, 0x05]).unwrap();
         let mario_dk_link = Members::new(&[0x00, 0x01, 0x02]).unwrap();
         let one = Members::new(&[0x09]).unwrap();
-        assert_eq!(capacity_release([((0, 2), mario_dk_link, 2), ((0, 0), samus_yoshi, 0), ((1, 1), one, 0)].into_iter()),
+        assert_eq!(capacity_release(true, [((0, 2), mario_dk_link, 2), ((0, 0), samus_yoshi, 0), ((1, 1), one, 0)].into_iter()),
             Some((1, 1)));
-        assert_eq!(capacity_release([((0, 2), mario_dk_link, 2), ((0, 0), samus_yoshi, 0)].into_iter()), Some((0, 0)));
+        assert_eq!(capacity_release(true, [((0, 2), mario_dk_link, 2), ((0, 0), samus_yoshi, 0)].into_iter()), Some((0, 0)));
+    }
+
+    /// Operator rule 2026-11-09 16:06Z, Eden `final-surface-i3-pf-1261f56c` `x6-cc`: `[Samus, Yoshi]` was freed for the
+    /// Ice Climbers (#805, committed 3,220,090,880 → 3,180,244,992). One second later the pair's prefetch was held at
+    /// 289 MB while that room was still arriving (committed 3,155,275,776), and the kept `[Mario, DK, Link]`, which
+    /// served DK and Link warm, was freed for it (#817). A release in flight is room on its way: nothing more is freed
+    /// for capacity until a planner pass finds the committed charge no lower than the pass before; then an unneeded
+    /// parked group goes first, and a group that keeps members of the new cycle only when nothing else is parked.
+    #[test]
+    fn a_release_in_flight_is_room_on_its_way() {
+        let mario_dk_link = Members::new(&[0x00, 0x01, 0x02]).unwrap();
+        let samus_yoshi = Members::new(&[0x03, 0x05]).unwrap();
+        let kept_only = || [((0usize, 2usize), mario_dk_link, 3u8)].into_iter();
+        let watch = ReleaseWatch::Settled.freed(Some(3_180_244_992));
+        assert!(!watch.settled());
+        assert_eq!(capacity_release(watch.settled(), kept_only()), None, "the free's room is still arriving");
+        let watch = watch.pass(Some(3_180_244_992));
+        assert!(!watch.settled(), "the first pass after the free only records it");
+        let watch = watch.pass(Some(3_155_275_776));
+        assert!(!watch.settled(), "still falling");
+        assert_eq!(capacity_release(watch.settled(), kept_only()), None);
+        let watch = watch.pass(Some(3_155_275_776));
+        assert!(watch.settled(), "stopped falling: settled");
+        assert_eq!(capacity_release(watch.settled(), kept_only()), Some((0, 2)), "the last resort, after it settled");
+        assert_eq!(capacity_release(true, [((0, 2), mario_dk_link, 3), ((0, 0), samus_yoshi, 0)].into_iter()), Some((0, 0)));
+        assert!(!watch.freed(Some(1)).settled(), "another free restarts the watch");
+        assert!(ReleaseWatch::Settled.freed(None).pass(None).pass(None).settled(), "unreadable counters never hold it");
+        assert!(ReleaseWatch::Settled.pass(Some(5)).settled());
+        // A prefetch held for memory shows as loading while the room is on its way; a pool hold is not memory.
+        assert_eq!(arriving_room(GroupState::Held(Hold::Memory), true), GroupState::Planned);
+        assert_eq!(arriving_room(GroupState::Held(Hold::Memory), false), GroupState::Held(Hold::Memory));
+        assert_eq!(arriving_room(GroupState::Held(Hold::Pool), true), GroupState::Held(Hold::Pool));
+        assert_eq!(arriving_room(GroupState::Built, true), GroupState::Built);
+        let counts = count_group_members([(2, arriving_room(GroupState::Held(Hold::Memory), true))]);
+        assert_eq!((counts.planned, counts.pending, counts.held, counts.hold), (2, 2, 0, None));
     }
 
     /// The entry tick frees a parked group only when the planner (or a refused prefetch) marked it to go now; any other
