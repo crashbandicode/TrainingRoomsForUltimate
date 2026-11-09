@@ -675,11 +675,12 @@ pub fn window_swappable(window: Members) -> bool { window_swappable_with(window,
 pub fn window_swappable_with(window: Members, policy: GroupPolicy) -> bool {
     match window.special() {
         Special::Native(_) | Special::Pair => true,
-        // M0: a Mii window plans no new groups. Its stated reason, "a one-member window cannot be
-        // left warm", no longer holds (`ExitRule::SelfCell`); while a Mii is the window its `R`
-        // header holds the Mii identity (MII-GROUPS-DESIGN §3.3) and a prefetch under that header is
-        // not established, so the rule is unchanged here and listed for the Mii owner.
-        Special::Mii => false,
+        // M0 lifted (primary inbox 2026-11-09 06:16Z; hot rc6-hot-xps26: a cycle change while P1 sat on
+        // the Gunner planned nothing until P1 left it). A Mii window plans its role's groups like any
+        // one-member window (`ExitRule::SelfCell` leaves it warm). Beside the live Mii, a group's keys
+        // and build take the owner's ordinary words, not the Mii's header (X6). A second Mii group
+        // stays out while a Mii is the window (`plan_extra_groups_with`: one Mii record per owner).
+        Special::Mii => true,
         Special::None if window.is_pair_lead() => {
             policy.ic_pair_groups && single_body_member(member_class(window, window.kinds()[2]))
         }
