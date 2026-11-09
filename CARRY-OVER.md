@@ -1134,6 +1134,45 @@ Inbox `INBOX-opus-rc6-bg-pt.md` 00:17Z item 1 (worker B; item 2, the start on PT
   ledger_held=0 map_after=0`. The scene end with the kind held: `rc6-bg-pt5` (same teardown code) `reconcile owner=0
   phase=finalize map=0`.
 
+### p23/rc6-bg-pt: a Pokémon Trainer exit retires its article pool over the next ticks (2026-11-09)
+
+Inbox `INBOX-opus-rc6-bg-pt.md` 02:00Z (worker A measured leaving PT at 114.9–118.5 ms with a 5-frame gap). On top of
+integration's `62e7c85` (merge `d1fd8dd`, ceiling `da86a68`); commits `3b9b4895`, size raise `9a7ea5c0`.
+
+- **Root cause** (Eden `rc6-bg-ptx1`/`ptx2`: guest trace points in the owned 13.0.5 code, no plugin change; evidence
+  `bg-pt-evidence/rc6-bg-ptx1`, `ptx2`, with the probe tools): the exit's setup tick ran `special_articles::retire_saved`'s
+  `0x3a6b80(holder)` whole, 28–57 ms. Pass 1 (each article deactivated; the trainer's `vt+0x48` = `0x33a1c90` clears
+  `bo+0x61` and switches its modules off) is 0.1–0.7 ms. Pass 2's `0x3aeb50(id)` runs the trainer weapon's teardown
+  (`vt+0x50` = `0x33a1fc0`): 15–33 ms of its own, plus its own article pool (eight sub-weapons), which it releases
+  through `0x3d3a90` at `[[bo+0x20]+0x98]+0x240`, 13–26 ms. The larger numbers are the boot's first exit.
+- **The split** (model `swap_model::special_articles::RetireStage`, `remaining`, `attachable`). Nothing moves off the
+  game thread, since it destroys live battle objects:
+  - the exit's tick runs pass 1 only (`deactivate_saved`): the trainer leaves the world at once;
+  - the next lifecycle tick releases the trainer's own pools through `0x3a6b80` (`release_sub_pools`). Only a pool of
+    the holder class `0x4f626e8` goes, the one the article module's constructor stores at `0x33b98d4`;
+  - the tick after runs pass 2 and the tail as native does (`destroy_saved`), except that an id `0x3ac560` no longer
+    finds is not handed to `0x3aeb50`, which reads the slot without a null check.
+- **The bank:**
+  - `Bank.retiring` and `group_lifecycle`'s Retire step, after the in-flight polls and before anything new, under
+    INSTALL, so a press meanwhile waits;
+  - `retire_step` / `retire_stage` / `finish_retirement`;
+  - `group_reachable` never attaches a retiring group;
+  - `retire_groups`, `leave_group`, the swap rollback and a following exit finish the stages first.
+- **Gate:** three seam rows (`special_groups.object_lookup` `0x3ac560`, `.object_destroy` `0x3aeb50`, `.static_init`
+  `0x3a9ab0`) and the guard pair's words (`EXIT_SPLIT`). Without them the exit keeps native's whole release.
+- **Proof:** host tests, each failed first: model `a_pt_exit_retires_its_pool_one_stage_per_tick`,
+  `a_retiring_pool_is_finished_before_anything_else_reads_it`; `tests/background_native_wiring.rs`
+  `a_pt_exit_retires_its_pool_over_later_ticks`. Recorded manifest edits of the four carried files.
+- **Eden `rc6-bg-ptx3`** (diag `a6045772` of `9a7ea5c0`; rows `rows-bg-pt/rows-ptexit.json`, `make_bn_rows7.py`;
+  evidence `bg-pt-evidence/rc6-bg-ptx3`): P1's cycle DK, Squirtle, Fox, Pyra, three laps, every switch judged at ≤ 4
+  frames. Unmapped 0, no `main+0x35609c0` read, `z-unmapped` passed (hook allocations included).
+  - PT → Fox: 54.6 ms, 3 frames (the boot's first exit); then 51.3 and 50.5 ms, 2 frames.
+  - Pyra → Mario: 46.7–48.5 ms, 1 frame; CPU lap ≤ 2 frames.
+  - The stages ran on their own ticks after Ready: SubPools 12.3–12.4 ms, Destroy 15.3–19.4 ms, `gone=0`; then the
+    0x72 re-acquisition, 105–114 ms.
+  - Failed only: the PT attach with the boot's first article rebuild (237 ms, 13 frames; the first-rebuild cost, not an
+    exit), and the cycle-change row's Fighters notice ("swap P1 to load 1 more" while every P1 group was built).
+
 ### p23/rc6-bg-ic: the Ice Climbers pair group built in the background, and a session that starts on Ice Climbers (2026-11-08, rc.6 item 3)
 
 Operator decision "All groups in rc.6" and the start-on-the-kind rule (`docs/DECISIONS.md` "Item 3 in rc.6", 20:26Z and
