@@ -349,6 +349,61 @@ pub(crate) fn preload_blocked_reason() -> Option<&'static str> {
     None
 }
 
+/// What the body bank's group lifecycle reads before each tick (`native_body_bank::group_lifecycle`).
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct Foreground {
+    /// A foreground request waits for INSTALL and for nothing else.
+    pub(crate) waiting: bool,
+    /// What the lifecycle's own role's waiting press resolves to.
+    pub(crate) target: Option<crate::runtime::roster::cycle_preload::Target>,
+}
+
+/// Primary 2026-11-09 07:17Z and 07:34Z: a foreground request is served before the body bank's next speculative step
+/// (`body_bank::speculative_step_admitted`) while it waits for INSTALL and for nothing else: a P1 or CPU press here
+/// (outside the menu's input grace), a press a Mii owner keeps with every other `begin` blocker clear, a hat request's
+/// source load. Not the per-frame partner refresh, and not a request kept for the menu, a recording or a Kirby not yet
+/// idle: those waits are their owners', and nothing holds the loads for them. `target` is what `role`'s own press
+/// resolves to, so the lifecycle lets the step serving it through (`body_bank::serving_step`).
+pub(crate) unsafe fn foreground(role: usize, entry: *const u8, owner: u32) -> Foreground {
+    let mut f = Foreground { waiting: crate::runtime::roster::kirby_hats::foreground_pending(), target: None };
+    if !menu::captures_input() {
+        for r in [Role::Player, Role::Cpu] {
+            let request = state_for(r).lock().pending.filter(|p| !matches!(p.selection, Selection::RefreshPartners));
+            let Some(request) = request else { continue; };
+            f.waiting = true;
+            if r as usize == role && request.entry == entry as usize && request.scope.owner == owner {
+                f.target = match request.selection {
+                    Selection::Direct(target) => Some(target.kind()),
+                    Selection::Cycle => ready_kind(entry, owner).and_then(|current|
+                        cycle_step(&setting(&MENU), r, current, state_for(r).lock().cursor)).map(|(kind, _)| kind),
+                    Selection::RefreshPartners => None,
+                }.map(crate::runtime::roster::cycle_preload::Target::fighter);
+            }
+        }
+    }
+    #[cfg(feature="mii-ordinary-player-alpha")]
+    if let Some(target) = mii_ordinary_player::foreground(role == Role::Player as usize) {
+        f.waiting = true;
+        f.target = f.target.or(target);
+    }
+    #[cfg(feature="mii-ordinary-cpu-alpha")]
+    if let Some(target) = mii_ordinary_cpu::foreground(role == Role::Cpu as usize) {
+        f.waiting = true;
+        f.target = f.target.or(target);
+    }
+    f
+}
+
+/// A cycle press's next fighter kind and slot from the live `current` (`service_body`; `foreground` for its target).
+fn cycle_step(m: &TrainingModpackMenu, role: Role, current: u32, cursor: Option<usize>) -> Option<(u32, Option<usize>)> {
+    let kinds: Vec<_> = roster(m, role).iter().map(|fighter| fighter.kind()).collect();
+    let original = cycle_original(role);
+    // Slot 0 is told apart from a numbered slot of the same group (Ice Climbers whose
+    // Solo preference differs) by the cursor, which a by-group search cannot see.
+    let at_original = cursor.is_none() && original.is_some_and(|kind| cycle_position(&[kind], current).is_some());
+    if at_original { next_from_original(&kinds, original) } else { next_cycle(current, cursor, &kinds, original) }
+}
+
 /// What may pause the Fighters notice: the accepted visible operations of `preload_blocked` only.
 /// Visible roster and Mii installs take INSTALL with practice suspended; the preloader's own
 /// speculative helper loads, hat-source loads and group prefetches take it without (and a hat
@@ -1357,19 +1412,7 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
         Selection::Direct(target) => (target, None),
         Selection::RefreshPartners => (TrioFighter::from_kind(current).unwrap(), state.cursor),
         Selection::Cycle => {
-            let choices = roster(&m, role);
-            let kinds: Vec<_> = choices.iter().map(|fighter| fighter.kind()).collect();
-            let original = cycle_original(role);
-            // Slot 0 is told apart from a numbered slot of the same group (Ice Climbers whose
-            // Solo preference differs) by the cursor, which a by-group search cannot see.
-            let at_original = state.cursor.is_none()
-                && original.is_some_and(|kind| cycle_position(&[kind], current).is_some());
-            let step = if at_original {
-                next_from_original(&kinds, original)
-            } else {
-                next_cycle(current, state.cursor, &kinds, original)
-            };
-            let Some((kind, slot)) = step else {
+            let Some((kind, slot)) = cycle_step(&m, role, current, state.cursor) else {
                 drop(state);
                 notify(role, "Select a character for this cycle".into());
                 return;

@@ -142,3 +142,60 @@ fn the_lifecycle_starts_and_settles_it_and_the_gate_needs_both_paths() {
     ordered(install, &["let identity_view = crate::runtime::roster::identity_view::install(base);",
         "BACKGROUND_ENABLED.store(async_ok && identity_view, Ordering::Release);"]);
 }
+
+const ROSTER: &str = include_str!("../src/runtime/roster/character_roster.rs");
+const MII_PLAYER: &str = include_str!("../src/runtime/mii/mii_ordinary_player.rs");
+const MII_CPU: &str = include_str!("../src/runtime/mii/mii_ordinary_cpu.rs");
+
+const HATS: &str = include_str!("../src/runtime/roster/kirby_hats.rs");
+const MODEL: &str = include_str!("../src/model/swap/body_bank.rs");
+
+/// Primary 2026-11-09 07:17Z and 07:34Z (Eden `rc6-hot-xps31`/`32`: a press made during the background builds waited for
+/// each in turn; then the 5 s release, a timeout guard, made exact). The rule is host-tested (`body_bank`
+/// `a_queued_press_is_served_before_the_next_background_build`, `a_waiting_press_lets_its_targets_prefetch_through`).
+/// Here: the lifecycle reads the foreground before the bank lock and puts the step serving the press's own target, or
+/// none, in place of any chosen step that takes INSTALL; a serving prefetch is no speculation for the burst grace. The
+/// foreground counts a request only while INSTALL is all it waits for (the roster's outside the menu, a Mii owner's with
+/// every other `begin` blocker clear, a hat's queued source load). A Mii owner's press waits the tick its group's
+/// CharInfo goes on the record, and no other CharInfo replaces it before that group's prefetch. No timeout is left.
+#[test]
+fn a_waiting_press_holds_every_speculative_step_but_its_own() {
+    let lifecycle = body(BANK, "unsafe fn group_lifecycle(");
+    ordered(lifecycle, &["let foreground = super::foreground(role, entry, owner);", "note_foreground(owner, foreground);",
+        "let mut state = BANKS[role].lock();", "(_, Some(group)) => Step::Background(group),",
+        "Step::Start(..) | Step::Background(_) | Step::Rearm(..) | Step::Prepare(..)",
+        "if speculative_step_admitted(foreground.waiting).is_err() =>",
+        "match foreground.target.and_then(|target| serving_group(base, bank, target, live)) {",
+        "Some((group, Serving::Prefetch)) => Step::Start(group, *bank.groups[group].members, bank.alias, true),",
+        "Some((group, Serving::ObjectRearm)) => Step::Rearm(group, *bank.groups[group].members, bank.alias),",
+        "None => Step::Idle,", "let started = now_us();", "Step::Start(group, members, alias, serving) => {",
+        "if !serving && crate::runtime::roster::cycle_preload::speculative_admission().is_none() { return; }"]);
+    ordered(body(BANK, "unsafe fn serving_group("), &["bank.configuration == target.configuration { return None; }",
+        "Some(c) => g.configuration == Some(c), None => g.identity.is_none()",
+        "object_rearm_due(g.state, *g.members, detached_pool(base, bank.owner, g), g.object_held)",
+        "object_rearm_admitted(live, kind)", "serving_step(g.state, g.identity.is_none() || g.charinfo_published, rearm_due)?;",
+        "prefetch_admitted(live).is_ok()"]);
+    assert!(body(BANK, "pub(super) fn pending_mii_publication(")
+        .contains("if bank.groups.iter().any(|g| g.charinfo_published && g.state.startable()) { return None; }"));
+    ordered(body(ROSTER, "pub(crate) unsafe fn foreground("), &["crate::runtime::roster::kirby_hats::foreground_pending()",
+        "if !menu::captures_input() {", ".pending.filter(|p| !matches!(p.selection, Selection::RefreshPartners));",
+        "cycle_step(&setting(&MENU), r, current, state_for(r).lock().cursor)",
+        "mii_ordinary_player::foreground(role == Role::Player as usize)", "mii_ordinary_cpu::foreground(role == Role::Cpu as usize)"]);
+    assert!(body(ROSTER, "unsafe fn service_body(").contains("let Some((kind, slot)) = cycle_step(&m, role, current, state.cursor) else {"));
+    assert!(body(HATS, "pub(crate) fn foreground_pending(").contains("p.leases_released && p.lease.is_none() && !p.started"));
+    // A press its owner cannot begin (no owner or catalog, a departed CPU) waits for that, not INSTALL: no foreground.
+    ordered(body(MII_PLAYER, "pub(super) unsafe fn foreground("), &["if !permitted_but_install() {return None;}",
+        "(s.owner.as_ref(),s.catalog.as_ref()) else {return None;};", "if !resolve {return Some(None);}"]);
+    assert!(MII_PLAYER.contains("unsafe fn permitted()->bool {permitted_but_install() && !INSTALL.active()}"));
+    ordered(body(MII_CPU, "pub(super) unsafe fn foreground("), &["if blocker(false).is_some() {return None;}",
+        "(s.owner.as_ref(),s.catalog.as_ref(),s.departed) else {return None;};", "if !resolve {return Some(None);}"]);
+    assert!(MII_CPU.contains("unsafe fn begin_blocker()->Option<Blocker> {blocker(true)}"));
+    assert!(body(MII_CPU, "unsafe fn blocker(").contains("else if install && INSTALL.active() {Some(Blocker::Install)}"));
+    for (owner, publication) in [(MII_PLAYER, "if mii_group_record_publication(entry) {return false;}"),
+        (MII_CPU, "if mii_group_record_publication(entry,owner) {return false;}")] {
+        ordered(body(owner, "pub(super) unsafe fn service("), &[publication, "begin(entry)"]);
+    }
+    for src in [BANK, ROSTER, MII_PLAYER, MII_CPU, HATS, MODEL] {
+        assert!(!src.contains("FOREGROUND_WAIT_CAP_US") && !src.contains("FOREGROUND_SINCE"), "a timeout is left");
+    }
+}

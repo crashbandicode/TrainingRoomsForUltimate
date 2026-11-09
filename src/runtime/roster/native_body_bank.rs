@@ -174,7 +174,7 @@ use crate::engine::swap::body_bank::{
     SpecialPolicy, BANK_FLAG, MAX_EXTRA_GROUPS, NANA, NATIVE_MEMBERS, PAIR_ACTIVE_FLAG, POOL_RESERVE, POPO,
     entry_bytes_of, mii_exit_bytes_match, mii_reuse_bytes_match, MiiEntryBytes, MiiIdentity, MII_ENTRY_START, RESOURCE_WORDS,
     baseline_words, identity_move, IdentityMove, leaves_at_pause, count_group_members, kept_members, waiting_for_pause,
-    next_window_targets, own_words, shadow_values, LiveIdentity,
+    next_window_targets, own_words, shadow_values, LiveIdentity, speculative_step_admitted, serving_step, Serving,
 };
 use crate::engine::swap::body_bank::memory::{self, Admission};
 use crate::engine::swap::body_bank::mii_publish::{PublishAttempts, PublishRefusal, PublishStep};
@@ -646,6 +646,9 @@ pub(super) fn pending_mii_publication(owner: u32) -> Option<(usize, MiiIdentity,
     let state = BANKS[role].lock();
     let bank = state.as_ref().filter(|b| b.owner == owner && b.phase == Phase::Ready && !b.departed
         && b.swap.is_none() && b.prefetch.is_none())?;
+    // One record per owner: a group's CharInfo stays on it until that group's prefetch copied it, even while a waiting
+    // press holds the prefetch back (primary 2026-11-09 07:34Z, `body_bank::serving_step`).
+    if bank.groups.iter().any(|g| g.charinfo_published && g.state.startable()) { return None; }
     bank.groups.iter().enumerate().find_map(|(i, g)| {
         if g.state != GroupState::Planned || g.charinfo_published { return None; }
         let (identity, c) = g.identity.zip(g.configuration)?;
@@ -5326,17 +5329,50 @@ unsafe fn sync_copy_packages(entry: *mut u8, owner: u32, role: usize) {
     }
 }
 
+/// Whether the last lifecycle tick saw a foreground request waiting (`character_roster::foreground`): one diag line as
+/// an episode starts and one as it ends.
+static FOREGROUND_HELD: AtomicBool = AtomicBool::new(false);
+
+fn note_foreground(owner: u32, foreground: super::Foreground) {
+    if FOREGROUND_HELD.swap(foreground.waiting, Ordering::AcqRel) == foreground.waiting { return; }
+    if foreground.waiting {
+        trace!("[GroupSwap] speculative steps wait owner={}: a foreground request waits for INSTALL; target={:x?}, only the step serving it goes first",
+            owner, foreground.target.map(|t| (t.kind, t.configuration.is_some())));
+    } else {
+        trace!("[GroupSwap] speculative steps resume owner={}: no foreground request waits", owner);
+    }
+}
+
+/// Primary 2026-11-09 07:34Z: the group of this bank holding a waiting press's `target` and the step that serves it
+/// (`body_bank::serving_step`), under the gates the lifecycle puts on that step everywhere: a prefetch while the live
+/// member admits one (D-KIRBY1), a re-arm as `rearm_candidate` and `kirby_rearm` admit it. A target in the live window
+/// (a member change) or in no group of this bank needs none.
+unsafe fn serving_group(base: usize, bank: &Bank, target: crate::runtime::roster::cycle_preload::Target, live: Option<u32>)
+    -> Option<(usize, Serving)> {
+    if bank.members.index_of(target.kind).is_some() && bank.configuration == target.configuration { return None; }
+    let (group, g) = bank.groups.iter().enumerate().find(|(_, g)| !g.leaving && g.members.index_of(target.kind).is_some()
+        && match target.configuration { Some(c) => g.configuration == Some(c), None => g.identity.is_none() })?;
+    let rearm_due = !g.object_refused && bank.construction.is_none() && bank.background.is_none()
+        && object_rearm_due(g.state, *g.members, detached_pool(base, bank.owner, g), g.object_held)
+        && g.members.object_kind().is_some_and(|kind| crate::engine::swap::body_bank::object_rearm_admitted(live, kind).is_ok());
+    let serving = serving_step(g.state, g.identity.is_none() || g.charinfo_published, rearm_due)?;
+    (serving == Serving::ObjectRearm || crate::engine::swap::body_bank::prefetch_admitted(live).is_ok()).then_some((group, serving))
+}
+
 unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
     let base = BASE.load(Ordering::Acquire);
     let settings = crate::runtime::roster::cycle_preload_config::snapshot();
     let now = now_us();
     sync_copy_packages(entry, owner, role);
+    // Read before the bank lock (the roster's and the owners' state): a foreground request waiting for INSTALL alone.
+    let foreground = super::foreground(role, entry, owner);
+    note_foreground(owner, foreground);
     // D-KIRBY1: no bank prefetch key rests on this R while its live member is
     // Kirby (a copy of a group kind would share R's G68 mirror with the key, and
     // the key's later `0x17e8610` release corrupts the registry the Reload walks;
     // RCA §3). A live Kirby defers Planned groups and hands Prefetched groups'
     // keys back; Built groups consumed their keys at construction.
-    enum Step { Poll(usize, super::InstallToken, u64, Members, usize), Start(usize, Members, usize),
+    enum Step { Poll(usize, super::InstallToken, u64, Members, usize), Start(usize, Members, usize, bool),
         Release(usize, Members, Members, usize), Background(usize), Leave(usize), Idle,
         Rearm(usize, Members, usize), RearmPoll(usize, super::InstallToken, u64, u32, usize), Retire(Retiring),
         Prepare(usize, usize), PreparePoll(Preparing) }
@@ -5345,6 +5381,7 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
         let Some(bank) = state.as_mut().filter(|bank| bank.entry == entry as usize && bank.phase == Phase::Ready
             && !bank.departed && bank.swap.is_none()) else { return; };
         let live = bank.members.ready_live(snapshot(entry)).map(|(_, kind)| kind);
+        let step =
         // Inbox 00:18Z: a PT group's object re-acquisition in flight.
         if let Some((group, token, since)) = bank.object_fetch {
             let kind = bank.groups[group].members.object_kind().unwrap_or(PT_OBJECT_KIND);
@@ -5399,11 +5436,24 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
             // a group held for capacity is retried only when no background build is owed.
             match (start, background_candidate(bank, live)) {
                 (Some(group), _) if bank.groups[group].state == GroupState::Planned =>
-                    Step::Start(group, *bank.groups[group].members, bank.alias),
+                    Step::Start(group, *bank.groups[group].members, bank.alias, false),
                 (_, Some(group)) => Step::Background(group),
-                (Some(group), None) => Step::Start(group, *bank.groups[group].members, bank.alias),
+                (Some(group), None) => Step::Start(group, *bank.groups[group].members, bank.alias, false),
                 (None, None) => Step::Idle,
             }
+        };
+        // Primary 2026-11-09 07:17Z and 07:34Z: a foreground request waiting for INSTALL alone is served next
+        // (`speculative_step_admitted`): no prefetch, background build, object re-arm or pool preparation takes INSTALL
+        // before it, except the one that serves the press's own target (`serving_group`); the polls run.
+        match step {
+            Step::Start(..) | Step::Background(_) | Step::Rearm(..) | Step::Prepare(..)
+                if speculative_step_admitted(foreground.waiting).is_err() =>
+                match foreground.target.and_then(|target| serving_group(base, bank, target, live)) {
+                    Some((group, Serving::Prefetch)) => Step::Start(group, *bank.groups[group].members, bank.alias, true),
+                    Some((group, Serving::ObjectRearm)) => Step::Rearm(group, *bank.groups[group].members, bank.alias),
+                    None => Step::Idle,
+                },
+            step => step,
         }
     };
     let started = now_us();
@@ -5579,9 +5629,10 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
                 log_memory(owner, group, kinds, "prefetch", started, MemorySample::capture(), memory::group_cost(kinds).prefetch);
             }
         }
-        Step::Start(group, members, alias) => {
+        Step::Start(group, members, alias, serving) => {
             if !groups_enabled(&settings) || super::INSTALL.active() { return; }
-            if crate::runtime::roster::cycle_preload::speculative_admission().is_none() { return; }
+            // A prefetch serving a waiting press is that press's own load, not speculation: no burst grace holds it.
+            if !serving && crate::runtime::roster::cycle_preload::speculative_admission().is_none() { return; }
             let Some(r) = resource(base, owner).filter(|r| *r == alias && alias != 0) else { return; };
             let (capacity, live) = pool_counts(base).unwrap_or((0, 0));
             let pool_free = (capacity as usize).saturating_sub(usize::from(live)).saturating_sub(POOL_RESERVE);
@@ -5688,10 +5739,10 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
             bank.groups[group].since_us = now;
             bank.groups[group].prefetch_committed = sample.committed.get();
             bank.prefetch = Some((group, token, now));
-            trace!("[GroupSwap] prefetch owner={} group={} kinds={:x?} R={:#x} map={} flags={:#x} task_pending={} pool={}/{} headroom={} INSTALL(resource) outstanding={} need={}",
+            trace!("[GroupSwap] prefetch owner={} group={} kinds={:x?} R={:#x} map={} flags={:#x} task_pending={} pool={}/{} headroom={} INSTALL(resource) outstanding={} need={} serves_press={}",
                 owner, group, &members.kinds()[..members.count()], r, fields::read::<u64>(r, 0x18).unwrap_or(0),
                 fields::read::<u8>(r, 0x4c).unwrap_or(0), task_pending(r), live, capacity, headroom.unwrap_or(0),
-                decision.outstanding, decision.need);
+                decision.outstanding, decision.need, serving);
         }
     }
 }
