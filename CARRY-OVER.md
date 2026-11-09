@@ -1136,7 +1136,10 @@ Operator decision "All groups in rc.6" and the start-on-the-kind rule (`docs/DEC
   - The notice counts the live pair-lead window as it serves (Eden `rc6-bg-ic2`: "Loaded 9/10 · swap P1 to load 1
     more" with every P1 fighter built). With groups on, `plan_budget` plans its window targets through
     `body_bank::window_targets`: a live pair-lead window counts its own reusable extras, the values `progress` reads,
-    not the lane window's two. With groups off, or for any other window, the lane's window is planned as before.
+    not the lane window's two.
+  - Since the primary's 2026-11-09 02:00Z decision (every kind), the same holds for any live attached window with groups
+    on: a one-member group, the pair group, a native group. Eden `rc6-bg-ic5` and `rc6-xc2/3` showed "swap P1 to load 2
+    more" on them with everything built. With groups off the lane's window is planned as before.
 - **The return to an Ice Climbers original is warm** (primary 2026-11-09 00:23Z; `docs/DECISIONS.md`). Eden
   `rc6-bg-ic2/3` showed it Reloading (6–7 frames), which ended P1's bank; the next switch out rebuilt everything.
   - The IcPair capability row's `original_bankable` is now true (EXCLUSIONS §9 lifted for the pair original). New

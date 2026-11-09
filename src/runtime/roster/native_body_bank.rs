@@ -721,7 +721,8 @@ pub(crate) fn plan_budget(menu: &crate::engine::compat::menu::TrainingModpackMen
     if grouped {
         group_bodies = plan_groups(&settings, menu, lanes, originals, &mut group_targets);
     }
-    // rc.6 item 3: a live pair-lead window plans what it serves (`body_bank::window_targets`; the values `progress` reads).
+    // rc.6 item 3: with groups on, the live attached window plans what it serves (`body_bank::window_targets`; the values
+    // `progress` reads).
     let live: [Option<(Members, u32)>; 2] = std::array::from_fn(|role| BANKS[role].lock().as_ref()
         .filter(|bank| bank.phase == Phase::Ready && !bank.departed)
         .map(|bank| (*bank.members, bank.observed.map_or(bank.members.kinds()[usize::from(bank.target)], |(_, kind)| kind))));
@@ -2011,6 +2012,16 @@ unsafe fn service_locked(entry: *mut u8, owner: u32, role: usize) -> Action {
     // P3-0: one tick of this entry's pre-service; the meter is armed by a request and read at Ready.
     bank.tick.observe(now_us());
     split::observe(role, now_us());
+    // Diag: each pre-service tick of a switch in flight, the entry's native progress (P1's attach into the pair group
+    // took a frame more than the CPU's between its acknowledgement and N2; primary 2026-11-09 02:00Z).
+    #[cfg(feature = "diag")]
+    if bank.phase == Phase::Changing {
+        let s = snapshot(entry);
+        let state = |cell: usize| fields::child(entry as usize, cell).and_then(|b| fields::read::<u8>(b, 0x3a));
+        trace!("[GroupSwap] attach tick owner={} target={} acknowledged={} index={} pending={} previous={} flags={:#x} outer={} loader={} changing={} guard={} states=[{:?},{:?},{:?}]",
+            owner, bank.target, bank.acknowledged, s.index, s.pending, s.previous_or_next, s.flags, s.outer, s.loader, s.changing,
+            s.guard, state(0x4160), state(0x4168), state(0x4170));
+    }
     // A former Ready receipt must not survive a callback observing an unfinished
     // native reset/replacement. Publish it again only after today's full proof.
     bank.observed = None;
@@ -5106,10 +5117,12 @@ unsafe fn activate_entry(entry: *mut u8, status: i32) {
         let nana = read::<usize>(entry, 0x4190);
         fields::write_unchecked(entry as usize, 0x4180, nana);
         fields::write_unchecked(entry as usize, 0x591f, PAIR_ACTIVE_FLAG & !BANK_FLAG);
+        let started = now_us();
         original!()(entry, status);
+        let native_us = now_us().saturating_sub(started);
         fields::write_unchecked(entry as usize, 0x591f, PAIR_ACTIVE_FLAG);
-        trace!("[IcPair] N2 activate pair owner={} status={:#x} flags {:#x}->2->6 popo_ctx={:#x} nana_ctx={:#x} +0x4178={:#x} +0x4180={:#x} states=[{:?},{:?}]",
-            owner, status, before, read::<usize>(entry, 0x4188), nana, read::<usize>(entry, 0x4178),
+        trace!("[IcPair] N2 activate pair owner={} status={:#x} native_us={} flags {:#x}->2->6 popo_ctx={:#x} nana_ctx={:#x} +0x4178={:#x} +0x4180={:#x} states=[{:?},{:?}]",
+            owner, status, native_us, before, read::<usize>(entry, 0x4188), nana, read::<usize>(entry, 0x4178),
             read::<usize>(entry, 0x4180),
             fields::child(entry as usize, 0x4160).and_then(|b| fields::read::<u8>(b, 0x3a)),
             fields::child(entry as usize, 0x4168).and_then(|b| fields::read::<u8>(b, 0x3a)));
