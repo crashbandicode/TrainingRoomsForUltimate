@@ -192,3 +192,63 @@ fn every_window_keeps_its_own_mii_set() {
     ordered(release, &["if handle != 0 && holder != 0 && handle.wrapping_add(1) >= 3 { release_face(holder, handle); }",
         "if owners.fetch_sub(1, Ordering::AcqRel) == 0 {", "dispose(block);", "release_weak(block);"]);
 }
+
+/// X6 (primary 2026-11-09 04:22Z, the live Mii window column; the rule is host-tested in `body_bank.rs`): beside a live
+/// Mii window every other group takes the owner's ordinary baseline wherever its native work reads `R`. The tick writes
+/// the baseline's words (its own header kinds), entry bytes and mirror, takes the shadow from `R` and puts the live Mii's
+/// back; the worker hooks act for every body of the armed build (the colour reads stay a Mii body's), Pokémon Trainer's
+/// pool task included; the holder step and every key request and release take the group's own words.
+#[test]
+fn a_group_beside_a_live_mii_window_takes_the_ordinary_baseline() {
+    let start = body(BANK, "unsafe fn start_background(");
+    ordered(start, &["bank.ordinary_identity.filter(|_| bank.identity.is_some() && g.identity.is_none()))",
+        "let baseline_tick = baseline.map(|(words, ordinary)| {", "let live = (save_resource_words(alias), save_entry_identity(entry as usize));",
+        "write_resource_words(alias, &baseline_words(words, members));", "write_entry_identity(entry as usize, &ordinary);",
+        "if mii_prepared { models(entry); }", "if mii_prepared { contexts(entry); }",
+        "if let Some((live_words, live_bytes)) = baseline_tick.as_ref() {",
+        "std::ptr::copy_nonoverlapping((alias + 0x40) as *const u8, (shadow + 0x40) as *mut u8, 0x68);",
+        "write_resource_words(alias, live_words);", "write_entry_identity(entry as usize, live_bytes);",
+        "restore_window(entry as usize, &live);", "baseline: baseline.map(|(_, ordinary)| ordinary) });"]);
+    let queue = body(BANK, "unsafe fn queue_background_bodies(");
+    ordered(queue, &["b.mii.or(b.baseline.map(|ordinary| MiiBuild { faces: [0; 2], values: shadow_values(&ordinary.entry) }))",
+        "MII_VALUES.store(m.values, Ordering::Release);", "MII_REAL_R.store(b.alias, Ordering::Release);"]);
+    for name in ["unsafe fn bg_mii_init_enter(", "unsafe fn bg_mii_construct_enter(", "unsafe fn bg_mii_construct_path(",
+        "unsafe fn bg_mii_tail_release("] {
+        let hook = body(BANK, name);
+        assert!(hook.contains("shadowed_body(ctx.registers[19].x() as usize)") && !hook.contains("background_mii_body"), "{hook}");
+    }
+    assert!(body(BANK, "unsafe fn bg_mii_index(").contains("background_mii_body(ctx.registers[19].x() as usize)"),
+        "the colour reads: Mii bodies only");
+    let install = body(BANK, "pub(super) unsafe fn install(");
+    for (offset, name, label) in [("0x651a70", "bg_trainer_enter", "background_mii.trainer_enter"),
+        ("0x651b50", "bg_trainer_exit", "background_mii.trainer_exit")] {
+        assert!(BANK.contains(&format!("#[skyline::hook(offset = {offset}, inline)]\nunsafe fn {name}(")), "{name}");
+        assert!(ROWS.contains(&format!("label: \"{label}\", group: \"native_body_bank\", offset: {offset},")), "{name}: seam row");
+        assert!(install.contains(&format!("({offset}, 0x")) && install.contains(name), "{name}: checked and installed");
+        assert!(BANK.contains(&format!("\"{label}\"")), "{label}: in BACKGROUND_MII_SEAMS");
+    }
+    let trainer = body(BANK, "unsafe fn bg_trainer_enter(");
+    ordered(trainer, &["ctx.registers[1].x() as usize == real", "ctx.registers[1].set_x(shadow_r_address() as u64);",
+        "MII_THREAD.store(current_thread(), Ordering::Release);"]);
+    assert!(body(BANK, "unsafe fn bg_trainer_exit(").contains("bg_mii_exit();"));
+    let holder = body(BANK, "unsafe fn start_holder(");
+    ordered(holder, &["let words = b.baseline.map(|_| save_resource_words(shadow_r_address()));", "with_words(b.alias, words, || {",
+        "build(holder, base + PARTNER_TABLE, 0, u64::from(u32::MAX), owner, 0);", "write_entry_identity(entry, &ordinary);",
+        "b.trainer = queue_trainer(base, entry, owner, holder);", "if let Some(live) = live { write_entry_identity(entry, &live); }"]);
+    let finish = body(BANK, "unsafe fn finish_background(");
+    ordered(finish, &["if b.baseline.is_some() {", "MII_REAL_R.store(0, Ordering::Release);",
+        "} else if alias_ok && b.baseline.is_some() {",
+        "release_group_keys_of(base, role, b.alias, b.group, &occupancy, owner, \"background build beside a Mii window\")",
+        "[GroupSwap] background baseline owner={} group={} ok={}"]);
+    // Every key request and release of a group takes its own words: no Mii-only bracket is left.
+    assert!(!BANK.contains("with_mii_identity"));
+    let lifecycle = body(BANK, "unsafe fn group_lifecycle(");
+    ordered(lifecycle, &["let words = group_words_of(role, group, r);", "with_words(r, words, || {", "r_handle::acquire("]);
+    ordered(lifecycle, &["Step::Rearm(group, members, alias) => {", "with_words(r, group_words_of(role, group, r), || {",
+        "acquired = r_handle::acquire("]);
+    assert!(body(BANK, "unsafe fn release_group_keys_of(").contains("with_words(r, group_words_of(role, group, r), || {"));
+    ordered(body(BANK, "unsafe fn retire_groups("), &["let live_mii = (bank.identity.is_some(), bank.ordinary_identity.map(|(words, _)| words));",
+        "own_words(*members, *identity, *window_identity, *baseline, save_resource_words(alias))", "with_words(alias, words, || {"]);
+    ordered(body(BANK, "unsafe fn leave_group("), &["let own = (g.state.holds_keys() || g.object_held)",
+        "own_words(members, identity, window_identity, baseline, save_resource_words(alias))", "with_words(alias, words, || {"]);
+}
