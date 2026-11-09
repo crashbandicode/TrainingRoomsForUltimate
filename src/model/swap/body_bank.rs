@@ -691,6 +691,14 @@ pub fn group_left_cycle(members: Members, wanted: &[u32]) -> bool {
     }
 }
 
+/// Operator decision 2026-11-08 23:42Z ("free under the pause menu"): a Built group that left the cycle stays parked,
+/// out of the plan, and is destroyed when Training's pause screen opens, because native's body destroy holds the game
+/// thread 75-134 ms per body (Eden `rc6-hot-xps16`). Its still-wanted members stay reachable until then. A Prefetched
+/// group returns its keys at once (it costs nothing); every other state holds nothing native.
+pub fn leaves_at_pause(state: GroupState) -> bool {
+    state == GroupState::Built
+}
+
 /// The slot a newly planned group takes: the first Released one (its native objects and keys are gone), else none and
 /// the group is appended.
 pub fn reuse_slot(states: impl Iterator<Item = GroupState>) -> Option<usize> {
@@ -1136,10 +1144,55 @@ pub fn count_extra_groups(groups: &[(Members, GroupState)]) -> GroupCounts {
 }
 
 pub fn count_extra_groups_iter(groups: impl IntoIterator<Item = (Members, GroupState)>) -> GroupCounts {
+    count_group_members(groups.into_iter().map(|(members, state)| (members.count() as u8, state)))
+}
+
+/// Operator decision 2026-11-08 23:42Z: the members of a parked group (left the cycle, freed at the next pause) that its
+/// role's cycle still has. They stay warm until the pause, so the notice and the planner count them; the ones that left
+/// count nowhere (rc6-hot-xps18). The [`group_left_cycle`] rules: Nana follows Popo, a native group is whole while any
+/// of its forms is wanted.
+pub fn kept_members(members: Members, wanted: &[u32]) -> u8 {
+    let kinds = &members.kinds()[..members.count()];
+    match members.special() {
+        Special::Native(_) => if kinds.iter().any(|kind| wanted.contains(kind)) { members.count() as u8 } else { 0 },
+        _ => kinds.iter().filter(|kind| wanted.contains(kind) || (**kind == NANA && wanted.contains(&POPO))).count() as u8,
+    }
+}
+
+/// Operator decision 2026-11-08 23:42Z: the new members waiting for the pause. `after_pause` is what the planner places
+/// with the parked groups gone; `held` says whether any group (parked ones included) holds a kind now. Every member it
+/// places that nothing holds is planned nowhere until the pause frees the parked bodies.
+pub fn waiting_for_pause(after_pause: &[Option<Members>], held: impl Fn(u32) -> bool) -> u8 {
+    after_pause.iter().flatten()
+        .flat_map(|members| { let kinds = members.kinds(); (0..members.count()).map(move |i| kinds[i]) })
+        .filter(|kind| !held(*kind)).count().min(usize::from(u8::MAX)) as u8
+}
+
+impl GroupCounts {
+    /// `waiting` members held until the pause frees the parked groups' bodies: planned, and shown as waiting for memory.
+    pub fn with_waiting(mut self, waiting: u8) -> GroupCounts {
+        if waiting > 0 {
+            self.planned = self.planned.saturating_add(waiting);
+            self.held = self.held.saturating_add(waiting);
+            self.hold = merge_hold(self.hold, Some(Hold::Memory));
+        }
+        self
+    }
+}
+
+/// The window's planned targets: the reusable extras of the window the planner wants for its next lane kind `target`
+/// (`shown`, target first). A group that holds the target already is that window (an exchange left it detached, e.g.
+/// while a Mii group is live) and counts with the groups; a member a group holds counts there too (rc6-hot-xps19).
+pub fn window_targets(shown: &[u32], target: u32, original: Option<u32>, grouped: impl Fn(u32) -> bool) -> u8 {
+    if grouped(target) { return 0; }
+    shown.iter().filter(|&&kind| kind != target && Some(kind) != original && !grouped(kind)).count() as u8
+}
+
+/// [`count_extra_groups_iter`] over `(member count, state)`, so a parked group can count only its kept members.
+pub fn count_group_members(groups: impl IntoIterator<Item = (u8, GroupState)>) -> GroupCounts {
     let mut counts = GroupCounts::default();
-    for (members, state) in groups {
+    for (count, state) in groups {
         if state == GroupState::Released { continue; }
-        let count = members.count() as u8;
         counts.planned += count;
         match state {
             GroupState::Released => {}
@@ -1471,6 +1524,27 @@ impl MiiIdentity {
     }
 }
 
+/// What a warm attach writes of the Mii identity (`R` words, entry bytes, D mirror).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum IdentityMove<T> {
+    /// The target is a Mii group: its own identity.
+    Mii,
+    /// Out of a Mii window into an ordinary group: these ordinary values.
+    Ordinary(T),
+    /// Between two ordinary windows: nothing (`R` and the entry hold the ordinary values already).
+    None,
+}
+
+/// rc.6 (Eden `rc6-hot-xps15`): a warm attach writes an identity only when a Mii is involved. A Mii target writes its own;
+/// out of a Mii window an ordinary target writes the move it saved when a Mii displaced it, else the owner's ordinary
+/// baseline; between two ordinary windows nothing, even when the target still holds a saved move from an earlier Mii
+/// (writing it changed what the adapters own).
+pub fn identity_move<T>(target_mii: bool, leaving_mii: bool, saved: Option<T>, baseline: Option<T>) -> IdentityMove<T> {
+    if target_mii { return IdentityMove::Mii; }
+    if !leaving_mii { return IdentityMove::None; }
+    saved.or(baseline).map_or(IdentityMove::None, IdentityMove::Ordinary)
+}
+
 /// rc.6 warm exit to any Built group (inbox 21:27Z): the `R+0x58..` words an ordinary `window` takes when it attaches out
 /// of a Mii window without its own saved identity move: the owner's ordinary `baseline` (what the first ordinary window a
 /// Mii displaced left in `R`) with that window's header kinds.
@@ -1587,6 +1661,86 @@ mod tests {
         assert_eq!(&baseline_words(baseline, window)[..3], &[0x00, 0x01, 0x02]);
         let trainer = Members::native_group(0x24).unwrap();
         assert_eq!(&baseline_words(baseline, trainer)[..3], &trainer.kinds());
+    }
+
+    /// Eden rc6-hot-xps15: after the exit from a Mii went to Mario's window through the baseline, [Samus, Fox] still held
+    /// the move it saved when the Mii displaced it, and its later attach out of Mario's (ordinary) window wrote it: the
+    /// Player adapter's owned state changed and the switch settled unowned. A warm attach writes an identity only when a
+    /// Mii is involved: a Mii target its own; out of a Mii window an ordinary target its saved move, else the baseline;
+    /// between two ordinary windows nothing.
+    #[test]
+    fn an_identity_moves_only_into_or_out_of_a_mii_window() {
+        let (saved, baseline) = (Some(1), Some(2));
+        assert_eq!(identity_move(true, false, saved, baseline), IdentityMove::Mii);
+        assert_eq!(identity_move::<u8>(true, true, None, None), IdentityMove::Mii);
+        assert_eq!(identity_move(false, true, saved, baseline), IdentityMove::Ordinary(1));
+        assert_eq!(identity_move(false, true, None, baseline), IdentityMove::Ordinary(2));
+        assert_eq!(identity_move::<u8>(false, true, None, None), IdentityMove::None);
+        assert_eq!(identity_move(false, false, saved, baseline), IdentityMove::None, "two ordinary windows");
+        assert_eq!(identity_move(false, false, saved, None), IdentityMove::None);
+    }
+
+    /// Operator decision 2026-11-08 23:42Z (inbox): a Built group that left the cycle stays parked until Training's pause
+    /// screen opens (native's body destroy costs 75-134 ms per body on the game thread, rc6-hot-xps16); a Prefetched one
+    /// returns its keys at once; a prefetch in flight settles first; nothing native exists for the rest.
+    #[test]
+    fn a_built_group_that_left_the_cycle_is_freed_under_the_pause() {
+        assert!(leaves_at_pause(GroupState::Built));
+        for state in [GroupState::Planned, GroupState::Prefetching, GroupState::Prefetched, GroupState::Failed,
+            GroupState::Held(Hold::Memory), GroupState::Released] {
+            assert!(!leaves_at_pause(state), "{state:?}");
+        }
+    }
+
+    /// rc6-hot-xps18 `mb-p1-change`: P1 dropped Fox, so `[Samus, Fox]` is parked until the pause. Samus is still served
+    /// warm from it and counts as built; Fox left and counts nowhere (counting the whole group out showed Samus as
+    /// "swap P1 to load", counting it whole showed Fox as planned). A native group stays whole while any form is wanted.
+    #[test]
+    fn a_parked_group_counts_only_the_members_its_cycle_keeps() {
+        let wanted = [0x01, 0x02, 0x03, 0x05, 0x08];
+        assert_eq!(kept_members(Members::new(&[0x03, 0x07]).unwrap(), &wanted), 1);
+        assert_eq!(kept_members(Members::new(&[0x07]).unwrap(), &wanted), 0);
+        assert_eq!(kept_members(Members::new(&[0x03, 0x05]).unwrap(), &wanted), 2);
+        assert_eq!(kept_members(Members::mii_group(0x4a).unwrap(), &wanted), 0);
+        let counts = count_group_members([(1, GroupState::Built), (2, GroupState::Planned), (3, GroupState::Released),
+            (1, GroupState::Held(Hold::Pool))]);
+        assert_eq!((counts.planned, counts.ready, counts.pending, counts.held, counts.hold), (4, 1, 2, 1, Some(Hold::Pool)));
+        assert_eq!(count_extra_groups_iter([(Members::new(&[0x03, 0x07]).unwrap(), GroupState::Built)]),
+            count_group_members([(2, GroupState::Built)]));
+    }
+
+    /// rc6-hot-xps19 `mb-align` (and xps16/xps17 laps): with the CPU's Mii group live, the planner's window target is the
+    /// next lane kind's window `[Peach, Falcon]`, which the exchange left in a detached record; counted once as the
+    /// window's target and once with the groups, the notice read "Loaded 7/8 · swap the CPU to load 1 more" with every
+    /// member built. A window target a group already holds is that group's, not the window's.
+    #[test]
+    fn a_window_target_a_group_holds_is_counted_once() {
+        let none = |_: u32| false;
+        assert_eq!(window_targets(&[0x0d, 0x0b], 0x0d, None, none), 1);
+        assert_eq!(window_targets(&[0x0d, 0x0b], 0x0d, Some(0x0b), none), 0);
+        let displaced = |kind: u32| [0x0d, 0x0b].contains(&kind);
+        assert_eq!(window_targets(&[0x0d, 0x0b], 0x0d, None, displaced), 0);
+        assert_eq!(window_targets(&[0x01, 0x00, 0x02], 0x01, None, |kind| [0x00, 0x01, 0x02].contains(&kind)), 0);
+        assert_eq!(window_targets(&[0x01, 0x00, 0x02], 0x01, None, |kind| kind == 0x02), 1);
+    }
+
+    /// Operator decision 2026-11-08 23:42Z: a new member the shared budget or a free group slot cannot take while a
+    /// parked group still holds them waits for the pause, shown as "(N waiting for memory)"; it is planned and built
+    /// in the background once the pause has freed the parked bodies. rc6-hot-xps18 `mb-cpu-change`: the CPU's Marth
+    /// was planned nowhere while its parked Mii group and P1's parked pair held the budget, and the notice never
+    /// named it. The count is the members the plan without the parked groups places that no group holds now.
+    #[test]
+    fn a_new_member_waits_for_the_pause_when_parked_groups_hold_the_budget() {
+        let newcomer = Members::new(&[0x16]).unwrap();
+        let samus = Members::new(&[0x03]).unwrap();
+        let held = |kind: u32| [0x03, 0x07, 0x4a].contains(&kind);
+        assert_eq!(waiting_for_pause(&[Some(newcomer), None, None], held), 1);
+        assert_eq!(waiting_for_pause(&[Some(samus), None, None], held), 0);
+        assert_eq!(waiting_for_pause(&[Some(Members::new(&[0x03, 0x16]).unwrap()), None, None], held), 1);
+        assert_eq!(waiting_for_pause(&[None, None, None], held), 0);
+        let counts = count_group_members([(2, GroupState::Built)]).with_waiting(1);
+        assert_eq!((counts.planned, counts.ready, counts.held, counts.hold), (3, 2, 1, Some(Hold::Memory)));
+        assert_eq!(count_group_members([(2, GroupState::Built)]).with_waiting(0), count_group_members([(2, GroupState::Built)]));
     }
 
     /// rc.6 item 3: the notice counts a prefetched group a background build still owes as loading (pending), so it reads

@@ -20,6 +20,63 @@ fn ordered(src: &str, steps: &[&str]) {
 const BANK: &str = include_str!("../src/runtime/roster/native_body_bank.rs");
 const SETUP: &str = include_str!("../src/runtime/roster/mii_setup.rs");
 const ROWS: &str = include_str!("../src/model/seams/native_seams/rows_a1.rs");
+const PLAYER: &str = include_str!("../src/runtime/mii/mii_ordinary_player.rs");
+const CPU: &str = include_str!("../src/runtime/mii/mii_ordinary_cpu.rs");
+const PLAYER_NATIVE: &str = include_str!("../src/runtime/mii/mii_ordinary_native.rs");
+const CPU_NATIVE: &str = include_str!("../src/runtime/mii/mii_selector_native.rs");
+
+/// Eden `rc6-hot-xps14`: the background setup published the group's record pair (global, `0x3759500`), and both
+/// adapters then refused every switch ("preflight current configuration changed", `record_eq=false`). A Mii group
+/// builds in the background only while both adapters are idle; right after the setup both adopt the record change into
+/// every stored snapshot, each copy of that record by its index (the destination, the current record, a protected
+/// owner's record), as a switch-time build's settle adopts it.
+#[test]
+fn both_adapters_adopt_the_record_change_of_a_background_setup() {
+    let start = body(BANK, "unsafe fn start_background(");
+    ordered(start, &[
+        "if mii.is_some() && !(super::mii_ordinary_player::background_idle() && super::mii_ordinary_cpu::background_idle()) {",
+        "let Some(token) = super::INSTALL.try_begin(false) else { return; };",
+        "let (outcome, change) = crate::runtime::roster::mii_setup::prepare_mii_background(",
+        "if let Some(change) = change.filter(|c| c.before != c.after) {",
+        "super::mii_ordinary_player::adopt_background_record(change.index, &change.before, &change.after);",
+        "super::mii_ordinary_cpu::adopt_background_record(change.index, &change.before, &change.after);",
+    ]);
+    let setup = body(SETUP, "unsafe fn prepare_at(");
+    ordered(setup, &["let record_before = fields::read::<[u8; RECORD_LEN]>(reads.record, 0);", "bind(reads.manager,",
+        "faces(owner,", ".map(|(before, after)| RecordChange { index: tokens.index, before, after });"]);
+    for (name, adapter) in [("Player", PLAYER), ("CPU", CPU)] {
+        let idle = body(adapter, "pub(super) fn background_idle()");
+        assert!(idle.contains("!s.busy() && s.generic.is_none()"), "{name}:\n{idle}");
+        let adopt = body(adapter, "pub(super) fn adopt_background_record(");
+        ordered(adopt, &["o.origin.adopt_record(index,before,after)+o.expected.adopt_record(index,before,after)",
+            "x.adopted.adopt_record(index,before,after)+x.mii.before.adopt_record(index,before,after)"]);
+    }
+    let player = body(PLAYER_NATIVE, "    pub(super) fn adopt_record(");
+    ordered(player, &["if self.binding.record_index==index && self.record==*before {self.record=*after;",
+        "if u16::from(p.owner.selector)==index && p.record==*before {p.record=*after;",
+        "if p.owner.index==index && p.current_record==Some(*before) {p.current_record=Some(*after);"]);
+    let cpu = body(CPU_NATIVE, "    pub(crate) fn adopt_record(");
+    ordered(cpu, &["if self.binding.record_index == index && self.record == *before { self.record = *after;",
+        "if self.index == index && self.current_record == *before { self.current_record = *after;",
+        "if *other == index && *record == *before { *record = *after;"]);
+}
+
+/// Eden `rc6-hot-xps14`: a Mii body init writes `D+0x3a8 = 0x69` into the live window's information block. Each window
+/// keeps `D+0x3a0..+0x3ac` (`Window::info_3a0`): taken at every detach, put back at its attach and at a rollback; a
+/// background-built group keeps what its body init wrote, and the live window gets its three words back.
+#[test]
+fn every_window_keeps_its_own_info_3a0_words() {
+    let swap = body(BANK, "unsafe fn perform_swap(");
+    ordered(swap, &["(GroupState::Built, Some(y)) => {", "saved_x.info_3a0 = read_info_3a0(entry as usize);",
+        "restore_window(entry as usize, &y);", "if let Some(words) = y.info_3a0 { write_info_3a0(entry as usize, words); }",
+        "(GroupState::Prefetched, None) => {", "saved_x.info_3a0 = read_info_3a0(entry as usize);"]);
+    let complete = body(BANK, "unsafe fn complete_exchange(");
+    ordered(complete, &["put_mii_r(alias, x.mii_r.unwrap_or_default());",
+        "if let Some(words) = x.info_3a0 { write_info_3a0(entry as usize, words); }"]);
+    let finish = body(BANK, "unsafe fn finish_background(");
+    ordered(finish, &["for (i, word) in b.info_words.iter().enumerate().take(3) {",
+        "window.info_3a0 = info_now.map(|w| [w[0], w[1], w[2]]);"]);
+}
 
 /// The tick: the live words, entry bytes and faces saved; the group's identity installed; the native setup at the
 /// background seam (entry Ready); the third only when it prepared; the shadow taken from `R` with the group's words in
@@ -61,7 +118,7 @@ fn the_worker_reads_the_shadow_and_the_groups_values() {
         ("0x60b5c8", "bg_mii_init_exit"), ("0x60b7a8", "bg_mii_construct_index_a"), ("0x60b834", "bg_mii_construct_index_b"),
         ("0x60b98c", "bg_mii_construct_enter"), ("0x60bf30", "bg_mii_construct_path"), ("0x60de68", "bg_mii_construct_tail"),
         ("0x60dec4", "bg_mii_tail_release"), ("0x60df04", "bg_mii_construct_exit"), ("0x33a05a8", "bg_mii_reader_costume"),
-        ("0x344fcd4", "bg_mii_reader_hat"), ("0x6e655c", "bg_mii_reader_6e655c"), ("0x6e6ccc", "bg_mii_reader_6e6ccc"),
+        ("0x344fcd4", "bg_mii_reader_hat"), ("0x6e655c", "bg_mii_reader_6e655c"), ("0x6e6bc4", "bg_mii_reader_paths"),
         ("0x33c3468", "bg_mii_reader_33c3468")];
     let install = body(BANK, "pub(super) unsafe fn install(");
     for (offset, name) in sites {
@@ -92,8 +149,11 @@ fn the_worker_reads_the_shadow_and_the_groups_values() {
     let costume = body(BANK, "unsafe fn bg_mii_reader_costume(");
     ordered(costume, &["if mii_worker_reads(ctx.registers[8].x() as usize) {", "ctx.registers[8].set_x(shadow_r_address() as u64);"]);
     let hat = body(BANK, "unsafe fn bg_mii_reader_hat(");
-    ordered(hat, &["if mii_worker_reads(ctx.registers[21].x() as usize) {",
+    ordered(hat, &["if mii_worker_reads(ctx.registers[21].x() as usize) {", "ctx.registers[21].set_x(shadow_r_address() as u64);",
         "ctx.registers[3].set_x(u64::from(fields::read_unchecked::<u32>(shadow_r_address(), 0x70)));"]);
+    // rc6-hot-xps14: `0x6e6bc0`'s reader ran on the worker during the Mii construction; its paths and costume take the shadow.
+    let paths = body(BANK, "unsafe fn bg_mii_reader_paths(");
+    ordered(paths, &["if mii_worker_reads(ctx.registers[20].x() as usize) {", "ctx.registers[20].set_x(shadow_r_address() as u64);"]);
     let queue = body(BANK, "unsafe fn queue_background_bodies(");
     ordered(queue, &["MII_VALUES.store(m.values, Ordering::Release);", "MII_OWNER.store(owner, Ordering::Release);",
         "MII_REAL_R.store(b.alias, Ordering::Release);", "let (tasks, queued) = queue_detached(base, owner, b.members);"]);

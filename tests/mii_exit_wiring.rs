@@ -44,16 +44,42 @@ fn the_exchange_writes_the_ordinary_baseline_for_any_ordinary_target() {
         "if x_identity.is_none() { bank.ordinary_identity = saved_x.identity; }",
         "let baseline = bank.ordinary_identity.filter(|_| x_identity.is_some());",
         "(GroupState::Built, Some(y)) => {",
-        "(None, None) => baseline.map(|(words, saved)| {",
+        // rc6-hot-xps15: only into or out of a Mii window (`body_bank::identity_move`), never between two ordinary ones.
+        "identity_move(target_identity.is_some(), x_identity.is_some(), y.identity, baseline)",
+        "(None, IdentityMove::Ordinary((words, saved))) => {",
         "let words = baseline_words(words, target_members);",
         "write_resource_words(alias, &words);",
         "write_entry_identity(entry as usize, &saved);",
-        "(header_of(owner, &words), saved.entry)",
+        "(None, _) => None,",
     ] {
         let found = tail[from..].find(step).unwrap_or_else(|| panic!("missing or out of order: {step}\n{tail}"));
         from += found + step.len();
     }
     assert!(BANK.contains("ordinary_identity: None,"), "every new bank starts without a baseline");
+}
+
+/// Eden rc6-hot-xps16: after an exit through the baseline the Mii group sat in another group record, whose configuration
+/// was not its own; `reachable_mii_group` (identity and configuration of one record) stopped matching and the next switch
+/// to the Mii took the canonical Reload. The configuration moves with the identity at every exchange and rollback.
+#[test]
+fn the_configuration_moves_with_its_identity() {
+    let swap = body(BANK, "unsafe fn perform_swap(");
+    let mut from = 0;
+    for step in [
+        "let x_identity = std::mem::replace(&mut bank.identity, bank.groups[swap.group].identity);",
+        "let x_configuration = std::mem::replace(&mut bank.configuration, bank.groups[swap.group].configuration);",
+        "group.identity = x_identity;",
+        "group.configuration = x_configuration;",
+        "mii_build = target_identity.zip(bank.configuration)",
+        "bank.identity = x_identity;",
+        "bank.configuration = x_configuration;",
+    ] {
+        let found = swap[from..].find(step).unwrap_or_else(|| panic!("missing or out of order: {step}\n{swap}"));
+        from += found + step.len();
+    }
+    let complete = body(BANK, "unsafe fn complete_exchange(");
+    assert!(complete.contains("bank.configuration = std::mem::replace(&mut record.configuration, target_configuration);"), "{complete}");
+    assert!(BANK.contains("identity: None, configuration: None, ordinary_identity: None,"));
 }
 
 /// Both adapters: a settled Mii group switch keeps its publication; a request out of that live Mii plans the exit

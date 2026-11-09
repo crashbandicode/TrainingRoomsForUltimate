@@ -120,7 +120,8 @@ fn the_lifecycle_starts_and_settles_it_and_the_gate_needs_both_paths() {
     let service = body(BANK, "unsafe fn service_locked(");
     ordered(service, &["else if bank.background.is_some() { Action::Background }",
         "|| background_candidate(bank, Some(members.kinds()[usize::from(index)])).is_some() {"]);
-    assert!(BANK.contains("Action::Background => settle_background(entry, owner, role),"));
+    // Inbox 22:17Z: each entry step names itself for its `slow step` line.
+    assert!(BANK.contains("Action::Background => { settle_background(entry, owner, role); \"background settle\" }"));
     let lifecycle = body(BANK, "unsafe fn group_lifecycle(");
     ordered(lifecycle, &["(Some(group), _) if bank.groups[group].state == GroupState::Planned =>",
         "(_, Some(group)) => Step::Background(group),", "Step::Background(group) => start_background(entry, owner, role, group),"]);

@@ -280,6 +280,19 @@ impl Snapshot {
         authority(self.binding,self.thread,[self.symbol,self.manager,self.internal],
             self.entries,0,self.owners[0].unwrap())
     }
+    /// rc.6 item 3 (a Mii group built in the background, `body_bank::start_background`): the bank's Mii setup changed
+    /// selector record `index` from `before` to `after` (its pair) while this owner was idle. Each copy of that record
+    /// here (the destination, a protected owner's record or current record) that still holds `before` takes `after`.
+    /// Returns how many copies changed.
+    pub(super) fn adopt_record(&mut self,index:u16,before:&[u8;values::RECORD_LEN],after:&[u8;values::RECORD_LEN])->usize {
+        let mut changed=0;
+        if self.binding.record_index==index && self.record==*before {self.record=*after;changed+=1;}
+        for p in self.protected.iter_mut().flatten() {
+            if u16::from(p.owner.selector)==index && p.record==*before {p.record=*after;changed+=1;}
+            if p.owner.index==index && p.current_record==Some(*before) {p.current_record=Some(*after);changed+=1;}
+        }
+        changed
+    }
 }
 pub(super) fn same_owned(a:&Snapshot,b:&Snapshot)->bool {
     a.binding==b.binding && a.thread!=0 && a.thread==b.thread
