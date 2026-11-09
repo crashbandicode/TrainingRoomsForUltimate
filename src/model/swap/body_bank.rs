@@ -802,9 +802,8 @@ pub fn async_build_eligible(members: Members, identity: bool) -> Result<(), &'st
 /// window, so its first switch is a warm exchange. The construction binds to the entry by index (body init's
 /// prepare_entry `0x17f1a60` at `0x607f30` writes the copy-registry slot of its cell from the worker), so only what the
 /// queued build already serves (`async_build_eligible`): an ordinary single-actor group or a Mii group, while the
-/// window holds no Mii identity (the costume selectors at `0x607dfc`/`0x17e9ae0` key on `R+0x58`) and its live member
-/// is not Kirby (D-KIRBY1: no bank key rests on its R). The live window (`window`, the attached group): the body's
-/// construction tail reads the live cells 0/1 from the worker and takes the pair rule on R for `[Popo, Nana]`, which may
+/// window's live member is not Kirby (D-KIRBY1: no bank key rests on its R). The live window (`window`, the attached
+/// group): the body's construction tail reads the live cells 0/1 from the worker and takes the pair rule on R for `[Popo, Nana]`, which may
 /// reset the whole R mid-play (SPECIAL-GROUPS §0 X1, `0x60de60-0x60de78`), and construct picks its info wrapper from the
 /// live window's actor count (X4, `0x60d21c-0x60d270`: in re6 one-actor windows gave every body `FE+0xf0`; only the
 /// pair's Nana took `FE+0x100`).
@@ -817,6 +816,13 @@ pub fn async_build_eligible(members: Members, identity: bool) -> Result<(), &'st
 /// - a native window (Pokémon Trainer, Pyra/Mythra; a session that starts on one) takes part: one actor, its cells 0/1
 ///   never `[Popo, Nana]`; only an Ice Climbers body picks its info wrapper from the live kinds (X4, `0x60d1f0`), so the
 ///   pair group needs the X4 hook there (the cross cells below).
+/// - a Mii window (`LiveIdentity::Mii`: P1 or the CPU on a Mii group; X6, primary 2026-11-09 04:22Z) takes part once the
+///   owner's ordinary baseline is known (`baseline`, `Bank::ordinary_identity`): every body's costume and paths key on
+///   `R+0x58`/`+0x64` (SPECIAL-GROUPS §0 X3: a Mii class forces costume 0), so the group's tick, key requests and worker
+///   take the baseline words with its own header kinds (`own_words`; the worker through the shadow `R`). Without a
+///   baseline it defers the build ("mii window"). A Mii group beside it waits ("mii beside a mii window"): an owner has
+///   one Mii record (`staged_descriptor_for_owner`), and the group's native setup would publish its pair into the
+///   record the live Mii reads.
 ///
 /// The groups:
 /// - a native group (SPECIAL-GROUPS §3) builds as an ordinary group does; its holder records come from native loader
@@ -829,8 +835,7 @@ pub fn async_build_eligible(members: Members, identity: bool) -> Result<(), &'st
 ///   build stays synchronous (`async_build_eligible`).
 /// - a Mii group (SPECIAL-GROUPS §1) builds when it carries its identity: the tick brackets `R`'s words, the entry's Mii
 ///   bytes and the D mirror and runs the native Mii setup, and the worker reads a shadow `R` (`native_body_bank`
-///   `SHADOW_R`). A live Mii window defers it (that window's faces and resource object in `R` are a case not built yet).
-///   A live native or pair window takes part (X5, primary 2026-11-09 02:42Z): of §0's live reads, the Mii body's costume
+///   `SHADOW_R`). A live Mii window defers it (above). A live native or pair window takes part (X5, primary 2026-11-09 02:42Z): of §0's live reads, the Mii body's costume
 ///   and paths read the shadow (X3), its cell byte is the group's (X2), its tail is the shared hook's (X1), and X4 and X5
 ///   touch only Ice Climbers and Aegis bodies; a pair window still needs the redirected tail, as every group does.
 ///
@@ -842,19 +847,16 @@ pub fn async_build_eligible(members: Members, identity: bool) -> Result<(), &'st
 ///   wrapper a background Popo or Nana body takes comes from its building group's words (`info_wrapper`), so Nana gets
 ///   her own `+0x100` as in her synchronous build; without it the build waits for another window.
 ///
-/// A Mii group (SPECIAL-GROUPS §1; `p23/rc6-hot-slots-mii`) builds in the background when it carries its identity: the
-/// tick brackets `R`'s words, the entry's Mii bytes and the D mirror and runs the native Mii setup, and the worker reads
-/// a shadow `R` (`native_body_bank` `SHADOW_R`). A live Mii window defers it (that window's faces and resource object in
-/// `R` are a case not built yet), and so does a live pair or native window: the Mii branch kept the base's "special
-/// window" refusal, and no Eden run has built a Mii group beside one (integration merge, 2026-11-09).
-///
 /// Every other group keeps today's build at its first switch.
-pub fn background_build_eligible(members: Members, identity: bool, window: Members, window_identity: bool, live_kirby: bool,
+pub fn background_build_eligible(members: Members, identity: bool, window: Members, live: LiveIdentity, live_kirby: bool,
     pair_tail: bool, info_x4: bool) -> Result<(), &'static str> {
     let native = |m: Members| matches!(m.special(), Special::Native(_));
     if members.special() == Special::Mii && !identity { return Err("mii without identity"); }
     if members.special() != Special::Pair && (identity || !native(members)) { async_build_eligible(members, identity)?; }
-    if window_identity { return Err("mii window"); }
+    if let LiveIdentity::Mii { baseline } = live {
+        if members.special() == Special::Mii { return Err("mii beside a mii window"); }
+        if !baseline { return Err("mii window"); }
+    }
     if live_kirby { return Err("live kirby"); }
     if window.is_pair() && !pair_tail { return Err("pair window"); }
     if native(window) && members.special() == Special::Pair && !info_x4 { return Err("pair group beside a native window without X4"); }
@@ -863,11 +865,27 @@ pub fn background_build_eligible(members: Members, identity: bool, window: Membe
 
 /// The group a background build starts next: the first Prefetched group in plan order that is eligible
 /// (`background_build_eligible`) beside the live `window`, from `(state, members, identity)`.
-pub fn next_background(groups: impl Iterator<Item = (GroupState, Members, bool)>, window: Members, window_identity: bool,
+pub fn next_background(groups: impl Iterator<Item = (GroupState, Members, bool)>, window: Members, live: LiveIdentity,
     live_kirby: bool, pair_tail: bool, info_x4: bool) -> Option<usize> {
     groups.enumerate().find(|(_, (state, members, identity))| *state == GroupState::Prefetched
-        && background_build_eligible(*members, *identity, window, window_identity, live_kirby, pair_tail, info_x4).is_ok())
+        && background_build_eligible(*members, *identity, window, live, live_kirby, pair_tail, info_x4).is_ok())
         .map(|(i, _)| i)
+}
+
+/// The live window's Mii identity as a background build sees it (X6, `background_build_eligible`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LiveIdentity {
+    /// An ordinary, native or pair window: `R` holds the owner's ordinary words.
+    Ordinary,
+    /// A Mii group's window; `baseline`: the owner's ordinary words are known (`Bank::ordinary_identity`).
+    Mii { baseline: bool },
+}
+
+impl LiveIdentity {
+    /// From the window's identity (`Bank::identity.is_some()`) and the baseline's (`Bank::ordinary_identity.is_some()`).
+    pub fn of(window_identity: bool, baseline: bool) -> Self {
+        if window_identity { Self::Mii { baseline } } else { Self::Ordinary }
+    }
 }
 
 /// Inbox 00:18Z (a console-crash class, at the base too): a Pokémon Trainer group's article pool is retired at its detach
@@ -1681,6 +1699,28 @@ pub fn baseline_words(baseline: [u32; RESOURCE_WORDS], window: Members) -> [u32;
     words
 }
 
+/// The `R+0x58..` words a group's native work takes when they are not the live window's (its key requests and releases,
+/// its background tick and the worker's shadow `R`): a Mii group its identity's over `current`; X6 (primary 2026-11-09
+/// 04:22Z), beside a live Mii window (`window_identity`) any other group the owner's ordinary `baseline` with its own
+/// header kinds (`baseline_words`, what its warm exit writes), not the Mii's costume, record and flags. `None` when `R`
+/// holds them already (an ordinary window), or when no baseline is known (its background build waits).
+pub fn own_words(members: Members, identity: Option<MiiIdentity>, window_identity: bool, baseline: Option<[u32; RESOURCE_WORDS]>,
+    current: [u32; RESOURCE_WORDS]) -> Option<[u32; RESOURCE_WORDS]> {
+    match identity {
+        Some(identity) => Some(identity.resource_words(current)),
+        None if window_identity => baseline.map(|baseline| baseline_words(baseline, members)),
+        None => None,
+    }
+}
+
+/// The values the worker hooks give a background body that reads a shadow `R` (`native_body_bank` `MII_VALUES`), from
+/// the identity bytes its tick wrote into the entry: the record index `FE+0x46` (bits 0-15), the costume `FE+0x41`
+/// (16-23, construct's `0x17e99c0` argument) and `FE+0x52` (24-31, body init's `0x607d7c`).
+pub fn shadow_values(entry: &MiiEntryBytes) -> u32 {
+    let at = |offset: usize| entry[offset - MII_ENTRY_START];
+    u32::from(u16::from_le_bytes([at(0x46), at(0x47)])) | u32::from(at(0x41)) << 16 | u32::from(at(0x52)) << 24
+}
+
 /// The identity-owned slice of a descriptor (what a Mii window must give back).
 pub fn entry_bytes_of(descriptor: &[u8; 0x70]) -> MiiEntryBytes {
     descriptor[MII_ENTRY_START..MII_ENTRY_END].try_into().unwrap()
@@ -1888,36 +1928,37 @@ mod tests {
     fn a_background_build_takes_an_ordinary_prefetched_group_beside_an_ordinary_window() {
         let ordinary = Members::new(&[0x2d, 0x2c, 0x1c]).unwrap();
         let window = Members::new(&[0x00, 0x01, 0x02]).unwrap();
-        assert_eq!(background_build_eligible(ordinary, false, window, false, false, false, false), Ok(()));
-        assert_eq!(background_build_eligible(Members::new(&[0x1c]).unwrap(), false, window, false, false, false, false), Ok(()));
+        assert_eq!(background_build_eligible(ordinary, false, window, LiveIdentity::Ordinary, false, false, false), Ok(()));
+        assert_eq!(background_build_eligible(Members::new(&[0x1c]).unwrap(), false, window, LiveIdentity::Ordinary, false, false, false), Ok(()));
         // SPECIAL-GROUPS §1 (operator 20:26Z, "All groups in rc.6"): a Mii group with its identity builds in the
         // background too (its R, entry and D words bracketed in the tick, shadow R on the worker); never without one.
-        assert_eq!(background_build_eligible(Members::mii_group(0x4a).unwrap(), true, window, false, false, false, false), Ok(()));
-        assert_eq!(background_build_eligible(Members::mii_group(0x4a).unwrap(), false, window, false, false, false, false),
+        assert_eq!(background_build_eligible(Members::mii_group(0x4a).unwrap(), true, window, LiveIdentity::Ordinary, false, false, false), Ok(()));
+        assert_eq!(background_build_eligible(Members::mii_group(0x4a).unwrap(), false, window, LiveIdentity::Ordinary, false, false, false),
             Err("mii without identity"));
-        assert_eq!(background_build_eligible(Members::mii_group(0x4a).unwrap(), true, window, true, false, false, false), Err("mii window"));
-        assert_eq!(background_build_eligible(ordinary, true, window, false, false, false, false), Err("identity"));
+        assert_eq!(background_build_eligible(Members::mii_group(0x4a).unwrap(), true, window, LiveIdentity::Mii { baseline: false }, false, false, false),
+            Err("mii beside a mii window"));
+        assert_eq!(background_build_eligible(ordinary, true, window, LiveIdentity::Ordinary, false, false, false), Err("identity"));
         // SPECIAL-GROUPS §2: the pair group builds in the background (`a_background_build_takes_the_pair_group_…`).
-        assert_eq!(background_build_eligible(Members::pair_group(), false, window, false, false, false, false), Ok(()));
-        assert_eq!(background_build_eligible(ordinary, false, window, true, false, false, false), Err("mii window"));
-        assert_eq!(background_build_eligible(ordinary, false, window, false, true, false, false), Err("live kirby"));
+        assert_eq!(background_build_eligible(Members::pair_group(), false, window, LiveIdentity::Ordinary, false, false, false), Ok(()));
+        assert_eq!(background_build_eligible(ordinary, false, window, LiveIdentity::Mii { baseline: false }, false, false, false), Err("mii window"));
+        assert_eq!(background_build_eligible(ordinary, false, window, LiveIdentity::Ordinary, true, false, false), Err("live kirby"));
         // SPECIAL-GROUPS §0 X1: a body's construction tail reads the live cells 0/1; `[Popo, Nana]` takes the pair rule
         // (and may reset the whole R) unless the tail is redirected (`pair_tail`).
         for pair in [Members::pair_group(), Members::pair_lead(0x02).unwrap()] {
-            assert_eq!(background_build_eligible(ordinary, false, pair, false, false, false, false), Err("pair window"));
+            assert_eq!(background_build_eligible(ordinary, false, pair, LiveIdentity::Ordinary, false, false, false), Err("pair window"));
         }
         // A one-actor native window (X4: every body `FE+0xf0` in re6) takes part (`p23/rc6-bg-pt`, Eden rc6-bg-pt3).
-        assert_eq!(background_build_eligible(ordinary, false, Members::native_group(0x24).unwrap(), false, false, false, false), Ok(()));
+        assert_eq!(background_build_eligible(ordinary, false, Members::native_group(0x24).unwrap(), LiveIdentity::Ordinary, false, false, false), Ok(()));
         let groups = [(GroupState::Built, ordinary, false), (GroupState::Prefetched, Members::mii_group(0x48).unwrap(), true),
             (GroupState::Planned, ordinary, false), (GroupState::Prefetched, Members::new(&[0x1c]).unwrap(), false),
             (GroupState::Prefetched, ordinary, false)];
-        assert_eq!(next_background(groups.iter().copied(), window, false, false, false, false), Some(1));
-        assert_eq!(next_background(groups[2..].iter().copied(), window, false, false, false, false).map(|i| i + 2), Some(3));
-        assert_eq!(next_background(groups.iter().copied(), window, true, false, false, false), None);
-        assert_eq!(next_background(groups.iter().copied(), window, false, true, false, false), None);
-        assert_eq!(next_background(groups.iter().copied(), Members::pair_group(), false, false, false, false), None);
-        assert_eq!(next_background(groups[..3].iter().copied(), window, false, false, false, false), Some(1));
-        assert_eq!(next_background([groups[0], groups[2]].into_iter(), window, false, false, false, false), None);
+        assert_eq!(next_background(groups.iter().copied(), window, LiveIdentity::Ordinary, false, false, false), Some(1));
+        assert_eq!(next_background(groups[2..].iter().copied(), window, LiveIdentity::Ordinary, false, false, false).map(|i| i + 2), Some(3));
+        assert_eq!(next_background(groups.iter().copied(), window, LiveIdentity::Mii { baseline: false }, false, false, false), None);
+        assert_eq!(next_background(groups.iter().copied(), window, LiveIdentity::Ordinary, true, false, false), None);
+        assert_eq!(next_background(groups.iter().copied(), Members::pair_group(), LiveIdentity::Ordinary, false, false, false), None);
+        assert_eq!(next_background(groups[..3].iter().copied(), window, LiveIdentity::Ordinary, false, false, false), Some(1));
+        assert_eq!(next_background([groups[0], groups[2]].into_iter(), window, LiveIdentity::Ordinary, false, false, false), None);
         // The saved info spans cover what `0x654dc0` writes: the dispatcher words, the descriptor copies, `+0x3ac`.
         let covered = |at: usize| BACKGROUND_INFO_SPANS.iter().any(|(start, len)| (*start..start + len).contains(&at));
         for at in [0x08, 0x10, 0x18, 0x20, 0x28, 0x2c, 0x30, 0x34, 0x50, 0x51, 0x6b, 0x72, 0x78, 0x84, 0x92, 0x3a0, 0x3aa, 0x3ac] {
@@ -1937,30 +1978,30 @@ mod tests {
         let pt = Members::native_group(0x25).unwrap();
         let aegis = Members::native_group(0x5b).unwrap();
         for native in [pt, aegis] {
-            assert_eq!(background_build_eligible(native, false, window, false, false, false, false), Ok(()));
-            assert_eq!(background_build_eligible(ordinary, false, native, false, false, false, false), Ok(()));
-            assert_eq!(background_build_eligible(Members::new(&[0x1c]).unwrap(), false, native, false, false, false, false), Ok(()));
-            assert_eq!(background_build_eligible(native, false, window, true, false, false, false), Err("mii window"));
-            assert_eq!(background_build_eligible(native, false, window, false, true, false, false), Err("live kirby"));
-            assert_eq!(background_build_eligible(native, false, Members::pair_group(), false, false, false, false), Err("pair window"));
+            assert_eq!(background_build_eligible(native, false, window, LiveIdentity::Ordinary, false, false, false), Ok(()));
+            assert_eq!(background_build_eligible(ordinary, false, native, LiveIdentity::Ordinary, false, false, false), Ok(()));
+            assert_eq!(background_build_eligible(Members::new(&[0x1c]).unwrap(), false, native, LiveIdentity::Ordinary, false, false, false), Ok(()));
+            assert_eq!(background_build_eligible(native, false, window, LiveIdentity::Mii { baseline: false }, false, false, false), Err("mii window"));
+            assert_eq!(background_build_eligible(native, false, window, LiveIdentity::Ordinary, true, false, false), Err("live kirby"));
+            assert_eq!(background_build_eligible(native, false, Members::pair_group(), LiveIdentity::Ordinary, false, false, false), Err("pair window"));
             // Cross cell (a): beside a live pair window with the redirected tail (X1; X4 does not apply to its kinds).
-            assert_eq!(background_build_eligible(native, false, Members::pair_group(), false, false, true, false),
+            assert_eq!(background_build_eligible(native, false, Members::pair_group(), LiveIdentity::Ordinary, false, true, false),
                 Ok(()));
-            assert_eq!(background_build_eligible(native, true, window, false, false, false, false), Err("native group"));
+            assert_eq!(background_build_eligible(native, true, window, LiveIdentity::Ordinary, false, false, false), Err("native group"));
             // Its switch-time build stays `0x658af0`'s.
             assert_eq!(async_build_eligible(native, false), Err("native group"));
         }
-        assert_eq!(background_build_eligible(pt, false, aegis, false, false, false, false), Ok(()));
-        assert_eq!(background_build_eligible(aegis, false, pt, false, false, false, false), Ok(()));
+        assert_eq!(background_build_eligible(pt, false, aegis, LiveIdentity::Ordinary, false, false, false), Ok(()));
+        assert_eq!(background_build_eligible(aegis, false, pt, LiveIdentity::Ordinary, false, false, false), Ok(()));
         // A Mii group (with its identity) builds beside an ordinary window and, with X5, beside a live native window.
-        assert_eq!(background_build_eligible(Members::mii_group(0x48).unwrap(), true, pt, false, false, false, false), Ok(()));
-        assert_eq!(background_build_eligible(Members::mii_group(0x48).unwrap(), true, window, false, false, false, false), Ok(()));
+        assert_eq!(background_build_eligible(Members::mii_group(0x48).unwrap(), true, pt, LiveIdentity::Ordinary, false, false, false), Ok(()));
+        assert_eq!(background_build_eligible(Members::mii_group(0x48).unwrap(), true, window, LiveIdentity::Ordinary, false, false, false), Ok(()));
         let groups = [(GroupState::Built, ordinary, false), (GroupState::Prefetched, pt, false),
             (GroupState::Prefetched, aegis, false)];
-        assert_eq!(next_background(groups.iter().copied(), window, false, false, false, false), Some(1));
-        assert_eq!(next_background(groups[2..].iter().copied(), pt, false, false, false, false), Some(0));
-        assert_eq!(next_background([(GroupState::Prefetched, ordinary, false)].into_iter(), pt, false, false, false, false), Some(0));
-        assert_eq!(next_background(groups.iter().copied(), Members::pair_group(), false, false, false, false), None);
+        assert_eq!(next_background(groups.iter().copied(), window, LiveIdentity::Ordinary, false, false, false), Some(1));
+        assert_eq!(next_background(groups[2..].iter().copied(), pt, LiveIdentity::Ordinary, false, false, false), Some(0));
+        assert_eq!(next_background([(GroupState::Prefetched, ordinary, false)].into_iter(), pt, LiveIdentity::Ordinary, false, false, false), Some(0));
+        assert_eq!(next_background(groups.iter().copied(), Members::pair_group(), LiveIdentity::Ordinary, false, false, false), None);
         // Native loader state 11's step: PT's pool task on the worker, Aegis's pool on the game thread.
         assert_eq!((pt.holder_step(), aegis.holder_step()), (Some(HolderStep::Trainer), Some(HolderStep::Partner)));
         for other in [ordinary, Members::pair_group(), Members::mii_group(0x4a).unwrap()] {
@@ -1988,31 +2029,31 @@ mod tests {
         let ordinary = Members::new(&[0x2d, 0x2c, 0x1c]).unwrap();
         let window = Members::new(&[0x00, 0x01, 0x02]).unwrap();
         for pair_tail in [false, true] {
-            assert_eq!(background_build_eligible(Members::pair_group(), false, window, false, false, pair_tail, false), Ok(()));
-            assert_eq!(background_build_eligible(Members::pair_group(), false, window, true, false, pair_tail, false), Err("mii window"));
-            assert_eq!(background_build_eligible(Members::pair_group(), false, window, false, true, pair_tail, false), Err("live kirby"));
-            assert_eq!(background_build_eligible(ordinary, false, Members::native_group(0x24).unwrap(), false, false, pair_tail, false),
+            assert_eq!(background_build_eligible(Members::pair_group(), false, window, LiveIdentity::Ordinary, false, pair_tail, false), Ok(()));
+            assert_eq!(background_build_eligible(Members::pair_group(), false, window, LiveIdentity::Mii { baseline: false }, false, pair_tail, false), Err("mii window"));
+            assert_eq!(background_build_eligible(Members::pair_group(), false, window, LiveIdentity::Ordinary, true, pair_tail, false), Err("live kirby"));
+            assert_eq!(background_build_eligible(ordinary, false, Members::native_group(0x24).unwrap(), LiveIdentity::Ordinary, false, pair_tail, false),
                 Ok(()));
-            assert_eq!(background_build_eligible(Members::pair_group(), false, Members::native_group(0x24).unwrap(), false, false,
+            assert_eq!(background_build_eligible(Members::pair_group(), false, Members::native_group(0x24).unwrap(), LiveIdentity::Ordinary, false,
                 pair_tail, false), Err("pair group beside a native window without X4"));
-            assert_eq!(background_build_eligible(Members::pair_group(), false, Members::native_group(0x24).unwrap(), false, false,
+            assert_eq!(background_build_eligible(Members::pair_group(), false, Members::native_group(0x24).unwrap(), LiveIdentity::Ordinary, false,
                 pair_tail, true), Ok(()));
         }
         for live_pair in [Members::pair_group(), Members::pair_lead(0x02).unwrap()] {
             assert!(live_pair.is_pair());
-            assert_eq!(background_build_eligible(ordinary, false, live_pair, false, false, true, false), Ok(()));
-            assert_eq!(background_build_eligible(Members::new(&[0x1c]).unwrap(), false, live_pair, false, false, true, false), Ok(()));
-            assert_eq!(background_build_eligible(ordinary, false, live_pair, false, false, false, false), Err("pair window"));
+            assert_eq!(background_build_eligible(ordinary, false, live_pair, LiveIdentity::Ordinary, false, true, false), Ok(()));
+            assert_eq!(background_build_eligible(Members::new(&[0x1c]).unwrap(), false, live_pair, LiveIdentity::Ordinary, false, true, false), Ok(()));
+            assert_eq!(background_build_eligible(ordinary, false, live_pair, LiveIdentity::Ordinary, false, false, false), Err("pair window"));
         }
         // The switch-time build of the pair group stays synchronous (`mode=sync reason=pair group`).
         assert_eq!(async_build_eligible(Members::pair_group(), false), Err("pair group"));
         // A session that starts on Ice Climbers: its other groups get built.
         let groups = [(GroupState::Prefetched, ordinary, false), (GroupState::Prefetched, Members::new(&[0x1c]).unwrap(), false)];
-        assert_eq!(next_background(groups.iter().copied(), Members::pair_lead(0x02).unwrap(), false, false, true, false), Some(0));
-        assert_eq!(next_background(groups.iter().copied(), Members::pair_lead(0x02).unwrap(), false, false, false, false), None);
+        assert_eq!(next_background(groups.iter().copied(), Members::pair_lead(0x02).unwrap(), LiveIdentity::Ordinary, false, true, false), Some(0));
+        assert_eq!(next_background(groups.iter().copied(), Members::pair_lead(0x02).unwrap(), LiveIdentity::Ordinary, false, false, false), None);
         // The pair group as the next build beside an ordinary window.
         let with_pair = [(GroupState::Built, ordinary, false), (GroupState::Prefetched, Members::pair_group(), false)];
-        assert_eq!(next_background(with_pair.iter().copied(), window, false, false, false, false), Some(1));
+        assert_eq!(next_background(with_pair.iter().copied(), window, LiveIdentity::Ordinary, false, false, false), Some(1));
     }
 
     /// Inbox 00:18Z (a console-crash class, at the base too): a later warm attach of a Pokémon Trainer group rebuilds its
@@ -3790,19 +3831,140 @@ mod tests {
         let mii = Members::mii_group(0x4a).unwrap();
         for native in [Members::native_group(0x24).unwrap(), Members::native_group(0x5a).unwrap()] {
             for x4 in [false, true] {
-                assert_eq!(background_build_eligible(mii, true, native, false, false, false, x4), Ok(()), "{native:?}");
+                assert_eq!(background_build_eligible(mii, true, native, LiveIdentity::Ordinary, false, false, x4), Ok(()), "{native:?}");
             }
         }
         for pair in [Members::pair_group(), Members::pair_lead(0x02).unwrap()] {
-            assert_eq!(background_build_eligible(mii, true, pair, false, false, true, false), Ok(()), "{pair:?}");
-            assert_eq!(background_build_eligible(mii, true, pair, false, false, false, false), Err("pair window"));
+            assert_eq!(background_build_eligible(mii, true, pair, LiveIdentity::Ordinary, false, true, false), Ok(()), "{pair:?}");
+            assert_eq!(background_build_eligible(mii, true, pair, LiveIdentity::Ordinary, false, false, false), Err("pair window"));
         }
         let pt = Members::native_group(0x24).unwrap();
-        assert_eq!(background_build_eligible(mii, false, pt, false, false, false, false), Err("mii without identity"));
-        assert_eq!(background_build_eligible(mii, true, pt, true, false, false, false), Err("mii window"));
-        assert_eq!(next_background([(GroupState::Prefetched, mii, true)].into_iter(), pt, false, false, false, false), Some(0));
+        assert_eq!(background_build_eligible(mii, false, pt, LiveIdentity::Ordinary, false, false, false), Err("mii without identity"));
+        assert_eq!(background_build_eligible(mii, true, pt, LiveIdentity::Mii { baseline: false }, false, false, false), Err("mii beside a mii window"));
+        assert_eq!(next_background([(GroupState::Prefetched, mii, true)].into_iter(), pt, LiveIdentity::Ordinary, false, false, false), Some(0));
         assert_eq!(next_background([(GroupState::Prefetched, mii, true)].into_iter(), Members::pair_lead(0x02).unwrap(),
-            false, false, true, false), Some(0));
+            LiveIdentity::Ordinary, false, true, false), Some(0));
+    }
+
+    /// X6 (primary 2026-11-09 04:22Z, the live Mii window column): with P1 or the CPU on a Mii group, every other group
+    /// builds in the background too. Its tick, its worker and its key requests take the owner's ordinary baseline words
+    /// (`own_words`) instead of the live Mii's (SPECIAL-GROUPS §0 X3 for every body), so a group waits only while no
+    /// baseline is known (`mii window`). A Mii group beside a live Mii window still waits: an owner has one Mii record
+    /// (`staged_descriptor_for_owner`), and the group's native setup would publish its own pair into the record the live
+    /// Mii reads.
+    #[test]
+    fn every_group_but_a_mii_builds_beside_a_live_mii_window_with_the_ordinary_baseline() {
+        let mii_window = Members::mii_group(0x4a).unwrap();
+        let ordinary = Members::new(&[0x2d, 0x2c, 0x1c]).unwrap();
+        let (pt, aegis) = (Members::native_group(0x24).unwrap(), Members::native_group(0x5a).unwrap());
+        for group in [ordinary, Members::new(&[0x1c]).unwrap(), pt, aegis, Members::pair_group()] {
+            for (pair_tail, info_x4) in [(false, false), (true, true)] {
+                assert_eq!(background_build_eligible(group, false, mii_window, LiveIdentity::Mii { baseline: true }, false, pair_tail, info_x4), Ok(()),
+                    "{group:?}");
+                assert_eq!(background_build_eligible(group, false, mii_window, LiveIdentity::Mii { baseline: false }, false, pair_tail, info_x4),
+                    Err("mii window"), "{group:?}: no ordinary baseline");
+            }
+            assert_eq!(background_build_eligible(group, false, mii_window, LiveIdentity::Mii { baseline: true }, true, true, true), Err("live kirby"));
+        }
+        let mii = Members::mii_group(0x48).unwrap();
+        for baseline in [false, true] {
+            assert_eq!(background_build_eligible(mii, true, mii_window, LiveIdentity::Mii { baseline }, false, true, true),
+                Err("mii beside a mii window"));
+        }
+        let planned = [(GroupState::Prefetched, mii, true), (GroupState::Prefetched, pt, false),
+            (GroupState::Prefetched, Members::pair_group(), false)];
+        assert_eq!(next_background(planned.iter().copied(), mii_window, LiveIdentity::Mii { baseline: true }, false, true, true), Some(1));
+        assert_eq!(next_background(planned[2..].iter().copied(), mii_window, LiveIdentity::Mii { baseline: true }, false, false, false), Some(0));
+        assert_eq!(next_background(planned.iter().copied(), mii_window, LiveIdentity::Mii { baseline: false }, false, true, true), None);
+        assert_eq!(next_background(planned[..1].iter().copied(), mii_window, LiveIdentity::Mii { baseline: true }, false, true, true), None);
+    }
+
+    /// X6: the words a group's native work takes in `R` (its key requests and releases, its background tick, the worker's
+    /// shadow `R`). A Mii group takes its identity's over the current words, as `with_mii_identity` always gave it. Beside
+    /// a live Mii window every other group takes the owner's ordinary baseline with its own header kinds, the words its
+    /// warm exit writes (`baseline_words`): the owner's costume and ordinary flags, not the Mii's. Beside an ordinary
+    /// window nothing: `R` holds the owner's ordinary words already.
+    #[test]
+    fn each_group_takes_its_own_words_in_r() {
+        let identity = MiiIdentity { kinds: [0x4a, u32::MAX, u32::MAX], costume: 2, index: 0, tokens: [75, 125, 0, 37], flags: [0, 1, 0] };
+        let baseline: [u32; RESOURCE_WORDS] = [0x00, 0x01, 0x02, 3, 0xbeef_0000, 0, 0, 0, 0, 0x0001_0100, u32::MAX];
+        let live_mii = identity.resource_words(baseline);
+        assert_ne!(live_mii[3], baseline[3]);
+        assert_ne!(live_mii[9], baseline[9]);
+        let mii = Members::mii_group(0x4a).unwrap();
+        assert_eq!(own_words(mii, Some(identity), false, None, baseline), Some(live_mii));
+        assert_eq!(own_words(mii, Some(identity), true, Some(baseline), live_mii), Some(live_mii));
+        for group in [Members::new(&[0x2d, 0x1c]).unwrap(), Members::native_group(0x24).unwrap(), Members::pair_group()] {
+            let own = own_words(group, None, true, Some(baseline), live_mii);
+            assert_eq!(own, Some(baseline_words(baseline, group)), "{group:?}");
+            let own = own.unwrap();
+            assert_eq!(&own[..3], &group.kinds());
+            assert_eq!((own[3], own[4], own[9], own[10]), (3, 0xbeef_0000, 0x0001_0100, u32::MAX),
+                "the owner's costume, record word and ordinary flags, not the Mii's");
+            assert_eq!(own_words(group, None, false, Some(baseline), baseline), None, "{group:?}: an ordinary window");
+            assert_eq!(own_words(group, None, true, None, live_mii), None, "{group:?}: no baseline (the build waits)");
+        }
+        // The worker's values from the identity bytes the tick wrote into the entry.
+        let mut entry = [0u8; MII_ENTRY_LEN];
+        entry[0] = 5;
+        entry[0x46 - MII_ENTRY_START..0x48 - MII_ENTRY_START].copy_from_slice(&0x1234u16.to_le_bytes());
+        entry[0x52 - MII_ENTRY_START] = 1;
+        assert_eq!(shadow_values(&entry), 0x0105_1234);
+        let window = [0u8; 0x70];
+        assert_eq!(shadow_values(&identity.entry_bytes(&window)), u32::from(identity.index) | 2 << 16);
+    }
+
+    /// Primary 2026-11-09 04:22Z item 3 (the CPU on Pokémon Trainer with a Mii group): the eligibility, the plan order, the
+    /// shadow words and the worker values take no owner. The same calls for owner 0 (P1) and owner 1 (the CPU) give the
+    /// same answers; only the record index the planner stages differs (Player0 keeps the window's, the CPU takes its
+    /// selector slot), as for every Mii group of that role.
+    #[test]
+    fn the_background_mii_path_beside_pokemon_trainer_is_the_same_for_both_roles() {
+        use crate::engine::mii::backend::Layout;
+        use crate::engine::mii::inventory::{Appearance, Canonical, MiiClass, MiiConfig, TaggedId, CHARINFO_LEN, CHARINFO_MASK_END};
+        use crate::engine::mii::ordinary_cpu::staged_descriptor_for_owner;
+        // `identity.rs`'s sample configuration (a Swordfighter preset).
+        let mut info = [7u8; CHARINFO_LEN];
+        info[..CHARINFO_MASK_END].fill(1);
+        let mut masked = info;
+        masked[..CHARINFO_MASK_END].fill(0);
+        let canonical = Canonical { class: MiiClass::Swordfighter, appearance: Appearance {
+            charinfo_masked: masked, specials: [1, 0, 0, 0], colour: 4, voice: 37,
+            outfit: 0x14_7bc5_9435, hat: 0x0f_a9ef_a5ea, chara: MiiClass::Swordfighter.chara_hash40() } };
+        let configuration = crate::engine::mii::lifetime::Configuration::from_saved(&MiiConfig {
+            slot_id: 107, slot_index: 0, name: String::new(), charinfo: info,
+            raw_tags: [TaggedId(0x13002b147bc59435), TaggedId(0x5a00000fa9efa5ea), TaggedId(0xc1004d15d7061f77)],
+            canonical, copies: vec![] }).unwrap();
+        let pt = Members::native_group(0x24).unwrap();
+        let mut window = [0u8; 0x70];
+        window[0x14..0x18].copy_from_slice(&3u32.to_le_bytes());
+        for (i, kind) in pt.kinds().iter().enumerate() { window[0x18 + 4 * i..0x1c + 4 * i].copy_from_slice(&kind.to_le_bytes()); }
+        window[0x28..0x2c].copy_from_slice(&1u32.to_le_bytes());
+        window[0x41] = 2;
+        let pt_words: [u32; RESOURCE_WORDS] = [0x24, 0x25, 0x26, 2, 0, 0, 0, 0, 0, 0x0001_0100, 0x24];
+        let answers = [0usize, 1].map(|owner| {
+            let staged = staged_descriptor_for_owner(Layout::Training, owner, window, Some(configuration)).unwrap();
+            let identity = MiiIdentity::from_descriptor(&staged).unwrap();
+            let mii = Members::mii_group(identity.kind()).unwrap();
+            let eligible = background_build_eligible(mii, true, pt, LiveIdentity::Ordinary, false, false, false);
+            let next = next_background([(GroupState::Built, Members::new(&[0x1c]).unwrap(), false),
+                (GroupState::Prefetched, mii, true)].into_iter(), pt, LiveIdentity::Ordinary, false, false, false);
+            let words = own_words(mii, Some(identity), false, None, pt_words).unwrap();
+            let values = shadow_values(&identity.entry_bytes(&window));
+            (eligible, next, words, values, identity.index)
+        });
+        assert_eq!((answers[0].0, answers[0].1), (Ok(()), Some(1)));
+        assert_eq!((answers[0].0, answers[0].1), (answers[1].0, answers[1].1));
+        let strip = |words: [u32; RESOURCE_WORDS], values: u32| {
+            let mut w = words;
+            w[4] &= 0xffff_0000;
+            (w, values & 0xffff_0000)
+        };
+        assert_eq!(strip(answers[0].2, answers[0].3), strip(answers[1].2, answers[1].3), "only the record index differs");
+        assert_eq!((answers[0].4, answers[1].4), (0, 1), "Player0 keeps the window's index, the CPU takes slot 1");
+        assert_eq!((answers[0].2[4] & 0xffff, answers[1].2[4] & 0xffff), (0, 1));
+        assert_eq!((answers[0].3 & 0xffff, answers[1].3 & 0xffff), (0, 1));
+        assert_eq!(&answers[0].2[..4], &[0x49, u32::MAX, u32::MAX, 2], "the Swordfighter header with the role's costume byte");
     }
 
     /// The notice rule (primary 2026-11-09 02:00Z, approved for every kind): with groups on, the live attached window
@@ -3845,18 +4007,18 @@ mod tests {
         let aegis = Members::native_group(0x5b).unwrap();
         for native in [pt, aegis] {
             for pair in [Members::pair_group(), Members::pair_lead(0x02).unwrap()] {
-                assert_eq!(background_build_eligible(native, false, pair, false, false, true, false), Ok(()), "(a)");
-                assert_eq!(background_build_eligible(native, false, pair, false, false, false, true), Err("pair window"));
+                assert_eq!(background_build_eligible(native, false, pair, LiveIdentity::Ordinary, false, true, false), Ok(()), "(a)");
+                assert_eq!(background_build_eligible(native, false, pair, LiveIdentity::Ordinary, false, false, true), Err("pair window"));
             }
-            assert_eq!(background_build_eligible(Members::pair_group(), false, native, false, false, false, true), Ok(()), "(b)");
-            assert_eq!(background_build_eligible(Members::pair_group(), false, native, false, false, true, false),
+            assert_eq!(background_build_eligible(Members::pair_group(), false, native, LiveIdentity::Ordinary, false, false, true), Ok(()), "(b)");
+            assert_eq!(background_build_eligible(Members::pair_group(), false, native, LiveIdentity::Ordinary, false, true, false),
                 Err("pair group beside a native window without X4"));
         }
         assert_eq!(next_background([(GroupState::Prefetched, pt, false)].into_iter(), Members::pair_lead(0x02).unwrap(),
-            false, false, true, false), Some(0));
+            LiveIdentity::Ordinary, false, true, false), Some(0));
         let pair = [(GroupState::Prefetched, Members::pair_group(), false)];
-        assert_eq!(next_background(pair.iter().copied(), aegis, false, false, false, true), Some(0));
-        assert_eq!(next_background(pair.iter().copied(), aegis, false, false, true, false), None);
+        assert_eq!(next_background(pair.iter().copied(), aegis, LiveIdentity::Ordinary, false, false, true), Some(0));
+        assert_eq!(next_background(pair.iter().copied(), aegis, LiveIdentity::Ordinary, false, true, false), None);
     }
 
     /// SPECIAL-GROUPS §0 X4 (primary 2026-11-09 00:52Z, the cross cells), from the disassembly
