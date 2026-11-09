@@ -52,6 +52,14 @@ fn ident(t: Option<&Tok>) -> Option<&str> {
     }
 }
 
+/// The runtime's call graph, a bare imported name resolved as Rust does (`Graph::precise_imports`): `lobby_persist`'s `restore` is
+/// `model::lobby_persist::restore`, not `kirby_hats::restore` (which made `entry_applied` look like it waits on the source lock).
+fn runtime_graph() -> Graph {
+    let mut graph = Graph::scan(&Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime"), &[]);
+    graph.precise_imports = true;
+    graph
+}
+
 /// Every `static NAME: …Mutex<…>` / `…RwLock<…>` of `root` (the scan of `hook_locks.rs`).
 fn static_locks(root: &Path) -> Vec<(String, String)> {
     fn walk(dir: &Path, root: &Path, out: &mut Vec<(String, String)>) {
@@ -689,7 +697,7 @@ fn roles_of(ctx: &Ctx, s: &Scan, key: &str) -> BTreeSet<String> {
 
 #[test]
 fn report_the_lock_table_and_the_order_edges() {
-    let graph = Graph::scan(&Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime"), &[]);
+    let graph = runtime_graph();
     let (ctx, s) = scan(&graph);
     // The lock table: each lock, the roles that take it (and from which functions).
     let mut table: BTreeMap<usize, BTreeMap<String, BTreeSet<String>>> = BTreeMap::new();
@@ -742,7 +750,7 @@ const WINDOW: &[&str] =
 
 #[test]
 fn no_two_locks_are_taken_in_both_orders_and_no_lock_is_retaken_while_held() {
-    let graph = Graph::scan(&Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime"), &[]);
+    let graph = runtime_graph();
     let (ctx, s) = scan(&graph);
     let (edges, _) = edges(&ctx, &s);
     let mut problems = Vec::new();
@@ -790,24 +798,28 @@ const SHARED_ON_PURPOSE: &[(&str, &str)] = &[];
 /// The runs that measured the hooks' threads (primary 2026-11-09 19:44Z/20:32Z, OPERATOR "measure first, fix exactly"; playbook
 /// CHECKLIST M row, main 87b3de0): hot-slots' two trace points per hook on its game address, a `thread == main` counter and a
 /// `thread != main` record point, on `b04856b2` diag (`artifacts/phase23/hook-threads/TABLE.md`).
-const MEASURED_RUNS: &str = "final-yoga-ht-mii-b04856b2 + final-yoga-ht-kr-b04856b2";
+const MEASURED_RUNS: &str = "final-yoga-ht-mii-b04856b2 + final-yoga-ht-kr-b04856b2 + final-yoga-ht-pair-b04856b2-r2 (a and b, an LDN \
+                             pair: the waiting rooms and a match) + final-yoga-ht-reset-b04856b2 (four native resets)";
 
-/// Game hooks measured on MainThread only: `(hook, calls, calls on MainThread)`, both runs together, exact counters. A hook that runs
+/// Game hooks measured on MainThread only: `(hook, calls, calls on MainThread)`, all runs together, exact counters. A hook that runs
 /// on MainThread cannot deadlock this way: while it waits, MainThread is not busy-joining a task group, so the core it leaves free
 /// lets the starved holder run (`rc6-qpf3`'s cycle needs the waiter on a task worker). A lock leaves the failing set only when every
 /// hook that waits on it is here; a hook seen on a worker thread, or never reached, never is.
 const MEASURED_ON_MAIN_THREAD: &[(&str, u64, u64)] = &[
-    ("input_delay::caller_a_note", 59_841, 59_841),
-    ("input_delay::caller_a_apply", 243_528, 243_528),
-    ("character_lifecycle::destruction_trace", 8, 8),
-    ("character_lifecycle::refresh_ordinal_portrait", 12, 12),
+    ("input_delay::caller_a_note", 73_937, 73_937),
+    ("input_delay::caller_a_apply", 358_224, 358_224),
+    ("input_delay::caller_b_note", 914, 914),
+    ("input_delay::caller_b_apply", 914, 914),
+    ("character_lifecycle::destruction_trace", 30, 30),
+    ("character_lifecycle::refresh_entry_portrait", 8, 8),
+    ("character_lifecycle::refresh_ordinal_portrait", 32, 32),
     ("states::state_kirby_opff_hook", 3_001, 3_001),
-    ("native_source_capacity::owner_cleanup_complete", 8, 8),
-    ("native_source_capacity::listener_removed", 8, 8),
-    ("native_source_capacity::actor_cleanup", 73, 73),
+    ("native_source_capacity::owner_cleanup_complete", 30, 30),
+    ("native_source_capacity::listener_removed", 30, 30),
+    ("native_source_capacity::actor_cleanup", 97, 97),
     ("native_source_capacity::pause_state_exit", 2, 2),
-    ("mii_hud_portrait::pipeline_before_tick", 46_437, 46_437),
-    ("mii_hud_portrait::pipeline_after_tick", 46_437, 46_437),
+    ("mii_hud_portrait::pipeline_before_tick", 93_041, 93_041),
+    ("mii_hud_portrait::pipeline_after_tick", 93_041, 93_041),
 ];
 
 /// The impl functions `f` runs through `helper(&STATIC ..)`, with the token position of the helper.
@@ -920,7 +932,7 @@ fn shared_locks(ctx: &Ctx, s: &Scan) -> Shared {
 
 #[test]
 fn no_lock_a_game_hook_waits_on_is_held_by_a_plugin_thread() {
-    let graph = Graph::scan(&Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime"), &[]);
+    let graph = runtime_graph();
     let (ctx, s) = scan(&graph);
     let shared = shared_locks(&ctx, &s);
     let measured = |hook: &str| MEASURED_ON_MAIN_THREAD.iter().any(|(h, _, _)| *h == hook);
@@ -984,7 +996,7 @@ const CATALOG_GAME_SIDE: &[&str] = &[
 
 #[test]
 fn the_mii_catalog_reply_is_consumed_on_the_game_thread_only() {
-    let graph = Graph::scan(&Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime"), &[]);
+    let graph = runtime_graph();
     let (ctx, s) = scan(&graph);
     let shared = shared_locks(&ctx, &s);
     let mut problems = Vec::new();
@@ -1000,6 +1012,25 @@ fn the_mii_catalog_reply_is_consumed_on_the_game_thread_only() {
     assert!(problems.is_empty(), "the catalog's game-side consumers run on a plugin thread:\n{}", problems.join("\n"));
 }
 
+/// A bare name a `use` imports from outside the runtime is that item (`runtime_graph`): `lobby_persist::entry_applied` calls the
+/// model's `restore`, so it reaches neither `kirby_hats::restore` nor `character_items::restore`, which the over-approximating graph
+/// (`Graph::scan` as the capability scan uses it) follows.
+#[test]
+fn an_imported_model_function_is_not_a_runtime_call() {
+    let precise = runtime_graph();
+    let loose = Graph::scan(&Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime"), &[]);
+    let reaches = |graph: &Graph, to: &str| {
+        let from = graph.find("lobby_persist::entry_applied");
+        assert_eq!(from.len(), 1);
+        let callees = graph.callees(from[0]);
+        graph.find(to).iter().any(|c| callees.contains(c))
+    };
+    for to in ["kirby_hats::restore", "character_items::restore"] {
+        assert!(reaches(&loose, to), "{to}: the control lost its edge");
+        assert!(!reaches(&precise, to), "{to}: an imported model function resolved to a runtime one");
+    }
+}
+
 /// Two scan blind spots (rc.6, hot-slots hook-thread table 2026-11-09: `allocation_trace` runs on the game's task workers): a call
 /// through a `#[path]` module declared under another name (`character_roster::body_bank::creation` is `native_body_bank.rs`), and
 /// one lock of a static array (`BANKS[role].lock()`). Both are followed now.
@@ -1009,7 +1040,7 @@ fn a_path_module_call_and_an_indexed_take_are_seen() {
         callgraph::path_modules("#[cfg(feature = \"x\")]\n#[path = \"native_body_bank.rs\"]\npub(crate) mod body_bank;\n#[path = \"../mii/a.rs\"] mod a;\n"),
         [("body_bank".to_owned(), "native_body_bank".to_owned())]
     );
-    let graph = Graph::scan(&Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime"), &[]);
+    let graph = runtime_graph();
     let (ctx, s) = scan(&graph);
     let one = |key: &str| {
         let found = graph.find(key);

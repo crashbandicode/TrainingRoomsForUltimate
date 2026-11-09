@@ -475,6 +475,12 @@ pub struct Graph {
     /// scanned as; and the same for every file when no scanned module has the declared name (`body_bank`, not `native`).
     path_mods_local: BTreeMap<String, BTreeMap<String, String>>,
     path_mods: BTreeMap<String, String>,
+    /// `file -> names its `use` statements import from outside the runtime (`crate::model`, `crate::engine`, `std`, external crates):
+    /// such a bare name is that item, never a runtime function of the same name.
+    foreign_imports: BTreeMap<String, BTreeSet<String>>,
+    /// Resolve a bare imported name precisely (`foreign_imports`), as Rust does. Off by default: the capability scan's declared
+    /// closures were built on the over-approximation (every runtime function of an imported name).
+    pub precise_imports: bool,
     by_name: BTreeMap<String, Vec<usize>>,
     /// Extra edges for calls the text cannot show (a function pointer table): `(from key, to key)`.
     pub dynamic: Vec<(String, String)>,
@@ -558,6 +564,7 @@ impl Graph {
         let mut aliases: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();
         let mut imports: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
         let mut path_mods_local: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();
+        let mut foreign_imports: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
         for path in files {
             let rel = path.strip_prefix(runtime_dir).unwrap().to_string_lossy().replace('\\', "/");
             for (name, module) in path_modules(&fs::read_to_string(&path).unwrap()) {
@@ -570,6 +577,19 @@ impl Graph {
                 if ident(&toks[i]) == Some("use") {
                     let end = (i..toks.len()).find(|&k| is_punct(&toks[k], ';')).unwrap_or(toks.len() - 1);
                     let stmt = &toks[i + 1..end];
+                    // `use crate::model::x::{a, b}` / `use std::…`: one root outside the runtime; a `{…}` root mixes paths and
+                    // is left to the over-approximation.
+                    let root = ident(stmt.first().unwrap_or(&Tok::PathSep));
+                    let second = (stmt.get(1) == Some(&Tok::PathSep)).then(|| stmt.get(2).and_then(ident)).flatten();
+                    let foreign = match root {
+                        Some("crate") => matches!(second, Some("model" | "engine")),
+                        Some("std" | "core" | "alloc" | "skyline" | "hos_lock" | "serde" | "serde_json" | "lock_api" | "smash") => true,
+                        _ => false,
+                    };
+                    if foreign {
+                        let names = stmt.iter().filter_map(ident).filter(|n| *n != "as" && *n != "self");
+                        foreign_imports.entry(rel.clone()).or_default().extend(names.map(str::to_owned));
+                    }
                     for (k, t) in stmt.iter().enumerate() {
                         if let Some(name) = ident(t) {
                             imports.entry(rel.clone()).or_default().insert(name.to_owned());
@@ -627,7 +647,7 @@ impl Graph {
             .filter(|(name, _)| !modules.contains(name.as_str()))
             .map(|(name, module)| (name.clone(), module.clone()))
             .collect();
-        Graph { funcs, aliases, imports, path_mods_local, path_mods, by_name, dynamic: Vec::new() }
+        Graph { funcs, aliases, imports, path_mods_local, path_mods, foreign_imports, precise_imports: false, by_name, dynamic: Vec::new() }
     }
 
     /// The module a `name::` qualifier in `file` means when `name` is a `#[path]` module declared under another name.
@@ -661,6 +681,9 @@ impl Graph {
         let local: Vec<usize> = candidates.iter().copied().filter(|&c| self.funcs[c].file == from.file).collect();
         if !local.is_empty() {
             return local;
+        }
+        if self.precise_imports && self.foreign_imports.get(&from.file).is_some_and(|i| i.contains(last)) {
+            return Vec::new();
         }
         if self.imports.get(&from.file).is_some_and(|i| i.contains(last)) {
             return candidates.clone();
@@ -828,6 +851,8 @@ mod receiver_tests {
             imports: BTreeMap::new(),
             path_mods_local: BTreeMap::new(),
             path_mods: BTreeMap::new(),
+            foreign_imports: BTreeMap::new(),
+            precise_imports: false,
             by_name,
             dynamic: Vec::new(),
         }
