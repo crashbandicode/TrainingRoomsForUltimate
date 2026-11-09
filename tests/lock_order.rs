@@ -795,6 +795,133 @@ const TYPED_STATIC_CALLS: &[(&str, &str, &str)] = &[
 /// needs the reason a starved plugin holder cannot stall a game hook that waits for it.
 const SHARED_ON_PURPOSE: &[(&str, &str)] = &[];
 
+/// Game entry points installed without `#[skyline::hook]`, walked as game hooks (docs lane review R1, 2026-11-09 23:23Z, finding 2):
+/// a vtable slot (`cpu::on_frame`, original `main+0x614630`), `A64HookFunction` replacements (`cpu_common`), inline-hook and
+/// trampoline targets (`native_service`, `native_body_bank::prepare_*`, `native_unlink_*`, `mii_ordinary_gate`, `seam_drill`),
+/// the game's callbacks (`reset_hub::on_init`, the inline keyboard's), Skyline's NRO-load hooks, and the exported trace control.
+/// `every_function_handed_to_the_game_is_listed` keeps this complete.
+const GAME_ENTRIES: &[&str] = &[
+    "cpu::on_frame",
+    "cpu_common::di_hook",
+    "cpu_common::change_status_hook",
+    "cpu_common::sub_guard_cont_hook",
+    "cpu_common::on_nro_load",
+    "roster::on_nro_load",
+    "reset_hub::on_init",
+    "native_service::training_mod_native_service_dispatch",
+    "mii_ordinary_gate::mii_ordinary_gate_decide",
+    "inline_keyboard::changed",
+    "inline_keyboard::moved",
+    "inline_keyboard::entered",
+    "inline_keyboard::cancelled",
+    "inline_keyboard::initialized",
+    "inline_keyboard::finished",
+    "native_body_bank::prepare_call",
+    "native_body_bank::prepare_clone_into",
+    "native_body_bank::prepare_clone_heap",
+    "native_unlink_install::leave",
+    "native_unlink_install::recursive_last_guard",
+    "native_unlink_install::sister_first_guard",
+    "native_unlink_install::sister_last_guard",
+    "native_unlink_install::header_first_guard",
+    "native_unlink_install::header_last_guard",
+    "native_unlink_install::vector_first_guard",
+    "native_unlink_install::vector_last_guard",
+    "native_unlink_probe::born",
+    "native_unlink_probe::cleared",
+    "native_unlink_probe::sister_cleared",
+    "native_unlink_probe::header_cleared",
+    "native_unlink_probe::vector_cleared",
+    "native_unlink_probe::enter",
+    "native_unlink_probe::header_enter",
+    "native_unlink_probe::header_leave",
+    "practice_trace::training_modpack_trace_control_v1",
+    "practice_trace::list_step",
+    "practice_trace::list_callback_enter",
+    "seam_drill::inline_0",
+    "seam_drill::inline_1",
+    "seam_drill::inline_2",
+    "seam_drill::inline_3",
+    "probe::mounted",
+];
+
+/// Functions whose address is handed out (`extern "C"`, `as *const ()`) that are not game entry points, and why.
+const NOT_GAME_ENTRIES: &[(&str, &str)] = &[
+    ("threads::detached", "a plugin thread's start (runtime::threads); its thread is walked from model::thread_stacks"),
+    ("threads::joined", "a plugin thread's start (runtime::threads); its thread is walked from model::thread_stacks"),
+    ("combo::tr_seq_step_v1", "a trace-point anchor our own code calls (its callers are walked)"),
+    ("combo::tr_seq_plan_v1", "a trace-point anchor our own code calls (its callers are walked)"),
+    ("combo::tr_seq_saved_v1", "a trace-point anchor our own code calls (its callers are walked)"),
+    ("combo::tr_combo_link_v1", "a trace-point anchor our own code calls (its callers are walked)"),
+    ("combo::tr_combo_attempt_v1", "a trace-point anchor our own code calls (its callers are walked)"),
+    ("combo::tr_combo_saved_v1", "a trace-point anchor our own code calls (its callers are walked)"),
+    ("combo::tr_combo_listed_v1", "a trace-point anchor our own code calls (its callers are walked)"),
+    ("combo::tr_combo_fighter_v1", "a trace-point anchor our own code calls (its callers are walked)"),
+    ("notices::tr_intro_posted_v1", "a trace-point anchor our own code calls (its callers are walked)"),
+    ("worker::tr_cycle_badges_v1", "a trace-point anchor our own code calls (its callers are walked)"),
+];
+
+/// Callback registrations the text cannot follow: `(registrar's module, registrar, the function that calls what is registered)`.
+/// `hud::register(draw)` puts a draw into the table `hud::run` calls on the UI pass (`anchors::ui_pass_calculate`, the game's task
+/// workers); `diag_log::set_tick(step)` puts a step into the table the heartbeat thread runs. The edges come from the registration
+/// calls themselves, so a new draw or tick is followed without a list.
+const REGISTRARS: &[(&str, &str, &str)] =
+    &[("hud", "register", "hud::run"), ("diag_log", "set_tick", "diag_log::start_drain_thread")];
+
+/// Calls from model code back into the runtime (the model is not scanned): `capabilities.rs` declares the same ones
+/// (`the_callback_edges_cover_the_capability_scan`).
+const MODEL_CALLBACKS: &[(&str, &str)] = &[
+    ("hitbox::frame", "hitbox::sphere_alive"),
+    ("hitbox::frame", "hitbox::sphere_kill_own"),
+    ("hitbox::frame", "hitbox::sphere_spawn"),
+    ("hitbox::hitbox_rebound_hook", "hitbox::sphere_alive"),
+    ("hitbox::hitbox_rebound_hook", "hitbox::sphere_kill_own"),
+    ("hitbox::frame", "hitbox::active"),
+    ("hitbox::frame", "hitbox::data"),
+    ("hitbox::frame", "hitbox::read_u64"),
+    ("hitbox::frame", "hitbox::read_f32"),
+];
+
+/// `(caller, callee)` for every callback the text cannot follow: the registrations' (`REGISTRARS`) and `MODEL_CALLBACKS`.
+fn callback_edges(graph: &Graph) -> Vec<(usize, usize)> {
+    let mut out = Vec::new();
+    for (module, registrar, runner) in REGISTRARS {
+        let runners = graph.find(runner);
+        for f in 0..graph.funcs.len() {
+            let body = &graph.funcs[f].body;
+            for i in 2..body.len() {
+                if ident(body.get(i)) != Some(registrar) || body[i - 1] != Tok::PathSep || ident(body.get(i - 2)) != Some(module) {
+                    continue;
+                }
+                if !punct(body.get(i + 1), '(') {
+                    continue;
+                }
+                // The argument: a path up to `)` or `,`; its last two segments name the registered function.
+                let mut k = i + 2;
+                let mut segments = Vec::new();
+                while let Some(t) = body.get(k) {
+                    match t {
+                        Tok::Ident(s) => segments.push(s.clone()),
+                        Tok::PathSep => {}
+                        _ => break,
+                    }
+                    k += 1;
+                }
+                let key = segments[segments.len().saturating_sub(2)..].join("::");
+                let targets = graph.find(&key);
+                assert_eq!(targets.len(), 1, "{module}::{registrar}({key}) in {}: {} functions", graph.funcs[f].key(), targets.len());
+                out.extend(runners.iter().map(|&r| (r, targets[0])));
+            }
+        }
+    }
+    for (from, to) in MODEL_CALLBACKS {
+        for a in graph.find(from) {
+            out.extend(graph.find(to).into_iter().map(|b| (a, b)));
+        }
+    }
+    out
+}
+
 /// The runs that measured the hooks' threads (primary 2026-11-09 19:44Z/20:32Z, OPERATOR "measure first, fix exactly"; playbook
 /// CHECKLIST M row, main 87b3de0): hot-slots' two trace points per hook on its game address, a `thread == main` counter and a
 /// `thread != main` record point, on `b04856b2` diag (`artifacts/phase23/hook-threads/TABLE.md`).
@@ -879,7 +1006,7 @@ fn shared_locks(ctx: &Ctx, s: &Scan) -> Shared {
     let graph = ctx.graph;
     let n = graph.funcs.len();
     // Per function: (token position, callee) for path and method calls and typed-static helpers.
-    let callees: Vec<Vec<(usize, usize)>> = (0..n)
+    let mut callees: Vec<Vec<(usize, usize)>> = (0..n)
         .map(|f| {
             let mut out: Vec<(usize, usize)> =
                 calls(&graph.funcs[f].body).iter().flat_map(|c| ctx.resolve(f, c).into_iter().map(move |t| (c.at, t))).collect();
@@ -887,6 +1014,9 @@ fn shared_locks(ctx: &Ctx, s: &Scan) -> Shared {
             out
         })
         .collect();
+    for (from, to) in callback_edges(graph) {
+        callees[from].push((0, to));
+    }
     let walk = |starts: Vec<usize>, plugin: bool| -> BTreeSet<usize> {
         let mut seen = BTreeSet::new();
         let mut stack = starts;
@@ -897,7 +1027,8 @@ fn shared_locks(ctx: &Ctx, s: &Scan) -> Shared {
         }
         seen
     };
-    let hooks: Vec<usize> = (0..n).filter(|&f| graph.funcs[f].attrs.contains("skyline::hook")).collect();
+    let mut hooks: Vec<usize> = (0..n).filter(|&f| graph.funcs[f].attrs.contains("skyline::hook")).collect();
+    hooks.extend(GAME_ENTRIES.iter().flat_map(|key| graph.find(key)));
     let mut out = Shared {
         game_waits: BTreeMap::new(),
         game_hooks: BTreeMap::new(),
@@ -963,7 +1094,10 @@ fn no_lock_a_game_hook_waits_on_is_held_by_a_plugin_thread() {
         assert_eq!(calls, on_main, "{hook}: {calls} calls but {on_main} on MainThread: it ran on a worker thread; fix its locks");
         assert!(*calls > 0, "{hook}: never reached; an unreached hook is not measured");
         let found = graph.find(hook);
-        assert!(found.iter().any(|&f| graph.funcs[f].attrs.contains("skyline::hook")), "{hook} is not a game hook any more");
+        assert!(
+            GAME_ENTRIES.contains(hook) || found.iter().any(|&f| graph.funcs[f].attrs.contains("skyline::hook")),
+            "{hook} is not a game hook any more"
+        );
         assert!(used.contains(*hook), "{hook} waits on no shared lock now: delete its MEASURED_ON_MAIN_THREAD row");
     }
     for p in &problems {
@@ -1010,6 +1144,89 @@ fn the_mii_catalog_reply_is_consumed_on_the_game_thread_only() {
         }
     }
     assert!(problems.is_empty(), "the catalog's game-side consumers run on a plugin thread:\n{}", problems.join("\n"));
+}
+
+/// The functions of `src/runtime` whose address the plugin hands to the game or to a native caller: every `extern "C"` /
+/// `extern "Rust"` function without `#[skyline::hook]`, and every function of a file taken there as `name as *const ()`. Keys are
+/// `module::name`, as the call graph names them.
+fn handed_out() -> BTreeSet<String> {
+    fn walk(dir: &Path, out: &mut BTreeSet<String>) {
+        let mut entries: Vec<_> = std::fs::read_dir(dir).unwrap().map(|e| e.unwrap().path()).collect();
+        entries.sort();
+        for path in entries {
+            if path.is_dir() {
+                walk(&path, out);
+                continue;
+            }
+            if path.extension().is_none_or(|e| e != "rs") {
+                continue;
+            }
+            let stem = path.file_stem().unwrap().to_string_lossy().into_owned();
+            let module = if stem == "mod" { path.parent().unwrap().file_name().unwrap().to_string_lossy().into_owned() } else { stem };
+            let text = std::fs::read_to_string(&path).unwrap();
+            let lines: Vec<&str> = text.lines().collect();
+            let defined = |name: &str| text.contains(&format!("fn {name}("));
+            for (i, line) in lines.iter().enumerate() {
+                for abi in ["extern \"C\" fn ", "extern \"Rust\" fn "] {
+                    if let Some(at) = line.find(abi) {
+                        let name: String = line[at + abi.len()..].chars().take_while(|c| c.is_alphanumeric() || *c == '_').collect();
+                        let attrs = lines[i.saturating_sub(3)..i].join(" ");
+                        if !name.is_empty() && !attrs.contains("skyline::hook") {
+                            out.insert(format!("{module}::{name}"));
+                        }
+                    }
+                }
+                let mut rest = *line;
+                while let Some(at) = rest.find(" as *const ()") {
+                    let name: String =
+                        rest[..at].chars().rev().take_while(|c| c.is_alphanumeric() || *c == '_').collect::<Vec<_>>().into_iter().rev().collect();
+                    if !name.is_empty() && defined(&name) {
+                        out.insert(format!("{module}::{name}"));
+                    }
+                    rest = &rest[at + 1..];
+                }
+            }
+        }
+    }
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");
+    let mut out = BTreeSet::new();
+    walk(&root, &mut out);
+    out
+}
+
+/// R1 finding 2's guard: every function handed to the game is a listed entry point (walked as a game hook) or listed as not one,
+/// with its reason, and every listed name is still handed out.
+#[test]
+fn every_function_handed_to_the_game_is_listed() {
+    let handed = handed_out();
+    for known in ["cpu::on_frame", "cpu_common::on_nro_load", "native_service::training_mod_native_service_dispatch", "threads::detached"] {
+        assert!(handed.contains(known), "the scan of handed-out functions misses {known}: {handed:?}");
+    }
+    let listed: BTreeSet<String> =
+        GAME_ENTRIES.iter().map(|k| (*k).to_owned()).chain(NOT_GAME_ENTRIES.iter().map(|(k, _)| (*k).to_owned())).collect();
+    let missing: Vec<&String> = handed.difference(&listed).collect();
+    let stale: Vec<&String> = listed.difference(&handed).collect();
+    assert!(missing.is_empty(), "handed to the game but on neither GAME_ENTRIES nor NOT_GAME_ENTRIES: {missing:?}");
+    assert!(stale.is_empty(), "listed but no longer handed out: {stale:?}");
+}
+
+/// R1 finding 1: the callback edges are followed (the UI pass reaches the HUD draws, the heartbeat reaches its ticks), and they cover
+/// every edge `tests/capabilities.rs` declares for its own scan.
+#[test]
+fn the_callback_edges_cover_the_capability_scan() {
+    let graph = runtime_graph();
+    let edges: BTreeSet<(String, String)> =
+        callback_edges(&graph).into_iter().map(|(a, b)| (graph.funcs[a].key(), graph.funcs[b].key())).collect();
+    for want in [("hud::run", "hud_draw::draw"), ("hud::run", "hitbox::draw_orbs"), ("diag_log::start_drain_thread", "p1::service")] {
+        assert!(edges.contains(&(want.0.to_owned(), want.1.to_owned())), "{want:?} not followed: {edges:?}");
+    }
+    let text = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/capabilities.rs")).unwrap();
+    let start = text.find("fn new() -> Analysis").expect("capabilities.rs Analysis::new");
+    let end = start + text[start..].find("let consts").expect("capabilities.rs Analysis::new end");
+    let ends: BTreeSet<&str> = edges.iter().flat_map(|(a, b)| [a.as_str(), b.as_str()]).collect();
+    for literal in text[start..end].split('"').skip(1).step_by(2).filter(|s| s.contains("::") && !s.contains(' ')) {
+        assert!(ends.contains(literal), "capabilities.rs declares {literal} in an edge this check does not follow");
+    }
 }
 
 /// A bare name a `use` imports from outside the runtime is that item (`runtime_graph`): `lobby_persist::entry_applied` calls the
