@@ -141,19 +141,32 @@ fn takes_lock(graph: &Graph, index: usize, file: &str, name: &str) -> bool {
 
 /// The carried code's typed statics: a helper handed `&STATIC` (`read(&MENU)`, `setting(&MENU)`, `lock_write(&MENU)`,
 /// `assign(&MENU, ..)`) calls the static's trait impl, which the text cannot show (a trait method). Each row is `(static, helper,
-/// the function the impl runs on a plugin thread)`: `Menu`'s `read_value` (and so `lock_write`) runs `plugin_view` there
-/// (`threads::on_plugin_thread()`; game threads run `current_menu`, which takes `EDITED`), and the guard's drop and `assign_value`
-/// run `store`, which takes `EDITED` on any thread. `menu_read_dispatches_on_the_thread` holds the impl to this table.
-/// rc.6 QP freeze (`rc6-qpf3`, 2026-11-09): without these edges the scan did not see the menu worker (`macros::port::worker_tick`
-/// -> `named_macros` -> `read(&MENU)` -> `current_menu`) take `EDITED`; the game's MainThread starved the worker on core 0 while it
-/// held it, and the layout task on another core waited in its hook for `EDITED`.
+/// the impl function)`: `read`/`setting` and `lock_write` run `Menu::read_value` (the guard is built from it), the guard's drop and
+/// `assign_value` run `store`. A function that branches on `on_plugin_thread()` (`callgraph::thread_dispatch`) is followed into its
+/// plugin-thread branch only (this scan walks plugin threads). rc.6 QP freeze (`rc6-qpf3`, 2026-11-09): without these edges the
+/// scan did not see the menu worker (`macros::port::worker_tick` -> `named_macros` -> `read(&MENU)` -> `current_menu`) take
+/// `EDITED`; the game's MainThread starved the worker on core 0 while it held it, and the layout task on another core waited in
+/// its hook for `EDITED`.
 const TYPED_STATIC_CALLS: &[(&str, &str, &str)] = &[
-    ("MENU", "read", "menu::plugin_view"),
-    ("MENU", "setting", "menu::plugin_view"),
-    ("MENU", "lock_write", "menu::plugin_view"),
+    ("MENU", "read", "menu::read_value"),
+    ("MENU", "setting", "menu::read_value"),
+    ("MENU", "lock_write", "menu::read_value"),
     ("MENU", "lock_write", "menu::store"),
     ("MENU", "assign", "menu::store"),
 ];
+
+/// The names `index` calls only inside the game-thread branch of an `on_plugin_thread()` dispatch: not followed on a plugin thread.
+fn game_branch_only(graph: &Graph, index: usize) -> BTreeSet<String> {
+    let body = &graph.funcs[index].body;
+    let Some((_, game)) = callgraph::thread_dispatch(body) else { return BTreeSet::new() };
+    let called = |k: usize| match (body.get(k), body.get(k + 1)) {
+        (Some(Tok::Ident(name)), Some(Tok::Punct('('))) => Some(name.clone()),
+        _ => None,
+    };
+    let inside: BTreeSet<String> = game.clone().filter_map(called).collect();
+    let outside: BTreeSet<String> = (0..body.len()).filter(|k| !game.contains(k)).filter_map(called).collect();
+    inside.difference(&outside).cloned().collect()
+}
 
 /// `TYPED_STATIC_CALLS` is what `compat/menu.rs` does: `Menu::read_value` sends a plugin thread to `plugin_view` and only a game
 /// thread to `current_menu`; `plugin_view` never names `EDITED`, and `current_menu` is the one reader that does.
@@ -253,6 +266,8 @@ fn edges(graph: &Graph, index: usize, by_name: &BTreeMap<String, Vec<usize>>, am
             _ => {}
         }
     }
+    let game_only = game_branch_only(graph, index);
+    out.retain(|&c| !game_only.contains(&graph.funcs[c].name));
     out
 }
 

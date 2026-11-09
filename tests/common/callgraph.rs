@@ -36,6 +36,35 @@ pub struct Func {
     pub body: Vec<Tok>,
 }
 
+/// A function that branches on the calling thread (`if …on_plugin_thread() { plugin } else { game }`, rc.6 QP freeze): the token
+/// ranges of the plugin-thread block and the game-thread block, so a scan can follow only the calls the walking thread makes.
+pub fn thread_dispatch(body: &[Tok]) -> Option<(std::ops::Range<usize>, std::ops::Range<usize>)> {
+    let at = body.iter().position(|t| matches!(t, Tok::Ident(s) if s == "on_plugin_thread"))?;
+    let block = |open: usize| -> Option<std::ops::Range<usize>> {
+        let mut depth = 0;
+        for (k, t) in body.iter().enumerate().skip(open) {
+            match t {
+                Tok::Punct('{') => depth += 1,
+                Tok::Punct('}') => {
+                    depth -= 1;
+                    if depth == 0 {
+                        return Some(open..k + 1);
+                    }
+                }
+                _ => {}
+            }
+        }
+        None
+    };
+    let open = (at..body.len()).find(|&k| body[k] == Tok::Punct('{'))?;
+    let plugin = block(open)?;
+    if !matches!(body.get(plugin.end), Some(Tok::Ident(s)) if s == "else") {
+        return None;
+    }
+    let game = block(plugin.end + 1)?;
+    Some((plugin, game))
+}
+
 impl Func {
     pub fn key(&self) -> String {
         format!("{}::{}", self.module, self.name)
