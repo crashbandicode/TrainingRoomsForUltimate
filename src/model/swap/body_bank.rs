@@ -25,7 +25,7 @@ pub const KIRBY: u32 = 0x06;
 // caller (`body_bank::member_forms_in`, `body_bank::prefetch_admitted`, …).
 pub use crate::engine::swap::swap_model::capabilities::{
     group_member_kind, key_release_admitted, kirby_parkable, member_forms, member_forms_in,
-    native_group_request, original_bankable, pair_lead_extra, pair_request, prefetch_admitted,
+    native_group_request, original_bankable, original_form_bankable, pair_lead_extra, pair_request, prefetch_admitted,
     single_member_request, special_group_kind, swap_commit_index, swap_commit_index_in,
     swappable_kind, window_swappable, window_swappable_with,
 };

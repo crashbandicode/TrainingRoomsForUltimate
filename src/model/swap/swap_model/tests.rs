@@ -561,3 +561,29 @@ fn previous_cell_index_names_a_cell_the_attached_group_has() {
     // A member outside the group (never built that way) still names an existing cell.
     assert_eq!(capabilities::previous_cell_index(2, 2, 2), 0);
 }
+
+/// rc.6 item 3 (operator decisions "All groups in rc.6" and "a session that starts on IC/PT still gets its groups
+/// built"; primary 2026-11-09 00:23Z): the return to an Ice Climbers original is warm. Eden rc6-bg-ic2/3: P1 started
+/// on the pair, and the return Yoshi → Ice Climbers was the canonical Reload (6–7 frames). It retired P1's bank, and the
+/// next switch out rebuilt the window and its groups. The pair original, in its pair form and while the pair bank is
+/// on, is now a bank member: the pair-lead window or a pair group serves it (`group_serves`). Solo Popo, the Miis and
+/// the native groups keep the canonical Reload, and the kind-only `original_bankable` is unchanged for every caller.
+#[test]
+fn an_ice_climbers_pair_original_is_a_bank_member_while_the_pair_bank_is_on() {
+    use capabilities::{original_bankable, original_form_bankable, FormClass};
+    assert!(capabilities::capabilities(FormClass::IcPair).original_bankable);
+    assert!(original_form_bankable(POPO, Forms::starting(POPO), true));
+    assert!(!original_form_bankable(POPO, Forms::starting(POPO), false), "pair bank off");
+    assert!(!original_form_bankable(POPO, Forms::solo_popo(), true), "Solo Popo");
+    assert!(!original_bankable(POPO) && !original_bankable(NANA), "the kind-only predicate is unchanged");
+    for kind in kinds().filter(|kind| *kind != POPO) {
+        for pair_bank in [false, true] {
+            assert_eq!(original_form_bankable(kind, Forms::starting(kind), pair_bank), original_bankable(kind), "{kind:#x}");
+        }
+    }
+    assert!(original_form_bankable(0x00, Forms::starting(0x00), false));
+    assert!(original_form_bankable(KIRBY, Forms::starting(KIRBY), false));
+    for kind in [0x24, 0x5a, 0x48] {
+        assert!(!original_form_bankable(kind, Forms::starting(kind), true), "{kind:#x}: native group or Mii");
+    }
+}

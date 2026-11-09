@@ -948,15 +948,25 @@ Operator decision "All groups in rc.6" and the start-on-the-kind rule (`docs/DEC
     more" with every P1 fighter built). With groups on, `plan_budget` plans its window targets through
     `body_bank::window_targets`: a live pair-lead window counts its own reusable extras, the values `progress` reads,
     not the lane window's two. With groups off, or for any other window, the lane's window is planned as before.
-  - The return to an Ice Climbers original is still the canonical Reload (`original_bankable(0x4b)` is false,
-    EXCLUSIONS §9); the Reload ends the bank, and the next switch out builds a window and its groups again.
+- **The return to an Ice Climbers original is warm** (primary 2026-11-09 00:23Z; `docs/DECISIONS.md`). Eden
+  `rc6-bg-ic2/3` showed it Reloading (6–7 frames), which ended P1's bank; the next switch out rebuilt everything.
+  - The IcPair capability row's `original_bankable` is now true (EXCLUSIONS §9 lifted for the pair original). New
+    `capabilities::original_form_bankable(kind, forms, pair_bank)`: the pair original, in the pair form and while the
+    pair bank is on. Every other kind answers `original_bankable(kind)`, which is unchanged (0x4b stays outside
+    `swappable_kind`: the pair is never a single-body cell).
+  - `native_body_bank::original_member(kind, descriptor)` is both Mii adapters' Original gate: `original_bank` on, the
+    form the staged request spells (`request_forms`), and the pair bank's state. `excluded_original` asks the same rule
+    with the slot-0 setting's form, so the planner and the notice count the pair original as served.
+  - `plan_in` then serves the return like a numbered pair target: the live pair-lead window is a reuse, a detached
+    one or a pair group is a group swap (`group_serves`), and a request whose non-group bytes differ still takes the
+    Reload with `reuse declined … bytes differ at`. The player's `at_origin` already recognises any live `0x4b`.
 - **Merge note** (accepted by the primary, 22:52Z): `p23/rc6-hot-slots-mii` hooks `0x60de68` too. Integration keeps
   one `background_tail`, which also restores the Mii shadow's `R`.
 
 **Proof:**
 - Host tests, each failed first: model `a_background_build_takes_the_pair_group_and_builds_beside_a_live_pair_window`,
-  `an_ice_climbers_start_gets_a_pair_lead_window`, `a_live_pair_lead_window_plans_what_it_serves`;
-  `tests/background_pair_wiring.rs` (5).
+  `an_ice_climbers_start_gets_a_pair_lead_window`, `a_live_pair_lead_window_plans_what_it_serves`,
+  `an_ice_climbers_pair_original_is_a_bank_member_while_the_pair_bank_is_on`; `tests/background_pair_wiring.rs` (6).
 - Recorded manifest edits of `rows_a1.rs`, `body_bank.rs` and `native_body_bank.rs`; `carry_pkg6.py
   carry/ledger/verify` re-derives all 250 files.
 - Eden: `artifacts/phase23/LANE-OPUS-RC6-BG-IC-REPORT.md`.

@@ -339,10 +339,13 @@ pub const fn capabilities(class: FormClass) -> Capabilities {
         // C122: `R+0x50` pair rule on cells 0/1 (one reference per body); ICE-CLIMBERS addendum:
         // pair-lead window, commit pair ↔ extra (never Nana), N1/N2/N3; SPECIAL-GROUPS §5: the pair
         // group exits through Nana. Shipped: `pair_groups` default on since C116.1 (E6 is the row).
+        // EXCLUSIONS §9 lifted for the pair original (operator decisions 2026-11-08 "All groups in rc.6" and "a
+        // session that starts on IC/PT still gets its groups built"; primary 2026-11-09): a pair-lead window or a pair
+        // group serves it, while the pair bank is on (`original_form_bankable`).
         FormClass::IcPair => Capabilities {
             bodies: 2, actors: 2, native_flags: 0x02, window_cell: CellRule::PairLead,
             grouping: Grouping::OwnGroupOnly(SpecialSwitch::Pair), pair_rule: true, park_gate: ParkGate::PairAlive,
-            exit_commit: ExitRule::PairExtraOnly, original_bankable: false,
+            exit_commit: ExitRule::PairExtraOnly, original_bankable: true,
             presentation: PresentationRule { pair_plate: true, ..KIND }, ..ORDINARY
         },
         // SOLO-STALL-RCA §3: `0x17e8410` skips a secondary Popo, so the layout pins it to cell 0
@@ -445,9 +448,22 @@ pub fn swappable_kind(kind: u32) -> bool {
 
 /// The role's slot-0 original may be an ordinary bank/group member (EXCLUSIONS §9, `original_bank`
 /// switch): the row's `original_bankable` over the swappable set. Ice Climbers, Miis and the native
-/// groups keep the canonical original Reload.
+/// groups keep the canonical original Reload here; the pair original's warm return is
+/// [`original_form_bankable`] (rc.6).
 pub fn original_bankable(kind: u32) -> bool {
     swappable_kind(kind) && capabilities(kind_class(kind)).original_bankable
+}
+
+/// The role's slot-0 original in its requested form `forms` may be a bank/group member, so its return is a warm switch:
+/// an ordinary original ([`original_bankable`]), or the normal Ice Climbers pair while the pair bank is on
+/// (`pair_bank`). The IcPair row's `original_bankable` cites the operator decision; the return is served by a
+/// pair-lead window or a pair group (`group_serves`) and never by a single-body cell, which is why the pair stays out
+/// of [`original_bankable`]. Solo Popo, the Miis and the native groups keep the canonical original Reload.
+pub fn original_form_bankable(kind: u32, forms: Forms, pair_bank: bool) -> bool {
+    match form_class(kind, forms) {
+        FormClass::IcPair => forms == Forms::starting(POPO) && pair_bank && capabilities(FormClass::IcPair).original_bankable,
+        _ => original_bankable(kind),
+    }
 }
 
 /// A kind the planner may choose as a member of a new extra group under `policy`: every

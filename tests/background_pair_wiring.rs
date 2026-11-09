@@ -80,6 +80,30 @@ fn the_start_up_window_serves_an_ice_climbers_start_with_the_pair_bank() {
     assert!(h4.contains("read::<u32>(entry, 0x28) == bank.members.actor_count()"), "{h4}");
 }
 
+const PLAYER: &str = include_str!("../src/runtime/mii/mii_ordinary_player.rs");
+const CPU: &str = include_str!("../src/runtime/mii/mii_ordinary_cpu.rs");
+
+/// The return to an Ice Climbers original is warm (primary 2026-11-09 00:23Z; model rule
+/// `an_ice_climbers_pair_original_is_a_bank_member_while_the_pair_bank_is_on`). Both Mii adapters' Original gates ask
+/// `native_body_bank::original_member` with the staged request's form, and the planner's canonical-original exclusion
+/// asks the same model rule with the slot-0 setting's form. Every other kind keeps `original_bankable(kind)`. The
+/// player's `at_origin` already recognises any live `0x4b` as the Ice Climbers origin.
+#[test]
+fn the_ice_climbers_original_is_served_by_its_bank() {
+    let member = body(BANK, "pub(crate) fn original_member(");
+    ordered(member, &["if !settings.original_bank_enabled() { return false; }",
+        "if kind != POPO { return original_bankable(kind); }",
+        "request_forms(word(0x14), [word(0x18), word(0x1c), word(0x20)], word(0x28))",
+        ".is_some_and(|forms| original_form_bankable(kind, forms, pair_enabled(&settings)))"]);
+    let excluded = body(BANK, "fn excluded_original(");
+    assert!(excluded.contains(
+        "original_form_bankable(*kind, super::requested_forms_at(menu, logical, *kind, None), pair_enabled(settings))"), "{excluded}");
+    for (name, src, kept) in [("player", PLAYER, 1), ("cpu", CPU, 0)] {
+        assert!(src.contains("&& super::body_bank::original_member(origin.original_kind,&descriptor) => Some(Live::Original),"), "{name}");
+        assert_eq!(src.matches("original_bankable(origin.original_kind)").count(), kept, "{name}: only the player's at_origin");
+    }
+}
+
 /// Eden rc6-bg-ic2 (`ic-start-loaded`, "Loaded 9/10 · swap P1 to load 1 more"): `plan_budget` plans a role's window
 /// targets through `body_bank::window_targets` with its live window and active member, the values `progress` reads,
 /// so a live pair-lead window counts what it serves.

@@ -166,7 +166,7 @@ use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU8, AtomicUsize, Ordering};
 use hos_lock::Mutex;
 use crate::engine::swap::body_bank::{
     count_extra_groups_iter, dispatcher_array_header_ok, dispatcher_idle_words, native_group_request, original_bankable,
-    pair_request, pair_resource_references, plan_extra_groups_with, prefetch_outcome,
+    original_form_bankable, pair_request, pair_resource_references, plan_extra_groups_with, prefetch_outcome,
     swap_commit_index_in, async_build_eligible, construction_task, TickGap,
     background_build_eligible, next_background, BACKGROUND_INFO_SPANS,
     GroupBudget, GroupExchange, GroupOwner, GroupPolicy, GroupState, Hold, Members, Phase, Special,
@@ -362,9 +362,26 @@ fn canonical_original(menu: &crate::engine::compat::menu::TrainingModpackMenu, r
 /// from the reusable count. With `original_bank` on, an ordinary single-body
 /// original is an ordinary member instead (EXCLUSIONS §9): the adapters then plan
 /// `Target::Original` through `plan()` like a numbered fighter, and nothing is
-/// excluded. Ice Climbers, Miis and native-group originals stay canonical.
+/// excluded. So is the normal Ice Climbers pair while the pair bank is on (rc.6,
+/// `original_form_bankable`; its window or pair group serves it). Solo Popo, Miis and
+/// native-group originals stay canonical.
 fn excluded_original(settings: &Settings, menu: &crate::engine::compat::menu::TrainingModpackMenu, role: usize) -> Option<u32> {
-    canonical_original(menu, role).filter(|kind| !(settings.original_bank_enabled() && original_bankable(*kind)))
+    let logical = if role == 0 { super::Role::Player } else { super::Role::Cpu };
+    canonical_original(menu, role).filter(|kind| !(settings.original_bank_enabled()
+        && original_form_bankable(*kind, super::requested_forms_at(menu, logical, *kind, None), pair_enabled(settings))))
+}
+
+/// The Mii adapters' gate for a return to the role's slot-0 original (EXCLUSIONS §9 with rc.6's pair original): may
+/// the bank serve it, so the return is a warm switch and never the Reload that retires the bank? `original_bank` on and,
+/// for Ice Climbers, `original_form_bankable` for the form the staged request's words spell (the pair needs the pair
+/// bank). Every other kind keeps `original_bankable(kind)`.
+pub(crate) fn original_member(kind: u32, descriptor: &[u8; 0x70]) -> bool {
+    let settings = crate::runtime::roster::cycle_preload_config::snapshot();
+    if !settings.original_bank_enabled() { return false; }
+    if kind != POPO { return original_bankable(kind); }
+    let word = |at: usize| u32::from_le_bytes([descriptor[at], descriptor[at + 1], descriptor[at + 2], descriptor[at + 3]]);
+    crate::engine::swap::swap_model::capabilities::request_forms(word(0x14), [word(0x18), word(0x1c), word(0x20)], word(0x28))
+        .is_some_and(|forms| original_form_bankable(kind, forms, pair_enabled(&settings)))
 }
 
 fn groups_enabled(settings: &crate::engine::preload::cycle_preload_config::Settings) -> bool {
@@ -601,9 +618,10 @@ fn members_for(settings: &crate::engine::preload::cycle_preload_config::Settings
 /// (`requested_forms_at`, the form every numbered slot of the role takes; the pair is never a cell
 /// 1–2 member, `Members::from_pair` builds its own window), and the entry is not the role's
 /// canonical-only original: with equal original and cycle forms the cycle roster excludes Ice
-/// Climbers (`roster_grid::cycle_exclusion`), so that entry is the slot-0 original, whose return is
-/// the canonical Reload (`original_bankable(0x4b)` is false). The form of every kept `0x4b` is still
-/// re-proven per request (`group_serves`). No allocation.
+/// Climbers (`roster_grid::cycle_exclusion`), so that entry is the slot-0 original, never a single-body
+/// member: its return is served by the pair-lead window or a pair group (`original_member`, rc.6) or
+/// is the canonical Reload. The form of every kept `0x4b` is still re-proven per request
+/// (`group_serves`). No allocation.
 fn window_lane(menu: &crate::engine::compat::menu::TrainingModpackMenu, role: usize, upcoming: &[u32])
     -> ([u32; crate::runtime::roster::cycle_preload::MAX_TARGETS], usize) {
     let logical = if role == 0 { super::Role::Player } else { super::Role::Cpu };

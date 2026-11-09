@@ -1112,7 +1112,7 @@
    "dest": "src/model/swap/body_bank.rs",
    "crate": "consts",
    "src_sha256": "ab3c4adcf084b2dd9433a5fe5715b428fb38c26d3b143d7632fb3d33078df0d6",
-   "dest_sha256": "d1eb7cd91ab766bb1cefd6701739f58273b4c9657a1330caad18434343af65da",
+   "dest_sha256": "8560b992a221cc1f4d1eb375d94186f927649486878e79e607c8e8c54f310506",
    "edits": [
     {
      "old": "    // a native group): count it so hats and helper slots agree with the planner.\n    let used: usize = windows.iter().map(|window| window.map_or(1, |members| members.count())).sum::<usize>()\n        + existing.iter().flat_map(|groups| groups.iter()).map(|members| members.count()).sum::<usize>()\n        + budget.hats_wanted;\n    let mut remaining = budget.ready_fighters.saturating_sub(used).min(budget.pool_free);\n    // (lane depth, kind): depth is the distance from the live fighter, so a role\n    // whose nearer neighbours are already built does not outrank the other role.\n    let mut candidates: [Vec<(usize, u32)>; 2] = [Vec::new(), Vec::new()];\n    // Whole special groups (PT, Aegis, the pair) at their lane depth.\n    let mut specials: [Vec<(usize, Members)>; 2] = [Vec::new(), Vec::new()];\n    let mut room = [0usize; 2];\n    let mut group_slots = [0usize; 2];\n    for role in 0..2 {\n        let Some(window) = windows[role].filter(|window| window_swappable_with(*window, policy)) else { continue; };\n        group_slots[role] = MAX_EXTRA_GROUPS.saturating_sub(existing[role].len());\n        room[role] = group_slots[role] * NATIVE_MEMBERS;\n        for (depth, &kind) in upcoming[role].iter().enumerate() {\n            if exclude[role] == Some(kind)\n                || window.index_of(kind).is_some()\n                || existing[role].iter().any(|group| group.index_of(kind).is_some())\n            { continue; }\n            if let Some(group) = Members::special_group(kind, budget.special) {\n                // One Mii identity per resource owner: a second lane Mii, or a\n                // Mii group this role already holds, stays canonical (DESIGN \u00a72).\n                let second_mii = group.special() == Special::Mii\n                    && (specials[role].iter().any(|(_, held)| held.special() == Special::Mii)\n                        || existing[role].iter().any(|held| held.special() == Special::Mii));\n                if !second_mii && !specials[role].iter().any(|(_, held)| held.kinds()[0] == group.kinds()[0]) {\n                    specials[role].push((depth, group));\n                }\n                continue;\n            }\n            if group_member_kind(kind, policy) && !candidates[role].iter().any(|(_, held)| *held == kind) {\n                candidates[role].push((depth, kind));\n            }\n        }\n    }\n    // Special groups are taken whole at their own lane depth, interleaved with\n    // the ordinary candidates; one that no longer fits the remaining bodies or a\n    // free group slot is skipped, never split.\n    let mut chosen_special: [Vec<Members>; 2] = [Vec::new(), Vec::new()];\n    let mut scursor = [0usize; 2];\n    let mut chosen: [Vec<u32>; 2] = [Vec::new(), Vec::new()];\n    let mut cursor = [0usize; 2];\n    let take = |role: usize, chosen: &mut [Vec<u32>; 2], cursor: &mut [usize; 2], remaining: &mut usize| -> bool {\n        if *remaining == 0 || cursor[role] >= candidates[role].len() || chosen[role].len() >= room[role] {\n            return false;\n        }\n        chosen[role].push(candidates[role][cursor[role]].1);\n        cursor[role] += 1;\n        *remaining -= 1;\n        true\n    };\n    let deepest = upcoming.iter().map(|lane| lane.len()).max().unwrap_or(0);\n    for depth in 0..deepest {\n        for role in 0..2 {\n            if cursor[role] < candidates[role].len() && candidates[role][cursor[role]].0 == depth {\n                take(role, &mut chosen, &mut cursor, &mut remaining);\n            } else if scursor[role] < specials[role].len() && specials[role][scursor[role]].0 == depth {\n                let group = specials[role][scursor[role]].1;\n                scursor[role] += 1;\n                let slots_used = chosen_special[role].len() + chosen[role].len().div_ceil(NATIVE_MEMBERS);\n                if remaining >= group.count() && slots_used < group_slots[role] {\n                    chosen_special[role].push(group);\n                    remaining -= group.count();\n",
@@ -1338,6 +1338,11 @@
      "old": "\n    /// tr-p23-hot-measure-1, g03 frame 85 (\"Loaded 2/5 (3 failed)\"): the CPU window `[34,0,1]` built, its two\n",
      "new": "\n    /// rc.6 item 3, a session that starts on Ice Climbers (Eden rc6-bg-ic2, `ic-start-loaded`): P1's live pair-lead\n    /// window `[Popo, Nana, DK]` and its built group `[Link, Samus, Yoshi]` are every P1 fighter, yet the notice stayed\n    /// \"Loaded 9/10 \u00b7 swap P1 to load 1 more\". The planner counted the window the lane's next kind would get (`[DK, Link,\n    /// Samus]`, two extras) where the live pair-lead window serves one. With groups on that window stays while the\n    /// groups build around it, so it plans what it serves, the count the notice reads; with groups off, or for any\n    /// other window, the next swap still builds the lane's window.\n    #[test]\n    fn a_live_pair_lead_window_plans_what_it_serves() {\n        use crate::engine::preload::cycle_preload_capacity::reusable_extras;\n        let window = Members::pair_lead(DK).unwrap();\n        let group = count_extra_groups(&[(members(&[LINK, SAMUS, YOSHI]), GroupState::Built)]);\n        let next = reusable_extras(&[DK, LINK, SAMUS], DK, Some(POPO));\n        assert_eq!(next, 2);\n        for (active, served) in [(POPO, 1), (DK, 0)] {\n            let (kinds, count) = window.logical_kinds();\n            let extra = reusable_extras(&kinds[..count], active, Some(POPO));\n            assert_eq!(extra, served, \"{active:#x}: Popo is the canonical original\");\n            let planned = window_targets(true, Some((window, active)), Some(POPO), next) + group.planned;\n            let role = role_counts(planned, extra, WindowStatus::Built, group);\n            assert_eq!((role.planned, role.ready, role.unstarted()), (served + 3, served + 3, 0), \"{active:#x}\");\n            assert_eq!(role.swap_owed(0), 0);\n        }\n        assert_eq!(window_targets(true, Some((window, POPO)), None, next), 1, \"an original that is not the pair\");\n        assert_eq!(window_targets(false, Some((window, POPO)), Some(POPO), next), next, \"groups off: the next swap builds it\");\n        assert_eq!(window_targets(true, None, Some(POPO), next), next, \"no live window\");\n        let ordinary = members(&[MARIO, DK, LINK]);\n        assert_eq!(window_targets(true, Some((ordinary, MARIO)), None, next), next, \"an ordinary window\");\n    }\n\n    /// tr-p23-hot-measure-1, g03 frame 85 (\"Loaded 2/5 (3 failed)\"): the CPU window `[34,0,1]` built, its two\n",
      "reason": "rc.6 item 3, a session that starts on Ice Climbers (p23/rc6-bg-ic; Eden rc6-bg-ic2 ic-start-loaded: Loaded 9/10, swap P1 to load 1 more): a live pair-lead window with groups on plans what it serves (body_bank::window_targets, plan_budget)"
+    },
+    {
+     "old": "    group_member_kind, key_release_admitted, kirby_parkable, member_forms, member_forms_in,\n    native_group_request, original_bankable, pair_lead_extra, pair_request, prefetch_admitted,\n    single_member_request, special_group_kind, swap_commit_index, swap_commit_index_in,\n",
+     "new": "    group_member_kind, key_release_admitted, kirby_parkable, member_forms, member_forms_in,\n    native_group_request, original_bankable, original_form_bankable, pair_lead_extra, pair_request, prefetch_admitted,\n    single_member_request, special_group_kind, swap_commit_index, swap_commit_index_in,\n",
+     "reason": "rc.6 item 3, the return to an Ice Climbers original is warm (operator decisions 2026-11-08 All groups in rc.6 and a session that starts on IC/PT still gets its groups built; primary 2026-11-09 00:23Z): EXCLUSIONS 9 lifted for the normal pair original while the pair bank is on (capabilities original_form_bankable, IcPair row; native_body_bank original_member, excluded_original; both Mii adapters Original gates)"
     }
    ]
   },
@@ -1391,7 +1396,29 @@
    "dest": "src/model/swap/swap_model/capabilities.rs",
    "crate": "consts",
    "src_sha256": "f8c65743dd5f2bf8762896822d14fa72edcd97d9070a26d921dd4701d84783cb",
-   "dest_sha256": "e916045d725f91013a8c8321cc1081ebf10c7bb298515c3a7c7c1472d107cbdb"
+   "dest_sha256": "cb43b969d3acd7a4ad9c14dfeedeb8bb98896af3d305e0bb953cbd45028da5e9",
+   "edits": [
+    {
+     "old": "        // group exits through Nana. Shipped: `pair_groups` default on since C116.1 (E6 is the row).\n        FormClass::IcPair => Capabilities {\n",
+     "new": "        // group exits through Nana. Shipped: `pair_groups` default on since C116.1 (E6 is the row).\n        // EXCLUSIONS \u00a79 lifted for the pair original (operator decisions 2026-11-08 \"All groups in rc.6\" and \"a\n        // session that starts on IC/PT still gets its groups built\"; primary 2026-11-09): a pair-lead window or a pair\n        // group serves it, while the pair bank is on (`original_form_bankable`).\n        FormClass::IcPair => Capabilities {\n",
+     "reason": "rc.6 item 3, the return to an Ice Climbers original is warm (operator decisions 2026-11-08 All groups in rc.6 and a session that starts on IC/PT still gets its groups built; primary 2026-11-09 00:23Z): EXCLUSIONS 9 lifted for the normal pair original while the pair bank is on (capabilities original_form_bankable, IcPair row; native_body_bank original_member, excluded_original; both Mii adapters Original gates)"
+    },
+    {
+     "old": "            grouping: Grouping::OwnGroupOnly(SpecialSwitch::Pair), pair_rule: true, park_gate: ParkGate::PairAlive,\n            exit_commit: ExitRule::PairExtraOnly, original_bankable: false,\n            presentation: PresentationRule { pair_plate: true, ..KIND }, ..ORDINARY\n",
+     "new": "            grouping: Grouping::OwnGroupOnly(SpecialSwitch::Pair), pair_rule: true, park_gate: ParkGate::PairAlive,\n            exit_commit: ExitRule::PairExtraOnly, original_bankable: true,\n            presentation: PresentationRule { pair_plate: true, ..KIND }, ..ORDINARY\n",
+     "reason": "rc.6 item 3, the return to an Ice Climbers original is warm (operator decisions 2026-11-08 All groups in rc.6 and a session that starts on IC/PT still gets its groups built; primary 2026-11-09 00:23Z): EXCLUSIONS 9 lifted for the normal pair original while the pair bank is on (capabilities original_form_bankable, IcPair row; native_body_bank original_member, excluded_original; both Mii adapters Original gates)"
+    },
+    {
+     "old": "/// switch): the row's `original_bankable` over the swappable set. Ice Climbers, Miis and the native\n/// groups keep the canonical original Reload.\npub fn original_bankable(kind: u32) -> bool {\n",
+     "new": "/// switch): the row's `original_bankable` over the swappable set. Ice Climbers, Miis and the native\n/// groups keep the canonical original Reload here; the pair original's warm return is\n/// [`original_form_bankable`] (rc.6).\npub fn original_bankable(kind: u32) -> bool {\n",
+     "reason": "rc.6 item 3, the return to an Ice Climbers original is warm (operator decisions 2026-11-08 All groups in rc.6 and a session that starts on IC/PT still gets its groups built; primary 2026-11-09 00:23Z): EXCLUSIONS 9 lifted for the normal pair original while the pair bank is on (capabilities original_form_bankable, IcPair row; native_body_bank original_member, excluded_original; both Mii adapters Original gates)"
+    },
+    {
+     "old": "\n/// A kind the planner may choose as a member of a new extra group under `policy`: every\n",
+     "new": "\n/// The role's slot-0 original in its requested form `forms` may be a bank/group member, so its return is a warm switch:\n/// an ordinary original ([`original_bankable`]), or the normal Ice Climbers pair while the pair bank is on\n/// (`pair_bank`). The IcPair row's `original_bankable` cites the operator decision; the return is served by a\n/// pair-lead window or a pair group (`group_serves`) and never by a single-body cell, which is why the pair stays out\n/// of [`original_bankable`]. Solo Popo, the Miis and the native groups keep the canonical original Reload.\npub fn original_form_bankable(kind: u32, forms: Forms, pair_bank: bool) -> bool {\n    match form_class(kind, forms) {\n        FormClass::IcPair => forms == Forms::starting(POPO) && pair_bank && capabilities(FormClass::IcPair).original_bankable,\n        _ => original_bankable(kind),\n    }\n}\n\n/// A kind the planner may choose as a member of a new extra group under `policy`: every\n",
+     "reason": "rc.6 item 3, the return to an Ice Climbers original is warm (operator decisions 2026-11-08 All groups in rc.6 and a session that starts on IC/PT still gets its groups built; primary 2026-11-09 00:23Z): EXCLUSIONS 9 lifted for the normal pair original while the pair bank is on (capabilities original_form_bankable, IcPair row; native_body_bank original_member, excluded_original; both Mii adapters Original gates)"
+    }
+   ]
   },
   {
    "src": "training_mod_consts/src/swap_model/copy_packages.rs",
@@ -1667,7 +1694,14 @@
    "dest": "src/model/swap/swap_model/tests.rs",
    "crate": "consts",
    "src_sha256": "9bdd8d3cea3f8d7a5bad644dc013b83467236d6c0eac668cac48c8eafd7f2a00",
-   "dest_sha256": "d93a1434b23a02b7d9c13840fbcdbc213073fb921615c0e715935bcbc30e98de"
+   "dest_sha256": "d816b6705c35dc0d83148c75e545a1a78cc4face5280beac90e1b7b30531f024",
+   "edits": [
+    {
+     "old": "    assert_eq!(capabilities::previous_cell_index(2, 2, 2), 0);\n}",
+     "new": "    assert_eq!(capabilities::previous_cell_index(2, 2, 2), 0);\n}\n\n/// rc.6 item 3 (operator decisions \"All groups in rc.6\" and \"a session that starts on IC/PT still gets its groups\n/// built\"; primary 2026-11-09 00:23Z): the return to an Ice Climbers original is warm. Eden rc6-bg-ic2/3: P1 started\n/// on the pair, and the return Yoshi \u2192 Ice Climbers was the canonical Reload (6\u20137 frames). It retired P1's bank, and the\n/// next switch out rebuilt the window and its groups. The pair original, in its pair form and while the pair bank is\n/// on, is now a bank member: the pair-lead window or a pair group serves it (`group_serves`). Solo Popo, the Miis and\n/// the native groups keep the canonical Reload, and the kind-only `original_bankable` is unchanged for every caller.\n#[test]\nfn an_ice_climbers_pair_original_is_a_bank_member_while_the_pair_bank_is_on() {\n    use capabilities::{original_bankable, original_form_bankable, FormClass};\n    assert!(capabilities::capabilities(FormClass::IcPair).original_bankable);\n    assert!(original_form_bankable(POPO, Forms::starting(POPO), true));\n    assert!(!original_form_bankable(POPO, Forms::starting(POPO), false), \"pair bank off\");\n    assert!(!original_form_bankable(POPO, Forms::solo_popo(), true), \"Solo Popo\");\n    assert!(!original_bankable(POPO) && !original_bankable(NANA), \"the kind-only predicate is unchanged\");\n    for kind in kinds().filter(|kind| *kind != POPO) {\n        for pair_bank in [false, true] {\n            assert_eq!(original_form_bankable(kind, Forms::starting(kind), pair_bank), original_bankable(kind), \"{kind:#x}\");\n        }\n    }\n    assert!(original_form_bankable(0x00, Forms::starting(0x00), false));\n    assert!(original_form_bankable(KIRBY, Forms::starting(KIRBY), false));\n    for kind in [0x24, 0x5a, 0x48] {\n        assert!(!original_form_bankable(kind, Forms::starting(kind), true), \"{kind:#x}: native group or Mii\");\n    }\n}",
+     "reason": "rc.6 item 3, the return to an Ice Climbers original is warm (operator decisions 2026-11-08 All groups in rc.6 and a session that starts on IC/PT still gets its groups built; primary 2026-11-09 00:23Z): EXCLUSIONS 9 lifted for the normal pair original while the pair bank is on (capabilities original_form_bankable, IcPair row; native_body_bank original_member, excluded_original; both Mii adapters Original gates)"
+    }
+   ]
   },
   {
    "src": "training_mod_consts/tests/fixtures/swap/README.md",
@@ -2483,7 +2517,7 @@
    "dest": "src/model/preload/cycle_preload_config.rs",
    "crate": "consts",
    "src_sha256": "49c8a777d9e7c728aa8ecc7a51df2f7990f3edf458fdf7163be3b82fa9e3bf01",
-   "dest_sha256": "dc73cd77352b18f95133881e638e5b8b58f7dfb83bf613a9dffd314de4f46ff5",
+   "dest_sha256": "c8cc79ffb69072f087c3240c0d031ba745ce26a38740a2f53f5069a437273110",
    "edits": [
     {
      "delete_from": "// The exported menu macro resolves these names at its use site.\nmod bank_submenu {",
@@ -2539,6 +2573,11 @@
      "old": "        assert_eq!(crate::engine::compat::menu::BASE_MENU.cycle_preload_group_swap, OnOff::ON);\n        assert_eq!(crate::engine::compat::menu::BASE_MENU.cycle_preload_ready_fighters, default_ready_fighters());\n        assert_eq!(default_ready_fighters(), CyclePreloadReadyFighters::EIGHT);\n        let text = render(Settings::DEFAULT);\n        assert!(text.contains(\"\\ngroup_swap=on\\n\") && text.contains(\"\\nready_fighters=8\\n\"));\n\n        // Older files without the keys keep the built-in choices.\n",
      "new": "        assert_eq!(crate::engine::compat::menu::BASE_MENU.cycle_preload_group_swap, OnOff::ON);\n        assert_eq!(crate::engine::compat::menu::BASE_MENU.cycle_preload_ready_fighters, default_ready_fighters());\n        assert_eq!(default_ready_fighters(), CyclePreloadReadyFighters::TEN);\n        let text = render(Settings::DEFAULT);\n        assert!(text.contains(\"\\ngroup_swap=on\\n\") && text.contains(\"\\nready_fighters=10\\n\"));\n\n        // Older files without the keys keep the built-in choices.\n",
      "reason": "P-HOT section 3.2 (DECISIONS 2026-11-02, operator: ten hot fighters including both active fighters): Ready Fighters defaults to 10"
+    },
+    {
+     "old": "/// canonical Reload that retires every bank and group (EXCLUSIONS-AUDIT \u00a79).\n/// `solo_popo_groups` admits Solo Popo as the first member of a detached swap\n",
+     "new": "/// canonical Reload that retires every bank and group (EXCLUSIONS-AUDIT \u00a79).\n/// Since rc.6 a normal Ice Climbers original counts too while `ic_pair_bank` is\n/// on: its pair-lead window or pair group serves the return.\n/// `solo_popo_groups` admits Solo Popo as the first member of a detached swap\n",
+     "reason": "rc.6 item 3, the return to an Ice Climbers original is warm (operator decisions 2026-11-08 All groups in rc.6 and a session that starts on IC/PT still gets its groups built; primary 2026-11-09 00:23Z): EXCLUSIONS 9 lifted for the normal pair original while the pair bank is on (capabilities original_form_bankable, IcPair row; native_body_bank original_member, excluded_original; both Mii adapters Original gates)"
     }
    ]
   },
@@ -5485,7 +5524,7 @@
    "dest": "src/runtime/roster/native_body_bank.rs",
    "crate": "root",
    "src_sha256": "ccf7ac678691fa0101a1eff5dbd9300a1b12fe64e9ebbde515697adfbb841c98",
-   "dest_sha256": "cc6ed881e195d7c7f5c437096ba8a6144503968e5d8227a05989b14b3078e9ed",
+   "dest_sha256": "5f8b6284734b251cda6db141a421529cb46bb444d1b2f11d052b9ab2a0008bd0",
    "edits": [
     {
      "old": "unsafe fn finalize_entry(entry: *mut u8) -> u64 {\n",
@@ -6492,6 +6531,26 @@
      "old": "        });\n        PLANNED_TARGETS[role].store(targets.saturating_add(group_targets[role]), Ordering::Release);\n",
      "new": "        });\n        let targets = crate::engine::swap::body_bank::window_targets(grouped, live[role], originals[role], next);\n        PLANNED_TARGETS[role].store(targets.saturating_add(group_targets[role]), Ordering::Release);\n",
      "reason": "rc.6 item 3, a session that starts on Ice Climbers (p23/rc6-bg-ic; Eden rc6-bg-ic2 ic-start-loaded: Loaded 9/10, swap P1 to load 1 more): a live pair-lead window with groups on plans what it serves (body_bank::window_targets, plan_budget)"
+    },
+    {
+     "old": "    count_extra_groups_iter, dispatcher_array_header_ok, dispatcher_idle_words, native_group_request, original_bankable,\n    pair_request, pair_resource_references, plan_extra_groups_with, prefetch_outcome,\n    swap_commit_index_in, async_build_eligible, construction_task, TickGap,\n",
+     "new": "    count_extra_groups_iter, dispatcher_array_header_ok, dispatcher_idle_words, native_group_request, original_bankable,\n    original_form_bankable, pair_request, pair_resource_references, plan_extra_groups_with, prefetch_outcome,\n    swap_commit_index_in, async_build_eligible, construction_task, TickGap,\n",
+     "reason": "rc.6 item 3, the return to an Ice Climbers original is warm (operator decisions 2026-11-08 All groups in rc.6 and a session that starts on IC/PT still gets its groups built; primary 2026-11-09 00:23Z): EXCLUSIONS 9 lifted for the normal pair original while the pair bank is on (capabilities original_form_bankable, IcPair row; native_body_bank original_member, excluded_original; both Mii adapters Original gates)"
+    },
+    {
+     "old": "/// `Target::Original` through `plan()` like a numbered fighter, and nothing is\n/// excluded. Ice Climbers, Miis and native-group originals stay canonical.\nfn excluded_original(settings: &Settings, menu: &crate::engine::compat::menu::TrainingModpackMenu, role: usize) -> Option<u32> {\n",
+     "new": "/// `Target::Original` through `plan()` like a numbered fighter, and nothing is\n/// excluded. So is the normal Ice Climbers pair while the pair bank is on (rc.6,\n/// `original_form_bankable`; its window or pair group serves it). Solo Popo, Miis and\n/// native-group originals stay canonical.\nfn excluded_original(settings: &Settings, menu: &crate::engine::compat::menu::TrainingModpackMenu, role: usize) -> Option<u32> {\n",
+     "reason": "rc.6 item 3, the return to an Ice Climbers original is warm (operator decisions 2026-11-08 All groups in rc.6 and a session that starts on IC/PT still gets its groups built; primary 2026-11-09 00:23Z): EXCLUSIONS 9 lifted for the normal pair original while the pair bank is on (capabilities original_form_bankable, IcPair row; native_body_bank original_member, excluded_original; both Mii adapters Original gates)"
+    },
+    {
+     "old": "fn excluded_original(settings: &Settings, menu: &crate::engine::compat::menu::TrainingModpackMenu, role: usize) -> Option<u32> {\n    canonical_original(menu, role).filter(|kind| !(settings.original_bank_enabled() && original_bankable(*kind)))\n}\n",
+     "new": "fn excluded_original(settings: &Settings, menu: &crate::engine::compat::menu::TrainingModpackMenu, role: usize) -> Option<u32> {\n    let logical = if role == 0 { super::Role::Player } else { super::Role::Cpu };\n    canonical_original(menu, role).filter(|kind| !(settings.original_bank_enabled()\n        && original_form_bankable(*kind, super::requested_forms_at(menu, logical, *kind, None), pair_enabled(settings))))\n}\n\n/// The Mii adapters' gate for a return to the role's slot-0 original (EXCLUSIONS \u00a79 with rc.6's pair original): may\n/// the bank serve it, so the return is a warm switch and never the Reload that retires the bank? `original_bank` on and,\n/// for Ice Climbers, `original_form_bankable` for the form the staged request's words spell (the pair needs the pair\n/// bank). Every other kind keeps `original_bankable(kind)`.\npub(crate) fn original_member(kind: u32, descriptor: &[u8; 0x70]) -> bool {\n    let settings = crate::runtime::roster::cycle_preload_config::snapshot();\n    if !settings.original_bank_enabled() { return false; }\n    if kind != POPO { return original_bankable(kind); }\n    let word = |at: usize| u32::from_le_bytes([descriptor[at], descriptor[at + 1], descriptor[at + 2], descriptor[at + 3]]);\n    crate::engine::swap::swap_model::capabilities::request_forms(word(0x14), [word(0x18), word(0x1c), word(0x20)], word(0x28))\n        .is_some_and(|forms| original_form_bankable(kind, forms, pair_enabled(&settings)))\n}\n",
+     "reason": "rc.6 item 3, the return to an Ice Climbers original is warm (operator decisions 2026-11-08 All groups in rc.6 and a session that starts on IC/PT still gets its groups built; primary 2026-11-09 00:23Z): EXCLUSIONS 9 lifted for the normal pair original while the pair bank is on (capabilities original_form_bankable, IcPair row; native_body_bank original_member, excluded_original; both Mii adapters Original gates)"
+    },
+    {
+     "old": "/// canonical-only original: with equal original and cycle forms the cycle roster excludes Ice\n/// Climbers (`roster_grid::cycle_exclusion`), so that entry is the slot-0 original, whose return is\n/// the canonical Reload (`original_bankable(0x4b)` is false). The form of every kept `0x4b` is still\n/// re-proven per request (`group_serves`). No allocation.\nfn window_lane(menu: &crate::engine::compat::menu::TrainingModpackMenu, role: usize, upcoming: &[u32])\n",
+     "new": "/// canonical-only original: with equal original and cycle forms the cycle roster excludes Ice\n/// Climbers (`roster_grid::cycle_exclusion`), so that entry is the slot-0 original, never a single-body\n/// member: its return is served by the pair-lead window or a pair group (`original_member`, rc.6) or\n/// is the canonical Reload. The form of every kept `0x4b` is still re-proven per request\n/// (`group_serves`). No allocation.\nfn window_lane(menu: &crate::engine::compat::menu::TrainingModpackMenu, role: usize, upcoming: &[u32])\n",
+     "reason": "rc.6 item 3, the return to an Ice Climbers original is warm (operator decisions 2026-11-08 All groups in rc.6 and a session that starts on IC/PT still gets its groups built; primary 2026-11-09 00:23Z): EXCLUSIONS 9 lifted for the normal pair original while the pair bank is on (capabilities original_form_bankable, IcPair row; native_body_bank original_member, excluded_original; both Mii adapters Original gates)"
     }
    ]
   },
@@ -8145,7 +8204,7 @@
    "dest": "src/runtime/mii/mii_ordinary_cpu.rs",
    "crate": "root",
    "src_sha256": "db7e15715560db924eba68ba570e97540f1b445b1cf4989a172c0426dd32c6ce",
-   "dest_sha256": "70bbef1a1fb5478c419c2476bad02e6b1409f24da606211c5098bb08241dd104",
+   "dest_sha256": "ab9ada16fd259e4156a1cc49288e3b365eab24d593f20227fd0f06f70f0c145c",
    "edits": [
     {
      "old": "fn note(reason:&str) { trace!(\"[MiiOrdinaryCpu] {reason}\"); }",
@@ -8471,6 +8530,16 @@
      "old": "    };\n    let now=settled.now;let exact=settled.exact;\n    let logical=b.logical;\n    // A Mii group switch whose exact proof was adopted publishes its configuration\n",
      "new": "    };\n    let now=settled.now;let exact=settled.exact;\n    STATE.lock().mii_exit=match (exact,published) {\n        (Some(c),Some((published_c,published))) if published_c==c=>Some(MiiExit {mii:b,configuration:c,published,adopted:now}),\n        _=>None,\n    };\n    let logical=b.logical;\n    // A Mii group switch whose exact proof was adopted publishes its configuration\n",
      "reason": "rc.6 warm exit from a Mii group (operator decision 2026-11-08, INBOX-opus-rc6-hotslots 15:58Z; console F6 #106: Mii Gunner to Pichu took a 5.9 s Reload, descriptor bytes differ at [46, 48, 4a, 4e]): an adapter that kept its Mii group switch publication plans the exit (plan_mii_exit, mii_exit_saved, mii_exit_bytes_match) to the Built window the Mii displaced; the exchange writes that window back and the settle tick puts the publication back through bank_restore (exit_settled)"
+    },
+    {
+     "old": "                Some(Live::Numbered {identity:Identity::Fighter(kind),cursor:destination.cursor}),\n            TargetKind::Original if publish.is_none() && same_class.is_none() && origin_saved.is_none()\n",
+     "new": "                Some(Live::Numbered {identity:Identity::Fighter(kind),cursor:destination.cursor}),\n            // rc.6: the normal Ice Climbers pair original too, while the pair bank is on (`original_member`).\n            TargetKind::Original if publish.is_none() && same_class.is_none() && origin_saved.is_none()\n",
+     "reason": "rc.6 item 3, the return to an Ice Climbers original is warm (operator decisions 2026-11-08 All groups in rc.6 and a session that starts on IC/PT still gets its groups built; primary 2026-11-09 00:23Z): EXCLUSIONS 9 lifted for the normal pair original while the pair bank is on (capabilities original_form_bankable, IcPair row; native_body_bank original_member, excluded_original; both Mii adapters Original gates)"
+    },
+    {
+     "old": "                && descriptor_kind(&descriptor)==origin.original_kind\n                && crate::engine::swap::body_bank::original_bankable(origin.original_kind)\n                && crate::runtime::roster::cycle_preload_config::snapshot().original_bank_enabled() => Some(Live::Original),\n            // A saved/preset Mii with no same-class proof may be served by its own\n",
+     "new": "                && descriptor_kind(&descriptor)==origin.original_kind\n                && super::body_bank::original_member(origin.original_kind,&descriptor) => Some(Live::Original),\n            // A saved/preset Mii with no same-class proof may be served by its own\n",
+     "reason": "rc.6 item 3, the return to an Ice Climbers original is warm (operator decisions 2026-11-08 All groups in rc.6 and a session that starts on IC/PT still gets its groups built; primary 2026-11-09 00:23Z): EXCLUSIONS 9 lifted for the normal pair original while the pair bank is on (capabilities original_form_bankable, IcPair row; native_body_bank original_member, excluded_original; both Mii adapters Original gates)"
     }
    ]
   },
@@ -8751,7 +8820,7 @@
    "dest": "src/runtime/mii/mii_ordinary_player.rs",
    "crate": "root",
    "src_sha256": "73e84c925f3aaedd6c09fd082ba41364d160e8cca38cc604617d5fdc38431b8d",
-   "dest_sha256": "944ed831e4e17ef2bfbd6cff40dab6c7e373ef77ed285df3b67c9abe3f99759f",
+   "dest_sha256": "8da28ef8cf110a104c4ef6985c9c5ce2747b6d53a393fea3d6effc6b61ee8a5f",
    "edits": [
     {
      "old": "fn note(reason:&str) { trace!(\"[MiiOrdinaryPlayer] {reason}\"); }",
@@ -9047,6 +9116,16 @@
      "old": "    };\n    let now=settled.now;let exact=settled.exact;\n    let logical=b.logical;\n    // A Mii group switch whose exact proof was adopted publishes its configuration\n",
      "new": "    };\n    let now=settled.now;let exact=settled.exact;\n    STATE.lock().mii_exit=match (exact,published) {\n        (Some(c),Some((published_c,published))) if published_c==c=>Some(MiiExit {mii:b,configuration:c,published,adopted:now}),\n        _=>None,\n    };\n    let logical=b.logical;\n    // A Mii group switch whose exact proof was adopted publishes its configuration\n",
      "reason": "rc.6 warm exit from a Mii group (operator decision 2026-11-08, INBOX-opus-rc6-hotslots 15:58Z; console F6 #106: Mii Gunner to Pichu took a 5.9 s Reload, descriptor bytes differ at [46, 48, 4a, 4e]): an adapter that kept its Mii group switch publication plans the exit (plan_mii_exit, mii_exit_saved, mii_exit_bytes_match) to the Built window the Mii displaced; the exchange writes that window back and the settle tick puts the publication back through bank_restore (exit_settled)"
+    },
+    {
+     "old": "                Some(Live::Numbered {identity:Identity::Fighter(kind),cursor:destination.cursor}),\n            mii_cycle::Target::Original if publish.is_none() && same_class.is_none() && origin_saved.is_none()\n",
+     "new": "                Some(Live::Numbered {identity:Identity::Fighter(kind),cursor:destination.cursor}),\n            // rc.6: the normal Ice Climbers pair original too, while the pair bank is on (`original_member`).\n            mii_cycle::Target::Original if publish.is_none() && same_class.is_none() && origin_saved.is_none()\n",
+     "reason": "rc.6 item 3, the return to an Ice Climbers original is warm (operator decisions 2026-11-08 All groups in rc.6 and a session that starts on IC/PT still gets its groups built; primary 2026-11-09 00:23Z): EXCLUSIONS 9 lifted for the normal pair original while the pair bank is on (capabilities original_form_bankable, IcPair row; native_body_bank original_member, excluded_original; both Mii adapters Original gates)"
+    },
+    {
+     "old": "                && descriptor_kind(&descriptor)==origin.original_kind\n                && crate::engine::swap::body_bank::original_bankable(origin.original_kind)\n                && crate::runtime::roster::cycle_preload_config::snapshot().original_bank_enabled() => Some(Live::Original),\n            // A saved/preset Mii with no same-class proof (another class, or a hat\n",
+     "new": "                && descriptor_kind(&descriptor)==origin.original_kind\n                && super::body_bank::original_member(origin.original_kind,&descriptor) => Some(Live::Original),\n            // A saved/preset Mii with no same-class proof (another class, or a hat\n",
+     "reason": "rc.6 item 3, the return to an Ice Climbers original is warm (operator decisions 2026-11-08 All groups in rc.6 and a session that starts on IC/PT still gets its groups built; primary 2026-11-09 00:23Z): EXCLUSIONS 9 lifted for the normal pair original while the pair bank is on (capabilities original_form_bankable, IcPair row; native_body_bank original_member, excluded_original; both Mii adapters Original gates)"
     }
    ]
   },
