@@ -1,5 +1,8 @@
-//! What the menu worker asks of the game, handed to the game-synchronized tick (lead ruling 2026-11-02: the worker reads no game state, so
-//! an action that reads or writes the game runs where the game is: the layout tick on the UI job). One atomic per request, no allocation.
+//! What the menu worker asks of the game, handed to the game (lead ruling 2026-11-02: the worker reads no game state, so an action that
+//! reads or writes the game runs where the game is). One atomic per request, no allocation. The item request is taken on Player 1's frame
+//! (`lobby::frame`), with the roster's other per-frame steps, not on the Training layout's tick: that tick runs on the game's task workers
+//! (hot-slots hook-thread table 2026-11-09), and the item engine takes the source lock (`character_sources::STATE`) that the menu worker's
+//! roster re-plan holds, the rc.6 freeze class (`tests/lock_order.rs`).
 
 use std::sync::atomic::{AtomicI32, Ordering};
 
@@ -13,14 +16,7 @@ pub fn give_item(item: u8) {
     GIVE_ITEM.store(i32::from(item), Ordering::Release);
 }
 
-/// Run what the worker asked for.
-///
-/// # Safety
-/// On the UI job thread, inside the Training layout's tick.
-pub unsafe fn run_menu_requests() {
-    let item = GIVE_ITEM.swap(NONE, Ordering::AcqRel);
-    if let Ok(choice) = usize::try_from(item) {
-        // The roster module queues it for the player's callback and says why in a notice when practice is not ready.
-        crate::runtime::roster::character_items::request(choice);
-    }
+/// The item the worker asked for, once (Player 1's frame queues it: `character_items::request`).
+pub fn take_give_item() -> Option<usize> {
+    usize::try_from(GIVE_ITEM.swap(NONE, Ordering::AcqRel)).ok()
 }
