@@ -85,15 +85,21 @@ A drilled combo, like a bound save or an active macro, moves to the top of its l
 - The notice counts what is loading: "Loading 4/10", then "Ready 10/10" or "All loaded".
 - Fighters past the ready budget still load when you switch to them, as before.
 
-### A cycle change makes things hot
+### A cycle change takes effect at once
 
-Changing Player 1's or the CPU's Character Cycles in Training takes effect when the menu closes. Groups whose fighters
-left the cycle are released, and the new fighters are built in the background the same way. The notice goes from
-Loading to Ready (in Eden, 14 s after a Player 1 change and 4 s after a CPU change). After a change, the first
-switches into the new fighters took 47–70 ms in Eden, also after a second change made while the first was still
-loading.
+Changing Player 1's or the CPU's Character Cycles in Training takes effect when the menu closes. The new fighters are
+built in the background right away, the same way. The notice goes from Loading to Ready (in Eden, 14 s after a Player 1
+change and 4 s after a CPU change). After a change, the first switches into the new fighters took 47–70 ms in Eden,
+also after a second change made while the first was still loading.
 
+- **Fighters that left the cycle** stay loaded until you next open Training's pause menu, which frees them. Until then,
+  a fighter loaded with them that the new cycle still has stays warm to switch to.
+- **If the new fighters need their room,** the old ones are freed at once instead: only as many as needed, and first
+  those the new cycle no longer has. The game pauses for a moment while they go (0.21 s for two fighters in Eden). You
+  never need to open the pause menu for a change to load.
 - The CPU seats that No. of CPUs raises (below) follow the new CPU cycle too.
+- TODO-PROOF: the candidate's `x6` session with the docs lane's rows (`x6-fit`: a change that fits frees nothing;
+  `x6-cc`: a change that needs room frees one group at once, then Ready with no pause). Branch proof `pp-rel-2`.
 - TODO-PROOF: hot lane, the longest pause while the background build runs after a cycle change (the target is at most
   4 frames), from the final pass's item-3 sessions.
 - TODO-PROOF: hot lane, a cycle press made while that build runs is held or served, never refused; and the fighter on
@@ -109,20 +115,6 @@ The two seats count in the Fighters notice. A seat that waits for memory shows a
 it loads once memory is free (in Eden, "Loaded 1/5 · swap both to load 3 more (1 waiting for memory)", then
 "Loaded 2/5 …").
 
-### CPU Level
-
-CPU › Level › CPU Level sets the CPUs' level to Off or Lv 1–9. It's saved with the other settings. Off is the default,
-and the game's own level then applies everywhere.
-
-- **In Training,** Lv N replaces Training's own level wherever Training uses it, that is, for the CPU (Lv. n)
-  behavior. The pause menu still shows Training's own level.
-  - If the two differ when Training starts, a notice says so once, for example "CPU level: Lv 7 from TrainingRooms
-    (Training menu: Lv 3)".
-  - Changing either level later in that session shows no second notice. The next entry into Training checks again.
-- **In the waiting room's practice** (local wireless rooms and the Quickplay lobby), Lv N is the training partners'
-  level. There's no notice there.
-- **In matches,** the setting does nothing.
-
 ### Mii editor: "Same as ‹name›, nothing new saved"
 
 A Save in the Mii editor that matches a Mii you already saved still saves nothing new and uses that Mii, as before.
@@ -137,17 +129,21 @@ lobby-persist runs and the merged candidate's final Quickplay session (`rc6-bg-f
 
 ### CPU Level
 
-CPU › Level › **CPU Level**: Off (the default) or Lv 1–9. Off leaves the game's own level.
-- **In Training,** Lv N replaces Training's own CPU level.
-  - If Training's menu shows another level when Training starts, a small notice says so once, for example "CPU level:
-    Lv 7 from TrainingRooms (Training menu: Lv 3)".
-  - It doesn't show again in that session, even if you change Training's level. The next entry into Training checks
-    again.
-- **In the waiting room,** the practice partners play at Lv N, with no notice.
+CPU › Level › **CPU Level** sets the CPUs' level: Off (the default) or Lv 1–9. It's saved with the other settings. Off
+leaves the game's own level everywhere.
+
+- **In Training,** Lv N replaces Training's own CPU level, the one the CPU (Lv. n) behavior plays at. Training's own
+  level is the one set on the character select, and the pause menu keeps showing it.
+  - If the two differ when Training starts, a small notice says so once, for example "CPU level: Lv 7 from
+    TrainingRooms (Training menu: Lv 3)".
+  - Changing CPU Level during the session takes effect at once, with no second notice. The next entry into Training
+    checks again.
+- **In the waiting room's practice** (local-wireless rooms and Quickplay's waiting area), the training partners play at
+  Lv N, with no notice.
 - **In a match,** nothing changes.
 
-TODO-PROOF: hot's CPU-level rows and the merged candidate's final Quickplay session (partners at the level, the step
-stopping at the match).
+TODO-PROOF: the candidate's CPU-level rows (branch proofs `lc-xps-02`, `lc-xps-04`) and the final Quickplay session
+(partners at the level, nothing written in the match).
 
 ## Fixed
 
@@ -157,9 +153,8 @@ stopping at the match).
 - **CONNECTIONS.** A combo's connections list its links with their moves and input events. In rc.5 they were empty. A
   shared combo file with any allowed name now stays the drill.
 - **Make combo** stores the macro's input events, and it saves only the exchange its own playback made. With no hit it
-  writes nothing, where rc.5 saved the exchange before it. TODO-PROOF: the no-hit case is host-tested only; no
-  final-pass row covers it (`cov-make-combo` makes a combo from a hit, `acc-make-combo` checks that the screen
-  opens). The primary decides: a row, or the host test.
+  writes nothing, where rc.5 saved the exchange before it. TODO-PROOF: the candidate's `yoga-cov` row
+  `cov-make-combo-no-hit` (it passed on `e39479df` in `covrec-nohit1`; the menu worker it runs through changed since).
 - **Mash interrupts playback** stops the CPU's macro, including a macro from the library. The CPU's mash does not stop
   Player 1's macro. In rc.5 the mash never stopped a library macro.
 - **A setup restore** only moves the fighters. It writes no save file, and the next Load goes back to the bound save.
@@ -185,7 +180,13 @@ stopping at the match).
     the game then hung on Quit Training;
   - a Mii in a No. of CPUs seat was loaded without its Mii and read null memory every frame;
   - after a scene change, a group switch could bring in the wrong fighter and leave the CPU cycle stuck on "Wait for
-    the character swap to finish".
+    the character swap to finish";
+  - with heavy fighters in the cycles and little memory left, a switch could use more memory than there was, and the
+    game crashed (seen in Eden). A switch now brings along only the next fighters that fit in memory. The others load
+    when you switch to them. TODO-PROOF: the candidate's `xps-hot` session (`hs08b-heavy-both`, branch proof
+    `wa-79cc-xps-hot`);
+  - the menu and the game could wait on each other for ever while a macro was being named, freezing the game. This
+    was found by checking the code, not in a test run, and it is fixed.
 - **No heap use in the game's hooks** when the CPU-as-Player 1 fallback runs, that is, without the standalone pilot
   plugin. rc.5 allocated there.
 - **P1 CPU Control in an online match.** Without the standalone pilot plugin, P1 CPU Control now plays Player 1 in an
@@ -199,8 +200,9 @@ stopping at the match).
 ## Known issues
 
 - Once, in Eden only, the game thread stopped at a menu close after a diagnostic CPU-cycle reload with Cycle Preload
-  Off. It was not seen again in four later boots with 38 menu closes. It is not reproduced, and it is noted rather
-  than explained.
+  Off. It was not seen again in four later boots with 38 menu closes, nor in a later loop of 40 closes on the rc.6
+  code. It is not reproduced, and it is noted rather than explained. The macro-naming freeze fixed above needs a
+  macro being named, which this stop didn't have, so that fix isn't known to be its cause.
 - **Waiting for memory.** When memory is short, a group or a CPU seat can stay "waiting for memory". The Fighters
   notice says so, for example "Loaded 9/10 (1 waiting for memory)". That fighter still loads when you switch to it,
   the normal (slower) way.
