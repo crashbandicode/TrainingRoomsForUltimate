@@ -95,11 +95,15 @@ also after a second change made while the first was still loading.
 - **Fighters that left the cycle** stay loaded until you next open Training's pause menu, which frees them. Until then,
   a fighter loaded with them that the new cycle still has stays warm to switch to.
 - **If the new fighters need their room,** the old ones are freed at once instead: only as many as needed, and first
-  those the new cycle no longer has. The game pauses for a moment while they go (0.21 s for two fighters in Eden). You
-  never need to open the pause menu for a change to load.
+  those the new cycle no longer has. The game pauses for a moment while they go (0.15–0.26 s for two fighters in
+  Eden). The memory they free comes back over the next second or two, and the new fighters wait for it rather than
+  free more. Fighters the new cycle still uses are freed only if there still isn't room after that. You never need to
+  open the pause menu for a change to load.
 - The CPU seats that No. of CPUs raises (below) follow the new CPU cycle too.
-- TODO-PROOF: the candidate's `x6` session with the docs lane's rows (`x6-fit`: a change that fits frees nothing;
-  `x6-cc`: a change that needs room frees one group at once, then Ready with no pause). Branch proof `pp-rel-2`.
+- TODO-PROOF: the next candidate's `x6` session with the docs lane's rows (`rows-pf-x6-settle`: `x6-fit` frees
+  nothing; `x6-cc` frees one group, waits for its memory, and keeps DK and Link warm). Branch proofs `pp-rel-2` and
+  `pp-settle-1` (`p23/rc6-preload-priority` `4480ff1d`); on `1261f56c` `x6-cc` also freed the group that kept DK and
+  Link warm, which `4480ff1d` fixes.
 - TODO-PROOF: hot lane, the longest pause while the background build runs after a cycle change (the target is at most
   4 frames), from the final pass's item-3 sessions.
 - TODO-PROOF: hot lane, a cycle press made while that build runs is held or served, never refused; and the fighter on
