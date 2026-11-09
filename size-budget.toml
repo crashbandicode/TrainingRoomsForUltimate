@@ -1044,3 +1044,11 @@ ceiling = 158858
 date = "2026-11-09"
 reason = "worker B, inbox INBOX-opus-rc6-bg-pt 02:42Z (p23/rc6-bg-pt d94e6562): a detached PT group's retired pool built on the task worker before its attach (native_body_bank Preparing, PREPARE_VTABLE and its functor/clones, queue_prepare, prepare_candidate/settled, finish_preparation, the Prepare steps; special_articles build_pool; model prepare_due), and the merged slow-step name of the exit's Retire step (1a7096a0, +1); measured 158858 (tools/size_gate.py), +232 over 158626"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to this operator-chosen rc.6 item under TASK-OPUS-rc6-bg-special (primary c07b3449, 2026-11-09 02:42Z: a raise goes in its own commit with approved_by)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 158863
+date = "2026-11-09"
+reason = "worker B (p23/rc6-bg-pt 4c50807d): the diag attach-tick trace reads only the entry's installed cells (d38fd025's trace logged Unmapped Read8 in Eden rc6-bg-ptx4); measured 158863 (tools/size_gate.py), +5 over 158858"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied under TASK-OPUS-rc6-bg-special (primary c07b3449, inbox 02:00Z: 0 Unmapped in the rows; a raise goes in its own commit with approved_by)"
