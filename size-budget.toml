@@ -980,3 +980,11 @@ ceiling = 153299
 date = "2026-11-09"
 reason = "rc.6 item 3, groups that left the cycle freed under the pause (operator decision 2026-11-08 23:42Z, INBOX-opus-rc6-hotslots; p23/rc6-hot-slots-mii): body_bank::leaves_at_pause/kept_members/waiting_for_pause/window_targets, native_body_bank pause_opening and the second plan without the parked groups, the pause hook call, the live pad-controller restore (restore_live_pads), the Mii adapters adopting a background record change (adopt_background_record, Snapshot::adopt_record), the identity and configuration moves and the slow-step diagnostics; measured 153299 (tools/size_gate.py), +467 over 152832"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to this operator-chosen rc.6 item under TASK-OPUS-rc6-hot-slots (primary c07b3449, 2026-11-08: a raise goes in its own commit with approved_by)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 158261
+date = "2026-11-09"
+reason = "rc.6 integration (p23/rc6-integration d659f0f5): the merge of p23/rc6-hot-slots-mii (b027703, 153299: +1104 over 152195, Mii groups built in the background, the warm exit from a Mii, groups freed under the pause) into 2f54db44 (157175), with one background_tail at 0x60de68 and one background_body (the 22:52Z rule; -18 against the sum); measured 158261 on the merged tree (tools/size_gate.py), +1086"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); combined ceiling = measured merged size per primary c07b3449, INBOX-opus-rc6-integration 2026-11-08 19:13Z"
