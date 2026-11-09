@@ -103,7 +103,8 @@ also after a second change made while the first was still loading.
   67 ms) in Eden, at the start of a Mii build, and 1–3 frames for the others.
 - A switch you press while the new fighters build waits for that build to end and then goes through. It is never
   refused (in Eden it went through 0.12 s after the build finished).
-- TODO-PROOF: hot lane, the fighter on screen stays when it leaves the cycle, until you switch away (`yoga-i3-live`).
+- If the fighter on screen leaves the cycle, it stays until you switch away, and that switch goes to a fighter of the
+  new cycle.
 
 ### No. of CPUs: the seats are the next fighters
 
