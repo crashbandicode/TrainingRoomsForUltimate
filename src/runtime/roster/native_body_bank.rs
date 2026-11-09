@@ -191,6 +191,7 @@ use crate::engine::swap::swap_model::occupancy::{KindOccupancy, Occupancy, Rules
 use crate::runtime::roster::body_graph::{self as graph, DESTROY_BODY, DISPATCHER_DESTROY, HEAP_FREE, SPECIAL_OBJECT_RELEASE};
 use crate::runtime::roster::r_handle;
 use crate::runtime::roster::special_articles as articles;
+use crate::engine::swap::swap_model::special_articles::{attachable, RetireStage};
 use crate::runtime::roster::build_split as split;
 
 macro_rules! trace {
@@ -206,6 +207,20 @@ static GROUPS_ENABLED: AtomicBool = AtomicBool::new(false);
 static PAIR_ENABLED: AtomicBool = AtomicBool::new(false);
 /// Special-group fingerprints (`0x3a6b80`, `0x392eb40`, `0x17e2fe0`) passed.
 static SPECIAL_ENABLED: AtomicBool = AtomicBool::new(false);
+/// Inbox 02:00Z: pass 2's own calls (`0x3ac560`, `0x3aeb50`, `0x3a9ab0`, the guard pair) passed, so a PT exit retires
+/// its pool in stages (`swap_model::special_articles::RetireStage`); otherwise the exit's tick keeps native's whole
+/// `0x3a6b80`.
+static EXIT_SPLIT: AtomicBool = AtomicBool::new(false);
+
+/// Inbox 02:00Z: a detached PT pool whose exit ran pass 1 only; the group lifecycle runs one more stage per tick
+/// (`retire_step`) under INSTALL (`token`, taken by the first later stage).
+#[derive(Clone, Copy, Debug)]
+struct Retiring {
+    group: usize,
+    holder: usize,
+    stage: RetireStage,
+    token: Option<super::InstallToken>,
+}
 /// Phase B′ fingerprints (the asynchronous construction path) and the functor vtable slot passed.
 static ASYNC_ENABLED: AtomicBool = AtomicBool::new(false);
 /// rc.6 item 3: the Phase B′ rows passed and the identity view's body-init site is hooked (its hook skips the
@@ -1323,7 +1338,9 @@ fn group_reachable(owner: u32, kind: u32, forms: Forms) -> bool {
     let base = BASE.load(Ordering::Acquire);
     BANKS[role].lock().as_ref().is_some_and(|bank|
         bank.swap.is_none() && bank.prefetch.is_none() && bank.object_fetch.is_none() && !bank.departed
-            && bank.groups.iter().any(|g| g.state.reachable() && group_serves(*g.members, kind, forms).is_some()
+            && bank.groups.iter().enumerate().any(|(i, g)| g.state.reachable() && group_serves(*g.members, kind, forms).is_some()
+                // Inbox 02:00Z: a pool still retiring is neither live nor empty.
+                && attachable(bank.retiring.filter(|r| r.group == i).map(|r| r.stage))
                 // Inbox 00:18Z: a PT group whose attach rebuilds its articles holds its object kind first; without it
                 // (a drain, a refused re-acquire) the request takes the Reload path rather than read unloaded files.
                 // SAFETY: `detached_pool` reads the group's own saved holder, proven by `valid_special_object`.
@@ -1346,6 +1363,67 @@ unsafe fn rearm_candidate(base: usize, bank: &Bank) -> Option<usize> {
     let owner = bank.owner;
     bank.groups.iter().position(|g| !g.object_refused && !g.leaving
         && object_rearm_due(g.state, *g.members, detached_pool(base, owner, g), g.object_held))
+}
+
+/// Inbox 02:00Z: the next stage of the PT pool the last exit left retiring (`RetireStage`), on this tick. The group
+/// lifecycle takes INSTALL for the first later stage (a press meanwhile waits for it, as for a prefetch) and gives it
+/// back after the last; a teardown, a leave or a rollback passes `blocking` and runs the stage with whatever INSTALL
+/// state it has. The pool must still be the group's valid saved holder. No bank lock is held across the native calls.
+unsafe fn retire_step(base: usize, role: usize, owner: u32, r: Retiring, why: &str) {
+    retire_stage(base, role, owner, r, why, false);
+}
+
+unsafe fn retire_stage(base: usize, role: usize, owner: u32, r: Retiring, why: &str, blocking: bool) {
+    let Some(stage) = r.stage.next() else {
+        if let Some(bank) = BANKS[role].lock().as_mut() { bank.retiring = None; }
+        return;
+    };
+    let current = BANKS[role].lock().as_ref().and_then(|bank| bank.groups.get(r.group)).and_then(|g| g.saved).map(|w| w.records[0]);
+    if current != Some(r.holder) || !valid_special_object(base, r.holder, owner) {
+        if let Some(bank) = BANKS[role].lock().as_mut() { bank.retiring = None; }
+        if let Some(token) = r.token { super::finish_install(token, "articles retire: holder gone"); }
+        trace!("[GroupSwap] articles retire UNEXPECTED owner={} group={} holder={:#x} stage={:?} saved={:x?}; dropped",
+            owner, r.group, r.holder, stage, current);
+        return;
+    }
+    let token = match r.token {
+        Some(token) => Some(token),
+        None if blocking => None,
+        None => {
+            if super::INSTALL.active() { return; }
+            let Some(token) = super::INSTALL.try_begin(false) else { return; };
+            Some(token)
+        }
+    };
+    let started = now_us();
+    let (pools, articles, gone) = match stage {
+        RetireStage::SubPools => {
+            let (pools, articles) = articles::release_sub_pools(base, r.holder);
+            (pools, articles, 0)
+        }
+        RetireStage::Destroy => (0, 0, articles::destroy_saved(base, owner, r.holder, why)),
+        RetireStage::Deactivate => (0, 0, 0),
+    };
+    let us = now_us().saturating_sub(started);
+    let done = stage.next().is_none();
+    if let Some(bank) = BANKS[role].lock().as_mut() {
+        bank.retiring = (!done).then_some(Retiring { stage, token, ..r });
+    }
+    let released = match token {
+        Some(token) if done => super::finish_install(token, "articles retired"),
+        _ => false,
+    };
+    trace!("[GroupSwap] articles retire stage owner={} group={} holder={:#x} stage={:?} us={} sub_pools={} sub_articles={} gone={} blocking={} INSTALL_released={}",
+        owner, r.group, r.holder, stage, us, pools, articles, gone, blocking, released);
+}
+
+/// Every stage still due (`special_articles::remaining`), now, in order: before a teardown, a leave or a rollback
+/// reads the pool, and before another exit starts its own.
+unsafe fn finish_retirement(base: usize, role: usize, owner: u32, why: &str) {
+    for _ in 0..3 {
+        let Some(r) = BANKS[role].lock().as_ref().and_then(|bank| bank.retiring) else { return; };
+        retire_stage(base, role, owner, r, why, true);
+    }
 }
 
 /// Inbox 00:18Z: the object kind a detached Pokémon Trainer group took again (`group_lifecycle`) goes back once its
@@ -1601,6 +1679,8 @@ struct Bank {
     /// Inbox 00:18Z: the object kind a detached Pokémon Trainer group takes again before its rebuild
     /// (`body_bank::object_rearm_due`), in flight: group, INSTALL token, start time.
     object_fetch: Option<(usize, super::InstallToken, u64)>,
+    /// Inbox 02:00Z: the PT pool the last exit left retiring (`Retiring`).
+    retiring: Option<Retiring>,
 }
 
 fn role(owner: u32) -> Option<usize> {
@@ -1785,7 +1865,7 @@ pub(super) unsafe fn build(entry: *const u8, owner: u32, members: Members) -> bo
         groups: storage.groups, alias: 0, exchange: None, swap: None, prefetch: None, swap_started: None,
         pair_logged: false, identity: None, activated: Default::default(),
         construction: None, background: None, tick: TickGap::default(), held_turn: 0, scene: None,
-        object_fetch: None,
+        object_fetch: None, retiring: None,
     });
     EXTRAS[role].store((members.count() - 1) as u8, Ordering::Release);
     GROUP_BODIES[role].store(0, Ordering::Release);
@@ -1856,7 +1936,7 @@ unsafe fn publish_pending(owner: u32, members: Members, scene: Option<(u32, u32)
         groups: storage.groups, alias: 0, exchange: None, swap: None, prefetch: None, swap_started: None,
         pair_logged: false, identity: None, activated: Default::default(),
         construction: None, background: None, tick: TickGap::default(), held_turn: 0, scene,
-        object_fetch: None,
+        object_fetch: None, retiring: None,
     });
     EXTRAS[role].store((members.count() - 1) as u8, Ordering::Release);
     GROUP_BODIES[role].store(0, Ordering::Release);
@@ -2182,6 +2262,7 @@ unsafe fn service_locked(entry: *mut u8, owner: u32, role: usize) -> Action {
             return if !idle { Action::None }
                 // rc.6 item 3: a background build in flight settles on the window's ticks; one owed starts.
                 else if bank.background.is_some() { Action::Background }
+                else if bank.retiring.is_some() { Action::Lifecycle }
                 else if bank.object_fetch.is_some() || rearm_candidate(BASE.load(Ordering::Acquire), bank).is_some() { Action::Lifecycle }
                 else if bank.prefetch.is_some() || bank.groups.iter().any(|g| g.state.startable() || g.leaving)
                     || background_candidate(bank, Some(members.kinds()[usize::from(index)])).is_some() {
@@ -2684,10 +2765,24 @@ unsafe fn exchange_articles(base: usize, role: usize, entry: usize, owner: u32, 
     };
     if let Some((flags, holder)) = outgoing {
         let valid = holder != 0 && valid_special_object(base, holder, owner);
-        if articles::retire_saved(base, owner, flags, holder, valid, "detach") {
+        // Inbox 02:00Z: the exit's tick runs pass 1 only (the trainer leaves the world); the group lifecycle releases
+        // its own pools and then destroys it on later ticks (`retire_step`), so no tick carries the whole release.
+        finish_retirement(base, role, owner, "another exit");
+        let split = EXIT_SPLIT.load(Ordering::Acquire);
+        let retired = if split {
+            articles::deactivate_saved(owner, flags, holder, valid, "detach")
+        } else {
+            articles::retire_saved(base, owner, flags, holder, valid, "detach")
+        };
+        if retired {
             let mut state = BANKS[role].lock();
-            if let Some(saved) = state.as_mut().and_then(|bank| bank.groups.get_mut(group)).and_then(|g| g.saved.as_mut()) {
-                saved.records[1] = 0;
+            if let Some(bank) = state.as_mut() {
+                if let Some(saved) = bank.groups.get_mut(group).and_then(|g| g.saved.as_mut()) {
+                    saved.records[1] = 0;
+                }
+                if split {
+                    bank.retiring = Some(Retiring { group, holder, stage: RetireStage::Deactivate, token: None });
+                }
             }
         }
     }
@@ -4242,6 +4337,9 @@ unsafe fn complete_exchange(base: usize, entry: *mut u8, owner: u32, role: usize
     }
     split::mark(split::Step::Ledger);
     let Some((group, via)) = rollback else { return; };
+    // Inbox 02:00Z: the outgoing window's pool, deactivated at this exchange, is emptied before it returns (its
+    // restore rebuilds it below).
+    finish_retirement(base, role, owner, "swap rollback");
     // PT-TRAINER-PARK: a failed warm attach rebuilt its pool; it goes before the previous window returns.
     if matches!(prepared, Prepared::Warm { .. }) {
         articles::retire_current(base, owner, entry as usize, current_holder_valid(base, entry as usize, owner), "warm rollback");
@@ -4396,7 +4494,7 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
     // keys back; Built groups consumed their keys at construction.
     enum Step { Poll(usize, super::InstallToken, u64, Members, usize), Start(usize, Members, usize),
         Release(usize, Members, Members, usize), Background(usize), Leave(usize), Idle,
-        Rearm(usize, Members, usize), RearmPoll(usize, super::InstallToken, u64, u32, usize) }
+        Rearm(usize, Members, usize), RearmPoll(usize, super::InstallToken, u64, u32, usize), Retire(Retiring) }
     let step = {
         let mut state = BANKS[role].lock();
         let Some(bank) = state.as_mut().filter(|bank| bank.entry == entry as usize && bank.phase == Phase::Ready
@@ -4408,6 +4506,9 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
             Step::RearmPoll(group, token, since, kind, bank.alias)
         } else if let Some((group, token, since)) = bank.prefetch {
             Step::Poll(group, token, since, *bank.groups[group].members, bank.alias)
+        // Inbox 02:00Z: the PT pool the last exit left retiring, one stage per tick, before anything new starts.
+        } else if let Some(r) = bank.retiring {
+            Step::Retire(r)
         } else if let Err(reason) = crate::engine::swap::body_bank::prefetch_admitted(live) {
             let (window, alias) = (*bank.members, bank.alias);
             match bank.groups.iter().position(|g| g.state == GroupState::Prefetched) {
@@ -4450,6 +4551,7 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
     };
     match step {
         Step::Idle => {}
+        Step::Retire(r) => retire_step(base, role, owner, r, "detach"),
         Step::Rearm(group, members, alias) => {
             // As a prefetch starts (`Step::Start`): this R, idle, Training; INSTALL held until it settles, so a press
             // meanwhile waits for it (`character_roster`'s pending request) instead of rebuilding without the files.
@@ -4756,6 +4858,8 @@ unsafe fn retire_groups(entry: *const u8, owner: u32, reason: &str) {
     drain_construction(entry, owner, role, reason);
     // rc.6 item 3: a background build in flight finishes into its group record, which the destroys below then free.
     drain_background(entry, owner, role, reason);
+    // Inbox 02:00Z: a PT pool still retiring is emptied before its holder is destroyed below.
+    finish_retirement(base, role, owner, reason);
     // D-KIRBY1: the kind a live Kirby copies keeps its key (read before the lock).
     let window = BANKS[role].lock().as_ref()
         .filter(|bank| bank.entry == entry as usize && bank.owner == owner).map(|bank| *bank.members);
@@ -4921,6 +5025,8 @@ unsafe fn retire_groups(entry: *const u8, owner: u32, reason: &str) {
 /// (`group_lifecycle` returns its keys first, D-KIRBY1) or a native install runs. Never under the bank lock.
 unsafe fn leave_group(entry: *const u8, owner: u32, role: usize, group: usize) {
     let base = BASE.load(Ordering::Acquire);
+    // Inbox 02:00Z: a PT pool still retiring is emptied before its holder is destroyed below.
+    finish_retirement(base, role, owner, "left the cycle");
     let Some(window) = BANKS[role].lock().as_ref()
         .filter(|bank| bank.entry == entry as usize && bank.owner == owner).map(|bank| *bank.members) else { return; };
     let copy = live_kirby_copy_kind(entry, owner, window);
@@ -5424,6 +5530,9 @@ const PAIR_SEAMS: &[&str] = &["ic_pair.partner_window", "ic_pair.pair_partner", 
     "ic_pair.commit_change", "ic_pair.outgoing_owner", "ic_pair.deactivate_body"];
 const SPECIAL_SEAMS: &[&str] = &["special_groups.object_release", "special_groups.heap_free",
     "special_groups.release_key"];
+/// Inbox 02:00Z: the PT exit's staged retirement (pass 2 of `0x3a6b80`, made by the bank).
+const EXIT_SPLIT_SEAMS: &[&str] = &["special_groups.object_lookup", "special_groups.object_destroy",
+    "special_groups.static_init"];
 /// rc.6 item 3, SPECIAL-GROUPS §3: the X5 hook and native state 11's holder step.
 const NATIVE_BACKGROUND_SEAMS: &[&str] = &["background_build.aegis_partner", "background_build.trainer_functor",
     "background_build.trainer_callback", "background_build.guard_acquire", "background_build.guard_release",
@@ -5503,6 +5612,16 @@ pub(super) unsafe fn install(base: usize) {
         && fingerprint(base, RELEASE_KEY, &[0xa9bd57f6, 0xa9014ff4, 0xa9027bfd, 0x910083fd, 0x9100a013, 0xaa0003f4], "SpecialGroups"))
         && groups_ok;
     SPECIAL_ENABLED.store(special_ok, Ordering::Release);
+    // Inbox 02:00Z: pass 2's own calls, which a staged PT exit makes itself (`special_articles::destroy_saved`).
+    let split_ok = gate(SEAM_GROUP, EXIT_SPLIT_SEAMS, special_ok
+        && fingerprint(base, articles::OBJECT_LOOKUP, &articles::OBJECT_LOOKUP_WORDS, "SpecialGroups")
+        && fingerprint(base, articles::OBJECT_DESTROY, &articles::OBJECT_DESTROY_WORDS, "SpecialGroups")
+        && fingerprint(base, articles::STATIC_INIT, &articles::STATIC_INIT_WORDS, "SpecialGroups")
+        && fingerprint(base, articles::GUARD_ACQUIRE, &[0xf000c6f0, 0xf9411e11, 0x9108e210, 0xd61f0220], "SpecialGroups")
+        && fingerprint(base, articles::GUARD_RELEASE, &[0xf000c6f0, 0xf9412211, 0x91090210, 0xd61f0220], "SpecialGroups"))
+        && special_ok;
+    EXIT_SPLIT.store(split_ok, Ordering::Release);
+    trace!("[SpecialGroups] PT exit split {}", if split_ok { "enabled; the pool retires over the next ticks" } else { "off; the exit's tick releases the whole pool" });
     // Phase B′ (operator decision 2026-11-02): the game's asynchronous construction path, owned 13.0.5
     // words, all or nothing. The functor vtable is relocated data (no static bytes to guard): its `+0x30`
     // slot must be the functor the callback runs (checked live, as the deactivate slot is). A mismatch

@@ -62,6 +62,53 @@ pub fn on_attach(flags: u8, holder: bool, articles: u64) -> Option<ArticleStep> 
     (flags & PT_WINDOW_FLAG != 0 && holder && articles == 0).then_some(ArticleStep::Rebuild)
 }
 
+/// Inbox 02:00Z (the PT exit's 5-frame gap): a detach's [`ArticleStep::Retire`], split across game-thread ticks.
+///
+/// FACTs (owned 13.0.5 ELF; Eden `rc6-bg-ptx1`/`ptx2` guest trace points, `rc6-eden/bg-pt-evidence/`):
+/// - `0x3a6b80` runs two passes. Pass 1 (`0x3a6bb0-0x3a6c04`) deactivates each article: the trainer's
+///   `vt+0x20` thunk `0x33a8a80` reaches the weapon's `vt+0x48` = `0x33a1c90`, which clears `bo+0x61` and switches its
+///   modules off (0.1-0.7 ms). Pass 2 (`0x3a6c5c-0x3a6cb0`) destroys each object by id (`0x3aeb50`, after
+///   `0x3ac560` and a one-time static init), then `+0x10 = 0`, `+0x228 = 0`.
+/// - All of the exit's 28-57 ms is pass 2: the trainer's own teardown (`vt+0x50` = `0x33a1fc0`, 15-33 ms) and its own
+///   article pool, which that teardown releases through `0x3d3a90` at `[[bo+0x20]+0x98]+0x240` (eight sub-weapons,
+///   13-26 ms; the holder class `0x4f626e8` the article module's constructor stores there, `0x33b98d4`).
+/// - `0x3ac560(id)` returns null for an id whose slot no longer holds it; `0x3aeb50(id)` does not check.
+///
+/// The exit's tick runs [`RetireStage::Deactivate`] only; each later tick runs the next stage. The trainer leaves the
+/// world at once (native's pass 1), and nothing else touches its pool until the stages finish.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RetireStage {
+    /// Pass 1 on the exit's tick.
+    Deactivate,
+    /// The deactivated trainer's own article pools through `0x3a6b80` (what its teardown would release first).
+    SubPools,
+    /// Pass 2 and the tail: each object destroyed by id when `0x3ac560` still finds it.
+    Destroy,
+}
+
+impl RetireStage {
+    /// The stage the next tick runs, `None` once the pool is retired.
+    pub fn next(self) -> Option<Self> {
+        match self {
+            Self::Deactivate => Some(Self::SubPools),
+            Self::SubPools => Some(Self::Destroy),
+            Self::Destroy => None,
+        }
+    }
+}
+
+/// The stages still due after `done`, in order: a teardown, a drain or a switch to the retiring group runs them at
+/// once (the pool must be empty before anything else reads or rebuilds it).
+pub fn remaining(done: RetireStage) -> impl Iterator<Item = RetireStage> {
+    std::iter::successors(done.next(), |stage| stage.next())
+}
+
+/// A group whose pool is still retiring is not attached warm: its pool is neither live (deactivated) nor empty (the
+/// rebuild needs count 0), so the activation would claim a deactivated trainer.
+pub fn attachable(retiring: Option<RetireStage>) -> bool {
+    retiring.is_none()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -179,6 +226,50 @@ mod tests {
             }
         }
         assert!(runs > 1500, "{}", runs);
+    }
+
+    /// Inbox 02:00Z: leaving a PT group took 114.9-118.5 ms with a 5-frame gap (worker A, `rc6-xc2`/`xc3`); the exit's
+    /// setup tick held `0x3a6b80` whole. Eden `rc6-bg-ptx1`/`ptx2` split it: pass 1 0.12-0.66 ms; pass 2 is the
+    /// trainer's teardown, 15.3-32.6 ms of its own plus 12.9-26.1 ms for its sub-pools. The exit's tick now runs pass 1
+    /// only and every later tick one stage, so no tick carries more than one of those parts.
+    #[test]
+    fn a_pt_exit_retires_its_pool_one_stage_per_tick() {
+        assert_eq!(on_detach(PT_FLAGS, true, PT_POOL), Some(ArticleStep::Retire));
+        let mut stage = RetireStage::Deactivate;
+        let mut ticks = vec![stage];
+        while let Some(next) = stage.next() {
+            stage = next;
+            ticks.push(stage);
+        }
+        assert_eq!(ticks, [RetireStage::Deactivate, RetireStage::SubPools, RetireStage::Destroy],
+            "the trainer's own pools before its teardown, which then finds them empty");
+        // The probe's worst (first exit of a boot) game-thread costs in microseconds, on top of a tick's own frame.
+        const FRAME_US: u64 = 16_667;
+        const SETUP_US: u64 = 19_100; // the exit's setup tick without the release (rc6-bg-pt7: 16-19 ms)
+        let cost = |s: RetireStage| match s { RetireStage::Deactivate => 660, RetireStage::SubPools => 26_100, RetireStage::Destroy => 32_600 };
+        let frames = |us: u64| us.div_ceil(FRAME_US);
+        assert!(frames(SETUP_US + cost(RetireStage::Deactivate)) <= 2, "the exit's own tick");
+        for s in [RetireStage::SubPools, RetireStage::Destroy] {
+            assert!(frames(FRAME_US + cost(s)) <= 3, "{s:?}");
+        }
+        let whole: u64 = ticks.iter().map(|s| cost(*s)).sum();
+        assert!(frames(SETUP_US + whole) >= 5, "one tick: the 5-frame exit this replaces");
+    }
+
+    /// The trainer is undrawn from the exit's tick (pass 1); a retiring group is not attached (its pool is neither live
+    /// nor empty); a teardown, a drain or a switch to it first runs every stage still due, in order.
+    #[test]
+    fn a_retiring_pool_is_finished_before_anything_else_reads_it() {
+        assert!(attachable(None));
+        for s in [RetireStage::Deactivate, RetireStage::SubPools, RetireStage::Destroy] {
+            assert!(!attachable(Some(s)), "{s:?}");
+        }
+        assert_eq!(remaining(RetireStage::Deactivate).collect::<Vec<_>>(), [RetireStage::SubPools, RetireStage::Destroy]);
+        assert_eq!(remaining(RetireStage::SubPools).collect::<Vec<_>>(), [RetireStage::Destroy]);
+        assert_eq!(remaining(RetireStage::Destroy).count(), 0);
+        // Aegis and ordinary windows have nothing to retire, so nothing is staged.
+        assert_eq!(on_detach(AEGIS_FLAGS, true, 3), None);
+        assert_eq!(on_detach(ORDINARY_FLAGS, false, 0), None);
     }
 
     #[test]

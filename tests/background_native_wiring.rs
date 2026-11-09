@@ -20,6 +20,56 @@ fn ordered(src: &str, steps: &[&str]) {
 
 const BANK: &str = include_str!("../src/runtime/roster/native_body_bank.rs");
 const ROWS: &str = include_str!("../src/model/seams/native_seams/rows_a1.rs");
+const SPECIAL: &str = include_str!("../src/runtime/roster/special_articles.rs");
+
+/// Inbox 02:00Z (leaving a PT group: 114.9-118.5 ms, a 5-frame gap; Eden rc6-bg-ptx1/ptx2 put all of it in pass 2 of
+/// `0x3a6b80`, the trainer's teardown and its own pools): the exit's tick runs pass 1 only (`deactivate_saved`); the
+/// group lifecycle's Retire step then releases the trainer's own pools and destroys it, one stage per later tick under
+/// INSTALL (a press meanwhile waits). A retiring group is not attached warm, and a teardown, a leave and a rollback
+/// finish the stages first. Gated on the split's own seam rows; without them the exit keeps native's whole release.
+#[test]
+fn a_pt_exit_retires_its_pool_over_later_ticks() {
+    let articles = body(BANK, "unsafe fn exchange_articles(");
+    ordered(articles, &["finish_retirement(base, role, owner, \"another exit\");", "let split = EXIT_SPLIT.load(Ordering::Acquire);",
+        "articles::deactivate_saved(owner, flags, holder, valid, \"detach\")",
+        "articles::retire_saved(base, owner, flags, holder, valid, \"detach\")",
+        "bank.retiring = Some(Retiring { group, holder, stage: RetireStage::Deactivate, token: None });"]);
+    let lifecycle = body(BANK, "unsafe fn group_lifecycle(");
+    // After the in-flight polls (they hold INSTALL, which the stages take), before anything new starts.
+    ordered(lifecycle, &["if let Some((group, token, since)) = bank.object_fetch {", "} else if let Some((group, token, since)) = bank.prefetch {",
+        "} else if let Some(r) = bank.retiring {", "Step::Retire(r)", "} else if let Err(reason) =",
+        "Step::Retire(r) => retire_step(base, role, owner, r, \"detach\"),"]);
+    assert!(body(BANK, "unsafe fn retire_step(").contains("retire_stage(base, role, owner, r, why, false);"));
+    assert!(body(BANK, "unsafe fn finish_retirement(").contains("retire_stage(base, role, owner, r, why, true);"));
+    let step = body(BANK, "unsafe fn retire_stage(");
+    ordered(step, &["let Some(stage) = r.stage.next() else", "if current != Some(r.holder) || !valid_special_object(base, r.holder, owner) {",
+        "super::INSTALL.try_begin(false)", "RetireStage::SubPools => {", "articles::release_sub_pools(base, r.holder)",
+        "RetireStage::Destroy => (0, 0, articles::destroy_saved(base, owner, r.holder, why)),",
+        "super::finish_install(token, \"articles retired\")"]);
+    let reachable = body(BANK, "fn group_reachable(");
+    assert!(reachable.contains("attachable(bank.retiring.filter(|r| r.group == i).map(|r| r.stage))"), "{reachable}");
+    ordered(body(BANK, "unsafe fn retire_groups("), &["drain_background(entry, owner, role, reason);",
+        "finish_retirement(base, role, owner, reason);"]);
+    ordered(body(BANK, "unsafe fn leave_group("), &["let base = BASE.load(Ordering::Acquire);",
+        "finish_retirement(base, role, owner, \"left the cycle\");"]);
+    ordered(body(BANK, "unsafe fn complete_exchange("), &["let Some((group, via)) = rollback else { return; };",
+        "finish_retirement(base, role, owner, \"swap rollback\");", "restore_window(entry as usize, &x);"]);
+    ordered(body(BANK, "unsafe fn service_locked("), &["else if bank.background.is_some() { Action::Background }",
+        "else if bank.retiring.is_some() { Action::Lifecycle }"]);
+    // Pass 2 as native runs it, except that an id `0x3ac560` no longer finds is never handed to `0x3aeb50`.
+    ordered(body(SPECIAL, "pub(crate) unsafe fn destroy_saved("), &["let found = lookup(base, id);",
+        "if found == 0 || fields::read::<u8>(found, 0x3a).unwrap_or(0) <= 3 { static_init(base); }",
+        "if found == 0 {", "destroy(object_id(object).unwrap_or(id));", "fields::write_unchecked(slot, 0, 0usize);",
+        "fields::write_unchecked(holder, POOL_COUNT, 0u64);", "fields::write_unchecked(holder, TABLE, 0usize);"]);
+    ordered(body(SPECIAL, "pub(crate) unsafe fn release_sub_pools("), &["fields::child(battle, 0x20)",
+        ".and_then(|accessor| fields::child(accessor, 0x98))", ".and_then(|module| fields::child(module, 0x240))",
+        "fields::read::<usize>(*pool, 0) == Some(base + HOLDER_VTABLE)", "release(base, pool);"]);
+    ordered(body(BANK, "pub(super) unsafe fn install(base: usize) {"), &["let split_ok = gate(SEAM_GROUP, EXIT_SPLIT_SEAMS, special_ok",
+        "EXIT_SPLIT.store(split_ok, Ordering::Release);"]);
+    for label in ["special_groups.object_lookup", "special_groups.object_destroy", "special_groups.static_init"] {
+        assert!(ROWS.contains(&format!("label: \"{label}\"")), "{label}");
+    }
+}
 
 /// X5 (`0x607ba8`): an Aegis body reads the live `FE+0x1c`; beside a one-member window that is −1 and the body would load
 /// model kind `0x73`/`0x74`. A background body of an Aegis group reads its group's cell 1, set before any body is queued
