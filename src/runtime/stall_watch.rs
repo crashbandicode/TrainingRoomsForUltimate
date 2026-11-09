@@ -8,10 +8,17 @@
 
 use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 
-use crate::model::stall_watch::{Event, Watch, WORKER_STEPS};
+use crate::model::stall_watch::{Event, Watch, GAME_STEPS, WORKER_STEPS};
 
 /// The menu worker's step (`WORKER_STEPS` index), set by the worker at each point of a press and a close.
 static WORKER_STEP: AtomicUsize = AtomicUsize::new(0);
+/// The game thread's step in the menu's Mii hand-off (`GAME_STEPS` index).
+static GAME_STEP: AtomicUsize = AtomicUsize::new(0);
+
+/// The game thread's place in the menu's Mii hand-off.
+pub fn game_step(step: usize) {
+    GAME_STEP.store(step, Ordering::Relaxed);
+}
 /// The diag drain thread's last tick (uptime ms).
 static DRAIN_TICK: AtomicU64 = AtomicU64::new(0);
 
@@ -28,8 +35,8 @@ pub fn drain_tick() {
 /// Start the watchdog thread (diag boot).
 pub fn start() {
     let _ = crate::runtime::threads::spawn(crate::model::thread_stacks::ThreadId::StallWatch, || {
-        line(format_args!("[StallWatch] started stall_ms={} arm_entries={}", crate::model::stall_watch::STALL_MS,
-            crate::model::stall_watch::ARM_ENTRIES));
+        line(format_args!("[StallWatch] started stall_ms={} arm_entries={} locks_tracked={}", crate::model::stall_watch::STALL_MS,
+            crate::model::stall_watch::ARM_ENTRIES, cfg!(feature = "hang-trace")));
         let mut watch = Watch::new();
         loop {
             std::thread::sleep(std::time::Duration::from_millis(250));
@@ -48,12 +55,15 @@ pub fn start() {
 fn report(entries: u64, quiet_ms: u64, now: u64) {
     let (hook, open) = crate::model::hook_stats::last_entered();
     let step = WORKER_STEP.load(Ordering::Relaxed);
+    let game = GAME_STEP.load(Ordering::Relaxed);
     let drain = now.saturating_sub(DRAIN_TICK.load(Ordering::Relaxed));
     line(format_args!(
         "[StallWatch] stalled entries={entries} quiet_ms={quiet_ms} last_hook={hook} open_scopes={open} worker_step={}:{} \
-         drain_ms_ago={drain}",
+         game_step={}:{} drain_ms_ago={drain}",
         step,
         WORKER_STEPS.get(step).copied().unwrap_or("?"),
+        game,
+        GAME_STEPS.get(game).copied().unwrap_or("?"),
     ));
     held_locks();
 }

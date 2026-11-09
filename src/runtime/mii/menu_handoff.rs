@@ -53,6 +53,8 @@ pub(crate) fn service() {
     if sequence == seen { return; }
     if SEEN.compare_exchange(seen, sequence, Ordering::AcqRel, Ordering::Acquire).is_err() { return; }
     drop(reader);
+    #[cfg(feature = "diag")]
+    crate::runtime::stall_watch::game_step(if open { 1 } else { 2 });
     if open {
         // Coalesced close/reopen cancels the old opening before capturing new facts.
         mii_saved_alpha::menu_close(None);
@@ -75,6 +77,8 @@ pub(crate) fn service() {
         }
     }
     PREPARED.store(sequence, Ordering::Release);
+    #[cfg(feature = "diag")]
+    crate::runtime::stall_watch::game_step(3);
 }
 
 /// Publications belong only to an opening already observed on the native side.

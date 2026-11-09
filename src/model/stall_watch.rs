@@ -9,7 +9,7 @@ pub const STALL_MS: u64 = 2_000;
 pub const ARM_ENTRIES: u64 = 1_000;
 
 /// The menu worker's place in a press and a close (`runtime::stall_watch::worker_step`), by index.
-pub const WORKER_STEPS: [&str; 10] = [
+pub const WORKER_STEPS: [&str; 13] = [
     "idle",
     "press",
     "recording_effect",
@@ -20,7 +20,15 @@ pub const WORKER_STEPS: [&str; 10] = [
     "publish",
     "closed",
     "sync_panels",
+    "apply_kept",
+    "setups_close",
+    "close_flags",
 ];
+
+/// The game thread's place in the menu's Mii hand-off (`runtime::stall_watch::game_step`, set by
+/// `mii::menu_handoff::service`): the close and open transitions call the saved-Mii adapters, which take the Mii
+/// owners' locks and read the native catalog (rc6-bg-qp3's menu had a qualified catalog when it stopped).
+pub const GAME_STEPS: [&str; 4] = ["none", "handoff_open", "handoff_close", "handoff_done"];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Event {

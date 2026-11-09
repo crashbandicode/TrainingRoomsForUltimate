@@ -1101,6 +1101,8 @@ fn close(menu: &mut Menu, setups: &mut super::setups::Ui) {
     #[cfg(feature = "diag")]
     crate::runtime::stall_watch::worker_step(7);
     published::publish(&settings.menu, outbox.rerolls);
+    #[cfg(feature = "diag")]
+    crate::runtime::stall_watch::worker_step(10);
     // The carried engines read the typed view of the committed settings (decision D1).
     crate::runtime::compat::menu::apply_kept(&settings);
     *SETTINGS.lock() = Some(settings);
@@ -1115,9 +1117,13 @@ fn close(menu: &mut Menu, setups: &mut super::setups::Ui) {
     }
     // This path is reached only after the Mii close intent was accepted.
     // A refusal changes no setup and does not trap the player in the menu.
+    #[cfg(feature = "diag")]
+    crate::runtime::stall_watch::worker_step(11);
     if let Err(why) = setups.close_menu() {
         notices::post("Setup library", why, 180, DEFAULT_COLOR);
     }
+    #[cfg(feature = "diag")]
+    crate::runtime::stall_watch::worker_step(12);
     CLOSE_COUNT.store(0, Ordering::Release);
     CLOSING.store(true, Ordering::Release);
     INPUT.reset();
