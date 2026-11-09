@@ -697,3 +697,11 @@ ceiling = 152832
 date = "2026-11-08"
 reason = "rc.6 item 3, Mii groups built in the background (p23/rc6-hot-slots d5584dc; operator 2026-11-08 20:26Z All groups in rc.6, SPECIAL-GROUPS 1): the tick's identity bracket and native setup (mii_setup::prepare_mii_background), the shadow R and 16 worker hooks, each window's Mii set (take/put/release_mii_r), and the exit from a Mii to any Built group (baseline_words, Bank::ordinary_identity; inbox 21:27Z); measured 152832 (tools/size_gate.py), +637 over 152195"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to this operator-chosen rc.6 item under TASK-OPUS-rc6-hot-slots (primary c07b3449, 2026-11-08: a raise goes in its own commit with approved_by)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 153299
+date = "2026-11-09"
+reason = "rc.6 item 3, groups that left the cycle freed under the pause (operator decision 2026-11-08 23:42Z, INBOX-opus-rc6-hotslots; p23/rc6-hot-slots-mii): body_bank::leaves_at_pause/kept_members/waiting_for_pause/window_targets, native_body_bank pause_opening and the second plan without the parked groups, the pause hook call, the live pad-controller restore (restore_live_pads), the Mii adapters adopting a background record change (adopt_background_record, Snapshot::adopt_record), the identity and configuration moves and the slow-step diagnostics; measured 153299 (tools/size_gate.py), +467 over 152832"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to this operator-chosen rc.6 item under TASK-OPUS-rc6-hot-slots (primary c07b3449, 2026-11-08: a raise goes in its own commit with approved_by)"
