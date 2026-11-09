@@ -698,7 +698,23 @@ fn report_the_lock_table_and_the_order_edges() {
     for w in &waits {
         println!("WAIT {w}");
     }
+    // The menu-close window (both freezes: `[Ui] press B`, then nothing): every lock the worker's close path can take,
+    // and the game-thread functions that take the same lock.
+    for entry in WINDOW {
+        let starts = graph.find(entry);
+        let reached: BTreeSet<usize> = starts.iter().flat_map(|&f| s.reach[f].iter().copied()).collect();
+        println!("WINDOW {entry}: {} locks", reached.len());
+        for lock in reached {
+            let game: Vec<String> = table.get(&lock).and_then(|r| r.get("game-hook")).map(|f| f.iter().cloned().collect()).unwrap_or_default();
+            println!("  WINDOW-LOCK {} game_takers={}", lock_name(&ctx, lock), if game.is_empty() { "-".to_owned() } else { game.join(", ") });
+        }
+    }
 }
+
+/// The menu close on the worker: the press that starts it, its two paths (with and without a Mii catalog), the publish,
+/// the typed write-back, and the settings writer the close wakes.
+const WINDOW: &[&str] =
+    &["worker::begin_close", "worker::retry_close", "worker::close", "published::publish", "menu::apply_kept", "writer::run"];
 
 #[test]
 fn no_two_locks_are_taken_in_both_orders_and_no_lock_is_retaken_while_held() {
