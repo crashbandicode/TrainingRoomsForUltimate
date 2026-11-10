@@ -178,7 +178,29 @@
    "dest": "src/model/seams/native_fields.rs",
    "crate": "root",
    "src_sha256": "1659bef7f17ee20e313258ec62aa6d912e93761bb0c124142337c149c429b835",
-   "dest_sha256": "1659bef7f17ee20e313258ec62aa6d912e93761bb0c124142337c149c429b835"
+   "dest_sha256": "446a4bc9e2289991f42b05f00fc195383d5b78fbbe3a92356a73f4a1ecd7cccb",
+   "edits": [
+    {
+     "old": "use std::mem::{align_of, size_of};\n\n",
+     "new": "use std::mem::{align_of, size_of};\n\n/// The end of the address space a process maps: a Horizon application's is 39 bits wide (`AddressSpace64Bit`); a host test\n/// process's at most 48. A word at or past it is not an address (float bytes read as a pointer: rc.6 `final-ally-72344fd9`).\n#[cfg(target_os = \"switch\")]\npub(crate) const USER_ADDRESS_END: usize = 1 << 39;\n#[cfg(not(target_os = \"switch\"))]\npub(crate) const USER_ADDRESS_END: usize = 1 << 48;\n\n",
+     "reason": "rc.6 ship blocker (final-ally-72344fd9, 2026-11-10 00:56Z): a teardown read a body window slot past the window size (+0x4150) and followed float bytes 0xb31caf33bf800000 as a body (8 Unmapped reads in retire_window). native_fields::object refuses words past the user address space (39-bit on Horizon), inline_elements returns only a native inline vector slots below its size, and retire_window and the pair traces read the window through it, checking the fighter vtable before any other field"
+    },
+    {
+     "old": "    address != 0 && address.is_multiple_of(align_of::<usize>())\n",
+     "new": "    address != 0 && address.is_multiple_of(align_of::<usize>()) && address < USER_ADDRESS_END\n",
+     "reason": "rc.6 ship blocker (final-ally-72344fd9, 2026-11-10 00:56Z): a teardown read a body window slot past the window size (+0x4150) and followed float bytes 0xb31caf33bf800000 as a body (8 Unmapped reads in retire_window). native_fields::object refuses words past the user address space (39-bit on Horizon), inline_elements returns only a native inline vector slots below its size, and retire_window and the pair traces read the window through it, checking the fighter vtable before any other field"
+    },
+    {
+     "old": "    object(child).then_some(child)\n}\n\n",
+     "new": "    object(child).then_some(child)\n}\n\n/// The elements of a native inline vector of pointers: its size at `base + header`, its data pointer at `+8`, which must name\n/// its own inline storage at `+0x10`, and `N` slots there. Only a slot below the size holding an [`object`] is an element; a\n/// header that does not describe its storage, or a size past `N`, gives none. A slot past the size is not read as a pointer at\n/// all: it may be uninitialised or left over (rc.6 `final-ally-72344fd9`: a finalize took a planned member's slot past the body\n/// window's size for a body and faulted on float bytes).\n///\n/// # Safety\n/// For a non-null base, the header and the `N` slots satisfy `read`'s requirements.\npub(crate) unsafe fn inline_elements<const N: usize>(base: usize, header: usize) -> [Option<usize>; N] {\n    let mut out = [None; N];\n    let Some(storage) = header.checked_add(2 * size_of::<usize>()).and_then(|offset| base.checked_add(offset)) else { return out };\n    let (Some(size), Some(data)) = (read::<u64>(base, header), read::<usize>(base, header + size_of::<usize>())) else { return out };\n    if data != storage || size > N as u64 {\n        return out;\n    }\n    for (i, slot) in out.iter_mut().enumerate().take(size as usize) {\n        *slot = child(storage, i * size_of::<usize>());\n    }\n    out\n}\n\n",
+     "reason": "rc.6 ship blocker (final-ally-72344fd9, 2026-11-10 00:56Z): a teardown read a body window slot past the window size (+0x4150) and followed float bytes 0xb31caf33bf800000 as a body (8 Unmapped reads in retire_window). native_fields::object refuses words past the user address space (39-bit on Horizon), inline_elements returns only a native inline vector slots below its size, and retire_window and the pair traces read the window through it, checking the fighter vtable before any other field"
+    },
+    {
+     "old": "        assert_eq!(unsafe { child(empty.as_ptr() as usize, size_of::<usize>()) }, None);\n",
+     "new": "        assert_eq!(unsafe { child(empty.as_ptr() as usize, size_of::<usize>()) }, None);\n    }\n\n    #[test]\n    fn a_word_past_the_user_address_space_is_not_a_child() {\n        // rc.6 `final-ally-72344fd9`: a finalize followed a window slot holding float bytes (-1.0f under another float) as a\n        // body and faulted 8 times; the word is aligned and non-null, so only the address-space bound refuses it.\n        let wild = [0xb31c_af33_bf80_0000usize];\n        assert_eq!(unsafe { child(wild.as_ptr() as usize, 0) }, None);\n        assert_eq!(unsafe { chain(wild.as_ptr() as usize, &[0]) }, None);\n        assert!(!object(USER_ADDRESS_END) && object(USER_ADDRESS_END - 8));\n    }\n\n    #[test]\n    fn only_a_vectors_slots_below_its_size_are_elements() {\n        // The body window's shape (`entry+0x4150` size, `+0x4158` data, three cells): one body installed, two members planned,\n        // and the second slot holding what final-ally-72344fd9's did. A low wild word past the size is refused as well.\n        let body = [0usize; 8];\n        let mut storage = [0usize; 5];\n        let window = storage.as_mut_ptr();\n        let base = window as usize;\n        let set = |word: usize, value: usize| unsafe { window.add(word).write_volatile(value) };\n        set(0, 1);\n        set(1, base + 0x10);\n        set(2, body.as_ptr() as usize);\n        set(3, 0xb31c_af33_bf80_0000);\n        set(4, 0x3f80_0000);\n        assert_eq!(unsafe { inline_elements::<3>(base, 0) }, [Some(body.as_ptr() as usize), None, None]);\n        set(0, 3);\n        assert_eq!(unsafe { inline_elements::<3>(base, 0) }, [Some(body.as_ptr() as usize), None, Some(0x3f80_0000)]);\n        set(0, 0);\n        assert_eq!(unsafe { inline_elements::<3>(base, 0) }, [None; 3], \"an emptied window has no cells\");\n        set(0, 4);\n        assert_eq!(unsafe { inline_elements::<3>(base, 0) }, [None; 3], \"a size past the capacity is not this vector\");\n        set(0, 1);\n        set(1, body.as_ptr() as usize);\n        assert_eq!(unsafe { inline_elements::<3>(base, 0) }, [None; 3], \"a data pointer off the inline storage is not this vector\");\n        assert_eq!(unsafe { inline_elements::<3>(0, 0x4150) }, [None; 3]);\n",
+     "reason": "rc.6 ship blocker (final-ally-72344fd9, 2026-11-10 00:56Z): a teardown read a body window slot past the window size (+0x4150) and followed float bytes 0xb31caf33bf800000 as a body (8 Unmapped reads in retire_window). native_fields::object refuses words past the user address space (39-bit on Horizon), inline_elements returns only a native inline vector slots below its size, and retire_window and the pair traces read the window through it, checking the fighter vtable before any other field"
+    }
+   ]
   },
   {
    "src": "src/native_unlink_core.rs",
@@ -6373,7 +6395,7 @@
    "dest": "src/runtime/roster/native_body_bank.rs",
    "crate": "root",
    "src_sha256": "ccf7ac678691fa0101a1eff5dbd9300a1b12fe64e9ebbde515697adfbb841c98",
-   "dest_sha256": "a2eaff09f2df0ec8262c89a11181c655f0780bbe0892276aefd03e68240345a3",
+   "dest_sha256": "c52b0c283d0495e5b3ba210d0129c5513c53c0289a2c7f52415885165b7590c4",
    "edits": [
     {
      "old": "unsafe fn finalize_entry(entry: *mut u8) -> u64 {\n",
@@ -8480,6 +8502,51 @@
      "old": "    // The mirror of the Ready bank (`READY`), never the bank's lock: the menu worker's re-plan reads this. A read that keeps meeting a\n    // write in progress gives up (no cached kind; the caller falls back to the descriptor's own kind).\n    let words = READY[role(owner)?].read(64)?;\n",
      "new": "    // The mirror of the Ready bank (`READY`), never the bank's lock: the menu worker's re-plan reads this. It yields between rounds\n    // so a game thread preempted mid-write can finish; a mirror still busy after every round is reported, not used silently.\n    // A game hook keeps its frame short (a few rounds); the menu worker can afford to wait for the writer.\n    let rounds = if crate::runtime::threads::on_plugin_thread() { READY_ROUNDS } else { 16 };\n    let Some(words) = READY[role(owner)?].read_yielding(rounds) else {\n        trace!(\"[BodyBank] ready mirror busy owner={} after {} rounds; no cached kind this plan\", owner, rounds);\n        return None;\n    };\n",
      "reason": "docs lane review R1 finding 4 (2026-11-09 23:23Z): cached_kind reads the Ready mirror with SeqCell::read_yielding (yields between bounded rounds so a preempted writer finishes; 1024 rounds on a plugin thread, 16 in a game hook) and reports an exhausted read instead of falling back silently"
+    },
+    {
+     "old": "    sets\n}\n\n",
+     "new": "    sets\n}\n\n/// The window's size (`+0x4150`); its data pointer (`+0x4158`) names its three cells (`+0x4160/68/70`).\nconst WINDOW: usize = 0x4150;\n\n/// The window's cells that hold a body: below its size, with its data pointer on the cells (`fields::inline_elements`).\nunsafe fn window_cells(entry: usize) -> [Option<usize>; NATIVE_MEMBERS] {\n    fields::inline_elements::<NATIVE_MEMBERS>(entry, WINDOW)\n}\n\n",
+     "reason": "rc.6 ship blocker (final-ally-72344fd9, 2026-11-10 00:56Z): a teardown read a body window slot past the window size (+0x4150) and followed float bytes 0xb31caf33bf800000 as a body (8 Unmapped reads in retire_window). native_fields::object refuses words past the user address space (39-bit on Horizon), inline_elements returns only a native inline vector slots below its size, and retire_window and the pair traces read the window through it, checking the fighter vtable before any other field"
+    },
+    {
+     "old": "        BodyRef { id: 0, kind: 0, cell: 0, activated: false, valid: false, registered: None });\n",
+     "new": "        BodyRef { id: 0, kind: 0, cell: 0, activated: false, valid: false, registered: None });\n    // Only the cells the window holds (`+0x4150`), not every planned member: a slot past the window's size is uninitialised\n    // or left over, and final-ally-72344fd9's finalize followed one (float bytes, `0xb31caf33bf800000`: 8 faults).\n    let installed = window_cells(entry as usize);\n    let held = installed.iter().flatten().count();\n    if always && held < count {\n        trace!(\"[BodyBank] retire owner={} reason={} planned={} held={}: slots past the window's size are not read\", owner, reason,\n            count, held);\n    }\n",
+     "reason": "rc.6 ship blocker (final-ally-72344fd9, 2026-11-10 00:56Z): a teardown read a body window slot past the window size (+0x4150) and followed float bytes 0xb31caf33bf800000 as a body (8 Unmapped reads in retire_window). native_fields::object refuses words past the user address space (39-bit on Horizon), inline_elements returns only a native inline vector slots below its size, and retire_window and the pair traces read the window through it, checking the fighter vtable before any other field"
+    },
+    {
+     "old": "        let Some(body) = fields::child(entry as usize, 0x4160 + i * 8) else { continue; };\n",
+     "new": "        let Some(body) = installed.get(i).copied().flatten() else { continue; };\n        let registered = registered_kind(resource(base, owner), i);\n        // The game's bytes first: a cell that is not a fighter body is not read further.\n        if fields::read::<usize>(body, 0) != Some(base + FIGHTER_VTABLE) {\n            cells.push(BodyRef { id: 0, kind: *kind, cell: i as u8, activated: false, valid: false, registered });\n            continue;\n        }\n",
+     "reason": "rc.6 ship blocker (final-ally-72344fd9, 2026-11-10 00:56Z): a teardown read a body window slot past the window size (+0x4150) and followed float bytes 0xb31caf33bf800000 as a body (8 Unmapped reads in retire_window). native_fields::object refuses words past the user address space (39-bit on Horizon), inline_elements returns only a native inline vector slots below its size, and retire_window and the pair traces read the window through it, checking the fighter vtable before any other field"
+    },
+    {
+     "old": "        let fighter = fields::read::<usize>(body, 0) == Some(base + FIGHTER_VTABLE);\n        let valid = fighter && own.is_some();\n",
+     "new": "",
+     "reason": "rc.6 ship blocker (final-ally-72344fd9, 2026-11-10 00:56Z): a teardown read a body window slot past the window size (+0x4150) and followed float bytes 0xb31caf33bf800000 as a body (8 Unmapped reads in retire_window). native_fields::object refuses words past the user address space (39-bit on Horizon), inline_elements returns only a native inline vector slots below its size, and retire_window and the pair traces read the window through it, checking the fighter vtable before any other field"
+    },
+    {
+     "old": "        cells.push(BodyRef { id, kind: if valid { own.unwrap_or(*kind) } else { *kind }, cell: i as u8,\n            activated: live || activated.contains(&(body, id)), valid, registered: registered_kind(resource(base, owner), i) });\n",
+     "new": "        cells.push(BodyRef { id, kind: own.unwrap_or(*kind), cell: i as u8,\n            activated: live || activated.contains(&(body, id)), valid: own.is_some(), registered });\n",
+     "reason": "rc.6 ship blocker (final-ally-72344fd9, 2026-11-10 00:56Z): a teardown read a body window slot past the window size (+0x4150) and followed float bytes 0xb31caf33bf800000 as a body (8 Unmapped reads in retire_window). native_fields::object refuses words past the user address space (39-bit on Horizon), inline_elements returns only a native inline vector slots below its size, and retire_window and the pair traces read the window through it, checking the fighter vtable before any other field"
+    },
+    {
+     "old": "            contexts[0], contexts[1], contexts[2], aliases[0], aliases[1],\n            fields::child(entry as usize, 0x4160).and_then(|b| fields::read::<u8>(b, 0x3a)),\n",
+     "new": "            contexts[0], contexts[1], contexts[2], aliases[0], aliases[1],\n            window_cells(entry as usize)[0].and_then(|b| fields::read::<u8>(b, 0x3a)),\n",
+     "reason": "rc.6 ship blocker (final-ally-72344fd9, 2026-11-10 00:56Z): a teardown read a body window slot past the window size (+0x4150) and followed float bytes 0xb31caf33bf800000 as a body (8 Unmapped reads in retire_window). native_fields::object refuses words past the user address space (39-bit on Horizon), inline_elements returns only a native inline vector slots below its size, and retire_window and the pair traces read the window through it, checking the fighter vtable before any other field"
+    },
+    {
+     "old": "            read::<usize>(entry, 0x4180),\n            fields::child(entry as usize, 0x4160).and_then(|b| fields::read::<u8>(b, 0x3a)),\n",
+     "new": "            read::<usize>(entry, 0x4180),\n            window_cells(entry as usize)[0].and_then(|b| fields::read::<u8>(b, 0x3a)),\n",
+     "reason": "rc.6 ship blocker (final-ally-72344fd9, 2026-11-10 00:56Z): a teardown read a body window slot past the window size (+0x4150) and followed float bytes 0xb31caf33bf800000 as a body (8 Unmapped reads in retire_window). native_fields::object refuses words past the user address space (39-bit on Horizon), inline_elements returns only a native inline vector slots below its size, and retire_window and the pair traces read the window through it, checking the fighter vtable before any other field"
+    },
+    {
+     "old": "            fields::child(entry as usize, 0x4160).and_then(|b| fields::read::<u8>(b, 0x3a)),\n",
+     "new": "            window_cells(entry as usize)[0].and_then(|b| fields::read::<u8>(b, 0x3a)),\n",
+     "reason": "rc.6 ship blocker (final-ally-72344fd9, 2026-11-10 00:56Z): a teardown read a body window slot past the window size (+0x4150) and followed float bytes 0xb31caf33bf800000 as a body (8 Unmapped reads in retire_window). native_fields::object refuses words past the user address space (39-bit on Horizon), inline_elements returns only a native inline vector slots below its size, and retire_window and the pair traces read the window through it, checking the fighter vtable before any other field"
+    },
+    {
+     "old": "                owner, id, state, saved, fields::child(entry as usize, 0x4160).and_then(|b| fields::read::<u8>(b, 0x3a)),\n",
+     "new": "                owner, id, state, saved, window_cells(entry as usize)[0].and_then(|b| fields::read::<u8>(b, 0x3a)),\n",
+     "reason": "rc.6 ship blocker (final-ally-72344fd9, 2026-11-10 00:56Z): a teardown read a body window slot past the window size (+0x4150) and followed float bytes 0xb31caf33bf800000 as a body (8 Unmapped reads in retire_window). native_fields::object refuses words past the user address space (39-bit on Horizon), inline_elements returns only a native inline vector slots below its size, and retire_window and the pair traces read the window through it, checking the fighter vtable before any other field"
     }
    ]
   },

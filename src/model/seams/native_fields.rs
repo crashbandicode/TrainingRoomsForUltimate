@@ -13,10 +13,17 @@
 
 use std::mem::{align_of, size_of};
 
+/// The end of the address space a process maps: a Horizon application's is 39 bits wide (`AddressSpace64Bit`); a host test
+/// process's at most 48. A word at or past it is not an address (float bytes read as a pointer: rc.6 `final-ally-72344fd9`).
+#[cfg(target_os = "switch")]
+pub(crate) const USER_ADDRESS_END: usize = 1 << 39;
+#[cfg(not(target_os = "switch"))]
+pub(crate) const USER_ADDRESS_END: usize = 1 << 48;
+
 /// Structural native-object check only; does not establish mapped memory or life.
 #[inline]
 pub(crate) fn object(address: usize) -> bool {
-    address != 0 && address.is_multiple_of(align_of::<usize>())
+    address != 0 && address.is_multiple_of(align_of::<usize>()) && address < USER_ADDRESS_END
 }
 
 /// Read a required field after the caller has qualified its native owner.
@@ -85,6 +92,27 @@ pub(crate) unsafe fn child(base: usize, offset: usize) -> Option<usize> {
     object(child).then_some(child)
 }
 
+/// The elements of a native inline vector of pointers: its size at `base + header`, its data pointer at `+8`, which must name
+/// its own inline storage at `+0x10`, and `N` slots there. Only a slot below the size holding an [`object`] is an element; a
+/// header that does not describe its storage, or a size past `N`, gives none. A slot past the size is not read as a pointer at
+/// all: it may be uninitialised or left over (rc.6 `final-ally-72344fd9`: a finalize took a planned member's slot past the body
+/// window's size for a body and faulted on float bytes).
+///
+/// # Safety
+/// For a non-null base, the header and the `N` slots satisfy `read`'s requirements.
+pub(crate) unsafe fn inline_elements<const N: usize>(base: usize, header: usize) -> [Option<usize>; N] {
+    let mut out = [None; N];
+    let Some(storage) = header.checked_add(2 * size_of::<usize>()).and_then(|offset| base.checked_add(offset)) else { return out };
+    let (Some(size), Some(data)) = (read::<u64>(base, header), read::<usize>(base, header + size_of::<usize>())) else { return out };
+    if data != storage || size > N as u64 {
+        return out;
+    }
+    for (i, slot) in out.iter_mut().enumerate().take(size as usize) {
+        *slot = child(storage, i * size_of::<usize>());
+    }
+    out
+}
+
 /// Follow nullable child fields, checking every parent and the final address.
 /// An empty chain returns its parent only when structurally valid.
 ///
@@ -135,6 +163,43 @@ mod tests {
         assert_eq!(unsafe { child(0, 0xa0) }, None);
         let empty = [0usize; 2];
         assert_eq!(unsafe { child(empty.as_ptr() as usize, size_of::<usize>()) }, None);
+    }
+
+    #[test]
+    fn a_word_past_the_user_address_space_is_not_a_child() {
+        // rc.6 `final-ally-72344fd9`: a finalize followed a window slot holding float bytes (-1.0f under another float) as a
+        // body and faulted 8 times; the word is aligned and non-null, so only the address-space bound refuses it.
+        let wild = [0xb31c_af33_bf80_0000usize];
+        assert_eq!(unsafe { child(wild.as_ptr() as usize, 0) }, None);
+        assert_eq!(unsafe { chain(wild.as_ptr() as usize, &[0]) }, None);
+        assert!(!object(USER_ADDRESS_END) && object(USER_ADDRESS_END - 8));
+    }
+
+    #[test]
+    fn only_a_vectors_slots_below_its_size_are_elements() {
+        // The body window's shape (`entry+0x4150` size, `+0x4158` data, three cells): one body installed, two members planned,
+        // and the second slot holding what final-ally-72344fd9's did. A low wild word past the size is refused as well.
+        let body = [0usize; 8];
+        let mut storage = [0usize; 5];
+        let window = storage.as_mut_ptr();
+        let base = window as usize;
+        let set = |word: usize, value: usize| unsafe { window.add(word).write_volatile(value) };
+        set(0, 1);
+        set(1, base + 0x10);
+        set(2, body.as_ptr() as usize);
+        set(3, 0xb31c_af33_bf80_0000);
+        set(4, 0x3f80_0000);
+        assert_eq!(unsafe { inline_elements::<3>(base, 0) }, [Some(body.as_ptr() as usize), None, None]);
+        set(0, 3);
+        assert_eq!(unsafe { inline_elements::<3>(base, 0) }, [Some(body.as_ptr() as usize), None, Some(0x3f80_0000)]);
+        set(0, 0);
+        assert_eq!(unsafe { inline_elements::<3>(base, 0) }, [None; 3], "an emptied window has no cells");
+        set(0, 4);
+        assert_eq!(unsafe { inline_elements::<3>(base, 0) }, [None; 3], "a size past the capacity is not this vector");
+        set(0, 1);
+        set(1, body.as_ptr() as usize);
+        assert_eq!(unsafe { inline_elements::<3>(base, 0) }, [None; 3], "a data pointer off the inline storage is not this vector");
+        assert_eq!(unsafe { inline_elements::<3>(0, 0x4150) }, [None; 3]);
     }
 
     #[test]
