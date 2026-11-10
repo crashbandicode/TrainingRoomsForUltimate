@@ -18,6 +18,7 @@ fn ordered(src: &str, steps: &[&str]) {
 }
 
 const BANK: &str = include_str!("../src/runtime/roster/native_body_bank.rs");
+const MODEL_BANK: &str = include_str!("../src/model/swap/body_bank.rs");
 const LEDGER: &str = include_str!("../src/runtime/roster/r_handle.rs");
 const CAPACITY: &str = include_str!("../src/runtime/roster/native_source_capacity.rs");
 
@@ -73,10 +74,16 @@ fn the_window_targets_skip_what_a_group_holds() {
         "let next = wanted_banks[role].map_or(0, |(members, target)| {",
         "let grouped = |kind: u32| BANKS[role].lock().as_ref().is_some_and(|bank| !bank.departed",
         "&& bank.groups.iter().any(|g| g.state != GroupState::Released && g.members.index_of(kind).is_some()));",
-        "next_window_targets(&shown, target, originals[role], grouped)",
+        // rc.7 target-first: the notice's list of the next window moved into the model (`body_bank::next_window_plan`).
+        "next_window_plan(members, target, notice_reserved[role], originals[role], grouped)",
         // A live attached window then plans what it serves (p23/rc6-bg-ic `window_targets`); integration merge 2026-11-09.
         "let targets = crate::engine::swap::body_bank::window_targets(grouped, live[role], originals[role], next);",
         "PLANNED_TARGETS[role].store(targets.saturating_add(group_targets[role]), Ordering::Release);",
+    ]);
+    // The model function still skips what a group holds (`grouped` reaches `next_window_targets`).
+    ordered(body(MODEL_BANK, "pub fn next_window_plan("), &[
+        "grouped: impl Fn(u32) -> bool",
+        "next_window_targets(&shown[..len], target, original, grouped)",
     ]);
 }
 
