@@ -52,6 +52,22 @@ fn publish(menu: &TrainingModpackMenu, event: &str) {
 fn store(settings: Settings) {
     let value = pack(settings);
     if CACHE.swap(value, Ordering::AcqRel) != value {
+        // The planner's reset runs on the game frame (`service`): it takes the planner's and the sources' locks, which the game's
+        // hooks wait on, and a publish runs on plugin threads (the lock-free runtime).
+        CHANGED.fetch_add(1, Ordering::AcqRel);
+    }
+}
+
+/// Settings changes `store` noted and the game frame has applied (`CHANGED` / `APPLIED`).
+static CHANGED: AtomicU32 = AtomicU32::new(0);
+static APPLIED: AtomicU32 = AtomicU32::new(0);
+
+/// The game frame (`lobby::update`): the preload planner resets for the settings a publish changed, once however many changes came
+/// since (each reset is the same: the grace, the paused preload, the open request stamps, the notice). It lands at the game's next
+/// poll after the publish, before the planner's own frame (`lobby::frame`) reads the new snapshot.
+pub(crate) fn service() {
+    let changed = CHANGED.load(Ordering::Acquire);
+    if APPLIED.swap(changed, Ordering::AcqRel) != changed {
         crate::runtime::roster::cycle_preload::settings_changed();
     }
 }

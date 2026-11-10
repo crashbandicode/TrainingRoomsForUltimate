@@ -609,7 +609,11 @@ pub fn cycle_facts() -> (crate::engine::swap::cycle_members::MiiAdmission, crate
 
 /// Numbered slot of `kind`'s group in `role`'s current cycle.
 fn locate(m: &TrainingModpackMenu, role: Role, kind: u32) -> Option<usize> {
-    let kinds: Vec<_> = roster(m, role).iter().map(|fighter| fighter.kind()).collect();
+    // No heap: the settings re-plan runs on the game frame (`compat::menu::service_roster_change`).
+    let mut kinds = crate::engine::swap::ordered_roster::KindList::new(0);
+    for fighter in roster_fixed(m, role).iter() {
+        kinds.push(fighter.kind());
+    }
     cycle_position(&kinds, kind)
 }
 
@@ -639,7 +643,8 @@ pub fn settings_changed(previous: &TrainingModpackMenu,
         crate::runtime::roster::cycle_preload::reset_admission_grace();
     }
     for role in [Role::Player, Role::Cpu] {
-        if roster(previous, role) != roster(&current, role) {
+        // No heap (`roster_fixed`, the trace's `DebugIter`): this runs on the game frame (`compat::menu::service_roster_change`).
+        if *roster_fixed(previous, role) != *roster_fixed(&current, role) {
             let mut state = state_for(role).lock();
             state.revision = state.revision.wrapping_add(1);
             // A numbered fighter keeps its slot intent through an edit (Ice Climbers can be
@@ -652,11 +657,8 @@ pub fn settings_changed(previous: &TrainingModpackMenu,
             trace!(
                 "[CharacterRoster] settings role={:?} size={} kinds={:x?}",
                 role,
-                roster(&current, role).len(),
-                roster(&current, role)
-                    .iter()
-                    .map(|f| f.kind())
-                    .collect::<Vec<_>>()
+                roster_fixed(&current, role).len(),
+                crate::engine::compat::fixed::DebugIter(roster_fixed(&current, role).iter().map(|f| f.kind()))
             );
         }
         let player_just_enabled = role == Role::Player

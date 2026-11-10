@@ -45,6 +45,10 @@ pub(crate) fn init() {
 
 /// Once per game frame, before the input processing (the input poll's note for Player 1).
 pub(crate) fn update() {
+    // What a settings publish asked of the game (the lock-free runtime: the publish runs on plugin threads, which never take the
+    // planner's or the roster's locks): the preload planner's reset, then the roster's re-plan, in the order the publish made them.
+    crate::runtime::roster::cycle_preload_config::service();
+    crate::runtime::compat::menu::service_roster_change();
     training::lobby::update();
     // A practice session starts (or ends) with the lobby practice: a lease left from before is dropped silently, the next frame
     // acquires a fresh one (`frame`). Training's session starts with the scene (the lease is empty then).

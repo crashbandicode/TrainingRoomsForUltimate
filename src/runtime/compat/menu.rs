@@ -178,9 +178,9 @@ pub(crate) fn before_publish(published: TrainingModpackMenu, previous: Option<Tr
 
 /// A publish's last step for the typed menu, on the publishing thread after the new value went live: rows the engines changed are
 /// written back into the settings the menu opens on. When a live menu changed, package 6's roster re-plan is only *noted* here: the
-/// menu worker runs it ([`run_roster_change`], a thread, never a game hook, so its allocations stay out of the hook counters), so a
-/// publish does only the publish (stream/stack: run here, the planner sat under boot's frame on Skyline's 64 KiB thread). The first
-/// publish of a run has nothing to compare with.
+/// game frame runs it ([`service_roster_change`], where the roster's locks are taken: the lock-free runtime), so a publish does only
+/// the publish (stream/stack: run here, the planner sat under boot's frame on Skyline's 64 KiB thread). The first publish of a run
+/// has nothing to compare with.
 pub(crate) fn after_publish(published: TrainingModpackMenu, next: TrainingModpackMenu, previous: Option<TrainingModpackMenu>) {
     if next != published {
         *PENDING.lock() = Some(next);
@@ -191,29 +191,37 @@ pub(crate) fn after_publish(published: TrainingModpackMenu, next: TrainingModpac
     }
 }
 
-/// The roster's pending re-plan: the menu as it was before the earliest publish the roster has not seen yet (several publishes
-/// before its next frame are compared once, earliest against live).
-static ROSTER_CHANGE: Mutex<Option<TrainingModpackMenu>> = Mutex::new(None);
-static ROSTER_CHANGED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+/// The roster's pending re-plan: the menu as it was before the earliest publish the game frame has not applied yet (several
+/// publishes before its next frame are compared once, earliest against live). The publishing path writes it (one publisher at a
+/// time, under `published::PUBLISHING`) and the game frame takes it ([`service_roster_change`]): a plugin thread never takes the
+/// roster's locks, which the game's hooks wait on (the lock-free runtime, `artifacts/phase23/TASK-OPUS-rc6-lockfree.md`). Neither
+/// side waits on the other: `Published` readers never wait, and its writer here is a plugin thread.
+static ROSTER_CHANGE: hos_lock::Published<Option<TrainingModpackMenu>> = hos_lock::Published::new(None);
+/// The `ROSTER_CHANGE` generation the game frame applied last.
+static ROSTER_APPLIED: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
 
 fn note_roster_change(previous: TrainingModpackMenu) {
-    {
-        let mut pending = ROSTER_CHANGE.lock();
-        if pending.is_none() {
-            *pending = Some(previous);
-        }
-        ROSTER_CHANGED.store(true, std::sync::atomic::Ordering::Release);
+    // A change the game frame has not applied yet keeps its earlier `previous`; it then compares that with the live menu.
+    if ROSTER_CHANGE.generation() == ROSTER_APPLIED.load(std::sync::atomic::Ordering::Acquire) {
+        ROSTER_CHANGE.publish(Some(previous));
     }
-    crate::runtime::ui::worker::wake();
 }
 
-/// The menu worker's step (`ui::worker::run`, after each wake): the roster re-plans for a noted settings change, once per change
-/// (one atomic load when nothing changed).
-pub(crate) fn run_roster_change() {
-    if !ROSTER_CHANGED.swap(false, std::sync::atomic::Ordering::AcqRel) {
+/// The game frame (`lobby::update`: the input poll and the fighter frame, on MainThread): the roster re-plans for a noted settings
+/// change, once per change (two atomic loads when nothing changed). It lands at the game's next poll after the publish, where the
+/// menu worker ran it right after the publish before; nothing the worker does next reads its outcome (`tests/lockfree_wiring.rs`).
+pub(crate) fn service_roster_change() {
+    use std::sync::atomic::Ordering;
+    let generation = ROSTER_CHANGE.generation();
+    let applied = ROSTER_APPLIED.load(Ordering::Acquire);
+    if generation == applied {
         return;
     }
-    let previous = ROSTER_CHANGE.lock().take();
+    // The publisher writes again only once this generation is applied, so this read is exactly that generation's value.
+    let previous = ROSTER_CHANGE.read();
+    if ROSTER_APPLIED.compare_exchange(applied, generation, Ordering::AcqRel, Ordering::Acquire).is_err() {
+        return;
+    }
     if let Some(previous) = previous {
         crate::runtime::roster::character_roster::settings_changed(&previous, None);
     }

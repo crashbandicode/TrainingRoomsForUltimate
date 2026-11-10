@@ -204,9 +204,6 @@ fn run() {
         if POPUP_REQ.swap(false, Ordering::AcqRel) {
             toggle_popup(&mut session);
         }
-        // A settings publish (this thread's commit, or the diag reload) noted a roster re-plan: it runs here, on a thread, not in the
-        // publish and never in a game hook (stream/stack).
-        crate::runtime::compat::menu::run_roster_change();
         // The named-macro layer's model is this thread's (design C): its worker tick runs before the panels are looked at.
         crate::runtime::macros::port::worker_tick();
         sync_sequence_drill();
