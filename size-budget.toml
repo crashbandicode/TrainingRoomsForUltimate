@@ -1268,3 +1268,11 @@ ceiling = 161567
 date = "2026-11-10"
 reason = "rc.6 p23/rc6-qp-respawn-freeze over 8d9d8901 (161492): the docs lane's review R1 fixes the primary ordered (2026-11-09 23:32Z; the combo HUD tick's try_lock, the Give item scene-change drop, cached_kind's yielding read, combo STAGED as Published, the menu worker off combo HELPER with SAMPLE as a TripleBuffer) and the retire_window ship blocker (primary 2026-11-10 00:59Z: native_fields::inline_elements and the address-space bound, window_cells): 161,567 measured by tools/size_gate.py at ddb7e29d"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to the product fixes ordered by the primary under the operator's 13:21Z rule (a raise goes in its own commit with approved_by)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 162071
+date = "2026-11-10"
+reason = "rc.6 p23/rc6-lockfree over a5bef175 (161567): the lock-free runtime the primary ordered (2026-11-10 00:47Z, operator order 00:44Z, artifacts/phase23/TASK-OPUS-rc6-lockfree.md): no plugin thread takes a lock a game entry waits on. The hand-offs model::drop_ring, model::box_handoff and model::owned_ring and runtime::roster::roster_requests; the settings re-plan and planner reset on the game frame; the combo helper's posted names and plans; the save states' and setups' hand-offs; the heartbeat's owned ring; the keyboard signals tried; the worker's hos_lock::Event wake; measured 162071 at d23d8b23 (tools/size_gate.py), +504"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7; restated for this work in TASK-OPUS-rc6-lockfree: 'The ceiling may rise with approved_by (the operator: raise as needed)'); a raise goes in its own commit with approved_by"
