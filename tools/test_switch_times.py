@@ -39,8 +39,9 @@ AFTER = """1000 #10 [CharacterRoster] request handed to the ordinary Mii owner r
 6000 #16 [CharacterRoster] request handed to the ordinary Mii owner role=Cpu selection=Cycle
 6100 #17 [BodyBank] ready owner=1 index=0 kind=0x2 previous=Changing bodies=[]
 7000 #18 [CharacterRoster] request handed to the ordinary Mii owner role=Player selection=Cycle
-7040 #19 [GroupSwap] swap owner=0 kind=0x8 request_to_ready_us=40000 bodies=[] max_tick_gap_us=17 ticks=3
+7000 #19 [GroupSwap] request owner=0 kind=0x8 group=0 member=1 via=2 from=0 state=Built form=single
 7040 #20 [BodyBank] ready owner=0 index=1 kind=0x8 previous=Changing bodies=[]
+7040 #21 [GroupSwap] swap owner=0 kind=0x8 request_to_ready_us=40000 bodies=[] max_tick_gap_us=17 ticks=3
 """
 
 
@@ -58,7 +59,7 @@ class SwitchTimes(unittest.TestCase):
                          [(0x6, "window 3", 7605), (0x36, "canonical", 3391), (0x1c, "window 3", 7929),
                           (0x8, "in-window", 52)])
         after = st.switches(self.lines(AFTER))
-        self.assertEqual([(r["kind"], r["path"], r["ms"]) for r in after], [(0x1c, "target-first", 2100), (0x8, "group", 40)])
+        self.assertEqual([(r["kind"], r["path"], r["ms"]) for r in after], [(0x1c, "target-first", 2100), (0x8, "group built", 40)])
         self.assertIn("| 1 | 0 | 1000 | 0x1c | target-first | 2100 |", st.table(after))
 
     def test_switch_times_counts_background_groups_built(self):

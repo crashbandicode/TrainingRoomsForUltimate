@@ -11,7 +11,7 @@ from the lines in between:
 - `window N`: a Reload built an N-body window;
 - `canonical`: a Reload with no bank;
 - `in-window`: a warm member change;
-- `group`: a warm exchange into a built group.
+- `group built` / `group prefetched`: a warm exchange into a group (a prefetched one builds at the switch).
 
 The background builds that completed before the role's next request are listed with each switch
 (`[GroupSwap] background built owner=N ... ok=true`). Logs are merged by their `#seq` numbers, so the `.previous`
@@ -119,6 +119,11 @@ def path_of(texts, owner):
     m = re.search(r"\[BodyBank\] build owner=%d .*count: (\d+)" % owner, joined)
     if m:
         return "window %s" % m.group(1)
+    # A warm exchange logs its request (with the group's state: Built, or Prefetched, which builds at the switch); its
+    # `swap` line comes after the ready line.
+    m = re.search(r"\[GroupSwap\] request owner=%d kind=0x[0-9a-f]+ group=\d+ .*?state=(\w+)" % owner, joined)
+    if m:
+        return "group %s" % m.group(1).lower()
     if "[GroupSwap] swap owner=%d " % owner in joined:
         return "group"
     if "[BodyBank] reuse owner=%d " % owner in joined:
