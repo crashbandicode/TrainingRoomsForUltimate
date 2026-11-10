@@ -195,3 +195,20 @@ fn the_staged_drill_crosses_threads_through_published() {
     let text = include_str!("../src/runtime/features/combo.rs");
     assert!(!text.contains("UnsafeCell"), "combo.rs hand-rolls a cross-thread cell again");
 }
+
+/// The combo helper (`combo::HELPER`) belongs to the fighter frame: the HUD tick reads it on the game's task workers
+/// (`anchors::ui_pass_calculate`), so the menu worker never takes it. A new target is staged for the frame (`stage_target`), and
+/// the last combo and the strip's sample come from the frame's hand-off (`SAMPLE`, a triple buffer: neither side waits). Docs lane
+/// review R1 addendum, 2026-11-10 00:25Z.
+#[test]
+fn the_menu_worker_never_takes_the_combo_helper() {
+    let g = graph();
+    for key in ["combo::set_target", "combo::last_combo", "combo::strip_sample"] {
+        assert!(!names(&g, key, "HELPER"), "{key} takes the helper the HUD tick reads");
+    }
+    assert!(calls(&g, "combo::set_target", "combo::stage_target"), "a new target is no longer staged for the frame");
+    let text = include_str!("../src/runtime/features/combo.rs");
+    let tick = text.split("pub fn hud_tick").nth(1).unwrap();
+    assert!(tick.contains("HELPER.try_lock()") && !tick.contains("HELPER.lock()"), "the HUD tick waits on the helper again");
+    assert!(text.contains("static SAMPLE: hos_lock::TripleBuffer<"), "the frame's hand-off to the worker is a lock again");
+}
