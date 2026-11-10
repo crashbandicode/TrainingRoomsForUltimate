@@ -91,12 +91,12 @@ Make combo, on a macro's or a chain's own screen, plays that file once on Player
 If the connected start save was deleted, Make combo skips the warp, shows "No start save. This macro plays from where the fighters are.", and still plays. A switch that is Off, or a file that never had a start save, does not warp and does not show that sentence. A chain whose first macro is missing skips that step and plays the next one that is still there.
 Play skips a deleted start save and shows the same sentence. A macro that never had one does not show it.
 
-![Make combo plays the macro from its start save under the drilled combo, then lists Combo 2](media/rc5-make-combo.gif)
+![Make combo plays the macro and lists Combo 1, made from it; drilled and played again, the bar grades it TRUE](media/rc6-make-combo.gif)
 
 Crop on a combo or a macro opens a handle screen. Up and Down switch In and Out. L and R move the handle that is focused, and they do not change the menu page. A saves a new file under the next unused Macro N or Combo N and returns to the original. B returns without writing. The original stays. A macro crop keeps that range of frames. The new file keeps the original's one start state, stamped at the clamped start frame. It does not store a pose for every frame. A combo crop keeps the links from the first handle through the last. The replay window is a separate row under Replays. It is not this Crop row.
 A chain has no Crop row, because it has no frames of its own.
 
-![Crop keeps a range of links as a new combo](media/rc5-crop-combo.gif)
+![Crop on a two-link combo, Out 2 to 1, saves Combo 2; drilled, the bar shows its one link](media/rc6-crop-combo.gif)
 
 There is no chord for a combo. Choosing Drill makes it the one drill.
 
@@ -196,7 +196,7 @@ Rename opens the Switch keyboard. B, or an empty confirm, keeps the old name. A 
 
 The combo's help lines list each link as the two moves and TRUE or not, then that link's input events, then its drift when it has one. The helper still says link for those hits. The word sequence is the file of combos, and the word chain is only the compound macro.
 
-![A macro's own screen: Start save On, and Set active for Player 1](media/rc5-macro-screen.gif)
+![A macro's own screen: Set active On for Player 1, then Play on Player 1 warps to its start save and plays it](media/rc6-macro-set-active.gif)
 
 ## Fighter Mismatch
 

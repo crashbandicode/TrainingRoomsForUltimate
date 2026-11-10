@@ -33,7 +33,7 @@ This page lists only the changes, each checked against the code of 0.2.0-rc.3 (`
 | Menu shortcuts 1 and 2 are edited in the menu with a chord editor, apply at once and are saved to `button_config.ini`. B + D-pad Up always opens the menu. | `src/model/menu/table.rs:430-433` |
 | A *Replay capture* row writes `replay_capture.ini`; the Online Deluxe overlay's row shows the same value. | `src/model/menu/table.rs:353`, `src/runtime/deluxe_row.rs:31` |
 
-![Fighter grid with cycle badges](media/cycle-badges.gif)
+![Fighter grid with cycle badges, then the cycle chord switching Player 1 in that order](media/rc6-cycle-switch.gif)
 
 ![A new menu shortcut applies at once](media/menu-shortcut.gif)
 

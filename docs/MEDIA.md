@@ -17,9 +17,41 @@ so it still plays at game speed (46 frames, 6.9 MB).
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `media/rc6-sequence-drill.gif` | `seq-gif` in `artifacts/phase23/rc6-eden/rows-seq/rows.json` | yoga | RECORDING.md, Sequences and the one drill; RELEASE-NOTES-rc6.md | rc.6 | 6 s | A sequence of three one-link combos (Pair 1, 2, 3: jab, jab), file streak 4 and best 9, is the drill. Load to a save with Player 1 in jab range. Jab, jab (Pair 1); walk forward a little; then an up tilt where Pair 2's jab should be. | The bar's SEQUENCE header, combo 1 of 3, and the row Pair 1 → Pair 2 → Pair 3. Pair 1 turns green with the check and the header reads combo 2 of 3, "Pair 1 landed". Then Pair 2 turns red, the footer reads "Pair 2 dropped · L1 wrong move: Up tilt · restart at combo 1", the header is back on combo 1, and the streak goes from 4 to 0 with best 9. | yes |
 
+## rc.6 docs clips (2026-11-10)
+
+A media audit on 2026-11-10 asked of every GIF whether it shows the state before, the action, and the result in the
+game or in a file, not only a menu. These clips replace or join the GIFs that showed only a menu
+(`artifacts/phase23/feature-gifs/AUDIT-MEDIA.md`).
+
+- **Build:** rc.6 `e6501ac6`, the diag NRO `c1b9f694…`, which adds log lines only, so the screen draws the same.
+  Eden's own recorder took them at 1280×720.
+- **Runs:**
+  - `docs-boot1-e6501ac6`: the XPS, 2026-11-10, 14:19–15:59Z;
+  - `docs-boot2-e6501ac6`: the Surface, 14:21–16:19Z;
+  - worker B's `rc6-docs-online-e6501ac6`: the XPS, 13:21–13:47Z. Two instances, b with TrainingRooms and a
+    vanilla, in a Quickplay room hosted in Eden.
+- **Review and cuts:**
+  - Each take was reviewed at the times in its row below (`clips.py times`).
+  - Each was cut to the before, the action and the result (`clips.py cutw`, 10 fps): one palette of 128 colours from
+    three frames, no dither, the game's frame times.
+  - The windows kept from the raw take are listed with each clip. The raw takes stay with the runs in
+    `artifacts/phase23/feature-gifs/runs/`.
+
+| File | Run, row | Embedded in | Length, size | Raw windows kept | What the frames show |
+| --- | --- | --- | --- | --- | --- |
+| `media/rc6-crop-combo.gif` | boot 1, `fx-crop-combo` | RECORDING.md, Combos | 9.1 s, 7.3 MB | 25.0–27.6, 43.3–46.6, 57.2–58.2, 59.3–61.7 s | 0–2.6 s Combo 1 drilled, two links in the bar; 2.6–5.9 s Crop, Out 2 → 1; 5.9–6.9 s Combo 2 listed beside Combo 1; 6.9–9.1 s Combo 2 drilled, one link. The row also checked that Combo 1's file was unchanged. |
+| `media/rc6-make-combo.gif` | boot 1, `fx-make-combo-drill` | RECORDING.md, Combos | 9.5 s, 5.4 MB | 32.4–33.4, 34.4–37.6, 42.6–44.0, 51.0–54.9 s | 0–1.0 s Make combo on Macro 1; 1.0–4.2 s the macro plays (jab, jab); 4.2–5.6 s COMBOS lists Combo 1, made from Macro 1, one link, drilled; 5.6–9.5 s Play: the warp, the jabs land, and the bar grades Combo 1 TRUE. |
+| `media/rc6-macro-set-active.gif` | boot 1, `fx-set-active-play` | RECORDING.md, A file's own screen | 6.3 s, 5.5 MB | 33.0–35.9, 38.2–41.8 s | 0–1.3 s the macro's screen, Set active Off; 1.3–2.9 s On, Player 1; 2.9–6.3 s Play on Player 1: the fighters warp to its start save and the jab lands (CPU 0 → 2.7%). |
+| `media/rc6-cycle-switch.gif` | boot 2, `fx-cycle-switch` | README, Fighters, cycles and Kirby hats; DIFFERENCES-FROM-THE-FORK.md | 8.6 s, 8.6 MB | 15.2–17.2, 21.6–23.0, 25.6–27.4, 28.6–30.0, 31.6–33.6 s | 0–2.0 s Character Cycles, red badges: Mario 0, Mii Brawler 1, Mii Swordfighter 2, Mii Gunner 3, Link 4; 2.0–3.4 s Training, Player 1 Mii Gunner; 3.4–5.2 s the chord: Link, "Player fighter applied"; 5.2–6.6 s Mario, "Original fighter restored"; 6.6–8.6 s Mii Brawler, "Player Mii configuration applied". |
+| `media/rc6-replay-window.gif` | boot 1, `cov-replay-window` | README, Menu shortcuts and replay capture | 8.4 s, 6.1 MB | 24.1–25.4, 25.8–26.8, 28.2–30.2, 31.0–31.8, 32.9–35.0, 36.4–37.6 s | 0–1.3 s Replay Captures lists the capture (Mario vs Mii Gunner, 180 frames); 1.3–2.3 s the Replay window; 2.3–4.3 s Fighter Mismatch, Switch to recorded fighter; 4.3–5.1 s Training, CPU Mario; 5.1–7.2 s "Saved Mii applied", the CPU reloads; 7.2–8.4 s CPU Mii Gunner. The capture is the row's fixture, an rc.4 capture. |
+| `media/rc6-waiting-partners.gif` | B, `qp-panel-change` | README, Waiting rooms | 6.6 s, 5.5 MB | B's clip, as kept in its run's `clips/` | 0.0–0.6 s one partner; 1.2 s the game's waiting-room menu (Training Partners 1, Stop); 3.7 s Right → 2, and a second partner drops in; 5.0–6.6 s both stand. |
+| `media/rc6-waiting-reentry.gif` | B, `qp-reentry` | README, Waiting rooms | 9.9 s, 6.8 MB | B's clip, as kept in its run's `clips/` | 0.0–0.5 s loading; 0.6 s the next room fades in with the two remembered partners; 1.5–9.9 s both stand (Stop). |
+
 ## rc.5 clips
 
-26 of the rows below are in [`media/`](media/), and the player docs embed them. They are Eden footage of
+23 of the rows below are in [`media/`](media/), and the player docs embed them. Three more were there until
+2026-11-10, when clips that show the result replaced them (rc.6 docs clips above); they remain in the history up to
+`da26d632`. They are Eden footage of
 `p23/rc5-wire-fix` diag builds, and for the last three of `p23/rc6-hot-slots` diag builds, which add log lines only (the
 screen draws the same):
 
@@ -92,11 +124,11 @@ Recording page. A row that says `rr-6` is not a capture of the old slot page. Re
 | `media/rc5-loop-no-warp.gif` | `media-rc5-loop-no-warp` | yoga | RECORDING.md, The loop | rr-6 | 8 s | Same macro, CPU loop set to 2 (X while the cursor is in Macros). ZR+Up and let both passes finish. | The first pass warps once. The second pass does not warp. It continues from where the first pass ended. | yes |
 | `media/rc5-chain-play.gif` | `media-rc5-chain-play` | yoga | RECORDING.md, Chains | rr-6 | 9 s | + New chain. Number two recordings, the first of which has a start save. Name it. Set it active for the CPU. ZR+Up. | One warp to macro 1's start save, then recording 1, then recording 2, with no warp between them. | yes |
 | `media/rc5-grade-not-true.gif` | `gif-gnt-b` after `gm-utilt-42` (`artifacts/phase23/rc6-combined/rows-docs-gifs`) | xps | RECORDING.md, Combos | strip | 7 s | A save with the CPU at 42% and Player 1 in reach, facing it. A macro from that save: up tilt, then up tilt 41 frames later, a link the strip calls `TRUE 0`. Make combo on it makes Combo 1; drill it. Combo helper On, On-time tolerance 1 frame. Attempt 1: Player 1's Play of the same inputs with the follow-up one frame later, so LINK reads `+1 DROP`. The CPU's Play warps both fighters back to the same save. Attempt 2: up tilt, then up smash with the same input timing (INPUT `+4`, as the reference). | Attempt 1 still counts (the bar does not require TRUE). Attempt 2 drops, and the bar says the move was wrong. | yes |
-| `media/rc5-make-combo.gif` | `gif-make-combo` (`artifacts/phase23/rc6-combined/rows-docs-gifs`) | xps | RECORDING.md, Combos | rr-6 | 10 s | Drill some other combo first, so the bar is showing it. The macro's start save must have Player 1 in reach of the CPU (the `mk6` fixture: x −12; at x −30 every jab misses and Make combo writes nothing). On the macro's screen, Make combo. Then the Recording page, Down to Combos & Sequences. | That macro plays once on Player 1 from its own start save. A new combo named Combo N appears in the hot five, made from that macro. The drilled combo is still the drill when it finishes. | yes |
-| `media/rc5-crop-combo.gif` | `media-rc5-crop-combo` | yoga | RECORDING.md, Combos | rr-6 | 7 s | Open a combo of at least two links. Crop. Move a handle with L or R. A saves. | The handle screen is open. A writes a new combo. The original combo is still in the list. | yes |
+| `media/rc5-make-combo.gif` | `gif-make-combo` (`artifacts/phase23/rc6-combined/rows-docs-gifs`) | xps | RECORDING.md, Combos | rr-6 | 10 s | Drill some other combo first, so the bar is showing it. The macro's start save must have Player 1 in reach of the CPU (the `mk6` fixture: x −12; at x −30 every jab misses and Make combo writes nothing). On the macro's screen, Make combo. Then the Recording page, Down to Combos & Sequences. | That macro plays once on Player 1 from its own start save. A new combo named Combo N appears in the hot five, made from that macro. The drilled combo is still the drill when it finishes. | replaced by `rc6-make-combo.gif` (2026-11-10) |
+| `media/rc5-crop-combo.gif` | `media-rc5-crop-combo` | yoga | RECORDING.md, Combos | rr-6 | 7 s | Open a combo of at least two links. Crop. Move a handle with L or R. A saves. | The handle screen is open. A writes a new combo. The original combo is still in the list. | replaced by `rc6-crop-combo.gif` (2026-11-10) |
 | `media/rc5-popup.gif` | `media-rc5-popup` | yoga | RECORDING.md, The pop-up | rr-6 | 8 s | In the match, ZR+Right. Cursor on a save that is not the bound save. Down onto a macro. B. | The window over the match. The title reads Recording (Player 1). Two stacked sections, four rows under each header. The bound save's name is green. The cursor is the dark highlight bar. B closes it and the bound save is unchanged. | yes |
 | `media/rc5-recording-page.gif` | `media-rc5-recording-page` | yoga | RECORDING.md, The Recording page | rr-6 | 8 s | Open the menu, go to Recording. ZR once. Then ZR back. | Player view shows saves and macros, and Combos & Sequences in the left column. CPU view hides Combos & Sequences. The bound save's name is green in both. | yes |
-| `media/rc5-macro-screen.gif` | `media-rc5-macro-screen` | yoga | RECORDING.md, A file's own screen | rr-6 | 6 s | On the Recording page, A on a macro that has a start save. | Breadcrumb reads Recording (Player view), then Save states & Macros, then the name. Start save shows the orange floppy and On. Set active is one row for that role. | yes |
+| `media/rc5-macro-screen.gif` | `media-rc5-macro-screen` | yoga | RECORDING.md, A file's own screen | rr-6 | 6 s | On the Recording page, A on a macro that has a start save. | Breadcrumb reads Recording (Player view), then Save states & Macros, then the name. Start save shows the orange floppy and On. Set active is one row for that role. | replaced by `rc6-macro-set-active.gif` (2026-11-10) |
 | `media/rc5-fighter-mismatch.gif` | `media-rc5-fighter-mismatch` | yoga | RECORDING.md, Fighter Mismatch | rr-6 | 7 s | CPU is Mario. Active chain whose first macro was recorded on a different fighter (change P1 to Pikachu, record a jab, change P1 back to Mario, put that recording first in a chain, set the chain active for the CPU). ZR+Up. | The Fighter Mismatch rows open, cursor on Keep. Keep plays the chain on Mario. There is no second prompt when a later macro plays. | yes |
 | `media/rc5-migration.gif` | `gif-migration` (`artifacts/phase23/rc6-combined/rows-docs-gifs`) | xps | RECORDING.md, Migration | first boot of a card from before the library | 8 s | Before boot, the card holds the old `save_states.json` with saves in indexes 1 and 2, the Save and Load chords on index 2, and `macros/selected.txt` naming `oldjab` (cov-rec's `boot/` card). Boot into Training. ZR+Right for the pop-up, Right to MACROS, B. ZR+Left. | SAVE STATES lists `Slot 2 (YYYY-MM-DD)` and `Slot 1 (YYYY-MM-DD)`, and Slot 2 is the bound save. MACROS lists `Old jab` as Player 1's active macro. Play runs it from where Player 1 stands; there is no warp. | yes |
 
@@ -212,7 +244,7 @@ stay under 10 MB.
 | `respawn-off.gif` | Off: the same KO, and P1 drops back in at once. This 2026-11-05 clip changed the row on the Saves page; the row is now on Fighters & Stages › Stages. 5.6 s, step 2. |
 | `cpu-kirby-hat.gif` | P1's Special + R3 gives the CPU Kirby a hat (Mario's), with the "CPU Kirby Hats" notice. 4.2 s. |
 | `p1-kirby-hat.gif` | P1's own Special + L3 hat chord, with the "Kirby Hats" notice. 4.1 s. |
-| `cycle-badges.gif` | Fighters & Stages › Character Cycles: the game's stock icons with the order badges (red for Player 1, blue for the CPU); ZR switches role. 9.5 s. |
+| `cycle-badges.gif` | Fighters & Stages › Character Cycles: the game's stock icons with the order badges (red for Player 1, blue for the CPU); ZR switches role. 9.5 s. Replaced on 2026-11-10 by `rc6-cycle-switch.gif`, which also shows the chord switching in that order; it remains in the history up to `da26d632`. |
 | `replay-capture.gif` | Recording page: A turns *Replay capture* On; the menu closes; L + R + Down opens the Online Deluxe overlay, whose Player Info page shows *Training Rooms › Replay capture: On*. 9.5 s. |
 | `menu-shortcut.gif` | Display & Controls › Menu shortcut 1: X captures ZL + D-pad Up in place of Minus, A confirms, the menu closes, and the new chord opens it at once. 9.5 s. |
 | `record-refused.gif` | With the CPU pilot driving P1 (armed on the Deluxe overlay), ZR + D-pad Down shows "P1 is controlled by an AI: recording is off". 4.7 s. |

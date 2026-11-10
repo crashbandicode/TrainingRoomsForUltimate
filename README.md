@@ -129,7 +129,12 @@ starts, then a wrong move drops the sequence back to combo 1.* See [docs/MEDIA.m
 
 ### Fighters, cycles and Kirby hats
 
-![Character Cycles: order badges on the game's stock icons](docs/media/cycle-badges.gif)
+![Character Cycles: the order badges, then each press of the cycle chord switches Player 1 in that order](docs/media/rc6-cycle-switch.gif)
+
+*Eden, 2026-11-10, rc.6 `e6501ac6` (diag NRO `c1b9f694`, log lines only): the grid's red badges number Player 1's
+order (Mario 0, Mii Brawler 1, Mii Swordfighter 2, Mii Gunner 3, Link 4). In Training, each press of the cycle chord
+switches Player 1 from Mii Gunner to Link, back to Mario, then to Mii Brawler. Cuts inside are listed in
+[docs/MEDIA.md](docs/MEDIA.md).*
 
 Cycle chords step through your own order of fighters per role (red for Player 1, blue for the CPU), drawn with the
 game's stock icons.
@@ -166,20 +171,38 @@ others untouched, and leaving without saving creates nothing. Saving a Mii you a
 
 ### Stages
 
+![Change Stage: Battlefield, Y for its Ω form, and Training reloads there](docs/media/change-stage.gif)
+
+*Eden, 2026-11-05, rc.3 `3c8f5bc` (release NRO `bf01353e…`): Battlefield picked in the grid, Y for its Ω form, A closes
+the menu, and Training reloads on Battlefield Ω.*
+
+*Change Stage* (Fighters & Stages › Stages) goes to the stage you pick when the menu closes, in Training and in
+waiting-room practice; Y picks its form first.
+
 ![Stage grid](docs/media/menu-stages.gif)
 
 Pick the stages and their order for Training rotation and waiting-room practice. *RC10, 2026-11-04, NRO
-`50d95130`.*
-
-*Change Stage* (Fighters & Stages › Stages) goes to the stage you pick when the menu closes, in Training and in
-waiting-room practice; Y picks its form first. *No clip yet.*
+`50d95130`: the grid only.*
 
 ### Waiting rooms
 
-![The menu in a Local Wireless waiting room](docs/media/waiting-menu.gif)
+![Training Partners 1 to 2 in a Quickplay waiting room: a second partner drops in](docs/media/rc6-waiting-partners.gif)
+
+*Eden, 2026-11-10, rc.6 `e6501ac6` (diag NRO `c1b9f694`, log lines only), a Quickplay room hosted in Eden: one partner
+standing; the game's own waiting-room menu, Training Partners 1, Right to 2; a second partner drops in, and both stand
+(Training Partner Behavior: Stop).*
+
+![The next room starts with the two partners and Stop](docs/media/rc6-waiting-reentry.gif)
+
+*The same run, the next room: it fades in with the two remembered partners, standing still.*
 
 The same menu works while you wait in an online or local room. The Training partners and CPU action you set in the
 game's own waiting-room menu are remembered for the next room, and CPU › Level › CPU Level sets the partners' level.
+
+![The menu in a Local Wireless waiting room](docs/media/waiting-menu.gif)
+
+*Eden, 2026-11-05, 0.2.0-rc.1 (release NRO `706c993f…`), a Local Wireless room hosted in Eden: the menu opens on its
+last page and R steps to CPU and Saves. The menu only.*
 
 ### Menu navigation
 
@@ -195,9 +218,17 @@ left. ZR no longer resets a page: each page ends with *Reset page to defaults*, 
 
 Menu shortcuts are changed in the menu and work at once.
 
+![A capture opened in the Replay window: its Mii goes to the CPU](docs/media/rc6-replay-window.gif)
+
+*Eden, 2026-11-10, rc.6 `e6501ac6` (diag NRO `c1b9f694`, log lines only): Recording › Replay Captures lists a capture
+(Mario vs Mii Gunner, 180 frames), A opens it in the Replay window, Fighter Mismatch offers the recorded fighter, and
+Switch reloads the CPU as the capture's Mii Gunner ("Saved Mii applied"). The capture is a test fixture, made before
+the clip. Cuts inside are listed in [docs/MEDIA.md](docs/MEDIA.md).*
+
 ![Replay capture in the menu and the Deluxe overlay](docs/media/replay-capture.gif)
 
-The *Replay capture* row and the Online Deluxe overlay show the same setting.
+The *Replay capture* row and the Online Deluxe overlay show the same setting. *Eden, 2026-11-05, 0.2.0-rc.1 (release
+NRO `706c993f…`): the menu row and the overlay only.*
 
 ## Status
 
