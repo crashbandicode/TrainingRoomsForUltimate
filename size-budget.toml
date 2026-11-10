@@ -1332,3 +1332,11 @@ ceiling = 162772
 date = "2026-11-10"
 reason = "rc.7 p23/rc7-target-first over 732663e2 (162596): target-first (artifacts/phase23/TASK-rc7.md item 2, the operator's rc.7 order relayed by the primary 2026-11-10 12:32Z): a window rebuild loads the picked fighter alone and its neighbours build as background groups (model::swap::body_bank target_only/target_first/neighbour_group/pack_neighbours/unpack_neighbours/reload_extras/canonical_replaces_window and ten host tests; native_body_bank proposed, NEIGHBOURS and the first group in plan_groups, plan_budget, retire_for_canonical); measured 162772 at 5692c494 (tools/size_gate.py), +176"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.7 order (TASK-rc7.md: 'ship the rc7 and as part of it include A's fix'); a raise goes in its own commit with approved_by"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 162792
+date = "2026-11-10"
+reason = "rc.7 p23/rc7-target-first over 3f7dca0c (162772): the planned=0 fix (integration FLAG 2026-11-10 17:53Z, primary 17:56Z): body_bank::notice_extras and next_window_plan, the notice reservation in plan_budget, one host test; measured 162792 at bdaf7227 (tools/size_gate.py), +20"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.7 order (TASK-rc7.md); a raise goes in its own commit with approved_by"
