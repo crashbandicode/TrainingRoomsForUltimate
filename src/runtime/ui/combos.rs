@@ -60,9 +60,9 @@ fn library() -> ComboLibrary {
 pub fn service_switch_replies() {
     while let Some((kind, queued)) = roster::take_reply() {
         live::fighter_event(event::REQUESTED, Some(kind), roster::player_kind(), u32::from(queued));
-        if !queued {
-            let name = TrioFighter::from_kind(kind).map_or("Unavailable", |fighter| fighter.name());
-            let note = format!("P1 was not switched to {name}");
+        // The kind is the fighter `after_close` asked for, so it always names one.
+        if let (false, Some(wanted)) = (queued, TrioFighter::from_kind(kind)) {
+            let note = format!("P1 was not switched to {}", wanted.name());
             notices::upsert(0x2A, "Combos", &note, 180, DEFAULT_COLOR);
         }
     }
