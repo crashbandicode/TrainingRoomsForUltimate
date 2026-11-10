@@ -555,3 +555,20 @@ operator's console play test of rc.6. It extends "2026-11-08: Item 3 in rc.6 —
   window is `Members::target_only`.
 
 This records the decision only; the implementation, host tests and Eden proofs are in the rc.7 notes.
+
+## 2026-11-10: rc.7 — the Kirby guard removal (D-KIRBY1) as a root fix (operator decision)
+
+- **Operator, about 12:30Z:** "ship the rc7 and as part of it include A's fix, the lock refactor and the kirby guard
+  removal". The primary (12:32Z): a root fix, not a removed check. Background body construction must never write or
+  read the live Kirby's copy registry, so background builds and prefetches proceed while Kirby is on screen. The Kirby
+  cell-0 invariant stays.
+- **The mechanism, by RE** (the docs lane's report, 12:55Z):
+  - Body init's registration (`prepare_entry` at `0x607f30`) was already skipped for background bodies (rc.6 item 3).
+  - The live hazard is `0x17e8610`'s G68 step (`0x17f0290` at `0x17e87ac`, while `R+0x4c` bit 2 is set). It hands
+    back the Kirby-copy package `(k, costume)` that native's load completion took. A release of the bank's keys never
+    took it, so under a live copy of `k` it takes the copy's.
+- **The fix (F1):** the bank owns that step for every release it causes (kind −1 there).
+  - The D-KIRBY1 gates then stand only while that hook can't be installed: the prefetch deferral, the key return, the
+    ledger's two rules, the background builds' "live kirby" and the drain before a Kirby target.
+  - **Unchanged:** the background registration skip, the cell-0 invariant and the copy-free departure gate
+    (EXCLUSIONS §2).

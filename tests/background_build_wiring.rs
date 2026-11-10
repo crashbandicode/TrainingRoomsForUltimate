@@ -133,7 +133,10 @@ fn the_lifecycle_starts_and_settles_it_and_the_gate_needs_both_paths() {
     // SPECIAL-GROUPS §0 X1/X4: the live window takes part in the rule; X6, with the owner's ordinary baseline beside a Mii.
     assert!(candidate.contains("*g.members, g.identity.is_some())), *bank.members, live_identity(bank),"), "{candidate}");
     assert!(BANK.contains("LiveIdentity::of(bank.identity.is_some(), bank.ordinary_identity.is_some())"));
-    assert!(candidate.contains("live == Some(KIRBY),"), "{candidate}");
+    // D-KIRBY1's "live kirby" while the G68 step is native's; rc.7 F1 owns it, and then a live Kirby defers no build.
+    assert!(candidate.contains("live_kirby_gate(live),"), "{candidate}");
+    assert!(body(BANK, "fn live_kirby_gate(")
+        .contains("crate::engine::swap::body_bank::d_kirby1_live(live, crate::runtime::roster::g68_step::enabled()) == Some(KIRBY)"));
     assert!(BANK.contains("const BODY_CELL_BYTE: usize = 0xf816;"));
     assert!(candidate.contains("bank.prefetch.is_some() || bank.construction.is_some()"), "{candidate}");
     let progress = body(BANK, "pub(crate) fn progress(");
@@ -171,7 +174,9 @@ fn a_waiting_press_holds_every_speculative_step_but_its_own() {
         "Some((group, Serving::ObjectRearm)) => Step::Rearm(group, *bank.groups[group].members, bank.alias),",
         "None => Step::Idle,", "let started = now_us();", "Step::Start(group, members, alias, serving) => {",
         "if !serving && crate::runtime::roster::cycle_preload::speculative_admission().is_none() { return; }"]);
-    ordered(body(BANK, "unsafe fn serving_group("), &["bank.configuration == target.configuration { return None; }",
+    ordered(body(BANK, "unsafe fn serving_group("), &[
+        "let live = crate::engine::swap::body_bank::d_kirby1_live(live, crate::runtime::roster::g68_step::enabled());",
+        "bank.configuration == target.configuration { return None; }",
         "Some(c) => g.configuration == Some(c), None => g.identity.is_none()",
         "object_rearm_due(g.state, *g.members, detached_pool(base, bank.owner, g), g.object_held)",
         "object_rearm_admitted(live, kind)", "serving_step(g.state, g.identity.is_none() || g.charinfo_published, rearm_due)?;",

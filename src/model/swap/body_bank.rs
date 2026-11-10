@@ -24,7 +24,7 @@ pub const KIRBY: u32 = 0x06;
 // the FACT every row encodes documented there. The names and signatures are unchanged for every
 // caller (`body_bank::member_forms_in`, `body_bank::prefetch_admitted`, …).
 pub use crate::engine::swap::swap_model::capabilities::{
-    group_member_kind, key_release_admitted, kirby_parkable, member_forms, member_forms_in,
+    d_kirby1_applies, d_kirby1_live, group_member_kind, key_release_admitted, kirby_parkable, member_forms, member_forms_in,
     native_group_request, object_rearm_admitted, original_bankable, original_form_bankable, pair_lead_extra, pair_request,
     prefetch_admitted,
     single_member_request, special_group_kind, swap_commit_index, swap_commit_index_in,
