@@ -1015,7 +1015,10 @@ unsafe fn reload_at_pose(
 ) {
     // A Reload destroys only the native window: detached bank groups go first.
     #[cfg(feature = "native-body-bank-alpha")]
-    body_bank::before_reload(entry);
+    {
+        body_bank::before_reload(entry);
+        body_bank::retire_for_canonical(entry, descriptor.bytes());
+    }
     pose.stage();
     native_fighter_install::install(base, entry, descriptor, native_fighter_install::Flags::Reload);
 }

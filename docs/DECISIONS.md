@@ -535,3 +535,23 @@ Relayed in `artifacts/phase23/INBOX-opus-rc6-hotslots.md`. They replace item 3 o
   capability expansion). Solo Popo and Mii originals keep the canonical Reload.
 
 This records the decisions only; the implementation, host tests and Eden proofs are recorded in `CARRY-OVER.md`.
+
+## 2026-11-10: rc.7 — a window rebuild loads the picked fighter first (operator order)
+
+Relayed in `artifacts/phase23/TASK-rc7.md` (item 2) and `TASK-OPUS-rc6.1-followups.md` (section 1), after the
+operator's console play test of rc.6. It extends "2026-11-08: Item 3 in rc.6 — groups built in the background" above.
+
+- **Before:** a switch whose fighter is in neither the live window nor a built group Reloads a window of the fighter and
+  up to two cycle neighbours, and the fighter is playable only when all of them are built. On the console a three-body
+  window took 7.6–7.9 s; a solo Reload took 3.3–3.5 s.
+- **Now, with group swap on:** that Reload builds the picked fighter alone, a one-member window. The members the full
+  window would have held become the role's first background group, admitted on the cost the window charged them; the
+  rest of the cycle follows as usual. The same rules apply: the live-Kirby rule and the memory admission a window used
+  for its supplements, which is the group prefetch's.
+- **Unchanged:** with group swap off the full window is built, the normal Ice Climbers pair keeps its pair-lead window,
+  and Mii, Pokémon Trainer and Pyra/Mythra keep their own paths. The start-up window at Training's load is not a switch
+  and is unchanged.
+- "A window bank always starts with two members" (`Members::from_forms`) still holds for the full window. The one-member
+  window is `Members::target_only`.
+
+This records the decision only; the implementation, host tests and Eden proofs are in the rc.7 notes.

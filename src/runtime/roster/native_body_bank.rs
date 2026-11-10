@@ -176,6 +176,7 @@ use crate::engine::swap::body_bank::{
     baseline_words, identity_move, IdentityMove, leaves_at_pause, count_group_members, kept_members,
     release_for_new_members, capacity_release, leaves_now, ReleaseWatch, arriving_room, room_coming, still_short,
     next_window_targets, own_words, shadow_values, LiveIdentity, speculative_step_admitted, serving_step, Serving,
+    target_first, reload_extras, canonical_replaces_window, neighbour_group, pack_neighbours,
 };
 use crate::engine::swap::body_bank::memory::{self, Admission};
 use crate::engine::swap::body_bank::mii_publish::{PublishAttempts, PublishRefusal, PublishStep};
@@ -543,6 +544,23 @@ fn groups_enabled(settings: &crate::engine::preload::cycle_preload_config::Setti
     settings.groups_enabled() && GROUPS_ENABLED.load(Ordering::Acquire)
 }
 
+/// Bodies the shared budget has besides the two active fighters (`ready_fighters` − 2): the room any group could take.
+fn group_pool(settings: &crate::engine::preload::cycle_preload_config::Settings) -> usize {
+    usize::from(settings.ready_fighters).saturating_sub(2)
+}
+
+/// Which ordinary kinds may join a group (the planner's and the target-first seed's one rule).
+fn group_policy(settings: &crate::engine::preload::cycle_preload_config::Settings) -> GroupPolicy {
+    GroupPolicy {
+        solo_popo_groups: settings.solo_popo_groups_enabled(),
+        ic_pair_groups: settings.ic_pair_groups_enabled() && PAIR_ENABLED.load(Ordering::Acquire),
+    }
+}
+
+/// rc.7 target-first: per role, the neighbours of the last target-first Reload's full window (`body_bank::pack_neighbours`),
+/// which `plan_groups` plans as that window's first group once it is Ready. `u64::MAX`: none.
+static NEIGHBOURS: [AtomicU64; 2] = [AtomicU64::new(u64::MAX), AtomicU64::new(u64::MAX)];
+
 /// Special groups the planner may form: native groups when group swap, the
 /// `native_groups` switch and their fingerprints are on; the pair group
 /// additionally needs the pair seams, the `pair_groups` switch and the shipped
@@ -855,7 +873,9 @@ pub(crate) fn plan_budget(menu: &crate::engine::compat::menu::TrainingModpackMen
                 let (members_lane, count) = window_lane(menu, role, &kinds[i + 1..]);
                 if let Some(members) = members_for(&settings, forms, &members_lane[..count],
                     usize::from(settings.bank_members - 1)) {
-                    wanted[role] = wanted[role].max(members.count() - 1);
+                    // rc.6.1 target-first: the bodies the next Reload builds besides the target (none when its neighbours
+                    // build as groups, which `plan_groups` charges); the notice still lists the window it prepares.
+                    wanted[role] = wanted[role].max(reload_extras(members, forms, grouped, group_pool(&settings)));
                     wanted_banks[role] = Some((members, kind));
                     break;
                 }
@@ -966,10 +986,7 @@ fn plan_groups(settings: &crate::engine::preload::cycle_preload_config::Settings
     let live = POOL_LIVE.load(Ordering::Acquire) as usize;
     let pool_free = if capacity == 0 { 0 } else { capacity.saturating_sub(live).saturating_sub(POOL_RESERVE) };
     let hats_wanted = lanes[..2].iter().flatten().flatten().count().min(usize::from(settings.slots));
-    let policy = GroupPolicy {
-        solo_popo_groups: settings.solo_popo_groups_enabled(),
-        ic_pair_groups: settings.ic_pair_groups_enabled() && PAIR_ENABLED.load(Ordering::Acquire),
-    };
+    let policy = group_policy(settings);
     let special = special_policy(settings);
     let mut windows = [None; 2];
     let mut existing = [crate::engine::compat::fixed::FixedList::<Members, MAX_EXTRA_GROUPS>::new(Members::pair_group()); 2];
@@ -1002,6 +1019,21 @@ fn plan_groups(settings: &crate::engine::preload::cycle_preload_config::Settings
                     if !group.leaving { "released (nothing native)" }
                     else if crate::engine::swap::body_bank::leaves_at_pause(before) { "parked; the next pause frees it" }
                     else { "leaving; the entry tick releases it" });
+            }
+            // rc.7 target-first: the full window's neighbours are this one-member window's first group, within the
+            // budget the window would have charged them (the other role's bodies as `proposed` counts them).
+            let word = NEIGHBOURS[role].swap(u64::MAX, Ordering::AcqRel);
+            if let Some(seed) = crate::engine::swap::body_bank::unpack_neighbours(word, *bank.members) {
+                let other = usize::from(EXTRAS[1 - role].load(Ordering::Acquire))
+                    + usize::from(GROUP_BODIES[1 - role].load(Ordering::Acquire));
+                let held = bank.groups.iter().any(|g| g.state != GroupState::Released
+                    && seed.kinds()[..seed.count()].iter().any(|kind| g.members.index_of(*kind).is_some()));
+                if !held && bank.groups.next_slot().is_some() && seed.count() <= pool_free
+                    && seed.count() + other <= group_pool(settings) {
+                    let slot = bank.groups.plan(seed, None);
+                    trace!("[GroupSwap] plan owner={} group={} kinds={:x?} special={:?} bodies={}: the target-first window's neighbours, first",
+                        owner, slot, &seed.kinds()[..seed.count()], seed.special(), seed.count());
+                }
             }
             for group in bank.groups.iter().filter(|g| g.state.counts_bodies()) {
                 existing[role].push(*group.members);
@@ -1249,7 +1281,22 @@ pub(super) fn proposed(owner: u32, target: Forms, upcoming: &[u32]) -> Option<Me
     let budget = budget.min(pool.saturating_sub(planned_other + (other_total - other)));
     let menu = crate::runtime::compat::sync::read(&crate::runtime::compat::menu::MENU);
     let (lane, count) = window_lane(&menu, role, upcoming);
-    let Some(members) = members_for(&settings, target, &lane[..count], budget) else {
+    let full = members_for(&settings, target, &lane[..count], budget);
+    // rc.7 target-first (TASK-rc7.md item 2; the console play test waited 7.6-7.9 s for a three-body window): the Reload
+    // builds the picked fighter alone (`body_bank::target_first`). The members the full window would have held are planned
+    // as the role's first background group once it is Ready (`NEIGHBOURS`, `plan_groups`), admitted on the cost the window
+    // charged them, then the rest of the lane as usual. No supplement is charged here, so the window waits for no memory.
+    if let Some(members) = target_first(target, groups_enabled(&settings), group_pool(&settings)) {
+        WINDOW_WAITING[role].store(0, Ordering::Release);
+        let seed = full.and_then(|full| neighbour_group(full, target.kinds[0], group_policy(&settings),
+            excluded_original(&settings, &menu, role)));
+        NEIGHBOURS[role].store(pack_neighbours(target.kinds[0], seed), Ordering::Release);
+        trace!("[BodyBank] target first owner={} target={:#x} lane={:x?} neighbours={:x?}; they build as groups",
+            owner, target.kinds[0], &lane[..count], seed.map(|m| m.kinds()));
+        return Some(members);
+    }
+    NEIGHBOURS[role].store(u64::MAX, Ordering::Release);
+    let Some(members) = full else {
         WINDOW_WAITING[role].store(0, Ordering::Release);
         return None;
     };
@@ -6492,6 +6539,33 @@ pub(super) unsafe fn before_reload(entry: *const u8) {
     if let Some(role) = role(owner) {
         r_handle::expect_free(ledger_role(role), owner, "mod reload");
     }
+}
+
+/// rc.6.1 target-first: called by `reload_at_pose` after [`before_reload`], with the descriptor native is about to load.
+/// A canonical Reload that repeats a Ready one-member ordinary window's words (`body_bank::canonical_replaces_window`)
+/// replaces that window, but `descriptor()` still matches it: retire the bank before native loads, as the tick's
+/// canonical replacement would have. A bank Reload's incoming bank is Building and is left alone.
+pub(super) unsafe fn retire_for_canonical(entry: *const u8, descriptor: &[u8; 0x70]) {
+    if !aligned(entry) { return; }
+    let owner = read::<u32>(entry, 0xe0);
+    let Some(role) = role(owner) else { return; };
+    let word = |at: usize| u32::from_le_bytes([descriptor[at], descriptor[at + 1], descriptor[at + 2], descriptor[at + 3]]);
+    let kind = {
+        let mut state = BANKS[role].lock();
+        let Some(bank) = state.as_mut().filter(|bank| bank.entry == entry as usize && bank.owner == owner
+            && canonical_replaces_window(*bank.members, bank.phase, word(0x14), [word(0x18), word(0x1c), word(0x20)], word(0x28)))
+            else { return; };
+        bank.phase = Phase::Retired;
+        bank.exchange = None;
+        bank.groups.clear();
+        EXTRAS[role].store(0, Ordering::Release);
+        GROUP_BODIES[role].store(0, Ordering::Release);
+        bank.members.kinds()[0]
+    };
+    // Native's canonical path takes a free R (state 6): the ledger starts over, as at a canonical replacement.
+    r_handle::reset(ledger_role(role), "canonical reload of a one-member window's shape");
+    trace!("[BodyBank] canonical reload owner={} kind={:#x}: the one-member window is retired before native loads its shape",
+        owner, kind);
 }
 
 /// Teardown assertion for a pair-lead window (Ready or Changing): `651660` frees
