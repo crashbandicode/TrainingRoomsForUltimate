@@ -859,10 +859,6 @@ const TYPED_STATIC_CALLS: &[(&str, &str, &str)] = &[
     ("MENU", "assign", "menu::store"),
 ];
 
-/// Shared locks the code shares on purpose, each with the reason it is not the hazard (read in the source). Empty: every row
-/// needs the reason a starved plugin holder cannot stall a game hook that waits for it.
-const SHARED_ON_PURPOSE: &[(&str, &str)] = &[];
-
 /// Game entry points installed without `#[skyline::hook]`, walked as game hooks (docs lane review R1, 2026-11-09 23:23Z, finding 2):
 /// a vtable slot (`cpu::on_frame`, original `main+0x614630`), `A64HookFunction` replacements (`cpu_common`), inline-hook and
 /// trampoline targets (`native_service`, `native_body_bank::prepare_*`, `native_unlink_*`, `mii_ordinary_gate`, `seam_drill`),
@@ -1019,50 +1015,6 @@ fn callback_edges(graph: &Graph) -> Vec<(usize, usize)> {
     out
 }
 
-/// The runs that measured the hooks' threads (primary 2026-11-09 19:44Z/20:32Z, OPERATOR "measure first, fix exactly"; playbook
-/// CHECKLIST M row, main 87b3de0): hot-slots' two trace points per hook on its game address, a `thread == main` counter and a
-/// `thread != main` record point, on `b04856b2` diag (`artifacts/phase23/hook-threads/TABLE.md`).
-/// The runs of hot-slots' first entry-point session: the mii plan (CPU and P1 cycles, CPU switches, Mii groups, the pause) and
-/// four native L+R+A resets, on `72344fd9`'s diag build (`9b1d2d99`).
-const ENTRY_RUNS: &str = "final-yoga-ht-mii-reset-72344fd9";
-/// The runs that reached the Mii editor hooks (hot-slots, TABLE.md 2026-11-10 01:57Z): its combined boot on the fix build
-/// `ead60d8c` (`72344fd9` + this branch: Training, the CPU to Kirby, the Mii editor rows with the name keyboard) and the two LDN
-/// pair sessions, whose guest opens the editor.
-const EDITOR_RUNS: &str =
-    "final-yoga-ht-fixcheck-ead60d8c-r2 + final-yoga-ht-pair-72344fd9 + final-yoga-ht-pair-b04856b2-r2 (a and b, LDN pairs: the guest editor)";
-const MEASURED_RUNS: &str = "final-yoga-ht-mii-b04856b2 + final-yoga-ht-kr-b04856b2 + final-yoga-ht-pair-b04856b2-r2 (a and b, an LDN \
-                             pair: the waiting rooms and a match) + final-yoga-ht-reset-b04856b2 (four native resets)";
-
-/// Game hooks measured on MainThread only: `(hook, calls, calls on MainThread, runs)`, the runs' exact counters together. A hook that runs
-/// on MainThread cannot deadlock this way: while it waits, MainThread is not busy-joining a task group, so the core it leaves free
-/// lets the starved holder run (`rc6-qpf3`'s cycle needs the waiter on a task worker). A lock leaves the failing set only when every
-/// hook that waits on it is here; a hook seen on a worker thread, or never reached, never is.
-const MEASURED_ON_MAIN_THREAD: &[(&str, u64, u64, &str)] = &[
-    ("input_delay::caller_a_note", 73_937, 73_937, MEASURED_RUNS),
-    ("input_delay::caller_a_apply", 358_224, 358_224, MEASURED_RUNS),
-    ("input_delay::caller_b_note", 914, 914, MEASURED_RUNS),
-    ("input_delay::caller_b_apply", 914, 914, MEASURED_RUNS),
-    ("character_lifecycle::destruction_trace", 30, 30, MEASURED_RUNS),
-    ("character_lifecycle::refresh_entry_portrait", 8, 8, MEASURED_RUNS),
-    ("character_lifecycle::refresh_ordinal_portrait", 32, 32, MEASURED_RUNS),
-    ("states::state_kirby_opff_hook", 3_001, 3_001, MEASURED_RUNS),
-    ("native_source_capacity::owner_cleanup_complete", 30, 30, MEASURED_RUNS),
-    ("native_source_capacity::listener_removed", 30, 30, MEASURED_RUNS),
-    ("native_source_capacity::actor_cleanup", 97, 97, MEASURED_RUNS),
-    ("native_source_capacity::pause_state_exit", 2, 2, MEASURED_RUNS),
-    ("mii_hud_portrait::pipeline_before_tick", 93_041, 93_041, MEASURED_RUNS),
-    ("mii_hud_portrait::pipeline_after_tick", 93_041, 93_041, MEASURED_RUNS),
-    // hot-slots, the R1 entry points (TABLE.md; inbox 2026-11-10 00:31Z).
-    ("cpu::on_frame", 45_743, 45_743, ENTRY_RUNS),
-    ("native_service::training_mod_native_service_dispatch", 92_724, 92_724, ENTRY_RUNS),
-    ("mii_ordinary_gate::mii_ordinary_gate_decide", 26, 26, ENTRY_RUNS),
-    // hot-slots' combined boot (primary 2026-11-10 01:16Z): the Mii editor hooks that wait on inline_keyboard SIGNALS.
-    ("mii_editor_bridge::edit_frame", 6_067, 6_067, EDITOR_RUNS),
-    ("mii_editor_bridge::editor_parent", 7_275, 7_275, EDITOR_RUNS),
-    ("mii_editor_bridge::editor_release", 9, 9, EDITOR_RUNS),
-    ("name_keyboard::name_frame", 843, 843, EDITOR_RUNS),
-];
-
 /// The impl functions `f` runs through `helper(&STATIC ..)`, with the token position of the helper.
 fn typed_static_callees(graph: &Graph, f: usize) -> Vec<(usize, usize)> {
     let body = &graph.funcs[f].body;
@@ -1210,59 +1162,36 @@ fn shared_locks(ctx: &Ctx, s: &Scan) -> Shared {
     out
 }
 
+/// The rc.6 freeze class, ended by construction (the lock-free runtime, operator order 2026-11-10 00:44Z,
+/// `artifacts/phase23/TASK-OPUS-rc6-lockfree.md`): no lock that a game entry point waits on is held by a plugin thread. There is no
+/// exception: no list of locks shared on purpose, no hooks excepted because a run measured them on MainThread
+/// (`artifacts/phase23/hook-threads/TABLE.md` keeps those measurements). It walks the shipped build and the diag build (the Eden
+/// runs': its own modules, threads and hooks too), every `#[skyline::hook]` and `GAME_ENTRIES`, the callback tables and bare-name
+/// function values; `the_shared_lock_check_sees_a_seeded_hazard` runs the same predicate on a seeded fixture.
 #[test]
 fn no_lock_a_game_hook_waits_on_is_held_by_a_plugin_thread() {
-    let graph = runtime_graph();
-    let (ctx, s) = scan(&graph);
-    let shared = shared_locks(&ctx, &s);
-    let measured = |hook: &str| MEASURED_ON_MAIN_THREAD.iter().any(|(h, _, _, _)| *h == hook);
-    let mut problems = Vec::new();
-    let mut used = BTreeSet::new();
-    for (lock, waits) in &shared.game_waits {
-        let Some(holds) = shared.plugin_holds.get(lock) else { continue };
-        let name = lock_name(&ctx, *lock);
-        if SHARED_ON_PURPOSE.iter().any(|(l, _)| *l == name) {
-            println!("SHARED-ON-PURPOSE {name}");
-            continue;
-        }
-        let hooks = &shared.game_hooks[lock];
-        used.extend(hooks.iter().filter(|h| measured(h)).cloned());
-        let open: Vec<&String> = hooks.iter().filter(|h| !measured(h)).collect();
-        if open.is_empty() {
-            let runs: BTreeSet<&str> =
-                MEASURED_ON_MAIN_THREAD.iter().filter(|(h, _, _, _)| hooks.contains(*h)).map(|(_, _, _, runs)| *runs).collect();
-            println!("MEASURED {name}: every waiting hook ran on MainThread only ({runs:?}): {hooks:?}");
-            continue;
-        }
-        problems.push(format!(
-            "{name}\n    hooks not measured MainThread-only: {}\n    game hooks wait: {}\n    plugin threads hold: {}",
-            open.iter().map(|h| h.as_str()).collect::<Vec<_>>().join(", "),
-            waits.iter().cloned().collect::<Vec<_>>().join(", "),
-            holds.iter().cloned().collect::<Vec<_>>().join(", ")
-        ));
-    }
-    for (hook, calls, on_main, _) in MEASURED_ON_MAIN_THREAD {
-        assert_eq!(calls, on_main, "{hook}: {calls} calls but {on_main} on MainThread: it ran on a worker thread; fix its locks");
-        assert!(*calls > 0, "{hook}: never reached; an unreached hook is not measured");
-        let found = graph.find(hook);
+    for (build, graph) in [("shipped", runtime_graph()), ("diag", diag_runtime_graph())] {
+        let (ctx, s) = scan(&graph);
+        let shared = shared_locks(&ctx, &s);
+        let problems: Vec<String> = lockfree_inventory(&ctx, &shared)
+            .into_iter()
+            .map(|(lock, entries, holds)| {
+                format!(
+                    "{lock}\n    game entries wait: {}\n    plugin threads hold: {}",
+                    entries.into_iter().collect::<Vec<_>>().join(", "),
+                    holds.into_iter().collect::<Vec<_>>().join(", ")
+                )
+            })
+            .collect();
+        println!("SHARED-LOCKS {build} {}", problems.len());
         assert!(
-            GAME_ENTRIES.contains(hook) || found.iter().any(|&f| graph.funcs[f].attrs.contains("skyline::hook")),
-            "{hook} is not a game hook any more"
+            problems.is_empty(),
+            "{build} build: locks a game entry waits on that a plugin thread can hold ({}):\n{}",
+            problems.len(),
+            problems.join("\n")
         );
-        assert!(used.contains(*hook), "{hook} waits on no shared lock now: delete its MEASURED_ON_MAIN_THREAD row");
     }
-    for p in &problems {
-        println!("SHARED {p}");
-    }
-    assert!(problems.is_empty(), "locks a game hook waits on that a plugin thread can hold ({}):\n{}", problems.len(), problems.join("\n"));
 }
-
-/// The lock-free runtime (operator order 2026-11-10 00:44Z, `artifacts/phase23/TASK-OPUS-rc6-lockfree.md`): no plugin thread ever
-/// takes a lock that any game entry point can wait on. The inventory is every such lock with no exception at all (no
-/// `SHARED_ON_PURPOSE`, no `MEASURED_ON_MAIN_THREAD`), over the diag build (the Eden runs' build: its own modules, threads and hooks
-/// too), every `#[skyline::hook]` and `GAME_ENTRIES`, the callback tables and bare-name function values. It is the work queue:
-/// `LOCKFREE_INVENTORY_MAX` only goes down, step by step, to 0.
-const LOCKFREE_INVENTORY_MAX: usize = 0;
 
 /// The diag build's call graph (`runtime_graph` plus the `#[cfg(feature = "diag")]` modules).
 fn diag_runtime_graph() -> Graph {
@@ -1271,7 +1200,8 @@ fn diag_runtime_graph() -> Graph {
     graph
 }
 
-/// `(lock, the game entries that wait on it, the plugin functions and threads that hold it)`, with no exception.
+/// `(lock, the game entries that wait on it, the plugin functions and threads that hold it)`: every lock a game entry waits on that a
+/// plugin thread holds, with no exception (the class check's list; the lock-free runtime emptied it, step by step).
 fn lockfree_inventory(ctx: &Ctx, shared: &Shared) -> Vec<(String, BTreeSet<String>, BTreeSet<String>)> {
     shared
         .game_waits
@@ -1281,23 +1211,6 @@ fn lockfree_inventory(ctx: &Ctx, shared: &Shared) -> Vec<(String, BTreeSet<Strin
             Some((lock_name(ctx, *lock), shared.game_hooks[lock].clone(), holds.clone()))
         })
         .collect()
-}
-
-#[test]
-fn the_lockfree_inventory_only_shrinks() {
-    let graph = diag_runtime_graph();
-    let (ctx, s) = scan(&graph);
-    let shared = shared_locks(&ctx, &s);
-    let items = lockfree_inventory(&ctx, &shared);
-    println!("LOCKFREE-INVENTORY {}", items.len());
-    for (lock, entries, holds) in &items {
-        let threads: BTreeSet<&str> = holds.iter().filter_map(|h| h.split_once(" (").and_then(|(_, t)| t.strip_suffix(')'))).collect();
-        println!("LOCKFREE {lock}\n    entries wait: {}\n    threads hold: {}\n    held in: {}",
-            entries.iter().cloned().collect::<Vec<_>>().join(", "),
-            threads.into_iter().collect::<Vec<_>>().join(", "),
-            holds.iter().cloned().collect::<Vec<_>>().join(", "));
-    }
-    assert!(items.len() <= LOCKFREE_INVENTORY_MAX, "the lock-free inventory grew: {} > {LOCKFREE_INVENTORY_MAX}", items.len());
 }
 
 /// Every plugin thread's entry resolves to the function its `model::thread_stacks` symbol names, in the diag build (no thread is
@@ -1594,9 +1507,11 @@ fn the_shared_lock_check_sees_a_seeded_hazard() {
     let ctx = Ctx::new(&graph, static_locks(&dir));
     let s = Scan { takes: (0..graph.funcs.len()).map(|f| takes(&ctx, f)).collect(), ..Scan::default() };
     let shared = shared_locks(&ctx, &s);
-    let name = |l: &usize| ctx.locks[*l].1.clone();
-    let hazards: BTreeSet<String> =
-        shared.game_waits.keys().filter(|l| shared.plugin_holds.contains_key(l)).map(name).collect();
+    // The class check's own predicate (`lockfree_inventory`), by the lock's name.
+    let hazards: BTreeSet<String> = lockfree_inventory(&ctx, &shared)
+        .into_iter()
+        .map(|(lock, _, _)| lock.rsplit("::").next().unwrap_or(&lock).to_owned())
+        .collect();
     assert!(hazards.contains("HELD"), "a blocking take on both sides: {hazards:?}");
     assert!(hazards.contains("TRIED"), "a plugin try_lock holds it too: {hazards:?}");
     assert!(!hazards.contains("POLLED"), "a game-side try_lock never waits: {hazards:?}");
