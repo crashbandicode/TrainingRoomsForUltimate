@@ -52,6 +52,18 @@ fn the_fault_s_numbers_fail_the_rule() {
 }
 
 #[test]
+fn the_combo_crop_fault_s_numbers_fail_the_rule() {
+    // rc.6 final-surface-cov-4e336da4, cov-crop (Recording > Combos & Sequences > Combo 1 > Crop): tr-menu painted 54,960 B
+    // of its 56 KiB, then overflowed below it in SDK code. Its deepest static path was 53,344 B on 4e336da4 (50,208 B before
+    // and after the whole-Sample copy `strip_sample` made), against a stale table row of 32,432 B static, 30,848 B measured.
+    assert!(thread_stacks::required(53_344, 54_960) > 56 * 1024);
+    assert!(thread_stacks::required(50_208, 0) > 56 * 1024, "the static path alone already needed more than 56 KiB");
+    assert!(thread_stacks::required(32_432, 30_848) <= 56 * 1024, "the stale row is why the rule passed");
+    let menu = thread_stacks::of(ThreadId::Menu);
+    assert!(menu.static_bound >= 50_208 && menu.measured >= 54_960, "tr-menu's row lost the crop's numbers: {menu:?}");
+}
+
+#[test]
 fn probe_accounts_for_the_actual_external_read_path_even_when_paint_misses_it() {
     // ui-16's 128 KiB subtraction jumped below the 24 KiB painted allocation.
     // Addressed ABI frames: adapter64 + read320 + parent10368 + decoder131904

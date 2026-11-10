@@ -72,9 +72,9 @@ pub const THREADS: [ThreadStack; 18] = [
     // and receipts, diag hook_stats and stack reports
     row(ThreadId::Heartbeat, c"tr-heartbeat", 32 * KIB, 8_096, 11_184, "Eden st-02..st-12, f6-37/sh-01", "diag_log::start_drain_thread::{closure#0}"),
     // settings.json read, recovery and the JSON parse, joined by the boot thread
-    row(ThreadId::SettingsLoad, c"tr-settings-load", 32 * KIB, 4_592, 9_904, "Eden st-02..st-12, f6-37/sh-01/s6-10", "boot::load_settings_boxed"),
+    row(ThreadId::SettingsLoad, c"tr-settings-load", 32 * KIB, 4_656, 9_904, "Eden st-02..st-12, f6-37/sh-01/s6-10", "boot::load_settings_boxed"),
     // save_states.json read and parse, joined by the boot thread
-    row(ThreadId::StateLoad, c"tr-state-load", 40 * KIB, 14_192, 18_624, "Eden st-02..st-12", "states::load_file"),
+    row(ThreadId::StateLoad, c"tr-state-load", 40 * KIB, 17_424, 18_624, "Eden st-02..st-12", "states::load_file"),
     // save_states.json serialise and atomic replace
     row(ThreadId::StateWriter, c"tr-state-writer", 40 * KIB, 15_184, 17_664, "Eden st-02..st-12, s6-13 save-state write", "states::start_writer::{closure#0}"),
     // diag: request files, diag-settings.json parse, publish and apply
@@ -88,9 +88,12 @@ pub const THREADS: [ThreadStack; 18] = [
     // first-boot import of the fork's files (blocking part), joined with a deadline
     row(ThreadId::Import, c"tr-import", 32 * KIB, 8_032, 10_080, "Eden st-02..st-12", "import::start::{closure#0}"),
     // first-boot import of the fork's captures in the background
-    row(ThreadId::ImportCaptures, c"tr-import-captures", 24 * KIB, 3_968, 0, "", "import::start_background::{closure#0}"),
-    // the menu worker: model steps, screens, settings JSON on close
-    row(ThreadId::Menu, c"tr-menu", 56 * KIB, 32_432, 30_848, "Eden st-02..st-12, f6-37/sh-01/ui18-02/p4c02", "ui::worker::run"),
+    row(ThreadId::ImportCaptures, c"tr-import-captures", 24 * KIB, 4_032, 0, "", "import::start_background::{closure#0}"),
+    // the menu worker: model steps, screens, settings JSON on close. Its deepest static path is the recording host's tick
+    // into a menu effect that lists the combo store: `port::worker_tick` -> `rr_host::service_at` -> `apply_menu` ->
+    // `Store<ComboRecord>::list` -> `decode`, then the SDK's file reads (diag ELF of rc.6 `4e336da4` and of the fix). On
+    // 56 KiB, final-surface-cov-4e336da4's combo crop painted 54,960 B and then overflowed below the stack in SDK code.
+    row(ThreadId::Menu, c"tr-menu", 84 * KIB, 50_208, 54_960, "Eden st-02..st-12, f6-37/sh-01/ui18-02/p4c02, final-surface-cov-4e336da4 cov-crop", "ui::worker::run"),
     // returns parked layout archives to the pool after their grace
     row(ThreadId::Archive, c"tr-archive", 28 * KIB, 2_672, 7_840, "Eden st-02..st-12, f6-37/sh-01", "ui::archive::prepare::{closure#2}"),
     // ARCropolis read ABI includes a 131904-byte decoder frame. The qualified
@@ -99,13 +102,13 @@ pub const THREADS: [ThreadStack; 18] = [
     // diag: diag-macro.req read and parse
     row(ThreadId::MacroDiag, c"tr-macro-diag", 28 * KIB, 3_248, 8_768, "Eden st-02..st-12", "macros::diag::start::{closure#0}"),
     // the replay capture archive and Mii preset writer
-    row(ThreadId::ReplaySave, c"replay-capture-save", 56 * KIB, 32_416, 25_248, "Eden st-02..st-12, f6-37/sh-01", "replay_store::start_writer::{closure#0}"),
+    row(ThreadId::ReplaySave, c"replay-capture-save", 56 * KIB, 32_480, 25_248, "Eden st-02..st-12, f6-37/sh-01", "replay_store::start_writer::{closure#0}"),
     // the saved Mii catalog read for the library
     row(ThreadId::MiiCatalog, c"mii-catalog", 28 * KIB, 5_872, 8_016, "Eden f6-31/f6-37/sh-01", "replay_store::init_catalog_fallback::{closure#0}::{closure#0}"),
     // console-practice-trace builds only: the practice trace file writer
     row(ThreadId::PracticeTrace, c"tr-practice-trace", 128 * KIB, 0, 0, "", "practice_trace::writer"),
     // diag: the stall watchdog (samples the hooks' entry count, prints held locks through svcOutputDebugString)
-    row(ThreadId::StallWatch, c"tr-stall-watch", 48 * KIB, 0, 0, "", "stall_watch::start::{closure#0}"),
+    row(ThreadId::StallWatch, c"tr-stall-watch", 48 * KIB, 3_104, 0, "", "stall_watch::start::{closure#0}"),
 ];
 
 const fn row(
