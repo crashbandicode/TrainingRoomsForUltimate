@@ -92,8 +92,9 @@ pub const THREADS: [ThreadStack; 18] = [
     // the menu worker: model steps, screens, settings JSON on close. Its deepest static path is the recording host's tick
     // into a menu effect that lists the combo store: `port::worker_tick` -> `rr_host::service_at` -> `apply_menu` ->
     // `Store<ComboRecord>::list` -> `decode`, then the SDK's file reads (diag ELF of rc.6 `4e336da4` and of the fix). On
-    // 56 KiB, final-surface-cov-4e336da4's combo crop painted 54,960 B and then overflowed below the stack in SDK code.
-    row(ThreadId::Menu, c"tr-menu", 84 * KIB, 50_208, 54_960, "Eden st-02..st-12, f6-37/sh-01/ui18-02/p4c02, final-surface-cov-4e336da4 cov-crop", "ui::worker::run"),
+    // 56 KiB, final-surface-cov-4e336da4's combo crop overflowed in SDK code: its stores reached 0x130 B below the stack's
+    // base (0x1101726000, size 0xe000), so it needed at least 57,344 + 0x130 = 57,648 B (its last paint mark was 54,960).
+    row(ThreadId::Menu, c"tr-menu", 88 * KIB, 50_208, 57_648, "Eden st-02..st-12, f6-37/sh-01/ui18-02/p4c02, final-surface-cov-4e336da4 cov-crop", "ui::worker::run"),
     // returns parked layout archives to the pool after their grace
     row(ThreadId::Archive, c"tr-archive", 28 * KIB, 2_672, 7_840, "Eden st-02..st-12, f6-37/sh-01", "ui::archive::prepare::{closure#2}"),
     // ARCropolis read ABI includes a 131904-byte decoder frame. The qualified
