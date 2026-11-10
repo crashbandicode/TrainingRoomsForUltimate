@@ -1356,3 +1356,11 @@ ceiling = 162822
 date = "2026-11-10"
 reason = "rc.7 p23/rc7-target-first over 71995d1d (162809): the Kirby gate (integration 2026-11-10 18:16Z with FLAG 2): body_bank::groups_load_beside, the live_gate parameter of reload_window and reload_extras, native_body_bank::live_gate, one host test; measured 162822 at 58a55d8b (tools/size_gate.py), +13"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.7 order (TASK-rc7.md); a raise goes in its own commit with approved_by"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 163111
+date = "2026-11-10"
+reason = "rc.7 item 3 on the fixed intermediate: p23/rc7-f1-int 14e43b54 over p23/rc7-integration 2707e872 (162822): D-KIRBY1's root fix F1 merged (p23/rc7-kirby-unguard a38c9018; +286 over 732663e2 in its own raise there, 162882), plus the merge's live_gate route through d_kirby1_live (A 2026-11-10 18:34Z; primary 18:36Z, 18:56Z), +3; measured 163111 at 14e43b54 (tools/size_gate.py), +289"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the operator's rc.7 order (TASK-rc7.md: 'ship the rc7 and as part of it include A's fix, the lock refactor and the kirby guard removal'); a raise goes in its own commit with approved_by"
