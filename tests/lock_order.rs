@@ -101,8 +101,6 @@ const FOREIGN_RECEIVERS: &[(&str, &[&str], &str)] = &[
     ("press", &["editor", "list", "m", "menu"], PANELS),
     ("view", &["bundle", "editor", "extras", "ui"], PANELS),
     ("target", &["active", "cycle", "editor", "proof"], "combos::Ui::target is private to ui/combos.rs"),
-    ("validate", &["?", "ids", "m", "mirrors", "prepared", "recording", "seed"], PROVIDER),
-    ("snapshot", &["?", "seen"], PROVIDER),
     (
         "poll",
         &["?", "JOBS", "adapter", "clock", "detector", "gate", "guard", "model", "queue", "replies", "reply", "t"],
@@ -113,8 +111,6 @@ const FOREIGN_RECEIVERS: &[(&str, &[&str], &str)] = &[
 ];
 const PANELS: &str = "combos::Ui and setups::Ui live only in the worker's state (`s.combos`, `s.setups`, `setups` in worker::close); \
                       these are std files, the model's menu and place keeper, engine editors, queues, MacroUi and a bank's bundle";
-const PROVIDER: &str = "setups::validate/snapshot are `impl Provider for Native`, which the model's setups editor calls through \
-                        the trait (R2 finding 3), never runtime code by name; these receivers are model and engine types";
 
 /// A call or reference in a body, at token `at`: `(segments, method)`, and for a method call the identifier before its `.` (the
 /// receiver's last field or variable: `combos` in `s.combos.open()`).
@@ -1267,7 +1263,7 @@ fn no_lock_a_game_hook_waits_on_is_held_by_a_plugin_thread() {
 /// `SHARED_ON_PURPOSE`, no `MEASURED_ON_MAIN_THREAD`), over the diag build (the Eden runs' build: its own modules, threads and hooks
 /// too), every `#[skyline::hook]` and `GAME_ENTRIES`, the callback tables and bare-name function values. It is the work queue:
 /// `LOCKFREE_INVENTORY_MAX` only goes down, step by step, to 0.
-const LOCKFREE_INVENTORY_MAX: usize = 3;
+const LOCKFREE_INVENTORY_MAX: usize = 2;
 
 /// The diag build's call graph (`runtime_graph` plus the `#[cfg(feature = "diag")]` modules).
 fn diag_runtime_graph() -> Graph {

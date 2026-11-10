@@ -194,3 +194,40 @@ fn the_save_states_take_the_workers_posts_without_its_locks() {
     ordered(body(host, "service"), &["states::reap_posts();", "let root"]);
 }
 
+/// Step 2e: the facts the setups transactions check (`setups::FACTS`) are a triple buffer the game writes (its writers take
+/// turns on `FACTS_WRITER`, which no plugin thread takes) and the menu worker reads: the worker never takes a lock the P1 callback
+/// waits on, and reads the facts the game wrote last, as under the lock. The worker is the buffer's one reader: `facts` is called
+/// only by the transactions' entry points, and those only by the worker's Setups panel (`ui/setups.rs`, `native::`); the game's
+/// functions (`service`, the clears) only write. (The coarse call graph here would follow `prepared.validate(..)` in `service` to the
+/// panel's `impl Provider` method of that name: `lock_order`'s `PROVIDER`, not a call.)
+#[test]
+fn the_setups_facts_are_a_buffer_the_worker_reads() {
+    let setups = include_str!("../src/runtime/features/states/setups.rs");
+    let reads = |f: &str| f.match_indices("facts()").any(|(at, _)| !f[..at].ends_with(|c: char| c == '_' || c == '.' || c.is_alphanumeric()));
+    let readers: Vec<&str> = ["open", "validate_selection", "request_snapshot", "request_bind", "service", "clear_facts", "retire_session", "write_facts", "poll"]
+        .into_iter()
+        .filter(|name| reads(body(setups, name)))
+        .collect();
+    assert_eq!(readers, ["open", "validate_selection", "request_snapshot", "request_bind"], "the facts buffer's readers");
+    let runtime = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");
+    let g = graph();
+    let callers: BTreeSet<String> = g
+        .funcs
+        .iter()
+        .filter(|f| {
+            let body = std::fs::read_to_string(runtime.join(&f.file)).unwrap_or_default();
+            ["open(", "validate_selection(", "request_snapshot(", "request_bind("].iter().any(|n| body.contains(&format!("native::{n}")))
+                && f.file != "features/states/setups.rs"
+        })
+        .map(|f| f.file.clone())
+        .collect();
+    assert_eq!(callers, BTreeSet::from(["ui/setups.rs".to_owned()]), "who calls the transactions' entry points");
+    for game in ["states::on_fighter_frame", "states::clear_session", "states::retire_setup_session"] {
+        assert!(reachable(&g, game).contains("setups::write_facts"), "{game} no longer writes the facts through write_facts");
+    }
+    ordered(body(setups, "write_facts"), &["FACTS_WRITER.lock()", "FACTS.write(facts)"]);
+    ordered(body(setups, "facts"), &["FACTS.read().0"]);
+    ordered(body(setups, "clear_facts"), &["write_facts(None)"]);
+    ordered(body(setups, "service"), &["write_facts(current)", "JOBS.take_game()"]);
+    assert!(!setups.contains("FACTS.lock()"), "a lock on the facts again");
+}

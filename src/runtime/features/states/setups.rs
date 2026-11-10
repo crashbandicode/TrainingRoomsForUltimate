@@ -12,9 +12,19 @@ use crate::model::state::{
 use std::sync::atomic::{AtomicU64, Ordering};
 
 static SESSION: AtomicU64 = AtomicU64::new(1);
-// This lock only copies a value; no native call, allocation or STATE access is
-// made while it is held. It supports callbacks on more than one game thread.
-static FACTS: hos_lock::Mutex<Option<Facts<Configuration>>> = hos_lock::Mutex::new(None);
+/// What the game observed for the worker's transactions: a triple buffer the game writes (under `FACTS_WRITER`: callbacks on
+/// more than one game thread take turns) and the menu worker reads (`facts`); neither side waits (the lock-free runtime: no plugin
+/// thread takes a lock a game callback waits on).
+static FACTS: hos_lock::TripleBuffer<Option<Facts<Configuration>>> = hos_lock::TripleBuffer::new(None);
+/// The game's writers of `FACTS` take turns on this: only a value is copied while it is held (no native call, allocation or
+/// `STATE` access). No plugin thread takes it.
+static FACTS_WRITER: hos_lock::Mutex<()> = hos_lock::Mutex::new(());
+
+/// Game threads: replace the facts the worker reads.
+fn write_facts(facts: Option<Facts<Configuration>>) {
+    let _turn = FACTS_WRITER.lock();
+    FACTS.write(facts);
+}
 static JOBS: Exchange<Job> = Exchange::new();
 const BUSY: &str = "A setup transaction is already in progress";
 
@@ -71,11 +81,12 @@ pub(super) fn retire_session() {
 }
 
 pub(super) fn clear_facts() {
-    *FACTS.lock() = None;
+    write_facts(None);
 }
 
+/// The menu worker (the one reader of `FACTS`): the facts the game wrote last.
 fn facts() -> Result<Facts<Configuration>, &'static str> {
-    let facts = (*FACTS.lock()).ok_or(Refusal::Ownership.message())?;
+    let facts = FACTS.read().0.ok_or(Refusal::Ownership.message())?;
     if facts.session != SESSION.load(Ordering::Acquire) {
         return Err(Refusal::Session.message());
     }
@@ -202,7 +213,7 @@ pub(super) unsafe fn service() {
             situations: state.ids.situations(),
         })
     });
-    *FACTS.lock() = current;
+    write_facts(current);
     let Some((ticket, mut job)) = JOBS.take_game() else {
         return;
     };
