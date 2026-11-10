@@ -1814,3 +1814,70 @@ Ice Climbers waited for a pause while two parked groups held the budget and P1's
 - `tests/cycle_change_wiring.rs`: `new_members_load_now_and_parked_groups_go_only_for_their_room`,
   `a_refused_prefetch_frees_a_parked_group_now`, and the entry-tick test;
 - `tests/group_hold_wiring.rs`: the lifecycle's leaving rule.
+
+### p23/rc6-preload-priority: a free is room on its way until it settles; a kept group goes last (2026-11-09)
+
+Primary 2026-11-09 16:06Z (integration's `final-surface-i3-pf-1261f56c` `x6-cc` on `1261f56c`).
+- **What happened:** `[3, 5]` was freed for the Ice Climbers (`#805`, headroom 224 → 264 MB). One second later the
+  pair's prefetch was refused at 289 MB, so `release_for_capacity` freed the kept `[0, 1, 2]` (`#817`), and DK and
+  Link went cold.
+- **Why:** a free's memory keeps arriving after `frees now`. The release's own steps are synchronous (destroy, keys,
+  `[Ledger] reconcile … task_pending=0`), but the committed charge falls for another second or two (`pp-rel-2`:
+  293 → 335 → 367 MB), and no native event marks the end.
+- **`body_bank::ReleaseWatch`:**
+  - a free (`frees now` at the entry tick, `pause frees` at the pause) starts it with the charge after the free;
+  - each planner pass (`plan_groups`) samples the charge. The first pass only records it; the release has settled at
+    the first pass that finds the charge no lower than the pass before;
+  - unreadable counters settle it, and a scene change clears it (`RELEASE_WATCH`, taken alone).
+- **While a release is in flight:**
+  - `capacity_release` (now `capacity_release(settled, …)`) frees nothing;
+  - `arriving_room` shows a prefetch held for memory as loading in `progress`, because its room is on its way.
+- **After it settles,** the fewest kept members still go first. A group that keeps members of the new cycle goes only
+  when nothing unneeded is parked and the room still lacks after the earlier releases settled.
+
+13 recorded manifest edits (`body_bank.rs` 3, `native_body_bank.rs` 10). Tests failed first
+(`FAIL-FIRST-settle-model.log`, `FAIL-FIRST-settle-wiring.log`):
+- `body_bank::a_release_in_flight_is_room_on_its_way`;
+- `tests/cycle_change_wiring.rs::a_free_is_room_on_its_way_until_a_planner_pass_finds_it_settled`, and
+  `a_refused_prefetch_frees_a_parked_group_now` (the settled argument).
+
+**Follow-up, primary 2026-11-09 17:13Z** (Eden `final-surface-i3-pf-b04856b2` `x6-cc`). On the Yoga the watch settled
+under the pair's need, so the kept group went as the last resort, which is correct by the rule. But for the 17 ms
+between the settle (`#798`) and that release (`#804`), the notice read "Loaded 10/12 (2 waiting for memory)" and was
+raised for 3 s.
+- **The decision moves earlier.** In the pass where the watch settles, `plan_groups` checks each held group
+  (`body_bank::still_short`): the admission refuses its cost now, or the pool is short. If so, it decides the capacity
+  release there (`release_for_capacity`). That is before `cycle_preload::on_frame` publishes the notice, because
+  `plan_budget` comes before `poll_status`.
+- **The notice:** `progress` shows a prefetch held for memory as loading while the room is arriving or a release
+  decided for it is in progress (`body_bank::room_coming`; `releasing`). "Waiting for memory" means nothing more can
+  be freed.
+- 6 recorded manifest edits. Tests failed first (`FAIL-FIRST-notice-model.log`, `FAIL-FIRST-notice-wiring.log`):
+  - `body_bank::a_release_in_progress_shows_loading_never_waiting`;
+  - `tests/cycle_change_wiring.rs::the_planner_decides_the_release_before_the_notice`;
+  - and the `progress` pins in `cycle_change_wiring` and `background_build_wiring`.
+
+**Option C, operator 2026-11-09 17:57Z, with the primary's purge (19:47Z).** The two-quiet-pass settle (`589c70eb`) and
+its raise are reverted. F6 (LANE-OPUS-RC6-PRELOAD-PRIORITY-REPORT.md; Eden `pp-re-trace-1`, `pp-re-trace-2`) found the
+exact point:
+- The game's resource service unloads what a free queued within 0.5 s.
+- jemalloc (`percpu_arena:percpu,dirty_decay_ms:1`) returns the pages to the kernel only when an arena's decay ticker
+  fires, 1.1 s and 2.9 s after `[Samus, Yoshi]`'s free.
+The release watch now waits for both, and never counts passes:
+- **Capture:** `leave_group`, after the release, scans the service's static directory and data tables
+  (`runtime::roster::res_unload::capture`) for what is queued.
+- **Read:** each planner pass reads it (directories first, `state` by acquire). `ReleaseWatch::Unloading` lasts until
+  none waits; then `Purging { ticket }` raises a request.
+- **Purge:** the bank's service hook runs `mallctl("arena.4096.purge")` (`main+0x392ec40`) at its top, under no lock,
+  only on a thread named `MainThread` and never on a plugin thread (`threads::on_plugin_thread`, from worker A's
+  `daf5c8c9`, byte-identical), then records it.
+- **Settle:** the next pass settles and decides any capacity release on the committed charge after the purge.
+- **Rows:** `native_seams::rows_res_unload` (group `res_unload`, authoritative, 12 rows, `tools/gen_rows_res_unload.py`).
+  Without them nothing is read or purged, and a free never holds the planner.
+- **16 recorded manifest edits.** Tests failed first (`fail-first-option-c-release_settles.log`,
+  `fail-first-purge-sequencing.log`):
+  - `body_bank::a_release_in_flight_is_room_on_its_way` and `a_release_settles_on_unloaded_then_purged_not_after_a_pass_count`;
+  - `engine::swap::res_unload`'s directory and file rules;
+  - `res_unload_host::the_watch_settles_on_unloaded_then_purged_in_that_order` (the reader over a host copy of the
+    tables);
+  - `tests/cycle_change_wiring.rs::a_free_is_room_on_its_way_until_unloaded_and_purged_on_main_thread`.

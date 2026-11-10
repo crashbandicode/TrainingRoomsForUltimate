@@ -129,13 +129,76 @@ fn a_refused_prefetch_frees_a_parked_group_now() {
     ]);
     let capacity = body(BANK, "fn release_for_capacity(");
     ordered(capacity, &[
+        "let settled = RELEASE_WATCH.lock().settled();",
         "if !g.leaving || !leaves_at_pause(g.state) { continue; }", "if g.release_now { return; }",
         "if bank.swap.is_none_or(|s| s.group != index) { parked.push(((role, index), *g.members, g.parked_kept)); }",
-        "let Some((role, index)) = capacity_release(parked.iter().copied()) else { return; };",
+        "let Some((role, index)) = capacity_release(settled, parked.iter().copied()) else { return; };",
         "g.release_now = true;", "trace!(\"[GroupSwap] release now owner={} group={} kinds={:x?} kept={} reason={} held prefetch",
     ]);
     let swap = body(BANK, "unsafe fn perform_swap(");
     ordered(swap, &["group.leaving = false;", "group.release_now = false;"]);
+}
+
+/// Operator rule 2026-11-09 16:06Z (Eden `final-surface-i3-pf-1261f56c` `x6-cc`: the kept `[0, 1, 2]` was freed while
+/// `[3, 5]`'s room was still arriving) and option C (17:57Z, the primary's purge 19:47Z): a free captures what it left
+/// queued for the game's unload and starts the release watch, at the entry tick and at the pause; each planner pass
+/// reads the unload and, once it is done, requests a purge; the bank's service hook runs the owed purge first, under no
+/// lock, only on MainThread and never on a plugin thread, and records it; while the watch is in flight a refused
+/// prefetch frees nothing more and a prefetch held for memory shows as loading; a scene change clears it and the purge.
+#[test]
+fn a_free_is_room_on_its_way_until_unloaded_and_purged_on_main_thread() {
+    let freed = "if !still { let mut watch = RELEASE_WATCH.lock(); *watch = watch.freed(); }";
+    let lifecycle = body(BANK, "unsafe fn group_lifecycle(");
+    ordered(lifecycle, &["leave_group(entry, owner, role, group);", "trace!(\"[GroupSwap] frees now", freed]);
+    let pause = body(BANK, "pub(super) unsafe fn pause_opening()");
+    ordered(pause, &["leave_group(entry as *const u8, owner, role, group);", "trace!(\"[GroupSwap] pause frees", freed,
+        "if still { break; }"]);
+    let leave = body(BANK, "unsafe fn leave_group(");
+    ordered(leave, &["graph::execute(base, &plan, &keys, owner, \"left the cycle\"", "r_handle::reconcile(ledger_role(role), \"left the cycle\");",
+        "res_unload::capture()", "trace!(\"[GroupSwap] release queued"]);
+    let plan = body(BANK, "fn plan_groups(");
+    ordered(plan, &["let unloading = res_unload::waiting();",
+        "*watch = watch.pass(unloading.map(|(u, _)| u.waiting()), res_unload::purges(), res_unload::base().is_some());",
+        "if let Some(ticket) = after.requested() { res_unload::request_purge(ticket); }",
+        "res_unload::settled(generation);", "trace!(\"[GroupSwap] released room {:?} -> {:?}",
+        "let budget = GroupBudget { ready_fighters: usize::from(settings.ready_fighters), pool_free, special };"]);
+    let service = body(BANK, "pub(super) unsafe fn service(");
+    ordered(service, &["if let Some(ticket) = res_unload::owed_purge() { purge_on_main_thread(ticket); }",
+        "let Some(role) = role(owner) else { return; };", "service_locked(entry, owner, role)"]);
+    let purge = body(BANK, "unsafe fn purge_on_main_thread(");
+    ordered(purge, &["let Some(base) = res_unload::base() else { return; };",
+        "skyline::nn::os::GetThreadNamePointer(skyline::nn::os::GetCurrentThread())", "== b\"MainThread\"",
+        "if !main || crate::runtime::threads::on_plugin_thread() {", "return;",
+        "debug_assert!(!crate::runtime::threads::on_plugin_thread()", "crate::engine::swap::res_unload::MALLCTL",
+        "crate::engine::swap::res_unload::PURGE_ALL.as_ptr()", "res_unload::purged(ticket);",
+        "trace!(\"[GroupSwap] purge ticket={} rc={} thread=MainThread us={}"]);
+    assert!(!purge.contains(".lock()"), "the purge takes no plugin lock: {purge}");
+    let progress = body(BANK, "pub(crate) fn progress(");
+    ordered(progress, &["let settled = RELEASE_WATCH.lock().settled();", "let coming = room_coming(settled, (0..2).any(releasing));",
+        "for (role, state) in BANKS.iter().enumerate() {", "arriving_room(g.state, coming)"]);
+    let scene = body(BANK, "pub(super) fn scene_changed(");
+    ordered(scene, &["*RELEASE_WATCH.lock() = ReleaseWatch::Settled;", "res_unload::clear();"]);
+    let unload = include_str!("../src/runtime/roster/res_unload.rs");
+    let clear = body(unload, "pub(crate) fn clear(");
+    assert!(clear.contains("REQUESTED.store(COMPLETED.load(Ordering::Acquire), Ordering::Release);"), "{clear}");
+}
+
+/// Operator rule 2026-11-09 17:13Z (Eden `final-surface-i3-pf-b04856b2` `x6-cc`: "Loaded 10/12 (2 waiting for memory)"
+/// raised for 3 s in the 17 ms between the watch's settle and the last-resort release): the planner decides a held
+/// group's capacity release in the pass that settles, before `cycle_preload` publishes the notice (`plan_budget` comes
+/// before `poll_status`), and the notice shows a held prefetch as loading while a release is in progress.
+#[test]
+fn the_planner_decides_the_release_before_the_notice() {
+    let plan = body(BANK, "fn plan_groups(");
+    ordered(plan, &["*watch = watch.pass(unloading.map(|(u, _)| u.waiting()), res_unload::purges(), res_unload::base().is_some());",
+        "RELEASE_MEMBERS[role].swap(release.members[role], Ordering::AcqRel)",
+        "if after.settled() {", "super::process_memory::admit(memory::group_cost(", "still_short(state, refused, pool_free, members.count())",
+        "release_for_capacity(owner, group, reason);"]);
+    let releasing = body(BANK, "fn releasing(");
+    assert!(releasing.contains("bank.groups.iter().any(|g| g.leaving && g.release_now)"), "{releasing}");
+    let preload = include_str!("../src/runtime/roster/cycle_preload.rs");
+    let on_frame = body(preload, "pub unsafe fn on_frame(");
+    ordered(on_frame, &["body_bank::plan_budget(&menu, &lanes);", "poll_status(false, false, Some(desired));"]);
 }
 
 /// The sparse planner (run on the menu's close, `cycle_preload::on_frame`) reads each role's cycle as it is now: a

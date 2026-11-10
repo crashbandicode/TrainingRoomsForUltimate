@@ -67,6 +67,9 @@ pub(crate) mod mii_setup;
 pub(crate) mod observe;
 #[cfg(feature = "native-body-bank-alpha")]
 pub(crate) mod r_handle;
+/// Operator option C (2026-11-09 17:57Z): the release watch's read of the game's resource unload (own code).
+#[cfg(feature = "native-body-bank-alpha")]
+pub(crate) mod res_unload;
 #[cfg(feature = "native-body-bank-alpha")]
 pub(crate) mod special_articles;
 #[cfg(feature = "mii-hud-portrait-alpha")]

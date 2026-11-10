@@ -1416,8 +1416,87 @@ pub fn leaves_now(state: GroupState, release_now: bool) -> bool {
 /// Operator rule 2026-11-09 (inbox 13:21Z): a prefetch refused for process memory or fighter-pool bodies while groups are
 /// parked frees one of them now, the one with the fewest members its cycle keeps, then the fewest bodies, the first of
 /// equals. `parked` yields `(key, members, kept)`. None: the refusal is a real shortage, shown "waiting for memory".
-pub fn capacity_release<K: Copy>(parked: impl Iterator<Item = (K, Members, u8)>) -> Option<K> {
+/// Operator rule 2026-11-09 16:06Z: nothing is freed while an earlier free's room is still arriving (`settled` false,
+/// [`ReleaseWatch`]), so a group that keeps members of the new cycle goes only when nothing unneeded is parked and the
+/// room still lacks after the earlier releases settled.
+pub fn capacity_release<K: Copy>(settled: bool, parked: impl Iterator<Item = (K, Members, u8)>) -> Option<K> {
+    if !settled { return None; }
     parked.min_by_key(|(_, members, kept)| (*kept, members.count())).map(|(key, _, _)| key)
+}
+
+/// Operator rule 2026-11-09 16:06Z (Eden `final-surface-i3-pf-1261f56c` `x6-cc`): a parked group freed now gives its
+/// memory back over the next second or two (Eden `final-surface-i3-pf-b04856b2`: about 113 MB 2 s after
+/// `[Samus, Yoshi]`'s free). F6: the game's resource service unloads the files within 0.5 s, and jemalloc returns their
+/// pages to the kernel only when an arena's decay ticker fires. Until then the room is on its way: nothing more is
+/// freed for capacity, and a prefetch held for memory shows as loading ([`arriving_room`]). Operator option C (17:57Z)
+/// with the primary's purge (19:47Z, F6): the
+/// watch ends exactly when the game has unloaded what the frees queued (`res_unload`, read by each planner pass) and a
+/// jemalloc purge requested after that has run on MainThread, so the committed charge is the room; never after a
+/// number of passes.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum ReleaseWatch {
+    /// Nothing freed is still on its way.
+    #[default]
+    Settled,
+    /// Freed; the game has not unloaded all the free queued.
+    Unloading,
+    /// Unloaded; waiting for the MainThread hook's purge number `ticket` (purges counted since boot, wrapping).
+    Purging { ticket: u32 },
+}
+
+impl ReleaseWatch {
+    /// A parked group was freed: its room is on its way (a free during another starts over at its unload).
+    pub fn freed(self) -> Self {
+        ReleaseWatch::Unloading
+    }
+    /// A planner pass. `waiting`: the read of what the frees queued, `Some(true)` while any is still to be unloaded,
+    /// None when the table is unreadable (it never holds a release). `purges`: the purges the MainThread hook has
+    /// completed. `purge`: whether the purge is available (its rows passed); without it the unload settles the watch.
+    pub fn pass(self, waiting: Option<bool>, purges: u32, purge: bool) -> Self {
+        match self {
+            ReleaseWatch::Settled => ReleaseWatch::Settled,
+            ReleaseWatch::Unloading if waiting == Some(true) => ReleaseWatch::Unloading,
+            ReleaseWatch::Unloading if purge => ReleaseWatch::Purging { ticket: purges.wrapping_add(1) },
+            ReleaseWatch::Unloading => ReleaseWatch::Settled,
+            ReleaseWatch::Purging { ticket } if purges.wrapping_sub(ticket) as i32 >= 0 => ReleaseWatch::Settled,
+            ReleaseWatch::Purging { .. } => self,
+        }
+    }
+    /// The purge this watch waits for; the MainThread hook runs one while a request is newer than its last.
+    pub fn requested(self) -> Option<u32> {
+        match self {
+            ReleaseWatch::Purging { ticket } => Some(ticket),
+            _ => None,
+        }
+    }
+    pub fn settled(self) -> bool {
+        self == ReleaseWatch::Settled
+    }
+}
+
+/// The state the notice shows for a group while a free's room is `arriving` ([`ReleaseWatch`]): a prefetch held for
+/// memory is loading, not waiting. A pool hold is not memory and shows as it is.
+pub fn arriving_room(state: GroupState, arriving: bool) -> GroupState {
+    if arriving && state == GroupState::Held(Hold::Memory) { GroupState::Planned } else { state }
+}
+
+/// Operator rule 2026-11-09 17:13Z (13:21Z point 4): whether a held group's room is coming, so the notice shows it as
+/// loading ([`arriving_room`]): a free's room is still arriving (`settled` false), or a release decided for it is in
+/// progress (`releasing`: a parked group marked to go now). Otherwise its hold shows as it is: "waiting for memory"
+/// means nothing more can be freed.
+pub fn room_coming(settled: bool, releasing: bool) -> bool {
+    !settled || releasing
+}
+
+/// Operator rule 2026-11-09 17:13Z: the planner's check, in the pass where the watch settles, of a held group: the
+/// reason a capacity release is still needed (`memory_refused`: the admission refuses its cost now; or fewer free pool
+/// bodies than its members), or None when it fits now (its next start is admitted) or it isn't held.
+pub fn still_short(state: GroupState, memory_refused: bool, pool_free: usize, members: usize) -> Option<&'static str> {
+    match state {
+        GroupState::Held(Hold::Memory) if memory_refused => Some("process headroom"),
+        GroupState::Held(Hold::Pool) if pool_free < members => Some("fighter pool"),
+        _ => None,
+    }
 }
 
 /// The lane window's planned targets (`next` for [`window_targets`]): the reusable extras of the window the planner wants
@@ -2125,7 +2204,7 @@ mod tests {
         let none = GroupBudget { ready_fighters: 2, pool_free: 0, special: SpecialPolicy::NONE };
         assert_eq!(choose([Some(p1), None], [&[], &[]], [&[], &[]],
             [&[0x16], &[]], none), ReleaseNow::default());
-        assert_eq!(capacity_release(std::iter::empty::<(usize, Members, u8)>()), None);
+        assert_eq!(capacity_release(true, std::iter::empty::<(usize, Members, u8)>()), None);
         let held = count_group_members([(2, GroupState::Built), (3, GroupState::Held(Hold::Memory))]).with_release(0);
         assert_eq!((held.planned, held.ready, held.pending, held.held, held.hold), (5, 2, 0, 3, Some(Hold::Memory)));
         let freeing = count_group_members([(2, GroupState::Built)]).with_release(2);
@@ -2135,9 +2214,102 @@ mod tests {
         let samus_yoshi = Members::new(&[0x03, 0x05]).unwrap();
         let mario_dk_link = Members::new(&[0x00, 0x01, 0x02]).unwrap();
         let one = Members::new(&[0x09]).unwrap();
-        assert_eq!(capacity_release([((0, 2), mario_dk_link, 2), ((0, 0), samus_yoshi, 0), ((1, 1), one, 0)].into_iter()),
+        assert_eq!(capacity_release(true, [((0, 2), mario_dk_link, 2), ((0, 0), samus_yoshi, 0), ((1, 1), one, 0)].into_iter()),
             Some((1, 1)));
-        assert_eq!(capacity_release([((0, 2), mario_dk_link, 2), ((0, 0), samus_yoshi, 0)].into_iter()), Some((0, 0)));
+        assert_eq!(capacity_release(true, [((0, 2), mario_dk_link, 2), ((0, 0), samus_yoshi, 0)].into_iter()), Some((0, 0)));
+    }
+
+    /// Operator rule 2026-11-09 16:06Z, Eden `final-surface-i3-pf-1261f56c` `x6-cc`: `[Samus, Yoshi]` was freed for the
+    /// Ice Climbers (#805). One second later the pair's prefetch was held for memory while that room was still
+    /// arriving, and the kept `[Mario, DK, Link]`, which served DK and Link warm, was freed for it (#817). A release in
+    /// flight is room on its way: nothing more is freed for capacity until the game has unloaded the freed group's
+    /// directories and files (operator option C, 17:57Z; `res_unload`); then an unneeded parked group goes first, and a
+    /// group that keeps members of the new cycle only when nothing else is parked.
+    #[test]
+    fn a_release_in_flight_is_room_on_its_way() {
+        let mario_dk_link = Members::new(&[0x00, 0x01, 0x02]).unwrap();
+        let samus_yoshi = Members::new(&[0x03, 0x05]).unwrap();
+        let kept_only = || [((0usize, 2usize), mario_dk_link, 3u8)].into_iter();
+        let watch = ReleaseWatch::Settled.freed();
+        assert!(!watch.settled());
+        assert_eq!(capacity_release(watch.settled(), kept_only()), None, "the free's room is still arriving");
+        let watch = watch.pass(Some(true), 0, true);
+        assert!(!watch.settled(), "its files are still loaded");
+        assert_eq!(capacity_release(watch.settled(), kept_only()), None);
+        let watch = watch.pass(Some(false), 0, true);
+        assert_eq!(watch, ReleaseWatch::Purging { ticket: 1 }, "unloaded: the purge is requested");
+        assert_eq!(capacity_release(watch.settled(), kept_only()), None, "its pages are not back yet");
+        let watch = watch.pass(Some(false), 1, true);
+        assert!(watch.settled(), "purged: the committed charge is the room");
+        assert_eq!(capacity_release(watch.settled(), kept_only()), Some((0, 2)), "the last resort, after it settled");
+        assert_eq!(capacity_release(true, [((0, 2), mario_dk_link, 3), ((0, 0), samus_yoshi, 0)].into_iter()), Some((0, 0)));
+        assert!(!watch.freed().settled(), "another free restarts the watch");
+        assert!(ReleaseWatch::Settled.pass(Some(true), 0, true).settled(), "nothing freed: nothing to wait for");
+        // A prefetch held for memory shows as loading while the room is on its way; a pool hold is not memory.
+        assert_eq!(arriving_room(GroupState::Held(Hold::Memory), true), GroupState::Planned);
+        assert_eq!(arriving_room(GroupState::Held(Hold::Memory), false), GroupState::Held(Hold::Memory));
+        assert_eq!(arriving_room(GroupState::Held(Hold::Pool), true), GroupState::Held(Hold::Pool));
+        assert_eq!(arriving_room(GroupState::Built, true), GroupState::Built);
+        let counts = count_group_members([(2, arriving_room(GroupState::Held(Hold::Memory), true))]);
+        assert_eq!((counts.planned, counts.pending, counts.held, counts.hold), (2, 2, 0, None));
+    }
+
+    /// Eden `final-surface-i3-pf-b04856b2` `x6-cc` (Yoga): `[Samus, Yoshi]` freed at #787; two planner passes later
+    /// (#798) the committed charge had stopped falling, the old watch settled, and the kept `[Mario, DK, Link]` went
+    /// 17 ms later (#804) for nothing: 113 MB more came back about 0.2 s after. F6 (Eden `pp-re-trace-1/2`): the game
+    /// unloads a free within 0.5 s, and its pages reach the kernel only when jemalloc's arena decay ticker fires
+    /// (1.1 s and 2.9 s after that free), so no pass count bounds it. Operator option C with the primary's 19:47Z
+    /// purge: the watch waits for what the free queued to be unloaded, then for one `arena.4096.purge` on MainThread
+    /// requested after that, however many passes each takes; the pass that sees the purge done settles it.
+    #[test]
+    fn a_release_settles_on_unloaded_then_purged_not_after_a_pass_count() {
+        let mut watch = ReleaseWatch::Settled.freed();
+        for pass in 0..600 {
+            watch = watch.pass(Some(true), 0, true);
+            assert_eq!(watch, ReleaseWatch::Unloading, "pass {pass}: what the free queued is still loaded");
+            assert_eq!(watch.requested(), None, "no purge before the unload ends");
+        }
+        watch = watch.pass(Some(false), 4, true);
+        assert_eq!(watch.requested(), Some(5), "unload done: the next purge (after the 4 the hook made) is requested");
+        for pass in 0..600 {
+            watch = watch.pass(Some(false), 4, true);
+            assert!(!watch.settled(), "pass {pass}: the MainThread hook has not purged yet");
+        }
+        let freed_again = watch.freed();
+        assert_eq!(freed_again, ReleaseWatch::Unloading, "a free while purging starts over: its unload comes first");
+        assert!(watch.pass(Some(true), 5, true).settled(), "the purge requested after the unload ran: settled");
+        assert!(ReleaseWatch::Settled.freed().pass(Some(false), 0, false).settled(), "no purge (rows): settled at the unload");
+        assert_eq!(ReleaseWatch::Settled.freed().pass(None, 0, true), ReleaseWatch::Purging { ticket: 1 },
+            "an unreadable table: purge anyway, it never holds the release");
+        assert!(ReleaseWatch::Settled.freed().pass(None, 0, false).settled());
+        let wrapped = ReleaseWatch::Settled.freed().pass(Some(false), u32::MAX, true);
+        assert_eq!(wrapped.requested(), Some(0));
+        assert!(!wrapped.pass(None, u32::MAX, true).settled() && wrapped.pass(None, 0, true).settled(), "the count wraps");
+    }
+
+    /// Operator rule 2026-11-09 17:13Z (Eden `final-surface-i3-pf-b04856b2` `x6-cc`, #798–#804): the watch settled under
+    /// the pair's need, and for the 17 ms before the last-resort release the notice read "Loaded 10/12 (2 waiting for
+    /// memory)", raised for 3 s. The planner decides that release in the pass that settles, before the notice is
+    /// published; a held prefetch shows "Loading" while its room is arriving or being freed, and "waiting for memory"
+    /// only when nothing can be freed.
+    #[test]
+    fn a_release_in_progress_shows_loading_never_waiting() {
+        assert_eq!(still_short(GroupState::Held(Hold::Memory), true, 9, 2), Some("process headroom"));
+        assert_eq!(still_short(GroupState::Held(Hold::Memory), false, 9, 2), None, "it fits now");
+        assert_eq!(still_short(GroupState::Held(Hold::Pool), false, 1, 2), Some("fighter pool"));
+        assert_eq!(still_short(GroupState::Held(Hold::Pool), false, 2, 2), None);
+        for state in [GroupState::Planned, GroupState::Prefetching, GroupState::Prefetched, GroupState::Built] {
+            assert_eq!(still_short(state, true, 0, 2), None, "{state:?}");
+        }
+        let shown = |settled: bool, releasing: bool| {
+            let held = arriving_room(GroupState::Held(Hold::Memory), room_coming(settled, releasing));
+            let counts = count_group_members([(10, GroupState::Built), (2, held)]);
+            (counts.pending, counts.held, counts.hold)
+        };
+        assert_eq!(shown(false, false), (2, 0, None), "the room is arriving");
+        assert_eq!(shown(true, true), (2, 0, None), "a release decided for it is in progress");
+        assert_eq!(shown(false, true), (2, 0, None));
+        assert_eq!(shown(true, false), (0, 2, Some(Hold::Memory)), "nothing can be freed: waiting for memory");
     }
 
     /// The entry tick frees a parked group only when the planner (or a refused prefetch) marked it to go now; any other
