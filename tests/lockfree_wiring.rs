@@ -267,3 +267,30 @@ fn the_keyboard_signals_are_only_ever_tried() {
     ordered(&keyboard[keyboard.find("pub(crate) unsafe fn open(").unwrap()..], &["Lease::acquire()?", "SIGNALS.try_lock()", "return None"]);
     ordered(&keyboard[keyboard.find("pub(crate) unsafe fn poll(").unwrap()..], &["sdk_calc(", "SIGNALS.try_lock()"]);
 }
+
+/// Step 5c: the menu worker sleeps on a `hos_lock::Event`, not std's parker. Game hooks wake it (`worker::wake`, 21 call paths from
+/// `cpu::on_frame`, the input poll, the AI epilogue): std's parker on the Skyline target is pthread's, whose `unpark` takes the
+/// parker's mutex, which the parked worker holds around its condition-variable wait and after every wake, a plugin-held lock no
+/// scan of this crate sees. Setting the event is an atomic swap and the arbiter's signal: it never waits. No runtime code parks.
+#[test]
+fn the_worker_sleeps_on_an_event_that_never_makes_a_waker_wait() {
+    let runtime = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");
+    let g = graph();
+    let files: BTreeSet<String> = g.funcs.iter().map(|f| f.file.clone()).collect();
+    for file in files {
+        // The code only: a comment may name the parker it replaced.
+        let text: String = std::fs::read_to_string(runtime.join(&file))
+            .unwrap_or_default()
+            .lines()
+            .map(|line| line.split("//").next().unwrap_or(""))
+            .collect::<Vec<_>>()
+            .join("\n");
+        for parker in ["thread::park", ".unpark()", "park_timeout("] {
+            assert!(!text.contains(parker), "{file} uses std's parker ({parker})");
+        }
+    }
+    let worker = include_str!("../src/runtime/ui/worker.rs");
+    ordered(body(worker, "wake"), &["WAKE.set()"]);
+    ordered(body(worker, "run"), &["WAKE.wait(Some(POLL))", "WAKE.wait(None)"]);
+    assert!(worker.contains("static WAKE: hos_lock::Event"), "the worker's wake is not the event");
+}

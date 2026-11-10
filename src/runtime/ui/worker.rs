@@ -4,8 +4,6 @@
 //! work lives here and never in a hook (R5: hooks allocate nothing).
 
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
-use std::sync::OnceLock;
-use std::thread::Thread;
 
 use hos_lock::Mutex;
 
@@ -29,7 +27,10 @@ use crate::model::input_delay::Owners;
 use crate::runtime::ui::state::{CLOSE_COUNT, CLOSING, EXT_SHOWN, FRAME, FRAME_SEQ, JUMPS, LAYOUT_READY, OPEN, POPUP, POPUP_REQ, PROMPT};
 
 static INPUT: Ring<64> = Ring::new();
-static WORKER: OnceLock<Thread> = OnceLock::new();
+/// What wakes the menu worker (`wake`, any thread, game hooks included). A `hos_lock::Event`, not `std::thread::park`/`unpark`:
+/// std's parker on this target is pthread's, whose `unpark` takes a mutex the parked worker holds around its wait, so a game hook
+/// waking the worker could wait for it (the lock-free runtime). Setting the event never waits.
+static WAKE: hos_lock::Event = hos_lock::Event::new();
 /// Complete polls/openings refused by the bounded ring; never half a physical poll.
 pub static DROPPED: AtomicU32 = AtomicU32::new(0);
 
@@ -67,10 +68,9 @@ pub fn request_writeback() {
     wake();
 }
 
+/// Wake the menu worker (any thread; never waits, no allocation).
 pub fn wake() {
-    if let Some(thread) = WORKER.get() {
-        thread.unpark();
-    }
+    WAKE.set();
 }
 
 /// The settings the menu opens on and commits to: what was loaded at boot, then each commit.
@@ -186,13 +186,12 @@ const POLL: std::time::Duration = std::time::Duration::from_millis(33);
 static LAST_DIAG: Mutex<String> = Mutex::new(String::new());
 
 fn run() {
-    let _ = WORKER.set(std::thread::current());
     let mut session = Session::default();
     let mut developer_reload = crate::runtime::developer_reload::Worker::default();
     loop {
         // Retire departing layer state before accepting a new scene's panel input.
         crate::runtime::macros::port::worker_events();
-        // Drain first: an event pushed before this thread registered has no unpark waiting for it.
+        // Drain first: the work behind a wake that came before this pass is already here.
         sync_input_generation(&mut session);
         while let Some((generation, event)) = INPUT.pop() {
             sync_input_generation(&mut session);
@@ -217,9 +216,9 @@ fn run() {
         #[cfg(feature = "diag")]
         crate::runtime::stall_watch::worker_step(0);
         if session.watching() || developer_pending {
-            std::thread::park_timeout(POLL);
+            WAKE.wait(Some(POLL));
         } else {
-            std::thread::park();
+            WAKE.wait(None);
         }
     }
 }

@@ -10,6 +10,7 @@
 
 #![forbid(unsafe_op_in_unsafe_fn)]
 
+pub mod event;
 pub mod mailbox;
 #[cfg(feature = "owners")]
 pub mod owners;
@@ -17,6 +18,7 @@ pub mod snapshot;
 pub mod triple;
 pub mod word;
 
+pub use event::Event;
 pub use mailbox::Mailbox;
 pub use snapshot::Published;
 pub use triple::TripleBuffer;

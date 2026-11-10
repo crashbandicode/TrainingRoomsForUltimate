@@ -16,6 +16,25 @@ pub struct HostFutex;
 static GENERATION: Mutex<u64> = Mutex::new(0);
 static CHANGED: Condvar = Condvar::new();
 
+/// Sleep while `*word == expected`, until `timeout` at the latest (`None`: no timeout), as the arbiter's timed wait does
+/// (`Event::wait`). The table's wakes are for every word, so it re-checks its own word after each one.
+pub(crate) fn wait_timeout(word: &AtomicU32, expected: u32, timeout: Option<std::time::Duration>) {
+    let deadline = timeout.map(|t| std::time::Instant::now() + t);
+    let mut generation = GENERATION.lock().unwrap_or_else(PoisonError::into_inner);
+    while word.load(Ordering::SeqCst) == expected {
+        match deadline {
+            None => generation = CHANGED.wait(generation).unwrap_or_else(PoisonError::into_inner),
+            Some(deadline) => {
+                let now = std::time::Instant::now();
+                if now >= deadline {
+                    return;
+                }
+                generation = CHANGED.wait_timeout(generation, deadline - now).unwrap_or_else(PoisonError::into_inner).0;
+            }
+        }
+    }
+}
+
 impl Futex for HostFutex {
     fn wait(word: &AtomicU32, expected: u32) {
         let mut generation = GENERATION.lock().unwrap_or_else(PoisonError::into_inner);

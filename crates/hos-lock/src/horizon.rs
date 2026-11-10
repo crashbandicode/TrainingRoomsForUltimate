@@ -77,6 +77,13 @@ unsafe fn signal_to_address(word: *const u32, signal: u64, value: u32, count: i3
     result as u32
 }
 
+/// Sleep while `*word == expected`, at most `timeout_ns` nanoseconds (negative: no timeout). It may return at any time; the caller
+/// re-checks (`Event::wait`).
+pub(crate) fn wait_timeout(word: &AtomicU32, expected: u32, timeout_ns: i64) {
+    // SAFETY: an `AtomicU32` is a live, aligned word.
+    let _ = unsafe { wait_for_address(word.as_ptr(), WAIT_IF_EQUAL, expected, timeout_ns) };
+}
+
 impl Futex for Arbiter {
     fn wait(word: &AtomicU32, expected: u32) {
         // SAFETY: an `AtomicU32` is a live, aligned word.
