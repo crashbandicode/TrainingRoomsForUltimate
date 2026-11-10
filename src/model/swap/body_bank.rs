@@ -1082,9 +1082,19 @@ pub fn target_first(forms: Forms, groups: bool, pool: usize) -> Option<Members> 
 /// Kirby) the switch keeps its canonical Reload, with no bank, as before target-first. A one-member bank there let the
 /// planner add groups no window had brought: integration FLAG 2 2026-11-10 17:56Z, P1's PT group planned beside a live
 /// Kirby and deferred by D-KIRBY1, so the notice stayed at "Loading 4/7".
-pub fn reload_window(full: Option<Members>, forms: Forms, groups: bool, pool: usize) -> Option<Members> {
+pub fn reload_window(full: Option<Members>, forms: Forms, groups: bool, pool: usize, live_gate: Option<u32>) -> Option<Members> {
     let full = full?;
-    Some(target_first(forms, groups, pool).unwrap_or(full))
+    Some(target_first(forms, groups && groups_load_beside(live_gate), pool).unwrap_or(full))
+}
+
+/// Whether a target's other members can load as groups beside it once it is live, so that [`target_first`] may leave
+/// them to the background. `live_gate` is the live kind D-KIRBY1's gates see for the target: the target itself, or
+/// with rc.7 F1 `d_kirby1_live(Some(target), ..)`, which is `None` once the bank owns the G68 step. D-KIRBY1
+/// ([`prefetch_admitted`]) defers every group prefetch beside a live Kirby. So while it is in force, a Kirby target keeps
+/// its full window: neighbours planned after him could never load while he is on screen, and the notice would read
+/// "Loading" until P1 left him (integration 2026-11-10 18:16Z; A's `tf-direct-after-3f7dca0c` #443–#446).
+pub fn groups_load_beside(live_gate: Option<u32>) -> bool {
+    prefetch_admitted(live_gate).is_ok()
 }
 
 /// The group a [`target_first`] Reload's neighbours build as: the members the `full` window would have held besides
@@ -1126,8 +1136,8 @@ pub fn unpack_neighbours(word: u64, window: Members) -> Option<Members> {
 /// The extra bodies the next Reload's window builds for `forms`, out of the `window` the lane would give it: none under
 /// [`target_first`] (its neighbours are charged as group bodies), otherwise the window's members after the target. The
 /// planner reserves these before the helpers (`plan_budget`).
-pub fn reload_extras(window: Members, forms: Forms, groups: bool, pool: usize) -> usize {
-    if target_first(forms, groups, pool).is_some() { 0 } else { window.count() - 1 }
+pub fn reload_extras(window: Members, forms: Forms, groups: bool, pool: usize, live_gate: Option<u32>) -> usize {
+    if reload_window(Some(window), forms, groups, pool, live_gate) != Some(window) { 0 } else { window.count() - 1 }
 }
 
 /// The members the Fighters notice counts for the window a role's next swap prepares (`plan_budget`): every one besides
@@ -3575,8 +3585,8 @@ mod tests {
         assert_eq!(target_first(Forms::starting(GAME_WATCH), false, 6), None);
         assert_eq!(target_first(Forms::starting(GAME_WATCH), true, 0), None, "no pool: no group could take the rest");
         let full = Members::from_forms(Forms::starting(GAME_WATCH), &[PIKACHU, KIRBY], 2).unwrap();
-        assert_eq!(reload_extras(full, Forms::starting(GAME_WATCH), false, 6), 2);
-        assert_eq!(reload_extras(full, Forms::starting(GAME_WATCH), true, 0), 2);
+        assert_eq!(reload_extras(full, Forms::starting(GAME_WATCH), false, 6, Some(GAME_WATCH)), 2);
+        assert_eq!(reload_extras(full, Forms::starting(GAME_WATCH), true, 0, Some(GAME_WATCH)), 2);
     }
 
     #[test]
@@ -3584,14 +3594,14 @@ mod tests {
         assert_eq!(target_first(Forms::starting(POPO), true, 6), None);
         let lead = Members::from_pair(&[PIKACHU], 2).unwrap();
         assert!(lead.is_pair_lead());
-        assert_eq!(reload_extras(lead, Forms::starting(POPO), true, 6), 2);
+        assert_eq!(reload_extras(lead, Forms::starting(POPO), true, 6, Some(POPO)), 2);
     }
 
     #[test]
     fn the_next_window_reserves_no_extras_when_they_build_as_groups() {
         let full = Members::from_forms(Forms::starting(GAME_WATCH), &[PIKACHU, KIRBY], 2).unwrap();
-        assert_eq!(reload_extras(full, Forms::starting(GAME_WATCH), true, 6), 0);
-        assert_eq!(reload_extras(full, Forms::starting(GAME_WATCH), false, 6), 2);
+        assert_eq!(reload_extras(full, Forms::starting(GAME_WATCH), true, 6, Some(GAME_WATCH)), 0);
+        assert_eq!(reload_extras(full, Forms::starting(GAME_WATCH), false, 6, Some(GAME_WATCH)), 2);
         // The helpers keep the room: nothing is reserved for P1's next window, the CPU's reservation is unchanged.
         assert_eq!(reserve_extras([0, 2], [0, 0], 6), [0, 2]);
     }
@@ -3612,7 +3622,7 @@ mod tests {
         let pool = 10;
         let seats = [Some(SeatState::Loading), Some(SeatState::Loading)];
         // The next swap's Reload builds the target alone: nothing is reserved for it physically.
-        assert_eq!(reload_extras(window, forms, true, pool), 0);
+        assert_eq!(reload_extras(window, forms, true, pool, Some(lane[0])), 0);
         // The notice counts the window that swap prepares: its other members load right after it, as the first group.
         let notice = reserve_extras([0, notice_extras(window)], [0, 0], pool);
         let next = next_window_plan(window, lane[0], notice[1], Some(CPU_ORIGINAL), |_| false);
@@ -3625,13 +3635,13 @@ mod tests {
         let assets = Readiness { progress: Progress::Loading, ready: 0, planned: 5, configured: 5, limit: 5, failed: 0 };
         assert_eq!(CacheStatus::new(assets, fighters, false).progress(), Progress::Loading);
         // `889919e1` counted the physical reservation: nothing planned, so the seats were dropped and the status hidden.
-        let physical = reserve_extras([0, reload_extras(window, forms, true, pool)], [0, 0], pool);
+        let physical = reserve_extras([0, reload_extras(window, forms, true, pool, Some(lane[0]))], [0, 0], pool);
         let hidden = next_window_plan(window, lane[0], physical[1], Some(CPU_ORIGINAL), |_| false);
         assert_eq!(hidden, 0);
         let none = with_seats(BuiltFighters::default(), seats);
         assert_eq!((none.planned, CacheStatus::new(assets, none, false).progress()), (0, Progress::Hidden));
         // With groups off the window is built whole, and the notice counts what is reserved, as before target-first.
-        assert_eq!(reload_extras(window, forms, false, pool), notice_extras(window));
+        assert_eq!(reload_extras(window, forms, false, pool, Some(lane[0])), notice_extras(window));
     }
 
     #[test]
@@ -3644,16 +3654,42 @@ mod tests {
         let kirby = Forms::starting(KIRBY);
         let full = Members::from_forms(kirby, &lane, 2);
         assert_eq!(full, None);
-        assert_eq!(reload_window(full, kirby, true, 10), None);
+        assert_eq!(reload_window(full, kirby, true, 10, Some(KIRBY)), None);
         // A role with no cycle neighbour at all (the menu's CPU pick with no cycle): the same.
-        assert_eq!(reload_window(Members::from_forms(Forms::starting(MARIO), &[], 2), Forms::starting(MARIO), true, 10), None);
+        assert_eq!(reload_window(Members::from_forms(Forms::starting(MARIO), &[], 2), Forms::starting(MARIO), true, 10, Some(MARIO)),
+            None);
         // A window to rebuild still loads its target first; with groups off, or no pool, the full window as before.
-        let full = Members::from_forms(kirby, &[PIKACHU, GAME_WATCH], 2);
+        let gw = Forms::starting(GAME_WATCH);
+        let full = Members::from_forms(gw, &[PIKACHU, KIRBY], 2);
         assert!(full.is_some());
-        assert_eq!(reload_window(full, kirby, true, 10), target_first(kirby, true, 10));
-        assert_eq!(reload_window(full, kirby, true, 10).map(|m| m.count()), Some(1));
-        assert_eq!(reload_window(full, kirby, false, 10), full);
-        assert_eq!(reload_window(full, kirby, true, 0), full);
+        assert_eq!(reload_window(full, gw, true, 10, Some(GAME_WATCH)), target_first(gw, true, 10));
+        assert_eq!(reload_window(full, gw, true, 10, Some(GAME_WATCH)).map(|m| m.count()), Some(1));
+        assert_eq!(reload_window(full, gw, false, 10, Some(GAME_WATCH)), full);
+        assert_eq!(reload_window(full, gw, true, 0, Some(GAME_WATCH)), full);
+    }
+
+    #[test]
+    fn a_kirby_target_keeps_his_full_window_while_d_kirby1_defers_his_groups() {
+        // A's `tf-direct-after-3f7dca0c` (#404, #443-#446) and integration 2026-11-10 18:16Z: target-first plans Kirby's
+        // neighbours once he is live, and D-KIRBY1 defers every group prefetch beside a live Kirby, so they never loaded
+        // while he was on screen and the notice read "Loading 5/8" until P1 left him. `732663e2` built them in his window.
+        let kirby = Forms::starting(KIRBY);
+        let full = Members::from_forms(kirby, &[PIKACHU, GAME_WATCH], 2);
+        let window = full.unwrap();
+        // F1's gate closed (the intermediate): the live kind D-KIRBY1 sees is Kirby, so the full window, reserved as before.
+        assert!(!groups_load_beside(Some(KIRBY)));
+        assert_eq!(reload_window(full, kirby, true, 10, Some(KIRBY)), full);
+        assert_eq!(reload_extras(window, kirby, true, 10, Some(KIRBY)), 2);
+        assert_eq!(notice_extras(window), 2);
+        // F1's gate open (`d_kirby1_live` gives no live kind once the bank owns the G68 step): target-first again.
+        assert!(groups_load_beside(None));
+        assert_eq!(reload_window(full, kirby, true, 10, None).map(|m| m.kinds()), Some([KIRBY, NONE, NONE]));
+        assert_eq!(reload_extras(window, kirby, true, 10, None), 0);
+        // A target whose groups load beside it is unchanged: target-first.
+        assert!(groups_load_beside(Some(GAME_WATCH)));
+        let gw = Forms::starting(GAME_WATCH);
+        assert_eq!(reload_window(Members::from_forms(gw, &[PIKACHU, KIRBY], 2), gw, true, 10, Some(GAME_WATCH))
+            .map(|m| m.count()), Some(1));
     }
 
     #[test]

@@ -557,6 +557,12 @@ fn group_policy(settings: &crate::engine::preload::cycle_preload_config::Setting
     }
 }
 
+/// The live kind D-KIRBY1's gates will see once `kind` is the live target (`body_bank::reload_window`'s `live_gate`).
+/// rc.7 F1 routes its gates through `body_bank::d_kirby1_live`; merged with F1, this one takes the same route.
+fn live_gate(kind: u32) -> Option<u32> {
+    Some(kind)
+}
+
 /// rc.7 target-first: per role, the neighbours of the last target-first Reload's full window (`body_bank::pack_neighbours`),
 /// which `plan_groups` plans as that window's first group once it is Ready. `u64::MAX`: none.
 static NEIGHBOURS: [AtomicU64; 2] = [AtomicU64::new(u64::MAX), AtomicU64::new(u64::MAX)];
@@ -878,7 +884,7 @@ pub(crate) fn plan_budget(menu: &crate::engine::compat::menu::TrainingModpackMen
                     usize::from(settings.bank_members - 1)) {
                     // rc.7 target-first: the bodies the next Reload builds besides the target (none when its neighbours
                     // build as groups, which `plan_groups` charges); the notice still counts the window it prepares.
-                    wanted[role] = wanted[role].max(reload_extras(members, forms, grouped, group_pool(&settings)));
+                    wanted[role] = wanted[role].max(reload_extras(members, forms, grouped, group_pool(&settings), live_gate(kind)));
                     notice_wanted[role] = notice_wanted[role].max(notice_extras(members));
                     wanted_banks[role] = Some((members, kind));
                     break;
@@ -1285,8 +1291,10 @@ pub(super) fn proposed(owner: u32, target: Forms, upcoming: &[u32]) -> Option<Me
     // builds the picked fighter alone (`body_bank::target_first`). The members the full window would have held are planned
     // as the role's first background group once it is Ready (`NEIGHBOURS`, `plan_groups`), admitted on the cost the window
     // charged them, then the rest of the lane as usual. No supplement is charged here, so the window waits for no memory.
-    // A switch with no window to rebuild keeps its canonical Reload (`body_bank::reload_window`).
-    if let (Some(members), Some(full)) = (reload_window(full, target, groups_enabled(&settings), group_pool(&settings)), full) {
+    // A switch with no window to rebuild keeps its canonical Reload, and a target whose groups could not load beside it
+    // (a Kirby target under D-KIRBY1) keeps its full window (`body_bank::reload_window`, `live_gate`).
+    let rebuilt = reload_window(full, target, groups_enabled(&settings), group_pool(&settings), live_gate(target.kinds[0]));
+    if let (Some(members), Some(full)) = (rebuilt, full) {
         if members != full {
             WINDOW_WAITING[role].store(0, Ordering::Release);
             let seed = neighbour_group(full, target.kinds[0], group_policy(&settings), excluded_original(&settings, &menu, role));
