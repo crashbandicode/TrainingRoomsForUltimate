@@ -189,10 +189,11 @@ pub fn stage_sequence(plan: Option<(&crate::engine::rr_host::SequencePlan, bool)
     generation
 }
 
-/// The bar's view of the drilled sequence, copied under the locks (the HUD tick; nothing allocates).
-fn seq_view() -> Option<SeqView> {
-    let plan = PLAN.lock();
-    let plan = plan.as_deref()?;
+/// The bar's view of the drilled sequence, copied under the locks (the HUD tick; nothing allocates). `None` when the menu worker
+/// holds `PLAN` (`stage_sequence`): the HUD tick runs on the game's task workers and never waits for it.
+fn seq_view() -> Option<Option<SeqView>> {
+    let plan = PLAN.try_lock()?;
+    let Some(plan) = plan.as_deref() else { return Some(None) };
     let run = RUN.lock().filter(|(generation, _)| *generation == plan.generation).map(|(_, run)| run);
     let walk = run.map_or(SequenceWalk::resume(plan.steps.len(), plan.streak, plan.best), |run| run.walk());
     let steps = plan.steps.len();
@@ -203,7 +204,7 @@ fn seq_view() -> Option<SeqView> {
         *chip = plan.names.get(first + c).copied().unwrap_or(Text::EMPTY);
     }
     let last = run.and_then(|run| run.last());
-    Some(SeqView {
+    Some(Some(SeqView {
         name: plan.name,
         at,
         steps,
@@ -213,7 +214,7 @@ fn seq_view() -> Option<SeqView> {
         chips,
         last,
         last_name: last.and_then(|s| plan.names.get(s.step).copied()).unwrap_or(Text::EMPTY),
-    })
+    }))
 }
 
 /// A drilled sequence's step was graded (`report_step`): the step (0-based), what it did (1 next, 2 finished, 3
@@ -403,10 +404,13 @@ pub fn on_layout_registered() {
     RENDERER.lock().invalidate();
 }
 
-/// One HUD tick: the bar's writes, shown with the strip while the helper is On and has a target.
+/// One HUD tick: the bar's writes, shown with the strip while the helper is On and has a target. It runs on the UI pass, on the
+/// game's task workers (`anchors::ui_pass_calculate`), and the menu worker writes `NAME` and `PLAN` (`stage_sequence`,
+/// `set_target`): it takes them with `try_lock`, and on contention writes nothing this pass (the bar keeps its panes; the next
+/// pass draws). Waiting would be the rc.6 freeze (`rc6-qpf3`; docs lane review R1, finding 1).
 pub fn hud_tick(strip_shown: bool, apply: impl FnMut(usize, &Look, Changed)) -> usize {
     let helper = *HELPER.lock();
-    let name = *NAME.lock();
-    let seq = seq_view();
+    let Some(name) = NAME.try_lock().map(|name| *name) else { return 0 };
+    let Some(seq) = seq_view() else { return 0 };
     RENDERER.lock().draw(&helper, &name, seq.as_ref(), strip_shown, apply)
 }
