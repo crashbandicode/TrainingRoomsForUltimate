@@ -330,15 +330,16 @@ pub fn p1_kind() -> Option<i32> {
     (kind >= 0).then_some(kind)
 }
 
-/// *Save last combo* (worker): the open exchange when it has a link, else the one before, as of the last frame.
+/// *Save last combo* (worker): the open exchange when it has a link, else the one before, as of the last frame. Read in place
+/// (`with_latest`): a whole `Sample` is two combos, and `tr-menu`'s deepest path cannot carry the copy (`final-surface-cov-4e336da4`).
 pub fn last_combo() -> Option<Combo> {
-    SAMPLE.read().0.last
+    SAMPLE.with_latest(|sample, _| sample.last)
 }
 
-/// The last combo published by the strip and the count of links captured (worker).
+/// The last combo published by the strip and the count of links captured (worker; the recording host's tick, on `tr-menu`'s
+/// deepest path), read in place as `last_combo`.
 pub fn strip_sample() -> (u32, Option<Combo>) {
-    let (sample, _) = SAMPLE.read();
-    (sample.seen, sample.strip)
+    SAMPLE.with_latest(|sample, _| (sample.seen, sample.strip))
 }
 
 /// The worker read the saved-combo list (`tr_combo_listed_v1`).
@@ -402,7 +403,12 @@ pub fn on_layout_registered() {
 /// `set_target`): it takes them, and `HELPER`, with `try_lock`, and on contention writes nothing this pass (the bar keeps its
 /// panes; the next pass draws). Waiting would be the rc.6 freeze (`rc6-qpf3`; docs lane review R1, finding 1 and its addendum).
 pub fn hud_tick(strip_shown: bool, apply: impl FnMut(usize, &Look, Changed)) -> usize {
-    let Some(helper) = HELPER.try_lock().map(|helper| *helper) else { return 0 };
+    // One copy of the helper (11 KB), as before the `try_lock`: an `Option<Helper>` on the way added 8.8 KB to the game task
+    // worker's frame (`hud_draw::draw`).
+    let helper = match HELPER.try_lock() {
+        Some(guard) => *guard,
+        None => return 0,
+    };
     let Some(name) = NAME.try_lock().map(|name| *name) else { return 0 };
     let Some(seq) = seq_view() else { return 0 };
     RENDERER.lock().draw(&helper, &name, seq.as_ref(), strip_shown, apply)
