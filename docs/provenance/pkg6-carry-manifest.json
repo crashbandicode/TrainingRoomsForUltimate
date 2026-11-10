@@ -9248,7 +9248,7 @@
    "dest": "src/runtime/mii/native_keyboard/inline_keyboard.rs",
    "crate": "root",
    "src_sha256": "4e3eb198a8c8924d0513ca9475f851543e4e53947f05b95847af70491a4cf154",
-   "dest_sha256": "9a9075a9bdc4d3173ec8e8c9c30889a06e198031635b22af5bed1e5050526062",
+   "dest_sha256": "62a242c064e9cdc01f3578cb09b032037a9b50d78553c0b03c5629a0273a4184",
    "edits": [
     {
      "old": "    fn sdk_finished(this: *mut Object, callback: unsafe extern \"C\" fn());\n}\n\n#[cfg(test)]\nmod tests {\n    use super::*;\n\n    #[test]\n    fn mii_limit_and_native_buffer_size_are_unchanged() {\n        let text = Text::new(&[65; 10], 4).unwrap();\n        assert_eq!(text.terminated().len(), 11);\n        assert_eq!(std::mem::size_of_val(text.terminated()), 22);\n        assert!(Text::new(&[65; 11], 0).is_none());\n        assert!(Text::new(&[65], 2).is_none());\n        assert!(Text::new(&[0], 0).is_none());\n    }\n\n    #[test]\n    fn macro_limit_counts_scalars_and_preserves_utf16_caret() {\n        let name = \"\ud83d\ude00\".repeat(super::super::MAX_NAME_CHARS);\n        let text = Text::macro_name(&name, 2).unwrap();\n        assert_eq!(text.units().len(), 96);\n        assert_eq!(text.cursor(), 2);\n        assert!(Text::macro_name(&format!(\"{name}a\"), 0).is_none());\n        assert!(Text::macro_name(&\"a\".repeat(49), 0).is_none());\n        assert!(Text::macro_name(\"\ud83d\ude00\", 1).is_none());\n        assert!(text_signal(&[0xd800], 1, 1, Limit::Macro).is_none());\n        assert!(text_signal(&[65], -1, 0, Limit::Macro).is_none());\n    }\n}\n",
@@ -9339,6 +9339,11 @@
      "old": "            *SIGNALS.lock() = Signals::default();\n",
      "new": "            // The next open resets them as well, so a failed try (never, under the\n            // lease) leaves nothing behind.\n            if let Some(mut signals) = SIGNALS.try_lock() { *signals = Signals::default(); }\n            let missed = MISSED.swap(0, Ordering::Relaxed);\n            if missed != 0 {\n                crate::engine::compat::logging::diagnostic(format_args!(\n                    \"[NativeKeyboard] signals_missed={missed} (a callback found the signals taken)\"));\n            }\n",
      "reason": "rc.6 lock-free runtime (operator order 2026-11-10 00:44Z, TASK-OPUS-rc6-lockfree step 5a): every take of the keyboard signals is a try_lock, so no thread (the menu worker's keyboard, a Mii editor hook's) ever waits on them; the lease already made the takes exclusive; a failed try is counted (callback), leaves the signals for the next poll, or fails the open"
+    },
+    {
+     "old": "        let Some(mut signals) = SIGNALS.try_lock() else { return None };\n",
+     "new": "        let mut signals = SIGNALS.try_lock()?;\n",
+     "reason": "rc.6 lock-free runtime step 5a, clippy question_mark: the open's tried take of the keyboard signals returns None through ? (the lease goes back as before)"
     }
    ]
   },

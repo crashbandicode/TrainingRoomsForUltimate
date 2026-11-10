@@ -176,7 +176,7 @@ impl Keyboard {
         let mut lease = Lease::acquire()?;
         // The lease is ours, so no other take is running; if a try ever failed,
         // the open fails and the lease goes back.
-        let Some(mut signals) = SIGNALS.try_lock() else { return None };
+        let mut signals = SIGNALS.try_lock()?;
         *signals = Signals { limit: text.limit(), ..Signals::default() };
         drop(signals);
         let work = lease.prepare_work();
