@@ -346,6 +346,9 @@ impl Drop for BankGuard<'_> {
 
 /// `[ready, entry, owner, kind, physical descriptor (0x70 bytes)]`, all zero unless the bank is Ready, not departed and observed.
 const READY_WORDS: usize = 4 + 0x70 / 8;
+/// Rounds of [`crate::model::seq_cell::SeqCell::read_yielding`] for `cached_kind` on a plugin thread (each 64 tries, then a
+/// yield).
+const READY_ROUNDS: usize = 1024;
 static READY: [crate::model::seq_cell::SeqCell<READY_WORDS>; 2] =
     [crate::model::seq_cell::SeqCell::new(), crate::model::seq_cell::SeqCell::new()];
 
@@ -2236,9 +2239,14 @@ unsafe fn pair_window(entry: *const u8) -> Option<(u32, Members)> {
 /// receipt, so a native CPU Behavior change keeps the active member's identity
 /// for the next cycle instead of falling back to the group's first kind.
 pub(crate) fn cached_kind(entry: usize, owner: u32, descriptor: &[u8; 0x70]) -> Option<u32> {
-    // The mirror of the Ready bank (`READY`), never the bank's lock: the menu worker's re-plan reads this. A read that keeps meeting a
-    // write in progress gives up (no cached kind; the caller falls back to the descriptor's own kind).
-    let words = READY[role(owner)?].read(64)?;
+    // The mirror of the Ready bank (`READY`), never the bank's lock: the menu worker's re-plan reads this. It yields between rounds
+    // so a game thread preempted mid-write can finish; a mirror still busy after every round is reported, not used silently.
+    // A game hook keeps its frame short (a few rounds); the menu worker can afford to wait for the writer.
+    let rounds = if crate::runtime::threads::on_plugin_thread() { READY_ROUNDS } else { 16 };
+    let Some(words) = READY[role(owner)?].read_yielding(rounds) else {
+        trace!("[BodyBank] ready mirror busy owner={} after {} rounds; no cached kind this plan", owner, rounds);
+        return None;
+    };
     if words[0] != 1 || words[1] != entry as u64 || words[2] != u64::from(owner) {
         return None;
     }

@@ -54,6 +54,18 @@ impl<const W: usize> SeqCell<W> {
         }
         None
     }
+
+    /// [`read`](Self::read) for up to `rounds` rounds of 64 tries, yielding the thread between rounds so a writer that was
+    /// preempted mid-write can finish (never a lock). `None` only when every round met a write in progress.
+    pub fn read_yielding(&self, rounds: usize) -> Option<[u64; W]> {
+        for _ in 0..rounds {
+            if let Some(value) = self.read(64) {
+                return Some(value);
+            }
+            std::thread::yield_now();
+        }
+        None
+    }
 }
 
 #[cfg(test)]
@@ -83,6 +95,27 @@ mod tests {
         writer.join().unwrap();
         assert_eq!(cell.read(1), Some([49_999; 8]));
         assert!(seen > 0);
+    }
+
+    #[test]
+    fn a_yielding_reader_outlasts_a_write_left_open() {
+        let cell: Arc<SeqCell<2>> = Arc::new(SeqCell::new());
+        cell.write(&[7, 7]);
+        // A writer preempted between its marks: the sequence stays odd until it runs again.
+        let seq = cell.seq.load(Relaxed);
+        cell.seq.store(seq + 1, Relaxed);
+        assert_eq!(cell.read(64), None, "a plain read gives up");
+        let writer = {
+            let cell = Arc::clone(&cell);
+            std::thread::spawn(move || {
+                std::thread::sleep(std::time::Duration::from_millis(20));
+                cell.words[0].store(8, Relaxed);
+                cell.words[1].store(8, Relaxed);
+                cell.seq.store(seq + 2, Release);
+            })
+        };
+        assert_eq!(cell.read_yielding(1_000_000), Some([8, 8]));
+        writer.join().unwrap();
     }
 
     #[test]
