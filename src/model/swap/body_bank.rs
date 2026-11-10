@@ -99,8 +99,9 @@ pub struct Members {
 impl Members {
     /// Distinct single bodies only, one to three of them (`0x4b` is Solo Popo).
     /// Canonical multi-body groups and exact Miis keep their loader. A one-member
-    /// group is an extra swap group only: a window bank always starts with two
-    /// members ([`Members::from_forms`]). A kind whose row pins cell 0
+    /// group is an extra swap group, or the target-first window of a rebuild whose
+    /// other members build as groups ([`Members::target_only`]); a full window bank
+    /// starts with two members ([`Members::from_forms`]). A kind whose row pins cell 0
     /// (`CellRule::PinCell0`: Kirby, whose copy registry assumes sub 0 of its
     /// entry, RE-KIRBY-UNLOAD §0–§3; Solo Popo, whose secondary resource
     /// registration `0x17e8410` skips, SOLO-STALL-RCA §3) is refused at cells 1–2:
@@ -351,6 +352,17 @@ impl Members {
             return None;
         }
         Self::laid_out(&selected[..count])
+    }
+
+    /// rc.6.1 target-first: the window of the picked fighter alone, the one-member window a rebuild makes when its other
+    /// members build as background groups ([`target_first`]). Only a single-body form has one (an ordinary kind, Kirby,
+    /// Solo Popo). Its Reload words are native's own single form, and a count-1 window with the bank flag is the state
+    /// every exchange into a one-member group leaves (`ExitRule::SelfCell`). No allocation.
+    pub fn target_only(forms: Forms) -> Option<Self> {
+        if single_member_request(forms.count, forms.kinds, forms.actor_count) != Some(forms) {
+            return None;
+        }
+        Self::new(&forms.kinds[..1])
     }
 
     /// Physical layout of a rotation (`CellRule::PinCell0`): a member whose row pins cell 0
@@ -1050,6 +1062,72 @@ pub fn group_sizes(bodies: usize) -> [usize; MAX_EXTRA_GROUPS] {
         remaining -= *size;
     }
     sizes
+}
+
+/// rc.6.1 target-first (primary 2026-11-10 12:16Z, the operator's console play test): the window a switch's Reload builds
+/// when group swap is on and the shared pool has room for any other body (`pool`: `ready_fighters` less the two active
+/// bodies). It is the picked fighter alone ([`Members::target_only`]), so the Reload waits for one body. The members a full
+/// window would have taken are the role's nearest group candidates ([`plan_extra_groups`] plans a one-member window's role
+/// as usual) and build in the background under the same guards. `None` keeps today's window: group swap off (nothing
+/// would build the rest), no pool, the normal pair (its pair-lead window), and any form without a one-member window.
+pub fn target_first(forms: Forms, groups: bool, pool: usize) -> Option<Members> {
+    if !groups || pool == 0 {
+        return None;
+    }
+    Members::target_only(forms)
+}
+
+/// The group a [`target_first`] Reload's neighbours build as: the members the `full` window would have held besides
+/// `target`, laid out like any group (Kirby at cell 0). The planner plans it first, ahead of the rest of the lane, so it
+/// is admitted on the same cost the full window's supplements were (`memory::window_extras` over those members is
+/// `admit(group_cost(..))`). A kind the planner would not group (`group_member_kind`, the excluded original) is left out;
+/// `None` when nothing is left.
+pub fn neighbour_group(full: Members, target: u32, policy: GroupPolicy, exclude: Option<u32>) -> Option<Members> {
+    let mut kinds = [u32::MAX; NATIVE_MEMBERS];
+    let mut count = 0;
+    for &kind in &full.kinds()[..full.count()] {
+        if kind != target && exclude != Some(kind) && group_member_kind(kind, policy) {
+            kinds[count] = kind;
+            count += 1;
+        }
+    }
+    if count == 0 { None } else { Members::laid_out(&kinds[..count]) }
+}
+
+/// A [`neighbour_group`] seed with its window's target as one word, which the planner reads without a lock
+/// (`native_body_bank::NEIGHBOURS`): 16 bits each for the target and up to two kinds, the count above. `u64::MAX`: none.
+pub fn pack_neighbours(target: u32, seed: Option<Members>) -> u64 {
+    let Some(seed) = seed.filter(|s| s.count() < NATIVE_MEMBERS && target < 0xffff) else { return u64::MAX; };
+    let kinds = seed.kinds();
+    u64::from(target) | (u64::from(kinds[0] & 0xffff) << 16) | (u64::from(kinds[1] & 0xffff) << 32) | ((seed.count() as u64) << 48)
+}
+
+/// The seed [`pack_neighbours`] stored, when `window` is its target's one-member window; `None` for any other window.
+pub fn unpack_neighbours(word: u64, window: Members) -> Option<Members> {
+    let field = |shift: u32| ((word >> shift) & 0xffff) as u32;
+    let count = (word >> 48) as usize;
+    if word == u64::MAX || window.count() != 1 || window.special() != Special::None || field(0) != window.kinds()[0]
+        || !(1..NATIVE_MEMBERS).contains(&count) {
+        return None;
+    }
+    Members::new(&[field(16), field(32)][..count])
+}
+
+/// The extra bodies the next Reload's window builds for `forms`, out of the `window` the lane would give it: none under
+/// [`target_first`] (its neighbours are charged as group bodies), otherwise the window's members after the target. The
+/// planner reserves these before the helpers (`plan_budget`).
+pub fn reload_extras(window: Members, forms: Forms, groups: bool, pool: usize) -> usize {
+    if target_first(forms, groups, pool).is_some() { 0 } else { window.count() - 1 }
+}
+
+/// rc.6.1 target-first: a canonical Reload replaces a Ready one-member ordinary window whose words it repeats (count 1,
+/// the same kind, one actor). The bank's descriptor check still matches such a Reload, so the bank is retired before
+/// native loads it; otherwise the construct seam would write the bank flag onto the canonical entry and the next tick would
+/// take its bodies as the window's. A bank Reload (its incoming bank already Building), a multi-body or Mii window and
+/// any other shape are left to the existing replacement check.
+pub fn canonical_replaces_window(window: Members, phase: Phase, count: u32, kinds: [u32; NATIVE_MEMBERS], actors: u32) -> bool {
+    phase == Phase::Ready && window.special() == Special::None && window.count() == 1
+        && count == 1 && kinds == window.kinds() && actors == window.actor_count()
 }
 
 /// Prefetch poll: ready wins; a timeout fails the group; otherwise keep waiting.
@@ -3335,6 +3413,166 @@ mod tests {
 
     fn kinds_of(plan: &[Option<Members>; MAX_EXTRA_GROUPS]) -> Vec<Vec<u32>> {
         plan.iter().flatten().map(|m| m.kinds()[..m.count()].to_vec()).collect()
+    }
+
+    // ----- rc.6.1 target-first (the console play test's P1: Mr. Game & Watch original; cycle Pikachu, Kirby, Palutena) -----
+
+    const GAME_WATCH: u32 = 0x1c;
+    const PALUTENA: u32 = 0x36;
+    const NONE: u32 = u32::MAX;
+
+    #[test]
+    fn a_rebuild_makes_the_picked_fighter_alone_the_window() {
+        // e6501ac6 built G&W's window [Kirby, G&W, Pikachu] in one Reload, playable after 7.9 s (console #426 -> #434).
+        let today = Members::from_forms(Forms::starting(GAME_WATCH), &[PIKACHU, KIRBY, PALUTENA], 2).unwrap();
+        assert_eq!(today.kinds(), [KIRBY, GAME_WATCH, PIKACHU]);
+        let window = target_first(Forms::starting(GAME_WATCH), true, 6).unwrap();
+        assert_eq!((window.kinds(), window.count(), window.index_of(GAME_WATCH)), ([GAME_WATCH, NONE, NONE], 1, Some(0)));
+        // Its Reload words are native's single form; Ready with the bank flag, left by its self-commit.
+        let ready = EntryState { count: 1, kinds: [GAME_WATCH, NONE, NONE], actor_count: 1, installed: 1, index: 0,
+            previous_or_next: 0xff, pending: 0xff, flags: BANK_FLAG, outer: 6, loader: 14, changing: 0, guard: 0 };
+        assert_eq!(window.ready_index(ready), Some(0));
+        assert_eq!(window.swap_commit_index_for(0), Some(0));
+        // Palutena (window admission refused both supplements, console #416) and Kirby get the same one-member window.
+        assert_eq!(target_first(Forms::starting(PALUTENA), true, 6).map(Members::kinds), Some([PALUTENA, NONE, NONE]));
+        assert_eq!(target_first(Forms::starting(KIRBY), true, 6).map(Members::kinds), Some([KIRBY, NONE, NONE]));
+    }
+
+    #[test]
+    fn target_only_is_the_single_body_form_alone() {
+        assert_eq!(Members::target_only(Forms::starting(PIKACHU)).map(Members::kinds), Some([PIKACHU, NONE, NONE]));
+        assert_eq!(Members::target_only(Forms::solo_popo()).map(Members::kinds), Some([POPO, NONE, NONE]));
+        // The normal pair, the Miis and the native groups have no one-member window.
+        assert_eq!(Members::target_only(Forms::starting(POPO)), None);
+        for kind in [0x48, 0x49, 0x4a, 0x24, 0x5a] {
+            assert_eq!(Members::target_only(Forms::starting(kind)), None, "{kind:#x}");
+        }
+    }
+
+    #[test]
+    fn the_rest_of_the_lane_is_planned_as_groups_beside_the_target() {
+        let window = target_first(Forms::starting(GAME_WATCH), true, 6).unwrap();
+        let lane: &[u32] = &[PIKACHU, KIRBY, PALUTENA];
+        // The members today's window held are the first group (Kirby laid out at cell 0)...
+        let full = Members::from_forms(Forms::starting(GAME_WATCH), lane, 2).unwrap();
+        let seed = neighbour_group(full, GAME_WATCH, GroupPolicy::DEFAULT, None).unwrap();
+        assert_eq!(seed.kinds(), [KIRBY, PIKACHU, NONE]);
+        // ...and the planner takes the rest of the lane beside it: with the console's Ready Fighters (8), Palutena alone.
+        // Without the seed it would have made one triple, whose admission needs more than the pair the window charged.
+        let plan = plan_extra_groups([Some(window), None], [&[seed], &[]], [lane, &[]], [None, None], budget(8));
+        assert_eq!(kinds_of(&plan[0]), vec![vec![PALUTENA]]);
+        let unseeded = plan_extra_groups([Some(window), None], [&[], &[]], [lane, &[]], [None, None], budget(8));
+        assert_eq!(kinds_of(&unseeded[0]), vec![vec![KIRBY, PIKACHU, PALUTENA]]);
+        // Both build in the background beside the one-member window, the neighbours first.
+        let palutena = plan[0][0].unwrap();
+        for group in [seed, palutena] {
+            assert_eq!(background_build_eligible(group, false, window, LiveIdentity::Ordinary, false, false, false), Ok(()));
+        }
+        assert_eq!(next_background([(GroupState::Prefetched, seed, false), (GroupState::Prefetched, palutena, false)].into_iter(),
+            window, LiveIdentity::Ordinary, false, false, false), Some(0));
+        // Kinds the planner would not group stay out of the seed (the excluded original; Solo Popo without its policy).
+        assert_eq!(neighbour_group(full, GAME_WATCH, GroupPolicy::DEFAULT, Some(KIRBY)).map(Members::kinds), Some([PIKACHU, NONE, NONE]));
+        let solo = Members::from_forms(Forms::starting(GAME_WATCH), &[POPO], 1).unwrap();
+        assert_eq!(neighbour_group(solo, GAME_WATCH, GroupPolicy::DEFAULT, None), None);
+    }
+
+    #[test]
+    fn the_neighbours_reach_the_planner_only_for_their_own_window() {
+        let window = target_first(Forms::starting(GAME_WATCH), true, 6).unwrap();
+        let seed = members(&[KIRBY, PIKACHU]);
+        let word = pack_neighbours(GAME_WATCH, Some(seed));
+        assert_eq!(unpack_neighbours(word, window), Some(seed));
+        assert_eq!(unpack_neighbours(pack_neighbours(GAME_WATCH, Some(members(&[PIKACHU]))), window), Some(members(&[PIKACHU])));
+        // Another target's window, a full window, a Mii window and no seed get nothing.
+        assert_eq!(unpack_neighbours(word, target_first(Forms::starting(PALUTENA), true, 6).unwrap()), None);
+        assert_eq!(unpack_neighbours(word, Members::from_forms(Forms::starting(GAME_WATCH), &[KIRBY, PIKACHU], 2).unwrap()), None);
+        assert_eq!(unpack_neighbours(word, Members::mii_group(0x48).unwrap()), None);
+        assert_eq!(pack_neighbours(GAME_WATCH, None), u64::MAX);
+        assert_eq!(unpack_neighbours(u64::MAX, window), None);
+    }
+
+    #[test]
+    fn a_kirby_target_loads_first_and_its_groups_follow_the_kirby_rule_of_a_full_window() {
+        // The Reload of a Kirby target waits for Kirby alone, at cell 0 (the copy registry's sub 0).
+        let window = target_first(Forms::starting(KIRBY), true, 6).unwrap();
+        assert_eq!((window.kinds(), window.index_of(KIRBY)), ([KIRBY, NONE, NONE], Some(0)));
+        let plan = plan_extra_groups([Some(window), None], [&[], &[]], [&[PIKACHU, GAME_WATCH], &[]], [None, None], budget(8));
+        let group = plan[0][0].unwrap();
+        assert_eq!(group.kinds(), [PIKACHU, GAME_WATCH, NONE]);
+        // Parity: a background build beside the one-member Kirby window is decided exactly as beside today's full Kirby
+        // window, with Kirby live or not. Target-first leaves the live-Kirby rule (D-KIRBY1, `p23/rc7-kirby-unguard`)
+        // to its owner.
+        let full = Members::from_forms(Forms::starting(KIRBY), &[PIKACHU, GAME_WATCH], 2).unwrap();
+        let other = members(&[FOX, SAMUS]);
+        for live_kirby in [true, false] {
+            assert_eq!(background_build_eligible(group, false, window, LiveIdentity::Ordinary, live_kirby, false, false),
+                background_build_eligible(other, false, full, LiveIdentity::Ordinary, live_kirby, false, false), "{live_kirby}");
+            assert_eq!(next_background([(GroupState::Prefetched, group, false)].into_iter(), window, LiveIdentity::Ordinary,
+                    live_kirby, false, false).is_some(),
+                next_background([(GroupState::Prefetched, other, false)].into_iter(), full, LiveIdentity::Ordinary,
+                    live_kirby, false, false).is_some(), "{live_kirby}");
+        }
+    }
+
+    #[test]
+    fn the_moved_members_take_the_admission_the_window_used() {
+        use super::memory::{admit, group_cost, window_extras, Admission};
+        // Console #416: the window [36, 1c, 8] admitted 0 of its supplements at 128,733,184 bytes of headroom.
+        let headroom = Some(128_733_184);
+        let (admitted, stopped) = window_extras(headroom, 0, &[GAME_WATCH, PIKACHU]);
+        assert_eq!(admitted, 0);
+        let stopped = stopped.unwrap();
+        assert_eq!(stopped.admission, Admission::Refuse);
+        // The same decision the group prefetch takes for those members (`process_memory::admit(group_cost(..))`).
+        assert_eq!(stopped, admit(headroom, 0, group_cost(&[GAME_WATCH])));
+        // Parity over headroom: the full window [G&W, Pikachu, Kirby] admitted both its supplements exactly when the
+        // target-first window's neighbour group [Kirby, Pikachu] is admitted at its prefetch.
+        let seed = members(&[KIRBY, PIKACHU]);
+        for mb in (0..=1200u64).step_by(25) {
+            let headroom = Some(mb * 1_000_000);
+            let window_both = window_extras(headroom, 0, &[PIKACHU, KIRBY]).0 == 2;
+            let group = admit(headroom, 0, group_cost(&seed.kinds()[..seed.count()])).admission == Admission::Admit;
+            assert_eq!(window_both, group, "{mb} MB");
+        }
+    }
+
+    #[test]
+    fn with_groups_off_the_rebuild_keeps_the_full_window() {
+        assert_eq!(target_first(Forms::starting(GAME_WATCH), false, 6), None);
+        assert_eq!(target_first(Forms::starting(GAME_WATCH), true, 0), None, "no pool: no group could take the rest");
+        let full = Members::from_forms(Forms::starting(GAME_WATCH), &[PIKACHU, KIRBY], 2).unwrap();
+        assert_eq!(reload_extras(full, Forms::starting(GAME_WATCH), false, 6), 2);
+        assert_eq!(reload_extras(full, Forms::starting(GAME_WATCH), true, 0), 2);
+    }
+
+    #[test]
+    fn the_pair_keeps_its_pair_lead_window() {
+        assert_eq!(target_first(Forms::starting(POPO), true, 6), None);
+        let lead = Members::from_pair(&[PIKACHU], 2).unwrap();
+        assert!(lead.is_pair_lead());
+        assert_eq!(reload_extras(lead, Forms::starting(POPO), true, 6), 2);
+    }
+
+    #[test]
+    fn the_next_window_reserves_no_extras_when_they_build_as_groups() {
+        let full = Members::from_forms(Forms::starting(GAME_WATCH), &[PIKACHU, KIRBY], 2).unwrap();
+        assert_eq!(reload_extras(full, Forms::starting(GAME_WATCH), true, 6), 0);
+        assert_eq!(reload_extras(full, Forms::starting(GAME_WATCH), false, 6), 2);
+        // The helpers keep the room: nothing is reserved for P1's next window, the CPU's reservation is unchanged.
+        assert_eq!(reserve_extras([0, 2], [0, 0], 6), [0, 2]);
+    }
+
+    #[test]
+    fn a_canonical_reload_of_the_window_shape_retires_a_one_member_bank() {
+        let one = target_first(Forms::starting(PALUTENA), true, 6).unwrap();
+        assert!(canonical_replaces_window(one, Phase::Ready, 1, [PALUTENA, NONE, NONE], 1));
+        // The bank's own Reload (Building), another kind (the descriptor check retires it) and other windows: unchanged.
+        assert!(!canonical_replaces_window(one, Phase::Building, 1, [PALUTENA, NONE, NONE], 1));
+        assert!(!canonical_replaces_window(one, Phase::Ready, 1, [GAME_WATCH, NONE, NONE], 1));
+        let three = Members::from_forms(Forms::starting(GAME_WATCH), &[PIKACHU, KIRBY], 2).unwrap();
+        assert!(!canonical_replaces_window(three, Phase::Ready, 3, three.kinds(), 1));
+        let mii = Members::mii_group(0x48).unwrap();
+        assert!(!canonical_replaces_window(mii, Phase::Ready, 1, mii.kinds(), 1));
     }
 
     #[test]
