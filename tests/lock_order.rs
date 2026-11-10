@@ -623,6 +623,12 @@ fn on_module_path(func: &callgraph::Func, module: &str) -> bool {
     [file, inner].iter().any(|have| have.ends_with(&want) || want.ends_with(have))
 }
 
+/// Each plugin thread's entry functions (`plugin_entries`, resolved by `entry_starts`): empty when one resolves to nothing
+/// (`every_plugin_thread_entry_resolves`).
+fn plugin_entry_funcs(graph: &Graph) -> Vec<(Vec<usize>, String)> {
+    plugin_entries().into_iter().map(|(key, name, module)| (entry_starts(graph, &key, &module), name)).collect()
+}
+
 fn scan(graph: &Graph) -> (Ctx<'_>, Scan) {
     let runtime = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");
     let ctx = Ctx::new(graph, static_locks(&runtime));
@@ -1115,6 +1121,38 @@ struct Shared {
     plugin_reached: BTreeMap<usize, BTreeSet<String>>,
 }
 
+/// `(from, token, to)` for a runtime function handed over by bare name as a value (`.and_then(stage_evidence)`,
+/// `service(waiting_name_allowed)`): `calls` keeps a value use only when it is path-qualified. It runs on the thread that hands it
+/// over (a synchronous callback) or is a registration whose runner `REGISTRARS` names, so the edge is from the function that hands
+/// it over (docs lane review R2, 2026-11-10). A same-file function only, and not a name the body binds itself.
+fn value_edges(graph: &Graph) -> Vec<(usize, usize, usize)> {
+    let mut out = Vec::new();
+    for (f, func) in graph.funcs.iter().enumerate() {
+        let b = &func.body;
+        for i in 1..b.len() {
+            let Some(name) = ident(b.get(i)) else { continue };
+            let next_ok = matches!(b.get(i + 1), Some(Tok::Punct(',' | ')' | ';' | ']' | '}'))) || ident(b.get(i + 1)) == Some("as");
+            if !next_ok || !matches!(b.get(i - 1), Some(Tok::Punct('(' | ',' | '=' | '[' | '{' | '&'))) {
+                continue;
+            }
+            let bound = (0..b.len().saturating_sub(1)).any(|k| {
+                matches!((&b[k], &b[k + 1]), (Tok::Ident(l), Tok::Ident(m)) if (l == "let" || l == "mut" || l == "for") && m == name)
+                    || matches!((&b[k], &b[k + 1]), (Tok::Punct('|' | '(' | ','), Tok::Ident(m))
+                        if m == name && matches!(b.get(k + 2), Some(Tok::Punct(':' | '|' | ','))))
+            });
+            if bound {
+                continue;
+            }
+            for (to, target) in graph.funcs.iter().enumerate() {
+                if to != f && target.name == name && target.file == func.file && !target.has_receiver {
+                    out.push((f, i, to));
+                }
+            }
+        }
+    }
+    out
+}
+
 fn shared_locks(ctx: &Ctx, s: &Scan) -> Shared {
     let graph = ctx.graph;
     let n = graph.funcs.len();
@@ -1129,6 +1167,9 @@ fn shared_locks(ctx: &Ctx, s: &Scan) -> Shared {
         .collect();
     for (from, to) in callback_edges(graph) {
         callees[from].push((0, to));
+    }
+    for (from, at, to) in value_edges(graph) {
+        callees[from].push((at, to));
     }
     let walk = |starts: Vec<usize>, plugin: bool| -> BTreeSet<usize> {
         let mut seen = BTreeSet::new();
@@ -1219,6 +1260,65 @@ fn no_lock_a_game_hook_waits_on_is_held_by_a_plugin_thread() {
         println!("SHARED {p}");
     }
     assert!(problems.is_empty(), "locks a game hook waits on that a plugin thread can hold ({}):\n{}", problems.len(), problems.join("\n"));
+}
+
+/// The lock-free runtime (operator order 2026-11-10 00:44Z, `artifacts/phase23/TASK-OPUS-rc6-lockfree.md`): no plugin thread ever
+/// takes a lock that any game entry point can wait on. The inventory is every such lock with no exception at all (no
+/// `SHARED_ON_PURPOSE`, no `MEASURED_ON_MAIN_THREAD`), over the diag build (the Eden runs' build: its own modules, threads and hooks
+/// too), every `#[skyline::hook]` and `GAME_ENTRIES`, the callback tables and bare-name function values. It is the work queue:
+/// `LOCKFREE_INVENTORY_MAX` only goes down, step by step, to 0.
+const LOCKFREE_INVENTORY_MAX: usize = 19;
+
+/// The diag build's call graph (`runtime_graph` plus the `#[cfg(feature = "diag")]` modules).
+fn diag_runtime_graph() -> Graph {
+    let mut graph = Graph::scan_with_diag(&Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime"));
+    graph.precise_imports = true;
+    graph
+}
+
+/// `(lock, the game entries that wait on it, the plugin functions and threads that hold it)`, with no exception.
+fn lockfree_inventory(ctx: &Ctx, shared: &Shared) -> Vec<(String, BTreeSet<String>, BTreeSet<String>)> {
+    shared
+        .game_waits
+        .keys()
+        .filter_map(|lock| {
+            let holds = shared.plugin_holds.get(lock)?;
+            Some((lock_name(ctx, *lock), shared.game_hooks[lock].clone(), holds.clone()))
+        })
+        .collect()
+}
+
+#[test]
+fn the_lockfree_inventory_only_shrinks() {
+    let graph = diag_runtime_graph();
+    let (ctx, s) = scan(&graph);
+    let shared = shared_locks(&ctx, &s);
+    let items = lockfree_inventory(&ctx, &shared);
+    println!("LOCKFREE-INVENTORY {}", items.len());
+    for (lock, entries, holds) in &items {
+        let threads: BTreeSet<&str> = holds.iter().filter_map(|h| h.split_once(" (").and_then(|(_, t)| t.strip_suffix(')'))).collect();
+        println!("LOCKFREE {lock}\n    entries wait: {}\n    threads hold: {}\n    held in: {}",
+            entries.iter().cloned().collect::<Vec<_>>().join(", "),
+            threads.into_iter().collect::<Vec<_>>().join(", "),
+            holds.iter().cloned().collect::<Vec<_>>().join(", "));
+    }
+    assert!(items.len() <= LOCKFREE_INVENTORY_MAX, "the lock-free inventory grew: {} > {LOCKFREE_INVENTORY_MAX}", items.len());
+}
+
+/// Every plugin thread's entry resolves to the function its `model::thread_stacks` symbol names, in the diag build (no thread is
+/// skipped silently: `macros::diag::start` once resolved to `threads.rs`'s `mod diag`, and `practice_trace::writer`, inside
+/// `mod enabled`, to nothing; docs lane review R2), and in the shipped build every thread but the diag build's own.
+#[test]
+fn every_plugin_thread_entry_resolves() {
+    let diag = diag_runtime_graph();
+    for (found, name) in plugin_entry_funcs(&diag) {
+        assert!(!found.is_empty(), "{name}: its entry resolves to no function in the diag build");
+    }
+    let shipped = runtime_graph();
+    let missing: BTreeSet<String> =
+        plugin_entry_funcs(&shipped).into_iter().filter(|(found, _)| found.is_empty()).map(|(_, name)| name).collect();
+    let diag_only: BTreeSet<String> = ["tr-probe", "tr-macro-diag"].iter().map(|s| (*s).to_owned()).collect();
+    assert_eq!(missing, diag_only, "the shipped build lacks only the diag build's own threads");
 }
 
 /// The saved-Mii catalog read is the one plugin-thread job behind the Training-entry freeze (`yoga-i3-final`, primary 2026-11-09

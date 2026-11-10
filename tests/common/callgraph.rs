@@ -543,14 +543,25 @@ fn module_of_file(rel: &str) -> String {
 impl Graph {
     /// `skip_dirs`: folders (relative to `runtime_dir`) that are not scanned: package 6's own seam-guarded areas.
     pub fn scan(runtime_dir: &Path, skip_dirs: &[&str]) -> Graph {
+        Self::scan_build(runtime_dir, skip_dirs, false)
+    }
+
+    /// [`scan`](Self::scan) with the diag build's own modules too (`#[cfg(feature = "diag")] mod x;`): the Eden runs use that
+    /// build, so the lock-free inventory walks its threads and hooks as well.
+    pub fn scan_with_diag(runtime_dir: &Path) -> Graph {
+        Self::scan_build(runtime_dir, &[], true)
+    }
+
+    fn scan_build(runtime_dir: &Path, skip_dirs: &[&str], diag: bool) -> Graph {
         let mut files = Vec::new();
         rust_files(runtime_dir, &mut files);
         files.retain(|path| {
             let rel = path.strip_prefix(runtime_dir).unwrap().to_string_lossy().replace('\\', "/");
             !skip_dirs.iter().any(|dir| rel.starts_with(&format!("{dir}/")))
         });
-        // Modules declared `#[cfg(feature = "diag")] mod x;` are Eden-only code: never in the shipped build, so not scanned.
-        let diag_only: Vec<PathBuf> = files
+        // Modules declared `#[cfg(feature = "diag")] mod x;` are Eden-only code: never in the shipped build, so not scanned
+        // (unless `diag`).
+        let diag_only: Vec<PathBuf> = if diag { Vec::new() } else { files
             .iter()
             .flat_map(|path| {
                 let toks = lex_attrs(&fs::read_to_string(path).unwrap());
@@ -558,7 +569,7 @@ impl Graph {
                 let own = dir.join(path.file_stem().unwrap());
                 toks.into_iter().flat_map(move |name| [dir.join(format!("{name}.rs")), dir.join(&name).join("mod.rs"), own.join(format!("{name}.rs")), own.join(&name).join("mod.rs")]).collect::<Vec<_>>()
             })
-            .collect();
+            .collect() };
         files.retain(|path| !diag_only.contains(path));
         let mut funcs = Vec::new();
         let mut aliases: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();
