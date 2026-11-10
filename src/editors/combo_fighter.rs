@@ -119,9 +119,10 @@ mod tests {
     #[test]
     fn the_shared_prompt_asks_about_player_1_and_reports_to_the_combos_ui() {
         use crate::engine::macro_ui::macro_panel::{Effect, FighterOrigin, MacroUi, Pad};
+        use crate::model::recording_menu::ViewRole;
         let mut ui = MacroUi::new();
-        assert!(!ui.open_fighter_prompt_for(FighterOrigin::Named, 1, "Ryu".into(), "Mario".into()), "Named keeps its own path");
-        assert!(ui.open_fighter_prompt_for(FighterOrigin::Combo, 4, "Ryu".into(), "Mario".into()));
+        assert!(!ui.open_fighter_prompt_for(FighterOrigin::Named, ViewRole::Cpu, 1, "Ryu".into(), "Mario".into()), "Named keeps its own path");
+        assert!(ui.open_fighter_prompt_for(FighterOrigin::Combo, ViewRole::Player, 4, "Ryu".into(), "Mario".into()));
         assert_eq!(ui.fighter_prompt(), Some((FighterOrigin::Combo, 4)));
         assert!(!ui.open_fighter_prompt(5, "Fox".into(), "Hero".into()), "one prompt at a time");
         let view = ui.view().expect("the prompt is on screen");
@@ -131,9 +132,9 @@ mod tests {
         assert!(!view.footer.contains("CPU") && view.footer.contains("A chooses") && view.footer.contains("B cancels"));
         assert!(matches!(ui.on_pad(Pad::Back), Effect::ComboFighter(None)));
         assert!(!ui.is_open());
-        ui.open_fighter_prompt_for(FighterOrigin::Combo, 4, "Ryu".into(), "Mario".into());
+        ui.open_fighter_prompt_for(FighterOrigin::Combo, ViewRole::Player, 4, "Ryu".into(), "Mario".into());
         assert!(matches!(ui.on_pad(Pad::Confirm), Effect::ComboFighter(Some(FighterChoice::Keep))), "Keep is the default");
-        ui.open_fighter_prompt_for(FighterOrigin::Combo, 4, "Ryu".into(), "Mario".into());
+        ui.open_fighter_prompt_for(FighterOrigin::Combo, ViewRole::Player, 4, "Ryu".into(), "Mario".into());
         ui.on_pad(Pad::Down);
         assert!(matches!(ui.on_pad(Pad::Confirm), Effect::ComboFighter(Some(FighterChoice::Switch))));
         assert_eq!(ui.loaded_id(), None, "no named macro was loaded");

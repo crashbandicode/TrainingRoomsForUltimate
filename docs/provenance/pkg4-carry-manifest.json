@@ -612,7 +612,7 @@
    "dest": "src/model/macro_ui/macro_panel.rs",
    "crate": "tui",
    "src_sha256": "1b6e698f679029bc6fa83ff9cd43756302bd939debaad2d3eeeacd10fb166da1",
-   "dest_sha256": "b8239457a37d3bdf9e618c5b99dc3731e8fa0681bd7dcad3de27638a0cd87304",
+   "dest_sha256": "41a5a33a19196f5b4dbbbcdffab9c121ca11ebe4387be4326046f37a1bb2496c",
    "edits": [
     {
      "old": "    /// Facing, status, and frames for one playback. Empty when the fighter is not ready.\n    pub fn copy_playback(",
@@ -843,6 +843,41 @@
      "old": "        assert!(!ui.open_editor(None));\n    }\n",
      "new": "        assert!(!ui.open_editor(None));\n    }\n\n    /// Primary 2026-11-08 #70 (a): Edit placement edits the role's active macro, the file Play plays. Eden\n    /// rc6-covrec-diag2 cov-edit-placement: with a macro active the row refused \"Load a macro and restore a Training\n    /// state first\", because it looked for the retired named layer's macro.\n    #[test]\n    fn edit_placement_opens_on_the_active_macro_and_writes_that_file() {\n        let mut ui = MacroUi::new();\n        let original = sample(Placement::default());\n        assert!(ui.open_placement(\"active-1\".into(), original.clone(), (10.0, 0.0)));\n        assert!(ui.is_open());\n        assert_eq!(ui.marker(), Some((10.0, 0.0)), \"the marker starts on the start save's position\");\n        assert_eq!(ui.loaded_id(), None, \"the named selection is not changed\");\n        ui.on_pad(Pad::Confirm);\n        assert_eq!(ui.marker(), Some((11.0, 0.0)));\n        goto(&mut ui, 10);\n        let Effect::Overwrite { id, recording } = ui.on_pad(Pad::Confirm) else { panic!(\"Write over the active file\") };\n        assert_eq!(id, \"active-1\");\n        assert_eq!(recording.placement.delta_x, 1.0);\n        assert_eq!(recording.frames, original.frames, \"inputs stay recorded\");\n        assert!(!ui.is_open());\n        assert_eq!(ui.loaded_id(), None);\n\n        assert!(ui.open_placement(\"active-1\".into(), original.clone(), (10.0, 0.0)));\n        ui.on_pad(Pad::Confirm);\n        goto(&mut ui, 9);\n        let Effect::KeepPlacement { id, placement } = ui.on_pad(Pad::Confirm) else { panic!(\"Keep for this session\") };\n        assert_eq!((id.as_str(), placement.delta_x), (\"active-1\", 1.0));\n        assert!(!ui.is_open());\n\n        assert!(ui.open_placement(\"active-1\".into(), original, (10.0, 0.0)));\n        assert!(matches!(ui.on_pad(Pad::Back), Effect::None));\n        assert!(!ui.is_open());\n        assert_eq!(ui.marker(), None);\n    }\n",
      "reason": "Primary 2026-11-08 #70 (a), p23/rc6-cov-rec: Edit placement edits the role's active macro, the file Play plays (MacroUi::open_placement and Editing; Write over writes that file, Keep reports Effect::KeepPlacement, Save as starts from it; the named selection is not changed)"
+    },
+    {
+     "old": "pub use fighter::{gate as fighter_gate, Choice as FighterChoice, Gate as FighterGate, Origin as FighterOrigin};\n",
+     "new": "pub use fighter::{gate as fighter_gate, Choice as FighterChoice, Gate as FighterGate, Origin as FighterOrigin};\nuse crate::model::recording_menu::ViewRole;\n",
+     "reason": "rc.7 Fighter Mismatch role fix (hot-slots 2026-11-10 18:58Z, cov-mismatch-cancel; primary 19:30Z): the prompt takes the side that plays (recording_menu::ViewRole) and names it with the menu's role names ('current Player 1 {}' / 'current CPU {}'); a library load and a replay clip pass the CPU; open_recording_fighter_prompt and open_fighter_prompt_for take the side; Combo's wording is unchanged"
+    },
+    {
+     "old": "                        FighterOrigin::Named,\n",
+     "new": "                        FighterOrigin::Named,\n                        // A library load plays on the CPU (`LoadContext::cpu_kind`).\n                        ViewRole::Cpu,\n",
+     "reason": "rc.7 Fighter Mismatch role fix (hot-slots 2026-11-10 18:58Z, cov-mismatch-cancel; primary 19:30Z): the prompt takes the side that plays (recording_menu::ViewRole) and names it with the menu's role names ('current Player 1 {}' / 'current CPU {}'); a library load and a replay clip pass the CPU; open_recording_fighter_prompt and open_fighter_prompt_for take the side; Combo's wording is unchanged"
+    },
+    {
+     "old": "    /// Prompt for a replay clip or track. The clip editor keeps the candidate and\n",
+     "new": "    /// Prompt for a replay clip or track, which previews on the CPU. The clip editor keeps the candidate and\n",
+     "reason": "rc.7 Fighter Mismatch role fix (hot-slots 2026-11-10 18:58Z, cov-mismatch-cancel; primary 19:30Z): the prompt takes the side that plays (recording_menu::ViewRole) and names it with the menu's role names ('current Player 1 {}' / 'current CPU {}'); a library load and a replay clip pass the CPU; open_recording_fighter_prompt and open_fighter_prompt_for take the side; Combo's wording is unchanged"
+    },
+    {
+     "old": "        self.open_fighter_prompt_for(FighterOrigin::Clip, revision, recorded_label, current_label)\n",
+     "new": "        self.open_fighter_prompt_for(FighterOrigin::Clip, ViewRole::Cpu, revision, recorded_label, current_label)\n",
+     "reason": "rc.7 Fighter Mismatch role fix (hot-slots 2026-11-10 18:58Z, cov-mismatch-cancel; primary 19:30Z): the prompt takes the side that plays (recording_menu::ViewRole) and names it with the menu's role names ('current Player 1 {}' / 'current CPU {}'); a library load and a replay clip pass the CPU; open_recording_fighter_prompt and open_fighter_prompt_for take the side; Combo's wording is unchanged"
+    },
+    {
+     "old": "    /// Refused while another panel is open.\n",
+     "new": "    /// `side` plays the inputs and `current_label` is its fighter. Refused while another panel is open.\n",
+     "reason": "rc.7 Fighter Mismatch role fix (hot-slots 2026-11-10 18:58Z, cov-mismatch-cancel; primary 19:30Z): the prompt takes the side that plays (recording_menu::ViewRole) and names it with the menu's role names ('current Player 1 {}' / 'current CPU {}'); a library load and a replay clip pass the CPU; open_recording_fighter_prompt and open_fighter_prompt_for take the side; Combo's wording is unchanged"
+    },
+    {
+     "old": "        origin: FighterOrigin,\n",
+     "new": "        origin: FighterOrigin,\n        side: ViewRole,\n",
+     "reason": "rc.7 Fighter Mismatch role fix (hot-slots 2026-11-10 18:58Z, cov-mismatch-cancel; primary 19:30Z): the prompt takes the side that plays (recording_menu::ViewRole) and names it with the menu's role names ('current Player 1 {}' / 'current CPU {}'); a library load and a replay clip pass the CPU; open_recording_fighter_prompt and open_fighter_prompt_for take the side; Combo's wording is unchanged"
+    },
+    {
+     "old": "            prompt: fighter::Prompt::new(origin, revision, recorded_label, current_label),\n",
+     "new": "            prompt: fighter::Prompt::new(origin, side, revision, recorded_label, current_label),\n",
+     "reason": "rc.7 Fighter Mismatch role fix (hot-slots 2026-11-10 18:58Z, cov-mismatch-cancel; primary 19:30Z): the prompt takes the side that plays (recording_menu::ViewRole) and names it with the menu's role names ('current Player 1 {}' / 'current CPU {}'); a library load and a replay clip pass the CPU; open_recording_fighter_prompt and open_fighter_prompt_for take the side; Combo's wording is unchanged"
     }
    ]
   },
@@ -851,7 +886,7 @@
    "dest": "src/model/macro_ui/macro_panel/fighter.rs",
    "crate": "tui",
    "src_sha256": "1a4e2da3199c28c0d66ad424b2d6cbdb38b9e9ed283e529dfbc8e29e01b50f69",
-   "dest_sha256": "2fc97ae6505e458ba682b6ea467f6e34c655e5371e8b21dd4b325c863033a8a4",
+   "dest_sha256": "314e89e859bd1a895de7b0968700e4925f546a6ddef5c6a2bc06a5288b42c5bf",
    "edits": [
     {
      "old": "            Pad::Extra => {}",
@@ -887,6 +922,46 @@
      "old": "        assert!(view.footer.contains(\"A chooses\") && view.footer.contains(\"B cancels\"));\n    }\n}\n",
      "new": "        assert!(view.footer.contains(\"A chooses\") && view.footer.contains(\"B cancels\"));\n    }\n\n    #[test]\n    fn a_recording_prompt_uses_the_same_rows_and_starts_on_keep() {\n        let prompt = Prompt::new(Origin::Recording, 0, \"Pikachu\".into(), \"Mario\".into());\n        let view = prompt.view();\n        assert_eq!(view.title, \"Fighter Mismatch\");\n        assert_eq!(view.labels[0], \"Keep current fighter\");\n        assert_eq!(view.labels[1], \"Switch to recorded fighter\");\n        assert_eq!(view.selected, 0);\n        assert_eq!(prompt.choice(), Choice::Keep);\n        assert!(view.footer.contains(\"Pikachu\") && view.footer.contains(\"Mario\"));\n        assert!(view.footer.contains(\"B cancels\"));\n    }\n}\n",
      "reason": "rc.5 recording path (dc136e1): `Origin::Recording` for a recording, a combo drill or a chain's macro 1, with the Named/Clip footer, and its host test"
+    },
+    {
+     "old": "use super::{Pad, View, PAGE};\n",
+     "new": "use super::{Pad, View, PAGE};\nuse crate::model::recording_menu::ViewRole;\n",
+     "reason": "rc.7 Fighter Mismatch role fix (hot-slots 2026-11-10 18:58Z, cov-mismatch-cancel; primary 19:30Z): the prompt takes the side that plays (recording_menu::ViewRole) and names it with the menu's role names ('current Player 1 {}' / 'current CPU {}'); a library load and a replay clip pass the CPU; open_recording_fighter_prompt and open_fighter_prompt_for take the side; Combo's wording is unchanged"
+    },
+    {
+     "old": "    origin: Origin,\n",
+     "new": "    origin: Origin,\n    /// The side the inputs play on; `current` is its fighter.\n    side: ViewRole,\n",
+     "reason": "rc.7 Fighter Mismatch role fix (hot-slots 2026-11-10 18:58Z, cov-mismatch-cancel; primary 19:30Z): the prompt takes the side that plays (recording_menu::ViewRole) and names it with the menu's role names ('current Player 1 {}' / 'current CPU {}'); a library load and a replay clip pass the CPU; open_recording_fighter_prompt and open_fighter_prompt_for take the side; Combo's wording is unchanged"
+    },
+    {
+     "old": "    pub fn new(origin: Origin, revision: u64, recorded: String, current: String) -> Self {\n        Self { origin, revision, recorded, current, cursor: 0 }\n",
+     "new": "    pub fn new(origin: Origin, side: ViewRole, revision: u64, recorded: String, current: String) -> Self {\n        Self { origin, side, revision, recorded, current, cursor: 0 }\n",
+     "reason": "rc.7 Fighter Mismatch role fix (hot-slots 2026-11-10 18:58Z, cov-mismatch-cancel; primary 19:30Z): the prompt takes the side that plays (recording_menu::ViewRole) and names it with the menu's role names ('current Player 1 {}' / 'current CPU {}'); a library load and a replay clip pass the CPU; open_recording_fighter_prompt and open_fighter_prompt_for take the side; Combo's wording is unchanged"
+    },
+    {
+     "old": "                \"Recorded {} \u00b7 current CPU {}\\nInputs are the same either way. A chooses, B cancels.\",\n                self.recorded, self.current\n",
+     "new": "                \"Recorded {} \u00b7 current {} {}\\nInputs are the same either way. A chooses, B cancels.\",\n                self.recorded, self.side.label(), self.current\n",
+     "reason": "rc.7 Fighter Mismatch role fix (hot-slots 2026-11-10 18:58Z, cov-mismatch-cancel; primary 19:30Z): the prompt takes the side that plays (recording_menu::ViewRole) and names it with the menu's role names ('current Player 1 {}' / 'current CPU {}'); a library load and a replay clip pass the CPU; open_recording_fighter_prompt and open_fighter_prompt_for take the side; Combo's wording is unchanged"
+    },
+    {
+     "old": "        let mut prompt = Prompt::new(Origin::Named, 7, \"Kirby\".into(), \"Hero\".into());\n",
+     "new": "        let mut prompt = Prompt::new(Origin::Named, ViewRole::Cpu, 7, \"Kirby\".into(), \"Hero\".into());\n",
+     "reason": "rc.7 Fighter Mismatch role fix (hot-slots 2026-11-10 18:58Z, cov-mismatch-cancel; primary 19:30Z): the prompt takes the side that plays (recording_menu::ViewRole) and names it with the menu's role names ('current Player 1 {}' / 'current CPU {}'); a library load and a replay clip pass the CPU; open_recording_fighter_prompt and open_fighter_prompt_for take the side; Combo's wording is unchanged"
+    },
+    {
+     "old": "        let view = Prompt::new(Origin::Clip, 1, \"Kirby\".into(), \"Hero\".into()).view();\n",
+     "new": "        let view = Prompt::new(Origin::Clip, ViewRole::Cpu, 1, \"Kirby\".into(), \"Hero\".into()).view();\n",
+     "reason": "rc.7 Fighter Mismatch role fix (hot-slots 2026-11-10 18:58Z, cov-mismatch-cancel; primary 19:30Z): the prompt takes the side that plays (recording_menu::ViewRole) and names it with the menu's role names ('current Player 1 {}' / 'current CPU {}'); a library load and a replay clip pass the CPU; open_recording_fighter_prompt and open_fighter_prompt_for take the side; Combo's wording is unchanged"
+    },
+    {
+     "old": "        let prompt = Prompt::new(Origin::Recording, 0, \"Pikachu\".into(), \"Mario\".into());\n",
+     "new": "        let prompt = Prompt::new(Origin::Recording, ViewRole::Player, 0, \"Pikachu\".into(), \"Mario\".into());\n",
+     "reason": "rc.7 Fighter Mismatch role fix (hot-slots 2026-11-10 18:58Z, cov-mismatch-cancel; primary 19:30Z): the prompt takes the side that plays (recording_menu::ViewRole) and names it with the menu's role names ('current Player 1 {}' / 'current CPU {}'); a library load and a replay clip pass the CPU; open_recording_fighter_prompt and open_fighter_prompt_for take the side; Combo's wording is unchanged"
+    },
+    {
+     "old": "        assert!(view.footer.contains(\"B cancels\"));\n    }\n",
+     "new": "        assert!(view.footer.contains(\"B cancels\"));\n    }\n\n    #[test]\n    fn the_footer_names_the_side_that_plays() {\n        // hot-slots 2026-11-10 18:58Z (`cov-mismatch-cancel`): Play on Player 1 (Donkey Kong) with the CPU on Mario read\n        // \"Recorded Mario \u00b7 current CPU Donkey Kong\". The role word is the playing side's, in the menu's names.\n        let first = |origin, side| {\n            let footer = Prompt::new(origin, side, 0, \"Mario\".into(), \"Donkey Kong\".into()).view().footer;\n            footer.lines().next().unwrap_or_default().to_owned()\n        };\n        for origin in [Origin::Named, Origin::Clip, Origin::Recording] {\n            assert_eq!(first(origin, ViewRole::Player), \"Recorded Mario \u00b7 current Player 1 Donkey Kong\", \"{origin:?}\");\n            assert_eq!(first(origin, ViewRole::Cpu), \"Recorded Mario \u00b7 current CPU Donkey Kong\", \"{origin:?}\");\n        }\n        // A combo's question is about Player 1's fighter: its wording is the same whichever side is passed.\n        assert_eq!(first(Origin::Combo, ViewRole::Player), \"Recorded on Mario \u00b7 P1 is Donkey Kong\");\n        assert_eq!(first(Origin::Combo, ViewRole::Cpu), \"Recorded on Mario \u00b7 P1 is Donkey Kong\");\n        // The second line is unchanged for every origin.\n        let view = Prompt::new(Origin::Recording, ViewRole::Player, 0, \"Mario\".into(), \"Donkey Kong\".into()).view();\n        assert_eq!(view.footer.lines().nth(1), Some(\"Inputs are the same either way. A chooses, B cancels.\"));\n    }\n",
+     "reason": "rc.7 Fighter Mismatch role fix (hot-slots 2026-11-10 18:58Z, cov-mismatch-cancel; primary 19:30Z): the prompt takes the side that plays (recording_menu::ViewRole) and names it with the menu's role names ('current Player 1 {}' / 'current CPU {}'); a library load and a replay clip pass the CPU; open_recording_fighter_prompt and open_fighter_prompt_for take the side; Combo's wording is unchanged"
     }
    ]
   },
@@ -1062,7 +1137,7 @@
    "dest": "src/runtime/macros/named_macros.rs",
    "crate": "root",
    "src_sha256": "737474479d5f05b064ab645d850ceb189cad3943097ae4fdb5fc74d2fcda0809",
-   "dest_sha256": "dd3da29556cec89cbfc150201726d76ede3c61dc4d7d6baca1e5eca8885981cd",
+   "dest_sha256": "6e7bbeb68ca6bbfc735a3f5deb9f073470852dd188ba859bba1cf841dadf7884",
    "edits": [
     {
      "old": "use training_mod_sync::*;",
@@ -1672,6 +1747,21 @@
      "old": "pub fn clip_foreground() -> bool {\n    !suspended() && !lock_read(&UI).is_open() && crate::runtime::macros::replay_capture::panel_visible()\n        && !naming_pending() && !crate::runtime::mii::native_keyboard::busy()\n",
      "new": "pub fn clip_foreground() -> bool {\n    // UI's guard ends with this statement: the keyboard service holds NAME_JOB while it takes UI, so UI is never held\n    // while NAME_JOB is taken (tests/lock_order.rs).\n    let open = lock_read(&UI).is_open();\n    !suspended() && !open && crate::runtime::macros::replay_capture::panel_visible()\n        && !naming_pending() && !crate::runtime::mii::native_keyboard::busy()\n",
      "reason": "rc.6 menu-close freeze audit (primary 2026-11-09 12:28Z; tests/lock_order.rs): clip_foreground reads UI open flag in its own statement, so UI is never held while NAME_JOB is taken (the keyboard service holds NAME_JOB while it takes UI)"
+    },
+    {
+     "old": "/// Open the shared Fighter Mismatch screen for a recording, a combo drill, or a chain's macro 1.\npub fn open_recording_fighter_prompt(origin: FighterOrigin, recorded: String, current: String) -> bool {\n",
+     "new": "/// Open the shared Fighter Mismatch screen for a recording, a combo drill, or a chain's macro 1, played by `side`.\npub fn open_recording_fighter_prompt(origin: FighterOrigin, side: crate::model::recording_menu::ViewRole, recorded: String, current: String) -> bool {\n",
+     "reason": "rc.7 Fighter Mismatch role fix (hot-slots 2026-11-10 18:58Z, cov-mismatch-cancel; primary 19:30Z): the prompt takes the side that plays (recording_menu::ViewRole) and names it with the menu's role names ('current Player 1 {}' / 'current CPU {}'); a library load and a replay clip pass the CPU; open_recording_fighter_prompt and open_fighter_prompt_for take the side; Combo's wording is unchanged"
+    },
+    {
+     "old": "    let opened = lock_write(&UI).open_fighter_prompt_for(origin, 0, recorded, current);\n",
+     "new": "    let opened = lock_write(&UI).open_fighter_prompt_for(origin, side, 0, recorded, current);\n",
+     "reason": "rc.7 Fighter Mismatch role fix (hot-slots 2026-11-10 18:58Z, cov-mismatch-cancel; primary 19:30Z): the prompt takes the side that plays (recording_menu::ViewRole) and names it with the menu's role names ('current Player 1 {}' / 'current CPU {}'); a library load and a replay clip pass the CPU; open_recording_fighter_prompt and open_fighter_prompt_for take the side; Combo's wording is unchanged"
+    },
+    {
+     "old": "    let opened=lock_write(&UI).open_fighter_prompt_for(FighterOrigin::Combo,revision,recorded,current);\n",
+     "new": "    let opened=lock_write(&UI).open_fighter_prompt_for(FighterOrigin::Combo,crate::model::recording_menu::ViewRole::Player,revision,recorded,current);\n",
+     "reason": "rc.7 Fighter Mismatch role fix (hot-slots 2026-11-10 18:58Z, cov-mismatch-cancel; primary 19:30Z): the prompt takes the side that plays (recording_menu::ViewRole) and names it with the menu's role names ('current Player 1 {}' / 'current CPU {}'); a library load and a replay clip pass the CPU; open_recording_fighter_prompt and open_fighter_prompt_for take the side; Combo's wording is unchanged"
     }
    ]
   },
