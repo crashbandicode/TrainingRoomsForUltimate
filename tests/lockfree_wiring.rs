@@ -249,3 +249,21 @@ fn the_heartbeat_takes_the_hooks_receipts_without_a_lock() {
     let heartbeat = reachable(&g, "cpu_pilot::service");
     assert!(!heartbeat.contains("cpu_pilot::post"), "the heartbeat posts to its own outbox");
 }
+
+/// Step 5a: the inline keyboard's callback signals (`inline_keyboard::SIGNALS`) are taken only with `try_lock`, by the menu worker's
+/// keyboard and by the Mii editor's (game hooks) alike: no thread ever waits on them. The keyboard lease already made the takes
+/// exclusive (every take is on the lease owner's thread, inside its calls), so a `try_lock` always succeeds there; if one ever
+/// failed, a callback counts a missed signal, a poll returns no new signals this pass (they wait for the next), and an open fails
+/// (the lease is released).
+#[test]
+fn the_keyboard_signals_are_only_ever_tried() {
+    let keyboard = include_str!("../src/runtime/mii/native_keyboard/inline_keyboard.rs");
+    assert!(!keyboard.contains("SIGNALS.lock()"), "a blocking take of the keyboard's signals again");
+    for callback in ["changed", "moved", "entered", "cancelled", "initialized", "finished"] {
+        let f = body(keyboard, callback);
+        assert!(f.contains("signals(") || f.contains("SIGNALS.try_lock()"), "the {callback} callback no longer tries the signals:\n{f}");
+    }
+    ordered(body(keyboard, "signals"), &["SIGNALS.try_lock()", "MISSED.fetch_add("]);
+    ordered(&keyboard[keyboard.find("pub(crate) unsafe fn open(").unwrap()..], &["Lease::acquire()?", "SIGNALS.try_lock()", "return None"]);
+    ordered(&keyboard[keyboard.find("pub(crate) unsafe fn poll(").unwrap()..], &["sdk_calc(", "SIGNALS.try_lock()"]);
+}

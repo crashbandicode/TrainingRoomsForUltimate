@@ -103,11 +103,10 @@ const FOREIGN_RECEIVERS: &[(&str, &[&str], &str)] = &[
     ("target", &["active", "cycle", "editor", "proof"], "combos::Ui::target is private to ui/combos.rs"),
     (
         "poll",
-        &["?", "JOBS", "adapter", "clock", "detector", "gate", "guard", "model", "queue", "replies", "reply", "t"],
+        &["?", "JOBS", "adapter", "clock", "detector", "gate", "guard", "model", "queue", "replies", "t"],
         "inline_keyboard::Keyboard is held only as `keyboard`, mii_catalog_request's private Broker only as `broker` \
-         (RECEIVER_MODULES); these are engine exchanges and queues, input adapters, the model's catalog reply",
+         (RECEIVER_MODULES); these are engine exchanges and queues, input adapters",
     ),
-    ("close", &["queue"], "practice_trace_core's queue; inline_keyboard::Keyboard is held only as `keyboard`"),
 ];
 const PANELS: &str = "combos::Ui and setups::Ui live only in the worker's state (`s.combos`, `s.setups`, `setups` in worker::close); \
                       these are std files, the model's menu and place keeper, engine editors, queues, MacroUi and a bank's bundle";
@@ -1263,7 +1262,7 @@ fn no_lock_a_game_hook_waits_on_is_held_by_a_plugin_thread() {
 /// `SHARED_ON_PURPOSE`, no `MEASURED_ON_MAIN_THREAD`), over the diag build (the Eden runs' build: its own modules, threads and hooks
 /// too), every `#[skyline::hook]` and `GAME_ENTRIES`, the callback tables and bare-name function values. It is the work queue:
 /// `LOCKFREE_INVENTORY_MAX` only goes down, step by step, to 0.
-const LOCKFREE_INVENTORY_MAX: usize = 1;
+const LOCKFREE_INVENTORY_MAX: usize = 0;
 
 /// The diag build's call graph (`runtime_graph` plus the `#[cfg(feature = "diag")]` modules).
 fn diag_runtime_graph() -> Graph {

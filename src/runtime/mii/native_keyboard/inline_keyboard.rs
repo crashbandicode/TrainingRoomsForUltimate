@@ -3,7 +3,7 @@
 //! owns its keyboard on one UI thread and never persists its pointers.
 //! ABI evidence: private SDK-INLINE-REPORT.md, owned SDK build 5fd4f531.
 use std::cell::UnsafeCell;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use hos_lock::Mutex;
 
 use crate::engine::mii::inline_keyboard::{Limit, Signals};
@@ -11,10 +11,25 @@ pub(crate) use crate::engine::mii::inline_keyboard::{Decision, Text};
 
 // Native calls never run with this lock held. Only our SDK callbacks and the
 // single owning UI-thread poll access it; Finalize finishes before the next owner.
+// Every take is a `try_lock` (the lock-free runtime): the lease already makes the
+// takes exclusive (each runs on the lease owner's thread, inside its calls), so a
+// try succeeds there, and no thread (the menu worker's keyboard, a Mii editor
+// hook's) ever waits on this. A try that failed is counted (`MISSED`).
 static SIGNALS: Mutex<Signals> = Mutex::new(Signals {
     limit: Limit::Mii, text: None, decision: None,
     initialized: false, finished: false, invalid: false,
 });
+static MISSED: AtomicU32 = AtomicU32::new(0);
+
+/// A callback's signal: `f` on the signals, or a counted miss (never, under the lease).
+fn signals(f: impl FnOnce(&mut Signals)) {
+    match SIGNALS.try_lock() {
+        Some(mut signals) => f(&mut signals),
+        None => {
+            MISSED.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+}
 static LEASED: AtomicBool = AtomicBool::new(false);
 pub(crate) fn active() -> bool { LEASED.load(Ordering::Acquire) }
 
@@ -57,23 +72,23 @@ struct Entered {
 
 unsafe extern "C" fn changed(arg: *const Changed) {
     let Some(arg) = arg.as_ref() else { return; };
-    SIGNALS.lock().change(&arg.text, arg.len, arg.cursor);
+    signals(|s| s.change(&arg.text, arg.len, arg.cursor));
 }
 
 unsafe extern "C" fn moved(arg: *const Moved) {
     let Some(arg) = arg.as_ref() else { return; };
-    SIGNALS.lock().change(&arg.text, arg.len, arg.cursor);
+    signals(|s| s.change(&arg.text, arg.len, arg.cursor));
 }
 
 unsafe extern "C" fn entered(arg: *const Entered) {
     let Some(arg) = arg.as_ref() else { return; };
-    SIGNALS.lock().enter(&arg.text, arg.len);
+    signals(|s| s.enter(&arg.text, arg.len));
 }
 
-unsafe extern "C" fn cancelled() { SIGNALS.lock().cancel(); }
+unsafe extern "C" fn cancelled() { signals(|s| s.cancel()); }
 
-unsafe extern "C" fn initialized() { SIGNALS.lock().initialized = true; }
-unsafe extern "C" fn finished() { SIGNALS.lock().finished = true; }
+unsafe extern "C" fn initialized() { signals(|s| s.initialized = true); }
+unsafe extern "C" fn finished() { signals(|s| s.finished = true); }
 
 #[repr(C)]
 struct Object { implementation: usize, work: usize }
@@ -159,7 +174,11 @@ impl Keyboard {
             return None;
         }
         let mut lease = Lease::acquire()?;
-        *SIGNALS.lock() = Signals { limit: text.limit(), ..Signals::default() };
+        // The lease is ours, so no other take is running; if a try ever failed,
+        // the open fails and the lease goes back.
+        let Some(mut signals) = SIGNALS.try_lock() else { return None };
+        *signals = Signals { limit: text.limit(), ..Signals::default() };
+        drop(signals);
         let work = lease.prepare_work();
         let mut object = Object { implementation: 0, work: 0 };
         sdk_construct(&mut object);
@@ -197,8 +216,12 @@ impl Keyboard {
         let state = sdk_calc(&mut self.object);
         #[cfg(not(feature = "mii-editor-alpha"))]
         sdk_calc(&mut self.object);
-        let signals = std::mem::replace(&mut *SIGNALS.lock(),
-            Signals { limit: self.text.limit(), ..Signals::default() });
+        // A failed try (never, under the lease) leaves the signals for the next poll.
+        let fresh = Signals { limit: self.text.limit(), ..Signals::default() };
+        let signals = match SIGNALS.try_lock() {
+            Some(mut signals) => std::mem::replace(&mut *signals, fresh),
+            None => fresh,
+        };
         if let Some(text) = signals.text { self.text = text; }
         self.initialized |= signals.initialized;
         self.invalid |= signals.invalid;
@@ -219,7 +242,14 @@ impl Keyboard {
             sdk_finalize(&mut self.object);
             sdk_destruct(&mut self.object);
             self.active = false;
-            *SIGNALS.lock() = Signals::default();
+            // The next open resets them as well, so a failed try (never, under the
+            // lease) leaves nothing behind.
+            if let Some(mut signals) = SIGNALS.try_lock() { *signals = Signals::default(); }
+            let missed = MISSED.swap(0, Ordering::Relaxed);
+            if missed != 0 {
+                crate::engine::compat::logging::diagnostic(format_args!(
+                    "[NativeKeyboard] signals_missed={missed} (a callback found the signals taken)"));
+            }
             self.lease = None;
         }
         true
