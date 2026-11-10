@@ -1316,3 +1316,11 @@ ceiling = 162071
 date = "2026-11-10"
 reason = "rc.6 p23/rc6-lockfree over a5bef175 (161567): the lock-free runtime the primary ordered (2026-11-10 00:47Z, operator order 00:44Z, artifacts/phase23/TASK-OPUS-rc6-lockfree.md): no plugin thread takes a lock a game entry waits on. The hand-offs model::drop_ring, model::box_handoff and model::owned_ring and runtime::roster::roster_requests; the settings re-plan and planner reset on the game frame; the combo helper's posted names and plans; the save states' and setups' hand-offs; the heartbeat's owned ring; the keyboard signals tried; the worker's hos_lock::Event wake; measured 162071 at d23d8b23 (tools/size_gate.py), +504"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7; restated for this work in TASK-OPUS-rc6-lockfree: 'The ceiling may rise with approved_by (the operator: raise as needed)'); a raise goes in its own commit with approved_by"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 162596
+date = "2026-11-10"
+reason = "rc.6 p23/rc6-lockfree with p23/rc6-integration e6501ac6 merged (20467b8c, integration 2026-11-10 09:14Z: the lock-free runtime compared against the shipped base): e6501ac6's 162094 plus the lock-free runtime's own +502 over a5bef175 (its raise 161567 to 162071, here measured on the merge); measured 162596 at 20467b8c (tools/size_gate.py)"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7; restated for this work in TASK-OPUS-rc6-lockfree: 'The ceiling may rise with approved_by (the operator: raise as needed)'); the combined ceiling of the two branches' own approved raises; a raise goes in its own commit with approved_by"
