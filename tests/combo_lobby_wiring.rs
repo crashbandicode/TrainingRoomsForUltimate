@@ -182,3 +182,16 @@ fn saved_combos_wait_for_the_practice_fighters() {
     assert!(row.contains("retired"), "{row}");
     assert!(row.contains("superseded by combos-lobby in rc.5"), "{row}");
 }
+
+/// The drill the menu worker stages for the frame hook (`combo::STAGED`) crosses threads through `hos_lock::Published`: the
+/// hand-rolled seqlock it replaced wrote its odd mark `Relaxed` and had no acquire fence before its re-check, so on AArch64 the
+/// hook could install a torn grade target (docs lane review R1, 2026-11-09 23:23Z, finding 5). The worker publishes (it may wait);
+/// the hook reads what is newer than it last saw, never waiting.
+#[test]
+fn the_staged_drill_crosses_threads_through_published() {
+    let g = graph();
+    assert!(names(&g, "combo::stage_target", "publish"), "the worker no longer publishes the staged drill");
+    assert!(names(&g, "combo::pull_staged", "read_if_newer"), "the frame hook no longer reads the staged drill as published");
+    let text = include_str!("../src/runtime/features/combo.rs");
+    assert!(!text.contains("UnsafeCell"), "combo.rs hand-rolls a cross-thread cell again");
+}

@@ -352,41 +352,21 @@ pub fn set_target(target: Option<(Combo, &str)>) {
     LABELS.lock().0 = Label::new(target.map_or("", |(_, name)| name));
 }
 
-/// A drill the menu worker staged for the frame hook. The hook holds `HELPER`; the worker must not.
-struct StagedTarget {
-    seq: AtomicU32,
-    value: core::cell::UnsafeCell<Option<(Combo, Text, Label)>>,
-}
-
-// The seqlock below is the synchronization. One menu worker writes; the frame hook reads.
-unsafe impl Sync for StagedTarget {}
-
-static STAGED: StagedTarget = StagedTarget {
-    seq: AtomicU32::new(0),
-    value: core::cell::UnsafeCell::new(None),
-};
+/// A drill the menu worker staged for the frame hook. The hook holds `HELPER`; the worker must not. `hos_lock::Published`: the
+/// worker publishes (it may wait for a reader to leave the other slot), the hook copies out what is newer than it last saw and
+/// never waits (docs lane review R1, finding 5: the hand-rolled seqlock here lacked its fences).
+static STAGED: hos_lock::Published<Option<(Combo, Text, Label)>> = hos_lock::Published::new(None);
+/// The `STAGED` generation the frame hook installed last (0: nothing staged yet).
 static STAGED_SEEN: AtomicU32 = AtomicU32::new(0);
 
 /// Publish a grade target without taking `HELPER`. The next `after_strip` installs it.
 pub fn stage_target(target: Option<(Combo, &str)>) {
-    let packed = target.map(|(combo, name)| (combo, Text::new(name), Label::new(name)));
-    let prev = STAGED.seq.fetch_add(1, Ordering::Relaxed);
-    unsafe { *STAGED.value.get() = packed; }
-    STAGED.seq.store(prev.wrapping_add(2), Ordering::Release);
+    STAGED.publish(target.map(|(combo, name)| (combo, Text::new(name), Label::new(name))));
 }
 
 /// `Some` when a staged target is ready: `Some(None)` clears, `Some(Some(_))` installs.
 fn pull_staged() -> Option<Option<(Combo, Text, Label)>> {
-    let seq = STAGED.seq.load(Ordering::Acquire);
-    if seq & 1 == 1 || seq == STAGED_SEEN.load(Ordering::Relaxed) {
-        return None;
-    }
-    let value = unsafe { *STAGED.value.get() };
-    if STAGED.seq.load(Ordering::Acquire) != seq {
-        return None;
-    }
-    STAGED_SEEN.store(seq, Ordering::Relaxed);
-    Some(value)
+    STAGED.read_if_newer(&STAGED_SEEN)
 }
 
 /// The draft name the next save uses (worker).
