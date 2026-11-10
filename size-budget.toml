@@ -1340,3 +1340,11 @@ ceiling = 162792
 date = "2026-11-10"
 reason = "rc.7 p23/rc7-target-first over 3f7dca0c (162772): the planned=0 fix (integration FLAG 2026-11-10 17:53Z, primary 17:56Z): body_bank::notice_extras and next_window_plan, the notice reservation in plan_budget, one host test; measured 162792 at bdaf7227 (tools/size_gate.py), +20"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.7 order (TASK-rc7.md); a raise goes in its own commit with approved_by"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 162809
+date = "2026-11-10"
+reason = "rc.7 p23/rc7-target-first over 505329ef (162792): the kr-after fix (integration FLAG 2 2026-11-10 17:56Z, primary 18:00Z): body_bank::reload_window, its use in proposed, one host test; measured 162809 at ad1a54c2 (tools/size_gate.py), +17"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.7 order (TASK-rc7.md); a raise goes in its own commit with approved_by"
