@@ -12,7 +12,7 @@ use hos_lock::Mutex;
 use serde::Deserialize;
 use serde_json::json;
 
-use crate::engine::compat::fixed::{FixedList, FixedQueue};
+use crate::engine::compat::fixed::FixedList;
 use crate::engine::compat::json_line::{DebugStr, Json, Obj};
 use skyline::hooks::{getRegionAddress, Region};
 use smash::app::{lua_bind::*, BattleObjectModuleAccessor};
@@ -71,7 +71,11 @@ static READ_WANTED: AtomicBool = AtomicBool::new(false);
 static POSTED: Mutex<Option<Posted>> = Mutex::new(None);
 /// The run id of the last request posted: an old request cannot re-arm a new match (the heartbeat's own).
 static SEEN: Mutex<Option<RunId>> = Mutex::new(None);
-static OUTBOX: Mutex<FixedQueue<Outgoing, 8>> = Mutex::new(FixedQueue::new());
+/// The hook's receipts to the heartbeat, a lock-free ring (the lock-free runtime: the heartbeat, a plugin thread, never takes a
+/// lock the hook waits on). The hook's posts take turns on `OUTBOX_TURN`, which no plugin thread takes; the heartbeat is the one
+/// consumer and frees what it moves out. A full ring refuses the newest and counts it, as the fixed queue it replaces did.
+static OUTBOX: crate::model::owned_ring::OwnedRing<Outgoing, 8> = crate::model::owned_ring::OwnedRing::new();
+static OUTBOX_TURN: Mutex<()> = Mutex::new(());
 
 /// A request read, validated and planned off the hook.
 struct Posted {
@@ -90,7 +94,8 @@ enum Outgoing {
 }
 
 fn post(outgoing: Outgoing) {
-    let _ = OUTBOX.lock().push(outgoing);
+    let _turn = OUTBOX_TURN.lock();
+    let _ = OUTBOX.push(outgoing);
 }
 
 /// A request's run id: `Request::kind` admits exactly 32 hex digits, kept without a heap string.
@@ -1223,7 +1228,7 @@ pub(crate) fn service() {
         return;
     }
     while write_next() {}
-    let dropped = OUTBOX.lock().take_refused();
+    let dropped = OUTBOX.take_refused();
     if dropped > 0 {
         crate::engine::compat::logging::diagnostic(format_args!("[CpuPilot] receipts_dropped={dropped} (outbox full)"));
     }
@@ -1243,7 +1248,7 @@ fn write_next() -> bool {
 #[inline(never)] // stream/stack: a receipt's facts live only in this frame, never under the file write
 fn next_receipt() -> Option<(RunId, &'static str, serde_json::Value)> {
     loop {
-        let next = OUTBOX.lock().pop();
+        let next = OUTBOX.pop();
         match next? {
             Outgoing::Receipt { facts, reason, trace } => {
                 return Some((facts.request.run, reason, receipt_value(&facts, reason, &trace)));

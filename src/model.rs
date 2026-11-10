@@ -207,6 +207,8 @@ pub mod seq_cell;
 pub mod drop_ring;
 #[path = "model/box_handoff.rs"]
 pub mod box_handoff;
+#[path = "model/owned_ring.rs"]
+pub mod owned_ring;
 
 #[path = "model/boot_notices.rs"]
 pub mod boot_notices;

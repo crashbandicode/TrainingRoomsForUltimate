@@ -231,3 +231,21 @@ fn the_setups_facts_are_a_buffer_the_worker_reads() {
     ordered(body(setups, "service"), &["write_facts(current)", "JOBS.take_game()"]);
     assert!(!setups.contains("FACTS.lock()"), "a lock on the facts again");
 }
+/// Step 3: the heartbeat (`tr-heartbeat`: the drain, and the steps registered in `diag_log::TICKS`) takes no lock a game entry
+/// waits on. The CPU-as-P1 fallback's receipts come through `model::owned_ring::OwnedRing`: the hook's posts take turns on
+/// `OUTBOX_TURN` (which the heartbeat never takes) and the heartbeat is the ring's one consumer, moving each receipt out and freeing
+/// it off the hook, as before. A full ring refuses the newest and counts it, as the fixed queue did.
+#[test]
+fn the_heartbeat_takes_the_hooks_receipts_without_a_lock() {
+    let pilot = include_str!("../src/runtime/p1/cpu_pilot.rs");
+    for heartbeat in ["service", "next_receipt", "write_next"] {
+        let f = body(pilot, heartbeat);
+        assert!(!f.contains("OUTBOX_TURN") && !f.contains("OUTBOX.lock()"), "the heartbeat's {heartbeat} takes the outbox's lock:\n{f}");
+    }
+    ordered(body(pilot, "post"), &["OUTBOX_TURN.lock()", "OUTBOX.push(outgoing)"]);
+    ordered(body(pilot, "service"), &["while write_next() {}", "OUTBOX.take_refused()"]);
+    ordered(body(pilot, "next_receipt"), &["OUTBOX.pop()"]);
+    let g = graph();
+    let heartbeat = reachable(&g, "cpu_pilot::service");
+    assert!(!heartbeat.contains("cpu_pilot::post"), "the heartbeat posts to its own outbox");
+}

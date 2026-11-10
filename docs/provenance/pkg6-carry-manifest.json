@@ -3341,7 +3341,7 @@
    "dest": "src/runtime/p1/cpu_pilot.rs",
    "crate": "root",
    "src_sha256": "0bfe37e127df332d23e818bf2705fdf577fafbfbd5fd965a5b421d44ec35d9ed",
-   "dest_sha256": "e4df96b94a077a55a2a23cf953b97bd1a61173b21fab411854867fe37d5d2f93",
+   "dest_sha256": "55c335f7465b61329dce702a1a3b9374dc8d474f3e0e01d7fad8885366c74b67",
    "edits": [
     {
      "old": "pub(crate) fn thinking() -> bool {\n    THINKING.load(Ordering::Acquire)\n}\n",
@@ -3527,6 +3527,31 @@
      "old": "    let refused = OUTBOX.lock().take_refused();\n    if refused > 0 {\n        crate::engine::compat::logging::diagnostic(format_args!(\"[CpuPilot] receipts_dropped={refused} (outbox full)\"));\n",
      "new": "    let dropped = OUTBOX.lock().take_refused();\n    if dropped > 0 {\n        crate::engine::compat::logging::diagnostic(format_args!(\"[CpuPilot] receipts_dropped={dropped} (outbox full)\"));\n",
      "reason": "rc.6 integration (primary inbox 2026-11-08 20:38Z): the outbox's dropped-receipt count is named `dropped` in its diag line (`receipts_dropped={dropped}`); the name `refused` read as a user-facing refusal to compliance.py's refusal row"
+    },
+    {
+     "old": "use crate::engine::compat::fixed::{FixedList, FixedQueue};\n",
+     "new": "use crate::engine::compat::fixed::FixedList;\n",
+     "reason": "rc.6 lock-free runtime (operator order 2026-11-10 00:44Z, TASK-OPUS-rc6-lockfree step 3): the CPU-as-P1 fallback's outbox is a lock-free owned ring (model::owned_ring); the hook's posts take turns on OUTBOX_TURN, a game-only lock, and the heartbeat (tr-heartbeat) pops without a lock"
+    },
+    {
+     "old": "static OUTBOX: Mutex<FixedQueue<Outgoing, 8>> = Mutex::new(FixedQueue::new());\n",
+     "new": "/// The hook's receipts to the heartbeat, a lock-free ring (the lock-free runtime: the heartbeat, a plugin thread, never takes a\n/// lock the hook waits on). The hook's posts take turns on `OUTBOX_TURN`, which no plugin thread takes; the heartbeat is the one\n/// consumer and frees what it moves out. A full ring refuses the newest and counts it, as the fixed queue it replaces did.\nstatic OUTBOX: crate::model::owned_ring::OwnedRing<Outgoing, 8> = crate::model::owned_ring::OwnedRing::new();\nstatic OUTBOX_TURN: Mutex<()> = Mutex::new(());\n",
+     "reason": "rc.6 lock-free runtime (operator order 2026-11-10 00:44Z, TASK-OPUS-rc6-lockfree step 3): the CPU-as-P1 fallback's outbox is a lock-free owned ring (model::owned_ring); the hook's posts take turns on OUTBOX_TURN, a game-only lock, and the heartbeat (tr-heartbeat) pops without a lock"
+    },
+    {
+     "old": "    let _ = OUTBOX.lock().push(outgoing);\n",
+     "new": "    let _turn = OUTBOX_TURN.lock();\n    let _ = OUTBOX.push(outgoing);\n",
+     "reason": "rc.6 lock-free runtime (operator order 2026-11-10 00:44Z, TASK-OPUS-rc6-lockfree step 3): the CPU-as-P1 fallback's outbox is a lock-free owned ring (model::owned_ring); the hook's posts take turns on OUTBOX_TURN, a game-only lock, and the heartbeat (tr-heartbeat) pops without a lock"
+    },
+    {
+     "old": "    let dropped = OUTBOX.lock().take_refused();\n",
+     "new": "    let dropped = OUTBOX.take_refused();\n",
+     "reason": "rc.6 lock-free runtime (operator order 2026-11-10 00:44Z, TASK-OPUS-rc6-lockfree step 3): the CPU-as-P1 fallback's outbox is a lock-free owned ring (model::owned_ring); the hook's posts take turns on OUTBOX_TURN, a game-only lock, and the heartbeat (tr-heartbeat) pops without a lock"
+    },
+    {
+     "old": "        let next = OUTBOX.lock().pop();\n",
+     "new": "        let next = OUTBOX.pop();\n",
+     "reason": "rc.6 lock-free runtime (operator order 2026-11-10 00:44Z, TASK-OPUS-rc6-lockfree step 3): the CPU-as-P1 fallback's outbox is a lock-free owned ring (model::owned_ring); the hook's posts take turns on OUTBOX_TURN, a game-only lock, and the heartbeat (tr-heartbeat) pops without a lock"
     }
    ]
   },
