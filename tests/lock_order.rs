@@ -1021,28 +1021,35 @@ fn callback_edges(graph: &Graph) -> Vec<(usize, usize)> {
 /// The runs that measured the hooks' threads (primary 2026-11-09 19:44Z/20:32Z, OPERATOR "measure first, fix exactly"; playbook
 /// CHECKLIST M row, main 87b3de0): hot-slots' two trace points per hook on its game address, a `thread == main` counter and a
 /// `thread != main` record point, on `b04856b2` diag (`artifacts/phase23/hook-threads/TABLE.md`).
+/// The runs of hot-slots' first entry-point session: the mii plan (CPU and P1 cycles, CPU switches, Mii groups, the pause) and
+/// four native L+R+A resets, on `72344fd9`'s diag build (`9b1d2d99`).
+const ENTRY_RUNS: &str = "final-yoga-ht-mii-reset-72344fd9";
 const MEASURED_RUNS: &str = "final-yoga-ht-mii-b04856b2 + final-yoga-ht-kr-b04856b2 + final-yoga-ht-pair-b04856b2-r2 (a and b, an LDN \
                              pair: the waiting rooms and a match) + final-yoga-ht-reset-b04856b2 (four native resets)";
 
-/// Game hooks measured on MainThread only: `(hook, calls, calls on MainThread)`, all runs together, exact counters. A hook that runs
+/// Game hooks measured on MainThread only: `(hook, calls, calls on MainThread, runs)`, the runs' exact counters together. A hook that runs
 /// on MainThread cannot deadlock this way: while it waits, MainThread is not busy-joining a task group, so the core it leaves free
 /// lets the starved holder run (`rc6-qpf3`'s cycle needs the waiter on a task worker). A lock leaves the failing set only when every
 /// hook that waits on it is here; a hook seen on a worker thread, or never reached, never is.
-const MEASURED_ON_MAIN_THREAD: &[(&str, u64, u64)] = &[
-    ("input_delay::caller_a_note", 73_937, 73_937),
-    ("input_delay::caller_a_apply", 358_224, 358_224),
-    ("input_delay::caller_b_note", 914, 914),
-    ("input_delay::caller_b_apply", 914, 914),
-    ("character_lifecycle::destruction_trace", 30, 30),
-    ("character_lifecycle::refresh_entry_portrait", 8, 8),
-    ("character_lifecycle::refresh_ordinal_portrait", 32, 32),
-    ("states::state_kirby_opff_hook", 3_001, 3_001),
-    ("native_source_capacity::owner_cleanup_complete", 30, 30),
-    ("native_source_capacity::listener_removed", 30, 30),
-    ("native_source_capacity::actor_cleanup", 97, 97),
-    ("native_source_capacity::pause_state_exit", 2, 2),
-    ("mii_hud_portrait::pipeline_before_tick", 93_041, 93_041),
-    ("mii_hud_portrait::pipeline_after_tick", 93_041, 93_041),
+const MEASURED_ON_MAIN_THREAD: &[(&str, u64, u64, &str)] = &[
+    ("input_delay::caller_a_note", 73_937, 73_937, MEASURED_RUNS),
+    ("input_delay::caller_a_apply", 358_224, 358_224, MEASURED_RUNS),
+    ("input_delay::caller_b_note", 914, 914, MEASURED_RUNS),
+    ("input_delay::caller_b_apply", 914, 914, MEASURED_RUNS),
+    ("character_lifecycle::destruction_trace", 30, 30, MEASURED_RUNS),
+    ("character_lifecycle::refresh_entry_portrait", 8, 8, MEASURED_RUNS),
+    ("character_lifecycle::refresh_ordinal_portrait", 32, 32, MEASURED_RUNS),
+    ("states::state_kirby_opff_hook", 3_001, 3_001, MEASURED_RUNS),
+    ("native_source_capacity::owner_cleanup_complete", 30, 30, MEASURED_RUNS),
+    ("native_source_capacity::listener_removed", 30, 30, MEASURED_RUNS),
+    ("native_source_capacity::actor_cleanup", 97, 97, MEASURED_RUNS),
+    ("native_source_capacity::pause_state_exit", 2, 2, MEASURED_RUNS),
+    ("mii_hud_portrait::pipeline_before_tick", 93_041, 93_041, MEASURED_RUNS),
+    ("mii_hud_portrait::pipeline_after_tick", 93_041, 93_041, MEASURED_RUNS),
+    // hot-slots, the R1 entry points (TABLE.md; inbox 2026-11-10 00:31Z).
+    ("cpu::on_frame", 45_743, 45_743, ENTRY_RUNS),
+    ("native_service::training_mod_native_service_dispatch", 92_724, 92_724, ENTRY_RUNS),
+    ("mii_ordinary_gate::mii_ordinary_gate_decide", 26, 26, ENTRY_RUNS),
 ];
 
 /// The impl functions `f` runs through `helper(&STATIC ..)`, with the token position of the helper.
@@ -1162,7 +1169,7 @@ fn no_lock_a_game_hook_waits_on_is_held_by_a_plugin_thread() {
     let graph = runtime_graph();
     let (ctx, s) = scan(&graph);
     let shared = shared_locks(&ctx, &s);
-    let measured = |hook: &str| MEASURED_ON_MAIN_THREAD.iter().any(|(h, _, _)| *h == hook);
+    let measured = |hook: &str| MEASURED_ON_MAIN_THREAD.iter().any(|(h, _, _, _)| *h == hook);
     let mut problems = Vec::new();
     let mut used = BTreeSet::new();
     for (lock, waits) in &shared.game_waits {
@@ -1176,7 +1183,9 @@ fn no_lock_a_game_hook_waits_on_is_held_by_a_plugin_thread() {
         used.extend(hooks.iter().filter(|h| measured(h)).cloned());
         let open: Vec<&String> = hooks.iter().filter(|h| !measured(h)).collect();
         if open.is_empty() {
-            println!("MEASURED {name}: every waiting hook ran on MainThread only ({MEASURED_RUNS}): {hooks:?}");
+            let runs: BTreeSet<&str> =
+                MEASURED_ON_MAIN_THREAD.iter().filter(|(h, _, _, _)| hooks.contains(*h)).map(|(_, _, _, runs)| *runs).collect();
+            println!("MEASURED {name}: every waiting hook ran on MainThread only ({runs:?}): {hooks:?}");
             continue;
         }
         problems.push(format!(
@@ -1186,7 +1195,7 @@ fn no_lock_a_game_hook_waits_on_is_held_by_a_plugin_thread() {
             holds.iter().cloned().collect::<Vec<_>>().join(", ")
         ));
     }
-    for (hook, calls, on_main) in MEASURED_ON_MAIN_THREAD {
+    for (hook, calls, on_main, _) in MEASURED_ON_MAIN_THREAD {
         assert_eq!(calls, on_main, "{hook}: {calls} calls but {on_main} on MainThread: it ran on a worker thread; fix its locks");
         assert!(*calls > 0, "{hook}: never reached; an unreached hook is not measured");
         let found = graph.find(hook);
