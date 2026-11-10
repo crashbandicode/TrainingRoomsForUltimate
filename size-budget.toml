@@ -1364,3 +1364,11 @@ ceiling = 163111
 date = "2026-11-10"
 reason = "rc.7 item 3 on the fixed intermediate: p23/rc7-f1-int 14e43b54 over p23/rc7-integration 2707e872 (162822): D-KIRBY1's root fix F1 merged (p23/rc7-kirby-unguard a38c9018; +286 over 732663e2 in its own raise there, 162882), plus the merge's live_gate route through d_kirby1_live (A 2026-11-10 18:34Z; primary 18:36Z, 18:56Z), +3; measured 163111 at 14e43b54 (tools/size_gate.py), +289"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the operator's rc.7 order (TASK-rc7.md: 'ship the rc7 and as part of it include A's fix, the lock refactor and the kirby guard removal'); a raise goes in its own commit with approved_by"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 163142
+date = "2026-11-10"
+reason = "rc.7 p23/rc7-mismatch-role over 1c474c40 (163111): the Fighter Mismatch role fix (hot-slots 2026-11-10 18:58Z, primary 19:30Z): the prompt's side, MismatchAsk.role, two host tests and the frame test; measured 163142 at 7b2a42b9 (tools/size_gate.py), +31"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.7 order (TASK-rc7.md); a raise goes in its own commit with approved_by"

@@ -8,6 +8,7 @@
 //! configuration is not a match) and owns every native request.
 
 use super::{Pad, View, PAGE};
+use crate::model::recording_menu::ViewRole;
 
 /// What a selection must do before it may play.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -66,6 +67,8 @@ pub enum Outcome {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Prompt {
     origin: Origin,
+    /// The side the inputs play on; `current` is its fighter.
+    side: ViewRole,
     revision: u64,
     recorded: String,
     current: String,
@@ -80,8 +83,8 @@ const ROWS: [(&str, Choice); 2] = [
 impl Prompt {
     /// `revision` is the owning selection's revision. The caller drops a prompt
     /// whose revision is no longer current. The cursor starts on Keep.
-    pub fn new(origin: Origin, revision: u64, recorded: String, current: String) -> Self {
-        Self { origin, revision, recorded, current, cursor: 0 }
+    pub fn new(origin: Origin, side: ViewRole, revision: u64, recorded: String, current: String) -> Self {
+        Self { origin, side, revision, recorded, current, cursor: 0 }
     }
 
     pub fn origin(&self) -> Origin {
@@ -118,8 +121,8 @@ impl Prompt {
                 self.recorded, self.current
             ),
             Origin::Named | Origin::Clip | Origin::Recording => format!(
-                "Recorded {} · current CPU {}\nInputs are the same either way. A chooses, B cancels.",
-                self.recorded, self.current
+                "Recorded {} · current {} {}\nInputs are the same either way. A chooses, B cancels.",
+                self.recorded, self.side.label(), self.current
             ),
         };
         View {
@@ -150,7 +153,7 @@ mod tests {
 
     #[test]
     fn prompt_defaults_to_keep_and_cancel_is_distinct_from_both_choices() {
-        let mut prompt = Prompt::new(Origin::Named, 7, "Kirby".into(), "Hero".into());
+        let mut prompt = Prompt::new(Origin::Named, ViewRole::Cpu, 7, "Kirby".into(), "Hero".into());
         assert_eq!(prompt.choice(), Choice::Keep);
         assert_eq!(prompt.view().selected, 0);
         assert_eq!(prompt.on_pad(Pad::Confirm), Outcome::Chose(Choice::Keep));
@@ -170,7 +173,7 @@ mod tests {
 
     #[test]
     fn prompt_view_names_both_fighters_and_both_actions() {
-        let view = Prompt::new(Origin::Clip, 1, "Kirby".into(), "Hero".into()).view();
+        let view = Prompt::new(Origin::Clip, ViewRole::Cpu, 1, "Kirby".into(), "Hero".into()).view();
         assert_eq!(view.labels.len(), PAGE);
         assert_eq!(view.labels[0], "Keep current fighter");
         assert_eq!(view.labels[1], "Switch to recorded fighter");
@@ -181,7 +184,7 @@ mod tests {
 
     #[test]
     fn a_recording_prompt_uses_the_same_rows_and_starts_on_keep() {
-        let prompt = Prompt::new(Origin::Recording, 0, "Pikachu".into(), "Mario".into());
+        let prompt = Prompt::new(Origin::Recording, ViewRole::Player, 0, "Pikachu".into(), "Mario".into());
         let view = prompt.view();
         assert_eq!(view.title, "Fighter Mismatch");
         assert_eq!(view.labels[0], "Keep current fighter");
@@ -190,5 +193,25 @@ mod tests {
         assert_eq!(prompt.choice(), Choice::Keep);
         assert!(view.footer.contains("Pikachu") && view.footer.contains("Mario"));
         assert!(view.footer.contains("B cancels"));
+    }
+
+    #[test]
+    fn the_footer_names_the_side_that_plays() {
+        // hot-slots 2026-11-10 18:58Z (`cov-mismatch-cancel`): Play on Player 1 (Donkey Kong) with the CPU on Mario read
+        // "Recorded Mario · current CPU Donkey Kong". The role word is the playing side's, in the menu's names.
+        let first = |origin, side| {
+            let footer = Prompt::new(origin, side, 0, "Mario".into(), "Donkey Kong".into()).view().footer;
+            footer.lines().next().unwrap_or_default().to_owned()
+        };
+        for origin in [Origin::Named, Origin::Clip, Origin::Recording] {
+            assert_eq!(first(origin, ViewRole::Player), "Recorded Mario · current Player 1 Donkey Kong", "{origin:?}");
+            assert_eq!(first(origin, ViewRole::Cpu), "Recorded Mario · current CPU Donkey Kong", "{origin:?}");
+        }
+        // A combo's question is about Player 1's fighter: its wording is the same whichever side is passed.
+        assert_eq!(first(Origin::Combo, ViewRole::Player), "Recorded on Mario · P1 is Donkey Kong");
+        assert_eq!(first(Origin::Combo, ViewRole::Cpu), "Recorded on Mario · P1 is Donkey Kong");
+        // The second line is unchanged for every origin.
+        let view = Prompt::new(Origin::Recording, ViewRole::Player, 0, "Mario".into(), "Donkey Kong".into()).view();
+        assert_eq!(view.footer.lines().nth(1), Some("Inputs are the same either way. A chooses, B cancels."));
     }
 }

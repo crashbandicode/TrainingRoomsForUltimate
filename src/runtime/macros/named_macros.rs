@@ -86,10 +86,10 @@ pub fn take_recording_fighter_choice() -> Option<Option<FighterChoice>> {
     lock_write(&RECORDING_FIGHTER).take()
 }
 
-/// Open the shared Fighter Mismatch screen for a recording, a combo drill, or a chain's macro 1.
-pub fn open_recording_fighter_prompt(origin: FighterOrigin, recorded: String, current: String) -> bool {
+/// Open the shared Fighter Mismatch screen for a recording, a combo drill, or a chain's macro 1, played by `side`.
+pub fn open_recording_fighter_prompt(origin: FighterOrigin, side: crate::model::recording_menu::ViewRole, recorded: String, current: String) -> bool {
     *lock_write(&RECORDING_FIGHTER) = None;
-    let opened = lock_write(&UI).open_fighter_prompt_for(origin, 0, recorded, current);
+    let opened = lock_write(&UI).open_fighter_prompt_for(origin, side, 0, recorded, current);
     if opened { assign(&menu::MENU_RECEIVED_INPUT, true); }
     opened
 }
@@ -269,7 +269,7 @@ pub(crate) fn open_clip_fighter_prompt(revision:u64, recorded:String, current:St
 /// owns the candidate and receives the answer through [`take_combo_fighter_choice`].
 pub(crate) fn open_combo_fighter_prompt(revision:u64, recorded:String, current:String) -> bool {
     *lock_write(&COMBO_FIGHTER)=None;
-    let opened=lock_write(&UI).open_fighter_prompt_for(FighterOrigin::Combo,revision,recorded,current);
+    let opened=lock_write(&UI).open_fighter_prompt_for(FighterOrigin::Combo,crate::model::recording_menu::ViewRole::Player,revision,recorded,current);
     if opened {assign(&menu::MENU_RECEIVED_INPUT,true);}
     opened
 }

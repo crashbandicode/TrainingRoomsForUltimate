@@ -145,6 +145,8 @@ pub struct Tick {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MismatchAsk {
     pub origin: &'static str,
+    /// The side that plays; the screen names its current fighter with this role.
+    pub role: ViewRole,
     pub recorded_kind: i32,
     pub current_kind: i32,
     pub recorded_label: String,
@@ -1194,6 +1196,10 @@ fn mismatch_for(book: &Book, role: Role) -> Option<MismatchAsk> {
     let origin = if book.is_chain(id) { "macro1" } else { "macro" };
     Some(MismatchAsk {
         origin,
+        role: match role {
+            Role::Player => ViewRole::Player,
+            Role::Cpu => ViewRole::Cpu,
+        },
         recorded_kind: recorded,
         current_kind: current,
         recorded_label: recorded.to_string(),
@@ -1220,6 +1226,7 @@ fn ask_drill(root: &Path, tick: &mut Tick) {
     );
     let ask = MismatchAsk {
         origin: "combo",
+        role: ViewRole::Player,
         recorded_kind: -1,
         current_kind: role_kind(Role::Player),
         recorded_label: recorded,
@@ -2641,6 +2648,29 @@ mod tests {
         answer_mismatch(MismatchChoice::Keep);
         let _ = service_pending(&root, state(13), state(13), false);
         assert!(lock(&ANSWER).is_none(), "an answer the fighters no longer need is dropped");
+    }
+
+    #[test]
+    fn the_mismatch_ask_names_the_side_that_plays() {
+        // hot-slots 2026-11-10 18:58Z (`cov-mismatch-cancel`): Play on Player 1 (Donkey Kong 2) with a Mario (1) macro
+        // asked about Player 1's fighter, but the screen called it the CPU's. The ask carries the playing side.
+        let _hold = hold();
+        for (role, side, chords) in [
+            (Role::Player, ViewRole::Player, (false, true, false)),
+            (Role::Cpu, ViewRole::Cpu, (false, false, true)),
+        ] {
+            reset_host();
+            let root = scratch("mismatch-side");
+            let id = one_macro(&root, "Mario macro", 15, 1, None);
+            let mut index = RecordingIndex::load(&root).unwrap();
+            index.set_active(role, Some(&id), 1).unwrap();
+            index.save(&root).unwrap();
+            set_role_fighter(role, 2);
+            on_chords(chords.0, chords.1, chords.2);
+            let tick = service_pending(&root, state(2), state(2), false);
+            let ask = tick.mismatch.expect("the recorded fighter is asked about");
+            assert_eq!((ask.role, ask.recorded_kind, ask.current_kind), (side, 1, 2), "{role:?}");
+        }
     }
 
     #[test]

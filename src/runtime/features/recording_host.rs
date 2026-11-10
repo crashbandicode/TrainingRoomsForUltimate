@@ -289,6 +289,7 @@ fn apply(tick: &Tick) {
         };
         let _ = crate::runtime::macros::named_macros::open_recording_fighter_prompt(
             crate::engine::macro_ui::macro_panel::FighterOrigin::Recording,
+            ask.role,
             recorded,
             current,
         );

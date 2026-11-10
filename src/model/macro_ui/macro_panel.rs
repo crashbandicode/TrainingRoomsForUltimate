@@ -10,6 +10,7 @@ use {crate::engine::compat::grid::NX_SUBMENU_COLUMNS, crate::engine::compat::gri
 
 mod fighter;
 pub use fighter::{gate as fighter_gate, Choice as FighterChoice, Gate as FighterGate, Origin as FighterOrigin};
+use crate::model::recording_menu::ViewRole;
 
 const PAGE: usize = NX_SUBMENU_ROWS * NX_SUBMENU_COLUMNS;
 /// Matches the legacy recorder's flick-jump bit. Other buttons count as input.
@@ -1038,6 +1039,8 @@ impl MacroUi {
                 self.screen = Screen::Fighter(Box::new(FighterScreen {
                     prompt: fighter::Prompt::new(
                         FighterOrigin::Named,
+                        // A library load plays on the CPU (`LoadContext::cpu_kind`).
+                        ViewRole::Cpu,
                         context.revision,
                         context.recorded_label,
                         context.current_label,
@@ -1051,7 +1054,7 @@ impl MacroUi {
         }
     }
 
-    /// Prompt for a replay clip or track. The clip editor keeps the candidate and
+    /// Prompt for a replay clip or track, which previews on the CPU. The clip editor keeps the candidate and
     /// receives [`Effect::ClipFighter`]. Refused while another panel is open.
     pub fn open_fighter_prompt(
         &mut self,
@@ -1059,15 +1062,16 @@ impl MacroUi {
         recorded_label: String,
         current_label: String,
     ) -> bool {
-        self.open_fighter_prompt_for(FighterOrigin::Clip, revision, recorded_label, current_label)
+        self.open_fighter_prompt_for(FighterOrigin::Clip, ViewRole::Cpu, revision, recorded_label, current_label)
     }
 
     /// Prompt for a caller that keeps its own candidate: a replay clip or track
     /// ([`Effect::ClipFighter`]) or a chosen combo ([`Effect::ComboFighter`]).
-    /// Refused while another panel is open.
+    /// `side` plays the inputs and `current_label` is its fighter. Refused while another panel is open.
     pub fn open_fighter_prompt_for(
         &mut self,
         origin: FighterOrigin,
+        side: ViewRole,
         revision: u64,
         recorded_label: String,
         current_label: String,
@@ -1077,7 +1081,7 @@ impl MacroUi {
         }
         self.playback_on = false;
         self.screen = Screen::Fighter(Box::new(FighterScreen {
-            prompt: fighter::Prompt::new(origin, revision, recorded_label, current_label),
+            prompt: fighter::Prompt::new(origin, side, revision, recorded_label, current_label),
             cpu_kind: None,
             candidate: None,
             prior: None,

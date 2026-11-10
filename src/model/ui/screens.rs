@@ -893,8 +893,10 @@ mod tests {
         // rc.5: the question has no Y action; the shared panel hint advertised "Y delete or other".
         let m = menu();
         let mut f = Frame::new();
-        fighter_question_frame(&m, "Fighter Mismatch", "Recorded Pikachu · current CPU Mario\nInputs are the same either way. A chooses, B cancels.",
+        // rc.7: the footer names the side that plays (hot-slots 2026-11-10 18:58Z, Play on Player 1).
+        fighter_question_frame(&m, "Fighter Mismatch", "Recorded Mario · current Player 1 Donkey Kong\nInputs are the same either way. A chooses, B cancels.",
             &["Keep current fighter", "Switch to recorded fighter"], 0, &mut f);
+        assert_eq!(f.help[0].string_lossy(), "Recorded Mario · current Player 1 Donkey Kong");
         assert_eq!(f.hint.string_lossy(), "D-pad move   A choose   B cancel");
         assert_eq!((f.tile_count, f.tile_focus), (2, 0));
         assert_eq!(f.tiles[1].string_lossy(), "Switch to recorded fighter");
