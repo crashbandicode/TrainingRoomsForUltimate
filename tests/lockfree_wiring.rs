@@ -166,3 +166,31 @@ fn the_combo_helpers_locks_are_game_side_and_the_worker_posts() {
     let worker = include_str!("../src/runtime/ui/worker.rs");
     ordered(body(worker, "sync_sequence_drill"), &["combo::reap_plans();", "APPLIED.lock()"]);
 }
+
+/// Step 2d: the recording worker's named load and bound save reach the save states through `model::box_handoff`: the worker posts
+/// a box (and drops the boxes the game emptied, each pass and at each post); game threads take the value out under a lock no
+/// plugin thread takes (`NAMED_TAKE`, `STATE`) and give the box back, never freeing it. A take happens where the lock's take did
+/// (the player's frame step; the session clear discards), so nothing lands later.
+#[test]
+fn the_save_states_take_the_workers_posts_without_its_locks() {
+    let g = graph();
+    let worker_reach = reachable(&g, "worker::run");
+    for game_side in ["states::on_fighter_frame", "states::apply_bound_post", "states::clear_session", "states::take_pair"] {
+        assert!(!worker_reach.contains(game_side), "the menu worker reaches {game_side}");
+    }
+    assert!(worker_reach.contains("states::reap_posts"), "the worker no longer drops the emptied boxes");
+    let states = include_str!("../src/runtime/features/states.rs");
+    for worker_side in ["request_named_load", "post_bound", "reap_posts"] {
+        let f = body(states, worker_side);
+        assert!(!f.contains(".lock()"), "the worker's {worker_side} takes a lock:\n{f}");
+    }
+    ordered(body(states, "request_named_load"), &["NAMED_LOAD.post(Some(Box::new(pair)))"]);
+    ordered(body(states, "post_bound"), &["BOUND_POST.post(Some(Box::new("]);
+    ordered(body(states, "on_fighter_frame"), &["apply_bound_post();", "NAMED_TAKE.lock()", "NAMED_LOAD.take(take_pair)", "begin_temporary(pair)"]);
+    ordered(body(states, "apply_bound_post"), &["BOUND_POST.pending()", "with(|state|", "setup_busy()", "BOUND_POST.take("]);
+    ordered(body(states, "clear_session"), &["NAMED_TAKE.lock()", "NAMED_LOAD.discard()"]);
+    ordered(body(states, "take_pair"), &["core::mem::replace(pair, [SavedState::never_saved(), SavedState::never_saved()])"]);
+    let host = include_str!("../src/runtime/features/recording_host.rs");
+    ordered(body(host, "service"), &["states::reap_posts();", "let root"]);
+}
+

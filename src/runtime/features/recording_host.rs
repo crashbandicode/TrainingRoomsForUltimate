@@ -209,6 +209,8 @@ pub unsafe fn on_player_poll(out: *mut MappedInputs) {
 }
 
 pub fn service() {
+    // The boxes the frame emptied (a named load, a bound save) come back here to be dropped: the game never frees one.
+    super::states::reap_posts();
     let root = Path::new(crate::model::storage::ROOT);
     if !root.is_dir() {
         let _ = std::fs::create_dir_all(root);

@@ -7,6 +7,8 @@
 //! - **Install** (the consumer, one at a time: the caller serialises it under the lock that guards its storage): swap `posted` out,
 //!   replace the storage's value with it, and store the replaced value in a free retire slot. Only the consumer fills a retire slot
 //!   and only the producer empties one, so a slot seen empty stays empty until the consumer fills it.
+//! - **Take** (the consumer, one at a time, for a request it consumes once): swap `posted` out, let the caller move the value's
+//!   contents out, and store the emptied box in a free retire slot.
 //! - **Two retire slots.** Each post reaps both before it swaps, so from the start of one reap to the start of the next the
 //!   consumer installs at most two values (the one still posted when the reap began, and the one its post swaps in). An install
 //!   finds both slots full only while a post's reap is running; it then installs nothing and is counted
@@ -105,7 +107,34 @@ impl<T> BoxHandoff<T> {
         true
     }
 
-    /// Installs that found no free retire slot since the last call.
+    /// The consumer (one at a time): take the posted value, if any. `f` moves what it needs out of it (it must leave the value
+    /// owning nothing the consumer may not free), and the box goes back to the producer. `None` when nothing or a clear was posted,
+    /// or when no retire slot is free (counted; the value stays posted for a later call). Never waits, allocates or frees.
+    pub fn take<R>(&self, f: impl FnOnce(&mut T) -> R) -> Option<R> {
+        if !self.pending() {
+            return None;
+        }
+        let Some(slot) = self.retired.iter().find(|slot| slot.load(Acquire).is_null()) else {
+            self.stalls.fetch_add(1, Relaxed);
+            return None;
+        };
+        let taken = self.posted.swap(core::ptr::null_mut(), AcqRel);
+        if taken.is_null() || taken == Self::clear_marker() {
+            return None;
+        }
+        // SAFETY: a `Box::into_raw` pointer the swap made this side's own; it goes back through `slot` below.
+        let result = f(unsafe { &mut *taken });
+        slot.store(taken, Release);
+        Some(result)
+    }
+
+    /// The consumer (one at a time): drop the posted value unread (it goes back to the producer as [`take`](Self::take)'s does).
+    /// False when nothing was posted.
+    pub fn discard(&self) -> bool {
+        self.take(|_| ()).is_some()
+    }
+
+    /// Installs and takes that found no free retire slot since the last call.
     pub fn take_stalls(&self) -> u32 {
         self.stalls.swap(0, Relaxed)
     }
@@ -164,6 +193,26 @@ mod tests {
         handoff.post(Some(Box::new(5)));
         assert!(handoff.install(&mut current));
         assert_eq!(current.as_deref(), Some(&5));
+        assert_eq!(handoff.take_stalls(), 0);
+    }
+
+    /// A take moves the value out and gives the box back; a discard drops nothing on the consumer; the newest post wins.
+    #[test]
+    fn a_take_moves_the_value_out_and_gives_the_box_back() {
+        let handoff: BoxHandoff<Vec<u8>> = BoxHandoff::new();
+        assert_eq!(handoff.take(std::mem::take), None, "nothing posted");
+        handoff.post(Some(Box::new(vec![1])));
+        handoff.post(Some(Box::new(vec![2, 2])));
+        assert_eq!(handoff.take(std::mem::take), Some(vec![2, 2]), "the newest post");
+        assert_eq!(handoff.take(std::mem::take), None, "taken once");
+        assert!(handoff.retired.iter().any(|slot| !slot.load(SeqCst).is_null()), "the emptied box went back");
+        handoff.post(Some(Box::new(vec![3])));
+        assert!(handoff.retired.iter().all(|slot| slot.load(SeqCst).is_null()), "the post reaped it");
+        assert!(handoff.discard());
+        assert!(!handoff.discard(), "discarded once");
+        handoff.post(None);
+        assert_eq!(handoff.take(std::mem::take), None, "a clear holds nothing to take");
+        assert!(!handoff.pending());
         assert_eq!(handoff.take_stalls(), 0);
     }
 

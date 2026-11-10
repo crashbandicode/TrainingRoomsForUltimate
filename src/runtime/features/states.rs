@@ -83,8 +83,13 @@ static RESPAWN_INVINCIBILITY: AtomicBool = AtomicBool::new(false);
 /// The chord latches: set by the chord engine, consumed once by the first eligible fighter callback.
 static SAVE_REQUEST: AtomicBool = AtomicBool::new(false);
 static LOAD_REQUEST: AtomicBool = AtomicBool::new(false);
-/// A recording's start save, applied as a temporary pair so a numbered slot is left alone.
-static NAMED_LOAD: Mutex<Option<[SavedState; 2]>> = Mutex::new(None);
+/// A recording's start save, applied as a temporary pair so a numbered slot is left alone. The recording worker posts it (it
+/// allocates and drops the box); game threads take it (`NAMED_TAKE`) and move the pair out, never freeing (the lock-free runtime:
+/// a plugin thread never takes a lock the fighter frame waits on).
+static NAMED_LOAD: crate::model::box_handoff::BoxHandoff<[SavedState; 2]> = crate::model::box_handoff::BoxHandoff::new();
+/// Game threads take or discard the posted `NAMED_LOAD` one at a time (the fighter frame, the session clear): the hand-off's
+/// consumer contract. No plugin thread takes it.
+static NAMED_TAKE: Mutex<()> = Mutex::new(());
 /// The slot file needs writing (the writer thread takes it).
 static DIRTY: AtomicBool = AtomicBool::new(false);
 
@@ -367,21 +372,42 @@ pub fn request_load() {
     LOAD_REQUEST.store(true, Ordering::Release);
 }
 
-/// Warp to a named save's pair. The next player frame starts it as a temporary load.
+/// Warp to a named save's pair. The next player frame starts it as a temporary load (a newer request replaces one not taken yet).
 pub fn request_named_load(pair: [SavedState; 2]) {
-    *NAMED_LOAD.lock() = Some(pair);
+    NAMED_LOAD.post(Some(Box::new(pair)));
+}
+
+/// The recording worker, each pass: drop the boxes the game emptied (`NAMED_LOAD`, `BOUND_POST`; a post does it too).
+pub fn reap_posts() {
+    NAMED_LOAD.reap();
+    BOUND_POST.reap();
+    let stalls = NAMED_LOAD.take_stalls() + BOUND_POST.take_stalls();
+    if stalls != 0 {
+        crate::runtime::diag_log::diagnostic(format_args!("[TrainingRooms] state posts deferred={stalls} (both retire slots full)"));
+    }
+}
+
+/// Move a posted pair out of its box, leaving never-saved records (no heap) for the worker to drop.
+fn take_pair(pair: &mut [SavedState; 2]) -> [SavedState; 2] {
+    core::mem::replace(pair, [SavedState::never_saved(), SavedState::never_saved()])
 }
 
 /// The bound save for the active slot, posted by the recording worker with its Mii identities split off (the worker
 /// may allocate and free; the frame step only moves them). A plugin thread never takes `STATE` (tests/hook_locks.rs),
-/// so the player's frame step applies the post under it.
+/// so the player's frame step applies the post under it, which also makes it the hand-off's one consumer at a time.
 struct BoundPost {
     pair: [SavedState; 2],
     miis: [Option<crate::engine::mii::lifetime::Configuration>; 2],
 }
 
-static BOUND_POST: Mutex<Option<BoundPost>> = Mutex::new(None);
-static BOUND_PENDING: AtomicBool = AtomicBool::new(false);
+static BOUND_POST: crate::model::box_handoff::BoxHandoff<BoundPost> = crate::model::box_handoff::BoxHandoff::new();
+
+impl BoundPost {
+    /// What a taken post leaves in its box: never-saved records, no Mii (no heap).
+    fn emptied() -> Self {
+        BoundPost { pair: [SavedState::never_saved(), SavedState::never_saved()], miis: [None, None] }
+    }
+}
 
 /// The bound save becomes the active slot (`rr_host::bound_sync`, on the recording worker): Load, Auto-load on death
 /// and their mirroring, damage and buffs act on that slot, so they act on the bound save. `None` (nothing bound)
@@ -392,23 +418,20 @@ pub fn post_bound(pair: Option<[SavedState; 2]>) {
     for record in &mut pair {
         record.mii = None;
     }
-    let previous = BOUND_POST.lock().replace(BoundPost { pair, miis });
-    BOUND_PENDING.store(true, Ordering::Release);
-    drop(previous);
+    BOUND_POST.post(Some(Box::new(BoundPost { pair, miis })));
 }
 
 /// The player's frame step: the posted bound save goes into the active slot, unless a save or a load holds the slot
 /// now (then it waits for a later frame).
 fn apply_bound_post() {
-    if !BOUND_PENDING.load(Ordering::Acquire) {
+    if !BOUND_POST.pending() {
         return;
     }
     with(|state| {
         if state.machine.setup_busy() {
             return;
         }
-        let Some(post) = BOUND_POST.lock().take() else { return };
-        BOUND_PENDING.store(false, Ordering::Release);
+        let Some(post) = BOUND_POST.take(|post| core::mem::replace(post, BoundPost::emptied())) else { return };
         let slot = usize::from(state.settings.slot).min(SLOTS - 1);
         let settings = state.settings;
         if !state.machine.bind_setup(slot, post.pair, false, &settings, &mut state.rng) {
@@ -453,7 +476,8 @@ pub(crate) fn clear_session() {
     preview::clear();
     SAVE_REQUEST.store(false, Ordering::Release);
     LOAD_REQUEST.store(false, Ordering::Release);
-    *NAMED_LOAD.lock() = None;
+    let _take = NAMED_TAKE.lock();
+    NAMED_LOAD.discard();
 }
 
 /// The roster's existing waiting-room lifetime decision, rather than a practice
@@ -715,7 +739,11 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
     let load_chord = !nana && !reset_hub::cpu_operated(fighter) && LOAD_REQUEST.swap(false, Ordering::AcqRel);
     if !nana && !reset_hub::cpu_operated(fighter) {
         apply_bound_post();
-        if let Some(pair) = NAMED_LOAD.lock().take() {
+        let named = {
+            let _take = NAMED_TAKE.lock();
+            NAMED_LOAD.take(take_pair)
+        };
+        if let Some(pair) = named {
             let accepted = with(|state| {
                 let accepted = state.machine.begin_temporary(pair);
                 if accepted {
