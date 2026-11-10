@@ -564,10 +564,11 @@ fn group_policy(settings: &crate::engine::preload::cycle_preload_config::Setting
     }
 }
 
-/// The live kind D-KIRBY1's gates will see once `kind` is the live target (`body_bank::reload_window`'s `live_gate`).
-/// rc.7 F1 routes its gates through `body_bank::d_kirby1_live`; merged with F1, this one takes the same route.
+/// The live kind D-KIRBY1's gates will see once `kind` is the live target (`body_bank::reload_window`'s `live_gate`),
+/// through rc.7 F1's `body_bank::d_kirby1_live` as F1's other gates: `None` once the bank owns the G68 step, so a Kirby
+/// target is target-first too and his neighbours build beside him.
 fn live_gate(kind: u32) -> Option<u32> {
-    Some(kind)
+    crate::engine::swap::body_bank::d_kirby1_live(Some(kind), crate::runtime::roster::g68_step::enabled())
 }
 
 /// rc.7 target-first: per role, the neighbours of the last target-first Reload's full window (`body_bank::pack_neighbours`),

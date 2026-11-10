@@ -3678,11 +3678,14 @@ mod tests {
         let window = full.unwrap();
         // F1's gate closed (the intermediate): the live kind D-KIRBY1 sees is Kirby, so the full window, reserved as before.
         assert!(!groups_load_beside(Some(KIRBY)));
+        assert!(!groups_load_beside(d_kirby1_live(Some(KIRBY), false)));
         assert_eq!(reload_window(full, kirby, true, 10, Some(KIRBY)), full);
         assert_eq!(reload_extras(window, kirby, true, 10, Some(KIRBY)), 2);
         assert_eq!(notice_extras(window), 2);
         // F1's gate open (`d_kirby1_live` gives no live kind once the bank owns the G68 step): target-first again.
         assert!(groups_load_beside(None));
+        assert!(groups_load_beside(d_kirby1_live(Some(KIRBY), true)));
+        assert_eq!(reload_window(full, kirby, true, 10, d_kirby1_live(Some(KIRBY), true)).map(|m| m.count()), Some(1));
         assert_eq!(reload_window(full, kirby, true, 10, None).map(|m| m.kinds()), Some([KIRBY, NONE, NONE]));
         assert_eq!(reload_extras(window, kirby, true, 10, None), 0);
         // A target whose groups load beside it is unchanged: target-first.

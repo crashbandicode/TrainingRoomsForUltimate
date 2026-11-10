@@ -572,3 +572,6 @@ This records the decision only; the implementation, host tests and Eden proofs a
     ledger's two rules, the background builds' "live kirby" and the drain before a Kirby target.
   - **Unchanged:** the background registration skip, the cell-0 invariant and the copy-free departure gate
     (EXCLUSIONS §2).
+  - **With target-first (above):** a Kirby target keeps his full window only while D-KIRBY1 is in force. Its gate
+    (`native_body_bank::live_gate`) takes F1's route (`d_kirby1_live`), so with F1 installed a Kirby target is
+    target-first like any other fighter and his neighbours build beside him.
