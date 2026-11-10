@@ -87,11 +87,13 @@ fn static_locks(root: &Path) -> Vec<(String, String)> {
     out
 }
 
-/// A call or reference in a body, at token `at`: `(segments, method)`.
+/// A call or reference in a body, at token `at`: `(segments, method)`, and for a method call the identifier before its `.` (the
+/// receiver's last field or variable: `combos` in `s.combos.open()`).
 struct Call {
     at: usize,
     segments: Vec<String>,
     method: bool,
+    receiver: Option<String>,
 }
 
 /// `Graph::references` with positions (same rules).
@@ -134,7 +136,8 @@ fn calls(body: &[Tok]) -> Vec<Call> {
             }
             let called = punct(body.get(k), '(');
             if (segments.len() == 1 && called) || segments.len() >= 2 || (method && called) {
-                out.push(Call { at: i, segments, method });
+                let receiver = if method && i > 1 { ident(body.get(i - 2)).map(str::to_owned) } else { None };
+                out.push(Call { at: i, segments, method, receiver });
             }
             i = k.max(i + 1);
         } else {
@@ -173,7 +176,13 @@ impl<'g> Ctx<'g> {
         let Some(all) = self.by_name.get(last) else { return Vec::new() };
         if call.method {
             let methods: Vec<usize> = all.iter().copied().filter(|&c| self.graph.funcs[c].has_receiver).collect();
-            return if methods.len() == 1 && methods[0] != from { methods } else { Vec::new() };
+            if methods.len() == 1 {
+                return if methods[0] != from { methods } else { Vec::new() };
+            }
+            // Ambiguous: the receiver's field names its module (`s.combos.press()` is `ui/combos.rs`'s, not `ui/setups.rs`'s
+            // `press`; docs lane review R1 addendum 2026-11-10 00:25Z). No match keeps it unfollowed.
+            let Some(receiver) = call.receiver.as_deref() else { return Vec::new() };
+            return methods.into_iter().filter(|&c| c != from && self.graph.funcs[c].module == receiver).collect();
         }
         let qualifier = call.segments.len().checked_sub(2).map(|k| call.segments[k].as_str());
         all.iter()
@@ -1246,6 +1255,25 @@ fn an_imported_model_function_is_not_a_runtime_call() {
         assert!(reaches(&loose, to), "{to}: the control lost its edge");
         assert!(!reaches(&precise, to), "{to}: an imported model function resolved to a runtime one");
     }
+}
+
+/// R1 addendum (docs lane, 2026-11-10 00:25Z): a method name several runtime types define (`open`, `tick`, `press`, `view` on
+/// `ui/combos.rs` and `ui/setups.rs`) resolves by the receiver's field, so the menu worker reaches the combo panel and what it
+/// locks (`combo::set_target`, `combo::last_combo`).
+#[test]
+fn an_ambiguous_method_resolves_by_its_receivers_field() {
+    let graph = runtime_graph();
+    let (ctx, _) = scan(&graph);
+    let worker = graph.find("worker::sync_panels");
+    assert_eq!(worker.len(), 1);
+    let keys: BTreeSet<String> = calls(&graph.funcs[worker[0]].body)
+        .iter()
+        .filter(|c| c.receiver.as_deref() == Some("combos"))
+        .flat_map(|c| ctx.resolve(worker[0], c))
+        .map(|t| graph.funcs[t].key())
+        .collect();
+    assert!(keys.contains("combos::open") && keys.contains("combos::tick"), "s.combos.open()/.tick() not followed: {keys:?}");
+    assert!(!keys.iter().any(|k| k.starts_with("setups::")), "a combos call resolved to the setups panel: {keys:?}");
 }
 
 /// Two scan blind spots (rc.6, hot-slots hook-thread table 2026-11-09: `allocation_trace` runs on the game's task workers): a call
