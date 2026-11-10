@@ -169,6 +169,13 @@ Player and CPU). *Add New…* opens Smash's own Mii Fighter editor from Training
 others untouched, and leaving without saving creates nothing. Saving a Mii you already have saves nothing new and says
 "Same as ‹saved name›, nothing new saved". See [docs/MII.md](docs/MII.md).
 
+![Add New, then Save with the copy unchanged: nothing new is saved](docs/media/rc6-mii-same.gif)
+
+*Eden, 2026-11-10, rc.6 `e6501ac6` (diag NRO `c1b9f694`, log lines only): the Mii Brawler list (three Miis), Add
+New…, Smash's Mii editor on a copy of the class's Mii, Save at once. Back in Training, the notice reads "Same as 格斗,
+nothing new saved". The row checked that every Mii file stayed byte-identical. Cuts inside are listed in
+[docs/MEDIA.md](docs/MEDIA.md).*
+
 ### Stages
 
 ![Change Stage: Battlefield, Y for its Ω form, and Training reloads there](docs/media/change-stage.gif)
@@ -198,6 +205,12 @@ standing; the game's own waiting-room menu, Training Partners 1, Right to 2; a s
 
 The same menu works while you wait in an online or local room. The Training partners and CPU action you set in the
 game's own waiting-room menu are remembered for the next room, and CPU › Level › CPU Level sets the partners' level.
+
+![Save last combo in a Local Wireless waiting room, then the helper bar drills it there](docs/media/rc6-lobby-combos.gif)
+
+*Eden, 2026-11-10, rc.6 `e6501ac6`, the guest of a Local Wireless room hosted in Eden: jab into jab in the waiting
+room; Recording › Combos & Sequences, *+ Save last combo…*; COMBOS lists "Lobby jabs, recorded on Sheik"; back in the
+room, the helper bar drills it. Cuts inside are listed in [docs/MEDIA.md](docs/MEDIA.md).*
 
 ![The menu in a Local Wireless waiting room](docs/media/waiting-menu.gif)
 

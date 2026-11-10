@@ -20,6 +20,15 @@ A save has no role and no chain. The old checklist that played a recording becau
 
 ![Load warps to the bound save and leaves the CPU standing](media/rc5-save-warp.gif)
 
+![Auto-load on death: with a bound save Player 1 is back on stage at once; unbound, the game's revival](media/rc6-autoload.gif)
+
+*Eden, 2026-11-10, rc.6 `e6501ac6` (diag NRO `c1b9f694`, log lines only):*
+- *With the Left save bound, Player 1 runs off and is KO'd, then is back at the save's spot at once.*
+- *The Left save's screen then sets Bind to Save / Load Off.*
+- *After the next KO, Player 1 comes down on the game's revival.*
+
+*Cuts inside are listed in [MEDIA.md](MEDIA.md).*
+
 ## Recording a macro, and its start save
 
 Record is ZR + D-pad Down. Stopping the recording keeps the inputs as a named macro. The recording also writes a save state named with the macro, "`name` · start", and the macro stores that file's id. That save holds both fighters where they were when Record started, and the macro keeps the recorded fighter's facing and speed at that moment (`note_record_start`, `src/model/rr_host.rs:389` on `p23/rc6-open-fixes`). The Start save switch defaults to On.
@@ -57,6 +66,11 @@ The old per-slot playback chords are not added.
 
 ![Play on CPU warps once to the start save, then plays the active macro](media/rc5-play-chord.gif)
 
+![Both Play chords at once: Player 1 and the CPU play together, then one after the other](media/rc6-both-play.gif)
+
+*Eden, 2026-11-10, rc.6 `e6501ac6`: both Play chords pressed together start Player 1's and the CPU's jabs at once,
+with both strip lanes running side by side. Then, played one after the other, the CPU's lane trails Player 1's.*
+
 ## The loop
 
 The loop belongs to the role, not to a file. Player 1 and the CPU each keep their own count. The counts are infinite, 1, 2, 3, 5, and 10. A new index uses 1. An old Loop On becomes infinite, and Loop Off, or a missing loop row, becomes 1.
@@ -80,6 +94,13 @@ An empty chain plays nothing. A chain whose recordings have all been deleted pla
 ## Combos
 
 *+ Save last combo…*, the first row of COMBOS on the Recording page and in the pop-up's Combos & Sequences tab, keeps the last combo the frame strip saw and makes it the drill. A opens the keyboard for its name; an empty name, or a room where no keyboard can open, gives it the next Combo N name. With no link on the strip yet it says so and writes nothing. The file is the combo's links and the input events of each follow-up: presses, releases, the C-stick, and the stick flicks (fast-fall, dash, tap-jump). Make combo records the same events, because it plays into the same strip. Any fighter can practise it. The format is in [COMBOS.md](COMBOS.md).
+
+![Save last combo: jab into jab, then COMBOS lists it and the helper bar drills it](media/rc6-save-last-combo.gif)
+
+*Eden, 2026-11-10, rc.6 `e6501ac6`: jab into jab, a TRUE combo on the strip. On the Recording page, COMBOS (0) and
+*+ Save last combo…*, then COMBOS (1) lists "Jab jab saved, recorded on Mario". Back in the match, the helper bar
+drills it. The name is typed on Eden's software keyboard, a window of its own that isn't in the frame. Cuts inside are
+listed in [MEDIA.md](MEDIA.md).*
 
 A combo counts when its recorded input events are there, the same kind and the same facing-relative direction, in order, and within the on-time tolerance, and the move that comes out is the recorded move. TRUE is not required. A link that is not a true combo still counts. TRUE stays on the helper bar as information. Drift is the held stick between those events. It is shown and it is not graded.
 
@@ -205,6 +226,12 @@ Fighter Mismatch is the prompt a macro, a chain, a replay clip, or a combo can o
 Play holds until those rows are answered. The cursor starts on Keep. Keep plays on the fighter you have. Switch changes to the fighter the file was recorded on, then plays. B cancels and does not play. A macro asks when its recorded fighter differs. For a CPU macro recorded on an exact Mii, Switch loads that Mii: its look, specials, colour, voice, outfit and hat. A Mii from a replay carries no ID and no name of its own, so it is installed as the saved Mii with the same look, or else with a made-up ID and the name "New Mii" (cov-rest `cbe961a` and `f2298ee`, `src/model/mii_install.rs` `installable`; final pass on `646a5f0d`: `yoga-cov` `cov-named-mii` and `int-named-mii-twice` PASS). A chain asks only for its first macro, and the line is `screen=mismatch ask=macro1`. Later macros are not checked and do not switch. A combo drill asks when the drilled combo changes to one recorded on another fighter. The first time a saved drill is seen, it does not ask. Load does not ask.
 
 ![Play of a chain whose first macro was recorded on another fighter](media/rc5-fighter-mismatch.gif)
+
+![A CPU macro recorded on a Mii: Switch loads that exact Mii](media/rc6-named-mii.gif)
+
+*Eden, 2026-11-10, rc.6 `e6501ac6`: a CPU macro recorded on a Mii Gunner, played with the CPU on Mario. Fighter
+Mismatch asks; Switch to recorded fighter reloads the CPU, and "Saved Mii applied" brings in the recorded Mii Gunner
+(red armour, spiked helmet).*
 
 ## Migration of the old slots
 
