@@ -130,3 +130,39 @@ fn the_menu_workers_roster_requests_run_on_the_game_frame() {
     let worker = include_str!("../src/runtime/ui/worker.rs");
     assert!(worker.contains("combos::service_switch_replies();"), "the worker no longer takes the roster's answers");
 }
+
+/// Step 2c: the combo helper's locks (`HELPER`, `RUN`, `PLAN`, `NAME`, `RENDERER`) are taken by game threads only, and the menu's
+/// labels (`LABELS`) by the menu worker only. The worker posts what it changes (`STAGED`, `NAME_POSTED`, `PLAN_POST`) and reads
+/// copies (`SAMPLE`, `PROGRESS`); each game thread that takes `PLAN` installs a posted plan first, and each that takes `NAME`
+/// takes a posted name first, so it sees what the worker staged last, as when the worker wrote it under the lock: nothing lands
+/// later. A staged target's label shows once the frame installed it (`STAGED_SEEN`), as when the frame wrote it. The game never
+/// frees a plan: the replaced ones go back to the worker (`model::box_handoff`), which drops them each pass.
+#[test]
+fn the_combo_helpers_locks_are_game_side_and_the_worker_posts() {
+    let g = graph();
+    let worker_reach = reachable(&g, "worker::run");
+    for game_side in ["combo::after_strip", "combo::session_clear", "combo::hud_tick", "combo::seq_view", "combo::note_step", "combo::take_posted_name"] {
+        assert!(!worker_reach.contains(game_side), "the menu worker reaches {game_side}");
+    }
+    let combo = include_str!("../src/runtime/features/combo.rs");
+    let game_locks = ["HELPER.", "RUN.", "PLAN.", "NAME.", "RENDERER."];
+    for worker_side in ["set_target", "stage_target", "stage_sequence", "set_draft", "labels", "take_progress", "reap_plans", "last_combo", "strip_sample"] {
+        let f = body(combo, worker_side);
+        for lock in game_locks {
+            assert!(!f.contains(lock), "the worker's {worker_side} takes {lock}:\n{f}");
+        }
+    }
+    for game_side in ["after_strip", "session_clear", "hud_tick", "seq_view", "note_step"] {
+        assert!(!body(combo, game_side).contains("LABELS"), "the game's {game_side} takes the menu's labels");
+    }
+    for game_side in ["after_strip", "session_clear", "seq_view"] {
+        ordered(body(combo, game_side), &["PLAN.", "PLAN_POST.install("]);
+    }
+    ordered(body(combo, "after_strip"), &["NAME.lock()", "take_posted_name(", "*name = text"]);
+    ordered(body(combo, "hud_tick"), &["NAME.try_lock()", "take_posted_name("]);
+    ordered(body(combo, "labels"), &["settle()"]);
+    ordered(body(combo, "stage_target"), &["settle()", "STAGED.publish(", "pending = Some((STAGED.generation()"]);
+    ordered(body(combo, "note_step"), &["PROGRESS.write("]);
+    let worker = include_str!("../src/runtime/ui/worker.rs");
+    ordered(body(worker, "sync_sequence_drill"), &["combo::reap_plans();", "APPLIED.lock()"]);
+}

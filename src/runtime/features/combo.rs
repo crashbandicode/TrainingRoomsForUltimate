@@ -7,6 +7,11 @@
 //! - The HUD tick draws the bar under the strip (`model::combo_plan`), writing only what changed.
 //! - Every graded link, resolved attempt and saved combo calls an exported trace function (§8): an Eden guest trace
 //!   point on it records the facts, with no log line.
+//! - The lock-free runtime (operator order 2026-11-10 00:44Z, `artifacts/phase23/TASK-OPUS-rc6-lockfree.md`): the game's locks
+//!   here (`HELPER`, `RUN`, `PLAN`, `NAME`, `RENDERER`) are taken by game threads only. The menu worker posts what it changes
+//!   (`STAGED`, `NAME_POSTED`, `PLAN_POST`) and the game installs it where it next reads it, so the game sees each change in
+//!   the order and at the point it did when the worker wrote it under the lock; the worker reads copies (`SAMPLE`,
+//!   `PROGRESS`) and keeps the menu's labels itself (`LABELS`).
 
 use core::sync::atomic::{AtomicI32, AtomicU32, Ordering};
 
@@ -36,9 +41,43 @@ struct Sample {
     last: Option<Combo>,
 }
 static RENDERER: Mutex<Renderer> = Mutex::new(Renderer::new());
-/// The target's name for the bar, and the names the menu shows (target, draft).
+/// The target's name for the bar (game threads only: the fighter frame installs a staged target's, the HUD tick reads it).
 static NAME: Mutex<Text> = Mutex::new(Text::EMPTY);
-static LABELS: Mutex<(Label, Label)> = Mutex::new((Label::EMPTY, Label::EMPTY));
+/// The names the menu worker gives the bar at once (`set_target`, `stage_sequence`): published, and taken into `NAME` by the
+/// game thread that next writes or reads it ([`take_posted_name`]), in the order the two kinds of write came.
+static NAME_POSTED: hos_lock::Published<Text> = hos_lock::Published::new(Text::EMPTY);
+/// The `NAME_POSTED` generation taken into `NAME` last (under `NAME`).
+static NAME_SEEN: AtomicU32 = AtomicU32::new(0);
+
+/// The names the menu shows, the target's and the draft's: the menu worker's own (no game thread takes this lock).
+static LABELS: Mutex<Labels> = Mutex::new(Labels { target: Label::EMPTY, draft: Label::EMPTY, pending: None });
+
+struct Labels {
+    target: Label,
+    draft: Label,
+    /// The label of the target the worker staged last (`stage_target`) and its `STAGED` generation: the menu shows it once the
+    /// fighter frame installed that generation (`STAGED_SEEN`), as when the frame wrote the label itself.
+    pending: Option<(u32, Label)>,
+}
+
+impl Labels {
+    /// The staged target's label, once the frame installed it.
+    fn settle(&mut self) {
+        if let Some((generation, label)) = self.pending {
+            if STAGED_SEEN.load(Ordering::Acquire) >= generation {
+                self.target = label;
+                self.pending = None;
+            }
+        }
+    }
+}
+
+/// Take a name the menu worker posted into `name` (the guard of `NAME`: one game thread at a time).
+fn take_posted_name(name: &mut Text) {
+    if let Some(posted) = NAME_POSTED.read_if_newer(&NAME_SEEN) {
+        *name = posted;
+    }
+}
 /// P1's fighter kind at the strip's last sample (-1 none): *Save last combo* writes its name as `recorded_on`.
 static P1_KIND: AtomicI32 = AtomicI32::new(-1);
 
@@ -50,17 +89,18 @@ fn settings() -> Settings {
 /// fighter P1 is now: kept for the next save's `recorded_on` only; the helper grades whatever fighter P1 is.
 pub fn after_strip(tracker: &Tracker, p1_kind: Option<i32>) {
     P1_KIND.store(p1_kind.unwrap_or(-1), Ordering::Relaxed);
-    let (out, names, stepped) = {
+    let (out, name, stepped) = {
         let mut helper = HELPER.lock();
-        let names = pull_staged().map(|staged| {
-            let (combo, text, label) = match staged {
-                Some((combo, text, label)) => (Some(combo), text, label),
-                None => (None, Text::EMPTY, Label::EMPTY),
+        let name = pull_staged().map(|staged| {
+            let (combo, text) = match staged {
+                Some((combo, text)) => (Some(combo), text),
+                None => (None, Text::EMPTY),
             };
             helper.set_target(combo);
-            (text, label)
+            text
         });
-        let plan = PLAN.lock();
+        let mut plan = PLAN.lock();
+        PLAN_POST.install(&mut plan);
         let (out, stepped) = match plan.as_deref() {
             Some(plan) => {
                 let mut run = RUN.lock();
@@ -74,17 +114,20 @@ pub fn after_strip(tracker: &Tracker, p1_kind: Option<i32>) {
         };
         let stepped = stepped.map(|s| (s, plan.as_deref().map_or(0, |p| p.generation)));
         drop(plan);
+        let stepped = stepped.map(|(s, generation)| note_step(s, generation));
         let last = helper.last_combo();
         SAMPLE.write(Sample { seen: helper.seen(), strip: last, last });
-        (out, names, stepped)
+        (out, name, stepped)
     };
-    if let Some((text, label)) = names {
-        *NAME.lock() = text;
-        LABELS.lock().0 = label;
+    if let Some(text) = name {
+        let mut name = NAME.lock();
+        // A name the worker posted before this install came first, as when it wrote `NAME` itself.
+        take_posted_name(&mut name);
+        *name = text;
     }
     report(out);
-    if let Some((stepped, generation)) = stepped {
-        report_step(stepped, generation);
+    if let Some((stepped, streak, best)) = stepped {
+        report_step(stepped, streak, best);
     }
 }
 
@@ -106,7 +149,8 @@ fn sequence_run<'a>(run: &'a mut Option<(u32, SequenceRun)>, plan: &SequenceStag
 pub fn session_clear() {
     let (out, stepped) = {
         let mut helper = HELPER.lock();
-        let plan = PLAN.lock();
+        let mut plan = PLAN.lock();
+        PLAN_POST.install(&mut plan);
         let (out, stepped) = match plan.as_deref() {
             Some(plan) => {
                 let mut run = RUN.lock();
@@ -116,18 +160,28 @@ pub fn session_clear() {
             }
             None => (helper.clear(), None),
         };
+        let stepped = stepped.map(|(s, generation)| note_step(s, generation));
         SAMPLE.write(Sample { seen: helper.seen(), strip: None, last: helper.last_combo() });
         (out, stepped)
     };
     report(out);
-    if let Some((stepped, generation)) = stepped {
-        report_step(stepped, generation);
+    if let Some((stepped, streak, best)) = stepped {
+        report_step(stepped, streak, best);
     }
 }
 
-/// A step of the drilled sequence was graded: its trace point, and the streak and best for the worker to save.
-fn report_step(stepped: Stepped, generation: u32) {
-    let (walk_streak, walk_best) = RUN.lock().map_or((0, 0), |(_, run)| (run.walk().streak(), run.walk().best()));
+/// Under `HELPER` (so `PROGRESS` has one writer at a time): the streak and best after a graded step of the drilled sequence, and
+/// for a finished run or a drop the progress the worker saves.
+fn note_step(stepped: Stepped, generation: u32) -> (Stepped, u32, u32) {
+    let (streak, best) = RUN.lock().map_or((0, 0), |(_, run)| (run.walk().streak(), run.walk().best()));
+    if matches!(stepped.advance, Advance::Finished | Advance::Dropped) {
+        PROGRESS.write(Progress { generation, streak, best });
+    }
+    (stepped, streak, best)
+}
+
+/// A step of the drilled sequence was graded: its trace point (the streak and best after it, from `note_step`).
+fn report_step(stepped: Stepped, walk_streak: u32, walk_best: u32) {
     let advance = match stepped.advance {
         Advance::Next(_) => 1,
         Advance::Finished => 2,
@@ -135,9 +189,6 @@ fn report_step(stepped: Stepped, generation: u32) {
         Advance::Idle => 0,
     };
     tr_seq_step_v1(stepped.step as u32, advance, walk_streak, walk_best);
-    if matches!(stepped.advance, Advance::Finished | Advance::Dropped) {
-        *PROGRESS.lock() = Some(Progress { generation, streak: walk_streak, best: walk_best });
-    }
 }
 
 /// A finished run or a drop changed the streak: the generation of the plan it belongs to, the streak and best.
@@ -148,15 +199,18 @@ pub struct Progress {
     pub best: u32,
 }
 
-static PROGRESS: Mutex<Option<Progress>> = Mutex::new(None);
+/// The game hands the menu worker the latest progress (written under `HELPER`, read by the worker only): neither side waits.
+static PROGRESS: hos_lock::TripleBuffer<Progress> = hos_lock::TripleBuffer::new(Progress { generation: 0, streak: 0, best: 0 });
 
-/// The worker saves the drilled sequence's streak and best to its file (`rr_host::save_sequence_progress`).
+/// The worker saves the drilled sequence's streak and best to its file (`rr_host::save_sequence_progress`): the latest progress
+/// since its last take, as the `Option` this was (a newer one replaced an untaken one there too).
 pub fn take_progress() -> Option<Progress> {
-    PROGRESS.lock().take()
+    let (progress, fresh) = PROGRESS.read();
+    fresh.then_some(progress)
 }
 
 /// A drilled sequence staged for the frame hook: the combos, their names, and the streak and best its file had. The
-/// worker builds and drops it; the frame hook only reads it under `PLAN`.
+/// worker builds and drops it (`PLAN_POST`); game threads only read it under `PLAN`.
 pub struct SequenceStage {
     pub generation: u32,
     pub name: Text,
@@ -166,14 +220,28 @@ pub struct SequenceStage {
     pub best: u32,
 }
 
+/// The staged plan as game threads see it (game threads only). Each one that takes it installs a plan the worker posted first
+/// (`PLAN_POST.install`), so it sees the plan the worker staged last, as when the worker replaced it under this lock.
 static PLAN: Mutex<Option<Box<SequenceStage>>> = Mutex::new(None);
+/// The worker's staged plans on their way to `PLAN`, and the replaced ones on their way back: the worker allocates and drops
+/// them, a game thread never does.
+static PLAN_POST: crate::model::box_handoff::BoxHandoff<SequenceStage> = crate::model::box_handoff::BoxHandoff::new();
 /// The frame hook's run of the staged plan, by the plan's generation.
 static RUN: Mutex<Option<(u32, SequenceRun)>> = Mutex::new(None);
 static PLAN_GENERATION: AtomicU32 = AtomicU32::new(0);
 
+/// The worker, each pass: drop the plans the game replaced (a post does it too).
+pub fn reap_plans() {
+    PLAN_POST.reap();
+    let stalls = PLAN_POST.take_stalls();
+    if stalls != 0 {
+        crate::runtime::diag_log::diagnostic(format_args!("[Combo] plan installs deferred={stalls} (both retire slots full)"));
+    }
+}
+
 /// The worker stages a drilled sequence (or none). `same_steps` keeps the run going (a rename, a saved streak);
-/// otherwise the next frame starts the new plan at combo 1. Returns the plan's generation. The old plan is dropped
-/// here, on the worker, after the lock is let go.
+/// otherwise the next frame starts the new plan at combo 1. Returns the plan's generation. The old plan comes back to the
+/// worker and is dropped here (`PLAN_POST`).
 pub fn stage_sequence(plan: Option<(&crate::engine::rr_host::SequencePlan, bool)>) -> u32 {
     let next = plan.map(|(plan, same_steps)| {
         let generation = if same_steps {
@@ -193,18 +261,20 @@ pub fn stage_sequence(plan: Option<(&crate::engine::rr_host::SequencePlan, bool)
     let generation = next.as_ref().map_or(0, |stage| stage.generation);
     if let Some(stage) = next.as_deref() {
         tr_seq_plan_v1(stage.generation, stage.steps.len() as u32, stage.streak, stage.best);
-        *NAME.lock() = stage.names.first().copied().unwrap_or(Text::EMPTY);
-        LABELS.lock().0 = Label::new(&plan.map_or(String::new(), |(plan, _)| plan.name.clone()));
+        NAME_POSTED.publish(stage.names.first().copied().unwrap_or(Text::EMPTY));
+        let mut labels = LABELS.lock();
+        labels.settle();
+        labels.target = Label::new(&plan.map_or(String::new(), |(plan, _)| plan.name.clone()));
     }
-    let old = core::mem::replace(&mut *PLAN.lock(), next);
-    drop(old);
+    PLAN_POST.post(next);
     generation
 }
 
-/// The bar's view of the drilled sequence, copied under the locks (the HUD tick; nothing allocates). `None` when the menu worker
-/// holds `PLAN` (`stage_sequence`): the HUD tick runs on the game's task workers and never waits for it.
+/// The bar's view of the drilled sequence, copied under the locks (the HUD tick; nothing allocates). `None` when the fighter
+/// frame holds `PLAN`: the HUD tick runs on the game's task workers and never waits for it.
 fn seq_view() -> Option<Option<SeqView>> {
-    let plan = PLAN.try_lock()?;
+    let mut plan = PLAN.try_lock()?;
+    PLAN_POST.install(&mut plan);
     let Some(plan) = plan.as_deref() else { return Some(None) };
     let run = RUN.lock().filter(|(generation, _)| *generation == plan.generation).map(|(_, run)| run);
     let walk = run.map_or(SequenceWalk::resume(plan.steps.len(), plan.streak, plan.best), |run| run.walk());
@@ -357,39 +427,48 @@ pub fn saved(combo: &Combo) {
     tr_combo_saved_v1(combo.len() as u32, combo.get(0).map_or(i32::MIN, |l| verdict_value(l.verdict)), 0, 0);
 }
 
-/// A new target (worker): staged, so the helper starts over on it at the next frame, and the menu shows its name at once.
+/// A new target (worker): staged, so the helper starts over on it at the next frame, and the menu and the bar show its name at
+/// once (the bar's through `NAME_POSTED`, taken by the next game thread that reads `NAME`).
 pub fn set_target(target: Option<(Combo, &str)>) {
     stage_target(target);
-    *NAME.lock() = Text::new(target.map_or("", |(_, name)| name));
-    LABELS.lock().0 = Label::new(target.map_or("", |(_, name)| name));
+    let name = target.map_or("", |(_, name)| name);
+    NAME_POSTED.publish(Text::new(name));
+    LABELS.lock().target = Label::new(name);
 }
 
 /// A drill the menu worker staged for the frame hook. The hook holds `HELPER`; the worker must not. `hos_lock::Published`: the
 /// worker publishes (it may wait for a reader to leave the other slot), the hook copies out what is newer than it last saw and
 /// never waits (docs lane review R1, finding 5: the hand-rolled seqlock here lacked its fences).
-static STAGED: hos_lock::Published<Option<(Combo, Text, Label)>> = hos_lock::Published::new(None);
-/// The `STAGED` generation the frame hook installed last (0: nothing staged yet).
+static STAGED: hos_lock::Published<Option<(Combo, Text)>> = hos_lock::Published::new(None);
+/// The `STAGED` generation the frame hook installed last (0: nothing staged yet). The worker reads it to show a staged target's
+/// label once it is installed (`Labels::settle`).
 static STAGED_SEEN: AtomicU32 = AtomicU32::new(0);
 
 /// Publish a grade target without taking `HELPER` (the menu worker: the drill, `ui::worker`, and the combo panel's target,
-/// `set_target`). The next `after_strip` installs it.
+/// `set_target`). The next `after_strip` installs it, and the menu's target label becomes its name then.
 pub fn stage_target(target: Option<(Combo, &str)>) {
-    STAGED.publish(target.map(|(combo, name)| (combo, Text::new(name), Label::new(name))));
+    let name = target.map_or("", |(_, name)| name);
+    let mut labels = LABELS.lock();
+    labels.settle();
+    STAGED.publish(target.map(|(combo, name)| (combo, Text::new(name))));
+    labels.pending = Some((STAGED.generation(), Label::new(name)));
 }
 
 /// `Some` when a staged target is ready: `Some(None)` clears, `Some(Some(_))` installs.
-fn pull_staged() -> Option<Option<(Combo, Text, Label)>> {
+fn pull_staged() -> Option<Option<(Combo, Text)>> {
     STAGED.read_if_newer(&STAGED_SEEN)
 }
 
 /// The draft name the next save uses (worker).
 pub fn set_draft(draft: &str) {
-    LABELS.lock().1 = Label::new(draft);
+    LABELS.lock().draft = Label::new(draft);
 }
 
-/// The menu's labels: the target's name and the draft (`model::menu::Env`).
+/// The menu's labels: the target's name and the draft (`model::menu::Env`; the worker).
 pub fn labels() -> (Label, Label) {
-    *LABELS.lock()
+    let mut labels = LABELS.lock();
+    labels.settle();
+    (labels.target, labels.draft)
 }
 
 /// The plugin's layout was registered again: every pane is written again.
@@ -398,12 +477,17 @@ pub fn on_layout_registered() {
 }
 
 /// One HUD tick: the bar's writes, shown with the strip while the helper is On and has a target. It runs on the UI pass, on the
-/// game's task workers (`anchors::ui_pass_calculate`), and the menu worker writes `NAME` and `PLAN` (`stage_sequence`,
-/// `set_target`): it takes them, and `HELPER`, with `try_lock`, and on contention writes nothing this pass (the bar keeps its
-/// panes; the next pass draws). Waiting would be the rc.6 freeze (`rc6-qpf3`; docs lane review R1, finding 1 and its addendum).
+/// game's task workers (`anchors::ui_pass_calculate`), while the fighter frame may hold `HELPER`, `NAME` or `PLAN`: it takes
+/// them with `try_lock`, and on contention writes nothing this pass (the bar keeps its panes; the next pass draws). No plugin
+/// thread takes them (the menu worker posts: `NAME_POSTED`, `PLAN_POST`); this tick takes what it posted first.
 pub fn hud_tick(strip_shown: bool, apply: impl FnMut(usize, &Look, Changed)) -> usize {
     let Some(helper) = HELPER.try_lock().map(|helper| *helper) else { return 0 };
-    let Some(name) = NAME.try_lock().map(|name| *name) else { return 0 };
+    let Some(name) = NAME.try_lock().map(|mut name| {
+        take_posted_name(&mut name);
+        *name
+    }) else {
+        return 0;
+    };
     let Some(seq) = seq_view() else { return 0 };
     RENDERER.lock().draw(&helper, &name, seq.as_ref(), strip_shown, apply)
 }

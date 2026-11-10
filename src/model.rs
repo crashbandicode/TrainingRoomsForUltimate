@@ -205,6 +205,8 @@ pub mod scalar_tls;
 pub mod seq_cell;
 #[path = "model/drop_ring.rs"]
 pub mod drop_ring;
+#[path = "model/box_handoff.rs"]
+pub mod box_handoff;
 
 #[path = "model/boot_notices.rs"]
 pub mod boot_notices;

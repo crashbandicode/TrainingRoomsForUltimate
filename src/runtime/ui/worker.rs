@@ -539,6 +539,8 @@ fn sync_sequence_drill() {
     use crate::runtime::features::combo;
 
     let root = std::path::Path::new(crate::model::storage::ROOT);
+    // The plans the game replaced come back here to be dropped (the game never frees one).
+    combo::reap_plans();
     let mut applied = APPLIED.lock();
     let Some(drill) = applied.as_mut().filter(|a| a.plan.is_some()) else {
         let _ = combo::take_progress();

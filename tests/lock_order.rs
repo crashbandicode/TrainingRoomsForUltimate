@@ -1267,7 +1267,7 @@ fn no_lock_a_game_hook_waits_on_is_held_by_a_plugin_thread() {
 /// `SHARED_ON_PURPOSE`, no `MEASURED_ON_MAIN_THREAD`), over the diag build (the Eden runs' build: its own modules, threads and hooks
 /// too), every `#[skyline::hook]` and `GAME_ENTRIES`, the callback tables and bare-name function values. It is the work queue:
 /// `LOCKFREE_INVENTORY_MAX` only goes down, step by step, to 0.
-const LOCKFREE_INVENTORY_MAX: usize = 9;
+const LOCKFREE_INVENTORY_MAX: usize = 5;
 
 /// The diag build's call graph (`runtime_graph` plus the `#[cfg(feature = "diag")]` modules).
 fn diag_runtime_graph() -> Graph {
