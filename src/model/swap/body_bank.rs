@@ -1077,6 +1077,16 @@ pub fn target_first(forms: Forms, groups: bool, pool: usize) -> Option<Members> 
     Members::target_only(forms)
 }
 
+/// The window a switch's Reload builds (`native_body_bank::proposed`): target-first applies to a window rebuild only. When
+/// the lane gives the target no `full` window (no cycle neighbour, or only special-group ones such as Pokémon Trainer beside
+/// Kirby) the switch keeps its canonical Reload, with no bank, as before target-first. A one-member bank there let the
+/// planner add groups no window had brought: integration FLAG 2 2026-11-10 17:56Z, P1's PT group planned beside a live
+/// Kirby and deferred by D-KIRBY1, so the notice stayed at "Loading 4/7".
+pub fn reload_window(full: Option<Members>, forms: Forms, groups: bool, pool: usize) -> Option<Members> {
+    let full = full?;
+    Some(target_first(forms, groups, pool).unwrap_or(full))
+}
+
 /// The group a [`target_first`] Reload's neighbours build as: the members the `full` window would have held besides
 /// `target`, laid out like any group (Kirby at cell 0). The planner plans it first, ahead of the rest of the lane, so it
 /// is admitted on the same cost the full window's supplements were (`memory::window_extras` over those members is
@@ -3622,6 +3632,28 @@ mod tests {
         assert_eq!((none.planned, CacheStatus::new(assets, none, false).progress()), (0, Progress::Hidden));
         // With groups off the window is built whole, and the notice counts what is reserved, as before target-first.
         assert_eq!(reload_extras(window, forms, false, pool), notice_extras(window));
+    }
+
+    #[test]
+    fn a_switch_with_no_window_to_rebuild_keeps_its_canonical_reload() {
+        // `final-surface-i3-kr-889919e1-r2` `kr-after` (integration FLAG 2 2026-11-10 17:56Z): P1's cycle is Pokémon Trainer
+        // and Kirby. After `kr-copy`'s canonical Reload to PT, the switch to Kirby has no full window: PT is a native group,
+        // never a window member. `732663e2` Reloaded Kirby canonically, with no bank and so no group planned beside him.
+        const SQUIRTLE: u32 = 0x24;
+        let lane = [SQUIRTLE, KIRBY, SQUIRTLE, KIRBY, SQUIRTLE];
+        let kirby = Forms::starting(KIRBY);
+        let full = Members::from_forms(kirby, &lane, 2);
+        assert_eq!(full, None);
+        assert_eq!(reload_window(full, kirby, true, 10), None);
+        // A role with no cycle neighbour at all (the menu's CPU pick with no cycle): the same.
+        assert_eq!(reload_window(Members::from_forms(Forms::starting(MARIO), &[], 2), Forms::starting(MARIO), true, 10), None);
+        // A window to rebuild still loads its target first; with groups off, or no pool, the full window as before.
+        let full = Members::from_forms(kirby, &[PIKACHU, GAME_WATCH], 2);
+        assert!(full.is_some());
+        assert_eq!(reload_window(full, kirby, true, 10), target_first(kirby, true, 10));
+        assert_eq!(reload_window(full, kirby, true, 10).map(|m| m.count()), Some(1));
+        assert_eq!(reload_window(full, kirby, false, 10), full);
+        assert_eq!(reload_window(full, kirby, true, 0), full);
     }
 
     #[test]

@@ -176,7 +176,7 @@ use crate::engine::swap::body_bank::{
     baseline_words, identity_move, IdentityMove, leaves_at_pause, count_group_members, kept_members,
     release_for_new_members, capacity_release, leaves_now, ReleaseWatch, arriving_room, room_coming, still_short,
     next_window_plan, own_words, shadow_values, LiveIdentity, speculative_step_admitted, serving_step, Serving,
-    target_first, reload_extras, notice_extras, canonical_replaces_window, neighbour_group, pack_neighbours,
+    reload_window, reload_extras, notice_extras, canonical_replaces_window, neighbour_group, pack_neighbours,
 };
 use crate::engine::swap::body_bank::memory::{self, Admission};
 use crate::engine::swap::body_bank::mii_publish::{PublishAttempts, PublishRefusal, PublishStep};
@@ -1285,14 +1285,16 @@ pub(super) fn proposed(owner: u32, target: Forms, upcoming: &[u32]) -> Option<Me
     // builds the picked fighter alone (`body_bank::target_first`). The members the full window would have held are planned
     // as the role's first background group once it is Ready (`NEIGHBOURS`, `plan_groups`), admitted on the cost the window
     // charged them, then the rest of the lane as usual. No supplement is charged here, so the window waits for no memory.
-    if let Some(members) = target_first(target, groups_enabled(&settings), group_pool(&settings)) {
-        WINDOW_WAITING[role].store(0, Ordering::Release);
-        let seed = full.and_then(|full| neighbour_group(full, target.kinds[0], group_policy(&settings),
-            excluded_original(&settings, &menu, role)));
-        NEIGHBOURS[role].store(pack_neighbours(target.kinds[0], seed), Ordering::Release);
-        trace!("[BodyBank] target first owner={} target={:#x} lane={:x?} neighbours={:x?}; they build as groups",
-            owner, target.kinds[0], &lane[..count], seed.map(|m| m.kinds()));
-        return Some(members);
+    // A switch with no window to rebuild keeps its canonical Reload (`body_bank::reload_window`).
+    if let (Some(members), Some(full)) = (reload_window(full, target, groups_enabled(&settings), group_pool(&settings)), full) {
+        if members != full {
+            WINDOW_WAITING[role].store(0, Ordering::Release);
+            let seed = neighbour_group(full, target.kinds[0], group_policy(&settings), excluded_original(&settings, &menu, role));
+            NEIGHBOURS[role].store(pack_neighbours(target.kinds[0], seed), Ordering::Release);
+            trace!("[BodyBank] target first owner={} target={:#x} lane={:x?} neighbours={:x?}; they build as groups",
+                owner, target.kinds[0], &lane[..count], seed.map(|m| m.kinds()));
+            return Some(members);
+        }
     }
     NEIGHBOURS[role].store(u64::MAX, Ordering::Release);
     let Some(members) = full else {
