@@ -1,0 +1,31 @@
+# Each thread's largest [ThreadStack] high_water mark in the rc.6 Eden runs of 2026-11-09/10 (diag builds), with its run.
+# tests/stack_marks.rs holds model::thread_stacks to them: a row whose `measured` is below a mark here fails. Append a newer
+# run's larger mark (its line and run) when a session shows one, then record it in the row.
+# boot: final-surface-cov-4e336da4
+[ThreadStack] high_water name=boot used=33200 size=65536 free=32336 low=false
+# mii-catalog: final-surface-lc-1261f56c
+[ThreadStack] high_water name=mii-catalog used=8016 size=28672 free=20656 low=false
+# replay-capture-save: final-surface-cov-4e336da4
+[ThreadStack] high_water name=replay-capture-save used=25344 size=57344 free=32000 low=false
+# tr-archive: final-surface-lc-1261f56c
+[ThreadStack] high_water name=tr-archive used=7840 size=28672 free=20832 low=false
+# tr-diag-reload: final-surface-lc-4e336da4
+[ThreadStack] high_water name=tr-diag-reload used=15552 size=40960 free=25408 low=false
+# tr-heartbeat: final-surface-cov-4e336da4
+[ThreadStack] high_water name=tr-heartbeat used=11840 size=32768 free=20928 low=false
+# tr-ini-writer: final-surface-cov-4e336da4
+[ThreadStack] high_water name=tr-ini-writer used=9248 size=28672 free=19424 low=false
+# tr-macro-diag: final-surface-of-1261f56c
+[ThreadStack] high_water name=tr-macro-diag used=9088 size=28672 free=19584 low=false
+# tr-menu: final-yoga-ht-fixcheck-604a3482
+[ThreadStack] high_water name=tr-menu used=56320 size=90112 free=33792 low=false
+# tr-probe: final-surface-lc-72344fd9
+[ThreadStack] high_water name=tr-probe used=151920 size=208896 free=56976 low=false
+# tr-stall-watch: final-surface-cov-4e336da4
+[ThreadStack] high_water name=tr-stall-watch used=2608 size=49152 free=46544 low=false
+# tr-state-diag: final-surface-of-1261f56c
+[ThreadStack] high_water name=tr-state-diag used=8960 size=40960 free=32000 low=false
+# tr-state-writer: final-surface-acc-r2
+[ThreadStack] high_water name=tr-state-writer used=18320 size=40960 free=22640 low=false
+# tr-trace-writer: final-yoga-ht-fixcheck-604a3482
+[ThreadStack] high_water name=tr-trace-writer used=8624 size=28672 free=20048 low=false

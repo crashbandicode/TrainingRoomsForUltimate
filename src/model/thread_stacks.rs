@@ -70,21 +70,21 @@ pub const THREADS: [ThreadStack; 18] = [
     // See docs/SH01-MEASURED-STACK-REVIEW.md (removed after v0.2.0-rc.1; see that tag); margin and SDK reserve are unchanged.
     // the diagnostics drain (open, append, close every 50 ms), the late seam report, the CPU-as-P1 fallback's request.json read
     // and receipts, diag hook_stats and stack reports
-    row(ThreadId::Heartbeat, c"tr-heartbeat", 32 * KIB, 8_096, 11_184, "Eden st-02..st-12, f6-37/sh-01", "diag_log::start_drain_thread::{closure#0}"),
+    row(ThreadId::Heartbeat, c"tr-heartbeat", 32 * KIB, 8_096, 11_840, "Eden st-02..st-12, f6-37/sh-01, final-surface-cov-4e336da4", "diag_log::start_drain_thread::{closure#0}"),
     // settings.json read, recovery and the JSON parse, joined by the boot thread
     row(ThreadId::SettingsLoad, c"tr-settings-load", 32 * KIB, 4_656, 9_904, "Eden st-02..st-12, f6-37/sh-01/s6-10", "boot::load_settings_boxed"),
     // save_states.json read and parse, joined by the boot thread
     row(ThreadId::StateLoad, c"tr-state-load", 40 * KIB, 17_424, 18_624, "Eden st-02..st-12", "states::load_file"),
     // save_states.json serialise and atomic replace
-    row(ThreadId::StateWriter, c"tr-state-writer", 40 * KIB, 15_184, 17_664, "Eden st-02..st-12, s6-13 save-state write", "states::start_writer::{closure#0}"),
+    row(ThreadId::StateWriter, c"tr-state-writer", 40 * KIB, 15_184, 18_320, "Eden st-02..st-12, s6-13 save-state write, final-surface-acc-r2", "states::start_writer::{closure#0}"),
     // diag: request files, diag-settings.json parse, publish and apply
-    row(ThreadId::StateDiag, c"tr-state-diag", 40 * KIB, 17_616, 8_592, "Eden st-02..st-12", "states::start_diag_triggers::{closure#0}"),
+    row(ThreadId::StateDiag, c"tr-state-diag", 40 * KIB, 17_616, 8_960, "Eden st-02..st-12, final-surface-of-1261f56c", "states::start_diag_triggers::{closure#0}"),
     // button_config.ini, replay_capture.ini and settings.json atomic writes
     row(ThreadId::IniWriter, c"tr-ini-writer", 28 * KIB, 3_248, 9_344, "Eden st-02..st-12", "features::writer::run"),
     // mii-editor-last.json (and the diag results observer trace): serialise from the boxed slot, atomic replace
     row(ThreadId::TraceWriter, c"tr-trace-writer", 28 * KIB, 2_720, 8_624, "Eden st-02..st-12, ui18-02 native Mii editor", "compat::filesystem::init::{closure#0}"),
     // diag: diag-settings-next.json parse, publish and apply
-    row(ThreadId::DiagReload, c"tr-diag-reload", 40 * KIB, 17_696, 9_840, "Eden st-02..st-12", "diag_reload::start::{closure#0}"),
+    row(ThreadId::DiagReload, c"tr-diag-reload", 40 * KIB, 17_696, 15_552, "Eden st-02..st-12, final-surface-lc-4e336da4", "diag_reload::start::{closure#0}"),
     // first-boot import of the fork's files (blocking part), joined with a deadline
     row(ThreadId::Import, c"tr-import", 32 * KIB, 8_032, 10_080, "Eden st-02..st-12", "import::start::{closure#0}"),
     // first-boot import of the fork's captures in the background
@@ -101,15 +101,15 @@ pub const THREADS: [ThreadStack; 18] = [
     // external path is separate from the owned-ELF scan; see docs/UI16-PROBE-STACK-FAULT.md (removed after v0.2.0-rc.1; see that tag).
     row(ThreadId::Probe, c"tr-probe", 204 * KIB, 3_440, 151_920, "Eden ui-17 same ARC92171b2f full probe", "ui::probe::install::{closure#0}").with_external(143_376),
     // diag: diag-macro.req read and parse
-    row(ThreadId::MacroDiag, c"tr-macro-diag", 28 * KIB, 3_248, 8_768, "Eden st-02..st-12", "macros::diag::start::{closure#0}"),
+    row(ThreadId::MacroDiag, c"tr-macro-diag", 28 * KIB, 3_248, 9_088, "Eden st-02..st-12, final-surface-of-1261f56c", "macros::diag::start::{closure#0}"),
     // the replay capture archive and Mii preset writer
-    row(ThreadId::ReplaySave, c"replay-capture-save", 56 * KIB, 32_480, 25_248, "Eden st-02..st-12, f6-37/sh-01", "replay_store::start_writer::{closure#0}"),
+    row(ThreadId::ReplaySave, c"replay-capture-save", 56 * KIB, 32_480, 25_344, "Eden st-02..st-12, f6-37/sh-01, final-surface-cov-4e336da4", "replay_store::start_writer::{closure#0}"),
     // the saved Mii catalog read for the library
     row(ThreadId::MiiCatalog, c"mii-catalog", 28 * KIB, 5_872, 8_016, "Eden f6-31/f6-37/sh-01", "replay_store::init_catalog_fallback::{closure#0}::{closure#0}"),
     // console-practice-trace builds only: the practice trace file writer
     row(ThreadId::PracticeTrace, c"tr-practice-trace", 128 * KIB, 0, 0, "", "practice_trace::writer"),
     // diag: the stall watchdog (samples the hooks' entry count, prints held locks through svcOutputDebugString)
-    row(ThreadId::StallWatch, c"tr-stall-watch", 48 * KIB, 3_104, 0, "", "stall_watch::start::{closure#0}"),
+    row(ThreadId::StallWatch, c"tr-stall-watch", 48 * KIB, 3_104, 2_608, "final-surface-cov-4e336da4", "stall_watch::start::{closure#0}"),
 ];
 
 const fn row(
