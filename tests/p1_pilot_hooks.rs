@@ -264,7 +264,8 @@ fn the_file_work_runs_on_the_heartbeat() {
     let service = body(PILOT, "pub(crate) fn service(");
     assert!(service.contains("while write_next() {}") && service.contains("if READ_WANTED.swap(false, Ordering::AcqRel) {"));
     assert!(body(PILOT, "fn write_next(").contains("write_receipt(run, reason, &value);"));
-    assert!(body(PILOT, "fn next_receipt(").contains("let next = OUTBOX.lock().pop();"));
+    // The lock-free runtime (step 3): the heartbeat pops the hook's receipts from a lock-free ring, never under a lock.
+    assert!(body(PILOT, "fn next_receipt(").contains("let next = OUTBOX.pop();"));
     // The command trace is reserved off the hook and never grows on it.
     assert!(body(PILOT, "unsafe fn plan(").contains("trace: Vec::with_capacity(TRACE_LIMIT),"));
     assert!(body(PILOT, "unsafe fn command_output(").contains("if command.trace.len() < TRACE_LIMIT {"));

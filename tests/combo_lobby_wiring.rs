@@ -110,7 +110,9 @@ fn combo_switch_prompt_works_in_lobby_practice() {
     assert!(!text.contains("Combos work in Training"), "the prompt is unreachable while open refuses a waiting scene");
     let g = graph();
     assert!(calls(&g, "combos::choose", "named_macros::open_combo_fighter_prompt"));
-    assert!(calls(&g, "combos::after_close", "character_roster::request_player_kind"));
+    // The lock-free runtime (step 2b): the worker posts the switch; the game frame makes the roster's request.
+    assert!(calls(&g, "combos::after_close", "roster_requests::request_player_kind_replied"));
+    assert!(calls(&g, "roster_requests::service", "character_roster::request_player_kind"));
     let roster = include_str!("../src/runtime/roster/character_roster.rs");
     assert!(
         roster.contains("cfg!(feature = \"waiting-roster-reload\") && lobby::active()"),

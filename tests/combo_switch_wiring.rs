@@ -69,7 +69,9 @@ fn the_answer_reaches_the_combos_ui() {
 fn switch_asks_the_player_role_once_when_the_menu_closes() {
     let g = graph();
     assert!(calls(&g, "worker::close_session", "combos::after_close"));
-    assert!(calls(&g, "combos::after_close", "character_roster::request_player_kind"));
+    // The lock-free runtime (step 2b): the worker posts the switch; the game frame makes the roster's request.
+    assert!(calls(&g, "combos::after_close", "roster_requests::request_player_kind_replied"));
+    assert!(calls(&g, "roster_requests::service", "character_roster::request_player_kind"));
     assert!(calls(&g, "character_roster::request_player_kind", "character_roster::queue_admitted"));
     for ident in ["Player", "Direct", "pending"] {
         assert!(names(&g, "character_roster::request_player_kind", ident), "request_player_kind names {ident}");
