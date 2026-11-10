@@ -1024,6 +1024,11 @@ fn callback_edges(graph: &Graph) -> Vec<(usize, usize)> {
 /// The runs of hot-slots' first entry-point session: the mii plan (CPU and P1 cycles, CPU switches, Mii groups, the pause) and
 /// four native L+R+A resets, on `72344fd9`'s diag build (`9b1d2d99`).
 const ENTRY_RUNS: &str = "final-yoga-ht-mii-reset-72344fd9";
+/// The runs that reached the Mii editor hooks (hot-slots, TABLE.md 2026-11-10 01:57Z): its combined boot on the fix build
+/// `ead60d8c` (`72344fd9` + this branch: Training, the CPU to Kirby, the Mii editor rows with the name keyboard) and the two LDN
+/// pair sessions, whose guest opens the editor.
+const EDITOR_RUNS: &str =
+    "final-yoga-ht-fixcheck-ead60d8c-r2 + final-yoga-ht-pair-72344fd9 + final-yoga-ht-pair-b04856b2-r2 (a and b, LDN pairs: the guest editor)";
 const MEASURED_RUNS: &str = "final-yoga-ht-mii-b04856b2 + final-yoga-ht-kr-b04856b2 + final-yoga-ht-pair-b04856b2-r2 (a and b, an LDN \
                              pair: the waiting rooms and a match) + final-yoga-ht-reset-b04856b2 (four native resets)";
 
@@ -1050,6 +1055,11 @@ const MEASURED_ON_MAIN_THREAD: &[(&str, u64, u64, &str)] = &[
     ("cpu::on_frame", 45_743, 45_743, ENTRY_RUNS),
     ("native_service::training_mod_native_service_dispatch", 92_724, 92_724, ENTRY_RUNS),
     ("mii_ordinary_gate::mii_ordinary_gate_decide", 26, 26, ENTRY_RUNS),
+    // hot-slots' combined boot (primary 2026-11-10 01:16Z): the Mii editor hooks that wait on inline_keyboard SIGNALS.
+    ("mii_editor_bridge::edit_frame", 6_067, 6_067, EDITOR_RUNS),
+    ("mii_editor_bridge::editor_parent", 7_275, 7_275, EDITOR_RUNS),
+    ("mii_editor_bridge::editor_release", 9, 9, EDITOR_RUNS),
+    ("name_keyboard::name_frame", 843, 843, EDITOR_RUNS),
 ];
 
 /// The impl functions `f` runs through `helper(&STATIC ..)`, with the token position of the helper.
