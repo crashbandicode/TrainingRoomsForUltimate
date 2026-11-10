@@ -211,6 +211,12 @@ impl<'g> Ctx<'g> {
             return methods.into_iter().filter(|&c| c != from && self.graph.funcs[c].module == module).collect();
         }
         let qualifier = call.segments.len().checked_sub(2).map(|k| call.segments[k].as_str());
+        // A type's associated function (`Recorder::open` in `practice_trace.rs`): the functions of that name in the module the file
+        // imports the type from. `Graph::callees` matched it by name to the panels' `Ui::open` methods and missed the type's own
+        // (the lock-free runtime, step 5d).
+        if let Some(module) = qualifier.and_then(|q| self.graph.type_module(&f.file, q)) {
+            return all.iter().copied().filter(|&c| c != from && self.graph.funcs[c].module == module).collect();
+        }
         all.iter()
             .copied()
             .filter(|&c| c != from && self.callees[from].contains(&c))
@@ -1211,6 +1217,30 @@ fn lockfree_inventory(ctx: &Ctx, shared: &Shared) -> Vec<(String, BTreeSet<Strin
             Some((lock_name(ctx, *lock), shared.game_hooks[lock].clone(), holds.clone()))
         })
         .collect()
+}
+
+/// A type-qualified call follows the module its type is imported from: `practice_trace.rs`'s `Recorder::open` is
+/// `practice_trace_core`'s, not the combo panel's `Ui::open` or the setups' `open` (the diag build's `tr-practice-trace` was listed as
+/// holding the combo and setups locks through that edge).
+#[test]
+fn a_type_qualified_call_follows_its_types_import() {
+    let graph = diag_runtime_graph();
+    assert_eq!(graph.type_module("roster/practice_trace.rs", "Recorder"), Some("practice_trace_core"));
+    let (ctx, _) = scan(&graph);
+    let ctx = &ctx;
+    let writers: Vec<usize> = (0..graph.funcs.len())
+        .filter(|&f| graph.funcs[f].file == "roster/practice_trace.rs" && graph.funcs[f].name == "writer")
+        .collect();
+    assert!(!writers.is_empty(), "practice_trace.rs's writer");
+    let callees: BTreeSet<String> = writers
+        .iter()
+        .flat_map(|&f| calls(&graph.funcs[f].body).into_iter().flat_map(move |c| ctx.resolve(f, &c)))
+        .map(|c| format!("{} @ {}", graph.funcs[c].key(), graph.funcs[c].file))
+        .collect();
+    assert!(callees.iter().any(|c| c.starts_with("practice_trace_core::open @")), "{callees:?}");
+    for wrong in ["ui/combos.rs", "ui/setups.rs", "features/states/setups.rs", "mii/native_keyboard/inline_keyboard.rs"] {
+        assert!(!callees.iter().any(|c| c.contains("::open @") && c.ends_with(wrong)), "Recorder::open resolved into {wrong}: {callees:?}");
+    }
 }
 
 /// Every plugin thread's entry resolves to the function its `model::thread_stacks` symbol names, in the diag build (no thread is

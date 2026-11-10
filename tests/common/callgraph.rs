@@ -481,6 +481,9 @@ pub struct Graph {
     /// Resolve a bare imported name precisely (`foreign_imports`), as Rust does. Off by default: the capability scan's declared
     /// closures were built on the over-approximation (every runtime function of an imported name).
     pub precise_imports: bool,
+    /// `file -> (type -> the runtime module it is imported from)`, from `use crate::runtime::…::module::{Type, …}` and
+    /// `use crate::runtime::…::module::Type;` (an uppercase name; nested groups are left out).
+    type_modules: BTreeMap<String, BTreeMap<String, String>>,
     by_name: BTreeMap<String, Vec<usize>>,
     /// Extra edges for calls the text cannot show (a function pointer table): `(from key, to key)`.
     pub dynamic: Vec<(String, String)>,
@@ -496,6 +499,43 @@ fn rust_files(dir: &Path, out: &mut Vec<PathBuf>) {
             out.push(path);
         }
     }
+}
+
+/// The types (uppercase names) a `use crate::runtime::…` statement imports, with the module each comes from: `(name, module)`.
+/// `…::module::{Type, Other as Alias, self as m}` gives `Type` and `Alias`; `…::module::Type [as Alias]` gives one. A nested
+/// group gives none (the caller keeps its over-approximation for those).
+fn imported_types(stmt: &[Tok]) -> Vec<(String, String)> {
+    let is_type = |name: &str| name.starts_with(|c: char| c.is_ascii_uppercase());
+    let mut out = Vec::new();
+    if let Some(open) = stmt.iter().position(|t| is_punct(t, '{')) {
+        let group = &stmt[open + 1..];
+        let Some(module) = open.checked_sub(2).and_then(|k| ident(&stmt[k])) else { return out };
+        if group.iter().any(|t| is_punct(t, '{')) {
+            return out;
+        }
+        for item in group.split(|t| is_punct(t, ',') || is_punct(t, '}')) {
+            let names: Vec<&str> = item.iter().filter_map(ident).collect();
+            let name = match names.as_slice() {
+                [name] => *name,
+                [_, "as", alias] => *alias,
+                _ => continue,
+            };
+            if is_type(name) {
+                out.push((name.to_owned(), module.to_owned()));
+            }
+        }
+    } else {
+        let names: Vec<&str> = stmt.iter().filter_map(ident).collect();
+        let (module, name) = match names.as_slice() {
+            [.., module, _, "as", alias] => (*module, *alias),
+            [.., module, name] => (*module, *name),
+            _ => return out,
+        };
+        if is_type(name) {
+            out.push((name.to_owned(), module.to_owned()));
+        }
+    }
+    out
 }
 
 /// The `#[path = "file.rs"] mod name;` declarations of `src` whose name differs from the file's module: `(name, module)`. A call
@@ -576,6 +616,7 @@ impl Graph {
         let mut imports: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
         let mut path_mods_local: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();
         let mut foreign_imports: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+        let mut type_modules: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();
         for path in files {
             let rel = path.strip_prefix(runtime_dir).unwrap().to_string_lossy().replace('\\', "/");
             for (name, module) in path_modules(&fs::read_to_string(&path).unwrap()) {
@@ -600,6 +641,10 @@ impl Graph {
                     if foreign {
                         let names = stmt.iter().filter_map(ident).filter(|n| *n != "as" && *n != "self");
                         foreign_imports.entry(rel.clone()).or_default().extend(names.map(str::to_owned));
+                    } else if root == Some("crate") && second == Some("runtime") {
+                        for (ty, module) in imported_types(stmt) {
+                            type_modules.entry(rel.clone()).or_default().insert(ty, module);
+                        }
                     }
                     for (k, t) in stmt.iter().enumerate() {
                         if let Some(name) = ident(t) {
@@ -658,7 +703,24 @@ impl Graph {
             .filter(|(name, _)| !modules.contains(name.as_str()))
             .map(|(name, module)| (name.clone(), module.clone()))
             .collect();
-        Graph { funcs, aliases, imports, path_mods_local, path_mods, foreign_imports, precise_imports: false, by_name, dynamic: Vec::new() }
+        Graph {
+            funcs,
+            aliases,
+            imports,
+            path_mods_local,
+            path_mods,
+            foreign_imports,
+            precise_imports: false,
+            type_modules,
+            by_name,
+            dynamic: Vec::new(),
+        }
+    }
+
+    /// The runtime module `file` imports the type `name` from (`Recorder` in `practice_trace.rs`: `practice_trace_core`), if its
+    /// `use` statements say so.
+    pub fn type_module(&self, file: &str, name: &str) -> Option<&str> {
+        self.type_modules.get(file).and_then(|m| m.get(name)).map(String::as_str)
     }
 
     /// The module a `name::` qualifier in `file` means when `name` is a `#[path]` module declared under another name.
@@ -864,6 +926,7 @@ mod receiver_tests {
             path_mods: BTreeMap::new(),
             foreign_imports: BTreeMap::new(),
             precise_imports: false,
+            type_modules: BTreeMap::new(),
             by_name,
             dynamic: Vec::new(),
         }
