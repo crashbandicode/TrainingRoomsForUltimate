@@ -175,8 +175,8 @@ use crate::engine::swap::body_bank::{
     entry_bytes_of, mii_exit_bytes_match, mii_reuse_bytes_match, MiiEntryBytes, MiiIdentity, MII_ENTRY_START, RESOURCE_WORDS,
     baseline_words, identity_move, IdentityMove, leaves_at_pause, count_group_members, kept_members,
     release_for_new_members, capacity_release, leaves_now, ReleaseWatch, arriving_room, room_coming, still_short,
-    next_window_targets, own_words, shadow_values, LiveIdentity, speculative_step_admitted, serving_step, Serving,
-    target_first, reload_extras, canonical_replaces_window, neighbour_group, pack_neighbours,
+    next_window_plan, own_words, shadow_values, LiveIdentity, speculative_step_admitted, serving_step, Serving,
+    target_first, reload_extras, notice_extras, canonical_replaces_window, neighbour_group, pack_neighbours,
 };
 use crate::engine::swap::body_bank::memory::{self, Admission};
 use crate::engine::swap::body_bank::mii_publish::{PublishAttempts, PublishRefusal, PublishStep};
@@ -833,6 +833,8 @@ pub(crate) fn plan_budget(menu: &crate::engine::compat::menu::TrainingModpackMen
     let started = now_us();
     let settings = crate::runtime::roster::cycle_preload_config::snapshot();
     let mut wanted = [0; 2];
+    // What the notice counts for each role's next window (`body_bank::notice_extras`), beside the physical want.
+    let mut notice_wanted = [0; 2];
     let mut wanted_banks = [None; 2];
     let grouped = groups_enabled(&settings);
     if ENABLED.load(Ordering::Acquire) && settings.fighters && settings.bank_members >= 2 {
@@ -856,6 +858,7 @@ pub(crate) fn plan_budget(menu: &crate::engine::compat::menu::TrainingModpackMen
                     && super::requested_forms_at(menu, logical, POPO, Some(0)) == Forms::solo_popo();
                 wanted[role] = crate::engine::swap::body_bank::window_share::cycle_window_demand(
                     &cycle, settings.bank_members, solo);
+                notice_wanted[role] = wanted[role];
             }
             let kinds = lane.map(|target| target.map_or(u32::MAX, |t| t.kind));
             for (i, &kind) in kinds.iter().enumerate() {
@@ -873,9 +876,10 @@ pub(crate) fn plan_budget(menu: &crate::engine::compat::menu::TrainingModpackMen
                 let (members_lane, count) = window_lane(menu, role, &kinds[i + 1..]);
                 if let Some(members) = members_for(&settings, forms, &members_lane[..count],
                     usize::from(settings.bank_members - 1)) {
-                    // rc.6.1 target-first: the bodies the next Reload builds besides the target (none when its neighbours
-                    // build as groups, which `plan_groups` charges); the notice still lists the window it prepares.
+                    // rc.7 target-first: the bodies the next Reload builds besides the target (none when its neighbours
+                    // build as groups, which `plan_groups` charges); the notice still counts the window it prepares.
                     wanted[role] = wanted[role].max(reload_extras(members, forms, grouped, group_pool(&settings)));
+                    notice_wanted[role] = notice_wanted[role].max(notice_extras(members));
                     wanted_banks[role] = Some((members, kind));
                     break;
                 }
@@ -894,6 +898,8 @@ pub(crate) fn plan_budget(menu: &crate::engine::compat::menu::TrainingModpackMen
         usize::from(settings.slots)
     };
     let reserved = crate::engine::swap::body_bank::reserve_extras(wanted, live, window_pool);
+    // The notice's share of the same pool: equal to `reserved` except where target-first builds the target alone.
+    let notice_reserved = crate::engine::swap::body_bank::reserve_extras(notice_wanted, live, window_pool);
     let originals = [excluded_original(&settings, menu, 0), excluded_original(&settings, menu, 1)];
     let mut group_targets = [0u8; 2];
     let mut group_bodies = 0usize;
@@ -910,19 +916,12 @@ pub(crate) fn plan_budget(menu: &crate::engine::compat::menu::TrainingModpackMen
         let next = wanted_banks[role].map_or(0, |(members, target)| {
             // A pair-lead bank plans one selectable extra (cell 2); Nana is not a target. The
             // target keeps its own cell (`CellRule::PinCell0` puts Kirby or Solo Popo at cell 0),
-            // so the reserved members are the target plus its first `value` window neighbours,
-            // never "the first cells" with cell 0 taken as the active fighter.
-            let (kinds, count) = members.logical_kinds();
-            let extras = if members.is_pair_lead() { count } else { *value };
-            let mut shown = crate::engine::compat::fixed::FixedList::<u32, { NATIVE_MEMBERS + 1 }>::new(0);
-            for kind in std::iter::once(target)
-                .chain(kinds[..count].iter().copied().filter(|kind| *kind != target).take(extras)) {
-                shown.push(kind);
-            }
+            // so the counted members are the target plus its first `notice_reserved` window neighbours,
+            // never "the first cells" with cell 0 taken as the active fighter (`body_bank::next_window_plan`).
             // rc6-hot-xps19: a detached record that holds them (the window a Mii group displaced) counts with the groups.
             let grouped = |kind: u32| BANKS[role].lock().as_ref().is_some_and(|bank| !bank.departed
                 && bank.groups.iter().any(|g| g.state != GroupState::Released && g.members.index_of(kind).is_some()));
-            next_window_targets(&shown, target, originals[role], grouped)
+            next_window_plan(members, target, notice_reserved[role], originals[role], grouped)
         });
         let targets = crate::engine::swap::body_bank::window_targets(grouped, live[role], originals[role], next);
         PLANNED_TARGETS[role].store(targets.saturating_add(group_targets[role]), Ordering::Release);

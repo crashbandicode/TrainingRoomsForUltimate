@@ -1120,6 +1120,30 @@ pub fn reload_extras(window: Members, forms: Forms, groups: bool, pool: usize) -
     if target_first(forms, groups, pool).is_some() { 0 } else { window.count() - 1 }
 }
 
+/// The members the Fighters notice counts for the window a role's next swap prepares (`plan_budget`): every one besides
+/// the target. Under [`target_first`] that Reload builds the target alone ([`reload_extras`] is 0, the physical
+/// reservation), but the members become its first background group once it is Ready ([`neighbour_group`]), so the swap
+/// still starts them. Counting the physical extras instead left a role without a bank planning nothing, and the parked
+/// seats with it (`hat_slots::with_seats`): `[PreloadStatus] state=Hidden planned=0` on `889919e1` (`of-seat-notice`).
+pub fn notice_extras(window: Members) -> usize {
+    window.count() - 1
+}
+
+/// The planned targets of the window a role's next swap prepares, as the notice counts them (`plan_budget`'s `next`):
+/// the target, then the first `extras` other members (`notice_extras`, reserved against the window pool; a pair-lead
+/// window lists all of its own), counted by [`next_window_targets`].
+pub fn next_window_plan(window: Members, target: u32, extras: usize, original: Option<u32>, grouped: impl Fn(u32) -> bool) -> u8 {
+    let (kinds, count) = window.logical_kinds();
+    let extras = if window.is_pair_lead() { count } else { extras };
+    let mut shown = [u32::MAX; NATIVE_MEMBERS + 1];
+    let mut len = 0;
+    for kind in std::iter::once(target).chain(kinds[..count].iter().copied().filter(|kind| *kind != target).take(extras)) {
+        shown[len] = kind;
+        len += 1;
+    }
+    next_window_targets(&shown[..len], target, original, grouped)
+}
+
 /// rc.6.1 target-first: a canonical Reload replaces a Ready one-member ordinary window whose words it repeats (count 1,
 /// the same kind, one actor). The bank's descriptor check still matches such a Reload, so the bank is retired before
 /// native loads it; otherwise the construct seam would write the bank flag onto the canonical entry and the next tick would
@@ -3560,6 +3584,44 @@ mod tests {
         assert_eq!(reload_extras(full, Forms::starting(GAME_WATCH), false, 6), 2);
         // The helpers keep the room: nothing is reserved for P1's next window, the CPU's reservation is unchanged.
         assert_eq!(reserve_extras([0, 2], [0, 0], 6), [0, 2]);
+    }
+
+    #[test]
+    fn a_role_without_a_bank_still_counts_the_window_its_next_swap_prepares() {
+        use crate::engine::preload::cycle_preload_policy::{BuiltFighters, CacheStatus, Progress, Readiness};
+        use crate::engine::preload::hat_slots::with_seats;
+        use crate::model::parked_entries::SeatState;
+        // `final-surface-of-889919e1` `of-seat-notice` (integration FLAG 2026-11-10 17:53Z): the preloader turned on with
+        // no bank on either role, the CPU (original Mario since its canonical switch) given the cycle [1, 2, 3], Ready
+        // Fighters 12 (a window pool of 10), and Training's two parked seats loading.
+        const CPU_ORIGINAL: u32 = 0x0;
+        let lane = [0x1u32, 0x2, 0x3];
+        let forms = Forms::starting(lane[0]);
+        let window = Members::from_forms(forms, &lane[1..], 2).unwrap();
+        assert_eq!(window.kinds(), lane);
+        let pool = 10;
+        let seats = [Some(SeatState::Loading), Some(SeatState::Loading)];
+        // The next swap's Reload builds the target alone: nothing is reserved for it physically.
+        assert_eq!(reload_extras(window, forms, true, pool), 0);
+        // The notice counts the window that swap prepares: its other members load right after it, as the first group.
+        let notice = reserve_extras([0, notice_extras(window)], [0, 0], pool);
+        let next = next_window_plan(window, lane[0], notice[1], Some(CPU_ORIGINAL), |_| false);
+        assert_eq!(next, 2);
+        let cpu = role_counts(window_targets(true, None, Some(CPU_ORIGINAL), next), 0, WindowStatus::Absent,
+            GroupCounts::default());
+        let fighters = with_seats(BuiltFighters { planned: cpu.planned, swap: cpu.swap_owed(1), ..BuiltFighters::default() },
+            seats);
+        assert_eq!((fighters.planned, fighters.pending, fighters.unstarted(), fighters.swap), (4, 2, 2, SWAP_CPU));
+        let assets = Readiness { progress: Progress::Loading, ready: 0, planned: 5, configured: 5, limit: 5, failed: 0 };
+        assert_eq!(CacheStatus::new(assets, fighters, false).progress(), Progress::Loading);
+        // `889919e1` counted the physical reservation: nothing planned, so the seats were dropped and the status hidden.
+        let physical = reserve_extras([0, reload_extras(window, forms, true, pool)], [0, 0], pool);
+        let hidden = next_window_plan(window, lane[0], physical[1], Some(CPU_ORIGINAL), |_| false);
+        assert_eq!(hidden, 0);
+        let none = with_seats(BuiltFighters::default(), seats);
+        assert_eq!((none.planned, CacheStatus::new(assets, none, false).progress()), (0, Progress::Hidden));
+        // With groups off the window is built whole, and the notice counts what is reserved, as before target-first.
+        assert_eq!(reload_extras(window, forms, false, pool), notice_extras(window));
     }
 
     #[test]
