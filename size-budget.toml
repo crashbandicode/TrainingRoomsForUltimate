@@ -1260,3 +1260,11 @@ ceiling = 161492
 date = "2026-11-09"
 reason = "rc.6 p23/rc6-qp-respawn-freeze over 1261f56c (161326): the QP freeze fix and its class fixes the primary ordered (2026-11-09 19:07Z/19:44Z/20:32Z): threads::on_plugin_thread and compat::menu::plugin_view (daf5c8c9), the Mii catalog check on the game thread (a5151526), KEPT published (3553918d), the layout archive's lock-free buffers (cdd4c72f, model::archive_slots replacing model::archive_retire), the Give item request on Player 1's frame (6ef998f7), and the body bank's lock-free Ready mirror (ab83d26b, model::seq_cell); measured 161492 at fae865ae (tools/size_gate.py), +166"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to the product fix ordered by the primary under the operator's 13:21Z rule (a raise goes in its own commit with approved_by)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 161567
+date = "2026-11-10"
+reason = "rc.6 p23/rc6-qp-respawn-freeze over 8d9d8901 (161492): the docs lane's review R1 fixes the primary ordered (2026-11-09 23:32Z; the combo HUD tick's try_lock, the Give item scene-change drop, cached_kind's yielding read, combo STAGED as Published, the menu worker off combo HELPER with SAMPLE as a TripleBuffer) and the retire_window ship blocker (primary 2026-11-10 00:59Z: native_fields::inline_elements and the address-space bound, window_cells): 161,567 measured by tools/size_gate.py at ddb7e29d"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to the product fixes ordered by the primary under the operator's 13:21Z rule (a raise goes in its own commit with approved_by)"
