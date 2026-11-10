@@ -3717,31 +3717,27 @@ mod tests {
         assert_eq!(next_step(None, None), None);
     }
 
-    #[test]
-    fn both_banks_with_a_deferred_group_build_then_admit_it() {
+    /// rc.7 FLAG 3: steps two banks (`groups`, from `states`) through `next_step`, `memory::admit` and
+    /// `memory::outstanding`, each step spending at most what `final-surface-i3-nt-7d720c68` measured (a prefetch 57 MB at
+    /// #331, a build 18 MB at #709). Returns the tick at which each bank's group 1 was admitted, and the final states.
+    /// `ranked` false is `7d720c68`'s pick, which ignored the deferral.
+    fn step_banks(groups: [[Members; 2]; 2], mut states: [[GroupState; 2]; 2], mut headroom: u64, ranked: bool)
+        -> ([Option<usize>; 2], [[GroupState; 2]; 2]) {
         use super::memory::{admit, group_cost, outstanding, Admission};
-        // Primary 2026-11-10 22:15Z: both banks hold a deferred Planned group behind a Prefetched one, and both must make
-        // progress. `final-surface-i3-nt-7d720c68` at #346: each bank's pair group Prefetched and one member Planned (P1
-        // [Samus], the CPU [0xf]), 565 MB of headroom. Each step spends at most what the run measured: a prefetch 57 MB
-        // (#331), a build 18 MB (#709).
         const PREFETCH_SPEND: u64 = 57_147_392;
         const BUILD_SPEND: u64 = 18_153_472;
         let window = Members::new(&[0x00, 0x01, 0x02]).unwrap();
-        let groups = [[Members::pair_group(), Members::new(&[0x03]).unwrap()], [Members::pair_group(), Members::new(&[0x0f]).unwrap()]];
         let cost = |m: Members| group_cost(&m.kinds()[..m.count()]);
         let held = |states: &[[GroupState; 2]; 2]| (0..2).flat_map(|r| (0..2).map(move |g| (r, g)))
             .map(|(r, g)| outstanding(states[r][g], cost(groups[r][g]))).sum::<u64>();
-        let mut states = [[GroupState::Prefetched, GroupState::Planned]; 2];
         let mut deferred = [false; 2];
-        let mut headroom = 565_465_088u64;
-        assert_eq!(held(&states), 478_642_176, "the run's outstanding: both pair groups' builds");
         let mut admitted = [None; 2];
         for tick in 0..8 {
             for role in 0..2 {
                 let start = next_start(states[role].iter().map(|state| (*state, true)), 0);
                 let background = next_background(states[role].iter().zip(groups[role]).map(|(state, members)| (*state, members, false)),
                     window, LiveIdentity::Ordinary, false, false, false);
-                match next_step(start.map(|g| (g, states[role][g], g == 1 && deferred[role])), background) {
+                match next_step(start.map(|g| (g, states[role][g], ranked && g == 1 && deferred[role])), background) {
                     Some(NextStep::Background(g)) => {
                         states[role][g] = GroupState::Built;
                         headroom -= BUILD_SPEND;
@@ -3760,9 +3756,27 @@ mod tests {
                 }
             }
         }
-        // Tick 0 defers both (as at #345/#346), tick 1 builds both pair groups, tick 2 admits both deferred groups.
-        assert_eq!(admitted, [Some(2), Some(2)], "{states:?}");
-        assert_eq!(states, [[GroupState::Built; 2]; 2]);
+        (admitted, states)
+    }
+
+    #[test]
+    fn both_banks_with_a_deferred_group_build_then_admit_it() {
+        use super::memory::{group_cost, outstanding};
+        // Primary 2026-11-10 22:15Z: both banks hold a deferred Planned group behind a Prefetched one, and both must make
+        // progress. `final-surface-i3-nt-7d720c68` at #346: each bank's pair group Prefetched and one member Planned (P1
+        // [Samus], the CPU [0xf]), 565 MB of headroom, 478 MB held by the two pair groups' builds.
+        let groups = [[Members::pair_group(), Members::new(&[0x03]).unwrap()], [Members::pair_group(), Members::new(&[0x0f]).unwrap()]];
+        let at_346 = [[GroupState::Prefetched, GroupState::Planned]; 2];
+        assert_eq!(2 * outstanding(GroupState::Prefetched, group_cost(&[POPO, NANA])), 478_642_176);
+        // Tick 0 defers both (#345/#346), tick 1 builds both pair groups, tick 2 admits both deferred groups.
+        assert_eq!(step_banks(groups, at_346, 565_465_088, true), ([Some(2), Some(2)], [[GroupState::Built; 2]; 2]));
+        // `7d720c68`'s pick re-picked both deferred prefetches on every tick, and nothing moved.
+        assert_eq!(step_banks(groups, at_346, 565_465_088, false), ([None, None], at_346));
+        // One bank (the docs lane, 22:24Z: a heavy draw with a reserve), the other with nothing left to do. 300 MB covers
+        // [Samus] (173 MB) but not beside the pair group's build (239 MB held): it waits for its own bank's build.
+        let one = [at_346[0], [GroupState::Built; 2]];
+        assert_eq!(step_banks(groups, one, 300_000_000, true), ([Some(2), None], [[GroupState::Built; 2]; 2]));
+        assert_eq!(step_banks(groups, one, 300_000_000, false), ([None, None], one));
     }
 
     #[test]
