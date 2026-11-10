@@ -1348,3 +1348,11 @@ ceiling = 162809
 date = "2026-11-10"
 reason = "rc.7 p23/rc7-target-first over 505329ef (162792): the kr-after fix (integration FLAG 2 2026-11-10 17:56Z, primary 18:00Z): body_bank::reload_window, its use in proposed, one host test; measured 162809 at ad1a54c2 (tools/size_gate.py), +17"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.7 order (TASK-rc7.md); a raise goes in its own commit with approved_by"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 162822
+date = "2026-11-10"
+reason = "rc.7 p23/rc7-target-first over 71995d1d (162809): the Kirby gate (integration 2026-11-10 18:16Z with FLAG 2): body_bank::groups_load_beside, the live_gate parameter of reload_window and reload_extras, native_body_bank::live_gate, one host test; measured 162822 at 58a55d8b (tools/size_gate.py), +13"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.7 order (TASK-rc7.md); a raise goes in its own commit with approved_by"
