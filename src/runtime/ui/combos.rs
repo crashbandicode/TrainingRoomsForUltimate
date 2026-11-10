@@ -13,7 +13,8 @@ use crate::editors::combo_fighter::{self as fighter, event, Plan};
 use crate::engine::compat::menu::OnOff;
 use crate::engine::macro_ui::macro_panel::FighterChoice;
 use crate::engine::swap::trio::TrioFighter;
-use crate::runtime::roster::character_roster as roster;
+// The roster as the menu worker sees it: requests the game frame runs and a copy of Player 1's fighter (the lock-free runtime).
+use crate::runtime::roster::roster_requests as roster;
 use crate::engine::macro_ui::macro_panel::{LibraryRow, View, COMBO_KEYBOARD_TITLE};
 use crate::model::combo_record::{
     clean_name, default_name, saved_combos_footer, ComboLibrary, ComboNotices, ComboRecord, SkipPost, DIR,
@@ -51,6 +52,20 @@ pub fn is_combo(editor: Editor) -> bool {
 
 fn library() -> ComboLibrary {
     ComboLibrary::new(format!("{}/{DIR}", crate::model::storage::ROOT))
+}
+
+/// The menu worker, each pass: the roster's answers to the switches `Ui::after_close` asked for (the trace point, and the notice
+/// when Player 1 was not switched). Lands a game frame after the menu closed, where it came at the close before; the notice and the
+/// trace point are the only consumers.
+pub fn service_switch_replies() {
+    while let Some((kind, queued)) = roster::take_reply() {
+        live::fighter_event(event::REQUESTED, Some(kind), roster::player_kind(), u32::from(queued));
+        if !queued {
+            let name = TrioFighter::from_kind(kind).map_or("Unavailable", |fighter| fighter.name());
+            let note = format!("P1 was not switched to {name}");
+            notices::upsert(0x2A, "Combos", &note, 180, DEFAULT_COLOR);
+        }
+    }
 }
 
 /// What a name the keyboard returns is for.
@@ -375,12 +390,9 @@ impl Ui {
     /// carry the loader's own notice; this one names the fighter.
     pub fn after_close(&mut self) {
         let Some(wanted) = self.switch_at_close.take() else { return };
-        let queued = roster::request_player_kind(wanted.kind());
-        live::fighter_event(event::REQUESTED, Some(wanted.kind()), roster::player_kind(), u32::from(queued));
-        if !queued {
-            let note = format!("P1 was not switched to {}", wanted.name());
-            notices::upsert(0x2A, "Combos", &note, 180, DEFAULT_COLOR);
-        }
+        // The roster admits it on the next game frame (`roster_requests`, the lock-free runtime); its answer comes back to
+        // `service_switch_replies` a worker pass later, where the trace point and the refusal notice are made as they were here.
+        roster::request_player_kind_replied(wanted.kind());
     }
 
     fn delete(&mut self, id: &str) -> Result<String, String> {

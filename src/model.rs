@@ -203,6 +203,8 @@ pub mod close_handoff;
 pub mod scalar_tls;
 #[path = "model/seq_cell.rs"]
 pub mod seq_cell;
+#[path = "model/drop_ring.rs"]
+pub mod drop_ring;
 
 #[path = "model/boot_notices.rs"]
 pub mod boot_notices;

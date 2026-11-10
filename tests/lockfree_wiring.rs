@@ -94,3 +94,39 @@ fn the_roster_re_plan_allocates_nothing() {
         }
     }
 }
+
+/// Step 2b: the menu worker's roster requests (the recording host's switch, the combo panel's switch at menu close) and its read of
+/// Player 1's fighter go through `roster::roster_requests`: the worker posts to a `DropRing` and reads a copy; the game frame
+/// (`lobby::update`, after the settings re-plan, as the worker's loop ordered them) runs `character_roster::request_*_kind` and keeps
+/// the copy current. No plugin thread reaches the roster's admission, so its locks (the role states, the Mii owners', the sources',
+/// the planner's request stamps) stay game-side. The combo panel's answer now comes a game frame after the close: its only
+/// consumers are the trace point and the refusal notice, made in `combos::service_switch_replies` each worker pass.
+#[test]
+fn the_menu_workers_roster_requests_run_on_the_game_frame() {
+    let g = graph();
+    let reach = reachable(&g, "worker::run");
+    for game_side in [
+        "character_roster::request_player_kind",
+        "character_roster::request_cpu_kind",
+        "character_roster::player_kind",
+        "character_roster::queue_admitted",
+    ] {
+        assert!(!reach.contains(game_side), "the menu worker reaches {game_side} again");
+    }
+    for posted in ["roster_requests::request_player_kind", "roster_requests::request_player_kind_replied", "roster_requests::take_reply"] {
+        assert!(reach.contains(posted), "the menu worker no longer posts through {posted}");
+    }
+    let lobby = include_str!("../src/runtime/lobby/mod.rs");
+    ordered(body(lobby, "update"), &[
+        "compat::menu::service_roster_change();",
+        "roster::roster_requests::service();",
+        "training::lobby::update();",
+    ]);
+    let combos = include_str!("../src/runtime/ui/combos.rs");
+    let close = &combos[combos.find("pub fn after_close").unwrap()..];
+    let close = &close[..close.find("\n    }\n").unwrap()];
+    assert!(!close.contains("fighter_event") && !close.contains("notices::"), "after_close reads the roster's answer itself again");
+    ordered(body(combos, "service_switch_replies"), &["roster::take_reply()", "live::fighter_event(event::REQUESTED", "notices::upsert(0x2A"]);
+    let worker = include_str!("../src/runtime/ui/worker.rs");
+    assert!(worker.contains("combos::service_switch_replies();"), "the worker no longer takes the roster's answers");
+}

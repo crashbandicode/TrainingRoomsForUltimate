@@ -43,6 +43,8 @@ pub(crate) mod hang_trace {
 pub(crate) mod heap_metrics;
 
 pub(crate) mod kirby_hats;
+/// The lock-free runtime: what the menu worker asks of the roster, run on the game frame (ours, not carried).
+pub(crate) mod roster_requests;
 pub(crate) mod native_gc_guard;
 pub(crate) mod native_unlink_install;
 #[cfg(feature = "native-unlink-probe")]

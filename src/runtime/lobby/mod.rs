@@ -49,6 +49,8 @@ pub(crate) fn update() {
     // planner's or the roster's locks): the preload planner's reset, then the roster's re-plan, in the order the publish made them.
     crate::runtime::roster::cycle_preload_config::service();
     crate::runtime::compat::menu::service_roster_change();
+    // The menu worker's roster requests (the recording host's switch, the combo panel's switch at close), in its order.
+    crate::runtime::roster::roster_requests::service();
     training::lobby::update();
     // A practice session starts (or ends) with the lobby practice: a lease left from before is dropped silently, the next frame
     // acquires a fresh one (`frame`). Training's session starts with the scene (the lease is empty then).

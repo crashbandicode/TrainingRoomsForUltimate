@@ -297,18 +297,18 @@ fn apply(tick: &Tick) {
         }
         crate::runtime::ui::worker::wake();
     } else if let Some(kind) = tick.switch_kind {
-        let requested = if tick.switch_player {
-            crate::runtime::roster::character_roster::request_player_kind(kind as u32)
+        // The roster admits it on the next game frame (`roster_requests`: the lock-free runtime); the answer was never used here.
+        if tick.switch_player {
+            crate::runtime::roster::roster_requests::request_player_kind(kind as u32);
         } else {
-            crate::runtime::roster::character_roster::request_cpu_kind(kind as u32)
-        };
-        let _ = requested;
+            crate::runtime::roster::roster_requests::request_cpu_kind(kind as u32);
+        }
     }
     if let Some(name) = &tick.switch_name {
         if let Some(kind) = (0..128u32).find(|kind| {
             crate::runtime::macros::named_macros::fighter_label(*kind as i32) == name.as_str()
         }) {
-            let _ = crate::runtime::roster::character_roster::request_player_kind(kind);
+            crate::runtime::roster::roster_requests::request_player_kind(kind);
         }
     }
     if let Some(id) = &tick.warp {

@@ -207,6 +207,8 @@ fn run() {
         // The named-macro layer's model is this thread's (design C): its worker tick runs before the panels are looked at.
         crate::runtime::macros::port::worker_tick();
         sync_sequence_drill();
+        // The roster's answers to the combo panel's switch at menu close (the game frame ran the request: the lock-free runtime).
+        super::combos::service_switch_replies();
         if refresh_recording(&mut session) {
             publish_frame(&session);
         }
