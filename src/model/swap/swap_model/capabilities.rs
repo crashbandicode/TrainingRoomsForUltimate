@@ -578,11 +578,26 @@ pub fn kirby_parkable(copy_flag: bool, retained_copy_kinds: Option<u128>, hat_le
 /// Planned groups wait, Prefetched groups hand their keys back; Built groups hold no keys.
 /// `live_kind` is the window's ready member, `None` if unknown. The reason text is read by the
 /// E4a row (`prefetch deferred … reason=live Kirby may copy a group kind (D-KIRBY1)`).
+/// rc.7: the runtime passes [`d_kirby1_live`], so once the bank owns the G68 step (F1) a live Kirby defers nothing.
 pub fn prefetch_admitted(live_kind: Option<u32>) -> Result<(), &'static str> {
     match live_kind {
         Some(kind) if !capabilities(kind_class(kind)).prefetch_while_live => Err("live Kirby may copy a group kind"),
         _ => Ok(()),
     }
+}
+
+/// rc.7 F1 (the D-KIRBY1 root fix): whether D-KIRBY1's live-Kirby rules are in force. A row that suspends prefetch while
+/// live (Kirby) restricts the bank only while the G68 step of the bank's releases is native's: once the bank owns it
+/// (`g68_owned`, `runtime::roster::g68_step`; `request_bit::Policy::Owned`) no release of the bank's keys reaches a copy's
+/// package, and the rules have nothing left to guard.
+pub fn d_kirby1_applies(row_suspends: bool, g68_owned: bool) -> bool {
+    row_suspends && !g68_owned
+}
+
+/// The live kind D-KIRBY1's gates ([`prefetch_admitted`], [`object_rearm_admitted`], the background build's
+/// `live_kirby`) see: the live kind, or `None` once the bank owns the G68 step ([`d_kirby1_applies`]).
+pub fn d_kirby1_live(live_kind: Option<u32>, g68_owned: bool) -> Option<u32> {
+    live_kind.filter(|_| !g68_owned)
 }
 
 /// A detached Pokémon Trainer group's object re-arm (`object_rearm_due`: its object kind taken again before its next

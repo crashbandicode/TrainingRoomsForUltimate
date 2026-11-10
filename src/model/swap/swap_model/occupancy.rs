@@ -18,6 +18,10 @@
 //!   exists; conservative on, inert until the adapter supplies hat-source kinds.
 //! - `OtherRoleLive` (disproved for the mirror shape: D-HANG1-SEPARATION §1 S-A 3/3 completed; the
 //!   hang is the parked never-activated Kirby, WP3/WP-K): off in `Rules::C116_1`.
+//!
+//! rc.7 F1 (`Rules::OWNED_G68`): the bank owns the G68 step of its releases (`runtime::roster::g68_step`;
+//! `request_bit::Policy::Owned` models it), so `LiveCopySharesRegistry` and `PrefetchDebtUnderLiveKirby` have no
+//! hazard left to guard and raise nothing; the other rules stand.
 
 use super::capabilities::{bank_object_kind, capabilities, form_class, Capabilities};
 #[cfg(any(test, feature = "simulator"))]
@@ -40,6 +44,10 @@ pub struct Rules {
     pub prefetch_debt_under_live_kirby: Grade,
     pub hat_source: Option<Grade>,
     pub other_role_live: Option<Grade>,
+    /// rc.7 F1 (the D-KIRBY1 root fix, `runtime::roster::g68_step`): the bank owns the G68 step of the
+    /// releases it causes, so a release of the bank's keys never reaches a copy's package
+    /// (`request_bit::Policy::Owned`). `live_copy` and `prefetch_debt_under_live_kirby` then raise nothing.
+    pub g68_owned: bool,
 }
 
 impl Rules {
@@ -49,7 +57,10 @@ impl Rules {
         prefetch_debt_under_live_kirby: Grade::Fact,
         hat_source: Some(Grade::Hyp),
         other_role_live: None,
+        g68_owned: false,
     };
+    /// rc.7: C116.1 with the G68 step owned (both D-KIRBY1 rules have no hazard left to guard).
+    pub const OWNED_G68: Rules = Rules { g68_owned: true, ..Rules::C116_1 };
 }
 
 impl Default for Rules {
@@ -92,16 +103,19 @@ impl KindOccupancy {
     /// The conflict `usage` of `kind` by `role` raises, if any (first matching rule, FACT rules first).
     pub fn conflicts(&self, role: Role, kind: u32, usage: Use, rules: &Rules) -> Option<Conflict> {
         let i = role.index();
-        if self.kirby_copy[i] == Some(kind) && matches!(usage, Use::Acquire | Use::Release) {
-            return Some(Conflict::LiveCopySharesRegistry);
-        }
-        // The suspend covers the fighter kinds a copy can share on R; the bank's object kinds are none (a detached PT
-        // group's object re-arm runs under a live Kirby: primary 2026-11-09 05:38Z, `object_rearm_admitted`).
-        if usage == Use::Acquire && self.prefetch_suspended(role) && !bank_object_kind(kind) {
-            return Some(Conflict::PrefetchDebtUnderLiveKirby);
-        }
-        if usage == Use::TargetKind && self.debt_blocks_target(role, kind) {
-            return Some(Conflict::PrefetchDebtUnderLiveKirby);
+        // rc.7 F1: with the G68 step owned, neither D-KIRBY1 rule has a hazard to guard.
+        if !rules.g68_owned {
+            if self.kirby_copy[i] == Some(kind) && matches!(usage, Use::Acquire | Use::Release) {
+                return Some(Conflict::LiveCopySharesRegistry);
+            }
+            // The suspend covers the fighter kinds a copy can share on R; the bank's object kinds are none (a detached
+            // PT group's object re-arm runs under a live Kirby: primary 2026-11-09 05:38Z, `object_rearm_admitted`).
+            if usage == Use::Acquire && self.prefetch_suspended(role) && !bank_object_kind(kind) {
+                return Some(Conflict::PrefetchDebtUnderLiveKirby);
+            }
+            if usage == Use::TargetKind && self.debt_blocks_target(role, kind) {
+                return Some(Conflict::PrefetchDebtUnderLiveKirby);
+            }
         }
         if rules.hat_source.is_some() && usage == Use::Build && self.kirby_copy[i].is_some() && self.hat_sources.contains(kind) {
             return Some(Conflict::HatSourceLive);
@@ -496,5 +510,41 @@ mod tests {
         assert_eq!(policy.pair_refs([POPO, 0x03, 0x07], 3), None);
         assert!(!policy.prefetch_admitted(Some(KIRBY)) && policy.prefetch_admitted(Some(0x07)) && policy.prefetch_admitted(None));
         assert!(!policy.key_release_admitted(0x00, Some(0x00)) && policy.key_release_admitted(0x00, Some(0x07)));
+    }
+
+    /// rc.7 F1: with the G68 step owned (`Rules::OWNED_G68`), the D-SG1/K1 shapes above raise no D-KIRBY1 conflict (the
+    /// copy's acquire and release, the suspend and the drain), and the rules that are not D-KIRBY1's stand.
+    #[test]
+    fn with_the_g68_step_owned_no_d_kirby1_rule_is_left() {
+        let rules = Rules::OWNED_G68;
+        assert!(rules.g68_owned && !Rules::C116_1.g68_owned);
+        assert_eq!(Rules { g68_owned: false, ..rules }, Rules::C116_1, "only the ownership differs");
+        let mut occ = occupancy();
+        occ.live[0] = Some(KIRBY);
+        occ.kirby_copy[0] = Some(0x00);
+        for usage in [Use::Release, Use::Acquire] {
+            assert_eq!(occ.conflicts(Role::Player, 0x00, usage, &rules), None, "the copied kind, {usage:?}");
+        }
+        assert_eq!(occ.conflicts(Role::Player, 0x07, Use::Acquire, &rules), None, "no suspend while Kirby is live");
+        let mut occ = occupancy();
+        occ.live[0] = Some(0x07);
+        occ.prefetched[0].insert(0x00);
+        assert_eq!(occ.conflicts(Role::Player, KIRBY, Use::TargetKind, &rules), None, "no drain before a Kirby target");
+        let mut occ = occupancy();
+        occ.kirby_copy[0] = Some(0x00);
+        occ.hat_sources.insert(0x00);
+        assert_eq!(occ.conflicts(Role::Player, 0x00, Use::Build, &rules), Some(Conflict::HatSourceLive), "K2 is not D-KIRBY1's");
+    }
+
+    /// rc.7 F1: the runtime's D-KIRBY1 gates see the live kind only while the G68 step is native's.
+    #[test]
+    fn the_d_kirby1_gates_see_a_live_kirby_only_while_the_g68_step_is_natives() {
+        use super::super::capabilities::{d_kirby1_applies, d_kirby1_live, prefetch_admitted};
+        assert_eq!(d_kirby1_live(Some(KIRBY), false), Some(KIRBY));
+        assert_eq!(d_kirby1_live(Some(KIRBY), true), None);
+        assert_eq!(d_kirby1_live(Some(0x07), false), Some(0x07));
+        assert!(prefetch_admitted(d_kirby1_live(Some(KIRBY), false)).is_err(), "rc.6: a live Kirby defers the prefetch");
+        assert!(prefetch_admitted(d_kirby1_live(Some(KIRBY), true)).is_ok(), "rc.7 F1: it does not");
+        assert!(d_kirby1_applies(true, false) && !d_kirby1_applies(true, true) && !d_kirby1_applies(false, false));
     }
 }

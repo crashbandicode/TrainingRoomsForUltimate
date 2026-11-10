@@ -237,7 +237,9 @@ fn a_retired_trainer_group_takes_its_object_kind_again_and_returns_it_after_the_
 #[test]
 fn a_trainer_object_rearm_runs_under_a_live_kirby_through_the_same_ledger_path() {
     let lifecycle = body(BANK, "unsafe fn group_lifecycle(");
-    ordered(lifecycle, &["} else if let Err(reason) = crate::engine::swap::body_bank::prefetch_admitted(live) {",
+    // rc.7 F1: the branch sees the live kind only while the G68 step is native's (`body_bank::d_kirby1_live`).
+    ordered(lifecycle, &["} else if let Err(reason) = crate::engine::swap::body_bank::prefetch_admitted(",
+        "crate::engine::swap::body_bank::d_kirby1_live(live, crate::runtime::roster::g68_step::enabled())) {",
         "match bank.groups.iter().position(|g| g.state == GroupState::Prefetched) {",
         "Some(group) => Step::Release(group, *bank.groups[group].members, window, alias),",
         "None => match kirby_rearm(base, bank, live) {", "Some(group) => Step::Rearm(group, *bank.groups[group].members, alias),",

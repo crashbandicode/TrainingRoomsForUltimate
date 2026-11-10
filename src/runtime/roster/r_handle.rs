@@ -205,6 +205,10 @@ pub(crate) unsafe fn release(base: usize, role: Role, group: Option<usize>, kind
     for (kind, text) in &receipt.kept {
         trace!("[Ledger] retained owner={} kind={:#x} reason={} ({})", owner, kind, text, reason);
     }
+    // rc.7 F1: a line only when a G68 step was taken out (bit 2 was set) or an arm found no slot since the last one.
+    if let Some((skipped, unarmed)) = super::g68_step::changed() {
+        trace!("[G68Step] owner={} skipped={} unarmed={} reason={}", owner, skipped, unarmed, reason);
+    }
     receipt
 }
 
@@ -276,9 +280,15 @@ pub(crate) fn settle_stale_on_empty(role: Role, reason: &str) -> usize {
 /// # Safety
 /// As for [`acquire`]; `r` is the proved alias.
 pub(crate) unsafe fn request_bit(role: Role, r: usize) -> (bit0::Lease, u8) {
-    let (lease, write) = bit0::begin(fields::read_unchecked::<u8>(r, 0x4c));
+    let before = fields::read_unchecked::<u8>(r, 0x4c);
+    let (lease, write) = bit0::begin(before);
     if let Some(byte) = write { fields::write_unchecked(r, 0x4c, byte); }
-    if let Some(handle) = lock(role).as_mut() { handle.ledger.request_bit = true; }
+    let owner = lock(role).as_mut().map(|handle| {
+        handle.ledger.request_bit = true;
+        handle.owner
+    });
+    // rc.7 F1: the build's tails arm their G68 step from this byte (`g68_step::lease_before`).
+    if let Some(owner) = owner { super::g68_step::lease_began(owner, before); }
     (lease, fields::read_unchecked::<u8>(r, 0x4c))
 }
 
@@ -296,7 +306,11 @@ pub(crate) unsafe fn end_request(role: Role, r: usize, lease: bit0::Lease) -> (b
     let (how, write) = bit0::end(lease, now);
     if let Some(byte) = write { fields::write_unchecked(r, 0x4c, byte); }
     let after = fields::read_unchecked::<u8>(r, 0x4c);
-    if let Some(handle) = lock(role).as_mut() { handle.ledger.request_bit = after & bit0::REQUEST != 0; }
+    let owner = lock(role).as_mut().map(|handle| {
+        handle.ledger.request_bit = after & bit0::REQUEST != 0;
+        handle.owner
+    });
+    if let Some(owner) = owner { super::g68_step::lease_ended(owner); }
     (how, now, after)
 }
 
@@ -393,8 +407,12 @@ unsafe fn execute(base: usize, r: usize, calls: &[NativeCall]) {
                 release(r as *mut u8, key.value());
             }
             NativeCall::ReleaseKind { kind } => {
+                // rc.7 F1: the bank caused this release, so its G68 step is the bank's (`g68_step`): the keys came from
+                // `0x17e64d0`, which took no G68 key.
+                super::g68_step::arm(r, *kind);
                 let release: unsafe extern "C" fn(*mut u8, u32) = std::mem::transmute(base + RELEASE_KIND);
                 release(r as *mut u8, *kind);
+                super::g68_step::disarm();
             }
             NativeCall::Acquire { .. } | NativeCall::WritePairRefs(_) | NativeCall::SetRequestBit => {}
         }

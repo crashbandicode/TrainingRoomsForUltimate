@@ -60,6 +60,8 @@ pub(crate) mod body_graph;
 #[cfg(feature = "native-body-bank-alpha")]
 pub(crate) mod copy_packages;
 #[cfg(feature = "native-body-bank-alpha")]
+pub(crate) mod g68_step;
+#[cfg(feature = "native-body-bank-alpha")]
 pub(crate) mod identity_view;
 #[cfg(feature = "native-body-bank-alpha")]
 pub(crate) mod mii_setup;

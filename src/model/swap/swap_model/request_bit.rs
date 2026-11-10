@@ -243,7 +243,14 @@ impl Owner {
     /// `0x17e8610(R, kind)`: the copy keys of `kind` while bit 2 is set, then R's own keys, then
     /// the reset when the map is empty. `g68` holds the other owners' references.
     pub fn release_kind(&mut self, kind: u32, g68: &mut BTreeMap<u32, u32>, faults: &mut Vec<Fault>) {
-        if self.flags & ACQUIRED != 0 {
+        self.release_kind_as(kind, true, g68, faults);
+    }
+
+    /// [`Self::release_kind`] with its G68 step (`0x17f0290` at `0x17e87ac`) taken or not: rc.7 F1
+    /// passes kind −1 there for a release of keys the bank took (`0x17f0290` returns at once for −1,
+    /// `0x17f02a4`), and R's own keys are still returned.
+    pub fn release_kind_as(&mut self, kind: u32, g68_step: bool, g68: &mut BTreeMap<u32, u32>, faults: &mut Vec<Fault>) {
+        if g68_step && self.flags & ACQUIRED != 0 {
             for key in released_keys(&self.roster, kind, self.costume) {
                 if take_one(&mut self.taken, key) { continue; }
                 let foreign = take_one(g68, key);
@@ -268,8 +275,13 @@ impl Owner {
 
     /// One body construction: the path builder's gate (`0x17e99d8`), then the tail `0x60dec4`.
     pub fn construct(&mut self, kind: u32, g68: &mut BTreeMap<u32, u32>, faults: &mut Vec<Fault>) {
+        self.construct_as(kind, true, g68, faults);
+    }
+
+    /// [`Self::construct`] whose tail takes the G68 step or not ([`Self::release_kind_as`]).
+    pub fn construct_as(&mut self, kind: u32, g68_step: bool, g68: &mut BTreeMap<u32, u32>, faults: &mut Vec<Fault>) {
         if self.flags & REQUEST == 0 { faults.push(Fault::EmptyPath { kind }); }
-        self.release_kind(kind, g68, faults);
+        self.release_kind_as(kind, g68_step, g68, faults);
     }
 }
 
@@ -309,6 +321,17 @@ pub enum Policy {
     Today,
     /// U19: [`begin`] before the construction, [`end`] after it.
     Lease,
+    /// rc.7 F1 (the D-KIRBY1 root fix) on top of U19's lease: the bank owns the G68 step of the
+    /// releases it causes. A drain (`r_handle::release`) never takes it, since `0x17e64d0` took no
+    /// G68 key. A build's tail takes it only for the keys a completion took under that build's own
+    /// lease (bit 2 clear when the lease began and set at the tail), which it then pairs.
+    Owned,
+}
+
+/// rc.7 F1, a bank build's tail: the G68 step pairs with a completion only when one ran under this
+/// build's lease (bit 2 clear when it began, set now). `before` is `R+0x4c` when the build began.
+pub fn tail_takes_g68_step(before: u8, now: u8) -> bool {
+    before & ACQUIRED == 0 && now & ACQUIRED != 0
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -330,6 +353,16 @@ pub enum Op {
     Drain(usize),
     /// A completion call on this R from the game thread (`0x14f5734` or `0x66de64`).
     Complete,
+    /// Native configures and completes this R and constructs the window again while the bank's keys
+    /// may sit on it (the scene path `0x66dcf0`, or a Reload's configure functor `0x17e8410`): the map
+    /// stays non-empty, so bits 1|2 outlive the window's tails.
+    Reconfigure,
+    /// A live Kirby copies the first kind of group `g` (needs a Kirby record in the roster). The
+    /// copy's package `(k, Kirby's costume)` is held by another owner's completion (the Kirby Hats
+    /// source slot, or the CPU), which is `g68` here.
+    Copy(usize),
+    /// Phase B′ (an async build across frames): its lease sees a completion before the tails.
+    BuildCompleting(usize),
 }
 
 /// One role's R through the bank's flows, with the other role's references in G68.
@@ -344,6 +377,10 @@ pub struct Scene {
     pub faults: Vec<Fault>,
     /// `R+0x4c` after each Phase B, as the next flow finds it.
     pub after_builds: Vec<u8>,
+    /// The window native builds at a Reload or reconfigure.
+    pub window: Vec<u32>,
+    /// The packages live Kirby copies hold (`Op::Copy`), as G68 keys.
+    pub copies: Vec<u32>,
 }
 
 impl Scene {
@@ -351,7 +388,7 @@ impl Scene {
     pub fn new(policy: Policy, window: &[u32], costume: u32, groups: &[&[u32]], other: Option<([u32; SUBS], u32)>) -> Self {
         let mut scene = Scene { policy, owner: Owner::new(costume), g68: BTreeMap::new(),
             groups: groups.iter().map(|g| (g.to_vec(), GroupState::Planned)).collect(), other, faults: Vec::new(),
-            after_builds: Vec::new() };
+            after_builds: Vec::new(), window: window.to_vec(), copies: Vec::new() };
         let header = words(window);
         scene.owner.configure(header, roster((header, costume), other));
         for kind in window { scene.owner.register(*kind); }
@@ -376,35 +413,74 @@ impl Scene {
                 self.groups[g].1 = GroupState::Prefetched;
             }
             Op::Drain(g) if self.groups[g].1 == GroupState::Prefetched => {
-                for kind in self.groups[g].0.clone() { self.owner.release_kind(kind, &mut self.g68, &mut self.faults); }
+                let g68_step = self.policy != Policy::Owned;
+                for kind in self.groups[g].0.clone() {
+                    self.owner.release_kind_as(kind, g68_step, &mut self.g68, &mut self.faults);
+                }
                 self.groups[g].1 = GroupState::Planned;
             }
-            Op::Build(g) if self.groups[g].1 == GroupState::Prefetched => {
-                let kinds = self.groups[g].0.clone();
-                // U18: the header and roster describe the incoming window before native runs.
-                self.owner.header = words(&kinds);
-                self.owner.roster = roster((words(&kinds), self.owner.costume), self.other);
-                let lease = match self.policy {
-                    Policy::Today => {
-                        self.owner.flags |= REQUEST;
-                        None
-                    }
-                    Policy::Lease => {
-                        let (lease, write) = begin(self.owner.flags);
-                        if let Some(byte) = write { self.owner.flags = byte; }
-                        Some(lease)
-                    }
-                };
-                for kind in &kinds { self.owner.construct(*kind, &mut self.g68, &mut self.faults); }
-                if let Some(lease) = lease {
-                    if let (_, Some(byte)) = end(lease, self.owner.flags) { self.owner.flags = byte; }
-                }
-                self.groups[g].1 = GroupState::Built;
-                self.after_builds.push(self.owner.flags);
-            }
+            Op::Build(g) if self.groups[g].1 == GroupState::Prefetched => self.build(g, false),
+            Op::BuildCompleting(g) if self.groups[g].1 == GroupState::Prefetched => self.build(g, true),
             Op::Complete => self.owner.completion(),
+            Op::Reconfigure => {
+                let header = words(&self.window);
+                let roster = roster((header, self.owner.costume), self.other);
+                if self.owner.configure(header, roster) {
+                    for kind in self.window.clone() { self.owner.register(kind); }
+                    self.owner.completion();
+                    for kind in self.window.clone() { self.owner.construct(kind, &mut self.g68, &mut self.faults); }
+                }
+            }
+            Op::Copy(g) => {
+                let kind = self.groups[g].0[0];
+                // The package a copy of `kind` needs is `(kind, Kirby's costume)`; another owner's
+                // completion holds it. Without a Kirby in the roster there is no copy.
+                let kirby = self.owner.roster.iter().find(|record| record.kinds[0] == KIRBY).map(|record| record.costume);
+                if let Some(key) = kirby.and_then(|costume| copy_key(kind, costume)) {
+                    *self.g68.entry(key).or_insert(0) += 1;
+                    self.copies.push(key);
+                }
+            }
             _ => {}
         }
+    }
+
+    /// Phase B of group `g`; `completing`: a completion runs under the lease before the tails.
+    fn build(&mut self, g: usize, completing: bool) {
+        let kinds = self.groups[g].0.clone();
+        // U18: the header and roster describe the incoming window before native runs.
+        self.owner.header = words(&kinds);
+        self.owner.roster = roster((words(&kinds), self.owner.costume), self.other);
+        let before = self.owner.flags;
+        let lease = match self.policy {
+            Policy::Today => {
+                self.owner.flags |= REQUEST;
+                None
+            }
+            Policy::Lease | Policy::Owned => {
+                let (lease, write) = begin(self.owner.flags);
+                if let Some(byte) = write { self.owner.flags = byte; }
+                Some(lease)
+            }
+        };
+        if completing { self.owner.completion(); }
+        for kind in &kinds {
+            let g68_step = self.policy != Policy::Owned || tail_takes_g68_step(before, self.owner.flags);
+            self.owner.construct_as(*kind, g68_step, &mut self.g68, &mut self.faults);
+        }
+        if let Some(lease) = lease {
+            if let (_, Some(byte)) = end(lease, self.owner.flags) { self.owner.flags = byte; }
+        }
+        self.groups[g].1 = GroupState::Built;
+        self.after_builds.push(self.owner.flags);
+    }
+
+    /// The copies whose package another owner holds and a release of this R took (the K1 steal).
+    pub fn stolen_copies(&self) -> Vec<u32> {
+        self.faults.iter().filter_map(|fault| match fault {
+            Fault::Unpaired { key, foreign: true } if self.copies.contains(key) => Some(*key),
+            _ => None,
+        }).collect()
     }
 
     /// Scene exit: the bank drains, the scene loop resets every R (`0x134efb4`).
@@ -607,7 +683,7 @@ mod tests {
                 for other in others {
                     for loading in [false, true] {
                         for seq in &seqs {
-                            for policy in [Policy::Today, Policy::Lease] {
+                            for policy in [Policy::Today, Policy::Lease, Policy::Owned] {
                                 let mut scene = Scene::new(policy, window, 2, &groups, other);
                                 if loading { scene.other_loading(window); }
                                 for op in seq { scene.apply(*op); }
@@ -615,7 +691,7 @@ mod tests {
                                 let paths = scene.faults.iter().any(|f| matches!(f, Fault::EmptyPath { .. }));
                                 assert!(!paths, "{:?} {:x?} {:x?}: {:x?}", policy, window, seq, scene.faults);
                                 match policy {
-                                    Policy::Lease => {
+                                    Policy::Lease | Policy::Owned => {
                                         assert!(scene.faults.is_empty(), "{:x?} {:x?} {:x?} {:x?}: {:x?}", window, groups, other, seq, scene.faults);
                                         assert!(scene.after_builds.iter().all(|f| *f == 0), "{:x?}: {:?}", seq, scene.after_builds);
                                         runs += 1;
@@ -638,5 +714,91 @@ mod tests {
         // record or a Kirby header is in play: 112 of the 4-step interleavings.
         assert!(today_faulted >= 100, "{}", today_faulted);
         assert_eq!(today_foreign, 0);
+    }
+
+    /// rc.7, D-KIRBY1's K1 shape without the guard (Ally S2, `d-kirby1-k1.jsonl`): a prefetched group
+    /// beside a live Kirby, a native reconfigure while its keys sit on R (bits 1|2 survive the window's
+    /// tails), a Kirby copy of the group's kind, then the drain. Under U19's lease alone the drain's
+    /// G68 step takes the copy's package from its holder.
+    #[test]
+    fn k1_without_the_guard_the_drain_takes_the_live_copys_package() {
+        let mut scene = Scene::new(Policy::Lease, &[KIRBY], 2, &[&[MARIO]], None);
+        for op in [Op::Prefetch(0), Op::Reconfigure] { scene.apply(op); }
+        assert_eq!(scene.owner.flags & ACQUIRED, ACQUIRED, "bit 2 outlived the window's tails (the group's keys keep the map)");
+        for op in [Op::Copy(0), Op::Drain(0)] { scene.apply(op); }
+        assert_eq!(scene.stolen_copies(), vec![key(MARIO, 2)]);
+    }
+
+    /// rc.7 F1: the same flow with the bank owning its G68 step keeps the copy's package and leaves
+    /// nothing unpaired.
+    #[test]
+    fn f1_the_drain_returns_its_own_keys_and_keeps_the_copys_package() {
+        let mut scene = Scene::new(Policy::Owned, &[KIRBY], 2, &[&[MARIO]], None);
+        for op in [Op::Prefetch(0), Op::Reconfigure, Op::Copy(0), Op::Drain(0)] { scene.apply(op); }
+        assert!(scene.stolen_copies().is_empty());
+        assert!(scene.faults.is_empty(), "{:x?}", scene.faults);
+        assert_eq!(scene.g68.get(&key(MARIO, 2)), Some(&1), "the copy's holder keeps its reference");
+        assert!(!scene.owner.registrations.contains_key(&MARIO), "R's own keys of the drained kind are returned");
+    }
+
+    /// rc.7 F1, a build: a tail takes the G68 step only for the keys a completion took under its own
+    /// lease. Bit 2 already set when the build began (a reconfigure before it): no step. A completion
+    /// under the lease (Phase B′ across frames): the step pairs it.
+    #[test]
+    fn f1_a_builds_tails_pair_only_their_own_leases_completion() {
+        assert!(!tail_takes_g68_step(REQUEST | COMPLETED | ACQUIRED, REQUEST | COMPLETED | ACQUIRED));
+        assert!(!tail_takes_g68_step(0, REQUEST));
+        assert!(tail_takes_g68_step(0, REQUEST | COMPLETED | ACQUIRED));
+        let other = Some(([KIRBY, NO_KIND, NO_KIND], 4));
+        let mut scene = Scene::new(Policy::Owned, &[MARIO], 2, &[&[FOX], &[SAMUS]], other);
+        for op in [Op::Prefetch(0), Op::Prefetch(1), Op::BuildCompleting(0), Op::Copy(1), Op::Build(1)] { scene.apply(op); }
+        scene.finish();
+        assert!(scene.faults.is_empty(), "{:x?}", scene.faults);
+        let mut today = Scene::new(Policy::Lease, &[MARIO], 2, &[&[FOX], &[SAMUS]], other);
+        for op in [Op::Prefetch(0), Op::Prefetch(1), Op::BuildCompleting(0), Op::Copy(1), Op::Build(1)] { today.apply(op); }
+        assert_eq!(today.stolen_copies(), vec![key(SAMUS, 4)], "without F1 the second build's tail takes it");
+    }
+
+    /// rc.7 F1 over every interleaving of length up to 4 of prefetch, build (with and without a
+    /// completion under its lease), drain, completion, a native reconfigure and a Kirby copy of each
+    /// group's kind, with a live Kirby on this role or the other: F1 never takes a copy's package and
+    /// leaves nothing kept or unpaired. U19's lease alone (today's code without D-KIRBY1) does.
+    #[test]
+    fn f1_never_takes_a_copys_package_in_any_interleaving() {
+        let windows: [&[u32]; 3] = [&[KIRBY], &[MARIO], &[KIRBY, FOX]];
+        let group_sets: [[&[u32]; 2]; 4] = [
+            [&[SAMUS], &[PIKACHU]],
+            [&[ROB, SAMUS], &[MARIO]],
+            [&[KIRBY], &[PIKACHU, SAMUS]],
+            [&[BRAWLER], &[SAMUS]],
+        ];
+        let others = [None, Some(([KIRBY, NO_KIND, NO_KIND], 4)), Some(([FOX, NO_KIND, NO_KIND], 1))];
+        let ops = [Op::Prefetch(0), Op::Prefetch(1), Op::Build(0), Op::BuildCompleting(1), Op::Drain(0), Op::Drain(1),
+            Op::Complete, Op::Reconfigure, Op::Copy(0), Op::Copy(1)];
+        let seqs = sequences(&ops, 4);
+        let (mut owned, mut lease_stolen) = (0usize, 0usize);
+        for window in windows {
+            for groups in group_sets {
+                if groups.iter().any(|g| g.iter().any(|k| window.contains(k))) { continue; }
+                for other in others {
+                    for seq in &seqs {
+                        for policy in [Policy::Lease, Policy::Owned] {
+                            let mut scene = Scene::new(policy, window, 2, &groups, other);
+                            for op in seq { scene.apply(*op); }
+                            scene.finish();
+                            match policy {
+                                Policy::Owned => {
+                                    assert!(scene.faults.is_empty(), "{:x?} {:x?} {:x?} {:x?}: {:x?}", window, groups, other, seq, scene.faults);
+                                    owned += 1;
+                                }
+                                _ => if !scene.stolen_copies().is_empty() { lease_stolen += 1; },
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        assert!(owned > 100_000, "{}", owned);
+        assert!(lease_stolen > 0, "the fail-first shape must exist without F1");
     }
 }

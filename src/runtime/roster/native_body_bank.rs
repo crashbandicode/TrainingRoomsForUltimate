@@ -26,6 +26,13 @@
 //! suspended while it is (`swap_model::occupancy`), the pair-rule `R+0x50` write only under
 //! an exclusive reset batch, and a `[Ledger] reconcile` line after every build and teardown.
 //!
+//! rc.7 F1, D-KIRBY1's root fix (`g68_step`): the mirror release above is `0x17e8610`'s G68 step, `0x17f0290` at
+//! `0x17e87ac`, which hands back the Kirby-copy package `(k, costume)` that native's load completion took for the
+//! header members. The bank's keys come from `0x17e64d0`, which takes no G68 key, so the bank now owns that step for
+//! every release it causes (kind −1 there: the ledger's releases and the tails of the bodies it builds). No release
+//! of the bank's keys reaches a copy's package, so the D-KIRBY1 gates above stand only while that hook is not
+//! installed (`body_bank::d_kirby1_live`, `Rules::OWNED_G68`).
+//!
 //! # Group swap (GROUP-SWAP-FEASIBILITY §6)
 //!
 //! The native window at `entry+0x4160` holds exactly three cells (fixed-capacity
@@ -1544,7 +1551,9 @@ fn occupancy_of(bank: &Bank, role: usize, copy: Option<u32>) -> Occupancy {
         }
     }
     kinds.kirby_copy[role] = copy;
-    Occupancy { kinds, rules: Rules::C116_1 }
+    // rc.7 F1: with the G68 step owned (`g68_step`), the ledger's two D-KIRBY1 rules have nothing to guard.
+    let rules = if crate::runtime::roster::g68_step::enabled() { Rules::OWNED_G68 } else { Rules::C116_1 };
+    Occupancy { kinds, rules }
 }
 
 /// [`occupancy_of`] for the role's current bank (takes and releases the bank lock).
@@ -2503,7 +2512,9 @@ pub(super) unsafe fn switch(entry: *mut u8, owner: u32, kind: u32, forms: Forms)
         let state = BANKS[role].lock();
         let Some(bank) = state.as_ref() else { return false; };
         let target_group = bank.groups.iter().position(|g| g.state.reachable() && group_serves(*g.members, kind, forms).is_some());
-        let kirby_target = !capabilities(form_class(kind, forms)).prefetch_while_live;
+        // rc.7 F1: the drain before a Kirby target is D-KIRBY1's; with the G68 step owned nothing needs draining.
+        let kirby_target = crate::engine::swap::body_bank::d_kirby1_applies(
+            !capabilities(form_class(kind, forms)).prefetch_while_live, crate::runtime::roster::g68_step::enabled());
         let pair_target = target_group.is_some_and(|g| bank.groups[g].state == GroupState::Prefetched
             && pair_resource_references(*bank.groups[g].members).is_some());
         let mut holders = crate::engine::compat::fixed::FixedList::<usize, MAX_EXTRA_GROUPS>::new(0);
@@ -2539,7 +2550,8 @@ pub(super) unsafe fn switch(entry: *mut u8, owner: u32, kind: u32, forms: Forms)
         let state = BANKS[role].lock();
         state.as_ref().map(|bank| {
             let target = bank.groups.iter().position(|g| g.state.reachable() && group_serves(*g.members, kind, forms).is_some());
-            let kirby = !capabilities(form_class(kind, forms)).prefetch_while_live;
+            let kirby = crate::engine::swap::body_bank::d_kirby1_applies(
+                !capabilities(form_class(kind, forms)).prefetch_while_live, crate::runtime::roster::g68_step::enabled());
             let pair = target.is_some_and(|g| bank.groups[g].state == GroupState::Prefetched
                 && pair_resource_references(*bank.groups[g].members).is_some());
             let why = if kirby { "Kirby target (drain before live)" } else { "pair build needs an exclusive reset batch" };
@@ -3920,13 +3932,32 @@ unsafe fn bg_mii_construct_path(ctx: &mut InlineCtx) {
     }
 }
 
-/// The construction tail's `bl 0x17e8610(R, kind)`: kind -1 (`0x17e86e4` then only re-checks the map) for every body of
-/// the armed build: the release would key on the live window's words; the settlement releases the group's keys with its
-/// own words in `R` (`release_group_keys_of`).
+/// The construction tail's `bl 0x17e8610(R, kind)` (`x0` R, `w1` kind, `x19` the body):
+/// - kind -1 (`0x17e86e4` then only re-checks the map) for every body of the armed build: the release would key on the
+///   live window's words; the settlement releases the group's keys with its own words in `R` (`release_group_keys_of`);
+/// - rc.7 F1 (`g68_step`): a bank-built body's release is the bank's, so its G68 step is armed. A background body's
+///   always: its build leaves the live window's words in the header, so no completion took this group's keys. A Phase B
+///   body's unless a completion took them under that build's own lease (`request_bit::tail_takes_g68_step`). Any other
+///   tail is native's and disarms this thread.
 #[skyline::hook(offset = 0x60dec4, inline)]
 unsafe fn bg_mii_tail_release(ctx: &mut InlineCtx) {
     if shadowed_body(ctx.registers[19].x() as usize) {
         ctx.registers[1].set_x(u64::from(u32::MAX));
+        crate::runtime::roster::g68_step::disarm();
+        return;
+    }
+    if !crate::runtime::roster::g68_step::enabled() { return; }
+    let body = ctx.registers[19].x() as usize;
+    let r = ctx.registers[0].x() as usize;
+    let phase_b = || aligned(body as *const u8) && fields::read::<u64>(body, 0x10)
+        .and_then(|owner| u32::try_from(owner).ok())
+        .and_then(crate::runtime::roster::g68_step::lease_before)
+        .is_some_and(|before| !crate::engine::swap::swap_model::request_bit::tail_takes_g68_step(before,
+            fields::read_unchecked::<u8>(r, 0x4c)));
+    if background_body(body) || phase_b() {
+        crate::runtime::roster::g68_step::arm(r, ctx.registers[1].w());
+    } else {
+        crate::runtime::roster::g68_step::disarm();
     }
 }
 
@@ -4257,7 +4288,13 @@ fn background_candidate(bank: &Bank, live: Option<u32>) -> Option<usize> {
         || bank.background.is_some() { return None; }
     next_background(bank.groups.iter().map(|g| (if g.background_refused || g.leaving || !background_kind_ready(bank, g) { GroupState::Failed } else { g.state },
         *g.members, g.identity.is_some())), *bank.members, live_identity(bank),
-        live == Some(KIRBY), BACKGROUND_PAIR_TAIL.load(Ordering::Acquire), BACKGROUND_X4.load(Ordering::Acquire))
+        live_kirby_gate(live), BACKGROUND_PAIR_TAIL.load(Ordering::Acquire), BACKGROUND_X4.load(Ordering::Acquire))
+}
+
+/// D-KIRBY1's "live kirby" for a background build: the live member is Kirby and the G68 step is native's (rc.7 F1:
+/// once the bank owns it, `g68_step`, a background build's tails and settlement reach no copy's package).
+fn live_kirby_gate(live: Option<u32>) -> bool {
+    crate::engine::swap::body_bank::d_kirby1_live(live, crate::runtime::roster::g68_step::enabled()) == Some(KIRBY)
 }
 
 /// X6: the live window's Mii identity and whether the owner's ordinary baseline is known.
@@ -4275,7 +4312,7 @@ fn background_kind_ready(bank: &Bank, group: &Group) -> bool {
 fn background_owed(bank: &Bank, group: &Group, live: Option<u32>) -> bool {
     BACKGROUND_ENABLED.load(Ordering::Acquire) && group.state == GroupState::Prefetched && !group.background_refused
         && !group.leaving && background_kind_ready(bank, group) && background_build_eligible(*group.members, group.identity.is_some(),
-            *bank.members, live_identity(bank), live == Some(KIRBY),
+            *bank.members, live_identity(bank), live_kirby_gate(live),
             BACKGROUND_PAIR_TAIL.load(Ordering::Acquire), BACKGROUND_X4.load(Ordering::Acquire))
             .is_ok()
 }
@@ -5579,6 +5616,7 @@ fn note_foreground(owner: u32, foreground: super::Foreground) {
 /// (a member change) or in no group of this bank needs none.
 unsafe fn serving_group(base: usize, bank: &Bank, target: crate::runtime::roster::cycle_preload::Target, live: Option<u32>)
     -> Option<(usize, Serving)> {
+    let live = crate::engine::swap::body_bank::d_kirby1_live(live, crate::runtime::roster::g68_step::enabled());
     if bank.members.index_of(target.kind).is_some() && bank.configuration == target.configuration { return None; }
     let (group, g) = bank.groups.iter().enumerate().find(|(_, g)| !g.leaving && g.members.index_of(target.kind).is_some()
         && match target.configuration { Some(c) => g.configuration == Some(c), None => g.identity.is_none() })?;
@@ -5602,6 +5640,8 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
     // the key's later `0x17e8610` release corrupts the registry the Reload walks;
     // RCA §3). A live Kirby defers Planned groups and hands Prefetched groups'
     // keys back; Built groups consumed their keys at construction.
+    // rc.7 F1: once the bank owns the G68 step of its releases (`g68_step`), no release of its keys reaches a copy's
+    // package, so a live Kirby defers nothing and takes no key back (`body_bank::d_kirby1_live`).
     enum Step { Poll(usize, super::InstallToken, u64, Members, usize), Start(usize, Members, usize, bool),
         Release(usize, Members, Members, usize), Background(usize), Leave(usize), Idle,
         Rearm(usize, Members, usize), RearmPoll(usize, super::InstallToken, u64, u32, usize), Retire(Retiring),
@@ -5626,7 +5666,8 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
             Step::PreparePoll(p)
         } else if let Some(group) = prepare_candidate(base, bank) {
             Step::Prepare(group, bank.groups[group].saved.map_or(0, |w| w.records[0]))
-        } else if let Err(reason) = crate::engine::swap::body_bank::prefetch_admitted(live) {
+        } else if let Err(reason) = crate::engine::swap::body_bank::prefetch_admitted(
+            crate::engine::swap::body_bank::d_kirby1_live(live, crate::runtime::roster::g68_step::enabled())) {
             let (window, alias) = (*bank.members, bank.alias);
             // Primary 2026-11-09 05:38Z: after the key returns, a detached PT group's object re-arm runs here too (its
             // object kind is no fighter a Kirby copy takes); fighter keys keep waiting.
@@ -6895,6 +6936,10 @@ const NATIVE_BACKGROUND_SEAMS: &[&str] = &["background_build.aegis_partner", "ba
 const BACKGROUND_TAIL_SEAMS: &[&str] = &["background_build.construct_tail"];
 /// rc.6 item 3, X4: the construction's info wrapper for background Ice Climbers bodies (`background_info`).
 const BACKGROUND_INFO_SEAMS: &[&str] = &["background_build.info_wrapper"];
+/// rc.7 F1: the G68 step inside `0x17e8610` and the construction tail's release (`g68_step`).
+const G68_STEP_SEAMS: &[&str] = &["group_swap.g68_step", "background_mii.tail_release"];
+/// The construction tail's `bl 0x17e8610(R, kind)` (`bg_mii_tail_release`).
+const TAIL_RELEASE: usize = 0x60dec4;
 
 pub(super) unsafe fn install(base: usize) {
     use crate::runtime::seams::seam_install::gate;
@@ -7036,12 +7081,28 @@ pub(super) unsafe fn install(base: usize) {
     if mii_ok {
         skyline::install_hooks!(bg_mii_init_enter, bg_mii_init_flags, bg_mii_init_leave, bg_mii_init_exit,
             bg_mii_construct_index_a, bg_mii_construct_index_b, bg_mii_construct_enter, bg_mii_construct_path,
-            bg_mii_tail_release, bg_mii_construct_exit, bg_mii_reader_costume, bg_mii_reader_hat,
+            bg_mii_construct_exit, bg_mii_reader_costume, bg_mii_reader_hat,
             bg_mii_reader_6e655c, bg_mii_reader_paths, bg_mii_reader_33c3468, bg_trainer_enter, bg_trainer_exit,
             bg_mii_reader_33c3370);
         BACKGROUND_MII_ENABLED.store(true, Ordering::Release);
     }
     trace!("[GroupSwap] background Mii builds {}", if mii_ok { "enabled" } else { "off; a Mii group builds at its first switch" });
+    // rc.7 F1, the D-KIRBY1 root fix (`g68_step`): the G68 step hook inside `0x17e8610` and the construction tail's
+    // release hook, all or nothing. Without them the G68 step stays native's and so do the D-KIRBY1 gates.
+    let g68_stock = fingerprint(base, crate::runtime::roster::g68_step::G68_STEP,
+        &crate::runtime::roster::g68_step::G68_STEP_WORDS, "GroupSwap")
+        && fingerprint(base, TAIL_RELEASE, &[0x944769d3], "GroupSwap");
+    let g68_ok = gate(SEAM_GROUP, G68_STEP_SEAMS, groups_ok && g68_stock) && groups_ok && g68_stock;
+    if mii_ok || g68_ok { skyline::install_hooks!(bg_mii_tail_release); }
+    if g68_ok {
+        crate::runtime::roster::g68_step::install_hook();
+        crate::runtime::roster::g68_step::enable();
+    }
+    trace!("[GroupSwap] G68 step {}", if g68_ok {
+        "owned (rc.7 F1): prefetches and background builds run beside a live Kirby"
+    } else {
+        "native; D-KIRBY1 stays"
+    });
     trace!("[GroupSwap] background build {} async={} identity_view={}",
         if async_ok && identity_view { "enabled" } else { "off; a group builds at its first switch" }, async_ok, identity_view);
     // SPECIAL-GROUPS §3: Pokémon Trainer and Pyra/Mythra groups in the background need the X5 site (`background_partner`)
