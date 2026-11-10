@@ -108,7 +108,11 @@ pub fn cancel_pending() {
     HAS_PENDING.store(false, Ordering::Release);
     sources::cancel(2);
 }
-pub fn scene_changed() { cancel_pending(); }
+pub fn scene_changed() {
+    // A Give item request still waiting for Player 1's frame belongs to the scene it was asked in (`ui::requests`).
+    let _ = crate::runtime::ui::requests::take_give_item();
+    cancel_pending();
+}
 
 pub unsafe fn on_frame(body: *mut app::BattleObjectModuleAccessor) {
     if !HAS_PENDING.load(Ordering::Acquire) { return; }

@@ -5084,7 +5084,7 @@
    "dest": "src/runtime/roster/character_items.rs",
    "crate": "root",
    "src_sha256": "b0679903a58021f041bec47d30926f946fc6ef8dbfb679574fd12e597ab78933",
-   "dest_sha256": "5dd002b7d05040e589f79b85a0c7b184be2403da5b0111b4e62f57056a436f28",
+   "dest_sha256": "173837b8d820a72db7fef3d94af6eb8cd3f5a6908122693d1b04e43a05ef09c3",
    "edits": [
     {
      "old": "const LEGACY_INDICES: [usize; 38] = [\n    4, 15, 5, 6, 7, 8, 9, 10, 0, 1, 12, 13, 14, 16,\n    17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30,\n    31, 32, 2, 3, 11, 40, 41, 42, 43, 44,\n];",
@@ -5140,6 +5140,11 @@
      "old": "    #[cfg(feature = \"source-owner-probe\")]\n    let source_present = source_present\n        || crate::runtime::roster::character_roster::source_owner_probe::item_source(spec.source as u32);\n",
      "new": "",
      "reason": "RC RESET option2: retire source-owner item experiment, preserve native loaded-source grant path."
+    },
+    {
+     "old": "pub fn scene_changed() { cancel_pending(); }\n",
+     "new": "pub fn scene_changed() {\n    // A Give item request still waiting for Player 1's frame belongs to the scene it was asked in (`ui::requests`).\n    let _ = crate::runtime::ui::requests::take_give_item();\n    cancel_pending();\n}\n",
+     "reason": "docs lane review R1 finding 3 (2026-11-09 23:23Z): the Give item request (ui::requests, taken on Player 1's frame since 6ef998f7) is dropped at the roster's scene change, so it never outlives the scene it was asked in"
     }
    ]
   },
