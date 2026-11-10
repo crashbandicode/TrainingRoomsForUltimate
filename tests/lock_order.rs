@@ -87,11 +87,42 @@ fn static_locks(root: &Path) -> Vec<(String, String)> {
     out
 }
 
-/// A call or reference in a body, at token `at`: `(segments, method)`.
+/// Receivers named otherwise than their type's module (docs lane review R2, finding 1): the inline keyboard is held as `keyboard`
+/// (`name_keyboard`, `native_keyboard`: `inline_keyboard::Keyboard`), the catalog request's `Broker` as `broker`.
+const RECEIVER_MODULES: &[(&str, &str)] = &[("keyboard", "inline_keyboard"), ("broker", "mii_catalog_request")];
+
+/// Ambiguous method calls left unfollowed although a runtime candidate reaches a lock, by `(method, receivers, why none of the runtime
+/// candidates is meant)`; `?` is a receiver that is not an identifier (a call's result, a path). Docs lane review R2, finding 1.
+const FOREIGN_RECEIVERS: &[(&str, &[&str], &str)] = &[
+    ("read_value", &["MENU", "source"], "the compat Readable impls: TYPED_STATIC_CALLS follows MENU's; the others take no lock"),
+    ("assign_value", &["target"], "the compat Assignable impls: TYPED_STATIC_CALLS follows MENU's (assign -> store)"),
+    ("open", &["?", "keeper", "list"], PANELS),
+    ("tick", &["?", "queue", "ui"], PANELS),
+    ("press", &["editor", "list", "m", "menu"], PANELS),
+    ("view", &["bundle", "editor", "extras", "ui"], PANELS),
+    ("target", &["active", "cycle", "editor", "proof"], "combos::Ui::target is private to ui/combos.rs"),
+    ("validate", &["?", "ids", "m", "mirrors", "prepared", "recording", "seed"], PROVIDER),
+    ("snapshot", &["?", "seen"], PROVIDER),
+    (
+        "poll",
+        &["?", "JOBS", "adapter", "clock", "detector", "gate", "guard", "model", "queue", "replies", "reply", "t"],
+        "inline_keyboard::Keyboard is held only as `keyboard`, mii_catalog_request's private Broker only as `broker` \
+         (RECEIVER_MODULES); these are engine exchanges and queues, input adapters, the model's catalog reply",
+    ),
+    ("close", &["queue"], "practice_trace_core's queue; inline_keyboard::Keyboard is held only as `keyboard`"),
+];
+const PANELS: &str = "combos::Ui and setups::Ui live only in the worker's state (`s.combos`, `s.setups`, `setups` in worker::close); \
+                      these are std files, the model's menu and place keeper, engine editors, queues, MacroUi and a bank's bundle";
+const PROVIDER: &str = "setups::validate/snapshot are `impl Provider for Native`, which the model's setups editor calls through \
+                        the trait (R2 finding 3), never runtime code by name; these receivers are model and engine types";
+
+/// A call or reference in a body, at token `at`: `(segments, method)`, and for a method call the identifier before its `.` (the
+/// receiver's last field or variable: `combos` in `s.combos.open()`).
 struct Call {
     at: usize,
     segments: Vec<String>,
     method: bool,
+    receiver: Option<String>,
 }
 
 /// `Graph::references` with positions (same rules).
@@ -134,7 +165,8 @@ fn calls(body: &[Tok]) -> Vec<Call> {
             }
             let called = punct(body.get(k), '(');
             if (segments.len() == 1 && called) || segments.len() >= 2 || (method && called) {
-                out.push(Call { at: i, segments, method });
+                let receiver = if method && i > 1 { ident(body.get(i - 2)).map(str::to_owned) } else { None };
+                out.push(Call { at: i, segments, method, receiver });
             }
             i = k.max(i + 1);
         } else {
@@ -173,7 +205,15 @@ impl<'g> Ctx<'g> {
         let Some(all) = self.by_name.get(last) else { return Vec::new() };
         if call.method {
             let methods: Vec<usize> = all.iter().copied().filter(|&c| self.graph.funcs[c].has_receiver).collect();
-            return if methods.len() == 1 && methods[0] != from { methods } else { Vec::new() };
+            if methods.len() == 1 {
+                return if methods[0] != from { methods } else { Vec::new() };
+            }
+            // Ambiguous: the receiver's field names its module (`s.combos.press()` is `ui/combos.rs`'s, not `ui/setups.rs`'s
+            // `press`; docs lane review R1 addendum 2026-11-10 00:25Z), or `RECEIVER_MODULES` does. No match keeps it unfollowed,
+            // which `every_unfollowed_ambiguous_call_that_reaches_a_lock_is_classified` checks.
+            let Some(receiver) = call.receiver.as_deref() else { return Vec::new() };
+            let module = RECEIVER_MODULES.iter().find(|(r, _)| *r == receiver).map_or(receiver, |(_, m)| *m);
+            return methods.into_iter().filter(|&c| c != from && self.graph.funcs[c].module == module).collect();
         }
         let qualifier = call.segments.len().checked_sub(2).map(|k| call.segments[k].as_str());
         all.iter()
@@ -542,18 +582,45 @@ struct Edge {
     via: String,
 }
 
-fn plugin_entries() -> Vec<(String, String)> {
-    let mut out: Vec<(String, String)> = PUBLISHING_ENTRIES.iter().map(|e| ((*e).to_owned(), format!("publish({e})"))).collect();
+/// The plugin threads' entries: `(key, thread, module path)`. A `THREADS` row's symbol gives the module path (`macros::diag` for
+/// `macros::diag::start::{closure#0}`); the publishers have none.
+fn plugin_entries() -> Vec<(String, String, String)> {
+    let mut out: Vec<(String, String, String)> =
+        PUBLISHING_ENTRIES.iter().map(|e| ((*e).to_owned(), format!("publish({e})"), String::new())).collect();
     for row in thread_stacks::THREADS.iter() {
         let path = row.symbol.split("::{").next().unwrap_or(row.symbol);
         let segments: Vec<&str> = path.split("::").collect();
         let key = segments[segments.len().saturating_sub(2)..].join("::");
+        let module = segments[..segments.len().saturating_sub(1)].join("::");
         let name = row.name.to_owned();
-        if !out.iter().any(|(k, _)| *k == key) {
-            out.push((key, name));
+        if !out.iter().any(|(k, _, _)| *k == key) {
+            out.push((key, name, module));
         }
     }
     out
+}
+
+/// The functions an entry names: with a module path, the functions of that name defined on it (`practice_trace::writer` is
+/// `practice_trace.rs`'s `mod enabled`'s; `macros::diag::start` is not `threads.rs`'s own `mod diag`: docs lane review R2, finding
+/// 5); without one, the key's matches.
+fn entry_starts(graph: &Graph, key: &str, module: &str) -> Vec<usize> {
+    if module.is_empty() {
+        return graph.find(key);
+    }
+    let name = key.rsplit("::").next().unwrap_or(key);
+    (0..graph.funcs.len()).filter(|&f| graph.funcs[f].name == name && on_module_path(&graph.funcs[f], module)).collect()
+}
+
+/// `func` is defined on `module`: its file's path, with or without its inline `mod`, and `module` agree segment by segment, one a
+/// suffix of the other (the rows name `states`, the file is `features/states.rs`).
+fn on_module_path(func: &callgraph::Func, module: &str) -> bool {
+    let file: Vec<&str> = func.file.trim_end_matches(".rs").trim_end_matches("/mod").split('/').collect();
+    let mut inner = file.clone();
+    if inner.last() != Some(&func.module.as_str()) {
+        inner.push(func.module.as_str());
+    }
+    let want: Vec<&str> = module.split("::").collect();
+    [file, inner].iter().any(|have| have.ends_with(&want) || want.ends_with(have))
 }
 
 fn scan(graph: &Graph) -> (Ctx<'_>, Scan) {
@@ -583,8 +650,8 @@ fn scan(graph: &Graph) -> (Ctx<'_>, Scan) {
             entries.push((vec![i], "game-hook".to_owned()));
         }
     }
-    for (key, name) in plugin_entries() {
-        let found = graph.find(&key);
+    for (key, name, module) in plugin_entries() {
+        let found = entry_starts(graph, &key, &module);
         if !found.is_empty() {
             entries.push((found, name));
         }
@@ -795,31 +862,204 @@ const TYPED_STATIC_CALLS: &[(&str, &str, &str)] = &[
 /// needs the reason a starved plugin holder cannot stall a game hook that waits for it.
 const SHARED_ON_PURPOSE: &[(&str, &str)] = &[];
 
+/// Game entry points installed without `#[skyline::hook]`, walked as game hooks (docs lane review R1, 2026-11-09 23:23Z, finding 2):
+/// a vtable slot (`cpu::on_frame`, original `main+0x614630`), `A64HookFunction` replacements (`cpu_common`), inline-hook and
+/// trampoline targets (`native_service`, `native_body_bank::prepare_*`, `native_unlink_*`, `mii_ordinary_gate`, `seam_drill`),
+/// the game's on-init callback (`reset_hub::on_init`), Skyline's NRO-load hooks, and the exported trace control.
+/// `every_function_handed_to_the_game_is_listed` keeps this complete.
+const GAME_ENTRIES: &[&str] = &[
+    "cpu::on_frame",
+    "cpu_common::di_hook",
+    "cpu_common::change_status_hook",
+    "cpu_common::sub_guard_cont_hook",
+    "cpu_common::on_nro_load",
+    "roster::on_nro_load",
+    "reset_hub::on_init",
+    "native_service::training_mod_native_service_dispatch",
+    "mii_ordinary_gate::mii_ordinary_gate_decide",
+    "native_body_bank::prepare_call",
+    "native_body_bank::prepare_clone_into",
+    "native_body_bank::prepare_clone_heap",
+    "native_unlink_install::leave",
+    "native_unlink_install::recursive_last_guard",
+    "native_unlink_install::sister_first_guard",
+    "native_unlink_install::sister_last_guard",
+    "native_unlink_install::header_first_guard",
+    "native_unlink_install::header_last_guard",
+    "native_unlink_install::vector_first_guard",
+    "native_unlink_install::vector_last_guard",
+    "native_unlink_probe::born",
+    "native_unlink_probe::cleared",
+    "native_unlink_probe::sister_cleared",
+    "native_unlink_probe::header_cleared",
+    "native_unlink_probe::vector_cleared",
+    "native_unlink_probe::enter",
+    "native_unlink_probe::header_enter",
+    "native_unlink_probe::header_leave",
+    "practice_trace::training_modpack_trace_control_v1",
+    "enabled::list_step",
+    "enabled::list_callback_enter",
+    "seam_drill::inline_0",
+    "seam_drill::inline_1",
+    "seam_drill::inline_2",
+    "seam_drill::inline_3",
+    "probe::mounted",
+];
+
+/// Functions whose address is handed out (`extern "C"`, `as *const ()`) that are not game entry points, and why.
+const NOT_GAME_ENTRIES: &[(&str, &str)] = &[
+    ("imp::detached", "a plugin thread's start (runtime::threads); its thread is walked from model::thread_stacks"),
+    ("imp::joined", "a plugin thread's start (runtime::threads); its thread is walked from model::thread_stacks"),
+    ("inline_keyboard::changed", KEYBOARD_CALLBACK),
+    ("inline_keyboard::moved", KEYBOARD_CALLBACK),
+    ("inline_keyboard::entered", KEYBOARD_CALLBACK),
+    ("inline_keyboard::cancelled", KEYBOARD_CALLBACK),
+    ("inline_keyboard::initialized", KEYBOARD_CALLBACK),
+    ("inline_keyboard::finished", KEYBOARD_CALLBACK),
+    ("combo::tr_seq_step_v1", "a trace-point anchor our own code calls (its callers are walked)"),
+    ("combo::tr_seq_plan_v1", "a trace-point anchor our own code calls (its callers are walked)"),
+    ("combo::tr_seq_saved_v1", "a trace-point anchor our own code calls (its callers are walked)"),
+    ("combo::tr_combo_link_v1", "a trace-point anchor our own code calls (its callers are walked)"),
+    ("combo::tr_combo_attempt_v1", "a trace-point anchor our own code calls (its callers are walked)"),
+    ("combo::tr_combo_saved_v1", "a trace-point anchor our own code calls (its callers are walked)"),
+    ("combo::tr_combo_listed_v1", "a trace-point anchor our own code calls (its callers are walked)"),
+    ("combo::tr_combo_fighter_v1", "a trace-point anchor our own code calls (its callers are walked)"),
+    ("notices::tr_intro_posted_v1", "a trace-point anchor our own code calls (its callers are walked)"),
+    ("worker::tr_cycle_badges_v1", "a trace-point anchor our own code calls (its callers are walked)"),
+];
+
+/// Listed entries the call graph does not contain, and why (docs lane review R2, finding 5: a key that resolves to nothing is not
+/// skipped silently). Every other `GAME_ENTRIES` key and every plugin entry resolves (`every_listed_entry_resolves`).
+const UNSCANNED_ENTRIES: &[(&str, &str)] = &[
+    ("probe::mounted", "ui/probe.rs is a `#[cfg(feature = \"diag\")]` module: Eden builds only, not scanned (R2 finding 6)"),
+    ("ui::probe::install", "the tr-probe thread: ui/probe.rs is a `#[cfg(feature = \"diag\")]` module, not scanned"),
+    ("macros::diag::start", "the tr-macro-diag thread: macros/diag.rs is a `#[cfg(feature = \"diag\")]` module, not scanned"),
+];
+
+/// Callback registrations the text cannot follow: `(registrar's module, registrar, the function that calls what is registered)`.
+/// `hud::register(draw)` puts a draw into the table `hud::run` calls on the UI pass (`anchors::ui_pass_calculate`, the game's task
+/// workers); `diag_log::set_tick(step)` puts a step into the table the heartbeat thread runs. The edges come from the registration
+/// calls themselves, so a new draw or tick is followed without a list.
+const REGISTRARS: &[(&str, &str, &str)] =
+    &[("hud", "register", "hud::run"), ("diag_log", "set_tick", "diag_log::start_drain_thread")];
+
+/// Calls from model code back into the runtime (the model is not scanned): `capabilities.rs` declares the same ones
+/// (`the_callback_edges_cover_the_capability_scan`).
+const MODEL_CALLBACKS: &[(&str, &str)] = &[
+    ("hitbox::frame", "hitbox::sphere_alive"),
+    ("hitbox::frame", "hitbox::sphere_kill_own"),
+    ("hitbox::frame", "hitbox::sphere_spawn"),
+    ("hitbox::hitbox_rebound_hook", "hitbox::sphere_alive"),
+    ("hitbox::hitbox_rebound_hook", "hitbox::sphere_kill_own"),
+    ("hitbox::frame", "hitbox::active"),
+    ("hitbox::frame", "hitbox::data"),
+    ("hitbox::frame", "hitbox::read_u64"),
+    ("hitbox::frame", "hitbox::read_f32"),
+];
+
+const KEYBOARD_CALLBACK: &str = "the inline keyboard's SDK callback: the SDK runs it synchronously on the thread that calls into \
+                                 the keyboard (inline_keyboard.rs), so it is walked from there (KEYBOARD_CALLBACKS), not as an entry";
+
+/// The inline keyboard's SDK callbacks, run synchronously inside the SDK calls of `Keyboard::open` (Appear), `poll` (Calc) and
+/// `close` (Finalize) on the keyboard's owner thread: `tr-menu` for the menu's keyboard (`native_keyboard`), a game hook for the Mii
+/// editor's (`name_keyboard`).
+const KEYBOARD_CALLBACKS: &[&str] = &[
+    "inline_keyboard::changed",
+    "inline_keyboard::moved",
+    "inline_keyboard::entered",
+    "inline_keyboard::cancelled",
+    "inline_keyboard::initialized",
+    "inline_keyboard::finished",
+];
+
+/// `(caller, callee)` for every callback the text cannot follow: the registrations' (`REGISTRARS`), `MODEL_CALLBACKS` and the
+/// keyboard's (`KEYBOARD_CALLBACKS`).
+fn callback_edges(graph: &Graph) -> Vec<(usize, usize)> {
+    let mut out = Vec::new();
+    for (module, registrar, runner) in REGISTRARS {
+        let runners = graph.find(runner);
+        for f in 0..graph.funcs.len() {
+            let body = &graph.funcs[f].body;
+            for i in 2..body.len() {
+                if ident(body.get(i)) != Some(registrar) || body[i - 1] != Tok::PathSep || ident(body.get(i - 2)) != Some(module) {
+                    continue;
+                }
+                if !punct(body.get(i + 1), '(') {
+                    continue;
+                }
+                // The argument: a path up to `)` or `,`; its last two segments name the registered function.
+                let mut k = i + 2;
+                let mut segments = Vec::new();
+                while let Some(t) = body.get(k) {
+                    match t {
+                        Tok::Ident(s) => segments.push(s.clone()),
+                        Tok::PathSep => {}
+                        _ => break,
+                    }
+                    k += 1;
+                }
+                let key = segments[segments.len().saturating_sub(2)..].join("::");
+                let targets = graph.find(&key);
+                assert_eq!(targets.len(), 1, "{module}::{registrar}({key}) in {}: {} functions", graph.funcs[f].key(), targets.len());
+                out.extend(runners.iter().map(|&r| (r, targets[0])));
+            }
+        }
+    }
+    for (from, to) in MODEL_CALLBACKS {
+        for a in graph.find(from) {
+            out.extend(graph.find(to).into_iter().map(|b| (a, b)));
+        }
+    }
+    for from in ["inline_keyboard::open", "inline_keyboard::poll", "inline_keyboard::close"] {
+        for a in graph.find(from) {
+            out.extend(KEYBOARD_CALLBACKS.iter().flat_map(|to| graph.find(to)).map(|b| (a, b)));
+        }
+    }
+    out
+}
+
 /// The runs that measured the hooks' threads (primary 2026-11-09 19:44Z/20:32Z, OPERATOR "measure first, fix exactly"; playbook
 /// CHECKLIST M row, main 87b3de0): hot-slots' two trace points per hook on its game address, a `thread == main` counter and a
 /// `thread != main` record point, on `b04856b2` diag (`artifacts/phase23/hook-threads/TABLE.md`).
+/// The runs of hot-slots' first entry-point session: the mii plan (CPU and P1 cycles, CPU switches, Mii groups, the pause) and
+/// four native L+R+A resets, on `72344fd9`'s diag build (`9b1d2d99`).
+const ENTRY_RUNS: &str = "final-yoga-ht-mii-reset-72344fd9";
+/// The runs that reached the Mii editor hooks (hot-slots, TABLE.md 2026-11-10 01:57Z): its combined boot on the fix build
+/// `ead60d8c` (`72344fd9` + this branch: Training, the CPU to Kirby, the Mii editor rows with the name keyboard) and the two LDN
+/// pair sessions, whose guest opens the editor.
+const EDITOR_RUNS: &str =
+    "final-yoga-ht-fixcheck-ead60d8c-r2 + final-yoga-ht-pair-72344fd9 + final-yoga-ht-pair-b04856b2-r2 (a and b, LDN pairs: the guest editor)";
 const MEASURED_RUNS: &str = "final-yoga-ht-mii-b04856b2 + final-yoga-ht-kr-b04856b2 + final-yoga-ht-pair-b04856b2-r2 (a and b, an LDN \
                              pair: the waiting rooms and a match) + final-yoga-ht-reset-b04856b2 (four native resets)";
 
-/// Game hooks measured on MainThread only: `(hook, calls, calls on MainThread)`, all runs together, exact counters. A hook that runs
+/// Game hooks measured on MainThread only: `(hook, calls, calls on MainThread, runs)`, the runs' exact counters together. A hook that runs
 /// on MainThread cannot deadlock this way: while it waits, MainThread is not busy-joining a task group, so the core it leaves free
 /// lets the starved holder run (`rc6-qpf3`'s cycle needs the waiter on a task worker). A lock leaves the failing set only when every
 /// hook that waits on it is here; a hook seen on a worker thread, or never reached, never is.
-const MEASURED_ON_MAIN_THREAD: &[(&str, u64, u64)] = &[
-    ("input_delay::caller_a_note", 73_937, 73_937),
-    ("input_delay::caller_a_apply", 358_224, 358_224),
-    ("input_delay::caller_b_note", 914, 914),
-    ("input_delay::caller_b_apply", 914, 914),
-    ("character_lifecycle::destruction_trace", 30, 30),
-    ("character_lifecycle::refresh_entry_portrait", 8, 8),
-    ("character_lifecycle::refresh_ordinal_portrait", 32, 32),
-    ("states::state_kirby_opff_hook", 3_001, 3_001),
-    ("native_source_capacity::owner_cleanup_complete", 30, 30),
-    ("native_source_capacity::listener_removed", 30, 30),
-    ("native_source_capacity::actor_cleanup", 97, 97),
-    ("native_source_capacity::pause_state_exit", 2, 2),
-    ("mii_hud_portrait::pipeline_before_tick", 93_041, 93_041),
-    ("mii_hud_portrait::pipeline_after_tick", 93_041, 93_041),
+const MEASURED_ON_MAIN_THREAD: &[(&str, u64, u64, &str)] = &[
+    ("input_delay::caller_a_note", 73_937, 73_937, MEASURED_RUNS),
+    ("input_delay::caller_a_apply", 358_224, 358_224, MEASURED_RUNS),
+    ("input_delay::caller_b_note", 914, 914, MEASURED_RUNS),
+    ("input_delay::caller_b_apply", 914, 914, MEASURED_RUNS),
+    ("character_lifecycle::destruction_trace", 30, 30, MEASURED_RUNS),
+    ("character_lifecycle::refresh_entry_portrait", 8, 8, MEASURED_RUNS),
+    ("character_lifecycle::refresh_ordinal_portrait", 32, 32, MEASURED_RUNS),
+    ("states::state_kirby_opff_hook", 3_001, 3_001, MEASURED_RUNS),
+    ("native_source_capacity::owner_cleanup_complete", 30, 30, MEASURED_RUNS),
+    ("native_source_capacity::listener_removed", 30, 30, MEASURED_RUNS),
+    ("native_source_capacity::actor_cleanup", 97, 97, MEASURED_RUNS),
+    ("native_source_capacity::pause_state_exit", 2, 2, MEASURED_RUNS),
+    ("mii_hud_portrait::pipeline_before_tick", 93_041, 93_041, MEASURED_RUNS),
+    ("mii_hud_portrait::pipeline_after_tick", 93_041, 93_041, MEASURED_RUNS),
+    // hot-slots, the R1 entry points (TABLE.md; inbox 2026-11-10 00:31Z).
+    ("cpu::on_frame", 45_743, 45_743, ENTRY_RUNS),
+    ("native_service::training_mod_native_service_dispatch", 92_724, 92_724, ENTRY_RUNS),
+    ("mii_ordinary_gate::mii_ordinary_gate_decide", 26, 26, ENTRY_RUNS),
+    // hot-slots' combined boot (primary 2026-11-10 01:16Z): the Mii editor hooks that wait on inline_keyboard SIGNALS.
+    ("mii_editor_bridge::edit_frame", 6_067, 6_067, EDITOR_RUNS),
+    ("mii_editor_bridge::editor_parent", 7_275, 7_275, EDITOR_RUNS),
+    ("mii_editor_bridge::editor_release", 9, 9, EDITOR_RUNS),
+    ("name_keyboard::name_frame", 843, 843, EDITOR_RUNS),
 ];
 
 /// The impl functions `f` runs through `helper(&STATIC ..)`, with the token position of the helper.
@@ -879,7 +1119,7 @@ fn shared_locks(ctx: &Ctx, s: &Scan) -> Shared {
     let graph = ctx.graph;
     let n = graph.funcs.len();
     // Per function: (token position, callee) for path and method calls and typed-static helpers.
-    let callees: Vec<Vec<(usize, usize)>> = (0..n)
+    let mut callees: Vec<Vec<(usize, usize)>> = (0..n)
         .map(|f| {
             let mut out: Vec<(usize, usize)> =
                 calls(&graph.funcs[f].body).iter().flat_map(|c| ctx.resolve(f, c).into_iter().map(move |t| (c.at, t))).collect();
@@ -887,6 +1127,9 @@ fn shared_locks(ctx: &Ctx, s: &Scan) -> Shared {
             out
         })
         .collect();
+    for (from, to) in callback_edges(graph) {
+        callees[from].push((0, to));
+    }
     let walk = |starts: Vec<usize>, plugin: bool| -> BTreeSet<usize> {
         let mut seen = BTreeSet::new();
         let mut stack = starts;
@@ -897,7 +1140,8 @@ fn shared_locks(ctx: &Ctx, s: &Scan) -> Shared {
         }
         seen
     };
-    let hooks: Vec<usize> = (0..n).filter(|&f| graph.funcs[f].attrs.contains("skyline::hook")).collect();
+    let mut hooks: Vec<usize> = (0..n).filter(|&f| graph.funcs[f].attrs.contains("skyline::hook")).collect();
+    hooks.extend(GAME_ENTRIES.iter().flat_map(|key| graph.find(key)));
     let mut out = Shared {
         game_waits: BTreeMap::new(),
         game_hooks: BTreeMap::new(),
@@ -912,8 +1156,8 @@ fn shared_locks(ctx: &Ctx, s: &Scan) -> Shared {
             }
         }
     }
-    for (key, name) in plugin_entries() {
-        let starts = graph.find(&key);
+    for (key, name, module) in plugin_entries() {
+        let starts = entry_starts(graph, &key, &module);
         for f in walk(starts, true) {
             out.plugin_reached.entry(f).or_default().insert(name.clone());
             let held: BTreeSet<usize> = s.takes[f]
@@ -935,7 +1179,7 @@ fn no_lock_a_game_hook_waits_on_is_held_by_a_plugin_thread() {
     let graph = runtime_graph();
     let (ctx, s) = scan(&graph);
     let shared = shared_locks(&ctx, &s);
-    let measured = |hook: &str| MEASURED_ON_MAIN_THREAD.iter().any(|(h, _, _)| *h == hook);
+    let measured = |hook: &str| MEASURED_ON_MAIN_THREAD.iter().any(|(h, _, _, _)| *h == hook);
     let mut problems = Vec::new();
     let mut used = BTreeSet::new();
     for (lock, waits) in &shared.game_waits {
@@ -949,7 +1193,9 @@ fn no_lock_a_game_hook_waits_on_is_held_by_a_plugin_thread() {
         used.extend(hooks.iter().filter(|h| measured(h)).cloned());
         let open: Vec<&String> = hooks.iter().filter(|h| !measured(h)).collect();
         if open.is_empty() {
-            println!("MEASURED {name}: every waiting hook ran on MainThread only ({MEASURED_RUNS}): {hooks:?}");
+            let runs: BTreeSet<&str> =
+                MEASURED_ON_MAIN_THREAD.iter().filter(|(h, _, _, _)| hooks.contains(*h)).map(|(_, _, _, runs)| *runs).collect();
+            println!("MEASURED {name}: every waiting hook ran on MainThread only ({runs:?}): {hooks:?}");
             continue;
         }
         problems.push(format!(
@@ -959,11 +1205,14 @@ fn no_lock_a_game_hook_waits_on_is_held_by_a_plugin_thread() {
             holds.iter().cloned().collect::<Vec<_>>().join(", ")
         ));
     }
-    for (hook, calls, on_main) in MEASURED_ON_MAIN_THREAD {
+    for (hook, calls, on_main, _) in MEASURED_ON_MAIN_THREAD {
         assert_eq!(calls, on_main, "{hook}: {calls} calls but {on_main} on MainThread: it ran on a worker thread; fix its locks");
         assert!(*calls > 0, "{hook}: never reached; an unreached hook is not measured");
         let found = graph.find(hook);
-        assert!(found.iter().any(|&f| graph.funcs[f].attrs.contains("skyline::hook")), "{hook} is not a game hook any more");
+        assert!(
+            GAME_ENTRIES.contains(hook) || found.iter().any(|&f| graph.funcs[f].attrs.contains("skyline::hook")),
+            "{hook} is not a game hook any more"
+        );
         assert!(used.contains(*hook), "{hook} waits on no shared lock now: delete its MEASURED_ON_MAIN_THREAD row");
     }
     for p in &problems {
@@ -1012,6 +1261,175 @@ fn the_mii_catalog_reply_is_consumed_on_the_game_thread_only() {
     assert!(problems.is_empty(), "the catalog's game-side consumers run on a plugin thread:\n{}", problems.join("\n"));
 }
 
+/// The functions of `src/runtime` whose address the plugin hands to the game or to a native caller: every `extern "C"` /
+/// `extern "Rust"` function without `#[skyline::hook]`, and every function of a file taken there as `name as *const ()`. Keys are
+/// the call graph's (`enabled::list_step` for a function in `practice_trace.rs`'s `mod enabled`); a file the graph does not scan
+/// (diag-only) gives `stem::name`.
+fn handed_out(graph: &Graph) -> BTreeSet<String> {
+    fn walk(dir: &Path, root: &Path, graph: &Graph, out: &mut BTreeSet<String>) {
+        let mut entries: Vec<_> = std::fs::read_dir(dir).unwrap().map(|e| e.unwrap().path()).collect();
+        entries.sort();
+        for path in entries {
+            if path.is_dir() {
+                walk(&path, root, graph, out);
+                continue;
+            }
+            if path.extension().is_none_or(|e| e != "rs") {
+                continue;
+            }
+            let rel = path.strip_prefix(root).unwrap().to_string_lossy().replace('\\', "/");
+            let stem = path.file_stem().unwrap().to_string_lossy().into_owned();
+            let module = if stem == "mod" { path.parent().unwrap().file_name().unwrap().to_string_lossy().into_owned() } else { stem };
+            let mut insert = |name: &str| {
+                let keys: Vec<String> = graph.funcs.iter().filter(|f| f.file == rel && f.name == name).map(|f| f.key()).collect();
+                if keys.is_empty() {
+                    out.insert(format!("{module}::{name}"));
+                }
+                out.extend(keys);
+            };
+            let text = std::fs::read_to_string(&path).unwrap();
+            let lines: Vec<&str> = text.lines().collect();
+            let defined = |name: &str| text.contains(&format!("fn {name}("));
+            for (i, line) in lines.iter().enumerate() {
+                for abi in ["extern \"C\" fn ", "extern \"Rust\" fn "] {
+                    if let Some(at) = line.find(abi) {
+                        let name: String = line[at + abi.len()..].chars().take_while(|c| c.is_alphanumeric() || *c == '_').collect();
+                        let attrs = lines[i.saturating_sub(3)..i].join(" ");
+                        if !name.is_empty() && !attrs.contains("skyline::hook") {
+                            insert(&name);
+                        }
+                    }
+                }
+                let mut rest = *line;
+                while let Some(at) = rest.find(" as *const ()") {
+                    let name: String =
+                        rest[..at].chars().rev().take_while(|c| c.is_alphanumeric() || *c == '_').collect::<Vec<_>>().into_iter().rev().collect();
+                    if !name.is_empty() && defined(&name) {
+                        insert(&name);
+                    }
+                    rest = &rest[at + 1..];
+                }
+            }
+        }
+    }
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");
+    let mut out = BTreeSet::new();
+    walk(&root, &root, graph, &mut out);
+    out
+}
+
+/// The ambiguous method calls `Ctx::resolve` leaves unfollowed while a runtime candidate reaches a lock: `(method, receiver)` (`?`
+/// when the receiver is not an identifier) to the functions that make them.
+fn unfollowed_ambiguous(ctx: &Ctx, s: &Scan) -> BTreeMap<(String, String), BTreeSet<String>> {
+    let graph = ctx.graph;
+    let mut out: BTreeMap<(String, String), BTreeSet<String>> = BTreeMap::new();
+    for f in 0..graph.funcs.len() {
+        for call in calls(&graph.funcs[f].body) {
+            let Some(method) = call.segments.last().filter(|_| call.method) else { continue };
+            if LOCK_METHODS.contains(&method.as_str()) || !ctx.resolve(f, &call).is_empty() {
+                continue;
+            }
+            let Some(all) = ctx.by_name.get(method) else { continue };
+            let methods: Vec<usize> = all.iter().copied().filter(|&m| graph.funcs[m].has_receiver).collect();
+            if methods.len() < 2 || !methods.iter().any(|&m| m != f && !s.reach[m].is_empty()) {
+                continue;
+            }
+            let receiver = call.receiver.clone().unwrap_or_else(|| "?".to_owned());
+            out.entry((method.clone(), receiver)).or_default().insert(graph.funcs[f].key());
+        }
+    }
+    out
+}
+
+/// R1 finding 2's guard: every function handed to the game is a listed entry point (walked as a game hook) or listed as not one,
+/// with its reason, and every listed name is still handed out.
+#[test]
+fn every_function_handed_to_the_game_is_listed() {
+    let handed = handed_out(&runtime_graph());
+    for known in ["cpu::on_frame", "cpu_common::on_nro_load", "native_service::training_mod_native_service_dispatch", "imp::detached"] {
+        assert!(handed.contains(known), "the scan of handed-out functions misses {known}: {handed:?}");
+    }
+    let listed: BTreeSet<String> =
+        GAME_ENTRIES.iter().map(|k| (*k).to_owned()).chain(NOT_GAME_ENTRIES.iter().map(|(k, _)| (*k).to_owned())).collect();
+    let missing: Vec<&String> = handed.difference(&listed).collect();
+    let stale: Vec<&String> = listed.difference(&handed).collect();
+    assert!(missing.is_empty(), "handed to the game but on neither GAME_ENTRIES nor NOT_GAME_ENTRIES: {missing:?}");
+    assert!(stale.is_empty(), "listed but no longer handed out: {stale:?}");
+}
+
+/// R2 finding 5's guard: every game entry and every plugin thread's entry resolves to a function on its module path, or is listed in
+/// `UNSCANNED_ENTRIES` (and does not resolve). A key that resolves to nothing would drop its whole reach from the check.
+#[test]
+fn every_listed_entry_resolves() {
+    let graph = runtime_graph();
+    let unscanned = |key: &str| UNSCANNED_ENTRIES.iter().any(|(k, _)| *k == key);
+    let mut keys: Vec<(String, Vec<usize>)> = GAME_ENTRIES.iter().map(|k| ((*k).to_owned(), graph.find(k))).collect();
+    for (key, _, module) in plugin_entries() {
+        let starts = entry_starts(&graph, &key, &module);
+        keys.push((if module.is_empty() { key } else { format!("{module}::{}", key.rsplit("::").next().unwrap()) }, starts));
+    }
+    let mut problems = Vec::new();
+    for (key, found) in &keys {
+        match (found.is_empty(), unscanned(key)) {
+            (true, false) => problems.push(format!("{key} resolves to no function on its module path")),
+            (false, true) => problems.push(format!("{key} resolves now: delete its UNSCANNED_ENTRIES row")),
+            _ => {}
+        }
+    }
+    for (key, _) in UNSCANNED_ENTRIES {
+        if !keys.iter().any(|(k, _)| k == key) {
+            problems.push(format!("{key} is no longer an entry: delete its UNSCANNED_ENTRIES row"));
+        }
+    }
+    assert!(problems.is_empty(), "{}", problems.join("\n"));
+}
+
+/// R2 finding 1's guard (docs lane, 2026-11-10 00:36Z): `Ctx::resolve` follows an ambiguous method only by its receiver, so every
+/// call it leaves unfollowed while a runtime candidate reaches a lock is classified in `FOREIGN_RECEIVERS`. A new one fails here
+/// until it is: a real receiver goes into `RECEIVER_MODULES`, a foreign one into `FOREIGN_RECEIVERS` with the reason.
+#[test]
+fn every_unfollowed_ambiguous_call_that_reaches_a_lock_is_classified() {
+    let graph = runtime_graph();
+    let (ctx, s) = scan(&graph);
+    let found = unfollowed_ambiguous(&ctx, &s);
+    let classified = |m: &str, r: &str| FOREIGN_RECEIVERS.iter().any(|(method, receivers, _)| *method == m && receivers.contains(&r));
+    let missing: Vec<String> =
+        found.iter().filter(|((m, r), _)| !classified(m, r)).map(|((m, r), callers)| format!(".{r}.{m}() in {callers:?}")).collect();
+    assert!(
+        missing.is_empty(),
+        "ambiguous calls left unfollowed whose runtime candidates reach a lock; name the receiver's module (RECEIVER_MODULES) or \
+         classify it (FOREIGN_RECEIVERS):\n{}",
+        missing.join("\n")
+    );
+    for (method, receivers, _) in FOREIGN_RECEIVERS {
+        for r in *receivers {
+            assert!(found.contains_key(&((*method).to_owned(), (*r).to_owned())), ".{r}.{method}() is not left unfollowed now: delete it");
+        }
+    }
+    for (receiver, module) in RECEIVER_MODULES {
+        assert!(graph.funcs.iter().any(|f| f.module == *module && f.has_receiver), "RECEIVER_MODULES: {receiver} -> {module} has no methods");
+    }
+}
+
+/// R1 finding 1: the callback edges are followed (the UI pass reaches the HUD draws, the heartbeat reaches its ticks), and they cover
+/// every edge `tests/capabilities.rs` declares for its own scan.
+#[test]
+fn the_callback_edges_cover_the_capability_scan() {
+    let graph = runtime_graph();
+    let edges: BTreeSet<(String, String)> =
+        callback_edges(&graph).into_iter().map(|(a, b)| (graph.funcs[a].key(), graph.funcs[b].key())).collect();
+    for want in [("hud::run", "hud_draw::draw"), ("hud::run", "hitbox::draw_orbs"), ("diag_log::start_drain_thread", "p1::service")] {
+        assert!(edges.contains(&(want.0.to_owned(), want.1.to_owned())), "{want:?} not followed: {edges:?}");
+    }
+    let text = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/capabilities.rs")).unwrap();
+    let start = text.find("fn new() -> Analysis").expect("capabilities.rs Analysis::new");
+    let end = start + text[start..].find("let consts").expect("capabilities.rs Analysis::new end");
+    let ends: BTreeSet<&str> = edges.iter().flat_map(|(a, b)| [a.as_str(), b.as_str()]).collect();
+    for literal in text[start..end].split('"').skip(1).step_by(2).filter(|s| s.contains("::") && !s.contains(' ')) {
+        assert!(ends.contains(literal), "capabilities.rs declares {literal} in an edge this check does not follow");
+    }
+}
+
 /// A bare name a `use` imports from outside the runtime is that item (`runtime_graph`): `lobby_persist::entry_applied` calls the
 /// model's `restore`, so it reaches neither `kirby_hats::restore` nor `character_items::restore`, which the over-approximating graph
 /// (`Graph::scan` as the capability scan uses it) follows.
@@ -1029,6 +1447,25 @@ fn an_imported_model_function_is_not_a_runtime_call() {
         assert!(reaches(&loose, to), "{to}: the control lost its edge");
         assert!(!reaches(&precise, to), "{to}: an imported model function resolved to a runtime one");
     }
+}
+
+/// R1 addendum (docs lane, 2026-11-10 00:25Z): a method name several runtime types define (`open`, `tick`, `press`, `view` on
+/// `ui/combos.rs` and `ui/setups.rs`) resolves by the receiver's field, so the menu worker reaches the combo panel and what it
+/// locks (`combo::set_target`, `combo::last_combo`).
+#[test]
+fn an_ambiguous_method_resolves_by_its_receivers_field() {
+    let graph = runtime_graph();
+    let (ctx, _) = scan(&graph);
+    let worker = graph.find("worker::sync_panels");
+    assert_eq!(worker.len(), 1);
+    let keys: BTreeSet<String> = calls(&graph.funcs[worker[0]].body)
+        .iter()
+        .filter(|c| c.receiver.as_deref() == Some("combos"))
+        .flat_map(|c| ctx.resolve(worker[0], c))
+        .map(|t| graph.funcs[t].key())
+        .collect();
+    assert!(keys.contains("combos::open") && keys.contains("combos::tick"), "s.combos.open()/.tick() not followed: {keys:?}");
+    assert!(!keys.iter().any(|k| k.starts_with("setups::")), "a combos call resolved to the setups panel: {keys:?}");
 }
 
 /// Two scan blind spots (rc.6, hot-slots hook-thread table 2026-11-09: `allocation_trace` runs on the game's task workers): a call

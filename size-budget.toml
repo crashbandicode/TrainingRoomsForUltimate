@@ -1292,3 +1292,11 @@ ceiling = 162019
 date = "2026-11-09"
 reason = "rc.6 integration f7372c43 (the last candidate): p23/rc6-preload-priority 06afa00d (+487) and p23/rc6-qp-respawn-freeze 8d9d8901 (+166, measured merged alone on b04856b2: 161553) merged on b04856b2 (161387); each branch raised its own ceiling with approved_by (161874, 161492); measured on the merge 162019 (tools/size_gate.py) = 161387 + 487 + 166 - 21, the lines both branches carry counted once (threads::on_plugin_thread from daf5c8c9)"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the combined ceiling of the two rc.6 product fixes the primary ordered merged into the last candidate (2026-11-09 23:09Z GO), each already raised with approved_by in its own branch; a raise goes in its own commit with approved_by"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 161567
+date = "2026-11-10"
+reason = "rc.6 p23/rc6-qp-respawn-freeze over 8d9d8901 (161492): the docs lane's review R1 fixes the primary ordered (2026-11-09 23:32Z; the combo HUD tick's try_lock, the Give item scene-change drop, cached_kind's yielding read, combo STAGED as Published, the menu worker off combo HELPER with SAMPLE as a TripleBuffer) and the retire_window ship blocker (primary 2026-11-10 00:59Z: native_fields::inline_elements and the address-space bound, window_cells): 161,567 measured by tools/size_gate.py at ddb7e29d"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); applied to the product fixes ordered by the primary under the operator's 13:21Z rule (a raise goes in its own commit with approved_by)"

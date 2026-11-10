@@ -182,3 +182,33 @@ fn saved_combos_wait_for_the_practice_fighters() {
     assert!(row.contains("retired"), "{row}");
     assert!(row.contains("superseded by combos-lobby in rc.5"), "{row}");
 }
+
+/// The drill the menu worker stages for the frame hook (`combo::STAGED`) crosses threads through `hos_lock::Published`: the
+/// hand-rolled seqlock it replaced wrote its odd mark `Relaxed` and had no acquire fence before its re-check, so on AArch64 the
+/// hook could install a torn grade target (docs lane review R1, 2026-11-09 23:23Z, finding 5). The worker publishes (it may wait);
+/// the hook reads what is newer than it last saw, never waiting.
+#[test]
+fn the_staged_drill_crosses_threads_through_published() {
+    let g = graph();
+    assert!(names(&g, "combo::stage_target", "publish"), "the worker no longer publishes the staged drill");
+    assert!(names(&g, "combo::pull_staged", "read_if_newer"), "the frame hook no longer reads the staged drill as published");
+    let text = include_str!("../src/runtime/features/combo.rs");
+    assert!(!text.contains("UnsafeCell"), "combo.rs hand-rolls a cross-thread cell again");
+}
+
+/// The combo helper (`combo::HELPER`) belongs to the fighter frame: the HUD tick reads it on the game's task workers
+/// (`anchors::ui_pass_calculate`), so the menu worker never takes it. A new target is staged for the frame (`stage_target`), and
+/// the last combo and the strip's sample come from the frame's hand-off (`SAMPLE`, a triple buffer: neither side waits). Docs lane
+/// review R1 addendum, 2026-11-10 00:25Z.
+#[test]
+fn the_menu_worker_never_takes_the_combo_helper() {
+    let g = graph();
+    for key in ["combo::set_target", "combo::last_combo", "combo::strip_sample"] {
+        assert!(!names(&g, key, "HELPER"), "{key} takes the helper the HUD tick reads");
+    }
+    assert!(calls(&g, "combo::set_target", "combo::stage_target"), "a new target is no longer staged for the frame");
+    let text = include_str!("../src/runtime/features/combo.rs");
+    let tick = text.split("pub fn hud_tick").nth(1).unwrap();
+    assert!(tick.contains("HELPER.try_lock()") && !tick.contains("HELPER.lock()"), "the HUD tick waits on the helper again");
+    assert!(text.contains("static SAMPLE: hos_lock::TripleBuffer<"), "the frame's hand-off to the worker is a lock again");
+}

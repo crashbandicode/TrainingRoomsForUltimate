@@ -347,6 +347,9 @@ impl Drop for BankGuard<'_> {
 
 /// `[ready, entry, owner, kind, physical descriptor (0x70 bytes)]`, all zero unless the bank is Ready, not departed and observed.
 const READY_WORDS: usize = 4 + 0x70 / 8;
+/// Rounds of [`crate::model::seq_cell::SeqCell::read_yielding`] for `cached_kind` on a plugin thread (each 64 tries, then a
+/// yield).
+const READY_ROUNDS: usize = 1024;
 static READY: [crate::model::seq_cell::SeqCell<READY_WORDS>; 2] =
     [crate::model::seq_cell::SeqCell::new(), crate::model::seq_cell::SeqCell::new()];
 
@@ -2281,9 +2284,14 @@ unsafe fn pair_window(entry: *const u8) -> Option<(u32, Members)> {
 /// receipt, so a native CPU Behavior change keeps the active member's identity
 /// for the next cycle instead of falling back to the group's first kind.
 pub(crate) fn cached_kind(entry: usize, owner: u32, descriptor: &[u8; 0x70]) -> Option<u32> {
-    // The mirror of the Ready bank (`READY`), never the bank's lock: the menu worker's re-plan reads this. A read that keeps meeting a
-    // write in progress gives up (no cached kind; the caller falls back to the descriptor's own kind).
-    let words = READY[role(owner)?].read(64)?;
+    // The mirror of the Ready bank (`READY`), never the bank's lock: the menu worker's re-plan reads this. It yields between rounds
+    // so a game thread preempted mid-write can finish; a mirror still busy after every round is reported, not used silently.
+    // A game hook keeps its frame short (a few rounds); the menu worker can afford to wait for the writer.
+    let rounds = if crate::runtime::threads::on_plugin_thread() { READY_ROUNDS } else { 16 };
+    let Some(words) = READY[role(owner)?].read_yielding(rounds) else {
+        trace!("[BodyBank] ready mirror busy owner={} after {} rounds; no cached kind this plan", owner, rounds);
+        return None;
+    };
     if words[0] != 1 || words[1] != entry as u64 || words[2] != u64::from(owner) {
         return None;
     }
@@ -2975,6 +2983,14 @@ fn copy_package_sets(bank: &Bank) -> CopyPackageSets {
     sets
 }
 
+/// The window's size (`+0x4150`); its data pointer (`+0x4158`) names its three cells (`+0x4160/68/70`).
+const WINDOW: usize = 0x4150;
+
+/// The window's cells that hold a body: below its size, with its data pointer on the cells (`fields::inline_elements`).
+unsafe fn window_cells(entry: usize) -> [Option<usize>; NATIVE_MEMBERS] {
+    fields::inline_elements::<NATIVE_MEMBERS>(entry, WINDOW)
+}
+
 /// The attached-window arm of the teardown protocol (`swap_model::lifecycle`, Astra §5
 /// step 4): clear every pad route that names one of this window's controllers (D-PTA1c)
 /// and run the Kirby arm for a never-activated Kirby cell (WP-K), then let native destroy
@@ -3002,18 +3018,30 @@ unsafe fn retire_window(entry: *const u8, owner: u32, reason: &str, always: bool
     };
     let mut cells = crate::engine::compat::fixed::FixedList::<BodyRef, NATIVE_MEMBERS>::new(
         BodyRef { id: 0, kind: 0, cell: 0, activated: false, valid: false, registered: None });
+    // Only the cells the window holds (`+0x4150`), not every planned member: a slot past the window's size is uninitialised
+    // or left over, and final-ally-72344fd9's finalize followed one (float bytes, `0xb31caf33bf800000`: 8 faults).
+    let installed = window_cells(entry as usize);
+    let held = installed.iter().flatten().count();
+    if always && held < count {
+        trace!("[BodyBank] retire owner={} reason={} planned={} held={}: slots past the window's size are not read", owner, reason,
+            count, held);
+    }
     for (i, kind) in kinds.iter().enumerate().take(count) {
-        let Some(body) = fields::child(entry as usize, 0x4160 + i * 8) else { continue; };
+        let Some(body) = installed.get(i).copied().flatten() else { continue; };
+        let registered = registered_kind(resource(base, owner), i);
+        // The game's bytes first: a cell that is not a fighter body is not read further.
+        if fields::read::<usize>(body, 0) != Some(base + FIGHTER_VTABLE) {
+            cells.push(BodyRef { id: 0, kind: *kind, cell: i as u8, activated: false, valid: false, registered });
+            continue;
+        }
         let id = fields::read::<u32>(body, 8).unwrap_or(0);
         // The ref carries the body's own kind (`body+0xc`, what its unload's `unprepare`
         // reads), not the planned one: at a mod Reload the cells still hold the outgoing
         // bodies while the bank already lists the incoming kinds (Yoga `m4b3` #140).
         let own = fields::read::<u32>(body, 0xc);
-        let fighter = fields::read::<usize>(body, 0) == Some(base + FIGHTER_VTABLE);
-        let valid = fighter && own.is_some();
         let live = fields::read::<u8>(body, 0x3a) == Some(4);
-        cells.push(BodyRef { id, kind: if valid { own.unwrap_or(*kind) } else { *kind }, cell: i as u8,
-            activated: live || activated.contains(&(body, id)), valid, registered: registered_kind(resource(base, owner), i) });
+        cells.push(BodyRef { id, kind: own.unwrap_or(*kind), cell: i as u8,
+            activated: live || activated.contains(&(body, id)), valid: own.is_some(), registered });
     }
     let contexts = graph::window_contexts(entry as usize, |context| valid_context(base, context, owner));
     let probed = contexts.len();
@@ -6485,7 +6513,7 @@ unsafe fn pair_teardown(entry: *const u8, reason: &str) {
         trace!("[IcPair] teardown owner={} reason={} flags={:#x} INVARIANT VIOLATED: bit 2 clear while a destroyer can run (651660 frees +0x4188/90/98 only on its bit-2 path); not repaired (operator decision #6) index={} loader={:#x} outer={} contexts=[{:#x},{:#x},{:#x}] aliases=[{:#x},{:#x}] states=[{:?},{:?},{:?}]",
             owner, reason, flags, read::<u8>(entry, 0x5918), read::<u8>(entry, 0x591c), read::<u8>(entry, 0x5920),
             contexts[0], contexts[1], contexts[2], aliases[0], aliases[1],
-            fields::child(entry as usize, 0x4160).and_then(|b| fields::read::<u8>(b, 0x3a)),
+            window_cells(entry as usize)[0].and_then(|b| fields::read::<u8>(b, 0x3a)),
             fields::child(entry as usize, 0x4168).and_then(|b| fields::read::<u8>(b, 0x3a)),
             fields::child(entry as usize, 0x4170).and_then(|b| fields::read::<u8>(b, 0x3a)));
     } else {
@@ -6624,7 +6652,7 @@ unsafe fn activate_entry(entry: *mut u8, status: i32) {
         trace!("[IcPair] N2 activate pair owner={} status={:#x} native_us={} flags {:#x}->2->6 popo_ctx={:#x} nana_ctx={:#x} +0x4178={:#x} +0x4180={:#x} states=[{:?},{:?}]",
             owner, status, native_us, before, read::<usize>(entry, 0x4188), nana, read::<usize>(entry, 0x4178),
             read::<usize>(entry, 0x4180),
-            fields::child(entry as usize, 0x4160).and_then(|b| fields::read::<u8>(b, 0x3a)),
+            window_cells(entry as usize)[0].and_then(|b| fields::read::<u8>(b, 0x3a)),
             fields::child(entry as usize, 0x4168).and_then(|b| fields::read::<u8>(b, 0x3a)));
         return;
     }
@@ -6636,7 +6664,7 @@ unsafe fn activate_entry(entry: *mut u8, status: i32) {
             owner, index, before, BANK_FLAG, status, read::<u8>(entry, 0x591c), read::<u8>(entry, 0x5920),
             read::<usize>(entry, 0x4178), read::<usize>(entry, 0x4180),
             read::<usize>(entry, 0x4188), read::<usize>(entry, 0x4190), read::<usize>(entry, 0x4198),
-            fields::child(entry as usize, 0x4160).and_then(|b| fields::read::<u8>(b, 0x3a)),
+            window_cells(entry as usize)[0].and_then(|b| fields::read::<u8>(b, 0x3a)),
             fields::child(entry as usize, 0x4168).and_then(|b| fields::read::<u8>(b, 0x3a)),
             fields::child(entry as usize, 0x4170).and_then(|b| fields::read::<u8>(b, 0x3a)));
     }
@@ -6669,7 +6697,7 @@ unsafe fn commit_change(entry: *mut u8) {
             fields::write_unchecked(entry as usize, 0x4180, 0usize);
             fields::write_unchecked(entry as usize, 0x591f, BANK_FLAG);
             trace!("[IcPair] N3 park pair owner={} nana_id={:#x} nana_state 4->{} info_saved={} popo_state={:?} +0x4178={:#x} +0x4180=0 flags=4",
-                owner, id, state, saved, fields::child(entry as usize, 0x4160).and_then(|b| fields::read::<u8>(b, 0x3a)),
+                owner, id, state, saved, window_cells(entry as usize)[0].and_then(|b| fields::read::<u8>(b, 0x3a)),
                 read::<usize>(entry, 0x4178));
         }
         Err(reason) => trace!("[IcPair] N3 refused owner={} reason={}; flags left {:#x} (no acknowledgement will follow)",

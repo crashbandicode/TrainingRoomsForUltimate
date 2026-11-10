@@ -19,10 +19,22 @@ use crate::model::frame_strip::{Tracker, Verdict};
 use crate::model::frame_strip_plan::{Changed, Look, Text};
 use crate::runtime::published;
 
+/// The fighter frame's (`after_strip`, `session_clear`) and the HUD tick's; the menu worker never takes it: it stages a target
+/// (`stage_target`) and reads `SAMPLE`.
 static HELPER: Mutex<Helper> = Mutex::new(Helper::new());
-/// The worker's copy of the last combo, with the helper's count of links captured (`Helper::seen`). The game thread
-/// publishes it after it has let go of HELPER.
-static SAMPLE: Mutex<(u32, Option<Combo>)> = Mutex::new((0, None));
+/// What the frame hands the menu worker, a triple buffer: neither side waits (docs lane review R1 addendum, 2026-11-10 00:25Z).
+/// Written under `HELPER` (one writer at a time); read by the menu worker only (`strip_sample`, `last_combo`).
+static SAMPLE: hos_lock::TripleBuffer<Sample> = hos_lock::TripleBuffer::new(Sample { seen: 0, strip: None, last: None });
+
+#[derive(Clone, Copy)]
+struct Sample {
+    /// The helper's count of links captured (`Helper::seen`).
+    seen: u32,
+    /// The strip's last combo for the recording host: none after a session clear.
+    strip: Option<Combo>,
+    /// *Save last combo*'s: the helper's, which it keeps across a clear.
+    last: Option<Combo>,
+}
 static RENDERER: Mutex<Renderer> = Mutex::new(Renderer::new());
 /// The target's name for the bar, and the names the menu shows (target, draft).
 static NAME: Mutex<Text> = Mutex::new(Text::EMPTY);
@@ -38,7 +50,7 @@ fn settings() -> Settings {
 /// fighter P1 is now: kept for the next save's `recorded_on` only; the helper grades whatever fighter P1 is.
 pub fn after_strip(tracker: &Tracker, p1_kind: Option<i32>) {
     P1_KIND.store(p1_kind.unwrap_or(-1), Ordering::Relaxed);
-    let (out, sample, names, stepped) = {
+    let (out, names, stepped) = {
         let mut helper = HELPER.lock();
         let names = pull_staged().map(|staged| {
             let (combo, text, label) = match staged {
@@ -62,8 +74,9 @@ pub fn after_strip(tracker: &Tracker, p1_kind: Option<i32>) {
         };
         let stepped = stepped.map(|s| (s, plan.as_deref().map_or(0, |p| p.generation)));
         drop(plan);
-        let sample = (helper.seen(), helper.last_combo());
-        (out, sample, names, stepped)
+        let last = helper.last_combo();
+        SAMPLE.write(Sample { seen: helper.seen(), strip: last, last });
+        (out, names, stepped)
     };
     if let Some((text, label)) = names {
         *NAME.lock() = text;
@@ -73,7 +86,6 @@ pub fn after_strip(tracker: &Tracker, p1_kind: Option<i32>) {
     if let Some((stepped, generation)) = stepped {
         report_step(stepped, generation);
     }
-    *SAMPLE.lock() = sample;
 }
 
 /// The run of the staged sequence: a new plan (another sequence, or its combos changed) starts over at combo 1 from
@@ -92,7 +104,7 @@ fn sequence_run<'a>(run: &'a mut Option<(u32, SequenceRun)>, plan: &SequenceStag
 
 /// The strip's session clear (leaving Training, a hot swap, a lobby change).
 pub fn session_clear() {
-    let (out, stepped, seen) = {
+    let (out, stepped) = {
         let mut helper = HELPER.lock();
         let plan = PLAN.lock();
         let (out, stepped) = match plan.as_deref() {
@@ -104,13 +116,13 @@ pub fn session_clear() {
             }
             None => (helper.clear(), None),
         };
-        (out, stepped, helper.seen())
+        SAMPLE.write(Sample { seen: helper.seen(), strip: None, last: helper.last_combo() });
+        (out, stepped)
     };
     report(out);
     if let Some((stepped, generation)) = stepped {
         report_step(stepped, generation);
     }
-    *SAMPLE.lock() = (seen, None);
 }
 
 /// A step of the drilled sequence was graded: its trace point, and the streak and best for the worker to save.
@@ -189,10 +201,11 @@ pub fn stage_sequence(plan: Option<(&crate::engine::rr_host::SequencePlan, bool)
     generation
 }
 
-/// The bar's view of the drilled sequence, copied under the locks (the HUD tick; nothing allocates).
-fn seq_view() -> Option<SeqView> {
-    let plan = PLAN.lock();
-    let plan = plan.as_deref()?;
+/// The bar's view of the drilled sequence, copied under the locks (the HUD tick; nothing allocates). `None` when the menu worker
+/// holds `PLAN` (`stage_sequence`): the HUD tick runs on the game's task workers and never waits for it.
+fn seq_view() -> Option<Option<SeqView>> {
+    let plan = PLAN.try_lock()?;
+    let Some(plan) = plan.as_deref() else { return Some(None) };
     let run = RUN.lock().filter(|(generation, _)| *generation == plan.generation).map(|(_, run)| run);
     let walk = run.map_or(SequenceWalk::resume(plan.steps.len(), plan.streak, plan.best), |run| run.walk());
     let steps = plan.steps.len();
@@ -203,7 +216,7 @@ fn seq_view() -> Option<SeqView> {
         *chip = plan.names.get(first + c).copied().unwrap_or(Text::EMPTY);
     }
     let last = run.and_then(|run| run.last());
-    Some(SeqView {
+    Some(Some(SeqView {
         name: plan.name,
         at,
         steps,
@@ -213,7 +226,7 @@ fn seq_view() -> Option<SeqView> {
         chips,
         last,
         last_name: last.and_then(|s| plan.names.get(s.step).copied()).unwrap_or(Text::EMPTY),
-    })
+    }))
 }
 
 /// A drilled sequence's step was graded (`report_step`): the step (0-based), what it did (1 next, 2 finished, 3
@@ -317,15 +330,15 @@ pub fn p1_kind() -> Option<i32> {
     (kind >= 0).then_some(kind)
 }
 
-/// *Save last combo* (worker): the open exchange when it has a link, else the one before.
+/// *Save last combo* (worker): the open exchange when it has a link, else the one before, as of the last frame.
 pub fn last_combo() -> Option<Combo> {
-    HELPER.lock().last_combo()
+    SAMPLE.read().0.last
 }
 
-/// The last combo published by the strip and the count of links captured, without taking the helper lock the frame
-/// hook holds.
+/// The last combo published by the strip and the count of links captured (worker).
 pub fn strip_sample() -> (u32, Option<Combo>) {
-    *SAMPLE.lock()
+    let (sample, _) = SAMPLE.read();
+    (sample.seen, sample.strip)
 }
 
 /// The worker read the saved-combo list (`tr_combo_listed_v1`).
@@ -344,48 +357,29 @@ pub fn saved(combo: &Combo) {
     tr_combo_saved_v1(combo.len() as u32, combo.get(0).map_or(i32::MIN, |l| verdict_value(l.verdict)), 0, 0);
 }
 
-/// A new target (worker): the helper starts over on it, and the bar shows its name.
+/// A new target (worker): staged, so the helper starts over on it at the next frame, and the menu shows its name at once.
 pub fn set_target(target: Option<(Combo, &str)>) {
-    HELPER.lock().set_target(target.map(|(combo, _)| combo));
+    stage_target(target);
     *NAME.lock() = Text::new(target.map_or("", |(_, name)| name));
     LABELS.lock().0 = Label::new(target.map_or("", |(_, name)| name));
 }
 
-/// A drill the menu worker staged for the frame hook. The hook holds `HELPER`; the worker must not.
-struct StagedTarget {
-    seq: AtomicU32,
-    value: core::cell::UnsafeCell<Option<(Combo, Text, Label)>>,
-}
-
-// The seqlock below is the synchronization. One menu worker writes; the frame hook reads.
-unsafe impl Sync for StagedTarget {}
-
-static STAGED: StagedTarget = StagedTarget {
-    seq: AtomicU32::new(0),
-    value: core::cell::UnsafeCell::new(None),
-};
+/// A drill the menu worker staged for the frame hook. The hook holds `HELPER`; the worker must not. `hos_lock::Published`: the
+/// worker publishes (it may wait for a reader to leave the other slot), the hook copies out what is newer than it last saw and
+/// never waits (docs lane review R1, finding 5: the hand-rolled seqlock here lacked its fences).
+static STAGED: hos_lock::Published<Option<(Combo, Text, Label)>> = hos_lock::Published::new(None);
+/// The `STAGED` generation the frame hook installed last (0: nothing staged yet).
 static STAGED_SEEN: AtomicU32 = AtomicU32::new(0);
 
-/// Publish a grade target without taking `HELPER`. The next `after_strip` installs it.
+/// Publish a grade target without taking `HELPER` (the menu worker: the drill, `ui::worker`, and the combo panel's target,
+/// `set_target`). The next `after_strip` installs it.
 pub fn stage_target(target: Option<(Combo, &str)>) {
-    let packed = target.map(|(combo, name)| (combo, Text::new(name), Label::new(name)));
-    let prev = STAGED.seq.fetch_add(1, Ordering::Relaxed);
-    unsafe { *STAGED.value.get() = packed; }
-    STAGED.seq.store(prev.wrapping_add(2), Ordering::Release);
+    STAGED.publish(target.map(|(combo, name)| (combo, Text::new(name), Label::new(name))));
 }
 
 /// `Some` when a staged target is ready: `Some(None)` clears, `Some(Some(_))` installs.
 fn pull_staged() -> Option<Option<(Combo, Text, Label)>> {
-    let seq = STAGED.seq.load(Ordering::Acquire);
-    if seq & 1 == 1 || seq == STAGED_SEEN.load(Ordering::Relaxed) {
-        return None;
-    }
-    let value = unsafe { *STAGED.value.get() };
-    if STAGED.seq.load(Ordering::Acquire) != seq {
-        return None;
-    }
-    STAGED_SEEN.store(seq, Ordering::Relaxed);
-    Some(value)
+    STAGED.read_if_newer(&STAGED_SEEN)
 }
 
 /// The draft name the next save uses (worker).
@@ -403,10 +397,13 @@ pub fn on_layout_registered() {
     RENDERER.lock().invalidate();
 }
 
-/// One HUD tick: the bar's writes, shown with the strip while the helper is On and has a target.
+/// One HUD tick: the bar's writes, shown with the strip while the helper is On and has a target. It runs on the UI pass, on the
+/// game's task workers (`anchors::ui_pass_calculate`), and the menu worker writes `NAME` and `PLAN` (`stage_sequence`,
+/// `set_target`): it takes them, and `HELPER`, with `try_lock`, and on contention writes nothing this pass (the bar keeps its
+/// panes; the next pass draws). Waiting would be the rc.6 freeze (`rc6-qpf3`; docs lane review R1, finding 1 and its addendum).
 pub fn hud_tick(strip_shown: bool, apply: impl FnMut(usize, &Look, Changed)) -> usize {
-    let helper = *HELPER.lock();
-    let name = *NAME.lock();
-    let seq = seq_view();
+    let Some(helper) = HELPER.try_lock().map(|helper| *helper) else { return 0 };
+    let Some(name) = NAME.try_lock().map(|name| *name) else { return 0 };
+    let Some(seq) = seq_view() else { return 0 };
     RENDERER.lock().draw(&helper, &name, seq.as_ref(), strip_shown, apply)
 }
