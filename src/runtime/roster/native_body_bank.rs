@@ -175,7 +175,7 @@ use crate::engine::swap::body_bank::{
     count_extra_groups_iter, dispatcher_array_header_ok, dispatcher_idle_words, native_group_request, original_bankable,
     original_form_bankable, pair_request, pair_resource_references, plan_extra_groups_with, prefetch_outcome, info_wrapper,
     swap_commit_index_in, async_build_eligible, construction_task, TickGap,
-    background_build_eligible, next_background, BACKGROUND_INFO_SPANS, trainer_task, HolderStep, object_rearm_due, object_ready,
+    background_build_eligible, next_background, next_step, NextStep, BACKGROUND_INFO_SPANS, trainer_task, HolderStep, object_rearm_due, object_ready,
     PT_OBJECT_KIND,
     GroupBudget, GroupExchange, GroupOwner, GroupPolicy, GroupState, Hold, Members, Phase, Special,
     SpecialPolicy, BANK_FLAG, MAX_EXTRA_GROUPS, NANA, NATIVE_MEMBERS, PAIR_ACTIVE_FLAG, POOL_RESERVE, POPO,
@@ -2008,6 +2008,9 @@ struct GroupData {
     kirby_logged: bool,
     /// One-shot "deferred: process memory held by admitted groups" diagnostic (GS-PANIC).
     memory_logged: bool,
+    /// The last memory admission of this Planned group deferred it; until its prefetch starts, owed background builds
+    /// go first (`body_bank::next_step`).
+    memory_deferred: bool,
     /// Committed process charge when the prefetch was admitted (its measured cost is logged when it settles).
     prefetch_committed: Option<u64>,
     /// The Mii identity a `Special::Mii` group carries (`None` otherwise), with
@@ -2046,7 +2049,7 @@ impl GroupData {
         let (identity, configuration) = identity.map_or((None, None), |(i, c)| (Some(i), Some(c)));
         Self { state: GroupState::Planned, saved: None,
             bodies: [Body::default(); NATIVE_MEMBERS], since_us: 0, busy_logged: false, kirby_logged: false,
-            memory_logged: false, prefetch_committed: None,
+            memory_logged: false, memory_deferred: false, prefetch_committed: None,
             identity, configuration, charinfo_published: false, publish: PublishAttempts::new(), background_refused: false,
             leaving: false, release_now: false, parked_kept: 0, object_held: false, object_refused: false, prepare_refused: false }
     }
@@ -5762,13 +5765,13 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
             let start = crate::engine::swap::body_bank::next_start(bank.groups.iter()
                 .map(|g| (g.state, g.identity.is_none() || g.charinfo_published)), bank.held_turn);
             // rc.6 item 3: every planned group's prefetch first, then the background builds of the prefetched ones;
-            // a group held for capacity is retried only when no background build is owed.
-            match (start, background_candidate(bank, live)) {
-                (Some(group), _) if bank.groups[group].state == GroupState::Planned =>
-                    Step::Start(group, *bank.groups[group].members, bank.alias, false),
-                (_, Some(group)) => Step::Background(group),
-                (Some(group), None) => Step::Start(group, *bank.groups[group].members, bank.alias, false),
-                (None, None) => Step::Idle,
+            // a group held for capacity, or deferred for what admitted groups hold, is retried only when no background
+            // build is owed (`body_bank::next_step`).
+            let start = start.map(|group| (group, bank.groups[group].state, bank.groups[group].memory_deferred));
+            match next_step(start, background_candidate(bank, live)) {
+                Some(NextStep::Prefetch(group)) => Step::Start(group, *bank.groups[group].members, bank.alias, false),
+                Some(NextStep::Background(group)) => Step::Background(group),
+                None => Step::Idle,
             }
         };
         // Primary 2026-11-09 07:17Z and 07:34Z: a foreground request waiting for INSTALL alone is served next
@@ -6005,6 +6008,7 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
                 Admission::Defer => {
                     let mut state = BANKS[role].lock();
                     if let Some(g) = state.as_mut().and_then(|bank| bank.groups.get_mut(group)) {
+                        g.memory_deferred = true;
                         if !g.memory_logged {
                             g.memory_logged = true;
                             trace!("[GroupSwap] prefetch deferred owner={} group={} kinds={:x?} reason=process memory held by admitted groups headroom={:?} outstanding={} need={} prefetch={} build={}",
@@ -6087,6 +6091,7 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
             let mut state = BANKS[role].lock();
             let Some(bank) = state.as_mut() else { super::finish_install(token, "group prefetch bank vanished"); return; };
             bank.groups[group].state = GroupState::Prefetching;
+            bank.groups[group].memory_deferred = false;
             bank.groups[group].since_us = now;
             bank.groups[group].prefetch_committed = sample.committed.get();
             bank.prefetch = Some((group, token, now));

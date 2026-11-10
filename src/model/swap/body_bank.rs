@@ -885,6 +885,29 @@ pub fn next_background(groups: impl Iterator<Item = (GroupState, Members, bool)>
         .map(|(i, _)| i)
 }
 
+/// What a role's group lifecycle starts next (`native_body_bank::group_lifecycle`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum NextStep {
+    Prefetch(usize),
+    Background(usize),
+}
+
+/// rc.6 item 3: every planned group's prefetch first, then the background builds of the prefetched ones; a group held
+/// for capacity is retried only when no background build is owed. `start` is [`next_start`]'s group with its state and
+/// whether its last memory admission deferred it ([`memory::Admission::Defer`]); `background` is [`next_background`]'s.
+/// A deferred group waits for what admitted groups still hold, which their builds spend, so it ranks like a held one.
+/// Ranked first, it kept the owed background builds from starting, and so waited on them for good: rc.7
+/// `final-surface-i3-nt-7d720c68` (integration FLAG 3, 2026-11-10 21:53Z), both roles' second prefetch deferred and their
+/// prefetched pair groups unbuilt for 170 s.
+pub fn next_step(start: Option<(usize, GroupState, bool)>, background: Option<usize>) -> Option<NextStep> {
+    match (start, background) {
+        (Some((group, GroupState::Planned, false)), _) => Some(NextStep::Prefetch(group)),
+        (_, Some(group)) => Some(NextStep::Background(group)),
+        (Some((group, _, _)), None) => Some(NextStep::Prefetch(group)),
+        (None, None) => None,
+    }
+}
+
 /// Primary 2026-11-09 07:17Z (item 3 is about fast switching, and right after Training loads is when the builds run)
 /// and 07:34Z (no timeout: exactly the steps that serve the press go first): a foreground request that waits for INSTALL
 /// and for nothing else (a P1 or CPU press with the roster or a Mii owner, a hat request's source load) is served next.
@@ -3666,6 +3689,80 @@ mod tests {
         assert_eq!(reload_window(full, gw, true, 10, Some(GAME_WATCH)).map(|m| m.count()), Some(1));
         assert_eq!(reload_window(full, gw, false, 10, Some(GAME_WATCH)), full);
         assert_eq!(reload_window(full, gw, true, 0, Some(GAME_WATCH)), full);
+    }
+
+    #[test]
+    fn a_prefetch_deferred_for_memory_lets_the_owed_background_build_go_first() {
+        use super::memory::{admit, group_cost, Admission};
+        // rc.7 `final-surface-i3-nt-7d720c68` (integration FLAG 3, 2026-11-10 21:53Z): P1's window [Mario, DK, Link] and
+        // its plan, the pair group then [Samus]. The pair group was prefetched (#330); [Samus]'s prefetch deferred (#345,
+        // headroom 565 MB, outstanding 478 MB: both roles' pair groups' builds). The CPU's plan did the same (#346).
+        const SAMUS: u32 = 0x03;
+        let window = Members::new(&[0x00, 0x01, 0x02]).unwrap();
+        let groups = [(GroupState::Prefetched, Members::pair_group(), false), (GroupState::Planned, Members::new(&[SAMUS]).unwrap(), false)];
+        assert_eq!(admit(Some(565_465_088), 478_642_176, group_cost(&[SAMUS])).admission, Admission::Defer);
+        let start = next_start(groups.iter().map(|(state, _, _)| (*state, true)), 0);
+        let background = next_background(groups.iter().copied(), window, LiveIdentity::Ordinary, false, false, false);
+        assert_eq!((start, background), (Some(1), Some(0)));
+        // The deferral waits for that build, so the build goes first. Before, the deferred prefetch was picked on every
+        // tick and nothing ran for 170 s, until P1's switch to Ice Climbers built the pair group in the foreground.
+        assert_eq!(next_step(Some((1, GroupState::Planned, true)), background), Some(NextStep::Background(0)));
+        // Admitted (`889919e1`, 666 MB of headroom): the planned prefetch first, as rc.6 item 3 orders it.
+        assert_eq!(admit(Some(663_179_264), 478_642_176, group_cost(&[SAMUS])).admission, Admission::Admit);
+        assert_eq!(next_step(Some((1, GroupState::Planned, false)), background), Some(NextStep::Prefetch(1)));
+        // With no build owed, the deferred prefetch is tried again; a held group still waits for owed builds.
+        assert_eq!(next_step(Some((1, GroupState::Planned, true)), None), Some(NextStep::Prefetch(1)));
+        assert_eq!(next_step(Some((1, GroupState::Held(Hold::Memory), false)), Some(0)), Some(NextStep::Background(0)));
+        assert_eq!(next_step(Some((1, GroupState::Held(Hold::Memory), false)), None), Some(NextStep::Prefetch(1)));
+        assert_eq!(next_step(None, None), None);
+    }
+
+    #[test]
+    fn both_banks_with_a_deferred_group_build_then_admit_it() {
+        use super::memory::{admit, group_cost, outstanding, Admission};
+        // Primary 2026-11-10 22:15Z: both banks hold a deferred Planned group behind a Prefetched one, and both must make
+        // progress. `final-surface-i3-nt-7d720c68` at #346: each bank's pair group Prefetched and one member Planned (P1
+        // [Samus], the CPU [0xf]), 565 MB of headroom. Each step spends at most what the run measured: a prefetch 57 MB
+        // (#331), a build 18 MB (#709).
+        const PREFETCH_SPEND: u64 = 57_147_392;
+        const BUILD_SPEND: u64 = 18_153_472;
+        let window = Members::new(&[0x00, 0x01, 0x02]).unwrap();
+        let groups = [[Members::pair_group(), Members::new(&[0x03]).unwrap()], [Members::pair_group(), Members::new(&[0x0f]).unwrap()]];
+        let cost = |m: Members| group_cost(&m.kinds()[..m.count()]);
+        let held = |states: &[[GroupState; 2]; 2]| (0..2).flat_map(|r| (0..2).map(move |g| (r, g)))
+            .map(|(r, g)| outstanding(states[r][g], cost(groups[r][g]))).sum::<u64>();
+        let mut states = [[GroupState::Prefetched, GroupState::Planned]; 2];
+        let mut deferred = [false; 2];
+        let mut headroom = 565_465_088u64;
+        assert_eq!(held(&states), 478_642_176, "the run's outstanding: both pair groups' builds");
+        let mut admitted = [None; 2];
+        for tick in 0..8 {
+            for role in 0..2 {
+                let start = next_start(states[role].iter().map(|state| (*state, true)), 0);
+                let background = next_background(states[role].iter().zip(groups[role]).map(|(state, members)| (*state, members, false)),
+                    window, LiveIdentity::Ordinary, false, false, false);
+                match next_step(start.map(|g| (g, states[role][g], g == 1 && deferred[role])), background) {
+                    Some(NextStep::Background(g)) => {
+                        states[role][g] = GroupState::Built;
+                        headroom -= BUILD_SPEND;
+                    }
+                    Some(NextStep::Prefetch(g)) => match admit(Some(headroom), held(&states), cost(groups[role][g])).admission {
+                        Admission::Admit => {
+                            states[role][g] = GroupState::Prefetched;
+                            deferred[role] = false;
+                            headroom -= PREFETCH_SPEND;
+                            admitted[role].get_or_insert(tick);
+                        }
+                        Admission::Defer => deferred[role] = true,
+                        Admission::Refuse => states[role][g] = GroupState::Held(Hold::Memory),
+                    },
+                    None => {}
+                }
+            }
+        }
+        // Tick 0 defers both (as at #345/#346), tick 1 builds both pair groups, tick 2 admits both deferred groups.
+        assert_eq!(admitted, [Some(2), Some(2)], "{states:?}");
+        assert_eq!(states, [[GroupState::Built; 2]; 2]);
     }
 
     #[test]

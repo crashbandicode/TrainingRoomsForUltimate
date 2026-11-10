@@ -126,8 +126,14 @@ fn the_lifecycle_starts_and_settles_it_and_the_gate_needs_both_paths() {
     // Inbox 22:17Z: each entry step names itself for its `slow step` line.
     assert!(BANK.contains("Action::Background => { settle_background(entry, owner, role); \"background settle\" }"));
     let lifecycle = body(BANK, "unsafe fn group_lifecycle(");
-    ordered(lifecycle, &["(Some(group), _) if bank.groups[group].state == GroupState::Planned =>",
-        "(_, Some(group)) => Step::Background(group),", "Step::Background(group) => start_background(entry, owner, role, group),"]);
+    // rc.7 (FLAG 3, `final-surface-i3-nt-7d720c68`): a prefetch deferred for memory ranks like a held one
+    // (`body_bank::next_step`, host-tested in `a_prefetch_deferred_for_memory_lets_the_owed_background_build_go_first`).
+    ordered(lifecycle, &["let start = start.map(|group| (group, bank.groups[group].state, bank.groups[group].memory_deferred));",
+        "match next_step(start, background_candidate(bank, live)) {",
+        "Some(NextStep::Background(group)) => Step::Background(group),",
+        "Step::Background(group) => start_background(entry, owner, role, group),",
+        "Admission::Defer => {", "g.memory_deferred = true;",
+        "bank.groups[group].state = GroupState::Prefetching;", "bank.groups[group].memory_deferred = false;"]);
     let candidate = body(BANK, "fn background_candidate(");
     assert!(candidate.contains("|| bank.background.is_some() { return None; }"), "{candidate}");
     // SPECIAL-GROUPS §0 X1/X4: the live window takes part in the rule; X6, with the owner's ordinary baseline beside a Mii.
@@ -166,7 +172,7 @@ const MODEL: &str = include_str!("../src/model/swap/body_bank.rs");
 fn a_waiting_press_holds_every_speculative_step_but_its_own() {
     let lifecycle = body(BANK, "unsafe fn group_lifecycle(");
     ordered(lifecycle, &["let foreground = super::foreground(role, entry, owner);", "note_foreground(owner, foreground);",
-        "let mut state = BANKS[role].lock();", "(_, Some(group)) => Step::Background(group),",
+        "let mut state = BANKS[role].lock();", "Some(NextStep::Background(group)) => Step::Background(group),",
         "Step::Start(..) | Step::Background(_) | Step::Rearm(..) | Step::Prepare(..)",
         "if speculative_step_admitted(foreground.waiting).is_err() =>",
         "match foreground.target.and_then(|target| serving_group(base, bank, target, live)) {",

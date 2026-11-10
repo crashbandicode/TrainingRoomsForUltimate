@@ -1372,3 +1372,11 @@ ceiling = 163142
 date = "2026-11-10"
 reason = "rc.7 p23/rc7-mismatch-role over 1c474c40 (163111): the Fighter Mismatch role fix (hot-slots 2026-11-10 18:58Z, primary 19:30Z): the prompt's side, MismatchAsk.role, two host tests and the frame test; measured 163142 at 7b2a42b9 (tools/size_gate.py), +31"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.7 order (TASK-rc7.md); a raise goes in its own commit with approved_by"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 163161
+date = "2026-11-10"
+reason = "rc.7 p23/rc7-nt-fix over 7d720c68 (163142): the FLAG 3 scheduler fix (integration 2026-11-10 21:53Z, primary 21:55Z): body_bank::next_step and NextStep, GroupData::memory_deferred, two host tests; measured 163161 at a5be07da (tools/size_gate.py), +19"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.7 order (TASK-rc7.md); a raise goes in its own commit with approved_by"
