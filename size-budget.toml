@@ -1324,3 +1324,11 @@ ceiling = 162596
 date = "2026-11-10"
 reason = "rc.6 p23/rc6-lockfree with p23/rc6-integration e6501ac6 merged (20467b8c, integration 2026-11-10 09:14Z: the lock-free runtime compared against the shipped base): e6501ac6's 162094 plus the lock-free runtime's own +502 over a5bef175 (its raise 161567 to 162071, here measured on the merge); measured 162596 at 20467b8c (tools/size_gate.py)"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7; restated for this work in TASK-OPUS-rc6-lockfree: 'The ceiling may rise with approved_by (the operator: raise as needed)'); the combined ceiling of the two branches' own approved raises; a raise goes in its own commit with approved_by"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 162882
+date = "2026-11-10"
+reason = "rc.7 item 3, p23/rc7-kirby-unguard 3e6ecff1 over 732663e2 (162596): D-KIRBY1's root fix F1 (TASK-rc7.md, operator order about 12:30Z; primary 12:32Z), the bank owns the G68 step of the releases it causes: runtime::roster::g68_step (the 0x17e87ac hook and its per-thread slots), the tail hook's arming, r_handle's release marker and lease record, the gates lifted through capabilities::d_kirby1_live/d_kirby1_applies and Rules::OWNED_G68, and the swap model's Policy::Owned scene; measured 162882 at 3e6ecff1 (tools/size_gate.py), +286"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the operator's rc.7 order (TASK-rc7.md: 'ship the rc7 and as part of it include A's fix, the lock refactor and the kirby guard removal'); a raise goes in its own commit with approved_by"
