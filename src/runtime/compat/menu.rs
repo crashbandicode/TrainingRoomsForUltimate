@@ -10,6 +10,7 @@
 //! differ back into the settings the menu opens on (`ui::worker::adopt_typed`), which the writer thread persists.
 
 use std::ops::{Deref, DerefMut};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use hos_lock::Mutex;
 
@@ -81,15 +82,33 @@ impl Readable for Menu {
     }
 }
 
-/// A game-side typed menu edit waiting for the menu worker. Saved defaults
-/// belong exclusively to the menu model's current/default snapshot pair.
-static PENDING: Mutex<Option<TrainingModpackMenu>> = Mutex::new(None);
+/// A typed menu edit waiting for the menu worker's writeback, one wait-free triple buffer per writer side: game threads (`store`,
+/// serialised by `EDITED`) and the publishing path (`after_publish`, under `published::PUBLISHING`); the menu worker is the one
+/// reader. Each value is stamped from `WRITEBACK_STAMP` as it is written, and the worker adopts the newest
+/// (`model::menu_writeback`). rc.8 §6: this was one `PENDING` mutex that `store` took on a game thread (the native service's poll,
+/// `sync_selection`) while the menu worker could hold it, the rc.6 freeze class. Saved defaults belong exclusively to the menu
+/// model's current/default snapshot pair.
+static GAME_WRITEBACK: hos_lock::TripleBuffer<Option<(u64, TrainingModpackMenu)>> = hos_lock::TripleBuffer::new(None);
+static PUBLISH_WRITEBACK: hos_lock::TripleBuffer<Option<(u64, TrainingModpackMenu)>> = hos_lock::TripleBuffer::new(None);
+static WRITEBACK_STAMP: AtomicU64 = AtomicU64::new(0);
+/// The stamp the menu worker adopted last (the worker's own).
+static ADOPTED: AtomicU64 = AtomicU64::new(0);
 
+fn writeback_stamp() -> u64 {
+    WRITEBACK_STAMP.fetch_add(1, Ordering::Relaxed) + 1
+}
+
+/// The menu worker: adopt the newest edit waiting for writeback, read in place. Never waits.
 pub fn flush_writeback() {
-    let menu = PENDING.lock().take();
-    if let Some(menu) = menu {
-        crate::runtime::ui::worker::adopt_typed(false, &menu.rows(), &menu.kept_values());
-    }
+    GAME_WRITEBACK.with_latest(|game, game_fresh| {
+        PUBLISH_WRITEBACK.with_latest(|publish, publish_fresh| {
+            let read = [(game, game_fresh), (publish, publish_fresh)];
+            if let Some((stamp, menu)) = crate::model::menu_writeback::newest(&read, ADOPTED.load(Ordering::Relaxed)) {
+                ADOPTED.store(*stamp, Ordering::Relaxed);
+                crate::runtime::ui::worker::adopt_typed(false, &menu.rows(), &menu.kept_values());
+            }
+        })
+    });
 }
 
 /// Store a game-side edit, then ask the existing worker to persist its changed rows.
@@ -100,9 +119,11 @@ fn store(menu: TrainingModpackMenu) {
         let mut edited = EDITED.lock();
         *edited = edit;
         EDIT_HANDOFF.write(edit);
+        if changed {
+            GAME_WRITEBACK.write(Some((writeback_stamp(), menu)));
+        }
     }
     if changed {
-        *PENDING.lock() = Some(menu);
         crate::runtime::ui::worker::request_writeback();
     }
 }
@@ -183,7 +204,7 @@ pub(crate) fn before_publish(published: TrainingModpackMenu, previous: Option<Tr
 /// has nothing to compare with.
 pub(crate) fn after_publish(published: TrainingModpackMenu, next: TrainingModpackMenu, previous: Option<TrainingModpackMenu>) {
     if next != published {
-        *PENDING.lock() = Some(next);
+        PUBLISH_WRITEBACK.write(Some((writeback_stamp(), next)));
         crate::runtime::ui::worker::request_writeback();
     }
     if let Some(previous) = previous.filter(|previous| *previous != next) {

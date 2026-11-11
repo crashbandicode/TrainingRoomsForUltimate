@@ -1388,3 +1388,11 @@ ceiling = 163293
 date = "2026-11-11"
 reason = "rc.7 integration: p23/rc7-svc-clobber (+2, the boot-crash fix, clobber_abi(\"C\") on hos-lock's two arbiter svcs; 163163 at 06f89f98) and p23/rc7-service-frame (+130, the FLAG 6 fix; 163291 at 07af455a), both over b3678dfe (163161), merged in p23/rc7-final (integration 2026-11-11 02:35Z): 163293"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.7 order (TASK-rc7.md); a raise goes in its own commit with approved_by"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 163320
+date = "2026-11-11"
+reason = "rc.8 p23/rc8-lock-walk over 3c7d43a1 (163293): TASK-rc8 section 6 (primary 2026-11-11 03:30Z), the typed menu writeback wait-free (two triple buffers read in place, the stamp, model::menu_writeback); measured 163320 at 02525cba (tools/size_gate.py), +27"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.8 order (TASK-rc8.md); a raise goes in its own commit with approved_by"

@@ -227,7 +227,8 @@ impl<'g> Ctx<'g> {
                         let local = all.iter().any(|&o| self.graph.funcs[o].file == f.file);
                         !local || callee.file == f.file
                     }
-                    Some("self" | "Self" | "super" | "crate") => callee.file == f.file,
+                    Some("super") => callee.file == self.graph.super_file(f),
+                    Some("self" | "Self" | "crate") => callee.file == f.file,
                     // A `#[path]` module declared under another name (`body_bank` is `native_body_bank.rs`).
                     Some(q) if self.graph.declared_module(&f.file, q).is_some() => self.graph.declared_module(&f.file, q) == Some(callee.module.as_str()),
                     Some(q) if q == callee.module => true,
@@ -1182,6 +1183,8 @@ fn shared_locks(ctx: &Ctx, s: &Scan) -> Shared {
 /// function values; `the_shared_lock_check_sees_a_seeded_hazard` runs the same predicate on a seeded fixture.
 #[test]
 fn no_lock_a_game_hook_waits_on_is_held_by_a_plugin_thread() {
+    // Both builds are checked before it fails, so one run lists every such lock.
+    let mut failures = Vec::new();
     for (build, graph) in [("shipped", runtime_graph()), ("diag", diag_runtime_graph())] {
         let (ctx, s) = scan(&graph);
         let shared = shared_locks(&ctx, &s);
@@ -1196,13 +1199,15 @@ fn no_lock_a_game_hook_waits_on_is_held_by_a_plugin_thread() {
             })
             .collect();
         println!("SHARED-LOCKS {build} {}", problems.len());
-        assert!(
-            problems.is_empty(),
-            "{build} build: locks a game entry waits on that a plugin thread can hold ({}):\n{}",
-            problems.len(),
-            problems.join("\n")
-        );
+        if !problems.is_empty() {
+            failures.push(format!(
+                "{build} build: locks a game entry waits on that a plugin thread can hold ({}):\n{}",
+                problems.len(),
+                problems.join("\n")
+            ));
+        }
     }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
 
 /// The diag build's call graph (`runtime_graph` plus the `#[cfg(feature = "diag")]` modules).
@@ -1419,6 +1424,44 @@ fn the_native_service_dispatch_hands_its_halves_to_the_walk() {
     assert!(value_edges(&graph).iter().any(|&(f, _, to)| f == from && to == pre), "the dispatch no longer hands pre to the walk");
     let (ctx, _) = scan(&graph);
     assert!(calls(&graph.funcs[from].body).iter().any(|c| ctx.resolve(from, c).contains(&post)), "the dispatch no longer calls post");
+}
+
+/// rc.8 §6 (A's 2026-11-11 03:01Z finding): `super::name` at a file's top level is the declaring file's `name`, also across a
+/// `#[path]` child declared under another name; inside an inline `mod {}` it stays in the file. Both resolvers read it so: the call
+/// graph's and `Ctx::resolve`. They took `super` as the same file, so `native_service.rs`'s `super::service` resolved to nothing.
+#[test]
+fn super_means_the_declaring_file() {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/super_path");
+    let graph = Graph::scan(&dir, &[]);
+    let ctx = Ctx::new(&graph, static_locks(&dir));
+    let one = |key: &str| -> usize {
+        let found = graph.find(key);
+        assert_eq!(found.len(), 1, "{key}: {found:?}");
+        found[0]
+    };
+    let service = one("parent::service");
+    for caller in ["renamed_child::dispatch", "plain::poll", "inline::caller"] {
+        let f = one(caller);
+        assert_eq!(graph.callees(f).into_iter().collect::<Vec<_>>(), vec![service], "{caller}: the call graph");
+        let resolved: Vec<usize> = calls(&graph.funcs[f].body).iter().flat_map(|c| ctx.resolve(f, c)).collect();
+        assert_eq!(resolved, vec![service], "{caller}: Ctx::resolve");
+    }
+}
+
+/// rc.8 §6: the poll the native service dispatch runs (`pre` → `super::service` → `character_roster::service` → …) is walked as
+/// the dispatch's, a game entry's: its lock takes are game waits. Before the `super` fix the walk saw only the owners' gates and
+/// leaves, and `compat/menu.rs::PENDING` (taken through `sync_selection` → `menu::store`) was a shared lock nobody saw.
+#[test]
+fn the_native_service_poll_is_walked_from_its_dispatch() {
+    let graph = runtime_graph();
+    let dispatch = "native_service::training_mod_native_service_dispatch";
+    let poll: Vec<String> =
+        graph.funcs.iter().filter(|f| f.file.ends_with("character_sources.rs") && f.name == "service").map(|f| f.key()).collect();
+    assert_eq!(poll.len(), 1, "the poll's sources::service: {poll:?}");
+    let (ctx, s) = scan(&graph);
+    let shared = shared_locks(&ctx, &s);
+    let want = format!("{} (hook {dispatch})", poll[0]);
+    assert!(shared.game_waits.values().any(|w| w.contains(&want)), "the poll's lock takes are not walked from the dispatch: {want}");
 }
 
 /// R2 finding 5's guard: every game entry and every plugin thread's entry resolves to a function on its module path, or is listed in
