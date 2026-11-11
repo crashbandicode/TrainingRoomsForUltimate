@@ -154,6 +154,7 @@ fn env() -> Env {
         replay_capture: writer::replay_capture(),
         combo_target: crate::runtime::features::combo::labels().0,
         combo_draft: crate::runtime::features::combo::labels().1,
+        build_tag: crate::model::frame::BUILD_TAG,
         ..Env::default()
     }
 }
