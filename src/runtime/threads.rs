@@ -157,9 +157,30 @@ mod imp {
             parts.busy.store(false, Ordering::Release);
             return Err(io::Error::other(format!("nn::os::CreateThread failed: {result:#x}")));
         }
+        // Proposal (rc.8 "Add New…" hang, defence in depth): off the MainThread's core, so neither can starve the other
+        // (`thread_stacks::plugin_core_mask`). No core left: the SDK's default, as before.
+        // SAFETY: reads the process's core mask; nothing is written.
+        let available = unsafe { nn::os::GetThreadAvailableCoreMask() };
+        if let Some((ideal, mask)) = thread_stacks::plugin_core_mask(available, thread_stacks::MAIN_CORE) {
+            // SAFETY: the thread was just created and is not started; the mask holds only cores the process may use.
+            unsafe { SetThreadCoreMask(parts.object, ideal, mask) };
+        }
+        #[cfg(feature = "diag")]
+        crate::engine::compat::logging::diagnostic(format_args!(
+            "[ThreadCores] name={} available={available:#x} cores={:?}",
+            name.to_str().unwrap_or("?"),
+            thread_stacks::plugin_core_mask(available, thread_stacks::MAIN_CORE)
+        ));
         // SAFETY: the object was just created; the name is a static C string.
         unsafe { nn::os::SetThreadNamePointer(parts.object, name.as_ptr().cast()) };
         Ok(parts)
+    }
+
+    extern "C" {
+        /// `nn::os::SetThreadCoreMask(ThreadType*, int idealCore, Bit64 affinityMask)`, exported by the game's `sdk`
+        /// (13.0.5: `_ZN2nn2os17SetThreadCoreMaskEPNS0_10ThreadTypeEim`); nnsdk-rs has no binding for it.
+        #[link_name = "\u{1}_ZN2nn2os17SetThreadCoreMaskEPNS0_10ThreadTypeEim"]
+        fn SetThreadCoreMask(thread: *mut nn::os::ThreadType, ideal_core: i32, affinity_mask: u64);
     }
 
     /// A detached thread's argument: the closure, boxed (in the shipped build a closure without captures is a zero-sized

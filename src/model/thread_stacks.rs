@@ -248,6 +248,23 @@ pub const fn free_stack(held: u32, count: usize) -> Option<usize> {
 /// The size of `nn::os::ThreadType` the static thread objects reserve (the SDK's 0x1c0, as the playbook's plugins use).
 pub const THREAD_OBJECT_BYTES: usize = 0x1c0;
 
+/// The core the game's MainThread runs on. Proposal (rc.8 "Add New…" hang, defence in depth): every GDB dump of a frozen
+/// b showed it there (`rc6-qpf3` 2026-11-09, B's 2026-11-11 host-thread sample: `CPUCore_0` pegged), and the diag build
+/// logs the core each plugin thread and the boot thread start on (`[ThreadCores]`).
+pub const MAIN_CORE: u32 = 0;
+
+/// The cores plugin threads may use: 1-3.
+pub const PLUGIN_CORES: u64 = 0b1110;
+
+/// Where a plugin thread runs, from the process's available core mask: `(ideal core, affinity mask)`, the cores 1-3 the
+/// process may use minus the MainThread's, ideal the lowest of them. `None` (keep the SDK's default, the creator's
+/// core) when none is left. A plugin thread there can't starve the MainThread, and the MainThread spinning can't starve
+/// it (rc.6 and rc.8 freezes: a plugin thread "Runnable, never scheduled" on core 0 under a busy MainThread).
+pub const fn plugin_core_mask(available: u64, main_core: u32) -> Option<(i32, u64)> {
+    let mask = available & PLUGIN_CORES & !(1u64 << main_core);
+    if mask == 0 { None } else { Some((mask.trailing_zeros() as i32, mask)) }
+}
+
 /// The smallest stack a row may have: the larger of its static bound and its measured high-water mark, plus a quarter, plus
 /// the SDK reserve, rounded up to a page.
 #[cfg(test)]

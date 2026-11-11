@@ -83,6 +83,26 @@ fn a_service_stack_is_claimed_lowest_first_and_never_twice() {
 }
 
 #[test]
+fn plugin_threads_keep_off_the_main_threads_core() {
+    use thread_stacks::{plugin_core_mask, MAIN_CORE};
+    // An application allowed cores 0-2 (or 0-3): the plugin threads get 1-2 (1-3), ideal core 1.
+    assert_eq!(plugin_core_mask(0b0111, MAIN_CORE), Some((1, 0b0110)));
+    assert_eq!(plugin_core_mask(0b1111, MAIN_CORE), Some((1, 0b1110)));
+    // Never core 0, never a core the process may not use.
+    for available in 0..16u64 {
+        if let Some((ideal, mask)) = plugin_core_mask(available, MAIN_CORE) {
+            assert_eq!(mask & 1, 0);
+            assert_eq!(mask & !available, 0);
+            assert_ne!(mask & (1 << ideal), 0);
+        }
+    }
+    // Only the MainThread's core available: the SDK default stays (the creator's core).
+    assert_eq!(plugin_core_mask(0b0001, MAIN_CORE), None);
+    // A MainThread found elsewhere is left alone too.
+    assert_eq!(plugin_core_mask(0b0111, 1), Some((2, 0b0100)));
+}
+
+#[test]
 fn the_fault_s_numbers_fail_the_rule() {
     // tr-trace-writer before the fix: thread_start 112 + shim 16 + body 59,712 B (diag ELF of 27d84f4) on 64 KiB.
     assert!(thread_stacks::required(59_840, 0) > 64 * 1024);
