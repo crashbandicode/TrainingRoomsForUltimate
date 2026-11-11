@@ -72,7 +72,7 @@ pub const THREADS: [ThreadStack; 18] = [
     // and receipts, diag hook_stats and stack reports
     row(ThreadId::Heartbeat, c"tr-heartbeat", 32 * KIB, 8_096, 11_840, "Eden st-02..st-12, f6-37/sh-01, final-surface-cov-4e336da4", "diag_log::start_drain_thread::{closure#0}"),
     // settings.json read, recovery and the JSON parse, joined by the boot thread
-    row(ThreadId::SettingsLoad, c"tr-settings-load", 32 * KIB, 4_656, 9_904, "Eden st-02..st-12, f6-37/sh-01/s6-10", "boot::load_settings_boxed"),
+    row(ThreadId::SettingsLoad, c"tr-settings-load", 32 * KIB, 5_088, 9_904, "Eden st-02..st-12, f6-37/sh-01/s6-10", "boot::load_settings_boxed"),
     // save_states.json read and parse, joined by the boot thread
     row(ThreadId::StateLoad, c"tr-state-load", 40 * KIB, 17_424, 18_624, "Eden st-02..st-12", "states::load_file"),
     // save_states.json serialise and atomic replace
@@ -84,11 +84,11 @@ pub const THREADS: [ThreadStack; 18] = [
     // mii-editor-last.json (and the diag results observer trace): serialise from the boxed slot, atomic replace
     row(ThreadId::TraceWriter, c"tr-trace-writer", 28 * KIB, 2_720, 8_624, "Eden st-02..st-12, ui18-02 native Mii editor", "compat::filesystem::init::{closure#0}"),
     // diag: diag-settings-next.json parse, publish and apply
-    row(ThreadId::DiagReload, c"tr-diag-reload", 40 * KIB, 17_696, 15_552, "Eden st-02..st-12, final-surface-lc-4e336da4", "diag_reload::start::{closure#0}"),
+    row(ThreadId::DiagReload, c"tr-diag-reload", 40 * KIB, 17_696, 15_712, "Eden final-rc8-chain-test-722525a5-r2, the rc.8 pass's chained 9d6c7e02 sessions", "diag_reload::start::{closure#0}"),
     // first-boot import of the fork's files (blocking part), joined with a deadline
-    row(ThreadId::Import, c"tr-import", 32 * KIB, 8_032, 10_080, "Eden st-02..st-12", "import::start::{closure#0}"),
+    row(ThreadId::Import, c"tr-import", 32 * KIB, 8_048, 10_080, "Eden st-02..st-12", "import::start::{closure#0}"),
     // first-boot import of the fork's captures in the background
-    row(ThreadId::ImportCaptures, c"tr-import-captures", 24 * KIB, 4_032, 0, "", "import::start_background::{closure#0}"),
+    row(ThreadId::ImportCaptures, c"tr-import-captures", 24 * KIB, 4_336, 0, "", "import::start_background::{closure#0}"),
     // the menu worker: model steps, screens, settings JSON on close. Its deepest static path is the recording host's tick
     // into a menu effect that lists the combo store: `port::worker_tick` -> `rr_host::service_at` -> `apply_menu` ->
     // `Store<ComboRecord>::list` -> `decode`, then the SDK's file reads (diag ELF of rc.6 `4e336da4` and of the fix). On
@@ -103,15 +103,17 @@ pub const THREADS: [ThreadStack; 18] = [
     // external path is separate from the owned-ELF scan; see docs/UI16-PROBE-STACK-FAULT.md (removed after v0.2.0-rc.1; see that tag).
     row(ThreadId::Probe, c"tr-probe", 204 * KIB, 3_440, 151_920, "Eden ui-17 same ARC92171b2f full probe", "ui::probe::install::{closure#0}").with_external(143_376),
     // diag: diag-macro.req read and parse
-    row(ThreadId::MacroDiag, c"tr-macro-diag", 28 * KIB, 3_248, 9_088, "Eden st-02..st-12, final-surface-of-1261f56c", "macros::diag::start::{closure#0}"),
+    row(ThreadId::MacroDiag, c"tr-macro-diag", 28 * KIB, 3_248, 9_152, "Eden st-02..st-12, final-surface-of-1261f56c, final-rc8-yoga-1/rc8-surface-1-9d6c7e02", "macros::diag::start::{closure#0}"),
     // the replay capture archive and Mii preset writer
-    row(ThreadId::ReplaySave, c"replay-capture-save", 56 * KIB, 32_480, 25_344, "Eden st-02..st-12, f6-37/sh-01, final-surface-cov-4e336da4", "replay_store::start_writer::{closure#0}"),
+    row(ThreadId::ReplaySave, c"replay-capture-save", 60 * KIB, 33_184, 25_344, "Eden st-02..st-12, f6-37/sh-01, final-surface-cov-4e336da4", "replay_store::start_writer::{closure#0}"),
     // the saved Mii catalog read for the library
-    row(ThreadId::MiiCatalog, c"mii-catalog", 28 * KIB, 5_872, 8_016, "Eden f6-31/f6-37/sh-01", "replay_store::init_catalog_fallback::{closure#0}::{closure#0}"),
+    row(ThreadId::MiiCatalog, c"mii-catalog", 28 * KIB, 6_048, 8_016, "Eden f6-31/f6-37/sh-01", "replay_store::init_catalog_fallback::{closure#0}::{closure#0}"),
     // console-practice-trace builds only: the practice trace file writer
     row(ThreadId::PracticeTrace, c"tr-practice-trace", 128 * KIB, 0, 0, "", "practice_trace::writer"),
     // diag: the stall watchdog (samples the hooks' entry count, prints held locks through svcOutputDebugString)
-    row(ThreadId::StallWatch, c"tr-stall-watch", 20 * KIB, 3_104, 2_608, "final-surface-cov-4e336da4", "stall_watch::start::{closure#0}"),
+    // The static bound is the `diag,hang-trace` ELF's: `held_locks` puts 32 `owners::Held` (768 B) in the frame. At "z" it is
+    // 4,016 B (plain diag 3,344; at "s" 3,776 and 3,104: B's rc.8 review, then the docs lane's), so 24 KiB.
+    row(ThreadId::StallWatch, c"tr-stall-watch", 24 * KIB, 4_016, 2_608, "final-surface-cov-4e336da4", "stall_watch::start::{closure#0}"),
 ];
 
 const fn row(
@@ -216,15 +218,17 @@ impl CallbackStack {
 /// stack, and a poll that finds none free is skipped. The size is the smallest page multiple the rule allows for the poll's
 /// path. rc.8 §4/§7: two stacks, from rc.7's four. Every rc.7 diag run reported `[NativeService] service stacks peak=1 of 4
 /// skipped_polls=0` (S3, `nt`, `f9`, `rc8-chain-test`, the docs lane's GIF runs), and a poll with none free is skipped,
-/// never waited for; the second covers a nested or concurrent poll none of them showed. 2 × 304 KiB: 608 KiB of `.bss`,
-/// from 1.25 MiB.
+/// never waited for; the second covers a nested or concurrent poll none of them showed. The rc.8 pass on `9d6c7e02` (271
+/// Yoga rows) reported `peak=1 of 2 skipped_polls=0` in every session. rc.8 R5 cut the poll's path to 145,504 B at "s";
+/// at R6's "z" it is 177,200 B in the diag ELF (the CPU's `begin_prepare`; the diag stack paint adds 16 B to the poll's
+/// entry), so 2 × 236 KiB: 472 KiB of `.bss`, from rc.7's 1.25 MiB.
 pub const SERVICE_STACK: CallbackStack = CallbackStack {
     name: "native-service",
-    bytes: 304 * KIB,
+    bytes: 236 * KIB,
     count: 2,
-    static_bound: 232_896,
+    static_bound: 177_200,
     native_room: 63_728,
-    native_bound: 1_776,
+    native_bound: 1_936,
     measured_in: "Eden final-surface-acc-d8679593-r2 ([HookStack] site=native_service min_free=63728)",
     on_stack: &["training_mod_native_service_pre"],
     entry: "training_mod_native_service_entry",

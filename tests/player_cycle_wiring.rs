@@ -43,14 +43,16 @@ const BODY_BANK: &str = include_str!("../src/runtime/roster/native_body_bank.rs"
 #[test]
 fn the_player_mii_owner_walks_the_one_list_with_its_admission() {
     let g = graph();
+    // rc.8 §7: `begin`'s work is `begin_prepare` (its frame is gone before a bank switch is submitted).
+    assert!(calls(&g, "mii_ordinary_player::begin", "mii_ordinary_player::begin_prepare"));
     assert!(calls(
         &g,
-        "mii_ordinary_player::begin",
+        "mii_ordinary_player::begin_prepare",
         "mii_ordinary_player::cycle_admission"
     ));
     assert!(
-        names(&g, "mii_ordinary_player::begin", "cycle_members")
-            && names(&g, "mii_ordinary_player::begin", "admitted")
+        names(&g, "mii_ordinary_player::begin_prepare", "cycle_members")
+            && names(&g, "mii_ordinary_player::begin_prepare", "admitted")
     );
     assert!(PLAYER.contains(
         "next_qualified_player_with_ice_climbers(&crate::engine::swap::cycle_members::cycle_members(menu.player_roster,admitted),"

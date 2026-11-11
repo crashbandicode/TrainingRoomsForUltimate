@@ -1874,7 +1874,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "764405e072372011d8ef26781894c939222a76434e0205e4c47572bbf0642acf",
+   "dest_sha256": "f02507fc3e9fa2eb289de8ad437ce7261fefb88ec6643233f92df7d70bb0c09c",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -2181,6 +2181,16 @@
      "old": "static VAULT_EVENTS: hos_lock::Mailbox<VaultEvent, 4096> = hos_lock::Mailbox::new();\n",
      "new": "static VAULT_EVENTS: hos_lock::Mailbox<VaultEvent, 4096> = hos_lock::Mailbox::new();\n/// rc.8 \u00a77 (diag): the most vault events waiting at once, of the 4096 slots (`diag_log`'s `[MailboxPeak]`).\n#[cfg(feature = \"diag\")]\npub(crate) fn vault_high_water() -> u32 { VAULT_EVENTS.high_water() }\n",
      "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): a diag-only accessor for the 4096-slot replay mailbox's high-water mark (hos_lock::Mailbox::high_water), which diag_log's [MailboxPeak] line reports so Eden runs size the mailboxes (1.15 MB of .bss); release builds unchanged"
+    },
+    {
+     "old": "static VAULT_EVENTS: hos_lock::Mailbox<VaultEvent, 4096> = hos_lock::Mailbox::new();\n/// rc.8 \u00a77 (diag): the most vault events waiting at once, of the 4096 slots (`diag_log`'s `[MailboxPeak]`).\n",
+     "new": "// rc.8 R4: the slots are sized in `handoff::REPLAY_EVENT_SLOTS`, which says what a full mailbox does.\nstatic VAULT_EVENTS: hos_lock::Mailbox<VaultEvent, { crate::engine::macros::handoff::REPLAY_EVENT_SLOTS }> = hos_lock::Mailbox::new();\n/// rc.8 \u00a77 (diag): the most vault events waiting at once (`diag_log`'s `[MailboxPeak]`).\n",
+     "reason": "rc.8 R4 (TASK-rc8.md SCOPE REOPENED; the operator 2026-11-11 11:24Z): the replay mailbox has handoff::REPLAY_EVENT_SLOTS slots (1024, from 4096: the rc.8 pass peaked at 4; 2.1 s of 8 samples a frame, the stall watchdog's STALL_MS), and its drain scratch follows; a full mailbox drops and counts as before"
+    },
+    {
+     "old": "    if scratch.is_empty() { scratch.resize(4096, (0, 0)); }\n",
+     "new": "    if scratch.is_empty() { scratch.resize(crate::engine::macros::handoff::REPLAY_EVENT_SLOTS, (0, 0)); }\n",
+     "reason": "rc.8 R4 (TASK-rc8.md SCOPE REOPENED; the operator 2026-11-11 11:24Z): the replay mailbox has handoff::REPLAY_EVENT_SLOTS slots (1024, from 4096: the rc.8 pass peaked at 4; 2.1 s of 8 samples a frame, the stall watchdog's STALL_MS), and its drain scratch follows; a full mailbox drops and counts as before"
     }
    ]
   },
@@ -2410,7 +2420,7 @@
    "dest": "src/runtime/macros/live_replay.rs",
    "crate": "root",
    "src_sha256": "fd955747dc9d40bcb6bae4b9877d2040e89d17c313215db53019c3d278ba5592",
-   "dest_sha256": "94708a8929dff688638ceec271467665920ed707dfb705b70371145d6a4bb472",
+   "dest_sha256": "23b56030db188ccc21ecafa595e151c5768ca6a56fb62559aa090ae2101db6e0",
    "edits": [
     {
      "old": "    let accepted = capture.pool.push(pending.key, entry, pending.tick, pending.sample);",
@@ -2713,6 +2723,16 @@
      "old": "static EVENTS: hos_lock::Mailbox<(u64, LiveEvent), 4096> = hos_lock::Mailbox::new();\n",
      "new": "static EVENTS: hos_lock::Mailbox<(u64, LiveEvent), 4096> = hos_lock::Mailbox::new();\n/// rc.8 \u00a77 (diag): the most live events waiting at once, of the 4096 slots (`diag_log`'s `[MailboxPeak]`).\n#[cfg(feature = \"diag\")]\npub(crate) fn events_high_water() -> u32 { EVENTS.high_water() }\n",
      "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): a diag-only accessor for the 4096-slot replay mailbox's high-water mark (hos_lock::Mailbox::high_water), which diag_log's [MailboxPeak] line reports so Eden runs size the mailboxes (1.15 MB of .bss); release builds unchanged"
+    },
+    {
+     "old": "static EVENTS: hos_lock::Mailbox<(u64, LiveEvent), 4096> = hos_lock::Mailbox::new();\n/// rc.8 \u00a77 (diag): the most live events waiting at once, of the 4096 slots (`diag_log`'s `[MailboxPeak]`).\n",
+     "new": "// rc.8 R4: the slots are sized in `handoff::REPLAY_EVENT_SLOTS`, which says what a full mailbox does.\nstatic EVENTS: hos_lock::Mailbox<(u64, LiveEvent), { crate::engine::macros::handoff::REPLAY_EVENT_SLOTS }> = hos_lock::Mailbox::new();\n/// rc.8 \u00a77 (diag): the most live events waiting at once (`diag_log`'s `[MailboxPeak]`).\n",
+     "reason": "rc.8 R4 (TASK-rc8.md SCOPE REOPENED; the operator 2026-11-11 11:24Z): the replay mailbox has handoff::REPLAY_EVENT_SLOTS slots (1024, from 4096: the rc.8 pass peaked at 4; 2.1 s of 8 samples a frame, the stall watchdog's STALL_MS), and its drain scratch follows; a full mailbox drops and counts as before"
+    },
+    {
+     "old": "    if scratch.is_empty() { scratch.resize(4096, (0, 0)); }\n",
+     "new": "    if scratch.is_empty() { scratch.resize(crate::engine::macros::handoff::REPLAY_EVENT_SLOTS, (0, 0)); }\n",
+     "reason": "rc.8 R4 (TASK-rc8.md SCOPE REOPENED; the operator 2026-11-11 11:24Z): the replay mailbox has handoff::REPLAY_EVENT_SLOTS slots (1024, from 4096: the rc.8 pass peaked at 4; 2.1 s of 8 samples a frame, the stall watchdog's STALL_MS), and its drain scratch follows; a full mailbox drops and counts as before"
     }
    ]
   },

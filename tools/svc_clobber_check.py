@@ -10,7 +10,9 @@ it.
 From each `svc`, every path through the function is followed (fall-through, and the targets of `b`, `b.cond`,
 `cbz`/`cbnz`, `tbz`/`tbnz` inside the function) with the set of registers the kernel zeroed and nothing has written yet.
 A path ends at `ret`/`br`/an unconditional branch out of the function, and at a call (`bl`/`blr`: x8-x17 are the
-callee's to clobber, so the compiler never relies on them across one). A read of a register still in the set is a
+callee's to clobber, so the compiler never relies on them across one). A `bl`/`b` to an `OUTLINED_FUNCTION_*`
+(opt-level "z": the machine outliner's moved caller code) is no call: its body is followed, then the caller after the
+`bl` (rc.8 R6). A read of a register still in the set is a
 violation. Exit 0: none; 1: violations (listed); 2: the ELF could not be read."""
 import re
 import subprocess
@@ -90,8 +92,12 @@ def effects(op, args):
 
 
 def parse(elf):
-    text = subprocess.run([OBJDUMP, "-d", "--no-show-raw-insn", "--demangle", elf], capture_output=True, text=True,
-                          check=True).stdout
+    return parse_text(subprocess.run([OBJDUMP, "-d", "--no-show-raw-insn", "--demangle", elf], capture_output=True,
+                                     text=True, check=True).stdout)
+
+
+def parse_text(text):
+    """objdump -d text -> [{"name", "insns": [(address, op, args)]}]."""
     funcs, cur = [], None
     for line in text.splitlines():
         m = FUNC.match(line)
@@ -124,23 +130,43 @@ def successors(i, insns, index):
     return nxt
 
 
+OUTLINED = "OUTLINED_FUNCTION_"
+
+
+def outlined_target(op, args, starts, funcs):
+    """The function index a `bl`/`b` enters when its target is an `OUTLINED_FUNCTION_*` (opt-level "z"), else None.
+    An outlined body isn't a callee: it is the caller's own code moved out, so it may read the caller's x8-x17, and the
+    caller may rely on registers it leaves unwritten (rc.8 R6; the docs lane's review of `p23/rc8-waste`)."""
+    if op not in ("bl", "b") or not args:
+        return None
+    t = TARGET.match(split_operands(args)[-1].strip())
+    k = starts.get(int(t.group(1), 16)) if t else None
+    return k if k is not None and funcs[k]["name"].startswith(OUTLINED) else None
+
+
 def check(elf):
-    funcs = parse(elf)
+    return check_funcs(parse(elf))
+
+
+def check_funcs(funcs):
+    starts = {f["insns"][0][0]: k for k, f in enumerate(funcs) if f["insns"]}
+    indexes = [{a: i for i, (a, _, _) in enumerate(f["insns"])} for f in funcs]
     sites, violations = [], []
-    for f in funcs:
-        insns = f["insns"]
-        index = {a: i for i, (a, _, _) in enumerate(insns)}
-        for i, (addr, op, args) in enumerate(insns):
+    for fi, f in enumerate(funcs):
+        for i, (addr, op, args) in enumerate(f["insns"]):
             if op != "svc":
                 continue
             sites.append((f["name"], addr, args))
-            seen, stack, steps = set(), [(i + 1, ZEROED)], 0
+            # A state: (function, instruction, registers zeroed and unwritten, the outlined calls to return from).
+            seen, stack, steps = set(), [(fi, i + 1, ZEROED, ())], 0
             while stack and steps < 20000:
-                j, live = stack.pop()
+                state = stack.pop()
+                g, j, live, returns = state
                 steps += 1
-                if j >= len(insns) or (j, live) in seen or not live:
+                insns = funcs[g]["insns"]
+                if j >= len(insns) or state in seen or not live:
                     continue
-                seen.add((j, live))
+                seen.add(state)
                 a, o, ar = insns[j]
                 if o == "svc":
                     continue
@@ -150,8 +176,17 @@ def check(elf):
                     violations.append((f["name"], addr, a, o, ar, sorted(bad)))
                     continue
                 live = frozenset(live - writes)
-                for k in successors(j, insns, index):
-                    stack.append((k, live))
+                entered = outlined_target(o, ar, starts, funcs)
+                if entered is not None:
+                    # `bl`: back here after its `ret`; `b`: its `ret` is the caller's return.
+                    stack.append((entered, 0, live, returns + ((g, j + 1),) if o == "bl" else returns))
+                    continue
+                if o == "ret" and returns:
+                    back_g, back_j = returns[-1]
+                    stack.append((back_g, back_j, live, returns[:-1]))
+                    continue
+                for k in successors(j, insns, indexes[g]):
+                    stack.append((g, k, live, returns))
     return sites, violations
 
 

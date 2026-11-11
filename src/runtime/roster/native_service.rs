@@ -48,6 +48,39 @@ static EXHAUSTED: AtomicU32 = AtomicU32::new(0);
 static PEAK: AtomicU32 = AtomicU32::new(0);
 #[cfg(feature = "diag")]
 static REPORTED_PEAK: AtomicU32 = AtomicU32::new(0);
+/// rc.8 R5 (diag; the docs lane's review, finding 3): the most bytes any poll used of a service stack, measured from the
+/// paint, against the static path the stack is sized for (`model::thread_stacks::SERVICE_STACK`, a lower bound: the
+/// analysis does not follow indirect calls).
+#[cfg(feature = "diag")]
+static REPORTED_USED: AtomicUsize = AtomicUsize::new(0);
+#[cfg(feature = "diag")]
+static POLLS: AtomicU32 = AtomicU32::new(0);
+
+/// Diag, startup only (before any dispatch): every service stack painted word by word.
+#[cfg(feature = "diag")]
+fn paint_stacks() {
+    for stack in &STACKS {
+        let base = stack.0.get() as usize;
+        for at in (base..base + STACK.bytes).step_by(8) {
+            // SAFETY: no dispatch has claimed a stack yet; the words are this static's own.
+            unsafe { core::ptr::write_volatile(at as *mut u64, crate::model::thread_stacks::PAINT) };
+        }
+    }
+}
+
+/// Diag: the most bytes used of any service stack so far (the paint's lowest overwritten word), read, never written.
+#[cfg(feature = "diag")]
+fn stacks_used() -> usize {
+    STACKS.iter().map(|stack| {
+        let base = stack.0.get() as usize;
+        let mut at = base;
+        // SAFETY: a static's words, read only; a poll on the other stack only ever lowers what is read here.
+        while at < base + STACK.bytes && unsafe { core::ptr::read_volatile(at as *const u64) } == crate::model::thread_stacks::PAINT {
+            at += 8;
+        }
+        crate::model::thread_stacks::used(STACK.bytes, at - base)
+    }).max().unwrap_or(0)
+}
 
 /// Lock-free: a compare-and-swap on `CLAIMED` that retries only when another claim or release changed it meanwhile.
 fn claim() -> Option<usize> {
@@ -75,6 +108,8 @@ fn top(stack: usize) -> usize {
 /// Startup only, after character_roster's existing pristine instruction checks
 /// and before game callbacks. No second650010 hook is installed.
 pub(super) unsafe fn install(base: usize) {
+    #[cfg(feature = "diag")]
+    paint_stacks();
     let mut original = std::ptr::null_mut();
     skyline::hooks::A64HookFunction(
         (base + 0x650010) as *const _,
@@ -131,6 +166,14 @@ unsafe extern "C" fn training_mod_native_service_pre(entry: *mut u8, context: &S
         if exhausted != 0 || peak > REPORTED_PEAK.swap(peak, Ordering::Relaxed) {
             crate::engine::compat::logging::diagnostic(format_args!(
                 "[NativeService] service stacks peak={} of {} skipped_polls={}", peak, STACK.count, exhausted));
+        }
+        // Every 512th poll: the stacks' measured use, one line when it grew.
+        if POLLS.fetch_add(1, Ordering::Relaxed) % 512 == 0 {
+            let used = stacks_used();
+            if used > REPORTED_USED.fetch_max(used, Ordering::Relaxed) {
+                crate::engine::compat::logging::diagnostic(format_args!(
+                    "[NativeService] service stack used={} of {} static_bound={}", used, STACK.bytes, STACK.static_bound));
+            }
         }
     }
     // A plugin consumer returning early ends only pre-dispatch, never native work.

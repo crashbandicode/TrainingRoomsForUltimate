@@ -41,7 +41,9 @@ fn created_entries_are_admitted_beside_what_the_cycle_waits_for() {
     let create = body(SOURCES, "unsafe fn create_capacity(");
     assert!(create.contains("super::process_memory::admit_created(cost)"), "{create}");
     assert!(!create.contains("super::process_memory::admit(cost)"), "{create}");
-    let service = body(SOURCES, "pub unsafe fn service(");
+    // rc.8 R5: `service`'s load is outlined into `service_load`.
+    assert!(body(SOURCES, "pub unsafe fn service(").contains("service_load(ctx, entry, slot, is_capacity, &prior_first);"));
+    let service = body(SOURCES, "unsafe fn service_load(");
     assert!(service.contains(
         "if is_capacity { super::process_memory::admit_created(memory_cost) } else { super::process_memory::admit(memory_cost) }"),
         "{service}");

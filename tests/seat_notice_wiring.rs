@@ -31,7 +31,8 @@ fn names(g: &Graph, key: &str, ident: &str) -> bool {
 #[test]
 fn the_loader_notes_a_seat_refused_for_memory() {
     let g = graph();
-    assert!(names(&g, "character_sources::service", "note_seat_memory"), "service notes the seat's admission");
+    // rc.8 R5: `service`'s load is `service_load`, in its own frame.
+    assert!(names(&g, "character_sources::service_load", "note_seat_memory"), "service notes the seat's admission");
     let text = include_str!("../src/runtime/roster/character_sources.rs");
     let note = text.find("f9_gate::note_seat_memory(slot, wanted.kind,").expect("the note in service");
     let refused = text.find("memory_refused(slot, wanted.kind, decision, memory_cost, \"preload\");").expect("the refusal");

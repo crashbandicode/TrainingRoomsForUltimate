@@ -44,8 +44,9 @@ struct Capture {
 
 fn toggle() -> &'static CaptureToggle { crate::runtime::macros::replay_store::toggle() }
 
-static EVENTS: hos_lock::Mailbox<(u64, LiveEvent), 4096> = hos_lock::Mailbox::new();
-/// rc.8 §7 (diag): the most live events waiting at once, of the 4096 slots (`diag_log`'s `[MailboxPeak]`).
+// rc.8 R4: the slots are sized in `handoff::REPLAY_EVENT_SLOTS`, which says what a full mailbox does.
+static EVENTS: hos_lock::Mailbox<(u64, LiveEvent), { crate::engine::macros::handoff::REPLAY_EVENT_SLOTS }> = hos_lock::Mailbox::new();
+/// rc.8 §7 (diag): the most live events waiting at once (`diag_log`'s `[MailboxPeak]`).
 #[cfg(feature = "diag")]
 pub(crate) fn events_high_water() -> u32 { EVENTS.high_water() }
 static EVENT_SERIAL: AtomicU64 = AtomicU64::new(1);
@@ -89,7 +90,7 @@ pub fn worker_events() {
     // Only this worker uses the scratch; allocate directly on its heap once.
     static SCRATCH: Mutex<Vec<(u64, usize)>> = Mutex::new(Vec::new());
     let mut scratch = SCRATCH.lock().unwrap();
-    if scratch.is_empty() { scratch.resize(4096, (0, 0)); }
+    if scratch.is_empty() { scratch.resize(crate::engine::macros::handoff::REPLAY_EVENT_SLOTS, (0, 0)); }
     EVENTS.drain_with_scratch(&mut scratch, |(serial, event)| {
         #[cfg(feature = "diag")]
         let (committed, first_seal) = {

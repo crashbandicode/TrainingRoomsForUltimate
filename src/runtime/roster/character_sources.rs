@@ -2315,7 +2315,28 @@ fn note_skip(slot: u32, reason: &'static str) {
     }
 }
 
+// rc.8 R5: not inlined into the poll's entry, so the gate's hand-over (`PriorFirst`, 7.9 KB) is only on these chains.
+#[inline(never)]
 pub unsafe fn service(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) {
+    // rc.8 R5: the gate, the capacity creation and the load each run in their own frame, one after the other, so their
+    // chains don't stack on each other (the native service poll's stacks are sized to the deepest).
+    let mut prior_first = PriorFirst::default();
+    let Some(is_capacity) = service_gate(ctx, entry, slot, &mut prior_first) else { return; };
+    #[cfg(feature = "managed-third-source-alpha")]
+    service_capacity(ctx, entry, slot);
+    service_load(ctx, entry, slot, is_capacity, &prior_first);
+}
+
+/// What `service_gate` hands the load: the capacity entry's first-load stability, taken at the gate (empty without
+/// `managed-third-source-alpha`).
+#[derive(Default)]
+struct PriorFirst(#[cfg(feature = "managed-third-source-alpha")] Option<FirstLoad>);
+
+/// `service`'s gate: the callback's slot, F9's hand-over and an owned slot end it (`None`); otherwise the load runs.
+#[inline(never)]
+unsafe fn service_gate(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32, prior_first: &mut PriorFirst) -> Option<bool> {
+    #[cfg(not(feature = "managed-third-source-alpha"))]
+    let _ = prior_first;
     // Diag (F9 research): one line per change of No. of CPUs seen by the native loader callback, with the slot it served, so an
     // Eden row tells whether this callback runs while the pause menu is open (before the game activates a parked entry).
     #[cfg(feature = "diag")]
@@ -2328,29 +2349,35 @@ pub unsafe fn service(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) {
     }
     let is_capacity=is_capacity_entry(entry,slot);
     if !cfg!(feature = "managed-sources") || !callback_slot(entry, slot) {
-        return;
+        return None;
     }
-    let index = slot as usize;
     // Every entry7 callback starts with no saved stability. Restore it only
     // after a valid first-load observation; any early decline resets the run.
     #[cfg(feature = "managed-third-source-alpha")]
-    let prior_first = if is_capacity {
+    { prior_first.0 = if is_capacity {
         STATE.lock().capacities[capacity_index(slot)].first_load.take()
     } else {
         None
-    };
+    }; }
     f9_note();
     if let crate::model::parked_entries::Body::Ready { kind, .. } = f9_body_of(entry, slot) {
         crate::runtime::roster::f9_gate::clear_armed_if(slot, kind);
     }
     if service_owned(ctx, entry, slot) {
         #[cfg(feature = "diag")] note_skip(slot, "owned");
-        return;
+        return None;
     }
     if crate::runtime::roster::f9_gate::block_new_load(slot) {
         #[cfg(feature = "diag")] note_skip(slot, "F9 handover");
-        return;
+        return None;
     }
+    Some(is_capacity)
+}
+
+/// `service`'s capacity creation for ordinary and speculative demand, before the load.
+#[cfg(feature = "managed-third-source-alpha")]
+#[inline(never)]
+unsafe fn service_capacity(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) {
     // Ordinary demand can require additional capacity before the idle return.
     // Its existing budget and helper-availability checks remain authoritative.
     #[cfg(feature="managed-third-source-alpha")]
@@ -2368,6 +2395,18 @@ pub unsafe fn service(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) {
             if let Some(intent)=intent {create_capacity(ctx,entry,slot,intent);}
         }
     }
+}
+
+/// `service` after its capacity creation: the selected want's checks, its preflight and the load (rc.8 R5: outlined, so
+/// the poll's other chains don't stack on this frame).
+#[inline(never)]
+unsafe fn service_load(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32, is_capacity: bool, prior_first: &PriorFirst) {
+    // Only the capacity entry's preflight reads these.
+    #[cfg(not(feature = "managed-third-source-alpha"))]
+    let _ = (ctx, prior_first);
+    let index = slot as usize;
+    #[cfg(feature = "managed-third-source-alpha")]
+    let prior_first = prior_first.0;
     let initial = {
         let state = STATE.lock();
         // Idle: no native snapshots, log formatting, or allocation.

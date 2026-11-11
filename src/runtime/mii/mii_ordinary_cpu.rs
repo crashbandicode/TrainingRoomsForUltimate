@@ -852,7 +852,8 @@ unsafe fn capture(entry:*mut u8) {
 /// One idle snapshot. A busy read, a failed protected-union compare, or a
 /// changed reservation/epoch leaves `expected` unchanged. The returned value
 /// replaces only the descriptor; records, scalars, owners, and control stay
-/// the caller's expected snapshot.
+/// the caller's expected snapshot. rc.8 R5: its snapshots live in its own frame, not in `begin_prepare`'s.
+#[inline(never)]
 unsafe fn refresh_idle_metadata(entry:*mut u8,kind:u32,expected:native::Snapshot,live:Destination,request:Request,retained:bool,active_present:bool)->native::Snapshot {
     let generation=epoch();
     let reservation={
@@ -880,10 +881,48 @@ unsafe fn refresh_idle_metadata(entry:*mut u8,kind:u32,expected:native::Snapshot
     comparison
 }
 
+/// A bank member switch `begin_prepare` admitted, submitted here once its frame is gone.
+#[cfg(feature="native-body-bank-alpha")]
+type BankSubmit=(Option<super::body_bank::Plan>,super::native_reload_pose::ReloadPose);
+#[cfg(not(feature="native-body-bank-alpha"))]
+type BankSubmit=core::convert::Infallible;
+
+/// rc.8 §7: `begin_prepare` holds the snapshots it copied (about 100 KB of frame); a bank switch is submitted after it
+/// returns, so that frame and `submit_bank`'s chain no longer stack on the native service poll's deepest path.
 #[inline(never)]
 unsafe fn begin(entry:*mut u8)->bool {
     #[cfg(feature = "console-swap-trace")]
     let _swap_stack = crate::runtime::roster::practice_trace::scope(0x1080013);
+    let mut bank:Option<BankSubmit>=None;
+    let started=begin_prepare(entry,&mut bank);
+    match bank {
+        #[cfg(feature="native-body-bank-alpha")]
+        Some((plan,pose))=>submit_bank(entry,plan,pose),
+        _=>started,
+    }
+}
+
+/// rc.8 R5: `begin_prepare`'s preflight snapshot, in its own frame: the current owner's, or `None` after a busy read
+/// (kept), a refused read or an owner that changed (the request refused and the mismatch noted).
+#[inline(never)]
+unsafe fn preflight_current(entry:*mut u8,kind:u32,expected:&native::Snapshot,retained:bool,request:Request)
+    ->Option<native::Snapshot> {
+    match native::snapshot(entry as usize,epoch(),kind) {
+        Ok(now) if native::same_owned(&now,expected,retained)=>Some(now),
+        Err(provenance::helpers::BUSY)=>None,
+        Err(reason)=>{refuse_request(request,reason);note(reason);None}
+        Ok(now)=>{refuse_request(request,"preflight current configuration changed");note_preflight_mismatch(expected,&now);None}
+    }
+}
+
+/// rc.8 R5: whether the preflight snapshot changed before INSTALL, in its own frame (a fresh snapshot and its `Ok` copy).
+#[inline(never)]
+unsafe fn snapshot_changed(entry:*mut u8,epoch:u64,kind:u32,current:&native::Snapshot)->bool {
+    native::snapshot(entry as usize,epoch,kind)!=Ok(*current)
+}
+
+#[inline(never)]
+unsafe fn begin_prepare(entry:*mut u8,bank:&mut Option<BankSubmit>)->bool {
     let blocker=begin_blocker();
     note_waiting(blocker);
     if blocker.is_some() {return false;}
@@ -1034,12 +1073,7 @@ unsafe fn begin(entry:*mut u8)->bool {
     };
     let destination=Destination{target,cursor:step.cursor};
     let publish=target.publish(origin_saved);
-    let current=match native::snapshot(entry as usize,epoch(),origin.original_kind) {
-        Ok(now) if native::same_owned(&now,&expected,retained || active.is_some())=>now,
-        Err(provenance::helpers::BUSY)=>return false,
-        Err(reason)=>{refuse_request(request,reason);note(reason);return false;}
-        Ok(now)=>{refuse_request(request,"preflight current configuration changed");note_preflight_mismatch(&expected,&now);return false;}
-    };
+    let Some(current)=preflight_current(entry,origin.original_kind,&expected,retained || active.is_some(),request) else {return false;};
     // Include saved/ordinary returns. Admission and phase publication both recheck
     // the current-to-target transition; the origin's hat alone is insufficient.
     let hat_change=match crate::engine::mii::ordinary_cpu::cpu_hat_route(current.layout,
@@ -1105,7 +1139,8 @@ unsafe fn begin(entry:*mut u8)->bool {
     // rc.6 warm exit: out of a live Mii group whose publication this owner kept, the window it displaced is warm.
     #[cfg(feature="native-body-bank-alpha")]
     let exit=active.is_some() && publish.is_none()
-        && STATE.lock().mii_exit.is_some_and(|x|x.mii.ticket.epoch==current.binding.epoch
+        // rc.8 R5: borrowed, not a copy of the kept MiiExit (18.5 KB of `begin_prepare`'s frame).
+        && STATE.lock().mii_exit.as_ref().is_some_and(|x|x.mii.ticket.epoch==current.binding.epoch
             && x.adopted==expected);
     #[cfg(feature="native-body-bank-alpha")]
     let plan={
@@ -1156,7 +1191,7 @@ unsafe fn begin(entry:*mut u8)->bool {
         refuse_request(request,"CPU position not ready before reload");return false;
     };
     let Some(token)=INSTALL.try_begin(true) else{return false;};
-    if native::snapshot(entry as usize,current.binding.epoch,origin.original_kind)!=Ok(current) {
+    if snapshot_changed(entry,current.binding.epoch,origin.original_kind,&current) {
         refused_before_submit(token,"CPU preflight changed before INSTALL ownership");return false;
     }
     let track={
@@ -1199,9 +1234,9 @@ unsafe fn begin(entry:*mut u8)->bool {
     };
     let Some(track)=track else {
         #[cfg(feature="native-body-bank-alpha")]
-        return submit_bank(entry,plan,pose);
+        {*bank=Some((plan,pose));return false;}
         #[cfg(not(feature="native-body-bank-alpha"))]
-        return false;
+        {let _=bank;return false;}
     };
     let staged=native_fighter_install::Descriptor::from_bytes(&track.descriptor);
     training::clear_session_state();
@@ -1243,6 +1278,7 @@ unsafe fn begin(entry:*mut u8)->bool {
 /// Warm member switch after the BankTrack is published, INSTALL and pose owned.
 /// A refusal performed no native write; release only this token's ownership.
 #[cfg(feature="native-body-bank-alpha")]
+#[inline(never)] // rc.8 §7: its own frame, not inside `begin`'s under `begin_prepare`'s
 unsafe fn submit_bank(entry:*mut u8,plan:Option<super::body_bank::Plan>,
     pose:super::native_reload_pose::ReloadPose)->bool {
     let bank=STATE.lock().bank;
@@ -1313,12 +1349,22 @@ unsafe fn bank_settle(entry:*mut u8,b:&BankTrack) {
     // rc.6 warm exit: a Mii group switch's publication, read before the settle drops its track, is kept for the
     // exit to the window it displaced; that exit settles through the kept record.
     let published=STATE.lock().bank.as_ref().filter(|t|t.ticket==b.ticket && t.token==b.token).and_then(|t|t.published);
-    let settled=match if b.exit {native::exit_settled(b)} else {native::bank_settled(b)} {
+    // rc.8 R5: the settle's result is borrowed, and what follows it runs in `bank_applied`'s own frame, beside the
+    // settle's chain (the native service poll's deepest), not under it.
+    let result=if b.exit {native::exit_settled(b)} else {native::bank_settled(b)};
+    let settled=match &result {
         Ok(settled)=>settled,
         Err(native::BankRefusal::Busy)=>return,
-        Err(native::BankRefusal::Kept(reason))=>{bank_refused(b,reason,false);return;}
-        Err(native::BankRefusal::Diverged(reason))=>{bank_refused(b,reason,true);return;}
+        Err(native::BankRefusal::Kept(reason))=>{bank_refused(b,*reason,false);return;}
+        Err(native::BankRefusal::Diverged(reason))=>{bank_refused(b,*reason,true);return;}
     };
+    bank_applied(entry,b,settled,published);
+}
+
+/// `bank_settle` once the switch settled: the kept Mii publication, the presentation, the outcome and the notices.
+#[cfg(feature="native-body-bank-alpha")]
+#[inline(never)]
+unsafe fn bank_applied(entry:*mut u8,b:&BankTrack,settled:&native::Settled,published:Option<(Configuration,native::BankPublished)>) {
     let now=settled.now;let exact=settled.exact;
     STATE.lock().mii_exit=match (exact,published) {
         (Some(c),Some((published_c,published))) if published_c==c=>Some(MiiExit {mii:*b,configuration:c,published,adopted:now}),

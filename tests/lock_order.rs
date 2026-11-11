@@ -1440,11 +1440,15 @@ fn super_means_the_declaring_file() {
         found[0]
     };
     let service = one("parent::service");
-    for caller in ["renamed_child::dispatch", "plain::poll", "inline::caller"] {
+    // rc.8 R8 (B's finding 1): `roster/owner.rs` declares `#[path = "../mii/far_child.rs"]`; the `..` is folded, and the
+    // child's own decoy `owner_service` is not the one `super::` means.
+    let owner_service = one("owner::owner_service");
+    for (caller, callee) in [("renamed_child::dispatch", service), ("plain::poll", service), ("inline::caller", service),
+                             ("far_child::far", owner_service)] {
         let f = one(caller);
-        assert_eq!(graph.callees(f).into_iter().collect::<Vec<_>>(), vec![service], "{caller}: the call graph");
+        assert_eq!(graph.callees(f).into_iter().collect::<Vec<_>>(), vec![callee], "{caller}: the call graph");
         let resolved: Vec<usize> = calls(&graph.funcs[f].body).iter().flat_map(|c| ctx.resolve(f, c)).collect();
-        assert_eq!(resolved, vec![service], "{caller}: Ctx::resolve");
+        assert_eq!(resolved, vec![callee], "{caller}: Ctx::resolve");
     }
 }
 
@@ -1455,13 +1459,16 @@ fn super_means_the_declaring_file() {
 fn the_native_service_poll_is_walked_from_its_dispatch() {
     let graph = runtime_graph();
     let dispatch = "native_service::training_mod_native_service_dispatch";
-    let poll: Vec<String> =
-        graph.funcs.iter().filter(|f| f.file.ends_with("character_sources.rs") && f.name == "service").map(|f| f.key()).collect();
-    assert_eq!(poll.len(), 1, "the poll's sources::service: {poll:?}");
     let (ctx, s) = scan(&graph);
     let shared = shared_locks(&ctx, &s);
-    let want = format!("{} (hook {dispatch})", poll[0]);
-    assert!(shared.game_waits.values().any(|w| w.contains(&want)), "the poll's lock takes are not walked from the dispatch: {want}");
+    // rc.8 R5: `sources::service` runs its gate, capacity creation and load as three outlined phases; each takes STATE.
+    for phase in ["service_gate", "service_capacity", "service_load"] {
+        let poll: Vec<String> =
+            graph.funcs.iter().filter(|f| f.file.ends_with("character_sources.rs") && f.name == phase).map(|f| f.key()).collect();
+        assert_eq!(poll.len(), 1, "the poll's sources::{phase}: {poll:?}");
+        let want = format!("{} (hook {dispatch})", poll[0]);
+        assert!(shared.game_waits.values().any(|w| w.contains(&want)), "the poll's lock takes are not walked from the dispatch: {want}");
+    }
 }
 
 /// R2 finding 5's guard: every game entry and every plugin thread's entry resolves to a function on its module path, or is listed in
