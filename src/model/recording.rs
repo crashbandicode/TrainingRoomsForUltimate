@@ -283,6 +283,20 @@ pub fn record_chord(
     refusal().map_or(Ok(true), Err)
 }
 
+/// rc.9 C14: Play on Player 1 writes Player 1's input, as an AI driving P1 does (the standalone CPU pilot, or the game's
+/// operator flag): its chord is refused then, with Record's B4 check (`p1_driven_by_ai`, asked only for a Play) and
+/// notice style. `Ok` is whether the Play goes to the worker.
+pub fn play_player_chord(play_player: bool, p1_driven_by_ai: impl FnOnce() -> bool) -> Result<bool, &'static str> {
+    if play_player && p1_driven_by_ai() {
+        Err(PLAY_PLAYER_AI_REFUSAL)
+    } else {
+        Ok(play_player)
+    }
+}
+
+/// The refusal's notice, worded as Record's (`RecordRefusal::P1DrivenByAi`).
+pub const PLAY_PLAYER_AI_REFUSAL: &str = "P1 is controlled by an AI: Play on Player 1 is off";
+
 /// The standalone ssbu-cpu-pilot's state export, `ssbu_cpu_pilot_state_v1(out) -> bool` (ABI 1, its
 /// `src/runtime.rs:510-538`, the same at 0162eed and 8b03e3b): `false` while the plugin is inactive.
 pub type PilotStateExport = unsafe extern "C" fn(*mut PilotStateV1) -> bool;

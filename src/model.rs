@@ -37,6 +37,8 @@ pub mod developer_ini;
 pub mod developer_debug;
 #[path = "model/developer_reload.rs"]
 pub mod developer_reload;
+#[path = "model/deluxe_overlay.rs"]
+pub mod deluxe_overlay;
 #[path = "model/diag_ring.rs"]
 pub mod diag_ring;
 #[path = "model/factory.rs"]

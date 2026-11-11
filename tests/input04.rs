@@ -45,7 +45,7 @@ fn c(buttons: &[u8]) -> Chord {
 }
 
 fn sample(held: &[u8], pressed: &[u8]) -> Sample {
-    Sample { held: c(held).0, pressed: c(pressed).0 }
+    Sample { held: c(held).0, pressed: c(pressed).0, ..Sample::default() }
 }
 
 fn temp_dir(name: &str) -> PathBuf {

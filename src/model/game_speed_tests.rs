@@ -10,7 +10,7 @@ fn bits(buttons: &[u8]) -> u16 {
 }
 
 fn sample(held: &[u8], pressed: &[u8]) -> Sample {
-    Sample { held: bits(held), pressed: bits(pressed) }
+    Sample { held: bits(held), pressed: bits(pressed), ..Sample::default() }
 }
 
 const R_UP: Chord = Chord((1 << logical::R) | (1 << logical::DPAD_UP));
@@ -109,6 +109,23 @@ fn hold_opens_on_the_chord_steps_on_left_right_and_closes_on_release() {
     let mut hold = Hold::new();
     assert_eq!(hold.poll(l_up, sample(&[l, UP], &[UP]), false), HoldEvent::Opened);
     assert_eq!(hold.poll(l_up, sample(&[l, LEFT], &[LEFT]), false), HoldEvent::Step(Dir::Left));
+}
+
+/// rc.9 (`PLUGIN-SHORTCUT-CONFLICTS.md`): the hold neither opens nor steps while Online Deluxe has the buttons: its
+/// window is drawn (C4), or both triggers are held on a GameCube pad, Deluxe's L + R there (C3; its L + R + Left/Right
+/// peer cycle is C10).
+#[test]
+fn hold_stands_down_while_deluxe_has_the_buttons() {
+    use logical::{ZL, ZR};
+    let gc = |held: &[u8], pressed: &[u8]| Sample { gamecube: true, ..sample(held, pressed) };
+    let mut hold = Hold::new();
+    assert_eq!(hold.poll(R_UP, sample(&[R, UP], &[UP]).with_overlay(true), false), HoldEvent::Idle, "window drawn");
+    assert_eq!(hold.poll(R_UP, gc(&[ZL, ZR, R, UP], &[UP]), false), HoldEvent::Idle, "GC: both triggers + Z + Up");
+    assert_eq!(hold.poll(R_UP, gc(&[R, UP], &[UP]), false), HoldEvent::Opened, "GC: Z + Up opens");
+    assert_eq!(hold.poll(R_UP, gc(&[ZL, ZR, R, LEFT], &[LEFT]), false), HoldEvent::Held, "GC: both triggers: no step");
+    assert_eq!(hold.poll(R_UP, gc(&[ZL, R, LEFT], &[LEFT]), false), HoldEvent::Step(Dir::Left), "one trigger steps");
+    assert_eq!(hold.poll(R_UP, sample(&[R, RIGHT], &[RIGHT]).with_overlay(true), false), HoldEvent::Held, "window: no step");
+    assert_eq!(hold.poll(R_UP, sample(&[R, RIGHT], &[RIGHT]), false), HoldEvent::Step(Dir::Right));
 }
 
 #[test]

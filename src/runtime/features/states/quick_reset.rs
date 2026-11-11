@@ -96,7 +96,18 @@ pub(crate) unsafe fn on_input(controller: usize, out: *mut MappedInputs) -> bool
         && !published::input_owners().any()
         && !named_macros::hook_queries().panel_visible
         && !replay_preview::occupied();
-    let (consume, request_now) = QUICK.lock().input(raw, eligible);
+    // rc.9 C14: the same AI check as Record's refusal (B4). It runs the pilot's export, so it is asked outside the lock,
+    // and only while the chord is held where it counts; the model uses the answer of the chord's first poll.
+    let p1_ai = eligible
+        && QuickReset::chord_held(raw)
+        && crate::model::recording::p1_driven_by_ai(natives::is_operation_cpu(0), crate::runtime::ui::pilot_export());
+    let quick = QUICK.lock().input(raw, eligible, || p1_ai);
+    if quick.refused {
+        notices::refuse(crate::model::state::quick_reset::AI_REFUSAL);
+        #[cfg(feature = "diag")]
+        crate::runtime::diag_log::diagnostic(format_args!("[QuickReset] refused ai=true"));
+    }
+    let (consume, request_now) = (quick.consume, quick.request);
     if !consume {
         return false;
     }

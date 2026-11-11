@@ -34,6 +34,8 @@ pub struct QuickReset {
     entries: Option<[usize; 2]>,
     poses: [Option<Pose>; 2],
     held: bool,
+    /// The held chord was refused on its first poll (rc.9 C14).
+    refused: bool,
 }
 
 impl QuickReset {
@@ -42,6 +44,7 @@ impl QuickReset {
             entries: None,
             poses: [None; 2],
             held: false,
+            refused: false,
         }
     }
 
@@ -80,14 +83,71 @@ impl QuickReset {
         self.poses.get(role).is_some_and(Option::is_none)
     }
 
-    /// Swallow every eligible held chord; request only its first poll.
-    pub fn input(&mut self, raw: u32, eligible: bool) -> (bool, bool) {
-        let held = raw & (bit::L | bit::REAL_DIGITAL_L) != 0
-            && raw & (bit::R | bit::REAL_DIGITAL_R) != 0
-            && raw & bit::A != 0;
-        let request = eligible && held && !self.held;
+    /// L + R + A held on the raw controller.
+    pub const fn chord_held(raw: u32) -> bool {
+        raw & (bit::L | bit::REAL_DIGITAL_L) != 0 && raw & (bit::R | bit::REAL_DIGITAL_R) != 0 && raw & bit::A != 0
+    }
+
+    /// Swallow every eligible held chord; request only its first poll. rc.9 C14: while an AI drives Player 1 (the
+    /// standalone CPU pilot, asked once on the chord's first poll, `p1_driven_by_ai`), the chord is refused for as long
+    /// as it is held: nothing is swallowed (the pilot writes P1's input), nothing is requested, and the first poll says
+    /// why.
+    pub fn input(&mut self, raw: u32, eligible: bool, p1_driven_by_ai: impl FnOnce() -> bool) -> QuickInput {
+        let held = Self::chord_held(raw);
+        let first = eligible && held && !self.held;
+        if first {
+            self.refused = p1_driven_by_ai();
+        } else if !held {
+            self.refused = false;
+        }
         self.held = held;
-        (eligible && held, request)
+        QuickInput {
+            consume: eligible && held && !self.refused,
+            request: first && !self.refused,
+            refused: first && self.refused,
+        }
+    }
+}
+
+/// What one poll does with the Quick Reset chord.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct QuickInput {
+    /// P1's mapped input is neutral this poll.
+    pub consume: bool,
+    /// The reset is requested (the chord's first poll).
+    pub request: bool,
+    /// rc.9 C14: an AI drives Player 1, so this press is refused (its first poll): the notice says why.
+    pub refused: bool,
+}
+
+/// The refusal's notice, worded as Record's (`recording::RecordRefusal::P1DrivenByAi`).
+pub const AI_REFUSAL: &str = "P1 is controlled by an AI: Quick Reset is off";
+
+#[cfg(test)]
+mod tests {
+    lib_unit_tests! {
+    use super::{QuickInput, QuickReset};
+    use crate::model::chords::bit;
+
+    const CHORD: u32 = bit::L | bit::R | bit::A;
+
+    /// rc.9 C14: with the standalone pilot driving Player 1, Quick Reset leaves P1's input alone and says why, once per
+    /// press; without it the chord swallows and requests as before.
+    #[test]
+    fn quick_reset_is_refused_while_an_ai_drives_p1() {
+        let mut q = QuickReset::new();
+        let first = q.input(CHORD, true, || true);
+        assert_eq!(first, QuickInput { consume: false, request: false, refused: true });
+        let held = q.input(CHORD, true, || panic!("asked only on the first poll"));
+        assert_eq!(held, QuickInput::default(), "still refused while held, no second notice");
+        assert_eq!(q.input(0, true, || false), QuickInput::default());
+        let player = q.input(CHORD, true, || false);
+        assert_eq!(player, QuickInput { consume: true, request: true, refused: false });
+        assert_eq!(q.input(CHORD, true, || true), QuickInput { consume: true, request: false, refused: false });
+        // Not eligible (no practice, the setting off): nothing, and the pilot is not asked.
+        let mut q = QuickReset::new();
+        assert_eq!(q.input(CHORD, false, || panic!("not asked")), QuickInput::default());
+    }
     }
 }
 

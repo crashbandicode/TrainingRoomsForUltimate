@@ -181,12 +181,58 @@ pub fn physical_mask(style: u32, set: u16) -> u32 {
 pub struct Sample {
     pub held: u16,
     pub pressed: u16,
+    /// The controller is a GameCube pad. Online Deluxe reads its two triggers as L and R, which are this plugin's ZL and
+    /// ZR there (`logical_set`).
+    pub gamecube: bool,
+    /// Online Deluxe's window is drawn (`model::deluxe_overlay`): its rows move with D-pad Up/Down and change with
+    /// ZR + Left/Right.
+    pub overlay: bool,
 }
 
 impl Sample {
     pub fn of(style: u32, current: u32, just_down: u32) -> Self {
-        Self { held: logical_set(style, current), pressed: logical_set(style, just_down) }
+        Self {
+            held: logical_set(style, current),
+            pressed: logical_set(style, just_down),
+            gamecube: style == STYLE_GAMECUBE,
+            overlay: false,
+        }
     }
+
+    /// The same sample with Online Deluxe's window state for this poll.
+    pub const fn with_overlay(self, overlay: bool) -> Self {
+        Self { overlay, ..self }
+    }
+}
+
+/// The four D-pad buttons.
+const DPAD: u16 = (1 << logical::DPAD_UP) | (1 << logical::DPAD_DOWN) | (1 << logical::DPAD_LEFT) | (1 << logical::DPAD_RIGHT);
+/// Both triggers: Online Deluxe's L + R on a GameCube pad.
+const TRIGGERS: u16 = (1 << logical::ZL) | (1 << logical::ZR);
+
+/// Online Deluxe's L + R chords are being held and `chord` is not one of them: L held on most controllers (rc.8), both
+/// triggers held on a GameCube pad (rc.9 C3). A chord that holds those buttons itself is the player's own.
+pub fn deluxe_shoulders(chord: Chord, sample: Sample) -> bool {
+    let l = 1u16 << logical::L;
+    let l_held = sample.held & l != 0 && chord.0 & l == 0;
+    let triggers = sample.gamecube && sample.held & TRIGGERS == TRIGGERS && chord.0 & TRIGGERS != TRIGGERS;
+    l_held || triggers
+}
+
+/// Whether a chord row passes beside Online Deluxe (rc.8 and rc.9, `PLUGIN-SHORTCUT-CONFLICTS.md`):
+/// - C4: no row with a D-pad button while Deluxe's window is drawn (its rows take D-pad Up/Down and ZR + Left/Right);
+/// - C3: on a GameCube pad, no row with ZL or ZR, and no rc.8 row, while both triggers are held (Deluxe's L + R there);
+/// - rc.8 (`rc8_row`, Input display and Game speed): not while L is held (Deluxe's L + R + D-pad Down holds R + Down).
+pub fn passes_row(chord: Chord, sample: Sample, rc8_row: bool) -> bool {
+    if !passes(chord, sample) || (sample.overlay && chord.0 & DPAD != 0) {
+        return false;
+    }
+    let l = 1u16 << logical::L;
+    let gc_triggers = sample.gamecube && sample.held & TRIGGERS == TRIGGERS && chord.0 & TRIGGERS != TRIGGERS;
+    if gc_triggers && (rc8_row || chord.0 & TRIGGERS != 0) {
+        return false;
+    }
+    !(rc8_row && sample.held & l != 0 && chord.0 & l == 0)
 }
 
 /// Whether `chord` passes on `sample` (§2.2 with the B8 edge rule): there is a held button `H` in the
@@ -205,10 +251,9 @@ pub fn passes(chord: Chord, sample: Sample) -> bool {
 
 /// rc.8's two rows (Input display, Game speed) pass only while L is not held, unless the chord holds L itself: Online
 /// Deluxe's overlay opens with L + R + D-pad Down, which contains the Input display chord R + D-pad Down (the docs lane,
-/// 2026-11-11 19:57Z: opening that overlay flipped the input display).
+/// 2026-11-11 19:57Z: opening that overlay flipped the input display). rc.9 adds C3 and C4 (`passes_row`).
 pub fn passes_without_l(chord: Chord, sample: Sample) -> bool {
-    let l = 1u16 << logical::L;
-    passes(chord, sample) && (chord.0 & l != 0 || sample.held & l == 0)
+    passes_row(chord, sample, true)
 }
 
 /// A request a consumer pulls (SPEC-input-04 §4 "pending-request flags").
@@ -368,7 +413,7 @@ impl Detector {
             (Request::RecordingPopup, chords.recording_popup),
             (Request::InputDisplay, chords.input_display),
         ] {
-            let pass = if request == Request::InputDisplay { passes_without_l(chord, sample) } else { passes(chord, sample) };
+            let pass = passes_row(chord, sample, request == Request::InputDisplay);
             if !pass {
                 continue;
             }
@@ -492,7 +537,7 @@ mod tests {
     }
 
     fn sample(held: &[u8], pressed: &[u8]) -> Sample {
-        Sample { held: bits(held), pressed: bits(pressed) }
+        Sample { held: bits(held), pressed: bits(pressed), ..Sample::default() }
     }
 
     fn row(at: &[usize]) -> [u8; 16] {
@@ -695,8 +740,8 @@ mod tests {
         ];
         for (request, chord) in rows {
             assert_eq!(chord.0 & l, 0, "{request:?}'s factory chord has no L");
-            let plain = Sample { held: chord.0, pressed: chord.0 };
-            let with_l = Sample { held: chord.0 | l, pressed: chord.0 };
+            let plain = Sample { held: chord.0, pressed: chord.0, ..Sample::default() };
+            let with_l = Sample { held: chord.0 | l, pressed: chord.0, ..Sample::default() };
             let without = Detector::new().poll(&set, plain, false);
             assert_eq!(without & request.bit(), request.bit(), "{request:?} fires");
             assert_eq!(Detector::new().poll(&set, with_l, false), without, "{request:?} with L held");
@@ -709,9 +754,78 @@ mod tests {
         assert_eq!(Detector::new().poll(&set, b_up_l, false), without);
         // The two rc.8 rows: not with L, as before without it.
         for chord in [set.input_display, set.game_speed] {
-            let plain = Sample { held: chord.0, pressed: chord.0 };
+            let plain = Sample { held: chord.0, pressed: chord.0, ..Sample::default() };
             assert!(passes_without_l(chord, plain) && passes(chord, plain));
-            assert!(!passes_without_l(chord, Sample { held: chord.0 | l, pressed: chord.0 }));
+            assert!(!passes_without_l(chord, Sample { held: chord.0 | l, pressed: chord.0, ..Sample::default() }));
+        }
+    }
+
+    /// rc.9 C4 (`PLUGIN-SHORTCUT-CONFLICTS.md`): while Online Deluxe's window is drawn, its rows take D-pad Up/Down and
+    /// ZR + Left/Right (ZR + Right on its CPU Pilot page handed P1 to the CPU as TR opened the Recording pop-up). No row
+    /// with a D-pad button fires then, and none of its buttons is hidden from the game; the menu shortcuts and a row
+    /// without the D-pad are unchanged.
+    #[test]
+    fn deluxe_window_stands_the_dpad_rows_down() {
+        let set = ChordSet::factory();
+        let rows = [
+            (Request::SaveState, set.save_state),
+            (Request::LoadState, set.load_state),
+            (Request::InputRecord, set.input_record),
+            (Request::InputPlayback, set.input_playback),
+            (Request::CpuCycle, set.cpu_cycle),
+            (Request::PlayerCycle, set.player_cycle),
+            (Request::PlayPlayer, set.play_player),
+            (Request::RecordingPopup, set.recording_popup),
+            (Request::InputDisplay, set.input_display),
+        ];
+        for (request, chord) in rows {
+            let press = Sample { held: chord.0, pressed: chord.0, ..Sample::default() };
+            let mut detector = Detector::new();
+            assert_eq!(detector.poll(&set, press.with_overlay(true), false), 0, "{request:?} with the window drawn");
+            assert_eq!(detector.hidden(), 0, "{request:?}: the game and Deluxe see the press");
+            assert_eq!(Detector::new().poll(&set, press, false) & request.bit(), request.bit(), "{request:?} without it");
+        }
+        let mut detector = Detector::new();
+        detector.poll(&set, sample(&[logical::R, DPAD_UP], &[DPAD_UP]).with_overlay(true), false);
+        assert_eq!(detector.hold_event(), crate::model::game_speed::HoldEvent::Idle, "the speed hold stays closed");
+        let mut detector = Detector::new();
+        detector.poll(&set, sample(&[B, DPAD_UP], &[DPAD_UP]).with_overlay(true), false);
+        assert!(detector.consume(Request::OpenMenu), "B + D-pad Up still opens the menu");
+        let mut detector = Detector::new();
+        detector.poll(&set, sample(&[logical::MINUS], &[logical::MINUS]).with_overlay(true), false);
+        assert!(detector.consume(Request::OpenMenu), "Minus still opens the menu");
+        let mut menu = Snapshot::factory();
+        menu.set("input_display_toggle", &row(&[logical::X as usize, logical::Y as usize])).unwrap();
+        let x_y = ChordSet::factory().with_rows(&menu);
+        let press = sample(&[logical::X, logical::Y], &[logical::Y]).with_overlay(true);
+        assert_eq!(Detector::new().poll(&x_y, press, false), Request::InputDisplay.bit(), "a row without the D-pad fires");
+    }
+
+    /// rc.9 C3: on a GameCube pad Online Deluxe's L + R is both triggers, this plugin's ZL + ZR, so L + R + D-pad Down
+    /// saved a state and started a recording at once. No ZL/ZR row and no rc.8 row fires while both are held; one
+    /// trigger works as before, and a Pro Controller holding ZL + ZR is unchanged. C10: Deluxe's L + R + Left/Right
+    /// (its peer cycle) fires no row on either pad.
+    #[test]
+    fn gamecube_triggers_are_deluxes_l_and_r() {
+        use logical::{DPAD_DOWN, R, ZL};
+        let set = ChordSet::factory();
+        let gc = |held: &[u8], pressed: &[u8]| Sample { gamecube: true, ..sample(held, pressed) };
+        for dir in [DPAD_DOWN, DPAD_UP, DPAD_LEFT, DPAD_RIGHT] {
+            let mut detector = Detector::new();
+            assert_eq!(detector.poll(&set, gc(&[ZL, ZR, dir], &[dir]), false), 0, "both triggers + {dir}");
+            assert_eq!(detector.hidden(), 0);
+        }
+        assert_eq!(Detector::new().poll(&set, gc(&[ZL, DPAD_DOWN], &[DPAD_DOWN]), false), Request::SaveState.bit());
+        assert_eq!(Detector::new().poll(&set, gc(&[ZR, DPAD_DOWN], &[DPAD_DOWN]), false), Request::InputRecord.bit());
+        assert_eq!(Detector::new().poll(&set, gc(&[R, DPAD_DOWN], &[DPAD_DOWN]), false), Request::InputDisplay.bit());
+        assert_eq!(Detector::new().poll(&set, gc(&[ZL, ZR, R, DPAD_DOWN], &[DPAD_DOWN]), false), 0, "Z + Down in it");
+        // The pad's own bits: both triggers arrive as the game's L and R (`logical_set`, style 7).
+        let raw = Sample::of(super::STYLE_GAMECUBE, super::bit::L | super::bit::R | super::bit::DPAD_DOWN, super::bit::DPAD_DOWN);
+        assert_eq!(Detector::new().poll(&set, raw, false), 0);
+        let both = Request::SaveState.bit() | Request::InputRecord.bit();
+        assert_eq!(Detector::new().poll(&set, sample(&[ZL, ZR, DPAD_DOWN], &[DPAD_DOWN]), false), both, "Pro: unchanged");
+        for dir in [DPAD_LEFT, DPAD_RIGHT] {
+            assert_eq!(Detector::new().poll(&set, sample(&[logical::L, R, dir], &[dir]), false), 0, "C10: L + R + {dir}");
         }
     }
 

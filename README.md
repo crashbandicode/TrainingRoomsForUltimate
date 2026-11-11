@@ -127,6 +127,11 @@ around. Let go and the pop-up closes; the speed stays.
 Both chords are rows of Display & Controls › Button chords ("Input display" and "Game speed"), editable and clearable
 like the others. They don't fire while L is held, so Online Deluxe's L + R + D-pad overlay chords leave them alone.
 
+With Online Deluxe 0.10.5 or later, no chord that uses the D-pad fires while Deluxe's window is open (its rows use
+D-pad Up/Down and ZR + Left/Right), so ZR + Right on its CPU Pilot page no longer also opens the Recording pop-up.
+The menu shortcuts still work. On a GameCube controller, Deluxe's L + R is both triggers: the ZL/ZR chords and the
+two chords above don't fire while both triggers are held, and one trigger works as before.
+
 ### Combos
 
 *+ Save last combo…* (Recording › Combos & Sequences) saves a combo you landed, and the combo helper grades your next
@@ -296,8 +301,12 @@ game's own waiting-room menu are remembered for the next room, and CPU › Level
 
 With the CPU pilot plugin 0.2.3 (`libssbu_cpu_pilot.nro`), the pilot can also drive Player 1 in Quickplay's
 waiting-room practice. Arm it from its CPU Pilot page as in Training. The practice shows no `CPU Lv` tag, and when a
-match is found the pilot keeps Player 1 in the match. The lobby tools above work beside it, Record is refused while it
-drives, and the Game speed chord works at every speed.
+match is found the pilot keeps Player 1 in the match. The lobby tools above work beside it, Record, Play on Player 1
+and Quick Reset are refused while it drives, and the Game speed chord works at every speed.
+
+To leave a Quickplay room before the match starts (the game's Pause › Leave Battle, which the QuickPlay cancel fix
+plugin keeps open for a few seconds after you join), close the TrainingRooms menu first: while it is open, Plus
+doesn't reach the game.
 
 ![Save last combo in a Local Wireless waiting room, then the helper bar drills it there](docs/media/rc6-lobby-combos.gif)
 

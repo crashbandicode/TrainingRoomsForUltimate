@@ -18,7 +18,7 @@
 
 use core::fmt::Write;
 
-use super::chords::{glyph, logical, passes_without_l, Sample};
+use super::chords::{deluxe_shoulders, glyph, logical, passes_without_l, Sample};
 use super::menu::chord::Chord;
 use super::storage::FixedPath;
 
@@ -151,10 +151,11 @@ impl Hold {
                 self.open = 0;
                 return HoldEvent::Closed;
             }
-            // With L held (and not in the chord) a Left/Right is not a step: Online Deluxe's chords are L + R + a button.
-            let l_held = sample.held & (1 << logical::L) != 0 && self.open & (1 << logical::L) == 0;
-            let left = !l_held && sample.pressed & (1 << logical::DPAD_LEFT) != 0;
-            let right = !l_held && sample.pressed & (1 << logical::DPAD_RIGHT) != 0;
+            // A Left/Right is not a step while Online Deluxe has it: its L + R chords are held (L, or both triggers on a
+            // GameCube pad, and not in the chord; rc.8 and rc.9 C3), or its window is drawn (rc.9 C4).
+            let deluxe = deluxe_shoulders(Chord(self.open), sample) || sample.overlay;
+            let left = !deluxe && sample.pressed & (1 << logical::DPAD_LEFT) != 0;
+            let right = !deluxe && sample.pressed & (1 << logical::DPAD_RIGHT) != 0;
             return match (left, right) {
                 (true, false) => HoldEvent::Step(Dir::Left),
                 (false, true) => HoldEvent::Step(Dir::Right),

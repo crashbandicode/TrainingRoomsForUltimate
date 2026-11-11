@@ -660,6 +660,17 @@ unsafe fn chord_step(settings: &RecorderSettings, _body: Body, facing: i8) {
         }
         return;
     }
+    // rc.9 C14: Play on Player 1 is refused while an AI drives Player 1 (the same check as Record's B4).
+    let play_player = match crate::model::recording::play_player_chord(play_player, || {
+        crate::model::recording::p1_driven_by_ai(natives::is_operation_cpu(0), crate::runtime::ui::pilot_export())
+    }) {
+        Ok(play) => play,
+        Err(text) => {
+            notices::refuse(text);
+            event("play_player_refused", "reason", 1, "", 0);
+            false
+        }
+    };
     let record = record && settings.trigger_chord;
     // A Record that would start the worker's capture asks the same refusals as every other record start (B4).
     let record = match record_chord(record, recording_host::capturing(), || record_refusal()) {

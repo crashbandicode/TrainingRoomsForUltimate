@@ -638,6 +638,19 @@ fn a_record_chord_that_starts_a_capture_is_refused_while_an_ai_drives_p1() {
     assert_eq!(record_chord(false, true, || panic!("no chord asks no refusal")), Ok(false));
 }
 
+/// rc.9 C14 (`PLUGIN-SHORTCUT-CONFLICTS.md`): Play on Player 1 writes P1's input, as the standalone pilot does while it
+/// drives P1, so its chord is refused then, with R7's check and notice style. Unarmed, inactive or absent: it plays.
+#[test]
+fn play_on_player_1_is_refused_while_an_ai_drives_p1() {
+    let pilot = |export: PilotStateExport| move || unsafe { p1_driven_by_ai(false, Some(export)) };
+    assert_eq!(play_player_chord(true, pilot(pilot_armed_l3)), Err("P1 is controlled by an AI: Play on Player 1 is off"));
+    assert_eq!(play_player_chord(true, pilot(pilot_unarmed)), Ok(true));
+    assert_eq!(play_player_chord(true, pilot(pilot_inactive)), Ok(true));
+    assert_eq!(play_player_chord(true, || unsafe { p1_driven_by_ai(false, None) }), Ok(true), "no pilot: it plays");
+    assert!(play_player_chord(true, || unsafe { p1_driven_by_ai(true, None) }).is_err(), "the operator flag too");
+    assert_eq!(play_player_chord(false, || panic!("no chord asks nothing")), Ok(false));
+}
+
 /// R7: a starting Record chord answers exactly as `record_refusal` does, over every combination of its live facts (the
 /// numbered and named starts ask the same function).
 #[test]
