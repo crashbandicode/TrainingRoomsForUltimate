@@ -913,6 +913,8 @@ const GAME_ENTRIES: &[&str] = &[
 const NOT_GAME_ENTRIES: &[(&str, &str)] = &[
     ("imp::detached", "a plugin thread's start (runtime::threads); its thread is walked from model::thread_stacks"),
     ("imp::joined", "a plugin thread's start (runtime::threads); its thread is walked from model::thread_stacks"),
+    ("native_service::training_mod_native_service_pre", NATIVE_SERVICE_HALF),
+    ("native_service::training_mod_native_service_post", NATIVE_SERVICE_HALF),
     ("inline_keyboard::changed", KEYBOARD_CALLBACK),
     ("inline_keyboard::moved", KEYBOARD_CALLBACK),
     ("inline_keyboard::entered", KEYBOARD_CALLBACK),
@@ -962,6 +964,10 @@ const MODEL_CALLBACKS: &[(&str, &str)] = &[
 
 const KEYBOARD_CALLBACK: &str = "the inline keyboard's SDK callback: the SDK runs it synchronously on the thread that calls into \
                                  the keyboard (inline_keyboard.rs), so it is walked from there (KEYBOARD_CALLBACKS), not as an entry";
+
+const NATIVE_SERVICE_HALF: &str = "a half of the native service dispatch, on the game's thread (rc.7 FLAG 6): the dispatch hands pre \
+                                   to the service-stack trampoline by address (a value edge) and calls post, so both are walked from \
+                                   native_service::training_mod_native_service_dispatch (the_native_service_dispatch_hands_its_halves_to_the_walk)";
 
 /// The inline keyboard's SDK callbacks, run synchronously inside the SDK calls of `Keyboard::open` (Appear), `poll` (Calc) and
 /// `close` (Finalize) on the keyboard's owner thread: `tr-menu` for the menu's keyboard (`native_keyboard`), a game hook for the Mii
@@ -1393,6 +1399,26 @@ fn every_function_handed_to_the_game_is_listed() {
     let stale: Vec<&String> = listed.difference(&handed).collect();
     assert!(missing.is_empty(), "handed to the game but on neither GAME_ENTRIES nor NOT_GAME_ENTRIES: {missing:?}");
     assert!(stale.is_empty(), "listed but no longer handed out: {stale:?}");
+}
+
+/// rc.7 FLAG 6: the native service dispatch runs its pre-service poll on a service stack, handing `training_mod_native_service_pre`
+/// to the trampoline by address, and calls `training_mod_native_service_post` itself. Both still run on the game's thread, so the
+/// walk from the dispatch (a game entry) must still reach them: `pre` through that value edge, `post` as a direct call.
+#[test]
+fn the_native_service_dispatch_hands_its_halves_to_the_walk() {
+    let graph = runtime_graph();
+    let dispatch = "native_service::training_mod_native_service_dispatch";
+    assert!(GAME_ENTRIES.contains(&dispatch));
+    let find = |key: &str| -> usize {
+        let found = graph.find(key);
+        assert_eq!(found.len(), 1, "{key}: {found:?}");
+        found[0]
+    };
+    let (from, pre, post) = (find(dispatch), find("native_service::training_mod_native_service_pre"),
+        find("native_service::training_mod_native_service_post"));
+    assert!(value_edges(&graph).iter().any(|&(f, _, to)| f == from && to == pre), "the dispatch no longer hands pre to the walk");
+    let (ctx, _) = scan(&graph);
+    assert!(calls(&graph.funcs[from].body).iter().any(|c| ctx.resolve(from, c).contains(&post)), "the dispatch no longer calls post");
 }
 
 /// R2 finding 5's guard: every game entry and every plugin thread's entry resolves to a function on its module path, or is listed in

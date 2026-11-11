@@ -176,6 +176,63 @@ pub const fn slot_bytes(ids: &[ThreadId]) -> usize {
     most
 }
 
+/// Stacks the plugin owns for its work inside a game callback that runs on a game thread whose stack it does not size.
+///
+/// rc.7 FLAG 6 (integration 2026-11-11 01:20Z, Eden `final-surface-acc-d8679593-r2`): the native service `main+0x650010`
+/// runs on whatever stack its caller has: a 1 MiB thread stack in most runs (S3 `rc7ku-s3s`: 1,032,992 B free), but at
+/// `acc-rename` a 64 KiB stack inside a heap block (`[HookStack] site=native_service … kind=0x5`: 63,728 B free). The
+/// plugin ran all its pre-service work there: a 236,608 B static path, `sources::service` alone a 77,808 B frame, so
+/// that dispatch wrote under the stack and faulted. The rows above cover only threads the plugin spawns. Now the
+/// plugin's part runs on one of these stacks and only the game's own call stays on the game's stack; both halves are
+/// checked here and by `tools/stack_depth.py <elf> table`.
+#[derive(Clone, Copy, Debug)]
+pub struct CallbackStack {
+    pub name: &'static str,
+    /// Bytes of each stack, and how many there are (one per dispatch in flight, nested ones included).
+    pub bytes: usize,
+    pub count: usize,
+    /// Deepest static path of the functions that run on these stacks, plus the trampoline's frame: a lower bound.
+    pub static_bound: usize,
+    /// The least room measured at the callback's entry on the game's stack (`[HookStack]` `min_free`).
+    pub native_room: usize,
+    /// Deepest static path that stays on the game's stack: the entry, the dispatch and its direct callees.
+    pub native_bound: usize,
+    pub measured_in: &'static str,
+    /// The functions run on these stacks; then the entry, whose path stays on the game's stack.
+    pub on_stack: &'static [&'static str],
+    pub entry: &'static str,
+}
+
+impl CallbackStack {
+    /// The plugin's part fits its own stack, and what stays on the game's stack fits the room measured there; each with
+    /// the rows' margin and SDK reserve.
+    pub const fn covers(&self) -> bool {
+        self.bytes.is_multiple_of(4096) && self.bytes >= required(self.static_bound, 0) && required(self.native_bound, 0) <= self.native_room
+    }
+}
+
+/// The native service's stacks (`runtime::roster::native_service`). Only the pre-service poll runs on them, each claimed
+/// for one poll; the owners' gates and leaves stay on the game's stack (`native_bound`), so the leaves never wait for a
+/// stack, and a poll that finds none free is skipped. 320 KiB is the smallest page multiple the rule allows for the poll's
+/// path; four stacks: 1.25 MiB of `.bss`.
+pub const SERVICE_STACK: CallbackStack = CallbackStack {
+    name: "native-service",
+    bytes: 320 * KIB,
+    count: 4,
+    static_bound: 236_992,
+    native_room: 63_728,
+    native_bound: 10_832,
+    measured_in: "Eden final-surface-acc-d8679593-r2 ([HookStack] site=native_service min_free=63728)",
+    on_stack: &["training_mod_native_service_pre"],
+    entry: "training_mod_native_service_entry",
+};
+
+/// The free stack among `count` whose bit `i` in `held` marks stack `i` in use: the lowest free one.
+pub const fn free_stack(held: u32, count: usize) -> Option<usize> {
+    let free = (!held).trailing_zeros() as usize;
+    if free < count { Some(free) } else { None }
+}
+
 /// The size of `nn::os::ThreadType` the static thread objects reserve (the SDK's 0x1c0, as the playbook's plugins use).
 pub const THREAD_OBJECT_BYTES: usize = 0x1c0;
 

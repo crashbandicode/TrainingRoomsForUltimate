@@ -223,6 +223,68 @@ def check_table(funcs, rows):
     return lines, bad
 
 
+CALLBACK_RE = re.compile(r"pub const (\w+): CallbackStack = CallbackStack \{(.*?)\};", re.S)
+
+
+def callback_rows(text):
+    """`model::thread_stacks` CallbackStack consts: the stacks the plugin owns for its work inside a game callback."""
+    def field(body, name):
+        m = re.search(name + r":\s*([^,\n]+),", body)
+        expr = m.group(1).strip()
+        if '"' in expr or "[" in expr:
+            return re.findall(r'"([^"]+)"', expr)
+        n = re.match(r"([\d_]+)(?:\s*\*\s*KIB)?$", expr)
+        return int(n.group(1).replace("_", "")) * (1024 if "KIB" in expr else 1)
+    rows = []
+    for m in CALLBACK_RE.finditer(text):
+        body = m.group(2) + ","
+        on_stack = re.search(r"on_stack:\s*&?\[([^\]]*)\]", body).group(1)
+        rows.append({"const": m.group(1), "name": field(body, "name")[0], "bytes": field(body, "bytes"),
+                     "static_bound": field(body, "static_bound"), "native_room": field(body, "native_room"),
+                     "native_bound": field(body, "native_bound"), "on_stack": re.findall(r'"([^"]+)"', on_stack),
+                     "entry": field(body, "entry")[0]})
+    return rows
+
+
+TRAMPOLINE = 16  # training_mod_native_service_on_stack's own frame on the service stack
+
+
+def check_callbacks(funcs, rows):
+    """rc.7 FLAG 6: a game callback the plugin serves on a game thread. What runs on the plugin's own stack must fit it, and
+    what stays on the game's stack (the entry's path; the plugin's part is entered through a register, so the walk does not
+    follow it) must fit the room measured there. A function the row names but the ELF lacks fails: the plugin's work would
+    still be on the game's stack."""
+    by_name = {}
+    for f in funcs.values():
+        by_name.setdefault(f["name"], f)
+    lines, bad = [], 0
+    for row in rows:
+        for name in row["on_stack"]:
+            f = by_name.get(name)
+            if f is None:
+                bad += 1
+                lines.append(f"{row['name']:20s} {name}: not in this ELF FAIL")
+                continue
+            depth = deepest(funcs, f["addr"])[0] + TRAMPOLINE
+            need = required(max(depth, row["static_bound"]), 0)
+            ok = row["static_bound"] >= depth and row["bytes"] >= need
+            bad += not ok
+            lines.append(f"{row['name']:20s} {name}: size={row['bytes']:7d} static={depth:7d} table_static={row['static_bound']:7d} "
+                         f"required={need:7d} {'ok' if ok else 'FAIL'}")
+        f = by_name.get(row["entry"])
+        if f is None:
+            bad += 1
+            lines.append(f"{row['name']:20s} {row['entry']}: not in this ELF FAIL")
+            continue
+        depth = deepest(funcs, f["addr"])[0]
+        need = required(max(depth, row["native_bound"]), 0)
+        ok = row["native_bound"] >= depth and need <= row["native_room"]
+        bad += not ok
+        lines.append(f"{row['name']:20s} {row['entry']} (game stack): static={depth:7d} table_static={row['native_bound']:7d} "
+                     f"required={need:7d} room={row['native_room']:7d} {'ok' if ok else 'FAIL'}")
+    return lines, bad
+
+
 HOOK_RE = re.compile(r"#\[(?:skyline::)?hook\(")
 
 # The hook budget from Eden (stream/stack, st-02..st-11, diag 5d21cf2f): the least stack room any hook or callback found at
@@ -342,9 +404,11 @@ def main():
                         print(f"   {g['frame']:7d}  blr={g['indirect']:<3d} {g['name'][:200]}")
     elif cmd == "table":
         path = sys.argv[3] if len(sys.argv) > 3 else "src/model/thread_stacks.rs"
-        lines, bad = check_table(funcs, table_rows(open(path).read()))
-        print("\n".join(lines))
-        sys.exit(1 if bad else 0)
+        text = open(path).read()
+        lines, bad = check_table(funcs, table_rows(text))
+        callback_lines, callback_bad = check_callbacks(funcs, callback_rows(text))
+        print("\n".join(lines + callback_lines))
+        sys.exit(1 if bad or callback_bad else 0)
 
 
 if __name__ == "__main__":
