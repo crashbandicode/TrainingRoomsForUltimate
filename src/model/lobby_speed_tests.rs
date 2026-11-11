@@ -1,6 +1,7 @@
 //! rc.8 R2: the lobby's 2/3 pace (against a model of the game's slow step), x1.5's cadence and gate, and the scheduler
 //! walk (against a fake scheduler laid out as `FUN_0137b3f0` reads it).
 
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 
 use super::super::game_speed::{fresh_table, table, Held, LobbyNow, LobbySlot, LobbyStep, Speed};
@@ -218,17 +219,19 @@ fn the_extra_pass_needs_the_live_practice_unpaused_with_no_slow_and_between_pass
 
 #[derive(Default)]
 struct Fake {
-    bytes: HashMap<usize, u8>,
+    bytes: RefCell<HashMap<usize, u8>>,
 }
 
 impl Fake {
-    fn put(&mut self, at: usize, value: u64, len: usize) {
+    fn put(&self, at: usize, value: u64, len: usize) {
+        let mut bytes = self.bytes.borrow_mut();
         for i in 0..len {
-            self.bytes.insert(at + i, (value >> (8 * i)) as u8);
+            bytes.insert(at + i, (value >> (8 * i)) as u8);
         }
     }
     fn get(&self, at: usize, len: usize) -> u64 {
-        (0..len).fold(0, |v, i| v | u64::from(*self.bytes.get(&(at + i)).unwrap_or(&0)) << (8 * i))
+        let bytes = self.bytes.borrow();
+        (0..len).fold(0, |v, i| v | u64::from(*bytes.get(&(at + i)).unwrap_or(&0)) << (8 * i))
     }
 }
 
@@ -250,7 +253,7 @@ const WALKER: usize = 0x7135_8970;
 /// A scheduler with `phases[p]` = the (group, tick) of each entry, phase 3's deque starting at element 254 so it spans two
 /// blocks. Each entry, task and vtable lives at its own address.
 fn scheduler(phases: &[&[(i32, usize)]], masks: &[(usize, u32)]) -> Fake {
-    let mut m = Fake::default();
+    let m = Fake::default();
     let mut next = 0x20_0000usize;
     let mut alloc = |size: usize| {
         let at = next;
@@ -290,8 +293,34 @@ fn scheduler(phases: &[&[(i32, usize)]], masks: &[(usize, u32)]) -> Fake {
     m
 }
 
-fn tick(n: usize) -> usize {
+const fn tick(n: usize) -> usize {
     0x71_0000_0000 + 0x100 * n
+}
+
+/// Ten tasks over phases 0, 1, 3, 5 and 9, the walker in phase 1; with groups 2 and 12 masked (`scheduler(&SAMPLE,
+/// MASKS)`), phase 3 lists three.
+const SAMPLE: [&[(i32, usize)]; 10] = [
+    &[(9, tick(1)), (0, tick(2))],
+    &[(8, tick(3)), (8, WALKER), (4, tick(4))],
+    &[],
+    &[(3, tick(5)), (12, tick(6)), (2, tick(7)), (0, tick(8))],
+    &[],
+    &[(5, tick(9))],
+    &[],
+    &[],
+    &[],
+    &[(6, tick(10))],
+];
+const MASKS: &[(usize, u32)] = &[(2, 1), (12, 1)];
+
+/// The entry, task and vtable of element `i` of phase `phase` in a `scheduler` fake.
+fn element(m: &Fake, phase: usize, i: usize) -> (usize, usize, usize) {
+    let deque = S + 0x30 * phase;
+    let (map, index) = (m.u64(deque + 0x60) as usize, m.u64(deque + 0x78) as usize + i);
+    let block = m.u64(map + 8 * (index / 256)) as usize;
+    let entry = m.u64(block + 16 * (index % 256)) as usize;
+    let task = m.u64(entry + 0x40) as usize;
+    (entry, task, m.u64(task) as usize)
 }
 
 #[test]
@@ -312,7 +341,7 @@ fn the_walk_follows_the_scheduler_and_leaves_out_the_walker_and_masked_groups() 
     let m = scheduler(&phases, &[(2, 1), (12, 1)]);
     let mut out = [Task::default(); 16];
     let plan = plan_pass(&m, S, WALKER, &mut out);
-    assert_eq!(plan, Plan { tasks: 9, skipped: 1, masked: 1, broken: 0 });
+    assert_eq!(plan, Plan { tasks: 9, skipped: 1, masked: 1, broken: 0, widest: 3 });
     assert!(plan.runnable());
     let got: Vec<(u8, usize)> = out[..plan.tasks].iter().map(|t| (t.phase, t.tick)).collect();
     assert_eq!(
@@ -338,24 +367,104 @@ fn a_walk_that_is_not_whole_or_has_no_walker_is_not_run() {
     let mut out = [Task::default(); 4];
     assert!(!plan_pass(&m, S, tick(99), &mut out).runnable());
     // No scheduler.
-    assert_eq!(plan_pass(&m, 0, WALKER, &mut out), Plan { tasks: 0, skipped: 0, masked: 0, broken: 1 });
+    assert_eq!(plan_pass(&m, 0, WALKER, &mut out), Plan { tasks: 0, skipped: 0, masked: 0, broken: 1, widest: 0 });
     // A null entry, a task without a vtable, a tick that is not code: broken, not run.
-    let mut broken = scheduler(&phases, &[]);
+    let broken = scheduler(&phases, &[]);
     let block = broken.u64(broken.u64(S + 0x60) as usize) as usize;
     broken.put(block, 0, 8);
     let plan = plan_pass(&broken, S, WALKER, &mut out);
     assert_eq!((plan.broken, plan.runnable()), (1, false));
-    let mut broken = scheduler(&phases, &[]);
+    let broken = scheduler(&phases, &[]);
     let entry = broken.u64(block) as usize;
     let task = broken.u64(entry + 0x40) as usize;
     broken.put(task, 0, 8);
     assert!(!plan_pass(&broken, S, WALKER, &mut out).runnable());
-    let mut broken = scheduler(&phases, &[]);
+    let broken = scheduler(&phases, &[]);
     let vtable = broken.u64(task) as usize;
     broken.put(vtable + 0x30, 0x71_0000_0002, 8);
     assert!(!plan_pass(&broken, S, WALKER, &mut out).runnable());
     // A deque larger than any the scheduler holds.
-    let mut huge = scheduler(&phases, &[]);
+    let huge = scheduler(&phases, &[]);
     huge.put(S + 0x80, 100_000, 8);
     assert!(!plan_pass(&huge, S, WALKER, &mut out).runnable());
+}
+
+// --- the pass (the docs lane's R2 review, findings 1 and 2) ----------------------------------------------------------
+
+#[test]
+fn counting_and_listing_walks_agree_and_a_phase_wider_than_the_buffer_is_not_run() {
+    let m = scheduler(&SAMPLE, MASKS);
+    let mut out = [Task::default(); 16];
+    assert_eq!(plan_phases(&m, S, 0..sched::PHASES, WALKER, None), plan_pass(&m, S, WALKER, &mut out));
+    assert_eq!(plan_phases(&m, S, 3..4, WALKER, None), Plan { tasks: 3, skipped: 0, masked: 1, broken: 0, widest: 3 });
+    let wide: Vec<(i32, usize)> = (0..=sched::PHASE_TASKS).map(|n| (0, tick(100 + n))).collect();
+    let phases: [&[(i32, usize)]; 10] = [&[(8, WALKER)], &wide, &[], &[], &[], &[], &[], &[], &[], &[]];
+    let survey = plan_phases(&scheduler(&phases, &[]), S, 0..sched::PHASES, WALKER, None);
+    assert_eq!((survey.broken, survey.widest), (0, sched::PHASE_TASKS + 1));
+    assert!(!survey.runnable(), "one phase holds more tasks than the pass's buffer");
+}
+
+#[test]
+fn the_pass_ticks_every_task_in_the_schedulers_order_and_is_whole() {
+    let m = scheduler(&SAMPLE, MASKS);
+    let mut out = [Task::default(); 16];
+    let plan = plan_pass(&m, S, WALKER, &mut out);
+    let mut buf = [Task::EMPTY; sched::PHASE_TASKS];
+    let mut ticked = Vec::new();
+    let pass = run_pass(&m, S, WALKER, &mut buf, || true, |t| ticked.push(t));
+    assert_eq!(pass, Pass { survey: plan, ticked: 9, whole: true });
+    assert_eq!(ticked, out[..9]);
+}
+
+#[test]
+fn each_phase_is_read_again_right_before_its_ticks() {
+    // Phase 0's first tick gives phase 3's first task another tick: phase 3 ticks the new one.
+    let m = scheduler(&SAMPLE, MASKS);
+    let (_, _, vtable) = element(&m, 3, 0);
+    let mut buf = [Task::EMPTY; sched::PHASE_TASKS];
+    let mut ticked = Vec::new();
+    let pass = run_pass(&m, S, WALKER, &mut buf, || true, |t| {
+        if t.tick == tick(1) {
+            m.put(vtable + 0x30, tick(50) as u64, 8);
+        }
+        ticked.push((t.phase, t.tick));
+    });
+    assert!(pass.whole);
+    assert!(ticked.contains(&(3, tick(50))) && !ticked.contains(&(3, tick(5))), "{ticked:?}");
+    // Phase 0's first tick frees phase 3's second task: phases 0 and 1 ran, phase 3 is not ticked, the pass not whole.
+    let m = scheduler(&SAMPLE, MASKS);
+    let (_, task, _) = element(&m, 3, 1);
+    let mut ticked = Vec::new();
+    let pass = run_pass(&m, S, WALKER, &mut buf, || true, |t| {
+        if t.tick == tick(1) {
+            m.put(task, 0, 8);
+        }
+        ticked.push(t.tick);
+    });
+    assert_eq!((pass.ticked, pass.whole), (4, false));
+    assert_eq!(ticked, [tick(1), tick(2), tick(3), tick(4)]);
+}
+
+#[test]
+fn the_pass_stops_between_ticks_once_the_practice_is_no_longer_live() {
+    let m = scheduler(&SAMPLE, MASKS);
+    let live = Cell::new(true);
+    let mut buf = [Task::EMPTY; sched::PHASE_TASKS];
+    let mut ticked = Vec::new();
+    // Phase 1's first task runs the practice's teardown (its session clear drops the live flag).
+    let pass = run_pass(&m, S, WALKER, &mut buf, || live.get(), |t| {
+        ticked.push(t.tick);
+        if t.tick == tick(3) {
+            live.set(false);
+        }
+    });
+    assert_eq!((pass.ticked, pass.whole), (3, false));
+    assert_eq!(ticked, [tick(1), tick(2), tick(3)]);
+    // No walker: nothing ticks. A buffer narrower than the widest phase: nothing ticks.
+    let mut calls = 0;
+    let pass = run_pass(&m, S, tick(99), &mut buf, || true, |_| calls += 1);
+    assert_eq!((pass.ticked, pass.whole), (0, false));
+    let mut narrow = [Task::EMPTY; 2];
+    let pass = run_pass(&m, S, WALKER, &mut narrow, || true, |_| calls += 1);
+    assert_eq!((pass.ticked, pass.whole, calls), (0, false, 0));
 }

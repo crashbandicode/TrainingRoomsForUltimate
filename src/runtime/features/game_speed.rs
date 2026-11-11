@@ -431,8 +431,9 @@ unsafe fn lobby_pace(base: usize) {
     let _ = step;
 }
 
-/// x1.5: on every other allowed update, one extra world step (`lobby::lobby_speed::extra_pass`). No lock is held while
-/// the world's tasks run (Player 1's frame inside them takes `LOBBY`).
+/// x1.5: on every other allowed update, one extra world step (`lobby::lobby_speed::extra_pass`). No `game_speed` lock is
+/// held while the world's tasks run (Player 1's frame inside them takes `LOBBY`), and the pass stops between ticks once
+/// `LOBBY_LIVE` drops.
 ///
 /// # Safety
 /// As `lobby_update`.
@@ -458,24 +459,28 @@ unsafe fn lobby_extra_step(base: usize) {
     if !due {
         return;
     }
-    let plan = pass::extra_pass(base, s);
+    let Some(done) = pass::extra_pass(base, s, &LOBBY_LIVE) else { return };
     #[cfg(feature = "diag")]
     {
         let n = pass::passes();
         static SKIPPED: AtomicU32 = AtomicU32::new(0);
-        if !plan.runnable() {
+        let plan = done.survey;
+        if !done.whole {
             if SKIPPED.fetch_add(1, Ordering::Relaxed) < 4 {
-                crate::runtime::diag_log::diagnostic(format_args!("[GameSpeed] lobby pass skipped {plan:?}"));
+                crate::runtime::diag_log::diagnostic(format_args!(
+                    "[GameSpeed] lobby pass skipped ticked={} {plan:?}",
+                    done.ticked
+                ));
             }
         } else if n <= 2 || n.is_multiple_of(600) {
             crate::runtime::diag_log::diagnostic(format_args!(
-                "[GameSpeed] lobby pass n={n} tasks={} skipped={} masked={}",
-                plan.tasks, plan.skipped, plan.masked
+                "[GameSpeed] lobby pass n={n} tasks={} skipped={} masked={} widest={}",
+                plan.tasks, plan.skipped, plan.masked, plan.widest
             ));
         }
     }
     #[cfg(not(feature = "diag"))]
-    let _ = plan;
+    let _ = done;
 }
 
 /// The practice's teardown (`session_clear`: the practice P1's destroy, the scene's exit, a scene change, the

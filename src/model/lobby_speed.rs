@@ -155,6 +155,8 @@ pub mod sched {
     pub const MASKED_MAX: i32 = 9;
     /// No walk reads more elements than this per phase (the census had 56 in all).
     pub const MAX_PER_PHASE: usize = 256;
+    /// The pass's task buffer: the most tasks one phase may hand it.
+    pub const PHASE_TASKS: usize = 96;
 }
 
 /// The phase word the scheduler stores before a phase's tasks: -1 for phases 0 and 9, the number otherwise.
@@ -192,10 +194,14 @@ pub struct Task {
     pub tick: usize,
 }
 
+impl Task {
+    pub const EMPTY: Task = Task { phase: 0, task: 0, tick: 0 };
+}
+
 /// What a walk found.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Plan {
-    /// Tasks written to `out`, in the scheduler's order.
+    /// Tasks to tick, in the scheduler's order (written to `out` when the walk has one).
     pub tasks: usize,
     /// Tasks whose tick is the skipped one (the registry walker).
     pub skipped: usize,
@@ -204,75 +210,143 @@ pub struct Plan {
     /// Entries, tasks or vtables that failed the pointer check, and elements past `out` or `MAX_PER_PHASE`: the walk
     /// was not the scheduler's own, so the pass doesn't run.
     pub broken: usize,
+    /// The most tasks to tick in one phase.
+    pub widest: usize,
 }
 
 impl Plan {
-    /// The pass runs only on a whole, clean walk with the walker found once.
+    /// The pass runs only on a whole, clean walk with the walker found once, and no phase wider than the buffer.
     pub const fn runnable(&self) -> bool {
-        self.broken == 0 && self.skipped == 1 && self.tasks > 0
+        self.broken == 0 && self.skipped == 1 && self.tasks > 0 && self.widest <= sched::PHASE_TASKS
     }
 }
 
-/// Walk the scheduler `s` as `FUN_0137b3f0` does unpaused (phases 0..=9, every element of each deque, masked groups
-/// left out) and list every task to tick, minus the task whose tick is `skip_tick`. Nothing is called.
-pub fn plan_pass(mem: &impl Mem, s: usize, skip_tick: usize, out: &mut [Task]) -> Plan {
+/// Walk the phases `phases` of the scheduler `s` as `FUN_0137b3f0` does unpaused (every element of each deque, masked
+/// groups left out), minus the task whose tick is `skip_tick`. With `out`, list each task to tick there (an element
+/// past its end is broken); without, only count. Nothing is called.
+pub fn plan_phases(
+    mem: &impl Mem,
+    s: usize,
+    phases: core::ops::Range<usize>,
+    skip_tick: usize,
+    mut out: Option<&mut [Task]>,
+) -> Plan {
     let mut plan = Plan::default();
     if !object(s) {
         plan.broken += 1;
         return plan;
     }
-    for phase in 0..sched::PHASES {
-        let deque = s + sched::STRIDE * phase;
-        let begin = mem.u64(deque + sched::BEGIN_AT) as usize;
-        let end = mem.u64(deque + sched::END_AT) as usize;
-        if begin == end {
-            continue;
+    for phase in phases.start..phases.end.min(sched::PHASES) {
+        let before = plan.tasks;
+        walk_phase(mem, s, phase, skip_tick, out.as_deref_mut(), &mut plan);
+        plan.widest = plan.widest.max(plan.tasks - before);
+    }
+    plan
+}
+
+/// The whole walk (phases 0..=9), listed into `out`.
+pub fn plan_pass(mem: &impl Mem, s: usize, skip_tick: usize, out: &mut [Task]) -> Plan {
+    plan_phases(mem, s, 0..sched::PHASES, skip_tick, Some(out))
+}
+
+fn walk_phase(mem: &impl Mem, s: usize, phase: usize, skip_tick: usize, mut out: Option<&mut [Task]>, plan: &mut Plan) {
+    let deque = s + sched::STRIDE * phase;
+    let begin = mem.u64(deque + sched::BEGIN_AT) as usize;
+    let end = mem.u64(deque + sched::END_AT) as usize;
+    if begin == end {
+        return;
+    }
+    let start = mem.u64(deque + sched::START_AT) as usize;
+    let size = mem.u64(deque + sched::SIZE_AT) as usize;
+    if !object(begin) || size > sched::MAX_PER_PHASE {
+        plan.broken += 1;
+        return;
+    }
+    for index in start..start + size {
+        let block = mem.u64(begin + (index / sched::PER_BLOCK) * 8) as usize;
+        if !object(block) {
+            plan.broken += 1;
+            return;
         }
-        let start = mem.u64(deque + sched::START_AT) as usize;
-        let size = mem.u64(deque + sched::SIZE_AT) as usize;
-        if !object(begin) || size > sched::MAX_PER_PHASE {
+        let entry = mem.u64(block + (index % sched::PER_BLOCK) * sched::ELEMENT) as usize;
+        if !object(entry) {
             plan.broken += 1;
             continue;
         }
-        for index in start..start + size {
-            let block = mem.u64(begin + (index / sched::PER_BLOCK) * 8) as usize;
-            if !object(block) {
-                plan.broken += 1;
-                break;
-            }
-            let entry = mem.u64(block + (index % sched::PER_BLOCK) * sched::ELEMENT) as usize;
-            if !object(entry) {
-                plan.broken += 1;
+        let group = mem.i32(entry + sched::ENTRY_GROUP_AT);
+        if group <= sched::MASKED_MAX {
+            let mask_at = (s + sched::MASKS_AT).wrapping_add((group as isize * 4) as usize);
+            if mem.u32(mask_at) != 0 {
+                plan.masked += 1;
                 continue;
             }
-            let group = mem.i32(entry + sched::ENTRY_GROUP_AT);
-            if group <= sched::MASKED_MAX {
-                let mask_at = (s + sched::MASKS_AT).wrapping_add((group as isize * 4) as usize);
-                if mem.u32(mask_at) != 0 {
-                    plan.masked += 1;
-                    continue;
-                }
-            }
-            let task = mem.u64(entry + sched::ENTRY_TASK_AT) as usize;
-            let vtable = if object(task) { mem.u64(task) as usize } else { 0 };
-            let tick = if object(vtable) { mem.u64(vtable + sched::TICK_SLOT) as usize } else { 0 };
-            if tick == 0 || !tick.is_multiple_of(4) {
-                plan.broken += 1;
-                continue;
-            }
-            if tick == skip_tick {
-                plan.skipped += 1;
-                continue;
-            }
+        }
+        let task = mem.u64(entry + sched::ENTRY_TASK_AT) as usize;
+        let vtable = if object(task) { mem.u64(task) as usize } else { 0 };
+        let tick = if object(vtable) { mem.u64(vtable + sched::TICK_SLOT) as usize } else { 0 };
+        if tick == 0 || !tick.is_multiple_of(4) {
+            plan.broken += 1;
+            continue;
+        }
+        if tick == skip_tick {
+            plan.skipped += 1;
+            continue;
+        }
+        if let Some(out) = out.as_deref_mut() {
             if plan.tasks == out.len() {
                 plan.broken += 1;
                 continue;
             }
             out[plan.tasks] = Task { phase: phase as u8, task, tick };
-            plan.tasks += 1;
+        }
+        plan.tasks += 1;
+    }
+}
+
+/// How an extra pass went.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Pass {
+    /// The whole walk, checked before any tick: nothing runs unless it is `runnable`.
+    pub survey: Plan,
+    /// Tasks ticked.
+    pub ticked: usize,
+    /// Every phase ran. The slow counters advance only then.
+    pub whole: bool,
+}
+
+/// x1.5's extra world step, the scheduler's way (the docs lane's R2 review, finding 1). The whole walk is checked first,
+/// without a buffer; then each phase is read again right before its ticks, as `FUN_0137b3f0` does (a tick may change a
+/// later phase's deque), and its tasks go to `tick` in order. The pass stops, not whole, when a phase's second read is
+/// not clean or `live` turns false between two ticks (the practice's teardown began inside a tick). `buf` holds one
+/// phase.
+pub fn run_pass(
+    mem: &impl Mem,
+    s: usize,
+    skip_tick: usize,
+    buf: &mut [Task],
+    live: impl Fn() -> bool,
+    mut tick: impl FnMut(Task),
+) -> Pass {
+    let survey = plan_phases(mem, s, 0..sched::PHASES, skip_tick, None);
+    let mut pass = Pass { survey, ticked: 0, whole: false };
+    if !survey.runnable() || survey.widest > buf.len() {
+        return pass;
+    }
+    for phase in 0..sched::PHASES {
+        let plan = plan_phases(mem, s, phase..phase + 1, skip_tick, Some(&mut *buf));
+        if plan.broken != 0 {
+            return pass;
+        }
+        for task in &buf[..plan.tasks] {
+            if !live() {
+                return pass;
+            }
+            tick(*task);
+            pass.ticked += 1;
         }
     }
-    plan
+    pass.whole = true;
+    pass
 }
 
 #[cfg(test)]
