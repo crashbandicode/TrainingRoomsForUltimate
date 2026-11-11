@@ -2,8 +2,9 @@
 """Static stack analysis of the plugin's ELF (the `.so` cargo-skyline turns into the NRO), stream/stack 2026-11-02.
 
 Per function: the bytes its prologue moves SP down by (the straight-line prologue simulated, including LLVM's inline
-stack-probe loop `sub x9, sp, #…; … mov sp, x9`). Call graph: direct `bl`, and tail `b` to a function start. Per entry: the
-deepest path, frames summed. Indirect calls (`blr`, vtables, `fmt` trait objects) and imports (SDK) are not followed, so
+stack-probe loop `sub x9, sp, #…; … mov sp, x9`, and the parts of it the machine outliner moved into an
+`OUTLINED_FUNCTION_*`, which opt-level "z" runs: rc.8 R6). Call graph: direct `bl`, and tail `b` to a function start.
+Per entry: the deepest path, frames summed. Indirect calls (`blr`, vtables, `fmt` trait objects) and imports (SDK) are not followed, so
 every number is a lower bound; the measured high-water marks of the diag build cover the rest (`model::thread_stacks`).
 
     python3 -I tools/stack_depth.py <elf> frames [--min N]       functions with frames of at least N bytes (default 4096)
@@ -54,12 +55,31 @@ def parse(text):
     return funcs
 
 
-def frame_of(insns):
+OUTLINED = "OUTLINED_FUNCTION_"
+
+
+def spliced(insns, funcs):
+    """The prologue's instructions with each `bl`/`b` to an `OUTLINED_FUNCTION_*` replaced by that function's body (opt-level
+    "z" runs LLVM's machine outliner, which moves register saves and `sub sp` out of prologues); stops at a tail `b`."""
+    out = []
+    for insn in insns[:96]:
+        _, op, args = insn
+        t = target(args) if op in ("bl", "b") else None
+        if t is not None and funcs is not None and t in funcs and funcs[t]["name"].startswith(OUTLINED):
+            out.extend(i for i in funcs[t]["insns"] if i[1] != "ret")
+            if op == "b":
+                break
+            continue
+        out.append(insn)
+    return out
+
+
+def frame_of(insns, funcs=None):
     """Bytes the prologue moves SP down by: the deepest point of the straight-line prologue."""
     sp = 0
     x9 = None
     deepest = 0
-    for _, op, args in insns[:96]:
+    for _, op, args in spliced(insns, funcs):
         a = args.replace(" ", "")
         if op == "sub" and a.startswith("sp,sp,#"):
             sp += imm(args) or 0
@@ -89,7 +109,11 @@ def target(args):
 def link(funcs):
     starts = set(funcs)
     for addr, f in funcs.items():
-        f["frame"] = frame_of(f["insns"])
+        if f["name"].startswith(OUTLINED):
+            # Its `sub sp` belongs to the prologue that calls it (counted there); only its own LR save is its frame.
+            f["frame"] = 16 if any(op == "str" and args.replace(" ", "").startswith("x30,[sp,#-") for _, op, args in f["insns"]) else 0
+        else:
+            f["frame"] = frame_of(f["insns"], funcs)
         calls, indirect = set(), 0
         for _, op, args in f["insns"]:
             if op in ("bl", "b"):

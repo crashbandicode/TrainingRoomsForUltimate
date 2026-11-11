@@ -134,6 +134,44 @@ class StackDepth(unittest.TestCase):
         self.assertIn("FAIL", lines[1])
         self.assertIn("no shim", lines[2])
 
+    def test_a_prologue_the_machine_outliner_split_is_still_counted(self):
+        # rc.8 R6, opt-level "z" (f6cad923's diag ELF, the CPU's begin_prepare): the register saves are an
+        # OUTLINED_FUNCTION between the frame record and `sub sp`; the old reader stopped at that `bl` (96 B of 116,576).
+        funcs = sd.link(sd.parse('''0000000000001000 <begin_prepare>:
+    1000: stp x29, x30, [sp, #-0x60]!
+    1004: bl 0x9000 <OUTLINED_FUNCTION_12>
+    1008: sub sp, sp, #0x1c, lsl #12
+    100c: sub sp, sp, #0x700
+    1010: bl 0x2000 <callee>
+    1014: ret
+
+0000000000002000 <callee>:
+    2000: str x30, [sp, #-0x10]!
+    2004: bl 0x9100 <OUTLINED_FUNCTION_40>
+    2008: ret
+
+0000000000003000 <tail_only>:
+    3000: b 0x9100 <OUTLINED_FUNCTION_40>
+
+0000000000009000 <OUTLINED_FUNCTION_12>:
+    9000: stp x28, x27, [sp, #0x10]
+    9004: stp x20, x19, [sp, #0x50]
+    9008: ret
+
+0000000000009100 <OUTLINED_FUNCTION_40>:
+    9100: sub sp, sp, #0x2d0
+    9104: str x30, [sp, #-0x10]!
+    9108: bl 0x3000 <tail_only>
+    910c: ret
+'''))
+        self.assertEqual(funcs[0x1000]["frame"], 0x60 + 0x1c700)
+        # The outlined `sub sp` (and its own LR save) count in the caller's prologue, not again in the outlined function.
+        self.assertEqual(funcs[0x2000]["frame"], 0x10 + 0x2d0 + 0x10)
+        self.assertEqual(funcs[0x3000]["frame"], 0x2d0 + 0x10)
+        self.assertEqual(funcs[0x9100]["frame"], 0x10)
+        self.assertEqual(funcs[0x9000]["frame"], 0)
+        self.assertEqual(funcs[0x1000]["calls"], {0x9000, 0x2000})
+
     def test_required_matches_the_model(self):
         # model::thread_stacks::required: max * 1.25 + 16 KiB, whole pages
         self.assertEqual(sd.required(59_840, 0), 94_208)
