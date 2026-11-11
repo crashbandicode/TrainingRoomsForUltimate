@@ -269,6 +269,20 @@ pub const fn record_refusal(
     }
 }
 
+/// A Record chord for the recording worker, which toggles a capture (`rr_host::on_chords`). A chord that would start one
+/// asks `refusal` first, the same refusals as every other record start (B4 first); a chord that stops the running capture
+/// always passes, and `refusal` is not asked. `Ok` is whether a Record goes to the worker; `Err` is the notice instead.
+pub fn record_chord(
+    record: bool,
+    capturing: bool,
+    refusal: impl FnOnce() -> Option<RecordRefusal>,
+) -> Result<bool, RecordRefusal> {
+    if !record || capturing {
+        return Ok(record);
+    }
+    refusal().map_or(Ok(true), Err)
+}
+
 /// The standalone ssbu-cpu-pilot's state export, `ssbu_cpu_pilot_state_v1(out) -> bool` (ABI 1, its
 /// `src/runtime.rs:510-538`, the same at 0162eed and 8b03e3b): `false` while the plugin is inactive.
 pub type PilotStateExport = unsafe extern "C" fn(*mut PilotStateV1) -> bool;

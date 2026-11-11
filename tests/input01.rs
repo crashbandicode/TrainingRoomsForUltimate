@@ -615,3 +615,37 @@ fn record_refused_while_the_standalone_pilot_drives_p1() {
     assert_eq!(std::mem::offset_of!(PilotStateV1, armed_level), 8);
     assert_eq!(std::mem::offset_of!(PilotStateV1, last_input), 16);
 }
+
+/// R7 (rc.8): since `0bb2bea3` the Record chord goes to the recording worker, which toggles a capture, and nothing asked B4
+/// any more. A chord that would start a capture now asks the same refusals as every other record start; a chord that stops a
+/// running capture (started before the pilot armed) still stops it, without asking.
+#[test]
+fn a_record_chord_that_starts_a_capture_is_refused_while_an_ai_drives_p1() {
+    let pilot = |export: PilotStateExport| move || record_refusal(unsafe { p1_driven_by_ai(false, Some(export)) }, true, false);
+    assert_eq!(record_chord(true, false, pilot(pilot_armed_l3)), Err(RecordRefusal::P1DrivenByAi));
+    assert_eq!(
+        record_chord(true, false, pilot(pilot_armed_l3)).map_err(RecordRefusal::text),
+        Err("P1 is controlled by an AI: recording is off")
+    );
+    assert_eq!(record_chord(true, false, pilot(pilot_unarmed)), Ok(true), "an unarmed pilot leaves P1 to the player");
+    assert_eq!(record_chord(true, false, pilot(pilot_inactive)), Ok(true), "an inactive export is not an AI");
+    assert_eq!(record_chord(true, true, || panic!("a stop asks no refusal")), Ok(true), "a running capture stops");
+    assert_eq!(record_chord(false, false, || panic!("no chord asks no refusal")), Ok(false));
+    assert_eq!(record_chord(false, true, || panic!("no chord asks no refusal")), Ok(false));
+}
+
+/// R7: a starting Record chord answers exactly as `record_refusal` does, over every combination of its live facts (the
+/// numbered and named starts ask the same function).
+#[test]
+fn a_starting_record_chord_answers_as_record_refusal() {
+    for ai in [false, true] {
+        for present in [false, true] {
+            for loading in [false, true] {
+                let expected = record_refusal(ai, present, loading);
+                let chord = record_chord(true, false, || record_refusal(ai, present, loading));
+                assert_eq!(chord.err(), expected, "ai={ai} present={present} loading={loading}");
+                assert_eq!(chord.ok(), expected.is_none().then_some(true));
+            }
+        }
+    }
+}
