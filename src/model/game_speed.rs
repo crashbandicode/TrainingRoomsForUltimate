@@ -18,7 +18,7 @@
 
 use core::fmt::Write;
 
-use super::chords::{glyph, logical, passes, Sample};
+use super::chords::{glyph, logical, passes_without_l, Sample};
 use super::menu::chord::Chord;
 use super::storage::FixedPath;
 
@@ -151,15 +151,17 @@ impl Hold {
                 self.open = 0;
                 return HoldEvent::Closed;
             }
-            let left = sample.pressed & (1 << logical::DPAD_LEFT) != 0;
-            let right = sample.pressed & (1 << logical::DPAD_RIGHT) != 0;
+            // With L held (and not in the chord) a Left/Right is not a step: Online Deluxe's chords are L + R + a button.
+            let l_held = sample.held & (1 << logical::L) != 0 && self.open & (1 << logical::L) == 0;
+            let left = !l_held && sample.pressed & (1 << logical::DPAD_LEFT) != 0;
+            let right = !l_held && sample.pressed & (1 << logical::DPAD_RIGHT) != 0;
             return match (left, right) {
                 (true, false) => HoldEvent::Step(Dir::Left),
                 (false, true) => HoldEvent::Step(Dir::Right),
                 _ => HoldEvent::Held,
             };
         }
-        if !blocked && passes(chord, sample) {
+        if !blocked && passes_without_l(chord, sample) {
             self.open = chord.0;
             return HoldEvent::Opened;
         }

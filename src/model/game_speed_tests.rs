@@ -94,6 +94,20 @@ fn hold_opens_on_the_chord_steps_on_left_right_and_closes_on_release() {
     assert_eq!(hold.poll(r_left, sample(&[R, LEFT], &[LEFT]), false), HoldEvent::Step(Dir::Left));
     hold.clear();
     assert!(!hold.is_open());
+    // With L held the chord doesn't open: Online Deluxe's L + R + D-pad Up (its 30 s capture) holds R + D-pad Up.
+    let l = logical::L;
+    assert_eq!(hold.poll(R_UP, sample(&[l, R, UP], &[UP]), false), HoldEvent::Idle, "L + R + Up is Online Deluxe's");
+    assert_eq!(hold.poll(R_UP, sample(&[l, R, UP], &[l, R, UP]), false), HoldEvent::Idle, "nor all three on one poll");
+    assert_eq!(hold.poll(R_UP, sample(&[R, UP], &[UP]), false), HoldEvent::Opened, "L released: it opens");
+    // While open, a Left/Right with L held is no step; without L it is.
+    assert_eq!(hold.poll(R_UP, sample(&[l, R, LEFT], &[LEFT]), false), HoldEvent::Held);
+    assert_eq!(hold.poll(R_UP, sample(&[l, R, RIGHT], &[RIGHT]), false), HoldEvent::Held);
+    assert_eq!(hold.poll(R_UP, sample(&[R, RIGHT], &[RIGHT]), false), HoldEvent::Step(Dir::Right));
+    // A hold chord that holds L itself opens and steps with L held.
+    let l_up = Chord((1 << l) | (1 << UP));
+    let mut hold = Hold::new();
+    assert_eq!(hold.poll(l_up, sample(&[l, UP], &[UP]), false), HoldEvent::Opened);
+    assert_eq!(hold.poll(l_up, sample(&[l, LEFT], &[LEFT]), false), HoldEvent::Step(Dir::Left));
 }
 
 #[test]

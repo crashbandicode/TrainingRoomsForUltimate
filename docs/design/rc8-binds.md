@@ -80,6 +80,16 @@ Where a choice is the operator's, this takes the sensible default and states it.
    - Why: R is free on every controller (the GameCube's Z), and it makes a third family beside ZL (states, cycles)
      and ZR (recording): two buttons, one shoulder, one D-pad direction.
    - Both rows are editable and can be emptied, like the eight others. Their reset and old-file rules are the same.
+   - **Not while L is held (added 2026-11-11, option 2 of the docs lane's 19:57Z finding; the primary 20:01Z).**
+     - Unlike the eight others, these two rows don't pass while L is held, unless the row's own chord holds L
+       (`chords::passes_without_l`). An open speed hold takes no Left/Right step while L is held.
+     - **Why:** Online Deluxe 0.10.4's chords on the card are L + R + a button: L + R + D-pad Down cycles its window's
+       pages, L + R + D-pad Up starts its 30 s capture, and L + R + X toggles. Extra buttons don't disqualify a chord,
+       so L + R + Down also flipped the input display, and L + R + Up would open the speed pop-up. The CPU pilot and
+       the counterpick plugin set their options in that same window.
+     - **The card scan** (`ultimate/` configs and the plugins' NRO strings, read-only, 2026-11-11): no other plugin
+       chord with R and a D-pad direction was found. The NRO strings show only text, so chords hard-coded as button
+       masks aren't covered.
 2. **The input display bind** flips `input_display_strip` between `Off` and `Frame strip`.
    - The flip is a settings change through the menu worker, like a change in the menu: published at once and saved
      with the settings. The menu then shows the same value: one source of truth.
@@ -203,6 +213,7 @@ Where a choice is the operator's, this takes the sensible default and states it.
 | "and then it goes away" | §3.3: closes on the poll no chord button is held; the speed stays | `hold_opens_on_the_chord_steps_on_left_right_and_closes_on_release` |
 | "in training it'll reflect in the training menu" | §3.6: `+0xb54` stored, then `0x1bbbd30(menu, value, menu+0x538)`, the setter's own unchanged-value path | `training_write_is_the_native_store_then_text`, `game_speed_rows_decode_the_native_offsets` |
 | R1 defect (the primary 2026-11-11 18:20Z): "The HUD stopwatch staying on \"x1.5\" after the chord steps back to x1" | §3.6: after the store and text, the UI tick runs the game's indicator refresh (`hud_icon`): `out_speed` and the flag cleared at x1, `in_speed` and the flag set away from it | `hud_icon_shows_away_from_x1_and_hides_back_at_x1`, `hud_icon_matches_the_speed_after_every_step_from_either_flag`, `game_speed_rows_decode_the_hud_icon` |
+| Chord overlap (the primary 2026-11-11 20:01Z, option 2): "the two rc.8 Training binds (Input display R + D-pad Down, and the speed hold's R + D-pad Up/Left/Right) don't pass while L is held" | §3.1: `chords::passes_without_l` for the two rows; an open hold takes no step with L held | `input_display_chord_raises_its_request`, `hold_opens_on_the_chord_steps_on_left_right_and_closes_on_release`, `only_the_rc8_rows_mind_l` |
 | "and the lobby it will just work" | §3.7–3.8: a plugin slot `{1, N}` in the BattleObjectSlow table, the native take and free steps, released before any round | `slot_take_and_free_match_the_native_steps`, `lobby_offers_the_training_speeds`, `lobby_slot_is_released_outside_the_practice_and_never_written_elsewhere` |
 | "can you make the speed up local too?" (§2b, owned by QCF) | §3.5, superseded by `docs/design/rc8-lobby-speed.md` (rc.8 R2): the lobby offers all five, 2/3 and x1.5 local | `lobby_offers_the_training_speeds` |
 

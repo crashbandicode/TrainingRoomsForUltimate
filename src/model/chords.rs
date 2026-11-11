@@ -203,6 +203,14 @@ pub fn passes(chord: Chord, sample: Sample) -> bool {
     })
 }
 
+/// rc.8's two rows (Input display, Game speed) pass only while L is not held, unless the chord holds L itself: Online
+/// Deluxe's overlay opens with L + R + D-pad Down, which contains the Input display chord R + D-pad Down (the docs lane,
+/// 2026-11-11 19:57Z: opening that overlay flipped the input display).
+pub fn passes_without_l(chord: Chord, sample: Sample) -> bool {
+    let l = 1u16 << logical::L;
+    passes(chord, sample) && (chord.0 & l != 0 || sample.held & l == 0)
+}
+
 /// A request a consumer pulls (SPEC-input-04 §4 "pending-request flags").
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Request {
@@ -360,7 +368,8 @@ impl Detector {
             (Request::RecordingPopup, chords.recording_popup),
             (Request::InputDisplay, chords.input_display),
         ] {
-            if !passes(chord, sample) {
+            let pass = if request == Request::InputDisplay { passes_without_l(chord, sample) } else { passes(chord, sample) };
+            if !pass {
                 continue;
             }
             fired |= chord.0;
@@ -470,7 +479,7 @@ pub fn unusable_on(chord: Chord, style: u32) -> bool {
 #[cfg(test)]
 mod tests {
     use super::logical::{self, A, B, DPAD_LEFT, DPAD_RIGHT, DPAD_UP, ZR};
-    use super::{passes, ChordSet, Detector, Request, Sample};
+    use super::{passes, passes_without_l, ChordSet, Detector, Request, Sample};
     use crate::model::factory::DEFS;
     use crate::model::menu::chord::Chord;
     use crate::model::menu::options::CHORD_ROWS;
@@ -649,12 +658,60 @@ mod tests {
         assert!(!detector.consume(Request::InputDisplay));
         assert_eq!(detector.poll(&set, sample(&[logical::R, logical::DPAD_DOWN], &[]), false), 0, "held: once");
         assert!(!passes(set.input_display, sample(&[logical::ZL, logical::DPAD_DOWN], &[logical::DPAD_DOWN])), "ZL + Down saves");
+        // Online Deluxe's overlay chord L + R + D-pad Down holds R + D-pad Down: the toggle stays put (2026-11-11 19:57Z).
+        let mut detector = Detector::new();
+        let overlay = sample(&[logical::L, logical::R, logical::DPAD_DOWN], &[logical::DPAD_DOWN]);
+        assert_eq!(detector.poll(&set, overlay, false), 0, "L + R + Down is Online Deluxe's overlay");
+        let overlay_at_once = sample(&[logical::L, logical::R, logical::DPAD_DOWN], &[logical::L, logical::R, logical::DPAD_DOWN]);
+        assert_eq!(detector.poll(&set, overlay_at_once, false), 0, "nor all three on one poll");
+        assert!(passes_without_l(set.input_display, toggle));
+        // A chord row that holds L itself still passes with L held.
+        let with_l = Chord(bits(&[logical::L, logical::DPAD_DOWN]));
+        assert!(passes_without_l(with_l, sample(&[logical::L, logical::DPAD_DOWN], &[logical::DPAD_DOWN])));
         // A row from the settings replaces the factory chord.
         let mut menu = Snapshot::factory();
         menu.set("input_display_toggle", &row(&[logical::X as usize, logical::Y as usize])).unwrap();
         let set = ChordSet::factory().with_rows(&menu);
         assert_eq!(set.input_display, Chord(bits(&[logical::X, logical::Y])));
         assert_eq!(set.game_speed, ChordSet::factory().game_speed);
+    }
+
+    /// The L exclusion is the two rc.8 rows' only: every other chord, and the menu shortcuts, fire with L held exactly
+    /// as without it.
+    #[test]
+    fn only_the_rc8_rows_mind_l() {
+        let set = ChordSet::factory();
+        let l = 1u16 << logical::L;
+        let rows = [
+            (Request::SaveState, set.save_state),
+            (Request::LoadState, set.load_state),
+            (Request::InputRecord, set.input_record),
+            (Request::InputPlayback, set.input_playback),
+            (Request::CpuCycle, set.cpu_cycle),
+            (Request::PlayerCycle, set.player_cycle),
+            (Request::PlayPlayer, set.play_player),
+            (Request::RecordingPopup, set.recording_popup),
+        ];
+        for (request, chord) in rows {
+            assert_eq!(chord.0 & l, 0, "{request:?}'s factory chord has no L");
+            let plain = Sample { held: chord.0, pressed: chord.0 };
+            let with_l = Sample { held: chord.0 | l, pressed: chord.0 };
+            let without = Detector::new().poll(&set, plain, false);
+            assert_eq!(without & request.bit(), request.bit(), "{request:?} fires");
+            assert_eq!(Detector::new().poll(&set, with_l, false), without, "{request:?} with L held");
+        }
+        // The permanent B + D-pad Up opens the menu with L held too.
+        let b_up = sample(&[B, DPAD_UP], &[DPAD_UP]);
+        let without = Detector::new().poll(&set, b_up, false);
+        assert_eq!(without & Request::OpenMenu.bit(), Request::OpenMenu.bit());
+        let b_up_l = sample(&[logical::L, B, DPAD_UP], &[DPAD_UP]);
+        assert_eq!(Detector::new().poll(&set, b_up_l, false), without);
+        // The two rc.8 rows: not with L, as before without it.
+        for chord in [set.input_display, set.game_speed] {
+            let plain = Sample { held: chord.0, pressed: chord.0 };
+            assert!(passes_without_l(chord, plain) && passes(chord, plain));
+            assert!(!passes_without_l(chord, Sample { held: chord.0 | l, pressed: chord.0 }));
+        }
     }
 
     #[test]
