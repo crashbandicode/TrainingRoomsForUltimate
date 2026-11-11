@@ -233,6 +233,14 @@ Play holds until those rows are answered. The cursor starts on Keep. Keep plays 
 Mismatch asks; Switch to recorded fighter reloads the CPU, and "Saved Mii applied" brings in the recorded Mii Gunner
 (red armour, spiked helmet).*
 
+The prompt's first line names the recorded fighter and the side that plays it: "current Player 1" or "current CPU".
+
+![A combo recorded on Luigi, drilled with Player 1 on Mario: Switch makes Player 1 Luigi](media/rc7-mismatch-player1.gif)
+
+*Eden, 2026-11-10, rc.7 `7d720c68` (diag NRO `a45ba951`, log lines only): Player 1 on Mario drills a combo recorded on
+Luigi, with Player Swapping Off. Fighter Mismatch reads "Recorded Luigi · current Player 1 Mario"; Switch to recorded
+fighter, and Player 1 becomes Luigi ("Player fighter applied"). Cuts inside are listed in [MEDIA.md](MEDIA.md).*
+
 ## Migration of the old slots
 
 The first time this library is built, empty slots are skipped. A recording slot that holds inputs becomes a macro named `Slot N (YYYY-MM-DD)`, using the date the migration runs and the slot's number starting at 1. Those macros have no start save, so they have no Start save switch, and they play from where the fighters are. No chain is built from them. Recording slots were never kept between boots, so on a card updated from an earlier build they are empty when the library is first built, and no slot becomes a macro. The save indexes are what carry over.

@@ -4,6 +4,27 @@ Every GIF in [`media/`](media/) is actual Eden footage: whole screen, 1280×720,
 game-speed timing kept, trimmed at the ends (any cut inside a clip is listed with it). Frames were reviewed (start,
 action, result) before a clip was kept. The raw takes stay outside git with their runs.
 
+## rc.7 docs clips (2026-11-10)
+
+- **Build:** rc.7 `7d720c68` (`p23/rc7-final` at 21:06Z: F1 plus the Fighter Mismatch role fix), the diag NRO
+  `a45ba951…`, which adds log lines only. rc.7's final head later moved to `b3678dfe`, which adds A's body-bank
+  scheduler fix. None of these three clips depends on that code.
+- **Run:** `docs-rc7b-7d720c68`, the Surface, one instance, 2026-11-10 21:38–22:38Z. 30 of 30 rows passed, after one
+  retry of four rows that had failed on harness faults.
+- **Review and cuts:**
+  - Each take was reviewed against its row's own timeline (`take_timeline.py`; batch F in
+    `artifacts/phase23/feature-gifs/takes/verdicts/`).
+  - Each was cut to before, action and result (`clips.py cutw`, 10 fps): one palette of 128 colours from three frames,
+    no dither, the game's frame times.
+  - Of a frame shorter than 1/10 s and the one after it, the longer is shown. Before 2026-11-11 00:58Z the cut kept the
+    first, and so dropped the 300 ms Switch frame from the first `rc7-mismatch-player1` cut.
+
+| File | Run, row | Embedded in | Length, size | Raw windows kept | What the frames show |
+| --- | --- | --- | --- | --- | --- |
+| `media/rc7-mismatch-player1.gif` | `docs-rc7b-7d720c68`, `cov-combo-other-fighter` | RECORDING.md, Fighter Mismatch | 5.8 s, 3.9 MB | 48.6–51.2, 53.0–56.2 s | 0–0.8 s the pop-up's COMBOS, the cursor on Luigi jabs ("Recorded on Luigi"); 0.8–2.2 s Fighter Mismatch, the footer "Recorded Luigi · current Player 1 Mario", Keep focused; 2.2–2.6 s "Switch to recorded fighter" focused and chosen; 2.6–4.6 s the match, Player 1 still Mario (HUD MARIO); 4.7–5.8 s Luigi drops in as Player 1, "Player Character · Player fighter applied", HUD LUIGI. Player Swapping was Off (it doesn't block this switch). |
+| `media/rc7-mii-editor.gif` | `docs-rc7b-7d720c68`, `fx-mii-editor-use` | README, Mii fighters | 7.3 s, 5.2 MB | 19.43–20.43, 34.92–36.42, 63.72–64.32, 67.12–68.62, 73.6–76.3 s | 0–1.0 s Smash's Mii Fighter Settings, specials 1/1/1/1; 1.0–2.4 s Neutral Special 2 Flashing Mach Punch and Side Special 2 Burning Dropkick, Save; 2.4–2.5 s the panel closes (Save); 2.5–3.1 s the Mii Brawler list with a fourth row, "4. 格斗 [2211]", the "> " on row 1; 3.1–3.8 s row 4 focused; 3.8–4.6 s "4. > 格斗 [2211]" (the marker leaves row 1); 4.6–7.3 s Training, Player 1 is Mii Brawler ("Player Mii configuration applied"), and B is the new neutral special's punch rush (strip: a multi-hit move). The row also checked that one new Mii file was written and nothing else changed. |
+| `media/rc7-lobby-stages-rotation.gif` | `docs-rc7b-7d720c68`, `fx-lobby-stages-rotation` | README, Stages | 7.8 s, 6.3 MB | 12.32–14.2, 24.92–27.4, 43.52–44.4, 66.67–69.2 s | 0–1.9 s the Lobby Stages grid: "1. Waiting Room", "2. Big Battlefield"; 1.9–3.0 s Training Stage Rotation [ON], the menu closes; 3.0–4.4 s Training on the training stage (Mario vs Donkey Kong); 4.4–5.3 s the character select, READY TO FIGHT; 5.3–7.8 s Training opens on Big Battlefield (Mario vs Dark Pit). The plugin's log names the stage it applied (`[TrainingRotation] apply`, stage 2). |
+
 ## rc.6 clips
 
 `rc6-sequence-drill.gif` comes from run `rc6-seq-diag1` on the Yoga, 2026-11-08, row `seq-gif`, 13:40:04–13:40:27Z,

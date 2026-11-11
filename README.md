@@ -176,6 +176,13 @@ New…, Smash's Mii editor on a copy of the class's Mii, Save at once. Back in T
 nothing new saved". The row checked that every Mii file stayed byte-identical. Cuts inside are listed in
 [docs/MEDIA.md](docs/MEDIA.md).*
 
+![Add New, two new specials, Save: the new Mii is listed, picked, and played](docs/media/rc7-mii-editor.gif)
+
+*Eden, 2026-11-10, rc.7 `7d720c68` (diag NRO `a45ba951`, log lines only): Add New… opens Smash's Mii editor. Neutral
+Special 2 and Side Special 2, then Save. The Mii Brawler list gains "4. 格斗 [2211]"; A picks it and the "> " moves to
+it. In Training, Player 1 is that Mii Brawler, and B is its new neutral special. The row checked that exactly one new
+Mii file was written. Cuts inside are listed in [docs/MEDIA.md](docs/MEDIA.md).*
+
 ### Stages
 
 ![Change Stage: Battlefield, Y for its Ω form, and Training reloads there](docs/media/change-stage.gif)
@@ -190,6 +197,12 @@ waiting-room practice; Y picks its form first.
 
 Pick the stages and their order for Training rotation and waiting-room practice. *RC10, 2026-11-04, NRO
 `50d95130`: the grid only.*
+
+![Lobby Stages ranks two stages; with Training Stage Rotation On, the next Training entry goes to Big Battlefield](docs/media/rc7-lobby-stages-rotation.gif)
+
+*Eden, 2026-11-10, rc.7 `7d720c68` (diag NRO `a45ba951`, log lines only): Lobby Stages ranks 1. Waiting Room and
+2. Big Battlefield, and Training Stage Rotation is On. From Training on the training stage, back through the character
+select, Training opens on Big Battlefield. Cuts inside are listed in [docs/MEDIA.md](docs/MEDIA.md).*
 
 ### Waiting rooms
 
