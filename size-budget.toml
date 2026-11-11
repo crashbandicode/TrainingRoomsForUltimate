@@ -1572,3 +1572,19 @@ ceiling = 165572
 date = "2026-11-11"
 reason = "rc.8 R1 fix on p23/rc8-binds 02af47fb over eca14e4b (165492): the speed bind runs the HUD speed indicator refresh after a closed-menu step (the primary 2026-11-11 18:20Z: an R1 defect, ships in rc.8); measured 165572 at 02af47fb (tools/size_gate.py, g9), +80"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.8 order (the primary 2026-11-11 18:20Z, R1 defect); a raise goes in its own commit with approved_by"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 165733
+date = "2026-11-11"
+reason = "rc.8 hang fix p23/rc8-handoff-spin f02d8589 over eca14e4b (165492): model::nowait_channel (std sync_channel's surface without the peer wait; the Add New hang, worker A's A3) replacing every std mpsc channel; measured 165733 at f02d8589 (tools/size_gate.py), +241"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the primary's 2026-11-11 18:01Z hang-fix order; a raise goes in its own commit with approved_by"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 165770
+date = "2026-11-11"
+reason = "rc.8 integration: p23/rc8-binds 0ee2d3d6 (R1 HUD stopwatch fix, 165572 = eca14e4b 165492 + 80) and p23/rc8-handoff-spin 04846d89 (the hang fix, model::nowait_channel) merged on eca14e4b in p23/rc8-integration (integration 2026-11-11 19:02Z): measured 165770"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.8 order (TASK-rc8.md; the primary 2026-11-11 18:47Z: the new head = eca14e4b + A's fix + the R1 stopwatch fix); a raise goes in its own commit with approved_by"

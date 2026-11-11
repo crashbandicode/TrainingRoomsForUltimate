@@ -3,7 +3,8 @@
 //! Returning the sender alongside the result permits reuse without keeping a
 //! spare sender alive while work runs. Dropped jobs report failure explicitly,
 //! return the endpoint, and preserve subsequent fallback requests.
-use std::sync::mpsc::{self, Receiver, SyncSender, TryRecvError};
+// The native side polls the replies: a `nowait_channel` never waits on a worker mid-send (rc.8 hang).
+use super::nowait_channel::{self as mpsc, Receiver, SyncSender, TryRecvError};
 
 pub struct Reply<T> {
     pub value: Result<T, ()>,

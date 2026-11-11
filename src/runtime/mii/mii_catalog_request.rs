@@ -2,7 +2,9 @@
 //! The game thread only queues and later applies an owned snapshot.
 
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{mpsc, Arc, Mutex};
+use std::sync::{Arc, Mutex};
+// rc.8 hang: the reply types are `nowait_channel`'s (std's channel spun on a worker mid-send).
+use crate::model::nowait_channel as mpsc;
 use crate::model::catalog_reply::{Job, Replies};
 use crate::runtime::ui::menu_app::{CatalogPublication, MENU_RECEIVED_INPUT};
 

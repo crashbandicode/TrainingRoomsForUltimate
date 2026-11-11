@@ -10251,7 +10251,7 @@
    "dest": "src/runtime/mii/mii_catalog_request.rs",
    "crate": "root",
    "src_sha256": "87a0062a0ef9cb6c0078409ff3ac876dd35d85d5e40aac6236eaed6f36482602",
-   "dest_sha256": "1273eef5190d91899271ce3ebcb915f7fad4e50bf90e68f7991ca49ed9fe6c37",
+   "dest_sha256": "9d0b86ecd6a06176873901e0df6bea6f0f146bccd7adb45b7fa9dafaabc7a898",
    "edits": [
     {
      "old": "use std::sync::{mpsc, Arc, Mutex};",
@@ -10419,6 +10419,11 @@
      "old": "    if let Some((verdict, snapshot)) = ready {\n",
      "new": "    if let Some((verdict, snapshot)) = ready {\n        // Every completed read, whatever its verdict: the editor checks its saved Mii here, on the game thread, never on the\n        // reader thread (the bridge's STATE is taken by game hooks; rc.6 Training-entry freeze class).\n        #[cfg(feature = \"mii-editor-alpha\")]\n        crate::runtime::mii::mii_editor_bridge::catalog_read(&snapshot);\n",
      "reason": "rc.6 freeze class (primary 2026-11-09 19:44Z; rc6-qpf3, tests/lock_order.rs): the saved-Mii catalog check runs on the game thread when the broker receives the snapshot (mii_catalog_request::service), never on the reader thread, because game hooks take the editor bridge's STATE"
+    },
+    {
+     "old": "use std::sync::{mpsc, Arc, Mutex};\n",
+     "new": "use std::sync::{Arc, Mutex};\n// rc.8 hang: the reply types are `nowait_channel`'s (std's channel spun on a worker mid-send).\nuse crate::model::nowait_channel as mpsc;\n",
+     "reason": "rc.8 \"Add New\u2026\" hang (worker A's finding A3, primary 2026-11-11 18:01Z): std's mpsc `try_recv`/`try_send` spin on a peer mid-operation, and the game's MainThread spun forever on the menu worker it had preempted on core 0; the channels game threads touch are `model::nowait_channel`, std's surface without the wait (tests/game_thread_handoffs.rs, tools/game_thread_wait_check.py)"
     }
    ]
   },
@@ -12657,7 +12662,7 @@
    "dest": "src/runtime/mii/mii_replay.rs",
    "crate": "root",
    "src_sha256": "2ff322e3ec71d67c29d255957d3c737af2e18a53bf72c2a98da78a70044ce9cb",
-   "dest_sha256": "95e2a87a011c07f81ee3289e878353aceb39be4953ee649c6935000f13eb02a0",
+   "dest_sha256": "7de7f0cbdaf957d0f3291abf42d6c5063df1836b22b4f5213760b4733a940291",
    "edits": [
     {
      "old": "//! Deferred replay resource identity. The existing Training service is the only native seam.\nuse super::*;\nuse std::{\n    collections::VecDeque,\n    sync::{mpsc, Arc},\n};\nuse crate::engine::mii::{\n    draft::Library,\n    lifetime::Configuration,\n    native_values::RowIds,\n    replay::{RawMii, ReplayMiis, Selection, SelectionSource, Target},\n};\n\nconst MAX_PENDING: usize = crate::engine::macros::MAX_RETAINED_CAPTURES * 8;\nstatic WORK: AtomicBool = AtomicBool::new(false);\nstatic STATE: Mutex<State> = Mutex::new(State {\n    pending: VecDeque::new(),\n    inflight: None,\n});\ntype Reply = mpsc::Sender<Result<Configuration, String>>;\nstruct Job {\n    raw: RawMii,\n    selected: Option<(u64, u64, Reply)>,\n}\nstruct Inflight {\n    job: Job,\n    configuration: Configuration,\n    result: mpsc::Receiver<Result<Arc<Library>, String>>,\n}\nstruct State {\n    pending: VecDeque<Job>,\n    inflight: Option<Inflight>,\n}\nfn generation() -> u64 {\n    mii_saved_alpha::current_generation(1)\n}\nfn current(job: &Job) -> bool {\n    job.selected.as_ref().is_none_or(|(epoch, revision, _)| {\n        *epoch == generation() && *revision == crate::runtime::macros::replay_capture::selection_revision()\n    })\n}\nfn finish(job: Job, result: Result<Configuration, String>) {\n    if let Some((_, _, reply)) = job.selected {\n        let _ = reply.send(result);\n    } else if let Err(error) = result {\n        trace!(\"[MiiReplay] deferred import unavailable: {error}; durable raw metadata retained\");\n    }\n}\n\n/// Called only after the companion was committed. This bounded queue is an optimization;\n/// the durable association remains authoritative and selected captures can retry after restart.\npub(crate) fn committed(miis: ReplayMiis) {\n    let mut s = STATE.lock().unwrap();\n    for raw in miis.entries() {\n        if s.pending.len() == MAX_PENDING {\n            break;\n        }\n        s.pending.push_back(Job {\n            raw: *raw,\n            selected: None,\n        });\n    }\n    WORK.store(\n        !s.pending.is_empty() || s.inflight.is_some(),\n        Ordering::Release,\n    );\n}\npub(crate) fn resolve(\n    raw: RawMii,\n    revision: u64,\n) -> Result<mpsc::Receiver<Result<Configuration, String>>, String> {\n    if !mii_ordinary_cpu::enabled() {\n        return Err(\"Replay Mii loading is unavailable in this build\".into());\n    }\n    let (reply, receive) = mpsc::channel();\n    let mut s = STATE.lock().unwrap();\n    if s.pending.len() == MAX_PENDING {\n        return Err(\"Mii import queue is busy; reopen this capture\".into());\n    }\n    s.pending.push_front(Job {\n        raw,\n        selected: Some((generation(), revision, reply)),\n    });\n    WORK.store(true, Ordering::Release);\n    Ok(receive)\n}\npub(crate) fn selected(target: Target, revision: u64) -> Selection {\n    Selection {\n",
@@ -12673,6 +12678,11 @@
      "old": "}\npub(crate) fn named_refusal(target: Target) -> Option<&'static str> {\n",
      "new": "}\n/// #54, reading B (primary 2026-11-08 23:03Z): `target` as the CPU Switch installs it, over the CPU catalog. None while\n/// the catalog is not there. Game callback only (it reads the CPU state).\npub(crate) fn installed_target(target: Target) -> Option<Target> {\n    target.configuration()?;\n    let catalog = mii_ordinary_cpu::replay_catalog()?;\n    Some(crate::engine::mii_install::installed_target(target, &catalog.configs))\n}\npub(crate) fn named_refusal(target: Target) -> Option<&'static str> {\n",
      "reason": "rc.6 TASK-OPUS-rc6-open-fixes item 2 (#54, primary inbox 2026-11-08 23:03Z, reading B): after a Switch the CPU holds what the install wrote (mii_install::installable: a replay Mii's filled create ID and name), so a recorded exact-Mii target is compared, exactly, as Switch installs it (mii_install::installed_target): replay_ready against the CPU catalog it holds, and mii_replay::installed_target for the identity worker's copy (the prompt's recorded_target_matches)"
+    },
+    {
+     "old": "use std::sync::{mpsc, Arc, OnceLock};\n",
+     "new": "use std::sync::{Arc, OnceLock};\n// rc.8 hang: the native service polls these; std's channel spun on a worker mid-send.\nuse crate::model::nowait_channel as mpsc;\n",
+     "reason": "rc.8 \"Add New\u2026\" hang (worker A's finding A3, primary 2026-11-11 18:01Z): std's mpsc `try_recv`/`try_send` spin on a peer mid-operation, and the game's MainThread spun forever on the menu worker it had preempted on core 0; the channels game threads touch are `model::nowait_channel`, std's surface without the wait (tests/game_thread_handoffs.rs, tools/game_thread_wait_check.py)"
     }
    ]
   },

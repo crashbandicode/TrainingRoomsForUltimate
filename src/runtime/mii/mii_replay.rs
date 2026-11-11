@@ -1,7 +1,9 @@
 //! Deferred replay resource identity. Native callbacks exchange boot-reserved values
 //! with the existing file writer; catalog construction stays on that writer.
 use super::*;
-use std::sync::{mpsc, Arc, OnceLock};
+use std::sync::{Arc, OnceLock};
+// rc.8 hang: the native service polls these; std's channel spun on a worker mid-send.
+use crate::model::nowait_channel as mpsc;
 use crate::model::{catalog_reply::{Job, Replies}, replay_jobs::{Identity, Queue, Work}, pooled_reply};
 use crate::engine::mii::{
     draft::Library, inventory::Snapshot as Catalog, lifetime::Configuration,

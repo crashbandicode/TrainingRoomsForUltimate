@@ -98,7 +98,7 @@ struct ResolveSelection { action:Option<ClipAction>, entry:usize }
 #[cfg(feature="mii-ordinary-cpu-alpha")]
 type ResolveTicket = crate::runtime::roster::character_roster::mii_replay::Ticket;
 #[cfg(not(feature="mii-ordinary-cpu-alpha"))]
-type ResolveTicket = std::sync::mpsc::Receiver<Result<Configuration,String>>;
+type ResolveTicket = crate::model::nowait_channel::Receiver<Result<Configuration,String>>;
 struct Reload { editor:Editor, requested:bool, ticks:u32, revision:u64,
     selection:Option<ResolveSelection>,
     resolving:Option<ResolveTicket>, resolve_error:Option<String> }

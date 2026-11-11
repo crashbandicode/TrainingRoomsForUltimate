@@ -1,6 +1,8 @@
 //! Boot-allocated close intent transport. A current opening retains its owned
 //! intent until close; a producer that observes Full retains ownership to retry.
-use std::sync::mpsc::{self, Receiver, SyncSender};
+//! The native side polls it every pre-service tick, so it is a `nowait_channel`:
+//! std's `try_recv` spun on the menu worker's in-flight `try_send` (rc.8 hang).
+use super::nowait_channel::{self as mpsc, Receiver, SyncSender};
 
 pub struct Intent<T> {
     pub opening: u32,
