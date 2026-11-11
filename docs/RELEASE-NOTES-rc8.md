@@ -2,7 +2,7 @@
 
 Notes for players. rc.8 is the internal name; the release's version name is set when it ships. Until then the menu's
 footer shows this build as `0.2.0-rc.6 · rc8` and the commit it was built from (below). This draft lists what the rc.8
-head `eca14e4b` contains for players, plus the CPU pilot plugin's 0.2.3, which ships beside it. How to use recording is
+head `3f9d61dd` contains for players, plus the CPU pilot plugin's 0.2.3, which ships beside it. How to use recording is
 [RECORDING.md](RECORDING.md), the frame strip is [FRAME-STRIP.md](FRAME-STRIP.md), and the pictures are the list in
 [MEDIA.md](MEDIA.md).
 
@@ -32,6 +32,10 @@ head `eca14e4b` contains for players, plus the CPU pilot plugin's 0.2.3, which s
   - The speed changes at once, with the menu closed: the chord sets the same Speed setting as the game's pause menu.
   - The pause menu's Other Settings › Speed and the HUD's stopwatch show the speed you chose, and a speed chosen in the
     pause menu is where the pop-up starts.
+  - The stopwatch appears as soon as you step away from x1 and goes away when you step back to x1, as it does when you
+    set the speed in the pause menu.
+
+![Back to x1: the stopwatch reads x1.5, then goes away](media/rc8-speed-hud-fixed.gif)
   - 1 Frame stays in the pause menu. While Training is on 1 Frame, the pop-up shows "1 Frame", and the first step goes
     from x1.
 - **In the waiting-room practice:** 1/4, 1/2, 2/3, x1 and x1.5, local only.
@@ -52,7 +56,7 @@ head `eca14e4b` contains for players, plus the CPU pilot plugin's 0.2.3, which s
 ### The build in the menu footer
 
 - The key hints at the foot of every menu page end with the build tag: the version, then `rc8` and the commit the NRO
-  was built from, for example `0.2.0-rc.6 · rc8 eca14e4b`.
+  was built from, for example `0.2.0-rc.6 · rc8 3f9d61dd`.
 - A build from uncommitted changes adds `-dirty`.
 
 ## Fixed

@@ -105,6 +105,13 @@ around. Let go and the pop-up closes; the speed stays.
   the game's pause menu (Other Settings › Speed), so the pause menu and the HUD's stopwatch show the speed you chose, and a speed chosen in the pause menu is where the
   pop-up starts. 1 Frame stays in the pause menu: while Training is on 1 Frame, the pop-up shows "1 Frame", and the
   first step goes from x1.
+  The stopwatch appears as soon as you step away from x1 and goes away when you step back to x1.
+
+  ![A forward smash at x1 with no stopwatch; Right to x1.5, and the stopwatch reads x1.5; Left back to x1, and it goes away](docs/media/rc8-speed-hud-fixed.gif)
+
+  *Eden, 2026-11-11, the rc.8 head `3f9d61dd` (diag NRO `04e95821`, log lines only), in Training: a forward smash at
+  x1 with no stopwatch; R + D-pad Up held, Right to x1.5, and the stopwatch reads x1.5; a quicker smash; held again,
+  Left back to x1, and the stopwatch goes away; a smash at x1.*
 - **In the waiting-room practice** the speed is local: 1/4, 1/2, 2/3, x1 and x1.5 change only your practice, while the
   room's timers and the other player stay at normal speed. Each practice session starts at x1.
 - It never changes a Quickplay or online match: a match always starts at normal speed.
