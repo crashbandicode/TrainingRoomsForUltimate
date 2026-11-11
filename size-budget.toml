@@ -1436,3 +1436,11 @@ ceiling = 164108
 date = "2026-11-11"
 reason = "rc.8 integration: p23/rc8-binds 9626926c (the lobby slot freed on the practice teardown, +33 over 1ecf920a) merged on 9d6c7e02 (164075) in p23/rc8-integration (integration 2026-11-11 09:45Z): 164075 + 33 = 164108"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.8 order (TASK-rc8.md) and the primary's 08:24Z defect order; a raise goes in its own commit with approved_by"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 164130
+date = "2026-11-11"
+reason = "rc.8 R7 p23/rc8-pilot-refusal over 38e58296 (164108): Record refused while an AI drives P1 on the recording worker's chord path (B4; the regression 0bb2bea3): model::recording::record_chord, chord_step's gate, recording_host::capturing; measured 164130 at 657c9da9 (tools/size_gate.py through tests/size_budget.rs), +22"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.8 order (TASK-rc8.md R7, operator 2026-11-11 06:24 EST: everything in rc.8) and the primary's 11:27Z R7 order; a raise goes in its own commit with approved_by"
