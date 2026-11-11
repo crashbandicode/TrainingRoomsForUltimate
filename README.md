@@ -125,7 +125,7 @@ around. Let go and the pop-up closes; the speed stays.
   <!-- R14 (worker B's r14bc-eca14e4b pair): keep this line only if R14 passes on the final head. -->
 
 Both chords are rows of Display & Controls › Button chords ("Input display" and "Game speed"), editable and clearable
-like the others.
+like the others. They don't fire while L is held, so Online Deluxe's L + R + D-pad overlay chords leave them alone.
 
 ### Combos
 

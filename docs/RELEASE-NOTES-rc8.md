@@ -52,6 +52,8 @@ head `3f9d61dd` contains for players, plus the CPU pilot plugin's 0.2.3, which s
 - They're two new rows of Display & Controls › Button chords: "Input display" and "Game speed".
 - They can be changed or cleared like the other chords.
 - R is Z on a GameCube controller.
+- R + D-pad binds don't fire while L is held, so Online Deluxe's L + R + D-pad overlay chords no longer toggle the input
+  display or open the speed pop-up.
 
 ### The build in the menu footer
 
