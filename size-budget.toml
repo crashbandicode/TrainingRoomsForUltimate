@@ -1564,3 +1564,11 @@ ceiling = 165492
 date = "2026-11-11"
 reason = "rc.8 integration: p23/rc8-waste 63b49abe (R3-R6, R8, R12, +315 over 729ab045 163358) merged on f85e70f5 (165177) in p23/rc8-integration (integration 2026-11-11 15:15Z): 165177 + 315 = 165492, the final rc.8 head"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.8 order (TASK-rc8.md SCOPE REOPENED, R3-R6); a raise goes in its own commit with approved_by"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 165572
+date = "2026-11-11"
+reason = "rc.8 R1 fix on p23/rc8-binds 02af47fb over eca14e4b (165492): the speed bind runs the HUD speed indicator refresh after a closed-menu step (the primary 2026-11-11 18:20Z: an R1 defect, ships in rc.8); measured 165572 at 02af47fb (tools/size_gate.py, g9), +80"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.8 order (the primary 2026-11-11 18:20Z, R1 defect); a raise goes in its own commit with approved_by"
