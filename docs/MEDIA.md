@@ -52,13 +52,29 @@ the shipped build), reviewed take by take (batch I). The rows' own takes are 128
 | `media/rc7-sequence-drill.gif` | `seq-gif` | README, Combos; RECORDING.md; RELEASE-NOTES-rc6.md | 6.0 s, 8.9 MB | 0–6.0 s | SEQUENCE Combo pairs: Pair 1 lands (✓), Pair 2 starts, "L1 wrong move: Up tilt", DROP +16, back at combo 1; streak 4 → 0, best 9. |
 | `media/rc7-record.gif` | `fx-record-list` (10 fps) | README, Recording and playback | 7.6 s, 3.5 MB | 11.6–13.0, 15.2–16.0, 17.9–18.7, 20.0–20.7, 22.4–23.7, 26.4–29.0 s | The pop-up with no saves and no macros (Player, then CPU); Record on Player 1 and two jabs; the pop-up lists "Macro 1" (Recorded on Mario) and "Macro 1 · start", with the connection. No playback. |
 
+From `docs-rd7-722525a5` (the Yoga, timed, alone, 2026-11-11 12:14–12:22Z) and `docs-rd7b-722525a5` (13:07–13:12Z),
+reviewed take by take (batches L and M): the reshoots of the clips that had been cropped.
+- **Why rd1's takes had failed:** the docs block's `strip` fixture bound a save with Player 1 30 units from the CPU, so
+  every jab missed.
+- **The fix:** these takes start from `cov-crop`'s `jab-start` instead (Player 1 at x −5 facing the CPU at x 5).
+- **The play chord:** the CPU loop is set to ∞, so only the second press can end the playback.
+
+| File | Row | Embedded in | Length, size | Raw windows kept | What the frames show |
+| --- | --- | --- | --- | --- | --- |
+| `media/rc7-frame-strip-advantage-hit.gif` | `gif-frame-strip-advantage-hit` | FRAME-STRIP.md | 3.0 s, 4.3 MB | 0–3.0 s | The jab lands at 0.8 s (CPU 2.7%); "ADVANTAGE −8 on hit" in red from 1.27 s. |
+| `media/rc7-frame-strip-advantage-shield.gif` | `gif-frame-strip-advantage-shield` | FRAME-STRIP.md | 2.9 s, 4.0 MB | 0–2.9 s | The jab on the held shield at 0.7 s; "−14 on shield" from 1.19 s; LINK stays "-"; CPU 0%. |
+| `media/rc7-frame-strip-drop.gif` | `gif-frame-strip-drop` | FRAME-STRIP.md | 3.4 s, 5.2 MB | 0–3.4 s | A hit at 0.7 s, a late jab: "LINK +17 DROP" in red, "INPUT +7 7f late, 17f past", LAST "DROP +17 Jab > Jab" at 1.27 s. |
+| `media/rc7-frame-strip-exchange.gif` | `gif-frame-strip-exchange` | FRAME-STRIP.md | 4.0 s, 5.9 MB | 0–4.0 s | A hit at 0.65 s (−8 on hit); the strip holds still 1.67–2.13 s; a second hit at 2.2 s opens a new exchange: LINK stays "-", LAST stays empty, the "adv −8" bracket moves under the new lanes (2.9 s). |
+| `media/rc7-frame-strip-freeze.gif` | `gif-frame-strip-freeze` | FRAME-STRIP.md | 5.0 s, 7.3 MB | 0–5.0 s | A hit at 0.7 s; the lanes hold still 1.66–3.4 s; the second jab (3.44 s, lands, 5.1%) starts the scroll again. |
+| `media/rc7-frame-strip-input.gif` | `gif-frame-strip-input` | FRAME-STRIP.md | 3.0 s, 4.2 MB | 0–3.0 s | "INPUT +3 3f late, 13f past" and "LINK +13 DROP" at 1.26 s; "ADVANTAGE −10 on hit" at 1.66 s. |
+| `media/rc7-frame-strip-last.gif` | `gif-frame-strip-last` | FRAME-STRIP.md | 3.6 s, 5.1 MB | 0–3.6 s | Three jabs: LAST "TRUE −5 Jab > Jab" at 0.94 s, then "TRUE 0 Jab > Jab" listed first at 1.2 s; "+1 on hit" in green at 1.99 s. |
+| `media/rc7-frame-strip-link.gif` | `gif-frame-strip-link` | FRAME-STRIP.md | 3.0 s, 4.6 MB | 0–3.0 s | "LINK −5 TRUE combo" in green with the green "window 6f" bar, LAST "TRUE −5" at 0.93 s; "−10 on hit" at 1.4 s. |
+| `media/rc7-play-chord.gif` | `docs-rd7b-722525a5`, `fx-play-stop` (10 fps) | RECORDING.md, Set active | 7.5 s, 8.9 MB | 17.6–25.1 s | Training; Play on CPU: one warp to the start save, then the CPU jabs in place, a new jab block in the strip's CPU lane every 25 frames; the same chord again at about 4.0 s: no new jab, the strip freezes, the CPU stands. |
+
 Kept from rc.5 but cut down to leave out the bar (primary 04:40Z, rule c: the retake from rd1 fell short, and the clip
 is clean outside the bar). The crops keep every frame and its time; the trims keep the menu part only.
-- Cropped to the top 436 rows (the bar is at y 443–466): `rc5-frame-strip-advantage-hit`, `-advantage-shield`,
-  `-drop`, `-exchange`, `-freeze`, `-input`, `-last`, `-link` (FRAME-STRIP.md) and `rc5-play-chord` (RECORDING.md),
-  each as `<name>-crop.gif`. The strip and readouts are whole; the fighters are cut at the knees or waist.
-  - The rd1 retakes of those eight strip clips started with Player 1 out of jab range (the setup's turn step logged
-    "no bodies found"), so no hit, no readout. The play-chord retake does not show the stop.
+- The eight frame-strip crops and the play-chord crop (`<name>-crop.gif`, 2026-11-11 morning) are no longer
+  embedded: the retakes above replace them.
 - Trimmed: `rc5-popup-trim.gif` (0.45–3.95 s, the pop-up only; the bar shows once it closes, so the close is not
   shown) and `rc5-recording-page-trim.gif` (from 0.5 s; the first 0.47 s in Training had the bar).
 - Removed: `rc5-record-start-save.gif` (RECORDING.md). `rc7-record-macro.gif`, embedded right after it, shows the

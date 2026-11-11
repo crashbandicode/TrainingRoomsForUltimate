@@ -76,7 +76,7 @@ Mash interrupts playback, when that option is On, stops the CPU's macro: the mas
 
 The old per-slot playback chords are not added.
 
-![Play on CPU warps once to the start save, then plays the active macro (top of the screen)](media/rc5-play-chord-crop.gif)
+![Play on CPU warps once to the start save and plays the active macro; the same chord again stops it](media/rc7-play-chord.gif)
 
 ![Both Play chords at once: Player 1 and the CPU play together, then one after the other](media/rc6-both-play.gif)
 
