@@ -80,16 +80,17 @@ Where a choice is the operator's, this takes the sensible default and states it.
    - Why: R is free on every controller (the GameCube's Z), and it makes a third family beside ZL (states, cycles)
      and ZR (recording): two buttons, one shoulder, one D-pad direction.
    - Both rows are editable and can be emptied, like the eight others. Their reset and old-file rules are the same.
-   - **Not while L is held (added 2026-11-11, option 2 of the docs lane's 19:57Z finding; the primary 20:01Z).**
+   - **Not while L is held (added 2026-11-11, option 2 of the docs lane's 19:57Z finding; the primary 20:01Z built it,
+     20:48Z chose it for rc.8).**
      - Unlike the eight others, these two rows don't pass while L is held, unless the row's own chord holds L
        (`chords::passes_without_l`). An open speed hold takes no Left/Right step while L is held.
      - **Why:** Online Deluxe 0.10.4's chords on the card are L + R + a button: L + R + D-pad Down cycles its window's
        pages, L + R + D-pad Up starts its 30 s capture, and L + R + X toggles. Extra buttons don't disqualify a chord,
        so L + R + Down also flipped the input display, and L + R + Up would open the speed pop-up. The CPU pilot and
        the counterpick plugin set their options in that same window.
-     - **The card scan** (`ultimate/` configs and the plugins' NRO strings, read-only, 2026-11-11): no other plugin
-       chord with R and a D-pad direction was found. The NRO strings show only text, so chords hard-coded as button
-       masks aren't covered.
+     - **The card scan** ([rc8-chord-survey.md](rc8-chord-survey.md): `ultimate/` configs and the plugins' NRO
+       strings, read-only, 2026-11-11): no other plugin chord with R and a D-pad direction was found. The NRO strings
+       show only text, so chords hard-coded as button masks aren't covered.
 2. **The input display bind** flips `input_display_strip` between `Off` and `Frame strip`.
    - The flip is a settings change through the menu worker, like a change in the menu: published at once and saved
      with the settings. The menu then shows the same value: one source of truth.
