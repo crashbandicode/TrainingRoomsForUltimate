@@ -34,6 +34,8 @@ head `3f9d61dd` contains for players, plus the CPU pilot plugin's 0.2.3, which s
     pause menu is where the pop-up starts.
   - The stopwatch appears as soon as you step away from x1 and goes away when you step back to x1, as it does when you
     set the speed in the pause menu.
+
+![Hold R + D-pad Up, Right: the stopwatch reads x1.5; Left back to x1: it goes away](media/rc8-speed-hud-fixed.gif)
   - 1 Frame stays in the pause menu. While Training is on 1 Frame, the pop-up shows "1 Frame", and the first step goes
     from x1.
 - **In the waiting-room practice:** 1/4, 1/2, 2/3, x1 and x1.5, local only.
@@ -52,6 +54,8 @@ head `3f9d61dd` contains for players, plus the CPU pilot plugin's 0.2.3, which s
 - R is Z on a GameCube controller.
 
 ### The build in the menu footer
+
+![Two menu pages: the key hints end with 0.2.0-rc.6 · rc8 3f9d61dd](media/rc8-footer-tag.gif)
 
 - The key hints at the foot of every menu page end with the build tag: the version, then `rc8` and the commit the NRO
   was built from, for example `0.2.0-rc.6 · rc8 3f9d61dd`.

@@ -106,6 +106,11 @@ around. Let go and the pop-up closes; the speed stays.
   pop-up starts. 1 Frame stays in the pause menu: while Training is on 1 Frame, the pop-up shows "1 Frame", and the
   first step goes from x1.
   The stopwatch appears as soon as you step away from x1 and goes away when you step back to x1.
+
+  ![Hold R + D-pad Up, Right: the stopwatch reads x1.5; Left back to x1: it goes away](docs/media/rc8-speed-hud-fixed.gif)
+
+  *Eden, 2026-11-11, the rc.8 head `3f9d61dd` (diag NRO `61533917`, log lines only), in Training: x1 with no
+  stopwatch; R + D-pad Up held, Right, and the stopwatch reads x1.5; held again, Left back to x1, and it goes away.*
 - **In the waiting-room practice** the speed is local: 1/4, 1/2, 2/3, x1 and x1.5 change only your practice, while the
   room's timers and the other player stay at normal speed. Each practice session starts at x1.
 - It never changes a Quickplay or online match: a match always starts at normal speed.
