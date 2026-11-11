@@ -220,12 +220,13 @@ impl CallbackStack {
 /// skipped_polls=0` (S3, `nt`, `f9`, `rc8-chain-test`, the docs lane's GIF runs), and a poll with none free is skipped,
 /// never waited for; the second covers a nested or concurrent poll none of them showed. The rc.8 pass on `9d6c7e02` (271
 /// Yoga rows) reported `peak=1 of 2 skipped_polls=0` in every session. rc.8 R5 cut the poll's path to 145,504 B at "s";
-/// at R6's "z" it is 177,184 B (the CPU's `begin_prepare`), so 2 × 236 KiB: 472 KiB of `.bss`, from rc.7's 1.25 MiB.
+/// at R6's "z" it is 177,200 B in the diag ELF (the CPU's `begin_prepare`; the diag stack paint adds 16 B to the poll's
+/// entry), so 2 × 236 KiB: 472 KiB of `.bss`, from rc.7's 1.25 MiB.
 pub const SERVICE_STACK: CallbackStack = CallbackStack {
     name: "native-service",
     bytes: 236 * KIB,
     count: 2,
-    static_bound: 177_184,
+    static_bound: 177_200,
     native_room: 63_728,
     native_bound: 1_936,
     measured_in: "Eden final-surface-acc-d8679593-r2 ([HookStack] site=native_service min_free=63728)",
