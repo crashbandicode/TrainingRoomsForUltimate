@@ -1,6 +1,7 @@
-# 0.2.0-rc.8 (draft)
+# rc.8 (draft)
 
-Notes for players. This is a draft: it lists the two new chords. The other rc.8 changes are added by their owners
+Notes for players. rc.8 is the internal name; the release's version name is set when it ships. This is a draft: it
+lists the two new chords. The other rc.8 changes are added by their owners
 before the build ships. How to use recording is [RECORDING.md](RECORDING.md), the frame strip is
 [FRAME-STRIP.md](FRAME-STRIP.md), and the pictures are the list in [MEDIA.md](MEDIA.md).
 
