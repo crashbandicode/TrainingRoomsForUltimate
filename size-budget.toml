@@ -1436,3 +1436,11 @@ ceiling = 164108
 date = "2026-11-11"
 reason = "rc.8 integration: p23/rc8-binds 9626926c (the lobby slot freed on the practice teardown, +33 over 1ecf920a) merged on 9d6c7e02 (164075) in p23/rc8-integration (integration 2026-11-11 09:45Z): 164075 + 33 = 164108"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.8 order (TASK-rc8.md) and the primary's 08:24Z defect order; a raise goes in its own commit with approved_by"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 164185
+date = "2026-11-11"
+reason = "rc.8 R13 (p23/rc8-build-tag): the build tag at the end of the menu footer, version · rc8 short sha set at build time; measured 164185 at c37c76d8 (tools/size_gate.py) = 164108 at 38e58296 + 77 (build.rs 63 under (root), src/model/ui 11 for BUILD_TAG and the page hint, src/model/menu 2 for Env::build_tag, src/runtime/ui 1 for env())"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.8 order (TASK-rc8.md R13, operator 11:58Z); a raise goes in its own commit with approved_by"
