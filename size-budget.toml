@@ -1420,3 +1420,19 @@ ceiling = 164075
 date = "2026-11-11"
 reason = "rc.8 integration: p23/rc8-waste (163358 at 5c3afd81, sections 4 and 7, over 19a3b8fe 163320) and p23/rc8-binds (164010 at 6fa33b46, sections 1-3, over 722525a5 163293), both over 163293 plus section 6 (+27, ca8ec28c), merged in p23/rc8-integration (integration 2026-11-11 07:12Z): 163293 + 27 + 38 + 717 = 164075"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.8 order (TASK-rc8.md); a raise goes in its own commit with approved_by"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 164043
+date = "2026-11-11"
+reason = "rc.8 p23/rc8-binds defect fix over 1ecf920a (164010): the lobby slot freed on the practice's teardown (worker B 2026-11-11 08:20Z, primary 08:24Z): LobbySlot::release, game_speed::release_lobby_slot from session_clear, slow_table; measured 164043 at 97437d66 (tools/size_gate.py), +33"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.8 order (TASK-rc8.md) and the primary's 08:24Z defect order; a raise goes in its own commit with approved_by"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 164108
+date = "2026-11-11"
+reason = "rc.8 integration: p23/rc8-binds 9626926c (the lobby slot freed on the practice teardown, +33 over 1ecf920a) merged on 9d6c7e02 (164075) in p23/rc8-integration (integration 2026-11-11 09:45Z): 164075 + 33 = 164108"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.8 order (TASK-rc8.md) and the primary's 08:24Z defect order; a raise goes in its own commit with approved_by"

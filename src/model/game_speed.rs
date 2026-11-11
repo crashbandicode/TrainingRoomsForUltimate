@@ -322,7 +322,8 @@ pub enum LobbyStep {
     Nothing,
     Taken(Held),
     Freed(Held),
-    /// The record was dropped without a write: the scene left the practice, or the table is not the one taken from.
+    /// The record was dropped without a write: the table is not the one taken from (or there is none), or the slot no
+    /// longer holds `{1, divisor}`.
     Dropped(Held),
     /// Every slot was in use: no slot, the speed stays x1 until one frees.
     NoFreeSlot,
@@ -343,22 +344,16 @@ impl LobbySlot {
         self.held
     }
 
-    /// One practice frame. `wanted` is the lobby speed the bind set; `bytes` reaches `now.table` (the runtime builds it
-    /// only for a non-zero table). Writes only while `now.in_practice` and only into the table the slot was taken from;
-    /// takes only while the waiting-room UI is free.
+    /// One P1 frame. `wanted` is the lobby speed the bind set; `bytes` reaches `now.table` (the runtime builds it only
+    /// for a non-zero table). Takes only in the practice while the waiting-room UI is free; a held slot whose speed no
+    /// longer applies is released (`release`), also on a frame after the scene left the practice.
     pub fn step(&mut self, wanted: Speed, now: LobbyNow, bytes: Option<&mut dyn Bytes>) -> LobbyStep {
         let divisor = wanted.slot_divisor().filter(|_| now.in_practice && !now.ui_busy && now.table != 0);
         if let Some(held) = self.held {
-            if !now.in_practice || now.table != held.table {
-                self.held = None;
-                return LobbyStep::Dropped(held);
-            }
-            if divisor == Some(held.divisor) {
+            if divisor == Some(held.divisor) && now.table == held.table {
                 return LobbyStep::Nothing;
             }
-            self.held = None;
-            let freed = bytes.is_some_and(|table| free(table, held.slot, held.divisor));
-            return if freed { LobbyStep::Freed(held) } else { LobbyStep::Dropped(held) };
+            return self.release(now.table, bytes);
         }
         let (Some(divisor), Some(table)) = (divisor, bytes) else { return LobbyStep::Nothing };
         match take(table, divisor) {
@@ -371,7 +366,22 @@ impl LobbySlot {
         }
     }
 
-    /// Forget the slot without a write (a session clear after the practice left).
+    /// The practice's teardown, before the native one can reuse the table: the session clear on the practice P1's
+    /// destroy, the scene's exit and any scene change (a match found shows no busy edge first, Eden 2026-11-11 08:20Z),
+    /// and a frame whose speed no longer applies. The slot is freed with a write only while `table_now`
+    /// (`*(main+0x52c3610)` now) is still the table it was taken from and the slot still holds `{1, divisor}`; otherwise
+    /// the record goes without a write.
+    pub fn release(&mut self, table_now: usize, bytes: Option<&mut dyn Bytes>) -> LobbyStep {
+        let Some(held) = self.held.take() else { return LobbyStep::Nothing };
+        let freed = table_now != 0 && table_now == held.table && bytes.is_some_and(|table| free(table, held.slot, held.divisor));
+        if freed {
+            LobbyStep::Freed(held)
+        } else {
+            LobbyStep::Dropped(held)
+        }
+    }
+
+    /// Forget the slot without a write.
     pub fn forget(&mut self) -> Option<Held> {
         self.held.take()
     }
