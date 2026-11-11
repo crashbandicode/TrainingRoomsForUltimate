@@ -84,7 +84,7 @@ pub const THREADS: [ThreadStack; 18] = [
     // mii-editor-last.json (and the diag results observer trace): serialise from the boxed slot, atomic replace
     row(ThreadId::TraceWriter, c"tr-trace-writer", 28 * KIB, 2_720, 8_624, "Eden st-02..st-12, ui18-02 native Mii editor", "compat::filesystem::init::{closure#0}"),
     // diag: diag-settings-next.json parse, publish and apply
-    row(ThreadId::DiagReload, c"tr-diag-reload", 40 * KIB, 17_696, 15_680, "Eden final-rc8-chain-test-722525a5-r2 (three reloads in one Up)", "diag_reload::start::{closure#0}"),
+    row(ThreadId::DiagReload, c"tr-diag-reload", 40 * KIB, 17_696, 15_712, "Eden final-rc8-chain-test-722525a5-r2, the rc.8 pass's chained 9d6c7e02 sessions", "diag_reload::start::{closure#0}"),
     // first-boot import of the fork's files (blocking part), joined with a deadline
     row(ThreadId::Import, c"tr-import", 32 * KIB, 8_032, 10_080, "Eden st-02..st-12", "import::start::{closure#0}"),
     // first-boot import of the fork's captures in the background
@@ -103,7 +103,7 @@ pub const THREADS: [ThreadStack; 18] = [
     // external path is separate from the owned-ELF scan; see docs/UI16-PROBE-STACK-FAULT.md (removed after v0.2.0-rc.1; see that tag).
     row(ThreadId::Probe, c"tr-probe", 204 * KIB, 3_440, 151_920, "Eden ui-17 same ARC92171b2f full probe", "ui::probe::install::{closure#0}").with_external(143_376),
     // diag: diag-macro.req read and parse
-    row(ThreadId::MacroDiag, c"tr-macro-diag", 28 * KIB, 3_248, 9_088, "Eden st-02..st-12, final-surface-of-1261f56c", "macros::diag::start::{closure#0}"),
+    row(ThreadId::MacroDiag, c"tr-macro-diag", 28 * KIB, 3_248, 9_152, "Eden st-02..st-12, final-surface-of-1261f56c, final-rc8-yoga-1/rc8-surface-1-9d6c7e02", "macros::diag::start::{closure#0}"),
     // the replay capture archive and Mii preset writer
     row(ThreadId::ReplaySave, c"replay-capture-save", 56 * KIB, 32_480, 25_344, "Eden st-02..st-12, f6-37/sh-01, final-surface-cov-4e336da4", "replay_store::start_writer::{closure#0}"),
     // the saved Mii catalog read for the library
