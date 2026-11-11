@@ -307,8 +307,13 @@ fn rates_are_the_speed_codes_table() {
             ("x1.5", 6, 180, Some(2)),
         ]
     );
+    // rc.8 R2: the lobby never applies `rate()`, so it never writes the rate words. Its two speeds whose Training rate
+    // raises the update rate are exactly the paced slot and the extra pass (`model::lobby_speed::LobbyPlan`).
+    use crate::model::lobby_speed::LobbyPlan;
     for speed in Place::Lobby.speeds() {
-        assert!(speed.rate().code == 0 && speed.rate().updates == 60, "the lobby's speeds never need the rate words");
+        let raises = speed.rate().code != 0 || speed.rate().updates != 60;
+        let plan = LobbyPlan::of(*speed);
+        assert_eq!(raises, matches!(plan, LobbyPlan::TwoThirds | LobbyPlan::ExtraPass), "{speed:?}");
     }
 }
 
