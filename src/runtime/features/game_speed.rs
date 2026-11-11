@@ -11,7 +11,7 @@
 //!   practice's teardown (the session clear on its P1's destroy, its exit, a scene change) frees it with a write, only
 //!   in the table it was taken from and only while the slot is still ours; a match found shows no busy edge first.
 
-use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering};
 
 use crate::engine::seams::native_fields as field;
 use crate::model::game_speed::{self as rules, mode, native, table, Bytes, HoldEvent, LobbyNow, LobbySlot, ModeApply, Place, Speed};
@@ -178,8 +178,25 @@ pub(crate) fn training_apply() {
     }
     // SAFETY: native Training on P1's poll, a game thread; every address is formed from a row that passed at boot.
     let outcome = unsafe { apply_now(base, wanted) };
+    // A skip that may clear by itself (the battle's objects not yet there, state 11) keeps the value for the next poll,
+    // unless a newer one came meanwhile (worker B's R8 finding: a skipped apply waited for the next pause). The log says
+    // each skip once.
+    let repeat = match outcome {
+        Ok(_) => {
+            LAST_SKIP.store(0, Ordering::Relaxed);
+            false
+        }
+        Err(why) => {
+            if RETRIED.contains(&why) {
+                let _ = MODE_PENDING.compare_exchange(0, wanted, Ordering::AcqRel, Ordering::Acquire);
+            }
+            let key = wanted << 8 | RETRIED.iter().position(|r| *r == why).map_or(0xff, |i| i as u32);
+            LAST_SKIP.swap(key, Ordering::Relaxed) == key
+        }
+    };
     #[cfg(feature = "diag")]
     match outcome {
+        Err(_) if repeat => {}
         Ok((applied, slot, done)) => crate::runtime::diag_log::diagnostic(format_args!(
             "[GameSpeed] training apply value={} was={applied} slot={slot:#x}->{:#x} freed={:?} code={} updates={} thread={:#x}",
             done.value,
@@ -190,11 +207,20 @@ pub(crate) fn training_apply() {
             // SAFETY: reads the calling thread's own object pointer; nothing is written.
             unsafe { skyline::nn::os::GetCurrentThread() } as usize
         )),
-        Err(why) => crate::runtime::diag_log::diagnostic(format_args!("[GameSpeed] training apply skipped value={wanted} why={why}")),
+        Err(why) => crate::runtime::diag_log::diagnostic(format_args!(
+            "[GameSpeed] training apply skipped value={wanted} why={why} retry={}",
+            RETRIED.contains(&why)
+        )),
     }
     #[cfg(not(feature = "diag"))]
-    let _ = outcome;
+    let _ = (outcome, repeat);
 }
+
+/// The skips `training_apply` retries on the next poll: the battle's objects or the slow table not there yet, the state
+/// the game itself applies 0 in. The others end the value: it is no longer the menu's, or it is applied already.
+const RETRIED: [&str; 4] = ["no menu", "state 11", "no mode object", "no slow table"];
+/// The last skip logged, `value << 8 | reason`, 0 after an apply: each skip is logged once.
+static LAST_SKIP: AtomicU32 = AtomicU32::new(0);
 
 /// The Training mode object (`FUN_0155a000`'s x25), found the way the game finds it on every update
 /// (`rules::registry_find` over `[[main+0x52c3910]]`, key `0x1022590708`), and only when its vtable is Training's.
@@ -294,25 +320,37 @@ fn slow_table(base: usize) -> usize {
     unsafe { field::read::<usize>(base, native::SLOW_TABLE) }.unwrap_or(0)
 }
 
-/// Player 1's frame, in every scene (`lobby::frame`): the waiting-room practice's slot. Outside the practice it takes
-/// nothing; a slot still held there is freed only in the table it was taken from (`LobbySlot::release`).
+/// A teardown release that found `LOBBY` taken (`release_lobby_slot`): the next `lobby_frame` makes it.
+static RELEASE_PENDING: AtomicBool = AtomicBool::new(false);
+
+/// Player 1's frame, in every scene (`lobby::frame`): the waiting-room practice's slot. Outside the practice it writes
+/// nothing: a slot record left there is dropped (design §3.8; worker B's R8 finding: a match's table can reuse the
+/// practice table's block and hold the game's own `{1, N}` at the same slot).
 pub(crate) fn lobby_frame() {
     let Some(base) = base() else { return };
     let Some(mut keeper) = LOBBY.try_lock() else { return };
     let in_practice = scene::lobby_term();
+    let pending = RELEASE_PENDING.swap(false, Ordering::AcqRel);
     if !in_practice && keeper.held().is_none() {
         return;
     }
-    let table = slow_table(base);
-    let now = LobbyNow { in_practice, ui_busy: crate::runtime::lobby::training::lobby::native_ui_busy(), table };
-    let wanted = Speed::from_value(LOBBY_WANTED.load(Ordering::Acquire)).unwrap_or(Speed::X1);
+    let table = if in_practice { slow_table(base) } else { 0 };
     let mut native = NativeTable(table);
-    let bytes: Option<&mut dyn Bytes> = if field::object(table) { Some(&mut native) } else { None };
-    let step = keeper.step(wanted, now, bytes);
+    let bytes: Option<&mut dyn Bytes> = if in_practice && field::object(table) { Some(&mut native) } else { None };
+    let wanted = Speed::from_value(LOBBY_WANTED.load(Ordering::Acquire)).unwrap_or(Speed::X1);
+    let step = if pending {
+        keeper.release(table, bytes)
+    } else {
+        let now = LobbyNow { in_practice, ui_busy: crate::runtime::lobby::training::lobby::native_ui_busy(), table };
+        keeper.step(wanted, now, bytes)
+    };
     drop(keeper);
     #[cfg(feature = "diag")]
     if step != rules::LobbyStep::Nothing {
-        crate::runtime::diag_log::diagnostic(format_args!("[GameSpeed] lobby {step:?} wanted={} in_practice={in_practice}", wanted.label()));
+        crate::runtime::diag_log::diagnostic(format_args!(
+            "[GameSpeed] lobby {step:?} wanted={} in_practice={in_practice} pending={pending}",
+            wanted.label()
+        ));
     }
     #[cfg(not(feature = "diag"))]
     let _ = step;
@@ -320,20 +358,31 @@ pub(crate) fn lobby_frame() {
 
 /// The practice's teardown (`session_clear`: the practice P1's destroy, the scene's exit, a scene change, the
 /// waiting-room UI turning busy): the lobby slot is freed with a write while the table it was taken from is still the
-/// game's, before the native teardown can hand that table to the next battle.
+/// game's, before the native teardown can hand that table to the next battle. Wait-free: with `LOBBY` taken, the next
+/// `lobby_frame` releases it (worker B's R8 finding on the blocking lock).
 fn release_lobby_slot() {
     let Some(base) = base() else { return };
-    let mut keeper = LOBBY.lock();
+    let Some(mut keeper) = LOBBY.try_lock() else {
+        RELEASE_PENDING.store(true, Ordering::Release);
+        return;
+    };
     if keeper.held().is_none() {
         return;
     }
-    let table = slow_table(base);
+    // The practice P1's destroy comes while the mode words are still the waiting room (Eden rc8b-qp2: the release
+    // 2.3 s before the match scene); a clear after the scene left the practice writes nothing, as `lobby_frame`.
+    let in_practice = scene::lobby_term();
+    let table = if in_practice { slow_table(base) } else { 0 };
     let mut native = NativeTable(table);
-    let bytes: Option<&mut dyn Bytes> = if field::object(table) { Some(&mut native) } else { None };
+    let bytes: Option<&mut dyn Bytes> = if in_practice && field::object(table) { Some(&mut native) } else { None };
     let step = keeper.release(table, bytes);
     drop(keeper);
     #[cfg(feature = "diag")]
-    crate::runtime::diag_log::diagnostic(format_args!("[GameSpeed] lobby release {step:?} table={table:#x}"));
+    crate::runtime::diag_log::diagnostic(format_args!(
+        "[GameSpeed] lobby release {step:?} table={table:#x} in_practice={in_practice} thread={:#x}",
+        // SAFETY: reads the calling thread's own object pointer; nothing is written.
+        unsafe { skyline::nn::os::GetCurrentThread() } as usize
+    ));
     #[cfg(not(feature = "diag"))]
     let _ = step;
 }

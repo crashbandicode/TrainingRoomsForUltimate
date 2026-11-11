@@ -147,6 +147,11 @@ Where a choice is the operator's, this takes the sensible default and states it.
    - **A release writes only into the table it was taken from,** and only when the slot still holds `{1, N}`. The
      table pointer is kept at take. Once the scene has left the practice, the plugin writes nothing at all; the
      game's own teardown then owns the table.
+     - **The release that matters** is the session clear on the practice P1's destroy (`97437d66`). A match found
+       shows no busy edge (worker B 08:20Z), and that destroy comes while the mode words are still the waiting room,
+       2.3 s before the match scene (Eden `rc8b-qp2-97437d66-xps`).
+     - R8 (worker B 09:45Z): both `step` and the teardown release are drop-only outside the practice again. A match's
+       table can reuse the practice table's block and hold the game's own `{1, N}` at our slot.
    - Training's speed is the game's own (decision 6). The native apply gives 0 to any battle without the Training
      object.
    - The Eden proof (§6) shows a Quickplay match starting with `[0x523d004] = 60`, code 0, and no slot in use, after
@@ -161,6 +166,8 @@ Where a choice is the operator's, this takes the sensible default and states it.
      init's `{0, 1}` pattern.
    - **If any row fails, the speed bind is off** (its install line says so), and the display bind still works.
 10. **No locks on a game path:** the new state is atomics, or `try_lock` used only by game threads.
+    - The teardown release too (R8): if `LOBBY` is taken, it sets `RELEASE_PENDING`, and the next `lobby_frame` makes
+      the release, still only in the practice.
     - The menu worker gets the display toggle as an atomic counter.
     - `lock_order` and `hook_locks` pass unchanged.
     - **No new hook.**
