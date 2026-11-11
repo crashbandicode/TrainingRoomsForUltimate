@@ -29,7 +29,9 @@ rc.5 let you build and edit sequences, but not drill them. rc.6 drills them.
 - A deleted combo is skipped. An empty sequence drills nothing. Every combo of a sequence is drilled, however many it
   has.
 
-![Drill a sequence: combo 1, then combo 2, then a drop back at combo 1](media/rc6-sequence-drill.gif)
+![Drill a sequence: combo 1, then combo 2, then a drop back at combo 1](media/rc7-sequence-drill.gif)
+
+*Shown on rc.7 `722525a5` as shipped (diag NRO `cfec85c7`, log lines only), 2026-11-11; the rc.6 clip carried another plugin's input bar.*
 
 The sequence bar is taller than the combo bar, so notices sit 56 layout units (about 37 pixels at 1280×720) lower
 than in rc.5, under either bar.

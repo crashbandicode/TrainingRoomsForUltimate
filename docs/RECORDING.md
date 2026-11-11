@@ -6,7 +6,7 @@ Two layers are easy to mix up, so this page keeps them apart.
 
 What a press does in a match: Load warps the save and starts nothing. The runtime asks the recorder what a finished load should do, and that answer is nothing. Record (ZR + D-pad Down) captures the pop-up's role and, when you stop, writes a named macro. The role stays Player 1 until the pop-up sets it. Play on Player 1 (ZR + D-pad Left) and Play on CPU (ZR + D-pad Up) play that role's active macro, or stop it. The recording pop-up (ZR + D-pad Right) opens and closes over the match.
 
-The machine is `src/model/playback.rs` and the library. The pop-up, the Recording page, and the file screens are `src/model/recording_menu.rs`. The pictures are full-screen captures, 1280 wide, under 10 seconds, one behaviour each, and [MEDIA.md](MEDIA.md) is the list.
+The machine is `src/model/playback.rs` and the library. The pop-up, the Recording page, and the file screens are `src/model/recording_menu.rs`. The pictures are 1280 wide, under 10 seconds, one behaviour each, and [MEDIA.md](MEDIA.md) is the list. Most are full-screen captures. A few rc.5 clips are cropped to the top of the screen, because another plugin's input bar crossed the rest, and say so; the pop-up and Recording page clips are trimmed to their menu part for the same reason.
 
 Files live under `sd:/ultimate/TrainingRooms/`. A macro, a chain, a combo, a sequence, and a save state are separate files. Renaming either end of a connection keeps it, because the connection stores the file's id.
 
@@ -18,7 +18,10 @@ Auto-load on death only warps to the bound save. If none is bound, it does nothi
 
 A save has no role and no chain. The old checklist that played a recording because a state loaded is not part of this machine.
 
-![Load warps to the bound save and leaves the CPU standing](media/rc5-save-warp.gif)
+![Load warps to the bound save and leaves the CPU standing](media/rc5-save-warp-crop.gif)
+
+*Eden, 2026-11-07, a `p23/rc5-wire-fix` diag build (see [MEDIA.md](MEDIA.md)). The clip shows only the top of the
+screen, because another plugin's input bar crossed the rest.*
 
 ![Auto-load on death: with a bound save Player 1 is back on stage at once; unbound, the game's revival](media/rc6-autoload.gif)
 
@@ -38,8 +41,6 @@ On means the role's Play chord warps to that save once, before the first pass, t
 If the connected start save was deleted, playback skips the warp and shows "No start save. This macro plays from where the fighters are." A macro that never had one does not show that sentence.
 
 When you record, the new macro is the most recently used of its kind. Each kind keeps five of those, the most recently used first. A sixth use drops the least recent out of that five. It stays on the card.
-
-![Record, then the new macro and its start save](media/rc5-record-start-save.gif)
 
 ![An empty library, Record on Player 1, two jabs, the stop: Macro 1 and its start save](media/rc7-record-macro.gif)
 
@@ -70,7 +71,7 @@ Mash interrupts playback, when that option is On, stops the CPU's macro: the mas
 
 The old per-slot playback chords are not added.
 
-![Play on CPU warps once to the start save, then plays the active macro](media/rc5-play-chord.gif)
+![Play on CPU warps once to the start save, then plays the active macro (top of the screen)](media/rc5-play-chord-crop.gif)
 
 ![Both Play chords at once: Player 1 and the CPU play together, then one after the other](media/rc6-both-play.gif)
 
@@ -83,7 +84,7 @@ The loop belongs to the role, not to a file. Player 1 and the CPU each keep thei
 
 The Play chord warps to the start save once, before the first pass, when the switch is On. Every later pass plays on from where the fighters are. The loop never warps back. A recording and a chain follow the same rule. Infinite keeps going. A finite count plays the macro, or the whole chain, that many times.
 
-![The second pass of a loop continues from where the fighters are](media/rc5-loop-no-warp.gif)
+![The second pass of a loop continues from where the fighters are](media/rc7-loop-no-warp.gif)
 
 ## Chains
 
@@ -95,7 +96,7 @@ The role it is set active for is the role whose Play chord plays it. The macros 
 
 An empty chain plays nothing. A chain whose recordings have all been deleted plays nothing. There is no extra sentence for either case. R in the numbered picker removes a number, including the last one, so the list may be empty. A adds the next number. A on a tile that already has a number does nothing. B is done. It is the Character Cycles picker, except that the last number can come off.
 
-![The CPU's Play chord warps to macro 1's start save, then plays the chain in order](media/rc5-chain-play.gif)
+![The CPU's Play chord warps to macro 1's start save, then plays the chain in order](media/rc7-chain-play.gif)
 
 ## Combos
 
@@ -144,7 +145,7 @@ A finished sequence adds one to the streak, and best is the highest streak. A dr
 
 The streak and the best are written to the sequence file, so the CONNECTIONS panel shows the same numbers as the bar, after the menu closes and after you leave Training.
 
-![Drill a sequence: combo 1, then combo 2, then a drop back at combo 1](media/rc6-sequence-drill.gif)
+![Drill a sequence: combo 1, then combo 2, then a drop back at combo 1](media/rc7-sequence-drill.gif)
 
 The picker is the same numbered picker as a chain, including R removing the last number. Edit combos, Rename and Delete are written to the card.
 
@@ -194,7 +195,7 @@ The bound save, the active macro of the role in view, and the drilled combo or s
 
 A on a save binds it to Save and Load. A on a macro or a chain sets it active for the role in view. A on a combo drills it. A on a sequence drills it, as described under Sequences. X cycles the loop, and only while the cursor is in Macros, and that count is written to the recording index. Y does nothing on this window.
 
-![The pop-up over the match, Player view, cursor on a save](media/rc5-popup.gif)
+![The pop-up over the match, Player view, cursor on a save](media/rc5-popup-trim.gif)
 
 The orange floppy is the save state a macro starts at. It is grey when that macro's Start save switch is Off. The Save states header uses the same orange floppy. A chain row shows how many macros it contains. The layout has no chain-mark picture yet, so the count is the chain mark. With the cursor on a chain, those macros show 1, 2, 3 in front of the name. + New chain is the last row under Macros, and + New sequence is the last row under Sequences. A opens the numbered picker. B on the picker opens the name step. In an online waiting room that name step does not open the keyboard. The new file stays Chain N or Sequence N.
 
@@ -202,7 +203,7 @@ The orange floppy is the save state a macro starts at. It is grey when that macr
 
 The Recording page uses the same stacked sections, with the same line under each file row. Its CONNECTIONS are the menu's two help lines, because the page's left column lists the groups. That column is Save states & Macros, Combos & Sequences, Replays, and Options. There is no tab switch on the page, because that column lists the groups. Each of the two library groups shows in brackets how many files it lists: saves and macros, or combos and sequences. ZR switches Player 1 and CPU. L and R change the menu page, except while a file screen, the crop screen, the numbered picker, or the name step is open: then L and R stay on Recording. The CPU view hides Combos & Sequences. A opens the file's own screen. On a save, Bind to Save / Load is that screen's first row. X cycles the loop only when the cursor is in Macros, and that count is written to the recording index. B closes the menu when no file screen is open. On a file screen, B goes back.
 
-![The Recording page, Player view, saves above macros](media/rc5-recording-page.gif)
+![The Recording page, Player view, saves above macros](media/rc5-recording-page-trim.gif)
 
 The old Recording and Saves rows leave this page. Their setting ids stay, so an old settings file still loads. What leaves the page is the slot number, Randomize slots, Record Slot, Trigger, the Duration dropdown, button slots, the save-state playback checklist, Source, and per-slot playback. The file cap stays at 36,000 frames. The capture stops taking frames there. A recording of that length is kept. One frame more is not saved. Replays keeps Ask before switching fighter, Edit placement, Replay window, and Replay capture. Options keeps Crop trailing neutral, Hitstun timing, Mash interrupts playback, the loop's list of counts, Settings override playback, Combo helper, On-time tolerance, and After an attempt. Respawn on platform stays under Fighters & Stages › Stages.
 
@@ -234,7 +235,7 @@ Fighter Mismatch is the prompt a macro, a chain, a replay clip, or a combo can o
 
 Play holds until those rows are answered. The cursor starts on Keep. Keep plays on the fighter you have. Switch changes to the fighter the file was recorded on, then plays. B cancels and does not play. A macro asks when its recorded fighter differs. For a CPU macro recorded on an exact Mii, Switch loads that Mii: its look, specials, colour, voice, outfit and hat. A Mii from a replay carries no ID and no name of its own, so it is installed as the saved Mii with the same look, or else with a made-up ID and the name "New Mii" (cov-rest `cbe961a` and `f2298ee`, `src/model/mii_install.rs` `installable`; final pass on `646a5f0d`: `yoga-cov` `cov-named-mii` and `int-named-mii-twice` PASS). A chain asks only for its first macro, and the line is `screen=mismatch ask=macro1`. Later macros are not checked and do not switch. A combo drill asks when the drilled combo changes to one recorded on another fighter. The first time a saved drill is seen, it does not ask. Load does not ask.
 
-![Play of a chain whose first macro was recorded on another fighter](media/rc5-fighter-mismatch.gif)
+![Play of a chain whose first macro was recorded on another fighter](media/rc7-fighter-mismatch.gif)
 
 ![A CPU macro recorded on a Mii: Switch loads that exact Mii](media/rc6-named-mii.gif)
 
@@ -258,7 +259,10 @@ A save index that holds a save becomes one file, both fighters, with the same `S
 
 `macros/selected.txt`, when it names a file that is there, becomes Player 1's active macro. The CPU has no active macro until you set one. The old "play a recording when a state loads" row is not turned into a chain.
 
-![The first boot of a card from before the library: two dated saves with Slot 2 bound, and Old jab active](media/rc5-migration.gif)
+![The first boot of a card from before the library: two dated saves with Slot 2 bound, and Old jab active](media/rc5-migration-crop.gif)
+
+*Eden, 2026-11-08, diag NRO `d20ead7b` (`688c478`; see [MEDIA.md](MEDIA.md)). The clip shows only the top of the
+screen, because another plugin's input bar crossed the rest.*
 
 ## Where the rules come from
 

@@ -122,10 +122,11 @@ X cycles the loop only while the cursor is in Macros.
 [docs/RECORDING.md](docs/RECORDING.md) is how to use it. The pop-up and the Recording page are in that doc.
 What rc.6 changes is [docs/RELEASE-NOTES-rc6.md](docs/RELEASE-NOTES-rc6.md).
 
-![Record and playback](docs/media/menu-recording.gif)
+![Record on Player 1: an empty library, two jabs, then Macro 1 and its start save](docs/media/rc7-record.gif)
 
-*The earlier slot recording: ZR + Down records, ZR + Up plays that slot. RC10, 2026-11-04, NRO `50d95130`. The
-redesign's Play on CPU chord is the same buttons, and it plays the CPU's active macro.*
+*Eden, 2026-11-11, rc.7 `722525a5` as shipped (diag NRO `cfec85c7`, log lines only): the pop-up lists no saves and no macros; Record
+on Player 1 and two jabs; the pop-up then lists "Macro 1" (Recorded on Mario) and its start save "Macro 1 · start".
+Playback is shown in [docs/RECORDING.md](docs/RECORDING.md). Cuts inside are listed in [docs/MEDIA.md](docs/MEDIA.md).*
 
 While the CPU pilot plugin plays Player 1, recording is refused with a notice.
 
@@ -142,10 +143,10 @@ as a file and makes it the drill. With *Combo helper* On, a bar under the frame 
 whether the recorded inputs came, in order and on time, and whether the same move came out. A true combo is shown,
 not required. Drilling a sequence adds a header and a row of its combos to that bar.
 
-![Drill a sequence: combo 1, then combo 2, then a drop back at combo 1](docs/media/rc6-sequence-drill.gif)
+![Drill a sequence: combo 1, then combo 2, then a drop back at combo 1](docs/media/rc7-sequence-drill.gif)
 
-*Eden, 2026-11-08, `p23/rc6-seq-drill` `e6ac460` (diag NRO `50c8a5df`, log lines only): combo 1 lands, combo 2
-starts, then a wrong move drops the sequence back to combo 1.* See [docs/MEDIA.md](docs/MEDIA.md).
+*Eden, 2026-11-11, rc.7 `722525a5` as shipped (diag NRO `cfec85c7`, log lines only): combo 1 lands, combo 2
+starts, then a wrong move (up tilt) drops the sequence back to combo 1.* See [docs/MEDIA.md](docs/MEDIA.md).
 
 ### Fighters, cycles and Kirby hats
 

@@ -36,6 +36,34 @@ action, result) before a clip was kept. The raw takes stay outside git with thei
 The takes' frames were read on each row's timeline; the machine checks are in each row's JSON (`di_state` Up alone,
 `respawn_invincibility` Off, the shortcut written and the menu opened by it).
 
+From `docs-rd1-722525a5` (the Yoga, alone, 2026-11-11 04:32–04:48Z; the rc.5 docs rows and the rc.6 sequence row on
+the shipped build), reviewed take by take (batch I). The rows' own takes are 1280 wide at 15 fps and are kept at 15 fps.
+
+| File | Row | Embedded in | Length, size | Raw windows kept | What the frames show |
+| --- | --- | --- | --- | --- | --- |
+| `media/rc7-frame-strip-lanes.gif` | `gif-frame-strip-lanes` | FRAME-STRIP.md | 3.8 s, 5.6 MB | 0–3.8 s | Player 1's lane gold, red, blue; the CPU's light grey then purple; runs print 11, 30, 23; ADVANTAGE −7 on hit. |
+| `media/rc7-frame-strip-chips.gif` | `gif-frame-strip-chips` | FRAME-STRIP.md | 3.2 s, 4.7 MB | 0–3.2 s | The attack chip with its arrow; a leftover X chip from the setup is on the strip until 1.3 s, never beside the new chip. |
+| `media/rc7-frame-strip-cstick.gif` | `gif-frame-strip-cstick` | FRAME-STRIP.md | 2.7 s, 4.1 MB | 0–2.7 s | A C-stick forward smash: the chip's right arrow; the stick row stays blank. |
+| `media/rc7-frame-strip-stick-row.gif` | `gif-frame-strip-stick-row` | FRAME-STRIP.md | 2.7 s, 4.0 MB | 0–1.1, 4.4–6.0 s | Held directions and blanks under Player 1's lane. The take's ledge fall and KO (1.2–2.4 s) are cut, with the down-right run in that part. |
+| `media/rc7-frame-strip-freeze-stick.gif` | `gif-frame-strip-freeze-stick` | FRAME-STRIP.md | 4.7 s, 7.0 MB | 0–4.7 s | The strip keeps scrolling through neutral, left, right with no button pressed; Mario runs off the left ledge at 3.2 s. |
+| `media/rc7-chain-play.gif` | `gif-chain-play` | RECORDING.md, Chains | 3.6 s, 5.0 MB | 0–3.6 s | One warp; recording 1 (walk and jab), then recording 2 (jab) with no warp between. |
+| `media/rc7-fighter-mismatch.gif` | `gif-fighter-mismatch` | RECORDING.md | 5.0 s, 4.1 MB | 0–5.0 s | The cursor starts on Keep; Mario plays the chain; no second prompt. |
+| `media/rc7-loop-no-warp.gif` | `gif-loop-no-warp` | RECORDING.md | 3.8 s, 5.3 MB | 0–3.8 s | The first pass warps; the second continues from where the first ended, with no warp. |
+| `media/rc7-sequence-drill.gif` | `seq-gif` | README, Combos; RECORDING.md; RELEASE-NOTES-rc6.md | 6.0 s, 8.9 MB | 0–6.0 s | SEQUENCE Combo pairs: Pair 1 lands (✓), Pair 2 starts, "L1 wrong move: Up tilt", DROP +16, back at combo 1; streak 4 → 0, best 9. |
+| `media/rc7-record.gif` | `fx-record-list` (10 fps) | README, Recording and playback | 7.6 s, 3.5 MB | 11.6–13.0, 15.2–16.0, 17.9–18.7, 20.0–20.7, 22.4–23.7, 26.4–29.0 s | The pop-up with no saves and no macros (Player, then CPU); Record on Player 1 and two jabs; the pop-up lists "Macro 1" (Recorded on Mario) and "Macro 1 · start", with the connection. No playback. |
+
+Kept from rc.5 but cut down to leave out the bar (primary 04:40Z, rule c: the retake from rd1 fell short, and the clip
+is clean outside the bar). The crops keep every frame and its time; the trims keep the menu part only.
+- Cropped to the top 436 rows (the bar is at y 443–466): `rc5-frame-strip-advantage-hit`, `-advantage-shield`,
+  `-drop`, `-exchange`, `-freeze`, `-input`, `-last`, `-link` (FRAME-STRIP.md) and `rc5-play-chord` (RECORDING.md),
+  each as `<name>-crop.gif`. The strip and readouts are whole; the fighters are cut at the knees or waist.
+  - The rd1 retakes of those eight strip clips started with Player 1 out of jab range (the setup's turn step logged
+    "no bodies found"), so no hit, no readout. The play-chord retake does not show the stop.
+- Trimmed: `rc5-popup-trim.gif` (0.45–3.95 s, the pop-up only; the bar shows once it closes, so the close is not
+  shown) and `rc5-recording-page-trim.gif` (from 0.5 s; the first 0.47 s in Training had the bar).
+- Removed: `rc5-record-start-save.gif` (RECORDING.md). `rc7-record-macro.gif`, embedded right after it, shows the
+  same record and start save without the bar.
+
 Removed from the README and DIFFERENCES-FROM-THE-FORK.md, not retaken (2026-11-11): `record-refused.gif` and
 `replay-capture.gif` (2026-11-05) carry the gamepad overlay's bar and the old input log; a retake needs the CPU pilot
 and Online Deluxe plugins in a docs boot and a route through the Deluxe overlay, which no current row has.
@@ -148,6 +176,11 @@ screen draws the same):
   `688c478`), booted on cov-rec's pre-library card. The row first checked the card the way cov-rec's #37 row does:
   two dated saves, Slot 2 bound, `oldjab` active, one migrate line. The take's first 0.9 s (a leftover notice) are
   trimmed. It was re-encoded with ffmpeg, one shared palette and no dither: 3.9 MB, 8.1 s.
+  - RECORDING.md now embeds `rc5-migration-crop.gif` (2026-11-11): the same frames and times, cropped to the top 436
+    rows to leave out the gamepad overlay plugin's input bar. The two lists and the notices are whole; the fighters
+    are cut at the waist.
+- `rc5-save-warp.gif` (Surface `out-confirm-2116Z`, above): RECORDING.md now embeds `rc5-save-warp-crop.gif`
+  (2026-11-11), cropped the same way; the fighters are cut at the knees.
 - `rc5-make-combo.gif`: run `rc6-docs-gifs-xps7` on the XPS, 2026-11-08 17:46Z, the same diag NRO, fixture `mk6` (the
   rc.5 `mk` fixture with its start save moved into reach, `make_mk6.py`). After the clip the row checked the card:
   `combo-2` written and hot, `combo-1` still the drill. The take is trimmed to 0.7–10.4 s and re-encoded the same way:
