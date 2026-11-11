@@ -2,15 +2,17 @@
 
 The frame strip is the input display. Turn it on at Display & Controls › Input Display. The choices are Off and Frame strip. Frame strip is the default. It sits at the top of the screen in Training and in waiting-room practice, and it replaces the old 15-row input log.
 
+The Input display chord, R + D-pad Down by default (R is Z on a GameCube controller), turns it on and off without opening the menu, in Training and in waiting-room practice. A notice says "Input display" and On or Off. The menu's Input Display row then shows the same value, and the choice is saved like a change made in the menu. The chord is the "Input display" row of Display & Controls › Button chords.
+
 It keeps the last 60 game frames, about one second. The newest frame is on the right. Player 1 and the CPU each have a lane. Player 1's button presses are chips above the lanes. On the right, three readouts say who could act first after the last hit, whether the last follow-up was a true combo, and how the press was timed. A LAST row under the lanes keeps the last four follow-ups.
 
 The strip hides while the TrainingRooms menu, the recording pop-up, the Fighter Mismatch question, or the game's pause menu is open, while Input Display is Off, and outside Training and lobby practice. It clears when the scene changes, when you hot-swap, when a save state loads, and when Training resets or replaces a fighter. The frames from before that did not happen. While the strip is on screen, the separate Frame Advantage notice stays down, because the ADVANTAGE readout is that number.
 
 An older settings file that still says Smash Inputs, Raw Inputs, or Status Only becomes Frame strip. Off stays Off.
 
-The pictures for this page are listed in [MEDIA.md](MEDIA.md). Each one is a full-screen capture, 1280 wide, under 10 seconds, and one behaviour.
+The pictures for this page are listed in [MEDIA.md](MEDIA.md). Each one is a full-screen capture, 1280 wide, under 10 seconds, and one behaviour, of rc.7 `722525a5` as shipped (diag NRO `cfec85c7`, log lines only), taken on 2026-11-11.
 
-![Both lanes after a forward smash: startup, active, recovery, hitlag and hitstun](media/rc5-frame-strip-lanes.gif)
+![Both lanes after a forward smash: startup, active, recovery, hitlag and hitstun](media/rc7-frame-strip-lanes.gif)
 
 ## Lanes and colours
 
@@ -48,27 +50,27 @@ A white tick drops from the chip to Player 1's lane. Up to eight chips stay on t
 
 The arrow on a chip is the left stick on that frame, binned to eight screen directions: right, up-right, up, up-left, left, down-left, down, down-right. A stick inside the dead zone (a small horizontal tilt, or a small vertical tilt) has no arrow. The arrow is drawn only when that bin is a direction.
 
-![An attack chip with an up-right arrow from the left stick](media/rc5-frame-strip-chips.gif)
+![An attack chip with an up-right arrow from the left stick](media/rc7-frame-strip-chips.gif)
 
 A C-stick attack, the attack the game marks as coming from the C-stick, takes its chip arrow from the C-stick when that stick is outside the dead zone. A press that is not a C-stick attack keeps the left-stick arrow, even if the C-stick is held. A C-stick attack whose C-stick stays inside the dead zone also keeps the left-stick arrow.
 
-![A forward smash from the C-stick, left stick neutral, with a right arrow on the attack chip](media/rc5-frame-strip-cstick.gif)
+![A forward smash from the C-stick, left stick neutral, with a right arrow on the attack chip](media/rc7-frame-strip-cstick.gif)
 
 ## Stick row
 
 Under Player 1's lane, every frame of the same 60 shows the left stick's held direction. It reads the physical left stick, so a C-stick attack with the left stick neutral leaves the row blank. The eight directions are the same bins as the chip arrow, and a neutral frame is blank. The row scrolls and freezes with the rest of the strip. A change of binned direction resets the quiet count, so the strip does not freeze across that change. Holding one direction can still freeze it.
 
-![The stick row during a dash dance: held directions, and blanks while the stick is neutral](media/rc5-frame-strip-stick-row.gif)
+![The stick row during a dash dance: held directions, and blanks while the stick is neutral](media/rc7-frame-strip-stick-row.gif)
 
 ## Freeze
 
 When both fighters can act, Player 1 has no new button press, the left stick stays in the same bin, and neither fighter is in hitlag, for 30 frames, the strip stops scrolling and keeps the last exchange on screen. It moves again on the next frame where that is no longer true: someone cannot act, a button goes down, the left stick's bin changes, or someone is in hitlag.
 
-![The strip holds still after the hit, then scrolls again when Player 1 jabs](media/rc5-frame-strip-freeze.gif)
+![The strip holds still after the hit, then scrolls again when Player 1 jabs](media/rc7-frame-strip-freeze.gif)
 
 A change from one held direction to another starts the strip scrolling again. Leaving neutral is one such change. Staying in the same direction does not.
 
-![The strip keeps scrolling while the left stick changes direction and no button is pressed](media/rc5-frame-strip-freeze-stick.gif)
+![The strip keeps scrolling while the left stick changes direction and no button is pressed](media/rc7-frame-strip-freeze-stick.gif)
 
 ## Readouts
 
@@ -82,9 +84,9 @@ ADVANTAGE is the CPU's first actionable frame minus yours, both counted from the
 
 The line under the number says **on hit** or **on shield**. Plus is green, minus is red, and zero is plain. A shield hit is not a link. It still sets ADVANTAGE, with the words on shield.
 
-![ADVANTAGE after a jab on hit, with the words on hit](media/rc5-frame-strip-advantage-hit.gif)
+![ADVANTAGE after a jab on hit, with the words on hit](media/rc7-frame-strip-advantage-hit.gif)
 
-![ADVANTAGE after a jab on the CPU's shield, with the words on shield](media/rc5-frame-strip-advantage-shield.gif)
+![ADVANTAGE after a jab on the CPU's shield, with the words on shield](media/rc7-frame-strip-advantage-shield.gif)
 
 ### LINK
 
@@ -97,9 +99,9 @@ LINK is that follow-up:
 
 The combo window is the green bar above Player 1's lane, labelled `window Nf`. N is how many frames wide the presses are that would still have made a true combo, assuming the same startup. The window starts on your first actionable frame after the previous hit. It is missing when even a frame-perfect press would drop, or when the true-combo number could not be read.
 
-![LINK after jab into jab: TRUE combo, and the green window bar](media/rc5-frame-strip-link.gif)
+![LINK after jab into jab: TRUE combo, and the green window bar](media/rc7-frame-strip-link.gif)
 
-![LINK after a late jab: DROP, with a positive number](media/rc5-frame-strip-drop.gif)
+![LINK after a late jab: DROP, with a positive number](media/rc7-frame-strip-drop.gif)
 
 ### INPUT
 
@@ -113,13 +115,13 @@ The number is that press minus your first actionable frame. The words next to it
 
 Then the spare frames. A true combo adds `, N spare`: how many frames later the same press could have been. A drop adds `, Nf past`: how far past the window the hit was. A true combo with no number omits that half.
 
-![INPUT on a late follow-up: the late count and the spare or past frames](media/rc5-frame-strip-input.gif)
+![INPUT on a late follow-up: the late count and the spare or past frames](media/rc7-frame-strip-input.gif)
 
 ### LAST
 
 The LAST row is the last four follow-ups, newest first. Each one is a pill and the two moves. A true combo's pill is green and reads `TRUE` plus the signed number, or `TRUE` alone when the number could not be read. A drop's pill is red and reads `DROP` plus the positive number. The moves use a plain `>` because that is what the font draws, as in `Jab > Up tilt`. A fighter-specific attack this list does not name is `Move`.
 
-![The LAST row with the newest follow-up first](media/rc5-frame-strip-last.gif)
+![The LAST row with the newest follow-up first](media/rc7-frame-strip-last.gif)
 
 ## The 20-frame exchange
 
@@ -131,7 +133,7 @@ If the CPU has been able to act for more than 20 frames, the next hit is not a d
 
 The same 20 frames are what the combo helper uses when it decides that an exchange ended before the next step. A gap of 20 still belongs to the exchange. A gap of 21 does not. The helper grades the follow-up's input events from these samples: presses, releases, the C-stick, and the fast-fall, dash, and tap-jump flicks, facing-relative. Drift is shown and is not graded. An older combo file that stored only presses is still graded on those presses.
 
-![A hit more than 20 frames after the CPU can act, which does not become a DROP](media/rc5-frame-strip-exchange.gif)
+![A hit more than 20 frames after the CPU can act, which does not become a DROP](media/rc7-frame-strip-exchange.gif)
 
 ## Sources
 

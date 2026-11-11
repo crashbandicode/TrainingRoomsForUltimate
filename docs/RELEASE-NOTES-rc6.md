@@ -29,7 +29,9 @@ rc.5 let you build and edit sequences, but not drill them. rc.6 drills them.
 - A deleted combo is skipped. An empty sequence drills nothing. Every combo of a sequence is drilled, however many it
   has.
 
-![Drill a sequence: combo 1, then combo 2, then a drop back at combo 1](media/rc6-sequence-drill.gif)
+![Drill a sequence: combo 1, then combo 2, then a drop back at combo 1](media/rc7-sequence-drill.gif)
+
+*Shown on rc.7 `722525a5` as shipped (diag NRO `cfec85c7`, log lines only), 2026-11-11; the rc.6 clip carried another plugin's input bar.*
 
 The sequence bar is taller than the combo bar, so notices sit 56 layout units (about 37 pixels at 1280×720) lower
 than in rc.5, under either bar.
@@ -71,58 +73,75 @@ A drilled combo, like a bound save or an active macro, moves to the top of its l
   every Mii build, 141 ms on the console. Leaving a Mii for the fighters it replaced takes about 45–115 ms; in rc.5 it
   was a full reload of 4–6 seconds, and the next visit to the Mii built it again. Going back to the Mii is a warm
   switch too, about 50 ms.
-  - Until Mii groups are built in the background as well, the first switch into a Mii still builds it: 0.3–1.1 s in
-    Eden.
-  - TODO-PROOF: hot lane, Mii groups built in the background, and leaving a Mii warm to any built group
-    (`p23/rc6-hot-slots-mii`).
-- TODO-PROOF: worker A and worker B, Ice Climbers, Pokémon Trainer and Pyra/Mythra groups built in the background,
-  including a session that starts on one of them (`p23/rc6-bg-ic`, `p23/rc6-bg-pt`). Until then the background build
-  waits while the fighter on screen is a Mii, Kirby, Ice Climbers, Pokémon Trainer or Pyra/Mythra.
+  - Mii groups are built in the background too, so the first switch into a Mii is warm (47–72 ms in Eden, for Player 1
+    and for the CPU), and leaving a Mii is warm to any built group (47–80 ms).
+- Ice Climbers, Pokémon Trainer and Pyra/Mythra groups are built in the background too, also while a Mii is on screen
+  and in a session that starts on one of them. Switching into them then took 64–82 ms in Eden. The background build
+  now waits only while Kirby is on screen, and for a second Mii group while a Mii is on screen (see Known issues).
+- Going back to an Ice Climbers (normal pair), Pokémon Trainer or Pyra/Mythra original while its group is on is a warm
+  switch now; it used to reload. Going back to a Solo Popo or Mii original still reloads.
 - The notice counts what is loading: "Loading 4/10", then "Ready 10/10" or "All loaded".
 - Fighters past the ready budget still load when you switch to them, as before.
 
-### A cycle change makes things hot
+### A cycle change takes effect at once
 
-Changing Player 1's or the CPU's Character Cycles in Training takes effect when the menu closes. Groups whose fighters
-left the cycle are released, and the new fighters are built in the background the same way. The notice goes from
-Loading to Ready (in Eden, 14 s after a Player 1 change and 4 s after a CPU change). After a change, the first
-switches into the new fighters took 47–70 ms in Eden, also after a second change made while the first was still
-loading.
+Changing Player 1's or the CPU's Character Cycles in Training takes effect when the menu closes. The new fighters are
+built in the background right away, the same way. The notice goes from Loading to Ready (in Eden, 14 s after a Player 1
+change and 4 s after a CPU change). After a change, the first switches into the new fighters took 47–70 ms in Eden,
+also after a second change made while the first was still loading.
 
+- **Fighters that left the cycle** stay loaded until you next open Training's pause menu, which frees them. Until then,
+  a fighter loaded with them that the new cycle still has stays warm to switch to.
+- **If the new fighters need their room,** the old ones are freed at once instead: only as many as needed, and first
+  those the new cycle no longer has. The game pauses for a moment while they go (0.04–0.27 s in Eden). Their memory is
+  handed back as soon as the game has unloaded them (about 0.04 s in Eden mid-play, unseen at a pause), so the new
+  fighters start loading right after (about 1 s after the free for the Ice Climbers in Eden). Fighters the new cycle
+  still uses are freed only if there still isn't room after that. You never need to open the pause menu for a change
+  to load.
+- Changing the cycle many times in a row doesn't build up memory: ten changes in Eden ended where they started.
 - The CPU seats that No. of CPUs raises (below) follow the new CPU cycle too.
-- TODO-PROOF: hot lane, the pause while the background build runs after a cycle change (the longest was 23 frames in
-  Eden; the target is at most 4).
-- TODO-PROOF: hot lane, a cycle press made while that build runs is held or served, never refused; and the fighter on
-  screen stays when it leaves the cycle, until you switch away.
+- While the new fighters build in the background, the game keeps running: its longest pause was 4 frames (about
+  67 ms) in Eden, at the start of a Mii build, and 1–3 frames for the others.
+- A switch you press while the new fighters build waits for that build to end and then goes through. It is never
+  refused (in Eden it went through 0.12 s after the build finished).
+- If the fighter on screen leaves the cycle, it stays until you switch away, and that switch goes to a fighter of the
+  new cycle.
 
 ### No. of CPUs: the seats are the next fighters
 
 Raising No. of CPUs from 1 to 3 brings in the CPU cycle's next two fighters as CPUs 2 and 3, already on the first
-raise. A Mii in those seats is the exact saved Mii, outfit and hat included. After a raise and a drop the Mii classes
-stay in both cycles and load.
+raise. A Mii in those seats is the exact saved Mii, outfit and hat included. With three CPUs up, and after a raise
+and a drop, the Mii classes stay in both cycles and load.
 
 The two seats count in the Fighters notice. A seat that waits for memory shows as "… waiting for memory" there, and
 it loads once memory is free (in Eden, "Loaded 1/5 · swap both to load 3 more (1 waiting for memory)", then
 "Loaded 2/5 …").
 
-### CPU Level
-
-CPU › Level › CPU Level sets the CPUs' level to Off or Lv 1–9. It's saved with the other settings. Off is the default,
-and the game's own level then applies everywhere.
-
-- **In Training,** Lv N replaces Training's own level wherever Training uses it, that is, for the CPU (Lv. n)
-  behavior. The pause menu still shows Training's own level.
-  - If the two differ when Training starts, a notice says so once, for example "CPU level: Lv 7 from TrainingRooms
-    (Training menu: Lv 3)".
-  - Changing either level later in that session shows no second notice. The next entry into Training checks again.
-- **In the waiting room's practice** (local wireless rooms and the Quickplay lobby), Lv N is the training partners'
-  level. There's no notice there.
-- **In matches,** the setting does nothing.
-
 ### Mii editor: "Same as ‹name›, nothing new saved"
 
 A Save in the Mii editor that matches a Mii you already saved still saves nothing new and uses that Mii, as before.
 It now says so: "Same as ‹saved name›, nothing new saved". A changed name alone counts as the same Mii.
+
+### The waiting room remembers its partners
+
+In a local-wireless room or Quickplay's waiting area, the game's own menu sets Training partners (how many CPUs) and the
+CPU action. When you change them, they're saved with the mod's settings. The next time you enter a waiting room, they're
+set before the CPUs appear. With nothing saved, the game's defaults stand (Automatic, Attack).
+
+### CPU Level
+
+CPU › Level › **CPU Level** sets the CPUs' level: Off (the default) or Lv 1–9. It's saved with the other settings. Off
+leaves the game's own level everywhere.
+
+- **In Training,** Lv N replaces Training's own CPU level, the one the CPU (Lv. n) behavior plays at. Training's own
+  level is the one set on the character select, and the pause menu keeps showing it.
+  - If the two differ when Training starts, a small notice says so once, for example "CPU level: Lv 7 from
+    TrainingRooms (Training menu: Lv 3)".
+  - Changing CPU Level during the session takes effect at once, with no second notice. The next entry into Training
+    checks again.
+- **In the waiting room's practice** (local-wireless rooms and Quickplay's waiting area), the training partners play at
+  Lv N, with no notice.
+- **In a match,** nothing changes.
 
 ## Fixed
 
@@ -132,8 +151,8 @@ It now says so: "Same as ‹saved name›, nothing new saved". A changed name al
 - **CONNECTIONS.** A combo's connections list its links with their moves and input events. In rc.5 they were empty. A
   shared combo file with any allowed name now stays the drill.
 - **Make combo** stores the macro's input events, and it saves only the exchange its own playback made. With no hit it
-  writes nothing, where rc.5 saved the exchange before it. TODO-PROOF: final pass, the no-hit case in Eden (it is
-  host-tested).
+  writes nothing, where rc.5 saved the exchange before it. TODO-PROOF: the candidate's `yoga-cov` row
+  `cov-make-combo-no-hit` (it passed on `e39479df` in `covrec-nohit1`; the menu worker it runs through changed since).
 - **Mash interrupts playback** stops the CPU's macro, including a macro from the library. The CPU's mash does not stop
   Player 1's macro. In rc.5 the mash never stopped a library macro.
 - **A setup restore** only moves the fighters. It writes no save file, and the next Load goes back to the bound save.
@@ -149,11 +168,9 @@ It now says so: "Same as ‹saved name›, nothing new saved". A changed name al
 - **Edit combos, Edit chain and Delete** are written to the card. In rc.5 only a save state's Delete was.
 - **The exact Mii.** Switch on a CPU macro recorded on an exact Mii loads that Mii: its look, specials, colour, voice,
   outfit and hat. rc.5 loaded the class's default Mii. A Mii from a replay has no ID and no name of its own; it is
-  loaded as your saved Mii with the same look, or else under the name "New Mii". TODO-PROOF: final pass, after the
-  cov-rest merge (proven on the cov-rest build).
+  loaded as your saved Mii with the same look, or else under the name "New Mii".
 - **Replay window.** The clip editor is drawn, a capture's Mii track no longer stays on "Reading recorded Mii...",
-  its Fighter Mismatch question is shown, and Switch loads the exact Mii. TODO-PROOF: final pass, after the cov-rest
-  merge (proven on the cov-rest build).
+  its Fighter Mismatch question is shown, and Switch loads the exact Mii.
 - **Notice plates.** Each dark plate is drawn under the notice texts, so a body's plate no longer covers the lower
   half of the header.
 - **Crashes and hangs:**
@@ -161,20 +178,39 @@ It now says so: "Same as ‹saved name›, nothing new saved". A changed name al
     the game then hung on Quit Training;
   - a Mii in a No. of CPUs seat was loaded without its Mii and read null memory every frame;
   - after a scene change, a group switch could bring in the wrong fighter and leave the CPU cycle stuck on "Wait for
-    the character swap to finish".
+    the character swap to finish";
+  - with heavy fighters in the cycles and little memory left, a switch could use more memory than there was, and the
+    game crashed (seen in Eden). A switch now brings along only the next fighters that fit in memory. The others load
+    when you switch to them;
+  - the menu and the game could wait on each other for ever while a macro was being named, freezing the game. This
+    was found by checking the code, not in a test run, and it is fixed.
 - **No heap use in the game's hooks** when the CPU-as-Player 1 fallback runs, that is, without the standalone pilot
   plugin. rc.5 allocated there.
+- **P1 CPU Control in an online match.** Without the standalone pilot plugin, P1 CPU Control now plays Player 1 in an
+  online match. Before, it worked only in Training: in a Quickplay match Player 1 stood still, and the game dropped the
+  console for inactivity. TODO-PROOF: the merged candidate's final Quickplay boot (branch proof `rc6-bg-qp6`).
+- **Lobby Items Off in Quickplay's waiting area.** Off now also stops the waiting room's timed item drops. In rc.5 they
+  kept coming with the row Off, one every 10–13 s. Items already out are still removed once when you turn it Off, and
+  On brings items back. In local-wireless rooms the game spawns no items at all.
 
 ## Known issues
 
-- Once, in Eden only, the game thread stopped at a menu close after a diagnostic CPU-cycle reload with Cycle Preload
-  Off. It was not seen again in four later boots with 38 menu closes. It is not reproduced, and it is noted rather
-  than explained.
-- TODO-PROOF: integration, Lobby Items row #62. Off stops the waiting room's item spawner, but in Eden's host-only
-  Local Wireless room the game never spawns an item, so an item appearing with the row On, and an existing item
-  removed when it turns Off, are not shown.
-- TODO-PROOF: cov-rest question of 17:14Z. While 2 or 3 CPUs are up, the Mii classes may be greyed in the cycles until
-  the count drops again. That is a reading of the code, not an Eden row, and it has no recorded answer.
+- **The game can freeze when the menu closes (rare).** In Eden it happened four times: once in Training after a
+  diagnostic CPU-cycle reload with Cycle Preload Off, and three times in Quickplay's waiting area while paging through
+  the menu (in the two longest loops, after 36 and 38 clean closes in a row). Other loops of the same steps closed the
+  menu cleanly. While the game was frozen, none of this mod's code was running; the game's own code was busy. The
+  cause isn't found yet. The macro-naming freeze fixed above is a different problem.
+- **Waiting for memory.** When memory is short, a group or a CPU seat can stay "waiting for memory". The Fighters
+  notice says so, for example "Loaded 9/10 (1 waiting for memory)". That fighter still loads when you switch to it,
+  the normal (slower) way.
+- **Kirby.** While Player 1 or the CPU is Kirby, groups that aren't built yet wait; built groups stay ready. A session
+  that starts on Kirby builds its other groups after the first switch away from Kirby. Leaving a Kirby that holds a
+  copy ability reloads, as in rc.3.1.
+- **Two Mii groups for one player.** The game keeps one Mii per player. With two Mii groups in one player's cycle, the
+  second is built in the background only after that player leaves the first Mii.
+- **A Training reset can pause for a moment.** Now and then a Training reset pauses the game for 0.14–0.23 s (seen in
+  Eden). The pause is in the game's own reset, not in this mod's loading.
+- **Known issue: when the standalone CPU pilot controls Player 1, Record isn't refused yet (fix planned).**
 
 ## Corrections to the rc.5 notes
 

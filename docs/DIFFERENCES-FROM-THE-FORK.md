@@ -18,7 +18,7 @@ This page lists only the changes, each checked against the code of 0.2.0-rc.3 (`
 
 ## Menu
 
-![The five pages](media/menu-tour.gif)
+![The five pages](media/rc7-menu-tour.gif)
 
 | Change | Where in the code |
 | --- | --- |
@@ -33,11 +33,11 @@ This page lists only the changes, each checked against the code of 0.2.0-rc.3 (`
 | Menu shortcuts 1 and 2 are edited in the menu with a chord editor, apply at once and are saved to `button_config.ini`. B + D-pad Up always opens the menu. | `src/model/menu/table.rs:430-433` |
 | A *Replay capture* row writes `replay_capture.ini`; the Online Deluxe overlay's row shows the same value. | `src/model/menu/table.rs:353`, `src/runtime/deluxe_row.rs:31` |
 
-![Fighter grid with cycle badges](media/cycle-badges.gif)
+![Fighter grid with cycle badges, then the cycle chord switching Player 1 in that order](media/rc6-cycle-switch.gif)
 
-![A new menu shortcut applies at once](media/menu-shortcut.gif)
+![A new menu shortcut applies at once](media/rc7-menu-shortcut.gif)
 
-![Replay capture, menu and Deluxe overlay](media/replay-capture.gif)
+![Replay capture, menu and Deluxe overlay](media/rc7-replay-capture.gif)
 
 ## CPU and practice behaviour
 
@@ -48,11 +48,9 @@ This page lists only the changes, each checked against the code of 0.2.0-rc.3 (`
 | Changing ledge or throw options in the menu re-rolls them at once, even for a CPU already on the ledge. | `src/model/cpu/state.rs:178-183` |
 | During input playback the recording wins over DI, SDI, air dodge, tech and throw. *Settings override playback* (default Off) restores the fork's rule. | `src/model/cpu/playback.rs:29-31` |
 | Ice Climbers keep one CPU state each for Popo and Nana. | `src/model/cpu/role.rs:32-52` |
-| When the CPU pilot plugin drives Player 1, CPU settings apply to the CPU only, and Record is refused with a notice. | `src/model/cpu/role.rs:3-6`, `src/runtime/features/recorder.rs:548` (`record_refusal`) |
+| When the CPU pilot plugin drives Player 1, CPU settings apply to the CPU only, and Record is refused ("P1 is controlled by an AI: recording is off"), from the chord and from the pop-up; a running recording can always be stopped. | `src/model/cpu/role.rs:3-6`, `src/model/recording.rs:244` (`RecordRefusal::P1DrivenByAi`), `src/model/recording.rs:275` (`record_chord`), `src/runtime/features/recorder.rs:694` (`record_refusal`) |
 
-![Respawn on platform Off: instant respawn](media/respawn-off.gif)
-
-![Record refused while the CPU pilot drives P1](media/record-refused.gif)
+![Respawn on platform Off: instant respawn](media/rc7-respawn-off.gif)
 
 ## Added in rc.2
 

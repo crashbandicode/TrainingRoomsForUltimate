@@ -78,18 +78,24 @@ had no guard in the fork.
 ## Mii groups and seats in rc.6
 
 - **Async build:** a Mii group is constructed on the task worker like an ordinary group, not by the synchronous loop
-  on the game thread (`async_build_eligible`, `src/model/swap/body_bank.rs:753`). The 2026-11-02 restriction stays for
+  on the game thread (`async_build_eligible`, `src/model/swap/body_bank.rs:790`). The 2026-11-02 restriction stays for
   native groups (Pokémon Trainer, Aegis) and the Ice Climbers pair.
 - **Warm exit:** leaving a Mii group for the window it displaced is a warm exchange; the Mii switch's publication is
-  put back in the settle tick (`plan_mii_exit`, `src/runtime/roster/native_body_bank.rs:989`). TODO-PROOF: hot lane,
-  the exit to any built group, and Mii groups built in the background (`p23/rc6-hot-slots-mii`).
+  put back in the settle tick (`plan_mii_exit`, `src/runtime/roster/native_body_bank.rs:1224`). Mii groups are built
+  in the background too (`p23/rc6-hot-slots-mii`). On the candidate `b04856b2`, `final-yoga-i3-mii-b04856b2-r2` 19/19:
+  - P1's first switch into its background-built Mii group was `group-warm` in 72 ms, and later ones in 49–50 ms. The
+    CPU's took 47 ms.
+  - Every exit from the Mii was `warm-exit`, in 47–51 ms: to P1's original (Mario), to Fox's built group, and to the
+    CPU's original.
+  - Beside the live Mii window, `final-yoga-i3-x6-b04856b2-r2` 14/14 built Pokémon Trainer, Samus and (once Samus's
+    group slot was freed) the Ice Climbers pair in the background. Its lap left the Mii warm in 80 ms, to Link.
 - **No. of CPUs seats:** a seat member keeps its exact-Mii configuration, so a Mii seat loads through the Mii helper
-  (`seat_load`, `src/model/parked_entries.rs:257`), and the seats park at one CPU whatever the plan lists
+  (`seat_load`, `src/model/parked_entries.rs:270`), and the seats park at one CPU whatever the plan lists
   (`parked_seat`, `:269`). A promoted seat parked again gets its Mii proof re-recorded only when its identity is
   unchanged.
 - **Portrait first:** a Mii press waits while that role's HUD portrait renders on a helper, and a seat load holds back
   while a portrait waits for one (`Blocker::Portrait`, `src/model/swap/source_load.rs:150`;
-  `seat_load_waits`, `src/model/parked_entries.rs:310`). The press runs after the render; it is not dropped.
+  `seat_load_waits`, `src/model/parked_entries.rs:359`). The press runs after the render; it is not dropped.
 
 ## Eden, rc.6
 
@@ -110,4 +116,6 @@ Each run is a diag build of the named commit, 2026-11-08. Evidence is under `art
 | Async build, warm exit | `me-p1-lap`, `me-cpu-lap`: every press applied, one Mii build per role, the exit 50–114 ms | `rc6-hot-xps6` (`d6a485f`) | pass |
 
 The `covrest-yoga-04` and `covrest-pair-y3` builds carry cov-rest commits that reach the rc.6 candidate with the
-cov-rest merge (TODO-PROOF: final pass).
+cov-rest merge. The final pass ran these rows again on the candidate `646a5f0d` (2026-11-09), and they passed:
+`cov-replay-window` and `cov-named-mii` in `yoga-cov` (41/41), and `p00`–`p07` with the editor and resume rows
+(`p07-guest-editor`, `p11-guest-resume`, `p12-guest-leave-editor`) in `yoga-pair` (17/17).
