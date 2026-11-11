@@ -2,10 +2,10 @@
 //! being built. `TR_BUILD_SHA` is `git rev-parse --short=8 HEAD` run from this directory, with `-dirty` when a tracked
 //! file differs from HEAD, or `unknown` without git or a repository (a source archive); the build never fails on it.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
-const BUILD_NAME: &str = "rc8";
+const BUILD_NAME: &str = "rc9";
 
 /// The binary's inputs: an edit after a clean build reruns this script, so the tag gains `-dirty`.
 const SOURCES: [&str; 6] = ["src", "assets", "crates", "third_party", "Cargo.toml", "Cargo.lock"];
@@ -28,7 +28,10 @@ fn rerun_if_changed(path: &Path) {
 }
 
 fn main() {
-    let dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+    // The package being built, as cargo sets it for this run (rc.9, TASK-rc9.md item 3): `env!` would freeze the path the
+    // script was compiled in, and a target dir shared with another checkout would read that checkout's HEAD.
+    let manifest = std::env::var_os("CARGO_MANIFEST_DIR").map_or_else(|| PathBuf::from("."), PathBuf::from);
+    let dir = manifest.as_path();
     rerun_if_changed(&dir.join("build.rs"));
     for source in SOURCES {
         rerun_if_changed(&dir.join(source));

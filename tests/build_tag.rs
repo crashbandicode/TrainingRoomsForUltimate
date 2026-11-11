@@ -6,7 +6,7 @@ use std::process::Command;
 
 #[test]
 fn the_build_tag_is_the_commit_being_built() {
-    assert_eq!(env!("TR_BUILD_NAME"), "rc8");
+    assert_eq!(env!("TR_BUILD_NAME"), "rc9");
     let tag = env!("TR_BUILD_SHA");
     let head = Command::new("git")
         .args(["-C", env!("CARGO_MANIFEST_DIR"), "rev-parse", "--short=8", "HEAD"])
