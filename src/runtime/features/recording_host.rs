@@ -21,6 +21,11 @@ pub fn on_chords(record: bool, play_player: bool, play_cpu: bool) {
     rr_host::on_chords(record, play_player, play_cpu);
 }
 
+/// Whether the worker's capture runs, so that a Record chord now stops it.
+pub fn capturing() -> bool {
+    rr_host::capture_role() != 0
+}
+
 /// Both fighters' live pose and summed speed. Atomics and kinetic reads only; no allocation.
 ///
 /// # Safety

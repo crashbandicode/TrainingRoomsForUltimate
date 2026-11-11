@@ -36,8 +36,8 @@ use crate::model::cpu::role::FighterKey;
 use crate::model::cpu::status;
 use crate::model::input_delay::{MappedInputs, Owners};
 use crate::model::recording::{
-    ControlCtx, ControlOut, Ended, Inject, LoadAction, MashCtx, Mode, Phase, PollFacts, PostCtx, RecordRefusal, Recorder,
-    RecorderSettings, StartSnapshot,
+    record_chord, ControlCtx, ControlOut, Ended, Inject, LoadAction, MashCtx, Mode, Phase, PollFacts, PostCtx, RecordRefusal,
+    Recorder, RecorderSettings, StartSnapshot,
 };
 use crate::model::settings::Snapshot;
 use crate::model::sites_pkg4;
@@ -661,6 +661,16 @@ unsafe fn chord_step(settings: &RecorderSettings, _body: Body, facing: i8) {
         return;
     }
     let record = record && settings.trigger_chord;
+    // A Record that would start the worker's capture asks the same refusals as every other record start (B4).
+    let record = match record_chord(record, recording_host::capturing(), || record_refusal()) {
+        Ok(record) => record,
+        Err(refusal) => {
+            notices::refuse(refusal.text());
+            let reason = refusal as i64;
+            event("record_refused", "reason", reason, "", 0);
+            false
+        }
+    };
     recording_host::on_chords(record, play_player, playback);
     recording_host::cpu_role_after_chord(facing);
 }

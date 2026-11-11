@@ -1492,3 +1492,19 @@ ceiling = 164549
 date = "2026-11-11"
 reason = "rc.8 integration: p23/rc8-build-tag d5aa6b94 (R13, the menu footer build tag and build.rs, +77 over 38e58296) merged on f105fe76 (164472) in p23/rc8-integration (integration 2026-11-11 13:59Z): 164472 + 77 = 164549"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.8 order (TASK-rc8.md R13, operator 11:58Z); a raise goes in its own commit with approved_by"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 164130
+date = "2026-11-11"
+reason = "rc.8 R7 p23/rc8-pilot-refusal over 38e58296 (164108): Record refused while an AI drives P1 on the recording worker's chord path (B4; the regression 0bb2bea3): model::recording::record_chord, chord_step's gate, recording_host::capturing; measured 164130 at 657c9da9 (tools/size_gate.py through tests/size_budget.rs), +22"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.8 order (TASK-rc8.md R7, operator 2026-11-11 06:24 EST: everything in rc.8) and the primary's 11:27Z R7 order; a raise goes in its own commit with approved_by"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 164571
+date = "2026-11-11"
+reason = "rc.8 integration: p23/rc8-pilot-refusal 8607526b (R7, Record refused while an AI drives P1, +22 over 38e58296) merged on 479f1193 (164549) in p23/rc8-integration (integration 2026-11-11 14:03Z): 164549 + 22 = 164571"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.8 order (TASK-rc8.md, scope reopened 11:24Z); a raise goes in its own commit with approved_by"
