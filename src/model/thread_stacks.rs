@@ -111,7 +111,7 @@ pub const THREADS: [ThreadStack; 18] = [
     // console-practice-trace builds only: the practice trace file writer
     row(ThreadId::PracticeTrace, c"tr-practice-trace", 128 * KIB, 0, 0, "", "practice_trace::writer"),
     // diag: the stall watchdog (samples the hooks' entry count, prints held locks through svcOutputDebugString)
-    row(ThreadId::StallWatch, c"tr-stall-watch", 48 * KIB, 3_104, 2_608, "final-surface-cov-4e336da4", "stall_watch::start::{closure#0}"),
+    row(ThreadId::StallWatch, c"tr-stall-watch", 20 * KIB, 3_104, 2_608, "final-surface-cov-4e336da4", "stall_watch::start::{closure#0}"),
 ];
 
 const fn row(
@@ -213,15 +213,18 @@ impl CallbackStack {
 
 /// The native service's stacks (`runtime::roster::native_service`). Only the pre-service poll runs on them, each claimed
 /// for one poll; the owners' gates and leaves stay on the game's stack (`native_bound`), so the leaves never wait for a
-/// stack, and a poll that finds none free is skipped. 320 KiB is the smallest page multiple the rule allows for the poll's
-/// path; four stacks: 1.25 MiB of `.bss`.
+/// stack, and a poll that finds none free is skipped. The size is the smallest page multiple the rule allows for the poll's
+/// path. rc.8 §4/§7: two stacks, from rc.7's four. Every rc.7 diag run reported `[NativeService] service stacks peak=1 of 4
+/// skipped_polls=0` (S3, `nt`, `f9`, `rc8-chain-test`, the docs lane's GIF runs), and a poll with none free is skipped,
+/// never waited for; the second covers a nested or concurrent poll none of them showed. 2 × 304 KiB: 608 KiB of `.bss`,
+/// from 1.25 MiB.
 pub const SERVICE_STACK: CallbackStack = CallbackStack {
     name: "native-service",
-    bytes: 320 * KIB,
-    count: 4,
-    static_bound: 236_992,
+    bytes: 304 * KIB,
+    count: 2,
+    static_bound: 232_896,
     native_room: 63_728,
-    native_bound: 10_832,
+    native_bound: 1_776,
     measured_in: "Eden final-surface-acc-d8679593-r2 ([HookStack] site=native_service min_free=63728)",
     on_stack: &["training_mod_native_service_pre"],
     entry: "training_mod_native_service_entry",
