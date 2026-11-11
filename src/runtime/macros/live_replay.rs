@@ -45,6 +45,9 @@ struct Capture {
 fn toggle() -> &'static CaptureToggle { crate::runtime::macros::replay_store::toggle() }
 
 static EVENTS: hos_lock::Mailbox<(u64, LiveEvent), 4096> = hos_lock::Mailbox::new();
+/// rc.8 §7 (diag): the most live events waiting at once, of the 4096 slots (`diag_log`'s `[MailboxPeak]`).
+#[cfg(feature = "diag")]
+pub(crate) fn events_high_water() -> u32 { EVENTS.high_water() }
 static EVENT_SERIAL: AtomicU64 = AtomicU64::new(1);
 static LOST_SERIAL: AtomicU64 = AtomicU64::new(0);
 static SAVE_SERIAL: AtomicU64 = AtomicU64::new(1);

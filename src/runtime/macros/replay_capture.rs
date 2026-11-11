@@ -122,6 +122,9 @@ static VAULT_HOOK: hos_lock::Mutex<VaultHook> = hos_lock::Mutex::new(VaultHook {
     epoch: 0, recording: false, truncated: false, counts: [0; 8], pending: [None; 8],
 });
 static VAULT_EVENTS: hos_lock::Mailbox<VaultEvent, 4096> = hos_lock::Mailbox::new();
+/// rc.8 §7 (diag): the most vault events waiting at once, of the 4096 slots (`diag_log`'s `[MailboxPeak]`).
+#[cfg(feature = "diag")]
+pub(crate) fn vault_high_water() -> u32 { VAULT_EVENTS.high_water() }
 static VAULT_DROPPED_EPOCH: AtomicU64 = AtomicU64::new(0);
 
 fn post_vault(epoch: u64, event: VaultEvent) -> bool {

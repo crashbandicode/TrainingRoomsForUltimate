@@ -407,6 +407,17 @@ pub fn set_tick(step: fn()) -> bool {
     TICKS.iter().any(|slot| slot.set(step).is_ok())
 }
 
+/// rc.8 §7 (diag): the most events the two replay mailboxes held at once, of their 4096 slots each (1.15 MB of `.bss`), one line
+/// when either rose: what the next Eden runs size them by.
+#[cfg(feature = "diag")]
+fn report_mailboxes(seen: &mut [u32; 2]) {
+    let now = [crate::runtime::macros::live_replay::events_high_water(), crate::runtime::macros::replay_capture::vault_high_water()];
+    if now != *seen {
+        *seen = now;
+        diagnostic(format_args!("[MailboxPeak] live_events={} vault_events={} capacity=4096", now[0], now[1]));
+    }
+}
+
 /// The drain thread: every 50 ms it moves buffered lines to the card. Its stack is the table's
 /// (`model::thread_stacks`). If it cannot be created, callers keep writing synchronously (SPEC-core-01 §7).
 pub fn start_drain_thread() {
@@ -414,6 +425,8 @@ pub fn start_drain_thread() {
         writer_started();
         #[cfg(feature = "diag")]
         let (mut observer, mut ticks) = (crate::model::hook_stats::Observer::new(), 0u32);
+        #[cfg(feature = "diag")]
+        let mut mailbox_peaks = [0u32; 2];
         #[cfg(feature = "plugin-heap-meter")]
         let mut metered_calls = 0usize;
         loop {
@@ -437,6 +450,7 @@ pub fn start_drain_thread() {
                     }
                     // The threads' stack high-water marks (stream/stack), on the same 10 s beat.
                     crate::runtime::threads::report();
+                    report_mailboxes(&mut mailbox_peaks);
                     // `plugin-heap-meter`: the byte meter of the same allocator, one line when this NRO allocated since the last one.
                     #[cfg(feature = "plugin-heap-meter")]
                     {
