@@ -36,15 +36,15 @@ pub(crate) fn helper_snapshot_for(source:Option<crate::engine::swap::source_life
     let view=registry().helpers;
     view.available_for(source)?;Ok(view)
 }
-pub(crate) fn check_helpers(view:helpers::View)->Result<(),&'static str> {check_helpers_for(view,None)}
-pub(crate) fn check_helpers_for(view:helpers::View,source:Option<crate::engine::swap::source_lifetime::SourceToken>)->Result<(),&'static str> {
+pub(crate) fn check_helpers(view:&helpers::View)->Result<(),&'static str> {check_helpers_for(view,None)}
+pub(crate) fn check_helpers_for(view:&helpers::View,source:Option<crate::engine::swap::source_lifetime::SourceToken>)->Result<(),&'static str> {
     let guard=registry();
     guard.helpers.available_for(source)?;
-    check(guard.helpers==view,"source provenance changed during native read")
+    check(guard.helpers==*view,"source provenance changed during native read")
 }
-pub(crate) fn final_registry(view:helpers::View,token:Option<super::InstallToken>)
+pub(crate) fn final_registry(view:&helpers::View,token:Option<super::InstallToken>)
     ->Result<hos_lock::MutexGuard<'static,Registry>,&'static str> {final_registry_for(view,token,None)}
-pub(crate) fn final_registry_for(view:helpers::View,token:Option<super::InstallToken>,source:Option<crate::engine::swap::source_lifetime::SourceToken>)
+pub(crate) fn final_registry_for(view:&helpers::View,token:Option<super::InstallToken>,source:Option<crate::engine::swap::source_lifetime::SourceToken>)
     ->Result<hos_lock::MutexGuard<'static,Registry>,&'static str> {
     let guard=registry();
     match token {
@@ -52,7 +52,7 @@ pub(crate) fn final_registry_for(view:helpers::View,token:Option<super::InstallT
         None=>check(!super::INSTALL.active(),helpers::CAPTURE_BUSY)?,
     }
     guard.helpers.available_for(source)?;
-    check(guard.helpers==view,"source provenance changed before commit")?;
+    check(guard.helpers==*view,"source provenance changed before commit")?;
     Ok(guard)
 }
 impl Registry {
@@ -121,7 +121,7 @@ pub(crate) unsafe fn mirrors(o:Owner)->values::Mirrors {
 pub(crate) unsafe fn control(row:usize)->[u8;7] {
     [0xa,0x6b,0x79,0x78,0x19,0x1a,0xa7].map(|offset|rd(row,offset))
 }
-pub(crate) unsafe fn helper_kind(view:helpers::View,id:usize,owner:Owner,kind:u32)->bool {
+pub(crate) unsafe fn helper_kind(view:&helpers::View,id:usize,owner:Owner,kind:u32)->bool {
     let Some(ordinal)=view.ordinal(id) else {
         return !cfg!(feature="mii-managed-source-coexist-alpha")
             && role_owner::original_row_matches(kind,rd(owner.row,8));
@@ -233,7 +233,7 @@ impl core::fmt::Debug for ByteRanges {
 /// 2026-11-08 16:44Z: which fields an F9 promotion and re-park change).
 #[cfg(feature = "diag")]
 static REFUSED_PROOF_NOTES: core::sync::atomic::AtomicU8 = core::sync::atomic::AtomicU8::new(0);
-fn note_refused_proof(view:helpers::View,id:usize,ordinal:usize,now:helpers::Proof,parked:bool,why:&str) {
+fn note_refused_proof(view:&helpers::View,id:usize,ordinal:usize,now:helpers::Proof,parked:bool,why:&str) {
     #[cfg(not(feature = "diag"))]
     let _ = (view, id, ordinal, now, parked, why);
     #[cfg(feature = "diag")]
@@ -248,7 +248,7 @@ fn note_refused_proof(view:helpers::View,id:usize,ordinal:usize,now:helpers::Pro
 /// Created Miis require their separate committed SourceBook receipt. Ordinary
 /// extras continue through the original strict admission; no generic widening.
 /// G is held; this consumes only the captured View and raw native reads.
-pub(crate) unsafe fn created_kind(view:helpers::View,extras:crate::engine::mii::capacity::Extras,
+pub(crate) unsafe fn created_kind(view:&helpers::View,extras:crate::engine::mii::capacity::Extras,
     id:usize,owner:Owner,kind:u32,facts:crate::engine::mii::capacity::ExtraFacts)
     ->Result<(),&'static str> {
     if MiiClass::from_kind(kind).is_none() {return extras.admit(id,&owner,facts);}
@@ -446,7 +446,7 @@ unsafe fn current_locked(base:usize, m:Map, locked:Binding,
     original_kind:u32, staged:Option<(&[u8;0x70],usize)>, helpers:helpers::View)
     -> Result<Snapshot,&'static str> {
     let entry=locked.entry;let epoch=locked.epoch;
-    check_helpers(helpers)?;
+    check_helpers(&helpers)?;
     check(rd::<usize>(m.symbol,0)==m.manager && rd::<usize>(m.manager,0)==m.internal
         && rd::<[usize;8]>(m.internal,0x20)==m.physical()
         && rd::<[usize;8]>(m.internal,0x60)==[0;8],"owner map changed")?;
@@ -491,14 +491,14 @@ unsafe fn current_locked(base:usize, m:Map, locked:Binding,
                 // Shared exact admission (roots, owners, object, creation descriptor
                 // word, indices, kinds, ordinary-only claim facts); raw reads under G.
                 // Never a helper ordinal or Mii owner; names the failed predicate.
-                created_kind(helpers,m.extras,id,owner,kind,super::super::mii_backend::extra_facts(table,id,fe,e,d,o))?;
+                created_kind(&helpers,m.extras,id,owner,kind,super::super::mii_backend::extra_facts(table,id,fe,e,d,o))?;
             } else if m.layout.logical(id as u32).is_some() {
                 let current=authority(b,skyline::nn::os::GetCurrentThread() as usize,
                     [m.symbol,m.manager,m.internal],m.entries,id as u32,owner);
                 let original=super::super::original_kind(super::super::Role::Cpu)
                     .ok_or("CPU original absent")?;
                 check(foreign_kind(current,original,rd(e,8),kind),"foreign original row/kind authority changed")?;
-            } else {check(helper_kind(helpers,id,owner,kind),"helper row kind/provenance changed")?;}
+            } else {check(helper_kind(&helpers,id,owner,kind),"helper row kind/provenance changed")?;}
             let other=Binding {owner:id as u32,entry:fe,row:e,record_index:u16::from(owner.selector),..b};
             let at=values::record_address(other,other).map_err(|_|"protected record bounds")?;
             check(span(at,values::RECORD_LEN,false),"protected record span")?;
@@ -526,7 +526,7 @@ unsafe fn current_locked(base:usize, m:Map, locked:Binding,
         && rd::<usize>(table,0xe8)==owner.object
         && rd::<usize>(entry,0xf8)==owner.information,
         "owner authority changed during bounded read")?;
-    check_helpers(helpers)?;
+    check_helpers(&helpers)?;
     Ok(Snapshot {layout:m.layout,helpers,binding:b,thread:skyline::nn::os::GetCurrentThread() as usize,
         original_kind,descriptor,scalars:Scalars::read(b.row,owner.information),record:rd(at,0),control:control(b.row),
         symbol:m.symbol,manager:m.manager,internal:m.internal,entries:m.entries,owners,protected})
@@ -631,7 +631,7 @@ pub(super) unsafe fn publish_same_class(track:&super::Track,selected:usize)
     check(fresh.ticket==track.ticket && fresh.same_class==Some(proof)
         && fresh.gate.may_publish(track.ticket,6) && super::epoch()==track.ticket.epoch,
         "same-class phase ticket/epoch changed")?;
-    let registry=final_registry(helpers,Some(track.token))?;
+    let registry=final_registry(&helpers,Some(track.token))?;
     // No fallible operation, row getter or native callback after the first write.
     copy_update(record,&update);
     write_tokens(&targets,update.tokens().into());
@@ -694,7 +694,7 @@ pub(super) unsafe fn publish(track:&super::Track, selected:usize) -> Result<(),&
             descriptor:&track.descriptor,payload:track.publish,
         }.validate()?;
     }
-    let registry=final_registry(helpers,Some(track.token))?;
+    let registry=final_registry(&helpers,Some(track.token))?;
     // No fallible operation or native callback after this point.
     if track.publish.is_some() {
         let update=crate::engine::mii::ordinary_player::retained_record(now.record,track.publish);
@@ -764,7 +764,7 @@ pub(super) unsafe fn bank_publish(bank:&super::BankTrack,c:Configuration,group_h
         && super::epoch()==bank.ticket.epoch,"bank publication ticket/epoch changed")?;
     let record=values::record_address(b,b).map_err(|_|"record changed")?;
     let track=state.bank.as_mut().ok_or("bank publication track absent")?;
-    let registry=final_registry(helpers,Some(bank.token))?;
+    let registry=final_registry(&helpers,Some(bank.token))?;
     // No fallible operation or native callback after this point. The track records what
     // it is about to replace in the same critical section (MII-PHASEB): from here on every
     // terminal arm compensates it (`bank_refused` -> `bank_restore`).
@@ -824,7 +824,7 @@ pub(super) unsafe fn prefetch_publish(entry:usize,c:Configuration,identity:crate
         "Mii group publication needs the native loader idle at 6/14").map_err(PublishRefusal::Race)?;
     let mut state=super::STATE.lock();
     if state.busy() || state.request.is_some() {return Err(PublishRefusal::Busy);}
-    let registry=final_registry(helpers,None).map_err(publish_refusal)?;
+    let registry=final_registry(&helpers,None).map_err(publish_refusal)?;
     let owner=state.owner.as_mut().filter(|o|o.expected==expected)
         .ok_or(PublishRefusal::Race("Mii group publication owner changed"))?;
     let record=values::record_address(b,b).map_err(|_|PublishRefusal::Race("record changed"))?;
@@ -876,7 +876,7 @@ pub(super) unsafe fn bank_restore(bank:&super::BankTrack,c:Configuration,publish
     let state=super::STATE.lock();
     check(state.bank.is_some_and(|now|now.ticket==bank.ticket && now.token==bank.token && !now.departed)
         && super::epoch()==bank.ticket.epoch,"bank rollback ticket/epoch changed or the scene departed")?;
-    let registry=final_registry(helpers,Some(bank.token))?;
+    let registry=final_registry(&helpers,Some(bank.token))?;
     // No fallible operation between here and the writes; nothing after them returns the retry sentinel.
     for (off,byte) in published.record[..CHARINFO_LEN].iter().enumerate() {wr(record,off,*byte);}
     published.scalars.write(b.row,o.information);
@@ -932,7 +932,7 @@ pub(super) unsafe fn completed(track:&super::Track) -> Result<Snapshot,&'static 
         && t.gate.can_complete(track.ticket)) && super::epoch()==track.ticket.epoch,
         "ready ticket/epoch changed before commit")?;
     let owner=state.owner.as_mut().ok_or("ready owner retired")?;
-    let mut registry=final_registry(helpers,Some(track.token))?;
+    let mut registry=final_registry(&helpers,Some(track.token))?;
     owner.expected=now;owner.active=track.publish;owner.cursor=track.destination.cursor;
     registry.commit(now.authority(),now.original_kind,super::descriptor_kind(&now.descriptor));
     drop(registry);drop(state);drop(g);
@@ -961,6 +961,7 @@ pub(super) struct Settled {
 }
 /// Lock order G -> adapter STATE -> COMMITTED.
 #[cfg(feature="native-body-bank-alpha")]
+#[inline(never)] // rc.8 §7: its snapshots and MiiExit copies live in its own frame, not in bank_service's
 pub(super) unsafe fn bank_settled(bank:&super::BankTrack) -> Result<Settled,BankRefusal> {
     let before=&bank.before;
     let base=super::base();
@@ -1026,7 +1027,7 @@ pub(super) unsafe fn bank_settled(bank:&super::BankTrack) -> Result<Settled,Bank
         Some(owner)=>owner,
         None=>{drop(state);drop(lock);return Err(BankRefusal::Kept("bank ticket/owner changed before settlement"));}
     };
-    let mut registry=match final_registry(helpers,Some(bank.token)) {
+    let mut registry=match final_registry(&helpers,Some(bank.token)) {
         Ok(registry)=>registry,
         Err(reason)=>{drop(state);drop(lock);return Err(BankRefusal::Kept(reason));}
     };
@@ -1051,9 +1052,12 @@ pub(super) unsafe fn bank_settled(bank:&super::BankTrack) -> Result<Settled,Bank
 /// against the receipt from before the Mii with the descriptor as it is now; then the owner adopts the window with no
 /// active configuration. `helpers::BUSY` before any write retries on the next callback.
 #[cfg(feature="native-body-bank-alpha")]
-pub(super) unsafe fn exit_settled(bank:&super::BankTrack,exit:Option<super::MiiExit>)->Result<Settled,BankRefusal> {
+#[inline(never)] // rc.8 §7: its snapshots and MiiExit copies live in its own frame, not in bank_service's
+pub(super) unsafe fn exit_settled(bank:&super::BankTrack)->Result<Settled,BankRefusal> {
     let before=&bank.before;
-    let exit=exit.filter(|x|x.mii.ticket.epoch==before.binding.epoch)
+    // rc.8 §7: the kept exit is read here once and borrowed (`bank_settle` read it and passed a copy, filtered into another).
+    let kept=super::STATE.lock().mii_exit;
+    let exit=kept.as_ref().filter(|x|x.mii.ticket.epoch==before.binding.epoch)
         .ok_or(BankRefusal::Diverged("warm exit without its kept Mii publication"))?;
     let base=super::base();
     let m=map(before.binding.entry).map_err(BankRefusal::Diverged)?;
@@ -1087,7 +1091,7 @@ pub(super) unsafe fn exit_settled(bank:&super::BankTrack,exit:Option<super::MiiE
     let Some(owner)=state.owner.as_mut().filter(|o|current && o.expected==exit.adopted && o.active==Some(exit.configuration)) else {
         return Err(BankRefusal::Diverged("warm exit ticket/owner changed after the restore"));
     };
-    let mut registry=final_registry(helpers,Some(bank.token)).map_err(BankRefusal::Diverged)?;
+    let mut registry=final_registry(&helpers,Some(bank.token)).map_err(BankRefusal::Diverged)?;
     owner.cursor=bank.destination.cursor;
     owner.expected=now;owner.active=None;
     registry.commit(now.authority(),now.original_kind,super::descriptor_kind(&now.descriptor));
@@ -1151,7 +1155,7 @@ pub(super) unsafe fn generic_completed(g:&super::Generic,kind:u32) -> Result<Sna
             kind,published_kind:published,
             index:own.index,original_index:old.index,
         })?;
-    let registry=final_registry(helpers,Some(g.token))?;
+    let registry=final_registry(&helpers,Some(g.token))?;
     owner.expected=now;
     drop(registry);drop(state);drop(lock);
     Ok(now)
@@ -1169,7 +1173,7 @@ pub(super) unsafe fn capture_origin(entry:usize,epoch:u64,kind:u32,catalog:&Cata
         check(super::super::mii_saved_alpha::menu_epoch()==opening
             && state.capture && !state.busy() && super::epoch()==epoch
             && state.owner.as_ref().is_some_and(|o|o.expected==expected),"menu owner retired")?;
-        let registry=final_registry(now.helpers,None)?;
+        let registry=final_registry(&now.helpers,None)?;
         state.capture=false;state.menu_valid=true;
         drop(registry);return Ok(());
     }
@@ -1199,7 +1203,7 @@ pub(super) unsafe fn capture_origin(entry:usize,epoch:u64,kind:u32,catalog:&Cata
     check(super::super::mii_saved_alpha::menu_epoch()==opening
         && state.capture && state.owner.is_none() && !state.busy()
         && super::epoch()==epoch,"origin capture retired")?;
-    let mut registry=final_registry(helpers,None)?;
+    let mut registry=final_registry(&helpers,None)?;
     state.owner=Some(super::Owner{origin:now,origin_saved:c,expected:now,active:c,cursor:None});
     state.capture=false;state.menu_valid=true;
     registry.commit(now.authority(),kind,kind);

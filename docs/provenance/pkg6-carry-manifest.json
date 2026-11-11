@@ -10723,7 +10723,7 @@
    "dest": "src/runtime/mii/mii_managed_helper.rs",
    "crate": "root",
    "src_sha256": "74e3d167129750c664730eff4934668ebced97ef8a374e430c63fb1d46b8a9ed",
-   "dest_sha256": "c7105b34109f2ed904cc3edc48a9df6c23eb5dc9e2cd6cd025c064839fee9673",
+   "dest_sha256": "9fe31553418ef1d1183fb9207e60933f6677c8b9867d7ff61094d3b8ccde4e6e",
    "edits": [
     {
      "old": "use std::sync::{Arc, Mutex};",
@@ -10934,6 +10934,31 @@
      "old": "        && now.record[..88] == *c.charinfo()\n        && now.record[88..96] != [0; 8]\n        && now.record[96..104] != [0; 8];\n",
      "new": "        && crate::model::parked_entries::mii_record_identity(&now.record, c.charinfo());\n",
      "reason": "rc.6 TASK-OPUS-rc6-open-fixes item 1, option 1 (primary inbox 2026-11-09 00:09Z and 00:23Z): going live rewrites a promoted F9 seat's descriptor (every reading-B re-proof logged descriptor_changed=true record_changed=false; Eden rc6-int-fix1 attempt 1: [MiiHelperProof] mismatch id=2 why=mii record parked=false at 3 CPUs), so a live seat keeps its Mii by reading B's identity predicate (parked_entries::mii_record_identity: the configuration's charinfo and a resource pair) in place of byte equality of both the descriptor and the record (MiiProof::holds with live); the Proof equality, the Mii binding and the mirrors' tokens stay exact; reproof_parked checks the same shared predicate; a diag-only line names a live seat's differing descriptor and record offsets"
+    },
+    {
+     "old": "            && provenance::check_helpers_for(t.data.before.helpers,Some(t.source)).is_ok(),\n",
+     "new": "            && provenance::check_helpers_for(&t.data.before.helpers,Some(t.source)).is_ok(),\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "            publication.observed.before.helpers,\n",
+     "new": "            &publication.observed.before.helpers,\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "        provenance::final_registry_for(completion.now.helpers, Some(t.install), Some(source))?;\n",
+     "new": "        provenance::final_registry_for(&completion.now.helpers, Some(t.install), Some(source))?;\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "        provenance::created_kind(view,now.extras,source.slot(),proof.owner,\n",
+     "new": "        provenance::created_kind(&view,now.extras,source.slot(),proof.owner,\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "                    view,\n",
+     "new": "                    &view,\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
     }
    ]
   },
@@ -10942,7 +10967,7 @@
    "dest": "src/runtime/mii/mii_ordinary_cpu.rs",
    "crate": "root",
    "src_sha256": "db7e15715560db924eba68ba570e97540f1b445b1cf4989a172c0426dd32c6ce",
-   "dest_sha256": "6fadc11e27307046db67d5e1e6353a73d22e0ad453be5af3f9481225955a949c",
+   "dest_sha256": "587e352a4250fbc2aec66856e37529fb93181ce0c6f1b1e33aac2f47bb6dbbcd",
    "edits": [
     {
      "old": "fn note(reason:&str) { trace!(\"[MiiOrdinaryCpu] {reason}\"); }",
@@ -11323,6 +11348,71 @@
      "old": "#[cfg(feature=\"native-body-bank-alpha\")]\n#[inline(never)] // stream/stack: its own frame, not `service`'s\nunsafe fn mii_group_record_publication(entry:*mut u8,owner:u32) {\n    use crate::engine::swap::body_bank::mii_publish::PublishRefusal;\n    let Some((group,identity,c))=super::body_bank::pending_mii_publication(owner) else {return;};\n    if INSTALL.active() || !mii_backend::ready() {return;}\n    let outcome=native::prefetch_publish(entry as usize,c,identity);\n    match outcome {\n        Ok(())=>trace!(\"[MiiOrdinaryCpu] Mii group record published owner={} group={} kind={:#x} index={} hat={}\",\n            owner,group,identity.kind(),identity.index,identity.hat()),\n        Err(PublishRefusal::Busy)=>return,\n        Err(_)=>{}\n    }\n    if let Some(reason)=super::body_bank::mii_charinfo_published(owner,group,identity,outcome) {note(reason);}\n}\n\n",
      "new": "#[cfg(feature=\"native-body-bank-alpha\")]\n#[inline(never)] // stream/stack: its own frame, not `service`'s\nunsafe fn mii_group_record_publication(entry:*mut u8,owner:u32)->bool {\n    use crate::engine::swap::body_bank::mii_publish::PublishRefusal;\n    let Some((group,identity,c))=super::body_bank::pending_mii_publication(owner) else {return false;};\n    if INSTALL.active() || !mii_backend::ready() {return false;}\n    let outcome=native::prefetch_publish(entry as usize,c,identity);\n    match outcome {\n        Ok(())=>trace!(\"[MiiOrdinaryCpu] Mii group record published owner={} group={} kind={:#x} index={} hat={}\",\n            owner,group,identity.kind(),identity.index,identity.hat()),\n        Err(PublishRefusal::Busy)=>return false,\n        Err(_)=>{}\n    }\n    let published=outcome.is_ok();\n    if let Some(reason)=super::body_bank::mii_charinfo_published(owner,group,identity,outcome) {note(reason);}\n    published\n}\n\n",
      "reason": "Primary 2026-11-09 07:17Z (Eden rc6-hot-xps31/32: a press made while background builds ran waited for each build in turn, 2-3 s) and 07:34Z (exact, no timeout), over integration a1f379f4: the group lifecycle starts no prefetch, background build, object re-arm or pool preparation while a foreground request waits (body_bank::speculative_step_admitted); the step in flight and the polls run as before. Primary 2026-11-09 07:34Z (the 5 s release of the press rule was a timeout guard; make it exact): a foreground request holds the speculative steps only while INSTALL is all it waits for (the roster's outside the menu, a Mii owner's with every other begin blocker clear, a hat's queued source load: character_roster::foreground, the owners' foreground, kirby_hats::foreground_pending), and the step serving the press's own target goes first (body_bank::serving_step: its group's prefetch while planned or held, a PT group's object re-arm; native_body_bank::serving_group). A Mii press waits the tick its group's CharInfo is published, and no other CharInfo replaces it before that group's prefetch (pending_mii_publication). No timeout is left"
+    },
+    {
+     "old": "            bank_service(entry,b);\n",
+     "new": "            bank_service(entry,&b);\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "                let Ok(registry)=provenance::final_registry(current.helpers,None) else{return false;};\n",
+     "new": "                let Ok(registry)=provenance::final_registry(&current.helpers,None) else{return false;};\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "        let registry=match provenance::final_registry(current.helpers,Some(token)) {\n",
+     "new": "        let registry=match provenance::final_registry(&current.helpers,Some(token)) {\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "            bank_refused(b,\"no reachable CPU Mii group for the published configuration\",false);\n",
+     "new": "            bank_refused(&b,\"no reachable CPU Mii group for the published configuration\",false);\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "            bank_refused(b,\"reachable CPU Mii group was planned for another configuration\",false);\n",
+     "new": "            bank_refused(&b,\"reachable CPU Mii group was planned for another configuration\",false);\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "            Err(reason)=>{bank_refused(b,reason,false);return false;}\n",
+     "new": "            Err(reason)=>{bank_refused(&b,reason,false);return false;}\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "        bank_refused(b,\"CPU bank member switch refused before the native request\",false);\n",
+     "new": "        bank_refused(&b,\"CPU bank member switch refused before the native request\",false);\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "unsafe fn bank_service(entry:*mut u8,b:BankTrack) {\n",
+     "new": "unsafe fn bank_service(entry:*mut u8,b:&BankTrack) {\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "unsafe fn bank_settle(entry:*mut u8,b:BankTrack) {\n",
+     "new": "unsafe fn bank_settle(entry:*mut u8,b:&BankTrack) {\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "    let published=STATE.lock().bank.filter(|t|t.ticket==b.ticket && t.token==b.token).and_then(|t|t.published);\n    let exit=STATE.lock().mii_exit;\n    let settled=match if b.exit {native::exit_settled(&b,exit)} else {native::bank_settled(&b)} {\n",
+     "new": "    let published=STATE.lock().bank.as_ref().filter(|t|t.ticket==b.ticket && t.token==b.token).and_then(|t|t.published);\n    let settled=match if b.exit {native::exit_settled(b)} else {native::bank_settled(b)} {\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "        (Some(c),Some((published_c,published))) if published_c==c=>Some(MiiExit {mii:b,configuration:c,published,adopted:now}),\n",
+     "new": "        (Some(c),Some((published_c,published))) if published_c==c=>Some(MiiExit {mii:*b,configuration:c,published,adopted:now}),\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "unsafe fn bank_refused(b:BankTrack,reason:&'static str,diverged:bool) {\n",
+     "new": "unsafe fn bank_refused(b:&BankTrack,reason:&'static str,diverged:bool) {\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "    let published=match STATE.lock().bank {\n",
+     "new": "    let published=match STATE.lock().bank.as_ref() {\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
     }
    ]
   },
@@ -11331,7 +11421,7 @@
    "dest": "src/runtime/mii/mii_ordinary_cpu_native.rs",
    "crate": "root",
    "src_sha256": "74f7f1c6dc08e35587866089d39528392008767e3ab20b6842c2e924e9d3a3dd",
-   "dest_sha256": "43b29c2936b2cd71cdf7807af4ffec5fd0ca5fffc7c1706c8246f2c0b99bfa37",
+   "dest_sha256": "441fe5068daafc1c809cbfba423714e43753eed1dc01983702b20d1be35f95a6",
    "edits": [
     {
      "old": "super::note(&format!(\"[MiiOrdinaryCpu] bank settle diverged",
@@ -11427,6 +11517,76 @@
      "old": "    };\n    let lock=PoolLock::acquire(super::base(),b.manager);\n    let now=current_locked(m,b,before.original_kind,None,helpers).map_err(BankRefusal::Diverged)?;\n    drop(lock);\n    if now.descriptor==before.descriptor || !super::super::body_bank::group_rebaseline(before.binding.entry,\n        before.binding.owner,before.binding.epoch,&before.descriptor,&now.descriptor) {\n        return Err(BankRefusal::Diverged(\"CPU warm exit without its group exchange\"));\n    }\n    let restore=super::BankTrack {before:Snapshot {descriptor:now.descriptor,control:before.control,..exit.mii.before},\n        descriptor:exit.mii.descriptor,..*bank};\n    let now=match bank_restore(&restore,exit.configuration,exit.published) {\n",
      "new": "    };\n    let lock=PoolLock::acquire(super::base(),b.manager);\n    let descriptor=rd::<[u8;0x70]>(before.binding.entry,0);\n    drop(lock);\n    if descriptor==before.descriptor || !super::super::body_bank::group_rebaseline(before.binding.entry,\n        before.binding.owner,before.binding.epoch,&before.descriptor,&descriptor) {\n        return Err(BankRefusal::Diverged(\"CPU warm exit without its group exchange\"));\n    }\n    let restore=super::BankTrack {before:Snapshot {descriptor,control:before.control,..exit.mii.before},\n        descriptor:exit.mii.descriptor,..*bank};\n    let now=match bank_restore(&restore,exit.configuration,exit.published) {\n",
      "reason": "rc.6 warm exit, CPU (rc6-hot-xps5, 2026-11-08: the CPU exit settled NativeSettledUnowned, \"CPU current index mirrors differ\"): until bank_restore, E+0x1a8 names the Mii destination record while FE and D name the window index, so exit_settled reads the descriptor directly under G instead of an owner walk"
+    },
+    {
+     "old": "    let registry=final_registry(helpers,Some(track.token))?;\n",
+     "new": "    let registry=final_registry(&helpers,Some(track.token))?;\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "    let registry=final_registry(publication.observed.before.helpers,Some(track.token))?;\n",
+     "new": "    let registry=final_registry(&publication.observed.before.helpers,Some(track.token))?;\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "    let mut registry=final_registry(now.helpers,Some(track.token))?;\n",
+     "new": "    let mut registry=final_registry(&now.helpers,Some(track.token))?;\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "    let registry=final_registry(publication.observed.before.helpers,Some(bank.token))?;\n",
+     "new": "    let registry=final_registry(&publication.observed.before.helpers,Some(bank.token))?;\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "    let registry=final_registry(helpers,Some(token)).map_err(publish_refusal)?;\n",
+     "new": "    let registry=final_registry(&helpers,Some(token)).map_err(publish_refusal)?;\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "    let registry=final_registry(helpers,Some(bank.token))?;\n",
+     "new": "    let registry=final_registry(&helpers,Some(bank.token))?;\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "    pub resource_pair:Option<bool>,\n}\n#[cfg(feature=\"native-body-bank-alpha\")]\n",
+     "new": "    pub resource_pair:Option<bool>,\n}\n#[cfg(feature=\"native-body-bank-alpha\")]\n#[inline(never)] // rc.8 \u00a77: its snapshots and MiiExit copies live in its own frame, not in bank_service's\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "    let mut registry=match final_registry(helpers,Some(bank.token)) {\n",
+     "new": "    let mut registry=match final_registry(&helpers,Some(bank.token)) {\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "pub(super) unsafe fn exit_settled(bank:&super::BankTrack,exit:Option<super::MiiExit>)->Result<Settled,BankRefusal> {\n",
+     "new": "#[inline(never)] // rc.8 \u00a77: its snapshots and MiiExit copies live in its own frame, not in bank_service's\npub(super) unsafe fn exit_settled(bank:&super::BankTrack)->Result<Settled,BankRefusal> {\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "    let exit=exit.filter(|x|x.mii.ticket.epoch==before.binding.epoch)\n",
+     "new": "    // rc.8 \u00a77: the kept exit is read here once and borrowed (`bank_settle` read it and passed a copy, filtered into another).\n    let kept=super::STATE.lock().mii_exit;\n    let exit=kept.as_ref().filter(|x|x.mii.ticket.epoch==before.binding.epoch)\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "    let mut registry=final_registry(helpers,Some(bank.token)).map_err(BankRefusal::Diverged)?;\n",
+     "new": "    let mut registry=final_registry(&helpers,Some(bank.token)).map_err(BankRefusal::Diverged)?;\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "    let registry=final_registry(now.helpers,Some(g.token))?;\n",
+     "new": "    let registry=final_registry(&now.helpers,Some(g.token))?;\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "        let registry=final_registry(now.helpers,None)?;\n",
+     "new": "        let registry=final_registry(&now.helpers,None)?;\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "    let mut registry=final_registry(helpers,None)?;\n",
+     "new": "    let mut registry=final_registry(&helpers,None)?;\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
     }
    ]
   },
@@ -11459,7 +11619,7 @@
    "dest": "src/runtime/mii/mii_ordinary_native.rs",
    "crate": "root",
    "src_sha256": "f359be35b161aa256850d33edc2f12d042927bbfb7e1fac4192e14876a8238d2",
-   "dest_sha256": "b2173797829643153e494ad700ea8320697744e9aa7bfe1453f69620e34dea41",
+   "dest_sha256": "19a1618fde75ccc8a6b443370fbe6564e3ab6c4a9609d30c204e39ce1f579dbd",
    "edits": [
     {
      "old": "super::note(&format!(\"[MiiOrdinaryPlayer] bank settle diverged",
@@ -11630,6 +11790,136 @@
      "old": "            self.entries,0,self.owners[0].unwrap())\n    }\n",
      "new": "            self.entries,0,self.owners[0].unwrap())\n    }\n    /// rc.6 item 3 (a Mii group built in the background, `body_bank::start_background`): the bank's Mii setup changed\n    /// selector record `index` from `before` to `after` (its pair) while this owner was idle. Each copy of that record\n    /// here (the destination, a protected owner's record or current record) that still holds `before` takes `after`.\n    /// Returns how many copies changed.\n    pub(super) fn adopt_record(&mut self,index:u16,before:&[u8;values::RECORD_LEN],after:&[u8;values::RECORD_LEN])->usize {\n        let mut changed=0;\n        if self.binding.record_index==index && self.record==*before {self.record=*after;changed+=1;}\n        for p in self.protected.iter_mut().flatten() {\n            if u16::from(p.owner.selector)==index && p.record==*before {p.record=*after;changed+=1;}\n            if p.owner.index==index && p.current_record==Some(*before) {p.current_record=Some(*after);changed+=1;}\n        }\n        changed\n    }\n",
      "reason": "Merge of p23/rc6-hot-slots-mii (b027703) into p23/rc6-integration: rc.6 item 3, Mii background build fixes (Eden rc6-hot-xps14..xps17): the Mii adapters adopt the selector-record change a background setup publishes (adopt_background_record, Snapshot::adopt_record) and a Mii group builds only while both are idle; the owner reader 0x6e6bc0 and the hat reader take the shadow on the worker; an identity moves only into or out of a Mii window (identity_move); the lane configuration moves with its identity; each window keeps its D+0x3a0..+0x3ac words; a release or background build puts back the live pad-slot controller it cleared (restore_live_pads, native reads it unchecked at 0x631984); both sides kept where they conflict with this branch (bg-pt, bg-ic, X4); one background_tail at 0x60de68 with the Mii x20 restore first, background_mii.construct_tail dropped, one background_body (primary 2026-11-08 22:52Z, 2026-11-09 02:24Z); a Mii group keeps the Mii branch refusal of a live pair or native window"
+    },
+    {
+     "old": "pub(crate) fn check_helpers(view:helpers::View)->Result<(),&'static str> {check_helpers_for(view,None)}\npub(crate) fn check_helpers_for(view:helpers::View,source:Option<crate::engine::swap::source_lifetime::SourceToken>)->Result<(),&'static str> {\n",
+     "new": "pub(crate) fn check_helpers(view:&helpers::View)->Result<(),&'static str> {check_helpers_for(view,None)}\npub(crate) fn check_helpers_for(view:&helpers::View,source:Option<crate::engine::swap::source_lifetime::SourceToken>)->Result<(),&'static str> {\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "    check(guard.helpers==view,\"source provenance changed during native read\")\n",
+     "new": "    check(guard.helpers==*view,\"source provenance changed during native read\")\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "pub(crate) fn final_registry(view:helpers::View,token:Option<super::InstallToken>)\n",
+     "new": "pub(crate) fn final_registry(view:&helpers::View,token:Option<super::InstallToken>)\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "pub(crate) fn final_registry_for(view:helpers::View,token:Option<super::InstallToken>,source:Option<crate::engine::swap::source_lifetime::SourceToken>)\n",
+     "new": "pub(crate) fn final_registry_for(view:&helpers::View,token:Option<super::InstallToken>,source:Option<crate::engine::swap::source_lifetime::SourceToken>)\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "    check(guard.helpers==view,\"source provenance changed before commit\")?;\n",
+     "new": "    check(guard.helpers==*view,\"source provenance changed before commit\")?;\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "pub(crate) unsafe fn helper_kind(view:helpers::View,id:usize,owner:Owner,kind:u32)->bool {\n",
+     "new": "pub(crate) unsafe fn helper_kind(view:&helpers::View,id:usize,owner:Owner,kind:u32)->bool {\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "fn note_refused_proof(view:helpers::View,id:usize,ordinal:usize,now:helpers::Proof,parked:bool,why:&str) {\n",
+     "new": "fn note_refused_proof(view:&helpers::View,id:usize,ordinal:usize,now:helpers::Proof,parked:bool,why:&str) {\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "pub(crate) unsafe fn created_kind(view:helpers::View,extras:crate::engine::mii::capacity::Extras,\n",
+     "new": "pub(crate) unsafe fn created_kind(view:&helpers::View,extras:crate::engine::mii::capacity::Extras,\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "    let entry=locked.entry;let epoch=locked.epoch;\n    check_helpers(helpers)?;\n",
+     "new": "    let entry=locked.entry;let epoch=locked.epoch;\n    check_helpers(&helpers)?;\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "                created_kind(helpers,m.extras,id,owner,kind,super::super::mii_backend::extra_facts(table,id,fe,e,d,o))?;\n",
+     "new": "                created_kind(&helpers,m.extras,id,owner,kind,super::super::mii_backend::extra_facts(table,id,fe,e,d,o))?;\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "            } else {check(helper_kind(helpers,id,owner,kind),\"helper row kind/provenance changed\")?;}\n",
+     "new": "            } else {check(helper_kind(&helpers,id,owner,kind),\"helper row kind/provenance changed\")?;}\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "    check_helpers(helpers)?;\n",
+     "new": "    check_helpers(&helpers)?;\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "        \"same-class phase ticket/epoch changed\")?;\n    let registry=final_registry(helpers,Some(track.token))?;\n",
+     "new": "        \"same-class phase ticket/epoch changed\")?;\n    let registry=final_registry(&helpers,Some(track.token))?;\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "    let registry=final_registry(helpers,Some(track.token))?;\n",
+     "new": "    let registry=final_registry(&helpers,Some(track.token))?;\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "    let track=state.bank.as_mut().ok_or(\"bank publication track absent\")?;\n    let registry=final_registry(helpers,Some(bank.token))?;\n",
+     "new": "    let track=state.bank.as_mut().ok_or(\"bank publication track absent\")?;\n    let registry=final_registry(&helpers,Some(bank.token))?;\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "    let registry=final_registry(helpers,None).map_err(publish_refusal)?;\n",
+     "new": "    let registry=final_registry(&helpers,None).map_err(publish_refusal)?;\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "    let registry=final_registry(helpers,Some(bank.token))?;\n",
+     "new": "    let registry=final_registry(&helpers,Some(bank.token))?;\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "    let mut registry=final_registry(helpers,Some(track.token))?;\n",
+     "new": "    let mut registry=final_registry(&helpers,Some(track.token))?;\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "/// Lock order G -> adapter STATE -> COMMITTED.\n#[cfg(feature=\"native-body-bank-alpha\")]\n",
+     "new": "/// Lock order G -> adapter STATE -> COMMITTED.\n#[cfg(feature=\"native-body-bank-alpha\")]\n#[inline(never)] // rc.8 \u00a77: its snapshots and MiiExit copies live in its own frame, not in bank_service's\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "    let mut registry=match final_registry(helpers,Some(bank.token)) {\n",
+     "new": "    let mut registry=match final_registry(&helpers,Some(bank.token)) {\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "pub(super) unsafe fn exit_settled(bank:&super::BankTrack,exit:Option<super::MiiExit>)->Result<Settled,BankRefusal> {\n",
+     "new": "#[inline(never)] // rc.8 \u00a77: its snapshots and MiiExit copies live in its own frame, not in bank_service's\npub(super) unsafe fn exit_settled(bank:&super::BankTrack)->Result<Settled,BankRefusal> {\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "    let exit=exit.filter(|x|x.mii.ticket.epoch==before.binding.epoch)\n",
+     "new": "    // rc.8 \u00a77: the kept exit is read here once and borrowed (`bank_settle` read it and passed a copy, filtered into another).\n    let kept=super::STATE.lock().mii_exit;\n    let exit=kept.as_ref().filter(|x|x.mii.ticket.epoch==before.binding.epoch)\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "    let mut registry=final_registry(helpers,Some(bank.token)).map_err(BankRefusal::Diverged)?;\n",
+     "new": "    let mut registry=final_registry(&helpers,Some(bank.token)).map_err(BankRefusal::Diverged)?;\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "    let registry=final_registry(helpers,Some(g.token))?;\n",
+     "new": "    let registry=final_registry(&helpers,Some(g.token))?;\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "        let registry=final_registry(now.helpers,None)?;\n",
+     "new": "        let registry=final_registry(&now.helpers,None)?;\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "    let mut registry=final_registry(helpers,None)?;\n",
+     "new": "    let mut registry=final_registry(&helpers,None)?;\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
     }
    ]
   },
@@ -11638,7 +11928,7 @@
    "dest": "src/runtime/mii/mii_ordinary_player.rs",
    "crate": "root",
    "src_sha256": "73e84c925f3aaedd6c09fd082ba41364d160e8cca38cc604617d5fdc38431b8d",
-   "dest_sha256": "25f82ec279e4142f5d364fee1d4e69ca5d9a033c1328f7df93051ebdc5f8b315",
+   "dest_sha256": "5e6a7a65468656ec68712677cedcd379f146b04ea25350a778d2ec7cedfdc692",
    "edits": [
     {
      "old": "fn note(reason:&str) { trace!(\"[MiiOrdinaryPlayer] {reason}\"); }",
@@ -11974,6 +12264,71 @@
      "old": "#[cfg(feature=\"native-body-bank-alpha\")]\n#[inline(never)] // stream/stack: its own frame, not `service`'s\nunsafe fn mii_group_record_publication(entry:*mut u8) {\n    use crate::engine::swap::body_bank::mii_publish::PublishRefusal;\n    let Some((group,identity,c))=super::body_bank::pending_mii_publication(0) else {return;};\n    if INSTALL.active() || !mii_backend::ready() {return;}\n    let outcome=native::prefetch_publish(entry as usize,c,identity);\n    match outcome {\n        Ok(())=>trace!(\"[MiiOrdinaryPlayer] Mii group record published group={} kind={:#x} index={} hat={}\",\n            group,identity.kind(),identity.index,identity.hat()),\n        Err(PublishRefusal::Busy)=>return,\n        Err(_)=>{}\n    }\n    if let Some(reason)=super::body_bank::mii_charinfo_published(0,group,identity,outcome) {note(reason);}\n}\n\n",
      "new": "#[cfg(feature=\"native-body-bank-alpha\")]\n#[inline(never)] // stream/stack: its own frame, not `service`'s\nunsafe fn mii_group_record_publication(entry:*mut u8)->bool {\n    use crate::engine::swap::body_bank::mii_publish::PublishRefusal;\n    let Some((group,identity,c))=super::body_bank::pending_mii_publication(0) else {return false;};\n    if INSTALL.active() || !mii_backend::ready() {return false;}\n    let outcome=native::prefetch_publish(entry as usize,c,identity);\n    match outcome {\n        Ok(())=>trace!(\"[MiiOrdinaryPlayer] Mii group record published group={} kind={:#x} index={} hat={}\",\n            group,identity.kind(),identity.index,identity.hat()),\n        Err(PublishRefusal::Busy)=>return false,\n        Err(_)=>{}\n    }\n    let published=outcome.is_ok();\n    if let Some(reason)=super::body_bank::mii_charinfo_published(0,group,identity,outcome) {note(reason);}\n    published\n}\n\n",
      "reason": "Primary 2026-11-09 07:17Z (Eden rc6-hot-xps31/32: a press made while background builds ran waited for each build in turn, 2-3 s) and 07:34Z (exact, no timeout), over integration a1f379f4: the group lifecycle starts no prefetch, background build, object re-arm or pool preparation while a foreground request waits (body_bank::speculative_step_admitted); the step in flight and the polls run as before. Primary 2026-11-09 07:34Z (the 5 s release of the press rule was a timeout guard; make it exact): a foreground request holds the speculative steps only while INSTALL is all it waits for (the roster's outside the menu, a Mii owner's with every other begin blocker clear, a hat's queued source load: character_roster::foreground, the owners' foreground, kirby_hats::foreground_pending), and the step serving the press's own target goes first (body_bank::serving_step: its group's prefetch while planned or held, a PT group's object re-arm; native_body_bank::serving_group). A Mii press waits the tick its group's CharInfo is published, and no other CharInfo replaces it before that group's prefetch (pending_mii_publication). No timeout is left"
+    },
+    {
+     "old": "            bank_service(entry,b);\n",
+     "new": "            bank_service(entry,&b);\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "                let Ok(registry)=native::final_registry(current.helpers,None) else{return false;};\n",
+     "new": "                let Ok(registry)=native::final_registry(&current.helpers,None) else{return false;};\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "        let registry=match native::final_registry(current.helpers,Some(token)) {\n",
+     "new": "        let registry=match native::final_registry(&current.helpers,Some(token)) {\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "            bank_refused(b,\"no reachable Mii group for the published configuration\",false);\n",
+     "new": "            bank_refused(&b,\"no reachable Mii group for the published configuration\",false);\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "            bank_refused(b,\"reachable Mii group was planned for another configuration\",false);\n",
+     "new": "            bank_refused(&b,\"reachable Mii group was planned for another configuration\",false);\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "            Err(reason)=>{bank_refused(b,reason,false);return false;}\n",
+     "new": "            Err(reason)=>{bank_refused(&b,reason,false);return false;}\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "        bank_refused(b,\"bank member switch refused before the native request\",false);\n",
+     "new": "        bank_refused(&b,\"bank member switch refused before the native request\",false);\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "unsafe fn bank_service(entry:*mut u8,b:BankTrack) {\n",
+     "new": "unsafe fn bank_service(entry:*mut u8,b:&BankTrack) {\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "unsafe fn bank_settle(entry:*mut u8,b:BankTrack) {\n",
+     "new": "unsafe fn bank_settle(entry:*mut u8,b:&BankTrack) {\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "    let published=STATE.lock().bank.filter(|t|t.ticket==b.ticket && t.token==b.token).and_then(|t|t.published);\n    let exit=STATE.lock().mii_exit;\n    let settled=match if b.exit {native::exit_settled(&b,exit)} else {native::bank_settled(&b)} {\n",
+     "new": "    let published=STATE.lock().bank.as_ref().filter(|t|t.ticket==b.ticket && t.token==b.token).and_then(|t|t.published);\n    let settled=match if b.exit {native::exit_settled(b)} else {native::bank_settled(b)} {\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "        (Some(c),Some((published_c,published))) if published_c==c=>Some(MiiExit {mii:b,configuration:c,published,adopted:now}),\n",
+     "new": "        (Some(c),Some((published_c,published))) if published_c==c=>Some(MiiExit {mii:*b,configuration:c,published,adopted:now}),\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "unsafe fn bank_refused(b:BankTrack,reason:&'static str,diverged:bool) {\n",
+     "new": "unsafe fn bank_refused(b:&BankTrack,reason:&'static str,diverged:bool) {\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "    let (published,departed)=match STATE.lock().bank {\n",
+     "new": "    let (published,departed)=match STATE.lock().bank.as_ref() {\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
     }
    ]
   },
@@ -12168,7 +12523,7 @@
    "dest": "src/runtime/mii/mii_selector_native.rs",
    "crate": "root",
    "src_sha256": "d2136f80078ff37c1d2fbb91ce1f217b1b63efa160e8a81f64861c2e3304103d",
-   "dest_sha256": "d7d4258a01dfa94d924939f2e180a9adc6c80e8a3136cdb6097678ebdad437a1",
+   "dest_sha256": "dd7bec9602525885192de50996044dc66104f1ce3a11ff2fa4d72db9283146e4",
    "edits": [
     {
      "old": "}\n#[derive(Clone, Copy, Debug, PartialEq, Eq)]\npub(crate) struct Snapshot {\n    pub layout: super::mii_backend::Layout,\n    pub helpers: helpers::View,\n    pub binding: Binding,\n    pub thread: usize,\n    pub original_kind: u32,\n    pub descriptor: [u8; 0x70],\n    /// Outgoing O header `R+0x54..0x68`, read under the same lock as `descriptor`.\n",
@@ -12259,6 +12614,36 @@
      "old": "impl Snapshot {\n    #[cfg(feature = \"mii-managed-helper-alpha\")]\n",
      "new": "impl Snapshot {\n    /// rc.6 item 3 (a Mii group built in the background, `body_bank::start_background`): the bank's Mii setup changed\n    /// selector record `index` from `before` to `after` (its pair) while this owner was idle. The destination, the\n    /// current record and the protected owners' records, when they are that record and still hold `before`, take\n    /// `after`. Returns how many changed.\n    pub(crate) fn adopt_record(&mut self, index: u16, before: &[u8; values::RECORD_LEN], after: &[u8; values::RECORD_LEN]) -> usize {\n        let mut changed = 0;\n        if self.binding.record_index == index && self.record == *before { self.record = *after; changed += 1; }\n        if self.index == index && self.current_record == *before { self.current_record = *after; changed += 1; }\n        for (other, record) in self.records.iter_mut().flatten() {\n            if *other == index && *record == *before { *record = *after; changed += 1; }\n        }\n        changed\n    }\n    #[cfg(feature = \"mii-managed-helper-alpha\")]\n",
      "reason": "Merge of p23/rc6-hot-slots-mii (b027703) into p23/rc6-integration: rc.6 item 3, Mii background build fixes (Eden rc6-hot-xps14..xps17): the Mii adapters adopt the selector-record change a background setup publishes (adopt_background_record, Snapshot::adopt_record) and a Mii group builds only while both are idle; the owner reader 0x6e6bc0 and the hat reader take the shadow on the worker; an identity moves only into or out of a Mii window (identity_move); the lane configuration moves with its identity; each window keeps its D+0x3a0..+0x3ac words; a release or background build puts back the live pad-slot controller it cleared (restore_live_pads, native reads it unchecked at 0x631984)"
+    },
+    {
+     "old": ")->Result<Snapshot,&'static str> {\n    check_helpers_for(helpers, source)?;\n",
+     "new": ")->Result<Snapshot,&'static str> {\n    check_helpers_for(&helpers, source)?;\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "                super::mii_ordinary_player::native::created_kind(helpers,m.extras,id,owner,kind,facts)?;\n",
+     "new": "                super::mii_ordinary_player::native::created_kind(&helpers,m.extras,id,owner,kind,facts)?;\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "                helper_kind(helpers, id, owner, kind),\n",
+     "new": "                helper_kind(&helpers, id, owner, kind),\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "    check_helpers_for(helpers, source)?;\n",
+     "new": "    check_helpers_for(&helpers, source)?;\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "        super::mii_ordinary_player::native::created_kind(helpers,m.extras,owner,own,kind,facts)?;\n",
+     "new": "        super::mii_ordinary_player::native::created_kind(&helpers,m.extras,owner,own,kind,facts)?;\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "    check_helpers_for(helpers,None)?;\n",
+     "new": "    check_helpers_for(&helpers,None)?;\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
     }
    ]
   },
@@ -12267,7 +12652,7 @@
    "dest": "src/runtime/mii/mii_source_provenance.rs",
    "crate": "root",
    "src_sha256": "31fabf9212a6f91d03a6ecc8e5505f8961ea671c4274075f6bbc10c605073c4e",
-   "dest_sha256": "8239532be9d7541243055a841dd594d52808072fa3a21f676335e445ddc4cc8a",
+   "dest_sha256": "50f50b5e751793732d838c92bd343cfe8188a5b1639236d15c1e18268ca9ea0b",
    "edits": [
     {
      "old": "            Helper::Unmanaged => crate::engine::mii::role_owner::original_row_matches(\n                now.kind, now.original.kind),\n            Helper::Unavailable { .. } => false,\n            Helper::Ready { ready, key, proof } => {\n                let token = ready.source();\n                token.slot() == id && Some(token.epoch()) == self.epoch\n",
@@ -12403,6 +12788,46 @@
      "old": "        lifetime::{Binding,Configuration},native_values::Mirrors};\n    #[test]\n",
      "new": "        lifetime::{Binding,Configuration},native_values::Mirrors};\n    /// TASK-OPUS-rc6-open-fixes item 1 (primary 2026-11-09 00:09Z, 00:23Z): a live F9 seat (slot <= No. of CPUs) keeps\n    /// its Mii by reading B's identity, not by bytes. Every re-proof in the rc.6 Eden evidence logged\n    /// `descriptor_changed=true record_changed=false`: going live rewrites the seat's descriptor. The `Proof`, the\n    /// binding and the mirrors' tokens stay exact, and the record must still carry the configuration's charinfo and a\n    /// resource pair, the predicate `mii_managed_helper::reproof_parked` checks before it re-records both.\n    #[test]\n    fn a_live_seat_keeps_its_mii_by_identity_not_bytes() {\n        let raw=RawSlot {index:0,slot_id:4155,name_len:1,name_units:[65,0,0,0,0,0,0,0,0,0],\n            colour:4,voice:37,specials:[0;4],tag_outfit:TaggedId(0x1300291bfef7a5f7),\n            tag_hat:TaggedId(0x5a00000fa9efa5ea),\n            tag_chara:TaggedId(0xc100000000000000|MiiClass::Gunner.chara_hash40()),charinfo:[0;88]};\n        let catalog=build_snapshot(vec![raw]);let c=Configuration::from_saved(&catalog.configs[0]).unwrap();\n        let mut draft=crate::engine::mii::draft::Draft::from_template(&catalog.configs[0]).unwrap();\n        draft.set_specials([1,0,0,0]).unwrap();let alt=draft.configuration().unwrap();\n        let b=Binding {epoch:2,owner:2,entry:0x1200,row:0x2200,holder:0x5000,manager:0x6000,\n            vector_begin:0x7000,vector_end:0x7000+4*104,record_index:2};\n        let mut record=[0u8;104];record[..88].copy_from_slice(c.charinfo());\n        record[88..96].copy_from_slice(&0x8000u64.to_le_bytes());record[96..].copy_from_slice(&0x9000u64.to_le_bytes());\n        let descriptor=crate::engine::mii::ordinary_cpu::staged_descriptor_for(2,[0;0x70],Some(c)).unwrap();\n        let t=c.tokens();\n        let mirrors=Mirrors {index:2,tokens:t,fe:[2,t.outfit,t.hat,t.colour,t.voice],\n            d:[2,t.outfit,t.hat,t.colour],d_specials:t.specials.map(u32::from),owner_index:2,\n            owner:[t.outfit,t.hat,t.colour,t.voice].map(u32::from)};\n        let mii=MiiProof {binding:b,configuration:c,record,descriptor};\n        let mut active=descriptor;active[0x10]^=1;active[0x34]^=1;active[0x5f]^=0x80;\n        let mut pair=record;pair[96]^=1;\n        // Parked (not live): byte equality of both, exactly as `matches`.\n        assert!(mii.holds(b,&descriptor,&record,mirrors,false));\n        assert_eq!(mii.holds(b,&active,&record,mirrors,false),mii.matches(b,&active,&record,mirrors));\n        assert!(!mii.holds(b,&active,&record,mirrors,false),\"a parked row's descriptor is exact\");\n        assert!(!mii.holds(b,&descriptor,&pair,mirrors,false),\"a parked row's record is exact\");\n        // Live: the activation's bytes may change, the Mii may not.\n        assert!(mii.holds(b,&active,&record,mirrors,true),\"the activation rewrote the descriptor\");\n        assert!(mii.holds(b,&active,&pair,mirrors,true),\"a present resource pair, rewritten\");\n        let mut other=record;other[0x10]^=1;\n        assert!(!mii.holds(b,&active,&other,mirrors,true),\"another charinfo is another Mii\");\n        for half in [88..96,96..104] {\n            let mut absent=record;absent[half].fill(0);\n            assert!(!mii.holds(b,&active,&absent,mirrors,true),\"no resource pair\");\n        }\n        assert!(!mii.holds(Binding {vector_end:b.vector_end+104,..b},&active,&record,mirrors,true),\"another binding\");\n        assert!(!mii.holds(b,&active,&record,Mirrors {index:3,..mirrors},true),\"the mirrors\");\n        assert!(!MiiProof {configuration:alt,..mii}.holds(b,&active,&record,mirrors,true),\"the tokens\");\n        // The record identity is the one reading B's re-proof checks, and the owners' snapshot asks it.\n        assert!(crate::model::parked_entries::mii_record_identity(&record,c.charinfo()));\n        assert!(!crate::model::parked_entries::mii_record_identity(&other,c.charinfo()));\n        assert!(include_str!(\"mii_managed_helper.rs\")\n            .contains(\"crate::model::parked_entries::mii_record_identity(&now.record, c.charinfo())\"),\"reproof_parked\");\n        assert!(include_str!(\"mii_ordinary_native.rs\").contains(\"mii.holds(b,&descriptor,&record,mirrors(owner),live)\"),\n            \"the owners' snapshot\");\n    }\n    #[test]\n",
      "reason": "rc.6 TASK-OPUS-rc6-open-fixes item 1, option 1 (primary inbox 2026-11-09 00:09Z and 00:23Z): going live rewrites a promoted F9 seat's descriptor (every reading-B re-proof logged descriptor_changed=true record_changed=false; Eden rc6-int-fix1 attempt 1: [MiiHelperProof] mismatch id=2 why=mii record parked=false at 3 CPUs), so a live seat keeps its Mii by reading B's identity predicate (parked_entries::mii_record_identity: the configuration's charinfo and a resource pair) in place of byte equality of both the descriptor and the record (MiiProof::holds with live); the Proof equality, the Mii binding and the mirrors' tokens stay exact; reproof_parked checks the same shared predicate; a diag-only line names a live seat's differing descriptor and record offsets"
+    },
+    {
+     "old": "    pub fn matches(self,binding:crate::engine::mii::lifetime::Binding,\n",
+     "new": "    pub fn matches(&self,binding:crate::engine::mii::lifetime::Binding,\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "    pub fn holds(self,binding:crate::engine::mii::lifetime::Binding,\n",
+     "new": "    pub fn holds(&self,binding:crate::engine::mii::lifetime::Binding,\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "    pub fn ordinal(self,id:usize)->Option<usize> {self.layout.helper(id)}\n    pub fn created_ordinal(self,id:usize)->Option<usize> {\n",
+     "new": "    pub fn ordinal(&self,id:usize)->Option<usize> {self.layout.helper(id)}\n    pub fn created_ordinal(&self,id:usize)->Option<usize> {\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "    pub fn source_at(self,id:usize)->Option<Helper> {\n",
+     "new": "    pub fn source_at(&self,id:usize)->Option<Helper> {\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "    pub fn loading(self,token:SourceToken)->bool {\n",
+     "new": "    pub fn loading(&self,token:SourceToken)->bool {\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "    pub fn accepts_created(self,id:usize,now:Proof,\n",
+     "new": "    pub fn accepts_created(&self,id:usize,now:Proof,\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "    pub fn available(self) -> Result<(), &'static str> { self.available_for(None) }\n    pub fn available_for(self, own:Option<SourceToken>) -> Result<(), &'static str> {\n",
+     "new": "    pub fn available(&self) -> Result<(), &'static str> { self.available_for(None) }\n    pub fn available_for(&self, own:Option<SourceToken>) -> Result<(), &'static str> {\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "    pub fn accepts(self, id: usize, now: Proof,\n",
+     "new": "    pub fn accepts(&self, id: usize, now: Proof,\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
     }
    ]
   },

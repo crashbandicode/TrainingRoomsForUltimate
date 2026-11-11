@@ -38,7 +38,7 @@ pub(crate) struct MiiProof {
 }
 impl MiiProof {
     /// Copied values only. Caller supplies current native map/G lock authority.
-    pub fn matches(self,binding:crate::engine::mii::lifetime::Binding,
+    pub fn matches(&self,binding:crate::engine::mii::lifetime::Binding,
         descriptor:&[u8;0x70],record:&[u8;crate::engine::mii::native_values::RECORD_LEN],
         mirrors:crate::engine::mii::native_values::Mirrors)->bool {
         self.holds(binding,descriptor,record,mirrors,false)
@@ -46,7 +46,7 @@ impl MiiProof {
     /// TASK-OPUS-rc6-open-fixes item 1 (primary 2026-11-09 00:09Z, 00:23Z): a live F9 seat (slot <= No. of CPUs) is the
     /// same Mii by reading B's identity predicate in place of byte equality of both the descriptor and the record: going
     /// live rewrites them (every re-proof logged `descriptor_changed=true`). Binding and mirrors' tokens stay exact.
-    pub fn holds(self,binding:crate::engine::mii::lifetime::Binding,
+    pub fn holds(&self,binding:crate::engine::mii::lifetime::Binding,
         descriptor:&[u8;0x70],record:&[u8;crate::engine::mii::native_values::RECORD_LEN],
         mirrors:crate::engine::mii::native_values::Mirrors,live:bool)->bool {
         self.binding==binding
@@ -81,22 +81,22 @@ pub(crate) struct View {
 }
 impl View {
     pub const EMPTY: Self = Self { layout:crate::engine::mii::backend::Layout::Training,epoch: None, slots: [Helper::Unmanaged; 2],miis:[None;2],created_slots:[Helper::Unmanaged;4],created_miis:[None;4] };
-    pub fn ordinal(self,id:usize)->Option<usize> {self.layout.helper(id)}
-    pub fn created_ordinal(self,id:usize)->Option<usize> {
+    pub fn ordinal(&self,id:usize)->Option<usize> {self.layout.helper(id)}
+    pub fn created_ordinal(&self,id:usize)->Option<usize> {
         (self.layout==crate::engine::mii::backend::Layout::Training)
             .then(||crate::engine::mii::capacity::EXTRA_SLOTS.iter().position(|slot|*slot==id)).flatten()
     }
-    pub fn source_at(self,id:usize)->Option<Helper> {
+    pub fn source_at(&self,id:usize)->Option<Helper> {
         self.ordinal(id).map(|i|self.slots[i])
             .or_else(||self.created_ordinal(id).map(|i|self.created_slots[i]))
     }
     /// Full source token equality includes generation, even at a reused FE.
-    pub fn loading(self,token:SourceToken)->bool {
+    pub fn loading(&self,token:SourceToken)->bool {
         Some(token.epoch())==self.epoch && self.source_at(token.slot())
             ==Some(Helper::Unavailable {token,phase:Phase::Loading})
     }
     #[cfg(any(test, feature = "mii-managed-source-coexist-alpha"))]
-    pub fn accepts_created(self,id:usize,now:Proof,
+    pub fn accepts_created(&self,id:usize,now:Proof,
         extras:crate::engine::mii::capacity::Extras,
         facts:crate::engine::mii::capacity::ExtraFacts,parked:bool)->bool {
         let Some(i)=self.created_ordinal(id) else{return false;};
@@ -125,8 +125,8 @@ impl View {
         }
     }
 
-    pub fn available(self) -> Result<(), &'static str> { self.available_for(None) }
-    pub fn available_for(self, own:Option<SourceToken>) -> Result<(), &'static str> {
+    pub fn available(&self) -> Result<(), &'static str> { self.available_for(None) }
+    pub fn available_for(&self, own:Option<SourceToken>) -> Result<(), &'static str> {
         if let Some(token)=own {
             if !self.loading(token) {
                 return Err("exact managed helper transaction absent");
@@ -157,7 +157,7 @@ impl View {
         Ok(())
     }
 
-    pub fn accepts(self, id: usize, now: Proof,
+    pub fn accepts(&self, id: usize, now: Proof,
         #[cfg(any(test, feature = "mii-managed-source-coexist-alpha"))] parked: bool) -> bool {
         let Some(ordinal)=self.ordinal(id) else{return false;};
         let helper=&self.slots[ordinal];
