@@ -46,6 +46,39 @@ fn rows_cover_their_need() {
 }
 
 #[test]
+fn the_service_stacks_cover_the_native_service() {
+    // rc.7 FLAG 6: the plugin's part of the native service runs on its own stacks, and what stays on the game's 64 KiB
+    // worker stack fits the room measured there (`tools/stack_depth.py <elf> table` checks the same row against the ELF).
+    let row = thread_stacks::SERVICE_STACK;
+    assert!(row.covers(), "{row:?}");
+    assert!(row.count >= 2, "a nested dispatch needs a second stack");
+    assert_eq!(row.on_stack, &["training_mod_native_service_pre"], "only the poll; the gates and leaves need no claim");
+}
+
+#[test]
+fn the_native_service_fault_s_numbers_fail_the_rule() {
+    // rc.7 FLAG 6, Eden final-surface-acc-d8679593-r2 `acc-rename`: everything ran on the caller's stack, a 64 KiB stack in a
+    // heap block with 63,728 B free at the dispatch's entry. The entry's deepest static path was 236,608 B (diag ELF of 0d742313), and
+    // `sources::service` alone had a 77,808 B frame: an Unmapped Write64 13.9 KB under that stack.
+    let before = thread_stacks::CallbackStack { native_bound: 236_608, ..thread_stacks::SERVICE_STACK };
+    assert!(!before.covers());
+    assert!(thread_stacks::required(77_808, 0) > before.native_room, "sources::service's frame alone");
+}
+
+#[test]
+fn a_service_stack_is_claimed_lowest_first_and_never_twice() {
+    use thread_stacks::free_stack;
+    assert_eq!(free_stack(0b0000, 4), Some(0));
+    assert_eq!(free_stack(0b0101, 4), Some(1));
+    assert_eq!(free_stack(0b0111, 4), Some(3));
+    assert_eq!(free_stack(0b1111, 4), None, "every stack in use: the dispatch refuses the call");
+    assert_eq!(free_stack(0b0111, 3), None);
+    // A release, then a claim: the lowest stack free again.
+    let held = 0b1111u32 & !(1 << 1);
+    assert_eq!(free_stack(held, 4), Some(1));
+}
+
+#[test]
 fn the_fault_s_numbers_fail_the_rule() {
     // tr-trace-writer before the fix: thread_start 112 + shim 16 + body 59,712 B (diag ELF of 27d84f4) on 64 KiB.
     assert!(thread_stacks::required(59_840, 0) > 64 * 1024);
