@@ -361,7 +361,10 @@ fn idle_cpu_preflight_recaptures_native_rank_before_exact_transaction_checks() {
     assert!(refresh.contains("state.reservation!=reservation || epoch()!=generation"));
     assert!(refresh.contains("owner.expected==expected && owner.live==live"));
     assert!(refresh.contains("expected.descriptor=comparison.descriptor"));
-    let begin = cpu.split("unsafe fn begin(").nth(1).unwrap();
+    // rc.8 R5: the preflight snapshot is `preflight_current`, in its own frame, and takes the refreshed `expected`.
+    let preflight = cpu.split("unsafe fn preflight_current(").nth(1).unwrap().split("unsafe fn ").next().unwrap();
+    assert!(preflight.contains("Ok(now) if native::same_owned(&now,expected,retained)=>Some(now),"));
+    let begin = cpu.split("unsafe fn begin_prepare(").nth(1).unwrap();
     assert!(begin.find("let expected=refresh_idle_metadata(").unwrap()
-        < begin.find("native::same_owned(&now,&expected,retained || active.is_some())").unwrap());
+        < begin.find("let Some(current)=preflight_current(entry,origin.original_kind,&expected,retained || active.is_some(),request)").unwrap());
 }

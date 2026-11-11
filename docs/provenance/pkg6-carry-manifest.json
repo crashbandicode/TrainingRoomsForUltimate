@@ -4313,7 +4313,7 @@
    "dest": "src/runtime/roster/native_service.rs",
    "crate": "root",
    "src_sha256": "4e685fad23d6d367d0c007dda4efa0e97ed780643aef51c3b10130df82a4c2ba",
-   "dest_sha256": "115c60d31084cd00d02b0a5ae8177e2197292eccadde8f87084b370aca926c9e",
+   "dest_sha256": "60c44a5126f7b67a431b1690fb2518754d00a87da411b4503e5e742755f89b9e",
    "edits": [
     {
      "old": "    context: &ServiceEntryContext,\n) -> u64 {\n",
@@ -4364,6 +4364,21 @@
      "old": "    if !super::mii_managed_helper::enter_native(entry) {return 0;}\n    let original: unsafe extern \"C\" fn(*mut u8) -> u64 =\n        std::mem::transmute(ORIGINAL.load(Ordering::Acquire));\n    let result = original(entry);\n",
      "new": "    if !super::mii_managed_helper::enter_native(entry) {return false;}\n    let _ = entry;\n    true\n}\n\n/// The owners leave after the game's call, on the game's stack; it never waits for a service stack.\n#[no_mangle]\n#[inline(never)]\nunsafe extern \"C\" fn training_mod_native_service_post(entry: *mut u8, result: u64) -> u64 {\n",
      "reason": "rc.7 FLAG 6 (integration 2026-11-11 01:20Z, final-surface-acc-d8679593-r2 acc-rename; primary 01:22Z, 01:26Z, 01:56Z): the native service main+0x650010 runs on its caller's stack, at acc-rename a 64 KiB heap-block stack (63,728 B free), and the plugin's pre-service poll has a 236,608 B static path (sources::service alone 77,808 B); the poll now runs on one of four static 320 KiB service stacks claimed for that poll only (lock-free; a poll with none free is skipped) through training_mod_native_service_on_stack, while the owners' gates, the game's call and the leaves stay on the caller's stack (10,704 B)"
+    },
+    {
+     "old": "static REPORTED_PEAK: AtomicU32 = AtomicU32::new(0);\n",
+     "new": "static REPORTED_PEAK: AtomicU32 = AtomicU32::new(0);\n/// rc.8 R5 (diag; the docs lane's review, finding 3): the most bytes any poll used of a service stack, measured from the\n/// paint, against the static path the stack is sized for (`model::thread_stacks::SERVICE_STACK`, a lower bound: the\n/// analysis does not follow indirect calls).\n#[cfg(feature = \"diag\")]\nstatic REPORTED_USED: AtomicUsize = AtomicUsize::new(0);\n#[cfg(feature = \"diag\")]\nstatic POLLS: AtomicU32 = AtomicU32::new(0);\n\n/// Diag, startup only (before any dispatch): every service stack painted word by word.\n#[cfg(feature = \"diag\")]\nfn paint_stacks() {\n    for stack in &STACKS {\n        let base = stack.0.get() as usize;\n        for at in (base..base + STACK.bytes).step_by(8) {\n            // SAFETY: no dispatch has claimed a stack yet; the words are this static's own.\n            unsafe { core::ptr::write_volatile(at as *mut u64, crate::model::thread_stacks::PAINT) };\n        }\n    }\n}\n\n/// Diag: the most bytes used of any service stack so far (the paint's lowest overwritten word), read, never written.\n#[cfg(feature = \"diag\")]\nfn stacks_used() -> usize {\n    STACKS.iter().map(|stack| {\n        let base = stack.0.get() as usize;\n        let mut at = base;\n        // SAFETY: a static's words, read only; a poll on the other stack only ever lowers what is read here.\n        while at < base + STACK.bytes && unsafe { core::ptr::read_volatile(at as *const u64) } == crate::model::thread_stacks::PAINT {\n            at += 8;\n        }\n        crate::model::thread_stacks::used(STACK.bytes, at - base)\n    }).max().unwrap_or(0)\n}\n",
+     "reason": "rc.8 R5 (the docs lane's review of p23/rc8-waste, finding 3): diag only, the service stacks are painted at install and every 512th poll reports the most bytes used ([NativeService] service stack used= of static_bound=), because the static bound does not follow indirect calls"
+    },
+    {
+     "old": "pub(super) unsafe fn install(base: usize) {\n",
+     "new": "pub(super) unsafe fn install(base: usize) {\n    #[cfg(feature = \"diag\")]\n    paint_stacks();\n",
+     "reason": "rc.8 R5 (the docs lane's review of p23/rc8-waste, finding 3): diag only, the service stacks are painted at install and every 512th poll reports the most bytes used ([NativeService] service stack used= of static_bound=), because the static bound does not follow indirect calls"
+    },
+    {
+     "old": "                \"[NativeService] service stacks peak={} of {} skipped_polls={}\", peak, STACK.count, exhausted));\n        }\n",
+     "new": "                \"[NativeService] service stacks peak={} of {} skipped_polls={}\", peak, STACK.count, exhausted));\n        }\n        // Every 512th poll: the stacks' measured use, one line when it grew.\n        if POLLS.fetch_add(1, Ordering::Relaxed) % 512 == 0 {\n            let used = stacks_used();\n            if used > REPORTED_USED.fetch_max(used, Ordering::Relaxed) {\n                crate::engine::compat::logging::diagnostic(format_args!(\n                    \"[NativeService] service stack used={} of {} static_bound={}\", used, STACK.bytes, STACK.static_bound));\n            }\n        }\n",
+     "reason": "rc.8 R5 (the docs lane's review of p23/rc8-waste, finding 3): diag only, the service stacks are painted at install and every 512th poll reports the most bytes used ([NativeService] service stack used= of static_bound=), because the static bound does not follow indirect calls"
     }
    ]
   },
@@ -5555,7 +5570,7 @@
    "dest": "src/runtime/roster/character_sources.rs",
    "crate": "root",
    "src_sha256": "6c3fe37031f02ee3c3891943600223546804839ee1ee6af103346710f4fb1514",
-   "dest_sha256": "31d9fd0f7949250e78c484e5a7e54cd0d6e434eccdcccda5c196d2083283f5e7",
+   "dest_sha256": "1bec7456452975778537577a0d5141ab8aadc48d40bc0f47370f4cc2d94aeadc",
    "edits": [
     {
      "delete_from": "/// Skip plugin automations for an owned helper body.",
@@ -6817,6 +6832,26 @@
      "old": "            if let Some(intent)=intent {create_capacity(ctx,entry,slot,intent);}\n        }\n    }\n",
      "new": "            if let Some(intent)=intent {create_capacity(ctx,entry,slot,intent);}\n        }\n    }\n}\n\n/// `service` after its capacity creation: the selected want's checks, its preflight and the load (rc.8 R5: outlined, so\n/// the poll's other chains don't stack on this frame).\n#[inline(never)]\n#[cfg_attr(not(feature = \"managed-third-source-alpha\"), allow(unused_variables))]\nunsafe fn service_load(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32, is_capacity: bool, prior_first: &PriorFirst) {\n    let index = slot as usize;\n    #[cfg(feature = \"managed-third-source-alpha\")]\n    let prior_first = prior_first.0;\n",
      "reason": "rc.8 R5 (TASK-rc8.md SCOPE REOPENED; the operator 2026-11-11 11:24Z): the native service poll's deeper chains, cut by outlining and borrowing with the same calls in the same order (no heap): the warm-exit settle in three frames (exit_plan, exit_settled, exit_adopt), the bank settle's outcome in bank_applied, the source service as gate, capacity and load, the CPU origin capture as recapture and new origin, begin_prepare's preflight snapshots in their own frames, and the kept MiiExit borrowed, not copied"
+    },
+    {
+     "old": "/// `service`'s gate: the callback's slot, F9's hand-over and an owned slot end it (`None`); otherwise the load runs.\n#[inline(never)]\n#[cfg_attr(not(feature = \"managed-third-source-alpha\"), allow(unused_variables))]\n",
+     "new": "/// `service`'s gate: the callback's slot, F9's hand-over and an owned slot end it (`None`); otherwise the load runs.\n#[inline(never)]\n",
+     "reason": "rc.8 R5 (g5): without managed-third-source-alpha, the outlined gate and load mark their unused parameters used, not a lint allow (tests/lint_allows.rs)"
+    },
+    {
+     "old": "unsafe fn service_gate(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32, prior_first: &mut PriorFirst) -> Option<bool> {\n",
+     "new": "unsafe fn service_gate(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32, prior_first: &mut PriorFirst) -> Option<bool> {\n    #[cfg(not(feature = \"managed-third-source-alpha\"))]\n    let _ = prior_first;\n",
+     "reason": "rc.8 R5 (g5): without managed-third-source-alpha, the outlined gate and load mark their unused parameters used, not a lint allow (tests/lint_allows.rs)"
+    },
+    {
+     "old": "#[cfg_attr(not(feature = \"managed-third-source-alpha\"), allow(unused_variables))]\n",
+     "new": "",
+     "reason": "rc.8 R5 (g5): without managed-third-source-alpha, the outlined gate and load mark their unused parameters used, not a lint allow (tests/lint_allows.rs)"
+    },
+    {
+     "old": "unsafe fn service_load(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32, is_capacity: bool, prior_first: &PriorFirst) {\n",
+     "new": "unsafe fn service_load(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32, is_capacity: bool, prior_first: &PriorFirst) {\n    // Only the capacity entry's preflight reads these.\n    #[cfg(not(feature = \"managed-third-source-alpha\"))]\n    let _ = (ctx, prior_first);\n",
+     "reason": "rc.8 R5 (g5): without managed-third-source-alpha, the outlined gate and load mark their unused parameters used, not a lint allow (tests/lint_allows.rs)"
     }
    ]
   },
@@ -15009,8 +15044,20 @@
    "dest": "tests/mii_replay185_headgear.rs",
    "crate": "mii",
    "src_sha256": "dc1217eeec20f201115dee096c09af7b3fc3b66afd8961353e56d481539109dd",
-   "dest_sha256": "b348e577e080d3eb7f5660d171c04c181adb3d7bd9c99899a0f1a42c3eda4040",
-   "prepend": "#[allow(dead_code, unused_imports)]\n#[path = \"../src/model/mii/mod.rs\"]\npub mod mii;\n#[allow(unused_imports)]\nmod engine {\n    pub use super::mii;\n}\n\n"
+   "dest_sha256": "31ab32a1b35093316114306dbc58d22fd0b0154dadc66f2a22acb233af00ac09",
+   "prepend": "#[allow(dead_code, unused_imports)]\n#[path = \"../src/model/mii/mod.rs\"]\npub mod mii;\n#[allow(unused_imports)]\nmod engine {\n    pub use super::mii;\n}\n\n",
+   "edits": [
+    {
+     "old": "    let begin = cpu.split(\"unsafe fn begin(\").nth(1).unwrap();\n",
+     "new": "    // rc.8 R5: the preflight snapshot is `preflight_current`, in its own frame, and takes the refreshed `expected`.\n    let preflight = cpu.split(\"unsafe fn preflight_current(\").nth(1).unwrap().split(\"unsafe fn \").next().unwrap();\n    assert!(preflight.contains(\"Ok(now) if native::same_owned(&now,expected,retained)=>Some(now),\"));\n    let begin = cpu.split(\"unsafe fn begin_prepare(\").nth(1).unwrap();\n",
+     "reason": "rc.8 R5 (g5): the CPU preflight snapshot is preflight_current, in its own frame, and still takes the refreshed expected (after refresh_idle_metadata)"
+    },
+    {
+     "old": "        < begin.find(\"native::same_owned(&now,&expected,retained || active.is_some())\").unwrap());\n",
+     "new": "        < begin.find(\"let Some(current)=preflight_current(entry,origin.original_kind,&expected,retained || active.is_some(),request)\").unwrap());\n",
+     "reason": "rc.8 R5 (g5): the CPU preflight snapshot is preflight_current, in its own frame, and still takes the refreshed expected (after refresh_idle_metadata)"
+    }
+   ]
   },
   {
    "src": "training_mod_mii/tests/quickplay_backend.rs",

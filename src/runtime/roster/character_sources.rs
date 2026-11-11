@@ -2334,8 +2334,9 @@ struct PriorFirst(#[cfg(feature = "managed-third-source-alpha")] Option<FirstLoa
 
 /// `service`'s gate: the callback's slot, F9's hand-over and an owned slot end it (`None`); otherwise the load runs.
 #[inline(never)]
-#[cfg_attr(not(feature = "managed-third-source-alpha"), allow(unused_variables))]
 unsafe fn service_gate(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32, prior_first: &mut PriorFirst) -> Option<bool> {
+    #[cfg(not(feature = "managed-third-source-alpha"))]
+    let _ = prior_first;
     // Diag (F9 research): one line per change of No. of CPUs seen by the native loader callback, with the slot it served, so an
     // Eden row tells whether this callback runs while the pause menu is open (before the game activates a parked entry).
     #[cfg(feature = "diag")]
@@ -2399,8 +2400,10 @@ unsafe fn service_capacity(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32)
 /// `service` after its capacity creation: the selected want's checks, its preflight and the load (rc.8 R5: outlined, so
 /// the poll's other chains don't stack on this frame).
 #[inline(never)]
-#[cfg_attr(not(feature = "managed-third-source-alpha"), allow(unused_variables))]
 unsafe fn service_load(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32, is_capacity: bool, prior_first: &PriorFirst) {
+    // Only the capacity entry's preflight reads these.
+    #[cfg(not(feature = "managed-third-source-alpha"))]
+    let _ = (ctx, prior_first);
     let index = slot as usize;
     #[cfg(feature = "managed-third-source-alpha")]
     let prior_first = prior_first.0;
