@@ -1412,3 +1412,11 @@ ceiling = 164363
 date = "2026-11-11"
 reason = "rc.8 p23/rc8-binds Training speed fix over 9626926c (164043): the bind does the game's speed code on P1's poll (QCF's Q4, the primary 2026-11-11 10:12Z): model::game_speed registry_find, Rate, mode_apply, the mode/native constants; runtime training_apply, mode_object, state_off, step_clear, apply_now; the 12 new game_speed seam rows; measured 164363 at 2c2ca140 (tools/size_gate.py), +320"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.8 order (TASK-rc8.md) and the primary's 10:12Z order; a raise goes in its own commit with approved_by"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 164368
+date = "2026-11-11"
+reason = "rc.8 p23/rc8-binds over d13813fe (164363): the Training mode object's registry key 0x1022590708 and the apply line's thread (worker B's note); measured 164368 at 11a27788 (tools/size_gate.py), +5"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.8 order (TASK-rc8.md) and the primary's 10:12Z/11:09Z orders; a raise goes in its own commit with approved_by"
