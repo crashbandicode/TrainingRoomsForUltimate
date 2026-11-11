@@ -98,7 +98,7 @@ struct ResolveSelection { action:Option<ClipAction>, entry:usize }
 #[cfg(feature="mii-ordinary-cpu-alpha")]
 type ResolveTicket = crate::runtime::roster::character_roster::mii_replay::Ticket;
 #[cfg(not(feature="mii-ordinary-cpu-alpha"))]
-type ResolveTicket = std::sync::mpsc::Receiver<Result<Configuration,String>>;
+type ResolveTicket = crate::model::nowait_channel::Receiver<Result<Configuration,String>>;
 struct Reload { editor:Editor, requested:bool, ticks:u32, revision:u64,
     selection:Option<ResolveSelection>,
     resolving:Option<ResolveTicket>, resolve_error:Option<String> }
@@ -615,7 +615,7 @@ pub fn service_reload() {
             }
             let result = match pending.resolving.as_ref().map(|receive| receive.try_recv()) {
                 Some(Ok(result)) => Some(result.map_err(|error| error.to_string())),
-                Some(Err(std::sync::mpsc::TryRecvError::Empty)) if pending.ticks <= 600 => None,
+                Some(Err(crate::model::nowait_channel::TryRecvError::Empty)) if pending.ticks <= 600 => None,
                 _ => Some(Err("Recorded Mii metadata could not be read; reopen this capture".into())),
             };
             if let Some(result) = result {
@@ -654,8 +654,8 @@ pub fn service_reload() {
                     pending.resolving=None;
                 }
                 Ok(Err(error))=>failure=Some(error.to_string()),
-                Err(std::sync::mpsc::TryRecvError::Disconnected)=>failure=Some("Mii resolver unavailable".into()),
-                Err(std::sync::mpsc::TryRecvError::Empty)=>{},
+                Err(crate::model::nowait_channel::TryRecvError::Disconnected)=>failure=Some("Mii resolver unavailable".into()),
+                Err(crate::model::nowait_channel::TryRecvError::Empty)=>{},
             }
         }
         let target=match pending.editor.target() {Ok(target)=>target,Err(error)=>{failure=Some(error);None}};

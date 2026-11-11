@@ -177,6 +177,11 @@ pub mod stall_watch;
 #[path = "model/entry_cells.rs"]
 pub mod entry_cells;
 
+/// Bounded channels with std `sync_channel`'s surface whose non-blocking calls never wait on the other side (rc.8 "Add
+/// New…" hang): every hand-off a game thread sends on or polls.
+#[path = "model/nowait_channel.rs"]
+pub mod nowait_channel;
+
 /// Startup-allocated catalog reply transport; native callers never allocate channels.
 #[path = "model/catalog_reply.rs"]
 pub mod catalog_reply;

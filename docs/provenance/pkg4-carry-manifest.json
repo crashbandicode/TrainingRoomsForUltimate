@@ -1770,7 +1770,7 @@
    "dest": "src/runtime/macros/replay_store.rs",
    "crate": "root",
    "src_sha256": "2324718b32e3b8dc6ab512ab723818cd68add8a709953bbb0c03752689966ac6",
-   "dest_sha256": "4bd8ed1b4d8b407830443610816e36c4fe1cd95c56d56a8434056baddf192ba2",
+   "dest_sha256": "09515ae2d131b5ac3479edc611a1ab9d23c26f4e239a3f3261fdc5045e199670",
    "edits": [
     {
      "old": "std::thread::Builder::new().name(\"replay-capture-save\".into()).stack_size(0x20000)\n        .spawn(move || {",
@@ -1866,6 +1866,11 @@
      "old": "                    #[cfg(feature = \"mii-editor-alpha\")]\n                    crate::runtime::mii::mii_editor_bridge::catalog_read(&native);\n",
      "new": "",
      "reason": "rc.6 freeze class (primary 2026-11-09 19:44Z; rc6-qpf3, tests/lock_order.rs): the saved-Mii catalog check runs on the game thread when the broker receives the snapshot (mii_catalog_request::service), never on the reader thread, because game hooks take the editor bridge's STATE"
+    },
+    {
+     "old": "use std::sync::{mpsc::{self, SyncSender}, Arc, OnceLock};\n",
+     "new": "use std::sync::{Arc, OnceLock};\n// rc.8 hang: game threads post jobs here; std's `try_send` could spin on the writer mid-read.\nuse crate::model::nowait_channel::{self as mpsc, SyncSender};\n",
+     "reason": "rc.8 \"Add New\u2026\" hang (worker A's finding A3, primary 2026-11-11 18:01Z): std's mpsc `try_recv`/`try_send` spin on a peer mid-operation, and the game's MainThread spun forever on the menu worker it had preempted on core 0; the channels game threads touch are `model::nowait_channel`, std's surface without the wait (tests/game_thread_handoffs.rs, tools/game_thread_wait_check.py)"
     }
    ]
   },
@@ -1874,7 +1879,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "f02507fc3e9fa2eb289de8ad437ce7261fefb88ec6643233f92df7d70bb0c09c",
+   "dest_sha256": "955b8c1d3209429b9c32c1c0f5042b17fdb271504ad4707a746136e8eca9aaf5",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -2191,6 +2196,12 @@
      "old": "    if scratch.is_empty() { scratch.resize(4096, (0, 0)); }\n",
      "new": "    if scratch.is_empty() { scratch.resize(crate::engine::macros::handoff::REPLAY_EVENT_SLOTS, (0, 0)); }\n",
      "reason": "rc.8 R4 (TASK-rc8.md SCOPE REOPENED; the operator 2026-11-11 11:24Z): the replay mailbox has handoff::REPLAY_EVENT_SLOTS slots (1024, from 4096: the rc.8 pass peaked at 4; 2.1 s of 8 samples a frame, the stall watchdog's STALL_MS), and its drain scratch follows; a full mailbox drops and counts as before"
+    },
+    {
+     "old": "std::sync::mpsc::",
+     "new": "crate::model::nowait_channel::",
+     "reason": "rc.8 \"Add New\u2026\" hang (worker A's finding A3, primary 2026-11-11 18:01Z): std's mpsc `try_recv`/`try_send` spin on a peer mid-operation, and the game's MainThread spun forever on the menu worker it had preempted on core 0; the channels game threads touch are `model::nowait_channel`, std's surface without the wait (tests/game_thread_handoffs.rs, tools/game_thread_wait_check.py)",
+     "count": 4
     }
    ]
   },

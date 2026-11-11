@@ -1,3 +1,5 @@
+#[path = "../src/model/nowait_channel.rs"]
+mod nowait_channel;
 #[path = "../src/model/catalog_reply.rs"]
 mod catalog_reply;
 
@@ -165,7 +167,7 @@ fn reply_pool_first_use_full_drop_and_reuse_allocate_nothing() {
         assert!(native(|| pool.claim()).is_none());
         native(|| job.complete(n));
         let (ticket, job) = native(|| pool.claim().unwrap());
-        assert!(matches!(native(|| ticket.try_recv()), Err(std::sync::mpsc::TryRecvError::Empty)));
+        assert!(matches!(native(|| ticket.try_recv()), Err(nowait_channel::TryRecvError::Empty)));
         native(|| drop(job));
         assert_eq!(native(|| ticket.try_recv()), Ok(Err(())));
         native(|| drop(ticket));

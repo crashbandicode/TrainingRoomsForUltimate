@@ -1,6 +1,7 @@
 //! Bounded ownership transfer from native publication to the UI worker.
 //! Endpoints are allocated at boot. The producer never borrows UI-owned state.
-use std::sync::mpsc::{self, Receiver, SyncSender};
+// The native side posts: a `nowait_channel` never waits on the worker mid-read (rc.8 hang).
+use super::nowait_channel::{self as mpsc, Receiver, SyncSender};
 
 pub struct Publication<T> {
     pub sequence: u32,

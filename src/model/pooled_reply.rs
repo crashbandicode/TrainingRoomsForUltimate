@@ -1,7 +1,9 @@
 //! Boot-reserved one-shot replies. A slot becomes reusable only after BOTH the
 //! request job and its ticket return their channel endpoints. Neither side waits.
 use std::cell::UnsafeCell;
-use std::sync::{atomic::{AtomicU8, Ordering}, mpsc::{self, Receiver, SyncSender, TryRecvError}};
+use std::sync::atomic::{AtomicU8, Ordering};
+// Tickets are polled on game threads: a `nowait_channel` never waits on a worker mid-send (rc.8 hang).
+use super::nowait_channel::{self as mpsc, Receiver, SyncSender, TryRecvError};
 
 const READER: u8 = 1;
 const WRITER: u8 = 2;

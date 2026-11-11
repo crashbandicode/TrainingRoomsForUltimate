@@ -12,7 +12,9 @@ use std::fs::{self, OpenOptions};
 use std::io::{self, Write};
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{mpsc::{self, SyncSender}, Arc, OnceLock};
+use std::sync::{Arc, OnceLock};
+// rc.8 hang: game threads post jobs here; std's `try_send` could spin on the writer mid-read.
+use crate::model::nowait_channel::{self as mpsc, SyncSender};
 
 use {crate::engine::macros::recover_previous_ini, crate::engine::macros::CaptureArchive, crate::engine::macros::CaptureSettings, crate::engine::macros::CaptureToggle, crate::engine::macros::IniRecovery, crate::engine::macros::LiveSession, crate::engine::macros::SharedCaptureArchive, crate::engine::macros::DEFAULT_CAPTURE_INI, crate::engine::macros::MAX_RETAINED_CAPTURES};
 
