@@ -109,7 +109,8 @@ def successors(i, insns, index):
     addr, op, args = insns[i]
     base = op.split(".")[0]
     nxt = [i + 1] if i + 1 < len(insns) else []
-    if base in ("ret", "br", "eret", "retaa", "retab", "braa", "brab") or base in ("bl", "blr", "blraa", "blrab"):
+    if base in ("ret", "br", "eret", "retaa", "retab", "braa", "brab") or base in ("bl", "blr", "blraa", "blrab") \
+            or base in ("brk", "udf", "hlt"):
         return []
     target = None
     last = split_operands(args)[-1] if args else ""
@@ -154,6 +155,32 @@ def check(elf):
     return sites, violations
 
 
+ALLOW = __file__.rsplit("/", 1)[0] + "/svc_clobber_allow.txt"
+
+
+def normal(op, args):
+    return " ".join((op + " " + re.sub(r"<[^>]*>", "", args).split("//")[0]).split())
+
+
+def allowed():
+    """Reviewed reads (`function | instruction | register | reason`): reads the analysis cannot tell from a dead value.
+    Every svc asm declares clobber_abi("C") (tests/svc_clobber_abi.rs), so the compiler never keeps a value live in
+    x8-x17 across one; a read it still reports lies past a join or a loop where the value is dead on the svc's path.
+    Each entry names the exact instruction, so a changed function reports again and needs a new review."""
+    out = {}
+    try:
+        lines = open(ALLOW).read().splitlines()
+    except OSError:
+        return out
+    for line in lines:
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        parts = [p.strip() for p in line.split("|")]
+        if len(parts) >= 4 and parts[3]:
+            out[(parts[0], " ".join(parts[1].split()), parts[2])] = parts[3]
+    return out
+
+
 def main():
     if len(sys.argv) < 2:
         print(__doc__)
@@ -163,13 +190,23 @@ def main():
     except (OSError, subprocess.CalledProcessError) as error:
         print("cannot read %s: %s" % (sys.argv[1], error))
         return 2
-    print("svc sites: %d; reads of x8-x17 after an svc before a write: %d" % (len(sites), len(violations)))
+    allow = allowed()
+    reviewed, open_ = [], []
+    for v in violations:
+        name, svc, at, op, args, bad = v
+        keys = [(name, normal(op, args), "x%d" % r) for r in bad]
+        (reviewed if all(k in allow for k in keys) else open_).append(v)
+    print("svc sites: %d; reads of x8-x17 after an svc before a write: %d (reviewed in %s: %d; open: %d)"
+          % (len(sites), len(violations), ALLOW.rsplit("/", 1)[1], len(reviewed), len(open_)))
     if "--list" in sys.argv:
         for name, addr, args in sites:
             print("  svc %s at %#x in %s" % (args, addr, name[:140]))
-    for name, svc, at, op, args, bad in violations:
-        print("VIOLATION %s: svc at %#x, then %#x %s %s reads %s" % (name[:140], svc, at, op, args, ["x%d" % r for r in bad]))
-    return 1 if violations else 0
+    for name, svc, at, op, args, bad in reviewed:
+        print("REVIEWED %s: svc at %#x, then %#x %s reads %s: %s" % (name[:140], svc, at, normal(op, args),
+              ["x%d" % r for r in bad], allow[(name, normal(op, args), "x%d" % bad[0])][:120]))
+    for name, svc, at, op, args, bad in open_:
+        print("VIOLATION %s: svc at %#x, then %#x %s reads %s" % (name[:140], svc, at, normal(op, args), ["x%d" % r for r in bad]))
+    return 1 if open_ else 0
 
 
 if __name__ == "__main__":
