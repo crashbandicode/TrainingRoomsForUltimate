@@ -1396,3 +1396,11 @@ ceiling = 164010
 date = "2026-11-11"
 reason = "rc.8 p23/rc8-binds over 722525a5 (163293): the input display toggle and the game speed hold (TASK-rc8.md §1-§3, primary 2026-11-11 04:02Z, docs/design/rc8-binds.md): model::game_speed (speeds, hold, slow-table steps, lobby slot), the two chord rows and the detector's hold, runtime::features::game_speed, the worker's toggle, notices::show_now, the 11 game_speed seam rows; measured 164010 at 6fa33b46 (tools/size_gate.py), +717"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.8 order (TASK-rc8.md); a raise goes in its own commit with approved_by"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 164043
+date = "2026-11-11"
+reason = "rc.8 p23/rc8-binds defect fix over 1ecf920a (164010): the lobby slot freed on the practice's teardown (worker B 2026-11-11 08:20Z, primary 08:24Z): LobbySlot::release, game_speed::release_lobby_slot from session_clear, slow_table; measured 164043 at 97437d66 (tools/size_gate.py), +33"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.8 order (TASK-rc8.md) and the primary's 08:24Z defect order; a raise goes in its own commit with approved_by"
