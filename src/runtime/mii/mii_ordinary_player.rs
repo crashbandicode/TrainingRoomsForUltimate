@@ -745,6 +745,12 @@ unsafe fn begin(entry:*mut u8)->bool {
     }
 }
 
+/// rc.8 R5: whether the preflight snapshot changed before INSTALL, in its own frame (a fresh snapshot and its `Ok` copy).
+#[inline(never)]
+unsafe fn snapshot_changed(entry:*mut u8,epoch:u64,kind:u32,current:&native::Snapshot)->bool {
+    native::snapshot(entry as usize,epoch,kind)!=Ok(*current)
+}
+
 #[inline(never)]
 unsafe fn begin_prepare(entry:*mut u8,bank:&mut Option<BankSubmit>)->bool {
     if !permitted() {return false;}
@@ -932,7 +938,8 @@ unsafe fn begin_prepare(entry:*mut u8,bank:&mut Option<BankSubmit>)->bool {
     // rc.6 warm exit: out of a live Mii group whose publication this owner kept, the window it displaced is warm.
     #[cfg(feature="native-body-bank-alpha")]
     let exit=active.is_some() && publish.is_none()
-        && STATE.lock().mii_exit.is_some_and(|x|x.mii.ticket.epoch==current.binding.epoch
+        // rc.8 R5: borrowed, not a copy of the kept MiiExit (18.5 KB of `begin_prepare`'s frame).
+        && STATE.lock().mii_exit.as_ref().is_some_and(|x|x.mii.ticket.epoch==current.binding.epoch
             && x.adopted==expected);
     #[cfg(feature="native-body-bank-alpha")]
     let plan={
@@ -983,7 +990,7 @@ unsafe fn begin_prepare(entry:*mut u8,bank:&mut Option<BankSubmit>)->bool {
     };
     let Some(token)=INSTALL.try_begin(true) else{return false;};
     // The preflight predates INSTALL ownership; freeze all foreign bytes/provenance anew.
-    if native::snapshot(entry as usize,current.binding.epoch,origin.original_kind)!=Ok(current) {
+    if snapshot_changed(entry,current.binding.epoch,origin.original_kind,&current) {
         refused_before_submit(token,"Player preflight changed before INSTALL ownership");return false;
     }
     let track={
@@ -1131,12 +1138,22 @@ unsafe fn bank_settle(entry:*mut u8,b:&BankTrack) {
     // rc.6 warm exit: a Mii group switch's publication, read before the settle drops its track, is kept for the
     // exit to the window it displaced; that exit settles through the kept record.
     let published=STATE.lock().bank.as_ref().filter(|t|t.ticket==b.ticket && t.token==b.token).and_then(|t|t.published);
-    let settled=match if b.exit {native::exit_settled(b)} else {native::bank_settled(b)} {
+    // rc.8 R5: the settle's result is borrowed, and what follows it runs in `bank_applied`'s own frame, beside the
+    // settle's chain (the native service poll's deepest), not under it.
+    let result=if b.exit {native::exit_settled(b)} else {native::bank_settled(b)};
+    let settled=match &result {
         Ok(settled)=>settled,
         Err(native::BankRefusal::Busy)=>return,
-        Err(native::BankRefusal::Kept(reason))=>{bank_refused(b,reason,false);return;}
-        Err(native::BankRefusal::Diverged(reason))=>{bank_refused(b,reason,true);return;}
+        Err(native::BankRefusal::Kept(reason))=>{bank_refused(b,*reason,false);return;}
+        Err(native::BankRefusal::Diverged(reason))=>{bank_refused(b,*reason,true);return;}
     };
+    bank_applied(entry,b,settled,published);
+}
+
+/// `bank_settle` once the switch settled: the kept Mii publication, the presentation, the outcome and the notices.
+#[cfg(feature="native-body-bank-alpha")]
+#[inline(never)]
+unsafe fn bank_applied(entry:*mut u8,b:&BankTrack,settled:&native::Settled,published:Option<(Configuration,native::BankPublished)>) {
     let now=settled.now;let exact=settled.exact;
     STATE.lock().mii_exit=match (exact,published) {
         (Some(c),Some((published_c,published))) if published_c==c=>Some(MiiExit {mii:*b,configuration:c,published,adopted:now}),

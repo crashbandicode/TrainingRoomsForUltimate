@@ -487,6 +487,13 @@ pub(super) unsafe fn bank_settled(bank:&super::BankTrack)->Result<Settled,BankRe
     Ok(Settled {now,exact,resource_pair})
 }
 
+/// rc.8 R5: what the warm exit carries across `bank_restore`. `exit_plan` builds it in its own frame, so the kept
+/// `MiiExit`, the snapshot read under G and their copies are gone before the restore runs.
+#[cfg(feature="native-body-bank-alpha")]
+struct ExitPlan {
+    restore:super::BankTrack, configuration:Configuration, published:BankPublished, adopted:Snapshot, helpers:helpers::View,
+}
+
 /// rc.6 warm exit from a Mii group (operator decision 2026-11-08): the bank exchanged the live Mii group for the
 /// window it displaced and wrote that window's `R` words, entry bytes and D mirror back (`perform_swap`). In this
 /// settle tick the bank's exchange receipt proves the descriptor (`group_rebaseline`), the Mii switch's publication
@@ -499,11 +506,35 @@ pub(super) unsafe fn bank_settled(bank:&super::BankTrack)->Result<Settled,BankRe
 #[cfg(feature="native-body-bank-alpha")]
 #[inline(never)] // rc.8 §7: its snapshots and MiiExit copies live in its own frame, not in bank_service's
 pub(super) unsafe fn exit_settled(bank:&super::BankTrack)->Result<Settled,BankRefusal> {
+    // rc.8 R5: the proof before the restore (`exit_plan`) and the adoption after it (`exit_adopt`) each have their own
+    // frame; this one holds the plan and the restore's result, borrowed.
+    let mut plan=None;
+    exit_plan(bank,&mut plan)?;
+    let Some(plan)=plan.as_ref() else {return Err(BankRefusal::Diverged("CPU warm exit without its kept Mii publication"))};
+    let restored=bank_restore(&plan.restore,plan.configuration,plan.published);
+    let now=match &restored {
+        Ok(restored)=>&restored.now,
+        Err(why) if *why==helpers::BUSY=>return Err(BankRefusal::Busy),
+        Err(why)=>return Err(BankRefusal::Diverged(why)),
+    };
+    exit_adopt(bank,plan,now)
+}
+
+/// rc.8 R5: `exit_settled` before the restore: the kept exit, the G identity, the helpers' view, the bank's exchange
+/// receipt; then the restore's track.
+#[cfg(feature="native-body-bank-alpha")]
+#[inline(never)]
+unsafe fn exit_plan(bank:&super::BankTrack,plan:&mut Option<ExitPlan>)->Result<(),BankRefusal> {
     let before=&bank.before;
-    // rc.8 §7: the kept exit is read here once and borrowed (`bank_settle` read it and passed a copy, filtered into another).
-    let kept=super::STATE.lock().mii_exit;
-    let exit=kept.as_ref().filter(|x|x.mii.ticket.epoch==before.binding.epoch)
-        .ok_or(BankRefusal::Diverged("CPU warm exit without its kept Mii publication"))?;
+    // rc.8 §7, R5: the kept exit is read here once, straight into the plan (no copy of the whole `MiiExit`); the
+    // restore's track takes the descriptor and control bytes as they are now, after the proof below.
+    {
+        let state=super::STATE.lock();
+        let exit=state.mii_exit.as_ref().filter(|x|x.mii.ticket.epoch==before.binding.epoch)
+            .ok_or(BankRefusal::Diverged("CPU warm exit without its kept Mii publication"))?;
+        *plan=Some(ExitPlan {restore:super::BankTrack {before:exit.mii.before,descriptor:exit.mii.descriptor,..*bank},
+            configuration:exit.configuration,published:exit.published,adopted:exit.adopted,helpers:helpers::View::EMPTY});
+    }
     let b=pool(before.binding.entry,before.binding.epoch).map_err(BankRefusal::Diverged)?;
     if b!=before.binding {return Err(BankRefusal::Diverged("CPU warm exit G identity changed"));}
     let helpers=match helper_snapshot() {
@@ -518,28 +549,33 @@ pub(super) unsafe fn exit_settled(bank:&super::BankTrack)->Result<Settled,BankRe
         before.binding.owner,before.binding.epoch,&before.descriptor,&descriptor) {
         return Err(BankRefusal::Diverged("CPU warm exit without its group exchange"));
     }
-    let restore=super::BankTrack {before:Snapshot {descriptor,control:before.control,..exit.mii.before},
-        descriptor:exit.mii.descriptor,..*bank};
-    let now=match bank_restore(&restore,exit.configuration,exit.published) {
-        Ok(restored)=>restored.now,
-        Err(why) if why==helpers::BUSY=>return Err(BankRefusal::Busy),
-        Err(why)=>return Err(BankRefusal::Diverged(why)),
-    };
+    let Some(plan)=plan.as_mut() else {return Err(BankRefusal::Diverged("CPU warm exit without its kept Mii publication"))};
+    // The restore's track: the receipt from before the Mii, with the descriptor and control bytes as they are now.
+    plan.restore.before.descriptor=descriptor;plan.restore.before.control=before.control;
+    plan.helpers=helpers;
+    Ok(())
+}
+
+/// rc.8 R5: `exit_settled` after the restore: the owner adopts the window (`now` is the restore's read-back).
+#[cfg(feature="native-body-bank-alpha")]
+#[inline(never)]
+unsafe fn exit_adopt(bank:&super::BankTrack,plan:&ExitPlan,now:&Snapshot)->Result<Settled,BankRefusal> {
+    let before=&bank.before;
     let mut state=super::STATE.lock();
     let current=!state.departed && state.bank.is_some_and(|t|t.ticket==bank.ticket && t.token==bank.token)
         && super::epoch()==before.binding.epoch;
-    let Some(owner)=state.owner.as_mut().filter(|o|current && o.expected==exit.adopted && o.live.target.saved().is_some()) else {
+    let Some(owner)=state.owner.as_mut().filter(|o|current && o.expected==plan.adopted && o.live.target.saved().is_some()) else {
         return Err(BankRefusal::Diverged("CPU warm exit ticket/owner changed after the restore"));
     };
-    let mut registry=final_registry(&helpers,Some(bank.token)).map_err(BankRefusal::Diverged)?;
-    owner.live=bank.destination;owner.expected=now;
+    let mut registry=final_registry(&plan.helpers,Some(bank.token)).map_err(BankRefusal::Diverged)?;
+    owner.live=bank.destination;owner.expected=*now;
     registry.commit(now.authority(),now.original_kind,super::descriptor_kind(&now.descriptor));
     super::note("[GroupSwap] warm exit: CPU Mii publication restored; descriptor/header/body proof passed");
     state.bank=None;state.mii_exit=None;
     state.replay_result=bank.replay.filter(|r|r.current(super::epoch(),super::super::mii_replay::revision(r.source)))
         .map(|selection|crate::engine::mii::replay::SelectionReceipt {selection,outcome:Ok(())});
     drop(registry);drop(state);
-    Ok(Settled {now,exact:None,resource_pair:None})
+    Ok(Settled {now:*now,exact:None,resource_pair:None})
 }
 
 /// Reuse the native before/after proof while the generic roster still holds INSTALL.
@@ -620,78 +656,22 @@ pub(super) unsafe fn completion_failure(track:&super::Track)->Option<Failure> {
 /// Later tickets retain their full protected owner/record union byte comparisons.
 pub(super) unsafe fn capture_origin(entry:usize,epoch:u64,kind:u32,catalog:&Catalog,opening:u64)
     ->Result<(),helpers::CaptureError> {
-    let previous={let state=super::STATE.lock();
-        state.owner.as_ref().map(|o|(o.expected,o.live,state.reservation,state.request,state.reservation.held()
-            || o.live.target.publish(o.origin_saved).is_some()))};
-    if let Some((expected,live,reservation,request,retained))=previous {
-        let m=map(entry)?;let b=pool(entry,epoch)?;
-        let helpers=helper_snapshot()?;
-        let g=PoolLock::acquire(super::base(),b.manager);
-        let now=current_locked(m,b,kind,None,helpers)?;
-        let descriptor=match policy::recapture_rank(now.layout,expected.binding,now.binding,
-            &expected.descriptor,&now.descriptor) {
-            Ok(descriptor)=>descriptor,
-            Err(reason)=>{
-                // expected and now are owned copies. Release G before formatting,
-                // the trace, or STATE. This branch does not read native memory again.
-                drop(g);
-                if reason=="CPU rank recapture changed non-rank descriptor bytes" {
-                    super::note_non_rank_recapture(&expected,&now);
-                }
-                return Err(reason.into());
-            }
-        };
-        // Only the CPU's live behavior bytes FE+0x34..=0x37 differ in this local
-        // comparison value. All other same_owned checks stay exact.
-        let comparison=Snapshot {descriptor,..expected};
-        check(same_owned(&now,&comparison,retained),"menu current owner changed")?;
-        check(current_locked(m,b,kind,None,helpers)?==now,"CPU menu snapshot changed before rank refresh")?;
-        let mut state=super::STATE.lock();
-        check(super::super::mii_saved_alpha::menu_epoch()==opening
-            && state.capture_at==(epoch,opening) && state.capture && !state.departed
-            && !state.busy() && state.generic.is_none() && state.request==request
-            && state.reservation==reservation && super::epoch()==epoch
-            && state.owner.as_ref().is_some_and(|o|o.expected==expected && o.live==live),"menu owner retired")?;
-        let registry=final_registry(&now.helpers,None)?;
-        // No whole-snapshot adoption: origin and historical foreign-owner values
-        // remain unchanged. Later tickets freeze a fresh, fully qualified union.
-        state.owner.as_mut().unwrap().expected.descriptor=descriptor;
-        state.capture=false;state.menu_valid=true;
-        drop(registry);drop(state);drop(g);return Ok(());
-    }
+    // rc.8 R5: a current owner's rank recapture and a new origin's capture each run in their own frame, one after the
+    // other (`recapture_rank`, `capture_new_origin`), not one under the other.
+    if recapture_rank(entry,epoch,kind,opening)? {return Ok(());}
+    capture_new_origin(entry,epoch,kind,catalog,opening)
+}
+
+/// `capture_origin` without a current owner: the origin is captured, its Mii configuration resolved in its own frame
+/// (`origin_configuration`).
+#[inline(never)]
+unsafe fn capture_new_origin(entry:usize,epoch:u64,kind:u32,catalog:&Catalog,opening:u64)
+    ->Result<(),helpers::CaptureError> {
     check(catalog.is_complete(),"CPU origin catalog incomplete")?;
     let before=snapshot(entry,epoch,kind)?;
     policy::native_rank(&before.descriptor)?;
     let c=if MiiClass::from_kind(kind).is_some() {
-        check(policy::supported_kind(kind),"CPU origin class not qualified")?;
-        let m=map(entry)?;let b=pool(entry,epoch)?;
-        let helpers=helper_snapshot()?;
-        let g=PoolLock::acquire(super::base(),b.manager);
-        let fresh=current_locked(m,b,kind,None,helpers)?;
-        check(fresh==before,"CPU origin changed before catalog resolution")?;
-        let observed=mirrors(fresh.owners[b.owner as usize].unwrap());
-        let saved=role_owner::saved_origin(catalog,kind,observed,&fresh.current_record);
-        drop(g);
-        let c=match saved {
-            Some(c)=>c,
-            None if fresh.layout.waiting()=>{
-                // Native waiting CPUs may use a built-in Mii absent from the saved catalog.
-                // Copy its actual values; do not synthesize a preset or write a saved file.
-                // Native getters run outside G. The common second snapshot below must still
-                // exactly match this source before its origin can be committed.
-                let tokens=observed.tokens;
-                let rows=values::RowIds {
-                    outfit:lookup_row_id(super::base(),OUTFIT_TABLE,tokens.outfit)?,
-                    hat:lookup_row_id(super::base(),HAT_TABLE,tokens.hat)?,
-                };
-                let mut charinfo=[0;88];
-                charinfo.copy_from_slice(&fresh.current_record[..88]);
-                Configuration::from_observed(MiiClass::from_kind(kind).unwrap(),tokens,charinfo,rows)
-                    .map_err(|_|"native CPU origin values or row identity invalid")?
-            },
-            None=>return Err(helpers::CaptureError::Refused("no exact original saved CPU configuration")),
-        };
-        Some(c)
+        Some(origin_configuration(entry,epoch,kind,catalog,&before)?)
     } else {check(before.layout.waiting() || before.index==0,"ordinary CPU origin index changed")?;None};
     let rows=c.map(|c|super::super::mii_ordinary_player::native::target_rows(c)).transpose()?;
     let m=map(entry)?;let b=pool(entry,epoch)?;
@@ -729,4 +709,84 @@ pub(super) unsafe fn capture_origin(entry:usize,epoch:u64,kind:u32,catalog:&Cata
     drop(registry);drop(state);drop(g);
     super::super::observe_mii_origin(super::super::Role::Cpu,epoch,kind,super::descriptor_forms(&now.descriptor),c);
     Ok(())
+}
+
+/// `capture_origin` with a current owner: its expected descriptor takes the CPU's live rank bytes. `Ok(false)`: no
+/// owner, so an origin is captured. rc.8 R5: outlined, its own frame.
+#[inline(never)]
+unsafe fn recapture_rank(entry:usize,epoch:u64,kind:u32,opening:u64)->Result<bool,helpers::CaptureError> {
+    let previous={let state=super::STATE.lock();
+        state.owner.as_ref().map(|o|(o.expected,o.live,state.reservation,state.request,state.reservation.held()
+            || o.live.target.publish(o.origin_saved).is_some()))};
+    let Some((expected,live,reservation,request,retained))=previous else {return Ok(false)};
+    let m=map(entry)?;let b=pool(entry,epoch)?;
+    let helpers=helper_snapshot()?;
+    let g=PoolLock::acquire(super::base(),b.manager);
+    let now=current_locked(m,b,kind,None,helpers)?;
+    let descriptor=match policy::recapture_rank(now.layout,expected.binding,now.binding,
+        &expected.descriptor,&now.descriptor) {
+        Ok(descriptor)=>descriptor,
+        Err(reason)=>{
+            // expected and now are owned copies. Release G before formatting,
+            // the trace, or STATE. This branch does not read native memory again.
+            drop(g);
+            if reason=="CPU rank recapture changed non-rank descriptor bytes" {
+                super::note_non_rank_recapture(&expected,&now);
+            }
+            return Err(reason.into());
+        }
+    };
+    // Only the CPU's live behavior bytes FE+0x34..=0x37 differ in this local
+    // comparison value. All other same_owned checks stay exact.
+    let comparison=Snapshot {descriptor,..expected};
+    check(same_owned(&now,&comparison,retained),"menu current owner changed")?;
+    check(current_locked(m,b,kind,None,helpers)?==now,"CPU menu snapshot changed before rank refresh")?;
+    let mut state=super::STATE.lock();
+    check(super::super::mii_saved_alpha::menu_epoch()==opening
+        && state.capture_at==(epoch,opening) && state.capture && !state.departed
+        && !state.busy() && state.generic.is_none() && state.request==request
+        && state.reservation==reservation && super::epoch()==epoch
+        && state.owner.as_ref().is_some_and(|o|o.expected==expected && o.live==live),"menu owner retired")?;
+    let registry=final_registry(&now.helpers,None)?;
+    // No whole-snapshot adoption: origin and historical foreign-owner values
+    // remain unchanged. Later tickets freeze a fresh, fully qualified union.
+    state.owner.as_mut().unwrap().expected.descriptor=descriptor;
+    state.capture=false;state.menu_valid=true;
+    drop(registry);drop(state);drop(g);Ok(true)
+}
+
+/// A Mii-class CPU origin's configuration: its exact saved one, or a waiting CPU's built-in Mii copied as it is.
+/// rc.8 R5: outlined from `capture_origin`, its own frame.
+#[inline(never)]
+unsafe fn origin_configuration(entry:usize,epoch:u64,kind:u32,catalog:&Catalog,before:&Snapshot)
+    ->Result<Configuration,helpers::CaptureError> {
+    check(policy::supported_kind(kind),"CPU origin class not qualified")?;
+    let m=map(entry)?;let b=pool(entry,epoch)?;
+    let helpers=helper_snapshot()?;
+    let g=PoolLock::acquire(super::base(),b.manager);
+    let fresh=current_locked(m,b,kind,None,helpers)?;
+    check(fresh==*before,"CPU origin changed before catalog resolution")?;
+    let observed=mirrors(fresh.owners[b.owner as usize].unwrap());
+    let saved=role_owner::saved_origin(catalog,kind,observed,&fresh.current_record);
+    drop(g);
+    let c=match saved {
+        Some(c)=>c,
+        None if fresh.layout.waiting()=>{
+            // Native waiting CPUs may use a built-in Mii absent from the saved catalog.
+            // Copy its actual values; do not synthesize a preset or write a saved file.
+            // Native getters run outside G. The common second snapshot below must still
+            // exactly match this source before its origin can be committed.
+            let tokens=observed.tokens;
+            let rows=values::RowIds {
+                outfit:lookup_row_id(super::base(),OUTFIT_TABLE,tokens.outfit)?,
+                hat:lookup_row_id(super::base(),HAT_TABLE,tokens.hat)?,
+            };
+            let mut charinfo=[0;88];
+            charinfo.copy_from_slice(&fresh.current_record[..88]);
+            Configuration::from_observed(MiiClass::from_kind(kind).unwrap(),tokens,charinfo,rows)
+                .map_err(|_|"native CPU origin values or row identity invalid")?
+        },
+        None=>return Err(helpers::CaptureError::Refused("no exact original saved CPU configuration")),
+    };
+    Ok(c)
 }

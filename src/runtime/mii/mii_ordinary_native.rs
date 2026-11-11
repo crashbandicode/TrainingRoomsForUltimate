@@ -1045,6 +1045,13 @@ pub(super) unsafe fn bank_settled(bank:&super::BankTrack) -> Result<Settled,Bank
     Ok(Settled {now,exact,resource_pair})
 }
 
+/// rc.8 R5: what the warm exit carries across `bank_restore`. `exit_plan` builds it in its own frame, so the kept
+/// `MiiExit`, the snapshot read under G and their copies are gone before the restore runs.
+#[cfg(feature="native-body-bank-alpha")]
+struct ExitPlan {
+    restore:super::BankTrack, configuration:Configuration, published:BankPublished, adopted:Snapshot, helpers:helpers::View,
+}
+
 /// rc.6 warm exit from a Mii group (operator decision 2026-11-08): the bank exchanged the live Mii group for the
 /// window it displaced and wrote that window's `R` words, entry bytes and D mirror back (`perform_swap`). In this
 /// settle tick the bank's exchange receipt proves the descriptor (`group_rebaseline`), the Mii switch's publication
@@ -1054,11 +1061,35 @@ pub(super) unsafe fn bank_settled(bank:&super::BankTrack) -> Result<Settled,Bank
 #[cfg(feature="native-body-bank-alpha")]
 #[inline(never)] // rc.8 §7: its snapshots and MiiExit copies live in its own frame, not in bank_service's
 pub(super) unsafe fn exit_settled(bank:&super::BankTrack)->Result<Settled,BankRefusal> {
+    // rc.8 R5: the proof before the restore (`exit_plan`) and the adoption after it (`exit_adopt`) each have their own
+    // frame; this one holds the plan and the restore's result, borrowed.
+    let mut plan=None;
+    exit_plan(bank,&mut plan)?;
+    let Some(plan)=plan.as_ref() else {return Err(BankRefusal::Diverged("warm exit without its kept Mii publication"))};
+    let restored=bank_restore(&plan.restore,plan.configuration,plan.published);
+    let now=match &restored {
+        Ok(restored)=>&restored.now,
+        Err(why) if *why==helpers::BUSY=>return Err(BankRefusal::Busy),
+        Err(why)=>return Err(BankRefusal::Diverged(why)),
+    };
+    exit_adopt(bank,plan,now)
+}
+
+/// rc.8 R5: `exit_settled` before the restore: the kept exit, the G identity, the helpers' view, the bank's exchange
+/// receipt; then the restore's track.
+#[cfg(feature="native-body-bank-alpha")]
+#[inline(never)]
+unsafe fn exit_plan(bank:&super::BankTrack,plan:&mut Option<ExitPlan>)->Result<(),BankRefusal> {
     let before=&bank.before;
-    // rc.8 §7: the kept exit is read here once and borrowed (`bank_settle` read it and passed a copy, filtered into another).
-    let kept=super::STATE.lock().mii_exit;
-    let exit=kept.as_ref().filter(|x|x.mii.ticket.epoch==before.binding.epoch)
-        .ok_or(BankRefusal::Diverged("warm exit without its kept Mii publication"))?;
+    // rc.8 §7, R5: the kept exit is read here once, straight into the plan (no copy of the whole `MiiExit`); the
+    // restore's track takes the descriptor as it is now, after the proof below.
+    {
+        let state=super::STATE.lock();
+        let exit=state.mii_exit.as_ref().filter(|x|x.mii.ticket.epoch==before.binding.epoch)
+            .ok_or(BankRefusal::Diverged("warm exit without its kept Mii publication"))?;
+        *plan=Some(ExitPlan {restore:super::BankTrack {before:exit.mii.before,descriptor:exit.mii.descriptor,..*bank},
+            configuration:exit.configuration,published:exit.published,adopted:exit.adopted,helpers:helpers::View::EMPTY});
+    }
     let base=super::base();
     let m=map(before.binding.entry).map_err(BankRefusal::Diverged)?;
     let b=pool(base,before.binding.entry,before.binding.epoch).map_err(BankRefusal::Diverged)?;
@@ -1078,27 +1109,32 @@ pub(super) unsafe fn exit_settled(bank:&super::BankTrack)->Result<Settled,BankRe
         before.binding.epoch,&before.descriptor,&now.descriptor) {
         return Err(BankRefusal::Diverged("warm exit without its group exchange"));
     }
-    let restore=super::BankTrack {before:Snapshot {descriptor:now.descriptor,..exit.mii.before},
-        descriptor:exit.mii.descriptor,..*bank};
-    let now=match bank_restore(&restore,exit.configuration,exit.published) {
-        Ok(restored)=>restored.now,
-        Err(why) if why==helpers::BUSY=>return Err(BankRefusal::Busy),
-        Err(why)=>return Err(BankRefusal::Diverged(why)),
-    };
+    let Some(plan)=plan.as_mut() else {return Err(BankRefusal::Diverged("warm exit without its kept Mii publication"))};
+    // The restore's track: the receipt from before the Mii, with the descriptor as it is now.
+    plan.restore.before.descriptor=now.descriptor;
+    plan.helpers=helpers;
+    Ok(())
+}
+
+/// rc.8 R5: `exit_settled` after the restore: the owner adopts the window (`now` is the restore's read-back).
+#[cfg(feature="native-body-bank-alpha")]
+#[inline(never)]
+unsafe fn exit_adopt(bank:&super::BankTrack,plan:&ExitPlan,now:&Snapshot)->Result<Settled,BankRefusal> {
+    let before=&bank.before;
     let mut state=super::STATE.lock();
     let current=state.bank.is_some_and(|t|t.ticket==bank.ticket && t.token==bank.token && !t.departed)
         && super::epoch()==before.binding.epoch;
-    let Some(owner)=state.owner.as_mut().filter(|o|current && o.expected==exit.adopted && o.active==Some(exit.configuration)) else {
+    let Some(owner)=state.owner.as_mut().filter(|o|current && o.expected==plan.adopted && o.active==Some(plan.configuration)) else {
         return Err(BankRefusal::Diverged("warm exit ticket/owner changed after the restore"));
     };
-    let mut registry=final_registry(&helpers,Some(bank.token)).map_err(BankRefusal::Diverged)?;
+    let mut registry=final_registry(&plan.helpers,Some(bank.token)).map_err(BankRefusal::Diverged)?;
     owner.cursor=bank.destination.cursor;
-    owner.expected=now;owner.active=None;
+    owner.expected=*now;owner.active=None;
     registry.commit(now.authority(),now.original_kind,super::descriptor_kind(&now.descriptor));
     super::note("[GroupSwap] warm exit: Player Mii publication restored; descriptor/header/body proof passed");
     state.bank=None;state.mii_exit=None;
     drop(registry);drop(state);
-    Ok(Settled {now,exact:None,resource_pair:None})
+    Ok(Settled {now:*now,exact:None,resource_pair:None})
 }
 
 /// Ready proof for the generic roster loader, which writes nothing here. Compares the fresh

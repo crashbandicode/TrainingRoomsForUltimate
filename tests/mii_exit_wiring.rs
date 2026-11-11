@@ -89,7 +89,9 @@ fn both_adapters_keep_the_publication_and_settle_the_exit_through_it() {
     for (name, adapter, live) in [("Player", PLAYER, "active.is_some()"), ("CPU", CPU, "active.is_some()")] {
         assert!(adapter.contains("mii_exit:None,"), "{name}: STATE starts without a kept publication");
         assert!(adapter.contains("struct MiiExit {mii:BankTrack,configuration:Configuration,published:native::BankPublished,adopted:native::Snapshot}"), "{name}");
-        let settle = body(adapter, "unsafe fn bank_settle(");
+        // rc.8 R5: what follows the settle is `bank_applied`, in its own frame.
+        let settle = [body(adapter, "unsafe fn bank_settle("), body(adapter, "unsafe fn bank_applied(")].concat();
+        let settle = settle.as_str();
         // rc.8 §7: the track is borrowed (`&BankTrack`, `as_ref`), and `exit_settled` reads the kept exit itself.
         let kept = settle.find("let published=STATE.lock().bank.as_ref().filter(|t|t.ticket==b.ticket && t.token==b.token).and_then(|t|t.published);")
             .unwrap_or_else(|| panic!("{name}: the publication is read before the settle drops the track:\n{settle}"));
@@ -99,11 +101,26 @@ fn both_adapters_keep_the_publication_and_settle_the_exit_through_it() {
             .unwrap_or_else(|| panic!("{name}:\n{settle}"));
         let outcome = settle.find("settle_outcome(Outcome::Applied").unwrap();
         assert!(kept < settled && settled < record && record < outcome, "{name}:\n{settle}");
-        assert!(adapter.contains(&format!("let exit={live} && publish.is_none()\n        && STATE.lock().mii_exit.is_some_and(|x|x.mii.ticket.epoch==current.binding.epoch\n            && STATE_OWNER_EXPECTED")
+        // rc.8 R5: borrowed (`as_ref`), not a copy of the kept MiiExit.
+        assert!(adapter.contains(&format!("let exit={live} && publish.is_none()\n        // rc.8 R5: borrowed, not a copy of the kept MiiExit (18.5 KB of `begin_prepare`'s frame).\n        && STATE.lock().mii_exit.as_ref().is_some_and(|x|x.mii.ticket.epoch==current.binding.epoch\n            && STATE_OWNER_EXPECTED")
             .replace("STATE_OWNER_EXPECTED", "x.adopted==expected)")), "{name}: the exit is planned only with its record");
         assert!(adapter.contains("if exit {super::body_bank::plan_mii_exit(entry,"), "{name}");
         assert!(adapter.contains("exit:exit && reuse"), "{name}: the BankTrack names the exit");
     }
+}
+
+/// rc.8 R5: the exit settle in its three frames, in call order: `exit_plan` (the proof and the restore's track),
+/// `exit_settled` (the restore) and `exit_adopt` (the adoption). Each is `#[inline(never)]`.
+fn exit_phases(native: &str) -> String {
+    let outer = body(native, "pub(super) unsafe fn exit_settled(");
+    let (plan, adopt) = (outer.find("exit_plan(bank,&mut plan)?;").unwrap(), outer.find("exit_adopt(bank,plan,now)").unwrap());
+    let restored = outer.find("bank_restore(&plan.restore,plan.configuration,plan.published)").unwrap();
+    assert!(plan < restored && restored < adopt, "{outer}");
+    for phase in ["unsafe fn exit_plan(", "pub(super) unsafe fn exit_settled(", "unsafe fn exit_adopt("] {
+        let at = native.find(&format!("#[inline(never)]\n{phase}")).or_else(|| native.find(&format!("#[inline(never)] // rc.8 §7: its snapshots and MiiExit copies live in its own frame, not in bank_service's\n{phase}")));
+        assert!(at.is_some(), "{phase} is #[inline(never)]");
+    }
+    [body(native, "unsafe fn exit_plan("), outer, body(native, "unsafe fn exit_adopt(")].concat()
 }
 
 /// The exit settle: the bank's exchange receipt proves the descriptor before anything is written, then the kept
@@ -111,19 +128,25 @@ fn both_adapters_keep_the_publication_and_settle_the_exit_through_it() {
 #[test]
 fn the_exit_settle_proves_the_exchange_restores_the_publication_then_adopts() {
     for (name, native, adopt, receipt) in [
-        ("Player", PLAYER_NATIVE, "owner.expected=now;owner.active=None;", "before:Snapshot {descriptor:now.descriptor,"),
-        ("CPU", CPU_NATIVE, "owner.live=bank.destination;owner.expected=now;", "before:Snapshot {descriptor,control:before.control,"),
+        ("Player", PLAYER_NATIVE, "owner.expected=*now;owner.active=None;", "plan.restore.before.descriptor=now.descriptor;"),
+        ("CPU", CPU_NATIVE, "owner.live=bank.destination;owner.expected=*now;",
+            "plan.restore.before.descriptor=descriptor;plan.restore.before.control=before.control;"),
     ] {
-        let exit = body(native, "pub(super) unsafe fn exit_settled(");
+        let exit = exit_phases(native);
+        let exit = exit.as_str();
         let proof = exit.find("group_rebaseline(").unwrap_or_else(|| panic!("{name}:\n{exit}"));
-        // rc.8 §7: the kept exit is read here, once, before the proof, and borrowed for this ticket's epoch.
-        let read = exit.find("let kept=super::STATE.lock().mii_exit;").unwrap_or_else(|| panic!("{name}:\n{exit}"));
-        assert!(read < proof && exit.contains("let exit=kept.as_ref().filter(|x|x.mii.ticket.epoch==before.binding.epoch)"), "{name}:\n{exit}");
-        let restore = exit.find("bank_restore(&restore,exit.configuration,exit.published)").unwrap_or_else(|| panic!("{name}:\n{exit}"));
+        // rc.8 §7, R5: the kept exit is read here, once, before the proof, for this ticket's epoch, straight into the plan,
+        // which carries its configuration, publication and adopted receipt across the restore.
+        let read = exit.find("let exit=state.mii_exit.as_ref().filter(|x|x.mii.ticket.epoch==before.binding.epoch)")
+            .unwrap_or_else(|| panic!("{name}:\n{exit}"));
+        let planned = exit.find("*plan=Some(ExitPlan {restore:super::BankTrack {before:exit.mii.before,descriptor:exit.mii.descriptor,..*bank},\n            configuration:exit.configuration,published:exit.published,adopted:exit.adopted,helpers:helpers::View::EMPTY});")
+            .unwrap_or_else(|| panic!("{name}:\n{exit}"));
+        assert!(read < planned && planned < proof, "{name}:\n{exit}");
+        let restore = exit.find("bank_restore(&plan.restore,plan.configuration,plan.published)").unwrap_or_else(|| panic!("{name}:\n{exit}"));
         let adopted = exit.find(adopt).unwrap_or_else(|| panic!("{name}:\n{exit}"));
         assert!(proof < restore && restore < adopted, "{name}:\n{exit}");
-        assert!(exit.contains(receipt), "{name}: the read-back compares the receipt from before the Mii");
-        assert!(exit.contains("..exit.mii.before}"), "{name}");
+        let receipt = exit.find(receipt).unwrap_or_else(|| panic!("{name}: the read-back compares the receipt from before the Mii"));
+        assert!(proof < receipt && receipt < restore && exit.contains("plan.helpers=helpers;"), "{name}:\n{exit}");
         assert!(exit.contains("state.bank=None;state.mii_exit=None;"), "{name}");
     }
 }
@@ -133,8 +156,8 @@ fn the_exit_settle_proves_the_exchange_restores_the_publication_then_adopts() {
 /// an owner walk before `bank_restore` refuses; the descriptor is read directly under G, as `bank_restore` reads.
 #[test]
 fn the_cpu_exit_reads_no_owner_walk_before_the_restore() {
-    let exit = body(CPU_NATIVE, "pub(super) unsafe fn exit_settled(");
-    let restore = exit.find("bank_restore(&restore,").expect("the restore");
+    let exit = exit_phases(CPU_NATIVE);
+    let restore = exit.find("bank_restore(&plan.restore,").expect("the restore");
     assert!(!exit[..restore].contains("current_locked("), "{exit}");
     assert!(exit[..restore].contains("let descriptor=rd::<[u8;0x70]>(before.binding.entry,0);"), "{exit}");
 }
