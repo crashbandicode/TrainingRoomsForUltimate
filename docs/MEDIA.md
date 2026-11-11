@@ -64,9 +64,24 @@ is clean outside the bar). The crops keep every frame and its time; the trims ke
 - Removed: `rc5-record-start-save.gif` (RECORDING.md). `rc7-record-macro.gif`, embedded right after it, shows the
   same record and start save without the bar.
 
-Removed from the README and DIFFERENCES-FROM-THE-FORK.md, not retaken (2026-11-11): `record-refused.gif` and
-`replay-capture.gif` (2026-11-05) carry the gamepad overlay's bar and the old input log; a retake needs the CPU pilot
-and Online Deluxe plugins in a docs boot and a route through the Deluxe overlay, which no current row has.
+With Online Deluxe 0.10.1 and the CPU pilot 0.2.1 (the card's own install, `switch-mtp-v0101-v021`) staged and the
+gamepad overlay left out: `docs-rd6-722525a5` (Surface, 2026-11-11 09:28–09:33Z) and `docs-rd6b-722525a5`
+(09:58–10:03Z).
+
+| File | Run, row | Embedded in | Length, size | Raw windows kept | What the frames show |
+| --- | --- | --- | --- | --- | --- |
+| `media/rc7-replay-capture.gif` | `docs-rd6-722525a5`, `fx-replay-capture` | README, Menu shortcuts and replay capture; DIFFERENCES-FROM-THE-FORK.md | 5.4 s, 3.4 MB | 0.0–0.6, 10.3–11.9, 27.3–28.4, 29.3–31.4 s | Training (a leftover "Saved Slot 1" notice); Recording › Replays › Replay capture [OFF], then [ON]; Training, the Online Deluxe overlay at the top right (its network page); its plugins page, "Training Rooms › Replay capture On". The log has `[ReplayCapture] menu preference enabled=true result=Applied` and `replay_capture.ini written by the writer thread enabled=true` at the menu's close. (The row's own check looked before the close and failed; the take is complete.) |
+
+`record-refused.gif` (2026-11-05, the bar and the old input log) is removed and **not retaken**: on this build Record
+was not refused. In `docs-rd6b-722525a5` `fx-record-refused` (evidence `feature-gifs/evidence/rd6b-record-not-refused.gif`,
+outside git):
+- the overlay's CPU Pilot page turned P1 from Player to "CPU (L3)", and the HUD read "CPU Lv3";
+- the pilot moved Player 1;
+- TrainingRooms had logged `pilot_present=true` at boot;
+- Record (ZR + D-pad Down) then showed "Input Recording · Lockout", then "Recording", not "P1 is controlled by an AI:
+  recording is off".
+
+The README and DIFFERENCES-FROM-THE-FORK.md still describe the refusal; that is reported, not changed here.
 
 Retired from the README (each carried the bar):
 - `mii-editor.gif` and `mii-editor-list.gif` (2026-11-05): `rc7-mii-editor.gif` shows the editor, the new row and the

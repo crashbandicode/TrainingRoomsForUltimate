@@ -37,6 +37,8 @@ This page lists only the changes, each checked against the code of 0.2.0-rc.3 (`
 
 ![A new menu shortcut applies at once](media/rc7-menu-shortcut.gif)
 
+![Replay capture, menu and Deluxe overlay](media/rc7-replay-capture.gif)
+
 ## CPU and practice behaviour
 
 | Change | Where in the code |
