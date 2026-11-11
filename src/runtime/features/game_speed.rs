@@ -6,8 +6,9 @@
 //! - Training: `hud_draw`'s `info_training` tick (the UI job thread) stores `PauseMenu+0xb54` and calls
 //!   `0x1bbbd30(menu, value, menu+0x538)`, the menu setter's own path for an unchanged value. The game's per-update apply
 //!   does the rest; the rate globals and the slow table are never written in Training.
-//! - The waiting-room practice: Player 1's frame step (`lobby::frame`) keeps one slot of the game's slow table, and
-//!   writes nothing once the scene has left the practice.
+//! - The waiting-room practice: Player 1's frame step (`lobby::frame`) keeps one slot of the game's slow table. The
+//!   practice's teardown (the session clear on its P1's destroy, its exit, a scene change) frees it with a write, only
+//!   in the table it was taken from and only while the slot is still ours; a match found shows no busy edge first.
 
 use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
 
@@ -74,8 +75,13 @@ pub(crate) fn on_hold(event: HoldEvent, style: u32) {
         return;
     }
     if event == HoldEvent::Closed {
-        if SHOWN.swap(0, Ordering::AcqRel) != 0 {
+        let shown = SHOWN.swap(0, Ordering::AcqRel);
+        if shown != 0 {
             notices::clear(rules::POPUP_ID);
+        }
+        #[cfg(feature = "diag")]
+        if let Some(speed) = Speed::from_value(shown) {
+            crate::runtime::diag_log::diagnostic(format_args!("[GameSpeed] popup close speed={}", speed.label()));
         }
         return;
     }
@@ -161,8 +167,14 @@ impl Bytes for NativeTable {
     }
 }
 
-/// Player 1's frame, in every scene (`lobby::frame`): the waiting-room practice's slot. Outside the practice it writes
-/// nothing; a slot record left from it is dropped.
+/// The slow table's global now, 0 without one.
+fn slow_table(base: usize) -> usize {
+    // SAFETY: a `.bss` word of main (`game_speed.rate_request` reads it there).
+    unsafe { field::read::<usize>(base, native::SLOW_TABLE) }.unwrap_or(0)
+}
+
+/// Player 1's frame, in every scene (`lobby::frame`): the waiting-room practice's slot. Outside the practice it takes
+/// nothing; a slot still held there is freed only in the table it was taken from (`LobbySlot::release`).
 pub(crate) fn lobby_frame() {
     let Some(base) = base() else { return };
     let Some(mut keeper) = LOBBY.try_lock() else { return };
@@ -170,18 +182,37 @@ pub(crate) fn lobby_frame() {
     if !in_practice && keeper.held().is_none() {
         return;
     }
-    // SAFETY: a `.bss` word of main (`game_speed.rate_request` reads it there).
-    let table = if in_practice { unsafe { field::read::<usize>(base, native::SLOW_TABLE) }.unwrap_or(0) } else { 0 };
+    let table = slow_table(base);
     let now = LobbyNow { in_practice, ui_busy: crate::runtime::lobby::training::lobby::native_ui_busy(), table };
     let wanted = Speed::from_value(LOBBY_WANTED.load(Ordering::Acquire)).unwrap_or(Speed::X1);
     let mut native = NativeTable(table);
-    let bytes: Option<&mut dyn Bytes> = if in_practice && field::object(table) { Some(&mut native) } else { None };
+    let bytes: Option<&mut dyn Bytes> = if field::object(table) { Some(&mut native) } else { None };
     let step = keeper.step(wanted, now, bytes);
     drop(keeper);
     #[cfg(feature = "diag")]
     if step != rules::LobbyStep::Nothing {
-        crate::runtime::diag_log::diagnostic(format_args!("[GameSpeed] lobby {step:?} wanted={}", wanted.label()));
+        crate::runtime::diag_log::diagnostic(format_args!("[GameSpeed] lobby {step:?} wanted={} in_practice={in_practice}", wanted.label()));
     }
+    #[cfg(not(feature = "diag"))]
+    let _ = step;
+}
+
+/// The practice's teardown (`session_clear`: the practice P1's destroy, the scene's exit, a scene change, the
+/// waiting-room UI turning busy): the lobby slot is freed with a write while the table it was taken from is still the
+/// game's, before the native teardown can hand that table to the next battle.
+fn release_lobby_slot() {
+    let Some(base) = base() else { return };
+    let mut keeper = LOBBY.lock();
+    if keeper.held().is_none() {
+        return;
+    }
+    let table = slow_table(base);
+    let mut native = NativeTable(table);
+    let bytes: Option<&mut dyn Bytes> = if field::object(table) { Some(&mut native) } else { None };
+    let step = keeper.release(table, bytes);
+    drop(keeper);
+    #[cfg(feature = "diag")]
+    crate::runtime::diag_log::diagnostic(format_args!("[GameSpeed] lobby release {step:?} table={table:#x}"));
     #[cfg(not(feature = "diag"))]
     let _ = step;
 }
@@ -192,10 +223,12 @@ pub(crate) fn practice_changed() {
     session_clear();
 }
 
-/// Session clear (`chords::session_clear`): the pop-up goes; a Training write not yet made is dropped.
+/// Session clear (`chords::session_clear`): the pop-up goes; a Training write not yet made is dropped; the lobby slot is
+/// released (`release_lobby_slot`).
 pub(crate) fn session_clear() {
     if SHOWN.swap(0, Ordering::AcqRel) != 0 {
         notices::clear(rules::POPUP_ID);
     }
     TRAINING_WANTED.store(0, Ordering::Release);
+    release_lobby_slot();
 }

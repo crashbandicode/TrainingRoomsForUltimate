@@ -197,14 +197,20 @@ fn lobby_slot_is_released_outside_the_practice_and_never_written_elsewhere() {
     assert_eq!(keeper.step(Speed::Quarter, busy, Some(&mut t)), LobbyStep::Freed(quarter));
     assert_eq!(keeper.step(Speed::Quarter, busy, Some(&mut t)), LobbyStep::Nothing);
     assert_eq!(t, fresh_table(), "back to the game's own table");
-    // Taken, then the scene leaves the practice before a frame frees it: the record goes, nothing is written.
+    // Taken, then the scene leaves the practice before a frame frees it, the table still the same: the first frame
+    // outside frees it there (the slot is still ours), and nothing is taken outside the practice.
     assert_eq!(keeper.step(Speed::Half, live, Some(&mut t)), LobbyStep::Taken(taken));
-    let snapshot = t;
     let gone = LobbyNow { in_practice: false, ui_busy: false, table: TABLE };
-    assert_eq!(keeper.step(Speed::Half, gone, Some(&mut t)), LobbyStep::Dropped(taken));
-    assert_eq!(t, snapshot, "no write outside the practice");
+    assert_eq!(keeper.step(Speed::Half, gone, Some(&mut t)), LobbyStep::Freed(taken));
+    assert_eq!(t, fresh_table());
     assert_eq!(keeper.held(), None);
     assert_eq!(keeper.step(Speed::Half, gone, Some(&mut t)), LobbyStep::Nothing, "never taken outside the practice");
+    // Outside the practice with the slot no longer ours (the game freed and reused it): the record goes, no write.
+    assert_eq!(keeper.step(Speed::Half, live, Some(&mut t)), LobbyStep::Taken(taken));
+    t[0x21] = 3;
+    let snapshot = t;
+    assert_eq!(keeper.step(Speed::Half, gone, Some(&mut t)), LobbyStep::Dropped(taken));
+    assert_eq!(t, snapshot, "a slot that is not ours is not written");
     // A different table (the practice's was destroyed and a new one made): the record goes, the new table is not touched
     // by a free.
     let mut keeper = LobbySlot::new();
@@ -230,4 +236,51 @@ fn lobby_slot_is_released_outside_the_practice_and_never_written_elsewhere() {
     keeper.step(Speed::Half, live, Some(&mut fresh_table()));
     assert_eq!(keeper.forget(), Some(taken));
     assert_eq!(keeper.held(), None);
+}
+
+/// Worker B, 2026-11-11 08:20Z: a match found from the waiting room shows no busy edge (9 Quickplay matches); the practice
+/// P1 is destroyed about 2 s before the match scene. Its session clear frees the slot with a write in the practice's
+/// table, so the match finds the game's own table even if that table is never destroyed.
+#[test]
+fn match_found_with_no_busy_edge_frees_the_slot_before_the_drop() {
+    const TABLE: usize = 0x1_0000_1000;
+    for (speed, divisor) in [(Speed::Half, 2u8), (Speed::Quarter, 4)] {
+        let live = LobbyNow { in_practice: true, ui_busy: false, table: TABLE };
+        let mut t = fresh_table();
+        // The game holds its own slot 0 (a hit slow) beside ours.
+        t[0x20] = 1;
+        t[0x21] = 3;
+        let mut keeper = LobbySlot::new();
+        let held = Held { table: TABLE, slot: 1, divisor };
+        assert_eq!(keeper.step(speed, live, Some(&mut t)), LobbyStep::Taken(held));
+        for _ in 0..120 {
+            assert_eq!(keeper.step(speed, live, Some(&mut t)), LobbyStep::Nothing, "no busy edge: held all along");
+        }
+        t[table::DIRTY_AT] = 0;
+        // The practice P1's destroy: the session clear, the table still the practice's.
+        assert_eq!(keeper.release(TABLE, Some(&mut t)), LobbyStep::Freed(held));
+        assert_eq!((t[0x22], t[0x23], t[table::DIRTY_AT]), (0, 1, 1), "freed as the game frees, dirty set");
+        assert_eq!((t[0x20], t[0x21]), (1, 3), "the game's slot is untouched");
+        // The scene change and the match's first P1 frame (the same table, never destroyed): nothing left to drop, no take.
+        assert_eq!(keeper.release(TABLE, Some(&mut t)), LobbyStep::Nothing);
+        let matched = LobbyNow { in_practice: false, ui_busy: false, table: TABLE };
+        let before = t;
+        assert_eq!(keeper.step(speed, matched, Some(&mut t)), LobbyStep::Nothing);
+        assert_eq!(t, before);
+        let in_use = (0..table::SLOTS).filter(|slot| t[0x20 + 2 * slot] == 1).map(|slot| t[0x21 + 2 * slot]).collect::<Vec<_>>();
+        assert_eq!(in_use, [3], "only the game's own slot is in use in the match");
+    }
+    // The release in a table that is not the practice's (destroyed and made again, or none): the record goes, no write.
+    let live = LobbyNow { in_practice: true, ui_busy: false, table: TABLE };
+    let mut keeper = LobbySlot::new();
+    keeper.step(Speed::Half, live, Some(&mut fresh_table()));
+    let mut new = fresh_table();
+    new[0x20] = 1;
+    new[0x21] = 2;
+    let before = new;
+    assert_eq!(keeper.release(TABLE + 0x100, Some(&mut new)), LobbyStep::Dropped(Held { table: TABLE, slot: 0, divisor: 2 }));
+    assert_eq!(new, before, "the next battle's table is not touched");
+    keeper.step(Speed::Half, live, Some(&mut fresh_table()));
+    assert_eq!(keeper.release(0, None), LobbyStep::Dropped(Held { table: TABLE, slot: 0, divisor: 2 }));
+    assert_eq!(LobbySlot::new().release(TABLE, Some(&mut fresh_table())), LobbyStep::Nothing);
 }
