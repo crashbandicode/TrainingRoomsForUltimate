@@ -1588,3 +1588,11 @@ ceiling = 165770
 date = "2026-11-11"
 reason = "rc.8 integration: p23/rc8-binds 0ee2d3d6 (R1 HUD stopwatch fix, 165572 = eca14e4b 165492 + 80) and p23/rc8-handoff-spin 04846d89 (the hang fix, model::nowait_channel) merged on eca14e4b in p23/rc8-integration (integration 2026-11-11 19:02Z): measured 165770"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.8 order (TASK-rc8.md; the primary 2026-11-11 18:47Z: the new head = eca14e4b + A's fix + the R1 stopwatch fix); a raise goes in its own commit with approved_by"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 165780
+date = "2026-11-11"
+reason = "rc.8 chord overlap, option 2 on p23/rc8-chord-l-exclusion b7385a69 over 3f9d61dd (165770): the Input display and Game speed chords don't pass while L is held (the primary 2026-11-11 20:01Z, pending the operator's choice); measured 165780 at b7385a69 (tools/size_gate.py, g11), +10"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.8 order (the primary 2026-11-11 20:01Z: build option 2 now); a raise goes in its own commit with approved_by"
