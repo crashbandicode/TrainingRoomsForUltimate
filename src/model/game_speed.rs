@@ -247,8 +247,10 @@ pub mod mode {
     /// `+0x1b4`: its slot in the slow table, `NO_SLOT` for none.
     pub const SLOT: usize = 0x1b4;
     pub const NO_SLOT: u8 = 0xff;
-    /// The mode object's key in the battle's object registry (`.14d36cc`–`.14d36d4`).
-    pub const KEY: u64 = 0x13_08ab_ad79;
+    /// The mode object's key in the battle's object registry: the game's per-update lookup (`.135ca40`–`.135ca48`)
+    /// and the battle setup's registration (`.14ed3b4`–`.14ed3c0`). Not `0x1308abad79`: that key holds another object
+    /// (vtable main+0x5070380, Eden 2026-11-11 `out-mode`).
+    pub const KEY: u64 = 0x10_2259_0708;
     /// The registry hashes and compares the low 40 bits (`and x8, x2, #0xffffffffff`).
     pub const KEY_MASK: u64 = 0xff_ffff_ffff;
     /// The registry node: next at `+0`, hash at `+8`, key at `+0x10`, the object at `+0x18`.

@@ -55,9 +55,12 @@ ROWS = [
      "practice's table goes with the practice."),
     # The Training apply the bind does itself (the game runs its speed code only on the pause/resume side; Eden
     # 2026-11-11 out-diag6, QCF 09:12Z/09:18Z), and the way to the object it applies to.
-    ("game_speed.mode_key", 0x14D36C0, "SeamKind::Relied", True, False,
-     "A battle function fetches the Training mode object: `[[main+0x52c3910]]` (the object registry), key `0x1308abad79` "
-     "(`mov`/`movk`/`movk`), `bl 0x15435c0` (the registry find). The bind walks the same registry for the same key."),
+    ("game_speed.mode_key", 0x135CA34, "SeamKind::Relied", True, False,
+     "The game's own per-update lookup of the Training mode object (`FUN_0135ca00`, every battle task entry): "
+     "`[[main+0x52c3910]]` (the object registry), key `0x1022590708` (`mov`/`movk`/`movk`), `bl 0x15435c0` (the "
+     "registry find). The battle setup registers the mode factory's object under it (`.14ed3b4`-`.14ed3c4`; QCF "
+     "11:16Z). Key `0x1308abad79` holds another object, vtable main+0x5070380 (Eden 2026-11-11 out-mode). The bind "
+     "walks the same registry for the same key (Eden out-key: x25, vtable main+0x506fd10)."),
     ("game_speed.mode_find", 0x15435CC, "SeamKind::Relied", True, False,
      "The registry find (a libc++ unordered_map): bucket count `[map+8]` (0: none), hash `key & 0xffffffffff`, bucket "
      "`hash & (n-1)` for a power of two else `hash % n`, `[[map] + 8*bucket]` the bucket's head, `[head]` its first node."),

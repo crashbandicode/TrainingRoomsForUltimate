@@ -209,7 +209,7 @@ fn game_speed_rows_decode_the_training_apply() {
     assert_eq!(page_off(key, 0, 1), native::REGISTRY);
     assert_eq!(uimm(word(key.guard, 2)), 0, "ldr x1, [x8]: the registry is [[main+0x52c3910]]");
     assert_eq!(mov_wide(&[word(key.guard, 3), word(key.guard, 4), word(key.guard, 5)]), mode::KEY);
-    let (pc, w) = at(key, 8);
+    let (pc, w) = at(key, 7);
     let find = row("game_speed.mode_find");
     assert_eq!(bl(pc, w), find.offset - 0xc, "bl FUN_015435c0 (the row starts at its first load)");
     assert_eq!(uimm(word(find.guard, 0)), mode::MAP_COUNT, "ldr x11, [x1, #8]: the bucket count");

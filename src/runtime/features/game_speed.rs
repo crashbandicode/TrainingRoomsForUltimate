@@ -181,8 +181,14 @@ pub(crate) fn training_apply() {
     #[cfg(feature = "diag")]
     match outcome {
         Ok((applied, slot, done)) => crate::runtime::diag_log::diagnostic(format_args!(
-            "[GameSpeed] training apply value={} was={applied} slot={slot:#x}->{:#x} freed={:?} code={} updates={}",
-            done.value, done.slot, done.freed, done.code, done.updates
+            "[GameSpeed] training apply value={} was={applied} slot={slot:#x}->{:#x} freed={:?} code={} updates={} thread={:#x}",
+            done.value,
+            done.slot,
+            done.freed,
+            done.code,
+            done.updates,
+            // SAFETY: reads the calling thread's own object pointer; nothing is written.
+            unsafe { skyline::nn::os::GetCurrentThread() } as usize
         )),
         Err(why) => crate::runtime::diag_log::diagnostic(format_args!("[GameSpeed] training apply skipped value={wanted} why={why}")),
     }
@@ -190,8 +196,8 @@ pub(crate) fn training_apply() {
     let _ = outcome;
 }
 
-/// The Training mode object (`FUN_0155a000`'s x25), found the way the game finds it (`rules::registry_find` over
-/// `[[main+0x52c3910]]`, key `0x1308abad79`), and only when its vtable is Training's.
+/// The Training mode object (`FUN_0155a000`'s x25), found the way the game finds it on every update
+/// (`rules::registry_find` over `[[main+0x52c3910]]`, key `0x1022590708`), and only when its vtable is Training's.
 ///
 /// # Safety
 /// Native Training on a game thread: the registry is the battle's own.

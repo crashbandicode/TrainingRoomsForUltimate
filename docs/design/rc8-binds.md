@@ -115,9 +115,14 @@ Where a choice is the operator's, this takes the sensible default and states it.
      the game's speed code (`FUN_0155a000`, `.155b4a8`–`.155bbb8`) runs only on the pause/resume side. In closed-menu
      play its gate (`.155a08c`–`.155a0c4`) skips it: 0 hits in play, 137 with the menu open.
    - **So P1's next poll (a game thread) does the apply's writes itself** (`training_apply`, `model::game_speed::mode_apply`):
-     - to the Training mode object, x25 there, found the way the game finds it: `[[main+0x52c3910]]`'s registry
-       (`FUN_015435c0`, a libc++ unordered_map) at key `0x1308abad79`, used only when its vtable is
-       `main+0x506fd10`;
+     - to the Training mode object, x25 there, found the way the game finds it on every update (`FUN_0135ca00`,
+       `.135ca34`–`.135ca50`): `[[main+0x52c3910]]`'s registry (`FUN_015435c0`, a libc++ unordered_map) at key
+       `0x1022590708`, used only when its vtable is `main+0x506fd10`.
+       - Not key `0x1308abad79` (QCF's first reading): that one holds another object, vtable `main+0x5070380`, which the
+         vtable check refused live (Eden `rc8b-train2-2c2ca140-xps/out-mode`). QCF corrected it at 11:16Z.
+       - `out-key` showed the game's find for `0x1022590708` returning x25 (`0x11a757f618`, vtable
+         `main+0x506fd10`), the same object its per-update step runs with.
+       - No hook is needed.
      - the applied value `+0x194`; its old slot freed `{0, 1}`; the step clears (`main+0x52b92ec` bit 2,
        `[[main+0x53398d8]+8]`); the rate code `main+0x593b444` and updates `main+0x523d004` (2/3: 4/120, x1.5: 6/180,
        the others 0/60); a new slot `{1, N}` and `+0x1b4`; the table's dirty byte last.
