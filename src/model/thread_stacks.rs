@@ -111,7 +111,9 @@ pub const THREADS: [ThreadStack; 18] = [
     // console-practice-trace builds only: the practice trace file writer
     row(ThreadId::PracticeTrace, c"tr-practice-trace", 128 * KIB, 0, 0, "", "practice_trace::writer"),
     // diag: the stall watchdog (samples the hooks' entry count, prints held locks through svcOutputDebugString)
-    row(ThreadId::StallWatch, c"tr-stall-watch", 20 * KIB, 3_104, 2_608, "final-surface-cov-4e336da4", "stall_watch::start::{closure#0}"),
+    // The static bound is the `diag,hang-trace` ELF's: `held_locks` puts 32 `owners::Held` (768 B) in the frame, 3,776 B
+    // against plain diag's 3,104 (B's rc.8 review), so 24 KiB.
+    row(ThreadId::StallWatch, c"tr-stall-watch", 24 * KIB, 3_776, 2_608, "final-surface-cov-4e336da4", "stall_watch::start::{closure#0}"),
 ];
 
 const fn row(

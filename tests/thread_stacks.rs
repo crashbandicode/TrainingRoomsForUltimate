@@ -71,7 +71,7 @@ fn a_service_stack_is_claimed_lowest_first_and_never_twice() {
     assert_eq!(free_stack(0b0000, 4), Some(0));
     assert_eq!(free_stack(0b0101, 4), Some(1));
     assert_eq!(free_stack(0b0111, 4), Some(3));
-    assert_eq!(free_stack(0b1111, 4), None, "every stack in use: the dispatch refuses the call");
+    assert_eq!(free_stack(0b1111, 4), None, "every stack in use: the dispatch skips this poll");
     assert_eq!(free_stack(0b0111, 3), None);
     // A release, then a claim: the lowest stack free again.
     let held = 0b1111u32 & !(1 << 1);
