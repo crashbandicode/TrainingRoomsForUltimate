@@ -475,6 +475,9 @@ pub struct Graph {
     /// scanned as; and the same for every file when no scanned module has the declared name (`body_bank`, not `native`).
     path_mods_local: BTreeMap<String, BTreeMap<String, String>>,
     path_mods: BTreeMap<String, String>,
+    /// `file -> the file that declares it as a module` (`mod name;`, with or without `#[path]`): what `super` means at a file's top
+    /// level (rc.8 §6: `native_service.rs`'s `super::service` is `character_roster.rs`'s, and the walk stopped there).
+    parents: BTreeMap<String, String>,
     /// `file -> names its `use` statements import from outside the runtime (`crate::model`, `crate::engine`, `std`, external crates):
     /// such a bare name is that item, never a runtime function of the same name.
     foreign_imports: BTreeMap<String, BTreeSet<String>>,
@@ -570,6 +573,33 @@ pub fn path_modules(src: &str) -> Vec<(String, String)> {
     out
 }
 
+/// The `mod name;` declarations of `src` that load another file: `(name, its #[path] target if any)`. An inline `mod name {`
+/// loads none.
+pub fn file_modules(src: &str) -> Vec<(String, Option<String>)> {
+    let mut out = Vec::new();
+    let mut path: Option<String> = None;
+    for line in src.lines().map(str::trim) {
+        let mut rest = line;
+        if let Some(after) = line.strip_prefix("#[path = \"") {
+            let (target, tail) = after.split_once("\"]").unwrap_or((after, ""));
+            path = Some(target.to_owned());
+            rest = tail.trim();
+            if rest.is_empty() {
+                continue;
+            }
+        }
+        if rest.starts_with("#[") && !rest.contains(" mod ") {
+            continue;
+        }
+        let words: Vec<&str> = rest.split_whitespace().collect();
+        match words.iter().position(|w| *w == "mod").and_then(|k| words.get(k + 1)) {
+            Some(name) if name.ends_with(';') => out.push((name.trim_end_matches(';').to_owned(), path.take())),
+            _ => path = None,
+        }
+    }
+    out
+}
+
 fn module_of_file(rel: &str) -> String {
     let path = Path::new(rel);
     let stem = path.file_stem().unwrap().to_string_lossy().into_owned();
@@ -611,6 +641,24 @@ impl Graph {
             })
             .collect() };
         files.retain(|path| !diag_only.contains(path));
+        let rel_of = |path: &Path| path.strip_prefix(runtime_dir).unwrap().to_string_lossy().replace('\\', "/");
+        let mut parents = BTreeMap::new();
+        for path in &files {
+            let dir = path.parent().unwrap();
+            let stem = path.file_stem().unwrap().to_string_lossy();
+            // `mod name;` in `x.rs` loads `x/name.rs`; in `mod.rs` (or a crate root), `name.rs` beside it. `#[path]` is relative to
+            // the declaring file's folder.
+            let base = if matches!(stem.as_ref(), "mod" | "lib" | "main") { dir.to_path_buf() } else { dir.join(stem.as_ref()) };
+            for (name, target) in file_modules(&fs::read_to_string(path).unwrap()) {
+                let candidates = match target {
+                    Some(target) => vec![dir.join(target)],
+                    None => vec![base.join(format!("{name}.rs")), base.join(&name).join("mod.rs")],
+                };
+                if let Some(child) = candidates.into_iter().find(|c| files.contains(c)) {
+                    parents.insert(rel_of(&child), rel_of(path));
+                }
+            }
+        }
         let mut funcs = Vec::new();
         let mut aliases: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();
         let mut imports: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
@@ -709,12 +757,22 @@ impl Graph {
             imports,
             path_mods_local,
             path_mods,
+            parents,
             foreign_imports,
             precise_imports: false,
             type_modules,
             by_name,
             dynamic: Vec::new(),
         }
+    }
+
+    /// The file `super` means in `f`: at a file's top level, the file that declares it as a module (the same file when it is not
+    /// scanned); inside an inline `mod {}`, the same file.
+    pub fn super_file<'a>(&'a self, f: &'a Func) -> &'a str {
+        if f.module != module_of_file(&f.file) {
+            return &f.file;
+        }
+        self.parents.get(&f.file).map_or(&f.file, String::as_str)
     }
 
     /// The runtime module `file` imports the type `name` from (`Recorder` in `practice_trace.rs`: `practice_trace_core`), if its
@@ -745,7 +803,11 @@ impl Graph {
             if let Some(target) = alias {
                 module = target;
             }
-            if module == "self" || module == "Self" || module == "super" || module == "crate" {
+            if module == "super" {
+                let file = self.super_file(from);
+                return candidates.iter().copied().filter(|&c| self.funcs[c].file == file).collect();
+            }
+            if module == "self" || module == "Self" || module == "crate" {
                 return candidates.iter().copied().filter(|&c| self.funcs[c].file == from.file).collect();
             }
             let module = self.declared_module(&from.file, module).unwrap_or(module);
@@ -924,6 +986,7 @@ mod receiver_tests {
             imports: BTreeMap::new(),
             path_mods_local: BTreeMap::new(),
             path_mods: BTreeMap::new(),
+            parents: BTreeMap::new(),
             foreign_imports: BTreeMap::new(),
             precise_imports: false,
             type_modules: BTreeMap::new(),
