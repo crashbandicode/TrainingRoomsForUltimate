@@ -41,8 +41,10 @@ const ROSTER: &str = include_str!("../src/runtime/roster/character_roster.rs");
 #[test]
 fn the_cpu_mii_owner_walks_the_one_list_with_its_admission() {
     let g = graph();
-    assert!(calls(&g, "mii_ordinary_cpu::begin", "mii_ordinary_cpu::cycle_admission"));
-    assert!(names(&g, "mii_ordinary_cpu::begin", "cycle_members") && names(&g, "mii_ordinary_cpu::begin", "admitted"));
+    // rc.8 §7: `begin`'s work is `begin_prepare` (its frame is gone before a bank switch is submitted).
+    assert!(calls(&g, "mii_ordinary_cpu::begin", "mii_ordinary_cpu::begin_prepare"));
+    assert!(calls(&g, "mii_ordinary_cpu::begin_prepare", "mii_ordinary_cpu::cycle_admission"));
+    assert!(names(&g, "mii_ordinary_cpu::begin_prepare", "cycle_members") && names(&g, "mii_ordinary_cpu::begin_prepare", "admitted"));
     assert!(CPU_OWNER.contains("mii_cycle::next_qualified_cpu(&crate::engine::swap::cycle_members::cycle_members(menu.cpu_roster,admitted),"));
     assert!(!CPU_OWNER.contains("next_qualified_cpu(&menu.cpu_roster.fighters()"), "the unfiltered roster is gone");
     assert!(names(&g, "mii_ordinary_cpu::cycle_admission", "cpu_admission"));

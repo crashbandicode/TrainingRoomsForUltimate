@@ -10967,7 +10967,7 @@
    "dest": "src/runtime/mii/mii_ordinary_cpu.rs",
    "crate": "root",
    "src_sha256": "db7e15715560db924eba68ba570e97540f1b445b1cf4989a172c0426dd32c6ce",
-   "dest_sha256": "587e352a4250fbc2aec66856e37529fb93181ce0c6f1b1e33aac2f47bb6dbbcd",
+   "dest_sha256": "76855bd2b56def8b4cb1a8c64734c5001529d945f0d4921e7f3283939c004873",
    "edits": [
     {
      "old": "fn note(reason:&str) { trace!(\"[MiiOrdinaryCpu] {reason}\"); }",
@@ -11413,6 +11413,31 @@
      "old": "    let published=match STATE.lock().bank {\n",
      "new": "    let published=match STATE.lock().bank.as_ref() {\n",
      "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "    comparison\n}\n\n",
+     "new": "    comparison\n}\n\n/// A bank member switch `begin_prepare` admitted, submitted here once its frame is gone.\n#[cfg(feature=\"native-body-bank-alpha\")]\ntype BankSubmit=(Option<super::body_bank::Plan>,super::native_reload_pose::ReloadPose);\n#[cfg(not(feature=\"native-body-bank-alpha\"))]\ntype BankSubmit=core::convert::Infallible;\n\n/// rc.8 \u00a77: `begin_prepare` holds the snapshots it copied (about 100 KB of frame); a bank switch is submitted after it\n/// returns, so that frame and `submit_bank`'s chain no longer stack on the native service poll's deepest path.\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): begin's work moves into an #[inline(never)] begin_prepare that hands a bank switch back, and begin submits it (submit_bank, #[inline(never)]) after begin_prepare's frame is gone; the two no longer stack on the native service poll's deepest path. Behaviour unchanged: the same calls in the same order"
+    },
+    {
+     "old": "    let _swap_stack = crate::runtime::roster::practice_trace::scope(0x1080013);\n",
+     "new": "    let _swap_stack = crate::runtime::roster::practice_trace::scope(0x1080013);\n    let mut bank:Option<BankSubmit>=None;\n    let started=begin_prepare(entry,&mut bank);\n    match bank {\n        #[cfg(feature=\"native-body-bank-alpha\")]\n        Some((plan,pose))=>submit_bank(entry,plan,pose),\n        _=>started,\n    }\n}\n\n#[inline(never)]\nunsafe fn begin_prepare(entry:*mut u8,bank:&mut Option<BankSubmit>)->bool {\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): begin's work moves into an #[inline(never)] begin_prepare that hands a bank switch back, and begin submits it (submit_bank, #[inline(never)]) after begin_prepare's frame is gone; the two no longer stack on the native service poll's deepest path. Behaviour unchanged: the same calls in the same order"
+    },
+    {
+     "old": "        return submit_bank(entry,plan,pose);\n",
+     "new": "        {*bank=Some((plan,pose));return false;}\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): begin's work moves into an #[inline(never)] begin_prepare that hands a bank switch back, and begin submits it (submit_bank, #[inline(never)]) after begin_prepare's frame is gone; the two no longer stack on the native service poll's deepest path. Behaviour unchanged: the same calls in the same order"
+    },
+    {
+     "old": "        #[cfg(not(feature=\"native-body-bank-alpha\"))]\n        return false;\n",
+     "new": "        #[cfg(not(feature=\"native-body-bank-alpha\"))]\n        {let _=bank;return false;}\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): begin's work moves into an #[inline(never)] begin_prepare that hands a bank switch back, and begin submits it (submit_bank, #[inline(never)]) after begin_prepare's frame is gone; the two no longer stack on the native service poll's deepest path. Behaviour unchanged: the same calls in the same order"
+    },
+    {
+     "old": "/// A refusal performed no native write; release only this token's ownership.\n#[cfg(feature=\"native-body-bank-alpha\")]\n",
+     "new": "/// A refusal performed no native write; release only this token's ownership.\n#[cfg(feature=\"native-body-bank-alpha\")]\n#[inline(never)] // rc.8 \u00a77: its own frame, not inside `begin`'s under `begin_prepare`'s\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): begin's work moves into an #[inline(never)] begin_prepare that hands a bank switch back, and begin submits it (submit_bank, #[inline(never)]) after begin_prepare's frame is gone; the two no longer stack on the native service poll's deepest path. Behaviour unchanged: the same calls in the same order"
     }
    ]
   },
@@ -11928,7 +11953,7 @@
    "dest": "src/runtime/mii/mii_ordinary_player.rs",
    "crate": "root",
    "src_sha256": "73e84c925f3aaedd6c09fd082ba41364d160e8cca38cc604617d5fdc38431b8d",
-   "dest_sha256": "5e6a7a65468656ec68712677cedcd379f146b04ea25350a778d2ec7cedfdc692",
+   "dest_sha256": "cf22765ad214139a7cf92c2c479218b6e3ae21a137b9b1b41432775898850370",
    "edits": [
     {
      "old": "fn note(reason:&str) { trace!(\"[MiiOrdinaryPlayer] {reason}\"); }",
@@ -12329,6 +12354,31 @@
      "old": "    let (published,departed)=match STATE.lock().bank {\n",
      "new": "    let (published,departed)=match STATE.lock().bank.as_ref() {\n",
      "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
+    },
+    {
+     "old": "        }\n    }\n}\n\n",
+     "new": "        }\n    }\n}\n\n/// A bank member switch `begin_prepare` admitted, submitted here once its frame is gone.\n#[cfg(feature=\"native-body-bank-alpha\")]\ntype BankSubmit=(Option<super::body_bank::Plan>,super::native_reload_pose::ReloadPose);\n#[cfg(not(feature=\"native-body-bank-alpha\"))]\ntype BankSubmit=core::convert::Infallible;\n\n/// rc.8 \u00a77: `begin_prepare` holds the snapshots it copied (about 100 KB of frame); a bank switch is submitted after it\n/// returns, so that frame and `submit_bank`'s chain no longer stack on the native service poll's deepest path.\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): begin's work moves into an #[inline(never)] begin_prepare that hands a bank switch back, and begin submits it (submit_bank, #[inline(never)]) after begin_prepare's frame is gone; the two no longer stack on the native service poll's deepest path. Behaviour unchanged: the same calls in the same order"
+    },
+    {
+     "old": "    let _swap_stack = crate::runtime::roster::practice_trace::scope(0x1080003);\n",
+     "new": "    let _swap_stack = crate::runtime::roster::practice_trace::scope(0x1080003);\n    let mut bank:Option<BankSubmit>=None;\n    let started=begin_prepare(entry,&mut bank);\n    match bank {\n        #[cfg(feature=\"native-body-bank-alpha\")]\n        Some((plan,pose))=>submit_bank(entry,plan,pose),\n        _=>started,\n    }\n}\n\n#[inline(never)]\nunsafe fn begin_prepare(entry:*mut u8,bank:&mut Option<BankSubmit>)->bool {\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): begin's work moves into an #[inline(never)] begin_prepare that hands a bank switch back, and begin submits it (submit_bank, #[inline(never)]) after begin_prepare's frame is gone; the two no longer stack on the native service poll's deepest path. Behaviour unchanged: the same calls in the same order"
+    },
+    {
+     "old": "        return submit_bank(entry,plan,pose);\n",
+     "new": "        {*bank=Some((plan,pose));return false;}\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): begin's work moves into an #[inline(never)] begin_prepare that hands a bank switch back, and begin submits it (submit_bank, #[inline(never)]) after begin_prepare's frame is gone; the two no longer stack on the native service poll's deepest path. Behaviour unchanged: the same calls in the same order"
+    },
+    {
+     "old": "        #[cfg(not(feature=\"native-body-bank-alpha\"))]\n        return false;\n",
+     "new": "        #[cfg(not(feature=\"native-body-bank-alpha\"))]\n        {let _=bank;return false;}\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): begin's work moves into an #[inline(never)] begin_prepare that hands a bank switch back, and begin submits it (submit_bank, #[inline(never)]) after begin_prepare's frame is gone; the two no longer stack on the native service poll's deepest path. Behaviour unchanged: the same calls in the same order"
+    },
+    {
+     "old": "/// A refusal performed no native write; release only this token's ownership.\n#[cfg(feature=\"native-body-bank-alpha\")]\n",
+     "new": "/// A refusal performed no native write; release only this token's ownership.\n#[cfg(feature=\"native-body-bank-alpha\")]\n#[inline(never)] // rc.8 \u00a77: its own frame, not inside `begin`'s under `begin_prepare`'s\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): begin's work moves into an #[inline(never)] begin_prepare that hands a bank switch back, and begin submits it (submit_bank, #[inline(never)]) after begin_prepare's frame is gone; the two no longer stack on the native service poll's deepest path. Behaviour unchanged: the same calls in the same order"
     }
    ]
   },

@@ -84,7 +84,7 @@ pub const THREADS: [ThreadStack; 18] = [
     // mii-editor-last.json (and the diag results observer trace): serialise from the boxed slot, atomic replace
     row(ThreadId::TraceWriter, c"tr-trace-writer", 28 * KIB, 2_720, 8_624, "Eden st-02..st-12, ui18-02 native Mii editor", "compat::filesystem::init::{closure#0}"),
     // diag: diag-settings-next.json parse, publish and apply
-    row(ThreadId::DiagReload, c"tr-diag-reload", 40 * KIB, 17_696, 15_552, "Eden st-02..st-12, final-surface-lc-4e336da4", "diag_reload::start::{closure#0}"),
+    row(ThreadId::DiagReload, c"tr-diag-reload", 40 * KIB, 17_696, 15_680, "Eden final-rc8-chain-test-722525a5-r2 (three reloads in one Up)", "diag_reload::start::{closure#0}"),
     // first-boot import of the fork's files (blocking part), joined with a deadline
     row(ThreadId::Import, c"tr-import", 32 * KIB, 8_032, 10_080, "Eden st-02..st-12", "import::start::{closure#0}"),
     // first-boot import of the fork's captures in the background
@@ -216,13 +216,13 @@ impl CallbackStack {
 /// stack, and a poll that finds none free is skipped. The size is the smallest page multiple the rule allows for the poll's
 /// path. rc.8 §4/§7: two stacks, from rc.7's four. Every rc.7 diag run reported `[NativeService] service stacks peak=1 of 4
 /// skipped_polls=0` (S3, `nt`, `f9`, `rc8-chain-test`, the docs lane's GIF runs), and a poll with none free is skipped,
-/// never waited for; the second covers a nested or concurrent poll none of them showed. 2 × 304 KiB: 608 KiB of `.bss`,
+/// never waited for; the second covers a nested or concurrent poll none of them showed. 2 × 272 KiB: 544 KiB of `.bss`,
 /// from 1.25 MiB.
 pub const SERVICE_STACK: CallbackStack = CallbackStack {
     name: "native-service",
-    bytes: 304 * KIB,
+    bytes: 272 * KIB,
     count: 2,
-    static_bound: 232_896,
+    static_bound: 209_216,
     native_room: 63_728,
     native_bound: 1_776,
     measured_in: "Eden final-surface-acc-d8679593-r2 ([HookStack] site=native_service min_free=63728)",

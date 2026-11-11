@@ -724,10 +724,29 @@ unsafe fn capture(entry:*mut u8) {
     }
 }
 
+/// A bank member switch `begin_prepare` admitted, submitted here once its frame is gone.
+#[cfg(feature="native-body-bank-alpha")]
+type BankSubmit=(Option<super::body_bank::Plan>,super::native_reload_pose::ReloadPose);
+#[cfg(not(feature="native-body-bank-alpha"))]
+type BankSubmit=core::convert::Infallible;
+
+/// rc.8 §7: `begin_prepare` holds the snapshots it copied (about 100 KB of frame); a bank switch is submitted after it
+/// returns, so that frame and `submit_bank`'s chain no longer stack on the native service poll's deepest path.
 #[inline(never)]
 unsafe fn begin(entry:*mut u8)->bool {
     #[cfg(feature = "console-swap-trace")]
     let _swap_stack = crate::runtime::roster::practice_trace::scope(0x1080003);
+    let mut bank:Option<BankSubmit>=None;
+    let started=begin_prepare(entry,&mut bank);
+    match bank {
+        #[cfg(feature="native-body-bank-alpha")]
+        Some((plan,pose))=>submit_bank(entry,plan,pose),
+        _=>started,
+    }
+}
+
+#[inline(never)]
+unsafe fn begin_prepare(entry:*mut u8,bank:&mut Option<BankSubmit>)->bool {
     if !permitted() {return false;}
     let pending={
         let s=STATE.lock();
@@ -1001,9 +1020,9 @@ unsafe fn begin(entry:*mut u8)->bool {
     };
     let Some(track)=track else {
         #[cfg(feature="native-body-bank-alpha")]
-        return submit_bank(entry,plan,pose);
+        {*bank=Some((plan,pose));return false;}
         #[cfg(not(feature="native-body-bank-alpha"))]
-        return false;
+        {let _=bank;return false;}
     };
     // Outgoing FE is still untouched. INSTALL copies the separately staged 0x70-byte descriptor.
     let staged=native_fighter_install::Descriptor::from_bytes(&track.descriptor);
@@ -1039,6 +1058,7 @@ unsafe fn begin(entry:*mut u8)->bool {
 /// Warm member switch after the BankTrack is published, INSTALL and pose owned.
 /// A refusal performed no native write; release only this token's ownership.
 #[cfg(feature="native-body-bank-alpha")]
+#[inline(never)] // rc.8 §7: its own frame, not inside `begin`'s under `begin_prepare`'s
 unsafe fn submit_bank(entry:*mut u8,plan:Option<super::body_bank::Plan>,
     pose:super::native_reload_pose::ReloadPose)->bool {
     let bank=STATE.lock().bank;
