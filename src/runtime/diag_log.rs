@@ -407,14 +407,15 @@ pub fn set_tick(step: fn()) -> bool {
     TICKS.iter().any(|slot| slot.set(step).is_ok())
 }
 
-/// rc.8 §7 (diag): the most events the two replay mailboxes held at once, of their 4096 slots each (1.15 MB of `.bss`), one line
-/// when either rose: what the next Eden runs size them by.
+/// rc.8 §7 (diag): the most events the two replay mailboxes held at once, of their slots each
+/// (`handoff::REPLAY_EVENT_SLOTS`, rc.8 R4), one line when either rose: what their size is checked against.
 #[cfg(feature = "diag")]
 fn report_mailboxes(seen: &mut [u32; 2]) {
     let now = [crate::runtime::macros::live_replay::events_high_water(), crate::runtime::macros::replay_capture::vault_high_water()];
     if now != *seen {
         *seen = now;
-        diagnostic(format_args!("[MailboxPeak] live_events={} vault_events={} capacity=4096", now[0], now[1]));
+        diagnostic(format_args!("[MailboxPeak] live_events={} vault_events={} capacity={}", now[0], now[1],
+            crate::engine::macros::handoff::REPLAY_EVENT_SLOTS));
     }
 }
 

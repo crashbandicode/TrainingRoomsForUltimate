@@ -9,6 +9,19 @@ pub enum VaultEvent {
     End { epoch: u64, truncated: bool },
 }
 
+/// rc.8 R4: the slots of each replay mailbox (`live_replay::EVENTS`, `replay_capture::VAULT_EVENTS`) and of each drain's heap
+/// scratch, from 4096. A game hook posts at most one `Sample` per fighter entry per game frame (8 entries at 60 frames a
+/// second: 480 a second), and every post wakes the menu worker, which drains them all. The rc.8 pass's highest
+/// `[MailboxPeak]` was 4 waiting (`final-surface-vs-9d6c7e02`, a 5,818-frame VS match with capture on; 1 or 2 elsewhere).
+/// 1024 slots hold 2.1 s of the 8-entry rate, the diag stall watchdog's `STALL_MS`: a worker that long without a pass is
+/// stalled in its own right.
+///
+/// A full mailbox drops the post and counts it (`[MacroHandoff] live_events_dropped=` / `vault_events_dropped=`):
+/// - live: that fighter's track is sealed, and the worker then clears every live capture not yet saved, so that match's
+///   saved replay gets no capture. The game's own replay is unaffected; the next match captures again.
+/// - vault: sampling of that replay playback stops, and its timeline keeps what arrived, marked truncated (never complete).
+pub const REPLAY_EVENT_SLOTS: usize = 1024;
+
 /// Worker-owned archive of the latest and previous native Vault timelines.
 pub struct VaultArchive {
     epoch: u64,
@@ -372,6 +385,13 @@ name").is_none());
         archive.apply(VaultEvent::Sample { epoch: 4, entry: 8, sample, quantized: false }, 2);
         assert!(archive.session.truncated);
         assert!(archive.session.tracks.is_empty());
+    }
+
+    #[test]
+    fn the_replay_mailboxes_hold_a_stall_watchdog_gap_of_eight_samples_a_frame() {
+        // rc.8 R4: 8 fighter entries, one sample each per frame at 60 frames a second, for the watchdog's STALL_MS.
+        let gap = 8 * 60 * crate::model::stall_watch::STALL_MS as usize / 1000;
+        assert!(super::REPLAY_EVENT_SLOTS >= gap, "{} slots < {gap}", super::REPLAY_EVENT_SLOTS);
     }
 
 }
