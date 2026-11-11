@@ -284,3 +284,128 @@ fn match_found_with_no_busy_edge_frees_the_slot_before_the_drop() {
     assert_eq!(keeper.release(0, None), LobbyStep::Dropped(Held { table: TABLE, slot: 0, divisor: 2 }));
     assert_eq!(LobbySlot::new().release(TABLE, Some(&mut fresh_table())), LobbyStep::Nothing);
 }
+
+#[test]
+fn rates_are_the_speed_codes_table() {
+    // QCF 09:12Z Q4 / jump table 0x44f0204: (rate code, updates per second, divisor).
+    let got: Vec<_> = Speed::ALL.iter().map(|s| (s.label(), s.rate().code, s.rate().updates, s.rate().divisor)).collect();
+    assert_eq!(
+        got,
+        [
+            ("x1", 0, 60, None),
+            ("1 Frame", 0, 60, None),
+            ("2/3", 4, 120, Some(3)),
+            ("1/2", 0, 60, Some(2)),
+            ("1/4", 0, 60, Some(4)),
+            ("x1.5", 6, 180, Some(2)),
+        ]
+    );
+    for speed in Place::Lobby.speeds() {
+        assert!(speed.rate().code == 0 && speed.rate().updates == 60, "the lobby's speeds never need the rate words");
+    }
+}
+
+#[test]
+fn mode_apply_does_the_speed_codes_writes() {
+    // x1 -> 1/2 on a table where the game holds slot 0: the first free slot, no free, dirty to set.
+    let mut t = fresh_table();
+    t[table::DIRTY_AT] = 0;
+    t[0x20] = 1;
+    t[0x21] = 3;
+    let half = mode_apply(Speed::Half, 1, mode::NO_SLOT, &mut t).unwrap();
+    assert_eq!(half, ModeApply { value: 4, slot: 1, code: 0, updates: 60, freed: None, dirty: true });
+    assert_eq!((t[0x22], t[0x23]), (1, 2));
+    assert_eq!(t[table::DIRTY_AT], 0, "the caller sets dirty last");
+    // 1/2 -> 1/4: its own slot freed {0, 1}, the first free one taken again.
+    let quarter = mode_apply(Speed::Quarter, 4, 1, &mut t).unwrap();
+    assert_eq!(quarter, ModeApply { value: 5, slot: 1, code: 0, updates: 60, freed: Some(1), dirty: true });
+    assert_eq!((t[0x22], t[0x23]), (1, 4));
+    assert_eq!((t[0x20], t[0x21]), (1, 3), "the game's other slot is untouched");
+    // 1/4 -> 2/3 and x1.5: the update rate words, a slot each.
+    let two_thirds = mode_apply(Speed::TwoThirds, 5, 1, &mut t).unwrap();
+    assert_eq!((two_thirds.code, two_thirds.updates, two_thirds.slot, two_thirds.freed), (4, 120, 1, Some(1)));
+    assert_eq!((t[0x22], t[0x23]), (1, 3));
+    let fast = mode_apply(Speed::OneAndHalf, 3, 1, &mut t).unwrap();
+    assert_eq!((fast.code, fast.updates, fast.slot), (6, 180, 1));
+    assert_eq!((t[0x22], t[0x23]), (1, 2));
+    // -> x1: freed, no slot, the rates back to 0/60.
+    let x1 = mode_apply(Speed::X1, 6, 1, &mut t).unwrap();
+    assert_eq!(x1, ModeApply { value: 1, slot: mode::NO_SLOT, code: 0, updates: 60, freed: Some(1), dirty: true });
+    assert_eq!((t[0x22], t[0x23]), (0, 1));
+    // Already applied: nothing, nothing written.
+    let before = t;
+    assert_eq!(mode_apply(Speed::X1, 1, mode::NO_SLOT, &mut t), None);
+    assert_eq!(t, before);
+    // A recorded slot the game has freed since is not written; a slot index past the table is ignored.
+    let mut t = fresh_table();
+    let done = mode_apply(Speed::Half, 1, 5, &mut t).unwrap();
+    assert_eq!((done.freed, done.slot), (None, 0));
+    let done = mode_apply(Speed::X1, 4, 0x20, &mut fresh_table()).unwrap();
+    assert_eq!((done.freed, done.dirty), (None, false));
+    // Every slot in use: no slot, as native (`+0x1b4` stays 0xff), the rates still written.
+    let mut full = fresh_table();
+    for slot in 0..table::SLOTS {
+        full[0x20 + 2 * slot] = 1;
+    }
+    let done = mode_apply(Speed::Quarter, 1, mode::NO_SLOT, &mut full).unwrap();
+    assert_eq!((done.slot, done.code, done.updates, done.dirty), (mode::NO_SLOT, 0, 60, false));
+}
+
+/// A libc++ unordered_map in a fake address space: `words` maps an address to its pointer-sized word.
+fn registry(n: u64, nodes: &[(u64, u64, u64, u64)]) -> (usize, std::collections::HashMap<usize, u64>) {
+    // nodes: (address, hash, key, object); chained in order through +0.
+    let mut words = std::collections::HashMap::new();
+    let (map, buckets) = (0x1000usize, 0x2000usize);
+    words.insert(map, buckets as u64);
+    words.insert(map + 8, n);
+    for (i, node) in nodes.iter().enumerate() {
+        let next = nodes.get(i + 1).map_or(0, |n| n.0);
+        words.insert(node.0 as usize, next);
+        words.insert(node.0 as usize + 8, node.1);
+        words.insert(node.0 as usize + 0x10, node.2);
+        words.insert(node.0 as usize + 0x18, node.3);
+    }
+    (map, words)
+}
+
+#[test]
+fn registry_find_walks_the_games_map() {
+    let key = mode::KEY;
+    let hash = key & mode::KEY_MASK;
+    // A power of two: bucket hash & (n-1); its head (a before-begin word) points at the first node.
+    let n = 16u64;
+    let bucket = hash & (n - 1);
+    let other = hash + n; // same bucket, another hash
+    let (map, mut words) = registry(n, &[(0x3000, other, other, 0xdead), (0x3100, hash, key | 0xff_0000_0000_0000, 0xbeef0)]);
+    words.insert(0x2000 + 8 * bucket as usize, 0x4000);
+    words.insert(0x4000, 0x3000);
+    let read = |at: usize| words.get(&at).copied();
+    assert_eq!(registry_find(map, key, &read), Some(0xbeef0), "the key above the 40-bit mask doesn't count");
+    // A node of another bucket ends the walk.
+    let (map, mut words) = registry(n, &[(0x3000, hash + 1, hash + 1, 0xdead), (0x3100, hash, key, 0xbeef0)]);
+    words.insert(0x2000 + 8 * bucket as usize, 0x4000);
+    words.insert(0x4000, 0x3000);
+    let read = |at: usize| words.get(&at).copied();
+    assert_eq!(registry_find(map, key, &read), None);
+    // Not a power of two: hash % n.
+    let n = 13u64;
+    let (map, mut words) = registry(n, &[(0x3000, hash, key, 0xbeef0)]);
+    words.insert(0x2000 + 8 * (hash % n) as usize, 0x4000);
+    words.insert(0x4000, 0x3000);
+    let read = |at: usize| words.get(&at).copied();
+    assert_eq!(registry_find(map, key, &read), Some(0xbeef0));
+    // An empty map, an empty bucket, an unreadable word: none.
+    let (map, words) = registry(0, &[]);
+    let read = |at: usize| words.get(&at).copied();
+    assert_eq!(registry_find(map, key, &read), None);
+    let (map, words) = registry(16, &[]);
+    let read = |at: usize| words.get(&at).copied();
+    assert_eq!(registry_find(map, key, &read), None);
+    // A cycle is bounded.
+    let (map, mut words) = registry(16, &[(0x3000, hash, key ^ 1, 0)]);
+    words.insert(0x3000, 0x3000);
+    words.insert(0x2000 + 8 * bucket as usize, 0x4000);
+    words.insert(0x4000, 0x3000);
+    let read = |at: usize| words.get(&at).copied();
+    assert_eq!(registry_find(map, key, &read), None);
+}

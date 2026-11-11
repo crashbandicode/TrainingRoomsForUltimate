@@ -49,7 +49,7 @@ QCF §1–§4 holds where this lane read it again. These sites were confirmed in
 | `.1bbbb70`–`.1bbbbcc` (item 7, value changed) | text via `0x1bbbd30`, the slide `+0x558`/`+0x568`, `str w20,[x19,#0xb54]`, then SE `0x15_1ca6_c028` unless `[[0x532f8d0]+8]+0x191` is set | the menu's own change: not used (an SE with the menu closed) |
 | `0x1bbbd30` (value → text) | `sub w8,w1,#2; cmp w8,#4; b.hi` (default `x1`), jump table `0x44f8a24`, `0x377a120(pane, label)` | called with the setter's own arguments |
 | only 2 callers of `0x1bbbd30`: `.1bbaf2c`, `.1bbbb7c` | the menu never refreshes the Speed text by itself when it opens | why a bare store isn't enough |
-| `.155b4a8`–`.155b5ec` (per-update apply) | applied value `x25+0x194` against `+0xb54`; on a change it frees the battle's slot (`{in_use 0, divisor 1}`, dirty `+0x40 = 1`, slot `0xff`) | the slot steps the lobby copies |
+| `.155b4a8`–`.155b5ec` (the speed code of `FUN_0155a000`, pause/resume side only; the bind repeats its writes) | applied value `x25+0x194` against `+0xb54`; on a change it frees the battle's slot (`{in_use 0, divisor 1}`, dirty `+0x40 = 1`, slot `0xff`) | the slot steps the lobby copies |
 | `.155b654`, `.155b674`, `.155b864` | x1/1 Frame: code 0 and rate 60; 2/3: code 4, rate `0x78`; x1.5: code 6, rate `0xb4` | QCF's rate trace points are right |
 | `.13e5500` (Training HUD) | `ldr w9,[[hud+8]+0x80+0xb54]` every frame | the speed icon refreshes itself |
 | `0x1fca5c0` `BattleObjectSlow__rate_request_impl` | `ldr x0,[0x52c3610]`; `ldrb [x0,#0x40]` dirty → `0x14a2cd0` (max divisor over `{in_use, N}` at `+0x20..+0x3f`), else default byte `[0x52c5189]` | the lobby's slot takes effect through the game's own rate |
@@ -110,8 +110,21 @@ Where a choice is the operator's, this takes the sensible default and states it.
    - It stores `PauseMenu+0xb54`, then calls `0x1bbbd30(menu, value, menu+0x538)`. That's the setter's own
      unchanged-value path (`.1bbaf28`/`.1bbaf2c`): text, no slide, no SE.
    - It runs on the UI job thread in `info_training`'s tick, where the plugin's HUD draw already runs.
-   - **It never writes the rate globals or a slot in Training.** The game's edge-triggered apply does that on the next
-     update, and its icon and help line refresh themselves.
+   - ~~It never writes the rate globals or a slot in Training; the game's apply does that on the next update.~~
+     **Corrected 2026-11-11 (Eden `rc8b-train-1ecf920a-xps/out-diag6`, QCF's RE 09:12Z/09:18Z, the primary 10:12Z):**
+     the game's speed code (`FUN_0155a000`, `.155b4a8`–`.155bbb8`) runs only on the pause/resume side. In closed-menu
+     play its gate (`.155a08c`–`.155a0c4`) skips it: 0 hits in play, 137 with the menu open.
+   - **So P1's next poll (a game thread) does the apply's writes itself** (`training_apply`, `model::game_speed::mode_apply`):
+     - to the Training mode object, x25 there, found the way the game finds it: `[[main+0x52c3910]]`'s registry
+       (`FUN_015435c0`, a libc++ unordered_map) at key `0x1308abad79`, used only when its vtable is
+       `main+0x506fd10`;
+     - the applied value `+0x194`; its old slot freed `{0, 1}`; the step clears (`main+0x52b92ec` bit 2,
+       `[[main+0x53398d8]+8]`); the rate code `main+0x593b444` and updates `main+0x523d004` (2/3: 4/120, x1.5: 6/180,
+       the others 0/60); a new slot `{1, N}` and `+0x1b4`; the table's dirty byte last.
+     - Not while the game's pause menu is open (its own apply runs then), not in the state that makes the game apply 0,
+       and never in the lobby.
+     - The game's own apply later sees `+0xb54 == +0x194` and leaves it.
+   - Its icon and help line refresh themselves.
    - When the pop-up opens, the bind reads `+0xb54`, so a value set in the native menu is where it starts.
 7. **The lobby (waiting-room practice) owns one slot in the BattleObjectSlow table** (`*(0x52c3610)`):
    - **Take:** the first slot with `in_use 0` becomes `{1, N}` (N 2 or 4), and dirty `+0x40 = 1`. The native apply's
@@ -152,7 +165,7 @@ Where a choice is the operator's, this takes the sensible default and states it.
 | Operator clause | Design | Test |
 | --- | --- | --- |
 | "I would like to be able to bind bringing up the input display" | §3.1–3.2: the chord row `input_display_toggle`; its request flips `input_display_strip` through the menu worker | `the_ten_chords_keep_todays_defaults_and_add_two`, `input_display_chord_raises_its_request`, `display_toggle_flips_the_strip_row` |
-| "and also a bind to decrease the speed" | §3.1, 3.3: the chord row `game_speed`, a hold that opens the speed pop-up | `the_ten_chords_keep_todays_defaults_and_add_two`, `hold_opens_on_the_chord_steps_on_left_right_and_closes_on_release` |
+| "and also a bind to decrease the speed" | §3.1, 3.3: the chord row `game_speed`, a hold that opens the speed pop-up; §3.6: the speed applied at once in Training (the game's own apply writes, done by the bind on P1's poll) | `the_ten_chords_keep_todays_defaults_and_add_two`, `hold_opens_on_the_chord_steps_on_left_right_and_closes_on_release`, `mode_apply_does_the_speed_codes_writes`, `registry_find_walks_the_games_map`, `game_speed_rows_decode_the_training_apply` |
 | "(basically trace how the training mode does it as it has 3/4 1x etc)" | §2, §3.5–3.6: the native values 1..6 at `PauseMenu+0xb54` and its labels; there is no 3/4 (the slow speeds are 2/3, 1/2, 1/4) | `speeds_are_the_native_values_and_labels`, `game_speed_rows_decode_the_native_offsets` |
 | "the idea is to be able to quickly change the speed perhaps if you want to practice it quickly" | §3.3: one combo, Left/Right while held, no menu | `hold_opens_on_the_chord_steps_on_left_right_and_closes_on_release` |
 | "it would have a small menu pop up showing the speed" | §3.4: the standing notice "Game speed" with the speed between the D-pad glyphs | `popup_body_shows_the_speed_between_the_dpad_glyphs` |
