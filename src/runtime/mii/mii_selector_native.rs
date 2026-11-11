@@ -223,7 +223,7 @@ unsafe fn current_locked_in(
     helpers:helpers::View,source:Option<SourceToken>,
     mut created:Option<policy::CreatedDestination>,
 )->Result<Snapshot,&'static str> {
-    check_helpers_for(helpers, source)?;
+    check_helpers_for(&helpers, source)?;
     if let Some(destination)=created {
         check(m.created && destination.registered_in(m.layout,m.extras,b.owner as usize,b.entry),
             "created destination registration changed")?;
@@ -326,7 +326,7 @@ unsafe fn current_locked_in(
                     None=>m.extras.admit(id,&owner,facts)?,
                 }
             } else {
-                super::mii_ordinary_player::native::created_kind(helpers,m.extras,id,owner,kind,facts)?;
+                super::mii_ordinary_player::native::created_kind(&helpers,m.extras,id,owner,kind,facts)?;
             }
         } else if id != own_id && m.layout.logical(id as u32).is_some() {
             let current = authority(
@@ -349,7 +349,7 @@ unsafe fn current_locked_in(
             )?;
         } else if id != own_id && m.layout.helper(id).is_some() {
             check(
-                helper_kind(helpers, id, owner, kind),
+                helper_kind(&helpers, id, owner, kind),
                 "CPU helper row kind/provenance changed",
             )?;
         }
@@ -414,7 +414,7 @@ unsafe fn current_locked_in(
             && rd::<usize>(b.entry, 0xf8) == own.information,
         "CPU final current authority changed",
     )?;
-    check_helpers_for(helpers, source)?;
+    check_helpers_for(&helpers, source)?;
     Ok(Snapshot {
         extras:m.extras,
         created,
@@ -474,11 +474,11 @@ pub(crate) unsafe fn snapshot_created(entry:usize,original_kind:u32,owner:usize)
         let table=pointer(super::BASE.load(std::sync::atomic::Ordering::Acquire),OWNER_TABLE,0x130,false)?;
         let facts=super::mii_backend::extra_facts(table,owner,own.entry,own.row,own.information,own.object);
         let kind=rd::<u32>(own.entry,0x18);
-        super::mii_ordinary_player::native::created_kind(helpers,m.extras,owner,own,kind,facts)?;
+        super::mii_ordinary_player::native::created_kind(&helpers,m.extras,owner,own,kind,facts)?;
         now.created=Some(receipt.destination.reuse_completed(own,facts,kind)
             .ok_or("created replacement lacks completed owner authority")?);
     }
-    check_helpers_for(helpers,None)?;
+    check_helpers_for(&helpers,None)?;
     drop(g);
     Ok(now)
 }

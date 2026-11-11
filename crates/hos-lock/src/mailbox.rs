@@ -23,6 +23,8 @@ pub struct Mailbox<T: Copy, const N: usize> {
     /// The next sequence number to deliver (the consumer's).
     next: AtomicU64,
     dropped: AtomicU32,
+    /// The most messages waiting at once (posted, not yet delivered), as posters saw it: what sizes `N`.
+    high_water: AtomicU32,
 }
 
 // SAFETY: a slot's cell is written only by the poster that moved it to WRITING, and read only by the one consumer while it is FULL;
@@ -43,6 +45,7 @@ impl<T: Copy, const N: usize> Mailbox<T, N> {
             seq: AtomicU64::new(0),
             next: AtomicU64::new(0),
             dropped: AtomicU32::new(0),
+            high_water: AtomicU32::new(0),
         }
     }
 
@@ -55,6 +58,12 @@ impl<T: Copy, const N: usize> Mailbox<T, N> {
                 // SAFETY: the slot is ours between WRITING and FULL.
                 unsafe { (*self.slots[i].get()).write((seq, message)) };
                 state.store(FULL, Release);
+                // Waiting now, this one included. A drain in progress has not stored `next` yet, so this can be high by what it
+                // is delivering: an upper bound, capped at N. Raised only when it grows; nothing here waits.
+                let waiting = (seq + 1).saturating_sub(self.next.load(Relaxed)).min(N as u64) as u32;
+                if waiting > self.high_water.load(Relaxed) {
+                    self.high_water.fetch_max(waiting, Relaxed);
+                }
                 return true;
             }
         }
@@ -105,6 +114,11 @@ impl<T: Copy, const N: usize> Mailbox<T, N> {
     /// Drops since the last call (a full mailbox).
     pub fn take_dropped(&self) -> u32 {
         self.dropped.swap(0, Relaxed)
+    }
+
+    /// The most messages that were waiting at once since the start (an upper bound; at most N).
+    pub fn high_water(&self) -> u32 {
+        self.high_water.load(Relaxed)
     }
 }
 
@@ -161,6 +175,26 @@ mod tests {
         assert_eq!(mailbox.drain_with_scratch(&mut [(0, 0); 2], |m| got.push(m)), 1);
         assert_eq!(got, vec![7]);
         assert_eq!(mailbox.take_dropped(), 0);
+    }
+
+    #[test]
+    fn the_high_water_mark_is_the_most_messages_waiting_at_once() {
+        let mailbox: Mailbox<u32, 8> = Mailbox::new();
+        assert_eq!(mailbox.high_water(), 0);
+        for i in 0..3 {
+            assert!(mailbox.post(i));
+        }
+        assert_eq!(mailbox.high_water(), 3);
+        assert_eq!(mailbox.drain(|_| {}), 3);
+        for i in 0..2 {
+            assert!(mailbox.post(i));
+        }
+        assert_eq!(mailbox.high_water(), 3, "two waiting after a drain do not raise it");
+        for i in 0..8 {
+            mailbox.post(i);
+        }
+        assert_eq!(mailbox.high_water(), 8, "never above the capacity");
+        assert_eq!(mailbox.take_dropped(), 2);
     }
 
     #[test]

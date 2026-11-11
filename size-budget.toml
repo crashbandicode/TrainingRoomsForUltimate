@@ -1396,3 +1396,11 @@ ceiling = 163320
 date = "2026-11-11"
 reason = "rc.8 p23/rc8-lock-walk over 3c7d43a1 (163293): TASK-rc8 section 6 (primary 2026-11-11 03:30Z), the typed menu writeback wait-free (two triple buffers read in place, the stamp, model::menu_writeback); measured 163320 at 02525cba (tools/size_gate.py), +27"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.8 order (TASK-rc8.md); a raise goes in its own commit with approved_by"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 163358
+date = "2026-11-11"
+reason = "rc.8 p23/rc8-waste over 19a3b8fe (163320): TASK-rc8 sections 4 and 7 (primary 2026-11-11 03:30Z), the Mii poll's snapshots by reference and the outlined warm-exit settle (10aa8498), the native service's two 304 KiB stacks (9131266f), the replay mailboxes' diag high-water mark; measured 163358 at 5c3afd81 (tools/size_gate.py), +38"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.8 order (TASK-rc8.md); a raise goes in its own commit with approved_by"

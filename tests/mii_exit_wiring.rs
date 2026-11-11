@@ -90,11 +90,12 @@ fn both_adapters_keep_the_publication_and_settle_the_exit_through_it() {
         assert!(adapter.contains("mii_exit:None,"), "{name}: STATE starts without a kept publication");
         assert!(adapter.contains("struct MiiExit {mii:BankTrack,configuration:Configuration,published:native::BankPublished,adopted:native::Snapshot}"), "{name}");
         let settle = body(adapter, "unsafe fn bank_settle(");
-        let kept = settle.find("let published=STATE.lock().bank.filter(|t|t.ticket==b.ticket && t.token==b.token).and_then(|t|t.published);")
+        // rc.8 §7: the track is borrowed (`&BankTrack`, `as_ref`), and `exit_settled` reads the kept exit itself.
+        let kept = settle.find("let published=STATE.lock().bank.as_ref().filter(|t|t.ticket==b.ticket && t.token==b.token).and_then(|t|t.published);")
             .unwrap_or_else(|| panic!("{name}: the publication is read before the settle drops the track:\n{settle}"));
-        let settled = settle.find("if b.exit {native::exit_settled(&b,exit)} else {native::bank_settled(&b)}")
+        let settled = settle.find("if b.exit {native::exit_settled(b)} else {native::bank_settled(b)}")
             .unwrap_or_else(|| panic!("{name}:\n{settle}"));
-        let record = settle.find("(Some(c),Some((published_c,published))) if published_c==c=>Some(MiiExit {mii:b,configuration:c,published,adopted:now}),")
+        let record = settle.find("(Some(c),Some((published_c,published))) if published_c==c=>Some(MiiExit {mii:*b,configuration:c,published,adopted:now}),")
             .unwrap_or_else(|| panic!("{name}:\n{settle}"));
         let outcome = settle.find("settle_outcome(Outcome::Applied").unwrap();
         assert!(kept < settled && settled < record && record < outcome, "{name}:\n{settle}");
@@ -115,6 +116,9 @@ fn the_exit_settle_proves_the_exchange_restores_the_publication_then_adopts() {
     ] {
         let exit = body(native, "pub(super) unsafe fn exit_settled(");
         let proof = exit.find("group_rebaseline(").unwrap_or_else(|| panic!("{name}:\n{exit}"));
+        // rc.8 §7: the kept exit is read here, once, before the proof, and borrowed for this ticket's epoch.
+        let read = exit.find("let kept=super::STATE.lock().mii_exit;").unwrap_or_else(|| panic!("{name}:\n{exit}"));
+        assert!(read < proof && exit.contains("let exit=kept.as_ref().filter(|x|x.mii.ticket.epoch==before.binding.epoch)"), "{name}:\n{exit}");
         let restore = exit.find("bank_restore(&restore,exit.configuration,exit.published)").unwrap_or_else(|| panic!("{name}:\n{exit}"));
         let adopted = exit.find(adopt).unwrap_or_else(|| panic!("{name}:\n{exit}"));
         assert!(proof < restore && restore < adopted, "{name}:\n{exit}");

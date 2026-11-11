@@ -1874,7 +1874,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "56269972a546a73bbfb441cffcade4fb1030fc98e28da001b656810686e89138",
+   "dest_sha256": "764405e072372011d8ef26781894c939222a76434e0205e4c47572bbf0642acf",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -2176,6 +2176,11 @@
      "old": "    if crate::runtime::ui::state::OPEN.load(Ordering::Acquire) { return; }\n    if loading() {",
      "new": "    if crate::runtime::ui::state::OPEN.load(Ordering::Acquire) { return; }\n    // The editor's Fighter Mismatch question owns Player 1's presses (the menu's pop-up route) until it is answered.\n    if crate::runtime::macros::named_macros::fighter_prompt_up() { return; }\n    if loading() {",
      "reason": "rc.6 #68 (lane cov-rest, 2026-11-08, 66a9a53): the clip editor's own Fighter Mismatch question owns Player 1's presses while it is up (on_input returns while fighter_prompt_up()); Eden covrest-yoga-01: Down and A went to the editor instead of the question."
+    },
+    {
+     "old": "static VAULT_EVENTS: hos_lock::Mailbox<VaultEvent, 4096> = hos_lock::Mailbox::new();\n",
+     "new": "static VAULT_EVENTS: hos_lock::Mailbox<VaultEvent, 4096> = hos_lock::Mailbox::new();\n/// rc.8 \u00a77 (diag): the most vault events waiting at once, of the 4096 slots (`diag_log`'s `[MailboxPeak]`).\n#[cfg(feature = \"diag\")]\npub(crate) fn vault_high_water() -> u32 { VAULT_EVENTS.high_water() }\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): a diag-only accessor for the 4096-slot replay mailbox's high-water mark (hos_lock::Mailbox::high_water), which diag_log's [MailboxPeak] line reports so Eden runs size the mailboxes (1.15 MB of .bss); release builds unchanged"
     }
    ]
   },
@@ -2405,7 +2410,7 @@
    "dest": "src/runtime/macros/live_replay.rs",
    "crate": "root",
    "src_sha256": "fd955747dc9d40bcb6bae4b9877d2040e89d17c313215db53019c3d278ba5592",
-   "dest_sha256": "2b6ba4809af82eb4d2928c608350b8bc6d974fef16d1961ab942d48259d78752",
+   "dest_sha256": "94708a8929dff688638ceec271467665920ed707dfb705b70371145d6a4bb472",
    "edits": [
     {
      "old": "    let accepted = capture.pool.push(pending.key, entry, pending.tick, pending.sample);",
@@ -2703,6 +2708,11 @@
      "old": "    println!(\"[ReplayCaptureSeal] serial={} {}\", serial, note);",
      "new": "    crate::runtime::diag_log::enqueue_diagnostic(format_args!(\n        \"[ReplayCaptureSeal] serial={} {}\", serial, note));",
      "reason": "Approved first-seal-only enqueue entry: retain existing ring ownership and drop accounting without caller synchronous drain"
+    },
+    {
+     "old": "static EVENTS: hos_lock::Mailbox<(u64, LiveEvent), 4096> = hos_lock::Mailbox::new();\n",
+     "new": "static EVENTS: hos_lock::Mailbox<(u64, LiveEvent), 4096> = hos_lock::Mailbox::new();\n/// rc.8 \u00a77 (diag): the most live events waiting at once, of the 4096 slots (`diag_log`'s `[MailboxPeak]`).\n#[cfg(feature = \"diag\")]\npub(crate) fn events_high_water() -> u32 { EVENTS.high_water() }\n",
+     "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): a diag-only accessor for the 4096-slot replay mailbox's high-water mark (hos_lock::Mailbox::high_water), which diag_log's [MailboxPeak] line reports so Eden runs size the mailboxes (1.15 MB of .bss); release builds unchanged"
     }
    ]
   },

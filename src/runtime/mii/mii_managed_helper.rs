@@ -254,7 +254,7 @@ pub(super) fn bind(
 fn current(t: &Track) -> bool {
     INSTALL.owns(t.install) && match t.data.created_epoch {
         Some(epoch)=>t.source.epoch()==epoch && t.data.before.created.is_some()
-            && provenance::check_helpers_for(t.data.before.helpers,Some(t.source)).is_ok(),
+            && provenance::check_helpers_for(&t.data.before.helpers,Some(t.source)).is_ok(),
         None=>t.ticket.epoch==mii_saved_alpha::current_generation(1)
             && t.data.player_epoch==mii_saved_alpha::current_generation(0),
     }
@@ -365,7 +365,7 @@ pub(super) unsafe fn prequeue(entry: usize, selected: usize) -> bool {
             "helper final ticket changed",
         )?;
         let registry = provenance::final_registry_for(
-            publication.observed.before.helpers,
+            &publication.observed.before.helpers,
             Some(t.install),
             Some(t.source),
         )?;
@@ -458,7 +458,7 @@ pub(super) unsafe fn completed_details(
         "helper completion token changed",
     )?;
     let registry =
-        provenance::final_registry_for(completion.now.helpers, Some(t.install), Some(source))?;
+        provenance::final_registry_for(&completion.now.helpers, Some(t.install), Some(source))?;
     let proof = helpers::MiiProof {
         binding: completion.now.binding,
         configuration: track.data.configuration,
@@ -591,7 +591,7 @@ pub(super) unsafe fn ready_checked(
             "created exact configuration changed")?;
         let table=provenance::pointer(BASE.load(Ordering::Acquire),
             crate::runtime::mii::mii_native_access::OWNER_TABLE,0x130,false)?;
-        provenance::created_kind(view,now.extras,source.slot(),proof.owner,
+        provenance::created_kind(&view,now.extras,source.slot(),proof.owner,
             c.canonical().class as u32,super::mii_backend::extra_facts(table,source.slot(),
                 proof.owner.entry,proof.owner.row,proof.owner.information,proof.owner.object))?;
         return Ok(());
@@ -622,7 +622,7 @@ pub(super) unsafe fn ready_checked(
                 && now.scalars == Scalars::saved(c)
                 && now.owners[source.slot()] == Some(proof.owner)
                 && provenance::helper_kind(
-                    view,
+                    &view,
                     source.slot(),
                     proof.owner,
                     c.canonical().class as u32,

@@ -556,7 +556,7 @@ pub(super) unsafe fn service(entry:*mut u8,owner:u32)->bool {
         let bank=STATE.lock().bank;
         if let Some(b)=bank {
             if b.ticket.entry!=entry as usize {return false;}
-            bank_service(entry,b);
+            bank_service(entry,&b);
             return true;
         }
     }
@@ -871,7 +871,7 @@ unsafe fn begin(entry:*mut u8)->bool {
             && request.current(mii_saved_alpha::menu_epoch(),active.map(|c|c.canonical())) {
             if let Some(o)=s.owner.as_mut().filter(|o|
                 o.expected==expected && o.active==active && o.cursor==cursor) {
-                let Ok(registry)=native::final_registry(current.helpers,None) else{return false;};
+                let Ok(registry)=native::final_registry(&current.helpers,None) else{return false;};
                 o.cursor=destination.cursor;s.request=None;s.restore=None;drop(registry);drop(s);
                 state_for(Role::Player).lock().cursor=destination.cursor;
                 publish_partners(Role::Player,descriptor_forms(&descriptor));
@@ -981,7 +981,7 @@ unsafe fn begin(entry:*mut u8)->bool {
             s.request=None;drop(s);refused_before_submit(token,"ordinary ticket exhausted");return false;
         };
         let ticket=Ticket{epoch:epoch(),entry:entry as usize,sequence};
-        let registry=match native::final_registry(current.helpers,Some(token)) {
+        let registry=match native::final_registry(&current.helpers,Some(token)) {
             Ok(registry)=>registry,
             Err(_)=>{drop(s);refused_before_submit(token,"Player source provenance changed before submit");return false;}
         };
@@ -1049,17 +1049,17 @@ unsafe fn submit_bank(entry:*mut u8,plan:Option<super::body_bank::Plan>,
     // (this one, Phase B's rollback, a settle refusal) puts it back in `bank_refused`.
     if let Some(c)=b.publish {
         let Some((identity,group_c))=super::body_bank::reachable_mii_group(0,b.logical) else {
-            bank_refused(b,"no reachable Mii group for the published configuration",false);
+            bank_refused(&b,"no reachable Mii group for the published configuration",false);
             return false;
         };
         if group_c!=c {
-            bank_refused(b,"reachable Mii group was planned for another configuration",false);
+            bank_refused(&b,"reachable Mii group was planned for another configuration",false);
             return false;
         }
         match native::bank_publish(&b,c,identity.hat()) {
             Ok(())=>trace!("[MiiOrdinaryPlayer] bank publish ticket={:?} target={:#x} index={} hat={} charinfo_written=true scalars_written=true",
                 b.ticket,b.logical,b.before.binding.record_index,identity.hat()),
-            Err(reason)=>{bank_refused(b,reason,false);return false;}
+            Err(reason)=>{bank_refused(&b,reason,false);return false;}
         }
     }
     // The outgoing member, read while the bank is still Ready (`switch` clears its observation).
@@ -1069,7 +1069,7 @@ unsafe fn submit_bank(entry:*mut u8,plan:Option<super::body_bank::Plan>,
         _ => false,
     };
     if !switched {
-        bank_refused(b,"bank member switch refused before the native request",false);
+        bank_refused(&b,"bank member switch refused before the native request",false);
         return false;
     }
     training::clear_session_state();
@@ -1082,7 +1082,7 @@ unsafe fn submit_bank(entry:*mut u8,plan:Option<super::body_bank::Plan>,
 /// never forced; a refusal releases INSTALL only once native is settled.
 #[cfg(feature="native-body-bank-alpha")]
 #[inline(never)] // stream/stack: its locals live in its own frame, not in every `service` call's
-unsafe fn bank_service(entry:*mut u8,b:BankTrack) {
+unsafe fn bank_service(entry:*mut u8,b:&BankTrack) {
     let live=super::body_bank::ready_kind(entry,0);
     if b.departed {
         if live.is_some() || settled(entry) {bank_refused(b,"scene departed during bank switch",false);}
@@ -1107,12 +1107,11 @@ unsafe fn bank_service(entry:*mut u8,b:BankTrack) {
 }
 
 #[cfg(feature="native-body-bank-alpha")]
-unsafe fn bank_settle(entry:*mut u8,b:BankTrack) {
+unsafe fn bank_settle(entry:*mut u8,b:&BankTrack) {
     // rc.6 warm exit: a Mii group switch's publication, read before the settle drops its track, is kept for the
     // exit to the window it displaced; that exit settles through the kept record.
-    let published=STATE.lock().bank.filter(|t|t.ticket==b.ticket && t.token==b.token).and_then(|t|t.published);
-    let exit=STATE.lock().mii_exit;
-    let settled=match if b.exit {native::exit_settled(&b,exit)} else {native::bank_settled(&b)} {
+    let published=STATE.lock().bank.as_ref().filter(|t|t.ticket==b.ticket && t.token==b.token).and_then(|t|t.published);
+    let settled=match if b.exit {native::exit_settled(b)} else {native::bank_settled(b)} {
         Ok(settled)=>settled,
         Err(native::BankRefusal::Busy)=>return,
         Err(native::BankRefusal::Kept(reason))=>{bank_refused(b,reason,false);return;}
@@ -1120,7 +1119,7 @@ unsafe fn bank_settle(entry:*mut u8,b:BankTrack) {
     };
     let now=settled.now;let exact=settled.exact;
     STATE.lock().mii_exit=match (exact,published) {
-        (Some(c),Some((published_c,published))) if published_c==c=>Some(MiiExit {mii:b,configuration:c,published,adopted:now}),
+        (Some(c),Some((published_c,published))) if published_c==c=>Some(MiiExit {mii:*b,configuration:c,published,adopted:now}),
         _=>None,
     };
     let logical=b.logical;
@@ -1162,9 +1161,9 @@ unsafe fn bank_settle(entry:*mut u8,b:BankTrack) {
 /// transient `helpers::BUSY` before writing keeps the track and INSTALL: the next
 /// `bank_service` callback reaches this arm again and retries.
 #[cfg(feature="native-body-bank-alpha")]
-unsafe fn bank_refused(b:BankTrack,reason:&'static str,diverged:bool) {
+unsafe fn bank_refused(b:&BankTrack,reason:&'static str,diverged:bool) {
     let effects=crate::engine::mii::ordinary_player::bank_refusal_effects(diverged);
-    let (published,departed)=match STATE.lock().bank {
+    let (published,departed)=match STATE.lock().bank.as_ref() {
         Some(now) if now.ticket==b.ticket && now.token==b.token=>(now.published,now.departed),
         _=>return,
     };

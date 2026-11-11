@@ -91,7 +91,7 @@ pub(super) unsafe fn publish_same_class(track:&super::Track,selected:usize,
     check(fresh.ticket==track.ticket && fresh.same_class==Some(proof)
         && fresh.destination==track.destination && fresh.gate.may_publish(track.ticket,6)
         && super::epoch()==track.ticket.epoch,"CPU same-class final ticket/epoch changed")?;
-    let registry=final_registry(helpers,Some(track.token))?;
+    let registry=final_registry(&helpers,Some(track.token))?;
     // Existing same-class write set only: payload and outfit/colour/voice/specials.
     // No index/header/flag/task/resource-pair or vector write in this branch.
     copy_update(at,&update);write_tokens(&targets,update.tokens().into());
@@ -131,7 +131,7 @@ pub(super) unsafe fn publish(track:&super::Track,selected:usize,evidence:&mut Op
     check(fresh.ticket==track.ticket && fresh.gate.may_publish(track.ticket,6)
         && fresh.destination==track.destination && super::epoch()==track.ticket.epoch,
         "CPU final ticket/epoch changed")?;
-    let registry=final_registry(publication.observed.before.helpers,Some(track.token))?;
+    let registry=final_registry(&publication.observed.before.helpers,Some(track.token))?;
     publication.write();
     let published=fresh.gate.publish(track.ticket,6);debug_assert!(published);
     drop(registry);drop(state);drop(publication);Ok(())
@@ -155,7 +155,7 @@ pub(super) unsafe fn completed(track:&super::Track)->Result<Snapshot,&'static st
     check(state.track.as_ref().is_some_and(|t|t.ticket==track.ticket&&t.gate.can_complete(track.ticket))
         && super::epoch()==track.ticket.epoch,"CPU ready ticket/epoch changed before commit")?;
     let owner=state.owner.as_mut().ok_or("CPU ready owner retired")?;
-    let mut registry=final_registry(now.helpers,Some(track.token))?;
+    let mut registry=final_registry(&now.helpers,Some(track.token))?;
     owner.expected=now;owner.live=track.destination;
     registry.commit(now.authority(),now.original_kind,super::descriptor_kind(&now.descriptor));
     drop(registry);drop(state);drop(completion);Ok(now)
@@ -204,7 +204,7 @@ pub(super) unsafe fn bank_publish(bank:&super::BankTrack,c:Configuration,group_h
     check(!state.departed && state.bank.is_some_and(|now|now.ticket==bank.ticket && now.token==bank.token)
         && super::epoch()==bank.ticket.epoch,"CPU bank publication ticket/epoch changed")?;
     let track=state.bank.as_mut().ok_or("CPU bank publication track absent")?;
-    let registry=final_registry(publication.observed.before.helpers,Some(bank.token))?;
+    let registry=final_registry(&publication.observed.before.helpers,Some(bank.token))?;
     // MII-PHASEB: the track records what the write replaces in the same critical section;
     // every terminal arm compensates it (`bank_refused` -> `bank_restore`).
     let before=publication.observed.before;
@@ -307,7 +307,7 @@ unsafe fn prefetch_publish_owned(receipt:PrefetchReceipt,c:Configuration,token:s
     if !state.reservation.acquire(super::super::INSTALL.owns(token)) {
         return Err(PublishRefusal::Race("CPU reservation refused before the Mii group publication"));
     }
-    let registry=final_registry(helpers,Some(token)).map_err(publish_refusal)?;
+    let registry=final_registry(&helpers,Some(token)).map_err(publish_refusal)?;
     let owner=state.owner.as_mut().filter(|o|o.expected==expected)
         .ok_or(PublishRefusal::Race("CPU Mii group publication owner changed"))?;
     let at=values::record_address(b,b).map_err(|_|PublishRefusal::Race("CPU destination record bounds"))?;
@@ -359,7 +359,7 @@ pub(super) unsafe fn bank_restore(bank:&super::BankTrack,c:Configuration,publish
     let state=super::STATE.lock();
     check(!state.departed && state.bank.is_some_and(|now|now.ticket==bank.ticket && now.token==bank.token)
         && super::epoch()==bank.ticket.epoch,"CPU bank rollback ticket/epoch changed or the scene departed")?;
-    let registry=final_registry(helpers,Some(bank.token))?;
+    let registry=final_registry(&helpers,Some(bank.token))?;
     // No fallible operation between here and the writes; nothing after them returns the retry sentinel.
     for (off,byte) in published.record[..CHARINFO_LEN].iter().enumerate() {wr(at,off,*byte);}
     wr::<u16>(b.row,0x1a8,published.index);
@@ -390,6 +390,7 @@ pub(super) struct Settled {
     pub resource_pair:Option<bool>,
 }
 #[cfg(feature="native-body-bank-alpha")]
+#[inline(never)] // rc.8 §7: its snapshots and MiiExit copies live in its own frame, not in bank_service's
 pub(super) unsafe fn bank_settled(bank:&super::BankTrack)->Result<Settled,BankRefusal> {
     let before=&bank.before;
     let m=map(before.binding.entry).map_err(BankRefusal::Diverged)?;
@@ -468,7 +469,7 @@ pub(super) unsafe fn bank_settled(bank:&super::BankTrack)->Result<Settled,BankRe
         Some(owner)=>owner,
         None=>{drop(state);drop(lock);return Err(BankRefusal::Kept("CPU bank ticket/owner changed before settlement"));}
     };
-    let mut registry=match final_registry(helpers,Some(bank.token)) {
+    let mut registry=match final_registry(&helpers,Some(bank.token)) {
         Ok(registry)=>registry,
         Err(reason)=>{drop(state);drop(lock);return Err(BankRefusal::Kept(reason));}
     };
@@ -496,9 +497,12 @@ pub(super) unsafe fn bank_settled(bank:&super::BankTrack)->Result<Settled,BankRe
 /// descriptor is read directly under G, as `bank_restore` reads its fields. `helpers::BUSY` before any write retries
 /// on the next callback.
 #[cfg(feature="native-body-bank-alpha")]
-pub(super) unsafe fn exit_settled(bank:&super::BankTrack,exit:Option<super::MiiExit>)->Result<Settled,BankRefusal> {
+#[inline(never)] // rc.8 §7: its snapshots and MiiExit copies live in its own frame, not in bank_service's
+pub(super) unsafe fn exit_settled(bank:&super::BankTrack)->Result<Settled,BankRefusal> {
     let before=&bank.before;
-    let exit=exit.filter(|x|x.mii.ticket.epoch==before.binding.epoch)
+    // rc.8 §7: the kept exit is read here once and borrowed (`bank_settle` read it and passed a copy, filtered into another).
+    let kept=super::STATE.lock().mii_exit;
+    let exit=kept.as_ref().filter(|x|x.mii.ticket.epoch==before.binding.epoch)
         .ok_or(BankRefusal::Diverged("CPU warm exit without its kept Mii publication"))?;
     let b=pool(before.binding.entry,before.binding.epoch).map_err(BankRefusal::Diverged)?;
     if b!=before.binding {return Err(BankRefusal::Diverged("CPU warm exit G identity changed"));}
@@ -527,7 +531,7 @@ pub(super) unsafe fn exit_settled(bank:&super::BankTrack,exit:Option<super::MiiE
     let Some(owner)=state.owner.as_mut().filter(|o|current && o.expected==exit.adopted && o.live.target.saved().is_some()) else {
         return Err(BankRefusal::Diverged("CPU warm exit ticket/owner changed after the restore"));
     };
-    let mut registry=final_registry(helpers,Some(bank.token)).map_err(BankRefusal::Diverged)?;
+    let mut registry=final_registry(&helpers,Some(bank.token)).map_err(BankRefusal::Diverged)?;
     owner.live=bank.destination;owner.expected=now;
     registry.commit(now.authority(),now.original_kind,super::descriptor_kind(&now.descriptor));
     super::note("[GroupSwap] warm exit: CPU Mii publication restored; descriptor/header/body proof passed");
@@ -567,7 +571,7 @@ pub(super) unsafe fn generic_completed(g:&super::Generic,kind:u32,cursor:Option<
             || now.descriptor==crate::engine::swap::entry_window::original_request(live_origin,owner.origin.original_kind),
         roster_cursor:cursor,
     })?;
-    let registry=final_registry(now.helpers,Some(g.token))?;
+    let registry=final_registry(&now.helpers,Some(g.token))?;
     owner.expected=now;owner.live=destination;
     drop(registry);drop(state);drop(completion);Ok(now)
 }
@@ -648,7 +652,7 @@ pub(super) unsafe fn capture_origin(entry:usize,epoch:u64,kind:u32,catalog:&Cata
             && !state.busy() && state.generic.is_none() && state.request==request
             && state.reservation==reservation && super::epoch()==epoch
             && state.owner.as_ref().is_some_and(|o|o.expected==expected && o.live==live),"menu owner retired")?;
-        let registry=final_registry(now.helpers,None)?;
+        let registry=final_registry(&now.helpers,None)?;
         // No whole-snapshot adoption: origin and historical foreign-owner values
         // remain unchanged. Later tickets freeze a fresh, fully qualified union.
         state.owner.as_mut().unwrap().expected.descriptor=descriptor;
@@ -717,7 +721,7 @@ pub(super) unsafe fn capture_origin(entry:usize,epoch:u64,kind:u32,catalog:&Cata
     check(super::super::mii_saved_alpha::menu_epoch()==opening
         && state.capture && state.owner.is_none() && !state.busy() && !state.departed
         && super::epoch()==epoch,"CPU origin capture retired")?;
-    let mut registry=final_registry(helpers,None)?;
+    let mut registry=final_registry(&helpers,None)?;
     state.owner=Some(super::Owner{origin:now,origin_saved:c,expected:now,
         live:super::Destination{target:super::Target::ORIGINAL,cursor:None}});
     state.capture=false;state.menu_valid=true;
