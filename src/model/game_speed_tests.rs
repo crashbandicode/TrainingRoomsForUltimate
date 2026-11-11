@@ -51,15 +51,16 @@ fn training_steps_walk_the_speeds_and_stop_at_the_ends() {
     assert_eq!(step(&[], Speed::Half, Dir::Right), Speed::Half);
 }
 
+/// rc.8 R2: the lobby offers Training's five speeds, in the same order (2/3 and x1.5 through `model::lobby_speed`, never
+/// through the update rate).
 #[test]
-fn lobby_offers_only_slot_speeds() {
+fn lobby_offers_the_training_speeds() {
     let list = Place::Lobby.speeds();
-    assert_eq!(list, &[Speed::Quarter, Speed::Half, Speed::X1]);
-    for speed in list {
-        assert!(*speed == Speed::X1 || speed.slot_divisor().is_some(), "{speed:?} is not the slot alone");
-    }
-    assert_eq!(step(list, Speed::X1, Dir::Right), Speed::X1, "no speed-up in the lobby until QCF's proof");
-    assert_eq!(step(list, Speed::X1, Dir::Left), Speed::Half);
+    assert_eq!(list, Place::Training.speeds());
+    assert_eq!(list, &[Speed::Quarter, Speed::Half, Speed::TwoThirds, Speed::X1, Speed::OneAndHalf]);
+    assert_eq!(step(list, Speed::X1, Dir::Right), Speed::OneAndHalf);
+    assert_eq!(step(list, Speed::X1, Dir::Left), Speed::TwoThirds);
+    assert_eq!(step(list, Speed::TwoThirds, Dir::Left), Speed::Half);
     assert_eq!(step(list, Speed::Half, Dir::Left), Speed::Quarter);
 }
 

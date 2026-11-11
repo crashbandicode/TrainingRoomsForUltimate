@@ -36,6 +36,9 @@ pub mod rows_res_unload;
 /// rc.8: the game speed bind, the Training menu's own store-and-text path and the slow table's steps
 /// (`src/runtime/features/game_speed.rs`).
 pub mod rows_game_speed;
+/// rc.8 R2: the waiting-room practice's 2/3 and x1.5, the class update it hooks and the slow step and battle scheduler it
+/// relies on (`src/runtime/lobby/lobby_speed.rs`).
+pub mod rows_lobby_speed;
 /// The installer's outcome-slot bits and its late report (`[TrainingSeams] late …`, R-A0b).
 pub mod report;
 /// The hook-sharing drill's setting and sites (the diagnostic build's stand-ins).
@@ -198,10 +201,10 @@ impl Site {
 
 /// Every row file, in table order: the one list a new row file joins (`COUNT`, `SITES`, and the host
 /// tests' `all()` read it).
-const TABLES: [&[Seam]; 12] = [
+const TABLES: [&[Seam]; 13] = [
     rows_a1::ROWS, rows_a2::ROWS, rows_a3::ROWS, rows_a4::ROWS, rows_a5::ROWS, rows_identity::ROWS, rows_q15::ROWS,
     rows_lobby_items::ROWS, rows_lobby_persist::ROWS, rows_cpu_level::ROWS, rows_res_unload::ROWS,
-    rows_game_speed::ROWS,
+    rows_game_speed::ROWS, rows_lobby_speed::ROWS,
 ];
 
 const fn total(tables: &[&[Seam]]) -> usize {

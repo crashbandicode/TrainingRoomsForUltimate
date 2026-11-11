@@ -9,6 +9,8 @@ pub(crate) mod game_mode;
 #[cfg(feature = "practice-stage")]
 pub(crate) mod lobby_items;
 pub(crate) mod lobby_persist;
+/// rc.8 R2: the waiting-room practice's 2/3 pace and x1.5 extra pass (one hook on the waiting area's update).
+pub(crate) mod lobby_speed;
 pub(crate) mod lobby_stage;
 #[cfg(feature = "practice-stage")]
 pub(crate) mod practice_stage;
@@ -43,6 +45,8 @@ pub(crate) fn init() {
     crate::runtime::features::cpu_level::init();
     // rc.8 game speed: no hook, only its rows (the lobby's slot rides `frame`).
     crate::runtime::features::game_speed::init();
+    // rc.8 R2: the lobby's 2/3 pace and x1.5 pass ride one hook on the waiting area's update (after game speed's rows).
+    lobby_speed::init();
 }
 
 /// Once per game frame, before the input processing (the input poll's note for Player 1).

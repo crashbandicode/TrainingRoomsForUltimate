@@ -115,6 +115,8 @@ hook_ids! {
     /// rc.6 CPU level: the Training session clock (on the waiting-room poll) and the rank step on Player 1's frame.
     CpuLevelClock => "cpu_level_clock",
     CpuLevel => "cpu_level",
+    /// rc.8 R2: the waiting area's class update (the 2/3 slot's pace and x1.5's extra scheduler pass, `lobby_speed`).
+    LobbySpeed => "lobby_speed",
     /// Every hook that has no name of its own yet (`HookScope::enter()`): allocations inside them are
     /// still counted, their invocations are counted together.
     Other => "other",

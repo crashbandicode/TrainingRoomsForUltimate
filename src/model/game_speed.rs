@@ -70,9 +70,10 @@ impl Speed {
 
 /// Training's speeds the bind offers, slowest first. 1 Frame stays with the native menu: it is a pause-and-step mode.
 pub const TRAINING_SPEEDS: [Speed; 5] = [Speed::Quarter, Speed::Half, Speed::TwoThirds, Speed::X1, Speed::OneAndHalf];
-/// The waiting-room practice's speeds: the ones the slot gives alone (2/3 and x1.5 also raise the update rate, which the
-/// room's own timers count).
-pub const LOBBY_SPEEDS: [Speed; 3] = [Speed::Quarter, Speed::Half, Speed::X1];
+/// The waiting-room practice's speeds: Training's five (rc.8 R2). 1/2 and 1/4 are a slot alone; 2/3 and x1.5 never raise
+/// the update rate, which the room's own timers count: 2/3 is a paced slot and x1.5 an extra world step
+/// (`model::lobby_speed`).
+pub const LOBBY_SPEEDS: [Speed; 5] = TRAINING_SPEEDS;
 
 /// Where the bind runs.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -479,6 +480,18 @@ pub struct Held {
     pub divisor: u8,
 }
 
+/// Rewrite the divisor of `slot` from `from` to `to` and set dirty, only while it still holds `{1, from}` (the same
+/// bytes `take` writes). Returns whether it wrote.
+pub fn retarget(table: &mut (impl Bytes + ?Sized), slot: u8, from: u8, to: u8) -> bool {
+    let at = table::SLOTS_AT + 2 * usize::from(slot);
+    if usize::from(slot) >= table::SLOTS || table.get(at) != 1 || table.get(at + 1) != from {
+        return false;
+    }
+    table.set(at + 1, to);
+    table.set(table::DIRTY_AT, 1);
+    true
+}
+
 /// What a lobby step did.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LobbyStep {
@@ -490,17 +503,21 @@ pub enum LobbyStep {
     Dropped(Held),
     /// Every slot was in use: no slot, the speed stays x1 until one frees.
     NoFreeSlot,
+    /// 2/3's pace rewrote the held slot's divisor (the held record shows the new one).
+    Paced(Held),
 }
 
-/// The lobby's slot keeper (decisions 7 and 8): edge-triggered, one slot at most.
+/// The lobby's slot keeper (decisions 7 and 8): edge-triggered, one slot at most. 2/3's slot is paced (`pace`).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct LobbySlot {
     held: Option<Held>,
+    /// The held slot is 2/3's: `pace` rewrites its divisor, and `step` keeps it whatever divisor it holds.
+    paced: bool,
 }
 
 impl LobbySlot {
     pub const fn new() -> Self {
-        Self { held: None }
+        Self { held: None, paced: false }
     }
 
     pub const fn held(&self) -> Option<Held> {
@@ -513,26 +530,54 @@ impl LobbySlot {
     /// is dropped (a match's table can reuse the practice table's block with the game's own `{1, N}` at that slot; worker
     /// B's R8 finding). The teardown's `release` has freed it before then.
     pub fn step(&mut self, wanted: Speed, now: LobbyNow, bytes: Option<&mut dyn Bytes>) -> LobbyStep {
-        let divisor = wanted.slot_divisor().filter(|_| now.in_practice && !now.ui_busy && now.table != 0);
+        let slot = super::lobby_speed::LobbyPlan::of(wanted).slot().filter(|_| now.in_practice && !now.ui_busy && now.table != 0);
         if let Some(held) = self.held {
             if !now.in_practice {
                 self.held = None;
+                self.paced = false;
                 return LobbyStep::Dropped(held);
             }
-            if divisor == Some(held.divisor) && now.table == held.table {
+            let keep = now.table == held.table
+                && match slot {
+                    Some((_, true)) => self.paced,
+                    Some((divisor, false)) => !self.paced && divisor == held.divisor,
+                    None => false,
+                };
+            if keep {
                 return LobbyStep::Nothing;
             }
             return self.release(now.table, bytes);
         }
-        let (Some(divisor), Some(table)) = (divisor, bytes) else { return LobbyStep::Nothing };
+        let (Some((divisor, paced)), Some(table)) = (slot, bytes) else { return LobbyStep::Nothing };
         match take(table, divisor) {
             Some(slot) => {
                 let held = Held { table: now.table, slot, divisor };
                 self.held = Some(held);
+                self.paced = paced;
                 LobbyStep::Taken(held)
             }
             None => LobbyStep::NoFreeSlot,
         }
+    }
+
+    /// 2/3's pace, on the waiting area's update after its slow step (`current_n`, `sub`: the slow state's current
+    /// divisor and sub-counter): at a period's end the held paced slot gets the divisor `lobby_speed::paced_divisor`
+    /// asks for, written only in the table it was taken from and only while it still holds `{1, divisor}`. Anything
+    /// else (no paced slot, inside a period, another table, a slot the game took back) writes nothing; `step` and
+    /// `release` deal with the record.
+    pub fn pace(&mut self, current_n: u8, sub: u8, table_now: usize, bytes: Option<&mut dyn Bytes>) -> LobbyStep {
+        let Some(held) = self.held.filter(|_| self.paced) else { return LobbyStep::Nothing };
+        let Some(want) = super::lobby_speed::paced_divisor(current_n, sub) else { return LobbyStep::Nothing };
+        if want == held.divisor || table_now == 0 || table_now != held.table {
+            return LobbyStep::Nothing;
+        }
+        let Some(table) = bytes else { return LobbyStep::Nothing };
+        if !retarget(table, held.slot, held.divisor, want) {
+            return LobbyStep::Nothing;
+        }
+        let held = Held { divisor: want, ..held };
+        self.held = Some(held);
+        LobbyStep::Paced(held)
     }
 
     /// The practice's teardown, before the native one can reuse the table: the session clear on the practice P1's
@@ -541,6 +586,7 @@ impl LobbySlot {
     /// (`*(main+0x52c3610)` now) is still the table it was taken from and the slot still holds `{1, divisor}`; otherwise
     /// the record goes without a write.
     pub fn release(&mut self, table_now: usize, bytes: Option<&mut dyn Bytes>) -> LobbyStep {
+        self.paced = false;
         let Some(held) = self.held.take() else { return LobbyStep::Nothing };
         let freed = table_now != 0 && table_now == held.table && bytes.is_some_and(|table| free(table, held.slot, held.divisor));
         if freed {
@@ -552,6 +598,7 @@ impl LobbySlot {
 
     /// Forget the slot without a write.
     pub fn forget(&mut self) -> Option<Held> {
+        self.paced = false;
         self.held.take()
     }
 }
