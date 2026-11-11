@@ -1436,3 +1436,27 @@ ceiling = 164108
 date = "2026-11-11"
 reason = "rc.8 integration: p23/rc8-binds 9626926c (the lobby slot freed on the practice teardown, +33 over 1ecf920a) merged on 9d6c7e02 (164075) in p23/rc8-integration (integration 2026-11-11 09:45Z): 164075 + 33 = 164108"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.8 order (TASK-rc8.md) and the primary's 08:24Z defect order; a raise goes in its own commit with approved_by"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 164363
+date = "2026-11-11"
+reason = "rc.8 p23/rc8-binds Training speed fix over 9626926c (164043): the bind does the game's speed code on P1's poll (QCF's Q4, the primary 2026-11-11 10:12Z): model::game_speed registry_find, Rate, mode_apply, the mode/native constants; runtime training_apply, mode_object, state_off, step_clear, apply_now; the 12 new game_speed seam rows; measured 164363 at 2c2ca140 (tools/size_gate.py), +320"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.8 order (TASK-rc8.md) and the primary's 10:12Z order; a raise goes in its own commit with approved_by"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 164368
+date = "2026-11-11"
+reason = "rc.8 p23/rc8-binds over d13813fe (164363): the Training mode object's registry key 0x1022590708 and the apply line's thread (worker B's note); measured 164368 at 11a27788 (tools/size_gate.py), +5"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.8 order (TASK-rc8.md) and the primary's 10:12Z/11:09Z orders; a raise goes in its own commit with approved_by"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 164433
+date = "2026-11-11"
+reason = "rc.8 integration: p23/rc8-binds 1e6bbbe1 (R1, the Training speed apply and its registry key, +325 over 9626926c) merged on 38e58296 (164108) in p23/rc8-integration (integration 2026-11-11 12:19Z): 164108 + 325 = 164433"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.8 order (TASK-rc8.md R1, scope reopened 11:24Z); a raise goes in its own commit with approved_by"

@@ -6,8 +6,11 @@
 //! Facts (13.0.5, the owned main ELF; seam group `game_speed`):
 //! - Training's Speed item is a `u32` at `PauseMenu+0xb54`: 1 x1, 2 1 Frame, 3 2/3, 4 1/2, 5 1/4, 6 x1.5 (labels
 //!   `mel_training_speed*`). The menu setter's own path for an unchanged value stores it and writes the row's text with
-//!   `0x1bbbd30(menu, value, menu+0x538)`, with no slide and no sound. The game's per-update apply reads the field and
-//!   does the rest (rate and slot), edge-triggered.
+//!   `0x1bbbd30(menu, value, menu+0x538)`, with no slide and no sound.
+//! - The game applies it in `FUN_0155a000`'s speed code, edge-triggered against the Training mode object's `+0x194`, and
+//!   only on the pause/resume side: in closed-menu play that code is skipped (Eden 2026-11-11 `out-diag6`: 0 hits in
+//!   play, 137 with the menu open; QCF's RE 09:12Z). So the bind also does the apply's writes itself (`mode_apply`),
+//!   to the same object, found the way the game finds it (`registry_find`).
 //! - The slow table is `*(main+0x52c3610)`, 0x48 bytes: sixteen `{in_use, divisor}` byte pairs at +0x20 and a dirty
 //!   byte at +0x40. A new table has every slot `{0, 1}` and dirty set. The apply frees a slot as `{0, 1}` plus dirty,
 //!   and takes the first slot with `in_use` 0 as `{1, N}` plus dirty. `BattleObjectSlow::rate_request` then gives
@@ -217,10 +220,158 @@ pub mod native {
     pub const SPEED_TEXT_FN: usize = 0x1bbbd30;
     /// `main+0x52c3610`: the slow table's global (`game_speed.rate_request`).
     pub const SLOW_TABLE: usize = 0x52c3610;
+    /// `main+0x52c3910`: the word the battle's object registry is reached through, `[[main+0x52c3910]]`
+    /// (`game_speed.mode_key`).
+    pub const REGISTRY: usize = 0x52c3910;
+    /// `main+0x506fd10`: the Training mode object's class vtable (`game_speed.mode_vtable`).
+    pub const MODE_VTABLE: usize = 0x506fd10;
+    /// `main+0x593b444`: the rate code (`game_speed.rates_slow`).
+    pub const RATE_CODE: usize = 0x593b444;
+    /// `main+0x523d004`: game updates per second, 60/120/180 (`game_speed.rates_slow`).
+    pub const UPDATE_RATE: usize = 0x523d004;
+    /// `main+0x532f8b0`: the state whose `+8 -> +0x138` set and `+0x2b8 == 11` makes the apply read 0
+    /// (`game_speed.mode_state`).
+    pub const STATE: usize = 0x532f8b0;
+    /// `main+0x52b92e0`: the static guard of the 1 Frame step bits at `main+0x52b92ec` (`game_speed.step_clear`).
+    pub const STEP_GUARD: usize = 0x52b92e0;
+    pub const STEP_BITS: usize = 0x52b92ec;
+    /// `main+0x53398d8`: the object whose `[+8]` byte the apply clears on a change away from 1 Frame
+    /// (`game_speed.step_clear`).
+    pub const STEP_FLAG: usize = 0x53398d8;
+}
+
+/// The Training mode object (`FUN_0155a000`'s `this`, x25 there), as the speed code uses it.
+pub mod mode {
+    /// `+0x194`: the value the game applied last.
+    pub const APPLIED: usize = 0x194;
+    /// `+0x1b4`: its slot in the slow table, `NO_SLOT` for none.
+    pub const SLOT: usize = 0x1b4;
+    pub const NO_SLOT: u8 = 0xff;
+    /// The mode object's key in the battle's object registry: the game's per-update lookup (`.135ca40`–`.135ca48`)
+    /// and the battle setup's registration (`.14ed3b4`–`.14ed3c0`). Not `0x1308abad79`: that key holds another object
+    /// (vtable main+0x5070380, Eden 2026-11-11 `out-mode`).
+    pub const KEY: u64 = 0x10_2259_0708;
+    /// The registry hashes and compares the low 40 bits (`and x8, x2, #0xffffffffff`).
+    pub const KEY_MASK: u64 = 0xff_ffff_ffff;
+    /// The registry node: next at `+0`, hash at `+8`, key at `+0x10`, the object at `+0x18`.
+    pub const NODE_HASH: usize = 8;
+    pub const NODE_KEY: usize = 0x10;
+    pub const NODE_OBJECT: usize = 0x18;
+    /// The registry: buckets at `+0`, their count at `+8`.
+    pub const MAP_COUNT: usize = 8;
+    /// The state the apply reads 0 in (`[[main+0x532f8b0]+8]+0x2b8`).
+    pub const STATE_OFF: u8 = 11;
+    pub const STATE_SET: usize = 0x138;
+    pub const STATE_KIND: usize = 0x2b8;
+    /// The 1 Frame step bit at `main+0x52b92ec` the apply always clears.
+    pub const STEP_BIT: u32 = 1 << 2;
+    /// The registry walk's bound (a bucket chain is a handful of nodes).
+    pub const WALK: usize = 64;
+}
+
+/// The battle's object registry lookup the game itself uses (`FUN_015435c0`, a libc++ `unordered_map` find), read-only:
+/// `map` is `[[main+0x52c3910]]`, `read` gives the pointer-sized word at an address (`None` when it is no object field).
+/// Returns the object stored for `key`, the Training mode object for `mode::KEY` in Training.
+pub fn registry_find(map: usize, key: u64, read: &dyn Fn(usize) -> Option<u64>) -> Option<usize> {
+    let buckets = read(map)?;
+    let n = read(map + mode::MAP_COUNT)?;
+    if n == 0 {
+        return None;
+    }
+    let hash = key & mode::KEY_MASK;
+    let index = |h: u64| if n & (n - 1) == 0 { h & (n - 1) } else { h % n };
+    let bucket = index(hash);
+    let head = read((buckets as usize).checked_add(8 * bucket as usize)?)?;
+    if head == 0 {
+        return None;
+    }
+    let mut node = read(head as usize)?;
+    for _ in 0..mode::WALK {
+        if node == 0 {
+            return None;
+        }
+        let node_hash = read(node as usize + mode::NODE_HASH)?;
+        if node_hash == hash {
+            if (read(node as usize + mode::NODE_KEY)? ^ key) & mode::KEY_MASK == 0 {
+                return Some(read(node as usize + mode::NODE_OBJECT)? as usize);
+            }
+        } else if index(node_hash) != bucket {
+            return None;
+        }
+        node = read(node as usize)?;
+    }
+    None
+}
+
+/// What the game's speed code does for a speed: the rate code at `main+0x593b444`, the updates per second at
+/// `main+0x523d004` and the slow divisor it takes a slot for (jump table `0x44f0204`, `game_speed.rates_*`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Rate {
+    pub code: u32,
+    pub updates: u32,
+    pub divisor: Option<u8>,
+}
+
+impl Speed {
+    pub const fn rate(self) -> Rate {
+        match self {
+            Speed::X1 | Speed::OneFrame => Rate { code: 0, updates: 60, divisor: None },
+            Speed::TwoThirds => Rate { code: 4, updates: 120, divisor: Some(3) },
+            Speed::Half => Rate { code: 0, updates: 60, divisor: Some(2) },
+            Speed::Quarter => Rate { code: 0, updates: 60, divisor: Some(4) },
+            Speed::OneAndHalf => Rate { code: 6, updates: 180, divisor: Some(2) },
+        }
+    }
+}
+
+/// The writes of one Training apply, beside the slot bytes `mode_apply` made in the table.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ModeApply {
+    /// `+0x194`.
+    pub value: u32,
+    /// `+0x1b4` (`mode::NO_SLOT` without one).
+    pub slot: u8,
+    pub code: u32,
+    pub updates: u32,
+    /// The mode object's previous slot, freed in the table.
+    pub freed: Option<u8>,
+    /// Whether the table's dirty byte must be set (last, after every other write).
+    pub dirty: bool,
+}
+
+/// The game's speed code for a change of the applied value to `speed` (`.155b5b8`–`.155bbb8`), which the game runs only
+/// on the pause/resume side: free the mode object's slot `slot` if it is in use (`{0, 1}`), then take the first free
+/// slot for the speed's divisor as `{1, N}` (none when all 16 are in use, as native). `applied`/`slot` are the object's
+/// `+0x194`/`+0x1b4`. The dirty byte is not written here: the caller sets it last. `None` when `speed` is applied already.
+pub fn mode_apply(speed: Speed, applied: u32, slot: u8, table: &mut (impl Bytes + ?Sized)) -> Option<ModeApply> {
+    if applied == speed.value() {
+        return None;
+    }
+    let mut out = ModeApply { value: speed.value(), slot: mode::NO_SLOT, code: 0, updates: 0, freed: None, dirty: false };
+    if slot != mode::NO_SLOT && usize::from(slot) < table::SLOTS {
+        let at = table::SLOTS_AT + 2 * usize::from(slot);
+        if table.get(at) != 0 {
+            table.set(at, 0);
+            table.set(at + 1, 1);
+            out.freed = Some(slot);
+            out.dirty = true;
+        }
+    }
+    let rate = speed.rate();
+    (out.code, out.updates) = (rate.code, rate.updates);
+    if let Some(divisor) = rate.divisor {
+        if let Some(free) = (0..table::SLOTS).find(|i| table.get(table::SLOTS_AT + 2 * i) == 0) {
+            table.set(table::SLOTS_AT + 2 * free, 1);
+            table.set(table::SLOTS_AT + 2 * free + 1, divisor);
+            out.slot = free as u8;
+            out.dirty = true;
+        }
+    }
+    Some(out)
 }
 
 /// Every row the bind relies on; all must pass the boot gate or the speed bind is off.
-pub const SEAM_ROWS: [&str; 11] = [
+pub const SEAM_ROWS: [&str; 23] = [
     "game_speed.speed_store_text",
     "game_speed.speed_text",
     "game_speed.training_chain",
@@ -232,6 +383,18 @@ pub const SEAM_ROWS: [&str; 11] = [
     "game_speed.max_divisor",
     "game_speed.table_create",
     "game_speed.table_destroy",
+    "game_speed.mode_key",
+    "game_speed.mode_find",
+    "game_speed.mode_walk",
+    "game_speed.mode_found",
+    "game_speed.mode_vtable",
+    "game_speed.mode_gate",
+    "game_speed.mode_state",
+    "game_speed.step_clear",
+    "game_speed.rates_slow",
+    "game_speed.rates_half",
+    "game_speed.rates_fast",
+    "game_speed.slot_divisors",
 ];
 
 /// What the UI tick writes for a wanted Training speed: the native store and then the text, only when the game's own

@@ -25,8 +25,9 @@ ROWS = [
      "jump table `0x44f8a24`, `0x377a120(pane, label)`. Its only callers are the setter's two paths: the menu never "
      "refreshes the row's text by itself."),
     ("game_speed.training_chain", 0x155B4A4, "SeamKind::Relied", True, False,
-     "The per-update apply (`0x1559590`) finds Training's object: `ldr w19,[x25,#0x194]` (the applied value), "
-     "`[[[main+0x52c3420]+8]]` then `+0xb38`; no object, and it applies 0, which sets no speed."),
+     "The speed code of `FUN_0155a000` (x25 the Training mode object) finds Training's menu: `ldr w19,[x25,#0x194]` "
+     "(the applied value), `[[[main+0x52c3420]+8]]` then `+0xb38`; no object, and it applies 0, which sets no speed. "
+     "The game reaches this code only on the pause/resume side (`game_speed.mode_gate`)."),
     ("game_speed.training_value", 0x155B574, "SeamKind::Relied", True, False,
      "The same apply reads the pause menu's Speed: `[[[[x20+0xb38]]+0x210]+8]+0x80`, `ldr w8,[x8,#0xb54]`, then on a "
      "change `str w8,[x25,#0x194]` (edge-triggered): the field the bind writes is the one the game applies."),
@@ -52,6 +53,46 @@ ROWS = [
     ("game_speed.table_destroy", 0x134D52C, "SeamKind::Relied", True, False,
      "The battle teardown frees the table and stores 0 at `main+0x52c3610`, beside the BattleObjectManager teardown: the "
      "practice's table goes with the practice."),
+    # The Training apply the bind does itself (the game runs its speed code only on the pause/resume side; Eden
+    # 2026-11-11 out-diag6, QCF 09:12Z/09:18Z), and the way to the object it applies to.
+    ("game_speed.mode_key", 0x135CA34, "SeamKind::Relied", True, False,
+     "The game's own per-update lookup of the Training mode object (`FUN_0135ca00`, every battle task entry): "
+     "`[[main+0x52c3910]]` (the object registry), key `0x1022590708` (`mov`/`movk`/`movk`), `bl 0x15435c0` (the "
+     "registry find). The battle setup registers the mode factory's object under it (`.14ed3b4`-`.14ed3c4`; QCF "
+     "11:16Z). Key `0x1308abad79` holds another object, vtable main+0x5070380 (Eden 2026-11-11 out-mode). The bind "
+     "walks the same registry for the same key (Eden out-key: x25, vtable main+0x506fd10)."),
+    ("game_speed.mode_find", 0x15435CC, "SeamKind::Relied", True, False,
+     "The registry find (a libc++ unordered_map): bucket count `[map+8]` (0: none), hash `key & 0xffffffffff`, bucket "
+     "`hash & (n-1)` for a power of two else `hash % n`, `[[map] + 8*bucket]` the bucket's head, `[head]` its first node."),
+    ("game_speed.mode_walk", 0x154365C, "SeamKind::Relied", True, False,
+     "The node walk: hash at `+8` (a node of another bucket ends the walk), key at `+0x10` compared under the same "
+     "40-bit mask, the next node at `+0`."),
+    ("game_speed.mode_found", 0x15436A4, "SeamKind::Relied", True, False,
+     "A found node: `ldp x9, x19, [x10, #0x18]`, the object at `+0x18` and its control block at `+0x20` (the bind takes "
+     "the object only, no reference)."),
+    ("game_speed.mode_vtable", 0x1555ED0, "SeamKind::Relied", True, False,
+     "The Training mode object's constructor stores its class vtable `main+0x506fd10` at `+0`: the bind writes only to "
+     "an object with this vtable (in other modes the same key holds another mode's object)."),
+    ("game_speed.mode_gate", 0x155A08C, "SeamKind::Relied", True, False,
+     "Why the bind applies the speed itself: `FUN_0155a000` skips its speed code to `.155a6d0` while `HUD+0x232` is set "
+     "(each running update sets it) and `[[menu+0x7b0]]+0x25c == 0` or `HUD+0x240 == 2` and `FUN_0159d380()` is false: "
+     "in closed-menu play the menu's Speed is never applied."),
+    ("game_speed.mode_state", 0x155B4D8, "SeamKind::Relied", True, False,
+     "The speed code reads the menu's value only outside one state: `[main+0x532f8b0]` -> `+8`, `+0x138` set and byte "
+     "`+0x2b8 == 11` means it applies 0. The bind applies nothing then either."),
+    ("game_speed.step_clear", 0x155B5F0, "SeamKind::Relied", True, False,
+     "On a change the apply clears bit 2 of `main+0x52b92ec` (the 1 Frame step bit, behind the static guard byte "
+     "`main+0x52b92e0`) and, for a value other than 1 Frame, the byte at `[[main+0x53398d8]+8]`. The bind does the same."),
+    ("game_speed.rates_slow", 0x155B654, "SeamKind::Relied", True, False,
+     "x1 and 1 Frame: rate code `main+0x593b444 = 0`, updates `main+0x523d004 = 60`; 2/3: code 4, updates 120, then a "
+     "slot from the table's first free one."),
+    ("game_speed.rates_half", 0x155B75C, "SeamKind::Relied", True, False,
+     "1/2 and 1/4: code 0, updates 60, then a slot (divisor 2 or 4)."),
+    ("game_speed.rates_fast", 0x155B85C, "SeamKind::Relied", True, False,
+     "x1.5: code 6, updates 180, then a slot with divisor 2."),
+    ("game_speed.slot_divisors", 0x155BB60, "SeamKind::Relied", True, False,
+     "The take's divisors 2 and 3: `strb #1` in_use, `orr w11,wzr,#2` / `#3`, then `strb w11,[x9,#0x21]` "
+     "(`game_speed.slot_take` holds 4, dirty and `+0x1b4`)."),
 ]
 
 

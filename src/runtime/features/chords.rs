@@ -94,6 +94,7 @@ pub unsafe fn on_poll(controller: usize) {
     };
     let (accepted, chord_bits, hold, display) = accepted;
     crate::runtime::features::game_speed::on_hold(hold, style);
+    crate::runtime::features::game_speed::training_apply();
     if display {
         crate::runtime::ui::worker::request_input_display_toggle();
     }
