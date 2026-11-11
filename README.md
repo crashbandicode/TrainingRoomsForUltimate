@@ -48,6 +48,9 @@ In the menu: L/R change page, ZL + Up/Down jumps to the previous or next section
 current values as defaults, B goes back. Each page ends with *Reset page to defaults*, which asks first. The menu reopens
 where you left it. The chords are edited on Display & Controls › Button chords.
 
+The key hints at the foot of every page end with the build tag: the version, then `rc8` and the commit the NRO was
+built from, for example `0.2.0-rc.6 · rc8 eca14e4b`. A build from uncommitted changes adds `-dirty`.
+
 ## Features
 
 Clips are Eden footage of the 0.2.0-rc.1 release NRO `706c993f`, recorded 2026-11-05, except those marked RC10 or with
@@ -105,6 +108,9 @@ around. Let go and the pop-up closes; the speed stays.
 - **In the waiting-room practice** the speed is local: 1/4, 1/2, 2/3, x1 and x1.5 change only your practice, while the
   room's timers and the other player stay at normal speed. Each practice session starts at x1.
 - It never changes a Quickplay or online match: a match always starts at normal speed.
+- **With the standalone CPU pilot** driving Player 1, the chord works the same way. In the waiting-room practice the
+  pilot still gets one input per game update at every speed, x1.5 included, so its inputs are never doubled.
+  <!-- R14 (worker B's r14bc-eca14e4b pair): keep this line only if R14 passes on the final head. -->
 
 Both chords are rows of Display & Controls › Button chords ("Input display" and "Game speed"), editable and clearable
 like the others.
@@ -168,7 +174,9 @@ What rc.6 changes is [docs/RELEASE-NOTES-rc6.md](docs/RELEASE-NOTES-rc6.md).
 on Player 1 and two jabs; the pop-up then lists "Macro 1" (Recorded on Mario) and its start save "Macro 1 · start".
 Playback is shown in [docs/RECORDING.md](docs/RECORDING.md). Cuts inside are listed in [docs/MEDIA.md](docs/MEDIA.md).*
 
-Known issue: when the standalone CPU pilot controls Player 1, Record isn't refused yet (fix planned).
+While an AI drives Player 1, for example the standalone CPU pilot, Record is refused, from the chord and from the
+pop-up: the notice reads "P1 is controlled by an AI: recording is off", and nothing is recorded. A recording that is
+already running can always be stopped.
 
 ### Combos
 
@@ -273,6 +281,11 @@ standing; the game's own waiting-room menu, Training Partners 1, Right to 2; a s
 
 The same menu works while you wait in an online or local room. The Training partners and CPU action you set in the
 game's own waiting-room menu are remembered for the next room, and CPU › Level › CPU Level sets the partners' level.
+
+With the CPU pilot plugin 0.2.3 (`libssbu_cpu_pilot.nro`), the pilot can also drive Player 1 in Quickplay's
+waiting-room practice. Arm it from its CPU Pilot page as in Training. The practice shows no `CPU Lv` tag, and when a
+match is found the pilot keeps Player 1 in the match. The lobby tools above work beside it, Record is refused while it
+drives, and the Game speed chord works at every speed.
 
 ![Save last combo in a Local Wireless waiting room, then the helper bar drills it there](docs/media/rc6-lobby-combos.gif)
 

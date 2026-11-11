@@ -116,8 +116,9 @@ evidence clips stay outside this repository): Player 1's HUD reads MARIO; the ov
 "Player" to "CPU (L3)" and the HUD from MARIO to CPU Lv3; the pilot dashes Player 1; Record shows "Input Recording ·
 Lockout", then "Recording".
 
-The README, DIFFERENCES-FROM-THE-FORK.md and the rc.6 release notes carry it as a known issue: when the standalone CPU
-pilot controls Player 1, Record isn't refused yet (fix planned). The fix is planned for rc.9.
+rc.8 fixes it (`p23/rc8-pilot-refusal` `8607526b`, merged into the rc.8 head `eca14e4b`): the Record chord now asks the
+same refusal as every other record start, so the README and DIFFERENCES-FROM-THE-FORK.md describe the refusal instead
+of a known issue. The clip is retaken on `eca14e4b` in the staged boot `docs-rd10-eca14e4b` (`fx-record-refused`).
 
 Retired from the README (each carried the bar):
 - `mii-editor.gif` and `mii-editor-list.gif` (2026-11-05): `rc7-mii-editor.gif` shows the editor, the new row and the
