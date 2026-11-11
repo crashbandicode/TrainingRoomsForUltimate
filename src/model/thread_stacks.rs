@@ -205,7 +205,7 @@ impl CallbackStack {
     /// The plugin's part fits its own stack, and what stays on the game's stack fits the room measured there; each with
     /// the rows' margin and SDK reserve.
     pub const fn covers(&self) -> bool {
-        self.bytes % 4096 == 0 && self.bytes >= required(self.static_bound, 0) && required(self.native_bound, 0) <= self.native_room
+        self.bytes.is_multiple_of(4096) && self.bytes >= required(self.static_bound, 0) && required(self.native_bound, 0) <= self.native_room
     }
 }
 
