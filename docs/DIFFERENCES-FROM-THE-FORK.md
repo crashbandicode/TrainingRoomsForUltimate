@@ -18,7 +18,7 @@ This page lists only the changes, each checked against the code of 0.2.0-rc.3 (`
 
 ## Menu
 
-![The five pages](media/menu-tour.gif)
+![The five pages](media/rc7-menu-tour.gif)
 
 | Change | Where in the code |
 | --- | --- |

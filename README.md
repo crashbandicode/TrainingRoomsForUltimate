@@ -2,10 +2,11 @@
 
 Practice tools for Training mode and the online waiting rooms of Super Smash Bros. Ultimate 13.0.5, as a Skyline plugin.
 
-![The TrainingRooms menu: B + D-pad Up opens it, R steps through the five pages](docs/media/menu-tour.gif)
+![The TrainingRooms menu: the five pages, then Hitbox Visualization turned On](docs/media/rc7-menu-tour.gif)
 
-*Eden, 2026-11-05, 0.2.0-rc.1 release NRO `706c993f`: the menu opens, R steps through the five pages, A turns Hitbox
-Visualization Off.*
+*Eden, 2026-11-11, rc.7 `722525a5` as shipped (diag NRO `cfec85c7`, log lines only; release NRO `b6e60bb9`): Training,
+the menu on CPU, then Saves, Recording, Fighters & Stages and Display & Controls; Hitbox Visualization is turned On, and
+back in Training yellow shapes cover both fighters. Cuts inside are listed in [docs/MEDIA.md](docs/MEDIA.md).*
 
 ## Install
 
@@ -50,11 +51,15 @@ their own build; see [docs/MEDIA.md](docs/MEDIA.md).
 
 ### Hitboxes and grab boxes
 
-![Forward smash with the overlay on: yellow hurtboxes on both fighters](docs/media/hitbox-overlay.gif)
+![Hitbox Visualization turned On, then a forward smash](docs/media/rc7-hitbox.gif)
+
+*Eden, 2026-11-11, rc.7 `722525a5` as shipped (diag NRO `cfec85c7`, log lines only): Training with nothing drawn;
+Display & Controls › Hitbox Visualization from Off to On; back in Training yellow shapes cover both fighters, and
+Player 1's forward smash sends the CPU from 6.3% to 24.8%.*
 
 Hitbox Visualization (Display & Controls) draws the fighters' hurtboxes (yellow), hitboxes and grab boxes. Since rc.3
 every fighter sphere is the plugin's own disc, so none is ever missing, even with two large fighters; projectiles keep
-the game's effect spheres, and the discs trail the camera by one to two frames while it pans. (The clip shows rc.1.)
+the game's effect spheres, and the discs trail the camera by one to two frames while it pans.
 
 ### Frame strip
 
@@ -86,9 +91,22 @@ and with no DI.
 The direction chips show the game's own DI line and SDI streak; each A adds weight to a chip. *In* and *Out* are
 relative to you, on either side of the CPU.
 
+*CPU Level* (CPU › Level: Off, or Lv 1–9) replaces Training's own CPU level. When the two differ as Training starts, a
+notice says so once.
+
+![Training's CPU card at Lv. 3; in Training, the notice names both levels](docs/media/rc7-cpu-level-notice.gif)
+
+*Eden, 2026-11-11, rc.7 `b3678dfe` (diag NRO `9dfc784c`, log lines only): CPU Level is Lv 7. The character select's CPU
+card reads CPU Lv. 3; in Training the notice reads "Lv 7 from TrainingRooms (Training menu: Lv 3)". Cuts inside are
+listed in [docs/MEDIA.md](docs/MEDIA.md).*
+
 ### Save states and respawn
 
-![Respawn on platform](docs/media/respawn-on.gif)
+![Respawn on platform turned On, then a fall off the stage: back on the revival platform](docs/media/rc7-respawn-on.gif)
+
+*Eden, 2026-11-11, rc.7 `722525a5` as shipped (diag NRO `cfec85c7`, log lines only): Fighters & Stages › Stages ›
+Respawn on platform from Off to On; Player 1 runs off the left side and is KO'd; Player 1 comes back on the revival
+platform at the top. Cuts inside are listed in [docs/MEDIA.md](docs/MEDIA.md).*
 
 Named save states (one bound to Save and Load at a time), mirroring and damage on load (Saves page). *Respawn on platform* (Fighters & Stages ›
 Stages) chooses between the game's respawn platform (above) and the instant respawn.
@@ -112,10 +130,11 @@ While the CPU pilot plugin plays Player 1, recording is refused with a notice.
 
 ### Combos
 
-![The combo helper grading two attempts against a true combo: on time, then 3f early](docs/media/combo-helper.gif)
+![The combo helper grading a drilled combo: Combo 1, jab → jab, TRUE −5, on time](docs/media/rc7-combo-helper.gif)
 
-*The combo helper bar under the frame strip: the saved up tilt → up tilt (TRUE −4) attempted on time, then 3 frames
-early. Eden, 2026-11-05, `ff69e53` (release `031f1eae…`).*
+*Eden, 2026-11-11, rc.7 `722525a5` as shipped (diag NRO `cfec85c7`, log lines only): the pop-up's COMBOS with Combo 1
+(jab → jab) drilled; the jabs; the bar under the frame strip grades the attempt: TRUE −5, on time. Cuts inside are
+listed in [docs/MEDIA.md](docs/MEDIA.md).*
 
 *+ Save last combo…*, the first row of COMBOS on the Recording page and in the recording pop-up, keeps your last combo
 as a file and makes it the drill. With *Combo helper* On, a bar under the frame strip grades each attempt link by link:
@@ -148,21 +167,14 @@ waits only while Kirby is on screen, and for a second Mii group while a Mii is o
 (`background_build_eligible`, `src/model/swap/body_bank.rs:852`). Raising No. of CPUs brings in the CPU cycle's next
 fighters, a saved Mii included.
 
-![P1's hat chord on the CPU Kirby](docs/media/cpu-kirby-hat.gif)
+![Player 1's Kirby: the hat chord twice, two hats in turn](docs/media/rc7-kirby-hats.gif)
+
+*Eden, 2026-11-11, rc.7 `722525a5` as shipped (diag NRO `cfec85c7`, log lines only): Player 1 is a plain Kirby; the hat
+chord gives Falco's hat, and again Sheik's.*
 
 Kirby hats change with a chord, for Player 1 or the CPU.
 
 ### Mii fighters
-
-![Add New opens the game's own Mii editor; a special is picked and saved](docs/media/mii-editor.gif)
-
-*Add New opens Smash's Mii Fighter editor: Neutral Special 3 picked, OK, Save. Eden, 2026-11-05, `ff69e53` (release
-`031f1eae…`).*
-
-![The new Mii in the Mii Brawler list, picked as the Player choice](docs/media/mii-editor-list.gif)
-
-*A new Mii (2. 格斗 [2111]) in the Mii Brawler list, picked as the Player choice. Eden, 2026-11-05, `ff69e53` (release
-`031f1eae…`).*
 
 Each Mii class (Fighters & Stages › Mii Brawler, Swordfighter, Gunner) lists your saved Miis per role (ZR switches
 Player and CPU). *Add New…* opens Smash's own Mii Fighter editor from Training. Saving creates a new Mii and leaves the
@@ -185,10 +197,11 @@ Mii file was written. Cuts inside are listed in [docs/MEDIA.md](docs/MEDIA.md).*
 
 ### Stages
 
-![Change Stage: Battlefield, Y for its Ω form, and Training reloads there](docs/media/change-stage.gif)
+![Change Stage: Battlefield, Y for its Ω form, and Training reloads there](docs/media/rc7-change-stage.gif)
 
-*Eden, 2026-11-05, rc.3 `3c8f5bc` (release NRO `bf01353e…`): Battlefield picked in the grid, Y for its Ω form, A closes
-the menu, and Training reloads on Battlefield Ω.*
+*Eden, 2026-11-11, rc.7 `722525a5` as shipped (diag NRO `cfec85c7`, log lines only): Training; Fighters & Stages ›
+Change Stage, the cursor from Waiting Room to Battlefield [N], Y gives [Ω], A; "Practice Stage · Stage requested"; and
+Training reloads on Battlefield Ω. Cuts inside are listed in [docs/MEDIA.md](docs/MEDIA.md).*
 
 *Change Stage* (Fighters & Stages › Stages) goes to the stage you pick when the menu closes, in Training and in
 waiting-room practice; Y picks its form first.

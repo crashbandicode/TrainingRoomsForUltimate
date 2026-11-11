@@ -4,6 +4,35 @@ Every GIF in [`media/`](media/) is actual Eden footage: whole screen, 1280×720,
 game-speed timing kept, trimmed at the ends (any cut inside a clip is listed with it). Frames were reviewed (start,
 action, result) before a clip was kept. The raw takes stay outside git with their runs.
 
+## Post-ship refresh: rc.7 as shipped (2026-11-11)
+
+- **Why:** many earlier clips carry a line of text across the frame, "Key BTN - LS +0000,+0000 RS +0000,+0000 GC LT ---
+  RT ---". It comes from another plugin, `libsmash_gamepad_overlay.nro`, which was in the capture sessions' plugin set.
+  The rc.1–rc.4 clips also show the fork's old 15-row input log at the left edge.
+  - The audit is `artifacts/phase23/feature-gifs/POSTSHIP-RETAKES.md`: 43 of the 68 GIFs carry the bar.
+  - Every docs capture now leaves that plugin out.
+- **Build:** rc.7 `722525a5` as shipped (release NRO `b6e60bb9…`). The clips use the same commit's diag NRO
+  `cfec85c7…`, because the rows check its log lines; the diag build adds log lines only.
+- **Runs:** the Yoga, one instance, 2026-11-11: `docs-rd2-722525a5` (05:06–05:14Z), `docs-rd2b-722525a5`
+  (05:27–05:34Z) and `docs-rd3b-722525a5` (05:18–05:23Z).
+- **Review and cuts:** each take's frames were read on its row's timeline. The cuts use `clips.py cutw` at 10 fps, as
+  above.
+
+| File | Run, row | Embedded in | Length, size | Raw windows kept | What the frames show |
+| --- | --- | --- | --- | --- | --- |
+| `media/rc7-menu-tour.gif` | `docs-rd2b-722525a5`, `fx-menu-tour-hitbox` | README (top), DIFFERENCES-FROM-THE-FORK.md | 7.5 s, 3.6 MB | 4.0–4.6, 7.6–8.6, 9.9–10.7, 11.4–12.2, 12.9–13.7, 14.5–15.5, 24.6–25.6, 28.5–30.0 s | Training with nothing drawn; the menu on CPU, then Saves, Recording, Fighters & Stages, Display & Controls (Hitbox Visualization [OFF]); [ON]; back in Training, yellow shapes cover Mario and Jigglypuff. |
+| `media/rc7-hitbox.gif` | `docs-rd2b-722525a5`, `fx-menu-tour-hitbox` | README, Hitboxes and grab boxes | 8.8 s, 8.0 MB | 4.0–4.8, 22.3–25.0, 28.5–33.8 s | 0–0.8 s Training, nothing drawn; 0.8–2.1 s Display & Controls, Hitbox Visualization [OFF] focused, then [ON]; 3.5–8.8 s yellow shapes on both fighters, Player 1's forward smash, the CPU 6.3% → 24.8%. The row's own help text reads "Hurtboxes are not available in this RC". |
+| `media/rc7-respawn-on.gif` | `docs-rd2b-722525a5`, `fx-respawn-on` | README, Save states and respawn | 9.6 s, 9.1 MB | 3.0–3.5, 17.9–19.2, 24.0–27.8, 34.0–38.0 s | 0–0.5 s Training; 0.5–1.8 s Fighters & Stages › Stages, Respawn on platform [OFF] focused, then [ON]; 1.8–5.6 s Player 1 runs off the left side and is KO'd; 5.6–9.6 s Player 1 on the revival platform at the top, coming down. The take has a second KO between 27.8 and 34.0 s (the run-off macro went on after the first respawn); the platform shown follows it. |
+| `media/rc7-change-stage.gif` | `docs-rd2b-722525a5`, `fx-change-stage` | README, Stages | 5.4 s, 3.1 MB | 0.0–0.8, 8.8–10.0, 10.6–11.6, 12.4–13.6, 18.6–19.8 s | Training; the Change Stage grid, the cursor from Waiting Room to Battlefield [N]; Y gives Battlefield [Ω] ("Form: Omega"); A, and "Practice Stage · Stage requested"; Training on Battlefield Ω. |
+| `media/rc7-kirby-hats.gif` | `docs-rd3b-722525a5`, `fx-p1-kirby-hats` | README, Fighters, cycles and Kirby hats | 8.1 s, 7.1 MB | 0.0–8.1 s (the whole take) | 0–1.1 s Player 1's plain Kirby vs Olimar; the hat chord; 4.4 s Kirby wears Falco's hat; the chord again; 7.4 s Sheik's hat. |
+| `media/rc7-combo-helper.gif` | `docs-rd2-722525a5`, `fx-make-combo-drill` | README, Combos | 5.4 s, 6.1 MB | 42.8–44.0, 50.8–55.0 s | The pop-up's COMBOS with Combo 1 (made from Macro 1, jab → jab) drilled; back in Training the jabs; the bar under the frame strip: "Combo 1 · 1 Jab>Jab · TRUE −5 · on time". |
+
+Retired from the README (each carried the bar):
+- `mii-editor.gif` and `mii-editor-list.gif` (2026-11-05): `rc7-mii-editor.gif` shows the editor, the new row and the
+  pick;
+- `menu-tour.gif`, `hitbox-overlay.gif`, `respawn-on.gif`, `change-stage.gif`, `cpu-kirby-hat.gif`,
+  `combo-helper.gif`: replaced above.
+
 ## rc.7 docs clips (2026-11-10)
 
 - **Build:** rc.7 `7d720c68` (`p23/rc7-final` at 21:06Z: F1 plus the Fighter Mismatch role fix), the diag NRO
@@ -11,6 +40,8 @@ action, result) before a clip was kept. The raw takes stay outside git with thei
   scheduler fix. None of these three clips depends on that code.
 - **Run:** `docs-rc7b-7d720c68`, the Surface, one instance, 2026-11-10 21:38–22:38Z. 30 of 30 rows passed, after one
   retry of four rows that had failed on harness faults.
+- **Also:** `docs-rc7c-b3678dfe`, the XPS, one instance, 2026-11-11 01:44–01:52Z, on rc.7's final head `b3678dfe`
+  (diag NRO `9dfc784c…`), for `rc7-record-macro` and `rc7-cpu-level-notice`.
 - **Review and cuts:**
   - Each take was reviewed against its row's own timeline (`take_timeline.py`; batch F in
     `artifacts/phase23/feature-gifs/takes/verdicts/`).
@@ -24,6 +55,8 @@ action, result) before a clip was kept. The raw takes stay outside git with thei
 | `media/rc7-mismatch-player1.gif` | `docs-rc7b-7d720c68`, `cov-combo-other-fighter` | RECORDING.md, Fighter Mismatch | 5.8 s, 3.9 MB | 48.6–51.2, 53.0–56.2 s | 0–0.8 s the pop-up's COMBOS, the cursor on Luigi jabs ("Recorded on Luigi"); 0.8–2.2 s Fighter Mismatch, the footer "Recorded Luigi · current Player 1 Mario", Keep focused; 2.2–2.6 s "Switch to recorded fighter" focused and chosen; 2.6–4.6 s the match, Player 1 still Mario (HUD MARIO); 4.7–5.8 s Luigi drops in as Player 1, "Player Character · Player fighter applied", HUD LUIGI. Player Swapping was Off (it doesn't block this switch). |
 | `media/rc7-mii-editor.gif` | `docs-rc7b-7d720c68`, `fx-mii-editor-use` | README, Mii fighters | 7.3 s, 5.2 MB | 19.43–20.43, 34.92–36.42, 63.72–64.32, 67.12–68.62, 73.6–76.3 s | 0–1.0 s Smash's Mii Fighter Settings, specials 1/1/1/1; 1.0–2.4 s Neutral Special 2 Flashing Mach Punch and Side Special 2 Burning Dropkick, Save; 2.4–2.5 s the panel closes (Save); 2.5–3.1 s the Mii Brawler list with a fourth row, "4. 格斗 [2211]", the "> " on row 1; 3.1–3.8 s row 4 focused; 3.8–4.6 s "4. > 格斗 [2211]" (the marker leaves row 1); 4.6–7.3 s Training, Player 1 is Mii Brawler ("Player Mii configuration applied"), and B is the new neutral special's punch rush (strip: a multi-hit move). The row also checked that one new Mii file was written and nothing else changed. |
 | `media/rc7-lobby-stages-rotation.gif` | `docs-rc7b-7d720c68`, `fx-lobby-stages-rotation` | README, Stages | 7.8 s, 6.3 MB | 12.32–14.2, 24.92–27.4, 43.52–44.4, 66.67–69.2 s | 0–1.9 s the Lobby Stages grid: "1. Waiting Room", "2. Big Battlefield"; 1.9–3.0 s Training Stage Rotation [ON], the menu closes; 3.0–4.4 s Training on the training stage (Mario vs Donkey Kong); 4.4–5.3 s the character select, READY TO FIGHT; 5.3–7.8 s Training opens on Big Battlefield (Mario vs Dark Pit). The plugin's log names the stage it applied (`[TrainingRotation] apply`, stage 2). |
+| `media/rc7-record-macro.gif` | `docs-rc7c-b3678dfe`, `fx-record-list` | RECORDING.md, Recording a macro | 6.6 s, 3.4 MB | 11.7–12.9, 15.3–16.0, 18.1–18.7, 20.3–20.9, 22.5–23.9, 26.4–28.5 s | 0–1.2 s the pop-up on Player 1: SAVE STATES (0), MACROS (0); 1.2–1.9 s Record (the pop-up opens and closes on Player); 1.9–3.1 s two jabs; 3.1–4.4 s the stop (the pop-up's role to CPU, the chord again); 4.4–6.6 s the pop-up: SAVE STATES (1) "Macro 1 · start", MACROS (1) "Macro 1" (Recorded on Mario), and CONNECTIONS "start save of Macro 1". The row checked that `macro-1.json` and `macro-1-start.json` are new. |
+| `media/rc7-cpu-level-notice.gif` | `docs-rc7c-b3678dfe`, `fx-lc-entry-notice` | README, CPU reactions | 9.7 s, 7.1 MB | 0.0–0.6, 4.2–5.4, 17.4–19.0, 21.1–22.9, 33.9–38.4 s | 0–0.6 s Training, Mario vs Hero; 0.6–1.8 s the pause menu (CPU Behavior Stop), Quit Training; 1.8–3.6 s the character select, the CPU card "Random, CPU Lv. 3"; 3.6–4.5 s READY TO FIGHT; 4.5–5.4 s loading; 5.4–9.5 s Training, Mario vs King K. Rool, the notice "CPU level · Lv 7 from TrainingRooms (Training menu: Lv 3)". CPU Behavior is Stop, so the CPU's play at Lv 7 isn't shown. |
 
 ## rc.6 clips
 

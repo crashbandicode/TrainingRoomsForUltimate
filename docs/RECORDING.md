@@ -41,6 +41,12 @@ When you record, the new macro is the most recently used of its kind. Each kind 
 
 ![Record, then the new macro and its start save](media/rc5-record-start-save.gif)
 
+![An empty library, Record on Player 1, two jabs, the stop: Macro 1 and its start save](media/rc7-record-macro.gif)
+
+*Eden, 2026-11-11, rc.7 `b3678dfe` (diag NRO `9dfc784c`, log lines only): the pop-up lists no saves and no macros; Record
+on Player 1, two jabs, the stop; the pop-up then lists "Macro 1" (Recorded on Mario) and its start save "Macro 1 ·
+start". The row checked that the two files are new. Cuts inside are listed in [MEDIA.md](MEDIA.md).*
+
 ## Set active, and the Play chords
 
 Each role has one active macro. It is either a recording or a chain. Set active for Player 1 replaces Player 1's previous one. Set active for the CPU replaces the CPU's. The two roles do not share an active macro.
