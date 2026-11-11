@@ -76,6 +76,7 @@ impl<const W: usize, const N: usize> DropRing<W, N> {
 
 #[cfg(test)]
 mod tests {
+    lib_unit_tests! {
     use super::*;
     use std::sync::Arc;
 
@@ -129,5 +130,6 @@ mod tests {
         producer.join().unwrap();
         assert_eq!(taken + dropped, TOTAL, "taken {taken} + dropped {dropped}");
         assert_eq!(last, TOTAL, "the newest value always gets through");
+    }
     }
 }

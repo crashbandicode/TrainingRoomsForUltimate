@@ -86,6 +86,7 @@ impl<T> Drop for Job<'_, T> {
 
 #[cfg(test)]
 mod tests {
+    lib_unit_tests! {
     use super::*;
     #[test]
     fn abandoned_reader_does_not_recycle_live_writer_or_leak_old_completion() {
@@ -133,5 +134,6 @@ mod tests {
                 });
             }
         });
+    }
     }
 }

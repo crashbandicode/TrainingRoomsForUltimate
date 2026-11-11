@@ -1941,6 +1941,7 @@ pub const UNCONVERTED: &[&str] = &[];
 
 #[cfg(test)]
 mod tests {
+    lib_unit_tests! {
     use super::*;
 
     #[test]
@@ -1968,5 +1969,6 @@ mod tests {
             assert!(s.guard.iter().any(|b| *b != 0), "{}", s.label);
             assert!(s.offset < 0x52aa000, "{} outside main's image", s.label);
         }
+    }
     }
 }

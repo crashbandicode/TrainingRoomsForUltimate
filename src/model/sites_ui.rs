@@ -133,6 +133,7 @@ pub fn pin_matches(words: [u32; 5], pin: [u32; 5]) -> bool {
 
 #[cfg(test)]
 mod tests {
+    lib_unit_tests! {
     use super::*;
 
     #[test]
@@ -156,5 +157,6 @@ mod tests {
         }
         assert_eq!(UI_SITES.iter().filter(|s| matches!(s.kind, SeamKind::Hook { .. })).count(), 3);
         assert_eq!(UI_SITES.iter().filter(|s| matches!(s.kind, SeamKind::Called)).count(), 2);
+    }
     }
 }

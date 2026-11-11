@@ -216,6 +216,7 @@ pub fn make(stock: &[u8], target: &[u8]) -> Vec<u8> {
 
 #[cfg(test)]
 mod tests {
+    lib_unit_tests! {
     use super::*;
 
     fn stock() -> Vec<u8> {
@@ -300,5 +301,6 @@ mod tests {
         let mut tiny: Vec<u8> = Vec::with_capacity(16);
         assert_eq!(build_into(&mut source, &small, &mut tiny), Err("archive output larger than the boot buffer"));
         assert!(tiny.is_empty() && tiny.capacity() < target.len());
+    }
     }
 }

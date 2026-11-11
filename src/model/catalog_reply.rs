@@ -63,6 +63,7 @@ impl<T> Drop for Job<T> {
 
 #[cfg(test)]
 mod tests {
+    lib_unit_tests! {
     use super::*;
 
     #[test]
@@ -94,5 +95,6 @@ mod tests {
         replies.rejected(Job::new(sender).rejected());
         Job::new(replies.begin().unwrap()).complete(7);
         assert_eq!(replies.poll(), Ok(Ok(7)));
+    }
     }
 }

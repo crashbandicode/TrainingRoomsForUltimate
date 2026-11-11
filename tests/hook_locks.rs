@@ -20,6 +20,10 @@
 //! `the_scan_catches_a_seeded_violation` runs the same scan on `tests/fixtures/hook_locks/`, a small runtime with one plugin thread
 //! that takes a hook's lock through a method call and through a helper, and requires both to be reported.
 
+// rc.9 test cut: the call-graph scanner's own tests (`tests/common/callgraph.rs`) run here, once.
+macro_rules! callgraph_self_tests {
+    ($($body:tt)*) => { $($body)* };
+}
 #[path = "common/callgraph.rs"]
 mod callgraph;
 

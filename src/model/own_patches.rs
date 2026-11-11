@@ -66,6 +66,7 @@ pub fn unpatch(offset: usize, actual: &[u8; GUARD_BYTES], patches: impl IntoIter
 
 #[cfg(test)]
 mod tests {
+    lib_unit_tests! {
     use super::*;
     use crate::model::guard::{guard_outcome, HookForm, Placement, SeamKind, BR_X17, LDR_X17_LITERAL_8, NOP};
 
@@ -159,5 +160,6 @@ mod tests {
         // A window that covers the far jump's tail and the patched word's site.
         let (seen, n) = unpatch(0x50, &window(&live, 0x50), patches);
         assert_eq!((seen, n), (window(&original, 0x50), 2));
+    }
     }
 }

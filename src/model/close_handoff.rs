@@ -54,6 +54,7 @@ impl<T> Consumer<T> {
 
 #[cfg(test)]
 mod tests {
+    lib_unit_tests! {
     use super::*;
     use std::sync::Arc;
     fn intent(opening: u32, epoch: u64, value: Arc<u8>) -> Intent<Arc<u8>> {
@@ -93,5 +94,6 @@ mod tests {
         let value = Arc::new(5);
         let returned = send.post(intent(1, 9, Arc::clone(&value))).err().unwrap();
         assert!(Arc::ptr_eq(&returned.value, &value));
+    }
     }
 }

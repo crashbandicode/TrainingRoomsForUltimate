@@ -482,6 +482,7 @@ impl<T: Copy + Default> Default for CaptureBuffer<T> {
 
 #[cfg(test)]
 mod tests {
+    lib_unit_tests! {
     #[test]
     fn preview_idle_close_ignores_a_stale_open_snapshot() {
         let retirement = super::PreviewRetirement::new();
@@ -751,5 +752,6 @@ mod tests {
         capture.cancel();
         assert_eq!(capture.finish(), None);
         assert!(capture.begin(), "a cancelled capture returns the buffer ready");
+    }
     }
 }

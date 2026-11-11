@@ -105,6 +105,7 @@ impl<Q, R> Queue<Q, R> {
 
 #[cfg(test)]
 mod tests {
+    lib_unit_tests! {
     use super::*;
     const A: Identity = Identity { epoch: 1, revision: 3 };
     const B: Identity = Identity { epoch: 1, revision: 4 };
@@ -156,5 +157,6 @@ mod tests {
         assert_eq!(q.poll(done), Poll::Retired);
         assert_eq!(q.poll(waiting), Poll::Retired);
         assert!(!q.has_work());
+    }
     }
 }

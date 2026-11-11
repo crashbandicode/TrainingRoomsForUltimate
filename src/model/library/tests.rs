@@ -1,5 +1,6 @@
 //! File, index, and migration behavior for the recording redesign.
 
+lib_unit_tests! {
 use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 
@@ -867,4 +868,5 @@ fn a_shared_combo_file_name_is_drilled_kept_and_sequenced() {
     assert!(index.bind_save(Some("Ryu BnB"), 6).is_err(), "a save id stays a store slug");
     assert!(index.set_active(Role::Player, Some("Ryu BnB"), 6).is_err(), "a macro id stays a store slug");
     assert!(Sequence::new("Bad", vec!["../x".into()]).is_err());
+}
 }

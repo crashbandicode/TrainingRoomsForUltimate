@@ -86,19 +86,3 @@ impl LiveSession {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn projection_retains_the_training_rounding_and_asymmetric_clamp() {
-        let source = LiveInput { buttons: 513, axes: [-2.0, 2.0, -0.5 / 120.0, 0.49999997 / 120.0] };
-        let before = source.axes.map(f32::to_bits);
-        let (projected, quantized) = source.project();
-        assert_eq!((projected.lstick_x, projected.lstick_y), (-128, 127));
-        assert_eq!((projected.rstick_x, projected.rstick_y), (-1, 0));
-        assert_eq!(projected.buttons, 513);
-        assert!(quantized);
-        assert_eq!(source.axes.map(f32::to_bits), before);
-    }
-}

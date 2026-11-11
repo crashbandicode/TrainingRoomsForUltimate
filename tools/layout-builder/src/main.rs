@@ -20,6 +20,11 @@ use nx_layout_toolbox::sarc::{read_arc, write_arc};
 use nx_layout_toolbox::bntx::{read_bntx, write_bntx, BntxFile, TextureFormat, pipeline::{import_dds, import_png_file, ImportOptions, ImportTextureFormat}};
 use nx_layout_toolbox::dds::Dds;
 
+// The unit tests of the by-path `src` files (rc.9: wrapped in `lib_unit_tests!`) still run in this tool's own test binary.
+#[cfg(test)]
+macro_rules! lib_unit_tests {
+    ($($body:tt)*) => { $($body)* };
+}
 #[path = "../../../src/model/archive_recipe.rs"]
 #[allow(dead_code)]
 mod archive_recipe;

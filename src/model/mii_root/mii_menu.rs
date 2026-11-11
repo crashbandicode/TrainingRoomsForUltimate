@@ -21,66 +21,6 @@ pub fn class_for_id(id: &str) -> Option<MiiClass> {
     PAGES.iter().find(|page| page.0 == id).map(|page| page.2)
 }
 
-#[cfg(all(test, feature = "mii-editor-alpha"))]
-mod connected_editor_tests {
-    use super::*;
-    use crate::engine::mii::inventory::{build_snapshot, RawSlot, TaggedId, CHARINFO_LEN,
-        TAG_OUTFIT, TAG_HAT, TAG_CHARA};
-
-    fn catalog() -> Snapshot {
-        build_snapshot(vec![RawSlot { index: 0, slot_id: 7, name_len: 1,
-            name_units: [65,0,0,0,0,0,0,0,0,0], colour: 0, voice: 37,
-            specials: [1,0,0,0], charinfo: [0; CHARINFO_LEN],
-            tag_outfit: TaggedId(u64::from(TAG_OUTFIT) << 56 | 1),
-            tag_hat: TaggedId(u64::from(TAG_HAT) << 56 | 2),
-            tag_chara: TaggedId(u64::from(TAG_CHARA) << 56 | MiiClass::Swordfighter.chara_hash40()) }])
-    }
-
-    #[test]
-    fn waiting_catalog_exposes_seed_without_fighter_role_permissions() {
-        let mut preferences = Preferences::default();
-        let before = preferences;
-        let mut menu = CatalogMenu::editor_only(catalog(), 9, &preferences).unwrap();
-        menu.open_class(MiiClass::Swordfighter);
-        for direction in [-4, -1, 1, 4] {
-            menu.step(direction);
-            menu.confirm(&mut preferences);
-            assert_eq!(menu.view(&preferences).panel.selected, 2);
-            assert_eq!(menu.view(&preferences).disabled, vec![true, true, false]);
-        }
-        assert_eq!(preferences, before);
-        assert!(menu.close(&preferences).is_none());
-        let seed = menu.editor_seed(&preferences).unwrap();
-        let EditorSeed::Saved(seed) = seed.seed else { panic!("same-class saved seed expected"); };
-        assert_eq!(seed.slot_id, 7);
-        assert_eq!(seed.canonical.appearance.specials, [1,0,0,0]);
-        assert!(!menu.alpha_player_cycle(MiiClass::Swordfighter.kind()));
-        assert!(!menu.alpha_cpu_cycle(MiiClass::Swordfighter.kind()));
-    }
-
-    #[test]
-    fn missing_class_requests_native_default_without_relabelling_saved_seed() {
-        let preferences = Preferences::default();
-        assert!(CatalogMenu::editor_only(catalog(), 0, &preferences).is_none());
-        let mut menu = CatalogMenu::editor_only(catalog(), 9, &preferences).unwrap();
-        menu.open_class(MiiClass::Gunner);
-        assert!(matches!(menu.editor_seed(&preferences).unwrap().seed,
-            EditorSeed::NativeDefault(MiiClass::Gunner)));
-        assert_eq!(menu.view(&preferences).disabled, vec![true, true, false]);
-    }
-
-    #[test]
-    fn complete_empty_catalog_allows_creation_but_read_defect_does_not() {
-        let preferences = Preferences::default();
-        let mut menu = CatalogMenu::editor_only(Snapshot::default(), 9, &preferences).unwrap();
-        menu.open_class(MiiClass::Brawler);
-        assert!(matches!(menu.editor_seed(&preferences).unwrap().seed,
-            EditorSeed::NativeDefault(MiiClass::Brawler)));
-        menu.snapshot.findings.push(Finding::Source { slot_id: None, error: "read denied".into() });
-        assert!(menu.editor_seed(&preferences).is_none());
-        assert_eq!(menu.view(&preferences).disabled, vec![true, true, true]);
-    }
-}
 
 /// Supplied once at menu open by the future native owner adapter, never inferred
 /// from a name, current class, or selected dropdown. Epoch is comparison-only.

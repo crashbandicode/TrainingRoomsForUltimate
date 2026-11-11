@@ -1,4 +1,9 @@
+// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
+macro_rules! lib_unit_tests {
+    ($($body:tt)*) => {};
+}
 #[path = "../src/model/nowait_channel.rs"]
+#[allow(dead_code)]
 mod nowait_channel;
 #[path = "../src/model/catalog_reply.rs"]
 mod catalog_reply;
@@ -80,6 +85,7 @@ fn helper_snapshot_publish_reader_retirement_and_reuse_allocate_nothing() {
     }
 }
 #[path = "../src/model/replay_jobs.rs"]
+#[allow(dead_code)]
 mod replay_jobs;
 
 #[test]

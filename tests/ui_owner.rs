@@ -3,6 +3,10 @@
 //! clears it after the 15 real frames that follow a close; while it is set the delay stage outputs a neutral record
 //! and empties its queue. This test drives the same pure pieces in that order (adapter -> owner bit -> delay queue).
 
+// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
+macro_rules! lib_unit_tests {
+    ($($body:tt)*) => {};
+}
 #[path = "../src/model.rs"]
 #[allow(dead_code)]
 mod model;

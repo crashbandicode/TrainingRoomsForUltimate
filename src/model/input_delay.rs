@@ -279,6 +279,7 @@ pub const fn applies(player_idx: i32, training_live: bool) -> bool {
 
 #[cfg(test)]
 mod tests {
+    lib_unit_tests! {
     use super::*;
 
     fn rec(n: u32) -> MappedInputs {
@@ -365,5 +366,6 @@ mod tests {
         assert_eq!(sticks.onto(record), played, "the strip reads the played frame");
         let (record, sticks) = physical.after_recorder(idle, idle);
         assert_eq!(sticks.onto(record), physical.onto(idle), "an untouched poll keeps the physical sticks");
+    }
     }
 }

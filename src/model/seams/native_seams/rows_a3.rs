@@ -614,6 +614,7 @@ pub const UNCONVERTED: &[&str] = &[];
 
 #[cfg(test)]
 mod tests {
+    lib_unit_tests! {
     use super::*;
 
     #[test]
@@ -656,5 +657,6 @@ mod tests {
     fn wp_a3_vtable_slot_rows_encode_the_original_targets() {
         assert_eq!(slot("training.vtable_on_init_slot"), 0x60dfa0);
         assert_eq!(slot("training.vtable_on_frame_slot"), 0x614630);
+    }
     }
 }

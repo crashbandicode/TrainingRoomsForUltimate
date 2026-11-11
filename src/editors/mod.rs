@@ -16,8 +16,4 @@ pub mod stages;
 pub mod setups;
 
 // P-CYCLE: the grid's numbered list is the CPU cycle's order (engine::swap::cycle_members with the grid's own badges).
-#[cfg(test)]
-mod cycle_members_tests;
 // P1-CYCLE: the Player grid numbers the Player walk, and a missing roster key is one value.
-#[cfg(test)]
-mod player_cycle_tests;

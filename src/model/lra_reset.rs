@@ -123,6 +123,7 @@ pub fn manager_slot_offset(adrp_site: usize, adrp: u32, ldr: u32) -> Option<usiz
 }
 #[cfg(test)]
 mod tests {
+    lib_unit_tests! {
     use super::*;
 
     #[test]
@@ -143,5 +144,6 @@ mod tests {
         let mut seen = Vec::new();
         run_hub(|step| seen.push(step));
         assert_eq!(seen, HUB_ORDER);
+    }
     }
 }

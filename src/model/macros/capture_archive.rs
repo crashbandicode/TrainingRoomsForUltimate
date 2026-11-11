@@ -815,6 +815,7 @@ fn invalid_data(message: impl Into<String>) -> io::Error {
 
 #[cfg(test)]
 mod tests {
+    lib_unit_tests! {
     use super::*;
     use std::io::{Seek, SeekFrom};
 
@@ -1147,5 +1148,6 @@ mod tests {
             assert!(temp.0.join(format!("{id}.tmrc")).exists());
             assert!(archive.load(&id).is_err());
         }
+    }
     }
 }

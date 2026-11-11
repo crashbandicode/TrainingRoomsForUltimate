@@ -6,10 +6,18 @@
 //! for each poisoned row, the natives an installed entry point may call are computed from the code and every
 //! one must be allowed by the `Granted` set the boot would hand the native-call layer.
 
+// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
+macro_rules! lib_unit_tests {
+    ($($body:tt)*) => {};
+}
 #[path = "../src/model.rs"]
 #[allow(dead_code)]
 mod model;
 
+// rc.9 test cut: the call-graph scanner's own tests run once, in `tests/hook_locks.rs`.
+macro_rules! callgraph_self_tests {
+    ($($body:tt)*) => {};
+}
 #[path = "common/callgraph.rs"]
 mod callgraph;
 

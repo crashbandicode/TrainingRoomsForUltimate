@@ -1,6 +1,10 @@
 //! SPEC-state-01 §5: the save / load machine, the placement rules and the hook predicates (host tests;
 //! the planned names are the spec's §9 rows).
 
+// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
+macro_rules! lib_unit_tests {
+    ($($body:tt)*) => {};
+}
 #[path = "../src/model.rs"]
 #[allow(dead_code)]
 mod model;

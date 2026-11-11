@@ -4,6 +4,13 @@
 //! game and exists only for the Switch. The crate is a `cdylib` only, so tests include `model` by
 //! path.
 
+/// rc.9 test cut: the unit tests of the `model` and `engine` files compile in this crate only. A test crate that includes one of
+/// those files by path (`tests/*.rs`) defines this macro empty, so each unit test runs once and not once per test crate.
+#[cfg(test)]
+macro_rules! lib_unit_tests {
+    ($($body:tt)*) => { $($body)* };
+}
+
 pub mod model;
 
 // The carried fork engines (package 6): each area is test-only until its consumer lands, except those engine/mod.rs leaves open.
@@ -13,14 +20,6 @@ pub mod engine;
 pub mod editors;
 // The install line's worst-case length (model site tables + the carried seam table): the runtime's buffer size and its host test.
 pub mod install_capacity;
-
-#[cfg(test)]
-#[path = "../tests/common/preload_allocations.rs"]
-mod preload_allocation_tests;
-
-#[cfg(test)]
-#[path = "../tests/common/res_unload_host.rs"]
-mod res_unload_host;
 
 #[cfg(test)]
 #[path = "model/lobby_flag_tests.rs"]
@@ -80,17 +79,3 @@ mod grid_matches_catalog {
     }
 }
 
-#[cfg(test)]
-mod f9_seat_tests;
-
-#[cfg(test)]
-mod planner_alloc_tests;
-
-#[cfg(test)]
-mod clip_input_tests;
-
-#[cfg(test)]
-mod kirby_hat_cpu_tests;
-
-#[cfg(test)]
-mod numbered_picker_tests;

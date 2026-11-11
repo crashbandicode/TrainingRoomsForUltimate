@@ -154,6 +154,7 @@ pub(crate) unsafe fn load_acquire_u64(address: usize) -> u64 {
 
 #[cfg(test)]
 mod tests {
+    lib_unit_tests! {
     use super::*;
 
     #[test]
@@ -262,5 +263,6 @@ mod tests {
         wide.store(0xfedcba9876543210, Ordering::Release);
         assert_eq!(unsafe { load_acquire_u32(&word as *const _ as usize) }, 0x89abcdef);
         assert_eq!(unsafe { load_acquire_u64(&wide as *const _ as usize) }, 0xfedcba9876543210);
+    }
     }
 }

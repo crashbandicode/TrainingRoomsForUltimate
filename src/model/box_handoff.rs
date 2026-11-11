@@ -149,6 +149,7 @@ impl<T> Drop for BoxHandoff<T> {
 
 #[cfg(test)]
 mod tests {
+    lib_unit_tests! {
     use super::*;
     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering::SeqCst};
     use std::sync::Arc;
@@ -279,5 +280,6 @@ mod tests {
         assert_eq!(drops.load(SeqCst), (TOTAL - 1) as usize, "every value but the installed one dropped once");
         drop(current);
         assert_eq!(drops.load(SeqCst), TOTAL as usize);
+    }
     }
 }

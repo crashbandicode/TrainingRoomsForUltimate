@@ -24,6 +24,8 @@ crate, the folder above the stages). The manifest also holds the module map the 
 Nothing under the stage is ever written.
 """
 import argparse, hashlib, json, os, posixpath, re, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import test_cut  # rc.9: the manifest edits `cut_tests`, `wrap_tests` and `wrap_file` (docs/TEST-CUT-LEDGER-rc9.md)
 
 STAGES = "/home/intpa/smash-training-lobby/artifacts/enhancements/console-practice91/lobby-parity167/parked-reuse175/refactor/stages"
 DEFAULT_MANIFEST = "docs/provenance/pkg4-carry-manifest.json"
@@ -107,6 +109,10 @@ def rewrite_includes(text: str, entry: dict, dest_by_src: dict) -> str:
 def apply_edits(entry: dict, out: bytes) -> bytes:
     for e in entry.get("edits", []):
         s = out.decode("utf-8")
+        cut = test_cut.apply_edit(e, s)  # rc.9 test cut: remove or wrap test-gated modules
+        if cut is not None:
+            out = cut.encode("utf-8")
+            continue
         if "delete_from" in e:
             # delete [delete_from, delete_to): `delete_from` occurs once; `delete_to` is the first occurrence after it
             if s.count(e["delete_from"]) != 1:
@@ -171,6 +177,14 @@ def main():
     changed = []
     for entry in manifest["files"]:
         dest = os.path.join(a.root, entry["dest"])
+        if entry.get("removed"):
+            # rc.9 test cut: a carried test-only file that is no longer in the tree; the entry keeps its stage hash and the reason
+            if a.cmd == "carry":
+                if os.path.exists(dest):
+                    os.remove(dest)
+            elif os.path.exists(dest):
+                print("PRESENT", entry["dest"], "(the manifest records it as removed)"); bad += 1
+            continue
         if a.cmd == "verify" and a.dest_only:
             if not os.path.exists(dest):
                 print("MISSING", entry["dest"]); bad += 1; continue
@@ -217,8 +231,8 @@ def write_ledger(root, manifest):
         f.write("file in this repository. Rows with root `smd` come from the standalone `smash-match-data-design` crate (git `faac04e`).\n\n")
         f.write("| Here | Fork path | src sha256 | here sha256 | edits (clean-room changes, each with its reason) |\n| --- | --- | --- | --- | --- |\n")
         for e in manifest["files"]:
-            edits = "; ".join(x["reason"] for x in e.get("edits", [])) or ("copied unchanged" if e["crate"] == "smd" else "path rewrite only")
-            f.write(f"| `{e['dest']}` | `{e['src']}` | `{e['src_sha256'][:16]}` | `{e['dest_sha256'][:16]}` | {edits} |\n")
+            edits = "; ".join([x["reason"] for x in e.get("edits", [])] + ([e["removed"]] if e.get("removed") else [])) or ("copied unchanged" if e["crate"] == "smd" else "path rewrite only")
+            f.write(f"| `{e['dest']}` | `{e['src']}` | `{e['src_sha256'][:16]}` | `{e['dest_sha256'][:16] or 'removed'}` | {edits} |\n")
 
 
 main()

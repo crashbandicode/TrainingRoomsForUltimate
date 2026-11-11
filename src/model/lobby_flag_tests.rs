@@ -2,6 +2,7 @@
 // The by-path test crates include model.rs and cannot see crate::engine, so these tests do not live in lobby_flag.rs.
 #[cfg(test)]
 mod tests {
+    lib_unit_tests! {
     use crate::model::lobby_flag::{is_waiting_room, scene_key, step, FlagClock, Scene, Step};
     use crate::engine::macro_ui::clip_panel::CloseInputGuard;
     use crate::engine::stages::training_stage_rotation_policy::{TRAINING_MELEE, TRAINING_MODE};
@@ -492,5 +493,6 @@ mod tests {
             });
         }
         None
+    }
     }
 }

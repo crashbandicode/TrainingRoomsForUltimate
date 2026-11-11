@@ -478,6 +478,7 @@ pub fn unusable_on(chord: Chord, style: u32) -> bool {
 
 #[cfg(test)]
 mod tests {
+    lib_unit_tests! {
     use super::logical::{self, A, B, DPAD_LEFT, DPAD_RIGHT, DPAD_UP, ZR};
     use super::{passes, passes_without_l, ChordSet, Detector, Request, Sample};
     use crate::model::factory::DEFS;
@@ -762,5 +763,6 @@ mod tests {
                 }
             }
         }
+    }
     }
 }

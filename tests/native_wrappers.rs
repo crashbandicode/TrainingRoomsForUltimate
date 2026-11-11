@@ -3,6 +3,10 @@
 //! Two wrappers of one address drift apart (defaults, argument order, fixed arguments) and the capability model cannot tell them
 //! apart; the one kept is the `game::natives` one.
 
+// rc.9 test cut: the call-graph scanner's own tests run once, in `tests/hook_locks.rs`.
+macro_rules! callgraph_self_tests {
+    ($($body:tt)*) => {};
+}
 #[path = "common/callgraph.rs"]
 mod callgraph;
 

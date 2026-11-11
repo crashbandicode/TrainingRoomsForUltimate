@@ -4,6 +4,10 @@
 //! real length (`MENU_COUNT`, as `tick::resolve` builds it) with every pane absent, so an index past the array
 //! panics in the test instead of on the console. Native structs use the same host shim as `ui_native_pause.rs`.
 extern crate self as skyline;
+// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
+macro_rules! lib_unit_tests {
+    ($($body:tt)*) => {};
+}
 #[path = "../src/model.rs"]
 #[allow(dead_code)]
 pub mod model;

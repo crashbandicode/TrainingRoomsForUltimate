@@ -1,5 +1,6 @@
 //! Host tests of the seam table and the 64-byte rule (WP-A core).
 
+lib_unit_tests! {
 use super::*;
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -717,4 +718,5 @@ fn the_runtime_sites_are_the_authored_rows_without_their_text() {
         assert_eq!(site.chain, seam.sharing == Sharing::Chain, "{}: sharing", seam.label);
         assert_eq!(find_image(seam.label).map(|(at, _)| at), Some(index), "{}: index", seam.label);
     }
+}
 }

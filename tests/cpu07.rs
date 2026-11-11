@@ -2,6 +2,10 @@
 //! hub are tested in `tests/cpu_core.rs` (`cpu07_should_delay`, `cpu07_tick_types_and_reset`,
 //! `cpu07_single_tick_per_frame`, `state06_hub_order_clears_cpu_state`); this file has the measurement.
 
+// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
+macro_rules! lib_unit_tests {
+    ($($body:tt)*) => {};
+}
 #[path = "../src/model.rs"]
 #[allow(dead_code)]
 mod model;

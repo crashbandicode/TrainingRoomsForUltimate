@@ -130,6 +130,7 @@ impl<const N: usize> Drop for Claim<'_, N> {
 
 #[cfg(test)]
 mod tests {
+    lib_unit_tests! {
     use super::*;
 
     #[test]
@@ -190,5 +191,6 @@ mod tests {
         assert!(handed > 0 && released <= handed);
         let all: Vec<_> = (0..2).filter_map(|_| slots.claim()).collect();
         assert_eq!(all.len(), 2, "every buffer is free again");
+    }
     }
 }

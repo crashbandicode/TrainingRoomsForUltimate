@@ -1193,6 +1193,7 @@ impl ExportRefusal {
 
 #[cfg(test)]
 mod cpu_role_parity {
+    lib_unit_tests! {
     use super::*;
 
     #[test]
@@ -1226,5 +1227,6 @@ mod cpu_role_parity {
                 assert!(stored.is_none(), "lockout and standby are not stored");
             }
         }
+    }
     }
 }

@@ -142,6 +142,7 @@ pub const INSTALL_LINE_CAPACITY: usize = FIXED_FIELDS + SITE_FIELDS + FEATURE_FI
 
 #[cfg(test)]
 mod tests {
+    lib_unit_tests! {
     use super::*;
     use crate::model::guard::GuardOutcome;
     use crate::model::install_line::{render_into, DeveloperReport, Extra, FeatureReport, InstallLine, SettingsReport, SiteReport, Written};
@@ -254,5 +255,6 @@ mod tests {
         ] {
             assert!(feature.name().len() <= MAX_FEATURE_NAME);
         }
+    }
     }
 }

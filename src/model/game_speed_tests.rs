@@ -1,3 +1,4 @@
+lib_unit_tests! {
 use super::*;
 use crate::model::chords::{logical, Sample, STYLE_GAMECUBE};
 use crate::model::menu::chord::Chord;
@@ -488,4 +489,5 @@ fn registry_find_walks_the_games_map() {
     words.insert(0x4000, 0x3000);
     let read = |at: usize| words.get(&at).copied();
     assert_eq!(registry_find(map, key, &read), None);
+}
 }

@@ -146,6 +146,7 @@ impl<const N: usize> Default for ParentHistory<N> {
 
 #[cfg(test)]
 mod tests {
+    lib_unit_tests! {
     use super::*;
 
     fn record(sequence: u64, thread: u64, stack: u64, node: u64, parent: u64) -> Observation {
@@ -246,5 +247,6 @@ mod tests {
         assert_eq!(table.get(0x1000), detached);
         assert_eq!(detached.previous.parent, 0x3000);
         assert_eq!(detached.latest.site, 30);
+    }
     }
 }

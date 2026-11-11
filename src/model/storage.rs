@@ -149,6 +149,7 @@ pub const fn should_rotate(bytes: u64, incoming: usize) -> bool {
 
 #[cfg(test)]
 mod tests {
+    lib_unit_tests! {
     use super::*;
 
     #[test]
@@ -160,5 +161,6 @@ mod tests {
     #[test]
     fn the_first_free_copy_number_is_used() {
         assert_eq!(first_free_invalid_copy(|name| name == "settings.invalid-1.json"), Some(2));
+    }
     }
 }

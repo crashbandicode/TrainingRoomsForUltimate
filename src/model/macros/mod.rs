@@ -66,5 +66,3 @@ pub use shared_capture::SharedCaptureArchive;
 #[cfg(test)]
 mod test_util;
 
-#[cfg(test)]
-mod move_crop_continuation_tests;

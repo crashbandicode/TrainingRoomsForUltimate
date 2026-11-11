@@ -413,6 +413,7 @@ pub fn overlapping_pairs() -> impl Iterator<Item = (usize, usize)> {
 
 #[cfg(test)]
 mod tests {
+    lib_unit_tests! {
     use super::*;
 
     #[test]
@@ -426,5 +427,6 @@ mod tests {
     fn an_unsupported_game_installs_nothing() {
         assert!(install_plan(Verdict::UnsupportedBuild).is_empty());
         assert_eq!(install_plan(Verdict::Supported).len(), SITES.len());
+    }
     }
 }

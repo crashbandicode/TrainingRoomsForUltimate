@@ -43,6 +43,7 @@ impl<T> Consumer<T> {
 
 #[cfg(test)]
 mod tests {
+    lib_unit_tests! {
     use super::*;
     use std::sync::Arc;
     fn value(sequence: u32, epoch: u64, n: u32) -> Publication<Arc<u32>> {
@@ -87,5 +88,6 @@ mod tests {
         drop(receive);
         let returned = send.post(value(2, 8, 10)).err().unwrap();
         assert_eq!(*returned.value, 10);
+    }
     }
 }

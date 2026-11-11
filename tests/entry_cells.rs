@@ -1,5 +1,9 @@
 //! Original F6 regression: the owned native reader branches around the body
 //! load when count <= active index (13.0.5 main+0x642c94..0x642ca8).
+// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
+macro_rules! lib_unit_tests {
+    ($($body:tt)*) => {};
+}
 #[path = "../src/model/entry_cells.rs"]
 mod entry_cells;
 

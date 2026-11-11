@@ -147,6 +147,7 @@ impl StageCycle<crate::engine::stages::lobby_stages::Selection> {
 
 #[cfg(test)]
 mod tests {
+    lib_unit_tests! {
     use super::*;
     use crate::engine::stages::lobby_stages::{native_stage, Form, Selection};
 
@@ -352,5 +353,5 @@ mod tests {
         assert_eq!(cycle.prepare(&[0, 3, 12]), Some(3));
         assert_eq!(cycle.enter(), Some(3));
     }
-
+    }
 }

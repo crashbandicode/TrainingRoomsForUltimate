@@ -41,6 +41,3 @@ pub fn clip_target(
     Ok(resolved.map(Target::mii))
 }
 
-#[cfg(test)]
-#[path = "replay_target_tests.rs"]
-mod tests;

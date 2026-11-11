@@ -132,6 +132,7 @@ pub fn sha256_hex(data: &[u8]) -> String {
 
 #[cfg(test)]
 mod tests {
+    lib_unit_tests! {
     use super::*;
 
     #[test]
@@ -154,5 +155,6 @@ mod tests {
             hasher.update(chunk);
         }
         assert_eq!(hex(&hasher.finish()), sha256_hex(&data));
+    }
     }
 }

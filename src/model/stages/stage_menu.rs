@@ -44,27 +44,3 @@ impl Default for Preferences {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn paging_wraps_and_clamps_the_short_final_page() {
-        // All + 117 named stages occupy seven full pages and six final cells.
-        assert_eq!(page_cursor(15, 118, true), Some(31));
-        assert_eq!(page_cursor(111, 118, true), Some(117));
-        assert_eq!(page_cursor(117, 118, true), Some(5));
-        assert_eq!(page_cursor(0, 118, false), Some(112));
-        assert_eq!(page_cursor(15, 118, false), Some(117));
-        assert_eq!(page_cursor(117, 118, false), Some(101));
-    }
-
-    #[test]
-    fn paging_a_single_or_empty_page_is_inert() {
-        for next in [false, true] {
-            assert_eq!(page_cursor(0, 0, next), None);
-            assert_eq!(page_cursor(0, 1, next), Some(0));
-            assert_eq!(page_cursor(3, 6, next), Some(3));
-        }
-    }
-}

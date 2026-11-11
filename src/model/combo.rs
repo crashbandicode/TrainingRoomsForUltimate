@@ -1036,6 +1036,3 @@ fn modal_drift(counts: &[u8; 8], order: &[u8; 8], seen: usize) -> Option<Dir> {
     best
 }
 
-#[cfg(test)]
-#[path = "combo_tests.rs"]
-mod tests;

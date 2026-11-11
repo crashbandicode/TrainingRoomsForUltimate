@@ -1,6 +1,10 @@
 //! The playback machine allocates nothing inside a hook. This crate installs the plugin's counting allocator.
 #![allow(unused)]
 
+// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
+macro_rules! lib_unit_tests {
+    ($($body:tt)*) => {};
+}
 #[path = "../src/model.rs"]
 #[allow(dead_code)]
 mod model;

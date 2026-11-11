@@ -69,6 +69,7 @@ impl Watch {
 
 #[cfg(test)]
 mod tests {
+    lib_unit_tests! {
     use super::*;
 
     #[test]
@@ -90,5 +91,6 @@ mod tests {
         for t in 0..100 {
             assert_eq!(watch.observe(2_000 + t * 60, 61_000 + t * 250), None);
         }
+    }
     }
 }

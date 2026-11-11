@@ -500,6 +500,7 @@ fn slug(name: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    lib_unit_tests! {
     use std::sync::atomic::{AtomicU32, Ordering};
 
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -656,5 +657,6 @@ mod tests {
         store.save_new(&note("beta")).unwrap();
         store.save_new(&note("Alpha")).unwrap();
         assert_eq!(store.list().unwrap().entries, vec!["alpha:Alpha".to_owned(), "beta:beta".to_owned()]);
+    }
     }
 }

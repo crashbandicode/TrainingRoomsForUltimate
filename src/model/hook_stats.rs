@@ -486,6 +486,7 @@ impl Observer {
 
 #[cfg(test)]
 mod tests {
+    lib_unit_tests! {
     use super::*;
 
     #[test]
@@ -521,5 +522,6 @@ mod tests {
         assert!(first.covered(HookId::ResetCheck) && !first.covered(HookId::HazardRule));
         assert_eq!(first.to_string(), "[TrainingRooms] hook_stats allocations=0 delta=0 hook_calls=3 hooks=reset_check:3");
         assert!(observer.observe(busy).is_none(), "nothing new since the report");
+    }
     }
 }

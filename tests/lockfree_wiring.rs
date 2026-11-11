@@ -3,6 +3,10 @@
 //! pins each hand-off the steps made: what a plugin thread now posts, where the game frame takes it, and that what now lands a frame
 //! later has no plugin-side reader of its outcome. The runtime is Switch-only, so the call-graph scanner reads it.
 
+// rc.9 test cut: the call-graph scanner's own tests run once, in `tests/hook_locks.rs`.
+macro_rules! callgraph_self_tests {
+    ($($body:tt)*) => {};
+}
 #[path = "common/callgraph.rs"]
 mod callgraph;
 

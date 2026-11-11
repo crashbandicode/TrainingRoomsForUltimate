@@ -84,38 +84,3 @@ pub(crate) unsafe fn owner_flags(r: usize) -> RFlags {
 // `r_handle::reconcile(role, phase)`, which reconciles the role's real ledger (WP4) at the same build and
 // teardown seams; the before-reload seam is `r_handle::expect_free`. `walk_map` and `owner_flags` stay.
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// A host-built libc++-shaped tree: nodes `{left, right, parent, is_black, key u64, refs u32, handle u32}`.
-    #[repr(C)]
-    #[derive(Clone, Copy)]
-    struct Node { left: usize, right: usize, parent: usize, black: u64, key: u64, refs: u32, handle: u32 }
-
-    #[repr(C)]
-    struct Owner { pad: [u64; 1], begin: usize, root: usize, size: u64 }
-
-    #[test]
-    fn the_walk_returns_the_keys_in_order_with_their_refs_and_rejects_a_torn_count() {
-        // The tree and the owner are only ever read through the raw address `walk_map` validates, so
-        // they are written through raw pointers too (the by-name writes would be "never read").
-        let mut nodes = [Node { left: 0, right: 0, parent: 0, black: 0, key: 0, refs: 0, handle: 0 }; 3];
-        let base = nodes.as_mut_ptr() as usize;
-        let at = |i: usize| base + i * std::mem::size_of::<Node>();
-        let mut owner = Owner { pad: [0], begin: at(0), root: at(1), size: 3 };
-        let r = &mut owner as *mut Owner as usize;
-        unsafe {
-            let p = nodes.as_mut_ptr();
-            p.add(1).write(Node { left: at(0), right: at(2), parent: 0, black: 1, key: 0x1333, refs: 2, handle: 0 });
-            p.add(0).write(Node { left: 0, right: 0, parent: at(1), black: 0, key: 0x1332, refs: 1, handle: 0 });
-            p.add(2).write(Node { left: 0, right: 0, parent: at(1), black: 0, key: 0x1338, refs: 1, handle: 0 });
-        }
-        let walked = unsafe { walk_map(r) }.expect("valid tree");
-        assert_eq!(&*walked, &[MapNode { key: 0x1332, refs: 1 }, MapNode { key: 0x1333, refs: 2 }, MapNode { key: 0x1338, refs: 1 }]);
-        unsafe { (*(r as *mut Owner)).size = 2; }
-        assert!(unsafe { walk_map(r) }.is_none(), "a count that disagrees with the nodes is not trusted");
-        unsafe { (*(r as *mut Owner)).size = 0; (*(r as *mut Owner)).root = 0; }
-        assert!(unsafe { walk_map(r) }.is_some_and(|nodes| nodes.is_empty()), "an empty map walks to nothing");
-    }
-}

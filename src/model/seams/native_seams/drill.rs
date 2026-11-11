@@ -81,6 +81,7 @@ pub const SITES: [(&str, &[&str]); 4] = [
 
 #[cfg(test)]
 mod tests {
+    lib_unit_tests! {
     use super::*;
     use crate::engine::seams::native_seams::{all, find_site, Sharing};
 
@@ -115,5 +116,6 @@ mod tests {
         assert!(matches!(rules[0], Sharing::Chain));
         assert!(matches!(rules[2], Sharing::EntryOrBody { .. }));
         assert!(all().any(|s| s.label == SITES[3].1[1] && matches!(s.sharing, Sharing::OwnHook { .. })));
+    }
     }
 }

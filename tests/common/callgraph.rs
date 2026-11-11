@@ -974,8 +974,11 @@ pub fn model_offsets(model_dir: &Path) -> BTreeMap<String, usize> {
     out
 }
 
+// rc.9 test cut: the scanner's own tests run in one binary (`tests/hook_locks.rs` passes the body through); the other
+// crates that include this file define `callgraph_self_tests!` empty.
 #[cfg(test)]
 mod receiver_tests {
+    callgraph_self_tests! {
     use super::*;
 
     fn fixture() -> Graph {
@@ -1050,5 +1053,6 @@ mod receiver_tests {
         for entry in ["direct", "qualified"] {
             assert!(reachable_names(&graph, entry).contains("unrelated_native"), "{entry}");
         }
+    }
     }
 }

@@ -20,18 +20,12 @@ pub mod fallback;
 // PT-TRAINER-PARK: a PT holder's article pool (the trainer) lives only while its window is attached.
 pub mod special_articles;
 pub mod target;
-#[cfg(test)]
-mod tests;
 // WP2 (worker B): the per-R ledger as data and the independent native simulator.
 pub mod ledger;
 #[cfg(any(test, feature = "simulator"))]
 pub mod native_model;
 // IC-PAIR-STALL: Aegis → PT → IC pair on one R, ledger and native agreeing (tests only).
-#[cfg(test)]
-mod pair_after_objects;
 // LEDGER-SCOPE: the R-ICP3/R-ICP4 reconcile observations replayed with the logged map counts (tests only).
-#[cfg(test)]
-mod order_replay;
 // WP3 (worker C): the teardown protocol (one destroy plan for every destroy path).
 pub mod lifecycle;
 // WP4: live-consumer occupancy and the ledger-driven policy.

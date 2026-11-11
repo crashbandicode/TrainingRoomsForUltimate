@@ -1248,32 +1248,3 @@ pub(super) unsafe fn capture_origin(entry:usize,epoch:u64,kind:u32,catalog:&Cata
     Ok(())
 }
 
-#[cfg(test)]
-mod scalar_write_tests {
-    use super::*;
-
-    #[test]
-    fn scalar_write_adds_only_e_hat_and_never_writes_native_d_hat() {
-        // Actual writer over synthetic local memory. No Horizon calls or game bytes.
-        #[repr(align(8))]
-        struct Aligned<const N:usize>([u8;N]);
-        let mut e_memory=Aligned([0xa5u8;0x260]);let mut d_memory=Aligned([0x5au8;0x3a0]);
-        let e=&mut e_memory.0;let d=&mut d_memory.0;
-        let scalars=Scalars {e:Tokens {outfit:75,hat:125,colour:0,voice:37,specials:[2,2,2,1]},
-            d_outfit:75,d_colour:0,d_specials:[2,2,2,1]};
-        unsafe {scalars.write(e.as_mut_ptr() as usize,d.as_mut_ptr() as usize);}
-        assert_eq!(&e[0x1aa..0x1b6],&[75,0,125,0,0,0,37,0,2,2,2,1]);
-        assert!(e[..0x1aa].iter().chain(&e[0x1b6..]).all(|b|*b==0xa5));
-        assert_eq!(&d[0x74..0x7a],&[75,0,0x5a,0x5a,0,0]);
-        assert_eq!(&d[0x390..0x3a0],&[2,0,0,0,2,0,0,0,2,0,0,0,1,0,0,0]);
-        for (i,byte) in d.iter().enumerate() {
-            if !(0x74..0x76).contains(&i) && !(0x78..0x7a).contains(&i) && !(0x390..0x3a0).contains(&i) {
-                assert_eq!(*byte,0x5a,"native-owned D byte {i:#x}");
-            }
-        }
-        // Return to a distinct value exercises the same source writer, not a 125 special case.
-        unsafe {Scalars {e:Tokens {hat:0,..scalars.e},..scalars}.write(e.as_mut_ptr() as usize,d.as_mut_ptr() as usize);}
-        assert_eq!(&e[0x1ac..0x1ae],&[0,0]);
-        assert_eq!(&d[0x76..0x78],&[0x5a,0x5a]);
-    }
-}

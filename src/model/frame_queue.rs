@@ -67,6 +67,7 @@ impl Default for FrameQueue {
 
 #[cfg(test)]
 mod tests {
+    lib_unit_tests! {
     use super::*;
 
     #[test]
@@ -105,5 +106,6 @@ mod tests {
         assert_eq!(q.room(), AHEAD);
         assert!(q.push(9));
         assert_eq!(q.pop(), Some(9));
+    }
     }
 }

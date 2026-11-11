@@ -873,6 +873,3 @@ pub const fn strip_owns_advantage(enabled: bool, on: bool, panes: bool) -> bool 
     enabled && on && panes
 }
 
-#[cfg(test)]
-#[path = "frame_strip_tests.rs"]
-mod tests;

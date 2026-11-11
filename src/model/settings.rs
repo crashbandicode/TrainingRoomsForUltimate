@@ -615,6 +615,7 @@ pub const fn write_mode(writer_thread_started: bool) -> WriteMode {
 
 #[cfg(test)]
 mod tests {
+    lib_unit_tests! {
     use super::*;
 
     #[test]
@@ -629,5 +630,6 @@ mod tests {
         assert_eq!(loaded.issues.len(), 1);
         assert!(loaded.settings.menu.lra_reset());
         assert!(loaded.settings.menu.stage_hazards());
+    }
     }
 }

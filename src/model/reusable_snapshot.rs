@@ -27,6 +27,7 @@ impl<T> Deref for Snapshot<T> {
 
 #[cfg(test)]
 mod tests {
+    lib_unit_tests! {
     use super::*;
     #[test]
     fn retired_transaction_cannot_overwrite_a_surviving_reader() {
@@ -43,5 +44,6 @@ mod tests {
         let next = storage.publish([9; 128]).unwrap();
         assert_eq!((&*next) as *const [i32; 128], address);
         assert_eq!(*next, [9; 128]);
+    }
     }
 }

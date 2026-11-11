@@ -48,6 +48,7 @@ pub unsafe fn store(address: u64, value: u64, node: u64, owner: u64, header_firs
 
 #[cfg(test)]
 mod tests {
+    lib_unit_tests! {
     use super::*;
     fn pointer<T>(value: &mut T) -> u64 { value as *mut T as u64 }
 
@@ -121,5 +122,6 @@ mod tests {
         assert_eq!(unsafe { store(pointer(&mut destination), 77, pointer(&mut node), 0, true) }, 0);
         assert_eq!(destination, 77);
         assert_eq!(root, expected);
+    }
     }
 }

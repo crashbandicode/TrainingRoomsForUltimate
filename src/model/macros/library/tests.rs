@@ -1,3 +1,4 @@
+lib_unit_tests! {
 use std::{fmt, fs};
 
 use serde::{Deserialize, Serialize};
@@ -709,4 +710,5 @@ fn library_is_the_macro_instantiation_of_the_generic_store() {
         MacroEntry { id, name: "Same".to_owned(), fighter_kind: 8, costume: 2, frame_count: 8 }
     );
     assert!(format!("{library:?}").starts_with("Store {"));
+}
 }

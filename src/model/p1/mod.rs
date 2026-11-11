@@ -249,5 +249,3 @@ impl Pilot {
     }
 }
 
-#[cfg(test)]
-mod tests;

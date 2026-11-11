@@ -61,7 +61,7 @@
    "dest": "src/model/macros/capture_archive.rs",
    "crate": "macros",
    "src_sha256": "dbfdf217e08fe1421c292b302ea58e60d541a817b7fc17b410b166e8c7458d5f",
-   "dest_sha256": "bc8676878aab6a136d8b22b40c5df564b42caeea9556ff668a6169a65ae39f94",
+   "dest_sha256": "b1d8d345b95b4ec5d8a275d90432e77326c0d8b6164fb749d528855a1691e5e4",
    "edits": [
     {
      "old": "file_id.as_bytes().chunks_exact(2) {",
@@ -102,6 +102,13 @@
      "old": "                truncated: false,\n                tracks: Vec::new(),\n            };\n            let bytes = capture_file(&serde_json::to_vec(&header).unwrap());\n",
      "new": "                truncated: false,\n                tracks: Vec::new(),\n                breaks: Vec::new(),\n            };\n            let bytes = capture_file(&serde_json::to_vec(&header).unwrap());\n",
      "reason": "P-TIMER (primary 2026-11-05 18:32Z; DECISIONS DEFERRED-LIST item 7): a capture keeps going across a stretch of the native record with no live play (TIME! to sudden death) as a CaptureBreak, instead of sealing every track at the end of regular time"
+    },
+    {
+     "wrap_tests": [
+      "tests"
+     ],
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the kept unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -110,14 +117,22 @@
    "dest": "src/model/macros/capture_toggle.rs",
    "crate": "macros",
    "src_sha256": "aa0f6a4b6440d708d0a774e19135ff9b425fa51ea4f16b7b3290279ed28f28d7",
-   "dest_sha256": "ba76aa883c4b2dccb6aa800e1489aa61c8f18fabc80baf6774b76fdf8a04ede7"
+   "dest_sha256": "17406369b09480908714f66d37ecd5e12e891ad8aed224de91ab2a6e106ff161",
+   "edits": [
+    {
+     "cut_tests": [
+      "tests"
+     ],
+     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+    }
+   ]
   },
   {
    "src": "training_mod_macros/src/live_capture.rs",
    "dest": "src/model/macros/live_capture.rs",
    "crate": "macros",
    "src_sha256": "61ae1a33ce4e788097f81761f12f0c86801b4f32a1ba273498b701ccc0f8bb91",
-   "dest_sha256": "48cbf44733df492fc20b40ddfa3b385752513f839df38afe04e758b23a8f4966",
+   "dest_sha256": "eeaf26f98976e0a564ba24cfc77244f90f764877993a7e6a21822951b92607cf",
    "edits": [
     {
      "old": "    pub fn active_key(&self) -> Option<NativeRecordKey> { self.active }",
@@ -208,6 +223,13 @@
      "old": "    }\n\n    #[test]\n    fn late_fighter_cannot_shift_shared_crop_time() {\n",
      "new": "    }\n\n    /// P-TIMER, the p4c-03 shape (Steve vs Byleth, 1:00, sudden death; native counter 4449): 3600 counters of\n    /// regular time, a stretch with no live sample for anyone (TIME! to the sudden-death GO), then sudden death.\n    /// Before the fix both tracks were sealed at 3600 and the capture said truncated.\n    #[test]\n    fn a_timer_match_continues_through_sudden_death() {\n        let mut pool = LiveCapturePool::new();\n        let key = pool.start_record(0);\n        for tick in 0..3600 {\n            for entry in 0..2 {\n                assert!(pool.push(key, entry, tick, sample(tick)));\n            }\n        }\n        let resume = 3600 + 300;\n        for tick in resume..4449 {\n            for entry in [1, 0] {\n                assert!(pool.push(key, entry, tick, sample(tick)), \"tick {tick} entry {entry}\");\n            }\n        }\n        let saved = pool.snapshot(key).unwrap();\n        assert!(!saved.truncated, \"complete: nothing was dropped\");\n        assert_eq!(saved.breaks, vec![crate::engine::macros::CaptureBreak { index: 3600, counter: resume }]);\n        for track in &saved.tracks {\n            assert_eq!(track.frames.len(), 3600 + (4449 - resume) as usize);\n            assert_eq!(track.frames[3600].input.buttons, resume, \"sudden death starts after the break\");\n        }\n        assert_eq!(saved.counter_at(3599), Some(3599));\n        assert_eq!(saved.counter_at(3600), Some(resume), \"true counters, time not compressed\");\n        assert_eq!(saved.counter_at(3600 + 10), Some(resume + 10));\n    }\n\n    /// A lone fighter's gap stays a discontinuity: one track cannot tell a stretch without play from its own drops.\n    #[test]\n    fn a_lone_track_gap_and_an_invalid_resume_still_seal() {\n        let mut pool = LiveCapturePool::new();\n        let key = pool.start_record(0);\n        assert!(pool.push(key, 0, 1, sample(1)));\n        assert!(!pool.push(key, 0, 9, sample(9)));\n        assert!(pool.snapshot(key).unwrap().truncated);\n        let key = pool.start_record(1);\n        for entry in 0..2 { assert!(pool.push(key, entry, 1, sample(1))); }\n        let mut invalid = sample(9);\n        invalid.y = f32::NAN;\n        assert!(!pool.push(key, 0, 9, invalid));\n        let saved = pool.snapshot(key).unwrap();\n        assert!(saved.truncated && saved.breaks.is_empty(), \"an invalid sample records no break\");\n    }\n\n    #[test]\n    fn a_gap_while_another_fighter_played_still_seals() {\n        let mut pool = LiveCapturePool::new();\n        let key = pool.start_record(0);\n        for tick in 0..10 {\n            assert!(pool.push(key, 1, tick, sample(tick)));\n            if tick < 5 { assert!(pool.push(key, 0, tick, sample(tick))); }\n        }\n        assert!(!pool.push(key, 0, 10, sample(10)), \"entry 0 missed ticks entry 1 played\");\n        assert!(pool.push(key, 1, 10, sample(10)));\n        let saved = pool.snapshot(key).unwrap();\n        assert!(saved.truncated && saved.breaks.is_empty());\n        assert_eq!(saved.tracks.iter().find(|t| t.entry == 0).unwrap().frames.len(), 5);\n    }\n\n    #[test]\n    fn a_fighter_resuming_elsewhere_or_backwards_seals_and_breaks_are_bounded() {\n        let mut pool = LiveCapturePool::new();\n        let key = pool.start_record(0);\n        for tick in 0..4 {\n            for entry in 0..2 { assert!(pool.push(key, entry, tick, sample(tick))); }\n        }\n        assert!(pool.push(key, 0, 20, sample(20)));\n        assert!(!pool.push(key, 1, 21, sample(21)), \"not the break's counter\");\n        assert!(!pool.push(key, 0, 19, sample(19)), \"backwards\");\n        let saved = pool.snapshot(key).unwrap();\n        assert!(saved.truncated);\n        assert_eq!(saved.breaks.len(), 1);\n\n        let mut pool = LiveCapturePool::new();\n        let key = pool.start_record(1);\n        let mut tick = 0;\n        for _ in 0..=crate::engine::macros::MAX_BREAKS {\n            for entry in 0..2 { assert!(pool.push(key, entry, tick, sample(tick))); }\n            tick += 5;\n        }\n        assert!(!pool.push(key, 0, tick, sample(tick)), \"one break more than MAX_BREAKS seals\");\n        let saved = pool.snapshot(key).unwrap();\n        assert!(saved.truncated);\n        assert_eq!(saved.breaks.len(), crate::engine::macros::MAX_BREAKS);\n    }\n\n    #[test]\n    fn late_fighter_cannot_shift_shared_crop_time() {\n",
      "reason": "P-TIMER (primary 2026-11-05 18:32Z; DECISIONS DEFERRED-LIST item 7): a capture keeps going across a stretch of the native record with no live play (TIME! to sudden death) as a CaptureBreak, instead of sealing every track at the end of regular time"
+    },
+    {
+     "cut_tests": [
+      "worker_first_seal_tests",
+      "tests"
+     ],
+     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
     }
    ]
   },
@@ -216,7 +238,7 @@
    "dest": "src/model/macros/live_frame.rs",
    "crate": "macros",
    "src_sha256": "a4f6894336d120ba5d80d20e306f7817c1f6a836d787d809b395bb3c7bf4c471",
-   "dest_sha256": "73b1f11392cb292aadef2d9d84ee2fc76f8c7e6d2ffb1b1c096c83f429916fb4",
+   "dest_sha256": "6ff99b906f899c079f5ed7fa7629cdca7a0aca0f23e9733169acd77de13ba95a",
    "edits": [
     {
      "old": "}\n\n#[derive(Clone, Debug, Default)]\npub struct LiveSession {\n",
@@ -227,6 +249,12 @@
      "old": "    pub truncated: bool,\n    /// Opaque native serializer counter, not a proven gameplay/input/replay clock.\n    /// Admitted tracks start together and advance contiguously without wrap.\n    pub first_counter: Option<u32>,\n}\n\n",
      "new": "    pub truncated: bool,\n    /// Opaque native serializer counter, not a proven gameplay/input/replay clock.\n    /// Admitted tracks start together and advance contiguously without wrap, except\n    /// across `breaks`, where every track resumes at the break's counter.\n    pub first_counter: Option<u32>,\n    /// Ascending by index and counter; empty for a record played without interruption.\n    pub breaks: Vec<CaptureBreak>,\n}\n\nimpl LiveSession {\n    /// The native counter of frame `index` (the same for every track).\n    pub fn counter_at(&self, index: u32) -> Option<u32> {\n        let first = self.first_counter?;\n        match self.breaks.iter().rev().find(|b| b.index <= index) {\n            Some(b) => b.counter.checked_add(index - b.index),\n            None => first.checked_add(index),\n        }\n    }\n}\n\n",
      "reason": "P-TIMER (primary 2026-11-05 18:32Z; DECISIONS DEFERRED-LIST item 7): a capture keeps going across a stretch of the native record with no live play (TIME! to sudden death) as a CaptureBreak, instead of sealing every track at the end of regular time"
+    },
+    {
+     "cut_tests": [
+      "tests"
+     ],
+     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
     }
    ]
   },
@@ -235,7 +263,15 @@
    "dest": "src/model/macros/move_start.rs",
    "crate": "macros",
    "src_sha256": "c9f0962e3b1023d00376b12717bcd5236f8f8b0abfc20a493d584e2b259fba2e",
-   "dest_sha256": "1d03dd4f45fca53cb6ce8d078c85baa2fbb9648f5562024d0549593e52496643"
+   "dest_sha256": "ffac70686b0cb8c171835796127e7c3f17c2b34992f0bdb84b4f818381cd89c5",
+   "edits": [
+    {
+     "cut_tests": [
+      "tests"
+     ],
+     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+    }
+   ]
   },
   {
    "src": "training_mod_macros/src/recording.rs",
@@ -271,7 +307,7 @@
    "dest": "src/model/macros/replay.rs",
    "crate": "macros",
    "src_sha256": "b04adf37bf6ab0c2419c9fb1699b13ae174b9fb3438eecc5792b0c1b0eac9721",
-   "dest_sha256": "3a04ce9c94e0b07e9e356de8f9837238c04a7203c21b2b5cb2f8c25e4f0b65f4",
+   "dest_sha256": "1cdd6615efb4f4166bb920d9d21881b0341529d08ccbb03b0813cb1310f95e5b",
    "edits": [
     {
      "old": "    pub tracks: Vec<ReplayTrack>,\n    pub truncated: bool,\n}\n\nimpl ReplaySession {\n    /// Associate only values from the same immutable committed capture. Native\n    /// CFMK row numbers and local live entry IDs are different namespaces.\n",
@@ -282,6 +318,12 @@
      "old": "        let mut mario = track(); mario.entry = 0;\n        for frame in &mut mario.frames { frame.start.fighter_kind = 0; }\n        let mut session = ReplaySession {tracks: vec![mario, brawler], truncated: false};\n        let associated = session.mii_for_track(&miis, 1, 0x48).unwrap();\n        assert_eq!(associated.entry(), 0); // Native index never replaces the selected live entry.\n",
      "new": "        let mut mario = track(); mario.entry = 0;\n        for frame in &mut mario.frames { frame.start.fighter_kind = 0; }\n        let mut session = ReplaySession {tracks: vec![mario, brawler], truncated: false, breaks: Vec::new()};\n        let associated = session.mii_for_track(&miis, 1, 0x48).unwrap();\n        assert_eq!(associated.entry(), 0); // Native index never replaces the selected live entry.\n",
      "reason": "P-TIMER (primary 2026-11-05 18:32Z; DECISIONS DEFERRED-LIST item 7): a capture keeps going across a stretch of the native record with no live play (TIME! to sudden death) as a CaptureBreak, instead of sealing every track at the end of regular time"
+    },
+    {
+     "cut_tests": [
+      "tests"
+     ],
+     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
     }
    ]
   },
@@ -290,7 +332,7 @@
    "dest": "src/model/macros/shared_capture.rs",
    "crate": "macros",
    "src_sha256": "46093f8256ff444e9943ee4672cc6c348ddc46548a6108fc177a45fe65c208f0",
-   "dest_sha256": "f2bd480204be9cefcfd5638db73f9e1450278148c34be8a4c03d697407115a21",
+   "dest_sha256": "ed6f808ad820cfcd8c259cdc4ddeb46233afe01a6fbe4bffc0b69253f08aa40d",
    "edits": [
     {
      "old": "            }\n        }\n    }\n}\n",
@@ -356,6 +398,12 @@
      "old": "            frame([-0.0, f32::from_bits(1), 0.49999997 / 120.0, 2.0]),\n            frame([-2.0, -0.5 / 120.0, 0.5 / 120.0, f32::from_bits(0x80000001)]),\n        ] }], truncated: false, first_counter: Some(123) }\n    }\n\n",
      "new": "            frame([-0.0, f32::from_bits(1), 0.49999997 / 120.0, 2.0]),\n            frame([-2.0, -0.5 / 120.0, 0.5 / 120.0, f32::from_bits(0x80000001)]),\n        ] }], truncated: false, first_counter: Some(123), breaks: Vec::new() }\n    }\n\n    /// P-TIMER: regular time, a stretch with no live play, then sudden death. The `.smd` keeps the true counters with\n    /// one global Gap before the resumed frame; the cache and the canonical load both return the break, complete.\n    #[test]\n    fn a_sudden_death_break_round_trips_with_its_gap_and_true_counters() {\n        let mut s = session();\n        for _ in 0..2 { let f = s.tracks[0].frames[0]; s.tracks[0].frames.push(f); }\n        s.breaks = vec![crate::engine::macros::CaptureBreak { index: 2, counter: 123 + 2 + 300 }];\n        let fixture = Fixture::new();\n        let dir = fixture.publish(&s);\n        let timeline = fs::read_to_string(dir.join(TIMELINE_FILE)).unwrap();\n        assert_eq!(timeline.matches(\"\\\"gap\\\"\").count() + timeline.matches(\"\\\"Gap\\\"\").count(), 1, \"one gap event\");\n        let loaded = fixture.load().unwrap();\n        assert!(!loaded.session.truncated);\n        assert_eq!(loaded.session.breaks, vec![2]);\n        assert_eq!(loaded.session.tracks[0].frames.len(), 4);\n        let cache = CaptureArchive::new(&dir).load(&encode_file_id(\"native-id\")).unwrap();\n        assert_eq!(cache.session.breaks, vec![2]);\n        // A break that does not jump, or sits outside the frames, is refused before publication.\n        for b in [crate::engine::macros::CaptureBreak { index: 2, counter: 125 },\n                  crate::engine::macros::CaptureBreak { index: 4, counter: 999 },\n                  crate::engine::macros::CaptureBreak { index: 0, counter: 999 }] {\n            let mut bad_break = s.clone();\n            bad_break.breaks = vec![b];\n            assert!(Fixture::new().archive().save_with_outcome(\"native-id\", \"Native title\", \"13.0.5\", &bad_break).is_err(), \"{b:?}\");\n        }\n    }\n\n",
      "reason": "P-TIMER (primary 2026-11-05 18:32Z; DECISIONS DEFERRED-LIST item 7): a capture keeps going across a stretch of the native record with no live play (TIME! to sudden death) as a CaptureBreak, instead of sealing every track at the end of regular time"
+    },
+    {
+     "cut_tests": [
+      "tests"
+     ],
+     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
     }
    ]
   },
@@ -364,7 +412,15 @@
    "dest": "src/model/macros/window.rs",
    "crate": "macros",
    "src_sha256": "a2318a537296bac67436de8656f07bcd897b2e4fccbd38b101bcd41210b9c58d",
-   "dest_sha256": "67c037aff31049b905f735d0184c9d0f0ade5c72017831e47a981fec091c99e7"
+   "dest_sha256": "7b42537a584d7e7f7844cdc37f4011de95942d11cc40aea746c938c3a037b039",
+   "edits": [
+    {
+     "cut_tests": [
+      "tests"
+     ],
+     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+    }
+   ]
   },
   {
    "src": "training_mod_macros/src/test_util.rs",
@@ -378,14 +434,21 @@
    "dest": "src/model/macros/recording/tests.rs",
    "crate": "macros",
    "src_sha256": "d08afc313059da5a98b341647b8187ba0079a96379a5a5377ea8d936e98d1a22",
-   "dest_sha256": "2b3e2272db2d832e0f2f2678ec2462a876a0521bbf8844eb3bd9264f37d25160"
+   "dest_sha256": "8b22e21dd37b51658afd2c300dbdcc732fb3ddcb32c998f22a89debd61685867",
+   "edits": [
+    {
+     "wrap_file": "lib_unit_tests",
+     "reason": "rc.9 test cut: the kept unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    }
+   ]
   },
   {
    "src": "training_mod_macros/src/window/tests.rs",
    "dest": "src/model/macros/window/tests.rs",
    "crate": "macros",
    "src_sha256": "2dc0eace36a068b95ca9347fa277446b874dcf8c2f69fd5375432464cffd666f",
-   "dest_sha256": "6fc99117d4eed875c7bb10c8db92b10a3aef85312df1f06fed9b87c98d30dbd8"
+   "dest_sha256": "",
+   "removed": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): test-only file removed"
   },
   {
    "src": "training_mod_macros/src/library.rs",
@@ -431,7 +494,7 @@
    "dest": "src/model/macros/library/tests.rs",
    "crate": "macros",
    "src_sha256": "be96184687f698ec92aa4c7954fdd3299f2c7bcf2edd3586eea8958539af8e55",
-   "dest_sha256": "32d730ebd150b7fd442e1c985bbc332839b0fe35d0c3547883ddfbdd19a3375b",
+   "dest_sha256": "38133f0b174835c6a9e9df7f86444100bfa22a327fd4bf3212d5e8281e8c91ba",
    "edits": [
     {
      "old": "use super::*;\nuse {crate::engine::macros::test_util::{frames, recording, start, TempDir}, crate::engine::macros::MomentumMode, crate::engine::macros::Placement, crate::engine::macros::MAX_FRAMES};\n\nconst _: () = assert!(SLUG_CHARS + \"-9999\".len() <= MAX_ID_CHARS);\n",
@@ -467,6 +530,10 @@
      "old": "impl From<MacroError> for MemoError {\n    fn from(err: MacroError) -> Self {\n        Self::Store(err)\n    }\n}\n",
      "new": "impl From<MacroError> for MemoError {\n    fn from(err: MacroError) -> Self {\n        Self::Store(err)\n    }\n}\n\nimpl From<crate::model::store::StoreError> for MemoError {\n    fn from(err: crate::model::store::StoreError) -> Self {\n        Self::Store(err.into())\n    }\n}\n",
      "reason": "Record::Error converts from the store's own StoreError"
+    },
+    {
+     "wrap_file": "lib_unit_tests",
+     "reason": "rc.9 test cut: the kept unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -475,7 +542,7 @@
    "dest": "src/model/macros/mod.rs",
    "crate": "macros",
    "src_sha256": "561c0de012c6f235d735c9d956305c7aa98fe0cdf7a1c560552a0a6275abc4ad",
-   "dest_sha256": "1dd00b86dc83c819c79501c1733eeb2e3a8d1a580b38ddf349226387e2f9e54b",
+   "dest_sha256": "6aee0f40647192830aea1f27665c56e2845f37349ccb0116d7d1d3667293ac01",
    "edits": [
     {
      "old": "mod capture_settings;\n",
@@ -525,6 +592,12 @@
      "old": "#[cfg(any(feature = \"diag\", test))]\npub use live_capture::{FirstSeal, SealReason};\npub use live_frame::{LiveFrame, LiveInput, LiveSession, LiveTrack};\npub use recording::{\n    InputFrame, MacroError, MacroRecording, MomentumMode, Placement, StartState, DEFAULT_FPS,\n",
      "new": "#[cfg(any(feature = \"diag\", test))]\npub use live_capture::{FirstSeal, SealReason};\npub use live_frame::{CaptureBreak, LiveFrame, LiveInput, LiveSession, LiveTrack, MAX_BREAKS};\npub use recording::{\n    InputFrame, MacroError, MacroRecording, MomentumMode, Placement, StartState, DEFAULT_FPS,\n",
      "reason": "P-TIMER (primary 2026-11-05 18:32Z; DECISIONS DEFERRED-LIST item 7): a capture keeps going across a stretch of the native record with no live play (TIME! to sudden death) as a CaptureBreak, instead of sealing every track at the end of regular time"
+    },
+    {
+     "cut_tests": [
+      "move_crop_continuation_tests"
+     ],
+     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
     }
    ]
   },
@@ -533,7 +606,7 @@
    "dest": "src/model/macros/move_crop_continuation_tests.rs",
    "crate": "macros",
    "src_sha256": "be8269aefe30822af6f9ad9974c338ff5e3ce5abd5a234f24c1dc12359aa1210",
-   "dest_sha256": "70b8bfc7b51e5c343378177d9bbcb5c6c647905b98120cb62cc3c3114d68ad1a",
+   "dest_sha256": "",
    "edits": [
     {
      "old": "use training_mod_macros::*;",
@@ -545,21 +618,30 @@
      "new": "[\"--exact\", \"engine::macros::move_crop_continuation_tests::move_crop_child\", \"--nocapture\"]",
      "reason": "the child process re-runs this binary: the exact test name now carries the module path"
     }
-   ]
+   ],
+   "removed": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): test-only file removed"
   },
   {
    "src": "training_mod_tui/src/clip_browser.rs",
    "dest": "src/model/macro_ui/clip_browser.rs",
    "crate": "tui",
    "src_sha256": "65a095c11c1d2a7eade83f0f3039677736d22257620ddee0d8bf06d33b3b9543",
-   "dest_sha256": "58a70f3c40c06651c26e98b9194f2dab6793c4493bd8e4237ca43e8d18033c27"
+   "dest_sha256": "1ae8a7bea2fdca3d90cea2fe8b2d79a11e29c253a33e584e5ac3a0820e01be49",
+   "edits": [
+    {
+     "cut_tests": [
+      "tests"
+     ],
+     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+    }
+   ]
   },
   {
    "src": "training_mod_tui/src/clip_panel.rs",
    "dest": "src/model/macro_ui/clip_panel.rs",
    "crate": "tui",
    "src_sha256": "0064feed6e12daaa07f3881e49c930bb335458b4216f104a12373fd935db5ea0",
-   "dest_sha256": "54368d29adfdbc5ebba2e4c362e4708dc2de1007238da04455f04ef1bd1cc504",
+   "dest_sha256": "7ca861ae0af6257d21e853713bc8c21dc751afff3dee6bb0e50bacb0c7e8aa81",
    "edits": [
     {
      "old": "            Pad::Extra => ClipAction::TogglePlay,\n        })",
@@ -585,6 +667,12 @@
      "old": "            x: i as f32, y: 0.0 }).collect();\n        ClipEditor::new(ReplaySession { tracks: vec![ReplayTrack { entry: 1, frames,\n            quantized_analog: false }], truncated: false }, vec![14]).unwrap()\n    }\n    #[test]\n",
      "new": "            x: i as f32, y: 0.0 }).collect();\n        ClipEditor::new(ReplaySession { tracks: vec![ReplayTrack { entry: 1, frames,\n            quantized_analog: false }], truncated: false, breaks: Vec::new() }, vec![14]).unwrap()\n    }\n    /// P-TIMER: a capture with a break at frame 6 (sudden death). A window across it is refused for preview and save;\n    /// windows on either side preview, the one after the break starting at the resumed frame.\n    #[test]\n    fn a_window_across_the_sudden_death_break_is_refused_and_each_side_works() {\n        let frames: Vec<ReplayFrame> = (0..10).map(|i| ReplayFrame { input: InputFrame { buttons: i, ..InputFrame::default() },\n            start: StartState { status: 14, ..StartState::neutral(18, 0, 1.0) }, x: i as f32, y: 0.0 }).collect();\n        let mut e = ClipEditor::new(ReplaySession { tracks: vec![ReplayTrack { entry: 1, frames,\n            quantized_analog: false }], truncated: false, breaks: vec![6] }, vec![14]).unwrap();\n        let ClipEffect::Error(message) = e.on_action(ClipAction::TogglePlay) else { panic!(\"whole capture crosses\") };\n        assert_eq!(message, BREAK_CROSSED);\n        e.on_action(ClipAction::SelectOut); e.on_action(ClipAction::Nudge(-4));\n        assert_eq!((e.view().start, e.view().end), (0, 6));\n        let ClipEffect::Preview(before) = e.on_action(ClipAction::TogglePlay) else { panic!(\"regular time previews\") };\n        assert_eq!(before.frames.iter().map(|f| f.buttons).collect::<Vec<_>>(), [0, 1, 2, 3, 4, 5]);\n        e.on_action(ClipAction::TogglePlay);\n        e.on_action(ClipAction::SelectOut); e.on_action(ClipAction::Nudge(4));\n        e.on_action(ClipAction::SelectIn); e.on_action(ClipAction::Nudge(6));\n        assert_eq!((e.view().start, e.view().end), (6, 10));\n        let ClipEffect::Preview(after) = e.on_action(ClipAction::TogglePlay) else { panic!(\"sudden death previews\") };\n        assert_eq!(after.frames.iter().map(|f| f.buttons).collect::<Vec<_>>(), [6, 7, 8, 9]);\n    }\n    #[test]\n",
      "reason": "P-TIMER (primary 2026-11-05 18:32Z; DECISIONS DEFERRED-LIST item 7): a capture keeps going across a stretch of the native record with no live play (TIME! to sudden death) as a CaptureBreak, instead of sealing every track at the end of regular time"
+    },
+    {
+     "cut_tests": [
+      "tests"
+     ],
+     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
     }
    ]
   },
@@ -593,7 +681,7 @@
    "dest": "src/model/macro_ui/replay_panel.rs",
    "crate": "tui",
    "src_sha256": "7f2595db169a3703c99d74d4ed25a7247c01dfd601bfd5e5cfa19350ea98eef9",
-   "dest_sha256": "c1c716155c63f6556d740c60b626818ffc6b7a1351044426495f5115b6aed752",
+   "dest_sha256": "33a591eaf8d27bd2841db45c9281b160bcb59b03d8ffdd4ef211b79e3a4b96c9",
    "edits": [
     {
      "old": "            Pad::Confirm => return self.confirm(),\n        }\n        Effect::None",
@@ -604,6 +692,12 @@
      "old": "            x: i as f32, y: 0.0 }).collect();\n        ReplayEditor::new(ReplaySession { tracks: vec![ReplayTrack { entry: 1, frames,\n            quantized_analog: false }], truncated: false }, vec![0, 14]).unwrap()\n    }\n\n",
      "new": "            x: i as f32, y: 0.0 }).collect();\n        ReplayEditor::new(ReplaySession { tracks: vec![ReplayTrack { entry: 1, frames,\n            quantized_analog: false }], truncated: false, breaks: Vec::new() }, vec![0, 14]).unwrap()\n    }\n\n",
      "reason": "P-TIMER (primary 2026-11-05 18:32Z; DECISIONS DEFERRED-LIST item 7): a capture keeps going across a stretch of the native record with no live play (TIME! to sudden death) as a CaptureBreak, instead of sealing every track at the end of regular time"
+    },
+    {
+     "cut_tests": [
+      "tests"
+     ],
+     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
     }
    ]
   },
@@ -612,7 +706,7 @@
    "dest": "src/model/macro_ui/macro_panel.rs",
    "crate": "tui",
    "src_sha256": "1b6e698f679029bc6fa83ff9cd43756302bd939debaad2d3eeeacd10fb166da1",
-   "dest_sha256": "41a5a33a19196f5b4dbbbcdffab9c121ca11ebe4387be4326046f37a1bb2496c",
+   "dest_sha256": "ee2526b3c8a48a72ef05a52e0342409e953a47168354a2ac7b91a047a837dc95",
    "edits": [
     {
      "old": "    /// Facing, status, and frames for one playback. Empty when the fighter is not ready.\n    pub fn copy_playback(",
@@ -878,6 +972,12 @@
      "old": "            prompt: fighter::Prompt::new(origin, revision, recorded_label, current_label),\n",
      "new": "            prompt: fighter::Prompt::new(origin, side, revision, recorded_label, current_label),\n",
      "reason": "rc.7 Fighter Mismatch role fix (hot-slots 2026-11-10 18:58Z, cov-mismatch-cancel; primary 19:30Z): the prompt takes the side that plays (recording_menu::ViewRole) and names it with the menu's role names ('current Player 1 {}' / 'current CPU {}'); a library load and a replay clip pass the CPU; open_recording_fighter_prompt and open_fighter_prompt_for take the side; Combo's wording is unchanged"
+    },
+    {
+     "cut_tests": [
+      "tests"
+     ],
+     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
     }
    ]
   },
@@ -886,7 +986,7 @@
    "dest": "src/model/macro_ui/macro_panel/fighter.rs",
    "crate": "tui",
    "src_sha256": "1a4e2da3199c28c0d66ad424b2d6cbdb38b9e9ed283e529dfbc8e29e01b50f69",
-   "dest_sha256": "314e89e859bd1a895de7b0968700e4925f546a6ddef5c6a2bc06a5288b42c5bf",
+   "dest_sha256": "1aa73700511b8530f7d52ba543ac3b61131edb6413aeec6e693f1ed92c951163",
    "edits": [
     {
      "old": "            Pad::Extra => {}",
@@ -962,6 +1062,12 @@
      "old": "        assert!(view.footer.contains(\"B cancels\"));\n    }\n",
      "new": "        assert!(view.footer.contains(\"B cancels\"));\n    }\n\n    #[test]\n    fn the_footer_names_the_side_that_plays() {\n        // hot-slots 2026-11-10 18:58Z (`cov-mismatch-cancel`): Play on Player 1 (Donkey Kong) with the CPU on Mario read\n        // \"Recorded Mario \u00b7 current CPU Donkey Kong\". The role word is the playing side's, in the menu's names.\n        let first = |origin, side| {\n            let footer = Prompt::new(origin, side, 0, \"Mario\".into(), \"Donkey Kong\".into()).view().footer;\n            footer.lines().next().unwrap_or_default().to_owned()\n        };\n        for origin in [Origin::Named, Origin::Clip, Origin::Recording] {\n            assert_eq!(first(origin, ViewRole::Player), \"Recorded Mario \u00b7 current Player 1 Donkey Kong\", \"{origin:?}\");\n            assert_eq!(first(origin, ViewRole::Cpu), \"Recorded Mario \u00b7 current CPU Donkey Kong\", \"{origin:?}\");\n        }\n        // A combo's question is about Player 1's fighter: its wording is the same whichever side is passed.\n        assert_eq!(first(Origin::Combo, ViewRole::Player), \"Recorded on Mario \u00b7 P1 is Donkey Kong\");\n        assert_eq!(first(Origin::Combo, ViewRole::Cpu), \"Recorded on Mario \u00b7 P1 is Donkey Kong\");\n        // The second line is unchanged for every origin.\n        let view = Prompt::new(Origin::Recording, ViewRole::Player, 0, \"Mario\".into(), \"Donkey Kong\".into()).view();\n        assert_eq!(view.footer.lines().nth(1), Some(\"Inputs are the same either way. A chooses, B cancels.\"));\n    }\n",
      "reason": "rc.7 Fighter Mismatch role fix (hot-slots 2026-11-10 18:58Z, cov-mismatch-cancel; primary 19:30Z): the prompt takes the side that plays (recording_menu::ViewRole) and names it with the menu's role names ('current Player 1 {}' / 'current CPU {}'); a library load and a replay clip pass the CPU; open_recording_fighter_prompt and open_fighter_prompt_for take the side; Combo's wording is unchanged"
+    },
+    {
+     "cut_tests": [
+      "tests"
+     ],
+     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
     }
    ]
   },

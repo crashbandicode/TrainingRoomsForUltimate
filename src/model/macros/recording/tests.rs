@@ -1,3 +1,4 @@
+lib_unit_tests! {
 use super::*;
 use crate::engine::macros::test_util::{frames, recording, start};
 
@@ -223,4 +224,5 @@ fn exact_mii_schema_preserves_payload_and_rejects_identity_loss() {
     let tag = invalid["mii"]["tags"][0].as_u64().unwrap();
     invalid["mii"]["tags"][0] = serde_json::json!(tag ^ 1);
     assert!(serde_json::from_value::<MacroRecording>(invalid).is_err());
+}
 }

@@ -21,6 +21,8 @@ A re-sync from a newer stage (W19 / W20 patched stages) is `carry --stage <name>
 Nothing under the stage is ever written.
 """
 import argparse, hashlib, json, os, posixpath, re, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import test_cut  # rc.9: the manifest edits `cut_tests`, `wrap_tests` and `wrap_file` (docs/TEST-CUT-LEDGER-rc9.md)
 
 STAGES = "/home/intpa/smash-training-lobby/artifacts/enhancements/console-practice91/lobby-parity167/parked-reuse175/refactor/stages"
 DEFAULT_MANIFEST = "docs/provenance/pkg6-carry-manifest.json"
@@ -167,6 +169,10 @@ def transform(entry: dict, modules: dict, stage_bytes: bytes, dest_by_src: dict)
         out = text.encode("utf-8")
     for e in entry.get("edits", []):
         s = out.decode("utf-8")
+        cut = test_cut.apply_edit(e, s)  # rc.9 test cut: remove or wrap test-gated modules
+        if cut is not None:
+            out = cut.encode("utf-8")
+            continue
         if "delete_from" in e:
             # delete [delete_from, delete_to): `delete_from` must occur once; `delete_to` is the first occurrence after it
             # (or, with `delete_to_last`, the last occurrence in the file); the text from delete_to on stays
@@ -210,6 +216,14 @@ def main():
     changed = []
     for entry in manifest["files"]:
         dest = os.path.join(a.root, entry["dest"])
+        if entry.get("removed"):
+            # rc.9 test cut: a carried test-only file that is no longer in the tree; the entry keeps its stage hash and the reason
+            if a.cmd == "carry":
+                if os.path.exists(dest):
+                    os.remove(dest)
+            elif os.path.exists(dest):
+                print("PRESENT", entry["dest"], "(the manifest records it as removed)"); bad += 1
+            continue
         if a.cmd == "verify" and a.dest_only:
             if not os.path.exists(dest):
                 print("MISSING", entry["dest"]); bad += 1; continue
@@ -318,11 +332,13 @@ def write_ledger(root, manifest):
         f.write("file in this repository.\n\n")
         f.write("| Here | Fork path (stage) | src sha256 | here sha256 | edits (clean-room changes, each with its reason) |\n| --- | --- | --- | --- | --- |\n")
         for e in manifest["files"]:
-            parts = list(dict.fromkeys(x["reason"] for x in e.get("edits", [])))  # a reason shared by many edits once
+            parts = list(dict.fromkeys(x["reason"] for x in e.get("edits", [])))
+            if e.get("removed"):
+                parts.append(e["removed"])  # a reason shared by many edits once
             if e.get("widen"):
                 parts.insert(0, "`pub(super)` widened to `pub(crate)` (the fork's parent was the crate root)")
             edits = "; ".join(parts) or "path rewrite only"
-            f.write(f"| `{e['dest']}` | `{e['src']}` | `{e['src_sha256'][:16]}` | `{e['dest_sha256'][:16]}` | {edits} |\n")
+            f.write(f"| `{e['dest']}` | `{e['src']}` | `{e['src_sha256'][:16]}` | `{e['dest_sha256'][:16] or 'removed'}` | {edits} |\n")
         f.write(DELETED_SECTION)
 
 

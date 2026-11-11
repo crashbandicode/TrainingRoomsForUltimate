@@ -49,6 +49,7 @@ pub const fn scene(facts: Facts) -> Option<Scene> {
 
 #[cfg(test)]
 mod tests {
+    lib_unit_tests! {
     use super::*;
 
     const fn f(native_training: bool, lobby_active: bool, busy: bool) -> Facts {
@@ -103,5 +104,6 @@ mod tests {
         let native = Facts { native_training: true, ..stale };
         assert!(is_training(native));
         assert_eq!(scene(native), Some(Scene::Training));
+    }
     }
 }

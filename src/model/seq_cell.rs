@@ -70,6 +70,7 @@ impl<const W: usize> SeqCell<W> {
 
 #[cfg(test)]
 mod tests {
+    lib_unit_tests! {
     use super::*;
     use std::sync::Arc;
 
@@ -126,5 +127,6 @@ mod tests {
         cell.write(&[1, 2]);
         assert_eq!(cell.seq.load(Relaxed), seq);
         assert_eq!(cell.read(1), Some([1, 2]));
+    }
     }
 }

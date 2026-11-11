@@ -2,6 +2,10 @@
 //! are the unit tests of the fork's `training_mod_consts/src/practice_setup.rs` (stage m5o, ours-new;
 //! CARRY-OVER.md) ported to this crate's types, plus the filesystem rules (two loads, a failed write).
 
+// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
+macro_rules! lib_unit_tests {
+    ($($body:tt)*) => {};
+}
 #[path = "../src/model.rs"]
 #[allow(dead_code)]
 mod model;

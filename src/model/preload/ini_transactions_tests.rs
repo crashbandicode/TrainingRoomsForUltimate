@@ -5,6 +5,7 @@
 //! that fails half way and the load after it; the path left missing between the two renames of a replace. Every one goes through
 //! the real file system under a fresh temporary directory, never through a hand-supplied result.
 
+lib_unit_tests! {
 use std::path::PathBuf;
 
 use crate::engine::compat::menu::BASE_MENU;
@@ -185,4 +186,5 @@ fn an_older_file_adopts_the_saved_menu_and_the_completed_file_is_stable_on_the_n
     assert_eq!(unset, Unset::NONE, "the completed file has every key");
     let (third, _) = load_ini_unset(&path);
     assert_eq!(third, IniLoad::Parsed(adopted), "third boot");
+}
 }

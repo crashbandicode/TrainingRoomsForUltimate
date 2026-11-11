@@ -236,6 +236,7 @@ pub fn render_into<'a>(buf: &'a mut [u8], line: &InstallLine<'_>) -> (&'a str, b
 
 #[cfg(test)]
 mod tests {
+    lib_unit_tests! {
     use super::*;
 
     /// Every site of every table of the merged tree and every feature the boot reports: the line is whole (longer than the old 8 KiB
@@ -358,5 +359,6 @@ mod tests {
             line.to_string(),
             "1 plugin=training_rooms/0.1.0 game=12.0.0 build=none result=unsupported_version reason=display_version heap_allocations=0"
         );
+    }
     }
 }

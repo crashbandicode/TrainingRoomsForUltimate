@@ -2,6 +2,10 @@
 //! The Eden s4-07 / u4b-02 fault (`tr-trace-writer`, a 59,712 B frame on a 65,536 B stack) fails `rows_cover_their_need`
 //! with that row's numbers (see `the_fault_s_numbers_fail_the_rule`).
 
+// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
+macro_rules! lib_unit_tests {
+    ($($body:tt)*) => {};
+}
 #[path = "../src/model.rs"]
 #[allow(dead_code)]
 mod model;

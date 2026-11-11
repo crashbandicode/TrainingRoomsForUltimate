@@ -189,6 +189,7 @@ pub fn recover_previous_ini(path: &Path) -> io::Result<IniRecovery> {
 
 #[cfg(test)]
 mod tests {
+    lib_unit_tests! {
     use super::*;
 
     /// A unique directory under the system temp dir, removed on drop (the fork's test_util::TempDir,
@@ -395,6 +396,7 @@ mod tests {
         assert_eq!(recover_previous_ini(&ini).unwrap(), IniRecovery::Absent);
         assert!(!ini.exists());
     }
+    }
 }
 
 // ---- additions for the menu's Replay capture toggle (draft 9, Q7; package 4) --------------------------
@@ -464,6 +466,7 @@ impl CaptureSettings {
 
 #[cfg(test)]
 mod toggle_tests {
+    lib_unit_tests! {
     use super::*;
 
     #[test]
@@ -501,5 +504,6 @@ mod toggle_tests {
         big.resize(MAX_BYTES + 1, b'#');
         let (settings, why) = CaptureSettings::from_bytes(Some(&big));
         assert!(!settings.enabled && why.is_some(), "oversized: nothing is used");
+    }
     }
 }

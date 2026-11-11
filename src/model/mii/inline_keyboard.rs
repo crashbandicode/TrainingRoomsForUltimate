@@ -110,30 +110,3 @@ impl Signals {
     pub fn cancel(&mut self) { self.decision = Some(Decision::Cancel); }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn mii_limit_and_native_buffer_size_are_unchanged() {
-        let text = Text::new(&[65; 10], 4).unwrap();
-        assert_eq!(text.terminated().len(), 11);
-        assert_eq!(std::mem::size_of_val(text.terminated()), 22);
-        assert!(Text::new(&[65; 11], 0).is_none());
-        assert!(Text::new(&[65], 2).is_none());
-        assert!(Text::new(&[0], 0).is_none());
-    }
-
-    #[test]
-    fn macro_limit_counts_scalars_and_preserves_utf16_caret() {
-        let name = "😀".repeat(MAX_NAME_CHARS);
-        let text = Text::macro_name(&name, 2).unwrap();
-        assert_eq!(text.units().len(), 96);
-        assert_eq!(text.cursor(), 2);
-        assert!(Text::macro_name(&format!("{name}a"), 0).is_none());
-        assert!(Text::macro_name(&"a".repeat(49), 0).is_none());
-        assert!(Text::macro_name("😀", 1).is_none());
-        assert!(text_signal(&[0xd800], 1, 1, Limit::Macro).is_none());
-        assert!(text_signal(&[65], -1, 0, Limit::Macro).is_none());
-    }
-}

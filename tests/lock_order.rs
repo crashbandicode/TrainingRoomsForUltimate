@@ -15,6 +15,10 @@
 //! order graph (two locks taken in both orders), and on a lock retaken while held. Limits are `hook_locks.rs`'s: calls
 //! through `dyn`, trait methods and stored closures are not seen; native locks (the game's own) are not seen.
 
+// rc.9 test cut: the call-graph scanner's own tests run once, in `tests/hook_locks.rs`.
+macro_rules! callgraph_self_tests {
+    ($($body:tt)*) => {};
+}
 #[path = "common/callgraph.rs"]
 mod callgraph;
 

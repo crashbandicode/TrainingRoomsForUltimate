@@ -55,6 +55,7 @@ pub fn contains(bytes: &[u8], expected: &[u8]) -> Option<bool> {
 
 #[cfg(test)]
 mod tests {
+    lib_unit_tests! {
     use super::*;
 
     fn fixture(little: bool, name: Option<&[u8]>, payload: &[u8]) -> Vec<u8> {
@@ -111,5 +112,6 @@ mod tests {
     #[test]
     fn non_utf8_names_do_not_match_valid_layout_names() {
         assert_eq!(contains(&fixture(true, Some(b"\xff"), b"data"), b"target"), Some(false));
+    }
     }
 }

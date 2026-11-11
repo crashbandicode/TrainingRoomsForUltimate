@@ -266,6 +266,7 @@ pub fn export(name: &str, pair: &[SavedState; 2]) -> Result<SetupRecord, SetupEr
 
 #[cfg(test)]
 mod tests {
+    lib_unit_tests! {
     use super::super::{
         machine::{Machine, Role},
         record::Marker,
@@ -473,5 +474,6 @@ mod tests {
         let (id, job) = exchange.take_writer().unwrap();
         exchange.finish_writer(id, job);
         assert_eq!(*exchange.poll(ticket).unwrap(), 6);
+    }
     }
 }

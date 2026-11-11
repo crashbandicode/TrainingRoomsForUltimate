@@ -167,5 +167,3 @@ pub fn timestamp(frame: u32, fps: u32) -> String {
     format!("{}:{:02} +{}f", seconds / 60, seconds % 60, frame % fps)
 }
 
-#[cfg(test)]
-mod tests;

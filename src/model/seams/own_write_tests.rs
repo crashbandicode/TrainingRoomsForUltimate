@@ -2,6 +2,7 @@
 //! `seal`) on the real rows: a group checked after another of our modules hooked inside its windows still verifies, and
 //! another plugin's hook over ours still does not.
 
+lib_unit_tests! {
 use std::collections::BTreeMap;
 
 use super::native_seams::{self, find, Seam, PATCH_SITES, SITES};
@@ -157,4 +158,5 @@ fn a_refused_row_is_named_once_in_the_shipped_log() {
     let text = line.to_string();
     assert_eq!(text, "[TrainingSeams] seam=lobby_stage.resource_request group=lobby_stage_probe offset=0x25f7874 outcome=occupied");
     assert!(crate::model::diag_ring::shipped(text.as_bytes()));
+}
 }

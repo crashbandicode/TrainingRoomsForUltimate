@@ -238,6 +238,7 @@ impl<T> fmt::Debug for Receiver<T> {
 
 #[cfg(test)]
 mod tests {
+    lib_unit_tests! {
     use super::*;
     use std::sync::Barrier;
     use std::time::{Duration, Instant};
@@ -416,5 +417,6 @@ mod tests {
             thread.join().unwrap();
         }
         assert_eq!(count, SENDERS * EACH);
+    }
     }
 }

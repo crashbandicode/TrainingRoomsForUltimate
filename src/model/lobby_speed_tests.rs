@@ -1,6 +1,7 @@
 //! rc.8 R2: the lobby's 2/3 pace (against a model of the game's slow step), x1.5's cadence and gate, and the scheduler
 //! walk (against a fake scheduler laid out as `FUN_0137b3f0` reads it).
 
+lib_unit_tests! {
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 
@@ -467,4 +468,5 @@ fn the_pass_stops_between_ticks_once_the_practice_is_no_longer_live() {
     let mut narrow = [Task::EMPTY; 2];
     let pass = run_pass(&m, S, WALKER, &mut narrow, || true, |_| calls += 1);
     assert_eq!((pass.ticked, pass.whole, calls), (0, false, 0));
+}
 }

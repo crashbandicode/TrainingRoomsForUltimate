@@ -81,6 +81,7 @@ impl<T, const N: usize> Drop for OwnedRing<T, N> {
 
 #[cfg(test)]
 mod tests {
+    lib_unit_tests! {
     use super::*;
     use std::sync::Arc;
 
@@ -149,5 +150,6 @@ mod tests {
         let refused = producer.join().unwrap();
         assert_eq!(taken + refused, TOTAL, "taken {taken} + refused {refused}");
         assert_eq!(u64::from(ring.take_refused()), refused);
+    }
     }
 }

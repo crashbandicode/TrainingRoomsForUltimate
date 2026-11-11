@@ -9,6 +9,10 @@
 //! The writers the hooks use now are proven here under the plugin's counting allocator; the wiring of the Switch-only
 //! `runtime/p1/cpu_pilot.rs` (no file and no heap call on a hook path; the file work on the heartbeat) is pinned by its source.
 
+// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
+macro_rules! lib_unit_tests {
+    ($($body:tt)*) => {};
+}
 #[path = "../src/model.rs"]
 #[allow(dead_code)]
 mod model;

@@ -199,6 +199,7 @@ pub const fn marker_written_after(blocking_done: bool, background_done: bool) ->
 
 #[cfg(test)]
 mod tests {
+    lib_unit_tests! {
     use super::*;
 
     #[test]
@@ -211,5 +212,6 @@ mod tests {
     fn routes_rename_the_settings_file() {
         assert_eq!(route("training_modpack_menu.conf").map(|r| r.to), Some("settings.json"));
         assert!(route("training_modpack.json").is_none());
+    }
     }
 }

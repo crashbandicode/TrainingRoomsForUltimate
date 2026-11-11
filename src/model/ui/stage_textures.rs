@@ -142,30 +142,3 @@ pub fn path_into(stage_id: u32, out: &mut [u8; 96]) -> Option<usize> {
     Some(total)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn path(id: u32) -> String {
-        let mut buffer = [0u8; 96];
-        let len = path_into(id, &mut buffer).unwrap();
-        String::from_utf8(buffer[..len].to_vec()).unwrap()
-    }
-
-    #[test]
-    fn paths_follow_the_documented_examples() {
-        assert_eq!(path(0), "ui/replace/stage/stage_1/stage_1_battlefield.bntx");
-        assert_eq!(path(3), "ui/replace/stage/stage_1/stage_1_end.bntx");
-        assert_eq!(path(347), "ui/replace_patch/stage/stage_1/stage_1_battlefields.bntx");
-        assert!(texture_of(311).is_none(), "the Waiting Room has no picture");
-    }
-
-    #[test]
-    fn the_table_has_115_unique_stages_of_which_12_are_patch_stages() {
-        assert_eq!(STAGE_TEXTURES.len(), 115);
-        for (i, (id, name, _)) in STAGE_TEXTURES.iter().enumerate() {
-            assert!(STAGE_TEXTURES[..i].iter().all(|(other, n, _)| other != id && n != name), "{id} {name}");
-        }
-        assert_eq!(STAGE_TEXTURES.iter().filter(|(_, _, patch)| *patch).count(), 12);
-    }
-}

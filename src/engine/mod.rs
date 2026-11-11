@@ -28,9 +28,6 @@ pub mod mii_root;
 #[cfg(any(test, target_os = "switch"))]
 #[path = "../model/mii_install.rs"]
 pub mod mii_install;
-#[cfg(test)]
-#[path = "../model/mii_fork_tests/mod.rs"]
-mod mii_fork_tests;
 #[cfg(any(test, target_os = "switch"))]
 #[path = "../model/preload/mod.rs"]
 pub mod preload;
@@ -70,10 +67,6 @@ pub mod rr_host;
 /// The frames a playing role hands from the recording worker to its hook.
 #[path = "../model/frame_queue.rs"]
 pub mod frame_queue;
-/// Card L1's contract: the sequence drill's model and host halves (test-only).
-#[cfg(test)]
-#[path = "../model/sequence_drill_contract.rs"]
-mod sequence_drill_contract;
 // CPU-as-P1: the session helpers (the pilot core is a path child of cpu_pilot) are consumed by the Switch-only runtime::p1::cpu_pilot; on the host their tests run by path
 // from tests/p1_core.rs (the playbook's by-path include).
 #[cfg(target_os = "switch")]

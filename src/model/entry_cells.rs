@@ -73,6 +73,7 @@ pub fn active_cell(index: u8, count: u64) -> Option<usize> {
 
 #[cfg(test)]
 mod tests {
+    lib_unit_tests! {
     use super::*;
 
     #[test]
@@ -166,5 +167,6 @@ mod tests {
             assert_eq!(body, 0);
             assert_eq!(reads, [0x14150]);
         }
+    }
     }
 }
