@@ -49,3 +49,58 @@ fn no_writeback_side_takes_a_lock() {
     let scope = &scope[..scope.find("\n    }\n").expect("the scope's end")];
     assert!(scope.contains("GAME_WRITEBACK.write("), "{store}");
 }
+
+/// Every `.rs` file under `src/runtime`, with its path relative to it.
+fn runtime_sources() -> Vec<(String, String)> {
+    fn walk(dir: &std::path::Path, root: &std::path::Path, out: &mut Vec<(String, String)>) {
+        for entry in std::fs::read_dir(dir).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                walk(&path, root, out);
+            } else if path.extension().is_some_and(|e| e == "rs") {
+                let rel = path.strip_prefix(root).unwrap().to_string_lossy().replace('\\', "/");
+                out.push((rel, std::fs::read_to_string(&path).unwrap()));
+            }
+        }
+    }
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");
+    let mut out = Vec::new();
+    walk(&root, &root, &mut out);
+    out
+}
+
+/// The calls of `name(` outside its own definition: `(file, the enclosing fn's header line)`.
+fn callers(name: &str) -> Vec<(String, String)> {
+    let mut out = Vec::new();
+    for (file, text) in runtime_sources() {
+        for (at, _) in text.match_indices(&format!("{name}(")) {
+            let line_start = text[..at].rfind('\n').map_or(0, |i| i + 1);
+            // Not its definition, not a longer name, not a method (`ADOPTED.store(`): these are plain or path calls.
+            if text[line_start..at].contains("fn ") || !text[..at].ends_with(|c: char| !c.is_alphanumeric() && c != '_' && c != '.') {
+                continue;
+            }
+            let header = text[..at].rmatch_indices("\nfn ").chain(text[..at].rmatch_indices("\npub fn ")).map(|(i, _)| i).max()
+                .map_or(String::new(), |i| text[i + 1..].lines().next().unwrap_or("").to_owned());
+            out.push((file.clone(), header));
+        }
+    }
+    out
+}
+
+/// rc.8 R8 (B's finding 3): each triple buffer has one reader and its writers take turns (the contract
+/// `hos_lock::TripleBuffer` states). The one reader is the menu worker's loop; `after_publish` runs only inside
+/// `publish`, under `PUBLISHING`. A "flush before publish" call elsewhere, or a second publisher outside that lock, would
+/// share a slot with no other test failing.
+#[test]
+fn the_writeback_buffers_keep_one_reader_and_one_writer_at_a_time() {
+    assert_eq!(callers("flush_writeback"), vec![("ui/worker.rs".to_owned(), "fn run() {".to_owned())],
+        "the menu worker's loop is the one reader");
+    assert_eq!(callers("after_publish"), vec![("published.rs".to_owned(), "pub fn publish(snapshot: &Snapshot, rerolls: u8) {".to_owned())]);
+    let published = runtime_sources().into_iter().find(|(f, _)| f == "published.rs").unwrap().1;
+    let publish = body(&published, "pub fn publish(");
+    let turn = publish.find("let _turn = PUBLISHING.lock();").expect("the publisher's turn");
+    assert!(turn < publish.find("after_publish(").unwrap(), "after_publish runs under PUBLISHING: {publish}");
+    // `store`, the game side's writer, is reached only from the typed menu's guard and assign (serialised by EDITED).
+    let menu_callers: Vec<String> = callers("store").into_iter().filter(|(f, _)| f == "compat/menu.rs").map(|(_, h)| h).collect();
+    assert_eq!(menu_callers.len(), 2, "{menu_callers:?}");
+}
