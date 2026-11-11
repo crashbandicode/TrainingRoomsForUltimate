@@ -41,6 +41,8 @@ pub struct Env {
     /// The combo helper's target and draft names (SPEC-input-07 §6), kept by the menu worker.
     pub combo_target: super::combo::Label,
     pub combo_draft: super::combo::Label,
+    /// The build tag the page's key hints end with (R13): `frame::BUILD_TAG` on the console; empty adds nothing.
+    pub build_tag: &'static str,
 }
 
 impl Default for Env {
@@ -55,6 +57,7 @@ impl Default for Env {
         replay_capture: false,
             combo_target: super::combo::Label::EMPTY,
             combo_draft: super::combo::Label::EMPTY,
+            build_tag: "",
         }
     }
 }

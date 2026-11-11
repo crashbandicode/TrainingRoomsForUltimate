@@ -381,6 +381,10 @@ impl Default for Frame {
 
 pub const TITLE: &str = "TrainingRooms";
 
+/// Which build this is (R13): the crate version, the internal build name and the commit's short sha (`-dirty` with
+/// uncommitted changes, `unknown` without git), set by `build.rs` at compile time.
+pub const BUILD_TAG: &str = concat!(env!("CARGO_PKG_VERSION"), " · ", env!("TR_BUILD_NAME"), " ", env!("TR_BUILD_SHA"));
+
 /// Real frames of discarded input and fade after the menu closes (SPEC-core-03 §2.3).
 pub const CLOSE_FRAMES: u32 = 15;
 
@@ -598,6 +602,12 @@ pub fn page_frame(menu: &Menu, frame: &mut Frame) {
     }
     let _ = frame.hint.write_str(HINT_PAGE);
     paint_recording(menu, frame);
+    // The build tag ends the page's own key hints, after them, in the same dim line (R13); the recording pop-up keeps its
+    // r8 footer.
+    let tag = menu.env().build_tag;
+    if !frame.popup && !tag.is_empty() {
+        let _ = write!(frame.hint, "      {tag}");
+    }
 }
 
 /// The count beside a group title: the rows it lists. A recording library group lists files, not
@@ -1258,5 +1268,71 @@ mod tests {
         let mut t: Text<4> = Text::new();
         let _ = t.write_str("abcdefgh");
         assert_eq!(t.string_lossy(), "abcd");
+    }
+
+    /// R13: the crate version, `rc8` and the commit's short sha (`git rev-parse --short=8`: 8 hex digits, more only if
+    /// 8 are ambiguous), `-dirty` with uncommitted changes, or `unknown` without git.
+    #[test]
+    fn the_build_tag_reads_version_name_and_short_sha() {
+        let rest = BUILD_TAG.strip_prefix(env!("CARGO_PKG_VERSION")).expect(BUILD_TAG);
+        let sha = rest.strip_prefix(" · rc8 ").expect(BUILD_TAG);
+        let hex = sha.strip_suffix("-dirty").unwrap_or(sha);
+        assert!(sha == "unknown" || (hex.len() >= 8 && hex.bytes().all(|b| b.is_ascii_hexdigit())), "{BUILD_TAG}");
+    }
+
+    /// R13: the tag ends the page's key hints, after them, on the page and on the Recording page; the pop-up and a
+    /// sub-screen keep their own keys, and a menu without a tag keeps the hint as it was.
+    #[test]
+    fn the_page_footer_ends_with_the_build_tag() {
+        use crate::model::recording_menu::Face;
+        let mut m = Menu::new(Settings::factory(), Env { build_tag: BUILD_TAG, ..Env::default() });
+        let mut f = Frame::new();
+        page_frame(&m, &mut f);
+        assert_eq!(f.hint.string_lossy(), format!("{HINT_PAGE}      {BUILD_TAG}"));
+        assert!(!f.help[0].is_empty(), "the help lines are kept");
+        m.press(Button::R);
+        m.press(Button::R);
+        page_frame(&m, &mut f);
+        assert_eq!(f.hint.string_lossy(), format!("{}      {BUILD_TAG}", m.recording().hint(Face::Page)));
+        m.recording_mut().toggle_popup();
+        page_frame(&m, &mut f);
+        assert_eq!(f.hint.string_lossy(), m.recording().hint(Face::Popup), "the pop-up keeps its r8 footer");
+        let mut c = Menu::new(Settings::factory(), Env { build_tag: BUILD_TAG, ..Env::default() });
+        c.press(Button::Up);
+        c.press(Button::A);
+        crate::model::screens::frame_of(&c, &mut f, |_| "Stage");
+        assert_eq!(f.hint.string_lossy(), "A reset   B cancel", "a sub-screen keeps its own keys");
+        page_frame(&menu(), &mut f);
+        assert_eq!(f.hint.string_lossy(), HINT_PAGE);
+    }
+
+    /// R13: with the longest tag a build makes (`-dirty`), every page's hint line fits its pane (`panes::spec`): the tag
+    /// is not cut at the pane's capacity, and the line's width at the pane's font (`text_width`'s 0.56 em) stays inside
+    /// the pane.
+    #[test]
+    fn the_build_tag_fits_every_page_footer() {
+        use super::super::panes::{spec, Kind, IDX_HINT};
+        const LONGEST: &str = concat!(env!("CARGO_PKG_VERSION"), " · ", env!("TR_BUILD_NAME"), " 0123abcd-dirty");
+        let pane = spec(IDX_HINT);
+        let Kind::Text { font, chars, .. } = pane.kind else { panic!("the hint pane is a text box") };
+        for tag in [BUILD_TAG, LONGEST] {
+            for developer in [false, true] {
+                let mut m = Menu::new(Settings::factory(), Env { developer_page: developer, build_tag: tag, ..Env::default() });
+                for _ in 0..8 {
+                    let page = m.page();
+                    for _ in 0..m.entry_count(page) + 1 {
+                        let mut f = Frame::new();
+                        page_frame(&m, &mut f);
+                        let hint = f.hint.string_lossy();
+                        assert!(hint.ends_with(tag), "{page:?}: {hint}");
+                        let units = f.hint.units().len();
+                        assert!(units <= usize::from(chars), "{page:?}: {units} units");
+                        assert!(units as f32 * font.0 * 0.56 <= pane.w, "{page:?}: {hint}");
+                        m.press(Button::Down);
+                    }
+                    m.press(Button::R);
+                }
+            }
+        }
     }
 }
