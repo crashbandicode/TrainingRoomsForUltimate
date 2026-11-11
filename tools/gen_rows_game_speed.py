@@ -41,8 +41,8 @@ ROWS = [
     ("game_speed.hud_icon", 0x13E54F8, "SeamKind::Relied", True, True,
      "The HUD's speed indicator refresh (x19 the HUD data object): `[[x19+8]+0x80]+0xb54` against 1 and the shown flag "
      "`ldrb w10,[x19,#0x231]`; shown at x1: `out_speed` (`add x0,x8,#0x178`, `bl 0x377aee0`), `strb wzr,[x19,#0x231]`. "
-     "It runs only in the menu state (`game_speed.hud_state`), not every frame: the bind runs it after a closed-menu "
-     "step."),
+     "It runs in the menu state (`game_speed.hud_state`) and in no other, not every frame: the bind runs it after a "
+     "closed-menu step."),
     ("game_speed.hud_icon_show", 0x13E5530, "SeamKind::Relied", True, True,
      "The same refresh, not shown and not x1: `in_speed` (`add x0,x8,#0x168`, `bl 0x377aee0`), then `orr w8,wzr,#1`, "
      "`strb w8,[x19,#0x231]`."),
