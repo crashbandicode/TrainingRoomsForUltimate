@@ -40,6 +40,10 @@ pub mod seams;
 #[cfg(test)]
 #[path = "../model/game_speed_rows_tests.rs"]
 mod game_speed_rows_tests;
+/// rc.8 R2: the lobby speed rows' guard words decoded against `model::lobby_speed`.
+#[cfg(test)]
+#[path = "../model/lobby_speed_rows_tests.rs"]
+mod lobby_speed_rows_tests;
 #[cfg(any(test, target_os = "switch"))]
 #[path = "../model/swap/mod.rs"]
 pub mod swap;

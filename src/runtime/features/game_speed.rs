@@ -7,14 +7,20 @@
 //!   `0x1bbbd30(menu, value, menu+0x538)`, the menu setter's own path for an unchanged value. The game applies the menu's
 //!   speed only on the pause/resume side, so P1's next poll (a game thread) then does the apply's own writes to the
 //!   Training mode object, the slow table and the rate words (`training_apply`, QCF's Q4).
-//! - The waiting-room practice: Player 1's frame step (`lobby::frame`) keeps one slot of the game's slow table. The
-//!   practice's teardown (the session clear on its P1's destroy, its exit, a scene change) frees it with a write, only
-//!   in the table it was taken from and only while the slot is still ours; a match found shows no busy edge first.
+//! - The waiting-room practice: Player 1's frame step (`lobby::frame`) keeps one slot of the game's slow table (1/2,
+//!   1/4, and 2/3's paced slot). The practice's teardown (the session clear on its P1's destroy, its exit, a scene
+//!   change) frees it with a write, only in the table it was taken from and only while the slot is still ours; a match
+//!   found shows no busy edge first.
+//! - rc.8 R2 (`model::lobby_speed`): the waiting area's update (`lobby::lobby_speed`'s hook, after the update's slow step
+//!   and scheduler pass) paces 2/3's slot and runs x1.5's extra world step. Both run only while the practice is live
+//!   (Player 1's frame arms it, the same teardown disarms it before the native teardown), and neither writes the update
+//!   rate words: those are Training's alone.
 
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering};
 
 use crate::engine::seams::native_fields as field;
 use crate::model::game_speed::{self as rules, mode, native, table, Bytes, HoldEvent, LobbyNow, LobbySlot, ModeApply, Place, Speed};
+use crate::model::lobby_speed::{self as lobby_rules, Cadence, LobbyPlan, PassNow};
 use crate::model::input_delay::Owners;
 use crate::model::notify::DEFAULT_COLOR;
 use crate::runtime::features::notices;
@@ -36,8 +42,18 @@ static MODE_PENDING: AtomicU32 = AtomicU32::new(0);
 static SHOWN: AtomicU32 = AtomicU32::new(0);
 /// The waiting-room practice's speed; x1 at each new practice session.
 static LOBBY_WANTED: AtomicU32 = AtomicU32::new(Speed::X1 as u32);
-/// The lobby's slot: Player 1's frame only (a game thread), `try_lock`.
+/// The lobby's slot: Player 1's frame and the waiting area's update (game threads), `try_lock`.
 static LOBBY: hos_lock::Mutex<LobbySlot> = hos_lock::Mutex::new(LobbySlot::new());
+/// The practice is live: Player 1's frame in the practice arms it, `session_clear` (the practice's teardown) disarms it.
+/// The waiting area's update paces and steps only while it is set.
+static LOBBY_LIVE: AtomicBool = AtomicBool::new(false);
+/// x1.5's every-other-update cadence: the waiting area's update only (one game thread), `try_lock`.
+static CADENCE: hos_lock::Mutex<Cadence> = hos_lock::Mutex::new(Cadence::new());
+
+/// The speed bind's rows all passed at boot (`lobby_speed` hooks only then).
+pub(crate) fn installed() -> bool {
+    base().is_some()
+}
 
 /// Once from `lobby::init`: compare every row; the bind does nothing unless all passed.
 pub(crate) fn init() {
@@ -331,6 +347,9 @@ pub(crate) fn lobby_frame() {
     let Some(mut keeper) = LOBBY.try_lock() else { return };
     let in_practice = scene::lobby_term();
     let pending = RELEASE_PENDING.swap(false, Ordering::AcqRel);
+    if in_practice {
+        LOBBY_LIVE.store(true, Ordering::Release);
+    }
     if !in_practice && keeper.held().is_none() {
         return;
     }
@@ -354,6 +373,114 @@ pub(crate) fn lobby_frame() {
     }
     #[cfg(not(feature = "diag"))]
     let _ = step;
+}
+
+/// The slow state's byte at `at` (`model::lobby_speed::native`).
+///
+/// # Safety
+/// `base` is main's base with `lobby_speed.slow_step` guarded: `.bss` bytes of main the slow step reads every update.
+unsafe fn slow_byte(base: usize, at: usize) -> u8 {
+    field::read_unchecked::<u8>(base + lobby_rules::native::SLOW_STATE, at)
+}
+
+/// The waiting area's update (`lobby::lobby_speed`'s hook: the main thread, after this update's slow step and
+/// scheduler pass): 2/3's pace and x1.5's extra world step, only while the practice is live.
+///
+/// # Safety
+/// The hook's thread and moment; every `lobby_speed` row passed (the hook is installed only then).
+pub(crate) unsafe fn lobby_update() {
+    let Some(base) = base() else { return };
+    // Only in the practice, as every lobby write (`lobby_frame`; worker B's R8 finding).
+    if !LOBBY_LIVE.load(Ordering::Acquire) || !scene::lobby_term() {
+        return;
+    }
+    let wanted = Speed::from_value(LOBBY_WANTED.load(Ordering::Acquire)).unwrap_or(Speed::X1);
+    match LobbyPlan::of(wanted) {
+        LobbyPlan::TwoThirds => lobby_pace(base),
+        LobbyPlan::ExtraPass => lobby_extra_step(base),
+        LobbyPlan::X1 | LobbyPlan::Slot(_) => {}
+    }
+}
+
+/// 2/3: at a slow period's end, the paced slot's next divisor (`LobbySlot::pace`).
+///
+/// # Safety
+/// As `lobby_update`.
+unsafe fn lobby_pace(base: usize) {
+    let Some(mut keeper) = LOBBY.try_lock() else { return };
+    let table = slow_table(base);
+    let (current_n, sub) = (slow_byte(base, lobby_rules::native::CURRENT_N_AT), slow_byte(base, lobby_rules::native::SUB_AT));
+    let mut native = NativeTable(table);
+    let bytes: Option<&mut dyn Bytes> = if field::object(table) { Some(&mut native) } else { None };
+    let step = keeper.pace(current_n, sub, table, bytes);
+    drop(keeper);
+    #[cfg(feature = "diag")]
+    {
+        static PACED: AtomicU32 = AtomicU32::new(0);
+        if let rules::LobbyStep::Paced(held) = step {
+            let n = PACED.fetch_add(1, Ordering::Relaxed);
+            if n < 4 || n.is_multiple_of(600) {
+                crate::runtime::diag_log::diagnostic(format_args!(
+                    "[GameSpeed] lobby paced n={n} divisor={} slot={} current_n={current_n}",
+                    held.divisor, held.slot
+                ));
+            }
+        }
+    }
+    #[cfg(not(feature = "diag"))]
+    let _ = step;
+}
+
+/// x1.5: on every other allowed update, one extra world step (`lobby::lobby_speed::extra_pass`). No `game_speed` lock is
+/// held while the world's tasks run (Player 1's frame inside them takes `LOBBY`), and the pass stops between ticks once
+/// `LOBBY_LIVE` drops.
+///
+/// # Safety
+/// As `lobby_update`.
+unsafe fn lobby_extra_step(base: usize) {
+    use crate::runtime::lobby::lobby_speed as pass;
+    let s = pass::scheduler(base);
+    let now = PassNow {
+        live: LOBBY_LIVE.load(Ordering::Acquire),
+        in_practice: scene::lobby_term(),
+        ui_busy: crate::runtime::lobby::training::lobby::native_ui_busy(),
+        paused: field::read_unchecked::<u32>(base, lobby_rules::native::PAUSED),
+        current_n: slow_byte(base, lobby_rules::native::CURRENT_N_AT),
+        target_n: slow_byte(base, lobby_rules::native::TARGET_N_AT),
+        phase_word: pass::phase_word(s),
+    };
+    let Some(mut cadence) = CADENCE.try_lock() else { return };
+    if s == 0 || !lobby_rules::pass_allowed(now) {
+        cadence.reset();
+        return;
+    }
+    let due = cadence.due();
+    drop(cadence);
+    if !due {
+        return;
+    }
+    let Some(done) = pass::extra_pass(base, s, &LOBBY_LIVE) else { return };
+    #[cfg(feature = "diag")]
+    {
+        let n = pass::passes();
+        static SKIPPED: AtomicU32 = AtomicU32::new(0);
+        let plan = done.survey;
+        if !done.whole {
+            if SKIPPED.fetch_add(1, Ordering::Relaxed) < 4 {
+                crate::runtime::diag_log::diagnostic(format_args!(
+                    "[GameSpeed] lobby pass skipped ticked={} {plan:?}",
+                    done.ticked
+                ));
+            }
+        } else if n <= 2 || n.is_multiple_of(600) {
+            crate::runtime::diag_log::diagnostic(format_args!(
+                "[GameSpeed] lobby pass n={n} tasks={} skipped={} masked={} widest={}",
+                plan.tasks, plan.skipped, plan.masked, plan.widest
+            ));
+        }
+    }
+    #[cfg(not(feature = "diag"))]
+    let _ = done;
 }
 
 /// The practice's teardown (`session_clear`: the practice P1's destroy, the scene's exit, a scene change, the
@@ -393,13 +520,18 @@ pub(crate) fn practice_changed() {
     session_clear();
 }
 
-/// Session clear (`chords::session_clear`): the pop-up goes; a Training write not yet made is dropped; the lobby slot is
-/// released (`release_lobby_slot`).
+/// Session clear (`chords::session_clear`): the pop-up goes; a Training write not yet made is dropped; the practice is
+/// no longer live (the waiting area's update stops pacing and stepping before the native teardown), and the lobby slot
+/// is released (`release_lobby_slot`).
 pub(crate) fn session_clear() {
     if SHOWN.swap(0, Ordering::AcqRel) != 0 {
         notices::clear(rules::POPUP_ID);
     }
     TRAINING_WANTED.store(0, Ordering::Release);
     MODE_PENDING.store(0, Ordering::Release);
+    LOBBY_LIVE.store(false, Ordering::Release);
+    if let Some(mut cadence) = CADENCE.try_lock() {
+        cadence.reset();
+    }
     release_lobby_slot();
 }

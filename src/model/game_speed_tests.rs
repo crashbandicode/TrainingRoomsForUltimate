@@ -51,15 +51,16 @@ fn training_steps_walk_the_speeds_and_stop_at_the_ends() {
     assert_eq!(step(&[], Speed::Half, Dir::Right), Speed::Half);
 }
 
+/// rc.8 R2: the lobby offers Training's five speeds, in the same order (2/3 and x1.5 through `model::lobby_speed`, never
+/// through the update rate).
 #[test]
-fn lobby_offers_only_slot_speeds() {
+fn lobby_offers_the_training_speeds() {
     let list = Place::Lobby.speeds();
-    assert_eq!(list, &[Speed::Quarter, Speed::Half, Speed::X1]);
-    for speed in list {
-        assert!(*speed == Speed::X1 || speed.slot_divisor().is_some(), "{speed:?} is not the slot alone");
-    }
-    assert_eq!(step(list, Speed::X1, Dir::Right), Speed::X1, "no speed-up in the lobby until QCF's proof");
-    assert_eq!(step(list, Speed::X1, Dir::Left), Speed::Half);
+    assert_eq!(list, Place::Training.speeds());
+    assert_eq!(list, &[Speed::Quarter, Speed::Half, Speed::TwoThirds, Speed::X1, Speed::OneAndHalf]);
+    assert_eq!(step(list, Speed::X1, Dir::Right), Speed::OneAndHalf);
+    assert_eq!(step(list, Speed::X1, Dir::Left), Speed::TwoThirds);
+    assert_eq!(step(list, Speed::TwoThirds, Dir::Left), Speed::Half);
     assert_eq!(step(list, Speed::Half, Dir::Left), Speed::Quarter);
 }
 
@@ -306,8 +307,13 @@ fn rates_are_the_speed_codes_table() {
             ("x1.5", 6, 180, Some(2)),
         ]
     );
+    // rc.8 R2: the lobby never applies `rate()`, so it never writes the rate words. Its two speeds whose Training rate
+    // raises the update rate are exactly the paced slot and the extra pass (`model::lobby_speed::LobbyPlan`).
+    use crate::model::lobby_speed::LobbyPlan;
     for speed in Place::Lobby.speeds() {
-        assert!(speed.rate().code == 0 && speed.rate().updates == 60, "the lobby's speeds never need the rate words");
+        let raises = speed.rate().code != 0 || speed.rate().updates != 60;
+        let plan = LobbyPlan::of(*speed);
+        assert_eq!(raises, matches!(plan, LobbyPlan::TwoThirds | LobbyPlan::ExtraPass), "{speed:?}");
     }
 }
 

@@ -61,6 +61,9 @@ pub mod frame_strip;
 pub mod frame_strip_plan;
 #[path = "model/game_speed.rs"]
 pub mod game_speed;
+/// rc.8 R2: the waiting-room practice's 2/3 pace and x1.5 extra pass.
+#[path = "model/lobby_speed.rs"]
+pub mod lobby_speed;
 #[path = "model/combo.rs"]
 pub mod combo;
 /// One drill, and a sequence's streak. Make combo does not change the drill.

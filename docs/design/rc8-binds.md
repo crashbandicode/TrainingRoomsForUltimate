@@ -102,8 +102,9 @@ Where a choice is the operator's, this takes the sensible default and states it.
    - **Training:** the five speeds Training offers: 1/4, 1/2, 2/3, x1, x1.5 (values 5, 4, 3, 1, 6).
      - **1 Frame is left to the native menu.** It's a pause-and-step mode with its own button, not a speed.
      - When Training is on 1 Frame, the pop-up shows "1 Frame", and the first step goes from x1's place.
-   - **Waiting-room practice:** 1/4, 1/2, x1. QCF §5: only the slot speeds are local. 2/3 and x1.5 are added only when
-     QCF's §2b proof says they're local.
+   - **Waiting-room practice:** ~~1/4, 1/2, x1~~. **Superseded 2026-11-11 (rc.8 R2, `TASK-rc8.md` "SCOPE REOPENED"):**
+     the same five as Training. 2/3 is a paced slot and x1.5 an extra world step, both local
+     (`docs/design/rc8-lobby-speed.md`; QCF's Eden pairs `qcf-spd04y`/`qcf-spd05y`).
    - **The order** is slowest to fastest until the Eden trace of the native Left/Right (T1) is in. Then the Training
      list takes the native order.
 6. **Training writes the game's own field, the native way:**
@@ -184,8 +185,8 @@ Where a choice is the operator's, this takes the sensible default and states it.
 | "you go left or right while holding the combo" | §3.3: newly pressed D-pad Left/Right steps, clamped; other chords blocked; the step buttons hidden | `training_steps_walk_the_speeds_and_stop_at_the_ends`, `hold_hides_the_chord_and_step_buttons_and_blocks_other_chords` |
 | "and then it goes away" | §3.3: closes on the poll no chord button is held; the speed stays | `hold_opens_on_the_chord_steps_on_left_right_and_closes_on_release` |
 | "in training it'll reflect in the training menu" | §3.6: `+0xb54` stored, then `0x1bbbd30(menu, value, menu+0x538)`, the setter's own unchanged-value path | `training_write_is_the_native_store_then_text`, `game_speed_rows_decode_the_native_offsets` |
-| "and the lobby it will just work" | §3.7–3.8: a plugin slot `{1, N}` in the BattleObjectSlow table, the native take and free steps, released before any round | `slot_take_and_free_match_the_native_steps`, `lobby_offers_only_slot_speeds`, `lobby_slot_is_released_outside_the_practice_and_never_written_elsewhere` |
-| "can you make the speed up local too?" (§2b, owned by QCF) | §3.5: the lobby list grows only when QCF's proof says a speed is local; until then x1, 1/2, 1/4 | `lobby_offers_only_slot_speeds` |
+| "and the lobby it will just work" | §3.7–3.8: a plugin slot `{1, N}` in the BattleObjectSlow table, the native take and free steps, released before any round | `slot_take_and_free_match_the_native_steps`, `lobby_offers_the_training_speeds`, `lobby_slot_is_released_outside_the_practice_and_never_written_elsewhere` |
+| "can you make the speed up local too?" (§2b, owned by QCF) | §3.5, superseded by `docs/design/rc8-lobby-speed.md` (rc.8 R2): the lobby offers all five, 2/3 and x1.5 local | `lobby_offers_the_training_speeds` |
 
 ## 5. Code shape
 
@@ -234,7 +235,7 @@ Where a choice is the operator's, this takes the sensible default and states it.
 
 ## 7. Not in this change
 
-- 2/3 and x1.5 in the lobby (QCF §2b).
+- ~~2/3 and x1.5 in the lobby (QCF §2b).~~ In rc.8 after all (R2, `docs/design/rc8-lobby-speed.md`).
 - 1 Frame from the bind.
 - Any change to `button_config.ini`.
 - **Overlap with worker A (§4/§6/§7):** A's `compat/menu.rs::PENDING` fix may touch the menu worker near the

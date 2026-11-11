@@ -1480,6 +1480,14 @@ approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.8 order (T
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
+ceiling = 164928
+date = "2026-11-11"
+reason = "rc.8 R2 p23/rc8-lobby-speed over 373fb696 (164407, p23/rc8-binds with R1 and R8): 2/3 and x1.5 in the waiting-room practice (TASK-rc8.md SCOPE REOPENED R2, primary 2026-11-11 11:27Z, docs/design/rc8-lobby-speed.md): model::lobby_speed (plans, the 2/3 pace, the x1.5 cadence and gate, the scheduler walk), LobbySlot::pace and retarget, runtime::lobby::lobby_speed (the class-update hook, the extra pass), game_speed::lobby_update, the 10 lobby_speed seam rows; measured 164928 at a144bef9 (tools/size_gate.py), +521"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.8 order (TASK-rc8.md SCOPE REOPENED); a raise goes in its own commit with approved_by"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
 ceiling = 164185
 date = "2026-11-11"
 reason = "rc.8 R13 (p23/rc8-build-tag): the build tag at the end of the menu footer, version · rc8 short sha set at build time; measured 164185 at c37c76d8 (tools/size_gate.py) = 164108 at 38e58296 + 77 (build.rs 63 under (root), src/model/ui 11 for BUILD_TAG and the page hint, src/model/menu 2 for Env::build_tag, src/runtime/ui 1 for env())"
@@ -1508,3 +1516,19 @@ ceiling = 164571
 date = "2026-11-11"
 reason = "rc.8 integration: p23/rc8-pilot-refusal 8607526b (R7, Record refused while an AI drives P1, +22 over 38e58296) merged on 479f1193 (164549) in p23/rc8-integration (integration 2026-11-11 14:03Z): 164549 + 22 = 164571"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.8 order (TASK-rc8.md, scope reopened 11:24Z); a raise goes in its own commit with approved_by"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 165013
+date = "2026-11-11"
+reason = "rc.8 R2 p23/rc8-lobby-speed review hardening over 2962474d (164928): the docs lane's R2 review findings 1 and 2 (13:38Z): model::lobby_speed::run_pass (the whole walk checked first, each phase read again right before its ticks, the pass stops when the practice stops being live), plan_phases and Plan::widest, the pass's task buffer as a static behind its own try_lock; measured 165013 at 27ffc5c7 (tools/size_gate.py), +85"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.8 order (TASK-rc8.md SCOPE REOPENED); a raise goes in its own commit with approved_by"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 165177
+date = "2026-11-11"
+reason = "rc.8 integration: p23/rc8-lobby-speed f6446410 (R2/R9, lobby 2/3 and x1.5 and the review hardening, +606 over 373fb696) merged on d3eeac81 (164571) in p23/rc8-integration (integration 2026-11-11 14:52Z): 164571 + 606 = 165177"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.8 order (TASK-rc8.md R2, SCOPE REOPENED); a raise goes in its own commit with approved_by"
