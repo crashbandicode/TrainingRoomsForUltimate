@@ -18,10 +18,10 @@ Auto-load on death only warps to the bound save. If none is bound, it does nothi
 
 A save has no role and no chain. The old checklist that played a recording because a state loaded is not part of this machine.
 
-![Load warps to the bound save and leaves the CPU standing](media/rc5-save-warp-crop.gif)
+![Load warps to the bound save and leaves the CPU standing](media/rc7-save-warp.gif)
 
-*Eden, 2026-11-07, a `p23/rc5-wire-fix` diag build (see [MEDIA.md](MEDIA.md)). The clip shows only the top of the
-screen, because another plugin's input bar crossed the rest.*
+*Eden, 2026-11-11, rc.7 `722525a5` as shipped (diag NRO `cfec85c7`, log lines only): both fighters at the bound save;
+Player 1 walks away; Load; both are back at the save, and the CPU stands: nothing plays.*
 
 ![Auto-load on death: with a bound save Player 1 is back on stage at once; unbound, the game's revival](media/rc6-autoload.gif)
 
