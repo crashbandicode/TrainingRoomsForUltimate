@@ -4,6 +4,20 @@ Every GIF in [`media/`](media/) is actual Eden footage: whole screen, 1280×720,
 game-speed timing kept, trimmed at the ends (any cut inside a clip is listed with it). Frames were reviewed (start,
 action, result) before a clip was kept. The raw takes stay outside git with their runs.
 
+## rc.8 chords (2026-11-11)
+
+- **Build:** the rc.8 integration head `d3eeac81` (R1 and R8 merged; not yet shipped), diag NRO `9f8afc66…` (release
+  NRO `08cd4a83…`). The rows check its `[GameSpeed]` and `input_display bind` log lines.
+- **Runs:** the Surface, one instance, display :71, untimed:
+  - `docs-rd8-d3eeac81` (15:12–15:17Z);
+  - `docs-rd8b-d3eeac81` (15:27–15:34Z).
+- **The lobby clip** waits for R2 (the lobby's 2/3 and x1.5). Integration's LDN pair pass runs it (`fx.py:fx_lobby_speed`).
+
+| File | Run, row | Embedded in | Length, size | Raw windows kept | What the frames show |
+| --- | --- | --- | --- | --- | --- |
+| `media/rc8-game-speed-chord.gif` | `docs-rd8b-d3eeac81`, `fx-speed-bind` (the 1280 capture) | README, Game speed; RELEASE-NOTES-rc8.md | 9.1 s, 7.7 MB | 4.9–5.7, 9.5–11.7, 12.3–13.8, 17.5–18.7, 19.3–21.8, 35.7–36.6 s | Mario vs Samus in Training. A jab at x1; the "Game speed" pop-up x1, 2/3, 1/2; a jab at 1/2; the pop-up at 1/4; a jab at 1/4; the pause menu's Other Settings: Speed 1/4 ("Play in slowest motion"), the HUD stopwatch 1/4. The log: `popup open place=Training speed=x1`, `step … speed=2/3`, `speed=1/2`, `training write value=4`, `popup close speed=1/2`, then `speed=1/4`, `training write value=5`, `popup close speed=1/4`. |
+| `media/rc8-input-display-chord.gif` | `docs-rd8-d3eeac81`, `fx-display-bind` | README, Frame strip; RELEASE-NOTES-rc8.md | 7.8 s, 5.6 MB | 3.2–4.6, 8.0–10.9, 13.4–16.9 s | A jab on the frame strip; R + D-pad Down: "Input display · Off", the strip gone, a jab with no strip; again: "Input display · On", the strip back, the jab drawn. The log: `input_display bind on=false`, then `on=true`. |
+
 ## Post-ship refresh: rc.7 as shipped (2026-11-11)
 
 - **Why:** many earlier clips carry a line of text across the frame, "Key BTN - LS +0000,+0000 RS +0000,+0000 GC LT ---

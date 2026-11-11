@@ -73,11 +73,24 @@ the CPU's first actionable frame minus yours. Plus means you act first. [docs/FR
 is how to read the lanes, the stick row, and the readouts. The rc.5 clips are listed in
 [docs/MEDIA.md](docs/MEDIA.md).
 
+![R + D-pad Down hides the frame strip, then shows it again](docs/media/rc8-input-display-chord.gif)
+
+*Eden, 2026-11-11, the rc.8 integration head `d3eeac81` (diag NRO `9f8afc66`, log lines only): a jab on the frame
+strip; R + D-pad Down, "Input display · Off", and the next jab draws no strip; R + D-pad Down again, "Input display ·
+On", and the jab draws on it. Cuts inside are listed in [docs/MEDIA.md](docs/MEDIA.md).*
+
 R + D-pad Down turns the input display on and off without opening the menu, in Training and in the waiting-room
 practice. A notice says "Input display" and On or Off. The menu's Input Display row shows the same value, and the
 choice is saved.
 
 ### Game speed
+
+![Hold R + D-pad Up: the Game speed pop-up steps to 1/2, then 1/4; the jabs slow down; the pause menu shows Speed 1/4](docs/media/rc8-game-speed-chord.gif)
+
+*Eden, 2026-11-11, the rc.8 integration head `d3eeac81` (diag NRO `9f8afc66`, log lines only), in Training: a jab at
+x1; R + D-pad Up held, the pop-up reads x1, then 2/3 and 1/2 with D-pad Left; a jab at 1/2; held again, 1/4; a jab at
+1/4; the pause menu's Other Settings shows Speed 1/4, and the HUD's stopwatch reads 1/4. Cuts inside are listed in
+[docs/MEDIA.md](docs/MEDIA.md).*
 
 Hold R + D-pad Up and a small "Game speed" pop-up shows the current speed between two D-pad arrows. While you hold
 it, D-pad Left and Right step one speed at a time; the steps stop at the slowest and fastest speeds instead of wrapping
@@ -86,7 +99,7 @@ around. Let go and the pop-up closes; the speed stays.
 - While you hold the chord, no other chord fires, and the chord's buttons and D-pad Left / Right don't reach the game.
   The rest of Player 1's controller still does, so you can keep moving.
 - **In Training** the speeds are Training's own: 1/4, 1/2, 2/3, x1 and x1.5. The chord sets the same Speed setting as
-  the game's pause menu, so the pause menu shows the speed you chose, and a speed chosen in the pause menu is where the
+  the game's pause menu (Other Settings › Speed), so the pause menu and the HUD's stopwatch show the speed you chose, and a speed chosen in the pause menu is where the
   pop-up starts. 1 Frame stays in the pause menu: while Training is on 1 Frame, the pop-up shows "1 Frame", and the
   first step goes from x1.
 - **In the waiting-room practice** the speed is local: 1/4, 1/2, 2/3, x1 and x1.5 change only your practice, while the

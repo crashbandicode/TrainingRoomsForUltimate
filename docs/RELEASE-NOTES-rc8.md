@@ -9,6 +9,8 @@ before the build ships. How to use recording is [RECORDING.md](RECORDING.md), th
 
 ### Input display chord: R + D-pad Down
 
+![R + D-pad Down hides the frame strip, then shows it again](media/rc8-input-display-chord.gif)
+
 - Turns the input display (the frame strip) on and off without opening the menu, in Training and in the waiting-room
   practice.
 - A notice says "Input display" and On or Off.
@@ -16,6 +18,10 @@ before the build ships. How to use recording is [RECORDING.md](RECORDING.md), th
   choice is saved.
 
 ### Game speed chord: hold R + D-pad Up
+
+![The Game speed pop-up steps to 1/2, then 1/4; the jabs slow down; the pause menu shows Speed 1/4](media/rc8-game-speed-chord.gif)
+
+- **Where Training shows it:** the pause menu's Other Settings › Speed, and the HUD's stopwatch.
 
 - Hold the chord and a small "Game speed" pop-up shows the current speed between two D-pad arrows.
 - While you hold it, D-pad Left and Right step one speed at a time. The steps stop at the slowest and fastest speeds
