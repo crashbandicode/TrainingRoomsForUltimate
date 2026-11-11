@@ -20,6 +20,36 @@ const FORBIDDEN: &[(&str, &str)] = &[
     ("crossbeam", "crossbeam's channels and backoff spin on a peer mid-operation"),
 ];
 
+/// std's mpsc error values: plain enums with no channel code (`nowait_channel` returns them, so callers keep matching
+/// `std::sync::mpsc::TryRecvError`). Naming them is allowed; anything else under `std::sync::mpsc` is not.
+const STD_ERROR_TYPES: &[&str] = &["TryRecvError", "TrySendError", "RecvError", "SendError", "RecvTimeoutError"];
+
+/// The forbidden uses in one whitespace-free line of code.
+fn forbidden_in(line: &str) -> Vec<(&'static str, &'static str)> {
+    let mut out = Vec::new();
+    for &(pattern, why) in FORBIDDEN {
+        for (at, _) in line.match_indices(pattern) {
+            if pattern == "sync::mpsc" && only_error_types(&line[at + pattern.len()..]) {
+                continue;
+            }
+            out.push((pattern, why));
+        }
+    }
+    out
+}
+
+/// After `sync::mpsc`: `::Name` or `::{A, B}` naming std's error types only.
+fn only_error_types(rest: &str) -> bool {
+    let Some(rest) = rest.strip_prefix("::") else { return false };
+    let names: Vec<&str> = if let Some(group) = rest.strip_prefix('{') {
+        let Some(end) = group.find('}') else { return false };
+        group[..end].split(',').filter(|s| !s.is_empty()).collect()
+    } else {
+        vec![rest.split(|c: char| !(c.is_ascii_alphanumeric() || c == '_')).next().unwrap_or("")]
+    };
+    !names.is_empty() && names.iter().all(|name| STD_ERROR_TYPES.contains(name))
+}
+
 fn rust_files(dir: &Path, out: &mut Vec<PathBuf>) {
     let Ok(entries) = fs::read_dir(dir) else { return };
     let mut entries: Vec<_> = entries.flatten().map(|e| e.path()).collect();
@@ -210,12 +240,10 @@ fn violations(root: &Path) -> (usize, Vec<String>) {
             continue;
         }
         let flat: String = code.chars().filter(|c| !c.is_whitespace()).collect();
-        for (pattern, why) in FORBIDDEN {
-            for (n, line) in code.lines().enumerate() {
-                let line_flat: String = line.chars().filter(|c| !c.is_whitespace()).collect();
-                if line_flat.contains(pattern) {
-                    out.push(format!("{}:{}: {} ({why})", rel(root, file), n + 1, pattern));
-                }
+        for (n, line) in code.lines().enumerate() {
+            let line_flat: String = line.chars().filter(|c| !c.is_whitespace()).collect();
+            for (pattern, why) in forbidden_in(&line_flat) {
+                out.push(format!("{}:{}: {} ({why})", rel(root, file), n + 1, pattern));
             }
         }
         // `use std::sync::{.., mpsc, ..}` (or `mpmc`), possibly across lines.
@@ -298,4 +326,20 @@ fn the_scanner_sees_through_comments_strings_and_test_modules() {
     assert!(flat.contains("{atomic::AtomicU8,mpsc::"), "{flat}");
     let gated_any = "#[cfg(any(feature = \"diag\", test))]\nuse std::sync::mpsc;\n";
     assert!(without_tests(&code_only(gated_any)).contains("mpsc"));
+}
+
+#[test]
+fn std_error_types_are_allowed_and_every_channel_use_is_not() {
+    assert!(forbidden_in("pubusestd::sync::mpsc::{RecvError,TryRecvError,TrySendError};").is_empty());
+    assert!(forbidden_in("Err(std::sync::mpsc::TryRecvError::Empty)=>{},").is_empty());
+    for bad in [
+        "usestd::sync::mpsc;",
+        "let(tx,rx)=std::sync::mpsc::sync_channel(4);",
+        "typeT=std::sync::mpsc::Receiver<u8>;",
+        "usestd::sync::mpsc::{self,TryRecvError};",
+        "usestd::sync::mpsc::{Receiver,TryRecvError};",
+        "usestd::sync::mpmc::Sender;",
+    ] {
+        assert!(!forbidden_in(bad).is_empty(), "{bad}");
+    }
 }

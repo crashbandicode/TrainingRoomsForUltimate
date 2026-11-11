@@ -22,7 +22,10 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import stack_depth as sd  # noqa: E402
 
-FORBIDDEN = re.compile(r"std::sync::mpmc::|std::sync::mpsc::|Backoff>::spin_(light|heavy)\b|crossbeam")
+# A function OF std's channels (its path or its impl's type starts there), not one that merely names a type from them in
+# its generics: `drop_in_place::<std::sync::mpsc::TrySendError<..>>` drops std's plain error enum, which `nowait_channel`
+# returns. Any channel code such a function reaches is a function of std's channels itself, and is caught.
+FORBIDDEN = re.compile(r"^<?(std::sync::mpmc::|std::sync::mpsc::)|Backoff>::spin_(light|heavy)\b|crossbeam")
 PLUGIN_THREAD_STEMS = {"threads"}
 
 

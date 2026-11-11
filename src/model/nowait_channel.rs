@@ -73,22 +73,10 @@ pub struct Receiver<T> {
     _not_sync: PhantomData<Cell<()>>,
 }
 
-/// `try_send` refused the value: every slot is full or held, or the receiver is gone. The value comes back.
-pub enum TrySendError<T> {
-    Full(T),
-    Disconnected(T),
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum TryRecvError {
-    /// Nothing is ready: no message, or the next one is still being written.
-    Empty,
-    /// Every sender is gone and nothing is queued.
-    Disconnected,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct RecvError;
+/// std's own error values (plain enums; no channel code), so callers that match on `std::sync::mpsc::TryRecvError` keep
+/// working: `TrySendError::Full` when every slot is full or held, `TryRecvError::Empty` when nothing is ready (no message,
+/// or the next one is still being written), the `Disconnected`s and `RecvError` as std's.
+pub use std::sync::mpsc::{RecvError, TryRecvError, TrySendError};
 
 /// A channel of `capacity` slots (at least one).
 pub fn sync_channel<T>(capacity: usize) -> (SyncSender<T>, Receiver<T>) {
@@ -247,35 +235,6 @@ impl<T> fmt::Debug for Receiver<T> {
     }
 }
 
-impl<T> fmt::Debug for TrySendError<T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(match self { Self::Full(_) => "Full(..)", Self::Disconnected(_) => "Disconnected(..)" })
-    }
-}
-
-impl<T> fmt::Display for TrySendError<T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(match self {
-            Self::Full(_) => "sending on a full channel",
-            Self::Disconnected(_) => "sending on a closed channel",
-        })
-    }
-}
-
-impl fmt::Display for TryRecvError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(match self {
-            Self::Empty => "receiving on an empty channel",
-            Self::Disconnected => "receiving on a closed channel",
-        })
-    }
-}
-
-impl fmt::Display for RecvError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("receiving on a closed channel")
-    }
-}
 
 #[cfg(test)]
 mod tests {

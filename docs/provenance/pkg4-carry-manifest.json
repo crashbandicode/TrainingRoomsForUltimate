@@ -1879,7 +1879,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "955b8c1d3209429b9c32c1c0f5042b17fdb271504ad4707a746136e8eca9aaf5",
+   "dest_sha256": "ff4404d7c9f63d8cd4a5bf4c0fb925720f7a9a99691856c6d73829862d996715",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -2198,10 +2198,9 @@
      "reason": "rc.8 R4 (TASK-rc8.md SCOPE REOPENED; the operator 2026-11-11 11:24Z): the replay mailbox has handoff::REPLAY_EVENT_SLOTS slots (1024, from 4096: the rc.8 pass peaked at 4; 2.1 s of 8 samples a frame, the stall watchdog's STALL_MS), and its drain scratch follows; a full mailbox drops and counts as before"
     },
     {
-     "old": "std::sync::mpsc::",
-     "new": "crate::model::nowait_channel::",
-     "reason": "rc.8 \"Add New\u2026\" hang (worker A's finding A3, primary 2026-11-11 18:01Z): std's mpsc `try_recv`/`try_send` spin on a peer mid-operation, and the game's MainThread spun forever on the menu worker it had preempted on core 0; the channels game threads touch are `model::nowait_channel`, std's surface without the wait (tests/game_thread_handoffs.rs, tools/game_thread_wait_check.py)",
-     "count": 4
+     "old": "type ResolveTicket = std::sync::mpsc::Receiver<Result<Configuration,String>>;\n",
+     "new": "type ResolveTicket = crate::model::nowait_channel::Receiver<Result<Configuration,String>>;\n",
+     "reason": "rc.8 \"Add New\u2026\" hang (worker A's finding A3, primary 2026-11-11 18:01Z): std's mpsc `try_recv`/`try_send` spin on a peer mid-operation, and the game's MainThread spun forever on the menu worker it had preempted on core 0; the channels game threads touch are `model::nowait_channel`, std's surface without the wait (tests/game_thread_handoffs.rs, tools/game_thread_wait_check.py)"
     }
    ]
   },

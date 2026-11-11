@@ -615,7 +615,7 @@ pub fn service_reload() {
             }
             let result = match pending.resolving.as_ref().map(|receive| receive.try_recv()) {
                 Some(Ok(result)) => Some(result.map_err(|error| error.to_string())),
-                Some(Err(crate::model::nowait_channel::TryRecvError::Empty)) if pending.ticks <= 600 => None,
+                Some(Err(std::sync::mpsc::TryRecvError::Empty)) if pending.ticks <= 600 => None,
                 _ => Some(Err("Recorded Mii metadata could not be read; reopen this capture".into())),
             };
             if let Some(result) = result {
@@ -654,8 +654,8 @@ pub fn service_reload() {
                     pending.resolving=None;
                 }
                 Ok(Err(error))=>failure=Some(error.to_string()),
-                Err(crate::model::nowait_channel::TryRecvError::Disconnected)=>failure=Some("Mii resolver unavailable".into()),
-                Err(crate::model::nowait_channel::TryRecvError::Empty)=>{},
+                Err(std::sync::mpsc::TryRecvError::Disconnected)=>failure=Some("Mii resolver unavailable".into()),
+                Err(std::sync::mpsc::TryRecvError::Empty)=>{},
             }
         }
         let target=match pending.editor.target() {Ok(target)=>target,Err(error)=>{failure=Some(error);None}};
