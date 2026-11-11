@@ -1420,3 +1420,11 @@ ceiling = 163627
 date = "2026-11-11"
 reason = "rc.8 p23/rc8-waste over 46aa3dd8 (163406): TASK-rc8.md SCOPE REOPENED (the operator 2026-11-11 11:24Z), R4 the replay mailboxes sized by handoff::REPLAY_EVENT_SLOTS (f6cad923, +9) and R5 the native service poll's outlined phases (b5c64d24, +212); measured 163627 at b5c64d24 (tools/size_gate.py), +221"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.8 order (TASK-rc8.md); a raise goes in its own commit with approved_by"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 163673
+date = "2026-11-11"
+reason = "rc.8 p23/rc8-waste over 21527b70 (163627): the docs lane's review of the reopened scope (2026-11-11 14:07Z), finding 3: the diag service-stack paint and its measured-use line, and g5's lint fix in the outlined source service (58a6746d); measured 163673 at 58a6746d (tools/size_gate.py), +46"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.8 order (TASK-rc8.md); a raise goes in its own commit with approved_by"
