@@ -210,6 +210,7 @@ leaves the game's own level everywhere.
   second is built in the background only after that player leaves the first Mii.
 - **A Training reset can pause for a moment.** Now and then a Training reset pauses the game for 0.14–0.23 s (seen in
   Eden). The pause is in the game's own reset, not in this mod's loading.
+- **Known issue: when the standalone CPU pilot controls Player 1, Record isn't refused yet (fix planned).**
 
 ## Corrections to the rc.5 notes
 

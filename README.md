@@ -128,7 +128,7 @@ What rc.6 changes is [docs/RELEASE-NOTES-rc6.md](docs/RELEASE-NOTES-rc6.md).
 on Player 1 and two jabs; the pop-up then lists "Macro 1" (Recorded on Mario) and its start save "Macro 1 · start".
 Playback is shown in [docs/RECORDING.md](docs/RECORDING.md). Cuts inside are listed in [docs/MEDIA.md](docs/MEDIA.md).*
 
-While the CPU pilot plugin plays Player 1, recording is refused with a notice.
+Known issue: when the standalone CPU pilot controls Player 1, Record isn't refused yet (fix planned).
 
 ### Combos
 

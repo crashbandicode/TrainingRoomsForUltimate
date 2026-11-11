@@ -73,15 +73,20 @@ gamepad overlay left out: `docs-rd6-722525a5` (Surface, 2026-11-11 09:28–09:33
 | `media/rc7-replay-capture.gif` | `docs-rd6-722525a5`, `fx-replay-capture` | README, Menu shortcuts and replay capture; DIFFERENCES-FROM-THE-FORK.md | 5.4 s, 3.4 MB | 0.0–0.6, 10.3–11.9, 27.3–28.4, 29.3–31.4 s | Training (a leftover "Saved Slot 1" notice); Recording › Replays › Replay capture [OFF], then [ON]; Training, the Online Deluxe overlay at the top right (its network page); its plugins page, "Training Rooms › Replay capture On". The log has `[ReplayCapture] menu preference enabled=true result=Applied` and `replay_capture.ini written by the writer thread enabled=true` at the menu's close. (The row's own check looked before the close and failed; the take is complete.) |
 
 `record-refused.gif` (2026-11-05, the bar and the old input log) is removed and **not retaken**: on this build Record
-was not refused. In `docs-rd6b-722525a5` `fx-record-refused` (evidence `feature-gifs/evidence/rd6b-record-not-refused.gif`,
-outside git):
+was not refused. In `docs-rd6b-722525a5` `fx-record-refused`:
 - the overlay's CPU Pilot page turned P1 from Player to "CPU (L3)", and the HUD read "CPU Lv3";
 - the pilot moved Player 1;
 - TrainingRooms had logged `pilot_present=true` at boot;
 - Record (ZR + D-pad Down) then showed "Input Recording · Lockout", then "Recording", not "P1 is controlled by an AI:
   recording is off".
 
-The README and DIFFERENCES-FROM-THE-FORK.md still describe the refusal; that is reported, not changed here.
+The evidence clip is `artifacts/phase23/feature-gifs/evidence/rd6b-record-not-refused.gif` (640 wide, 7.4 s, 4.0 MB;
+evidence clips stay outside this repository): Player 1's HUD reads MARIO; the overlay's CPU Pilot page goes from
+"Player" to "CPU (L3)" and the HUD from MARIO to CPU Lv3; the pilot dashes Player 1; Record shows "Input Recording ·
+Lockout", then "Recording".
+
+The README, DIFFERENCES-FROM-THE-FORK.md and the rc.6 release notes carry it as a known issue: when the standalone CPU
+pilot controls Player 1, Record isn't refused yet (fix planned). The fix is planned for rc.9.
 
 Retired from the README (each carried the bar):
 - `mii-editor.gif` and `mii-editor-list.gif` (2026-11-05): `rc7-mii-editor.gif` shows the editor, the new row and the
