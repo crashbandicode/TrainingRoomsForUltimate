@@ -1428,3 +1428,11 @@ ceiling = 164407
 date = "2026-11-11"
 reason = "rc.8 p23/rc8-binds R8 over 1e6bbbe1 (164368): worker B's review findings (lobby: drop-only outside the practice, the wait-free teardown release with RELEASE_PENDING, the release line's thread; Training: transient skips retried, logged once); measured 164407 at 853b17a6 (tools/size_gate.py), +39"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.8 order (TASK-rc8.md R8) and the primary's 11:27Z order; a raise goes in its own commit with approved_by"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 164928
+date = "2026-11-11"
+reason = "rc.8 R2 p23/rc8-lobby-speed over 373fb696 (164407, p23/rc8-binds with R1 and R8): 2/3 and x1.5 in the waiting-room practice (TASK-rc8.md SCOPE REOPENED R2, primary 2026-11-11 11:27Z, docs/design/rc8-lobby-speed.md): model::lobby_speed (plans, the 2/3 pace, the x1.5 cadence and gate, the scheduler walk), LobbySlot::pace and retarget, runtime::lobby::lobby_speed (the class-update hook, the extra pass), game_speed::lobby_update, the 10 lobby_speed seam rows; measured 164928 at a144bef9 (tools/size_gate.py), +521"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.8 order (TASK-rc8.md SCOPE REOPENED); a raise goes in its own commit with approved_by"
