@@ -70,6 +70,14 @@ head `3f9d61dd` contains for players, plus the CPU pilot plugin's 0.2.3, which s
 - A recording that is already running can always be stopped.
 - This replaces rc.7's known issue, where the Record chord still started a recording while the pilot drove Player 1.
 
+### A rare freeze as the menu closes
+
+- Closing the TrainingRooms menu could, rarely, freeze the game, in Training or in the waiting-room practice. It was
+  seen once, on Eden, in the waiting-room practice right after *Add New…* in a Mii class list. When the menu closes,
+  the game no longer waits for the menu's own thread, which is how it could get stuck.
+- The freeze could not be made to happen again, so this fix comes from the code, not from a caught freeze. If the game
+  still freezes as the menu closes, please report it.
+
 ## With the CPU pilot plugin 0.2.3
 
 The CPU pilot is a separate plugin, `libssbu_cpu_pilot.nro`. Its 0.2.3 ships beside this build:
