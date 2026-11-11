@@ -1,6 +1,6 @@
 //! SPEC-core-08, the first-boot import on real directories (the copy loop, the receipt, N6, N8, the capture
-//! staging rule, interrupted and failed copies, a second boot). The plan's own rules are in
-//! `tests/migration.rs`.
+//! staging rule, interrupted and failed copies, a second boot). The plan's own row-level rules were `tests/migration.rs`, removed in the rc.9 test cut
+//! (docs/TEST-CUT-LEDGER-rc9.md); these tests still drive the plan end to end.
 
 // rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
 macro_rules! lib_unit_tests {

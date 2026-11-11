@@ -6,7 +6,7 @@
 //! The gate shells out to Python on purpose: the count must be the primary's counter itself (sloc4), the one that
 //! measured the fork, not a second implementation in Rust that could drift from it. A missing Python (or one
 //! older than 3.11, without `tomllib`) fails this test; there is no skip switch, because a gate that can be
-//! skipped is not a gate. The interpreter is `/usr/bin/python3`, as in `tests/eden_scripts.rs`.
+//! skipped is not a gate. The interpreter is `/usr/bin/python3`.
 
 use std::process::Command;
 
