@@ -118,7 +118,10 @@ deluxe-sdk = ["dep:deluxe-plugin-sdk"]
 # The fork's host-only replay simulator (consts feature; used by the swap-model replay tests).
 simulator = []
 [profile.release]
-opt-level = "s"
+# rc.8 R6 (TASK-rc8.md; the operator 2026-11-11 11:24Z): "z", from "s": -741,376 B resident (text 2.79 -> 2.01 MB).
+# Held only with the timed Yoga check (kr, cov-grade) and the stack table on the "z" diag ELF; the playbook's
+# CHECKLIST M row names "s", so this needs the operator's approval of its change (p23/rc8-opt-level-z).
+opt-level = "z"
 lto = true
 codegen-units = 1
 panic = "abort"

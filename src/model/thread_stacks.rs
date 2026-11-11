@@ -72,7 +72,7 @@ pub const THREADS: [ThreadStack; 18] = [
     // and receipts, diag hook_stats and stack reports
     row(ThreadId::Heartbeat, c"tr-heartbeat", 32 * KIB, 8_096, 11_840, "Eden st-02..st-12, f6-37/sh-01, final-surface-cov-4e336da4", "diag_log::start_drain_thread::{closure#0}"),
     // settings.json read, recovery and the JSON parse, joined by the boot thread
-    row(ThreadId::SettingsLoad, c"tr-settings-load", 32 * KIB, 4_656, 9_904, "Eden st-02..st-12, f6-37/sh-01/s6-10", "boot::load_settings_boxed"),
+    row(ThreadId::SettingsLoad, c"tr-settings-load", 32 * KIB, 5_088, 9_904, "Eden st-02..st-12, f6-37/sh-01/s6-10", "boot::load_settings_boxed"),
     // save_states.json read and parse, joined by the boot thread
     row(ThreadId::StateLoad, c"tr-state-load", 40 * KIB, 17_424, 18_624, "Eden st-02..st-12", "states::load_file"),
     // save_states.json serialise and atomic replace
@@ -86,9 +86,9 @@ pub const THREADS: [ThreadStack; 18] = [
     // diag: diag-settings-next.json parse, publish and apply
     row(ThreadId::DiagReload, c"tr-diag-reload", 40 * KIB, 17_696, 15_712, "Eden final-rc8-chain-test-722525a5-r2, the rc.8 pass's chained 9d6c7e02 sessions", "diag_reload::start::{closure#0}"),
     // first-boot import of the fork's files (blocking part), joined with a deadline
-    row(ThreadId::Import, c"tr-import", 32 * KIB, 8_032, 10_080, "Eden st-02..st-12", "import::start::{closure#0}"),
+    row(ThreadId::Import, c"tr-import", 32 * KIB, 8_048, 10_080, "Eden st-02..st-12", "import::start::{closure#0}"),
     // first-boot import of the fork's captures in the background
-    row(ThreadId::ImportCaptures, c"tr-import-captures", 24 * KIB, 4_032, 0, "", "import::start_background::{closure#0}"),
+    row(ThreadId::ImportCaptures, c"tr-import-captures", 24 * KIB, 4_336, 0, "", "import::start_background::{closure#0}"),
     // the menu worker: model steps, screens, settings JSON on close. Its deepest static path is the recording host's tick
     // into a menu effect that lists the combo store: `port::worker_tick` -> `rr_host::service_at` -> `apply_menu` ->
     // `Store<ComboRecord>::list` -> `decode`, then the SDK's file reads (diag ELF of rc.6 `4e336da4` and of the fix). On
@@ -105,9 +105,9 @@ pub const THREADS: [ThreadStack; 18] = [
     // diag: diag-macro.req read and parse
     row(ThreadId::MacroDiag, c"tr-macro-diag", 28 * KIB, 3_248, 9_152, "Eden st-02..st-12, final-surface-of-1261f56c, final-rc8-yoga-1/rc8-surface-1-9d6c7e02", "macros::diag::start::{closure#0}"),
     // the replay capture archive and Mii preset writer
-    row(ThreadId::ReplaySave, c"replay-capture-save", 56 * KIB, 32_480, 25_344, "Eden st-02..st-12, f6-37/sh-01, final-surface-cov-4e336da4", "replay_store::start_writer::{closure#0}"),
+    row(ThreadId::ReplaySave, c"replay-capture-save", 60 * KIB, 33_184, 25_344, "Eden st-02..st-12, f6-37/sh-01, final-surface-cov-4e336da4", "replay_store::start_writer::{closure#0}"),
     // the saved Mii catalog read for the library
-    row(ThreadId::MiiCatalog, c"mii-catalog", 28 * KIB, 5_872, 8_016, "Eden f6-31/f6-37/sh-01", "replay_store::init_catalog_fallback::{closure#0}::{closure#0}"),
+    row(ThreadId::MiiCatalog, c"mii-catalog", 28 * KIB, 6_048, 8_016, "Eden f6-31/f6-37/sh-01", "replay_store::init_catalog_fallback::{closure#0}::{closure#0}"),
     // console-practice-trace builds only: the practice trace file writer
     row(ThreadId::PracticeTrace, c"tr-practice-trace", 128 * KIB, 0, 0, "", "practice_trace::writer"),
     // diag: the stall watchdog (samples the hooks' entry count, prints held locks through svcOutputDebugString)
@@ -226,7 +226,7 @@ pub const SERVICE_STACK: CallbackStack = CallbackStack {
     count: 2,
     static_bound: 209_216,
     native_room: 63_728,
-    native_bound: 1_776,
+    native_bound: 1_936,
     measured_in: "Eden final-surface-acc-d8679593-r2 ([HookStack] site=native_service min_free=63728)",
     on_stack: &["training_mod_native_service_pre"],
     entry: "training_mod_native_service_entry",
