@@ -13,8 +13,10 @@ action, result) before a clip was kept. The raw takes stay outside git with thei
   - Every docs capture now leaves that plugin out.
 - **Build:** rc.7 `722525a5` as shipped (release NRO `b6e60bb9…`). The clips use the same commit's diag NRO
   `cfec85c7…`, because the rows check its log lines; the diag build adds log lines only.
-- **Runs:** the Yoga, one instance, 2026-11-11: `docs-rd2-722525a5` (05:06–05:14Z), `docs-rd2b-722525a5`
-  (05:27–05:34Z) and `docs-rd3b-722525a5` (05:18–05:23Z).
+- **Runs:** one instance each, 2026-11-11:
+  - on the Yoga: `docs-rd2-722525a5` (05:06–05:14Z), `docs-rd2b-722525a5` (05:27–05:34Z) and `docs-rd3b-722525a5`
+    (05:18–05:23Z);
+  - on the Surface: `docs-rd5-722525a5` (07:42–07:48Z).
 - **Review and cuts:** each take's frames were read on its row's timeline. The cuts use `clips.py cutw` at 10 fps, as
   above.
 
@@ -27,11 +29,23 @@ action, result) before a clip was kept. The raw takes stay outside git with thei
 | `media/rc7-kirby-hats.gif` | `docs-rd3b-722525a5`, `fx-p1-kirby-hats` | README, Fighters, cycles and Kirby hats | 8.1 s, 7.1 MB | 0.0–8.1 s (the whole take) | 0–1.1 s Player 1's plain Kirby vs Olimar; the hat chord; 4.4 s Kirby wears Falco's hat; the chord again; 7.4 s Sheik's hat. |
 | `media/rc7-combo-helper.gif` | `docs-rd2-722525a5`, `fx-make-combo-drill` | README, Combos | 5.4 s, 6.1 MB | 42.8–44.0, 50.8–55.0 s | The pop-up's COMBOS with Combo 1 (made from Macro 1, jab → jab) drilled; back in Training the jabs; the bar under the frame strip: "Combo 1 · 1 Jab>Jab · TRUE −5 · on time". |
 
+| `media/rc7-di-up.gif` | `docs-rd5-722525a5`, `fx-di-up` (Surface, 07:42–07:48Z) | README, CPU reactions | 9.0 s, 7.9 MB | 7.9–8.6, 9.3–12.3, 21.9–22.5, 23.7–24.9, 31.6–32.1, 32.8–35.8 s | 0–0.7 s Toon Link loaded at 80% (CPU damage on load Random Value 80–80, DI and SDI empty); 0.7–3.7 s Player 1's forward smash, the CPU launched on a shallow line, landing at the right; 3.7–5.5 s CPU › Defence › DI Direction, "none selected", then "Up x1"; 5.5–9.0 s the same load at 80% and forward smash, a steeper line, the CPU near the top right 1.5 s after the hit (mid-height with no DI). |
+| `media/rc7-menu-shortcut.gif` | `docs-rd5-722525a5`, `fx-menu-shortcut` | README, Menu shortcuts; DIFFERENCES-FROM-THE-FORK.md | 6.2 s, 1.5 MB | 0.0–0.3, 5.0–5.6, 6.7–7.5, 8.0–9.4, 10.2–10.9, 13.8–14.6, 15.4–17.0 s | Training; Display & Controls › Menu shortcut 1 "Minus"; the chord editor; the capture reads "ZL", then "ZL + D-pad Up"; A, and the row reads "ZL + D-pad Up" (`button_config.ini written by the writer thread`); Training; the menu open again (`[Ui] menu opened`), from ZL + D-pad Up. |
+| `media/rc7-respawn-off.gif` | `docs-rd5-722525a5`, `fx-respawn-off` | DIFFERENCES-FROM-THE-FORK.md | 7.5 s, 6.3 MB | 3.8–4.4, 9.75–10.8, 15.6–17.2, 18.2–22.4 s | Training; Fighters & Stages › Stages › Respawn on platform [ON], then [OFF]; Player 1 runs off the left side, KO; 0.5 s after the blast Player 1 is back at the top, falling, with no platform (the plugin's `dead_rebirth_wait_frame` returned 1). |
+
+The takes' frames were read on each row's timeline; the machine checks are in each row's JSON (`di_state` Up alone,
+`respawn_invincibility` Off, the shortcut written and the menu opened by it).
+
+Removed from the README and DIFFERENCES-FROM-THE-FORK.md, not retaken (2026-11-11): `record-refused.gif` and
+`replay-capture.gif` (2026-11-05) carry the gamepad overlay's bar and the old input log; a retake needs the CPU pilot
+and Online Deluxe plugins in a docs boot and a route through the Deluxe overlay, which no current row has.
+
 Retired from the README (each carried the bar):
 - `mii-editor.gif` and `mii-editor-list.gif` (2026-11-05): `rc7-mii-editor.gif` shows the editor, the new row and the
   pick;
 - `menu-tour.gif`, `hitbox-overlay.gif`, `respawn-on.gif`, `change-stage.gif`, `cpu-kirby-hat.gif`,
-  `combo-helper.gif`: replaced above.
+  `combo-helper.gif`, `di-up.gif` and `di-none.gif` (one clip now), `menu-shortcut.gif`, and `respawn-off.gif`
+  (DIFFERENCES-FROM-THE-FORK.md): replaced above.
 
 ## rc.7 docs clips (2026-11-10)
 
@@ -143,6 +157,9 @@ screen draws the same):
   `TRUE 0` (input +4), attempt 1 `+1 DROP` (input +5), attempt 2 up tilt into up smash (input +4). The take is trimmed
   at 0.8 s. It was re-encoded with one shared palette of 96 colours and no dither, keeping every second frame with the
   time of both: 9.9 MB, 7.1 s.
+  - RECORDING.md now embeds `rc5-grade-not-true-crop.gif` (2026-11-11): the same frames and times, cropped to the top
+    436 rows to leave out the gamepad overlay plugin's input bar (y 443–452). The frame strip and helper bar are
+    whole; the fighters are cut at the knees in the last 2 s.
 
 Each was taken at 1280×720 and 15 fps by the runner's `gif` step. Seven takes over 10 MB were re-encoded with one shared
 palette of 96 colours and no dither: `rc5-popup.gif` and `rc5-save-warp.gif` keep every frame, and

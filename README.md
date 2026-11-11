@@ -79,12 +79,15 @@ below.
 
 ### CPU reactions
 
-![DI Up, two forward smashes](docs/media/di-up.gif)
+![No DI, then DI Up from the menu: the same forward smash launches the CPU higher](docs/media/rc7-di-up.gif)
 
-![No DI, the same two forward smashes](docs/media/di-none.gif)
+*Eden, 2026-11-11, rc.7 `722525a5` as shipped (diag NRO `cfec85c7`, log lines only): the CPU loads at 80% (CPU damage
+on load, Random Value 80–80) and takes Player 1's forward smash with no DI; CPU › Defence › DI Direction gets Up; the
+same load and forward smash launch the CPU on a steeper line, higher at the same moment after the hit. Cuts inside
+are listed in [docs/MEDIA.md](docs/MEDIA.md).*
 
-DI, SDI, air dodge, shield tilt, mash, ledge, tech and throw options on the CPU page. Above: the same hits with DI Up
-and with no DI.
+DI, SDI, air dodge, shield tilt, mash, ledge, tech and throw options on the CPU page. Above: the same hit with no DI
+and with DI Up.
 
 ![The DI and SDI direction grids](docs/media/di-sdi-chips.gif)
 
@@ -123,8 +126,6 @@ What rc.6 changes is [docs/RELEASE-NOTES-rc6.md](docs/RELEASE-NOTES-rc6.md).
 
 *The earlier slot recording: ZR + Down records, ZR + Up plays that slot. RC10, 2026-11-04, NRO `50d95130`. The
 redesign's Play on CPU chord is the same buttons, and it plays the CPU's active macro.*
-
-![Record refused while the CPU pilot drives Player 1](docs/media/record-refused.gif)
 
 While the CPU pilot plugin plays Player 1, recording is refused with a notice.
 
@@ -253,7 +254,11 @@ left. ZR no longer resets a page: each page ends with *Reset page to defaults*, 
 
 ### Menu shortcuts and replay capture
 
-![Changing menu shortcut 1](docs/media/menu-shortcut.gif)
+![Menu shortcut 1 changed from Minus to ZL + D-pad Up, which then opens the menu](docs/media/rc7-menu-shortcut.gif)
+
+*Eden, 2026-11-11, rc.7 `722525a5` as shipped (diag NRO `cfec85c7`, log lines only): Display & Controls › Menu
+shortcut 1 reads Minus; A opens the chord editor, X starts the capture, ZL held with D-pad Up gives "ZL + D-pad Up", A
+confirms; back in Training, ZL + D-pad Up opens the menu. Cuts inside are listed in [docs/MEDIA.md](docs/MEDIA.md).*
 
 Menu shortcuts are changed in the menu and work at once.
 
@@ -264,10 +269,7 @@ Menu shortcuts are changed in the menu and work at once.
 Switch reloads the CPU as the capture's Mii Gunner ("Saved Mii applied"). The capture is a test fixture, made before
 the clip. Cuts inside are listed in [docs/MEDIA.md](docs/MEDIA.md).*
 
-![Replay capture in the menu and the Deluxe overlay](docs/media/replay-capture.gif)
-
-The *Replay capture* row and the Online Deluxe overlay show the same setting. *Eden, 2026-11-05, 0.2.0-rc.1 (release
-NRO `706c993f…`): the menu row and the overlay only.*
+The *Replay capture* row and the Online Deluxe overlay show the same setting.
 
 ## Status
 

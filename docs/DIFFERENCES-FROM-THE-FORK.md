@@ -35,9 +35,7 @@ This page lists only the changes, each checked against the code of 0.2.0-rc.3 (`
 
 ![Fighter grid with cycle badges, then the cycle chord switching Player 1 in that order](media/rc6-cycle-switch.gif)
 
-![A new menu shortcut applies at once](media/menu-shortcut.gif)
-
-![Replay capture, menu and Deluxe overlay](media/replay-capture.gif)
+![A new menu shortcut applies at once](media/rc7-menu-shortcut.gif)
 
 ## CPU and practice behaviour
 
@@ -50,9 +48,7 @@ This page lists only the changes, each checked against the code of 0.2.0-rc.3 (`
 | Ice Climbers keep one CPU state each for Popo and Nana. | `src/model/cpu/role.rs:32-52` |
 | When the CPU pilot plugin drives Player 1, CPU settings apply to the CPU only, and Record is refused with a notice. | `src/model/cpu/role.rs:3-6`, `src/runtime/features/recorder.rs:548` (`record_refusal`) |
 
-![Respawn on platform Off: instant respawn](media/respawn-off.gif)
-
-![Record refused while the CPU pilot drives P1](media/record-refused.gif)
+![Respawn on platform Off: instant respawn](media/rc7-respawn-off.gif)
 
 ## Added in rc.2
 
