@@ -34,8 +34,11 @@ const FOREVER: i64 = -1;
 /// `word` is a live, 4-byte-aligned word of this process.
 unsafe fn wait_for_address(word: *const u32, arbitration: u64, value: u32, timeout_ns: i64) -> u32 {
     let result: u64;
-    // SAFETY: the kernel reads the word and may block this thread; x0–x7 are declared clobbered as for any supervisor
-    // call. Not `nomem`: the wait orders memory like any lock operation.
+    // SAFETY: the kernel reads the word and may block this thread. `clobber_abi("C")`: the Switch kernel zeroes x8–x17
+    // on SVC return (Eden does not), so no value may live in them across the call (rc.7 boot crash on the operator's
+    // Switch, 2026-11-11 02:01Z: the word's address kept in x10 across this svc, then `ldaxr wzr, [x10]` at 0; memory
+    // rule inline-svc-clobber-abi, as the v0.1.0 boot crash of 2026-11-04). Not `nomem`: the wait orders memory like any
+    // lock operation.
     unsafe {
         core::arch::asm!(
             "svc #0x34",
@@ -47,6 +50,7 @@ unsafe fn wait_for_address(word: *const u32, arbitration: u64, value: u32, timeo
             lateout("x5") _,
             lateout("x6") _,
             lateout("x7") _,
+            clobber_abi("C"),
             options(nostack),
         );
     }
@@ -59,7 +63,8 @@ unsafe fn wait_for_address(word: *const u32, arbitration: u64, value: u32, timeo
 /// `word` is a live, 4-byte-aligned word of this process.
 unsafe fn signal_to_address(word: *const u32, signal: u64, value: u32, count: i32) -> u32 {
     let result: u64;
-    // SAFETY: as `wait_for_address`; the kernel only uses the address to find its sleepers.
+    // SAFETY: as `wait_for_address` (`clobber_abi("C")` for the kernel's x8–x17); the kernel only uses the address to
+    // find its sleepers.
     unsafe {
         core::arch::asm!(
             "svc #0x35",
@@ -71,6 +76,7 @@ unsafe fn signal_to_address(word: *const u32, signal: u64, value: u32, count: i3
             lateout("x5") _,
             lateout("x6") _,
             lateout("x7") _,
+            clobber_abi("C"),
             options(nostack),
         );
     }
