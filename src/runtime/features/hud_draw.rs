@@ -62,6 +62,10 @@ pub unsafe fn draw(layout: *mut Layout, name: &[u8]) {
     if !active || layout.is_null() {
         return;
     }
+    if !waiting {
+        // rc.8: the game speed bind's Training write, on this tick (the UI job thread), the native way.
+        crate::runtime::features::game_speed::training_tick();
+    }
     let root = if waiting { pane::find_child((*layout).root_pane, b"TrModPort") } else { (*layout).root_pane };
     if root.is_null() {
         return;

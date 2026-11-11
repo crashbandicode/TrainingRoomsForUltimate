@@ -228,6 +228,22 @@ impl Queue {
         }
     }
 
+    /// The standing notice `id` on screen now, ahead of everything (rc.8's speed pop-up, shown while its combo is held):
+    /// an existing `id` moves to the front with the new text. The notice that was on screen waits behind it with the
+    /// time it had left and is drawn again when it returns. A full queue drops a waiting plain notice for a new `id`.
+    pub fn show_now(&mut self, id: u8, header: &'static str, body: Body, length: u16, color: [u8; 4]) {
+        self.forget_delivery(id);
+        if let Some(at) = (0..self.len).find(|&i| self.entries[i].is_some_and(|e| e.standing == Some(id))) {
+            self.remove(at);
+        } else if !self.make_room() {
+            return;
+        }
+        if let Some(first) = self.entries[0].as_mut() {
+            first.drawn = false;
+        }
+        self.insert(0, Entry { header, body, length: length.max(1), color, drawn: false, standing: Some(id) });
+    }
+
     /// Remove the standing notice `id` (queued or on screen) and its delivery record.
     pub fn clear_id(&mut self, id: u8) {
         if let Some(at) = (0..self.len).find(|&i| self.entries[i].is_some_and(|e| e.standing == Some(id))) {

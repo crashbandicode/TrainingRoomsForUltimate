@@ -41,6 +41,8 @@ pub(crate) fn init() {
     lobby_stage::init();
     // rc.6 CPU level: no hook, only its rows (the clock rides `update`, the step rides `frame`).
     crate::runtime::features::cpu_level::init();
+    // rc.8 game speed: no hook, only its rows (the lobby's slot rides `frame`).
+    crate::runtime::features::game_speed::init();
 }
 
 /// Once per game frame, before the input processing (the input poll's note for Player 1).
@@ -58,6 +60,8 @@ pub(crate) fn update() {
     let active = training::lobby::active();
     if active != WAS_ACTIVE.swap(active, std::sync::atomic::Ordering::AcqRel) {
         training::practice::forget();
+        // rc.8: each practice session's speed starts at x1.
+        crate::runtime::features::game_speed::practice_changed();
     }
     // The CPU level's Training session clock: it runs in every scene, so the character select between two Training entries
     // ends a session.
@@ -162,6 +166,9 @@ pub(crate) unsafe fn frame(fighter: usize) {
             // rc.6 CPU level: the session's notice and the CPUs' rank, after the roster's steps of this frame.
             crate::runtime::features::cpu_level::frame();
         }
+        // rc.8 game speed: the waiting-room practice's slot (nothing elsewhere; a record left from the practice is dropped
+        // without a write).
+        crate::runtime::features::game_speed::lobby_frame();
     }
     // Diag build: the character-item table's constants as the game resolves them (once).
     // (Diagnostic instrumentation, not product code: its one-time text is not a hook allocation of the plugin.)

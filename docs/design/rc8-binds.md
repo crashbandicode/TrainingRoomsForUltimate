@@ -9,7 +9,7 @@
 - This is a design working file. Its requirement table quotes the operator's request clause by clause, as the
   completion checklist asks of a design report. The README and the user docs carry no quotes.
 
-![The two binds: the editor rows, the pop-up while the combo is held, and where each place writes the speed](rc8-binds.png)
+![The two binds: the editor rows, the pop-up while the combo is held, and where each place writes the speed](../decisions/rc8-binds.png)
 
 ## 1. What exists today
 
@@ -95,7 +95,9 @@ Where a choice is the operator's, this takes the sensible default and states it.
    - **Close:** on the first poll where none of the chord's buttons is held, the pop-up goes away. The speed stays.
    - The press that opened it is never also a step.
 4. **The pop-up** is the standing notice "Game speed", body `<D-pad Left glyph> 1/2 <D-pad Right glyph>` (the game
-   font's own glyphs, `chords::glyph`). It's updated on each step and cleared on release.
+   font's own glyphs, `chords::glyph`).
+   - It goes to the front at once (`notices::show_now`, new): `upsert` would wait behind a notice on screen.
+   - It's updated on each step and cleared on release. A notice it covered comes back with the time it had left.
 5. **The speeds and their order:**
    - **Training:** the five speeds Training offers: 1/4, 1/2, 2/3, x1, x1.5 (values 5, 4, 3, 1, 6).
      - **1 Frame is left to the native menu.** It's a pause-and-step mode with its own button, not a speed.

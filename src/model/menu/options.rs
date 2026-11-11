@@ -86,8 +86,9 @@ pub static SITUATIONS: [(&str, &str); 13] = [
     ("Ledge Trump", "trump_override"),
 ];
 
-/// The eight chord rows of the *Button chords* editor, with their setting ids.
-pub static CHORD_ROWS: [(&str, &str); 8] = [
+/// The ten chord rows of the *Button chords* editor, with their setting ids (rc.8 added the last two:
+/// `docs/design/rc8-binds.md`).
+pub static CHORD_ROWS: [(&str, &str); 10] = [
     ("Save State Save", "save_state_save"),
     ("Save State Load", "save_state_load"),
     ("Record", "input_record"),
@@ -96,4 +97,6 @@ pub static CHORD_ROWS: [(&str, &str); 8] = [
     ("Recording pop-up", "recording_popup"),
     ("Cycle Player", "player_cycle"),
     ("Cycle CPU", "cpu_cycle"),
+    ("Input display", "input_display_toggle"),
+    ("Game speed", "game_speed"),
 ];

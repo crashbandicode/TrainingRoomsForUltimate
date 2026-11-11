@@ -455,6 +455,22 @@ fn migrate_the_old_rows() {
     assert_eq!(migrate(&[]), [0, 1]);
 }
 
+/// rc.8's input display bind flips the row the menu shows, read as `Settings::from_snapshot` reads it.
+#[test]
+fn display_toggle_flips_the_strip_row() {
+    assert_eq!(toggled(Some(&[0, 1])), ([1, 0], false), "Frame strip -> Off");
+    assert_eq!(toggled(Some(&[1, 0])), ([0, 1], true), "Off -> Frame strip");
+    assert_eq!(toggled(None), ([1, 0], false), "a missing row is the factory Frame strip");
+    assert_eq!(toggled(Some(&[0, 0])), ([1, 0], false), "nothing set reads as the strip");
+    let mut snapshot = crate::model::settings::Snapshot::factory();
+    assert!(Settings::from_snapshot(&snapshot).on);
+    for expected in [false, true, false] {
+        let (next, on) = toggled(snapshot.get(ROW));
+        snapshot.set(ROW, &next).unwrap();
+        assert_eq!((Settings::from_snapshot(&snapshot).on, on), (expected, expected));
+    }
+}
+
 /// Review IV-2: the strip owns the frame advantage only while it can draw it; a layout without its panes leaves the
 /// Frame Advantage notice posting as before (the base turned the display off on a missing pane, `input02`).
 #[test]
