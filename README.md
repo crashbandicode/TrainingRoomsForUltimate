@@ -37,6 +37,10 @@ flowchart LR
 | Cycle the CPU / Player 1 fighter | ZL + D-pad Left / ZL + D-pad Right |
 | Kirby hat: Player 1 / CPU | Special + L3 / Special + R3 |
 | Reset the training room | L + R + A |
+| Input display on / off | R + D-pad Down |
+| Game speed: hold, then D-pad Left / Right | R + D-pad Up |
+
+R is Z on a GameCube controller.
 
 The first time Training opens on a new install, TrainingRooms also shows six reminders: Welcome, Open Menu, Save State, Load State, Input Record and Input Playback. A later launch leaves those reminders off. The chords in the table stay available.
 
@@ -68,6 +72,29 @@ Player 1 and the CPU, a chip for each new button, and ADVANTAGE, LINK, and INPUT
 the CPU's first actionable frame minus yours. Plus means you act first. [docs/FRAME-STRIP.md](docs/FRAME-STRIP.md)
 is how to read the lanes, the stick row, and the readouts. The rc.5 clips are listed in
 [docs/MEDIA.md](docs/MEDIA.md).
+
+R + D-pad Down turns the input display on and off without opening the menu, in Training and in the waiting-room
+practice. A notice says "Input display" and On or Off. The menu's Input Display row shows the same value, and the
+choice is saved.
+
+### Game speed
+
+Hold R + D-pad Up and a small "Game speed" pop-up shows the current speed between two D-pad arrows. While you hold
+it, D-pad Left and Right step one speed at a time; the steps stop at the slowest and fastest speeds instead of wrapping
+around. Let go and the pop-up closes; the speed stays.
+
+- While you hold the chord, no other chord fires, and the chord's buttons and D-pad Left / Right don't reach the game.
+  The rest of Player 1's controller still does, so you can keep moving.
+- **In Training** the speeds are Training's own: 1/4, 1/2, 2/3, x1 and x1.5. The chord sets the same Speed setting as
+  the game's pause menu, so the pause menu shows the speed you chose, and a speed chosen in the pause menu is where the
+  pop-up starts. 1 Frame stays in the pause menu: while Training is on 1 Frame, the pop-up shows "1 Frame", and the
+  first step goes from x1.
+- **In the waiting-room practice** the speed is local: 1/4, 1/2, 2/3, x1 and x1.5 change only your practice, while the
+  room's timers and the other player stay at normal speed. Each practice session starts at x1.
+- It never changes a Quickplay or online match: a match always starts at normal speed.
+
+Both chords are rows of Display & Controls › Button chords ("Input display" and "Game speed"), editable and clearable
+like the others.
 
 ### Combos
 

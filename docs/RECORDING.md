@@ -61,6 +61,11 @@ Each role has one active macro. It is either a recording or a chain. Set active 
 | Play on CPU | ZR + D-pad Up | Plays the CPU's active macro, or stops it. This chord was Input Playback. |
 | Recording pop-up | ZR + D-pad Right | Opens the pop-up. The same chord closes it. |
 
+The same editor (Display & Controls › Button chords) also has the cycle chords (ZL + D-pad Left / Right) and two
+chords that aren't about recording: Input display (R + D-pad Down) turns the frame strip on and off, and Game speed
+(R + D-pad Up, held, with D-pad Left / Right) changes the game speed. The README's Controls and Game speed sections
+describe them.
+
 Both Play chords may be on at once. They do not share a machine: Player 1 and the CPU can play at the same time. A chain does not use that. Its macros play one after another.
 
 A chord's buttons do not reach the game while you hold them, so pressing Record or Play does not make Player 1 shield. A recording does not contain the Record chord that started or stopped it. Play gives the role one recorded frame per game frame, in order, so a macro plays back as it was recorded on either role.

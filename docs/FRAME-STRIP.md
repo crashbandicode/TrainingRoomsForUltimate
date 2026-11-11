@@ -2,6 +2,8 @@
 
 The frame strip is the input display. Turn it on at Display & Controls › Input Display. The choices are Off and Frame strip. Frame strip is the default. It sits at the top of the screen in Training and in waiting-room practice, and it replaces the old 15-row input log.
 
+The Input display chord, R + D-pad Down by default (R is Z on a GameCube controller), turns it on and off without opening the menu, in Training and in waiting-room practice. A notice says "Input display" and On or Off. The menu's Input Display row then shows the same value, and the choice is saved like a change made in the menu. The chord is the "Input display" row of Display & Controls › Button chords.
+
 It keeps the last 60 game frames, about one second. The newest frame is on the right. Player 1 and the CPU each have a lane. Player 1's button presses are chips above the lanes. On the right, three readouts say who could act first after the last hit, whether the last follow-up was a true combo, and how the press was timed. A LAST row under the lanes keeps the last four follow-ups.
 
 The strip hides while the TrainingRooms menu, the recording pop-up, the Fighter Mismatch question, or the game's pause menu is open, while Input Display is Off, and outside Training and lobby practice. It clears when the scene changes, when you hot-swap, when a save state loads, and when Training resets or replaces a fighter. The frames from before that did not happen. While the strip is on screen, the separate Frame Advantage notice stays down, because the ADVANTAGE readout is that number.
