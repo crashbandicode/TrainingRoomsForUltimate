@@ -508,11 +508,17 @@ impl LobbySlot {
     }
 
     /// One P1 frame. `wanted` is the lobby speed the bind set; `bytes` reaches `now.table` (the runtime builds it only
-    /// for a non-zero table). Takes only in the practice while the waiting-room UI is free; a held slot whose speed no
-    /// longer applies is released (`release`), also on a frame after the scene left the practice.
+    /// in the practice, for a non-zero table). Takes only in the practice while the waiting-room UI is free; a held slot
+    /// whose speed no longer applies is released (`release`) in the practice. Outside it nothing is written: the record
+    /// is dropped (a match's table can reuse the practice table's block with the game's own `{1, N}` at that slot; worker
+    /// B's R8 finding). The teardown's `release` has freed it before then.
     pub fn step(&mut self, wanted: Speed, now: LobbyNow, bytes: Option<&mut dyn Bytes>) -> LobbyStep {
         let divisor = wanted.slot_divisor().filter(|_| now.in_practice && !now.ui_busy && now.table != 0);
         if let Some(held) = self.held {
+            if !now.in_practice {
+                self.held = None;
+                return LobbyStep::Dropped(held);
+            }
             if divisor == Some(held.divisor) && now.table == held.table {
                 return LobbyStep::Nothing;
             }

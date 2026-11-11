@@ -1460,3 +1460,19 @@ ceiling = 164433
 date = "2026-11-11"
 reason = "rc.8 integration: p23/rc8-binds 1e6bbbe1 (R1, the Training speed apply and its registry key, +325 over 9626926c) merged on 38e58296 (164108) in p23/rc8-integration (integration 2026-11-11 12:19Z): 164108 + 325 = 164433"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.8 order (TASK-rc8.md R1, scope reopened 11:24Z); a raise goes in its own commit with approved_by"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 164407
+date = "2026-11-11"
+reason = "rc.8 p23/rc8-binds R8 over 1e6bbbe1 (164368): worker B's review findings (lobby: drop-only outside the practice, the wait-free teardown release with RELEASE_PENDING, the release line's thread; Training: transient skips retried, logged once); measured 164407 at 853b17a6 (tools/size_gate.py), +39"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.8 order (TASK-rc8.md R8) and the primary's 11:27Z order; a raise goes in its own commit with approved_by"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 164472
+date = "2026-11-11"
+reason = "rc.8 integration: p23/rc8-binds 373fb696 (R8, worker B five findings, +39 over 1e6bbbe1) merged on 1716360e (164433) in p23/rc8-integration (integration 2026-11-11 13:19Z): 164433 + 39 = 164472"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.8 order (TASK-rc8.md, scope reopened 11:24Z); a raise goes in its own commit with approved_by"
