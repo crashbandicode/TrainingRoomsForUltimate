@@ -1384,7 +1384,7 @@ approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.7 order (T
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 163291
+ceiling = 163293
 date = "2026-11-11"
-reason = "rc.7 p23/rc7-service-frame over b3678dfe (163161): the FLAG 6 fix (integration 2026-11-11 01:20Z, primary 01:26Z, 01:56Z): the service stacks, the trampoline, the pre/gates/post split, model::thread_stacks::CallbackStack and SERVICE_STACK, the stack_depth.py callback check; measured 163291 at 07af455a (tools/size_gate.py), +130"
+reason = "rc.7 integration: p23/rc7-svc-clobber (+2, the boot-crash fix, clobber_abi(\"C\") on hos-lock's two arbiter svcs; 163163 at 06f89f98) and p23/rc7-service-frame (+130, the FLAG 6 fix; 163291 at 07af455a), both over b3678dfe (163161), merged in p23/rc7-final (integration 2026-11-11 02:35Z): 163293"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.7 order (TASK-rc7.md); a raise goes in its own commit with approved_by"
