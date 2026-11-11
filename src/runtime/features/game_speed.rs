@@ -19,7 +19,7 @@
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering};
 
 use crate::engine::seams::native_fields as field;
-use crate::model::game_speed::{self as rules, mode, native, table, Bytes, HoldEvent, LobbyNow, LobbySlot, ModeApply, Place, Speed};
+use crate::model::game_speed::{self as rules, hud, mode, native, table, Bytes, HoldEvent, LobbyNow, LobbySlot, ModeApply, Place, Speed};
 use crate::model::lobby_speed::{self as lobby_rules, Cadence, LobbyPlan, PassNow};
 use crate::model::input_delay::Owners;
 use crate::model::notify::DEFAULT_COLOR;
@@ -168,9 +168,35 @@ pub(crate) unsafe fn training_tick() {
     // SAFETY: `game_speed.speed_text` passed its guard: `0x1bbbd30(menu, value, pane)`, as the setter calls it.
     let text: unsafe extern "C" fn(usize, u32, usize) = std::mem::transmute(base + native::SPEED_TEXT_FN);
     text(menu, write.value, menu + write.text_pane);
+    hud_icon(base, menu, write.value);
     MODE_PENDING.store(write.value, Ordering::Release);
     #[cfg(feature = "diag")]
     crate::runtime::diag_log::diagnostic(format_args!("[GameSpeed] training write value={} was={current}", write.value));
+}
+
+/// The HUD's speed indicator after a closed-menu step: the game shows and hides it only in its menu state
+/// (`game_speed.hud_state`), so the step runs that refresh itself (`rules::hud_icon`): `in_speed` or `out_speed` on the
+/// pause menu and the HUD's shown flag to match.
+///
+/// # Safety
+/// The UI job thread inside the `info_training` tick (after the holder's animation update), `menu` the pause menu the
+/// write went to.
+unsafe fn hud_icon(base: usize, menu: usize, value: u32) {
+    let Some(hud) = field::read::<usize>(base, native::TRAINING_ROOT).and_then(|root| field::chain(root, &native::HUD_CHAIN)) else {
+        return;
+    };
+    // The refresh's own object: its `[[+8]+0x80]` is this menu (`game_speed.hud_icon`).
+    if field::chain(hud, &native::PANEL_CHAIN[native::HUD_CHAIN.len()..]) != Some(menu) {
+        return;
+    }
+    let Some(shown) = field::read::<u8>(hud, hud::SHOWN) else { return };
+    let Some(icon) = rules::hud_icon(value, shown != 0) else { return };
+    // SAFETY: `game_speed.anim_play` passed its guard: `0x377aee0(anim, rate)`, as the refresh calls it.
+    let play: unsafe extern "C" fn(usize, f32) = std::mem::transmute(base + native::ANIM_PLAY_FN);
+    play(menu + icon.anim, 1.0);
+    field::write_unchecked::<u8>(hud, hud::SHOWN, u8::from(icon.shown));
+    #[cfg(feature = "diag")]
+    crate::runtime::diag_log::diagnostic(format_args!("[GameSpeed] hud icon value={value} shown={shown}->{}", u8::from(icon.shown)));
 }
 
 /// P1's poll (`chords::on_poll`, a game thread: the one the game recomputes the slow table on), after the UI tick wrote

@@ -51,7 +51,7 @@ QCF §1–§4 holds where this lane read it again. These sites were confirmed in
 | only 2 callers of `0x1bbbd30`: `.1bbaf2c`, `.1bbbb7c` | the menu never refreshes the Speed text by itself when it opens | why a bare store isn't enough |
 | `.155b4a8`–`.155b5ec` (the speed code of `FUN_0155a000`, pause/resume side only; the bind repeats its writes) | applied value `x25+0x194` against `+0xb54`; on a change it frees the battle's slot (`{in_use 0, divisor 1}`, dirty `+0x40 = 1`, slot `0xff`) | the slot steps the lobby copies |
 | `.155b654`, `.155b674`, `.155b864` | x1/1 Frame: code 0 and rate 60; 2/3: code 4, rate `0x78`; x1.5: code 6, rate `0xb4` | QCF's rate trace points are right |
-| `.13e5500` (Training HUD) | `ldr w9,[[hud+8]+0x80+0xb54]` every frame | the speed icon refreshes itself |
+| `.13e5500` (Training HUD) | ~~`ldr w9,[[hud+8]+0x80+0xb54]` every frame~~ **corrected 2026-11-11 (R1 defect, §3.6):** only in the HUD's menu state 6, never in play | ~~the speed icon refreshes itself~~ the bind runs this refresh itself |
 | `0x1fca5c0` `BattleObjectSlow__rate_request_impl` | `ldr x0,[0x52c3610]`; `ldrb [x0,#0x40]` dirty → `0x14a2cd0` (max divisor over `{in_use, N}` at `+0x20..+0x3f`), else default byte `[0x52c5189]` | the lobby's slot takes effect through the game's own rate |
 | **create** `.1345f74`–`.134601c` | only when `*(0x52c3610) == 0`: 0x48 bytes, all 16 slots `{0, 1}`, dirty 1 | **a new table has no slot in use** |
 | **destroy** `.134d52c`–`.134d558` | `[0x523d138] = 1.0f`, the table freed, `*(0x52c3610) = 0`, in the same teardown that empties BattleObjectManager | the practice battle's table goes with the battle |
@@ -130,7 +130,21 @@ Where a choice is the operator's, this takes the sensible default and states it.
      - Not while the game's pause menu is open (its own apply runs then), not in the state that makes the game apply 0,
        and never in the lobby.
      - The game's own apply later sees `+0xb54 == +0x194` and leaves it.
-   - Its icon and help line refresh themselves.
+   - ~~Its icon and help line refresh themselves.~~ **The HUD speed indicator: corrected 2026-11-11** (the docs lane's
+     GIFs `docs-rd10-eca14e4b`; the primary's 18:20Z made it an R1 defect for rc.8). After a step back to x1 the
+     stopwatch kept the last label ("x1.5"), and a step away from x1 showed none.
+     - **The game's refresh** (`.13e5500`–`.13e5544`) compares `+0xb54` with its shown flag at `D+0x231`. Any value but
+       x1 plays `in_speed` (`menu+0x168`) and sets the flag; x1 plays `out_speed` (`menu+0x178`) and clears it.
+       - `D` is the HUD's data object: the chain's `[[[[root+8]]+0xb38]]+0x210`, stored at `.13af80c`.
+     - **It runs only in state 6** of that object's state machine (`.13e5470` at `D+0xa0`), the Training menu state
+       the Speed is edited in. Play (state 5, `.13e5110`) never runs it, so a closed-menu store changed nothing on
+       screen.
+     - **The label** is the pane `menu+0x338`, which `0x1bbbd30` writes only for values 2–6. A step back to x1 left the
+       last one showing.
+     - **So the UI tick runs that refresh after its store and text** (`hud_icon`, `model::game_speed::hud_icon`): the
+       same animation through `0x377aee0(anim, 1.0)` and the same flag. It runs only when the HUD object's
+       `[[+8]+0x80]` is the menu the write went to. The next menu visit finds the flag right and does nothing.
+     - The help line refreshes itself (`FUN_01bc0f30`, cursor on the Speed row).
    - When the pop-up opens, the bind reads `+0xb54`, so a value set in the native menu is where it starts.
 7. **The lobby (waiting-room practice) owns one slot in the BattleObjectSlow table** (`*(0x52c3610)`):
    - **Take:** the first slot with `in_use 0` becomes `{1, N}` (N 2 or 4), and dirty `+0x40 = 1`. The native apply's
@@ -161,6 +175,9 @@ Where a choice is the operator's, this takes the sensible default and states it.
    ELF like `rows_cpu_level`.
    - **Code rows:** the setter's unchanged path, `0x1bbbd30`, the apply's read and free, the HUD read, the create and
      destroy, `rate_request` and the max-divisor function.
+     - The HUD indicator fix adds four: `hud_icon_show` (`.13e5530`), `hud_state` (the state table, `.13af660`),
+       `hud_data` (`str x20,[x19,#0x210]`, `.13af808`) and `anim_play` (`0x377aee0`, called). The card scan over the
+       rc.7 card's 19 plugins finds no reference to any of them (`rc8-binds-gates/card-scan-game-speed-hud.txt`).
    - **Data rows:** the label table `0x44f8a24`.
    - It's authoritative, compared once at boot. Host tests decode every offset the runtime uses from the guarded
      words (the QCF pattern): `0xb38`, `0x210`, `0x80`, `0xb54`, `0x538`, `0x52c3610`, `+0x20`, `+0x40`, and the
@@ -185,6 +202,7 @@ Where a choice is the operator's, this takes the sensible default and states it.
 | "you go left or right while holding the combo" | §3.3: newly pressed D-pad Left/Right steps, clamped; other chords blocked; the step buttons hidden | `training_steps_walk_the_speeds_and_stop_at_the_ends`, `hold_hides_the_chord_and_step_buttons_and_blocks_other_chords` |
 | "and then it goes away" | §3.3: closes on the poll no chord button is held; the speed stays | `hold_opens_on_the_chord_steps_on_left_right_and_closes_on_release` |
 | "in training it'll reflect in the training menu" | §3.6: `+0xb54` stored, then `0x1bbbd30(menu, value, menu+0x538)`, the setter's own unchanged-value path | `training_write_is_the_native_store_then_text`, `game_speed_rows_decode_the_native_offsets` |
+| R1 defect (the primary 2026-11-11 18:20Z): "The HUD stopwatch staying on \"x1.5\" after the chord steps back to x1" | §3.6: after the store and text, the UI tick runs the game's indicator refresh (`hud_icon`): `out_speed` and the flag cleared at x1, `in_speed` and the flag set away from it | `hud_icon_shows_away_from_x1_and_hides_back_at_x1`, `hud_icon_matches_the_speed_after_every_step_from_either_flag`, `game_speed_rows_decode_the_hud_icon` |
 | "and the lobby it will just work" | §3.7–3.8: a plugin slot `{1, N}` in the BattleObjectSlow table, the native take and free steps, released before any round | `slot_take_and_free_match_the_native_steps`, `lobby_offers_the_training_speeds`, `lobby_slot_is_released_outside_the_practice_and_never_written_elsewhere` |
 | "can you make the speed up local too?" (§2b, owned by QCF) | §3.5, superseded by `docs/design/rc8-lobby-speed.md` (rc.8 R2): the lobby offers all five, 2/3 and x1.5 local | `lobby_offers_the_training_speeds` |
 
@@ -214,6 +232,8 @@ Where a choice is the operator's, this takes the sensible default and states it.
 - **Training:** hold the speed combo; the pop-up shows; Right, Left; release.
   - The native Training menu shows the value.
   - The trace `.155b5b8` shows the applied value; the HUD icon shows.
+  - **R1 fix (2026-11-11):** x1.5 → x1 timed on a perf host with the GDB stub on (it runs at x1), and a GIF of the
+    stopwatch shown at x1.5 and gone at x1.
 - **Training:** the display combo hides and shows the strip.
 - **Lobby (LDN pair, with host acceptance per `AGENTS.md`):**
   - 1/2, then 1/4: the trace at `0x1fca5d0` shows the plugin's `{1, 2}` / `{1, 4}`, and `[0x523d004]` stays 60;

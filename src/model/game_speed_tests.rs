@@ -148,6 +148,60 @@ fn training_write_is_the_native_store_then_text() {
     assert_eq!((write.field, write.text_pane), (SPEED_FIELD, SPEED_TEXT_PANE));
 }
 
+/// The indicator after one bind step, from a flag: the animation played (if any) and the flag after it.
+fn icon_step(to: Speed, shown: bool) -> (Option<usize>, bool) {
+    let icon = hud_icon(to.value(), shown);
+    (icon.map(|i| i.anim), icon.map_or(shown, |i| i.shown))
+}
+
+/// rc.8 R1 defect (the docs lane's GIFs 2026-11-11, `docs-rd10-eca14e4b`): after a step back to x1 the HUD kept showing
+/// the last speed ("x1.5"), and a step away from x1 showed none. The game refreshes the indicator only in its menu state;
+/// every closed-menu step now does that refresh.
+#[test]
+fn hud_icon_shows_away_from_x1_and_hides_back_at_x1() {
+    let (show, hide) = (Some(hud::SHOW_ANIM), Some(hud::HIDE_ANIM));
+    // Every step back to x1 from a shown indicator hides it: from x1.5 (the GIFs) and from 2/3 (1/2 and 1/4 reach x1
+    // through 2/3).
+    assert_eq!(icon_step(Speed::X1, true), (hide, false));
+    // Every step away from x1 shows it.
+    for to in [Speed::TwoThirds, Speed::OneAndHalf] {
+        assert_eq!(icon_step(to, false), (show, true), "x1 -> {to:?}");
+    }
+    // Between the slow speeds the shown indicator stays; only its text changes (`0x1bbbd30` writes it for 2..6).
+    for to in [Speed::Quarter, Speed::Half, Speed::TwoThirds, Speed::OneAndHalf] {
+        assert_eq!(icon_step(to, true), (None, true), "{to:?} while shown");
+    }
+    assert_eq!(icon_step(Speed::X1, false), (None, false), "x1 while hidden");
+    // The animations are the refresh's own (`game_speed_rows_decode_the_hud_icon`).
+    assert_eq!((hud::SHOW_ANIM, hud::HIDE_ANIM, hud::SHOWN), (0x168, 0x178, 0x231));
+}
+
+/// Every Left/Right from every Training speed, from both flags: after the step the indicator is shown exactly when the
+/// speed is not x1, and the game's own refresh on the next menu visit (the same rule) has nothing left to do.
+#[test]
+fn hud_icon_matches_the_speed_after_every_step_from_either_flag() {
+    let list = Place::Training.speeds();
+    for &from in list {
+        for dir in [Dir::Left, Dir::Right] {
+            let to = step(list, from, dir);
+            for shown in [false, true] {
+                let (anim, after) = icon_step(to, shown);
+                assert_eq!(after, to != Speed::X1, "{from:?} {dir:?} -> {to:?} from shown={shown}");
+                assert_eq!(anim.is_some(), after != shown, "{from:?} -> {to:?}: an animation only on a change");
+                assert_eq!(hud_icon(to.value(), after), None, "{to:?}: the menu's refresh finds it done");
+            }
+        }
+    }
+    // The GIF's walk (`fx-speed-x1`): from 1/4 with the indicator shown, Right four times to x1.5, Left to x1.
+    let (mut speed, mut shown) = (Speed::Quarter, true);
+    for dir in [Dir::Right, Dir::Right, Dir::Right, Dir::Right, Dir::Left] {
+        speed = step(list, speed, dir);
+        shown = icon_step(speed, shown).1;
+        assert_eq!(shown, speed != Speed::X1, "{speed:?}");
+    }
+    assert_eq!((speed, shown), (Speed::X1, false), "the stopwatch is gone at x1");
+}
+
 #[test]
 fn slot_take_and_free_match_the_native_steps() {
     let mut t = fresh_table();

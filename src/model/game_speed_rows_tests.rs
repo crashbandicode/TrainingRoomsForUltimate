@@ -196,6 +196,71 @@ fn imm_value(w: u32) -> u64 {
     }
 }
 
+/// STP (64-bit, signed offset): the offset of the first register.
+fn stp64(w: u32) -> usize {
+    assert_eq!(w & 0xffc0_0000, 0xa900_0000, "{w:#010x} is not STP x, x, [x, #imm]");
+    ((((w >> 15) & 0x7f) as i64) << 57 >> 57) as usize * 8
+}
+
+/// A load/store's base register (Rn) and its data register (Rt).
+fn rn(w: u32) -> u32 {
+    (w >> 5) & 0x1f
+}
+
+fn rt(w: u32) -> u32 {
+    w & 0x1f
+}
+
+/// rc.8 R1 fix: the HUD speed indicator refresh the bind runs after a closed-menu step, decoded from its rows: the
+/// object (the chain's first five hops), its shown flag, the two animations, the function that plays them, and the
+/// state table that runs the refresh only in the menu state.
+#[test]
+fn game_speed_rows_decode_the_hud_icon() {
+    use crate::model::game_speed::{hud, Speed};
+    let at = |r: &crate::engine::seams::native_seams::Seam, n: usize| (r.offset + 4 * n, word(r.guard, n));
+    // `.13e54f8`: x19 is the HUD data object, `[[x19+8]+0x80]` the pause menu; shown at x1 -> out_speed, flag cleared.
+    let hide = row("game_speed.hud_icon");
+    assert_eq!(native::HUD_CHAIN[..], native::PANEL_CHAIN[..5], "the HUD object is the menu chain's fifth hop");
+    let (menu_hop, panel_hop) = (word(hide.guard, 0), word(hide.guard, 1));
+    assert!(load(menu_hop, 8) && rn(menu_hop) == 19 && uimm(menu_hop) == native::PANEL_CHAIN[5], "ldr x8, [x19, #8]");
+    assert_eq!(uimm(panel_hop), native::PANEL_CHAIN[6], "ldr x8, [x8, #0x80]");
+    let flag = word(hide.guard, 3);
+    assert!(load(flag, 1) && rn(flag) == 19 && uimm(flag) == hud::SHOWN, "ldrb w10, [x19, #0x231]");
+    assert_eq!(cmp_imm(word(hide.guard, 4)), Speed::X1.value());
+    assert_eq!(add_imm(word(hide.guard, 8)), hud::HIDE_ANIM);
+    let (pc, w) = at(hide, 9);
+    assert_eq!(bl(pc, w), native::ANIM_PLAY_FN);
+    let clear = word(hide.guard, 10);
+    assert!(store(clear, 1) && rn(clear) == 19 && uimm(clear) == hud::SHOWN && rt(clear) == 31, "strb wzr, [x19, #0x231]");
+    // `.13e5530`: not shown and not x1 -> in_speed, flag set.
+    let show = row("game_speed.hud_icon_show");
+    assert_eq!(add_imm(word(show.guard, 2)), hud::SHOW_ANIM);
+    let (pc, w) = at(show, 3);
+    assert_eq!(bl(pc, w), native::ANIM_PLAY_FN);
+    assert_eq!(orr_imm(word(show.guard, 4)), 1);
+    let set = word(show.guard, 5);
+    assert!(store(set, 1) && rn(set) == 19 && uimm(set) == hud::SHOWN, "strb w8, [x19, #0x231]");
+    assert_eq!(row("game_speed.anim_play").offset, native::ANIM_PLAY_FN);
+    // The constructor's state table: play (state 5) is `0x13e5110`, state 6 is the refresh's function, which holds
+    // both refresh rows; the object it fills is the one stored at the chain's `+0x210`.
+    let states = row("game_speed.hud_state");
+    let handler = |n: usize, m: usize| {
+        let (pc, w) = at(states, n);
+        adrp(pc, w) + add_imm(word(states.guard, m))
+    };
+    let (play, refresh) = (handler(0, 1), handler(3, 4));
+    assert_eq!(play, 0x13e5110);
+    assert_eq!(stp64(word(states.guard, 5)), hud::STATE_TABLE + 16 * 5);
+    assert_eq!(stp64(word(states.guard, 8)), hud::STATE_TABLE + 16 * hud::REFRESH_STATE);
+    assert_eq!(refresh, 0x13e5470);
+    // State 7's handler starts at `0x13e5770`: both refresh rows sit inside state 6's.
+    assert!(hide.offset > refresh && show.offset > hide.offset && show.offset < refresh + 0x300, "the refresh is state 6's");
+    let table_base = rn(word(states.guard, 8));
+    let stored = word(row("game_speed.hud_data").guard, 1);
+    assert!(store(stored, 8) && uimm(stored) == native::HUD_CHAIN[4], "str x20, [x19, #0x210]");
+    assert_eq!(rt(stored), table_base, "the object stored at +0x210 is the one whose state table holds the refresh");
+}
+
 #[test]
 fn game_speed_rows_decode_the_training_apply() {
     use crate::model::game_speed::{mode, Speed};

@@ -217,6 +217,12 @@ pub mod native {
     pub const TRAINING_ROOT: usize = 0x52c3420;
     /// From the root to the pause menu: `[[[[[[root]+8]]+0xb38]]+0x210]+8]+0x80`.
     pub const PANEL_CHAIN: [usize; 7] = [8, 0, 0xb38, 0, 0x210, 8, 0x80];
+    /// From the root to the HUD's data object, the same chain's first five hops (`game_speed.hud_data`): the object the
+    /// speed indicator's refresh runs on (x19 at `.13e5500`), whose `[[+8]+0x80]` is the pause menu.
+    pub const HUD_CHAIN: [usize; 5] = [8, 0, 0xb38, 0, 0x210];
+    /// `main+0x377aee0(anim, rate)`: plays one of the layout's animations, as the refresh calls it
+    /// (`game_speed.anim_play`).
+    pub const ANIM_PLAY_FN: usize = 0x377aee0;
     /// `main+0x1bbbd30(menu, value, pane)`: value -> text (`game_speed.speed_text`).
     pub const SPEED_TEXT_FN: usize = 0x1bbbd30;
     /// `main+0x52c3610`: the slow table's global (`game_speed.rate_request`).
@@ -239,6 +245,39 @@ pub mod native {
     /// `main+0x53398d8`: the object whose `[+8]` byte the apply clears on a change away from 1 Frame
     /// (`game_speed.step_clear`).
     pub const STEP_FLAG: usize = 0x53398d8;
+}
+
+/// The HUD's speed indicator (the stopwatch: `info_training`'s `in_speed`/`out_speed`, text `set_txt_speed`), as the game's
+/// refresh drives it (`.13e5500`–`.13e5544`).
+pub mod hud {
+    /// The HUD data object's `+0x231`: the indicator is shown.
+    pub const SHOWN: usize = 0x231;
+    /// The pause menu's `+0x168`: `in_speed`, which shows it.
+    pub const SHOW_ANIM: usize = 0x168;
+    /// The pause menu's `+0x178`: `out_speed`, which hides it.
+    pub const HIDE_ANIM: usize = 0x178;
+    /// The HUD's state handlers sit at `+0x40 + 16 * state`: the refresh is state 6's (`0x13e5470`), the Training menu
+    /// state the Speed is edited in. Play (state 5, `0x13e5110`) never runs it.
+    pub const STATE_TABLE: usize = 0x40;
+    pub const REFRESH_STATE: usize = 6;
+}
+
+/// One change of the HUD's speed indicator: the animation played on the pause menu and the shown flag after it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Icon {
+    pub anim: usize,
+    pub shown: bool,
+}
+
+/// The game's indicator refresh (`.13e5500`–`.13e5544`) for the menu's value and the shown flag: any value but x1 shows
+/// it (`in_speed`, flag set), x1 hides it (`out_speed`, flag cleared), each only when the flag says otherwise. The game
+/// runs it only in its menu state, so the bind runs it after a closed-menu step; the next menu visit finds it done.
+pub fn hud_icon(value: u32, shown: bool) -> Option<Icon> {
+    match (shown, value == Speed::X1.value()) {
+        (false, false) => Some(Icon { anim: hud::SHOW_ANIM, shown: true }),
+        (true, true) => Some(Icon { anim: hud::HIDE_ANIM, shown: false }),
+        _ => None,
+    }
 }
 
 /// The Training mode object (`FUN_0155a000`'s `this`, x25 there), as the speed code uses it.
@@ -372,7 +411,7 @@ pub fn mode_apply(speed: Speed, applied: u32, slot: u8, table: &mut (impl Bytes 
 }
 
 /// Every row the bind relies on; all must pass the boot gate or the speed bind is off.
-pub const SEAM_ROWS: [&str; 23] = [
+pub const SEAM_ROWS: [&str; 27] = [
     "game_speed.speed_store_text",
     "game_speed.speed_text",
     "game_speed.training_chain",
@@ -380,6 +419,10 @@ pub const SEAM_ROWS: [&str; 23] = [
     "game_speed.slot_free",
     "game_speed.slot_take",
     "game_speed.hud_icon",
+    "game_speed.hud_icon_show",
+    "game_speed.hud_state",
+    "game_speed.hud_data",
+    "game_speed.anim_play",
     "game_speed.rate_request",
     "game_speed.max_divisor",
     "game_speed.table_create",

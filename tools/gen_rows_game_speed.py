@@ -39,8 +39,24 @@ ROWS = [
      "The apply's take (here 1/4): `strb #1,[x9]` in_use, `strb #4,[x9,#0x21]` divisor, `strb #1,[x8,#0x40]` dirty, "
      "slot to `[x25+0x1b4]`. The lobby's take is these steps, in this order."),
     ("game_speed.hud_icon", 0x13E54F8, "SeamKind::Relied", True, True,
-     "Training's HUD reads the Speed every frame (`[[hud+8]+0x80]+0xb54`, `cmp w9,#1`): the speed icon follows the field "
-     "by itself."),
+     "The HUD's speed indicator refresh (x19 the HUD data object): `[[x19+8]+0x80]+0xb54` against 1 and the shown flag "
+     "`ldrb w10,[x19,#0x231]`; shown at x1: `out_speed` (`add x0,x8,#0x178`, `bl 0x377aee0`), `strb wzr,[x19,#0x231]`. "
+     "It runs only in the menu state (`game_speed.hud_state`), not every frame: the bind runs it after a closed-menu "
+     "step."),
+    ("game_speed.hud_icon_show", 0x13E5530, "SeamKind::Relied", True, True,
+     "The same refresh, not shown and not x1: `in_speed` (`add x0,x8,#0x168`, `bl 0x377aee0`), then `orr w8,wzr,#1`, "
+     "`strb w8,[x19,#0x231]`."),
+    ("game_speed.hud_state", 0x13AF660, "SeamKind::Relied", True, False,
+     "The HUD data object's constructor fills its state table (`+0x40 + 16 * state`): state 5 (play) `0x13e5110` at "
+     "`+0x90`, state 6 `0x13e5470` (the refresh's function) at `+0xa0`. Play never reads the Speed; state 6 is the "
+     "Training menu state the Speed is edited in (entered from play at `.13e53d0`)."),
+    ("game_speed.hud_data", 0x13AF808, "SeamKind::Relied", True, False,
+     "The same constructor stores that object at `+0x210` of its owner (`str x20,[x19,#0x210]`): the chain's "
+     "`[[[[root+8]]+0xb38]]+0x210` is the refresh's x19, whose `[[+8]+0x80]` is the pause menu."),
+    ("game_speed.anim_play", 0x377AEE0, "SeamKind::Called", False, False,
+     "called: `0x377aee0(anim, rate)` plays one layout animation (`ldr x8,[x0,#8]`, the layout's animator list at "
+     "`+0x80`), as the refresh plays `in_speed`/`out_speed` with rate 1.0. The bind calls it on the UI tick, after the "
+     "holder's animation update."),
     ("game_speed.rate_request", 0x1FCA5C0, "SeamKind::Relied", True, True,
      "`BattleObjectSlow__rate_request_impl`: `ldr x0,[main+0x52c3610]`, `ldrb w8,[x0,#0x40]` dirty -> `bl 0x14a2cd0` "
      "(max divisor), else the default byte: a slot in the table slows the battle objects."),
