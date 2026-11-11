@@ -1404,3 +1404,11 @@ ceiling = 164043
 date = "2026-11-11"
 reason = "rc.8 p23/rc8-binds defect fix over 1ecf920a (164010): the lobby slot freed on the practice's teardown (worker B 2026-11-11 08:20Z, primary 08:24Z): LobbySlot::release, game_speed::release_lobby_slot from session_clear, slow_table; measured 164043 at 97437d66 (tools/size_gate.py), +33"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.8 order (TASK-rc8.md) and the primary's 08:24Z defect order; a raise goes in its own commit with approved_by"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 164363
+date = "2026-11-11"
+reason = "rc.8 p23/rc8-binds Training speed fix over 9626926c (164043): the bind does the game's speed code on P1's poll (QCF's Q4, the primary 2026-11-11 10:12Z): model::game_speed registry_find, Rate, mode_apply, the mode/native constants; runtime training_apply, mode_object, state_off, step_clear, apply_now; the 12 new game_speed seam rows; measured 164363 at 2c2ca140 (tools/size_gate.py), +320"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.8 order (TASK-rc8.md) and the primary's 10:12Z order; a raise goes in its own commit with approved_by"
