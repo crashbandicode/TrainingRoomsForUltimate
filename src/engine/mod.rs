@@ -36,6 +36,10 @@ mod mii_fork_tests;
 pub mod preload;
 #[path = "../model/seams/mod.rs"]
 pub mod seams;
+/// rc.8: the game speed rows' guard words decoded against `model::game_speed` (it needs both, so it is mounted here).
+#[cfg(test)]
+#[path = "../model/game_speed_rows_tests.rs"]
+mod game_speed_rows_tests;
 #[cfg(any(test, target_os = "switch"))]
 #[path = "../model/swap/mod.rs"]
 pub mod swap;

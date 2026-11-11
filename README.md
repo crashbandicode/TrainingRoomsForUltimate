@@ -34,8 +34,14 @@ flowchart LR
 | Record / Play on CPU | ZR + D-pad Down / ZR + D-pad Up |
 | Play on Player 1 / recording pop-up | ZR + D-pad Left / ZR + D-pad Right |
 | Cycle the CPU / Player 1 fighter | ZL + D-pad Left / ZL + D-pad Right |
+| Input display on / off | R + D-pad Down |
+| Game speed: hold, then D-pad Left / Right; release to close | R + D-pad Up |
 | Kirby hat: Player 1 / CPU | Special + L3 / Special + R3 |
 | Reset the training room | L + R + A |
+
+Game speed shows a small pop-up while the chord is held. In Training it steps through the game's own speeds (1/4, 1/2,
+2/3, x1, x1.5) and sets Training's Speed setting, so the Training menu shows the same value. In the waiting-room
+practice it offers 1/4, 1/2 and x1, only for that practice: the speed goes back to x1 before the match starts.
 
 The first time Training opens on a new install, TrainingRooms also shows six reminders: Welcome, Open Menu, Save State, Load State, Input Record and Input Playback. A later launch leaves those reminders off. The chords in the table stay available.
 

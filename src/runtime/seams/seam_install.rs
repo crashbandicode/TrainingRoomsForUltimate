@@ -58,6 +58,7 @@ const AUTHORITATIVE: &[&str] = &[
     "res_unload",
     "lobby_persist",
     "cpu_level",
+    "game_speed",
     "native_body_bank",
     "character_roster",
     "character_lifecycle",

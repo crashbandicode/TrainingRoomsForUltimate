@@ -68,6 +68,36 @@ pub fn request_writeback() {
     wake();
 }
 
+/// rc.8: the input display bind's presses since the worker last looked (`docs/design/rc8-binds.md`).
+static DISPLAY_TOGGLES: AtomicU32 = AtomicU32::new(0);
+
+/// The input display bind passed (P1's poll, a game thread): the worker flips the row. No allocation, no lock.
+pub fn request_input_display_toggle() {
+    DISPLAY_TOGGLES.fetch_add(1, Ordering::AcqRel);
+    wake();
+}
+
+/// rc.8: the input display row flips as a menu change would: the live settings take it, it is published and the writer
+/// saves it, and a notice says the new state. An even number of presses since the last look leaves the row as it is.
+fn toggle_input_display(presses: u32) {
+    use crate::model::frame_strip;
+    let Some(mut settings) = SETTINGS.lock().clone() else { return };
+    let mut on = frame_strip::Settings::from_snapshot(&settings.menu).on;
+    if presses % 2 == 1 {
+        let (next, now_on) = frame_strip::toggled(settings.menu.get(frame_strip::ROW));
+        if settings.menu.set(frame_strip::ROW, &next).is_err() {
+            return;
+        }
+        on = now_on;
+        published::publish(&settings.menu, 0);
+        *SETTINGS.lock() = Some(settings);
+        writer::request_settings();
+    }
+    notices::post("Input display", if on { "On" } else { "Off" }, 120, DEFAULT_COLOR);
+    #[cfg(feature = "diag")]
+    diagnostic(format_args!("[TrainingRooms] input_display bind on={on} presses={presses}"));
+}
+
 /// Wake the menu worker (any thread; never waits, no allocation).
 pub fn wake() {
     WAKE.set();
@@ -202,6 +232,10 @@ fn run() {
         }
         if POPUP_REQ.swap(false, Ordering::AcqRel) {
             toggle_popup(&mut session);
+        }
+        let presses = DISPLAY_TOGGLES.swap(0, Ordering::AcqRel);
+        if presses != 0 {
+            toggle_input_display(presses);
         }
         // The named-macro layer's model is this thread's (design C): its worker tick runs before the panels are looked at.
         crate::runtime::macros::port::worker_tick();

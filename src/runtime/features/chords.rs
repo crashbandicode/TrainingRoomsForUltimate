@@ -78,6 +78,9 @@ pub unsafe fn on_poll(controller: usize) {
         let block = blocked();
         let State { chords: set, detector, .. } = &mut *state;
         let passed = detector.poll(set, sample, block);
+        // rc.8: the game speed hold's event and the input display toggle are acted on once `STATE` is released.
+        let hold = detector.hold_event();
+        let display = detector.consume(Request::InputDisplay);
         PENDING.store(detector.has_pending_request(), Ordering::Release);
         #[cfg(feature = "diag")]
         {
@@ -87,9 +90,13 @@ pub unsafe fn on_poll(controller: usize) {
         }
         #[cfg(not(feature = "diag"))]
         let _ = passed;
-        (!block && chords::plus_shortcut_accepted(set, sample), chords::physical_mask(style, detector.hidden()))
+        (!block && chords::plus_shortcut_accepted(set, sample), chords::physical_mask(style, detector.hidden()), hold, display)
     };
-    let (accepted, chord_bits) = accepted;
+    let (accepted, chord_bits, hold, display) = accepted;
+    crate::runtime::features::game_speed::on_hold(hold, style);
+    if display {
+        crate::runtime::ui::worker::request_input_display_toggle();
+    }
     const FIELDS: [usize; 4] = [field::CURRENT_BUTTONS, field::PREVIOUS_BUTTONS, field::JUST_DOWN, field::JUST_RELEASE];
     if chords::clear_plus_bits(modal, accepted) {
         for offset in FIELDS {
@@ -168,11 +175,13 @@ pub fn take_open_menu() -> bool {
     consumed
 }
 
-/// Session clear: all pending requests go.
+/// Session clear: all pending requests go, and the game speed pop-up with them.
 pub fn session_clear() {
     let mut state = STATE.lock();
     state.detector.clear_session();
     note_pending(&state);
+    drop(state);
+    crate::runtime::features::game_speed::session_clear();
 }
 
 /// The last published settings generation the detector adopted (only read and written under `STATE`). A publish replaces the six

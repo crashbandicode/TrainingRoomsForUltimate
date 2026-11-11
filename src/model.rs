@@ -59,6 +59,8 @@ pub mod input_delay;
 pub mod frame_strip;
 #[path = "model/frame_strip_plan.rs"]
 pub mod frame_strip_plan;
+#[path = "model/game_speed.rs"]
+pub mod game_speed;
 #[path = "model/combo.rs"]
 pub mod combo;
 /// One drill, and a sequence's streak. Make combo does not change the drill.

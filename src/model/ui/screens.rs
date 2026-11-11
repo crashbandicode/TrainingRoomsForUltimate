@@ -728,7 +728,8 @@ mod tests {
         m.press(Button::R);
         open(&mut m, "Button chords");
         let f = frame(&m);
-        assert_eq!(f.row_count, 8);
+        // rc.8: Input display and Game speed joined the eight chord rows.
+        assert_eq!(f.row_count, 10);
         m.press(Button::A);
         let f = frame(&m);
         assert!(f.crumb.string_lossy().contains("Save State Save"));

@@ -1404,3 +1404,19 @@ ceiling = 163358
 date = "2026-11-11"
 reason = "rc.8 p23/rc8-waste over 19a3b8fe (163320): TASK-rc8 sections 4 and 7 (primary 2026-11-11 03:30Z), the Mii poll's snapshots by reference and the outlined warm-exit settle (10aa8498), the native service's two 304 KiB stacks (9131266f), the replay mailboxes' diag high-water mark; measured 163358 at 5c3afd81 (tools/size_gate.py), +38"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.8 order (TASK-rc8.md); a raise goes in its own commit with approved_by"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 164010
+date = "2026-11-11"
+reason = "rc.8 p23/rc8-binds over 722525a5 (163293): the input display toggle and the game speed hold (TASK-rc8.md §1-§3, primary 2026-11-11 04:02Z, docs/design/rc8-binds.md): model::game_speed (speeds, hold, slow-table steps, lobby slot), the two chord rows and the detector's hold, runtime::features::game_speed, the worker's toggle, notices::show_now, the 11 game_speed seam rows; measured 164010 at 6fa33b46 (tools/size_gate.py), +717"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.8 order (TASK-rc8.md); a raise goes in its own commit with approved_by"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 164075
+date = "2026-11-11"
+reason = "rc.8 integration: p23/rc8-waste (163358 at 5c3afd81, sections 4 and 7, over 19a3b8fe 163320) and p23/rc8-binds (164010 at 6fa33b46, sections 1-3, over 722525a5 163293), both over 163293 plus section 6 (+27, ca8ec28c), merged in p23/rc8-integration (integration 2026-11-11 07:12Z): 163293 + 27 + 38 + 717 = 164075"
+approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the rc.8 order (TASK-rc8.md); a raise goes in its own commit with approved_by"

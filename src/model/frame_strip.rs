@@ -854,6 +854,17 @@ pub fn migrate(old: &[u8]) -> [u8; 2] {
     }
 }
 
+/// rc.8's input display bind (`docs/design/rc8-binds.md`): the row's next value, Off <-> Frame strip, read the way
+/// `Settings::from_snapshot` reads it (a missing or unreadable row is the factory Frame strip, so it turns Off).
+pub fn toggled(row: Option<&[u8]>) -> ([u8; 2], bool) {
+    let on = row.and_then(|r| r.iter().position(|v| *v != 0)).is_none_or(|i| i == 1);
+    if on {
+        ([1, 0], false)
+    } else {
+        ([0, 1], true)
+    }
+}
+
 /// Whether the strip samples and shows, and so owns the frame advantage (the Frame Advantage notice stands down while
 /// the strip shows the same number, SPEC-input-06 §3.5): boot enabled it, its row is On and the layout has its panes.
 /// Without the panes (another mod's `info_training`, the stock archive) nothing draws the strip, so the notice posts as

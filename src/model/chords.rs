@@ -7,6 +7,7 @@
 //! raised while any input owner is active or its 15-frame grace runs; N7 the permanent `B + D-pad Up`
 //! and the two INI shortcuts (`menu_shortcuts`) open the menu with the same edge rule.
 
+use super::game_speed::{Hold, HoldEvent};
 use super::menu::chord::{Chord, BUTTONS};
 use super::menu_shortcuts::MenuShortcuts;
 
@@ -214,6 +215,8 @@ pub enum Request {
     OpenMenu,
     PlayPlayer,
     RecordingPopup,
+    /// rc.8: the input display row flips (Off / Frame strip).
+    InputDisplay,
 }
 
 impl Request {
@@ -233,13 +236,17 @@ pub struct ChordSet {
     pub player_cycle: Chord,
     pub play_player: Chord,
     pub recording_popup: Chord,
+    /// rc.8: toggles the input display (`docs/design/rc8-binds.md`).
+    pub input_display: Chord,
+    /// rc.8: the game speed hold (`model::game_speed::Hold`).
+    pub game_speed: Chord,
     pub shortcuts: MenuShortcuts,
 }
 
 impl ChordSet {
     /// The factory chords: ZL + D-pad Down/Up (save/load), ZR + D-pad Down/Up (record/play on CPU),
     /// ZL + D-pad Left/Right (cycle CPU/player), ZR + D-pad Left/Right (play on Player 1 / recording
-    /// pop-up), and the default shortcuts.
+    /// pop-up), R + D-pad Down/Up (input display / game speed, rc.8), and the default shortcuts.
     pub const fn factory() -> Self {
         const fn two(a: u8, b: u8) -> Chord {
             Chord((1 << a) | (1 << b))
@@ -253,13 +260,15 @@ impl ChordSet {
             player_cycle: two(logical::ZL, logical::DPAD_RIGHT),
             play_player: two(logical::ZR, logical::DPAD_LEFT),
             recording_popup: two(logical::ZR, logical::DPAD_RIGHT),
+            input_display: two(logical::R, logical::DPAD_DOWN),
+            game_speed: two(logical::R, logical::DPAD_UP),
             shortcuts: super::menu_shortcuts::DEFAULT_SHORTCUTS,
         }
     }
 
-    /// The eight chord rows of a settings snapshot. The shortcuts are kept from `self` (they live in
-    /// the INI, not the settings). A snapshot without `play_player` or `recording_popup` keeps those
-    /// two factory chords.
+    /// The ten chord rows of a settings snapshot. The shortcuts are kept from `self` (they live in
+    /// the INI, not the settings). A snapshot without one of the later rows (`play_player`,
+    /// `recording_popup`, rc.8's `input_display_toggle` and `game_speed`) keeps its factory chord.
     pub fn with_rows(self, snapshot: &super::settings::Snapshot) -> Self {
         let row = |id: &str, fallback: Chord| snapshot.get(id).map_or(fallback, Chord::from_row);
         Self {
@@ -271,6 +280,8 @@ impl ChordSet {
             player_cycle: row("player_cycle", self.player_cycle),
             play_player: row("play_player", self.play_player),
             recording_popup: row("recording_popup", self.recording_popup),
+            input_display: row("input_display_toggle", self.input_display),
+            game_speed: row("game_speed", self.game_speed),
             shortcuts: self.shortcuts,
         }
     }
@@ -290,11 +301,19 @@ pub struct Detector {
     swallow: u16,
     /// What this poll keeps from the game: `swallow` with the buttons released on this poll (their release edge).
     hidden: u16,
+    /// rc.8: the game speed hold and what the last poll did to it.
+    hold: Hold,
+    hold_event: HoldEvent,
 }
 
 impl Detector {
     pub const fn new() -> Self {
-        Self { pending: 0, swallow: 0, hidden: 0 }
+        Self { pending: 0, swallow: 0, hidden: 0, hold: Hold::new(), hold_event: HoldEvent::Idle }
+    }
+
+    /// What the last poll did to the game speed hold (the runtime opens, steps and closes the pop-up from it).
+    pub fn hold_event(&self) -> HoldEvent {
+        self.hold_event
     }
 
     /// The logical buttons this poll keeps from the game: those of a chord that passed, from the poll it passed until
@@ -315,8 +334,17 @@ impl Detector {
     /// (SPEC-input-04 §5.3). Returns the set of chords that passed this poll as a bit set of
     /// `Request`s for the runtime's diagnostics.
     pub fn poll(&mut self, chords: &ChordSet, sample: Sample, blocked: bool) -> u16 {
+        let was_open = self.hold.is_open();
+        self.hold_event = self.hold.poll(chords.game_speed, sample, blocked);
         if blocked {
             self.hold_back(0, sample);
+            return 0;
+        }
+        // rc.8: the game speed hold owns the poll it opens on, every poll it stays open and the poll it closes on. No
+        // other chord fires then (ZL + D-pad Left would cycle the CPU), and its chord's buttons and D-pad Left/Right stay
+        // from the game until each is released.
+        if was_open || self.hold.is_open() {
+            self.hold_back(self.hold.hidden(), sample);
             return 0;
         }
         let mut passed = 0u16;
@@ -330,6 +358,7 @@ impl Detector {
             (Request::PlayerCycle, chords.player_cycle),
             (Request::PlayPlayer, chords.play_player),
             (Request::RecordingPopup, chords.recording_popup),
+            (Request::InputDisplay, chords.input_display),
         ] {
             if !passes(chord, sample) {
                 continue;
@@ -371,9 +400,12 @@ impl Detector {
         self.pending != 0
     }
 
-    /// Session clear: scene departure, hot swap, the waiting-room UI becoming busy.
+    /// Session clear: scene departure, hot swap, the waiting-room UI becoming busy. The speed hold closes too (the
+    /// runtime takes the pop-up down).
     pub fn clear_session(&mut self) {
         self.pending = 0;
+        self.hold.clear();
+        self.hold_event = HoldEvent::Idle;
     }
 }
 
@@ -466,8 +498,8 @@ mod tests {
     }
 
     #[test]
-    fn the_eight_chords_keep_todays_defaults() {
-        let eight: [(&str, [usize; 2], &str); 8] = [
+    fn the_ten_chords_keep_todays_defaults_and_add_two() {
+        let ten: [(&str, [usize; 2], &str); 10] = [
             ("save_state_save", [6, 9], "Save State Save"),
             ("save_state_load", [6, 8], "Save State Load"),
             ("input_record", [7, 9], "Record"),
@@ -476,13 +508,26 @@ mod tests {
             ("recording_popup", [7, 11], "Recording pop-up"),
             ("player_cycle", [6, 11], "Cycle Player"),
             ("cpu_cycle", [6, 10], "Cycle CPU"),
+            // rc.8: R + D-pad Down / Up, a third family beside ZL and ZR.
+            ("input_display_toggle", [5, 9], "Input display"),
+            ("game_speed", [5, 8], "Game speed"),
         ];
-        for (id, at, label) in eight {
+        for (id, at, label) in ten {
             assert_eq!(factory_row(id), row(&at), "{id}");
             let (shown, row_id) = CHORD_ROWS.into_iter().find(|(_, row_id)| *row_id == id).unwrap();
             assert_eq!((shown, row_id), (label, id));
         }
-        assert_eq!(CHORD_ROWS.len(), eight.len());
+        assert_eq!(CHORD_ROWS.len(), ten.len());
+        // No two rows share a factory chord, and the new ones are usable on a GameCube pad (R is its Z).
+        let chords: Vec<Chord> = ten.iter().map(|(id, ..)| Chord::from_row(factory_row(id))).collect();
+        for (i, a) in chords.iter().enumerate() {
+            assert!(chords[i + 1..].iter().all(|b| b != a), "{} shares its chord", ten[i].0);
+        }
+        assert!(!super::unusable_on(ChordSet::factory().input_display, super::STYLE_GAMECUBE));
+        assert!(!super::unusable_on(ChordSet::factory().game_speed, super::STYLE_GAMECUBE));
+        let set = ChordSet::factory();
+        assert_eq!(set.input_display, Chord::from_row(factory_row("input_display_toggle")));
+        assert_eq!(set.game_speed, Chord::from_row(factory_row("game_speed")));
         let set = ChordSet::factory();
         assert_eq!(set.save_state, Chord::from_row(factory_row("save_state_save")));
         assert_eq!(set.load_state, Chord::from_row(factory_row("save_state_load")));
@@ -590,6 +635,60 @@ mod tests {
         assert_eq!(detector.poll(&set, sample(&[ZR, DPAD_UP], &[ZR, DPAD_UP]), false), Request::InputPlayback.bit());
         assert_eq!(detector.poll(&set, sample(&[ZR, DPAD_UP], &[]), true), 0);
         assert_eq!(detector.hidden(), bits(&[ZR, DPAD_UP]));
+    }
+
+    #[test]
+    fn input_display_chord_raises_its_request() {
+        let set = ChordSet::factory();
+        let mut detector = Detector::new();
+        let toggle = sample(&[logical::R, logical::DPAD_DOWN], &[logical::DPAD_DOWN]);
+        assert_eq!(detector.poll(&set, toggle, true), 0, "not while an owner holds the poll");
+        assert_eq!(detector.poll(&set, toggle, false), Request::InputDisplay.bit());
+        assert_eq!(detector.hidden(), bits(&[logical::R, logical::DPAD_DOWN]), "R does not shield");
+        assert!(detector.consume(Request::InputDisplay));
+        assert!(!detector.consume(Request::InputDisplay));
+        assert_eq!(detector.poll(&set, sample(&[logical::R, logical::DPAD_DOWN], &[]), false), 0, "held: once");
+        assert!(!passes(set.input_display, sample(&[logical::ZL, logical::DPAD_DOWN], &[logical::DPAD_DOWN])), "ZL + Down saves");
+        // A row from the settings replaces the factory chord.
+        let mut menu = Snapshot::factory();
+        menu.set("input_display_toggle", &row(&[logical::X as usize, logical::Y as usize])).unwrap();
+        let set = ChordSet::factory().with_rows(&menu);
+        assert_eq!(set.input_display, Chord(bits(&[logical::X, logical::Y])));
+        assert_eq!(set.game_speed, ChordSet::factory().game_speed);
+    }
+
+    #[test]
+    fn hold_hides_the_chord_and_step_buttons_and_blocks_other_chords() {
+        use crate::model::game_speed::{Dir, HoldEvent};
+        use logical::{DPAD_LEFT, DPAD_RIGHT, DPAD_UP, R, ZL};
+        let set = ChordSet::factory();
+        let mut detector = Detector::new();
+        assert_eq!(detector.poll(&set, sample(&[R, DPAD_UP], &[DPAD_UP]), false), 0);
+        assert_eq!(detector.hold_event(), HoldEvent::Opened);
+        assert_eq!(detector.hidden(), bits(&[R, DPAD_UP, DPAD_LEFT, DPAD_RIGHT]));
+        // ZL + Left while the pop-up is open steps the speed; it does not cycle the CPU.
+        assert_eq!(detector.poll(&set, sample(&[R, ZL, DPAD_LEFT], &[DPAD_LEFT]), false), 0);
+        assert_eq!(detector.hold_event(), HoldEvent::Step(Dir::Left));
+        assert!(!detector.is_pending(Request::CpuCycle));
+        assert_eq!(detector.hidden() & bits(&[R, DPAD_LEFT, DPAD_RIGHT]), bits(&[R, DPAD_LEFT, DPAD_RIGHT]));
+        assert_eq!(detector.poll(&set, sample(&[R, DPAD_RIGHT], &[DPAD_RIGHT]), false), 0);
+        assert_eq!(detector.hold_event(), HoldEvent::Step(Dir::Right));
+        // R released while Right is still held: closed, and Right stays from the game until its release.
+        assert_eq!(detector.poll(&set, sample(&[DPAD_RIGHT], &[]), false), 0);
+        assert_eq!(detector.hold_event(), HoldEvent::Closed);
+        assert_ne!(detector.hidden() & bits(&[DPAD_RIGHT]), 0, "no taunt on the way out");
+        assert_eq!(detector.poll(&set, sample(&[], &[]), false), 0);
+        assert_eq!(detector.poll(&set, sample(&[], &[]), false), 0);
+        assert_eq!(detector.hidden(), 0);
+        // After the hold, the other chords are back.
+        assert_eq!(detector.poll(&set, sample(&[ZL, DPAD_LEFT], &[DPAD_LEFT]), false), Request::CpuCycle.bit());
+        // A session clear closes the hold without an event.
+        let mut detector = Detector::new();
+        detector.poll(&set, sample(&[R, DPAD_UP], &[DPAD_UP]), false);
+        detector.clear_session();
+        assert_eq!(detector.hold_event(), HoldEvent::Idle);
+        assert_eq!(detector.poll(&set, sample(&[R, DPAD_UP], &[]), false), 0);
+        assert_eq!(detector.hold_event(), HoldEvent::Idle, "held, not newly pressed: it does not reopen");
     }
 
     #[test]

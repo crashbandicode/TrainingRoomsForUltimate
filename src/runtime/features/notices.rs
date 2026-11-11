@@ -116,6 +116,12 @@ pub fn upsert(id: u8, header: &'static str, body: &str, length: u16, color: [u8;
     send(Mail::Upsert { id, header, body: Body::copied(body), length, color });
 }
 
+/// The standing notice `id` on screen now, ahead of every other notice (rc.8's speed pop-up while its combo is held). `body`
+/// is copied. Allocation-free; any thread (through the mailbox).
+pub fn show_now(id: u8, header: &'static str, body: &str, length: u16, color: [u8; 4]) {
+    send(Mail::ShowNow { id, header, body: Body::copied(body), length, color });
+}
+
 /// Remove the standing notice `id` (queued or on screen) and its delivery record. Any thread (through the mailbox).
 pub fn clear(id: u8) {
     send(Mail::Clear(id));
@@ -134,6 +140,7 @@ enum Mail {
     Post { header: &'static str, body: &'static str, length: u16, color: [u8; 4] },
     PostBody { header: &'static str, body: Body, length: u16, color: [u8; 4] },
     Upsert { id: u8, header: &'static str, body: Body, length: u16, color: [u8; 4] },
+    ShowNow { id: u8, header: &'static str, body: Body, length: u16, color: [u8; 4] },
     Clear(u8),
     Saved(usize),
 }
@@ -151,6 +158,7 @@ fn take_mail(queue: &mut Queue) {
         Mail::Post { header, body, length, color } => queue.post_static(header, body, length, color),
         Mail::PostBody { header, body, length, color } => queue.post(header, body, length, color),
         Mail::Upsert { id, header, body, length, color } => queue.upsert(id, header, body, length, color),
+        Mail::ShowNow { id, header, body, length, color } => queue.show_now(id, header, body, length, color),
         Mail::Clear(id) => queue.clear_id(id),
         Mail::Saved(slot) => crate::model::boot_notices::saved(queue, slot),
     });

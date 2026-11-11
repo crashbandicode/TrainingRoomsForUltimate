@@ -1,0 +1,105 @@
+#!/usr/bin/env python3
+"""Write `src/model/seams/native_seams/rows_game_speed.rs` (rc.8, the game speed bind) from the owned 13.0.5 main ELF.
+
+    python3 -I tools/gen_rows_game_speed.py <main-13.0.5.elf> <out.rs>
+
+The rows below are the source of truth for labels, kinds and notes; the guard bytes come from the ELF (.text), the host
+test `native_seams::tests::compared_rows_match_the_owned_elf` re-checks them on every `cargo test`, and
+`model::game_speed`'s tests decode every offset the runtime uses from these guard words. Same tool as
+`tools/gen_rows_cpu_level.py`; the design is `docs/design/rc8-binds.md`.
+"""
+import hashlib
+import struct
+import sys
+
+GROUP = "game_speed"
+SCOPES = "Scopes(Scopes::TRAINING.0 | Scopes::LOBBY_WAITING.0)"
+# (label, offset, kind, read_only, per_frame, note)
+ROWS = [
+    ("game_speed.speed_store_text", 0x1BBAF10, "SeamKind::Relied", True, False,
+     "The Training menu setter (`0x1bbacc0`, item 7) for an unchanged value: `add x21,x19,#0x538` (the Speed row's value "
+     "pane), `str w20,[x19,#0xb54]`, `bl 0x1bbbd30(menu, value, pane)`: the store and the text with no slide and no sound. "
+     "The bind writes the same two things the same way."),
+    ("game_speed.speed_text", 0x1BBBD30, "SeamKind::Called", False, False,
+     "called: value -> text (`mel_training_speed*`) into the pane in x2: `sub w8,w1,#2; cmp w8,#4; b.hi` (default x1), "
+     "jump table `0x44f8a24`, `0x377a120(pane, label)`. Its only callers are the setter's two paths: the menu never "
+     "refreshes the row's text by itself."),
+    ("game_speed.training_chain", 0x155B4A4, "SeamKind::Relied", True, False,
+     "The per-update apply (`0x1559590`) finds Training's object: `ldr w19,[x25,#0x194]` (the applied value), "
+     "`[[[main+0x52c3420]+8]]` then `+0xb38`; no object, and it applies 0, which sets no speed."),
+    ("game_speed.training_value", 0x155B574, "SeamKind::Relied", True, False,
+     "The same apply reads the pause menu's Speed: `[[[[x20+0xb38]]+0x210]+8]+0x80`, `ldr w8,[x8,#0xb54]`, then on a "
+     "change `str w8,[x25,#0x194]` (edge-triggered): the field the bind writes is the one the game applies."),
+    ("game_speed.slot_free", 0x155B5B0, "SeamKind::Relied", True, False,
+     "The apply frees the battle's previous slow slot: slot `[x25+0x1b4]` (0xff none) in the table `*(main+0x52c3610)`, "
+     "`ldrb [x10,#0x20]!` in_use, `strb wzr` in_use, `strb #1,[x9,#0x21]` divisor, `strb #1,[x8,#0x40]` dirty. The "
+     "lobby's free is these steps."),
+    ("game_speed.slot_take", 0x155BBA0, "SeamKind::Relied", True, False,
+     "The apply's take (here 1/4): `strb #1,[x9]` in_use, `strb #4,[x9,#0x21]` divisor, `strb #1,[x8,#0x40]` dirty, "
+     "slot to `[x25+0x1b4]`. The lobby's take is these steps, in this order."),
+    ("game_speed.hud_icon", 0x13E54F8, "SeamKind::Relied", True, True,
+     "Training's HUD reads the Speed every frame (`[[hud+8]+0x80]+0xb54`, `cmp w9,#1`): the speed icon follows the field "
+     "by itself."),
+    ("game_speed.rate_request", 0x1FCA5C0, "SeamKind::Relied", True, True,
+     "`BattleObjectSlow__rate_request_impl`: `ldr x0,[main+0x52c3610]`, `ldrb w8,[x0,#0x40]` dirty -> `bl 0x14a2cd0` "
+     "(max divisor), else the default byte: a slot in the table slows the battle objects."),
+    ("game_speed.max_divisor", 0x14A2CD0, "SeamKind::Relied", True, True,
+     "The largest divisor over the in-use slots: `ldrb [x0,#0x20]` in_use, `ldrb [x8,#0x21]` divisor, pairs of two "
+     "bytes."),
+    ("game_speed.table_create", 0x1345FDC, "SeamKind::Relied", True, False,
+     "A table is created if `*(main+0x52c3610)` is 0 (a live one is kept): every slot `{0, 1}` (`0x0100010001000100` "
+     "from +0x20), dirty 1 at +0x40. A new battle's table holds no slot of the plugin."),
+    ("game_speed.table_destroy", 0x134D52C, "SeamKind::Relied", True, False,
+     "The battle teardown frees the table and stores 0 at `main+0x52c3610`, beside the BattleObjectManager teardown: the "
+     "practice's table goes with the practice."),
+]
+
+
+def sections(elf):
+    shoff, = struct.unpack_from("<Q", elf, 0x28)
+    shentsize, shnum, shstrndx = struct.unpack_from("<HHH", elf, 0x3A)
+    headers = [struct.unpack_from("<IIQQQQ", elf, shoff + i * shentsize) for i in range(shnum)]
+    strtab = headers[shstrndx][4]
+    out = {}
+    for name, _t, _f, addr, off, size in headers:
+        end = elf.index(b"\0", strtab + name)
+        out[elf[strtab + name:end].decode()] = (addr, off, size)
+    return out
+
+
+def window(elf, secs, at):
+    for name in (".text", ".rodata"):
+        addr, off, size = secs[name]
+        if addr <= at and at + 64 <= addr + size:
+            return elf[off + at - addr: off + at - addr + 64]
+    raise SystemExit(f"{at:#x} is in neither .text nor .rodata")
+
+
+def main():
+    elf = open(sys.argv[1], "rb").read()
+    secs = sections(elf)
+    lines = [
+        "//! rc.8 game speed seam rows, generated by `tools/gen_rows_game_speed.py` from the owned 13.0.5 main ELF",
+        f"//! (sha256 {hashlib.sha256(elf).hexdigest()}); regenerate rather than hand-edit.",
+        "use super::*;",
+        "",
+        "pub const ROWS: &[Seam] = &[",
+    ]
+    for label, at, kind, read_only, per_frame, note in ROWS:
+        guard = ", ".join(f"0x{b:02x}" for b in window(elf, secs, at))
+        lines += [
+            f'    Seam {{ label: "{label}", group: "{GROUP}", offset: {at:#x},',
+            f"           kind: {kind},",
+            f"           guard: [{guard}],",
+            f'           feature: "", scopes: {SCOPES}, read_only: {str(read_only).lower()}, '
+            f"per_frame: {str(per_frame).lower()},",
+            "           sharing: Sharing::None,",
+            f'           note: "{note}" }},',
+        ]
+    lines.append("];")
+    open(sys.argv[2], "w").write("\n".join(lines) + "\n")
+    print("wrote", sys.argv[2], len(ROWS), "rows")
+
+
+if __name__ == "__main__":
+    main()

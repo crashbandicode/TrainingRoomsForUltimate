@@ -24,6 +24,8 @@ The player triggers save-state save and load, input recording and playback, and 
 | Input Playback | `input_playback` | multi choice | same | ZR + D-pad Up |
 | Cycle CPU Character (fork, carry over) | `cpu_cycle` | multi choice | same | ZL + D-pad Left |
 | Cycle Player Character (fork, carry over) | `player_cycle` | multi choice | same | ZL + D-pad Right |
+| Input display (rc.8, `docs/design/rc8-binds.md`) | `input_display_toggle` | multi choice | same | R + D-pad Down |
+| Game speed (rc.8: a hold; Left/Right step while held) | `game_speed` | multi choice | same | R + D-pad Up |
 
 **Menu shortcut 1 / 2 (draft 9, N7, decided 2026-11-01; menu question 9, option B).** Two more rows on the same page (Display & Controls › Controls), `editor` rows that open this spec's chord editor (the entry rule of §2.2: hold one button, press the others). They edit the INI shortcuts of §2.3 / §7: slot 1 (`shortcut_1`, default Minus) and slot 2 (`shortcut_2`, default disabled); an empty entry or `disabled` disables a slot. **A change applies at once** (the new chord is live as soon as the editor confirms; no restart, unlike the fork) and **the menu writes `button_config.ini`, the file of record** (§7). The permanent `B + D-pad Up` is shown as a fixed `info` row and cannot be edited or disabled. The two rows are not chord settings in the menu file: their state lives only in the INI.
 
