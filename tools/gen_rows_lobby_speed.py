@@ -33,8 +33,8 @@ ROWS = [
      "runs after this update's world tasks."),
     ("lobby_speed.paused_flag", 0x135CA14, "SeamKind::Relied", True, True,
      "The same entry reads the paused word: the static guard byte `main+0x52b92e0` (`ldarb`, `tbz` skips the whole entry "
-     "until it is set), then `ldr w22,[main+0x52b92e8]`; non-zero runs only the tasks marked to run while paused. The "
-     "extra pass runs only while it is 0."),
+     "until it is set), then `ldr w22,[main+0x52b92e8]`; non-zero runs just the tasks marked to run when paused. The "
+     "extra pass needs it at 0."),
     ("lobby_speed.slow_step", 0x135CB08, "SeamKind::Relied", True, True,
      "The slow step with one update per period (`ldrb w8,[main+0x52c5188]; cmp w8,#1`): base `main+0x52c5184`, the logic "
      "frame counter `+0` += 1, the target `+5` (0x52c5189) latched into the current `+4`, the sub-counters `+6`/`+7` "

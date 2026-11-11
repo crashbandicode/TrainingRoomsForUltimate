@@ -462,10 +462,10 @@ unsafe fn lobby_extra_step(base: usize) {
     #[cfg(feature = "diag")]
     {
         let n = pass::passes();
-        static REFUSED: AtomicU32 = AtomicU32::new(0);
+        static SKIPPED: AtomicU32 = AtomicU32::new(0);
         if !plan.runnable() {
-            if REFUSED.fetch_add(1, Ordering::Relaxed) < 4 {
-                crate::runtime::diag_log::diagnostic(format_args!("[GameSpeed] lobby pass refused {plan:?}"));
+            if SKIPPED.fetch_add(1, Ordering::Relaxed) < 4 {
+                crate::runtime::diag_log::diagnostic(format_args!("[GameSpeed] lobby pass skipped {plan:?}"));
             }
         } else if n <= 2 || n.is_multiple_of(600) {
             crate::runtime::diag_log::diagnostic(format_args!(

@@ -46,8 +46,8 @@ FUN_0135ca00 (the battle task entry, every update, main thread)
    times per update.
    - **Allowed only** (`pass_allowed`) while the practice is live, its UI is free, the game isn't paused, no slow of
      any kind is active (`N` and the target both 1), and the scheduler is between passes (phase word -1).
-   - **Refused** (nothing ticked) unless the walk is whole: every pointer checked, at most 96 tasks, the walker found
-     exactly once (`Plan::runnable`).
+   - **Skipped** (nothing ticked; diag `lobby pass skipped`) unless the walk is whole: every pointer checked, at most
+     96 tasks, the walker found exactly once (`Plan::runnable`).
 5. **Teardown (R9 too):** the practice's live flag is armed by Player 1's frame in the practice and cleared by
    `game_speed::session_clear`, the same teardown that frees the slot in `9626926c` (the practice P1's destroy, the
    exit, a scene change). The pace and the extra pass stop there, before the native teardown. A match found starts at
