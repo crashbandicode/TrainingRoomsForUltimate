@@ -600,6 +600,21 @@ pub fn file_modules(src: &str) -> Vec<(String, Option<String>)> {
     out
 }
 
+/// `path` with `.` dropped and each `..` folded into the component before it, as Rust resolves `#[path]` (lexically).
+fn lexical(path: &Path) -> PathBuf {
+    let mut out = PathBuf::new();
+    for part in path.components() {
+        match part {
+            std::path::Component::CurDir => {}
+            std::path::Component::ParentDir if out.file_name().is_some() => {
+                out.pop();
+            }
+            other => out.push(other),
+        }
+    }
+    out
+}
+
 fn module_of_file(rel: &str) -> String {
     let path = Path::new(rel);
     let stem = path.file_stem().unwrap().to_string_lossy().into_owned();
@@ -651,7 +666,9 @@ impl Graph {
             let base = if matches!(stem.as_ref(), "mod" | "lib" | "main") { dir.to_path_buf() } else { dir.join(stem.as_ref()) };
             for (name, target) in file_modules(&fs::read_to_string(path).unwrap()) {
                 let candidates = match target {
-                    Some(target) => vec![dir.join(target)],
+                    // rc.8 R8 (B's finding 1): `#[path = "../mii/x.rs"]` (12 children of `character_roster.rs`) is folded, so
+                    // `roster/../mii/x.rs` is the scanned `mii/x.rs`.
+                    Some(target) => vec![lexical(&dir.join(target))],
                     None => vec![base.join(format!("{name}.rs")), base.join(&name).join("mod.rs")],
                 };
                 if let Some(child) = candidates.into_iter().find(|c| files.contains(c)) {

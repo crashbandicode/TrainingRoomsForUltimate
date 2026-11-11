@@ -1440,11 +1440,15 @@ fn super_means_the_declaring_file() {
         found[0]
     };
     let service = one("parent::service");
-    for caller in ["renamed_child::dispatch", "plain::poll", "inline::caller"] {
+    // rc.8 R8 (B's finding 1): `roster/owner.rs` declares `#[path = "../mii/far_child.rs"]`; the `..` is folded, and the
+    // child's own decoy `owner_service` is not the one `super::` means.
+    let owner_service = one("owner::owner_service");
+    for (caller, callee) in [("renamed_child::dispatch", service), ("plain::poll", service), ("inline::caller", service),
+                             ("far_child::far", owner_service)] {
         let f = one(caller);
-        assert_eq!(graph.callees(f).into_iter().collect::<Vec<_>>(), vec![service], "{caller}: the call graph");
+        assert_eq!(graph.callees(f).into_iter().collect::<Vec<_>>(), vec![callee], "{caller}: the call graph");
         let resolved: Vec<usize> = calls(&graph.funcs[f].body).iter().flat_map(|c| ctx.resolve(f, c)).collect();
-        assert_eq!(resolved, vec![service], "{caller}: Ctx::resolve");
+        assert_eq!(resolved, vec![callee], "{caller}: Ctx::resolve");
     }
 }
 
