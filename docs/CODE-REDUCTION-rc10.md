@@ -365,6 +365,10 @@ The five probes nothing used are deleted (the operator's Group A): `mii-ldn-qual
 - **Tests and tools:** `tests/pkg6_features.rs` (the table is 9 names; the five are asserted gone),
   `tests/lock_order.rs` (the probe's eight hook entries leave the list), `tools/feature_matrix.py` (its combinations).
 - The other 71 rows of features that no longer exist stay in the tables: they were not in the operator's Group A.
+- **`named-input-trace` compiles again** (Group B, kept): its trace line called `.bits()` on a `u32`. The fix is that
+  one word. `cargo check --features named-input-trace` is now a gate of every slice (`docs/BUILD.md`, "Probe check";
+  the `named-input-trace` row of `tools/feature_matrix.py`'s core set). Two of the probe's functions have no caller
+  (`trace_write`, `trace_close_input`); they are left as they are.
 - **Eden boot** (run `rc10-s4-fb028a9b-g2`, the Surface, diag NRO `d2d39f02…` of `fb028a9b`, the GDB stub on before
   the load, tracing off): the plugin installed (`result=installed heap_allocations=0`); 11 rows passed: the stub and
   the load, boot to Training, the old settings, the migration, a chord, the CPU fighter through the menu, five hot

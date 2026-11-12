@@ -958,7 +958,7 @@ pub fn trace_write(index: usize, input: &MappedInputs, buffered: bool, mirror: f
     let seq = TRACE_WRITES.fetch_add(1, Ordering::Relaxed) + 1;
     println!(
         "[NamedTrace] w run={} seq={} idx={} buttons={:#x} lx={} ly={} rx={} ry={} buffered={} mirror={}",
-        TRACE_RUN.load(Ordering::Relaxed), seq, index, input.buttons.bits(),
+        TRACE_RUN.load(Ordering::Relaxed), seq, index, input.buttons,
         input.lstick_x, input.lstick_y, input.rstick_x, input.rstick_y,
         u8::from(buffered), mirror
     );

@@ -71,6 +71,8 @@ CORE = [
     ("heap-meter", ["--features", "diag,plugin-heap-meter"]),
     ("trace+meter", ["--features", "diag,console-practice-trace,plugin-heap-meter"]),
     ("hang-trace", ["--features", "diag,hang-trace"]),
+    # rc.10: this probe stopped compiling unnoticed (a `.bits()` on a `u32`); it is in the core set so it cannot rot again.
+    ("named-input-trace", ["--features", "diag,named-input-trace"]),
 ]
 
 

@@ -17,6 +17,11 @@ elite-rematch, ssbu-quiet-elite-switch, ssbu-tile-cursor: each pins `rust-toolch
   `size-budget.toml`, or when that file records a raise without the lead's approval. `cargo test` runs it
   (`tests/size_budget.rs`, which needs `/usr/bin/python3` 3.11+ and has no skip switch). The budget only ratchets
   down; the plan is `docs/SIZE-PLAN.md`.
+- **Probe check** (rc.10 S4): `cargo check --features named-input-trace` for the Switch target, a gate of every slice
+  since that probe was found not to compile. It is the `named-input-trace` row of `tools/feature_matrix.py`'s core set
+  (`python3 -I tools/feature_matrix.py --run --mode switch --set core …`), or directly
+  `rustup run skyline-v3 cargo check -Zjson-target-spec -Zbuild-std=core,alloc,std,panic_abort --target
+  <aarch64-skyline-switch.json> --features named-input-trace` with `RUSTFLAGS=--cfg skyline_std_v3`.
 - **Switch builds** (`cargo skyline build --release`, `cargo skyline build --release --features diag`) do not use
   the pin. cargo-skyline 3.5.0 runs `rustup run skyline-v3 cargo build -Zbuild-std=core,alloc,std,panic_abort` with
   `RUSTFLAGS=--cfg skyline_std_v3` (strings of the binary, identical on both hosts). The `skyline-v3` toolchain is

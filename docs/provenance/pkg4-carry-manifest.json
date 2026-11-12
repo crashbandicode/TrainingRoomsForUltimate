@@ -1955,7 +1955,7 @@
    "dest": "src/runtime/macros/named_macros.rs",
    "crate": "root",
    "src_sha256": "737474479d5f05b064ab645d850ceb189cad3943097ae4fdb5fc74d2fcda0809",
-   "dest_sha256": "f415617fc055dd87ab8b5c6fa596aec6a90ae679fc46e0e30d8b42a1ce2f1ed7",
+   "dest_sha256": "08ed98e39512ae8e97aafd52ba287dc192d3de0a3322e8a6abf7e700c3511fb4",
    "edits": [
     {
      "old": "use training_mod_sync::*;",
@@ -2634,6 +2634,18 @@
       ]
      ],
      "reason": "rc.10 S2 (docs/CODE-REDUCTION-rc10.md; docs/DECISIONS.md, D11 superseded): the always-on Cargo features are not switches; their cfg gates are removed and the code that compiled only with one off is deleted"
+    },
+    {
+     "line_patch": [
+      [
+       961,
+       961,
+       [
+        "        TRACE_RUN.load(Ordering::Relaxed), seq, index, input.buttons,"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S4 (the primary 2026-11-12 05:25Z): named-input-trace compiles again (its trace line passed `.bits()` on a u32)"
     }
    ]
   },
