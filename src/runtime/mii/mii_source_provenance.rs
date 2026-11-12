@@ -1,6 +1,5 @@
 //! Value projection of SourceBook ownership; never a second source lifetime book.
 use crate::engine::swap::source_lifetime::{Phase, SceneEpoch, SourceToken};
-#[cfg(any(test, feature = "mii-managed-source-coexist-alpha"))]
 use crate::engine::swap::source_lifetime::{ReadyToken, SourceKey};
 use crate::engine::mii::ordinary_player::Owner;
 
@@ -66,7 +65,6 @@ pub(crate) struct CreatedReceipt {
 pub(crate) enum Helper {
     Unmanaged,
     Unavailable { token: SourceToken, phase: Phase },
-    #[cfg(any(test, feature = "mii-managed-source-coexist-alpha"))]
     Ready { ready: ReadyToken, key: SourceKey, proof: Proof },
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -95,7 +93,6 @@ impl View {
         Some(token.epoch())==self.epoch && self.source_at(token.slot())
             ==Some(Helper::Unavailable {token,phase:Phase::Loading})
     }
-    #[cfg(any(test, feature = "mii-managed-source-coexist-alpha"))]
     pub fn accepts_created(&self,id:usize,now:Proof,
         extras:crate::engine::mii::capacity::Extras,
         facts:crate::engine::mii::capacity::ExtraFacts,parked:bool)->bool {
@@ -150,7 +147,6 @@ impl View {
             }
             // Ordinary created sources have no Mii receipt and retain the
             // existing Extras::admit checks. They cannot authorize a Mii.
-            #[cfg(any(test, feature = "mii-managed-source-coexist-alpha"))]
             if self.created_miis[_i].is_some() && !matches!(helper,Helper::Ready {ready,..}
                 if Some(ready.source().epoch())==self.epoch) {return Err(NO_AUTHORITY);}
         }
@@ -158,7 +154,7 @@ impl View {
     }
 
     pub fn accepts(&self, id: usize, now: Proof,
-        #[cfg(any(test, feature = "mii-managed-source-coexist-alpha"))] parked: bool) -> bool {
+        parked: bool) -> bool {
         let Some(ordinal)=self.ordinal(id) else{return false;};
         let helper=&self.slots[ordinal];
         match *helper {
@@ -169,7 +165,6 @@ impl View {
             Helper::Unmanaged => crate::engine::mii::role_owner::original_row_matches(
                 now.kind, now.original.kind),
             Helper::Unavailable { .. } => false,
-            #[cfg(any(test, feature = "mii-managed-source-coexist-alpha"))]
             Helper::Ready { ready, key, proof } => {
                 let token = ready.source();
                 token.slot() == id && Some(token.epoch()) == self.epoch
@@ -188,7 +183,7 @@ impl View {
     }
 }
 
-#[cfg(all(target_os = "switch", feature = "mii-managed-source-coexist-alpha"))]
+#[cfg(target_os = "switch")]
 impl super::Registry {
     /// Source STATE is held by the caller; registry is the leaf lock.
     pub(crate) fn source(&mut self, epoch: SceneEpoch, slot: usize, helper: Helper) {
@@ -208,7 +203,7 @@ impl super::Registry {
     }
 }
 
-#[cfg(all(target_os = "switch", feature = "mii-managed-source-coexist-alpha"))]
+#[cfg(target_os = "switch")]
 pub(crate) unsafe fn observe(entry: usize, slot: u32) -> Option<Proof> {
     use crate::runtime::mii::mii_native_access::*;
     use super::{control, map, pointer, span};
@@ -250,7 +245,7 @@ pub(crate) unsafe fn observe(entry: usize, slot: u32) -> Option<Proof> {
     Some(proof)
 }
 
-#[cfg(all(target_os = "switch", feature = "mii-managed-source-coexist-alpha"))]
+#[cfg(target_os = "switch")]
 pub(crate) unsafe fn original(entry: usize, slot: u32) -> Option<OriginalRow> {
     observe(entry, slot).filter(|p| crate::engine::mii::role_owner::original_row_matches(
         p.kind, p.original.kind))

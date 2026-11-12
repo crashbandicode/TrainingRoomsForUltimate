@@ -63,9 +63,6 @@ impl Descriptor {
     }
 
     /// Re-stage a descriptor value captured earlier.
-    #[cfg(any(test, feature = "native-body-bank-alpha",
-        feature = "mii-ordinary-player-alpha", feature = "mii-ordinary-cpu-alpha",
-        feature = "mii-managed-helper-alpha"))]
     #[inline]
     pub(crate) fn from_bytes(bytes: &[u8; DESCRIPTOR_LEN]) -> Self {
         Self(*bytes)
@@ -101,8 +98,6 @@ impl Descriptor {
         self.put(ACTOR_COUNT, group.actor_count);
     }
 
-    #[cfg(any(test, feature = "native-body-bank-alpha",
-        feature = "mii-ordinary-player-alpha", feature = "mii-ordinary-cpu-alpha"))]
     #[inline]
     pub(crate) fn bytes(&self) -> &[u8; DESCRIPTOR_LEN] {
         &self.0

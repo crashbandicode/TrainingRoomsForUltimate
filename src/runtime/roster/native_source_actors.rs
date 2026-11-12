@@ -111,13 +111,10 @@ unsafe fn actor_plan(kind: u32) -> Option<ActorPlan> {
 /// separately preserves every physical body/context, including parked members.
 /// A pair-lead bank reports its three group contexts with the pair's partner links.
 unsafe fn visible_plan(entry: *const u8, owner: u32, forms: super::super::Forms) -> Option<ActorPlan> {
-    #[cfg(feature = "native-body-bank-alpha")]
     if let Some(members) = super::super::body_bank::ready_members(entry, owner) {
         return Some(ActorPlan { first: 2, count: members.count(), kinds: members.kinds(), partners: false,
             pair_lead: members.is_pair_lead() });
     }
-    #[cfg(not(feature = "native-body-bank-alpha"))]
-    let _ = (entry, owner);
     if forms.flags & 4 != 0 { return actor_plan(forms.kinds[0]); }
     if (forms.count == 2 && forms.actor_count == 2 && forms.flags == 2)
         || (forms.count == 1 && forms.actor_count == 1 && forms.flags == 0) {
@@ -414,21 +411,16 @@ unsafe fn visible_bank_checked(scene: Snapshot, input: Inputs, index: usize) -> 
 /// committed descriptor and bodies, active cell), whose active member's control and kind the row
 /// must name (`capacity_creation::creation_row`). Every other bank check is `visible_bank`'s.
 /// `true`: admitted by the committed body-bank rule.
-#[cfg(feature = "managed-visible-grouped-source-alpha")]
 unsafe fn creation_bank(scene: Snapshot, input: Inputs, index: usize) -> Result<(VisibleBank, bool), &'static str> {
     let (bank, row) = visible_bank_parts(scene, input, index)?;
     let alternate = visible::expected_slot(row, bank, bank);
-    #[cfg(feature = "native-body-bank-alpha")]
     let window = if alternate == Some(row) { None } else { Some(committed_window(bank)) };
-    #[cfg(not(feature = "native-body-bank-alpha"))]
-    let window = None;
     let body_bank = crate::engine::swap::capacity_creation::creation_row(row, alternate, window)?;
     Ok((bank, body_bank))
 }
 
 /// lobby-preload B: the captured window as values, with the body bank's committed member kinds
 /// re-read now (None when no Ready body bank owns this exact window).
-#[cfg(all(feature = "managed-visible-grouped-source-alpha", feature = "native-body-bank-alpha"))]
 unsafe fn committed_window(bank: VisibleBank) -> crate::engine::swap::capacity_creation::BankWindow {
     let committed = super::super::body_bank::ready_members(bank.entry as *const u8, bank.owner)
         .map(|members| members.kinds());
@@ -458,7 +450,6 @@ pub(crate) unsafe fn visible_preflight(scene: Snapshot, input: Inputs) -> [Optio
 
 // Extra evidence for initial native reservation only. No saved pointer is
 // dereferenced: every member comes from the currently resolved original entry.
-#[cfg(feature = "managed-visible-grouped-source-alpha")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct CreationVisible {
     descriptor: [u32; 28],
@@ -473,7 +464,6 @@ pub(crate) struct CreationVisible {
     body_bank: bool,
 }
 
-#[cfg(feature = "managed-visible-grouped-source-alpha")]
 impl CreationVisible {
     /// lobby-preload B: admitted through the committed body-bank rule (`visible_bank_kept` watches it).
     pub(crate) fn body_bank(&self) -> bool { self.body_bank }
@@ -481,7 +471,6 @@ impl CreationVisible {
 
 /// The creation capture of one visible owner, naming its first failed check (lobby-preload D:
 /// the creation-waiting line). The reads, their order and the captured value are unchanged.
-#[cfg(feature = "managed-visible-grouped-source-alpha")]
 unsafe fn creation_visible_one(scene: Snapshot, input: Inputs, index: usize) -> Result<CreationVisible, &'static str> {
     let owner = scene.layout.owners()[index];
     let entry = native_source::entry(owner).ok_or("visible: entry absent")?;
@@ -582,18 +571,15 @@ unsafe fn creation_visible_one(scene: Snapshot, input: Inputs, index: usize) -> 
         form, bodies, actors, alternate, body_bank })
 }
 
-#[cfg(feature = "managed-visible-grouped-source-alpha")]
 pub(crate) unsafe fn creation_visible(scene: Snapshot, input: Inputs) -> Option<[Option<CreationVisible>; 2]> {
     creation_visible_checked(scene, input).ok()
 }
 
 /// The visible owner (owners-array index) and the check its creation capture failed.
-#[cfg(feature = "managed-visible-grouped-source-alpha")]
 pub(crate) type VisibleFailure = (u8, &'static str);
 
 /// `creation_visible` naming the visible owner (owners-array index) and the check that failed
 /// (lobby-preload D: the creation-waiting line). Same owners, order and captures.
-#[cfg(feature = "managed-visible-grouped-source-alpha")]
 pub(crate) unsafe fn creation_visible_checked(scene: Snapshot, input: Inputs)
     -> Result<[Option<CreationVisible>; 2], VisibleFailure> {
     let mut originals = [None; 2];
@@ -668,7 +654,6 @@ pub(crate) fn comparison_view(
     before: Inputs,
     expected: Option<Inputs>,
 ) -> Snapshot {
-    #[cfg(feature = "managed-ldn-third-source-alpha")]
     {
         let mut current = current;
         let prior_member = prior.ldn.and_then(|fields| fields.input);
@@ -683,22 +668,13 @@ pub(crate) fn comparison_view(
         }
         current
     }
-    #[cfg(not(feature = "managed-ldn-third-source-alpha"))]
-    {
-        let _ = (prior, before, expected);
-        current
-    }
 }
 
-#[cfg(feature = "managed-ldn-third-source-alpha")]
 type ViewRow = (usize, u8, i32, i32, i32);
-#[cfg(feature = "managed-ldn-third-source-alpha")]
 type ViewShared = (usize, usize, usize, usize, u8);
-#[cfg(feature = "managed-ldn-third-source-alpha")]
 type ViewOwn = (i32, usize, usize, u8, u8);
 
 /// One entry's input view as the scene proof's model sees it: rows, shared fields, the entry's own fields.
-#[cfg(feature = "managed-ldn-third-source-alpha")]
 fn input_view(input: Inputs) -> crate::engine::swap::source_load::InputView<ViewRow, ViewShared, ViewOwn> {
     crate::engine::swap::source_load::InputView {
         slot: input.slot,

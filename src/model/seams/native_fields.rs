@@ -74,7 +74,6 @@ pub(crate) unsafe fn read<T: Copy>(base: usize, offset: usize) -> Option<T> {
 /// lifetime/locking authority. No pointer validation beyond null, alignment and
 /// address arithmetic is performed.
 #[inline]
-#[cfg(any(test, feature = "native-unlink-guard"))]
 pub(crate) unsafe fn write<T: Copy>(base: usize, offset: usize, value: T) -> bool {
     let Some(at) = address::<T>(base, offset) else { return false; };
     std::ptr::write_volatile(at as *mut T, value);
@@ -134,7 +133,6 @@ pub(crate) unsafe fn chain(mut base: usize, offsets: &[usize]) -> Option<usize> 
 /// The address must identify a live, aligned native atomic word for this load.
 /// The caller prevents destruction and incompatible non-atomic access.
 #[inline]
-#[cfg(any(test, feature = "mii-ordinary-player-alpha"))]
 pub(crate) unsafe fn load_acquire_u32(address: usize) -> u32 {
     (&*(address as *const std::sync::atomic::AtomicU32))
         .load(std::sync::atomic::Ordering::Acquire)
@@ -146,7 +144,6 @@ pub(crate) unsafe fn load_acquire_u32(address: usize) -> u32 {
 /// The address must identify a live, aligned native atomic word for this load.
 /// The caller prevents destruction and incompatible non-atomic access.
 #[inline]
-#[cfg(any(test, feature = "mii-editor-alpha"))]
 pub(crate) unsafe fn load_acquire_u64(address: usize) -> u64 {
     (&*(address as *const std::sync::atomic::AtomicU64))
         .load(std::sync::atomic::Ordering::Acquire)

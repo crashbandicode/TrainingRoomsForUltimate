@@ -56,7 +56,6 @@ impl Training {
 
     /// The age-zero state-5 call that follows a state-stack transition or the
     /// product reenter. Identity only: no editor logic may run on that call.
-    #[cfg(feature = "training-stage-rotation-alpha")]
     pub unsafe fn entering(base: usize, context: usize) -> bool {
         Self::qualify(base, context, true).is_some()
     }

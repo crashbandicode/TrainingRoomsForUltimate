@@ -5,11 +5,9 @@
 //! unchanged and live in native_unlink_guard::store. The writer is unknown.
 use skyline::hooks::InlineCtx;
 use std::sync::atomic::{AtomicBool, Ordering};
-#[cfg(feature = "native-unlink-guard")]
 use std::sync::atomic::AtomicU64;
 
 static INSTALLED: AtomicBool = AtomicBool::new(false);
-#[cfg(feature = "native-unlink-guard")]
 static GUARD_EVENTS: AtomicU64 = AtomicU64::new(0);
 
 /// Walker and destructor windows: hooked instruction plus its neighbours
@@ -27,7 +25,6 @@ const OBSERVED_WINDOWS: [(usize, [u32; 3]); 9] = [
     (0x38951fc, [0xf90002bf, 0xa9017edf, 0xa9007edf]),
 ];
 
-#[cfg(feature = "native-unlink-guard")]
 const GUARDED_STORES: [(usize, [u32; 3]); 8] = [
     (0x38958e4, [0x91002129, 0xf9000128, 0xa941a668]),
     (0x38958fc, [0xf9400269, 0xf9000928, 0xf900027f]),
@@ -44,20 +41,20 @@ const UNLINK_SEAMS: &[&str] = &[
     "unlink.observed_38958a4", "unlink.leave_window", "unlink.observed_3895148", "unlink.observed_38951c4",
     "unlink.observed_3896bbc", "unlink.observed_38952cc", "unlink.observed_3895904", "unlink.observed_3895874",
     "unlink.observed_38951fc", "unlink.leave",
-    #[cfg(feature = "native-unlink-guard")] "unlink.recursive_last_window",
-    #[cfg(feature = "native-unlink-guard")] "unlink.recursive_last",
-    #[cfg(feature = "native-unlink-guard")] "unlink.sister_first_window",
-    #[cfg(feature = "native-unlink-guard")] "unlink.sister_first",
-    #[cfg(feature = "native-unlink-guard")] "unlink.sister_last_window",
-    #[cfg(feature = "native-unlink-guard")] "unlink.sister_last",
-    #[cfg(feature = "native-unlink-guard")] "unlink.header_first_window",
-    #[cfg(feature = "native-unlink-guard")] "unlink.header_first",
-    #[cfg(feature = "native-unlink-guard")] "unlink.header_last_window",
-    #[cfg(feature = "native-unlink-guard")] "unlink.header_last",
-    #[cfg(feature = "native-unlink-guard")] "unlink.vector_first_window",
-    #[cfg(feature = "native-unlink-guard")] "unlink.vector_first",
-    #[cfg(feature = "native-unlink-guard")] "unlink.vector_last_window",
-    #[cfg(feature = "native-unlink-guard")] "unlink.vector_last",
+    "unlink.recursive_last_window",
+    "unlink.recursive_last",
+    "unlink.sister_first_window",
+    "unlink.sister_first",
+    "unlink.sister_last_window",
+    "unlink.sister_last",
+    "unlink.header_first_window",
+    "unlink.header_first",
+    "unlink.header_last_window",
+    "unlink.header_last",
+    "unlink.vector_first_window",
+    "unlink.vector_first",
+    "unlink.vector_last_window",
+    "unlink.vector_last",
 ];
 
 fn mismatch(main: usize, windows: &[(usize, [u32; 3])]) -> Option<usize> {
@@ -73,11 +70,9 @@ fn mismatch(main: usize, windows: &[(usize, [u32; 3])]) -> Option<usize> {
 unsafe extern "C" fn leave(ctx: &InlineCtx) {
     #[cfg(feature = "native-unlink-probe")]
     crate::runtime::roster::native_unlink_probe::observe_leave(ctx);
-    #[cfg(feature = "native-unlink-guard")]
     guarded_store(ctx, 0x38958e4, false, false);
 }
 
-#[cfg(feature = "native-unlink-guard")]
 unsafe fn guarded_store(ctx: &InlineCtx, site: u64, add_sixteen: bool, header_first: bool) {
     let node = ctx.registers[if matches!(site, 0x38951dc | 0x38951f4 | 0x38952a8 | 0x38952c4) { 21 } else { 19 }].x();
     let address = ctx.registers[9].x().wrapping_add(if add_sixteen { 16 } else { 0 });
@@ -94,19 +89,12 @@ unsafe fn guarded_store(ctx: &InlineCtx, site: u64, add_sixteen: bool, header_fi
     }
 }
 
-#[cfg(feature = "native-unlink-guard")]
 unsafe extern "C" fn recursive_last_guard(ctx: &InlineCtx) { guarded_store(ctx, 0x38958fc, true, false); }
-#[cfg(feature = "native-unlink-guard")]
 unsafe extern "C" fn sister_first_guard(ctx: &InlineCtx) { guarded_store(ctx, 0x3895854, false, false); }
-#[cfg(feature = "native-unlink-guard")]
 unsafe extern "C" fn sister_last_guard(ctx: &InlineCtx) { guarded_store(ctx, 0x389586c, true, false); }
-#[cfg(feature = "native-unlink-guard")]
 unsafe extern "C" fn header_first_guard(ctx: &InlineCtx) { guarded_store(ctx, 0x38951dc, false, true); }
-#[cfg(feature = "native-unlink-guard")]
 unsafe extern "C" fn header_last_guard(ctx: &InlineCtx) { guarded_store(ctx, 0x38951f4, true, false); }
-#[cfg(feature = "native-unlink-guard")]
 unsafe extern "C" fn vector_first_guard(ctx: &InlineCtx) { guarded_store(ctx, 0x38952a8, false, false); }
-#[cfg(feature = "native-unlink-guard")]
 unsafe extern "C" fn vector_last_guard(ctx: &InlineCtx) { guarded_store(ctx, 0x38952c4, false, false); }
 
 unsafe fn hook(main: usize, offset: usize, callback: unsafe extern "C" fn(&InlineCtx)) {
@@ -134,7 +122,6 @@ pub fn init() {
         }
         None => true,
     };
-    #[cfg(feature = "native-unlink-guard")]
     let legacy = legacy && match mismatch(main, &GUARDED_STORES) {
         Some(offset) => {
             crate::engine::compat::logging::diagnostic(format_args!("[NativeUnlink] guard refused window at {offset:#x}"));
@@ -157,12 +144,8 @@ pub fn init() {
         "unlink_probe.walk_3895874", "unlink_probe.walk_38951fc"], crate::runtime::roster::native_unlink_probe::prepare(main));
     #[cfg(not(feature = "native-unlink-probe"))]
     let observer = false;
-    #[cfg(feature = "native-unlink-guard")]
     let shared = true;
-    #[cfg(not(feature = "native-unlink-guard"))]
-    let shared = observer;
     unsafe {
-        #[cfg(feature = "native-unlink-guard")]
         for (offset, _) in GUARDED_STORES {
             // The callback executes the displaced STR conditionally. NOP is
             // copied into Skyline's trampoline so the STR never executes twice.
@@ -180,7 +163,6 @@ pub fn init() {
                 hook(main, offset, callback);
             }
         }
-        #[cfg(feature = "native-unlink-guard")]
         for (offset, callback) in [
             (0x38958fc, recursive_last_guard as unsafe extern "C" fn(&InlineCtx)),
             (0x3895854, sister_first_guard), (0x389586c, sister_last_guard),
@@ -194,7 +176,6 @@ pub fn init() {
     if observer {
         crate::runtime::roster::native_unlink_probe::publish_ready();
     }
-    #[cfg(feature = "native-unlink-guard")]
     crate::engine::compat::logging::diagnostic(format_args!(
         "[NativeUnlink] experimental missing-parent guard enabled; observer={observer}; writer unknown"));
 }

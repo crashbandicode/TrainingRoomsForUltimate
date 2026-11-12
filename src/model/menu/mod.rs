@@ -1296,8 +1296,8 @@ impl Menu {
         self.reset_kept(id)
     }
 
-    // Choice counts: 89 with mii-saved-alpha, else 86. Lobby stages: STAGES.len() == 117.
-    const CYCLE_CHOICES: usize = if cfg!(feature = "mii-saved-alpha") { 89 } else { 86 };
+    // Choice counts: 89 (86 fighters and forms, 3 Mii classes). Lobby stages: STAGES.len() == 117.
+    const CYCLE_CHOICES: usize = 89;
     const LOBBY_STAGES: usize = 117;
 
     /// Factory JSON of a kept key. A missing key already means this. `None` when this menu does not own it.

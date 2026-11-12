@@ -2,9 +2,7 @@
 use crate::runtime::mii::mii_native_access::*;
 use super::super::mii_ordinary_player::native::{check,pointer,span,Scalars,mirrors,
     helpers,helper_snapshot,final_registry};
-#[cfg(feature="native-body-bank-alpha")]
 use super::super::mii_ordinary_player::native::{permanent,publish_refusal};
-#[cfg(feature="native-body-bank-alpha")]
 use crate::engine::swap::body_bank::mii_publish::PublishRefusal;
 use super::super::mii_selector_native::{self as shared,Map,same_map};
 use crate::engine::mii::{lifetime::{Binding,Configuration},native_values as values,
@@ -161,23 +159,19 @@ pub(super) unsafe fn completed(track:&super::Track)->Result<Snapshot,&'static st
     drop(registry);drop(state);drop(completion);Ok(now)
 }
 /// Terminal class of a CPU bank member settlement; see the Player adapter.
-#[cfg(feature="native-body-bank-alpha")]
 pub(super) enum BankRefusal { Busy, Kept(&'static str), Diverged(&'static str) }
 
 /// What a CPU Mii one-member group switch published before its native request
 /// (the destination record, `E+0x1a8` and the E/D scalars), for a rollback.
-#[cfg(feature="native-body-bank-alpha")]
 #[derive(Clone,Copy)]
 pub(super) struct BankPublished { record:[u8;values::RECORD_LEN], scalars:Scalars, index:u16 }
 
-#[cfg(feature="native-body-bank-alpha")]
 fn bank_target<'a>(bank:&'a super::BankTrack,c:Configuration)->shared::PublicationTarget<'a> {
     let published=u16::from_le_bytes([bank.descriptor[0x46],bank.descriptor[0x47]]);
     shared::PublicationTarget {before:&bank.before,descriptor:&bank.descriptor,
         payload:Some(c).filter(|_|policy::saved_payload_routes_to_destination(published,bank.before.binding.record_index)),
         scalars:Scalars::saved(c),source:None,hat_change:bank.hat_change,original_index:bank.origin_index}
 }
-#[cfg(feature="native-body-bank-alpha")]
 unsafe fn retained_origin_bank(bank:&super::BankTrack)->Result<(),&'static str> {
     if bank.origin_index==bank.before.binding.record_index {return Ok(());}
     let Some(expected)=bank.origin_record else{return Ok(());};
@@ -191,7 +185,6 @@ unsafe fn retained_origin_bank(bank:&super::BankTrack)->Result<(),&'static str> 
 /// headgear proof), then the same write set as `publish`: the CharInfo at the
 /// destination record, `E+0x1a8` and the E/D scalars. The identity words, entry
 /// bytes and D mirror follow at the bank's build.
-#[cfg(feature="native-body-bank-alpha")]
 pub(super) unsafe fn bank_publish(bank:&super::BankTrack,c:Configuration,group_hat:u16,evidence:&mut Option<Publication>)
     ->Result<(),&'static str> {
     let target=bank_target(bank,c);
@@ -219,7 +212,6 @@ pub(super) unsafe fn bank_publish(bank:&super::BankTrack,c:Configuration,group_h
 /// so the write takes INSTALL and the record-1 reservation exactly as the exact
 /// path does, releases INSTALL right after, and the owner's receipt adopts the
 /// bytes. The switch's `bank_publish` rewrites them with `E+0x1a8`/scalars later.
-#[cfg(feature="native-body-bank-alpha")]
 pub(super) unsafe fn prefetch_publish(entry:usize,c:Configuration,identity:crate::engine::swap::body_bank::MiiIdentity)
     ->Result<(),PublishRefusal> {
     shared::target_rows(c).map_err(publish_refusal)?;
@@ -271,7 +263,6 @@ pub(super) unsafe fn prefetch_publish(entry:usize,c:Configuration,identity:crate
 /// after the binding proof and before INSTALL) the locked walk and the registry fence use
 /// (see the invariant in `prefetch_publish`); `original_kind` is the owner's origin kind the locked
 /// walk is keyed by, `retained` the reservation mode and `map` the map the caller walked.
-#[cfg(feature="native-body-bank-alpha")]
 #[derive(Clone,Copy)]
 struct PrefetchReceipt {
     identity:crate::engine::mii::identity::Identity,
@@ -281,12 +272,10 @@ struct PrefetchReceipt {
     retained:bool,
     map:Map,
 }
-#[cfg(feature="native-body-bank-alpha")]
 fn prefetch_identity(s:&Snapshot)->crate::engine::mii::identity::Identity {
     crate::engine::mii::identity::Identity {entry:s.binding.entry,owner:s.binding.owner,epoch:s.binding.epoch,
         descriptor:s.descriptor,index:s.index,..crate::engine::mii::identity::Identity::ZERO}
 }
-#[cfg(feature="native-body-bank-alpha")]
 unsafe fn prefetch_publish_owned(receipt:PrefetchReceipt,c:Configuration,token:super::super::InstallToken)
     ->Result<(),PublishRefusal> {
     use crate::engine::mii::identity::{verify,ExpectedMutation};
@@ -317,7 +306,6 @@ unsafe fn prefetch_publish_owned(receipt:PrefetchReceipt,c:Configuration,token:s
     Ok(())
 }
 /// A verified restore: the receipt and the owner's state read back after the writes.
-#[cfg(feature="native-body-bank-alpha")]
 pub(super) struct Restored {
     pub receipt:crate::engine::mii::ordinary_player::RestoreReceipt,
     pub now:Snapshot,
@@ -333,7 +321,6 @@ pub(super) struct Restored {
 /// read back through the current walk (consistent again) and compared with the kept
 /// receipt, adopting at most native's own pair. `helpers::BUSY` comes back only before any
 /// write (the caller retries).
-#[cfg(feature="native-body-bank-alpha")]
 pub(super) unsafe fn bank_restore(bank:&super::BankTrack,c:Configuration,published:BankPublished)->Result<Restored,&'static str> {
     use crate::engine::mii::ordinary_player::{publication_rollback,restore_receipt,PublicationRollback};
     let before=&bank.before;
@@ -382,14 +369,12 @@ pub(super) unsafe fn bank_restore(bank:&super::BankTrack,c:Configuration,publish
 /// receipt, with equal protected rows, records and provenance. `expected` stays
 /// `before`; the registry is fenced, not written. Lock order G -> STATE -> COMMITTED.
 /// A settled CPU bank member switch (WP-M2 settle split; see the Player `Settled`).
-#[cfg(feature="native-body-bank-alpha")]
 #[derive(Clone,Copy,Debug)]
 pub(super) struct Settled {
     pub now:Snapshot,
     pub exact:Option<Configuration>,
     pub resource_pair:Option<bool>,
 }
-#[cfg(feature="native-body-bank-alpha")]
 #[inline(never)] // rc.8 §7: its snapshots and MiiExit copies live in its own frame, not in bank_service's
 pub(super) unsafe fn bank_settled(bank:&super::BankTrack)->Result<Settled,BankRefusal> {
     let before=&bank.before;
@@ -489,7 +474,6 @@ pub(super) unsafe fn bank_settled(bank:&super::BankTrack)->Result<Settled,BankRe
 
 /// rc.8 R5: what the warm exit carries across `bank_restore`. `exit_plan` builds it in its own frame, so the kept
 /// `MiiExit`, the snapshot read under G and their copies are gone before the restore runs.
-#[cfg(feature="native-body-bank-alpha")]
 struct ExitPlan {
     restore:super::BankTrack, configuration:Configuration, published:BankPublished, adopted:Snapshot, helpers:helpers::View,
 }
@@ -503,7 +487,6 @@ struct ExitPlan {
 /// window's index, so no owner walk can read that state (rc6-hot-xps5: `CPU current index mirrors differ`): the
 /// descriptor is read directly under G, as `bank_restore` reads its fields. `helpers::BUSY` before any write retries
 /// on the next callback.
-#[cfg(feature="native-body-bank-alpha")]
 #[inline(never)] // rc.8 §7: its snapshots and MiiExit copies live in its own frame, not in bank_service's
 pub(super) unsafe fn exit_settled(bank:&super::BankTrack)->Result<Settled,BankRefusal> {
     // rc.8 R5: the proof before the restore (`exit_plan`) and the adoption after it (`exit_adopt`) each have their own
@@ -522,7 +505,6 @@ pub(super) unsafe fn exit_settled(bank:&super::BankTrack)->Result<Settled,BankRe
 
 /// rc.8 R5: `exit_settled` before the restore: the kept exit, the G identity, the helpers' view, the bank's exchange
 /// receipt; then the restore's track.
-#[cfg(feature="native-body-bank-alpha")]
 #[inline(never)]
 unsafe fn exit_plan(bank:&super::BankTrack,plan:&mut Option<ExitPlan>)->Result<(),BankRefusal> {
     let before=&bank.before;
@@ -557,7 +539,6 @@ unsafe fn exit_plan(bank:&super::BankTrack,plan:&mut Option<ExitPlan>)->Result<(
 }
 
 /// rc.8 R5: `exit_settled` after the restore: the owner adopts the window (`now` is the restore's read-back).
-#[cfg(feature="native-body-bank-alpha")]
 #[inline(never)]
 unsafe fn exit_adopt(bank:&super::BankTrack,plan:&ExitPlan,now:&Snapshot)->Result<Settled,BankRefusal> {
     let before=&bank.before;
@@ -688,7 +669,6 @@ unsafe fn capture_new_origin(entry:usize,epoch:u64,kind:u32,catalog:&Catalog,ope
             let record=now.records.iter().flatten().find(|(index,_)|*index==id as u16)
                 .ok_or("CPU origin helper record absent")?;
             let original_kind=match now.helpers.slots[now.layout.helper(id).unwrap()] {
-                #[cfg(any(test, feature = "mii-managed-source-coexist-alpha"))]
                 helpers::Helper::Ready {proof,..}=>i64::from(proof.original.kind),
                 helpers::Helper::Unmanaged=>i64::from(rd::<u32>(owner.entry,0x18)),
                 helpers::Helper::Unavailable {..}=>return Err(helpers::CaptureError::Refused("CPU helper authority unavailable")),

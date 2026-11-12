@@ -94,7 +94,6 @@ pub unsafe fn inherited_costume(slot: u32) -> Option<u32> {
     Some(read(resource_owner(slot)?, 0x64))
 }
 
-#[cfg(feature = "managed-third-source-alpha")]
 pub(super) fn ordinary_kind(kind: u32) -> bool {
     let forms = Forms::starting(kind);
     !(0x48..=0x4a).contains(&kind) && TrioFighter::from_kind(kind).is_some() && forms.count == 1 && forms.actor_count == 1
@@ -103,7 +102,6 @@ pub(super) fn ordinary_kind(kind: u32) -> bool {
 /// Capability-scoped created Mii readiness. This does not replace the caller's
 /// current map/registered-roots/G payload validation. Raw reads only, including
 /// the same descriptor/body/loader checks as native helpers; safe with G held.
-#[cfg(feature="mii-managed-helper-alpha")]
 pub unsafe fn parked_created_ready(current:*const u8,slot:u32,kind:u32,
     destination:crate::engine::mii::ordinary_cpu::CreatedDestination)->bool {
     destination.record()==slot as u16 && slot<8
@@ -117,7 +115,6 @@ pub unsafe fn parked_created_ready(current:*const u8,slot:u32,kind:u32,
 /// Completion of a non-activating native install, including every form in the
 /// canonical group. Grouped parked installs still require runtime qualification.
 pub unsafe fn parked_ready(current: *const u8, slot: u32, kind: u32) -> bool {
-    #[cfg(feature="mii-managed-helper-alpha")]
     if matches!(slot,2|3|5|6) && (0x48..=0x4a).contains(&kind) {
         return aligned(current) && read::<u32>(current,0xe0)==slot
             && crate::runtime::mii::mii_native_access::cpu::helper_ready_for_kind(BASE.load(Ordering::Acquire),current as usize,slot,kind);

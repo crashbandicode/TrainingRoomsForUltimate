@@ -59,10 +59,11 @@ skyline = { version = "=0.6.0" }
 nnsdk = { version = "0.6.2" }
 
 [features]
-# The shipped closure: the fork's M5o release feature list (stages/m5o RECEIPTS-m5o1.json,
-# `m5o1-switch-root-full-release`), evaluated through the table below. `cargo skyline build --release`
-# (default features) therefore builds the shipped product; tests/pkg6_features.rs checks it. `deluxe-sdk` joined with L1 (MIT SDK, 20dd1cb).
-default = ["enhancements-alpha", "native-unlink-guard", "deluxe-sdk", "mii-hud-portrait-alpha", "cycle-preload-extended", "lobby-preload-extended", "native-body-bank-alpha"]
+# rc.10 S2 (operator 2026-11-12; docs/DECISIONS.md "D11 superseded"): the product is not behind feature switches. The 25
+# features of the fork's M5o release list that every shipped build enabled are gone, and their code is always compiled; a
+# `--no-default-features` build is the whole product without the optional Deluxe SDK. What remains is `deluxe-sdk` (an
+# optional dependency), `diag` and the diagnostic family. tests/pkg6_features.rs checks the table.
+default = ["deluxe-sdk"]
 
 # Eden-only diagnostics (stand-ins, per-event lines). The shipped NRO never enables it. Every probe,
 # observer, trace and meter below requires it (decision D11; the fork's diag taxonomy).
@@ -73,46 +74,17 @@ diag = []
 texture-probe = ["diag"]
 seam-drill = ["diag"]
 
-# --- Carried feature table (package 6, decision D11) ---------------------------------------------------
-# Taken from the fork's root Cargo.toml lines 82-122 and 124-240 (line 123 not printed) of stage m5o (lead-authorised, CARRY-OVER.md pkg6
-# section). Sub-crate features of the fork (`training_mod_consts/x`, `training_mod_tui/x`) are the same-name
-# features of this one crate. `dep:` entries are added with the carry of their crate (C6).
-# Not in the shipped closure ("carried, not shipped"): every `*-probe`/`*-observer`/`*-trace`/meter feature
-# and `automation-results-native` (see docs/PACKAGE-6-PLAN.md (removed after v0.2.0-rc.1; see that tag) section 12).
-native-body-bank-alpha = ["managed-visible-grouped-source-alpha", "lobby-preload-extended", "mii-ordinary-cpu-alpha"]
-cycle-preload-extended = ["managed-third-source-alpha"]
+# --- The carried diagnostic features (package 6) ---------------------------------------------------------
+# From the fork's root Cargo.toml of stage m5o (CARRY-OVER.md pkg6 section): the probes, traces and meters, never in a
+# shipped build, and `automation-results-native`.
 console-practice-trace = ["diag"]
 console-swap-trace = ["console-practice-trace"]
 native-unlink-probe = ["console-swap-trace"]
-native-unlink-guard = []
-enhancements-alpha = ["mii-editor-alpha", "cpu-pilot-probe", "mii-managed-helper-alpha", "waiting-roster-reload", "practice-stage-request-alpha", "training-stage-rotation-alpha"]
-# P1 AI assistance (product feature kept under its name). `dep:ssbu-cpu-pilot-core` joins with C6.
-cpu-pilot-probe = ["p1-cpu-control"]
-p1-cpu-control = []
 automation-results-native = ["deluxe-sdk"]
 hang-trace = ["diag", "hos-lock/owners"]
 plugin-heap-meter = ["diag"]
-waiting-roster-reload = []
 named-input-trace = ["diag"]
-lobby-stage = []
-practice-stage = ["lobby-stage"]
-practice-stage-request-alpha = ["practice-stage"]
-training-stage-rotation-alpha = ["lobby-stage", "mii-editor-alpha", "training-stage-rotation"]
-training-stage-rotation = []
-mii-saved-alpha = []
-mii-ordinary-player-alpha = ["mii-saved-alpha"]
-mii-ordinary-cpu-alpha = ["mii-ordinary-player-alpha"]
-mii-managed-source-coexist-alpha = ["mii-ordinary-cpu-alpha", "managed-sources"]
-mii-managed-helper-alpha = ["mii-managed-source-coexist-alpha"]
-mii-hud-portrait-alpha = ["mii-managed-helper-alpha"]
-mii-ldn-qualification-probe = ["mii-ordinary-player-alpha", "diag"]
-mii-editor-alpha = ["mii-ordinary-cpu-alpha"]
-managed-sources = []
-managed-third-source-alpha = ["managed-sources"]
-managed-grouped-source-alpha = ["managed-third-source-alpha"]
-managed-visible-grouped-source-alpha = ["managed-grouped-source-alpha"]
-managed-ldn-third-source-alpha = ["managed-third-source-alpha"]
-lobby-preload-extended = ["cycle-preload-extended", "managed-ldn-third-source-alpha"]
+mii-ldn-qualification-probe = ["diag"]
 # Runtime capture toggle on the Deluxe Plugins page (Q7): `engine::deluxe_row` (src/model/deluxe_row.rs), `runtime::deluxe_row`.
 deluxe-sdk = ["dep:deluxe-plugin-sdk"]
 # The fork's host-only replay simulator (consts feature; used by the swap-model replay tests).

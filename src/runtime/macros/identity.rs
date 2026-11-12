@@ -88,10 +88,7 @@ pub fn reacknowledge_named(target: Target) {
 pub fn service() {
     REACK.drain(|(target, session, revision)| {
         if session == named_macros::session_revision() && revision == named_macros::selection_revision() {
-            #[cfg(feature = "mii-ordinary-cpu-alpha")]
             roster::mii_replay::reacknowledge_named(target);
-            #[cfg(not(feature = "mii-ordinary-cpu-alpha"))]
-            let _ = target;
         }
     });
     REQUEST.drain(|key| {
@@ -101,7 +98,6 @@ pub fn service() {
             named_refusal: None, clip_refusal: None, named_installed: None, clip_installed: None };
         if current {
             facts.configuration = roster::current_mii_configuration(1);
-            #[cfg(feature = "mii-ordinary-cpu-alpha")]
             {
                 facts.named_installed = key.named.and_then(roster::mii_replay::installed_target);
                 facts.clip_installed = key.clip.and_then(roster::mii_replay::installed_target);

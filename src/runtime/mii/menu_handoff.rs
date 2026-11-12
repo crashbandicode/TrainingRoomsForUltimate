@@ -5,7 +5,6 @@ use std::sync::OnceLock;
 use hos_lock::Mutex;
 use crate::model::close_handoff::{self, Consumer, Intent, Producer};
 use crate::engine::mii_root::mii_menu::PendingSelection;
-#[cfg(feature = "mii-editor-alpha")]
 use crate::engine::mii_root::mii_menu::EditorRequest;
 use crate::runtime::{ui::menu_app, roster::character_roster::mii_saved_alpha};
 
@@ -15,7 +14,6 @@ pub struct CloseIntent {
     pub opening: u32,
     pub epoch: u64,
     pub selection: Option<PendingSelection>,
-    #[cfg(feature = "mii-editor-alpha")]
     pub editor: Option<EditorRequest>,
 }
 static CLOSE: OnceLock<Producer<CloseIntent>> = OnceLock::new();
@@ -60,16 +58,12 @@ pub(crate) fn service() {
         mii_saved_alpha::menu_close(None);
         let opening = mii_saved_alpha::menu_open();
         let captured = mii_saved_alpha::menu_ready(opening);
-        #[cfg(feature = "mii-editor-alpha")]
         let requested = captured || super::mii_editor_bridge::menu_ready(opening);
-        #[cfg(not(feature = "mii-editor-alpha"))]
-        let requested = captured;
         if !requested { menu_app::note_no_catalog(sequence); }
     } else {
         let intent = intent.filter(|i| i.epoch == mii_saved_alpha::menu_epoch());
         if let Some(intent) = intent {
             // The fork's order (`common/menu.rs` 486-491): the editor request first, then the catalog close.
-            #[cfg(feature = "mii-editor-alpha")]
             if let Some(editor) = intent.editor { super::mii_editor_bridge::request(editor); }
             mii_saved_alpha::menu_close(intent.selection);
         } else {

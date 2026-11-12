@@ -1,16 +1,11 @@
 //! Shared native saved-original primitives. No hook, request, file IO or diagnostic dispatch.
 //! The caller establishes current native service/INSTALL authority. Stored integers are identities.
 use crate::engine::seams::native_fields;
-#[cfg(feature = "mii-saved-alpha")]
 use skyline::hooks::{getRegionAddress, Region};
-#[cfg(feature = "mii-saved-alpha")]
 use crate::engine::mii::lifetime::Binding;
 use crate::engine::mii::lifetime::Tokens as ValueTokens;
-#[cfg(feature = "mii-saved-alpha")]
 use crate::engine::mii::native_values::{self as values, RecordUpdate};
-#[cfg(feature = "mii-saved-alpha")]
 pub(crate) const CHARINFO_LEN: usize = 88;
-#[cfg(feature = "mii-saved-alpha")]
 pub(crate) const POOL_HOLDER: usize = 0x593b6a0;
 pub(crate) const OWNER_TABLE: usize = 0x5324680;
 pub(crate) const UI_DB: usize = 0x532f730;
@@ -18,16 +13,13 @@ pub(crate) const OUTFIT_TABLE: usize = 0x248;
 pub(crate) const HAT_TABLE: usize = 0x238;
 pub(crate) const OUTFIT_ROW: usize = 0x3282b70;
 pub(crate) const HAT_ROW: usize = 0x32870b0;
-#[cfg(feature = "mii-saved-alpha")]
 pub(crate) const LOCK: usize = 0x39c19c0;
-#[cfg(feature = "mii-saved-alpha")]
 pub(crate) const UNLOCK: usize = 0x39c19d0;
 // Required fields are qualified by the current callback/PoolLock and the
 // binding/owner checks below. Never use these aliases to bypass a failed bind.
 pub(crate) use crate::engine::seams::native_fields::{
     object as aligned, read_unchecked as rd, write_unchecked as wr,
 };
-#[cfg(feature = "mii-saved-alpha")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct Context {
     pub(crate) binding: Binding,
@@ -124,7 +116,6 @@ pub(crate) unsafe fn lookup_row_id(
 /// Raw rederivation only: no manager lookup, native callback, logging, allocation or Rust mutex.
 /// With locked_g=Some, verify the current holder still names that mutex before reading its vector.
 /// Class comes from the current saved-row binding; never changes the native kind/index.
-#[cfg(feature = "mii-saved-alpha")]
 pub(crate) unsafe fn context_for_kind(
     base: usize, fe: usize, e: usize, locked_g: Option<usize>,
     thread: usize, owner_epoch: (u32, u64), kind: u32,
@@ -163,7 +154,6 @@ pub(crate) unsafe fn context_for_kind(
     Ok(Context { binding, thread })
 }
 
-#[cfg(feature = "mii-saved-alpha")]
 pub(crate) fn tokens(t: Tokens) -> ValueTokens {
     ValueTokens {
         outfit: t.outfit,
@@ -184,12 +174,10 @@ impl From<ValueTokens> for Tokens {
         }
     }
 }
-#[cfg(feature = "mii-saved-alpha")]
 pub(crate) struct PoolLock {
     pub(crate) g: usize,
     unlock: unsafe extern "C" fn(usize),
 }
-#[cfg(feature = "mii-saved-alpha")]
 impl PoolLock {
     pub(crate) unsafe fn acquire(base: usize, g: usize) -> Self {
         let lock: unsafe extern "C" fn(usize) = std::mem::transmute(base + LOCK);
@@ -198,7 +186,6 @@ impl PoolLock {
         Self { g, unlock }
     }
 }
-#[cfg(feature = "mii-saved-alpha")]
 impl Drop for PoolLock {
     fn drop(&mut self) {
         unsafe { (self.unlock)(self.g) }
@@ -206,13 +193,11 @@ impl Drop for PoolLock {
 }
 /// The single CharInfo write primitive used by saved adapters. All validation
 /// must precede this call. Native shared_ptr bytes +58..68 are deliberately untouched.
-#[cfg(feature = "mii-saved-alpha")]
 pub(crate) unsafe fn copy_update(record: usize, update: &RecordUpdate) {
     for (offset, byte) in update.charinfo().iter().enumerate() {
         wr(record, offset, *byte);
     }
 }
-#[cfg(feature = "mii-saved-alpha")]
 #[path = "mii_native_cpu_scope.rs"]
 pub(crate) mod cpu;
 

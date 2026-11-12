@@ -3,9 +3,7 @@
 //! publications and constructs the catalog menu.
 
 use std::sync::Arc;
-#[cfg(feature = "mii-saved-alpha")]
 use std::sync::OnceLock;
-#[cfg(feature = "mii-saved-alpha")]
 use crate::model::catalog_mailbox::{self, Producer, Consumer, Publication};
 use crate::engine::{mii::inventory::Snapshot, mii_root::mii_menu::Context};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
@@ -67,16 +65,12 @@ impl App {
 }
 
 
-#[cfg(feature = "mii-saved-alpha")]
 const PUBLICATION_CAPACITY: usize = 2;
-#[cfg(feature = "mii-saved-alpha")]
 static PUBLICATIONS: OnceLock<Producer<CatalogPublication>> = OnceLock::new();
 // Only the UI worker takes this guard. Native producers hold no reference to it.
-#[cfg(feature = "mii-saved-alpha")]
 static CATALOG_READER: OnceLock<Mutex<Consumer<CatalogPublication>>> = OnceLock::new();
 
 /// Boot only, before native callbacks can publish.
-#[cfg(feature = "mii-saved-alpha")]
 pub(crate) fn init_publications() {
     if PUBLICATIONS.get().is_some() { return; }
     let (producer, consumer) = catalog_mailbox::channel(PUBLICATION_CAPACITY);
@@ -85,7 +79,6 @@ pub(crate) fn init_publications() {
 }
 
 /// Native producer. Failed submission returns identical ownership to its policy.
-#[cfg(feature = "mii-saved-alpha")]
 pub(crate) fn publish_catalog(publication: CatalogPublication) -> Result<(), CatalogPublication> {
     let sequence = sequence();
     if !active() || publication.epoch != crate::runtime::roster::character_roster::mii_saved_alpha::menu_epoch()
@@ -97,7 +90,6 @@ pub(crate) fn publish_catalog(publication: CatalogPublication) -> Result<(), Cat
 
 /// UI worker only. Never takes the native App guard. Reject a close/reopen or
 /// epoch retirement both before and after this bounded drain.
-#[cfg(feature = "mii-saved-alpha")]
 pub(crate) fn take_catalog() -> Option<CatalogPublication> {
     let sequence = sequence();
     let epoch = crate::runtime::roster::character_roster::mii_saved_alpha::menu_epoch();
@@ -135,12 +127,9 @@ pub(crate) fn sequence() -> u32 { OPEN_SEQ.load(Ordering::Acquire) }
 /// The opening for which no Mii catalog was requested (none will come: not in Training or waiting practice, or the
 /// catalog adapters are off). The fork inserted its Mii pages only once a catalog was mounted (`containers/app.rs`
 /// 287-301); here the pages stay and say why they are empty. 0 = none (an opening's sequence is odd).
-#[cfg(feature = "mii-saved-alpha")]
 static NO_CATALOG: AtomicU32 = AtomicU32::new(0);
 
-#[cfg(feature = "mii-saved-alpha")]
 pub(crate) fn note_no_catalog(sequence: u32) { NO_CATALOG.store(sequence, Ordering::Release); }
 
 /// No catalog will come for the opening `sequence`.
-#[cfg(feature = "mii-saved-alpha")]
 pub(crate) fn no_catalog(sequence: u32) -> bool { sequence != 0 && NO_CATALOG.load(Ordering::Acquire) == sequence }

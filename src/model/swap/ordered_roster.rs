@@ -76,9 +76,7 @@ impl OrderedFighterRoster {
     pub fn hat_kinds_fixed(self) -> KindList {
         let mut out = KindList::new(0);
         for fighter in self.fighters_excluding_fixed(None).iter() {
-            if fighter.kind() != TrioFighter::KIRBY.kind()
-                && (cfg!(feature="mii-managed-helper-alpha") || !(0x48..=0x4a).contains(&fighter.kind()))
-            {
+            if fighter.kind() != TrioFighter::KIRBY.kind() {
                 out.push(fighter.kind());
             }
         }
@@ -242,34 +240,6 @@ mod tests {
     lib_unit_tests! {
     use super::*;
 
-    #[cfg(not(feature = "mii-saved-alpha"))]
-    #[test]
-    fn alpha_tail_is_validated_before_base_downgrade() {
-        let mut values = vec![0u8; MII_ALPHA_CHOICE_COUNT + 1];
-        values[80] = 1; // Sora, Sword, Mario.
-        values[87] = 2;
-        values[1] = 3;
-        let read = |v: &[u8]| serde_json::from_value::<OrderedFighterRoster>(serde_json::json!(v));
-        assert_eq!(
-            read(&values).unwrap().fighters(),
-            vec![TrioFighter::from_kind(0x5d).unwrap(), TrioFighter::MARIO]
-        );
-        values[87] = 3; // Removing the unsupported tail must not hide a duplicate.
-        assert!(read(&values).is_err());
-        values[87] = 4; // Nor a gap.
-        assert!(read(&values).is_err());
-        values.fill(0);
-        values[87] = 1;
-        assert_eq!(read(&values).unwrap().fighters(), vec![TrioFighter::MARIO]);
-        values[0] = 1; // All cannot silently discard a nonzero Sword preference.
-        assert!(read(&values).is_err());
-        values[87] = 0;
-        values[82] = 1; // All with Mythra/Ivysaur start preferences is unchanged.
-        values[84] = 1;
-        assert_eq!(read(&values).unwrap().values(), values[..87]);
-        values.push(0); // Unknown adjacent length is not a future-format escape.
-        assert!(read(&values).is_err());
-    }
 
     fn invalid_empty_duplicate_gapped_or_mixed_ranks_are_rejected() {
         let mut values = vec![0u8; CHOICES.len() + 1];

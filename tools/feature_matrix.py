@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Compile every cargo feature of the plugin (decision D11: every feature in the table must build).
+"""Compile every cargo feature of the plugin: every feature in the table must build. Since rc.10 S2 (docs/DECISIONS.md, which
+supersedes D11) the table is `deluxe-sdk`, `diag` and the diagnostic family; the product itself is not behind a feature.
 
 The feature table of `Cargo.toml` is the source: this lists (and, with `--run`, compiles) a set of feature combinations:
 

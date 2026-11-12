@@ -346,7 +346,6 @@ unsafe fn training_state(context: usize, args: usize) -> usize {
     let base = BASE.load(Ordering::Acquire);
     // Ordinary Training rotation observes the age-zero state entry here, before
     // any editor-session logic; it never changes this callback's native return.
-    #[cfg(feature = "training-stage-rotation-alpha")]
     if native::Training::entering(base, context) {
         crate::runtime::lobby::training_stage_rotation::training_entry(context);
     }
@@ -435,7 +434,6 @@ unsafe fn training_state(context: usize, args: usize) -> usize {
             let queued = unchanged && preview.is_some_and(|(active, _)| active == 0) && current.reenter();
             // Only this successful product reenter marks the next age-zero
             // Training state call as a return rather than a new entry.
-            #[cfg(feature = "training-stage-rotation-alpha")]
             if queued { crate::runtime::lobby::training_stage_rotation::reenter_requested(context); }
             let mut state = STATE.lock(); let s = state.as_mut().unwrap();
             s.phase = if queued { Phase::Returning } else { Phase::Refused };

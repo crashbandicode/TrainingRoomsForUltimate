@@ -103,7 +103,6 @@ unsafe fn allocation_trace(ctx: &mut InlineCtx) {
     crate::runtime::roster::practice_trace::checkpoint(30, [ctx.registers[0].x(), ctx.registers[1].x(), ctx.registers[2].x(), ctx.registers[30].x(), 0]);
     crate::runtime::roster::hang_trace::ALLOCATION.hit();
     // P-HOT B H3 (LANE-HOT-SLOTS-REPORT.md §12): a role with a pending start-up window gets it at its creation.
-    #[cfg(feature = "native-body-bank-alpha")]
     crate::runtime::roster::character_roster::body_bank::creation(ctx.registers[1].x() as u32, ctx.registers[2].x() as *mut u8);
     let desc = ctx.registers[2].x() as *const u8;
     if aligned(desc) && bounded_log(&BOUNDARY_LOGS, 384) {

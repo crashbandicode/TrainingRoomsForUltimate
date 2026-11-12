@@ -68,9 +68,7 @@ fn role(i: usize) -> MiiRole {
 /// Enabled role adapters are the sole owners, including capture refusals. Feature-disabled
 /// builds retain the existing fixture path; they never compete for an enabled role.
 fn unified(i:usize)->bool {
-    #[cfg(feature="mii-ordinary-player-alpha")]
     if i==0 {return super::mii_ordinary_player::enabled();}
-    #[cfg(feature="mii-ordinary-cpu-alpha")]
     if i==1 {return super::mii_ordinary_cpu::enabled();}
     let _=i;false
 }
@@ -93,7 +91,6 @@ pub(super) fn init(base: usize) {
 /// Cancel the previous opening before App reset. No catalog/native work here.
 pub(crate) fn menu_open() -> u64 {
     let opening = MENU_EPOCH.fetch_add(1, Ordering::AcqRel).wrapping_add(1);
-    #[cfg(feature="mii-ordinary-cpu-alpha")]
     super::mii_auto_init::cancel();
     let mut state = ALPHA.lock();
     state.menu.cancel();
@@ -130,9 +127,7 @@ pub(super) fn accept_catalog(catalog: Arc<Snapshot>, opening: u64, owners: [u64;
     {
         return false;
     }
-    #[cfg(feature="mii-ordinary-player-alpha")]
     super::mii_ordinary_player::catalog_ready(Arc::clone(&catalog), state.epoch[0], opening);
-    #[cfg(feature="mii-ordinary-cpu-alpha")]
     super::mii_ordinary_cpu::catalog_ready(Arc::clone(&catalog), state.epoch[1], opening);
     state.catalog = Some(catalog);
     state.menu.begin();
@@ -163,13 +158,10 @@ pub(crate) fn menu_close(pending: Option<PendingSelection>) {
     if let Some(pending) = pending.filter(|p| p.context.epoch == menu_epoch()) {
         for action in pending.actions {
             let i = usize::from(matches!(action, Action::ReloadCpu(_)));
-            #[cfg(feature="mii-ordinary-player-alpha")]
             if i == 0 && super::mii_ordinary_player::menu_close(pending.context, action) {
                 continue;
             }
-            #[cfg(feature="mii-ordinary-cpu-alpha")]
             if i == 1 && super::mii_ordinary_cpu::menu_close(pending.context,action) {continue;}
-            #[cfg(feature="mii-ordinary-cpu-alpha")]
             if super::mii_ordinary_cpu::writers_reserved(i,i as u16) {
                 notice("saved Mii request refused: ordinary CPU retains its destination");continue;
             }
@@ -216,7 +208,6 @@ pub(super) fn intercept(roster_role: Role, selection: Selection) -> bool {
         }
         return protected;
     };
-    #[cfg(feature="mii-ordinary-cpu-alpha")]
     if super::mii_ordinary_cpu::writers_reserved(i,i as u16) {
         drop(state);notice("saved Mii cycle refused: ordinary CPU retains its destination");return true;
     }
@@ -280,7 +271,6 @@ fn context(s: &Alpha) -> MenuContext {
 
 unsafe fn permitted(i:usize) -> bool {
     let _=i;
-    #[cfg(feature="mii-ordinary-cpu-alpha")]
     if super::mii_ordinary_cpu::writers_reserved(i,i as u16) {return false;}
     crate::runtime::compat::common::is_native_training_mode()
         && crate::runtime::compat::common::is_ready_go()
@@ -465,11 +455,8 @@ unsafe fn settle_saved_track(entry: *mut u8, owner: u32, i: usize, track: Track)
         "saved Mii native ready; exact completion refused"
     };
     if done {
-        #[cfg(feature="mii-hud-portrait-alpha")]
         publish_mii_presentation(entry, owner, track.epoch, track.after.canonical().class as u32,
             super::PortraitIntent::Exact(track.after));
-        #[cfg(not(feature="mii-hud-portrait-alpha"))]
-        publish_mii_presentation(entry, owner, track.epoch, track.after.canonical().class as u32);
     }
     let released = finish_install(track.token, reason);
     if done {
@@ -503,11 +490,9 @@ unsafe fn finish_saved_capture(
     expected: Option<Configuration>,
 ) -> Option<bool> {
     // The preceding ordinary service may still be waiting for native readiness.
-    #[cfg(feature="mii-ordinary-player-alpha")]
     if i == 0 && super::mii_ordinary_player::menu_capture_pending(entry) {
         return Some(false);
     }
-    #[cfg(feature="mii-ordinary-cpu-alpha")]
     if i == 1 && super::mii_ordinary_cpu::menu_capture_pending(entry) {return Some(false);}
     if !mii_backend::ready()
         || INSTALL.active()
@@ -521,11 +506,7 @@ unsafe fn finish_saved_capture(
     if MiiClass::from_kind(read::<u32>(entry, 0x18)).is_some() && ready_single_mii(entry, owner).is_none() {
         return Some(false);
     }
-    #[cfg(feature="mii-ordinary-player-alpha")]
     let ordinary_owned=super::mii_ordinary_player::owns(entry as usize);
-    #[cfg(not(feature="mii-ordinary-player-alpha"))]
-    let ordinary_owned=false;
-    #[cfg(feature="mii-ordinary-cpu-alpha")]
     let ordinary_owned=ordinary_owned || super::mii_ordinary_cpu::owns(entry as usize);
     let result = if !unified(i) && !ordinary_owned && MiiClass::from_kind(read::<u32>(entry, 0x18)).is_some() {
         match expected {
@@ -558,27 +539,18 @@ unsafe fn finish_saved_capture(
         s.intent[i] = None;
     }
     s.menu.finish(role(i), valid);
-    #[cfg(feature="mii-ordinary-player-alpha")]
     let ordinary = super::mii_ordinary_player::player_context();
-    #[cfg(not(feature="mii-ordinary-player-alpha"))]
-    let ordinary = None;
     let mut captured_context = context(&s);
     if unified(0) && ordinary.is_none()
         && original_kind(Role::Player).is_some_and(|k|MiiClass::from_kind(k).is_some()) {
         captured_context.original=PlayerOrigin::Unresolved;
     }
-    #[cfg(feature="mii-ordinary-cpu-alpha")]
     let ordinary_cpu=super::mii_ordinary_cpu::menu_qualified();
-    #[cfg(feature="mii-ordinary-cpu-alpha")]
     let cpu_context=ordinary_cpu.then(super::mii_ordinary_cpu::cpu_context);
-    #[cfg(not(feature="mii-ordinary-cpu-alpha"))]
-    let cpu_context=None;
     // Keep the worker-built snapshot shared; the UI constructs its menu off-hook.
     let publish = s.menu.take_owned_context(captured_context,ordinary,cpu_context)
         .map(|context| {
-            #[cfg(feature="mii-ordinary-cpu-alpha")]
             let mut context = context;
-            #[cfg(feature="mii-ordinary-cpu-alpha")]
             {
                 // Exact captured original only. An unqualified adapter publishes none,
                 // and the player origin is not a substitute.
@@ -593,8 +565,6 @@ unsafe fn finish_saved_capture(
     refresh_work(&s);
     drop(s);
     if let Some((catalog, context)) = publish {
-        #[cfg(not(feature="mii-ordinary-cpu-alpha"))]
-        let ordinary_cpu = false;
         super::mii_catalog_request::publish_menu(crate::runtime::ui::menu_app::CatalogPublication {
             catalog, epoch: context.epoch, context: Some(context), ordinary_cpu,
         });
@@ -727,9 +697,7 @@ unsafe fn submit_saved_intent(
 }
 
 pub(super) fn scene_changed() {
-    #[cfg(feature="mii-ordinary-player-alpha")]
     super::mii_ordinary_player::scene_changed();
-    #[cfg(feature="mii-ordinary-cpu-alpha")]
     super::mii_ordinary_cpu::scene_changed();
     MENU_EPOCH.fetch_add(1, Ordering::AcqRel);
     let mut s = ALPHA.lock();
@@ -751,7 +719,6 @@ pub(super) fn scene_changed() {
     }
     refresh_work(&s);
     drop(s);
-    #[cfg(feature="mii-ordinary-cpu-alpha")]
     super::mii_auto_init::reset();
     super::mii_catalog_request::retire();
 }
@@ -762,9 +729,7 @@ pub(super) fn on_destroy(entry: *const u8, owner: u32) {
             || state.active.is_some_and(|a|a.entry==entry as usize)};
     let legacy={let s=ALPHA.lock();s.owner[i].as_ref().is_some_and(|o|o.entry==entry as usize)
         || s.track[i].is_some_and(|t|t.entry==entry as usize)};
-    #[cfg(feature="mii-ordinary-player-alpha")]
     let exact=exact || super::mii_ordinary_player::owns(entry as usize) || super::mii_ordinary_player::tracked(entry as usize);
-    #[cfg(feature="mii-ordinary-cpu-alpha")]
     let exact=exact || super::mii_ordinary_cpu::owns(entry as usize) || super::mii_ordinary_cpu::tracked(entry as usize);
     if !exact && !legacy {return;}
     MENU_EPOCH.fetch_add(1, Ordering::AcqRel);
@@ -793,7 +758,6 @@ pub(super) fn on_destroy(entry: *const u8, owner: u32) {
     if let Some(token) = token {
         finish_install(token, "saved Mii alpha exact native destructor");
     }
-    #[cfg(feature="mii-ordinary-cpu-alpha")]
     super::mii_auto_init::reset();
     super::mii_catalog_request::retire();
     trace!(

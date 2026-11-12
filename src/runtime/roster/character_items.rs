@@ -23,7 +23,6 @@ struct Spec { choice: usize, kind: i32, variation: i32, source: i32 }
 struct Pending {
     body: u32, choice: usize, saved: Option<HeldItemSnapshot>, age: u16,
     // Alpha acceptance evidence only; no per-frame formatting or allocation.
-    #[cfg(feature = "managed-third-source-alpha")]
     capacity_polls: u16,
 }
 static PENDING: Mutex<Option<Pending>> = Mutex::new(None);
@@ -92,7 +91,6 @@ pub unsafe fn request(choice: usize) {
     if let Some(body) = try_get_module_accessor(FighterId::Player) {
         let mut pending = PENDING.lock();
         *pending = Some(Pending { body: (*body).battle_object_id, choice, saved: None, age: 0,
-            #[cfg(feature = "managed-third-source-alpha")]
             capacity_polls: 0,
         });
         HAS_PENDING.store(true, Ordering::Release);
@@ -145,7 +143,7 @@ pub unsafe fn on_frame(body: *mut app::BattleObjectModuleAccessor) {
     if let Some(HeldItemSnapshot::Item { variation, .. }) = pending.saved {
         item_spec.variation = variation;
     }
-    let lease = if cfg!(feature = "managed-sources") && !common_item(item_spec) {
+    let lease = if !common_item(item_spec) {
         match sources::prepare(2, item_spec.source as u32,
             Holder { category: 2, id: u64::from(pending.body) }) {
             Ok(Some(lease)) => Some(lease),
@@ -154,7 +152,6 @@ pub unsafe fn on_frame(body: *mut app::BattleObjectModuleAccessor) {
                 // than a native load takes. Keep their resources intact and
                 // pause only the loading budget while waiting for capacity.
                 let capacity_wait = sources::waiting_for_capacity(2);
-                #[cfg(feature = "managed-third-source-alpha")]
                 if capacity_wait {
                     pending.capacity_polls = pending.capacity_polls.saturating_add(1);
                     if matches!(pending.capacity_polls, 1 | 901) {
@@ -306,31 +303,12 @@ pub unsafe fn restore(body: *mut app::BattleObjectModuleAccessor, saved: HeldIte
             if ItemModule::is_have_item(body, 0) { ItemModule::remove_item(body, 0); }
         }
         HeldItemSnapshot::Unsupported => notice("This saved item's exact variant is unsupported"),
-        HeldItemSnapshot::Item { choice, variation, lifetime, lifetime_max, fuse, fuse_max } => {
-            if cfg!(feature = "managed-sources") {
-                cancel_pending();
-                requeue(Pending { body: (*body).battle_object_id, choice: usize::from(choice),
-                    saved: Some(saved), age: 0,
-                    #[cfg(feature = "managed-third-source-alpha")]
-                    capacity_polls: 0,
-                });
-                return;
-            }
-            let mut spec = spec(usize::from(choice)).expect("validated saved choice");
-            spec.variation = variation;
-            match grant(body, spec, false) {
-                Ok(item) => {
-                    // A different resource version must not receive incompatible timers.
-                    if WorkModule::get_int(item, *ITEM_INSTANCE_WORK_INT_LIFE_TIME_MAX) == lifetime_max
-                        && WorkModule::get_int(item, *ITEM_INSTANCE_WORK_INT_BOMB_COUNTER_MAX) == fuse_max
-                    {
-                        WorkModule::set_int(item, lifetime, *ITEM_INSTANCE_WORK_INT_LIFE_TIME);
-                        WorkModule::set_int(item, fuse, *ITEM_INSTANCE_WORK_INT_BOMB_COUNTER);
-                        crate::engine::compat::logging::diagnostic(format_args!("[CharacterItem] restored choice={choice} variation={variation} life={lifetime} fuse={fuse}"));
-                    } else { notice("Item restored; its native timer limits changed"); }
-                }
-                Err(reason) => notice(reason),
-            }
+        HeldItemSnapshot::Item { choice, .. } => {
+            cancel_pending();
+            requeue(Pending { body: (*body).battle_object_id, choice: usize::from(choice),
+                saved: Some(saved), age: 0,
+                capacity_polls: 0,
+            });
         }
     }
 }

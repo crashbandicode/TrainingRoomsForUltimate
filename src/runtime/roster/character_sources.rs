@@ -1,18 +1,15 @@
 //! Shared, demand-driven native source ownership for copy abilities and items.
 //! Native entries are borrowed only at their own loader callback. Requests,
 //! leases and epochs contain values; every game accessor is resolved afresh.
-#[cfg(feature = "managed-third-source-alpha")]
 use super::native_source_capacity::managed as capacity;
 use super::{aligned, finish_install, native_source, read, InstallToken};
 use super::{ready_forms, INSTALL};
-#[cfg(feature = "mii-managed-source-coexist-alpha")]
 use super::mii_ordinary_player::native as coexist;
 use crate::engine::swap::source_lifetime::{
     Holder, LeaseToken, LoadToken, NativeEntry, SceneEpoch, SourceBook,
     SourceToken,
 };
 use crate::engine::swap::source_lifetime::{Phase, SourceKey};
-#[cfg(feature = "managed-third-source-alpha")]
 use skyline::hooks::InlineCtx;
 use super::native_service::ServiceEntryContext;
 use smash::app::{self, lua_bind::*, sv_battle_object};
@@ -21,9 +18,7 @@ use std::convert::TryFrom;
 use std::sync::atomic::{AtomicBool, Ordering};
 use hos_lock::Mutex;
 use crate::engine::swap::source_load::{verdict, Unfinished, Verdict};
-#[cfg(any(feature = "managed-third-source-alpha", feature = "mii-managed-source-coexist-alpha"))]
 use crate::engine::swap::source_load::STALL_TICKS;
-#[cfg(feature = "managed-third-source-alpha")]
 use crate::engine::swap::capacity_creation::{self as creation, Refusal, Waiting};
 
 /// The once-per-load reports at the bound (FAIL 2). Native has not completed the load and keeps it
@@ -34,9 +29,8 @@ const STALL_FAILED: &str = "stalled; native completion proven, scene proof faile
 const NATIVE_WITHOUT_RESOURCES: &str = "native completion without usable resources";
 
 // P1 hat, CPU hat, P1 item, then (portrait feature) P1 portrait, CPU portrait.
-const CHANNELS: usize = if cfg!(feature = "mii-hud-portrait-alpha") { 5 } else { 3 };
+const CHANNELS: usize = 5;
 /// Portrait wants carry the loaded configuration and avoid the other owner's bust row.
-#[cfg(feature = "mii-hud-portrait-alpha")]
 pub const PORTRAIT_CHANNELS: [usize; 2] = super::mii_hud_portrait_policy::SOURCE_CHANNELS;
 const LEASES: usize = 64;
 
@@ -46,7 +40,6 @@ struct Want {
     kind: u32,
     configuration:Option<crate::engine::mii::lifetime::Configuration>,
     /// Portrait exclusion mask; zero preserves ordinary hat/item selection.
-    #[cfg(feature = "mii-hud-portrait-alpha")]
     avoid: u8,
 }
 
@@ -60,17 +53,13 @@ struct Source {
     prefetched: bool,
     measurement: Option<crate::engine::preload::preload_metrics::OperationStamp>,
     configuration:Option<crate::engine::mii::lifetime::Configuration>,
-    #[cfg(feature = "mii-managed-source-coexist-alpha")]
     original: Option<coexist::helpers::OriginalRow>,
-    #[cfg(feature="mii-managed-helper-alpha")]
     created_destination: Option<crate::engine::mii::ordinary_cpu::CreatedDestination>,
-    #[cfg(feature="managed-third-source-alpha")]
     created_descriptor: Option<[u8; 0x70]>,
     /// GS-PANIC: committed process charge when the load was admitted; its measured charge is logged at ready.
     memory_committed: Option<u64>,
 }
 
-#[cfg(feature = "managed-third-source-alpha")]
 #[derive(Clone, Copy)]
 struct FirstLoad {
     wanted: Want,
@@ -81,17 +70,12 @@ struct FirstLoad {
 }
 
 /// Event-only evidence; none of these fields participates in admission or release.
-#[cfg(feature = "managed-third-source-alpha")]
 #[derive(Clone, Copy, PartialEq, Eq)]
 struct CleanupObservation {
     retiring: Option<Source>,
-    #[cfg(feature = "managed-grouped-source-alpha")]
     current_actors: Option<capacity::Actors>,
-    #[cfg(feature = "managed-grouped-source-alpha")]
     retiring_actors: Option<capacity::Actors>,
-    #[cfg(feature = "managed-grouped-source-alpha")]
     masks: [(u8, u8); 2], // current/retiring: seen, valid; diagnostic only.
-    #[cfg(feature = "managed-grouped-source-alpha")]
     cleaned: [[Option<capacity::Actor>; 3]; 2],
     last_actor: Option<(Option<SourceToken>, usize)>,
     ready_actors: u32,
@@ -103,18 +87,13 @@ struct CleanupObservation {
     listener_removed: Option<bool>,
 }
 
-#[cfg(feature = "managed-third-source-alpha")]
 impl CleanupObservation {
     const fn new() -> Self {
         Self {
             retiring: None,
-            #[cfg(feature = "managed-grouped-source-alpha")]
             current_actors: None,
-            #[cfg(feature = "managed-grouped-source-alpha")]
             retiring_actors: None,
-            #[cfg(feature = "managed-grouped-source-alpha")]
             masks: [(0, 0); 2],
-            #[cfg(feature = "managed-grouped-source-alpha")]
             cleaned: [[None; 3]; 2],
             last_actor: None,
             ready_actors: 0,
@@ -128,7 +107,6 @@ impl CleanupObservation {
     }
 }
 
-#[cfg(feature = "managed-third-source-alpha")]
 struct Capacity {
     attempted: Option<SceneEpoch>,
     stable: Option<(Want, capacity::Preflight, u16, u8)>,
@@ -139,13 +117,11 @@ struct Capacity {
     /// lobby-preload D: which creation waits were logged in this scene.
     waiting: Waiting<SceneEpoch>,
 }
-#[cfg(feature = "managed-third-source-alpha")]
 impl Capacity {
     const NEW:Self=Self {attempted:None,stable:None,reservation:None,load:None,
         first_load:None,observation:CleanupObservation::new(),
         waiting:Waiting::NEW};
 }
-#[cfg(feature = "managed-third-source-alpha")]
 fn capacity_index(slot:u32)->usize {
     crate::engine::preload::cycle_preload_capacity::capacity_index(slot as usize)
         .expect("capacity access requires a validated extra slot")
@@ -158,7 +134,6 @@ enum Consumer {
     Hat { body: u32, kind: u32, slot: u32 },
     Item { body: u32, kind: i32 },
     /// Held only while a portrait render is queued. Scene departure and `release` end it.
-    #[cfg(feature = "mii-hud-portrait-alpha")]
     Portrait,
 }
 
@@ -180,15 +155,12 @@ struct State {
     preload_failed: u128,
     preload_settled: bool,
     preload_limit: u8,
-    #[cfg(feature="mii-managed-helper-alpha")]
     refusals: [Option<(Want, &'static str)>; CHANNELS],
     leases: [Option<LiveLease>; LEASES],
     failed: u128,
-    #[cfg(feature = "managed-third-source-alpha")]
     capacities: [Capacity; crate::engine::preload::cycle_preload_capacity::ALL_EXTRA_SLOTS.len()],
     /// lobby-preload D: a creation preflight refusal standing in this scene and the refused
     /// extra's position in the creation order. Only the readiness line reads it.
-    #[cfg(feature = "managed-third-source-alpha")]
     creation_hold: Option<(SceneEpoch, u8)>,
 }
 
@@ -201,19 +173,15 @@ static STATE: Mutex<State> = Mutex::new(State {
     preload_failed: 0,
     preload_settled: false,
     preload_limit: 0,
-    #[cfg(feature="mii-managed-helper-alpha")]
     refusals: [None; CHANNELS],
     leases: [None; LEASES],
     failed: 0,
-    #[cfg(feature = "managed-third-source-alpha")]
     capacities: [const { Capacity::NEW }; crate::engine::preload::cycle_preload_capacity::ALL_EXTRA_SLOTS.len()],
-    #[cfg(feature = "managed-third-source-alpha")]
     creation_hold: None,
 });
 /// P-HOT §3.5.1 (operator decisions "B" and "1"): entry 3 borrowed by the fifth Kirby hat while one CPU is visible.
 /// F9 reads `current()` (a borrowed entry 3 holds no CPU rotation fighter) and ends the borrow with
 /// `release(Release::Retired | Release::Promoted)`; a new scene ends it too. Lock order: STATE, then ENTRY3_BORROW.
-#[cfg(feature = "managed-third-source-alpha")]
 pub(crate) static ENTRY3_BORROW: Mutex<crate::engine::preload::hat_slots::BorrowBook<u32, SceneEpoch>> =
     Mutex::new(crate::engine::preload::hat_slots::BorrowBook::new());
 static HAS_CONSUMERS: AtomicBool = AtomicBool::new(false);
@@ -273,7 +241,6 @@ fn memory_refused(slot: u32, kind: u32, decision: crate::engine::swap::body_bank
 
 /// PAUSE-HELPER (`model::pause_helper`): capacity slots retired at a pause-open and waiting to be created again.
 /// Lock order: STATE, then PAUSE.
-#[cfg(feature = "managed-third-source-alpha")]
 static PAUSE: Mutex<crate::model::pause_helper::Ledger<{ crate::engine::preload::cycle_preload_capacity::ALL_EXTRA_SLOTS.len() }>> =
     Mutex::new(crate::model::pause_helper::Ledger::new());
 
@@ -281,7 +248,6 @@ static PAUSE: Mutex<crate::model::pause_helper::Ledger<{ crate::engine::preload:
 /// this plugin created that the walk would reach with no actor is retired first, through the native single-slot
 /// retire; any other actorless entry it walks is reported (the plugin does not own it). No plugin lock is held across
 /// the native retire (its destructor callback takes them).
-#[cfg(feature = "managed-third-source-alpha")]
 pub(super) unsafe fn pause_opening() {
     use super::native_source_capacity::{entry_at, entry_facts, retire_at};
     let mut exposed = 0u8;
@@ -315,7 +281,6 @@ pub(super) unsafe fn pause_opening() {
 }
 
 /// A retire this ledger began has both native completions: the slot may be created again in this scene.
-#[cfg(feature = "managed-third-source-alpha")]
 fn pause_retire_completed(state: &mut State, index: usize, complete: bool, path: &str) {
     if complete {
         state.capacities[index].attempted = None;
@@ -335,7 +300,6 @@ pub(crate) fn preload_epoch()->SceneEpoch {STATE.lock().book.epoch()}
 /// The helper load holding INSTALL now, for a queued visible request's waiting line (FAIL 2):
 /// (slot, kind, loader callbacks, speculative). None: a visible transaction or a capacity
 /// creation holds it, or nothing does. Values only.
-#[cfg(feature = "mii-ordinary-cpu-alpha")]
 pub(crate) fn install_holder() -> Option<(u32, u32, u16, bool)> {
     let state = STATE.lock();
     state.sources.iter().flatten().find(|source| source.install.is_some())
@@ -345,7 +309,6 @@ pub(crate) fn install_holder() -> Option<(u32, u32, u16, bool)> {
 /// Current retained helper generations consume warm capacity even when leased
 /// or finishing a load. Do not admit a body bank by counting only idle Ready
 /// speculative sources; that would undercount a hat/portrait consumer.
-#[cfg(feature = "native-body-bank-alpha")]
 pub(super) fn warm_occupancy() -> usize {
     let state = STATE.lock();
     state.sources.iter().flatten()
@@ -408,7 +371,6 @@ pub(crate) fn preload_readiness(blocked:bool,
 /// targets `purpose_view` gives them (an armed Reload, else the parked member) against the current Ready source on
 /// each entry, and a standing memory refusal (`f9_gate::seat_held`). A live seat, an entry without a member and every
 /// other scene are `None`. Lock order as `purpose_view`: STATE, then the borrow record and the F9 gate.
-#[cfg(feature="managed-third-source-alpha")]
 pub(crate) unsafe fn seat_states()->[Option<crate::model::parked_entries::SeatState>;2] {
     if !crate::runtime::compat::common::is_native_training_mode() {return [None;2];}
     let quantity=native_source::training_cpu_quantity();
@@ -429,7 +391,6 @@ pub(crate) unsafe fn seat_states()->[Option<crate::model::parked_entries::SeatSt
 /// scene holds (`limited`) instead of reporting `Loading` for the whole visit. Planning, metrics
 /// and creation keep `preload_limit`.
 fn shown_limit(state:&State)->u8 {
-    #[cfg(feature="managed-third-source-alpha")]
     if let Some((_,position))=state.creation_hold.filter(|(epoch,_)|state.book.is_current(*epoch)) {
         return creation::held_limit(usize::from(state.preload_limit),
             crate::engine::preload::cycle_preload_capacity::BASE_HELPERS,Some(usize::from(position))) as u8;
@@ -439,7 +400,6 @@ fn shown_limit(state:&State)->u8 {
 
 pub(crate) unsafe fn preload_hat_target(role:usize,kind:u32)->Option<crate::runtime::roster::cycle_preload::Target> {
     if !(0x48..=0x4a).contains(&kind) {return Some(crate::runtime::roster::cycle_preload::Target::fighter(kind));}
-    #[cfg(feature="mii-managed-helper-alpha")]
     if super::mii_managed_helper::admission_ready(true) {
         return super::mii_managed_helper::configuration(role,kind).ok()
             .map(|configuration|crate::runtime::roster::cycle_preload::Target {kind,configuration:Some(configuration)});
@@ -451,15 +411,12 @@ pub(crate) unsafe fn preload_hat_target(role:usize,kind:u32)->Option<crate::runt
 unsafe fn helper_target(target: crate::runtime::roster::cycle_preload::Target)
     -> Option<crate::runtime::roster::cycle_preload::Target> {
     crate::engine::swap::trio::TrioFighter::from_kind(target.kind)?;
-    #[cfg(feature="mii-managed-helper-alpha")]
     let target=if (0x48..=0x4a).contains(&target.kind) {
         if !super::mii_managed_helper::admission_ready(true) {return None;}
         let hats=super::mii_ordinary_cpu::helper_origin_hats()?;
         crate::runtime::roster::cycle_preload::Target {configuration:Some(
             crate::engine::mii::ordinary_cpu::helper_configuration(target.configuration?,hats).ok()?),..target}
     }else{target};
-    #[cfg(not(feature="mii-managed-helper-alpha"))]
-    if (0x48..=0x4a).contains(&target.kind) {return None;}
     Some(target)
 }
 
@@ -476,10 +433,9 @@ pub(crate) unsafe fn set_preload_plan(epoch:SceneEpoch,targets:[Option<crate::ru
     if !state.book.is_current(epoch) {return;}
     let plan=targets.map(|t|t.filter(|t|(state.preload_failed|state.failed) & (1u128<<t.kind)==0)
         .map(|t|Want {epoch:state.book.epoch(),kind:t.kind,configuration:t.configuration,
-            #[cfg(feature="mii-hud-portrait-alpha")] avoid:0}));
+            avoid:0}));
     if plan!=state.preload {state.preload_settled=false;state.preload=plan;}
     state.preload_purpose=purposes;
-    #[cfg(feature = "managed-third-source-alpha")]
     ENTRY3_BORROW.lock().departed(state.book.epoch());
 }
 
@@ -503,15 +459,9 @@ fn want_exact(want:Want)->bool {
 /// Demand precedes speculative preload on the ordinary helper pair. Created
 /// capacity stays ordinary-only in RC; exact saved Miis retain native helper slots.
 fn selected_request(state:&State,slot:u32,menu_open:bool)->Option<(Want,bool)> {
-    #[cfg(feature="managed-third-source-alpha")]
     let extra_owned=reservation_for(state,slot).is_some();
-    #[cfg(not(feature="managed-third-source-alpha"))]
-    let extra_owned=false;
-    #[cfg(feature="managed-third-source-alpha")]
     let exact_supported=!extra_owned || reservation_for(state,slot)
         .is_some_and(|owner|created_exact_supported(owner.backend()));
-    #[cfg(not(feature="managed-third-source-alpha"))]
-    let exact_supported=true;
     let supported=|want:Want| exact_supported || !want_exact(want);
     if let Some(want)=pending_request_for(state,Some(slot),menu_open).filter(|want|supported(*want)) {
         return Some((want,false));
@@ -523,16 +473,12 @@ fn selected_request(state:&State,slot:u32,menu_open:bool)->Option<(Want,bool)> {
     let sources=std::array::from_fn(|i|state.sources[i].filter(|s|state.book.is_current(s.token.epoch())
         && state.book.phase(s.token.slot())!=Ok(Phase::Failed)).map(|s|Want {
             epoch:s.token.epoch(),kind:s.kind,configuration:s.configuration,
-            #[cfg(feature="mii-hud-portrait-alpha")] avoid:0}));
+            avoid:0}));
     let targets:[Option<Want>;crate::runtime::roster::cycle_preload::MAX_TARGETS]=std::array::from_fn(|i|state.preload[i].filter(|w|i<usize::from(settings.slots)
         && (state.preload_failed|state.failed)&(1u128<<w.kind)==0));
     // P-HOT (LANE-HOT-SLOTS-REPORT.md §5.1, §3.5.1): Training's helper entries by purpose.
-    #[cfg(feature="managed-third-source-alpha")]
     let targets=purpose_view(state,slot as usize,targets);
-    #[cfg(feature="managed-third-source-alpha")]
     let seat=parked_seat_view(state,slot,&targets);
-    #[cfg(not(feature="managed-third-source-alpha"))]
-    let seat=false;
     // Scheduling grants no native admission; the created destination must still
     // pass its full registration, protected-record and source-lifetime checks.
     let targets=crate::engine::preload::cycle_preload_policy::schedulable(targets,exact_supported,want_exact);
@@ -548,7 +494,6 @@ fn selected_request(state:&State,slot:u32,menu_open:bool)->Option<(Want,bool)> {
 /// else the parked member, in `purpose_view`'s order; `seat_states` counts the parked one). That seat is judged on its own entry
 /// (`cycle_preload_policy::seat_missing`): its member on the other seat's entry doesn't count for it. Lock order as
 /// `purpose_view`: STATE (held by the caller), then the borrow record and the F9 gate.
-#[cfg(feature="managed-third-source-alpha")]
 fn parked_seat_view(state:&State,slot:u32,view:&[Option<Want>;crate::runtime::roster::cycle_preload::MAX_TARGETS])->bool {
     if !matches!(slot,2|3) || !unsafe{crate::runtime::compat::common::is_native_training_mode()} {return false;}
     let mut wants=view.iter().flatten();
@@ -566,7 +511,6 @@ fn parked_seat_view(state:&State,slot:u32,view:&[Option<Want>;crate::runtime::ro
 /// take hat-only targets first, entry 2 fighter targets only, entry 3 fighter targets and the fifth hat only through
 /// the borrow (§3.5.1 rule 1). While entry 3 is borrowed it keeps the borrowed hat and nothing else, even when the plan
 /// no longer wants it (rule 2: F9 ends a borrow, P-HOT never replaces it). The waiting rooms keep the one plan order.
-#[cfg(feature="managed-third-source-alpha")]
 fn purpose_view(state:&State,slot:usize,targets:[Option<Want>;crate::runtime::roster::cycle_preload::MAX_TARGETS])
     ->[Option<Want>;crate::runtime::roster::cycle_preload::MAX_TARGETS] {
     use crate::engine::preload::hat_slots::{borrow_admitted,slot_view,Purpose,SlotFacts,BORROW_ENTRY};
@@ -586,7 +530,6 @@ fn purpose_view(state:&State,slot:usize,targets:[Option<Want>;crate::runtime::ro
                 epoch: state.book.epoch(),
                 kind,
                 configuration,
-                #[cfg(feature = "mii-hud-portrait-alpha")]
                 avoid: 0,
             });
             let mut only = [None; crate::runtime::roster::cycle_preload::MAX_TARGETS];
@@ -605,7 +548,6 @@ fn purpose_view(state:&State,slot:usize,targets:[Option<Want>;crate::runtime::ro
                 epoch: state.book.epoch(),
                 kind,
                 configuration,
-                #[cfg(feature = "mii-hud-portrait-alpha")]
                 avoid: 0,
             });
             let mut only = [None; crate::runtime::roster::cycle_preload::MAX_TARGETS];
@@ -628,36 +570,26 @@ fn purpose_view(state:&State,slot:usize,targets:[Option<Want>;crate::runtime::ro
 }
 
 /// A HUD portrait job wants a helper (its channel's request) or holds one until its render is done (its lease).
-#[cfg(feature = "managed-third-source-alpha")]
 fn portrait_waits(state: &State) -> bool {
-    #[cfg(feature = "mii-hud-portrait-alpha")]
     {
         PORTRAIT_CHANNELS.iter().any(|channel| state.wants[*channel].is_some())
             || state.leases.iter().flatten().any(|live| matches!(live.consumer, Consumer::Portrait))
     }
-    #[cfg(not(feature = "mii-hud-portrait-alpha"))]
-    {
-        let _ = state;
-        false
-    }
 }
 
 /// The plan targets a helper request reads (`selected_request`'s filter: the Cycle Preload cap, no failed kind).
-#[cfg(feature="managed-third-source-alpha")]
 fn plan_targets(state:&State)->[Option<Want>;crate::runtime::roster::cycle_preload::MAX_TARGETS] {
     let slots=usize::from(crate::runtime::roster::cycle_preload_config::snapshot().slots);
     std::array::from_fn(|i|state.preload[i].filter(|w|i<slots && (state.preload_failed|state.failed)&(1u128<<w.kind)==0))
 }
 
 /// What the existing helper or created entry `slot` may load of the plan: its purpose view.
-#[cfg(feature="managed-third-source-alpha")]
 fn helper_view(state:&State,slot:u32)->[Option<Want>;crate::runtime::roster::cycle_preload::MAX_TARGETS] {
     purpose_view(state,slot as usize,plan_targets(state))
 }
 
 /// The created entries this scene's plan may use (`hat_slots::created_allowance`), counted by the plan's purposes; a
 /// creation the preflight refused ends it at that entry while the hold stands (`creation_hold`).
-#[cfg(feature="managed-third-source-alpha")]
 fn created_allowance(state:&State,backend:Backend)->usize {
     use crate::engine::preload::hat_slots::Purpose;
     let helpers=backend.helpers();
@@ -672,7 +604,6 @@ fn created_allowance(state:&State,backend:Backend)->usize {
 }
 
 /// P-HOT §3.5.1 rule 2: a speculative hat-only load admitted on Training's entry 3 publishes the borrow record.
-#[cfg(feature="managed-third-source-alpha")]
 fn publish_borrow(state:&State,slot:u32,wanted:Want,speculative:bool) {
     use crate::engine::preload::hat_slots::{Purpose,BORROW_ENTRY};
     if !speculative || slot as usize!=BORROW_ENTRY || !unsafe{crate::runtime::compat::common::is_native_training_mode()} {return;}
@@ -701,9 +632,8 @@ use crate::engine::mii::backend::Layout as Backend;
 
 unsafe fn callback_slot(entry: *const u8, slot: u32) -> bool {
     use crate::engine::preload::cycle_preload_capacity::source_callback;
-    let third = cfg!(feature = "managed-third-source-alpha");
+    let third = true;
     if slot != 4 { return source_callback(slot, third, None, None); }
-    #[cfg(all(feature="managed-third-source-alpha", feature="cycle-preload-extended"))]
     {
         use crate::engine::preload::cycle_preload_capacity::CallbackIdentity;
         let backend = qualified_backend().ok();
@@ -716,14 +646,12 @@ unsafe fn callback_slot(entry: *const u8, slot: u32) -> bool {
         });
         source_callback(slot, third, current, registered)
     }
-    #[cfg(not(all(feature="managed-third-source-alpha", feature="cycle-preload-extended")))]
-    { let _ = entry; false }
 }
 
 fn candidates(backend: Backend) -> [u32; crate::engine::preload::cycle_preload_capacity::SOURCE_SLOTS] {
     crate::engine::preload::cycle_preload_capacity::slots_with_waiting(backend,
-        cfg!(feature="managed-third-source-alpha"),cfg!(feature="managed-ldn-third-source-alpha"),
-        cfg!(feature="cycle-preload-extended"),cfg!(feature="lobby-preload-extended"))
+        true,true,
+        true,true)
 }
 
 /// The plan arrives budgeted (`hat_slots::budgeted`: fighter look-ahead within `helper_budget`, hats within Ready
@@ -733,8 +661,8 @@ fn preload_limit(backend: Backend) -> usize {
     let slots = crate::runtime::roster::cycle_preload_config::snapshot().slots;
     crate::engine::preload::cycle_preload_capacity::target_count_with_waiting(
         slots, backend,
-        cfg!(feature="managed-third-source-alpha"),cfg!(feature="managed-ldn-third-source-alpha"),
-        cfg!(feature="cycle-preload-extended"),cfg!(feature="lobby-preload-extended"))
+        true,true,
+        true,true)
 }
 
 /// Called on the visible practice frame's sparse planning boundary, before its
@@ -747,22 +675,18 @@ pub(crate) unsafe fn refresh_preload_capacity() -> u8 {
 
 /// Scene-specific created capacity. Quickplay and the additional waiting seats
 /// require the lobby candidate; every use still checks the retained native owner.
-#[cfg(feature = "managed-third-source-alpha")]
 fn third_source_backend(backend: Backend) -> bool {
     backend == Backend::Training
-        || (backend == Backend::Ldn && cfg!(feature = "managed-ldn-third-source-alpha"))
-        || (backend == Backend::Quickplay && cfg!(feature = "lobby-preload-extended"))
+        || (backend == Backend::Ldn)
+        || (backend == Backend::Quickplay)
 }
 
-#[cfg(feature="managed-third-source-alpha")]
 fn created_exact_supported(_backend:Backend)->bool {
     crate::engine::preload::cycle_preload_policy::created_mii_sources()
 }
 
-#[cfg(feature = "managed-third-source-alpha")]
 fn reservation(state: &State) -> Option<capacity::Reservation> {reservation_for(state,7)}
 
-#[cfg(feature = "managed-third-source-alpha")]
 fn reservation_for(state:&State,slot:u32)->Option<capacity::Reservation> {
     let index=crate::engine::preload::cycle_preload_capacity::capacity_index(slot as usize)?;
     state.capacities[index].reservation
@@ -773,8 +697,7 @@ fn reservation_for(state:&State,slot:u32)->Option<capacity::Reservation> {
 /// Waiting's native helpers 5/6 are not created capacity. Only an exact retained
 /// reservation identifies a created entry, including during departure.
 fn is_capacity_entry(entry:*const u8,slot:u32)->bool {
-    if slot==7 {return cfg!(feature="managed-third-source-alpha");}
-    #[cfg(feature="cycle-preload-extended")]
+    if slot==7 {return true;}
     if let Some(index)=crate::engine::preload::cycle_preload_capacity::capacity_index(slot as usize) {
         return STATE.lock().capacities[index].reservation
             .is_some_and(|(_,value)|value.entry==entry as usize);
@@ -785,13 +708,11 @@ fn is_capacity_entry(entry:*const u8,slot:u32)->bool {
 
 
 unsafe fn usable(entry: *const u8, slot: u32, kind: u32, backend: Backend) -> bool {
-    #[cfg(feature = "managed-third-source-alpha")]
     if is_capacity_entry(entry,slot) {
         let (current, source) = {
             let state=STATE.lock();
             (reservation_for(&state,slot),state.sources[slot as usize])
         };
-        #[cfg(feature="mii-managed-helper-alpha")]
         if let Some(source)=source.filter(|source|source.created_destination.is_some()) {
             let Some(configuration)=source.configuration else {return false;};
             let ready={
@@ -805,8 +726,6 @@ unsafe fn usable(entry: *const u8, slot: u32, kind: u32, backend: Backend) -> bo
             return backend==Backend::Training && source.kind==kind
                 && current.is_some_and(|owner|capacity::ready_created(owner,entry,kind,receipt.destination));
         }
-        #[cfg(not(feature="mii-managed-helper-alpha"))]
-        let _=source;
         return third_source_backend(backend)
             && current.is_some_and(|value| capacity::ready(value, entry, kind));
     }
@@ -820,15 +739,12 @@ unsafe fn usable(entry: *const u8, slot: u32, kind: u32, backend: Backend) -> bo
 /// managed helper backend.
 unsafe fn waiting_layout(entry: *const u8, slot: u32, backend: Backend) -> bool {
     if native_source::exact_waiting_layout(entry, slot) { return true; }
-    #[cfg(feature = "managed-ldn-third-source-alpha")]
-    if backend == Backend::Ldn || (backend == Backend::Quickplay && cfg!(feature="lobby-preload-extended")) {
+    if backend == Backend::Ldn || (backend == Backend::Quickplay) {
         let owner = reservation(&STATE.lock());
         if owner.is_some_and(|owner| capacity::owned_ldn_helper(owner, entry, slot)) {
             return true;
         }
     }
-    #[cfg(not(feature = "managed-ldn-third-source-alpha"))]
-    let _ = backend;
     false
 }
 
@@ -847,7 +763,7 @@ fn waiting_backend() -> Option<Backend> {
 unsafe fn qualified_backend() -> Result<Backend, &'static str> {
     let training_closed = crate::runtime::compat::common::is_native_training_mode()
         && !crate::model::parked_entries::training_quantity_open(native_source::training_cpu_quantity());
-    if !cfg!(feature = "managed-sources") || training_closed {
+    if training_closed {
         return Err("Character resource loading is not available in this scene yet");
     }
     if crate::runtime::compat::common::is_native_training_mode() {
@@ -863,7 +779,6 @@ pub unsafe fn prepare(
     kind: u32,
     holder: Holder,
 ) -> Result<Option<Lease>, &'static str> {
-    #[cfg(feature = "mii-hud-portrait-alpha")]
     if PORTRAIT_CHANNELS.contains(&channel) {
         return Err("Portrait channels require prepare_portrait");
     }
@@ -872,7 +787,6 @@ pub unsafe fn prepare(
 
 /// Exclusive portrait lease. The configuration is the one the visible owner loaded.
 /// Nothing here resolves a different saved identity to fit a helper.
-#[cfg(feature = "mii-hud-portrait-alpha")]
 pub unsafe fn prepare_portrait(
     channel: usize,
     kind: u32,
@@ -896,21 +810,17 @@ unsafe fn prepare_with(
     exact: Option<crate::engine::mii::lifetime::Configuration>,
     avoid: u8,
 ) -> Result<Option<Lease>, &'static str> {
-    #[cfg(not(feature = "mii-hud-portrait-alpha"))]
-    let _ = (exact, avoid);
     if channel >= CHANNELS {
         return Err("Invalid source request");
     }
     let Some(kind_bit) = 1u128
         .checked_shl(kind)
-        .filter(|_| (!(0x48..=0x4a).contains(&kind) || cfg!(feature="mii-managed-helper-alpha"))
-            && crate::engine::swap::trio::TrioFighter::from_kind(kind).is_some())
+        .filter(|_| crate::engine::swap::trio::TrioFighter::from_kind(kind).is_some())
     else {
         return Err("This character's resources are unsupported");
     };
     // Unqualified scenes leave requests, channels and counters untouched.
     let backend = qualified_backend()?;
-    #[cfg(feature="mii-managed-helper-alpha")]
     {
         // A consumer polls prepare until success/error. Deliver its exact
         // request's refusal before it can resolve/requeue or read native rows.
@@ -920,13 +830,9 @@ unsafe fn prepare_with(
             return Err(refusal.1);
         }
     }
-    #[cfg(not(feature="mii-managed-helper-alpha"))]
-    let configuration=None;
-    #[cfg(feature="mii-managed-helper-alpha")]
     let configuration=if (0x48..=0x4a).contains(&kind) {
         if channel == 2 {return Err("Mii helpers are limited to copy hats");}
         let queued={
-            #[cfg(feature = "mii-hud-portrait-alpha")]
             if let Some(c) = exact {
                 if !super::mii_managed_helper::admission_ready(true) {
                     return Ok(None);
@@ -935,12 +841,6 @@ unsafe fn prepare_with(
                     .ok_or("Captured helper hat tokens are unavailable")?;
                 Some(crate::engine::mii::ordinary_cpu::helper_configuration(c, hats)?)
             } else {
-                let state=STATE.lock();
-                state.wants[channel]
-                    .filter(|w|w.kind==kind&&state.book.is_current(w.epoch)).and_then(|w|w.configuration)
-            }
-            #[cfg(not(feature = "mii-hud-portrait-alpha"))]
-            {
                 let state=STATE.lock();
                 state.wants[channel]
                     .filter(|w|w.kind==kind&&state.book.is_current(w.epoch)).and_then(|w|w.configuration)
@@ -970,10 +870,8 @@ unsafe fn prepare_with(
         let wanted = Want {
             epoch: state.book.epoch(),
             kind,configuration,
-            #[cfg(feature = "mii-hud-portrait-alpha")]
             avoid,
         };
-        #[cfg(feature="mii-managed-helper-alpha")]
         { state.refusals[channel] = None; }
         state.wants[channel] = Some(wanted);
         wanted
@@ -989,7 +887,6 @@ unsafe fn prepare_with(
                 || state.sources[helper].is_none_or(|s|s.configuration!=wanted.configuration) {
                 continue;
             }
-            #[cfg(feature = "mii-hud-portrait-alpha")]
             {
                 // A portrait never shares any live lease. Hats and items skip a helper
                 // only while its portrait render is still the consumer.
@@ -1012,7 +909,6 @@ unsafe fn prepare_with(
         {
             continue;
         }
-        #[cfg(feature="mii-managed-helper-alpha")]
         if let Some(c)=wanted.configuration {
             if !super::mii_managed_helper::ready(ready,c) {continue;}
         }
@@ -1051,12 +947,6 @@ unsafe fn prepare_with(
 /// every created source in the selected capacity backend. Loading, native busy,
 /// failed/unknown ownership and mere queued wants retain the normal timeout.
 pub fn waiting_for_capacity(channel: usize) -> bool {
-    #[cfg(not(feature = "managed-third-source-alpha"))]
-    {
-        let _ = channel;
-        false
-    }
-    #[cfg(feature = "managed-third-source-alpha")]
     unsafe {
         if channel >= CHANNELS || admission_blocked() { return false; }
         let Ok(backend) = qualified_backend() else { return false; };
@@ -1126,11 +1016,9 @@ pub fn cancel(channel: usize) {
     if let Some(want) = state.wants.get_mut(channel) {
         *want = None;
     }
-    #[cfg(feature="mii-managed-helper-alpha")]
     if let Some(refusal) = state.refusals.get_mut(channel) {
         *refusal = None;
     }
-    #[cfg(feature = "managed-third-source-alpha")]
     {
         for capacity in &mut state.capacities {capacity.stable=None;capacity.first_load=None;}
     }
@@ -1162,7 +1050,7 @@ pub fn retain_hat(lease: Lease, body: u32) {
 /// Value receipt for the body-bank departure gate: a Kirby with such a lease is
 /// not parked, because a parked copy source lease is unqualified. Takes the
 /// source lock briefly; never call while holding the bank lock.
-#[cfg(feature = "native-body-bank-alpha")] // Its only caller is the body bank.
+// Its only caller is the body bank.
 pub fn hat_lease_on_body(body: u32) -> bool {
     STATE.lock().leases.iter().flatten()
         .any(|live| matches!(live.consumer, Consumer::Hat { body: id, .. } if id == body))
@@ -1173,19 +1061,16 @@ pub fn retain_item(lease: Lease, body: u32, kind: i32) {
 }
 
 /// The portrait lease stays live until the adapter releases it or the scene departs.
-#[cfg(feature = "mii-hud-portrait-alpha")]
 pub fn retain_portrait(lease: Lease) {
     retain(lease, Consumer::Portrait);
 }
 
-#[cfg(feature = "mii-hud-portrait-alpha")]
 pub fn portrait_lease_valid(lease: Lease, holder: Holder) -> bool {
     let state = STATE.lock();
     state.book.validate_lease(lease.token, holder)
         && state.leases.iter().flatten().any(|live| live.token == lease.token)
 }
 
-#[cfg(feature = "mii-hud-portrait-alpha")]
 pub fn portrait_ready(lease: Lease, holder: Holder) -> Option<crate::engine::swap::source_lifetime::ReadyToken> {
     let state = STATE.lock();
     state.book.leased_ready(lease.token, holder)
@@ -1194,7 +1079,6 @@ pub fn portrait_ready(lease: Lease, holder: Holder) -> Option<crate::engine::swa
 /// Renderer-specific parked admission. Created destinations require their
 /// sealed exact-Mii capability and the full current source proof; being an
 /// allocated slot alone never widens the ordinary helper predicate.
-#[cfg(feature="mii-hud-portrait-alpha")]
 pub(super) unsafe fn portrait_render_ready(entry: *const u8, lease: Lease, holder: Holder) -> bool {
     let source = {
         let state = STATE.lock();
@@ -1205,7 +1089,6 @@ pub(super) unsafe fn portrait_render_ready(entry: *const u8, lease: Lease, holde
         source
     };
     if source.token.entry() != NativeEntry(entry as u64) { return false; }
-    #[cfg(feature="mii-managed-helper-alpha")]
     if let Some(destination) = source.created_destination {
         let Some(configuration) = source.configuration else { return false; };
         let Some(ready) = portrait_ready(lease, holder) else { return false; };
@@ -1352,7 +1235,6 @@ unsafe fn consumer_alive(consumer: Consumer, hats: &mut [HatObservation; 2]) -> 
     let (id, category) = match consumer {
         Consumer::Reserved => return true,
         // Released by the portrait adapter after the queue drains, or by scene departure.
-        #[cfg(feature = "mii-hud-portrait-alpha")]
         Consumer::Portrait => return true,
         Consumer::Hat { body, .. } => (body, *BATTLE_OBJECT_CATEGORY_FIGHTER),
         Consumer::Item { body, .. } => (body, *BATTLE_OBJECT_CATEGORY_ITEM),
@@ -1362,7 +1244,6 @@ unsafe fn consumer_alive(consumer: Consumer, hats: &mut [HatObservation; 2]) -> 
     if body.is_null() || app::utility::get_category(&mut *body) != category { return false; }
     match consumer {
         Consumer::Reserved => true,
-        #[cfg(feature = "mii-hud-portrait-alpha")]
         Consumer::Portrait => true,
         Consumer::Item { kind, .. } => app::utility::get_kind(&mut *body) == kind,
         Consumer::Hat { kind, slot, .. } => {
@@ -1402,7 +1283,6 @@ unsafe fn f9_publish(decision: crate::model::parked_entries::Decision) {
             super::refresh_hud(entry, publish.owner, publish.kind);
         }
     }
-    #[cfg(feature = "managed-third-source-alpha")]
     if let Some(how) = decision.release_now {
         let _ = ENTRY3_BORROW.lock().release(f9_hat_release(how));
     }
@@ -1465,10 +1345,7 @@ unsafe fn f9_note() {
         [Some(entry2), Some(entry3)] => Some(crate::model::parked_entries::Seats { entry2, entry3 }),
         _ => None,
     };
-    #[cfg(feature = "managed-third-source-alpha")]
     let borrowed_kind = ENTRY3_BORROW.lock().current().map(|borrow| borrow.kind);
-    #[cfg(not(feature = "managed-third-source-alpha"))]
-    let borrowed_kind = None;
     let kirby_has_copy = crate::runtime::compat::common::try_get_module_accessor(
         crate::runtime::compat::common::consts::FighterId::Player,
     )
@@ -1522,7 +1399,6 @@ unsafe fn f9_player_frame() {
         crate::runtime::roster::f9_gate::Step::Activate => f9_publish(crate::runtime::roster::f9_gate::decision()),
         crate::runtime::roster::f9_gate::Step::Reload => {
             for after in crate::runtime::roster::f9_gate::armed().into_iter().flatten() {
-                #[cfg(feature = "managed-third-source-alpha")]
                 if let Some(how) = after.release {
                     let _ = ENTRY3_BORROW.lock().release(f9_hat_release(how));
                 }
@@ -1530,7 +1406,6 @@ unsafe fn f9_player_frame() {
             }
         }
     }
-    #[cfg(feature = "mii-managed-helper-alpha")]
     if !pause {
         f9_reproof();
     }
@@ -1540,7 +1415,6 @@ unsafe fn f9_player_frame() {
 /// identity but not its Mii record bytes, and the Mii owners refuse every snapshot until its Mii proof is taken again.
 /// Once a promoted seat is parked (its entry above No. of CPUs) and parked ready, re-record it. A seat with no exact
 /// Mii keeps its proof (its helper proof matched in covrest-11).
-#[cfg(feature = "mii-managed-helper-alpha")]
 unsafe fn f9_reproof() {
     let quantity = native_source::training_cpu_quantity();
     for slot in [2u32, 3] {
@@ -1608,27 +1482,22 @@ pub unsafe fn on_frame(body: *mut app::BattleObjectModuleAccessor) {
 
 pub fn scene_changed() {
     crate::runtime::roster::f9_gate::reset();
-    #[cfg(feature="mii-managed-helper-alpha")]
     super::mii_managed_helper::depart();
     // LOG-REFUSED: refusal lines are bounded per scene.
     *MEMORY_REFUSED.lock() = [[0; 4]; 8];
-    #[cfg(feature = "managed-third-source-alpha")]
     {
         *PAUSE.lock() = crate::model::pause_helper::Ledger::new();
     }
     let mut state = STATE.lock();
-    #[cfg(feature = "mii-managed-source-coexist-alpha")]
     let mut registry = coexist::registry();
     state.wants = [None; CHANNELS];
     state.preload = [None; crate::runtime::roster::cycle_preload::MAX_TARGETS];
     state.preload_failed = 0;
     state.preload_settled = false;
     state.preload_limit = 0;
-    #[cfg(feature="mii-managed-helper-alpha")]
     { state.refusals = [None; CHANNELS]; }
     state.leases = [None; LEASES];
     state.failed = 0;
-    #[cfg(feature = "managed-third-source-alpha")]
     {
         for capacity in &mut state.capacities {capacity.stable=None;capacity.attempted=None;capacity.first_load=None;}
         // Keep the old reservation until both actual native boundaries arrive.
@@ -1638,7 +1507,6 @@ pub fn scene_changed() {
         .book
         .depart_scene()
         .expect("native scene epoch exhausted");
-    #[cfg(feature = "mii-managed-source-coexist-alpha")]
     {
         for slot in 0..state.sources.len() {
             let helper = state.sources[slot].map_or(coexist::helpers::Helper::Unmanaged,
@@ -1673,7 +1541,6 @@ unsafe fn service_owned(_ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) -
         }
         (source, !state.book.is_current(source.token.epoch()))
     };
-    #[cfg(feature="mii-managed-helper-alpha")]
     if original.configuration.is_some()
         && super::mii_managed_helper::retained_terminal(original.token) {
         return true;
@@ -1681,15 +1548,11 @@ unsafe fn service_owned(_ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) -
     let mut source = original;
     source.ticks = source.ticks.saturating_add(1);
     if let Some(stamp)=source.measurement.as_mut() {stamp.frame(false);}
-    #[cfg(feature="mii-managed-helper-alpha")]
     let native_done = match source.created_destination {
         Some(destination) => native_source::parked_created_ready(entry, slot, source.kind, destination),
         None => native_source::parked_ready(entry, slot, source.kind),
     };
-    #[cfg(not(feature="mii-managed-helper-alpha"))]
-    let native_done = native_source::parked_ready(entry, slot, source.kind);
     let native_ready = || native_source::ready(entry, slot, source.kind);
-    #[cfg(feature = "managed-third-source-alpha")]
     let capacity_observation = if is_capacity {
         let state = STATE.lock();
         (
@@ -1703,7 +1566,6 @@ unsafe fn service_owned(_ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) -
     } else {
         (None, None)
     };
-    #[cfg(feature = "managed-third-source-alpha")]
     let complete = if is_capacity {
         // Scene departure never releases a pending created-entry load: full
         // acceptance or its actual destructor does. A load native has completed
@@ -1714,7 +1576,6 @@ unsafe fn service_owned(_ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) -
                 .0
                 .zip(capacity_observation.1)
                 .is_some_and(|(owner, before)| {
-                        #[cfg(feature="mii-managed-helper-alpha")]
                         if let Some(destination) = source.created_destination {
                             return capacity::loaded_created(_ctx, entry, owner, before, source.kind, destination);
                         }
@@ -1723,13 +1584,8 @@ unsafe fn service_owned(_ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) -
     } else {
         native_done && (departed || native_ready().is_some())
     };
-    #[cfg(not(feature = "managed-third-source-alpha"))]
-    let complete =
-        native_done && (departed || native_ready().is_some());
-    #[cfg(feature="managed-third-source-alpha")]
     let complete = complete && source.created_descriptor
         .is_none_or(|expected| read::<[u8; 0x70]>(entry, 0) == expected);
-    #[cfg(feature = "managed-third-source-alpha")]
     let stalled = if is_capacity && source.ticks == STALL_TICKS {
         Some(capacity::stalled_checks(
             _ctx,
@@ -1743,22 +1599,15 @@ unsafe fn service_owned(_ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) -
     };
     // FAIL 2: on a created entry, native completion is the entry's own actor,
     // control and archive readiness beside `native_done`. Read only at the bound.
-    #[cfg(feature = "managed-third-source-alpha")]
     let entry_ready = is_capacity && native_done && source.ticks >= STALL_TICKS
         && capacity_observation.0.is_some_and(|owner| {
-            #[cfg(feature="mii-managed-helper-alpha")]
             if let Some(destination)=source.created_destination {
                 return capacity::ready_created(owner,entry,source.kind,destination);
             }
             capacity::ready(owner, entry, source.kind)
         });
-    #[cfg(not(feature = "managed-third-source-alpha"))]
-    let entry_ready = false;
-    #[cfg(feature = "managed-grouped-source-alpha")]
     let ready_actors = (is_capacity && complete).then(|| capacity::actors_at(entry, slot, source.kind)).flatten();
-    #[cfg(feature = "managed-grouped-source-alpha")]
     let complete = complete && (!is_capacity || ready_actors.is_some());
-    #[cfg(feature="mii-managed-helper-alpha")]
     let mii_completion=if source.configuration.is_some() && complete && !departed {
         match super::mii_managed_helper::completed_details(source.token,source.ticks) {
             Ok(proof)=>proof,Err(reason)=>{
@@ -1767,21 +1616,14 @@ unsafe fn service_owned(_ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) -
             }
         }
     } else {None};
-    #[cfg(feature="mii-managed-helper-alpha")]
     let mii_proof = mii_completion.as_ref().map(|completion| completion.mii);
-    #[cfg(feature="mii-managed-helper-alpha")]
     let complete=complete && (source.configuration.is_none() || mii_proof.is_some());
-    #[cfg(feature = "mii-managed-source-coexist-alpha")]
     let proof = if complete && !departed {
         let observed = {
-            #[cfg(feature="mii-managed-helper-alpha")]
             if is_capacity { mii_completion.as_ref().map(|completion| completion.proof) }
             else { coexist::helpers::observe(entry as usize, slot) }
-            #[cfg(not(feature="mii-managed-helper-alpha"))]
-            { coexist::helpers::observe(entry as usize, slot) }
         };
         observed.filter(|proof| {
-            #[cfg(feature="mii-managed-helper-alpha")]
             if mii_proof.is_some() {
                 return source.original.is_some_and(|old|coexist::helpers::OriginalRow {
                     index:proof.original.index,..old}==proof.original);
@@ -1789,26 +1631,22 @@ unsafe fn service_owned(_ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) -
             Some(proof.original)==source.original
         })
     } else { None };
-    #[cfg(feature="mii-managed-helper-alpha")]
     if mii_proof.is_some() && proof.is_none() {
         super::mii_managed_helper::refuse_completion(source.token,"managed original row/provenance changed at completion");
         return true;
     }
-    #[cfg(feature="mii-managed-helper-alpha")]
     let complete=complete && (source.configuration.is_none() || proof.is_some());
     let mut state = STATE.lock();
     if state.sources[index] != Some(original) {
         return true;
     }
-    #[cfg(feature = "mii-managed-source-coexist-alpha")]
     if !source.install.is_some_and(|token| INSTALL.owns(token)) { return true; }
-    #[cfg(feature = "mii-managed-source-coexist-alpha")]
     let mut registry = (complete || (native_done && source.ticks >= STALL_TICKS && !departed))
         .then(coexist::registry);
     let departed = !state.book.is_current(source.token.epoch());
     let mut finished = None;
     let mut event = None;
-    if complete && (!cfg!(feature = "managed-third-source-alpha") || !is_capacity || !departed)
+    if complete && (!is_capacity || !departed)
         && (source.configuration.is_none() || !departed) {
         if !departed {
             if state.book.complete(source.load).is_err() { return true; }
@@ -1845,19 +1683,16 @@ unsafe fn service_owned(_ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) -
             Verdict::Wait => {}
         }
     }
-    #[cfg(feature="mii-managed-helper-alpha")]
     if complete && !departed && source.configuration.is_some() {
         // Only a completed selector transaction can advance this managed row's index anchor.
         // The visible roles' immutable saved-original snapshots remain untouched.
         source.original=proof.map(|p|p.original);
     }
     state.sources[index] = Some(source);
-    #[cfg(feature = "mii-managed-source-coexist-alpha")]
     {
         if let Some(registry) = registry.as_mut() {
             let ready = state.book.ready(index);
             let helper = match (ready, state.book.key(index), proof) {
-                #[cfg(feature="mii-managed-helper-alpha")]
                 (Ok(ready),Ok(Some(key)),Some(proof))
                     if !departed && ready.source()==source.token && proof.kind==key.kind
                         && proof.costume==key.costume && mii_proof.is_some() =>
@@ -1870,7 +1705,6 @@ unsafe fn service_owned(_ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) -
                     phase: state.book.phase(index).expect("registered source slot") },
             };
             registry.source(state.book.epoch(), index, helper);
-            #[cfg(feature="mii-managed-helper-alpha")]
             if matches!(helper,coexist::helpers::Helper::Ready {..}) {
                 if let Some(ordinal)=registry.helpers.ordinal(index) {registry.helpers.miis[ordinal]=mii_proof;}
                 if let Some(ordinal)=registry.helpers.created_ordinal(index) {
@@ -1883,32 +1717,24 @@ unsafe fn service_owned(_ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) -
         }
         drop(registry);
     }
-    #[cfg(feature="mii-managed-helper-alpha")]
     if finished.is_some() && source.configuration.is_some() {
         super::mii_managed_helper::release(source.token);
     }
-    #[cfg(feature = "managed-third-source-alpha")]
     if is_capacity && finished.is_some() {
         state.capacities[capacity_index(slot)].load = None;
         if event == Some("ready") {
-            #[cfg(feature = "managed-grouped-source-alpha")]
             let count = ready_actors.map_or(0, |actors| actors.count());
-            #[cfg(not(feature = "managed-grouped-source-alpha"))]
-            let count = 1;
             state.capacities[capacity_index(slot)].observation.ready_actors =
                 state.capacities[capacity_index(slot)].observation.ready_actors.saturating_add(count);
-            #[cfg(feature = "managed-grouped-source-alpha")]
             { state.capacities[capacity_index(slot)].observation.current_actors = ready_actors; }
         }
     }
     drop(state);
-    #[cfg(feature = "managed-grouped-source-alpha")]
     if is_capacity && event == Some("ready") {
         crate::engine::compat::logging::diagnostic(format_args!(
             "[ManagedSourceCleanup] canonical ready source={:?} kind=0x{:x} actors={:x?}",
             source.token, source.kind, ready_actors));
     }
-    #[cfg(feature="mii-managed-helper-alpha")]
     if event==Some("ready") {
         if let Some(proof)=mii_proof {
             crate::engine::compat::logging::diagnostic(format_args!("[MiiHelper] exact parked completion source={:?} proof={:?}",source.token,proof));
@@ -1929,7 +1755,6 @@ unsafe fn service_owned(_ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) -
     if let Some(event) = event {
         // The bound's checks, with what differed from the commit-time scene and input rows
         // (FAIL 2: names the other owner's change), then the verdict.
-        #[cfg(feature = "managed-third-source-alpha")]
         if let Some(checks) = stalled.filter(|_| matches!(event, STALL_RETAINED | STALL_FAILED)) {
             crate::engine::compat::logging::diagnostic(format_args!(
                 "[CharacterSources] stalled slot={} kind=0x{:x} ticks={} reservation={} preflight={} owned={} snapshot={:?} scene={:?} original_resources={:?} inputs={:?} ready={:?} native_done={} departed={} entry_ready={} scene_diff_hex={:x?} input_rows_hex={:x?} input_fields_equal={:?} changed_rows={:x?}; {}",
@@ -1950,7 +1775,6 @@ unsafe fn service_owned(_ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) -
 
 /// Only a proven configuration mismatch retires an unsubmitted exact intent.
 /// Keep a per-channel receipt so its consumer observes Err instead of requeueing.
-#[cfg(feature="mii-managed-helper-alpha")]
 fn refuse_want(wanted: Want, slot: u32, reason: &'static str) {
     let mut state = STATE.lock();
     let mut refused = false;
@@ -1970,36 +1794,17 @@ fn refuse_want(wanted: Want, slot: u32, reason: &'static str) {
 }
 
 fn slot_allowed(avoid: u8, slot: u32) -> bool {
-    #[cfg(feature = "mii-hud-portrait-alpha")]
-    { super::mii_hud_portrait_policy::slot_may_install(avoid, slot) }
-    #[cfg(not(feature = "mii-hud-portrait-alpha"))]
-    { let _ = (avoid, slot); true }
+    super::mii_hud_portrait_policy::slot_may_install(avoid, slot)
 }
 
-#[cfg(not(feature = "mii-hud-portrait-alpha"))]
-fn pending_request_for(state: &State, slot: Option<u32>, menu_open: bool) -> Option<Want> {
-    let _ = slot;
-    if menu_open { None } else { pending_request(state) }
-}
 
-#[cfg(not(feature = "mii-hud-portrait-alpha"))]
-fn pending_request(state: &State) -> Option<Want> {
-    state.wants.iter().flatten().copied().find(|want| {
-        state.book.is_current(want.epoch) && !state.sources.iter().flatten().any(|source|
-            source.kind == want.kind && source.configuration==want.configuration
-                && state.book.is_current(source.token.epoch())
-                && state.book.phase(source.token.slot()) != Ok(Phase::Failed))
-    })
-}
 
-#[cfg(all(feature = "mii-hud-portrait-alpha", feature = "managed-third-source-alpha"))]
 fn pending_request(state: &State) -> Option<Want> {
     pending_request_for(state, None, false)
 }
 
 /// The first unsatisfied want this slot may install. An avoided slot neither
 /// satisfies the want nor installs it. `slot == None` is the previous global walk.
-#[cfg(feature = "mii-hud-portrait-alpha")]
 fn pending_request_for(state: &State, slot: Option<u32>, menu_open: bool) -> Option<Want> {
     // Exact portrait requests depend on the loaded fighter, not menu preferences.
     // Hats/items still wait for menu close, even when a hat carries a Mii payload.
@@ -2017,13 +1822,7 @@ fn pending_request_for(state: &State, slot: Option<u32>, menu_open: bool) -> Opt
     })
 }
 
-#[cfg(not(feature = "mii-hud-portrait-alpha"))]
-fn ready_still_requested(state: &State, index: usize) -> bool {
-    state.book.phase(index) == Ok(Phase::Ready) && state.sources[index].is_some_and(|source|
-state.wants.iter().flatten().any(|want| want.kind == source.kind && want.configuration==source.configuration))
-}
 
-#[cfg(feature = "mii-hud-portrait-alpha")]
 fn ready_still_requested(state: &State, index: usize) -> bool {
     state.book.phase(index) == Ok(Phase::Ready) && state.sources[index].is_some_and(|source|
 state.wants.iter().flatten().any(|want|
@@ -2045,12 +1844,10 @@ unsafe fn admission_blocker() -> Option<&'static str> {
     else { None }
 }
 
-#[cfg(feature = "mii-hud-portrait-alpha")]
 pub unsafe fn portrait_admission_blocker() -> Option<&'static str> {
     admission_blocker()
 }
 
-#[cfg(feature = "managed-third-source-alpha")]
 unsafe fn admission_blocked() -> bool {
     admission_blocker().is_some() || super::menu::captures_input()
 }
@@ -2086,7 +1883,6 @@ unsafe fn native_admission(
     !backend.waiting() || waiting_layout(entry, slot, backend)
 }
 
-#[cfg(feature = "managed-third-source-alpha")]
 fn helpers_unavailable(state: &State, backend: Backend) -> bool {
     backend.helpers().iter().copied().all(|slot| {
         let index = slot as usize;
@@ -2094,23 +1890,20 @@ fn helpers_unavailable(state: &State, backend: Backend) -> bool {
     })
 }
 
-#[cfg(feature="managed-third-source-alpha")]
 #[derive(Clone,Copy,PartialEq,Eq)]
 struct CreationIntent {extra:u32,wanted:Want,speculative:bool}
 
 /// One shared admission policy for every additional helper. A requested cache
 /// count never makes an unowned native entry usable.
-#[cfg(feature="managed-third-source-alpha")]
 fn creation_intent(state:&State,backend:Backend,speculative:bool)->Option<CreationIntent> {
     use crate::engine::preload::cycle_preload_capacity as policy;
     let settings=crate::runtime::roster::cycle_preload_config::snapshot();
     let slots = settings.slots;
-    #[cfg(feature = "native-body-bank-alpha")]
     let slots = super::body_bank::helper_budget(slots);
     let limit=policy::target_count_with_waiting(slots,backend,true,
-        cfg!(feature="managed-ldn-third-source-alpha"),cfg!(feature="cycle-preload-extended"),cfg!(feature="lobby-preload-extended"));
+        true,true,true);
     if !speculative {
-        if cfg!(feature="cycle-preload-extended") && limit<=policy::BASE_HELPERS {return None;}
+        if limit<=policy::BASE_HELPERS {return None;}
         let wanted=pending_request(state)?;
         let extra=policy::extra_slots(backend)[0] as u32;
         let owner=&state.capacities[capacity_index(extra)];
@@ -2154,7 +1947,6 @@ fn creation_intent(state:&State,backend:Backend,speculative:bool)->Option<Creati
 
 /// Retain the native claim until real retirement, including a failed post-call
 /// qualification. Each slot has one attempt per scene and serializes via INSTALL.
-#[cfg(feature="managed-third-source-alpha")]
 unsafe fn create_capacity(ctx:&ServiceEntryContext,entry:*const u8,slot:u32,intent:CreationIntent) {
     let grace = if intent.speculative {
         let Some(generation) = crate::runtime::roster::cycle_preload::speculative_admission() else { return; };
@@ -2261,7 +2053,6 @@ unsafe fn create_capacity(ctx:&ServiceEntryContext,entry:*const u8,slot:u32,inte
 
 /// lobby-preload D: once per (scene, extra, reason). A refused preflight is evaluated again on
 /// every helper loader callback (the designed wait, not a retry loop); this line reports it.
-#[cfg(feature="managed-third-source-alpha")]
 fn creation_waiting(intent:CreationIntent,slot:u32,refusal:Refusal) {
     crate::engine::compat::logging::diagnostic(format_args!(
         "[CharacterSources] capacity creation waiting slot={} callback={} epoch={:?} want=0x{:x} speculative={} reason={}; preflight repeats on each helper callback",
@@ -2270,11 +2061,9 @@ fn creation_waiting(intent:CreationIntent,slot:u32,refusal:Refusal) {
 
 /// Only called with the current native loader callback's argument.
 /// Already-owned loads run before any scene, mode or ownership gate.
-#[cfg(feature="managed-third-source-alpha")]
 unsafe fn capacity_preflight_for(ctx: &ServiceEntryContext, entry: *const u8,
     owner: capacity::Reservation, previous: Option<Source>)
     -> Result<capacity::Preflight, capacity::LoadDecline> {
-    #[cfg(feature="mii-managed-helper-alpha")]
     if let Some(source) = previous.filter(|source| source.created_destination.is_some()) {
         let ready = {
             let state = STATE.lock();
@@ -2322,7 +2111,6 @@ pub unsafe fn service(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) {
     // chains don't stack on each other (the native service poll's stacks are sized to the deepest).
     let mut prior_first = PriorFirst::default();
     let Some(is_capacity) = service_gate(ctx, entry, slot, &mut prior_first) else { return; };
-    #[cfg(feature = "managed-third-source-alpha")]
     service_capacity(ctx, entry, slot);
     service_load(ctx, entry, slot, is_capacity, &prior_first);
 }
@@ -2330,13 +2118,11 @@ pub unsafe fn service(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) {
 /// What `service_gate` hands the load: the capacity entry's first-load stability, taken at the gate (empty without
 /// `managed-third-source-alpha`).
 #[derive(Default)]
-struct PriorFirst(#[cfg(feature = "managed-third-source-alpha")] Option<FirstLoad>);
+struct PriorFirst(Option<FirstLoad>);
 
 /// `service`'s gate: the callback's slot, F9's hand-over and an owned slot end it (`None`); otherwise the load runs.
 #[inline(never)]
 unsafe fn service_gate(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32, prior_first: &mut PriorFirst) -> Option<bool> {
-    #[cfg(not(feature = "managed-third-source-alpha"))]
-    let _ = prior_first;
     // Diag (F9 research): one line per change of No. of CPUs seen by the native loader callback, with the slot it served, so an
     // Eden row tells whether this callback runs while the pause menu is open (before the game activates a parked entry).
     #[cfg(feature = "diag")]
@@ -2348,12 +2134,11 @@ unsafe fn service_gate(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32, pri
         }
     }
     let is_capacity=is_capacity_entry(entry,slot);
-    if !cfg!(feature = "managed-sources") || !callback_slot(entry, slot) {
+    if !callback_slot(entry, slot) {
         return None;
     }
     // Every entry7 callback starts with no saved stability. Restore it only
     // after a valid first-load observation; any early decline resets the run.
-    #[cfg(feature = "managed-third-source-alpha")]
     { prior_first.0 = if is_capacity {
         STATE.lock().capacities[capacity_index(slot)].first_load.take()
     } else {
@@ -2375,19 +2160,16 @@ unsafe fn service_gate(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32, pri
 }
 
 /// `service`'s capacity creation for ordinary and speculative demand, before the load.
-#[cfg(feature = "managed-third-source-alpha")]
 #[inline(never)]
 unsafe fn service_capacity(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32) {
     // Ordinary demand can require additional capacity before the idle return.
     // Its existing budget and helper-availability checks remain authoritative.
-    #[cfg(feature="managed-third-source-alpha")]
     if admission_blocker().is_none() {
         if let Ok(backend) = qualified_backend() {
             let intent = { creation_intent(&STATE.lock(), backend, false) };
             if let Some(intent) = intent { create_capacity(ctx, entry, slot, intent); }
         }
     }
-    #[cfg(feature="managed-third-source-alpha")]
     if usize::from(crate::runtime::roster::cycle_preload_config::snapshot().slots)>crate::engine::preload::cycle_preload_capacity::BASE_HELPERS && !super::preload_blocked()
         && !super::menu::captures_input() {
         if let Ok(backend)=qualified_backend() {
@@ -2402,10 +2184,7 @@ unsafe fn service_capacity(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32)
 #[inline(never)]
 unsafe fn service_load(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32, is_capacity: bool, prior_first: &PriorFirst) {
     // Only the capacity entry's preflight reads these.
-    #[cfg(not(feature = "managed-third-source-alpha"))]
-    let _ = (ctx, prior_first);
     let index = slot as usize;
-    #[cfg(feature = "managed-third-source-alpha")]
     let prior_first = prior_first.0;
     let initial = {
         let state = STATE.lock();
@@ -2456,13 +2235,11 @@ unsafe fn service_load(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32, is_
     let Ok(backend) = qualified_backend() else {
         return;
     };
-    #[cfg(feature="mii-managed-helper-alpha")]
     if (backend==Backend::Training || wanted.configuration.is_some())
         && !super::mii_managed_helper::admission_ready(wanted.configuration.is_some()) {return;}
     if !candidates(backend).contains(&slot) {
         return;
     }
-    #[cfg(feature = "managed-third-source-alpha")]
     let (capacity_load, first_load_callbacks) = if is_capacity {
         // Only this module's current reservation can admit 7. An isolated
         // R3+X experiment's entry never becomes a managed source.
@@ -2519,7 +2296,6 @@ unsafe fn service_load(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32, is_
     let Some(costume) = native_source::inherited_costume(slot) else {
         return;
     };
-    #[cfg(feature="mii-managed-helper-alpha")]
     if wanted.configuration.is_some_and(|c| if is_capacity {
         !super::mii_managed_helper::created_slot_eligible(slot,c)
     } else { !super::mii_managed_helper::slot_eligible(slot,c) }) {
@@ -2548,7 +2324,6 @@ unsafe fn service_load(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32, is_
     let Some(install) = INSTALL.try_begin(false) else {
         return;
     };
-    #[cfg(feature = "managed-third-source-alpha")]
     if is_capacity {
         let owner = reservation_for(&STATE.lock(),slot);
         if owner.and_then(|owner| {
@@ -2561,7 +2336,6 @@ unsafe fn service_load(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32, is_
             return;
         }
     }
-    #[cfg(feature="mii-managed-helper-alpha")]
     let mii_prepared=match wanted.configuration {
         Some(c)=>match if is_capacity {
             super::mii_managed_helper::prepare_created(entry as usize,slot,c,wanted.epoch)
@@ -2579,11 +2353,9 @@ unsafe fn service_load(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32, is_
             }
         },None=>None,
     };
-    #[cfg(feature = "mii-managed-source-coexist-alpha")]
     let original = match previous {
         // Missing first-install proof stays missing for this native lifetime.
         Some(source) => {
-            #[cfg(feature="mii-managed-helper-alpha")]
             if is_capacity {
                 // Both capacity preflights just revalidated this exact source
                 // and its original row under G. A new exact install additionally
@@ -2604,31 +2376,13 @@ unsafe fn service_load(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32, is_
                 }
                 source.original
             }
-            #[cfg(not(feature="mii-managed-helper-alpha"))]
-            {
-            if source.original.is_some_and(|original|
-                coexist::helpers::observe(entry as usize, slot)
-                    .is_none_or(|now| now.original != original))
-            {
-                finish_install(install, "managed original row changed");
-                return;
-            }
-            source.original
-            }
         }
         None => if is_capacity {
-            #[cfg(feature="mii-managed-helper-alpha")]
-            { mii_prepared.as_ref().map(|prepared| prepared.original()) }
-            #[cfg(not(feature="mii-managed-helper-alpha"))]
-            { None }
+            mii_prepared.as_ref().map(|prepared| prepared.original())
         } else {coexist::helpers::original(entry as usize, slot)},
     };
-    #[cfg(feature="managed-third-source-alpha")]
     let created_descriptor = if is_capacity {
-        #[cfg(feature="mii-managed-helper-alpha")]
         let exact = mii_prepared.as_ref().map(|prepared| prepared.descriptors().1);
-        #[cfg(not(feature="mii-managed-helper-alpha"))]
-        let exact: Option<[u8; 0x70]> = None;
         Some(exact.unwrap_or_else(|| {
             let forms = super::Forms::starting(wanted.kind);
             let mut descriptor = super::native_fighter_install::Descriptor::copy_from(entry);
@@ -2650,7 +2404,6 @@ unsafe fn service_load(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32, is_
         || ready_still_requested(&state, index)
         || state.book.can_replace(index) != Ok(true)
     {
-        #[cfg(feature = "managed-third-source-alpha")]
         if is_capacity {
             state.capacities[capacity_index(slot)].first_load = None;
         }
@@ -2658,23 +2411,19 @@ unsafe fn service_load(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32, is_
         finish_install(install, "managed source intent changed");
         return;
     }
-    #[cfg(feature = "mii-managed-source-coexist-alpha")]
     if !INSTALL.owns(install) {
         drop(state);
         finish_install(install, "managed exact install owner changed");
         return;
     }
-    #[cfg(feature = "mii-managed-source-coexist-alpha")]
     let mut registry = Some(coexist::registry());
     let key = SourceKey { kind: wanted.kind, costume };
     let load = match state.book.begin_install(index, wanted.epoch, NativeEntry(entry as u64), key) {
         Ok(load) => load,
         Err(_) => {
-            #[cfg(feature = "managed-third-source-alpha")]
             if is_capacity {
                 state.capacities[capacity_index(slot)].first_load = None;
             }
-            #[cfg(feature = "mii-managed-source-coexist-alpha")]
             drop(registry);
             drop(state);
             finish_install(install, "managed source admission rejected");
@@ -2693,17 +2442,12 @@ unsafe fn service_load(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32, is_
         prefetched: speculative,
         measurement,
         configuration:wanted.configuration,
-        #[cfg(feature="mii-managed-helper-alpha")]
         created_destination: mii_prepared.as_ref().and_then(|prepared| prepared.created_destination()),
-        #[cfg(feature="managed-third-source-alpha")]
         created_descriptor,
-        #[cfg(feature = "mii-managed-source-coexist-alpha")]
         original,
         memory_committed,
     });
-    #[cfg(feature = "managed-third-source-alpha")]
     publish_borrow(&state, slot, wanted, speculative);
-    #[cfg(feature = "mii-managed-source-coexist-alpha")]
     {
         if let Some(registry)=registry.as_mut() {
             registry.source(state.book.epoch(), index,
@@ -2711,7 +2455,6 @@ unsafe fn service_load(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32, is_
         }
         drop(registry);
     }
-    #[cfg(feature="mii-managed-helper-alpha")]
     if let Some(prepared)=mii_prepared {
         if let Err(reason)=super::mii_managed_helper::bind(prepared,load,install) {
             drop(state);
@@ -2719,14 +2462,12 @@ unsafe fn service_load(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32, is_
             return;
         }
     }
-    #[cfg(feature = "managed-third-source-alpha")]
     if is_capacity {
         state.capacities[capacity_index(slot)].load = capacity_load.map(|before| (load.source(), before));
         state.capacities[capacity_index(slot)].first_load = None;
         // A replacement publishes its new source before native release of the
         // old actor. Retain the old generation solely to attribute that event.
         state.capacities[capacity_index(slot)].observation.retiring = previous;
-        #[cfg(feature = "managed-grouped-source-alpha")]
         {
             let observed = &mut state.capacities[capacity_index(slot)].observation;
             observed.retiring_actors = observed.current_actors.take();
@@ -2735,7 +2476,6 @@ unsafe fn service_load(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32, is_
         }
     }
     drop(state);
-    #[cfg(feature = "managed-third-source-alpha")]
     if first_load_callbacks != 0 {
         crate::engine::compat::logging::diagnostic(format_args!(
             "[CharacterSources] first capacity load stable slot={} callbacks={}",
@@ -2746,7 +2486,6 @@ unsafe fn service_load(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32, is_
         "[CharacterSources] install slot={} kind=0x{:x}",
         slot, wanted.kind
     ));
-    #[cfg(feature="mii-managed-helper-alpha")]
     if wanted.configuration.is_some() {
         if !super::mii_managed_helper::install(load.source()) {
             crate::engine::compat::logging::diagnostic(format_args!("[MiiHelper] native submit refused; INSTALL retained source={:?}",load.source()));
@@ -2758,11 +2497,9 @@ unsafe fn service_load(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32, is_
 
 /// Association uses the native destructor's current actor and current entry7,
 /// including old actors released while a new managed install is pending.
-#[cfg(feature = "managed-third-source-alpha")]
 pub(super) unsafe fn capacity_actor_cleanup(ctx: &InlineCtx) {
     for slot in crate::engine::preload::cycle_preload_capacity::ALL_EXTRA_SLOTS {capacity_actor_cleanup_at(ctx,slot as u32);}
 }
-#[cfg(feature="managed-third-source-alpha")]
 unsafe fn capacity_actor_cleanup_at(ctx: &InlineCtx, slot:u32) {
     let (saved, current, observation) = {
         let state = STATE.lock();
@@ -2771,7 +2508,6 @@ unsafe fn capacity_actor_cleanup_at(ctx: &InlineCtx, slot:u32) {
         };
         (saved, state.sources[slot as usize], state.capacities[capacity_index(slot)].observation)
     };
-    #[cfg(feature = "managed-grouped-source-alpha")]
     let association = {
         let actor = ctx.registers[20].x() as usize;
         if observation.retiring_actors.is_some_and(|set| set.unretired(actor, observation.masks[1].0)) {
@@ -2781,32 +2517,18 @@ unsafe fn capacity_actor_cleanup_at(ctx: &InlineCtx, slot:u32) {
                 .map(|source| (source, observation.current_actors, 0))
         }
     };
-    #[cfg(feature = "managed-grouped-source-alpha")]
     let event = association.and_then(|(source, actors, group)|
         capacity::actor_cleanup_observation(ctx, saved.1, source.kind, actors, observation.cleaned[group][0]));
-    #[cfg(not(feature = "managed-grouped-source-alpha"))]
-    let event = capacity::actor_cleanup_observation(ctx, saved.1);
     let Some(event) = event else {
         return;
     };
-    #[cfg(feature = "managed-grouped-source-alpha")]
     let source = association.map(|(source, _, _)| source);
-    #[cfg(not(feature = "managed-grouped-source-alpha"))]
-    let source = current
-        .filter(|source| source.kind == event.kind)
-        .or_else(|| {
-            observation
-                .retiring
-                .filter(|source| source.kind == event.kind)
-        });
     let source = source.filter(|source| {
             source.token.epoch() == saved.0
                 && source.token.entry() == NativeEntry(saved.1.entry as u64)
         });
     let key = (source.map(|source| source.token), event.actor);
-    #[cfg(feature = "managed-grouped-source-alpha")]
     let group = association.map(|(_, _, group)| group).unwrap_or(0);
-    #[cfg(feature = "managed-grouped-source-alpha")]
     if observation.masks[group].0 & (1 << event.index) != 0 { return; }
     if observation.last_actor == Some(key) {
         return;
@@ -2821,7 +2543,6 @@ unsafe fn capacity_actor_cleanup_at(ctx: &InlineCtx, slot:u32) {
     }
     let observed = &mut state.capacities[capacity_index(slot)].observation;
     observed.last_actor = Some(key);
-    #[cfg(feature = "managed-grouped-source-alpha")]
     {
         observed.masks[group].0 |= 1 << event.index;
         observed.cleaned[group][event.index] = event.record;
@@ -2834,10 +2555,8 @@ unsafe fn capacity_actor_cleanup_at(ctx: &InlineCtx, slot:u32) {
             observed.ready_cleanups = observed.ready_cleanups.saturating_add(1);
         }
     }
-    #[cfg(feature = "managed-grouped-source-alpha")]
     let masks = observed.masks;
     drop(state);
-    #[cfg(feature = "managed-grouped-source-alpha")]
     crate::engine::compat::logging::diagnostic(format_args!(
         "[ManagedSourceCleanup] canonical cleanup source={:?} retiring={} index={} masks={:?} record={:x?}",
         key.0, group == 1, event.index, masks, event.record));
@@ -2849,7 +2568,6 @@ unsafe fn capacity_actor_cleanup_at(ctx: &InlineCtx, slot:u32) {
 }
 
 /// The entry destructor owns entry now; read the current service outside STATE.
-#[cfg(feature = "managed-third-source-alpha")]
 unsafe fn capacity_destroying(entry: *const u8,slot:u32) {
     let saved = STATE.lock().capacities[capacity_index(slot)].reservation;
     let Some(saved) = saved.filter(|(_, value)| {
@@ -2865,11 +2583,9 @@ unsafe fn capacity_destroying(entry: *const u8,slot:u32) {
     }
 }
 
-#[cfg(feature = "managed-third-source-alpha")]
 pub(super) unsafe fn capacity_listener_removed(ctx: &InlineCtx) {
     for slot in crate::engine::preload::cycle_preload_capacity::ALL_EXTRA_SLOTS {capacity_listener_removed_at(ctx,slot as u32);}
 }
-#[cfg(feature="managed-third-source-alpha")]
 unsafe fn capacity_listener_removed_at(ctx: &InlineCtx, slot:u32) {
     let (saved, observation) = {
         let state = STATE.lock();
@@ -2903,11 +2619,9 @@ unsafe fn capacity_listener_removed_at(ctx: &InlineCtx, slot:u32) {
 
 /// Numeric association at the actual owner cleanup boundary, after its native
 /// destructor body. Never dereference a saved owner, including allocator reuse.
-#[cfg(feature = "managed-third-source-alpha")]
 pub(super) fn capacity_owner_retired(owner: usize)->bool {
     crate::engine::preload::cycle_preload_capacity::ALL_EXTRA_SLOTS.iter().any(|slot|capacity_owner_retired_at(owner,*slot as u32))
 }
-#[cfg(feature="managed-third-source-alpha")]
 fn capacity_owner_retired_at(owner: usize, slot:u32) -> bool {
     let mut state = STATE.lock();
     let Some((epoch, mut value)) = state.capacities[capacity_index(slot)].reservation else {
@@ -2942,17 +2656,14 @@ fn capacity_owner_retired_at(owner: usize, slot:u32) -> bool {
 /// The synchronous native entry destructor owns this argument. Keep the full
 /// admission token beside it until this callback, including across mode changes.
 pub unsafe fn on_destroy(entry: *const u8, slot: u32) {
-    #[cfg(any(feature="managed-third-source-alpha",feature="mii-managed-source-coexist-alpha"))]
     let is_capacity=is_capacity_entry(entry,slot);
     if slot >= 8 {
         return;
     }
-    #[cfg(feature = "managed-third-source-alpha")]
     if is_capacity {
         capacity_destroying(entry,slot);
     }
     let mut state = STATE.lock();
-    #[cfg(feature = "managed-third-source-alpha")]
     if is_capacity {
         if let Some((epoch, mut value)) = state.capacities[capacity_index(slot)].reservation {
             if value.entry == entry as usize {
@@ -2986,17 +2697,14 @@ pub unsafe fn on_destroy(entry: *const u8, slot: u32) {
         return;
     }
     let current=state.book.is_current(source.token.epoch());
-    #[cfg(feature = "managed-third-source-alpha")]
     let destruction = (
         state.book.phase(slot as usize),
         !state.book.is_current(source.token.epoch()),
     );
-    #[cfg(feature = "mii-managed-source-coexist-alpha")]
     let mut registry = Some(coexist::registry());
     let released = match state.book.native_destroyed(source.token) {
         Ok(released) => released,
         Err(error) => {
-            #[cfg(feature = "mii-managed-source-coexist-alpha")]
             drop(registry);
             drop(state);
             crate::engine::compat::logging::diagnostic(format_args!(
@@ -3013,21 +2721,17 @@ pub unsafe fn on_destroy(entry: *const u8, slot: u32) {
     }
     HAS_CONSUMERS.store(state.leases.iter().any(Option::is_some), Ordering::Release);
     state.sources[slot as usize] = None;
-    #[cfg(feature = "mii-managed-source-coexist-alpha")]
     {
         if let Some(registry)=registry.as_mut() {
             registry.source(state.book.epoch(), slot as usize, coexist::helpers::Helper::Unmanaged);
         }
         drop(registry);
     }
-    #[cfg(feature="mii-managed-helper-alpha")]
     super::mii_managed_helper::release(source.token);
-    #[cfg(feature = "managed-third-source-alpha")]
     if is_capacity {
         state.capacities[capacity_index(slot)].load = None;
     }
     drop(state);
-    #[cfg(feature = "managed-third-source-alpha")]
     if is_capacity {
         crate::engine::compat::logging::diagnostic(format_args!(
             "[ManagedSourceCleanup] entry destruction source={:?} phase={:?} ticks={} departed={} pending_install={:?} gate_active={}",

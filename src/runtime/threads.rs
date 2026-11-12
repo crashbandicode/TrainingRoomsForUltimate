@@ -127,7 +127,7 @@ mod imp {
         #[cfg(feature = "diag")] PROBE = [Probe];
         #[cfg(feature = "diag")] MACRO_DIAG = [MacroDiag];
         REPLAY_SAVE = [ReplaySave];
-        #[cfg(feature = "mii-saved-alpha")] MII_CATALOG = [MiiCatalog];
+        MII_CATALOG = [MiiCatalog];
         #[cfg(feature = "console-practice-trace")] PRACTICE_TRACE = [PracticeTrace];
         #[cfg(feature = "diag")] STALL_WATCH = [StallWatch];
     }

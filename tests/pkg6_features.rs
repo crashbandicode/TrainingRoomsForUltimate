@@ -1,28 +1,23 @@
-//! The cargo feature structure of the carried fork code (decision D11): `default` is the shipped closure, no
-//! diagnostic feature is in it, every probe/observer/trace/meter requires `diag`. Ported from the fork's
-//! `training_mod_consts/tests/diag_features.rs` (ours-new, stage m5o), which reads its crate's manifest the same way.
+//! The cargo feature table (rc.10 S2, docs/DECISIONS.md "the product is not behind feature switches", which supersedes
+//! D11): the product is always compiled; `default` adds the optional Deluxe SDK; everything else is `diag` and the
+//! diagnostic family, never in a shipped build, each requiring `diag`.
 
 use std::collections::{BTreeMap, BTreeSet};
 
 const MANIFEST: &str = include_str!("../Cargo.toml");
 
-/// The M5o release feature list (stages/m5o RECEIPTS-m5o1.json, `m5o1-switch-root-full-release`).
-const RELEASE: &[&str] = &[
-    "enhancements-alpha",
-    "native-unlink-guard",
-    "deluxe-sdk",
-    "mii-hud-portrait-alpha",
-    "cycle-preload-extended",
-    "lobby-preload-extended",
-    "native-body-bank-alpha",
+/// The features every shipped build enabled until rc.10 S2. They are not features any more: their code is always compiled.
+const FORMER_PRODUCT_FEATURES: &[&str] = &[
+    "enhancements-alpha", "native-unlink-guard", "mii-hud-portrait-alpha", "cycle-preload-extended", "lobby-preload-extended",
+    "native-body-bank-alpha", "managed-visible-grouped-source-alpha", "mii-ordinary-cpu-alpha", "managed-third-source-alpha",
+    "mii-editor-alpha", "cpu-pilot-probe", "p1-cpu-control", "mii-managed-helper-alpha", "waiting-roster-reload",
+    "practice-stage-request-alpha", "training-stage-rotation-alpha", "lobby-stage", "practice-stage", "training-stage-rotation",
+    "mii-saved-alpha", "mii-ordinary-player-alpha", "mii-managed-source-coexist-alpha", "managed-sources",
+    "managed-grouped-source-alpha", "managed-ldn-third-source-alpha",
 ];
 
-/// Deviations from the shipped closure. None since decision L1 was answered (2026-11-02): `deluxe-sdk` is back in `default` with the
-/// MIT SDK (rev 20dd1cb, vendored under third_party/). A new deviation is added here with its decision.
-const PENDING_DEVIATIONS: &[&str] = &[];
-
-/// Product features kept under a diagnostic-looking name (external boundary).
-const PRODUCT_DESPITE_NAME: &[&str] = &["cpu-pilot-probe"];
+/// Product features kept under a diagnostic-looking name. None since rc.10 S2 (`cpu-pilot-probe` was the one).
+const PRODUCT_DESPITE_NAME: &[&str] = &[];
 
 fn features() -> BTreeMap<String, Vec<String>> {
     let mut map = BTreeMap::new();
@@ -68,25 +63,28 @@ fn is_diagnostic_name(name: &str) -> bool {
 }
 
 #[test]
-fn default_features_are_the_shipped_release_list_minus_the_pending_deviations() {
+fn the_product_is_not_behind_feature_switches() {
     let map = features();
-    let default = map.get("default").expect("a default feature list");
-    let expected: Vec<String> =
-        RELEASE.iter().filter(|f| !PENDING_DEVIATIONS.contains(f)).map(|s| s.to_string()).collect();
-    assert_eq!(default, &expected, "`cargo skyline build --release` builds the shipped product except the pending deviations");
-    for f in RELEASE {
-        assert!(map.contains_key(*f), "release feature {f} is declared");
+    assert_eq!(map.get("default"), Some(&vec!["deluxe-sdk".to_string()]), "the default build adds only the optional Deluxe SDK");
+    for f in FORMER_PRODUCT_FEATURES {
+        assert!(!map.contains_key(*f), "{f} is not a switch any more");
+        assert!(map.values().all(|deps| !deps.iter().any(|d| d == f)), "no feature requires {f}");
     }
+    // Explicit: a new feature must change this test.
+    let names: BTreeSet<&str> = map.keys().map(String::as_str).collect();
+    assert_eq!(names, BTreeSet::from([
+        "automation-results-native", "console-practice-trace", "console-swap-trace", "default", "deluxe-sdk", "diag", "hang-trace",
+        "mii-ldn-qualification-probe", "named-input-trace", "native-unlink-probe", "plugin-heap-meter", "seam-drill", "simulator",
+        "texture-probe",
+    ]));
 }
 
 #[test]
-fn the_shipped_closure_is_the_m5o_closure_and_deluxe_sdk_pulls_the_vendored_mit_sdk() {
-    // Explicit on purpose: a new deviation must change this test.
-    assert!(PENDING_DEVIATIONS.is_empty());
+fn the_shipped_closure_is_deluxe_sdk_which_pulls_the_vendored_mit_sdk() {
     let map = features();
     let mut shipped = closure(&map, &["default"]);
     shipped.remove("default");
-    assert_eq!(shipped, closure(&map, RELEASE), "the default closure is the M5o release closure");
+    assert_eq!(shipped, BTreeSet::from(["deluxe-sdk".to_string()]));
     assert!(shipped.contains("deluxe-sdk"));
     assert_eq!(map.get("deluxe-sdk"), Some(&vec!["dep:deluxe-plugin-sdk".to_string()]));
     let dependency = MANIFEST
@@ -152,14 +150,11 @@ fn every_probe_trace_observer_and_meter_requires_diag() {
 }
 
 #[test]
-fn the_renamed_product_features_and_their_old_names() {
+fn the_retired_aliases_of_product_code_stay_retired() {
     let map = features();
-    for (product, old) in [("lobby-stage", "lobby-stage-probe"), ("practice-stage", "practice-stage-observer")] {
-        assert!(!closure(&map, &[product]).contains("diag"), "{product} is product code");
+    for old in ["lobby-stage-probe", "practice-stage-observer"] {
         assert!(!map.contains_key(old), "{old} was an empty diagnostic alias retired after its probe served");
     }
-    assert!(closure(&map, &["practice-stage-request-alpha"]).contains("practice-stage"));
-    assert!(closure(&map, &["training-stage-rotation-alpha"]).contains("lobby-stage"));
 }
 
 /// Lead ruling 2026-11-02: one global allocator. The fork's `console-practice-trace`, `native-unlink-probe` and `plugin-heap-meter` each
@@ -191,7 +186,7 @@ fn the_plugin_has_one_global_allocator() {
     assert!(alloc.contains("#[cfg(feature = \"console-practice-trace\")]\n#[global_allocator]"));
 }
 
-/// `tools/feature_matrix.py` is the CI-style build check (decision D11: every feature must build); its list covers every feature of
+/// `tools/feature_matrix.py` is the CI-style build check (every feature must build); its list covers every feature of
 /// the table in the `each` and `alone` sets and the allocator features together.
 #[test]
 fn the_feature_matrix_lists_every_feature() {
@@ -250,9 +245,8 @@ fn rc_retired_observation_features_and_modules_cannot_be_reenabled() {
         "src/model/seams/native_seams/rows_hitbox_observer.rs"] {
         assert!(!root.join(path).exists(), "retired module {path}");
     }
-    // Option 3 was not approved. Keep historical tools and the product pilot alias.
-    for feature in ["console-practice-trace", "console-swap-trace", "hang-trace",
-        "native-unlink-probe", "native-unlink-guard", "plugin-heap-meter", "cpu-pilot-probe"] {
+    // Option 3 was not approved. Keep the historical tools.
+    for feature in ["console-practice-trace", "console-swap-trace", "hang-trace", "native-unlink-probe", "plugin-heap-meter"] {
         assert!(map.contains_key(feature), "retained feature {feature}");
     }
 }

@@ -9,7 +9,6 @@
 //! `mii-hud-portrait-alpha`.
 
 /// Diag meter of the group build's game-thread time (stream f6; empty without `diag`).
-#[cfg(feature = "native-body-bank-alpha")]
 pub(crate) mod build_split;
 pub(crate) mod character_items;
 pub(crate) mod character_lifecycle;
@@ -55,26 +54,16 @@ pub(crate) mod practice_trace_core;
 pub(crate) mod scope_gate;
 pub(crate) mod turnip_identity;
 
-#[cfg(feature = "native-body-bank-alpha")]
 pub(crate) mod body_graph;
-#[cfg(feature = "native-body-bank-alpha")]
 pub(crate) mod copy_packages;
-#[cfg(feature = "native-body-bank-alpha")]
 pub(crate) mod g68_step;
-#[cfg(feature = "native-body-bank-alpha")]
 pub(crate) mod identity_view;
-#[cfg(feature = "native-body-bank-alpha")]
 pub(crate) mod mii_setup;
-#[cfg(feature = "native-body-bank-alpha")]
 pub(crate) mod observe;
-#[cfg(feature = "native-body-bank-alpha")]
 pub(crate) mod r_handle;
 /// Operator option C (2026-11-09 17:57Z): the release watch's read of the game's resource unload (own code).
-#[cfg(feature = "native-body-bank-alpha")]
 pub(crate) mod res_unload;
-#[cfg(feature = "native-body-bank-alpha")]
 pub(crate) mod special_articles;
-#[cfg(feature = "mii-hud-portrait-alpha")]
 pub(crate) mod presentation;
 
 /// The rows of other packages' tables (and its own `roster_*` rows of `sites_pkg6`) that cover the `smash::` calls of the cycle's
@@ -195,8 +184,7 @@ pub(crate) fn init() {
     native_gc_guard::init();
     // Capture the full pristine load contract before reload_trace patches its interior.
     // Activation remains after the ordinary Mii guards in character_roster::init.
-    #[cfg(feature = "managed-third-source-alpha")]
     let load_contract = character_roster::prepare_load_contract();
     character_lifecycle::init();
-    character_roster::init(#[cfg(feature = "managed-third-source-alpha")] load_contract);
+    character_roster::init(load_contract);
 }

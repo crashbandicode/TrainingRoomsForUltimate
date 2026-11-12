@@ -21,10 +21,7 @@ use crate::engine::swap::body_bank::memory::{self, Decision, GroupCost};
 
 /// What every admitted consumer still holds: both roles' groups and every helper load in flight.
 pub(crate) fn outstanding() -> u64 {
-    #[cfg(feature = "native-body-bank-alpha")]
     let groups = super::body_bank::group_outstanding();
-    #[cfg(not(feature = "native-body-bank-alpha"))]
-    let groups = 0u64;
     groups.saturating_add(super::sources::helper_outstanding())
 }
 
@@ -52,7 +49,6 @@ pub(crate) fn admit(cost: GroupCost) -> (Decision, MemorySample) {
 /// rc.6 window admission (hs08b): how many of a switch's new window's supplemental members, in the planner's order, the
 /// process holds now (`memory::window_extras`), and the decision that stopped the count. Called where the switch plans
 /// the window (`body_bank::proposed`, the request's preflight), never in a hook.
-#[cfg(feature = "native-body-bank-alpha")]
 pub(crate) fn admit_window(supplements: &[u32]) -> (usize, Option<Decision>) {
     let sample = MemorySample::capture();
     let headroom = headroom(&sample);
@@ -61,9 +57,6 @@ pub(crate) fn admit_window(supplements: &[u32]) -> (usize, Option<Decision>) {
 
 /// What the cycle waits for: the supplements its windows were refused and its groups held for memory.
 pub(crate) fn cycle_waiting() -> u64 {
-    #[cfg(not(feature = "native-body-bank-alpha"))]
-    return 0;
-    #[cfg(feature = "native-body-bank-alpha")]
     super::body_bank::cycle_waiting()
 }
 

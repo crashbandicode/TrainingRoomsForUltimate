@@ -73,7 +73,6 @@ impl State {
         }
     }
     fn retire(&mut self) {
-        #[cfg(feature = "training-stage-rotation-alpha")]
         if let (Some(_), Some((scene, _))) = (self.live, self.seen) {
             // Published but not completed: the departing scene's live stage is unknown.
             crate::runtime::lobby::training_stage_rotation::direct_uncertain(scene.mode, scene.melee);
@@ -298,7 +297,6 @@ pub(crate) unsafe fn update(wrapper:usize,core:usize,mode:u32,melee:u8,active_ob
                     "[PracticeStageRequest] native_complete lease={c:?} state={} active={} pair=({},{}) task=({},0x{:x}) slots={:?} resources={:?}",
                     v.state,v.active,v.incoming,v.outgoing,v.task_state,v.task_fiber,v.slots,v.resources));
                 state.live=None; state.settled=Some(c); state.phase(Phase::Complete);
-                #[cfg(feature = "training-stage-rotation-alpha")]
                 crate::runtime::lobby::training_stage_rotation::direct_completed(scene.mode, scene.melee, c.target, c.hash);
             }
             Ok(v) if !policy::same_owner(v,c) => state.phase(Phase::Retained("native owner changed")),

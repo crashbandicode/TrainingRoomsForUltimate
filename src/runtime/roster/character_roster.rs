@@ -25,7 +25,6 @@ use crate::engine::swap::character_forms::{
 mod native_service;
 use native_service::ServiceEntryContext;
 
-#[cfg(feature = "native-body-bank-alpha")]
 #[path = "native_body_bank.rs"]
 pub(crate) mod body_bank;
 
@@ -43,10 +42,8 @@ use crate::engine::swap::native_hud_refresh as native_hud_refresh;
 
 #[path = "native_source.rs"]
 mod native_source;
-#[cfg(feature = "managed-third-source-alpha")]
 #[path = "native_source_capacity.rs"]
 mod native_source_capacity;
-#[cfg(feature = "managed-third-source-alpha")]
 pub(super) use native_source_capacity::{prepare_load_contract, VerifiedLoad};
 #[path = "character_sources.rs"]
 pub mod sources;
@@ -58,43 +55,31 @@ macro_rules! trace {
     ($($arg:tt)*) => { crate::engine::compat::logging::diagnostic(format_args!($($arg)*)) };
 }
 
-#[cfg(feature="mii-saved-alpha")]
 #[path="../mii/mii_saved_alpha.rs"]
 pub(crate) mod mii_saved_alpha;
-#[cfg(feature="mii-saved-alpha")]
 #[path="../mii/mii_catalog_request.rs"]
 pub(crate) mod mii_catalog_request;
-#[cfg(feature="mii-saved-alpha")]
 #[path="../mii/mii_backend.rs"]
 mod mii_backend;
-#[cfg(feature="mii-saved-alpha")]
 #[path="../mii/mii_saved_fingerprints.rs"]
 mod mii_saved_fingerprints;
 
-#[cfg(feature="mii-ordinary-player-alpha")]
 #[path="../mii/mii_ordinary_player.rs"]
 mod mii_ordinary_player;
-#[cfg(feature="mii-ordinary-cpu-alpha")]
 #[path="../mii/mii_ordinary_cpu.rs"]
 mod mii_ordinary_cpu;
-#[cfg(feature="mii-ordinary-cpu-alpha")]
 #[path="../mii/mii_selector_native.rs"]
 mod mii_selector_native;
 #[cfg(feature="mii-ldn-qualification-probe")]
 #[path="../mii/mii_ldn_qualification.rs"]
 mod mii_ldn_qualification;
-#[cfg(feature="mii-managed-helper-alpha")]
 #[path="../mii/mii_managed_helper.rs"]
 mod mii_managed_helper;
-#[cfg(feature="mii-ordinary-cpu-alpha")]
 #[path="../mii/mii_auto_init.rs"]
 mod mii_auto_init;
-#[cfg(feature="mii-ordinary-cpu-alpha")]
 #[path="../mii/mii_replay.rs"]
 pub(crate) mod mii_replay;
-#[cfg(feature="mii-hud-portrait-alpha")]
 pub(crate) use crate::engine::mii_root::mii_hud_portrait_policy as mii_hud_portrait_policy;
-#[cfg(feature="mii-hud-portrait-alpha")]
 #[path="../mii/mii_hud_portrait.rs"]
 pub(crate) mod mii_hud_portrait; // WP-P: `swap_native::presentation` reads the card slot through `slot_of_owner`
 
@@ -109,24 +94,17 @@ pub fn current_mii_configuration(role: usize) -> Option<crate::engine::mii::life
         _ => None,
     }
 }
-#[cfg(feature = "mii-ordinary-player-alpha")]
 fn settled_player_mii() -> Option<crate::engine::mii::lifetime::Configuration> {
     mii_ordinary_player::current_configuration()
 }
-#[cfg(not(feature = "mii-ordinary-player-alpha"))]
-fn settled_player_mii() -> Option<crate::engine::mii::lifetime::Configuration> { None }
-#[cfg(feature = "mii-ordinary-cpu-alpha")]
 fn settled_cpu_mii() -> Option<crate::engine::mii::lifetime::Configuration> {
     mii_ordinary_cpu::current_configuration()
 }
-#[cfg(not(feature = "mii-ordinary-cpu-alpha"))]
-fn settled_cpu_mii() -> Option<crate::engine::mii::lifetime::Configuration> { None }
 
 static BASE: AtomicUsize = AtomicUsize::new(0);
 /// The main image base this module installed with (0 before install); for the WP-P
 /// readback facade's lifecycle hooks outside this module (its only callers, in
 /// `training/save_states.rs`, are compiled with the same feature).
-#[cfg(feature = "mii-hud-portrait-alpha")]
 pub(crate) fn main_base() -> usize { BASE.load(Ordering::Acquire) }
 static INSTALL: InstallGate = InstallGate::new();
 static OWNED_BUTTONS: AtomicU32 = AtomicU32::new(0);
@@ -144,14 +122,12 @@ static WAITING_MEMORY: OwnerMutex<WaitingSession<WaitingValue>> = OwnerMutex::ne
 type WaitingValue=crate::engine::mii::remembered::Value<TrioFighter,Forms>;
 
 /// Loaded configuration, or an explicit original restoration. Absence is `NotMii`.
-#[cfg(feature="mii-hud-portrait-alpha")]
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum PortraitIntent {
     Exact(crate::engine::mii::lifetime::Configuration),
     Original { original_kind: u32 },
     NotMii,
 }
-#[cfg(feature="mii-saved-alpha")]
 fn remember_owned(role:Role,generation:u64,kind:u32,forms:Forms,
     configuration:Option<crate::engine::mii::lifetime::Configuration>,cursor:Option<usize>,original:bool) {
     let mut memory=WAITING_MEMORY.lock();
@@ -169,20 +145,13 @@ fn restore_owned(role:Role,value:WaitingValue)->bool {
     // Missing qualification never falls through to a kind-only Mii load.
     match role {
         Role::Player => {
-            #[cfg(feature="mii-ordinary-player-alpha")]
-            { value.owned | mii_ordinary_player::request_restore(value) }
-            #[cfg(not(feature="mii-ordinary-player-alpha"))]
-            { value.owned }
+            value.owned | mii_ordinary_player::request_restore(value)
         }
         Role::Cpu => {
-            #[cfg(feature="mii-ordinary-cpu-alpha")]
-            { value.owned | mii_ordinary_cpu::request_restore(value) }
-            #[cfg(not(feature="mii-ordinary-cpu-alpha"))]
-            { value.owned }
+            value.owned | mii_ordinary_cpu::request_restore(value)
         }
     }
 }
-#[cfg(feature="mii-saved-alpha")]
 fn observe_mii_origin(role:Role,generation:u64,kind:u32,forms:Forms,
     configuration:Option<crate::engine::mii::lifetime::Configuration>) {
     let (Some(configuration),Some(fighter))=(configuration,TrioFighter::from_kind(kind)) else{return;};
@@ -310,7 +279,7 @@ fn scope(role: Role) -> Option<Scope> {
             mode: mode.mode,
             owner: role as u32,
         })
-    } else if cfg!(feature = "waiting-roster-reload") && lobby::active() {
+    } else if lobby::active() {
         Some(Scope {
             mode: mode.mode,
             owner: if role == Role::Player { 0 } else { 4 },
@@ -333,7 +302,6 @@ pub(crate) fn preload_blocked() -> bool {
 pub(crate) fn preload_blocked_reason() -> Option<&'static str> {
     // Capture the immutable visible origins before speculative loads can take
     // INSTALL. The same native backend qualification serves Training and waiting.
-    #[cfg(feature="mii-ordinary-cpu-alpha")]
     if mii_auto_init::initializing() && unsafe {mii_backend::ready()} {return Some("mii auto-init");}
     if INSTALL.active() {return Some("INSTALL");}
     if crate::runtime::roster::kirby_hats::preload_pending() {return Some("kirby hats");}
@@ -342,9 +310,7 @@ pub(crate) fn preload_blocked_reason() -> Option<&'static str> {
         if s.pending.is_some() {return Some(if role==0 {"player request pending"} else {"cpu request pending"});}
         if s.active.is_some() {return Some(if role==0 {"player request active"} else {"cpu request active"});}
     }
-    #[cfg(feature="mii-ordinary-player-alpha")]
     if let Some(reason)=mii_ordinary_player::preload_pending_reason() {return Some(reason);}
-    #[cfg(feature="mii-ordinary-cpu-alpha")]
     if let Some(reason)=mii_ordinary_cpu::preload_pending_reason() {return Some(reason);}
     None
 }
@@ -381,12 +347,10 @@ pub(crate) unsafe fn foreground(role: usize, entry: *const u8, owner: u32) -> Fo
             }
         }
     }
-    #[cfg(feature="mii-ordinary-player-alpha")]
     if let Some(target) = mii_ordinary_player::foreground(role == Role::Player as usize) {
         f.waiting = true;
         f.target = f.target.or(target);
     }
-    #[cfg(feature="mii-ordinary-cpu-alpha")]
     if let Some(target) = mii_ordinary_cpu::foreground(role == Role::Cpu as usize) {
         f.waiting = true;
         f.target = f.target.or(target);
@@ -409,14 +373,11 @@ fn cycle_step(m: &TrainingModpackMenu, role: Role, current: u32, cursor: Option<
 /// speculative helper loads, hat-source loads and group prefetches take it without (and a hat
 /// request is asset work), so they never read as a pause (C116.2 console "Paused 2/3").
 pub(crate) fn notice_blocked() -> bool {
-    #[cfg(feature="mii-ordinary-cpu-alpha")]
     if mii_auto_init::initializing() && unsafe {mii_backend::ready()} {return true;}
     if INSTALL.suspends_practice()
         || STATES.iter().any(|s| {let s=s.lock();
             s.pending.is_some() || s.active.is_some()}) {return true;}
-    #[cfg(feature="mii-ordinary-player-alpha")]
     if mii_ordinary_player::preload_pending() {return true;}
-    #[cfg(feature="mii-ordinary-cpu-alpha")]
     if mii_ordinary_cpu::preload_pending() {return true;}
     false
 }
@@ -425,11 +386,9 @@ pub(crate) fn preload_targets(menu: &TrainingModpackMenu, role:usize)
     -> [Option<crate::runtime::roster::cycle_preload::Target>;crate::runtime::roster::cycle_preload::MAX_TARGETS] {
     let role=if role==0 {Role::Player}else{Role::Cpu};
     if !role.enabled() {return [None;crate::runtime::roster::cycle_preload::MAX_TARGETS];}
-    #[cfg(feature="mii-ordinary-player-alpha")]
     if role==Role::Player {
         if let Some(targets)=mii_ordinary_player::preload_targets(menu) {return targets;}
     }
-    #[cfg(feature="mii-ordinary-cpu-alpha")]
     if role==Role::Cpu {
         if let Some(targets)=mii_ordinary_cpu::preload_targets(menu) {return targets;}
     }
@@ -471,7 +430,6 @@ pub fn waiting_choice_settled(role: usize) -> bool {
 /// automatic roster install close an unfinished panel as ordinary swap cleanup.
 pub fn waiting_drafts_ready() -> bool {
     if busy() { return false; }
-    if !cfg!(feature = "waiting-roster-reload") { return true; }
     if STATES.iter().any(|state| {
         let state = state.lock();
         state.observed.is_none() || state.pending.is_some() || state.active.is_some()
@@ -482,7 +440,6 @@ pub fn waiting_drafts_ready() -> bool {
 
 fn finish_install(token: InstallToken, reason: &str) -> bool {
     let finished = INSTALL.finish(token);
-    #[cfg(feature = "managed-third-source-alpha")]
     if reason == "managed source destroyed" {
         trace!(
             "[NativeInstall] managed destructor token={:?} finished={} gate_active_after={}",
@@ -513,7 +470,6 @@ pub fn solo_popo_active(cpu: bool) -> bool {
 }
 
 /// Forms for a fighter that is not at a known numbered slot: slot 0 or a direct pick.
-#[cfg(feature = "mii-ordinary-cpu-alpha")]
 fn requested_forms(m: &TrainingModpackMenu, role: Role, kind: u32) -> Forms {
     requested_forms_at(m, role, kind, None)
 }
@@ -584,20 +540,14 @@ fn roster_fixed(m: &TrainingModpackMenu, role: Role) -> crate::engine::swap::ord
 /// The CPU cycle's Mii admission as the CPU Mii owner last computed it (`cycle_members::cpu_admission`, published from
 /// its service; none while it is not qualified). Every CPU cycle walker and the menu read this one answer (P-CYCLE).
 pub(crate) fn cpu_cycle_admission() -> crate::engine::swap::cycle_members::MiiAdmission {
-    #[cfg(feature = "mii-ordinary-cpu-alpha")]
     return mii_ordinary_cpu::published_admission();
-    #[cfg(not(feature = "mii-ordinary-cpu-alpha"))]
-    crate::engine::swap::cycle_members::NO_MII
 }
 
 /// The Player cycle's Mii admission as the Player Mii owner last computed it (`cycle_members::player_admission`,
 /// published from its service; none while it is not qualified). Every Player cycle walker and the menu read this one
 /// answer (P1-CYCLE).
 pub(crate) fn player_cycle_admission() -> crate::engine::swap::cycle_members::MiiAdmission {
-    #[cfg(feature = "mii-ordinary-player-alpha")]
     return mii_ordinary_player::published_admission();
-    #[cfg(not(feature = "mii-ordinary-player-alpha"))]
-    crate::engine::swap::cycle_members::NO_MII
 }
 
 /// What the portrait grid shows of the cycles (P-CYCLE, P1-CYCLE): each role's Mii admission, and each role's slot 0
@@ -732,17 +682,13 @@ fn queue_admitted(role: Role, selection: Selection, restoring: bool, once: bool)
             preload_targets(&setting(&MENU),role as usize)[0],_=>None};
         if let Some(target)=target {crate::runtime::roster::cycle_preload::request(role as usize,false,target);}
     }
-    #[cfg(any(feature="mii-ordinary-player-alpha",feature="mii-ordinary-cpu-alpha"))]
     let user_request=!restoring && !matches!(selection,Selection::RefreshPartners);
-    #[cfg(feature="mii-ordinary-player-alpha")]
     if mii_ordinary_player::intercept(role,selection,user_request)==Some(true){
         if user {trace!("[CharacterRoster] request handed to the ordinary Mii owner role={:?} selection={:?}",role,selection);}
         return;
     }
     // The CPU owner logs its own acceptance or refusal.
-    #[cfg(feature="mii-ordinary-cpu-alpha")]
     if mii_ordinary_cpu::intercept(role,selection,user_request)==Some(true){return;}
-    #[cfg(feature="mii-saved-alpha")]
     if mii_saved_alpha::intercept(role,selection){
         if user {trace!("[CharacterRoster] request handed to the saved Mii owner role={:?} selection={:?}",role,selection);}
         return;
@@ -925,16 +871,12 @@ fn operator_buttons(player_idx: i32, buttons: u32) -> u64 {
 /// Cancel plugin intent immediately. An already installed native reload belongs
 /// to the native scene teardown; never clear its flags or force its state ahead.
 pub fn scene_changed(mode: game_mode::Mode) {
-    #[cfg(feature = "native-body-bank-alpha")]
     body_bank::scene_changed();
-    #[cfg(feature="mii-saved-alpha")]
     mii_saved_alpha::scene_changed();
-    #[cfg(feature = "native-body-bank-alpha")]
     body_bank::adopt_scene_generation();
     #[cfg(feature="mii-ldn-qualification-probe")]
     mii_ldn_qualification::scene_changed();
     sources::scene_changed();
-    #[cfg(feature="mii-hud-portrait-alpha")]
     mii_hud_portrait::scene_changed();
     crate::runtime::roster::character_items::scene_changed();
     let same_lobby = WAITING_MEMORY
@@ -1014,7 +956,6 @@ unsafe fn reload_at_pose(
     pose: native_reload_pose::ReloadPose,
 ) {
     // A Reload destroys only the native window: detached bank groups go first.
-    #[cfg(feature = "native-body-bank-alpha")]
     {
         body_bank::before_reload(entry);
         body_bank::retire_for_canonical(entry, descriptor.bytes());
@@ -1027,7 +968,6 @@ unsafe fn ready_forms(entry: *const u8, owner: u32) -> Option<(Forms, u32)> {
     if !aligned(entry) || read::<u32>(entry, 0xe0) != owner {
         return None;
     }
-    #[cfg(feature = "native-body-bank-alpha")]
     if let Some(ready) = body_bank::ready_forms(entry, owner) {
         return Some(ready);
     }
@@ -1063,7 +1003,6 @@ unsafe fn ready_forms(entry: *const u8, owner: u32) -> Option<(Forms, u32)> {
 }
 
 /// `ready_forms` without the roster catalog admission: single-kind Mii entries only.
-#[cfg(feature = "mii-saved-alpha")]
 unsafe fn ready_single_mii(entry: *const u8, owner: u32) -> Option<u32> {
     if !aligned(entry) || read::<u32>(entry, 0xe0) != owner {
         return None;
@@ -1089,13 +1028,10 @@ unsafe fn ready_single_mii(entry: *const u8, owner: u32) -> Option<u32> {
     // is the same single body as the canonical entry (MII-GROUPS-DESIGN §4): the
     // value rule `single_mii_bank_window` names the window shape, the bank proves
     // its own descriptor and body receipts, and the body checks below still apply.
-    #[cfg(feature = "native-body-bank-alpha")]
     let ready = state.ready().or_else(|| {
         let forms = crate::engine::swap::body_bank::single_mii_bank_window(state)?;
         body_bank::ready_forms(entry, owner).filter(|(bank_forms, _)| *bank_forms == forms)
     });
-    #[cfg(not(feature = "native-body-bank-alpha"))]
-    let ready = state.ready();
     let (forms, live_kind) = ready?;
     if forms.count != 1 {
         return None;
@@ -1114,7 +1050,6 @@ unsafe fn ready_single_mii(entry: *const u8, owner: u32) -> Option<u32> {
 }
 
 /// Existing readiness readers only; no native calls or Rust mutexes (also used under G lock).
-#[cfg(feature = "mii-saved-alpha")]
 pub(crate) unsafe fn mii_saved_cpu_visible_ready(entry: *const u8, owner: u32, kind: u32) -> bool {
     if !(0x48..=0x4a).contains(&kind) { return false; }
     match owner {
@@ -1125,7 +1060,6 @@ pub(crate) unsafe fn mii_saved_cpu_visible_ready(entry: *const u8, owner: u32, k
 }
 
 /// Called before G lock; the current probe may already own INSTALL, never a roster replacement.
-#[cfg(feature="mii-saved-alpha")]
 pub(crate) unsafe fn mii_cpu_probe_roster_idle() -> bool {
     crate::model::parked_entries::training_quantity_open(native_source::training_cpu_quantity())
         && !crate::runtime::roster::f9_gate::handover_pending()
@@ -1144,12 +1078,10 @@ unsafe fn service(ctx: &ServiceEntryContext, entry: *mut u8) {
         return;
     }
     let owner = read::<u32>(entry, 0xe0);
-    #[cfg(feature = "native-body-bank-alpha")]
     body_bank::service(entry, owner);
     #[cfg(feature="mii-ldn-qualification-probe")]
     mii_ldn_qualification::service(entry, owner);
     sources::service(ctx, entry, owner);
-    #[cfg(feature="mii-hud-portrait-alpha")]
     mii_hud_portrait::service(entry, owner);
     republish_after_rebuild(entry, owner);
     service_body(entry,owner,ctx.caller_lr());
@@ -1162,17 +1094,11 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
         return;
     }
     let role = if owner == 0 { Role::Player } else { Role::Cpu };
-    #[cfg(feature="mii-saved-alpha")]
     mii_catalog_request::service();
-    #[cfg(feature="mii-ordinary-cpu-alpha")]
     mii_auto_init::service(entry,owner);
-    #[cfg(feature="mii-ordinary-cpu-alpha")]
     mii_replay::service(entry,owner);
-    #[cfg(feature="mii-ordinary-player-alpha")]
     if mii_ordinary_player::service(entry,owner){return;}
-    #[cfg(feature="mii-ordinary-cpu-alpha")]
     if mii_ordinary_cpu::service(entry,owner){return;}
-    #[cfg(feature="mii-saved-alpha")]
     if mii_saved_alpha::service(entry,owner){return;}
     let active = state_for(role).lock().active;
     if let Some(mut active) = active {
@@ -1225,14 +1151,11 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
             }
             publish_partners(role, active.forms);
             role.sync_selection(active.target);
-            #[cfg(feature="mii-hud-portrait-alpha")]
             mii_hud_portrait::before_refresh(entry, owner, active.target.kind());
             refresh_hud(entry, owner, active.target.kind());
-            #[cfg(feature = "mii-ordinary-player-alpha")]
             if owner == 0 {
                 mii_ordinary_player::complete_generic(entry, active.install, active.target.kind());
             }
-            #[cfg(feature = "mii-ordinary-cpu-alpha")]
             if role == Role::Cpu {
                 mii_ordinary_cpu::complete_generic(entry, active.install, active.target.kind(), active.slot);
             }
@@ -1327,13 +1250,10 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
                 if newly_observed {
                     // Exact native origin capture supplies a saved Mii default. A kind-only
                     // observation must not suppress its configuration on a later return.
-                    #[cfg(feature="mii-saved-alpha")]
                     let exact_origin_pending=mii_backend::current().is_some_and(|l|l.waiting())
                         && (0x48..=0x4a).contains(&kind)
-                        && ((role==Role::Player && cfg!(feature="mii-ordinary-player-alpha"))
-                            || (role==Role::Cpu && cfg!(feature="mii-ordinary-cpu-alpha")));
-                    #[cfg(not(feature="mii-saved-alpha"))]
-                    let exact_origin_pending=false;
+                        && ((role==Role::Player)
+                            || (role==Role::Cpu));
                     let fresh_lobby = current_scope.waiting()
                         && !exact_origin_pending
                         && WAITING_MEMORY
@@ -1490,11 +1410,9 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
         owner, entry as usize, current, target.kind(), slot.map(|i| i+1), active.epoch, active.scope.mode);
     #[cfg(feature = "console-swap-trace")]
     crate::runtime::roster::practice_trace::checkpoint(901, [entry as u64, u64::from(owner), u64::from(current), u64::from(target.kind()), active.epoch as u64]);
-    #[cfg(feature = "mii-ordinary-player-alpha")]
     if owner == 0 {
         mii_ordinary_player::begin_generic(entry, install_token, descriptor.bytes());
     }
-    #[cfg(feature = "mii-ordinary-cpu-alpha")]
     if role == Role::Cpu {
         mii_ordinary_cpu::begin_generic(entry, install_token, descriptor.bytes());
     }
@@ -1516,18 +1434,13 @@ pub unsafe fn on_destroy(entry: *const u8) {
     let owner = read::<u32>(entry, 0xe0);
     // R3-1: revoke both body registrations before body-bank/nested destruction.
     training::practice::entry_departed(entry as usize, owner);
-    #[cfg(feature = "native-body-bank-alpha")]
     body_bank::on_destroy(entry);
-    #[cfg(feature="mii-saved-alpha")]
     mii_saved_alpha::on_destroy(entry,owner);
-    #[cfg(feature="mii-ordinary-player-alpha")]
     mii_ordinary_player::on_destroy(entry);
-    #[cfg(feature="mii-ordinary-cpu-alpha")]
     mii_ordinary_cpu::on_destroy(entry);
     #[cfg(feature="mii-ldn-qualification-probe")]
     mii_ldn_qualification::on_destroy(entry, owner);
     sources::on_destroy(entry, owner);
-    #[cfg(feature="mii-hud-portrait-alpha")]
     mii_hud_portrait::on_destroy(entry, owner);
     if !matches!(owner, 0 | 1 | 4) {
         return;
@@ -1603,7 +1516,6 @@ pub unsafe fn on_destroy(entry: *const u8) {
         // Native Training -> CSS -> Training retains the same mode tuple. The
         // actual P1 entry destructor is also a scene boundary for plugin intent.
         sources::scene_changed();
-        #[cfg(feature="mii-hud-portrait-alpha")]
         mii_hud_portrait::scene_changed();
         crate::runtime::roster::kirby_hats::practice_departed(lobby::is_waiting_scene());
         crate::runtime::roster::character_items::scene_changed();
@@ -1614,10 +1526,8 @@ pub unsafe fn on_destroy(entry: *const u8) {
 /// Exact Miis keep their single-body proof. An ordinary bank is admitted only
 /// through its owned descriptor and all current body receipts; flags4 alone is
 /// never enough. Presentation names the active logical member, not kind word0.
-#[cfg(feature = "mii-saved-alpha")]
 unsafe fn presentation_ready(entry: *const u8, owner: u32, kind: u32) -> bool {
     if !active_body(entry, owner, kind) { return false; }
-    #[cfg(feature = "native-body-bank-alpha")]
     if body_bank::ready_kind(entry, owner) == Some(kind) { return true; }
     read::<u32>(entry, 0x18) == kind && read::<u8>(entry, 0x5918) == 0
 }
@@ -1625,13 +1535,12 @@ unsafe fn presentation_ready(entry: *const u8, owner: u32, kind: u32) -> bool {
 /// Called only after a Mii adapter accepts its exact completion, while its
 /// current callback and INSTALL token are still owned. Publish presentation only;
 /// original CSS identity and saved configuration/preferences remain untouched.
-#[cfg(feature = "mii-saved-alpha")]
 unsafe fn publish_mii_presentation(
     entry: *const u8,
     owner: u32,
     generation: u64,
     kind: u32,
-    #[cfg(feature="mii-hud-portrait-alpha")] portrait: PortraitIntent,
+    portrait: PortraitIntent,
 ) {
     let Some(logical)=mii_backend::current().and_then(|l|l.logical(owner)) else{return;};
     let role = if owner == 0 { Role::Player } else { Role::Cpu };
@@ -1661,7 +1570,6 @@ unsafe fn publish_mii_presentation(
     REBUILT[role as usize].store(false, Ordering::Release);
     drop(state);
     role.sync_selection(fighter);
-    #[cfg(feature="mii-hud-portrait-alpha")]
     if mii_hud_portrait::should_defer_hud(owner, kind, portrait) {
         // The exact texture does not exist yet. Keep the previous portrait and let the
         // service callback refresh and bind after the render proof. A rejected hold
@@ -1679,18 +1587,14 @@ unsafe fn publish_mii_presentation(
     // WP-P shadow readback (rule 5): the card after this publication, value-only. A deferred
     // exact bust is still pending here; the exact job's own bind is read back by the reset
     // and state-load hooks, so only a non-exact publication is judged against "no bust".
-    #[cfg(feature="mii-hud-portrait-alpha")]
     if !matches!(portrait, PortraitIntent::Exact(_)) {
         crate::runtime::roster::presentation::shadow_readback(BASE.load(Ordering::Acquire), owner, kind, false, "publish");
     }
-    #[cfg(not(feature="mii-hud-portrait-alpha"))]
-    refresh_hud(entry, owner, kind);
 }
 
 /// The publish site is the engine entry-service callback, after
 /// `mii_hud_portrait::service` has returned, so this call does not hold that
 /// function's `ServiceCallback`. Rejection still falls back here.
-#[cfg(feature="mii-hud-portrait-alpha")]
 fn policy_rejected_hud(accepted: bool) -> bool {
     mii_hud_portrait_policy::rejected_deferral(true, accepted, true, true)
         == mii_hud_portrait_policy::HudStep::RefreshFallback
@@ -1771,16 +1675,10 @@ unsafe fn republish_after_rebuild(entry: *mut u8, owner: u32) {
     if published != owner {
         return;
     }
-    #[cfg(feature = "mii-hud-portrait-alpha")]
     {
         mii_hud_portrait::represent(entry, owner, kind);
         // WP-P shadow readback after the native reset republish (the L+R+A class).
         crate::runtime::roster::presentation::shadow_readback(BASE.load(Ordering::Acquire), owner, kind, false, "native reset");
-    }
-    #[cfg(not(feature = "mii-hud-portrait-alpha"))]
-    {
-        refresh_hud(entry, owner, kind);
-        trace!("[CharacterRoster] native reset: Mii kind 0x{:x} republished owner={}", kind, owner);
     }
 }
 
@@ -1868,12 +1766,9 @@ unsafe fn refresh_hud(entry: *const u8, owner: u32, kind: u32) {
         event_type: 0x1d,
         entry: read(entry, 0x41e4),
         active_index: {
-            #[cfg(feature = "native-body-bank-alpha")]
             { if body_bank::ready_kind(entry, owner) == Some(kind) {
                 u32::from(read::<u8>(entry, 0x5918))
             } else { 0 } }
-            #[cfg(not(feature = "native-body-bank-alpha"))]
-            { 0 }
         },
         kind,
     };
@@ -2001,7 +1896,6 @@ unsafe fn refresh_waiting_icon(listener: *const u8, owner: u32, kind: u32, base:
 /// CPU4's waiting-card icon pane, read fresh through the generation-checked waiting UI
 /// handle for both the local and the online waiting controller. No texture assignment
 /// and no heap use.
-#[cfg(feature="mii-hud-portrait-alpha")]
 pub(super) unsafe fn waiting_icon_pane(base: usize, owner: u32) -> Option<*const u8> {
     if owner != 4 {
         return None;
@@ -2013,7 +1907,6 @@ pub(super) unsafe fn waiting_icon_pane(base: usize, owner: u32) -> Option<*const
 /// ordinary swaps. Resolve the registered listener and generation-checked pane
 /// now; never use a saved UI address during departure. Success retires its native
 /// texture override, allowing the portrait batch to be destroyed afterward.
-#[cfg(feature="mii-hud-portrait-alpha")]
 pub(super) unsafe fn restore_waiting_kind_icon(base: usize, kind: u32) -> bool {
     waiting_icon_source(base).is_some_and(|(listener, _)| waiting_icon(listener, 4, kind, base).is_ok())
 }
@@ -2021,7 +1914,6 @@ pub(super) unsafe fn restore_waiting_kind_icon(base: usize, kind: u32) -> bool {
 /// F-HUD-c readback for `[Hud] readback … icon=` (diag): CPU4's bound waiting icon against the icon its body's own
 /// costume names (`R+0x64` of the CPU entry, the word the body's files are keyed on), plus the row colour the publisher
 /// reads. Value only; the cache lookup is the one `waiting_icon` makes. Err when the card or `R` is not present.
-#[cfg(feature="mii-hud-portrait-alpha")]
 pub(crate) unsafe fn waiting_icon_observation(
     base: usize, kind: u32,
 ) -> Result<crate::engine::swap::swap_model::presentation::WaitingIconObservation, &'static str> {
@@ -2042,7 +1934,6 @@ pub(crate) unsafe fn waiting_icon_observation(
     })
 }
 
-#[cfg(feature="mii-hud-portrait-alpha")]
 unsafe fn waiting_icon_source(base: usize) -> Option<(*const u8, *const u8)> {
     let symbol = setting(&crate::runtime::compat::common::FIGHTER_MANAGER_ADDR);
     if symbol == 0 || read::<usize>(base as *const u8, 0x52c3420) == 0 {
@@ -2082,7 +1973,6 @@ unsafe fn waiting_icon_source(base: usize) -> Option<(*const u8, *const u8)> {
     None
 }
 
-#[cfg(feature="mii-hud-portrait-alpha")]
 unsafe fn waiting_card_pane(listener: *const u8, base: usize) -> Option<*const u8> {
     waiting_partner_icon(listener, 4, base, false).map(|(icon, _)| icon)
 }
@@ -2330,7 +2220,7 @@ const ROSTER_SEAMS: &[&str] = &["roster.native_service", "lifecycle.reload_entry
     "roster.waiting_online_icons", "roster.icon_hash", "roster.icon_request", "roster.icon_assign",
     "roster.spawn_pose_loads", "roster.spawn_pose_facing"];
 
-pub fn init(#[cfg(feature = "managed-third-source-alpha")] load_contract: Option<VerifiedLoad>) {
+pub fn init(load_contract: Option<VerifiedLoad>) {
     unsafe {
         let base = getRegionAddress(Region::Text) as usize;
         let legacy = [
@@ -2420,31 +2310,21 @@ pub fn init(#[cfg(feature = "managed-third-source-alpha")] load_contract: Option
             return;
         }
         BASE.store(base, Ordering::Release);
-    #[cfg(feature="mii-saved-alpha")]
     mii_saved_alpha::init(base);
-    #[cfg(feature="mii-managed-helper-alpha")]
     mii_managed_helper::init_storage();
-    #[cfg(feature="mii-ordinary-cpu-alpha")]
     mii_replay::init();
         // Validate the original destructor range before capacity installs its
         // listener-removed hook at 0x652214 inside that range. The Mii gate's
         // own patch at 0x6510f4 is outside all capacity fingerprint ranges.
-        #[cfg(feature="mii-ordinary-player-alpha")]
         if !mii_ordinary_player::init(base) {return;}
-        #[cfg(feature = "managed-third-source-alpha")]
         native_source_capacity::init(base, load_contract);
         #[cfg(feature="mii-ldn-qualification-probe")]
         mii_ldn_qualification::init(base);
-        #[cfg(feature="mii-ordinary-cpu-alpha")]
         mii_ordinary_cpu::init();
         native_service::install(base);
-        #[cfg(feature = "native-body-bank-alpha")]
         body_bank::install(base);
-        #[cfg(feature="mii-hud-portrait-alpha")]
         mii_hud_portrait::init(base);
-        if cfg!(feature = "waiting-roster-reload") {
-            skyline::install_hooks!(load_local_waiting_icons, load_online_waiting_icons);
-        }
-        trace!("[CharacterRoster] native async loader installed; ordinary P1/CPU1; waiting_enabled={}; one existing entry per role; no manual loader pumping", cfg!(feature = "waiting-roster-reload"));
+        skyline::install_hooks!(load_local_waiting_icons, load_online_waiting_icons);
+        trace!("[CharacterRoster] native async loader installed; ordinary P1/CPU1; waiting_enabled={}; one existing entry per role; no manual loader pumping", true);
     }
 }

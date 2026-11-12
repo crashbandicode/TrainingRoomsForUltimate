@@ -238,12 +238,8 @@ fn poll_status(blocked: bool, notice_blocked: bool, desired: Option<[Option<Targ
                 readiness.limited(), readiness.failed, readiness.progress));
         }
     }
-    #[cfg(feature = "native-body-bank-alpha")]
     let fighters = crate::runtime::roster::character_roster::body_bank::progress();
-    #[cfg(not(feature = "native-body-bank-alpha"))]
-    let fighters = crate::engine::preload::cycle_preload_policy::BuiltFighters::default();
     // F9-SEAT-NOTICE: Training's two parked seats count in the fighter status (a seat held for memory included).
-    #[cfg(feature = "managed-third-source-alpha")]
     // SAFETY: the visible Player's frame; the seat read is the guarded pause-menu count and the source book.
     let fighters = crate::engine::preload::hat_slots::with_seats(fighters,
         unsafe { crate::runtime::roster::character_roster::sources::seat_states() });
@@ -377,10 +373,6 @@ pub(crate) fn scene_end() {
 
 /// Same ordered mixed-roster resolver as actual cycling, with value-only
 /// qualification. Helper admission later checks exact rows and headgear again.
-#[cfg(any(
-    feature = "mii-ordinary-player-alpha",
-    feature = "mii-ordinary-cpu-alpha"
-))]
 pub(crate) fn mixed_targets(
     menu: &crate::engine::compat::menu::TrainingModpackMenu,
     role: usize,
@@ -539,7 +531,6 @@ pub unsafe fn on_frame(body: &mut smash::app::BattleObjectModuleAccessor) {
             .map(|t| t.map(Target::fighter_cache));
         lanes[3] = cpu_rotation.map(|t| t.map(Target::fighter_cache));
     }
-    #[cfg(feature = "native-body-bank-alpha")]
     {
         let banks = crate::runtime::roster::character_roster::body_bank::plan_budget(&menu, &lanes);
         // Only ordinary fighter look-ahead is covered by a body bank or one of
@@ -554,10 +545,7 @@ pub unsafe fn on_frame(body: &mut smash::app::BattleObjectModuleAccessor) {
         }
         crate::runtime::roster::character_roster::sources::refresh_preload_capacity();
     }
-    #[cfg(feature = "native-body-bank-alpha")]
     let helper_slots = crate::runtime::roster::character_roster::body_bank::helper_budget(settings.slots);
-    #[cfg(not(feature = "native-body-bank-alpha"))]
-    let helper_slots = settings.slots;
     // `kirby_hats::preload_targets` yields Player hats only while the Player's current fighter is
     // Kirby with hats in its cycle: then those hats outrank the CPU's fighter look-ahead.
     let order = if lanes[crate::engine::preload::cycle_preload_policy::PLAYER_HATS].iter().any(Option::is_some) {

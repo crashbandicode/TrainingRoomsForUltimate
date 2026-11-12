@@ -19,7 +19,6 @@ impl InstallGate {
         self.active.load(Ordering::Acquire) != 0
     }
 
-    #[cfg(any(test, feature = "mii-ordinary-player-alpha"))]
     pub fn owns(&self, token: InstallToken) -> bool {
         self.active.load(Ordering::Acquire) == token.0
     }

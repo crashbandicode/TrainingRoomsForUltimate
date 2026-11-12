@@ -55,7 +55,6 @@ impl Editor {
         if raw.class().kind()!=kind as u32 { return Err("Capture fighter identity changed".into()); }
         Ok(*raw)
     }
-    #[cfg(feature="mii-ordinary-cpu-alpha")]
     fn raw(&self)->Result<crate::engine::mii::replay::RawMii,String> {
         let view=self.view();
         self.raw_for(view.entry,view.fighter_kind,view.previous_selected)
@@ -68,7 +67,7 @@ impl Editor {
         let index=usize::try_from(entry).ok().filter(|index|*index<self.resolved.len());
         crate::engine::macro_ui::replay_target::clip_target(kind, raw.as_ref().map_err(String::as_str),
             index.and_then(|index|self.resolved[index]), index.is_some_and(|index|self.resolve_failed & (1 << index) != 0),
-            cfg!(feature="mii-ordinary-cpu-alpha"))
+            true)
     }
     fn target(&self)->Result<Option<Target>,String> {
         let view=self.view();
@@ -95,20 +94,14 @@ static PENDING: Mutex<Option<Pending>> = Mutex::new(None);
 /// This uses the existing native-service loading window and its safety gates.
 #[derive(Clone,Copy)]
 struct ResolveSelection { action:Option<ClipAction>, entry:usize }
-#[cfg(feature="mii-ordinary-cpu-alpha")]
 type ResolveTicket = crate::runtime::roster::character_roster::mii_replay::Ticket;
-#[cfg(not(feature="mii-ordinary-cpu-alpha"))]
-type ResolveTicket = crate::model::nowait_channel::Receiver<Result<Configuration,String>>;
 struct Reload { editor:Editor, requested:bool, ticks:u32, revision:u64,
     selection:Option<ResolveSelection>,
     resolving:Option<ResolveTicket>, resolve_error:Option<String> }
 pub(crate) fn selection_revision()->u64 {SELECTION_REVISION.load(Ordering::Acquire)}
 fn target_ready(target:Target,current:Option<i32>)->bool {
     let Some(_kind)=current else {return false;};
-    #[cfg(feature="mii-ordinary-cpu-alpha")]
-    { crate::runtime::macros::identity::clip_ready(target) }
-    #[cfg(not(feature="mii-ordinary-cpu-alpha"))]
-    {target.ready(_kind as u32,None)}
+    crate::runtime::macros::identity::clip_ready(target)
 }
 use crate::engine::macros::handoff::{VaultArchive as Capture, VaultEvent};
 static CAPTURE: Mutex<Capture> = Mutex::new(Capture::new());
@@ -347,7 +340,6 @@ fn gate_selection(action: Option<ClipAction>, current: Option<i32>) -> bool {
     // Resolve appearance metadata independently of the user's fighter choice.
     // Keep can then export the original Mii, and an already-matching Mii does not
     // prompt just because this selection lacks a loader acknowledgement.
-    #[cfg(feature="mii-ordinary-cpu-alpha")]
     if let Some((entry, raw)) = unresolved {
         let revision = SELECTION_REVISION.load(Ordering::Acquire);
         match crate::runtime::roster::character_roster::mii_replay::resolve(raw, revision) {
@@ -370,8 +362,6 @@ fn gate_selection(action: Option<ClipAction>, current: Option<i32>) -> bool {
             }
         }
     }
-    #[cfg(not(feature="mii-ordinary-cpu-alpha"))]
-    let _ = unresolved;
     if gate != FighterGate::Prompt { return false; }
     let revision = SELECTION_REVISION.load(Ordering::Acquire);
     *PENDING.lock().unwrap() = Some(Pending { revision, action });
@@ -569,10 +559,7 @@ pub fn service_reload_request() {
     RELOAD_REQUEST.drain(|(target, revision)| {
         let eligible = revision == selection_revision()
             && crate::runtime::roster::character_roster::cpu_reload_ready();
-        #[cfg(feature="mii-ordinary-cpu-alpha")]
         let accepted = eligible && crate::runtime::roster::character_roster::mii_replay::request(target, revision);
-        #[cfg(not(feature="mii-ordinary-cpu-alpha"))]
-        let accepted = eligible && crate::runtime::roster::character_roster::request_cpu_kind(target.kind());
         let posted = RELOAD_RESULT.post((revision, accepted));
         debug_assert!(posted, "one outstanding clip character result");
         crate::runtime::ui::worker::wake();
@@ -659,7 +646,6 @@ pub fn service_reload() {
             }
         }
         let target=match pending.editor.target() {Ok(target)=>target,Err(error)=>{failure=Some(error);None}};
-        #[cfg(feature="mii-ordinary-cpu-alpha")]
         if let Some(reason)=target.and_then(|target|crate::runtime::macros::identity::clip_refusal(target,pending.revision)) {
             failure=Some(reason.into());
         }
@@ -681,7 +667,6 @@ pub fn service_reload() {
             *EDITOR.lock().unwrap()=Some(pending.editor);
             notify(failure.unwrap_or_else(||"Exact preview fighter did not load; selection kept".into()));
         } else if target.is_none() && pending.resolving.is_none() {
-            #[cfg(feature="mii-ordinary-cpu-alpha")]
             {
                 let raw=pending.editor.raw();
                 let revision=pending.revision;

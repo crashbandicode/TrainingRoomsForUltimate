@@ -67,7 +67,7 @@ pub fn is_source_member(requested: u32, member: u32) -> bool {
     if (0x48..=0x4a).contains(&requested) {
         // A Mii source has exactly its own class member. Generic archive,
         // typed-param and copy-file readiness remain mandatory at the caller.
-        return cfg!(feature = "mii-managed-helper-alpha") && requested == member;
+        return requested == member;
     }
     crate::engine::swap::trio::TrioFighter::from_kind(requested).is_some()
         && Forms::starting(requested).same_group(member)
@@ -303,7 +303,7 @@ mod tests {
         assert!(!is_source_member(0x00, 0x4c));
         assert!(!is_source_member(0x4b, u32::MAX));
         assert!(!is_source_member(0x4c, 0x4c));
-        assert_eq!(is_source_member(0x48, 0x48), cfg!(feature = "mii-managed-helper-alpha"));
+        assert!(is_source_member(0x48, 0x48));
         assert!(is_source_member(0x5a, 0x5b));
         assert!(is_source_member(0x24, 0x26));
 

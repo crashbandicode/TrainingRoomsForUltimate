@@ -349,7 +349,7 @@ fn next_qualified<T>(
 #[path = "../../../tests/support/mii_cycle_compact.rs"]
 pub(crate) mod compact_regressions;
 
-#[cfg(all(test, feature = "mii-saved-alpha"))]
+#[cfg(test)]
 mod tests {
     lib_unit_tests! {
     use super::*;

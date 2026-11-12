@@ -52,9 +52,7 @@ struct CommittedCapture {
 
 enum WriteJob {
     Capture(Box<CommittedCapture>),
-    #[cfg(feature = "mii-ordinary-cpu-alpha")]
     ReadCatalog(CatalogJob),
-    #[cfg(feature = "mii-ordinary-cpu-alpha")]
     // The box and reply endpoint are reserved at boot and returned after each job.
     Import(Box<crate::runtime::roster::character_roster::mii_replay::ImportPayload>,
         crate::runtime::roster::character_roster::mii_replay::ImportReply),
@@ -87,7 +85,6 @@ pub fn start_writer() -> Result<(), String> {
             let archive = SharedCaptureArchive::new(format!("{}/replay_captures",
                 crate::model::storage::ROOT));
             // The same serialized owner is the only writer of mod presets. Native saves are read-only.
-            #[cfg(feature = "mii-ordinary-cpu-alpha")]
             let mut presets = crate::engine::mii::draft_store::Store::open(
                 crate::model::storage::ROOT).map_err(|error| error.to_string());
             while let Ok(message) = receiver.recv() {
@@ -99,7 +96,6 @@ pub fn start_writer() -> Result<(), String> {
                                 println!("[ReplayCapture] {} id={} name={:?}",
                                     if outcome.created { "persisted" } else { "already_present" },
                                     outcome.id, saved.replay_name);
-                                #[cfg(feature = "mii-ordinary-cpu-alpha")]
                                 if let Some(miis) = saved.miis {
                                     crate::runtime::roster::character_roster::mii_replay::committed(miis);
                                 }
@@ -108,7 +104,6 @@ pub fn start_writer() -> Result<(), String> {
                                 saved.replay_id, error),
                         }
                     }
-                    #[cfg(feature = "mii-ordinary-cpu-alpha")]
                     WriteJob::ReadCatalog(reply) => {
                         // Stable native header reads stay in saved::read_catalog. Preset merge stays
                         // on this writer, after any import already queued ahead of this job.
@@ -120,7 +115,6 @@ pub fn start_writer() -> Result<(), String> {
                         }
                         reply.complete(Arc::new(native));
                     }
-                    #[cfg(feature = "mii-ordinary-cpu-alpha")]
                     WriteJob::Import(mut payload, reply) => {
                         use crate::runtime::roster::character_roster::mii_replay::Error;
                         let result = if let Some(library) = payload.library.as_ref() {
@@ -163,28 +157,22 @@ pub fn persist_committed(replay_id: String, replay_name: String, session: Arc<Li
 }
 
 /// Queue one owned catalog read. Never blocks the caller on the writer or the filesystem.
-#[cfg(feature = "mii-saved-alpha")]
 pub(crate) enum CatalogQueue {
     Queued,
     Full(CatalogJob),
     Unavailable(CatalogJob),
 }
 
-#[cfg(feature = "mii-saved-alpha")]
 pub(crate) type CatalogJob = crate::model::catalog_reply::Job<Arc<crate::engine::mii::inventory::Snapshot>>;
-#[cfg(feature = "mii-saved-alpha")]
 static CATALOG_FALLBACK: OnceLock<SyncSender<CatalogJob>> = OnceLock::new();
 
-#[cfg(feature = "mii-saved-alpha")]
 fn read_saved_mii_catalog() -> crate::engine::mii::inventory::Snapshot {
     crate::engine::mii::saved::read_catalog(Path::new("save:/save_data/mii"))
 }
 
-#[cfg(feature = "mii-saved-alpha")]
 pub(crate) fn request_mii_catalog(
     reply: CatalogJob,
 ) -> CatalogQueue {
-    #[cfg(feature = "mii-ordinary-cpu-alpha")]
     if let Some(writer) = WRITER.get() {
         return match writer.try_send(WriteJob::ReadCatalog(reply)) {
             Ok(()) => CatalogQueue::Queued,
@@ -200,14 +188,12 @@ pub(crate) fn request_mii_catalog(
 
 /// One permanent 128 KiB reader used only when the shared replay writer cannot take the job.
 /// Saved-only builds have no preset writer; a dead writer still returns the native catalog.
-#[cfg(feature = "mii-saved-alpha")]
 fn init_catalog_fallback() {
     CATALOG_FALLBACK.get_or_init(|| {
         let (sender, receiver) = mpsc::sync_channel::<CatalogJob>(1);
         let _ = crate::runtime::threads::spawn(crate::model::thread_stacks::ThreadId::MiiCatalog, move || {
                 while let Ok(reply) = receiver.recv() {
                     let native = read_saved_mii_catalog();
-                    #[cfg(feature = "mii-ordinary-cpu-alpha")]
                     let native = {
                         let mut native = native;
                         native.findings.push(crate::engine::mii::inventory::Finding::PresetSource {
@@ -223,7 +209,6 @@ fn init_catalog_fallback() {
     });
 }
 
-#[cfg(feature = "mii-saved-alpha")]
 fn fallback_catalog(reply: CatalogJob) -> CatalogQueue {
     let Some(sender) = CATALOG_FALLBACK.get() else {
         return CatalogQueue::Unavailable(reply);
@@ -235,7 +220,6 @@ fn fallback_catalog(reply: CatalogJob) -> CatalogQueue {
     }
 }
 
-#[cfg(feature = "mii-ordinary-cpu-alpha")]
 pub(crate) fn import_mii(
     payload: Box<crate::runtime::roster::character_roster::mii_replay::ImportPayload>,
     reply: crate::runtime::roster::character_roster::mii_replay::ImportReply,
@@ -254,9 +238,7 @@ pub(crate) fn import_mii(
 /// before the Deluxe row registers. Configuration is read once; capture
 /// sampling performs no filesystem reads.
 pub fn init() {
-    #[cfg(feature = "mii-saved-alpha")]
     init_catalog_fallback();
-    #[cfg(feature = "mii-ordinary-cpu-alpha")]
     if let Err(error) = start_writer() { println!("[ReplayCapture] Mii library unavailable: {error}"); }
     let path = REPLAY_CAPTURE_INI;
     let result = (|| -> Result<CaptureSettings, String> {

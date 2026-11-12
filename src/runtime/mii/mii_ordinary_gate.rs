@@ -124,13 +124,10 @@ unsafe fn r68_on_continuation(payload:Option<([u8;0x70],bool)>,selected:usize) {
 unsafe extern "C" fn mii_ordinary_gate_decide(entry:usize,selected:usize,native_sp:usize)->usize {
     crate::runtime::threads::headroom("mii_ordinary_gate_decide");
     // stream/stack: each arm is its own frame (inline(never)), so the callback's stack holds only the arm that runs.
-    #[cfg(feature="mii-ordinary-cpu-alpha")]
     if super::super::mii_ordinary_cpu::tracked(entry) {return decide_cpu(entry,selected,native_sp);}
-    #[cfg(feature="mii-managed-helper-alpha")]
     if super::super::mii_managed_helper::tracked(entry) {return decide_helper(entry,selected,native_sp);}
     decide_player(entry,selected,native_sp)
 }
-#[cfg(feature="mii-ordinary-cpu-alpha")]
 #[inline(never)]
 unsafe fn decide_cpu(entry:usize,selected:usize,native_sp:usize)->usize {
     {
@@ -150,7 +147,6 @@ unsafe fn decide_cpu(entry:usize,selected:usize,native_sp:usize)->usize {
         };
     }
 }
-#[cfg(feature="mii-managed-helper-alpha")]
 #[inline(never)]
 unsafe fn decide_helper(entry:usize,selected:usize,native_sp:usize)->usize {
     {

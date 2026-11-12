@@ -944,6 +944,7 @@ const UNSCANNED_ENTRIES: &[(&str, &str)] = &[
     ("probe::mounted", "ui/probe.rs is a `#[cfg(feature = \"diag\")]` module: Eden builds only, not scanned (R2 finding 6)"),
     ("ui::probe::install", "the tr-probe thread: ui/probe.rs is a `#[cfg(feature = \"diag\")]` module, not scanned"),
     ("macros::diag::start", "the tr-macro-diag thread: macros/diag.rs is a `#[cfg(feature = \"diag\")]` module, not scanned"),
+    ("compat::filesystem::init", "the tr-trace-writer thread: compat/filesystem.rs is a `#[cfg(feature = \"diag\")]` module since rc.10 S2 (it was `all(diag, mii-editor-alpha)`), not scanned"),
 ];
 
 /// Callback registrations the text cannot follow: `(registrar's module, registrar, the function that calls what is registered)`.
@@ -1270,7 +1271,7 @@ fn every_plugin_thread_entry_resolves() {
     let shipped = runtime_graph();
     let missing: BTreeSet<String> =
         plugin_entry_funcs(&shipped).into_iter().filter(|(found, _)| found.is_empty()).map(|(_, name)| name).collect();
-    let diag_only: BTreeSet<String> = ["tr-probe", "tr-macro-diag"].iter().map(|s| (*s).to_owned()).collect();
+    let diag_only: BTreeSet<String> = ["tr-probe", "tr-macro-diag", "tr-trace-writer"].iter().map(|s| (*s).to_owned()).collect();
     assert_eq!(missing, diag_only, "the shipped build lacks only the diag build's own threads");
 }
 

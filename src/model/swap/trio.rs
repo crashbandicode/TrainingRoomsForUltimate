@@ -97,12 +97,9 @@ pub(crate) const CHOICES: &[(u32, &str)] = &[
     (0x26, "Charizard"),
     // Native entry descriptor, not the individual Popo/Nana actor kinds.
     (0x4b, "Ice Climbers"),
-    #[cfg(feature = "mii-saved-alpha")]
     (0x49, "Mii Swordfighter"),
     // Append only: retain the existing Sword index in persisted arrays.
-    #[cfg(feature = "mii-saved-alpha")]
     (0x48, "Mii Brawler"),
-    #[cfg(feature = "mii-saved-alpha")]
     (0x4a, "Mii Gunner"),
 ];
 

@@ -63,13 +63,8 @@ fn live() -> Live {
 }
 
 fn reading_token() -> Option<crate::engine::mii::auto_init::Token> {
-    #[cfg(feature = "mii-ordinary-cpu-alpha")]
     {
         super::mii_auto_init::reading_token()
-    }
-    #[cfg(not(feature = "mii-ordinary-cpu-alpha"))]
-    {
-        None
     }
 }
 
@@ -95,12 +90,9 @@ pub(crate) fn close_opening(opening: u64) {
     drop(broker);
     // A quick close can cancel the menu read that superseded automatic capture.
     // Restart through the normal eligible native callback, never the stale reply.
-    #[cfg(feature = "mii-ordinary-cpu-alpha")]
     if restart_auto {
         super::mii_auto_init::reset();
     }
-    #[cfg(not(feature = "mii-ordinary-cpu-alpha"))]
-    let _ = restart_auto;
 }
 
 pub(super) fn retire() {
@@ -131,7 +123,6 @@ pub(super) fn service() {
     if let Some((verdict, snapshot)) = ready {
         // Every completed read, whatever its verdict: the editor checks its saved Mii here, on the game thread, never on the
         // reader thread (the bridge's STATE is taken by game hooks; rc.6 Training-entry freeze class).
-        #[cfg(feature = "mii-editor-alpha")]
         crate::runtime::mii::mii_editor_bridge::catalog_read(&snapshot);
         apply(verdict, snapshot);
     }
@@ -222,12 +213,7 @@ fn abandon_auto(kind: Option<Kind>) {
     let Some(Kind::Auto(token)) = kind else {
         return;
     };
-    #[cfg(feature = "mii-ordinary-cpu-alpha")]
     super::mii_auto_init::abandon(token);
-    #[cfg(not(feature = "mii-ordinary-cpu-alpha"))]
-    {
-        let _ = token;
-    }
 }
 
 fn apply(verdict: Verdict, snapshot: Arc<Snapshot>) {
@@ -240,12 +226,7 @@ fn apply(verdict: Verdict, snapshot: Arc<Snapshot>) {
         }
         Verdict::Editor { opening } => retain_editor(snapshot, opening),
         Verdict::Auto(token) => {
-            #[cfg(feature = "mii-ordinary-cpu-alpha")]
             super::mii_auto_init::deliver(token, snapshot);
-            #[cfg(not(feature = "mii-ordinary-cpu-alpha"))]
-            {
-                let _ = (token, snapshot);
-            }
         }
     }
 }
@@ -266,7 +247,6 @@ pub(super) fn publish_menu(publication: CatalogPublication) {
 }
 
 fn retain_editor(snapshot: Arc<Snapshot>, opening: u64) {
-    #[cfg(feature = "mii-editor-alpha")]
     {
         match crate::runtime::mii::mii_editor_bridge::mount_opened_catalog(snapshot, opening) {
             crate::runtime::mii::mii_editor_bridge::OpenedCatalog::Shown
@@ -279,9 +259,5 @@ fn retain_editor(snapshot: Arc<Snapshot>, opening: u64) {
                 PENDING.store(broker.busy(), Ordering::Release);
             }
         }
-    }
-    #[cfg(not(feature = "mii-editor-alpha"))]
-    {
-        let _ = (snapshot, opening);
     }
 }

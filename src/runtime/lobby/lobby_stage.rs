@@ -33,7 +33,7 @@ fn prepare_entry(index: usize) -> Option<(Selection, u32)> {
     let prefs = crate::runtime::compat::common::menu::stage_preferences();
     let mut cycles = CYCLES.lock().unwrap();
     match cycles[index].prepare_preferences(menu.lobby_practice == OnOff::ON,
-        menu.lobby_stages, &prefs, cfg!(feature = "practice-stage-request-alpha"))
+        menu.lobby_stages, &prefs, true)
         .and_then(|selection| selection.map(|selection| native_stage(selection)
             .map(|stage| (selection, stage))).transpose()) {
         Ok(selection) => selection,
@@ -56,14 +56,12 @@ fn consume_entry(index: usize) -> Option<(Selection, u32)> {
 
 #[skyline::hook(offset = 0x25f7874, inline)]
 unsafe fn resource_request(ctx: &mut InlineCtx) {
-    #[cfg(feature = "practice-stage")]
     crate::runtime::lobby::practice_stage::observe_resource_request(ctx);
     let Some(mode) = crate::runtime::lobby::game_mode::current() else {
         return;
     };
     // Ordinary Training's explicit entry rotation shares this callback and
     // returns before the waiting-family gate below; it never takes that branch.
-    #[cfg(feature = "training-stage-rotation-alpha")]
     crate::runtime::lobby::training_stage_rotation::resource_request(ctx, mode);
     let Some(index) = cycle_index(mode.mode) else { return; };
     let config = ctx.registers[1].x() as *const u8;
@@ -226,7 +224,6 @@ pub fn init() {
         std::slice::from_raw_parts((base + offset) as *const u32, words.len()) == *words
     })) && verified;
     QUICKPLAY_VERIFIED.store(quickplay_verified, Ordering::Release);
-    #[cfg(feature = "training-stage-rotation-alpha")]
     {
         // The first two windows are the generic loader's slot choice and its
         // resource call; ordinary Training's apply depends on them as well.

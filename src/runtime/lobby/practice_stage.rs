@@ -132,7 +132,6 @@ unsafe fn stage_update(ctx: &mut InlineCtx) {
         && (crate::runtime::compat::common::is_native_training_mode()
             || crate::runtime::lobby::lobby_stage::qualified_waiting(mode.mode, mode.melee));
     if !in_scope {
-        #[cfg(feature = "practice-stage-request-alpha")]
         crate::runtime::lobby::practice_stage_request::depart();
         if let Ok(mut last) = LAST.try_lock() {
             *last = None;
@@ -181,7 +180,6 @@ unsafe fn stage_update(ctx: &mut InlineCtx) {
                 .map(|at| word(at)),
         }
     });
-    #[cfg(feature = "practice-stage-request-alpha")]
     crate::runtime::lobby::practice_stage_request::update(wrapper, core, mode.mode, mode.melee,
         stage_slots.get(active as usize).copied().unwrap_or(0));
     let Some(snapshot) = snapshot else { return };
@@ -294,7 +292,6 @@ pub fn init() {
         "[PracticeStageObserver] verified={verified} passive=true"
     ));
     if verified {
-        #[cfg(feature = "practice-stage-request-alpha")]
         crate::runtime::lobby::practice_stage_request::init(base);
         VERIFIED.store(true, Ordering::Release);
         skyline::install_hooks!(stage_update);

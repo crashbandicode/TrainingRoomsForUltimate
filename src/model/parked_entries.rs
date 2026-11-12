@@ -606,7 +606,7 @@ mod tests {
         assert!(gate.contains("crate::model::parked_entries::live_seat("), "F9 publishes its live seats");
         let native = include_str!("../runtime/mii/mii_ordinary_native.rs");
         assert!(native.contains("crate::runtime::roster::f9_gate::seat_live(id as u32)"), "the snapshot asks F9");
-        assert!(native.contains("(parked || owner_live)"), "a live seat need not be parked; its proof stays exact");
+        assert!(native.contains("now, parked || owner_live)"), "a live seat need not be parked; its proof stays exact");
     }
 
     fn the_in_flight_question_is_asked_only_for_an_unpublished_cell() {

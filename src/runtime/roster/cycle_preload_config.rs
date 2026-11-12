@@ -13,7 +13,6 @@ static CACHE: AtomicU32 = AtomicU32::new(0);
 pub fn init() {
     let menu = crate::runtime::compat::sync::read(&crate::runtime::compat::menu::MENU);
     publish(&menu, "loaded");
-    #[cfg(feature = "native-body-bank-alpha")]
     crate::runtime::roster::character_roster::body_bank::report_group_swap(&snapshot());
 }
 

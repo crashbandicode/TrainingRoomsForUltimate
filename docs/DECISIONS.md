@@ -575,3 +575,23 @@ This records the decision only; the implementation, host tests and Eden proofs a
   - **With target-first (above):** a Kirby target keeps his full window only while D-KIRBY1 is in force. Its gate
     (`native_body_bank::live_gate`) takes F1's route (`d_kirby1_live`), so with F1 installed a Kirby target is
     target-first like any other fighter and his neighbours build beside him.
+
+## rc.10 S2: the product is not behind feature switches (supersedes D11)
+
+2026-11-12, the operator, on the rc.10 code-reduction plan (`docs/CODE-REDUCTION-rc10.md`, S2).
+
+- **Before (D11, package 6):** the plugin carried the fork's whole Cargo feature table, and every feature in it had to
+  build. 25 of those features were on in every build that shipped.
+- **Now:** those 25 features are gone. Their code is always compiled, and the code that only compiled with one of
+  them off is deleted. `deluxe-sdk` (an optional dependency), `diag` and the diagnostic family stay features.
+- **`cargo build --no-default-features`** is now the whole product without the Deluxe SDK. Before, it was a smaller
+  build that never shipped.
+- **The guard tables' `feature` column** keeps the name each row was carried with; a name that is no longer a Cargo
+  feature means "every build" (`tests/pkg6_features.rs`).
+- Removed: `enhancements-alpha`, `native-unlink-guard`, `mii-hud-portrait-alpha`, `cycle-preload-extended`,
+  `lobby-preload-extended`, `native-body-bank-alpha`, `managed-visible-grouped-source-alpha`,
+  `mii-ordinary-cpu-alpha`, `managed-third-source-alpha`, `mii-editor-alpha`, `cpu-pilot-probe`, `p1-cpu-control`,
+  `mii-managed-helper-alpha`, `waiting-roster-reload`, `practice-stage-request-alpha`,
+  `training-stage-rotation-alpha`, `lobby-stage`, `practice-stage`, `training-stage-rotation`, `mii-saved-alpha`,
+  `mii-ordinary-player-alpha`, `mii-managed-source-coexist-alpha`, `managed-sources`,
+  `managed-grouped-source-alpha`, `managed-ldn-third-source-alpha`.

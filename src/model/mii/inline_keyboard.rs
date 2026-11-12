@@ -27,7 +27,6 @@ pub struct Text {
 
 impl Text {
     // Keep the old Mii constructor/ten-unit contract at the compatibility path.
-    #[cfg(any(test, feature = "mii-editor-alpha"))]
     pub fn new(units: &[u16], cursor: usize) -> Option<Self> {
         Self::with_limit(units, cursor, Limit::Mii)
     }

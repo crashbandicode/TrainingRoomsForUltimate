@@ -820,7 +820,6 @@ fn nana_removed(entry: i32) -> bool {
 /// The per-role "state load started / completed" notification of the Mii HUD portrait (SPEC-state-01 section 9): the roster cycle's
 /// presentation check observes the role's HUD card when a load starts and compares it when that role's restore completes (a load must
 /// change no card). Only while the cycle runs and its install recorded the main image base.
-#[cfg(feature = "mii-hud-portrait-alpha")]
 unsafe fn hud_load(role: usize, started: bool) {
     let base = if crate::runtime::roster::running() { crate::runtime::roster::character_roster::main_base() } else { 0 };
     if base == 0 {
@@ -833,8 +832,6 @@ unsafe fn hud_load(role: usize, started: bool) {
     }
 }
 
-#[cfg(not(feature = "mii-hud-portrait-alpha"))]
-unsafe fn hud_load(_role: usize, _started: bool) {}
 
 /// Do what the frame asked, with no lock held.
 unsafe fn apply(raw: &Raw, nana: bool, out: Out) {

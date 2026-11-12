@@ -354,13 +354,7 @@ pub fn service_switch_request() {
     let mut newest = None;
     SWITCH_MII.drain(|target| newest = Some(target));
     let Some(target) = newest else { return };
-    #[cfg(feature = "mii-ordinary-cpu-alpha")]
     let accepted = crate::runtime::roster::character_roster::mii_replay::request_named(target);
-    #[cfg(not(feature = "mii-ordinary-cpu-alpha"))]
-    let accepted = {
-        let _ = target;
-        false
-    };
     #[cfg(feature = "diag")]
     crate::runtime::diag_log::diagnostic(format_args!(
         "[PracticeRecording] screen=mismatch switch_mii=1 kind={} accepted={}",

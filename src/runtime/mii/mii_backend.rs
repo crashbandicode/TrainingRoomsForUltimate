@@ -5,22 +5,17 @@ pub(super) use crate::engine::mii::backend::Layout;
 pub(super) fn current()->Option<Layout> {
     let mode=crate::runtime::lobby::game_mode::current()?;
     Layout::scene(mode.initialized,mode.melee,mode.mode,
-        cfg!(feature="waiting-roster-reload") && super::lobby::active())
+        super::lobby::active())
 }
 pub(super) fn cpu()->Option<u32> {Some(current()?.visible()[1])}
 /// Registered created entries (value copy) that Mii owner checks may accept beside
 /// the layout owners. Read outside native G; rechecks under G are physical only.
-#[cfg(any(feature="mii-ordinary-player-alpha",feature="mii-ordinary-cpu-alpha"))]
 pub(super) fn extras()->crate::engine::mii::capacity::Extras {
-    #[cfg(feature="managed-third-source-alpha")]
-    { super::native_source_capacity::managed::owned_extras() }
-    #[cfg(not(feature="managed-third-source-alpha"))]
-    { crate::engine::mii::capacity::Extras::NONE }
+    super::native_source_capacity::managed::owned_extras()
 }
 /// Raw current facts of created entry `slot` for `Extras::admit`. Reads only; safe
 /// with native G held (no native call, no Rust lock). Callers have already
 /// span-checked FE (0x5a88), E (0x260), D (0x3a0), O (0xb0) and the owner table (0x130).
-#[cfg(any(feature="mii-ordinary-player-alpha",feature="mii-ordinary-cpu-alpha"))]
 pub(super) unsafe fn extra_facts(table:usize,slot:usize,fe:usize,e:usize,d:usize,o:usize)
     ->crate::engine::mii::capacity::ExtraFacts {
     use crate::runtime::mii::mii_native_access::rd;

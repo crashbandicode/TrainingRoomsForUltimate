@@ -206,8 +206,7 @@ fn load_context(recording:&MacroRecording, prompt:bool, current:Option<i32>) -> 
         cpu_kind:current,
         matches,
         prompt_enabled:prompt && read(&MENU).fighter_prompt==OnOff::ON,
-        // An exact Mii can only be requested by the Mii alpha; other builds keep the CPU.
-        can_switch:target.is_some_and(|target|cfg!(feature="mii-ordinary-cpu-alpha") || target.configuration().is_none()),
+        can_switch:target.is_some(),
         revision:selection_revision(),
         recorded_label:if target.is_some_and(|target|target.configuration().is_some()) {format!("{recorded} (recorded Mii)")} else {recorded},
         current_label:current.map_or_else(||"CPU".to_owned(),fighter_label),
@@ -225,10 +224,7 @@ pub(crate) fn recorded_target_matches(target:crate::engine::mii::replay::Target,
 fn exact_target_ready(target:crate::engine::mii::replay::Target,current:Option<i32>) -> bool {
     let Some(kind)=current else{return false;};
     if target.configuration().is_none() {return target.ready(kind as u32,None);}
-    #[cfg(feature="mii-ordinary-cpu-alpha")]
-    {crate::runtime::macros::identity::named_ready(target)}
-    #[cfg(not(feature="mii-ordinary-cpu-alpha"))]
-    {false}
+    crate::runtime::macros::identity::named_ready(target)
 }
 fn observe_loaded() {
     let (plays_current,target)={let ui=lock_read(&UI);(ui.plays_current(),ui.loaded_target())};
@@ -281,14 +277,6 @@ fn submit_loaded_character() {
     if CHARACTER_PENDING.load(Ordering::Acquire) { return; }
     let target=lock_read(&UI).loaded_target();
     let Some(target)=target else{return;};
-    #[cfg(not(feature="mii-ordinary-cpu-alpha"))]
-    if target.configuration().is_some() {
-        let revision=selection_revision();
-        if NAMED_REFUSAL_SHOWN.swap(revision,Ordering::AcqRel)!=revision {
-            notify("Exact Mii macro loading is unavailable in this build");
-        }
-        return;
-    }
     if lock_write(&UI).claim_character_request()!=Some(target.kind() as i32) {return;}
     CHARACTER_PENDING.store(true, Ordering::Release);
     let posted = CHARACTER_REQUEST.post((target, selection_revision()));
@@ -300,11 +288,7 @@ pub fn service_character_request() {
     CHARACTER_REQUEST.drain(|(target, revision)| {
         let eligible = revision == selection_revision() && source_is_named()
             && crate::runtime::roster::character_roster::cpu_reload_ready();
-        #[cfg(feature="mii-ordinary-cpu-alpha")]
         let accepted = eligible && crate::runtime::roster::character_roster::mii_replay::request_named(target);
-        #[cfg(not(feature="mii-ordinary-cpu-alpha"))]
-        let accepted = eligible && target.configuration().is_none()
-            && crate::runtime::roster::character_roster::request_cpu_kind(target.kind());
         let posted = CHARACTER_RESULT.post((revision, accepted));
         debug_assert!(posted, "one outstanding named character result");
         crate::runtime::ui::worker::wake();
@@ -1310,7 +1294,6 @@ pub fn service_character() {
         observe_loaded();
         return;
     }
-    #[cfg(feature="mii-ordinary-cpu-alpha")]
     {
         let target=lock_read(&UI).loaded_target();
         if let Some(reason)=target.and_then(crate::runtime::macros::identity::named_refusal) {
@@ -1321,7 +1304,6 @@ pub fn service_character() {
     }
     observe_loaded();
     if crate::runtime::roster::character_roster::busy() {return;}
-    #[cfg(feature="mii-ordinary-cpu-alpha")]
     {
         let target=lock_read(&UI).loaded_target();
         if let Some(target)=target {

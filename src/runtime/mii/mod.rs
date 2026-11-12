@@ -4,7 +4,6 @@
 
 pub(crate) mod mii_identity_binding;
 pub(crate) mod native_keyboard;
-#[cfg(feature = "mii-editor-alpha")]
 pub(crate) mod mii_editor_bridge;
 pub(crate) mod mii_native_access;
 #[cfg(feature = "diag")]
@@ -14,9 +13,7 @@ pub(crate) mod bust_context;
 pub(crate) fn init() {
     #[cfg(feature = "diag")]
     bust_context::init();
-    #[cfg(feature = "mii-editor-alpha")]
     mii_editor_bridge::init();
 }
 
-#[cfg(feature = "mii-saved-alpha")]
 pub(crate) mod menu_handoff;

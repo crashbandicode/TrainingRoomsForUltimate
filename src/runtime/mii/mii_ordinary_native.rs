@@ -78,10 +78,7 @@ pub(crate) fn foreign_kind(now:Authority,original_kind:u32,row_kind:i8,kind:u32)
 /// ExpectedMutation::NativeBehavior)` (WP5a): a per-owner mismatch fails that
 /// owner's claim only and never widens tolerance for another owner.
 pub(crate) unsafe fn owner_header_matches(entry:usize,id:u32,object:usize,kind:u32)->bool {
-    #[cfg(feature="native-body-bank-alpha")]
     if let Some(matches)=super::super::body_bank::group_header(entry,id,object) {return matches;}
-    #[cfg(not(feature="native-body-bank-alpha"))]
-    let _=(entry,id);
     rd::<u32>(object,0x58)==kind
 }
 pub(crate) fn retire_authority(id:usize,entry:usize) {
@@ -91,7 +88,6 @@ pub(crate) fn retire_authority(id:usize,entry:usize) {
 /// lobby-preload A: a visible exact Mii as extra-capacity creation proved it: the owner's
 /// authority rederived under G (equal to the one committed for it), its descriptor and its
 /// selected record. `native_source_capacity` compares it again after the native creation call.
-#[cfg(all(feature="mii-ordinary-cpu-alpha",feature="managed-third-source-alpha"))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct VisibleMii {
     pub(crate) authority:Authority,
@@ -101,13 +97,11 @@ pub(crate) struct VisibleMii {
 /// lobby-preload A: true only when `now`, rederived under G, is exactly the authority committed
 /// for its owner (`Committed::permits`: binding, epoch, thread, map, entries, owner) with this
 /// original row kind and committed Mii kind. A native or uncommitted Mii never qualifies.
-#[cfg(all(feature="mii-ordinary-cpu-alpha",feature="managed-third-source-alpha"))]
 pub(crate) fn visible_committed(now:Authority,original_kind:u32,kind:u32)->bool {
     COMMITTED.lock().visible.get(now.binding.owner as usize).copied().flatten()
         .is_some_and(|c|c.permits(now,original_kind,kind))
 }
 /// lobby-preload A: Player0's visible exact Mii, proven from a fresh snapshot. Reads only.
-#[cfg(all(feature="mii-ordinary-cpu-alpha",feature="managed-third-source-alpha"))]
 pub(super) unsafe fn visible_exact(entry:usize,epoch:u64,original_kind:u32,kind:u32)->Result<VisibleMii,&'static str> {
     let now=snapshot(entry,epoch,original_kind)?;
     let authority=now.authority();
@@ -123,36 +117,27 @@ pub(crate) unsafe fn control(row:usize)->[u8;7] {
 }
 pub(crate) unsafe fn helper_kind(view:&helpers::View,id:usize,owner:Owner,kind:u32)->bool {
     let Some(ordinal)=view.ordinal(id) else {
-        return !cfg!(feature="mii-managed-source-coexist-alpha")
-            && role_owner::original_row_matches(kind,rd(owner.row,8));
+        return false;
     };
     let now=helpers::Proof {original:helpers::OriginalRow {row:owner.row,
         kind:rd(owner.row,8),index:owner.index,selector:owner.selector,control:control(owner.row)},
         thread:skyline::nn::os::GetCurrentThread() as usize,owner,kind,costume:rd(owner.object,0x64)};
-    #[cfg(any(test, feature = "mii-managed-source-coexist-alpha"))]
     let managed=matches!(view.slots.get(ordinal),Some(helpers::Helper::Ready{..}));
-    #[cfg(any(test, feature = "mii-managed-source-coexist-alpha"))]
     let parked=!managed || (rd::<u32>(owner.object,0x54)==id as u32
         && super::super::native_source::parked_ready(owner.entry as *const u8,id as u32,kind));
-    #[cfg(not(any(test, feature = "mii-managed-source-coexist-alpha")))]
-    let parked=true;
     // TASK-OPUS-rc6-open-fixes item 1, reading A (primary 2026-11-08 23:03Z): a promoted F9 seat the game plays as a CPU
     // (slot <= No. of CPUs) is a CPU owner for this snapshot, not a parked helper row. Its source must still be exactly
     // the published one (the proof, key, token and Mii binding below); it is only not parked while it plays (Eden
     // covrest-12: the recorded proof equal to the row read now, `parked=false`).
-    #[cfg(any(test, feature = "mii-managed-source-coexist-alpha"))]
     let owner_live=crate::runtime::roster::f9_gate::seat_live(id as u32);
-    if !view.accepts(id,now, #[cfg(any(test, feature = "mii-managed-source-coexist-alpha"))] (parked || owner_live)) {
+    if !view.accepts(id,now, parked || owner_live) {
         note_refused_proof(view,id,ordinal,now,parked,"proof");
         return false;
     }
     // Item 1 (primary 2026-11-09 00:09Z, 00:23Z): going live rewrites the seat's descriptor (every re-proof logged
     // `descriptor_changed=true`), so a live seat keeps its Mii by reading B's identity in place of byte equality of the
     // descriptor and the record (`MiiProof::holds`). The binding checks below and the mirrors' tokens stay exact.
-    #[cfg(any(test, feature = "mii-managed-source-coexist-alpha"))]
     let live=owner_live && !parked;
-    #[cfg(not(any(test, feature = "mii-managed-source-coexist-alpha")))]
-    let live=false;
     if let Some(Some(mii))=view.miis.get(ordinal) {
         let b=mii.binding;
         if b.epoch != super::super::mii_saved_alpha::current_generation(1)
@@ -252,9 +237,6 @@ pub(crate) unsafe fn created_kind(view:&helpers::View,extras:crate::engine::mii:
     id:usize,owner:Owner,kind:u32,facts:crate::engine::mii::capacity::ExtraFacts)
     ->Result<(),&'static str> {
     if MiiClass::from_kind(kind).is_none() {return extras.admit(id,&owner,facts);}
-    #[cfg(not(feature="mii-managed-helper-alpha"))]
-    {let _=view;extras.admit(id,&owner,facts)}
-    #[cfg(feature="mii-managed-helper-alpha")]
     {
     let ordinal=view.created_ordinal(id).ok_or("created Mii backend differs")?;
     let receipt=view.created_miis[ordinal].ok_or("created Mii receipt absent")?;
@@ -304,7 +286,6 @@ pub(crate) fn check(ok: bool, reason: &'static str) -> Result<(), &'static str> 
 /// published (`crate::engine::swap::body_bank::mii_publish`): a busy sentinel clears by itself and costs no attempt,
 /// a helper with no ordinary authority cannot clear while the owner idles, and every other read/write failure is a
 /// race the next frame reads again (counted).
-#[cfg(feature="native-body-bank-alpha")]
 pub(crate) fn publish_refusal(reason: &'static str) -> crate::engine::swap::body_bank::mii_publish::PublishRefusal {
     use crate::engine::swap::body_bank::mii_publish::PublishRefusal;
     if reason == helpers::BUSY || reason == helpers::CAPTURE_BUSY { PublishRefusal::Busy }
@@ -312,7 +293,6 @@ pub(crate) fn publish_refusal(reason: &'static str) -> crate::engine::swap::body
     else { PublishRefusal::Race(reason) }
 }
 /// A refusal that cannot clear while the owner idles (`PublishRefusal::Permanent`) unless `ok`.
-#[cfg(feature="native-body-bank-alpha")]
 pub(crate) fn permanent(ok: bool, reason: &'static str)
     -> Result<(), crate::engine::swap::body_bank::mii_publish::PublishRefusal> {
     if ok { Ok(()) } else { Err(crate::engine::swap::body_bank::mii_publish::PublishRefusal::Permanent(reason)) }
@@ -421,9 +401,7 @@ unsafe fn map(entry: usize) -> Result<Map,&'static str> {
     check(rd::<u32>(internal,0xa0) as usize==physical.iter().filter(|p| **p!=0).count(),
         "current map count")?;
     let extras=super::super::mii_backend::extras();
-    if cfg!(feature="mii-managed-source-coexist-alpha") || layout.waiting() {
-        check(layout.shape_with(&physical,extras),"Mii backend owner shape differs")?;
-    }
+    check(layout.shape_with(&physical,extras),"Mii backend owner shape differs")?;
     if layout.waiting() {
         check(super::super::native_source::exact_waiting_layout_with(physical[5] as *const u8,5,layout,extras),"waiting row layout changed")?;
     }
@@ -709,7 +687,6 @@ pub(super) unsafe fn publish(track:&super::Track, selected:usize) -> Result<(),&
 }
 /// What a Mii one-member group switch published before its native request, so a
 /// switch refused afterwards can put the owner's exact record and scalars back.
-#[cfg(feature="native-body-bank-alpha")]
 #[derive(Clone,Copy)]
 pub(super) struct BankPublished { record:[u8;values::RECORD_LEN], scalars:Scalars }
 
@@ -722,7 +699,6 @@ pub(super) struct BankPublished { record:[u8;values::RECORD_LEN], scalars:Scalar
 /// for `group_hat` (`HatPublication::validate_bank`). Writes the CharInfo onto the
 /// owner's selector record and the E/D scalars; the identity words follow at the
 /// build. Lock order G -> adapter STATE -> COMMITTED.
-#[cfg(feature="native-body-bank-alpha")]
 pub(super) unsafe fn bank_publish(bank:&super::BankTrack,c:Configuration,group_hat:u16)->Result<(),&'static str> {
     target_rows(c)?;
     let before=&bank.before;
@@ -782,7 +758,6 @@ pub(super) unsafe fn bank_publish(bank:&super::BankTrack,c:Configuration,group_h
 /// (none may be: `final_registry(.., None)`), G is held, the owner's unchanged
 /// receipt is re-proven and then adopts the bytes; nothing else is written. The
 /// switch's `bank_publish` rewrites the same bytes with the scalars later.
-#[cfg(feature="native-body-bank-alpha")]
 pub(super) unsafe fn prefetch_publish(entry:usize,c:Configuration,identity:crate::engine::swap::body_bank::MiiIdentity)
     ->Result<(),crate::engine::swap::body_bank::mii_publish::PublishRefusal> {
     use crate::engine::swap::body_bank::mii_publish::PublishRefusal;
@@ -835,7 +810,6 @@ pub(super) unsafe fn prefetch_publish(entry:usize,c:Configuration,identity:crate
 }
 
 /// A verified restore: the receipt and the owner's state read back after the writes.
-#[cfg(feature="native-body-bank-alpha")]
 pub(super) struct Restored {
     pub receipt:crate::engine::mii::ordinary_player::RestoreReceipt,
     pub now:Snapshot,
@@ -850,7 +824,6 @@ pub(super) struct Restored {
 /// receipt is verified when the owner's kept receipt (`before`) describes native again,
 /// with at most native's own pair at `record+0x58` (a crossed Phase B Mii setup) to adopt.
 /// `helpers::BUSY` comes back only before any write: the caller keeps the track and retries.
-#[cfg(feature="native-body-bank-alpha")]
 pub(super) unsafe fn bank_restore(bank:&super::BankTrack,c:Configuration,published:BankPublished)->Result<Restored,&'static str> {
     use crate::engine::mii::ordinary_player::{publication_rollback,restore_receipt,PublicationRollback};
     let before=&bank.before;
@@ -941,7 +914,6 @@ pub(super) unsafe fn completed(track:&super::Track) -> Result<Snapshot,&'static 
 
 /// Terminal class of a bank member settlement. `Diverged` means the owner's
 /// physical receipt no longer describes native state; `Kept` leaves it valid.
-#[cfg(feature="native-body-bank-alpha")]
 pub(super) enum BankRefusal { Busy, Kept(&'static str), Diverged(&'static str) }
 
 /// Same-entry bank member switch, current ready callback. Nothing is adopted: the
@@ -952,7 +924,6 @@ pub(super) enum BankRefusal { Busy, Kept(&'static str), Diverged(&'static str) }
 /// configuration that stays active (the published one only when the exact proof was
 /// adopted), the degrade reason when the body was proven but a resource clause failed,
 /// and whether the record's native pair was present.
-#[cfg(feature="native-body-bank-alpha")]
 #[derive(Clone,Copy,Debug)]
 pub(super) struct Settled {
     pub now:Snapshot,
@@ -960,7 +931,6 @@ pub(super) struct Settled {
     pub resource_pair:Option<bool>,
 }
 /// Lock order G -> adapter STATE -> COMMITTED.
-#[cfg(feature="native-body-bank-alpha")]
 #[inline(never)] // rc.8 §7: its snapshots and MiiExit copies live in its own frame, not in bank_service's
 pub(super) unsafe fn bank_settled(bank:&super::BankTrack) -> Result<Settled,BankRefusal> {
     let before=&bank.before;
@@ -1047,7 +1017,6 @@ pub(super) unsafe fn bank_settled(bank:&super::BankTrack) -> Result<Settled,Bank
 
 /// rc.8 R5: what the warm exit carries across `bank_restore`. `exit_plan` builds it in its own frame, so the kept
 /// `MiiExit`, the snapshot read under G and their copies are gone before the restore runs.
-#[cfg(feature="native-body-bank-alpha")]
 struct ExitPlan {
     restore:super::BankTrack, configuration:Configuration, published:BankPublished, adopted:Snapshot, helpers:helpers::View,
 }
@@ -1058,7 +1027,6 @@ struct ExitPlan {
 /// goes back through `bank_restore` (the window is no longer the published group), whose read-back proves the rest
 /// against the receipt from before the Mii with the descriptor as it is now; then the owner adopts the window with no
 /// active configuration. `helpers::BUSY` before any write retries on the next callback.
-#[cfg(feature="native-body-bank-alpha")]
 #[inline(never)] // rc.8 §7: its snapshots and MiiExit copies live in its own frame, not in bank_service's
 pub(super) unsafe fn exit_settled(bank:&super::BankTrack)->Result<Settled,BankRefusal> {
     // rc.8 R5: the proof before the restore (`exit_plan`) and the adoption after it (`exit_adopt`) each have their own
@@ -1077,7 +1045,6 @@ pub(super) unsafe fn exit_settled(bank:&super::BankTrack)->Result<Settled,BankRe
 
 /// rc.8 R5: `exit_settled` before the restore: the kept exit, the G identity, the helpers' view, the bank's exchange
 /// receipt; then the restore's track.
-#[cfg(feature="native-body-bank-alpha")]
 #[inline(never)]
 unsafe fn exit_plan(bank:&super::BankTrack,plan:&mut Option<ExitPlan>)->Result<(),BankRefusal> {
     let before=&bank.before;
@@ -1117,7 +1084,6 @@ unsafe fn exit_plan(bank:&super::BankTrack,plan:&mut Option<ExitPlan>)->Result<(
 }
 
 /// rc.8 R5: `exit_settled` after the restore: the owner adopts the window (`now` is the restore's read-back).
-#[cfg(feature="native-body-bank-alpha")]
 #[inline(never)]
 unsafe fn exit_adopt(bank:&super::BankTrack,plan:&ExitPlan,now:&Snapshot)->Result<Settled,BankRefusal> {
     let before=&bank.before;

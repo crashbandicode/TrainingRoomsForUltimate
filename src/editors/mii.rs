@@ -23,16 +23,12 @@ impl MiiList {
         let mut catalog = match context {
             Some(context) if context.epoch == epoch => CatalogMenu::new(snapshot, context, &preferences)?,
             Some(_) => return None,
-            #[cfg(feature = "mii-editor-alpha")]
             None => CatalogMenu::editor_only(snapshot, epoch, &preferences)?,
-            #[cfg(not(feature = "mii-editor-alpha"))]
-            None => return None,
         };
         catalog.set_editor_available(crate::engine::mii_root::mii_menu::NATIVE_EDITOR_AVAILABLE);
         Some(Self { catalog, preferences, opened: None, epoch })
     }
 
-    #[cfg(feature = "mii-ordinary-cpu-alpha")]
     pub fn qualify_cpu(&mut self, qualified: bool) {
         self.catalog.qualify_ordinary_cpu_cycle(qualified);
     }
@@ -49,18 +45,9 @@ impl MiiList {
     /// The roster grids' Mii tiles for this opening (the fork's `app.rs` 563-685 asks the mounted catalog the same). The
     /// CPU cycle's admission and the slot 0s are the runtime's, set by the worker (`MiiTiles::cpu_cycle`, `slot_zero`).
     pub fn tiles(&self) -> crate::editors::roster::MiiTiles {
-        #[cfg(feature = "mii-saved-alpha")]
         let player = [0x48u32, 0x49, 0x4a].map(|kind| self.catalog.alpha_player_cycle(kind));
-        #[cfg(not(feature = "mii-saved-alpha"))]
-        let player = [false; 3];
-        #[cfg(feature = "mii-ordinary-cpu-alpha")]
         let cpu = [0x48u32, 0x49, 0x4a].map(|kind| self.catalog.alpha_cpu_cycle(kind));
-        #[cfg(not(feature = "mii-ordinary-cpu-alpha"))]
-        let cpu = [false; 3];
-        #[cfg(feature = "mii-managed-helper-alpha")]
         let hat = [0x48u32, 0x49, 0x4a].map(|kind| self.catalog.alpha_helper_hat(kind));
-        #[cfg(not(feature = "mii-managed-helper-alpha"))]
-        let hat = [false; 3];
         crate::editors::roster::MiiTiles { player, cpu, hat, ..Default::default() }
     }
 
@@ -84,7 +71,6 @@ impl MiiList {
         }
     }
 
-    #[cfg(feature = "mii-editor-alpha")]
     pub fn editor_request(&self) -> Option<crate::engine::mii_root::mii_menu::EditorRequest> {
         self.catalog.editor_seed(&self.preferences)
     }
@@ -126,7 +112,7 @@ impl MiiList {
     }
 }
 
-#[cfg(all(test, feature = "mii-editor-alpha"))]
+#[cfg(test)]
 mod tests {
     lib_unit_tests! {
     use super::*;

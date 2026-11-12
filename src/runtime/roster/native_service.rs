@@ -19,7 +19,6 @@ impl ServiceEntryContext {
         // Capture the actual callback stack; TLS alone cannot identify a fiber stack.
         self as *const Self as usize + std::mem::size_of::<Self>()
     }
-    #[cfg(feature = "managed-third-source-alpha")]
     pub(super) fn dispatcher_tuple(&self) -> [usize; 4] {
         self.words
     }
@@ -186,13 +185,10 @@ unsafe extern "C" fn training_mod_native_service_pre(entry: *mut u8, context: &S
 /// stale or refused track), as before.
 #[inline(never)]
 unsafe fn training_mod_native_service_gates(entry: *mut u8) -> bool {
-    #[cfg(feature = "mii-ordinary-player-alpha")]
     if !super::mii_ordinary_player::enter_native(entry) {
         return false;
     }
-    #[cfg(feature = "mii-ordinary-cpu-alpha")]
     if !super::mii_ordinary_cpu::enter_native(entry) {return false;}
-    #[cfg(feature="mii-managed-helper-alpha")]
     if !super::mii_managed_helper::enter_native(entry) {return false;}
     let _ = entry;
     true
@@ -203,11 +199,8 @@ unsafe fn training_mod_native_service_gates(entry: *mut u8) -> bool {
 #[inline(never)]
 unsafe extern "C" fn training_mod_native_service_post(entry: *mut u8, result: u64) -> u64 {
     crate::runtime::roster::practice_trace::event(222, [entry as u64, result, 0, 0, 0]);
-    #[cfg(feature="mii-managed-helper-alpha")]
     super::mii_managed_helper::leave_native(entry);
-    #[cfg(feature = "mii-ordinary-player-alpha")]
     super::mii_ordinary_player::leave_native(entry);
-    #[cfg(feature = "mii-ordinary-cpu-alpha")]
     super::mii_ordinary_cpu::leave_native(entry);
     crate::runtime::roster::practice_trace::event(223, [entry as u64, result, 0, 0, 0]);
     result

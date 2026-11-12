@@ -27,9 +27,7 @@ static STATE:OwnerMutex<State>=OwnerMutex::new(State {
     owner:None,track:None,catalog:None,capture:false,capture_at:(0,0),menu_valid:false,request:None,next:1,
     reservation:crate::engine::mii::ordinary_cpu::Reservation::empty(),departed:false,replay_result:None,generic:None,restore:None,
     recapture_log:None,waiting:Waiting::new(),
-    #[cfg(feature="native-body-bank-alpha")]
     bank:None,
-    #[cfg(feature="native-body-bank-alpha")]
     mii_exit:None,
 });
 struct Owner {
@@ -71,7 +69,6 @@ impl Prepared {
 /// Same-entry bank member switch: no phase-6 publication and no new physical
 /// receipt. `before` stays the owner's expected snapshot; logical is this token's
 /// requested member and `retained` the same_owned record mode used at preflight.
-#[cfg(feature="native-body-bank-alpha")]
 #[derive(Clone,Copy)]
 struct BankTrack {
     ticket:Ticket, token:InstallToken, before:native::Snapshot, logical:u32,
@@ -91,7 +88,6 @@ struct BankTrack {
 /// rc.6 warm exit (operator decision 2026-11-08): a settled Mii group switch's publication, kept while the
 /// owner's receipt is the one that switch adopted, so the exit to the window it displaced can put it back
 /// (`native::exit_settled`).
-#[cfg(feature="native-body-bank-alpha")]
 #[derive(Clone,Copy)]
 struct MiiExit {mii:BankTrack,configuration:Configuration,published:native::BankPublished,adopted:native::Snapshot}
 /// Read-only receipt for an ordinary load kept on the generic roster path.
@@ -110,15 +106,12 @@ struct State {
     recapture_log:Option<(u64,NonRankDiff,RecaptureFlags)>,
     /// FAIL 2: the queued request's last noted blocker; one line per change, not per callback.
     waiting:Waiting<Request>,
-    #[cfg(feature="native-body-bank-alpha")]
     bank:Option<BankTrack>,
-    #[cfg(feature="native-body-bank-alpha")]
     mii_exit:Option<MiiExit>,
 }
 impl State {
     /// An owned phase-6 transaction or bank member switch holds this adapter.
     fn busy(&self)->bool {
-        #[cfg(feature="native-body-bank-alpha")]
         if self.bank.is_some() {return true;}
         self.track.is_some()
     }
@@ -129,7 +122,6 @@ fn note(reason:impl std::fmt::Display) { trace!("[MiiOrdinaryCpu] {reason}"); }
 
 /// rc.6 item 3 (Mii groups built in the background): no transaction holds this adapter, so a background Mii setup's
 /// record change (`adopt_background_record`) is the only change between its snapshots and native.
-#[cfg(feature="native-body-bank-alpha")]
 pub(super) fn background_idle()->bool {
     let s=STATE.lock();
     !s.busy() && s.generic.is_none()
@@ -138,7 +130,6 @@ pub(super) fn background_idle()->bool {
 /// rc.6 item 3: the bank's background Mii setup changed selector record `index` from `before` to `after` (the pair
 /// `0x3759500` publishes) while this adapter was idle. Every stored snapshot takes it (`Snapshot::adopt_record`), as a
 /// switch-time build's settle adopts the owner's new snapshot. Returns how many record copies changed.
-#[cfg(feature="native-body-bank-alpha")]
 pub(super) fn adopt_background_record(index:u16,before:&[u8;crate::engine::mii::native_values::RECORD_LEN],
     after:&[u8;crate::engine::mii::native_values::RECORD_LEN])->usize {
     let mut s=STATE.lock();
@@ -154,7 +145,6 @@ pub(super) fn adopt_background_record(index:u16,before:&[u8;crate::engine::mii::
 /// lobby-preload A: the CPU's visible exact Mii for extra-capacity creation. Only the authority
 /// this adapter committed for the CPU owner (1 Training, 4 waiting), rederived now under G with
 /// the CPU's original row kind, proves it. Reads only.
-#[cfg(feature="managed-third-source-alpha")]
 pub(super) unsafe fn visible_exact(current:*const u8,kind:u32)->Result<provenance::VisibleMii,&'static str> {
     let original=original_kind(Role::Cpu).ok_or("CPU original absent")?;
     let now=native::snapshot(current as usize,epoch(),original)?;
@@ -315,7 +305,6 @@ pub(super) fn library_catalog() -> Result<Option<Arc<Catalog>>, ()> {
     let s = STATE.try_lock().ok_or(())?;
     Ok(s.catalog.as_ref().map(Arc::clone))
 }
-#[cfg(feature="mii-ordinary-cpu-alpha")]
 pub(super) fn publish_library(expected: &Arc<Catalog>, prepared: &Arc<Catalog>) -> Result<bool, ()> {
     let mut s = STATE.try_lock().ok_or(())?;
     if !s.catalog.as_ref().is_some_and(|catalog| Arc::ptr_eq(catalog, expected)) { return Ok(false); }
@@ -327,13 +316,11 @@ pub(super) unsafe fn menu_capture_pending(entry:*const u8)->bool {
     s.capture && (s.owner.as_ref().is_some_and(|o|o.origin.binding.entry==entry as usize)
         || original_kind(Role::Cpu)==Some(read::<u32>(entry,0x18)))
 }
-#[cfg(feature="mii-managed-helper-alpha")]
 pub(super) fn helper_origin_captured()->bool {
     let s=STATE.lock();
     !s.departed && !s.capture && !s.busy()
         && s.owner.as_ref().is_some_and(|o|o.origin.binding.epoch==epoch())
 }
-#[cfg(feature="mii-managed-helper-alpha")]
 pub(super) fn helper_origin_hats()->Option<[u16;2]> {
     let s=STATE.lock();
     s.owner.as_ref().filter(|o|!s.departed && o.origin.binding.epoch==epoch())
@@ -520,11 +507,8 @@ pub(super) fn intercept(role:Role,selection:Selection,user_request:bool)->Option
     // Same-entry banks: a qualified, captured owner (current epoch, valid menu and
     // catalog, no capture pending, not departed) also keeps ordinary-only cycles. A
     // missing or unqualified owner still takes the fallback above or the roster.
-    #[cfg(feature="native-body-bank-alpha")]
     let ordinary_cycle=matches!(selection,Selection::Cycle) && !s.departed && s.menu_valid && !s.capture
         && s.catalog.is_some() && owner.origin.binding.epoch==epoch();
-    #[cfg(not(feature="native-body-bank-alpha"))]
-    let ordinary_cycle=false;
     let requested=setting(&MENU).cpu_roster.fighters_excluding_fixed(None).iter()
         .any(|f|MiiClass::from_kind(f.kind()).is_some())
         || ordinary_cycle
@@ -580,10 +564,7 @@ unsafe fn blocker(install:bool)->Option<Blocker> {
 }
 /// The CPU's HUD portrait render holds a helper (sequencing: the press runs after the render, never dropped).
 fn portrait_render_held()->bool {
-    #[cfg(feature="mii-hud-portrait-alpha")]
-    {super::mii_hud_portrait::render_holds_helper(1)}
-    #[cfg(not(feature="mii-hud-portrait-alpha"))]
-    {false}
+    super::mii_hud_portrait::render_holds_helper(1)
 }
 unsafe fn permitted()->bool {begin_blocker().is_none()}
 
@@ -619,7 +600,6 @@ unsafe fn ready_descriptor(entry:*const u8,d:&[u8;0x70])->bool {
 }
 /// Live member of this CPU owner's ready same-entry bank when `d` is exactly that
 /// bank's physical group. Value only; the bank module proves bodies under its lock.
-#[cfg(feature="native-body-bank-alpha")]
 unsafe fn bank_live(entry:*const u8,owner:u32,d:&[u8;0x70])->Option<u32> {
     let members=super::body_bank::ready_members(entry,owner)?;
     let word=|at:usize|u32::from_le_bytes(d[at..at+4].try_into().unwrap());
@@ -628,8 +608,6 @@ unsafe fn bank_live(entry:*const u8,owner:u32,d:&[u8;0x70])->Option<u32> {
         super::body_bank::ready_kind(entry,owner)
     } else {None}
 }
-#[cfg(not(feature="native-body-bank-alpha"))]
-unsafe fn bank_live(_entry:*const u8,_owner:u32,_d:&[u8;0x70])->Option<u32> {None}
 /// The live fighter of this CPU owner's entry (the outgoing one of a request); see the Player
 /// adapter. Current native callback only, before the request changes the bank.
 unsafe fn live_kind(entry:*const u8,owner:u32,d:&[u8;0x70])->u32 {bank_live(entry,owner,d).unwrap_or_else(||descriptor_kind(d))}
@@ -642,18 +620,12 @@ fn bank_member_forms(d:&[u8;0x70],kind:u32)->Forms {
 /// Logical CPU fighter of the owned physical receipt, for value planning only. Uses
 /// the bank's value receipt (no entry read), so it is safe outside the native
 /// callback; request/settlement proofs keep the strict `bank_live`.
-#[cfg(feature="native-body-bank-alpha")]
 unsafe fn logical_kind(expected:&native::Snapshot)->u32 {
     super::body_bank::cached_kind(expected.binding.entry,expected.binding.owner,&expected.descriptor)
         .unwrap_or_else(||descriptor_kind(&expected.descriptor))
 }
-#[cfg(not(feature="native-body-bank-alpha"))]
-unsafe fn logical_kind(expected:&native::Snapshot)->u32 {descriptor_kind(&expected.descriptor)}
 /// The bank module disproved this owner's operation after native settlement.
-#[cfg(feature="native-body-bank-alpha")]
 fn bank_failed(entry:*const u8,owner:u32)->bool {super::body_bank::failed(entry,owner)}
-#[cfg(not(feature="native-body-bank-alpha"))]
-fn bank_failed(_entry:*const u8,_owner:u32)->bool {false}
 /// Native loader idle with no pending/active change: nothing remains to force.
 unsafe fn settled(entry:*const u8)->bool {
     read::<u8>(entry,0x5920)==6 && read::<u8>(entry,0x591c)==14 && read::<u8>(entry,0x591a)==0xff
@@ -667,7 +639,6 @@ pub(super) unsafe fn service(entry:*mut u8,owner:u32)->bool {
     if !matches!(owner,1|4) || !ENABLED.load(Ordering::Acquire) {return false;}
     // P-CYCLE: the admission the menu shows is the one the walkers walk, refreshed every frame from this state.
     publish_admission(cycle_admission(&STATE.lock()));
-    #[cfg(feature="native-body-bank-alpha")]
     {
         let bank=STATE.lock().bank;
         if let Some(b)=bank {
@@ -705,7 +676,6 @@ pub(super) unsafe fn service(entry:*mut u8,owner:u32)->bool {
     if needs_capture {capture(entry);}
     // Primary 2026-11-09 07:34Z: a press waits the tick a group's CharInfo goes on the record, so the bank's next
     // lifecycle tick can start that group's prefetch first when it serves the press (`body_bank::serving_step`).
-    #[cfg(feature="native-body-bank-alpha")]
     if mii_group_record_publication(entry,owner) {return false;}
     {
         let mut s=STATE.lock();
@@ -721,7 +691,6 @@ pub(super) unsafe fn service(entry:*mut u8,owner:u32)->bool {
 /// frame at no cost; a read/write race counts against the group; a refusal that
 /// cannot clear while the owner idles fails the group at once
 /// (`crate::engine::swap::body_bank::mii_publish`). The refusal reason is noted once.
-#[cfg(feature="native-body-bank-alpha")]
 #[inline(never)] // stream/stack: its own frame, not `service`'s
 unsafe fn mii_group_record_publication(entry:*mut u8,owner:u32)->bool {
     use crate::engine::swap::body_bank::mii_publish::PublishRefusal;
@@ -762,7 +731,6 @@ unsafe fn complete(entry:*const u8,t:&Track) {
                     // The delivered fighter: the member at the staged starting cell for a bank
                     // build (never `+0x18[0]`, a pinned Kirby/Solo Popo), the request's kind otherwise.
                     let target=t.reload_target().kind;
-                    #[cfg(feature="mii-hud-portrait-alpha")]
                     publish_mii_presentation(entry,t.before.binding.owner,t.ticket.epoch,target,
                         if t.destination.target==Target::ORIGINAL {
                             super::PortraitIntent::Original {
@@ -773,8 +741,6 @@ unsafe fn complete(entry:*const u8,t:&Track) {
                         } else {
                             super::PortraitIntent::NotMii
                         });
-                    #[cfg(not(feature="mii-hud-portrait-alpha"))]
-                    publish_mii_presentation(entry,t.before.binding.owner,t.ticket.epoch,target);
                     crate::runtime::roster::cycle_preload::foreground_settled();
                     let released=settle_outcome(Outcome::Applied {receipt:receipt_of(&now,target),lease:t.token},t.ticket,None,true);
                     if t.replay.is_none() {state_for(Role::Cpu).lock().cursor=t.destination.cursor;}
@@ -882,10 +848,7 @@ unsafe fn refresh_idle_metadata(entry:*mut u8,kind:u32,expected:native::Snapshot
 }
 
 /// A bank member switch `begin_prepare` admitted, submitted here once its frame is gone.
-#[cfg(feature="native-body-bank-alpha")]
 type BankSubmit=(Option<super::body_bank::Plan>,super::native_reload_pose::ReloadPose);
-#[cfg(not(feature="native-body-bank-alpha"))]
-type BankSubmit=core::convert::Infallible;
 
 /// rc.8 §7: `begin_prepare` holds the snapshots it copied (about 100 KB of frame); a bank switch is submitted after it
 /// returns, so that frame and `submit_bank`'s chain no longer stack on the native service poll's deepest path.
@@ -896,7 +859,6 @@ unsafe fn begin(entry:*mut u8)->bool {
     let mut bank:Option<BankSubmit>=None;
     let started=begin_prepare(entry,&mut bank);
     match bank {
-        #[cfg(feature="native-body-bank-alpha")]
         Some((plan,pose))=>submit_bank(entry,plan,pose),
         _=>started,
     }
@@ -1137,12 +1099,10 @@ unsafe fn begin_prepare(entry:*mut u8,bank:&mut Option<BankSubmit>)->bool {
     // bank planner owns eligibility and budget; upcoming kinds come from the real
     // mixed CPU cycle after this destination.
     // rc.6 warm exit: out of a live Mii group whose publication this owner kept, the window it displaced is warm.
-    #[cfg(feature="native-body-bank-alpha")]
     let exit=active.is_some() && publish.is_none()
         // rc.8 R5: borrowed, not a copy of the kept MiiExit (18.5 KB of `begin_prepare`'s frame).
         && STATE.lock().mii_exit.as_ref().is_some_and(|x|x.mii.ticket.epoch==current.binding.epoch
             && x.adopted==expected);
-    #[cfg(feature="native-body-bank-alpha")]
     let plan={
         let after=match destination.target.kind() {
             TargetKind::Fighter(kind) if publish.is_none() && same_class.is_none()
@@ -1181,11 +1141,8 @@ unsafe fn begin_prepare(entry:*mut u8,bank:&mut Option<BankSubmit>)->bool {
             else {super::body_bank::plan(entry,current.binding.owner,descriptor,&upcoming)}
         })
     };
-    #[cfg(feature="native-body-bank-alpha")]
     let (physical,bank_build,reuse)=plan.map_or((descriptor,false,false),
         |p|(p.descriptor,!p.reuse && p.is_bank(),p.reuse));
-    #[cfg(not(feature="native-body-bank-alpha"))]
-    let (physical,bank_build,reuse)=(descriptor,false,false);
     if !permitted(){return false;}
     let Some(pose)=capture_reload_pose(entry,current.binding.owner) else {
         refuse_request(request,"CPU position not ready before reload");return false;
@@ -1216,7 +1173,6 @@ unsafe fn begin_prepare(entry:*mut u8,bank:&mut Option<BankSubmit>)->bool {
         s.next=next;s.request=None;
         if reuse {
             // Published before the native request; settled only by bank_service.
-            #[cfg(feature="native-body-bank-alpha")]
             {s.bank=Some(BankTrack {ticket,token,before:current,logical:descriptor_kind(&descriptor),
                 destination,retained:retained || active.is_some(),replay:request.replay(),
                 publish,descriptor,hat_change,origin_index:origin.index,
@@ -1233,10 +1189,7 @@ unsafe fn begin_prepare(entry:*mut u8,bank:&mut Option<BankSubmit>)->bool {
         }
     };
     let Some(track)=track else {
-        #[cfg(feature="native-body-bank-alpha")]
         {*bank=Some((plan,pose));return false;}
-        #[cfg(not(feature="native-body-bank-alpha"))]
-        {let _=bank;return false;}
     };
     let staged=native_fighter_install::Descriptor::from_bytes(&track.descriptor);
     training::clear_session_state();
@@ -1244,13 +1197,10 @@ unsafe fn begin_prepare(entry:*mut u8,bank:&mut Option<BankSubmit>)->bool {
         track.ticket,live_kind(entry,current.binding.owner,&current.descriptor),track.reload_target().kind,current.index,
         track.destination.cursor,&current.record[88..104]);
     trace!("[MiiOrdinaryCpu] staged ticket={:?} bank_build={} descriptor={:02x?}",track.ticket,track.bank,track.descriptor);
-    #[cfg(feature="native-body-bank-alpha")]
     let submitted=match plan {
         Some(p) if track.bank => super::body_bank::submit(entry,current.binding.owner,p,pose),
         _ => {reload_at_pose(base(),entry,&staged,pose);true}
     };
-    #[cfg(not(feature="native-body-bank-alpha"))]
-    let submitted={reload_at_pose(base(),entry,&staged,pose);true};
     if !submitted {
         // The bank refused before any native write: no Reload was issued.
         let owned={
@@ -1277,7 +1227,6 @@ unsafe fn begin_prepare(entry:*mut u8,bank:&mut Option<BankSubmit>)->bool {
 
 /// Warm member switch after the BankTrack is published, INSTALL and pose owned.
 /// A refusal performed no native write; release only this token's ownership.
-#[cfg(feature="native-body-bank-alpha")]
 #[inline(never)] // rc.8 §7: its own frame, not inside `begin`'s under `begin_prepare`'s
 unsafe fn submit_bank(entry:*mut u8,plan:Option<super::body_bank::Plan>,
     pose:super::native_reload_pose::ReloadPose)->bool {
@@ -1321,7 +1270,6 @@ unsafe fn submit_bank(entry:*mut u8,plan:Option<super::body_bank::Plan>,
 }
 
 /// Settle a CPU member switch in this owner's ready callback; never forced.
-#[cfg(feature="native-body-bank-alpha")]
 #[inline(never)] // stream/stack: its locals live in its own frame, not in every `service` call's
 unsafe fn bank_service(entry:*mut u8,b:&BankTrack) {
     let live=super::body_bank::ready_kind(entry,b.before.binding.owner);
@@ -1344,7 +1292,6 @@ unsafe fn bank_service(entry:*mut u8,b:&BankTrack) {
     }
 }
 
-#[cfg(feature="native-body-bank-alpha")]
 unsafe fn bank_settle(entry:*mut u8,b:&BankTrack) {
     // rc.6 warm exit: a Mii group switch's publication, read before the settle drops its track, is kept for the
     // exit to the window it displaced; that exit settles through the kept record.
@@ -1362,7 +1309,6 @@ unsafe fn bank_settle(entry:*mut u8,b:&BankTrack) {
 }
 
 /// `bank_settle` once the switch settled: the kept Mii publication, the presentation, the outcome and the notices.
-#[cfg(feature="native-body-bank-alpha")]
 #[inline(never)]
 unsafe fn bank_applied(entry:*mut u8,b:&BankTrack,settled:&native::Settled,published:Option<(Configuration,native::BankPublished)>) {
     let now=settled.now;let exact=settled.exact;
@@ -1373,11 +1319,8 @@ unsafe fn bank_applied(entry:*mut u8,b:&BankTrack,settled:&native::Settled,publi
     let logical=b.logical;
     // A Mii group switch whose exact proof was adopted publishes its configuration
     // (the exact HUD portrait); an ordinary switch publishes the live kind.
-    #[cfg(feature="mii-hud-portrait-alpha")]
     publish_mii_presentation(entry,b.before.binding.owner,b.ticket.epoch,logical,
         exact.map_or(super::PortraitIntent::NotMii,super::PortraitIntent::Exact));
-    #[cfg(not(feature="mii-hud-portrait-alpha"))]
-    publish_mii_presentation(entry,b.before.binding.owner,b.ticket.epoch,logical);
     crate::runtime::roster::cycle_preload::foreground_settled();
     let released=settle_outcome(Outcome::Applied {receipt:receipt_of(&now,logical),lease:b.token},b.ticket,None,true);
     if b.replay.is_none() {state_for(Role::Cpu).lock().cursor=b.destination.cursor;}
@@ -1403,7 +1346,6 @@ unsafe fn bank_applied(entry:*mut u8,b:&BankTrack,settled:&native::Settled,publi
 /// MII-PHASEB: the one compensation point of the switch-time publication, as in the Player
 /// adapter: a recorded `bank_publish` is put back and read back under G before INSTALL goes;
 /// a restore that met the transient `helpers::BUSY` before writing keeps the track and retries.
-#[cfg(feature="native-body-bank-alpha")]
 unsafe fn bank_refused(b:&BankTrack,reason:&'static str,diverged:bool) {
     let effects=crate::engine::mii::ordinary_player::bank_refusal_effects(diverged);
     let published=match STATE.lock().bank.as_ref() {
@@ -1686,7 +1628,6 @@ pub(super) fn on_destroy(entry:*const u8) {
         if s.generic.as_ref().is_some_and(|g|g.before.binding.entry==entry as usize) {s.generic=None;}
         let exact=s.owner.as_ref().is_some_and(|o|o.origin.binding.entry==entry as usize);
         if exact {s.owner=None;s.request=None;s.restore=None;s.replay_result=None;s.capture=false;s.menu_valid=false;s.recapture_log=None;s.reservation.retire(true);s.departed=false;}
-        #[cfg(feature="native-body-bank-alpha")]
         if let Some(b)=s.bank.filter(|b|b.ticket.entry==entry as usize) {
             s.bank=None;
             let released=settle_outcome(Outcome::Destroyed {reason:"ordinary CPU1 bank switch destructor",lease:b.token},

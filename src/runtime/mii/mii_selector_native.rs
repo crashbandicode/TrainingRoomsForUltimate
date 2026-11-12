@@ -68,7 +68,6 @@ impl Snapshot {
         }
         changed
     }
-    #[cfg(feature = "mii-managed-helper-alpha")]
     pub(crate) fn helper_hats(&self) -> Option<[u16; 2]> {
         let hat = |id: usize| self.protected[id].map(|p| u16::from_le_bytes([p.e[4], p.e[5]]));
         let [a,b]=self.layout.helpers();Some([hat(a as usize)?, hat(b as usize)?])
@@ -460,7 +459,6 @@ pub(crate) unsafe fn snapshot(
 /// Initial read only; the resulting capability is usable only after the caller
 /// binds the full SourceBook token. Epoch0 is not CPU1 authority and is never
 /// compared to its mutable generation; created lifetime checks use SourceToken.
-#[cfg(feature="mii-managed-helper-alpha")]
 pub(crate) unsafe fn snapshot_created(entry:usize,original_kind:u32,owner:usize)
     ->Result<Snapshot,&'static str> {
     let helpers=helper_snapshot_for(None)?;
@@ -484,7 +482,6 @@ pub(crate) unsafe fn snapshot_created(entry:usize,original_kind:u32,owner:usize)
 }
 /// Revalidation of an already captured created destination, never recapture of
 /// an existing Mii. The full ready source receipt is checked by the caller.
-#[cfg(feature="mii-managed-helper-alpha")]
 pub(crate) unsafe fn created_ready_snapshot(binding:Binding,original_kind:u32,
     destination:policy::CreatedDestination,helpers:helpers::View)
     ->Result<CompletionGuard,&'static str> {

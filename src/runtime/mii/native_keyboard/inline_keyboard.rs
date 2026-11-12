@@ -148,11 +148,9 @@ const _: () = {
 pub(crate) struct Poll {
     pub text: Text,
     pub decision: Option<Decision>,
-    #[cfg(feature = "mii-editor-alpha")]
     pub initialized: bool,
     pub finished: bool,
     pub invalid: bool,
-    #[cfg(feature = "mii-editor-alpha")]
     pub state: i32,
 }
 
@@ -212,10 +210,7 @@ impl Keyboard {
 
     pub(crate) unsafe fn poll(&mut self) -> Option<Poll> {
         if !self.active || !self.on_owner_thread() { return None; }
-        #[cfg(feature = "mii-editor-alpha")]
         let state = sdk_calc(&mut self.object);
-        #[cfg(not(feature = "mii-editor-alpha"))]
-        sdk_calc(&mut self.object);
         // A failed try (never, under the lease) leaves the signals for the next poll.
         let fresh = Signals { limit: self.text.limit(), ..Signals::default() };
         let signals = match SIGNALS.try_lock() {
@@ -226,10 +221,8 @@ impl Keyboard {
         self.initialized |= signals.initialized;
         self.invalid |= signals.invalid;
         Some(Poll { text: self.text, decision: signals.decision,
-                    #[cfg(feature = "mii-editor-alpha")]
                     initialized: self.initialized,
                     finished: signals.finished, invalid: self.invalid,
-                    #[cfg(feature = "mii-editor-alpha")]
                     state })
     }
 

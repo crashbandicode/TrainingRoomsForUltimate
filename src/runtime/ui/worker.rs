@@ -195,9 +195,7 @@ struct Session {
     /// The open roster grid's editor (role, previewed forms), kept across presses.
     roster: Option<crate::editors::roster::RosterEditor>,
     mii: Option<crate::editors::mii::MiiList>,
-    #[cfg(feature = "mii-saved-alpha")]
     opening: u32,
-    #[cfg(feature = "mii-saved-alpha")]
     pending_close: Option<crate::runtime::mii::menu_handoff::CloseIntent>,
 }
 
@@ -205,7 +203,6 @@ impl Session {
     /// The worker has something to poll (the layer changes its panels on the game thread, the keyboard returns there).
     fn watching(&self) -> bool {
         if self.setups.watching() { return true; }
-        #[cfg(feature = "mii-saved-alpha")]
         if self.pending_close.is_some() { return true; }
         self.phase != Phase::Menu || self.menu.as_ref().is_some_and(|m| matches!(m.screen(), Some(Screen::External(Editor::MiiList(_)))))
     }
@@ -273,7 +270,6 @@ fn sync_input_generation(s: &mut Session) {
         s.refusal = None;
         s.roster = None;
         s.mii = None;
-        #[cfg(feature = "mii-saved-alpha")]
         { s.pending_close = None; }
         if s.phase == Phase::Prompt {
             // The next `sync_panels` draws a question that is still up again, on a new model.
@@ -298,14 +294,12 @@ fn handle(event: Event, s: &mut Session) {
         s.refusal = None;
         s.roster = None;
         s.mii = None;
-        #[cfg(feature = "mii-saved-alpha")]
         { s.pending_close = None; }
         if s.phase == Phase::Panel {
             s.phase = Phase::Menu;
         }
         CLOSING.store(false, Ordering::Release);
         crate::runtime::ui::menu_app::note_open();
-        #[cfg(feature = "mii-saved-alpha")]
         { s.opening = crate::runtime::ui::menu_app::sequence(); }
         publish_frame(s);
         publish_jumps(s);
@@ -394,11 +388,9 @@ fn press(button: Button, s: &mut Session) {
         }
         return;
     }
-    #[cfg(feature = "mii-saved-alpha")]
     if s.pending_close.is_some() { return; }
     s.refusal = None;
     s.setup_note = None;
-    #[cfg(feature = "mii-editor-alpha")]
     let mut editor_request = None;
     let panel = s.phase == Phase::Panel;
     let closed = {
@@ -415,11 +407,9 @@ fn press(button: Button, s: &mut Session) {
             }
         } else if matches!(m.screen(), Some(Screen::External(Editor::MiiList(_)))) && button != Button::B {
             if let Some(list) = s.mii.as_mut() {
-                #[cfg(feature = "mii-editor-alpha")]
                 if button == Button::A {
                     editor_request = list.editor_request();
                 }
-                #[cfg(feature = "mii-editor-alpha")]
                 if editor_request.is_some() {
                     // Add New leaves the list and closes the menu; its native
                     // request is posted with the captured epoch before OPEN falls.
@@ -428,8 +418,6 @@ fn press(button: Button, s: &mut Session) {
                 } else {
                     list.press(button, m);
                 }
-                #[cfg(not(feature = "mii-editor-alpha"))]
-                list.press(button, m);
             }
         } else {
             m.press(button);
@@ -479,7 +467,6 @@ fn press(button: Button, s: &mut Session) {
     }
     if closed {
         begin_close(s,
-            #[cfg(feature = "mii-editor-alpha")]
             editor_request,
         );
     } else {
@@ -689,7 +676,6 @@ fn sync_panels(s: &mut Session) {
     if s.menu.is_none() && !(prompt_phase && prompt_visible && !OPEN.load(Ordering::Acquire)) {
         return;
     }
-    #[cfg(feature = "mii-saved-alpha")]
     if s.pending_close.is_some() {
         retry_close(s);
         if s.pending_close.is_some() { return; }
@@ -776,10 +762,8 @@ fn sync_panels(s: &mut Session) {
                 m.press(Button::B);
             }
             begin_close(s,
-                #[cfg(feature = "mii-editor-alpha")]
                 None,
             );
-            #[cfg(feature = "mii-saved-alpha")]
             if s.pending_close.is_some() { return; }
         }
         Step::HideClip => {
@@ -831,7 +815,6 @@ fn sync_mii(s: &mut Session) {
         Some(Screen::External(Editor::MiiList(class))) => Some(*class),
         _ => None,
     };
-    #[cfg(feature = "mii-saved-alpha")]
     if s.mii.is_none() {
         if let Some(publication) = crate::runtime::ui::menu_app::take_catalog() {
             // Provider rejects stale epoch/opening sequence without the native App guard.
@@ -839,7 +822,6 @@ fn sync_mii(s: &mut Session) {
             s.mii = crate::editors::mii::MiiList::new(
                 (*publication.catalog).clone(), publication.context, publication.epoch, menu,
             );
-            #[cfg(feature = "mii-ordinary-cpu-alpha")]
             if let Some(list) = s.mii.as_mut() { list.qualify_cpu(publication.ordinary_cpu); }
         }
     }
@@ -947,10 +929,7 @@ fn publish_frame(s: &Session) {
         } else {
             frame_of(menu, &mut next, stage_label);
             next.help = [crate::model::frame::Text::new(); 2];
-            #[cfg(feature = "mii-saved-alpha")]
             let none = crate::runtime::ui::menu_app::no_catalog(s.opening);
-            #[cfg(not(feature = "mii-saved-alpha"))]
-            let none = true;
             let _ = core::fmt::Write::write_str(&mut next.help[0], if none {
                 "Mii lists open in Training and in waiting practice."
             } else {
@@ -1073,12 +1052,10 @@ pub extern "C" fn tr_cycle_badges_v1(lo: u64, mid: u64, hi: u64, role_count: u32
 /// the native handoff owns the intent; a full queue keeps this exact value.
 fn begin_close(
     s: &mut Session,
-    #[cfg(feature = "mii-editor-alpha")]
     editor: Option<crate::engine::mii_root::mii_menu::EditorRequest>,
 ) {
     #[cfg(feature = "diag")]
     crate::runtime::stall_watch::worker_step(4);
-    #[cfg(feature = "mii-saved-alpha")]
     if let Some(list) = s.mii.as_ref() {
         // A portrait pick this opening (its kept value differs from the live settings) resolves that role's choice itself.
         let picked = s.menu.as_ref().map_or([false; 2], |menu| {
@@ -1089,11 +1066,7 @@ fn begin_close(
         s.pending_close = Some(crate::runtime::mii::menu_handoff::CloseIntent {
             opening: s.opening,
             epoch: list.epoch(),
-            #[cfg(feature = "mii-editor-alpha")]
             selection: list.close_for(editor.is_some(), picked),
-            #[cfg(not(feature = "mii-editor-alpha"))]
-            selection: list.close_for(false, picked),
-            #[cfg(feature = "mii-editor-alpha")]
             editor,
         });
         retry_close(s);
@@ -1102,7 +1075,6 @@ fn begin_close(
     close_session(s);
 }
 
-#[cfg(feature = "mii-saved-alpha")]
 fn retry_close(s: &mut Session) {
     let Some(intent) = s.pending_close.take() else { return };
     // Renderer loss/reset/reopen invalidates the captured opening. Never let a

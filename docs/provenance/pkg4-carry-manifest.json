@@ -1955,7 +1955,7 @@
    "dest": "src/runtime/macros/named_macros.rs",
    "crate": "root",
    "src_sha256": "737474479d5f05b064ab645d850ceb189cad3943097ae4fdb5fc74d2fcda0809",
-   "dest_sha256": "9a76c9682d5068c79e98538bfeba642259fd5498b950f519ad7f913f1f502a30",
+   "dest_sha256": "f415617fc055dd87ab8b5c6fa596aec6a90ae679fc46e0e30d8b42a1ce2f1ed7",
    "edits": [
     {
      "old": "use training_mod_sync::*;",
@@ -2590,6 +2590,50 @@
       ]
      ],
      "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
+    },
+    {
+     "line_patch": [
+      [
+       209,
+       210,
+       [
+        "        can_switch:target.is_some(),"
+       ]
+      ],
+      [
+       228,
+       231,
+       [
+        "    crate::runtime::macros::identity::named_ready(target)"
+       ]
+      ],
+      [
+       284,
+       291,
+       []
+      ],
+      [
+       303,
+       303,
+       []
+      ],
+      [
+       305,
+       307,
+       []
+      ],
+      [
+       1313,
+       1313,
+       []
+      ],
+      [
+       1324,
+       1324,
+       []
+      ]
+     ],
+     "reason": "rc.10 S2 (docs/CODE-REDUCTION-rc10.md; docs/DECISIONS.md, D11 superseded): the always-on Cargo features are not switches; their cfg gates are removed and the code that compiled only with one off is deleted"
     }
    ]
   },
@@ -2598,7 +2642,7 @@
    "dest": "src/runtime/macros/replay_store.rs",
    "crate": "root",
    "src_sha256": "2324718b32e3b8dc6ab512ab723818cd68add8a709953bbb0c03752689966ac6",
-   "dest_sha256": "09515ae2d131b5ac3479edc611a1ab9d23c26f4e239a3f3261fdc5045e199670",
+   "dest_sha256": "d7db4f74a686b760b01863f46dfd152f1dfe55baeb5d585877fb5bd9453a52de",
    "edits": [
     {
      "old": "std::thread::Builder::new().name(\"replay-capture-save\".into()).stack_size(0x20000)\n        .spawn(move || {",
@@ -2699,6 +2743,101 @@
      "old": "use std::sync::{mpsc::{self, SyncSender}, Arc, OnceLock};\n",
      "new": "use std::sync::{Arc, OnceLock};\n// rc.8 hang: game threads post jobs here; std's `try_send` could spin on the writer mid-read.\nuse crate::model::nowait_channel::{self as mpsc, SyncSender};\n",
      "reason": "rc.8 \"Add New\u2026\" hang (worker A's finding A3, primary 2026-11-11 18:01Z): std's mpsc `try_recv`/`try_send` spin on a peer mid-operation, and the game's MainThread spun forever on the menu worker it had preempted on core 0; the channels game threads touch are `model::nowait_channel`, std's surface without the wait (tests/game_thread_handoffs.rs, tools/game_thread_wait_check.py)"
+    },
+    {
+     "line_patch": [
+      [
+       55,
+       55,
+       []
+      ],
+      [
+       57,
+       57,
+       []
+      ],
+      [
+       90,
+       90,
+       []
+      ],
+      [
+       102,
+       102,
+       []
+      ],
+      [
+       111,
+       111,
+       []
+      ],
+      [
+       123,
+       123,
+       []
+      ],
+      [
+       166,
+       166,
+       []
+      ],
+      [
+       173,
+       173,
+       []
+      ],
+      [
+       175,
+       175,
+       []
+      ],
+      [
+       178,
+       178,
+       []
+      ],
+      [
+       183,
+       183,
+       []
+      ],
+      [
+       187,
+       187,
+       []
+      ],
+      [
+       203,
+       203,
+       []
+      ],
+      [
+       210,
+       210,
+       []
+      ],
+      [
+       226,
+       226,
+       []
+      ],
+      [
+       238,
+       238,
+       []
+      ],
+      [
+       257,
+       257,
+       []
+      ],
+      [
+       259,
+       259,
+       []
+      ]
+     ],
+     "reason": "rc.10 S2 (docs/CODE-REDUCTION-rc10.md; docs/DECISIONS.md, D11 superseded): the always-on Cargo features are not switches; their cfg gates are removed and the code that compiled only with one off is deleted"
     }
    ]
   },
@@ -2707,7 +2846,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "ff4404d7c9f63d8cd4a5bf4c0fb925720f7a9a99691856c6d73829862d996715",
+   "dest_sha256": "5e5f5553cba4515429f31c646bc29e3ef71d72fc19da32ad7e7def1776e9281d",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -3029,6 +3168,70 @@
      "old": "type ResolveTicket = std::sync::mpsc::Receiver<Result<Configuration,String>>;\n",
      "new": "type ResolveTicket = crate::model::nowait_channel::Receiver<Result<Configuration,String>>;\n",
      "reason": "rc.8 \"Add New\u2026\" hang (worker A's finding A3, primary 2026-11-11 18:01Z): std's mpsc `try_recv`/`try_send` spin on a peer mid-operation, and the game's MainThread spun forever on the menu worker it had preempted on core 0; the channels game threads touch are `model::nowait_channel`, std's surface without the wait (tests/game_thread_handoffs.rs, tools/game_thread_wait_check.py)"
+    },
+    {
+     "line_patch": [
+      [
+       58,
+       58,
+       []
+      ],
+      [
+       71,
+       71,
+       [
+        "            true)"
+       ]
+      ],
+      [
+       98,
+       98,
+       []
+      ],
+      [
+       100,
+       101,
+       []
+      ],
+      [
+       108,
+       111,
+       [
+        "    crate::runtime::macros::identity::clip_ready(target)"
+       ]
+      ],
+      [
+       350,
+       350,
+       []
+      ],
+      [
+       373,
+       374,
+       []
+      ],
+      [
+       572,
+       572,
+       []
+      ],
+      [
+       574,
+       575,
+       []
+      ],
+      [
+       662,
+       662,
+       []
+      ],
+      [
+       684,
+       684,
+       []
+      ]
+     ],
+     "reason": "rc.10 S2 (docs/CODE-REDUCTION-rc10.md; docs/DECISIONS.md, D11 superseded): the always-on Cargo features are not switches; their cfg gates are removed and the code that compiled only with one off is deleted"
     }
    ]
   },

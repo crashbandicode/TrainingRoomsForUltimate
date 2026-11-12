@@ -17,7 +17,7 @@ pub const PAGES: [(&str, &str, MiiClass); 3] = [
     ("mii_gunner_config", "Mii Gunner", MiiClass::Gunner),
 ];
 
-#[cfg(all(test, feature = "mii-editor-alpha"))]
+#[cfg(test)]
 mod connected_editor_tests {
     lib_unit_tests! {
     use super::*;
@@ -155,7 +155,6 @@ pub struct PendingSelection {
     pub actions: Vec<Action>,
 }
 
-#[cfg(feature = "mii-editor-alpha")]
 #[derive(Clone)]
 pub enum EditorSeed {
     Saved(Box<crate::engine::mii::inventory::MiiConfig>),
@@ -163,7 +162,6 @@ pub enum EditorSeed {
     NativeDefault(MiiClass),
 }
 
-#[cfg(feature = "mii-editor-alpha")]
 #[derive(Clone)]
 pub struct EditorRequest {
     pub seed: EditorSeed,
@@ -182,7 +180,6 @@ pub struct CatalogMenu {
     list_mode: bool,
     cursor: usize,
     rows: Vec<DropdownRow>,
-    #[cfg(feature="mii-ordinary-cpu-alpha")]
     ordinary_cpu:bool,
 }
 
@@ -204,7 +201,6 @@ impl CatalogMenu {
             list_mode: false,
             cursor: 0,
             rows: Vec::new(),
-            #[cfg(feature="mii-ordinary-cpu-alpha")]
             ordinary_cpu:false,
         })
     }
@@ -217,7 +213,6 @@ impl CatalogMenu {
 
     /// A waiting-room editor needs a catalog, but has no qualified fighter-swap
     /// context. Do not grant either role permission by inventing a live original.
-    #[cfg(feature = "mii-editor-alpha")]
     pub fn editor_only(snapshot: Snapshot, epoch: u64, preferences: &Preferences) -> Option<Self> {
         let context = Context { epoch, original: PlayerOrigin::Unresolved,
             active: Active { player: selection::PlayerLive::NotMii, cpu: None },
@@ -229,19 +224,12 @@ impl CatalogMenu {
         })
     }
 
-    #[cfg(feature="mii-saved-alpha")]
     pub fn alpha_player_cycle(&self, kind: u32)->bool {
         match self.context.original {
-            #[cfg(feature="mii-ordinary-player-alpha")]
             PlayerOrigin::Mii(origin) if self.context.active.player!=selection::PlayerLive::NotMii =>
                 MiiClass::from_kind(kind).is_some_and(|class|
                     selection::eligible(&self.snapshot,Role::Player,class,self.context.original)
                         .any(|c|c.canonical.appearance.hat==origin.0.appearance.hat)),
-            #[cfg(not(feature="mii-ordinary-player-alpha"))]
-            PlayerOrigin::Mii(origin) if origin.0.class as u32 == kind =>
-                selection::eligible(&self.snapshot,Role::Player,origin.0.class,self.context.original)
-                    .any(|c|c.canonical.appearance.hat==origin.0.appearance.hat),
-            #[cfg(feature="mii-ordinary-player-alpha")]
             PlayerOrigin::NotMii if self.context.active.player != selection::PlayerLive::NotMii =>
                 MiiClass::from_kind(kind).is_some_and(|class|
                     selection::eligible(&self.snapshot,Role::Player,class,self.context.original).next().is_some()),
@@ -249,17 +237,14 @@ impl CatalogMenu {
         }
     }
 
-    #[cfg(feature="mii-ordinary-cpu-alpha")]
     pub fn qualify_ordinary_cpu_cycle(&mut self, qualified:bool) {self.ordinary_cpu=qualified;}
     /// Class admission for a manual same-class choice. A saved CPU original with no
     /// other configuration of its class remains selectable here.
-    #[cfg(feature="mii-ordinary-cpu-alpha")]
     pub fn alpha_cpu_cycle(&self,kind:u32)->bool {
         self.ordinary_cpu && crate::engine::mii::ordinary_cpu::supported_kind(kind)
             && MiiClass::from_kind(kind).is_some_and(|class|
                 selection::eligible(&self.snapshot,Role::Cpu,class,self.context.original).next().is_some())
     }
-    #[cfg(feature="mii-managed-helper-alpha")]
     pub fn alpha_helper_hat(&self,kind:u32)->bool {
         self.ordinary_cpu && self.context.active.player!=selection::PlayerLive::NotMii
             && MiiClass::from_kind(kind).is_some_and(|class|
@@ -304,7 +289,6 @@ impl CatalogMenu {
     }
 
     /// Seed is copied by value; selecting Add New never edits a native saved row.
-    #[cfg(feature = "mii-editor-alpha")]
     pub fn editor_seed(&self, preferences: &Preferences) -> Option<EditorRequest> {
         let add_new = if self.list_mode { self.cursor == self.rows.len() } else { self.role.is_none() && self.cursor == 2 };
         if !self.editor_available || !add_new || !self.snapshot.is_complete() {
@@ -358,7 +342,7 @@ impl CatalogMenu {
     }
 
     fn ordinary_player(&self) -> bool {
-        cfg!(feature="mii-ordinary-player-alpha")
+        true
             && self.context.original == PlayerOrigin::NotMii
             && self.context.active.player != selection::PlayerLive::NotMii
     }
@@ -387,7 +371,6 @@ impl CatalogMenu {
                 } else {
                     "The active Player class updates on menu close. Other class choices apply on a later cycle. B: Back".into()
                 },
-            #[cfg(feature="mii-ordinary-cpu-alpha")]
             _ if self.ordinary_cpu && self.role==Some(Role::Cpu) =>
                 if self.context.active.cpu.is_some() {
                     "The active CPU class updates on menu close. Other class choices apply on a later cycle. B: Back".into()
@@ -408,7 +391,7 @@ impl CatalogMenu {
             let mut disabled: Vec<bool> = visible.map(|(_, row)| self.editor_only || row.greyed).collect();
             if self.editor_available && self.list_mode && self.rows.len() >= start && self.rows.len() < start + page_size {
                 labels.push("Add New…".into());
-                disabled.push(!cfg!(feature = "mii-editor-alpha") || !self.snapshot.is_complete());
+                disabled.push(!self.snapshot.is_complete());
             }
             if labels.is_empty() && !self.editor_available {
                 labels.push("Unavailable".into());
@@ -433,7 +416,7 @@ impl CatalogMenu {
                     .map(|entry| entry.name);
                 labels.push(format!("{name}: {}", selected.unwrap_or("Unavailable")));
             }
-            let can_add = cfg!(feature = "mii-editor-alpha") && self.snapshot.is_complete();
+            let can_add = self.snapshot.is_complete();
             let mut disabled = vec![self.editor_only, self.editor_only];
             if self.editor_available {
                 labels.push(if can_add { "Add New" } else { "Add New (unavailable)" }.into());

@@ -331,7 +331,7 @@ pub unsafe fn on_frame(body: *mut app::BattleObjectModuleAccessor) {
         && !StatusModule::is_changing(body)
         && matches!(StatusModule::status_kind(body), kind if kind == *FIGHTER_STATUS_KIND_WAIT || kind == *FIGHTER_STATUS_KIND_FALL)
     {
-        if cfg!(feature = "managed-sources") && !pending.cleared {
+        if !pending.cleared {
             pending.cleared = true;
             state.pending = Some(pending);
             drop(state);
@@ -342,7 +342,7 @@ pub unsafe fn on_frame(body: *mut app::BattleObjectModuleAccessor) {
             }
             return;
         }
-        let slot = if cfg!(feature = "managed-sources") {
+        let slot = {
             if let Err(reason) = sources::finish_hat_clear(body, pending.leases_released) {
                 clear_pending(role, &mut state);
                 drop(state);
@@ -364,13 +364,6 @@ pub unsafe fn on_frame(body: *mut app::BattleObjectModuleAccessor) {
                     return;
                 }
             }
-        } else {
-        let source = IntoIterator::into_iter([FighterId::Player, FighterId::CPU])
-            .filter_map(try_get_module_accessor)
-            .find(|source| app::utility::get_kind(&mut **source) as u32 == pending.kind);
-        let slot = source.map(|source|
-            WorkModule::get_int(source, *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID));
-        slot
         };
         let Some(slot) = slot else {
             clear_pending(role, &mut state);

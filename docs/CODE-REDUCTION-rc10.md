@@ -1,7 +1,7 @@
 # rc.10 code reduction: measurement and plan
 
 The plan of `TASK-rc10-code-reduction.md`, measured on `main` `b1e27e5a`, 2026-11-12 (UTC), and the result of each
-slice as it lands on `rc10`. Done so far: **S3** and **S1** (below, "S3: done", "S1: done").
+slice as it lands on `rc10`. Done so far: **S3**, **S1** and **S2** (below, "S3: done", "S1: done", "S2: done").
 
 ## The short answer
 
@@ -310,6 +310,30 @@ turns each file into the array its source file includes, so the tables are the s
   file (`tools/test_rows_tsv.py`).
 - The 86 rows of removed and non-shipped probes are still in the tables, so the install line is unchanged. S4 drops
   the rows of the probes it removes.
+## S2: done (2026-11-12)
+
+The 25 Cargo features that every shipped build enabled are not switches any more (`docs/DECISIONS.md`, "the product
+is not behind feature switches", which supersedes D11).
+
+- **Product lines: 111,612 to 110,367 (−1,245).** Non-test lines: 118,493 to 117,248. On `tools/sloc.py`: 154,519 to
+  152,990 (−1,529). The budget is ratcheted down to 152,990.
+- **1,031 `cfg` uses in 59 files** were evaluated with those features on: an always-true gate is removed and its item
+  stays; an always-false gate is removed with its item; a mixed one keeps only what still varies (`diag`, a probe,
+  `test`, the target).
+- **Run-time tests of a feature** (`cfg!(feature = ..)`) became constants. `x && true`-style operands were dropped by
+  exact identities, and 16 conditions were simplified by hand, keeping the same evaluation: the dropped operands are
+  pure, or were already short-circuited away. Two dead branches went with them (`runtime/roster/kirby_hats.rs`,
+  `runtime/roster/character_items.rs`). Where a constant is only passed along as an argument, it stays `true`.
+- **`Cargo.toml`** keeps `deluxe-sdk` (an optional dependency), `diag`, the diagnostic family and `simulator`.
+  `default = ["deluxe-sdk"]`.
+- **`cargo build --no-default-features`** is now the whole product without the Deluxe SDK.
+- **The guard tables' `feature` column is unchanged**: a row keeps the name it was carried with, and a name that is no
+  longer a Cargo feature means "every build". The row digests are unchanged.
+- **Tests and tools:** `tests/pkg6_features.rs` checks the new table (the 25 names are not features and nothing
+  requires them; the table is exactly the 14 names left). `tools/feature_matrix.py` reads the table and needed only
+  its description. Two tests that pin source text follow the new text (`model/parked_entries.rs`,
+  `tests/lock_order.rs`: `runtime/compat/filesystem.rs` is now gated by `diag` alone, so the call graph treats its
+  thread as diag-only, which it is).
 ## Line deltas per slice
 
 | Slice | Head | Raw non-test (product) | `tools/sloc.py` | Tests | Coverage |
@@ -318,3 +342,4 @@ turns each file into the array its source file includes, so the tables are the s
 | `rc10` start | `f5146184` | 129,593 (122,707) | 165,930 | 821 (873) | 90.18% |
 | S3 | `6c419689` | 126,703 (119,817) | 162,692 | 821 (873) | 90.59% |
 | S1 | `13e8ef5d` | 118,493 (111,612) | 154,519 | 824 (876) | not re-measured |
+| S2 | the commit after `0d9b8be9` | 117,248 (110,367) | 152,990 | 824 (876) | not re-measured |

@@ -6,13 +6,11 @@
 
 pub(crate) mod automation_helper;
 pub(crate) mod game_mode;
-#[cfg(feature = "practice-stage")]
 pub(crate) mod lobby_items;
 pub(crate) mod lobby_persist;
 /// rc.8 R2: the waiting-room practice's 2/3 pace and x1.5 extra pass (one hook on the waiting area's update).
 pub(crate) mod lobby_speed;
 pub(crate) mod lobby_stage;
-#[cfg(feature = "practice-stage")]
 pub(crate) mod practice_stage;
 pub(crate) mod practice_stage_request;
 pub(crate) mod training;
@@ -33,10 +31,8 @@ use crate::runtime::game;
 /// (`seam_install::prime` / `seal`, `model::own_patches`), so either order verifies; this one stays the fork's.
 pub(crate) fn init() {
     training::lobby::init();
-    #[cfg(feature = "practice-stage")]
     practice_stage::init();
     // Lobby Items (N11) compares the observer's item-gate rows too; its own hook site is nobody else's.
-    #[cfg(feature = "practice-stage")]
     lobby_items::init();
     // The waiting room's practice panel: saved Training partners and behavior (rc.6). Its sites are nobody else's.
     lobby_persist::init();
@@ -162,7 +158,6 @@ pub(crate) unsafe fn frame(fighter: usize) {
 
             drop(_items);
             // Lobby Items (N11): the one removal an Off edge owes in the waiting room (nothing on the other frames).
-            #[cfg(feature = "practice-stage")]
             lobby_items::frame();
             let _preload = HookScope::enter_hook(HookId::RosterPreload);
             crate::runtime::roster::cycle_preload::on_frame(&mut *body);
