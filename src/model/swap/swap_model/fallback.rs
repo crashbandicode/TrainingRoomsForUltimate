@@ -36,6 +36,7 @@ pub enum Fallback {
 }
 
 impl Fallback {
+    #[cfg(test)]
     pub const ALL: [Fallback; 11] = [
         Fallback::OwnerReceiptChanged, Fallback::GroupSwapDisabled, Fallback::NotReachable, Fallback::WindowShape,
         Fallback::AliasChanged, Fallback::ResourceNotReady, Fallback::RegistryUnreadable, Fallback::PoolFull,

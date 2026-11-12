@@ -112,6 +112,7 @@ pub fn entry_id_valid(entry: i32) -> bool {
 
 /// The offset of the pointer slot an `adrp Xn, page; ldr Xt, [Xn, #imm]` pair at `adrp_site` reads
 /// (the 64-bit unsigned-offset form), or `None` when the words are not that pair.
+#[cfg(test)]
 pub fn manager_slot_offset(adrp_site: usize, adrp: u32, ldr: u32) -> Option<usize> {
     use super::stage_hazards::{adrp_offset, is_adrp};
     if !is_adrp(adrp) || ldr & 0xffc0_0000 != 0xf940_0000 {

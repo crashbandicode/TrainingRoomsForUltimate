@@ -1937,6 +1937,7 @@ pub const ROWS: &[Seam] = &[
 ];
 
 /// Ratchet (API.md): `path:fn` of every `#[skyline::hook]` in WP-A2's files without a row yet.
+#[cfg(test)]
 pub const UNCONVERTED: &[&str] = &[];
 
 #[cfg(test)]

@@ -17,6 +17,7 @@ use super::hitbox::{Effects, Sphere, FIGHTER_SETS, KIND_HURT, MAX_HELD, SCALE};
 /// The most fighter objects Training (and the waiting room's practice) draws at once: Player 1 and the CPU, each of them
 /// possibly Ice Climbers, whose Nana is a fighter object of her own. No other fighter adds a fighter object (Pokémon
 /// Trainer's trainer, Pyra and Mythra's partner, summons and items are articles or swap in place).
+#[cfg(test)]
 pub const ORB_FIGHTERS: usize = 4;
 
 /// An own orb's handle: non-zero, and naming the status the orb was made in.
@@ -121,6 +122,7 @@ impl Board {
         }
     }
 
+    #[cfg(test)]
     pub fn clear_all(&mut self) {
         self.keys = [0; FIGHTER_SETS];
         self.lens = [0; FIGHTER_SETS];

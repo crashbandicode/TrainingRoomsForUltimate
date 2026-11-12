@@ -1030,18 +1030,6 @@ pub fn begin_restore() {
     }
 }
 
-pub unsafe fn request_playback() {
-    if !hook_queries().playback_allowed {
-        notify("Load a named macro and wait for its fighter");
-        return;
-    }
-    super::input_record::stop_playback();
-    match super::save_states::request_macro_restore() {
-        Ok(()) => RESTORE_ACTION.store(2, Ordering::Relaxed),
-        Err(message) => notify(message),
-    }
-}
-
 /// Run after the CPU's restore callback. No inputs start while either fighter
 /// still has charge/buff/character restoration work pending.
 pub unsafe fn service_restore() {

@@ -35,12 +35,6 @@ pub(crate) mod save_states {
     pub(crate) use crate::runtime::features::states::cancel_pending;
     pub(crate) use crate::runtime::lobby::training::save_states::is_loading;
 
-    /// Restore the saved state; the restore's completion calls `recorder::on_state_restored`, which starts the named macro.
-    pub(crate) fn request_macro_restore() -> Result<(), &'static str> {
-        crate::runtime::features::states::request_load();
-        Ok(())
-    }
-
     /// Capture the live pair once, then reuse it for native preview start/stop.
     /// # Safety
     /// Only the existing primary-CPU game callback may request native restoration.

@@ -233,6 +233,7 @@ impl MacroRecording {
     }
 
     /// Renames the macro (trimmed and validated); the frames are never touched.
+    #[cfg(test)]
     pub fn set_name(&mut self, name: &str) -> Result<(), MacroError> {
         let name = name.trim();
         check_name(name)?;
@@ -259,6 +260,7 @@ impl MacroRecording {
     }
 
     /// Off keeps the id. No id means there is no switch to flip.
+    #[cfg(test)]
     pub fn set_start_save_on(&mut self, on: bool) {
         if self.start_save.is_some() {
             self.start_save_on = on;

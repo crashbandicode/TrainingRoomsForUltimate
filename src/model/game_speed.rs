@@ -59,6 +59,7 @@ impl Speed {
 
     /// The slow divisor the game's apply requests for this speed with the update rate left at 60: 1/2 and 1/4. 2/3 and
     /// x1.5 also change the update rate, so the slot alone cannot give them.
+    #[cfg(test)]
     pub const fn slot_divisor(self) -> Option<u8> {
         match self {
             Speed::Half => Some(2),
@@ -261,7 +262,9 @@ pub mod hud {
     pub const HIDE_ANIM: usize = 0x178;
     /// The HUD's state handlers sit at `+0x40 + 16 * state`: the refresh is state 6's (`0x13e5470`), the Training menu
     /// state the Speed is edited in. Play (state 5, `0x13e5110`) never runs it.
+    #[cfg(test)]
     pub const STATE_TABLE: usize = 0x40;
+    #[cfg(test)]
     pub const REFRESH_STATE: usize = 6;
 }
 
@@ -456,6 +459,7 @@ pub mod table {
     pub const SLOTS_AT: usize = 0x20;
     pub const SLOTS: usize = 16;
     pub const DIRTY_AT: usize = 0x40;
+    #[cfg(test)]
     pub const SIZE: usize = 0x48;
 }
 
@@ -475,6 +479,7 @@ impl<const N: usize> Bytes for [u8; N] {
 }
 
 /// A table as the game creates it (`.1345fdc`): every slot `{0, 1}`, dirty set.
+#[cfg(test)]
 pub fn fresh_table() -> [u8; table::SIZE] {
     let mut out = [0u8; table::SIZE];
     for slot in 0..table::SLOTS {
@@ -643,6 +648,7 @@ impl LobbySlot {
     }
 
     /// Forget the slot without a write.
+    #[cfg(test)]
     pub fn forget(&mut self) -> Option<Held> {
         self.paced = false;
         self.held.take()

@@ -30,12 +30,6 @@ pub struct NativeIdentity {
     pub resource: usize,
 }
 
-/// Existing native Training reset dispatch covers all four visible owners.
-/// Managed seats still require their current publication in the adapter.
-pub fn training_portrait_owner(owner: u64, training: bool) -> bool {
-    training && owner <= 3
-}
-
 /// Caller-defined category and identity (copy body, live item, etc.).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Holder {

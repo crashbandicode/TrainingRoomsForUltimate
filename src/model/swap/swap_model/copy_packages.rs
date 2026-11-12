@@ -32,6 +32,7 @@
 
 use super::copy_registry::{registry_costume, Registry, Roster, ENTRIES, NO_KIND, SUBS};
 use super::request_bit::{acquired_keys, acquired_keys_iter, completion_members_iter, copy_key, released_keys};
+#[cfg(test)]
 use std::collections::BTreeMap;
 use crate::engine::compat::fixed::FixedList;
 use crate::engine::swap::body_bank::{MAX_EXTRA_GROUPS, NATIVE_MEMBERS};
@@ -163,6 +164,7 @@ fn sync_changes(held: impl Iterator<Item = Acquisition> + Clone,
 }
 
 /// The key multiset `held` keeps referenced in G68.
+#[cfg(test)]
 pub fn referenced(held: &[Acquisition]) -> BTreeMap<u32, u32> {
     let mut refs = BTreeMap::new();
     for acquisition in held {

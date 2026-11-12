@@ -163,6 +163,7 @@ impl<const N: usize> ByteRing<N> {
     }
 
     /// Count a line the caller could not hand to the ring (e.g. the lock was busy).
+    #[cfg(test)]
     pub fn note_dropped(&mut self, lines: u64) {
         self.dropped += lines;
     }

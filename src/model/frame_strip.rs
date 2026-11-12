@@ -820,7 +820,6 @@ pub struct Settings {
 /// The new row's id, and the old rows it replaces (SPEC-input-06 §3.1).
 pub const ROW: &str = "input_display_strip";
 pub const OLD_ROW: &str = "input_display";
-pub const OLD_STATUS_ROW: &str = "input_display_status";
 
 impl Settings {
     pub const fn factory() -> Self {

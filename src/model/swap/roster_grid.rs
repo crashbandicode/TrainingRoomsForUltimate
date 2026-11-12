@@ -27,8 +27,6 @@ pub enum RosterPurpose {
     ManualSwap,
 }
 
-pub const MANUAL_FLASH_FRAMES: u8 = 24;
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Direction {
     Left,
@@ -470,15 +468,6 @@ pub fn css_order_each(kinds: &[u32], values: &[u8], excluded: Option<u32>, mut e
 }
 
 impl RosterGrid {
-    /// On editor entry/role switch display that role's persisted starting forms.
-    pub fn sync_forms(&mut self, kinds: &[u32], values: &[u8]) {
-        for group in [Group::Aegis, Group::PokemonTrainer] {
-            let forms = group.forms();
-            self.forms[group as usize] = selected_group_index(kinds, values, forms[0].0)
-                .and_then(|i| forms.iter().position(|(kind, _)| *kind == kinds[i]))
-                .unwrap_or(0) as u8;
-        }
-    }
 }
 
 /// Position of `kind` in the caller's stable catalog. The catalog lives in the

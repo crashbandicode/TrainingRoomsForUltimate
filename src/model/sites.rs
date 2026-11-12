@@ -13,6 +13,7 @@
 //! rows here.
 
 use super::guard::{outcome_for, GuardOutcome, HookForm, Placement, SeamKind, Sharing, GUARD_BYTES};
+#[cfg(test)]
 use super::version::Verdict;
 
 macro_rules! features {
@@ -147,11 +148,13 @@ impl Site {
     }
 
     /// The first byte after the 64-byte window at the site.
+    #[cfg(test)]
     pub const fn window_end(&self) -> usize {
         self.offset + GUARD_BYTES
     }
 
     /// Whether the two 64-byte windows share bytes (a hook at one then changes what the other reads).
+    #[cfg(test)]
     pub const fn overlaps(&self, other: &Site) -> bool {
         self.offset < other.window_end() && other.offset < self.window_end()
     }
@@ -374,6 +377,7 @@ pub fn find(name: &str) -> Option<&'static Site> {
 }
 
 /// The sites a feature needs (its own, then the shared Training predicate when it uses it).
+#[cfg(test)]
 pub fn sites_of(feature: Feature) -> impl Iterator<Item = &'static Site> {
     SITES.iter().filter(move |site| site.feature == feature)
 }
@@ -386,6 +390,7 @@ pub fn feature_usable(feature: Feature, usable: impl Fn(&Site) -> bool) -> bool 
 }
 /// What boot does with the table for a game verdict: nothing for an unsupported game
 /// (SPEC-core-01 §2: install nothing and log one line), every site otherwise.
+#[cfg(test)]
 pub fn install_plan(verdict: Verdict) -> &'static [Site] {
     match verdict {
         Verdict::Supported => &SITES,
@@ -405,6 +410,7 @@ pub enum Phase {
 pub const BOOT_PHASES: [Phase; 2] = [Phase::CheckEveryWindow, Phase::InstallUsableFeatures];
 
 /// Index pairs `(a, b)`, `a < b`, of sites whose 64-byte windows overlap.
+#[cfg(test)]
 pub fn overlapping_pairs() -> impl Iterator<Item = (usize, usize)> {
     (0..SITES.len())
         .flat_map(|a| (a + 1..SITES.len()).map(move |b| (a, b)))

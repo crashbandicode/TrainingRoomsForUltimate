@@ -23,17 +23,15 @@ pub const KIRBY: u32 = 0x06;
 // WORKPLAN §2.2): one capability row per fighter form, each gate a one-liner over the table, and
 // the FACT every row encodes documented there. The names and signatures are unchanged for every
 // caller (`body_bank::member_forms_in`, `body_bank::prefetch_admitted`, …).
-pub use crate::engine::swap::swap_model::capabilities::{
-    d_kirby1_applies, d_kirby1_live, group_member_kind, key_release_admitted, kirby_parkable, member_forms, member_forms_in,
-    native_group_request, object_rearm_admitted, original_bankable, original_form_bankable, pair_lead_extra, pair_request,
-    prefetch_admitted,
-    single_member_request, special_group_kind, swap_commit_index, swap_commit_index_in,
-    swappable_kind, window_swappable, window_swappable_with,
-};
+pub use crate::engine::swap::swap_model::capabilities::{d_kirby1_applies, d_kirby1_live, group_member_kind, kirby_parkable, member_forms, member_forms_in, native_group_request, object_rearm_admitted, original_bankable, original_form_bankable, pair_lead_extra, pair_request, prefetch_admitted, single_member_request, swap_commit_index, swap_commit_index_in, window_swappable_with};
+#[cfg(test)]
+pub use crate::engine::swap::swap_model::capabilities::{key_release_admitted, special_group_kind, swappable_kind, window_swappable};
 use crate::engine::swap::swap_model::capabilities::{bankable_kind, pins_cell0};
 use crate::engine::preload::cycle_preload_capacity::MAX_TARGETS;
 // WP4: the resource bookkeeping wrappers below are thin views of the ledger's data.
-use crate::engine::swap::swap_model::ledger::{native_window_requests, orphan_keys, pair_rule, RFlags};
+use crate::engine::swap::swap_model::ledger::pair_rule;
+#[cfg(test)]
+use crate::engine::swap::swap_model::ledger::{native_window_requests, orphan_keys, RFlags};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Phase { Idle, Building, Ready, Changing, Retired }
@@ -313,6 +311,7 @@ impl Members {
     /// the source-cache size. `None` when the target is ineligible or fewer than
     /// two members remain. Padding stays `u32::MAX` through [`Members::new`].
     /// No allocation.
+    #[cfg(test)]
     pub fn from_cycle(target: u32, upcoming: &[u32], extra_budget: usize) -> Option<Self> {
         Self::from_forms(Forms::starting(target), upcoming, extra_budget)
     }
@@ -525,8 +524,11 @@ pub struct SpecialPolicy {
 
 impl SpecialPolicy {
     pub const NONE: Self = Self { native: false, pair: false, mii: false };
+    #[cfg(test)]
     pub const NATIVE: Self = Self { native: true, pair: false, mii: false };
+    #[cfg(test)]
     pub const ALL: Self = Self { native: true, pair: true, mii: false };
+    #[cfg(test)]
     pub const MII: Self = Self { native: true, pair: false, mii: true };
 }
 
@@ -545,6 +547,7 @@ impl SpecialPolicy {
 /// window kind native did not request itself. The native adapter records those requests as
 /// `Holder::Native` tokens and acquires the rest through the ledger, which refuses a second
 /// construction acquisition structurally; this wrapper remains the value-only view.
+#[cfg(test)]
 pub fn supplemental_acquisitions(members: Members) -> ([u32; NATIVE_MEMBERS], usize) {
     let native: Vec<u32> = native_window_requests(members.kinds(), RFlags::TRAINING).iter().map(|r| r.kind).collect();
     let mut kinds = [u32::MAX; NATIVE_MEMBERS];
@@ -605,6 +608,7 @@ pub fn pair_resource_references(members: Members) -> Option<u32> {
 /// WP4: computed, not hard-coded — `ledger::orphan_keys` = registration set minus native release
 /// set under the Training flags (`0x1338` for `0x75`, nothing for any other kind); the release
 /// itself is issued by `r_handle::release` in that order.
+#[cfg(test)]
 pub fn orphan_object_keys(kind: u32) -> ([u32; 2], usize) {
     let mut keys = [u32::MAX; 2];
     let mut count = 0;
@@ -1000,6 +1004,7 @@ pub mod construction_task {
     pub const QUEUE_ID: u32 = 1;
     pub const FUNCTOR: usize = 0x50;
     pub const FUNCTOR_PTR: usize = 0x70;
+    #[cfg(test)]
     pub const CANCEL: usize = 0x80;
     /// The two scheduler arguments state 10 passes after the callback.
     pub const SCHEDULE_ARGS: (u32, u32) = (2, 1);
@@ -1234,6 +1239,7 @@ pub struct GroupBudget {
 /// window is left by its self-commit like any window is left by its commit
 /// ([`swap_commit_index_in`]), so a role in a one-member window plans as usual.
 /// This is the default policy; see [`plan_extra_groups_with`].
+#[cfg(test)]
 pub fn plan_extra_groups(
     windows: [Option<Members>; 2],
     existing: [&[Members]; 2],
@@ -1919,6 +1925,7 @@ pub const RESOURCE_WORDS: usize = 11;
 
 /// The bank flag the one-member Mii window shows at `+0x591f` (`prepare_models`
 /// writes `expected_flags(0)` = [`BANK_FLAG`]); a canonical Mii entry shows 0.
+#[cfg(test)]
 pub const MII_WINDOW_FLAGS: u8 = BANK_FLAG;
 
 /// The resource-owner words a Mii one-member group needs in `R` while its key

@@ -10,6 +10,7 @@
 /// The inline hook site: the `cbz` of the `adrp; ldrsw; cbz` run in the stage-loading routine.
 pub const HOOK_SITE_OFFSET: usize = 0x231_1bec;
 /// The first instruction of the `adrp; add; ldur; ldrb; ldr; sub` run the flag address derives from.
+#[cfg(test)]
 pub const FLAG_SCAN_OFFSET: usize = 0x174_08c4;
 /// The hazard rule byte in 13.0.5 (`.bss`), offset from `.text`.
 pub const FLAG_OFFSET: usize = 0x530_a985;
@@ -76,31 +77,37 @@ pub const fn is_add_imm(word: u32) -> bool {
 }
 
 /// `ldur Rt, [Rn, #simm9]` (integer load).
+#[cfg(test)]
 pub const fn is_ldur(word: u32) -> bool {
     word & 0x3fe0_0c00 == 0x3840_0000
 }
 
 /// `ldrb Wt, [Xn, #imm12]`.
+#[cfg(test)]
 pub const fn is_ldrb_imm(word: u32) -> bool {
     word & 0xffc0_0000 == 0x3940_0000
 }
 
 /// `ldr Rt, [Xn, #imm12]` (32- or 64-bit).
+#[cfg(test)]
 pub const fn is_ldr_imm(word: u32) -> bool {
     word & 0xbfc0_0000 == 0xb940_0000
 }
 
 /// `sub Rd, Rn, #imm12` (32- or 64-bit, no flags).
+#[cfg(test)]
 pub const fn is_sub_imm(word: u32) -> bool {
     word & 0x7f80_0000 == 0x5100_0000
 }
 
 /// `ldrsw Xt, [Xn, #imm12]`.
+#[cfg(test)]
 pub const fn is_ldrsw_imm(word: u32) -> bool {
     word & 0xffc0_0000 == 0xb980_0000
 }
 
 /// `cbz` / `cbnz`'s zero form (`cbz Rt, label`, 32- or 64-bit).
+#[cfg(test)]
 pub const fn is_cbz(word: u32) -> bool {
     word & 0x7f00_0000 == 0x3400_0000
 }
@@ -137,6 +144,7 @@ pub fn flag_offset(adrp_site: usize, adrp: u32, add: u32) -> Option<usize> {
 }
 
 /// Index of the first run of consecutive instructions of the given classes.
+#[cfg(test)]
 pub fn find_run(words: &[u32], classes: &[fn(u32) -> bool]) -> Option<usize> {
     if classes.is_empty() || words.len() < classes.len() {
         return None;
@@ -145,12 +153,14 @@ pub fn find_run(words: &[u32], classes: &[fn(u32) -> bool]) -> Option<usize> {
 }
 
 /// The flag scan: the first `adrp, add, ldur, ldrb, ldr, sub` run. Returns the index of its `adrp`.
+#[cfg(test)]
 pub fn find_flag_run(words: &[u32]) -> Option<usize> {
     find_run(words, &[is_adrp, is_add_imm, is_ldur, is_ldrb_imm, is_ldr_imm, is_sub_imm])
 }
 
 /// The hook scan: the first `adrp, ldrsw, cbz` run. Returns the index of its `adrp`; the site is the
 /// `cbz`, two words after it.
+#[cfg(test)]
 pub fn find_hook_run(words: &[u32]) -> Option<usize> {
     find_run(words, &[is_adrp, is_ldrsw_imm, is_cbz])
 }

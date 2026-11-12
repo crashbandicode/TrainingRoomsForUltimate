@@ -124,6 +124,7 @@ pub fn hex(hash: &[u8; 32]) -> String {
 }
 
 /// The hash of `data`, as lower-case hex.
+#[cfg(test)]
 pub fn sha256_hex(data: &[u8]) -> String {
     let mut hasher = Sha256::new();
     hasher.update(data);

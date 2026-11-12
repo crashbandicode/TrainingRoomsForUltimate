@@ -83,6 +83,7 @@ impl Initialization {
 
 /// A mixed Player roster waits only while its native qualification can still finish.
 /// Explicit Mii/original-Mii protection is independent of this temporary wait.
+#[cfg(test)]
 pub fn player_qualifying(
     native_training: bool,
     cpu_quantity: Option<u32>,

@@ -5,9 +5,14 @@
 //! Development-only: the product is built with neither results feature (`automation-results-observer` is a diag feature,
 //! `automation-results-native` needs the Deluxe SDK, decision L1), so the carried tests are what runs these files by default.
 
+#[cfg(test)]
 pub mod adapter;
+#[cfg(test)]
 pub mod control;
+#[cfg(test)]
 pub mod flow;
+#[cfg(test)]
 pub mod popup;
 pub mod pulse;
+#[cfg(test)]
 pub mod recording;

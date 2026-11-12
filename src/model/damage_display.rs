@@ -66,6 +66,7 @@ pub const PERCENT_PANES: [PaneRule; 16] = [
 ];
 
 /// The death-effect panes whose alpha and global alpha are set to 0.
+#[cfg(test)]
 pub const DEATH_EFFECT_PANES: [&str; 4] = ["set_fxui_dead1", "set_fxui_dead2", "set_fxui_dead3", "set_fxui_fire"];
 
 /// Whether `rule` is skipped for these digits: the hundreds panes (names containing `3`) when the
@@ -88,12 +89,14 @@ pub fn animation_frame(animation: &str, d: Digits) -> Option<f32> {
 
 /// What a pane's alpha says about the animation frames: they are rewritten once per fighter per tick,
 /// only when some digit pane's alpha was not 255.
+#[cfg(test)]
 pub fn needs_animation_rewrite(alpha_was: u8, global_alpha_was: u8) -> bool {
     alpha_was != 255 || global_alpha_was != 255
 }
 
 /// Whether the helper runs this HUD tick: in Training with ready-go, and only while a save-state load
 /// or a lobby quick reset is in progress.
+#[cfg(test)]
 pub const fn runs(training: bool, ready_go: bool, load_or_quick_reset_in_progress: bool) -> bool {
     training && ready_go && load_or_quick_reset_in_progress
 }

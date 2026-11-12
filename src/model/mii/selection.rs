@@ -162,6 +162,7 @@ pub fn resolve(
 
 /// One cycle entry per selectable class, in tile order. Slot 0 itself is not an entry; the roster
 /// keeps it as the original.
+#[cfg(test)]
 pub fn cycle_entries(snapshot: &Snapshot, prefs: &Preferences, origin: PlayerOrigin) -> Vec<(MiiClass, Choice)> {
     CLASSES
         .iter()

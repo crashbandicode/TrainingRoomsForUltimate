@@ -26,15 +26,9 @@ pub static SHIELD: [&str; 4] = ["None", "Infinite", "Hold", "Constant"];
 pub static STRENGTH: [&str; 4] = ["None", "Normal", "Medium", "High"];
 pub static MIRRORING: [&str; 3] = ["None", "Alternate", "Random"];
 pub static SAVE_DAMAGE: [&str; 3] = ["Default", "Save State", "Random Value"];
-pub static SLOTS: [&str; 5] = ["Slot 1", "Slot 2", "Slot 3", "Slot 4", "Slot 5"];
 pub static HITSTUN_PLAYBACK: [&str; 3] = ["As Hitstun Ends", "As Hitstop Ends", "As Hitstop Begins"];
 /// The loop counts X cycles, and the Options row shows. The factory row stays length 2.
 pub static LOOP_COUNTS: [&str; 6] = ["∞", "1", "2", "3", "5", "10"];
-pub static RECORD_TRIGGER: [&str; 2] = ["Button Combination", "Save State Load"];
-pub static DURATIONS: [&str; 19] = [
-    "60", "90", "120", "150", "180", "210", "240", "270", "300", "330", "360", "390", "420", "450", "480", "510", "540",
-    "570", "600",
-];
 pub static BUFFS: [&str; 18] = [
     "Accelerate", "Oomph", "Psyche Up", "Bounce", "Arsene", "Deep Breathing", "Limit", "KO Punch", "1-Winged Angel",
     "Jump", "Speed", "Shield", "Buster", "Smash", "Power Dragon", "Mini Waft", "Half Waft", "Full Waft",
@@ -43,7 +37,6 @@ pub static INPUT_DISPLAY: [&str; 2] = ["Off", "Frame strip"];
 /// SPEC-input-07 §6: frames from the recorded press that still count as on time, and what follows an attempt.
 pub static COMBO_TOLERANCE: [&str; 3] = ["Exact", "1 frame", "2 frames"];
 pub static COMBO_AFTER: [&str; 2] = ["Keep playing", "Load save state"];
-pub static MACRO_SOURCE: [&str; 2] = ["Numbered Slots", "Named Library"];
 pub static CYCLE_SLOTS: [&str; 6] = ["Off", "1", "2", "3", "4", "5"];
 pub static SOURCES: [&str; 3] = ["Fighters", "Hats", "Both"];
 pub static BODIES: [&str; 3] = ["Off", "2", "3"];

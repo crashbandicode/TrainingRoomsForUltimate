@@ -28,6 +28,7 @@ use serde_json::{Map, Value};
 /// Top-level key holding the page id the menu opens on (Q5; SPEC-core-04 §3.1).
 pub const LAST_PAGE_KEY: &str = "last_page";
 /// The fork's top-level `mii_preferences` key, preserved verbatim (package 6 reads it).
+#[cfg(test)]
 pub const MII_PREFERENCES_KEY: &str = "mii_preferences";
 /// Largest weight on a weighted row.
 pub const WEIGHT_MAX: u8 = 5;
@@ -264,6 +265,7 @@ impl Settings {
 
     /// The preserved `mii_preferences` extra as its JSON value (read-only; absent when the file has none).
     /// It is written back unchanged with the other top-level keys.
+    #[cfg(test)]
     pub fn mii_preferences(&self) -> Option<&Value> {
         self.extra.get(MII_PREFERENCES_KEY)
     }
@@ -602,7 +604,9 @@ pub enum WriteMode {
 
 /// The stack of the writer thread and the boot-time loader thread (SPEC-core-04 §5, §8, amended 2026-11-02: the sizes come from
 /// the measured thread table, `model::thread_stacks`; the loader keeps its own thread).
+#[cfg(test)]
 pub const WRITER_STACK_BYTES: usize = crate::model::thread_stacks::of(crate::model::thread_stacks::ThreadId::IniWriter).bytes;
+#[cfg(test)]
 pub const LOADER_STACK_BYTES: usize = crate::model::thread_stacks::of(crate::model::thread_stacks::ThreadId::SettingsLoad).bytes;
 
 pub const fn write_mode(writer_thread_started: bool) -> WriteMode {

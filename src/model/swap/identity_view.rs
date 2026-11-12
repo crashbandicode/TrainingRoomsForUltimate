@@ -144,6 +144,7 @@ pub fn costume(scope: Scope, header: &Header, published: Published, region: u32)
 }
 
 /// What every selector copy computes today (keyed on the primary): the vanilla oracle.
+#[cfg(test)]
 pub const fn native_selector(header: &Header, region: u32) -> u32 {
     native_costume(header.primary(), header.costume, region)
 }

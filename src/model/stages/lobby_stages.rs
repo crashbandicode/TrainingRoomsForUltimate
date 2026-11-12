@@ -1,7 +1,9 @@
 //! Lobby-stage preferences. Catalog indices are stable; ranks store selection order.
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-pub use crate::engine::stages::stage_forms::{Form, Forms, Selection};
+pub use crate::engine::stages::stage_forms::{Forms, Selection};
+#[cfg(test)]
+pub use crate::engine::stages::stage_forms::Form;
 
 // Owned ui_stage_db.prc: can_select=true, sorted by native disp_order.
 // Labels join name_id to msg_name+us_en.msbt's nam_stg1_* keys; stage IDs
@@ -182,6 +184,7 @@ pub fn native_stage(selection: Selection) -> Result<u32, &'static str> {
         .ok_or("form unavailable for this stage")
 }
 
+#[cfg(test)]
 pub fn form_catalog() -> Vec<[Option<u32>; 3]> {
     STAGES.iter().map(|(stage, _)| native_forms(*stage)).collect()
 }

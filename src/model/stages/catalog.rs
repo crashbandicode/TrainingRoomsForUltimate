@@ -6,18 +6,17 @@
 
 use super::lobby_stages;
 pub use super::stage_forms::{Form, HelpControls};
+#[cfg(test)]
 use super::stage_menu;
 
 /// Selectable stages, in grid order: `(stage id, label)`.
 pub const STAGES: &[(u32, &str)] = lobby_stages::STAGES;
 /// Number of selectable stages (117 at stage m5o).
+#[cfg(test)]
 pub const STAGE_COUNT: usize = STAGES.len();
 /// Tiles of the grid: the stages plus the All tile.
+#[cfg(test)]
 pub const TILE_COUNT: usize = STAGE_COUNT + 1;
-/// Tiles per page (4 rows x 4 columns).
-pub const PAGE_SIZE: usize = stage_menu::PAGE_SIZE;
-/// Pages of the full grid.
-pub const PAGE_COUNT: usize = TILE_COUNT.div_ceil(PAGE_SIZE);
 
 /// The native alternate forms of a stage: `[Normal, Omega, Battlefield]`, `None` where the stage has none.
 pub fn native_forms(stage: u32) -> [Option<u32>; 3] {
@@ -25,6 +24,7 @@ pub fn native_forms(stage: u32) -> [Option<u32>; 3] {
 }
 
 /// The next or previous page's cell for a cursor, wrapping at the ends (`None` for an empty grid).
+#[cfg(test)]
 pub fn page_cursor(selected: usize, count: usize, next: bool) -> Option<usize> {
     stage_menu::page_cursor(selected, count, next)
 }

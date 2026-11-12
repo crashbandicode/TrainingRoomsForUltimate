@@ -26,7 +26,9 @@
 use super::capabilities::{bank_object_kind, capabilities, form_class, Capabilities};
 #[cfg(any(test, feature = "simulator"))]
 use super::capabilities::{can_window_member_of, member_forms, pins_cell0, FormClass, Grouping};
-use super::ledger::{Conflict, KindSet64, LiveConsumers, ReleaseFootprint, ResidentDependencies, Role, Use, NO_KIND};
+use super::ledger::{Conflict, KindSet64, LiveConsumers, ReleaseFootprint, Role, Use};
+#[cfg(test)]
+use super::ledger::{ResidentDependencies, NO_KIND};
 #[cfg(any(test, feature = "simulator"))]
 use super::ledger::{native_window_requests, orphan_keys, pair_rule, NativeCall, RFlags};
 use crate::engine::swap::character_forms::Forms;
@@ -147,6 +149,7 @@ impl LiveConsumers for Occupancy {
 /// Kirby, parked or live, references none (`prepare_tuple`/`release_tuple` return early for kind 6,
 /// K1 §3.1); a parked never-activated Kirby's copy-tuple *list* is the destroy-side hazard WP3's
 /// `DestroyPlan` carries (K-R1 decides the native initialiser).
+#[cfg(test)]
 pub fn kirby_registry_of(copy: Option<u32>) -> KindSet64 {
     let mut set = KindSet64::default();
     if let Some(kind) = copy { set.insert(kind); }
@@ -156,6 +159,7 @@ pub fn kirby_registry_of(copy: Option<u32>) -> KindSet64 {
 /// What a role's resident bodies still depend on in R after their keys are gone: every parked and
 /// live body kind (the NRO tree, GROUP-SWAP-IMPL §14.3) plus the Kirby copy's kind (its registry
 /// record).
+#[cfg(test)]
 pub fn resident_dependencies(body_kinds: impl IntoIterator<Item = u32>, kirby_copy: Option<u32>) -> ResidentDependencies {
     let mut kinds = KindSet64::default();
     for kind in body_kinds {

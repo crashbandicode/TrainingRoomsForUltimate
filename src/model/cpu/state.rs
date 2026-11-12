@@ -22,6 +22,7 @@ use super::throw::{self, Throw};
 use super::tech::{self, Hidden, MotionHashes, Tech, TechChange, TechRequest};
 use crate::model::lra_reset::HubStep;
 use crate::model::menu::reroll;
+#[cfg(test)]
 use crate::model::settings::Snapshot;
 
 /// What the last frame saw of a body, for the hooks that answer between frames (the air-dodge stick
@@ -134,6 +135,7 @@ impl Cpu {
     }
 
     /// The state at factory settings.
+    #[cfg(test)]
     pub fn factory(seed: u64) -> Self {
         Self::new(CpuSettings::from_snapshot(&Snapshot::factory()), seed)
     }

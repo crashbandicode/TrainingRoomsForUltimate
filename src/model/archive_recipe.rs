@@ -156,6 +156,7 @@ fn apply(stock: &mut impl Stock, recipe: &[u8], output: &mut Vec<u8>) -> Result<
 /// Write a recipe that turns `stock` into `target` (the host builder and the tests). A greedy matcher:
 /// 32-byte chunks of the stock archive are indexed every 16 bytes; at each target position the longest
 /// run that matches a stock chunk becomes a copy, anything else a literal. Not used on the Switch.
+#[cfg(test)]
 pub fn make(stock: &[u8], target: &[u8]) -> Vec<u8> {
     const CHUNK: usize = 32;
     const STRIDE: usize = 16;

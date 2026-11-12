@@ -376,12 +376,8 @@ fn kirby_entry_for(ids: &Table, copied: i32) -> Option<&'static Entry> {
         .or_else(|| ENTRIES.iter().find(|e| e.kinds.iter().any(|c| KIRBY_SHARED.contains(c) && ids.is(*c, copied))))
 }
 
-/// Whether a copied fighter has a charge entry in Kirby's table.
-pub fn has_kirby_entry(ids: &Table, copied: i32) -> bool {
-    kirby_entry_for(ids, copied).is_some()
-}
-
 /// The fighter kinds that have a charge entry here.
+#[cfg(test)]
 pub fn has_entry(ids: &Table, kind: i32) -> bool {
     entry_for(ids, kind).is_some()
 }

@@ -29,6 +29,7 @@ use super::storage::{self, SettingsSource};
 use super::store::write_replace;
 
 /// The temporary file `write_replace` uses for the active file.
+#[cfg(test)]
 pub const TEMP_NAME: &str = "settings.json.tmp";
 /// What the replace fallback leaves behind if the process dies inside it.
 pub const BACKUP_NAME: &str = "settings.json.bak";

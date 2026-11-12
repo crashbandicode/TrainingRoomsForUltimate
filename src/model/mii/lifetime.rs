@@ -320,6 +320,7 @@ impl MiiOverride {
     pub fn phase(&self) -> Phase {
         self.phase
     }
+    #[cfg(test)]
     pub fn pending_ticket(&self) -> Option<Ticket> {
         self.pending.map(|p| p.ticket)
     }
@@ -405,6 +406,7 @@ impl MiiOverride {
         self.prepare(self.original, Operation::Restore).map(Some)
     }
 
+    #[cfg(test)]
     pub fn can_change_kind_or_return_slot0(&self, live: Observed) -> Result<(), Error> {
         self.ready(live)?;
         if self.expected != self.original {

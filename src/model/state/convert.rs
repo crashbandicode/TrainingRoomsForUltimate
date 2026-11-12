@@ -10,6 +10,7 @@
 
 use serde_json::Value;
 
+#[cfg(test)]
 use super::file::SaveFile;
 use super::held_item::HeldItem;
 
@@ -79,6 +80,7 @@ pub fn snapshot_for(index: usize, player_kind: i32, cpu_kind: i32) -> Option<Hel
 /// Convert a (copied) save file in place. Returns how many player records got a snapshot. A record with
 /// any snapshot (even `Empty` / `Unsupported`), a never-saved record, a setting of None, and every
 /// CPU-role record are left alone.
+#[cfg(test)]
 pub fn convert_file(file: &mut SaveFile, index: usize) -> usize {
     let mut converted = 0;
     for slot in 0..file.player.len() {

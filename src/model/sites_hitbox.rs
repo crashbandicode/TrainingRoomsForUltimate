@@ -27,11 +27,16 @@ pub const HITBOX_RGB_LAST_OFFSET: usize = 0x201_7c80;
 pub const HITBOX_RATE_LAST_OFFSET: usize = 0x201_7ce0;
 pub const HITBOX_SLEEP_EFFECT_OFFSET: usize = 0x206_9140;
 pub const HITBOX_ACCESSOR_OFFSET: usize = 0x227_daf0;
+#[cfg(test)]
 pub const HITBOX_ATTACK_STACK_OFFSET: usize = 0x228_4cd0;
+#[cfg(test)]
 pub const HITBOX_CATCH_STACK_OFFSET: usize = 0x22a_c2ec;
 /// Hurtboxes (decision HB1): the `HitModule` thunk, its group/part tables, its part update.
+#[cfg(test)]
 pub const HITBOX_HURT_MODULE_OFFSET: usize = 0x203_db10;
+#[cfg(test)]
 pub const HITBOX_HURT_GROUPS_OFFSET: usize = 0x46_9af0;
+#[cfg(test)]
 pub const HITBOX_HURT_PART_OFFSET: usize = 0x46_8490;
 /// Own orbs (decision HB-OWN-ORBS; `model::hitbox_orbs`): the bone transform, the projection and its screen size words.
 pub const ORB_JOINT_POSITION_OFFSET: usize = 0x205_7640;

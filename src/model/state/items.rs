@@ -128,6 +128,7 @@ pub fn timers_apply(timers: &Timers, live_lifetime_max: i32, live_fuse_max: i32)
 }
 
 /// The face override a turnip grant sets while it is made: the chosen face is `variation + 1`.
+#[cfg(test)]
 pub fn turnip_face(variation: i32) -> u32 {
     (variation + 1) as u32
 }
@@ -142,6 +143,7 @@ pub const FACE_CHOSEN: f32 = 58.0;
 
 /// The choice a held item of `kind` and `variation` is saved as: the first choice whose spec has that
 /// kind and accepts that variation. `kind_of` resolves a spec's kind constant to the live value.
+#[cfg(test)]
 pub fn choice_of(kind: i32, variation: i32, kind_of: impl Fn(C) -> i32) -> Option<u8> {
     (0..super::held_item::ITEM_NAMES.len() as u8).find(|choice| {
         spec_for(*choice).is_some_and(|spec| kind_of(spec.kind) == kind)

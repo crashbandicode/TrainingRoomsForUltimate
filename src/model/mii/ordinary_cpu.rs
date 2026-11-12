@@ -279,6 +279,7 @@ pub fn recapture_rank(layout:crate::engine::mii::backend::Layout,expected:Bindin
 /// Preflight refresh before a ticket exists. Rank must already match. Only a
 /// qualified FE+0x35 change is copied. Any other byte, including rank and the
 /// controller word, refuses.
+#[cfg(test)]
 pub fn refresh_control_type(layout:crate::engine::mii::backend::Layout,expected:Binding,current:Binding,
     expected_descriptor:&[u8;0x70],current_descriptor:&[u8;0x70])->Result<[u8;0x70],&'static str> {
     if expected!=current || current.epoch==0 || current.owner!=layout.visible()[1] {
@@ -458,6 +459,7 @@ impl Reservation {
     pub const fn empty() -> Self { Self(false) }
     pub fn held(self) -> bool { self.0 }
     /// A retained CPU payload blocks CPU ownership and every claim touching record1.
+    #[cfg(test)]
     pub fn conflicts(self, role:usize, record:u16)->bool {
         self.0 && (role==OWNER || record==DESTINATION)
     }
@@ -485,6 +487,7 @@ pub struct GenericOrdinaryFacts {
     pub roster_cursor: Option<usize>,
 }
 
+#[cfg(test)]
 pub fn generic_ordinary_commit(f: GenericOrdinaryFacts) -> Result<Destination, &'static str> {
     generic_ordinary_commit_in(crate::engine::mii::backend::Layout::Training,0,f)
 }
@@ -646,6 +649,7 @@ impl CreatedDestination {
     }
     pub fn owner(self) -> Owner { self.owner }
     pub fn record(self) -> u16 { self.record }
+    #[cfg(test)]
     pub fn protected(self) -> [Option<u16>; 8] { self.protected }
 
 
@@ -762,6 +766,7 @@ impl CreatedDestination {
     }
 }
 
+#[cfg(test)]
 pub fn staged_descriptor(original: [u8; 0x70], target: Option<Configuration>) -> [u8; 0x70] {
     staged_descriptor_for(OWNER, original, target).expect("CPU selector")
 }
@@ -805,6 +810,7 @@ pub fn saved_payload_routes_to_destination(published_index:u16,destination_index
 }
 
 /// No selector allocator: only the caller's already-proved owner is accepted.
+#[cfg(test)]
 pub fn staged_descriptor_for(owner: usize, original: [u8; 0x70], target: Option<Configuration>) -> Option<[u8; 0x70]> {
     staged_descriptor_in(crate::engine::mii::backend::Layout::Training,owner,original,target)
 }
@@ -833,11 +839,13 @@ pub fn staged_descriptor_for_owner(layout:crate::engine::mii::backend::Layout,ow
 }
 
 /// The mixed phase is explicit: native FE already contains target; E and D still contain before.
+#[cfg(test)]
 pub fn publication_indices(before:u16,target_index:u16,e:u16,fe:u16,d:u16)->bool {
     // This is only descriptor-shape evidence. The caller still requires the executing
     // typed ticket, current protected union, loader6 and selected-O phase proof.
     publication_indices_for(OWNER, before, target_index, e, fe, d)
 }
+#[cfg(test)]
 pub fn publication_indices_for(owner:usize,before:u16,target_index:u16,e:u16,fe:u16,d:u16)->bool {
     publication_indices_in(crate::engine::mii::backend::Layout::Training,owner,before,target_index,e,fe,d)
 }
@@ -905,6 +913,7 @@ pub fn outgoing_object_matches_with(
 /// The outgoing O header a canonical or window load leaves before publication: the
 /// selector, the descriptor's three group words and the `+0x41` flag. An exchanged
 /// group's outgoing header is the captured one, not this value.
+#[cfg(test)]
 pub fn descriptor_header(selector: u8, descriptor: &[u8; 0x70]) -> [u32; 5] {
     let word = |offset: usize| u32::from_le_bytes([
         descriptor[offset], descriptor[offset + 1],

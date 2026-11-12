@@ -384,14 +384,13 @@ pub mod emtr {
     pub const ALPHA0_KEYS: usize = 0x440;
     pub const COLOUR1_KEYS: usize = 0x4c0;
     pub const ALPHA1_KEYS: usize = 0x540;
-    pub const SCALE_KEYS: usize = 0x600;
     pub const KEY_ROWS: usize = 8;
-    pub const BLEND: usize = 0x89e;
     pub const SOURCES: usize = 0x99c;
     pub const FIXED0: usize = 0x9a0;
     pub const FIXED1: usize = 0x9b0;
-    pub const BASE_SCALE: usize = 0x9c0;
+    #[cfg(test)]
     pub const SAMPLERS: usize = 0x9f0;
+    #[cfg(test)]
     pub const SAMPLER_STRIDE: usize = 0x20;
 }
 
@@ -486,16 +485,19 @@ impl EmitterColours {
     }
 
     /// Colour 1's RGB at `t`.
+    #[cfg(test)]
     pub fn colour1_at(&self, t: f32) -> [f32; 3] {
         pick(self.sources[1], [self.fixed1[0], self.fixed1[1], self.fixed1[2]], &self.colour1, self.counts[2], t)
     }
 
     /// Alpha 0 at `t`.
+    #[cfg(test)]
     pub fn alpha0_at(&self, t: f32) -> f32 {
         pick(self.sources[2], [self.fixed0[3]; 3], &self.alpha0, self.counts[1], t)[0]
     }
 
     /// Alpha 1 at `t`.
+    #[cfg(test)]
     pub fn alpha1_at(&self, t: f32) -> f32 {
         pick(self.sources[3], [self.fixed1[3]; 3], &self.alpha1, self.counts[3], t)[0]
     }

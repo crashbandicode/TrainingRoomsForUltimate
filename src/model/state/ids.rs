@@ -266,6 +266,7 @@ pub const ARTICLE_COUNT: i32 = 0x26;
 
 impl Table {
     /// Every constant resolved to `base + its index` (host tests: distinct, known values).
+    #[cfg(test)]
     pub fn sequential(base: i32) -> Self {
         let mut table = Self::unresolved();
         for (i, slot) in table.values.iter_mut().enumerate() {
@@ -306,7 +307,4 @@ impl Table {
         .any(|c| self.is(*c, kind))
     }
 
-    pub fn is_pokemon(&self, kind: i32) -> bool {
-        [C::KindPokemonSquirtle, C::KindPokemonIvysaur, C::KindPokemonCharizard].iter().any(|c| self.is(*c, kind))
-    }
 }

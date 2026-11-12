@@ -186,6 +186,7 @@ pub fn record_address(expected: Binding, fresh: Binding) -> Result<usize, Error>
 
 /// A freshly copied current owner map is required, including inactive native helpers. None
 /// means a positively absent entry, not an unreadable or unchecked manager lookup.
+#[cfg(test)]
 pub fn qualified_scope(
     fresh: Binding,
     saved_row_kind: u32,
@@ -231,6 +232,7 @@ pub struct CpuOwner {
 /// Origin01 #284/#297/#298: saved Sword CPU1 and native inactive Swords2/3,
 /// distinct current objects and indices. P1 is the explicitly qualified ordinary Luigi fixture.
 /// Ordinary P1's zero Mii index is observed, not treated as a claim on record0.
+#[cfg(test)]
 pub fn qualified_cpu_scope(
     owners: &[CpuOwner; 4],
     other_entries_present: bool,
@@ -282,6 +284,7 @@ pub struct CpuHelper {
 
 /// Helper configuration and numeric ownership are invariant across the target's reload.
 /// Shared-pointer words are compared as bytes, never dereferenced or reference-counted here.
+#[cfg(test)]
 pub fn preserved_cpu_helpers(
     expected: &[CpuHelper; 2],
     current: &[CpuHelper; 2],

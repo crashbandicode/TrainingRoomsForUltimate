@@ -610,6 +610,7 @@ pub const ROWS: &[Seam] = &[
 
 /// Ratchet (API.md): `path:fn` of every `#[skyline::hook]` in WP-A3's files without a row yet. Empty: the three
 /// `lua2cpp_common` hooks are image rows in `images.rs` (rows 27/36).
+#[cfg(test)]
 pub const UNCONVERTED: &[&str] = &[];
 
 #[cfg(test)]

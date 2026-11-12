@@ -583,6 +583,7 @@ impl ComboNotices {
 /// An action note (the target note, and the other Combos results) replaces the skipped-file
 /// notice. The open menu freezes whichever standing notice is in front, so leaving `0x2B` queued
 /// would keep the target note off the screen.
+#[cfg(test)]
 pub fn apply_combo_action(queue: &mut super::notify::Queue, text: &str) {
     queue.clear_id(ComboNotices::SKIPPED_ID);
     queue.upsert(

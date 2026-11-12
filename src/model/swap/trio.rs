@@ -112,13 +112,16 @@ pub struct TrioFighter(u32);
 impl TrioFighter {
     pub const MARIO: Self = Self(0);
     pub const KIRBY: Self = Self(0x06);
+    #[cfg(test)]
     pub const PIKACHU: Self = Self(0x08);
+    #[cfg(test)]
     pub const BOWSER: Self = Self(0x0f);
-    pub const LUCINA: Self = Self(0x16);
+    #[cfg(test)]
     pub const GAMEWATCH: Self = Self(0x1c);
+    #[cfg(test)]
     pub const PALUTENA: Self = Self(0x36);
+    #[cfg(test)]
     pub const BAYONETTA: Self = Self(0x40);
-    pub const ICE_CLIMBERS: Self = Self(0x4b);
 
     pub const fn kind(self) -> u32 {
         self.0

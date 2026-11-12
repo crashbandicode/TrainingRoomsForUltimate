@@ -9,14 +9,6 @@ use super::sites::{Feature, Site};
 
 pub const UI_REGISTER_VIEW_OFFSET: usize = 0x35b9360;
 pub const EFFMGR_INSTANCE_WORDS_OFFSET: usize = 0x34cb16c;
-pub const EFFMGR_ENTRY_HASH_OFFSET: usize = 0x3560884;
-pub const EFFMGR_ENTRY_DATA_OFFSET: usize = 0x35609ac;
-pub const EFFMGR_SYSTEM_BASE_OFFSET: usize = 0x35609fc;
-pub const EFFMGR_SYSTEM_RESOURCES_OFFSET: usize = 0x3560a98;
-pub const VFX_TEXTURE_TABLE_OFFSET: usize = 0x9a1b8;
-pub const VFX_TEXTURE_SLOT_OFFSET: usize = 0x9abb4;
-pub const VFX_EMITTER_TABLE_OFFSET: usize = 0x9ac08;
-pub const VFX_EMITTER_SAMPLER_OFFSET: usize = 0x9ac4c;
 
 pub static SITES: [Site; 10] = [
     Site {

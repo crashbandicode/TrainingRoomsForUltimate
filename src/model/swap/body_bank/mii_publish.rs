@@ -50,6 +50,7 @@ impl PublishAttempts {
     }
 
     /// Counted refusals (races and permanent ones); `Busy` is never counted.
+    #[cfg(test)]
     pub const fn refusals(&self) -> u8 {
         self.refusals
     }

@@ -31,6 +31,7 @@ impl<const N: usize> Weights<N> {
         self.0.iter().all(|w| *w == 0)
     }
 
+    #[cfg(test)]
     pub fn weight(&self, i: usize) -> u8 {
         self.0.get(i).copied().unwrap_or(0)
     }

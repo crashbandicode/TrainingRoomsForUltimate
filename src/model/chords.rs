@@ -51,12 +51,16 @@ pub mod bit {
     pub const RIGHT_SR: u32 = 1 << 15;
     pub const STICK_L: u32 = 1 << 16;
     pub const STICK_R: u32 = 1 << 17;
+    #[cfg(test)]
     pub const L_UP: u32 = 1 << 20;
     pub const L_RIGHT: u32 = 1 << 21;
+    #[cfg(test)]
     pub const L_DOWN: u32 = 1 << 22;
     pub const L_LEFT: u32 = 1 << 23;
+    #[cfg(test)]
     pub const R_UP: u32 = 1 << 24;
     pub const R_RIGHT: u32 = 1 << 25;
+    #[cfg(test)]
     pub const R_DOWN: u32 = 1 << 26;
     pub const R_LEFT: u32 = 1 << 27;
     pub const PLUS: u32 = 1 << 18;
@@ -90,12 +94,16 @@ impl Buttons {
     pub const fn dpad_right(self) -> bool { self.has(bit::DPAD_RIGHT) }
     pub const fn real_digital_l(self) -> bool { self.has(bit::REAL_DIGITAL_L) }
     pub const fn real_digital_r(self) -> bool { self.has(bit::REAL_DIGITAL_R) }
+    #[cfg(test)]
     pub const fn l_up(self) -> bool { self.has(bit::L_UP) }
     pub const fn l_right(self) -> bool { self.has(bit::L_RIGHT) }
+    #[cfg(test)]
     pub const fn l_down(self) -> bool { self.has(bit::L_DOWN) }
     pub const fn l_left(self) -> bool { self.has(bit::L_LEFT) }
+    #[cfg(test)]
     pub const fn r_up(self) -> bool { self.has(bit::R_UP) }
     pub const fn r_right(self) -> bool { self.has(bit::R_RIGHT) }
+    #[cfg(test)]
     pub const fn r_down(self) -> bool { self.has(bit::R_DOWN) }
     pub const fn r_left(self) -> bool { self.has(bit::R_LEFT) }
 }
@@ -446,6 +454,7 @@ impl Detector {
         passes(chords.cpu_cycle, sample)
     }
 
+    #[cfg(test)]
     pub fn is_pending(&self, request: Request) -> bool {
         self.pending & request.bit() != 0
     }
@@ -517,6 +526,7 @@ pub fn glyph(button: u8, style: u32) -> Option<u16> {
 }
 
 /// Whether a chord cannot pass on this style (the menu greys the row: SPEC-input-04 question 3).
+#[cfg(test)]
 pub fn unusable_on(chord: Chord, style: u32) -> bool {
     style == STYLE_GAMECUBE && chord.0 & ((1 << logical::L) | (1 << logical::MINUS)) != 0
 }

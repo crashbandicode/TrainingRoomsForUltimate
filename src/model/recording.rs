@@ -442,6 +442,7 @@ impl CpuRoleDrive {
         }
     }
 
+    #[cfg(test)]
     pub const fn possession(&self) -> Possession {
         self.possession
     }
@@ -633,6 +634,7 @@ impl Recorder {
         self.mode
     }
 
+    #[cfg(test)]
     pub const fn possession(&self) -> Possession {
         self.possession
     }
@@ -645,14 +647,7 @@ impl Recorder {
         self.length
     }
 
-    pub const fn record_slot(&self) -> u8 {
-        self.record_slot
-    }
-
-    pub const fn play_slot(&self) -> u8 {
-        self.play_slot
-    }
-
+    #[cfg(test)]
     pub fn slot_len(&self, slot: u8) -> u16 {
         self.len.get(usize::from(slot)).copied().unwrap_or(0)
     }
@@ -1009,6 +1004,7 @@ impl Recorder {
     // ---- triggers ------------------------------------------------------------------------------
 
     /// A weighted random slot of Playback Button Slots (the plugin's own generator, question 12).
+    #[cfg(test)]
     pub fn pick_chord_slot(s: &RecorderSettings, rng: &mut Rng) -> Option<u8> {
         s.playback_slots.pick(rng).map(|i| i as u8)
     }
@@ -1150,13 +1146,6 @@ impl Recorder {
         self.current_facing = facing;
     }
 
-    pub const fn current_facing(&self) -> i8 {
-        self.current_facing
-    }
-
-    pub const fn mash_started(&self) -> bool {
-        self.mash_started
-    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

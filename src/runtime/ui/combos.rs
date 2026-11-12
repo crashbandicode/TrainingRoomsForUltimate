@@ -121,10 +121,6 @@ impl Ui {
         self.target = target.map(|(id, r)| (id, r.name));
     }
 
-    pub fn active_editor(&self) -> Option<Editor> {
-        self.active
-    }
-
     /// A row of the group was entered.
     pub fn open(&mut self, editor: Editor) -> Result<Opened, String> {
         self.load_target();
@@ -414,10 +410,6 @@ impl Ui {
             return;
         }
         external::press_panel(button);
-    }
-
-    pub fn panel_up(&self) -> bool {
-        !named_macros::suspended() && (self.active.is_some() || self.naming.is_some()) && external::panel_up()
     }
 
     pub fn view(&self) -> Option<View> {

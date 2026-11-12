@@ -349,6 +349,7 @@ pub const CALLBACKS: &[CallbackContract] = &[
 ];
 
 /// The callback contract by name.
+#[cfg(test)]
 pub fn contract(name: &str) -> Option<&'static CallbackContract> {
     CALLBACKS.iter().find(|c| c.name == name)
 }
@@ -411,11 +412,13 @@ const fn project(rows: &[CallbackContract]) -> [Gate; GATE_COUNT] {
 pub static GATES: [Gate; GATE_COUNT] = project(CALLBACKS);
 
 /// Whether `c` may run in `now` (the rule of [`Gate::admitted`]).
+#[cfg(test)]
 pub fn admitted(c: &CallbackContract, now: Scope) -> bool {
     c.gate().admitted(now)
 }
 
 /// Whether `c` is admitted whatever the scene (the rule of [`Gate::admitted_everywhere`]).
+#[cfg(test)]
 pub const fn admitted_everywhere(c: &CallbackContract) -> bool {
     c.gate().admitted_everywhere()
 }

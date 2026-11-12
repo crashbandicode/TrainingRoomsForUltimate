@@ -44,9 +44,6 @@ pub const BIND_MII_RESOURCE: usize = 0x67e7d0;
 pub const SETUP_MII_FACES: usize = 0x67ead0;
 /// `0x3759500`: the pool publication `0x67e7d0` tails into; stores the pair at `0x375a9ec`.
 pub const PUBLISH_PAIR: usize = 0x3759500;
-pub const PAIR_STORE: usize = 0x375a9ec;
-/// The canonical call chain (`adrp/ldr` of the manager slot through `bl 0x67e7d0`).
-pub const MANAGER_CHAIN: usize = 0x651428;
 /// The `D+0x94` gate that guards the chain (`ldr x8,[x19,#0xf8]; ldrb w8,[x8,#0x94]; cbnz`).
 pub const CHAIN_GATE: usize = 0x65141c;
 /// `**(main+0x52b94f8)` is the first argument of `0x67e7d0`.
@@ -64,14 +61,6 @@ pub const R_INDEX: usize = 0x68;
 pub const R_FACE_HANDLES: usize = 0x90;
 pub const D_GATE: usize = 0x94;
 pub const FE_TOKENS: usize = 0x46;
-/// `0x67e7d0` retires the record at `R+0x68` only when that index is `<= 9`.
-pub const RETIRED_INDEX_MAX: u16 = 9;
-/// The change commit that parks the bank's in-window change (`+0x591a != 0xff`, outer 6).
-pub const COMMIT_CHANGE: usize = 0x6581f0;
-/// The Reload loader: dispatches on `+0x591c` only while `+0x5920 == 3` and `+0x591c <= 0xb`.
-pub const RELOAD_LOADER: usize = 0x650010;
-/// State 6's own call of `0x67e7d0` (the native point the bank's Phase B replays).
-pub const STATE6_BIND_CALL: usize = 0x651444;
 /// Entry phase bytes: outer `+0x5920`, loader `+0x591c`, pending request `+0x591a`,
 /// change in progress `+0x5934`, guard `+0x5935`, the bank's acknowledgement `+0x5933`.
 pub const FE_OUTER: usize = 0x5920;
@@ -88,13 +77,12 @@ pub struct EntryPhase { pub outer: u8, pub loader: u8, pub pending: u8, pub chan
 impl EntryPhase {
     /// Ready: outer 6, loader 14, no pending request, no change, no guard. The only phase
     /// from which the bank accepts a member switch (`Members::ready_index`).
+    #[cfg(test)]
     pub const READY: Self = Self { outer: 6, loader: 14, pending: 0xff, changing: 0, guard: 0, acknowledged: 1 };
     /// The bank's own in-window change as `0x6581f0` leaves it on the bank flag (outer 3,
     /// loader 0xc, request consumed, change marked, not yet acknowledged): `awaiting_completion`.
+    #[cfg(test)]
     pub const BANK_PARKED: Self = Self { outer: 3, loader: 0xc, pending: 0xff, changing: 1, guard: 0, acknowledged: 0 };
-    /// Native's own point of the two calls (Reload state 6), for the record and the tests:
-    /// native's loader is running there, never a phase the bank's adapter may call from.
-    pub const RELOAD_STATE6: Self = Self { outer: 3, loader: 6, pending: 0xff, changing: 0, guard: 0, acknowledged: 1 };
 
     pub fn ready(&self) -> bool {
         self.outer == 6 && self.loader == 14 && self.pending == 0xff && self.changing == 0 && self.guard == 0
@@ -156,10 +144,10 @@ pub const CHAIN_WORDS: [u32; 11] = [
 pub struct Tokens { pub index: u16, pub outfit: u16, pub hat: u16, pub colour: u16, pub voice: u16 }
 
 impl Tokens {
+    #[cfg(test)]
     pub fn from_entry_halfwords(halfwords: [u16; 5]) -> Self {
         Self { index: halfwords[0], outfit: halfwords[1], hat: halfwords[2], colour: halfwords[3], voice: halfwords[4] }
     }
-    pub fn halfwords(&self) -> [u16; 5] { [self.index, self.outfit, self.hat, self.colour, self.voice] }
 }
 
 /// Everything the adapter proves before the first native effect, as copied values.
@@ -232,6 +220,3 @@ pub fn classify(pair_after: (usize, usize), faces_after: (u32, u32), charinfo_in
     Outcome::Prepared { pair: pair_after, faces: faces_after }
 }
 
-/// Interim routing rule (WORKPLAN §2.11 step 4, Astra): a Mii target whose setup
-/// preflight is not established is routed canonically **before** any group mutation.
-pub fn admits_group_mutation(preflight: Result<(), &'static str>) -> bool { preflight.is_ok() }

@@ -34,10 +34,6 @@ pub fn roster_of(values: &[u8]) -> OrderedFighterRoster {
     serde_json::from_value(serde_json::Value::from(values.to_vec())).unwrap_or(OrderedFighterRoster::all())
 }
 
-/// Every Mii class. The Player cycle does not use this: it walks [`player_admission`], the same list the P1 Cycles
-/// grid numbers (P1-CYCLE).
-pub const ALL_MII: MiiAdmission = [true; 3];
-
 /// The ordered members of one role's cycle, before slot 0 is taken out: All in CSS order, otherwise the ranks in rank
 /// order, with each Mii class kept only when `admitted`. Allocation-free (the planner's per-tick form).
 pub fn cycle_members(roster: OrderedFighterRoster, admitted: MiiAdmission) -> FighterList {

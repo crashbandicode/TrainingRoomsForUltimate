@@ -507,13 +507,6 @@ pub fn admit(a: Admission, owner: u32, row: u32) -> Result<(), &'static str> {
     Ok(())
 }
 
-/// A fixed parked source has no visible pane yet. This admits rendering only;
-/// publication must later satisfy the ordinary pane/bind and active-source proof.
-pub fn admit_prepared(a: Admission, owner: u32, row: u32) -> Result<(), &'static str> {
-    if !matches!(owner, 2 | 3) || row != owner { return Err("not a fixed parked portrait row"); }
-    admit_render(a, owner, row)
-}
-
 fn admit_render(a: Admission, owner: u32, row: u32) -> Result<(), &'static str> {
     if !a.lease_valid { return Err("portrait lease not valid"); }
     if a.install_active { return Err("INSTALL active"); }

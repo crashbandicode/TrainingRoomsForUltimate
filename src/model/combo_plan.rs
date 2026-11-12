@@ -168,6 +168,7 @@ fn pill_color(s: &Summary) -> [u8; 4] {
 }
 
 /// The x of `frames` from A₁ on cell `cell`'s ruler, clamped to its ends.
+#[cfg(test)]
 pub fn ruler_x(cell: usize, frames: i32) -> f32 {
     ruler_at(CELL_X0 + cell as f32 * CELL_PITCH, frames)
 }

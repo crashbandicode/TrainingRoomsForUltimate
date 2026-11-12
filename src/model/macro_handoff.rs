@@ -165,6 +165,7 @@ impl SlotTransfer {
         }
     }
 
+    #[cfg(test)]
     pub fn import(slot: usize, frames: &[crate::model::input_delay::MappedInputs], origin: crate::model::recording::Origin)
         -> Result<Self, crate::model::recording::ImportRefusal>
     {
@@ -401,11 +402,6 @@ impl<T: Copy + Default> CaptureBuffer<T> {
         true
     }
 
-    /// Hook: the capture is running.
-    pub fn capturing(&self) -> bool {
-        self.owner.load(SeqCst) == HOOK
-    }
-
     /// Hook: store frame `index` (frames in between are default-filled). False when not capturing or past the prepared capacity
     /// (the hook never grows the buffer).
     pub fn store(&self, index: usize, frame: T) -> bool {
@@ -428,6 +424,7 @@ impl<T: Copy + Default> CaptureBuffer<T> {
     }
 
     /// Hook: frame `index` was stored.
+    #[cfg(test)]
     pub fn has_frame(&self, index: usize) -> bool {
         self.owner.load(SeqCst) == HOOK && index < self.len.load(SeqCst)
     }

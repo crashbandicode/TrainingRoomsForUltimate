@@ -114,6 +114,7 @@ impl CaptureSettings {
     /// recognises as `[capture] enabled`. The host's append path is never relied
     /// on. Any other layout keeps the toggle session-only (no host persistence);
     /// the error names the reason for the startup log.
+    #[cfg(test)]
     pub fn persistence_compatible(contents: &str) -> Result<(), String> {
         let scan = scan(contents)?;
         let host: Vec<usize> = contents
@@ -147,6 +148,7 @@ impl CaptureSettings {
 /// the `#` comment is stripped, the line is split at the first `=` and the key
 /// is trimmed. The host compares it exactly (case-sensitive); `;` is not a
 /// comment to it.
+#[cfg(test)]
 pub fn host_persistence_key(line: &str) -> Option<&str> {
     let line = line.split('#').next().unwrap_or("");
     let (key, _) = line.split_once('=')?;

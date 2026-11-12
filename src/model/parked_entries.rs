@@ -15,6 +15,7 @@ pub const ENTRY2: u32 = 2;
 /// Training helper entry that becomes CPU 3, and the fifth-hat borrow.
 pub const ENTRY3: u32 = 3;
 /// Hat entries, first to last. Entry 3 is not in this list.
+#[cfg(test)]
 pub const HAT_ENTRIES: [u32; 4] = [7, 6, 5, 4];
 
 /// What the loader callback can see on one parked entry.
@@ -132,6 +133,7 @@ pub fn live_seat(slot: u32, promoted: [bool; 2], quantity: Option<u32>) -> bool 
 
 /// Where a hat may be placed. Entries 7/6/5/4 at any open count. Entry 3 only as the fifth hat at one CPU.
 /// Entry 2 never.
+#[cfg(test)]
 pub fn hat_may_use(slot: u32, quantity: Option<u32>, borrow_open: bool) -> bool {
     match slot {
         4..=7 => training_quantity_open(quantity),

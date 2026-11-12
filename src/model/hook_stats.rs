@@ -419,6 +419,7 @@ pub struct Observation {
 
 impl Observation {
     /// A hook that has run at least once since boot.
+    #[cfg(test)]
     pub fn covered(&self, id: HookId) -> bool {
         self.now.entries[id as usize] > 0
     }

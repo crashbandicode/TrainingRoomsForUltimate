@@ -72,11 +72,6 @@ impl OrderedFighterRoster {
             .collect()
     }
 
-    /// Known roster catalog with Kirby removed. Does not apply original-P1 exclusion.
-    pub fn hat_kinds(self) -> Vec<u32> {
-        self.hat_kinds_fixed().to_vec()
-    }
-
     /// `hat_kinds` without heap (the preload planner's per-tick form).
     pub fn hat_kinds_fixed(self) -> KindList {
         let mut out = KindList::new(0);
@@ -213,6 +208,7 @@ impl<'de> Deserialize<'de> for OrderedFighterRoster {
     }
 }
 
+#[cfg(test)]
 pub const DEFAULT_PLAYER_ROSTER: OrderedFighterRoster =
     match OrderedFighterRoster::from_fighters(&[
         TrioFighter::GAMEWATCH,
@@ -223,6 +219,7 @@ pub const DEFAULT_PLAYER_ROSTER: OrderedFighterRoster =
         None => unreachable!(),
     };
 
+#[cfg(test)]
 pub const DEFAULT_CPU_ROSTER: OrderedFighterRoster = match OrderedFighterRoster::from_fighters(&[
     TrioFighter::PIKACHU,
     TrioFighter::KIRBY,

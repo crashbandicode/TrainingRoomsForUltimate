@@ -891,6 +891,7 @@ pub const ROWS: &[Seam] = &[
 ];
 
 /// Ratchet (API.md): every `#[skyline::hook]` in this A-WP's files has a row above.
+#[cfg(test)]
 pub const UNCONVERTED: &[&str] = &[];
 
 // Not rows of the main-image table (see REPORT.md):

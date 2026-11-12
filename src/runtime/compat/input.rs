@@ -55,10 +55,6 @@ pub struct MappedInputs {
 const _: () = assert!(core::mem::size_of::<MappedInputs>() == core::mem::size_of::<Record>());
 
 impl MappedInputs {
-    /// No buttons, both sticks centred.
-    pub const fn empty() -> MappedInputs {
-        MappedInputs { buttons: Buttons(0), lstick_x: 0, lstick_y: 0, rstick_x: 0, rstick_y: 0 }
-    }
 }
 
 impl From<Record> for MappedInputs {

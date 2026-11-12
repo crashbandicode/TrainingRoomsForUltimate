@@ -13,11 +13,19 @@ mod sequence;
 
 use serde::{Deserialize, Serialize};
 
-pub use chain::{Chain, ChainEntry};
-pub use hot::{RecordingIndex, INDEX_FILE};
+pub use chain::Chain;
+#[cfg(test)]
+pub use chain::ChainEntry;
+pub use hot::RecordingIndex;
+#[cfg(test)]
+pub use hot::INDEX_FILE;
 pub use migrate::{migrate, LegacySlot, MigrationReceipt};
-pub use save::{NamedSave, NamedSaveEntry};
-pub use sequence::{Sequence, SequenceEntry};
+pub use save::NamedSave;
+#[cfg(test)]
+pub use save::NamedSaveEntry;
+pub use sequence::Sequence;
+#[cfg(test)]
+pub use sequence::SequenceEntry;
 
 /// Directory of recordings and chains, under the TrainingRooms data folder.
 pub const MACROS_DIR: &str = "macros";

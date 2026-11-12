@@ -108,6 +108,7 @@ impl Split {
         Self { start_us: now_us, last_us: now_us, running: true, ..Self::default() }
     }
 
+    #[cfg(test)]
     pub fn running(&self) -> bool {
         self.running
     }
@@ -252,6 +253,7 @@ impl Gaps {
         self.armed = false;
     }
 
+    #[cfg(test)]
     pub fn ticks(&self) -> u32 {
         self.ticks
     }
@@ -262,6 +264,7 @@ impl Gaps {
     }
 
     /// The largest gap after a tick that did `work`, if any is among the top gaps.
+    #[cfg(test)]
     pub fn largest_after(&self, work: Work) -> Option<Gap> {
         self.top().iter().copied().find(|g| g.after == work)
     }

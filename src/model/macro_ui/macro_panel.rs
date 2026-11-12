@@ -108,6 +108,7 @@ pub fn admit_numbered(frame_count: usize) -> SlotAdmit {
 /// `slot` is the captured facing/status. `None` keeps the shared recorder value
 /// and does not park it. A captured slot parks the shared pair so playback can
 /// restore it instead of leaving the imported facing behind.
+#[cfg(test)]
 pub fn engage_slot_origin(
     shared: (f32, i32),
     parked: Option<(f32, i32)>,
@@ -119,6 +120,7 @@ pub fn engage_slot_origin(
     }
 }
 
+#[cfg(test)]
 pub fn release_slot_origin(shared: (f32, i32), parked: Option<(f32, i32)>) -> ((f32, i32), Option<(f32, i32)>) {
     match parked {
         Some(saved) => (saved, None),
@@ -369,6 +371,7 @@ impl MacroUi {
         self.character_ready && !self.is_open() && self.loaded.is_some()
     }
 
+    #[cfg(test)]
     pub fn loaded_id(&self) -> Option<&str> {
         self.loaded.as_ref().and_then(|loaded| loaded.id.as_deref())
     }
@@ -379,6 +382,7 @@ impl MacroUi {
             .map(|loaded| loaded.recording.frames.as_slice())
     }
 
+    #[cfg(test)]
     pub fn loaded_facing(&self) -> Option<f32> {
         self.loaded
             .as_ref()
@@ -685,6 +689,7 @@ impl MacroUi {
     }
 
     /// The supplied reference must come from the Training restore, never live movement.
+    #[cfg(test)]
     pub fn open_editor(&mut self, restored_reference: Option<(f32, f32)>) -> bool {
         if self.loaded.is_none() {
             return false;
@@ -751,6 +756,7 @@ impl MacroUi {
     }
 
     /// Install a macro that was just written or loaded. Closes any panel.
+    #[cfg(test)]
     pub fn commit_loaded(
         &mut self,
         id: String,
@@ -762,6 +768,7 @@ impl MacroUi {
     }
 
     /// Validated recording from the replay-export stream. No selector is created.
+    #[cfg(test)]
     pub fn import_recording(
         &mut self,
         recording: MacroRecording,
@@ -782,6 +789,7 @@ impl MacroUi {
         Some(kind)
     }
 
+    #[cfg(test)]
     pub fn observe_cpu(&mut self, kind: Option<i32>, busy: bool) {
         self.observe_exact_cpu(kind, None, busy);
     }
@@ -858,6 +866,7 @@ impl MacroUi {
         Some(draft.working.apply(anchor))
     }
 
+    #[cfg(test)]
     pub fn arm_playback(&mut self) -> bool {
         if !self.playback_allowed() {
             return false;
@@ -872,6 +881,7 @@ impl MacroUi {
     }
 
     /// Returns the input for `tick`. A repeated tick does not advance.
+    #[cfg(test)]
     pub fn feed_playback(&mut self, tick: u64) -> Option<InputFrame> {
         if self.emitted_tick == Some(tick) {
             return self.emitted;
@@ -896,38 +906,9 @@ impl MacroUi {
         frame
     }
 
+    #[cfg(test)]
     pub fn playback_frame(&self) -> usize {
         self.playback_frame
-    }
-
-    /// `copy_playback` into a caller-owned buffer (cleared, then filled; no allocation when its capacity suffices).
-    pub fn copy_playback_into(&self, out: &mut Vec<InputFrame>) -> Option<(f32, i32)> {
-        if !self.playback_allowed() {
-            return None;
-        }
-        let recording = &self.loaded.as_ref()?.recording;
-        if recording.frames.is_empty() {
-            return None;
-        }
-        out.clear();
-        out.extend_from_slice(&recording.frames);
-        Some((recording.start.facing, recording.start.status))
-    }
-
-    /// Facing, status, and frames for one playback. Empty when the fighter is not ready.
-    pub fn copy_playback(&self) -> Option<(f32, i32, Vec<InputFrame>)> {
-        if !self.playback_allowed() {
-            return None;
-        }
-        let recording = &self.loaded.as_ref()?.recording;
-        if recording.frames.is_empty() {
-            return None;
-        }
-        Some((
-            recording.start.facing,
-            recording.start.status,
-            recording.frames.clone(),
-        ))
     }
 
     /// Put an unsaved recording back on screen after the disk write failed.

@@ -2,7 +2,6 @@
 
 use std::path::Path;
 
-use crate::engine::library::LegacySlot;
 use crate::engine::macros::InputFrame;
 use crate::engine::rr_host::{self, Tick};
 use crate::model::input_delay::MappedInputs;
@@ -185,10 +184,6 @@ pub fn cpu_playback(
     recorder: crate::model::cpu::playback::PlaybackState,
 ) -> crate::model::cpu::playback::PlaybackState {
     rr_host::cpu_playback(recorder)
-}
-
-pub fn push_capture(side: u8, frame: InputFrame) {
-    rr_host::push_capture(side, frame);
 }
 
 /// The CPU run's frame for this game frame (the AI epilogue, game thread); its first one after a warp gets the start speed.

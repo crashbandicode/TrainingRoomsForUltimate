@@ -84,6 +84,7 @@ pub type Roster = [Record; ENTRIES];
 
 /// `0x17e4f50(R)` over the entries' current descriptors (`(kinds, costume)` per entry, `None` for
 /// no entry): record `i` describes entry `i`.
+#[cfg(test)]
 pub fn roster_of(descriptors: &[Option<([u32; SUBS], u32)>; ENTRIES]) -> Roster {
     let mut roster = [Record::DEFAULT; ENTRIES];
     for (i, descriptor) in descriptors.iter().enumerate() {
@@ -275,6 +276,7 @@ pub fn restore<O: RegistryOps>(ops: &mut O, failed: Members, restored: Members) 
 /// staging a Reload (`E+0x5935`, `0x17e4f50` would copy `E+0x70`), and the roster still describes
 /// the window from its own configure or attach. `destroy` destroys one group's bodies (`0x3aeb50`
 /// per body: unload, `unprepare`).
+#[cfg(test)]
 pub fn teardown<O: RegistryOps, B>(ops: &mut O, window: Members, detached: &[(Members, B)],
     mut destroy: impl FnMut(&mut O, Members, &B)) {
     if detached.is_empty() { return; }

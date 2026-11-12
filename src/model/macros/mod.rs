@@ -43,24 +43,35 @@ mod replay;
 mod shared_capture;
 mod window;
 
-pub use capture_archive::{CaptureArchive, CaptureEntry, CaptureListing, CaptureSaveOutcome, SavedCapture};
-pub use crate::model::capture_settings::{host_persistence_key, recover_previous_ini, CaptureSettings, IniRecovery,
-    CAPTURE_CONFIG_KEY, DEFAULT_CAPTURE_INI};
-pub use capture_toggle::{CaptureToggle, RecordEnded, RecordOwner, RecordOwnership, RecordPhase,
-    ToggleRequest, ToggleSnapshot, CAPTURE_OFF, CAPTURE_ON};
-pub use crate::model::store::{Listing, Record, SkippedFile, Store, MAX_FILE_BYTES, MAX_ID_CHARS};
-pub use library::{Library, MacroEntry};
+pub use capture_archive::{CaptureArchive, CaptureSaveOutcome, SavedCapture};
+#[cfg(test)]
+pub use capture_archive::{CaptureEntry, CaptureListing};
+pub use crate::model::capture_settings::{recover_previous_ini, CaptureSettings, IniRecovery, DEFAULT_CAPTURE_INI};
+#[cfg(test)]
+pub use crate::model::capture_settings::{host_persistence_key, CAPTURE_CONFIG_KEY};
+pub use capture_toggle::{CaptureToggle, RecordOwner, RecordOwnership, ToggleRequest, CAPTURE_ON};
+#[cfg(test)]
+pub use capture_toggle::{RecordEnded, RecordPhase, ToggleSnapshot, CAPTURE_OFF};
+pub use crate::model::store::SkippedFile;
+#[cfg(test)]
+pub use crate::model::store::{Listing, Record, Store, MAX_FILE_BYTES, MAX_ID_CHARS};
+pub use library::Library;
+#[cfg(test)]
+pub use library::MacroEntry;
 pub use live_capture::{LiveCapturePool, NativeRecordKey, MAX_RETAINED_CAPTURES};
 #[cfg(any(feature = "diag", test))]
 pub use live_capture::{FirstSeal, SealReason};
 pub use live_frame::{CaptureBreak, LiveFrame, LiveInput, LiveSession, LiveTrack, MAX_BREAKS};
-pub use recording::{
-    InputFrame, MacroError, MacroRecording, MomentumMode, Placement, StartState, DEFAULT_FPS,
-    MAX_FRAMES, MAX_GAME_VERSION_BYTES, MAX_NAME_CHARS, SCHEMA_VERSION,
-};
-pub use window::{timestamp, FrameSnapshot, FrameWindow, Step};
+pub use recording::{InputFrame, MacroError, MacroRecording, MomentumMode, Placement, StartState, MAX_FRAMES, MAX_GAME_VERSION_BYTES, MAX_NAME_CHARS};
+#[cfg(test)]
+pub use recording::{DEFAULT_FPS, SCHEMA_VERSION};
+pub use window::{FrameSnapshot, FrameWindow};
+#[cfg(test)]
+pub use window::{timestamp, Step};
 pub use replay::{ReplayFrame, ReplaySession, ReplayTrack};
-pub use move_start::{MoveFamily, MoveStart, MoveStartRules, MAX_MOVE_SETUP};
+pub use move_start::{MoveFamily, MoveStart, MoveStartRules};
+#[cfg(test)]
+pub use move_start::MAX_MOVE_SETUP;
 pub use shared_capture::SharedCaptureArchive;
 
 #[cfg(test)]

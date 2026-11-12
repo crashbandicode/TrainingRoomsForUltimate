@@ -13,6 +13,7 @@
 /// The setting row's id.
 pub const ROW_ID: &str = "cpu_level";
 /// The row's options: Off, then Lv 1..=9.
+#[cfg(test)]
 pub const OPTIONS: usize = 10;
 /// The notice plate's header.
 pub const NOTICE_HEADER: &str = "CPU level";
@@ -23,6 +24,7 @@ pub const RANK_TABLE_13_0_5: [i32; 8] = [15, 21, 31, 42, 48, 60, 75, 100];
 /// Training's CPU Behavior values (the pause menu's `+0xb4c`) that use Training's own level.
 pub mod behavior {
     /// Stop, the value a Training entry starts with.
+    #[cfg(test)]
     pub const STOP: u32 = 1;
     /// CPU (Lv. n).
     pub const CPU_LEVEL: u32 = 2;

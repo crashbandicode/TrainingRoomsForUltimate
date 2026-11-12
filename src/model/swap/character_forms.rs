@@ -106,14 +106,6 @@ impl EntryState {
         self.ready_with_install_marker(false)
     }
 
-    /// Count activation calls native 656ee0 directly, retaining the completed
-    /// parked install's +5934 marker. Only a current, sealed promotion may use
-    /// this shape; it is not load completion or ownership authority. An active
-    /// Reload still requires ready(), including marker zero.
-    pub fn ready_count_promoted(self, parked_install: bool) -> Option<(Forms, u32)> {
-        self.ready_with_install_marker(parked_install)
-    }
-
     fn ready_with_install_marker(self, parked_install: bool) -> Option<(Forms, u32)> {
         let forms = if self.kinds[0] == 0x4b && self.count == 1 {
             Forms::solo_popo()

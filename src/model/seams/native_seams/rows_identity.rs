@@ -99,5 +99,6 @@ pub const ROWS: &[Seam] = &[
 ];
 
 /// Ratchet: every identity-view hook has a row.
+#[cfg(test)]
 #[rustfmt::skip]
 pub const UNCONVERTED: &[&str] = &[];

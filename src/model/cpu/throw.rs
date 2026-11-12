@@ -18,7 +18,6 @@ pub mod throw_option {
     pub const FORWARD: u8 = 1;
     pub const BACKWARD: u8 = 2;
     pub const UP: u8 = 3;
-    pub const DOWN: u8 = 4;
 }
 
 /// One body's throw state: the case and the two delays held for this grab.

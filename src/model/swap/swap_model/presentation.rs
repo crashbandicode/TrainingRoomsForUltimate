@@ -267,6 +267,7 @@ pub fn waiting_icon_costume(kind: u32, entry_costume: u32) -> u32 {
 }
 
 /// The costume the key builder `0x3238a70` writes into the icon's file name for `kind`'s ui_chara and a costume argument.
+#[cfg(test)]
 pub const fn icon_file_costume(kind: u32, costume: u32, region: u32) -> u32 {
     if kind == crate::engine::swap::identity_view::ROB && crate::engine::swap::identity_view::region_swaps(region) {
         match costume {

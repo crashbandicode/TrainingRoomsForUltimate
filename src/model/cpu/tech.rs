@@ -24,7 +24,6 @@ pub mod mistech_option {
     pub const GETUP: usize = 0;
     pub const ATTACK: usize = 1;
     pub const ROLL_F: usize = 2;
-    pub const ROLL_B: usize = 3;
 }
 
 /// A roll direction relative to the body's facing.

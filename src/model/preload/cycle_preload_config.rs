@@ -268,6 +268,7 @@ pub const fn default_slots() -> CyclePreloadSlots {
 }
 
 /// Menu row index for a bank member count: Off is 0, then each native size.
+#[cfg(test)]
 const fn bank_index(members: u8) -> Option<usize> {
     if members == 0 {
         Some(0)
@@ -315,6 +316,7 @@ const _: () = assert!(count!(TWO THREE FOUR FIVE SIX SEVEN EIGHT NINE TEN ELEVEN
 const _: () = assert!(CyclePreloadReadyFighters::ALL_CONSTS.len() == READY_CHOICES);
 
 /// Menu row index for a ready-fighter total.
+#[cfg(test)]
 const fn ready_index(total: u8) -> Option<usize> {
     if valid_ready_fighters(total) {
         Some((total - READY_FIGHTERS_MIN) as usize)
@@ -609,6 +611,7 @@ impl Unset {
     /// Ten-bit word for an atomic cache: bank_members, group_swap, ready_fighters,
     /// ic_pair_bank, original_bank, solo_popo_groups, ic_pair_groups, native_groups,
     /// pair_groups, mii_groups.
+    #[cfg(test)]
     pub const fn to_bits(self) -> u16 {
         (self.bank_members as u16)
             | ((self.group_swap as u16) << 1)
@@ -622,6 +625,7 @@ impl Unset {
             | ((self.mii_groups as u16) << 9)
     }
 
+    #[cfg(test)]
     pub const fn from_bits(bits: u16) -> Self {
         Self {
             bank_members: bits & 1 != 0,
@@ -641,6 +645,7 @@ impl Unset {
 /// Saved menu choices for the keys an older INI omitted. A key the INI carries
 /// keeps the INI value; a menu list that is not exactly one choice keeps the
 /// built-in choice. The result is never a non-selectable setting.
+#[cfg(test)]
 pub fn adopt_unset(settings: Settings, unset: Unset, menu: &crate::engine::compat::menu::TrainingModpackMenu) -> Settings {
     let mut adopted = settings;
     if unset.bank_members {
@@ -770,6 +775,7 @@ pub fn settings_from_menu(menu: &crate::engine::compat::menu::TrainingModpackMen
     }
 }
 
+#[cfg(test)]
 fn on_off(on: bool) -> crate::engine::compat::menu::OnOff {
     if on {
         crate::engine::compat::menu::OnOff::ON
@@ -778,6 +784,7 @@ fn on_off(on: bool) -> crate::engine::compat::menu::OnOff {
     }
 }
 
+#[cfg(test)]
 pub fn apply_settings(menu: &mut crate::engine::compat::menu::TrainingModpackMenu, settings: Settings) {
     let settings = if settings.selectable() {
         settings
@@ -896,6 +903,7 @@ pub fn render(settings: Settings) -> String {
     )
 }
 
+#[cfg(test)]
 pub fn parse(text: &str) -> Result<Settings, &'static str> {
     parse_unset(text).map(|(settings, _)| settings)
 }

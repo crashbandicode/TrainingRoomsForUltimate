@@ -60,8 +60,6 @@ impl fmt::Debug for Name {
     }
 }
 
-/// The layout the menu lives in, and the container the plugin adds under its root pane.
-pub const LAYOUT_NAME: &str = "info_training";
 pub const ROOT: Name = Name::new("TrModMenu");
 
 /// Text alignment inside a text box (the box's own edge the text starts from).
@@ -202,8 +200,6 @@ pub const BADGE_W: f32 = 24.0;
 pub const BADGE_X: f32 = POP_ROW_LEFT + 20.0;
 pub const HEAD_MARK_X: f32 = POP_ROW_LEFT + 20.0;
 pub const HEAD_SQ: f32 = 16.0;
-/// The r8 kind colours: the CONNECTIONS pills and the section headers' squares.
-pub const KIND_SAVE: [u8; 4] = [240, 150, 60, 255];
 pub const KIND_MACRO: [u8; 4] = [92, 150, 240, 255];
 pub const KIND_COMBO: [u8; 4] = [170, 120, 240, 255];
 pub const KIND_SEQUENCE: [u8; 4] = [235, 105, 170, 255];
@@ -276,7 +272,6 @@ pub const CHROME_GREENS: usize = ROWS;
 pub const CHROME_HAIR: usize = 1;
 pub const CHROME_OUTLINE: usize = 8;
 pub const CHROME_CURSOR: usize = 5;
-pub const CHROME: usize = CHROME_GREENS + CHROME_HAIR + CHROME_OUTLINE + CHROME_CURSOR;
 pub const IDX_GREEN: usize = IDX_ROW_HI + 1;
 pub const IDX_HAIRLINE: usize = IDX_GREEN + CHROME_GREENS;
 pub const IDX_OUTLINE: usize = IDX_HAIRLINE + CHROME_HAIR;
@@ -313,6 +308,7 @@ pub struct Area {
 }
 
 impl Area {
+    #[cfg(test)]
     pub fn overlaps(self, other: Area) -> bool {
         (self.x - other.x).abs() * 2.0 < self.w + other.w && (self.y - other.y).abs() * 2.0 < self.h + other.h
     }

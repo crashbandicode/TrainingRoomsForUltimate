@@ -72,6 +72,7 @@ pub fn is_staging(rel: &str) -> bool {
 }
 
 /// The temporary name a capture is written under before its rename.
+#[cfg(test)]
 pub fn part_name(to: &str, out: &mut impl core::fmt::Write) -> core::fmt::Result {
     write!(out, "{to}.part")
 }
@@ -193,6 +194,7 @@ pub fn result(outcomes: &[Outcome]) -> ImportResult {
 
 /// The marker is written after the last file of both parts (SPEC-core-08 §5): the blocking part
 /// never writes it, so a game that quits during the background copy repeats the import.
+#[cfg(test)]
 pub const fn marker_written_after(blocking_done: bool, background_done: bool) -> bool {
     blocking_done && background_done
 }

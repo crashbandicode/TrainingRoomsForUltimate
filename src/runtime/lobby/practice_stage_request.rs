@@ -125,8 +125,6 @@ fn queue(selection: Selection, context: MenuContext) -> Result<u64, &'static str
     Ok(id)
 }
 
-pub fn status() -> Option<Status> { STATE.try_lock().and_then(|s| s.status) }
-
 /// Invalidate plugin tickets, even when a departing allocation address is reused.
 /// No native dereference or cleanup occurs here. StageManager owns accepted work.
 pub(crate) fn depart() {

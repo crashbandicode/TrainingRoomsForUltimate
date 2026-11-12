@@ -189,6 +189,7 @@ impl Settle {
         match self {Settle::Adopted=>published,Settle::Diverged(_)=>None}
     }
     /// Cascade guard: a settle never retires owner authority nor invalidates `capture_origin`.
+    #[cfg(test)]
     pub fn retires_authority(self)->bool {false}
     pub fn diverged_reason(self)->Option<&'static str> {match self {Settle::Diverged(r)=>Some(r),Settle::Adopted=>None}}
 }
@@ -309,6 +310,7 @@ impl SameClass {
     }
     /// CPU1 has its own current protected-union reader; this does not admit it through
     /// unique_player or change the Player0 constructor's exact authority.
+    #[cfg(test)]
     pub fn prepare_cpu(
         before:crate::engine::mii::lifetime::Configuration,after:crate::engine::mii::lifetime::Configuration,
         current:SameClassValues,descriptor:&[u8;0x70],

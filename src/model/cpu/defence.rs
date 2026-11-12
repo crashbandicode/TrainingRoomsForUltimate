@@ -6,6 +6,7 @@
 //! opponent on every row and on both sides (decision B7): an angle `a` is mirrored to `π − a` when the
 //! player stands to the CPU's right; Left and Right are absolute; Neutral is the stick at rest.
 
+#[cfg(test)]
 use core::f32::consts::{FRAC_PI_2, FRAC_PI_4, PI};
 
 use super::rng::Rng;
@@ -27,6 +28,7 @@ pub mod direction {
 }
 
 /// The angle of a direction before mirroring, in radians; `None` for Neutral (the stick at rest).
+#[cfg(test)]
 pub fn angle(dir: u8) -> Option<f32> {
     Some(match dir {
         direction::OUT | direction::RIGHT => 0.0,
@@ -242,6 +244,7 @@ impl Defence {
     }
 
     /// Forget what was written (a save-state load or a new session may have reset the flag).
+    #[cfg(test)]
     pub fn stale_forget(&mut self) {
         self.stale_written = None;
     }

@@ -49,6 +49,7 @@ impl HelpControls {
 impl Form {
     pub const ALL: [Self; 3] = [Self::Normal, Self::Omega, Self::Battlefield];
 
+    #[cfg(test)]
     pub const fn label(self) -> &'static str {
         match self {
             Self::Normal => "Normal",

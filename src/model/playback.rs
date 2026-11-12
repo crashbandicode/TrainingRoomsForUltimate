@@ -201,6 +201,7 @@ impl Playback {
     }
 
     /// How many times this role has warped to a start save. A loop does not add one.
+    #[cfg(test)]
     pub fn warps(&self, role: Role) -> u32 {
         self.warps[role_slot(role)]
     }

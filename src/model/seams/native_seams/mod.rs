@@ -47,16 +47,10 @@ pub mod drill;
 #[cfg(test)]
 mod tests;
 
-/// Game version the rows were read from.
-pub const TABLE_VERSION: &str = "13.0.5";
-/// NSO build ID of the `main` the rows were read from.
-pub const TABLE_BUILD_ID: &str = "21450c647b8c5940ed5b68218ea128fd3c5d597d";
 /// The guard rules and types are `model::guard`'s (one rule set for every site table).
-pub use crate::model::guard::{
-    entry_far_jump_target, entry_form, entry_or_body_outcome, exact_outcome, far_jump_at, guard_outcome, outcome_for,
-    outcome_for_own, region_of, EntryForm, GuardOutcome, HookForm, MainRegion, Placement, SeamKind, Sharing, BR_X17,
-    GUARD_BYTES, HOOK_SPAN_WORDS, LDR_X17_LITERAL_8, MAIN_RODATA_END, MAIN_RODATA_START, MAIN_TEXT_END, NOP, WORDS,
-};
+pub use crate::model::guard::{entry_form, entry_or_body_outcome, exact_outcome, outcome_for, outcome_for_own, region_of, EntryForm, GuardOutcome, HookForm, MainRegion, Placement, SeamKind, Sharing, GUARD_BYTES, HOOK_SPAN_WORDS};
+#[cfg(test)]
+pub use crate::model::guard::{entry_far_jump_target, far_jump_at, guard_outcome, BR_X17, LDR_X17_LITERAL_8, MAIN_RODATA_END, MAIN_RODATA_START, MAIN_TEXT_END, NOP, WORDS};
 
 /// Where a callback may run (WP-E reviews and fills these; WP-E's `Scope` maps onto the bits).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -70,6 +64,7 @@ impl Scopes {
     pub const ONLINE: Scopes = Scopes(8);
     pub const ALL: Scopes = Scopes(15);
 
+    #[cfg(test)]
     pub const fn with(self, other: Scopes) -> Scopes {
         Scopes(self.0 | other.0)
     }
@@ -246,6 +241,7 @@ pub fn find_site(label: &str) -> Option<(usize, &'static Site)> {
 pub static SEAMS: &[&[Seam]] = &TABLES;
 
 /// The ratchet of `#[skyline::hook]` attributes without a row yet (empty at M5).
+#[cfg(test)]
 pub static UNCONVERTED: &[&[&str]] = &[
     rows_a1::UNCONVERTED,
     rows_a2::UNCONVERTED,

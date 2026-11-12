@@ -15,21 +15,24 @@ pub mod bit {
     pub const DPAD_RIGHT: u32 = 1;
     pub const DPAD_DOWN: u32 = 2;
     pub const DPAD_LEFT: u32 = 3;
+    #[cfg(test)]
     pub const X: u32 = 4;
+    #[cfg(test)]
     pub const A: u32 = 5;
+    #[cfg(test)]
     pub const B: u32 = 6;
+    #[cfg(test)]
     pub const Y: u32 = 7;
     pub const L: u32 = 8;
+    #[cfg(test)]
     pub const R: u32 = 9;
+    #[cfg(test)]
     pub const ZL: u32 = 10;
-    pub const ZR: u32 = 11;
-    pub const LEFT_SL: u32 = 12;
-    pub const LEFT_SR: u32 = 13;
-    pub const RIGHT_SL: u32 = 14;
-    pub const RIGHT_SR: u32 = 15;
-    pub const STICK_L: u32 = 16;
+    #[cfg(test)]
     pub const STICK_R: u32 = 17;
+    #[cfg(test)]
     pub const PLUS: u32 = 18;
+    #[cfg(test)]
     pub const MINUS: u32 = 19;
     pub const LSTICK_UP: u32 = 20;
     pub const LSTICK_RIGHT: u32 = 21;
@@ -39,8 +42,6 @@ pub mod bit {
     pub const RSTICK_RIGHT: u32 = 25;
     pub const RSTICK_DOWN: u32 = 26;
     pub const RSTICK_LEFT: u32 = 27;
-    pub const REAL_L: u32 = 28;
-    pub const REAL_R: u32 = 29;
 }
 
 /// The controller record's style field.

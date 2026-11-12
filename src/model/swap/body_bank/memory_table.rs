@@ -353,9 +353,6 @@ pub const KIND_COSTS: &[(u32, u64, u64)] = &[
 /// A kind never measured: the largest per-kind estimate of each phase (207.1 / 101.4 MiB).
 pub const DEFAULT_PREFETCH: u64 = 217186304;
 pub const DEFAULT_BUILD: u64 = 106364928;
-/// The 10th-percentile one-member cost the bounds assume for unmeasured partners (17.6 / 4.9 MiB).
-pub const LOWER_PREFETCH: u64 = 18481152;
-pub const LOWER_BUILD: u64 = 5111808;
 
 /// Whole member sets measured as one group: `(sorted kinds padded with u32::MAX, prefetch, build,
 /// prefetch observations, build observations)`; 0 = that phase not measured for the set (the per-kind

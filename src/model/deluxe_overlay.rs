@@ -15,10 +15,12 @@ pub struct DeluxeOverlayStateV1 {
 }
 
 /// Deluxe's window is drawn (any page).
+#[cfg(test)]
 pub const DELUXE_WINDOW_VISIBLE: u32 = 1 << 0;
 /// The shown page has selectable or editable rows (D-pad and ZR + Left/Right act).
 pub const DELUXE_ROWS_PAGE: u32 = 1 << 1;
 /// The Debug view is open.
+#[cfg(test)]
 pub const DELUXE_DEBUG_VIEW: u32 = 1 << 2;
 
 /// `ssbu_online_deluxe_overlay_state_v1(out) -> bool`: fills `*out` and returns true; false if `out` is null. Lock-free.

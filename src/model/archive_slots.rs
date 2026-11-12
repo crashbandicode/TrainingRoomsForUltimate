@@ -75,6 +75,7 @@ impl<const N: usize> Slots<N> {
     }
 
     /// Whether a handed-out buffer still waits for its grace.
+    #[cfg(test)]
     pub fn parked(&self) -> bool {
         self.slots.iter().any(|slot| slot.state.load(Acquire) == PARKED)
     }

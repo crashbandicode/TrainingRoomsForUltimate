@@ -138,6 +138,7 @@ impl ThreadStack {
         self
     }
 
+    #[cfg(test)]
     pub const fn required(&self) -> usize {
         required(self.static_bound + self.external_bound, self.measured)
     }
@@ -150,13 +151,16 @@ pub const fn of(id: ThreadId) -> &'static ThreadStack {
 
 /// The boot loaders, joined one after the other by the boot thread before the next starts: they share one static stack,
 /// sized for the largest of them (`runtime::threads` refuses a second start while the stack is in use).
+#[cfg(test)]
 pub const BOOT_LOADERS: [ThreadId; 3] = [ThreadId::Import, ThreadId::SettingsLoad, ThreadId::StateLoad];
 
 /// The last user of the boot loaders' stack: a detached thread started at the end of boot (after the loaders and the
 /// install line), which keeps the stack until it ends; nothing starts on that stack after it.
+#[cfg(test)]
 pub const BOOT_STACK_LAST: ThreadId = ThreadId::ImportCaptures;
 
 /// Every thread on the boot stack: the joined loaders, then `BOOT_STACK_LAST`.
+#[cfg(test)]
 pub const BOOT_STACK: [ThreadId; 4] = [ThreadId::Import, ThreadId::SettingsLoad, ThreadId::StateLoad, ThreadId::ImportCaptures];
 
 /// The threads that are joined (the boot thread waits for them); every other thread runs for the session or ends on its own.
@@ -208,6 +212,7 @@ pub struct CallbackStack {
 impl CallbackStack {
     /// The plugin's part fits its own stack, and what stays on the game's stack fits the room measured there; each with
     /// the rows' margin and SDK reserve.
+    #[cfg(test)]
     pub const fn covers(&self) -> bool {
         self.bytes.is_multiple_of(4096) && self.bytes >= required(self.static_bound, 0) && required(self.native_bound, 0) <= self.native_room
     }
@@ -245,6 +250,7 @@ pub const THREAD_OBJECT_BYTES: usize = 0x1c0;
 
 /// The smallest stack a row may have: the larger of its static bound and its measured high-water mark, plus a quarter, plus
 /// the SDK reserve, rounded up to a page.
+#[cfg(test)]
 pub const fn required(static_bound: usize, measured: usize) -> usize {
     let need = if static_bound > measured { static_bound } else { measured };
     let total = need + need / 4 + SDK_RESERVE;
@@ -262,6 +268,7 @@ pub const fn low(size: usize, used: usize) -> bool {
 }
 
 /// The untouched depth of a painted stack, from its lowest word up (`words[0]` is the bottom).
+#[cfg(test)]
 pub fn untouched(words: &[u64]) -> usize {
     words.iter().take_while(|w| **w == PAINT).count() * 8
 }

@@ -37,6 +37,7 @@ pub mod occupancy;
 // WP-E: scope and read-only contract per callback.
 pub mod scope;
 // WP-P (worker E): presentation intent from the transition parts and the HUD model (H1-H6).
+#[cfg(test)]
 pub mod hud_model;
 pub mod presentation;
 

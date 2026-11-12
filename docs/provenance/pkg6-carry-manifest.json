@@ -263,7 +263,7 @@
    "dest": "src/model/seams/native_seams/mod.rs",
    "crate": "consts",
    "src_sha256": "9c16e57af94e9f6424c92a5bd3de8df64508eb3cda01ff7c4eb9c1054c8338e3",
-   "dest_sha256": "6557685a1fe2ac0b2065a53bfb7f4eeef9fb2fea25ab3dad31f1e256c3a2f62e",
+   "dest_sha256": "b6f4f79333c20d5f1948dacafcbd2a8ed0fb367a31905068b798d8db8ba5e2a4",
    "edits": [
     {
      "old": "        first.then_some(seam.offset)\n    })\n}\n\n/// The 64-byte comparison of one site.\n#[derive(Clone, Copy, Debug, PartialEq, Eq)]\npub enum GuardOutcome {\n    /// Identical to 13.0.5.\n    Stock,\n    /// Only Skyline hook shapes differ. `at` is the byte offset of the first; `usable` applies the\n    /// kind's rule (false: another plugin owns the words we would replace or rely on).\n    HookedByOther { at: usize, usable: bool },\n    /// A `Sharing::EntryOrBody` entry row whose entry another plugin's far jump owns, with the body\n    /// after it stock: usable, through the body site (`entry_or_body_outcome`).\n    Shared,\n    /// A change that is not a hook: the site is left alone.\n    Foreign { first_diff: usize },\n}\n\nimpl GuardOutcome {\n    pub const fn usable(self) -> bool {\n        match self {\n            GuardOutcome::Stock | GuardOutcome::Shared => true,\n            GuardOutcome::HookedByOther { usable, .. } => usable,\n            GuardOutcome::Foreign { .. } => false,\n        }\n    }\n\n    /// The install line's word for the outcome.\n    pub const fn code(self) -> &'static str {\n        match self {\n            GuardOutcome::Stock => \"stock\",\n            GuardOutcome::HookedByOther { usable: true, .. } => \"other\",\n            GuardOutcome::HookedByOther { usable: false, .. } => \"occupied\",\n            GuardOutcome::Shared => \"shared\",\n            GuardOutcome::Foreign { .. } => \"foreign\",\n        }\n    }\n}\n\nconst WORDS: usize = GUARD_BYTES / 4;\nconst NOP: u32 = 0xd503_201f;\nconst LDR_X17_LITERAL_8: u32 = 0x5800_0051;\nconst BR_X17: u32 = 0xd61f_0220;\nconst B_MASK: u32 = 0xfc00_0000;\nconst B_OPCODE: u32 = 0x1400_0000;\n\nfn words(bytes: &[u8; GUARD_BYTES]) -> [u32; WORDS] {\n    let mut out = [0u32; WORDS];\n    for (i, word) in out.iter_mut().enumerate() {\n        *word = u32::from_le_bytes([bytes[4 * i], bytes[4 * i + 1], bytes[4 * i + 2], bytes[4 * i + 3]]);\n    }\n    out\n}\n\n/// Length in words of a Skyline hook shape starting at word `i` (cut at the end of the window).\nfn hook_shape(actual: &[u32; WORDS], i: usize) -> Option<usize> {\n    let at = |k: usize| actual.get(i + k).copied();\n    let len = if at(0) == Some(NOP) && at(1) == Some(LDR_X17_LITERAL_8) && at(2) == Some(BR_X17) {\n        5\n    } else if at(0) == Some(LDR_X17_LITERAL_8) && at(1) == Some(BR_X17) {\n        4\n    } else if actual[i] & B_MASK == B_OPCODE {\n        1\n    } else {\n        return None;\n    };\n    Some(len.min(WORDS - i))\n}\n\n/// Whether a hook shape at word `word` takes words this kind needs as they are.\nconst fn blocks(kind: SeamKind, word: usize) -> bool {\n    match kind {\n        SeamKind::Hook { .. } => word < HOOK_SPAN_WORDS,\n        SeamKind::Called => false,\n        SeamKind::Relied => word == 0,\n    }\n}\n\n/// Compare a site's 64 bytes now (`actual`) with its 13.0.5 bytes (`expected`).\npub fn guard_outcome(expected: &[u8; GUARD_BYTES], actual: &[u8; GUARD_BYTES], kind: SeamKind) -> GuardOutcome {\n    let expected = words(expected);\n    let actual = words(actual);\n    let mut first_hook = None;\n    let mut usable = true;\n    let mut i = 0;\n    while i < WORDS {\n        if actual[i] == expected[i] {\n            i += 1;\n            continue;\n        }\n        let Some(len) = hook_shape(&actual, i) else {\n            return GuardOutcome::Foreign { first_diff: 4 * i };\n        };\n        first_hook.get_or_insert(4 * i);\n        // A shape that starts inside the span also covers every word it spans.\n        if (i..i + len).any(|w| blocks(kind, w)) {\n            usable = false;\n        }\n        i += len;\n    }\n    match first_hook {\n        None => GuardOutcome::Stock,\n        Some(at) => GuardOutcome::HookedByOther { at, usable },\n    }\n}\n",
@@ -414,6 +414,39 @@
      "old": "const TABLES: [&[Seam]; 12] = [\n    rows_a1::ROWS, rows_a2::ROWS, rows_a3::ROWS, rows_a4::ROWS, rows_a5::ROWS, rows_identity::ROWS, rows_q15::ROWS,\n    rows_lobby_items::ROWS, rows_lobby_persist::ROWS, rows_cpu_level::ROWS, rows_res_unload::ROWS,\n    rows_game_speed::ROWS,\n",
      "new": "const TABLES: [&[Seam]; 13] = [\n    rows_a1::ROWS, rows_a2::ROWS, rows_a3::ROWS, rows_a4::ROWS, rows_a5::ROWS, rows_identity::ROWS, rows_q15::ROWS,\n    rows_lobby_items::ROWS, rows_lobby_persist::ROWS, rows_cpu_level::ROWS, rows_res_unload::ROWS,\n    rows_game_speed::ROWS, rows_lobby_speed::ROWS,\n",
      "reason": "rc.8 R2 (p23/rc8-lobby-speed, TASK-rc8.md SCOPE REOPENED, primary 2026-11-11 11:27Z, docs/design/rc8-lobby-speed.md): the lobby speed seam rows (rows_lobby_speed, authoritative group lobby_speed) join beside rows_game_speed"
+    },
+    {
+     "line_patch": [
+      [
+       50,
+       53,
+       []
+      ],
+      [
+       55,
+       59,
+       [
+        "pub use crate::model::guard::{entry_form, entry_or_body_outcome, exact_outcome, outcome_for, outcome_for_own, region_of, EntryForm, GuardOutcome, HookForm, MainRegion, Placement, SeamKind, Sharing, GUARD_BYTES, HOOK_SPAN_WORDS};",
+        "#[cfg(test)]",
+        "pub use crate::model::guard::{entry_far_jump_target, far_jump_at, guard_outcome, BR_X17, LDR_X17_LITERAL_8, MAIN_RODATA_END, MAIN_RODATA_START, MAIN_TEXT_END, NOP, WORDS};"
+       ]
+      ],
+      [
+       73,
+       72,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       249,
+       248,
+       [
+        "#[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
     }
    ]
   },
@@ -422,7 +455,7 @@
    "dest": "src/model/seams/native_seams/rows_a1.rs",
    "crate": "consts",
    "src_sha256": "bea518c0c64876c6ac10329715157b93fa6890e1297e08958d784a442acedb1d",
-   "dest_sha256": "66528d0c12e50d9a8646fd573129ec1bcd9605cc28a5520f3b4972d46cfef04f",
+   "dest_sha256": "7f9b78783498a3383cbb123093f34c64f58da3b93f3a8d02cc3dac1f08751607",
    "edits": [
     {
      "old": "use super::*;\n\npub const ROWS: &[Seam] = &[\n    // body_bank:hook/replace:exact=16 body_bank_probe:hook/replace:exact=16 source_capacity:contract/fnv:exact=64:extent=704/0x549eb59c76d87db2\n    Seam { label: \"body_bank.prepare_models\", group: \"native_body_bank\", offset: 0x654dc0,\n           kind: SeamKind::Hook { form: HookForm::Replace, placement: Placement::Entry },\n",
@@ -493,6 +526,18 @@
      "old": "           note: \"construction tail bl 0x17e8610(R, kind) (w1 kind, x19 body): kind -1 for a background Mii body, whose keys the settlement releases with its identity in R\" },\n",
      "new": "           note: \"construction tail bl 0x17e8610(R, kind) (x0 R, w1 kind, x19 body): kind -1 for a background Mii body, whose keys the settlement releases with its identity in R; rc.7 F1 arms the G68 step of a bank-built body's release (g68_step)\" },\n    Seam { label: \"group_swap.g68_step\", group: \"native_body_bank\", offset: 0x17e87ac,\n           kind: SeamKind::Hook { form: HookForm::Inline, placement: Placement::Mid },\n           guard: [0xb9, 0x1e, 0x00, 0x94, 0x48, 0x05, 0x80, 0x52, 0x95, 0x7e, 0x08, 0x1b, 0xe0, 0x03, 0x13, 0xaa, 0xe1, 0x03, 0x15, 0xaa, 0x08, 0xea, 0xff, 0x97, 0x88, 0x22, 0x01, 0x51, 0x1f, 0x09, 0x00, 0x71, 0x68, 0x01, 0x00, 0x54, 0xa1, 0x0a, 0x00, 0x11, 0xe0, 0x03, 0x13, 0xaa, 0x02, 0xea, 0xff, 0x97, 0xa1, 0x0e, 0x00, 0x11, 0xe0, 0x03, 0x13, 0xaa, 0xff, 0xe9, 0xff, 0x97, 0xa1, 0x12, 0x00, 0x11],\n           feature: \"native-body-bank-alpha\", scopes: Scopes::ALL, read_only: false, per_frame: false,\n           sharing: Sharing::None,\n           note: \"0x17e8610's bl 0x17f0290(G68, R+0xb0, kind, sel) (x19 R, w2 = w20 kind): rc.7 F1 passes kind -1 (0x17f02a4 returns at once) for a release the bank caused, armed by thread, R and kind (g68_step); R's own keys still go (w20)\" },\n",
      "reason": "rc.7 item 3, the Kirby guard removal (D-KIRBY1 root fix F1, p23/rc7-kirby-unguard; docs lane report 12:55Z): the bank owns the G68 step of the releases it causes (g68_step), and the D-KIRBY1 gates stand only while that hook is not installed"
+    },
+    {
+     "line_patch": [
+      [
+       877,
+       876,
+       [
+        "#[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
     }
    ]
   },
@@ -501,7 +546,7 @@
    "dest": "src/model/seams/native_seams/rows_a2.rs",
    "crate": "consts",
    "src_sha256": "d2894a66f249d8dab23cfd8ecede6ce4a59784fb4ba58db998072b6251ef5ace",
-   "dest_sha256": "c756fbfc28d9d38da97a7ef757531baf8ee38bdfc178ecd46e3030dc971e9d1f",
+   "dest_sha256": "a1132bc26335100b96ae513dcccfc855413b2a6c1aabe7284ced78fe69ff4fb1",
    "edits": [
     {
      "old": "                0xe0, 0x03, 0x13, 0xaa, 0x14, 0x9f, 0x09, 0x94, 0xbb, 0x01, 0x00, 0xb4, 0x68, 0x23, 0x00, 0x91],\n        feature: \"mii-ordinary-player-alpha\", scopes: Scopes::ALL, read_only: true, per_frame: false, sharing: Sharing::None,\n        note: \"\" },\n    Seam { label: \"mii_quit_observer.update_entry\", group: \"mii_quit_observer\", offset: 0x376bce0,\n        kind: SeamKind::Hook { form: HookForm::Inline, placement: Placement::Entry },\n        guard: [0xff, 0x83, 0x02, 0xd1, 0xe8, 0x23, 0x00, 0xfd, 0xfa, 0x67, 0x05, 0xa9, 0xf8, 0x5f, 0x06, 0xa9,\n                0xf6, 0x57, 0x07, 0xa9, 0xf4, 0x4f, 0x08, 0xa9, 0xfd, 0x7b, 0x09, 0xa9, 0xfd, 0x43, 0x02, 0x91,\n                0xf8, 0xd9, 0x00, 0xb0, 0x18, 0x43, 0x45, 0xf9, 0x17, 0x00, 0x80, 0x12, 0x17, 0x5c, 0x02, 0xb9,\n                0x1f, 0x00, 0x05, 0x79, 0x00, 0x03, 0xc0, 0x3d, 0x08, 0xec, 0x40, 0x39, 0xf4, 0x03, 0x01, 0xaa],\n        feature: \"mii-quit-observer\", scopes: Scopes::ALL, read_only: true, per_frame: false, sharing: Sharing::None,\n        note: \"entry inline, diag-only; records entry sp/lr against the 0xa0 frame: must stay at the entry\" },\n    Seam { label: \"mii_quit_observer.direct_action\", group: \"mii_quit_observer\", offset: 0x376c32c,\n        kind: SeamKind::Hook { form: HookForm::Inline, placement: Placement::Mid },\n        guard: [0x68, 0x56, 0x42, 0xb9, 0x61, 0x52, 0x42, 0xb9, 0x1f, 0x05, 0x00, 0x31, 0x60, 0x35, 0x00, 0x54,\n                0x69, 0xde, 0x40, 0xf9, 0xe9, 0x2d, 0x00, 0xb4, 0x75, 0xe2, 0x06, 0x91, 0xe8, 0x03, 0x15, 0xaa,\n                0x2a, 0x21, 0x40, 0xb9, 0x5f, 0x01, 0x01, 0x6b, 0xea, 0xa7, 0x9f, 0x1a, 0x08, 0xb1, 0x89, 0x9a,\n                0x29, 0x59, 0x6a, 0xf8, 0x69, 0xff, 0xff, 0xb5, 0x1f, 0x01, 0x15, 0xeb, 0x60, 0x05, 0x00, 0x54],\n        feature: \"mii-quit-observer\", scopes: Scopes::ALL, read_only: true, per_frame: false, sharing: Sharing::None,\n        note: \"\" },\n    Seam { label: \"mii_quit_observer.registered_store\", group: \"mii_quit_observer\", offset: 0x376c6f0,\n        kind: SeamKind::Hook { form: HookForm::Inline, placement: Placement::Mid },\n        guard: [0x68, 0x5e, 0x02, 0xb9, 0xe9, 0x06, 0x00, 0x35, 0xca, 0x02, 0x40, 0xf9, 0xaa, 0x01, 0x00, 0xb4,\n                0xe9, 0x03, 0x16, 0xaa, 0x4b, 0x21, 0x40, 0xb9, 0x7f, 0x01, 0x08, 0x6b, 0xeb, 0xa7, 0x9f, 0x1a,\n                0x29, 0xb1, 0x8a, 0x9a, 0x4a, 0x59, 0x6b, 0xf8, 0x6a, 0xff, 0xff, 0xb5, 0x3f, 0x01, 0x16, 0xeb,\n                0x80, 0x00, 0x00, 0x54, 0x2a, 0x21, 0x40, 0xb9, 0x5f, 0x01, 0x08, 0x6b, 0xed, 0x29, 0x00, 0x54],\n        feature: \"mii-quit-observer\", scopes: Scopes::ALL, read_only: true, per_frame: false, sharing: Sharing::None,\n        note: \"\" },\n    Seam { label: \"mii_quit_observer.update_return\", group: \"mii_quit_observer\", offset: 0x376cc3c,\n        kind: SeamKind::Hook { form: HookForm::Inline, placement: Placement::Mid },\n        guard: [0xe8, 0x23, 0x40, 0xfd, 0xfd, 0x7b, 0x49, 0xa9, 0xf4, 0x4f, 0x48, 0xa9, 0xf6, 0x57, 0x47, 0xa9,\n                0xf8, 0x5f, 0x46, 0xa9, 0xfa, 0x67, 0x45, 0xa9, 0xff, 0x83, 0x02, 0x91, 0xc0, 0x03, 0x5f, 0xd6,\n                0x1f, 0x05, 0x00, 0x31, 0x61, 0xd9, 0xff, 0x54, 0x2a, 0xfe, 0xff, 0x17, 0x21, 0x15, 0x40, 0xf9,\n                0xb2, 0xfe, 0xff, 0x17, 0x60, 0x0e, 0x01, 0xf0, 0x00, 0x60, 0x26, 0x91, 0x8e, 0x4e, 0x09, 0x94],\n        feature: \"mii-quit-observer\", scopes: Scopes::ALL, read_only: true, per_frame: false, sharing: Sharing::None,\n        note: \"\" },\n    Seam { label: \"mii_quit_observer.called_376d5d0\", group: \"mii_quit_observer\", offset: 0x376d5d0,\n        kind: SeamKind::Called,\n        guard: [0xf5, 0x0f, 0x1d, 0xf8, 0xf4, 0x4f, 0x01, 0xa9, 0xfd, 0x7b, 0x02, 0xa9, 0xfd, 0x83, 0x00, 0x91,\n                0x28, 0xa0, 0x41, 0xb9, 0x09, 0x50, 0x42, 0xb9, 0x1f, 0x01, 0x09, 0x6b, 0x41, 0x09, 0x00, 0x54,\n                0x08, 0xfc, 0x40, 0x39, 0xf3, 0x03, 0x01, 0xaa, 0xf4, 0x03, 0x00, 0xaa, 0xa8, 0x00, 0x00, 0x34,\n                0x68, 0x02, 0x40, 0xf9, 0x08, 0xc1, 0x40, 0xf9, 0xe0, 0x03, 0x13, 0xaa, 0x00, 0x01, 0x3f, 0xd6],\n        feature: \"mii-quit-observer\", scopes: Scopes::ALL, read_only: true, per_frame: false, sharing: Sharing::None,\n        note: \"\" },\n    Seam { label: \"mii_quit_observer.predicate_return\", group: \"mii_quit_observer\", offset: 0x376d6dc,\n        kind: SeamKind::Hook { form: HookForm::Inline, placement: Placement::Mid },\n        guard: [0x20, 0x01, 0x00, 0x36, 0x68, 0xa2, 0x41, 0xb9, 0x88, 0x5a, 0x02, 0xb9, 0x68, 0x02, 0x40, 0xf9,\n                0x08, 0x19, 0x41, 0xf9, 0xe0, 0x03, 0x13, 0xaa, 0x00, 0x01, 0x3f, 0xd6, 0x08, 0x00, 0x00, 0x12,\n                0x88, 0x12, 0x0a, 0x39, 0x88, 0xea, 0x40, 0x39, 0x88, 0x00, 0x00, 0x35, 0x88, 0x36, 0x40, 0xb9,\n                0x1f, 0x0d, 0x00, 0x71, 0xa1, 0x00, 0x00, 0x54, 0xfd, 0x7b, 0x42, 0xa9, 0xf4, 0x4f, 0x41, 0xa9],\n        feature: \"mii-quit-observer\", scopes: Scopes::ALL, read_only: true, per_frame: false, sharing: Sharing::None,\n        note: \"\" },\n    Seam { label: \"mii_quit_observer.called_376d860\", group: \"mii_quit_observer\", offset: 0x376d860,\n        kind: SeamKind::Called,\n        guard: [0x00, 0x80, 0x00, 0xd1, 0x5b, 0xff, 0xff, 0x17, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,\n                0xff, 0xc3, 0x00, 0xd1, 0xf4, 0x4f, 0x01, 0xa9, 0xfd, 0x7b, 0x02, 0xa9, 0xfd, 0x83, 0x00, 0x91,\n                0xc1, 0x07, 0x00, 0xb4, 0x08, 0x58, 0x40, 0xf9, 0xf4, 0x03, 0x00, 0xaa, 0x68, 0x07, 0x00, 0xb4,\n                0x28, 0x00, 0x40, 0xf9, 0x08, 0xb9, 0x40, 0xf9, 0xe0, 0x03, 0x01, 0xaa, 0xf3, 0x03, 0x01, 0xaa],\n        feature: \"mii-quit-observer\", scopes: Scopes::ALL, read_only: true, per_frame: false, sharing: Sharing::None,\n        note: \"\" },\n    Seam { label: \"mii_quit_observer.called_376ded0\", group: \"mii_quit_observer\", offset: 0x376ded0,\n        kind: SeamKind::Called,\n        guard: [0xf8, 0x5f, 0xbc, 0xa9, 0xf6, 0x57, 0x01, 0xa9, 0xf4, 0x4f, 0x02, 0xa9, 0xfd, 0x7b, 0x03, 0xa9,\n                0xfd, 0xc3, 0x00, 0x91, 0x08, 0xec, 0x40, 0x39, 0x68, 0x00, 0x00, 0x34, 0x13, 0x00, 0x80, 0x12,\n                0x55, 0x00, 0x00, 0x14, 0x18, 0xf0, 0x40, 0xf9, 0x16, 0xa0, 0x07, 0x91, 0x1f, 0x03, 0x16, 0xeb,\n                0x60, 0xff, 0xff, 0x54, 0xf4, 0x03, 0x01, 0xaa, 0x17, 0xe0, 0x06, 0x91, 0x13, 0x00, 0x80, 0x12],\n        feature: \"mii-quit-observer\", scopes: Scopes::ALL, read_only: true, per_frame: false, sharing: Sharing::None,\n        note: \"\" },\n    Seam { label: \"mii_quit_observer.registered_action\", group: \"mii_quit_observer\", offset: 0x376e044,\n        kind: SeamKind::Hook { form: HookForm::Inline, placement: Placement::Mid },\n        guard: [0xe0, 0x03, 0x13, 0x2a, 0xfd, 0x7b, 0x43, 0xa9, 0xf4, 0x4f, 0x42, 0xa9, 0xf6, 0x57, 0x41, 0xa9,\n                0xf8, 0x5f, 0xc4, 0xa8, 0xc0, 0x03, 0x5f, 0xd6, 0x13, 0x1f, 0x40, 0xb9, 0xf9, 0xff, 0xff, 0x17,\n                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x82, 0x15, 0x00, 0xb4,\n                0xff, 0x43, 0x01, 0xd1, 0xf8, 0x5f, 0x01, 0xa9, 0xf6, 0x57, 0x02, 0xa9, 0xf4, 0x4f, 0x03, 0xa9],\n        feature: \"mii-quit-observer\", scopes: Scopes::ALL, read_only: true, per_frame: false, sharing: Sharing::None,\n        note: \"\" },\n    Seam { label: \"mii_hud_portrait.relied_377aef0\", group: \"mii_hud_portrait\", offset: 0x377aef0,\n        kind: SeamKind::Relied,\n        guard: [0xfd, 0xc3, 0x00, 0x91, 0x08, 0x04, 0x40, 0xf9, 0x13, 0x05, 0x40, 0xf9, 0x13, 0x08, 0x00, 0xb4,\n",
@@ -628,6 +673,18 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       1940,
+       1939,
+       [
+        "#[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
     }
    ]
   },
@@ -636,7 +693,7 @@
    "dest": "src/model/seams/native_seams/rows_a3.rs",
    "crate": "consts",
    "src_sha256": "78b74b30208d4d09007bedb5f5ae50ed1dcc4531ffca39700e28bb14bc233925",
-   "dest_sha256": "ca444f2bb9270c20b9966370d01a63468da2b27d9bcc8d4750370724981ca754",
+   "dest_sha256": "98521236a280065c12e93f42519d66575a206a70ce386c7b59492545258fcd0e",
    "edits": [
     {
      "old": "                0x00, 0x28, 0x40, 0xf9, 0x08, 0x00, 0x40, 0xf9, 0x03, 0x5d, 0x40, 0xf9, 0x60, 0x00, 0x1f, 0xd6],\n        feature: \"debug_assertions\", scopes: Scopes::ALL, read_only: false, per_frame: false, sharing: Sharing::None,\n        note: \"entry: replace hook owns the function (leaf thunk, no prologue)\" },\n    Seam { label: \"needle.is_visible_backshield\", group: \"training\", offset: 0x1655610,\n        kind: SeamKind::Called,\n        guard: [0xfd, 0x7b, 0xbf, 0xa9, 0xfd, 0x03, 0x00, 0x91, 0x00, 0x28, 0x40, 0xf9, 0x08, 0x00, 0x40, 0xf9,\n                0x08, 0x85, 0x40, 0xf9, 0xa1, 0x0f, 0x80, 0x52, 0x01, 0x00, 0xa4, 0x72, 0x00, 0x01, 0x3f, 0xd6,\n                0xe8, 0x03, 0x20, 0x2a, 0x00, 0x01, 0x00, 0x12, 0xfd, 0x7b, 0xc1, 0xa8, 0xc0, 0x03, 0x5f, 0xd6,\n                0x00, 0x28, 0x40, 0xf9, 0x08, 0x00, 0x40, 0xf9, 0x02, 0x85, 0x40, 0xf9, 0xc1, 0x0f, 0x80, 0x52],\n        feature: \"debug_assertions\", scopes: Scopes::ALL, read_only: true, per_frame: false, sharing: Sharing::None,\n        note: \"\" },\n    Seam { label: \"needle.copy_setup\", group: \"training\", offset: 0xba0e80,\n        kind: SeamKind::Called,\n        guard: [0xe8, 0x0f, 0x19, 0xfc, 0xfc, 0x6f, 0x01, 0xa9, 0xfa, 0x67, 0x02, 0xa9, 0xf8, 0x5f, 0x03, 0xa9,\n                0xf6, 0x57, 0x04, 0xa9, 0xf4, 0x4f, 0x05, 0xa9, 0xfd, 0x7b, 0x06, 0xa9, 0xfd, 0x83, 0x01, 0x91,\n                0xff, 0x43, 0x17, 0xd1, 0x18, 0xa4, 0x40, 0xf9, 0xfa, 0x03, 0x03, 0x2a, 0x5f, 0x18, 0x00, 0x71,\n                0xc1, 0x02, 0x00, 0x54, 0x1a, 0xac, 0x00, 0x36, 0x08, 0x03, 0x40, 0xf9, 0x07, 0x55, 0x40, 0xf9],\n        feature: \"\", scopes: Scopes::ALL, read_only: true, per_frame: false, sharing: Sharing::None,\n        note: \"\" },\n    Seam { label: \"needle.get_battle_object_from_id\", group: \"training\", offset: 0x3ac560,\n        kind: SeamKind::Called,\n        guard: [0x08, 0x7c, 0x1c, 0x53, 0x1f, 0x11, 0x00, 0x71, 0x68, 0x07, 0x00, 0x54, 0x69, 0x08, 0x02, 0x90,\n                0x29, 0xd1, 0x07, 0x91, 0x28, 0x79, 0xa8, 0xb8, 0x08, 0x01, 0x09, 0x8b, 0x00, 0x01, 0x1f, 0xd6,\n                0x68, 0x78, 0x02, 0x90, 0x08, 0xa5, 0x42, 0xf9, 0x09, 0x01, 0x40, 0xf9, 0x08, 0x6c, 0x10, 0x53,\n                0x2a, 0x19, 0x40, 0xb9, 0x1f, 0x01, 0x0a, 0x6b, 0xe2, 0x05, 0x00, 0x54, 0x29, 0x05, 0x40, 0xf9],\n        feature: \"\", scopes: Scopes::ALL, read_only: true, per_frame: false, sharing: Sharing::None,\n        note: \"\" },\n    Seam { label: \"needle.ui_pass_calculate\", group: \"training\", offset: 0x375efa8,\n",
@@ -678,6 +735,18 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       613,
+       612,
+       [
+        "#[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
     }
    ]
   },
@@ -686,7 +755,7 @@
    "dest": "src/model/seams/native_seams/rows_a4.rs",
    "crate": "consts",
    "src_sha256": "f22b743ebc91cb8d97fcc4d15acd3184dfa4521b5564bf4508fd04ab7b92d525",
-   "dest_sha256": "e02c7b26d599b3d433f6d3727a6fee78e6f2b8c3b4e811b800fdcb8d0ee25065",
+   "dest_sha256": "edd3a9bd01c985101d20ee837b8ce9e3762791a79584213a01d3af2d7d2ec713",
    "edits": [
     {
      "old": "           feature: \"automation-results-native\", scopes: Scopes::ALL, read_only: false, per_frame: false,\n           sharing: Sharing::None,\n           note: \"Entry hook, diag only (automation-results-native/-observer). NOTE: elite_stages_counterpick hooks this entry at runtime (B123-pre map) and builds 0x150e9d0 (card scan), so with the full card set this row is occupied and the helper refuses, exactly as its FNV contract refuses today; sharing would be needed before this diag helper runs beside that plugin.\" },\n    // automation_native:contract/fnv:exact=64:extent=152/0xd7a63bcf755ccd55\n    Seam { label: \"automation.contract_1d5b590\", group: \"automation_helper_native\", offset: 0x1d5b590,\n           kind: SeamKind::Relied,\n           guard: [0xf5, 0x0f, 0x1d, 0xf8, 0xf4, 0x4f, 0x01, 0xa9, 0xfd, 0x7b, 0x02, 0xa9, 0xfd, 0x83, 0x00, 0x91, 0x3f, 0x04, 0x00, 0x31, 0x00, 0x02, 0x00, 0x54, 0x08, 0xdf, 0x01, 0x90, 0x08, 0xc5, 0x44, 0xf9, 0x08, 0x05, 0x40, 0xf9, 0x08, 0x01, 0x40, 0xb9, 0x1f, 0x05, 0x00, 0x71, 0x48, 0x01, 0x00, 0x54, 0x3f, 0x28, 0x00, 0x71, 0x82, 0x07, 0x00, 0x54, 0x08, 0xdf, 0x01, 0x90, 0x08, 0xc1, 0x44, 0xf9],\n           feature: \"automation-results-native\", scopes: Scopes::ALL, read_only: false, per_frame: false,\n           sharing: Sharing::None,\n           note: \"dependency window\" },\n    // automation_native:contract/fnv:exact=52\n    Seam { label: \"automation.contract_32f1900\", group: \"automation_helper_native\", offset: 0x32f1900,\n           kind: SeamKind::Relied,\n           guard: [0xff, 0x0b, 0x00, 0xf9, 0xff, 0x83, 0x00, 0x39, 0x68, 0x22, 0x41, 0xb9, 0x08, 0x05, 0x00, 0x51, 0x1f, 0x11, 0x00, 0x71, 0x08, 0x31, 0x9f, 0x1a, 0x68, 0x1a, 0x01, 0xb9, 0x68, 0xf6, 0x80, 0xb9, 0x1f, 0x4d, 0x00, 0x71, 0x22, 0x03, 0x00, 0x54, 0x68, 0x0a, 0x08, 0x8b, 0xe9, 0x07, 0x1f, 0x32, 0x09, 0xa9, 0x00, 0xb9, 0xfd, 0x7b, 0x46, 0xa9, 0xf5, 0x23, 0x40, 0xf9, 0xf4, 0x4f, 0x45, 0xa9],\n           feature: \"automation-results-native\", scopes: Scopes::ALL, read_only: false, per_frame: false,\n           sharing: Sharing::None,\n           note: \"dependency window\" },\n    // automation_native:contract/fnv:exact=64:extent=144/0x3cd5c89b211f54e0\n    Seam { label: \"automation.contract_1d5a540\", group: \"automation_helper_native\", offset: 0x1d5a540,\n           kind: SeamKind::Relied,\n           guard: [0xff, 0x03, 0x01, 0xd1, 0xf5, 0x0b, 0x00, 0xf9, 0xf4, 0x4f, 0x02, 0xa9, 0xfd, 0x7b, 0x03, 0xa9, 0xfd, 0xc3, 0x00, 0x91, 0xa8, 0xae, 0x01, 0xb0, 0x14, 0x11, 0x44, 0xf9, 0x95, 0x06, 0x40, 0xf9, 0xa8, 0x8a, 0x40, 0xf9, 0xf3, 0x03, 0x00, 0xaa, 0x00, 0x41, 0x40, 0xf9, 0x31, 0x56, 0x06, 0x94, 0xa8, 0xfa, 0x40, 0xb9, 0x1f, 0x01, 0x00, 0x71, 0xa9, 0x0a, 0x45, 0x39, 0xe8, 0x07, 0x9f, 0x1a],\n           feature: \"automation-results-native\", scopes: Scopes::ALL, read_only: false, per_frame: false,\n           sharing: Sharing::None,\n           note: \"dependency window\" },\n    // automation_native:contract/fnv:exact=64:extent=316/0x70f47f6bc9a56d18\n    Seam { label: \"automation.save_success_popup\", group: \"automation_helper_native\", offset: 0x1d5a7e0,\n           kind: SeamKind::Relied,\n           guard: [0xf4, 0x4f, 0xbe, 0xa9, 0xfd, 0x7b, 0x01, 0xa9, 0xfd, 0x43, 0x00, 0x91, 0x48, 0xab, 0x01, 0xb0, 0x08, 0xdd, 0x42, 0xf9, 0xf3, 0x03, 0x00, 0xaa, 0x00, 0x01, 0x40, 0xf9, 0x91, 0x90, 0xdb, 0x97, 0x1f, 0x08, 0x00, 0x71, 0xa0, 0x03, 0x00, 0x54, 0x1f, 0x04, 0x00, 0x71, 0xe1, 0x07, 0x00, 0x54, 0x68, 0xf6, 0x80, 0xb9, 0x1f, 0x4d, 0x00, 0x71, 0xe2, 0x07, 0x00, 0x54, 0x68, 0x0a, 0x08, 0x8b],\n           feature: \"automation-results-native\", scopes: Scopes::ALL, read_only: false, per_frame: false,\n           sharing: Sharing::None,\n           note: \"save success opens its popup before status 3\" },\n    // automation_native:contract/fnv:exact=64:extent=556/0x108f1484300f02f\n    Seam { label: \"automation.caller_147f960\", group: \"automation_helper_native\", offset: 0x147f960,\n           kind: SeamKind::Relied,\n           guard: [0xff, 0x03, 0x01, 0xd1, 0xf5, 0x0b, 0x00, 0xf9, 0xf4, 0x4f, 0x02, 0xa9, 0xfd, 0x7b, 0x03, 0xa9, 0xfd, 0xc3, 0x00, 0x91, 0x28, 0xf2, 0x01, 0x90, 0x08, 0x89, 0x44, 0xf9, 0x01, 0x01, 0x40, 0xf9, 0x35, 0xaf, 0x95, 0xd2, 0x75, 0x15, 0xa1, 0xf2, 0x75, 0x02, 0xc0, 0xf2, 0xf3, 0x03, 0x00, 0xaa, 0xe0, 0x03, 0x00, 0x91, 0xe2, 0x03, 0x15, 0xaa, 0x0a, 0x0f, 0x03, 0x94, 0xf4, 0x03, 0x40, 0xf9],\n           feature: \"automation-results-native\", scopes: Scopes::ALL, read_only: false, per_frame: false,\n           sharing: Sharing::None,\n           note: \"caller/message materialization\" },\n    // automation_native:contract/fnv:exact=40\n    Seam { label: \"automation.caller_147faa0\", group: \"automation_helper_native\", offset: 0x147faa0,\n           kind: SeamKind::Relied,\n           guard: [0x08, 0x51, 0x82, 0xd2, 0x28, 0x56, 0xb6, 0xf2, 0x29, 0xde, 0x9b, 0xd2, 0x09, 0x67, 0xa7, 0xf2, 0x1f, 0x00, 0x00, 0x72, 0x88, 0xe3, 0xdf, 0xf2, 0xe8, 0x1f, 0xeb, 0xf2, 0x29, 0xe3, 0xdf, 0xf2, 0xe9, 0x1f, 0xeb, 0xf2, 0x35, 0x11, 0x88, 0x9a, 0x88, 0x02, 0x40, 0xf9, 0x08, 0xc5, 0x40, 0xf9, 0xe0, 0x03, 0x14, 0xaa, 0x00, 0x01, 0x3f, 0xd6, 0xc8, 0x97, 0x98, 0xd2, 0x48, 0x1e, 0xbe, 0xf2],\n           feature: \"automation-results-native\", scopes: Scopes::ALL, read_only: false, per_frame: false,\n           sharing: Sharing::None,\n           note: \"caller/message materialization\" },\n    // automation_native:contract/fnv:exact=64:extent=104/0x4b015ae25ac7fd21 automation_observer:contract/fnv:exact=8\n    Seam { label: \"automation.caller_1d5b628\", group: \"automation_helper_native\", offset: 0x1d5b628,\n           kind: SeamKind::Relied,\n",
@@ -702,6 +771,18 @@
      "delete_from": "    // automation_observer:contract/fnv:exact=56\n",
      "delete_to": "];\n",
      "reason": "RC RESET option2, lead 2026-11-03 10:42:04: retire four exclusive results-observer rows; retain native helper rows."
+    },
+    {
+     "line_patch": [
+      [
+       201,
+       200,
+       [
+        "#[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
     }
    ]
   },
@@ -710,12 +791,24 @@
    "dest": "src/model/seams/native_seams/rows_a5.rs",
    "crate": "consts",
    "src_sha256": "840976a5e6ed534d82850aba0c5fd891d34339c1474e02fced838276bd432a33",
-   "dest_sha256": "62ad2d81ec66a5082139fd7eb8faf3da013ca558bedac9b6bcd4a320558c1334",
+   "dest_sha256": "9b8ac826955c25895adc2ae9c856cfd7e1f3a3f991b933fd3ca1e6c9480209ce",
    "edits": [
     {
      "old": "           feature: \"console-practice-trace\", scopes: Scopes::ALL, read_only: false, per_frame: false,\n           sharing: Sharing::None,\n           note: \"Diag only (console-practice-trace). Placement heuristic says entry because the previous word is an unconditional b; it is a branch target inside the list callback loop (mid-function).\" },\n    // console_map:hook/raw_inline:exact=20\n    Seam { label: \"console_map.free_pages_result\", group: \"console_map_probe\", offset: 0x37cae24,\n           kind: SeamKind::Hook { form: HookForm::Raw, placement: Placement::Mid },\n           guard: [0x40, 0x06, 0x00, 0x35, 0x88, 0x0b, 0x01, 0xf0, 0x08, 0x41, 0x11, 0x91, 0x09, 0xfd, 0x5f, 0xc8, 0x29, 0x01, 0x15, 0xcb, 0x09, 0xfd, 0x0a, 0xc8, 0xaa, 0xff, 0xff, 0x35, 0x80, 0x0b, 0x01, 0xf0, 0x00, 0x40, 0x10, 0x91, 0x7f, 0x02, 0x00, 0xb9, 0xe1, 0xda, 0x07, 0x94, 0xfd, 0x7b, 0x46, 0xa9, 0xf4, 0x4f, 0x45, 0xa9, 0xf6, 0x57, 0x44, 0xa9, 0xf8, 0x5f, 0x43, 0xa9, 0xff, 0xc3, 0x01, 0x91],\n           feature: \"console-map-probe\", scopes: Scopes::ALL, read_only: false, per_frame: false,\n           sharing: Sharing::None,\n           note: \"diag\" },\n    // turnip:relied/code:exact=64\n    Seam { label: \"turnip.lua_module_public\", group: \"turnip_identity\", offset: 0x2056ab0,\n           kind: SeamKind::Relied,\n",
      "new": "           feature: \"console-practice-trace\", scopes: Scopes::ALL, read_only: false, per_frame: false,\n           sharing: Sharing::None,\n           note: \"Diag only (console-practice-trace). Placement heuristic says entry because the previous word is an unconditional b; it is a branch target inside the list callback loop (mid-function).\" },\n    // turnip:relied/code:exact=64\n    Seam { label: \"turnip.lua_module_public\", group: \"turnip_identity\", offset: 0x2056ab0,\n           kind: SeamKind::Relied,\n",
      "reason": "Integrate approved Slim4b86500 retirement/scope and cold-owner/SDK roots into current composed source. Preserve current pkg6 const locks, F6 task ordering, Setup lifecycle and Deluxe persistence. Retired probe consumers removed with their features; shared host oracle retained. New exact composition requires fresh gates."
+    },
+    {
+     "line_patch": [
+      [
+       894,
+       893,
+       [
+        "#[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
     }
    ]
   },
@@ -724,7 +817,21 @@
    "dest": "src/model/seams/native_seams/rows_identity.rs",
    "crate": "consts",
    "src_sha256": "0849f9d7a92a1b09f9ba0a4fc01ff496763690c67c6d7a13f8d7311cf7d72f16",
-   "dest_sha256": "0849f9d7a92a1b09f9ba0a4fc01ff496763690c67c6d7a13f8d7311cf7d72f16"
+   "dest_sha256": "ee4730a8af8655f011c3ed0783415fc0d5119b379eea3d7f656665307d5c2646",
+   "edits": [
+    {
+     "line_patch": [
+      [
+       102,
+       101,
+       [
+        "#[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
+    }
+   ]
   },
   {
    "src": "training_mod_consts/src/native_seams/images.rs",
@@ -873,7 +980,7 @@
    "dest": "src/model/swap/source_lifetime.rs",
    "crate": "root",
    "src_sha256": "9908fbdce2de0082c581e18c4a452ba4ac1e1cc18fac63b7f954f8b8e96aecaf",
-   "dest_sha256": "fa12eea801e2a1dd1a1b4aae921322ae9c10848982d0aea9a096c9d2fd18b518",
+   "dest_sha256": "772ead985d7d03ea56a841d3ef4d351ddeaf4b8b65a9dd6607b59ef2c33083b0",
    "edits": [
     {
      "old": "    /// Every acquire owns a distinct lease, even when holder values are equal.\n",
@@ -1002,6 +1109,16 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "line_patch": [
+      [
+       31,
+       36,
+       []
+      ]
+     ],
+     "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
     }
    ]
   },
@@ -1117,7 +1234,7 @@
    "dest": "src/model/swap/roster_grid.rs",
    "crate": "tui",
    "src_sha256": "90f7eaf48933ccfb39e4696cb8dd38782dfd194630bfd031ed4bbf2442cc5d20",
-   "dest_sha256": "a2de92746981d4318a761ac21b0a4a36d37881e684037fe587f39caddfd2673c",
+   "dest_sha256": "f548d70185b0f610310cc2afd289c8e52f2b05d41cf7f8f351262ef0555b9c8b",
    "edits": [
     {
      "old": "pub fn css_order(kinds: &[u32], values: &[u8], excluded: Option<u32>) -> Vec<u32> {\n    GRID.iter()\n        .filter_map(|slot| match slot {\n            Slot::Fighter(kind, _) => Some(*kind),\n            Slot::Shared(group) => {\n                let default = group.forms()[0].0;\n                Some(\n                    selected_group_index(kinds, values, default)\n                        .map(|i| kinds[i])\n                        .unwrap_or(default),\n                )\n            }\n            _ => None,\n        })\n        .filter(|kind| kinds.contains(kind) && excluded.map(group_kind) != Some(group_kind(*kind)))\n        .collect()\n}",
@@ -1169,6 +1286,21 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "line_patch": [
+      [
+       29,
+       30,
+       []
+      ],
+      [
+       473,
+       481,
+       []
+      ]
+     ],
+     "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
     }
    ]
   },
@@ -1277,7 +1409,7 @@
    "dest": "src/model/mii/auto_init.rs",
    "crate": "mii",
    "src_sha256": "cc0ab5f24f0c3866420026c9d364746a48321c0dac80dc525cb0fe1054e9207e",
-   "dest_sha256": "bf6c0ee9d2d59e63a4c26de2886ce292b82e8973ef6e804d70fea0ce2c64414d",
+   "dest_sha256": "67ab489724ed763e3ce0694d13c92f21e461c9f5746e3dcb29a74fe9460e707f",
    "edits": [
     {
      "old": "//! One automatic catalog read per visible-entry lifetime. Values only; no IO or native access.\nuse crate::engine::mii::inventory::MiiClass;\n\n#[derive(Clone, Copy, Debug, PartialEq, Eq)]\npub struct Token {\n    pub generations: [u64; 2],\n    pub opening: u64,\n}\n\n#[derive(Clone, Copy, Debug, PartialEq, Eq)]\nenum Phase {\n    Waiting,\n    Reading,\n    Finished,\n}\n\npub struct Initialization {\n    token: Option<Token>,\n    ready: u8,\n    phase: Phase,\n}\n\nimpl Initialization {\n    pub const fn empty() -> Self {\n        Self {\n            token: None,\n            ready: 0,\n            phase: Phase::Waiting,\n        }\n    }\n\n    pub fn pending(&self) -> bool {\n        self.phase != Phase::Finished\n    }\n\n    /// `eligible` includes both known originals, the current role's native readiness,\n    /// and the existing practice exclusions. A callback supplies only its own role.\n    pub fn observe(&mut self, token: Token, role: u32, eligible: bool) -> Option<Token> {\n        if role > 1 || self.phase != Phase::Waiting {\n            return None;\n        }\n        if self.token.is_some_and(|previous| previous != token) {\n            return None;\n        }\n        self.token = Some(token);\n        let bit = 1 << role;\n        if eligible {\n            self.ready |= bit;\n        } else {\n            self.ready &= !bit;\n        }\n        if self.ready != 3 {\n            return None;\n        }\n        self.phase = Phase::Reading;\n        Some(token)\n    }\n\n    /// Consume this read exactly once, including incomplete or stale results.\n    /// An old completion cannot consume a new lifetime's pending read.\n    pub fn finish(&mut self, token: Token, current: Token, complete: bool) -> bool {\n        if self.phase != Phase::Reading || self.token != Some(token) {\n            return false;\n        }\n        self.phase = Phase::Finished;\n        token == current && complete\n    }\n\n    /// An explicit menu refresh supersedes automatic work for this lifetime.\n    pub fn cancel(&mut self) {\n        self.phase = Phase::Finished;\n    }\n\n    /// Scene change and visible-entry destruction both start a fresh lifetime.\n    pub fn reset(&mut self) {\n        *self = Self::empty();\n    }\n\n    pub fn reading(&self) -> Option<Token> {\n        if self.phase == Phase::Reading { self.token } else { None }\n    }\n}\n\n/// A mixed Player roster waits only while its native qualification can still finish.\n/// Explicit Mii/original-Mii protection is independent of this temporary wait.\npub fn player_qualifying(\n    native_training: bool,\n    cpu_quantity: Option<u32>,\n    automatic: bool,\n    capture: bool,\n) -> bool {\n    native_training && cpu_quantity == Some(1) && (automatic || capture)\n}\n\n/// Until capture succeeds, consume Mii-related input without creating a request.\n/// Plain ordinary-only routing remains available while the catalog is loading.\npub fn requires_owner(original: Option<u32>, roster_has_mii: bool, direct: Option<u32>) -> bool {\n    roster_has_mii\n        || original.and_then(MiiClass::from_kind).is_some()\n        || direct.and_then(MiiClass::from_kind).is_some()\n}\n\n/// A continuation or an early manual choice replaces the visible CSS-origin body,\n/// and origin capture accepts only that body. Hold the replacement while\n/// the role has no owner for the current generation, the visible body is still the\n/// immutable origin, and qualification can still finish: the automatic read is\n/// pending or the role's capture is armed, and the backend is before ready-go or\n/// exactly ready (the read's own readiness gate). Otherwise the continuation proceeds\n/// unchanged; an owner applies its own rules.\npub fn holds_origin_replacement(\n    qualified: bool,\n    origin_body: bool,\n    automatic: bool,\n    capture: bool,\n    ready_go: bool,\n    backend_ready: bool,\n) -> bool {\n    !qualified && origin_body && (automatic || capture) && (!ready_go || backend_ready)\n}\n\n#[cfg(test)]\nmod tests {\n    use super::*;\n\n    const FIRST: Token = Token {\n        generations: [7, 11],\n        opening: 13,\n    };\n\n    #[test]\n    fn one_read_and_one_arm_per_lifetime_even_after_read_failure() {\n        for complete in [true, false] {\n            let mut init = Initialization::empty();\n            assert_eq!(init.observe(FIRST, 0, true), None);\n            assert_eq!(init.observe(FIRST, 0, true), None);\n            assert_eq!(init.observe(FIRST, 1, true), Some(FIRST));\n            assert_eq!(init.observe(FIRST, 1, true), None);\n            assert_eq!(init.finish(FIRST, FIRST, complete), complete);\n            assert!(!init.finish(FIRST, FIRST, true));\n            assert!(!init.pending());\n            assert_eq!(init.observe(FIRST, 0, true), None);\n            assert_eq!(init.observe(FIRST, 1, true), None);\n        }\n    }\n\n    #[test]\n    fn scene_destructor_and_menu_changes_reject_stale_completion() {\n        let mut init = Initialization::empty();\n        init.observe(FIRST, 0, true);\n        init.observe(FIRST, 1, true);\n        init.cancel(); // A real menu opening owns its independent refresh.\n        assert!(!init.finish(FIRST, FIRST, true));\n        assert!(!init.pending());\n        for next in [\n            Token {\n                generations: [8, 12],\n                opening: 14,\n            }, // Scene boundary.\n            Token {\n                generations: [7, 12],\n                opening: 14,\n            }, // CPU entry destruction.\n        ] {\n            init.reset();\n            assert_eq!(init.observe(next, 0, true), None);\n            assert_eq!(init.observe(next, 1, true), Some(next));\n            assert!(!init.finish(FIRST, next, true));\n            assert!(init.pending());\n            assert!(init.finish(next, next, true));\n        }\n        init.reset();\n        init.observe(FIRST, 0, true);\n        init.observe(FIRST, 1, true);\n        assert!(!init.finish(\n            FIRST,\n            Token {\n                opening: 14,\n                ..FIRST\n            },\n            true\n        ));\n    }\n\n    #[test]\n    fn readiness_precedes_arming_and_mii_input_never_falls_through_unqualified() {\n        let mut init = Initialization::empty();\n        assert_eq!(init.observe(FIRST, 0, false), None); // Original/readiness unavailable.\n        assert_eq!(init.observe(FIRST, 1, true), None);\n        assert_eq!(init.observe(FIRST, 0, false), None); // INSTALL or another action owns practice.\n        assert_eq!(init.observe(FIRST, 4, true), None); // Not a visible Training role.\n        assert!(!init.finish(FIRST, FIRST, true));\n        assert!(requires_owner(Some(0x49), false, None));\n        assert!(requires_owner(Some(9), true, None));\n        assert!(requires_owner(Some(9), false, Some(0x48)));\n        assert!(!requires_owner(Some(9), false, Some(0x0f)));\n        assert!(!requires_owner(None, false, None));\n        let mixed_player = |native, quantity, automatic, capture| {\n            requires_owner(\n                Some(9),\n                player_qualifying(native, quantity, automatic, capture),\n                None,\n            )\n        };\n        assert!(mixed_player(true, Some(1), init.pending(), false));\n        assert!(!mixed_player(false, Some(1), init.pending(), false)); // Waiting scope.\n        assert!(!mixed_player(true, Some(2), init.pending(), false)); // Unsupported quantity.\n        assert!(!mixed_player(true, None, init.pending(), true)); // Unknown native quantity.\n        assert_eq!(init.observe(FIRST, 0, true), Some(FIRST));\n        assert!(init.finish(FIRST, FIRST, true));\n        assert!(mixed_player(true, Some(1), init.pending(), true)); // Catalog done; role capture armed.\n        assert!(!mixed_player(true, Some(1), init.pending(), false)); // Refused/completed capture.\n        init.reset();\n        init.observe(FIRST, 0, true);\n        init.observe(FIRST, 1, true);\n        assert!(!init.finish(FIRST, FIRST, false)); // Incomplete catalog consumes the attempt.\n        assert!(!mixed_player(true, Some(1), init.pending(), false));\n        assert!(requires_owner(Some(0x49), false, None)); // Immutable Mii origin remains protected.\n        assert!(requires_owner(Some(9), false, Some(0x48))); // Direct Mii remains refused.\n    }\n\n    const ORIGIN: u32 = 0x0e;\n    const REMEMBERED: u32 = 6;\n    const RETURN: Token = Token {\n        generations: [18, 18],\n        opening: 19,\n    };\n\n    type Hold = fn(bool, bool, bool, bool, bool, bool) -> bool;\n\n    /// One waiting lifetime after a match, frame by frame in callback order: auto-init,\n    /// the role's capture, then the roster's continuation consult. Capture qualifies\n    /// only the CSS-origin body; an unheld continuation replaces it at once. Ready-go is\n    /// frame 3; `menu` cancels the automatic read at frame 4 and arms capture itself.\n    /// Returns (frame qualified, frame replaced, capture still armed).\n    fn after_match(\n        hold: Hold,\n        complete: bool,\n        ready: bool,\n        menu: bool,\n    ) -> (Option<u32>, Option<u32>, bool) {\n        let mut init = Initialization::empty();\n        init.reset();\n        let (mut body, mut capture, mut reading) = (ORIGIN, false, None);\n        let (mut qualified_at, mut replaced_at) = (None, None);\n        for frame in 0..12 {\n            let go = frame >= 3;\n            if menu && frame == 4 {\n                init.cancel();\n                capture = true;\n            }\n            if let Some(token) = reading.take() {\n                capture |= init.finish(token, RETURN, complete);\n            } else if go && ready {\n                init.observe(RETURN, 0, true);\n                reading = init.observe(RETURN, 1, true);\n            }\n            if capture && body == ORIGIN {\n                capture = false;\n                qualified_at = Some(frame);\n            }\n            let (qualified, origin) = (qualified_at.is_some(), body == ORIGIN);\n            let automatic = init.pending();\n            let held = hold(qualified, origin, automatic, capture, go, ready);\n            if origin && !held {\n                body = REMEMBERED;\n                replaced_at = Some(frame);\n            }\n        }\n        (qualified_at, replaced_at, capture)\n    }\n\n    #[test]\n    fn match_return_qualifies_the_css_origin_before_its_continuation() {\n        let unheld: Hold = |_, _, _, _, _, _| false;\n        // Counterexample (C99 return): the continuation replaces the CSS body first,\n        // so the armed capture can never qualify and stays armed.\n        let old = after_match(unheld, true, true, false);\n        assert_eq!(old, (None, Some(0), true));\n        // Held: the delivered read arms capture, the origin qualifies, then the\n        // remembered choice continues in the same frame's later consult.\n        let held = (Some(4), Some(4), false);\n        assert_eq!(after_match(holds_origin_replacement, true, true, false), held);\n        // A menu that supersedes the read arms capture itself; same order.\n        assert_eq!(after_match(holds_origin_replacement, true, true, true), held);\n    }\n\n    #[test]\n    fn continuation_hold_is_released_when_qualification_cannot_finish() {\n        // An incomplete catalog consumes the read without arming capture.\n        let incomplete = after_match(holds_origin_replacement, false, true, false);\n        assert_eq!(incomplete, (None, Some(4), false));\n        // A backend that is not exactly ready at ready-go never starts the read.\n        let unready = after_match(holds_origin_replacement, true, false, false);\n        assert_eq!(unready, (None, Some(3), false));\n        // Before ready-go the visible entries may still be loading: held regardless.\n        assert!(holds_origin_replacement(false, true, true, false, false, false));\n        // A qualified owner, or neither a pending read nor an armed capture, never holds.\n        assert!(!holds_origin_replacement(true, true, true, true, false, true));\n        assert!(!holds_origin_replacement(false, true, false, false, false, true));\n        // An armed capture alone holds while the backend can still qualify it.\n        assert!(holds_origin_replacement(false, true, false, true, true, true));\n        assert!(!holds_origin_replacement(false, true, false, true, true, false));\n        // A body that is no longer the CSS origin can never be captured: never held.\n        assert!(!holds_origin_replacement(false, false, true, true, true, true));\n        assert!(!holds_origin_replacement(false, false, true, true, false, false));\n    }\n}\n",
@@ -1319,6 +1451,18 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "line_patch": [
+      [
+       86,
+       85,
+       [
+        "#[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
     }
    ]
   },
@@ -1367,7 +1511,7 @@
    "dest": "src/model/mii/capacity.rs",
    "crate": "mii",
    "src_sha256": "5d1c327198a51570b05277dde4bacc9260b6a1c92341eba4fcaf1c2d8178838e",
-   "dest_sha256": "55c1a47fdd5c490f36087812aa0453632e24bf9f031c9f55d4a9c577941749d1",
+   "dest_sha256": "3a07a81047541429e87858b6f5086e2365a2d29593152f945c201abf7adbea70",
    "edits": [
     {
      "old": "        let Some(index) = extra_slots(self.layout).iter().position(|value| *value == slot)\n            .filter(|index| self.entries[*index] != 0) else {\n            return Err(\"extra slot is not a registered creation\");\n        };\n        self.roots[index].ok_or(\"extra registered roots unavailable\")\n    }\n\n    /// A registered extra's current native roots must equal its registration.\n    /// Raw values only; the caller reads them from current roots under its lock.\n    pub fn owned_roots(\n",
@@ -1444,6 +1588,18 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "line_patch": [
+      [
+       114,
+       113,
+       [
+        "    #[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
     }
    ]
   },
@@ -1778,7 +1934,7 @@
    "dest": "src/model/mii/lifetime.rs",
    "crate": "mii",
    "src_sha256": "c5ae4c4aa0aaaacbf795debce87f951fa1332a83ecee6743af029ceb0387feb0",
-   "dest_sha256": "e1053d168796fcf278ce84e03b7fe85fed577727e3cf3949cdd98ac979d2dadb",
+   "dest_sha256": "dc32b5e7e790edf136de2e534fc5f5cb7bc6fc51d411faff9cdc93e2d5db07bd",
    "edits": [
     {
      "old": "#[derive(Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]\n#[serde(try_from = \"StoredConfiguration\", into = \"StoredConfiguration\")]\npub struct Configuration {\n    canonical: Canonical,\n    charinfo: [u8; CHARINFO_LEN],\n    tokens: Tokens,\n}\n",
@@ -1853,6 +2009,25 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "line_patch": [
+      [
+       323,
+       322,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       408,
+       407,
+       [
+        "    #[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
     }
    ]
   },
@@ -1861,14 +2036,67 @@
    "dest": "src/model/mii/mii_setup.rs",
    "crate": "mii",
    "src_sha256": "f3e7a2bd52fdc0ff0db7bea3de0a597b2734bb29eeb41748d175c8db8ebc41e7",
-   "dest_sha256": "f3e7a2bd52fdc0ff0db7bea3de0a597b2734bb29eeb41748d175c8db8ebc41e7"
+   "dest_sha256": "bed3dbc5a2d399762be556265e12a76b7d6473a2d3d7b062421b40880025a205",
+   "edits": [
+    {
+     "line_patch": [
+      [
+       47,
+       49,
+       []
+      ],
+      [
+       67,
+       74,
+       []
+      ],
+      [
+       91,
+       90,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       94,
+       93,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       95,
+       97,
+       []
+      ],
+      [
+       159,
+       158,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       162,
+       162,
+       []
+      ],
+      [
+       235,
+       237,
+       []
+      ]
+     ],
+     "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
+    }
+   ]
   },
   {
    "src": "training_mod_mii/src/native_values.rs",
    "dest": "src/model/mii/native_values.rs",
    "crate": "mii",
    "src_sha256": "d95d260023c31acdfa4520346c1914b07a6a3037ea70cf688390acdb4dac1ae3",
-   "dest_sha256": "b2724948546f6e857ae8bfe277ff59ec9914bb69f663066eddca5e0c0cccbe14",
+   "dest_sha256": "511ccf63d5c7fbc2c938a0e544bd153c9107434489073d539e2a63438f07e86a",
    "edits": [
     {
      "table_tests": true,
@@ -1905,6 +2133,32 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "line_patch": [
+      [
+       189,
+       188,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       234,
+       233,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       285,
+       284,
+       [
+        "#[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
     }
    ]
   },
@@ -1913,7 +2167,7 @@
    "dest": "src/model/mii/ordinary_cpu.rs",
    "crate": "mii",
    "src_sha256": "e4628b4e3e7a00dc2c29d715b9755284f5afa3446513824912066178f0cc6caf",
-   "dest_sha256": "47a2ae14454c55f82b38d9279deb754d835924d44f22628381c49fe38852c103",
+   "dest_sha256": "fb64e19e907e5d3383f2c872e10fb0921e1594861903093025be8a45665260ac",
    "edits": [
     {
      "old": "/// and an extra index/selector equal to the destination refuses. A protected set\n/// that cannot fit the fixed record table refuses instead of truncating.\npub fn assignment_with(layout:crate::engine::mii::backend::Layout,extras:crate::engine::mii::capacity::Extras,\n    destination:usize,owners:&[Option<Owner>;8])->Option<[Option<u16>;8]> {\n    if !layout.selector(destination) || extras.entry(destination).is_some() {return None;}\n    if !layout.shape_with(&owners.map(|o|o.map_or(0,|o|o.entry)),extras) {\n        return None;\n    }\n    let mut protected = [None; 8];\n    let mut used = 0;\n",
@@ -2057,6 +2311,74 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "line_patch": [
+      [
+       282,
+       281,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       461,
+       460,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       488,
+       487,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       649,
+       648,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       765,
+       764,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       808,
+       807,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       836,
+       835,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       841,
+       840,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       908,
+       907,
+       [
+        "#[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
     }
    ]
   },
@@ -2065,7 +2387,7 @@
    "dest": "src/model/mii/ordinary_player.rs",
    "crate": "mii",
    "src_sha256": "602bba789924053897d816ea58b838f135f8cec49c8e955a4249d5687cf9b7d6",
-   "dest_sha256": "63aff99d719a1300d837a1e6f71056a0832e8c93a8cc8ce80aa25cb7ca78fe4a",
+   "dest_sha256": "7238b463c4371f3190f299f5b0026e893f1579ffba265dad723864cd962fbd6c",
    "edits": [
     {
      "table_tests": true,
@@ -2128,6 +2450,25 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "line_patch": [
+      [
+       192,
+       191,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       312,
+       311,
+       [
+        "    #[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
     }
    ]
   },
@@ -2200,7 +2541,28 @@
    "dest": "src/model/mii/role_adapter.rs",
    "crate": "mii",
    "src_sha256": "cca266fa21fda3309c2318353ba07b4ff20dc53dc41a2f5bc2fbc9a29356e53f",
-   "dest_sha256": "9f9ef71ea825d603e36baceaa2a38ffd327982484a8f6f5eaec6ea613b757284"
+   "dest_sha256": "d44d208137518557ec05a5ddde433a77dd49b295d0749eb67abd97693dd55eb2",
+   "edits": [
+    {
+     "line_patch": [
+      [
+       206,
+       205,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       252,
+       251,
+       [
+        "    #[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
+    }
+   ]
   },
   {
    "src": "training_mod_mii/src/role_owner.rs",
@@ -2321,7 +2683,7 @@
    "dest": "src/model/mii/selection.rs",
    "crate": "mii",
    "src_sha256": "f20f5a2389b4035988e7d61b8fcf86afa7aafe056e839f54d0903719430a9215",
-   "dest_sha256": "640ad33b2cc078753da0ff5b903b71168e6f52ed397fcaa9310e49511be81da1",
+   "dest_sha256": "d583a5a780fd9ad8a101232b11f96c2cacd6b4cb53f4514c57f9ab413148e063",
    "edits": [
     {
      "old": "#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]\n",
@@ -2388,6 +2750,18 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "line_patch": [
+      [
+       165,
+       164,
+       [
+        "#[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
     }
    ]
   },
@@ -2431,7 +2805,7 @@
    "dest": "src/model/swap/body_bank.rs",
    "crate": "consts",
    "src_sha256": "ab3c4adcf084b2dd9433a5fe5715b428fb38c26d3b143d7632fb3d33078df0d6",
-   "dest_sha256": "87cca22c04d7ec8d31185e6876fe55433911221fb40dcb2731b01762608a5775",
+   "dest_sha256": "f32b4a6849b624d3bfd384c1ca9d9dd3c30394c25f3695d24a5535bae025c9e9",
    "edits": [
     {
      "old": "    // a native group): count it so hats and helper slots agree with the planner.\n    let used: usize = windows.iter().map(|window| window.map_or(1, |members| members.count())).sum::<usize>()\n        + existing.iter().flat_map(|groups| groups.iter()).map(|members| members.count()).sum::<usize>()\n        + budget.hats_wanted;\n    let mut remaining = budget.ready_fighters.saturating_sub(used).min(budget.pool_free);\n    // (lane depth, kind): depth is the distance from the live fighter, so a role\n    // whose nearer neighbours are already built does not outrank the other role.\n    let mut candidates: [Vec<(usize, u32)>; 2] = [Vec::new(), Vec::new()];\n    // Whole special groups (PT, Aegis, the pair) at their lane depth.\n    let mut specials: [Vec<(usize, Members)>; 2] = [Vec::new(), Vec::new()];\n    let mut room = [0usize; 2];\n    let mut group_slots = [0usize; 2];\n    for role in 0..2 {\n        let Some(window) = windows[role].filter(|window| window_swappable_with(*window, policy)) else { continue; };\n        group_slots[role] = MAX_EXTRA_GROUPS.saturating_sub(existing[role].len());\n        room[role] = group_slots[role] * NATIVE_MEMBERS;\n        for (depth, &kind) in upcoming[role].iter().enumerate() {\n            if exclude[role] == Some(kind)\n                || window.index_of(kind).is_some()\n                || existing[role].iter().any(|group| group.index_of(kind).is_some())\n            { continue; }\n            if let Some(group) = Members::special_group(kind, budget.special) {\n                // One Mii identity per resource owner: a second lane Mii, or a\n                // Mii group this role already holds, stays canonical (DESIGN \u00a72).\n                let second_mii = group.special() == Special::Mii\n                    && (specials[role].iter().any(|(_, held)| held.special() == Special::Mii)\n                        || existing[role].iter().any(|held| held.special() == Special::Mii));\n                if !second_mii && !specials[role].iter().any(|(_, held)| held.kinds()[0] == group.kinds()[0]) {\n                    specials[role].push((depth, group));\n                }\n                continue;\n            }\n            if group_member_kind(kind, policy) && !candidates[role].iter().any(|(_, held)| *held == kind) {\n                candidates[role].push((depth, kind));\n            }\n        }\n    }\n    // Special groups are taken whole at their own lane depth, interleaved with\n    // the ordinary candidates; one that no longer fits the remaining bodies or a\n    // free group slot is skipped, never split.\n    let mut chosen_special: [Vec<Members>; 2] = [Vec::new(), Vec::new()];\n    let mut scursor = [0usize; 2];\n    let mut chosen: [Vec<u32>; 2] = [Vec::new(), Vec::new()];\n    let mut cursor = [0usize; 2];\n    let take = |role: usize, chosen: &mut [Vec<u32>; 2], cursor: &mut [usize; 2], remaining: &mut usize| -> bool {\n        if *remaining == 0 || cursor[role] >= candidates[role].len() || chosen[role].len() >= room[role] {\n            return false;\n        }\n        chosen[role].push(candidates[role][cursor[role]].1);\n        cursor[role] += 1;\n        *remaining -= 1;\n        true\n    };\n    let deepest = upcoming.iter().map(|lane| lane.len()).max().unwrap_or(0);\n    for depth in 0..deepest {\n        for role in 0..2 {\n            if cursor[role] < candidates[role].len() && candidates[role][cursor[role]].0 == depth {\n                take(role, &mut chosen, &mut cursor, &mut remaining);\n            } else if scursor[role] < specials[role].len() && specials[role][scursor[role]].0 == depth {\n                let group = specials[role][scursor[role]].1;\n                scursor[role] += 1;\n                let slots_used = chosen_special[role].len() + chosen[role].len().div_ceil(NATIVE_MEMBERS);\n                if remaining >= group.count() && slots_used < group_slots[role] {\n                    chosen_special[role].push(group);\n                    remaining -= group.count();\n",
@@ -3368,6 +3742,92 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "line_patch": [
+      [
+       26,
+       32,
+       [
+        "pub use crate::engine::swap::swap_model::capabilities::{d_kirby1_applies, d_kirby1_live, group_member_kind, kirby_parkable, member_forms, member_forms_in, native_group_request, object_rearm_admitted, original_bankable, original_form_bankable, pair_lead_extra, pair_request, prefetch_admitted, single_member_request, swap_commit_index, swap_commit_index_in, window_swappable_with};",
+        "#[cfg(test)]",
+        "pub use crate::engine::swap::swap_model::capabilities::{key_release_admitted, special_group_kind, swappable_kind, window_swappable};"
+       ]
+      ],
+      [
+       36,
+       36,
+       [
+        "use crate::engine::swap::swap_model::ledger::pair_rule;",
+        "#[cfg(test)]",
+        "use crate::engine::swap::swap_model::ledger::{native_window_requests, orphan_keys, RFlags};"
+       ]
+      ],
+      [
+       316,
+       315,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       528,
+       527,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       529,
+       528,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       530,
+       529,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       548,
+       547,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       608,
+       607,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       1003,
+       1002,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       1237,
+       1236,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       1922,
+       1921,
+       [
+        "#[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
     }
    ]
   },
@@ -3461,14 +3921,26 @@
    "dest": "src/model/swap/body_bank/memory_table.rs",
    "crate": "consts",
    "src_sha256": "b0d548718ed283299a11a8b7388645e1b6bdcb1206026c917457a786b1314bdf",
-   "dest_sha256": "b0d548718ed283299a11a8b7388645e1b6bdcb1206026c917457a786b1314bdf"
+   "dest_sha256": "3a46daaad0cc0aeda42bb45086de8723758ccdb749f5ad04d178b60e51332d90",
+   "edits": [
+    {
+     "line_patch": [
+      [
+       356,
+       358,
+       []
+      ]
+     ],
+     "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
+    }
+   ]
   },
   {
    "src": "training_mod_consts/src/body_bank/window_share.rs",
    "dest": "src/model/swap/body_bank/window_share.rs",
    "crate": "consts",
    "src_sha256": "f9528f8532d1fc5cac2fd50a7e8e758f3ce491b78163d4322a93d5e2978b5e33",
-   "dest_sha256": "d5c427500f2b38554eddaf57f1094b50d11337545a2c98e6c7cafa4167263146",
+   "dest_sha256": "2940a84f5f3afabe817439b80a96571954510587921ef3f53435503188eaaf89",
    "edits": [
     {
      "table_tests": true,
@@ -3505,6 +3977,27 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "line_patch": [
+      [
+       23,
+       23,
+       [
+        "use super::{NATIVE_MEMBERS, POPO};",
+        "#[cfg(test)]",
+        "use super::reserve_extras;"
+       ]
+      ],
+      [
+       45,
+       44,
+       [
+        "#[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
     }
    ]
   },
@@ -3513,7 +4006,7 @@
    "dest": "src/model/swap/body_bank/mii_publish.rs",
    "crate": "consts",
    "src_sha256": "27966b691dd20370a74df9dabe406316f7ae39f900b1f8165f0870be03fb927f",
-   "dest_sha256": "7505dffd53e79d573cda0deec678491ab90e293118f7a7bad8feaf8bcbf9b4cd",
+   "dest_sha256": "9accdc61de574fb9bcc9fbe313e8ca741bff078685e981a914a2140451fb0b98",
    "edits": [
     {
      "table_tests": true,
@@ -3545,6 +4038,18 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "line_patch": [
+      [
+       53,
+       52,
+       [
+        "    #[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
     }
    ]
   },
@@ -3553,7 +4058,7 @@
    "dest": "src/model/swap/swap_model/capabilities.rs",
    "crate": "consts",
    "src_sha256": "f8c65743dd5f2bf8762896822d14fa72edcd97d9070a26d921dd4701d84783cb",
-   "dest_sha256": "cba5b1598810a2e5ca2a92f42c33912e7e4197da13dde940d540bfd09077f717",
+   "dest_sha256": "2faf8d07ff66cc210c5537b5450ca76d96d1380d5fc8764fe4496152a57e5b7f",
    "edits": [
     {
      "old": "        FormClass::IcPair => Capabilities {\n            bodies: 2, actors: 2, native_flags: 0x02, window_cell: CellRule::PairLead,\n            grouping: Grouping::OwnGroupOnly(SpecialSwitch::Pair), pair_rule: true, park_gate: ParkGate::PairAlive,\n            exit_commit: ExitRule::PairExtraOnly, original_bankable: false,\n",
@@ -3599,6 +4104,69 @@
      "old": "\n/// A detached Pok\u00e9mon Trainer group's object re-arm (`object_rearm_due`: its object kind taken again before its next\n",
      "new": "\n/// rc.7 F1 (the D-KIRBY1 root fix): whether D-KIRBY1's live-Kirby rules are in force. A row that suspends prefetch while\n/// live (Kirby) restricts the bank only while the G68 step of the bank's releases is native's: once the bank owns it\n/// (`g68_owned`, `runtime::roster::g68_step`; `request_bit::Policy::Owned`) no release of the bank's keys reaches a copy's\n/// package, and the rules have nothing left to guard.\npub fn d_kirby1_applies(row_suspends: bool, g68_owned: bool) -> bool {\n    row_suspends && !g68_owned\n}\n\n/// The live kind D-KIRBY1's gates ([`prefetch_admitted`], [`object_rearm_admitted`], the background build's\n/// `live_kirby`) see: the live kind, or `None` once the bank owns the G68 step ([`d_kirby1_applies`]).\npub fn d_kirby1_live(live_kind: Option<u32>, g68_owned: bool) -> Option<u32> {\n    live_kind.filter(|_| !g68_owned)\n}\n\n/// A detached Pok\u00e9mon Trainer group's object re-arm (`object_rearm_due`: its object kind taken again before its next\n",
      "reason": "rc.7 item 3, the Kirby guard removal (D-KIRBY1 root fix F1, p23/rc7-kirby-unguard; docs lane report 12:55Z): the bank owns the G68 step of the releases it causes (g68_step), and the D-KIRBY1 gates stand only while that hook is not installed"
+    },
+    {
+     "line_patch": [
+      [
+       15,
+       18,
+       [
+        "use crate::engine::swap::body_bank::{GroupPolicy, Members, Special, AEGIS_OBJECT_KIND, KIRBY, NANA, NATIVE_MEMBERS, POPO, PT_OBJECT_KIND};",
+        "#[cfg(test)]",
+        "use crate::engine::swap::body_bank::SpecialPolicy;"
+       ]
+      ],
+      [
+       118,
+       117,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       412,
+       411,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       417,
+       416,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       425,
+       424,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       481,
+       480,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       623,
+       622,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       697,
+       696,
+       [
+        "#[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
     }
    ]
   },
@@ -3607,7 +4175,7 @@
    "dest": "src/model/swap/swap_model/copy_packages.rs",
    "crate": "consts",
    "src_sha256": "a39d0ce52841ce038c3d0e67a8c747a87e5a182edef9a03b03487e508ee0c655",
-   "dest_sha256": "18fe164be55663d81ffe5b5859ff651713bba2d15602bfeb7b2207dbd20381c6",
+   "dest_sha256": "5550a0bd93cb2968cb34f50fd7b6f48cabba682eb2084fce40310167b0469d9e",
    "edits": [
     {
      "old": "//! member set it may register, exactly what the completion would take for that set\n//! ([`acquisitions`]). It releases each with the same inputs (exact inverse), and admits a\n//! registration only once G68 reports ready.\n\nuse super::copy_registry::{registry_costume, Registry, Roster, ENTRIES, NO_KIND, SUBS};\nuse super::request_bit::{acquired_keys, completion_members, copy_key, released_keys};\nuse std::collections::BTreeMap;\n\n/// One native acquisition `0x17efb40(G68, roster, member, costume)`. Its release is\n/// `0x17f0290(G68, roster, member, costume)` with the same values.\n#[derive(Clone, Debug, PartialEq, Eq)]\npub struct Acquisition {\n    pub set: [u32; SUBS],\n    pub member: u32,\n    pub costume: u32,\n    pub roster: Roster,\n",
@@ -3694,6 +4262,25 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "line_patch": [
+      [
+       35,
+       34,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       166,
+       165,
+       [
+        "#[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
     }
    ]
   },
@@ -3702,7 +4289,7 @@
    "dest": "src/model/swap/swap_model/copy_registry.rs",
    "crate": "consts",
    "src_sha256": "ae8205b2e710ea906058b3dfedb8675327113bdca5c0e71eddb96af4c509853f",
-   "dest_sha256": "742021181255050e3eabf1135e328d5538f57f4a8243cae3a9ed6c3c2010c12a",
+   "dest_sha256": "4720a1932240003df7e05d76682f0fedd77ffe8bbf83c3323698c6d63c1d2c93",
    "edits": [
     {
      "table_tests": true,
@@ -3714,6 +4301,25 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       87,
+       86,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       278,
+       277,
+       [
+        "#[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
     }
    ]
   },
@@ -3722,7 +4328,7 @@
    "dest": "src/model/swap/swap_model/fallback.rs",
    "crate": "consts",
    "src_sha256": "2345a0a33be95738ef34f24f357c69e2bcea4c566ad6d9141cae3c3784d26065",
-   "dest_sha256": "a838c67414049e65baa7b1deca58aa728f33b89d0ae34305c2b03224e99e2ca8",
+   "dest_sha256": "71a26dc20695a81ad3eedc5425392f7c9fd4d43f3d55e9f7552e30437a988fe3",
    "edits": [
     {
      "old": "        _ if reason.transient() => Disposition::Keep,\n        GroupState::Prefetched => Disposition::FailReturningKeys,\n        GroupState::Planned | GroupState::Failed => Disposition::Fail,\n    }\n}\n",
@@ -3777,6 +4383,18 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "line_patch": [
+      [
+       39,
+       38,
+       [
+        "    #[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
     }
    ]
   },
@@ -3830,7 +4448,7 @@
    "dest": "src/model/swap/swap_model/ledger.rs",
    "crate": "consts",
    "src_sha256": "900a579c038101633b6234a001024943cbea9a6e88df249aa1eee89ff7bf8487",
-   "dest_sha256": "0ae87c52078671495ca1dc0707c683210f0d7681ec0c48143622a6606f67c998",
+   "dest_sha256": "c68d5ad617988a24360c67392e9455091e1a78469a52d3ce2a07a40707cd2341",
    "edits": [
     {
      "old": "    pub const fn with(self, n: u8) -> Self { KeySet(self.0 | (1 << n)) }\n    pub const fn minus(self, other: KeySet) -> KeySet { KeySet(self.0 & !other.0) }\n    pub const fn union(self, other: KeySet) -> KeySet { KeySet(self.0 | other.0) }\n    pub const fn is_empty(self) -> bool { self.0 == 0 }\n    pub const fn len(self) -> usize { self.0.count_ones() as usize }\n    pub fn iter(self, kind: u32) -> impl Iterator<Item = KeyId> {\n        (0u8..8).filter(move |n| self.contains(*n)).map(move |n| KeyId { kind, n })\n    }\n}\n\n/// Resource-owner bytes the key rules depend on: `R+0x48`, `R+0x7d`, `R+0x7f` (module doc).\n",
@@ -3902,6 +4520,75 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "line_patch": [
+      [
+       98,
+       98,
+       []
+      ],
+      [
+       233,
+       232,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       266,
+       270,
+       []
+      ],
+      [
+       329,
+       328,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       614,
+       613,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       671,
+       670,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       683,
+       690,
+       []
+      ],
+      [
+       693,
+       692,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       706,
+       705,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       710,
+       709,
+       [
+        "    #[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
     }
    ]
   },
@@ -4000,7 +4687,7 @@
    "dest": "src/model/swap/swap_model/mod.rs",
    "crate": "consts",
    "src_sha256": "9eaf8a4afc10f7ad20140f9cb97b2ebe0e65dc45c49dd17cb0341c36d4cea60f",
-   "dest_sha256": "e615554b17f278122e66458fec4c94b019b6b7e592e2acfe12890f4adae599f9",
+   "dest_sha256": "58a7cfe0fbd698fe60d9c17fbbc6e93bdcf1fb7b071b48e6756c91763db5386e",
    "edits": [
     {
      "line_patch": [
@@ -4011,6 +4698,18 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "line_patch": [
+      [
+       40,
+       39,
+       [
+        "#[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
     }
    ]
   },
@@ -4106,7 +4805,7 @@
    "dest": "src/model/swap/swap_model/occupancy.rs",
    "crate": "consts",
    "src_sha256": "e190e95a1db710a75729ba9c1b82798483e7d8cc7107bbed32d9fcfd0373da0a",
-   "dest_sha256": "0b9d7016c379fae41de0c890ebbc8682c46cfc0662145b5d0a805dfee5cc8c10",
+   "dest_sha256": "9c86eb7b10d4069f976a6148514c06c520e570cefd4fd8f4057130d3938fbaa5",
    "edits": [
     {
      "old": "//!   R while a member whose row has `prefetch_while_live: false` (Kirby) is live \u2014 *suspend*:\n//!   no acquisition while it is live; *drain*: a transition whose target is such a member must\n//!   first return every prefetched key (the planner drains Prefetched groups to Planned before the\n",
@@ -4193,6 +4892,34 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "line_patch": [
+      [
+       29,
+       29,
+       [
+        "use super::ledger::{Conflict, KindSet64, LiveConsumers, ReleaseFootprint, Role, Use};",
+        "#[cfg(test)]",
+        "use super::ledger::{ResidentDependencies, NO_KIND};"
+       ]
+      ],
+      [
+       150,
+       149,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       159,
+       158,
+       [
+        "#[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
     }
    ]
   },
@@ -4261,7 +4988,7 @@
    "dest": "src/model/swap/swap_model/presentation.rs",
    "crate": "consts",
    "src_sha256": "9799543979d2cadb54791db843919ff133837d121b96695935ca5334c2ab6bde",
-   "dest_sha256": "709e0da198787dfcb306e3f89074b5a8d49698edc08e40f5d55d01ad0119d252",
+   "dest_sha256": "a9f3d5628081795fde35613b2736b0e8defd73d9ca9810ac71a59788eccb4105",
    "edits": [
     {
      "table_tests": true,
@@ -4310,6 +5037,18 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "line_patch": [
+      [
+       270,
+       269,
+       [
+        "#[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
     }
    ]
   },
@@ -4448,7 +5187,7 @@
    "dest": "src/model/swap/swap_model/scope.rs",
    "crate": "consts",
    "src_sha256": "45d14a9c5d825e1622e369d16f6af119955d609ddec5dd0fe7f06a45d144d4e7",
-   "dest_sha256": "bd1b4a811e761ee692f1b3f44a99278f6163ebff8b6a8c9a538031854b89b7da",
+   "dest_sha256": "54a03f3657f0f8c45e8914df25caa839524b77cb03e76331146158952722ca83",
    "edits": [
     {
      "delete_from": "    CallbackContract {\n        name: \"cpu_pilot::thinking\",",
@@ -4500,6 +5239,32 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "line_patch": [
+      [
+       352,
+       351,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       414,
+       413,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       419,
+       418,
+       [
+        "#[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
     }
    ]
   },
@@ -4508,7 +5273,7 @@
    "dest": "src/model/swap/swap_model/special_articles.rs",
    "crate": "consts",
    "src_sha256": "293f62f71c979736335d10aa9feb57310d2fbaef3ae8d03df06c0449f3298973",
-   "dest_sha256": "198519cbbe8e4303903381ea0b93224274b837a20371ee45fe63ed18cf438a2b",
+   "dest_sha256": "73ad8af27643871aaf5213ca33356c5856bd3ce34cd66455e250aace93e72db4",
    "edits": [
     {
      "old": "    (flags & PT_WINDOW_FLAG != 0 && holder && articles == 0).then_some(ArticleStep::Rebuild)\n}\n",
@@ -4565,6 +5330,18 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "line_patch": [
+      [
+       102,
+       101,
+       [
+        "#[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
     }
    ]
   },
@@ -5080,7 +5857,7 @@
    "dest": "src/model/swap/character_forms.rs",
    "crate": "consts",
    "src_sha256": "3ab7ebcd981e92f7def72ed19d1476862b2436e4ffddc5b6157f3078571dca1a",
-   "dest_sha256": "2f8fd2c4c5502265b1fd98d940b877846342886a6dcf89e3f310dbad0b0f80fb",
+   "dest_sha256": "0f03312653ec9036d6ec443e13d53ed275545b91dab21bbf89f66981a0d5cf4c",
    "edits": [
     {
      "old": "        return None;\n    }\n    Some(if member == 0x4c { 0x4b } else { member })\n}\n\n#[derive(Clone, Copy, Debug)]\npub struct EntryState {\n    pub count: u32,\n    pub kinds: [u32; 3],\n    pub actor_count: u32,\n    pub installed: u64,\n",
@@ -5167,6 +5944,16 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "line_patch": [
+      [
+       107,
+       114,
+       []
+      ]
+     ],
+     "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
     }
    ]
   },
@@ -5175,7 +5962,7 @@
    "dest": "src/model/swap/identity_view.rs",
    "crate": "consts",
    "src_sha256": "a263f5fe3881315a37a9bd0cf159f691f79df7db800d85d923b51d63ca2b8fa2",
-   "dest_sha256": "03a5a277fb7a0efad347f16c806741fd2c6353aed2280c51a88dc9a2393596d6",
+   "dest_sha256": "3478eb7a299e38d7630afbeadcdad0a8cbc6aab5359284239b6877a510afbd16",
    "edits": [
     {
      "table_tests": true,
@@ -5249,6 +6036,18 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "line_patch": [
+      [
+       147,
+       146,
+       [
+        "#[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
     }
    ]
   },
@@ -5257,7 +6056,7 @@
    "dest": "src/model/swap/trio.rs",
    "crate": "consts",
    "src_sha256": "4e90058defa07842f8c417a17dbe678086ee45a20935f8811bc672f474e042cc",
-   "dest_sha256": "fc50373fbdad718ad463506a9ce05d3830ac6016f1c60bbe591f5014eb3d2574",
+   "dest_sha256": "7061cd5c3249278320ee759b02485ba9c9994f4c2dfe88d9bc053a88488431b4",
    "edits": [
     {
      "old": "use {training_mod_tui::StatefulTable, training_mod_tui::SubMenu, training_mod_tui::SubMenuType, training_mod_tui::Toggle, crate::engine::compat::grid::NX_SUBMENU_COLUMNS, training_mod_tui::NX_SUBMENU_ROWS};\n",
@@ -5304,6 +6103,51 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "line_patch": [
+      [
+       115,
+       114,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       116,
+       115,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       117,
+       117,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       119,
+       118,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       120,
+       119,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       121,
+       121,
+       []
+      ]
+     ],
+     "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
     }
    ]
   },
@@ -5372,7 +6216,7 @@
    "dest": "src/model/swap/ordered_roster.rs",
    "crate": "consts",
    "src_sha256": "d51c3fa83b6288383d654a6e9fb4721d194317c6e9cbc1b11cfde1d2230b103f",
-   "dest_sha256": "96cb595f4f5b33a0b9d51c57e1c134d479a4e67fa44be10d1f630a1ee8d0ccb2",
+   "dest_sha256": "571dd83a5bb5db6a78af92ec0656fb971ad8414fecd5bfe9286078f363c782b8",
    "edits": [
     {
      "old": "use {training_mod_tui::StatefulTable, training_mod_tui::SubMenu, training_mod_tui::SubMenuType, training_mod_tui::Toggle, crate::engine::compat::grid::NX_SUBMENU_COLUMNS, training_mod_tui::NX_SUBMENU_ROWS};\n",
@@ -5444,6 +6288,30 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "line_patch": [
+      [
+       73,
+       77,
+       []
+      ],
+      [
+       216,
+       215,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       226,
+       225,
+       [
+        "#[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
     }
    ]
   },
@@ -5602,7 +6470,7 @@
    "dest": "src/model/preload/cycle_preload_capacity.rs",
    "crate": "consts",
    "src_sha256": "4ebdbabc047d5540685b728840afd5862f940aec24ba8d0ff65e7f4c2d7ba07c",
-   "dest_sha256": "0f083c0298ad47b6a25b0d1ca15904ed2ebc976d66662417756aa8985883720c",
+   "dest_sha256": "983f962fca178de01bfdb79b855eacb4622bc432a9370fec256335bc48e41556",
    "edits": [
     {
      "old": "//! Value-only capacity contract for cycle preloading. Counts and backend limits\n//! live here; the slot order is the single `mii::capacity` contract that Mii\n//! owner checks also use. Native ownership must still qualify every entry.\nuse crate::engine::mii::backend::Layout;\n\npub use crate::engine::mii::capacity::{capacity_index, extra_slots, Extras, ALL_EXTRA_SLOTS, BASE_HELPERS, EXTRA_SLOTS, MAX_TARGETS};\npub const ABSENT_SLOT: u32 = 8;\n\n/// Potential entries, not permission to create or dereference them. Training\n/// extensions and solo waiting extensions require separate opt-in features.\npub fn slots(layout: Layout, third: bool, ldn_third: bool, extended: bool)\n    -> [u32; MAX_TARGETS] {\n    slots_with_waiting(layout, third, ldn_third, extended, false)\n}\n\npub fn slots_with_waiting(layout: Layout, third: bool, ldn_third: bool, extended: bool, waiting: bool)\n    -> [u32; MAX_TARGETS] {\n    let mut slots = [ABSENT_SLOT; MAX_TARGETS];\n    slots[..BASE_HELPERS].copy_from_slice(&layout.helpers());\n    let extra_count = if !third { 0 } else {\n        match layout {\n            Layout::Training => if extended { EXTRA_SLOTS.len() } else { 1 },\n            Layout::Ldn => if waiting { extra_slots(layout).len() } else { usize::from(ldn_third) },\n",
@@ -5650,6 +6518,25 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "line_patch": [
+      [
+       83,
+       82,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       87,
+       86,
+       [
+        "#[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
     }
    ]
   },
@@ -6002,7 +6889,7 @@
    "dest": "src/model/mii_root/mii_hud_portrait_policy.rs",
    "crate": "root",
    "src_sha256": "aa4526a723fa74aa0b811c2883a7671c699797bda691622e5348604c674a2c33",
-   "dest_sha256": "449c9b8280825178cffeef652b2aee57e75aa3e2026da10c419b0566175be8cc",
+   "dest_sha256": "f5a41b29ccad0e23b9d2a4452edb43acaee6f94514eaf336b994edc05ebc6ceb",
    "edits": [
     {
      "old": "\n/// Candidate request subs on a helper row. Nothing here claims native code never uses\n/// them: first use requires `RequestWords::idle_unregistered`, and an owned request that\n/// stops reading live is disowned.\npub const PORTRAIT_SUBS: [u32; 3] = [7, 8, 9];\npub const VISIBLE_OWNERS: usize = 2;\n/// Two helper rows times three subs.\npub const OWNED_CAPACITY: usize = 6;\n\n/// The two exact-portrait request channels in the shared source registry.\n/// Configuration alone cannot identify a portrait: Kirby Mii hats carry it too.\npub const SOURCE_CHANNELS: [usize; 2] = [3, 4];\npub fn source_channel_admitted(channel: usize, exact: bool, menu_open: bool) -> bool {\n    !menu_open || (SOURCE_CHANNELS.contains(&channel) && exact)\n}\n\n/// Count active helper acquisition attempts, not time deliberately spent behind\n",
@@ -6239,6 +7126,16 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "line_patch": [
+      [
+       508,
+       514,
+       []
+      ]
+     ],
+     "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
     }
    ]
   },
@@ -6292,7 +7189,7 @@
    "dest": "src/model/stages/stage_forms.rs",
    "crate": "tui",
    "src_sha256": "104cea14a4d26ba7791ac7b432dd39f4e44b1e09340de932789a8596c318b500",
-   "dest_sha256": "9bba4e0153a94a2def0bb97aa5dd9c0fdf058feaa68d6e4b321648273d792307",
+   "dest_sha256": "4c1b227088ac5ec77814186157ddcffbe9d5353eed5faffafb2cb7743d34c6a5",
    "edits": [
     {
      "old": "pub(crate) enum HelpControls",
@@ -6334,6 +7231,18 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "line_patch": [
+      [
+       52,
+       51,
+       [
+        "    #[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
     }
    ]
   },
@@ -6342,7 +7251,7 @@
    "dest": "src/model/stages/stage_menu.rs",
    "crate": "tui",
    "src_sha256": "7dece73f4a1563cb27d760b54577627d5ecbfe54867701737f45a3ffcb70592c",
-   "dest_sha256": "cfdbbec199490c74b94ff2070b81de6b313b43c1dc573d059e90b72ab65511e1",
+   "dest_sha256": "3351735d42ccfe83c214c1296f8fded1815fcb105d4e6f2df3965e0f3c1c22a6",
    "edits": [
     {
      "table_tests": true,
@@ -6369,6 +7278,39 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "line_patch": [
+      [
+       5,
+       4,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       6,
+       5,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       7,
+       6,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       10,
+       9,
+       [
+        "#[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
     }
    ]
   },
@@ -6377,7 +7319,7 @@
    "dest": "src/model/stages/lobby_stages.rs",
    "crate": "consts",
    "src_sha256": "86d084f7400d24e8e6be5554b391071a5b3a36d6208ccf28651727199b37586f",
-   "dest_sha256": "90990cd781f2dadef768a354f5fc137fd8da628b0bea51e29efa8b1afbbbc130",
+   "dest_sha256": "a3a629e9a3a9627a08198806c167b993f7f8a182242d8ed46acda6d0d4a3babd",
    "edits": [
     {
      "old": "use {training_mod_tui::StatefulTable, training_mod_tui::SubMenu, training_mod_tui::SubMenuType, training_mod_tui::Toggle, crate::engine::compat::grid::NX_SUBMENU_COLUMNS, training_mod_tui::NX_SUBMENU_ROWS};\n",
@@ -6444,6 +7386,27 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "line_patch": [
+      [
+       4,
+       4,
+       [
+        "pub use crate::engine::stages::stage_forms::{Forms, Selection};",
+        "#[cfg(test)]",
+        "pub use crate::engine::stages::stage_forms::Form;"
+       ]
+      ],
+      [
+       185,
+       184,
+       [
+        "#[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
     }
    ]
   },
@@ -6678,7 +7641,7 @@
    "dest": "src/model/preload/cycle_preload_config.rs",
    "crate": "consts",
    "src_sha256": "49c8a777d9e7c728aa8ecc7a51df2f7990f3edf458fdf7163be3b82fa9e3bf01",
-   "dest_sha256": "3aede00f781fac7a0b2d29ddd7986c6c08888d3fa0db636721a9d575cd9d0010",
+   "dest_sha256": "bf851d3bf9f620e66c10319692ce7916d61518c1d388c4ddf6044b2e3f67055b",
    "edits": [
     {
      "delete_from": "// The exported menu macro resolves these names at its use site.\nmod bank_submenu {",
@@ -6795,6 +7758,67 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "line_patch": [
+      [
+       271,
+       270,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       318,
+       317,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       612,
+       611,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       625,
+       624,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       644,
+       643,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       773,
+       772,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       781,
+       780,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       899,
+       898,
+       [
+        "#[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
     }
    ]
   },
@@ -10502,7 +11526,7 @@
    "dest": "src/runtime/roster/native_body_bank.rs",
    "crate": "root",
    "src_sha256": "ccf7ac678691fa0101a1eff5dbd9300a1b12fe64e9ebbde515697adfbb841c98",
-   "dest_sha256": "1d33e6bfa45caef0b17bc50467e16567aa61f0f2872de5f6ee2e37386f694d10",
+   "dest_sha256": "388e7fd7b8e6fd12ae714955615bb881226ab9078f6f6ab74c6c7bd5704cb288",
    "edits": [
     {
      "old": "unsafe fn finalize_entry(entry: *mut u8) -> u64 {\n",
@@ -12934,6 +13958,18 @@
      "old": "            bank.groups[group].state = GroupState::Prefetching;\n",
      "new": "            bank.groups[group].state = GroupState::Prefetching;\n            bank.groups[group].memory_deferred = false;\n",
      "reason": "rc.7 FLAG 3 (integration 2026-11-10 21:53Z, final-surface-i3-nt-7d720c68; primary 21:55Z, 22:15Z, 22:18Z): a Planned group whose memory admission deferred it (process memory held by admitted groups) ranks like a held one in the group lifecycle, so an owed background build, which spends what the deferral waits for, goes first (body_bank::next_step, NextStep; GroupData::memory_deferred set on Defer, cleared when its prefetch starts); before, the deferred prefetch was picked on every tick and both roles' prefetched pair groups stayed unbuilt; two host tests"
+    },
+    {
+     "line_patch": [
+      [
+       174,
+       187,
+       [
+        "use crate::engine::swap::body_bank::{dispatcher_array_header_ok, dispatcher_idle_words, native_group_request, original_bankable, original_form_bankable, pair_request, pair_resource_references, plan_extra_groups_with, prefetch_outcome, info_wrapper, swap_commit_index_in, async_build_eligible, construction_task, TickGap, background_build_eligible, next_background, next_step, NextStep, BACKGROUND_INFO_SPANS, trainer_task, HolderStep, object_rearm_due, object_ready, PT_OBJECT_KIND, GroupBudget, GroupExchange, GroupOwner, GroupPolicy, GroupState, Hold, Members, Phase, Special, SpecialPolicy, BANK_FLAG, MAX_EXTRA_GROUPS, NANA, NATIVE_MEMBERS, PAIR_ACTIVE_FLAG, POOL_RESERVE, POPO, entry_bytes_of, mii_exit_bytes_match, mii_reuse_bytes_match, MiiEntryBytes, MiiIdentity, MII_ENTRY_START, RESOURCE_WORDS, baseline_words, identity_move, IdentityMove, leaves_at_pause, count_group_members, kept_members, release_for_new_members, capacity_release, leaves_now, ReleaseWatch, arriving_room, room_coming, still_short, next_window_plan, own_words, shadow_values, LiveIdentity, speculative_step_admitted, serving_step, Serving, reload_window, reload_extras, notice_extras, canonical_replaces_window, neighbour_group, pack_neighbours};"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
     }
    ]
   },
@@ -18177,7 +19213,7 @@
    "dest": "src/runtime/lobby/practice_stage_request.rs",
    "crate": "root",
    "src_sha256": "a8da0a25cd70d8782d76e6eb8c21a1a5e80a052314bb20dc57d3de0bd5d8d211",
-   "dest_sha256": "f99c84e802f81efefefea3391c7733c9b522b30f0d3815d622d6fe0c497a3471",
+   "dest_sha256": "cf94eb340f26e3220115e9dd5065585f1ff9d9c4eafcac3a5351435e2bbf388a",
    "edits": [
     {
      "old": "notification(\"Practice Stage\".into(), message, 180);",
@@ -18243,6 +19279,16 @@
      "old": "/// A UI close may only address the scene/active stage that opened that menu.",
      "new": "/// A UI request may only address the scene/active stage that opened that menu.",
      "reason": "Direct A submits immediately; opening identity qualification does not defer the request to menu close."
+    },
+    {
+     "line_patch": [
+      [
+       127,
+       128,
+       []
+      ]
+     ],
+     "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
     }
    ]
   },
@@ -18421,7 +19467,7 @@
    "dest": "src/model/mii_root/mii_menu.rs",
    "crate": "tui",
    "src_sha256": "94d7a41fe2ff5d3c4dcaed6ff0e87df4c96d64bd927a99e4550a198784cb761c",
-   "dest_sha256": "307200b6d903beaf1b494f2c52f0755c047d34e84ae55f2934dfb59fb52e713f",
+   "dest_sha256": "da808d79193997fd313b02d0a2c4f4b2189aa241044bc228717bf1b4a3f9f92f",
    "edits": [
     {
      "old": "use {crate::macro_panel, crate::StatefulTable, crate::SubMenu, crate::SubMenuType, crate::engine::compat::grid::NX_SUBMENU_COLUMNS, crate::NX_SUBMENU_ROWS};",
@@ -18573,6 +19619,21 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "line_patch": [
+      [
+       19,
+       22,
+       []
+      ],
+      [
+       266,
+       306,
+       []
+      ]
+     ],
+     "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
     }
    ]
   },

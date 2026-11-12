@@ -20,10 +20,14 @@ pub mod file {
     /// JSON despite the extension, is `training_modpack_menu.conf` (SPEC-core-04 §4).
     pub const LEGACY_SETTINGS: &str = "training_modpack_menu.conf";
     /// The install line, and the sparse event lines of a `diag` build.
+    #[cfg(test)]
     pub const EVENTS_LOG: &str = "events.log";
+    #[cfg(test)]
     pub const DIAGNOSTICS: &str = "practice-diagnostics.log";
+    #[cfg(test)]
     pub const DIAGNOSTICS_PREVIOUS: &str = "practice-diagnostics.previous.log";
     /// Gate lines (`[PracticeRecording]`, and the other lines a row waits for). Not rotated.
+    #[cfg(test)]
     pub const GATES: &str = "practice-gates.log";
     /// Decision N1: `developer_page=on` shows the Developer page.
     pub const DEVELOPER_INI: &str = "developer.ini";
@@ -31,8 +35,6 @@ pub mod file {
     pub const MIGRATION: &str = "migration.json";
     /// The save-state slots (SPEC-state-01 §7): five per role, the fork's file name.
     pub const SAVE_STATES: &str = "save_states.json";
-    /// The folder of the portable setup library (`<id>.json` per setup).
-    pub const SETUPS_DIR: &str = "setups";
 }
 
 /// Full paths the diagnostics file uses (also built by `FixedPath::in_root`; a test keeps them equal).

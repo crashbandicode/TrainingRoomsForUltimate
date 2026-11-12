@@ -99,6 +99,7 @@ impl FrameWindow {
         self.start..self.end
     }
 
+    #[cfg(test)]
     pub fn selected_frames(&self) -> u32 {
         self.end - self.start
     }
@@ -161,6 +162,7 @@ impl FrameWindow {
 }
 
 /// Frame readout as `M:SS +Ff`, e.g. frame 312 at 60 fps is `0:05 +12f`.
+#[cfg(test)]
 pub fn timestamp(frame: u32, fps: u32) -> String {
     let fps = fps.max(1);
     let seconds = frame / fps;

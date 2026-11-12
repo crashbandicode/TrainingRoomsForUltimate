@@ -50,6 +50,7 @@ impl Chain {
         Ok(chain)
     }
 
+    #[cfg(test)]
     pub fn set_start_save_on(&mut self, on: bool) {
         self.start_save_on = on;
     }

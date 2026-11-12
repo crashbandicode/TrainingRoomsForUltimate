@@ -120,6 +120,7 @@ impl BuffState {
     }
 
     /// The buffing flag.
+    #[cfg(test)]
     pub fn buffing(&self) -> bool {
         self.buffing
     }

@@ -47,6 +47,7 @@ impl Removal {
     }
 
     /// A removal is owed and waits for the gate or the roster.
+    #[cfg(test)]
     pub fn owed(&self) -> bool {
         self.owed
     }

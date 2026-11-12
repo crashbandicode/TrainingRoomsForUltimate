@@ -95,7 +95,6 @@ impl KeySet {
     pub const fn contains(self, n: u8) -> bool { self.0 & (1 << n) != 0 }
     pub const fn with(self, n: u8) -> Self { KeySet(self.0 | (1 << n)) }
     pub const fn minus(self, other: KeySet) -> KeySet { KeySet(self.0 & !other.0) }
-    pub const fn union(self, other: KeySet) -> KeySet { KeySet(self.0 | other.0) }
     pub const fn is_empty(self) -> bool { self.0 == 0 }
     pub const fn len(self) -> usize { self.0.count_ones() as usize }
     pub fn iter(self, kind: u32) -> impl Iterator<Item = KeyId> + Clone {
@@ -230,6 +229,7 @@ pub struct NativeRequest {
 /// Model of `0x17e5bc0` for the entry cells `[R+0x58, R+0x5c, R+0x60]` (module doc). Object
 /// kinds get exactly the keys native registers for them (`0x72` → `+0`; `0x75` → `+0, +1`),
 /// not the generic set the bank's prefetch would.
+#[cfg(test)]
 pub fn native_window_requests(cells: [u32; 3], flags: RFlags) -> Vec<NativeRequest> {
     native_window_requests_fixed(cells, flags).iter().copied().collect()
 }
@@ -263,11 +263,6 @@ pub fn native_window_requests_fixed(cells: [u32; 3], flags: RFlags)
         _ => {}
     }
     out
-}
-
-/// Pair-rule reference count state 6 leaves in `R+0x50` (`650010.c:615–618`).
-pub fn native_pair_refs(cells: [u32; 3]) -> u32 {
-    if cells[0] == POPO && cells[1] != NO_KIND { 2 } else { 1 }
 }
 
 /// Whether a body's construction tail takes the pair rule (C122 §1.2: cells 0/1 exactly
@@ -326,6 +321,7 @@ pub struct AcqToken {
 impl AcqToken {
     pub fn kind(&self) -> u32 { self.kind }
     pub fn keys(&self) -> KeySet { self.keys }
+    #[cfg(test)]
     pub fn holder(&self) -> Holder { self.holder }
     pub fn recipe(&self) -> ReleaseRecipe { self.recipe }
     pub fn batch(&self) -> BatchId { self.batch }
@@ -611,6 +607,7 @@ impl Ledger {
     /// Native released a registration it made itself (the partner weapon's / trainer's own
     /// `0x17e8610(R, object)`, D-SG1 §2.5; a window body's tail): the recorded `Holder::Native`
     /// token of `kind` is discharged. Returns whether one existed.
+    #[cfg(test)]
     pub fn native_consumed(&mut self, kind: u32) -> bool {
         let Some(i) = self.acquisitions.iter().position(|a| a.kind == kind && a.holder == Holder::Native) else { return false; };
         let _ = self.acquisitions.remove(i);
@@ -668,6 +665,7 @@ impl Ledger {
     }
 
     /// Pair-rule references a build must leave in `R+0x50`: one per construction under the rule.
+    #[cfg(test)]
     pub fn pair_references(&self, batch: BatchId) -> u8 {
         self.acquisitions.iter()
             .filter(|a| a.batch == batch && matches!(a.recipe, ReleaseRecipe::PairReset { .. }))
@@ -680,16 +678,9 @@ impl Ledger {
     pub fn remove_residents(&mut self, batch: BatchId) {
         self.residents.retain(|(b, _)| *b != batch);
     }
-    /// Kinds some resident body still depends on (a release or reset must not take their NRO/registry).
-    pub fn resident_kinds(&self) -> KindSet64 {
-        let mut set = KindSet64::default();
-        for (_, deps) in &self.residents {
-            for kind in deps.kinds.iter() { set.insert(kind); }
-        }
-        set
-    }
 
     /// `(key value, refs)` the model predicts in `R+0x10` right now, sorted by key.
+    #[cfg(test)]
     pub fn predicted(&self) -> Vec<(u32, u32)> {
         self.predicted_iter().collect()
     }
@@ -703,10 +694,12 @@ impl Ledger {
             Some((next, refs))
         })
     }
+    #[cfg(test)]
     pub fn predicted_map_nodes(&self) -> usize { self.predicted_iter().count() }
 
     /// Nothing held by us or recorded for native: a canonical Reload may be issued (state 6 needs
     /// `R+0x18 == 0`, `0x17e4700`).
+    #[cfg(test)]
     pub fn expect_free(&self) -> Result<(), Vec<KeyId>> {
         let keys: Vec<KeyId> = self.predicted().into_iter().map(|(value, _)| KeyId::from_value(value)).collect();
         if keys.is_empty() { Ok(()) } else { Err(keys) }

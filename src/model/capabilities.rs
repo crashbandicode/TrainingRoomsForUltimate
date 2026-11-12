@@ -110,12 +110,14 @@ pub fn call_rows(offset: usize) -> impl Iterator<Item = &'static Site> {
 }
 /// Every row that stands for the same guard as `row` (same offset, same kind of guard, same bytes), itself
 /// included.
+#[cfg(test)]
 pub fn equivalent_rows(row: &Site) -> impl Iterator<Item = &'static Site> + '_ {
     let writes = |s: &Site| matches!(s.kind, SeamKind::Hook { .. });
     all_sites().filter(move |s| s.offset == row.offset && writes(s) == writes(row) && s.guard == row.guard)
 }
 
 /// The name a call of the function at `offset` goes by in `CROSS_NEEDS` (the first of its rows).
+#[cfg(test)]
 pub fn call_name(offset: usize) -> Option<&'static str> {
     call_rows(offset).next().map(|s| s.name)
 }

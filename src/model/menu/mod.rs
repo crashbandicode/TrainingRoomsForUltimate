@@ -659,6 +659,7 @@ impl Menu {
 
     /// The Developer rows are inert while the page is hidden: a consumer asks for the effective
     /// value, `stored AND enabled` (SPEC-core-02 §2.8).
+    #[cfg(test)]
     pub fn developer_effective(&self, id: &str) -> bool {
         self.env.developer_page && self.toggle_by_id(id)
     }
@@ -716,12 +717,8 @@ impl Menu {
         }
     }
 
-    pub fn into_settings(mut self) -> Settings {
-        self.settings.set_last_page(self.page.id());
-        self.settings
-    }
-
     /// The JSON the commit writes (`{"menu": …, "defaults_menu": …}` and the other top-level keys).
+    #[cfg(test)]
     pub fn serialized(&mut self) -> String {
         self.commit().to_json()
     }
@@ -871,6 +868,7 @@ impl Menu {
         core::mem::take(&mut self.outbox)
     }
 
+    #[cfg(test)]
     pub fn outbox(&self) -> &Outbox {
         &self.outbox
     }
@@ -936,6 +934,7 @@ impl Menu {
 
     /// Whether the footer offers *Clear* (Y) on the screen showing: the delay popup, a direction
     /// grid and the chord editor clear their value; a plain checklist has no clear.
+    #[cfg(test)]
     pub fn clear_hint(&self) -> bool {
         matches!(
             self.stack.last(),

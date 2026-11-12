@@ -12,8 +12,6 @@ use super::ordered_ids;
 
 /// How far ZL+Up / ZL+Down moves a section. The menu's section jump uses the same distance.
 pub const PAGE: usize = 12;
-/// Rows of one section the twelve row panes can show at once (two sections).
-pub const VISIBLE: usize = 6;
 
 const SAVE_ON: [u8; 4] = [242, 152, 72, 255];
 const SAVE_OFF: [u8; 4] = [126, 132, 144, 255];
@@ -531,6 +529,7 @@ impl RecordingScreens {
         }
     }
 
+    #[cfg(test)]
     pub fn last_effect(&self) -> &Effect {
         &self.last_effect
     }
@@ -622,6 +621,7 @@ impl RecordingScreens {
         self.section_view(face, group, section)
     }
 
+    #[cfg(test)]
     pub fn section_cursor(&self, face: Face, group: u8, section: u8) -> usize {
         let place = self.place(face, group);
         place.at[usize::from(section)]
@@ -757,6 +757,7 @@ impl RecordingScreens {
         out
     }
 
+    #[cfg(test)]
     pub fn set_cursor(&mut self, face: Face, group: u8, section: u8, index: usize) {
         let place = self.place_mut(face, group);
         let section = section.min(1);
@@ -764,26 +765,31 @@ impl RecordingScreens {
         place.at[usize::from(section)] = index;
     }
 
+    #[cfg(test)]
     pub fn set_file_cursor(&mut self, cursor: usize) {
         if let Some(file) = self.file.as_mut() {
             file.cursor = cursor;
         }
     }
 
+    #[cfg(test)]
     pub fn set_links(&mut self, id: &str, links: Vec<String>) {
         if let Some(combo) = self.catalog.combos.iter_mut().find(|file| file.id == id) {
             combo.links = links;
         }
     }
 
+    #[cfg(test)]
     pub fn has_chain_named(&self, name: &str) -> bool {
         self.catalog.macros.iter().any(|file| file.chain && file.name == name)
     }
 
+    #[cfg(test)]
     pub fn picker_recording_ids(&self) -> Vec<String> {
         self.recording_ids()
     }
 
+    #[cfg(test)]
     pub fn start_save_id(&self, id: &str) -> Option<&str> {
         self.macro_by_id(id).and_then(|file| file.start_save.as_deref())
     }
@@ -818,10 +824,6 @@ impl RecordingScreens {
 
     pub fn set_keyboard_blocked(&mut self, blocked: bool) {
         self.keyboard_blocked = blocked;
-    }
-
-    pub fn naming(&self) -> bool {
-        self.keyboard.is_some()
     }
 
     pub fn crop_open(&self) -> bool {

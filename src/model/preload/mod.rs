@@ -5,6 +5,7 @@
 
 pub mod boot_cache;
 pub mod cycle_admission_grace;
+#[cfg(test)]
 pub mod notice_queue;
 pub mod cycle_preload_capacity;
 pub mod cycle_preload_config;

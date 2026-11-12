@@ -19,12 +19,16 @@ pub const UI_IS_READY_GO_OFFSET: usize = 0x15c_e620;
 
 /// The five words the two anchors pin (SPEC-core-05 §4.1): the instructions the hook sits on and the
 /// four after it, up to the holder layout's virtual Calculate (`blr x8`).
+#[cfg(test)]
 pub const UI_PASS_PIN: [u32; 5] = [0xf942_2ee0, 0xf940_0008, 0xf940_4d08, 0xaa13_03e1, 0x2a1f_03e2];
+#[cfg(test)]
 pub const UI_REGISTER_PIN: [u32; 5] = [0xf942_2ea0, 0xf940_0008, 0xf940_4d08, 0x3200_03e2, 0xaa13_03e1];
 
 /// The manager's global slot, as the `adrp`/`ldr` words decode (`main+0x593ba90`, `.bss`).
+#[cfg(test)]
 pub const UI_MANAGER_SLOT_OFFSET: usize = 0x593_ba90;
 /// `ui_manager_global`'s two words.
+#[cfg(test)]
 pub const UI_MANAGER_ADRP_LDR: [u32; 2] = [0xb001_0efc, 0xf945_4b88];
 
 pub static UI_SITES: [Site; 6] = [    Site {
@@ -127,6 +131,7 @@ pub fn decode_adrp_ldr(pc: u64, adrp: u32, ldr: u32) -> Option<u64> {
 }
 
 /// Whether the five words at an anchor are the pinned ones.
+#[cfg(test)]
 pub fn pin_matches(words: [u32; 5], pin: [u32; 5]) -> bool {
     words == pin
 }

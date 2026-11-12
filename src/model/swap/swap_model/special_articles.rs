@@ -99,6 +99,7 @@ impl RetireStage {
 
 /// The stages still due after `done`, in order: a teardown, a drain or a switch to the retiring group runs them at
 /// once (the pool must be empty before anything else reads or rebuilds it).
+#[cfg(test)]
 pub fn remaining(done: RetireStage) -> impl Iterator<Item = RetireStage> {
     std::iter::successors(done.next(), |stage| stage.next())
 }

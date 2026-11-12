@@ -91,6 +91,7 @@ impl InputAdapter {
     }
 
     /// Records in the queue.
+    #[cfg(test)]
     pub const fn queued(&self) -> usize {
         self.queue.len()
     }
@@ -98,6 +99,7 @@ impl InputAdapter {
     /// One P1 poll: `actual` is the record the game mapped; returns what the game gets. Owners other
     /// than gameplay empty the queue and give neutral (`DelayQueue::poll`). The second value is the
     /// resume check, once, when the first `delay` polls after a resume are done.
+    #[cfg(test)]
     pub fn poll(&mut self, mask: &AtomicU8, delay: u8, actual: MappedInputs) -> (MappedInputs, Option<ResumeCheck>) {
         let (out, _, check) = self.poll_with(mask, delay, actual, Sticks::of_record(actual));
         (out, check)

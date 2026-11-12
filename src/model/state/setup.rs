@@ -18,7 +18,9 @@ use serde_json::{Map, Value};
 use super::held_item::HeldItem;
 use super::json::Writer;
 use super::record::{charge_from_json, steve_from_json, write_charge, write_steve, Charge, Marker, SavedState, Steve};
-use crate::model::store::{Listing, Record, Store, StoreError};
+use crate::model::store::{Record, Store, StoreError};
+#[cfg(test)]
+use crate::model::store::Listing;
 
 /// Current setup file schema.
 pub const SETUP_SCHEMA_VERSION: u32 = 1;
@@ -422,4 +424,5 @@ impl Record for SetupRecord {
 /// The setup library, normally rooted at `<storage root>/setups`.
 pub type SetupLibrary = Store<SetupRecord>;
 /// A scan of the setup library.
+#[cfg(test)]
 pub type SetupListing = Listing<SetupEntry>;

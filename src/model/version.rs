@@ -15,6 +15,7 @@
 /// The only game display version this build installs on.
 pub const SUPPORTED_VERSION: &str = "13.0.5";
 /// NSO build ID of the 13.0.5 `main` every offset and 64-byte guard in this build was read from.
+#[cfg(test)]
 pub const MAIN_BUILD_ID: &str = "21450c647b8c5940ed5b68218ea128fd3c5d597d";
 /// `MAIN_BUILD_ID` as bytes (the note descriptor).
 pub const MAIN_BUILD_ID_BYTES: [u8; 20] = [
@@ -22,6 +23,7 @@ pub const MAIN_BUILD_ID_BYTES: [u8; 20] = [
     0x3c, 0x5d, 0x59, 0x7d,
 ];
 /// main+offset of the 13.0.5 build-id note (documentation and a host check; the guard scans).
+#[cfg(test)]
 pub const MAIN_BUILD_ID_NOTE_OFFSET: usize = 0x4f16f3c;
 /// How much of the end of `.rodata` the guard scans for the note (the note is the last 0x24 bytes
 /// of `.rodata` in 13.0.5; one page also covers a differently sized tail on another build).

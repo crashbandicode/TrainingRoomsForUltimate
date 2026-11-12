@@ -2,11 +2,15 @@
 use serde::{Deserialize, Serialize};
 
 /// Shared with the native stage panel: paging moves the cursor, never ranks.
+#[cfg(test)]
 pub const PAGE_ROWS: usize = 4;
+#[cfg(test)]
 pub const PAGE_COLUMNS: usize = crate::engine::compat::grid::NX_SUBMENU_COLUMNS;
+#[cfg(test)]
 pub const PAGE_SIZE: usize = PAGE_ROWS * PAGE_COLUMNS;
 
 /// Wrap pages, retaining the cell where possible and clamping on the final page.
+#[cfg(test)]
 pub(crate) fn page_cursor(selected: usize, count: usize, next: bool) -> Option<usize> {
     if count == 0 {
         return None;

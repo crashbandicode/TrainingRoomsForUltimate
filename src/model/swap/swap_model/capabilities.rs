@@ -12,10 +12,9 @@
 //! WORKPLAN §5.3 names (Kirby canonical-only if the K-rows are red); the shipped rows are all
 //! `Shipped` except the Mii row (Mii groups land with the M0 merge) and `Foreign`.
 
-use crate::engine::swap::body_bank::{
-    GroupPolicy, Members, Special, SpecialPolicy, AEGIS_OBJECT_KIND, KIRBY, NANA, NATIVE_MEMBERS, POPO,
-    PT_OBJECT_KIND,
-};
+use crate::engine::swap::body_bank::{GroupPolicy, Members, Special, AEGIS_OBJECT_KIND, KIRBY, NANA, NATIVE_MEMBERS, POPO, PT_OBJECT_KIND};
+#[cfg(test)]
+use crate::engine::swap::body_bank::SpecialPolicy;
 use crate::engine::swap::character_forms::Forms;
 use crate::engine::mii::inventory::MiiClass;
 use crate::engine::swap::trio::TrioFighter;
@@ -115,6 +114,7 @@ pub enum SpecialSwitch {
 }
 
 impl SpecialSwitch {
+    #[cfg(test)]
     pub fn enabled(self, policy: SpecialPolicy) -> bool {
         match self {
             SpecialSwitch::Native => policy.native,
@@ -409,11 +409,13 @@ pub fn pins_cell0(kind: u32) -> bool { pins_cell0_of(&capabilities(single_member
 /// into the cell-0 member's cell; `unprepare` `0x17f26c0` unlinks the same node twice, §3); for Solo
 /// Popo the secondary registration `0x17e8410` skips. A planned layout is valid only when this is
 /// false; `Members::new` refuses such a layout.
+#[cfg(test)]
 pub fn self_mirror_hazard(cells: &[u32]) -> bool {
     cells.iter().enumerate().any(|(i, kind)| i != 0 && *kind != u32::MAX && pins_cell0(*kind))
 }
 
 /// Does this row form its own complete group under `policy`?
+#[cfg(test)]
 pub fn forms_own_group_of(row: &Capabilities, policy: SpecialPolicy) -> bool {
     row.qualification == Qualification::Shipped
         && matches!(row.grouping, Grouping::OwnGroupOnly(switch) if switch.enabled(policy))
@@ -422,6 +424,7 @@ pub fn forms_own_group_of(row: &Capabilities, policy: SpecialPolicy) -> bool {
 pub fn single_body_member(class: FormClass) -> bool { single_body_member_of(&capabilities(class)) }
 pub fn can_window_member(class: FormClass, cell: usize) -> bool { can_window_member_of(&capabilities(class), cell) }
 pub fn can_group_member(class: FormClass, policy: GroupPolicy) -> bool { can_group_member_of(&capabilities(class), policy) }
+#[cfg(test)]
 pub fn forms_own_group(class: FormClass, policy: SpecialPolicy) -> bool { forms_own_group_of(&capabilities(class), policy) }
 
 /// The class a bare kind denotes: its native starting form (the pair for `0x4b`).
@@ -478,6 +481,7 @@ pub fn original_form_bankable(kind: u32, forms: Forms, pair_bank: bool, native_b
 pub fn group_member_kind(kind: u32, policy: GroupPolicy) -> bool { can_group_member(single_member_class(kind), policy) }
 
 /// A lane kind that forms its own group under `policy` (PT/Aegis with `native`, the pair with `pair`).
+#[cfg(test)]
 pub fn special_group_kind(kind: u32, policy: SpecialPolicy) -> bool { forms_own_group(kind_class(kind), policy) }
 
 /// Ordinary single-body kind allowed in cell 2 of a pair-lead bank. Nana is not a catalog kind,
@@ -620,6 +624,7 @@ pub fn bank_object_kind(kind: u32) -> bool {
 /// (`live_copy_kind`: `INT_COPY_CHARA` while `FLAG_COPY`, else `None`): the D-KIRBY1 last-line
 /// guard (`Conflict::LiveCopySharesRegistry` in WP4's occupancy terms). The reason text is read by
 /// the E4 rows (`key kept … reason=live Kirby copies this kind`).
+#[cfg(test)]
 pub fn key_release_admitted(kind: u32, live_copy_kind: Option<u32>) -> Result<(), &'static str> {
     if live_copy_kind == Some(kind) { Err("live Kirby copies this kind") } else { Ok(()) }
 }
@@ -694,6 +699,7 @@ pub fn previous_cell_index(from: u8, member: u8, count: usize) -> u8 {
 /// `0x17e8410` secondary-cell skip and the `R+0x50` pair rule never see Popo there, and the Solo
 /// window's `R+0x50 = 2` has no consumer outside that rule); a pair-lead bank never participates
 /// under the default policy: see [`window_swappable_with`].
+#[cfg(test)]
 pub fn window_swappable(window: Members) -> bool { window_swappable_with(window, GroupPolicy::DEFAULT) }
 
 /// [`window_swappable`] under `policy`: a native group or a pair group in the window is a complete

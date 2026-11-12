@@ -1604,3 +1604,10 @@ ceiling = 165932
 date = "2026-11-11"
 reason = "rc.9 chord fixes (TR side of PLUGIN-SHORTCUT-CONFLICTS C3, C4, C14) on rc9 7a4cba64 (165779): Online Deluxe's window-state export reader (model/runtime deluxe_overlay), the GameCube trigger and window rules in model::chords, Quick Reset's and Play on Player 1's AI refusal (+151), and build.rs's run-time CARGO_MANIFEST_DIR (+2); measured 165932 (tools/size_gate.py), +153"
 approved_by = "Operator 'Raise as needed' (DECISIONS 2d27de7); the operator 2026-11-11 about 18:30 EST: 'fix the conflicting chords and ship' (TASK-rc9-chord-fixes.md, the primary 23:28Z); a raise goes in its own commit with approved_by"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 162692
+date = "2026-11-12"
+reason = "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): code no Switch build uses removed, or moved behind #[cfg(test)] where only tests use it (eight whole files and about 270 items), on rc10 f5146184 (165930); measured 162692 (tools/size_gate.py), -3238. A cut: the ratchet."

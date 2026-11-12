@@ -196,7 +196,7 @@
    "dest": "src/model/macros/live_capture.rs",
    "crate": "macros",
    "src_sha256": "61ae1a33ce4e788097f81761f12f0c86801b4f32a1ba273498b701ccc0f8bb91",
-   "dest_sha256": "d7d8e2d0ce3ef70bbcde3151a8fa79ac5b148bec91df6c09115e0d687b2cebcf",
+   "dest_sha256": "6fb029fc1c3311c45c643ca1d3ce2f26ec4fd17f36284ddebd2c9479d3d080b0",
    "edits": [
     {
      "old": "    pub fn active_key(&self) -> Option<NativeRecordKey> { self.active }",
@@ -343,6 +343,32 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "line_patch": [
+      [
+       126,
+       125,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       142,
+       141,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       148,
+       147,
+       [
+        "    #[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
     }
    ]
   },
@@ -437,7 +463,7 @@
    "dest": "src/model/macros/recording.rs",
    "crate": "macros",
    "src_sha256": "7f611cd67f13b8c41dbcfe6a411b82ea4d4d9eb4a0a7e3687f46e3ac2dbd8596",
-   "dest_sha256": "f1c904497e7bddf599fd5ac37598528958148a1c38d85952b7fedeb96d7b3a0f",
+   "dest_sha256": "f198c956ee7d85e38c0d79d1041940cc4f01429122c1540eaec21d6809fca5b6",
    "edits": [
     {
      "old": "    pub frames: Vec<InputFrame>,\n}",
@@ -458,6 +484,25 @@
      "old": "fn check_name(name: &str) -> Result<(), MacroError> {",
      "new": "fn start_save_switch_on() -> bool {\n    true\n}\n\nfn is_switch_on(on: &bool) -> bool {\n    *on\n}\n\n/// `macros/<id>.json` whose `kind` is `chain`. A recording list omits these.\npub fn is_chain_document(bytes: &[u8]) -> bool {\n    serde_json::from_slice::<serde_json::Value>(bytes)\n        .ok()\n        .and_then(|value| value.get(\"kind\").and_then(serde_json::Value::as_str).map(|kind| kind == \"chain\"))\n        .unwrap_or(false)\n}\n\nfn check_name(name: &str) -> Result<(), MacroError> {",
      "reason": "Recording redesign rr-1: chain documents share macros/ and are omitted from the recording list."
+    },
+    {
+     "line_patch": [
+      [
+       236,
+       235,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       262,
+       261,
+       [
+        "    #[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
     }
    ]
   },
@@ -629,7 +674,28 @@
    "dest": "src/model/macros/window.rs",
    "crate": "macros",
    "src_sha256": "a2318a537296bac67436de8656f07bcd897b2e4fccbd38b101bcd41210b9c58d",
-   "dest_sha256": "67c037aff31049b905f735d0184c9d0f0ade5c72017831e47a981fec091c99e7"
+   "dest_sha256": "8ed9c6a3410aa4216c6f0397f4ad9f8063a7755f0a40b0ec474477ed429ed56c",
+   "edits": [
+    {
+     "line_patch": [
+      [
+       102,
+       101,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       164,
+       163,
+       [
+        "#[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
+    }
+   ]
   },
   {
    "src": "training_mod_macros/src/test_util.rs",
@@ -806,7 +872,7 @@
    "dest": "src/model/macros/mod.rs",
    "crate": "macros",
    "src_sha256": "561c0de012c6f235d735c9d956305c7aa98fe0cdf7a1c560552a0a6275abc4ad",
-   "dest_sha256": "6aee0f40647192830aea1f27665c56e2845f37349ccb0116d7d1d3667293ac01",
+   "dest_sha256": "8692588345f1ecfd561627f59e05821f35aa279fec96acda4fb6cfe8000dec07",
    "edits": [
     {
      "old": "mod capture_settings;\n",
@@ -866,6 +932,53 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "line_patch": [
+      [
+       46,
+       52,
+       [
+        "pub use capture_archive::{CaptureArchive, CaptureSaveOutcome, SavedCapture};",
+        "#[cfg(test)]",
+        "pub use capture_archive::{CaptureEntry, CaptureListing};",
+        "pub use crate::model::capture_settings::{recover_previous_ini, CaptureSettings, IniRecovery, DEFAULT_CAPTURE_INI};",
+        "#[cfg(test)]",
+        "pub use crate::model::capture_settings::{host_persistence_key, CAPTURE_CONFIG_KEY};",
+        "pub use capture_toggle::{CaptureToggle, RecordOwner, RecordOwnership, ToggleRequest, CAPTURE_ON};",
+        "#[cfg(test)]",
+        "pub use capture_toggle::{RecordEnded, RecordPhase, ToggleSnapshot, CAPTURE_OFF};",
+        "pub use crate::model::store::SkippedFile;",
+        "#[cfg(test)]",
+        "pub use crate::model::store::{Listing, Record, Store, MAX_FILE_BYTES, MAX_ID_CHARS};",
+        "pub use library::Library;",
+        "#[cfg(test)]",
+        "pub use library::MacroEntry;"
+       ]
+      ],
+      [
+       57,
+       61,
+       [
+        "pub use recording::{InputFrame, MacroError, MacroRecording, MomentumMode, Placement, StartState, MAX_FRAMES, MAX_GAME_VERSION_BYTES, MAX_NAME_CHARS};",
+        "#[cfg(test)]",
+        "pub use recording::{DEFAULT_FPS, SCHEMA_VERSION};",
+        "pub use window::{FrameSnapshot, FrameWindow};",
+        "#[cfg(test)]",
+        "pub use window::{timestamp, Step};"
+       ]
+      ],
+      [
+       63,
+       63,
+       [
+        "pub use move_start::{MoveFamily, MoveStart, MoveStartRules};",
+        "#[cfg(test)]",
+        "pub use move_start::MAX_MOVE_SETUP;"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
     }
    ]
   },
@@ -1078,7 +1191,7 @@
    "dest": "src/model/macro_ui/macro_panel.rs",
    "crate": "tui",
    "src_sha256": "1b6e698f679029bc6fa83ff9cd43756302bd939debaad2d3eeeacd10fb166da1",
-   "dest_sha256": "25ce68534f152763e79b6f29efc1b8a2eb4e8a9226c828e72a617f7c8a1d9b3c",
+   "dest_sha256": "a8c4eb1d652eac824e870558cbce1136ee67933c45a0780c433e94f18b82c602",
    "edits": [
     {
      "old": "    /// Facing, status, and frames for one playback. Empty when the fighter is not ready.\n    pub fn copy_playback(",
@@ -1470,6 +1583,93 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "line_patch": [
+      [
+       111,
+       110,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       122,
+       121,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       372,
+       371,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       382,
+       381,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       688,
+       687,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       754,
+       753,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       765,
+       764,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       785,
+       784,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       861,
+       860,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       875,
+       874,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       899,
+       898,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       901,
+       930,
+       []
+      ]
+     ],
+     "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
     }
    ]
   },
@@ -1755,7 +1955,7 @@
    "dest": "src/runtime/macros/named_macros.rs",
    "crate": "root",
    "src_sha256": "737474479d5f05b064ab645d850ceb189cad3943097ae4fdb5fc74d2fcda0809",
-   "dest_sha256": "6e7bbeb68ca6bbfc735a3f5deb9f073470852dd188ba859bba1cf841dadf7884",
+   "dest_sha256": "9a76c9682d5068c79e98538bfeba642259fd5498b950f519ad7f913f1f502a30",
    "edits": [
     {
      "old": "use training_mod_sync::*;",
@@ -2380,6 +2580,16 @@
      "old": "    let opened=lock_write(&UI).open_fighter_prompt_for(FighterOrigin::Combo,revision,recorded,current);\n",
      "new": "    let opened=lock_write(&UI).open_fighter_prompt_for(FighterOrigin::Combo,crate::model::recording_menu::ViewRole::Player,revision,recorded,current);\n",
      "reason": "rc.7 Fighter Mismatch role fix (hot-slots 2026-11-10 18:58Z, cov-mismatch-cancel; primary 19:30Z): the prompt takes the side that plays (recording_menu::ViewRole) and names it with the menu's role names ('current Player 1 {}' / 'current CPU {}'); a library load and a replay clip pass the CPU; open_recording_fighter_prompt and open_fighter_prompt_for take the side; Combo's wording is unchanged"
+    },
+    {
+     "line_patch": [
+      [
+       1033,
+       1044,
+       []
+      ]
+     ],
+     "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
     }
    ]
   },

@@ -128,14 +128,6 @@ impl Shield {
         self.tilt = s.shield_tilt;
     }
 
-    /// The reset bundle and the session clear: everything back to nothing (the cached damage
-    /// multiplier is the caller's and survives).
-    pub fn reset_state(&mut self) {
-        let tilt = self.tilt;
-        *self = Self::new();
-        self.tilt = tilt;
-    }
-
     /// The per-frame part (SPEC-cpu-05 §5): the hit offset resets when the body is idle or in hitstun;
     /// the first frame of each shieldstun rolls the reaction delay and takes one hit off the offset; the
     /// Hold decay flag drops whenever the status is not `GUARD`.

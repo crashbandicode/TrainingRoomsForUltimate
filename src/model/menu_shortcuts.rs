@@ -217,6 +217,7 @@ impl MenuShortcuts {
     }
 
     /// The text for the menu: `Minus or B + DPad Up`.
+    #[cfg(test)]
     pub fn description(self) -> String {
         [self.additional[0], self.additional[1], DEFAULT_OPEN_MENU_CONFIG]
             .iter()

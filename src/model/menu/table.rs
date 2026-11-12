@@ -426,6 +426,7 @@ pub static ROWS: [Row; 92] = [
 
 /// Number of `ROWS` of a page that are visible with the pilot absent (and with it present, minus
 /// one: the info row replaces the two fallback rows).
+#[cfg(test)]
 pub fn row_count(page: Page, pilot_present: bool) -> usize {
     ROWS.iter().filter(|row| GROUPS[usize::from(row.group)].page == page && row.visible(pilot_present)).count()
 }

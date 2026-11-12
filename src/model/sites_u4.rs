@@ -12,7 +12,9 @@ pub const UI_TEX_RELEASE_HANDLE_OFFSET: usize = 0x3540b10;
 pub const UI_TEX_BIND_OFFSET: usize = 0x379e9c0;
 pub const UI_TEX_CLEAR_OFFSET: usize = 0x379e470;
 pub const UI_TEX_RELEASE_WEAK_OFFSET: usize = 0x39c2670;
+#[cfg(test)]
 pub const UI_TEX_READY_WORDS_OFFSET: usize = 0x379e610;
+#[cfg(test)]
 pub const UI_TEX_CTOR_OFFSET: usize = 0x37a31e0;
 /// The lookup's `adrp`/`ldr` pair that names the file-resource service slot (inside the lookup row's window).
 pub const UI_TEX_SERVICE_SLOT_WORDS_OFFSET: usize = 0x353da58;

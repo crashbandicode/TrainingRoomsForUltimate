@@ -114,6 +114,7 @@ impl Owners {
         Owners(bits)
     }
 
+    #[cfg(test)]
     pub const fn with(self, other: Owners) -> Owners {
         Owners(self.0 | other.0)
     }
@@ -242,6 +243,7 @@ impl DelayQueue {
 
     /// A poll while something other than gameplay owns P1's input: the queue is emptied and the
     /// poll outputs neutral (SPEC-input-03 §5.1). Otherwise `step`.
+    #[cfg(test)]
     pub fn poll(&mut self, delay: u8, owners: Owners, actual: MappedInputs) -> MappedInputs {
         self.poll_with(delay, owners, actual, Sticks::of_record(actual)).0
     }

@@ -134,6 +134,7 @@ pub mod native {
     /// `main+0x1358970`: the registry walker task's tick (`lobby_speed.walker_tick`), the one task the pass skips.
     pub const WALKER_TICK: usize = 0x1358970;
     /// `main+0x151b170`: the hooked instruction in the waiting area's update (`lobby_speed.class_update`).
+    #[cfg(test)]
     pub const CLASS_UPDATE_SITE: usize = 0x151b170;
 }
 
@@ -245,6 +246,7 @@ pub fn plan_phases(
 }
 
 /// The whole walk (phases 0..=9), listed into `out`.
+#[cfg(test)]
 pub fn plan_pass(mem: &impl Mem, s: usize, skip_tick: usize, out: &mut [Task]) -> Plan {
     plan_phases(mem, s, 0..sched::PHASES, skip_tick, Some(out))
 }

@@ -80,10 +80,12 @@ pub fn slots_with_waiting(layout: Layout, third: bool, ldn_third: bool, extended
     slots
 }
 
+#[cfg(test)]
 pub fn supported_count(layout: Layout, third: bool, ldn_third: bool, extended: bool) -> usize {
     slots(layout, third, ldn_third, extended).iter().filter(|slot| **slot != ABSENT_SLOT).count()
 }
 
+#[cfg(test)]
 pub fn target_count(requested: u8, layout: Layout, third: bool, ldn_third: bool, extended: bool) -> usize {
     usize::from(requested).min(MAX_TARGETS).min(supported_count(layout, third, ldn_third, extended))
 }

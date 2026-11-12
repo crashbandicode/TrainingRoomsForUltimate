@@ -166,6 +166,7 @@ pub static SITES: [Site; 12] = [
 ];
 
 /// The package's sites of one feature (all of them must be usable for the feature to install).
+#[cfg(test)]
 pub fn sites_of(feature: Feature) -> impl Iterator<Item = &'static Site> {
     SITES.iter().filter(move |site| site.feature == feature)
 }

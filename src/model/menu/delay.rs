@@ -17,11 +17,13 @@ impl DelayRange {
     }
 
     /// The `i`-th value, `i < count()`.
+    #[cfg(test)]
     pub const fn value_at(&self, i: u32) -> u16 {
         self.min + (i as u16) * self.step
     }
 
     /// A uniform pick, given a uniform random `u32` from the caller's own generator.
+    #[cfg(test)]
     pub const fn pick(&self, random: u32) -> u16 {
         self.value_at(random % self.count())
     }

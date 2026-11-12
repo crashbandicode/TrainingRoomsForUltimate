@@ -880,6 +880,7 @@ impl HandleSet {
     }
 
     /// The handles held now (tests, diagnostics).
+    #[cfg(test)]
     pub fn handles(&self) -> impl Iterator<Item = u32> + '_ {
         self.held[..self.len].iter().map(|h| h.handle)
     }

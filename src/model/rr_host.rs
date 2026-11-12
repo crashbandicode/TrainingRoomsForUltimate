@@ -1511,6 +1511,7 @@ fn note_hot(root: &Path, kind: Kind, id: &str) {
     }
 }
 
+#[cfg(test)]
 pub fn write_crop(root: &Path, source: &str, combo: bool) -> Option<String> {
     let window = lock(&CROP).take()?;
     if combo {

@@ -123,6 +123,7 @@ impl LiveCapturePool {
         true
     }
 
+    #[cfg(test)]
     pub fn active_key(&self) -> Option<NativeRecordKey> { self.active }
 
     /// Existing worker consumes this after applying the event, before releasing its lock.
@@ -139,12 +140,14 @@ impl LiveCapturePool {
         self.records.retain(|record| record.key.index != index);
     }
 
+    #[cfg(test)]
     pub fn key_for_index(&self, index: u32) -> Option<NativeRecordKey> {
         self.records.iter().find(|record| record.key.index == index).map(|record| record.key)
     }
 
     /// Skip redundant native getters for a repeated callback. A different count
     /// still reaches push(), which detects and seals gaps/backwards movement.
+    #[cfg(test)]
     pub fn wants_sample(&self, key: NativeRecordKey, entry: i32, tick: u32) -> bool {
         if self.active != Some(key) || !(0..ENTRIES as i32).contains(&entry) { return false; }
         self.records.back().and_then(|record| record.live.as_ref()).is_some_and(|live| {

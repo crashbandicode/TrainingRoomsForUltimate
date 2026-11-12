@@ -131,6 +131,7 @@ impl Queue {
     }
 
     /// The header of the notice on screen, if any.
+    #[cfg(test)]
     pub fn front_header(&self) -> Option<&'static str> {
         self.entries[0].map(|e| e.header)
     }

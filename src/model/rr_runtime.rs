@@ -8,9 +8,9 @@ use super::library::{
     StartSaveState, Use, MACROS_DIR, SAVES_DIR, SEQUENCES_DIR,
 };
 use super::macro_ui::macro_panel::{fighter_gate, FighterGate, FighterOrigin};
-use super::macros::{
-    FrameSnapshot, FrameWindow, InputFrame, Library, MacroRecording, StartState, MAX_FRAMES,
-};
+use super::macros::{FrameSnapshot, FrameWindow, InputFrame, Library, MacroRecording, StartState};
+#[cfg(test)]
+use super::macros::MAX_FRAMES;
 use super::playback::{Book, Playback};
 use crate::model::combo::{Combo, LinkRec};
 use crate::model::combo_record::{clean_name, default_name, ComboLibrary, ComboRecord};
@@ -50,14 +50,17 @@ impl Tape {
         }
     }
 
+    #[cfg(test)]
     pub fn resident_len(&self) -> usize {
         self.resident.len()
     }
 
+    #[cfg(test)]
     pub fn window_len(&self) -> usize {
         self.window.len()
     }
 
+    #[cfg(test)]
     pub fn reads(&self) -> &[(usize, usize)] {
         &self.reads
     }
@@ -94,6 +97,7 @@ impl Tape {
 }
 
 /// The file cap stays 36,000. A length inside it is kept.
+#[cfg(test)]
 pub fn length_is_kept(frames: usize) -> bool {
     frames > 0 && frames <= MAX_FRAMES
 }
@@ -112,10 +116,6 @@ impl Capture {
             role: Role::Player,
             frames: Vec::new(),
         }
-    }
-
-    pub fn on(&self) -> bool {
-        self.on
     }
 
     pub fn role(&self) -> Role {
@@ -359,6 +359,7 @@ pub fn crop_combo_file(
 }
 
 /// Replay export is a cropped recording with no start save.
+#[cfg(test)]
 pub fn replay_export(
     frames: &[InputFrame],
     start: u32,
@@ -445,11 +446,6 @@ pub fn chord_notice(index: &mut RecordingIndex) -> Option<&'static str> {
     }
     index.mark_chord_notice_seen();
     Some(CHORD_NOTICE)
-}
-
-/// An empty chain or sequence adds no sentence.
-pub fn notice_for_empty_chain_or_sequence() -> Option<&'static str> {
-    None
 }
 
 pub fn duplicate_save(root: &Path, id: &str, at: u64) -> Result<String, Error> {

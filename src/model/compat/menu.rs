@@ -333,6 +333,7 @@ impl TrainingModpackMenu {
     }
 
     /// The Kirby hat order of `role` as fighter kinds (Kirby removed, the Mii classes only with the helper build).
+    #[cfg(test)]
     pub fn ordered_kirby_hat_kinds(&self, role: RosterRole) -> Vec<u32> {
         self.ordered_kirby_hat_kinds_fixed(role).to_vec()
     }
@@ -391,6 +392,7 @@ impl TrainingModpackMenu {
     }
 }
 
+#[cfg(test)]
 pub use super::grid::NX_SUBMENU_COLUMNS;
 
 #[cfg(test)]

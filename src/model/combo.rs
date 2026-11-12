@@ -147,6 +147,7 @@ impl Event {
 }
 
 /// The first `STEPS` events, in the order given. A later one is dropped.
+#[cfg(test)]
 pub fn retain(events: impl IntoIterator<Item = Event>) -> [Option<Event>; STEPS] {
     let mut out = [None; STEPS];
     for (slot, event) in out.iter_mut().zip(events) {
@@ -189,6 +190,7 @@ impl LinkRec {
     }
 
     /// A presses-only link, the shape an old file grades as.
+    #[cfg(test)]
     pub fn presses(
         from: Move,
         to: Move,

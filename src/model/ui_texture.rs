@@ -25,8 +25,6 @@ pub const CONTROL_COUNT: usize = 8;
 /// The control block's vtable slot of `on_zero_shared` (the game calls `[[control] + 0x10](control)`).
 pub const CONTROL_ON_ZERO: usize = 0x10;
 
-/// The UI texture: handle, pending-job pointer, the texture-info the TexMap takes, and the job-state object.
-pub const TEXTURE_HANDLE: usize = 0x00;
 pub const TEXTURE_JOB: usize = 0x18;
 pub const TEXTURE_DESCRIPTOR: usize = 0x38;
 /// The embedded texture-info's 8-byte descriptor slot (written by the view registration), its width and height (`u16` each) and the byte that says

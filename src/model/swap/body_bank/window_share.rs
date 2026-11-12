@@ -20,7 +20,9 @@
 //! less the helper sources present and the other role's extras), so a window forms again as soon as the lane
 //! reaches window kinds.
 
-use super::{reserve_extras, NATIVE_MEMBERS, POPO};
+use super::{NATIVE_MEMBERS, POPO};
+#[cfg(test)]
+use super::reserve_extras;
 use crate::engine::swap::swap_model::capabilities::bankable_kind;
 
 /// The window extras a cycling role can use in this scene with group swap off: one fewer than the distinct kinds of
@@ -42,6 +44,7 @@ pub fn cycle_window_demand(cycle: &[u32], bank_members: u8, solo_popo_member: bo
 
 /// Group swap off: the windows reserve their extras out of the saved slot count first (`reserve_extras`, existing
 /// windows keep theirs), and the helper sources may hold the rest. Returns (per-role window reservation, helper cap).
+#[cfg(test)]
 pub fn groups_off_shares(wanted: [usize; 2], live: [usize; 2], slots: usize) -> ([usize; 2], usize) {
     let reserved = reserve_extras(wanted, live, slots);
     (reserved, slots.saturating_sub(reserved.iter().sum::<usize>()))

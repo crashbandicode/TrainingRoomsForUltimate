@@ -203,6 +203,7 @@ impl SavedRole {
     pub fn expected(&self) -> Configuration {
         self.state.expected()
     }
+    #[cfg(test)]
     pub fn pending_ticket(&self) -> Option<Ticket> {
         self.state.pending_ticket()
     }
@@ -249,6 +250,7 @@ impl SavedRole {
         Ok(self.state.restore(current.live)?)
     }
 
+    #[cfg(test)]
     pub fn can_change_kind_or_return_slot0(&self, current: Current) -> Result<(), Error> {
         self.current(&current)?;
         Ok(self.state.can_change_kind_or_return_slot0(current.live)?)

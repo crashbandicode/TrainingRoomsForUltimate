@@ -111,6 +111,7 @@ impl Extras {
     }
 
     /// The owning registry's records, including their roots.
+    #[cfg(test)]
     pub fn registered<const N: usize>(records: [Option<Roots>; N]) -> Option<Self> {
         Self::registered_for(Layout::Training, records)
     }
