@@ -298,6 +298,7 @@ turns each file into the array its source file includes, so the tables are the s
   154,519 (−8,173). The budget is ratcheted down to 154,519.
 - **The lines moved; they were not deleted.** 958 rows left 22 `*.rs` files (8,526 lines) and are 1,231 lines of
   data (350 KB). `build.rs` grew by about 50 lines.
+- **The NROs are the same:** against S3's, 40 bytes differ in each (the build id and the commit in the build tag).
 - **Every row is identical.** `src/model/table_digest_tests.rs` pins a SHA-256 over every row's `Debug` text, in
   table order, for the 690 seam rows, the 258 site rows and the two small tables. The digests were taken while the
   rows were still Rust literals and pass unchanged on the data files.
@@ -316,4 +317,4 @@ turns each file into the array its source file includes, so the tables are the s
 | Plan baseline | `b1e27e5a` | 129,593 (122,707) | 165,931 | 865 (917 with the crates' gates) | 91.54% |
 | `rc10` start | `f5146184` | 129,593 (122,707) | 165,930 | 821 (873) | 90.18% |
 | S3 | `6c419689` | 126,703 (119,817) | 162,692 | 821 (873) | 90.59% |
-| S1 | the commit after `6c6ad6bb` | 118,493 (111,612) | 154,519 | 824 (876) | not re-measured |
+| S1 | `13e8ef5d` | 118,493 (111,612) | 154,519 | 824 (876) | not re-measured |

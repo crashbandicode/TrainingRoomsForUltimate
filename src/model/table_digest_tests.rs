@@ -42,7 +42,7 @@ fn every_site_row_is_the_row_it_was() {
 }
 
 /// Every row of every data file carries a 64-byte guard (the playbook's rule, which its compliance check reads from
-/// `guard: [..]` literals in `src/`; the rows are no longer there), and the files hold exactly the tables' rows.
+/// the guard literals in `src/`; the rows are no longer there), and the files hold exactly the tables' rows.
 #[test]
 fn every_data_row_has_a_64_byte_guard() {
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("data/tables");
