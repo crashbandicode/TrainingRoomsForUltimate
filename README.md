@@ -127,9 +127,10 @@ around. Let go and the pop-up closes; the speed stays.
 Both chords are rows of Display & Controls › Button chords ("Input display" and "Game speed"), editable and clearable
 like the others. They don't fire while L is held, so Online Deluxe's L + R + D-pad overlay chords leave them alone.
 
-With Online Deluxe 0.10.5 or later, no chord that uses the D-pad fires while Deluxe's window is open (its rows use
-D-pad Up/Down and ZR + Left/Right), so ZR + Right on its CPU Pilot page no longer also opens the Recording pop-up.
-The menu shortcuts still work. On a GameCube controller, Deluxe's L + R is both triggers: the ZL/ZR chords and the
+With Online Deluxe 0.10.5 or later, no chord that uses the D-pad fires while Deluxe's window shows a page with rows
+(Settings, Window Options, Plugins or a plugin's own page, whose rows use D-pad Up/Down and ZR + Left/Right), so
+ZR + Right on its CPU Pilot page no longer also opens the Recording pop-up. Its Performance view doesn't stop them,
+and the menu shortcuts still work. On a GameCube controller, Deluxe's L + R is both triggers: the ZL/ZR chords and the
 two chords above don't fire while both triggers are held, and one trigger works as before.
 
 ### Combos

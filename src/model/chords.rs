@@ -184,8 +184,8 @@ pub struct Sample {
     /// The controller is a GameCube pad. Online Deluxe reads its two triggers as L and R, which are this plugin's ZL and
     /// ZR there (`logical_set`).
     pub gamecube: bool,
-    /// Online Deluxe's window is drawn (`model::deluxe_overlay`): its rows move with D-pad Up/Down and change with
-    /// ZR + Left/Right.
+    /// Online Deluxe's window shows a page with rows (`model::deluxe_overlay::rows_page_visible`): they move with D-pad
+    /// Up/Down and change with ZR + Left/Right. Its Performance and Debug views have none.
     pub overlay: bool,
 }
 
@@ -220,7 +220,7 @@ pub fn deluxe_shoulders(chord: Chord, sample: Sample) -> bool {
 }
 
 /// Whether a chord row passes beside Online Deluxe (rc.8 and rc.9, `PLUGIN-SHORTCUT-CONFLICTS.md`):
-/// - C4: no row with a D-pad button while Deluxe's window is drawn (its rows take D-pad Up/Down and ZR + Left/Right);
+/// - C4: no row with a D-pad button while Deluxe shows a page with rows (they take D-pad Up/Down and ZR + Left/Right);
 /// - C3: on a GameCube pad, no row with ZL or ZR, and no rc.8 row, while both triggers are held (Deluxe's L + R there);
 /// - rc.8 (`rc8_row`, Input display and Game speed): not while L is held (Deluxe's L + R + D-pad Down holds R + Down).
 pub fn passes_row(chord: Chord, sample: Sample, rc8_row: bool) -> bool {
@@ -760,13 +760,30 @@ mod tests {
         }
     }
 
-    /// rc.9 C4 (`PLUGIN-SHORTCUT-CONFLICTS.md`): while Online Deluxe's window is drawn, its rows take D-pad Up/Down and
+    /// rc.9 C4 (`PLUGIN-SHORTCUT-CONFLICTS.md`): while Online Deluxe shows a page with rows, they take D-pad Up/Down and
     /// ZR + Left/Right (ZR + Right on its CPU Pilot page handed P1 to the CPU as TR opened the Recording pop-up). No row
     /// with a D-pad button fires then, and none of its buttons is hidden from the game; the menu shortcuts and a row
-    /// without the D-pad are unchanged.
+    /// without the D-pad are unchanged. Its Performance view is drawn without rows (the primary 2026-11-12 00:14Z): the
+    /// rows fire under it.
     #[test]
     fn deluxe_window_stands_the_dpad_rows_down() {
+        use crate::model::deluxe_overlay::{
+            rows_page_visible, DeluxeOverlayStateV1, DELUXE_ROWS_PAGE, DELUXE_WINDOW_VISIBLE,
+        };
+        unsafe extern "C" fn rows_page(out: *mut DeluxeOverlayStateV1) -> bool {
+            unsafe { out.write(DeluxeOverlayStateV1 { size: 8, flags: DELUXE_WINDOW_VISIBLE | DELUXE_ROWS_PAGE }) };
+            true
+        }
+        unsafe extern "C" fn performance(out: *mut DeluxeOverlayStateV1) -> bool {
+            unsafe { out.write(DeluxeOverlayStateV1 { size: 8, flags: DELUXE_WINDOW_VISIBLE }) };
+            true
+        }
         let set = ChordSet::factory();
+        let save = sample(&[logical::ZL, logical::DPAD_DOWN], &[logical::DPAD_DOWN]);
+        let on_rows = save.with_overlay(unsafe { rows_page_visible(Some(rows_page)) });
+        assert_eq!(Detector::new().poll(&set, on_rows, false), 0, "a rows page: Save state stands down");
+        let on_performance = save.with_overlay(unsafe { rows_page_visible(Some(performance)) });
+        assert_eq!(Detector::new().poll(&set, on_performance, false), Request::SaveState.bit(), "Performance: it fires");
         let rows = [
             (Request::SaveState, set.save_state),
             (Request::LoadState, set.load_state),
@@ -781,7 +798,7 @@ mod tests {
         for (request, chord) in rows {
             let press = Sample { held: chord.0, pressed: chord.0, ..Sample::default() };
             let mut detector = Detector::new();
-            assert_eq!(detector.poll(&set, press.with_overlay(true), false), 0, "{request:?} with the window drawn");
+            assert_eq!(detector.poll(&set, press.with_overlay(true), false), 0, "{request:?} on a rows page");
             assert_eq!(detector.hidden(), 0, "{request:?}: the game and Deluxe see the press");
             assert_eq!(Detector::new().poll(&set, press, false) & request.bit(), request.bit(), "{request:?} without it");
         }

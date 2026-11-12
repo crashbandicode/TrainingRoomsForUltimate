@@ -63,9 +63,9 @@ pub unsafe fn on_poll(controller: usize) {
     }
     let read = |offset: usize| ((controller + offset) as *const u32).read_volatile();
     let style = read(field::STYLE);
-    // rc.9 C4: Online Deluxe's window takes D-pad Up/Down and ZR + Left/Right while drawn; the D-pad rows stand down.
+    // rc.9 C4: an Online Deluxe page with rows takes D-pad Up/Down and ZR + Left/Right; the D-pad rows stand down.
     let sample = Sample::of(style, read(field::CURRENT_BUTTONS), read(field::JUST_DOWN))
-        .with_overlay(crate::runtime::deluxe_overlay::window_visible());
+        .with_overlay(crate::runtime::deluxe_overlay::rows_page_visible());
     let modal = published::input_owners().contains(Owners::MENU) || recorder::replay_editor_occupied();
     let accepted = {
         let mut state = STATE.lock();

@@ -1,4 +1,4 @@
-//! Online Deluxe's window state for the chords (rc.9 C4): its export `ssbu_online_deluxe_overlay_state_v1`
+//! Online Deluxe's rows-page state for the chords (rc.9 C4): its export `ssbu_online_deluxe_overlay_state_v1`
 //! (`model::deluxe_overlay`), looked up by name on the first ask and again after a miss at most once a second, then
 //! called on each of Player 1's polls. Lock-free and allocation-free: atomics only.
 
@@ -11,7 +11,7 @@ static ADDRESS: AtomicUsize = AtomicUsize::new(0);
 /// When the lookup last ran and missed (`NEVER_TRIED` before the first).
 static LAST_TRY: AtomicU64 = AtomicU64::new(NEVER_TRIED);
 #[cfg(feature = "diag")]
-static LAST_VISIBLE: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(2);
+static LAST_ROWS: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(2);
 
 fn export() -> Option<OverlayStateExport> {
     let mut address = ADDRESS.load(Ordering::Acquire);
@@ -35,13 +35,14 @@ fn export() -> Option<OverlayStateExport> {
     Some(unsafe { core::mem::transmute::<usize, OverlayStateExport>(address) })
 }
 
-/// Whether Online Deluxe's window is drawn now. No export (an older Deluxe, or none on the card) is no window.
-pub fn window_visible() -> bool {
+/// Whether Online Deluxe's window shows a page with rows now (not the Performance or Debug view). No export (an older
+/// Deluxe, or none on the card) is no rows page.
+pub fn rows_page_visible() -> bool {
     // SAFETY: `export` is Deluxe's own export or none.
-    let visible = unsafe { deluxe_overlay::window_visible(export()) };
+    let rows = unsafe { deluxe_overlay::rows_page_visible(export()) };
     #[cfg(feature = "diag")]
-    if LAST_VISIBLE.swap(u8::from(visible), Ordering::AcqRel) != u8::from(visible) {
-        crate::runtime::diag_log::diagnostic(format_args!("[Chords] deluxe_overlay visible={visible}"));
+    if LAST_ROWS.swap(u8::from(rows), Ordering::AcqRel) != u8::from(rows) {
+        crate::runtime::diag_log::diagnostic(format_args!("[Chords] deluxe_overlay rows_page={rows}"));
     }
-    visible
+    rows
 }

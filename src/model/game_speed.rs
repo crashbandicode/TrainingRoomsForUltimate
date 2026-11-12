@@ -152,7 +152,7 @@ impl Hold {
                 return HoldEvent::Closed;
             }
             // A Left/Right is not a step while Online Deluxe has it: its L + R chords are held (L, or both triggers on a
-            // GameCube pad, and not in the chord; rc.8 and rc.9 C3), or its window is drawn (rc.9 C4).
+            // GameCube pad, and not in the chord; rc.8 and rc.9 C3), or it shows a page with rows (rc.9 C4).
             let deluxe = deluxe_shoulders(Chord(self.open), sample) || sample.overlay;
             let left = !deluxe && sample.pressed & (1 << logical::DPAD_LEFT) != 0;
             let right = !deluxe && sample.pressed & (1 << logical::DPAD_RIGHT) != 0;
