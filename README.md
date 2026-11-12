@@ -117,7 +117,20 @@ Capture moments from your replays and open them in Training.
 ![A replay moment opened against the CPU](docs/media/rc6-replay-window.gif)<br>*Opening a replay moment*<br>
 ![Replay capture on, in the menu and in Online Deluxe](docs/media/rc7-replay-capture.gif)<br>*Turning replay capture on*
 
+## Build
+
+```powershell
+cargo test --all-targets
+cargo skyline build --release
+```
+
+## License
+
+MIT License: see [LICENSE](LICENSE).
+
+This project was developed with the assistance of AI. It is an unofficial fan project, not affiliated with or
+endorsed by Nintendo.
+
 ## More
 
-What's new: [rc.9](docs/RELEASE-NOTES-rc9.md). MIT licence ([LICENSE](LICENSE)); an unofficial fan project, not
-affiliated with Nintendo, made with the help of AI. [Technical notes](docs/TECHNICAL.md).
+What's new: [rc.9](docs/RELEASE-NOTES-rc9.md). [Technical notes](docs/TECHNICAL.md).
