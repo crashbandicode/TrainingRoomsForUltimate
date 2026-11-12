@@ -3,6 +3,9 @@
 2026-11-11. Operator order (`artifacts/phase23/TASK-rc9-test-cut.md`): the host tests go to at most 1,000, a hard limit, keeping what
 guards real behaviour and the ship gates. This file lists every cut and why, and what is kept. Base: `28082c29` (rc.8 notes on `main`).
 
+**2026-11-12:** most of the cut tests returned as table-driven tests (one `#[test]` per module) for the coverage order:
+`docs/COVERAGE-rc9.md`. The count is 865. This file describes the cut as it was made at `7a4cba64`.
+
 ## Before and after
 
 | | Test binaries | Tests (`cargo test -- --list`) | Distinct test names |
