@@ -10,7 +10,7 @@ The strip hides while the TrainingRooms menu, the recording pop-up, the Fighter 
 
 An older settings file that still says Smash Inputs, Raw Inputs, or Status Only becomes Frame strip. Off stays Off.
 
-The pictures for this page are listed in [MEDIA.md](MEDIA.md). Each one is a full-screen capture, 1280 wide, under 10 seconds, and one behaviour, of rc.7 `722525a5` as shipped (diag NRO `cfec85c7`, log lines only), taken on 2026-11-11.
+The pictures for this page are listed in [MEDIA.md](MEDIA.md). Each one is a full-screen capture, 1280 wide, under 10 seconds, and one behaviour, of rc.7 `722525a5` as shipped (diag NRO `cfec85c7`, log lines only), taken on 2026-11-11. On 2026-11-12 they were checked against rc.10 `32ee7595`'s strip (the `docs-rd12-32ee7595` takes): the rows, colours, chips, stick glyphs, brackets and readouts draw the same, so they stand.
 
 ![Both lanes after a forward smash: startup, active, recovery, hitlag and hitstun](media/rc7-frame-strip-lanes.gif)
 

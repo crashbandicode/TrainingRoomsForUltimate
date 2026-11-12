@@ -4,6 +4,24 @@ Every GIF in [`media/`](media/) is actual Eden footage: whole screen, 1280×720,
 game-speed timing kept, trimmed at the ends (any cut inside a clip is listed with it). Frames were reviewed (start,
 action, result) before a clip was kept. The raw takes stay outside git with their runs.
 
+## rc.10 docs clips (2026-11-12)
+
+- **Build:** rc.10 `32ee7595` as shipped, its diag NRO `79922abe…`.
+- **Run:** `docs-rd12-32ee7595` on the Surface, 13:56–14:26Z: one instance, untimed, muted, Eden's GDB stub on.
+  - The companions are the card's: CPU pilot 0.2.4 and Online Deluxe 0.10.5 with the card's settings. No gamepad
+    overlay.
+  - Every row passed.
+- **Evidence clips** (640 wide, outside git with the run, `feature-gifs/evidence/`):
+  - `rc10-pilot-refusals.gif`: the pilot armed from Deluxe's page with no TrainingRooms pop-up, then Record and Play
+    on Player 1 refused;
+  - `rc10-recording-popup.gif`: the Recording pop-up over the match, with R switching it to the CPU.
+
+| File | Run, row | Embedded in | Length, size | Raw windows kept | What the frames show |
+| --- | --- | --- | --- | --- | --- |
+| `media/rc10-save-load.gif` | `docs-rd12-32ee7595`, `fx-save-load` | README, Save states | 9.8 s, 5.7 MB | 5.0–14.8 s | Mario vs Mewtwo in Training. Mario at a new spot; ZL + D-pad Down: "Save State · Saved Slot 1"; Mario walks back and forward-smashes Mewtwo (10%); ZL + D-pad Up: the load burst, both fighters back where Save was pressed, Mewtwo at 0%, nothing plays. The log: `state saved slot=1`, `state load_request`, `state placed`. |
+| `media/rc10-footer-tag.gif` | `docs-rd13-32ee7595`, `fx-footer-tag` (the Surface, 15:12–15:24Z) | TECHNICAL.md, the build tag | 9.8 s, 1.6 MB | 0.0–9.8 s | Mario vs Ganondorf in Training; the menu opens on Fighters & Stages, R to Display & Controls; both pages' key hints end with `0.2.0-rc.6 · rc10 32ee7595`; the menu closes. |
+| `media/rc10-record-play-cpu.gif` | `docs-rd12-32ee7595`, `fx-record-play-cpu` (take 3) | README, Recording | 9.9 s, 9.6 MB | 6.7–11.0, 19.2–24.8 s | Mario records a jab, a dash and a forward smash (Mewtwo 18.5%); after the cut, Play on CPU warps both to the recording's start (0%), and Mewtwo dashes and forward-smashes as recorded. Cut out between the windows: the stop, the CPU's pick of the new recording (made in `recording-index.json`, as the pop-up's pick would be) and the Fighter Mismatch question (Keep). The log: `recording=1`/`=0`, `screen=playback role=cpu warp=1`, `start_observed slot=1`. |
+
 ## rc.8 chords (2026-11-11)
 
 - **Build:** the rc.8 integration head `d3eeac81` (R1 and R8 merged; not yet shipped), diag NRO `9f8afc66…` (release

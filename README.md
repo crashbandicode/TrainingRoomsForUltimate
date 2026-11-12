@@ -45,6 +45,8 @@ A strip at the top shows your inputs and the CPU's, and who can act first. R + D
 
 ![R + D-pad Down hides the strip, then shows it again](docs/media/rc8-input-display-chord.gif)<br>*Turning the input display off and on*
 
+How to read it: [the frame strip guide](docs/FRAME-STRIP.md)
+
 ### Game speed
 Slow the game down or speed it up. Hold R + D-pad Up and press Left or Right.
 
@@ -61,12 +63,14 @@ Teach the CPU to DI, tech, shield, mash and more, on the CPU page.
 ### Save states and respawn
 Save where you stand with ZL + D-pad Down, and go back with ZL + D-pad Up.
 
+![Save, a smash sends the CPU away, then Load puts both fighters back](docs/media/rc10-save-load.gif)<br>*Save, move, load: back where you saved*<br>
 ![Respawn on platform turned on, then a fall](docs/media/rc7-respawn-on.gif)<br>*Respawning on the platform*
 
 ### Recording
-Record yourself, then let the CPU play it back. ZR + D-pad Down records, ZR + D-pad Up plays.
+Record yourself, then let the CPU play it back. ZR + D-pad Down records, ZR + D-pad Up plays; the recording pop-up
+(ZR + D-pad Right) picks which recording the CPU plays.
 
-![Recording two jabs](docs/media/rc7-record.gif)<br>*Recording two jabs*
+![Mario records a jab and a smash, then the CPU does the same moves](docs/media/rc10-record-play-cpu.gif)<br>*Record, then the CPU plays it back*
 
 ### Combos
 Save a combo you landed and practise it: a bar grades each try. Recording › Combos & Sequences.

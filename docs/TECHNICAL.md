@@ -58,8 +58,14 @@ current values as defaults, B goes back. Each page ends with *Reset page to defa
 where you left it. The chords are edited on Display & Controls › Button chords.
 
 The key hints at the foot of every page end with the build tag: the version, then the build name and the commit the NRO
-was built from, for example `0.2.0-rc.6 · rc9 01950601` (rc.8 builds read `rc8`). A build from uncommitted changes adds
-`-dirty`.
+was built from, for example `0.2.0-rc.6 · rc10 32ee7595` (rc.8 and rc.9 builds read `rc8` and `rc9`). A build from
+uncommitted changes adds `-dirty`.
+
+**Clip** [`rc10-footer-tag.gif`](media/rc10-footer-tag.gif): the menu opens on two pages whose key hints end with `0.2.0-rc.6 · rc10 32ee7595`
+
+*Eden, 2026-11-12, rc.10 `32ee7595` as shipped (diag NRO `79922abe`), `docs-rd13-32ee7595` `fx-footer-tag`: Training,
+the menu on Fighters & Stages, R to Display & Controls, the menu closes. The tag is read from the frames (it isn't
+logged). The cut is listed in [MEDIA.md](MEDIA.md).*
 
 ## Features in detail
 
@@ -173,6 +179,13 @@ listed in [MEDIA.md](MEDIA.md).*
 
 ### Save states and respawn
 
+**Clip** [`rc10-save-load.gif`](media/rc10-save-load.gif): Save at a new spot, a smash sends the CPU away, then Load puts both fighters back
+
+*Eden, 2026-11-12, rc.10 `32ee7595` (diag NRO `79922abe`), `docs-rd12-32ee7595`
+`fx-save-load`: Mario steps left and ZL + D-pad Down saves ("Saved Slot 1"); he walks back and forward-smashes Mewtwo
+(10%); ZL + D-pad Up puts both where Save was pressed, Mewtwo at 0%, and nothing plays. The log: `state saved slot=1`,
+`state load_request`, `state placed`, no playback line. The cut is listed in [MEDIA.md](MEDIA.md).*
+
 **Clip** [`rc7-respawn-on.gif`](media/rc7-respawn-on.gif): Respawn on platform turned On, then a fall off the stage: back on the revival platform
 
 *Eden, 2026-11-11, rc.7 `722525a5` as shipped (diag NRO `cfec85c7`, log lines only): Fighters & Stages › Stages ›
@@ -189,6 +202,16 @@ that role's Play chord plays it without warping back on later loops. On the Reco
 X cycles the loop only while the cursor is in Macros.
 [RECORDING.md](RECORDING.md) is how to use it. The pop-up and the Recording page are in that doc.
 What rc.6 changes is [RELEASE-NOTES-rc6.md](RELEASE-NOTES-rc6.md).
+
+**Clip** [`rc10-record-play-cpu.gif`](media/rc10-record-play-cpu.gif): Record on Player 1, then Play on CPU: the CPU does the recorded moves
+
+*Eden, 2026-11-12, rc.10 `32ee7595` (diag NRO `79922abe`), `docs-rd12-32ee7595` `fx-record-play-cpu` (take 3): ZR + D-pad
+Down records Mario's jab, dash and forward smash, ZR + D-pad Down stops; ZR + D-pad Up warps both fighters to the
+recording's start save, and Mewtwo plays the same inputs (a dash and a forward smash in the recorded direction). Two
+things are cut out: the CPU's pick of the new recording (the pop-up's pick, made in `recording-index.json` by the
+harness: Record makes the new macro active for the recorded role only) and the Fighter Mismatch question (Keep). The
+log: `screen=recording role=player recording=1`/`=0`, `screen=playback role=cpu warp=1`, `[RecordingHost]
+start_observed slot=1`, then the CPU's status changes. The windows are listed in [MEDIA.md](MEDIA.md).*
 
 **Clip** [`rc7-record.gif`](media/rc7-record.gif): Record on Player 1: an empty library, two jabs, then Macro 1 and its start save
 
