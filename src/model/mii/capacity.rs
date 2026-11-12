@@ -88,6 +88,7 @@ impl Extras {
 
     /// Entry identities only (value policy and tests). `owned_roots` and
     /// `admit` refuse every extra of such a value.
+    #[cfg(test)]
     pub fn new<const N: usize>(entries: [usize; N]) -> Option<Self> {
         Self::new_for(Layout::Training, entries)
     }

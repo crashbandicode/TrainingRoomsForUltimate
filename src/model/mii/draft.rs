@@ -8,12 +8,14 @@ pub const MAX_NAME_CHARS: usize = 48;
 pub const MAX_PRESETS: usize = 256;
 const SCHEMA: u32 = 1;
 
+#[cfg(test)]
 #[derive(Clone)]
 pub struct Draft {
     template: MiiConfig,
     specials: [u8; 4],
 }
 
+#[cfg(test)]
 impl Draft {
     /// An existing qualified appearance is copied; editing never changes its native save.
     pub fn from_template(template: &MiiConfig) -> Result<Self, &'static str> {
@@ -100,6 +102,7 @@ impl Library {
 
     /// First explicit save commits a draft. Native configurations win duplicate lookup and
     /// existing names stay unchanged. Dropping/cancelling a Draft performs no library mutation.
+    #[cfg(test)]
     pub fn save(&mut self, draft: &Draft, name: &str, native: &Snapshot) -> Result<Saved, &'static str> {
         let preset = draft.preset(name)?;
         self.insert(preset, native)

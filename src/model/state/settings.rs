@@ -60,9 +60,6 @@ impl Buffs {
         option < 32 && self.0 & (1 << option) != 0
     }
 
-    pub fn any(&self) -> bool {
-        self.0 != 0
-    }
 }
 
 /// The state rows, as a hook reads them.

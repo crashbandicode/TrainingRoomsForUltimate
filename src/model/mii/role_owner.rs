@@ -10,6 +10,7 @@ pub fn current_record_claim(kind:u32,index:u16)->bool {
 pub fn claims(owners: &[Option<Owner>; 8], kinds: &[Option<u32>; 8]) -> Option<[Option<u16>; 8]> {
     claims_with(false,owners,kinds)
 }
+#[cfg(test)]
 pub fn claims_in(layout:crate::engine::mii::backend::Layout,owners:&[Option<Owner>;8],kinds:&[Option<u32>;8])->Option<[Option<u16>;8]> {
     claims_in_with(layout,crate::engine::mii::capacity::Extras::NONE,owners,kinds)
 }

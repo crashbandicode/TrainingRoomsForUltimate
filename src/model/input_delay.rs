@@ -90,6 +90,7 @@ pub struct Owners(u8);
 
 impl Owners {
     /// Gameplay owns the input.
+    #[cfg(test)]
     pub const NONE: Owners = Owners(0);
     /// The plugin's menu or a modal panel captured the input, or closed within the last 15 frames.
     pub const MENU: Owners = Owners(1);
@@ -172,6 +173,7 @@ impl DelayQueue {
         Self { ring: [MappedInputs::NEUTRAL; SLOTS], sticks: [Sticks::NEUTRAL; SLOTS], head: 0, len: 0 }
     }
 
+    #[cfg(test)]
     pub const fn len(&self) -> usize {
         self.len
     }
@@ -217,6 +219,7 @@ impl DelayQueue {
     /// plays the oldest record (`a` polls old), the `a - b` records between it and the new steady
     /// state are discarded unplayed, and from the next poll the output is `b` polls old, so the
     /// output jumps forward in time by `a - b` frames (SPEC-input-03 §5, "Decreasing d").
+    #[cfg(test)]
     pub fn step(&mut self, delay: u8, actual: MappedInputs) -> MappedInputs {
         self.step_with(delay, actual, Sticks::of_record(actual)).0
     }
@@ -261,6 +264,7 @@ impl DelayQueue {
 /// The stages of one P1 poll of the final input mapping, in order (SPEC-input-03 §5.2, SPEC-input-01
 /// §5.1): the menu and the chords read the raw controller before the delay, so they are never
 /// delayed; the input display and the recorder run after it and see delayed input.
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PollStage {
     MenuInput,
@@ -270,6 +274,7 @@ pub enum PollStage {
     Recorder,
 }
 
+#[cfg(test)]
 pub const POLL_ORDER: [PollStage; 5] =
     [PollStage::MenuInput, PollStage::ChordDetection, PollStage::InputDelay, PollStage::InputDisplay, PollStage::Recorder];
 

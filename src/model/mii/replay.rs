@@ -75,6 +75,7 @@ impl Selection {
             && self.generation == generation
             && self.revision == revision
     }
+    #[cfg(test)]
     pub fn ready(self, kind: u32, current: Option<Configuration>) -> bool {
         self.target.ready(kind, current)
     }

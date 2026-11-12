@@ -1,7 +1,9 @@
 //! Ordinary CPU1's native selector assignment. Not a free-slot allocator.
 use {crate::engine::mii::lifetime::{Binding, Configuration}, crate::engine::mii::ordinary_player::Owner};
 
+#[cfg(test)]
 pub const OWNER: usize = 1;
+#[cfg(test)]
 pub const DESTINATION: u16 = 1;
 
 /// Exact native CPU descriptor receipts qualify all three classes. Runtime adapter acceptance is separate.
@@ -401,6 +403,7 @@ impl Target {
     pub fn publish(self, original:Option<Configuration>)->Option<Configuration> {
         if self.kind==TargetKind::Original {original} else {self.configuration}
     }
+    #[cfg(test)]
     pub fn index(self)->u16 {if self.configuration.is_some() {DESTINATION} else {0}}
 }
 /// Prepared before INSTALL. The owner commits this value only after Gate::can_complete
@@ -544,14 +547,17 @@ mod generic_completion_tests {
 
 /// Native Training's four present rows include inactive helpers. Their current index AND
 /// selector protect records. Repeated original index0 is permitted; destination1 is not shared.
+#[cfg(test)]
 pub fn assignment(owners: &[Option<Owner>; 8]) -> Option<[Option<u16>; 8]> {
     assignment_for(OWNER, owners)
 }
 
 /// One proved selector destination; callers supply live ownership and phase authority.
+#[cfg(test)]
 pub fn assignment_for(destination: usize, owners: &[Option<Owner>; 8]) -> Option<[Option<u16>; 8]> {
     assignment_in(crate::engine::mii::backend::Layout::Training,destination,owners)
 }
+#[cfg(test)]
 pub fn assignment_in(layout:crate::engine::mii::backend::Layout,destination:usize,owners:&[Option<Owner>;8])->Option<[Option<u16>;8]> {
     assignment_with(layout,crate::engine::mii::capacity::Extras::NONE,destination,owners)
 }
@@ -863,6 +869,7 @@ pub fn publication_indices_in(layout:crate::engine::mii::backend::Layout,owner:u
 /// shared resource keeps the original window's kinds while FE+0x18.. names the exchanged
 /// group (`GroupExchange::new`), so the descriptor words are not an expectation for it
 /// (D-PTA1, PTA116T #658: header [1, 9, 1, 5, 0] under FE words [0x21, 0x1e, -1]).
+#[cfg(test)]
 pub fn outgoing_object_matches(
     before: Owner,
     before_header: [u32; 5],
@@ -877,6 +884,7 @@ pub fn outgoing_object_matches(
 }
 /// WP5a: the prequeue proof is `identity::verify(captured, now, ExpectedMutation::None)` over the
 /// outgoing object, its captured header, index and tokens; the selector clauses stay as they were.
+#[cfg(test)]
 pub fn outgoing_object_matches_for(
     before: Owner, before_header: [u32; 5], before_tokens: [u16; 4],
     selected: usize, header: [u32; 5], index: u16, tokens: [u32; 4],

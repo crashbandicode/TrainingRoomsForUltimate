@@ -231,12 +231,14 @@ pub fn install_plan(verdict: Verdict) -> &'static [Site] {
 /// Boot's two phases for sites (SPEC-core-01 §5.1 step 5b, §6 "Overlapping thunks"): every window is
 /// compared first, then anything is written. A write at one site changes the bytes another site's
 /// window reads, so checking after installing would see our own hook as a foreign change.
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Phase {
     CheckEveryWindow,
     InstallUsableFeatures,
 }
 
+#[cfg(test)]
 pub const BOOT_PHASES: [Phase; 2] = [Phase::CheckEveryWindow, Phase::InstallUsableFeatures];
 
 /// Index pairs `(a, b)`, `a < b`, of sites whose 64-byte windows overlap.

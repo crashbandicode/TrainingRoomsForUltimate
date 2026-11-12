@@ -111,19 +111,6 @@ impl MenuCapture {
         }
     }
 
-    /// `ordinary` comes only from the independent owned ordinary-Player adapter.
-    /// It must never replace a protected saved origin, even after failed recapture.
-    pub fn take_context(&mut self, context: Context, ordinary: Option<selection::PlayerLive>) -> Option<Context> {
-        self.take_context_with_cpu(context,ordinary,false)
-    }
-    pub fn take_context_with_cpu(&mut self, context: Context,
-        ordinary: Option<selection::PlayerLive>, ordinary_cpu:bool) -> Option<Context> {
-        let ordinary=ordinary.filter(|_|context.original==PlayerOrigin::NotMii)
-            .filter(|live|*live!=selection::PlayerLive::NotMii)
-            .map(|live|(PlayerOrigin::NotMii,live));
-        self.take_owned_context(context,ordinary,ordinary_cpu.then_some(None))
-    }
-
     /// Unified adapters supply both immutable origin and current live identity after a
     /// fresh menu recapture. Some(None) is a qualified CPU currently on an ordinary fighter.
     /// `cpu_original` is preserved as supplied. Live CPU identity and the player origin
@@ -327,18 +314,6 @@ impl CatalogMenu {
             self.role = Some(role);
         }
         // Add New is dispatched separately through editor_seed.
-    }
-
-    /// true means the class page remains open; false returns to Character Extras.
-    pub fn back(&mut self) -> bool {
-        if self.list_mode { return false; }
-        if let Some(role) = self.role.take() {
-            self.cursor = usize::from(role == Role::Cpu);
-            self.rows.clear();
-            true
-        } else {
-            false
-        }
     }
 
     fn ordinary_player(&self) -> bool {

@@ -192,6 +192,7 @@ impl<R: Record> Store<R> {
         }
     }
 
+    #[cfg(test)]
     pub fn dir(&self) -> &Path {
         &self.dir
     }

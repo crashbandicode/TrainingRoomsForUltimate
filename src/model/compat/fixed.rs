@@ -120,6 +120,7 @@ impl<T: Copy, const N: usize> std::ops::DerefMut for FixedList<T, N> {
 
 /// Up to `N` owned values in arrival order, held in an array (no heap): what a game callback hands to a plugin thread when the
 /// values are not `Copy` (hos-lock's `Mailbox` carries `Copy` messages). A full queue hands the value back and counts it.
+#[cfg(test)]
 pub struct FixedQueue<T, const N: usize> {
     items: [Option<T>; N],
     head: usize,
@@ -127,6 +128,7 @@ pub struct FixedQueue<T, const N: usize> {
     refused: u32,
 }
 
+#[cfg(test)]
 impl<T, const N: usize> FixedQueue<T, N> {
     pub const fn new() -> Self {
         Self { items: [const { None }; N], head: 0, len: 0, refused: 0 }
@@ -168,6 +170,7 @@ impl<T, const N: usize> FixedQueue<T, N> {
     }
 }
 
+#[cfg(test)]
 impl<T, const N: usize> Default for FixedQueue<T, N> {
     fn default() -> Self {
         Self::new()

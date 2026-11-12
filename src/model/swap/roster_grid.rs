@@ -19,14 +19,7 @@ pub enum Role {
     Cpu,
 }
 
-/// Which lists the shared portrait grid is editing.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum RosterPurpose {
-    FighterCycles,
-    KirbyHats,
-    ManualSwap,
-}
-
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Direction {
     Left,
@@ -186,6 +179,7 @@ const GRID: [Slot; CELLS] = [
     Slot::All,
 ];
 
+#[cfg(test)]
 const fn row_len(row: usize) -> usize {
     if row < FULL_ROWS {
         COLUMNS
@@ -209,6 +203,7 @@ const fn position(cell: usize) -> (usize, usize) {
     (row, row_start(row) + cell % COLUMNS)
 }
 
+#[cfg(test)]
 const fn cell_at(row: usize, column: usize) -> usize {
     row * COLUMNS + column - row_start(row)
 }
@@ -234,6 +229,7 @@ impl RosterGrid {
         self.role
     }
 
+    #[cfg(test)]
     pub const fn cursor(&self) -> usize {
         self.cursor
     }
@@ -257,14 +253,9 @@ impl RosterGrid {
         }
     }
 
-    /// The All cell has no meaning for an immediate single-character action.
-    pub fn step_manual(&mut self, direction: Direction) {
-        self.step(direction);
-        if self.cursor_info().content == CellContent::All { self.step(direction); }
-    }
-
     /// Left/Right wrap within the physical row. Up/Down wrap through the rows and
     /// land on the nearest physical column, so the centered last row clamps.
+    #[cfg(test)]
     pub fn step(&mut self, direction: Direction) {
         let (row, column) = position(self.cursor);
         let (row, column) = match direction {

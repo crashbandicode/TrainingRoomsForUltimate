@@ -9,6 +9,7 @@ use std::ops::Range;
 use crate::engine::macros::recording::{InputFrame, MacroError, MacroRecording, StartState, DEFAULT_FPS};
 
 /// Cursor increment.
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Step {
     Frame,
@@ -16,6 +17,7 @@ pub enum Step {
     Seconds(u32),
 }
 
+#[cfg(test)]
 impl Step {
     pub const SECOND: Step = Step::Seconds(1);
     pub const FIVE_SECONDS: Step = Step::Seconds(5);
@@ -77,6 +79,7 @@ impl FrameWindow {
         self.total
     }
 
+    #[cfg(test)]
     pub fn fps(&self) -> u32 {
         self.fps
     }
@@ -110,10 +113,12 @@ impl FrameWindow {
         self.cursor
     }
 
+    #[cfg(test)]
     pub fn forward(&mut self, step: Step) -> u32 {
         self.seek(self.cursor.saturating_add(step.frames(self.fps)))
     }
 
+    #[cfg(test)]
     pub fn back(&mut self, step: Step) -> u32 {
         self.cursor = self.cursor.saturating_sub(step.frames(self.fps));
         self.cursor

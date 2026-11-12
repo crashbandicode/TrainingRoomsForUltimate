@@ -40,12 +40,16 @@
 //! is native's own end of the bit, without native's reset, which would also drop the other batches'
 //! keys.
 
-use super::copy_registry::{Record, Roster, ENTRIES, KIRBY, NO_KIND, SUBS};
+use super::copy_registry::{Roster, KIRBY, NO_KIND};
+#[cfg(test)]
+use super::copy_registry::{Record, ENTRIES, SUBS};
+#[cfg(test)]
 use std::collections::BTreeMap;
 
 /// `R+0x4c` bit 0: configured for the header (the request bit).
 pub const REQUEST: u8 = 1;
 /// Bit 1: the completion ran.
+#[cfg(test)]
 pub const COMPLETED: u8 = 2;
 /// Bit 2: the completion took the header members' G68 keys; `0x17e8610` releases by kind.
 pub const ACQUIRED: u8 = 4;
@@ -70,6 +74,7 @@ pub fn copy_key(kind: u32, costume: u32) -> Option<u32> {
 /// key per kind of every record whose first kind is neither `-1` nor Kirby (the second and third
 /// unless `0x4b/0x4c/-1`) under `costume`; any other kind takes its own key once per Kirby record,
 /// under that record's `+0x51`.
+#[cfg(test)]
 pub fn acquired_keys(roster: &Roster, kind: u32, costume: u32) -> Vec<u32> {
     acquired_keys_iter(roster, kind, costume).collect()
 }
@@ -97,6 +102,7 @@ pub fn acquired_keys_iter(roster: &Roster, kind: u32, costume: u32) -> impl Iter
 /// (`0x17f02e4–0x17f030c`), the second and third unless `0x4b/0x4c/-1`/Kirby (`0x17f0310–0x17f03a4`),
 /// Mii kinds without costume; any other kind releases its key per Kirby record, a Mii kind without
 /// costume (`0x17f03d8–0x17f0518`), otherwise with the record's `+0x51` (`0x17f051c…`).
+#[cfg(test)]
 pub fn released_keys(roster: &Roster, kind: u32, costume: u32) -> Vec<u32> {
     let mut keys = Vec::new();
     let out_of_range = |k: u32| (k as i32) < 0 || (0x4d..=0x50).contains(&k);
@@ -126,6 +132,7 @@ pub fn released_keys(roster: &Roster, kind: u32, costume: u32) -> Vec<u32> {
 
 /// The header members the completion takes keys for (`0x17e8484`, `0x17e84f0–0x17e8504`,
 /// `0x17e8570–0x17e8584`).
+#[cfg(test)]
 pub fn completion_members(header: [u32; 3]) -> Vec<u32> {
     completion_members_iter(header).collect()
 }
@@ -182,6 +189,7 @@ pub fn end(lease: Lease, now: u8) -> (End, Option<u8>) {
 // ---------------------------------------------------------------------------------------------
 
 /// An acquisition and a release that do not pair.
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Fault {
     /// A completion of this R took `key` and no release of this R returned it before the reset.
@@ -194,6 +202,7 @@ pub enum Fault {
 }
 
 /// One resource owner `R`: the fields the request bit and the copy keys depend on.
+#[cfg(test)]
 #[derive(Clone, Debug)]
 pub struct Owner {
     /// Low byte of `R+0x4c`.
@@ -210,6 +219,7 @@ pub struct Owner {
     pub taken: BTreeMap<u32, u32>,
 }
 
+#[cfg(test)]
 impl Owner {
     pub fn new(costume: u32) -> Self {
         Owner { flags: 0, registrations: BTreeMap::new(), header: [NO_KIND; SUBS], costume,
@@ -285,6 +295,7 @@ impl Owner {
     }
 }
 
+#[cfg(test)]
 fn take_one(map: &mut BTreeMap<u32, u32>, key: u32) -> bool {
     match map.get_mut(&key) {
         Some(n) => {
@@ -297,6 +308,7 @@ fn take_one(map: &mut BTreeMap<u32, u32>, key: u32) -> bool {
 }
 
 /// The roster `0x17e4f50` writes for our entry 0 and the other role's entry 1 (`(kinds, costume)`).
+#[cfg(test)]
 pub fn roster(own: ([u32; SUBS], u32), other: Option<([u32; SUBS], u32)>) -> Roster {
     let mut roster = [Record::DEFAULT; ENTRIES];
     roster[0] = Record { entry: 0, kinds: own.0, costume: own.1 };
@@ -305,6 +317,7 @@ pub fn roster(own: ([u32; SUBS], u32), other: Option<([u32; SUBS], u32)>) -> Ros
 }
 
 /// A kind list as descriptor words (`-1` padded).
+#[cfg(test)]
 pub fn words(kinds: &[u32]) -> [u32; SUBS] {
     let mut words = [NO_KIND; SUBS];
     words[..kinds.len()].copy_from_slice(kinds);
@@ -315,6 +328,7 @@ pub fn words(kinds: &[u32]) -> [u32; SUBS] {
 // The bank's flows on one role, under a policy for the request bit
 // ---------------------------------------------------------------------------------------------
 
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Policy {
     /// C116.1 before U19: `R+0x4c |= 1` when clear, never ended (GROUP-SWAP-IMPL §14.2).
@@ -334,6 +348,7 @@ pub fn tail_takes_g68_step(before: u8, now: u8) -> bool {
     before & ACQUIRED == 0 && now & ACQUIRED != 0
 }
 
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GroupState {
     Planned,
@@ -342,6 +357,7 @@ pub enum GroupState {
     Built,
 }
 
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Op {
     /// `0x17e64d0(R, k)` for each kind of the group (`r_handle::acquire`).
@@ -366,6 +382,7 @@ pub enum Op {
 }
 
 /// One role's R through the bank's flows, with the other role's references in G68.
+#[cfg(test)]
 #[derive(Clone, Debug)]
 pub struct Scene {
     pub policy: Policy,
@@ -383,6 +400,7 @@ pub struct Scene {
     pub copies: Vec<u32>,
 }
 
+#[cfg(test)]
 impl Scene {
     /// The window's Reload, native from configure to the last tail: our R ends reset.
     pub fn new(policy: Policy, window: &[u32], costume: u32, groups: &[&[u32]], other: Option<([u32; SUBS], u32)>) -> Self {

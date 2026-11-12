@@ -14,15 +14,20 @@
 //! - A refused non-presentation clause must not starve the HUD (Fable rule 1); a structural
 //!   Mii resource failure stays a body-transition failure (Astra): `presentation_after_settle`.
 
+#[cfg(test)]
 use crate::engine::swap::character_forms::Forms;
+#[cfg(test)]
 use crate::engine::mii::inventory::MiiClass;
+#[cfg(test)]
 use crate::engine::mii::lifetime::Configuration;
 
 /// Scene context; part of the target. A context the mechanism does not support is a
 /// planner refusal before the transition, never a `HUD skipped` line after a body swap.
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Context { Training, QpWaiting, LdnWaiting }
 
+#[cfg(test)]
 impl Context {
     /// Physical owners whose card this context presents: Training P1/CPU1; waiting rooms
     /// present P1 and the waiting CPU4 card (`refresh_hud`'s two admitted shapes).
@@ -39,6 +44,7 @@ impl Context {
 pub struct TextureKey(pub u64);
 
 impl TextureKey {
+    #[cfg(test)]
     pub fn of(configuration: &Configuration) -> Self {
         let mut h: u64 = 0xcbf2_9ce4_8422_2325;
         let t = configuration.tokens();
@@ -55,6 +61,7 @@ impl TextureKey {
 /// (`TextureKey::of(&configuration)`), not the configuration itself: the HUD compares
 /// textures, and the render job receives the configuration from the transition that
 /// owns it, so this enum stays a few words wide and `Copy` (no lint allowance).
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Presentation {
     /// Ordinary fighter, a PT/Aegis form, Solo Popo, Kirby (the hat is body-side).
@@ -67,6 +74,7 @@ pub enum Presentation {
     DefaultMii { class: u32 },
 }
 
+#[cfg(test)]
 impl Presentation {
     pub fn kind(&self) -> u32 {
         match *self {
@@ -85,12 +93,15 @@ impl Presentation {
 }
 
 /// Where the publisher runs relative to the native transition (one answer per kind).
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Ordering { AfterReady, AtAcknowledge, AfterBuildVerified, OnNativeEvent }
 
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TransitionKind { CanonicalReload, WarmSwap, PhaseBuild, NativeEvent }
 
+#[cfg(test)]
 pub fn ordering_for(kind: TransitionKind) -> Ordering {
     match kind {
         TransitionKind::CanonicalReload => Ordering::AfterReady,
@@ -106,16 +117,20 @@ pub fn ordering_for(kind: TransitionKind) -> Ordering {
 pub struct HudExpectation { pub kind: u32, pub bust: Option<TextureKey>, pub pair: bool, pub waiting_icon: Option<u32> }
 
 /// Scene epoch, entry incarnation, logical and physical owner, transition revision.
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Stamp { pub scene_epoch: u64, pub incarnation: usize, pub logical_owner: u32, pub physical_owner: u32, pub revision: u64 }
 
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BustRule { Never, ExactWhenConfigured }
 
 /// The capability-table `presentation` row (WP1 table gains it; defined here until then).
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PresentationRule { pub kind_event: bool, pub bust: BustRule, pub pair_plate: bool, pub waiting_icon: bool, pub native_form_follow: bool }
 
+#[cfg(test)]
 impl PresentationRule {
     /// One row per form: Mii classes may show a bust; a two-actor form is the pair plate;
     /// a multi-kind single-actor form (PT, Aegis) follows native form changes.
@@ -131,10 +146,12 @@ impl PresentationRule {
     }
 }
 
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Unsupported { Context { context: Context, physical_owner: u32 }, Form(&'static str) }
 
 /// Derived once at preflight; immutable for the transition.
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PresentationIntent {
     pub stamp: Stamp,
@@ -145,6 +162,7 @@ pub struct PresentationIntent {
     pub rule: PresentationRule,
 }
 
+#[cfg(test)]
 impl PresentationIntent {
     /// The derivation from the validated transition's parts (kind, forms, active member,
     /// exact configuration, context, stamp). `from_target(&Target, …)` is this function
@@ -197,9 +215,11 @@ impl PresentationIntent {
 /// proven live with the target kind is presented even when a non-presentation clause
 /// degraded — as the live kind, never as an exact claim; a diverged body publishes the
 /// live kind read back so the card never lies.
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Settlement { Adopted, Degraded, Diverged { live_kind: u32, active_index: u8 } }
 
+#[cfg(test)]
 pub fn presentation_after_settle(intent: &PresentationIntent, settlement: Settlement) -> Presentation {
     match settlement {
         Settlement::Adopted => intent.presentation,
@@ -208,18 +228,9 @@ pub fn presentation_after_settle(intent: &PresentationIntent, settlement: Settle
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Receipt { pub stamp: Stamp, pub expected: HudExpectation }
-
-/// Outcome of the publisher for one stamp. `Applied` only after a readback for this
-/// stamp; a late completion for a superseded stamp is discarded (`Departed`); a missing
-/// listener or a blocked helper is a named `Pending`; a terminal generic fallback is
-/// `Degraded` and does not satisfy an exact-portrait requirement.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum PresentationProgress { Pending(&'static str), Applied(Receipt), Degraded { reason: &'static str, retry: u8 }, Departed }
-
 /// Compare a value-only card observation with the expectation. `bust_key` is the key the
 /// readback resolved for the bound texture (`None` when the slot is not in bust mode).
+#[cfg(test)]
 pub fn verify(expected: &HudExpectation, observed_kind: Option<u32>, bust_key: Option<TextureKey>, pair: bool, waiting_icon: Option<u32>)
     -> Result<(), &'static str> {
     if let Some(k) = observed_kind { if k != expected.kind { return Err("card kind differs from the expectation"); } }

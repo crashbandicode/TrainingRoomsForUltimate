@@ -1,8 +1,10 @@
 //! Fixed-size diagnostic correlation. No native pointers are dereferenced here.
 //! Kept independent of Skyline so the fault-capture contract can be tested.
 
+#[cfg(test)]
 pub const SLOTS: usize = 512;
 
+#[cfg(test)]
 #[derive(Clone, Copy, Default, Debug, PartialEq, Eq)]
 #[repr(C)]
 pub struct Observation {
@@ -14,6 +16,7 @@ pub struct Observation {
     pub links: [u64; 6],
 }
 
+#[cfg(test)]
 impl Observation {
     pub const EMPTY: Self = Self {
         sequence: 0, tick: 0, thread: 0, stack: 0, node: 0, links: [0; 6],
@@ -25,12 +28,14 @@ impl Observation {
     }
 }
 
+#[cfg(test)]
 pub struct Correlator {
     entries: [Observation; SLOTS],
     pub overwritten: u64,
     pub unmatched: u64,
 }
 
+#[cfg(test)]
 impl Correlator {
     pub const fn new() -> Self {
         Self { entries: [Observation::EMPTY; SLOTS], overwritten: 0, unmatched: 0 }
@@ -61,12 +66,14 @@ impl Correlator {
     }
 }
 
+#[cfg(test)]
 impl Default for Correlator {
     fn default() -> Self { Self::new() }
 }
 
 /// A native post-store or explicitly identified read site observed this parent.
 /// This is a bounded history, not a claim that all possible writers are hooked.
+#[cfg(test)]
 #[derive(Clone, Copy, Default, Debug, PartialEq, Eq)]
 #[repr(C)]
 pub struct ParentEvent {
@@ -75,10 +82,12 @@ pub struct ParentEvent {
     pub site: u64,
     pub parent: u64,
 }
+#[cfg(test)]
 impl ParentEvent {
     pub const EMPTY: Self = Self { tick: 0, thread: 0, site: 0, parent: 0 };
 }
 
+#[cfg(test)]
 #[derive(Clone, Copy, Default, Debug, PartialEq, Eq)]
 #[repr(C)]
 pub struct NodeHistory {
@@ -89,16 +98,19 @@ pub struct NodeHistory {
     pub previous: ParentEvent,
     pub latest: ParentEvent,
 }
+#[cfg(test)]
 impl NodeHistory {
     pub const EMPTY: Self = Self { node: 0, owner: 0, birth: 0, birth_tick: 0,
         previous: ParentEvent::EMPTY, latest: ParentEvent::EMPTY };
 }
 
+#[cfg(test)]
 pub struct ParentHistory<const N: usize> {
     entries: [NodeHistory; N],
     pub replaced: u64,
     pub missing_birth: u64,
 }
+#[cfg(test)]
 impl<const N: usize> ParentHistory<N> {
     pub const fn new() -> Self {
         Self { entries: [NodeHistory::EMPTY; N], replaced: 0, missing_birth: 0 }
@@ -140,6 +152,7 @@ impl<const N: usize> ParentHistory<N> {
         slot.latest = event;
     }
 }
+#[cfg(test)]
 impl<const N: usize> Default for ParentHistory<N> {
     fn default() -> Self { Self::new() }
 }

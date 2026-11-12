@@ -1632,3 +1632,10 @@ basis = "rustfmt-sloc4"
 ceiling = 151623
 date = "2026-11-12"
 reason = "rc.10 S4 (docs/CODE-REDUCTION-rc10.md): the five probes nothing used are deleted with their 15 seam rows (operator 2026-11-12), on rc10 745834de (152990); measured 151623 (tools/size_gate.py), -1367. A cut: the ratchet."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 147878
+date = "2026-11-12"
+reason = "rc.10 S3b (docs/CODE-REDUCTION-rc10.md): the rest of the dead code, with the dead types and their impl blocks (the primary 2026-11-12 05:25Z: function-by-function proof in place of byte identity), on rc10 83e91989 (151623); measured 147878 (tools/size_gate.py), -3745. A cut: the ratchet."

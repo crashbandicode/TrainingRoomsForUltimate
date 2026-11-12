@@ -281,9 +281,6 @@ impl SavedRole {
     pub fn abandon_unwritten(&mut self, ticket: Ticket) -> Result<(), Error> {
         Ok(self.state.abandon_unwritten(ticket)?)
     }
-    pub fn cancel_prepared(&mut self, ticket: Ticket) -> Result<(), Error> {
-        Ok(self.state.cancel_prepared(ticket)?)
-    }
     pub fn refuse(&mut self, ticket: Ticket) -> Result<(), Error> {
         Ok(self.state.refuse(ticket)?)
     }

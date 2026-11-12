@@ -273,6 +273,7 @@ impl RecordOwnership {
         Self { owner: None }
     }
 
+    #[cfg(test)]
     pub fn owner(&self) -> Option<RecordOwner> {
         self.owner
     }

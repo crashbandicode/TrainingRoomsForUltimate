@@ -238,7 +238,7 @@
    "dest": "src/model/seams/native_unlink_core.rs",
    "crate": "root",
    "src_sha256": "cc0beb6ca3ab506dc57ada0e048f9d19547c3a4407d3e6f534a761ba7952ce94",
-   "dest_sha256": "f494084bf632d1240b45c569d76de0dd9b9ad586b23e3c09cf5b86763afa4cfc",
+   "dest_sha256": "d1f75c7b316e4c483ae0a24f586d0b1aada2b094687b91ccc24d15620ea6dcaf",
    "edits": [
     {
      "table_tests": true,
@@ -250,6 +250,102 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       4,
+       3,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       6,
+       5,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       17,
+       16,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       28,
+       27,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       34,
+       33,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       64,
+       63,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       70,
+       69,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       78,
+       77,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       82,
+       81,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       92,
+       91,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       97,
+       96,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       102,
+       101,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       143,
+       142,
+       [
+        "#[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3b (docs/CODE-REDUCTION-rc10.md; the primary 2026-11-12 05:25Z): the rest of the dead code: types no Switch build uses and what touches them are removed, or moved behind #[cfg(test)] where only tests use them"
     }
    ]
   },
@@ -283,7 +379,7 @@
    "dest": "src/model/seams/native_seams/mod.rs",
    "crate": "consts",
    "src_sha256": "9c16e57af94e9f6424c92a5bd3de8df64508eb3cda01ff7c4eb9c1054c8338e3",
-   "dest_sha256": "b6f4f79333c20d5f1948dacafcbd2a8ed0fb367a31905068b798d8db8ba5e2a4",
+   "dest_sha256": "b29c7e1a98d9d5f07dd2dbf31320af95ba7631e168960d62f498e1f6767bfb36",
    "edits": [
     {
      "old": "        first.then_some(seam.offset)\n    })\n}\n\n/// The 64-byte comparison of one site.\n#[derive(Clone, Copy, Debug, PartialEq, Eq)]\npub enum GuardOutcome {\n    /// Identical to 13.0.5.\n    Stock,\n    /// Only Skyline hook shapes differ. `at` is the byte offset of the first; `usable` applies the\n    /// kind's rule (false: another plugin owns the words we would replace or rely on).\n    HookedByOther { at: usize, usable: bool },\n    /// A `Sharing::EntryOrBody` entry row whose entry another plugin's far jump owns, with the body\n    /// after it stock: usable, through the body site (`entry_or_body_outcome`).\n    Shared,\n    /// A change that is not a hook: the site is left alone.\n    Foreign { first_diff: usize },\n}\n\nimpl GuardOutcome {\n    pub const fn usable(self) -> bool {\n        match self {\n            GuardOutcome::Stock | GuardOutcome::Shared => true,\n            GuardOutcome::HookedByOther { usable, .. } => usable,\n            GuardOutcome::Foreign { .. } => false,\n        }\n    }\n\n    /// The install line's word for the outcome.\n    pub const fn code(self) -> &'static str {\n        match self {\n            GuardOutcome::Stock => \"stock\",\n            GuardOutcome::HookedByOther { usable: true, .. } => \"other\",\n            GuardOutcome::HookedByOther { usable: false, .. } => \"occupied\",\n            GuardOutcome::Shared => \"shared\",\n            GuardOutcome::Foreign { .. } => \"foreign\",\n        }\n    }\n}\n\nconst WORDS: usize = GUARD_BYTES / 4;\nconst NOP: u32 = 0xd503_201f;\nconst LDR_X17_LITERAL_8: u32 = 0x5800_0051;\nconst BR_X17: u32 = 0xd61f_0220;\nconst B_MASK: u32 = 0xfc00_0000;\nconst B_OPCODE: u32 = 0x1400_0000;\n\nfn words(bytes: &[u8; GUARD_BYTES]) -> [u32; WORDS] {\n    let mut out = [0u32; WORDS];\n    for (i, word) in out.iter_mut().enumerate() {\n        *word = u32::from_le_bytes([bytes[4 * i], bytes[4 * i + 1], bytes[4 * i + 2], bytes[4 * i + 3]]);\n    }\n    out\n}\n\n/// Length in words of a Skyline hook shape starting at word `i` (cut at the end of the window).\nfn hook_shape(actual: &[u32; WORDS], i: usize) -> Option<usize> {\n    let at = |k: usize| actual.get(i + k).copied();\n    let len = if at(0) == Some(NOP) && at(1) == Some(LDR_X17_LITERAL_8) && at(2) == Some(BR_X17) {\n        5\n    } else if at(0) == Some(LDR_X17_LITERAL_8) && at(1) == Some(BR_X17) {\n        4\n    } else if actual[i] & B_MASK == B_OPCODE {\n        1\n    } else {\n        return None;\n    };\n    Some(len.min(WORDS - i))\n}\n\n/// Whether a hook shape at word `word` takes words this kind needs as they are.\nconst fn blocks(kind: SeamKind, word: usize) -> bool {\n    match kind {\n        SeamKind::Hook { .. } => word < HOOK_SPAN_WORDS,\n        SeamKind::Called => false,\n        SeamKind::Relied => word == 0,\n    }\n}\n\n/// Compare a site's 64 bytes now (`actual`) with its 13.0.5 bytes (`expected`).\npub fn guard_outcome(expected: &[u8; GUARD_BYTES], actual: &[u8; GUARD_BYTES], kind: SeamKind) -> GuardOutcome {\n    let expected = words(expected);\n    let actual = words(actual);\n    let mut first_hook = None;\n    let mut usable = true;\n    let mut i = 0;\n    while i < WORDS {\n        if actual[i] == expected[i] {\n            i += 1;\n            continue;\n        }\n        let Some(len) = hook_shape(&actual, i) else {\n            return GuardOutcome::Foreign { first_diff: 4 * i };\n        };\n        first_hook.get_or_insert(4 * i);\n        // A shape that starts inside the span also covers every word it spans.\n        if (i..i + len).any(|w| blocks(kind, w)) {\n            usable = false;\n        }\n        i += len;\n    }\n    match first_hook {\n        None => GuardOutcome::Stock,\n        Some(at) => GuardOutcome::HookedByOther { at, usable },\n    }\n}\n",
@@ -467,6 +563,32 @@
       ]
      ],
      "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
+    },
+    {
+     "line_patch": [
+      [
+       528,
+       527,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       546,
+       545,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       551,
+       550,
+       [
+        "    #[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3b (docs/CODE-REDUCTION-rc10.md; the primary 2026-11-12 05:25Z): the rest of the dead code: types no Switch build uses and what touches them are removed, or moved behind #[cfg(test)] where only tests use them"
     }
    ]
   },
@@ -1072,7 +1194,7 @@
    "dest": "src/model/swap/source_lifetime.rs",
    "crate": "root",
    "src_sha256": "9908fbdce2de0082c581e18c4a452ba4ac1e1cc18fac63b7f954f8b8e96aecaf",
-   "dest_sha256": "772ead985d7d03ea56a841d3ef4d351ddeaf4b8b65a9dd6607b59ef2c33083b0",
+   "dest_sha256": "01a5f9f1e82fcc8428ddb24559298ced8b3894ebd7a9eb9f5dc25ab04a7d214f",
    "edits": [
     {
      "old": "    /// Every acquire owns a distinct lease, even when holder values are equal.\n",
@@ -1211,6 +1333,79 @@
       ]
      ],
      "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
+    },
+    {
+     "line_patch": [
+      [
+       82,
+       84,
+       []
+      ],
+      [
+       177,
+       176,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       206,
+       205,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       214,
+       213,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       244,
+       243,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       259,
+       258,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       274,
+       273,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       298,
+       297,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       338,
+       337,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       347,
+       346,
+       [
+        "    #[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3b (docs/CODE-REDUCTION-rc10.md; the primary 2026-11-12 05:25Z): the rest of the dead code: types no Switch build uses and what touches them are removed, or moved behind #[cfg(test)] where only tests use them"
     }
    ]
   },
@@ -1326,7 +1521,7 @@
    "dest": "src/model/swap/roster_grid.rs",
    "crate": "tui",
    "src_sha256": "90f7eaf48933ccfb39e4696cb8dd38782dfd194630bfd031ed4bbf2442cc5d20",
-   "dest_sha256": "4ea86d81754ff228b8e6fd3d959f4ba19adae7cb724e54ba2bc24d97934a9291",
+   "dest_sha256": "250492ea97fbcadc63f6630907cf4aa9a6889d25519ce9edd132577c8b34013c",
    "edits": [
     {
      "old": "pub fn css_order(kinds: &[u32], values: &[u8], excluded: Option<u32>) -> Vec<u32> {\n    GRID.iter()\n        .filter_map(|slot| match slot {\n            Slot::Fighter(kind, _) => Some(*kind),\n            Slot::Shared(group) => {\n                let default = group.forms()[0].0;\n                Some(\n                    selected_group_index(kinds, values, default)\n                        .map(|i| kinds[i])\n                        .unwrap_or(default),\n                )\n            }\n            _ => None,\n        })\n        .filter(|kind| kinds.contains(kind) && excluded.map(group_kind) != Some(group_kind(*kind)))\n        .collect()\n}",
@@ -1445,6 +1640,51 @@
       ]
      ],
      "reason": "rc.10 S2 (docs/CODE-REDUCTION-rc10.md; docs/DECISIONS.md, D11 superseded): the always-on Cargo features are not switches; their cfg gates are removed and the code that compiled only with one off is deleted"
+    },
+    {
+     "line_patch": [
+      [
+       22,
+       29,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       189,
+       188,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       212,
+       211,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       237,
+       236,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       260,
+       265,
+       []
+      ],
+      [
+       268,
+       267,
+       [
+        "    #[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3b (docs/CODE-REDUCTION-rc10.md; the primary 2026-11-12 05:25Z): the rest of the dead code: types no Switch build uses and what touches them are removed, or moved behind #[cfg(test)] where only tests use them"
     }
    ]
   },
@@ -1655,7 +1895,7 @@
    "dest": "src/model/mii/capacity.rs",
    "crate": "mii",
    "src_sha256": "5d1c327198a51570b05277dde4bacc9260b6a1c92341eba4fcaf1c2d8178838e",
-   "dest_sha256": "3a07a81047541429e87858b6f5086e2365a2d29593152f945c201abf7adbea70",
+   "dest_sha256": "aa5cdd401abd1c0ebbcbf605b29320ee5789064d95ade83dc9e57df9631ec600",
    "edits": [
     {
      "old": "        let Some(index) = extra_slots(self.layout).iter().position(|value| *value == slot)\n            .filter(|index| self.entries[*index] != 0) else {\n            return Err(\"extra slot is not a registered creation\");\n        };\n        self.roots[index].ok_or(\"extra registered roots unavailable\")\n    }\n\n    /// A registered extra's current native roots must equal its registration.\n    /// Raw values only; the caller reads them from current roots under its lock.\n    pub fn owned_roots(\n",
@@ -1744,6 +1984,18 @@
       ]
      ],
      "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
+    },
+    {
+     "line_patch": [
+      [
+       91,
+       90,
+       [
+        "    #[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3b (docs/CODE-REDUCTION-rc10.md; the primary 2026-11-12 05:25Z): the rest of the dead code: types no Switch build uses and what touches them are removed, or moved behind #[cfg(test)] where only tests use them"
     }
    ]
   },
@@ -1817,7 +2069,7 @@
    "dest": "src/model/mii/draft.rs",
    "crate": "mii",
    "src_sha256": "fdd17191625c0bf1c132758259fd93d0cac53f8f42314b6a8d0cf83fab3d7b21",
-   "dest_sha256": "f9a53ec91bcca40258509449862c101b6b92b02b5df8dc6c9ae6dea6b79b349a",
+   "dest_sha256": "cad8dd52911653a69659e3fdf9c6d38ebf6116705d29a36236583e82b621b9d6",
    "edits": [
     {
      "table_tests": true,
@@ -1844,6 +2096,32 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "line_patch": [
+      [
+       11,
+       10,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       17,
+       16,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       103,
+       102,
+       [
+        "    #[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3b (docs/CODE-REDUCTION-rc10.md; the primary 2026-11-12 05:25Z): the rest of the dead code: types no Switch build uses and what touches them are removed, or moved behind #[cfg(test)] where only tests use them"
     }
    ]
   },
@@ -1852,7 +2130,7 @@
    "dest": "src/model/mii/draft_store.rs",
    "crate": "mii",
    "src_sha256": "dcca386efde444feee28fedd097cc5acb3b3f8c98353335d04a995305bf17451",
-   "dest_sha256": "1ca7bdf524f9fe4875cc1e5c35fd28d3e79787aaa4a1097d2af17494d8b7909d",
+   "dest_sha256": "1a25b80fcad17c3102949bbaaa8d6e63b9d39019b25889e4605b0f79b26c9a7b",
    "edits": [
     {
      "old": ".args([\"--exact\", \"draft_store::tests::preset_continues_in_a_fresh_process\", \"--nocapture\"])",
@@ -1889,6 +2167,27 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "line_patch": [
+      [
+       4,
+       4,
+       [
+        "use {crate::engine::mii::draft::{Library, Saved}, crate::engine::mii::inventory::Snapshot};",
+        "#[cfg(test)]",
+        "use crate::engine::mii::draft::Draft;"
+       ]
+      ],
+      [
+       39,
+       38,
+       [
+        "    #[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3b (docs/CODE-REDUCTION-rc10.md; the primary 2026-11-12 05:25Z): the rest of the dead code: types no Switch build uses and what touches them are removed, or moved behind #[cfg(test)] where only tests use them"
     }
    ]
   },
@@ -2057,7 +2356,28 @@
    "dest": "src/model/mii/ldn_handshake.rs",
    "crate": "mii",
    "src_sha256": "c182743b5387af42b2c19f2d701287e18370c3361f53ba50a74a2d9fa3f8c7bf",
-   "dest_sha256": "c182743b5387af42b2c19f2d701287e18370c3361f53ba50a74a2d9fa3f8c7bf"
+   "dest_sha256": "348d2916e84ce38574d2514fe6c83463ffd8a6b15c7bdd4fe3a8aaa30ff7d52d",
+   "edits": [
+    {
+     "line_patch": [
+      [
+       44,
+       43,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       137,
+       136,
+       [
+        "    #[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3b (docs/CODE-REDUCTION-rc10.md; the primary 2026-11-12 05:25Z): the rest of the dead code: types no Switch build uses and what touches them are removed, or moved behind #[cfg(test)] where only tests use them"
+    }
+   ]
   },
   {
    "src": "training_mod_mii/src/lib.rs",
@@ -2078,7 +2398,7 @@
    "dest": "src/model/mii/lifetime.rs",
    "crate": "mii",
    "src_sha256": "c5ae4c4aa0aaaacbf795debce87f951fa1332a83ecee6743af029ceb0387feb0",
-   "dest_sha256": "dc32b5e7e790edf136de2e534fc5f5cb7bc6fc51d411faff9cdc93e2d5db07bd",
+   "dest_sha256": "e156e6e21f285bde9dbb2f12483f43385b2142e5d77f73f2e6c451d58d7da182",
    "edits": [
     {
      "old": "#[derive(Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]\n#[serde(try_from = \"StoredConfiguration\", into = \"StoredConfiguration\")]\npub struct Configuration {\n    canonical: Canonical,\n    charinfo: [u8; CHARINFO_LEN],\n    tokens: Tokens,\n}\n",
@@ -2172,6 +2492,18 @@
       ]
      ],
      "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
+    },
+    {
+     "line_patch": [
+      [
+       437,
+       436,
+       [
+        "    #[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3b (docs/CODE-REDUCTION-rc10.md; the primary 2026-11-12 05:25Z): the rest of the dead code: types no Switch build uses and what touches them are removed, or moved behind #[cfg(test)] where only tests use them"
     }
    ]
   },
@@ -2311,7 +2643,7 @@
    "dest": "src/model/mii/ordinary_cpu.rs",
    "crate": "mii",
    "src_sha256": "e4628b4e3e7a00dc2c29d715b9755284f5afa3446513824912066178f0cc6caf",
-   "dest_sha256": "fb64e19e907e5d3383f2c872e10fb0921e1594861903093025be8a45665260ac",
+   "dest_sha256": "4e3a245a174fc50d955783c4258bfddf397f9a94f18e71caef63307818cc109a",
    "edits": [
     {
      "old": "/// and an extra index/selector equal to the destination refuses. A protected set\n/// that cannot fit the fixed record table refuses instead of truncating.\npub fn assignment_with(layout:crate::engine::mii::backend::Layout,extras:crate::engine::mii::capacity::Extras,\n    destination:usize,owners:&[Option<Owner>;8])->Option<[Option<u16>;8]> {\n    if !layout.selector(destination) || extras.entry(destination).is_some() {return None;}\n    if !layout.shape_with(&owners.map(|o|o.map_or(0,|o|o.entry)),extras) {\n        return None;\n    }\n    let mut protected = [None; 8];\n    let mut used = 0;\n",
@@ -2523,6 +2855,67 @@
       ]
      ],
      "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
+    },
+    {
+     "line_patch": [
+      [
+       4,
+       3,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       5,
+       4,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       404,
+       403,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       547,
+       546,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       552,
+       551,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       555,
+       554,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       866,
+       865,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       880,
+       879,
+       [
+        "#[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3b (docs/CODE-REDUCTION-rc10.md; the primary 2026-11-12 05:25Z): the rest of the dead code: types no Switch build uses and what touches them are removed, or moved behind #[cfg(test)] where only tests use them"
     }
    ]
   },
@@ -2531,7 +2924,7 @@
    "dest": "src/model/mii/ordinary_player.rs",
    "crate": "mii",
    "src_sha256": "602bba789924053897d816ea58b838f135f8cec49c8e955a4249d5687cf9b7d6",
-   "dest_sha256": "7238b463c4371f3190f299f5b0026e893f1579ffba265dad723864cd962fbd6c",
+   "dest_sha256": "ff51081c19ec4b0a9e966e3c3627b563b1966cf5aa7cca27a0e04048cd0dca10",
    "edits": [
     {
      "table_tests": true,
@@ -2613,6 +3006,23 @@
       ]
      ],
      "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
+    },
+    {
+     "line_patch": [
+      [
+       108,
+       107,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       499,
+       499,
+       []
+      ]
+     ],
+     "reason": "rc.10 S3b (docs/CODE-REDUCTION-rc10.md; the primary 2026-11-12 05:25Z): the rest of the dead code: types no Switch build uses and what touches them are removed, or moved behind #[cfg(test)] where only tests use them"
     }
    ]
   },
@@ -2628,7 +3038,7 @@
    "dest": "src/model/mii/replay.rs",
    "crate": "mii",
    "src_sha256": "dd58afdd5a0bcfeff0dd6a53708d1aebb509e46e15552edc04859632897df7c7",
-   "dest_sha256": "8577c6c4c21012deea87ff24b8e9ea1f27dcb094b0c50f03e310e7b78ac04188",
+   "dest_sha256": "f521f0f4996c741f36f95f86cee85e00b4a56c554643794b3dd9eebfd69b958c",
    "edits": [
     {
      "table_tests": true,
@@ -2677,6 +3087,18 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "line_patch": [
+      [
+       78,
+       77,
+       [
+        "    #[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3b (docs/CODE-REDUCTION-rc10.md; the primary 2026-11-12 05:25Z): the rest of the dead code: types no Switch build uses and what touches them are removed, or moved behind #[cfg(test)] where only tests use them"
     }
    ]
   },
@@ -2685,7 +3107,7 @@
    "dest": "src/model/mii/role_adapter.rs",
    "crate": "mii",
    "src_sha256": "cca266fa21fda3309c2318353ba07b4ff20dc53dc41a2f5bc2fbc9a29356e53f",
-   "dest_sha256": "d44d208137518557ec05a5ddde433a77dd49b295d0749eb67abd97693dd55eb2",
+   "dest_sha256": "569d1366bf7950d9d1c6262d457bac00af8dd47ac1f7fe0ed750f20701d2a97c",
    "edits": [
     {
      "line_patch": [
@@ -2705,6 +3127,16 @@
       ]
      ],
      "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
+    },
+    {
+     "line_patch": [
+      [
+       284,
+       286,
+       []
+      ]
+     ],
+     "reason": "rc.10 S3b (docs/CODE-REDUCTION-rc10.md; the primary 2026-11-12 05:25Z): the rest of the dead code: types no Switch build uses and what touches them are removed, or moved behind #[cfg(test)] where only tests use them"
     }
    ]
   },
@@ -2713,7 +3145,7 @@
    "dest": "src/model/mii/role_owner.rs",
    "crate": "mii",
    "src_sha256": "827c41e73a22759abc5030859250e699425bf568795b56dd83338c23774e2adb",
-   "dest_sha256": "cc4b14febca0af54b3ccfe7894df7805f791aeaf5732ba2aa0693c08bed3e746",
+   "dest_sha256": "2c1017fa264ff8684d03eefa388dbdd3fb7915af8efcf51a741f804cf574e072",
    "edits": [
     {
      "table_tests": true,
@@ -2750,6 +3182,18 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "line_patch": [
+      [
+       13,
+       12,
+       [
+        "#[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3b (docs/CODE-REDUCTION-rc10.md; the primary 2026-11-12 05:25Z): the rest of the dead code: types no Switch build uses and what touches them are removed, or moved behind #[cfg(test)] where only tests use them"
     }
    ]
   },
@@ -2914,7 +3358,7 @@
    "dest": "src/model/mii/transition.rs",
    "crate": "mii",
    "src_sha256": "e3cacfe4b9540f009acf22e17a98742dd7ae9b1c376a04858308803b3f56befb",
-   "dest_sha256": "2fc64cd6582e1704f91f4a6c72cf6f918b3bd8703eb55e8f0f2fed96ef2f138f",
+   "dest_sha256": "776c8119c73aa0ddbeda95e50d089777456e8f4680482f056a214158ff80b652",
    "edits": [
     {
      "table_tests": true,
@@ -2941,6 +3385,182 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "line_patch": [
+      [
+       23,
+       22,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       25,
+       25,
+       [
+        "use crate::engine::mii::identity::Identity;",
+        "#[cfg(test)]",
+        "use crate::engine::mii::identity::{verify, ExpectedMutation, Mismatch};",
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       28,
+       27,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       30,
+       29,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       32,
+       31,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       36,
+       35,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       50,
+       49,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       64,
+       63,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       75,
+       74,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       82,
+       81,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       138,
+       137,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       147,
+       146,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       155,
+       154,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       167,
+       166,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       176,
+       175,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       204,
+       203,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       215,
+       214,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       272,
+       271,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       297,
+       296,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       302,
+       301,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       312,
+       311,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       317,
+       316,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       328,
+       327,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       333,
+       332,
+       [
+        "#[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3b (docs/CODE-REDUCTION-rc10.md; the primary 2026-11-12 05:25Z): the rest of the dead code: types no Switch build uses and what touches them are removed, or moved behind #[cfg(test)] where only tests use them"
     }
    ]
   },
@@ -2949,7 +3569,7 @@
    "dest": "src/model/swap/body_bank.rs",
    "crate": "consts",
    "src_sha256": "ab3c4adcf084b2dd9433a5fe5715b428fb38c26d3b143d7632fb3d33078df0d6",
-   "dest_sha256": "f32b4a6849b624d3bfd384c1ca9d9dd3c30394c25f3695d24a5535bae025c9e9",
+   "dest_sha256": "08b914ed70dad758e01705332f60336bf77bd849a05edaeea3c8f9a22f0ecaf7",
    "edits": [
     {
      "old": "    // a native group): count it so hats and helper slots agree with the planner.\n    let used: usize = windows.iter().map(|window| window.map_or(1, |members| members.count())).sum::<usize>()\n        + existing.iter().flat_map(|groups| groups.iter()).map(|members| members.count()).sum::<usize>()\n        + budget.hats_wanted;\n    let mut remaining = budget.ready_fighters.saturating_sub(used).min(budget.pool_free);\n    // (lane depth, kind): depth is the distance from the live fighter, so a role\n    // whose nearer neighbours are already built does not outrank the other role.\n    let mut candidates: [Vec<(usize, u32)>; 2] = [Vec::new(), Vec::new()];\n    // Whole special groups (PT, Aegis, the pair) at their lane depth.\n    let mut specials: [Vec<(usize, Members)>; 2] = [Vec::new(), Vec::new()];\n    let mut room = [0usize; 2];\n    let mut group_slots = [0usize; 2];\n    for role in 0..2 {\n        let Some(window) = windows[role].filter(|window| window_swappable_with(*window, policy)) else { continue; };\n        group_slots[role] = MAX_EXTRA_GROUPS.saturating_sub(existing[role].len());\n        room[role] = group_slots[role] * NATIVE_MEMBERS;\n        for (depth, &kind) in upcoming[role].iter().enumerate() {\n            if exclude[role] == Some(kind)\n                || window.index_of(kind).is_some()\n                || existing[role].iter().any(|group| group.index_of(kind).is_some())\n            { continue; }\n            if let Some(group) = Members::special_group(kind, budget.special) {\n                // One Mii identity per resource owner: a second lane Mii, or a\n                // Mii group this role already holds, stays canonical (DESIGN \u00a72).\n                let second_mii = group.special() == Special::Mii\n                    && (specials[role].iter().any(|(_, held)| held.special() == Special::Mii)\n                        || existing[role].iter().any(|held| held.special() == Special::Mii));\n                if !second_mii && !specials[role].iter().any(|(_, held)| held.kinds()[0] == group.kinds()[0]) {\n                    specials[role].push((depth, group));\n                }\n                continue;\n            }\n            if group_member_kind(kind, policy) && !candidates[role].iter().any(|(_, held)| *held == kind) {\n                candidates[role].push((depth, kind));\n            }\n        }\n    }\n    // Special groups are taken whole at their own lane depth, interleaved with\n    // the ordinary candidates; one that no longer fits the remaining bodies or a\n    // free group slot is skipped, never split.\n    let mut chosen_special: [Vec<Members>; 2] = [Vec::new(), Vec::new()];\n    let mut scursor = [0usize; 2];\n    let mut chosen: [Vec<u32>; 2] = [Vec::new(), Vec::new()];\n    let mut cursor = [0usize; 2];\n    let take = |role: usize, chosen: &mut [Vec<u32>; 2], cursor: &mut [usize; 2], remaining: &mut usize| -> bool {\n        if *remaining == 0 || cursor[role] >= candidates[role].len() || chosen[role].len() >= room[role] {\n            return false;\n        }\n        chosen[role].push(candidates[role][cursor[role]].1);\n        cursor[role] += 1;\n        *remaining -= 1;\n        true\n    };\n    let deepest = upcoming.iter().map(|lane| lane.len()).max().unwrap_or(0);\n    for depth in 0..deepest {\n        for role in 0..2 {\n            if cursor[role] < candidates[role].len() && candidates[role][cursor[role]].0 == depth {\n                take(role, &mut chosen, &mut cursor, &mut remaining);\n            } else if scursor[role] < specials[role].len() && specials[role][scursor[role]].0 == depth {\n                let group = specials[role][scursor[role]].1;\n                scursor[role] += 1;\n                let slots_used = chosen_special[role].len() + chosen[role].len().div_ceil(NATIVE_MEMBERS);\n                if remaining >= group.count() && slots_used < group_slots[role] {\n                    chosen_special[role].push(group);\n                    remaining -= group.count();\n",
@@ -3972,6 +4592,65 @@
       ]
      ],
      "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
+    },
+    {
+     "line_patch": [
+      [
+       39,
+       43,
+       []
+      ],
+      [
+       697,
+       696,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       1447,
+       1446,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       1451,
+       1450,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       1842,
+       1841,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       1851,
+       1850,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       1970,
+       1969,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       1971,
+       1970,
+       [
+        "    #[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3b (docs/CODE-REDUCTION-rc10.md; the primary 2026-11-12 05:25Z): the rest of the dead code: types no Switch build uses and what touches them are removed, or moved behind #[cfg(test)] where only tests use them"
     }
    ]
   },
@@ -4150,7 +4829,7 @@
    "dest": "src/model/swap/body_bank/mii_publish.rs",
    "crate": "consts",
    "src_sha256": "27966b691dd20370a74df9dabe406316f7ae39f900b1f8165f0870be03fb927f",
-   "dest_sha256": "9accdc61de574fb9bcc9fbe313e8ca741bff078685e981a914a2140451fb0b98",
+   "dest_sha256": "1a01b2b4cc385e91d1bfadcded5944238b145299e5839c0b8cf6949b19509603",
    "edits": [
     {
      "table_tests": true,
@@ -4194,6 +4873,18 @@
       ]
      ],
      "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
+    },
+    {
+     "line_patch": [
+      [
+       59,
+       58,
+       [
+        "    #[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3b (docs/CODE-REDUCTION-rc10.md; the primary 2026-11-12 05:25Z): the rest of the dead code: types no Switch build uses and what touches them are removed, or moved behind #[cfg(test)] where only tests use them"
     }
    ]
   },
@@ -4319,7 +5010,7 @@
    "dest": "src/model/swap/swap_model/copy_packages.rs",
    "crate": "consts",
    "src_sha256": "a39d0ce52841ce038c3d0e67a8c747a87e5a182edef9a03b03487e508ee0c655",
-   "dest_sha256": "5550a0bd93cb2968cb34f50fd7b6f48cabba682eb2084fce40310167b0469d9e",
+   "dest_sha256": "bd5d48642b084ff34f3ca6ab694f55da5e9fc97043b4910e9e9abfc3057f24f0",
    "edits": [
     {
      "old": "//! member set it may register, exactly what the completion would take for that set\n//! ([`acquisitions`]). It releases each with the same inputs (exact inverse), and admits a\n//! registration only once G68 reports ready.\n\nuse super::copy_registry::{registry_costume, Registry, Roster, ENTRIES, NO_KIND, SUBS};\nuse super::request_bit::{acquired_keys, completion_members, copy_key, released_keys};\nuse std::collections::BTreeMap;\n\n/// One native acquisition `0x17efb40(G68, roster, member, costume)`. Its release is\n/// `0x17f0290(G68, roster, member, costume)` with the same values.\n#[derive(Clone, Debug, PartialEq, Eq)]\npub struct Acquisition {\n    pub set: [u32; SUBS],\n    pub member: u32,\n    pub costume: u32,\n    pub roster: Roster,\n",
@@ -4425,6 +5116,70 @@
       ]
      ],
      "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
+    },
+    {
+     "line_patch": [
+      [
+       33,
+       34,
+       [
+        "use super::copy_registry::{registry_costume, Roster, ENTRIES, NO_KIND, SUBS};",
+        "#[cfg(test)]",
+        "use super::copy_registry::Registry;",
+        "use super::request_bit::{acquired_keys_iter, completion_members_iter};",
+        "#[cfg(test)]",
+        "use super::request_bit::{acquired_keys, copy_key};"
+       ]
+      ],
+      [
+       74,
+       73,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       88,
+       87,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       103,
+       102,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       129,
+       128,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       136,
+       135,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       142,
+       141,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       209,
+       211,
+       []
+      ]
+     ],
+     "reason": "rc.10 S3b (docs/CODE-REDUCTION-rc10.md; the primary 2026-11-12 05:25Z): the rest of the dead code: types no Switch build uses and what touches them are removed, or moved behind #[cfg(test)] where only tests use them"
     }
    ]
   },
@@ -4433,7 +5188,7 @@
    "dest": "src/model/swap/swap_model/copy_registry.rs",
    "crate": "consts",
    "src_sha256": "ae8205b2e710ea906058b3dfedb8675327113bdca5c0e71eddb96af4c509853f",
-   "dest_sha256": "4720a1932240003df7e05d76682f0fedd77ffe8bbf83c3323698c6d63c1d2c93",
+   "dest_sha256": "cabc3a608a1364a32fcc4182e322bce31f5399135c12ad57efb776e511de05eb",
    "edits": [
     {
      "table_tests": true,
@@ -4464,6 +5219,88 @@
       ]
      ],
      "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
+    },
+    {
+     "line_patch": [
+      [
+       32,
+       31,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       38,
+       37,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       39,
+       38,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       46,
+       45,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       70,
+       69,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       103,
+       102,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       111,
+       110,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       119,
+       118,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       124,
+       123,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       133,
+       132,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       137,
+       136,
+       [
+        "#[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3b (docs/CODE-REDUCTION-rc10.md; the primary 2026-11-12 05:25Z): the rest of the dead code: types no Switch build uses and what touches them are removed, or moved behind #[cfg(test)] where only tests use them"
     }
    ]
   },
@@ -4592,7 +5429,7 @@
    "dest": "src/model/swap/swap_model/ledger.rs",
    "crate": "consts",
    "src_sha256": "900a579c038101633b6234a001024943cbea9a6e88df249aa1eee89ff7bf8487",
-   "dest_sha256": "c68d5ad617988a24360c67392e9455091e1a78469a52d3ce2a07a40707cd2341",
+   "dest_sha256": "2ded87702225054d6ec65b272cfa12fcadf433909b1a00a13d90c783a22b0697",
    "edits": [
     {
      "old": "    pub const fn with(self, n: u8) -> Self { KeySet(self.0 | (1 << n)) }\n    pub const fn minus(self, other: KeySet) -> KeySet { KeySet(self.0 & !other.0) }\n    pub const fn union(self, other: KeySet) -> KeySet { KeySet(self.0 | other.0) }\n    pub const fn is_empty(self) -> bool { self.0 == 0 }\n    pub const fn len(self) -> usize { self.0.count_ones() as usize }\n    pub fn iter(self, kind: u32) -> impl Iterator<Item = KeyId> {\n        (0u8..8).filter(move |n| self.contains(*n)).map(move |n| KeyId { kind, n })\n    }\n}\n\n/// Resource-owner bytes the key rules depend on: `R+0x48`, `R+0x7d`, `R+0x7f` (module doc).\n",
@@ -4733,6 +5570,164 @@
       ]
      ],
      "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
+    },
+    {
+     "line_patch": [
+      [
+       56,
+       55,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       59,
+       58,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       76,
+       75,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       99,
+       98,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       326,
+       325,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       328,
+       328,
+       []
+      ],
+      [
+       339,
+       341,
+       []
+      ],
+      [
+       374,
+       373,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       376,
+       375,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       397,
+       399,
+       []
+      ],
+      [
+       404,
+       403,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       416,
+       415,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       423,
+       422,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       432,
+       431,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       445,
+       444,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       463,
+       465,
+       []
+      ],
+      [
+       468,
+       467,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       492,
+       491,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       523,
+       522,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       529,
+       528,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       620,
+       619,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       709,
+       708,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       738,
+       737,
+       [
+        "    #[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3b (docs/CODE-REDUCTION-rc10.md; the primary 2026-11-12 05:25Z): the rest of the dead code: types no Switch build uses and what touches them are removed, or moved behind #[cfg(test)] where only tests use them"
     }
    ]
   },
@@ -4741,7 +5736,7 @@
    "dest": "src/model/swap/swap_model/lifecycle.rs",
    "crate": "consts",
    "src_sha256": "8bfb6a934f7d9250c7800ae01bbbd3372caa737fdba33cbbed9ea95b07a9275b",
-   "dest_sha256": "38984b5f0922b24a5f0e72104b2313f61163a0145e7c385e5bf963d1989469fb",
+   "dest_sha256": "59904184aa74fc75c624c32d0f24705e982cc81d6fff424ad49e3e048799adfb",
    "edits": [
     {
      "old": "impl Phases {\n    fn route(&mut self, slot: u8, controller: usize) {\n        if !self.routes.iter().any(|(s, _)| *s == slot) { self.routes.push((slot, controller)); }\n    }\n\n    /// Every route slot naming one of `controllers` is cleared first (D-PTA1c).\n    fn routes_for(&mut self, owner: u32, controllers: &[usize], consumers: &NativeConsumers) {\n        for route in consumers.pad_routes.iter().flatten() {\n            if route.controller != 0 && controllers.contains(&route.controller) { self.route(route.slot, route.controller); }\n        }\n        // Nana's route (`owner+8`, U2): the same rule from the separately probed word.\n        if let Some(controller) = consumers.nana_owner_plus_8 {\n            let slot = owner.saturating_add(8);\n            if controller != 0 && slot < PAD_SLOTS as u32 && controllers.contains(&controller) { self.route(slot as u8, controller); }\n        }\n    }\n\n    /// Kirby fields count only `valid` refs: an invalid ref's `kind` is the planned kind, not the\n    /// body's own `+0xc` that `unprepare` reads (Yoga `m4b3` #140: the incoming window's Kirby\n",
@@ -4823,6 +5818,109 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "line_patch": [
+      [
+       121,
+       120,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       126,
+       125,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       137,
+       136,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       140,
+       139,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       167,
+       166,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       174,
+       173,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       190,
+       189,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       309,
+       308,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       324,
+       323,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       404,
+       403,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       412,
+       411,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       427,
+       426,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       434,
+       433,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       447,
+       446,
+       [
+        "#[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3b (docs/CODE-REDUCTION-rc10.md; the primary 2026-11-12 05:25Z): the rest of the dead code: types no Switch build uses and what touches them are removed, or moved behind #[cfg(test)] where only tests use them"
     }
    ]
   },
@@ -4949,7 +6047,7 @@
    "dest": "src/model/swap/swap_model/occupancy.rs",
    "crate": "consts",
    "src_sha256": "e190e95a1db710a75729ba9c1b82798483e7d8cc7107bbed32d9fcfd0373da0a",
-   "dest_sha256": "9c86eb7b10d4069f976a6148514c06c520e570cefd4fd8f4057130d3938fbaa5",
+   "dest_sha256": "5ee84f3e1530b2639d7a3ce2d4649599d1be3e04f69357a514551ea1c86e4cda",
    "edits": [
     {
      "old": "//!   R while a member whose row has `prefetch_while_live: false` (Kirby) is live \u2014 *suspend*:\n//!   no acquisition while it is live; *drain*: a transition whose target is such a member must\n//!   first return every prefetched key (the planner drains Prefetched groups to Planned before the\n",
@@ -5064,6 +6162,27 @@
       ]
      ],
      "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
+    },
+    {
+     "line_patch": [
+      [
+       29,
+       29,
+       [
+        "use super::ledger::{Conflict, KindSet64, LiveConsumers, Role, Use};",
+        "#[cfg(test)]",
+        "use super::ledger::ReleaseFootprint;"
+       ]
+      ],
+      [
+       174,
+       173,
+       [
+        "#[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3b (docs/CODE-REDUCTION-rc10.md; the primary 2026-11-12 05:25Z): the rest of the dead code: types no Switch build uses and what touches them are removed, or moved behind #[cfg(test)] where only tests use them"
     }
    ]
   },
@@ -5132,7 +6251,7 @@
    "dest": "src/model/swap/swap_model/presentation.rs",
    "crate": "consts",
    "src_sha256": "9799543979d2cadb54791db843919ff133837d121b96695935ca5334c2ab6bde",
-   "dest_sha256": "a9f3d5628081795fde35613b2736b0e8defd73d9ca9810ac71a59788eccb4105",
+   "dest_sha256": "0582d8daa7e26df6f4dac98554d110f4b7a279d2f29eee3c4363f7a3aeababad",
    "edits": [
     {
      "table_tests": true,
@@ -5193,6 +6312,163 @@
       ]
      ],
      "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
+    },
+    {
+     "line_patch": [
+      [
+       17,
+       16,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       18,
+       17,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       19,
+       18,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       23,
+       22,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       26,
+       25,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       42,
+       41,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       58,
+       57,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       70,
+       69,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       88,
+       87,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       91,
+       90,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       94,
+       93,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       109,
+       108,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       112,
+       111,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       116,
+       115,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       119,
+       118,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       134,
+       133,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       138,
+       137,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       148,
+       147,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       200,
+       199,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       203,
+       202,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       211,
+       220,
+       []
+      ],
+      [
+       223,
+       222,
+       [
+        "#[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3b (docs/CODE-REDUCTION-rc10.md; the primary 2026-11-12 05:25Z): the rest of the dead code: types no Switch build uses and what touches them are removed, or moved behind #[cfg(test)] where only tests use them"
     }
    ]
   },
@@ -5201,7 +6477,7 @@
    "dest": "src/model/swap/swap_model/request_bit.rs",
    "crate": "consts",
    "src_sha256": "38def5e05fd40dcc04450002c012aa62e35a68630851ec69e382db46c82ddf73",
-   "dest_sha256": "a2115757d8f1028ef15110f600aee1d98a0bdfbbd668af30edf33158ba10c23b",
+   "dest_sha256": "d62e356005b9428467ad2fda0ca0b5ddf11673eb1aec443726d5cf621e2ba7bf",
    "edits": [
     {
      "old": "/// `0x17efb40(G68, roster, kind, costume)` as its control flow (`0x17efb50\u20130x17eff9c`): Kirby takes a\n/// key per kind of every record whose first kind is neither `-1` nor Kirby (the second and third\n/// unless `0x4b/0x4c/-1`) under `costume`; any other kind takes its own key once per Kirby record,\n/// under that record's `+0x51`.\npub fn acquired_keys(roster: &Roster, kind: u32, costume: u32) -> Vec<u32> {\n    let mut keys = Vec::new();\n    if kind == KIRBY {\n        for record in roster {\n            let [k0, k1, k2] = record.kinds;\n            if k0 == NO_KIND || k0 == KIRBY { continue; }\n            keys.extend(copy_key(k0, costume));\n            for k in [k1, k2] {\n                if (POPO..=NANA).contains(&k) || k == NO_KIND { continue; }\n                keys.extend(copy_key(k, costume));\n            }\n        }\n    } else {\n        for record in roster {\n            if record.kinds[0] == KIRBY { keys.extend(copy_key(kind, record.costume)); }\n        }\n    }\n    keys\n}\n\n/// `0x17f0290(G68, roster, kind, costume)`, transcribed a second time from its own listing (not\n/// from [`acquired_keys`]): early exit for `-1`, `0x4d..=0x50` or negative (`0x17f02a4\u20130x17f02bc`);\n/// Kirby walks the records (`0x17f03ac\u20130x17f03c8`), the first kind unless `-1`/Kirby\n",
@@ -5323,6 +6599,126 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "line_patch": [
+      [
+       43,
+       43,
+       [
+        "use super::copy_registry::{Roster, KIRBY, NO_KIND};",
+        "#[cfg(test)]",
+        "use super::copy_registry::{Record, ENTRIES, SUBS};",
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       49,
+       48,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       73,
+       72,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       100,
+       99,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       129,
+       128,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       185,
+       184,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       197,
+       196,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       213,
+       212,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       288,
+       287,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       300,
+       299,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       308,
+       307,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       318,
+       317,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       337,
+       336,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       345,
+       344,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       369,
+       368,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       386,
+       385,
+       [
+        "#[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3b (docs/CODE-REDUCTION-rc10.md; the primary 2026-11-12 05:25Z): the rest of the dead code: types no Switch build uses and what touches them are removed, or moved behind #[cfg(test)] where only tests use them"
     }
    ]
   },
@@ -5494,7 +6890,49 @@
    "dest": "src/model/swap/swap_model/target.rs",
    "crate": "consts",
    "src_sha256": "a50f4d78e65979b273ddc3dace302ef701047e446dbf973d2a7c4bb0a6a0cd20",
-   "dest_sha256": "19eacf4ec053ac9298bbe2700c83fe1b40fc6790929f915f0287d26d24c2bfa5"
+   "dest_sha256": "2d97f89fffb6532b6a23c508c54b0841e3cbd54f43ebda2cb0aad0807eddd8a5",
+   "edits": [
+    {
+     "line_patch": [
+      [
+       10,
+       9,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       13,
+       12,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       28,
+       27,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       40,
+       39,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       48,
+       47,
+       [
+        "#[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3b (docs/CODE-REDUCTION-rc10.md; the primary 2026-11-12 05:25Z): the rest of the dead code: types no Switch build uses and what touches them are removed, or moved behind #[cfg(test)] where only tests use them"
+    }
+   ]
   },
   {
    "src": "training_mod_consts/src/swap_model/tests.rs",
@@ -6125,7 +7563,7 @@
    "dest": "src/model/swap/identity_view.rs",
    "crate": "consts",
    "src_sha256": "a263f5fe3881315a37a9bd0cf159f691f79df7db800d85d923b51d63ca2b8fa2",
-   "dest_sha256": "3478eb7a299e38d7630afbeadcdad0a8cbc6aab5359284239b6877a510afbd16",
+   "dest_sha256": "41839a90e168f0855dae577b2aea06f8f7bdd8c750e335d70d0c2fc83640eeda",
    "edits": [
     {
      "table_tests": true,
@@ -6211,6 +7649,18 @@
       ]
      ],
      "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
+    },
+    {
+     "line_patch": [
+      [
+       142,
+       141,
+       [
+        "#[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3b (docs/CODE-REDUCTION-rc10.md; the primary 2026-11-12 05:25Z): the rest of the dead code: types no Switch build uses and what touches them are removed, or moved behind #[cfg(test)] where only tests use them"
     }
    ]
   },
@@ -6399,7 +7849,7 @@
    "dest": "src/model/swap/ordered_roster.rs",
    "crate": "consts",
    "src_sha256": "d51c3fa83b6288383d654a6e9fb4721d194317c6e9cbc1b11cfde1d2230b103f",
-   "dest_sha256": "bada80dc3e6bb2021b2a299bdd98c77251846666455f179c4f2f9fc22406cfed",
+   "dest_sha256": "71bbc6040d39e4d2c7535e938406b1a26273a467b3de0d7a4f6a80b7950b58dd",
    "edits": [
     {
      "old": "use {training_mod_tui::StatefulTable, training_mod_tui::SubMenu, training_mod_tui::SubMenuType, training_mod_tui::Toggle, crate::engine::compat::grid::NX_SUBMENU_COLUMNS, training_mod_tui::NX_SUBMENU_ROWS};\n",
@@ -6512,6 +7962,16 @@
       ]
      ],
      "reason": "rc.10 S2 (docs/CODE-REDUCTION-rc10.md; docs/DECISIONS.md, D11 superseded): the always-on Cargo features are not switches; their cfg gates are removed and the code that compiled only with one off is deleted"
+    },
+    {
+     "line_patch": [
+      [
+       66,
+       72,
+       []
+      ]
+     ],
+     "reason": "rc.10 S3b (docs/CODE-REDUCTION-rc10.md; the primary 2026-11-12 05:25Z): the rest of the dead code: types no Switch build uses and what touches them are removed, or moved behind #[cfg(test)] where only tests use them"
     }
    ]
   },
@@ -6520,7 +7980,7 @@
    "dest": "src/model/swap/mii_cycle.rs",
    "crate": "consts",
    "src_sha256": "c413a3b1fe5ea1eadc36be20913a55a780bcbac58bf81dded0f0c278d4eb0fe2",
-   "dest_sha256": "0586545154d548429694814c07ca87a044e99b7a152afb05adab401ac10e74c8",
+   "dest_sha256": "4d7ee7473f707a94faffc1923062b0b2d40bdfb9992a49cad09d9c92916faa71",
    "edits": [
     {
      "old": "    let mut choices = Vec::with_capacity(ordered.len());\n",
@@ -6674,6 +8134,25 @@
       ]
      ],
      "reason": "rc.10 S2 (docs/CODE-REDUCTION-rc10.md; docs/DECISIONS.md, D11 superseded): the always-on Cargo features are not switches; their cfg gates are removed and the code that compiled only with one off is deleted"
+    },
+    {
+     "line_patch": [
+      [
+       173,
+       172,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       279,
+       278,
+       [
+        "#[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3b (docs/CODE-REDUCTION-rc10.md; the primary 2026-11-12 05:25Z): the rest of the dead code: types no Switch build uses and what touches them are removed, or moved behind #[cfg(test)] where only tests use them"
     }
    ]
   },
@@ -6682,7 +8161,7 @@
    "dest": "src/model/preload/cycle_preload_capacity.rs",
    "crate": "consts",
    "src_sha256": "4ebdbabc047d5540685b728840afd5862f940aec24ba8d0ff65e7f4c2d7ba07c",
-   "dest_sha256": "983f962fca178de01bfdb79b855eacb4622bc432a9370fec256335bc48e41556",
+   "dest_sha256": "fc06ff14e0b6cf7e89ba38da8a89cb05ba2d8a786bd87f5a90f205b144cf8270",
    "edits": [
     {
      "old": "//! Value-only capacity contract for cycle preloading. Counts and backend limits\n//! live here; the slot order is the single `mii::capacity` contract that Mii\n//! owner checks also use. Native ownership must still qualify every entry.\nuse crate::engine::mii::backend::Layout;\n\npub use crate::engine::mii::capacity::{capacity_index, extra_slots, Extras, ALL_EXTRA_SLOTS, BASE_HELPERS, EXTRA_SLOTS, MAX_TARGETS};\npub const ABSENT_SLOT: u32 = 8;\n\n/// Potential entries, not permission to create or dereference them. Training\n/// extensions and solo waiting extensions require separate opt-in features.\npub fn slots(layout: Layout, third: bool, ldn_third: bool, extended: bool)\n    -> [u32; MAX_TARGETS] {\n    slots_with_waiting(layout, third, ldn_third, extended, false)\n}\n\npub fn slots_with_waiting(layout: Layout, third: bool, ldn_third: bool, extended: bool, waiting: bool)\n    -> [u32; MAX_TARGETS] {\n    let mut slots = [ABSENT_SLOT; MAX_TARGETS];\n    slots[..BASE_HELPERS].copy_from_slice(&layout.helpers());\n    let extra_count = if !third { 0 } else {\n        match layout {\n            Layout::Training => if extended { EXTRA_SLOTS.len() } else { 1 },\n            Layout::Ldn => if waiting { extra_slots(layout).len() } else { usize::from(ldn_third) },\n",
@@ -6749,6 +8228,18 @@
       ]
      ],
      "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
+    },
+    {
+     "line_patch": [
+      [
+       61,
+       60,
+       [
+        "#[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3b (docs/CODE-REDUCTION-rc10.md; the primary 2026-11-12 05:25Z): the rest of the dead code: types no Switch build uses and what touches them are removed, or moved behind #[cfg(test)] where only tests use them"
     }
    ]
   },
@@ -7401,7 +8892,7 @@
    "dest": "src/model/stages/stage_forms.rs",
    "crate": "tui",
    "src_sha256": "104cea14a4d26ba7791ac7b432dd39f4e44b1e09340de932789a8596c318b500",
-   "dest_sha256": "4c1b227088ac5ec77814186157ddcffbe9d5353eed5faffafb2cb7743d34c6a5",
+   "dest_sha256": "3d5a1d3f73255b217dcd264025c2f5c0b4387d32f6d2f32003b909d3c427e819",
    "edits": [
     {
      "old": "pub(crate) enum HelpControls",
@@ -7455,6 +8946,39 @@
       ]
      ],
      "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
+    },
+    {
+     "line_patch": [
+      [
+       20,
+       19,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       28,
+       27,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       43,
+       42,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       70,
+       69,
+       [
+        "    #[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3b (docs/CODE-REDUCTION-rc10.md; the primary 2026-11-12 05:25Z): the rest of the dead code: types no Switch build uses and what touches them are removed, or moved behind #[cfg(test)] where only tests use them"
     }
    ]
   },
@@ -7798,7 +9322,7 @@
    "dest": "src/model/items/character_items.rs",
    "crate": "consts",
    "src_sha256": "57640dd2a5a9ea201d3a588e05bb950f5f7cecb551d602acfeeb44d0b5a3c2bf",
-   "dest_sha256": "1ff7c23463adfee2b9dc6a57545adb3ee59778c9eb12e1ed0d6190555693ced7",
+   "dest_sha256": "3821e1da5f6be98a151c99851ae757df4356079d412863a58072afc3286ad507",
    "edits": [
     {
      "old": "use {crate::StatefulTable, crate::SubMenu, crate::SubMenuType, crate::Toggle, crate::NX_SUBMENU_COLUMNS, crate::NX_SUBMENU_ROWS};\n",
@@ -7845,6 +9369,48 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "line_patch": [
+      [
+       2,
+       2,
+       [
+        "use serde::{Deserialize, Serialize};",
+        "#[cfg(test)]",
+        "use serde::{Deserializer, Serializer};"
+       ]
+      ],
+      [
+       19,
+       18,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       72,
+       71,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       84,
+       83,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       90,
+       89,
+       [
+        "#[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3b (docs/CODE-REDUCTION-rc10.md; the primary 2026-11-12 05:25Z): the rest of the dead code: types no Switch build uses and what touches them are removed, or moved behind #[cfg(test)] where only tests use them"
     }
    ]
   },
@@ -7853,7 +9419,7 @@
    "dest": "src/model/preload/cycle_preload_config.rs",
    "crate": "consts",
    "src_sha256": "49c8a777d9e7c728aa8ecc7a51df2f7990f3edf458fdf7163be3b82fa9e3bf01",
-   "dest_sha256": "bf851d3bf9f620e66c10319692ce7916d61518c1d388c4ddf6044b2e3f67055b",
+   "dest_sha256": "ba7a8c3a9ca2237581af50f7ba5295980649487ca30cd3a0f87de7b05b45e79a",
    "edits": [
     {
      "delete_from": "// The exported menu macro resolves these names at its use site.\nmod bank_submenu {",
@@ -8031,6 +9597,104 @@
       ]
      ],
      "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
+    },
+    {
+     "line_patch": [
+      [
+       16,
+       16,
+       [
+        "use std::io::Write;",
+        "#[cfg(test)]",
+        "use std::io::Read;"
+       ]
+      ],
+      [
+       424,
+       423,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       549,
+       548,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       565,
+       564,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       592,
+       591,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       834,
+       833,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       1049,
+       1048,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       1055,
+       1054,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       1066,
+       1065,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       1186,
+       1185,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       1211,
+       1210,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       1233,
+       1232,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       1253,
+       1252,
+       [
+        "#[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3b (docs/CODE-REDUCTION-rc10.md; the primary 2026-11-12 05:25Z): the rest of the dead code: types no Switch build uses and what touches them are removed, or moved behind #[cfg(test)] where only tests use them"
     }
    ]
   },
@@ -24131,7 +25795,7 @@
    "dest": "src/model/mii_root/mii_menu.rs",
    "crate": "tui",
    "src_sha256": "94d7a41fe2ff5d3c4dcaed6ff0e87df4c96d64bd927a99e4550a198784cb761c",
-   "dest_sha256": "361eced7b56d0d037bed9c1bde909e7a402e5be4211f519ee27a53f1635e3031",
+   "dest_sha256": "6c02ff59a254e1f67da9cdf4013f5b8166c5a9dd5ef0d2e0cc8839b2cc30d8bd",
    "edits": [
     {
      "old": "use {crate::macro_panel, crate::StatefulTable, crate::SubMenu, crate::SubMenuType, crate::engine::compat::grid::NX_SUBMENU_COLUMNS, crate::NX_SUBMENU_ROWS};",
@@ -24396,6 +26060,21 @@
       ]
      ],
      "reason": "rc.10 S2 (docs/CODE-REDUCTION-rc10.md; docs/DECISIONS.md, D11 superseded): the always-on Cargo features are not switches; their cfg gates are removed and the code that compiled only with one off is deleted"
+    },
+    {
+     "line_patch": [
+      [
+       112,
+       124,
+       []
+      ],
+      [
+       332,
+       343,
+       []
+      ]
+     ],
+     "reason": "rc.10 S3b (docs/CODE-REDUCTION-rc10.md; the primary 2026-11-12 05:25Z): the rest of the dead code: types no Switch build uses and what touches them are removed, or moved behind #[cfg(test)] where only tests use them"
     }
    ]
   },
@@ -24601,7 +26280,7 @@
    "dest": "src/model/lobby/automation/pulse.rs",
    "crate": "root",
    "src_sha256": "3a4561a96f75be9cdca1705de9579c026f94039b2809350c886fefec98702563",
-   "dest_sha256": "1c0ba3a68e4a2e117594a450bd76748c6cd680a144bdbd20f1e86b7157acb5db",
+   "dest_sha256": "63633b1a72b8d328e0a276c9ecc38614298c3791ba421e1373b35853e674ae9c",
    "edits": [
     {
      "old": "impl Scheduler {\n",
@@ -24643,6 +26322,179 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "line_patch": [
+      [
+       7,
+       6,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       9,
+       8,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       10,
+       9,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       11,
+       10,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       12,
+       11,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       13,
+       12,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       14,
+       13,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       15,
+       14,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       30,
+       29,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       40,
+       39,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       56,
+       55,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       64,
+       63,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       70,
+       69,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       78,
+       77,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       90,
+       89,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       96,
+       95,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       217,
+       216,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       227,
+       226,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       238,
+       237,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       265,
+       264,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       273,
+       272,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       279,
+       278,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       285,
+       284,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       336,
+       335,
+       [
+        "#[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3b (docs/CODE-REDUCTION-rc10.md; the primary 2026-11-12 05:25Z): the rest of the dead code: types no Switch build uses and what touches them are removed, or moved behind #[cfg(test)] where only tests use them"
     }
    ]
   },

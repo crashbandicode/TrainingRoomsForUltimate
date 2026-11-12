@@ -30,8 +30,12 @@
 //! ([`acquisitions`]). It releases each with the same inputs (exact inverse), and admits a
 //! registration only once G68 reports ready.
 
-use super::copy_registry::{registry_costume, Registry, Roster, ENTRIES, NO_KIND, SUBS};
-use super::request_bit::{acquired_keys, acquired_keys_iter, completion_members_iter, copy_key, released_keys};
+use super::copy_registry::{registry_costume, Roster, ENTRIES, NO_KIND, SUBS};
+#[cfg(test)]
+use super::copy_registry::Registry;
+use super::request_bit::{acquired_keys_iter, completion_members_iter};
+#[cfg(test)]
+use super::request_bit::{acquired_keys, copy_key};
 #[cfg(test)]
 use std::collections::BTreeMap;
 use crate::engine::compat::fixed::FixedList;
@@ -71,6 +75,7 @@ pub struct Acquisition {
 }
 
 impl Acquisition {
+    #[cfg(test)]
     pub fn keys(&self) -> Vec<u32> { acquired_keys(&self.roster, self.member, self.costume) }
 }
 
@@ -85,6 +90,7 @@ pub fn roster_for(roster: &Roster, owner: u32, set: [u32; SUBS]) -> Roster {
 
 /// What registering `set` takes: one acquisition per completion member that takes any key, with the
 /// costume the selector gives over the set's primary (`R+0x64` = `costume`).
+#[cfg(test)]
 pub fn acquisitions(roster: &Roster, owner: u32, set: [u32; SUBS], costume: u32, region: u32) -> Vec<Acquisition> {
     acquisitions_iter(roster, owner, set, costume, region).collect()
 }
@@ -100,6 +106,7 @@ pub fn acquisitions_iter(roster: &Roster, owner: u32, set: [u32; SUBS], costume:
 
 /// The packages the registrations of `set`'s bodies need: `copy_key(kind, costume)` of every tuple
 /// they register (`prepare_entry`, U18's transcription), the other entries' bodies registered first.
+#[cfg(test)]
 pub fn needed_by_registration(roster: &Roster, owner: u32, set: [u32; SUBS], costume: u32, region: u32) -> Vec<u32> {
     let roster = roster_for(roster, owner, set);
     let mut registry = Registry::new();
@@ -126,6 +133,7 @@ pub fn needed_by_registration(roster: &Roster, owner: u32, set: [u32; SUBS], cos
 
 /// The calls that bring `held` to `wanted`: every new acquisition first, then the releases of the
 /// held ones no longer wanted, so a key two sets share never drops to zero in between.
+#[cfg(test)]
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Sync {
     pub acquire: Vec<Acquisition>,
@@ -133,12 +141,14 @@ pub struct Sync {
     pub release: Vec<usize>,
 }
 
+#[cfg(test)]
 pub fn sync(held: &[Acquisition], wanted: &[Acquisition]) -> Sync {
     sync_iter(held.iter().copied(), wanted.iter().copied())
 }
 
 /// Match occurrences, not just membership: duplicate sets retain their native reference counts.
 /// Rescanning borrowed/value iterators avoids a scratch allocation on every unchanged native tick.
+#[cfg(test)]
 pub fn sync_iter(held: impl Iterator<Item = Acquisition> + Clone,
     wanted: impl Iterator<Item = Acquisition> + Clone) -> Sync {
     let mut acquire = Vec::new();
@@ -206,9 +216,6 @@ pub fn roster_bytes(roster: &Roster) -> [u8; ROSTER_BYTES] {
     }
     bytes
 }
-
-/// Every key a release of `held[i]` returns, as `0x17f0290` computes it.
-pub fn released(held: &Acquisition) -> Vec<u32> { released_keys(&held.roster, held.member, held.costume) }
 
 #[cfg(test)]
 mod tests {

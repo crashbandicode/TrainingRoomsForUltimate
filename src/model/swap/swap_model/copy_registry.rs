@@ -29,13 +29,16 @@
 //! attached — the bodies native "has" — and nothing for detached groups.
 
 use crate::engine::swap::body_bank::Members;
+#[cfg(test)]
 use std::collections::BTreeMap;
 
 /// Fighter-manager entries, and the per-entry cells of the registry.
 pub const ENTRIES: usize = 8;
 pub const SUBS: usize = 3;
 pub const KIRBY: u32 = 0x06;
+#[cfg(test)]
 const POPO: u32 = 0x4b;
+#[cfg(test)]
 const NANA: u32 = 0x4c;
 const ROB: u32 = 0x2d;
 /// `-1` as the native int tables and descriptors store it.
@@ -43,6 +46,7 @@ pub const NO_KIND: u32 = u32::MAX;
 
 /// Early returns shared by `prepare_entry` (`0x17f1a80–0x17f1abc`) and `unprepare`
 /// (`0x17f26e0–0x17f2710`): kind −1, `0x4d..=0x50`, negative, and Popo/Nana at `sub > 0`.
+#[cfg(test)]
 pub fn skipped(kind: u32, sub: usize) -> bool {
     (kind as i32) < 0 || (0x4d..=0x50).contains(&kind) || ((kind == POPO || kind == NANA) && sub > 0)
 }
@@ -67,6 +71,7 @@ pub fn registry_costume(primary: u32, costume: u32, region: u32) -> u32 {
 
 /// `{kind @+0x10, costume @+0x14, ctx @+0x18}` of a registry node; `ctx = kirby_entry<<7 |
 /// source_entry<<3 | source_sub`.
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Tuple { pub kind: u32, pub costume: u32, pub ctx: u32 }
 
@@ -100,6 +105,7 @@ pub fn roster_of(descriptors: &[Option<([u32; SUBS], u32)>; ENTRIES]) -> Roster 
 /// `cell[(ctx>>3)&15][ctx&7]` (`0x17f2800–0x17f2814`); every other kind into `cell[ctx>>7][0]`
 /// (`0x17f28f0–0x17f2900`). Such a node is removed twice: the count reaches −1, the sentinel is
 /// freed and the loop spins (K-R1).
+#[cfg(test)]
 pub fn self_mirror(walker: u32, entry: usize, sub: usize, ctx: u32) -> bool {
     if walker == KIRBY {
         ((ctx >> 3) & 15) as usize == entry && (ctx & 7) as usize == sub
@@ -108,6 +114,7 @@ pub fn self_mirror(walker: u32, entry: usize, sub: usize, ctx: u32) -> bool {
     }
 }
 
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Fault {
     /// The mirror search of an unload found its node in the walked cell itself (removed twice).
@@ -116,11 +123,13 @@ pub enum Fault {
     SentinelPop { entry: usize, sub: usize, walker: u32 },
 }
 
+#[cfg(test)]
 #[derive(Clone, Copy, Debug)]
 struct Node { tuple: Tuple }
 
 /// The registry: `cells`, the kind ints, the per-tuple registration count `prepare_tuple`
 /// takes and `release_tuple 0x17f1360` returns, the nodes a clear freed unreleased, and faults.
+#[cfg(test)]
 #[derive(Clone, Debug)]
 pub struct Registry {
     cells: [[Vec<Node>; SUBS]; ENTRIES],
@@ -130,10 +139,12 @@ pub struct Registry {
     pub faults: Vec<Fault>,
 }
 
+#[cfg(test)]
 impl Default for Registry {
     fn default() -> Self { Self::new() }
 }
 
+#[cfg(test)]
 impl Registry {
     /// As the G68 constructor leaves it (`0x17edd34–0x17ee1ac`): 24 empty cells, kinds −1.
     pub fn new() -> Self {

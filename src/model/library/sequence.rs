@@ -3,7 +3,9 @@
 use serde::{Deserialize, Serialize};
 
 use super::Error;
+#[cfg(test)]
 use crate::model::combo_record::ComboLibrary;
+#[cfg(test)]
 use crate::model::ordered_ids::IdList;
 use crate::model::store::Record;
 
@@ -35,6 +37,7 @@ impl Sequence {
     }
 
     /// Combo ids that still open, in file order. A renamed combo keeps its id. A deleted one is skipped.
+    #[cfg(test)]
     pub fn present_ids(&self, combos: &ComboLibrary) -> Vec<String> {
         self.combos.iter().filter(|id| combos.load(id).is_ok()).cloned().collect()
     }
@@ -42,6 +45,7 @@ impl Sequence {
 
 pub type SequenceEntry = super::ordered::OrderedEntry;
 
+#[cfg(test)]
 impl IdList for Sequence {
     fn ids(&self) -> &[String] {
         &self.combos

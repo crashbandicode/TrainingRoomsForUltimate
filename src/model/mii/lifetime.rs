@@ -434,6 +434,7 @@ impl MiiOverride {
     }
 
     /// Valid only before submit, when no native write/call could have happened.
+    #[cfg(test)]
     pub fn cancel_prepared(&mut self, ticket: Ticket) -> Result<(), Error> {
         self.transaction(ticket)?;
         if self.phase != Phase::Prepared {

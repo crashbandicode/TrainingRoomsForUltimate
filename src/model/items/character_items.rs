@@ -1,5 +1,7 @@
 //! Stable item menu identities. Runtime item kinds belong to the native adapter.
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
+#[cfg(test)]
+use serde::{Deserializer, Serializer};
 
 pub const ITEM_NAMES: [&str; 38] = [
     "Banjo & Kazooie: Grenade Egg", "Bowser Jr.: Mechakoopa",
@@ -16,6 +18,7 @@ pub const ITEM_NAMES: [&str; 38] = [
     "Toon Link: Bomb", "Villager: Wood Chip", "Young Link: Bomb",
 ];
 
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct CharacterItemChoice(pub Option<u8>);
 
@@ -69,6 +72,7 @@ impl HeldItemSnapshot {
 /// Consume a present item field independently of its slot's other data. Older
 /// saves omit it (the field's serde default is None). A damaged or unsupported
 /// item becomes Unsupported instead of discarding every practice save slot.
+#[cfg(test)]
 pub fn deserialize_saved_item<'de, D: Deserializer<'de>>(
     deserializer: D,
 ) -> Result<Option<HeldItemSnapshot>, D::Error> {
@@ -81,12 +85,14 @@ pub fn deserialize_saved_item<'de, D: Deserializer<'de>>(
         .ok().filter(|item| item.valid()).unwrap_or(HeldItemSnapshot::Unsupported)))
 }
 
+#[cfg(test)]
 impl Serialize for CharacterItemChoice {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         (0..ITEM_NAMES.len()).map(|i| u8::from(self.0 == Some(i as u8))).collect::<Vec<_>>().serialize(serializer)
     }
 }
 
+#[cfg(test)]
 impl<'de> Deserialize<'de> for CharacterItemChoice {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let values = Vec::<u8>::deserialize(deserializer)?;

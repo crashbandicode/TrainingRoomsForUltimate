@@ -1010,6 +1010,7 @@ impl Recorder {
     }
 
     /// Both chords passed in one poll: playback wins and the record request is dropped (§2.2).
+    #[cfg(test)]
     pub fn resolve_chords(record: bool, playback: bool) -> ChordAction {
         if playback {
             ChordAction::Playback
@@ -1148,6 +1149,7 @@ impl Recorder {
 
 }
 
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ChordAction {
     None,

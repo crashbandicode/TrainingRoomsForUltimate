@@ -64,6 +64,7 @@ pub enum Aim {
 }
 
 impl Aim {
+    #[cfg(test)]
     pub fn of(stick: Option<u8>) -> Aim {
         match stick {
             None => Aim::Neutral,

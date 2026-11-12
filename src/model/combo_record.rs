@@ -556,6 +556,7 @@ impl ComboNotices {
     pub const SKIPPED_ID: u8 = 0x2B;
     pub const ACTION_ID: u8 = 0x2A;
 
+    #[cfg(test)]
     pub fn new() -> Self {
         Self { posted: None }
     }

@@ -26,7 +26,9 @@
 use super::capabilities::{bank_object_kind, capabilities, form_class, Capabilities};
 #[cfg(any(test, feature = "simulator"))]
 use super::capabilities::{can_window_member_of, member_forms, pins_cell0, FormClass, Grouping};
-use super::ledger::{Conflict, KindSet64, LiveConsumers, ReleaseFootprint, Role, Use};
+use super::ledger::{Conflict, KindSet64, LiveConsumers, Role, Use};
+#[cfg(test)]
+use super::ledger::ReleaseFootprint;
 #[cfg(test)]
 use super::ledger::{ResidentDependencies, NO_KIND};
 #[cfg(any(test, feature = "simulator"))]
@@ -171,6 +173,7 @@ pub fn resident_dependencies(body_kinds: impl IntoIterator<Item = u32>, kirby_co
 
 /// A release footprint is admitted only when none of the registry records it would touch is one a
 /// resident Kirby copy references (K1 §3.2: `0x17e8610` releases R's mirror for `(kind, costume)`).
+#[cfg(test)]
 pub fn footprint_admitted(footprint: &ReleaseFootprint, kirby_registry: KindSet64) -> Result<(), Conflict> {
     if footprint.kind_registry.iter().any(|record| kirby_registry.contains(record.kind)) {
         Err(Conflict::LiveCopySharesRegistry)

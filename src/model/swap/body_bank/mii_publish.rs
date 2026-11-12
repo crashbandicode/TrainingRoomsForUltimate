@@ -56,6 +56,7 @@ impl PublishAttempts {
     }
 
     /// The reason of the previous counted refusal.
+    #[cfg(test)]
     pub const fn last(&self) -> Option<&'static str> {
         self.last
     }

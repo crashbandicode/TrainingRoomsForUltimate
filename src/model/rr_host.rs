@@ -11,7 +11,9 @@ use super::library::{
     StartSaveState, Use, MACROS_DIR, SAVES_DIR, SEQUENCES_DIR,
 };
 use super::frame_queue::FrameQueue;
-use super::macros::{FrameSnapshot, FrameWindow, InputFrame, Library, MacroRecording, MomentumMode, Placement, MAX_FRAMES};
+use super::macros::{FrameWindow, InputFrame, Library, MacroRecording, MomentumMode, Placement, MAX_FRAMES};
+#[cfg(test)]
+use super::macros::FrameSnapshot;
 use super::playback::{Book, Playback, StartLink};
 use super::rr_runtime::{
     chord_notice, civil_date, crop_combo_file, crop_macro_file, delete_save,
@@ -51,6 +53,7 @@ static RUN_CPU: AtomicBool = AtomicBool::new(false);
 static MACHINE: Mutex<Option<Playback>> = Mutex::new(None);
 static RESIDENT: Mutex<Option<Resident>> = Mutex::new(None);
 static MENU_EFFECT: Mutex<Effect> = Mutex::new(Effect::None);
+#[cfg(test)]
 static CROP: Mutex<Option<CropWindow>> = Mutex::new(None);
 static DEFER_MIGRATE: AtomicBool = AtomicBool::new(false);
 static ROLE_KIND: [AtomicI32; 2] = [const { AtomicI32::new(-1) }; 2];
@@ -113,6 +116,7 @@ struct Resident {
 }
 
 /// The crop handles. The menu names the file. The replay window names the frames.
+#[cfg(test)]
 #[derive(Clone, Debug)]
 pub struct CropWindow {
     pub start: u32,
@@ -292,10 +296,7 @@ pub fn post_effect(effect: Effect) {
     *lock(&MENU_EFFECT) = effect;
 }
 
-pub fn set_current_fighter(kind: i32) {
-    CURRENT_KIND.store(kind as u32, Ordering::Release);
-}
-
+#[cfg(test)]
 pub fn set_crop_window(window: CropWindow) {
     *lock(&CROP) = Some(window);
 }
@@ -804,6 +805,7 @@ pub fn publish_selection(root: &Path, selection: &Selection, drill_kind: Option<
 
 /// What the grade helper should do when the recording drill id changes.
 /// The same id is not applied again: applying a target clears the open attempt.
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GradeFollow<'a> {
     Same,
@@ -813,6 +815,7 @@ pub enum GradeFollow<'a> {
 
 /// The helper's target follows the recording drill. `applied` is the id already
 /// given to the helper. `None` clears it. A different id is installed once.
+#[cfg(test)]
 pub fn follow_grade<'a>(applied: Option<&str>, drill: Option<&'a str>) -> GradeFollow<'a> {
     if applied == drill {
         GradeFollow::Same
@@ -825,6 +828,7 @@ pub fn follow_grade<'a>(applied: Option<&str>, drill: Option<&'a str>) -> GradeF
 
 /// A sequence drill starts at step 1 over the sequence's combos that still open, going on from the streak and best
 /// saved in its file. None when the file does not load.
+#[cfg(test)]
 pub fn start_sequence_drill(root: &Path, id: &str) -> Option<crate::model::drill::SequenceDrill> {
     let sequence = Store::<Sequence>::new(root.join(SEQUENCES_DIR)).load(id).ok()?;
     let combos = crate::model::combo_record::ComboLibrary::new(root.join("combos"));
@@ -921,6 +925,7 @@ pub fn follow_drill<'a>(
 
 /// What the helper grades for the recording drill. A combo drill grades itself. A sequence drill grades its current
 /// step, but only when `sequence` is the drill of that same id. No drill, or an unknown kind, grades nothing.
+#[cfg(test)]
 pub fn drill_grade_target<'a>(
     kind: Option<DrillKind>,
     drill: Option<&'a str>,

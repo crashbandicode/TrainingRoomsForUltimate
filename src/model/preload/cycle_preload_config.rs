@@ -13,7 +13,9 @@
 
 use std::convert::TryFrom;
 use std::fs::OpenOptions;
-use std::io::{Read, Write};
+use std::io::Write;
+#[cfg(test)]
+use std::io::Read;
 
 use {crate::engine::compat::choice::byteflags, crate::engine::compat::choice::count};
 use serde::Deserialize;
@@ -421,6 +423,7 @@ fn bank_from_values(values: &[u8]) -> Option<CyclePreloadBankMembers> {
 
 /// Startup cache value. A missing file uses the shared maximum, whether or not
 /// its default could be saved. A rejected file stays off.
+#[cfg(test)]
 pub fn startup_settings(load: IniLoad) -> Settings {
     match load {
         IniLoad::Parsed(settings) | IniLoad::Created(settings) => settings,
@@ -546,6 +549,7 @@ pub fn unpack(word: u32) -> Settings {
     }
 }
 
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum IniLoad {
     /// A present file, parsed.
@@ -562,6 +566,7 @@ pub enum IniLoad {
     Rejected(&'static str),
 }
 
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Publish {
     /// Menu matches the cached choice, or the menu value cannot be stored.
@@ -589,6 +594,7 @@ pub struct Unset {
 }
 
 impl Unset {
+    #[cfg(test)]
     pub const NONE: Self = Self {
         bank_members: false,
         group_swap: false,
@@ -831,6 +837,7 @@ pub fn apply_settings(menu: &mut crate::engine::compat::menu::TrainingModpackMen
     menu.cycle_preload_mii_groups = on_off(settings.mii_groups);
 }
 
+#[cfg(test)]
 pub fn publish_decision(previous: Settings, menu: &crate::engine::compat::menu::TrainingModpackMenu) -> Publish {
     let fallback = if previous.selectable() {
         previous
@@ -1046,12 +1053,14 @@ pub fn parse_unset(text: &str) -> Result<(Settings, Unset), &'static str> {
     Ok((settings, unset))
 }
 
+#[cfg(test)]
 pub fn load_ini(path: &str) -> IniLoad {
     load_ini_unset(path).0
 }
 
 /// [`load_ini`] plus the optional keys a parsed file omitted (`Unset::NONE` for
 /// a created, recovered-and-complete or rejected file).
+#[cfg(test)]
 pub fn load_ini_unset(path: &str) -> (IniLoad, Unset) {
     match std::fs::metadata(path) {
         Ok(metadata) => load_present(path, &metadata),
@@ -1063,6 +1072,7 @@ pub fn load_ini_unset(path: &str) -> (IniLoad, Unset) {
 }
 
 /// A present path: read and parse it, never write it.
+#[cfg(test)]
 fn load_present(path: &str, metadata: &std::fs::Metadata) -> (IniLoad, Unset) {
     if !metadata.is_file() {
         return (IniLoad::Rejected("cycle preload ini is not a file"), Unset::NONE);
@@ -1183,6 +1193,7 @@ fn parent_dir(path: &str) -> Option<&str> {
     }
 }
 
+#[cfg(test)]
 fn read_existing(path: &str) -> (IniLoad, Unset) {
     let file = match std::fs::File::open(path) {
         Ok(file) => file,
@@ -1208,6 +1219,7 @@ fn read_existing(path: &str) -> (IniLoad, Unset) {
     }
 }
 
+#[cfg(test)]
 fn recover_previous(path: &str) -> Option<(IniLoad, Unset)> {
     let previous = format!("{path}.previous");
     let metadata = std::fs::metadata(&previous).ok()?;
@@ -1230,6 +1242,7 @@ fn recover_previous(path: &str) -> Option<(IniLoad, Unset)> {
 /// (`create(true)` on a temporary file, then a rename: the path every menu apply
 /// uses) and reads it back. A present file is only read. Only the plugin writes
 /// this file, once at boot, so the check-then-write has no race to lose.
+#[cfg(test)]
 fn create_default(path: &str) -> (IniLoad, Unset) {
     match std::fs::metadata(path) {
         Ok(metadata) => return load_present(path, &metadata),
@@ -1250,6 +1263,7 @@ fn create_default(path: &str) -> (IniLoad, Unset) {
 
 /// The read-back of a freshly written default: `Created` only when it parses to
 /// [`Settings::DEFAULT`] with every key present.
+#[cfg(test)]
 fn verify_default(readback: (IniLoad, Unset)) -> IniLoad {
     match readback {
         (IniLoad::Parsed(settings), unset) if settings == Settings::DEFAULT && !unset.any() => {

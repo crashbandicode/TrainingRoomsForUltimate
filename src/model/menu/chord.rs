@@ -54,6 +54,7 @@ impl Chord {
         self.0 & (1 << bit) != 0
     }
 
+    #[cfg(test)]
     pub const fn count(self) -> u32 {
         self.0.count_ones()
     }

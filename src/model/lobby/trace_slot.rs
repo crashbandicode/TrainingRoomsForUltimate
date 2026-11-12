@@ -11,10 +11,12 @@ use std::sync::Mutex;
 use serde::Serialize;
 
 /// The newest unwritten state of one kind.
+#[cfg(test)]
 pub struct LatestSlot<T> {
     value: Mutex<Option<T>>,
 }
 
+#[cfg(test)]
 impl<T> LatestSlot<T> {
     pub const fn new() -> Self {
         Self { value: Mutex::new(None) }
@@ -40,6 +42,7 @@ impl<T> LatestSlot<T> {
     }
 }
 
+#[cfg(test)]
 impl<T> Default for LatestSlot<T> {
     fn default() -> Self {
         Self::new()
@@ -158,12 +161,14 @@ pub fn write_json<T: Serialize>(path: &Path, value: &T) -> io::Result<()> {
 
 /// One writer-thread turn: write the newest state of `slot` to `path`. `Ok(false)` when the slot was empty; on a failed write the
 /// state goes back into the slot (unless a newer one is there) and the error is returned, with the old file untouched.
+#[cfg(test)]
 pub fn flush<T: Serialize>(slot: &LatestSlot<T>, path: &Path) -> io::Result<bool> {
     flush_with(slot, |value| write_json(path, value))
 }
 
 /// [`flush`] with the writer given as a function (the carried bridge's `write_trace` logs its event line and then calls
 /// [`write_json`]).
+#[cfg(test)]
 pub fn flush_with<T>(slot: &LatestSlot<T>, write: impl FnOnce(&T) -> io::Result<()>) -> io::Result<bool> {
     let Some(value) = slot.take() else { return Ok(false) };
     match write(&value) {

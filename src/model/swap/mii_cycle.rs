@@ -170,6 +170,7 @@ impl CycleChoices {
 /// Each role's slot 0 is outside the numbered order and is the return between
 /// loops. A kind-only Mii or a non-catalog sentinel is not an original.
 /// Missing/ineligible saved choices are skipped without rewriting preferences.
+#[cfg(test)]
 pub fn next_cycle(
     ordered: &[TrioFighter],
     catalog: &Snapshot,
@@ -276,6 +277,7 @@ pub fn next_qualified_cpu<T>(
 /// Player traversal includes the protected original as its final, unnumbered
 /// position. An unavailable numbered choice may be skipped before native work;
 /// failure to qualify the original stops rather than wrapping past slot 0.
+#[cfg(test)]
 pub fn next_qualified_player<T>(
     ordered: &[TrioFighter],
     catalog: &Snapshot,

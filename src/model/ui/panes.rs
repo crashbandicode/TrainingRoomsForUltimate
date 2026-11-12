@@ -411,6 +411,7 @@ pub const IDX_ORB: usize = IDX_ORBS + 1;
 /// The orb panes' names: `tr_oa_00` .. `tr_of_11`, one prefix per hundred.
 const ORB_PREFIXES: [&str; 6] = ["tr_oa_", "tr_ob_", "tr_oc_", "tr_od_", "tr_oe_", "tr_of_"];
 /// How many panes the plugin adds to the layout.
+#[cfg(test)]
 pub const COUNT: usize = IDX_ORB + ORBS;
 
 /// The combo bar's pane indices and geometry (canvas units; the bar's centre is the origin of its panes).
@@ -1108,6 +1109,7 @@ pub const fn spec(index: usize) -> Spec {
 }
 
 /// Every pane of the menu, in tree (draw) order: back to front.
+#[cfg(test)]
 pub fn specs() -> Vec<Spec> {
     (0..COUNT).map(spec).collect()
 }

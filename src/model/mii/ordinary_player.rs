@@ -105,6 +105,7 @@ impl ExactBankSettle<'_> {
     /// configuration, in two parts (WORKPLAN §2.11 step 3): `structural` proves the
     /// body and its mirrors, `resources` the native pair. `verify` is both, structural
     /// first, so a caller that wants the canonical all-or-nothing answer still has it.
+    #[cfg(test)]
     pub fn verify(&self,c:&crate::engine::mii::lifetime::Configuration)->Result<(),&'static str> {
         self.structural(c)?;self.resources()
     }
@@ -496,7 +497,6 @@ impl Gate {
             ticket, phase: Phase::Submitted, executing: false, published: false, native_only: false,
         })
     }
-    pub fn ticket(self) -> Ticket { self.ticket }
     pub fn phase(self) -> Phase { self.phase }
     pub fn published(self) -> bool { self.published }
     pub fn enter(&mut self, ticket: Ticket, loader: u8) -> bool {

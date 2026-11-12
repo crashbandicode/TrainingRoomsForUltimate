@@ -66,6 +66,7 @@ pub fn run_hub(mut step: impl FnMut(HubStep)) {
 
 /// How the frame counters reset (SPEC-state-06 §5.2 step 3). The counters' own behaviour is
 /// SPEC-cpu-07's; only the type rule is needed by the hub.
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum FrameCounterType {
     /// Counts game frames and is reset to 0 (and stopped) by a reset or a save-state load.
@@ -77,6 +78,7 @@ pub enum FrameCounterType {
 }
 
 /// A counter's value and whether it is running.
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct FrameCounter {
     pub kind: FrameCounterType,
@@ -85,6 +87,7 @@ pub struct FrameCounter {
 }
 
 /// `reset_all`: every in-game counter is set to 0 and stops counting; the other types are untouched.
+#[cfg(test)]
 pub fn reset_in_game_counters(counters: &mut [FrameCounter]) {
     for counter in counters {
         if counter.kind == FrameCounterType::InGame {

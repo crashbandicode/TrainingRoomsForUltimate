@@ -5,10 +5,13 @@
 //! a turnip then gets its special-init action with its power, and an item that needs a fighter's own data
 //! is granted only when a fighter of that kind is in the match.
 
+#[cfg(test)]
 use super::held_item::HeldItem;
+#[cfg(test)]
 use super::ids::C;
 
 /// What a choice needs to be granted.
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Spec {
     /// The `ITEM_KIND_*` constant.
@@ -23,6 +26,7 @@ pub struct Spec {
 }
 
 /// An item variation.
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Variation {
     Number(i32),
@@ -30,16 +34,19 @@ pub enum Variation {
     Constant(C),
 }
 
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Turnip {
     Daisy,
     Peach,
 }
 
+#[cfg(test)]
 const fn spec(kind: C, source: Option<C>) -> Option<Spec> {
     Some(Spec { kind, variation: Variation::Number(0), source, turnip: None })
 }
 
+#[cfg(test)]
 const fn turnip(who: Turnip) -> Option<Spec> {
     let (kind, source) = match who {
         Turnip::Daisy => (C::ItemDaisyTurnip, C::KindDaisy),
@@ -49,6 +56,7 @@ const fn turnip(who: Turnip) -> Option<Spec> {
 }
 
 /// The spec of the fork's item `choice` (an index into `held_item::ITEM_NAMES`, SPEC-state-04 §2.1).
+#[cfg(test)]
 pub fn spec_for(choice: u8) -> Option<Spec> {
     match choice {
         0 => spec(C::ItemBuddyBomb, Some(C::KindBanjo)),
@@ -88,6 +96,7 @@ pub fn spec_for(choice: u8) -> Option<Spec> {
 }
 
 /// What a restore does for a snapshot.
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Restore {
     /// Clear the player's hand (an `Empty` snapshot).
@@ -99,6 +108,7 @@ pub enum Restore {
 
 /// The timers a restored item gets back, only when the live item's maxima equal the saved maxima (a
 /// different resource version must not receive incompatible timers).
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Timers {
     pub lifetime: i32,
@@ -108,6 +118,7 @@ pub struct Timers {
 }
 
 /// The restore for a snapshot.
+#[cfg(test)]
 pub fn restore_for(snapshot: &HeldItem) -> Restore {
     if !snapshot.valid() {
         return Restore::Nothing;
@@ -120,11 +131,6 @@ pub fn restore_for(snapshot: &HeldItem) -> Restore {
             None => Restore::Nothing,
         },
     }
-}
-
-/// Whether the timers are written: both live maxima equal the saved ones.
-pub fn timers_apply(timers: &Timers, live_lifetime_max: i32, live_fuse_max: i32) -> bool {
-    timers.lifetime_max == live_lifetime_max && timers.fuse_max == live_fuse_max
 }
 
 /// The face override a turnip grant sets while it is made: the chosen face is `variation + 1`.

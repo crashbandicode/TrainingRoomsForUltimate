@@ -12,6 +12,7 @@ pub struct DelayRange {
 
 impl DelayRange {
     /// How many values the range holds (`min..=max` by `step`).
+    #[cfg(test)]
     pub const fn count(&self) -> u32 {
         (self.max - self.min) as u32 / self.step as u32 + 1
     }
@@ -30,6 +31,7 @@ impl DelayRange {
 }
 
 /// A delay row as a consumer reads it.
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DelaySpec<'a> {
     /// Nothing ticked and no range: the row's own empty meaning (SPEC-cpu-*).

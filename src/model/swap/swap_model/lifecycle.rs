@@ -118,11 +118,13 @@ pub struct NativeConsumers {
 
 /// The window group natively attached to its entry: cells `+0x4160/68/70` and
 /// the deduplicated contexts `+0x4178/+0x4180/+0x4188/90/98`.
+#[cfg(test)]
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct AttachedGroup { pub owner: u32, pub cells: Vec<BodyRef>, pub contexts: Vec<ContextRef> }
 
 /// A detached group (saved window fields) or a partially built group being
 /// rolled back: everything we must destroy ourselves.
+#[cfg(test)]
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct DetachedGroup {
     pub owner: u32,
@@ -134,9 +136,11 @@ pub struct DetachedGroup {
     pub held_kinds: Vec<u32>,
 }
 
+#[cfg(test)]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Bundle { Attached(AttachedGroup), Detached(DetachedGroup) }
 
+#[cfg(test)]
 impl Bundle {
     pub fn bodies(&self) -> &[BodyRef] {
         match self { Bundle::Attached(group) => &group.cells, Bundle::Detached(group) => &group.bodies }
@@ -164,6 +168,7 @@ pub enum DestroyStep {
 
 /// What happens to the attached window after the plan: nothing (no attached
 /// bundle), or native destroys it (Reload states 1–3, finalize).
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Attached { #[default] None, NativeRetiring }
 
@@ -171,6 +176,7 @@ pub enum Attached { #[default] None, NativeRetiring }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Skipped { Body(u32), Context(usize), Dispatchers([usize; 2]), Records([usize; 3]) }
 
+#[cfg(test)]
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct DestroyPlan {
     pub steps: Vec<DestroyStep>,
@@ -187,6 +193,7 @@ pub struct DestroyPlan {
     pub kirby_branch_mismatch: usize,
 }
 
+#[cfg(test)]
 impl DestroyPlan {
     pub fn routes_cleared(&self) -> usize {
         self.steps.iter().filter(|s| matches!(s, DestroyStep::ReleasePadRoute { .. })).count()
@@ -306,6 +313,7 @@ impl DetachedPlan<'_> {
 }
 
 /// Phase buckets of one or more bundles, merged in finalize's order.
+#[cfg(test)]
 #[derive(Default)]
 struct Phases {
     routes: Vec<(u8, usize)>,
@@ -321,6 +329,7 @@ struct Phases {
     kirby_branch_mismatch: usize,
 }
 
+#[cfg(test)]
 impl Phases {
     fn route(&mut self, slot: u8, controller: usize) {
         if !self.routes.iter().any(|(s, _)| *s == slot) { self.routes.push((slot, controller)); }
@@ -401,6 +410,7 @@ fn unique_contexts(contexts: &[ContextRef]) -> impl Iterator<Item = &ContextRef>
 /// The plan for one bundle: an attached window yields its route releases plus
 /// [`Attached::NativeRetiring`]; a detached group yields finalize's order after
 /// the route releases.
+#[cfg(test)]
 pub fn destroy_plan(bundle: &Bundle, consumers: &NativeConsumers) -> DestroyPlan {
     destroy_plan_many(std::slice::from_ref(bundle), consumers)
 }
@@ -409,6 +419,7 @@ pub fn destroy_plan(bundle: &Bundle, consumers: &NativeConsumers) -> DestroyPlan
 /// `retire_groups`, with or without the attached window): routes of all of
 /// them first, then all bodies, all contexts, all dispatcher arrays, all
 /// records, one key release — `retire_groups`' order since GROUP-SWAP-IMPL.
+#[cfg(test)]
 pub fn destroy_plan_many(bundles: &[Bundle], consumers: &NativeConsumers) -> DestroyPlan {
     let mut phases = Phases::default();
     for bundle in bundles {
@@ -424,6 +435,7 @@ pub fn destroy_plan_many(bundles: &[Bundle], consumers: &NativeConsumers) -> Des
 /// released slots nulled and the controllers and bodies native (or we) freed.
 /// Used by the tests and by WP2's replay; `body_graph::execute` is the native
 /// counterpart.
+#[cfg(test)]
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ConsumerModel {
     pub routes: [usize; PAD_SLOTS],
@@ -431,6 +443,7 @@ pub struct ConsumerModel {
     pub destroyed_bodies: Vec<u32>,
 }
 
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Fault {
     /// A route slot still names a freed controller: the tick would read it
@@ -444,6 +457,7 @@ pub enum Fault {
     KirbyBranchMismatch { body: u32 },
 }
 
+#[cfg(test)]
 impl ConsumerModel {
     pub fn from_consumers(consumers: &NativeConsumers) -> Self {
         let mut routes = [0usize; PAD_SLOTS];

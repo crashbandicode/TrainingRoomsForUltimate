@@ -79,9 +79,6 @@ pub struct PromotionToken {
     serial: u64,
 }
 
-impl PromotionToken {
-    pub fn source(self) -> SourceToken { self.source }
-}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct LeaseToken {
@@ -174,6 +171,7 @@ impl<const SOURCES: usize, const LEASES: usize> SourceBook<SOURCES, LEASES> {
 
     /// Register a freshly verified, already-ready source in an empty book slot.
     /// Caller must verify the entry/key in this epoch; never imports old tokens.
+    #[cfg(test)]
     pub fn register_ready(
         &mut self, slot: usize, epoch: SceneEpoch, entry: NativeEntry, key: SourceKey,
     ) -> Result<ReadyToken, Error> {
@@ -203,6 +201,7 @@ impl<const SOURCES: usize, const LEASES: usize> SourceBook<SOURCES, LEASES> {
     /// The adapter must prove the exact active native identity and own INSTALL
     /// before committing. This is not readoption: no parked-ready interval or
     /// helper lease is published between the visible source and its new load.
+    #[cfg(test)]
     pub fn begin_promoted_reload(&mut self, promotion: PromotionToken, key: SourceKey)
         -> Result<LoadToken, Error> {
         self.promoted_ready(promotion)?;
@@ -211,6 +210,7 @@ impl<const SOURCES: usize, const LEASES: usize> SourceBook<SOURCES, LEASES> {
         self.admit(source.slot, source.epoch, source.entry, key, Phase::Loading).map(LoadToken)
     }
 
+    #[cfg(test)]
     pub fn can_reload_promoted(&self, promotion: PromotionToken) -> bool {
         self.promoted_ready(promotion).is_ok() && !self.pinned(promotion.source.slot)
     }
@@ -241,6 +241,7 @@ impl<const SOURCES: usize, const LEASES: usize> SourceBook<SOURCES, LEASES> {
     /// Complete an explicit return-to-native load without publishing it as a
     /// plugin resource. Caller has verified the original descriptor/body ready
     /// on this exact entry's callback. This is not a destructor notification.
+    #[cfg(test)]
     pub fn returned_native(&mut self, load: LoadToken) -> Result<(), Error> {
         let state = self.exact(load.0)?;
         if state.phase == Phase::Departed { return Err(Error::Departed); }
@@ -256,6 +257,7 @@ impl<const SOURCES: usize, const LEASES: usize> SourceBook<SOURCES, LEASES> {
     /// destroying its body or invalidating leases held by existing consumers.
     /// Caller must establish the native activation boundary and preserve those
     /// resources. Loading is not completion: this accepts only a ready token.
+    #[cfg(test)]
     pub fn promote(&mut self, ready: ReadyToken) -> Result<PromotionToken, Error> {
         self.validate_ready(ready)?;
         let state = self.exact(ready.0)?;
@@ -271,6 +273,7 @@ impl<const SOURCES: usize, const LEASES: usize> SourceBook<SOURCES, LEASES> {
     /// entire transaction first: a later stale/loading seat must not reserve an
     /// earlier one. Retrying the same reservation returns the same serials.
     /// Reservation protects resources; it does not certify visible activation.
+    #[cfg(test)]
     pub fn reserve_promotions<const N: usize>(
         &mut self, sources: [Option<SourceToken>; N],
     ) -> Result<[Option<PromotionToken>; N], Error> {
@@ -295,6 +298,7 @@ impl<const SOURCES: usize, const LEASES: usize> SourceBook<SOURCES, LEASES> {
 
     /// Re-adopt only after the caller proves native deactivation has completed
     /// and the exact retained entry/body is parked ready. No reload is implied.
+    #[cfg(test)]
     pub fn readopt(&mut self, promotion: PromotionToken) -> Result<ReadyToken, Error> {
         let ready = ReadyToken(promotion.source);
         self.validate_ready(ready)?;
@@ -335,6 +339,7 @@ impl<const SOURCES: usize, const LEASES: usize> SourceBook<SOURCES, LEASES> {
 
     /// A publication receipt, never an activation proof by itself. Consumers
     /// also reacquire and validate their current native pointers before use.
+    #[cfg(test)]
     pub fn published_promotion(&self, promotion: PromotionToken) -> Result<Option<u64>, Error> {
         self.promoted_ready(promotion)?;
         Ok(self.slots[promotion.source.slot].presentation)
@@ -344,6 +349,7 @@ impl<const SOURCES: usize, const LEASES: usize> SourceBook<SOURCES, LEASES> {
     /// The adapter selects the completed transaction's readiness contract and
     /// rechecks its source snapshot before calling this; this never reads native
     /// memory or upgrades an unpublished reservation to a presentation.
+    #[cfg(test)]
     pub fn published_identity(&self, promotion: PromotionToken,
         sealed: Option<NativeIdentity>, current: Option<NativeIdentity>, installing: bool,
     ) -> Option<u64> {

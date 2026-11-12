@@ -41,6 +41,7 @@ impl Sample {
 
     /// Resolved without any acknowledgement: the consumer's abort branch.
     /// Never Begin.
+    #[cfg(test)]
     pub const fn aborted(self) -> bool { self.resolved != 0 && self.ack == 0 }
 }
 
@@ -134,6 +135,7 @@ impl Handshake {
 
     pub const fn armed(&self) -> bool { matches!(self.state, State::Armed(_)) }
 
+    #[cfg(test)]
     pub const fn fired(&self) -> bool { matches!(self.state, State::Committed(_)) }
 
     /// Explicit end of the owning session (refusal, timeout, expiry). The next

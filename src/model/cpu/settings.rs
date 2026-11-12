@@ -58,10 +58,6 @@ impl<const N: usize> Weights<N> {
         None
     }
 
-    /// The only selected option, or the first when several (a single-select row).
-    pub fn first(&self) -> Option<usize> {
-        self.0.iter().position(|w| *w != 0)
-    }
 }
 
 /// A delay row as a consumer reads it (SPEC-core-02 §2.8, decision N3): nothing, a weighted checklist

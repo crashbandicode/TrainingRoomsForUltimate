@@ -61,7 +61,7 @@
    "dest": "src/model/macros/capture_archive.rs",
    "crate": "macros",
    "src_sha256": "dbfdf217e08fe1421c292b302ea58e60d541a817b7fc17b410b166e8c7458d5f",
-   "dest_sha256": "e71c6ea648629b92b56175e52c75cfe06bf36857c6c1272c4b0d8b59f4f66d54",
+   "dest_sha256": "3f6bd716f03fbfb30df7da1249c7c76dbb4358e1f04a46336ad075cb98f91ddf",
    "edits": [
     {
      "old": "file_id.as_bytes().chunks_exact(2) {",
@@ -113,6 +113,25 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       217,
+       216,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       227,
+       226,
+       [
+        "    #[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3b (docs/CODE-REDUCTION-rc10.md; the primary 2026-11-12 05:25Z): the rest of the dead code: types no Switch build uses and what touches them are removed, or moved behind #[cfg(test)] where only tests use them"
     }
    ]
   },
@@ -121,7 +140,7 @@
    "dest": "src/model/macros/capture_toggle.rs",
    "crate": "macros",
    "src_sha256": "aa0f6a4b6440d708d0a774e19135ff9b425fa51ea4f16b7b3290279ed28f28d7",
-   "dest_sha256": "9f82f9b0eb14c54c8932f606443856cdaf51a70b56fe3e6b57cb7e611d2cc02b",
+   "dest_sha256": "baeac271b1b0af7b4342ee73b0c4fb657ade269315edf141067d0a03832ef7aa",
    "edits": [
     {
      "table_tests": true,
@@ -188,6 +207,18 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "line_patch": [
+      [
+       276,
+       275,
+       [
+        "    #[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3b (docs/CODE-REDUCTION-rc10.md; the primary 2026-11-12 05:25Z): the rest of the dead code: types no Switch build uses and what touches them are removed, or moved behind #[cfg(test)] where only tests use them"
     }
    ]
   },
@@ -556,7 +587,7 @@
    "dest": "src/model/macros/shared_capture.rs",
    "crate": "macros",
    "src_sha256": "46093f8256ff444e9943ee4672cc6c348ddc46548a6108fc177a45fe65c208f0",
-   "dest_sha256": "70364e9efaa09deabd50afbe1d9e38be93764e96b75fe72703ed0f3592ea797e",
+   "dest_sha256": "5ce6e7fce63a9f73f353189dabb6c63638adb1914994e48304301142ccc2a811",
    "edits": [
     {
      "old": "            }\n        }\n    }\n}\n",
@@ -666,6 +697,18 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "line_patch": [
+      [
+       136,
+       135,
+       [
+        "    #[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3b (docs/CODE-REDUCTION-rc10.md; the primary 2026-11-12 05:25Z): the rest of the dead code: types no Switch build uses and what touches them are removed, or moved behind #[cfg(test)] where only tests use them"
     }
    ]
   },
@@ -674,7 +717,7 @@
    "dest": "src/model/macros/window.rs",
    "crate": "macros",
    "src_sha256": "a2318a537296bac67436de8656f07bcd897b2e4fccbd38b101bcd41210b9c58d",
-   "dest_sha256": "8ed9c6a3410aa4216c6f0397f4ad9f8063a7755f0a40b0ec474477ed429ed56c",
+   "dest_sha256": "448c7de3e47aaf7a888f28e0eca8e317c1a144cbd484a54979025123fe8ce1dd",
    "edits": [
     {
      "line_patch": [
@@ -694,6 +737,46 @@
       ]
      ],
      "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
+    },
+    {
+     "line_patch": [
+      [
+       12,
+       11,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       19,
+       18,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       80,
+       79,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       113,
+       112,
+       [
+        "    #[cfg(test)]"
+       ]
+      ],
+      [
+       117,
+       116,
+       [
+        "    #[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3b (docs/CODE-REDUCTION-rc10.md; the primary 2026-11-12 05:25Z): the rest of the dead code: types no Switch build uses and what touches them are removed, or moved behind #[cfg(test)] where only tests use them"
     }
    ]
   },
@@ -1191,7 +1274,7 @@
    "dest": "src/model/macro_ui/macro_panel.rs",
    "crate": "tui",
    "src_sha256": "1b6e698f679029bc6fa83ff9cd43756302bd939debaad2d3eeeacd10fb166da1",
-   "dest_sha256": "a8c4eb1d652eac824e870558cbce1136ee67933c45a0780c433e94f18b82c602",
+   "dest_sha256": "edd1dc1a07e9fe7f4dafa3e0aef8e8bf5d54f1e2cc7f26f07d142415ab50bb5e",
    "edits": [
     {
      "old": "    /// Facing, status, and frames for one playback. Empty when the fighter is not ready.\n    pub fn copy_playback(",
@@ -1670,6 +1753,60 @@
       ]
      ],
      "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
+    },
+    {
+     "line_patch": [
+      [
+       49,
+       48,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       61,
+       60,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       71,
+       70,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       81,
+       80,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       83,
+       82,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       91,
+       90,
+       [
+        "#[cfg(test)]"
+       ]
+      ],
+      [
+       98,
+       97,
+       [
+        "#[cfg(test)]"
+       ]
+      ]
+     ],
+     "reason": "rc.10 S3b (docs/CODE-REDUCTION-rc10.md; the primary 2026-11-12 05:25Z): the rest of the dead code: types no Switch build uses and what touches them are removed, or moved behind #[cfg(test)] where only tests use them"
     }
    ]
   },

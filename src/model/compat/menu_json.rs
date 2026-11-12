@@ -6,15 +6,19 @@
 //! and the per-key defaults) still run against a menu file shaped like the fork's. The clean room's own reader of this file is
 //! `model::settings::parse` (package 1); this module is only the carried code's expectation. Written for this repository.
 
+#[cfg(test)]
 use serde::Deserialize;
 
+#[cfg(test)]
 use super::menu::{TrainingModpackMenu, BASE_MENU};
 
+#[cfg(test)]
 const fn base_menu() -> TrainingModpackMenu {
     BASE_MENU
 }
 
 /// The two snapshots of the file.
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
 pub struct SavedMenus {
     #[serde(default = "base_menu")]
@@ -24,11 +28,13 @@ pub struct SavedMenus {
 }
 
 /// What `parse_menu_file` returns: the fork's value also holds the roster and preference sections.
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct LoadedMenuFile {
     pub settings: SavedMenus,
 }
 
+#[cfg(test)]
 pub fn parse_menu_file(contents: &str) -> Result<LoadedMenuFile, serde_json::Error> {
     Ok(LoadedMenuFile { settings: serde_json::from_str(contents)? })
 }

@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use super::Error;
+#[cfg(test)]
 use crate::model::ordered_ids::IdList;
 use crate::model::store::Record;
 
@@ -58,6 +59,7 @@ impl Chain {
 
 pub type ChainEntry = super::ordered::OrderedEntry;
 
+#[cfg(test)]
 impl IdList for Chain {
     fn ids(&self) -> &[String] {
         &self.recordings

@@ -20,19 +20,27 @@
 //! (the staged descriptor is what state 6 installs; `D-PTA1-RCA §8.2 option 1`); a Mii-payload track has
 //! no proven continuation (`Recovery::AwaitDestruction` with its reason, the explicit exclusion).
 
+#[cfg(test)]
 use core::marker::PhantomData;
 
-use crate::engine::mii::identity::{verify, ExpectedMutation, Identity, Mismatch};
+use crate::engine::mii::identity::Identity;
+#[cfg(test)]
+use crate::engine::mii::identity::{verify, ExpectedMutation, Mismatch};
+#[cfg(test)]
 use crate::engine::mii::ordinary_player::{Gate, Phase, Ticket};
 
+#[cfg(test)]
 #[derive(Debug)]
 pub struct Preflight;
+#[cfg(test)]
 #[derive(Debug)]
 pub struct Committed;
+#[cfg(test)]
 #[derive(Debug)]
 pub struct Recovering;
 
 /// The compensation a committed transaction takes when its proof fails. Chosen at preflight.
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Recovery {
     /// Continue the native epilogue; native installs the staged descriptor; at loader 14 the
@@ -47,6 +55,7 @@ pub enum Recovery {
     /// since row 7 (forward continuation everywhere); it remains the named shape of that stall.
     AwaitDestruction,
 }
+#[cfg(test)]
 impl Recovery {
     pub const fn admits_native_ticks(self) -> bool {
         matches!(self, Recovery::NativeContinue | Recovery::RollbackBuilt)
@@ -61,6 +70,7 @@ impl Recovery {
 }
 
 /// What can still move a transaction that holds the lease.
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Progress {
     /// Native service ticks for the entry are admitted and lead to Ready.
@@ -72,6 +82,7 @@ pub enum Progress {
 }
 
 /// The recoveries a transaction may take, fixed before the first native effect.
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct RecoveryPlan {
     /// A prequeue or Ready proof mismatch after commit.
@@ -79,6 +90,7 @@ pub struct RecoveryPlan {
     /// A failed Phase B build (verification failed after construction).
     pub build_failure: Recovery,
 }
+#[cfg(test)]
 impl RecoveryPlan {
     /// Plain-kind track (no Mii payload, no same-class proof): D-PTA1b generalised.
     pub const PLAIN_KIND: RecoveryPlan = RecoveryPlan { late_mismatch: Recovery::NativeContinue, build_failure: Recovery::RollbackBuilt };
@@ -135,6 +147,7 @@ pub struct Refusal<L> {
 }
 
 /// What the gate hook does with the native prequeue (`0x6510f4`).
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GateDecision {
     /// Run the native state-6 tail (publication verified, or a native continuation).
@@ -144,6 +157,7 @@ pub enum GateDecision {
 }
 
 /// Evidence a recovering transaction finishes on.
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Evidence {
     /// Loader idle at 14 with no pending change (`settled(entry)`).
@@ -152,6 +166,7 @@ pub struct Evidence {
     pub rollback_done: Option<ReadyReceipt>,
 }
 
+#[cfg(test)]
 #[derive(Debug)]
 pub struct Txn<S, L> {
     ticket: Ticket,
@@ -164,6 +179,7 @@ pub struct Txn<S, L> {
     _s: PhantomData<S>,
 }
 
+#[cfg(test)]
 impl<S, L> Txn<S, L> {
     pub fn ticket(&self) -> Ticket { self.ticket }
     pub fn identity(&self) -> &Identity { &self.identity }
@@ -173,6 +189,7 @@ impl<S, L> Txn<S, L> {
     fn into_outcome_destroyed(self, reason: &'static str) -> Outcome<L> { Outcome::Destroyed { reason, lease: self.lease } }
 }
 
+#[cfg(test)]
 impl<L> Txn<Preflight, L> {
     /// Everything decidable from the snapshot is decided here. The first failing check refuses and
     /// hands the lease back with nothing applied.
@@ -201,6 +218,7 @@ impl<L> Txn<Preflight, L> {
 }
 
 /// Result of a native tick entering a committed transaction.
+#[cfg(test)]
 #[derive(Debug)]
 pub enum Enter<L> {
     /// Run the original service for this entry.
@@ -212,6 +230,7 @@ pub enum Enter<L> {
     NativeRefused(Txn<Recovering, L>),
 }
 
+#[cfg(test)]
 impl<L> Txn<Committed, L> {
     pub fn record(&mut self, effect: &'static str) { self.applied.push(effect); }
     /// The native tick protocol (`Gate::enter`). A refused loader is a recovery, never a dead end.
@@ -269,6 +288,7 @@ impl<L> Txn<Committed, L> {
     pub fn destroyed(self, reason: &'static str) -> Outcome<L> { self.into_outcome_destroyed(reason) }
 }
 
+#[cfg(test)]
 impl<L> Txn<Recovering, L> {
     pub fn recovery(&self) -> Recovery { self.recovery.map(|(how, _)| how).unwrap_or(Recovery::AwaitDestruction) }
     pub fn reason(&self) -> &'static str { self.recovery.map(|(_, reason)| reason).unwrap_or("recovery") }
@@ -294,11 +314,13 @@ impl<L> Txn<Recovering, L> {
 
 /// `Txn::settle`'s answer. A plain enum, not a `Result`: the recovering transaction is the large
 /// arm (it carries the preflight `Identity`), and it is a normal continuation, not an error.
+#[cfg(test)]
 #[derive(Debug)]
 pub enum Settlement<L> {
     Applied(Outcome<L>),
     Recovering(Txn<Recovering, L>),
 }
+#[cfg(test)]
 impl<L> Settlement<L> {
     pub fn applied(self) -> Option<Outcome<L>> {
         match self { Settlement::Applied(outcome) => Some(outcome), Settlement::Recovering(_) => None }
@@ -309,11 +331,13 @@ impl<L> Settlement<L> {
 }
 
 /// `Txn<Recovering>::finish`'s answer: done with the outcome, or still pending (the same transaction).
+#[cfg(test)]
 #[derive(Debug)]
 pub enum Finish<L> {
     Done(Outcome<L>),
     Pending(Txn<Recovering, L>),
 }
+#[cfg(test)]
 impl<L> Finish<L> {
     pub fn done(self) -> Option<Outcome<L>> {
         match self { Finish::Done(outcome) => Some(outcome), Finish::Pending(_) => None }
@@ -325,11 +349,13 @@ impl<L> Finish<L> {
 
 /// The transaction as an adapter stores it between callbacks (the typestates above are the
 /// compile-time contract; this holder sequences them at runtime).
+#[cfg(test)]
 #[derive(Debug)]
 pub enum Step<L> {
     Committed(Txn<Committed, L>),
     Recovering(Txn<Recovering, L>),
 }
+#[cfg(test)]
 impl<L> Step<L> {
     pub fn ticket(&self) -> Ticket {
         match self { Step::Committed(t) => t.ticket, Step::Recovering(t) => t.ticket }

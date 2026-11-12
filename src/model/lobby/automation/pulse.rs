@@ -4,14 +4,22 @@
 //! from that same "about 100 ms" ratio (ceil(180/100*6)). That ratio is not a
 //! measured UI period.
 
+#[cfg(test)]
 use std::sync::atomic::{fence, AtomicU32, AtomicU64, Ordering};
 
+#[cfg(test)]
 pub const MASK_A: u32 = 1 << 5;
+#[cfg(test)]
 pub const MASK_Y: u32 = 1 << 7;
+#[cfg(test)]
 pub const MASK_L_LEFT: u32 = 1 << 23;
+#[cfg(test)]
 pub const MASK_L_RIGHT: u32 = 1 << 21;
+#[cfg(test)]
 pub const BUTTON_HELD_STEPS: u8 = 6;
+#[cfg(test)]
 pub const STICK_HELD_STEPS: u8 = 11;
+#[cfg(test)]
 pub const NEUTRAL_BEFORE_PRESS: u8 = 10;
 
 #[repr(C)]
@@ -27,6 +35,7 @@ pub struct Record {
 
 const _: () = assert!(std::mem::size_of::<Record>() == 0x30);
 
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Action {
     Idle = 0,
@@ -37,6 +46,7 @@ pub enum Action {
     SaveYes = 5,
 }
 
+#[cfg(test)]
 impl Action {
     pub const fn code(self) -> u32 {
         self as u32
@@ -53,6 +63,7 @@ impl Action {
     }
 }
 
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Command {
     pub generation: u64,
@@ -61,12 +72,14 @@ pub struct Command {
     pub action: Action,
 }
 
+#[cfg(test)]
 impl Command {
     pub const fn idle() -> Self {
         Self { generation: 0, epoch: 0, serial: 0, action: Action::Idle }
     }
 }
 
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum StepKind {
     Edge { mask: u32, stick: bool },
@@ -75,6 +88,7 @@ enum StepKind {
     Neutral,
 }
 
+#[cfg(test)]
 pub struct Scheduler {
     serial: u32,
     script: [StepKind; 28],
@@ -87,12 +101,14 @@ pub struct Scheduler {
     had_press: bool,
 }
 
+#[cfg(test)]
 impl Default for Scheduler {
     fn default() -> Self {
         Self::new()
     }
 }
 
+#[cfg(test)]
 impl Scheduler {
     pub const fn new() -> Self {
         Self {
@@ -214,6 +230,7 @@ impl Scheduler {
     }
 }
 
+#[cfg(test)]
 fn write_script(action: Action, out: &mut [StepKind; 28]) -> u8 {
     match action {
         Action::Idle => 0,
@@ -224,6 +241,7 @@ fn write_script(action: Action, out: &mut [StepKind; 28]) -> u8 {
     }
 }
 
+#[cfg(test)]
 fn button(mask: u32, out: &mut [StepKind; 28]) -> u8 {
     out[0] = StepKind::Edge { mask, stick: false };
     let mut index = 1u8;
@@ -235,6 +253,7 @@ fn button(mask: u32, out: &mut [StepKind; 28]) -> u8 {
     index + 1
 }
 
+#[cfg(test)]
 fn select_then_confirm(direction: u32, out: &mut [StepKind; 28]) -> u8 {
     out[0] = StepKind::Edge { mask: direction, stick: true };
     let mut index = 1u8;
@@ -262,6 +281,7 @@ fn select_then_confirm(direction: u32, out: &mut [StepKind; 28]) -> u8 {
 
 /// One stable publish. A busy writer preserves the reader's last command; it does not
 /// cancel the pulse. An unknown action code loads as idle.
+#[cfg(test)]
 pub struct Slot {
     seq: AtomicU64,
     generation: AtomicU64,
@@ -270,18 +290,21 @@ pub struct Slot {
     action: AtomicU32,
 }
 
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Sample {
     Stable(Command),
     Busy,
 }
 
+#[cfg(test)]
 impl Default for Slot {
     fn default() -> Self {
         Self::new()
     }
 }
 
+#[cfg(test)]
 impl Slot {
     pub const fn new() -> Self {
         Self {
@@ -333,6 +356,7 @@ impl Slot {
     }
 }
 
+#[cfg(test)]
 pub fn inject_port(
     records: &mut [Record; 10],
     port: u8,

@@ -133,6 +133,7 @@ impl SharedCaptureArchive {
         Ok(())
     }
 
+    #[cfg(test)]
     pub fn save_with_outcome(&self, replay_id: &str, replay_name: &str, game_version: &str,
         session: &LiveSession) -> io::Result<CaptureSaveOutcome> {
         self.save_with_miis(replay_id, replay_name, game_version, session, None)

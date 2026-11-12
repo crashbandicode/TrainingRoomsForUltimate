@@ -6,6 +6,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use super::library::{start_save_state, Chain, LoopCount, RecordingIndex, Role, StartSaveState};
 use super::macros::{InputFrame, MacroRecording};
+#[cfg(test)]
 use crate::model::state::settings::StateSettings;
 
 /// What a Play chord, a mash, or a load did to the runs. `notice` stays empty: this slice adds none.
@@ -28,6 +29,7 @@ pub struct Played<'a> {
 
 /// A warp to the bound save. Mirroring, damage and buffs are the settings the load already applies.
 /// `save_id` borrows the book.
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DeathWarp<'a> {
     pub save_id: &'a str,
@@ -342,11 +344,13 @@ impl Playback {
     }
 
     /// Load names the bound save and does not touch either run.
+    #[cfg(test)]
     pub fn load<'a>(&self, book: &'a Book, settings: &StateSettings) -> Option<DeathWarp<'a>> {
         bound_warp(book, settings)
     }
 
     /// Auto-load on death names the bound save when the row is on, and nothing when none is bound.
+    #[cfg(test)]
     pub fn auto_load_on_death<'a>(&self, book: &'a Book, settings: &StateSettings) -> Option<DeathWarp<'a>> {
         if !settings.autoload {
             return None;
@@ -369,6 +373,7 @@ fn passes(count: LoopCount) -> Option<u32> {
     }
 }
 
+#[cfg(test)]
 fn bound_warp<'a>(book: &'a Book, settings: &StateSettings) -> Option<DeathWarp<'a>> {
     if !settings.enable {
         return None;

@@ -122,6 +122,7 @@ impl Queue {
         Self { entries: [None; CAPACITY], len: 0, delivered: [0; DELIVERED_CAPACITY], delivered_len: 0 }
     }
 
+    #[cfg(test)]
     pub const fn len(&self) -> usize {
         self.len
     }

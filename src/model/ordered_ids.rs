@@ -4,6 +4,7 @@
 //! has no engine module. JSON field names stay on the documents that use these helpers.
 
 /// The id list inside a chain (`recordings`) or a sequence (`combos`).
+#[cfg(test)]
 pub trait IdList {
     fn ids(&self) -> &[String];
     fn ids_mut(&mut self) -> &mut Vec<String>;

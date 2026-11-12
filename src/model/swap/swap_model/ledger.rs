@@ -53,9 +53,11 @@
 //! → `0x17e8610(R, body.kind)` once per body. State 6 writes `R+0x50 = 1`, then `2` for a Popo
 //! primary with a secondary (`650010.c:615–618`).
 
+#[cfg(test)]
 use std::collections::BTreeMap;
 
 pub const KEY_STRIDE: u32 = 42;
+#[cfg(test)]
 pub const KIRBY: u32 = 0x06;
 pub const POPO: u32 = 0x4b;
 pub const NANA: u32 = 0x4c;
@@ -73,6 +75,7 @@ pub struct KeyId {
 }
 impl KeyId {
     pub const fn value(self) -> u32 { self.kind * KEY_STRIDE + self.n as u32 }
+    #[cfg(test)]
     pub const fn from_value(value: u32) -> Self {
         KeyId { kind: value / KEY_STRIDE, n: (value % KEY_STRIDE) as u8 }
     }
@@ -96,6 +99,7 @@ impl KeySet {
     pub const fn with(self, n: u8) -> Self { KeySet(self.0 | (1 << n)) }
     pub const fn minus(self, other: KeySet) -> KeySet { KeySet(self.0 & !other.0) }
     pub const fn is_empty(self) -> bool { self.0 == 0 }
+    #[cfg(test)]
     pub const fn len(self) -> usize { self.0.count_ones() as usize }
     pub fn iter(self, kind: u32) -> impl Iterator<Item = KeyId> + Clone {
         (0u8..8).filter(move |n| self.contains(*n)).map(move |n| KeyId { kind, n })
@@ -323,9 +327,9 @@ impl AcqToken {
     pub fn keys(&self) -> KeySet { self.keys }
     #[cfg(test)]
     pub fn holder(&self) -> Holder { self.holder }
+    #[cfg(test)]
     pub fn recipe(&self) -> ReleaseRecipe { self.recipe }
     pub fn batch(&self) -> BatchId { self.batch }
-    pub fn id(&self) -> u32 { self.id }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -336,9 +340,6 @@ pub enum Role {
 impl Role {
     pub const fn index(self) -> usize {
         match self { Role::Player => 0, Role::Cpu => 1 }
-    }
-    pub const fn other(self) -> Role {
-        match self { Role::Player => Role::Cpu, Role::Cpu => Role::Player }
     }
     pub const fn from_index(index: usize) -> Option<Role> {
         match index { 0 => Some(Role::Player), 1 => Some(Role::Cpu), _ => None }
@@ -371,8 +372,10 @@ pub enum Conflict {
 pub trait LiveConsumers {
     fn conflict(&self, role: Role, kind: u32, usage: Use) -> Option<Conflict>;
 }
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct NoConsumers;
+#[cfg(test)]
 impl LiveConsumers for NoConsumers {
     fn conflict(&self, _role: Role, _kind: u32, _usage: Use) -> Option<Conflict> { None }
 }
@@ -394,13 +397,11 @@ impl KindSet64 {
     pub fn insert(&mut self, kind: u32) {
         if kind < 128 { self.0[(kind / 64) as usize] |= 1 << (kind % 64); }
     }
-    pub fn remove(&mut self, kind: u32) {
-        if kind < 128 { self.0[(kind / 64) as usize] &= !(1 << (kind % 64)); }
-    }
     pub fn contains(self, kind: u32) -> bool {
         kind < 128 && self.0[(kind / 64) as usize] & (1 << (kind % 64)) != 0
     }
     pub fn is_empty(self) -> bool { self.0 == [0, 0] }
+    #[cfg(test)]
     pub fn iter(self) -> impl Iterator<Item = u32> {
         (0u32..128).filter(move |kind| self.contains(*kind))
     }
@@ -413,6 +414,7 @@ pub struct ResidentDependencies {
     pub kinds: KindSet64,
 }
 
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct KindCostume {
     pub kind: u32,
@@ -420,6 +422,7 @@ pub struct KindCostume {
 }
 
 /// Everything `0x17e8610(R, kind)` touches besides the key owner's own keys (K1 §3.2).
+#[cfg(test)]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ReleaseFootprint {
     pub keys: KeySet,
@@ -429,6 +432,7 @@ pub struct ReleaseFootprint {
 }
 
 /// Owner state the footprint depends on, read at the call seam.
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct OwnerState {
     /// `task+0x10 != 0` for the task at `R+0xa8`.
@@ -442,6 +446,7 @@ pub struct OwnerState {
 }
 
 /// Footprint of one `0x17e8610(R, kind)` given the keys this release will actually remove.
+#[cfg(test)]
 pub fn release_kind_footprint(kind: u32, flags: RFlags, state: OwnerState, removed_nodes: usize) -> ReleaseFootprint {
     ReleaseFootprint {
         keys: native_release_set(kind, flags),
@@ -460,11 +465,9 @@ pub fn release_kind_footprint(kind: u32, flags: RFlags, state: OwnerState, remov
 pub struct ResetBatchPermit {
     batch: BatchId,
 }
-impl ResetBatchPermit {
-    pub fn batch(self) -> BatchId { self.batch }
-}
 
 /// Result of comparing the ledger's prediction with the owner's actual `(key, refs)` pairs.
+#[cfg(test)]
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Reconciliation {
     /// Present on R, not predicted (or more refs than predicted): `(key, extra refs)`.
@@ -489,6 +492,7 @@ fn ordered_actual(input: impl Iterator<Item = (u32, u32)> + Clone)
         next
     })
 }
+#[cfg(test)]
 impl Reconciliation {
     pub fn balanced(&self) -> bool { self.residual.is_empty() && self.missing.is_empty() }
 }
@@ -520,12 +524,14 @@ impl Ledger {
     pub fn new(flags: RFlags) -> Self {
         Ledger { flags, acquisitions: Vec::new(), residents: Vec::new(), retained: Vec::new(), next_id: 0, next_batch: 0, pair_refs: None, request_bit: false }
     }
+    #[cfg(test)]
     pub fn flags(&self) -> RFlags { self.flags }
     pub fn set_flags(&mut self, flags: RFlags) { self.flags = flags; }
     pub fn new_batch(&mut self) -> BatchId {
         self.next_batch += 1;
         BatchId(self.next_batch)
     }
+    #[cfg(test)]
     pub fn tokens(&self) -> &[AcqToken] { &self.acquisitions }
     pub fn retained(&self) -> &[Retained] { &self.retained }
 
@@ -617,6 +623,7 @@ impl Ledger {
     /// The native calls that balance `token`, in order: per-key `0x17e2fe0` for every orphan,
     /// then `0x17e8610(R, kind)` (D-SG1 order: the orphans first so the reset tail still fires).
     /// Refused — token handed back — when the live consumers object (K1).
+    #[cfg(test)]
     pub fn release(
         &mut self,
         token: AcqToken,
@@ -706,6 +713,7 @@ impl Ledger {
     }
 
     /// Compare the prediction with the owner's actual `(key value, refs)` pairs.
+    #[cfg(test)]
     pub fn reconcile(&self, actual: &[(u32, u32)]) -> Reconciliation {
         Reconciliation { residual: self.residual_iter(actual.iter().copied()).collect(),
             missing: self.missing_iter(actual.iter().copied()).collect(),
@@ -735,6 +743,7 @@ impl Ledger {
     /// WP2 shadow mode: a ledger mirroring what the current bank code holds — one `OwnedPerKind`
     /// prefetch token per `(group, kind)` of every group that `holds_keys()`. Built groups hold
     /// nothing (their tails ran); the window's native requests settled at construction.
+    #[cfg(test)]
     pub fn mirror(flags: RFlags, prefetched: &[(GroupId, u32)]) -> Ledger {
         let mut ledger = Ledger::new(flags);
         let mut batches: BTreeMap<GroupId, BatchId> = BTreeMap::new();

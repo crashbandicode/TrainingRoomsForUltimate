@@ -17,6 +17,7 @@ pub enum Form {
 
 /// Button legend appended to the highlighted form. The native help pane needs
 /// a static string, so each supported row has its own literal.
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HelpControls {
     TrainingApply,
@@ -25,6 +26,7 @@ pub enum HelpControls {
     RotationOnly,
 }
 
+#[cfg(test)]
 macro_rules! with_controls {
     ($controls:expr, $prefix:literal) => {
         match $controls {
@@ -40,6 +42,7 @@ macro_rules! with_controls {
     };
 }
 
+#[cfg(test)]
 impl HelpControls {
     pub(crate) const fn bare(self) -> &'static str {
         with_controls!(self, "")
@@ -67,6 +70,7 @@ impl Form {
     /// Current form label only. Y Change Form appears when another supported form
     /// is available to cycle to; unsupported current forms and single-form stages
     /// omit the Y hint entirely.
+    #[cfg(test)]
     pub(crate) const fn help_line(
         self,
         native_forms: [Option<u32>; 3],

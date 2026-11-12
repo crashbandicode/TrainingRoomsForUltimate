@@ -10,12 +10,14 @@ use super::combo::{Combo, Helper, Out, Settings, Summary};
 use super::frame_strip::Tracker;
 
 /// Ids the recording index uses, cut to 48 bytes on a character boundary.
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DrillId {
     bytes: [u8; 48],
     len: u8,
 }
 
+#[cfg(test)]
 impl DrillId {
     pub const EMPTY: DrillId = DrillId { bytes: [0; 48], len: 0 };
 
@@ -38,6 +40,7 @@ impl DrillId {
 }
 
 /// What the one drill is.
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Kind {
     Combo,
@@ -45,6 +48,7 @@ pub enum Kind {
 }
 
 /// The helper drills one thing. Selecting either kind replaces the other.
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct OneDrill {
     kind: Option<Kind>,
@@ -53,6 +57,7 @@ pub struct OneDrill {
     made: Option<DrillId>,
 }
 
+#[cfg(test)]
 impl OneDrill {
     pub const fn new() -> Self {
         Self { kind: None, id: DrillId::EMPTY, made: None }
@@ -79,6 +84,7 @@ impl OneDrill {
     }
 }
 
+#[cfg(test)]
 impl Default for OneDrill {
     fn default() -> Self {
         Self::new()
@@ -110,6 +116,7 @@ pub struct SequenceWalk {
 
 impl SequenceWalk {
     /// A walk over `len` steps at combo 1, with no streak.
+    #[cfg(test)]
     pub const fn new(len: usize) -> Self {
         Self::resume(len, 0, 0)
     }
@@ -123,6 +130,7 @@ impl SequenceWalk {
         self.at
     }
 
+    #[cfg(test)]
     pub fn steps(&self) -> usize {
         self.len
     }
@@ -162,6 +170,7 @@ impl SequenceWalk {
 }
 
 /// A drilled sequence: its id, the ids of its combos that still open, and the walk over them.
+#[cfg(test)]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SequenceDrill {
     id: DrillId,
@@ -169,6 +178,7 @@ pub struct SequenceDrill {
     walk: SequenceWalk,
 }
 
+#[cfg(test)]
 impl SequenceDrill {
     /// A drill of sequence `id` over `present` (its combo ids that still open, in file order), at step 1.
     pub fn new(id: &str, present: &[&str]) -> Self {

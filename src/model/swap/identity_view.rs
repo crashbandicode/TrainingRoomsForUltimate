@@ -139,6 +139,7 @@ pub fn key(scope: Scope, header: &Header, published: Published) -> u32 {
 }
 
 /// The per-body costume a selector copy must produce.
+#[cfg(test)]
 pub fn costume(scope: Scope, header: &Header, published: Published, region: u32) -> u32 {
     native_costume(key(scope, header, published), header.costume, region)
 }

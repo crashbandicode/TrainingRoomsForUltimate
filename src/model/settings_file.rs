@@ -147,6 +147,7 @@ fn file_name(path: &Path) -> String {
 
 /// Write `settings` as the active file: the Store's transactional write (the menu's writer, a later
 /// package, calls this).
+#[cfg(test)]
 pub fn save(dir: &Path, settings: &Settings) -> io::Result<()> {
     write_replace(&dir.join(storage::file::SETTINGS), settings.to_json().as_bytes())
 }

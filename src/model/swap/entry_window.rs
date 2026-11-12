@@ -175,22 +175,6 @@ fn start_up_words(words: Words, original: u32) -> bool {
         && words.kinds[count..].iter().all(|kind| *kind == NONE)
 }
 
-/// A window published by H1, before the entry exists: keyed by owner and its words, for the scene epoch it was made
-/// in. H4 binds it to the first constructed entry of that owner whose descriptor shows exactly these words, in the
-/// same epoch.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Pending<E> {
-    pub owner: u32,
-    pub words: Words,
-    pub epoch: E,
-}
-
-impl<E: Copy + PartialEq> Pending<E> {
-    pub fn binds(&self, owner: u32, words: Words, epoch: E) -> bool {
-        self.owner == owner && self.words == words && self.epoch == epoch
-    }
-}
-
 /// The owner generation a bank's group exchange must show. H1 stamps the window with the generation current while the
 /// new scene is configured; that scene's own scene change opens the next one after the bank's step. A window the bank
 /// step kept for the new scene (`kept`) takes the new generation; any other bank keeps its stamp, so a group exchange

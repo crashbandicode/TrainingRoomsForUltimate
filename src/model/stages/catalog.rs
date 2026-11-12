@@ -5,6 +5,7 @@
 //! fork's files, so the grid reaches them here.
 
 use super::lobby_stages;
+#[cfg(test)]
 pub use super::stage_forms::{Form, HelpControls};
 #[cfg(test)]
 use super::stage_menu;
@@ -19,6 +20,7 @@ pub const STAGE_COUNT: usize = STAGES.len();
 pub const TILE_COUNT: usize = STAGE_COUNT + 1;
 
 /// The native alternate forms of a stage: `[Normal, Omega, Battlefield]`, `None` where the stage has none.
+#[cfg(test)]
 pub fn native_forms(stage: u32) -> [Option<u32>; 3] {
     lobby_stages::native_forms(stage)
 }
@@ -30,11 +32,13 @@ pub fn page_cursor(selected: usize, count: usize, next: bool) -> Option<usize> {
 }
 
 /// The help pane's line for the highlighted form: the form label, the Y hint when another form exists, and the button legend.
+#[cfg(test)]
 pub fn form_help(form: Form, native_forms: [Option<u32>; 3], controls: HelpControls) -> &'static str {
     form.help_line(native_forms, controls)
 }
 
 /// The button legend alone (a tile without a form row).
+#[cfg(test)]
 pub fn controls_help(controls: HelpControls) -> &'static str {
     controls.bare()
 }

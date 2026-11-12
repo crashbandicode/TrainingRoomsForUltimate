@@ -7,6 +7,7 @@ use super::library::{
     migrate, Chain, Error, Kind, LegacySlot, LoopCount, NamedSave, RecordingIndex, Role, Sequence,
     StartSaveState, Use, MACROS_DIR, SAVES_DIR, SEQUENCES_DIR,
 };
+#[cfg(test)]
 use super::macro_ui::macro_panel::{fighter_gate, FighterGate, FighterOrigin};
 use super::macros::{FrameSnapshot, FrameWindow, InputFrame, Library, MacroRecording, StartState};
 #[cfg(test)]
@@ -122,6 +123,7 @@ impl Capture {
         self.role
     }
 
+    #[cfg(test)]
     pub fn frames(&self) -> &[InputFrame] {
         &self.frames
     }
@@ -159,6 +161,7 @@ impl RecordStop {
         }
     }
 
+    #[cfg(test)]
     pub fn cursor(&self) -> Option<&str> {
         match self {
             RecordStop::Saved { id, .. } => Some(id),
@@ -236,6 +239,7 @@ pub fn drive_mash(machine: &mut Playback, role: Role, interrupt: bool) -> bool {
     machine.mash(role, interrupt)
 }
 
+#[cfg(test)]
 pub fn drive_load<'a>(
     machine: &Playback,
     book: &'a Book,
@@ -244,6 +248,7 @@ pub fn drive_load<'a>(
     machine.load(book, settings)
 }
 
+#[cfg(test)]
 pub fn drive_auto_load<'a>(
     machine: &Playback,
     book: &'a Book,
@@ -252,6 +257,7 @@ pub fn drive_auto_load<'a>(
     machine.auto_load_on_death(book, settings)
 }
 
+#[cfg(test)]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ChainAsk {
     pub step: usize,
@@ -262,6 +268,7 @@ pub struct ChainAsk {
 }
 
 /// Macro 1 only. A later step never asks and never names a fighter to switch to.
+#[cfg(test)]
 pub fn chain_mismatch(
     steps: &[(&str, &str)],
     current: &str,
@@ -370,6 +377,7 @@ pub fn replay_export(
     crop_macro(frames, start, end, snapshot, name)
 }
 
+#[cfg(test)]
 #[derive(Clone, Debug)]
 pub struct MakeComboPass {
     pub role: Role,
@@ -408,6 +416,7 @@ pub fn save_last_combo(root: &Path, combo: &Combo, name: &str, recorded_on: Opti
 }
 
 /// One Player pass from the chain's start save. The drill id is not written.
+#[cfg(test)]
 pub fn make_combo(book: &Book) -> MakeComboPass {
     let drill = book.index.drill().cloned();
     let mut once = book.clone();

@@ -7,9 +7,11 @@
 //! A [`Target`] carries the form, so "Original Ice Climbers pair" and "numbered Solo Popo" are two
 //! different targets of the same kind, and a group serves a target only in the target's own form.
 
+#[cfg(test)]
 use super::capabilities::{capabilities, form_class, request_forms, Capabilities, FormClass};
 use crate::engine::swap::body_bank::Members;
 use crate::engine::swap::character_forms::Forms;
+#[cfg(test)]
 use crate::engine::mii::lifetime::Configuration;
 
 /// The selectable member index of `members` that serves `kind` in `forms` (WP-I, WORKPLAN §2.13;
@@ -25,6 +27,7 @@ pub fn group_serves(members: Members, kind: u32, forms: Forms) -> Option<u8> {
 
 /// Where a request came from. Slot 0 is the original; numbered slots are the cycle lanes; a
 /// direct pick (grid or menu) and a replay switch carry no slot.
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Selection {
     Original,
@@ -37,6 +40,7 @@ pub enum Selection {
 /// group expansion for a transformation form, the single body otherwise) and, for a Mii, the
 /// exact configuration when one is staged. `kind` is `form.kinds[0]`, kept for the callers that
 /// still key on it.
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Target {
     pub selection: Selection,
@@ -45,6 +49,7 @@ pub struct Target {
     pub exact: Option<Configuration>,
 }
 
+#[cfg(test)]
 impl Target {
     pub fn new(selection: Selection, form: Forms, exact: Option<Configuration>) -> Self {
         Self { selection, form, kind: form.kinds[0], exact }

@@ -214,6 +214,7 @@ impl CaptureArchive {
     /// Saves a new capture without replacing an existing replay id. Saves for
     /// this archive must be serialized by the caller. The returned value is
     /// the stable lowercase-hex filename id used by `load` and `list`.
+    #[cfg(test)]
     pub fn save(
         &self,
         replay_id: &str,
@@ -224,6 +225,7 @@ impl CaptureArchive {
         self.save_with_outcome(replay_id, replay_name, game_version, session).map(|saved| saved.id)
     }
 
+    #[cfg(test)]
     pub fn save_with_outcome(
         &self,
         replay_id: &str,

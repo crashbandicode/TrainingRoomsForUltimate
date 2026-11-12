@@ -17,7 +17,9 @@ pub mod options;
 pub mod table;
 
 use chord::Chord;
-use delay::{DelayRange, DelaySpec};
+use delay::DelayRange;
+#[cfg(test)]
+use delay::DelaySpec;
 use grid::{ConsoleMode, GridKind, GridLayout, Move, RosterUse};
 use input::Button;
 use options::{CHORD_ROWS, SITUATIONS, SWAP_GROUP_IDS};
@@ -261,6 +263,7 @@ pub struct PlaceKeeper {
 }
 
 impl PlaceKeeper {
+    #[cfg(test)]
     pub const fn new() -> PlaceKeeper {
         PlaceKeeper { place: None }
     }
@@ -292,6 +295,7 @@ impl PlaceKeeper {
         m
     }
 
+    #[cfg(test)]
     pub fn place(&self) -> Option<Place> {
         self.place
     }
@@ -774,6 +778,7 @@ impl Menu {
     }
 
     /// What a consumer reads from the delay row called `id` (SPEC-core-02 §2.8).
+    #[cfg(test)]
     pub fn delay_spec(&self, id: &str) -> Option<DelaySpec<'_>> {
         let row = ROWS.iter().find(|row| row.id == id)?;
         let Control::MultiSelectRange { first, step, range_id } = row.control else {
@@ -885,6 +890,7 @@ impl Menu {
     /// each id present replaces its row wholly, so a shorter array leaves the appended options off;
     /// an id missing is left as it is; an id that is not a row is ignored. A delay row's checklist
     /// and range are one row: updating either clears the other first.
+    #[cfg(test)]
     pub fn bulk_update(&mut self, entries: &[(&str, &[u8])]) {
         for (id, array) in entries {
             let Some((_, def)) = settings::def(id) else { continue };

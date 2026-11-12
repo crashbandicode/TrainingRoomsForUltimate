@@ -46,6 +46,7 @@ pub struct NameContext {
 }
 
 /// Whether a recording may be saved as schema 1, with an exact Mii, or not at all.
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MiiIdentity {
     /// Fighter is not a Mii. Schema 1 is the right file.
@@ -58,6 +59,7 @@ pub enum MiiIdentity {
 
 /// `observed_kind` is `configuration.canonical().class.kind()` when a configuration
 /// was actually read. The source (saved, original, or discovered) is not a separate case.
+#[cfg(test)]
 pub fn mii_identity(fighter_kind: i32, observed_kind: Option<u32>) -> MiiIdentity {
     let Some(class) = crate::engine::mii::inventory::MiiClass::from_kind(fighter_kind as u32) else {
         return MiiIdentity::Ordinary;
@@ -68,6 +70,7 @@ pub fn mii_identity(fighter_kind: i32, observed_kind: Option<u32>) -> MiiIdentit
     }
 }
 
+#[cfg(test)]
 pub fn export_mii_refusal(identity: MiiIdentity) -> Option<&'static str> {
     match identity {
         MiiIdentity::Unknown => Some(
@@ -78,8 +81,10 @@ pub fn export_mii_refusal(identity: MiiIdentity) -> Option<&'static str> {
 }
 
 /// Numbered CPU slots hold this many frames. Longer named files stay playable.
+#[cfg(test)]
 pub const NUMBERED_SLOT_FRAMES: usize = 600;
 
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SlotAdmit {
     Ready,
@@ -88,6 +93,7 @@ pub enum SlotAdmit {
 }
 
 /// Full copy, or the original length left untouched. Never a shortened vec.
+#[cfg(test)]
 pub fn copy_numbered_frames(frames: &[InputFrame]) -> Result<Vec<InputFrame>, SlotAdmit> {
     match admit_numbered(frames.len()) {
         SlotAdmit::Ready => Ok(frames.to_vec()),
@@ -95,6 +101,7 @@ pub fn copy_numbered_frames(frames: &[InputFrame]) -> Result<Vec<InputFrame>, Sl
     }
 }
 
+#[cfg(test)]
 pub fn admit_numbered(frame_count: usize) -> SlotAdmit {
     if frame_count == 0 {
         SlotAdmit::Empty

@@ -65,13 +65,6 @@ impl OrderedFighterRoster {
         self.fighters_excluding(None)
     }
 
-    /// `[all, ranks...]`, the same array the portrait editor and JSON store.
-    pub fn values(self) -> Vec<u8> {
-        std::iter::once(u8::from(self.all))
-            .chain(self.ranks)
-            .collect()
-    }
-
     /// `hat_kinds` without heap (the preload planner's per-tick form).
     pub fn hat_kinds_fixed(self) -> KindList {
         let mut out = KindList::new(0);

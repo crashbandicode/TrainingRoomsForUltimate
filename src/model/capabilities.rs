@@ -195,6 +195,7 @@ impl Granted {
         self.offsets.binary_search(&offset).is_ok()
     }
 
+    #[cfg(test)]
     pub fn len(&self) -> usize {
         self.offsets.len()
     }

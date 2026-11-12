@@ -92,6 +92,7 @@ pub const FINGERPRINT_BASIS: u64 = 0xcbf2_9ce4_8422_2325;
 
 /// Reconstruct the plugin's archive from `stock`. Never accepts a partial, corrupted or mismatched
 /// recipe, a changed stock archive, or an output that does not match its fingerprint.
+#[cfg(test)]
 pub fn build(stock: &[u8], recipe: &[u8]) -> Result<Vec<u8>> {
     let size = header(recipe)?.output_len;
     if !(4..=MAX_ARCHIVE_BYTES).contains(&size) {

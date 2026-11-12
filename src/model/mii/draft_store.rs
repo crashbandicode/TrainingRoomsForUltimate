@@ -1,7 +1,9 @@
 //! Bounded, mod-owned preset persistence. Native Mii saves are never a destination.
 //! One menu/filesystem owner must serialize access to this directory.
 use std::{fs, io::{self, Read, Write}, path::{Path, PathBuf}};
-use {crate::engine::mii::draft::{Draft, Library, Saved}, crate::engine::mii::inventory::Snapshot};
+use {crate::engine::mii::draft::{Library, Saved}, crate::engine::mii::inventory::Snapshot};
+#[cfg(test)]
+use crate::engine::mii::draft::Draft;
 
 pub const MAX_FILE_BYTES: u64 = 1024 * 1024;
 const FILE: &str = "mii-presets.json";
@@ -36,6 +38,7 @@ impl Store {
 
     /// Commit on disk before publishing the new in-memory library. Duplicate
     /// configurations preserve their first name and do not write any file.
+    #[cfg(test)]
     pub fn save(&mut self, draft: &Draft, name: &str, native: &Snapshot) -> io::Result<Saved> {
         let mut next = self.library.clone();
         let outcome = next.save(draft, name, native)

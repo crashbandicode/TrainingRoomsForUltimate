@@ -23,6 +23,7 @@ pub mod bit {
     pub const B: u32 = 6;
     #[cfg(test)]
     pub const Y: u32 = 7;
+    #[cfg(test)]
     pub const L: u32 = 8;
     #[cfg(test)]
     pub const R: u32 = 9;

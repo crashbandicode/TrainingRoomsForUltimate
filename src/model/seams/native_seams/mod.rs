@@ -525,6 +525,7 @@ impl Site {
 
     /// This row's outcome for the bytes now at its site: kind rule + sharing rule for code, an exact
     /// comparison for `.rodata` (no plugin hooks read-only data, so any difference is foreign).
+    #[cfg(test)]
     pub fn outcome(&self, actual: &[u8; GUARD_BYTES]) -> GuardOutcome {
         self.outcome_with(actual, None)
     }
@@ -543,11 +544,13 @@ impl Site {
 
 impl Seam {
     /// The read-only region of `main` this row's 64 bytes lie in (from its offset).
+    #[cfg(test)]
     pub const fn region(&self) -> Option<MainRegion> {
         region_of(self.offset)
     }
 
     /// This row's outcome for the bytes now at its site (the run-time view's rule, `Site::outcome`).
+    #[cfg(test)]
     pub fn outcome(&self, actual: &[u8; GUARD_BYTES]) -> GuardOutcome {
         self.site().outcome(actual)
     }

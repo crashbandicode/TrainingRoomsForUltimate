@@ -264,6 +264,7 @@ impl SetupRecord {
         Ok(())
     }
 
+    #[cfg(test)]
     pub fn role(&self, role: Role) -> &FighterSetup {
         match role {
             Role::Player => &self.player,

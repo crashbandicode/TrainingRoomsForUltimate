@@ -36,11 +36,6 @@ use crate::engine::swap::swap_model::ledger::{native_window_requests, orphan_key
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Phase { Idle, Building, Ready, Changing, Retired }
 
-impl Phase {
-    /// A press during construction/switching is never queued as another change.
-    /// A retired private probe must leave the mapped controller frame alone.
-    pub fn accepts_input(self) -> bool { matches!(self, Self::Idle | Self::Ready) }
-}
 
 /// Native shape of a swap group beyond the ordinary one-to-three single bodies
 /// (SPECIAL-GROUPS-DESIGN §2, §3, §5).
@@ -694,6 +689,7 @@ pub struct GroupPolicy {
 }
 
 impl GroupPolicy {
+    #[cfg(test)]
     pub const DEFAULT: Self = Self { solo_popo_groups: false, ic_pair_groups: false };
 }
 
@@ -1444,10 +1440,12 @@ pub fn merge_hold(a: Option<Hold>, b: Option<Hold>) -> Option<Hold> {
     }
 }
 
+#[cfg(test)]
 pub fn count_extra_groups(groups: &[(Members, GroupState)]) -> GroupCounts {
     count_extra_groups_iter(groups.iter().copied())
 }
 
+#[cfg(test)]
 pub fn count_extra_groups_iter(groups: impl IntoIterator<Item = (Members, GroupState)>) -> GroupCounts {
     count_group_members(groups.into_iter().map(|(members, state)| (members.count() as u8, state)))
 }
@@ -1839,6 +1837,7 @@ pub struct GroupExchange {
     after: GroupOwner,
 }
 impl GroupExchange {
+    #[cfg(test)]
     pub fn new(before: GroupOwner, after: GroupOwner, members: Members) -> Option<Self> {
         Self::new_with_header(before, after, members, before.header)
     }
@@ -1848,6 +1847,7 @@ impl GroupExchange {
     /// exchange, D-PTA1), the Mii identity header `[owner, mii, MAX, MAX, costume]`
     /// once a Mii group is built or attached, and the restored previous header
     /// when a Mii window is left (MII-GROUPS-DESIGN §3).
+    #[cfg(test)]
     pub fn new_with_header(before: GroupOwner, after: GroupOwner, members: Members, header: [u32; 5]) -> Option<Self> {
         Self::new_with_entry(before, after, members, header, None)
     }
@@ -1967,7 +1967,9 @@ impl MiiIdentity {
     pub fn kind(self) -> u32 { self.kinds[0] }
     pub fn outfit(self) -> u16 { self.tokens[0] }
     pub fn hat(self) -> u16 { self.tokens[1] }
+    #[cfg(test)]
     pub fn colour(self) -> u16 { self.tokens[2] }
+    #[cfg(test)]
     pub fn voice(self) -> u16 { self.tokens[3] }
 
     /// `R+0x54..0x68` as the adapters and the exchange receipt read it.

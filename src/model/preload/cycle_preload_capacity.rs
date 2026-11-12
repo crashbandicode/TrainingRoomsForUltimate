@@ -58,6 +58,7 @@ mod callback_tests {
 
 /// Potential entries, not permission to create or dereference them. Training
 /// extensions and solo waiting extensions require separate opt-in features.
+#[cfg(test)]
 pub fn slots(layout: Layout, third: bool, ldn_third: bool, extended: bool)
     -> [u32; SOURCE_SLOTS] {
     slots_with_waiting(layout, third, ldn_third, extended, false)

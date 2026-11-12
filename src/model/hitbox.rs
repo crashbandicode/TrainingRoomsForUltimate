@@ -369,6 +369,7 @@ pub struct FramePlan {
 impl FramePlan {
     pub const NONE: FramePlan = FramePlan { restore: false, sleep: false, redraw: false };
 
+    #[cfg(test)]
     pub const fn calls(self) -> bool {
         self.restore || self.sleep || self.redraw
     }
@@ -1022,11 +1023,6 @@ impl SetTable {
         };
         self.used[i] = self.clock;
         i
-    }
-
-    /// The key (accessor address) of set `i`, 0 when free.
-    pub fn key(&self, i: usize) -> usize {
-        self.keys[i]
     }
 
     /// The set of `key` if it has one.

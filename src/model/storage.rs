@@ -98,7 +98,9 @@ impl<const N: usize> fmt::Debug for FixedPath<N> {
 }
 
 /// Buffer size for any path of this plugin.
+#[cfg(test)]
 pub const PATH_CAPACITY: usize = 128;
+#[cfg(test)]
 pub type Path = FixedPath<PATH_CAPACITY>;
 
 /// How many renamed copies of a corrupt settings file are kept before the oldest number is reused.

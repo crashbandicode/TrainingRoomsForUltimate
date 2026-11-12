@@ -115,23 +115,6 @@ impl PreviewRetirement {
     pub fn clear(&self) { self.close.store(false, SeqCst); }
 }
 
-/// One message from a game thread to the worker. `Copy` and small, so posting allocates nothing.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum LayerEvent {
-    /// The named capture ended with `len` frames in the capture buffer (`crop`: Recording Crop was on).
-    CaptureFinished { len: u32, crop: bool },
-    /// A named playback or a clip preview ended.
-    PlaybackEnded,
-    /// The playback chord asked for the loaded named macro (the worker requests the restore).
-    RequestPlayback,
-    /// A save-state restore finished and the layer's follow-up ran on the game thread (the worker refreshes its view).
-    RestoreDone,
-    /// The session ended (leaving Training, a hot swap, a lobby change): close transient panels.
-    SessionCleared,
-    /// One game frame passed with a practice CPU on stage (the worker's character and keyboard services may run).
-    FrameTick,
-}
-
 /// One bounded numbered-slot transfer. The worker constructs a request, a game
 /// callback executes it against its Recorder, and the worker consumes the reply.
 /// Both directions use the same fixed payload: no allocation occurs in execute.

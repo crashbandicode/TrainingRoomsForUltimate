@@ -570,6 +570,7 @@ pub fn parse_bytes(bytes: &[u8]) -> Loaded {
 }
 
 /// Close of the menu, as far as the file is concerned (SPEC-core-04 §5).
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CloseReason {
     /// The player closed the menu.
@@ -579,21 +580,25 @@ pub enum CloseReason {
 }
 
 /// Whether closing the menu for `reason` writes the file.
+#[cfg(test)]
 pub const fn writes_on_close(reason: CloseReason) -> bool {
     matches!(reason, CloseReason::Closed)
 }
 
 /// The steps of a commit, in order: the globals features read are replaced before the write is
 /// queued, so features see the change from the next frame (SPEC-core-04 §5).
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CommitStep {
     Publish,
     QueueWrite,
 }
 
+#[cfg(test)]
 pub const COMMIT_ORDER: [CommitStep; 2] = [CommitStep::Publish, CommitStep::QueueWrite];
 
 /// How the file is written.
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum WriteMode {
     /// A writer thread with a 64 KiB stack takes the jobs.
@@ -609,6 +614,7 @@ pub const WRITER_STACK_BYTES: usize = crate::model::thread_stacks::of(crate::mod
 #[cfg(test)]
 pub const LOADER_STACK_BYTES: usize = crate::model::thread_stacks::of(crate::model::thread_stacks::ThreadId::SettingsLoad).bytes;
 
+#[cfg(test)]
 pub const fn write_mode(writer_thread_started: bool) -> WriteMode {
     if writer_thread_started {
         WriteMode::Thread
