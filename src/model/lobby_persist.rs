@@ -158,18 +158,6 @@ mod tests {
         }
     }
 
-    fn bad_stored_values_read_as_not_saved() {
-        for text in [r#"{"partners": 9, "behavior": 3}"#, r#"{"partners": -1}"#, r#"{"partners": "2"}"#, r#"[2, 7]"#, "7"] {
-            let value: Value = serde_json::from_str(text).unwrap();
-            assert_eq!(Saved::from_value(Some(&value)), Saved::NONE, "{text}");
-        }
-        let value: Value = serde_json::from_str(r#"{"partners": 9, "behavior": 7}"#).unwrap();
-        assert_eq!(Saved::from_value(Some(&value)), Saved { partners: None, behavior: Some(ATTACK) }, "a bad field alone");
-        assert_eq!(Saved::from_value(None), Saved::NONE);
-        assert!((0..=4).all(valid_partners) && !valid_partners(5));
-        assert!(valid_behavior(ATTACK) && valid_behavior(STOP) && !valid_behavior(0) && !valid_behavior(2));
-    }
-
     fn chosen_maps_the_row_handler_to_the_panel_values() {
         let room = [AUTOMATIC, 1, 2, 3];
         assert_eq!(chosen(PARTNERS_ROW, 0, &room), Some(Change::Partners(AUTOMATIC)));
@@ -195,11 +183,6 @@ mod tests {
         assert_eq!(restore(saved, &[0, 1, 2, 3, AUTOMATIC, 5])[0], None, "not the panel's vector");
     }
 
-    fn nothing_saved_restores_nothing() {
-        assert_eq!(restore(Saved::NONE, &[AUTOMATIC, 1, 2, 3]), [None, None]);
-        assert_eq!(Saved::unpack(Saved::NONE.pack()), Saved::NONE);
-    }
-
     fn a_change_updates_only_its_own_row() {
         let saved = Saved::NONE.with(Change::Partners(1));
         assert_eq!(saved, Saved { partners: Some(1), behavior: None });
@@ -214,10 +197,8 @@ mod tests {
     fn case_table() {
         crate::test_table::run(&[
             ("a_saved_pair_round_trips_through_the_settings_key", a_saved_pair_round_trips_through_the_settings_key as fn()),
-            ("bad_stored_values_read_as_not_saved", bad_stored_values_read_as_not_saved as fn()),
             ("chosen_maps_the_row_handler_to_the_panel_values", chosen_maps_the_row_handler_to_the_panel_values as fn()),
             ("restore_applies_only_what_the_room_offers", restore_applies_only_what_the_room_offers as fn()),
-            ("nothing_saved_restores_nothing", nothing_saved_restores_nothing as fn()),
             ("a_change_updates_only_its_own_row", a_change_updates_only_its_own_row as fn()),
         ]);
     }

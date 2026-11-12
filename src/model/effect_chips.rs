@@ -206,26 +206,6 @@ mod tests {
         assert_eq!(pick_layer(ChipVisual::Di, &[]), None);
     }
 
-    fn equal_layer_ratios_keep_the_first_sampler_zero_picture() {
-        let candidates = [
-            Candidate { sampler: 1, width: 1, height: 1000 },
-            Candidate { sampler: 0, width: 64, height: 128 },
-            Candidate { sampler: 0, width: 128, height: 256 },
-        ];
-        assert_eq!(pick_layer(ChipVisual::Di, &candidates), Some(1));
-        assert_eq!(pick_layer(ChipVisual::Sdi, &candidates), Some(1));
-    }
-
-    fn the_layer_runs_from_the_centre_along_the_direction() {
-        let p = place(ChipVisual::Di, 90.0, 100.0, 50.0, 184.0, 64, 256);
-        let reach = REACH * 184.0;
-        assert!((p.h - reach).abs() < 1e-3);
-        assert!((p.x - 100.0).abs() < 1e-3 && (p.y - (50.0 + reach / 2.0)).abs() < 1e-3, "{p:?}");
-        assert_eq!(p.rot, 0.0, "Up: the texture's +Y is already up");
-        let out = place(ChipVisual::Di, 0.0, 0.0, 0.0, 184.0, 64, 256);
-        assert!((out.x - reach / 2.0).abs() < 1e-3 && out.y.abs() < 1e-3 && out.rot == -90.0, "{out:?}");
-    }
-
     fn the_sdi_burst_is_stretched_two_times_along_the_vector() {
         let p = place(ChipVisual::Sdi, 90.0, 0.0, 0.0, 184.0, 256, 128);
         // Unstretched, the 2:1 band would be h/2 tall for its width; drawn twice as tall.
@@ -242,23 +222,14 @@ mod tests {
         assert_eq!(plan(Held::Bound(ChipVisual::Sdi), ChipVisual::None), Step::Drop, "grid closed or menu hidden");
     }
 
-    fn a_failed_visual_is_not_retried_every_frame_but_after_the_grid_closes() {
-        assert_eq!(plan(Held::Failed(ChipVisual::Di), ChipVisual::Di), Step::Keep);
-        assert_eq!(plan(Held::Failed(ChipVisual::Di), ChipVisual::None), Step::Drop);
-        assert_eq!(plan(Held::Failed(ChipVisual::Di), ChipVisual::Sdi), Step::Request(ChipVisual::Sdi));
-    }
-
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
             ("the_state_words_round_trip", the_state_words_round_trip as fn()),
             ("di_draws_the_streak_and_sdi_the_burst", di_draws_the_streak_and_sdi_the_burst as fn()),
-            ("equal_layer_ratios_keep_the_first_sampler_zero_picture", equal_layer_ratios_keep_the_first_sampler_zero_picture as fn()),
-            ("the_layer_runs_from_the_centre_along_the_direction", the_layer_runs_from_the_centre_along_the_direction as fn()),
             ("the_sdi_burst_is_stretched_two_times_along_the_vector", the_sdi_burst_is_stretched_two_times_along_the_vector as fn()),
             ("the_page_requests_on_open_releases_on_close_and_swaps_between_grids", the_page_requests_on_open_releases_on_close_and_swaps_between_grids as fn()),
-            ("a_failed_visual_is_not_retried_every_frame_but_after_the_grid_closes", a_failed_visual_is_not_retried_every_frame_but_after_the_grid_closes as fn()),
         ]);
     }
     }

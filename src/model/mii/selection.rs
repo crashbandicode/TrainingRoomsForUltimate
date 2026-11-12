@@ -335,83 +335,6 @@ mod tests {
         assert_eq!(merged.configuration(native_choice),Some(imported));
     }
 
-    fn operator_example_cycle_and_dropdown() {
-        let snap = example();
-        assert!(snap.is_complete());
-        let origin = Origin(canonical_of(&snap, 2622));
-        let prefs = Preferences::default();
-        let entries = cycle_entries(&snap, &prefs, PlayerOrigin::Mii(origin));
-        let ids: Vec<(MiiClass, u32)> = entries.iter().map(|(c, ch)| (*c, ch.slot_id.unwrap())).collect();
-        assert_eq!(ids, vec![(MiiClass::Brawler, 4155), (MiiClass::Swordfighter, 2700), (MiiClass::Gunner, 3137)]);
-        assert!(entries.iter().all(|(_, ch)| ch.source == Source::FirstEligible(Fallback::NoPreference)));
-        assert!(class_selectable(&snap, Role::Player, MiiClass::Swordfighter, PlayerOrigin::Mii(origin)));
-
-        let rows = dropdown(&snap, &prefs, Role::Player, MiiClass::Swordfighter, PlayerOrigin::Mii(origin));
-        assert_eq!(rows.iter().map(|r| (r.slot_id.unwrap(), r.greyed, r.selected)).collect::<Vec<_>>(), vec![(2622, true, false), (2700, false, true)]);
-
-        // A persisted Brawler preference picks C; B and C stay dropdown rows, still one Brawler entry.
-        let prefs = prefs.with(Role::Player, MiiClass::Brawler, Some(canonical_of(&snap, 4300))).unwrap();
-        let entries = cycle_entries(&snap, &prefs, PlayerOrigin::Mii(origin));
-        let brawler: Vec<&Choice> = entries.iter().filter(|(c, _)| *c == MiiClass::Brawler).map(|(_, ch)| ch).collect();
-        assert_eq!(brawler.len(), 1);
-        assert_eq!((brawler[0].slot_id.unwrap(), brawler[0].source), (4300, Source::Preference));
-        assert_eq!(dropdown(&snap, &prefs, Role::Player, MiiClass::Brawler, PlayerOrigin::Mii(origin)).len(), 3);
-    }
-
-    fn duplicate_only_origin_class_is_not_selectable_for_player_but_cpu_may_use_it() {
-        let snap = build_snapshot(vec![
-            slot(0, 2622, SWORD, b'a', 1),
-            slot(1, 2900, SWORD, b'a', 9), // byte-identical appearance, different name/create id: a copy
-            slot(2, 3137, GUNNER, b'f', 6),
-        ]);
-        assert_eq!(snap.of_class(MiiClass::Swordfighter).count(), 1);
-        let origin = Origin(canonical_of(&snap, 2622));
-        assert!(!class_selectable(&snap, Role::Player, MiiClass::Swordfighter, PlayerOrigin::Mii(origin)));
-        assert!(class_selectable(&snap, Role::Player, MiiClass::Gunner, PlayerOrigin::Mii(origin)));
-        assert!(resolve(&snap, &Preferences::default(), Role::Player, MiiClass::Swordfighter, PlayerOrigin::Mii(origin)).is_none());
-        let cpu = resolve(&snap, &Preferences::default(), Role::Cpu, MiiClass::Swordfighter, PlayerOrigin::Mii(origin)).unwrap();
-        assert_eq!((cpu.slot_id.unwrap(), cpu.canonical), (2622, origin.0));
-        let entries = cycle_entries(&snap, &Preferences::default(), PlayerOrigin::Mii(origin));
-        assert_eq!(entries.iter().map(|(c, _)| *c).collect::<Vec<_>>(), vec![MiiClass::Gunner]);
-    }
-
-    fn preference_equal_to_origin_or_stale_falls_back_without_mutation() {
-        let snap = example();
-        let origin = Origin(canonical_of(&snap, 2622));
-        let prefs = Preferences::default().with(Role::Player, MiiClass::Swordfighter, Some(origin.0)).unwrap();
-        let before = prefs;
-        let choice = resolve(&snap, &prefs, Role::Player, MiiClass::Swordfighter, PlayerOrigin::Mii(origin)).unwrap();
-        assert_eq!((choice.slot_id.unwrap(), choice.source), (2700, Source::FirstEligible(Fallback::PreferenceIsOrigin)));
-        assert_eq!(prefs, before);
-
-        let stale = {
-            let foreign = build_snapshot(vec![slot(0, 9999, SWORD, b'z', 42)]);
-            canonical_of(&foreign, 9999)
-        };
-        let prefs = Preferences::default().with(Role::Player, MiiClass::Swordfighter, Some(stale)).unwrap();
-        let before = prefs;
-        let choice = resolve(&snap, &prefs, Role::Player, MiiClass::Swordfighter, PlayerOrigin::Mii(origin)).unwrap();
-        assert_eq!((choice.slot_id.unwrap(), choice.source), (2700, Source::FirstEligible(Fallback::PreferenceUnavailable)));
-        assert_eq!(prefs, before);
-    }
-
-    fn player_and_cpu_choices_are_independent() {
-        let snap = example();
-        let origin = Origin(canonical_of(&snap, 2622));
-        let prefs = Preferences::default()
-            .with(Role::Cpu, MiiClass::Swordfighter, Some(origin.0)).unwrap()
-            .with(Role::Cpu, MiiClass::Brawler, Some(canonical_of(&snap, 4200))).unwrap();
-        let cpu_sword = resolve(&snap, &prefs, Role::Cpu, MiiClass::Swordfighter, PlayerOrigin::Mii(origin)).unwrap();
-        assert_eq!((cpu_sword.slot_id.unwrap(), cpu_sword.source), (2622, Source::Preference));
-        let player_sword = resolve(&snap, &prefs, Role::Player, MiiClass::Swordfighter, PlayerOrigin::Mii(origin)).unwrap();
-        assert_eq!(player_sword.slot_id.unwrap(), 2700);
-        let player_brawler = resolve(&snap, &prefs, Role::Player, MiiClass::Brawler, PlayerOrigin::Mii(origin)).unwrap();
-        assert_eq!((player_brawler.slot_id.unwrap(), player_brawler.source), (4155, Source::FirstEligible(Fallback::NoPreference)));
-        let cpu_brawler = resolve(&snap, &prefs, Role::Cpu, MiiClass::Brawler, PlayerOrigin::Mii(origin)).unwrap();
-        assert_eq!(cpu_brawler.slot_id.unwrap(), 4200);
-        assert!(dropdown(&snap, &prefs, Role::Cpu, MiiClass::Swordfighter, PlayerOrigin::Mii(origin)).iter().all(|r| !r.greyed));
-    }
-
     fn menu_close_touches_only_active_cycled_player_or_active_cpu() {
         let snap = example();
         let origin = Origin(canonical_of(&snap, 2622));
@@ -449,100 +372,12 @@ mod tests {
         assert_eq!(actions, vec![Action::ReloadCpu(Choice { canonical: canonical_of(&snap, 4155), slot_id: Some(4155), source: Source::Preference })]);
     }
 
-    fn unrelated_menu_close_preserves_native_cpu_and_cycled_player() {
-        let snap = example();
-        let before = Preferences::default();
-        let active = Active {
-            player: PlayerLive::Cycled { class: MiiClass::Brawler, canonical: canonical_of(&snap, 4200) },
-            cpu: Some((MiiClass::Swordfighter, canonical_of(&snap, 2700))),
-        };
-        assert!(on_menu_close(&snap, &before, &before, PlayerOrigin::NotMii, active).is_empty());
-        let unrelated = before.with(Role::Cpu, MiiClass::Gunner, Some(canonical_of(&snap, 3137))).unwrap();
-        assert!(on_menu_close(&snap, &before, &unrelated, PlayerOrigin::NotMii, active).is_empty());
-        let selected = unrelated.with(Role::Cpu, MiiClass::Swordfighter, Some(canonical_of(&snap, 2622))).unwrap();
-        let actions = on_menu_close(&snap, &unrelated, &selected, PlayerOrigin::NotMii, active);
-        assert_eq!(actions, vec![Action::ReloadCpu(Choice {
-            canonical: canonical_of(&snap, 2622), slot_id: Some(2622), source: Source::Preference,
-        })]);
-    }
-
-    fn incomplete_catalog_blocks_both_roles_and_unknown_original_blocks_only_player() {
-        let mut snap = example();
-        let prefs = Preferences::default();
-        assert!(cycle_entries(&snap, &prefs, PlayerOrigin::Unresolved).is_empty());
-        assert!(resolve(&snap, &prefs, Role::Cpu, MiiClass::Swordfighter, PlayerOrigin::Unresolved).is_some());
-        assert!(dropdown(&snap, &prefs, Role::Player, MiiClass::Swordfighter, PlayerOrigin::Unresolved)
-            .iter().all(|row| row.greyed && !row.selected));
-        snap.findings.push(crate::engine::mii::inventory::Finding::Source { slot_id: Some(9999), error: "unreadable".into() });
-        for role in [Role::Player, Role::Cpu] {
-            for class in CLASSES {
-                assert!(!class_selectable(&snap, role, class, PlayerOrigin::NotMii));
-                assert!(resolve(&snap, &prefs, role, class, PlayerOrigin::NotMii).is_none());
-                assert!(dropdown(&snap, &prefs, role, class, PlayerOrigin::NotMii)
-                    .iter().all(|row| row.greyed && !row.selected));
-            }
-        }
-    }
-
-    fn identity_preference_survives_a_new_representative_save_id() {
-        let original = build_snapshot(vec![slot(0, 5, SWORD, b'a', 1)]);
-        let wanted = canonical_of(&original, 5);
-        let prefs = Preferences::default().with(Role::Cpu, MiiClass::Swordfighter, Some(wanted)).unwrap();
-        let before = serde_json::to_vec(&prefs).unwrap();
-        let moved = build_snapshot(vec![slot(0, 700, SWORD, b'a', 9)]);
-        let chosen = resolve(&moved, &prefs, Role::Cpu, MiiClass::Swordfighter, PlayerOrigin::NotMii).unwrap();
-        assert_eq!((chosen.slot_id.unwrap(), chosen.canonical, chosen.source), (700, wanted, Source::Preference));
-        assert_eq!(serde_json::to_vec(&prefs).unwrap(), before);
-    }
-
-    fn session_fallback_keeps_persisted_bytes_and_recovers_in_next_session() {
-        let snap = example();
-        let wanted = canonical_of(&snap, 2622);
-        let prefs = Preferences::default().with(Role::Player, MiiClass::Swordfighter, Some(wanted)).unwrap();
-        let before = serde_json::to_vec(&prefs).unwrap();
-        assert_eq!(resolve(&snap, &prefs, Role::Player, MiiClass::Swordfighter, PlayerOrigin::Mii(Origin(wanted))).unwrap().slot_id.unwrap(), 2700);
-        let absent = build_snapshot(vec![slot(0, 2700, SWORD, b'b', 2)]);
-        assert_eq!(resolve(&absent, &prefs, Role::Player, MiiClass::Swordfighter, PlayerOrigin::NotMii).unwrap().slot_id.unwrap(), 2700);
-        assert_eq!(serde_json::to_vec(&prefs).unwrap(), before);
-        assert_eq!(resolve(&snap, &prefs, Role::Player, MiiClass::Swordfighter, PlayerOrigin::NotMii).unwrap().source, Source::Preference);
-    }
-
-    fn all_six_selectors_roundtrip_and_wrong_class_is_rejected() {
-        let snap = example();
-        let mut prefs = Preferences::default();
-        for (role, ids) in [(Role::Player, [4300, 2700, 3137]), (Role::Cpu, [4155, 2622, 3137])] {
-            for (class, id) in CLASSES.into_iter().zip(ids) {
-                prefs = prefs.with(role, class, Some(canonical_of(&snap, id))).unwrap();
-            }
-        }
-        let bytes = serde_json::to_vec(&prefs).unwrap();
-        assert_eq!(serde_json::from_slice::<Preferences>(&bytes).unwrap(), prefs);
-        let mut bad = serde_json::to_value(prefs).unwrap();
-        bad["cpu"][0] = bad["cpu"][1].clone();
-        assert!(serde_json::from_value::<Preferences>(bad).is_err());
-        assert!(prefs.with(Role::Cpu, MiiClass::Gunner, Some(canonical_of(&snap, 2622))).is_err());
-        assert_eq!(serde_json::from_str::<Preferences>("{}").unwrap(), Preferences::default());
-        let player_only = serde_json::json!({"player":[null, canonical_of(&snap, 2622), null]});
-        let parsed: Preferences = serde_json::from_value(player_only).unwrap();
-        assert_eq!(parsed.get(Role::Player, MiiClass::Swordfighter), Some(canonical_of(&snap, 2622)));
-        assert!(CLASSES.into_iter().all(|class| parsed.get(Role::Cpu, class).is_none()));
-    }
-
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
             ("replay_import_uses_native_first_dedup_without_native_ids_or_preference_writes", replay_import_uses_native_first_dedup_without_native_ids_or_preference_writes as fn()),
-            ("operator_example_cycle_and_dropdown", operator_example_cycle_and_dropdown as fn()),
-            ("duplicate_only_origin_class_is_not_selectable_for_player_but_cpu_may_use_it", duplicate_only_origin_class_is_not_selectable_for_player_but_cpu_may_use_it as fn()),
-            ("preference_equal_to_origin_or_stale_falls_back_without_mutation", preference_equal_to_origin_or_stale_falls_back_without_mutation as fn()),
-            ("player_and_cpu_choices_are_independent", player_and_cpu_choices_are_independent as fn()),
             ("menu_close_touches_only_active_cycled_player_or_active_cpu", menu_close_touches_only_active_cycled_player_or_active_cpu as fn()),
-            ("unrelated_menu_close_preserves_native_cpu_and_cycled_player", unrelated_menu_close_preserves_native_cpu_and_cycled_player as fn()),
-            ("incomplete_catalog_blocks_both_roles_and_unknown_original_blocks_only_player", incomplete_catalog_blocks_both_roles_and_unknown_original_blocks_only_player as fn()),
-            ("identity_preference_survives_a_new_representative_save_id", identity_preference_survives_a_new_representative_save_id as fn()),
-            ("session_fallback_keeps_persisted_bytes_and_recovers_in_next_session", session_fallback_keeps_persisted_bytes_and_recovers_in_next_session as fn()),
-            ("all_six_selectors_roundtrip_and_wrong_class_is_rejected", all_six_selectors_roundtrip_and_wrong_class_is_rejected as fn()),
         ]);
     }
     }

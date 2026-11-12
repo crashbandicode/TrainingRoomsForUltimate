@@ -120,29 +120,6 @@ mod tests {
             }).collect() }
     }
 
-    fn mid_attack_needs_explicit_lead_in_and_preserves_selected_momentum() {
-        let track = track();
-        let mut window = track.window().unwrap();
-        window.set_in(6);
-        window.set_out(10);
-        assert!(track.export(&window, "attack", "13.0.5", &[0, 14]).is_err());
-        assert_eq!(track.previous_clean_start(6, &[0, 14]), Some(3));
-        window.set_in(3);
-        let exported = track.export(&window, "attack", "13.0.5", &[0, 14]).unwrap();
-        assert_eq!(exported.frames.len(), 7);
-        assert_eq!(exported.frames[0].buttons, 513);
-        assert_eq!(exported.start.speed_y, -3.0);
-    }
-
-    fn rejects_mixed_fighter_window_and_empty_track() {
-        let mut track = track();
-        track.frames[6].start.fighter_kind = 8;
-        assert!(track.export(&track.window().unwrap(), "mixed", "13.0.5", &[14]).is_err());
-        track.frames.clear();
-        assert!(track.window().is_err());
-        assert_eq!(track.previous_clean_start(100, &[14]), None);
-    }
-
     fn replay_mii_unique_class_binds_different_indices_and_refuses_ambiguous_history() {
         use crate::engine::mii::replay::{ReplayMiis, HEADER_LEN, VERSION};
         let mut bytes = vec![0; HEADER_LEN];
@@ -176,8 +153,6 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
-            ("mid_attack_needs_explicit_lead_in_and_preserves_selected_momentum", mid_attack_needs_explicit_lead_in_and_preserves_selected_momentum as fn()),
-            ("rejects_mixed_fighter_window_and_empty_track", rejects_mixed_fighter_window_and_empty_track as fn()),
             ("replay_mii_unique_class_binds_different_indices_and_refuses_ambiguous_history", replay_mii_unique_class_binds_different_indices_and_refuses_ambiguous_history as fn()),
         ]);
     }

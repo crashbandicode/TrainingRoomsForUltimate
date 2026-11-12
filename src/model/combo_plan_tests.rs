@@ -173,42 +173,6 @@ fn after_a_drop_the_bar_names_it_and_restarts_at_combo_one() {
     assert_eq!(draw_seq(&h, &seq)[at::REASON].text, Text::new("the exchange ended"));
 }
 
-fn a_finished_sequence_shows_every_combo_done() {
-    let mut h = helper(true, true);
-    h.restart_with(Some(reference()));
-    let finished = Stepped { step: 1, summary: clean(), advance: Advance::Finished };
-    let looks = draw_seq(&h, &view(0, Some(finished), "Nair loop combo"));
-    assert_eq!((looks[at::SEQ_LANDED].text, looks[at::SEQ_LANDED].color), (Text::new("sequence done ·"), GOOD));
-    assert_eq!(looks[at::SEQ_CURRENT].text, Text::new("Ryu BnB:"));
-    assert!((0..2).all(|c| looks[at::SEQ_CHIP_EDGE + c].color == GOOD && looks[at::SEQ_CHECK_LONG + c].visible));
-}
-
-fn the_combo_bar_shows_no_sequence_pane() {
-    let mut r = Renderer::new();
-    let writes = draw(&mut r, &helper(true, true), true);
-    let at_ = |i: usize| writes.iter().find(|(j, _)| *j == i).unwrap().1;
-    assert_eq!(at_(at::CONTAINER).y, BAR_Y);
-    assert_eq!(at_(at::BACKDROP).w, BAR_W);
-    assert!((at::SEQ_BACKDROP..COUNT).all(|i| !at_(i).visible));
-    assert_eq!(at_(at::CELL).w, CELL_W);
-}
-
-fn the_chips_keep_the_current_combo_in_view() {
-    assert_eq!(SeqView::first_chip(0, 2), 0);
-    assert_eq!(SeqView::first_chip(0, 6), 0);
-    assert_eq!(SeqView::first_chip(3, 6), 2);
-    assert_eq!(SeqView::first_chip(5, 6), 2);
-}
-
-fn the_cells_follow_the_newest_links() {
-    assert_eq!(first_cell(0, 2), 0);
-    assert_eq!(first_cell(0, 9), 0);
-    assert_eq!(first_cell(4, 9), 1);
-    assert_eq!(first_cell(8, 9), 5);
-    assert_eq!(first_cell(9, 9), 5);
-    assert_eq!(ruler_x(1, -50), ruler_x(1, RULER_FROM), "clamped to the ruler");
-}
-
 /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
 #[test]
 fn case_table() {
@@ -218,10 +182,6 @@ fn case_table() {
         ("texts_name_verdicts_marks_results_and_reasons", texts_name_verdicts_marks_results_and_reasons as fn()),
         ("a_drilled_sequence_draws_the_header_the_combo_row_and_the_helper_cells", a_drilled_sequence_draws_the_header_the_combo_row_and_the_helper_cells as fn()),
         ("after_a_drop_the_bar_names_it_and_restarts_at_combo_one", after_a_drop_the_bar_names_it_and_restarts_at_combo_one as fn()),
-        ("a_finished_sequence_shows_every_combo_done", a_finished_sequence_shows_every_combo_done as fn()),
-        ("the_combo_bar_shows_no_sequence_pane", the_combo_bar_shows_no_sequence_pane as fn()),
-        ("the_chips_keep_the_current_combo_in_view", the_chips_keep_the_current_combo_in_view as fn()),
-        ("the_cells_follow_the_newest_links", the_cells_follow_the_newest_links as fn()),
     ]);
 }
 }

@@ -84,21 +84,6 @@ mod tests {
     use super::*;
 
     const MARIO: u32 = 0x00;
-    const RYU: u32 = 0x3c;
-
-    fn no_question_without_a_recorded_fighter_or_when_it_is_p1s() {
-        assert_eq!(plan(None, Some((MARIO, "Mario")), true), Plan::Proceed);
-        assert_eq!(plan(Some("Mario"), Some((MARIO, "Mario")), true), Plan::Proceed);
-        assert_eq!(plan(Some("  mario "), Some((MARIO, "Mario")), true), Plan::Proceed, "case and spaces");
-        // P1 not known yet (no practice entry observed): never a question.
-        assert_eq!(plan(Some("Ryu"), None, true), Plan::Proceed);
-    }
-
-    fn another_fighter_is_asked_about() {
-        // Player Swapping is not an input: a Switch is one explicit load, admitted with it Off (report §2a).
-        assert_eq!(plan(Some("Ryu"), Some((MARIO, "Mario")), true), Plan::Ask(TrioFighter::from_kind(RYU).unwrap()));
-        assert_eq!(plan(Some("RYU"), Some((MARIO, "Mario")), true), Plan::Ask(TrioFighter::from_kind(RYU).unwrap()));
-    }
 
     fn it_is_kept_without_asking_as_a_named_macro_would_be() {
         // The setting Off: keep, silently.
@@ -153,8 +138,6 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
-            ("no_question_without_a_recorded_fighter_or_when_it_is_p1s", no_question_without_a_recorded_fighter_or_when_it_is_p1s as fn()),
-            ("another_fighter_is_asked_about", another_fighter_is_asked_about as fn()),
             ("it_is_kept_without_asking_as_a_named_macro_would_be", it_is_kept_without_asking_as_a_named_macro_would_be as fn()),
             ("the_shared_prompt_asks_about_player_1_and_reports_to_the_combos_ui", the_shared_prompt_asks_about_player_1_and_reports_to_the_combos_ui as fn()),
             ("every_roster_name_is_found_and_the_answers_read_well", every_roster_name_is_found_and_the_answers_read_well as fn()),

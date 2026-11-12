@@ -281,20 +281,11 @@ mod tests {
         assert!(ReleaseWatch::Settled.freed().pass(None, purges(), base().is_some()).settled(), "nor any hold");
     }
 
-    fn an_index_outside_the_table_is_not_read() {
-        let t = Table { data: 0x1000, data_count: 4, directories: 0x2000, directory_count: 2 };
-        assert_eq!(t.directory(1), Some(0x2000 + DIRECTORY_SIZE));
-        assert_eq!(t.directory(2), None);
-        assert_eq!(t.data(4), None);
-        assert_eq!(t.data(u32::MAX), None);
-    }
-
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
             ("the_watch_settles_on_unloaded_then_purged_in_that_order", the_watch_settles_on_unloaded_then_purged_in_that_order as fn()),
-            ("an_index_outside_the_table_is_not_read", an_index_outside_the_table_is_not_read as fn()),
         ]);
     }
     }

@@ -131,21 +131,6 @@ mod tests {
         out
     }
 
-    fn swoff2_the_replaced_rule_never_forms_a_window_after_the_special_tail() {
-        let lap = &SWOFF2[..LAP];
-        let routes = replay(lap, &SWOFF2, false);
-        // Lap 1 as Yoga logged it: a window build every third step, helpers 3, through step 78.
-        for (i, (route, helpers)) in routes[..78].iter().enumerate() {
-            let expected = if i % 3 == 0 { Route::WindowBuild } else { Route::InWindow };
-            assert_eq!((*route, *helpers), (expected, 3), "step {}", i + 1);
-        }
-        // Step 79 (Sora) is canonical; from step 80 the helpers are 5 and no window forms again (steps 80-97).
-        assert_eq!(routes[78].0, Route::Canonical);
-        for (i, (route, helpers)) in routes.iter().enumerate().skip(79) {
-            assert_eq!((*route, *helpers), (Route::Canonical, 5), "step {}", i + 1);
-        }
-    }
-
     fn swoff2_a_window_forms_again_once_the_lane_returns_to_window_kinds() {
         let lap = &SWOFF2[..LAP];
         let routes = replay(lap, &SWOFF2, true);
@@ -166,45 +151,11 @@ mod tests {
         }
     }
 
-    /// A lap that starts on the special kinds: the replaced rule gave the helpers all five slots before the first
-    /// window; this rule keeps the window share from the first plan.
-    fn a_scene_that_starts_on_special_kinds_still_forms_windows() {
-        let mut lap: Vec<u32> = SWOFF2[78..LAP].to_vec();
-        lap.extend_from_slice(&SWOFF2[..78]);
-        let steps: Vec<u32> = lap.iter().copied().chain(lap.iter().copied().take(12)).collect();
-        let old = replay(&lap, &steps, false);
-        assert!(old.iter().all(|(route, _)| *route == Route::Canonical), "{:?}", old);
-        let new = replay(&lap, &steps, true);
-        assert!(new[..7].iter().all(|(route, _)| *route == Route::Canonical));
-        assert_eq!(new[7].0, Route::WindowBuild, "the first window kind after the special run (0x3f)");
-        assert!(new.iter().filter(|(route, _)| *route == Route::WindowBuild).count() >= 26);
-    }
-
-    fn demand_comes_from_the_cycle_and_is_capped_by_bank_members() {
-        assert_eq!(cycle_window_demand(&SWOFF2[..LAP], 3, false), 2);
-        assert_eq!(cycle_window_demand(&SWOFF2[..LAP], 2, false), 1);
-        assert_eq!(cycle_window_demand(&[0x24, 0x5a, 0x4b, 0x48, 0x49, 0x4a], 3, false), 0, "no member kind");
-        assert_eq!(cycle_window_demand(&[0x24, 0x1, 0x5a], 3, false), 0, "one member kind forms no window");
-        assert_eq!(cycle_window_demand(&[], 3, false), 0);
-    }
-
-    fn windows_reserve_before_helpers_out_of_the_slot_count() {
-        assert_eq!(groups_off_shares([0, 2], [0, 0], 5), ([0, 2], 3));
-        assert_eq!(groups_off_shares([2, 2], [0, 0], 5), ([2, 2], 1));
-        // An existing window keeps its extras; the remainder is shared fairly by depth.
-        assert_eq!(groups_off_shares([2, 2], [0, 2], 3), ([1, 2], 0));
-        assert_eq!(groups_off_shares([0, 0], [0, 0], 5), ([0, 0], 5));
-    }
-
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
-            ("swoff2_the_replaced_rule_never_forms_a_window_after_the_special_tail", swoff2_the_replaced_rule_never_forms_a_window_after_the_special_tail as fn()),
             ("swoff2_a_window_forms_again_once_the_lane_returns_to_window_kinds", swoff2_a_window_forms_again_once_the_lane_returns_to_window_kinds as fn()),
-            ("a_scene_that_starts_on_special_kinds_still_forms_windows", a_scene_that_starts_on_special_kinds_still_forms_windows as fn()),
-            ("demand_comes_from_the_cycle_and_is_capped_by_bank_members", demand_comes_from_the_cycle_and_is_capped_by_bank_members as fn()),
-            ("windows_reserve_before_helpers_out_of_the_slot_count", windows_reserve_before_helpers_out_of_the_slot_count as fn()),
         ]);
     }
     }

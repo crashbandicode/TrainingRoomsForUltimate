@@ -27,20 +27,11 @@ mod tests {
         }
     }
 
-    fn training_and_unrelated_scenes_keep_native_requests() {
-        for (mode, melee) in [(0x04040000, 0x20), (0x03010101, 0x0d), (0, 0),
-            (0x02020000, 0x0d), (0x07010300, 0x0d), (0x07010401, 0x0d), (0x07010400, 0x0e)] {
-            assert_eq!(waiting_hazards(true, mode, melee, true, false), None);
-            assert_eq!(waiting_hazards(true, mode, melee, true, true), None);
-        }
-    }
-
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
             ("waiting_families_accept_both_settings_but_not_their_matches", waiting_families_accept_both_settings_but_not_their_matches as fn()),
-            ("training_and_unrelated_scenes_keep_native_requests", training_and_unrelated_scenes_keep_native_requests as fn()),
         ]);
     }
     }

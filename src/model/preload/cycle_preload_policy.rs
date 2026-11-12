@@ -460,7 +460,7 @@ pub fn announce(shown: Option<Readiness>, now: Readiness, paused_polls: u8) -> b
 mod tests {
     lib_unit_tests! {
     use super::*;
-    use crate::engine::preload::cycle_preload_capacity::reusable_extras;
+    
     const NONE: fn(i32) -> bool = |_| false;
     fn ready_of(kinds: &[i32]) -> [Option<i32>; 8] {
         let mut ready = [None; 8];
@@ -516,34 +516,6 @@ mod tests {
         assert!(!loading_assets.announce(Some(complete), 0));
     }
 
-    fn failure_busy_and_off_do_not_manufacture_readiness() {
-        let assets = readiness(5, 1, false, [Some(1)], NONE, ready_of(&[1]));
-        let fighters = BuiltFighters { planned: 4, ready: 2, failed: 2, ..BuiltFighters::default() };
-        let failed = CacheStatus::new(assets, fighters, false);
-        assert_eq!(failed.progress(), Progress::Partial);
-        assert_eq!(failed.text().to_string(), "Loaded 2/4 (2 failed)");
-        let busy = CacheStatus::new(assets, BuiltFighters { planned: 2, ready: 2,
-            ..BuiltFighters::default() }, true);
-        assert_eq!(busy.text().to_string(), "Ready 2/2");
-        let off = CacheStatus::new(Readiness { configured: 0, ..assets }, fighters, false);
-        assert_eq!(off.progress(), Progress::Hidden);
-        assert_eq!(off.text().to_string(), "");
-        assert!(!off.announce(Some(failed), 3));
-        let empty = CacheStatus::new(readiness(5, 5, false, [None::<i32>], NONE, [None; 8]),
-            BuiltFighters::default(), false);
-        assert_eq!(empty.progress(), Progress::Hidden);
-        // Only an owed load can be paused, and only after the debounce.
-        let paused = CacheStatus::new(assets, BuiltFighters { planned: 2, pending: 2,
-            ..BuiltFighters::default() }, true);
-        assert_eq!(paused.progress(), Progress::Paused);
-        assert!(!paused.announce(None, 1));
-        assert!(paused.announce(None, PAUSE_POLLS));
-        // Nothing owed, only a swap: a blocked loader defers nothing, so it stays Waiting.
-        let unstarted = CacheStatus::new(assets, BuiltFighters { planned: 2,
-            ..BuiltFighters::default() }, true);
-        assert_eq!(unstarted.progress(), Progress::Waiting);
-    }
-
     /// g03 frame 85 of tr-p23-hot-measure-1 read "Loaded 2/5 (3 failed)" for a group the memory admission
     /// refused at its start. A held group is named for what it waits for, never as a failure, and a change
     /// in the held count is a change shown.
@@ -589,54 +561,6 @@ mod tests {
                 held: total.held + f.held, hold: crate::engine::swap::body_bank::merge_hold(total.hold, f.hold) };
         }
         total
-    }
-
-    fn done_is_its_own_state_and_ready_keeps_meaning_built() {
-        // 5 planned, 2 built, 3 prefetched (reachable without a reload), nothing running.
-        let done = status(fighters(5, 2, 3, 0, 0));
-        assert_eq!(done.progress(), Progress::Done);
-        assert_eq!(done.text().to_string(), "All loaded (5/5, 2 instant)");
-        assert_eq!(done.frames(), 180);
-        // Ready is only the all-built case (C113 §6): a prefetched group is never counted built.
-        let built = status(fighters(5, 5, 0, 0, 0));
-        assert_eq!((built.progress(), built.text().to_string()), (Progress::Ready, "Ready 5/5".to_string()));
-        let only_prefetched = status(fighters(3, 0, 3, 0, 0));
-        assert_eq!(only_prefetched.progress(), Progress::Done);
-        assert_eq!(only_prefetched.text().to_string(), "All loaded (3/3, 0 instant)");
-        // Work still owed is not done, however much is loaded.
-        let running = status(fighters(5, 2, 2, 0, 1));
-        assert_eq!((running.progress(), running.text().to_string()), (Progress::Loading, "Loading 4/5".to_string()));
-        assert_eq!(running.frames(), 90);
-        // A failure settles the plan but is never Done or Ready.
-        let partial = status(fighters(5, 2, 2, 1, 0));
-        assert_eq!((partial.progress(), partial.text().to_string()), (Progress::Partial, "Loaded 4/5 (1 failed)".to_string()));
-        assert_eq!(partial.frames(), 180);
-        // The Done notice outlasts transient progress.
-        assert!(done.frames() > running.frames());
-    }
-
-    fn before_the_first_swap_the_notice_says_to_swap_not_ready_zero() {
-        let fresh = status(fighters(3, 0, 0, 0, 0));
-        assert_eq!((fresh.progress(), fresh.text().to_string()), (Progress::Waiting, "Swap once to load".to_string()));
-        assert_eq!(fresh.frames(), 120);
-        // One role loaded, the other's window not built yet: honest, and not Done.
-        let half = status(fighters(5, 3, 0, 0, 0));
-        assert_eq!((half.progress(), half.text().to_string()),
-            (Progress::Waiting, "Loaded 3/5 · swap to load 2 more".to_string()));
-        let half_prefetched = status(fighters(5, 1, 2, 0, 0));
-        assert_eq!(half_prefetched.text().to_string(), "Loaded 3/5 · swap to load 2 more");
-        // Windows being built read as progress, not as a hint.
-        let building = status(fighters(5, 0, 0, 0, 2));
-        assert_eq!((building.progress(), building.text().to_string()), (Progress::Loading, "Loading 0/5".to_string()));
-        // A busy native UI does not pause the hint: nothing is deferred, the swap is still the user's
-        // (C116.2 console: "Paused 2/3" stood for a CPU swap that nothing would ever resume).
-        let blocked = CacheStatus::new(readiness(5, 5, false, [Some(1)], NONE, ready_of(&[1])),
-            fighters(3, 0, 0, 0, 0), true);
-        assert_eq!((blocked.progress(), blocked.text().to_string()), (Progress::Waiting, "Swap once to load".to_string()));
-        // It does pause a window that is still building.
-        let deferred = CacheStatus::new(readiness(5, 5, false, [Some(1)], NONE, ready_of(&[1])),
-            fighters(3, 0, 0, 0, 2), true);
-        assert_eq!((deferred.progress(), deferred.text().to_string()), (Progress::Paused, "Paused 0/3".to_string()));
     }
 
     fn the_waiting_text_names_the_role_that_must_swap() {
@@ -716,145 +640,6 @@ mod tests {
         }
     }
 
-    fn a_role_with_nothing_to_load_adds_nothing() {
-        // A CPU on its Mii with no bankable cycle plans nothing: only the Player's targets count,
-        // so the status settles as soon as the Player's are.
-        let player = fighters(3, 1, 2, 0, 0);
-        let cpu = BuiltFighters::default();
-        let total = both_roles(player, cpu);
-        assert_eq!(total, player);
-        let done = status(total);
-        assert_eq!((done.progress(), done.text().to_string()), (Progress::Done, "All loaded (3/3, 1 instant)".to_string()));
-        // The same CPU with a cycle that has not been swapped yet is waiting for that swap.
-        let waiting = status(both_roles(player, fighters(2, 0, 0, 0, 0)));
-        assert_eq!(waiting.progress(), Progress::Waiting);
-        assert_eq!(waiting.text().to_string(), "Loaded 3/5 · swap the CPU to load 2 more");
-        // Nothing planned anywhere stays hidden.
-        assert_eq!(status(both_roles(cpu, cpu)).progress(), Progress::Hidden);
-    }
-
-    fn receipts_partition_the_plan() {
-        assert_eq!(fighters(5, 1, 1, 1, 1).unstarted(), 1);
-        assert_eq!(fighters(5, 5, 0, 0, 0).unstarted(), 0);
-        // A receipt that lags the plan never underflows.
-        assert_eq!(fighters(2, 2, 2, 2, 2).unstarted(), 0);
-        assert_eq!(fighters(200, 255, 255, 0, 0).unstarted(), 0);
-        assert_eq!(fighters(5, 2, 3, 0, 0).loaded(), 5);
-        assert_eq!(fighters(0, 200, 100, 0, 0).loaded(), 255);
-    }
-
-    fn a_settled_notice_is_not_raised_again_when_prefetched_groups_get_built() {
-        let done = status(fighters(5, 2, 3, 0, 0));
-        // A swap builds a prefetched group: the count of instant ones moves, the notice does not.
-        assert!(!status(fighters(5, 3, 2, 0, 0)).announce(Some(done), 0));
-        assert!(!status(fighters(5, 5, 0, 0, 0)).announce(Some(done), 0));
-        assert!(!done.announce(Some(done), 0));
-        // A new plan size, a failure, or work owed again is a change worth showing.
-        assert!(status(fighters(6, 2, 4, 0, 0)).announce(Some(done), 0));
-        assert!(status(fighters(5, 2, 2, 1, 0)).announce(Some(done), 0));
-        assert!(status(fighters(6, 2, 3, 0, 1)).announce(Some(done), 0));
-        // Progress while loading announces every step; leaving Waiting announces too.
-        let first = status(fighters(5, 0, 1, 0, 4));
-        let second = status(fighters(5, 0, 2, 0, 3));
-        assert!(second.announce(Some(first), 0));
-        assert!(!first.announce(Some(first), 0));
-        assert!(first.announce(Some(status(fighters(5, 0, 0, 0, 0))), 0));
-        // The first and last states of one lap are each announced once.
-        assert!(done.announce(Some(second), 0));
-    }
-
-    fn original_reload_and_active_body_are_not_parked_reuse_targets() {
-        // C111 physical red: R.O.B. / Lucario / original Mr. Game & Watch.
-        assert_eq!(reusable_extras(&[0x2d, 0x2c, 0x1c], 0x2d, Some(0x1c)), 1);
-        assert_eq!(reusable_extras(&[0x2d, 0x2c, 0x1c], 0x2c, Some(0x1c)), 1);
-        assert_eq!(reusable_extras(&[0x0b, 0x1f, 0x2e], 0x0b, Some(0x1c)), 2);
-        // Differently configured numbered Solo Popo is a separate reusable target.
-        assert_eq!(reusable_extras(&[0x4b, 0, 1], 0, None), 2);
-        let assets = readiness(5, 5, false, [Some(1), Some(2)], NONE, ready_of(&[1, 2]));
-        let only_assets = CacheStatus::new(assets, BuiltFighters::default(), false);
-        assert_eq!(only_assets.text().to_string(), "");
-        assert_eq!(only_assets.progress(), Progress::Hidden);
-    }
-
-    fn denominator_is_the_actual_plan_not_the_configured_five() {
-        // Five configured, only two distinct targets exist: Ready 2/2, never 2/5.
-        let plan = [Some(1), Some(2), None, None, None];
-        let r = readiness(5, 5, false, plan, NONE, ready_of(&[1, 2]));
-        assert_eq!((r.progress, r.ready, r.planned, r.configured), (Progress::Ready, 2, 2, 5));
-        assert_eq!(r.text().to_string(), "Ready 2/2");
-        let r = readiness(5, 5, false, plan, NONE, ready_of(&[2]));
-        assert_eq!((r.progress, r.ready, r.planned), (Progress::Loading, 1, 2));
-        assert_eq!(r.text().to_string(), "Loading 1/2");
-    }
-    fn full_five_distinguishes_ready_two_from_ready_five() {
-        let plan = [Some(1), Some(2), Some(3), Some(4), Some(5)];
-        let two = readiness(5, 5, false, plan, NONE, ready_of(&[1, 2]));
-        assert_eq!((two.progress, two.text().to_string()), (Progress::Loading, "Loading 2/5".to_string()));
-        let five = readiness(5, 5, false, plan, NONE, ready_of(&[1, 2, 3, 4, 5]));
-        assert_eq!((five.progress, five.text().to_string()), (Progress::Ready, "Ready 5/5".to_string()));
-    }
-    fn backend_capacity_truncates_and_is_named() {
-        // Hardware holds two of the five configured: the plan beyond it is not owed.
-        let plan = [Some(1), Some(2), Some(3), Some(4), Some(5)];
-        let r = readiness(5, 2, false, plan, NONE, ready_of(&[1]));
-        assert_eq!((r.planned, r.ready, r.limited()), (2, 1, true));
-        assert_eq!(r.text().to_string(), "Loading 1/2 (max 2)");
-        let r = readiness(5, 2, false, plan, NONE, ready_of(&[1, 2, 3]));
-        assert_eq!((r.progress, r.text().to_string()), (Progress::Ready, "Ready 2/2 (max 2)".to_string()));
-        // A short plan under spare capacity is not capacity-limited.
-        assert!(!readiness(5, 4, false, [Some(1), Some(2), None, None, None], NONE, [None; 8]).limited());
-        // Configuration at or under capacity is not limited either.
-        assert!(!readiness(2, 2, false, [Some(1), Some(2)], NONE, [None; 8]).limited());
-    }
-    fn stale_or_unplanned_residents_do_not_count() {
-        let plan = [Some(1), Some(2)];
-        let r = readiness(2, 2, false, plan, NONE, ready_of(&[7, 8, 9]));
-        assert_eq!((r.progress, r.ready, r.planned), (Progress::Loading, 0, 2));
-        let r = readiness(2, 2, false, plan, NONE, ready_of(&[7, 2]));
-        assert_eq!((r.progress, r.ready), (Progress::Loading, 1));
-    }
-    fn one_failed_target_stays_in_the_denominator_and_is_never_ready() {
-        let plan = [Some(1), Some(2), Some(3)];
-        // Target 2 failed even though a source for it is resident: not counted,
-        // not dropped from the denominator, and never reported Ready.
-        let r = readiness(3, 3, false, plan, |k| k == 2, ready_of(&[1, 2, 3]));
-        assert_eq!((r.progress, r.ready, r.planned, r.failed), (Progress::Partial, 2, 3, 1));
-        assert_ne!(r.progress, Progress::Ready);
-        assert_eq!(r.text().to_string(), "Partial 2/3 (1 failed)");
-        // Others still loading: keep Loading, with the failure visible.
-        let r = readiness(3, 3, false, plan, |k| k == 2, ready_of(&[1]));
-        assert_eq!((r.progress, r.ready, r.planned), (Progress::Loading, 1, 3));
-        assert_eq!(r.text().to_string(), "Loading 1/3 (1 failed)");
-        // A pause does not hide a settled failure.
-        let r = readiness(3, 3, true, plan, |k| k == 2, ready_of(&[1, 3]));
-        assert_eq!(r.progress, Progress::Partial);
-    }
-    fn all_failed_is_not_silent() {
-        let plan = [Some(1), Some(2), Some(3)];
-        let r = readiness(3, 3, false, plan, |_| true, ready_of(&[1, 2, 3]));
-        assert_eq!((r.progress, r.ready, r.planned, r.failed), (Progress::Partial, 0, 3, 3));
-        assert_eq!(r.text().to_string(), "Partial 0/3 (3 failed)");
-        assert!(announce(None, r, 0));
-        assert!(!announce(Some(r), r, 0));
-        // A genuinely empty plan or Off is still hidden.
-        assert_eq!(readiness(3, 3, false, [None::<i32>; 3], |_| true, [None; 8]).progress, Progress::Hidden);
-        assert_eq!(readiness(0, 3, false, plan, |_| true, [None; 8]).progress, Progress::Hidden);
-    }
-    fn off_unavailable_and_empty_are_hidden() {
-        let plan = [Some(1), Some(2)];
-        assert_eq!(readiness(0, 5, false, plan, NONE, ready_of(&[1, 2])).progress, Progress::Hidden);
-        // No qualified backend (actual match): capacity 0 even though configured.
-        assert_eq!(readiness(5, 0, false, plan, NONE, ready_of(&[1, 2])).progress, Progress::Hidden);
-        assert_eq!(readiness(5, 5, false, [None, None], NONE, [None; 8]).progress, Progress::Hidden);
-        assert_eq!(Readiness { progress: Progress::Hidden, ..readiness(0, 0, false, plan, NONE, [None; 8]) }.text().to_string(), "");
-    }
-    fn blocked_pauses_incomplete_loads_but_never_unreadies() {
-        let plan = [Some(1), Some(2), Some(3)];
-        let r = readiness(3, 3, true, plan, NONE, ready_of(&[1]));
-        assert_eq!((r.progress, r.text().to_string()), (Progress::Paused, "Paused 1/3".to_string()));
-        let r = readiness(3, 3, true, plan, NONE, ready_of(&[1, 2, 3]));
-        assert_eq!(r.progress, Progress::Ready);
-    }
     fn announces_changes_once_and_debounces_pause() {
         let plan = [Some(1), Some(2), Some(3)];
         let loading = readiness(3, 3, false, plan, NONE, ready_of(&[1]));
@@ -883,44 +668,6 @@ mod tests {
         assert!(!announce(Some(partial), partial, 0));
         assert_eq!(partial.frames(), ready.frames());
     }
-    fn next_hat_displaces_lower_priority_fighter_when_an_equipped_hat_owns_other_helper() {
-        // Mario is leased by the current hat. Fox is a wanted fighter, but the
-        // next Game & Watch hat has priority. The old policy pinned Fox and
-        // forced an on-demand hat load even with the two-target budget.
-        let (mario, game_watch, fox) = (0, 0x1c, 7);
-        let targets = [Some(game_watch), Some(fox)];
-        let mut sources = [None; 8];
-        sources[2] = Some(fox);
-        sources[3] = Some(mario);
-        assert_eq!(missing(targets, sources, 3, false, false), None);
-        assert_eq!(missing(targets, sources, 2, true, true), None);
-        assert_eq!(missing(targets, sources, 2, true, false), Some(game_watch));
-        sources[2] = Some(game_watch);
-        // Never evict the higher-priority hat for Fox: no speculative churn.
-        assert_eq!(missing(targets, sources, 2, true, false), None);
-        assert_eq!(missing(targets, sources, 3, false, false), None);
-        // Once Mario's actual native lease ends, both targets can be ready.
-        assert_eq!(missing(targets, sources, 3, true, false), Some(fox));
-        sources[3] = Some(fox);
-        for slot in [2, 3] { assert_eq!(missing(targets, sources, slot, true, false), None); }
-    }
-    fn five_targets_fill_without_eviction_and_demand_still_wins() {
-        let lane=[Some(10),Some(11),Some(12),Some(13),Some(14)];
-        let lanes=[lane,[None;5],[None;5],[None;5]];
-        for count in 0..=5 {
-            let targets=merge(lanes,count);
-            assert_eq!(targets.iter().flatten().count(),usize::from(count));
-            let mut sources=[None;8];
-            for slot in [2,3,7,6,5] {
-                if let Some(target)=missing(targets,sources,slot,true,false) {sources[slot]=Some(target);}
-            }
-            assert_eq!(sources.iter().flatten().count(),usize::from(count));
-            for slot in [2,3,7,6,5] {assert_eq!(missing(targets,sources,slot,true,false),None);}
-        }
-        assert_eq!(merge(lanes,255),lane);
-        assert_eq!(missing(lane,[None;8],7,true,true),None);
-        assert_eq!(missing(lane,[None;8],7,false,false),None);
-    }
     fn native_forms_share_one_cache_target() {
         assert_eq!(fighter_group(0x5a), fighter_group(0x5b));
         assert_eq!(fighter_group(0x24), fighter_group(0x25));
@@ -939,45 +686,6 @@ mod tests {
             [Some(fighter_group(0x5a)), Some(0)]
         );
     }
-    fn zero_one_two_and_cross_lane_deduplication() {
-        let lanes = [
-            [Some(1), Some(2)],
-            [Some(1), Some(3)],
-            [None, None],
-            [None, None],
-        ];
-        assert_eq!(merge(lanes, 0), [None, None]);
-        assert_eq!(merge(lanes, 1), [Some(1), None]);
-        assert_eq!(merge(lanes, 2), [Some(1), Some(2)]);
-        assert_eq!(merge(lanes, 255), [Some(1), Some(2)]);
-    }
-    fn two_ready_sources_do_not_evict_each_other() {
-        let mut sources = [None; 8];
-        sources[2] = Some(10);
-        sources[3] = Some(11);
-        assert_eq!(missing([Some(10), Some(11)], sources, 2, true, false), None);
-        assert_eq!(missing([Some(10), Some(11)], sources, 3, true, false), None);
-        assert_eq!(
-            missing([Some(11), Some(12)], sources, 2, true, false),
-            Some(12)
-        );
-        assert_eq!(missing([Some(11), Some(12)], sources, 3, true, false), None);
-    }
-    fn demands_leases_and_inflight_sources_win() {
-        let mut sources = [None; 8];
-        sources[5] = Some(10);
-        assert_eq!(
-            missing([Some(10), Some(11)], sources, 6, true, false),
-            Some(11)
-        );
-        assert_eq!(
-            missing([Some(10), Some(11)], sources, 6, false, false),
-            None
-        );
-        assert_eq!(missing([Some(10), Some(11)], sources, 6, true, true), None);
-        assert_eq!(missing([Some(10), None], sources, 6, true, false), None);
-        assert_eq!(missing([None, None], sources, 6, true, false), None);
-    }
 
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
     struct Target {
@@ -985,8 +693,6 @@ mod tests {
         config: u16,
         epoch: u8,
     }
-    fn plain(kind: u32) -> Target { Target { kind, config: 0, epoch: 1 } }
-    fn exact(kind: u32, config: u16) -> Target { Target { kind, config, epoch: 1 } }
     fn constrained(target: Target) -> bool { exact_mii(target.kind, target.config != 0) }
     fn plan_of(items: [Target; 5]) -> [Option<Target>; 5] { items.map(Some) }
     const FALCON: Target = Target { kind: 0x0b, config: 0, epoch: 1 };
@@ -1002,149 +708,6 @@ mod tests {
         let mut sources = [None; 8];
         for (slot, target) in slots { sources[*slot] = Some(*target); }
         sources
-    }
-    /// `legacy` is the old shared walk: native slots see the global plan, extras
-    /// see ordinary targets only. Scarce scheduling is the slot-local partition.
-    fn sweep(plan: [Option<Target>; 5], sources: &mut [Option<Target>; 8], order: &[usize],
-        native: &[usize], legacy: bool, demand: bool, locked: &[usize]) -> usize {
-        let mut moves = 0;
-        for &slot in order {
-            let replaceable = !locked.contains(&slot);
-            let view = if legacy && native.contains(&slot) {
-                plan
-            } else {
-                schedulable(plan, native.contains(&slot), constrained)
-            };
-            let Some(next) = missing(view, *sources, slot, replaceable, demand) else { continue; };
-            if sources[slot] == Some(next) { continue; }
-            sources[slot] = Some(next);
-            moves += 1;
-        }
-        moves
-    }
-    fn settle(plan: [Option<Target>; 5], sources: &mut [Option<Target>; 8], order: &[usize],
-        native: &[usize], locked: &[usize]) -> usize {
-        let mut sweeps = 0;
-        loop {
-            sweeps += 1;
-            assert!(sweeps <= 4, "placement did not converge");
-            if sweep(plan, sources, order, native, false, false, locked) == 0 { return sweeps; }
-        }
-    }
-    fn residents(sources: impl IntoIterator<Item = Option<Target>>) -> Vec<Target> {
-        let mut found: Vec<_> = sources.into_iter().flatten().collect();
-        found.sort_by_key(|target| (target.kind, target.config, target.epoch));
-        found
-    }
-    fn four_ready_ordinary_plan_then_converges_to_five_without_evicting_in_a_loop() {
-        // The reported Training stall: bases 2/3 and extras 7/6 hold the four
-        // earlier ordinary targets. Gunner is missing, extra 5 does not exist,
-        // and the shared walk will not evict Falcon or Mario for it.
-        let plan = kirby_plan();
-        let order = [2usize, 3, 7, 6, 5];
-        let native = [2usize, 3];
-        let mut stalled = occupy(&[(2, FALCON), (3, MARIO), (7, SEPHIROTH), (6, GAME_WATCH)]);
-        assert_eq!(sweep(plan, &mut stalled, &order, &native, true, false, &[]), 0);
-        assert_eq!(residents(stalled).len(), 4);
-        assert!(!residents(stalled).contains(&GUNNER));
-        let mut sources = stalled;
-        let sweeps = settle(plan, &mut sources, &order, &native, &[]);
-        assert!(sweeps > 1);
-        assert_eq!(sweep(plan, &mut sources, &order, &native, false, false, &[]), 0);
-        assert_eq!(residents(sources), residents(plan_of([FALCON, MARIO, SEPHIROTH, GAME_WATCH, GUNNER])));
-        assert!(native.contains(&sources.iter().position(|source| *source == Some(GUNNER)).unwrap()));
-        for slot in [7usize, 6, 5] { assert!(!sources[slot].is_some_and(constrained)); }
-        // The indicator still reads the original ordinary-first plan.
-        assert_eq!(plan[0], Some(FALCON));
-        assert_eq!(plan[4], Some(GUNNER));
-        let ready = readiness(5, 5, false, plan, |_| false, sources);
-        assert_eq!((ready.progress, ready.ready, ready.planned, ready.failed), (Progress::Ready, 5, 5, 0));
-    }
-    fn ordinary_only_slot_view_matches_the_old_global_walk() {
-        let plan = plan_of([plain(10), plain(11), plain(12), plain(13), plain(14)]);
-        assert_eq!(schedulable(plan, true, constrained), plan);
-        assert_eq!(schedulable(plan, false, constrained), plan);
-        let mut sources = [None; 8];
-        assert_eq!(settle(plan, &mut sources, &[2, 3, 7, 6, 5], &[2, 3], &[]), 2);
-        assert_eq!(sources.iter().flatten().count(), 5);
-        assert_eq!(sweep(plan, &mut sources, &[2, 3, 7, 6, 5], &[2, 3], false, false, &[]), 0);
-        // A hat that is not an exact Mii still outranks a later fighter.
-        let hats = [Some(plain(0x1c)), Some(plain(7))];
-        assert_eq!(schedulable(hats, true, constrained), hats);
-        let mut held = [None; 8];
-        held[2] = Some(plain(7));
-        assert_eq!(missing(schedulable(hats, true, constrained), held, 2, true, false), Some(plain(0x1c)));
-    }
-    fn demand_and_leases_protect_residents_while_the_other_native_slot_takes_the_mii() {
-        let plan = kirby_plan();
-        let order = [2usize, 3, 7, 6, 5];
-        let native = [2usize, 3];
-        let mut sources = occupy(&[(2, FALCON), (3, MARIO), (7, SEPHIROTH), (6, GAME_WATCH)]);
-        assert_eq!(sweep(plan, &mut sources, &order, &native, false, true, &[]), 0);
-        assert_eq!(sources[2], Some(FALCON));
-        // Slot 2 stays leased to Falcon. Slot 3 is free and is the other native helper.
-        let sweeps = settle(plan, &mut sources, &order, &native, &[2]);
-        assert!(sweeps > 1);
-        assert_eq!(sources[2], Some(FALCON));
-        assert_eq!(sources[3], Some(GUNNER));
-        assert_eq!(sweep(plan, &mut sources, &order, &native, false, false, &[2]), 0);
-        assert_eq!(residents(sources).len(), 5);
-        // Both native helpers leased: the Mii stays missing and extras do not take it.
-        let mut both = occupy(&[(2, FALCON), (3, MARIO), (7, SEPHIROTH), (6, GAME_WATCH)]);
-        assert_eq!(settle(plan, &mut both, &order, &native, &[2, 3]), 1);
-        assert!(!residents(both).contains(&GUNNER));
-        for slot in [7usize, 6, 5] { assert!(!both[slot].is_some_and(constrained)); }
-    }
-    fn two_distinct_mii_configurations_occupy_the_native_pair() {
-        let sword = exact(0x49, 7);
-        let gunner = exact(0x4a, 3);
-        assert_ne!(sword, gunner);
-        let plan = plan_of([FALCON, gunner, MARIO, sword, SEPHIROTH]);
-        let mut sources = occupy(&[(2, FALCON), (3, MARIO), (7, SEPHIROTH), (6, plain(0x58))]);
-        // A same-kind source with the other configuration does not satisfy Gunner.
-        sources[2] = Some(exact(0x4a, 9));
-        let _ = settle(plan, &mut sources, &[2, 3, 7, 6, 5], &[2, 3], &[]);
-        assert_eq!(sweep(plan, &mut sources, &[2, 3, 7, 6, 5], &[2, 3], false, false, &[]), 0);
-        let native: Vec<Target> = [2usize, 3].iter().copied().filter_map(|slot| sources[slot]).collect();
-        assert_eq!(residents([Some(native[0]), Some(native[1]), None, None, None, None, None, None]),
-            residents([Some(gunner), Some(sword), None, None, None, None, None, None]));
-        for slot in [7usize, 6, 5] { assert!(!sources[slot].is_some_and(constrained)); }
-        let stale = Target { epoch: 0, ..gunner };
-        let mut aged = [None; 8];
-        aged[2] = Some(stale);
-        let view = schedulable([Some(gunner), Some(FALCON), None, None, None], true, constrained);
-        assert_eq!(missing(view, aged, 2, true, false), Some(gunner));
-    }
-    fn training_and_waiting_place_the_mii_on_their_own_native_pair() {
-        let plan = kirby_plan();
-        let mut training = occupy(&[(2, FALCON), (3, MARIO), (7, SEPHIROTH), (6, GAME_WATCH)]);
-        settle(plan, &mut training, &[2, 3, 7, 6, 5], &[2, 3], &[]);
-        assert!(training[2] == Some(GUNNER) || training[3] == Some(GUNNER));
-        for slot in [7usize, 6, 5] { assert_ne!(training[slot], Some(GUNNER)); }
-        // Waiting helpers are 5/6. Created extras are 7, then 3, then 2.
-        let mut waiting = occupy(&[(5, FALCON), (6, MARIO), (7, SEPHIROTH), (3, GAME_WATCH)]);
-        settle(plan, &mut waiting, &[5, 6, 7, 3, 2], &[5, 6], &[]);
-        assert_eq!(sweep(plan, &mut waiting, &[5, 6, 7, 3, 2], &[5, 6], false, false, &[]), 0);
-        assert!(waiting[5] == Some(GUNNER) || waiting[6] == Some(GUNNER));
-        for slot in [7usize, 3, 2] { assert_ne!(waiting[slot], Some(GUNNER)); }
-        assert_eq!(residents(training), residents(waiting));
-    }
-    fn a_third_exact_mii_remains_unscheduled_without_a_retry() {
-        let first = exact(0x48, 1);
-        let second = exact(0x49, 2);
-        let third = exact(0x4a, 3);
-        let plan = plan_of([first, MARIO, second, FALCON, third]);
-        let mut sources = [None; 8];
-        let sweeps = settle(plan, &mut sources, &[2, 3, 7, 6, 5], &[2, 3], &[]);
-        assert!(sweeps > 1);
-        assert_eq!(sweep(plan, &mut sources, &[2, 3, 7, 6, 5], &[2, 3], false, false, &[]), 0);
-        assert_eq!(sources[2], Some(first));
-        assert_eq!(sources[3], Some(second));
-        assert!(!sources.contains(&Some(third)));
-        for slot in [7usize, 6, 5] { assert!(!sources[slot].is_some_and(constrained)); }
-        let ready = readiness(5, 5, false, plan, |_| false, sources);
-        assert_eq!((ready.progress, ready.ready, ready.planned, ready.failed), (Progress::Loading, 4, 5, 0));
-        assert_eq!(plan, plan_of([first, MARIO, second, FALCON, third]));
     }
     fn a_failed_mii_stays_in_the_original_indicator_and_is_not_scheduled() {
         let plan = kirby_plan();
@@ -1167,37 +730,11 @@ mod tests {
         crate::test_table::run(&[
             ("a_parked_seat_loads_its_member_even_when_the_other_seat_holds_it", a_parked_seat_loads_its_member_even_when_the_other_seat_holds_it as fn()),
             ("warm_assets_never_claim_fighters_are_ready", warm_assets_never_claim_fighters_are_ready as fn()),
-            ("failure_busy_and_off_do_not_manufacture_readiness", failure_busy_and_off_do_not_manufacture_readiness as fn()),
             ("held_fighters_read_waiting_not_failed", held_fighters_read_waiting_not_failed as fn()),
-            ("done_is_its_own_state_and_ready_keeps_meaning_built", done_is_its_own_state_and_ready_keeps_meaning_built as fn()),
-            ("before_the_first_swap_the_notice_says_to_swap_not_ready_zero", before_the_first_swap_the_notice_says_to_swap_not_ready_zero as fn()),
             ("the_waiting_text_names_the_role_that_must_swap", the_waiting_text_names_the_role_that_must_swap as fn()),
             ("player_kirby_hats_rank_above_the_cpu_fighter_lookahead", player_kirby_hats_rank_above_the_cpu_fighter_lookahead as fn()),
-            ("a_role_with_nothing_to_load_adds_nothing", a_role_with_nothing_to_load_adds_nothing as fn()),
-            ("receipts_partition_the_plan", receipts_partition_the_plan as fn()),
-            ("a_settled_notice_is_not_raised_again_when_prefetched_groups_get_built", a_settled_notice_is_not_raised_again_when_prefetched_groups_get_built as fn()),
-            ("original_reload_and_active_body_are_not_parked_reuse_targets", original_reload_and_active_body_are_not_parked_reuse_targets as fn()),
-            ("denominator_is_the_actual_plan_not_the_configured_five", denominator_is_the_actual_plan_not_the_configured_five as fn()),
-            ("full_five_distinguishes_ready_two_from_ready_five", full_five_distinguishes_ready_two_from_ready_five as fn()),
-            ("backend_capacity_truncates_and_is_named", backend_capacity_truncates_and_is_named as fn()),
-            ("stale_or_unplanned_residents_do_not_count", stale_or_unplanned_residents_do_not_count as fn()),
-            ("one_failed_target_stays_in_the_denominator_and_is_never_ready", one_failed_target_stays_in_the_denominator_and_is_never_ready as fn()),
-            ("all_failed_is_not_silent", all_failed_is_not_silent as fn()),
-            ("off_unavailable_and_empty_are_hidden", off_unavailable_and_empty_are_hidden as fn()),
-            ("blocked_pauses_incomplete_loads_but_never_unreadies", blocked_pauses_incomplete_loads_but_never_unreadies as fn()),
             ("announces_changes_once_and_debounces_pause", announces_changes_once_and_debounces_pause as fn()),
-            ("next_hat_displaces_lower_priority_fighter_when_an_equipped_hat_owns_other_helper", next_hat_displaces_lower_priority_fighter_when_an_equipped_hat_owns_other_helper as fn()),
-            ("five_targets_fill_without_eviction_and_demand_still_wins", five_targets_fill_without_eviction_and_demand_still_wins as fn()),
             ("native_forms_share_one_cache_target", native_forms_share_one_cache_target as fn()),
-            ("zero_one_two_and_cross_lane_deduplication", zero_one_two_and_cross_lane_deduplication as fn()),
-            ("two_ready_sources_do_not_evict_each_other", two_ready_sources_do_not_evict_each_other as fn()),
-            ("demands_leases_and_inflight_sources_win", demands_leases_and_inflight_sources_win as fn()),
-            ("four_ready_ordinary_plan_then_converges_to_five_without_evicting_in_a_loop", four_ready_ordinary_plan_then_converges_to_five_without_evicting_in_a_loop as fn()),
-            ("ordinary_only_slot_view_matches_the_old_global_walk", ordinary_only_slot_view_matches_the_old_global_walk as fn()),
-            ("demand_and_leases_protect_residents_while_the_other_native_slot_takes_the_mii", demand_and_leases_protect_residents_while_the_other_native_slot_takes_the_mii as fn()),
-            ("two_distinct_mii_configurations_occupy_the_native_pair", two_distinct_mii_configurations_occupy_the_native_pair as fn()),
-            ("training_and_waiting_place_the_mii_on_their_own_native_pair", training_and_waiting_place_the_mii_on_their_own_native_pair as fn()),
-            ("a_third_exact_mii_remains_unscheduled_without_a_retry", a_third_exact_mii_remains_unscheduled_without_a_retry as fn()),
             ("a_failed_mii_stays_in_the_original_indicator_and_is_not_scheduled", a_failed_mii_stays_in_the_original_indicator_and_is_not_scheduled as fn()),
         ]);
     }

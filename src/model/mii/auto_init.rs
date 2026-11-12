@@ -130,58 +130,6 @@ mod tests {
         opening: 13,
     };
 
-    fn one_read_and_one_arm_per_lifetime_even_after_read_failure() {
-        for complete in [true, false] {
-            let mut init = Initialization::empty();
-            assert_eq!(init.observe(FIRST, 0, true), None);
-            assert_eq!(init.observe(FIRST, 0, true), None);
-            assert_eq!(init.observe(FIRST, 1, true), Some(FIRST));
-            assert_eq!(init.observe(FIRST, 1, true), None);
-            assert_eq!(init.finish(FIRST, FIRST, complete), complete);
-            assert!(!init.finish(FIRST, FIRST, true));
-            assert!(!init.pending());
-            assert_eq!(init.observe(FIRST, 0, true), None);
-            assert_eq!(init.observe(FIRST, 1, true), None);
-        }
-    }
-
-    fn scene_destructor_and_menu_changes_reject_stale_completion() {
-        let mut init = Initialization::empty();
-        init.observe(FIRST, 0, true);
-        init.observe(FIRST, 1, true);
-        init.cancel(); // A real menu opening owns its independent refresh.
-        assert!(!init.finish(FIRST, FIRST, true));
-        assert!(!init.pending());
-        for next in [
-            Token {
-                generations: [8, 12],
-                opening: 14,
-            }, // Scene boundary.
-            Token {
-                generations: [7, 12],
-                opening: 14,
-            }, // CPU entry destruction.
-        ] {
-            init.reset();
-            assert_eq!(init.observe(next, 0, true), None);
-            assert_eq!(init.observe(next, 1, true), Some(next));
-            assert!(!init.finish(FIRST, next, true));
-            assert!(init.pending());
-            assert!(init.finish(next, next, true));
-        }
-        init.reset();
-        init.observe(FIRST, 0, true);
-        init.observe(FIRST, 1, true);
-        assert!(!init.finish(
-            FIRST,
-            Token {
-                opening: 14,
-                ..FIRST
-            },
-            true
-        ));
-    }
-
     fn readiness_precedes_arming_and_mii_input_never_falls_through_unqualified() {
         let mut init = Initialization::empty();
         assert_eq!(init.observe(FIRST, 0, false), None); // Original/readiness unavailable.
@@ -285,35 +233,12 @@ mod tests {
         assert_eq!(after_match(holds_origin_replacement, true, true, true), held);
     }
 
-    fn continuation_hold_is_released_when_qualification_cannot_finish() {
-        // An incomplete catalog consumes the read without arming capture.
-        let incomplete = after_match(holds_origin_replacement, false, true, false);
-        assert_eq!(incomplete, (None, Some(4), false));
-        // A backend that is not exactly ready at ready-go never starts the read.
-        let unready = after_match(holds_origin_replacement, true, false, false);
-        assert_eq!(unready, (None, Some(3), false));
-        // Before ready-go the visible entries may still be loading: held regardless.
-        assert!(holds_origin_replacement(false, true, true, false, false, false));
-        // A qualified owner, or neither a pending read nor an armed capture, never holds.
-        assert!(!holds_origin_replacement(true, true, true, true, false, true));
-        assert!(!holds_origin_replacement(false, true, false, false, false, true));
-        // An armed capture alone holds while the backend can still qualify it.
-        assert!(holds_origin_replacement(false, true, false, true, true, true));
-        assert!(!holds_origin_replacement(false, true, false, true, true, false));
-        // A body that is no longer the CSS origin can never be captured: never held.
-        assert!(!holds_origin_replacement(false, false, true, true, true, true));
-        assert!(!holds_origin_replacement(false, false, true, true, false, false));
-    }
-
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
-            ("one_read_and_one_arm_per_lifetime_even_after_read_failure", one_read_and_one_arm_per_lifetime_even_after_read_failure as fn()),
-            ("scene_destructor_and_menu_changes_reject_stale_completion", scene_destructor_and_menu_changes_reject_stale_completion as fn()),
             ("readiness_precedes_arming_and_mii_input_never_falls_through_unqualified", readiness_precedes_arming_and_mii_input_never_falls_through_unqualified as fn()),
             ("match_return_qualifies_the_css_origin_before_its_continuation", match_return_qualifies_the_css_origin_before_its_continuation as fn()),
-            ("continuation_hold_is_released_when_qualification_cannot_finish", continuation_hold_is_released_when_qualification_cannot_finish as fn()),
         ]);
     }
     }

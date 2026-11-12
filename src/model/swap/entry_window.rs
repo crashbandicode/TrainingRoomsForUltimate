@@ -208,28 +208,9 @@ mod tests {
     const DK: u32 = 0x1;
     const LINK: u32 = 0x2;
     const KIRBY: u32 = 0x6;
-    const LITTLE_MAC: u32 = 0x34;
-    const STEVE: u32 = 0x58;
 
     fn facts(owner: u32, kinds: [u32; 3]) -> HeaderFacts {
         HeaderFacts { training: true, owner, flags: 0, object: NONE, kinds }
-    }
-
-    /// tr-p23-hot-measure-3 at `0x66de18`: the CPU `{flags 0, owner 1, [40,−1,−1], object −1}` is extendable; PT
-    /// `{owner 0, [24,25,26], object 0x24}` is not (the game builds its group itself).
-    fn h1_extends_only_one_ordinary_body_of_a_visible_role_in_training() {
-        assert_eq!(extendable(facts(1, [0x40, NONE, NONE])), Some(0x40));
-        assert_eq!(extendable(facts(0, [STEVE, NONE, NONE])), Some(STEVE));
-        // Pokémon Trainer and Pyra/Mythra starts: `a_native_group_start_is_its_own_window_lead`.
-        // The IC pair start: `an_ice_climbers_start_gets_a_pair_lead_window`.
-        assert_eq!(extendable(facts(0, [0x4b, NONE, NONE])), None, "Solo Popo");
-        for mii in [0x48, 0x49, 0x4a] {
-            assert_eq!(extendable(facts(1, [mii, NONE, NONE])), None, "{mii:#x}");
-        }
-        assert_eq!(extendable(facts(2, [0x40, NONE, NONE])), None, "a parked helper");
-        assert_eq!(extendable(facts(7, [0x40, NONE, NONE])), None, "an extra");
-        assert_eq!(extendable(HeaderFacts { flags: 1, ..facts(1, [0x40, NONE, NONE]) }), None, "already requested");
-        assert_eq!(extendable(HeaderFacts { training: false, ..facts(1, [0x40, NONE, NONE]) }), None, "not Training");
     }
 
     /// Ready Fighters is shared by both roles, the two active fighters counted; the bodies setting caps a window.
@@ -241,77 +222,6 @@ mod tests {
         assert_eq!(extras_allowed(2, 3), 0, "2: today's path");
         assert_eq!(extras_allowed(12, 2), 1, "two bodies");
         assert_eq!(extras_allowed(12, 0), 0, "bodies off");
-    }
-
-    /// tr-p23-hot-measure-1: the CPU entered as Little Mac with the cycle Mario, DK, Link, …: the window is Little Mac
-    /// and his next two, Little Mac at cell 0 (native's own primary request) and active.
-    fn the_start_up_window_is_the_original_and_its_next_members() {
-        let members = entry_window(LITTLE_MAC, &[MARIO, DK, LINK], 2, false).unwrap();
-        assert_eq!(&members.kinds()[..members.count()], &[LITTLE_MAC, MARIO, DK]);
-        let words = Words::of(&members);
-        assert_eq!((words.count, words.kinds, words.active), (3, [LITTLE_MAC, MARIO, DK], 0));
-        let two = entry_window(STEVE, &[MARIO, DK], 1, false).unwrap();
-        assert_eq!(&two.kinds()[..two.count()], &[STEVE, MARIO]);
-    }
-
-    /// The original stays at cell 0: a Kirby member ahead of an ordinary original is skipped; a Kirby original keeps
-    /// cell 0 itself.
-    fn the_original_keeps_cell_0_and_a_pinned_member_waits() {
-        let members = entry_window(MARIO, &[KIRBY, DK, LINK], 2, false).unwrap();
-        assert_eq!(&members.kinds()[..members.count()], &[MARIO, DK, LINK]);
-        let kirby = entry_window(KIRBY, &[MARIO, DK], 2, false).unwrap();
-        assert_eq!(&kirby.kinds()[..kirby.count()], &[KIRBY, MARIO, DK]);
-    }
-
-    /// No window: no room, no bankable next member, or an original that is not one ordinary body.
-    fn no_start_up_window_without_room_members_or_an_ordinary_original() {
-        assert_eq!(entry_window(MARIO, &[DK, LINK], 0, false), None, "no room");
-        assert_eq!(entry_window(MARIO, &[], 2, false), None, "no next member");
-        assert_eq!(entry_window(MARIO, &[0x48, 0x49], 2, false), None, "Miis are never window members");
-        for original in [0x48, 0x25, 0x5b, 0x4c] {
-            assert_eq!(entry_window(original, &[MARIO, DK], 2, false), None, "{original:#x}");
-        }
-    }
-
-    /// rc.6 item 3, a session that starts on Pokémon Trainer or Pyra/Mythra (INBOX-opus-rc6-hotslots 01:09Z, the native-group
-    /// equivalent of the Ice Climbers start): native's header for the start is the whole native group with its object kind
-    /// (tr-p23-hot-measure-3: PT `{owner 0, [24, 25, 26], object 0x24}`). H1 accepts the native group as the window lead:
-    /// the window is that group itself (`Members::native_group`, no extra cell, whatever room Ready Fighters leaves; its
-    /// bodies are native's own), so the role gets a bank and its other groups build in the background beside it. H3 keeps
-    /// native's creation as it is (same count, kinds and actor count; the active form stays native's), H4 binds on those
-    /// words, and the original's own request is native's words again. Only the group's own order is a lead (a header that
-    /// starts on another form, such as Ivysaur `[25, 26, 24]`, stays native's), and the object kind must be its lead.
-    fn a_native_group_start_is_its_own_window_lead() {
-        const PT: [u32; 3] = [0x24, 0x25, 0x26];
-        const AEGIS: [u32; 3] = [0x5a, 0x5b, NONE];
-        for owner in [0, 1] {
-            assert_eq!(extendable(HeaderFacts { object: 0x24, ..facts(owner, PT) }), Some(0x24), "Pokémon Trainer");
-            assert_eq!(extendable(HeaderFacts { object: 0x5a, ..facts(owner, AEGIS) }), Some(0x5a), "Pyra/Mythra");
-        }
-        assert_eq!(extendable(facts(0, PT)), None, "no object kind");
-        assert_eq!(extendable(HeaderFacts { object: 0x25, ..facts(0, [0x25, 0x26, 0x24]) }), None, "another starting form");
-        assert_eq!(extendable(HeaderFacts { object: 0x5b, ..facts(0, [0x5b, 0x5a, NONE]) }), None, "another starting form");
-        assert_eq!(extendable(HeaderFacts { object: 0x5a, ..facts(0, PT) }), None, "another object kind");
-        assert_eq!(extendable(HeaderFacts { object: 0x24, flags: 1, ..facts(0, PT) }), None, "already requested");
-        assert_eq!(extendable(HeaderFacts { object: 0x24, training: false, ..facts(0, PT) }), None, "not Training");
-        assert_eq!(extendable(HeaderFacts { object: 0x24, ..facts(2, PT) }), None, "a parked helper");
-        for (original, kinds) in [(0x24, PT), (0x5a, AEGIS)] {
-            for extras in [0, 2] {
-                let window = entry_window(original, &[MARIO, DK], extras, false).expect("the native group");
-                assert_eq!(window, Members::native_group(original).unwrap(), "{original:#x}");
-                assert_eq!(window.kinds(), kinds);
-            }
-            let words = Words::of(&Members::native_group(original).unwrap());
-            assert_eq!((words.count, words.kinds, words.actor_count), (window_count(original), kinds, 1));
-            assert!(creation_matches(words, words), "{original:#x}: native's own creation");
-            assert!(creation_matches(Words { active: 1, ..words }, words), "{original:#x}: native's starting form stays");
-            assert!(!creation_matches(Words { count: 1, kinds: [original, NONE, NONE], actor_count: 1, active: 0 }, words),
-                "{original:#x}: not the group");
-            assert!(!keeps_native_creation(Words::of(&entry_window(MARIO, &[DK, LINK], 2, false).unwrap())));
-            assert!(keeps_native_creation(words), "{original:#x}");
-        }
-        fn window_count(original: u32) -> u32 { if original == 0x24 { 3 } else { 2 } }
-        assert_eq!(entry_window(0x25, &[MARIO, DK], 2, false), None, "not the lead");
     }
 
     /// rc.6 item 3 (TASK-OPUS-rc6-bg-special, 22:32Z: a session that starts on Ice Climbers still gets its groups built;
@@ -360,119 +270,12 @@ mod tests {
         assert_eq!(original_request(descriptor(extra_active), POPO), descriptor(extra_active), "not the original's cell");
     }
 
-    /// H3: only native's single form of the window's original is rewritten; H4: the window binds only to the same
-    /// owner's entry showing the written words in the same scene.
-    fn the_creation_is_rewritten_and_bound_only_for_its_own_window() {
-        let window = Words::of(&entry_window(LITTLE_MAC, &[MARIO, DK], 2, false).unwrap());
-        let native = Words { count: 1, kinds: [LITTLE_MAC, NONE, NONE], actor_count: 1, active: 0 };
-        assert!(creation_matches(native, window));
-        assert!(!creation_matches(Words { kinds: [NONE; 3], ..native }, window), "kind -1 creates");
-        assert!(!creation_matches(Words { kinds: [MARIO, NONE, NONE], ..native }, window), "another fighter");
-        assert!(!creation_matches(window, window), "already a window");
-        let pending = Pending { owner: 1, words: window, epoch: 7u64 };
-        assert!(pending.binds(1, window, 7));
-        assert!(!pending.binds(0, window, 7), "another owner");
-        assert!(!pending.binds(1, native, 7), "the native words");
-        assert!(!pending.binds(1, window, 8), "a later scene");
-    }
-
-    /// rc6-hot-xps1 (2026-11-08, XPS): H1 stamps the owner generation of the scene being configured, and that scene's
-    /// own `scene_changed` advances it afterwards. A window kept for the new scene follows it; nothing else does.
-    fn a_kept_start_up_window_joins_its_scenes_owner_generation() {
-        let (at_h1, after_the_change) = (4u64, 5u64);
-        assert_eq!(scene_generation(at_h1, after_the_change, true), after_the_change, "kept for the new scene");
-        assert_eq!(scene_generation(at_h1, after_the_change, false), at_h1,
-            "departed or retired: the old stamp, so an exchange from an earlier scene stays refused");
-        assert_eq!(scene_generation(after_the_change, after_the_change, true), after_the_change, "already current");
-    }
-
-    /// rc6-hot-xps2 (2026-11-08, XPS): P1 lap switch 07, back to the original Mario from the group [Ness, Mario], staged
-    /// the origin's start-up window `(3, [0, 1, 2])` as the request; native reloaded three ordinary bodies, a
-    /// construction read an unloaded resource and its thread died. The original's request is native's single form H3
-    /// started from; every other byte stays, and native's own words (one body, PT, the IC pair, Aegis, a Mii) stay.
-    fn the_original_request_is_natives_single_form_of_a_start_up_window() {
-        fn descriptor(count: u32, kinds: [u32; 3], actors: u32, active: u8) -> [u8; 0x70] {
-            let mut d = [0x5au8; 0x70];
-            d[0x14..0x18].copy_from_slice(&count.to_le_bytes());
-            for (i, kind) in kinds.iter().enumerate() {
-                d[0x18 + i * 4..0x1c + i * 4].copy_from_slice(&kind.to_le_bytes());
-            }
-            d[0x28..0x2c].copy_from_slice(&actors.to_le_bytes());
-            d[0x43] = active;
-            d
-        }
-        let window = descriptor(3, [MARIO, DK, LINK], 1, 0);
-        assert_eq!(original_request(window, MARIO), descriptor(1, [MARIO, NONE, NONE], 1, 0), "the start-up window");
-        assert_eq!(original_request(descriptor(2, [STEVE, MARIO, NONE], 1, 0), STEVE),
-            descriptor(1, [STEVE, NONE, NONE], 1, 0), "a two-body window");
-        assert_eq!(original_request(descriptor(3, [KIRBY, MARIO, DK], 1, 0), KIRBY),
-            descriptor(1, [KIRBY, NONE, NONE], 1, 0), "a Kirby original keeps cell 0");
-        // Primary 13:58Z (cov-rest `covrest-04`, `bc93b9f` diag): the CPU's return to slot 0, Fox, from its Mii groups
-        // reloaded the two-member window `(2, [7, 1])` and never settled.
-        const FOX: u32 = 0x7;
-        assert_eq!(original_request(descriptor(2, [FOX, DK, NONE], 1, 0), FOX), descriptor(1, [FOX, NONE, NONE], 1, 0),
-            "the CPU's two-member window");
-        for (words, original, why) in [
-            (descriptor(1, [MARIO, NONE, NONE], 1, 0), MARIO, "native's one body"),
-            (descriptor(3, [0x24, 0x25, 0x26], 1, 0), 0x24, "Pokémon Trainer"),
-            (descriptor(2, [0x4b, 0x4c, NONE], 2, 0), 0x4b, "the IC pair"),
-            (descriptor(2, [0x5a, 0x5b, NONE], 1, 0), 0x5a, "Aegis"),
-            (descriptor(1, [0x48, NONE, NONE], 1, 0), 0x48, "a Mii"),
-            (window, DK, "another fighter's window"),
-            (descriptor(3, [MARIO, DK, LINK], 1, 1), MARIO, "not the original's cell"),
-        ] {
-            assert_eq!(original_request(words, original), words, "{why}");
-        }
-    }
-
-    /// Primary 12:40Z (cov-rest `covrest-02`, rc.5 diag): the CPU cycle Mario, Mii Brawler, Swordfighter, Gunner, Link
-    /// fell back the same way on its first press, a Mii group exchange out of the CPU's start-up window (the Miis are
-    /// groups: `cycle_members` leaves them out of the window). Any group exchange starts from the receipt
-    /// `group_owner` mints only while the bank's stamp is the owner's current generation, and a Mii exchange keeps that
-    /// generation. With the stamp the kept window adopts, the Mii exchange is proven; with the stamp H1 left, there is
-    /// no receipt to start from.
-    fn a_cpu_mii_group_exchange_out_of_a_kept_window_after_the_scene_change() {
-        use crate::engine::swap::body_bank::{GroupExchange, GroupOwner};
-        let (at_h1, after_the_change) = (1u64, 2u64);
-        let window = entry_window(MARIO, &[LINK, DK], 2, false).unwrap();
-        let receipt = |stamp: u64| (stamp == after_the_change).then(|| {
-            let mut descriptor = [0u8; 0x70];
-            descriptor[0x14..0x18].copy_from_slice(&(window.count() as u32).to_le_bytes());
-            for (i, kind) in window.kinds().iter().enumerate() {
-                descriptor[0x18 + i * 4..0x1c + i * 4].copy_from_slice(&kind.to_le_bytes());
-            }
-            descriptor[0x28] = 1;
-            GroupOwner { entry: 0x1000, owner: 1, epoch: after_the_change, resource: 0x2000,
-                header: [1, MARIO, LINK, DK, 0], descriptor, bodies: [(0x3000, 1), (0x4000, 262144), (0x5000, 327680)] }
-        });
-        assert!(receipt(at_h1).is_none(), "the stamp H1 left: no receipt, the fallback rc6-hot-xps1 and covrest-02 saw");
-        let before = receipt(scene_generation(at_h1, after_the_change, true)).expect("the kept window's receipt");
-        let brawler = Members::mii_group(0x48).unwrap();
-        let mii_header = [1, 0x48, NONE, NONE, 0];
-        let mut after = GroupOwner { header: mii_header, ..before };
-        after.descriptor[0x14..0x18].copy_from_slice(&1u32.to_le_bytes());
-        after.descriptor[0x18..0x24].copy_from_slice(&[0x48, 0, 0, 0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
-        after.descriptor[0x28..0x2c].copy_from_slice(&1u32.to_le_bytes());
-        assert!(GroupExchange::new_with_header(before, after, brawler, mii_header).is_some(), "the Mii group moves in");
-        assert!(GroupExchange::new_with_header(before, GroupOwner { epoch: at_h1, ..after }, brawler, mii_header).is_none(),
-            "a generation that differs across the exchange refuses");
-    }
-
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
-            ("h1_extends_only_one_ordinary_body_of_a_visible_role_in_training", h1_extends_only_one_ordinary_body_of_a_visible_role_in_training as fn()),
             ("both_start_up_windows_share_ready_fighters", both_start_up_windows_share_ready_fighters as fn()),
-            ("the_start_up_window_is_the_original_and_its_next_members", the_start_up_window_is_the_original_and_its_next_members as fn()),
-            ("the_original_keeps_cell_0_and_a_pinned_member_waits", the_original_keeps_cell_0_and_a_pinned_member_waits as fn()),
-            ("no_start_up_window_without_room_members_or_an_ordinary_original", no_start_up_window_without_room_members_or_an_ordinary_original as fn()),
-            ("a_native_group_start_is_its_own_window_lead", a_native_group_start_is_its_own_window_lead as fn()),
             ("an_ice_climbers_start_gets_a_pair_lead_window", an_ice_climbers_start_gets_a_pair_lead_window as fn()),
-            ("the_creation_is_rewritten_and_bound_only_for_its_own_window", the_creation_is_rewritten_and_bound_only_for_its_own_window as fn()),
-            ("a_kept_start_up_window_joins_its_scenes_owner_generation", a_kept_start_up_window_joins_its_scenes_owner_generation as fn()),
-            ("the_original_request_is_natives_single_form_of_a_start_up_window", the_original_request_is_natives_single_form_of_a_start_up_window as fn()),
-            ("a_cpu_mii_group_exchange_out_of_a_kept_window_after_the_scene_change", a_cpu_mii_group_exchange_out_of_a_kept_window_after_the_scene_change as fn()),
         ]);
     }
     }

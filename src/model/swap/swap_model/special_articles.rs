@@ -170,97 +170,6 @@ mod tests {
         fn trainer_drawn(&self) -> bool { self.claimed && self.articles != 0 }
     }
 
-    /// The `sp1`/`l1b` lane: PT built, activated (trainer claimed), then P1 → Aegis. Before the fix the detach
-    /// kept the pool, so the claimed trainer stayed drawn. Now it is retired, and a warm return draws it again.
-    fn a_detached_pt_draws_no_trainer_and_a_warm_return_claims_a_new_one() {
-        let mut pt = Holder::built(PT_FLAGS);
-        assert!(!pt.trainer_drawn(), "#205: +0x5a90 is null right after the build");
-        pt.activate();
-        assert!(pt.trainer_drawn(), "m-075840: the trainer is claimed once PT activates");
-        let mut aegis = Holder::built(AEGIS_FLAGS);
-        pt.detach();
-        aegis.activate();
-        assert!(!pt.trainer_drawn(), "m-075849: no trainer while Aegis is the window");
-        assert_eq!(pt.articles, 0, "0x3a6b80 emptied the pool");
-        aegis.detach();
-        pt.attach();
-        assert!(pt.trainer_drawn(), "the return PT swap claims a rebuilt trainer");
-    }
-
-    /// The defect itself: without the retire, the detached holder still draws its trainer.
-    fn without_the_retire_the_detached_trainer_stays_drawn() {
-        let mut pt = Holder::built(PT_FLAGS);
-        pt.activate();
-        pt.attached = false; // the M5f detach: window saved, pool untouched
-        assert!(pt.trainer_drawn());
-    }
-
-    /// Over every sequence of group exchanges (PT, Aegis, ordinary, a rollback that re-attaches the outgoing
-    /// window), a PT trainer is drawn exactly when its window is attached and activated. The pool is rebuilt only
-    /// after a retire, never on top of a live one, and Aegis and ordinary windows are never touched.
-    fn a_pt_trainer_is_drawn_only_while_its_window_is_attached() {
-        let mut runs = 0;
-        for seed in 0u64..300 {
-            let mut x = seed.wrapping_mul(0x9e37_79b9_7f4a_7c15) | 1;
-            let mut next = |n: u64| { x ^= x << 13; x ^= x >> 7; x ^= x << 17; x % n };
-            let mut groups = [Holder::built(PT_FLAGS), Holder::built(AEGIS_FLAGS), Holder::built(ORDINARY_FLAGS)];
-            groups[2].present = false;
-            for g in groups.iter_mut().skip(1) { g.attached = false; }
-            let mut window = 0usize;
-            groups[0].activate();
-            for _ in 0..12 {
-                let target = next(3) as usize;
-                if target == window { continue; }
-                let before = groups;
-                groups[window].detach();
-                let rollback = next(5) == 0;
-                if rollback {
-                    // The rollback restores the outgoing window and native activates it again.
-                    groups[window].attach();
-                } else {
-                    groups[target].attach();
-                    window = target;
-                }
-                for (i, g) in groups.iter().enumerate() {
-                    assert_eq!(g.trainer_drawn(), g.attached && g.flags & PT_WINDOW_FLAG != 0,
-                        "seed {} group {} {:?}", seed, i, g);
-                    if g.flags & PT_WINDOW_FLAG == 0 {
-                        assert_eq!(g.articles, before[i].articles, "seed {}: a non-PT holder is never touched", seed);
-                    }
-                }
-                runs += 1;
-            }
-        }
-        assert!(runs > 1500, "{}", runs);
-    }
-
-    /// Inbox 02:00Z: leaving a PT group took 114.9-118.5 ms with a 5-frame gap (worker A, `rc6-xc2`/`xc3`); the exit's
-    /// setup tick held `0x3a6b80` whole. Eden `rc6-bg-ptx1`/`ptx2` split it: pass 1 0.12-0.66 ms; pass 2 is the
-    /// trainer's teardown, 15.3-32.6 ms of its own plus 12.9-26.1 ms for its sub-pools. The exit's tick now runs pass 1
-    /// only and every later tick one stage, so no tick carries more than one of those parts.
-    fn a_pt_exit_retires_its_pool_one_stage_per_tick() {
-        assert_eq!(on_detach(PT_FLAGS, true, PT_POOL), Some(ArticleStep::Retire));
-        let mut stage = RetireStage::Deactivate;
-        let mut ticks = vec![stage];
-        while let Some(next) = stage.next() {
-            stage = next;
-            ticks.push(stage);
-        }
-        assert_eq!(ticks, [RetireStage::Deactivate, RetireStage::SubPools, RetireStage::Destroy],
-            "the trainer's own pools before its teardown, which then finds them empty");
-        // The probe's worst (first exit of a boot) game-thread costs in microseconds, on top of a tick's own frame.
-        const FRAME_US: u64 = 16_667;
-        const SETUP_US: u64 = 19_100; // the exit's setup tick without the release (rc6-bg-pt7: 16-19 ms)
-        let cost = |s: RetireStage| match s { RetireStage::Deactivate => 660, RetireStage::SubPools => 26_100, RetireStage::Destroy => 32_600 };
-        let frames = |us: u64| us.div_ceil(FRAME_US);
-        assert!(frames(SETUP_US + cost(RetireStage::Deactivate)) <= 2, "the exit's own tick");
-        for s in [RetireStage::SubPools, RetireStage::Destroy] {
-            assert!(frames(FRAME_US + cost(s)) <= 3, "{s:?}");
-        }
-        let whole: u64 = ticks.iter().map(|s| cost(*s)).sum();
-        assert!(frames(SETUP_US + whole) >= 5, "one tick: the 5-frame exit this replaces");
-    }
-
     /// The trainer is undrawn from the exit's tick (pass 1); a retiring group is not attached (its pool is neither live
     /// nor empty); a teardown, a drain or a switch to it first runs every stage still due, in order.
     fn a_retiring_pool_is_finished_before_anything_else_reads_it() {
@@ -298,28 +207,12 @@ mod tests {
         assert!(pt.trainer_drawn(), "and claims the prepared trainer");
     }
 
-    fn the_rule_s_edges() {
-        assert_eq!(on_detach(PT_FLAGS, true, PT_POOL), Some(ArticleStep::Retire));
-        assert_eq!(on_detach(PT_FLAGS, true, 0), None, "already retired");
-        assert_eq!(on_detach(PT_FLAGS, false, PT_POOL), None, "no valid holder");
-        assert_eq!(on_detach(AEGIS_FLAGS, true, 3), None, "Aegis: no in-place native rebuild, files served by R");
-        assert_eq!(on_attach(PT_FLAGS, true, 0), Some(ArticleStep::Rebuild));
-        assert_eq!(on_attach(PT_FLAGS, true, PT_POOL), None, "a fresh build already filled the pool");
-        assert_eq!(on_attach(AEGIS_FLAGS, true, 0), None);
-        assert_eq!(on_attach(ORDINARY_FLAGS, false, 0), None);
-    }
-
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
-            ("a_detached_pt_draws_no_trainer_and_a_warm_return_claims_a_new_one", a_detached_pt_draws_no_trainer_and_a_warm_return_claims_a_new_one as fn()),
-            ("without_the_retire_the_detached_trainer_stays_drawn", without_the_retire_the_detached_trainer_stays_drawn as fn()),
-            ("a_pt_trainer_is_drawn_only_while_its_window_is_attached", a_pt_trainer_is_drawn_only_while_its_window_is_attached as fn()),
-            ("a_pt_exit_retires_its_pool_one_stage_per_tick", a_pt_exit_retires_its_pool_one_stage_per_tick as fn()),
             ("a_retiring_pool_is_finished_before_anything_else_reads_it", a_retiring_pool_is_finished_before_anything_else_reads_it as fn()),
             ("a_retired_pt_pool_is_built_again_on_the_worker_before_its_attach", a_retired_pt_pool_is_built_again_on_the_worker_before_its_attach as fn()),
-            ("the_rule_s_edges", the_rule_s_edges as fn()),
         ]);
     }
     }

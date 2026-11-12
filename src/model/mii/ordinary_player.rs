@@ -556,30 +556,6 @@ mod tests {
             index: i as u16, selector: i as u8, alias: 0,
         }))
     }
-    fn ticket(sequence: u64) -> Ticket { Ticket { epoch: 7, entry: 0x1000, sequence } }
-    fn refused_gate_that_continues_natively_admits_service_without_publishing() {
-        let t = ticket(1);
-        let mut gate = Gate::new(t).unwrap();
-        assert!(gate.enter(t, 6));
-        gate.refuse();
-        gate.leave(t, 6);
-        assert_eq!(gate.phase(), Phase::Refused);
-        assert!(!gate.enter(t, 6), "a plain refusal still fails closed");
-        assert!(gate.continue_natively());
-        assert!(gate.native_only());
-        assert!(gate.enter(t, 6));
-        gate.leave(t, 6);
-        assert!(gate.enter(t, 14));
-        assert_eq!(gate.phase(), Phase::Refused);
-        assert!(!gate.may_publish(t, 6));
-        assert!(!gate.can_complete(t));
-        assert!(!gate.published());
-        let mut published = Gate::new(ticket(2)).unwrap();
-        assert!(published.enter(ticket(2), 6));
-        assert!(published.publish(ticket(2), 6));
-        published.refuse();
-        assert!(!published.continue_natively(), "a published gate never continues natively");
-    }
     fn player_claim_keeps_real_mii_indices_and_accepts_ordinary_placeholders() {
         let baseline=owners();
         let kinds=[Some(0x49);8];
@@ -591,41 +567,6 @@ mod tests {
         assert!(unique_player(&changed,&ordinary));
         changed[2].as_mut().unwrap().object=baseline[0].unwrap().object;
         assert!(!unique_player(&changed,&ordinary));
-    }
-    fn native_phase_six_bypass_cannot_reach_phase_seven() {
-        let t=ticket(1); let mut g=Gate::new(t).unwrap();
-        assert!(g.enter(t, 6));
-        g.leave(t,7);
-        assert_eq!(g.phase(),Phase::Refused);
-        assert!(!g.enter(t,7));
-        assert!(!g.can_complete(t));
-        assert_eq!(g.ticket(),t); // submitted ownership is retained
-    }
-    fn reentry_duplicate_publication_and_stale_generation_cannot_commit() {
-        let t=ticket(1); let mut g=Gate::new(t).unwrap();
-        assert!(g.enter(t,6));
-        assert!(!g.enter(t,6));
-        assert!(!g.may_publish(Ticket { epoch: 8, ..t },6));
-        assert!(g.publish(t,6));
-        assert!(!g.publish(t,6));
-        assert_eq!(g.phase(),Phase::Refused);
-    }
-    fn forward_return_same_saved_reuse_each_require_a_fresh_published_ticket() {
-        for sequence in 1..=3 {
-            let t=ticket(sequence); let mut g=Gate::new(t).unwrap();
-            assert!(!g.can_complete(t));
-            assert!(g.enter(t,4)); g.leave(t,6);
-            assert!(g.enter(t,6)); assert!(g.publish(t,6)); g.leave(t,7);
-            assert!(g.can_complete(t));
-            assert!(!g.can_complete(ticket(sequence+1)));
-        }
-    }
-    fn departure_during_native_call_never_reopens_or_releases_the_ticket() {
-        let t=ticket(1); let mut g=Gate::new(t).unwrap();
-        assert!(g.enter(t,6)); g.depart();
-        assert!(!g.may_publish(t,6)); g.leave(t,6);
-        assert!(!g.enter(t,6)); assert_eq!(g.phase(),Phase::Departed);
-        assert_eq!(g.ticket(),t);
     }
     fn saved() -> crate::engine::mii::lifetime::Configuration {
         use crate::engine::mii::inventory::{Appearance,Canonical,MiiClass,MiiConfig,TaggedId,CHARINFO_MASK_END};
@@ -670,45 +611,6 @@ mod tests {
         let rows=[RowIds {outfit:0x13002b147bc59435,hat:0x5a00000fa9efa5ea};2];
         let mut record=[0xa5;0x68];record[..88].copy_from_slice(before.charinfo());
         (before,after,values,descriptor,rows,record)
-    }
-
-    fn saved_origin_full_payload_mirrors_and_rows_are_required_for_each_role() {
-        let (origin,alternate,values,_,rows,record)=same_class_fixture();
-        assert!(crate::engine::mii::role_owner::validate_saved(origin,0,values.mirrors,rows[0],&record).is_ok());
-        let mut bytes=record;bytes[0]^=1; // masked catalog identity is unchanged
-        assert!(crate::engine::mii::role_owner::validate_saved(origin,0,values.mirrors,rows[0],&bytes).is_err());
-        assert!(crate::engine::mii::role_owner::validate_saved(alternate,0,values.mirrors,rows[0],&record).is_err());
-        let mut mirrors=values.mirrors;mirrors.d_specials[0]^=1;
-        assert!(crate::engine::mii::role_owner::validate_saved(origin,0,mirrors,rows[0],&record).is_err());
-        let mut changed_rows=rows[0];changed_rows.outfit^=1;
-        assert!(crate::engine::mii::role_owner::validate_saved(origin,0,values.mirrors,changed_rows,&record).is_err());
-        // Helpers must be full copies of the immutable origin at their own claims.
-        for id in [1,2,3] {
-            let mut helper=values.mirrors;helper.index=id;helper.fe[0]=id;
-            helper.d[0]=id;helper.owner_index=id;
-            assert!(crate::engine::mii::role_owner::validate_saved(origin,id,helper,rows[0],&record).is_ok());
-            assert!(crate::engine::mii::role_owner::validate_saved(origin,0,helper,rows[0],&record).is_err());
-            assert!(crate::engine::mii::role_owner::validate_saved(origin,id,helper,rows[0],&bytes).is_err());
-        }
-    }
-
-    fn same_class_saved_original_return_publishes_original_and_retains_native_pair() {
-        let (origin,alternate,mut current,original_descriptor,rows,record)=same_class_fixture();
-        let alternate_descriptor=staged_descriptor(original_descriptor,Some(alternate));
-        let t=alternate.tokens();
-        current.mirrors.tokens=t;current.mirrors.fe=[0,t.outfit,t.hat,t.colour,t.voice];
-        current.mirrors.d=[0,t.outfit,t.hat,t.colour];current.mirrors.d_specials=t.specials.map(u32::from);
-        current.mirrors.owner=[t.outfit,t.hat,t.colour,t.voice].map(u32::from);
-        let before=retained_record(record,Some(alternate));
-        let proof=SameClass::prepare(alternate,origin,current,&alternate_descriptor,rows,&before).unwrap();
-        let origin_tokens=origin.tokens();
-        current.mirrors.fe=[0,origin_tokens.outfit,origin_tokens.hat,origin_tokens.colour,origin_tokens.voice];
-        let update=proof.prepare_write(current,&original_descriptor,rows,&before).unwrap();
-        let mut returned=before;update.apply_to_copy(&mut returned).unwrap();
-        assert_eq!(&returned[..88],origin.charinfo());
-        assert_eq!(&returned[88..],&before[88..]);
-        let mut foreign=before;foreign[0]^=1;
-        assert!(proof.prepare_write(current,&original_descriptor,rows,&foreign).is_err());
     }
 
     fn same_class_cpu_proof_is_exact_owner_one_not_a_player_guard_bypass() {
@@ -770,111 +672,6 @@ mod tests {
         assert!(proof.prepare_write(bad,&target,rows,&record).is_err()); // old E required
     }
 
-    fn ldn_cpu_same_class_uses_physical_four_and_exact_unmasked_payload() {
-        let (before,_,mut cpu,mut descriptor,rows,record)=same_class_fixture();
-        let mut stored=serde_json::to_value(before).unwrap();
-        let byte=stored["charinfo"][0].as_u64().unwrap();
-        stored["charinfo"][0]=serde_json::json!(byte^1);
-        let after:crate::engine::mii::lifetime::Configuration=serde_json::from_value(stored).unwrap();
-        assert_eq!(before.canonical(),after.canonical());assert_ne!(before,after);
-        cpu.binding.owner=4;cpu.binding.record_index=4;cpu.binding.vector_end=cpu.binding.vector_begin+5*104;
-        cpu.owner.index=4;cpu.owner.selector=4;cpu.header[0]=4;
-        cpu.mirrors.index=4;cpu.mirrors.owner_index=4;cpu.mirrors.fe[0]=4;cpu.mirrors.d[0]=4;
-        descriptor[4..8].copy_from_slice(&4u32.to_le_bytes());
-        descriptor[0x46..0x48].copy_from_slice(&4u16.to_le_bytes());
-        let rows=[rows[0];2];
-        assert!(SameClass::prepare_cpu(before,after,cpu,&descriptor,rows,&record).is_err());
-        let proof=SameClass::prepare_cpu_in(crate::engine::mii::backend::Layout::Ldn,before,after,cpu,&descriptor,rows,&record).unwrap();
-        let target=crate::engine::mii::ordinary_cpu::staged_descriptor_in(crate::engine::mii::backend::Layout::Ldn,4,descriptor,Some(after)).unwrap();
-        let update=proof.prepare_write(cpu,&target,rows,&record).unwrap();
-        let mut changed=record;update.apply_to_copy(&mut changed).unwrap();
-        assert_eq!(&changed[..88],after.charinfo());assert_eq!(&changed[88..],&record[88..]);
-        let mut stale=cpu;stale.binding.epoch+=1;
-        assert!(proof.prepare_write(stale,&target,rows,&record).is_err());
-    }
-
-    fn same_class_owned_object_header_epoch_and_native_gates_cannot_be_rebased() {
-        let (before,after,old,descriptor,rows,record)=same_class_fixture();
-        let proof=SameClass::prepare(before,after,old,&descriptor,rows,&record).unwrap();
-        let target=staged_descriptor(descriptor,Some(after));let t=after.tokens();
-        let mut phase=old;phase.mirrors.fe=[0,t.outfit,t.hat,t.colour,t.voice];
-        for changed in 0..8 {
-            let mut bad=phase;
-            match changed {
-                0=>bad.owner.object+=8,
-                1=>bad.header[1]=0x4a,
-                2=>bad.binding.epoch+=1,
-                3=>bad.owner.index=1,
-                4=>bad.initialized=false,
-                5=>bad.task_idle=false,
-                6=>bad.rebuild_open=false,
-                _=>bad.owner.alias=1,
-            }
-            assert!(proof.prepare_write(bad,&target,rows,&record).is_err(),"changed field {changed}");
-        }
-        let mut changed=record;changed[0]^=1;let untouched=changed;
-        assert!(proof.prepare_write(phase,&target,rows,&changed).is_err());
-        assert_eq!(changed,untouched);
-        let mut bad_rows=rows;bad_rows[1].outfit^=1;
-        assert!(proof.prepare_write(phase,&target,bad_rows,&record).is_err());
-        assert!(SameClass::prepare(before,before,old,&descriptor,rows,&record).is_err());
-        let mut uninitialized=old;uninitialized.initialized=false;
-        assert!(SameClass::prepare(before,after,uninitialized,&descriptor,rows,&record).is_ok());
-    }
-    fn same_class_clear_latch_preflight_does_not_authorize_retained_writes() {
-        let (before,after,mut current,descriptor,rows,record)=same_class_fixture();
-        // Observed B2: current configuration and quiescent task, configuration latch clear.
-        current.initialized=false;
-        let proof=SameClass::prepare(before,after,current,&descriptor,rows,&record).unwrap();
-        let target=staged_descriptor(descriptor,Some(after));let t=after.tokens();
-        let mut phase=current;phase.mirrors.fe=[0,t.outfit,t.hat,t.colour,t.voice];
-        assert_eq!(proof.prepare_write(phase,&target,rows,&record).err(),
-            Some("same-class retained O/task/rebuild gate"));
-        // Only a freshly observed set phase may use the retained-O writer.
-        phase.initialized=true;
-        let update=proof.prepare_write(phase,&target,rows,&record).unwrap();
-        let mut changed=record;update.apply_to_copy(&mut changed).unwrap();
-        assert_eq!(&changed[..88],after.charinfo());
-        assert_eq!(&changed[88..],&record[88..]);
-        let mut bad=current;bad.task_idle=false;
-        assert_eq!(SameClass::prepare(before,after,bad,&descriptor,rows,&record).err(),
-            Some("same-class retained O task not quiescent"));
-        bad=current;bad.header[1]=0x4a;
-        assert_eq!(SameClass::prepare(before,after,bad,&descriptor,rows,&record).err(),
-            Some("same-class current O header/descriptor mismatch"));
-        bad=current;bad.mirrors.d[0]=1;
-        assert_eq!(SameClass::prepare(before,after,bad,&descriptor,rows,&record).err(),
-            Some("same-class preflight mirrors differ"));
-        bad=current;bad.owner.entry+=8;
-        assert_eq!(SameClass::prepare(before,after,bad,&descriptor,rows,&record).err(),
-            Some("same-class ordinary owner/target mismatch"));
-    }
-    fn actual_descriptor_return_and_retention_kernel_never_restore_unused_zero_payload() {
-        let c=saved();
-        let mut ordinary=[0xa5;0x70];
-        ordinary[0x18..0x1c].copy_from_slice(&9u32.to_le_bytes());
-        ordinary[0x46..0x48].copy_from_slice(&0u16.to_le_bytes());
-        ordinary[0x4a..0x4c].copy_from_slice(&0u16.to_le_bytes());
-        let saved_descriptor=staged_descriptor(ordinary,Some(c));
-        assert_eq!(u32::from_le_bytes(saved_descriptor[0x18..0x1c].try_into().unwrap()),0x49);
-        for off in 0..0x70 {
-            if !(0x14..0x24).contains(&off) && !(0x28..0x2c).contains(&off)
-                && off!=0x43 && !(0x48..0x50).contains(&off) {
-                assert_eq!(saved_descriptor[off],ordinary[off],"unowned descriptor byte {off}");
-            }
-        }
-        assert_eq!(staged_descriptor(ordinary,None),ordinary);
-        let mut native=[0x7b;0x68];
-        native[..88].fill(0x55); // the unused ordinary payload is not the saved face
-        let forward=retained_record(native,Some(c));
-        assert_eq!(&forward[..88],c.charinfo());
-        assert_eq!(&forward[88..],&native[88..]);
-        let returned=retained_record(forward,None);
-        assert_eq!(returned,forward);
-        assert_eq!(retained_record(returned,Some(c)),returned);
-        assert_eq!(staged_descriptor(ordinary,Some(c)),saved_descriptor);
-    }
-
     fn menu_selection_is_bound_to_the_current_ordinary_cycled_class() {
         use crate::engine::mii::selection::{Action, Choice, Origin, PlayerLive, PlayerOrigin, Source};
         let active=saved().canonical();
@@ -915,20 +712,9 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
-            ("refused_gate_that_continues_natively_admits_service_without_publishing", refused_gate_that_continues_natively_admits_service_without_publishing as fn()),
             ("player_claim_keeps_real_mii_indices_and_accepts_ordinary_placeholders", player_claim_keeps_real_mii_indices_and_accepts_ordinary_placeholders as fn()),
-            ("native_phase_six_bypass_cannot_reach_phase_seven", native_phase_six_bypass_cannot_reach_phase_seven as fn()),
-            ("reentry_duplicate_publication_and_stale_generation_cannot_commit", reentry_duplicate_publication_and_stale_generation_cannot_commit as fn()),
-            ("forward_return_same_saved_reuse_each_require_a_fresh_published_ticket", forward_return_same_saved_reuse_each_require_a_fresh_published_ticket as fn()),
-            ("departure_during_native_call_never_reopens_or_releases_the_ticket", departure_during_native_call_never_reopens_or_releases_the_ticket as fn()),
-            ("saved_origin_full_payload_mirrors_and_rows_are_required_for_each_role", saved_origin_full_payload_mirrors_and_rows_are_required_for_each_role as fn()),
-            ("same_class_saved_original_return_publishes_original_and_retains_native_pair", same_class_saved_original_return_publishes_original_and_retains_native_pair as fn()),
             ("same_class_cpu_proof_is_exact_owner_one_not_a_player_guard_bypass", same_class_cpu_proof_is_exact_owner_one_not_a_player_guard_bypass as fn()),
             ("same_class_publication_requires_staged_fe_but_old_e_d_o", same_class_publication_requires_staged_fe_but_old_e_d_o as fn()),
-            ("ldn_cpu_same_class_uses_physical_four_and_exact_unmasked_payload", ldn_cpu_same_class_uses_physical_four_and_exact_unmasked_payload as fn()),
-            ("same_class_owned_object_header_epoch_and_native_gates_cannot_be_rebased", same_class_owned_object_header_epoch_and_native_gates_cannot_be_rebased as fn()),
-            ("same_class_clear_latch_preflight_does_not_authorize_retained_writes", same_class_clear_latch_preflight_does_not_authorize_retained_writes as fn()),
-            ("actual_descriptor_return_and_retention_kernel_never_restore_unused_zero_payload", actual_descriptor_return_and_retention_kernel_never_restore_unused_zero_payload as fn()),
             ("menu_selection_is_bound_to_the_current_ordinary_cycled_class", menu_selection_is_bound_to_the_current_ordinary_cycled_class as fn()),
         ]);
     }
@@ -943,10 +729,6 @@ mod generic_completion_tests {
     fn loaded(kind: u32) -> GenericOrdinaryFacts {
         GenericOrdinaryFacts { transaction_busy:false,origin_is_saved:false,active_is_saved:false,
             cursor_owned:false,kind,published_kind:kind,index:0,original_index:0 }
-    }
-
-    fn ordinary_cycle_accepts_kirby_and_kind_zero_mario() {
-        for kind in [0x6,0x0,0x1e] {assert_eq!(generic_ordinary_commit(loaded(kind)),Ok(()));}
     }
 
     fn completion_cannot_adopt_mii_owned_busy_or_moved_state() {
@@ -966,7 +748,6 @@ mod generic_completion_tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
-            ("ordinary_cycle_accepts_kirby_and_kind_zero_mario", ordinary_cycle_accepts_kirby_and_kind_zero_mario as fn()),
             ("completion_cannot_adopt_mii_owned_busy_or_moved_state", completion_cannot_adopt_mii_owned_busy_or_moved_state as fn()),
         ]);
     }

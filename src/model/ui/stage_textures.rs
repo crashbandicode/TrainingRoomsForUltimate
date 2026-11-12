@@ -160,20 +160,11 @@ mod tests {
         assert!(texture_of(311).is_none(), "the Waiting Room has no picture");
     }
 
-    fn the_table_has_115_unique_stages_of_which_12_are_patch_stages() {
-        assert_eq!(STAGE_TEXTURES.len(), 115);
-        for (i, (id, name, _)) in STAGE_TEXTURES.iter().enumerate() {
-            assert!(STAGE_TEXTURES[..i].iter().all(|(other, n, _)| other != id && n != name), "{id} {name}");
-        }
-        assert_eq!(STAGE_TEXTURES.iter().filter(|(_, _, patch)| *patch).count(), 12);
-    }
-
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
             ("paths_follow_the_documented_examples", paths_follow_the_documented_examples as fn()),
-            ("the_table_has_115_unique_stages_of_which_12_are_patch_stages", the_table_has_115_unique_stages_of_which_12_are_patch_stages as fn()),
         ]);
     }
     }

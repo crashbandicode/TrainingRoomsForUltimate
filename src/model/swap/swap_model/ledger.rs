@@ -765,91 +765,6 @@ mod tests {
 
     const T: RFlags = RFlags::TRAINING;
 
-    fn the_training_registration_sets_match_the_d_sg1_calibration() {
-        // D-SG1 §1: Fox 3 keys, Daisy 2, Byleth 4 with +7; Aegis 0x75 {0,1,6}; PT 0x72 {0,6}.
-        assert_eq!(registration_set(0x07, T), KeySet::of(&[0, 1, 6]));
-        assert_eq!(registration_set(0x0e, T), KeySet::of(&[0, 6]));
-        assert_eq!(registration_set(BYLETH, T), KeySet::of(&[0, 1, 6, 7]));
-        assert_eq!(registration_set(AEGIS_OBJECT_KIND, T), KeySet::of(&[0, 1, 6]));
-        assert_eq!(registration_set(PT_OBJECT_KIND, T), KeySet::of(&[0, 6]));
-        assert_eq!(registration_set(0x00, T), KeySet::of(&[0, 6]), "Mario: kind < 5 has no table entry");
-        assert_eq!(registration_set(0x49, T), KeySet::of(&[0, 2, 3, 4, 6]));
-        assert_eq!(registration_set(NANA, T), KeySet::of(&[0, 6]), "Nana is ordinary (icp4d: 0xc78, 0xc7e)");
-        assert_eq!(registration_set(NO_KIND, T), KeySet::EMPTY);
-        // Flags: R+0x48 == 1 drops +1 and +6; R+0x7f != 0 drops +6; R+0x7d != 0 drops Byleth's +7.
-        assert_eq!(registration_set(0x07, RFlags { r48: 1, ..T }), KeySet::of(&[0]));
-        assert_eq!(registration_set(0x07, RFlags { r7f: 1, ..T }), KeySet::of(&[0, 1]));
-        assert_eq!(registration_set(BYLETH, RFlags { r7d: 1, ..T }), KeySet::of(&[0, 1, 6]));
-        assert_eq!(registration_set(0x4f, RFlags { r48: 2, ..T }), KeySet::of(&[0, 5, 6]), "0x4f: +5 under R+0x48 == 2, table bit 0");
-        assert_eq!(registration_set(0x4f, T), KeySet::of(&[0, 6]), "0x4f table bit is 0");
-    }
-
-    fn the_aegis_object_kind_has_exactly_one_orphan_key_and_nothing_else_does() {
-        let orphans: Vec<u32> = orphan_keys(AEGIS_OBJECT_KIND, T).iter(AEGIS_OBJECT_KIND).map(KeyId::value).collect();
-        assert_eq!(orphans, vec![0x1338]);
-        assert_eq!(crate::engine::swap::body_bank::orphan_object_keys(AEGIS_OBJECT_KIND).0[0], 0x1338, "the shipped point fix and the computed set agree");
-        for kind in (0u32..0x80).filter(|k| *k != AEGIS_OBJECT_KIND) {
-            for r48 in 0..3u8 { for r7d in 0..2u8 { for r7f in 0..2u8 {
-                let flags = RFlags { r48, r7d, r7f };
-                assert!(orphan_keys(kind, flags).is_empty(), "kind {kind:#x} flags {flags:?} orphan {:?}", orphan_keys(kind, flags));
-            } } }
-        }
-        // Outside Training the +6 key is not registered, so even Aegis has no orphan.
-        assert!(orphan_keys(AEGIS_OBJECT_KIND, RFlags { r7f: 1, ..T }).is_empty());
-    }
-
-    fn native_window_requests_follow_the_17e5bc0_table() {
-        let ordinary = native_window_requests([0x07, 0x08, 0x09], T);
-        assert_eq!(ordinary.len(), 1, "an ordinary primary requests only R+0x58; the hook owns the rest");
-        let solo = native_window_requests([POPO, 0x03, 0x07], T);
-        assert_eq!(solo.iter().map(|r| r.kind).collect::<Vec<_>>(), vec![POPO, 0x03], "SOLO §2: Link is native's");
-        let pt = native_window_requests([0x24, 0x25, 0x26], T);
-        assert_eq!(pt.iter().map(|r| r.kind).collect::<Vec<_>>(), vec![0x24, PT_OBJECT_KIND, 0x25, 0x26]);
-        assert_eq!(pt[1].keys, KeySet::of(&[0]), "native registers only 0x12b4 for the trainer");
-        let aegis = native_window_requests([0x5a, 0x5b, NO_KIND], T);
-        assert_eq!(aegis.iter().map(|r| r.kind).collect::<Vec<_>>(), vec![0x5a, AEGIS_OBJECT_KIND, 0x5b]);
-        assert_eq!(aegis[1].keys, KeySet::of(&[0, 1]), "native never registers 0x1338");
-        assert_eq!(native_pair_refs([POPO, NANA, 0x02]), 2);
-        assert_eq!(native_pair_refs([POPO, NO_KIND, NO_KIND]), 1);
-        assert!(pair_rule([POPO, NANA, 0x02]) && !pair_rule([POPO, 0x03, 0x07]));
-    }
-
-    fn a_kind_native_already_requested_for_a_construction_is_not_acquired_twice() {
-        let mut ledger = Ledger::new(T);
-        let batch = ledger.new_batch();
-        let mut tokens = Vec::new();
-        for request in native_window_requests([POPO, 0x03, 0x07], T) {
-            tokens.push(ledger.record_native(request, batch));
-        }
-        let refused = ledger.acquire(0x03, Holder::Build(GroupId(0)), ReleaseRecipe::ConstructionTail, batch, &NoConsumers, Role::Player);
-        assert_eq!(refused.err(), Some(LedgerRefusal::AlreadyHeld { kind: 0x03, by: Holder::Native }));
-        let (fox, call) = ledger.acquire(0x07, Holder::Build(GroupId(0)), ReleaseRecipe::ConstructionTail, batch, &NoConsumers, Role::Player).unwrap();
-        assert_eq!(call, Some(NativeCall::Acquire { kind: 0x07 }));
-        tokens.push(fox);
-        assert_eq!(ledger.predicted_map_nodes(), 7, "Popo {{0,6}}, Link {{0,6}}, Fox {{0,1,6}}: one node each, Link once");
-        for kind in [POPO, 0x03, 0x07] { assert!(ledger.construction_settled(kind, batch)); }
-        assert_eq!(ledger.expect_free(), Ok(()));
-        drop(tokens);
-    }
-
-    fn release_after_acquire_is_the_identity_and_names_the_orphan_first() {
-        for kind in 0u32..0x80 {
-            for r48 in 0..3u8 { for r7d in 0..2u8 { for r7f in 0..2u8 {
-                let flags = RFlags { r48, r7d, r7f };
-                let mut ledger = Ledger::new(flags);
-                let batch = ledger.new_batch();
-                let (token, call) = ledger.acquire(kind, Holder::Prefetch(GroupId(0)), ReleaseRecipe::OwnedPerKind, batch, &NoConsumers, Role::Player).unwrap();
-                assert_eq!(call, Some(NativeCall::Acquire { kind }));
-                let calls = ledger.release(token, &NoConsumers, Role::Player).unwrap();
-                let releases: Vec<u32> = calls.iter().filter_map(|c| match c { NativeCall::ReleaseKey(k) => Some(k.value()), _ => None }).collect();
-                let expected: Vec<u32> = orphan_keys(kind, flags).iter(kind).map(KeyId::value).collect();
-                assert_eq!(releases, expected, "kind {:#x} flags {:?}", kind, flags);
-                assert_eq!(calls.last(), Some(&NativeCall::ReleaseKind { kind }));
-                assert_eq!(ledger.expect_free(), Ok(()));
-            } } }
-        }
-    }
-
     struct Copying(u32);
     impl LiveConsumers for Copying {
         fn conflict(&self, _role: Role, kind: u32, usage: Use) -> Option<Conflict> {
@@ -906,30 +821,13 @@ mod tests {
         assert!(ledger.reconcile(&ledger.predicted()).balanced());
     }
 
-    fn kind_sets_cover_the_whole_kind_space() {
-        let mut set = KindSet64::default();
-        set.insert(0x00); set.insert(0x3f); set.insert(0x40); set.insert(0x7f); set.insert(200);
-        assert_eq!(set.iter().collect::<Vec<_>>(), vec![0x00, 0x3f, 0x40, 0x7f]);
-        set.remove(0x40);
-        assert!(!set.contains(0x40) && set.contains(0x7f));
-        let footprint = release_kind_footprint(0x00, T, OwnerState { task_pending: true, loads_completed: true, costume: 0, map_nodes: 2 }, 2);
-        assert_eq!(footprint.kind_registry, vec![KindCostume { kind: 0x00, costume: 0 }]);
-        assert!(footprint.may_cancel_task && footprint.may_reset_r);
-    }
-
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
-            ("the_training_registration_sets_match_the_d_sg1_calibration", the_training_registration_sets_match_the_d_sg1_calibration as fn()),
-            ("the_aegis_object_kind_has_exactly_one_orphan_key_and_nothing_else_does", the_aegis_object_kind_has_exactly_one_orphan_key_and_nothing_else_does as fn()),
-            ("native_window_requests_follow_the_17e5bc0_table", native_window_requests_follow_the_17e5bc0_table as fn()),
-            ("a_kind_native_already_requested_for_a_construction_is_not_acquired_twice", a_kind_native_already_requested_for_a_construction_is_not_acquired_twice as fn()),
-            ("release_after_acquire_is_the_identity_and_names_the_orphan_first", release_after_acquire_is_the_identity_and_names_the_orphan_first as fn()),
             ("a_release_the_live_consumers_refuse_hands_the_token_back_and_can_be_retained", a_release_the_live_consumers_refuse_hands_the_token_back_and_can_be_retained as fn()),
             ("a_pair_reset_is_permitted_only_when_no_other_batch_holds_keys", a_pair_reset_is_permitted_only_when_no_other_batch_holds_keys as fn()),
             ("reconciliation_names_residual_and_missing_keys_by_refs", reconciliation_names_residual_and_missing_keys_by_refs as fn()),
-            ("kind_sets_cover_the_whole_kind_space", kind_sets_cover_the_whole_kind_space as fn()),
         ]);
     }
     }

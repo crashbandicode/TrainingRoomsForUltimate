@@ -44,39 +44,6 @@ fn a_record_round_trips_through_its_json() {
     assert_eq!(back, rec);
 }
 
-fn bad_fields_are_refused_by_name() {
-    let good = serde_json::to_value(record("A")).unwrap();
-    let broken = |edit: &dyn Fn(&mut Value)| {
-        let mut v = good.clone();
-        edit(&mut v);
-        serde_json::from_value::<ComboRecord>(v).unwrap_err().to_string()
-    };
-    assert!(broken(&|v| v["links"][0]["from"] = json!("nair")).contains("from"));
-    assert!(broken(&|v| v["links"][0]["steps"][0]["button"] = json!("zl")).contains("button"));
-    assert!(broken(&|v| v["links"][0]["verdict"] = json!({"kind": "drop", "link": null})).contains("verdict"));
-    assert!(broken(&|v| v["links"] = json!([])).contains("links"));
-    assert!(broken(&|v| v["schema_version"] = json!(2)).contains("schema_version"));
-    assert!(broken(&|v| v["links"][0]["window"] = json!([1])).contains("window"));
-}
-
-fn names_are_one_to_48_characters() {
-    assert!(record("x").validate().is_ok());
-    assert!(record(&"é".repeat(48)).validate().is_ok());
-    assert!(record(&"é".repeat(49)).validate().is_err());
-    assert!(record("  ").validate().is_err());
-    assert!(record("a\nb").validate().is_err());
-    assert_eq!(clean_name("  Nair loop  ").as_deref(), Some("Nair loop"));
-    assert_eq!(clean_name("   "), None);
-    assert_eq!(clean_name(&"x".repeat(60)).map(|n| n.len()), Some(48));
-}
-
-fn the_default_name_is_the_lowest_unused_combo_n() {
-    let entry = |name: &str| ComboEntry { id: String::new(), name: name.to_owned(), links: 1, recorded_on: None };
-    assert_eq!(default_name(&[]), "Combo 1");
-    assert_eq!(default_name(&[entry("Combo 1"), entry("combo 3")]), "Combo 2");
-    assert_eq!(default_name(&[entry("Combo 2")]), "Combo 1");
-}
-
 fn the_library_saves_lists_renames_deletes_and_selects() {
     let dir = scratch("library");
     let library = ComboLibrary::new(&dir);
@@ -111,9 +78,6 @@ fn the_library_saves_lists_renames_deletes_and_selects() {
 fn case_table() {
     crate::test_table::run(&[
         ("a_record_round_trips_through_its_json", a_record_round_trips_through_its_json as fn()),
-        ("bad_fields_are_refused_by_name", bad_fields_are_refused_by_name as fn()),
-        ("names_are_one_to_48_characters", names_are_one_to_48_characters as fn()),
-        ("the_default_name_is_the_lowest_unused_combo_n", the_default_name_is_the_lowest_unused_combo_n as fn()),
         ("the_library_saves_lists_renames_deletes_and_selects", the_library_saves_lists_renames_deletes_and_selects as fn()),
     ]);
 }

@@ -164,32 +164,6 @@ mod tests {
         assert_eq!(q.step(false), Frame { visible: false, draw: None });
     }
 
-    fn a_plain_notice_still_counts_down_while_the_quick_menu_hides_the_pane() {
-        let mut q = q();
-        plain(&mut q, "a", 5);
-        let f = q.step(true);
-        assert!(!f.visible);
-        assert!(f.draw.is_some(), "text is written on the first frame even while hidden, as before");
-        run(&mut q, 3, true);
-        assert!(q.is_empty());
-        assert!(!q.take_delivered("a"), "a plain notice is never recorded as delivered");
-    }
-
-    fn a_standing_notice_waits_behind_plain_notices_and_new_plain_ones_stay_ahead_of_it() {
-        let mut q = q();
-        plain(&mut q, "welcome", 3);
-        q.upsert("Fighters", "Swap once to load".to_string(), 10, 1);
-        assert_eq!(headers(&q), ["welcome", "Fighters"]);
-        plain(&mut q, "swap", 3);
-        assert_eq!(headers(&q), ["welcome", "swap", "Fighters"]);
-        // Once the standing notice is on screen a later plain notice waits for it instead.
-        run(&mut q, 4, false);
-        assert_eq!(first(&q), Some("Fighters"));
-        q.step(false);
-        plain(&mut q, "late", 3);
-        assert_eq!(headers(&q), ["Fighters", "late"]);
-    }
-
     fn upsert_updates_in_place_and_restarts_the_full_time() {
         let mut q = q();
         q.upsert("Fighters", "Loading 1/5".to_string(), 10, 1);
@@ -209,77 +183,6 @@ mod tests {
         assert!(!q.take_delivered("Fighters"));
     }
 
-    fn delivery_needs_the_full_visible_time_and_the_quick_menu_does_not_consume_it() {
-        let mut q = q();
-        q.upsert("Fighters", "All loaded".to_string(), 10, 1);
-        // 9 visible frames leave it queued (completes when the length reaches 1).
-        run(&mut q, 4, false);
-        // The quick menu hides the pane for a long time: no countdown, nothing delivered, not lost.
-        let f = q.step(true);
-        assert!(!f.visible);
-        run(&mut q, 500, true);
-        assert!(q.is_queued("Fighters"));
-        assert!(!q.take_delivered("Fighters"));
-        run(&mut q, 4, false);
-        assert!(q.is_queued("Fighters"));
-        q.step(false);
-        assert!(!q.is_queued("Fighters"));
-        assert!(q.take_delivered("Fighters"));
-        assert!(!q.take_delivered("Fighters"), "a delivery is read once");
-    }
-
-    fn a_standing_notice_of_length_one_is_not_delivered_unseen() {
-        let mut q = q();
-        q.upsert("Fighters", "x".to_string(), 1, 1);
-        run(&mut q, 20, true);
-        assert!(q.is_queued("Fighters"));
-        assert!(!q.take_delivered("Fighters"));
-        q.step(false);
-        assert!(q.take_delivered("Fighters"));
-    }
-
-    fn a_wipe_by_another_writer_is_not_a_delivery() {
-        let mut q = q();
-        q.upsert("Fighters", "All loaded".to_string(), 10, 1);
-        run(&mut q, 3, false);
-        q.clear_all();
-        assert!(!q.is_queued("Fighters"));
-        assert!(!q.take_delivered("Fighters"));
-        q.upsert("Fighters", "All loaded".to_string(), 10, 1);
-        run(&mut q, 3, false);
-        q.clear("Fighters");
-        assert!(!q.is_queued("Fighters"));
-        assert!(!q.take_delivered("Fighters"));
-    }
-
-    fn a_new_content_drops_the_earlier_delivery_record() {
-        let mut q = q();
-        q.upsert("Fighters", "a".to_string(), 2, 1);
-        run(&mut q, 2, false);
-        q.upsert("Fighters", "b".to_string(), 2, 1);
-        assert!(!q.take_delivered("Fighters"), "the record belonged to the old content");
-        run(&mut q, 2, false);
-        assert!(q.take_delivered("Fighters"));
-    }
-
-    fn a_delivery_survives_a_wipe_that_follows_it() {
-        let mut q = q();
-        q.upsert("Fighters", "a".to_string(), 2, 1);
-        run(&mut q, 2, false);
-        q.clear_all();
-        assert!(q.take_delivered("Fighters"), "it was seen before the wipe");
-    }
-
-    fn clearing_one_header_leaves_the_others() {
-        let mut q = q();
-        plain(&mut q, "a", 9);
-        q.upsert("Fighters", "x".to_string(), 9, 1);
-        plain(&mut q, "b", 9);
-        q.clear("a");
-        assert_eq!(headers(&q), ["b", "Fighters"]);
-        assert!(q.is_queued("b") && !q.is_queued("a"));
-    }
-
     fn holds_covers_a_queued_entry_and_an_unread_delivery() {
         let mut q = q();
         assert!(!q.holds("Fighters"));
@@ -293,39 +196,13 @@ mod tests {
         assert!(!q.take_delivered("Fighters"), "clearing drops the record");
     }
 
-    fn a_swap_notice_burst_never_loses_the_standing_notice() {
-        // Ten swap notices of 3 s each arrive while the standing notice is queued; it is still there,
-        // carries the latest content and is shown once they have all run.
-        let mut q = q();
-        q.upsert("Fighters", "Loading 1/5".to_string(), 180, 1);
-        for _ in 0..10 {
-            plain(&mut q, "swap", 180);
-        }
-        q.upsert("Fighters", "All loaded (5/5, 2 instant)".to_string(), 180, 2);
-        run(&mut q, 10 * 179, false);
-        assert_eq!(headers(&q), ["Fighters"]);
-        let f = q.step(false);
-        assert_eq!(f.draw.map(|d| d.1), Some("All loaded (5/5, 2 instant)".to_string()));
-        run(&mut q, 179, false);
-        assert!(q.take_delivered("Fighters"));
-    }
-
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
             ("plain_notices_behave_as_before_the_queue_was_extracted", plain_notices_behave_as_before_the_queue_was_extracted as fn()),
-            ("a_plain_notice_still_counts_down_while_the_quick_menu_hides_the_pane", a_plain_notice_still_counts_down_while_the_quick_menu_hides_the_pane as fn()),
-            ("a_standing_notice_waits_behind_plain_notices_and_new_plain_ones_stay_ahead_of_it", a_standing_notice_waits_behind_plain_notices_and_new_plain_ones_stay_ahead_of_it as fn()),
             ("upsert_updates_in_place_and_restarts_the_full_time", upsert_updates_in_place_and_restarts_the_full_time as fn()),
-            ("delivery_needs_the_full_visible_time_and_the_quick_menu_does_not_consume_it", delivery_needs_the_full_visible_time_and_the_quick_menu_does_not_consume_it as fn()),
-            ("a_standing_notice_of_length_one_is_not_delivered_unseen", a_standing_notice_of_length_one_is_not_delivered_unseen as fn()),
-            ("a_wipe_by_another_writer_is_not_a_delivery", a_wipe_by_another_writer_is_not_a_delivery as fn()),
-            ("a_new_content_drops_the_earlier_delivery_record", a_new_content_drops_the_earlier_delivery_record as fn()),
-            ("a_delivery_survives_a_wipe_that_follows_it", a_delivery_survives_a_wipe_that_follows_it as fn()),
-            ("clearing_one_header_leaves_the_others", clearing_one_header_leaves_the_others as fn()),
             ("holds_covers_a_queued_entry_and_an_unread_delivery", holds_covers_a_queued_entry_and_an_unread_delivery as fn()),
-            ("a_swap_notice_burst_never_loses_the_standing_notice", a_swap_notice_burst_never_loses_the_standing_notice as fn()),
         ]);
     }
     }

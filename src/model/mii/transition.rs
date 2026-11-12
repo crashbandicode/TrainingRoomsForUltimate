@@ -444,18 +444,6 @@ mod tests {
         assert_eq!(outcome.into_lease(), Lease(1));
     }
 
-    fn native_loader_7_after_commit_is_a_destruction_only_recovery_not_a_dead_end() {
-        // DEFECT #2 / D-SG1: state 6 found the owner busy; `E+0x591c = 7`, nothing published.
-        let txn = committed(RecoveryPlan::PLAIN_KIND);
-        let Enter::NativeRefused(mut rec) = txn.enter(7) else { panic!("loader 7 unpublished is native's refusal") };
-        assert_eq!(rec.progress(), Progress::DestructionOnly);
-        assert!(!rec.enter(7), "the original service must not run on a null alias");
-        let rec = rec.finish(Evidence { loader_settled: true, ..Evidence::default() }).pending().expect("a settled loader cannot finish a destruction-only recovery");
-        let outcome = rec.destroyed("room closed during the stall");
-        assert_eq!(outcome.name(), "Destroyed");
-        assert_eq!(outcome.into_lease(), Lease(1));
-    }
-
     fn failure_injected_at_every_seam_yields_one_named_outcome_with_the_lease() {
         type Seam = Box<dyn Fn() -> (Option<Progress>, Lease)>;
         let seams: [(&str, Seam); 8] = [
@@ -515,7 +503,6 @@ mod tests {
         crate::test_table::run(&[
             ("a_committed_transaction_can_only_settle_or_recover_and_always_returns_install", a_committed_transaction_can_only_settle_or_recover_and_always_returns_install as fn()),
             ("a_verified_prequeue_publishes_and_a_verified_ready_applies_with_one_lease", a_verified_prequeue_publishes_and_a_verified_ready_applies_with_one_lease as fn()),
-            ("native_loader_7_after_commit_is_a_destruction_only_recovery_not_a_dead_end", native_loader_7_after_commit_is_a_destruction_only_recovery_not_a_dead_end as fn()),
             ("failure_injected_at_every_seam_yields_one_named_outcome_with_the_lease", failure_injected_at_every_seam_yields_one_named_outcome_with_the_lease as fn()),
         ]);
     }

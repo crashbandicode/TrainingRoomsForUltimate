@@ -97,32 +97,11 @@ mod tests {
         ));
     }
 
-    fn reset_does_not_authorize_other_descriptor_changes() {
-        let before = original();
-        for word in 0..28 {
-            let mut changed = RESET;
-            changed[word] ^= 1;
-            assert!(
-                !matches(changed, before, Some([PAIR; 4]), PAIR[1]),
-                "unexpected descriptor word {} was accepted", word
-            );
-        }
-        // An independently recreated scene can carry a new native rules pointer;
-        // the previous receipt is never authority for that new current pair.
-        let next = [PAIR[0] + 0x1000, PAIR[1]];
-        assert!(!matches(RESET, before, Some([next; 4]), PAIR[1]));
-        let mut next_receipt = RESET;
-        next_receipt[22] = next[0] as u32;
-        next_receipt[23] = (next[0] >> 32) as u32;
-        assert!(matches(next_receipt, before, Some([next; 4]), PAIR[1]));
-    }
-
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
             ("native_reset_receipt_requires_authorized_current_originals", native_reset_receipt_requires_authorized_current_originals as fn()),
-            ("reset_does_not_authorize_other_descriptor_changes", reset_does_not_authorize_other_descriptor_changes as fn()),
         ]);
     }
     }

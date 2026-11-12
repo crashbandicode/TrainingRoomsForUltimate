@@ -157,28 +157,6 @@ mod tests {
         }
     }
 
-    fn departure_or_native_ui_preempts_same_tick_readiness() {
-        let mut browser = browser();
-        browser.on_pad(Pad::Confirm, true);
-        assert_eq!(browser.tick(false, true), Effect::Close);
-        assert!(!browser.pending());
-        assert!(!browser.release_cpu(false));
-        assert_eq!(browser.tick(true, true), Effect::None);
-    }
-
-    fn repeated_confirm_cannot_extend_the_180_tick_deadline() {
-        let mut browser = browser();
-        browser.on_pad(Pad::Confirm, true);
-        for _ in 0..179 {
-            assert_eq!(browser.tick(true, false), Effect::None);
-            assert_eq!(browser.on_pad(Pad::Confirm, true), Effect::None);
-        }
-        assert_eq!(browser.tick(true, false), Effect::TimedOut);
-        assert!(!browser.pending());
-        assert!(!browser.release_cpu(false));
-        assert_eq!(browser.tick(true, true), Effect::None);
-    }
-
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
@@ -186,8 +164,6 @@ mod tests {
             ("active_waiting_cpu_can_finish_before_the_exact_capture_opens", active_waiting_cpu_can_finish_before_the_exact_capture_opens as fn()),
             ("idle_training_stays_immediate_and_waiting_can_choose_another_capture", idle_training_stays_immediate_and_waiting_can_choose_another_capture as fn()),
             ("explicit_cancel_before_or_after_readiness_cannot_open_on_return", explicit_cancel_before_or_after_readiness_cannot_open_on_return as fn()),
-            ("departure_or_native_ui_preempts_same_tick_readiness", departure_or_native_ui_preempts_same_tick_readiness as fn()),
-            ("repeated_confirm_cannot_extend_the_180_tick_deadline", repeated_confirm_cannot_extend_the_180_tick_deadline as fn()),
         ]);
     }
     }

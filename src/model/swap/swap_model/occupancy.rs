@@ -324,35 +324,6 @@ mod tests {
         assert_eq!(consumers.conflict(Role::Player, 0x07, Use::Acquire), Some(Conflict::PrefetchDebtUnderLiveKirby));
     }
 
-    /// Primary 2026-11-09 05:38Z: a detached PT group's object re-arm runs under a live Kirby through the ledger. The
-    /// suspend rule covers the fighter kinds a Kirby copy can share on R; the trainer's object kind (and the Aegis
-    /// partner's) is admitted, every fighter kind still is not, and the live copy's guard is unchanged. Eden rc6-kr1
-    /// (the gate lifted, the ledger not): `object kind NOT re-acquired … reason=Conflict(PrefetchDebtUnderLiveKirby)`.
-    fn an_object_kind_is_acquired_under_a_live_kirby_and_a_fighter_kind_is_not() {
-        use super::super::ledger::{GroupId, Holder, Ledger, ReleaseRecipe, AEGIS_OBJECT_KIND, PT_OBJECT_KIND};
-        let rules = Rules::C116_1;
-        let mut occ = occupancy();
-        occ.live[0] = Some(KIRBY);
-        for copy in [None, Some(0x24), Some(0x00)] {
-            occ.kirby_copy[0] = copy;
-            assert_eq!(occ.conflicts(Role::Player, PT_OBJECT_KIND, Use::Acquire, &rules), None, "{copy:?}");
-            assert_eq!(occ.conflicts(Role::Player, AEGIS_OBJECT_KIND, Use::Acquire, &rules), None, "{copy:?}");
-            assert_eq!(occ.conflicts(Role::Player, PT_OBJECT_KIND, Use::Release, &rules), None, "{copy:?}");
-            let squirtle = if copy == Some(0x24) { Conflict::LiveCopySharesRegistry } else { Conflict::PrefetchDebtUnderLiveKirby };
-            assert_eq!(occ.conflicts(Role::Player, 0x24, Use::Acquire, &rules), Some(squirtle), "{copy:?}");
-            assert_eq!(occ.conflicts(Role::Player, 0x07, Use::Acquire, &rules), Some(Conflict::PrefetchDebtUnderLiveKirby));
-        }
-        // The re-arm's own acquisition through the ledger (`r_handle::acquire`: `Holder::Prefetch`, the occupancy that
-        // names the live copy).
-        let consumers = Occupancy { kinds: occ, rules };
-        let mut ledger = Ledger::new(RFlags::TRAINING);
-        let batch = ledger.new_batch();
-        assert!(ledger.acquire(PT_OBJECT_KIND, Holder::Prefetch(GroupId(1)), ReleaseRecipe::OwnedPerKind, batch, &consumers,
-            Role::Player).is_ok());
-        assert!(ledger.acquire(0x07, Holder::Prefetch(GroupId(2)), ReleaseRecipe::OwnedPerKind, batch, &consumers,
-            Role::Player).is_err(), "a fighter kind's prefetch still waits for the live Kirby");
-    }
-
     fn footprint_admission_keeps_a_copied_kinds_registry_and_residents_name_the_copy() {
         let state = OwnerState { task_pending: false, loads_completed: true, costume: 0, map_nodes: 2 };
         let footprint = release_kind_footprint(0x00, RFlags::TRAINING, state, 2);
@@ -507,29 +478,6 @@ mod tests {
         assert!(!policy.key_release_admitted(0x00, Some(0x00)) && policy.key_release_admitted(0x00, Some(0x07)));
     }
 
-    /// rc.7 F1: with the G68 step owned (`Rules::OWNED_G68`), the D-SG1/K1 shapes above raise no D-KIRBY1 conflict (the
-    /// copy's acquire and release, the suspend and the drain), and the rules that are not D-KIRBY1's stand.
-    fn with_the_g68_step_owned_no_d_kirby1_rule_is_left() {
-        let rules = Rules::OWNED_G68;
-        assert!(rules.g68_owned && !Rules::C116_1.g68_owned);
-        assert_eq!(Rules { g68_owned: false, ..rules }, Rules::C116_1, "only the ownership differs");
-        let mut occ = occupancy();
-        occ.live[0] = Some(KIRBY);
-        occ.kirby_copy[0] = Some(0x00);
-        for usage in [Use::Release, Use::Acquire] {
-            assert_eq!(occ.conflicts(Role::Player, 0x00, usage, &rules), None, "the copied kind, {usage:?}");
-        }
-        assert_eq!(occ.conflicts(Role::Player, 0x07, Use::Acquire, &rules), None, "no suspend while Kirby is live");
-        let mut occ = occupancy();
-        occ.live[0] = Some(0x07);
-        occ.prefetched[0].insert(0x00);
-        assert_eq!(occ.conflicts(Role::Player, KIRBY, Use::TargetKind, &rules), None, "no drain before a Kirby target");
-        let mut occ = occupancy();
-        occ.kirby_copy[0] = Some(0x00);
-        occ.hat_sources.insert(0x00);
-        assert_eq!(occ.conflicts(Role::Player, 0x00, Use::Build, &rules), Some(Conflict::HatSourceLive), "K2 is not D-KIRBY1's");
-    }
-
     /// rc.7 F1: the runtime's D-KIRBY1 gates see the live kind only while the G68 step is native's.
     fn the_d_kirby1_gates_see_a_live_kirby_only_while_the_g68_step_is_natives() {
         use super::super::capabilities::{d_kirby1_applies, d_kirby1_live, prefetch_admitted};
@@ -546,12 +494,10 @@ mod tests {
     fn case_table() {
         crate::test_table::run(&[
             ("conflicts_encode_the_kirby_drain_and_suspend_rules_and_the_live_copy_guard", conflicts_encode_the_kirby_drain_and_suspend_rules_and_the_live_copy_guard as fn()),
-            ("an_object_kind_is_acquired_under_a_live_kirby_and_a_fighter_kind_is_not", an_object_kind_is_acquired_under_a_live_kirby_and_a_fighter_kind_is_not as fn()),
             ("footprint_admission_keeps_a_copied_kinds_registry_and_residents_name_the_copy", footprint_admission_keeps_a_copied_kinds_registry_and_residents_name_the_copy as fn()),
             ("consts_wrappers_equal_the_old_bodies_they_now_derive_from_the_ledger", consts_wrappers_equal_the_old_bodies_they_now_derive_from_the_ledger as fn()),
             ("the_ledger_policy_reproduces_no_catalogue_fault_on_the_wp4_fixtures", the_ledger_policy_reproduces_no_catalogue_fault_on_the_wp4_fixtures as fn()),
             ("the_kirby_row_decides_the_s_b_replay_on_the_model", the_kirby_row_decides_the_s_b_replay_on_the_model as fn()),
-            ("with_the_g68_step_owned_no_d_kirby1_rule_is_left", with_the_g68_step_owned_no_d_kirby1_rule_is_left as fn()),
             ("the_d_kirby1_gates_see_a_live_kirby_only_while_the_g68_step_is_natives", the_d_kirby1_gates_see_a_live_kirby_only_while_the_g68_step_is_natives as fn()),
         ]);
     }

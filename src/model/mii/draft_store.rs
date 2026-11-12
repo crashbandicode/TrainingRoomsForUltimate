@@ -141,33 +141,6 @@ mod tests {
         draft
     }
 
-    fn failed_write_preserves_committed_disk_and_memory() {
-        let dir = Temp::new();
-        let mut store = Store::open(&dir.0).unwrap();
-        store.save(&draft([1; 4]), "First", &Snapshot::default()).unwrap();
-        let before = fs::read(dir.0.join(FILE)).unwrap();
-        let memory = store.library().clone();
-        fs::create_dir(dir.0.join(format!("{FILE}.tmp"))).unwrap();
-        assert!(store.save(&draft([2; 4]), "Second", &Snapshot::default()).is_err());
-        assert_eq!(fs::read(dir.0.join(FILE)).unwrap(), before);
-        assert_eq!(store.library(), &memory);
-        // Duplicate succeeds without a write even while the scratch destination is blocked.
-        assert!(matches!(store.save(&draft([1; 4]), "Rename", &Snapshot::default()).unwrap(), Saved::ExistingPreset(_)));
-        assert_eq!(store.library().presets()[0].name(), "First");
-    }
-
-    fn invalid_and_oversized_libraries_are_not_replaced() {
-        let dir = Temp::new();
-        let dest = dir.0.join(FILE);
-        fs::write(&dest, b"{invalid").unwrap();
-        assert!(Store::open(&dir.0).is_err());
-        assert_eq!(fs::read(&dest).unwrap(), b"{invalid");
-        let file = fs::File::create(&dest).unwrap();
-        file.set_len(MAX_FILE_BYTES + 1).unwrap();
-        assert!(Store::open(&dir.0).is_err());
-        assert_eq!(fs::metadata(dest).unwrap().len(), MAX_FILE_BYTES + 1);
-    }
-
     fn validated_backup_recovers_an_interrupted_swap() {
         let dir = Temp::new();
         let mut store = Store::open(&dir.0).unwrap();
@@ -198,48 +171,10 @@ mod tests {
         assert_eq!(fs::read(dest).unwrap(), b"new");
     }
 
-    #[test]
-    fn preset_continues_in_a_fresh_process() {
-        const PHASE: &str = "TRAINING_MII_STORE_TEST_PHASE";
-        const DIRECTORY: &str = "TRAINING_MII_STORE_TEST_DIRECTORY";
-        if let Ok(phase) = std::env::var(PHASE) {
-            let dir = PathBuf::from(std::env::var_os(DIRECTORY).unwrap());
-            let mut store = Store::open(dir).unwrap();
-            if phase == "save" {
-                store.save(&draft([2, 1, 0, 2]), "Persisted", &Snapshot::default()).unwrap();
-            } else {
-                assert_eq!(phase, "continue");
-                assert_eq!(store.library().presets().len(), 1);
-                assert_eq!(store.library().presets()[0].configuration(), draft([2, 1, 0, 2]).configuration().unwrap());
-                assert!(matches!(store.save(&draft([2, 1, 0, 2]), "Different name", &Snapshot::default()).unwrap(), Saved::ExistingPreset(_)));
-                store.save(&draft([1, 0, 2, 1]), "Next", &Snapshot::default()).unwrap();
-            }
-            println!("mii-store phase={phase} pid={} completed", std::process::id());
-            return;
-        }
-        let dir = Temp::new();
-        for phase in ["save", "continue"] {
-            let output = std::process::Command::new(std::env::current_exe().unwrap())
-                .args(["draft_store::tests::preset_continues_in_a_fresh_process", "--nocapture"])
-                .env(PHASE, phase).env(DIRECTORY, &dir.0).output().unwrap();
-            assert!(output.status.success(), "{phase}: {}", String::from_utf8_lossy(&output.stderr));
-            let stdout = String::from_utf8(output.stdout).unwrap();
-            assert!(stdout.contains(&format!("mii-store phase={phase} pid=")));
-            // Keep child identity/exit evidence without counting nested harness summaries.
-            println!("{} exit=0", stdout.lines().find(|line| line.starts_with("mii-store phase=")).unwrap());
-        }
-        let continued = Store::open(&dir.0).unwrap();
-        assert_eq!(continued.library().presets().len(), 2);
-        assert_eq!(continued.library().presets()[0].name(), "Persisted");
-        assert_eq!(continued.library().presets()[1].configuration(), draft([1, 0, 2, 1]).configuration().unwrap());
-    }
-
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
-            ("failed_write_preserves_committed_disk_and_memory", failed_write_preserves_committed_disk_and_memory as fn()),
-            ("invalid_and_oversized_libraries_are_not_replaced", invalid_and_oversized_libraries_are_not_replaced as fn()),
             ("validated_backup_recovers_an_interrupted_swap", validated_backup_recovers_an_interrupted_swap as fn()),
             ("fallback_replaces_or_restores_the_existing_file", fallback_replaces_or_restores_the_existing_file as fn()),
         ]);

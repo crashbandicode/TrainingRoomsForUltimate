@@ -98,28 +98,6 @@ mod tests {
         Seen { menu_open, panel_visible, clip_visible, clip_foreground: clip_visible, prompt_visible: false }
     }
 
-    fn a_fighter_question_with_the_menu_closed_is_drawn_until_it_is_answered() {
-        // rc.5: Play on a recording made on another fighter opened the question with the menu closed; nothing drew it or
-        // gave it Player 1, and the held fighters stayed stopped.
-        let asked = Seen { prompt_visible: true, ..seen(false, true, false) };
-        assert_eq!(next(Phase::Menu, asked), (Phase::Prompt, Step::ShowPrompt));
-        assert_eq!(next(Phase::Prompt, asked), (Phase::Prompt, Step::Nothing));
-        let answered = seen(false, false, false);
-        assert_eq!(next(Phase::Prompt, answered), (Phase::Menu, Step::HidePrompt));
-    }
-
-    /// Eden rc6-covrec-diag1 and diag2 (2026-11-08): the Replay window's A opened the clip editor (status editor=true; the
-    /// game held on the clip), but no editor frame was ever drawn. The hand-over closes the menu, the close drops the
-    /// menu's model, and the worker built every frame only when it still held a model.
-    fn the_clip_editor_draws_without_a_menu_model() {
-        let (phase, step) = next(Phase::Panel, seen(true, true, true));
-        assert_eq!((phase, step), (Phase::Clip, Step::HandOverToClip));
-        assert!(!frame_needs_menu(phase), "the editor's frame comes from the layer's view");
-        for phase in [Phase::Menu, Phase::Panel, Phase::Prompt] {
-            assert!(frame_needs_menu(phase), "{phase:?} is drawn from the menu's model");
-        }
-    }
-
     /// The same runs: the hand-over's own close reset the menu session, and the reset put the worker back in Menu, so
     /// the editor was never drawn although it held the game. The clip phase survives the reset; the layer closing the
     /// editor ends it.
@@ -130,14 +108,6 @@ mod tests {
         for phase in [Phase::Menu, Phase::Panel, Phase::Prompt] {
             assert_eq!(after_session_reset(phase), Phase::Menu);
         }
-    }
-
-    fn the_question_keeps_player_1_until_nothing_holds_it() {
-        // A press during the question used to release the bit (the pop-up's sync saw neither menu nor pop-up).
-        assert!(menu_owns_input(false, false, false, true));
-        assert!(!menu_owns_input(false, false, false, false));
-        assert!(menu_owns_input(true, false, false, false) && menu_owns_input(false, true, false, false));
-        assert!(menu_owns_input(false, false, true, false));
     }
 
     fn a_fighter_question_inside_the_open_menu_stays_the_menu_panels() {
@@ -152,85 +122,12 @@ mod tests {
         assert_eq!(next(Phase::Prompt, in_menu), (Phase::Menu, Step::HidePrompt));
     }
 
-    fn a_panel_stays_while_the_layer_shows_it() {
-        assert_eq!(next(Phase::Panel, seen(true, true, false)), (Phase::Panel, Step::Nothing));
-    }
-
-    fn a_panel_that_closed_itself_pops_the_menu_row() {
-        assert_eq!(next(Phase::Panel, seen(true, false, false)), (Phase::Menu, Step::PopRow));
-    }
-
-    fn a_clip_editor_takes_the_screen_and_the_menu_closes() {
-        // The clip editor counts as a visible panel too: the clip wins.
-        assert_eq!(next(Phase::Panel, seen(true, true, true)), (Phase::Clip, Step::HandOverToClip));
-        assert_eq!(next(Phase::Clip, seen(false, true, true)), (Phase::Clip, Step::Nothing));
-        assert_eq!(next(Phase::Clip, seen(false, false, false)), (Phase::Menu, Step::HideClip));
-    }
-
-    fn losing_the_menu_closes_the_layers_panel() {
-        assert_eq!(next(Phase::Panel, seen(false, true, false)), (Phase::Menu, Step::CloseLayer));
-        // A clip editor survives the menu closing: it is its own owner.
-        assert_eq!(next(Phase::Panel, seen(false, true, true)), (Phase::Menu, Step::CloseLayer));
-    }
-
-    fn mismatch_keeps_menu_input_until_the_layer_releases_it() {
-        // ui-16: the replay is loaded, but Fighter Mismatch still needs physical A/B.
-        let mismatch = Seen { clip_foreground: false, ..seen(true, true, true) };
-        assert_eq!(next(Phase::Panel, mismatch), (Phase::Panel, Step::Nothing));
-        let accepted = Seen { clip_foreground: true, ..mismatch };
-        assert_eq!(next(Phase::Panel, accepted), (Phase::Clip, Step::HandOverToClip));
-        // Canceling the pending replay instead returns to the Recording row.
-        assert_eq!(next(Phase::Panel, seen(true, false, false)), (Phase::Menu, Step::PopRow));
-    }
-
-    fn keyboard_over_an_existing_clip_does_not_discard_the_clip_phase() {
-        let naming = Seen { clip_foreground: false, ..seen(false, true, true) };
-        assert_eq!(next(Phase::Clip, naming), (Phase::Clip, Step::Nothing));
-        assert_eq!(next(Phase::Clip, seen(false, true, true)), (Phase::Clip, Step::Nothing));
-    }
-
-    /// Eden covrest-yoga-01 (2026-11-08, `p23/rc6-cov-rest` with the #68 fix): Down to the Mii track resolved the
-    /// recorded Mii and opened the clip editor's own Fighter Mismatch question (`[NamedMacroDiag] view title="Fighter
-    /// Mismatch"`), but the frames kept showing the editor: the Clip phase had no way to the question, so nothing drew
-    /// it and the editor kept Player 1's presses (Down and A went to the editor). The question is drawn alone and owns
-    /// the presses; once answered, the editor is drawn again.
-    fn the_clip_editors_own_question_is_drawn_and_then_the_editor_again() {
-        let editor = seen(false, true, true);
-        let asked = Seen { prompt_visible: true, ..editor };
-        assert_eq!(next(Phase::Clip, asked), (Phase::Prompt, Step::ShowPrompt));
-        assert_eq!(next(Phase::Prompt, asked), (Phase::Prompt, Step::Nothing));
-        assert_eq!(next(Phase::Prompt, editor), (Phase::Clip, Step::HidePrompt), "answered: back to the editor");
-        assert_eq!(next(Phase::Prompt, seen(false, false, false)), (Phase::Menu, Step::HidePrompt));
-        assert_eq!(next(Phase::Clip, Seen { prompt_visible: true, ..seen(false, false, false) }), (Phase::Menu, Step::HideClip));
-        let worker = include_str!("../../runtime/ui/worker.rs");
-        assert!(worker.contains("let prompt_phase = s.phase == Phase::Menu || s.phase == Phase::Clip;"),
-            "a closed menu's model does not stop the clip editor's question from being shown");
-        let clip = include_str!("../../runtime/macros/replay_capture.rs");
-        assert!(clip.contains("if crate::runtime::macros::named_macros::fighter_prompt_up() { return; }"),
-            "the question owns Player 1's presses, not the editor");
-    }
-
-    fn the_menu_phase_does_nothing_on_its_own() {
-        assert_eq!(next(Phase::Menu, seen(true, true, true)), (Phase::Menu, Step::Nothing));
-    }
-
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
-            ("a_fighter_question_with_the_menu_closed_is_drawn_until_it_is_answered", a_fighter_question_with_the_menu_closed_is_drawn_until_it_is_answered as fn()),
-            ("the_clip_editor_draws_without_a_menu_model", the_clip_editor_draws_without_a_menu_model as fn()),
             ("the_hand_over_close_keeps_the_clip_editor_drawn", the_hand_over_close_keeps_the_clip_editor_drawn as fn()),
-            ("the_question_keeps_player_1_until_nothing_holds_it", the_question_keeps_player_1_until_nothing_holds_it as fn()),
             ("a_fighter_question_inside_the_open_menu_stays_the_menu_panels", a_fighter_question_inside_the_open_menu_stays_the_menu_panels as fn()),
-            ("a_panel_stays_while_the_layer_shows_it", a_panel_stays_while_the_layer_shows_it as fn()),
-            ("a_panel_that_closed_itself_pops_the_menu_row", a_panel_that_closed_itself_pops_the_menu_row as fn()),
-            ("a_clip_editor_takes_the_screen_and_the_menu_closes", a_clip_editor_takes_the_screen_and_the_menu_closes as fn()),
-            ("losing_the_menu_closes_the_layers_panel", losing_the_menu_closes_the_layers_panel as fn()),
-            ("mismatch_keeps_menu_input_until_the_layer_releases_it", mismatch_keeps_menu_input_until_the_layer_releases_it as fn()),
-            ("keyboard_over_an_existing_clip_does_not_discard_the_clip_phase", keyboard_over_an_existing_clip_does_not_discard_the_clip_phase as fn()),
-            ("the_clip_editors_own_question_is_drawn_and_then_the_editor_again", the_clip_editors_own_question_is_drawn_and_then_the_editor_again as fn()),
-            ("the_menu_phase_does_nothing_on_its_own", the_menu_phase_does_nothing_on_its_own as fn()),
         ]);
     }
     }

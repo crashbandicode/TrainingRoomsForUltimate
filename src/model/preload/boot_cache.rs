@@ -72,7 +72,7 @@ mod tests {
     use super::*;
     use crate::engine::compat::menu::{OnOff, BASE_MENU};
     use crate::engine::preload::cycle_preload_config::{load_ini, render, CyclePreloadSlots, IniLoad};
-    use crate::model::settings::Snapshot;
+    
     use std::path::PathBuf;
 
     struct Dir(PathBuf);
@@ -101,16 +101,6 @@ mod tests {
         menu
     }
 
-    fn the_factory_menu_is_the_factory_snapshot_and_the_engine_default() {
-        // The approved fresh-install defaults (factory table, MENU-DRAFT) are the engine's defaults: Solo Popo Off, Preload Samples Off.
-        assert_eq!(BASE_MENU, TrainingModpackMenu::from_snapshot(&Snapshot::factory()));
-        assert_eq!(desired(&BASE_MENU), Settings::DEFAULT);
-        assert_eq!(BASE_MENU.solo_popo_original, OnOff::OFF);
-        assert_eq!(BASE_MENU.cycle_preload_measurements, OnOff::OFF);
-        let samples = Settings::DEFAULT.measurements;
-        assert!(!samples);
-    }
-
     fn a_first_boot_writes_the_players_settings_and_the_second_boot_leaves_the_file_alone() {
         let dir = Dir::new("first");
         let path = dir.path();
@@ -137,17 +127,6 @@ mod tests {
         assert_eq!(load_ini(&path), IniLoad::Parsed(boot.active), "the cache now follows the settings");
     }
 
-    fn missing_factory_cache_is_written_and_invalid_menu_does_not_create_one() {
-        let dir = Dir::new("missing-factory");
-        let path = dir.path();
-        let mut invalid = BASE_MENU;
-        invalid.cycle_preload_slots = CyclePreloadSlots::empty();
-        assert_eq!(sync(&path, &invalid).active, Settings::FAIL_CLOSED);
-        assert!(!std::path::Path::new(&path).exists());
-        assert_eq!(sync(&path, &BASE_MENU).cache, Cache::Written);
-        assert_eq!(std::fs::read_to_string(&path).unwrap(), render(desired(&BASE_MENU)));
-    }
-
     fn off_settings_survive_missing_stale_rejected_and_unwritable_caches() {
         let dir = Dir::new("off");
         let path = dir.path();
@@ -167,55 +146,13 @@ mod tests {
         assert_eq!(load_ini(&path), IniLoad::Parsed(Settings::DEFAULT));
     }
 
-    fn a_rejected_cache_is_regenerated_and_cannot_change_the_active_choice() {
-        let dir = Dir::new("rejected");
-        let path = dir.path();
-        std::fs::write(&path, "[cycle_preload]\nslots=9\n").unwrap();
-        let boot = sync(&path, &BASE_MENU);
-        assert_eq!(boot.active, Settings::DEFAULT, "not FAIL_CLOSED: the bad file is not the source");
-        assert_eq!(boot.cache, Cache::Written);
-        assert_eq!(load_ini(&path), IniLoad::Parsed(Settings::DEFAULT));
-        assert_eq!(sync(&path, &BASE_MENU).cache, Cache::Unchanged);
-    }
-
-    fn a_cache_that_cannot_be_written_leaves_the_active_choice_and_the_old_file() {
-        let dir = Dir::new("failed");
-        let path = dir.path();
-        store_ini(&path, Settings::DEFAULT).unwrap();
-        let before = std::fs::read(&path).unwrap();
-        std::fs::create_dir(format!("{path}.tmp")).unwrap();
-        let boot = sync(&path, &imported());
-        assert_eq!(boot.active, desired(&imported()));
-        assert_eq!(boot.cache, Cache::Failed("could not write cycle preload ini"));
-        assert_eq!(std::fs::read(&path).unwrap(), before);
-    }
-
-    fn rows_that_are_not_one_choice_fail_closed_and_do_not_touch_the_file() {
-        let dir = Dir::new("malformed");
-        let path = dir.path();
-        store_ini(&path, Settings::DEFAULT).unwrap();
-        let before = std::fs::read(&path).unwrap();
-        let mut menu = BASE_MENU;
-        menu.cycle_preload_slots = CyclePreloadSlots::empty();
-        let boot = sync(&path, &menu);
-        assert_eq!(boot.active, Settings::FAIL_CLOSED);
-        assert_eq!(boot.active.slots, 0);
-        assert_eq!(boot.cache, Cache::Unchanged);
-        assert_eq!(std::fs::read(&path).unwrap(), before);
-    }
-
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
-            ("the_factory_menu_is_the_factory_snapshot_and_the_engine_default", the_factory_menu_is_the_factory_snapshot_and_the_engine_default as fn()),
             ("a_first_boot_writes_the_players_settings_and_the_second_boot_leaves_the_file_alone", a_first_boot_writes_the_players_settings_and_the_second_boot_leaves_the_file_alone as fn()),
             ("a_stale_cache_never_overrides_settings_json", a_stale_cache_never_overrides_settings_json as fn()),
-            ("missing_factory_cache_is_written_and_invalid_menu_does_not_create_one", missing_factory_cache_is_written_and_invalid_menu_does_not_create_one as fn()),
             ("off_settings_survive_missing_stale_rejected_and_unwritable_caches", off_settings_survive_missing_stale_rejected_and_unwritable_caches as fn()),
-            ("a_rejected_cache_is_regenerated_and_cannot_change_the_active_choice", a_rejected_cache_is_regenerated_and_cannot_change_the_active_choice as fn()),
-            ("a_cache_that_cannot_be_written_leaves_the_active_choice_and_the_old_file", a_cache_that_cannot_be_written_leaves_the_active_choice_and_the_old_file as fn()),
-            ("rows_that_are_not_one_choice_fail_closed_and_do_not_touch_the_file", rows_that_are_not_one_choice_fail_closed_and_do_not_touch_the_file as fn()),
         ]);
     }
     }

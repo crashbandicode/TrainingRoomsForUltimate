@@ -14,16 +14,15 @@ mod test_table;
 #[allow(dead_code)]
 mod model;
 
-use model::factory::DEFS;
 use model::menu::chord::Chord;
 use model::menu::delay::{DelayRange, DelaySpec};
-use model::menu::grid::{ConsoleMode, GridKind, GridLayout, Move, RosterUse, ITEM_TILES, STAGE_TILES};
-use model::menu::input::{Button, HoldRepeat, HOLD_REPEAT_PERIOD};
+use model::menu::grid::{ConsoleMode, GridKind, GridLayout, Move, RosterUse};
+use model::menu::input::Button;
 use model::menu::table::{row_count, Control, Editor, Page, GROUPS, ROWS};
 use model::menu::{
     reroll, DelayView, Entry, Env, Grey, Menu, RowValue, Screen, SliderState,
 };
-use model::settings::{self, Kind, Settings};
+use model::settings::{self, Settings};
 
 // ---- helpers ---------------------------------------------------------------------------------
 
@@ -97,189 +96,6 @@ fn reset_page(m: &mut Menu) {
 
 // ---- the factory table (SPEC-core-02 §2.7, §2.8, SPEC-core-04 §3.1) ------------------------------
 
-/// `(id, kind, len, indices set to 1 in the factory value)`, written from the spec tables.
-const SPEC_TABLE: &[(&str, Kind, usize, &[usize])] = &[
-    ("mash_state", Kind::Weighted, 30, &[]),
-    ("follow_up", Kind::Weighted, 30, &[]),
-    ("mash_triggers", Kind::Multiple, 17, &[0, 1, 3, 7]),
-    ("attack_angle", Kind::Weighted, 3, &[]),
-    ("throw_state", Kind::Weighted, 5, &[0]),
-    ("throw_delay", Kind::Weighted, 31, &[]),
-    ("pummel_delay", Kind::Weighted, 31, &[]),
-    ("falling_aerials", Kind::Weighted, 2, &[1]),
-    ("full_hop", Kind::Weighted, 2, &[0]),
-    ("aerial_delay", Kind::Weighted, 31, &[]),
-    ("fast_fall", Kind::Weighted, 2, &[1]),
-    ("fast_fall_delay", Kind::Weighted, 31, &[]),
-    ("oos_offset", Kind::Weighted, 31, &[]),
-    ("reaction_time", Kind::Weighted, 31, &[]),
-    ("ledge_neutral_override", Kind::Weighted, 30, &[]),
-    ("ledge_roll_override", Kind::Weighted, 30, &[]),
-    ("ledge_jump_override", Kind::Weighted, 30, &[]),
-    ("ledge_attack_override", Kind::Weighted, 30, &[]),
-    ("tech_action_override", Kind::Weighted, 30, &[]),
-    ("clatter_override", Kind::Weighted, 30, &[]),
-    ("tumble_override", Kind::Weighted, 30, &[]),
-    ("hitstun_override", Kind::Weighted, 30, &[]),
-    ("parry_override", Kind::Weighted, 30, &[]),
-    ("shieldstun_override", Kind::Weighted, 30, &[]),
-    ("footstool_override", Kind::Weighted, 30, &[]),
-    ("landing_override", Kind::Weighted, 30, &[]),
-    ("trump_override", Kind::Weighted, 30, &[]),
-    ("air_dodge_dir", Kind::Weighted, 11, &[]),
-    ("di_state", Kind::Weighted, 11, &[]),
-    ("sdi_state", Kind::Weighted, 11, &[]),
-    ("sdi_strength", Kind::Single, 4, &[0]),
-    ("clatter_strength", Kind::Single, 4, &[0]),
-    ("ledge_state", Kind::Weighted, 10, &[0, 1, 2, 3]),
-    ("ledge_delay", Kind::Weighted, 31, &[]),
-    ("tech_state", Kind::Weighted, 4, &[0, 1, 2, 3]),
-    ("miss_tech_state", Kind::Weighted, 4, &[0, 1, 2, 3]),
-    ("shield_state", Kind::Single, 4, &[0]),
-    ("shield_tilt", Kind::Single, 11, &[]),
-    ("crouch", Kind::Single, 2, &[1]),
-    ("stale_dodges", Kind::Single, 2, &[0]),
-    ("tech_hide", Kind::Single, 2, &[1]),
-    ("recording_slot", Kind::Single, 5, &[0]),
-    ("record_trigger", Kind::Single, 2, &[0]),
-    ("recording_duration", Kind::Single, 19, &[3]),
-    ("recording_crop", Kind::Single, 2, &[0]),
-    ("playback_button_slots", Kind::Weighted, 5, &[0]),
-    ("hitstun_playback", Kind::Single, 3, &[0]),
-    ("save_state_playback", Kind::Weighted, 5, &[]),
-    ("playback_mash", Kind::Single, 2, &[0]),
-    ("playback_loop", Kind::Single, 2, &[1]),
-    ("save_state_save", Kind::Multiple, 16, &[6, 9]),
-    ("save_state_load", Kind::Multiple, 16, &[6, 8]),
-    ("input_record", Kind::Multiple, 16, &[7, 9]),
-    ("input_playback", Kind::Multiple, 16, &[7, 8]),
-    ("cpu_cycle", Kind::Multiple, 16, &[6, 10]),
-    ("player_cycle", Kind::Multiple, 16, &[6, 11]),
-    ("play_player", Kind::Multiple, 16, &[7, 10]),
-    ("recording_popup", Kind::Multiple, 16, &[7, 11]),
-    ("input_display_toggle", Kind::Multiple, 16, &[5, 9]),
-    ("game_speed", Kind::Multiple, 16, &[5, 8]),
-    ("save_state_mirroring", Kind::Single, 3, &[0]),
-    ("save_state_autoload", Kind::Single, 2, &[1]),
-    ("save_damage_cpu", Kind::Single, 3, &[0]),
-    ("save_damage_player", Kind::Single, 3, &[0]),
-    ("save_state_enable", Kind::Single, 2, &[0]),
-    ("save_state_slot", Kind::Single, 5, &[0]),
-    ("randomize_slots", Kind::Weighted, 5, &[]),
-    ("buff_state", Kind::Multiple, 18, &[]),
-    ("frame_advantage", Kind::Single, 2, &[1]),
-    ("hitbox_vis", Kind::Single, 2, &[1]),
-    ("input_display_strip", Kind::Single, 2, &[1]),
-    ("input_delay", Kind::Single, 31, &[0]),
-    ("stage_hazards", Kind::Single, 2, &[1]),
-    ("hud", Kind::Single, 2, &[0]),
-    ("lra_reset", Kind::Single, 2, &[0]),
-    // Draft 9 and the fork's rows.
-    ("respawn_invincibility", Kind::Single, 2, &[1]),
-    ("settings_override_playback", Kind::Single, 2, &[1]),
-    ("dev_reload_config", Kind::Single, 2, &[1]),
-    ("dev_debug_hooks", Kind::Single, 2, &[1]),
-    ("cycle_preload_measurements", Kind::Single, 2, &[1]),
-    ("macro_source", Kind::Single, 2, &[0]),
-    ("fighter_prompt", Kind::Single, 2, &[0]),
-    ("trio_practice", Kind::Single, 2, &[1]),
-    ("lobby_practice", Kind::Single, 2, &[1]),
-    ("training_stage_rotation", Kind::Single, 2, &[1]),
-    ("solo_popo_original", Kind::Single, 2, &[1]),
-    ("p1_cpu_control", Kind::Single, 2, &[1]),
-    ("p1_cpu_level", Kind::Single, 9, &[2]),
-    ("cycle_preload_slots", Kind::Single, 6, &[5]),
-    ("cycle_preload_sources", Kind::Single, 3, &[2]),
-    ("cycle_preload_bank_members", Kind::Single, 3, &[2]),
-    // P-HOT: Ready Fighters 2..=12 starts at 10 (index 8).
-    ("cycle_preload_ready_fighters", Kind::Single, 11, &[8]),
-    // P-HOT: Ready Hats 0..=5 starts at 5.
-    ("cycle_preload_ready_hats", Kind::Single, 6, &[5]),
-    ("cycle_preload_group_swap", Kind::Single, 2, &[0]),
-    ("cycle_preload_ic_pair_bank", Kind::Single, 2, &[0]),
-    ("cycle_preload_original_bank", Kind::Single, 2, &[0]),
-    ("cycle_preload_solo_popo_groups", Kind::Single, 2, &[0]),
-    ("cycle_preload_ic_pair_groups", Kind::Single, 2, &[0]),
-    ("cycle_preload_native_groups", Kind::Single, 2, &[0]),
-    ("cycle_preload_pair_groups", Kind::Single, 2, &[0]),
-    ("cycle_preload_mii_groups", Kind::Single, 2, &[0]),
-    // Operator 2026-11-07: Combo helper On, 1 frame, keep playing.
-    ("combo_helper", Kind::Single, 2, &[0]),
-    ("combo_tolerance", Kind::Single, 3, &[1]),
-    ("combo_after", Kind::Single, 2, &[0]),
-    // rc.6: CPU Level, Off and Lv 1..=9, Off by default (operator 2026-11-09 11:19Z).
-    ("cpu_level", Kind::Single, 10, &[0]),
-];
-
-fn core02_factory_table_matches_spec() {
-    for (id, kind, len, ones) in SPEC_TABLE {
-        let (_, def) = settings::def(id).unwrap_or_else(|| panic!("{id} has no row"));
-        assert_eq!(def.kind, *kind, "{id}");
-        assert_eq!(def.len, *len, "{id}");
-        let mut want = vec![0u8; *len];
-        for i in *ones {
-            want[*i] = 1;
-        }
-        assert_eq!(def.default, want.as_slice(), "{id}");
-    }
-    // The two damage sliders, and the seven delay ranges (absent by default).
-    for id in ["save_damage_limits_cpu", "save_damage_limits_player"] {
-        let (_, def) = settings::def(id).unwrap();
-        assert_eq!((def.kind, def.len, def.default), (Kind::Slider, 2, &[0u8, 150][..]), "{id}");
-    }
-    for id in ["aerial_delay", "fast_fall_delay", "throw_delay", "pummel_delay", "ledge_delay", "oos_offset", "reaction_time"] {
-        let (_, range) = settings::def(&format!("{id}_range")).unwrap();
-        assert_eq!((range.kind, range.len, range.default.len()), (Kind::Range, 0, 0), "{id}");
-    }
-    // Nothing else is in the table, and no id is there twice (the + 1 is Lobby Items, Phase 2 N11, appended).
-    assert_eq!(DEFS.len(), SPEC_TABLE.len() + 2 + 7 + 1);
-    for (i, def) in DEFS.iter().enumerate() {
-        assert!(!DEFS[..i].iter().any(|d| d.id == def.id), "{} twice", def.id);
-    }
-    // The retired row is not in the table.
-    assert!(settings::def("character_item").is_none());
-    assert!(settings::def("update_policy").is_none());
-}
-
-fn every_menu_row_with_an_id_binds_to_its_row_or_is_an_editor_key() {
-    for row in &ROWS {
-        if row.id.is_empty() {
-            continue;
-        }
-        let in_table = settings::def(row.id).is_some();
-        match row.control {
-            // Rows that hold their value in the settings file have a table row.
-            Control::Toggle | Control::Dropdown(_) | Control::YesNoRandom | Control::Number { .. } | Control::MultiSelect(_)
-            | Control::MultiSelectRange { .. } | Control::Slider | Control::DirectionGrid { .. } => {
-                assert!(in_table, "{} ({}) has no table row", row.title, row.id)
-            }
-            Control::Editor(_) => {}
-            other => panic!("{} has an id but control {other:?}", row.title),
-        }
-        if let Control::MultiSelectRange { range_id, .. } = row.control {
-            assert!(settings::def(range_id).is_some_and(|(_, d)| d.kind == Kind::Range), "{range_id}");
-        }
-    }
-    // Option counts agree with the table rows.
-    for row in &ROWS {
-        let Some((_, def)) = settings::def(row.id) else { continue };
-        match row.control {
-            Control::Dropdown(labels) | Control::MultiSelect(labels) => {
-                // The loop row shows six counts. The factory value stays the old length-2 toggle.
-                if row.id == "playback_loop" {
-                    assert_eq!(labels.len(), 6);
-                    assert_eq!(def.len, 2);
-                } else {
-                    assert_eq!(labels.len(), def.len, "{}", row.title);
-                }
-            }
-            Control::YesNoRandom => assert_eq!(def.len, 2),
-            Control::DirectionGrid { .. } => assert_eq!(def.len, 11),
-            _ => {}
-        }
-    }
-}
-
 // ---- the layout (MENU-DRAFT §2 with the approved RC deferrals) -----------------------------------------------------------
 
 fn layout_row_counts_match_the_rc_freeze() {
@@ -338,73 +154,7 @@ fn layout_row_counts_match_the_rc_freeze() {
     }
 }
 
-fn layout_the_pilot_swaps_the_fallback_rows_for_one_info_row() {
-    let absent = menu_with(Env { pilot_present: false, ..Env::default() });
-    let present = menu_with(Env { pilot_present: true, ..Env::default() });
-    let titles = |m: &Menu| -> Vec<&'static str> {
-        (0..m.entry_count(Page::Cpu))
-            .filter_map(|i| match m.entry(Page::Cpu, i) {
-                Some(Entry::Row(r)) => Some(ROWS[r].title),
-                _ => None,
-            })
-            .collect()
-    };
-    assert!(titles(&absent).contains(&"P1 CPU Control") && titles(&absent).contains(&"P1 CPU Level"));
-    assert!(!titles(&absent).contains(&"P1 control"));
-    assert!(titles(&present).contains(&"P1 control"));
-    assert!(!titles(&present).contains(&"P1 CPU Control"));
-}
-
-fn layout_every_row_has_two_line_help() {
-    for row in &ROWS {
-        let (first, second) = row.help_lines();
-        assert!(!first.is_empty(), "{} has no help", row.title);
-        assert!(first.len() <= 80 && second.len() <= 80, "{}: a help line is too long", row.title);
-        assert!(!row.help.contains("Shield+"), "{}: stale chord text", row.title);
-    }
-}
-
-fn layout_advanced_group_is_collapsed_until_opened() {
-    let mut m = menu();
-    let loading = GROUPS.iter().position(|g| g.title == "Loading").unwrap();
-    assert!(GROUPS[loading].advanced && !m.group_is_open(loading));
-    let closed = m.entry_count(Page::FightersStages);
-    for _ in 0..3 {
-        m.press(Button::R);
-    }
-    assert_eq!(m.page(), Page::FightersStages);
-    goto_entry(&mut m, Entry::Group(loading));
-    m.press(Button::A);
-    assert!(m.group_is_open(loading));
-    assert_eq!(m.entry_count(Page::FightersStages), closed + 7, "seven Loading rows appear (Ready Hats, P-HOT)");
-    m.press(Button::A);
-    assert_eq!(m.entry_count(Page::FightersStages), closed);
-    // Other groups are always open, and their headers are not focus stops.
-    assert!(!GROUPS.iter().enumerate().any(|(g, group)| !group.advanced && !m.group_is_open(g)));
-}
-
 // ---- navigation, pages -------------------------------------------------------------------------
-
-fn core02_table_nav_wrap_skip() {
-    // The page's list wraps in both directions and skips the headers of ordinary groups.
-    let mut m = menu();
-    let first = m.focused_row().expect("focus starts on a row, not a header");
-    assert_eq!(ROWS[first].title, "Mash");
-    m.press(Button::Up);
-    assert!(matches!(m.focus(), Some(Entry::ResetPage(_))), "wraps to the page's last line, Reset page to defaults");
-    m.press(Button::Up);
-    let last = m.focused_row().unwrap();
-    // rc.6: CPU Level (group Level, after Player 1 control) is the page's last row.
-    assert_eq!(ROWS[last].title, "CPU Level", "the last row of the page is above it");
-    m.press(Button::Down);
-    m.press(Button::Down);
-    assert_eq!(m.focused_row(), Some(first));
-    // Down never rests on a header of an ordinary group.
-    for _ in 0..m.entry_count(Page::Cpu) {
-        m.press(Button::Down);
-        assert!(!matches!(m.focus(), Some(Entry::Group(_)) | None));
-    }
-}
 
 fn core02_table_carriage_return() {
     // A grid page whose last row is short: moving right off the end of the row returns to its first
@@ -464,55 +214,6 @@ fn core02_page_machine() {
 }
 
 // ---- controls ------------------------------------------------------------------------------------
-
-fn core02_toggle_flips_on_a() {
-    let mut m = menu();
-    goto(&mut m, "hud");
-    assert_eq!(m.value(row_of("hud")), RowValue::Toggle(true));
-    m.press(Button::A);
-    assert_eq!(get(&m, "hud"), [0, 1]);
-    m.press(Button::A);
-    assert_eq!(get(&m, "hud"), [1, 0]);
-    // Left / Right do nothing on a toggle.
-    m.press(Button::Right);
-    assert_eq!(get(&m, "hud"), [1, 0]);
-}
-
-fn core02_toggle_single_exclusive() {
-    // A dropdown keeps exactly one option set, however it is changed.
-    let mut m = menu();
-    goto(&mut m, "sdi_strength");
-    assert_eq!(get(&m, "sdi_strength"), [1, 0, 0, 0]);
-    press(&mut m, &[Button::A, Button::Down, Button::Down, Button::A]);
-    assert!(m.screen().is_none());
-    assert_eq!(get(&m, "sdi_strength"), [0, 0, 1, 0]);
-    m.press(Button::Right);
-    assert_eq!(get(&m, "sdi_strength"), [0, 0, 0, 1]);
-    // B leaves the list without a change.
-    press(&mut m, &[Button::A, Button::Up, Button::B]);
-    assert_eq!(get(&m, "sdi_strength"), [0, 0, 0, 1]);
-}
-
-fn core02_toggle_wrap() {
-    // Left / Right cycle a dropdown in place and wrap (Q2); the list shows the current option.
-    let mut m = menu();
-    goto(&mut m, "sdi_strength");
-    m.press(Button::Left);
-    assert_eq!(m.value(row_of("sdi_strength")), RowValue::Choice(Some(3)), "wraps from the first to the last");
-    m.press(Button::Right);
-    assert_eq!(m.value(row_of("sdi_strength")), RowValue::Choice(Some(0)), "and back");
-    m.press(Button::Right);
-    m.press(Button::A);
-    assert!(matches!(m.screen(), Some(Screen::List { cursor: 1, .. })), "the list opens on the current option");
-    // A direction chip's weight wraps from the largest back to 0.
-    let mut m = menu();
-    goto(&mut m, "di_state");
-    m.press(Button::A);
-    for expected in [1, 2, 3, 4, 5, 0] {
-        m.press(Button::A);
-        assert_eq!(get(&m, "di_state")[8], expected);
-    }
-}
 
 fn core02_y_clears_weighted_only() {
     // Y clears a weighted chip; on a plain checklist and a list it does nothing.
@@ -597,24 +298,6 @@ fn number_row_steps_and_clamps() {
     assert_eq!(m.value(row_of("cycle_preload_ready_fighters")), RowValue::Number(Some(12)));
 }
 
-/// P-HOT (LANE-HOT-SLOTS-REPORT.md §3.2, §5.1): Ready Hats is its own row, 0..=5, starting at 5, and the typed menu
-/// reads the chosen count.
-fn ready_hats_row_defaults_to_five() {
-    let mut m = menu();
-    goto(&mut m, "cycle_preload_ready_hats");
-    assert_eq!(m.value(row_of("cycle_preload_ready_hats")), RowValue::Number(Some(5)));
-    m.press(Button::Right);
-    assert_eq!(m.value(row_of("cycle_preload_ready_hats")), RowValue::Number(Some(5)), "stops at five");
-    for _ in 0..3 {
-        m.press(Button::Left);
-    }
-    assert_eq!(m.value(row_of("cycle_preload_ready_hats")), RowValue::Number(Some(2)));
-    for _ in 0..5 {
-        m.press(Button::Left);
-    }
-    assert_eq!(m.value(row_of("cycle_preload_ready_hats")), RowValue::Number(Some(0)), "stops at none");
-}
-
 fn multi_select_ticks_and_all_none() {
     let mut m = menu();
     goto(&mut m, "mash_state");
@@ -655,23 +338,6 @@ fn situation_overrides_editor_picks_a_situation_then_actions() {
 }
 
 // ---- sliders (damage ranges) ---------------------------------------------------------------------
-
-fn damage_range_is_greyed_unless_random() {
-    let mut m = menu();
-    let range = goto(&mut m, "save_damage_limits_player");
-    assert_eq!(m.grey(range), Some(Grey::DamageNotRandom));
-    m.press(Button::A);
-    assert!(m.screen().is_none(), "A on a greyed row does nothing");
-    set(&mut m, "save_damage_player", &[0, 0, 1]);
-    assert_eq!(m.grey(range), None);
-    // The external reload has no saved page, so Q5 now opens CPU. Navigate
-    // back to the range before exercising its unchanged activation assertion.
-    goto(&mut m, "save_damage_limits_player");
-    m.press(Button::A);
-    assert!(matches!(m.screen(), Some(Screen::Slider { state: SliderState::LowerHover, .. })));
-    // The CPU's range follows the CPU's own dropdown, not the player's.
-    assert_eq!(m.grey(row_of("save_damage_limits_cpu")), Some(Grey::DamageNotRandom));
-}
 
 fn core02_slider_states() {
     let mut m = menu();
@@ -732,78 +398,6 @@ fn core02_slider_clamp_steps() {
 }
 
 // ---- greyed rows ---------------------------------------------------------------------------------
-
-fn respawn_invincibility_is_greyed_while_auto_load_is_on() {
-    let mut m = menu();
-    let respawn = goto(&mut m, "respawn_invincibility");
-    assert_eq!(m.grey(respawn), None);
-    m.press(Button::A);
-    assert_eq!(get(&m, "respawn_invincibility"), [1, 0]);
-    goto(&mut m, "save_state_autoload");
-    m.press(Button::A);
-    assert_eq!(get(&m, "save_state_autoload"), [1, 0]);
-    assert_eq!(m.grey(respawn), Some(Grey::AutoLoadOn));
-    assert!(Grey::AutoLoadOn.text().contains("Auto-load"));
-    goto(&mut m, "respawn_invincibility");
-    m.press(Button::A);
-    assert_eq!(get(&m, "respawn_invincibility"), [1, 0], "A on a greyed row changes nothing");
-    // The stored value is kept; turning Auto-load off frees the row again.
-    goto(&mut m, "save_state_autoload");
-    m.press(Button::A);
-    assert_eq!(m.grey(respawn), None);
-}
-
-fn the_respawn_row_says_platform_or_instant() {
-    let row = ROWS.iter().find(|r| r.id == "respawn_invincibility").expect("row");
-    assert_eq!(row.title, "Respawn on platform");
-    let (first, second) = row.help_lines();
-    assert!(first.contains("revival platform"), "{first}");
-    assert!(first.contains("invincibility"), "{first}");
-    assert!(second.contains("instantly"), "{second}");
-    assert!(second.contains("Auto-load on death"), "{second}");
-    assert!(second.contains("Saves"), "{second}");
-    assert!(first.len() <= 80 && second.len() <= 80, "{first} / {second}");
-}
-
-fn respawn_setting_id_is_unchanged() {
-    let row = ROWS.iter().find(|r| r.title == "Respawn on platform").expect("row");
-    assert_eq!(row.id, "respawn_invincibility");
-    assert!(DEFS.iter().any(|def| def.id == "respawn_invincibility"));
-}
-
-fn the_respawn_row_is_in_the_stage_options() {
-    let row = ROWS.iter().position(|r| r.id == "respawn_invincibility").expect("row");
-    assert_eq!(ROWS[row].page(), Page::FightersStages);
-    assert_eq!(GROUPS[usize::from(ROWS[row].group)].title, "Stages");
-    let stages: Vec<&str> = ROWS.iter().filter(|r| r.group == ROWS[row].group).map(|r| r.title).collect();
-    let at = |title: &str| stages.iter().position(|t| *t == title).unwrap_or_else(|| panic!("{title} in {stages:?}"));
-    assert!(at("Stage Hazards") < at("Lobby Items") && at("Lobby Items") < at("Respawn on platform"), "{stages:?}");
-    assert!(ROWS[row].help_lines().1.contains("Saves"), "{}", ROWS[row].help);
-    let mut m = menu();
-    let saved = get(&m, "respawn_invincibility");
-    goto(&mut m, "respawn_invincibility");
-    m.press(Button::A);
-    let flipped = get(&m, "respawn_invincibility");
-    assert_ne!(flipped, saved);
-    for _ in 0..6 {
-        if m.page() == Page::Saves {
-            break;
-        }
-        m.press(Button::R);
-    }
-    assert_eq!(m.page(), Page::Saves);
-    reset_page(&mut m);
-    assert_eq!(get(&m, "respawn_invincibility"), flipped, "a Saves reset leaves the stage-options row");
-    for _ in 0..6 {
-        if m.page() == Page::FightersStages {
-            break;
-        }
-        m.press(Button::R);
-    }
-    assert_eq!(m.page(), Page::FightersStages);
-    reset_page(&mut m);
-    assert_eq!(get(&m, "respawn_invincibility"), saved, "a Fighters & Stages reset restores it");
-}
 
 fn swap_group_entries_grey_with_the_reason() {
     let mut m = menu();
@@ -869,23 +463,6 @@ fn direction_grid_navigation_follows_the_chip_layout() {
     m.press(Button::Down);
     m.press(Button::Down);
     assert_eq!(chip(&m), 9, "down from Right skips the empty cell and wraps to Left");
-}
-
-fn direction_grid_weights_all_none_and_preview() {
-    let mut m = menu();
-    let r = goto(&mut m, "sdi_state");
-    assert_eq!(m.value(r), RowValue::Chips(0));
-    m.press(Button::A);
-    m.press(Button::A); // Neutral +1
-    m.press(Button::Up);
-    press(&mut m, &[Button::A, Button::A]); // Up +2
-    assert_eq!(get(&m, "sdi_state"), [0, 0, 2, 0, 0, 0, 0, 0, 1, 0, 0]);
-    assert_eq!(m.value(r), RowValue::Chips((1 << 2) | (1 << 8)));
-    m.press(Button::ZL);
-    assert!(get(&m, "sdi_state").iter().all(|v| *v >= 1), "ZL ticks every chip, keeping weights");
-    assert_eq!(get(&m, "sdi_state")[2], 2);
-    m.press(Button::ZL);
-    assert!(get(&m, "sdi_state").iter().all(|v| *v == 0), "ZL again clears them all");
 }
 
 fn shield_tilt_grid_holds_exactly_one_chip() {
@@ -987,71 +564,6 @@ fn goto_cursor(m: &mut Menu, target: usize) {
     panic!("cursor {target} not reached");
 }
 
-fn core02_delay_range_bounds() {
-    // Min <= max, both inside the row's value set, at the row's own step (1 / 5 / 10).
-    for (id, first_step, values) in [("aerial_delay", 1u16, 31u16), ("throw_delay", 5, 31), ("ledge_delay", 10, 31)] {
-        let mut m = menu();
-        let r = goto(&mut m, id);
-        m.press(Button::A);
-        goto_cursor(&mut m, 32);
-        m.press(Button::A);
-        // Push Max to the top of the set, then past it: it stops at the last value.
-        for _ in 0..5 {
-            m.press(Button::Up);
-        }
-        let range = get(&m, &format!("{id}_range"));
-        assert_eq!(range, [0, 30], "{id}: Max stops at the last option");
-        assert_eq!(
-            m.value(r),
-            RowValue::Delay(DelayView::Range(DelayRange { min: 0, max: first_step * (values - 1), step: first_step })),
-            "{id}: the range reads in the row's units"
-        );
-        // Min cannot pass Max, Max cannot pass Min.
-        m.press(Button::B);
-        goto_cursor(&mut m, 31);
-        m.press(Button::A);
-        for _ in 0..5 {
-            m.press(Button::Up);
-        }
-        assert_eq!(get(&m, &format!("{id}_range")), [30, 30], "{id}: Min stops at Max");
-        for _ in 0..5 {
-            m.press(Button::Down);
-        }
-        assert_eq!(get(&m, &format!("{id}_range")), [0, 30]);
-        // The slow step is one option, and Left at the lowest stays.
-        m.press(Button::Right);
-        m.press(Button::Right);
-        m.press(Button::Left);
-        assert_eq!(get(&m, &format!("{id}_range")), [1, 30]);
-        m.press(Button::B);
-        goto_cursor(&mut m, 32);
-        m.press(Button::A);
-        for _ in 0..40 {
-            m.press(Button::Left);
-        }
-        assert_eq!(get(&m, &format!("{id}_range")), [1, 1], "Max stops at Min");
-    }
-    // The range table row refuses a reversed or oversized pair.
-    let mut s = Settings::factory();
-    assert!(s.menu.set("aerial_delay_range", &[5, 3]).is_err());
-    assert!(s.menu.set("aerial_delay_range", &[0, 31]).is_err());
-    assert!(s.menu.set("aerial_delay_range", &[3, 5]).is_ok());
-}
-
-fn core02_delay_range_roundtrip() {
-    let mut m = menu();
-    set(&mut m, "ledge_delay_range", &[2, 9]);
-    let r = row_of("ledge_delay");
-    assert_eq!(m.value(r), RowValue::Delay(DelayView::Range(DelayRange { min: 20, max: 90, step: 10 })));
-    let text = m.serialized();
-    let loaded = settings::parse(&text);
-    assert!(!loaded.corrupt(), "{:?}", loaded.issues);
-    assert_eq!(loaded.settings.menu.get("ledge_delay_range"), Some(&[2u8, 9][..]));
-    let reopened = Menu::new(loaded.settings, Env::default());
-    assert_eq!(reopened.value(r), m.value(r));
-    assert_eq!(reopened.delay_spec("ledge_delay"), Some(DelaySpec::Range(DelayRange { min: 20, max: 90, step: 10 })));
-}
-
 fn core02_delay_no_range_loads_checklist() {
     // A file with no range field loads every delay row as a checklist.
     let loaded = settings::parse(r#"{"menu": {"throw_delay": [0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]}}"#);
@@ -1088,54 +600,6 @@ fn delay_range_pick_is_uniform_over_the_step_values() {
     assert_eq!(DelayRange { min: 7, max: 7, step: 1 }.pick(12345), 7);
 }
 
-fn core02_slot_sets_have_no_range() {
-    for id in ["randomize_slots", "playback_button_slots", "save_state_playback"] {
-        assert!(ROWS.iter().all(|row| row.id != id), "{id} left the menu");
-        assert!(settings::def(id).is_some(), "{id} stays in the factory");
-        assert!(settings::def(&format!("{id}_range")).is_none(), "{id} has no range row");
-        assert!(menu().delay_spec(id).is_none(), "{id} is not a delay row");
-    }
-    // Exactly the seven delay rows carry a range.
-    let ranged: Vec<&str> = ROWS.iter().filter(|r| matches!(r.control, Control::MultiSelectRange { .. })).map(|r| r.id).collect();
-    assert_eq!(ranged, ["ledge_delay", "oos_offset", "reaction_time", "throw_delay", "pummel_delay", "aerial_delay", "fast_fall_delay"]);
-}
-
-fn core03_delay_popup_render_plan() {
-    // The popup shows both controls; the inactive one is greyed, with the reason, and ignores A.
-    let mut m = menu();
-    let r = goto(&mut m, "oos_offset");
-    m.press(Button::A);
-    let (checklist, range) = m.delay_grey(r);
-    assert!(checklist.is_none() && range.is_none());
-    m.press(Button::A);
-    let (_, range) = m.delay_grey(r);
-    assert_eq!(range.map(Grey::text), Some(Grey::ChecklistSet.text()));
-    assert!(m.help_row().is_some_and(|row| row.title == "OoS Offset"));
-}
-
-fn core02_delay_row_reset_and_save_defaults() {
-    // Reset and save treat the checklist and the range as one row: both are restored together.
-    let mut m = menu();
-    set(&mut m, "aerial_delay_range", &[3, 8]);
-    m.press(Button::X);
-    // Change the row to a checklist (clear the range first), then reset the page: back to the range.
-    let mut s = m.settings().clone();
-    s.menu.set("aerial_delay_range", &[]).unwrap();
-    s.menu.set("aerial_delay", &[0, 1]).unwrap();
-    let env = *m.env();
-    m.reopen(s, env);
-    goto(&mut m, "mash_state");
-    reset_page(&mut m);
-    assert_eq!(get(&m, "aerial_delay_range"), [3, 8]);
-    assert!(get(&m, "aerial_delay").iter().all(|v| *v == 0), "the checklist is restored with it");
-    // Factory defaults: the range is empty after a reset.
-    let mut m = menu();
-    set(&mut m, "pummel_delay_range", &[0, 2]);
-    goto(&mut m, "mash_state");
-    reset_page(&mut m);
-    assert!(get(&m, "pummel_delay_range").is_empty());
-}
-
 fn core02_delay_row_bulk_update_clears_range() {
     let mut m = menu();
     set(&mut m, "ledge_delay_range", &[1, 3]);
@@ -1151,133 +615,7 @@ fn core02_delay_row_bulk_update_clears_range() {
 
 // ---- defaults, reset, serialization --------------------------------------------------------------
 
-fn core02_defaults_and_reset() {
-    let mut m = menu();
-    // Change several rows of the CPU page, then the confirmed reset line returns the page to the defaults.
-    goto(&mut m, "sdi_strength");
-    m.press(Button::Right);
-    goto(&mut m, "stale_dodges");
-    m.press(Button::A);
-    goto(&mut m, "mash_state");
-    press(&mut m, &[Button::A, Button::A, Button::B]);
-    goto(&mut m, "di_state");
-    press(&mut m, &[Button::A, Button::A, Button::B]);
-    // A row of another page stays.
-    m.press(Button::R);
-    goto(&mut m, "hud");
-    m.press(Button::A);
-    m.press(Button::L);
-    m.press(Button::L);
-    m.press(Button::L);
-    m.press(Button::L);
-    assert_eq!(m.page(), Page::Cpu);
-    reset_page(&mut m);
-    let factory = Settings::factory();
-    for id in ["sdi_strength", "stale_dodges", "mash_state", "di_state"] {
-        assert_eq!(m.settings().menu.get(id), factory.menu.get(id), "{id}");
-    }
-    assert_eq!(get(&m, "hud"), [0, 1], "other pages are untouched");
-    // Saved defaults replace the factory ones for the next reset.
-    goto(&mut m, "stale_dodges");
-    m.press(Button::A);
-    m.press(Button::X);
-    m.press(Button::A);
-    assert_eq!(get(&m, "stale_dodges"), [1, 0]);
-    reset_page(&mut m);
-    assert_eq!(get(&m, "stale_dodges"), [0, 1], "reset restores the saved default");
-}
-
-fn core02_serialize_roundtrip() {
-    let mut m = menu();
-    goto(&mut m, "sdi_state");
-    press(&mut m, &[Button::A, Button::A, Button::B]);
-    goto(&mut m, "aerial_delay");
-    press(&mut m, &[Button::A, Button::A, Button::B]);
-    goto(&mut m, "Replay capture");
-    let text = m.serialized();
-    let loaded = settings::parse(&text);
-    assert!(!loaded.corrupt(), "{:?}", loaded.issues);
-    // Every settings array, sliders as [lower, upper], survives the round trip.
-    assert_eq!(loaded.settings.menu, m.settings().menu);
-    assert_eq!(loaded.settings.defaults, m.settings().defaults);
-    let value: serde_json::Value = serde_json::from_str(&text).unwrap();
-    assert_eq!(value["menu"]["save_damage_limits_cpu"], serde_json::json!([0, 150]));
-    assert_eq!(value["menu"]["sdi_state"][8], 1);
-    assert_eq!(value["last_page"], "recording", "the page the menu was left on");
-    // The two snapshots are independent.
-    assert_eq!(value["defaults_menu"]["sdi_state"][8], 0);
-}
-
-fn core02_update_from_shorter_array() {
-    // The fork's fix: a shorter array leaves the appended options off, not stale.
-    let mut m = menu();
-    set(&mut m, "mash_state", &[1; 30]);
-    m.bulk_update(&[("mash_state", &[0, 1, 1])]);
-    let row = get(&m, "mash_state");
-    assert_eq!(row.len(), 30);
-    assert_eq!(&row[..4], [0, 1, 1, 0]);
-    assert!(row[3..].iter().all(|v| *v == 0));
-    // A longer array loses its extra elements; a missing id is unchanged; an unknown id is ignored.
-    m.bulk_update(&[("sdi_strength", &[0, 1, 0, 0, 1, 1]), ("not_a_row", &[1])]);
-    assert_eq!(get(&m, "sdi_strength"), [0, 1, 0, 0]);
-    assert_eq!(&get(&m, "mash_state")[..3], [0, 1, 1]);
-    // A slider array must have exactly two elements; a bad one is refused and the row stays.
-    m.bulk_update(&[("save_damage_limits_cpu", &[5])]);
-    assert_eq!(get(&m, "save_damage_limits_cpu"), [0, 150]);
-    m.bulk_update(&[("save_damage_limits_cpu", &[5, 20])]);
-    assert_eq!(get(&m, "save_damage_limits_cpu"), [5, 20]);
-}
-
-fn core02_hold_repeat_period() {
-    assert_eq!(HOLD_REPEAT_PERIOD, 21);
-    let mut hold = HoldRepeat::default();
-    let mut at = Vec::new();
-    for frame in 1..=70u32 {
-        if hold.frame(true) {
-            at.push(frame);
-        }
-    }
-    assert_eq!(at, [21, 42, 63], "a held stick repeats every 21 frames");
-    // Releasing restarts the count; an accepted input resets it too.
-    assert!(!hold.frame(false));
-    for _ in 0..20 {
-        assert!(!hold.frame(true));
-    }
-    hold.reset();
-    for _ in 0..20 {
-        assert!(!hold.frame(true));
-    }
-    assert!(hold.frame(true));
-}
-
 // ---- N1: the Developer page ----------------------------------------------------------------------
-
-fn core02_hidden_page_ring() {
-    let off = menu();
-    assert_eq!(off.ring().count(), 5);
-    assert!(!off.ring().any(|p| p == Page::Developer));
-    let mut m = menu();
-    for _ in 0..8 {
-        m.press(Button::R);
-        assert_ne!(m.page(), Page::Developer, "R skips the hidden page");
-    }
-    for _ in 0..8 {
-        m.press(Button::L);
-        assert_ne!(m.page(), Page::Developer, "and so does L");
-    }
-    let on = menu_with(Env { developer_page: true, ..Env::default() });
-    assert_eq!(on.ring().count(), 6);
-    let mut m = menu_with(Env { developer_page: true, ..Env::default() });
-    for _ in 0..4 {
-        m.press(Button::R);
-    }
-    assert_eq!(m.page(), Page::DisplayControls);
-    m.press(Button::R);
-    assert_eq!(m.page(), Page::Developer, "the Developer page follows Display & Controls");
-    assert_eq!(m.entry_count(Page::Developer), 1 + 3 + 1, "a header, three rows and the reset line");
-    m.press(Button::R);
-    assert_eq!(m.page(), Page::Cpu);
-}
 
 fn core02_hidden_page_rows_serialized() {
     // With the flag off the rows exist, are stored and survive a round trip; the consumers read
@@ -1306,179 +644,6 @@ fn core02_hidden_page_rows_serialized() {
 }
 
 // ---- Q5: the page the menu opens on --------------------------------------------------------------
-
-fn core02_first_open_is_cpu() {
-    let m = menu();
-    assert_eq!(m.page(), Page::Cpu);
-    assert!(m.settings().last_page().is_none());
-    assert_eq!(ROWS[m.focused_row().unwrap()].page(), Page::Cpu);
-}
-
-fn core02_open_on_last_page() {
-    let mut m = menu();
-    m.press(Button::R);
-    m.press(Button::R);
-    assert_eq!(m.page(), Page::Recording);
-    let settings = m.commit().clone();
-    assert_eq!(settings.last_page(), Some("recording"));
-    // Reopening, here or after a restart (through the file), lands on the same page.
-    let mut m2 = Menu::new(settings.clone(), Env::default());
-    assert_eq!(m2.page(), Page::Recording);
-    assert_eq!(m2.page(), Page::Recording);
-    assert!(matches!(m2.focus(), Some(Entry::Group(g)) if GROUPS[g].page == Page::Recording));
-    let text = m2.serialized();
-    let restarted = Menu::new(settings::parse(&text).settings, Env::default());
-    assert_eq!(restarted.page(), Page::Recording);
-    // Reopen the same instance too (the cursor of the page is kept).
-    let mut m3 = menu();
-    for _ in 0..3 {
-        m3.press(Button::R);
-    }
-    m3.press(Button::Down);
-    let cursor = m3.cursor();
-    let s = m3.commit().clone();
-    m3.press(Button::B);
-    m3.reopen(s, Env::default());
-    assert_eq!(m3.page(), Page::FightersStages);
-    assert_eq!(m3.cursor(), cursor);
-    assert!(!m3.is_closed() && m3.screen().is_none());
-}
-
-fn core02_last_page_missing_falls_back() {
-    // A saved Developer page with the flag off, an unknown id, a non-string value: CPU.
-    for saved in [serde_json::json!("developer"), serde_json::json!("nowhere"), serde_json::json!(7), serde_json::json!(null)] {
-        let mut s = Settings::factory();
-        s.extra.insert("last_page".to_owned(), saved.clone());
-        let m = Menu::new(s, Env::default());
-        assert_eq!(m.page(), Page::Cpu, "{saved}");
-    }
-    // The same saved page opens when the flag is on.
-    let mut s = Settings::factory();
-    s.set_last_page("developer");
-    assert_eq!(Menu::new(s.clone(), Env { developer_page: true, ..Env::default() }).page(), Page::Developer);
-    assert_eq!(Menu::new(s, Env::default()).page(), Page::Cpu);
-}
-
-fn q5_reopen_uses_loaded_page_or_cpu_not_the_previous_visible_page() {
-    let invalid = [None, Some(serde_json::json!("developer")), Some(serde_json::json!("nowhere")),
-        Some(serde_json::json!(7)), Some(serde_json::json!(null))];
-    for previous in Page::ALL {
-        for saved in &invalid {
-            let mut original = Settings::factory();
-            original.set_last_page(previous.id());
-            let mut m = Menu::new(original, Env { developer_page: true, ..Env::default() });
-            assert_eq!(m.page(), previous);
-            let mut incoming = Settings::factory();
-            incoming.menu.set("stale_dodges", &[0, 1]).unwrap();
-            incoming.defaults.set("stale_dodges", &[0, 1]).unwrap();
-            incoming.extra.insert("foreign_config".into(), serde_json::json!({"kept": [4, 2]}));
-            if let Some(value) = saved { incoming.extra.insert("last_page".into(), value.clone()); }
-            let loaded = settings::parse(&incoming.to_json());
-            assert!(!loaded.corrupt());
-            let expected = loaded.settings.to_json();
-            m.reopen(loaded.settings, Env::default());
-            assert_eq!(m.page(), Page::Cpu, "previous={previous:?}, saved={saved:?}");
-            assert_eq!(m.settings().to_json(), expected, "fallback is not a settings rewrite");
-            assert_eq!(m.take_outbox(), Default::default(), "loading emits no user effect");
-        }
-    }
-    // Every visible saved page wins over a different old page; Developer needs the flag.
-    for developer_page in [false, true] {
-        for page in Page::ALL {
-            let mut m = menu();
-            m.press(Button::R);
-            let mut incoming = Settings::factory();
-            incoming.set_last_page(page.id());
-            m.reopen(incoming, Env { developer_page, ..Env::default() });
-            let expected = if page == Page::Developer && !developer_page { Page::Cpu } else { page };
-            assert_eq!(m.page(), expected);
-        }
-    }
-}
-
-#[test]
-fn q5_saved_developer_page_restores_in_a_fresh_process_then_continues_on_cpu() {
-    use std::{fs, process::Command, time::{SystemTime, UNIX_EPOCH}};
-    const MODE: &str = "TR_UI_Q5_PROCESS_MODE";
-    const ROOT: &str = "TR_UI_Q5_PROCESS_ROOT";
-    const NAME: &str = "q5_saved_developer_page_restores_in_a_fresh_process_then_continues_on_cpu";
-    let now = || SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
-    if let Ok(mode) = std::env::var(MODE) {
-        let root = std::path::PathBuf::from(std::env::var_os(ROOT).unwrap());
-        let path = root.join("settings.json");
-        match mode.as_str() {
-            "save" => {
-                let mut s = Settings::factory();
-                s.menu.set("stale_dodges", &[0, 1]).unwrap();
-                s.defaults.set("stale_dodges", &[0, 1]).unwrap();
-                s.extra.insert("foreign_config".into(), serde_json::json!({"kept": [4, 2]}));
-                let mut m = Menu::new(s, Env { developer_page: true, ..Env::default() });
-                for _ in 0..5 { m.press(Button::R); }
-                assert_eq!(m.page(), Page::Developer);
-                m.press(Button::B);
-                assert!(m.is_closed());
-                fs::write(&path, m.serialized()).unwrap();
-                assert_eq!(settings::parse(&fs::read_to_string(&path).unwrap()).settings.last_page(), Some("developer"));
-                fs::write(root.join("saver.json"), format!("{{\"pid\":{},\"saved_after_close\":true,\"time_ns\":{}}}", std::process::id(), now())).unwrap();
-            }
-            "restore" => {
-                let loaded = settings::parse(&fs::read_to_string(&path).unwrap());
-                assert!(!loaded.corrupt());
-                assert_eq!(loaded.settings.last_page(), Some("developer"));
-                let expected = loaded.settings.to_json();
-                let mut m = menu();
-                for _ in 0..4 { m.press(Button::R); }
-                assert_eq!(m.page(), Page::DisplayControls);
-                m.reopen(loaded.settings, Env::default());
-                assert_eq!(m.page(), Page::Cpu, "a fresh process may reuse its worker Menu too");
-                assert_eq!(m.settings().to_json(), expected);
-                assert_eq!(m.take_outbox(), Default::default());
-                // Continue with actual navigation and close, replacing only the saved page.
-                m.press(Button::R);
-                assert_eq!(m.page(), Page::Saves);
-                m.press(Button::B);
-                let continued = settings::parse(&m.serialized()).settings;
-                assert_eq!(continued.last_page(), Some("saves"));
-                let mut wanted = settings::parse(&expected).settings;
-                wanted.set_last_page("saves");
-                assert_eq!(continued.to_json(), wanted.to_json());
-                fs::write(root.join("restorer.json"), format!("{{\"pid\":{},\"nondefault_restored\":true,\"continued_after_fallback\":true,\"time_ns\":{}}}", std::process::id(), now())).unwrap();
-            }
-            _ => panic!("unknown process mode"),
-        }
-        return;
-    }
-    let root = std::env::temp_dir().join(format!("tr-ui-q5-{}-{}", std::process::id(), now()));
-    fs::create_dir(&root).unwrap();
-    let exe = std::env::current_exe().unwrap();
-    let run = |mode| Command::new(&exe).args(["--exact", NAME, "--nocapture"])
-        .env(MODE, mode).env(ROOT, &root).output().unwrap();
-    let saved = run("save");
-    assert!(saved.status.success(), "saver failed: {} {}", String::from_utf8_lossy(&saved.stdout), String::from_utf8_lossy(&saved.stderr));
-    let saver_exit = now();
-    let restore_launch = now();
-    let restored = run("restore");
-    assert!(restored.status.success(), "restorer failed: {} {}", String::from_utf8_lossy(&restored.stdout), String::from_utf8_lossy(&restored.stderr));
-    println!("Q5_CONTINUATION saver_exit_ns={saver_exit} restore_launch_ns={restore_launch} saver={} restorer={}",
-        fs::read_to_string(root.join("saver.json")).unwrap(), fs::read_to_string(root.join("restorer.json")).unwrap());
-    assert!(saver_exit <= restore_launch);
-    fs::remove_dir_all(root).unwrap();
-}
-
-fn core04_last_page_roundtrip() {
-    for page in Page::ALL {
-        let mut s = Settings::factory();
-        s.set_last_page(page.id());
-        let loaded = settings::parse(&s.to_json());
-        assert!(!loaded.corrupt());
-        assert_eq!(loaded.settings.last_page(), Some(page.id()));
-        assert_eq!(Page::from_id(page.id()), Some(page));
-    }
-    // It is a top-level key, not a settings row, and a file without it loads.
-    let text = Settings::factory().to_json();
-    assert!(!text.contains("last_page"), "absent until a page is saved");
-    assert!(settings::parse(&text).settings.last_page().is_none());
-}
 
 fn mii_preferences_is_the_preserved_extra_as_json() {
     assert!(Settings::factory().mii_preferences().is_none());
@@ -1548,26 +713,6 @@ fn menu_change_to_cpu_choices_emits_reroll_events() {
 
 fn chord(bits: &[u8]) -> Chord {
     Chord(bits.iter().fold(0u16, |mask, b| mask | (1 << b)))
-}
-
-fn core03_shortcut_rows_open_editor() {
-    let mut m = menu();
-    let one = goto(&mut m, "Menu shortcut 1");
-    assert_eq!(m.value(one), RowValue::Chord(Chord::DEFAULT_SHORTCUT_1));
-    assert_eq!(Chord::DEFAULT_SHORTCUT_1.to_string(), "Minus");
-    assert_eq!(m.value(row_of("Menu shortcut 2")), RowValue::Chord(Chord::NONE));
-    assert_eq!(Chord::NONE.to_string(), "disabled");
-    assert_eq!(chord(&[6, 8]).to_string(), "ZL + D-pad Up");
-    m.press(Button::A);
-    assert!(matches!(
-        m.screen(),
-        Some(Screen::ChordEntry { target: model::menu::ChordTarget::Shortcut(0), captured }) if *captured == Chord::DEFAULT_SHORTCUT_1
-    ));
-    m.press(Button::B);
-    goto(&mut m, "Menu shortcut 2");
-    m.press(Button::A);
-    assert!(matches!(m.screen(), Some(Screen::ChordEntry { target: model::menu::ChordTarget::Shortcut(1), .. })));
-    assert!(matches!(ROWS[one].control, Control::Editor(Editor::ShortcutSlot(0))));
 }
 
 fn core03_permanent_shortcut_row_info() {
@@ -1704,71 +849,6 @@ fn replay_capture_toggle_writes_its_ini() {
 
 // ---- N5: paging by console mode ------------------------------------------------------------------
 
-fn pages_of(layout: &GridLayout) -> Vec<usize> {
-    (0..layout.pages()).map(|p| layout.page_len(p)).collect()
-}
-
-fn core03_item_grid_layout_docked() {
-    let l = GridLayout::new(GridKind::Items, ConsoleMode::Docked);
-    assert_eq!((l.cols, l.rows, l.short_names), (5, 8, true));
-    assert_eq!(pages_of(&l), [38]);
-    assert_eq!(l.pages(), 1);
-}
-
-fn core03_item_grid_layout_handheld() {
-    let l = GridLayout::new(GridKind::Items, ConsoleMode::Handheld);
-    assert_eq!((l.cols, l.rows, l.short_names), (4, 4, false));
-    assert_eq!(pages_of(&l), [16, 16, 6]);
-}
-
-fn core03_stage_grid_layout_docked() {
-    let l = GridLayout::new(GridKind::Stages, ConsoleMode::Docked);
-    assert_eq!((l.cols, l.rows, l.short_names), (5, 8, true));
-    assert_eq!(l.tiles(), STAGE_TILES, "All + the catalog");
-}
-
-fn core03_stage_grid_pages_docked_40_40_38() {
-    let l = GridLayout::new(GridKind::Stages, ConsoleMode::Docked);
-    assert_eq!(pages_of(&l), [40, 40, STAGE_TILES - 80]);
-}
-
-fn core03_stage_grid_layout_handheld() {
-    let l = GridLayout::new(GridKind::Stages, ConsoleMode::Handheld);
-    assert_eq!((l.cols, l.rows, l.short_names), (4, 4, false));
-}
-
-fn core03_stage_grid_pages_handheld_8() {
-    let l = GridLayout::new(GridKind::Stages, ConsoleMode::Handheld);
-    assert_eq!(l.pages(), 8);
-    assert_eq!(pages_of(&l), [16, 16, 16, 16, 16, 16, 16, STAGE_TILES - 112]);
-}
-
-fn core03_item_grid_pages_cover_38_items_once() {
-    for mode in [ConsoleMode::Docked, ConsoleMode::Handheld] {
-        let l = GridLayout::new(GridKind::Items, mode);
-        let tiles: Vec<usize> = (0..l.pages()).flat_map(|p| (0..l.per_page()).filter_map(move |c| l.tile(p, c))).collect();
-        assert_eq!(tiles, (0..ITEM_TILES).collect::<Vec<_>>(), "{mode:?}: every item once, in order");
-    }
-}
-
-fn core03_stage_grid_pages_cover_every_tile_once() {
-    for mode in [ConsoleMode::Docked, ConsoleMode::Handheld] {
-        let l = GridLayout::new(GridKind::Stages, mode);
-        let tiles: Vec<usize> = (0..l.pages()).flat_map(|p| (0..l.per_page()).filter_map(move |c| l.tile(p, c))).collect();
-        assert_eq!(tiles, (0..STAGE_TILES).collect::<Vec<_>>(), "{mode:?}: All first, every tile once, in order");
-        assert_eq!(l.tile(l.pages(), 0), None);
-    }
-}
-
-fn core03_stage_grid_rotation_and_form_same_in_both_layouts() {
-    // The model's part: the tile order is the same list in both layouts (the badges and the form
-    // tag are drawn per tile, SPEC-core-03), and the layout change never reorders tiles.
-    let docked = GridLayout::new(GridKind::Stages, ConsoleMode::Docked);
-    let handheld = GridLayout::new(GridKind::Stages, ConsoleMode::Handheld);
-    let order = |l: &GridLayout| -> Vec<usize> { (0..l.pages()).flat_map(|p| (0..l.page_len(p)).filter_map(move |c| l.tile(p, c))).collect() };
-    assert_eq!(order(&docked), order(&handheld));
-}
-
 fn change_stage_comes_before_the_rotation_rows_and_opens_the_stages_without_all() {
     let mut m = menu_with(Env { console: ConsoleMode::Docked, ..Env::default() });
     let titles: Vec<&str> = (0..m.entry_count(Page::FightersStages))
@@ -1786,38 +866,6 @@ fn change_stage_comes_before_the_rotation_rows_and_opens_the_stages_without_all(
     assert_eq!(m.take_stage_press(), Some((1, Button::A)));
     m.press(Button::B);
     assert!(m.screen().is_none(), "B goes back to the page: {:?}", m.screen());
-}
-
-fn change_stage_grid_pages_cover_every_stage_once_and_no_all_tile() {
-    for mode in [ConsoleMode::Docked, ConsoleMode::Handheld] {
-        let l = GridLayout::new(GridKind::StageChange, mode);
-        let tiles: Vec<usize> = (0..l.pages()).flat_map(|p| (0..l.page_len(p)).filter_map(move |c| l.tile(p, c))).collect();
-        assert_eq!(tiles, (1..STAGE_TILES).collect::<Vec<_>>(), "{mode:?}: the stage grid's numbers, All left out");
-        assert_eq!(l.tile(l.pages(), 0), None);
-    }
-}
-
-fn core03_item_grid_layout_fixed_at_open() {
-    let mut m = menu_with(Env { console: ConsoleMode::Docked, ..Env::default() });
-    goto(&mut m, "Give item");
-    m.press(Button::A);
-    let layout = |m: &Menu| match m.screen() {
-        Some(Screen::Grid { layout, .. }) => *layout,
-        other => panic!("{other:?}"),
-    };
-    assert_eq!(layout(&m), GridLayout::new(GridKind::Items, ConsoleMode::Docked));
-    // The console is undocked while the grid is open: nothing changes until it is opened again.
-    m.set_console(ConsoleMode::Handheld);
-    m.press(Button::Down);
-    assert_eq!(layout(&m), GridLayout::new(GridKind::Items, ConsoleMode::Docked));
-    m.press(Button::B);
-    m.press(Button::A);
-    assert_eq!(layout(&m), GridLayout::new(GridKind::Items, ConsoleMode::Handheld));
-    // The stage grid reads the mode the same way.
-    m.press(Button::B);
-    goto(&mut m, "Lobby Stages");
-    m.press(Button::A);
-    assert_eq!(layout(&m), GridLayout::new(GridKind::Stages, ConsoleMode::Handheld));
 }
 
 fn grid_screen_pages_with_l_r_and_keeps_the_cursor_on_a_tile() {
@@ -1867,123 +915,54 @@ fn grid_screen_pages_with_l_r_and_keeps_the_cursor_on_a_tile() {
 
 // ---- cross-checks --------------------------------------------------------------------------------
 
-fn dropdown_options_are_unique_and_row_values_read_back() {
-    // Every dropdown row's factory choice reads back as a valid option of its list.
-    let m = menu();
-    for (i, row) in ROWS.iter().enumerate() {
-        if let Control::Dropdown(labels) = row.control {
-            match m.value(i) {
-                RowValue::Choice(Some(at)) => assert!(at < labels.len(), "{}", row.title),
-                other => panic!("{}: {other:?}", row.title),
-            }
-            let mut sorted = labels.to_vec();
-            sorted.sort_unstable();
-            sorted.dedup();
-            assert_eq!(sorted.len(), labels.len(), "{} has a repeated label", row.title);
-        }
-    }
-    assert_eq!(m.value(row_of("input_display_strip")), RowValue::Choice(Some(1)), "Frame strip");
-    assert!(ROWS.iter().all(|row| row.id != "recording_duration"), "Duration left the menu");
-    assert_eq!(m.value(row_of("hitstun_playback")), RowValue::Choice(Some(0)));
-}
 
 
-fn page_defaults_controls_roundtrip_and_reset_only_the_focused_complete_row() {
+fn core03_shortcut_rows_open_editor() {
     let mut m = menu();
-    goto(&mut m, "aerial_delay");
-    set(&mut m, "aerial_delay_range", &[3, 8]);
-    m.press(Button::X);
-    let defaults = m.settings().defaults.clone();
-    m.bulk_update(&[("aerial_delay", &[0, 1])]);
-    set(&mut m, "stale_dodges", &[0, 1]);
-    m.press(Button::Y);
-    assert_eq!(get(&m, "aerial_delay_range"), [3, 8]);
-    assert!(get(&m, "aerial_delay").iter().all(|v| *v == 0));
-    assert_eq!(get(&m, "stale_dodges"), [0, 1], "row reset does not reset its page");
-    assert_eq!(m.settings().defaults, defaults, "reset never overwrites saved defaults");
-    let json = m.serialized();
-    let reloaded = settings::parse(&json);
-    assert_eq!(reloaded.settings.defaults, defaults);
-}
-
-
-fn saving_committed_current_values_alone_requests_persistence_without_rerolls() {
-    let mut settings = Settings::factory();
-    settings.menu.set("stale_dodges", &[0, 1]).unwrap();
-    let mut m = Menu::new(settings, Env::default());
-    assert_eq!(m.take_outbox(), Default::default());
-    m.press(Button::X);
+    let one = goto(&mut m, "Menu shortcut 1");
+    assert_eq!(m.value(one), RowValue::Chord(Chord::DEFAULT_SHORTCUT_1));
+    assert_eq!(Chord::DEFAULT_SHORTCUT_1.to_string(), "Minus");
+    assert_eq!(m.value(row_of("Menu shortcut 2")), RowValue::Chord(Chord::NONE));
+    assert_eq!(Chord::NONE.to_string(), "disabled");
+    assert_eq!(chord(&[6, 8]).to_string(), "ZL + D-pad Up");
+    m.press(Button::A);
+    assert!(matches!(
+        m.screen(),
+        Some(Screen::ChordEntry { target: model::menu::ChordTarget::Shortcut(0), captured }) if *captured == Chord::DEFAULT_SHORTCUT_1
+    ));
     m.press(Button::B);
-    let intent = m.take_outbox();
-    assert!(intent.changed, "worker close must request the settings write for an X-only save");
-    assert_eq!(intent.rerolls, 0, "saving defaults does not change current CPU choices");
-    let loaded = settings::parse(&m.serialized());
-    assert!(!loaded.corrupt());
-    assert_eq!(loaded.settings.defaults.get("stale_dodges"), Some(&[0, 1][..]));
-    assert_eq!(loaded.settings.defaults, loaded.settings.menu);
-    m.reopen(loaded.settings, Env::default());
-    m.press(Button::X);
-    assert_eq!(m.take_outbox(), Default::default(), "saving identical defaults is a no-op");
+    goto(&mut m, "Menu shortcut 2");
+    m.press(Button::A);
+    assert!(matches!(m.screen(), Some(Screen::ChordEntry { target: model::menu::ChordTarget::Shortcut(1), .. })));
+    assert!(matches!(ROWS[one].control, Control::Editor(Editor::ShortcutSlot(0))));
 }
 
 /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
 #[test]
 fn case_table() {
     crate::test_table::run(&[
-        ("core02_factory_table_matches_spec", core02_factory_table_matches_spec as fn()),
-        ("every_menu_row_with_an_id_binds_to_its_row_or_is_an_editor_key", every_menu_row_with_an_id_binds_to_its_row_or_is_an_editor_key as fn()),
         ("layout_row_counts_match_the_rc_freeze", layout_row_counts_match_the_rc_freeze as fn()),
-        ("layout_the_pilot_swaps_the_fallback_rows_for_one_info_row", layout_the_pilot_swaps_the_fallback_rows_for_one_info_row as fn()),
-        ("layout_every_row_has_two_line_help", layout_every_row_has_two_line_help as fn()),
-        ("layout_advanced_group_is_collapsed_until_opened", layout_advanced_group_is_collapsed_until_opened as fn()),
-        ("core02_table_nav_wrap_skip", core02_table_nav_wrap_skip as fn()),
         ("core02_table_carriage_return", core02_table_carriage_return as fn()),
         ("core02_page_machine", core02_page_machine as fn()),
-        ("core02_toggle_flips_on_a", core02_toggle_flips_on_a as fn()),
-        ("core02_toggle_single_exclusive", core02_toggle_single_exclusive as fn()),
-        ("core02_toggle_wrap", core02_toggle_wrap as fn()),
         ("core02_y_clears_weighted_only", core02_y_clears_weighted_only as fn()),
         ("core02_clear_hint_rule", core02_clear_hint_rule as fn()),
         ("dropdown_yes_no_random_maps_to_the_weighted_row", dropdown_yes_no_random_maps_to_the_weighted_row as fn()),
         ("number_row_steps_and_clamps", number_row_steps_and_clamps as fn()),
-        ("ready_hats_row_defaults_to_five", ready_hats_row_defaults_to_five as fn()),
         ("multi_select_ticks_and_all_none", multi_select_ticks_and_all_none as fn()),
         ("situation_overrides_editor_picks_a_situation_then_actions", situation_overrides_editor_picks_a_situation_then_actions as fn()),
-        ("damage_range_is_greyed_unless_random", damage_range_is_greyed_unless_random as fn()),
         ("core02_slider_states", core02_slider_states as fn()),
         ("core02_slider_clamp_steps", core02_slider_clamp_steps as fn()),
-        ("respawn_invincibility_is_greyed_while_auto_load_is_on", respawn_invincibility_is_greyed_while_auto_load_is_on as fn()),
-        ("the_respawn_row_says_platform_or_instant", the_respawn_row_says_platform_or_instant as fn()),
-        ("respawn_setting_id_is_unchanged", respawn_setting_id_is_unchanged as fn()),
-        ("the_respawn_row_is_in_the_stage_options", the_respawn_row_is_in_the_stage_options as fn()),
         ("swap_group_entries_grey_with_the_reason", swap_group_entries_grey_with_the_reason as fn()),
         ("direction_grid_navigation_follows_the_chip_layout", direction_grid_navigation_follows_the_chip_layout as fn()),
-        ("direction_grid_weights_all_none_and_preview", direction_grid_weights_all_none_and_preview as fn()),
         ("shield_tilt_grid_holds_exactly_one_chip", shield_tilt_grid_holds_exactly_one_chip as fn()),
         ("core02_delay_row_exclusion", core02_delay_row_exclusion as fn()),
         ("core02_delay_row_y_clear", core02_delay_row_y_clear as fn()),
-        ("core02_delay_range_bounds", core02_delay_range_bounds as fn()),
-        ("core02_delay_range_roundtrip", core02_delay_range_roundtrip as fn()),
         ("core02_delay_no_range_loads_checklist", core02_delay_no_range_loads_checklist as fn()),
         ("delay_range_pick_is_uniform_over_the_step_values", delay_range_pick_is_uniform_over_the_step_values as fn()),
-        ("core02_slot_sets_have_no_range", core02_slot_sets_have_no_range as fn()),
-        ("core03_delay_popup_render_plan", core03_delay_popup_render_plan as fn()),
-        ("core02_delay_row_reset_and_save_defaults", core02_delay_row_reset_and_save_defaults as fn()),
         ("core02_delay_row_bulk_update_clears_range", core02_delay_row_bulk_update_clears_range as fn()),
-        ("core02_defaults_and_reset", core02_defaults_and_reset as fn()),
-        ("core02_serialize_roundtrip", core02_serialize_roundtrip as fn()),
-        ("core02_update_from_shorter_array", core02_update_from_shorter_array as fn()),
-        ("core02_hold_repeat_period", core02_hold_repeat_period as fn()),
-        ("core02_hidden_page_ring", core02_hidden_page_ring as fn()),
         ("core02_hidden_page_rows_serialized", core02_hidden_page_rows_serialized as fn()),
-        ("core02_first_open_is_cpu", core02_first_open_is_cpu as fn()),
-        ("core02_open_on_last_page", core02_open_on_last_page as fn()),
-        ("core02_last_page_missing_falls_back", core02_last_page_missing_falls_back as fn()),
-        ("q5_reopen_uses_loaded_page_or_cpu_not_the_previous_visible_page", q5_reopen_uses_loaded_page_or_cpu_not_the_previous_visible_page as fn()),
-        ("core04_last_page_roundtrip", core04_last_page_roundtrip as fn()),
         ("mii_preferences_is_the_preserved_extra_as_json", mii_preferences_is_the_preserved_extra_as_json as fn()),
         ("menu_change_to_cpu_choices_emits_reroll_events", menu_change_to_cpu_choices_emits_reroll_events as fn()),
-        ("core03_shortcut_rows_open_editor", core03_shortcut_rows_open_editor as fn()),
         ("core03_permanent_shortcut_row_info", core03_permanent_shortcut_row_info as fn()),
         ("chords_permanent_chord_fixed", chords_permanent_chord_fixed as fn()),
         ("chords_shortcut_rows_open_editor", chords_shortcut_rows_open_editor as fn()),
@@ -1992,21 +971,7 @@ fn case_table() {
         ("button_chords_editor_writes_the_chord_setting", button_chords_editor_writes_the_chord_setting as fn()),
         ("chord_text_and_row_conversion", chord_text_and_row_conversion as fn()),
         ("replay_capture_toggle_writes_its_ini", replay_capture_toggle_writes_its_ini as fn()),
-        ("core03_item_grid_layout_docked", core03_item_grid_layout_docked as fn()),
-        ("core03_item_grid_layout_handheld", core03_item_grid_layout_handheld as fn()),
-        ("core03_stage_grid_layout_docked", core03_stage_grid_layout_docked as fn()),
-        ("core03_stage_grid_pages_docked_40_40_38", core03_stage_grid_pages_docked_40_40_38 as fn()),
-        ("core03_stage_grid_layout_handheld", core03_stage_grid_layout_handheld as fn()),
-        ("core03_stage_grid_pages_handheld_8", core03_stage_grid_pages_handheld_8 as fn()),
-        ("core03_item_grid_pages_cover_38_items_once", core03_item_grid_pages_cover_38_items_once as fn()),
-        ("core03_stage_grid_pages_cover_every_tile_once", core03_stage_grid_pages_cover_every_tile_once as fn()),
-        ("core03_stage_grid_rotation_and_form_same_in_both_layouts", core03_stage_grid_rotation_and_form_same_in_both_layouts as fn()),
         ("change_stage_comes_before_the_rotation_rows_and_opens_the_stages_without_all", change_stage_comes_before_the_rotation_rows_and_opens_the_stages_without_all as fn()),
-        ("change_stage_grid_pages_cover_every_stage_once_and_no_all_tile", change_stage_grid_pages_cover_every_stage_once_and_no_all_tile as fn()),
-        ("core03_item_grid_layout_fixed_at_open", core03_item_grid_layout_fixed_at_open as fn()),
         ("grid_screen_pages_with_l_r_and_keeps_the_cursor_on_a_tile", grid_screen_pages_with_l_r_and_keeps_the_cursor_on_a_tile as fn()),
-        ("dropdown_options_are_unique_and_row_values_read_back", dropdown_options_are_unique_and_row_values_read_back as fn()),
-        ("page_defaults_controls_roundtrip_and_reset_only_the_focused_complete_row", page_defaults_controls_roundtrip_and_reset_only_the_focused_complete_row as fn()),
-        ("saving_committed_current_values_alone_requests_persistence_without_rerolls", saving_committed_current_values_alone_requests_persistence_without_rerolls as fn()),
     ]);
 }

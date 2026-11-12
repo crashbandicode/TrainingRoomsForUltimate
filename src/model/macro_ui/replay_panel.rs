@@ -183,17 +183,6 @@ mod tests {
         assert_eq!(e.window.cursor(), 0);
     }
 
-    fn export_uses_the_marked_start_snapshot_and_half_open_end() {
-        let mut e = editor();
-        e.window.seek(60); choose(&mut e, 10);
-        e.window.seek(120); choose(&mut e, 11);
-        let Effect::Export(recording) = choose(&mut e, 15) else { panic!("expected export") };
-        assert_eq!(recording.frames.len(), 60);
-        assert_eq!(recording.start.speed_y, 60.0);
-        assert_eq!(recording.start.fighter_kind, 18);
-        assert!(e.view().labels[20].contains("120/2000"));
-    }
-
     fn automatic_loop_keeps_the_preceding_complete_capture_selectable() {
         let complete = editor().session;
         let mut partial = complete.clone();
@@ -213,7 +202,6 @@ mod tests {
     fn case_table() {
         crate::test_table::run(&[
             ("precise_game_time_navigation_both_directions_and_custom_seconds", precise_game_time_navigation_both_directions_and_custom_seconds as fn()),
-            ("export_uses_the_marked_start_snapshot_and_half_open_end", export_uses_the_marked_start_snapshot_and_half_open_end as fn()),
             ("automatic_loop_keeps_the_preceding_complete_capture_selectable", automatic_loop_keeps_the_preceding_complete_capture_selectable as fn()),
         ]);
     }

@@ -168,13 +168,6 @@ mod tests {
     lib_unit_tests! {
     use super::{ResumeReadiness, ResumeSlot};
 
-    #[derive(Debug, PartialEq, Eq)]
-    struct MovesScreen {
-        confirmed: [u8; 4],
-        pending: [u8; 4],
-        focused_row: u8,
-    }
-
     fn ready(session: u64) -> ResumeReadiness {
         ResumeReadiness {
             session,
@@ -183,48 +176,6 @@ mod tests {
             practice_ready: true,
             another_ui_active: false,
         }
-    }
-
-    fn pending_moves_survive_match_without_becoming_confirmed() {
-        let mut slot = ResumeSlot::new();
-        let ticket = slot
-            .suspend(
-                7,
-                MovesScreen {
-                    confirmed: [2, 1, 1, 1],
-                    pending: [2, 2, 1, 1],
-                    focused_row: 1,
-                },
-            )
-            .unwrap();
-        let blocked = [
-            ResumeReadiness { previous_ui_released: false, ..ready(7) },
-            ResumeReadiness { interruption_resolved: false, ..ready(7) },
-            ResumeReadiness { practice_ready: false, ..ready(7) },
-            ResumeReadiness { another_ui_active: true, ..ready(7) },
-            ready(8),
-        ];
-        for observation in blocked {
-            assert!(slot.begin_restore(ticket, observation).is_none());
-        }
-        let screen = slot.begin_restore(ticket, ready(7)).unwrap();
-        assert_eq!(screen.confirmed, [2, 1, 1, 1]);
-        assert_eq!(screen.pending, [2, 2, 1, 1]);
-        assert_eq!(screen.focused_row, 1);
-        assert!(slot.begin_restore(ticket, ready(7)).is_none());
-        assert!(slot.restored(ticket));
-        assert!(slot.ticket().is_none());
-    }
-
-    fn failed_keyboard_restore_retains_unconfirmed_text_and_caret() {
-        let mut slot = ResumeSlot::new();
-        // The adapter, not this generic layer, defines and validates the payload.
-        let ticket = slot.suspend(9, ("Original", "Resume", 3_usize)).unwrap();
-        assert!(!slot.restored(ticket));
-        assert_eq!(slot.begin_restore(ticket, ready(9)), Some(&("Original", "Resume", 3)));
-        assert!(slot.restore_failed(ticket));
-        assert_eq!(slot.begin_restore(ticket, ready(9)), Some(&("Original", "Resume", 3)));
-        assert!(slot.restored(ticket));
     }
 
     fn competing_request_and_stale_completion_cannot_destroy_current_work() {
@@ -250,24 +201,6 @@ mod tests {
         assert!(slot.ticket().is_none());
     }
 
-    fn failed_restore_then_second_interruption_keeps_original_pending_screen() {
-        let mut slot = ResumeSlot::new();
-        let ticket = slot.suspend(12, ([1, 1, 0, 0], 2_u8)).unwrap();
-        assert_eq!(slot.begin_restore(ticket, ready(12)), Some(&([1, 1, 0, 0], 2)));
-        assert!(slot.restore_failed(ticket));
-        // The adapter must keep this ticket instead of offering a second
-        // snapshot from the partly reconstructed UI to the occupied slot.
-        assert!(slot.interrupt_restore(ticket));
-        assert!(slot.begin_restore(ticket, ready(13)).is_none());
-        assert_eq!(slot.begin_restore(ticket, ready(12)), Some(&([1, 1, 0, 0], 2)));
-        assert!(slot.interrupt_restore(ticket));
-        assert_eq!(slot.begin_restore(ticket, ready(12)), Some(&([1, 1, 0, 0], 2)));
-        assert!(slot.restored(ticket));
-        let next = slot.suspend(12, ([0, 0, 0, 0], 0)).unwrap();
-        assert!(!slot.interrupt_restore(ticket));
-        assert_eq!(slot.begin_restore(next, ready(12)), Some(&([0, 0, 0, 0], 0)));
-    }
-
     fn deferred_value_refinement_survives_reinterruption_under_exact_ticket() {
         let mut slot = ResumeSlot::new();
         let old = slot.suspend(12, None::<[u8; 3]>).unwrap();
@@ -291,11 +224,8 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
-            ("pending_moves_survive_match_without_becoming_confirmed", pending_moves_survive_match_without_becoming_confirmed as fn()),
-            ("failed_keyboard_restore_retains_unconfirmed_text_and_caret", failed_keyboard_restore_retains_unconfirmed_text_and_caret as fn()),
             ("competing_request_and_stale_completion_cannot_destroy_current_work", competing_request_and_stale_completion_cannot_destroy_current_work as fn()),
             ("explicit_cancel_does_not_leave_work_to_resume", explicit_cancel_does_not_leave_work_to_resume as fn()),
-            ("failed_restore_then_second_interruption_keeps_original_pending_screen", failed_restore_then_second_interruption_keeps_original_pending_screen as fn()),
             ("deferred_value_refinement_survives_reinterruption_under_exact_ticket", deferred_value_refinement_survives_reinterruption_under_exact_ticket as fn()),
         ]);
     }

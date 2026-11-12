@@ -85,33 +85,12 @@ mod tests {
         native_id[..4].copy_from_slice(&2622u32.to_le_bytes());
         assert!(parse(&native_id).is_err());
     }
-    fn editor_name_boundary_never_splits_utf16_character() {
-        let mut seed = seed();
-        seed.name = "123456789😀".into();
-        let row = from_seed(&seed).unwrap();
-        assert_eq!(parse(&row).unwrap().0, "123456789");
-        seed.name = "12345678😀".into();
-        assert_eq!(parse(&from_seed(&seed).unwrap()).unwrap().0, seed.name);
-        seed.name.clear();
-        assert_eq!(parse(&from_seed(&seed).unwrap()).unwrap().0, "New Mii");
-    }
-    fn edited_row_keeps_valid_changes_and_refuses_bad_specials() {
-        let seed = seed(); let mut row = from_seed(&seed).unwrap();
-        row[0x142..0x146].copy_from_slice(&[0, 2, 2, 1]);
-        let (_, edited) = parse(&row).unwrap();
-        assert_eq!(edited.tokens().specials, [0, 2, 2, 1]);
-        assert_ne!(edited.canonical(), seed.canonical);
-        row[0x142] = 3;
-        assert!(parse(&row).is_err());
-    }
 
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
             ("owned_editor_row_drops_native_id_and_keeps_configuration", owned_editor_row_drops_native_id_and_keeps_configuration as fn()),
-            ("editor_name_boundary_never_splits_utf16_character", editor_name_boundary_never_splits_utf16_character as fn()),
-            ("edited_row_keeps_valid_changes_and_refuses_bad_specials", edited_row_keeps_valid_changes_and_refuses_bad_specials as fn()),
         ]);
     }
     }

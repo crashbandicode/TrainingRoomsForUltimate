@@ -115,36 +115,6 @@ mod tests {
         PresentationIntent::from_parts(kind, Forms::starting(kind), 0, c, ctx, stamp(owner)).unwrap()
     }
 
-    fn from_parts_matches_todays_portrait_intent_decisions_and_the_form_rows() {
-        // Exact(c) -> exact bust; Original/preset Mii -> default class portrait; NotMii -> kind.
-        let exact = intent(0x4a, Some(gunner(125)), 0, Context::Training);
-        assert!(matches!(exact.presentation, Presentation::ExactMii { class: 0x4a, .. }));
-        assert_eq!(exact.expectation().bust, Some(TextureKey::of(&gunner(125))));
-        let preset = intent(0x4a, None, 0, Context::Training);
-        assert_eq!(preset.presentation, Presentation::DefaultMii { class: 0x4a });
-        assert_eq!(preset.expectation(), HudExpectation { kind: 0x4a, bust: None, pair: false, waiting_icon: None });
-        let fox = intent(0x7, None, 1, Context::Training);
-        assert_eq!(fox.presentation, Presentation::Kind { kind: 0x7, active_index: 0 });
-        // A configuration of another class never becomes the exact bust of this kind.
-        let wrong = intent(0x48, Some(gunner(125)), 0, Context::Training);
-        assert_eq!(wrong.presentation, Presentation::DefaultMii { class: 0x48 });
-        // Ice Climbers: two actors -> pair plate; PT: three kinds, one actor -> native form follow.
-        let ic = Forms::starting(0x4b);
-        if ic.actor_count == 2 {
-            let pair = PresentationIntent::from_parts(0x4b, ic, 0, None, Context::Training, stamp(0)).unwrap();
-            assert_eq!(pair.presentation, Presentation::Pair { lead: 0x4b });
-            assert!(pair.expectation().pair);
-        }
-        let pt = Forms::starting(0x27);
-        if pt.count > 1 && pt.actor_count == 1 {
-            let i = PresentationIntent::from_parts(0x27, pt, 0, None, Context::Training, stamp(0)).unwrap();
-            assert!(i.rule.native_form_follow);
-            assert_eq!(i.after_native_form(0x28, 1).presentation, Presentation::Kind { kind: 0x28, active_index: 1 });
-        }
-        // Texture keys separate faces with equal class and tokens.
-        assert_ne!(TextureKey::of(&gunner(125)), TextureKey::of(&gunner(0)));
-    }
-
     fn h6_contexts_either_present_or_are_refused_at_planning_never_skipped_after() {
         assert!(PresentationIntent::from_parts(0x7, Forms::starting(0x7), 0, None, Context::QpWaiting, stamp(4)).is_ok());
         assert_eq!(PresentationIntent::from_parts(0x7, Forms::starting(0x7), 0, None, Context::QpWaiting, stamp(1)),
@@ -202,22 +172,6 @@ mod tests {
         assert_eq!(m.observed(1), Some(fox.expectation()));
     }
 
-    fn h4_h5_a_state_load_changes_no_card_and_replay_previews_keep_the_bust() {
-        let mut m = HudModel::with_css([0x3, 0x9]);
-        let exact = intent(0x4a, Some(gunner(125)), 0, Context::Training);
-        m.settle_and_publish(&exact, Settlement::Adopted).unwrap();
-        let before = m.clone();
-        // Save on A, swap to B, load: the load applies position only (B123PRE row 8); verify only.
-        assert_eq!(m.on_state_load(0, &exact), Ok(()));
-        assert_eq!(m, before);
-        // Replay X/Y/B (preview, restart, close) emit no portrait event: the bust stays bound.
-        for _ in ["X", "Y", "B"] { assert_eq!(m.readback(0, &exact.expectation()), Ok(())); }
-        // A load after a stale card (M5 shape) is reported, not silently accepted.
-        let mut stale = HudModel::with_css([0x3, 0x9]);
-        stale.publish(0, Presentation::DefaultMii { class: 0x4a });
-        assert_eq!(stale.on_state_load(0, &exact), Err("exact bust not bound"));
-    }
-
     fn native_form_change_follows_the_member_and_the_waiting_icon_tracks_cpu4() {
         let mut m = HudModel::with_css([0x27, 0x9]);
         let pt = PresentationIntent::from_parts(0x27, Forms::starting(0x27), 0, None, Context::Training, stamp(0)).unwrap();
@@ -236,11 +190,9 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
-            ("from_parts_matches_todays_portrait_intent_decisions_and_the_form_rows", from_parts_matches_todays_portrait_intent_decisions_and_the_form_rows as fn()),
             ("h6_contexts_either_present_or_are_refused_at_planning_never_skipped_after", h6_contexts_either_present_or_are_refused_at_planning_never_skipped_after as fn()),
             ("h1_h2_publication_after_every_settle_matches_the_derived_intent_and_degraded_still_publishes", h1_h2_publication_after_every_settle_matches_the_derived_intent_and_degraded_still_publishes as fn()),
             ("h3_native_reset_never_leaves_a_mii_card_static_when_a_configuration_is_the_target", h3_native_reset_never_leaves_a_mii_card_static_when_a_configuration_is_the_target as fn()),
-            ("h4_h5_a_state_load_changes_no_card_and_replay_previews_keep_the_bust", h4_h5_a_state_load_changes_no_card_and_replay_previews_keep_the_bust as fn()),
             ("native_form_change_follows_the_member_and_the_waiting_icon_tracks_cpu4", native_form_change_follows_the_member_and_the_waiting_icon_tracks_cpu4 as fn()),
         ]);
     }

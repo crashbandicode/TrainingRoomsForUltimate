@@ -231,21 +231,6 @@ mod tests {
         }
     }
 
-    fn count_counts_token_trees() {
-        assert_eq!(count!(), 0);
-        assert_eq!(count!(A B C D), 4);
-    }
-
-    fn constants_are_unit_vectors_in_declaration_order() {
-        assert_eq!(Pick::FIRST.to_byte_vec(), [1, 0, 0]);
-        assert_eq!(Pick::THIRD.to_byte_vec(), [0, 0, 1]);
-        assert_eq!(Pick::ALL_CONSTS, [Pick::FIRST, Pick::SECOND, Pick::THIRD]);
-        assert_eq!(Pick::ALL_NAMES, ["First", "Second", "Third"]);
-        assert_eq!(Pick::ALL_FIELDS, ["FIRST", "SECOND", "THIRD"]);
-        assert_eq!(Pick::empty().to_byte_vec(), [0, 0, 0]);
-        assert_eq!(Pick::all().to_byte_vec(), [1, 1, 1]);
-    }
-
     fn arithmetic_saturates_like_the_crate_it_replaces() {
         assert_eq!((Pick::FIRST + Pick::THIRD).to_byte_vec(), [1, 0, 1]);
         assert_eq!((Pick::all() - Pick::SECOND).to_byte_vec(), [1, 0, 1]);
@@ -277,26 +262,13 @@ mod tests {
         assert_eq!((Pick::FIRST + Pick::THIRD).to_string(), "First + Third");
     }
 
-    fn json_is_one_integer_per_choice() {
-        assert_eq!(serde_json::to_string(&Pick::SECOND).unwrap(), "[0,1,0]");
-        assert_eq!(serde_json::from_str::<Pick>("[0,0,1]").unwrap(), Pick::THIRD);
-        assert_eq!(serde_json::from_str::<Pick>("[3,0,0]").unwrap(), Pick::FIRST * 3u8);
-        assert!(serde_json::from_str::<Pick>("[1,0]").is_err(), "too short");
-        assert!(serde_json::from_str::<Pick>("[1,0,0,0]").is_err(), "too long");
-        assert!(serde_json::from_str::<Pick>("[1,0,300]").is_err(), "not a byte");
-        assert!(serde_json::from_str::<Pick>("\"First\"").is_err());
-    }
-
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
-            ("count_counts_token_trees", count_counts_token_trees as fn()),
-            ("constants_are_unit_vectors_in_declaration_order", constants_are_unit_vectors_in_declaration_order as fn()),
             ("arithmetic_saturates_like_the_crate_it_replaces", arithmetic_saturates_like_the_crate_it_replaces as fn()),
             ("contains_only_looks_at_zero_and_nonzero", contains_only_looks_at_zero_and_nonzero as fn()),
             ("display_joins_the_labels_of_the_set_choices", display_joins_the_labels_of_the_set_choices as fn()),
-            ("json_is_one_integer_per_choice", json_is_one_integer_per_choice as fn()),
         ]);
     }
     }

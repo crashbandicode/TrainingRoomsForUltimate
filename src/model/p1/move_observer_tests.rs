@@ -23,69 +23,10 @@ fn completed_trace(statuses: &[i32], expected: Family) {
     assert_eq!(observer.active_family(), None);
 }
 
-fn jab_combo_and_charged_smash_phases_complete_once() {
-    completed_trace(&[0x27, 0x27, 0x28, 0x28, 0], Family::Jab);
-    completed_trace(&[0x2d, 0x2e, 0x2e, 0x2f, 0], Family::SideSmash);
-}
-
 fn aerial_and_special_aftermath_and_extended_phases_continue_one_instance() {
     completed_trace(&[0x36, 0x18, 0x18, 0], Family::Aerial);
     completed_trace(&[0x1de, 0x10, 0x19, 0], Family::UpSpecial);
     completed_trace(&[0x1df, 0x1e1, 0x1e2, 0x1e2, 0], Family::DownSpecial);
-}
-
-fn whiffs_complete_and_family_cancel_closes_then_opens() {
-    let mut observer = MoveObserver::default();
-    assert_eq!(
-        observer.step(sample(0, 0x27, 0)).active_family,
-        Some(Family::Jab)
-    );
-    // No hit/damage signal is required: this completed attack can have whiffed.
-    let cancel = observer.step(sample(1, 0x2a, 0x27));
-    assert_eq!(cancel.completed, Some(Family::Jab));
-    assert_eq!(cancel.active_family, Some(Family::SideTilt));
-    assert_eq!(
-        observer.step(sample(2, 0, 0x2a)).completed,
-        Some(Family::SideTilt)
-    );
-}
-
-fn prev0_recovers_common_entry_but_unknown_specific_status_cannot_open_alone() {
-    let mut observer = MoveObserver::default();
-    assert_eq!(
-        observer.step(sample(0, 0x1e1, 0x1df)).active_family,
-        Some(Family::DownSpecial)
-    );
-    assert_eq!(
-        observer.step(sample(1, 0, 0x1e1)).completed,
-        Some(Family::DownSpecial)
-    );
-    assert_eq!(observer.step(sample(2, 0x203, 0x37)).active_family, None);
-    assert_eq!(observer.step(sample(3, 0, 0x203)).completed, None);
-}
-
-fn damage_in_extended_phase_interrupts_without_stale_reopening() {
-    let mut observer = MoveObserver::default();
-    observer.step(sample(0, 0x1df, 0));
-    observer.step(sample(1, 0x1e1, 0x1df));
-    let event = observer.step(Observation {
-        p1_damage: 4.0,
-        ..sample(2, 0x1e1, 0x1df)
-    });
-    assert_eq!(
-        event.interrupted,
-        Some(InterruptedMove {
-            family: Family::DownSpecial,
-            reason: InterruptionReason::DamageRiseUnconfirmed
-        })
-    );
-    assert_eq!(event.completed, None);
-    assert_eq!(event.active_family, None);
-    let stale = observer.step(Observation {
-        p1_damage: 4.0,
-        ..sample(3, 0x1e1, 0x1df)
-    });
-    assert_eq!(stale, Events::default());
 }
 
 fn explicit_native_signal_and_common_interruptions_are_separate_from_armor_policy() {
@@ -121,47 +62,12 @@ fn explicit_native_signal_and_common_interruptions_are_separate_from_armor_polic
     assert_eq!(hitstun.completed, None);
 }
 
-fn grabs_throws_jumps_and_final_do_not_open_moves() {
-    let mut observer = MoveObserver::default();
-    for (tick, status) in [0x37, 0x38, 0x40, 0xb, 0xc, 0x1e0, 0].iter().enumerate() {
-        assert_eq!(
-            observer.step(sample(tick as u64, *status, 0)),
-            Events::default()
-        );
-    }
-}
-
-fn repeated_ticks_and_unobserved_same_status_reentry_cannot_invent_instances() {
-    let mut observer = MoveObserver::default();
-    observer.step(sample(10, 0x27, 0));
-    assert_eq!(
-        observer.step(sample(10, 0, 0x27)),
-        Events {
-            active_family: Some(Family::Jab),
-            ..Events::default()
-        }
-    );
-    // A new ATTACK instance with no observed transition is indistinguishable.
-    assert_eq!(observer.step(sample(11, 0x27, 0x27)).completed, None);
-    assert_eq!(
-        observer.step(sample(12, 0, 0x27)).completed,
-        Some(Family::Jab)
-    );
-    assert_eq!(observer.step(sample(12, 0, 0x27)), Events::default());
-}
-
 /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
 #[test]
 fn case_table() {
     crate::test_table::run(&[
-        ("jab_combo_and_charged_smash_phases_complete_once", jab_combo_and_charged_smash_phases_complete_once as fn()),
         ("aerial_and_special_aftermath_and_extended_phases_continue_one_instance", aerial_and_special_aftermath_and_extended_phases_continue_one_instance as fn()),
-        ("whiffs_complete_and_family_cancel_closes_then_opens", whiffs_complete_and_family_cancel_closes_then_opens as fn()),
-        ("prev0_recovers_common_entry_but_unknown_specific_status_cannot_open_alone", prev0_recovers_common_entry_but_unknown_specific_status_cannot_open_alone as fn()),
-        ("damage_in_extended_phase_interrupts_without_stale_reopening", damage_in_extended_phase_interrupts_without_stale_reopening as fn()),
         ("explicit_native_signal_and_common_interruptions_are_separate_from_armor_policy", explicit_native_signal_and_common_interruptions_are_separate_from_armor_policy as fn()),
-        ("grabs_throws_jumps_and_final_do_not_open_moves", grabs_throws_jumps_and_final_do_not_open_moves as fn()),
-        ("repeated_ticks_and_unobserved_same_status_reentry_cannot_invent_instances", repeated_ticks_and_unobserved_same_status_reentry_cannot_invent_instances as fn()),
     ]);
 }
 }

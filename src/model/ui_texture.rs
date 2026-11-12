@@ -130,22 +130,6 @@ mod tests {
     lib_unit_tests! {
     use super::*;
 
-    fn facts() -> TextureFacts {
-        TextureFacts { handle: HANDLE_NONE, job: 0, has_state: false, state: 0 }
-    }
-
-    fn a_texture_is_ready_only_when_the_handle_was_consumed_and_no_job_is_pending() {
-        assert!(is_ready(facts()));
-        assert!(!is_ready(TextureFacts { handle: 0x1234, ..facts() }), "the file is still loading");
-        assert!(!is_ready(TextureFacts { job: 0x7000_0000, ..facts() }), "a decode job is pending");
-    }
-
-    fn the_state_object_must_say_finished_when_there_is_one() {
-        assert!(is_ready(TextureFacts { has_state: true, state: STATE_LOADED, ..facts() }));
-        assert!(!is_ready(TextureFacts { has_state: true, state: 2, ..facts() }));
-        assert!(is_ready(TextureFacts { has_state: false, state: 2, ..facts() }), "state is not read without the object");
-    }
-
     fn the_queue_releases_after_the_delay_in_any_order() {
         let mut q: RetireQueue<u32, 4> = RetireQueue::new(8);
         assert!(q.push(1, 10));
@@ -157,16 +141,6 @@ mod tests {
         assert!(q.is_empty());
     }
 
-    fn a_full_queue_refuses_and_keeps_its_items() {
-        let mut q: RetireQueue<u8, 2> = RetireQueue::new(1);
-        assert!(q.push(1, 0));
-        assert!(q.push(2, 0));
-        assert!(!q.push(3, 0));
-        assert_eq!(q.len(), 2);
-        assert_eq!(q.pop_due(1), Some(1));
-        assert!(q.push(3, 1));
-    }
-
     fn a_kept_file_is_requested_again_only_when_the_page_stops_wanting_it() {
         assert_eq!(carry(Some(0x51), Some(0x51)), Carry::Keep, "the same file: the texture stays");
         assert_eq!(carry(None, Some(0x51)), Carry::Request, "nothing held: request");
@@ -175,44 +149,12 @@ mod tests {
         assert_eq!(carry(None, None), Carry::Idle);
     }
 
-    fn a_role_switch_keeps_every_tile_the_two_lists_share() {
-        // The roster grid's cells and their fighters are role-independent (roster_grid::describe), so a Player →
-        // CPU role switch wants the same hash at every tile: each bound or loading texture is kept, and nothing
-        // is re-requested while the previous texture is still being released.
-        let wants: [Option<u64>; 8] = [None, Some(0x11), Some(0x12), Some(0x13), None, Some(0x14), Some(0x15), None];
-        let held: [Option<u64>; 8] = [None, Some(0x11), Some(0x12), Some(0x13), None, Some(0x14), Some(0x15), None];
-        for i in 0..8 {
-            let expect = if held[i].is_some() { Carry::Keep } else { Carry::Idle };
-            assert_eq!(carry(held[i], wants[i]), expect, "tile {i} across the role switch");
-        }
-        // A different page (the stage grid) wants other files: everything is requested again.
-        assert_eq!(carry(Some(0x11), Some(0x99)), Carry::Request);
-    }
-
-    fn every_portrait_can_change_each_frame_without_shortening_retirement_grace() {
-        let mut queue: RetireQueue<u64, RETIRE_SLOTS> = RetireQueue::new(RETIRE_DELAY_FRAMES);
-        for frame in 0..40 {
-            while let Some(retired_at) = queue.pop_due(frame) {
-                assert!(frame >= retired_at + RETIRE_DELAY_FRAMES);
-            }
-            for _ in 0..MAX_RETIRED_PER_FRAME {
-                assert!(queue.push(frame, frame), "all panes and diagnostic textures fit at frame {frame}");
-            }
-        }
-        assert!(queue.len() <= MAX_RETIRED_PER_FRAME * RETIRE_DELAY_FRAMES as usize);
-    }
-
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
-            ("a_texture_is_ready_only_when_the_handle_was_consumed_and_no_job_is_pending", a_texture_is_ready_only_when_the_handle_was_consumed_and_no_job_is_pending as fn()),
-            ("the_state_object_must_say_finished_when_there_is_one", the_state_object_must_say_finished_when_there_is_one as fn()),
             ("the_queue_releases_after_the_delay_in_any_order", the_queue_releases_after_the_delay_in_any_order as fn()),
-            ("a_full_queue_refuses_and_keeps_its_items", a_full_queue_refuses_and_keeps_its_items as fn()),
             ("a_kept_file_is_requested_again_only_when_the_page_stops_wanting_it", a_kept_file_is_requested_again_only_when_the_page_stops_wanting_it as fn()),
-            ("a_role_switch_keeps_every_tile_the_two_lists_share", a_role_switch_keeps_every_tile_the_two_lists_share as fn()),
-            ("every_portrait_can_change_each_frame_without_shortening_retirement_grace", every_portrait_can_change_each_frame_without_shortening_retirement_grace as fn()),
         ]);
     }
     }

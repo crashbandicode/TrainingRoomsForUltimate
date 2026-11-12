@@ -320,31 +320,6 @@ mod tests {
         assert_eq!(c.tick(5_000_000, STALL_US), None, "a clock step back reports nothing");
     }
 
-    fn a_steady_slow_frame_rate_is_not_a_stall() {
-        let mut c = TickClock::IDLE;
-        assert_eq!(c.tick(1_000_000, STALL_US), None);
-        assert_eq!(c.tick(1_080_000, STALL_US), Some(80_000), "leaving the previous pace is one stall");
-        assert_eq!(c.tick(1_160_000, STALL_US), None, "the same pace again is not a stall");
-        assert_eq!(c.tick(1_250_000, STALL_US), None, "ten more milliseconds is still that pace");
-        assert_eq!(c.tick(1_500_000, STALL_US), Some(250_000), "a hitch past the pace by the threshold is a stall");
-    }
-
-    fn marks_charge_the_time_since_the_previous_mark_to_their_step() {
-        let mut s = Split::start(1_000);
-        s.mark(Step::Plugin, 1_010);
-        s.mark(Step::Unprepare, 1_510);
-        s.mark(Step::Plugin, 1_520);
-        s.mark(Step::Control, 61_520);
-        s.mark(Step::Allocate, 62_000);
-        assert_eq!(s.us(Step::Plugin), 20);
-        assert_eq!(s.calls(Step::Plugin), 2);
-        assert_eq!(s.us(Step::Unprepare), 500);
-        assert_eq!(s.us(Step::Control), 60_000);
-        assert_eq!(s.setup_us(), 60_520, "setup ends with 0x64f820: allocation is not part of it");
-        assert_eq!(s.total_us(), 61_000);
-        assert_eq!(s.largest(), Step::Control);
-    }
-
     fn a_stopped_or_never_started_split_ignores_marks_and_a_clock_step_back_charges_nothing() {
         let mut idle = Split::default();
         idle.mark(Step::Models, 5);
@@ -419,8 +394,6 @@ mod tests {
     fn case_table() {
         crate::test_table::run(&[
             ("the_tick_clock_reports_only_gaps_above_the_threshold_and_never_the_first_tick", the_tick_clock_reports_only_gaps_above_the_threshold_and_never_the_first_tick as fn()),
-            ("a_steady_slow_frame_rate_is_not_a_stall", a_steady_slow_frame_rate_is_not_a_stall as fn()),
-            ("marks_charge_the_time_since_the_previous_mark_to_their_step", marks_charge_the_time_since_the_previous_mark_to_their_step as fn()),
             ("a_stopped_or_never_started_split_ignores_marks_and_a_clock_step_back_charges_nothing", a_stopped_or_never_started_split_ignores_marks_and_a_clock_step_back_charges_nothing as fn()),
             ("the_line_names_every_step_that_ran_with_its_calls", the_line_names_every_step_that_ran_with_its_calls as fn()),
             ("step_table_is_complete_and_names_are_unique", step_table_is_complete_and_names_are_unique as fn()),

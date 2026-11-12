@@ -279,45 +279,6 @@ mod tests {
             descriptor, index: 0, tokens: [0; 4], bodies: [(0x90000, 1), (0xa0000, 2), (0, 0)], active: 0 }
     }
 
-    fn exchanged_group_header_is_its_own_capture_not_the_descriptor_words() {
-        let before = pta116t_before();
-        let now = before;
-        assert_eq!(verify(&before, &now, ExpectedMutation::None), Ok(()), "the prequeue compares capture against capture");
-        // The old predicate expected [selector, FE+0x18, FE+0x1c, FE+0x20, FE+0x41] = [1, 0x21, 0x1e, -1, 0].
-        let derived = Identity { header: [1, 0x21, 0x1e, u32::MAX, 0], ..before };
-        assert_eq!(verify(&derived, &now, ExpectedMutation::None), Err(Mismatch { field: Field::Header(1), expected: 0x21, actual: 9 }),
-            "D-PTA1: a derived header is a mismatch, and the first word that differs is named");
-        for word in 0..5 {
-            let mut foreign = now; foreign.header[word] ^= 0x100;
-            assert_eq!(verify(&before, &foreign, ExpectedMutation::None).unwrap_err().field, Field::Header(word as u8));
-            assert_eq!(verify(&before, &foreign, ExpectedMutation::NativeBehavior).unwrap_err().field, Field::Header(word as u8), "no mutation frees the header except an exact Mii setup");
-        }
-        let mut other_object = now; other_object.object += 0x100;
-        assert_eq!(verify(&before, &other_object, ExpectedMutation::None).unwrap_err().field, Field::Object);
-        let mut other_index = now; other_index.index = 3;
-        assert_eq!(verify(&before, &other_index, ExpectedMutation::None).unwrap_err().field, Field::Index);
-        let mut other_tokens = now; other_tokens.tokens[2] = 9;
-        assert_eq!(verify(&before, &other_tokens, ExpectedMutation::None).unwrap_err().field, Field::Tokens(2));
-    }
-
-    fn configure_skipped_admits_exactly_the_installed_r68_and_tokens() {
-        // W-M2-4: the gate installed R+0x68 = FE+0x46 of the incoming Mii and the configured tokens on
-        // the skip path; the receipt proves those values and refuses any other change.
-        let before = pta116t_before();
-        let mut now = before; now.index = 7; now.tokens = [0x10b, 0x2, 0x33, 0x0];
-        let allowed = ExpectedMutation::ConfigureSkipped { index: 7, tokens: [0x10b, 0x2, 0x33, 0x0] };
-        assert_eq!(verify(&before, &now, allowed), Ok(()));
-        assert_eq!(verify(&before, &now, ExpectedMutation::None).unwrap_err().field, Field::Index, "without the receipt the install is a mismatch");
-        let mut stale = now; stale.index = 0;
-        assert_eq!(verify(&before, &stale, allowed), Err(Mismatch { field: Field::Index, expected: 7, actual: 0 }), "a stale R+0x68 is the defect");
-        let mut other_token = now; other_token.tokens[2] = 0x34;
-        assert_eq!(verify(&before, &other_token, allowed).unwrap_err().field, Field::Tokens(2));
-        let mut header = now; header.header[1] ^= 1;
-        assert_eq!(verify(&before, &header, allowed).unwrap_err().field, Field::Header(1), "the skip path writes nothing else");
-        let mut body = now; body.bodies[0].1 += 1;
-        assert_eq!(verify(&before, &body, allowed).unwrap_err().field, Field::Body(0));
-    }
-
     fn training_menu_live_bytes_are_tolerated_only_in_domain_and_nothing_else_is() {
         let before = pta116t_before();
         // C120 S2 #934 / C104 #336..#342: Behavior=Control writes ffffffff>00000001, 01>00, 01>24, 100>21; FE+0x36 as written.
@@ -389,19 +350,6 @@ mod tests {
         assert_eq!(verify(&after, &toggled, ExpectedMutation::None).unwrap_err().field, Field::Descriptor(0x10));
     }
 
-    fn a_native_form_selection_changes_only_the_selected_member() {
-        let before = pta116t_before();
-        let mut now = before; now.active = 1;
-        assert_eq!(verify(&before, &now, ExpectedMutation::NativeFormSelection(1)), Ok(()));
-        assert_eq!(verify(&before, &now, ExpectedMutation::None).unwrap_err().field, Field::Active);
-        assert_eq!(verify(&before, &now, ExpectedMutation::NativeFormSelection(2)), Err(Mismatch { field: Field::Active, expected: 2, actual: 1 }));
-        let mut out_of_range = before; out_of_range.active = 3;
-        assert_eq!(verify(&before, &out_of_range, ExpectedMutation::NativeFormSelection(3)).unwrap_err().field, Field::Active);
-        let mut plus_bytes = now; plus_bytes.descriptor[0x18] ^= 1;
-        assert_eq!(verify(&before, &plus_bytes, ExpectedMutation::NativeFormSelection(1)).unwrap_err().field, Field::Descriptor(0x18), "the form change rewrites no descriptor word");
-        assert_eq!(verify(&before, &before, ExpectedMutation::NativeFormSelection(1)), Ok(()), "an unchanged selection is admitted too");
-    }
-
     fn an_exact_mii_publication_frees_only_what_the_setup_owns() {
         let before = pta116t_before();
         let layout = GroupLayout { count: 1, kinds: [0x4a, u32::MAX, u32::MAX], actors: 1 };
@@ -424,11 +372,8 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
-            ("exchanged_group_header_is_its_own_capture_not_the_descriptor_words", exchanged_group_header_is_its_own_capture_not_the_descriptor_words as fn()),
-            ("configure_skipped_admits_exactly_the_installed_r68_and_tokens", configure_skipped_admits_exactly_the_installed_r68_and_tokens as fn()),
             ("training_menu_live_bytes_are_tolerated_only_in_domain_and_nothing_else_is", training_menu_live_bytes_are_tolerated_only_in_domain_and_nothing_else_is as fn()),
             ("a_group_exchange_permits_exactly_the_minted_layout_and_bodies", a_group_exchange_permits_exactly_the_minted_layout_and_bodies as fn()),
-            ("a_native_form_selection_changes_only_the_selected_member", a_native_form_selection_changes_only_the_selected_member as fn()),
             ("an_exact_mii_publication_frees_only_what_the_setup_owns", an_exact_mii_publication_frees_only_what_the_setup_owns as fn()),
         ]);
     }

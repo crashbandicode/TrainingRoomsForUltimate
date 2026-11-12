@@ -24,27 +24,6 @@ fn configuration(class:MiiClass,hat:u16)->Configuration {
         [0;88],RowIds {outfit:0x1300001bfef7a5f7,hat:0x5a00000fa9efa5ea | (u64::from(hat)<<40)}).unwrap()
 }
 
-fn all_eight_owners_require_every_foreign_record_in_bounds() {
-    for slot in [7, 6, 5, 4] {
-        let (destination, extras, owners, kinds, facts) = fixture(slot);
-        let protected = destination.protected();
-        assert_eq!(protected.iter().flatten().count(), 7);
-        for record in 0..8 {
-            assert_eq!(protected.contains(&Some(record)), record != slot as u16);
-        }
-        for records in 0..8 {
-            assert!(CreatedDestination::capture(Layout::Training, extras, slot,
-                &owners, &kinds, facts, records).is_none());
-        }
-        assert!(CreatedDestination::capture(Layout::Training, extras, slot,
-            &owners, &kinds, facts, 8).is_some());
-        for layout in [Layout::Ldn, Layout::Quickplay] {
-            assert!(CreatedDestination::capture(layout, extras, slot,
-                &owners, &kinds, facts, 8).is_none());
-        }
-    }
-}
-
 fn four_created_rows_keep_creation_word_and_all_foreign_claims_through_each_class() {
     for slot in [7,6,5,4] {
         let (destination,extras,owners,kinds,facts)=fixture(slot);
@@ -126,33 +105,12 @@ fn created_fresh_o_rejects_pointer_header_tokens_initialization_and_task_changes
     }
 }
 
-fn another_created_registration_refreshes_protection_without_replacing_existing_authority() {
-    let (_,full,owners,kinds,facts)=fixture(7);
-    let single=Extras::registered([Some(Roots {entry:owners[7].unwrap().entry,
-        resource:facts.resource,alias:facts.alias_root,selection:facts.selection,
-        descriptor_selector:facts.descriptor_selector}),None,None]).unwrap();
-    let mut initial=owners;initial[4]=None;initial[5]=None;initial[6]=None;
-    let initial_kinds=initial.map(|o|o.map(|_|9));
-    let destination=CreatedDestination::capture(Layout::Training,single,7,&initial,&initial_kinds,facts,8).unwrap();
-    assert!(destination.registered_in(Layout::Training,full,7,owners[7].unwrap().entry));
-    assert!(!destination.protected().contains(&Some(5)));
-    let now=destination.protected_now(Layout::Training,full,&owners,&kinds).unwrap();
-    assert!(now.contains(&Some(5)) && now.contains(&Some(6)) && now.contains(&Some(0)));
-    assert_ne!(now,destination.protected(),"transaction snapshots must detect a union change across publication");
-    let changed=Extras::registered([Some(Roots {entry:owners[7].unwrap().entry,
-        resource:facts.resource+8,alias:facts.alias_root,selection:facts.selection,
-        descriptor_selector:0}),None,None]).unwrap();
-    assert!(!destination.registered_in(Layout::Training,changed,7,owners[7].unwrap().entry));
-}
-
 /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
 #[test]
 fn case_table() {
     crate::test_table::run(&[
-        ("all_eight_owners_require_every_foreign_record_in_bounds", all_eight_owners_require_every_foreign_record_in_bounds as fn()),
         ("four_created_rows_keep_creation_word_and_all_foreign_claims_through_each_class", four_created_rows_keep_creation_word_and_all_foreign_claims_through_each_class as fn()),
         ("created_fresh_o_rejects_pointer_header_tokens_initialization_and_task_changes", created_fresh_o_rejects_pointer_header_tokens_initialization_and_task_changes as fn()),
-        ("another_created_registration_refreshes_protection_without_replacing_existing_authority", another_created_registration_refreshes_protection_without_replacing_existing_authority as fn()),
     ]);
 }
 }

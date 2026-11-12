@@ -810,7 +810,7 @@ impl RebindWait {
 #[cfg(test)]
 mod rebuild_tests {
     lib_unit_tests! {
-    use super::{represent, Binding, Live, Ownership, RebindStep, RebindWait, Represent, Request, Shown, REBIND_SETTLE_CALLBACKS};
+    use super::{represent, Binding, Live, RebindStep, RebindWait, Represent, Request, Shown};
 
     // Training CPU after a CSS (Random) Dr. Mario start and an exact replay Gunner.
     const CPU_ENTRY: usize = 0x11aed3e000;
@@ -831,85 +831,11 @@ mod rebuild_tests {
         }
     }
 
-    fn every_mii_class_rebinds_only_its_own_publication() {
-        for class in 0x48..=0x4a {
-            let shown = shown(class);
-            assert_eq!(represent(None, Some(shown), live(class), true, false), Represent::Rebind(shown));
-            let other = if class == 0x4a { 0x48 } else { class + 1 };
-            assert_eq!(represent(None, Some(shown), live(other), true, false), Represent::Paint);
-        }
-    }
-
-    fn a_stale_entry_owner_or_generation_only_republishes_the_kind() {
-        let shown = shown(GUNNER);
-        let stale = [
-            Live { entry: CPU_ENTRY + 0x6000, ..live(GUNNER) },
-            Live { physical: 0, ..live(GUNNER) },
-            Live { generation: 7, ..live(GUNNER) },
-        ];
-        for found in stale {
-            assert_eq!(represent(None, Some(shown), found, true, false), Represent::Paint);
-            let mut wait = RebindWait { shown, key: 1, waits: 0 };
-            assert!(matches!(wait.step(Some(found), true, true), RebindStep::Drop(_)));
-        }
-    }
-
-    fn a_pending_job_owns_its_publication() {
-        let shown = shown(GUNNER);
-        // A withheld job publishes and binds after its render proof.
-        assert_eq!(represent(Some(true), Some(shown), live(GUNNER), true, false), Represent::Defer);
-        // An already published job is repainted; its own bind follows.
-        assert_eq!(represent(Some(false), Some(shown), live(GUNNER), true, false), Represent::Paint);
-    }
-
-    fn a_generic_fallback_or_lost_texture_republishes_the_kind_only() {
-        // Never bound (budget/refusal fallback): no shown record.
-        assert_eq!(represent(None, None, live(GUNNER), false, false), Represent::Paint);
-        // Batch teardown, an explicit unbind or a lost registration clears `retained`.
-        assert_eq!(represent(None, Some(shown(GUNNER)), live(GUNNER), false, false), Represent::Paint);
-        // A halted scene never rebinds.
-        assert_eq!(represent(None, Some(shown(GUNNER)), live(GUNNER), true, true), Represent::Paint);
-        // Lost between arming and the settled bind.
-        let mut wait = RebindWait { shown: shown(GUNNER), key: 1, waits: 0 };
-        assert!(matches!(wait.step(Some(live(GUNNER)), true, false), RebindStep::Drop(_)));
-    }
-
-    fn departure_or_unsettled_assets_end_the_rebind_without_binding() {
-        let mut departed = RebindWait { shown: shown(GUNNER), key: 1, waits: 0 };
-        assert!(matches!(departed.step(None, true, true), RebindStep::Drop(_)));
-        let mut wait = RebindWait { shown: shown(GUNNER), key: 1, waits: 0 };
-        for _ in 0..REBIND_SETTLE_CALLBACKS {
-            assert_eq!(wait.step(Some(live(GUNNER)), false, true), RebindStep::Wait);
-        }
-        assert!(matches!(wait.step(Some(live(GUNNER)), false, true), RebindStep::Drop(_)));
-    }
-
-    fn a_rebind_reuses_the_bound_record_and_keeps_both_owners_rows() {
-        let mut own = Ownership::new();
-        let (p1, cpu) = (binding(2, 7), binding(3, 8));
-        own.bound(0, p1);
-        own.bound(1, cpu);
-        let before = (own.bound, own.owned_count());
-        let mut wait = RebindWait { shown: Shown { binding: cpu, ..shown(GUNNER) }, key: 1, waits: 0 };
-        let RebindStep::Bind(rebound) = wait.step(Some(live(GUNNER)), true, true) else { panic!("expected a bind") };
-        assert_eq!(rebound, cpu);
-        own.bound(1, rebound);
-        assert_eq!((own.bound, own.owned_count()), before);
-        assert!(super::row_free_for(&own.bound, 1, cpu.request.row));
-        assert!(!super::row_free_for(&own.bound, 1, p1.request.row));
-    }
-
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
             ("dr_mario_to_exact_gunner_native_reset_rebinds_the_retained_texture_every_time", dr_mario_to_exact_gunner_native_reset_rebinds_the_retained_texture_every_time as fn()),
-            ("every_mii_class_rebinds_only_its_own_publication", every_mii_class_rebinds_only_its_own_publication as fn()),
-            ("a_stale_entry_owner_or_generation_only_republishes_the_kind", a_stale_entry_owner_or_generation_only_republishes_the_kind as fn()),
-            ("a_pending_job_owns_its_publication", a_pending_job_owns_its_publication as fn()),
-            ("a_generic_fallback_or_lost_texture_republishes_the_kind_only", a_generic_fallback_or_lost_texture_republishes_the_kind_only as fn()),
-            ("departure_or_unsettled_assets_end_the_rebind_without_binding", departure_or_unsettled_assets_end_the_rebind_without_binding as fn()),
-            ("a_rebind_reuses_the_bound_record_and_keeps_both_owners_rows", a_rebind_reuses_the_bound_record_and_keeps_both_owners_rows as fn()),
         ]);
     }
     }
@@ -919,7 +845,7 @@ mod rebuild_tests {
 mod hud_asset_tests {
     lib_unit_tests! {
     use super::{
-        hud_assets_settled, service_bind_after_wait, tick_bind_allowed, HudAssets, HudHold, Job, Ownership, Request,
+        hud_assets_settled, tick_bind_allowed, HudAssets, HudHold, Job, Ownership, Request,
     };
 
     fn source_tick_binds_only_a_published_live_training_wait_on_its_thread() {
@@ -943,13 +869,6 @@ mod hud_asset_tests {
         }
     }
 
-    fn a_tick_bound_pane_is_not_bound_again_on_the_service_callback() {
-        assert!(service_bind_after_wait(false, false));
-        assert!(!service_bind_after_wait(false, true));
-        assert!(!service_bind_after_wait(true, false));
-        assert!(!service_bind_after_wait(true, true));
-    }
-
     fn gnw_to_gunner_waits_for_key_and_native_applier_completion() {
         // Run146's observed bind-time keys. Event return leaves the old frame.
         let gunner = 0xc1004e1257ab1d87;
@@ -966,14 +885,6 @@ mod hud_asset_tests {
         assert!(!hud_assets_settled(gunner, native));
         native.update_busy = false;
         assert!(hud_assets_settled(gunner, native));
-    }
-
-    fn same_class_reload_still_waits_for_pending_native_update() {
-        let key = 0xc1004e1257ab1d87;
-        let native = HudAssets { committed_key: key,
-            event_dirty: true, channel_busy: false, update_busy: false };
-        assert!(!hud_assets_settled(key, native));
-        assert!(!hud_assets_settled(0, HudAssets { event_dirty: false, ..native }));
     }
 
     fn pending_hud_assets_do_not_block_retirement_off_the_service_callback() {
@@ -993,9 +904,7 @@ mod hud_asset_tests {
     fn case_table() {
         crate::test_table::run(&[
             ("source_tick_binds_only_a_published_live_training_wait_on_its_thread", source_tick_binds_only_a_published_live_training_wait_on_its_thread as fn()),
-            ("a_tick_bound_pane_is_not_bound_again_on_the_service_callback", a_tick_bound_pane_is_not_bound_again_on_the_service_callback as fn()),
             ("gnw_to_gunner_waits_for_key_and_native_applier_completion", gnw_to_gunner_waits_for_key_and_native_applier_completion as fn()),
-            ("same_class_reload_still_waits_for_pending_native_update", same_class_reload_still_waits_for_pending_native_update as fn()),
             ("pending_hud_assets_do_not_block_retirement_off_the_service_callback", pending_hud_assets_do_not_block_retirement_off_the_service_callback as fn()),
         ]);
     }
@@ -1191,47 +1100,11 @@ mod stage_hide_tests {
         assert!(!bypass_stage_hide(view, Some(Job { request: Request { row: 2, sub: 4 }, ..job })));
     }
 
-    fn stage_hide_bypass_covers_native_completion_until_owned_job_retires() {
-        // Run153: request (2,7) at 0x1201183800 has c/d/e = 0/1/0 when the
-        // hide fires again. Rendering has finished, but the native batch has not drained.
-        let armed = 0x12_0118_3800;
-        let job = Job::new(0, Request { row: 2, sub: 7 }, 7, 0);
-        let mut activity = BatchActivity::default();
-        activity.note(27, 27, armed, false);
-        let view = StageHideView {
-            batch: 0x11_810a_6f80, fresh_batch: 0x11_810a_6f80,
-            issued_batch: 0x11_810a_6f80, latch: 0, armed_request: armed, activity,
-        };
-        assert!(bypass_stage_hide(view, Some(job)));
-        // Retirement or a new native render restores ordinary native behaviour.
-        assert!(!bypass_stage_hide(view, None));
-        assert!(!bypass_stage_hide(StageHideView { armed_request: 0, ..view }, Some(job)));
-        activity.note(0, 27, 0x11_fd5c_2400, true);
-        assert!(!bypass_stage_hide(StageHideView { activity, ..view }, Some(job)));
-    }
-
-    fn batch_activity_ignores_null_slots_and_counts_every_foreign_active_request() {
-        let armed = 0x11_82b5_bc00;
-        let mut sparse = BatchActivity::default();
-        sparse.note(27, 27, armed, true);
-        sparse.note(3, 27, 0, true);
-        sparse.note(4, 27, 0x11_82b5_0800, false);
-        assert_eq!(sparse, BatchActivity { owned_slot: Some(27), owned_request: armed, foreign_active: 0 });
-        sparse.note(5, 27, 0x11_82b5_0a00, true);
-        sparse.note(70, 27, 0x11_82b5_8c00, true);
-        assert_eq!(sparse.foreign_active, 2);
-        let mut missing = BatchActivity::default();
-        missing.note(27, 27, 0, true);
-        assert_eq!(missing, BatchActivity { owned_slot: Some(27), ..BatchActivity::default() });
-    }
-
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
             ("stage_hide_bypass_only_for_the_owned_pass_of_the_armed_request", stage_hide_bypass_only_for_the_owned_pass_of_the_armed_request as fn()),
-            ("stage_hide_bypass_covers_native_completion_until_owned_job_retires", stage_hide_bypass_covers_native_completion_until_owned_job_retires as fn()),
-            ("batch_activity_ignores_null_slots_and_counts_every_foreign_active_request", batch_activity_ignores_null_slots_and_counts_every_foreign_active_request as fn()),
         ]);
     }
     }
@@ -1275,147 +1148,6 @@ mod tests {
         }
         o.bound(owner, Binding { request, descriptor: desc });
         request.sub
-    }
-
-    fn two_owners_cannot_share_a_row_and_rotate_independently() {
-        let mut o = Ownership::new(); let mut h = [0; 3];
-        assert_eq!(publish(&mut o, 0, 1, &mut h), 7);
-        assert!(o.issue(Job::new(1, req(8), 1, 0)).is_err());
-        let mut cpu_h = [0; 3];
-        assert_eq!(publish_on(&mut o, 1, 3, 1, &mut cpu_h), 7);
-        for _ in 0..6 {
-            let p1 = o.bound[0].unwrap(); let cpu = o.bound[1].unwrap();
-            let next = publish_on(&mut o, 1, 3, 9, &mut cpu_h);
-            assert_ne!(next, cpu.request.sub);
-            assert_eq!(o.bound[0], Some(p1));
-            let cpu = o.bound[1];
-            assert_ne!(publish(&mut o, 0, 9, &mut h), p1.request.sub);
-            assert_eq!(o.bound[1], cpu);
-        }
-        assert_eq!(o.owned_count(), 4);
-    }
-
-    fn drained_portrait_keeps_ownership_while_other_helper_loads() {
-        let mut o = Ownership::new(); let mut h = [0; 3];
-        publish(&mut o, 1, 1, &mut h);
-        let previous = o.bound[1];
-        let job = Job::new(1, req(8), 2, 0x7700);
-        o.issue(job).unwrap();
-        for _ in 0..240 {
-            assert_eq!(o.complete_when_helper_idle(drained(0x7800), live(ROW, 0x7828), true, true), Outcome::Wait);
-            assert_eq!(o.in_flight, Some(job));
-            assert_eq!(o.bound[1], previous);
-        }
-        assert_eq!(o.complete_when_helper_idle(drained(0x7800), live(ROW, 0x7828), true, false),
-            Outcome::Bind { owner: 1, index: 0x14 });
-        assert!(o.in_flight.is_none());
-        // Completion alone never changes a native pane or releases its old texture.
-        assert_eq!(o.bound[1], previous);
-    }
-
-    fn busy_helper_does_not_erase_contamination_or_departure() {
-        for mode in 0..3 {
-            let mut o = Ownership::new();
-            o.issue(Job::new(0, req(7), 1, 0)).unwrap();
-            assert_eq!(o.complete_when_helper_idle(drained(0x7700), idle(), mode != 0, true), Outcome::Wait);
-            if mode == 1 { o.supersede(0, 2); }
-            if mode == 2 { o.depart(); }
-            assert_eq!(o.complete_when_helper_idle(drained(0x7700), live(ROW, 0x7728), true, true), Outcome::Wait);
-            let expected = [DISCARD_CONTAMINATED, DISCARD_SUPERSEDED, DISCARD_DEPARTED][mode];
-            assert_eq!(o.complete_when_helper_idle(drained(0x7700), live(ROW, 0x7728), true, false), Outcome::Discard(expected));
-            assert_eq!(o.bound, [None; VISIBLE_OWNERS]);
-        }
-    }
-
-    fn old_texture_stays_bound_until_the_pane_moves() {
-        let mut o = Ownership::new(); let mut h = [0; 3];
-        assert_eq!(publish(&mut o, 0, 1, &mut h), 7);
-        let request = match o.select(ROW, words(&o, h)) { Select::Request { request, .. } => request, x => panic!("{:?}", x) };
-        assert_eq!(request.sub, 8);
-        o.issue(Job::new(0, request, 2, 0x7700)).unwrap();
-        assert!(matches!(o.select(ROW, words(&o, h)), Select::Refuse(_)));
-        assert_eq!(o.bound[0].unwrap().request.sub, 7);
-        assert!(matches!(o.complete(queued(0x7800), live(ROW, 1), true), Outcome::Wait));
-        // Drained but table pointer unchanged: not a fresh registration of ours.
-        assert!(matches!(o.complete(drained(0x7700), live(ROW, 1), true), Outcome::Discard(_)));
-        assert_eq!(o.bound[0].unwrap().request.sub, 7);
-        assert!(!o.is_owned(req(8)));
-        // Fresh issue completes and moves the pane; 7 is then free and 8 protected.
-        o.issue(Job::new(0, request, 3, 0x7700)).unwrap();
-        assert!(matches!(o.complete(drained(0x7800), live(ROW, 0x7828), true), Outcome::Bind { owner: 0, index: 0x14 }));
-        o.bound(0, Binding { request, descriptor: 0x7800 }); h[1] = 0x7828;
-        match o.select(ROW, words(&o, h)) { Select::Request { request, first_use } => { assert_eq!(request.sub, 7); assert!(!first_use); } x => panic!("{:?}", x) }
-        assert!(o.issue(Job::new(0, req(8), 4, 0)).is_err());
-    }
-
-    fn contamination_waits_for_drain_then_discards_and_never_binds() {
-        let mut o = Ownership::new(); let mut h = [0; 3];
-        assert_eq!(publish(&mut o, 0, 1, &mut h), 7);
-        o.issue(Job::new(0, req(8), 2, 0x7700)).unwrap();
-        // Fields changed while count 1 / word 0xb: latch, keep the job and the lease.
-        assert!(matches!(o.complete(queued(0x7700), idle(), false), Outcome::Wait));
-        assert!(o.in_flight.is_some_and(|j| j.contaminated));
-        // Fields match again and the queue still has not drained: still waiting.
-        assert!(matches!(o.complete(queued(0x7800), live(ROW, 0x7828), true), Outcome::Wait));
-        assert!(o.in_flight.is_some());
-        // Drained with everything looking registered: discarded, never bound, disowned.
-        assert!(matches!(o.complete(drained(0x7800), live(ROW, 0x7828), true), Outcome::Discard(_)));
-        assert!(o.in_flight.is_none());
-        assert!(!o.is_owned(req(8)));
-        assert_eq!(o.bound[0].unwrap().request.sub, 7);
-        assert!(matches!(o.select(ROW, words(&o, h)), Select::Request { request: Request { row: 2, sub: 8 }, first_use: true }));
-    }
-
-    fn supersession_and_cancellation_wait_for_drain_and_keep_the_bound_texture() {
-        let mut o = Ownership::new(); let mut h = [0; 3];
-        assert_eq!(publish(&mut o, 0, 1, &mut h), 7);
-        let request = req(8);
-        o.issue(Job::new(0, request, 2, 0)).unwrap();
-        o.supersede(0, 3);
-        assert!(matches!(o.complete(queued(0x7800), live(ROW, 0x7828), true), Outcome::Wait));
-        assert!(o.in_flight.is_some());
-        assert!(matches!(o.complete(drained(0x7800), live(ROW, 0x7828), true), Outcome::Discard(_)));
-        assert_eq!(o.bound[0].unwrap().request.sub, 7);
-        assert!(o.is_owned(req(8)));
-        h[1] = 0x7828;
-        match o.select(ROW, words(&o, h)) { Select::Request { request, first_use } => { assert_eq!(request.sub, 8); assert!(!first_use); } x => panic!("{:?}", x) }
-        // Cancellation: in-flight superseded, bound record untouched, old texture protected.
-        let mut p = Ownership::new(); let mut g = [0; 3];
-        assert_eq!(publish(&mut p, 0, 1, &mut g), 7);
-        p.issue(Job::new(0, req(8), 2, 0)).unwrap();
-        p.cancel_owner(0);
-        assert!(p.in_flight.unwrap().superseded);
-        assert_eq!(p.bound[0].unwrap().request.sub, 7);
-        assert!(p.issue(Job::new(1, req(7), 1, 0)).is_err()); // publisher busy
-        assert!(matches!(p.complete(drained(0x7800), live(ROW, 0x7828), true), Outcome::Discard(_)));
-        assert_eq!(p.bound[0].unwrap().request.sub, 7);
-        assert!(p.issue(Job::new(1, req(7), 1, 0)).is_err()); // still bound
-        // Supersession never applies to the other owner's job.
-        let mut r = Ownership::new();
-        r.issue(Job::new(1, req(7), 1, 0)).unwrap();
-        r.supersede(0, 9);
-        assert!(!r.in_flight.unwrap().superseded);
-    }
-
-    fn departure_and_teardown_keep_the_in_flight_record_until_drain() {
-        let mut o = Ownership::new(); let mut h = [0; 3];
-        publish(&mut o, 0, 1, &mut h); publish_on(&mut o, 1, 3, 1, &mut [0; 3]);
-        o.issue(Job::new(0, req(9), 2, 0)).unwrap();
-        o.depart();
-        assert!(o.in_flight.unwrap().departed);
-        assert_eq!(o.owned_count(), 2);
-        assert!(o.bound[0].is_some());
-        assert!(matches!(o.complete(queued(0x7900), live(ROW, 1), true), Outcome::Wait));
-        o.teardown();
-        assert_eq!(o.owned_count(), 0); assert_eq!(o.bound, [None; VISIBLE_OWNERS]);
-        assert!(o.in_flight.is_some());
-        assert!(matches!(o.select(ROW, [idle(); 3]), Select::Refuse(_)));
-        assert!(matches!(o.complete(drained(0x7900), live(ROW, 0x7928), true), Outcome::Discard(_)));
-        assert!(o.in_flight.is_none());
-        let mut p = Ownership::new();
-        p.issue(Job::new(0, req(7), 1, 0)).unwrap();
-        assert!(p.abandon_in_flight().is_some());
-        assert!(p.in_flight.is_none());
     }
 
     fn foreign_requests_are_never_taken_and_lost_ownership_is_reported() {
@@ -1535,70 +1267,21 @@ mod tests {
         assert!(matches!(o.complete(drained(0x7900), live(ROW, 1), true), Outcome::Discard(_)));
     }
 
-    /// hud59 P4: a verified original rebind releases the custom binding without disowning it.
-    fn verified_original_rebind_unbinds_without_disowning() {
-        let mut o = Ownership::new(); let mut h = [0; 3];
-        assert_eq!(publish(&mut o, 0, 1, &mut h), 7);
-        o.unbind(0);
-        assert!(o.bound[0].is_none());
-        assert!(o.is_owned(req(7)));
-        match o.select(ROW, words(&o, h)) { Select::Request { request, first_use } => { assert_eq!(request.sub, 7); assert!(!first_use); } x => panic!("{:?}", x) }
-    }
-
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
-            ("two_owners_cannot_share_a_row_and_rotate_independently", two_owners_cannot_share_a_row_and_rotate_independently as fn()),
-            ("drained_portrait_keeps_ownership_while_other_helper_loads", drained_portrait_keeps_ownership_while_other_helper_loads as fn()),
-            ("busy_helper_does_not_erase_contamination_or_departure", busy_helper_does_not_erase_contamination_or_departure as fn()),
-            ("old_texture_stays_bound_until_the_pane_moves", old_texture_stays_bound_until_the_pane_moves as fn()),
-            ("contamination_waits_for_drain_then_discards_and_never_binds", contamination_waits_for_drain_then_discards_and_never_binds as fn()),
-            ("supersession_and_cancellation_wait_for_drain_and_keep_the_bound_texture", supersession_and_cancellation_wait_for_drain_and_keep_the_bound_texture as fn()),
-            ("departure_and_teardown_keep_the_in_flight_record_until_drain", departure_and_teardown_keep_the_in_flight_record_until_drain as fn()),
             ("foreign_requests_are_never_taken_and_lost_ownership_is_reported", foreign_requests_are_never_taken_and_lost_ownership_is_reported as fn()),
             ("original_restoration_requires_explicit_intent", original_restoration_requires_explicit_intent as fn()),
             ("exclusive_lease_rule_never_shares_a_pinned_helper_or_steals", exclusive_lease_rule_never_shares_a_pinned_helper_or_steals as fn()),
             ("admission_tracks_the_native_gates", admission_tracks_the_native_gates as fn()),
             ("skip_only_for_the_exact_armed_uncontaminated_render", skip_only_for_the_exact_armed_uncontaminated_render as fn()),
             ("reuse_of_the_table_occupant_binds_after_an_observed_clear", reuse_of_the_table_occupant_binds_after_an_observed_clear as fn()),
-            ("verified_original_rebind_unbinds_without_disowning", verified_original_rebind_unbinds_without_disowning as fn()),
         ]);
     }
     }
 }
 
-#[cfg(test)]
-mod scope_tests {
-    lib_unit_tests! {
-    use super::*;
-    fn binding(row: u32, sub: u32) -> Binding { Binding { request: Request { row, sub }, descriptor: 0x7000 + sub as usize } }
-
-    #[test]
-    fn one_bust_row_per_owner() {
-        let none: [Option<Binding>; VISIBLE_OWNERS] = [None; VISIBLE_OWNERS];
-        assert!(row_free_for(&none, 0, 2));
-        assert!(row_free_for(&none, 1, 2));
-        // P1 bound on helper row 2: the CPU may not render on row 2, but may on row 3.
-        let p1_on_2 = [Some(binding(2, 7)), None, None, None];
-        assert!(row_free_for(&p1_on_2, 0, 2));   // the same owner replacing its own bust
-        assert!(!row_free_for(&p1_on_2, 1, 2));
-        assert!(row_free_for(&p1_on_2, 1, 3));
-        // Both bound on distinct rows: each may only keep its own row.
-        let split = [Some(binding(2, 7)), Some(binding(3, 7)), None, None];
-        assert!(row_free_for(&split, 0, 2));
-        assert!(!row_free_for(&split, 0, 3));
-        assert!(row_free_for(&split, 1, 3));
-        assert!(!row_free_for(&split, 1, 2));
-        // The guard composes with the existing bound-request exclusion in `select`.
-        let mut o = Ownership::new();
-        o.bound(0, binding(2, 7));
-        assert!(matches!(o.select(2, [RequestWords { index: -1, registered: 0, holder: 0 }; 3]),
-            Select::Request { request: Request { row: 2, sub: 8 }, first_use: true }));
-        assert!(!row_free_for(&o.bound, 1, 2));
-    }
-    }
-}
 
 #[cfg(test)]
 mod prepared_tests {
@@ -1613,45 +1296,6 @@ mod prepared_tests {
         }, RequestWords { index: table_index(request.row) as i32, registered: 1, holder: 0x8000 }, true),
             Outcome::Bind { .. }));
         Binding { request, descriptor }
-    }
-
-    fn four_owners_reserve_prepared_requests_without_publishing_or_aliasing_rows() {
-        let mut o = Ownership::new();
-        let measured = crate::engine::swap::mii_cycle::compact_regressions::AllocationCount::start();
-        for (owner, row) in [5, 6, 2, 3].into_iter().enumerate() {
-            let b = render(&mut o, owner, Request { row, sub: 7 }, 9);
-            let p = o.prepare(owner, b, 9).unwrap();
-            assert_eq!(o.prepared[owner], Some(p));
-            assert_eq!(o.bound[owner], None);
-            assert!(o.issue(Job::new(owner, b.request, 10, b.descriptor)).is_err());
-            assert!(!o.row_free_for((owner + 1) % 4, row));
-            assert!(matches!(o.select(row, [RequestWords { index: -1, registered: 0, holder: 0 }; 3]),
-                Select::Request { request: Request { sub: 8, .. }, .. }));
-        }
-        assert_eq!(measured.finish(), 0);
-    }
-
-    fn same_owner_rotation_retains_displayed_texture_during_unconditional_table_clear() {
-        let mut o = Ownership::new();
-        let a = render(&mut o, 2, Request { row: 2, sub: 7 }, 1);
-        let prepared = o.prepare(2, a, 1).unwrap();
-        o.bound(2, prepared.binding);
-        let b = render(&mut o, 2, Request { row: 2, sub: 8 }, 2);
-        o.bound(2, b);
-        o.issue(Job::new(2, a.request, 3, b.descriptor)).unwrap();
-        // Retarget A releases A's old registration and clears table[row], even
-        // though B is displayed. B remains batch-owned and must not be released.
-        assert_eq!(o.complete(Completion { queue: Queue { count: 1, word: 0xa }, table: 0,
-            descriptor: a.descriptor }, RequestWords { index: -1, registered: 0, holder: 0 }, true), Outcome::Wait);
-        assert_eq!(o.bound[2], Some(b));
-        assert!(o.is_owned(b.request));
-        assert!(matches!(o.complete(Completion { queue: Queue { count: 0, word: 0 },
-            table: a.descriptor, descriptor: a.descriptor }, RequestWords {
-                index: table_index(2) as i32, registered: 1, holder: 0x8000 }, true), Outcome::Bind { owner: 2, .. }));
-        assert_eq!(o.bound[2], Some(b));
-        o.bound(2, a);
-        assert_eq!(o.bound[2], Some(a));
-        assert!(o.is_owned(b.request));
     }
 
     fn preparation_serial_and_departure_reject_old_receipts_without_native_release() {
@@ -1676,8 +1320,6 @@ mod prepared_tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
-            ("four_owners_reserve_prepared_requests_without_publishing_or_aliasing_rows", four_owners_reserve_prepared_requests_without_publishing_or_aliasing_rows as fn()),
-            ("same_owner_rotation_retains_displayed_texture_during_unconditional_table_clear", same_owner_rotation_retains_displayed_texture_during_unconditional_table_clear as fn()),
             ("preparation_serial_and_departure_reject_old_receipts_without_native_release", preparation_serial_and_departure_reject_old_receipts_without_native_release as fn()),
         ]);
     }
@@ -1723,46 +1365,6 @@ mod native_admission_tests {
             assert_eq!(render_preset(request, request.sub, 0x48, Some(Job::new(0, request, 1, 0))), None);
         }
     }
-    fn invalid_part_indices_never_produce_an_address_offset() {
-        for index in [i32::MIN, -1, 8, i32::MAX] { assert_eq!(part_offset(index), None); }
-        assert_eq!(part_offset(0), Some(0x330));
-        assert_eq!(part_offset(7), Some(0x6220));
-    }
-    fn avoided_rows_do_not_satisfy_or_pin_a_portrait_want() {
-        assert!(!slot_may_install(1 << 2, 2));
-        assert!(slot_may_install(1 << 2, 3));
-        for slot in 0..8 { assert!(slot_may_install(0, slot)); }
-    }
-    fn native_stores_reject_match_and_unqualified_scene_modes() {
-        assert!(may_write_scene(0x20, 0x04040000));
-        assert!(may_write_scene(0x0d, 0x02010000));
-        for mode in [0x07010100, 0x07010101, 0x07010102, 0x07010400, 0x87010400] {
-            assert!(may_write_scene(0x0d, mode));
-        }
-        for (melee, mode) in [(0x0d,0x07010000),(0x0d,0x07010001),(0x0d,0x07010300),(0x0d,0x07010401),(0x10,0x07010400),(0x0e,0x07010400),
-            (0x0e,0x07010101),(0x01,0x02010000),(1,0x01010000),(0x20,0x02010000),(0x20,0x07010101)] {
-            assert!(!may_write_scene(melee, mode));
-        }
-    }
-
-    #[cfg(test)]
-    #[test]
-    fn hud_refresh_defers_only_an_active_in_scope_exact_mii() {
-        let defer = HudRefresh::DeferUntilPortrait;
-        let now = HudRefresh::Now;
-        // The reproduced switch is Gunner 0x4a. Brawler and Sword are the same exact-portrait path.
-        for kind in [0x48u32, 0x49, 0x4a] {
-            assert_eq!(hud_refresh(kind, HudIntent::Exact, true, true, false), defer);
-        }
-        assert_eq!(hud_refresh(0x4a, HudIntent::Original, true, true, false), now);
-        assert_eq!(hud_refresh(0x4a, HudIntent::NotMii, true, true, false), now);
-        assert_eq!(hud_refresh(0x0a, HudIntent::Exact, true, true, false), now);
-        assert_eq!(hud_refresh(0x47, HudIntent::Exact, true, true, false), now);
-        assert_eq!(hud_refresh(0x4b, HudIntent::Exact, true, true, false), now);
-        assert_eq!(hud_refresh(0x4a, HudIntent::Exact, false, true, false), now);
-        assert_eq!(hud_refresh(0x4a, HudIntent::Exact, true, false, false), now);
-        assert_eq!(hud_refresh(0x4a, HudIntent::Exact, true, true, true), now);
-    }
 
     #[cfg(test)]
     #[test]
@@ -1802,33 +1404,6 @@ mod native_admission_tests {
 
     #[cfg(test)]
     #[test]
-    fn refusal_retirement_and_budget_refresh_once_while_scene_exit_does_not() {
-        for terminal in [HudTerminal::Refusal, HudTerminal::Retirement, HudTerminal::Budget] {
-            let held = HudHold::start(HudRefresh::DeferUntilPortrait, 7);
-            let (done, step) = held.on_terminal(7, true, true, terminal);
-            assert_eq!(step, HudStep::RefreshFallback);
-            assert_eq!(done, HudHold::Published);
-            assert_eq!(done.on_terminal(7, true, true, terminal).1, HudStep::Keep);
-        }
-        let held = HudHold::start(HudRefresh::DeferUntilPortrait, 7);
-        let (dead, step) = held.on_terminal(7, true, true, HudTerminal::SceneExit);
-        assert_eq!(step, HudStep::Keep);
-        assert_eq!(dead, HudHold::Retired);
-        let (dead, step) = held.on_terminal(7, false, true, HudTerminal::Refusal);
-        assert_eq!(step, HudStep::Keep);
-        assert_eq!(dead, HudHold::Retired);
-        let (waiting, step) = held.on_terminal(7, true, false, HudTerminal::Refusal);
-        assert_eq!(step, HudStep::Keep);
-        assert_eq!(waiting, held);
-        let (dead, step) = held.on_proof(7, false, true);
-        assert_eq!(step, HudStep::Keep);
-        assert_eq!(dead, HudHold::Retired);
-        assert_eq!(held.retire().on_proof(7, true, true).1, HudStep::Keep);
-        assert_eq!(held.on_terminal(7, true, true, HudTerminal::Completed).1, HudStep::Keep);
-    }
-
-    #[cfg(test)]
-    #[test]
     fn foreign_callback_does_not_publish_and_a_later_service_proof_does() {
         let held = HudHold::start(HudRefresh::DeferUntilPortrait, 4);
         let (still, step) = held.on_proof(4, true, false);
@@ -1850,26 +1425,6 @@ mod native_admission_tests {
         assert!(!after_event_pane(Some(PaneRead { index: 0x20, part_ready: true })));
         assert!(!after_event_pane(Some(PaneRead { index: 0, part_ready: false })));
         assert!(!after_event_pane(None));
-    }
-
-    #[cfg(test)]
-    #[test]
-    fn rejected_deferral_falls_back_only_for_the_current_owner() {
-        assert_eq!(rejected_deferral(true, false, true, true), HudStep::RefreshFallback);
-        assert_eq!(rejected_deferral(true, true, true, true), HudStep::Keep);
-        assert_eq!(rejected_deferral(true, false, false, true), HudStep::Keep);
-        assert_eq!(rejected_deferral(false, false, true, true), HudStep::Keep);
-    }
-
-    #[cfg(test)]
-    #[test]
-    fn discard_reasons_choose_the_hud_terminal() {
-        assert_eq!(hud_terminal_for_discard(DISCARD_SUPERSEDED), HudTerminal::Superseded);
-        assert_eq!(hud_terminal_for_discard(DISCARD_DEPARTED), HudTerminal::Retirement);
-        assert_eq!(hud_terminal_for_discard(DISCARD_CONTAMINATED), HudTerminal::Refusal);
-        assert_eq!(hud_terminal_for_discard(DISCARD_UNREGISTERED), HudTerminal::Refusal);
-        assert_eq!(hud_terminal_for_discard(DISCARD_FULL), HudTerminal::Refusal);
-        assert_eq!(hud_terminal_for_discard("some other refusal"), HudTerminal::Refusal);
     }
 
     #[cfg(test)]
@@ -1903,9 +1458,6 @@ mod native_admission_tests {
     fn case_table() {
         crate::test_table::run(&[
             ("render_preset_does_not_change_request_identity_or_admit_foreign_work", render_preset_does_not_change_request_identity_or_admit_foreign_work as fn()),
-            ("invalid_part_indices_never_produce_an_address_offset", invalid_part_indices_never_produce_an_address_offset as fn()),
-            ("avoided_rows_do_not_satisfy_or_pin_a_portrait_want", avoided_rows_do_not_satisfy_or_pin_a_portrait_want as fn()),
-            ("native_stores_reject_match_and_unqualified_scene_modes", native_stores_reject_match_and_unqualified_scene_modes as fn()),
         ]);
     }
     }

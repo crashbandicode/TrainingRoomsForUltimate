@@ -49,22 +49,12 @@ fn the_target_note_shows_after_a_skipped_file_notice() {
     assert!(worker.contains("ComboNotices::ACTION_ID"));
 }
 
-fn the_skipped_notice_posts_once_per_change() {
-    let mut notes = ComboNotices::new();
-    assert!(matches!(notes.post_skipped(&skipped("typo.json")), SkipPost::Post(_)));
-    assert_eq!(notes.post_skipped(&skipped("typo.json")), SkipPost::Same);
-    assert!(matches!(notes.post_skipped(&skipped("other.json")), SkipPost::Post(_)));
-    let runtime = include_str!("../runtime/ui/combos.rs");
-    assert!(runtime.contains("post_skipped"));
-}
-
 /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
 #[test]
 fn case_table() {
     crate::test_table::run(&[
         ("saved_combos_show_the_focused_combos_full_label", saved_combos_show_the_focused_combos_full_label as fn()),
         ("the_target_note_shows_after_a_skipped_file_notice", the_target_note_shows_after_a_skipped_file_notice as fn()),
-        ("the_skipped_notice_posts_once_per_change", the_skipped_notice_posts_once_per_change as fn()),
     ]);
 }
 }

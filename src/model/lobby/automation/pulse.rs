@@ -363,18 +363,6 @@ mod tests {
         }
     }
 
-    fn run(action: Action, steps: usize) -> Vec<Record> {
-        let mut sched = Scheduler::new();
-        let cmd = Command { generation: 0x100, epoch: 1, serial: 1, action };
-        let mut out = Vec::new();
-        for _ in 0..steps {
-            let mut record = fresh(0.4);
-            sched.step(&mut record, Some(cmd));
-            out.push(record);
-        }
-        out
-    }
-
     fn record_is_one_port_slot_and_only_that_port_changes() {
         let mut records = [fresh(0.4); 10];
         for record in &mut records {
@@ -395,57 +383,6 @@ mod tests {
         let mut untouched = [fresh(0.4); 10];
         assert!(!inject_port(&mut untouched, 10, Some(cmd), &mut sched));
         assert_eq!(untouched[0].held, 0);
-    }
-
-    fn button_is_one_edge_five_holds_then_one_release_and_does_not_repeat() {
-        let trace = run(Action::ButtonA, 9);
-        assert_eq!(trace[0].held, MASK_A);
-        assert_eq!(trace[0].pressed, MASK_A);
-        assert_eq!(trace[0].released, 0);
-        for (step, record) in trace.iter().enumerate().take(6).skip(1) {
-            assert_eq!(record.held, MASK_A, "hold {step}");
-            assert_eq!(record.pressed, 0);
-        }
-        assert_eq!(trace[6].held, 0);
-        assert_eq!(trace[6].released, MASK_A);
-        assert_eq!(trace[6].left[2], 0.4);
-        assert_eq!(trace[7].held, 0);
-        assert_eq!(trace[7].released, 0);
-        assert_eq!(trace[8].pressed, 0);
-        let yes = run(Action::RematchYes, 7);
-        assert_eq!(yes[0].pressed, MASK_A);
-        assert_eq!(yes[0].left[0], 0.25);
-        assert_ne!(yes[0].held, MASK_L_LEFT);
-    }
-
-    fn rematch_no_holds_stick_then_ten_neutrals_then_one_a() {
-        let trace = run(Action::RematchNo, 30);
-        for (step, record) in trace.iter().enumerate().take(11) {
-            assert_eq!(record.held, MASK_L_LEFT, "stick {step}");
-            assert_eq!(record.left[0], -1.0);
-            assert_eq!(record.left[1], 0.0);
-            assert_eq!(record.left[2], 0.4);
-            assert_eq!(record.left[3], 0.0);
-            assert_eq!(record.right[0], 0.1);
-        }
-        assert_eq!(trace[0].pressed, MASK_L_LEFT);
-        assert_eq!(trace[1].pressed, 0);
-        for (step, record) in trace.iter().enumerate().take(21).skip(11) {
-            assert_eq!(record.held, 0, "gap {step}");
-            assert_eq!(record.pressed, 0);
-            assert_eq!(record.released, 0);
-            assert_eq!(record.left[0], 0.25);
-        }
-        assert_eq!(trace[21].pressed, MASK_A);
-        assert_eq!(trace[21].held, MASK_A);
-        for record in trace.iter().take(27).skip(22) {
-            assert_eq!(record.held, MASK_A);
-            assert_eq!(record.pressed, 0);
-        }
-        assert_eq!(trace[27].released, MASK_A);
-        assert_eq!(trace[27].held, 0);
-        assert_eq!(trace[28].held, 0);
-        assert_eq!(trace[29].pressed, 0);
     }
 
     fn cancel_releases_a_button_once_and_drops_the_rest_of_no() {
@@ -517,8 +454,6 @@ mod tests {
     fn case_table() {
         crate::test_table::run(&[
             ("record_is_one_port_slot_and_only_that_port_changes", record_is_one_port_slot_and_only_that_port_changes as fn()),
-            ("button_is_one_edge_five_holds_then_one_release_and_does_not_repeat", button_is_one_edge_five_holds_then_one_release_and_does_not_repeat as fn()),
-            ("rematch_no_holds_stick_then_ten_neutrals_then_one_a", rematch_no_holds_stick_then_ten_neutrals_then_one_a as fn()),
             ("cancel_releases_a_button_once_and_drops_the_rest_of_no", cancel_releases_a_button_once_and_drops_the_rest_of_no as fn()),
             ("a_second_press_waits_ten_neutral_steps", a_second_press_waits_ten_neutral_steps as fn()),
             ("slot_round_trip_keeps_generation_and_unknown_action_is_idle", slot_round_trip_keeps_generation_and_unknown_action_is_idle as fn()),

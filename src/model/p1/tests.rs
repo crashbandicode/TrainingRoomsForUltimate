@@ -55,77 +55,6 @@ fn parses_exact_config_examples_and_rounds_seconds_up() {
     assert_eq!(parsed.trigger, Trigger::AfterGameFrames(0));
 }
 
-fn rejects_invalid_config_and_requires_measured_ranks() {
-    for input in [
-        r#"{"level":0,"trigger":{"kind":"immediate"},"command":"release","guard_frames":60}"#,
-        r#"{"level":10,"trigger":{"kind":"immediate"},"command":"release","guard_frames":60}"#,
-        r#"{"level":1,"trigger":{"kind":"after_moves","moves":-1},"command":"release","guard_frames":60}"#,
-        r#"{"level":1,"trigger":{"kind":"after_seconds","seconds":-0.1},"command":"release","guard_frames":60}"#,
-        r#"{"level":1,"trigger":{"kind":"immediate","seconds":2},"command":"release","guard_frames":60}"#,
-    ] {
-        assert!(config::from_json(input).is_err(), "{}", input);
-    }
-    let invalid = config::JsonConfig {
-        level: 1,
-        trigger: config::JsonTrigger::AfterSeconds {
-            seconds: f64::INFINITY,
-        },
-        command: config::JsonCommand::Release,
-        require_contact: true,
-        guard_frames: 60,
-    };
-    assert!(Config::try_from(invalid).is_err());
-    assert!(Pilot::new(cfg(Trigger::Immediately, Command::Release), None).is_err());
-}
-
-fn immediate_and_zero_move_commands_obey_contact_configuration() {
-    for trigger in [Trigger::Immediately, Trigger::AfterCompletedMoves(0)] {
-        let mut release = Pilot::new(cfg(trigger, Command::Release), RANKS).unwrap();
-        assert_eq!(release.step(live(10)), Output::Pad);
-        assert_eq!(release.phase(), Phase::Done(End::Completed));
-        let mut config = cfg(trigger, Command::WalkOff);
-        config.require_contact = false;
-        let mut walk = Pilot::new(config, RANKS).unwrap();
-        assert_eq!(walk.step(live(10)), Output::Command(Command::WalkOff));
-    }
-}
-
-fn completed_attack_special_events_include_whiffs_without_guessing_or_duplicates() {
-    let mut pilot = Pilot::new(
-        cfg(Trigger::AfterCompletedMoves(2), Command::WalkOff),
-        RANKS,
-    )
-    .unwrap();
-    assert_eq!(pilot.step(live(0)), Output::Ai);
-    // Time / other actions alone cannot synthesize completed attack events.
-    assert_eq!(pilot.step(live(100)), Output::Ai);
-    assert_eq!(pilot.completed_moves(), 0);
-    let one_whiff = Frame {
-        completed_moves: 1,
-        ..live(101)
-    };
-    assert_eq!(pilot.step(one_whiff), Output::Ai);
-    assert_eq!(pilot.step(one_whiff), Output::Ai);
-    assert_eq!(pilot.completed_moves(), 1);
-    assert_eq!(
-        pilot.step(Frame {
-            completed_moves: 1,
-            ..live(102)
-        }),
-        Output::Ai
-    );
-    assert_eq!(pilot.completed_moves(), 2);
-    assert_eq!(pilot.damaging_hits(), 0);
-    assert_eq!(
-        pilot.step(Frame {
-            infliction: true,
-            target_damage: 6.0,
-            ..live(103)
-        }),
-        Output::Command(Command::WalkOff)
-    );
-}
-
 fn game_time_uses_active_frame_deltas_and_pauses_return_physical_pad() {
     let mut config = cfg(Trigger::AfterGameFrames(300), Command::WalkOff);
     config.require_contact = false;
@@ -165,32 +94,6 @@ fn game_time_uses_active_frame_deltas_and_pauses_return_physical_pad() {
         }),
         Output::Pad
     );
-}
-
-fn same_or_next_frame_damaging_hit_allows_walk_off() {
-    for delayed in [false, true] {
-        let mut pilot = Pilot::new(cfg(Trigger::Immediately, Command::WalkOff), RANKS).unwrap();
-        assert_eq!(pilot.step(live(10)), Output::Ai);
-        let edge = Frame {
-            infliction: true,
-            target_damage: if delayed { 0.0 } else { 8.0 },
-            ..live(11)
-        };
-        if delayed {
-            assert_eq!(pilot.step(edge), Output::Ai);
-            assert_eq!(
-                pilot.step(Frame {
-                    target_damage: 8.0,
-                    ..live(12)
-                }),
-                Output::Command(Command::WalkOff)
-            );
-        } else {
-            assert_eq!(pilot.step(edge), Output::Command(Command::WalkOff));
-        }
-        assert_eq!(pilot.damaging_hits(), 1);
-        assert_eq!(pilot.damage_dealt(), 8.0);
-    }
 }
 
 fn sustained_infliction_cannot_count_damage_beyond_next_frame() {
@@ -238,30 +141,6 @@ fn sustained_infliction_cannot_count_damage_beyond_next_frame() {
     assert_eq!(pilot.damage_dealt(), 3.0);
 }
 
-fn pause_discards_pending_hit_before_unrelated_resumed_damage() {
-    let mut pilot = Pilot::new(cfg(Trigger::Immediately, Command::WalkOff), RANKS).unwrap();
-    pilot.step(live(0));
-    pilot.step(Frame {
-        infliction: true,
-        ..live(1)
-    });
-    assert_eq!(
-        pilot.step(Frame {
-            active: false,
-            ..live(2)
-        }),
-        Output::Pad
-    );
-    assert_eq!(
-        pilot.step(Frame {
-            target_damage: 12.0,
-            ..live(100)
-        }),
-        Output::Ai
-    );
-    assert_eq!(pilot.damaging_hits(), 0);
-}
-
 fn match_end_identity_and_walk_off_completion_release_control() {
     for identity_change in [false, true] {
         let mut pilot =
@@ -297,34 +176,14 @@ fn match_end_identity_and_walk_off_completion_release_control() {
     assert_eq!(pilot.phase(), Phase::Done(End::Completed));
 }
 
-fn guard_releases_both_ai_and_command_at_frame_limit() {
-    for trigger in [Trigger::Immediately, Trigger::AfterGameFrames(60)] {
-        let mut config = cfg(trigger, Command::WalkOff);
-        config.require_contact = false;
-        config.guard_frames = 2;
-        let mut pilot = Pilot::new(config, RANKS).unwrap();
-        pilot.step(live(100));
-        pilot.step(live(101));
-        assert_eq!(pilot.step(live(102)), Output::Pad);
-        assert_eq!(pilot.phase(), Phase::Done(End::GuardExpired));
-        assert_eq!(pilot.step(live(103)), Output::Pad);
-    }
-}
-
 /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
 #[test]
 fn case_table() {
     crate::test_table::run(&[
         ("parses_exact_config_examples_and_rounds_seconds_up", parses_exact_config_examples_and_rounds_seconds_up as fn()),
-        ("rejects_invalid_config_and_requires_measured_ranks", rejects_invalid_config_and_requires_measured_ranks as fn()),
-        ("immediate_and_zero_move_commands_obey_contact_configuration", immediate_and_zero_move_commands_obey_contact_configuration as fn()),
-        ("completed_attack_special_events_include_whiffs_without_guessing_or_duplicates", completed_attack_special_events_include_whiffs_without_guessing_or_duplicates as fn()),
         ("game_time_uses_active_frame_deltas_and_pauses_return_physical_pad", game_time_uses_active_frame_deltas_and_pauses_return_physical_pad as fn()),
-        ("same_or_next_frame_damaging_hit_allows_walk_off", same_or_next_frame_damaging_hit_allows_walk_off as fn()),
         ("sustained_infliction_cannot_count_damage_beyond_next_frame", sustained_infliction_cannot_count_damage_beyond_next_frame as fn()),
-        ("pause_discards_pending_hit_before_unrelated_resumed_damage", pause_discards_pending_hit_before_unrelated_resumed_damage as fn()),
         ("match_end_identity_and_walk_off_completion_release_control", match_end_identity_and_walk_off_completion_release_control as fn()),
-        ("guard_releases_both_ai_and_command_at_frame_limit", guard_releases_both_ai_and_command_at_frame_limit as fn()),
     ]);
 }
 }

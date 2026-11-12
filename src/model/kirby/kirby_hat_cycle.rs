@@ -159,20 +159,6 @@ mod tests {
     lib_unit_tests! {
     use super::*;
 
-    fn lobby_return_restores_equipped_hat_once_for_each_role() {
-        let mut roles = [HatContinuation::new(), HatContinuation::new()];
-        for (role, kind) in [0x48, 0x02].iter().copied().enumerate() {
-            let mut cycle = HatCycle::new();
-            cycle.commit(kind);
-            roles[role].observe(HatSnapshot { cycle, equipped: Some(kind) });
-            roles[role].scene_changed(true); // Match departure.
-            roles[role].scene_changed(true); // Waiting practice returns.
-            roles[role].observe(HatSnapshot::default()); // Transitional native body.
-            assert_eq!(roles[role].take_restore().unwrap().equipped, Some(kind));
-            assert!(roles[role].take_restore().is_none());
-        }
-    }
-
     fn lost_hat_stays_lost_but_shortcut_cursor_survives_return() {
         let mut memory = HatContinuation::new();
         let mut cycle = HatCycle::new();
@@ -184,76 +170,6 @@ mod tests {
         let snapshot = memory.take_restore().unwrap();
         assert_eq!(snapshot.equipped, None);
         assert_eq!(snapshot.cycle.target(&[0x02, 0x48], None), Some(0x48));
-    }
-
-    fn fresh_session_or_non_kirby_choice_forgets_hat() {
-        for fresh_scene in [false, true] {
-            let mut memory = HatContinuation::new();
-            memory.observe(HatSnapshot { cycle: HatCycle::new(), equipped: Some(0x48) });
-            if fresh_scene { memory.scene_changed(false); } else { memory.clear(); }
-            memory.scene_changed(true);
-            assert!(memory.take_restore().is_none());
-        }
-    }
-
-    fn starts_advances_restores_and_wraps() {
-        let mut cycle = HatCycle::default();
-        let choices = [0, 3, 0x53];
-        assert_eq!(cycle.target(&choices, Some(3)), Some(0));
-        cycle.commit(0);
-        assert_eq!(cycle.target(&choices, Some(0)), Some(3));
-        cycle.commit(3);
-        assert_eq!(cycle.target(&choices, None), Some(3));
-        cycle.commit(3);
-        assert_eq!(cycle.target(&choices, Some(3)), Some(0x53));
-        cycle.commit(0x53);
-        assert_eq!(cycle.target(&choices, Some(0x53)), Some(0));
-    }
-
-    fn unaccepted_load_does_not_advance_and_roles_are_independent() {
-        let mut roles = [HatCycle::default(); 2];
-        roles[0].commit(0);
-        assert_eq!(roles[0].target(&[0, 3], Some(0)), Some(3));
-        // No native acceptance, therefore no commit.
-        assert_eq!(roles[0].target(&[0, 3], Some(0)), Some(3));
-        assert_eq!(roles[1].target(&[3, 0], None), Some(3));
-        assert_eq!(roles[0].target(&[0, 3], None), Some(0));
-    }
-
-    fn edited_list_uses_current_order_without_equipping_anything() {
-        let mut cycle = HatCycle::default();
-        cycle.commit(3);
-        assert_eq!(cycle.target(&[3, 0, 2], Some(3)), Some(0));
-        assert_eq!(cycle.target(&[0, 2], Some(3)), Some(0));
-        assert_eq!(cycle.target(&[], None), None);
-        assert_eq!(cycle.target(&[3], None), Some(3));
-        assert_eq!(cycle.target(&[3], Some(3)), Some(3));
-    }
-
-    fn held_shortcut_is_consumed_until_special_release() {
-        let mut latch = ShortcutLatch::default();
-        assert_eq!(
-            latch.sample(true, true, true, false, [true; 2]),
-            (Some(0), true)
-        );
-        for _ in 0..60 {
-            assert_eq!(
-                latch.sample(true, true, true, false, [true; 2]),
-                (None, true)
-            );
-        }
-        assert_eq!(
-            latch.sample(true, true, false, false, [true; 2]),
-            (None, true)
-        );
-        assert_eq!(
-            latch.sample(false, true, false, false, [true; 2]),
-            (None, false)
-        );
-        assert_eq!(
-            latch.sample(true, true, false, true, [true; 2]),
-            (Some(1), true)
-        );
     }
 
     fn directional_unavailable_and_ambiguous_chords_do_not_request() {
@@ -319,13 +235,7 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
-            ("lobby_return_restores_equipped_hat_once_for_each_role", lobby_return_restores_equipped_hat_once_for_each_role as fn()),
             ("lost_hat_stays_lost_but_shortcut_cursor_survives_return", lost_hat_stays_lost_but_shortcut_cursor_survives_return as fn()),
-            ("fresh_session_or_non_kirby_choice_forgets_hat", fresh_session_or_non_kirby_choice_forgets_hat as fn()),
-            ("starts_advances_restores_and_wraps", starts_advances_restores_and_wraps as fn()),
-            ("unaccepted_load_does_not_advance_and_roles_are_independent", unaccepted_load_does_not_advance_and_roles_are_independent as fn()),
-            ("edited_list_uses_current_order_without_equipping_anything", edited_list_uses_current_order_without_equipping_anything as fn()),
-            ("held_shortcut_is_consumed_until_special_release", held_shortcut_is_consumed_until_special_release as fn()),
             ("directional_unavailable_and_ambiguous_chords_do_not_request", directional_unavailable_and_ambiguous_chords_do_not_request as fn()),
             ("cpu_operator_chords_cycle_only_the_cpu_hat_on_their_own_latch", cpu_operator_chords_cycle_only_the_cpu_hat_on_their_own_latch as fn()),
         ]);

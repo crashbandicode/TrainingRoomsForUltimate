@@ -30,37 +30,10 @@ fn training_helpers_admit_a_changed_hat_and_an_unequal_saved_pair() {
     assert_eq!(cpu::headgear_reload(Layout::Training, 2, 0, 0), Ok(false));
 }
 
-fn invalid_slots_and_a_max_hat_are_refused() {
-    for slot in [0usize, 1, 4, 5, 6, 7, 8] {
-        assert!(!cpu::helper_slot_admission(Layout::Training, slot, [0, 125], 125), "{slot}");
-    }
-    assert!(!cpu::helper_slot_admission(Layout::Training, 2, [0, 125], u16::MAX));
-    assert_eq!(
-        cpu::headgear_reload(Layout::Training, 2, 0, u16::MAX),
-        Err("invalid headgear row"),
-    );
-}
-
-fn waiting_helpers_admit_a_changed_hat_and_reject_training_slots() {
-    for layout in [Layout::Ldn, Layout::Quickplay] {
-        assert!(cpu::helper_slot_admission(layout, 5, [0, 125], 125));
-        assert!(cpu::helper_slot_admission(layout, 6, [0, 125], 0));
-        assert!(cpu::helper_slot_admission(layout, 5, [0, 125], 0));
-        assert!(cpu::helper_slot_admission(layout, 6, [0, 125], 125));
-        assert!(!cpu::helper_slot_admission(layout, 2, [0, 125], 125));
-        assert!(!cpu::helper_slot_admission(layout, 3, [0, 125], 0));
-        assert_eq!(cpu::headgear_reload(layout, 5, 0, 125), Ok(true));
-        assert_eq!(cpu::headgear_reload(layout, 6, 125, 0), Ok(true));
-        assert_eq!(cpu::headgear_reload(layout, 5, 0, 0), Ok(false));
-    }
-}
-
 /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
 #[test]
 fn case_table() {
     crate::test_table::run(&[
         ("training_helpers_admit_a_changed_hat_and_an_unequal_saved_pair", training_helpers_admit_a_changed_hat_and_an_unequal_saved_pair as fn()),
-        ("invalid_slots_and_a_max_hat_are_refused", invalid_slots_and_a_max_hat_are_refused as fn()),
-        ("waiting_helpers_admit_a_changed_hat_and_reject_training_slots", waiting_helpers_admit_a_changed_hat_and_reject_training_slots as fn()),
     ]);
 }

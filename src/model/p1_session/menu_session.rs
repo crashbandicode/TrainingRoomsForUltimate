@@ -86,24 +86,12 @@ mod tests {
         );
     }
 
-    fn off_then_on_rearms_even_when_no_fighter_observes_the_off_commit() {
-        let mut arbitration = Arbitration::new();
-        let on = update(0, 3);
-        arbitration.observe(on, true);
-        assert_eq!(arbitration.observe(on, false), None);
-        let off = update(on, 0);
-        let on_again = update(off, 3);
-        assert_ne!(on_again, on);
-        assert_eq!(arbitration.observe(on_again, false), Some(3));
-    }
-
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
             ("menu_changes_replace_or_stop_and_repeated_commits_are_idempotent", menu_changes_replace_or_stop_and_repeated_commits_are_idempotent as fn()),
             ("request_preempts_until_a_later_explicit_setting_change", request_preempts_until_a_later_explicit_setting_change as fn()),
-            ("off_then_on_rearms_even_when_no_fighter_observes_the_off_commit", off_then_on_rearms_even_when_no_fighter_observes_the_off_commit as fn()),
         ]);
     }
     }

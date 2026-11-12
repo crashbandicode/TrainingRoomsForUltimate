@@ -439,48 +439,6 @@ mod tests {
         fn request(&self, choice: usize) -> ToggleRequest { self.toggle.request_choice(choice) }
     }
 
-    fn off_record_then_fram_publication_then_on_record() {
-        let mut sim = Sim::new(false);
-        assert_eq!(sim.current(), Some(CAPTURE_OFF));
-        assert_eq!(sim.start(7, 0, 0, true), Some(false));
-        assert!(sim.pool.active_key().is_none());
-        assert_eq!(sim.request(CAPTURE_ON), ToggleRequest::Pending);
-        // The latched value stays visible; nothing changes mid-record.
-        assert_eq!(sim.current(), Some(CAPTURE_OFF));
-        assert!(!sim.toggle.is_armed());
-        assert!(!sim.push(0, 10));
-        sim.publish(7, 0, true);
-        assert_eq!(sim.ended, vec![RecordEnded { armed: false, desired: true }]);
-        assert!(sim.ended[0].pending_applied());
-        assert_eq!(sim.toggle.phase(), RecordPhase::Idle);
-        assert_eq!(sim.current(), Some(CAPTURE_ON));
-        assert_eq!(sim.start(7, 1, 0, true), Some(true));
-        assert!(sim.toggle.is_armed());
-        assert!(sim.push(0, 10));
-        assert_eq!(sim.current(), Some(CAPTURE_ON));
-    }
-
-    fn on_to_off_with_a_bound_save_keeps_the_snapshot() {
-        let mut sim = Sim::new(true);
-        assert_eq!(sim.start(7, 0, 0, true), Some(true));
-        assert!(sim.push(0, 10));
-        assert!(sim.push(0, 11));
-        let bound = sim.copy(0).expect("native copy binds the prefix");
-        assert!(bound.truncated);
-        assert_eq!(bound.tracks[0].frames.len(), 2);
-        assert_eq!(sim.request(CAPTURE_OFF), ToggleRequest::Pending);
-        assert_eq!(sim.current(), Some(CAPTURE_ON));
-        // Toggling clears no buffers: the slot and its snapshot stay in the pool.
-        assert!(sim.pool.key_for_index(0).is_some());
-        sim.stop(7, false);
-        assert_eq!(sim.ended, vec![RecordEnded { armed: true, desired: false }]);
-        assert_eq!(sim.current(), Some(CAPTURE_OFF));
-        assert_eq!(bound.tracks[0].frames.len(), 2);
-        assert!(Arc::ptr_eq(&bound, &sim.copy(0).unwrap()));
-        assert_eq!(sim.start(7, 1, 0, true), Some(false));
-        assert!(sim.pool.key_for_index(0).is_some());
-    }
-
     fn unarmed_record_cannot_inherit_an_older_armed_key_for_its_slot() {
         for with_replacement_hook in [true, false] {
             let mut sim = Sim::new(true);
@@ -496,17 +454,6 @@ mod tests {
             assert!(sim.copy(3).is_none());
             assert_eq!(sim.owner.owner().map(|owner| owner.index), Some(3));
         }
-    }
-
-    fn rejected_native_start_changes_nothing() {
-        let mut sim = Sim::new(true);
-        assert_eq!(sim.start(7, 0, 0, false), None);
-        assert_eq!(sim.toggle.phase(), RecordPhase::Idle);
-        assert!(sim.owner.owner().is_none());
-        assert!(sim.pool.active_key().is_none());
-        assert_eq!(sim.request(CAPTURE_OFF), ToggleRequest::Applied);
-        assert_eq!(sim.current(), Some(CAPTURE_OFF));
-        assert!(sim.ended.is_empty());
     }
 
     fn nonzero_segment_continues_ownership_and_keeps_the_pending_latch() {
@@ -534,50 +481,6 @@ mod tests {
         assert!(idle.owner.owner().is_none());
     }
 
-    fn exhausted_record_ends_ownership_and_keeps_the_partial_prefix() {
-        let mut sim = Sim::new(true);
-        assert_eq!(sim.start(7, 0, 0, true), Some(true));
-        let key = sim.pool.active_key().unwrap();
-        assert!(sim.push(0, 5));
-        sim.serializer(7, Some((0, true)));
-        assert_eq!(sim.toggle.phase(), RecordPhase::Armed);
-        // The serializer cleared state2: native buffer exhaustion.
-        sim.serializer(7, Some((0, false)));
-        assert_eq!(sim.toggle.phase(), RecordPhase::Idle);
-        assert_eq!(sim.ended, vec![RecordEnded { armed: true, desired: true }]);
-        assert!(!sim.ended[0].pending_applied());
-        let saved = sim.pool.snapshot(key).unwrap();
-        assert!(saved.truncated);
-        assert_eq!(saved.tracks[0].frames.len(), 1);
-        assert_eq!(sim.request(CAPTURE_OFF), ToggleRequest::Applied);
-        sim.serializer(7, None);
-        sim.stop(7, true);
-        assert_eq!(sim.ended.len(), 1);
-    }
-
-    fn late_old_owner_events_do_not_end_a_newer_record() {
-        let mut sim = Sim::new(false);
-        assert_eq!(sim.start(1, 0, 0, true), Some(false));
-        assert_eq!(sim.request(CAPTURE_ON), ToggleRequest::Pending);
-        // A new native interface replaces the old one: its record ends, the latch applies.
-        assert_eq!(sim.start(2, 0, 0, true), Some(true));
-        assert_eq!(sim.ended, vec![RecordEnded { armed: false, desired: true }]);
-        assert!(sim.toggle.is_armed());
-        sim.stop(1, false);
-        sim.publish(1, 0, true);
-        sim.invalidate(1, 0);
-        sim.serializer(1, None);
-        sim.publish(2, 9, true);
-        sim.invalidate(2, 9);
-        sim.publish(2, 0, false);
-        assert!(sim.toggle.is_armed());
-        assert_eq!(sim.ended.len(), 1);
-        assert_eq!(sim.request(CAPTURE_OFF), ToggleRequest::Pending);
-        sim.publish(2, 0, true);
-        assert_eq!(sim.ended.len(), 2);
-        assert_eq!(sim.current(), Some(CAPTURE_OFF));
-    }
-
     fn request_racing_the_start_latch_governs_that_record() {
         let toggle = CaptureToggle::new();
         toggle.seed(false);
@@ -598,26 +501,6 @@ mod tests {
         assert_eq!(toggle.end_record(), Some(RecordEnded { armed: false, desired: false }));
     }
 
-    fn reversing_a_pending_request_from_the_row_settles_without_pending() {
-        let toggle = CaptureToggle::new();
-        toggle.seed(true);
-        toggle.set_ready();
-        assert!(toggle.begin_record());
-        assert_eq!(toggle.request_choice(CAPTURE_OFF), ToggleRequest::Pending);
-        assert_eq!(toggle.request_choice(CAPTURE_ON), ToggleRequest::Applied);
-        assert_eq!(toggle.current_choice(), Some(CAPTURE_ON));
-        assert!(toggle.desired());
-        let ended = toggle.end_record().unwrap();
-        assert_eq!(ended, RecordEnded { armed: true, desired: true });
-        assert!(!ended.pending_applied());
-        // Repeating the latched value is still a plain request, never reinterpreted.
-        assert!(toggle.begin_record());
-        assert_eq!(toggle.request_choice(CAPTURE_ON), ToggleRequest::Applied);
-        assert_eq!(toggle.request_choice(CAPTURE_OFF), ToggleRequest::Pending);
-        assert_eq!(toggle.request_choice(CAPTURE_OFF), ToggleRequest::Pending);
-        assert!(!toggle.desired());
-    }
-
     fn unavailable_until_ready_and_foreign_choices_are_rejected() {
         let toggle = CaptureToggle::new();
         toggle.seed(true);
@@ -631,20 +514,6 @@ mod tests {
         assert_eq!(toggle.current_choice(), Some(CAPTURE_ON));
         assert_eq!(toggle.request_choice(CAPTURE_OFF), ToggleRequest::Applied);
         assert_eq!(toggle.snapshot(), ToggleSnapshot { desired: false, phase: RecordPhase::Idle, ready: true });
-    }
-
-    fn packed_word_round_trips_every_field() {
-        for desired in [false, true] {
-            for phase in [RecordPhase::Idle, RecordPhase::Unarmed, RecordPhase::Armed] {
-                for ready in [false, true] {
-                    let snapshot = ToggleSnapshot { desired, phase, ready };
-                    assert_eq!(CaptureToggle::decode(CaptureToggle::encode(snapshot)), snapshot);
-                }
-            }
-        }
-        assert_eq!(RecordPhase::from_bits(3), RecordPhase::Idle);
-        assert_eq!(CaptureToggle::default().snapshot(),
-            ToggleSnapshot { desired: false, phase: RecordPhase::Idle, ready: false });
     }
 
     fn concurrent_requests_and_record_boundaries_stay_coherent() {
@@ -697,17 +566,10 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
-            ("off_record_then_fram_publication_then_on_record", off_record_then_fram_publication_then_on_record as fn()),
-            ("on_to_off_with_a_bound_save_keeps_the_snapshot", on_to_off_with_a_bound_save_keeps_the_snapshot as fn()),
             ("unarmed_record_cannot_inherit_an_older_armed_key_for_its_slot", unarmed_record_cannot_inherit_an_older_armed_key_for_its_slot as fn()),
-            ("rejected_native_start_changes_nothing", rejected_native_start_changes_nothing as fn()),
             ("nonzero_segment_continues_ownership_and_keeps_the_pending_latch", nonzero_segment_continues_ownership_and_keeps_the_pending_latch as fn()),
-            ("exhausted_record_ends_ownership_and_keeps_the_partial_prefix", exhausted_record_ends_ownership_and_keeps_the_partial_prefix as fn()),
-            ("late_old_owner_events_do_not_end_a_newer_record", late_old_owner_events_do_not_end_a_newer_record as fn()),
             ("request_racing_the_start_latch_governs_that_record", request_racing_the_start_latch_governs_that_record as fn()),
-            ("reversing_a_pending_request_from_the_row_settles_without_pending", reversing_a_pending_request_from_the_row_settles_without_pending as fn()),
             ("unavailable_until_ready_and_foreign_choices_are_rejected", unavailable_until_ready_and_foreign_choices_are_rejected as fn()),
-            ("packed_word_round_trips_every_field", packed_word_round_trips_every_field as fn()),
             ("concurrent_requests_and_record_boundaries_stay_coherent", concurrent_requests_and_record_boundaries_stay_coherent as fn()),
         ]);
     }

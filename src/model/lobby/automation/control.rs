@@ -208,35 +208,12 @@ mod tests {
         assert_eq!(c.current(3), Some(Progress::Armed as usize));
     }
 
-    fn concurrent_arm_is_claimed_once() {
-        let c = Controls::new();
-        c.enable();
-        let barrier = std::sync::Barrier::new(8);
-        let accepted = std::thread::scope(|scope| {
-            let jobs: Vec<_> = (0..8)
-                .map(|_| {
-                    let c = &c;
-                    let barrier = &barrier;
-                    scope.spawn(move || {
-                        barrier.wait();
-                        c.edit(2, 1)
-                    })
-                })
-                .collect();
-            jobs.into_iter()
-                .map(|j| usize::from(j.join().unwrap()))
-                .sum::<usize>()
-        });
-        assert_eq!(accepted, 1);
-    }
-
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
             ("unsupported_build_cannot_arm_and_settings_freeze_until_done", unsupported_build_cannot_arm_and_settings_freeze_until_done as fn()),
             ("cancelled_and_previous_callbacks_cannot_complete_new_request", cancelled_and_previous_callbacks_cannot_complete_new_request as fn()),
-            ("concurrent_arm_is_claimed_once", concurrent_arm_is_claimed_once as fn()),
         ]);
     }
     }

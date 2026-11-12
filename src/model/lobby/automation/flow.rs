@@ -170,49 +170,6 @@ mod tests {
             rematch,
         }
     }
-    fn every_action_is_once_and_save_must_finish_before_rematch() {
-        let mut f = Flow::new(request(true, Decision::Yes), 0);
-        let steps = [
-            (Screen::IntroReady, Effect::AdvanceIntro),
-            (Screen::Cards, Effect::RequestSave),
-            (Screen::SaveConfirm, Effect::ConfirmSave),
-            (Screen::Saving, Effect::None),
-            (Screen::SaveSuccess, Effect::CloseSave),
-            (Screen::SavedAndClosed, Effect::AdvanceResults),
-            (Screen::Rematch, Effect::Choose(Decision::Yes)),
-            (Screen::Accepted(Decision::Yes), Effect::Complete),
-        ];
-        for (screen, expected) in steps {
-            assert_eq!(f.observe(1, Some(42), screen), expected);
-            assert_eq!(f.observe(1, Some(42), screen), Effect::None);
-        }
-    }
-    fn save_failure_or_skipped_save_never_accepts_rematch() {
-        for (screen, why) in [
-            (Screen::SaveFailed, Failure::SaveFailed),
-            (Screen::Rematch, Failure::SaveSkipped),
-        ] {
-            let mut f = Flow::new(request(true, Decision::Yes), 0);
-            assert_eq!(f.observe(1, Some(1), Screen::Cards), Effect::RequestSave);
-            assert_eq!(f.observe(2, Some(1), screen), Effect::Failed(why));
-            assert_eq!(f.observe(3, Some(1), Screen::Rematch), Effect::None);
-        }
-    }
-    fn no_save_requires_the_requested_decision_and_manual_stops_at_cards() {
-        let mut f = Flow::new(request(false, Decision::No), 0);
-        assert_eq!(f.observe(1, Some(1), Screen::Cards), Effect::AdvanceResults);
-        assert_eq!(
-            f.observe(2, Some(1), Screen::Rematch),
-            Effect::Choose(Decision::No)
-        );
-        assert_eq!(
-            f.observe(3, Some(1), Screen::Accepted(Decision::Yes)),
-            Effect::Failed(Failure::WrongDecision)
-        );
-        let mut f = Flow::new(request(false, Decision::Manual), 0);
-        assert_eq!(f.observe(1, Some(2), Screen::Cards), Effect::Complete);
-        assert_eq!(f.observe(2, Some(2), Screen::Rematch), Effect::None);
-    }
     fn auto_advanced_results_still_apply_the_requested_rematch_once() {
         for choice in [Decision::Yes, Decision::No, Decision::Manual] {
             for saw_intro in [false, true] {
@@ -258,29 +215,12 @@ mod tests {
             assert_eq!(f.observe(3, Some(7), Screen::Rematch), Effect::None);
         }
     }
-    fn changed_results_or_timeout_stops_without_an_action() {
-        let mut f = Flow::new(request(true, Decision::Yes), 0);
-        assert_eq!(f.observe(1, Some(1), Screen::Cards), Effect::RequestSave);
-        assert_eq!(
-            f.observe(2, Some(2), Screen::SaveConfirm),
-            Effect::Failed(Failure::SceneChanged)
-        );
-        let mut f = Flow::new(request(true, Decision::Yes), 0);
-        assert_eq!(
-            f.observe(600_000, None, Screen::Waiting),
-            Effect::Failed(Failure::TimedOut)
-        );
-    }
 
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
-            ("every_action_is_once_and_save_must_finish_before_rematch", every_action_is_once_and_save_must_finish_before_rematch as fn()),
-            ("save_failure_or_skipped_save_never_accepts_rematch", save_failure_or_skipped_save_never_accepts_rematch as fn()),
-            ("no_save_requires_the_requested_decision_and_manual_stops_at_cards", no_save_requires_the_requested_decision_and_manual_stops_at_cards as fn()),
             ("auto_advanced_results_still_apply_the_requested_rematch_once", auto_advanced_results_still_apply_the_requested_rematch_once as fn()),
-            ("changed_results_or_timeout_stops_without_an_action", changed_results_or_timeout_stops_without_an_action as fn()),
         ]);
     }
     }

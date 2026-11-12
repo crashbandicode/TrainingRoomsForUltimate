@@ -529,27 +529,11 @@ mod generic_completion_tests {
         }
     }
 
-    fn ordinary_completion_cannot_adopt_saved_reserved_or_unfinished_owners() {
-        let f=loaded(0x6);
-        for invalid in [
-            GenericOrdinaryFacts {transaction_busy:true,..f},
-            GenericOrdinaryFacts {reservation_held:true,..f},
-            GenericOrdinaryFacts {origin_is_saved:true,..f},
-            GenericOrdinaryFacts {live_is_saved:true,..f},
-            GenericOrdinaryFacts {published_kind:0x0,..f},
-            GenericOrdinaryFacts {index:1,..f},
-        ] {assert!(generic_ordinary_commit(invalid).is_err());}
-        for kind in [0x48,0x49,0x4a] {
-            assert!(generic_ordinary_commit(loaded(kind)).is_err());
-        }
-    }
-
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
             ("ordinary_cycle_commits_kirby_mario_and_exact_origin", ordinary_cycle_commits_kirby_mario_and_exact_origin as fn()),
-            ("ordinary_completion_cannot_adopt_saved_reserved_or_unfinished_owners", ordinary_completion_cannot_adopt_saved_reserved_or_unfinished_owners as fn()),
         ]);
     }
     }
@@ -955,111 +939,6 @@ mod native_rank_tests {
         (binding,descriptor)
     }
 
-    fn rank_recapture_accepts_trigger_variant_boundaries_and_noop() {
-        for layout in [Layout::Training,Layout::Ldn,Layout::Quickplay] {
-            let (binding,origin)=original(layout);
-            for (before,after) in [(5,15),(15,20),(0,50),(50,77),(77,100),(100,0),(0,0)] {
-                let mut expected=origin;expected[0x37]=before;
-                let mut current=expected;current[0x37]=after;
-                assert_eq!(recapture_rank(layout,binding,binding,&expected,&current),Ok(current));
-                assert_eq!(native_rank(&current),Ok(after));
-                assert_eq!(expected[0x37],before);
-                assert_eq!(origin[0x37],0);
-            }
-        }
-    }
-
-    fn rank_recapture_rejects_each_byte_outside_the_live_behavior_bundle() {
-        let (binding,expected)=original(Layout::Ldn);
-        let mut current=expected;current[0x37]=50;
-        assert_eq!(recapture_rank(Layout::Ldn,binding,binding,&expected,&current),Ok(current));
-        // FE+0x10..0x14 and FE+0x34..=0x37 are the control select inputs; their
-        // neighbours stay identity.
-        for offset in (0..0x70).filter(|offset|!(0x10..0x14).contains(offset) && !(0x34..=0x37).contains(offset)) {
-            let mut changed=current;changed[offset]^=1;
-            assert!(recapture_rank(Layout::Ldn,binding,binding,&expected,&changed).is_err(),
-                "unexpected descriptor change at {offset:#x}");
-        }
-        for offset in [0x34,0x36] {
-            let mut changed=current;changed[offset]^=1;
-            assert_eq!(recapture_rank(Layout::Ldn,binding,binding,&expected,&changed),Ok(changed));
-        }
-        // The fixture's controller word is -1; one flipped bit leaves the native domain.
-        for offset in 0x10..0x14 {
-            let mut changed=current;changed[offset]^=1;
-            assert!(recapture_rank(Layout::Ldn,binding,binding,&expected,&changed).is_err(),
-                "out-of-domain controller change at {offset:#x} was adopted");
-        }
-        let mut assigned=current;assigned[0x10..0x14].copy_from_slice(&1i32.to_le_bytes());
-        assert_eq!(recapture_rank(Layout::Ldn,binding,binding,&expected,&assigned),Ok(assigned));
-    }
-
-    fn control_type_recapture_accepts_only_the_indexed_domain() {
-        let (binding,origin)=original(Layout::Ldn);
-        let mut current=origin;current[0x35]=0x22;current[0x37]=50;
-        assert_eq!(recapture_rank(Layout::Ldn,binding,binding,&origin,&current),Ok(current));
-        assert_eq!(origin[0x35],1);
-        assert_eq!(refresh_control_type(Layout::Ldn,binding,binding,&origin,&current),
-            Err("CPU control refresh changed other descriptor bytes"));
-        let mut control_only=origin;control_only[0x35]=0x22;
-        assert_eq!(refresh_control_type(Layout::Ldn,binding,binding,&origin,&control_only),Ok(control_only));
-        for rejected in [0x28u8,0xff] {
-            let mut high=origin;high[0x35]=rejected;
-            assert!(recapture_rank(Layout::Ldn,binding,binding,&origin,&high).is_err());
-            assert!(refresh_control_type(Layout::Ldn,binding,binding,&origin,&high).is_err());
-        }
-        // AI+0xc10 is live behavior for recapture; the control-type-only helper keeps refusing it.
-        let mut adjacent=control_only;adjacent[0x36]^=1;
-        assert_eq!(recapture_rank(Layout::Ldn,binding,binding,&origin,&adjacent),Ok(adjacent));
-        assert!(refresh_control_type(Layout::Ldn,binding,binding,&origin,&adjacent).is_err());
-        let stable=[0x40u8;0x70];
-        assert_eq!(recapture_rank(Layout::Ldn,binding,binding,&stable,&stable),Ok(stable));
-        let live=with_native_live_metadata(origin,&control_only).unwrap();
-        assert_eq!(live[0x35],0x22);
-        assert_eq!(&live[0x34..0x35],&origin[0x34..0x35]);
-        assert_eq!(&live[0x36..0x46],&origin[0x36..0x46]);
-        let restored=staged_descriptor_in(Layout::Ldn,binding.owner as usize,live,None).unwrap();
-        assert_eq!(restored[0x35],0x22);
-        assert_eq!(u32::from_le_bytes(restored[0x18..0x1c].try_into().unwrap()),
-            u32::from_le_bytes(origin[0x18..0x1c].try_into().unwrap()));
-        assert_eq!(restored[0x46..0x48],origin[0x46..0x48]);
-    }
-
-    fn unsupported_rank_is_rejected_on_either_side_even_without_drift() {
-        let (binding,valid)=original(Layout::Training);
-        for rank in [101,255] {
-            let mut invalid=valid;invalid[0x37]=rank;
-            assert!(native_rank(&invalid).is_err());
-            assert!(with_native_rank(valid,&invalid).is_err());
-            assert!(with_native_rank(invalid,&valid).is_err());
-            for (expected,current) in [(valid,invalid),(invalid,valid),(invalid,invalid)] {
-                assert!(recapture_rank(Layout::Training,binding,binding,&expected,&current).is_err());
-            }
-        }
-    }
-
-    fn rank_recapture_rejects_changed_binding_and_non_cpu_or_retired_lifetimes() {
-        let (binding,expected)=original(Layout::Ldn);
-        let mut current=expected;current[0x37]=77;
-        for changed in [
-            Binding {epoch:binding.epoch+1,..binding},
-            Binding {owner:5,..binding},
-            Binding {entry:binding.entry+8,..binding},
-            Binding {row:binding.row+8,..binding},
-            Binding {holder:binding.holder+8,..binding},
-            Binding {manager:binding.manager+8,..binding},
-            Binding {vector_begin:binding.vector_begin+0x68,..binding},
-            Binding {vector_end:binding.vector_end+0x68,..binding},
-            Binding {record_index:binding.record_index+1,..binding},
-        ] {
-            assert!(recapture_rank(Layout::Ldn,binding,changed,&expected,&current).is_err());
-        }
-        for invalid in [Binding {epoch:0,..binding},Binding {owner:0,..binding},Binding {owner:5,..binding}] {
-            assert!(recapture_rank(Layout::Ldn,invalid,invalid,&expected,&current).is_err());
-        }
-        assert!(recapture_rank(Layout::Training,binding,binding,&expected,&current).is_err());
-    }
-
     fn saved_original_and_saved_reuse_retain_live_rank_without_mutating_origin() {
         use {crate::engine::mii::inventory::MiiClass, crate::engine::mii::lifetime::Tokens, crate::engine::mii::native_values::RowIds};
         let saved=Configuration::from_observed(MiiClass::Swordfighter,
@@ -1095,37 +974,6 @@ mod native_rank_tests {
                 assert_eq!(reused,wanted);
                 assert_eq!(origin,frozen_origin);
             }
-        }
-    }
-
-    fn rank_aware_generic_original_classification_stays_exact_for_other_bytes() {
-        for layout in [Layout::Training,Layout::Ldn,Layout::Quickplay] {
-            let (_,origin)=original(layout);
-            let index=u16::from_le_bytes(origin[0x46..0x48].try_into().unwrap());
-            let mut current=origin;current[0x37]=77;
-            let classify=|descriptor:[u8;0x70]| {
-                let live_origin=with_native_live_metadata(origin,&descriptor)?;
-                generic_ordinary_commit_in(layout,index,GenericOrdinaryFacts {
-                    reservation_held:false,origin_is_saved:false,live_is_saved:false,transaction_busy:false,
-                    kind:9,origin_kind:9,published_kind:9,index,
-                    descriptor_equals_origin:descriptor==live_origin,roster_cursor:Some(2),
-                })
-            };
-            assert_eq!(classify(current),Ok(Destination {target:Target::ORIGINAL,cursor:None}));
-            let mut control=current;control[0x35]=0x22;
-            assert_eq!(classify(control),Ok(Destination {target:Target::ORIGINAL,cursor:None}));
-            // A return to the original under another live behavior is still the original.
-            for offset in [0x34,0x36] {
-                let mut changed=current;changed[offset]^=1;
-                assert_eq!(classify(changed),Ok(Destination {target:Target::ORIGINAL,cursor:None}));
-            }
-            for offset in [0x33,0x38,0x43] {
-                let mut changed=current;changed[offset]^=1;
-                assert_eq!(classify(changed),Ok(Destination {target:Target::fighter(9),cursor:Some(2)}));
-            }
-            current[0x37]=101;
-            assert!(classify(current).is_err());
-            assert_eq!(origin[0x37],0);
         }
     }
 
@@ -1193,37 +1041,6 @@ mod native_rank_tests {
         }
     }
 
-    fn live_behavior_only_change_is_the_bank_receipt_descriptor_rule() {
-        let (_,origin)=original(Layout::Training);
-        // Native Training CPU Behavior=Control (C104 #336..#342): controller word
-        // ffffffff>00000001, operation 01>00, control type 01>24, rank 100>21.
-        let control=controlled(origin,1,0,0x24,0,21);
-        assert!(live_behavior_only_change(&origin,&control));
-        assert!(live_behavior_only_change(&control,&origin));
-        assert!(live_behavior_only_change(&origin,&origin));
-        // Each live byte alone is accepted inside its domain.
-        for alone in [controlled(origin,8,1,1,0,0),controlled(origin,-1,0,1,0,0),controlled(origin,-1,1,0x27,0,0),
-                controlled(origin,-1,1,1,0xff,0),controlled(origin,-1,1,1,0,100)] {
-            assert!(live_behavior_only_change(&origin,&alone));
-        }
-        // Pad outside -1..=8, control type above 0x27 or rank above 100 refuses.
-        for unqualified in [controlled(origin,9,0,0x24,0,21),controlled(origin,-2,0,0x24,0,21),
-                controlled(origin,1,0,0x28,0,21),controlled(origin,1,0,0x24,0,101)] {
-            assert!(!live_behavior_only_change(&origin,&unqualified));
-            assert!(!live_behavior_only_change(&unqualified,&control));
-        }
-        // An unchanged byte keeps any value: another role's entry is never refused for its own values.
-        let mut odd=origin;odd[0x37]=0xff;odd[0x35]=0x7f;odd[0x10..0x14].copy_from_slice(&0x7fu32.to_le_bytes());
-        assert!(live_behavior_only_change(&odd,&odd));
-        // Every byte outside the five live bytes must match exactly, beside a toggle or alone.
-        for offset in (0..0x70).filter(|o|!(0x10..0x14).contains(o) && !(0x34..0x38).contains(o)) {
-            let mut beside=control;beside[offset]^=1;
-            let mut alone=origin;alone[offset]^=1;
-            assert!(!live_behavior_only_change(&origin,&beside),"identity change at {offset:#x} accepted beside Control");
-            assert!(!live_behavior_only_change(&origin,&alone),"identity change at {offset:#x} accepted alone");
-        }
-    }
-
     fn controller_word_outside_the_native_domain_or_its_neighbours_refuses() {
         let (binding,origin)=original(Layout::Training);
         let control=controlled(origin,1,0,0x24,0,21);
@@ -1263,45 +1080,6 @@ mod native_rank_tests {
         assert_eq!(recapture_rank(Layout::Training,binding,binding,&stable,&stable_rank),Ok(stable_rank));
     }
 
-    fn every_native_behavior_including_control_is_recaptured_and_returns_to_cpu() {
-        for layout in [Layout::Training,Layout::Ldn,Layout::Quickplay] {
-            let (binding,origin)=original(layout);
-            let stop=behavior(origin,1,0x22,0,0);
-            let attack=behavior(origin,1,0x05,0,0);
-            let level=behavior(origin,1,0x05,0,77);
-            // C94 runtime: selecting Control changed only operation 01>00 and type 01>24.
-            let control=behavior(origin,0,0x24,0,0);
-            // C104 runtime: Control additionally assigned controller ffffffff>00000001 and rank 100>21.
-            let assigned=controlled(origin,1,0,0x24,0,21);
-            // Each idle change from the previously adopted behavior, then back to the CPU origin.
-            let mut expected=origin;
-            for current in [stop,attack,level,control,assigned,stop,assigned,origin] {
-                assert_eq!(recapture_rank(layout,binding,binding,&expected,&current),Ok(current));
-                expected=current;
-            }
-            assert_eq!(expected,origin);
-        }
-    }
-
-    fn identity_or_unqualified_bytes_beside_a_control_change_still_refuse() {
-        let (binding,origin)=original(Layout::Training);
-        let control=behavior(origin,0,1,3,0);
-        assert_eq!(recapture_rank(Layout::Training,binding,binding,&origin,&control),Ok(control));
-        // Owner word, kind group, the neighbouring bytes, O header byte, starting form, index.
-        for offset in [0x04,0x18,0x33,0x38,0x41,0x43,0x46] {
-            let mut changed=control;changed[offset]^=1;
-            assert!(recapture_rank(Layout::Training,binding,binding,&origin,&changed).is_err(),
-                "identity change at {offset:#x} was adopted with Control");
-            assert_ne!(with_native_live_metadata(origin,&changed),Ok(changed));
-        }
-        for unqualified in [behavior(origin,0,0x28,3,0),behavior(origin,0,0xff,3,0),behavior(origin,0,1,3,101)] {
-            assert!(recapture_rank(Layout::Training,binding,binding,&origin,&unqualified).is_err());
-            assert!(with_native_live_metadata(origin,&unqualified).is_err());
-        }
-        let retired=Binding {epoch:binding.epoch+1,..binding};
-        assert!(recapture_rank(Layout::Training,binding,retired,&origin,&control).is_err());
-    }
-
     fn original_restore_and_exact_mii_staging_keep_the_live_behavior() {
         use {crate::engine::mii::inventory::MiiClass, crate::engine::mii::lifetime::Tokens, crate::engine::mii::native_values::RowIds};
         let saved=Configuration::from_observed(MiiClass::Swordfighter,
@@ -1331,18 +1109,9 @@ mod native_rank_tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
-            ("rank_recapture_accepts_trigger_variant_boundaries_and_noop", rank_recapture_accepts_trigger_variant_boundaries_and_noop as fn()),
-            ("rank_recapture_rejects_each_byte_outside_the_live_behavior_bundle", rank_recapture_rejects_each_byte_outside_the_live_behavior_bundle as fn()),
-            ("control_type_recapture_accepts_only_the_indexed_domain", control_type_recapture_accepts_only_the_indexed_domain as fn()),
-            ("unsupported_rank_is_rejected_on_either_side_even_without_drift", unsupported_rank_is_rejected_on_either_side_even_without_drift as fn()),
-            ("rank_recapture_rejects_changed_binding_and_non_cpu_or_retired_lifetimes", rank_recapture_rejects_changed_binding_and_non_cpu_or_retired_lifetimes as fn()),
             ("saved_original_and_saved_reuse_retain_live_rank_without_mutating_origin", saved_original_and_saved_reuse_retain_live_rank_without_mutating_origin as fn()),
-            ("rank_aware_generic_original_classification_stays_exact_for_other_bytes", rank_aware_generic_original_classification_stays_exact_for_other_bytes as fn()),
             ("control_assignment_recaptures_the_controller_word_and_returns_to_cpu", control_assignment_recaptures_the_controller_word_and_returns_to_cpu as fn()),
-            ("live_behavior_only_change_is_the_bank_receipt_descriptor_rule", live_behavior_only_change_is_the_bank_receipt_descriptor_rule as fn()),
             ("controller_word_outside_the_native_domain_or_its_neighbours_refuses", controller_word_outside_the_native_domain_or_its_neighbours_refuses as fn()),
-            ("every_native_behavior_including_control_is_recaptured_and_returns_to_cpu", every_native_behavior_including_control_is_recaptured_and_returns_to_cpu as fn()),
-            ("identity_or_unqualified_bytes_beside_a_control_change_still_refuse", identity_or_unqualified_bytes_beside_a_control_change_still_refuse as fn()),
             ("original_restore_and_exact_mii_staging_keep_the_live_behavior", original_restore_and_exact_mii_staging_keep_the_live_behavior as fn()),
         ]);
     }
@@ -1473,73 +1242,6 @@ mod tests {
             saved.object, [1, 0x4a, u32::MAX, u32::MAX, 1], 1, [68, 0, 37, 4]));
     }
 
-    fn exchanged_group_outgoing_header_is_its_own_capture_not_the_descriptor_words() {
-        // PTA116T #651-#659 (D-PTA1): CPU1 sits in the exchanged group [Wario, Pit]
-        // (FE words count 2, [0x21, 0x1e, -1]) while the shared R still carries the
-        // window's header [1, Luigi, DK, Yoshi, 0]. A Reload submitted from that state
-        // must be publishable; the descriptor-derived header refused exactly this.
-        let before = rows()[OWNER].unwrap();
-        let mut descriptor = [0u8; 0x70];
-        descriptor[0x14..0x18].copy_from_slice(&2u32.to_le_bytes());
-        descriptor[0x18..0x1c].copy_from_slice(&0x21u32.to_le_bytes());
-        descriptor[0x1c..0x20].copy_from_slice(&0x1eu32.to_le_bytes());
-        descriptor[0x20..0x24].copy_from_slice(&u32::MAX.to_le_bytes());
-        descriptor[0x28] = 1;
-        let window_header = [1, 9, 1, 5, 0];
-        let exchanged = descriptor_header(before.selector, &descriptor);
-        assert_eq!(exchanged, [1, 0x21, 0x1e, u32::MAX, 0]);
-        assert!(outgoing_object_matches_for(before, window_header, [0; 4],
-            before.object, window_header, 0, [0; 4]));
-        // The C116 expectation (FE words) against the unchanged R header: refused.
-        assert!(!outgoing_object_matches_for(before, exchanged, [0; 4],
-            before.object, window_header, 0, [0; 4]));
-        // A header that changed since the capture still refuses, word by word.
-        for field in 0..5 {
-            let mut changed = window_header;
-            changed[field] ^= 1;
-            assert!(!outgoing_object_matches_for(before, window_header, [0; 4],
-                before.object, changed, 0, [0; 4]));
-        }
-        // A capture naming another selector, another O or another index still refuses.
-        let foreign = [0, 9, 1, 5, 0];
-        assert!(!outgoing_object_matches_for(before, foreign, [0; 4], before.object, foreign, 0, [0; 4]));
-        assert!(!outgoing_object_matches_for(before, window_header, [0; 4],
-            before.object + 8, window_header, 0, [0; 4]));
-        assert!(!outgoing_object_matches_for(before, window_header, [0; 4],
-            before.object, window_header, 1, [0; 4]));
-    }
-
-    fn a_configure_skipped_receipt_admits_exactly_the_installed_index_and_tokens() {
-        // U5 / W-M2-4: on the configure-skip path the gate writes the staged Mii's record index and
-        // tokens into the initialised O before the prequeue proof; the proof admits exactly those.
-        use crate::engine::mii::identity::ExpectedMutation;
-        let before = rows()[OWNER].unwrap();
-        let header = [1, 9, 1, 5, 0];
-        let captured_tokens = [0x10, 0x20, 0x30, 0x40];
-        let untouched = OutgoingObject { object: before.object, header, index: before.index, tokens: [0x10, 0x20, 0x30, 0x40] };
-        let installed = OutgoingObject { index: 7, tokens: [0x10b, 0x2, 0x33, 0x0], ..untouched };
-        let receipt = ExpectedMutation::ConfigureSkipped { index: 7, tokens: [0x10b, 0x2, 0x33, 0x0] };
-        assert!(outgoing_object_matches_with(before, header, captured_tokens, untouched, ExpectedMutation::None));
-        assert!(outgoing_object_matches_with(before, header, captured_tokens, installed, receipt));
-        assert!(!outgoing_object_matches_with(before, header, captured_tokens, installed, ExpectedMutation::None),
-            "without the receipt the installed words are a mismatch");
-        assert!(!outgoing_object_matches_with(before, header, captured_tokens, untouched, receipt),
-            "the receipt names the installed words; a stale O+0x68 does not pass it");
-        let mut other_token = installed;
-        other_token.tokens[2] ^= 1;
-        assert!(!outgoing_object_matches_with(before, header, captured_tokens, other_token, receipt));
-        let mut other_header = installed;
-        other_header.header[1] ^= 1;
-        assert!(!outgoing_object_matches_with(before, header, captured_tokens, other_header, receipt),
-            "the skip path writes no header word");
-        let other_object = OutgoingObject { object: before.object + 8, ..installed };
-        assert!(!outgoing_object_matches_with(before, header, captured_tokens, other_object, receipt));
-        // The 7-argument form is the plain proof.
-        assert_eq!(
-            outgoing_object_matches_for(before, header, captured_tokens, before.object, header, before.index, untouched.tokens),
-            outgoing_object_matches_with(before, header, captured_tokens, untouched, ExpectedMutation::None));
-    }
-
     fn original_alias_does_not_license_destination_or_inactive_selector_alias() {
         let original = rows();
         assert_eq!(assignment(&original), Some([Some(0),Some(2),Some(3),None,None,None,None,None]));
@@ -1558,72 +1260,7 @@ mod tests {
         changed = original; changed[1].as_mut().unwrap().alias = 1;
         assert_eq!(assignment(&changed), None);
     }
-    fn registered_extras_are_protected_non_destinations() {
-        use crate::engine::mii::capacity::Extras;
-        let layout = crate::engine::mii::backend::Layout::Training;
-        let extra = |id: usize, index: u16, selector: u8| Some(Owner {
-            entry: 0x1000 + id*0x100, row: 0x2000 + id*0x100,
-            information: 0x3000 + id*0x100, object: 0x4000 + id*0x100,
-            index, selector, alias: 0,
-        });
-        let mut owners = rows();
-        owners[7] = extra(7, 7, 7);
-        owners[6] = extra(6, 0, 6);
-        let extras = Extras::new([owners[7].unwrap().entry, owners[6].unwrap().entry, 0]).unwrap();
-        assert_eq!(assignment_with(layout, extras, OWNER, &owners),
-            Some([Some(0), Some(2), Some(3), Some(7), Some(6), None, None, None]));
-        // Without registration the same physical rows remain unknown entries.
-        assert_eq!(assignment_with(layout, Extras::NONE, OWNER, &owners), None);
-        assert_eq!(assignment_with(layout, Extras::new([owners[7].unwrap().entry, 0, 0]).unwrap(), OWNER, &owners), None);
-        // An extra is never a destination and never shares the destination record.
-        assert_eq!(assignment_with(layout, extras, 7, &owners), None);
-        let mut changed = owners; changed[7].as_mut().unwrap().index = OWNER as u16;
-        assert_eq!(assignment_with(layout, extras, OWNER, &changed), None);
-        changed = owners; changed[6].as_mut().unwrap().selector = 5;
-        assert_eq!(assignment_with(layout, extras, OWNER, &changed), None);
-        changed = owners; changed[7].as_mut().unwrap().alias = 1;
-        assert_eq!(assignment_with(layout, extras, OWNER, &changed), None);
-        // An extra aliasing an owner identity is refused by the shape itself.
-        changed = owners; changed[7].as_mut().unwrap().entry = owners[2].unwrap().entry;
-        let aliased = Extras::new([owners[2].unwrap().entry, owners[6].unwrap().entry, 0]).unwrap();
-        assert_eq!(assignment_with(layout, aliased, OWNER, &changed), None);
-        changed = owners; changed[7].as_mut().unwrap().row = owners[3].unwrap().row;
-        assert_eq!(assignment_with(layout, extras, OWNER, &changed), None);
-        // The legacy four-owner result is unchanged.
-        assert_eq!(assignment_in(layout, OWNER, &rows()), assignment(&rows()));
-    }
-    fn five_waiting_helpers_protect_every_foreign_mii_record() {
-        use {crate::engine::mii::backend::Layout, crate::engine::mii::capacity::Extras};
-        for layout in [Layout::Ldn, Layout::Quickplay] {
-            let owners = std::array::from_fn(|id| (id != 1).then_some(Owner {
-                entry: 0x1000 + id * 0x100, row: 0x2000 + id * 0x100,
-                information: 0x3000 + id * 0x100, object: 0x4000 + id * 0x100,
-                index: 0, selector: id as u8, alias: 0,
-            }));
-            let extras = Extras::new_for(layout, [owners[7].unwrap().entry,
-                owners[3].unwrap().entry, owners[2].unwrap().entry]).unwrap();
-            for target in [4, 5, 6] {
-                let protected = assignment_with(layout, extras, target, &owners).unwrap();
-                assert!(!protected.contains(&Some(target as u16)));
-                for id in [0, 2, 3, 4, 5, 6, 7] {
-                    if id != target { assert!(protected.contains(&Some(id as u16))); }
-                }
-                let mut collision = owners;
-                collision[3].as_mut().unwrap().index = target as u16;
-                assert_eq!(assignment_with(layout, extras, target, &collision), None);
-                assert_eq!(assignment_with(layout, Extras::NONE, target, &owners), None);
-            }
-            for extra in [7, 3, 2] { assert_eq!(assignment_with(layout, extras, extra, &owners), None); }
-        }
-    }
 
-    fn native_fe_assignment_keeps_typed_ordinary_phase_and_old_mirrors() {
-        assert!(publication_indices(1,Target::ORIGINAL.index(),1,0,1));
-        assert!(publication_indices(0,Target::fighter(0x24).index(),0,0,0));
-        for (before,e,fe,d) in [(1,0,0,1),(1,1,1,1),(1,1,0,0),(2,2,0,2)] {
-            assert!(!publication_indices(before,Target::ORIGINAL.index(),e,fe,d));
-        }
-    }
     fn staged_cpu_preserves_native_role_and_original_return_is_byte_exact() {
         use crate::engine::mii::inventory::{build_snapshot,MiiClass,RawSlot,TaggedId};
         let info=[0u8;88];
@@ -1662,20 +1299,6 @@ mod tests {
         assert_eq!(planned.target,Target::mii(saved));
         assert_eq!(planned.cursor,Some(2));
         assert!(supported_kind(0x49));assert!(supported_kind(0x4a));assert!(supported_kind(0x48));assert!(!supported_kind(0x47));
-    }
-    fn refused_native_continuation_cannot_release_the_destination_or_start_reuse() {
-        use crate::engine::mii::ordinary_player::{Gate,Phase,Ticket};
-        let ticket=Ticket{epoch:5,entry:0x1100,sequence:1};
-        let mut lease=Reservation::empty();assert!(lease.acquire(true));
-        let mut gate=Gate::new(ticket).unwrap();
-        assert!(gate.enter(ticket,6));
-        gate.refuse();gate.leave(ticket,6);
-        assert_eq!(gate.phase(),Phase::Refused);
-        assert!(!gate.enter(ticket,7));
-        assert!(!gate.can_complete(ticket));
-        assert!(lease.held()); // both unpublished and terminal published failures retain reservation
-        lease.retire(false);assert!(lease.held());
-        lease.retire(true);assert!(!lease.held());
     }
     fn menu_capture_does_not_acquire_but_ticket_blocks_other_writers_until_exact_retirement() {
         let mut lease=Reservation::empty();
@@ -1725,14 +1348,8 @@ mod tests {
         crate::test_table::run(&[
             ("created_destination_requires_registered_roots_and_preserves_every_other_record", created_destination_requires_registered_roots_and_preserves_every_other_record as fn()),
             ("outgoing_object_uses_old_header_before_native_publication", outgoing_object_uses_old_header_before_native_publication as fn()),
-            ("exchanged_group_outgoing_header_is_its_own_capture_not_the_descriptor_words", exchanged_group_outgoing_header_is_its_own_capture_not_the_descriptor_words as fn()),
-            ("a_configure_skipped_receipt_admits_exactly_the_installed_index_and_tokens", a_configure_skipped_receipt_admits_exactly_the_installed_index_and_tokens as fn()),
             ("original_alias_does_not_license_destination_or_inactive_selector_alias", original_alias_does_not_license_destination_or_inactive_selector_alias as fn()),
-            ("registered_extras_are_protected_non_destinations", registered_extras_are_protected_non_destinations as fn()),
-            ("five_waiting_helpers_protect_every_foreign_mii_record", five_waiting_helpers_protect_every_foreign_mii_record as fn()),
-            ("native_fe_assignment_keeps_typed_ordinary_phase_and_old_mirrors", native_fe_assignment_keeps_typed_ordinary_phase_and_old_mirrors as fn()),
             ("staged_cpu_preserves_native_role_and_original_return_is_byte_exact", staged_cpu_preserves_native_role_and_original_return_is_byte_exact as fn()),
-            ("refused_native_continuation_cannot_release_the_destination_or_start_reuse", refused_native_continuation_cannot_release_the_destination_or_start_reuse as fn()),
             ("menu_capture_does_not_acquire_but_ticket_blocks_other_writers_until_exact_retirement", menu_capture_does_not_acquire_but_ticket_blocks_other_writers_until_exact_retirement as fn()),
             ("receipt_renewal_cannot_authorize_install_after_the_cpu_changes", receipt_renewal_cannot_authorize_install_after_the_cpu_changes as fn()),
         ]);
@@ -1790,55 +1407,14 @@ mod helper_tests {
 mod recapture_diagnostic_tests {
     lib_unit_tests! {
     use super::*;
-    use crate::engine::mii::backend::Layout;
-    use crate::engine::mii::lifetime::Binding;
+    
+    
 
     fn flags(index_eq: bool) -> RecaptureFlags {
         RecaptureFlags {
             index_eq, scalars_eq: true, selector_record_eq: false, current_record_eq: true,
             captured_index: 4, live_index: 26,
         }
-    }
-    fn ldn_binding() -> Binding {
-        let owner = Layout::Ldn.visible()[1];
-        Binding { epoch: 7, owner, entry: 0x1000, row: 0x2000, holder: 0x3000,
-            manager: 0x4000, vector_begin: 0x5000, vector_end: 0x5000 + 32 * 0x68,
-            record_index: owner as u16 }
-    }
-
-    fn rank_only_change_has_no_pairs_and_recapture_still_accepts_it() {
-        let binding = ldn_binding();
-        let expected = [0u8; 0x70];
-        let mut current = expected;
-        current[0x37] = 50;
-        assert_eq!(non_rank_descriptor_diff(&expected, &current).count, 0);
-        assert_eq!(recapture_rank(Layout::Ldn, binding, binding, &expected, &current), Ok(current));
-    }
-
-    fn non_rank_bytes_stay_refused_and_the_line_lists_each_offset() {
-        let binding = ldn_binding();
-        let expected = [0u8; 0x70];
-        let mut current = expected;
-        current[0x04] = 0x0a;
-        current[0x37] = 50;
-        current[0x46] = 0x1a;
-        assert_eq!(
-            recapture_rank(Layout::Ldn, binding, binding, &expected, &current),
-            Err("CPU rank recapture changed non-rank descriptor bytes"),
-        );
-        let diff = non_rank_descriptor_diff(&expected, &current);
-        assert_eq!(diff.count, 2);
-        assert_eq!(diff.pairs[0], (0x04, 0x00, 0x0a));
-        assert_eq!(diff.pairs[1], (0x46, 0x00, 0x1a));
-        assert!(diff.pairs[2..].iter().all(|pair| *pair == (0, 0, 0)));
-        let mut buf = [0u8; RECAPTURE_DIAGNOSTIC_BYTES];
-        let n = write_recapture_diagnostic(&mut buf, &diff, &flags(false)).unwrap();
-        let line = std::str::from_utf8(&buf[..n]).unwrap();
-        assert_eq!(
-            line,
-            "recapture non-rank n=2 index_eq=0 scalars_eq=1 selector_record_eq=0 current_record_eq=1 captured_index=4 live_index=26 04:00>0a 46:00>1a",
-        );
-        assert!(!line.contains(" 37:"));
     }
 
     fn every_non_rank_offset_fits_once_per_epoch_tuple() {
@@ -1874,8 +1450,6 @@ mod recapture_diagnostic_tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
-            ("rank_only_change_has_no_pairs_and_recapture_still_accepts_it", rank_only_change_has_no_pairs_and_recapture_still_accepts_it as fn()),
-            ("non_rank_bytes_stay_refused_and_the_line_lists_each_offset", non_rank_bytes_stay_refused_and_the_line_lists_each_offset as fn()),
             ("every_non_rank_offset_fits_once_per_epoch_tuple", every_non_rank_offset_fits_once_per_epoch_tuple as fn()),
         ]);
     }

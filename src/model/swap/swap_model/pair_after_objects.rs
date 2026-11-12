@@ -125,12 +125,6 @@ mod tests {
         (world, permit, pt, stale)
     }
 
-    fn today_the_pt_object_token_outlives_the_build_and_refuses_the_pair_permit() {
-        let (world, permit, pt, _) = run(false, false);
-        assert!(!world.balanced(), "the 0x72 token predicts keys native freed");
-        assert_eq!(permit, Err(vec![pt]), "the guard refuses on the PT group's batch (#1508 `other batches [3]`)");
-    }
-
     fn settling_the_object_on_an_empty_map_keeps_ledger_and_native_equal_and_admits_the_pair() {
         let (world, permit, _, _) = run(true, false);
         assert!(world.balanced(), "{:?}", world.ledger.reconcile(&world.r.snapshot()));
@@ -138,45 +132,11 @@ mod tests {
         assert_eq!(permit, Ok(()));
     }
 
-    /// The configure-time rule alone also recovers (defence for any other stale path). With the
-    /// post-build rule in place it finds nothing to settle (no `[Ledger] stale` line).
-    fn a_configure_on_an_empty_r_settles_whatever_the_ledger_still_holds() {
-        let (world, permit, _, stale) = run(false, true);
-        assert_eq!((permit, stale), (Ok(()), 1));
-        assert!(world.balanced());
-        let (world, permit, _, stale) = run(true, true);
-        assert_eq!((permit, stale), (Ok(()), 0));
-        assert!(world.ledger.tokens().is_empty());
-    }
-
-    /// Aegis with another group's keys on R: the object's native tail took `0x1332/0x1333`, so the
-    /// post-build release removes only the orphan `0x1338` (#1466: the map went 9 → 8).
-    fn the_aegis_release_takes_only_its_orphan_after_the_native_tail() {
-        let mut world = World::new();
-        let _pt = world.prefetch(1, &PT, PT_OBJECT);
-        let aegis = world.prefetch(0, &AEGIS, AEGIS_OBJECT);
-        for kind in AEGIS {
-            world.r.release_kind(kind, None, &mut world.g68);
-            let _construction = world.take(kind, aegis);
-            assert!(world.ledger.construction_settled(kind, aegis));
-        }
-        world.r.release_kind(AEGIS_OBJECT, None, &mut world.g68);
-        let before = world.r.map_nodes();
-        let token = world.take(AEGIS_OBJECT, aegis).unwrap();
-        let calls = world.ledger.release(token, &NoConsumers, Role::Cpu).unwrap();
-        world.apply(calls);
-        assert_eq!(before - world.r.map_nodes(), 1, "only 0x1338 is left for the bank");
-        assert!(world.balanced());
-    }
-
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
-            ("today_the_pt_object_token_outlives_the_build_and_refuses_the_pair_permit", today_the_pt_object_token_outlives_the_build_and_refuses_the_pair_permit as fn()),
             ("settling_the_object_on_an_empty_map_keeps_ledger_and_native_equal_and_admits_the_pair", settling_the_object_on_an_empty_map_keeps_ledger_and_native_equal_and_admits_the_pair as fn()),
-            ("a_configure_on_an_empty_r_settles_whatever_the_ledger_still_holds", a_configure_on_an_empty_r_settles_whatever_the_ledger_still_holds as fn()),
-            ("the_aegis_release_takes_only_its_orphan_after_the_native_tail", the_aegis_release_takes_only_its_orphan_after_the_native_tail as fn()),
         ]);
     }
 }

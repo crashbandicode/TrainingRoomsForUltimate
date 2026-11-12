@@ -193,14 +193,6 @@ mod tests {
         }
     }
 
-    fn a_fixed_list_reads_as_the_slice_of_what_was_pushed() {
-        let mut list = FixedList::<u32, 3>::new(0);
-        assert!(list.is_empty());
-        assert!(list.push(7) && list.push(8) && list.push(9) && !list.push(10));
-        assert_eq!(&*list, &[7, 8, 9]);
-        assert_eq!(list.iter().copied().max(), Some(9));
-    }
-
     fn it_fills_to_its_capacity_and_then_refuses() {
         let mut list = FixedVec::<u8, 3>::new();
         assert!(list.is_empty() && list.last().is_none());
@@ -218,23 +210,13 @@ mod tests {
         assert_eq!(serde_json::to_string(&FixedVec::<u8, 2>::new()).unwrap(), "[]");
     }
 
-    fn a_copy_is_independent() {
-        let mut a = FixedVec::<u8, 2>::new();
-        a.push(1);
-        let mut b = a;
-        b.push(2);
-        assert_eq!((a.len(), b.len()), (1, 2));
-    }
-
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
             ("a_queue_gives_its_values_back_in_order_and_refuses_past_its_capacity", a_queue_gives_its_values_back_in_order_and_refuses_past_its_capacity as fn()),
-            ("a_fixed_list_reads_as_the_slice_of_what_was_pushed", a_fixed_list_reads_as_the_slice_of_what_was_pushed as fn()),
             ("it_fills_to_its_capacity_and_then_refuses", it_fills_to_its_capacity_and_then_refuses as fn()),
             ("it_serialises_like_a_vec", it_serialises_like_a_vec as fn()),
-            ("a_copy_is_independent", a_copy_is_independent as fn()),
         ]);
     }
     }

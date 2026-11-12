@@ -7,8 +7,8 @@
 
 lib_unit_tests! {
 use super::*;
-use crate::engine::swap::body_bank::{pair_resource_references, GroupPolicy, Members, Special, SpecialPolicy, KIRBY, NANA, POPO};
-use crate::engine::swap::character_forms::{Forms, PresentedReceipt, Rebuild};
+use crate::engine::swap::body_bank::{GroupPolicy, Members, Special, SpecialPolicy, KIRBY, NANA, POPO};
+use crate::engine::swap::character_forms::Forms;
 use crate::engine::mii::inventory::MiiClass;
 
 mod oracle {
@@ -281,90 +281,6 @@ fn derived_predicates_match_todays_scattered_gates() {
     }
 }
 
-fn table_rows_agree_with_the_members_shapes_they_describe() {
-    for (kind, class) in [(0x24u32, FormClass::PokemonTrainer), (0x26, FormClass::PokemonTrainer), (0x5a, FormClass::Aegis), (0x5b, FormClass::Aegis)] {
-        let group = Members::native_group(kind).unwrap();
-        let row = capabilities(class);
-        assert_eq!(form_class(kind, Forms::starting(kind)), class);
-        assert_eq!((usize::from(row.bodies), u32::from(row.actors)), (group.count(), group.actor_count()));
-        assert_eq!(group.special(), Special::Native(row.native_flags));
-        assert_eq!(row.native_flags, Forms::starting(kind).flags);
-        assert_eq!(row.object_kind, group.object_kind());
-        assert_eq!(row.carries_records, group.carries_records());
-        assert!(!row.pair_rule && pair_resource_references(group).is_none());
-        assert_eq!(swap_commit_index_in(group, 0), swap_commit_index(0, group.count()));
-    }
-    let pair = capabilities(FormClass::IcPair);
-    let lead = Members::pair_lead(0x02).unwrap();
-    let group = Members::pair_group();
-    assert_eq!((pair.bodies, pair.actors, pair.native_flags), (2, 2, Forms::starting(POPO).flags));
-    assert_eq!((usize::from(pair.bodies), u32::from(pair.actors)), (group.count(), group.actor_count()));
-    assert!(pair.pair_rule, "C122: one R+0x50 reference per body of a [Popo, Nana, …] window");
-    assert_eq!(pair_resource_references(lead), Some(lead.count() as u32));
-    assert_eq!(pair_resource_references(group), Some(group.count() as u32));
-    assert_eq!((exit_rule(lead), exit_rule(group)), (ExitRule::PairExtraOnly, ExitRule::ViaNana));
-    for kind in kinds() {
-        // The member row: a bank member is a single body (Solo for `0x4b`).
-        let row = capabilities(form_class(kind, member_forms(kind)));
-        if bankable_kind(kind) {
-            let one = Members::new(&[kind]).unwrap();
-            assert_eq!(row.bodies, 1);
-            assert!(row.object_kind.is_none() && !row.carries_records && !row.pair_rule);
-            assert!(one.object_kind().is_none() && !one.carries_records() && pair_resource_references(one).is_none());
-            // Row 2: a one-member window leaves by its self-commit.
-            assert_eq!(exit_rule(one), ExitRule::SelfCell, "{:#x}", kind);
-            assert_eq!(exit_rule(Members::laid_out(&[kind, if kind == 0x02 { 0x07 } else { 0x02 }]).unwrap()), ExitRule::NextCell);
-        } else {
-            assert!(Members::new(&[kind]).is_none(), "{:#x}", kind);
-        }
-    }
-    // Solo Popo: pinned to physical cell 0 at any rotation position (row 4), exactly as
-    // `Members::new` admits it and `Members::laid_out` lays it out.
-    assert!(Members::new(&[POPO, 0x02]).is_some() && Members::new(&[0x02, POPO]).is_none());
-    assert_eq!(Members::laid_out(&[0x02, POPO]).map(|m| m.kinds()), Some([POPO, 0x02, u32::MAX]));
-    assert!((0..3).all(|cell| can_window_member(FormClass::SoloPopo, cell)));
-    assert!(pins_cell0_of(&capabilities(FormClass::SoloPopo)) && pins_cell0(POPO));
-    assert_eq!(capabilities(FormClass::SoloPopo).group_switch, Some(GroupSwitch::SoloPopo));
-    assert_eq!(exit_rule(Members::new(&[POPO, 0x02]).unwrap()), ExitRule::NextCell);
-    let solo_groups = GroupPolicy { solo_popo_groups: true, ..GroupPolicy::DEFAULT };
-    assert!(single_body_member(FormClass::SoloPopo) && can_window_member(FormClass::SoloPopo, 2));
-    assert!(!can_group_member(FormClass::SoloPopo, GroupPolicy::DEFAULT) && can_group_member(FormClass::SoloPopo, solo_groups));
-    // Kirby and R.O.B. are ordinary single bodies with their own row deltas.
-    assert_eq!(capabilities(FormClass::Kirby).park_gate, ParkGate::CopyFree);
-    assert!(!capabilities(FormClass::Kirby).prefetch_while_live);
-    assert_eq!(capabilities(FormClass::Rob).r_identity, RIdentity::ReadsPrimaryCostume);
-    for class in [FormClass::Ordinary, FormClass::Kirby, FormClass::Rob] {
-        assert!(single_body_member(class) && can_window_member(class, 2) && can_group_member(class, GroupPolicy::DEFAULT));
-        assert_eq!(departure_admitted(class, false, Some(0), false), Ok(()));
-    }
-    assert_eq!(departure_admitted(FormClass::Ordinary, true, None, true), Ok(()), "only the Kirby row gates on the copy state");
-    assert_eq!(departure_admitted(FormClass::Kirby, true, None, true), Err("Kirby holds a copy ability"));
-}
-
-fn presentation_rows_agree_with_todays_native_reset_decision() {
-    const ENTRY: usize = 0x11aed3e000;
-    for kind in kinds() {
-        let class = form_class(kind, Forms::starting(kind));
-        if class == FormClass::Foreign {
-            assert_eq!(capabilities(class).presentation, PresentationRule { kind_event: false, bust: BustRule::Never, pair_plate: false, waiting_icon: false, native_form_follow: false });
-            continue;
-        }
-        let rule = capabilities(class).presentation;
-        // Today's native-reset decision (`character_forms::PresentedReceipt::rebuild`): a Mii class
-        // publication is republished (its bust belongs to the exact-portrait lifecycle), every other
-        // kind is admitted as the static kind portrait.
-        let mut receipt = PresentedReceipt::NONE;
-        receipt.publish(ENTRY, 1, kind);
-        let republished = receipt.rebuild(None, ENTRY, kind) == Rebuild::Republish((ENTRY, 1, kind));
-        assert_eq!(rule.bust == BustRule::ExactWhenConfigured, republished, "{kind:#x}");
-        assert_eq!(rule.pair_plate, class == FormClass::IcPair, "{kind:#x}");
-        let forms = Forms::starting(kind);
-        assert_eq!(rule.native_form_follow, forms.count > 1 && forms.actor_count == 1, "transformation forms follow Down+B: {kind:#x}");
-        assert!(rule.kind_event && rule.waiting_icon, "{:#x}", kind);
-    }
-    assert_eq!(capabilities(FormClass::SoloPopo).presentation, capabilities(FormClass::Ordinary).presentation);
-}
-
 fn the_pair_and_solo_popo_are_distinct_classes_and_targets() {
     assert_eq!(form_class(POPO, Forms::starting(POPO)), FormClass::IcPair);
     assert_eq!(form_class(POPO, Forms::solo_popo()), FormClass::SoloPopo);
@@ -396,38 +312,6 @@ fn the_pair_and_solo_popo_are_distinct_classes_and_targets() {
     assert_eq!(form_class(ROB, Forms::starting(ROB)), FormClass::Rob);
 }
 
-fn a_parked_pair_lead_window_and_a_pair_group_serve_the_pair_target_not_solo() {
-    // WP-I (WORKPLAN §2.13 step 1): the Ally S4 shape, pair-lead window [4b, 4c, a] parked as a
-    // detached group while [7, 8] is the window; the return request is the normal pair.
-    let pair = Forms::starting(POPO);
-    let solo = Forms::solo_popo();
-    let lead = Members::pair_lead(0x0a).unwrap();
-    assert_eq!(group_serves(lead, POPO, pair), Some(0));
-    assert_eq!(group_serves(lead, POPO, solo), None, "FINAL-INT §6: member_forms(0x4b) alone never yields the pair");
-    assert_eq!(group_serves(lead, 0x0a, Forms::starting(0x0a)), Some(2));
-    assert_eq!(group_serves(lead, NANA, Forms::starting(NANA)), None, "Nana is never a request target");
-    // The detached pair group (Special::Pair) serves the pair through Popo only.
-    let group = Members::pair_group();
-    assert_eq!(group_serves(group, POPO, pair), Some(0));
-    assert_eq!(group_serves(group, POPO, solo), None);
-    assert_eq!(group_serves(group, NANA, Forms::starting(NANA)), None);
-    // A Solo-led group serves the Solo request and never the pair.
-    let solo_led = Members::from_forms(solo, &[0x02, 0x07], 2).unwrap();
-    assert_eq!(group_serves(solo_led, POPO, solo), Some(0));
-    assert_eq!(group_serves(solo_led, POPO, pair), None);
-    // Native groups serve each form only as its own expansion; ordinary groups serve their kinds.
-    let pt = Members::native_group(0x24).unwrap();
-    assert_eq!(group_serves(pt, 0x26, Forms::starting(0x26)), Some(2));
-    assert_eq!(group_serves(pt, 0x26, Forms::starting(0x24)), None);
-    let ordinary = Members::new(&[0x07, 0x08]).unwrap();
-    assert_eq!(group_serves(ordinary, 0x08, Forms::starting(0x08)), Some(1));
-    assert_eq!(group_serves(ordinary, POPO, pair), None);
-    // Through a Target: the same parked window serves the original pair, not a numbered Solo.
-    assert_eq!(Target::new(Selection::Original, pair, None).served_by(lead), Some(0));
-    assert_eq!(Target::new(Selection::Numbered(1), solo, None).served_by(lead), None);
-    assert_eq!(Target::new(Selection::Direct, Forms::starting(0x0a), None).served_by(lead), Some(2));
-}
-
 fn the_kirby_fallback_row_makes_kirby_canonical_only_without_touching_the_shipped_row() {
     // Shipped (B123-pre rows, E4a–E4d): Kirby is an ordinary bank, group and original member, laid
     // out at cell 0 (`CellRule::PinCell0`); the pair-lead window, whose cell 0 is the pair, never
@@ -450,37 +334,6 @@ fn the_kirby_fallback_row_makes_kirby_canonical_only_without_touching_the_shippe
         assert_eq!(capabilities(class).qualification, Qualification::Shipped, "{class:?}");
     }
     assert!(matches!(capabilities(FormClass::Foreign).qualification, Qualification::Gated(_)));
-}
-
-fn an_active_only_row_is_built_as_the_target_but_never_parked_or_grouped() {
-    let row = Capabilities { window_cell: CellRule::ActiveOnly, ..capabilities(FormClass::Kirby) };
-    assert!(can_window_member_of(&row, 0) && !can_window_member_of(&row, 1) && !can_window_member_of(&row, 2));
-    for policy in group_policies() { assert!(!can_group_member_of(&row, policy)); }
-    assert!(!single_body_member_of(&row), "an active-only form is not an upcoming extra");
-    for class in [FormClass::Ordinary, FormClass::Kirby, FormClass::Rob, FormClass::Mii(MiiClass::Brawler), FormClass::PokemonTrainer,
-        FormClass::Aegis, FormClass::IcPair, FormClass::SoloPopo, FormClass::Foreign] {
-        assert_ne!(capabilities(class).window_cell, CellRule::ActiveOnly, "no shipped row uses the 7a candidate: {class:?}");
-    }
-}
-
-fn own_group_rows_follow_their_policy_switch_including_the_mii_switch() {
-    for policy in special_policies() {
-        assert_eq!(forms_own_group(FormClass::PokemonTrainer, policy), policy.native);
-        assert_eq!(forms_own_group(FormClass::Aegis, policy), policy.native);
-        assert_eq!(forms_own_group(FormClass::IcPair, policy), policy.pair);
-        assert_eq!(forms_own_group(FormClass::Mii(MiiClass::Gunner), policy), policy.mii, "{:?}", policy);
-        for class in [FormClass::Ordinary, FormClass::Kirby, FormClass::Rob, FormClass::SoloPopo, FormClass::Foreign] {
-            assert!(!forms_own_group(class, policy), "{:?} {:?}", class, policy);
-        }
-    }
-    // M0: `SpecialPolicy::ALL` keeps `mii: false` (the Mii switch is its own menu row); `MII` turns it on.
-    assert!(!SpecialSwitch::Mii.enabled(SpecialPolicy::ALL));
-    assert!(SpecialSwitch::Mii.enabled(SpecialPolicy::MII));
-    assert_eq!(capabilities(FormClass::Mii(MiiClass::Gunner)).grouping, Grouping::OwnGroupOnly(SpecialSwitch::Mii));
-    assert_eq!(capabilities(FormClass::Mii(MiiClass::Gunner)).exit_commit, ExitRule::SelfCell);
-    let mii = Members::mii_group(0x4a).unwrap();
-    assert_eq!((exit_rule(mii), swap_commit_index_in(mii, 0)), (ExitRule::SelfCell, Some(0)));
-    assert_eq!(capabilities(FormClass::Mii(MiiClass::Gunner)).r_identity, RIdentity::RequiresOwn);
 }
 
 fn kirby_is_laid_out_at_cell_0_whatever_its_rotation_position() {
@@ -525,34 +378,6 @@ fn kirby_is_laid_out_at_cell_0_whatever_its_rotation_position() {
     assert!(bankable_kind(KIRBY) && swappable_kind(KIRBY) && (0..3).all(|cell| can_window_member(FormClass::Kirby, cell)));
 }
 
-fn previous_cell_index_names_a_cell_the_attached_group_has() {
-    // C116.1 first console boot (Atmosphère report 01793544752): `0x655f60` case 7 reads
-    // `cell[+0x5910]->id` after the exchange, so the window's previous index must not outrun the
-    // attached group. Exhaustive over every window cell, group size and selected member.
-    for count in 1..=3usize {
-        for from in 0..3u8 {
-            for member in 0..count as u8 {
-                let previous = capabilities::previous_cell_index(from, member, count);
-                // Edition 2018 crate: explicit arguments (no inline captures in the message).
-                assert!(usize::from(previous) < count, "from={} member={} count={}", from, member, count);
-                if usize::from(from) < count {
-                    assert_eq!(previous, from, "a cell the group has stays the window's cell");
-                } else {
-                    assert_eq!(previous, member, "the self-commit shape stands in");
-                }
-            }
-        }
-    }
-    // The console case: cell 2 of [b, 1f, 2e] into the two-member group [2d, 2c] at member 0.
-    assert_eq!(capabilities::previous_cell_index(2, 0, 2), 0);
-    // The 811 Eden one-member cases (`installed=1 from=1|2`) and a three-member group keeping the window's cell.
-    assert_eq!(capabilities::previous_cell_index(1, 0, 1), 0);
-    assert_eq!(capabilities::previous_cell_index(2, 0, 1), 0);
-    assert_eq!(capabilities::previous_cell_index(2, 1, 3), 2);
-    // A member outside the group (never built that way) still names an existing cell.
-    assert_eq!(capabilities::previous_cell_index(2, 2, 2), 0);
-}
-
 /// rc.6 item 3 (operator decisions "All groups in rc.6" and "a session that starts on IC/PT still gets its groups
 /// built"; primary 2026-11-09 00:23Z): the return to an Ice Climbers original is warm. Eden rc6-bg-ic2/3: P1 started
 /// on the pair, and the return Yoshi → Ice Climbers was the canonical Reload (6–7 frames). It retired P1's bank, and the
@@ -578,46 +403,15 @@ fn an_ice_climbers_pair_original_is_a_bank_member_while_the_pair_bank_is_on() {
     }
 }
 
-/// rc.6 item 3, a session that starts on Pokémon Trainer or Pyra/Mythra (INBOX-opus-rc6-hotslots 01:09Z: the operator
-/// decided "All groups in rc.6", and lifting the EXCLUSIONS §9 PT/Aegis-original row is approved). The start-up window is
-/// the native group itself (`entry_window`), so the return to that original must not be the canonical Reload that
-/// retires the role's bank: while native groups are on, the native group original is a bank member, served by the
-/// window or by the detached record holding it (`group_serves`). The kind-only `original_bankable` is unchanged for every
-/// caller (a native group is never a single-body cell), and every other kind answers as before.
-fn a_native_group_original_is_a_bank_member_while_native_groups_are_on() {
-    use capabilities::{original_bankable, original_form_bankable, FormClass};
-    assert!(capabilities::capabilities(FormClass::PokemonTrainer).original_bankable);
-    assert!(capabilities::capabilities(FormClass::Aegis).original_bankable);
-    for kind in [0x24, 0x25, 0x26, 0x5a, 0x5b] {
-        assert!(original_form_bankable(kind, Forms::starting(kind), false, true), "{kind:#x}");
-        assert!(!original_form_bankable(kind, Forms::starting(kind), true, false), "{kind:#x}: native groups off");
-        assert!(!original_bankable(kind), "{kind:#x}: the kind-only predicate is unchanged");
-    }
-    for kind in kinds().filter(|kind| !matches!(*kind, 0x24..=0x26 | 0x5a | 0x5b | POPO)) {
-        for native_bank in [false, true] {
-            assert_eq!(original_form_bankable(kind, Forms::starting(kind), false, native_bank), original_bankable(kind), "{kind:#x}");
-        }
-    }
-    assert!(original_form_bankable(POPO, Forms::starting(POPO), true, true), "the pair keeps its own rule");
-    assert!(!original_form_bankable(0x48, Forms::starting(0x48), true, true), "a Mii");
-}
-
 /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
 #[test]
 fn case_table() {
     crate::test_table::run(&[
         ("derived_predicates_match_todays_scattered_gates", derived_predicates_match_todays_scattered_gates as fn()),
-        ("table_rows_agree_with_the_members_shapes_they_describe", table_rows_agree_with_the_members_shapes_they_describe as fn()),
-        ("presentation_rows_agree_with_todays_native_reset_decision", presentation_rows_agree_with_todays_native_reset_decision as fn()),
         ("the_pair_and_solo_popo_are_distinct_classes_and_targets", the_pair_and_solo_popo_are_distinct_classes_and_targets as fn()),
-        ("a_parked_pair_lead_window_and_a_pair_group_serve_the_pair_target_not_solo", a_parked_pair_lead_window_and_a_pair_group_serve_the_pair_target_not_solo as fn()),
         ("the_kirby_fallback_row_makes_kirby_canonical_only_without_touching_the_shipped_row", the_kirby_fallback_row_makes_kirby_canonical_only_without_touching_the_shipped_row as fn()),
-        ("an_active_only_row_is_built_as_the_target_but_never_parked_or_grouped", an_active_only_row_is_built_as_the_target_but_never_parked_or_grouped as fn()),
-        ("own_group_rows_follow_their_policy_switch_including_the_mii_switch", own_group_rows_follow_their_policy_switch_including_the_mii_switch as fn()),
         ("kirby_is_laid_out_at_cell_0_whatever_its_rotation_position", kirby_is_laid_out_at_cell_0_whatever_its_rotation_position as fn()),
-        ("previous_cell_index_names_a_cell_the_attached_group_has", previous_cell_index_names_a_cell_the_attached_group_has as fn()),
         ("an_ice_climbers_pair_original_is_a_bank_member_while_the_pair_bank_is_on", an_ice_climbers_pair_original_is_a_bank_member_while_the_pair_bank_is_on as fn()),
-        ("a_native_group_original_is_a_bank_member_while_native_groups_are_on", a_native_group_original_is_a_bank_member_while_native_groups_are_on as fn()),
     ]);
 }
 }

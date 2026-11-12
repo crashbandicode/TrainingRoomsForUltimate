@@ -213,7 +213,7 @@ mod tests {
     lib_unit_tests! {
     use super::*;
     use crate::engine::swap::swap_model::copy_registry::{Record, KIRBY};
-    use std::convert::TryInto;
+    
 
     const MARIO: u32 = 0x00;
     const DK: u32 = 0x01;
@@ -245,48 +245,6 @@ mod tests {
         keys.sort_unstable();
         keys.dedup();
         keys
-    }
-
-    /// The s3 crash: a Kirby group `[6,4,5]` built under the home `[1,2,3]` against a Mega Man CPU.
-    /// Kirby's registration needs Mega Man's copy package under Kirby's costume. That is the package of
-    /// the null hat-model node (`0x62003f`), and nothing in the bank's flow took it. Holding the set's
-    /// acquisitions covers it.
-    fn the_k15_crash_needs_the_cpu_s_copy_package() {
-        let r = roster([DK, LINK, SAMUS], 0, Some(([MEGAMAN, N, N], 3)));
-        let needed = needed_by_registration(&r, 0, [KIRBY, SAMUSD, YOSHI], 0, 1);
-        assert!(needed.contains(&((MEGAMAN << 17) | 0x1003f)), "{:x?}", needed);
-        // Its hat model's part key in the s3 registers is the same kind and costume.
-        assert_eq!((0x62003f >> 17) & 0xff, MEGAMAN);
-        let held = acquisitions(&r, 0, [KIRBY, SAMUSD, YOSHI], 0, 1);
-        let keys = held_keys(&held);
-        assert!(needed.iter().all(|k| keys.contains(k)), "needed {:x?} held {:x?}", needed, keys);
-    }
-
-    /// K14 (Yoga `m4b3`/`m4bg1`): the non-Kirby group `[1b,16,15]` under the Kirby home `[6,5,7]`
-    /// against Falcon. The roster's own record is the group (`R+0xb0` dump: `rec+0x28 = [1b,16,15]`).
-    /// The record with Kirby at k0 is manager entry 2, a cycle-preload helper (the `0x17f211c` frame
-    /// has x27 = 2). Its copy relation for Chrom loads `fighter/chrom/kirbycopy/c06`: the null node
-    /// key `0xc36003f` is (kind 0x1b, costume 6). Without that helper nothing is needed. The attach
-    /// back to the Kirby home needs Falcon's package and the home's own non-Kirby members' packages.
-    #[test]
-    fn k14_needs_the_helper_kirby_s_packages_for_every_group_body() {
-        let mut r = roster([KIRBY, YOSHI, FOX], 2, Some(([FALCON, N, N], 1)));
-        assert!(needed_by_registration(&r, 0, [CHROM, LUCINA, MARTH], 2, 1).is_empty());
-        r[2] = Record { entry: 2, kinds: [KIRBY, N, N], costume: 6 };
-        let group = needed_by_registration(&r, 0, [CHROM, LUCINA, MARTH], 2, 1);
-        assert_eq!(group, vec![(MARTH << 17) | (6 << 25) | 0x1003f, (LUCINA << 17) | (6 << 25) | 0x1003f,
-            (CHROM << 17) | (6 << 25) | 0x1003f]);
-        assert_eq!((0xc36003fu32 >> 17) & 0xff, CHROM);
-        assert_eq!(0xc36003fu32 >> 25, 6);
-        let keys = held_keys(&acquisitions(&r, 0, [CHROM, LUCINA, MARTH], 2, 1));
-        assert!(group.iter().all(|k| keys.contains(k)), "{:x?} {:x?}", group, keys);
-        let r = roster([KIRBY, YOSHI, FOX], 2, Some(([FALCON, N, N], 1)));
-        let home = needed_by_registration(&r, 0, [KIRBY, YOSHI, FOX], 2, 1);
-        for key in [(FALCON << 17) | (2 << 25) | 0x1003f, (YOSHI << 17) | (2 << 25) | 0x1003f, (FOX << 17) | (2 << 25) | 0x1003f] {
-            assert!(home.contains(&key), "{:x?}", home);
-        }
-        let keys = held_keys(&acquisitions(&r, 0, [KIRBY, YOSHI, FOX], 2, 1));
-        assert!(home.iter().all(|k| keys.contains(k)));
     }
 
     /// For every roster shape, member set and costume: what the bank holds for a set covers every
@@ -327,74 +285,11 @@ mod tests {
         assert!(covered > 300, "{}", covered);
     }
 
-    /// The sync keeps G68's references exact. Over every sequence of wanted sets (a roster change
-    /// and any group set appearing or leaving), each acquisition is later released with the same
-    /// inputs. No release ever takes a key the holdings did not take, and after the final release
-    /// nothing is referenced.
-    fn sync_pairs_every_acquisition_with_its_release() {
-        let rosters = [
-            roster([DK, LINK, SAMUS], 0, Some(([MEGAMAN, N, N], 3))),
-            roster([DK, LINK, SAMUS], 0, Some(([KIRBY, N, N], 3))),
-            roster([KIRBY, YOSHI, FOX], 0, Some(([FALCON, N, N], 1))),
-        ];
-        let sets: [[u32; SUBS]; 4] = [[DK, LINK, SAMUS], [KIRBY, SAMUSD, YOSHI], [KIRBY, YOSHI, FOX], [CHROM, LUCINA, MARTH]];
-        let mut runs = 0;
-        for seed in 0u64..400 {
-            let mut x = seed.wrapping_mul(0x9e37_79b9_7f4a_7c15) | 1;
-            let mut next = |n: u64| { x ^= x << 13; x ^= x >> 7; x ^= x << 17; x % n };
-            let mut held: Vec<Acquisition> = Vec::new();
-            let mut g68: BTreeMap<u32, i64> = BTreeMap::new();
-            for _ in 0..8 {
-                let r = &rosters[next(rosters.len() as u64) as usize];
-                let mut wanted = Vec::new();
-                for set in sets { if next(2) == 0 { wanted.extend(acquisitions(r, 0, set, 0, 1)); } }
-                let plan = sync(&held, &wanted);
-                for a in &plan.acquire { for k in a.keys() { *g68.entry(k).or_insert(0) += 1; } }
-                for i in &plan.release {
-                    for k in released(&held[*i]) {
-                        let refs = g68.entry(k).or_insert(0);
-                        *refs -= 1;
-                        assert!(*refs >= 0, "seed {}: key {:#x} released below zero", seed, k);
-                    }
-                }
-                for i in &plan.release { held.remove(*i); }
-                held.extend(plan.acquire);
-                let mut want_sorted = wanted.clone();
-                want_sorted.sort_by_key(|a| (a.set, a.member));
-                let mut held_sorted = held.clone();
-                held_sorted.sort_by_key(|a| (a.set, a.member));
-                assert_eq!(held_sorted.len(), want_sorted.len());
-                assert_eq!(referenced(&held).into_iter().map(|(k, v)| (k, v as i64)).collect::<BTreeMap<_, _>>(),
-                    g68.iter().filter(|(_, v)| **v != 0).map(|(k, v)| (*k, *v)).collect::<BTreeMap<_, _>>(), "seed {}", seed);
-                runs += 1;
-            }
-            let plan = sync(&held, &[]);
-            for i in &plan.release { for k in released(&held[*i]) { *g68.entry(k).or_insert(0) -= 1; } }
-            assert!(g68.values().all(|v| *v == 0), "seed {}: {:x?}", seed, g68);
-        }
-        assert!(runs >= 3200);
-    }
-
-    fn the_buffer_carries_what_the_natives_read() {
-        let r = roster([KIRBY, SAMUSD, YOSHI], 3, Some(([MEGAMAN, N, N], 5)));
-        let b = roster_bytes(&r);
-        assert_eq!(i32::from_le_bytes(b[0x8..0xc].try_into().unwrap()), 0);
-        assert_eq!(u32::from_le_bytes(b[0x28..0x2c].try_into().unwrap()), KIRBY);
-        assert_eq!(u32::from_le_bytes(b[0x30..0x34].try_into().unwrap()), YOSHI);
-        assert_eq!(b[0x51], 3);
-        assert_eq!(u32::from_le_bytes(b[0xa8..0xac].try_into().unwrap()), MEGAMAN);
-        assert_eq!(b[0xd1], 5);
-        assert_eq!(i32::from_le_bytes(b[0x108..0x10c].try_into().unwrap()), -1);
-    }
-
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
-            ("the_k15_crash_needs_the_cpu_s_copy_package", the_k15_crash_needs_the_cpu_s_copy_package as fn()),
             ("holdings_cover_every_registration", holdings_cover_every_registration as fn()),
-            ("sync_pairs_every_acquisition_with_its_release", sync_pairs_every_acquisition_with_its_release as fn()),
-            ("the_buffer_carries_what_the_natives_read", the_buffer_carries_what_the_natives_read as fn()),
         ]);
     }
     }

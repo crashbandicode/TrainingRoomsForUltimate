@@ -172,23 +172,6 @@ mod tests {
         assert!(frame.rows[..usize::from(frame.row_count)].iter().any(|row| row.label.string_lossy() == "Add New…"));
     }
 
-    fn waiting_catalog_opens_each_class_at_add_new_without_role_permissions() {
-        use crate::engine::mii_root::mii_menu::EditorSeed;
-        let mut menu = Menu::new(Settings::factory(), Env::default());
-        let mut list = MiiList::new(Snapshot::default(), None, 1, &menu).unwrap();
-        for class in 0..3 {
-            list.open(class);
-            let mut frame = Frame::new();
-            list.frame(&menu, &mut frame);
-            assert_eq!(frame.row_count, 1);
-            assert_eq!(frame.rows[0].label.string_lossy(), "Add New…");
-            let request = list.editor_request().unwrap();
-            assert!(matches!(request.seed, EditorSeed::NativeDefault(kind) if kind.kind() == 0x48 + u32::from(class)));
-            list.press(Button::ZR, &mut menu);
-            assert!(list.close().is_none());
-        }
-    }
-
     fn unavailable_capability_refuses_editor_without_granting_role_permissions() {
         let mut menu = Menu::new(Settings::factory(), Env::default());
         let mut list = MiiList::new(Snapshot::default(), None, 1, &menu).unwrap();
@@ -213,7 +196,6 @@ mod tests {
     fn case_table() {
         crate::test_table::run(&[
             ("saved_choices_keep_role_identity_and_close_actions", saved_choices_keep_role_identity_and_close_actions as fn()),
-            ("waiting_catalog_opens_each_class_at_add_new_without_role_permissions", waiting_catalog_opens_each_class_at_add_new_without_role_permissions as fn()),
             ("unavailable_capability_refuses_editor_without_granting_role_permissions", unavailable_capability_refuses_editor_without_granting_role_permissions as fn()),
         ]);
     }

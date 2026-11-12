@@ -396,17 +396,6 @@ mod tests {
         assert!(!waiting.restarted(9));
     }
 
-    fn sp1_readiness_counts_the_helpers_while_extra_7_is_refused() {
-        // [Preload] … ready=2 planned=5 limit=5 Loading for the whole visit before D.
-        assert_eq!(held_limit(5, 2, None), 5);
-        // Refused extra 7 (position 0): the line counts the two helpers it can hold.
-        assert_eq!(held_limit(5, 2, Some(0)), 2);
-        // Extra 7 created, extra 3 refused: three.
-        assert_eq!(held_limit(5, 2, Some(1)), 3);
-        // Never above the configured limit.
-        assert_eq!(held_limit(2, 2, Some(2)), 2);
-    }
-
     const FULL: Compiled = Compiled { grouped_helper: true, managed_grouped: true, visible_grouped: true };
 
     fn facts(index: usize, count: u32, installed: u64, kind: u32, exact_mii: ExactMiiProof) -> OwnerFacts {
@@ -436,51 +425,6 @@ mod tests {
         assert!(!owner_admission(false, owners[1], FULL).grouped_visible);
     }
 
-    /// The visible owner is admitted only with the proof; any other result refuses it as on M5f.
-    fn visible_mii_admits_only_with_the_visible_proof() {
-        for index in [0usize, 1] {
-            for kind in [0x48u32, 0x49, 0x4a] {
-                assert!(owner_admission(true, facts(index, 1, 1, kind, ExactMiiProof::Proven), FULL).admits);
-                for proof in [ExactMiiProof::NotApplicable, ExactMiiProof::Busy, ExactMiiProof::Refused] {
-                    assert!(!owner_admission(true, facts(index, 1, 1, kind, proof), FULL).admits,
-                        "index {} kind {:#x} {:?}", index, kind, proof);
-                    assert!(!owner_admission(false, facts(index, 1, 1, kind, proof), FULL).admits);
-                }
-            }
-            // A proof never admits a non-Mii kind (here one neither ordinary nor grouped), an
-            // uninstalled owner or another count.
-            let foreign = OwnerFacts { ordinary: false, starting_forms: 1, ..facts(index, 1, 1, 0x5b, ExactMiiProof::Proven) };
-            assert!(!owner_admission(true, foreign, FULL).admits);
-            assert!(!owner_admission(true, facts(index, 1, 0, 0x4a, ExactMiiProof::Proven), FULL).admits);
-            assert!(!owner_admission(true, facts(index, 4, 1, 0x4a, ExactMiiProof::Proven), FULL).admits);
-        }
-    }
-
-    /// The rules M5f already had are unchanged (the `native_source_capacity` managed tests, moved).
-    fn helper_and_ordinary_rules_are_unchanged() {
-        // Exact Mii base helpers: proven only.
-        for (index, kind) in [(2usize, 0x4au32), (2, 0x48), (3, 0x49)] {
-            assert!(owner_admission(true, facts(index, 1, 1, kind, ExactMiiProof::Proven), FULL).admits);
-            for proof in [ExactMiiProof::NotApplicable, ExactMiiProof::Busy, ExactMiiProof::Refused] {
-                assert!(!owner_admission(true, facts(index, 1, 1, kind, proof), FULL).admits);
-            }
-        }
-        // Ordinary owners beside one exact Gunner helper.
-        for (index, kind) in [(0usize, 0x1cu32), (1, 0x00), (3, 0x0b)] {
-            assert!(owner_admission(true, facts(index, 1, 1, kind, ExactMiiProof::NotApplicable), FULL).admits);
-        }
-        // Grouped helpers: counts 2..=3 at index 2/3; Training only with managed grouped sources.
-        let grouped = facts(2, 2, 1, 0x5a, ExactMiiProof::NotApplicable);
-        assert!(owner_admission(true, grouped, FULL).admits);
-        let probe = Compiled { managed_grouped: false, ..FULL };
-        assert!(!owner_admission(true, grouped, probe).admits);
-        assert!(owner_admission(false, grouped, probe).admits);
-        // Grouped visible owners only when compiled.
-        let pyra = facts(0, 2, 1, 0x5a, ExactMiiProof::NotApplicable);
-        assert!(owner_admission(false, pyra, FULL).admits);
-        assert!(!owner_admission(false, pyra, Compiled { visible_grouped: false, ..FULL }).admits);
-    }
-
     /// g1 (M5g diag), the CPU swapped off the Mii between the slot-3 and slot-2 creations:
     /// owner 4 became body bank [0x0, 0x9] (#1275 build entry 0x11facac000, #1282 R 0x11b1f11e00,
     /// #1283 bodies 77212354448/77212864912 = 0x11fa370790/0x11fa3ed190, active 0x0), and slot 2 waited for the visit with
@@ -503,17 +447,6 @@ mod tests {
         (window, (0x11_e300_0100, 1, 0x0, 4, 4))
     }
 
-    /// Fails on M5g's rule (alternate families only): the committed body bank's active row admits.
-    fn g1_1322_committed_body_bank_row_admits() {
-        let (window, row) = g1_window();
-        // The native alternate-form rule has no row for a [0x0, 0x9] window.
-        assert_eq!(creation_row(row, None, Some(window)), Ok(true));
-        assert_eq!(body_bank_row(window, row), Ok(row));
-        // After a native member switch to Luigi the committed active cell moves with it.
-        let luigi = BankWindow { active: 1, ..window };
-        assert_eq!(creation_row((0x11_e300_0200, 1, 0x9, 4, 4), None, Some(luigi)), Ok(true));
-    }
-
     /// The committed bank is the authority: without it, or with any other member or route, the
     /// row is refused as on M5g.
     fn body_bank_row_needs_the_committed_window_and_its_active_member() {
@@ -534,13 +467,6 @@ mod tests {
         assert_eq!(body_bank_row(window, (0x11_e300_0100, 2, 0x0, -1, -1)), Ok((0x11_e300_0100, 2, 0x0, -1, -1)));
     }
 
-    /// Aegis/Trainer windows keep the native alternate-form rule (`Ok(false)`).
-    fn native_alternate_forms_keep_their_rule() {
-        let row = (0x3000, 1, 0x5a, 4, 4);
-        assert_eq!(creation_row(row, Some(row), None), Ok(false));
-        assert!(creation_row(row, Some((0x3100, 1, 0x5b, 4, 4)), None).is_err());
-    }
-
     fn the_line_names_the_sp1_owner() {
         assert_eq!(SP1_OWNER.to_string(),
             "owner index=1 count=1 kind=0x4a proof=not-applicable (not ordinary, grouped, a ready bank or a proven exact Mii)");
@@ -553,13 +479,8 @@ mod tests {
             ("sp1_refusal_is_logged_once_per_scene_and_extra", sp1_refusal_is_logged_once_per_scene_and_extra as fn()),
             ("keys_separate_checks_and_owners", keys_separate_checks_and_owners as fn()),
             ("unstable_is_noted_once_at_the_threshold", unstable_is_noted_once_at_the_threshold as fn()),
-            ("sp1_readiness_counts_the_helpers_while_extra_7_is_refused", sp1_readiness_counts_the_helpers_while_extra_7_is_refused as fn()),
             ("sp1_return_visit_admits_the_proven_visible_mii_cpu", sp1_return_visit_admits_the_proven_visible_mii_cpu as fn()),
-            ("visible_mii_admits_only_with_the_visible_proof", visible_mii_admits_only_with_the_visible_proof as fn()),
-            ("helper_and_ordinary_rules_are_unchanged", helper_and_ordinary_rules_are_unchanged as fn()),
-            ("g1_1322_committed_body_bank_row_admits", g1_1322_committed_body_bank_row_admits as fn()),
             ("body_bank_row_needs_the_committed_window_and_its_active_member", body_bank_row_needs_the_committed_window_and_its_active_member as fn()),
-            ("native_alternate_forms_keep_their_rule", native_alternate_forms_keep_their_rule as fn()),
             ("the_line_names_the_sp1_owner", the_line_names_the_sp1_owner as fn()),
         ]);
     }

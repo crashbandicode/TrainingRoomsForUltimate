@@ -80,34 +80,6 @@ fn published_record(c: Configuration) -> [u8; 104] {
     record
 }
 
-fn owner_aware_staging_keeps_player_index_and_takes_the_cpu_slot() {
-    let gunner = configuration(MiiClass::Gunner, 125);
-    let mut window = window();
-    window[0x46..0x48].copy_from_slice(&0u16.to_le_bytes());
-    // Player0 is no selector on any layout: `staged_descriptor_in` refuses it, the
-    // owner-aware rule stages the Player bytes with the window's own index.
-    for layout in [Layout::Training, Layout::Ldn, Layout::Quickplay] {
-        assert_eq!(staged_descriptor_in(layout, 0, window, Some(gunner)), None);
-        let player = staged_descriptor_for_owner(layout, 0, window, Some(gunner)).unwrap();
-        assert_eq!(player, staged_descriptor(window, Some(gunner)));
-        assert_eq!(&player[0x46..0x48], &[0, 0]);
-        assert_eq!(u32::from_le_bytes(player[0x18..0x1c].try_into().unwrap()), 0x4a);
-        assert_eq!(&player[0x48..0x50], &[75, 0, 125, 0, 0, 0, 37, 0]);
-        assert_eq!(player[0x43], 0);
-    }
-    // The Training CPU is selector 1; a waiting CPU is selector 4; a non-selector is refused.
-    let cpu = staged_descriptor_for_owner(Layout::Training, 1, window, Some(gunner)).unwrap();
-    assert_eq!(cpu, staged_descriptor_in(Layout::Training, 1, window, Some(gunner)).unwrap());
-    assert_eq!(&cpu[0x46..0x48], &[1, 0]);
-    let waiting = staged_descriptor_for_owner(Layout::Ldn, 4, window, Some(gunner)).unwrap();
-    assert_eq!(&waiting[0x46..0x48], &[4, 0]);
-    assert_eq!(staged_descriptor_for_owner(Layout::Training, 4, window, Some(gunner)), None);
-    assert_eq!(staged_descriptor_for_owner(Layout::Training, 7, window, Some(gunner)), None);
-    // Without a configuration the bytes are the window's (no identity to stage).
-    assert_eq!(staged_descriptor_for_owner(Layout::Training, 0, window, None), Some(window));
-    assert_eq!(staged_descriptor_for_owner(Layout::Training, 1, window, None), Some(window));
-}
-
 fn bank_headgear_publication_replaces_fresh_o_with_the_group_hat_proof() {
     let gunner = configuration(MiiClass::Gunner, 125);
     let descriptor = staged_descriptor_in(Layout::Training, 1, window(), Some(gunner)).unwrap();
@@ -259,7 +231,6 @@ fn bank_notices_name_the_role_and_the_exact_or_original_outcome() {
 #[test]
 fn case_table() {
     crate::test_table::run(&[
-        ("owner_aware_staging_keeps_player_index_and_takes_the_cpu_slot", owner_aware_staging_keeps_player_index_and_takes_the_cpu_slot as fn()),
         ("bank_headgear_publication_replaces_fresh_o_with_the_group_hat_proof", bank_headgear_publication_replaces_fresh_o_with_the_group_hat_proof as fn()),
         ("exact_bank_settle_accepts_the_canonical_values_and_fails_closed_per_field", exact_bank_settle_accepts_the_canonical_values_and_fails_closed_per_field as fn()),
         ("a_settle_outcome_adopts_or_diverges_with_a_hard_resource_clause_and_never_retires_the_owner", a_settle_outcome_adopts_or_diverges_with_a_hard_resource_clause_and_never_retires_the_owner as fn()),

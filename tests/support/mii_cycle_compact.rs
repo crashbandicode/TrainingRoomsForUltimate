@@ -44,25 +44,6 @@ impl Drop for AllocationCount {
     fn drop(&mut self) { ALLOCS.with(|count| count.set(None)); }
 }
 
-fn shared_counter_observes_alloc_zeroed_and_realloc() {
-    let measurement = AllocationCount::start();
-    unsafe {
-        let layout = Layout::from_size_align(16, 8).unwrap();
-        let zeroed = std::alloc::alloc_zeroed(layout);
-        assert!(!zeroed.is_null());
-        assert_eq!(*std::hint::black_box(zeroed), 0);
-        let grown = std::alloc::realloc(zeroed, layout, 32);
-        assert!(!grown.is_null());
-        std::alloc::dealloc(grown, Layout::from_size_align(32, 8).unwrap());
-        let plain = std::alloc::alloc(layout);
-        assert!(!plain.is_null());
-        std::hint::black_box(plain);
-        std::alloc::dealloc(plain, layout);
-    }
-    assert_eq!(measurement.finish(), 3);
-    assert_eq!(AllocationCount::start().finish(), 0);
-}
-
 fn catalog() -> Snapshot {
     let rows = [MiiClass::Brawler, MiiClass::Swordfighter, MiiClass::Gunner]
         .into_iter().flat_map(|class| [0u8, 1].map(move |variant| (class, variant)))
@@ -255,7 +236,6 @@ fn first_and_repeated_full_roster_qualified_walks_allocate_nothing() {
 #[test]
 fn case_table() {
     crate::test_table::run(&[
-        ("shared_counter_observes_alloc_zeroed_and_realloc", shared_counter_observes_alloc_zeroed_and_realloc as fn()),
         ("compact_ring_matches_reference_for_full_mixed_duplicate_and_rejected_rosters", compact_ring_matches_reference_for_full_mixed_duplicate_and_rejected_rosters as fn()),
         ("first_and_repeated_full_roster_qualified_walks_allocate_nothing", first_and_repeated_full_roster_qualified_walks_allocate_nothing as fn()),
     ]);

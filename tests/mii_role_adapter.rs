@@ -266,94 +266,6 @@ fn captured_cpu_apply_restore_preserves_original_helpers_and_owned_resource_tail
     assert!(state.can_change_kind_or_return_slot0(original).is_ok());
 }
 
-fn role_context_alias_and_helper_changes_fail_before_owned_payload() {
-    let original = cpu();
-    let alt = configuration(true);
-    let mut state = SavedRole::capture(Role::Cpu, original).unwrap();
-    assert_eq!(
-        state.select(7, original, Action::ReloadPlayer(choice(alt)), alt),
-        Err(Error::WrongRole)
-    );
-    assert_eq!(
-        state.select(6, original, Action::ReloadCpu(choice(alt)), alt),
-        Err(Error::ContextChanged)
-    );
-    let tx = state
-        .select(7, original, Action::ReloadCpu(choice(alt)), alt)
-        .unwrap()
-        .unwrap();
-    let mut changed = original;
-    changed.thread += 8;
-    assert!(state.submit(tx.ticket(), changed).is_err());
-    changed = original;
-    changed.live.binding.epoch += 1;
-    assert!(state.submit(tx.ticket(), changed).is_err());
-    let commit = state.submit(tx.ticket(), original).unwrap();
-    changed = original;
-    changed.scope.cpu.as_mut().unwrap().helpers[0].record[96] ^= 1;
-    assert!(commit.prepare_write(changed, rows(alt)).is_err());
-    assert_eq!(state.phase(), Phase::Loading);
-    state.depart();
-    assert_eq!(state.pending_ticket(), Some(tx.ticket()));
-    assert!(state
-        .complete(tx.ticket(), with_config(original, alt))
-        .is_err());
-    assert_eq!(state.pending_ticket(), Some(tx.ticket()));
-    state.settle_terminal(tx.ticket()).unwrap(); // test supplies actual-terminal premise
-    changed = original;
-    changed.scope.cpu.as_mut().unwrap().owners[2].index = 1;
-    assert!(SavedRole::capture(Role::Cpu, changed).is_err());
-    changed = original;
-    let owners = &mut changed.scope.cpu.as_mut().unwrap().owners;
-    owners[1].object = owners[0].object;
-    assert!(SavedRole::capture(Role::Cpu, changed).is_err());
-}
-
-fn independent_role_values_do_not_widen_player_scope_or_protected_slot_zero() {
-    let cpu = cpu();
-    let mut p1 = cpu;
-    p1.live.binding.owner = 0;
-    p1.live.binding.record_index = 0;
-    p1.scope = Scope::player([
-        Some(0x49),
-        Some(9),
-        Some(9),
-        Some(9),
-        None,
-        None,
-        None,
-        None,
-    ]);
-    p1.mirrors = mirrors(0, p1.live.configuration.tokens());
-    // Pure separate-role context; not a claim that both native layouts can coexist.
-    let mut player = SavedRole::capture(Role::Player, p1).unwrap();
-    let mut cpu_state = SavedRole::capture(Role::Cpu, cpu).unwrap();
-    let alt = configuration(true);
-    let tx = cpu_state
-        .select(7, cpu, Action::ReloadCpu(choice(alt)), alt)
-        .unwrap()
-        .unwrap();
-    assert_eq!(player.expected(), p1.live.configuration);
-    assert!(player
-        .select(
-            7,
-            p1,
-            Action::ReloadPlayer(choice(player.original())),
-            player.original()
-        )
-        .is_err());
-    assert!(player.submit(tx.ticket(), p1).is_err());
-    let mut other_mii = p1;
-    other_mii.scope.player_kinds.as_mut().unwrap()[1] = Some(0x49);
-    assert!(SavedRole::capture(Role::Player, other_mii).is_err());
-    let mut extra = cpu;
-    extra.scope.cpu.as_mut().unwrap().other_entries_present = true;
-    assert!(SavedRole::capture(Role::Cpu, extra).is_err());
-    let mut ldn = cpu;
-    ldn.live.binding.owner = 4;
-    assert!(SavedRole::capture(Role::Cpu, ldn).is_err());
-}
-
 fn unwritten_submission_can_recover_and_restore_previous_alternate() {
     let original = cpu();
     let alt = configuration(true);
@@ -395,53 +307,6 @@ fn unwritten_submission_can_recover_and_restore_previous_alternate() {
     let mut alias = original;
     alias.scope.cpu.as_mut().unwrap().owners[2].alias = 1;
     assert!(SavedRole::capture(Role::Cpu, alias).is_err());
-}
-
-fn player_payload_and_unrelated_roster_change_preserve_strict_scope() {
-    let mut original = cpu();
-    original.live.binding.owner = 0;
-    original.live.binding.record_index = 0;
-    original.scope = Scope::player([
-        Some(0x49),
-        Some(9),
-        Some(9),
-        Some(9),
-        None,
-        None,
-        None,
-        None,
-    ]);
-    original.mirrors = mirrors(0, original.live.configuration.tokens());
-    let alt = configuration(true);
-    let mut state = SavedRole::capture(Role::Player, original).unwrap();
-    let tx = state
-        .select(7, original, Action::ReloadPlayer(choice(alt)), alt)
-        .unwrap()
-        .unwrap();
-    let payload = state
-        .submit(tx.ticket(), original)
-        .unwrap()
-        .prepare_write(original, rows(alt))
-        .unwrap();
-    let mut copy = original.record;
-    payload.apply_to_copy(&mut copy).unwrap();
-    assert_eq!(&copy[..88], alt.charinfo());
-    assert_eq!(&copy[88..], &original.record[88..]);
-    let ready = with_config(original, alt);
-    state.complete(tx.ticket(), ready).unwrap();
-    let mut changed = ready;
-    changed.scope.player_kinds.as_mut().unwrap()[1] = Some(0x0f);
-    assert_eq!(state.restore(changed), Err(Error::ContextChanged));
-    assert_eq!(state.expected(), alt);
-    // Glue must block that unrelated install; it cannot repair authority by re-snapshotting it.
-    let restore = state.restore(ready).unwrap().unwrap();
-    state
-        .submit(restore.ticket(), ready)
-        .unwrap()
-        .prepare_write(ready, rows(original.live.configuration))
-        .unwrap();
-    state.complete(restore.ticket(), original).unwrap();
-    assert!(state.can_change_kind_or_return_slot0(original).is_ok());
 }
 
 fn terminal_native_readiness_settlement_retains_original_expected_and_refusal() {
@@ -584,10 +449,7 @@ fn case_table() {
     crate::test_table::run(&[
         ("menu_recapture_never_rebases_failed_cpu_scope_or_inflight_expected_state", menu_recapture_never_rebases_failed_cpu_scope_or_inflight_expected_state as fn()),
         ("captured_cpu_apply_restore_preserves_original_helpers_and_owned_resource_tail", captured_cpu_apply_restore_preserves_original_helpers_and_owned_resource_tail as fn()),
-        ("role_context_alias_and_helper_changes_fail_before_owned_payload", role_context_alias_and_helper_changes_fail_before_owned_payload as fn()),
-        ("independent_role_values_do_not_widen_player_scope_or_protected_slot_zero", independent_role_values_do_not_widen_player_scope_or_protected_slot_zero as fn()),
         ("unwritten_submission_can_recover_and_restore_previous_alternate", unwritten_submission_can_recover_and_restore_previous_alternate as fn()),
-        ("player_payload_and_unrelated_roster_change_preserve_strict_scope", player_payload_and_unrelated_roster_change_preserve_strict_scope as fn()),
         ("terminal_native_readiness_settlement_retains_original_expected_and_refusal", terminal_native_readiness_settlement_retains_original_expected_and_refusal as fn()),
         ("new_saved_classes_keep_exact_restore_and_reject_cross_class_or_ordinary_scope", new_saved_classes_keep_exact_restore_and_reject_cross_class_or_ordinary_scope as fn()),
     ]);

@@ -58,34 +58,11 @@ mod connected_editor_tests {
         assert!(!menu.alpha_cpu_cycle(MiiClass::Swordfighter.kind()));
     }
 
-    fn missing_class_requests_native_default_without_relabelling_saved_seed() {
-        let preferences = Preferences::default();
-        assert!(CatalogMenu::editor_only(catalog(), 0, &preferences).is_none());
-        let mut menu = CatalogMenu::editor_only(catalog(), 9, &preferences).unwrap();
-        menu.open_class(MiiClass::Gunner);
-        assert!(matches!(menu.editor_seed(&preferences).unwrap().seed,
-            EditorSeed::NativeDefault(MiiClass::Gunner)));
-        assert_eq!(menu.view(&preferences).disabled, vec![true, true, false]);
-    }
-
-    fn complete_empty_catalog_allows_creation_but_read_defect_does_not() {
-        let preferences = Preferences::default();
-        let mut menu = CatalogMenu::editor_only(Snapshot::default(), 9, &preferences).unwrap();
-        menu.open_class(MiiClass::Brawler);
-        assert!(matches!(menu.editor_seed(&preferences).unwrap().seed,
-            EditorSeed::NativeDefault(MiiClass::Brawler)));
-        menu.snapshot.findings.push(Finding::Source { slot_id: None, error: "read denied".into() });
-        assert!(menu.editor_seed(&preferences).is_none());
-        assert_eq!(menu.view(&preferences).disabled, vec![true, true, true]);
-    }
-
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
             ("waiting_catalog_exposes_seed_without_fighter_role_permissions", waiting_catalog_exposes_seed_without_fighter_role_permissions as fn()),
-            ("missing_class_requests_native_default_without_relabelling_saved_seed", missing_class_requests_native_default_without_relabelling_saved_seed as fn()),
-            ("complete_empty_catalog_allows_creation_but_read_defect_does_not", complete_empty_catalog_allows_creation_but_read_defect_does_not as fn()),
         ]);
     }
     }

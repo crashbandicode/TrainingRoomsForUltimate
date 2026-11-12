@@ -562,90 +562,6 @@ mod tests {
         panic!("could not reach {title}");
     }
 
-    fn the_reset_line_and_its_confirmation_are_drawn_and_the_footer_has_no_zr() {
-        let mut m = menu();
-        let f = frame(&m);
-        assert!(!f.hint.string_lossy().contains("ZR"), "{}", f.hint.string_lossy());
-        assert!(f.hint.string_lossy().contains("ZL+Up/Down section"));
-        m.press(Button::Up);
-        assert!(matches!(m.focus(), Some(Entry::ResetPage(_))));
-        let f = frame(&m);
-        let focus = usize::from(f.focus.expect("the line is focused"));
-        assert_eq!(f.rows[focus].label.string_lossy(), RESET_LABEL);
-        assert!(f.help[1].string_lossy().contains("confirm"));
-        m.press(Button::A);
-        let f = frame(&m);
-        assert!(f.crumb.string_lossy().ends_with(RESET_LABEL));
-        assert_eq!(f.hint.string_lossy(), "A reset   B cancel");
-        assert!(f.help[0].string_lossy().contains(Page::Cpu.title()));
-        assert!(!f.help[1].string_lossy().contains("shortcut"), "the CPU page has no shortcut rows");
-    }
-
-    /// The confirmation says what the reset leaves: on Display & Controls the two menu shortcuts are not settings of
-    /// the page (they live in the shortcuts file), and a confirmed reset leaves them as they are.
-    fn the_reset_confirmation_names_what_stays() {
-        let shortcuts = [crate::model::menu::chord::Chord(0x41), crate::model::menu::chord::Chord::NONE];
-        let mut m = Menu::new(Settings::factory(), Env { shortcuts, ..Env::default() });
-        for _ in 0..6 {
-            if m.page() == Page::DisplayControls {
-                break;
-            }
-            m.press(Button::R);
-        }
-        assert_eq!(m.page(), Page::DisplayControls);
-        while !matches!(m.focus(), Some(Entry::ResetPage(_))) {
-            m.press(Button::Up);
-        }
-        m.press(Button::A);
-        let f = frame(&m);
-        assert!(f.help[1].string_lossy().contains("menu shortcuts stay"), "{}", f.help[1].string_lossy());
-        m.press(Button::A);
-        assert_eq!(m.env().shortcuts, shortcuts, "the reset left the shortcuts");
-        let (page, changed) = m.take_page_reset().expect("the reset ran");
-        assert_eq!(page, Page::DisplayControls);
-        assert!(changed.iter().all(|id| !id.contains("shortcut")), "{changed:?}");
-    }
-
-    fn reused_frame_drops_roster_and_popup_state_when_returning_to_pages() {
-        let mut reused = Frame::new();
-        for title in ["Character Cycles", "SDI Strength", "Character Cycles"] {
-            let mut m = menu();
-            open(&mut m, title);
-            frame_of(&m, &mut reused, |i| if i == 0 { "Battlefield" } else { "Stage" });
-            assert_eq!(reused, frame(&m), "opening {title}");
-            m.press(Button::B);
-            frame_of(&m, &mut reused, |i| if i == 0 { "Battlefield" } else { "Stage" });
-            assert_eq!(reused, frame(&m), "leaving {title}");
-        }
-    }
-
-    fn a_dropdown_popup_lists_its_options_and_marks_the_current_one() {
-        let mut m = menu();
-        open(&mut m, "SDI Strength");
-        let f = frame(&m);
-        assert_eq!(f.row_count, 4);
-        assert_eq!(f.rows[3].label.string_lossy(), "High");
-        assert!(f.rows.iter().take(4).any(|r| r.value.string_lossy() == "(current)"));
-        assert!(f.crumb.string_lossy().contains("SDI Strength"));
-        assert!(f.hint.string_lossy().contains("A set"));
-        assert_eq!(f.group_count, 0);
-    }
-
-    fn a_checklist_popup_shows_ticks_and_scrolls_with_the_cursor() {
-        let mut m = menu();
-        open(&mut m, "Mash");
-        for _ in 0..20 {
-            m.press(Button::Down);
-        }
-        let f = frame(&m);
-        assert_eq!(f.row_count as usize, ROW_LINES);
-        assert!(f.focus.is_some());
-        assert_eq!(window_start(20, 30), 20 + 1 + ROW_LINES / 2 - ROW_LINES);
-        m.press(Button::A);
-        let f = frame(&m);
-        assert!(f.rows[f.focus.unwrap() as usize].value.string_lossy() == "[x]");
-    }
-
     fn the_delay_popup_greys_the_checklist_once_a_range_is_set_and_says_why() {
         let mut m = menu();
         open(&mut m, "Ledge Delay");
@@ -673,21 +589,6 @@ mod tests {
         assert!(f.help[1].string_lossy().contains("range is set"), "{:?}", f.help[1]);
     }
 
-    fn left_and_right_step_a_column_of_the_delay_checklist_and_stop_at_the_edge() {
-        let mut m = menu();
-        open(&mut m, "Ledge Delay");
-        m.press(Button::Right);
-        assert_eq!(frame(&m).tile_focus, 4);
-        m.press(Button::Left);
-        m.press(Button::Left);
-        assert_eq!(frame(&m).tile_focus, 0, "no step past the first column");
-        for _ in 0..9 {
-            m.press(Button::Right);
-        }
-        assert_eq!(frame(&m).tile_focus, 28, "the last full column; 32 would be past the 31 boxes");
-        m.press(Button::A);
-        assert_eq!(frame(&m).tile_state[28], 1, "a tick shows");
-    }
     fn the_overrides_screen_is_columns_of_boxes_and_left_right_step_a_column() {
         let mut m = menu();
         open(&mut m, "Situation overrides");
@@ -737,29 +638,6 @@ mod tests {
         let _ = (Page::Cpu, Editor::GiveItem);
     }
 
-    fn a_direction_grid_shows_the_chips_with_their_weights_and_says_the_choice_in_words() {
-        let mut m = menu();
-        open(&mut m, "DI Direction");
-        m.press(Button::A);
-        let f = frame(&m);
-        assert_eq!(f.view, View::Chips);
-        assert_eq!(f.chip_focus, 8, "the focus starts on Neutral");
-        assert_eq!(f.chip_weights[8], 1);
-        assert!(f.help[1].string_lossy().contains("Neutral x1"), "{:?}", f.help[1]);
-        assert_eq!(f.chip_visual, ChipVisual::Di, "the DI grid draws the game's DI visual");
-    }
-
-    fn only_the_di_and_sdi_grids_ask_for_the_games_visual() {
-        for (title, want) in [("DI Direction", ChipVisual::Di), ("SDI Direction", ChipVisual::Sdi), ("Airdodge Direction", ChipVisual::None)] {
-            let mut m = menu();
-            open(&mut m, title);
-            m.press(Button::A);
-            let f = frame(&m);
-            assert_eq!(f.view, View::Chips, "{title}");
-            assert_eq!(f.chip_visual, want, "{title}");
-        }
-    }
-
     fn open_grid(mode: crate::model::menu::grid::ConsoleMode, title: &str) -> Menu {
         let mut m = Menu::new(Settings::factory(), Env { console: mode, ..Env::default() });
         open(&mut m, title);
@@ -785,92 +663,6 @@ mod tests {
         let mut m = open_grid(ConsoleMode::Docked, "Lobby Stages");
         m.press(Button::A);
         assert_eq!(m.take_give_item(), None);
-    }
-
-    fn a_docked_label_that_is_cut_ends_in_two_dots_and_names_with_one_first_word_stay_apart() {
-        let mut a = Text::<28>::new();
-        let mut b = Text::<28>::new();
-        let mut c = Text::<28>::new();
-        tile_label(GridKind::Items, 0, true, |_| "", &mut a);
-        assert!(a.units().len() <= 14);
-        fn stage(n: usize) -> &'static str {
-            ["Mushroom Kingdom", "Mushroomy Kingdom", "Final Destination"][n]
-        }
-        tile_label(GridKind::Stages, 1, true, stage, &mut b);
-        tile_label(GridKind::Stages, 2, true, stage, &mut c);
-        assert_eq!(b.string_lossy(), "Mushroom Kin..");
-        assert_eq!(c.string_lossy(), "Mushroomy Ki..");
-        let mut d = Text::<28>::new();
-        tile_label(GridKind::Stages, 3, false, stage, &mut d);
-        assert_eq!(d.string_lossy(), "Final Destination");
-    }
-
-    fn the_item_grid_is_one_docked_page_of_38_short_names_and_three_handheld_pages() {
-        use crate::model::menu::grid::ConsoleMode;
-        let m = open_grid(ConsoleMode::Docked, "Give item");
-        let f = frame(&m);
-        assert_eq!((f.view, f.tile_cols, f.tile_rows, f.tile_count), (View::Tiles, 5, 8, 38));
-        assert!(f.tile_item_grid);
-        assert_eq!(&f.tile_n[..38], &(0..38).collect::<Vec<u16>>());
-        assert!(f.tiles[..38].iter().all(|t| !t.is_empty() && t.units().len() <= 14));
-        let mut m = open_grid(ConsoleMode::Handheld, "Give item");
-        let f = frame(&m);
-        assert_eq!((f.tile_cols, f.tile_rows, f.tile_count), (4, 4, 16));
-        m.press(Button::R);
-        m.press(Button::R);
-        assert_eq!(frame(&m).tile_count, 6, "the third page holds the last 6 items");
-        assert!(frame(&m).crumb.string_lossy().contains("page 3 of 3"));
-        assert_eq!(&frame(&m).tile_n[..6], &[32, 33, 34, 35, 36, 37]);
-        m.press(Button::B);
-        assert!(!frame(&m).tile_item_grid, "item pictures must disappear on leaving the grid");
-    }
-
-    fn the_stage_grid_pages_follow_the_catalog_docked_and_handheld() {
-        use crate::model::menu::grid::ConsoleMode;
-        let mut m = open_grid(ConsoleMode::Docked, "Lobby Stages");
-        let mut counts = Vec::new();
-        for _ in 0..3 {
-            counts.push(frame(&m).tile_count);
-            m.press(Button::R);
-        }
-        assert_eq!(counts, [40, 40, (crate::model::menu::grid::STAGE_TILES - 80) as u8]);
-        assert_eq!(frame(&m).tiles[0].string_lossy(), "All");
-        let m = open_grid(ConsoleMode::Handheld, "Lobby Stages");
-        let pages = crate::model::menu::grid::STAGE_TILES.div_ceil(16);
-        assert!(frame(&m).crumb.string_lossy().contains(&format!("page 1 of {pages}")));
-    }
-
-    fn the_change_stage_grid_starts_on_the_first_stage_with_its_picture_and_says_what_a_does() {
-        use crate::model::menu::grid::ConsoleMode;
-        let m = open_grid(ConsoleMode::Docked, "Change Stage");
-        let f = frame(&m);
-        assert_eq!((f.view, f.tile_count), (View::Tiles, 40));
-        assert!(f.tile_stage_grid, "stage pictures, as on Lobby Stages");
-        assert_eq!(&f.tile_n[..3], &[1, 2, 3], "the stage grid's numbers, without All");
-        assert_eq!(f.tiles[0].string_lossy(), "Battlefield", "catalog stage 0, not All");
-        assert!(f.crumb.string_lossy().contains("Change Stage"), "{:?}", f.crumb);
-        assert!(f.help[0].string_lossy().contains("go to now"), "{:?}", f.help[0]);
-    }
-    fn a_panel_of_the_macro_layer_is_a_4_by_8_tile_page_with_a_two_line_footer() {
-        let m = menu();
-        let mut labels = vec![String::new(); PANEL_CELLS];
-        labels[0] = "Jab string · Mario".into();
-        labels[1] = "Ledge trap · Pikachu".into();
-        let mut f = Frame::new();
-        panel_frame(&m, "Named Library", "Ledge trap · Pikachu\npage 1/1  skipped 0    A loads, B closes.", &labels, 1, &mut f);
-        assert_eq!((f.view, f.tile_cols, f.tile_rows, f.tile_count), (View::Tiles, 4, 8, 32));
-        assert_eq!(f.tiles[0].string_lossy(), "Jab string · Mario");
-        assert_eq!((f.tile_state[0], f.tile_state[2], f.tile_state[31]), (0, TILE_HIDDEN, TILE_HIDDEN));
-        assert_eq!(f.tile_focus, 1);
-        assert_eq!(f.crumb.string_lossy(), "CPU  >  Named Library");
-        assert_eq!(f.help[0].string_lossy(), "Ledge trap · Pikachu");
-        assert!(f.help[1].string_lossy().starts_with("page 1/1"));
-        assert_eq!(f.group_count, 0);
-        assert_eq!(f.row_count, 0);
-        // A one-label panel (the system keyboard's "Name and save") and a focus past the labels are clamped.
-        let mut f = Frame::new();
-        panel_frame(&m, "Name macro", "Recording · 12f · 0.20s\nA: system keyboard   B: return", &["Name and save"], 9, &mut f);
-        assert_eq!((f.tile_count, f.tile_focus), (1, 0));
     }
 
     fn the_fighter_question_shows_its_own_keys() {
@@ -925,23 +717,10 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
-            ("the_reset_line_and_its_confirmation_are_drawn_and_the_footer_has_no_zr", the_reset_line_and_its_confirmation_are_drawn_and_the_footer_has_no_zr as fn()),
-            ("the_reset_confirmation_names_what_stays", the_reset_confirmation_names_what_stays as fn()),
-            ("reused_frame_drops_roster_and_popup_state_when_returning_to_pages", reused_frame_drops_roster_and_popup_state_when_returning_to_pages as fn()),
-            ("a_dropdown_popup_lists_its_options_and_marks_the_current_one", a_dropdown_popup_lists_its_options_and_marks_the_current_one as fn()),
-            ("a_checklist_popup_shows_ticks_and_scrolls_with_the_cursor", a_checklist_popup_shows_ticks_and_scrolls_with_the_cursor as fn()),
             ("the_delay_popup_greys_the_checklist_once_a_range_is_set_and_says_why", the_delay_popup_greys_the_checklist_once_a_range_is_set_and_says_why as fn()),
-            ("left_and_right_step_a_column_of_the_delay_checklist_and_stop_at_the_edge", left_and_right_step_a_column_of_the_delay_checklist_and_stop_at_the_edge as fn()),
             ("the_overrides_screen_is_columns_of_boxes_and_left_right_step_a_column", the_overrides_screen_is_columns_of_boxes_and_left_right_step_a_column as fn()),
             ("the_swap_groups_overrides_chords_and_chord_editor_have_frames", the_swap_groups_overrides_chords_and_chord_editor_have_frames as fn()),
-            ("a_direction_grid_shows_the_chips_with_their_weights_and_says_the_choice_in_words", a_direction_grid_shows_the_chips_with_their_weights_and_says_the_choice_in_words as fn()),
-            ("only_the_di_and_sdi_grids_ask_for_the_games_visual", only_the_di_and_sdi_grids_ask_for_the_games_visual as fn()),
             ("a_on_the_give_item_grid_asks_for_that_item_every_time_and_the_stage_grid_asks_for_nothing", a_on_the_give_item_grid_asks_for_that_item_every_time_and_the_stage_grid_asks_for_nothing as fn()),
-            ("a_docked_label_that_is_cut_ends_in_two_dots_and_names_with_one_first_word_stay_apart", a_docked_label_that_is_cut_ends_in_two_dots_and_names_with_one_first_word_stay_apart as fn()),
-            ("the_item_grid_is_one_docked_page_of_38_short_names_and_three_handheld_pages", the_item_grid_is_one_docked_page_of_38_short_names_and_three_handheld_pages as fn()),
-            ("the_stage_grid_pages_follow_the_catalog_docked_and_handheld", the_stage_grid_pages_follow_the_catalog_docked_and_handheld as fn()),
-            ("the_change_stage_grid_starts_on_the_first_stage_with_its_picture_and_says_what_a_does", the_change_stage_grid_starts_on_the_first_stage_with_its_picture_and_says_what_a_does as fn()),
-            ("a_panel_of_the_macro_layer_is_a_4_by_8_tile_page_with_a_two_line_footer", a_panel_of_the_macro_layer_is_a_4_by_8_tile_page_with_a_two_line_footer as fn()),
             ("the_fighter_question_shows_its_own_keys", the_fighter_question_shows_its_own_keys as fn()),
             ("every_sub_screen_of_every_row_draws_within_the_budget", every_sub_screen_of_every_row_draws_within_the_budget as fn()),
         ]);

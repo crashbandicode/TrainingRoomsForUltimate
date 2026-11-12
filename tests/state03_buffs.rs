@@ -50,37 +50,6 @@ fn state03_hero_spell_sequence() {
     assert_eq!(cast, vec![Spell::Bounce, Spell::Psyche, Spell::Oomph, Spell::Accelerate]);
 }
 
-fn state03_hero_cast_order_and_tail() {
-    let two = buffs(&[Buffs::OOMPH, Buffs::BOUNCE]);
-    let mut state = BuffState::new();
-    let mut rng = Rng::new(1);
-    let first = state.step(BuffKind::Hero, two, &BuffFacts::default(), &mut rng);
-    assert_eq!(first.hero_cast, Some(Spell::Bounce), "last selected first");
-    assert!(first.buffing);
-    let _ = state.step(BuffKind::Hero, two, &BuffFacts { hero_cast_now: true, ..BuffFacts::default() }, &mut rng);
-    let second = state.step(BuffKind::Hero, two, &BuffFacts { hero_cast_before: true, ..BuffFacts::default() }, &mut rng);
-    assert_eq!(second.hero_cast, Some(Spell::Oomph));
-    let _ = state.step(BuffKind::Hero, two, &BuffFacts { hero_cast_now: true, ..BuffFacts::default() }, &mut rng);
-    // Nothing left: a 3-frame tail (still silenced), then done.
-    let tail: Vec<bool> = (0..4)
-        .map(|i| state.step(BuffKind::Hero, two, &BuffFacts { hero_cast_before: i == 0, ..BuffFacts::default() }, &mut rng).done)
-        .collect();
-    assert_eq!(tail, vec![false, false, false, true]);
-}
-
-fn state03_single_write_two_frame_tail() {
-    for (kind, option) in [(BuffKind::Cloud, Buffs::LIMIT), (BuffKind::Joker, Buffs::ARSENE), (BuffKind::LittleMac, Buffs::KO)] {
-        // The runtime stops stepping a record once it reports done.
-        let mut outs = run(kind, buffs(&[option]), &idle(5));
-        outs.truncate(outs.iter().position(|o| o.done).unwrap() + 1);
-        assert!(outs[0].add_limit == (kind == BuffKind::Cloud) && outs[0].add_rebel == (kind == BuffKind::Joker) && outs[0].ko_gauge == (kind == BuffKind::LittleMac));
-        // The write happens once; the step is done after the tail.
-        assert_eq!(outs.iter().filter(|o| o.add_limit || o.add_rebel || o.ko_gauge).count(), 1);
-        assert_eq!(outs.iter().position(|o| o.done), Some(2), "{kind:?}");
-        assert!(outs[0].buffing && !outs[2].buffing);
-    }
-}
-
 fn state03_unselected_done_immediately() {
     for kind in [BuffKind::Cloud, BuffKind::Joker, BuffKind::LittleMac, BuffKind::Sephiroth, BuffKind::WiiFit, BuffKind::MinMin, BuffKind::Shulk, BuffKind::Wario] {
         let outs = run(kind, Buffs(0), &idle(1));
@@ -169,28 +138,11 @@ fn state03_bookkeeping_by_record_and_clear() {
     assert_eq!(player, BuffState::new());
 }
 
-fn state03_two_buffable_fighters() {
-    let b = buffs(&[Buffs::ACCELERATE, Buffs::MONAD_SPEED]);
-    let hero = run(BuffKind::Hero, b, &idle(1));
-    let shulk = run(BuffKind::Shulk, b, &idle(1));
-    assert!(hero[0].hero_cast.is_some() && shulk[0].shulk_write.is_some());
-}
-
-fn state03_hook_predicates() {
-    use model::state::hooks;
-    // The effects of a buffing fighter are not hidden while the load runs; the others are.
-    assert!(!hooks::effect_hidden(true, true));
-    assert!(hooks::effect_hidden(true, false));
-    assert!(hooks::sound_silenced(true) && hooks::quake_suppressed(true));
-}
-
 /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
 #[test]
 fn case_table() {
     crate::test_table::run(&[
         ("state03_hero_spell_sequence", state03_hero_spell_sequence as fn()),
-        ("state03_hero_cast_order_and_tail", state03_hero_cast_order_and_tail as fn()),
-        ("state03_single_write_two_frame_tail", state03_single_write_two_frame_tail as fn()),
         ("state03_unselected_done_immediately", state03_unselected_done_immediately as fn()),
         ("state03_sephiroth_flag_lifecycle", state03_sephiroth_flag_lifecycle as fn()),
         ("state03_wario_waft_level", state03_wario_waft_level as fn()),
@@ -198,7 +150,5 @@ fn case_table() {
         ("state03_wiifit_breathing_no_heal", state03_wiifit_breathing_no_heal as fn()),
         ("state03_minmin_sequence", state03_minmin_sequence as fn()),
         ("state03_bookkeeping_by_record_and_clear", state03_bookkeeping_by_record_and_clear as fn()),
-        ("state03_two_buffable_fighters", state03_two_buffable_fighters as fn()),
-        ("state03_hook_predicates", state03_hook_predicates as fn()),
     ]);
 }

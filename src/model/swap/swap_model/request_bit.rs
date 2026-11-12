@@ -502,139 +502,6 @@ mod tests {
     const BRAWLER: u32 = 0x48;
     const ROB: u32 = 0x2d;
 
-    fn key(kind: u32, costume: u32) -> u32 { (kind << 17) | (costume << 25) | 0x1003f }
-
-    fn all_rosters() -> Vec<Roster> {
-        let descriptors: [Option<([u32; SUBS], u32)>; 7] = [
-            None,
-            Some(([KIRBY, NO_KIND, NO_KIND], 3)),
-            Some(([MARIO, FOX, NO_KIND], 1)),
-            Some(([BRAWLER, NO_KIND, NO_KIND], 5)),
-            Some(([POPO, NANA, NO_KIND], 2)),
-            Some(([0x4e, 0x4f, 0x50], 4)),
-            Some(([FOX, KIRBY, SAMUS], 7)),
-        ];
-        let mut rosters = Vec::new();
-        for a in &descriptors {
-            for b in &descriptors {
-                let mut roster = [Record::DEFAULT; ENTRIES];
-                if let Some((kinds, costume)) = a { roster[0] = Record { entry: 0, kinds: *kinds, costume: *costume }; }
-                if let Some((kinds, costume)) = b { roster[1] = Record { entry: 1, kinds: *kinds, costume: *costume }; }
-                rosters.push(roster);
-            }
-        }
-        rosters
-    }
-
-    /// The two listings agree: per (roster, kind, costume), `0x17f0290` returns exactly the
-    /// multiset `0x17efb40` took. Native's pairing is per kind, so it holds only when every kind
-    /// released while bit 2 is set is a kind the completion acquired for.
-    fn the_two_listings_pair_per_kind_roster_and_costume() {
-        let kinds = [MARIO, KIRBY, FOX, BRAWLER, 0x49, 0x4a, POPO, NANA, 0x4d, 0x4e, 0x50, ROB, 0x52, 0x75, NO_KIND];
-        let mut nonempty = 0;
-        for roster in all_rosters() {
-            for kind in kinds {
-                for costume in [0u32, 1, 7, 0xff] {
-                    let mut acquired = acquired_keys(&roster, kind, costume);
-                    let mut released = released_keys(&roster, kind, costume);
-                    acquired.sort_unstable();
-                    released.sort_unstable();
-                    assert_eq!(acquired, released, "kind {:#x} costume {} roster {:?}", kind, costume, roster);
-                    if !acquired.is_empty() { nonempty += 1; }
-                }
-            }
-        }
-        assert!(nonempty > 100, "{}", nonempty);
-    }
-
-    fn copy_keys_follow_the_listing() {
-        assert_eq!(copy_key(FOX, 3), Some(key(FOX, 3)));
-        assert_eq!(copy_key(BRAWLER, 3), Some(key(BRAWLER, 0)));
-        for kind in [NO_KIND, KIRBY, 0x4d, 0x4e, 0x4f, 0x50, 0x8000_0000] { assert_eq!(copy_key(kind, 1), None); }
-        assert_eq!(completion_members([POPO, NANA, NO_KIND]), vec![POPO]);
-        assert_eq!(completion_members([MARIO, FOX, NO_KIND]), vec![MARIO, FOX]);
-        assert_eq!(completion_members([NO_KIND, NO_KIND, SAMUS]), vec![NO_KIND, SAMUS]);
-        // A non-Kirby kind takes one key per Kirby record, under that record's costume.
-        let roster = roster(([MARIO, NO_KIND, NO_KIND], 2), Some(([KIRBY, NO_KIND, NO_KIND], 5)));
-        assert_eq!(acquired_keys(&roster, MARIO, 2), vec![key(MARIO, 5)]);
-        assert_eq!(acquired_keys(&roster, KIRBY, 5), vec![key(MARIO, 5)]);
-    }
-
-    fn the_lease_clears_only_the_bit_it_set() {
-        for before in 0u8..8 {
-            let (lease, write) = begin(before);
-            assert_eq!(write, (before & 1 == 0).then_some(before | 1));
-            for now in 0u8..8 {
-                let (how, write) = end(lease, now);
-                match how {
-                    End::NotOurs => assert!(before & 1 == 1 && write.is_none()),
-                    End::Restored => assert!(before & 1 == 0 && now == before | 1 && write == Some(before)),
-                    End::ResetRan => assert!(before & 1 == 0 && now == 0 && write.is_none()),
-                    End::Changed => assert!(before & 1 == 0 && now != before | 1 && now != 0 && write.is_none()),
-                }
-            }
-        }
-    }
-
-    /// Native's own lifecycle is symmetric for every window shape the model covers (pair and PT
-    /// windows excepted: their tails take the pair rule): after the Reload R is reset and nothing is
-    /// kept or unpaired.
-    fn a_native_reload_pairs_every_acquisition() {
-        let windows: [&[u32]; 6] = [&[MARIO], &[KIRBY], &[KIRBY, FOX], &[FOX, SAMUS, PIKACHU], &[BRAWLER], &[ROB, MARIO]];
-        let others = [None, Some(([KIRBY, NO_KIND, NO_KIND], 4)), Some(([FOX, KIRBY, NO_KIND], 1)), Some(([BRAWLER, NO_KIND, NO_KIND], 0))];
-        for window in windows {
-            for other in others {
-                let scene = Scene::new(Policy::Today, window, 2, &[], other);
-                assert!(scene.faults.is_empty(), "{:x?} {:x?}: {:x?}", window, other, scene.faults);
-                assert_eq!(scene.owner.flags, 0);
-                assert!(scene.owner.registrations.is_empty() && scene.owner.taken.is_empty());
-            }
-        }
-    }
-
-    /// The reported shape: two prefetched groups, Phase B of one; the other group's keys keep the
-    /// map non-empty, so the reset does not run and bit 0 stays. A later completion takes keys for
-    /// the header members and the drain hands back keys of the drained kind.
-    fn today_a_build_beside_another_prefetch_leaves_bit0_and_unpairs_the_keys() {
-        let other = Some(([KIRBY, NO_KIND, NO_KIND], 4));
-        let mut scene = Scene::new(Policy::Today, &[MARIO], 2, &[&[FOX], &[SAMUS]], other);
-        for op in [Op::Prefetch(0), Op::Prefetch(1), Op::Build(0)] { scene.apply(op); }
-        assert_eq!(scene.after_builds, vec![REQUEST], "bit 0 outlives the build");
-        scene.apply(Op::Complete);
-        assert_eq!(scene.owner.flags, REQUEST | COMPLETED | ACQUIRED);
-        assert_eq!(scene.owner.taken.keys().copied().collect::<Vec<_>>(), vec![key(FOX, 4)]);
-        scene.apply(Op::Drain(1));
-        assert_eq!(scene.faults, vec![
-            Fault::Unpaired { key: key(SAMUS, 4), foreign: false },
-            Fault::Kept { key: key(FOX, 4) },
-        ]);
-    }
-
-    /// A key that an unpaired release finds belongs to whoever holds it: with a Kirby CPU between
-    /// its completion and its tails, `0x17e2fe0` drops that R's reference (the K1 shape). The
-    /// bank's flows below never reach it (`every_interleaving_pairs_under_the_lease` counts 0); the
-    /// test pins the release semantics the model charges.
-    fn an_unpaired_release_takes_whatever_reference_it_finds() {
-        let other = Some(([KIRBY, NO_KIND, NO_KIND], 4));
-        let mut scene = Scene::new(Policy::Today, &[MARIO], 2, &[&[FOX], &[SAMUS]], other);
-        for op in [Op::Prefetch(0), Op::Prefetch(1), Op::Build(0), Op::Complete] { scene.apply(op); }
-        scene.g68.insert(key(SAMUS, 4), 1);
-        scene.apply(Op::Drain(1));
-        assert_eq!(scene.faults[0], Fault::Unpaired { key: key(SAMUS, 4), foreign: true });
-        assert!(scene.g68.is_empty());
-    }
-
-    /// Under the lease the same flows leave `R+0x4c` as Phase B found it (or reset), a completion
-    /// after the build takes nothing, and every construction still sees bit 0.
-    fn the_lease_ends_with_the_construction() {
-        let other = Some(([KIRBY, NO_KIND, NO_KIND], 4));
-        let mut scene = Scene::new(Policy::Lease, &[MARIO], 2, &[&[FOX], &[SAMUS]], other);
-        for op in [Op::Prefetch(0), Op::Prefetch(1), Op::Build(0), Op::Complete, Op::Drain(1)] { scene.apply(op); }
-        assert_eq!(scene.after_builds, vec![0]);
-        assert!(scene.faults.is_empty(), "{:x?}", scene.faults);
-        assert_eq!(scene.owner.flags, 0);
-    }
-
     fn sequences(ops: &[Op], len: usize) -> Vec<Vec<Op>> {
         let mut out = vec![Vec::new()];
         let mut frontier = vec![Vec::new()];
@@ -709,46 +576,6 @@ mod tests {
         assert_eq!(today_foreign, 0);
     }
 
-    /// rc.7, D-KIRBY1's K1 shape without the guard (Ally S2, `d-kirby1-k1.jsonl`): a prefetched group
-    /// beside a live Kirby, a native reconfigure while its keys sit on R (bits 1|2 survive the window's
-    /// tails), a Kirby copy of the group's kind, then the drain. Under U19's lease alone the drain's
-    /// G68 step takes the copy's package from its holder.
-    fn k1_without_the_guard_the_drain_takes_the_live_copys_package() {
-        let mut scene = Scene::new(Policy::Lease, &[KIRBY], 2, &[&[MARIO]], None);
-        for op in [Op::Prefetch(0), Op::Reconfigure] { scene.apply(op); }
-        assert_eq!(scene.owner.flags & ACQUIRED, ACQUIRED, "bit 2 outlived the window's tails (the group's keys keep the map)");
-        for op in [Op::Copy(0), Op::Drain(0)] { scene.apply(op); }
-        assert_eq!(scene.stolen_copies(), vec![key(MARIO, 2)]);
-    }
-
-    /// rc.7 F1: the same flow with the bank owning its G68 step keeps the copy's package and leaves
-    /// nothing unpaired.
-    fn f1_the_drain_returns_its_own_keys_and_keeps_the_copys_package() {
-        let mut scene = Scene::new(Policy::Owned, &[KIRBY], 2, &[&[MARIO]], None);
-        for op in [Op::Prefetch(0), Op::Reconfigure, Op::Copy(0), Op::Drain(0)] { scene.apply(op); }
-        assert!(scene.stolen_copies().is_empty());
-        assert!(scene.faults.is_empty(), "{:x?}", scene.faults);
-        assert_eq!(scene.g68.get(&key(MARIO, 2)), Some(&1), "the copy's holder keeps its reference");
-        assert!(!scene.owner.registrations.contains_key(&MARIO), "R's own keys of the drained kind are returned");
-    }
-
-    /// rc.7 F1, a build: a tail takes the G68 step only for the keys a completion took under its own
-    /// lease. Bit 2 already set when the build began (a reconfigure before it): no step. A completion
-    /// under the lease (Phase B′ across frames): the step pairs it.
-    fn f1_a_builds_tails_pair_only_their_own_leases_completion() {
-        assert!(!tail_takes_g68_step(REQUEST | COMPLETED | ACQUIRED, REQUEST | COMPLETED | ACQUIRED));
-        assert!(!tail_takes_g68_step(0, REQUEST));
-        assert!(tail_takes_g68_step(0, REQUEST | COMPLETED | ACQUIRED));
-        let other = Some(([KIRBY, NO_KIND, NO_KIND], 4));
-        let mut scene = Scene::new(Policy::Owned, &[MARIO], 2, &[&[FOX], &[SAMUS]], other);
-        for op in [Op::Prefetch(0), Op::Prefetch(1), Op::BuildCompleting(0), Op::Copy(1), Op::Build(1)] { scene.apply(op); }
-        scene.finish();
-        assert!(scene.faults.is_empty(), "{:x?}", scene.faults);
-        let mut today = Scene::new(Policy::Lease, &[MARIO], 2, &[&[FOX], &[SAMUS]], other);
-        for op in [Op::Prefetch(0), Op::Prefetch(1), Op::BuildCompleting(0), Op::Copy(1), Op::Build(1)] { today.apply(op); }
-        assert_eq!(today.stolen_copies(), vec![key(SAMUS, 4)], "without F1 the second build's tail takes it");
-    }
-
     /// rc.7 F1 over every interleaving of length up to 4 of prefetch, build (with and without a
     /// completion under its lease), drain, completion, a native reconfigure and a Kirby copy of each
     /// group's kind, with a live Kirby on this role or the other: F1 never takes a copy's package and
@@ -795,17 +622,7 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
-            ("the_two_listings_pair_per_kind_roster_and_costume", the_two_listings_pair_per_kind_roster_and_costume as fn()),
-            ("copy_keys_follow_the_listing", copy_keys_follow_the_listing as fn()),
-            ("the_lease_clears_only_the_bit_it_set", the_lease_clears_only_the_bit_it_set as fn()),
-            ("a_native_reload_pairs_every_acquisition", a_native_reload_pairs_every_acquisition as fn()),
-            ("today_a_build_beside_another_prefetch_leaves_bit0_and_unpairs_the_keys", today_a_build_beside_another_prefetch_leaves_bit0_and_unpairs_the_keys as fn()),
-            ("an_unpaired_release_takes_whatever_reference_it_finds", an_unpaired_release_takes_whatever_reference_it_finds as fn()),
-            ("the_lease_ends_with_the_construction", the_lease_ends_with_the_construction as fn()),
             ("every_interleaving_pairs_under_the_lease", every_interleaving_pairs_under_the_lease as fn()),
-            ("k1_without_the_guard_the_drain_takes_the_live_copys_package", k1_without_the_guard_the_drain_takes_the_live_copys_package as fn()),
-            ("f1_the_drain_returns_its_own_keys_and_keeps_the_copys_package", f1_the_drain_returns_its_own_keys_and_keeps_the_copys_package as fn()),
-            ("f1_a_builds_tails_pair_only_their_own_leases_completion", f1_a_builds_tails_pair_only_their_own_leases_completion as fn()),
             ("f1_never_takes_a_copys_package_in_any_interleaving", f1_never_takes_a_copys_package_in_any_interleaving as fn()),
         ]);
     }

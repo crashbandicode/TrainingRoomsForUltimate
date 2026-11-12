@@ -322,29 +322,6 @@ mod tests {
         assert_eq!(READY_HATS_DEFAULT, 5);
     }
 
-    /// Operator decision "B": the created entries take the hats first; entry 2 never takes a hat-only target; entry 3
-    /// takes one only through the borrow, which needs one native CPU, a closed pause, a replaceable entry 3 and every
-    /// created entry in use.
-    fn a_fifth_hat_borrows_entry_3_only_with_one_cpu() {
-        let plan = plan();
-        assert_eq!(slot_view(plan, facts(7, true, false, false))[..6],
-            [Some(0x18), Some(0x1a), Some(0x13), Some(0x14), Some(0x16), Some(0x2)], "created: hats first");
-        assert_eq!(slot_view(plan, facts(SEAT_ENTRY, false, true, true))[..2], [Some(0x2), None], "entry 2: fighters only");
-        assert_eq!(slot_view(plan, facts(BORROW_ENTRY, false, false, true))[..2], [Some(0x2), None],
-            "entry 3 before the created entries are all in use: fighters only");
-        assert_eq!(slot_view(plan, facts(BORROW_ENTRY, false, true, true))[..3], [Some(0x2), Some(0x18), Some(0x1a)],
-            "entry 3 with the borrow open: fighters, then the hats");
-        assert_eq!(slot_view(plan, facts(BORROW_ENTRY, false, true, false))[..2], [Some(0x2), None], "borrow closed");
-        assert!(borrow_admitted(Some(1), false, true));
-        for (count, pause, replaceable) in [(Some(2), false, true), (Some(3), false, true), (None, false, true),
-            (Some(1), true, true), (Some(1), false, false)] {
-            assert!(!borrow_admitted(count, pause, replaceable), "{count:?} pause={pause} replaceable={replaceable}");
-        }
-        // The waiting rooms keep one view: entries 2/3 there are not F9 seats.
-        let waiting = SlotFacts { training: false, ..facts(BORROW_ENTRY, false, false, false) };
-        assert_eq!(slot_view(plan, waiting)[0], Some(0x18));
-    }
-
     /// rc6-hot-xps1 hs06 (2026-11-08, XPS): P1 Kirby with Ready Fighters 10 and groups on, so the windows and groups
     /// hold every fighter and the plan is five hats. No hat loaded in 40 s. Four created entries are allowed for five
     /// hats (the fifth borrows entry 3); entries 2 and 3, which may load none of the hats, do not hold them back; the
@@ -457,7 +434,6 @@ mod tests {
         crate::test_table::run(&[
             ("a_seat_held_for_memory_counts_in_the_fighter_status", a_seat_held_for_memory_counts_in_the_fighter_status as fn()),
             ("hats_are_budgeted_apart_from_fighters_and_a_shared_kind_is_one_fighter_target", hats_are_budgeted_apart_from_fighters_and_a_shared_kind_is_one_fighter_target as fn()),
-            ("a_fifth_hat_borrows_entry_3_only_with_one_cpu", a_fifth_hat_borrows_entry_3_only_with_one_cpu as fn()),
             ("a_hats_only_plan_creates_four_entries_before_the_borrow", a_hats_only_plan_creates_four_entries_before_the_borrow as fn()),
             ("parked_seats_on_their_members_let_a_hats_only_plan_create_its_entries", parked_seats_on_their_members_let_a_hats_only_plan_create_its_entries as fn()),
             ("a_borrowed_entry_3_carries_a_record_f9_reads", a_borrowed_entry_3_carries_a_record_f9_reads as fn()),

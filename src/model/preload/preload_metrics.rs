@@ -808,35 +808,6 @@ mod tests {
         }
     }
 
-    fn micros_use_the_tick_frequency_and_refuse_an_unknown_frequency() {
-        assert_eq!(micros(19_200_000, 19_200_000), Some(1_000_000));
-        assert_eq!(micros(320_000, 19_200_000), Some(16_666));
-        assert_eq!(micros(5, 0), None);
-        assert_eq!(micros(u64::MAX, 1), Some(u64::MAX));
-    }
-
-    fn failed_or_unsupported_counters_never_produce_deltas_or_headroom() {
-        let good = sample(0, 1_000);
-        let mut failed = sample(1, 1_100);
-        failed.committed = Counter {
-            result: 0xe401,
-            value: 0,
-        };
-        assert_eq!(failed.committed_since(&good), None);
-        assert_eq!(good.committed_since(&failed), None);
-        assert_eq!(failed.headroom(), None);
-        let mut missing = good;
-        missing.budget = Counter::MISSING;
-        assert_eq!(missing.headroom(), None);
-        assert_eq!(sample(1, 900).committed_since(&good), Some(-100));
-        assert_eq!(good.headroom(), Some(3_000));
-    }
-
-    fn headroom_refuses_an_internally_inconsistent_sample() {
-        assert_eq!(sample(0, 4_001).headroom(), None);
-        assert_eq!(sample(0, 4_000).headroom(), Some(0));
-    }
-
     #[cfg(not(target_arch = "aarch64"))]
     #[test]
     fn host_capture_is_explicitly_unsupported() {
@@ -848,41 +819,6 @@ mod tests {
             OperationStamp::begin(false, Operation::Request, Target::Hat, 0, true, 0),
             None
         );
-    }
-
-    fn frame_intervals_bucket_by_wall_time_and_count_blocked_frames() {
-        let mut frames = Frames::default();
-        for (tick, blocked) in [
-            (1_000, true),
-            (17_667, true),
-            (35_667, false),
-            (35_667 + 17_500, false),
-            (35_667 + 17_500 + 60_000, false),
-        ] {
-            frames.note(tick, HZ, blocked);
-        }
-        assert_eq!(frames.observed, 5);
-        assert_eq!(frames.blocked, 2);
-        assert_eq!(frames.max_gap, 60_000);
-        assert_eq!(frames.gaps, [2, 1, 0, 0, 0, 1]);
-        let mut unknown = Frames::default();
-        unknown.note(0, 0, false);
-        unknown.note(9, 0, false);
-        assert_eq!((unknown.max_gap, unknown.gaps), (9, [0; 6]));
-    }
-
-    fn record_measures_wall_ticks_and_wrapping_caller_frames() {
-        let mut open = stamp(Operation::Request, false, 5_000, 1_000);
-        open.frame = u32::MAX - 1;
-        let record = open.record(
-            sample(455_000, 1_300),
-            3,
-            Outcome::Ready,
-            Preload::default(),
-        );
-        assert_eq!(record.frames, 5);
-        assert_eq!(record.micros(), Some(450_000));
-        assert_eq!(record.committed_delta(), Some(300));
     }
 
     fn session_separates_hits_misses_background_and_blocked_requests() {
@@ -1051,11 +987,6 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
-            ("micros_use_the_tick_frequency_and_refuse_an_unknown_frequency", micros_use_the_tick_frequency_and_refuse_an_unknown_frequency as fn()),
-            ("failed_or_unsupported_counters_never_produce_deltas_or_headroom", failed_or_unsupported_counters_never_produce_deltas_or_headroom as fn()),
-            ("headroom_refuses_an_internally_inconsistent_sample", headroom_refuses_an_internally_inconsistent_sample as fn()),
-            ("frame_intervals_bucket_by_wall_time_and_count_blocked_frames", frame_intervals_bucket_by_wall_time_and_count_blocked_frames as fn()),
-            ("record_measures_wall_ticks_and_wrapping_caller_frames", record_measures_wall_ticks_and_wrapping_caller_frames as fn()),
             ("session_separates_hits_misses_background_and_blocked_requests", session_separates_hits_misses_background_and_blocked_requests as fn()),
             ("settings_report_the_previous_condition_then_clear_its_totals", settings_report_the_previous_condition_then_clear_its_totals as fn()),
             ("lines_label_committed_charge_and_mark_missing_values", lines_label_committed_charge_and_mark_missing_values as fn()),

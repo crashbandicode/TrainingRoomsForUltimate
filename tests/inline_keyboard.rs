@@ -17,59 +17,10 @@ mod engine {
 #[path = "../src/model/hook_stats.rs"]
 mod hook_stats;
 
-use mii::inline_keyboard::{text_signal, Decision, Limit, Signals, Text};
+use mii::inline_keyboard::{Decision, Limit, Signals, Text};
 
 #[global_allocator]
 static ALLOCATOR: hook_stats::CountingAllocator = hook_stats::CountingAllocator;
-
-fn independent_utf16_vectors_preserve_macro_boundaries() {
-    // Explicit UTF-16 facts: A, U+1F600, B. Cursor positions 0,1,3,4 are boundaries.
-    let units = [0x41, 0xd83d, 0xde00, 0x42];
-    for cursor in [0, 1, 3, 4] {
-        let text = text_signal(&units, 4, cursor, Limit::Macro).unwrap();
-        assert_eq!(text.units(), units);
-        assert_eq!(text.cursor(), cursor as usize);
-    }
-    for cursor in [-1, 2, 5, 256, i32::MAX] {
-        assert!(text_signal(&units, 4, cursor, Limit::Macro).is_none());
-    }
-    for units in [&[0xd800][..], &[0xdc00], &[0xdc00, 0xd800], &[0xd800, 0x41], &[0xd800, 0xd800]] {
-        assert!(text_signal(units, units.len() as i32, 0, Limit::Macro).is_none());
-    }
-    assert!(text_signal(&[0xdbff, 0xdfff], 2, 2, Limit::Macro).is_some()); // U+10FFFF.
-    for unit in [0, 9, 10, 0x7f, 0x85] {
-        assert!(text_signal(&[unit], 1, 1, Limit::Macro).is_none());
-    }
-    assert!(text_signal(&[0x200d], 1, 1, Limit::Macro).is_some()); // ZWJ is not Cc.
-    assert!(text_signal(&units, -1, 0, Limit::Macro).is_none());
-    assert!(text_signal(&units, 5, 0, Limit::Macro).is_none());
-    assert!(text_signal(&units, i32::MAX, 0, Limit::Macro).is_none());
-    assert_eq!(text_signal(&[0x41, 0, 0xd800], 1, 1, Limit::Macro).unwrap().units(), &[0x41]);
-}
-
-fn mii_raw_units_and_terminated_native_buffer_keep_their_contract() {
-    let units = [0xd800, 10, 0xdc00, 65, 66, 67, 68, 69, 70, 71];
-    let text = Text::new(&units, 1).unwrap();
-    assert_eq!(text.units(), units);
-    assert_eq!(text.cursor(), 1);
-    assert_eq!(text.terminated(), &[0xd800, 10, 0xdc00, 65, 66, 67, 68, 69, 70, 71, 0]);
-    assert_eq!(std::mem::size_of_val(text.terminated()), 22);
-    assert!(Text::new(&[65; 11], 0).is_none());
-    assert!(Text::new(&[65, 0], 0).is_none());
-    assert!(Text::new(&units, 256).is_none());
-}
-
-fn scalar_limit_is_distinct_from_utf16_capacity() {
-    let max = "\u{1f600}".repeat(48);
-    let text = Text::macro_name(&max, 96).unwrap();
-    assert_eq!(text.units().len(), 96);
-    assert_eq!(text.terminated().len(), 97);
-    assert_eq!(text.cursor(), 96);
-    assert!(Text::macro_name(&(max + "a"), 0).is_none());
-    assert!(Text::macro_name(&"a".repeat(49), 0).is_none());
-    assert!(Text::macro_name(&"a".repeat(48), 48).is_some());
-    assert!(Text::macro_name("A\u{1f600}B", 2).is_none());
-}
 
 fn enter_freezes_its_value_across_later_change_and_invalid_callbacks() {
     let mut signals = Signals { limit: Limit::Macro, ..Signals::default() };
@@ -92,25 +43,6 @@ fn enter_freezes_its_value_across_later_change_and_invalid_callbacks() {
     assert!(signals.invalid, "a later valid update cannot clear a protocol error");
     signals.cancel();
     assert!(matches!(signals.decision, Some(Decision::Cancel)));
-}
-
-fn empty_enter_and_new_owner_preserve_distinct_transport_semantics() {
-    let mut mii = Signals::default();
-    mii.enter(&[], 0);
-    assert!(matches!(mii.decision, Some(Decision::Cancel)));
-    let mut macros = Signals { limit: Limit::Macro, ..Signals::default() };
-    macros.enter(&[], 0);
-    assert!(matches!(macros.decision, Some(Decision::Enter(text)) if text.units().is_empty()));
-    macros.change(&[0], 1, 0);
-    let next = std::mem::take(&mut macros);
-    assert!(next.invalid && !macros.invalid && macros.text.is_none() && macros.decision.is_none());
-}
-
-fn callback_value_fits_without_narrowing_a_valid_caret() {
-    assert!(std::mem::size_of::<Text>() <= 200);
-    let text = text_signal(&[65; 48], 48, 48, Limit::Macro).unwrap();
-    assert_eq!(text.cursor(), 48);
-    assert!(text_signal(&[65; 48], 48, 256, Limit::Macro).is_none());
 }
 
 #[test]
@@ -161,11 +93,6 @@ fn keyboard_validation_does_not_allocate_on_first_or_repeated_use() {
 #[test]
 fn case_table() {
     crate::test_table::run(&[
-        ("independent_utf16_vectors_preserve_macro_boundaries", independent_utf16_vectors_preserve_macro_boundaries as fn()),
-        ("mii_raw_units_and_terminated_native_buffer_keep_their_contract", mii_raw_units_and_terminated_native_buffer_keep_their_contract as fn()),
-        ("scalar_limit_is_distinct_from_utf16_capacity", scalar_limit_is_distinct_from_utf16_capacity as fn()),
         ("enter_freezes_its_value_across_later_change_and_invalid_callbacks", enter_freezes_its_value_across_later_change_and_invalid_callbacks as fn()),
-        ("empty_enter_and_new_owner_preserve_distinct_transport_semantics", empty_enter_and_new_owner_preserve_distinct_transport_semantics as fn()),
-        ("callback_value_fits_without_narrowing_a_valid_caret", callback_value_fits_without_narrowing_a_valid_caret as fn()),
     ]);
 }

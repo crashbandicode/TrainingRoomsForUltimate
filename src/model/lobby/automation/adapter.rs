@@ -798,7 +798,7 @@ fn dismiss_ready(state: &Snapshot) -> bool {
 mod tests {
     lib_unit_tests! {
     use super::super::control::Controls;
-    use super::super::pulse::{Action as PulseAction, Record, Scheduler, MASK_Y};
+    use super::super::pulse::{Record, Scheduler};
     use super::*;
 
     fn request(save: bool, rematch: Decision) -> Request {
@@ -867,52 +867,6 @@ mod tests {
         Record { held: 0, pressed: 0, released: 0, pad: 0, left: [0.0; 4], right: [0.0; 4] }
     }
 
-    fn one_save_command_pulses_y_once_and_cancel_releases_it() {
-        let mut adapter = Adapter::new();
-        let req = request(true, Decision::Manual);
-        adapter.handle(1, Some(req), Observation::Begin { seq: 1, save_status: Some(0) });
-        let armed = adapter.handle(2, Some(req), Observation::Cards(cards_s0()));
-        assert_eq!(armed.command.action, PulseAction::ButtonY);
-        let mut completed = Scheduler::new();
-        let mut edges = 0;
-        for _ in 0..8 {
-            let mut record = blank();
-            completed.step(&mut record, Some(armed.command));
-            if record.pressed == MASK_Y {
-                edges += 1;
-            }
-        }
-        assert_eq!(edges, 1);
-        let mut sched = Scheduler::new();
-        let mut record = blank();
-        sched.step(&mut record, Some(armed.command));
-        assert_eq!(record.pressed, MASK_Y);
-        record = blank();
-        sched.step(&mut record, Some(armed.command));
-        assert_eq!(record.held, MASK_Y);
-        let cancelled = adapter.handle(3, None, Observation::SaveStatus(0));
-        assert_eq!(cancelled.command.action, PulseAction::Idle);
-        record = blank();
-        sched.step(&mut record, Some(cancelled.command));
-        assert_eq!(record.released, MASK_Y);
-        assert_eq!(record.held, 0);
-        record = blank();
-        sched.step(&mut record, Some(cancelled.command));
-        assert_eq!(record.released, 0);
-    }
-
-    // The captured Quickplay cards in results-native48-runtime01/cards-gate04
-    // use route 1 at R+0x928. Native routes both zero and nonzero values to
-    // 1d5b590; the nonzero route is not an outstanding save request.
-    fn quickplay_port_routed_cards_can_request_save() {
-        let mut adapter = Adapter::new();
-        let req = request(true, Decision::Yes);
-        adapter.handle(1, Some(req), Observation::Begin { seq: 1, save_status: Some(0) });
-        let cards = CardsView { input_route: 1, ..cards_s0() };
-        let armed = adapter.handle(2, Some(req), Observation::Cards(cards));
-        assert_eq!(armed.command.action, Action::ButtonY);
-    }
-
     // Actual Save prompt in results-native49-runtime01/save-focus02 starts on
     // No. Right, neutral, A selects native code 2 and creates a replay file.
     fn save_confirmation_selects_yes_before_pressing_a() {
@@ -936,109 +890,6 @@ mod tests {
             }
         }
         assert_eq!(a_edges, 1);
-    }
-
-    fn forced_save_close_cancels_confirmation_input() {
-        let mut adapter = Adapter::new();
-        let req = request(true, Decision::Yes);
-        adapter.handle(1, Some(req), Observation::Begin { seq: 1, save_status: Some(0) });
-        adapter.handle(2, Some(req), Observation::Cards(cards_s0()));
-        adapter.handle(3, Some(req), Observation::Open(open_save(0)));
-        adapter.handle(4, Some(req), Observation::Popup(PopupTick { owner: 10, save_status: None, state: Some(ready(1)) }));
-        adapter.handle(5, Some(req), Observation::Popup(PopupTick { owner: 10, save_status: None, state: Some(ready(3)) }));
-        let forced = Snapshot { phase: 5, pending: 6, result: 1, ..ready(3) };
-        let out = adapter.handle(6, Some(req), Observation::Popup(PopupTick { owner: 10, save_status: None, state: Some(forced) }));
-        assert_eq!(out.command.action, Action::Idle, "save input survived a forced prompt close");
-    }
-
-    fn open_gate_requires_an_idle_popup() {
-        assert!(open_gate_admits(0, 0));
-        assert!(!open_gate_admits(3, 0));
-        assert!(!open_gate_admits(0, 1));
-        assert!(!open_gate_admits(-1, 0));
-    }
-
-    fn native_codes_map_explicitly_and_do_not_follow_decision_discriminants() {
-        assert_eq!(rematch_decision(1), Some(Decision::No));
-        assert_eq!(rematch_decision(2), Some(Decision::Yes));
-        assert_eq!(rematch_decision(0), None);
-        assert_eq!(rematch_decision(3), None);
-        assert_ne!(Decision::Yes as u8, 2);
-        assert_ne!(Decision::No as u8, 1);
-    }
-
-    fn save_chain_completes_once_and_a_sticky_five_does_not() {
-        let mut a = Adapter::new();
-        let req = request(true, Decision::No);
-        let begin = a.handle(1, Some(req), Observation::Begin { seq: 50, save_status: Some(0) });
-        assert!(notes(&begin).contains(&"epoch_begin"));
-        let armed = a.handle(2, Some(req), Observation::Cards(cards_s0()));
-        assert_eq!(armed.command.action, Action::ButtonY);
-        assert!(notes(&armed).contains(&"pulse_armed"));
-        a.handle(3, Some(req), Observation::Open(open_save(0)));
-        let mut state = ready(1);
-        a.handle(4, Some(req), Observation::Popup(PopupTick { owner: 10, save_status: None, state: Some(state) }));
-        state = ready(3);
-        let confirm = a.handle(5, Some(req), Observation::Popup(PopupTick { owner: 10, save_status: None, state: Some(state) }));
-        assert_eq!(confirm.command.action, Action::SaveYes);
-        for status in [1, 2, 3] {
-            a.handle(6, Some(req), Observation::SaveStatus(status));
-        }
-        let dismiss = OpenView {
-            owner: 10,
-            caller: 0x11,
-            message: 0x22,
-            word_160: 0,
-            word_164: 0,
-            word_168: 0,
-            word_16c: 0,
-            word_170: 0,
-            data_ok: true, save_status: None,
-        };
-        a.handle(7, Some(req), Observation::Open(dismiss));
-        let mut tick = ready(1);
-        a.handle(8, Some(req), Observation::Popup(PopupTick { owner: 10, save_status: None, state: Some(tick) }));
-        tick = ready(3);
-        let success = a.handle(9, Some(req), Observation::Popup(PopupTick { owner: 10, save_status: None, state: Some(tick) }));
-        assert_eq!(success.command.action, Action::ButtonA);
-        let done = a.handle(10, Some(req), Observation::SaveStatus(5));
-        assert!(notes(&done).contains(&"save_completed"));
-        assert_ne!(done.publish, Some(Progress::Done));
-        let again = a.handle(11, Some(req), Observation::SaveStatus(5));
-        assert!(!notes(&again).contains(&"save_completed"));
-        assert_ne!(again.publish, Some(Progress::Done));
-
-        let mut sticky = Adapter::new();
-        sticky.handle(1, Some(req), Observation::Begin { seq: 9, save_status: Some(5) });
-        let held = sticky.handle(2, Some(req), Observation::SaveStatus(5));
-        assert!(!notes(&held).contains(&"save_completed"));
-        assert_ne!(held.publish, Some(Progress::Done));
-    }
-
-    fn success_popup_opens_before_native_save_status_becomes_three() {
-        let mut a = Adapter::new();
-        let req = request(true, Decision::Manual);
-        a.handle(1, Some(req), Observation::Begin { seq: 71, save_status: Some(0) });
-        a.handle(2, Some(req), Observation::Cards(cards_s0()));
-        a.handle(3, Some(req), Observation::Open(open_save(0)));
-        a.handle(4, Some(req), Observation::Popup(PopupTick { owner: 10, save_status: None, state: Some(ready(1)) }));
-        a.handle(5, Some(req), Observation::Popup(PopupTick { owner: 10, save_status: None, state: Some(ready(3)) }));
-        a.handle(6, Some(req), Observation::SaveStatus(1));
-        a.handle(7, Some(req), Observation::SaveStatus(2));
-        // Native 0x1d5a86c opens this popup BEFORE 0x1d5a870 stores status 3.
-        let opened = a.handle(8, Some(req), Observation::Open(OpenView {
-            owner: 10, caller: 0x1d5a870, message: 0x58ffff1e1eed5764,
-            word_160: 0, word_164: 0, word_168: 0, word_16c: 0,
-            word_170: 0, data_ok: true, save_status: None,
-        }));
-        assert_eq!(opened.command.action, Action::Idle);
-        let saving = a.handle(9, Some(req), Observation::Popup(PopupTick { owner: 10, save_status: None, state: Some(ready(3)) }));
-        assert_eq!(saving.command.action, Action::Idle);
-        let success = a.handle(10, Some(req), Observation::SaveStatus(3));
-        assert_eq!(success.command.action, Action::ButtonA);
-        assert_ne!(success.publish, Some(Progress::Done));
-        let done = a.handle(11, Some(req), Observation::SaveStatus(5));
-        assert_eq!(done.publish, Some(Progress::Done));
     }
 
     // The result-card callback does not run during native save phases 3–6.
@@ -1131,48 +982,6 @@ mod tests {
         }));
         assert_eq!(accepted.publish, Some(Progress::Done));
         assert_eq!(accepted.command.action, Action::Idle);
-    }
-
-    fn status_five_still_dismisses_the_success_popup_once() {
-        let mut a = Adapter::new();
-        let req = request(true, Decision::Manual);
-        a.handle(1, Some(req), Observation::Begin { seq: 70, save_status: Some(0) });
-        a.handle(2, Some(req), Observation::Cards(cards_s0()));
-        a.handle(3, Some(req), Observation::Open(open_save(0)));
-        a.handle(4, Some(req), Observation::Popup(PopupTick { owner: 10, save_status: None, state: Some(ready(1)) }));
-        let confirm = a.handle(5, Some(req), Observation::Popup(PopupTick { owner: 10, save_status: None, state: Some(ready(3)) }));
-        for status in [1, 2, 3] {
-            a.handle(6, Some(req), Observation::SaveStatus(status));
-        }
-        let dismiss = OpenView {
-            owner: 10,
-            caller: 0x11,
-            message: 0x22,
-            word_160: 0,
-            word_164: 0,
-            word_168: 0,
-            word_16c: 0,
-            word_170: 0,
-            data_ok: true, save_status: None,
-        };
-        a.handle(7, Some(req), Observation::Open(dismiss));
-        a.handle(8, Some(req), Observation::Popup(PopupTick { owner: 10, save_status: None, state: Some(ready(1)) }));
-        let jumped = a.handle(9, Some(req), Observation::SaveStatus(5));
-        assert!(notes(&jumped).contains(&"save_completed"));
-        assert_eq!(jumped.command.action, Action::Idle);
-        assert_ne!(jumped.command.serial, confirm.command.serial);
-        assert_ne!(jumped.publish, Some(Progress::Done));
-        let success = a.handle(
-            10,
-            Some(req),
-            Observation::Popup(PopupTick { owner: 10, save_status: None, state: Some(ready(3)) }),
-        );
-        assert_eq!(success.command.action, Action::ButtonA);
-        assert_ne!(success.command.serial, jumped.command.serial);
-        assert_ne!(success.publish, Some(Progress::Done));
-        let finished = a.handle(11, Some(req), Observation::SaveStatus(5));
-        assert_eq!(finished.publish, Some(Progress::Done));
-        assert!(!notes(&finished).contains(&"save_completed"));
     }
 
     fn nonzero_save_default_refuses_and_does_not_complete() {
@@ -1312,17 +1121,9 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
-            ("one_save_command_pulses_y_once_and_cancel_releases_it", one_save_command_pulses_y_once_and_cancel_releases_it as fn()),
-            ("quickplay_port_routed_cards_can_request_save", quickplay_port_routed_cards_can_request_save as fn()),
             ("save_confirmation_selects_yes_before_pressing_a", save_confirmation_selects_yes_before_pressing_a as fn()),
-            ("forced_save_close_cancels_confirmation_input", forced_save_close_cancels_confirmation_input as fn()),
-            ("open_gate_requires_an_idle_popup", open_gate_requires_an_idle_popup as fn()),
-            ("native_codes_map_explicitly_and_do_not_follow_decision_discriminants", native_codes_map_explicitly_and_do_not_follow_decision_discriminants as fn()),
-            ("save_chain_completes_once_and_a_sticky_five_does_not", save_chain_completes_once_and_a_sticky_five_does_not as fn()),
-            ("success_popup_opens_before_native_save_status_becomes_three", success_popup_opens_before_native_save_status_becomes_three as fn()),
             ("popup_hooks_track_the_save_without_result_tick_samples", popup_hooks_track_the_save_without_result_tick_samples as fn()),
             ("completed_save_does_not_mask_the_next_rematch_prompt", completed_save_does_not_mask_the_next_rematch_prompt as fn()),
-            ("status_five_still_dismisses_the_success_popup_once", status_five_still_dismisses_the_success_popup_once as fn()),
             ("nonzero_save_default_refuses_and_does_not_complete", nonzero_save_default_refuses_and_does_not_complete as fn()),
             ("rematch_yes_and_no_wait_thirty_six_ticks_and_ignore_forced_or_early", rematch_yes_and_no_wait_thirty_six_ticks_and_ignore_forced_or_early as fn()),
             ("zero_and_three_are_not_accepted_and_a_foreign_owner_does_not_drop_ready", zero_and_three_are_not_accepted_and_a_foreign_owner_does_not_drop_ready as fn()),

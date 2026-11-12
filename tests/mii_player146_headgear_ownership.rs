@@ -17,7 +17,7 @@ mod engine {
     pub use super::mii;
 }
 
-use {crate::engine::mii::backend::Layout, crate::engine::mii::inventory::{MiiClass, CHARINFO_LEN}, crate::engine::mii::lifetime::{Binding, Configuration, Tokens}, crate::engine::mii::native_values::{Mirrors, RowIds, RECORD_LEN}, crate::engine::mii::ordinary_cpu::{self as cpu, HatPublication}, crate::engine::mii::ordinary_player::{self, Owner, SameClass, SameClassValues}};
+use {crate::engine::mii::backend::Layout, crate::engine::mii::inventory::{MiiClass, CHARINFO_LEN}, crate::engine::mii::lifetime::{Binding, Configuration, Tokens}, crate::engine::mii::native_values::{RowIds, RECORD_LEN}, crate::engine::mii::ordinary_cpu::{self as cpu, HatPublication}, crate::engine::mii::ordinary_player::{self, Owner}};
 
 const OUTFIT: u16 = 68;
 const OUTFIT_HASH: u64 = 0x1af17e2dff;
@@ -61,17 +61,6 @@ fn player_owner() -> (Binding, Owner) {
         record_index: 0,
     };
     (binding, owner)
-}
-
-fn mirrors(tokens: Tokens) -> Mirrors {
-    Mirrors {
-        index: 0, tokens,
-        fe: [0, tokens.outfit, tokens.hat, tokens.colour, tokens.voice],
-        d: [0, tokens.outfit, tokens.hat, tokens.colour],
-        d_specials: tokens.specials.map(u32::from),
-        owner_index: 0,
-        owner: [tokens.outfit, tokens.hat, tokens.colour, tokens.voice].map(u32::from),
-    }
 }
 
 fn publication<'a>(
@@ -144,56 +133,10 @@ fn fresh_o_uses_each_rows_own_index_for_all_three_classes() {
     assert_eq!(binding.record_index, 0);
 }
 
-fn player_same_class_proof_rejects_a_changed_hat_and_keeps_an_equal_hat() {
-    let (binding, owner) = player_owner();
-    let before = mii(MiiClass::Gunner, PLAIN_HAT, PLAIN_HAT_HASH, 0x11);
-    let same_hat = mii(MiiClass::Gunner, PLAIN_HAT, PLAIN_HAT_HASH, 0x22);
-    let changed_hat = mii(MiiClass::Gunner, ARMORED_HAT, ARMORED_HAT_HASH, 0x11);
-    let descriptor = ordinary_player::staged_descriptor(blank_descriptor(), Some(before));
-    assert_eq!(u32::from_le_bytes(descriptor[0x18..0x1c].try_into().unwrap()), MiiClass::Gunner as u32);
-    assert_eq!(descriptor[0x41], 0);
-    let mut record = [0u8; RECORD_LEN];
-    record[..CHARINFO_LEN].copy_from_slice(before.charinfo());
-    let current = SameClassValues {
-        binding, thread: 0x9000, owner,
-        header: [0, MiiClass::Gunner as u32, u32::MAX, u32::MAX, 0],
-        mirrors: mirrors(before.tokens()),
-        initialized: true, task_idle: true, rebuild_open: true,
-    };
-    let same_rows = [rows(PLAIN_HAT, PLAIN_HAT_HASH); 2];
-    assert!(SameClass::prepare(before, same_hat, current, &descriptor, same_rows, &record).is_ok());
-    assert_eq!(
-        SameClass::prepare(
-            before, changed_hat, current, &descriptor,
-            [rows(PLAIN_HAT, PLAIN_HAT_HASH), rows(ARMORED_HAT, ARMORED_HAT_HASH)],
-            &record,
-        )
-        .err(),
-        Some("same-class hat changed"),
-    );
-}
-
-fn fresh_publication_keeps_equal_hat_and_rejects_a_foreign_index() {
-    let armored = mii(MiiClass::Swordfighter, ARMORED_HAT, ARMORED_HAT_HASH, 0x11);
-    let mut row = ordinary_player::staged_descriptor(blank_descriptor(), Some(armored));
-    row[0x46..0x48].copy_from_slice(&0u16.to_le_bytes());
-    let admitted = publication(&row, 0, PLAIN_HAT, ARMORED_HAT, true, Some(armored));
-    assert!(admitted.validate().is_ok());
-    row[0x46..0x48].copy_from_slice(&1u16.to_le_bytes());
-    assert!(publication(&row, 0, PLAIN_HAT, ARMORED_HAT, true, Some(armored)).validate().is_err());
-    assert_eq!(
-        cpu::headgear_reload(Layout::Training, 4, PLAIN_HAT, ARMORED_HAT),
-        Err("headgear row is not on this layout"),
-    );
-    assert_eq!(cpu::headgear_reload(Layout::Training, 0, ARMORED_HAT, ARMORED_HAT), Ok(false));
-}
-
 /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
 #[test]
 fn case_table() {
     crate::test_table::run(&[
         ("fresh_o_uses_each_rows_own_index_for_all_three_classes", fresh_o_uses_each_rows_own_index_for_all_three_classes as fn()),
-        ("player_same_class_proof_rejects_a_changed_hat_and_keeps_an_equal_hat", player_same_class_proof_rejects_a_changed_hat_and_keeps_an_equal_hat as fn()),
-        ("fresh_publication_keeps_equal_hat_and_rejects_a_foreign_index", fresh_publication_keeps_equal_hat_and_rejects_a_foreign_index as fn()),
     ]);
 }

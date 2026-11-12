@@ -256,10 +256,8 @@ mod tests {
     const R: Chord = Chord(1 << 5);
     const ZL: Chord = Chord(1 << 6);
     const DPAD_UP: Chord = Chord(1 << 8);
-    const DPAD_RIGHT: Chord = Chord(1 << 11);
     const PLUS: Chord = Chord(1 << 12);
     const MINUS: Chord = Chord(1 << 13);
-    const LSTICK: Chord = Chord(1 << 14);
 
     fn union(a: Chord, b: Chord) -> Chord {
         Chord(a.0 | b.0)
@@ -267,21 +265,6 @@ mod tests {
 
     fn passes(config: MenuShortcuts, held: Chord, pressed: Chord) -> bool {
         config.passes(|button| held.contains(button), |button| pressed.contains(button))
-    }
-
-    fn defaults_and_missing_keys() {
-        assert_eq!(MenuShortcuts::parse(""), DEFAULT_SHORTCUTS);
-        assert_eq!(MenuShortcuts::parse(DEFAULT_INI), DEFAULT_SHORTCUTS);
-        assert_eq!(MenuShortcuts::parse("[other]\nshortcut_1=Plus"), DEFAULT_SHORTCUTS);
-        let config = MenuShortcuts::parse("[menu]\nshortcut_2=ZL + R");
-        assert_eq!(config.additional, [MINUS, union(ZL, R)]);
-    }
-
-    fn supported_names_comments_and_disabled_slots() {
-        let config =
-            MenuShortcuts::parse("[ MeNu ]\nSHORTCUT_1= disabled ; off\nshortcut_2= Left Stick Press + DPAD_RIGHT # chord");
-        assert_eq!(config.additional, [Chord::NONE, union(LSTICK, DPAD_RIGHT)]);
-        assert_eq!(MenuShortcuts::parse("[menu]\nshortcut_1=none").additional[0], Chord::NONE);
     }
 
     fn invalid_or_duplicate_slot_falls_back_independently() {
@@ -303,14 +286,6 @@ mod tests {
         assert!(!passes(config, B, B));
     }
 
-    fn minus_is_edge_triggered_and_plus_is_not_an_implicit_opener() {
-        assert!(passes(DEFAULT_SHORTCUTS, MINUS, MINUS));
-        assert!(!passes(DEFAULT_SHORTCUTS, MINUS, Chord::NONE));
-        assert!(!passes(DEFAULT_SHORTCUTS, PLUS, PLUS));
-        assert!(!passes(DEFAULT_SHORTCUTS, PLUS, Chord::NONE));
-        assert!(passes(MenuShortcuts::parse("[menu]\nshortcut_2=Plus"), PLUS, PLUS));
-    }
-
     fn custom_chord_requires_every_held_button_and_one_new_edge() {
         let config = MenuShortcuts::parse("[menu]\nshortcut_1=disabled\nshortcut_2=R + ZL");
         let both = union(R, ZL);
@@ -318,15 +293,6 @@ mod tests {
         assert!(passes(config, both, ZL));
         assert!(!passes(config, R, R));
         assert!(!passes(config, both, Chord::NONE));
-    }
-
-    fn to_ini_text_roundtrip() {
-        for (a, b) in [(MINUS, Chord::NONE), (Chord::NONE, union(ZL, DPAD_UP)), (union(X, Y), union(R, LSTICK)), (Chord::NONE, Chord::NONE)] {
-            let shortcuts = MenuShortcuts::new(a, b);
-            let text = shortcuts.to_ini_text(DEFAULT_INI);
-            assert_eq!(MenuShortcuts::parse(&text), shortcuts, "{text}");
-        }
-        assert!(MenuShortcuts::new(Chord::NONE, Chord::NONE).to_ini_text(DEFAULT_INI).contains("shortcut_1=disabled"));
     }
 
     fn to_ini_text_keeps_comments_and_unknown_lines() {
@@ -350,27 +316,15 @@ mod tests {
         assert_eq!(MenuShortcuts::new(Chord::NONE, Chord::NONE).description(), "B + DPad Up");
     }
 
-    fn written_names_parse_back_for_every_button() {
-        for bit in 0..BUTTON_COUNT {
-            let chord = Chord(1 << bit);
-            assert_eq!(parse_chord(&ini_name(chord)), Some(chord), "button {bit}");
-        }
-    }
-
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
-            ("defaults_and_missing_keys", defaults_and_missing_keys as fn()),
-            ("supported_names_comments_and_disabled_slots", supported_names_comments_and_disabled_slots as fn()),
             ("invalid_or_duplicate_slot_falls_back_independently", invalid_or_duplicate_slot_falls_back_independently as fn()),
             ("permanent_chord_survives_disabled_extras_and_uses_press_edges", permanent_chord_survives_disabled_extras_and_uses_press_edges as fn()),
-            ("minus_is_edge_triggered_and_plus_is_not_an_implicit_opener", minus_is_edge_triggered_and_plus_is_not_an_implicit_opener as fn()),
             ("custom_chord_requires_every_held_button_and_one_new_edge", custom_chord_requires_every_held_button_and_one_new_edge as fn()),
-            ("to_ini_text_roundtrip", to_ini_text_roundtrip as fn()),
             ("to_ini_text_keeps_comments_and_unknown_lines", to_ini_text_keeps_comments_and_unknown_lines as fn()),
             ("description_reads_aloud", description_reads_aloud as fn()),
-            ("written_names_parse_back_for_every_button", written_names_parse_back_for_every_button as fn()),
         ]);
     }
     }

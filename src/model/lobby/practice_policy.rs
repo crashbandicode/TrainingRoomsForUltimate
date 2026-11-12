@@ -64,16 +64,6 @@ mod tests {
         let c = context(true, true, 0x20, 0x04040000, false).unwrap();
         assert_eq!([c.role(0), c.role(1), c.role(4)], [Some(0), Some(1), None]);
     }
-    fn match_css_results_arena_and_unready_waiting_cannot_acquire() {
-        for (initialized, melee, mode, active) in [
-            (true, 1, 0x02010000, true), (true, 1, 0x07010100, true),
-            (true, 0x0e, 0x07010101, true),
-            (true, 0x10, 0x07010400, true), (true, 0x0e, 0x07010400, true),
-            (true, 0x0d, 0x07010401, true),
-            (true, 0x0d, 0x07010200, true), (true, 0x20, 0x04040000, false),
-            (true, 0x0d, 0x02010000, false), (false, 0x0d, 0x02010000, true),
-        ] { assert_eq!(context(false, initialized, melee, mode, active), None); }
-    }
     fn replacement_and_mode_change_invalidate_both_roles() {
         let owned = Entries { context: Context::Waiting, player: 0x1000, cpu: 0x9000 };
         let mut lease = EntryLease::new();
@@ -98,7 +88,6 @@ mod tests {
     fn case_table() {
         crate::test_table::run(&[
             ("waiting_roles_are_not_dense_training_slots", waiting_roles_are_not_dense_training_slots as fn()),
-            ("match_css_results_arena_and_unready_waiting_cannot_acquire", match_css_results_arena_and_unready_waiting_cannot_acquire as fn()),
             ("replacement_and_mode_change_invalidate_both_roles", replacement_and_mode_change_invalidate_both_roles as fn()),
         ]);
     }

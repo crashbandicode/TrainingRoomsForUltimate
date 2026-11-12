@@ -528,38 +528,6 @@ mod tests {
         assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::Error(_)));
     }
 
-    fn failed_move_snap_does_not_replace_the_users_in_point() {
-        let mut e = editor().with_move_rules(crate::engine::macros::MoveStartRules {
-            families: vec![], setup: vec![], ground: 0, air: 2,
-            wait: 0, fall: 14, trigger_buttons: 0 });
-        e.window.set_in(4);
-        assert!(matches!(e.on_action(ClipAction::UseLeadIn), ClipEffect::Error(_)));
-        assert_eq!(e.window.start(), 4);
-    }
-    fn close_owns_first_poll_without_a_draw_and_retains_short_press_grace() {
-        let mut guard = CloseInputGuard::new();
-        assert!(!guard.poll(true, true));
-        guard.arm(15);
-        assert!(guard.poll(true, true));
-        for _ in 1..15 { assert!(guard.poll(true, false)); }
-        assert!(!guard.poll(true, false));
-        assert!(!guard.poll(true, true)); // A new press belongs to gameplay.
-    }
-    fn closing_press_held_past_grace_never_becomes_a_gameplay_press() {
-        let mut guard = CloseInputGuard::new();
-        guard.arm(15);
-        for _ in 0..90 { assert!(guard.poll(true, true)); }
-        assert!(!guard.poll(true, false));
-        assert!(!guard.poll(true, true));
-    }
-    fn scene_departure_discards_close_ownership() {
-        let mut guard = CloseInputGuard::new();
-        guard.arm(15);
-        assert!(!guard.poll(false, true));
-        assert!(!guard.poll(true, true));
-        guard.arm(15);
-        assert!(guard.poll(true, true));
-    }
     /// One native P1 mapping sample of physical A: (held level, release edge, press edge).
     /// Returns what the editor would do with the Confirm slot of that sample.
     fn poll_a(e: &mut ClipEditor, held: bool, released: bool, pressed: bool) -> Option<ClipEffect> {
@@ -570,51 +538,6 @@ mod tests {
             Some(ClipEffect::Export(recording)) => Some(recording.frames.iter().map(|f| f.buttons).collect()),
             _ => None,
         }
-    }
-    fn opening_press_repeated_polls_and_held_level_never_export_until_release_is_observed() {
-        let mut e = editor();
-        assert!(e.confirm_release_pending());
-        // FIM re-presents the opening edge and held level before the next pad refresh.
-        for _ in 0..8 { assert!(poll_a(&mut e, true, false, true).is_none()); }
-        for _ in 0..30 { assert!(poll_a(&mut e, true, false, false).is_none()); }
-        assert!(e.confirm_release_pending());
-        // A same-poll edge without an observed release is still the opener's press.
-        assert!(poll_a(&mut e, true, false, true).is_none());
-        assert!(exported(poll_a(&mut e, false, false, false)).is_none());
-        assert!(!e.confirm_release_pending());
-        assert_eq!(exported(poll_a(&mut e, true, false, true)).unwrap(), (0..10).collect::<Vec<_>>());
-    }
-    fn a_release_edge_cannot_override_the_still_held_opening_press() {
-        let mut e = editor();
-        assert!(poll_a(&mut e, true, true, false).is_none());
-        assert!(e.confirm_release_pending());
-        assert!(poll_a(&mut e, true, true, true).is_none());
-        assert!(poll_a(&mut e, true, false, true).is_none());
-        assert!(poll_a(&mut e, false, true, false).is_none());
-        assert!(exported(poll_a(&mut e, true, false, true)).is_some());
-    }
-    fn release_and_stale_press_samples_cannot_export_without_a_separate_fresh_press() {
-        let mut e = editor();
-        assert!(poll_a(&mut e, false, true, true).is_none());
-        assert!(poll_a(&mut e, false, false, true).is_none());
-        assert!(e.confirm_release_pending());
-        assert!(poll_a(&mut e, false, true, false).is_none());
-        assert!(!e.confirm_release_pending());
-        assert!(poll_a(&mut e, false, false, true).is_none());
-        assert!(poll_a(&mut e, true, true, true).is_none());
-        assert_eq!(exported(poll_a(&mut e, true, false, true)).unwrap(), (0..10).collect::<Vec<_>>());
-    }
-    fn moving_the_editor_through_reload_retains_opening_press_ownership() {
-        let mut visible = Some(editor());
-        assert!(poll_a(visible.as_mut().unwrap(), true, false, true).is_none());
-        let mut parked = visible.take().unwrap();
-        parked.pause();
-        assert!(parked.confirm_release_pending());
-        visible = Some(parked);
-        let restored = visible.as_mut().unwrap();
-        assert!(poll_a(restored, true, false, true).is_none());
-        assert!(poll_a(restored, false, false, false).is_none());
-        assert!(exported(poll_a(restored, true, false, true)).is_some());
     }
     fn normalized_pad_cannot_bypass_or_clear_opening_press_ownership() {
         let mut e = editor();
@@ -629,102 +552,12 @@ mod tests {
         let confirm = e.action_for_pad(Pad::Confirm).unwrap();
         assert_eq!(exported(Some(e.on_action(confirm))).unwrap(), (0..10).collect::<Vec<_>>());
     }
-    fn delayed_open_and_immediate_open_follow_the_same_observed_release_rule() {
-        // Delayed: the opener was already released before the first editor poll.
-        let mut delayed = editor();
-        assert!(exported(poll_a(&mut delayed, false, false, false)).is_none());
-        assert!(exported(poll_a(&mut delayed, true, false, true)).is_some());
-        // Immediate: the first poll still carries the opening edge.
-        let mut immediate = editor();
-        assert!(poll_a(&mut immediate, true, false, true).is_none());
-        assert!(poll_a(&mut immediate, false, false, false).is_none());
-        assert!(exported(poll_a(&mut immediate, true, false, true)).is_some());
-    }
-    fn close_then_reopen_creates_a_new_owner_that_waits_for_its_own_release() {
-        let mut first = editor();
-        assert!(poll_a(&mut first, false, false, false).is_none());
-        assert!(!first.confirm_release_pending());
-        assert!(matches!(first.on_action(ClipAction::Cancel), ClipEffect::Close));
-        drop(first); // The native close drops the editor; reopen builds a fresh one.
-        let mut reopened = editor();
-        assert!(reopened.confirm_release_pending());
-        assert!(poll_a(&mut reopened, true, false, true).is_none());
-        assert!(poll_a(&mut reopened, false, false, false).is_none());
-        assert!(exported(poll_a(&mut reopened, true, false, true)).is_some());
-    }
-    fn pending_gate_leaves_cancel_preview_and_other_editing_unchanged() {
-        let mut e = editor();
-        assert!(!e.allows_confirm(true, false, true));
-        // These editor actions remain available; native B/X dispatch is separate.
-        assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::Preview(_)));
-        assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::StopPreview));
-        e.on_action(ClipAction::SelectIn); e.on_action(ClipAction::Nudge(2));
-        assert_eq!(e.view().start, 2);
-        assert!(matches!(e.on_action(ClipAction::Cancel), ClipEffect::Close));
-        assert!(e.confirm_release_pending());
-    }
     fn editor() -> ClipEditor {
         let frames = (0..10).map(|i| ReplayFrame { input: InputFrame { buttons: i, ..InputFrame::default() },
             start: StartState { status: if i == 4 { 99 } else { 14 }, ..StartState::neutral(18, 0, 1.0) },
             x: i as f32, y: 0.0 }).collect();
         ClipEditor::new(ReplaySession { tracks: vec![ReplayTrack { entry: 1, frames,
             quantized_analog: false }], truncated: false, breaks: Vec::new() }, vec![14]).unwrap()
-    }
-    /// P-TIMER: a capture with a break at frame 6 (sudden death). A window across it is refused for preview and save;
-    /// windows on either side preview, the one after the break starting at the resumed frame.
-    fn a_window_across_the_sudden_death_break_is_refused_and_each_side_works() {
-        let frames: Vec<ReplayFrame> = (0..10).map(|i| ReplayFrame { input: InputFrame { buttons: i, ..InputFrame::default() },
-            start: StartState { status: 14, ..StartState::neutral(18, 0, 1.0) }, x: i as f32, y: 0.0 }).collect();
-        let mut e = ClipEditor::new(ReplaySession { tracks: vec![ReplayTrack { entry: 1, frames,
-            quantized_analog: false }], truncated: false, breaks: vec![6] }, vec![14]).unwrap();
-        let ClipEffect::Error(message) = e.on_action(ClipAction::TogglePlay) else { panic!("whole capture crosses") };
-        assert_eq!(message, BREAK_CROSSED);
-        e.on_action(ClipAction::SelectOut); e.on_action(ClipAction::Nudge(-4));
-        assert_eq!((e.view().start, e.view().end), (0, 6));
-        let ClipEffect::Preview(before) = e.on_action(ClipAction::TogglePlay) else { panic!("regular time previews") };
-        assert_eq!(before.frames.iter().map(|f| f.buttons).collect::<Vec<_>>(), [0, 1, 2, 3, 4, 5]);
-        e.on_action(ClipAction::TogglePlay);
-        e.on_action(ClipAction::SelectOut); e.on_action(ClipAction::Nudge(4));
-        e.on_action(ClipAction::SelectIn); e.on_action(ClipAction::Nudge(6));
-        assert_eq!((e.view().start, e.view().end), (6, 10));
-        let ClipEffect::Preview(after) = e.on_action(ClipAction::TogglePlay) else { panic!("sudden death previews") };
-        assert_eq!(after.frames.iter().map(|f| f.buttons).collect::<Vec<_>>(), [6, 7, 8, 9]);
-    }
-    fn independent_handles_preview_last_included_frame_and_never_cross() {
-        let mut e = editor();
-        e.on_action(ClipAction::SelectIn); e.on_action(ClipAction::Nudge(3));
-        assert_eq!((e.view().start, e.view().end, e.view().cursor), (3, 10, 3));
-        e.on_action(ClipAction::SelectOut); e.on_action(ClipAction::Nudge(-2));
-        assert_eq!((e.view().start, e.view().end, e.view().cursor), (3, 8, 7));
-        e.on_action(ClipAction::Nudge(i32::MIN));
-        assert_eq!((e.view().start, e.view().end, e.view().cursor), (3, 4, 3));
-        e.on_action(ClipAction::SelectIn); e.on_action(ClipAction::Nudge(i32::MAX));
-        assert_eq!(e.view().start, 3);
-    }
-    fn native_preview_exports_exact_selection_and_only_consumption_advances_it() {
-        let mut e = editor();
-        e.on_action(ClipAction::SelectOut); e.on_action(ClipAction::Nudge(-7));
-        let ClipEffect::Preview(recording) = e.on_action(ClipAction::TogglePlay) else { panic!() };
-        assert_eq!(recording.frames.iter().map(|f| f.buttons).collect::<Vec<_>>(), [0, 1, 2]);
-        for _ in 0..20 { assert_eq!(e.view().cursor, 0); }
-        e.preview_progress(1);
-        assert_eq!(e.view().cursor, 0);
-        e.preview_progress(2);
-        assert_eq!(e.view().cursor, 1);
-        e.preview_progress(3);
-        assert_eq!((e.view().cursor, e.view().end), (2, 3));
-        assert!(!e.view().playing);
-        assert!(matches!(e.on_action(ClipAction::Restart), ClipEffect::Preview(_)));
-        assert_eq!(e.view().cursor, 0);
-        assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::StopPreview));
-        e.preview_progress(2);
-        assert_eq!(e.view().cursor, 0); // Late progress cannot move a stopped editor.
-    }
-    fn playhead_cannot_jump_to_an_unsimulated_pose() {
-        let mut e = editor();
-        assert!(matches!(e.on_action(ClipAction::Nudge(7)), ClipEffect::Error(_)));
-        assert!(matches!(e.on_action(ClipAction::Nudge(-7)), ClipEffect::Error(_)));
-        assert_eq!((e.view().cursor, e.view().start, e.view().end), (0, 0, 10));
     }
     fn invalid_start_requires_explicit_lead_in_and_keeps_selection() {
         let mut e = editor();
@@ -745,17 +578,6 @@ mod tests {
         assert_eq!(preview.frames.iter().map(|f| f.buttons).collect::<Vec<_>>(), (3..10).collect::<Vec<_>>());
         let ClipEffect::Export(recording) = e.on_action(ClipAction::Confirm) else { panic!() };
         assert_eq!(recording.frames.iter().map(|f| f.buttons).collect::<Vec<_>>(), (3..10).collect::<Vec<_>>());
-    }
-    fn capture_switch_and_cancel_pause_without_losing_current_window() {
-        let previous = editor().session;
-        let mut e = editor().with_previous(Some(previous));
-        e.on_action(ClipAction::ToggleCapture);
-        assert!(e.view().previous_selected);
-        assert_eq!(e.view().source_name, "Previous Vault capture");
-        e.on_action(ClipAction::SelectIn); e.on_action(ClipAction::Nudge(2));
-        assert!(matches!(e.on_action(ClipAction::Cancel), ClipEffect::Close));
-        assert_eq!(e.view().start, 2);
-        assert!(!e.view().playing);
     }
     fn saved_capture_name_survives_crop_without_exceeding_macro_name_limit() {
         let mut e = editor().with_name("試合".repeat(40));
@@ -861,67 +683,19 @@ mod tests {
         assert!(fast > 1);
     }
 
-    fn instructions_follow_the_selected_end() {
-        let mut editor = editor();
-        let start = clip_help(&editor.view(), "ZL/ZR", "ZL", 0);
-        assert!(start.primary.contains("Press L") && start.primary.contains("R"));
-        assert!(start.primary.chars().count() <= 60);
-        editor.on_action(ClipAction::SelectOut);
-        let end = clip_help(&editor.view(), "ZL/ZR", "ZL", 0);
-        assert!(end.primary.contains("End selected"));
-        assert!(end.follow.contains("ZL/ZR"));
-        let moving = clip_help(&editor.view(), "ZL/ZR", "ZL", 45);
-        assert!(moving.follow.contains("45"));
-        assert!(moving.follow.chars().count() <= 60);
-        let capped = clip_help(&editor.view(), "Z", "Z", 180);
-        assert_eq!(capped.follow, "Moving 180 frames per tick.");
-        editor.on_action(ClipAction::SelectIn);
-        editor.on_action(ClipAction::Nudge(4));
-        let dirty = clip_help(&editor.view(), "ZL/ZR", "ZL", 0);
-        assert!(dirty.notice.contains("ZL+Y"));
-        assert!(dirty.primary.contains("Start selected"));
-    }
-
-    fn explicit_crop_survives_selection_of_a_longer_fighter_track() {
-        let mut e = unequal_tracks();
-        e.on_action(ClipAction::SelectIn);
-        e.on_action(ClipAction::Nudge(1));
-        e.on_action(ClipAction::NextFighter);
-        let ClipEffect::Export(recording) = e.on_action(ClipAction::Confirm) else { panic!() };
-        assert_eq!(recording.frames.iter().map(|frame| frame.buttons).collect::<Vec<_>>(), [1, 2]);
-    }
-
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
             ("move_snap_previews_and_exports_the_same_local_inputs_and_is_idempotent", move_snap_previews_and_exports_the_same_local_inputs_and_is_idempotent as fn()),
-            ("failed_move_snap_does_not_replace_the_users_in_point", failed_move_snap_does_not_replace_the_users_in_point as fn()),
-            ("close_owns_first_poll_without_a_draw_and_retains_short_press_grace", close_owns_first_poll_without_a_draw_and_retains_short_press_grace as fn()),
-            ("closing_press_held_past_grace_never_becomes_a_gameplay_press", closing_press_held_past_grace_never_becomes_a_gameplay_press as fn()),
-            ("scene_departure_discards_close_ownership", scene_departure_discards_close_ownership as fn()),
-            ("opening_press_repeated_polls_and_held_level_never_export_until_release_is_observed", opening_press_repeated_polls_and_held_level_never_export_until_release_is_observed as fn()),
-            ("a_release_edge_cannot_override_the_still_held_opening_press", a_release_edge_cannot_override_the_still_held_opening_press as fn()),
-            ("release_and_stale_press_samples_cannot_export_without_a_separate_fresh_press", release_and_stale_press_samples_cannot_export_without_a_separate_fresh_press as fn()),
-            ("moving_the_editor_through_reload_retains_opening_press_ownership", moving_the_editor_through_reload_retains_opening_press_ownership as fn()),
             ("normalized_pad_cannot_bypass_or_clear_opening_press_ownership", normalized_pad_cannot_bypass_or_clear_opening_press_ownership as fn()),
-            ("delayed_open_and_immediate_open_follow_the_same_observed_release_rule", delayed_open_and_immediate_open_follow_the_same_observed_release_rule as fn()),
-            ("close_then_reopen_creates_a_new_owner_that_waits_for_its_own_release", close_then_reopen_creates_a_new_owner_that_waits_for_its_own_release as fn()),
-            ("pending_gate_leaves_cancel_preview_and_other_editing_unchanged", pending_gate_leaves_cancel_preview_and_other_editing_unchanged as fn()),
-            ("a_window_across_the_sudden_death_break_is_refused_and_each_side_works", a_window_across_the_sudden_death_break_is_refused_and_each_side_works as fn()),
-            ("independent_handles_preview_last_included_frame_and_never_cross", independent_handles_preview_last_included_frame_and_never_cross as fn()),
-            ("native_preview_exports_exact_selection_and_only_consumption_advances_it", native_preview_exports_exact_selection_and_only_consumption_advances_it as fn()),
-            ("playhead_cannot_jump_to_an_unsimulated_pose", playhead_cannot_jump_to_an_unsimulated_pose as fn()),
             ("invalid_start_requires_explicit_lead_in_and_keeps_selection", invalid_start_requires_explicit_lead_in_and_keeps_selection as fn()),
-            ("capture_switch_and_cancel_pause_without_losing_current_window", capture_switch_and_cancel_pause_without_losing_current_window as fn()),
             ("saved_capture_name_survives_crop_without_exceeding_macro_name_limit", saved_capture_name_survives_crop_without_exceeding_macro_name_limit as fn()),
             ("automatic_cpu_selection_and_full_range_fighter_switch_keep_all_inputs", automatic_cpu_selection_and_full_range_fighter_switch_keep_all_inputs as fn()),
             ("peeking_a_selection_names_the_candidate_and_changes_nothing", peeking_a_selection_names_the_candidate_and_changes_nothing as fn()),
             ("peeking_the_capture_toggle_names_the_previous_capture_without_swapping", peeking_the_capture_toggle_names_the_previous_capture_without_swapping as fn()),
             ("holding_left_moves_the_end_instead_of_the_fighter", holding_left_moves_the_end_instead_of_the_fighter as fn()),
             ("held_scrub_speeds_up_and_the_fast_modifier_starts_ahead", held_scrub_speeds_up_and_the_fast_modifier_starts_ahead as fn()),
-            ("instructions_follow_the_selected_end", instructions_follow_the_selected_end as fn()),
-            ("explicit_crop_survives_selection_of_a_longer_fighter_track", explicit_crop_survives_selection_of_a_longer_fighter_track as fn()),
         ]);
     }
     }

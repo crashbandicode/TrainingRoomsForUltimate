@@ -334,6 +334,45 @@ def table_tests(text, keep=()):
     return text
 
 
+def drop_cases(text, names):
+    """Remove the named case functions (with their doc comments and attributes) and their `case_table` rows; a table left
+    without rows goes too. Each name must be defined exactly once in `text`."""
+    for name in names:
+        mask = lex_spans(text)
+        hits = [m for m in re.finditer(r'\bfn\s+' + re.escape(name) + r'\s*\(', text) if mask[m.start()]]
+        if len(hits) != 1:
+            raise SystemExit(f'drop_cases: `{name}` is defined {len(hits)} times')
+        m = hits[0]
+        start = text.rfind('\n', 0, m.start()) + 1
+        while start > 0:
+            ps = text.rfind('\n', 0, start - 1) + 1
+            line = text[ps:start - 1].strip()
+            if line.startswith('///') or (line.startswith('#[') and line.endswith(']')) or (line.startswith('//') and not line.startswith('// rc.9')):
+                start = ps
+            else:
+                break
+        depth, j = 0, text.index('{', m.end())
+        while j < len(text):
+            if mask[j]:
+                if text[j] == '{':
+                    depth += 1
+                elif text[j] == '}':
+                    depth -= 1
+                    if depth == 0:
+                        break
+            j += 1
+        end = j + 1
+        if end < len(text) and text[end] == '\n':
+            end += 1
+        if text[:start].endswith('\n\n') and (end >= len(text) or text[end] == '\n'):
+            end += 1 if end < len(text) else 0
+        text = text[:start] + text[end:]
+        text = re.sub(r'^[ \t]*\("' + re.escape(name) + r'", [^\n]*\),\n', '', text, count=1, flags=re.M)
+    # tables without rows
+    text = re.sub(r'\n?(?:[ \t]*///[^\n]*\n)*[ \t]*#\[test\]\n[ \t]*fn ' + TABLE_FN + r'\(\) \{\n[ \t]*crate::test_table::run\(&\[\n[ \t]*\]\);\n[ \t]*\}\n', '\n', text)
+    return text
+
+
 def apply_edit(e, text):
     """One manifest edit of the test cut, or None when `e` is another kind of edit."""
     if 'cut_tests' in e:
@@ -346,6 +385,14 @@ def apply_edit(e, text):
         return table_tests(text, e.get('keep', ()))
     if 'table_file' in e:
         return tabulate_region(text, e.get('keep', ()))
+    if 'drop_cases' in e:
+        return drop_cases(text, e['drop_cases'])
+    if 'line_patch' in e:
+        # [first line, last line, replacement lines], 1-based and inclusive, against the text before this edit
+        lines = text.split('\n')
+        for first, last, new in sorted(e['line_patch'], reverse=True):
+            lines[first - 1:last] = new
+        return '\n'.join(lines)
     if 'insert_before_line' in e:
         lines = text.split('\n')
         at = e['insert_before_line'] - 1

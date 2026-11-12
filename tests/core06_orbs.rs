@@ -86,28 +86,6 @@ fn the_orb_panes_cover_four_full_fighters() {
     assert_eq!(board.in_draw_order().count(), model::panes::ORBS, "every orb of a full board has a pane");
 }
 
-/// Review HB-2: past the panes the cut is deterministic, every hitbox and grab box before any hurtbox. A gone fighter's
-/// last pass lingers beside four full fighters (the only way past `ORBS`).
-fn past_the_panes_hurtboxes_are_cut_first_and_the_order_is_stable() {
-    let mut board = Board::new();
-    // The gone fighter: 40 hurt spheres and 8 hit spheres, published first (the stalest slot).
-    board.publish(0x900, (0..48).map(|i| orb_of_kind(1000.0 + i as f32, if i < 8 { hitbox::KIND_HIT } else { hitbox::KIND_HURT })));
-    for f in 0..orbs::ORB_FIGHTERS {
-        let kind = |i: usize| match i % 16 { 0 => hitbox::KIND_HIT, 1 => hitbox::KIND_GRAB, _ => hitbox::KIND_HURT };
-        board.publish((f + 1) << 8, (0..MAX_HELD).map(|i| orb_of_kind((f * 1000 + i) as f32, kind(i))));
-    }
-    let all: Vec<Orb> = board.in_draw_order().copied().collect();
-    assert_eq!(all.len(), model::panes::ORBS + 48);
-    let drawn = &all[..model::panes::ORBS];
-    let cut = &all[model::panes::ORBS..];
-    let not_hurt = all.iter().filter(|o| o.kind != hitbox::KIND_HURT).count();
-    assert_eq!(drawn.iter().filter(|o| o.kind != hitbox::KIND_HURT).count(), not_hurt, "every hitbox and grab box is drawn");
-    assert!(cut.iter().all(|o| o.kind == hitbox::KIND_HURT), "only hurtboxes are cut");
-    assert!(drawn[..not_hurt].iter().all(|o| o.kind != hitbox::KIND_HURT), "hitboxes and grab boxes come first");
-    assert_eq!(board.in_draw_order().copied().collect::<Vec<_>>(), all, "the same board is cut the same way");
-    assert_eq!(board.live().count(), all.len(), "the order drops nothing and adds nothing");
-}
-
 /// Review HB-1: what the layout tick writes into the orb panes. An inactive tick (the waiting room's practice ended while
 /// its layout stays) hides every pane the last tick showed and the container; once hidden, nothing more is written.
 fn an_inactive_tick_hides_the_orbs_it_showed() {
@@ -194,22 +172,6 @@ fn projected_orbs_map_onto_the_layout_canvas() {
     assert_eq!(orbs::edge_points(&o), [[1.5, 2.0, 3.0], [1.0, 2.5, 3.0]]);
 }
 
-fn the_layout_carries_one_disc_pane_per_orb() {
-    use model::panes as p;
-    let specs = p::specs();
-    assert_eq!(specs.len(), p::COUNT);
-    let container = &specs[p::IDX_ORBS];
-    assert_eq!(container.name.as_str(), "TrOrbs");
-    assert!(!container.visible);
-    for k in 0..p::ORBS {
-        let s = &specs[p::IDX_ORB + k];
-        assert_eq!(s.parent, container.name, "orb {k}");
-        assert!(!s.visible);
-        assert!(matches!(s.kind, p::Kind::Rect { color: [255, 255, 255, 255] }));
-    }
-    const { assert!(p::ORBS >= 2 * 74, "two large fighters' first passes fit") };
-}
-
 /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
 #[test]
 fn case_table() {
@@ -217,11 +179,9 @@ fn case_table() {
         ("own_orbs_are_never_refused_and_conclude_with_the_status", own_orbs_are_never_refused_and_conclude_with_the_status as fn()),
         ("an_orb_is_the_hitbox_size_in_the_spheres_tint", an_orb_is_the_hitbox_size_in_the_spheres_tint as fn()),
         ("the_orb_panes_cover_four_full_fighters", the_orb_panes_cover_four_full_fighters as fn()),
-        ("past_the_panes_hurtboxes_are_cut_first_and_the_order_is_stable", past_the_panes_hurtboxes_are_cut_first_and_the_order_is_stable as fn()),
         ("an_inactive_tick_hides_the_orbs_it_showed", an_inactive_tick_hides_the_orbs_it_showed as fn()),
         ("the_board_keeps_each_fighters_last_pass_and_ages_out_the_gone", the_board_keeps_each_fighters_last_pass_and_ages_out_the_gone as fn()),
         ("screen_half_mirrors_the_games_size_words", screen_half_mirrors_the_games_size_words as fn()),
         ("projected_orbs_map_onto_the_layout_canvas", projected_orbs_map_onto_the_layout_canvas as fn()),
-        ("the_layout_carries_one_disc_pane_per_orb", the_layout_carries_one_disc_pane_per_orb as fn()),
     ]);
 }

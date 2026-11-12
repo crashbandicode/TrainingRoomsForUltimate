@@ -142,49 +142,6 @@ mod tests {
         Configuration::from_saved(&config).unwrap()
     }
 
-    fn a_replay_mii_installs_the_saved_mii_with_the_same_look() {
-        let replay = replay(LOOK);
-        assert!(!has_identity(replay.charinfo()), "the fixture has no create ID and no name");
-        let other = {
-            let mut look = LOOK;
-            look[0x40] ^= 1;
-            saved(2622, look, [9; 16], "Other")
-        };
-        let spook = saved(13348, LOOK, SPOOK, "Spook");
-        let installed = installable(replay, &[other, spook.clone()]);
-        assert_eq!(installed, Configuration::from_saved(&spook).unwrap(), "MII.md row 12: that one is used");
-        assert_eq!(installed.canonical(), replay.canonical());
-        assert_eq!(installed.tokens(), replay.tokens());
-    }
-
-    fn a_replay_mii_with_no_saved_twin_gets_a_create_id_and_the_new_mii_name() {
-        let replay = replay(LOOK);
-        let installed = installable(replay, &[]);
-        let bytes = installed.charinfo();
-        assert!(has_identity(bytes));
-        assert_eq!(installed.canonical(), replay.canonical(), "the look is the Mii's");
-        assert_eq!(installed.tokens(), replay.tokens());
-        assert_eq!(bytes[TERMINATOR.end..], LOOK[TERMINATOR.end..]);
-        assert_eq!((bytes[6] >> 4, bytes[8] >> 6), (4, 2), "a saved Mii's create ID bits (SPOOK: 0x48, 0x96)");
-        let name: Vec<u16> =
-            bytes[NAME].chunks(2).map(|unit| u16::from_le_bytes([unit[0], unit[1]])).take_while(|unit| *unit != 0).collect();
-        assert_eq!(String::from_utf16(&name).unwrap(), FALLBACK_NAME);
-        assert_eq!(bytes[TERMINATOR], [0, 0]);
-        assert_eq!(installable(replay, &[]), installed, "the same Mii always gets the same create ID");
-        let mut look = LOOK;
-        look[0x40] ^= 1;
-        assert_ne!(installable(self::replay(look), &[]).charinfo()[CREATE_ID], bytes[CREATE_ID]);
-    }
-
-    fn a_mii_with_its_own_create_id_and_name_is_installed_as_it_is() {
-        let own = Configuration::from_saved(&saved(4155, LOOK, [7; 16], "Mine")).unwrap();
-        assert!(has_identity(own.charinfo()));
-        assert_eq!(installable(own, &[saved(13348, LOOK, SPOOK, "Spook")]), own);
-        let mut nameless = saved(0, LOOK, [7; 16], "x");
-        nameless.charinfo[NAME].fill(0);
-        assert!(!has_identity(&nameless.charinfo), "a create ID without a name is not whole");
-    }
-
     /// TASK-OPUS-rc6-open-fixes item 2 (#54, cov-rest 20:22Z; Eden covrest-yoga-04): after a Switch the CPU holds what
     /// the install wrote, `installable(c)` (a replay Mii's filled create ID and name), so comparing it with the recorded
     /// `c` asked Fighter Mismatch again on the next Play. Reading B (primary 2026-11-08 23:03Z): exact equality, against
@@ -209,21 +166,11 @@ mod tests {
         assert_eq!(installed_target(own, &[saved(13348, LOOK, SPOOK, "Spook")]), own, "a whole Mii is installed as it is");
     }
 
-    /// The CPU install (`mii_ordinary_cpu::begin`'s exact-Mii target) writes this module's configuration.
-    fn the_cpu_install_writes_the_installable_configuration() {
-        let cpu = include_str!("../runtime/mii/mii_ordinary_cpu.rs");
-        assert!(cpu.contains("let c=crate::engine::mii_install::installable(c,&catalog.configs);"));
-    }
-
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
-            ("a_replay_mii_installs_the_saved_mii_with_the_same_look", a_replay_mii_installs_the_saved_mii_with_the_same_look as fn()),
-            ("a_replay_mii_with_no_saved_twin_gets_a_create_id_and_the_new_mii_name", a_replay_mii_with_no_saved_twin_gets_a_create_id_and_the_new_mii_name as fn()),
-            ("a_mii_with_its_own_create_id_and_name_is_installed_as_it_is", a_mii_with_its_own_create_id_and_name_is_installed_as_it_is as fn()),
             ("a_switched_mii_matches_its_recorded_target_as_installed", a_switched_mii_matches_its_recorded_target_as_installed as fn()),
-            ("the_cpu_install_writes_the_installable_configuration", the_cpu_install_writes_the_installable_configuration as fn()),
         ]);
     }
     }

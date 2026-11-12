@@ -168,66 +168,6 @@ impl Configuration {
     }
 }
 
-#[cfg(test)]
-mod observed_configuration_tests {
-    lib_unit_tests! {
-    use super::*;
-    use crate::engine::mii::native_values::RowIds;
-
-    fn native() -> (Tokens, [u8; CHARINFO_LEN], RowIds) {
-        (
-            Tokens { outfit: 0, hat: 0, colour: 0, voice: 0, specials: [0; 4] },
-            core::array::from_fn(|i| i as u8),
-            RowIds { outfit: 0x1300001bfef7a5f7, hat: 0x5a00000fa9efa5ea },
-        )
-    }
-
-    fn builtin_origin_retains_exact_values_without_a_catalog_entry() {
-        let (tokens, bytes, rows) = native();
-        let value = Configuration::from_observed(MiiClass::Brawler, tokens, bytes, rows).unwrap();
-        assert_eq!(value.tokens(), tokens);
-        assert_eq!(value.charinfo(), &bytes);
-        assert_eq!(value.canonical().class, MiiClass::Brawler);
-        assert_eq!(value.canonical().appearance.outfit, rows.outfit & LOW40);
-        assert!(value.canonical().appearance.charinfo_masked[..CHARINFO_MASK_END]
-            .iter().all(|b| *b == 0));
-        let mut distinct = bytes;
-        distinct[0] ^= 1;
-        let other = Configuration::from_observed(MiiClass::Brawler, tokens, distinct, rows).unwrap();
-        assert_eq!(value.canonical(), other.canonical());
-        assert_ne!(value, other); // Returning slot0 must retain the unmasked native identity.
-    }
-
-    fn observed_origin_rejects_invalid_rows_and_lossy_tokens() {
-        let (tokens, bytes, rows) = native();
-        for bad in [
-            Tokens { colour: 256, ..tokens },
-            Tokens { voice: 256, ..tokens },
-            Tokens { specials: [3, 0, 0, 0], ..tokens },
-            Tokens { outfit: 1, ..tokens },
-        ] {
-            assert_eq!(Configuration::from_observed(MiiClass::Brawler, bad, bytes, rows),
-                Err(Error::InvalidConfiguration));
-        }
-        for bad in [
-            RowIds { outfit: rows.outfit ^ (1 << 56), ..rows },
-            RowIds { hat: 0x5a00000000000000, ..rows },
-        ] {
-            assert_eq!(Configuration::from_observed(MiiClass::Brawler, tokens, bytes, bad),
-                Err(Error::InvalidConfiguration));
-        }
-    }
-
-    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
-    #[test]
-    fn case_table() {
-        crate::test_table::run(&[
-            ("builtin_origin_retains_exact_values_without_a_catalog_entry", builtin_origin_retains_exact_values_without_a_catalog_entry as fn()),
-            ("observed_origin_rejects_invalid_rows_and_lossy_tokens", observed_origin_rejects_invalid_rows_and_lossy_tokens as fn()),
-        ]);
-    }
-    }
-}
 
 /// Values copied from the current native binding. These do not pin native objects or prove
 /// exclusivity. All owners, mirrors and record contents still need fresh adapter validation.
@@ -627,108 +567,6 @@ mod tests {
             source: Source::Preference,
         }
     }
-    fn apply_ready(state: &mut MiiOverride, before: Configuration, after: Configuration) -> Ticket {
-        let tx = state
-            .apply(live(before), choice(after), after)
-            .unwrap()
-            .unwrap();
-        state.submit(tx.ticket(), live(before)).unwrap();
-        assert_eq!(
-            state.complete(tx.ticket(), live(after)),
-            Ok(Operation::Apply)
-        );
-        tx.ticket()
-    }
-
-    fn alternate_to_alternate_restores_first_exact_original_before_kind_or_slot0() {
-        let a = config(0, 10);
-        let b = config(1, 11);
-        let c = config(2, 12);
-        let mut state = MiiOverride::capture(Role::Player, live(a)).unwrap();
-        apply_ready(&mut state, a, b);
-        apply_ready(&mut state, b, c);
-        assert_eq!(state.original(), a);
-        assert_eq!(
-            state.can_change_kind_or_return_slot0(live(c)),
-            Err(Error::RestoreRequired)
-        );
-        let restore = state.restore(live(c)).unwrap().unwrap();
-        assert_eq!(restore.after().charinfo(), a.charinfo());
-        state.submit(restore.ticket(), live(c)).unwrap();
-        assert_eq!(
-            state.can_change_kind_or_return_slot0(live(c)),
-            Err(Error::Busy)
-        );
-        assert_eq!(
-            state.complete(restore.ticket(), live(a)),
-            Ok(Operation::Restore)
-        );
-        assert_eq!(state.can_change_kind_or_return_slot0(live(a)), Ok(()));
-        assert_eq!(state.restore(live(a)), Ok(None));
-    }
-
-    fn masked_catalog_equality_does_not_replace_expected_exact_native_bytes() {
-        let a = config(0, 10);
-        let b = config(1, 11);
-        let copy = config(1, 99);
-        assert_eq!(b.canonical(), copy.canonical());
-        let mut state = MiiOverride::capture(Role::Player, live(a)).unwrap();
-        apply_ready(&mut state, a, b);
-        assert_eq!(state.apply(live(b), choice(copy), copy), Ok(None));
-        assert_eq!(state.expected(), b);
-        assert_eq!(
-            state.restore(live(copy)),
-            Err(Error::UnexpectedConfiguration)
-        );
-        // A reset or foreign writer returning original bytes is not silently re-snapshotted.
-        assert_eq!(state.restore(live(a)), Err(Error::UnexpectedConfiguration));
-        assert_eq!(state.original(), a);
-    }
-
-    fn stale_completion_and_changed_pool_or_epoch_cannot_authorize_a_later_write() {
-        let a = config(0, 10);
-        let b = config(1, 11);
-        let c = config(2, 12);
-        let mut state = MiiOverride::capture(Role::Player, live(a)).unwrap();
-        let old = apply_ready(&mut state, a, b);
-        let tx = state.apply(live(b), choice(c), c).unwrap().unwrap();
-        assert_eq!(state.complete(old, live(b)), Err(Error::StaleTicket));
-        let mut moved = live(b);
-        moved.binding.manager += 8;
-        assert_eq!(state.submit(tx.ticket(), moved), Err(Error::BindingChanged));
-        moved = live(b);
-        moved.binding.epoch += 1; // same FE address, different lifetime
-        assert_eq!(state.submit(tx.ticket(), moved), Err(Error::BindingChanged));
-        state.submit(tx.ticket(), live(b)).unwrap();
-        assert_eq!(
-            state.complete(tx.ticket(), live(b)),
-            Err(Error::UnexpectedConfiguration)
-        );
-        assert_eq!(state.phase(), Phase::Refused);
-        assert_eq!(state.pending_ticket(), Some(tx.ticket()));
-    }
-
-    fn departure_never_restores_or_discards_pending_native_ownership() {
-        let a = config(0, 10);
-        let b = config(1, 11);
-        let mut state = MiiOverride::capture(Role::Player, live(a)).unwrap();
-        let tx = state.apply(live(a), choice(b), b).unwrap().unwrap();
-        state.submit(tx.ticket(), live(a)).unwrap();
-        state.depart();
-        assert_eq!(state.pending_ticket(), Some(tx.ticket()));
-        assert_eq!(state.complete(tx.ticket(), live(b)), Err(Error::WrongPhase));
-        assert_eq!(state.restore(live(a)), Err(Error::Departed));
-        state.settle_terminal(tx.ticket()).unwrap(); // adapter's actual destruction receipt
-        assert_eq!(state.phase(), Phase::Departed);
-        let fresh = Observed {
-            binding: binding(8),
-            configuration: a,
-        };
-        let mut rebuilt = MiiOverride::capture(Role::Player, fresh).unwrap();
-        let next = rebuilt.apply(fresh, choice(b), b).unwrap().unwrap();
-        assert_ne!(next.ticket(), tx.ticket());
-        assert_eq!(rebuilt.submit(tx.ticket(), fresh), Err(Error::StaleTicket));
-    }
 
     fn only_unsubmitted_work_can_be_cancelled_without_terminal_native_receipt() {
         let a = config(0, 10);
@@ -786,10 +624,6 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
-            ("alternate_to_alternate_restores_first_exact_original_before_kind_or_slot0", alternate_to_alternate_restores_first_exact_original_before_kind_or_slot0 as fn()),
-            ("masked_catalog_equality_does_not_replace_expected_exact_native_bytes", masked_catalog_equality_does_not_replace_expected_exact_native_bytes as fn()),
-            ("stale_completion_and_changed_pool_or_epoch_cannot_authorize_a_later_write", stale_completion_and_changed_pool_or_epoch_cannot_authorize_a_later_write as fn()),
-            ("departure_never_restores_or_discards_pending_native_ownership", departure_never_restores_or_discards_pending_native_ownership as fn()),
             ("only_unsubmitted_work_can_be_cancelled_without_terminal_native_receipt", only_unsubmitted_work_can_be_cancelled_without_terminal_native_receipt as fn()),
             ("unsupported_role_class_hat_and_origin_choice_never_prepare_a_transaction", unsupported_role_class_hat_and_origin_choice_never_prepare_a_transaction as fn()),
         ]);

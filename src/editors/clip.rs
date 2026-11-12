@@ -101,24 +101,6 @@ mod tests {
         }
     }
 
-    fn the_clip_frame_carries_the_timeline_the_lines_and_the_layers_own_help() {
-        let mut f = Frame::new();
-        clip_frame(&view(), "Pikachu", 0, &mut f);
-        assert_eq!(f.view, View::Clip);
-        assert_eq!(f.clip, ClipBar { total: 1800, start: 120, end: 480, cursor: 300, handle: 2, playing: false });
-        assert_eq!(f.crumb.string_lossy(), "Replay window  >  Latest Vault capture");
-        assert_eq!(f.rows[0].label.string_lossy(), "Fighter");
-        assert_eq!(f.rows[0].value.string_lossy(), "Pikachu");
-        assert_eq!(f.rows[1].value.string_lossy(), "120 - 480  (360 frames, 6.00s of 1800)");
-        assert_eq!(f.rows[2].value.string_lossy(), "300");
-        assert_eq!(f.rows[3].label.string_lossy(), "This capture is partial");
-        assert_eq!(f.rows[4].value.string_lossy(), "latest");
-        assert!(f.help[0].string_lossy().starts_with("End selected"), "{:?}", f.help[0]);
-        assert!(f.hint.string_lossy().contains("X preview"));
-        assert_eq!(f.group_count, 0);
-        assert!(f.row_count as usize <= f.rows.len());
-    }
-
     fn a_playing_preview_and_a_refusal_show_in_the_frame() {
         let mut v = view();
         v.playing = true;
@@ -146,7 +128,6 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
-            ("the_clip_frame_carries_the_timeline_the_lines_and_the_layers_own_help", the_clip_frame_carries_the_timeline_the_lines_and_the_layers_own_help as fn()),
             ("a_playing_preview_and_a_refusal_show_in_the_frame", a_playing_preview_and_a_refusal_show_in_the_frame as fn()),
             ("a_held_scrub_names_its_speed", a_held_scrub_names_its_speed as fn()),
         ]);

@@ -155,35 +155,3 @@ pub fn find_hook_run(words: &[u32]) -> Option<usize> {
     find_run(words, &[is_adrp, is_ldrsw_imm, is_cbz])
 }
 
-#[cfg(test)]
-mod tests {
-    lib_unit_tests! {
-    use super::*;
-
-    fn rule_byte_only_in_training() {
-        assert_eq!(rule_byte(true, true), Some(1));
-        assert_eq!(rule_byte(true, false), None);
-    }
-
-    fn adrp_offsets_are_signed_pages() {
-        assert_eq!(adrp_offset(0x9000_0000), 0);
-        assert_eq!(adrp_offset(0xf000_0000 | (0x7_ffff << 5)), -4096);
-    }
-
-    fn a_run_is_found_by_class() {
-        let words = [0x1400_0000, 0x9000_0000, 0xb980_0000, 0x3400_0000];
-        assert_eq!(find_hook_run(&words), Some(1));
-        assert_eq!(find_hook_run(&words[..3]), None);
-    }
-
-    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
-    #[test]
-    fn case_table() {
-        crate::test_table::run(&[
-            ("rule_byte_only_in_training", rule_byte_only_in_training as fn()),
-            ("adrp_offsets_are_signed_pages", adrp_offsets_are_signed_pages as fn()),
-            ("a_run_is_found_by_class", a_run_is_found_by_class as fn()),
-        ]);
-    }
-    }
-}

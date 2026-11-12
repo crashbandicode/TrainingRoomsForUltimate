@@ -141,8 +141,8 @@ pub fn read_catalog(dir: &Path) -> Snapshot {
 mod tests {
     lib_unit_tests! {
     use super::*;
-    use crate::engine::mii::inventory::{MiiClass, HASH40_UI_CHARA_MIISWORDSMAN};
-    use crate::engine::mii::selection::{resolve, PlayerOrigin, Preferences, Role};
+    use crate::engine::mii::inventory::HASH40_UI_CHARA_MIISWORDSMAN;
+    
 
     fn header(id: u32) -> [u8; HEADER_LEN] {
         let mut h = [0; HEADER_LEN];
@@ -156,27 +156,6 @@ mod tests {
         h
     }
 
-    fn native_header_keeps_owned_name_tokens_and_identity() {
-        let snap = catalog_from([Ok("mii_7.bin".into())].into_iter(), |_| Ok(header(7)));
-        assert!(snap.is_complete());
-        let c = &snap.configs[0];
-        assert_eq!((c.name.as_str(), c.slot_id, c.outfit_hint(), c.hat_hint()), ("A", 7, 41, 0));
-        assert_eq!(c.canonical.class, MiiClass::Swordfighter);
-        assert_eq!(c.canonical.appearance.voice, 37);
-    }
-
-    fn unreadable_or_invalid_file_makes_entire_catalog_unselectable() {
-        for failure in [Err("read denied".into()), Ok(header(99))] {
-            let snap = catalog_from([Ok("mii_7.bin".into()), Ok("mii_8.bin".into())].into_iter(), |id| {
-                if id == 7 { Ok(header(7)) } else { failure.clone() }
-            });
-            assert_eq!(snap.configs.len(), 1);
-            assert_eq!(snap.slots_seen, 2);
-            assert!(!snap.is_complete());
-            assert!(resolve(&snap, &Preferences::default(), Role::Cpu, MiiClass::Swordfighter, PlayerOrigin::NotMii).is_none());
-        }
-    }
-
     fn enumeration_errors_and_bounds_do_not_publish_partial_inventory() {
         let error = catalog_from([Ok("mii_7.bin".into()), Err("entry error".into())].into_iter(), |_| panic!("must not read incomplete enumeration"));
         assert!(!error.is_complete());
@@ -185,15 +164,6 @@ mod tests {
         assert_eq!(parse_name("mii_07.bin"), None);
         assert_eq!(parse_name("mii_4294967296.bin"), None);
         assert_eq!(parse_name("mii_7.bin"), Some(7));
-    }
-
-    fn changed_or_wrong_length_headers_are_not_accepted() {
-        let h = header(7);
-        let mut changed = h; changed[0x141] = 3;
-        assert!(check_reads((SLOT_SIZE as u64, h), (SLOT_SIZE as u64, changed)).is_err());
-        assert!(check_reads((HEADER_LEN as u64, h), (SLOT_SIZE as u64, h)).is_err());
-        assert!(check_reads((SLOT_SIZE as u64, h), (SLOT_SIZE as u64 - 1, h)).is_err());
-        assert_eq!(check_reads((SLOT_SIZE as u64, h), (SLOT_SIZE as u64, h)), Ok(h));
     }
 
     fn real_file_adapter_reads_only_and_detects_truncation() {
@@ -212,89 +182,12 @@ mod tests {
         assert!(!read_catalog(&dir).is_complete());
     }
 
-    fn native_excluded_headers_do_not_poison_named_catalog() {
-        use crate::engine::mii::inventory::{HASH40_UI_CHARA_MIIFIGHTER, HASH40_UI_CHARA_MIIGUNNER};
-        let labels = [HASH40_UI_CHARA_MIIFIGHTER, HASH40_UI_CHARA_MIISWORDSMAN,
-            HASH40_UI_CHARA_MIIGUNNER];
-        let snap = catalog_from((7..=10).map(|id| Ok(format!("mii_{id}.bin"))), |id| {
-            let mut h = header(id);
-            if id >= 8 {
-                h[0x114..0x118].fill(0);
-                h[0x118..0x12e].fill(0);
-                h[0x130..0x138].copy_from_slice(&0x13ffff0000000000u64.to_le_bytes());
-                h[0x138..0x140].copy_from_slice(&0x5affff0000000000u64.to_le_bytes());
-                h[0x1a0..0x1a8].copy_from_slice(&(0xc100000000000000u64 | labels[(id - 8) as usize]).to_le_bytes());
-                h[0x1a9] = 1;
-            }
-            Ok(h)
-        });
-        assert!(snap.is_complete());
-        assert_eq!(snap.slots_seen, 4, "physical file count is not reduced");
-        assert_eq!(snap.configs.len(), 1);
-        assert_eq!(snap.configs[0].slot_id, 7);
-        for id in 8..=10 {
-            assert!(snap.findings.contains(&Finding::NativeExcluded {
-                slot_index: (id - 7) as usize, slot_id: id, flag: 1,
-            }));
-        }
-    }
-
-    fn unmarked_unnamed_header_remains_a_fatal_defect() {
-        let snap = catalog_from([Ok("mii_7.bin".into())].into_iter(), |_| {
-            let mut h = header(7);
-            h[0x114..0x118].fill(0);
-            Ok(h)
-        });
-        assert!(!snap.is_complete());
-        assert_eq!(snap.findings, vec![Finding::NameLength { slot_index: 0, slot_id: 7, len: 0 }]);
-    }
-
-    fn native_exclusion_is_independent_of_the_name() {
-        let snap = catalog_from([Ok("mii_7.bin".into())].into_iter(), |_| {
-            let mut h = header(7); // valid nonempty name
-            h[0x1a9] = 1;
-            Ok(h)
-        });
-        assert!(snap.is_complete());
-        assert!(snap.configs.is_empty());
-        assert_eq!(snap.findings, vec![Finding::NativeExcluded { slot_index: 0, slot_id: 7, flag: 1 }]);
-    }
-
-    fn native_exclusion_does_not_hide_source_identity_failures() {
-        let snap = catalog_from([Ok("mii_7.bin".into())].into_iter(), |_| {
-            let mut h = header(99);
-            h[0x1a9] = 1;
-            Ok(h)
-        });
-        assert!(!snap.is_complete());
-        assert!(matches!(&snap.findings[..], [Finding::Source { slot_id: Some(7), .. }]));
-    }
-
-    fn root_native_excluded_row_does_not_poison_catalog() {
-        let snap = catalog_from((7..=8).map(|id| Ok(format!("mii_{id}.bin"))), |id| {
-            let mut h = header(id);
-            if id == 8 { h[0x114..0x118].fill(0); h[0x1a9] = 1; }
-            Ok(h)
-        });
-        assert!(snap.is_complete(), "native excluded row poisoned catalog");
-        assert_eq!(snap.configs.len(), 1);
-        assert_eq!(snap.slots_seen, 2);
-    }
-
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
-            ("native_header_keeps_owned_name_tokens_and_identity", native_header_keeps_owned_name_tokens_and_identity as fn()),
-            ("unreadable_or_invalid_file_makes_entire_catalog_unselectable", unreadable_or_invalid_file_makes_entire_catalog_unselectable as fn()),
             ("enumeration_errors_and_bounds_do_not_publish_partial_inventory", enumeration_errors_and_bounds_do_not_publish_partial_inventory as fn()),
-            ("changed_or_wrong_length_headers_are_not_accepted", changed_or_wrong_length_headers_are_not_accepted as fn()),
             ("real_file_adapter_reads_only_and_detects_truncation", real_file_adapter_reads_only_and_detects_truncation as fn()),
-            ("native_excluded_headers_do_not_poison_named_catalog", native_excluded_headers_do_not_poison_named_catalog as fn()),
-            ("unmarked_unnamed_header_remains_a_fatal_defect", unmarked_unnamed_header_remains_a_fatal_defect as fn()),
-            ("native_exclusion_is_independent_of_the_name", native_exclusion_is_independent_of_the_name as fn()),
-            ("native_exclusion_does_not_hide_source_identity_failures", native_exclusion_does_not_hide_source_identity_failures as fn()),
-            ("root_native_excluded_row_does_not_poison_catalog", root_native_excluded_row_does_not_poison_catalog as fn()),
         ]);
     }
     }

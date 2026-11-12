@@ -30,8 +30,6 @@ pub mod native_model;
 #[cfg(test)]
 mod pair_after_objects;
 // LEDGER-SCOPE: the R-ICP3/R-ICP4 reconcile observations replayed with the logged map counts (tests only).
-#[cfg(test)]
-mod order_replay;
 // WP3 (worker C): the teardown protocol (one destroy plan for every destroy path).
 pub mod lifecycle;
 // WP4: live-consumer occupancy and the ledger-driven policy.

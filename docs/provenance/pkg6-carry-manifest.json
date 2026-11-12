@@ -837,7 +837,7 @@
    "dest": "src/model/swap/source_descriptor.rs",
    "crate": "root",
    "src_sha256": "36e7170964bd32eef13962c50f1bb559f3e0adc691d66366615ec4042fc2dcce",
-   "dest_sha256": "02515c0f5d2d16f10b8385b5d1acde57e54e7c83e1698e1dd3222a3ad8e4d026",
+   "dest_sha256": "bc2988d4e228c99070356c9b457125d782b6ac64dc0b8df31182182dfb5e3ee1",
    "widen": true,
    "edits": [
     {
@@ -850,6 +850,21 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       100,
+       119,
+       []
+      ],
+      [
+       125,
+       125,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -858,7 +873,7 @@
    "dest": "src/model/swap/source_lifetime.rs",
    "crate": "root",
    "src_sha256": "9908fbdce2de0082c581e18c4a452ba4ac1e1cc18fac63b7f954f8b8e96aecaf",
-   "dest_sha256": "2b64f5fc749d6295879a19e37f3a834a2fb556e222cacef9ed0a70b8c3862dc1",
+   "dest_sha256": "fa12eea801e2a1dd1a1b4aae921322ae9c10848982d0aea9a096c9d2fd18b518",
    "edits": [
     {
      "old": "    /// Every acquire owns a distinct lease, even when holder values are equal.\n",
@@ -937,6 +952,56 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       475,
+       475,
+       []
+      ],
+      [
+       477,
+       525,
+       []
+      ],
+      [
+       555,
+       560,
+       []
+      ],
+      [
+       593,
+       761,
+       []
+      ],
+      [
+       788,
+       958,
+       []
+      ],
+      [
+       979,
+       979,
+       []
+      ],
+      [
+       981,
+       981,
+       []
+      ],
+      [
+       983,
+       989,
+       []
+      ],
+      [
+       991,
+       1000,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -945,7 +1010,7 @@
    "dest": "src/model/swap/source_visible_forms.rs",
    "crate": "root",
    "src_sha256": "87647851bc41c795d6f61a6b526068a8493f57fdbe040231c909d549fcc21885",
-   "dest_sha256": "5f86e1cb2e7c01d4610ebb941a2322540bedd86174e179261499e9f18eb8d1f2",
+   "dest_sha256": "1cb9f1aacd364168190d62cfd6d2371adbaf90b71cefceb4bda75899757164db",
    "widen": true,
    "edits": [
     {
@@ -958,6 +1023,26 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       146,
+       150,
+       []
+      ],
+      [
+       171,
+       271,
+       []
+      ],
+      [
+       277,
+       284,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -966,7 +1051,7 @@
    "dest": "src/model/swap/native_hud_refresh.rs",
    "crate": "root",
    "src_sha256": "b92d55d6aaed20764d3f98aa45ef152464c52d139e97d074ea91d821e2233bbb",
-   "dest_sha256": "0518b50a0b0e3d0ed4f45842eadb82524824c48b9973003e577fea74668e9a1a",
+   "dest_sha256": "d5aafcbe21d7985b9de28fc33a1b53e56889732affb563da6b38c9d9b4dd61bf",
    "widen": true,
    "edits": [
     {
@@ -984,6 +1069,21 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       81,
+       120,
+       []
+      ],
+      [
+       126,
+       128,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -1017,7 +1117,7 @@
    "dest": "src/model/swap/roster_grid.rs",
    "crate": "tui",
    "src_sha256": "90f7eaf48933ccfb39e4696cb8dd38782dfd194630bfd031ed4bbf2442cc5d20",
-   "dest_sha256": "8a584420c7e7249cbbe03ee52923eaadb1a93db448e506a6e88e5e095e5ef7fd",
+   "dest_sha256": "a2de92746981d4318a761ac21b0a4a36d37881e684037fe587f39caddfd2673c",
    "edits": [
     {
      "old": "pub fn css_order(kinds: &[u32], values: &[u8], excluded: Option<u32>) -> Vec<u32> {\n    GRID.iter()\n        .filter_map(|slot| match slot {\n            Slot::Fighter(kind, _) => Some(*kind),\n            Slot::Shared(group) => {\n                let default = group.forms()[0].0;\n                Some(\n                    selected_group_index(kinds, values, default)\n                        .map(|i| kinds[i])\n                        .unwrap_or(default),\n                )\n            }\n            _ => None,\n        })\n        .filter(|kind| kinds.contains(kind) && excluded.map(group_kind) != Some(group_kind(*kind)))\n        .collect()\n}",
@@ -1034,6 +1134,41 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       569,
+       679,
+       []
+      ],
+      [
+       688,
+       719,
+       []
+      ],
+      [
+       734,
+       936,
+       []
+      ],
+      [
+       985,
+       1155,
+       []
+      ],
+      [
+       1160,
+       1165,
+       []
+      ],
+      [
+       1167,
+       1173,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -1042,7 +1177,7 @@
    "dest": "src/model/preload/cycle_admission_grace.rs",
    "crate": "consts",
    "src_sha256": "2552af2ee8e87bbcdbb0bdca70a277930a97f948a1c99c6e655f0c7a8adc4737",
-   "dest_sha256": "bff83012527e2b7264bfe609330afdbb6c863a8fa84e2b14e0d850b2950f86f5",
+   "dest_sha256": "44fd570451f3ab6e6ed730bb7d3bc51dd48bacc9861596e5bfac4fbf70c80969",
    "edits": [
     {
      "table_tests": true,
@@ -1054,6 +1189,31 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       121,
+       154,
+       []
+      ],
+      [
+       165,
+       188,
+       []
+      ],
+      [
+       195,
+       198,
+       []
+      ],
+      [
+       200,
+       202,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -1062,7 +1222,7 @@
    "dest": "src/model/preload/notice_queue.rs",
    "crate": "consts",
    "src_sha256": "c4013a040c6660e14820aa75ec08e92b10d8b2981d09e42d3faeec1c7d21a11e",
-   "dest_sha256": "570aaa717e2a015c8af788e21a769265d9aace29ed660eebb80dfd3bbae1e548",
+   "dest_sha256": "4b56c0c75d468cd4bd055c50ad50c012131fcc82195856072957365cc35e67f1",
    "edits": [
     {
      "table_tests": true,
@@ -1074,6 +1234,41 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       167,
+       192,
+       []
+      ],
+      [
+       212,
+       282,
+       []
+      ],
+      [
+       296,
+       312,
+       []
+      ],
+      [
+       318,
+       319,
+       []
+      ],
+      [
+       321,
+       326,
+       []
+      ],
+      [
+       328,
+       328,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -1082,7 +1277,7 @@
    "dest": "src/model/mii/auto_init.rs",
    "crate": "mii",
    "src_sha256": "cc0ab5f24f0c3866420026c9d364746a48321c0dac80dc525cb0fe1054e9207e",
-   "dest_sha256": "d9f0b59ea1247e56927880c3ed16276b2110cc2082ab3c9e82643beecb0bb2d6",
+   "dest_sha256": "bf6c0ee9d2d59e63a4c26de2886ce292b82e8973ef6e804d70fea0ce2c64414d",
    "edits": [
     {
      "old": "//! One automatic catalog read per visible-entry lifetime. Values only; no IO or native access.\nuse crate::engine::mii::inventory::MiiClass;\n\n#[derive(Clone, Copy, Debug, PartialEq, Eq)]\npub struct Token {\n    pub generations: [u64; 2],\n    pub opening: u64,\n}\n\n#[derive(Clone, Copy, Debug, PartialEq, Eq)]\nenum Phase {\n    Waiting,\n    Reading,\n    Finished,\n}\n\npub struct Initialization {\n    token: Option<Token>,\n    ready: u8,\n    phase: Phase,\n}\n\nimpl Initialization {\n    pub const fn empty() -> Self {\n        Self {\n            token: None,\n            ready: 0,\n            phase: Phase::Waiting,\n        }\n    }\n\n    pub fn pending(&self) -> bool {\n        self.phase != Phase::Finished\n    }\n\n    /// `eligible` includes both known originals, the current role's native readiness,\n    /// and the existing practice exclusions. A callback supplies only its own role.\n    pub fn observe(&mut self, token: Token, role: u32, eligible: bool) -> Option<Token> {\n        if role > 1 || self.phase != Phase::Waiting {\n            return None;\n        }\n        if self.token.is_some_and(|previous| previous != token) {\n            return None;\n        }\n        self.token = Some(token);\n        let bit = 1 << role;\n        if eligible {\n            self.ready |= bit;\n        } else {\n            self.ready &= !bit;\n        }\n        if self.ready != 3 {\n            return None;\n        }\n        self.phase = Phase::Reading;\n        Some(token)\n    }\n\n    /// Consume this read exactly once, including incomplete or stale results.\n    /// An old completion cannot consume a new lifetime's pending read.\n    pub fn finish(&mut self, token: Token, current: Token, complete: bool) -> bool {\n        if self.phase != Phase::Reading || self.token != Some(token) {\n            return false;\n        }\n        self.phase = Phase::Finished;\n        token == current && complete\n    }\n\n    /// An explicit menu refresh supersedes automatic work for this lifetime.\n    pub fn cancel(&mut self) {\n        self.phase = Phase::Finished;\n    }\n\n    /// Scene change and visible-entry destruction both start a fresh lifetime.\n    pub fn reset(&mut self) {\n        *self = Self::empty();\n    }\n\n    pub fn reading(&self) -> Option<Token> {\n        if self.phase == Phase::Reading { self.token } else { None }\n    }\n}\n\n/// A mixed Player roster waits only while its native qualification can still finish.\n/// Explicit Mii/original-Mii protection is independent of this temporary wait.\npub fn player_qualifying(\n    native_training: bool,\n    cpu_quantity: Option<u32>,\n    automatic: bool,\n    capture: bool,\n) -> bool {\n    native_training && cpu_quantity == Some(1) && (automatic || capture)\n}\n\n/// Until capture succeeds, consume Mii-related input without creating a request.\n/// Plain ordinary-only routing remains available while the catalog is loading.\npub fn requires_owner(original: Option<u32>, roster_has_mii: bool, direct: Option<u32>) -> bool {\n    roster_has_mii\n        || original.and_then(MiiClass::from_kind).is_some()\n        || direct.and_then(MiiClass::from_kind).is_some()\n}\n\n/// A continuation or an early manual choice replaces the visible CSS-origin body,\n/// and origin capture accepts only that body. Hold the replacement while\n/// the role has no owner for the current generation, the visible body is still the\n/// immutable origin, and qualification can still finish: the automatic read is\n/// pending or the role's capture is armed, and the backend is before ready-go or\n/// exactly ready (the read's own readiness gate). Otherwise the continuation proceeds\n/// unchanged; an owner applies its own rules.\npub fn holds_origin_replacement(\n    qualified: bool,\n    origin_body: bool,\n    automatic: bool,\n    capture: bool,\n    ready_go: bool,\n    backend_ready: bool,\n) -> bool {\n    !qualified && origin_body && (automatic || capture) && (!ready_go || backend_ready)\n}\n\n#[cfg(test)]\nmod tests {\n    use super::*;\n\n    const FIRST: Token = Token {\n        generations: [7, 11],\n        opening: 13,\n    };\n\n    #[test]\n    fn one_read_and_one_arm_per_lifetime_even_after_read_failure() {\n        for complete in [true, false] {\n            let mut init = Initialization::empty();\n            assert_eq!(init.observe(FIRST, 0, true), None);\n            assert_eq!(init.observe(FIRST, 0, true), None);\n            assert_eq!(init.observe(FIRST, 1, true), Some(FIRST));\n            assert_eq!(init.observe(FIRST, 1, true), None);\n            assert_eq!(init.finish(FIRST, FIRST, complete), complete);\n            assert!(!init.finish(FIRST, FIRST, true));\n            assert!(!init.pending());\n            assert_eq!(init.observe(FIRST, 0, true), None);\n            assert_eq!(init.observe(FIRST, 1, true), None);\n        }\n    }\n\n    #[test]\n    fn scene_destructor_and_menu_changes_reject_stale_completion() {\n        let mut init = Initialization::empty();\n        init.observe(FIRST, 0, true);\n        init.observe(FIRST, 1, true);\n        init.cancel(); // A real menu opening owns its independent refresh.\n        assert!(!init.finish(FIRST, FIRST, true));\n        assert!(!init.pending());\n        for next in [\n            Token {\n                generations: [8, 12],\n                opening: 14,\n            }, // Scene boundary.\n            Token {\n                generations: [7, 12],\n                opening: 14,\n            }, // CPU entry destruction.\n        ] {\n            init.reset();\n            assert_eq!(init.observe(next, 0, true), None);\n            assert_eq!(init.observe(next, 1, true), Some(next));\n            assert!(!init.finish(FIRST, next, true));\n            assert!(init.pending());\n            assert!(init.finish(next, next, true));\n        }\n        init.reset();\n        init.observe(FIRST, 0, true);\n        init.observe(FIRST, 1, true);\n        assert!(!init.finish(\n            FIRST,\n            Token {\n                opening: 14,\n                ..FIRST\n            },\n            true\n        ));\n    }\n\n    #[test]\n    fn readiness_precedes_arming_and_mii_input_never_falls_through_unqualified() {\n        let mut init = Initialization::empty();\n        assert_eq!(init.observe(FIRST, 0, false), None); // Original/readiness unavailable.\n        assert_eq!(init.observe(FIRST, 1, true), None);\n        assert_eq!(init.observe(FIRST, 0, false), None); // INSTALL or another action owns practice.\n        assert_eq!(init.observe(FIRST, 4, true), None); // Not a visible Training role.\n        assert!(!init.finish(FIRST, FIRST, true));\n        assert!(requires_owner(Some(0x49), false, None));\n        assert!(requires_owner(Some(9), true, None));\n        assert!(requires_owner(Some(9), false, Some(0x48)));\n        assert!(!requires_owner(Some(9), false, Some(0x0f)));\n        assert!(!requires_owner(None, false, None));\n        let mixed_player = |native, quantity, automatic, capture| {\n            requires_owner(\n                Some(9),\n                player_qualifying(native, quantity, automatic, capture),\n                None,\n            )\n        };\n        assert!(mixed_player(true, Some(1), init.pending(), false));\n        assert!(!mixed_player(false, Some(1), init.pending(), false)); // Waiting scope.\n        assert!(!mixed_player(true, Some(2), init.pending(), false)); // Unsupported quantity.\n        assert!(!mixed_player(true, None, init.pending(), true)); // Unknown native quantity.\n        assert_eq!(init.observe(FIRST, 0, true), Some(FIRST));\n        assert!(init.finish(FIRST, FIRST, true));\n        assert!(mixed_player(true, Some(1), init.pending(), true)); // Catalog done; role capture armed.\n        assert!(!mixed_player(true, Some(1), init.pending(), false)); // Refused/completed capture.\n        init.reset();\n        init.observe(FIRST, 0, true);\n        init.observe(FIRST, 1, true);\n        assert!(!init.finish(FIRST, FIRST, false)); // Incomplete catalog consumes the attempt.\n        assert!(!mixed_player(true, Some(1), init.pending(), false));\n        assert!(requires_owner(Some(0x49), false, None)); // Immutable Mii origin remains protected.\n        assert!(requires_owner(Some(9), false, Some(0x48))); // Direct Mii remains refused.\n    }\n\n    const ORIGIN: u32 = 0x0e;\n    const REMEMBERED: u32 = 6;\n    const RETURN: Token = Token {\n        generations: [18, 18],\n        opening: 19,\n    };\n\n    type Hold = fn(bool, bool, bool, bool, bool, bool) -> bool;\n\n    /// One waiting lifetime after a match, frame by frame in callback order: auto-init,\n    /// the role's capture, then the roster's continuation consult. Capture qualifies\n    /// only the CSS-origin body; an unheld continuation replaces it at once. Ready-go is\n    /// frame 3; `menu` cancels the automatic read at frame 4 and arms capture itself.\n    /// Returns (frame qualified, frame replaced, capture still armed).\n    fn after_match(\n        hold: Hold,\n        complete: bool,\n        ready: bool,\n        menu: bool,\n    ) -> (Option<u32>, Option<u32>, bool) {\n        let mut init = Initialization::empty();\n        init.reset();\n        let (mut body, mut capture, mut reading) = (ORIGIN, false, None);\n        let (mut qualified_at, mut replaced_at) = (None, None);\n        for frame in 0..12 {\n            let go = frame >= 3;\n            if menu && frame == 4 {\n                init.cancel();\n                capture = true;\n            }\n            if let Some(token) = reading.take() {\n                capture |= init.finish(token, RETURN, complete);\n            } else if go && ready {\n                init.observe(RETURN, 0, true);\n                reading = init.observe(RETURN, 1, true);\n            }\n            if capture && body == ORIGIN {\n                capture = false;\n                qualified_at = Some(frame);\n            }\n            let (qualified, origin) = (qualified_at.is_some(), body == ORIGIN);\n            let automatic = init.pending();\n            let held = hold(qualified, origin, automatic, capture, go, ready);\n            if origin && !held {\n                body = REMEMBERED;\n                replaced_at = Some(frame);\n            }\n        }\n        (qualified_at, replaced_at, capture)\n    }\n\n    #[test]\n    fn match_return_qualifies_the_css_origin_before_its_continuation() {\n        let unheld: Hold = |_, _, _, _, _, _| false;\n        // Counterexample (C99 return): the continuation replaces the CSS body first,\n        // so the armed capture can never qualify and stays armed.\n        let old = after_match(unheld, true, true, false);\n        assert_eq!(old, (None, Some(0), true));\n        // Held: the delivered read arms capture, the origin qualifies, then the\n        // remembered choice continues in the same frame's later consult.\n        let held = (Some(4), Some(4), false);\n        assert_eq!(after_match(holds_origin_replacement, true, true, false), held);\n        // A menu that supersedes the read arms capture itself; same order.\n        assert_eq!(after_match(holds_origin_replacement, true, true, true), held);\n    }\n\n    #[test]\n    fn continuation_hold_is_released_when_qualification_cannot_finish() {\n        // An incomplete catalog consumes the read without arming capture.\n        let incomplete = after_match(holds_origin_replacement, false, true, false);\n        assert_eq!(incomplete, (None, Some(4), false));\n        // A backend that is not exactly ready at ready-go never starts the read.\n        let unready = after_match(holds_origin_replacement, true, false, false);\n        assert_eq!(unready, (None, Some(3), false));\n        // Before ready-go the visible entries may still be loading: held regardless.\n        assert!(holds_origin_replacement(false, true, true, false, false, false));\n        // A qualified owner, or neither a pending read nor an armed capture, never holds.\n        assert!(!holds_origin_replacement(true, true, true, true, false, true));\n        assert!(!holds_origin_replacement(false, true, false, false, false, true));\n        // An armed capture alone holds while the backend can still qualify it.\n        assert!(holds_origin_replacement(false, true, false, true, true, true));\n        assert!(!holds_origin_replacement(false, true, false, true, true, false));\n        // A body that is no longer the CSS origin can never be captured: never held.\n        assert!(!holds_origin_replacement(false, false, true, true, true, true));\n        assert!(!holds_origin_replacement(false, false, true, true, false, false));\n    }\n}\n",
@@ -1099,6 +1294,31 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       133,
+       184,
+       []
+      ],
+      [
+       288,
+       307,
+       []
+      ],
+      [
+       312,
+       313,
+       []
+      ],
+      [
+       316,
+       316,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -1107,7 +1327,7 @@
    "dest": "src/model/mii/backend.rs",
    "crate": "mii",
    "src_sha256": "7bee3bae61809c3743530da2bf3721dcd88d52b4e419964db5192dd1d8e8ffbc",
-   "dest_sha256": "f92a24a19a41c4e2009eb1e323bbb806c92ee4f20c05fd3387ea283f1bb8c808",
+   "dest_sha256": "86bfba254961140e66a29945c4f8d3c74a20e57b3a2f43e1a84f879a92a11a0d",
    "edits": [
     {
      "old": "//! Exact native backend shapes; logical roles are never physical owner indices.\n//!\n//! Local-wireless and Quickplay waiting share one PracticeScene setup (13.0.5\n//! `0x1790020`, reached identically from the general controller `0x2310570` and\n//! the online controller `0x237e970`): one primary row/entry 0 and CPU rows/entries\n//! 4/5/6, with no mode branch around that construction. They stay distinct variants\n//! so a mode word is never inferred from a shape and every live-shape gate still runs.\n#[derive(Clone, Copy, Debug, PartialEq, Eq)]\npub enum Layout { Training, Ldn, Quickplay }\nimpl Layout {\n    /// The two observed online waiting routes use the same native PracticeScene\n    /// owner map 0/4/5/6. Hardware C108 logs #630-660 and #718-737 witness the\n    /// 0x07010400 route; it was previously excluded even though stage loading\n    /// admitted it. This only classifies a mode: scene() still requires active\n    /// waiting melee0d, and native adapters still prove every live owner.\n    /// Arenas and unobserved 0x070104 submodes remain excluded.\n    pub const fn quickplay_family(mode:u32)->Option<u32> {\n        let mode=mode & 0x7fffffff;\n        if mode & 0xffffff00 == 0x07010100 {Some(0x07010100)}\n        else if mode == 0x07010400 {Some(mode)} else {None}\n    }\n    pub const fn quickplay_waiting_mode(mode:u32)->bool {Self::quickplay_family(mode).is_some()}\n\n    /// Value-only continuity across an observed match excursion. Never grants\n    /// permission to call a practice API in a live match. The second online\n    /// route uses melee10 (hardware #661-675 and #706-717), not melee0e.\n    pub const fn continuation(initialized:bool,melee:u8,mode:u32)->Option<u32> {\n        if !initialized {return None;}\n        if mode==0x02010000 && matches!(melee,0x01|0x0d) {return Some(mode);}\n        match Self::quickplay_family(mode) {\n            Some(0x07010100) if matches!(melee,0x01|0x0d|0x0e)=>Some(0x07010100),\n            Some(0x07010400) if matches!(melee,0x0d|0x0e|0x10)=>Some(0x07010400),\n            _=>None,\n        }\n    }\n    pub fn scene(initialized:bool,melee:u8,mode:u32,waiting_active:bool)->Option<Self> {\n        match (initialized,melee,mode) {\n            (true,0x20,0x04040000)=>Some(Self::Training),\n            (true,0x0d,0x02010000) if waiting_active=>Some(Self::Ldn),\n            (true,0x0d,mode) if waiting_active && Self::quickplay_waiting_mode(mode)=>Some(Self::Quickplay),\n            _=>None,\n        }\n    }\n    /// The shared waiting shape: visible 0/4, helpers 5/6, native selection indices.\n    pub const fn waiting(self)->bool {!matches!(self,Self::Training)}\n    pub const fn visible(self)->[u32;2] {match self {Self::Training=>[0,1],Self::Ldn|Self::Quickplay=>[0,4]}}\n    pub const fn helpers(self)->[u32;2] {match self {Self::Training=>[2,3],Self::Ldn|Self::Quickplay=>[5,6]}}\n    pub fn owners(self)->[usize;4] {let v=self.visible();let h=self.helpers();[v[0] as usize,v[1] as usize,h[0] as usize,h[1] as usize]}\n    pub fn logical(self,physical:u32)->Option<usize> {self.visible().iter().position(|id|*id==physical)}\n    pub fn helper(self,physical:usize)->Option<usize> {self.helpers().iter().position(|id|*id as usize==physical)}\n    pub fn selector(self,physical:usize)->bool {physical!=0 && self.owners().contains(&physical)}\n    pub fn shape(self,entries:&[usize;8])->bool {\n        let ids=self.owners();\n        entries.iter().enumerate().all(|(id,p)|(*p!=0)==ids.contains(&id))\n            && ids.iter().enumerate().all(|(i,id)|ids[..i].iter().all(|other|entries[*id]!=entries[*other]))\n    }\n    /// `shape` plus exactly the registered entries for this layout. No\n    /// other nonzero slot, moved identity or owner/extra alias is accepted.\n    pub fn shape_with(self,entries:&[usize;8],extras:crate::engine::mii::capacity::Extras)->bool {\n        if !extras.matches(self) {return false;}\n        let Some(view)=extras.view(entries) else {return false;};\n        self.shape(&view) && extras.slots().all(|(_,entry)|!view.contains(&entry))\n    }\n    /// Raw map facts shared by native waiting admission and Mii owner adapters.\n    /// An identity registration never substitutes for this fresh physical check.\n    pub fn waiting_map(self,primary:&[usize;8],backup:&[usize;8],count:u32,\n        extras:crate::engine::mii::capacity::Extras)->bool {\n        self.waiting() && count==self.count_with(extras) && *backup==[0;8]\n            && self.shape_with(primary,extras)\n            && primary.iter().all(|pointer|pointer.is_multiple_of(8))\n    }\n    /// Native entry count of a `shape_with` map.\n    pub fn count_with(self,extras:crate::engine::mii::capacity::Extras)->u32 {(self.owners().len()+extras.count()) as u32}\n    pub fn quantity(self,quantity:Option<u32>)->bool {match self {Self::Training=>quantity==Some(1),Self::Ldn|Self::Quickplay=>quantity.is_none()}}\n}\n\n#[cfg(test)] mod tests {\n    use super::*;\n    #[test] fn registered_waiting_map_preserves_all_native_guards() {\n        use crate::engine::mii::capacity::Extras;\n        for layout in [Layout::Ldn,Layout::Quickplay] {\n            let base=[0x1000,0,0,0,0x4000,0x5000,0x6000,0];\n            assert!(layout.waiting_map(&base,&[0;8],4,Extras::NONE));\n            for entries in [[0x7000,0,0],[0x7000,0x3000,0],[0x7000,0x3000,0x2000]] {\n                let extras=Extras::new_for(layout,entries).unwrap();\n                let physical=extras.physical(&base);let count=4+extras.count() as u32;\n                assert!(layout.waiting_map(&physical,&[0;8],count,extras));\n                assert!(!layout.waiting_map(&physical,&[0;8],4,extras));\n                assert!(!layout.waiting_map(&physical,&[0;8],count,Extras::NONE));\n                for slot in 0..8 {\n                    let mut backup=[0;8];backup[slot]=0x8000;\n                    assert!(!layout.waiting_map(&physical,&backup,count,extras));\n                    let mut changed=physical;changed[slot]=0x9000;\n                    if !layout.owners().contains(&slot) {\n                        assert!(!layout.waiting_map(&changed,&[0;8],count,extras));\n                    }\n                }\n                let mut misaligned=physical;misaligned[4]+=1;\n                assert!(!layout.waiting_map(&misaligned,&[0;8],count,extras));\n            }\n        }\n    }\n\n    #[test] fn exact_backend_shape_and_logical_cpu() {\n        let map=[0x1000,0,0,0,0x2000,0x3000,0x4000,0];\n        assert_eq!(Layout::scene(true,13,0x02010000,true),Some(Layout::Ldn));\n        for (melee,mode) in [(1,0x02010000),(13,0x07010000),(32,0x02010000)] {\n            assert_eq!(Layout::scene(true,melee,mode,true),None);\n        }\n        assert!(Layout::Ldn.shape(&map));assert!(!Layout::Training.shape(&map));\n        assert_eq!(Layout::Ldn.logical(4),Some(1));assert_eq!(Layout::Ldn.logical(1),None);\n        assert_eq!(Layout::Ldn.helper(5),Some(0));assert_eq!(Layout::Ldn.helper(6),Some(1));\n        assert!(Layout::Ldn.quantity(None));assert!(!Layout::Ldn.quantity(Some(1)));\n        assert!(Layout::Training.quantity(Some(1)));assert!(!Layout::Training.quantity(None));\n        let mut alias=map;alias[6]=map[5];assert!(!Layout::Ldn.shape(&alias));\n    }\n    #[test] fn quickplay_waiting_shares_the_shape_but_keeps_its_own_mode_family() {\n        for mode in [0x07010100,0x07010101,0x07010102,0x07010400,0x87010400] {\n            assert_eq!(Layout::scene(true,0x0d,mode,true),Some(Layout::Quickplay));\n            assert_eq!(Layout::scene(true,0x0d,mode,false),None);\n            assert_eq!(Layout::scene(false,0x0d,mode,true),None);\n        }\n        // Arenas, unobserved submodes, both online match melees and other families stay out.\n        for (melee,mode) in [(0x0d,0x07010300),(0x0d,0x07010401),(0x10,0x07010400),(0x0e,0x07010400),(0x0e,0x07010101),(0x01,0x07010101),(0x0d,0x08010100),(0x20,0x07010101)] {\n            assert_eq!(Layout::scene(true,melee,mode,true),None);\n        }\n        assert_ne!(Layout::Quickplay,Layout::Ldn);\n        assert!(Layout::Quickplay.waiting() && Layout::Ldn.waiting() && !Layout::Training.waiting());\n        let map=[0x1000,0,0,0,0x2000,0x3000,0x4000,0];\n        assert!(Layout::Quickplay.shape(&map));\n        assert_eq!(Layout::Quickplay.visible(),Layout::Ldn.visible());\n        assert_eq!(Layout::Quickplay.helpers(),Layout::Ldn.helpers());\n        assert_eq!(Layout::Quickplay.owners(),Layout::Ldn.owners());\n        assert_eq!(Layout::Quickplay.logical(4),Some(1));assert_eq!(Layout::Quickplay.logical(1),None);\n        assert_eq!(Layout::Quickplay.helper(5),Some(0));assert_eq!(Layout::Quickplay.helper(6),Some(1));\n        assert!(Layout::Quickplay.selector(5) && !Layout::Quickplay.selector(0) && !Layout::Quickplay.selector(2));\n        assert!(Layout::Quickplay.quantity(None) && !Layout::Quickplay.quantity(Some(1)));\n        let mut alias=map;alias[6]=map[5];assert!(!Layout::Quickplay.shape(&alias));\n    }\n    #[test] fn only_registered_training_extras_extend_the_shape() {\n        use crate::engine::mii::capacity::Extras;\n        let training=[0x10,0x20,0x30,0x40,0,0,0,0];\n        assert!(Layout::Training.shape_with(&training,Extras::NONE));\n        assert_eq!(Layout::Training.count_with(Extras::NONE),4);\n        let mut created=training;created[7]=0x70;created[6]=0x60;\n        let extras=Extras::new([0x70,0x60,0]).unwrap();\n        assert!(Layout::Training.shape_with(&created,extras));\n        assert_eq!(Layout::Training.count_with(extras),6);\n        assert!(!Layout::Training.shape(&created),\"plain shape stays exact\");\n        // Unregistered, moved, slot4 or aliased extras are refused.\n        assert!(!Layout::Training.shape_with(&created,Extras::new([0x70,0,0]).unwrap()));\n        let mut moved=created;moved[6]=0x61;assert!(!Layout::Training.shape_with(&moved,extras));\n        let mut four=created;four[4]=0x44;assert!(!Layout::Training.shape_with(&four,extras));\n        let mut alias=training;alias[7]=0x30;\n        assert!(!Layout::Training.shape_with(&alias,Extras::new([0x30,0,0]).unwrap()));\n        // Registered extras never extend a waiting layout.\n        let mut waiting=[0x10,0,0,0,0x20,0x30,0x40,0];\n        assert!(Layout::Ldn.shape_with(&waiting,Extras::NONE));\n        waiting[7]=0x70;\n        assert!(!Layout::Ldn.shape_with(&waiting,Extras::new([0x70,0,0]).unwrap()));\n        assert!(!Layout::Quickplay.shape_with(&waiting,Extras::new([0x70,0,0]).unwrap()));\n    }\n}\n",
@@ -1124,6 +1344,21 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       105,
+       164,
+       []
+      ],
+      [
+       170,
+       172,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -1132,7 +1367,7 @@
    "dest": "src/model/mii/capacity.rs",
    "crate": "mii",
    "src_sha256": "5d1c327198a51570b05277dde4bacc9260b6a1c92341eba4fcaf1c2d8178838e",
-   "dest_sha256": "91d404270af7d048e7f9c57843ae93252d457cb0aec4cf7f0e1e3abe526f0a01",
+   "dest_sha256": "55c1a47fdd5c490f36087812aa0453632e24bf9f031c9f55d4a9c577941749d1",
    "edits": [
     {
      "old": "        let Some(index) = extra_slots(self.layout).iter().position(|value| *value == slot)\n            .filter(|index| self.entries[*index] != 0) else {\n            return Err(\"extra slot is not a registered creation\");\n        };\n        self.roots[index].ok_or(\"extra registered roots unavailable\")\n    }\n\n    /// A registered extra's current native roots must equal its registration.\n    /// Raw values only; the caller reads them from current roots under its lock.\n    pub fn owned_roots(\n",
@@ -1179,6 +1414,36 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       281,
+       443,
+       []
+      ],
+      [
+       485,
+       513,
+       []
+      ],
+      [
+       652,
+       681,
+       []
+      ],
+      [
+       686,
+       691,
+       []
+      ],
+      [
+       693,
+       693,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -1187,7 +1452,7 @@
    "dest": "src/model/mii/catalog_request.rs",
    "crate": "mii",
    "src_sha256": "8cefd069f0af12e1a80415acf619a6122009d8d6aab9158f45580a77cc8388ec",
-   "dest_sha256": "ccf11a4e0398db1263e44668db6e21d95f18ce3597bfd0682cba2d5d0b742f3f",
+   "dest_sha256": "79c835b65eb63eaff26ec672c75e04f071d1db5e01d646be2f413b9cc293cd75",
    "edits": [
     {
      "table_tests": true,
@@ -1199,6 +1464,51 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       395,
+       413,
+       []
+      ],
+      [
+       454,
+       465,
+       []
+      ],
+      [
+       512,
+       606,
+       []
+      ],
+      [
+       650,
+       667,
+       []
+      ],
+      [
+       672,
+       672,
+       []
+      ],
+      [
+       674,
+       674,
+       []
+      ],
+      [
+       676,
+       680,
+       []
+      ],
+      [
+       683,
+       683,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -1207,7 +1517,7 @@
    "dest": "src/model/mii/draft.rs",
    "crate": "mii",
    "src_sha256": "fdd17191625c0bf1c132758259fd93d0cac53f8f42314b6a8d0cf83fab3d7b21",
-   "dest_sha256": "656ea63e53137bdb1ffc4f8ae8be599c943e9ab2c4f6c573a22d70b8e4f1f78b",
+   "dest_sha256": "f9a53ec91bcca40258509449862c101b6b92b02b5df8dc6c9ae6dea6b79b349a",
    "edits": [
     {
      "table_tests": true,
@@ -1219,6 +1529,21 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       188,
+       192,
+       []
+      ],
+      [
+       194,
+       309,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -1227,7 +1552,7 @@
    "dest": "src/model/mii/draft_store.rs",
    "crate": "mii",
    "src_sha256": "dcca386efde444feee28fedd097cc5acb3b3f8c98353335d04a995305bf17451",
-   "dest_sha256": "e0d0aad8616d5dda89bfe4656c33f7fd6334ac147fee9e3f0b5c4f8a82fb20c0",
+   "dest_sha256": "1ca7bdf524f9fe4875cc1e5c35fd28d3e79787aaa4a1097d2af17494d8b7909d",
    "edits": [
     {
      "old": ".args([\"--exact\", \"draft_store::tests::preset_continues_in_a_fresh_process\", \"--nocapture\"])",
@@ -1244,6 +1569,26 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       144,
+       170,
+       []
+      ],
+      [
+       201,
+       236,
+       []
+      ],
+      [
+       241,
+       242,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -1252,7 +1597,7 @@
    "dest": "src/model/mii/editor_row.rs",
    "crate": "mii",
    "src_sha256": "bd6f9f383f890d202164a8ee194797bcbbe69e9c73a816c0c5bc3ed21788176d",
-   "dest_sha256": "cbbed6679dcc3b97f16f60972741cf4a12ba8558ca4a5190bfb89ff46b23826f",
+   "dest_sha256": "ee28413b021bcf3e643c0aef0d25b2b620f7de6ef8bdfefa5c5c8eaa0b66a354",
    "edits": [
     {
      "old": "}\n\npub fn parse(row: &Row) -> Result<(String, Configuration), &'static str> {\n    let raw = saved::parse_header(0, 0, row).map_err(|_| \"Invalid owned editor row\")?;\n    let config = inventory::classify(&raw).map_err(|_| \"Invalid edited Mii\")?;\n    let value = Configuration::from_saved(&config).map_err(|_| \"Edited Mii resources differ\")?;\n    Ok((config.name, value))\n}\n\n#[cfg(test)]\n",
@@ -1282,6 +1627,21 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       88,
+       106,
+       []
+      ],
+      [
+       113,
+       114,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -1290,7 +1650,7 @@
    "dest": "src/model/mii/identity.rs",
    "crate": "mii",
    "src_sha256": "8099b07738c2f57ea09e7b47f37d10248c2d8376943c3400f312de9996cd798d",
-   "dest_sha256": "1fcba8318d176c1afa3af69f2a58c96a6deb1a1e03bcb8553687f1679b6e4ee7",
+   "dest_sha256": "144e3b7ec8b19183189567002e4e813d5cd64fb3ec5df66ab65322f113bd17e1",
    "edits": [
     {
      "table_tests": true,
@@ -1302,6 +1662,31 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       282,
+       320,
+       []
+      ],
+      [
+       392,
+       404,
+       []
+      ],
+      [
+       427,
+       428,
+       []
+      ],
+      [
+       431,
+       431,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -1310,7 +1695,7 @@
    "dest": "src/model/mii/inventory.rs",
    "crate": "mii",
    "src_sha256": "7cb9fa0651cbee81e6a3d0cc62745e62f3c2f798acf84f9ea25eeafb65c7cf2f",
-   "dest_sha256": "5d6264e77408ac273947bb8f48117d08c644561da2dcee81ee227ecfa6ccd12e",
+   "dest_sha256": "185bffcdaa3a780a243e3116f2d35c03fe6ab3030ef4f00429a25068c7ad882a",
    "edits": [
     {
      "old": "}\n\npub fn classify(slot: &RawSlot) -> Result<MiiConfig, Finding> {\n    let (slot_index, slot_id) = (slot.index, slot.slot_id);\n    if slot.specials.iter().any(|s| *s > 2) {\n        return Err(Finding::SpecialOutOfRange { slot_index, slot_id, specials: slot.specials });\n",
@@ -1334,6 +1719,36 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       424,
+       424,
+       []
+      ],
+      [
+       452,
+       539,
+       []
+      ],
+      [
+       559,
+       594,
+       []
+      ],
+      [
+       599,
+       605,
+       []
+      ],
+      [
+       607,
+       608,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -1363,7 +1778,7 @@
    "dest": "src/model/mii/lifetime.rs",
    "crate": "mii",
    "src_sha256": "c5ae4c4aa0aaaacbf795debce87f951fa1332a83ecee6743af029ceb0387feb0",
-   "dest_sha256": "97efea238e82d8a142e34a4ef58f8e0c9d9f1594b869c4d5294ae6478dd00df4",
+   "dest_sha256": "e1053d168796fcf278ce84e03b7fe85fed577727e3cf3949cdd98ac979d2dadb",
    "edits": [
     {
      "old": "#[derive(Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]\n#[serde(try_from = \"StoredConfiguration\", into = \"StoredConfiguration\")]\npub struct Configuration {\n    canonical: Canonical,\n    charinfo: [u8; CHARINFO_LEN],\n    tokens: Tokens,\n}\n",
@@ -1418,6 +1833,26 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       171,
+       230,
+       []
+      ],
+      [
+       630,
+       731,
+       []
+      ],
+      [
+       789,
+       792,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -1433,7 +1868,7 @@
    "dest": "src/model/mii/native_values.rs",
    "crate": "mii",
    "src_sha256": "d95d260023c31acdfa4520346c1914b07a6a3037ea70cf688390acdb4dac1ae3",
-   "dest_sha256": "27ff4b1cefc7be89baf0fe0aa0a2e47396223c7c363e03898506d74e6dc126c4",
+   "dest_sha256": "b2724948546f6e857ae8bfe277ff59ec9914bb69f663066eddca5e0c0cccbe14",
    "edits": [
     {
      "table_tests": true,
@@ -1445,6 +1880,31 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       441,
+       458,
+       []
+      ],
+      [
+       557,
+       616,
+       []
+      ],
+      [
+       622,
+       622,
+       []
+      ],
+      [
+       625,
+       626,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -1453,7 +1913,7 @@
    "dest": "src/model/mii/ordinary_cpu.rs",
    "crate": "mii",
    "src_sha256": "e4628b4e3e7a00dc2c29d715b9755284f5afa3446513824912066178f0cc6caf",
-   "dest_sha256": "4969da242bf30455439d4a0ea4bf0cc7221a8539c89bedf209de5cbeef58a9c4",
+   "dest_sha256": "47a2ae14454c55f82b38d9279deb754d835924d44f22628381c49fe38852c103",
    "edits": [
     {
      "old": "/// and an extra index/selector equal to the destination refuses. A protected set\n/// that cannot fit the fixed record table refuses instead of truncating.\npub fn assignment_with(layout:crate::engine::mii::backend::Layout,extras:crate::engine::mii::capacity::Extras,\n    destination:usize,owners:&[Option<Owner>;8])->Option<[Option<u16>;8]> {\n    if !layout.selector(destination) || extras.entry(destination).is_some() {return None;}\n    if !layout.shape_with(&owners.map(|o|o.map_or(0,|o|o.entry)),extras) {\n        return None;\n    }\n    let mut protected = [None; 8];\n    let mut used = 0;\n",
@@ -1489,6 +1949,114 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       532,
+       546,
+       []
+      ],
+      [
+       552,
+       552,
+       []
+      ],
+      [
+       958,
+       1062,
+       []
+      ],
+      [
+       1098,
+       1128,
+       []
+      ],
+      [
+       1196,
+       1226,
+       []
+      ],
+      [
+       1266,
+       1304,
+       []
+      ],
+      [
+       1334,
+       1338,
+       []
+      ],
+      [
+       1340,
+       1340,
+       []
+      ],
+      [
+       1342,
+       1342,
+       []
+      ],
+      [
+       1344,
+       1345,
+       []
+      ],
+      [
+       1476,
+       1542,
+       []
+      ],
+      [
+       1561,
+       1618,
+       []
+      ],
+      [
+       1620,
+       1626,
+       []
+      ],
+      [
+       1665,
+       1678,
+       []
+      ],
+      [
+       1728,
+       1729,
+       []
+      ],
+      [
+       1731,
+       1733,
+       []
+      ],
+      [
+       1735,
+       1735,
+       []
+      ],
+      [
+       1793,
+       1794,
+       [
+        "    ",
+        "    "
+       ]
+      ],
+      [
+       1801,
+       1841,
+       []
+      ],
+      [
+       1877,
+       1878,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -1497,7 +2065,7 @@
    "dest": "src/model/mii/ordinary_player.rs",
    "crate": "mii",
    "src_sha256": "602bba789924053897d816ea58b838f135f8cec49c8e955a4249d5687cf9b7d6",
-   "dest_sha256": "fb4a820f0c73f4549cb80e35e532c17093d1866fd8cb383ce322444931a088fb",
+   "dest_sha256": "63aff99d719a1300d837a1e6f71056a0832e8c93a8cc8ce80aa25cb7ca78fe4a",
    "edits": [
     {
      "table_tests": true,
@@ -1510,6 +2078,56 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       559,
+       582,
+       []
+      ],
+      [
+       594,
+       628,
+       []
+      ],
+      [
+       673,
+       711,
+       []
+      ],
+      [
+       773,
+       877,
+       []
+      ],
+      [
+       918,
+       918,
+       []
+      ],
+      [
+       920,
+       925,
+       []
+      ],
+      [
+       928,
+       931,
+       []
+      ],
+      [
+       946,
+       949,
+       []
+      ],
+      [
+       969,
+       969,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -1525,7 +2143,7 @@
    "dest": "src/model/mii/replay.rs",
    "crate": "mii",
    "src_sha256": "dd58afdd5a0bcfeff0dd6a53708d1aebb509e46e15552edc04859632897df7c7",
-   "dest_sha256": "39710255d94b340c29527ce3c1c2aec8cd1140ed480ddfa7d1bd48565ef954b4",
+   "dest_sha256": "8577c6c4c21012deea87ff24b8e9ea1f27dcb094b0c50f03e310e7b78ac04188",
    "edits": [
     {
      "table_tests": true,
@@ -1537,6 +2155,43 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       8,
+       9,
+       []
+      ],
+      [
+       344,
+       344,
+       [
+        "    "
+       ]
+      ],
+      [
+       438,
+       488,
+       []
+      ],
+      [
+       564,
+       625,
+       []
+      ],
+      [
+       631,
+       631,
+       []
+      ],
+      [
+       634,
+       634,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -1552,7 +2207,7 @@
    "dest": "src/model/mii/role_owner.rs",
    "crate": "mii",
    "src_sha256": "827c41e73a22759abc5030859250e699425bf568795b56dd83338c23774e2adb",
-   "dest_sha256": "d35a99965c350deef82ed116a453dfe5b3abe5a046dbb534d4827dbc830b6306",
+   "dest_sha256": "cc4b14febca0af54b3ccfe7894df7805f791aeaf5732ba2aa0693c08bed3e746",
    "edits": [
     {
      "table_tests": true,
@@ -1564,6 +2219,31 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       228,
+       248,
+       []
+      ],
+      [
+       295,
+       434,
+       []
+      ],
+      [
+       440,
+       440,
+       []
+      ],
+      [
+       442,
+       447,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -1572,7 +2252,7 @@
    "dest": "src/model/mii/saved.rs",
    "crate": "mii",
    "src_sha256": "56a7f3f2957398f6efbfd5944e1a1dbab5c45bbae2057916c8b2dff92d54a976",
-   "dest_sha256": "3462ce8b46b37b0de4f871ce732dd532e393ecb0c0d18b182d4904b714283efb",
+   "dest_sha256": "ff233b90591ab2b80a54e6a2332bfca945982e3f2636be61f946b1e63a95929a",
    "edits": [
     {
      "old": "\n/// Owned bytes only. Validation of class, tags, name length and specials is shared with inventory.\npub fn parse_header(id: u32, index: usize, bytes: &[u8; HEADER_LEN]) -> Result<RawSlot, String> {\n    let u32_at = |off| u32::from_le_bytes(bytes[off..off + 4].try_into().unwrap());\n    let u64_at = |off| u64::from_le_bytes(bytes[off..off + 8].try_into().unwrap());\n    let stored = u32_at(0);\n    if stored != id {\n        return Err(format!(\"filename id {id} differs from header id {stored}\"));\n    }\n    let mut name_units = [0; 10];\n    for (i, unit) in name_units.iter_mut().enumerate() {\n",
@@ -1590,6 +2270,49 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       144,
+       145,
+       [
+        "    use crate::engine::mii::inventory::HASH40_UI_CHARA_MIISWORDSMAN;",
+        "    "
+       ]
+      ],
+      [
+       159,
+       179,
+       []
+      ],
+      [
+       188,
+       196,
+       []
+      ],
+      [
+       215,
+       283,
+       []
+      ],
+      [
+       288,
+       289,
+       []
+      ],
+      [
+       291,
+       291,
+       []
+      ],
+      [
+       293,
+       297,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -1598,7 +2321,7 @@
    "dest": "src/model/mii/selection.rs",
    "crate": "mii",
    "src_sha256": "f20f5a2389b4035988e7d61b8fcf86afa7aafe056e839f54d0903719430a9215",
-   "dest_sha256": "0a5c3a429032c8f0dfabfd20975164957ba238359cc87c373545e57067ca92de",
+   "dest_sha256": "640ad33b2cc078753da0ff5b903b71168e6f52ed397fcaa9310e49511be81da1",
    "edits": [
     {
      "old": "#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]\n",
@@ -1640,6 +2363,31 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       338,
+       414,
+       []
+      ],
+      [
+       452,
+       530,
+       []
+      ],
+      [
+       536,
+       539,
+       []
+      ],
+      [
+       541,
+       545,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -1648,7 +2396,7 @@
    "dest": "src/model/mii/transition.rs",
    "crate": "mii",
    "src_sha256": "e3cacfe4b9540f009acf22e17a98742dd7ae9b1c376a04858308803b3f56befb",
-   "dest_sha256": "4109ca1b705f16b9e854726be163781982452673005ebf100ea317930948287a",
+   "dest_sha256": "2fc64cd6582e1704f91f4a6c72cf6f918b3bd8703eb55e8f0f2fed96ef2f138f",
    "edits": [
     {
      "table_tests": true,
@@ -1660,6 +2408,21 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       447,
+       458,
+       []
+      ],
+      [
+       518,
+       518,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -1668,7 +2431,7 @@
    "dest": "src/model/swap/body_bank.rs",
    "crate": "consts",
    "src_sha256": "ab3c4adcf084b2dd9433a5fe5715b428fb38c26d3b143d7632fb3d33078df0d6",
-   "dest_sha256": "2ce18695cae3aecb4365850929585f7d9fa3fe6eb719e24ccd4571490ca878b8",
+   "dest_sha256": "87cca22c04d7ec8d31185e6876fe55433911221fb40dcb2731b01762608a5775",
    "edits": [
     {
      "old": "    // a native group): count it so hats and helper slots agree with the planner.\n    let used: usize = windows.iter().map(|window| window.map_or(1, |members| members.count())).sum::<usize>()\n        + existing.iter().flat_map(|groups| groups.iter()).map(|members| members.count()).sum::<usize>()\n        + budget.hats_wanted;\n    let mut remaining = budget.ready_fighters.saturating_sub(used).min(budget.pool_free);\n    // (lane depth, kind): depth is the distance from the live fighter, so a role\n    // whose nearer neighbours are already built does not outrank the other role.\n    let mut candidates: [Vec<(usize, u32)>; 2] = [Vec::new(), Vec::new()];\n    // Whole special groups (PT, Aegis, the pair) at their lane depth.\n    let mut specials: [Vec<(usize, Members)>; 2] = [Vec::new(), Vec::new()];\n    let mut room = [0usize; 2];\n    let mut group_slots = [0usize; 2];\n    for role in 0..2 {\n        let Some(window) = windows[role].filter(|window| window_swappable_with(*window, policy)) else { continue; };\n        group_slots[role] = MAX_EXTRA_GROUPS.saturating_sub(existing[role].len());\n        room[role] = group_slots[role] * NATIVE_MEMBERS;\n        for (depth, &kind) in upcoming[role].iter().enumerate() {\n            if exclude[role] == Some(kind)\n                || window.index_of(kind).is_some()\n                || existing[role].iter().any(|group| group.index_of(kind).is_some())\n            { continue; }\n            if let Some(group) = Members::special_group(kind, budget.special) {\n                // One Mii identity per resource owner: a second lane Mii, or a\n                // Mii group this role already holds, stays canonical (DESIGN \u00a72).\n                let second_mii = group.special() == Special::Mii\n                    && (specials[role].iter().any(|(_, held)| held.special() == Special::Mii)\n                        || existing[role].iter().any(|held| held.special() == Special::Mii));\n                if !second_mii && !specials[role].iter().any(|(_, held)| held.kinds()[0] == group.kinds()[0]) {\n                    specials[role].push((depth, group));\n                }\n                continue;\n            }\n            if group_member_kind(kind, policy) && !candidates[role].iter().any(|(_, held)| *held == kind) {\n                candidates[role].push((depth, kind));\n            }\n        }\n    }\n    // Special groups are taken whole at their own lane depth, interleaved with\n    // the ordinary candidates; one that no longer fits the remaining bodies or a\n    // free group slot is skipped, never split.\n    let mut chosen_special: [Vec<Members>; 2] = [Vec::new(), Vec::new()];\n    let mut scursor = [0usize; 2];\n    let mut chosen: [Vec<u32>; 2] = [Vec::new(), Vec::new()];\n    let mut cursor = [0usize; 2];\n    let take = |role: usize, chosen: &mut [Vec<u32>; 2], cursor: &mut [usize; 2], remaining: &mut usize| -> bool {\n        if *remaining == 0 || cursor[role] >= candidates[role].len() || chosen[role].len() >= room[role] {\n            return false;\n        }\n        chosen[role].push(candidates[role][cursor[role]].1);\n        cursor[role] += 1;\n        *remaining -= 1;\n        true\n    };\n    let deepest = upcoming.iter().map(|lane| lane.len()).max().unwrap_or(0);\n    for depth in 0..deepest {\n        for role in 0..2 {\n            if cursor[role] < candidates[role].len() && candidates[role][cursor[role]].0 == depth {\n                take(role, &mut chosen, &mut cursor, &mut remaining);\n            } else if scursor[role] < specials[role].len() && specials[role][scursor[role]].0 == depth {\n                let group = specials[role][scursor[role]].1;\n                scursor[role] += 1;\n                let slots_used = chosen_special[role].len() + chosen[role].len().div_ceil(NATIVE_MEMBERS);\n                if remaining >= group.count() && slots_used < group_slots[role] {\n                    chosen_special[role].push(group);\n                    remaining -= group.count();\n",
@@ -2355,6 +3118,256 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       2162,
+       2176,
+       []
+      ],
+      [
+       2193,
+       2203,
+       []
+      ],
+      [
+       2218,
+       2245,
+       []
+      ],
+      [
+       2308,
+       2335,
+       []
+      ],
+      [
+       2356,
+       2421,
+       []
+      ],
+      [
+       2456,
+       2509,
+       []
+      ],
+      [
+       2564,
+       2600,
+       []
+      ],
+      [
+       2646,
+       2679,
+       []
+      ],
+      [
+       2703,
+       2808,
+       []
+      ],
+      [
+       2829,
+       3026,
+       []
+      ],
+      [
+       3056,
+       3173,
+       []
+      ],
+      [
+       3279,
+       3406,
+       []
+      ],
+      [
+       3442,
+       3467,
+       []
+      ],
+      [
+       3507,
+       3572,
+       []
+      ],
+      [
+       3633,
+       3657,
+       []
+      ],
+      [
+       3721,
+       3746,
+       []
+      ],
+      [
+       3757,
+       3808,
+       []
+      ],
+      [
+       3838,
+       3915,
+       []
+      ],
+      [
+       3984,
+       4177,
+       []
+      ],
+      [
+       4361,
+       4413,
+       []
+      ],
+      [
+       4429,
+       4457,
+       []
+      ],
+      [
+       4521,
+       4716,
+       []
+      ],
+      [
+       4805,
+       4840,
+       []
+      ],
+      [
+       4916,
+       4940,
+       []
+      ],
+      [
+       4964,
+       5040,
+       []
+      ],
+      [
+       5046,
+       5046,
+       []
+      ],
+      [
+       5048,
+       5048,
+       []
+      ],
+      [
+       5050,
+       5051,
+       []
+      ],
+      [
+       5053,
+       5053,
+       []
+      ],
+      [
+       5055,
+       5056,
+       []
+      ],
+      [
+       5059,
+       5060,
+       []
+      ],
+      [
+       5062,
+       5062,
+       []
+      ],
+      [
+       5065,
+       5066,
+       []
+      ],
+      [
+       5068,
+       5072,
+       []
+      ],
+      [
+       5074,
+       5081,
+       []
+      ],
+      [
+       5083,
+       5086,
+       []
+      ],
+      [
+       5089,
+       5095,
+       []
+      ],
+      [
+       5098,
+       5102,
+       []
+      ],
+      [
+       5105,
+       5105,
+       []
+      ],
+      [
+       5107,
+       5107,
+       []
+      ],
+      [
+       5109,
+       5110,
+       []
+      ],
+      [
+       5112,
+       5114,
+       []
+      ],
+      [
+       5116,
+       5120,
+       []
+      ],
+      [
+       5124,
+       5125,
+       []
+      ],
+      [
+       5127,
+       5127,
+       []
+      ],
+      [
+       5129,
+       5133,
+       []
+      ],
+      [
+       5136,
+       5136,
+       []
+      ],
+      [
+       5139,
+       5139,
+       []
+      ],
+      [
+       5141,
+       5144,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -2363,7 +3376,7 @@
    "dest": "src/model/swap/body_bank/memory.rs",
    "crate": "consts",
    "src_sha256": "bfbc9c80a215184a125634c4b90fbf97c63007608db892a95df466d784869915",
-   "dest_sha256": "c8fffa1a39742b4541495bfd48d6a269fc59c847dd62fa9d5dc64f3ea2ec7e2f",
+   "dest_sha256": "22b542279249cdee96149ecad53eeccfd14f72da597c12043ec0d46af2e54cc9",
    "edits": [
     {
      "old": "        GroupState::Prefetching => with_margin(cost.total()),\n        GroupState::Prefetched => with_margin(cost.build),\n        GroupState::Planned | GroupState::Built | GroupState::Failed => 0,\n    }\n}\n",
@@ -2400,6 +3413,46 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       219,
+       223,
+       []
+      ],
+      [
+       226,
+       303,
+       []
+      ],
+      [
+       319,
+       443,
+       []
+      ],
+      [
+       464,
+       475,
+       []
+      ],
+      [
+       480,
+       486,
+       []
+      ],
+      [
+       488,
+       497,
+       []
+      ],
+      [
+       499,
+       499,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -2415,7 +3468,7 @@
    "dest": "src/model/swap/body_bank/window_share.rs",
    "crate": "consts",
    "src_sha256": "f9528f8532d1fc5cac2fd50a7e8e758f3ce491b78163d4322a93d5e2978b5e33",
-   "dest_sha256": "3f7cb6fd2526a3c3d7f67e8d4d382052dcb46e0e2f7d5faf4353023d2886006d",
+   "dest_sha256": "d5c427500f2b38554eddaf57f1094b50d11337545a2c98e6c7cafa4167263146",
    "edits": [
     {
      "table_tests": true,
@@ -2427,6 +3480,31 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       134,
+       148,
+       []
+      ],
+      [
+       169,
+       198,
+       []
+      ],
+      [
+       203,
+       203,
+       []
+      ],
+      [
+       205,
+       207,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -2435,7 +3513,7 @@
    "dest": "src/model/swap/body_bank/mii_publish.rs",
    "crate": "consts",
    "src_sha256": "27966b691dd20370a74df9dabe406316f7ae39f900b1f8165f0870be03fb927f",
-   "dest_sha256": "22ccab2df2478c0c7e704882fd277649e3fe7149c6e92634d30cd1dd83aaf8f1",
+   "dest_sha256": "7505dffd53e79d573cda0deec678491ab90e293118f7a7bad8feaf8bcbf9b4cd",
    "edits": [
     {
      "table_tests": true,
@@ -2447,6 +3525,26 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       96,
+       97,
+       []
+      ],
+      [
+       123,
+       178,
+       []
+      ],
+      [
+       184,
+       188,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -2509,7 +3607,7 @@
    "dest": "src/model/swap/swap_model/copy_packages.rs",
    "crate": "consts",
    "src_sha256": "a39d0ce52841ce038c3d0e67a8c747a87e5a182edef9a03b03487e508ee0c655",
-   "dest_sha256": "5ab0af9a09edae2b4a091101ead1dd48fff630d0bdc896cf0eada72af32dd6c3",
+   "dest_sha256": "18fe164be55663d81ffe5b5859ff651713bba2d15602bfeb7b2207dbd20381c6",
    "edits": [
     {
      "old": "//! member set it may register, exactly what the completion would take for that set\n//! ([`acquisitions`]). It releases each with the same inputs (exact inverse), and admits a\n//! registration only once G68 reports ready.\n\nuse super::copy_registry::{registry_costume, Registry, Roster, ENTRIES, NO_KIND, SUBS};\nuse super::request_bit::{acquired_keys, completion_members, copy_key, released_keys};\nuse std::collections::BTreeMap;\n\n/// One native acquisition `0x17efb40(G68, roster, member, costume)`. Its release is\n/// `0x17f0290(G68, roster, member, costume)` with the same values.\n#[derive(Clone, Debug, PartialEq, Eq)]\npub struct Acquisition {\n    pub set: [u32; SUBS],\n    pub member: u32,\n    pub costume: u32,\n    pub roster: Roster,\n",
@@ -2564,6 +3662,38 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       216,
+       216,
+       [
+        "    "
+       ]
+      ],
+      [
+       248,
+       289,
+       []
+      ],
+      [
+       330,
+       389,
+       []
+      ],
+      [
+       394,
+       394,
+       []
+      ],
+      [
+       396,
+       397,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -2592,7 +3722,7 @@
    "dest": "src/model/swap/swap_model/fallback.rs",
    "crate": "consts",
    "src_sha256": "2345a0a33be95738ef34f24f357c69e2bcea4c566ad6d9141cae3c3784d26065",
-   "dest_sha256": "2c424e0964bd4134598a4d7cba99ccf34efce5c4dd470dad205938239e45cee8",
+   "dest_sha256": "a838c67414049e65baa7b1deca58aa728f33b89d0ae34305c2b03224e99e2ca8",
    "edits": [
     {
      "old": "        _ if reason.transient() => Disposition::Keep,\n        GroupState::Prefetched => Disposition::FailReturningKeys,\n        GroupState::Planned | GroupState::Failed => Disposition::Fail,\n    }\n}\n",
@@ -2619,6 +3749,34 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       98,
+       175,
+       [
+        "    ",
+        "    "
+       ]
+      ],
+      [
+       189,
+       199,
+       []
+      ],
+      [
+       204,
+       205,
+       []
+      ],
+      [
+       207,
+       207,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -2627,7 +3785,7 @@
    "dest": "src/model/swap/swap_model/hud_model.rs",
    "crate": "consts",
    "src_sha256": "15b229a86c290378e17aa8781d5bd326b03f4a2f6d4209b830a4cad9f1453b2d",
-   "dest_sha256": "e00353e0c4ede775fbffbd8507686f9183eaec061c0cae3d928239c84910d284",
+   "dest_sha256": "7164130568edc62b294c0fe4e7b9c8b6fc9044189a6bbef78fd8d4df575b4f22",
    "edits": [
     {
      "table_tests": true,
@@ -2639,6 +3797,31 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       118,
+       147,
+       []
+      ],
+      [
+       205,
+       220,
+       []
+      ],
+      [
+       239,
+       239,
+       []
+      ],
+      [
+       243,
+       243,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -2647,7 +3830,7 @@
    "dest": "src/model/swap/swap_model/ledger.rs",
    "crate": "consts",
    "src_sha256": "900a579c038101633b6234a001024943cbea9a6e88df249aa1eee89ff7bf8487",
-   "dest_sha256": "7e1203fe8969f9425062acc2de06665a5db8a007e00ad1d380a71e340d54ca8d",
+   "dest_sha256": "0ae87c52078671495ca1dc0707c683210f0d7681ec0c48143622a6606f67c998",
    "edits": [
     {
      "old": "    pub const fn with(self, n: u8) -> Self { KeySet(self.0 | (1 << n)) }\n    pub const fn minus(self, other: KeySet) -> KeySet { KeySet(self.0 & !other.0) }\n    pub const fn union(self, other: KeySet) -> KeySet { KeySet(self.0 | other.0) }\n    pub const fn is_empty(self) -> bool { self.0 == 0 }\n    pub const fn len(self) -> usize { self.0.count_ones() as usize }\n    pub fn iter(self, kind: u32) -> impl Iterator<Item = KeyId> {\n        (0u8..8).filter(move |n| self.contains(*n)).map(move |n| KeyId { kind, n })\n    }\n}\n\n/// Resource-owner bytes the key rules depend on: `R+0x48`, `R+0x7d`, `R+0x7f` (module doc).\n",
@@ -2694,6 +3877,31 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       768,
+       852,
+       []
+      ],
+      [
+       909,
+       919,
+       []
+      ],
+      [
+       924,
+       928,
+       []
+      ],
+      [
+       932,
+       932,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -2702,7 +3910,7 @@
    "dest": "src/model/swap/swap_model/lifecycle.rs",
    "crate": "consts",
    "src_sha256": "8bfb6a934f7d9250c7800ae01bbbd3372caa737fdba33cbbed9ea95b07a9275b",
-   "dest_sha256": "0ac0854c6d657eadc38650298c2261b42e1fad7e0d3e567d733b953be0e4e2ba",
+   "dest_sha256": "38984b5f0922b24a5f0e72104b2313f61163a0145e7c385e5bf963d1989469fb",
    "edits": [
     {
      "old": "impl Phases {\n    fn route(&mut self, slot: u8, controller: usize) {\n        if !self.routes.iter().any(|(s, _)| *s == slot) { self.routes.push((slot, controller)); }\n    }\n\n    /// Every route slot naming one of `controllers` is cleared first (D-PTA1c).\n    fn routes_for(&mut self, owner: u32, controllers: &[usize], consumers: &NativeConsumers) {\n        for route in consumers.pad_routes.iter().flatten() {\n            if route.controller != 0 && controllers.contains(&route.controller) { self.route(route.slot, route.controller); }\n        }\n        // Nana's route (`owner+8`, U2): the same rule from the separately probed word.\n        if let Some(controller) = consumers.nana_owner_plus_8 {\n            let slot = owner.saturating_add(8);\n            if controller != 0 && slot < PAD_SLOTS as u32 && controllers.contains(&controller) { self.route(slot as u8, controller); }\n        }\n    }\n\n    /// Kirby fields count only `valid` refs: an invalid ref's `kind` is the planned kind, not the\n    /// body's own `+0xc` that `unprepare` reads (Yoga `m4b3` #140: the incoming window's Kirby\n",
@@ -2749,6 +3957,41 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       542,
+       623,
+       []
+      ],
+      [
+       660,
+       695,
+       []
+      ],
+      [
+       742,
+       901,
+       []
+      ],
+      [
+       906,
+       910,
+       []
+      ],
+      [
+       913,
+       914,
+       []
+      ],
+      [
+       917,
+       919,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -2757,14 +4000,26 @@
    "dest": "src/model/swap/swap_model/mod.rs",
    "crate": "consts",
    "src_sha256": "9eaf8a4afc10f7ad20140f9cb97b2ebe0e65dc45c49dd17cb0341c36d4cea60f",
-   "dest_sha256": "9eaf8a4afc10f7ad20140f9cb97b2ebe0e65dc45c49dd17cb0341c36d4cea60f"
+   "dest_sha256": "e615554b17f278122e66458fec4c94b019b6b7e592e2acfe12890f4adae599f9",
+   "edits": [
+    {
+     "line_patch": [
+      [
+       33,
+       34,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    }
+   ]
   },
   {
    "src": "training_mod_consts/src/swap_model/native_model.rs",
    "dest": "src/model/swap/swap_model/native_model.rs",
    "crate": "consts",
    "src_sha256": "78ba97e97253bb7f7a46782ba9caf07c698a8a2ec3e78982c6747531286b4a87",
-   "dest_sha256": "936ba8c87b542246c56a2b4825cfa61e31fa7233090d9916c6e33a251788b26a",
+   "dest_sha256": "0ed7fc3690fd9958a2628773aad826bd7eb168990890d6ec0d2a674d6df45315",
    "edits": [
     {
      "old": "    }\n\n    #[test]\n    fn d_pta1c_old_policy_leaves_the_pad_route_dangling_through_the_reload() {\n",
@@ -2781,6 +4036,68 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       1080,
+       1080,
+       [
+        "    use super::super::ledger::{native_release_set, orphan_keys, registration_set, KeyId, KeySet};"
+       ]
+      ],
+      [
+       1108,
+       1115,
+       []
+      ],
+      [
+       1130,
+       1156,
+       []
+      ],
+      [
+       1175,
+       1207,
+       []
+      ],
+      [
+       1242,
+       1250,
+       []
+      ],
+      [
+       1270,
+       1308,
+       []
+      ],
+      [
+       1313,
+       1313,
+       []
+      ],
+      [
+       1315,
+       1317,
+       []
+      ],
+      [
+       1319,
+       1320,
+       []
+      ],
+      [
+       1323,
+       1323,
+       []
+      ],
+      [
+       1325,
+       1325,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -2789,7 +4106,7 @@
    "dest": "src/model/swap/swap_model/occupancy.rs",
    "crate": "consts",
    "src_sha256": "e190e95a1db710a75729ba9c1b82798483e7d8cc7107bbed32d9fcfd0373da0a",
-   "dest_sha256": "b7f91aaa20c2d549582a323803cb7fa3425a33ae9be13f1feec029c48b581d88",
+   "dest_sha256": "0b9d7016c379fae41de0c890ebbc8682c46cfc0662145b5d0a805dfee5cc8c10",
    "edits": [
     {
      "old": "//!   R while a member whose row has `prefetch_while_live: false` (Kirby) is live \u2014 *suspend*:\n//!   no acquisition while it is live; *drain*: a transition whose target is such a member must\n//!   first return every prefetched key (the planner drains Prefetched groups to Planned before the\n",
@@ -2851,6 +4168,31 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       327,
+       355,
+       []
+      ],
+      [
+       510,
+       532,
+       []
+      ],
+      [
+       549,
+       549,
+       []
+      ],
+      [
+       554,
+       554,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -2859,7 +4201,7 @@
    "dest": "src/model/swap/swap_model/order_replay.rs",
    "crate": "consts",
    "src_sha256": "5928a2d8fe09b5796c8757e6c4d1e91698c271b474a5ae3f2039bfd9c41c4684",
-   "dest_sha256": "5fa8cafa799ab279276107126df11d79ab49ad9a6d352096d8b8ec26132a5ad5",
+   "dest_sha256": "",
    "edits": [
     {
      "table_file": true,
@@ -2869,14 +4211,15 @@
      "wrap_file": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
-   ]
+   ],
+   "removed": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): the file's cases add no line coverage; removed"
   },
   {
    "src": "training_mod_consts/src/swap_model/pair_after_objects.rs",
    "dest": "src/model/swap/swap_model/pair_after_objects.rs",
    "crate": "consts",
    "src_sha256": "e8ffe87991c0ee88243f09164116eb193e265cc092eea67c2713bc036f1fa3b4",
-   "dest_sha256": "8441e86497b0f53c340f313b11a045bff38844a5285b64cc92aadd0c5c381310",
+   "dest_sha256": "b0376cd79112a9ec570002c5fa7451cf5c7ed2d96361e7330a0ea1c388299d2a",
    "edits": [
     {
      "table_file": true,
@@ -2885,6 +4228,31 @@
     {
      "wrap_file": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       128,
+       133,
+       []
+      ],
+      [
+       141,
+       171,
+       []
+      ],
+      [
+       176,
+       176,
+       []
+      ],
+      [
+       178,
+       179,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -2893,7 +4261,7 @@
    "dest": "src/model/swap/swap_model/presentation.rs",
    "crate": "consts",
    "src_sha256": "9799543979d2cadb54791db843919ff133837d121b96695935ca5334c2ab6bde",
-   "dest_sha256": "cf60220f4c8fff53fb480bc4d9f229afcde61e69065777d3350587f160988bef",
+   "dest_sha256": "709e0da198787dfcb306e3f89074b5a8d49698edc08e40f5d55d01ad0119d252",
    "edits": [
     {
      "table_tests": true,
@@ -2905,6 +4273,43 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       312,
+       312,
+       [
+        "    use crate::engine::swap::identity_view::native_costume;"
+       ]
+      ],
+      [
+       315,
+       319,
+       []
+      ],
+      [
+       335,
+       375,
+       []
+      ],
+      [
+       388,
+       392,
+       []
+      ],
+      [
+       398,
+       400,
+       []
+      ],
+      [
+       402,
+       402,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -2913,7 +4318,7 @@
    "dest": "src/model/swap/swap_model/request_bit.rs",
    "crate": "consts",
    "src_sha256": "38def5e05fd40dcc04450002c012aa62e35a68630851ec69e382db46c82ddf73",
-   "dest_sha256": "ef6a215605c70281d0f75d13c7abb42146a2c47d59e928627f03034aca66c50e",
+   "dest_sha256": "a2115757d8f1028ef15110f600aee1d98a0bdfbbd668af30edf33158ba10c23b",
    "edits": [
     {
      "old": "/// `0x17efb40(G68, roster, kind, costume)` as its control flow (`0x17efb50\u20130x17eff9c`): Kirby takes a\n/// key per kind of every record whose first kind is neither `-1` nor Kirby (the second and third\n/// unless `0x4b/0x4c/-1`) under `costume`; any other kind takes its own key once per Kirby record,\n/// under that record's `+0x51`.\npub fn acquired_keys(roster: &Roster, kind: u32, costume: u32) -> Vec<u32> {\n    let mut keys = Vec::new();\n    if kind == KIRBY {\n        for record in roster {\n            let [k0, k1, k2] = record.kinds;\n            if k0 == NO_KIND || k0 == KIRBY { continue; }\n            keys.extend(copy_key(k0, costume));\n            for k in [k1, k2] {\n                if (POPO..=NANA).contains(&k) || k == NO_KIND { continue; }\n                keys.extend(copy_key(k, costume));\n            }\n        }\n    } else {\n        for record in roster {\n            if record.kinds[0] == KIRBY { keys.extend(copy_key(kind, record.costume)); }\n        }\n    }\n    keys\n}\n\n/// `0x17f0290(G68, roster, kind, costume)`, transcribed a second time from its own listing (not\n/// from [`acquired_keys`]): early exit for `-1`, `0x4d..=0x50` or negative (`0x17f02a4\u20130x17f02bc`);\n/// Kirby walks the records (`0x17f03ac\u20130x17f03c8`), the first kind unless `-1`/Kirby\n",
@@ -3010,6 +4415,31 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       505,
+       637,
+       []
+      ],
+      [
+       712,
+       751,
+       []
+      ],
+      [
+       798,
+       804,
+       []
+      ],
+      [
+       806,
+       808,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -3018,7 +4448,7 @@
    "dest": "src/model/swap/swap_model/scope.rs",
    "crate": "consts",
    "src_sha256": "45d14a9c5d825e1622e369d16f6af119955d609ddec5dd0fe7f06a45d144d4e7",
-   "dest_sha256": "aa46e5361141d919359a20d9eb313b3d090f4289478c9a107298a71ddb7b26a1",
+   "dest_sha256": "bd1b4a811e761ee692f1b3f44a99278f6163ebff8b6a8c9a538031854b89b7da",
    "edits": [
     {
      "delete_from": "    CallbackContract {\n        name: \"cpu_pilot::thinking\",",
@@ -3040,6 +4470,36 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       444,
+       476,
+       []
+      ],
+      [
+       478,
+       519,
+       []
+      ],
+      [
+       529,
+       570,
+       []
+      ],
+      [
+       586,
+       590,
+       []
+      ],
+      [
+       592,
+       594,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -3048,7 +4508,7 @@
    "dest": "src/model/swap/swap_model/special_articles.rs",
    "crate": "consts",
    "src_sha256": "293f62f71c979736335d10aa9feb57310d2fbaef3ae8d03df06c0449f3298973",
-   "dest_sha256": "cb832beaaa9c2499a68c5c896127949e9f8c3772ae3c2027b5b865691fd9efdf",
+   "dest_sha256": "198519cbbe8e4303903381ea0b93224274b837a20371ee45fe63ed18cf438a2b",
    "edits": [
     {
      "old": "    (flags & PT_WINDOW_FLAG != 0 && holder && articles == 0).then_some(ArticleStep::Rebuild)\n}\n",
@@ -3080,6 +4540,31 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       173,
+       263,
+       []
+      ],
+      [
+       301,
+       311,
+       []
+      ],
+      [
+       316,
+       319,
+       []
+      ],
+      [
+       322,
+       322,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -3095,7 +4580,7 @@
    "dest": "src/model/swap/swap_model/tests.rs",
    "crate": "consts",
    "src_sha256": "9bdd8d3cea3f8d7a5bad644dc013b83467236d6c0eac668cac48c8eafd7f2a00",
-   "dest_sha256": "fc60dc9df8dee24a56b94c9eb7d10e44e2aad77087c17bfbe28f7a5cc56ea13f",
+   "dest_sha256": "98475198487e04256a7e141d0e6c3020f2b653d9f6b6ef799f6625a05c7896d6",
    "edits": [
     {
      "old": "    assert_eq!(capabilities::previous_cell_index(2, 2, 2), 0);\n}",
@@ -3114,6 +4599,69 @@
     {
      "wrap_file": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       10,
+       11,
+       [
+        "use crate::engine::swap::body_bank::{GroupPolicy, Members, Special, SpecialPolicy, KIRBY, NANA, POPO};",
+        "use crate::engine::swap::character_forms::Forms;"
+       ]
+      ],
+      [
+       284,
+       367,
+       []
+      ],
+      [
+       399,
+       430,
+       []
+      ],
+      [
+       453,
+       483,
+       []
+      ],
+      [
+       528,
+       555,
+       []
+      ],
+      [
+       581,
+       604,
+       []
+      ],
+      [
+       610,
+       611,
+       []
+      ],
+      [
+       613,
+       613,
+       []
+      ],
+      [
+       615,
+       616,
+       []
+      ],
+      [
+       618,
+       618,
+       []
+      ],
+      [
+       620,
+       620,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -3220,7 +4768,7 @@
    "dest": "tests/mii_helper147_headgear.rs",
    "crate": "mii",
    "src_sha256": "0deda79e22972927e655373b79f29baea059ce0eb964e5089999b351529981b6",
-   "dest_sha256": "d8066ff6d0694b6deadffe1ce433df40221035af8092797bb353a3bbacdbc217",
+   "dest_sha256": "a934fb590348453dc2ad21564d17e4cad927fe57a61e11de9b084c4829d03990",
    "prepend": "#[allow(dead_code, unused_imports)]\n#[path = \"../src/model/mii/mod.rs\"]\npub mod mii;\n#[allow(unused_imports)]\nmod engine {\n    pub use super::mii;\n}\n\n",
    "edits": [
     {
@@ -3231,6 +4779,21 @@
      "insert_before_line": 5,
      "text": "// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.\nmacro_rules! lib_unit_tests {\n    ($($body:tt)*) => {};\n}\n// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).\n#[path = \"../src/test_table.rs\"]\nmod test_table;\n",
      "reason": "rc.9: the by-path unit tests run in the lib's binary; this file's cases run as one table"
+    },
+    {
+     "line_patch": [
+      [
+       33,
+       57,
+       []
+      ],
+      [
+       63,
+       64,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -3239,7 +4802,7 @@
    "dest": "tests/mii_ldn_handshake.rs",
    "crate": "mii",
    "src_sha256": "958bfb6b45fa72514d23ffb3f477df5332d7d6b30b8c68a40ac59f0a3eb485f3",
-   "dest_sha256": "2049e25a8c452ea6cd16bf7f11180473ee6d421aedc6e2bff50936ff86666b9e",
+   "dest_sha256": "6a9d2ba5f89d36df72cfc01479c43fee261eb0a7742311bc127225b19e18b2b7",
    "prepend": "#[allow(dead_code, unused_imports)]\n#[path = \"../src/model/mii/mod.rs\"]\npub mod mii;\n#[allow(unused_imports)]\nmod engine {\n    pub use super::mii;\n}\n\n",
    "edits": [
     {
@@ -3250,6 +4813,53 @@
      "insert_before_line": 5,
      "text": "// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.\nmacro_rules! lib_unit_tests {\n    ($($body:tt)*) => {};\n}\n// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).\n#[path = \"../src/test_table.rs\"]\nmod test_table;\n",
      "reason": "rc.9: the by-path unit tests run in the lib's binary; this file's cases run as one table"
+    },
+    {
+     "line_patch": [
+      [
+       21,
+       21,
+       [
+        "    interruption, Handshake, Identity, Interruption, Observation, Sample,"
+       ]
+      ],
+      [
+       25,
+       25,
+       []
+      ],
+      [
+       35,
+       67,
+       []
+      ],
+      [
+       87,
+       112,
+       []
+      ],
+      [
+       161,
+       207,
+       []
+      ],
+      [
+       212,
+       213,
+       []
+      ],
+      [
+       215,
+       215,
+       []
+      ],
+      [
+       218,
+       220,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -3258,7 +4868,7 @@
    "dest": "tests/mii_bank_groups.rs",
    "crate": "mii",
    "src_sha256": "101fa5ca3b74af22a7c58eaa9f1aeb873f09a83c419f1224b0f2784e81aab057",
-   "dest_sha256": "10b9c4ed1f3b8fa699ae101d4b43f42ddd2e28133c904edac1322729ee174ecb",
+   "dest_sha256": "23f5940063846ccf23eb987be44d896579ccd664597aaf9016be0efe4570751d",
    "prepend": "#[allow(dead_code, unused_imports)]\n#[path = \"../src/model/mii/mod.rs\"]\npub mod mii;\n#[allow(unused_imports)]\nmod engine {\n    pub use super::mii;\n}\n\n",
    "edits": [
     {
@@ -3269,6 +4879,21 @@
      "insert_before_line": 1,
      "text": "// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.\nmacro_rules! lib_unit_tests {\n    ($($body:tt)*) => {};\n}\n// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).\n#[path = \"../src/test_table.rs\"]\nmod test_table;\n",
      "reason": "rc.9: the by-path unit tests run in the lib's binary; this file's cases run as one table"
+    },
+    {
+     "line_patch": [
+      [
+       81,
+       108,
+       []
+      ],
+      [
+       262,
+       262,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -3277,7 +4902,7 @@
    "dest": "tests/mii_bank_publication.rs",
    "crate": "mii",
    "src_sha256": "e52d41ffa711a1d75f345676a03c17f1e5c9c5b90ef8b3257fa0d0ec6dd1a7da",
-   "dest_sha256": "fb25e28618c25ddba83aabe2645bbaf479933306ab2df66935bae81639b6ce29",
+   "dest_sha256": "8d246b4449ace4e810e696b028c3569de8055ad2374e80f67edecfee801e7490",
    "prepend": "#[allow(dead_code, unused_imports)]\n#[path = \"../src/model/mii/mod.rs\"]\npub mod mii;\n#[allow(unused_imports)]\nmod engine {\n    pub use super::mii;\n}\n\n",
    "edits": [
     {
@@ -3288,6 +4913,26 @@
      "insert_before_line": 1,
      "text": "// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.\nmacro_rules! lib_unit_tests {\n    ($($body:tt)*) => {};\n}\n// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).\n#[path = \"../src/test_table.rs\"]\nmod test_table;\n",
      "reason": "rc.9: the by-path unit tests run in the lib's binary; this file's cases run as one table"
+    },
+    {
+     "line_patch": [
+      [
+       29,
+       31,
+       []
+      ],
+      [
+       52,
+       84,
+       []
+      ],
+      [
+       116,
+       117,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -3296,7 +4941,7 @@
    "dest": "tests/mii_setup_preflight.rs",
    "crate": "mii",
    "src_sha256": "ed0cbedbfa6380329e52a254458f16dc7e7b856cf4453836cfa4e1e9d4dbc0c9",
-   "dest_sha256": "827ee62df90005258af589997097d41ffaec44ccd3f3245e30fca192ba53e6d4",
+   "dest_sha256": "ed550683d0d012ed66d9b1486ecc1cafef055f82d406a8216c7d171700dda14e",
    "prepend": "#[allow(dead_code, unused_imports)]\n#[path = \"../src/model/mii/mod.rs\"]\npub mod mii;\n#[allow(unused_imports)]\nmod engine {\n    pub use super::mii;\n}\n\n",
    "edits": [
     {
@@ -3307,6 +4952,36 @@
      "insert_before_line": 1,
      "text": "// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.\nmacro_rules! lib_unit_tests {\n    ($($body:tt)*) => {};\n}\n// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).\n#[path = \"../src/test_table.rs\"]\nmod test_table;\n",
      "reason": "rc.9: the by-path unit tests run in the lib's binary; this file's cases run as one table"
+    },
+    {
+     "line_patch": [
+      [
+       30,
+       32,
+       []
+      ],
+      [
+       70,
+       81,
+       []
+      ],
+      [
+       92,
+       171,
+       []
+      ],
+      [
+       177,
+       177,
+       []
+      ],
+      [
+       179,
+       182,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -3315,7 +4990,7 @@
    "dest": "tests/mii_player146_headgear_ownership.rs",
    "crate": "mii",
    "src_sha256": "67c0fb189b4fefec4f57f0271ca8c0bdf49b1f5100fe51b13027c02abf2cec9b",
-   "dest_sha256": "cc7d83d00a39454cb26a2cdedafd04326a46ffc5239d68600d766c71545add6a",
+   "dest_sha256": "522747785b0d1aaff80dbbd18ec46c741e95c77bba3e5b67e3390c4da8270bb0",
    "prepend": "#[allow(dead_code, unused_imports)]\n#[path = \"../src/model/mii/mod.rs\"]\npub mod mii;\n#[allow(unused_imports)]\nmod engine {\n    pub use super::mii;\n}\n\n",
    "edits": [
     {
@@ -3326,6 +5001,33 @@
      "insert_before_line": 5,
      "text": "// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.\nmacro_rules! lib_unit_tests {\n    ($($body:tt)*) => {};\n}\n// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).\n#[path = \"../src/test_table.rs\"]\nmod test_table;\n",
      "reason": "rc.9: the by-path unit tests run in the lib's binary; this file's cases run as one table"
+    },
+    {
+     "line_patch": [
+      [
+       20,
+       20,
+       [
+        "use {crate::engine::mii::backend::Layout, crate::engine::mii::inventory::{MiiClass, CHARINFO_LEN}, crate::engine::mii::lifetime::{Binding, Configuration, Tokens}, crate::engine::mii::native_values::{RowIds, RECORD_LEN}, crate::engine::mii::ordinary_cpu::{self as cpu, HatPublication}, crate::engine::mii::ordinary_player::{self, Owner}};"
+       ]
+      ],
+      [
+       64,
+       74,
+       []
+      ],
+      [
+       147,
+       190,
+       []
+      ],
+      [
+       196,
+       197,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -3334,7 +5036,7 @@
    "dest": "tests/mii_role_adapter.rs",
    "crate": "mii",
    "src_sha256": "c0afddd51f968b3bc5e7db8f72abde8bb9b8439cdfb3ba5b310ac0af7cd58b58",
-   "dest_sha256": "6ff3229d571bf1d6e6b2df14fe1d86277cd77e0cd89e29d6acd3a747613db052",
+   "dest_sha256": "a450251c2ff22d1fc1375fe7153bc55727af1237ecfc39f6b787c943ea622a8d",
    "prepend": "#[allow(dead_code, unused_imports)]\n#[path = \"../src/model/mii/mod.rs\"]\npub mod mii;\n#[allow(unused_imports)]\nmod engine {\n    pub use super::mii;\n}\n\n",
    "edits": [
     {
@@ -3345,6 +5047,31 @@
      "insert_before_line": 1,
      "text": "// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.\nmacro_rules! lib_unit_tests {\n    ($($body:tt)*) => {};\n}\n// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).\n#[path = \"../src/test_table.rs\"]\nmod test_table;\n",
      "reason": "rc.9: the by-path unit tests run in the lib's binary; this file's cases run as one table"
+    },
+    {
+     "line_patch": [
+      [
+       269,
+       356,
+       []
+      ],
+      [
+       398,
+       444,
+       []
+      ],
+      [
+       587,
+       588,
+       []
+      ],
+      [
+       590,
+       590,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -3353,7 +5080,7 @@
    "dest": "src/model/swap/character_forms.rs",
    "crate": "consts",
    "src_sha256": "3ab7ebcd981e92f7def72ed19d1476862b2436e4ffddc5b6157f3078571dca1a",
-   "dest_sha256": "3c499209c8601f94001cc732d85ceae84a9aa5380352a35d00d8fb9be252cda5",
+   "dest_sha256": "2f8fd2c4c5502265b1fd98d940b877846342886a6dcf89e3f310dbad0b0f80fb",
    "edits": [
     {
      "old": "        return None;\n    }\n    Some(if member == 0x4c { 0x4b } else { member })\n}\n\n#[derive(Clone, Copy, Debug)]\npub struct EntryState {\n    pub count: u32,\n    pub kinds: [u32; 3],\n    pub actor_count: u32,\n    pub installed: u64,\n",
@@ -3385,6 +5112,61 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       343,
+       357,
+       []
+      ],
+      [
+       359,
+       381,
+       []
+      ],
+      [
+       458,
+       571,
+       []
+      ],
+      [
+       619,
+       642,
+       []
+      ],
+      [
+       646,
+       712,
+       []
+      ],
+      [
+       750,
+       784,
+       []
+      ],
+      [
+       790,
+       791,
+       []
+      ],
+      [
+       794,
+       797,
+       []
+      ],
+      [
+       799,
+       802,
+       []
+      ],
+      [
+       804,
+       805,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -3393,7 +5175,7 @@
    "dest": "src/model/swap/identity_view.rs",
    "crate": "consts",
    "src_sha256": "a263f5fe3881315a37a9bd0cf159f691f79df7db800d85d923b51d63ca2b8fa2",
-   "dest_sha256": "0dfeb004f53dc3a0f94a0309649cbbf7a96a7579b9c1349722679198dea97ae0",
+   "dest_sha256": "03a5a277fb7a0efad347f16c806741fd2c6353aed2280c51a88dc9a2393596d6",
    "edits": [
     {
      "table_tests": true,
@@ -3405,6 +5187,68 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       239,
+       239,
+       [
+        "    "
+       ]
+      ],
+      [
+       241,
+       242,
+       []
+      ],
+      [
+       251,
+       264,
+       []
+      ],
+      [
+       267,
+       408,
+       []
+      ],
+      [
+       456,
+       464,
+       []
+      ],
+      [
+       466,
+       469,
+       []
+      ],
+      [
+       471,
+       514,
+       []
+      ],
+      [
+       542,
+       558,
+       []
+      ],
+      [
+       563,
+       569,
+       []
+      ],
+      [
+       572,
+       574,
+       []
+      ],
+      [
+       576,
+       576,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -3413,7 +5257,7 @@
    "dest": "src/model/swap/trio.rs",
    "crate": "consts",
    "src_sha256": "4e90058defa07842f8c417a17dbe678086ee45a20935f8811bc672f474e042cc",
-   "dest_sha256": "1d29101f2ceaef437fc8463ccc9fea25719473ef31ce789ae1a73b482b606f75",
+   "dest_sha256": "fc50373fbdad718ad463506a9ce05d3830ac6016f1c60bbe591f5014eb3d2574",
    "edits": [
     {
      "old": "use {training_mod_tui::StatefulTable, training_mod_tui::SubMenu, training_mod_tui::SubMenuType, training_mod_tui::Toggle, crate::engine::compat::grid::NX_SUBMENU_COLUMNS, training_mod_tui::NX_SUBMENU_ROWS};\n",
@@ -3445,6 +5289,21 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       180,
+       238,
+       []
+      ],
+      [
+       240,
+       252,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -3453,7 +5312,7 @@
    "dest": "src/model/swap/capacity_creation.rs",
    "crate": "consts",
    "src_sha256": "f130c2364f384fd3ab98e41b45416b73ed3c595dfa8e5576721a1f855157a304",
-   "dest_sha256": "623c716c94fee27970cd14ab8d35bedfb016daf29f131b94d29c03f4264adb1e",
+   "dest_sha256": "8a37d7111c79d037a4879afeb5ce24373c1b75e5b404d6ff547fee5d0a69b923",
    "edits": [
     {
      "table_tests": true,
@@ -3465,6 +5324,46 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       399,
+       409,
+       []
+      ],
+      [
+       439,
+       483,
+       []
+      ],
+      [
+       506,
+       516,
+       []
+      ],
+      [
+       537,
+       543,
+       []
+      ],
+      [
+       556,
+       556,
+       []
+      ],
+      [
+       558,
+       560,
+       []
+      ],
+      [
+       562,
+       562,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -3473,7 +5372,7 @@
    "dest": "src/model/swap/ordered_roster.rs",
    "crate": "consts",
    "src_sha256": "d51c3fa83b6288383d654a6e9fb4721d194317c6e9cbc1b11cfde1d2230b103f",
-   "dest_sha256": "5e7ddd04474746be480977368c9f69b72d22a1937751f93d2334f57d6b2d9bc9",
+   "dest_sha256": "96cb595f4f5b33a0b9d51c57e1c134d479a4e67fa44be10d1f630a1ee8d0ccb2",
    "edits": [
     {
      "old": "use {training_mod_tui::StatefulTable, training_mod_tui::SubMenu, training_mod_tui::SubMenuType, training_mod_tui::Toggle, crate::engine::compat::grid::NX_SUBMENU_COLUMNS, training_mod_tui::NX_SUBMENU_ROWS};\n",
@@ -3525,6 +5424,26 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       248,
+       289,
+       []
+      ],
+      [
+       317,
+       348,
+       []
+      ],
+      [
+       380,
+       382,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -3533,7 +5452,7 @@
    "dest": "src/model/swap/mii_cycle.rs",
    "crate": "consts",
    "src_sha256": "c413a3b1fe5ea1eadc36be20913a55a780bcbac58bf81dded0f0c278d4eb0fe2",
-   "dest_sha256": "da207a8a7f98471570364723f0f6d9504ee979f5415f7003a3082c8a17094992",
+   "dest_sha256": "faaf5f3c4357692af43ffd41c70cfe3aec127efd65aaf8e57c279ee1161aff66",
    "edits": [
     {
      "old": "    let mut choices = Vec::with_capacity(ordered.len());\n",
@@ -3618,6 +5537,63 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       357,
+       368,
+       [
+        "    "
+       ]
+      ],
+      [
+       388,
+       413,
+       []
+      ],
+      [
+       493,
+       511,
+       []
+      ],
+      [
+       583,
+       620,
+       []
+      ],
+      [
+       648,
+       1142,
+       []
+      ],
+      [
+       1147,
+       1147,
+       []
+      ],
+      [
+       1149,
+       1149,
+       []
+      ],
+      [
+       1151,
+       1151,
+       []
+      ],
+      [
+       1153,
+       1154,
+       []
+      ],
+      [
+       1156,
+       1165,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -3626,7 +5602,7 @@
    "dest": "src/model/preload/cycle_preload_capacity.rs",
    "crate": "consts",
    "src_sha256": "4ebdbabc047d5540685b728840afd5862f940aec24ba8d0ff65e7f4c2d7ba07c",
-   "dest_sha256": "a6365d517fb2b7f82b4a6c4e70d62d3b298787855f54df41c56d927f4f510f04",
+   "dest_sha256": "0f083c0298ad47b6a25b0d1ca15904ed2ebc976d66662417756aa8985883720c",
    "edits": [
     {
      "old": "//! Value-only capacity contract for cycle preloading. Counts and backend limits\n//! live here; the slot order is the single `mii::capacity` contract that Mii\n//! owner checks also use. Native ownership must still qualify every entry.\nuse crate::engine::mii::backend::Layout;\n\npub use crate::engine::mii::capacity::{capacity_index, extra_slots, Extras, ALL_EXTRA_SLOTS, BASE_HELPERS, EXTRA_SLOTS, MAX_TARGETS};\npub const ABSENT_SLOT: u32 = 8;\n\n/// Potential entries, not permission to create or dereference them. Training\n/// extensions and solo waiting extensions require separate opt-in features.\npub fn slots(layout: Layout, third: bool, ldn_third: bool, extended: bool)\n    -> [u32; MAX_TARGETS] {\n    slots_with_waiting(layout, third, ldn_third, extended, false)\n}\n\npub fn slots_with_waiting(layout: Layout, third: bool, ldn_third: bool, extended: bool, waiting: bool)\n    -> [u32; MAX_TARGETS] {\n    let mut slots = [ABSENT_SLOT; MAX_TARGETS];\n    slots[..BASE_HELPERS].copy_from_slice(&layout.helpers());\n    let extra_count = if !third { 0 } else {\n        match layout {\n            Layout::Training => if extended { EXTRA_SLOTS.len() } else { 1 },\n            Layout::Ldn => if waiting { extra_slots(layout).len() } else { usize::from(ldn_third) },\n",
@@ -3659,6 +5635,21 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       109,
+       116,
+       []
+      ],
+      [
+       143,
+       143,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -3667,7 +5658,7 @@
    "dest": "src/model/preload/cycle_preload_policy.rs",
    "crate": "root",
    "src_sha256": "8f006ae6d6f978d500da383c4edbb5e731d9b91e19fa7b3e18037e73224ae7b2",
-   "dest_sha256": "338ef3cf4c631a699bbca50701909b0a9d9de5e0faf30d56b60b56346501bd6a",
+   "dest_sha256": "e1840c06c1cdf86a31c6db3f662972f5b0ba5cca9282d1108456b8f4c5f01d21",
    "edits": [
     {
      "old": "/// CPU's fighter look-ahead. Each CPU fighter that `merge` would place before the last Player hat\n/// moves, in its own order, to just behind that hat; every other pair of targets keeps `merge`'s\n/// order, and a target in both lanes keeps the earlier, hat position. The cost is the CPU's next\n/// swap, which may then find no warm helper for its fighter. Without a Player hat this is `merge`.\npub fn merge_player_hats_first<T: Copy + Eq, const N: usize>(lanes: [[Option<T>; N]; 4], slots: u8) -> [Option<T>; N] {\n    let mut order: Vec<(usize, T)> = Vec::with_capacity(4 * N);\n    for depth in 0..N {\n        for (lane, targets) in lanes.iter().enumerate() {\n            if let Some(target) = targets[depth] {\n                order.push((lane, target));\n            }\n        }\n    }\n    if let Some(last_hat) = order.iter().rposition(|(lane, _)| *lane == PLAYER_HATS) {\n        let (head, tail) = order.split_at(last_hat + 1);\n        let mut ranked: Vec<(usize, T)> = head.iter().copied().filter(|(lane, _)| *lane != CPU_FIGHTERS).collect();\n        ranked.extend(head.iter().copied().filter(|(lane, _)| *lane == CPU_FIGHTERS));\n        ranked.extend_from_slice(tail);\n        order = ranked;\n    }\n    let limit = usize::from(slots).min(crate::engine::preload::cycle_preload_capacity::MAX_TARGETS).min(N);\n    let mut result = [None; N];\n    let mut count = 0;\n    for (_, target) in order {\n        if count >= limit {\n",
@@ -3834,6 +5825,78 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       463,
+       463,
+       [
+        "    "
+       ]
+      ],
+      [
+       519,
+       546,
+       []
+      ],
+      [
+       592,
+       639,
+       []
+      ],
+      [
+       719,
+       857,
+       []
+      ],
+      [
+       886,
+       923,
+       []
+      ],
+      [
+       942,
+       980,
+       []
+      ],
+      [
+       988,
+       989,
+       []
+      ],
+      [
+       1005,
+       1147,
+       []
+      ],
+      [
+       1170,
+       1170,
+       []
+      ],
+      [
+       1172,
+       1173,
+       []
+      ],
+      [
+       1176,
+       1187,
+       []
+      ],
+      [
+       1189,
+       1190,
+       []
+      ],
+      [
+       1192,
+       1200,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -3842,7 +5905,7 @@
    "dest": "src/model/swap/character_memory.rs",
    "crate": "root",
    "src_sha256": "513ed484fc3ab77d9d39567ced7626950b7c63ecc54acdd6f99e08db293c3cc8",
-   "dest_sha256": "bd1b8f4f4d0b5a2a761e1714b04a53a33b2159f7844d2492660b369a69d63bc1",
+   "dest_sha256": "39ab20189e147079dcad65c95c26268b987887742f2fc5143a334694e7922409",
    "edits": [
     {
      "table_tests": true,
@@ -3854,6 +5917,28 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       136,
+       136,
+       [
+        "    use super::WaitingSession;"
+       ]
+      ],
+      [
+       153,
+       312,
+       []
+      ],
+      [
+       318,
+       326,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -3862,7 +5947,7 @@
    "dest": "src/model/kirby/kirby_hat_cycle.rs",
    "crate": "root",
    "src_sha256": "685316a7023abcc3e32de85829aa6450514c2807e32191b536920dbb84184528",
-   "dest_sha256": "b698cdbeb43c6d7d2bd7a1596a2deb9d8381c190e714cd08a0f89beabed22053",
+   "dest_sha256": "b6264141bc0ae82e682ab54de63d45734777cfa1420d9ed6b44f2d6496f268a3",
    "edits": [
     {
      "old": "    (left_click && right_click, left_click || right_click)\n}\n",
@@ -3884,6 +5969,31 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       162,
+       175,
+       []
+      ],
+      [
+       187,
+       256,
+       []
+      ],
+      [
+       322,
+       322,
+       []
+      ],
+      [
+       324,
+       328,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -3892,7 +6002,7 @@
    "dest": "src/model/mii_root/mii_hud_portrait_policy.rs",
    "crate": "root",
    "src_sha256": "aa4526a723fa74aa0b811c2883a7671c699797bda691622e5348604c674a2c33",
-   "dest_sha256": "64d7e8c5cbf6dd582e78e6186a78b52d3ab3d3a72e9ed658cb8adce6f3b01901",
+   "dest_sha256": "449c9b8280825178cffeef652b2aee57e75aa3e2026da10c419b0566175be8cc",
    "edits": [
     {
      "old": "\n/// Candidate request subs on a helper row. Nothing here claims native code never uses\n/// them: first use requires `RequestWords::idle_unregistered`, and an owned request that\n/// stops reading live is disowned.\npub const PORTRAIT_SUBS: [u32; 3] = [7, 8, 9];\npub const VISIBLE_OWNERS: usize = 2;\n/// Two helper rows times three subs.\npub const OWNED_CAPACITY: usize = 6;\n\n/// The two exact-portrait request channels in the shared source registry.\n/// Configuration alone cannot identify a portrait: Kirby Mii hats carry it too.\npub const SOURCE_CHANNELS: [usize; 2] = [3, 4];\npub fn source_channel_admitted(channel: usize, exact: bool, menu_open: bool) -> bool {\n    !menu_open || (SOURCE_CHANNELS.contains(&channel) && exact)\n}\n\n/// Count active helper acquisition attempts, not time deliberately spent behind\n",
@@ -4015,6 +6125,120 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       813,
+       813,
+       [
+        "    use super::{represent, Binding, Live, RebindStep, RebindWait, Represent, Request, Shown};"
+       ]
+      ],
+      [
+       834,
+       901,
+       []
+      ],
+      [
+       907,
+       912,
+       []
+      ],
+      [
+       922,
+       922,
+       [
+        "        hud_assets_settled, tick_bind_allowed, HudAssets, HudHold, Job, Ownership, Request,"
+       ]
+      ],
+      [
+       946,
+       952,
+       []
+      ],
+      [
+       969,
+       976,
+       []
+      ],
+      [
+       996,
+       996,
+       []
+      ],
+      [
+       998,
+       998,
+       []
+      ],
+      [
+       1194,
+       1227,
+       []
+      ],
+      [
+       1233,
+       1234,
+       []
+      ],
+      [
+       1278,
+       1418,
+       []
+      ],
+      [
+       1538,
+       1547,
+       []
+      ],
+      [
+       1552,
+       1558,
+       []
+      ],
+      [
+       1565,
+       1565,
+       []
+      ],
+      [
+       1571,
+       1601,
+       []
+      ],
+      [
+       1616,
+       1654,
+       []
+      ],
+      [
+       1679,
+       1680,
+       []
+      ],
+      [
+       1726,
+       1765,
+       []
+      ],
+      [
+       1805,
+       1831,
+       []
+      ],
+      [
+       1853,
+       1872,
+       []
+      ],
+      [
+       1906,
+       1908,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -4023,7 +6247,7 @@
    "dest": "src/model/lobby/practice_policy.rs",
    "crate": "root",
    "src_sha256": "6d28615050b338db6a207bbc955159e9f47347d91dfb402c3a4036135bf9f477",
-   "dest_sha256": "c0d66a9b6ade5ed256f00914f27f2b9c5adb1a9ebd6736e2d32aab0bd5e0f528",
+   "dest_sha256": "112df21fe498691bd2c25d10bc41879bfef4a2aad7eb8c50ab4268313114c7ca",
    "edits": [
     {
      "old": "pub struct EntryLease(Option<Entries>);\n",
@@ -4045,6 +6269,21 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       67,
+       76,
+       []
+      ],
+      [
+       101,
+       101,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -4053,7 +6292,7 @@
    "dest": "src/model/stages/stage_forms.rs",
    "crate": "tui",
    "src_sha256": "104cea14a4d26ba7791ac7b432dd39f4e44b1e09340de932789a8596c318b500",
-   "dest_sha256": "191dbff9aeb629ce2769641cbe70df010aae2a57f46ccf7b1a1e02bb185b0738",
+   "dest_sha256": "9bba4e0153a94a2def0bb97aa5dd9c0fdf058feaa68d6e4b321648273d792307",
    "edits": [
     {
      "old": "pub(crate) enum HelpControls",
@@ -4070,6 +6309,31 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       155,
+       172,
+       []
+      ],
+      [
+       236,
+       254,
+       []
+      ],
+      [
+       259,
+       259,
+       []
+      ],
+      [
+       261,
+       261,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -4078,7 +6342,7 @@
    "dest": "src/model/stages/stage_menu.rs",
    "crate": "tui",
    "src_sha256": "7dece73f4a1563cb27d760b54577627d5ecbfe54867701737f45a3ffcb70592c",
-   "dest_sha256": "89f9e74d1f77deba66c381674a581661d48fada65d24a7f1eb198371578e7bc4",
+   "dest_sha256": "cfdbbec199490c74b94ff2070b81de6b313b43c1dc573d059e90b72ab65511e1",
    "edits": [
     {
      "table_tests": true,
@@ -4090,6 +6354,21 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       47,
+       50,
+       []
+      ],
+      [
+       52,
+       80,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -4098,7 +6377,7 @@
    "dest": "src/model/stages/lobby_stages.rs",
    "crate": "consts",
    "src_sha256": "86d084f7400d24e8e6be5554b391071a5b3a36d6208ccf28651727199b37586f",
-   "dest_sha256": "4a342ab66a59f317cdf4bfc45f2faf13e384d43730b87fac580979012ba03bdd",
+   "dest_sha256": "90990cd781f2dadef768a354f5fc137fd8da628b0bea51e29efa8b1afbbbc130",
    "edits": [
     {
      "old": "use {training_mod_tui::StatefulTable, training_mod_tui::SubMenu, training_mod_tui::SubMenuType, training_mod_tui::Toggle, crate::engine::compat::grid::NX_SUBMENU_COLUMNS, training_mod_tui::NX_SUBMENU_ROWS};\n",
@@ -4140,6 +6419,31 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       332,
+       409,
+       []
+      ],
+      [
+       422,
+       436,
+       []
+      ],
+      [
+       444,
+       444,
+       []
+      ],
+      [
+       446,
+       446,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -4169,7 +6473,7 @@
    "dest": "src/model/stages/practice_stage_request_policy.rs",
    "crate": "root",
    "src_sha256": "f21325a210af687c2c008978356be0f0850b064390c242c8bb2d8ec955d002a6",
-   "dest_sha256": "dd68affed8a3237d120e4f9d7eae340052b4a46ef83a8c41d76fc8ec658b4181",
+   "dest_sha256": "d54a8fa4d37d91a45c7370ee48334cc70234f7a80ec173d0a11d2b7dc75a619a",
    "widen": true,
    "edits": [
     {
@@ -4182,6 +6486,41 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       204,
+       259,
+       []
+      ],
+      [
+       307,
+       394,
+       []
+      ],
+      [
+       428,
+       467,
+       []
+      ],
+      [
+       473,
+       474,
+       []
+      ],
+      [
+       476,
+       480,
+       []
+      ],
+      [
+       482,
+       484,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -4190,7 +6529,7 @@
    "dest": "src/model/stages/training_stage_rotation_policy.rs",
    "crate": "root",
    "src_sha256": "7c87c293b95021b738e748aad978d7e90399781320f8a1cfa1b7b2fde7a81981",
-   "dest_sha256": "a09f1bf074ffb5bd83f6e5595595adbeb67a180beef7ea52fb007ccb2803cf35",
+   "dest_sha256": "6b676a714a1a1890f5b5a44370318791cea0204610df38e5429e17170f1c9d99",
    "widen": true,
    "edits": [
     {
@@ -4203,6 +6542,44 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       152,
+       153,
+       [
+        "    ",
+        "    "
+       ]
+      ],
+      [
+       158,
+       158,
+       []
+      ],
+      [
+       188,
+       239,
+       []
+      ],
+      [
+       264,
+       345,
+       []
+      ],
+      [
+       368,
+       370,
+       []
+      ],
+      [
+       372,
+       375,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -4211,7 +6588,7 @@
    "dest": "src/model/stages/waiting_hazards_policy.rs",
    "crate": "root",
    "src_sha256": "8a378ab2499cab662a7412a336edffea5920caed1057c11190052b6380092b40",
-   "dest_sha256": "a1effe42d70933ece5d49eb3ed3c78684e899aec22a80aba15a80a0b6c07d308",
+   "dest_sha256": "0b0eb2873db3d3c9a4e3a67abecef3e0bd66623c14ea24aa7bc1deee525b1614",
    "edits": [
     {
      "table_tests": true,
@@ -4223,6 +6600,21 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       30,
+       37,
+       []
+      ],
+      [
+       43,
+       43,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -4231,7 +6623,7 @@
    "dest": "src/model/items/character_items.rs",
    "crate": "consts",
    "src_sha256": "57640dd2a5a9ea201d3a588e05bb950f5f7cecb551d602acfeeb44d0b5a3c2bf",
-   "dest_sha256": "a7392e0d537bb364a2d468e2b9c621c5329df04ec47575c03ea26c7800bb1819",
+   "dest_sha256": "1ff7c23463adfee2b9dc6a57545adb3ee59778c9eb12e1ed0d6190555693ced7",
    "edits": [
     {
      "old": "use {crate::StatefulTable, crate::SubMenu, crate::SubMenuType, crate::Toggle, crate::NX_SUBMENU_COLUMNS, crate::NX_SUBMENU_ROWS};\n",
@@ -4258,6 +6650,26 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       113,
+       150,
+       []
+      ],
+      [
+       160,
+       172,
+       []
+      ],
+      [
+       201,
+       204,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -4266,7 +6678,7 @@
    "dest": "src/model/preload/cycle_preload_config.rs",
    "crate": "consts",
    "src_sha256": "49c8a777d9e7c728aa8ecc7a51df2f7990f3edf458fdf7163be3b82fa9e3bf01",
-   "dest_sha256": "a2654c447eed0fa8b9fb373a8b17493c3bf0bca9f154c30488d506fe4db1da8c",
+   "dest_sha256": "3aede00f781fac7a0b2d29ddd7986c6c08888d3fa0db636721a9d575cd9d0010",
    "edits": [
     {
      "delete_from": "// The exported menu macro resolves these names at its use site.\nmod bank_submenu {",
@@ -4338,6 +6750,51 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       1312,
+       1399,
+       []
+      ],
+      [
+       1447,
+       1636,
+       []
+      ],
+      [
+       1718,
+       1880,
+       []
+      ],
+      [
+       2212,
+       2557,
+       []
+      ],
+      [
+       2562,
+       2564,
+       []
+      ],
+      [
+       2566,
+       2570,
+       []
+      ],
+      [
+       2573,
+       2576,
+       []
+      ],
+      [
+       2581,
+       2588,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -4388,7 +6845,7 @@
    "dest": "src/model/p1/move_observer_tests.rs",
    "crate": "root",
    "src_sha256": "7b0ca617626f81d6073e39323b913d172f897a718bb94f567e70d2adc7c61ac2",
-   "dest_sha256": "003eafe75708b9af188b3442fabe5a4e7095ecbfe08eec9ac9144d34e4380af1",
+   "dest_sha256": "4aaecc4708c12810a4a3ccaf1b789f4ff1235f5a1cb941ada05aba888e1b286b",
    "edits": [
     {
      "table_file": true,
@@ -4397,6 +6854,41 @@
     {
      "wrap_file": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       26,
+       30,
+       []
+      ],
+      [
+       35,
+       88,
+       []
+      ],
+      [
+       124,
+       152,
+       []
+      ],
+      [
+       157,
+       157,
+       []
+      ],
+      [
+       159,
+       161,
+       []
+      ],
+      [
+       163,
+       164,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -4405,7 +6897,7 @@
    "dest": "src/model/p1/tests.rs",
    "crate": "root",
    "src_sha256": "3cd60855f7604ae17959a1c669e4d2ed80d8f8fb644ea02534ef8dc2035e5ffb",
-   "dest_sha256": "dabd97f1e02b51b7b4085b0855c7ccf3bc8de4f5d804f97a1e0981e069580d92",
+   "dest_sha256": "314c2df65e4a439d7392cb072a63f3ff0d8a167582836e1bfab385cddd2b0f45",
    "edits": [
     {
      "table_file": true,
@@ -4414,6 +6906,51 @@
     {
      "wrap_file": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       58,
+       128,
+       []
+      ],
+      [
+       168,
+       193,
+       []
+      ],
+      [
+       241,
+       264,
+       []
+      ],
+      [
+       300,
+       313,
+       []
+      ],
+      [
+       319,
+       321,
+       []
+      ],
+      [
+       323,
+       323,
+       []
+      ],
+      [
+       325,
+       325,
+       []
+      ],
+      [
+       327,
+       327,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -4443,7 +6980,7 @@
    "dest": "src/model/preload/preload_metrics.rs",
    "crate": "root",
    "src_sha256": "795ede5522c0ac2c16bd2c03e774f06ec9e3ba838feea46d20101926d192cfca",
-   "dest_sha256": "8df510ed01672c127038852ebd79e585887a159470e464f028dbaa72b87883d9",
+   "dest_sha256": "161f2616f3bef7be3cba33af0f6a6d4bf7e23424093fe5e076ddeeaeec40eaa0",
    "edits": [
     {
      "old": "//! callback counts supplied by the caller. Capture never allocates, locks, or logs;\n//! only `snapshot` and `OperationStamp::finish` write, one bounded diagnostic line each.\nuse std::convert::TryFrom;\nuse std::fmt;\nuse std::sync::atomic::{AtomicBool, Ordering};\nuse std::sync::Mutex;\n\n/// Result stored when this build cannot issue the SVC (host value tests).\npub const UNSUPPORTED: u32 = u32::MAX;\n/// Frame-interval bucket upper bounds; the last bucket holds everything above 50 ms.\nconst GAP_BOUNDS_US: [u64; 5] = [17_500, 20_000, 25_000, 34_000, 50_000];\n",
@@ -4470,6 +7007,26 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       811,
+       839,
+       []
+      ],
+      [
+       851,
+       885,
+       []
+      ],
+      [
+       1054,
+       1058,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -4594,7 +7151,7 @@
    "dest": "src/model/p1_session/menu_session.rs",
    "crate": "root",
    "src_sha256": "327f70c40386384a06de1e06f1a646439005325fca51b609e71b71e829095982",
-   "dest_sha256": "680fad09a78ecd3a9662155fe19ace0a686d77b2dfffb8c0540cec7996b4e7e1",
+   "dest_sha256": "3e5579180959782c9666c3e555bdbb45715e2dea681b88dd19391e165e73fc32",
    "widen": true,
    "edits": [
     {
@@ -4607,6 +7164,21 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       89,
+       99,
+       []
+      ],
+      [
+       106,
+       106,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -4615,7 +7187,7 @@
    "dest": "src/model/p1_session/stage_session.rs",
    "crate": "root",
    "src_sha256": "058be3adc1bce088239c483540ae5bf77ca4ad455467393e78eaaafac21afc67",
-   "dest_sha256": "2a7f1464645b8b53d4a9c16a5a1631188cbbdcfc5616e730fa8a439129a7fec1",
+   "dest_sha256": "c7a02389457d5cdd224889e8c6faf3334ad3b9d86dcdad996cfe24315095a652",
    "widen": true,
    "edits": [
     {
@@ -4628,6 +7200,21 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       68,
+       91,
+       []
+      ],
+      [
+       119,
+       120,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -14061,7 +16648,7 @@
    "dest": "src/runtime/mii/mii_source_provenance.rs",
    "crate": "root",
    "src_sha256": "31fabf9212a6f91d03a6ecc8e5505f8961ea671c4274075f6bbc10c605073c4e",
-   "dest_sha256": "2c14d662520ef4c38cb49e7ad717601b2a3ad92cf3b7dc94dc382171020b3b05",
+   "dest_sha256": "c4993cb6d84369efe5c80dca8f53b35d8d4dd85a930917ec8aa141ef0d30a814",
    "edits": [
     {
      "old": "            Helper::Unmanaged => crate::engine::mii::role_owner::original_row_matches(\n                now.kind, now.original.kind),\n            Helper::Unavailable { .. } => false,\n            Helper::Ready { ready, key, proof } => {\n                let token = ready.source();\n                token.slot() == id && Some(token.epoch()) == self.epoch\n",
@@ -14249,6 +16836,41 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       266,
+       325,
+       []
+      ],
+      [
+       357,
+       433,
+       []
+      ],
+      [
+       438,
+       439,
+       []
+      ],
+      [
+       441,
+       441,
+       []
+      ],
+      [
+       455,
+       504,
+       []
+      ],
+      [
+       570,
+       570,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -15749,7 +18371,7 @@
    "dest": "src/model/mii_root/resume.rs",
    "crate": "tui",
    "src_sha256": "e92b99bdb4e7b7f4c3ed2c211610992fa1daf5a5ae23b460697565d2023e0793",
-   "dest_sha256": "d2b033b78b530b3d2648d6367f5703217bf28c731882baf0047f926508a6071f",
+   "dest_sha256": "df28b3f761e16a2e70e3b5df0d3a3a74151e4941c4c0add238711c3eb421a5ff",
    "edits": [
     {
      "table_tests": true,
@@ -15761,6 +18383,36 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       171,
+       177,
+       []
+      ],
+      [
+       186,
+       227,
+       []
+      ],
+      [
+       253,
+       270,
+       []
+      ],
+      [
+       294,
+       295,
+       []
+      ],
+      [
+       298,
+       298,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -15769,7 +18421,7 @@
    "dest": "src/model/mii_root/mii_menu.rs",
    "crate": "tui",
    "src_sha256": "94d7a41fe2ff5d3c4dcaed6ff0e87df4c96d64bd927a99e4550a198784cb761c",
-   "dest_sha256": "f4bc0613a377d07fc396c082a5a1c9f3d65dbeddbe857b3ef5bbd4a33307fc89",
+   "dest_sha256": "307200b6d903beaf1b494f2c52f0755c047d34e84ae55f2934dfb59fb52e713f",
    "edits": [
     {
      "old": "use {crate::macro_panel, crate::StatefulTable, crate::SubMenu, crate::SubMenuType, crate::engine::compat::grid::NX_SUBMENU_COLUMNS, crate::NX_SUBMENU_ROWS};",
@@ -15906,6 +18558,21 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       61,
+       81,
+       []
+      ],
+      [
+       87,
+       88,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -15914,7 +18581,7 @@
    "dest": "src/model/lobby/automation/adapter.rs",
    "crate": "root",
    "src_sha256": "df094011e9da70957a2c7e308f5a7b761a5213b04190e7e508bfc59fe6f71940",
-   "dest_sha256": "1332f7899edf2ebc0ccd5bb206fc56b70d075e63cd391d219c76e8c17a94d665",
+   "dest_sha256": "cf92939940bf2da494e2a388928192d08dba4e845fe5f29f73e14349b7f84024",
    "edits": [
     {
      "old": "impl Adapter {\n",
@@ -15931,6 +18598,48 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       801,
+       801,
+       [
+        "    use super::super::pulse::{Record, Scheduler};"
+       ]
+      ],
+      [
+       870,
+       915,
+       []
+      ],
+      [
+       939,
+       1041,
+       []
+      ],
+      [
+       1134,
+       1175,
+       []
+      ],
+      [
+       1315,
+       1316,
+       []
+      ],
+      [
+       1318,
+       1322,
+       []
+      ],
+      [
+       1325,
+       1325,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -15939,7 +18648,7 @@
    "dest": "src/model/lobby/automation/control.rs",
    "crate": "root",
    "src_sha256": "b32c1c5dde398e494832b1ae4f266a99368054c9c5fc2a2767fb2047797bd64f",
-   "dest_sha256": "dca67cd0953fdece3762708d33c6335518c30695444bdeef4de176a95c723d1b",
+   "dest_sha256": "902874b49c7ebb32759ac10d683e880556797517d149cba41b9aee944687594e",
    "edits": [
     {
      "old": "impl Controls {\n",
@@ -15956,6 +18665,21 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       211,
+       232,
+       []
+      ],
+      [
+       239,
+       239,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -15964,7 +18688,7 @@
    "dest": "src/model/lobby/automation/flow.rs",
    "crate": "root",
    "src_sha256": "c8576428768e6cde2e41a7fbb60fcc74ca8dbb1c773af67690e24469cd4b646a",
-   "dest_sha256": "cc989bd6d0a6f198f674225de7a36403c4eed3a60bafbe15b3095e552088bad4",
+   "dest_sha256": "8d86235d41449365ea3104e331ac4ff4b202faf5b42740827cab3ba5eb4cdace",
    "edits": [
     {
      "old": "    #[cfg_attr(not(test), expect(dead_code, reason = \"The native adapter starts at cards; intro readiness is not yet connected.\"))]\n",
@@ -15981,6 +18705,31 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       173,
+       215,
+       []
+      ],
+      [
+       261,
+       273,
+       []
+      ],
+      [
+       279,
+       281,
+       []
+      ],
+      [
+       283,
+       283,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -15989,7 +18738,7 @@
    "dest": "src/model/lobby/automation/popup.rs",
    "crate": "root",
    "src_sha256": "35a9ea32b9fa302cac348caf781a556e60ef74b0fcdd45ef39b6b59e9fb3d98d",
-   "dest_sha256": "e527619cd1a24c8ff538cb59dc752e2126ef2dd039c9e62cbea778e3604032ce",
+   "dest_sha256": "9dd47ff1628276edd5423a63ae45cdc129c1eeede36cbeef4d85e4acdf933250",
    "edits": [
     {
      "old": "impl Popup {\n",
@@ -16006,6 +18755,21 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       158,
+       249,
+       []
+      ],
+      [
+       272,
+       278,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -16014,7 +18778,7 @@
    "dest": "src/model/lobby/automation/pulse.rs",
    "crate": "root",
    "src_sha256": "3a4561a96f75be9cdca1705de9579c026f94039b2809350c886fefec98702563",
-   "dest_sha256": "65eb4dc2ca4ab1bcedbaeed46186c19e4902deeed1d7bb7385fcdafe8f09735b",
+   "dest_sha256": "1c0ba3a68e4a2e117594a450bd76748c6cd680a144bdbd20f1e86b7157acb5db",
    "edits": [
     {
      "old": "impl Scheduler {\n",
@@ -16036,6 +18800,26 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       366,
+       377,
+       []
+      ],
+      [
+       398,
+       448,
+       []
+      ],
+      [
+       520,
+       521,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -16044,7 +18828,7 @@
    "dest": "src/model/lobby/automation/recording.rs",
    "crate": "root",
    "src_sha256": "b1ba255dad55df7122d31a61128d406fc298753682a4d9a5bafadd38fd5fdd29",
-   "dest_sha256": "202a8f88f3edde4ea7e8f9cd2d0909201b48032290ab1a0f93b5e333ea57d55f",
+   "dest_sha256": "3e732f29c16a683b201696b189758a2f40e93f997449a9d1487c58e528910006",
    "edits": [
     {
      "old": "#[cfg_attr(feature = \"automation-results-observer\", derive(serde::Serialize))]\n",
@@ -16062,6 +18846,21 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       93,
+       109,
+       []
+      ],
+      [
+       139,
+       139,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -16144,7 +18943,7 @@
    "dest": "src/model/mii/inline_keyboard.rs",
    "crate": "root",
    "src_sha256": "4e3eb198a8c8924d0513ca9475f851543e4e53947f05b95847af70491a4cf154",
-   "dest_sha256": "b67d17d37d8f5bb287a8138ca83ec5c180830de172902989c443f117e98fa11b",
+   "dest_sha256": "050ee86f2889e6ab747a74d659439211963048922f5cafbb942473d033bfc273",
    "edits": [
     {
      "old": "#[cfg_attr(not(feature = \"mii-editor-alpha\"), allow(dead_code))]\n    pub(crate) fn new",
@@ -16336,6 +19135,21 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       113,
+       116,
+       []
+      ],
+      [
+       118,
+       149,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -16365,7 +19179,7 @@
    "dest": "tests/mii_replay185_headgear.rs",
    "crate": "mii",
    "src_sha256": "dc1217eeec20f201115dee096c09af7b3fc3b66afd8961353e56d481539109dd",
-   "dest_sha256": "4abd003c3e48b2b07ab6ae7374b37dcff075af8a84899244d61c558b8b064af3",
+   "dest_sha256": "cb96c59775822f865b78a95445ba3e374e1798764bd90a4a396930f9e332aa2c",
    "prepend": "#[allow(dead_code, unused_imports)]\n#[path = \"../src/model/mii/mod.rs\"]\npub mod mii;\n#[allow(unused_imports)]\nmod engine {\n    pub use super::mii;\n}\n\n",
    "edits": [
     {
@@ -16386,6 +19200,48 @@
      "insert_before_line": 6,
      "text": "// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.\nmacro_rules! lib_unit_tests {\n    ($($body:tt)*) => {};\n}\n// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).\n#[path = \"../src/test_table.rs\"]\nmod test_table;\n",
      "reason": "rc.9: the by-path unit tests run in the lib's binary; this file's cases run as one table"
+    },
+    {
+     "line_patch": [
+      [
+       21,
+       21,
+       [
+        "use {crate::engine::mii::backend::Layout, crate::engine::mii::inventory::MiiClass, crate::engine::mii::lifetime::{Binding, Configuration, Tokens}, crate::engine::mii::native_values::{Mirrors, RowIds}, crate::engine::mii::ordinary_cpu::{self as cpu, HatPublication}, crate::engine::mii::ordinary_player::{self, Owner, SameClass, SameClassValues}, crate::engine::mii::replay::ReplayMiis};"
+       ]
+      ],
+      [
+       70,
+       200,
+       []
+      ],
+      [
+       247,
+       261,
+       []
+      ],
+      [
+       300,
+       347,
+       []
+      ],
+      [
+       372,
+       376,
+       []
+      ],
+      [
+       378,
+       378,
+       []
+      ],
+      [
+       381,
+       381,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -16394,7 +19250,7 @@
    "dest": "src/model/mii_fork_tests/quickplay_backend.rs",
    "crate": "mii",
    "src_sha256": "ceae39afaf18aadd6fceaaabc9c6f1189d680cd454bdceb8f83a7bf4cf1921d6",
-   "dest_sha256": "f6f078da5addfb5c74d86ccb2403a890475ba2238ac84fd1f8d4dacdf08f4e02",
+   "dest_sha256": "539edd6d1dca58a6496293dc50a29fa8e8c40bb9aae666061b4f45d264d3baa7",
    "edits": [
     {
      "old": "extern crate self as training_mod_consts;\npub use training_mod_mii as mii;\n",
@@ -16429,6 +19285,41 @@
     {
      "table_file": true,
      "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "line_patch": [
+      [
+       5,
+       5,
+       []
+      ],
+      [
+       7,
+       7,
+       []
+      ],
+      [
+       12,
+       81,
+       []
+      ],
+      [
+       94,
+       133,
+       []
+      ],
+      [
+       138,
+       140,
+       []
+      ],
+      [
+       142,
+       143,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -16437,7 +19328,7 @@
    "dest": "src/model/mii_fork_tests/ldn_backend.rs",
    "crate": "mii",
    "src_sha256": "09d80635f2cb30c8be3d7400b786cf6ca14cc7a37c66ba2c50be14443f824a36",
-   "dest_sha256": "0c17d09d305301ea23ce47023c49f70af51b71d306467468a20cd3d261da4f55",
+   "dest_sha256": "8fe78b8ccf6ac706f25e8828b647b88e4529793411f9f68bd9034c15a53d8a88",
    "edits": [
     {
      "old": "extern crate self as training_mod_consts;\npub use training_mod_mii as mii;\n",
@@ -16457,6 +19348,43 @@
     {
      "table_file": true,
      "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "line_patch": [
+      [
+       2,
+       2,
+       [
+        "use {crate::engine::mii::backend::Layout, crate::engine::mii::inventory::{build_snapshot, RawSlot, TaggedId}, crate::engine::mii::lifetime::Configuration, crate::engine::mii::ordinary_player::Owner, crate::engine::mii::remembered::Value, crate::engine::mii::role_owner};"
+       ]
+      ],
+      [
+       5,
+       5,
+       []
+      ],
+      [
+       17,
+       47,
+       []
+      ],
+      [
+       57,
+       79,
+       []
+      ],
+      [
+       123,
+       123,
+       []
+      ],
+      [
+       125,
+       125,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   }

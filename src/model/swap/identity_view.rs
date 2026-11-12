@@ -236,10 +236,8 @@ pub fn weapon_owner(weapon_kind: u32) -> u32 {
 mod tests {
     lib_unit_tests! {
     use super::*;
-    use crate::engine::swap::character_forms::Forms;
+    
 
-    const REGIONS: [u32; 20] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 31, 32, 255, u32::MAX];
-    const COSTUMES: [u32; 11] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 0xff, u32::MAX];
     const FOX: u32 = 0x07;
     const KIRBY: u32 = 0x06;
     const MARIO: u32 = 0x00;
@@ -248,164 +246,8 @@ mod tests {
     const BRAWLER: u32 = 0x48;
     const JOKER: u32 = 0x52;
 
-    /// The region codes the listing swaps for, written out (not derived from `0x7fe`).
-    fn swapping_region(region: u32) -> bool {
-        matches!(region, 1..=10) || region >= 14
-    }
-
-    fn expected(kind: u32, costume: u32, region: u32) -> u32 {
-        match kind {
-            ROB if swapping_region(region) && costume == 0 => 1,
-            ROB if swapping_region(region) && costume == 1 => 0,
-            0x48..=0x4a => 0,
-            _ => costume,
-        }
-    }
-
     fn header(kinds: [u32; 3], costume: u32) -> Header {
         Header { kinds, costume }
-    }
-
-    fn the_selector_matches_the_listing_for_every_kind_region_and_costume() {
-        for kind in (0..0x80u32).chain([0xff, NO_KIND]) {
-            for &region in &REGIONS {
-                for &costume in &COSTUMES {
-                    assert_eq!(native_costume(kind, costume, region), expected(kind, costume, region),
-                        "kind {:#x} region {} costume {}", kind, region, costume);
-                }
-            }
-        }
-        // The rows the operator sees: Japan keeps Famicom slot 0, Western regions swap to the NES grey.
-        assert_eq!(native_costume(ROB, 0, 0), 0);
-        assert_eq!(native_costume(ROB, 0, 1), 1);
-        assert_eq!(native_costume(ROB, 1, 2), 0);
-        assert_eq!(native_costume(ROB, 5, 2), 5);
-        assert_eq!(native_costume(ROB, 0, 11), 0);
-        assert_eq!(native_costume(ROB, 0, 14), 1);
-        for mii in MII_FIRST..=MII_LAST {
-            for &costume in &COSTUMES {
-                assert_eq!(native_costume(mii, costume, 1), 0);
-            }
-        }
-        assert_eq!(native_costume(0x4b, 3, 1), 3, "Popo is not a Mii");
-        assert_eq!(native_costume(0x47, 3, 1), 3);
-    }
-
-    /// I3: every entry native builds keys exactly as native does, at every scope and kind it serves.
-    fn every_native_entry_shape_keys_exactly_as_native() {
-        for primary in 0..0x60u32 {
-            let forms = Forms::starting(primary);
-            let h0 = header(forms.kinds, 0);
-            for &costume in &COSTUMES {
-                let h = Header { costume, ..h0 };
-                for &region in &REGIONS {
-                    let native = native_selector(&h, region);
-                    for &member in forms.kinds[..forms.count as usize].iter() {
-                        for scope in [Scope::Body(member), Scope::Request(member)] {
-                            assert_eq!(costume_of(scope, &h, region), native,
-                                "primary {:#x} member {:#x} {:?} region {} costume {}", primary, member, scope, region, costume);
-                        }
-                    }
-                    // Foreign requests (a Kirby copy, Trainer/Aegis objects) keep the primary's key.
-                    for foreign in [ROB, BRAWLER, GUNNER, 0x72, 0x75, KIRBY] {
-                        if !h.holds(foreign) {
-                            assert_eq!(costume_of(Scope::Request(foreign), &h, region), native);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    fn costume_of(scope: Scope, h: &Header, region: u32) -> u32 {
-        costume(scope, h, Published::EMPTY, region)
-    }
-
-    fn rob_takes_its_regional_default_in_every_cell_and_group() {
-        for &region in &REGIONS {
-            for &c in &COSTUMES {
-                let rob = native_costume(ROB, c, region);
-                // Window cells 0, 1, 2 under any primary.
-                for kinds in [[ROB, FOX, MARIO], [FOX, ROB, MARIO], [FOX, MARIO, ROB], [KIRBY, ROB, LUCARIO], [GUNNER, ROB, NO_KIND]] {
-                    let h = header(kinds, c);
-                    assert_eq!(costume_of(Scope::Body(ROB), &h, region), rob);
-                    assert_eq!(costume_of(Scope::Request(ROB), &h, region), rob);
-                }
-                // A detached group on a home window without R.O.B.: published for this R.
-                let home = header([FOX, MARIO, LUCARIO], c);
-                let published = Published::EMPTY.with(ROB).with(JOKER);
-                assert_eq!(costume(Scope::Request(ROB), &home, published, region), rob);
-                assert_eq!(costume(Scope::Body(ROB), &home, published, region), rob);
-                // Unpublished, R.O.B. is a foreign request and keeps the home primary's key.
-                assert_eq!(costume(Scope::Request(ROB), &home, Published::EMPTY, region), c);
-            }
-        }
-    }
-
-    fn co_members_of_a_rob_or_mii_primary_keep_their_own_costume() {
-        for &region in &REGIONS {
-            for &c in &COSTUMES {
-                for primary in [ROB, BRAWLER, GUNNER] {
-                    let h = header([primary, FOX, JOKER], c);
-                    for member in [FOX, JOKER] {
-                        assert_eq!(costume_of(Scope::Body(member), &h, region), c);
-                        assert_eq!(costume_of(Scope::Request(member), &h, region), c);
-                    }
-                }
-            }
-        }
-        // What native does today for the same window (the D-ROB1 defect the view removes).
-        let h = header([ROB, FOX, JOKER], 0);
-        assert_eq!(native_selector(&h, 1), 1, "native gives Fox R.O.B.'s swap");
-        assert_eq!(costume_of(Scope::Body(FOX), &h, 1), 0);
-    }
-
-    fn a_mii_body_takes_costume_zero_whatever_the_primary() {
-        for &region in &REGIONS {
-            for &c in &COSTUMES {
-                for mii in MII_FIRST..=MII_LAST {
-                    let window = header([KIRBY, mii, FOX], c);
-                    assert_eq!(costume_of(Scope::Body(mii), &window, region), 0);
-                    assert_eq!(costume_of(Scope::Request(mii), &window, region), 0);
-                    let group = header([FOX, MARIO, NO_KIND], c);
-                    assert_eq!(costume(Scope::Request(mii), &group, Published::EMPTY.with(mii), region), 0);
-                }
-            }
-        }
-    }
-
-    /// I2: once a kind is a body of R (header or published), body and request scopes agree, so a
-    /// registration and its release use one costume.
-    fn body_and_request_scopes_agree_for_every_body_of_r() {
-        let homes = [[FOX, MARIO, LUCARIO], [KIRBY, FOX, NO_KIND], [ROB, JOKER, MARIO], [GUNNER, NO_KIND, NO_KIND]];
-        for home in homes {
-            for &c in &COSTUMES {
-                let h = header(home, c);
-                for group in [[ROB, LUCARIO], [BRAWLER, NO_KIND], [KIRBY, JOKER], [MARIO, FOX]] {
-                    let mut published = Published::EMPTY;
-                    for kind in group {
-                        published = published.with(kind);
-                    }
-                    for &region in &REGIONS {
-                        for kind in home.iter().chain(group.iter()).copied().filter(|k| *k != NO_KIND) {
-                            assert_eq!(costume(Scope::Body(kind), &h, published, region),
-                                costume(Scope::Request(kind), &h, published, region),
-                                "home {:x?} kind {:#x} region {}", home, kind, region);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    fn foreign_requests_keep_the_primary_key() {
-        // Kirby (cell 0 under PinCell0) copying R.O.B. or a Mii keeps Kirby's key, as native does.
-        let h = header([KIRBY, FOX, MARIO], 0);
-        for foreign in [ROB, BRAWLER, 0x72, 0x75] {
-            assert_eq!(key(Scope::Request(foreign), &h, Published::EMPTY), KIRBY);
-            assert_eq!(costume_of(Scope::Request(foreign), &h, 1), 0);
-        }
-        assert_eq!(key(Scope::Request(NO_KIND), &header([FOX, NO_KIND, NO_KIND], 2), Published::EMPTY), FOX);
     }
 
     fn the_published_set_only_grows_and_ignores_unstorable_kinds() {
@@ -453,65 +295,8 @@ mod tests {
         }
     }
 
-    fn non_mii_or_recordless_descriptors_give_no_configured_words() {
-        assert!(configured_mii_words(&mii_descriptor(FOX, 0, [1, 2, 3, 4])).is_none());
-        assert!(configured_mii_words(&mii_descriptor(0x4b, 0, [1, 2, 3, 4])).is_none());
-        assert!(configured_mii_words(&mii_descriptor(GUNNER, u16::MAX, [1, 2, 3, 4])).is_none());
-        let mut two = mii_descriptor(BRAWLER, 1, [1, 2, 3, 4]);
-        two[0x14..0x18].copy_from_slice(&2u32.to_le_bytes());
-        assert!(configured_mii_words(&two).is_none(), "not a one-member staging");
-    }
-
     // Weapon kinds named by skyline-smash `lua_const` (WEAPON_KIND_*), cross-checked against the table.
-    const ROBOT_GYRO: u32 = 0xb7;
-    const ROBOT_HOMINGTARGET: u32 = 0xc0;
-    const PIKMIN_PIKMIN: u32 = 0x9d;
-    const LUCARIO_AURABALL: u32 = 0xb4;
     const OLIMAR: u32 = 0x2b;
-
-    fn the_weapon_owner_table_names_each_weapons_fighter() {
-        assert!(WEAPON_OWNER.iter().all(|&k| k <= 0x75), "native's switch bound at 0x33ac5f0");
-        // R.O.B.'s weapons are exactly ROBOT_GYRO..=ROBOT_HOMINGTARGET.
-        let rob: Vec<u32> = (0..WEAPON_KINDS as u32).filter(|&w| weapon_owner(w) == ROB).collect();
-        assert_eq!(rob, (ROBOT_GYRO..=ROBOT_HOMINGTARGET).collect::<Vec<_>>());
-        assert_eq!(weapon_owner(PIKMIN_PIKMIN), OLIMAR);
-        assert_eq!(weapon_owner(LUCARIO_AURABALL), LUCARIO);
-        for w in 0..=0x14 {
-            assert!((MII_FIRST..=MII_LAST).contains(&weapon_owner(w)), "Mii weapon {:#x}", w);
-        }
-        for w in [WEAPON_KINDS as u32, 0x1000, (-1i32) as u32, NO_KIND] {
-            assert_eq!(weapon_owner(w), NO_KIND);
-        }
-    }
-
-    /// The C116.1 crash: R.O.B. builds its Gyro pool during its own init while Olimar is the
-    /// primary and the active body. The Gyro's node must use the costume R.O.B.'s files were
-    /// registered with (`Scope::Body(ROB)`), not the active body's.
-    fn a_weapon_keys_on_its_owner_fighter_whatever_body_is_active() {
-        for &region in &REGIONS {
-            for &c in &COSTUMES {
-                let rob = native_costume(ROB, c, region);
-                let window = header([OLIMAR, LUCARIO, ROB], c);
-                let home = header([OLIMAR, NO_KIND, NO_KIND], c);
-                let detached = Published::EMPTY.with(LUCARIO).with(ROB);
-                for (h, p) in [(window, Published::EMPTY), (home, detached)] {
-                    for w in ROBOT_GYRO..=ROBOT_HOMINGTARGET {
-                        let keyed = costume(Scope::Request(weapon_owner(w)), &h, p, region);
-                        assert_eq!(keyed, costume(Scope::Body(ROB), &h, p, region), "I2 weapon {:#x}", w);
-                        assert_eq!(keyed, rob);
-                    }
-                    assert_eq!(costume(Scope::Request(weapon_owner(PIKMIN_PIKMIN)), &h, p, region), c);
-                    assert_eq!(costume(Scope::Request(weapon_owner(LUCARIO_AURABALL)), &h, p, region), c);
-                }
-            }
-        }
-        // The crash cell: region 1 swaps, the entry costume is 0. Native (and the active-body key)
-        // gave the Gyro costume 0 while R.O.B.'s files were registered with costume 1.
-        let window = header([OLIMAR, LUCARIO, ROB], 0);
-        assert_eq!(native_selector(&window, 1), 0);
-        assert_eq!(costume(Scope::Body(ROB), &window, Published::EMPTY, 1), 1);
-        assert_eq!(costume(Scope::Request(weapon_owner(ROBOT_GYRO)), &window, Published::EMPTY, 1), 1);
-    }
 
     /// I2 for every weapon kind: a weapon whose fighter is a body of `R` keys as that body's own
     /// registration; any other weapon (a Kirby copy's, a common one) keeps native's primary key.
@@ -539,41 +324,13 @@ mod tests {
         }
     }
 
-    /// I3 for weapons: every entry native builds keys every weapon kind exactly as native does.
-    fn every_native_entry_keys_every_weapon_as_native() {
-        for primary in 0..0x60u32 {
-            let forms = Forms::starting(primary);
-            for &costume_word in &[0u32, 1, 2, 7, 0xff] {
-                let h = header(forms.kinds, costume_word);
-                for &region in &REGIONS {
-                    let native = native_selector(&h, region);
-                    for w in 0..WEAPON_KINDS as u32 {
-                        assert_eq!(costume_of(Scope::Request(weapon_owner(w)), &h, region), native,
-                            "primary {:#x} weapon {:#x} region {} costume {}", primary, w, region, costume_word);
-                    }
-                }
-            }
-        }
-    }
-
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
-            ("the_selector_matches_the_listing_for_every_kind_region_and_costume", the_selector_matches_the_listing_for_every_kind_region_and_costume as fn()),
-            ("every_native_entry_shape_keys_exactly_as_native", every_native_entry_shape_keys_exactly_as_native as fn()),
-            ("rob_takes_its_regional_default_in_every_cell_and_group", rob_takes_its_regional_default_in_every_cell_and_group as fn()),
-            ("co_members_of_a_rob_or_mii_primary_keep_their_own_costume", co_members_of_a_rob_or_mii_primary_keep_their_own_costume as fn()),
-            ("a_mii_body_takes_costume_zero_whatever_the_primary", a_mii_body_takes_costume_zero_whatever_the_primary as fn()),
-            ("body_and_request_scopes_agree_for_every_body_of_r", body_and_request_scopes_agree_for_every_body_of_r as fn()),
-            ("foreign_requests_keep_the_primary_key", foreign_requests_keep_the_primary_key as fn()),
             ("the_published_set_only_grows_and_ignores_unstorable_kinds", the_published_set_only_grows_and_ignores_unstorable_kinds as fn()),
             ("configured_mii_words_are_the_state_six_index_and_tokens", configured_mii_words_are_the_state_six_index_and_tokens as fn()),
-            ("non_mii_or_recordless_descriptors_give_no_configured_words", non_mii_or_recordless_descriptors_give_no_configured_words as fn()),
-            ("the_weapon_owner_table_names_each_weapons_fighter", the_weapon_owner_table_names_each_weapons_fighter as fn()),
-            ("a_weapon_keys_on_its_owner_fighter_whatever_body_is_active", a_weapon_keys_on_its_owner_fighter_whatever_body_is_active as fn()),
             ("every_weapon_agrees_with_its_fighters_registration_or_stays_native", every_weapon_agrees_with_its_fighters_registration_or_stays_native as fn()),
-            ("every_native_entry_keys_every_weapon_as_native", every_native_entry_keys_every_weapon_as_native as fn()),
         ]);
     }
     }

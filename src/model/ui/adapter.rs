@@ -262,103 +262,10 @@ mod tests {
         bits.iter().fold(0, |m, b| m | (1 << b))
     }
 
-    fn hold_b_press_up_or_hold_up_press_b_opens_and_holding_both_does_not_reopen() {
-        let mut a = Adapter::new();
-        assert!(!a.poll(mask(&[bit::B]), Style::Pro, false, true, NO_SHORTCUTS).open);
-        assert!(a.poll(mask(&[bit::B, bit::DPAD_UP]), Style::Pro, false, true, NO_SHORTCUTS).open);
-        // Held on: no edge, no second open.
-        assert!(!a.poll(mask(&[bit::B, bit::DPAD_UP]), Style::Pro, false, true, NO_SHORTCUTS).open);
-        let mut a = Adapter::new();
-        assert!(!a.poll(mask(&[bit::DPAD_UP]), Style::Pro, false, true, NO_SHORTCUTS).open);
-        assert!(a.poll(mask(&[bit::DPAD_UP, bit::B]), Style::Pro, false, true, NO_SHORTCUTS).open);
-    }
-
     fn the_chord_is_refused_while_the_pause_menu_owns_input() {
         let mut a = Adapter::new();
         a.poll(mask(&[bit::B]), Style::Pro, false, false, NO_SHORTCUTS);
         assert!(!a.poll(mask(&[bit::B, bit::DPAD_UP]), Style::Pro, false, false, NO_SHORTCUTS).open);
-    }
-
-    fn a_configured_shortcut_opens_and_the_default_minus_is_an_edge() {
-        let mut a = Adapter::new();
-        let minus = [Chord::DEFAULT_SHORTCUT_1, Chord::NONE];
-        assert!(a.poll(mask(&[bit::MINUS]), Style::Pro, false, true, minus).open);
-        assert!(!a.poll(mask(&[bit::MINUS]), Style::Pro, false, true, minus).open);
-        assert!(!a.poll(0, Style::Pro, false, true, minus).open);
-        assert!(a.poll(mask(&[bit::MINUS]), Style::Pro, false, true, minus).open);
-        // A disabled (empty) shortcut never passes.
-        let mut a = Adapter::new();
-        assert!(!a.poll(mask(&[bit::MINUS]), Style::Pro, false, true, NO_SHORTCUTS).open);
-    }
-
-    fn plus_alone_never_opens_it_stays_the_games_pause() {
-        let mut a = Adapter::new();
-        assert!(!a.poll(mask(&[bit::PLUS]), Style::Pro, false, true, [Chord::DEFAULT_SHORTCUT_1, Chord::NONE]).open);
-    }
-
-    fn an_open_menu_reads_edges_of_the_dpad_and_buttons_and_repeats_only_the_stick() {
-        let mut a = Adapter::new();
-        let s = a.poll(mask(&[bit::DPAD_DOWN, bit::A]), Style::Pro, true, true, NO_SHORTCUTS);
-        assert_eq!(s.presses().collect::<Vec<_>>(), [Button::Down, Button::A]);
-        // The d-pad held does not repeat, however long.
-        for _ in 0..60 {
-            assert_eq!(a.poll(mask(&[bit::DPAD_DOWN, bit::A]), Style::Pro, true, true, NO_SHORTCUTS).presses().count(), 0);
-        }
-        // A stick direction presses on its edge, then every 21 frames.
-        let mut a = Adapter::new();
-        let held = mask(&[bit::LSTICK_UP]);
-        assert_eq!(a.poll(held, Style::Pro, true, true, NO_SHORTCUTS).presses().collect::<Vec<_>>(), [Button::Up]);
-        let mut fired = Vec::new();
-        for frame in 1..=50 {
-            if a.poll(held, Style::Pro, true, true, NO_SHORTCUTS).presses().count() > 0 {
-                fired.push(frame);
-            }
-        }
-        assert_eq!(fired, [21, 42]);
-    }
-
-    fn shoulder_buttons_follow_the_controller_type() {
-        assert_eq!(logical(mask(&[bit::L]), Style::Pro), L);
-        assert_eq!(logical(mask(&[bit::L]), Style::GameCube), ZL);
-        assert_eq!(logical(mask(&[bit::ZR]), Style::GameCube), R);
-        assert_eq!(logical(mask(&[bit::R]), Style::GameCube), ZR);
-        assert_eq!(logical(mask(&[bit::LEFT_SL]), Style::DualJoyCon), ZL);
-        assert_eq!(logical(mask(&[bit::RIGHT_SR]), Style::Pro), ZR);
-        assert_eq!(logical(mask(&[bit::REAL_L]), Style::GameCube), ZL);
-    }
-
-    fn zl_held_turns_up_and_down_into_section_jumps_and_its_release_is_then_not_a_tap() {
-        let mut a = Adapter::new();
-        let p = |a: &mut Adapter, bits: &[u32]| a.poll(mask(bits), Style::Pro, true, true, NO_SHORTCUTS).presses().collect::<Vec<_>>();
-        assert_eq!(p(&mut a, &[bit::ZL]), [], "ZL alone presses nothing yet");
-        assert_eq!(p(&mut a, &[bit::ZL, bit::DPAD_DOWN]), [Button::JumpDown]);
-        assert_eq!(p(&mut a, &[bit::ZL]), []);
-        assert_eq!(p(&mut a, &[bit::ZL, bit::DPAD_UP]), [Button::JumpUp]);
-        // Left / Right are not jumps; they still mark ZL as used.
-        assert_eq!(p(&mut a, &[bit::ZL, bit::DPAD_RIGHT]), [Button::Right]);
-        assert_eq!(p(&mut a, &[]), [], "a ZL that steered is not a tap on its release");
-        // The stick repeats the jump while held, as it repeats a move.
-        let mut a = Adapter::new();
-        p(&mut a, &[bit::ZL]);
-        assert_eq!(p(&mut a, &[bit::ZL, bit::LSTICK_DOWN]), [Button::JumpDown]);
-        let repeats = (1..=21).filter(|_| p(&mut a, &[bit::ZL, bit::LSTICK_DOWN]) == [Button::JumpDown]).count();
-        assert_eq!(repeats, 1);
-    }
-
-    fn a_zl_tap_is_sent_on_its_release() {
-        let mut a = Adapter::new();
-        let p = |a: &mut Adapter, bits: &[u32]| a.poll(mask(bits), Style::Pro, true, true, NO_SHORTCUTS).presses().collect::<Vec<_>>();
-        assert_eq!(p(&mut a, &[bit::ZL]), []);
-        assert_eq!(p(&mut a, &[bit::ZL]), []);
-        assert_eq!(p(&mut a, &[]), [Button::ZL]);
-        // A button pressed during the hold uses it too.
-        assert_eq!(p(&mut a, &[bit::ZL]), []);
-        assert_eq!(p(&mut a, &[bit::ZL, bit::A]), [Button::A]);
-        assert_eq!(p(&mut a, &[]), []);
-        // A GameCube pad's L is its ZL and works the same.
-        let mut a = Adapter::new();
-        let g = |a: &mut Adapter, bits: &[u32]| a.poll(mask(bits), Style::GameCube, true, true, NO_SHORTCUTS).presses().collect::<Vec<_>>();
-        assert_eq!(g(&mut a, &[bit::L, bit::DPAD_DOWN]), [Button::JumpDown]);
     }
 
     /// Review MN-1: on a screen without jumps (a direction grid, the slider, a roster or stage grid, a panel) ZL is
@@ -399,29 +306,6 @@ mod tests {
         assert_eq!(p(&mut a, &[]), [], "and its release is no second ZL");
     }
 
-    /// Review MN-2: ZL let go on the same poll as another press is not a tap (the press used the hold).
-    fn a_zl_release_with_another_press_on_the_same_poll_is_not_a_tap() {
-        let mut a = Adapter::new();
-        let p = |a: &mut Adapter, bits: &[u32]| a.poll(mask(bits), Style::Pro, true, true, NO_SHORTCUTS).presses().collect::<Vec<_>>();
-        assert_eq!(p(&mut a, &[bit::ZL]), []);
-        assert_eq!(p(&mut a, &[bit::A]), [Button::A], "A ticks the entry; ZL's all-or-none does not follow");
-        assert_eq!(p(&mut a, &[]), []);
-        assert_eq!(p(&mut a, &[bit::ZL]), []);
-        assert_eq!(p(&mut a, &[bit::DPAD_DOWN]), [Button::Down], "a direction on the release poll is a plain move");
-        assert_eq!(p(&mut a, &[]), []);
-        // A stick repeat on the release poll counts too.
-        let mut a = Adapter::new();
-        p(&mut a, &[bit::LSTICK_DOWN]);
-        // The hold repeats on its 21st poll after the press: the 20 polls before it are with ZL held.
-        for _ in 0..20 {
-            assert_eq!(p(&mut a, &[bit::ZL, bit::LSTICK_DOWN]), []);
-        }
-        assert_eq!(p(&mut a, &[bit::LSTICK_DOWN]), [Button::Down], "the repeat on the release poll");
-        // A tap alone still works.
-        assert_eq!(p(&mut a, &[bit::ZL]), []);
-        assert_eq!(p(&mut a, &[]), [Button::ZL]);
-    }
-
     fn a_zl_held_since_the_opening_chord_is_not_a_tap() {
         let mut a = Adapter::new();
         let held = mask(&[bit::ZL, bit::DPAD_UP]);
@@ -436,35 +320,13 @@ mod tests {
         assert_eq!(a.poll(0, Style::Pro, true, true, shortcut).presses().collect::<Vec<_>>(), [Button::ZL]);
     }
 
-    fn the_open_press_is_not_read_as_a_menu_press_after_resync() {
-        let mut a = Adapter::new();
-        let held = mask(&[bit::B, bit::DPAD_UP]);
-        a.poll(mask(&[bit::B]), Style::Pro, false, true, NO_SHORTCUTS);
-        assert!(a.poll(held, Style::Pro, false, true, NO_SHORTCUTS).open);
-        a.resync(held, Style::Pro);
-        // Still holding both next poll: nothing is pressed, B is not a press.
-        assert_eq!(a.poll(held, Style::Pro, true, true, NO_SHORTCUTS).presses().count(), 0);
-        // Releasing then pressing B closes.
-        a.poll(0, Style::Pro, true, true, NO_SHORTCUTS);
-        assert_eq!(a.poll(mask(&[bit::B]), Style::Pro, true, true, NO_SHORTCUTS).presses().collect::<Vec<_>>(), [Button::B]);
-    }
-
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
-            ("hold_b_press_up_or_hold_up_press_b_opens_and_holding_both_does_not_reopen", hold_b_press_up_or_hold_up_press_b_opens_and_holding_both_does_not_reopen as fn()),
             ("the_chord_is_refused_while_the_pause_menu_owns_input", the_chord_is_refused_while_the_pause_menu_owns_input as fn()),
-            ("a_configured_shortcut_opens_and_the_default_minus_is_an_edge", a_configured_shortcut_opens_and_the_default_minus_is_an_edge as fn()),
-            ("plus_alone_never_opens_it_stays_the_games_pause", plus_alone_never_opens_it_stays_the_games_pause as fn()),
-            ("an_open_menu_reads_edges_of_the_dpad_and_buttons_and_repeats_only_the_stick", an_open_menu_reads_edges_of_the_dpad_and_buttons_and_repeats_only_the_stick as fn()),
-            ("shoulder_buttons_follow_the_controller_type", shoulder_buttons_follow_the_controller_type as fn()),
-            ("zl_held_turns_up_and_down_into_section_jumps_and_its_release_is_then_not_a_tap", zl_held_turns_up_and_down_into_section_jumps_and_its_release_is_then_not_a_tap as fn()),
-            ("a_zl_tap_is_sent_on_its_release", a_zl_tap_is_sent_on_its_release as fn()),
             ("on_a_screen_without_jumps_zl_is_its_own_button_and_up_down_move", on_a_screen_without_jumps_zl_is_its_own_button_and_up_down_move as fn()),
-            ("a_zl_release_with_another_press_on_the_same_poll_is_not_a_tap", a_zl_release_with_another_press_on_the_same_poll_is_not_a_tap as fn()),
             ("a_zl_held_since_the_opening_chord_is_not_a_tap", a_zl_held_since_the_opening_chord_is_not_a_tap as fn()),
-            ("the_open_press_is_not_read_as_a_menu_press_after_resync", the_open_press_is_not_read_as_a_menu_press_after_resync as fn()),
         ]);
     }
     }

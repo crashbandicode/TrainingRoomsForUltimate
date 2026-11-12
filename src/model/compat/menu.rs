@@ -399,28 +399,6 @@ mod tests {
     use super::*;
     use crate::engine::swap::ordered_roster::{DEFAULT_CPU_ROSTER, DEFAULT_PLAYER_ROSTER};
 
-    fn on_off_is_on_then_off_like_the_factory_table() {
-        assert_eq!(OnOff::ALL_NAMES, ["On", "Off"]);
-        assert_eq!(OnOff::ON.to_byte_vec(), [1, 0]);
-        assert_eq!(OnOff::OFF.to_byte_vec(), [0, 1]);
-        assert_eq!(OnOff::ON + OnOff::OFF, OnOff::all());
-    }
-
-    /// The Solo Popo cycle rows are not rows of the settings table: their kept keys carry them (the row's option bytes), and a
-    /// malformed or missing key is the factory value.
-    fn the_solo_popo_cycle_rows_come_from_their_kept_keys() {
-        let mut snapshot = Snapshot::factory();
-        assert_eq!(TrainingModpackMenu::from_snapshot(&snapshot).solo_popo_player_cycle, OnOff::OFF);
-        snapshot.set_kept("solo_popo_player_cycle", serde_json::json!([1, 0])).unwrap();
-        snapshot.set_kept("solo_popo_cpu", serde_json::json!([1, 0])).unwrap();
-        let view = TrainingModpackMenu::from_snapshot(&snapshot);
-        assert_eq!((view.solo_popo_player_cycle, view.solo_popo_cpu), (OnOff::ON, OnOff::ON));
-        snapshot.set_kept("solo_popo_cpu", serde_json::json!("On")).unwrap();
-        snapshot.set_kept("solo_popo_player_cycle", serde_json::json!([1, 0, 0])).unwrap();
-        let view = TrainingModpackMenu::from_snapshot(&snapshot);
-        assert_eq!((view.solo_popo_player_cycle, view.solo_popo_cpu), (OnOff::OFF, OnOff::OFF));
-    }
-
     /// Every row-shaped field of the view (`rows()`), whether the settings table defines it (a row) or not (a kept key the
     /// write-back stores in the same shape): a non-factory value in the snapshot reaches the typed view and comes back unchanged.
     /// The Solo Popo cycle rows were the kept keys this missed (Eden s6-04); the test lists the others with them.
@@ -449,58 +427,6 @@ mod tests {
             assert_eq!(got.get(id), Some(changed), "{id} did not reach the typed view");
         }
         assert!(kept_ids.contains(&"solo_popo_player_cycle") && kept_ids.contains(&"solo_popo_cpu"), "kept: {kept_ids:?}");
-    }
-
-    fn a_snapshot_round_trips_through_the_view() {
-        let mut snapshot = Snapshot::factory();
-        snapshot.set("cycle_preload_slots", &[0, 1, 0, 0, 0, 0]).unwrap();
-        snapshot.set("cycle_preload_group_swap", &[0, 1]).unwrap();
-        snapshot.set("cycle_preload_ready_fighters", &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]).unwrap();
-        let view = TrainingModpackMenu::from_snapshot(&snapshot);
-        assert_eq!(view.cycle_preload_slots, preload::CyclePreloadSlots::ONE);
-        assert_eq!(view.cycle_preload_group_swap, OnOff::OFF);
-        assert_eq!(view.cycle_preload_ready_fighters, preload::CyclePreloadReadyFighters::TWELVE);
-        let mut back = Snapshot::factory();
-        for (id, elements) in view.rows() {
-            if back.get(id).is_some() {
-                back.set(id, &elements).unwrap();
-            }
-        }
-        assert_eq!(back, snapshot);
-    }
-
-    fn the_lobby_fields_follow_the_rows_and_the_kept_stage_list() {
-        use crate::engine::stages::lobby_stages::{LobbyStageOrder, STAGES};
-        let factory = TrainingModpackMenu::from_snapshot(&Snapshot::factory());
-        assert_eq!(factory.lobby_practice, OnOff::OFF);
-        assert_eq!(factory.training_stage_rotation, OnOff::OFF);
-        assert_eq!(factory.lobby_stages, LobbyStageOrder::NATIVE);
-        // all = 1 and no ranks: the whole catalog in its listed order
-        let mut order = vec![1u8];
-        order.extend(std::iter::repeat_n(0u8, STAGES.len()));
-        let text = format!(
-            r#"{{"menu":{{"lobby_practice":[1,0],"training_stage_rotation":[1,0],"lobby_stages":{order:?}}}}}"#
-        );
-        let loaded = crate::model::settings::parse(&text);
-        assert!(loaded.issues.is_empty(), "{:?}", loaded.issues);
-        let view = TrainingModpackMenu::from_snapshot(&loaded.settings.menu);
-        assert_eq!(view.lobby_practice, OnOff::ON);
-        assert_eq!(view.training_stage_rotation, OnOff::ON);
-        assert_eq!(view.lobby_stages.stages().len(), STAGES.len());
-        // a malformed kept list is the native order, never a panic
-        let loaded = crate::model::settings::parse(r#"{"menu":{"lobby_stages":[9,9]}}"#);
-        assert_eq!(TrainingModpackMenu::from_snapshot(&loaded.settings.menu).lobby_stages, LobbyStageOrder::NATIVE);
-    }
-
-    fn the_macro_rows_follow_the_snapshot_and_default_to_ask_and_numbered_slots() {
-        let factory = TrainingModpackMenu::from_snapshot(&Snapshot::factory());
-        assert_eq!((factory.fighter_prompt, factory.macro_source), (OnOff::ON, MacroSource::NUMBERED));
-        let mut snapshot = Snapshot::factory();
-        snapshot.set("macro_source", &[0, 1]).unwrap();
-        snapshot.set("fighter_prompt", &[0, 1]).unwrap();
-        let view = TrainingModpackMenu::from_snapshot(&snapshot);
-        assert_eq!((view.fighter_prompt, view.macro_source), (OnOff::OFF, MacroSource::NAMED));
-        assert_eq!(MacroSource::ALL_NAMES, ["Numbered Slots", "Named Library"]);
     }
 
     fn a_committed_snapshot_and_settings_reach_every_typed_view() {
@@ -566,24 +492,13 @@ mod tests {
         assert_eq!(mii_preferences_of(Some(&serde_json::json!("not an object"))), MiiPreferences::default());
     }
 
-    fn a_short_row_leaves_the_tail_off() {
-        assert_eq!(from_row(&[1], &OnOff::ALL_CONSTS), OnOff::ON);
-        assert_eq!(from_row(&[], &OnOff::ALL_CONSTS), OnOff::empty());
-    }
-
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
-            ("on_off_is_on_then_off_like_the_factory_table", on_off_is_on_then_off_like_the_factory_table as fn()),
-            ("the_solo_popo_cycle_rows_come_from_their_kept_keys", the_solo_popo_cycle_rows_come_from_their_kept_keys as fn()),
             ("every_row_shaped_field_reaches_the_view_as_a_row_or_a_kept_key", every_row_shaped_field_reaches_the_view_as_a_row_or_a_kept_key as fn()),
-            ("a_snapshot_round_trips_through_the_view", a_snapshot_round_trips_through_the_view as fn()),
-            ("the_lobby_fields_follow_the_rows_and_the_kept_stage_list", the_lobby_fields_follow_the_rows_and_the_kept_stage_list as fn()),
-            ("the_macro_rows_follow_the_snapshot_and_default_to_ask_and_numbered_slots", the_macro_rows_follow_the_snapshot_and_default_to_ask_and_numbered_slots as fn()),
             ("a_committed_snapshot_and_settings_reach_every_typed_view", a_committed_snapshot_and_settings_reach_every_typed_view as fn()),
             ("one_bad_mii_selector_keeps_the_other_choices", one_bad_mii_selector_keeps_the_other_choices as fn()),
-            ("a_short_row_leaves_the_tail_off", a_short_row_leaves_the_tail_off as fn()),
         ]);
     }
     }

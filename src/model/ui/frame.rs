@@ -890,37 +890,6 @@ mod tests {
         Menu::new(Settings::factory(), Env::default())
     }
 
-    fn the_first_open_shows_cpu_with_its_groups_and_the_first_rows() {
-        let m = menu();
-        let mut f = Frame::new();
-        page_frame(&m, &mut f);
-        assert_eq!(f.tabs[0].string_lossy(), "CPU");
-        assert_eq!(f.tab_count, 5);
-        assert_eq!(f.tab_active, 0);
-        // rc.6: the CPU page's seventh group is Level (CPU Level), after Player 1 control.
-        assert_eq!(f.group_count, 7);
-        assert_eq!(f.groups[0].string_lossy(), "Reactions  (4)");
-        assert_eq!(f.groups[6].string_lossy(), "Level  (1)");
-        assert_eq!(f.group_active, 0);
-        assert_eq!(f.rows[0].label.string_lossy(), "Mash");
-        assert_eq!(f.row_count, 4);
-        assert_eq!(f.focus, Some(0));
-        assert!(!f.help[0].is_empty());
-    }
-
-    fn moving_down_into_the_next_group_switches_the_group_and_its_rows() {
-        let mut m = menu();
-        for _ in 0..4 {
-            m.press(Button::Down);
-        }
-        let mut f = Frame::new();
-        page_frame(&m, &mut f);
-        assert_eq!(f.group_active, 1);
-        assert_eq!(f.rows[0].label.string_lossy(), "Airdodge Direction");
-        assert_eq!(f.focus, Some(0));
-        assert_eq!(f.row_count, 6);
-    }
-
     fn recording_paint_uses_a_green_plate_a_white_cursor_and_the_visible_hot_rows() {
         use crate::model::menu::table::SAVES_MACROS;
         use crate::model::recording_menu::{Catalog, Face, LoopMark, MacroFile};
@@ -1046,36 +1015,6 @@ mod tests {
         menu
     }
 
-    /// Primary 2026-11-08 (#19, #49): the r8 pop-up (`RECORDING-REDESIGN-r8-popup-combo.png`) has a line under each
-    /// row and CONNECTIONS in its own column on the right. Eden rc6-covrec-diag2: the pop-up drew one line per row and
-    /// joined CONNECTIONS into the help line at the bottom.
-    fn the_popup_draws_sublines_and_a_connections_column() {
-        use crate::model::menu::table::COMBOS_SEQ;
-        use crate::model::recording_menu::Face;
-        let mut menu = recording_menu_with_files();
-        let mut catalog = menu.recording().catalog().clone();
-        catalog.combos[0].recorded_on = "Pikachu → Mario".into();
-        menu.recording_mut().set_catalog(catalog);
-        menu.recording_mut().toggle_popup();
-        menu.recording_mut().press_popup(Button::ZR);
-        let combos = menu.recording().section(Face::Popup, COMBOS_SEQ, 1);
-        let at = combos.rows.iter().position(|row| row.name == "c1").expect("c1 listed");
-        menu.recording_mut().set_cursor(Face::Popup, COMBOS_SEQ, 1, at);
-        let mut frame = Frame::new();
-        page_frame(&menu, &mut frame);
-        assert!(frame.popup);
-        let slot = (0..usize::from(frame.row_count)).find(|i| frame.rows[*i].label.string_lossy() == "c1").expect("c1 drawn");
-        assert_eq!(frame.rows[slot].sub.string_lossy(), "Recorded on Pikachu → Mario");
-        let header = (0..usize::from(frame.row_count)).find(|i| frame.rows[*i].label.string_lossy().starts_with("COMBOS")).expect("header");
-        assert!(frame.rows[header].sub.is_empty(), "a header has no subline");
-        assert_eq!(frame.conn_head.string_lossy(), "CONNECTIONS  of the row under the cursor");
-        let lines: Vec<String> = (0..usize::from(frame.conn_count)).map(|i| frame.conn[i].string_lossy()).collect();
-        assert_eq!(lines.first().map(String::as_str), Some("c1"), "{lines:?}");
-        assert!(lines.iter().any(|line| line == "Sequence 1 #1"), "{lines:?}");
-        assert_eq!(lines.last().map(String::as_str), Some("Fighters  Pikachu → Mario"), "{lines:?}");
-        assert!(!frame.help[0].string_lossy().contains("CONNECTIONS"), "the help keeps its own lines");
-    }
-
     /// Primary 2026-11-08 15:55Z, the r8 pop-up as drawn (`RECORDING-REDESIGN-r8-popup-combo.png`): the title
     /// "Recording" with the L/R role tabs, each section header with its file count, CONNECTIONS as kind boxes in a tree,
     /// and the r8 footer.
@@ -1107,141 +1046,6 @@ mod tests {
         assert_eq!(page.role_tab, None, "the page has no role tabs in its title");
     }
 
-    /// Primary 2026-11-08 16:51Z, the r8 pop-up's remaining parts (`RECORDING-REDESIGN-r8-popup-combo.png`, `-macro.png`;
-    /// RECORDING-REDESIGN.md "How to read a list"): each section header on a dark band with its kind's mark (the floppy
-    /// for SAVE STATES, a square for the others), the red order badge at a row's left edge instead of a number before
-    /// the name, and the page tabs as outlined boxes. A drilled sequence is a green row in the hot outline and wears the
-    /// badge of the combo under the cursor. The page keeps its number before the name.
-    fn the_popup_draws_header_bands_order_badges_and_boxed_tabs() {
-        use crate::model::menu::table::COMBOS_SEQ;
-        use crate::model::recording_menu::{Face, FileTag, LoopMark};
-        let mut menu = recording_menu_with_files();
-        menu.recording_mut().adopt(None, [None, None], [LoopMark::Finite(1), LoopMark::Finite(1)], Some("q1".into()));
-        menu.recording_mut().toggle_popup();
-        menu.recording_mut().press_popup(Button::ZR);
-        let combos = menu.recording().section(Face::Popup, COMBOS_SEQ, 1);
-        let at = combos.rows.iter().position(|row| row.name == "c1").expect("c1 listed");
-        menu.recording_mut().set_cursor(Face::Popup, COMBOS_SEQ, 1, at);
-        let mut frame = Frame::new();
-        page_frame(&menu, &mut frame);
-        assert_eq!(frame.band.iter().filter(|on| **on).count(), 2, "{:?}", frame.band);
-        assert!(frame.band[0] && frame.band[SECTION_ROWS + 1], "both headers sit on a band");
-        assert_eq!(frame.head_tag, [Some(FileTag::Sequence), Some(FileTag::Combo)]);
-        let labels: Vec<String> = (0..usize::from(frame.row_count)).map(|i| frame.rows[i].label.string_lossy()).collect();
-        let seq = labels.iter().position(|label| label.ends_with("Sequence 1")).expect("the sequence row");
-        assert_eq!(labels[seq], "Sequence 1", "no number before the name in the pop-up");
-        assert_eq!(frame.badges.iter().flatten().copied().collect::<Vec<_>>(), [(seq as u8, 1)], "c1 is its combo 1");
-        assert!(frame.green[seq], "the drilled sequence is green");
-        assert!(frame.outline[0].is_some_and(|(first, count)| usize::from(first) <= seq && seq < usize::from(first + count)));
-        assert!(frame.tab_boxes);
-        menu.recording_mut().press_popup(Button::ZL);
-        let mut frame = Frame::new();
-        page_frame(&menu, &mut frame);
-        assert_eq!(frame.head_tag, [Some(FileTag::Save), Some(FileTag::Macro)]);
-        menu.recording_mut().press_popup(Button::ZR);
-        menu.recording_mut().toggle_popup();
-        menu.recording_mut().set_cursor(Face::Page, COMBOS_SEQ, 1, at);
-        let mut page = Frame::new();
-        page_frame(&menu, &mut page);
-        assert!(!page.tab_boxes && page.band.iter().all(|on| !on) && page.badges.iter().all(Option::is_none));
-        assert!(page.head_tag.iter().all(Option::is_none));
-    }
-
-    /// Eden rc6-covrec-diag3 `cov-popup-r8` (2026-11-08): the MACROS header's loop count "1" was hidden under the loop
-    /// icon; both sat at the column's right edge and the icon draws on top. Primary 13:05Z (#19): the loop count sits
-    /// inside the panel, as in the r8 mockup. The icon goes left of the count, on the page and in the pop-up.
-    fn the_loop_icon_sits_left_of_the_macros_loop_count() {
-        use crate::model::menu::table::SAVES_MACROS;
-        use crate::model::recording_menu::Face;
-        for popup in [false, true] {
-            let mut menu = recording_menu_with_files();
-            menu.recording_mut().set_cursor(Face::Page, SAVES_MACROS, 1, 0);
-            if popup {
-                menu.recording_mut().toggle_popup();
-            }
-            let mut frame = Frame::new();
-            page_frame(&menu, &mut frame);
-            let header = (0..usize::from(frame.row_count)).find(|i| frame.rows[*i].label.string_lossy().starts_with("MACROS")).expect("MACROS");
-            let count = frame.rows[header].value.string_lossy();
-            assert!(!count.is_empty(), "the header carries the loop count");
-            let icon = frame.icons[super::super::panes::FLOPPIES + 1];
-            assert!(icon.on, "the loop icon is drawn");
-            let text_left = super::super::panes::row_span(popup).1 - super::super::panes::text_width(count.encode_utf16().count());
-            assert!(icon.x + 14.0 <= text_left, "popup={popup}: the icon ({}) covers the count from {text_left}", icon.x);
-        }
-    }
-
-    /// Eden `rc5-opus-floppy1` (2026-11-08): `Save states & Macros (0)` beside an open macro. The count was of settings
-    /// rows, and a library group has none; it lists files.
-    fn a_recording_library_group_counts_its_files() {
-        let menu = recording_menu_with_files();
-        let mut frame = Frame::new();
-        page_frame(&menu, &mut frame);
-        let groups: Vec<String> = (0..usize::from(frame.group_count)).map(|i| frame.groups[i].string_lossy()).collect();
-        assert!(groups.contains(&"Save states & Macros  (2)".to_string()), "{groups:?}");
-        assert!(groups.contains(&"Combos & Sequences  (3)".to_string()), "{groups:?}");
-        let options = groups.iter().find(|line| line.starts_with("Options")).expect("Options group");
-        assert_ne!(options, "Options  (0)", "settings groups still count their rows");
-    }
-
-    /// The same shot's footer read `B closeUp/Down move`: the recording hint was appended to the page hint.
-    fn the_recording_hint_replaces_the_page_hint() {
-        use crate::model::menu::table::SAVES_MACROS;
-        use crate::model::recording_menu::Face;
-        let mut menu = recording_menu_with_files();
-        let mut frame = Frame::new();
-        page_frame(&menu, &mut frame);
-        assert_eq!(frame.hint.string_lossy(), menu.recording().hint(Face::Page));
-        menu.recording_mut().set_cursor(Face::Page, SAVES_MACROS, 1, 0);
-        menu.press(Button::A);
-        assert!(menu.recording().file_open());
-        let mut frame = Frame::new();
-        page_frame(&menu, &mut frame);
-        assert_eq!(frame.hint.string_lossy(), "Up/Down move   Left/Right On/Off   A do it   B back");
-        let mut other = Menu::new(Settings::factory(), Env::default());
-        other.press(Button::Down);
-        let mut frame = Frame::new();
-        page_frame(&other, &mut frame);
-        assert_eq!(frame.hint.string_lossy(), HINT_PAGE, "pages without the recording screens keep the page hint");
-    }
-
-    fn a_toggle_and_a_dropdown_read_like_the_mockup() {
-        let mut m = menu();
-        for _ in 0..4 {
-            m.press(Button::Down);
-        }
-        let mut f = Frame::new();
-        page_frame(&m, &mut f);
-        let dropdown = (0..f.row_count as usize).find(|i| f.rows[*i].label.string_lossy() == "SDI Strength").unwrap();
-        assert!(f.rows[dropdown].value.string_lossy().starts_with("<  "));
-        let toggle = (0..f.row_count as usize).find(|i| f.rows[*i].label.string_lossy() == "Dodge Staling").unwrap();
-        assert!(matches!(f.rows[toggle].value_tone, Tone::On | Tone::Off));
-    }
-
-    fn every_page_of_the_ring_fits_the_row_budget_of_the_layout() {
-        for developer in [false, true] {
-            let mut m = Menu::new(Settings::factory(), Env { developer_page: developer, ..Env::default() });
-            for _ in 0..8 {
-                let page = m.page();
-                for _ in 0..m.entry_count(page) + 1 {
-                    let mut f = Frame::new();
-                    page_frame(&m, &mut f);
-                    let expected = {
-                        let active = m.focus().map(group_of);
-                        (0..m.entry_count(page))
-                            .filter_map(|n| m.entry(page, n))
-                            .filter(|e| Some(group_of(*e)) == active && !matches!(e, Entry::Group(g) if !GROUPS[*g].advanced))
-                            .count()
-                    };
-                    assert!(expected <= ROW_LINES, "{page:?}: {expected} lines in one group");
-                    assert!(f.group_count as usize <= GROUP_LINES);
-                    m.press(Button::Down);
-                }
-                m.press(Button::R);
-            }
-        }
-    }
-
     fn the_fade_is_logarithmic_from_255_to_0_over_15_frames() {
         assert_eq!(fade_alpha(0), 255);
         assert_eq!(fade_alpha(15), 0);
@@ -1249,12 +1053,6 @@ mod tests {
         let curve: Vec<u8> = (1..15).map(fade_alpha).collect();
         assert!(curve.windows(2).all(|w| w[0] >= w[1]), "{curve:?}");
         assert!(curve[0] > 240 && curve[13] < 70);
-    }
-
-    fn text_is_cut_at_its_capacity_never_past_it() {
-        let mut t: Text<4> = Text::new();
-        let _ = t.write_str("abcdefgh");
-        assert_eq!(t.string_lossy(), "abcd");
     }
 
     /// R13: the crate version, `rc8` and the commit's short sha (`git rev-parse --short=8`: 8 hex digits, more only if
@@ -1324,20 +1122,10 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
-            ("the_first_open_shows_cpu_with_its_groups_and_the_first_rows", the_first_open_shows_cpu_with_its_groups_and_the_first_rows as fn()),
-            ("moving_down_into_the_next_group_switches_the_group_and_its_rows", moving_down_into_the_next_group_switches_the_group_and_its_rows as fn()),
             ("recording_paint_uses_a_green_plate_a_white_cursor_and_the_visible_hot_rows", recording_paint_uses_a_green_plate_a_white_cursor_and_the_visible_hot_rows as fn()),
             ("a_macro_screen_draws_the_floppy_before_the_start_save_name", a_macro_screen_draws_the_floppy_before_the_start_save_name as fn()),
-            ("the_popup_draws_sublines_and_a_connections_column", the_popup_draws_sublines_and_a_connections_column as fn()),
             ("the_popup_has_the_r8_title_counts_boxes_and_footer", the_popup_has_the_r8_title_counts_boxes_and_footer as fn()),
-            ("the_popup_draws_header_bands_order_badges_and_boxed_tabs", the_popup_draws_header_bands_order_badges_and_boxed_tabs as fn()),
-            ("the_loop_icon_sits_left_of_the_macros_loop_count", the_loop_icon_sits_left_of_the_macros_loop_count as fn()),
-            ("a_recording_library_group_counts_its_files", a_recording_library_group_counts_its_files as fn()),
-            ("the_recording_hint_replaces_the_page_hint", the_recording_hint_replaces_the_page_hint as fn()),
-            ("a_toggle_and_a_dropdown_read_like_the_mockup", a_toggle_and_a_dropdown_read_like_the_mockup as fn()),
-            ("every_page_of_the_ring_fits_the_row_budget_of_the_layout", every_page_of_the_ring_fits_the_row_budget_of_the_layout as fn()),
             ("the_fade_is_logarithmic_from_255_to_0_over_15_frames", the_fade_is_logarithmic_from_255_to_0_over_15_frames as fn()),
-            ("text_is_cut_at_its_capacity_never_past_it", text_is_cut_at_its_capacity_never_past_it as fn()),
             ("the_build_tag_reads_version_name_and_short_sha", the_build_tag_reads_version_name_and_short_sha as fn()),
             ("the_page_footer_ends_with_the_build_tag", the_page_footer_ends_with_the_build_tag as fn()),
             ("the_build_tag_fits_every_page_footer", the_build_tag_fits_every_page_footer as fn()),

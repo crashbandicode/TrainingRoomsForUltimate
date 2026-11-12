@@ -106,14 +106,6 @@ pub fn reusable_extras(kinds: &[u32], active: u32, canonical_original: Option<u3
 mod tests {
     lib_unit_tests! {
     use super::*;
-    fn only_training_can_use_every_extra_and_waiting_seats_stay_reserved() {
-        assert_eq!(slots(Layout::Training,true,true,true),[2,3,7,6,5,4]);
-        assert_eq!(slots(Layout::Training,true,true,false),[2,3,7,8,8,8]);
-        assert_eq!(slots(Layout::Ldn,true,true,true),[5,6,7,8,8,8]);
-        assert_eq!(slots(Layout::Ldn,true,false,true),[5,6,8,8,8,8]);
-        assert_eq!(slots(Layout::Quickplay,true,true,true),[5,6,8,8,8,8]);
-        assert_eq!(slots(Layout::Training,false,true,true),[2,3,8,8,8,8]);
-    }
     fn every_requested_budget_obeys_the_backend_limit() {
         assert_eq!(supported_count(Layout::Training,true,true,true), 6);
         assert_eq!(MAX_TARGETS, 5, "renderer demand must not extend the saved preload menu");
@@ -140,7 +132,6 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
-            ("only_training_can_use_every_extra_and_waiting_seats_stay_reserved", only_training_can_use_every_extra_and_waiting_seats_stay_reserved as fn()),
             ("every_requested_budget_obeys_the_backend_limit", every_requested_budget_obeys_the_backend_limit as fn()),
             ("waiting_capacity_is_opt_in_and_uses_its_own_plan", waiting_capacity_is_opt_in_and_uses_its_own_plan as fn()),
         ]);

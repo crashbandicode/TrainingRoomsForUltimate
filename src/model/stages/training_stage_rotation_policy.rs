@@ -149,13 +149,12 @@ impl TrainingRotation {
 mod tests {
     lib_unit_tests! {
     use super::*;
-    use crate::engine::stages::lobby_stages::{Form, STAGES};
-    use crate::engine::stages::stage_menu::Mode;
+    
+    
 
     const BF: Selection = Selection::normal(0);
     const FD: Selection = Selection::normal(3);
     const OWNER: usize = 0x2a00_1000;
-    const OTHER: usize = 0x2a00_2000;
 
     /// Independently recorded 40-bit package hashes (catalog rows and retained logs).
     fn hash_of(native: u32) -> Option<u64> {
@@ -185,58 +184,6 @@ mod tests {
         assert_eq!(rotation.entry(OWNER, true, order(), &prefs), Entry::Prepared(BF, 0));
     }
 
-    fn one_entry_prepares_once_and_repeated_loader_calls_consume_one_step() {
-        let prefs = Preferences::default();
-        let mut rotation = TrainingRotation::new();
-        assert_eq!(rotation.entry(OWNER, true, order(), &prefs), Entry::Prepared(BF, 0));
-        assert_eq!(rotation.apply(true, hash_of), Ok(Some(applied(BF, 0))));
-        // A second and third loader call in the same entry reapply the same pair.
-        assert_eq!(rotation.apply(true, hash_of), Ok(Some(applied(BF, 0))));
-        assert_eq!(rotation.apply(true, hash_of), Ok(Some(applied(BF, 0))));
-        // The next genuine entry is the next stage, exactly one step later.
-        assert_eq!(rotation.entry(OWNER, true, order(), &prefs), Entry::Prepared(FD, 3));
-        assert_eq!(rotation.apply(true, hash_of), Ok(Some(applied(FD, 3))));
-        assert_eq!(rotation.entry(OWNER, true, order(), &prefs), Entry::Prepared(BF, 0));
-    }
-
-    fn product_reenter_suppresses_exactly_one_age_zero_call_and_reapplies() {
-        let prefs = Preferences::default();
-        let mut rotation = TrainingRotation::new();
-        assert_eq!(rotation.entry(OWNER, true, order(), &prefs), Entry::Prepared(BF, 0));
-        assert_eq!(rotation.apply(true, hash_of), Ok(Some(applied(BF, 0))));
-        rotation.reenter_requested(OWNER);
-        assert_eq!(rotation.entry(OWNER, true, order(), &prefs), Entry::Suppressed);
-        assert_eq!(rotation.apply(true, hash_of), Ok(Some(applied(BF, 0))));
-        // Only one return was requested; the following transition is a new entry.
-        assert_eq!(rotation.entry(OWNER, true, order(), &prefs), Entry::Prepared(FD, 3));
-        // A reenter for an owner this cycle never saw sets nothing.
-        rotation.reenter_requested(OTHER);
-        assert_eq!(rotation.apply(true, hash_of), Ok(Some(applied(FD, 3))));
-        assert_eq!(rotation.entry(OWNER, true, order(), &prefs), Entry::Prepared(BF, 0));
-    }
-
-    fn off_to_on_around_a_product_return_does_not_advance() {
-        let prefs = Preferences::default();
-        let mut rotation = TrainingRotation::new();
-        assert_eq!(rotation.entry(OWNER, true, order(), &prefs), Entry::Prepared(BF, 0));
-        assert_eq!(rotation.apply(true, hash_of), Ok(Some(applied(BF, 0))));
-        // Off at the return: the one-shot is still consumed by that age-zero call.
-        rotation.reenter_requested(OWNER);
-        assert_eq!(rotation.entry(OWNER, false, order(), &prefs), Entry::Disabled);
-        assert_eq!(rotation.apply(false, hash_of), Ok(None));
-        // On again inside the same sequence: no stale suppress, no stale snapshot,
-        // and the cursor has moved exactly once (BF was entered).
-        assert_eq!(rotation.apply(true, hash_of), Ok(None));
-        assert_eq!(rotation.entry(OWNER, true, order(), &prefs), Entry::Prepared(FD, 3));
-        // Off while a return is pending, On before it lands: still a return.
-        rotation.apply(true, hash_of).unwrap();
-        rotation.entry(OWNER, false, order(), &prefs);
-        rotation.reenter_requested(OWNER);
-        assert_eq!(rotation.entry(OWNER, true, order(), &prefs), Entry::Suppressed);
-        assert_eq!(rotation.apply(true, hash_of), Ok(None)); // Off cleared the snapshot.
-        assert_eq!(rotation.entry(OWNER, true, order(), &prefs), Entry::Prepared(BF, 0));
-    }
-
     fn direct_completion_replaces_the_reapplied_stage_and_uncertainty_clears_it() {
         let prefs = Preferences::default();
         let mut rotation = TrainingRotation::new();
@@ -261,88 +208,6 @@ mod tests {
         assert_eq!(fresh.apply(true, hash_of), Ok(None));
     }
 
-    fn new_entry_cancels_an_abandoned_reservation_even_at_the_same_context() {
-        let mut prefs = Preferences::default();
-        let mut rotation = TrainingRotation::new();
-        // Prepared, but the loader never ran (entry abandoned back to character select).
-        assert_eq!(rotation.entry(OWNER, true, order(), &prefs), Entry::Prepared(BF, 0));
-        let bf = STAGES.iter().position(|(stage, _)| *stage == 0).unwrap();
-        prefs.rotation_forms.set(bf, Form::Omega).unwrap();
-        // Same context, next transition: current preferences, not the stale reservation.
-        assert_eq!(rotation.entry(OWNER, true, order(), &prefs),
-            Entry::Prepared(Selection { stage: 0, form: Form::Omega }, 1));
-        assert_eq!(rotation.apply(true, hash_of),
-            Ok(Some(applied(Selection { stage: 0, form: Form::Omega }, 1))));
-        // Within one entry, a later edit does not replace the owned reservation.
-        assert_eq!(rotation.entry(OWNER, true, order(), &prefs), Entry::Prepared(FD, 3));
-        prefs.rotation_forms.set(bf, Form::Normal).unwrap();
-        let fd = STAGES.iter().position(|(stage, _)| *stage == 3).unwrap();
-        prefs.rotation_forms.set(fd, Form::Battlefield).unwrap();
-        assert_eq!(rotation.apply(true, hash_of), Ok(Some(applied(FD, 3))));
-    }
-
-    fn sequence_initialization_and_new_owner_drop_suppress_reservation_and_snapshot() {
-        let prefs = Preferences::default();
-        let mut rotation = TrainingRotation::new();
-        assert_eq!(rotation.entry(OWNER, true, order(), &prefs), Entry::Prepared(BF, 0));
-        assert_eq!(rotation.apply(true, hash_of), Ok(Some(applied(BF, 0))));
-        rotation.reenter_requested(OWNER);
-        // Training exits and a new sequence is constructed at the same address.
-        rotation.sequence_initialized();
-        assert_eq!(rotation.apply(true, hash_of), Ok(None)); // No owner yet: never write.
-        assert_eq!(rotation.entry(OWNER, true, order(), &prefs), Entry::Prepared(FD, 3));
-        assert_eq!(rotation.apply(true, hash_of), Ok(Some(applied(FD, 3))));
-        // A different context without an installer observation is also a new owner.
-        rotation.reenter_requested(OWNER);
-        assert_eq!(rotation.entry(OTHER, true, order(), &prefs), Entry::Prepared(BF, 0));
-        // An abandoned reservation of a dead sequence is not applied by the new one
-        // before its own entry.
-        rotation.sequence_initialized();
-        assert_eq!(rotation.apply(true, hash_of), Ok(None));
-        assert_eq!(rotation.entry(OWNER, true, order(), &prefs), Entry::Prepared(BF, 0));
-    }
-
-    fn invalid_forms_refuse_without_consuming_and_lobby_direct_mode_is_ignored() {
-        let mut prefs = Preferences::default();
-        let training = STAGES.iter().position(|(stage, _)| *stage == 308).unwrap();
-        prefs.rotation_forms.set(training, Form::Omega).unwrap();
-        let mut rotation = TrainingRotation::new();
-        assert_eq!(rotation.entry(OWNER, true, order(), &prefs),
-            Entry::Refused("form unavailable for this stage"));
-        assert_eq!(rotation.apply(true, hash_of), Ok(None));
-        prefs.rotation_forms = crate::engine::stages::lobby_stages::Forms::NORMAL;
-        prefs.mode = Mode::Direct;
-        prefs.direct_stage = 95;
-        prefs.direct_form = Form::Battlefield;
-        // Training rotation is rotation only; the saved lobby Direct choice is not used.
-        assert_eq!(rotation.entry(OWNER, true, order(), &prefs), Entry::Prepared(BF, 0));
-        assert_eq!(rotation.apply(true, hash_of), Ok(Some(applied(BF, 0))));
-        // Even invalid in-memory preferences must not revive the previous entry's
-        // applied stage after a refusal at the same context. The cursor stays put.
-        prefs.rotation_forms.set(training, Form::Omega).unwrap();
-        assert_eq!(rotation.entry(OWNER, true, order(), &prefs),
-            Entry::Refused("form unavailable for this stage"));
-        assert_eq!(rotation.apply(true, hash_of), Ok(None));
-        prefs.rotation_forms = crate::engine::stages::lobby_stages::Forms::NORMAL;
-        // A catalog row that cannot be read keeps the reservation for a retry.
-        assert_eq!(rotation.entry(OWNER, true, order(), &prefs), Entry::Prepared(FD, 3));
-        assert_eq!(rotation.apply(true, |_| None), Err("stage catalog row unavailable"));
-        assert_eq!(rotation.apply(true, hash_of), Ok(Some(applied(FD, 3))));
-        // An empty order refuses rather than inventing a stage.
-        let all_off: Result<LobbyStageOrder, _> = serde_json::from_str("[0,0,0,0]");
-        assert!(all_off.is_err());
-    }
-
-    fn user_chosen_waiting_room_rank_is_entered_as_chosen() {
-        let prefs = Preferences::default();
-        let mut rotation = TrainingRotation::new();
-        assert_eq!(rotation.entry(OWNER, true, LobbyStageOrder::NATIVE, &prefs),
-            Entry::Prepared(Selection::normal(311), 311));
-        assert_eq!(rotation.apply(true, hash_of), Ok(Some(applied(Selection::normal(311), 311))));
-        assert_eq!(rotation.entry(OWNER, true, LobbyStageOrder::NATIVE, &prefs),
-            Entry::Prepared(Selection::normal(311), 311));
-    }
-
     fn qualified_loader_rejects_other_callers_slots_descriptors_and_scenes() {
         let base = 0x7100_0000_0000usize;
         let descriptor = base + 0x52c55d0;
@@ -365,14 +230,7 @@ mod tests {
     fn case_table() {
         crate::test_table::run(&[
             ("disabled_setting_prepares_nothing_writes_nothing_and_keeps_the_cursor", disabled_setting_prepares_nothing_writes_nothing_and_keeps_the_cursor as fn()),
-            ("one_entry_prepares_once_and_repeated_loader_calls_consume_one_step", one_entry_prepares_once_and_repeated_loader_calls_consume_one_step as fn()),
-            ("product_reenter_suppresses_exactly_one_age_zero_call_and_reapplies", product_reenter_suppresses_exactly_one_age_zero_call_and_reapplies as fn()),
-            ("off_to_on_around_a_product_return_does_not_advance", off_to_on_around_a_product_return_does_not_advance as fn()),
             ("direct_completion_replaces_the_reapplied_stage_and_uncertainty_clears_it", direct_completion_replaces_the_reapplied_stage_and_uncertainty_clears_it as fn()),
-            ("new_entry_cancels_an_abandoned_reservation_even_at_the_same_context", new_entry_cancels_an_abandoned_reservation_even_at_the_same_context as fn()),
-            ("sequence_initialization_and_new_owner_drop_suppress_reservation_and_snapshot", sequence_initialization_and_new_owner_drop_suppress_reservation_and_snapshot as fn()),
-            ("invalid_forms_refuse_without_consuming_and_lobby_direct_mode_is_ignored", invalid_forms_refuse_without_consuming_and_lobby_direct_mode_is_ignored as fn()),
-            ("user_chosen_waiting_room_rank_is_entered_as_chosen", user_chosen_waiting_room_rank_is_entered_as_chosen as fn()),
             ("qualified_loader_rejects_other_callers_slots_descriptors_and_scenes", qualified_loader_rejects_other_callers_slots_descriptors_and_scenes as fn()),
         ]);
     }

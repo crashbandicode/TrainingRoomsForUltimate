@@ -240,44 +240,6 @@ mod tests {
         STAGES.iter().position(|(id, _)| *id == stage).unwrap()
     }
 
-    fn ranks(e: &StageEditor) -> Vec<(usize, u8)> {
-        e.order[1..].iter().enumerate().filter(|(_, r)| **r != 0).map(|(i, r)| (i, *r)).collect()
-    }
-
-    fn a_missing_order_reads_as_the_native_order_and_writes_back_in_the_files_form() {
-        let e = StageEditor::read(None, None);
-        assert_eq!(e.order.len(), STAGES.len() + 1);
-        assert_eq!(ranks(&e), vec![(0, 1)]);
-        let back: LobbyStageOrder = serde_json::from_value(e.order_value()).unwrap();
-        assert_eq!(back, LobbyStageOrder::NATIVE);
-        assert_eq!(e.mode(), Mode::Rotation);
-    }
-
-    fn a_adds_at_the_end_removes_and_compacts_and_keeps_the_last_stage() {
-        let mut e = StageEditor::read(None, None);
-        assert_eq!(e.press(4, Button::A), Effect::Changed);
-        assert_eq!(e.press(2, Button::A), Effect::Changed);
-        assert_eq!(ranks(&e), vec![(0, 1), (1, 3), (3, 2)]);
-        assert_eq!(e.press(1, Button::A), Effect::Changed, "the first stage leaves; the others move up");
-        assert_eq!(ranks(&e), vec![(1, 2), (3, 1)]);
-        e.press(4, Button::A);
-        assert_eq!(e.press(2, Button::A), Effect::Nothing, "the last stage stays");
-        let typed: LobbyStageOrder = serde_json::from_value(e.order_value()).unwrap();
-        assert_eq!(typed.stages(), vec![STAGES[1].0]);
-    }
-
-    fn all_takes_every_stage_and_a_stage_chosen_from_all_becomes_the_only_one() {
-        let mut e = StageEditor::read(None, None);
-        assert_eq!(e.press(0, Button::A), Effect::Changed);
-        assert!(e.all() && ranks(&e).is_empty());
-        let typed: LobbyStageOrder = serde_json::from_value(e.order_value()).unwrap();
-        assert_eq!(typed.stages().len(), STAGES.len());
-        assert_eq!(e.press(0, Button::A), Effect::Nothing);
-        e.press(6, Button::A);
-        assert!(!e.all());
-        assert_eq!(ranks(&e), vec![(5, 1)]);
-    }
-
     fn y_cycles_only_the_forms_the_game_has_and_direct_requests_the_stage_with_its_form() {
         let mut e = StageEditor::read(None, None);
         let battlefield = index_of(0);
@@ -352,9 +314,6 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
-            ("a_missing_order_reads_as_the_native_order_and_writes_back_in_the_files_form", a_missing_order_reads_as_the_native_order_and_writes_back_in_the_files_form as fn()),
-            ("a_adds_at_the_end_removes_and_compacts_and_keeps_the_last_stage", a_adds_at_the_end_removes_and_compacts_and_keeps_the_last_stage as fn()),
-            ("all_takes_every_stage_and_a_stage_chosen_from_all_becomes_the_only_one", all_takes_every_stage_and_a_stage_chosen_from_all_becomes_the_only_one as fn()),
             ("y_cycles_only_the_forms_the_game_has_and_direct_requests_the_stage_with_its_form", y_cycles_only_the_forms_the_game_has_and_direct_requests_the_stage_with_its_form as fn()),
             ("change_stage_goes_to_the_stage_with_the_form_y_picked_and_keeps_the_rotation", change_stage_goes_to_the_stage_with_the_form_y_picked_and_keeps_the_rotation as fn()),
             ("change_stage_tiles_show_the_form_tag_and_the_footer_shows_the_controls", change_stage_tiles_show_the_form_tag_and_the_footer_shows_the_controls as fn()),

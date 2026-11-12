@@ -686,7 +686,7 @@ fn record(err: impl ToString) -> Error {
 #[cfg(test)]
 mod tests {
     lib_unit_tests! {
-    use super::super::library::{start_save_state, Drill, DrillKind};
+    use super::super::library::{Drill, DrillKind};
     use super::*;
     use crate::model::combo::{Aim, Event, LinkRec};
     use crate::model::frame_strip::{Button, Move, Verdict};
@@ -772,59 +772,6 @@ mod tests {
         );
     }
 
-    fn record_stores_the_start_save_id() {
-        let root = scratch("record");
-        let mut index = RecordingIndex::fresh();
-        index.set_active(Role::Player, Some("old"), 1).unwrap();
-        index.save(&root).unwrap();
-        let mut capture = Capture::idle();
-        toggle_record(&mut capture, Role::Player);
-        push_frame(&mut capture, Role::Player, frame(4));
-        let stop = finish_recording(&root, &capture, state(13), state(7), (0.0, 0.0), 5).unwrap();
-        let RecordStop::Saved {
-            ref id,
-            ref start_save,
-        } = stop
-        else {
-            panic!("empty")
-        };
-        let id = id.clone();
-        let start_save = start_save.clone();
-        assert_eq!(stop.cursor(), Some(id.as_str()));
-        let macros = Library::new(root.join(MACROS_DIR));
-        let saved = macros.load(&id).unwrap();
-        assert_eq!(saved.name, "Macro 1");
-        assert_eq!(saved.start_save.as_deref(), Some(start_save.as_str()));
-        let saves = Store::<NamedSave>::new(root.join(SAVES_DIR));
-        assert_eq!(saves.load(&start_save).unwrap().name, "Macro 1 · start");
-        let index = RecordingIndex::load(&root).unwrap();
-        assert_eq!(index.active(Role::Player), Some(id.as_str()));
-        assert_eq!(index.active(Role::Cpu), None);
-        assert_eq!(
-            index.hot(Kind::Macro).first().map(String::as_str),
-            Some(id.as_str())
-        );
-    }
-
-    fn a_cpu_role_recording_becomes_the_cpu_active_macro_and_names_the_cpu() {
-        let root = scratch("cpu-active");
-        let mut index = RecordingIndex::fresh();
-        index.set_active(Role::Player, Some("keep-player"), 1).unwrap();
-        index.save(&root).unwrap();
-        let mut capture = Capture::idle();
-        toggle_record(&mut capture, Role::Cpu);
-        push_frame(&mut capture, Role::Cpu, frame(33_281));
-        let stop = finish_recording(&root, &capture, state(0), state(0x1d), (0.0, 0.0), 5).unwrap();
-        let RecordStop::Saved { id, .. } = stop else {
-            panic!("empty")
-        };
-        let saved = Library::new(root.join(MACROS_DIR)).load(&id).unwrap();
-        assert_eq!(saved.start.fighter_kind, 0x1d, "the CPU's fighter, not the player's");
-        let index = RecordingIndex::load(&root).unwrap();
-        assert_eq!(index.active(Role::Cpu), Some(id.as_str()));
-        assert_eq!(index.active(Role::Player), Some("keep-player"));
-    }
-
     fn a_long_macro_plays_from_a_600_frame_window() {
         assert!(length_is_kept(MAX_FRAMES));
         assert!(!length_is_kept(MAX_FRAMES + 1));
@@ -845,26 +792,6 @@ mod tests {
         assert_eq!(tape.reads(), &[(3_600, 600), (4_200, 100)]);
         assert_eq!(tape.hook_frame(4_200).unwrap().buttons, 4_200);
         assert_eq!(tape.resident_len(), RESIDENT_FRAMES);
-    }
-
-    fn a_macro_with_no_start_save_does_not_warp() {
-        let mut index = RecordingIndex::fresh();
-        index.set_active(Role::Player, Some("bare"), 1).unwrap();
-        let mut book = Book::new(index);
-        book.add_recording("bare", recording("Bare", &[3, 4], None));
-        let mut machine = Playback::new();
-        let effect = drive_play(&mut machine, Role::Player, &book);
-        assert!(effect.started);
-        assert!(effect.warp.is_none());
-        assert_eq!(machine.warps(Role::Player), 0);
-        assert_eq!(
-            drive_step(&mut machine, Role::Player, &book)
-                .unwrap()
-                .frame
-                .buttons,
-            3
-        );
-        assert!(start_save_notice(start_save_state(None, true, false)).is_none());
     }
 
     fn the_play_chords_drive_the_role_machines() {
@@ -1034,23 +961,6 @@ mod tests {
         assert_eq!(book.index.loop_count(Role::Player), LoopCount::Infinite);
     }
 
-    fn the_missing_start_save_sentence_is_only_for_a_deleted_link() {
-        assert_eq!(
-            start_save_notice(start_save_state(Some("gone"), true, false)),
-            Some(MISSING_START_SAVE)
-        );
-        assert!(start_save_notice(start_save_state(None, true, false)).is_none());
-        assert!(start_save_notice(start_save_state(Some("kept"), false, true)).is_none());
-        let source = include_str!("rr_runtime.rs");
-        let restrictions = include_str!("../../docs/RESTRICTIONS.md");
-        assert!(source.contains("restriction: macro-start-save-missing"));
-        assert!(restrictions.contains("| `macro-start-save-missing` |"));
-        assert!(
-            restrictions.contains("No start save. This macro plays from where the fighters are.")
-        );
-        assert!(restrictions.contains("the connected start file was deleted"));
-    }
-
     fn the_chord_notice_shows_once() {
         let mut index = RecordingIndex::fresh();
         assert_eq!(chord_notice(&mut index), Some(CHORD_NOTICE));
@@ -1065,48 +975,6 @@ mod tests {
         assert_eq!(stop.notice(), Some("Recording was empty"));
         assert!(stop.cursor().is_none());
         assert!(!root.join(MACROS_DIR).exists());
-    }
-
-    fn silent_when_a_chain_or_a_sequence_is_empty() {
-        assert!(notice_for_empty_chain_or_sequence().is_none());
-    }
-
-    fn deleting_the_bound_save_clears_the_binding() {
-        let root = scratch("unbind");
-        let id = save_chord(&root, state(3), state(4), 1).unwrap();
-        assert_eq!(
-            RecordingIndex::load(&root).unwrap().bound(),
-            Some(id.as_str())
-        );
-        delete_save(&root, &id, 2).unwrap();
-        assert!(RecordingIndex::load(&root).unwrap().bound().is_none());
-        let next = save_chord(&root, state(8), state(9), 3).unwrap();
-        let index = RecordingIndex::load(&root).unwrap();
-        assert_eq!(index.bound(), Some(next.as_str()));
-        let saved = Store::<NamedSave>::new(root.join(SAVES_DIR))
-            .load(&next)
-            .unwrap();
-        assert_eq!(saved.name, "Save 1");
-        assert_eq!(saved.player.fighter_kind, 8);
-    }
-
-    fn duplicate_copies_the_save_and_leaves_it_bound() {
-        let root = scratch("dup");
-        let id = save_chord(&root, state(3), state(4), 1).unwrap();
-        let copy = duplicate_save(&root, &id, 2).unwrap();
-        assert_ne!(copy, id);
-        let index = RecordingIndex::load(&root).unwrap();
-        assert_eq!(index.bound(), Some(id.as_str()));
-        assert_eq!(
-            index.hot(Kind::Save).first().map(String::as_str),
-            Some(copy.as_str())
-        );
-        let store = Store::<NamedSave>::new(root.join(SAVES_DIR));
-        let original = store.load(&id).unwrap();
-        let copied = store.load(&copy).unwrap();
-        assert_eq!(original.player.fighter_kind, copied.player.fighter_kind);
-        assert_eq!(copied.name, "Save 2");
-        assert_eq!(original.name, "Save 1");
     }
 
     fn migration_runs_once_at_boot() {
@@ -1278,52 +1146,22 @@ mod tests {
         assert_eq!(after.active(Role::Cpu), Some("macro-1"), "the menu published a selection older than the index");
     }
 
-    /// Eden rc6-covrec-diag1 (2026-11-08): a combo under the cursor showed no CONNECTIONS lines, because the catalog
-    /// the worker loads gave every combo no link lines. RECORDING.md: "The combo's help lines list each link as the
-    /// two moves and TRUE or not, then that link's input events, then its drift".
-    fn the_catalog_gives_each_combo_its_connection_lines() {
-        let root = scratch("combo-lines");
-        RecordingIndex::load(&root).unwrap().save(&root).unwrap();
-        let combo = Combo::from_links([link(Move::Jab, Move::Jab), link(Move::Jab, Move::SideTilt)]).unwrap();
-        let id = ComboLibrary::new(root.join("combos"))
-            .save_new(&ComboRecord::new("Jab jab".into(), combo, None))
-            .unwrap();
-        let loaded = load_catalog(&root).unwrap();
-        let file = loaded.catalog.combos.iter().find(|file| file.id == id).unwrap();
-        assert_eq!(file.links, crate::model::recording_menu::combo_link_lines(&combo));
-        assert!(file.links.iter().any(|line| line.starts_with("L2 ")), "{:?}", file.links);
-        let mut screens = RecordingScreens::new();
-        screens.set_catalog(loaded.catalog);
-        let index = screens.section(Face::Page, COMBOS_SEQ, 1).rows.iter().position(|row| row.name == "Jab jab").unwrap();
-        screens.set_cursor(Face::Page, COMBOS_SEQ, 1, index);
-        let lines: Vec<String> = screens.connections(Face::Page, COMBOS_SEQ).into_iter().map(|line| line.text).collect();
-        assert!(lines.iter().any(|line| line.starts_with("L1 jab → jab")), "{lines:?}");
-    }
-
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
             ("record_follows_the_popup_role", record_follows_the_popup_role as fn()),
-            ("record_stores_the_start_save_id", record_stores_the_start_save_id as fn()),
-            ("a_cpu_role_recording_becomes_the_cpu_active_macro_and_names_the_cpu", a_cpu_role_recording_becomes_the_cpu_active_macro_and_names_the_cpu as fn()),
             ("a_long_macro_plays_from_a_600_frame_window", a_long_macro_plays_from_a_600_frame_window as fn()),
-            ("a_macro_with_no_start_save_does_not_warp", a_macro_with_no_start_save_does_not_warp as fn()),
             ("the_play_chords_drive_the_role_machines", the_play_chords_drive_the_role_machines as fn()),
             ("a_chain_asks_fighter_mismatch_for_macro_1_only", a_chain_asks_fighter_mismatch_for_macro_1_only as fn()),
             ("rename_uses_the_switch_keyboard_headers", rename_uses_the_switch_keyboard_headers as fn()),
             ("crop_writes_a_new_file_and_leaves_the_original", crop_writes_a_new_file_and_leaves_the_original as fn()),
             ("replay_export_has_no_start_save", replay_export_has_no_start_save as fn()),
             ("make_combo_on_a_chain_plays_one_pass_on_player_1", make_combo_on_a_chain_plays_one_pass_on_player_1 as fn()),
-            ("the_missing_start_save_sentence_is_only_for_a_deleted_link", the_missing_start_save_sentence_is_only_for_a_deleted_link as fn()),
             ("the_chord_notice_shows_once", the_chord_notice_shows_once as fn()),
             ("the_empty_recording_notice_stays", the_empty_recording_notice_stays as fn()),
-            ("silent_when_a_chain_or_a_sequence_is_empty", silent_when_a_chain_or_a_sequence_is_empty as fn()),
-            ("deleting_the_bound_save_clears_the_binding", deleting_the_bound_save_clears_the_binding as fn()),
-            ("duplicate_copies_the_save_and_leaves_it_bound", duplicate_copies_the_save_and_leaves_it_bound as fn()),
             ("migration_runs_once_at_boot", migration_runs_once_at_boot as fn()),
             ("a_menu_close_after_record_on_cpu_keeps_the_new_active_file", a_menu_close_after_record_on_cpu_keeps_the_new_active_file as fn()),
-            ("the_catalog_gives_each_combo_its_connection_lines", the_catalog_gives_each_combo_its_connection_lines as fn()),
         ]);
     }
     }

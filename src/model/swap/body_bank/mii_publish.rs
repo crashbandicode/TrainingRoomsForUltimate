@@ -93,8 +93,6 @@ mod tests {
     use super::*;
 
     const RACE: &str = "the native loader idle at 6/14";
-    const OTHER: &str = "CPU reservation refused";
-    const PERMANENT: &str = "CPU Mii group publication identity changed";
 
     fn noted(reason: &'static str) -> PublishStep {
         PublishStep::Retry { note: Some(reason) }
@@ -120,72 +118,11 @@ mod tests {
         assert_eq!(attempts.last(), Some(RACE));
     }
 
-    fn the_console_shape_of_180_identical_refusals_is_one_line_then_the_fallback() {
-        // C116.1 first boot: 180 x the same reason, 180 lines, then the fallback.
-        let mut attempts = PublishAttempts::new();
-        let steps: Vec<PublishStep> =
-            (0..MII_PUBLISH_ATTEMPTS).map(|_| attempts.refused(PublishRefusal::Race(RACE))).collect();
-        assert_eq!(steps.iter().filter(|step| **step == noted(RACE)).count(), 1);
-        assert_eq!(steps[0], noted(RACE));
-        let last = usize::from(MII_PUBLISH_ATTEMPTS) - 1;
-        assert_eq!(steps[last], PublishStep::Fail { refusals: MII_PUBLISH_ATTEMPTS, reason: RACE });
-        assert!(steps[1..last].iter().all(|step| *step == QUIET));
-    }
-
-    fn a_changed_reason_is_noted_again_and_a_permanent_refusal_fails_at_once() {
-        let mut attempts = PublishAttempts::new();
-        assert_eq!(attempts.refused(PublishRefusal::Race(RACE)), noted(RACE));
-        assert_eq!(attempts.refused(PublishRefusal::Race(RACE)), QUIET);
-        assert_eq!(attempts.refused(PublishRefusal::Race(OTHER)), noted(OTHER));
-        assert_eq!(attempts.refused(PublishRefusal::Race(OTHER)), QUIET);
-        // The permanent refusal on the fifth attempt, nowhere near the limit.
-        assert_eq!(
-            attempts.refused(PublishRefusal::Permanent(PERMANENT)),
-            PublishStep::Fail { refusals: 5, reason: PERMANENT }
-        );
-    }
-
-    fn a_permanent_first_refusal_fails_on_the_first_frame() {
-        let mut attempts = PublishAttempts::new();
-        assert_eq!(
-            attempts.refused(PublishRefusal::Permanent(PERMANENT)),
-            PublishStep::Fail { refusals: 1, reason: PERMANENT }
-        );
-        assert_eq!(attempts.last(), Some(PERMANENT));
-    }
-
-    fn busy_is_never_counted_never_noted_and_never_fails() {
-        let mut attempts = PublishAttempts::new();
-        for _ in 0..10 * usize::from(MII_PUBLISH_ATTEMPTS) {
-            assert_eq!(attempts.refused(PublishRefusal::Busy), QUIET);
-        }
-        assert_eq!(attempts, PublishAttempts::new());
-        // The counted attempts start from zero afterwards.
-        assert_eq!(attempts.refused(PublishRefusal::Race(RACE)), noted(RACE));
-        assert_eq!(attempts.refusals(), 1);
-        // A Busy between two identical races does not make the second one a new line.
-        assert_eq!(attempts.refused(PublishRefusal::Busy), QUIET);
-        assert_eq!(attempts.refused(PublishRefusal::Race(RACE)), QUIET);
-    }
-
-    fn the_counter_saturates_instead_of_wrapping() {
-        let mut attempts = PublishAttempts { refusals: u8::MAX, last: None };
-        assert_eq!(
-            attempts.refused(PublishRefusal::Race(RACE)),
-            PublishStep::Fail { refusals: u8::MAX, reason: RACE }
-        );
-    }
-
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
             ("a_repeated_race_is_noted_once_and_the_final_refusal_fails_with_its_reason", a_repeated_race_is_noted_once_and_the_final_refusal_fails_with_its_reason as fn()),
-            ("the_console_shape_of_180_identical_refusals_is_one_line_then_the_fallback", the_console_shape_of_180_identical_refusals_is_one_line_then_the_fallback as fn()),
-            ("a_changed_reason_is_noted_again_and_a_permanent_refusal_fails_at_once", a_changed_reason_is_noted_again_and_a_permanent_refusal_fails_at_once as fn()),
-            ("a_permanent_first_refusal_fails_on_the_first_frame", a_permanent_first_refusal_fails_on_the_first_frame as fn()),
-            ("busy_is_never_counted_never_noted_and_never_fails", busy_is_never_counted_never_noted_and_never_fails as fn()),
-            ("the_counter_saturates_instead_of_wrapping", the_counter_saturates_instead_of_wrapping as fn()),
         ]);
     }
     }

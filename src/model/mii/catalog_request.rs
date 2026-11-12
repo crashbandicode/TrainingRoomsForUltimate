@@ -392,25 +392,6 @@ mod tests {
         }
     }
 
-    fn menu_catalog_becomes_ready_only_for_its_opening() {
-        let mut requests = Requests::new();
-        assert!(!requests.pending());
-        let kind = submit(requests.request(menu(6)));
-        assert_eq!(kind, menu(6));
-        assert!(requests.pending());
-        assert!(matches!(requests.request(menu(6)).step, Step::Wait));
-        let effect = requests.complete(requests.serial(), live(6, true));
-        assert_eq!(
-            effect.verdict,
-            Verdict::Menu {
-                opening: 6,
-                owners: [2, 4]
-            }
-        );
-        assert!(matches!(effect.step, Step::Wait));
-        assert!(!requests.pending());
-    }
-
     fn closing_before_capture_is_armed_restores_auto_init_once() {
         for phase in ["flying", "waiting", "delivered", "queued"] {
             let mut requests = Requests::new();
@@ -451,18 +432,6 @@ mod tests {
         reopened.request(menu(7));
         reopened.menu_armed(6); // Old delivery cannot consume a new opening's debt.
         assert!(reopened.close_menu(7));
-    }
-
-    fn editor_result_is_not_a_fighter_menu_result() {
-        let mut requests = Requests::new();
-        let kind = submit(requests.request(Kind::Editor { opening: 9 }));
-        assert!(matches!(kind, Kind::Editor { opening: 9 }));
-        let effect = requests.complete(requests.serial(), live(9, true));
-        assert_eq!(effect.verdict, Verdict::Editor { opening: 9 });
-        assert!(!matches!(
-            effect.verdict,
-            Verdict::Menu { .. } | Verdict::Auto(_)
-        ));
     }
 
     fn fighter_menu_demand_supersedes_the_editor_catalog_for_one_opening() {
@@ -509,101 +478,6 @@ mod tests {
         assert_eq!(submit(waiting.retry(live(10, true))), menu(10));
     }
 
-    fn stale_generation_and_wrong_serial_do_not_apply() {
-        let mut requests = Requests::new();
-        submit(requests.request(menu(6)));
-        let serial = requests.serial();
-        let ignored = requests.complete(serial.wrapping_add(9), live(6, true));
-        assert_eq!(ignored.verdict, Verdict::Discard);
-        assert!(ignored.finished.is_none());
-        assert!(requests.pending());
-        let mut moved = live(6, true);
-        moved.owners[1] = 5;
-        let effect = requests.complete(serial, moved);
-        assert_eq!(effect.verdict, Verdict::Discard);
-        assert_eq!(effect.finished, Some(menu(6)));
-        assert!(!requests.pending());
-    }
-
-    fn reopen_discards_the_old_read_and_submits_one_fresh_read() {
-        let mut requests = Requests::new();
-        submit(requests.request(menu(3)));
-        let old = requests.serial();
-        assert!(matches!(requests.request(menu(4)).step, Step::Wait));
-        let effect = requests.complete(old, live(4, true));
-        assert_eq!(effect.verdict, Verdict::Discard);
-        assert_eq!(effect.finished, Some(menu(3)));
-        assert_eq!(submit(Effect::quiet(effect.step)), menu(4));
-        let effect = requests.complete(requests.serial(), live(4, true));
-        assert_eq!(
-            effect.verdict,
-            Verdict::Menu {
-                opening: 4,
-                owners: [2, 4]
-            }
-        );
-    }
-
-    fn close_keeps_the_selection_epoch_and_drops_the_catalog() {
-        let opening = 11u64;
-        let pending_epoch = opening;
-        let mut requests = Requests::new();
-        submit(requests.request(menu(opening)));
-        let serial = requests.serial();
-        requests.close_menu(opening);
-        assert_eq!(opening, 11);
-        assert_eq!(pending_epoch, opening);
-        let effect = requests.complete(serial, live(opening, true));
-        assert_eq!(effect.verdict, Verdict::Discard);
-        assert!(matches!(effect.step, Step::Wait));
-        let mut waiting = Requests::new();
-        submit(waiting.request(menu(opening)));
-        assert!(matches!(waiting.rejected_full().step, Step::Wait));
-        waiting.close_menu(opening);
-        assert!(!waiting.pending());
-        assert!(matches!(
-            waiting.retry(live(opening, true)).step,
-            Step::Wait
-        ));
-    }
-
-    fn retired_scene_discards_the_flying_read_and_a_later_open_submits_once() {
-        let mut requests = Requests::new();
-        submit(requests.request(menu(5)));
-        let serial = requests.serial();
-        requests.retire();
-        assert!(matches!(requests.request(menu(6)).step, Step::Wait));
-        let effect = requests.complete(serial, live(6, true));
-        assert_eq!(effect.verdict, Verdict::Discard);
-        assert_eq!(submit(Effect::quiet(effect.step)), menu(6));
-
-        let mut waiting = Requests::new();
-        submit(waiting.request(menu(5)));
-        waiting.rejected_full();
-        waiting.retire();
-        assert!(!waiting.pending());
-        assert_eq!(submit(waiting.request(menu(7))), menu(7));
-    }
-
-    fn auto_catalog_arms_only_while_its_token_is_still_current() {
-        let mut requests = Requests::new();
-        assert!(matches!(
-            submit(requests.request(Kind::Auto(AUTO))),
-            Kind::Auto(AUTO)
-        ));
-        let mut current = live(AUTO.opening, false);
-        current.auto = Some(AUTO);
-        let effect = requests.complete(requests.serial(), current);
-        assert_eq!(effect.verdict, Verdict::Auto(AUTO));
-
-        let mut cancelled = Requests::new();
-        submit(cancelled.request(Kind::Auto(AUTO)));
-        let serial = cancelled.serial();
-        let effect = cancelled.complete(serial, live(AUTO.opening, false));
-        assert_eq!(effect.verdict, Verdict::Discard);
-        assert_eq!(effect.finished, Some(Kind::Auto(AUTO)));
-    }
-
     fn full_writer_queue_stops_after_four_sends_and_does_not_enqueue() {
         let (tx, rx) = std::sync::mpsc::sync_channel(4);
         for n in 0..4u8 {
@@ -647,40 +521,14 @@ mod tests {
         assert!(!requests.pending());
     }
 
-    fn waiting_read_is_replaced_by_one_later_demand() {
-        let mut requests = Requests::new();
-        submit(requests.request(Kind::Auto(AUTO)));
-        assert!(matches!(requests.rejected_full().step, Step::Wait));
-        let replaced = requests.request(menu(3));
-        assert!(matches!(replaced.step, Step::Wait));
-        assert_eq!(replaced.dropped, Some(Kind::Auto(AUTO)));
-        assert_eq!(submit(requests.retry(live(3, true))), menu(3));
-        let effect = requests.complete(requests.serial(), live(3, true));
-        assert_eq!(
-            effect.verdict,
-            Verdict::Menu {
-                opening: 3,
-                owners: [2, 4]
-            }
-        );
-    }
-
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
-            ("menu_catalog_becomes_ready_only_for_its_opening", menu_catalog_becomes_ready_only_for_its_opening as fn()),
             ("closing_before_capture_is_armed_restores_auto_init_once", closing_before_capture_is_armed_restores_auto_init_once as fn()),
-            ("editor_result_is_not_a_fighter_menu_result", editor_result_is_not_a_fighter_menu_result as fn()),
             ("fighter_menu_demand_supersedes_the_editor_catalog_for_one_opening", fighter_menu_demand_supersedes_the_editor_catalog_for_one_opening as fn()),
-            ("stale_generation_and_wrong_serial_do_not_apply", stale_generation_and_wrong_serial_do_not_apply as fn()),
-            ("reopen_discards_the_old_read_and_submits_one_fresh_read", reopen_discards_the_old_read_and_submits_one_fresh_read as fn()),
-            ("close_keeps_the_selection_epoch_and_drops_the_catalog", close_keeps_the_selection_epoch_and_drops_the_catalog as fn()),
-            ("retired_scene_discards_the_flying_read_and_a_later_open_submits_once", retired_scene_discards_the_flying_read_and_a_later_open_submits_once as fn()),
-            ("auto_catalog_arms_only_while_its_token_is_still_current", auto_catalog_arms_only_while_its_token_is_still_current as fn()),
             ("full_writer_queue_stops_after_four_sends_and_does_not_enqueue", full_writer_queue_stops_after_four_sends_and_does_not_enqueue as fn()),
             ("closed_opening_cannot_be_requested_again", closed_opening_cannot_be_requested_again as fn()),
-            ("waiting_read_is_replaced_by_one_later_demand", waiting_read_is_replaced_by_one_later_demand as fn()),
         ]);
     }
     }

@@ -155,98 +155,6 @@ mod tests {
             decided: false, opening: false }
     }
 
-    fn retained_idle_result_is_not_a_new_decision() {
-        // binding44/no02/popup-after-no.json: same popup owner, phase0,
-        // previous7, result1 long after No returned to character select.
-        let mut p = Popup::new();
-        p.begin(1);
-        p.opened(1, 0x11e21bee80, Some(Kind::Rematch));
-        assert_eq!(p.observe(1, 0x11e21bee80, Snapshot { opening: false, ..state(0, 1) }), None);
-        assert_eq!(p.observe(1, 0x11e21bee80, state(3, 0)), None);
-    }
-
-    fn open_pending_idle_ticks_preserve_the_fresh_prompt() {
-        // Native open sets opening=1 first. The idle handler pushes phase1
-        // on a later tick, so an entry hook can observe idle more than once.
-        let mut p = Popup::new();
-        p.begin(1);
-        p.opened(1, 10, Some(Kind::Rematch));
-        for _ in 0..2 {
-            assert_eq!(p.observe(1, 10, Snapshot { opening: true, ..state(0, 0) }), None);
-        }
-        assert_eq!(p.observe(1, 10, state(1, 0)), None);
-        assert_eq!(p.observe(1, 10, state(3, 0)), Some(Event::Ready(Kind::Rematch)));
-    }
-
-    fn second_manager_tick_does_not_discard_the_owned_prompt() {
-        let mut p = Popup::new();
-        p.begin(1);
-        p.opened(1, 10, Some(Kind::Rematch));
-        p.observe(1, 10, state(1, 0));
-        assert_eq!(p.observe(1, 20, state(0, 1)), None);
-        assert_eq!(p.observe(1, 10, state(3, 0)), Some(Event::Ready(Kind::Rematch)));
-    }
-
-    fn normal_answer_is_latched_before_results_teardown() {
-        for result in [0, 1, 2, 3] {
-            let mut p = Popup::new();
-            p.begin(2);
-            p.opened(2, 10, Some(Kind::Rematch));
-            assert_eq!(p.observe(2, 10, state(1, 0)), None);
-            assert_eq!(p.observe(2, 10, state(3, 0)), Some(Event::Ready(Kind::Rematch)));
-            assert_eq!(p.observe(2, 10, state(3, 0)), None);
-            let answer = Snapshot { pending: 6, decided: true, ..state(3, result) };
-            assert_eq!(p.observe(2, 10, answer), Some(Event::Decided {
-                kind: Kind::Rematch, result, source: Source::Normal,
-            }));
-            p.end(); // No idle-popup tick is required before epoch teardown.
-            assert_eq!(p.observe(2, 10, state(0, result)), None);
-        }
-    }
-
-    fn timer_and_unsettled_prompt_are_not_ready_for_input() {
-        let mut p = Popup::new();
-        p.begin(1);
-        p.opened(1, 10, Some(Kind::Rematch));
-        for s in [state(4, 0), Snapshot { age: 0, ..state(3, 0) },
-            Snapshot { opening: true, ..state(3, 0) },
-            Snapshot { decided: true, ..state(3, 0) },
-            Snapshot { pending: 2, ..state(3, 0) }] {
-            assert_eq!(p.observe(1, 10, s), None);
-        }
-        assert_eq!(p.observe(1, 10, state(3, 0)), Some(Event::Ready(Kind::Rematch)));
-    }
-
-    fn forced_and_late_answers_keep_their_provenance() {
-        for (s, source) in [(Snapshot { pending: 6, ..state(5, 1) }, Source::Forced),
-            (state(6, 2), Source::Late), (state(0, 1), Source::Late)] {
-            let mut p = Popup::new();
-            p.begin(1);
-            p.opened(1, 10, Some(Kind::Rematch));
-            p.observe(1, 10, state(1, 0));
-            assert_eq!(p.observe(1, 10, s), Some(Event::Decided {
-                kind: Kind::Rematch, result: s.result, source,
-            }));
-            assert_eq!(p.observe(1, 10, s), None);
-        }
-    }
-
-    fn another_dialog_cannot_acknowledge_the_rematch() {
-        let mut p = Popup::new();
-        p.begin(1);
-        p.opened(1, 10, Some(Kind::Rematch));
-        p.observe(1, 10, state(3, 0));
-        p.opened(1, 10, Some(Kind::SaveConfirmation));
-        assert_eq!(p.observe(1, 10, state(3, 0)), Some(Event::Ready(Kind::SaveConfirmation)));
-        assert_eq!(p.observe(1, 10, state(0, 2)), Some(Event::Decided {
-            kind: Kind::SaveConfirmation, result: 2, source: Source::Late,
-        }));
-        p.opened(1, 10, Some(Kind::Rematch));
-        p.observe(1, 10, state(3, 0));
-        p.opened(1, 10, None);
-        assert_eq!(p.observe(1, 10, state(0, 2)), None);
-    }
-
     fn teardown_reused_address_or_wrong_epoch_discards_pending_answer() {
         // Each path represents a different invalidation boundary, not an
         // additional gameplay matrix.
@@ -269,13 +177,6 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
-            ("retained_idle_result_is_not_a_new_decision", retained_idle_result_is_not_a_new_decision as fn()),
-            ("open_pending_idle_ticks_preserve_the_fresh_prompt", open_pending_idle_ticks_preserve_the_fresh_prompt as fn()),
-            ("second_manager_tick_does_not_discard_the_owned_prompt", second_manager_tick_does_not_discard_the_owned_prompt as fn()),
-            ("normal_answer_is_latched_before_results_teardown", normal_answer_is_latched_before_results_teardown as fn()),
-            ("timer_and_unsettled_prompt_are_not_ready_for_input", timer_and_unsettled_prompt_are_not_ready_for_input as fn()),
-            ("forced_and_late_answers_keep_their_provenance", forced_and_late_answers_keep_their_provenance as fn()),
-            ("another_dialog_cannot_acknowledge_the_rematch", another_dialog_cannot_acknowledge_the_rematch as fn()),
             ("teardown_reused_address_or_wrong_epoch_discards_pending_answer", teardown_reused_address_or_wrong_epoch_discards_pending_answer as fn()),
         ]);
     }

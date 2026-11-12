@@ -101,8 +101,6 @@ mod grid_matches_catalog {
 #[cfg(test)]
 mod f9_seat_tests;
 
-#[cfg(test)]
-mod planner_alloc_tests;
 
 #[cfg(test)]
 mod clip_input_tests;

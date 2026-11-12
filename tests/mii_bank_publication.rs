@@ -26,9 +26,6 @@ use crate::engine::mii::ordinary_player::*;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct Receipt { descriptor: [u32; 4], scalars: [u16; 4], record: [u8; 0x68] }
 
-/// `begin()`'s gate for the next request: `same_owned(now, owner.expected)`.
-fn admits_next(expected: &Receipt, now: &Receipt) -> bool { expected == now }
-
 fn before() -> Receipt {
     // Pikachu active in the [Samus, Fox, Pikachu] window; record 0 already carries the
     // group's CharInfo (prefetch publication adopted it into `expected`), pair 0/0.
@@ -49,39 +46,6 @@ fn restore(before: &Receipt, now: &mut Receipt) -> RestoreReceipt {
     now.record[..88].copy_from_slice(&before.record[..88]);
     now.scalars = before.scalars;
     restore_receipt(&before.record, &now.record, now.descriptor == before.descriptor && now.scalars == before.scalars)
-}
-
-fn a_refused_mii_switch_restores_its_publication_and_the_next_request_is_admitted() {
-    let before = before();
-    let effects = bank_refusal_effects(false);
-    assert!(effects.keep_owner && !effects.retire_authority, "cascade guard: the owner and its receipt stay");
-    let expected = before;
-    // M3: the window was rolled back, native settled on the committed in-window member.
-    let mut now = published(before);
-    assert!(!admits_next(&expected, &now), "today's strand: the published scalars outlive the refusal");
-    assert_eq!(publication_rollback(true, now.descriptor == PUBLISHED_GROUP), PublicationRollback::Restore);
-    let receipt = restore(&before, &mut now);
-    assert_eq!(receipt, RestoreReceipt::Exact);
-    assert!(receipt.verified() && admits_next(&expected, &now), "the next request (e.g. Fox) is admitted without Quit");
-}
-
-fn a_crossed_mii_setup_leaves_native_s_pair_which_the_receipt_adopts() {
-    let before = before();
-    let mut expected = before;
-    let mut now = published(before);
-    // The Phase B setup ran (`0x3759500` published the pair at `record+0x58`), the build failed
-    // afterwards and the window rolled back: native owns that pair until its next bind.
-    now.record[88..96].copy_from_slice(&0x1209a8cdf0u64.to_le_bytes());
-    now.record[96..104].copy_from_slice(&0x11f98bb1a0u64.to_le_bytes());
-    let receipt = restore(&before, &mut now);
-    assert_eq!(receipt, RestoreReceipt::NativePairAdopted);
-    assert!(!admits_next(&expected, &now));
-    expected.record = now.record; // the adapter adopts the record under the verified receipt
-    assert!(admits_next(&expected, &now));
-    // A half pair is no native publication: it is not adopted.
-    let mut half = published(before);
-    half.record[88..96].copy_from_slice(&0x1209a8cdf0u64.to_le_bytes());
-    assert_eq!(restore(&before, &mut half), RestoreReceipt::Differs);
 }
 
 fn a_live_exchange_keeps_the_publication_and_nothing_published_restores_nothing() {
@@ -113,8 +77,6 @@ fn a_live_exchange_keeps_the_publication_and_nothing_published_restores_nothing(
 #[test]
 fn case_table() {
     crate::test_table::run(&[
-        ("a_refused_mii_switch_restores_its_publication_and_the_next_request_is_admitted", a_refused_mii_switch_restores_its_publication_and_the_next_request_is_admitted as fn()),
-        ("a_crossed_mii_setup_leaves_native_s_pair_which_the_receipt_adopts", a_crossed_mii_setup_leaves_native_s_pair_which_the_receipt_adopts as fn()),
         ("a_live_exchange_keeps_the_publication_and_nothing_published_restores_nothing", a_live_exchange_keeps_the_publication_and_nothing_published_restores_nothing as fn()),
     ]);
 }

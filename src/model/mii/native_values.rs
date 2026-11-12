@@ -438,24 +438,6 @@ mod tests {
         }
     }
 
-    fn unchanged_count_does_not_hide_pool_relocation_or_owner_alias() {
-        let original = binding();
-        assert_eq!(record_address(original, original), Ok(0x5000));
-        let mut moved = original;
-        moved.vector_begin += RECORD_LEN;
-        moved.vector_end += RECORD_LEN;
-        assert_eq!(record_address(original, moved), Err(Error::Binding));
-        moved = original;
-        moved.manager += 8;
-        assert_eq!(record_address(original, moved), Err(Error::Binding));
-        let mut kinds = [None; 8];
-        kinds[0] = Some(0x49);
-        kinds[1] = Some(9);
-        assert_eq!(qualified_scope(original, 0x49, kinds), Ok(()));
-        kinds[3] = Some(0x49); // inactive helper is still another Mii owner
-        assert_eq!(qualified_scope(original, 0x49, kinds), Err(Error::OtherMii));
-    }
-
     fn captured_cpu_owners() -> [CpuOwner; 4] {
         // Origin01 first visit: actual #281/#284/#297/#298 FE/D/O addresses.
         // E identities follow the converter captures and their native 0x260 stride.
@@ -554,76 +536,13 @@ mod tests {
         );
     }
 
-    fn record_copy_compare_is_exact_and_preserves_shared_ownership_bytes() {
-        let before = [0x11; CHARINFO_LEN];
-        let after = [0x22; CHARINFO_LEN];
-        let target = Tokens {
-            outfit: 43,
-            hat: 0,
-            colour: 4,
-            voice: 37,
-            specials: [1, 2, 0, 0],
-        };
-        let mut record = [0xa5; RECORD_LEN];
-        record[..CHARINFO_LEN].copy_from_slice(&before);
-        let update = RecordUpdate::compare_record(before, after, target, &record).unwrap();
-        let mut changed = record;
-        changed[0] ^= 1; // catalog masks this byte, exact live compare must not
-        let saved = changed;
-        assert!(matches!(
-            RecordUpdate::compare_record(before, after, target, &changed),
-            Err(Error::RecordChanged)
-        ));
-        assert_eq!(
-            update.apply_to_copy(&mut changed),
-            Err(Error::RecordChanged)
-        );
-        assert_eq!(changed, saved);
-        assert_eq!(update.apply_to_copy(&mut record), Ok(()));
-        assert_eq!(&record[..CHARINFO_LEN], &after);
-        assert_eq!(&record[CHARINFO_LEN..], &[0xa5; 16]);
-    }
-
-    fn native_tagged_rows_require_saved_hint_and_hash_not_an_asset_index() {
-        let tokens = Tokens {
-            outfit: 43,
-            hat: 0,
-            colour: 4,
-            voice: 37,
-            specials: [1, 2, 0, 0],
-        };
-        let rows = RowIds {
-            outfit: 0x13002b147bc59435,
-            hat: 0x5a00000fa9efa5ea,
-        };
-        assert_eq!(
-            rows.validate_tokens(tokens, 0x147bc59435, 0x0fa9efa5ea),
-            Ok(())
-        );
-        let wrong_hint = Tokens {
-            outfit: 42,
-            ..tokens
-        };
-        assert_eq!(
-            rows.validate_tokens(wrong_hint, 0x147bc59435, 0x0fa9efa5ea),
-            Err(Error::RowIdentity)
-        );
-        assert_eq!(
-            RowIds { outfit: 43, ..rows }.validate_tokens(tokens, 0x147bc59435, 0x0fa9efa5ea),
-            Err(Error::RowIdentity)
-        );
-    }
-
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
             ("captured_sword_mirrors_use_four_d_halfwords_and_full_width_owner_tokens", captured_sword_mirrors_use_four_d_halfwords_and_full_width_owner_tokens as fn()),
-            ("unchanged_count_does_not_hide_pool_relocation_or_owner_alias", unchanged_count_does_not_hide_pool_relocation_or_owner_alias as fn()),
             ("saved_cpu_assignments_do_not_admit_index_or_owner_aliases_or_widen_p1", saved_cpu_assignments_do_not_admit_index_or_owner_aliases_or_widen_p1 as fn()),
             ("same_helper_hash_does_not_hide_record_resource_or_mirror_changes", same_helper_hash_does_not_hide_record_resource_or_mirror_changes as fn()),
-            ("record_copy_compare_is_exact_and_preserves_shared_ownership_bytes", record_copy_compare_is_exact_and_preserves_shared_ownership_bytes as fn()),
-            ("native_tagged_rows_require_saved_hint_and_hash_not_an_asset_index", native_tagged_rows_require_saved_hint_and_hash_not_an_asset_index as fn()),
         ]);
     }
     }

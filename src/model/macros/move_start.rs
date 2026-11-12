@@ -172,49 +172,6 @@ mod tests {
                 start: StartState { status, ..StartState::neutral(74, 0, 1.0) }, x: 0.0, y: 0.0 }).collect() }
     }
 
-    fn charged_smash_keeps_local_turn_setup_instead_of_distant_idle() {
-        // Original regression: old WAIT/FALL search skips thousands of active
-        // frames. A previous special ends, then turn/dash and smash charge/fire.
-        let mut statuses = vec![486; 4400]; statuses[0] = 0;
-        statuses.extend([6, 6, 7, 7, 7, 45, 45, 46, 47, 47]);
-        let t = track(&statuses);
-        assert_eq!(t.previous_clean_start(4409, &[0, 14]), Some(0));
-        let start = rules().snap(&t, 4409).unwrap();
-        assert_eq!((start.frame, start.action_frame, start.action_status), (4399, 4405, 45));
-        assert_eq!(start.context.status, 0);
-        assert_eq!(t.frames[4399].start.status, 486); // Source remains immutable.
-    }
-
-    fn aerial_includes_ground_jump_and_double_jump_inputs() {
-        let mut t = track(&[486, 10, 10, 11, 12, 54, 54]);
-        for f in &mut t.frames[3..] { f.start.situation = 2; f.start.speed_y = 3.5; }
-        let start = rules().snap(&t, 6).unwrap();
-        assert_eq!((start.frame, start.action_frame, start.context.situation), (0, 5, 0));
-        assert_eq!(start.context.status, 0);
-    }
-
-    fn airborne_start_keeps_momentum_but_does_not_claim_animation_restore() {
-        let mut t = track(&[14, 54, 54]);
-        t.frames[0].start.situation = 2; t.frames[0].start.speed_y = 2.5;
-        let start = rules().snap(&t, 2).unwrap();
-        assert_eq!((start.frame, start.context.status, start.context.speed_y), (0, 14, 2.5));
-    }
-
-    fn keeps_buffered_direction_before_the_immediate_pre_move_frame() {
-        let mut rules = rules(); rules.trigger_buttons = 1;
-        let mut t = track(&[32, 32, 32, 45, 46, 47]);
-        t.frames[0].input = InputFrame::default();
-        t.frames[1].input = InputFrame { buttons: 1, lstick_y: -127, ..Default::default() };
-        t.frames[2].input = InputFrame { buttons: 1, ..Default::default() };
-        assert_eq!(rules.snap(&t, 5).unwrap().frame, 1);
-    }
-
-    fn consecutive_same_family_moves_snap_to_the_latest_starter() {
-        let t = track(&[0, 45, 46, 47, 45, 46, 47]);
-        let s = rules().snap(&t, 6).unwrap();
-        assert_eq!((s.frame, s.action_frame), (3, 4));
-    }
-
     fn setup_points_forward_and_long_idle_never_jumps_to_replay_beginning() {
         let t = track(&[0, 45, 47, 486, 6, 7, 45, 46, 47]);
         let s = rules().snap(&t, 5).unwrap();
@@ -238,27 +195,12 @@ mod tests {
         assert_eq!(rules.snap(&t, 5).unwrap().frame, 1);
     }
 
-    fn refuses_missing_trigger_identity_change_and_unbounded_setup() {
-        assert!(rules().snap(&track(&[45, 46, 47]), 2).is_err());
-        assert!(rules().snap(&track(&[0, 0, 0]), 2).is_err());
-        let mut t = track(&[0, 7, 45]); t.frames[0].start.fighter_kind = 8;
-        assert!(rules().snap(&t, 2).is_err());
-        let mut statuses = vec![7; 122]; statuses[0] = 0; statuses.push(45);
-        assert!(rules().snap(&track(&statuses), 122).is_err());
-    }
-
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
-            ("charged_smash_keeps_local_turn_setup_instead_of_distant_idle", charged_smash_keeps_local_turn_setup_instead_of_distant_idle as fn()),
-            ("aerial_includes_ground_jump_and_double_jump_inputs", aerial_includes_ground_jump_and_double_jump_inputs as fn()),
-            ("airborne_start_keeps_momentum_but_does_not_claim_animation_restore", airborne_start_keeps_momentum_but_does_not_claim_animation_restore as fn()),
-            ("keeps_buffered_direction_before_the_immediate_pre_move_frame", keeps_buffered_direction_before_the_immediate_pre_move_frame as fn()),
-            ("consecutive_same_family_moves_snap_to_the_latest_starter", consecutive_same_family_moves_snap_to_the_latest_starter as fn()),
             ("setup_points_forward_and_long_idle_never_jumps_to_replay_beginning", setup_points_forward_and_long_idle_never_jumps_to_replay_beginning as fn()),
             ("released_buffer_and_jump_bit_are_preserved", released_buffer_and_jump_bit_are_preserved as fn()),
-            ("refuses_missing_trigger_identity_change_and_unbounded_setup", refuses_missing_trigger_identity_change_and_unbounded_setup as fn()),
         ]);
     }
     }

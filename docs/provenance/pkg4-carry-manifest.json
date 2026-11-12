@@ -121,7 +121,7 @@
    "dest": "src/model/macros/capture_toggle.rs",
    "crate": "macros",
    "src_sha256": "aa0f6a4b6440d708d0a774e19135ff9b425fa51ea4f16b7b3290279ed28f28d7",
-   "dest_sha256": "a7d591fca8ebfad663b8fa33aec6ffb6ca9df61489a65a0e3c9c899330451946",
+   "dest_sha256": "9f82f9b0eb14c54c8932f606443856cdaf51a70b56fe3e6b57cb7e611d2cc02b",
    "edits": [
     {
      "table_tests": true,
@@ -133,6 +133,61 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       442,
+       483,
+       []
+      ],
+      [
+       499,
+       509,
+       []
+      ],
+      [
+       537,
+       580,
+       []
+      ],
+      [
+       601,
+       620,
+       []
+      ],
+      [
+       634,
+       647,
+       []
+      ],
+      [
+       700,
+       701,
+       []
+      ],
+      [
+       703,
+       703,
+       []
+      ],
+      [
+       705,
+       706,
+       []
+      ],
+      [
+       708,
+       708,
+       []
+      ],
+      [
+       710,
+       710,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -141,7 +196,7 @@
    "dest": "src/model/macros/live_capture.rs",
    "crate": "macros",
    "src_sha256": "61ae1a33ce4e788097f81761f12f0c86801b4f32a1ba273498b701ccc0f8bb91",
-   "dest_sha256": "b8995b54d2c93d461fbde14ff6d99d66e17cf595d16762c4267f7bf1b1805520",
+   "dest_sha256": "d7d8e2d0ce3ef70bbcde3151a8fa79ac5b148bec91df6c09115e0d687b2cebcf",
    "edits": [
     {
      "old": "    pub fn active_key(&self) -> Option<NativeRecordKey> { self.active }",
@@ -243,6 +298,51 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       313,
+       349,
+       []
+      ],
+      [
+       369,
+       384,
+       []
+      ],
+      [
+       398,
+       487,
+       []
+      ],
+      [
+       516,
+       600,
+       []
+      ],
+      [
+       605,
+       606,
+       []
+      ],
+      [
+       608,
+       608,
+       []
+      ],
+      [
+       610,
+       614,
+       []
+      ],
+      [
+       616,
+       619,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -251,7 +351,7 @@
    "dest": "src/model/macros/live_frame.rs",
    "crate": "macros",
    "src_sha256": "a4f6894336d120ba5d80d20e306f7817c1f6a836d787d809b395bb3c7bf4c471",
-   "dest_sha256": "e77f7792ea8b8f66ab9593a9ebd4e9ce85ef775dbd5bef81e51f592f7fb9623f",
+   "dest_sha256": "6ff99b906f899c079f5ed7fa7629cdca7a0aca0f23e9733169acd77de13ba95a",
    "edits": [
     {
      "old": "}\n\n#[derive(Clone, Debug, Default)]\npub struct LiveSession {\n",
@@ -269,6 +369,21 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       89,
+       92,
+       []
+      ],
+      [
+       94,
+       107,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -277,7 +392,7 @@
    "dest": "src/model/macros/move_start.rs",
    "crate": "macros",
    "src_sha256": "c9f0962e3b1023d00376b12717bcd5236f8f8b0abfc20a493d584e2b259fba2e",
-   "dest_sha256": "8b4670b22b07e22d7ca0601324dfd923e4751173dc388087f19afe6817f703ee",
+   "dest_sha256": "0927832a995118f82c8823cc075ce70428f7c22fefc31954871d879a60123ada",
    "edits": [
     {
      "table_tests": true,
@@ -289,6 +404,31 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       175,
+       217,
+       []
+      ],
+      [
+       241,
+       249,
+       []
+      ],
+      [
+       254,
+       258,
+       []
+      ],
+      [
+       261,
+       261,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -326,7 +466,7 @@
    "dest": "src/model/macros/replay.rs",
    "crate": "macros",
    "src_sha256": "b04adf37bf6ab0c2419c9fb1699b13ae174b9fb3438eecc5792b0c1b0eac9721",
-   "dest_sha256": "a22d85d479a8e6106c41e3fc3a92c7515da2e5d1099a797f76b8e08dd082269a",
+   "dest_sha256": "886865e88806c2fee8eec050a2c7813438a9a427336d8f6d6f2699a91e8ed5ba",
    "edits": [
     {
      "old": "    pub tracks: Vec<ReplayTrack>,\n    pub truncated: bool,\n}\n\nimpl ReplaySession {\n    /// Associate only values from the same immutable committed capture. Native\n    /// CFMK row numbers and local live entry IDs are different namespaces.\n",
@@ -348,6 +488,21 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       123,
+       145,
+       []
+      ],
+      [
+       179,
+       180,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -356,7 +511,7 @@
    "dest": "src/model/macros/shared_capture.rs",
    "crate": "macros",
    "src_sha256": "46093f8256ff444e9943ee4672cc6c348ddc46548a6108fc177a45fe65c208f0",
-   "dest_sha256": "f75adcf6691c572d16dcacb6224758debd64c245b0b15e6ec135a40da2bb2ee6",
+   "dest_sha256": "70364e9efaa09deabd50afbe1d9e38be93764e96b75fe72703ed0f3592ea797e",
    "edits": [
     {
      "old": "            }\n        }\n    }\n}\n",
@@ -433,6 +588,39 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       514,
+       516,
+       [
+        "    use smash_match_data_oracle::{validate_capture, CaptureExt};",
+        "    "
+       ]
+      ],
+      [
+       613,
+       686,
+       []
+      ],
+      [
+       709,
+       911,
+       []
+      ],
+      [
+       918,
+       921,
+       []
+      ],
+      [
+       923,
+       929,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -478,7 +666,7 @@
    "dest": "src/model/macros/window/tests.rs",
    "crate": "macros",
    "src_sha256": "2dc0eace36a068b95ca9347fa277446b874dcf8c2f69fd5375432464cffd666f",
-   "dest_sha256": "749056d2289fb52ea8948133657b95e20997c0acacd5cd17702135718213aa9e",
+   "dest_sha256": "f32dbef1b02748f944188f7a180adb358983d94f2811f9ea2db6c5ee5f70891b",
    "edits": [
     {
      "table_file": true,
@@ -487,6 +675,38 @@
     {
      "wrap_file": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       3,
+       3,
+       [
+        "use crate::engine::macros::test_util::frames;"
+       ]
+      ],
+      [
+       23,
+       157,
+       []
+      ],
+      [
+       186,
+       288,
+       []
+      ],
+      [
+       293,
+       301,
+       []
+      ],
+      [
+       303,
+       307,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -586,7 +806,7 @@
    "dest": "src/model/macros/mod.rs",
    "crate": "macros",
    "src_sha256": "561c0de012c6f235d735c9d956305c7aa98fe0cdf7a1c560552a0a6275abc4ad",
-   "dest_sha256": "1dd00b86dc83c819c79501c1733eeb2e3a8d1a580b38ddf349226387e2f9e54b",
+   "dest_sha256": "6aee0f40647192830aea1f27665c56e2845f37349ccb0116d7d1d3667293ac01",
    "edits": [
     {
      "old": "mod capture_settings;\n",
@@ -636,6 +856,16 @@
      "old": "#[cfg(any(feature = \"diag\", test))]\npub use live_capture::{FirstSeal, SealReason};\npub use live_frame::{LiveFrame, LiveInput, LiveSession, LiveTrack};\npub use recording::{\n    InputFrame, MacroError, MacroRecording, MomentumMode, Placement, StartState, DEFAULT_FPS,\n",
      "new": "#[cfg(any(feature = \"diag\", test))]\npub use live_capture::{FirstSeal, SealReason};\npub use live_frame::{CaptureBreak, LiveFrame, LiveInput, LiveSession, LiveTrack, MAX_BREAKS};\npub use recording::{\n    InputFrame, MacroError, MacroRecording, MomentumMode, Placement, StartState, DEFAULT_FPS,\n",
      "reason": "P-TIMER (primary 2026-11-05 18:32Z; DECISIONS DEFERRED-LIST item 7): a capture keeps going across a stretch of the native record with no live play (TIME! to sudden death) as a CaptureBreak, instead of sealing every track at the end of regular time"
+    },
+    {
+     "line_patch": [
+      [
+       69,
+       70,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -644,7 +874,7 @@
    "dest": "src/model/macros/move_crop_continuation_tests.rs",
    "crate": "macros",
    "src_sha256": "be8269aefe30822af6f9ad9974c338ff5e3ce5abd5a234f24c1dc12359aa1210",
-   "dest_sha256": "5c7ae64d72712202d3089fc86a472c79e68160c30cc4224669c000a013a4640d",
+   "dest_sha256": "",
    "edits": [
     {
      "old": "use training_mod_macros::*;",
@@ -660,14 +890,15 @@
      "wrap_file": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
-   ]
+   ],
+   "removed": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): the file's cases add no line coverage; removed"
   },
   {
    "src": "training_mod_tui/src/clip_browser.rs",
    "dest": "src/model/macro_ui/clip_browser.rs",
    "crate": "tui",
    "src_sha256": "65a095c11c1d2a7eade83f0f3039677736d22257620ddee0d8bf06d33b3b9543",
-   "dest_sha256": "9c7ff789c0329faa5b99279cdd6a01667407accaa2dfa557a63af6c8bcf40539",
+   "dest_sha256": "dc39bb3a2302fc5ab0883f654232717e5927104f9b440946ef7994107485e666",
    "edits": [
     {
      "table_tests": true,
@@ -679,6 +910,21 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       160,
+       181,
+       []
+      ],
+      [
+       189,
+       190,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -687,7 +933,7 @@
    "dest": "src/model/macro_ui/clip_panel.rs",
    "crate": "tui",
    "src_sha256": "0064feed6e12daaa07f3881e49c930bb335458b4216f104a12373fd935db5ea0",
-   "dest_sha256": "9ceba083444ca62c5cacfa815418fb35d828649c84fe7a015991ff20601e0b24",
+   "dest_sha256": "ce2c5ee657b55f40138e54613f5edf8385d7ca324bfd0089c5e2852c3ba8c6f3",
    "edits": [
     {
      "old": "            Pad::Extra => ClipAction::TogglePlay,\n        })",
@@ -724,6 +970,61 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       531,
+       562,
+       []
+      ],
+      [
+       573,
+       617,
+       []
+      ],
+      [
+       632,
+       665,
+       []
+      ],
+      [
+       672,
+       727,
+       []
+      ],
+      [
+       748,
+       758,
+       []
+      ],
+      [
+       864,
+       893,
+       []
+      ],
+      [
+       899,
+       906,
+       []
+      ],
+      [
+       908,
+       914,
+       []
+      ],
+      [
+       916,
+       916,
+       []
+      ],
+      [
+       923,
+       924,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -732,7 +1033,7 @@
    "dest": "src/model/macro_ui/replay_panel.rs",
    "crate": "tui",
    "src_sha256": "7f2595db169a3703c99d74d4ed25a7247c01dfd601bfd5e5cfa19350ea98eef9",
-   "dest_sha256": "11bd780e73bf86f164c5a6ee3a08d7fca17aff4c3a9a0df855a053192c5b0a53",
+   "dest_sha256": "715b76b491c3cbc3574301f27a0f1381e966481f131f2e5f5a13a8dfa550c139",
    "edits": [
     {
      "old": "            Pad::Confirm => return self.confirm(),\n        }\n        Effect::None",
@@ -754,6 +1055,21 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       186,
+       196,
+       []
+      ],
+      [
+       216,
+       216,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -762,7 +1078,7 @@
    "dest": "src/model/macro_ui/macro_panel.rs",
    "crate": "tui",
    "src_sha256": "1b6e698f679029bc6fa83ff9cd43756302bd939debaad2d3eeeacd10fb166da1",
-   "dest_sha256": "6c274b1c1bbc8f75fca6cb6305c8c76143b4ef0eaf7a0866e38a24ca87ca0b29",
+   "dest_sha256": "25ce68534f152763e79b6f29efc1b8a2eb4e8a9226c828e72a617f7c8a1d9b3c",
    "edits": [
     {
      "old": "    /// Facing, status, and frames for one playback. Empty when the fighter is not ready.\n    pub fn copy_playback(",
@@ -1039,6 +1355,121 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       1840,
+       1861,
+       []
+      ],
+      [
+       1959,
+       1971,
+       []
+      ],
+      [
+       2017,
+       2035,
+       []
+      ],
+      [
+       2064,
+       2124,
+       []
+      ],
+      [
+       2146,
+       2171,
+       []
+      ],
+      [
+       2214,
+       2235,
+       []
+      ],
+      [
+       2291,
+       2327,
+       []
+      ],
+      [
+       2486,
+       2541,
+       []
+      ],
+      [
+       2553,
+       2564,
+       []
+      ],
+      [
+       2585,
+       2599,
+       []
+      ],
+      [
+       2629,
+       2648,
+       []
+      ],
+      [
+       2676,
+       2676,
+       []
+      ],
+      [
+       2681,
+       2681,
+       []
+      ],
+      [
+       2684,
+       2684,
+       []
+      ],
+      [
+       2686,
+       2688,
+       []
+      ],
+      [
+       2690,
+       2690,
+       []
+      ],
+      [
+       2693,
+       2693,
+       []
+      ],
+      [
+       2695,
+       2695,
+       []
+      ],
+      [
+       2702,
+       2704,
+       []
+      ],
+      [
+       2706,
+       2706,
+       []
+      ],
+      [
+       2708,
+       2708,
+       []
+      ],
+      [
+       2710,
+       2710,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },
@@ -1047,7 +1478,7 @@
    "dest": "src/model/macro_ui/macro_panel/fighter.rs",
    "crate": "tui",
    "src_sha256": "1a4e2da3199c28c0d66ad424b2d6cbdb38b9e9ed283e529dfbc8e29e01b50f69",
-   "dest_sha256": "b0d1cce073ee04e5f79b0253c743d468845ed2f2ff4c32b23b56175e8d89f29b",
+   "dest_sha256": "1aa73700511b8530f7d52ba543ac3b61131edb6413aeec6e693f1ed92c951163",
    "edits": [
     {
      "old": "            Pad::Extra => {}",
@@ -1134,6 +1565,21 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "line_patch": [
+      [
+       137,
+       140,
+       []
+      ],
+      [
+       142,
+       227,
+       []
+      ]
+     ],
+     "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
    ]
   },

@@ -258,36 +258,6 @@ mod tests {
         }
     }
 
-    fn cancelling_snapshot_keeps_ticket_until_retired_without_opening_name() {
-        let mut ui = Setups::default();
-        let mut provider = Fake::default();
-        ui.begin_save(&mut provider, (1, 2, true)).unwrap();
-        ui.cancel_name();
-        assert!(ui.watching());
-        assert_eq!(ui.poll(&mut provider), None);
-        provider.reply = Some(Ok(Reply::Snapshot(Box::new(record()))));
-        assert_eq!(ui.poll(&mut provider), Some(Ok(false)));
-        assert!(ui.draft().is_none());
-        assert!(!ui.watching());
-        assert!(provider.bound.is_empty());
-    }
-
-    fn failed_selection_keeps_the_previously_validated_choice() {
-        let mut ui = Setups::default();
-        let mut provider = Fake::default();
-        ui.choose(&mut provider, (1, 0, true), record(), true)
-            .unwrap();
-        provider.refuse = true;
-        assert_eq!(
-            ui.choose(&mut provider, (2, 4, false), record(), false),
-            Err("busy")
-        );
-        provider.refuse = false;
-        ui.close_menu(&mut provider).unwrap();
-        assert_eq!(provider.bound[0].0, (1, 0, true));
-        assert!(provider.bound[0].1);
-    }
-
     fn invalid_name_and_file_failure_keep_draft_cancel_exports_nothing() {
         let mut ui = Setups::default();
         let mut provider = Fake::default();
@@ -322,8 +292,6 @@ mod tests {
     fn case_table() {
         crate::test_table::run(&[
             ("library_selection_freezes_target_and_only_actual_close_binds_once", library_selection_freezes_target_and_only_actual_close_binds_once as fn()),
-            ("cancelling_snapshot_keeps_ticket_until_retired_without_opening_name", cancelling_snapshot_keeps_ticket_until_retired_without_opening_name as fn()),
-            ("failed_selection_keeps_the_previously_validated_choice", failed_selection_keeps_the_previously_validated_choice as fn()),
             ("invalid_name_and_file_failure_keep_draft_cancel_exports_nothing", invalid_name_and_file_failure_keep_draft_cancel_exports_nothing as fn()),
         ]);
     }

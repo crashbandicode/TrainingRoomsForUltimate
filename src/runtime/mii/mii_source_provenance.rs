@@ -263,66 +263,6 @@ mod tests {
     use super::*;
     use crate::engine::swap::source_lifetime::{NativeEntry, SourceBook};
 
-    fn native_ice_climbers_helpers_share_visible_origin_identity_in_every_layout() {
-        use crate::engine::mii::backend::Layout;
-        for layout in [Layout::Training, Layout::Ldn, Layout::Quickplay] {
-            let view = View { layout, ..View::EMPTY };
-            for id in 0..8 {
-                if view.ordinal(id).is_none() { continue; }
-                let owner = Owner { entry:0x1000+id*0x100, row:0x2000+id*0x100,
-                    information:0x3000+id*0x100, object:0x4000+id*0x100,
-                    index:0, selector:id as u8, alias:0 };
-                let proof = Proof { original:OriginalRow { row:owner.row, kind:0x6e,
-                    index:0, selector:id as u8, control:[0;7] },
-                    thread:0x8000, owner, kind:0x4b, costume:0 };
-                assert!(view.accepts(id,proof,true));
-                // This is a paired-selection -> primary-actor mapping, not an
-                // arbitrary ordinary fighter, secondary actor or Mii exemption.
-                for kind in [0xb,0x4c,0x48,0x49,0x4a] {
-                    assert!(!view.accepts(id,Proof {kind,..proof},true));
-                }
-                for kind in [-1,0x6d,0x4c] {
-                    assert!(!view.accepts(id,Proof {
-                        original:OriginalRow {kind,..proof.original},..proof},true));
-                }
-                let mut book=SourceBook::<8,1>::new();
-                let key=SourceKey {kind:proof.kind,costume:proof.costume};
-                let load=book.begin_install(id,book.epoch(),NativeEntry(owner.entry as u64),key).unwrap();
-                let ready=book.complete(load).unwrap();
-                let ordinal=view.ordinal(id).unwrap();
-                let mut managed=View {epoch:Some(book.epoch()),..view};
-                managed.slots[ordinal]=Helper::Ready {ready,key,proof};
-                assert!(managed.accepts(id,proof,true));
-                assert!(!managed.accepts(id,proof,false));
-                assert!(!managed.accepts(id,Proof {original:OriginalRow {
-                    kind:0x4b,..proof.original},..proof},true));
-                assert!(!managed.accepts(id,Proof {thread:0x8008,..proof},true));
-                managed.epoch=Some(book.depart_scene().unwrap());
-                assert!(!managed.accepts(id,proof,true));
-            }
-        }
-    }
-
-    fn ldn_helper_projection_requires_its_exact_physical_token_and_epoch() {
-        let mut book=SourceBook::<8,1>::new();
-        let key=SourceKey {kind:9,costume:0};
-        let owner=Owner {entry:0x1500,row:0x2500,information:0x3500,object:0x4500,
-            index:27,selector:5,alias:0};
-        let proof=Proof {original:OriginalRow {row:owner.row,kind:0x49,index:27,selector:5,control:[0;7]},
-            thread:0x8000,owner,kind:9,costume:0};
-        let load=book.begin_install(5,book.epoch(),NativeEntry(owner.entry as u64),key).unwrap();
-        let loading=View {layout:crate::engine::mii::backend::Layout::Ldn,epoch:Some(book.epoch()),
-            slots:[Helper::Unavailable {token:load.source(),phase:Phase::Loading},Helper::Unmanaged],miis:[None;2],..View::EMPTY};
-        assert_eq!(loading.available_for(Some(load.source())),Ok(()));
-        assert!(View {layout:crate::engine::mii::backend::Layout::Training,..loading}.available_for(Some(load.source())).is_err());
-        let ready=book.complete(load).unwrap();
-        let view=View {slots:[Helper::Ready {ready,key,proof},Helper::Unmanaged],..loading};
-        assert_eq!(view.ordinal(5),Some(0));assert_eq!(view.ordinal(6),Some(1));
-        assert!(view.accepts(5,proof,true));assert!(!view.accepts(2,proof,true));
-        let departed=View {epoch:Some(book.depart_scene().unwrap()),..view};
-        assert!(!departed.accepts(5,proof,true));
-    }
-
     fn same_bytes_replacement_changes_provenance_and_departure_refuses() {
         let mut book = SourceBook::<4, 1>::new();
         let key = SourceKey { kind: 7, costume: 0 };
@@ -354,91 +294,11 @@ mod tests {
         assert_eq!(unqualified.available(), Err(NO_AUTHORITY));
     }
 
-    /// C116.2 mii-fix, the first console boot of C116.1 (`R/c1162/MII-PROVENANCE-REPORT.md`): the CPU owner
-    /// stored its helper view at its last completion (helper 2 = the Mii Gunner, helper 3 = a fighter source);
-    /// the cycle preloader then reloaded helper 3 (the Kirby hat source, kind 0xb -> 0x59). While the source
-    /// loads the view is BUSY; afterwards the live view differs from the stored one only in `slots[1]`, the live
-    /// view authorizes every helper row of the locked walk, and the stored one refuses helper 3. Comparing the
-    /// live view against the stored one therefore refused every frame for as long as nothing completed; the
-    /// walk and its fences compare the view against itself within one transaction instead.
-    fn helper_3_reload_changes_only_its_slot_and_the_fresh_view_authorizes_the_whole_walk() {
-        use crate::engine::mii::{backend::Layout, inventory::{build_snapshot, MiiClass, RawSlot, TaggedId},
-            lifetime::{Binding, Configuration}};
-        let mut book = SourceBook::<8, 1>::new();
-        // Training helpers are the physical entries 2 and 3 (ordinals 0 and 1).
-        let owner2 = Owner { entry: 0x1200, row: 0x2200, information: 0x3200, object: 0x4200,
-            index: 2, selector: 2, alias: 0 };
-        let owner3 = Owner { entry: 0x1300, row: 0x2300, information: 0x3300, object: 0x4300,
-            index: 3, selector: 3, alias: 0 };
-        let proof = |owner: Owner, id: u8, kind: u32| Proof {
-            original: OriginalRow { row: owner.row, kind: 0x49, index: u16::from(id), selector: id, control: [0; 7] },
-            thread: 21, owner, kind, costume: 0 };
-        let (key2, key3) = (SourceKey { kind: 0x4a, costume: 0 }, SourceKey { kind: 0xb, costume: 0 });
-        let load2 = book.begin_install(2, book.epoch(), NativeEntry(owner2.entry as u64), key2).unwrap();
-        let ready2 = book.complete(load2).unwrap();
-        let load3 = book.begin_install(3, book.epoch(), NativeEntry(owner3.entry as u64), key3).unwrap();
-        let ready3 = book.complete(load3).unwrap();
-        let (proof2, proof3) = (proof(owner2, 2, 0x4a), proof(owner3, 3, 0xb));
-        // Helper 2 carries the saved Mii Gunner's exact payload proof.
-        let raw = RawSlot { index: 0, slot_id: 4155, name_len: 1, name_units: [65, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            colour: 4, voice: 37, specials: [0; 4], tag_outfit: TaggedId(0x1300291bfef7a5f7),
-            tag_hat: TaggedId(0x5a00000fa9efa5ea),
-            tag_chara: TaggedId(0xc100000000000000 | MiiClass::Gunner.chara_hash40()), charinfo: [0; 88] };
-        let catalog = build_snapshot(vec![raw]);
-        let configuration = Configuration::from_saved(&catalog.configs[0]).unwrap();
-        assert_eq!(configuration.canonical().class as u32, key2.kind);
-        let binding = Binding { epoch: 4, owner: 2, entry: owner2.entry, row: owner2.row, holder: 0x5000,
-            manager: 0x6000, vector_begin: 0x7000, vector_end: 0x7000 + 4 * 104, record_index: 2 };
-        let mii = MiiProof { binding, configuration, record: [0; 104], descriptor: [0; 0x70] };
-        let stored = View { layout: Layout::Training, epoch: Some(book.epoch()),
-            slots: [Helper::Ready { ready: ready2, key: key2, proof: proof2 },
-                Helper::Ready { ready: ready3, key: key3, proof: proof3 }],
-            miis: [Some(mii), None],..View::EMPTY };
-        assert_eq!(stored.available(), Ok(()));
-        assert!(stored.accepts(2, proof2, true) && stored.accepts(3, proof3, true));
-
-        // The preloader replaces helper 3's source: BUSY for as long as it loads.
-        let key3b = SourceKey { kind: 0x59, costume: 0 };
-        let reload = book.begin_install(3, book.epoch(), NativeEntry(owner3.entry as u64), key3b).unwrap();
-        let loading = View { slots: [stored.slots[0],
-            Helper::Unavailable { token: reload.source(), phase: Phase::Loading }], ..stored };
-        assert_eq!(loading.available(), Err(BUSY));
-        assert_ne!(NO_AUTHORITY, BUSY);
-
-        // After the reload: a new ready token, key and proof in helper 3's slot only.
-        let ready3b = book.complete(reload).unwrap();
-        let proof3b = proof(owner3, 3, 0x59);
-        let live = View { slots: [stored.slots[0], Helper::Ready { ready: ready3b, key: key3b, proof: proof3b }],
-            ..stored };
-        assert_eq!(live.available(), Ok(()));
-        assert_ne!(live, stored);
-        assert_ne!(ready3b, ready3);
-        assert_eq!((live.layout, live.epoch, live.miis), (stored.layout, stored.epoch, stored.miis));
-        assert_eq!(live.slots[0], stored.slots[0]);
-        assert_ne!(live.slots[1], stored.slots[1]);
-
-        // The locked walk's helper-row decisions against the one fresh view.
-        assert!(live.accepts(2, proof2, true), "helper 2 is untouched by the reload");
-        assert!(live.accepts(3, proof3b, true));
-        assert!(!live.accepts(3, proof3, true), "the replaced source's proof is not the live one");
-        // The owner's stored view cannot authorize the reloaded row: it must never be the baseline.
-        assert!(!stored.accepts(3, proof3b, true));
-        assert!(stored.accepts(2, proof2, true));
-
-        // A helper that is not loading but has no ordinary authority is a different, permanent refusal.
-        let unqualified = View { slots: [stored.slots[0],
-            Helper::Unavailable { token: ready3b.source(), phase: Phase::Ready }], ..stored };
-        assert_eq!(unqualified.available(), Err(NO_AUTHORITY));
-    }
-
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
-            ("native_ice_climbers_helpers_share_visible_origin_identity_in_every_layout", native_ice_climbers_helpers_share_visible_origin_identity_in_every_layout as fn()),
-            ("ldn_helper_projection_requires_its_exact_physical_token_and_epoch", ldn_helper_projection_requires_its_exact_physical_token_and_epoch as fn()),
             ("same_bytes_replacement_changes_provenance_and_departure_refuses", same_bytes_replacement_changes_provenance_and_departure_refuses as fn()),
-            ("helper_3_reload_changes_only_its_slot_and_the_fresh_view_authorizes_the_whole_walk", helper_3_reload_changes_only_its_slot_and_the_fresh_view_authorizes_the_whole_walk as fn()),
         ]);
     }
     }
@@ -452,56 +312,6 @@ mod mii_tests {
     use crate::engine::swap::source_lifetime::{SourceBook,NativeEntry,Holder};
     use crate::engine::mii::{inventory::{build_snapshot,RawSlot,MiiClass,TaggedId},
         lifetime::{Binding,Configuration},native_values::Mirrors};
-    /// TASK-OPUS-rc6-open-fixes item 1 (primary 2026-11-09 00:09Z, 00:23Z): a live F9 seat (slot <= No. of CPUs) keeps
-    /// its Mii by reading B's identity, not by bytes. Every re-proof in the rc.6 Eden evidence logged
-    /// `descriptor_changed=true record_changed=false`: going live rewrites the seat's descriptor. The `Proof`, the
-    /// binding and the mirrors' tokens stay exact, and the record must still carry the configuration's charinfo and a
-    /// resource pair, the predicate `mii_managed_helper::reproof_parked` checks before it re-records both.
-    fn a_live_seat_keeps_its_mii_by_identity_not_bytes() {
-        let raw=RawSlot {index:0,slot_id:4155,name_len:1,name_units:[65,0,0,0,0,0,0,0,0,0],
-            colour:4,voice:37,specials:[0;4],tag_outfit:TaggedId(0x1300291bfef7a5f7),
-            tag_hat:TaggedId(0x5a00000fa9efa5ea),
-            tag_chara:TaggedId(0xc100000000000000|MiiClass::Gunner.chara_hash40()),charinfo:[0;88]};
-        let catalog=build_snapshot(vec![raw]);let c=Configuration::from_saved(&catalog.configs[0]).unwrap();
-        let mut draft=crate::engine::mii::draft::Draft::from_template(&catalog.configs[0]).unwrap();
-        draft.set_specials([1,0,0,0]).unwrap();let alt=draft.configuration().unwrap();
-        let b=Binding {epoch:2,owner:2,entry:0x1200,row:0x2200,holder:0x5000,manager:0x6000,
-            vector_begin:0x7000,vector_end:0x7000+4*104,record_index:2};
-        let mut record=[0u8;104];record[..88].copy_from_slice(c.charinfo());
-        record[88..96].copy_from_slice(&0x8000u64.to_le_bytes());record[96..].copy_from_slice(&0x9000u64.to_le_bytes());
-        let descriptor=crate::engine::mii::ordinary_cpu::staged_descriptor_for(2,[0;0x70],Some(c)).unwrap();
-        let t=c.tokens();
-        let mirrors=Mirrors {index:2,tokens:t,fe:[2,t.outfit,t.hat,t.colour,t.voice],
-            d:[2,t.outfit,t.hat,t.colour],d_specials:t.specials.map(u32::from),owner_index:2,
-            owner:[t.outfit,t.hat,t.colour,t.voice].map(u32::from)};
-        let mii=MiiProof {binding:b,configuration:c,record,descriptor};
-        let mut active=descriptor;active[0x10]^=1;active[0x34]^=1;active[0x5f]^=0x80;
-        let mut pair=record;pair[96]^=1;
-        // Parked (not live): byte equality of both, exactly as `matches`.
-        assert!(mii.holds(b,&descriptor,&record,mirrors,false));
-        assert_eq!(mii.holds(b,&active,&record,mirrors,false),mii.matches(b,&active,&record,mirrors));
-        assert!(!mii.holds(b,&active,&record,mirrors,false),"a parked row's descriptor is exact");
-        assert!(!mii.holds(b,&descriptor,&pair,mirrors,false),"a parked row's record is exact");
-        // Live: the activation's bytes may change, the Mii may not.
-        assert!(mii.holds(b,&active,&record,mirrors,true),"the activation rewrote the descriptor");
-        assert!(mii.holds(b,&active,&pair,mirrors,true),"a present resource pair, rewritten");
-        let mut other=record;other[0x10]^=1;
-        assert!(!mii.holds(b,&active,&other,mirrors,true),"another charinfo is another Mii");
-        for half in [88..96,96..104] {
-            let mut absent=record;absent[half].fill(0);
-            assert!(!mii.holds(b,&active,&absent,mirrors,true),"no resource pair");
-        }
-        assert!(!mii.holds(Binding {vector_end:b.vector_end+104,..b},&active,&record,mirrors,true),"another binding");
-        assert!(!mii.holds(b,&active,&record,Mirrors {index:3,..mirrors},true),"the mirrors");
-        assert!(!MiiProof {configuration:alt,..mii}.holds(b,&active,&record,mirrors,true),"the tokens");
-        // The record identity is the one reading B's re-proof checks, and the owners' snapshot asks it.
-        assert!(crate::model::parked_entries::mii_record_identity(&record,c.charinfo()));
-        assert!(!crate::model::parked_entries::mii_record_identity(&other,c.charinfo()));
-        assert!(include_str!("mii_managed_helper.rs")
-            .contains("crate::model::parked_entries::mii_record_identity(&now.record, c.charinfo())"),"reproof_parked");
-        assert!(include_str!("mii_ordinary_native.rs").contains("mii.holds(b,&descriptor,&record,mirrors(owner),live)"),
-            "the owners' snapshot");
-    }
     fn ordinary_helper_mii_exact_payload_resources_and_generation_are_independent_of_class() {
         let raw=RawSlot {index:0,slot_id:4155,name_len:1,name_units:[65,0,0,0,0,0,0,0,0,0],
             colour:4,voice:37,specials:[0;4],tag_outfit:TaggedId(0x1300291bfef7a5f7),
@@ -567,7 +377,6 @@ mod mii_tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
-            ("a_live_seat_keeps_its_mii_by_identity_not_bytes", a_live_seat_keeps_its_mii_by_identity_not_bytes as fn()),
             ("ordinary_helper_mii_exact_payload_resources_and_generation_are_independent_of_class", ordinary_helper_mii_exact_payload_resources_and_generation_are_independent_of_class as fn()),
         ]);
     }

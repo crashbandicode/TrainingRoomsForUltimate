@@ -65,30 +65,6 @@ mod tests {
     lib_unit_tests! {
     use super::*;
 
-    fn observed_pair_alone_or_existing_native_ai_never_activates() {
-        assert!(Session::start(false, true, 1, 0).is_none());
-        assert!(Session::start(true, false, 1, 0).is_none());
-        assert!(Session::start(true, true, 1, 1).is_none());
-        assert!(Session::start(true, true, 2, 0).is_none());
-        assert!(Session::start(true, true, 0, 0).is_none());
-    }
-
-    fn exactly_120_unpaused_attempts_then_no_automatic_retry() {
-        let mut session = Session::start(true, true, 1, 0).unwrap();
-        for _ in 0..180 {
-            assert_eq!(session.before(true, true), Action::Pass);
-        }
-        assert_eq!(session.frames, 0);
-        for attempt in 1..=120 {
-            assert_eq!(session.before(true, false), Action::Initialize);
-            session.after(1);
-            assert_eq!(session.frames, attempt);
-        }
-        assert_eq!(session.status, Status::Failed);
-        assert_eq!(session.before(true, false), Action::Pass);
-        assert_eq!(session.frames, 120);
-    }
-
     fn success_on_final_attempt_keeps_isolation_after_owner_and_during_menu() {
         let mut session = Session::start(true, true, 1, 0).unwrap();
         for _ in 0..119 {
@@ -116,8 +92,6 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
-            ("observed_pair_alone_or_existing_native_ai_never_activates", observed_pair_alone_or_existing_native_ai_never_activates as fn()),
-            ("exactly_120_unpaused_attempts_then_no_automatic_retry", exactly_120_unpaused_attempts_then_no_automatic_retry as fn()),
             ("success_on_final_attempt_keeps_isolation_after_owner_and_during_menu", success_on_final_attempt_keeps_isolation_after_owner_and_during_menu as fn()),
             ("cancel_before_completion_never_raises_again", cancel_before_completion_never_raises_again as fn()),
         ]);

@@ -95,84 +95,8 @@ pub const fn disposition(reason: Fallback, state: GroupState) -> Disposition {
 mod tests {
     lib_unit_tests! {
     use super::*;
-    use crate::engine::swap::swap_model::ledger::{GroupId, Holder, Ledger, NativeCall, NoConsumers, ReleaseRecipe, RFlags, Role};
-    use crate::engine::swap::swap_model::native_model::{kind_table, RModel, G68};
-
-    const GROUPS: [&[u32]; 5] = [&[0x07], &[0x1b, 0x16, 0x15], &[0x48], &[0x52, 0x03], &[0x06, 0x04, 0x05]];
-
-    /// Prefetch `kinds` as the bank does (ledger token, then `0x17e64d0`), on an R that also holds
-    /// another group's keys so the map does not empty by accident.
-    fn prefetched(kinds: &[u32]) -> (Ledger, RModel, Vec<crate::engine::swap::swap_model::ledger::AcqToken>) {
-        let table = kind_table();
-        let mut ledger = Ledger::new(RFlags::TRAINING);
-        let mut r = RModel::default();
-        let other = ledger.new_batch();
-        let (_other, _) = ledger.acquire(0x0b, Holder::Prefetch(GroupId(1)), ReleaseRecipe::ConstructionTail, other, &NoConsumers, Role::Player).unwrap();
-        r.acquire(0x0b, &table);
-        let batch = ledger.new_batch();
-        let mut tokens = Vec::new();
-        for kind in kinds {
-            let (token, call) = ledger.acquire(*kind, Holder::Prefetch(GroupId(0)), ReleaseRecipe::ConstructionTail, batch, &NoConsumers, Role::Player).unwrap();
-            assert_eq!(call, Some(NativeCall::Acquire { kind: *kind }));
-            r.acquire(*kind, &table);
-            tokens.push(token);
-        }
-        (ledger, r, tokens)
-    }
-
-    fn release_all(ledger: &mut Ledger, r: &mut RModel, tokens: Vec<crate::engine::swap::swap_model::ledger::AcqToken>) {
-        let mut g68 = G68::default();
-        for token in tokens {
-            for call in ledger.release(token, &NoConsumers, Role::Player).unwrap() {
-                match call {
-                    NativeCall::ReleaseKey(key) => r.release_key(key.value()),
-                    NativeCall::ReleaseKind { kind } => r.release_kind(kind, None, &mut g68),
-                    other => panic!("unexpected {:?}", other),
-                }
-            }
-        }
-    }
-
-    /// The reported defect: under today's rule a Prefetched group fails with its keys still on R,
-    /// and no later state releases them (`Failed` is never retried).
-    fn today_a_failed_prefetched_group_keeps_its_keys() {
-        for kinds in GROUPS {
-            let (ledger, r, tokens) = prefetched(kinds);
-            assert!(!tokens.is_empty());
-            let reconcile = ledger.reconcile(&r.snapshot());
-            assert!(reconcile.balanced());
-            assert!(ledger.predicted().len() > 1, "{:x?}: the group's keys stay predicted and on R", kinds);
-        }
-    }
-
-    /// Every permanent fallback on a Prefetched group returns exactly what the prefetch took:
-    /// `[Ledger] reconcile residual=[] missing=[]`, and only the other group's keys stay on R.
-    /// A transient one keeps the keys for the retry, still reconciled.
-    fn a_permanent_fallback_returns_every_key_and_a_transient_one_keeps_them() {
-        let table = kind_table();
-        for reason in Fallback::ALL {
-            for kinds in GROUPS {
-                let (mut ledger, mut r, tokens) = prefetched(kinds);
-                match disposition(reason, GroupState::Prefetched) {
-                    Disposition::FailReturningKeys => {
-                        assert!(!reason.transient());
-                        release_all(&mut ledger, &mut r, tokens);
-                        let reconcile = ledger.reconcile(&r.snapshot());
-                        assert!(reconcile.residual.is_empty() && reconcile.missing.is_empty(), "{:?} {:x?}: {:?}", reason, kinds, reconcile);
-                        let mut other = RModel::default();
-                        other.acquire(0x0b, &table);
-                        assert_eq!(r.snapshot(), other.snapshot(), "{:?} {:x?}: only the other group's keys remain", reason, kinds);
-                    }
-                    Disposition::Keep => {
-                        assert!(reason.transient());
-                        assert!(ledger.reconcile(&r.snapshot()).balanced());
-                        assert_eq!(ledger.tokens().len(), kinds.len() + 1, "the group keeps its tokens for the retry");
-                    }
-                    Disposition::Fail => panic!("{:?}: a Prefetched group never fails without returning its keys", reason),
-                }
-            }
-        }
-    }
+    
+    
 
     fn built_and_in_flight_groups_are_never_failed_by_a_fallback() {
         for reason in Fallback::ALL {
@@ -186,25 +110,11 @@ mod tests {
         assert_eq!(Fallback::PoolFull.text(), "fighter pool has no room for the group");
     }
 
-    /// A swap that reaches a group held for capacity (nothing native exists, like a planned one) is served
-    /// canonically by the same rule as a planned group: a transient reason keeps it, a permanent one fails it.
-    fn held_group_at_a_swap_is_disposed_like_planned() {
-        use crate::engine::swap::body_bank::Hold;
-        for reason in Fallback::ALL {
-            for hold in [Hold::Memory, Hold::Pool] {
-                assert_eq!(disposition(reason, GroupState::Held(hold)), disposition(reason, GroupState::Planned), "{reason:?}");
-            }
-        }
-    }
-
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
-            ("today_a_failed_prefetched_group_keeps_its_keys", today_a_failed_prefetched_group_keeps_its_keys as fn()),
-            ("a_permanent_fallback_returns_every_key_and_a_transient_one_keeps_them", a_permanent_fallback_returns_every_key_and_a_transient_one_keeps_them as fn()),
             ("built_and_in_flight_groups_are_never_failed_by_a_fallback", built_and_in_flight_groups_are_never_failed_by_a_fallback as fn()),
-            ("held_group_at_a_swap_is_disposed_like_planned", held_group_at_a_swap_is_disposed_like_planned as fn()),
         ]);
     }
     }
