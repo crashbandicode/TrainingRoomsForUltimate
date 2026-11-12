@@ -254,8 +254,9 @@ the NROs unchanged and adds no warning.
 **The NROs are the same**
 
 Release and diag NROs built from the S3 commit against those built from `f5146184`: `.text` is byte-identical in
-both. The exact differing bytes (build id, the commit in the build tag, panic-location line numbers) are in the lane
-report.
+both. Of the 4,136,960 and 4,329,472 bytes, 557 and 563 differ: the 32-byte build id, the 8 characters of the commit
+in the build tag, and the line numbers of 500 and 506 panic locations, which moved because lines above them were
+added or removed.
 
 **Why dead types stayed, and what touches them**
 
@@ -294,4 +295,4 @@ report.
 | --- | --- | --- | --- | --- | --- |
 | Plan baseline | `b1e27e5a` | 129,593 (122,707) | 165,931 | 865 (917 with the crates' gates) | 91.54% |
 | `rc10` start | `f5146184` | 129,593 (122,707) | 165,930 | 821 (873) | 90.18% |
-| S3 | the commit that adds this row | 126,703 (119,817) | 162,692 | 821 (873) | in the lane report |
+| S3 | `6c419689` | 126,703 (119,817) | 162,692 | 821 (873) | 90.59% |
