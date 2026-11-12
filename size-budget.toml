@@ -1639,3 +1639,11 @@ basis = "rustfmt-sloc4"
 ceiling = 147878
 date = "2026-11-12"
 reason = "rc.10 S3b (docs/CODE-REDUCTION-rc10.md): the rest of the dead code, with the dead types and their impl blocks (the primary 2026-11-12 05:25Z: function-by-function proof in place of byte identity), on rc10 83e91989 (151623); measured 147878 (tools/size_gate.py), -3745. A cut: the ratchet."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 147919
+date = "2026-11-12"
+reason = "rc.11 on rc10 a6e1716e (147878): the core move (d7ab7618, cherry-picked as f578a918) +26: plugin threads get a core mask off the MainThread's core (model::thread_stacks::plugin_core_mask, runtime::threads::create's nn::os::SetThreadCoreMask); worker A's thread-safety audit fixes (e7b593ad, 82b1f8c9, 26fad742, here 45eee6ae, 45aa2952, e8fc2193) +12, +1, +2: lobby_persist's writer clears STORE_DUE first and re-arms it, the ARC probe behind its own arc-probe feature, the background build's Acquire after the settled pending count; measured 147919 (tools/size_gate.py) on e8fc2193 against 147878, +41"
+approved_by = "The primary 2026-11-12 13:31Z (the budget raised by exactly what the core move adds; a raise goes in its own commit with approved_by), 15:15Z (the final rc.11 candidate: the core move, worker A's three fixes, the size raise and the rc11 name) and 15:33Z (based on a6e1716e)"
