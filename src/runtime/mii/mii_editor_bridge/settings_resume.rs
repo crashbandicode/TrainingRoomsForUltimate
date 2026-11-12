@@ -317,3 +317,97 @@ unsafe fn settings_frame(component: usize) {
 
 pub(super) fn init() { skyline::install_hooks!(settings_frame); }
 
+#[cfg(test)]
+mod tests {
+    lib_unit_tests! {
+    use super::*;
+
+    fn policy_runs_once_per_settings_entry() {
+        let mut slot = None;
+        assert!(!Policy::due(&mut slot, 1, 2, 0), "age 0 has no selectors yet");
+        assert!(Policy::due(&mut slot, 1, 2, 1));
+        assert_eq!(slot.as_mut().unwrap().record(&Ok(1)),
+            Some(("waiting_cosmetics_disabled", [0, 1, 1, 0])));
+        assert!(!Policy::due(&mut slot, 1, 2, 2), "settled entries stay idle");
+        // Returning to Settings resets the native component age: reapply once.
+        assert!(!Policy::due(&mut slot, 1, 2, 0));
+        assert!(Policy::due(&mut slot, 1, 2, 1));
+        assert_eq!(slot.as_mut().unwrap().record(&Ok(0)),
+            Some(("waiting_cosmetics_disabled", [1, 1, 1, 0])));
+        assert!(!Policy::due(&mut slot, 1, 2, 2));
+        assert!(Policy::due(&mut slot, 1, 3, 5), "another component is a new entry");
+    }
+
+    fn quickplay_keeps_native_cosmetic_rows() {
+        assert!(!suppress_native_cosmetics(Origin::Quickplay));
+        assert!(!suppress_native_cosmetics(Origin::Training));
+        assert!(suppress_native_cosmetics(Origin::LocalWireless));
+        let random = Snapshot::parse(Value::integer(2), Value::integer(1), Value::integer(0)).unwrap();
+        assert_eq!(random, Snapshot { row: 2, area: 1, confirming: false });
+        let voice_row = Snapshot::parse(Value::integer(5), Value::integer(0), Value::integer(0)).unwrap();
+        assert_eq!(voice_row.row, 5);
+    }
+
+    fn random_confirmation_is_not_a_highlight() {
+        let highlight = Snapshot::parse(Value::integer(2), Value::integer(1), Value::integer(0)).unwrap();
+        let pending = Snapshot::parse(Value::integer(2), Value::integer(1), Value::integer(1)).unwrap();
+        assert_eq!(highlight, Snapshot { row: 2, area: 1, confirming: false });
+        assert_eq!(pending, Snapshot { row: 2, area: 1, confirming: true });
+        assert_ne!(highlight, pending);
+        assert!(Snapshot::parse(Value::integer(2), Value::integer(0), Value::integer(1)).is_err());
+        assert!(Snapshot::parse(Value::integer(2), Value::integer(1), Value::integer(2)).is_err());
+        assert!(wrapper_after_policy(false, false));
+        assert!(!wrapper_after_policy(true, false));
+        assert!(wrapper_after_policy(true, true));
+    }
+
+    fn random_wrapper_latches_once_per_settings_page() {
+        let mut slot = None;
+        assert!(!WrapLatch::due(&mut slot, 1, 2, 0), "age 0 has not built the method table");
+        assert!(WrapLatch::due(&mut slot, 1, 2, 1));
+        assert_eq!(slot.as_mut().unwrap().record(&Ok(2)), None);
+        assert!(WrapLatch::due(&mut slot, 1, 2, 1));
+        assert_eq!(slot.as_mut().unwrap().record(&Ok(1)),
+            Some(("settings_random_wrapped", [1, 1, 2, 0])));
+        assert!(!WrapLatch::due(&mut slot, 1, 2, 4), "one install per page");
+        assert!(WrapLatch::due(&mut slot, 1, 9, 1), "a new component wraps again");
+    }
+
+    fn policy_retries_transient_results_and_stops_on_identity() {
+        let mut slot = None;
+        assert!(Policy::due(&mut slot, 1, 2, 1));
+        assert_eq!(slot.as_mut().unwrap().record(&Ok(2)), None);
+        assert!(Policy::due(&mut slot, 1, 2, 2));
+        assert_eq!(slot.as_mut().unwrap().record(&Err(Error::Binding)), None);
+        assert!(Policy::due(&mut slot, 1, 2, 3));
+        assert_eq!(slot.as_mut().unwrap().record(&Err(Error::Identity)),
+            Some(("waiting_cosmetics_policy_failed", [3, 3, 3, 0])));
+        assert!(!Policy::due(&mut slot, 1, 2, 4));
+    }
+
+    fn policy_gives_up_after_bounded_attempts() {
+        let mut slot = None;
+        for age in 1..u32::from(Policy::ATTEMPTS) {
+            assert!(Policy::due(&mut slot, 1, 2, age));
+            assert_eq!(slot.as_mut().unwrap().record(&Ok(2)), None);
+        }
+        assert!(Policy::due(&mut slot, 1, 2, u32::from(Policy::ATTEMPTS)));
+        assert_eq!(slot.as_mut().unwrap().record(&Ok(2)),
+            Some(("waiting_cosmetics_policy_failed", [0, 120, 120, 0])));
+        assert!(!Policy::due(&mut slot, 1, 2, 121));
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("policy_runs_once_per_settings_entry", policy_runs_once_per_settings_entry as fn()),
+            ("quickplay_keeps_native_cosmetic_rows", quickplay_keeps_native_cosmetic_rows as fn()),
+            ("random_confirmation_is_not_a_highlight", random_confirmation_is_not_a_highlight as fn()),
+            ("random_wrapper_latches_once_per_settings_page", random_wrapper_latches_once_per_settings_page as fn()),
+            ("policy_retries_transient_results_and_stops_on_identity", policy_retries_transient_results_and_stops_on_identity as fn()),
+            ("policy_gives_up_after_bounded_attempts", policy_gives_up_after_bounded_attempts as fn()),
+        ]);
+    }
+    }
+}

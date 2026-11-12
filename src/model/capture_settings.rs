@@ -219,7 +219,6 @@ mod tests {
         }
     }
 
-    #[test]
     fn defaults_to_disabled_and_documents_the_ini_form() {
         assert_eq!(CaptureSettings::default(), CaptureSettings { enabled: false });
         assert_eq!(
@@ -229,7 +228,6 @@ mod tests {
         assert_eq!(CaptureSettings::parse("# no setting\n").unwrap(), CaptureSettings::default());
     }
 
-    #[test]
     fn parses_supported_values_case_insensitively_with_comments() {
         for value in ["on", "ON", "true", "TrUe", "1"] {
             let settings = CaptureSettings::parse(&format!(
@@ -247,7 +245,6 @@ mod tests {
         }
     }
 
-    #[test]
     fn ignores_unrelated_sections_keys_and_global_values() {
         let settings = CaptureSettings::parse(
             "enabled=on\n[other]\nenabled=on\n[capture]\nunknown=value\n[other-again]\nenabled=off\n",
@@ -256,7 +253,6 @@ mod tests {
         assert_eq!(settings, CaptureSettings::default());
     }
 
-    #[test]
     fn rejects_invalid_and_duplicate_capture_values_clearly() {
         let invalid = CaptureSettings::parse("[capture]\nenabled=maybe\n").unwrap_err();
         assert!(invalid.contains("invalid [capture] enabled value"));
@@ -313,7 +309,6 @@ mod tests {
         ("[capture]\nenabled=on\n[capture]\nEnabled=off\n", "duplicate [capture] enabled"),
     ];
 
-    #[test]
     fn host_rewrite_of_each_value_parses_back_without_duplicates() {
         for fixture in COMPATIBLE {
             CaptureSettings::persistence_compatible(fixture)
@@ -335,7 +330,6 @@ mod tests {
         }
     }
 
-    #[test]
     fn incompatible_layouts_are_refused_with_the_reason() {
         for (fixture, reason) in INCOMPATIBLE {
             let error = CaptureSettings::persistence_compatible(fixture)
@@ -353,7 +347,6 @@ mod tests {
         assert!(!CaptureSettings::parse(&appended_elsewhere).unwrap().enabled);
     }
 
-    #[test]
     fn host_key_tokenization_matches_the_pinned_writer() {
         assert_eq!(host_persistence_key("enabled=on"), Some("enabled"));
         assert_eq!(host_persistence_key("  enabled = on # note"), Some("enabled"));
@@ -365,7 +358,6 @@ mod tests {
         assert_eq!(host_persistence_key("enabled"), None);
     }
 
-    #[test]
     fn previous_ini_is_restored_only_when_the_ini_is_missing() {
         let temp = TempDir::new();
         let ini = temp.path().join("replay_capture.ini");
@@ -395,6 +387,21 @@ mod tests {
         fs::create_dir(&previous).unwrap();
         assert_eq!(recover_previous_ini(&ini).unwrap(), IniRecovery::Absent);
         assert!(!ini.exists());
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("defaults_to_disabled_and_documents_the_ini_form", defaults_to_disabled_and_documents_the_ini_form as fn()),
+            ("parses_supported_values_case_insensitively_with_comments", parses_supported_values_case_insensitively_with_comments as fn()),
+            ("ignores_unrelated_sections_keys_and_global_values", ignores_unrelated_sections_keys_and_global_values as fn()),
+            ("rejects_invalid_and_duplicate_capture_values_clearly", rejects_invalid_and_duplicate_capture_values_clearly as fn()),
+            ("host_rewrite_of_each_value_parses_back_without_duplicates", host_rewrite_of_each_value_parses_back_without_duplicates as fn()),
+            ("incompatible_layouts_are_refused_with_the_reason", incompatible_layouts_are_refused_with_the_reason as fn()),
+            ("host_key_tokenization_matches_the_pinned_writer", host_key_tokenization_matches_the_pinned_writer as fn()),
+            ("previous_ini_is_restored_only_when_the_ini_is_missing", previous_ini_is_restored_only_when_the_ini_is_missing as fn()),
+        ]);
     }
     }
 }
@@ -469,7 +476,6 @@ mod toggle_tests {
     lib_unit_tests! {
     use super::*;
 
-    #[test]
     fn the_toggle_rewrites_the_recognised_line_in_place() {
         let original = "# notes\n[other]\nenabled=on\n[capture]\nenabled = off ; keep\nextra=1\n";
         let on = CaptureSettings::to_ini_text(original, true);
@@ -482,7 +488,6 @@ mod toggle_tests {
         assert_eq!(on.lines().count(), original.lines().count());
     }
 
-    #[test]
     fn a_document_without_the_line_gets_one() {
         let text = CaptureSettings::to_ini_text("# only a comment", true);
         assert_eq!(CaptureSettings::parse(&text).unwrap(), CaptureSettings { enabled: true });
@@ -492,7 +497,6 @@ mod toggle_tests {
         assert!(CaptureSettings::persistence_compatible(&default).is_ok());
     }
 
-    #[test]
     fn reads_fail_closed() {
         assert_eq!(CaptureSettings::from_bytes(None), (CaptureSettings::default(), None));
         assert_eq!(CaptureSettings::from_bytes(Some(b"[capture]\nenabled=on\n")).0, CaptureSettings { enabled: true });
@@ -504,6 +508,16 @@ mod toggle_tests {
         big.resize(MAX_BYTES + 1, b'#');
         let (settings, why) = CaptureSettings::from_bytes(Some(&big));
         assert!(!settings.enabled && why.is_some(), "oversized: nothing is used");
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("the_toggle_rewrites_the_recognised_line_in_place", the_toggle_rewrites_the_recognised_line_in_place as fn()),
+            ("a_document_without_the_line_gets_one", a_document_without_the_line_gets_one as fn()),
+            ("reads_fail_closed", reads_fail_closed as fn()),
+        ]);
     }
     }
 }

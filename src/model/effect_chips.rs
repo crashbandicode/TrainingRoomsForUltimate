@@ -166,3 +166,100 @@ pub fn unpack_layer(word: u64) -> Option<LayerWord> {
     })
 }
 
+#[cfg(test)]
+mod tests {
+    lib_unit_tests! {
+    use super::*;
+
+    fn the_state_words_round_trip() {
+        for h in [Held::Nothing, Held::Bound(ChipVisual::Di), Held::Bound(ChipVisual::Sdi), Held::Failed(ChipVisual::Di), Held::Failed(ChipVisual::Sdi)] {
+            assert_eq!(held_of(held_code(h)), h);
+        }
+        for v in [ChipVisual::None, ChipVisual::Di, ChipVisual::Sdi] {
+            assert_eq!(visual_of(visual_code(v)), v);
+        }
+        let l = LayerWord { visual: ChipVisual::Sdi, width: 256, height: 128, tint: [200, 244, 255, 255] };
+        assert_eq!(unpack_layer(pack_layer(l)), Some(l));
+        assert_eq!(unpack_layer(0), None);
+        assert_eq!(pack_layer(LayerWord { visual: ChipVisual::None, ..l }), 0);
+    }
+
+    /// The 13.0.5 pictures in `pictures()` order: DI tri00, line09, line11, flare01; SDI line00, impact13, mask00, grade00.
+    const DI: [Candidate; 4] = [
+        Candidate { sampler: 0, width: 64, height: 128 },
+        Candidate { sampler: 0, width: 64, height: 256 },
+        Candidate { sampler: 0, width: 64, height: 128 },
+        Candidate { sampler: 0, width: 32, height: 32 },
+    ];
+    const SDI: [Candidate; 4] = [
+        Candidate { sampler: 0, width: 64, height: 128 },
+        Candidate { sampler: 0, width: 256, height: 128 },
+        Candidate { sampler: 1, width: 128, height: 128 },
+        Candidate { sampler: 2, width: 64, height: 64 },
+    ];
+
+    fn di_draws_the_streak_and_sdi_the_burst() {
+        assert_eq!(pick_layer(ChipVisual::Di, &DI), Some(1), "line09, 64 x 256");
+        assert_eq!(pick_layer(ChipVisual::Sdi, &SDI), Some(1), "impact13, 256 x 128");
+        assert_eq!(pick_layer(ChipVisual::None, &DI), None);
+        assert_eq!(pick_layer(ChipVisual::Sdi, &SDI[2..]), None, "only later samplers: no burst");
+        assert_eq!(pick_layer(ChipVisual::Di, &[]), None);
+    }
+
+    fn equal_layer_ratios_keep_the_first_sampler_zero_picture() {
+        let candidates = [
+            Candidate { sampler: 1, width: 1, height: 1000 },
+            Candidate { sampler: 0, width: 64, height: 128 },
+            Candidate { sampler: 0, width: 128, height: 256 },
+        ];
+        assert_eq!(pick_layer(ChipVisual::Di, &candidates), Some(1));
+        assert_eq!(pick_layer(ChipVisual::Sdi, &candidates), Some(1));
+    }
+
+    fn the_layer_runs_from_the_centre_along_the_direction() {
+        let p = place(ChipVisual::Di, 90.0, 100.0, 50.0, 184.0, 64, 256);
+        let reach = REACH * 184.0;
+        assert!((p.h - reach).abs() < 1e-3);
+        assert!((p.x - 100.0).abs() < 1e-3 && (p.y - (50.0 + reach / 2.0)).abs() < 1e-3, "{p:?}");
+        assert_eq!(p.rot, 0.0, "Up: the texture's +Y is already up");
+        let out = place(ChipVisual::Di, 0.0, 0.0, 0.0, 184.0, 64, 256);
+        assert!((out.x - reach / 2.0).abs() < 1e-3 && out.y.abs() < 1e-3 && out.rot == -90.0, "{out:?}");
+    }
+
+    fn the_sdi_burst_is_stretched_two_times_along_the_vector() {
+        let p = place(ChipVisual::Sdi, 90.0, 0.0, 0.0, 184.0, 256, 128);
+        // Unstretched, the 2:1 band would be h/2 tall for its width; drawn twice as tall.
+        assert!((p.h / (p.w * 128.0 / 256.0) - SDI_STRETCH).abs() < 1e-4, "{p:?}");
+        let di = place(ChipVisual::Di, 90.0, 0.0, 0.0, 184.0, 64, 256);
+        assert!((di.w / di.h - DI_WIDTH_RATIO).abs() < 1e-6, "the DI streak keeps the emitter's proportions");
+    }
+
+    fn the_page_requests_on_open_releases_on_close_and_swaps_between_grids() {
+        assert_eq!(plan(Held::Nothing, ChipVisual::None), Step::Keep);
+        assert_eq!(plan(Held::Nothing, ChipVisual::Di), Step::Request(ChipVisual::Di));
+        assert_eq!(plan(Held::Bound(ChipVisual::Di), ChipVisual::Di), Step::Keep);
+        assert_eq!(plan(Held::Bound(ChipVisual::Di), ChipVisual::Sdi), Step::DropThenRequest(ChipVisual::Sdi));
+        assert_eq!(plan(Held::Bound(ChipVisual::Sdi), ChipVisual::None), Step::Drop, "grid closed or menu hidden");
+    }
+
+    fn a_failed_visual_is_not_retried_every_frame_but_after_the_grid_closes() {
+        assert_eq!(plan(Held::Failed(ChipVisual::Di), ChipVisual::Di), Step::Keep);
+        assert_eq!(plan(Held::Failed(ChipVisual::Di), ChipVisual::None), Step::Drop);
+        assert_eq!(plan(Held::Failed(ChipVisual::Di), ChipVisual::Sdi), Step::Request(ChipVisual::Sdi));
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("the_state_words_round_trip", the_state_words_round_trip as fn()),
+            ("di_draws_the_streak_and_sdi_the_burst", di_draws_the_streak_and_sdi_the_burst as fn()),
+            ("equal_layer_ratios_keep_the_first_sampler_zero_picture", equal_layer_ratios_keep_the_first_sampler_zero_picture as fn()),
+            ("the_layer_runs_from_the_centre_along_the_direction", the_layer_runs_from_the_centre_along_the_direction as fn()),
+            ("the_sdi_burst_is_stretched_two_times_along_the_vector", the_sdi_burst_is_stretched_two_times_along_the_vector as fn()),
+            ("the_page_requests_on_open_releases_on_close_and_swaps_between_grids", the_page_requests_on_open_releases_on_close_and_swaps_between_grids as fn()),
+            ("a_failed_visual_is_not_retried_every_frame_but_after_the_grid_closes", a_failed_visual_is_not_retried_every_frame_but_after_the_grid_closes as fn()),
+        ]);
+    }
+    }
+}

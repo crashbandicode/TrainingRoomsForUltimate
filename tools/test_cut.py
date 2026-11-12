@@ -184,7 +184,14 @@ def wrap(text, names, macro):
         if d is None:
             raise SystemExit(f'wrap_tests: no inline test-gated module named {name}')
         a, b = d['body']
-        text = text[:a] + f'\n    {macro}! {{' + text[a:b].rstrip() + '\n    }\n' + text[b:]
+        # leading inner attributes and inner doc comments stay outside the macro
+        while True:
+            m = re.match(r'[ \t]*\n|[ \t]*(?://!|#!\[)[^\n]*\n', text[a:b])
+            if not m or (not m.group(0).strip() and not re.match(r'(?:[ \t]*\n)*[ \t]*(?://!|#!\[)', text[a:b])):
+                break
+            a += m.end()
+        lead = '' if text[a - 1] == '\n' and text[d['body'][0]:a].strip() else '\n'
+        text = text[:a] + f'{lead}    {macro}! {{' + ('\n' if not lead else '') + text[a:b].rstrip() + '\n    }\n' + text[b:]
     return text
 
 
@@ -197,6 +204,136 @@ def wrap_file(text, macro):
     return (head + '\n' if head else '') + f'{macro}! {{\n' + rest.rstrip() + '\n}\n'
 
 
+TEST_FN = re.compile(r'((?:\s*(?:#\[[^\]\n]*\]|//[^\n]*))*)\s*(?:pub(?:\([^)]*\))?\s+)?fn\s+(\w+)\s*\(\s*\)\s*(->[^{;]*)?\{')
+TABLE_FN = 'case_table'
+
+
+def _scopes(text, mask):
+    """Inline module bodies of `text` as (body_start, body_end), innermost last, plus the root (0, len)."""
+    out = [(0, len(text))]
+    for m in re.finditer(r'\bmod\s+\w+\s*\{', text):
+        if not mask[m.start()]:
+            continue
+        open_at = m.end() - 1
+        depth = 0
+        j = open_at
+        while j < len(text):
+            if mask[j]:
+                if text[j] == '{':
+                    depth += 1
+                elif text[j] == '}':
+                    depth -= 1
+                    if depth == 0:
+                        break
+            j += 1
+        out.append((open_at + 1, j))
+    return out
+
+
+def tabulate_region(text, keep=()):
+    """Turn the `#[test]` functions of each module scope in `text` into cases of one `#[test] fn case_table()` per scope.
+    A case runs on its own thread (`crate::test_table::run`), as the harness ran it, and asserts what it asserted. Left as
+    they are: a scope with fewer than two tests, a test under `cfg`, `ignore` or `should_panic`, a name in `keep` (a case a lint
+    only accepts inside a `#[test]`), a test that re-executes the binary (`current_exe`), and one this scanner cannot read."""
+    mask = lex_spans(text)
+    scopes = _scopes(text, mask)
+    by_scope = {}
+    edits = []  # (start, end, replacement)
+    for m in re.finditer(r'#\[test\]', text):
+        if not mask[m.start()]:
+            continue
+        f = TEST_FN.match(text, m.end())
+        if not f:
+            continue
+        # attributes on the lines directly above `#[test]`
+        pre = ''
+        ls = text.rfind('\n', 0, m.start()) + 1
+        if text[ls:m.start()].strip():
+            continue
+        k = ls
+        while k > 0:
+            ps = text.rfind('\n', 0, k - 1) + 1
+            line = text[ps:k - 1].strip()
+            if line.startswith('#[') and line.endswith(']'):
+                pre = line + pre
+                k = ps
+            else:
+                break
+        attrs = pre + f.group(1)
+        if 'cfg' in attrs or 'ignore' in attrs:
+            continue
+        name = f.group(2)
+        if name in keep:
+            continue
+        # a test that runs this binary again with `--exact <its name>` must stay a test of that name
+        depth, j = 0, f.end() - 1
+        while j < len(text):
+            if mask[j]:
+                if text[j] == '{':
+                    depth += 1
+                elif text[j] == '}':
+                    depth -= 1
+                    if depth == 0:
+                        break
+            j += 1
+        if 'current_exe' in text[f.end():j]:
+            continue
+        if 'should_panic' in attrs:
+            continue
+        sp = expect = None
+        call = f'{name} as fn()' if not f.group(3) else f'(|| {{ {name}().unwrap(); }}) as fn()'
+        scope = max((s for s in scopes if s[0] <= m.start() < s[1]), key=lambda s: s[0])
+        by_scope.setdefault(scope, []).append((m, f, sp, name, call, expect, k))
+    for scope, tests in by_scope.items():
+        if len(tests) < 2 or re.search(r'\bfn\s+' + TABLE_FN + r'\b', text[scope[0]:scope[1]]):
+            continue
+        rows = []
+        for m, f, sp, name, call, expect, attr_start in tests:
+            # drop the `#[test]` line
+            ls = text.rfind('\n', 0, m.start()) + 1
+            le = text.find('\n', m.end()) + 1
+            if text[m.end():le].strip() == '':
+                edits.append((ls, le, ''))
+            else:
+                edits.append((m.start(), m.end(), ''))
+            if sp:
+                am = re.search(r'#\[should_panic(?:\(\s*expected\s*=\s*"(?:[^"\\]|\\.)*"\s*\))?\]', text[attr_start:f.end()])
+                a, b = attr_start + am.start(), attr_start + am.end()
+                las = text.rfind('\n', 0, a) + 1
+                lae = text.find('\n', b) + 1
+                if text[las:a].strip() == '' and text[b:lae].strip() == '':
+                    edits.append((las, lae, ''))
+                else:
+                    edits.append((a, b, ''))
+            rows.append(f'("{name}", {call}),')
+        ls = text.rfind('\n', 0, tests[0][0].start()) + 1
+        ind = re.match(r'[ \t]*', text[ls:]).group(0)
+        table = (f'\n{ind}/// rc.9: this module\'s cases in one table. Each case runs on its own thread, as the test harness ran it.\n'
+                 f'{ind}#[test]\n{ind}fn {TABLE_FN}() {{\n{ind}    crate::test_table::run(&[\n'
+                 + ''.join(f'{ind}        {r}\n' for r in rows) + f'{ind}    ]);\n{ind}}}\n')
+        end = scope[1]
+        if end == len(text):
+            edits.append((end, end, ('' if text.endswith('\n') else '\n') + table))
+        else:
+            # before the scope's closing brace, on its own lines
+            ce = text.rfind('\n', 0, end) + 1
+            if text[ce:end].strip() == '':
+                edits.append((ce, ce, table.lstrip('\n') if text[:ce].endswith('\n\n') else table))
+            else:
+                edits.append((end, end, table))
+    for s, e, rep in sorted(edits, key=lambda x: (x[0], x[1]), reverse=True):
+        text = text[:s] + rep + text[e:]
+    return text
+
+
+def table_tests(text, keep=()):
+    """`tabulate_region` on the body of every top-level inline test-gated module."""
+    for d in sorted((x for x in find_test_mods(text) if x['inline']), key=lambda x: x['start'], reverse=True):
+        a, b = d['body']
+        text = text[:a] + tabulate_region(text[a:b], keep) + text[b:]
+    return text
+
+
 def apply_edit(e, text):
     """One manifest edit of the test cut, or None when `e` is another kind of edit."""
     if 'cut_tests' in e:
@@ -205,6 +342,14 @@ def apply_edit(e, text):
         return wrap(text, e['wrap_tests'], e['macro'])
     if 'wrap_file' in e:
         return wrap_file(text, e['wrap_file'])
+    if 'table_tests' in e:
+        return table_tests(text, e.get('keep', ()))
+    if 'table_file' in e:
+        return tabulate_region(text, e.get('keep', ()))
+    if 'insert_before_line' in e:
+        lines = text.split('\n')
+        at = e['insert_before_line'] - 1
+        return '\n'.join(lines[:at]) + ('\n' if at else '') + e['text'] + '\n'.join(lines[at:])
     return None
 
 

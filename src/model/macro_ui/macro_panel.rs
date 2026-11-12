@@ -1767,3 +1767,949 @@ fn neutral_frame(frame: &InputFrame) -> bool {
         && stick(frame.rstick_y)
 }
 
+#[cfg(test)]
+mod tests {
+    lib_unit_tests! {
+    use super::*;
+
+    fn start() -> StartState {
+        StartState {
+            fighter_kind: 0x08,
+            costume: 2,
+            facing: -1.0,
+            situation: 2,
+            status: 0x22,
+            speed_x: 0.5,
+            speed_y: 1.25,
+        }
+    }
+
+    fn attack() -> InputFrame {
+        InputFrame {
+            buttons: 0x1,
+            lstick_x: 0,
+            lstick_y: 40,
+            rstick_x: 0,
+            rstick_y: 0,
+        }
+    }
+
+    fn frames() -> Vec<InputFrame> {
+        vec![attack()]
+    }
+
+    fn goto(ui: &mut MacroUi, target: usize) {
+        for _ in 0..64 {
+            let current = ui.view().expect("panel open").selected;
+            if current == target {
+                return;
+            }
+            let row = current / NX_SUBMENU_COLUMNS;
+            let col = current % NX_SUBMENU_COLUMNS;
+            let target_row = target / NX_SUBMENU_COLUMNS;
+            let target_col = target % NX_SUBMENU_COLUMNS;
+            let pad = if row < target_row {
+                Pad::Down
+            } else if row > target_row {
+                Pad::Up
+            } else if col < target_col {
+                Pad::Right
+            } else {
+                Pad::Left
+            };
+            ui.on_pad(pad);
+        }
+        panic!("cursor stayed at {}", ui.view().unwrap().selected);
+    }
+
+    fn native_keyboard_validation_preserves_draft_and_inputs() {
+        let mut ui = MacroUi::new();
+        ui.offer_save(frames(), start(), false, "13.0.5");
+        assert_eq!(ui.name_prompt(), Some("Recording"));
+        assert_eq!(ui.native_name_view().unwrap().labels, ["Name and save"]);
+        assert!(matches!(ui.confirm_native_name("   ".into()), Effect::Notify(_)));
+        assert!(ui.is_open());
+        let Effect::Save(recording) = ui.confirm_native_name("  Aerial turn 2  ".into()) else { panic!() };
+        assert_eq!(recording.name, "Aerial turn 2");
+        assert_eq!(recording.frames, frames());
+        assert_eq!(recording.start, start());
+        assert_eq!(recording.placement.momentum, MomentumMode::PreserveRecorded);
+        assert!(ui.name_prompt().is_none());
+    }
+
+    fn default_name_saves_and_cancel_discards() {
+        let mut ui = MacroUi::new();
+        assert!(matches!(
+            ui.offer_save(frames(), start(), false, "13.0.5"),
+            Effect::None
+        ));
+        let saved = ui.on_pad(Pad::Confirm);
+        let Effect::Save(recording) = saved else {
+            panic!("expected save");
+        };
+        assert_eq!(recording.name, "Recording");
+        assert_eq!(recording.frames, frames());
+        assert_eq!(recording.start.facing, -1.0);
+        assert_eq!(recording.placement.momentum, MomentumMode::PreserveRecorded);
+        assert!(!ui.is_open());
+
+        ui.offer_save(frames(), start(), false, "13.0.5");
+        assert!(matches!(ui.on_pad(Pad::Back), Effect::None));
+        assert!(!ui.is_open());
+        assert!(ui.loaded_id().is_none());
+    }
+
+    fn empty_name_stays_on_the_dialog_and_typed_name_pages() {
+        let mut ui = MacroUi::new();
+        ui.offer_save(frames(), start(), false, "13.0.5");
+        for _ in 0..9 {
+            ui.on_pad(Pad::Extra);
+        }
+        assert!(matches!(ui.on_pad(Pad::Confirm), Effect::Notify(_)));
+        assert!(ui.is_open());
+
+        goto(&mut ui, 0);
+        ui.on_pad(Pad::Confirm);
+        goto(&mut ui, 30);
+        ui.on_pad(Pad::Confirm);
+        assert_eq!(ui.view().unwrap().selected, 0);
+        ui.on_pad(Pad::Confirm);
+        goto(&mut ui, 16);
+        let Effect::Save(recording) = ui.on_pad(Pad::Confirm) else {
+            panic!("expected save");
+        };
+        assert_eq!(recording.name, "A2");
+        assert_eq!(recording.frames.len(), 1);
+    }
+
+    fn crop_drops_only_the_neutral_tail() {
+        let mut ui = MacroUi::new();
+        let mut recorded = frames();
+        recorded.push(InputFrame::default());
+        recorded.push(InputFrame {
+            buttons: FLICK_JUMP,
+            ..InputFrame::default()
+        });
+        ui.offer_save(recorded, start(), true, "13.0.5");
+        let Effect::Save(recording) = ui.on_pad(Pad::Confirm) else {
+            panic!("expected save");
+        };
+        assert_eq!(recording.frames, frames());
+    }
+
+    fn library_pages_and_cancel_keeps_the_previous_choice() {
+        let mut ui = MacroUi::new();
+        ui.commit_loaded("kept".to_owned(), sample(Placement::default()), Some(0x08))
+            .unwrap();
+        let rows: Vec<LibraryRow> = (0..40)
+            .map(|index| LibraryRow {
+                id: format!("id{index}"),
+                label: format!("macro {index}"),
+            })
+            .collect();
+        ui.open_library(rows, 2);
+        for _ in 0..8 {
+            ui.on_pad(Pad::Down);
+        }
+        ui.on_pad(Pad::Right);
+        let view = ui.view().unwrap();
+        assert_eq!(view.labels[1], "macro 33");
+        assert!(view.footer.contains("page 2/2"));
+        let Effect::Choose(id) = ui.on_pad(Pad::Confirm) else {
+            panic!("expected choose");
+        };
+        assert_eq!(id, "id33");
+        assert_eq!(ui.loaded_id(), Some("kept"));
+
+        ui.open_library(
+            vec![LibraryRow {
+                id: "other".to_owned(),
+                label: "other".to_owned(),
+            }],
+            0,
+        );
+        assert!(matches!(ui.on_pad(Pad::Back), Effect::None));
+        assert!(!ui.is_open());
+        assert_eq!(ui.loaded_id(), Some("kept"));
+    }
+
+    fn placement_edit_keeps_inputs_and_can_stay_temporary() {
+        let mut ui = MacroUi::new();
+        let original = frames();
+        ui.commit_loaded("drill".to_owned(), sample(Placement::default()), Some(0x08))
+            .unwrap();
+        assert!(ui.open_editor(Some((4.0, 8.0))));
+        ui.on_pad(Pad::Confirm);
+        assert!(matches!(ui.on_pad(Pad::Back), Effect::None));
+        assert_eq!(ui.loaded_placement().unwrap().delta_x, 0.0);
+        assert_eq!(ui.loaded_frames(), Some(original.as_slice()));
+
+        assert!(ui.open_editor(Some((4.0, 8.0))));
+        ui.on_pad(Pad::Confirm);
+        goto(&mut ui, 9);
+        assert!(matches!(ui.on_pad(Pad::Confirm), Effect::Notify(_)));
+        let placement = ui.loaded_placement().unwrap();
+        assert_eq!(placement.delta_x, 1.0);
+        assert_eq!(placement.momentum, MomentumMode::PreserveRecorded);
+        assert_eq!(ui.loaded_facing(), Some(-1.0));
+        assert_eq!(ui.loaded_frames(), Some(original.as_slice()));
+        assert!(!ui.is_open());
+    }
+
+    fn manual_fighter_change_invalidates_loaded_playback() {
+        let mut ui = MacroUi::new();
+        ui.commit_loaded("drill".into(), sample(Placement::default()), Some(0x08)).unwrap();
+        assert!(ui.playback_allowed());
+        ui.observe_cpu(Some(0x12), false);
+        assert!(!ui.playback_allowed());
+        assert!(!ui.arm_playback());
+        ui.observe_cpu(Some(0x08), true);
+        assert!(!ui.playback_allowed());
+        ui.observe_cpu(Some(0x08), false);
+        assert!(ui.playback_allowed());
+    }
+
+    fn placement_needs_restored_reference_and_save_keeps_it() {
+        let mut ui = MacroUi::new();
+        ui.commit_loaded("drill".into(), sample(Placement::default()), Some(0x08)).unwrap();
+        assert!(!ui.open_editor(None));
+        ui.restored_target(1, (5.0, 8.0));
+        ui.commit_loaded("copy".into(), sample(Placement::default()), Some(0x08)).unwrap();
+        assert!(ui.open_editor(None));
+        assert_eq!(ui.marker(), Some((5.0, 8.0)));
+        ui.close_transient();
+        assert!(!ui.open_editor(None));
+    }
+
+    /// Primary 2026-11-08 #70 (a): Edit placement edits the role's active macro, the file Play plays. Eden
+    /// rc6-covrec-diag2 cov-edit-placement: with a macro active the row refused "Load a macro and restore a Training
+    /// state first", because it looked for the retired named layer's macro.
+    fn edit_placement_opens_on_the_active_macro_and_writes_that_file() {
+        let mut ui = MacroUi::new();
+        let original = sample(Placement::default());
+        assert!(ui.open_placement("active-1".into(), original.clone(), (10.0, 0.0)));
+        assert!(ui.is_open());
+        assert_eq!(ui.marker(), Some((10.0, 0.0)), "the marker starts on the start save's position");
+        assert_eq!(ui.loaded_id(), None, "the named selection is not changed");
+        ui.on_pad(Pad::Confirm);
+        assert_eq!(ui.marker(), Some((11.0, 0.0)));
+        goto(&mut ui, 10);
+        let Effect::Overwrite { id, recording } = ui.on_pad(Pad::Confirm) else { panic!("Write over the active file") };
+        assert_eq!(id, "active-1");
+        assert_eq!(recording.placement.delta_x, 1.0);
+        assert_eq!(recording.frames, original.frames, "inputs stay recorded");
+        assert!(!ui.is_open());
+        assert_eq!(ui.loaded_id(), None);
+
+        assert!(ui.open_placement("active-1".into(), original.clone(), (10.0, 0.0)));
+        ui.on_pad(Pad::Confirm);
+        goto(&mut ui, 9);
+        let Effect::KeepPlacement { id, placement } = ui.on_pad(Pad::Confirm) else { panic!("Keep for this session") };
+        assert_eq!((id.as_str(), placement.delta_x), ("active-1", 1.0));
+        assert!(!ui.is_open());
+
+        assert!(ui.open_placement("active-1".into(), original, (10.0, 0.0)));
+        assert!(matches!(ui.on_pad(Pad::Back), Effect::None));
+        assert!(!ui.is_open());
+        assert_eq!(ui.marker(), None);
+    }
+
+    fn waiting_interruption_preserves_unfinished_name_and_explicit_cancel() {
+        let mut ui = MacroUi::new();
+        let original = sample(Placement { delta_x: 7.0, delta_y: -2.0, ..Placement::default() });
+        ui.restore_draft(original.clone());
+        ui.on_pad(Pad::Left);
+        let before = ui.view();
+        ui.invalidate_practice_context();
+        assert_eq!(ui.view(), before);
+        assert_eq!(ui.name_prompt(), Some("Drill"));
+        assert!(!ui.playback_allowed());
+        let Effect::Save(saved) = ui.confirm_native_name("Returned drill".into()) else { panic!("explicit save expected"); };
+        assert_eq!(saved.frames, original.frames);
+        assert_eq!(saved.placement, original.placement);
+        ui.restore_draft(*saved);
+        ui.on_pad(Pad::Back);
+        ui.invalidate_practice_context();
+        assert!(!ui.is_open(), "a cancelled draft must not reappear on return");
+    }
+
+    fn native_checkpoint_survives_repeated_interruption_without_commit() {
+        let mut ui = MacroUi::new();
+        let mut original = sample(Placement { delta_x: 7.0, delta_y: -2.0, ..Placement::default() });
+        original.start = StartState::neutral(0x48, 0, 1.0);
+        original.set_mii(exact_mii()).unwrap();
+        ui.restore_draft(original.clone());
+        ui.on_pad(Pad::Left);
+        let grid_selection = ui.view().unwrap().selected;
+        for (text, caret) in [("😀 middle", 2), ("still unfinished", 6)] {
+            assert!(ui.checkpoint_native_name(text, caret));
+            ui.invalidate_practice_context();
+            ui.invalidate_practice_context();
+            assert_eq!(ui.name_prompt(), Some(text));
+            assert_eq!(ui.native_name_cursor(), Some(caret));
+            assert_eq!(ui.view().unwrap().selected, grid_selection);
+            assert!(ui.loaded_id().is_none());
+            assert!(!ui.playback_allowed());
+        }
+        let Effect::Save(saved) = ui.confirm_native_name(ui.name_prompt().unwrap().to_owned()) else {
+            panic!("only explicit confirm may save");
+        };
+        assert_eq!(saved.name, "still unfinished");
+        assert_eq!(saved.frames, original.frames);
+        assert_eq!(saved.start, original.start);
+        assert_eq!(saved.placement, original.placement);
+        assert_eq!(saved.mii, original.mii);
+    }
+
+    fn native_checkpoint_rejects_invalid_values_atomically_and_keeps_empty_drafts() {
+        let mut ui = MacroUi::new();
+        ui.restore_draft(sample(Placement::default()));
+        let full = "😀".repeat(48); // 48 scalars, 96 UTF-16 units.
+        assert!(ui.checkpoint_native_name(&full, 2));
+        for (bad, caret) in [("a".repeat(49), 0), ("x\0y".into(), 0),
+            ("x\ny".into(), 0), ("😀".into(), 1), ("a".into(), 2)] {
+            assert!(!ui.checkpoint_native_name(&bad, caret));
+            assert_eq!(ui.name_prompt(), Some(full.as_str()));
+            assert_eq!(ui.native_name_cursor(), Some(2));
+        }
+        assert!(ui.checkpoint_native_name("", 0));
+        ui.invalidate_practice_context();
+        assert_eq!(ui.name_prompt(), Some(""));
+        assert!(matches!(ui.confirm_native_name("".into()), Effect::Notify(_)));
+        assert_eq!(ui.name_prompt(), Some(""), "invalid confirmation cannot discard a draft");
+        assert!(matches!(ui.on_pad(Pad::Back), Effect::None));
+        ui.invalidate_practice_context();
+        assert_eq!(ui.name_prompt(), None);
+        assert_eq!(ui.native_name_cursor(), None);
+        assert!(!ui.checkpoint_native_name("late callback", 0));
+        assert!(matches!(ui.confirm_native_name("late enter".into()), Effect::None));
+    }
+
+    fn native_caret_survives_placement_but_not_new_draft_or_discard() {
+        let mut ui = MacroUi::new();
+        ui.restore_draft(sample(Placement::default()));
+        ui.restored_target(1, (4.0, 8.0));
+        assert!(ui.checkpoint_native_name("custom name", 3));
+        ui.native_name_placement();
+        assert!(!ui.checkpoint_native_name("wrong screen", 0));
+        ui.on_pad(Pad::Back);
+        assert_eq!(ui.name_prompt(), Some("custom name"));
+        assert_eq!(ui.native_name_cursor(), Some(3));
+        ui.close_transient(); // A new lobby discards all unfinished naming state.
+        assert_eq!(ui.native_name_cursor(), None);
+        ui.offer_save(frames(), start(), false, "13.0.5");
+        assert_eq!(ui.name_prompt(), Some("Recording"));
+        assert_eq!(ui.native_name_cursor(), Some(9));
+    }
+
+    fn waiting_interruption_keeps_placement_edits_but_drops_old_stage_anchor() {
+        let mut ui = MacroUi::new();
+        ui.commit_loaded("drill".into(), sample(Placement::default()), Some(0x08)).unwrap();
+        assert!(ui.open_editor(Some((4.0, 8.0))));
+        ui.on_pad(Pad::Confirm); // X +1, still an uncommitted draft.
+        goto(&mut ui, 9);
+        let before = ui.view();
+        ui.invalidate_practice_context();
+        assert_eq!(ui.view(), before);
+        assert_eq!(ui.marker(), None);
+        assert_eq!(ui.loaded_placement().unwrap().delta_x, 0.0);
+        assert!(matches!(ui.on_pad(Pad::Confirm), Effect::Notify(_)));
+        assert_eq!(ui.loaded_placement().unwrap().delta_x, 1.0);
+        assert!(!ui.playback_allowed());
+        ui.observe_cpu(Some(0x08), false);
+        assert!(ui.playback_allowed());
+        ui.restored_target(2, (12.0, 6.0));
+        assert_eq!(ui.restored_target(2, (99.0, 99.0)), Some((13.0, 6.0)));
+    }
+
+    fn save_dialog_placement_round_trip_and_momentum() {
+        let mut ui = MacroUi::new();
+        // A restored reference exists even before the first macro is saved.
+        assert!(ui.restored_target(1, (4.0, 8.0)).is_none());
+        ui.offer_save(frames(), start(), false, "13.0.5");
+        ui.on_pad(Pad::Left);
+        ui.on_pad(Pad::Confirm);
+        goto(&mut ui, 18);
+        ui.on_pad(Pad::Confirm);
+        ui.on_pad(Pad::Confirm);
+        goto(&mut ui, 8);
+        ui.on_pad(Pad::Confirm);
+        ui.on_pad(Pad::Back);
+        goto(&mut ui, 16);
+        let Effect::Save(recording) = ui.on_pad(Pad::Confirm) else {
+            panic!("expected save");
+        };
+        assert_eq!(recording.placement.delta_x, 1.0);
+        assert_eq!(recording.placement.momentum, MomentumMode::AtRest);
+        assert_eq!(recording.frames, frames());
+        assert_eq!(recording.start.status, 0x22);
+    }
+
+    fn restore_uses_the_first_anchor_for_the_whole_generation() {
+        let mut ui = MacroUi::new();
+        let placement = Placement {
+            delta_x: 3.0,
+            delta_y: 4.0,
+            ..Placement::default()
+        };
+        ui.commit_loaded("drill".to_owned(), sample(placement), Some(0x08))
+            .unwrap();
+        let first = ui.restored_target(1, (10.0, 20.0)).unwrap();
+        let repeated = ui.restored_target(1, first).unwrap();
+        let again = ui.restored_target(2, (10.0, 20.0)).unwrap();
+        assert_eq!(first, (13.0, 24.0));
+        assert_eq!(repeated, first);
+        assert_eq!(again, first);
+        assert!(ui.ready_velocity(true).is_some());
+        let at_rest = Placement {
+            momentum: MomentumMode::AtRest,
+            ..placement
+        };
+        ui.commit_loaded("drill".to_owned(), sample(at_rest), Some(0x08))
+            .unwrap();
+        assert_eq!(ui.ready_velocity(true), Some((0.0, 0.0)));
+        assert!(ui.ready_velocity(false).is_none());
+    }
+
+    fn aerial_start_survives_zero_offset_and_rest_mode() {
+        let mut ui = MacroUi::new();
+        let mut recording = sample(Placement::default());
+        recording.start.speed_y = -1.5;
+        ui.commit_loaded("fall".into(), recording.clone(), Some(0x08)).unwrap();
+        assert!(ui.restore_in_air());
+        assert_eq!(ui.ready_velocity(true), Some((0.5, -1.5)));
+        recording.placement.momentum = MomentumMode::AtRest;
+        ui.commit_loaded("rest".into(), recording.clone(), Some(0x08)).unwrap();
+        assert!(ui.restore_in_air());
+        assert_eq!(ui.ready_velocity(true), Some((0.0, 0.0)));
+        recording.start.situation = 0;
+        recording.start.speed_y = 0.0;
+        ui.commit_loaded("ground".into(), recording, Some(0x08)).unwrap();
+        assert!(!ui.restore_in_air());
+    }
+
+    fn character_request_is_once_and_playback_does_not_double_advance() {
+        let mut ui = MacroUi::new();
+        let mut recording = sample(Placement::default());
+        recording.frames.push(InputFrame {
+            buttons: 0x4,
+            ..InputFrame::default()
+        });
+        let effect = ui.import_recording(recording, Some(0)).unwrap();
+        assert!(matches!(effect, Effect::NeedCharacter(0x08)));
+        assert_eq!(ui.claim_character_request(), Some(0x08));
+        assert_eq!(ui.claim_character_request(), None);
+        ui.observe_cpu(Some(0x08), true);
+        assert!(!ui.playback_allowed());
+        ui.observe_cpu(Some(0x08), false);
+        assert!(ui.playback_allowed());
+        assert!(ui.arm_playback());
+        let first = ui.feed_playback(1);
+        let duplicate = ui.feed_playback(1);
+        assert_eq!(first, duplicate);
+        assert_eq!(ui.playback_frame(), 1);
+        ui.restored_target(3, (1.0, 2.0));
+        assert_eq!(ui.playback_frame(), 1);
+        assert!(ui.feed_playback(1).is_some());
+    }
+
+    fn empty_import_is_rejected_without_opening_a_selector() {
+        let mut ui = MacroUi::new();
+        let empty = MacroRecording {
+            schema_version: crate::engine::macros::SCHEMA_VERSION,
+            name: "Nope".to_owned(),
+            game_version: String::new(),
+            start: start(),
+            mii: None,
+            placement: Placement::default(),
+            frames: Vec::new(),
+            start_save: None,
+            start_save_on: true,
+        };
+        assert!(ui.import_recording(empty, None).is_err());
+        assert!(!ui.is_open());
+        assert!(ui.loaded_id().is_none());
+        ui.import_recording(sample(Placement::default()), Some(0x08))
+            .unwrap();
+        assert!(ui.playback_allowed());
+        assert!(!ui.is_open());
+    }
+
+    fn sample(placement: Placement) -> MacroRecording {
+        let mut recording = MacroRecording::new("Drill", "13.0.5", start(), frames()).unwrap();
+        recording.set_placement(placement).unwrap();
+        recording
+    }
+
+    fn exact_mii() -> crate::engine::mii::lifetime::Configuration {
+        use crate::engine::mii::inventory::{classify, MiiClass, RawSlot, TaggedId, CHARINFO_LEN, TAG_CHARA, TAG_HAT, TAG_OUTFIT};
+        let saved = classify(&RawSlot {
+            index: 0, slot_id: 13231, name_len: 1,
+            name_units: [65, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            charinfo: [7; CHARINFO_LEN], colour: 4, voice: 37, specials: [1, 0, 0, 0],
+            tag_outfit: TaggedId((u64::from(TAG_OUTFIT) << 56) | (1 << 40) | 0x1b_fef7_a5f7),
+            tag_hat: TaggedId((u64::from(TAG_HAT) << 56) | 0x0f_a9ef_a5ea),
+            tag_chara: TaggedId((u64::from(TAG_CHARA) << 56) | MiiClass::Brawler.chara_hash40()),
+        }).unwrap();
+        crate::engine::mii::lifetime::Configuration::from_saved(&saved).unwrap()
+    }
+
+    fn exact_mii_naming_save_as_and_same_class_ack_keep_identity() {
+        let configuration = exact_mii();
+        let mut original = MacroRecording::new("Captured", "13.0.5", StartState::neutral(0x48, 0, 1.0), frames()).unwrap();
+        original.set_mii(configuration).unwrap();
+        let mut ui = MacroUi::new();
+        ui.restore_draft(original.clone());
+        let Effect::Save(named) = ui.confirm_native_name("Named Brawler".into()) else { panic!() };
+        assert_eq!(named.mii, Some(configuration));
+        ui.restore_draft((*named).clone()); // Failed filesystem save returns the same owned draft.
+        let Effect::Save(retried) = ui.confirm_native_name("Retried Brawler".into()) else { panic!() };
+        assert_eq!(retried.mii, Some(configuration));
+        assert!(matches!(ui.commit_loaded("brawler".into(), *retried, Some(0x48)).unwrap(), Effect::NeedCharacter(0x48)));
+        assert!(!ui.playback_allowed());
+        assert_eq!(ui.claim_character_request(), Some(0x48));
+        ui.observe_cpu(Some(0x48), false);
+        assert!(!ui.playback_allowed());
+        let mut wrong = serde_json::to_value(configuration).unwrap();
+        wrong["charinfo"][0] = serde_json::json!(9); // Same canonical identity, different exact bytes.
+        let wrong = serde_json::from_value(wrong).unwrap();
+        ui.observe_exact_cpu(Some(0x48), Some(wrong), false);
+        assert!(!ui.playback_allowed());
+        ui.observe_exact_cpu(Some(0x48), Some(configuration), true);
+        assert!(!ui.playback_allowed());
+        ui.observe_exact_cpu(Some(0x48), Some(configuration), false);
+        assert!(ui.playback_allowed());
+        assert!(ui.open_editor(Some((0.0, 0.0))));
+        ui.save_as();
+        let Effect::Save(copy) = ui.confirm_native_name("Copy Brawler".into()) else { panic!() };
+        assert_eq!(copy.mii, Some(configuration));
+        assert_eq!(copy.schema_version, 2);
+        assert_eq!(copy.frames, original.frames);
+        ui.invalidate_character_request();
+        assert!(!ui.playback_allowed());
+        assert_eq!(ui.claim_character_request(), Some(0x48));
+    }
+    fn loaded_macro_does_not_undo_manual_cpu_choice() {
+        let mut ui = MacroUi::new();
+        ui.commit_loaded("ordinary".into(), sample(Placement::default()), Some(0x08)).unwrap();
+        assert!(ui.playback_allowed());
+        ui.observe_cpu(Some(0x08), true);
+        assert_eq!(ui.claim_character_request(), None);
+        ui.observe_cpu(Some(0x0f), false);
+        assert!(!ui.playback_allowed());
+        assert_eq!(ui.claim_character_request(), None);
+        ui.observe_cpu(Some(0x08), false);
+        assert!(ui.playback_allowed());
+        assert_eq!(ui.claim_character_request(), None);
+        ui.invalidate_character_request();
+        assert_eq!(ui.claim_character_request(), Some(0x08));
+
+        let configuration = exact_mii();
+        let mut recording = MacroRecording::new("Exact", "13.0.5", StartState::neutral(0x48, 0, 1.0), frames()).unwrap();
+        recording.set_mii(configuration).unwrap();
+        ui.commit_loaded("exact".into(), recording, Some(0x48)).unwrap();
+        assert_eq!(ui.claim_character_request(), Some(0x48));
+        ui.observe_exact_cpu(Some(0x48), Some(configuration), false);
+        assert!(ui.playback_allowed());
+        ui.observe_cpu(Some(0x0f), false);
+        assert_eq!(ui.claim_character_request(), None);
+        let mut wrong = serde_json::to_value(configuration).unwrap();
+        wrong["charinfo"][0] = serde_json::json!(9);
+        let wrong = serde_json::from_value(wrong).unwrap();
+        ui.observe_cpu(Some(0x48), false);
+        ui.observe_exact_cpu(Some(0x48), Some(wrong), false);
+        assert_eq!(ui.claim_character_request(), None);
+        assert!(!ui.playback_allowed());
+        // Runtime can renew an exact current receipt without a UI install request.
+        assert_eq!(ui.claim_character_request(), None);
+        ui.observe_exact_cpu(Some(0x48), Some(configuration), false);
+        assert!(ui.playback_allowed());
+        assert_eq!(ui.claim_character_request(), None);
+    }
+
+    fn numbered_slot_copy_rejects_over_limit_without_truncation() {
+        let mut over = vec![InputFrame::default(); NUMBERED_SLOT_FRAMES + 1];
+        over[0].buttons = 1;
+        let rejected = copy_numbered_frames(&over);
+        assert_eq!(rejected, Err(SlotAdmit::OverLimit { frames: 601, limit: NUMBERED_SLOT_FRAMES }));
+        assert_eq!(over.len(), 601);
+        assert_eq!(over[0].buttons, 1);
+        assert_eq!(copy_numbered_frames(&[]), Err(SlotAdmit::Empty));
+        let full = vec![InputFrame::default(); NUMBERED_SLOT_FRAMES];
+        let copied = copy_numbered_frames(&full).unwrap();
+        assert_eq!(copied.len(), NUMBERED_SLOT_FRAMES);
+        assert_eq!(copied, full);
+    }
+
+    fn slot_facing_parks_only_a_captured_slot() {
+        let shared = (1.0, 7);
+        let (active, parked) = engage_slot_origin(shared, None, Some((-1.0, 4)));
+        assert_eq!(active, (-1.0, 4));
+        assert_eq!(parked, Some(shared));
+        let (restored, parked) = release_slot_origin(active, parked);
+        assert_eq!(restored, shared);
+        assert_eq!(parked, None);
+        let (active, parked) = engage_slot_origin((-1.0, 4), Some(shared), Some((1.0, 9)));
+        assert_eq!(active, (1.0, 9));
+        assert_eq!(parked, Some(shared));
+        let (active, parked) = engage_slot_origin(shared, None, None);
+        assert_eq!(active, shared);
+        assert_eq!(parked, None);
+    }
+
+    fn library_y_binds_only_when_the_slot_label_is_set() {
+        let rows = vec![LibraryRow { id: "fox".into(), label: "Fox drill".into() }];
+        let mut plain = MacroUi::new();
+        plain.open_library(rows.clone(), 0);
+        assert_eq!(plain.view().unwrap().title, "Named Library");
+        assert!(plain.view().unwrap().footer.contains("A loads, B closes."));
+        assert!(matches!(plain.on_pad(Pad::Extra), Effect::None));
+        assert!(plain.is_open());
+
+        let mut labeled = MacroUi::new();
+        labeled.open_library_titled(rows, 0, "Named Library", Some("Record Slot 3".into()));
+        let footer = labeled.view().unwrap().footer;
+        // A reads the file for playback (it does not start it); Y copies to the slot.
+        assert!(footer.contains("A Load from file, Y Copy to Record Slot 3"), "{footer}");
+        assert!(!footer.contains("binds"), "{footer}");
+        let Effect::BindToSlot { id } = labeled.on_pad(Pad::Extra) else { panic!("expected bind") };
+        assert_eq!(id, "fox");
+        assert!(!labeled.is_open());
+    }
+
+    fn context(cpu_kind: i32, matches: bool, prompt_enabled: bool) -> LoadContext {
+        LoadContext {
+            cpu_kind: Some(cpu_kind),
+            matches,
+            prompt_enabled,
+            can_switch: true,
+            revision: 5,
+            recorded_label: "Kirby".into(),
+            current_label: "Hero".into(),
+        }
+    }
+
+    /// The library A press the runtime sees before it reads the file.
+    fn pick(ui: &mut MacroUi) {
+        let rows = ["id0", "id1"].map(|id| LibraryRow { id: id.into(), label: id.into() });
+        ui.open_library_titled(rows.to_vec(), 0, "Named Library", Some("Record Slot 1".into()));
+        ui.on_pad(Pad::Right);
+        let Effect::Choose(id) = ui.on_pad(Pad::Confirm) else { panic!("expected choose") };
+        assert_eq!(id, "id1");
+    }
+
+    fn mismatch_prompts_and_keep_plays_the_same_inputs_on_the_current_cpu() {
+        let mut ui = MacroUi::new();
+        ui.commit_loaded("kept".into(), sample(Placement::default()), Some(0x08)).unwrap();
+        let mut candidate = sample(Placement::default());
+        candidate.frames.push(InputFrame { buttons: 0x4, ..InputFrame::default() });
+        let original = candidate.clone();
+        pick(&mut ui);
+        // Recorded fighter 0x08 against a CPU that is 0x12.
+        let effect = ui.offer_load("id1".into(), candidate, context(0x12, false, true)).unwrap();
+        assert!(matches!(effect, Effect::None));
+        assert_eq!(ui.fighter_prompt(), Some((FighterOrigin::Named, 5)));
+        // Nothing is committed, and nothing plays, while the question is open.
+        assert_eq!(ui.loaded_id(), Some("kept"));
+        assert!(!ui.playback_allowed());
+        assert_eq!(ui.claim_character_request(), None);
+        let view = ui.view().unwrap();
+        assert_eq!((view.labels[0].as_str(), view.labels[1].as_str()),
+            ("Keep current fighter", "Switch to recorded fighter"));
+        assert_eq!(view.selected, 0, "Keep is the safe default");
+
+        assert_eq!(ui.take_prompt_commit(), None, "nothing is remembered before the answer");
+        assert!(matches!(ui.on_pad(Pad::Confirm), Effect::None));
+        assert_eq!(ui.fighter_prompt(), None);
+        assert_eq!(ui.take_prompt_commit(), Some(("id1".to_owned(), "Drill".to_owned())));
+        assert_eq!(ui.take_prompt_commit(), None);
+        assert_eq!(ui.loaded_id(), Some("id1"));
+        assert!(ui.plays_current());
+        assert_eq!(ui.claim_character_request(), None, "Keep must not schedule a CPU reload");
+        // The inputs and recorded identity are the file's, untouched.
+        assert_eq!(ui.loaded_frames(), Some(original.frames.as_slice()));
+        assert_eq!(ui.loaded_start(), Some(original.start));
+        assert_eq!(ui.loaded_target().unwrap().kind(), 0x08);
+        // They play on whichever CPU is settled, but never mid-install.
+        ui.observe_cpu(Some(0x12), true);
+        assert!(!ui.playback_allowed());
+        ui.observe_cpu(Some(0x12), false);
+        assert!(ui.playback_allowed());
+        ui.observe_cpu(Some(0x0f), false);
+        assert!(ui.playback_allowed());
+        assert!(ui.arm_playback());
+        assert_eq!(ui.feed_playback(1), Some(original.frames[0]));
+        assert_eq!(ui.feed_playback(2), Some(original.frames[1]));
+        assert_eq!(ui.claim_character_request(), None);
+    }
+
+    fn switch_uses_the_existing_exact_fighter_request_and_keeps_the_inputs() {
+        let mut ui = MacroUi::new();
+        let candidate = sample(Placement::default());
+        pick(&mut ui);
+        ui.offer_load("id1".into(), candidate.clone(), context(0x12, false, true)).unwrap();
+        ui.on_pad(Pad::Down);
+        assert_eq!(ui.view().unwrap().selected, 1);
+        assert!(matches!(ui.on_pad(Pad::Confirm), Effect::NeedCharacter(0x08)));
+        assert_eq!(ui.loaded_id(), Some("id1"));
+        assert!(!ui.plays_current());
+        assert!(!ui.playback_allowed());
+        assert_eq!(ui.claim_character_request(), Some(0x08));
+        ui.observe_cpu(Some(0x12), false);
+        assert!(!ui.playback_allowed(), "Switch still waits for the recorded fighter");
+        ui.observe_cpu(Some(0x08), false);
+        assert!(ui.playback_allowed());
+        assert!(ui.plays_current(), "an explicit Switch is completed once");
+        ui.observe_cpu(Some(0x12), false);
+        assert!(ui.playback_allowed(), "a later manual swap stays the user's choice");
+        assert_eq!(ui.claim_character_request(), None);
+        assert_eq!(ui.loaded_frames(), Some(candidate.frames.as_slice()));
+    }
+
+    fn cancel_returns_to_the_list_and_changes_nothing() {
+        let mut ui = MacroUi::new();
+        ui.commit_loaded("kept".into(), sample(Placement::default()), Some(0x08)).unwrap();
+        pick(&mut ui);
+        ui.offer_load("id1".into(), sample(Placement::default()), context(0x12, false, true)).unwrap();
+        assert!(matches!(ui.on_pad(Pad::Back), Effect::None));
+        assert_eq!(ui.fighter_prompt(), None);
+        assert_eq!(ui.take_prompt_commit(), None, "a cancelled load is never remembered");
+        let view = ui.view().unwrap();
+        assert_eq!((view.title.as_str(), view.selected), ("Named Library", 1));
+        assert_eq!(ui.loaded_id(), Some("kept"));
+        assert!(!ui.plays_current());
+        assert_eq!(ui.claim_character_request(), None);
+        assert!(matches!(ui.on_pad(Pad::Back), Effect::None));
+        assert!(ui.playback_allowed(), "the previous macro is still ready on its fighter");
+    }
+
+    fn same_fighter_never_prompts_and_a_disabled_prompt_keeps_the_cpu_silently() {
+        for enabled in [true, false] {
+            let mut ui = MacroUi::new();
+            pick(&mut ui);
+            let effect = ui.offer_load("id1".into(), sample(Placement::default()), context(0x08, true, enabled)).unwrap();
+            assert!(matches!(effect, Effect::None));
+            assert_eq!(ui.fighter_prompt(), None);
+            assert!(ui.plays_current());
+            assert!(ui.playback_allowed());
+        }
+        let mut ui = MacroUi::new();
+        pick(&mut ui);
+        let effect = ui.offer_load("id1".into(), sample(Placement::default()), context(0x12, false, false)).unwrap();
+        assert!(matches!(effect, Effect::None), "no NeedCharacter and no prompt");
+        assert_eq!(ui.fighter_prompt(), None);
+        assert!(!ui.is_open());
+        assert!(ui.plays_current());
+        assert_eq!(ui.claim_character_request(), None);
+        assert!(ui.playback_allowed());
+    }
+
+    fn already_matching_exact_mii_loads_without_a_prompt_or_reload() {
+        let configuration = exact_mii();
+        let mut recording = MacroRecording::new("Exact", "13.0.5", StartState::neutral(0x48, 0, 1.0), frames()).unwrap();
+        recording.set_mii(configuration).unwrap();
+        let mut ui = MacroUi::new();
+        let effect = ui.offer_load("same".into(), recording.clone(), context(0x48, true, true)).unwrap();
+        assert!(matches!(effect, Effect::None));
+        assert_eq!(ui.fighter_prompt(), None);
+        assert_eq!(ui.claim_character_request(), None);
+        assert!(ui.playback_allowed());
+        assert_eq!(ui.loaded_target().unwrap().configuration(), Some(configuration));
+        assert_eq!(ui.loaded_frames(), Some(recording.frames.as_slice()));
+    }
+
+    fn same_class_with_a_different_exact_mii_is_a_mismatch_and_keep_ignores_the_exact_mii() {
+        let configuration = exact_mii();
+        let mut recording = MacroRecording::new("Exact", "13.0.5", StartState::neutral(0x48, 0, 1.0), frames()).unwrap();
+        recording.set_mii(configuration).unwrap();
+        let mut ui = MacroUi::new();
+        pick(&mut ui);
+        // The CPU is the same Brawler class; the runtime's exact predicate says it is another Mii.
+        ui.offer_load("id1".into(), recording, context(0x48, false, true)).unwrap();
+        assert!(ui.fighter_prompt().is_some());
+        ui.on_pad(Pad::Confirm);
+        assert!(ui.plays_current());
+        let mut other = serde_json::to_value(configuration).unwrap();
+        other["charinfo"][0] = serde_json::json!(9);
+        let other = serde_json::from_value(other).unwrap();
+        ui.observe_exact_cpu(Some(0x48), Some(other), false);
+        assert!(ui.playback_allowed());
+        // The file keeps its exact Mii. Keep neither rewrites nor reapplies it.
+        assert_eq!(ui.loaded_target().unwrap().configuration(), Some(configuration));
+        assert_eq!(ui.claim_character_request(), None);
+    }
+
+    fn an_older_mii_file_without_its_exact_mii_plays_on_the_current_cpu_without_a_prompt() {
+        let legacy = MacroRecording::new("Old", "13.0.5", StartState::neutral(0x48, 0, 1.0), frames()).unwrap();
+        assert!(legacy.playback_target().is_err());
+        let mut ui = MacroUi::new();
+        let effect = ui.offer_load("old".into(), legacy, context(0x08, false, true)).unwrap();
+        assert!(matches!(effect, Effect::Notify(_)));
+        assert_eq!(ui.fighter_prompt(), None);
+        assert!(ui.plays_current());
+        assert_eq!(ui.loaded_id(), Some("old"));
+        assert!(ui.playback_allowed());
+        assert_eq!(ui.claim_character_request(), None);
+    }
+
+    fn a_build_that_cannot_load_the_recorded_identity_keeps_the_cpu_without_asking() {
+        let mut ui = MacroUi::new();
+        pick(&mut ui);
+        let context = LoadContext { can_switch: false, ..context(0x12, false, true) };
+        let effect = ui.offer_load("id1".into(), sample(Placement::default()), context).unwrap();
+        assert!(matches!(effect, Effect::None), "nothing to switch to, and not an older-file notice");
+        assert_eq!(ui.fighter_prompt(), None);
+        assert!(ui.plays_current());
+        assert_eq!(ui.claim_character_request(), None);
+        assert!(ui.playback_allowed());
+    }
+
+    fn a_stale_or_departed_prompt_never_commits_and_leaves_the_previous_macro() {
+        let mut ui = MacroUi::new();
+        ui.commit_loaded("kept".into(), sample(Placement::default()), Some(0x08)).unwrap();
+        pick(&mut ui);
+        ui.offer_load("id1".into(), sample(Placement::default()), context(0x12, false, true)).unwrap();
+        ui.invalidate_practice_context(); // The waiting scene changed.
+        assert_eq!(ui.fighter_prompt(), None);
+        assert!(!ui.is_open());
+        assert!(matches!(ui.on_pad(Pad::Confirm), Effect::None));
+        assert_eq!(ui.loaded_id(), Some("kept"));
+
+        // The runtime retires a prompt whose selection revision moved on.
+        pick(&mut ui);
+        ui.offer_load("id1".into(), sample(Placement::default()), context(0x12, false, true)).unwrap();
+        assert!(ui.drop_fighter_prompt());
+        assert!(!ui.drop_fighter_prompt());
+        assert_eq!(ui.loaded_id(), Some("kept"));
+        assert!(!ui.is_open());
+    }
+
+    fn a_clip_prompt_reports_its_choice_and_leaves_the_candidate_to_the_editor() {
+        let mut ui = MacroUi::new();
+        assert!(ui.open_fighter_prompt(3, "Kirby".into(), "Hero".into()));
+        assert_eq!(ui.fighter_prompt(), Some((FighterOrigin::Clip, 3)));
+        assert!(!ui.open_fighter_prompt(4, "Fox".into(), "Hero".into()), "one prompt at a time");
+        assert!(matches!(ui.on_pad(Pad::Back), Effect::ClipFighter(None)));
+        assert!(!ui.is_open());
+        ui.open_fighter_prompt(3, "Kirby".into(), "Hero".into());
+        ui.on_pad(Pad::Down);
+        assert!(matches!(ui.on_pad(Pad::Confirm), Effect::ClipFighter(Some(FighterChoice::Switch))));
+        ui.open_fighter_prompt(3, "Kirby".into(), "Hero".into());
+        assert!(matches!(ui.on_pad(Pad::Confirm), Effect::ClipFighter(Some(FighterChoice::Keep))));
+        assert_eq!(ui.loaded_id(), None);
+    }
+
+    fn external_name_confirms_without_a_macro_payload() {
+        let mut ui = MacroUi::new();
+        assert!(matches!(
+            ui.offer_name(NameContext { token: 9, title: SETUP_KEYBOARD_TITLE }, "Setup", "Fox vs Marth"),
+            Effect::None
+        ));
+        assert_eq!(ui.name_prompt(), Some("Setup"));
+        assert_eq!(ui.native_name_title(), Some(SETUP_KEYBOARD_TITLE));
+        assert!(ui.checkpoint_native_name("Slot draft", 4));
+        ui.invalidate_practice_context();
+        assert_eq!(ui.name_prompt(), Some("Slot draft"));
+        assert_eq!(ui.native_name_title(), Some(SETUP_KEYBOARD_TITLE));
+        assert_eq!(ui.native_name_cursor(), Some(4));
+        assert!(matches!(ui.native_name_placement(), Effect::None));
+        assert_eq!(ui.name_prompt(), Some("Slot draft"));
+        assert!(matches!(ui.confirm_native_name("   ".into()), Effect::Notify(_)));
+        assert_eq!(ui.name_prompt(), Some("   "));
+        let Effect::NameConfirmed { context, name } = ui.confirm_native_name("  Morning setup  ".into()) else {
+            panic!("expected name confirmation");
+        };
+        assert_eq!(context.token, 9);
+        assert_eq!(context.title, SETUP_KEYBOARD_TITLE);
+        assert_eq!(name, "Morning setup");
+        assert!(ui.name_prompt().is_none());
+        assert!(ui.native_name_title().is_none());
+    }
+
+    fn keyboard_title_stays_with_the_draft_kind() {
+        let mut ui = MacroUi::new();
+        let effect = ui.offer_save(frames(), start(), false, "13.0.5");
+        assert!(matches!(effect, Effect::None));
+        assert_eq!(ui.native_name_title(), Some(MACRO_KEYBOARD_TITLE));
+        assert!(ui.checkpoint_native_name("Kept macro", 4));
+        ui.invalidate_practice_context();
+        assert_eq!(ui.native_name_title(), Some(MACRO_KEYBOARD_TITLE));
+        assert_eq!(ui.name_prompt(), Some("Kept macro"));
+
+        let effect = ui.offer_name(
+            NameContext { token: 3, title: SETUP_KEYBOARD_TITLE },
+            "Setup",
+            "Slot 2",
+        );
+        assert!(matches!(effect, Effect::None));
+        assert_eq!(ui.native_name_title(), Some(SETUP_KEYBOARD_TITLE));
+        assert_ne!(ui.native_name_title(), Some(MACRO_KEYBOARD_TITLE));
+    }
+
+    fn mii_identity_keeps_exact_class_and_refuses_unknown() {
+        use crate::engine::mii::inventory::MiiClass;
+        let classes = [MiiClass::Brawler, MiiClass::Swordfighter, MiiClass::Gunner];
+        for class in classes {
+            assert_eq!(mii_identity(class.kind() as i32, Some(class.kind())), MiiIdentity::Exact);
+            assert_eq!(mii_identity(class.kind() as i32, None), MiiIdentity::Unknown);
+        }
+        assert_eq!(
+            mii_identity(MiiClass::Brawler.kind() as i32, Some(MiiClass::Gunner.kind())),
+            MiiIdentity::Unknown
+        );
+        assert_eq!(mii_identity(0x07, None), MiiIdentity::Ordinary);
+        assert_eq!(mii_identity(0x07, Some(MiiClass::Brawler.kind())), MiiIdentity::Ordinary);
+        assert_eq!(mii_identity(-1, Some(MiiClass::Brawler.kind())), MiiIdentity::Ordinary);
+        assert_eq!(export_mii_refusal(MiiIdentity::Unknown), Some(
+            "Exact Mii was not available when recording started. Record this slot again."
+        ));
+        assert_eq!(export_mii_refusal(MiiIdentity::Ordinary), None);
+        assert_eq!(export_mii_refusal(MiiIdentity::Exact), None);
+    }
+
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("native_keyboard_validation_preserves_draft_and_inputs", native_keyboard_validation_preserves_draft_and_inputs as fn()),
+            ("default_name_saves_and_cancel_discards", default_name_saves_and_cancel_discards as fn()),
+            ("empty_name_stays_on_the_dialog_and_typed_name_pages", empty_name_stays_on_the_dialog_and_typed_name_pages as fn()),
+            ("crop_drops_only_the_neutral_tail", crop_drops_only_the_neutral_tail as fn()),
+            ("library_pages_and_cancel_keeps_the_previous_choice", library_pages_and_cancel_keeps_the_previous_choice as fn()),
+            ("placement_edit_keeps_inputs_and_can_stay_temporary", placement_edit_keeps_inputs_and_can_stay_temporary as fn()),
+            ("manual_fighter_change_invalidates_loaded_playback", manual_fighter_change_invalidates_loaded_playback as fn()),
+            ("placement_needs_restored_reference_and_save_keeps_it", placement_needs_restored_reference_and_save_keeps_it as fn()),
+            ("edit_placement_opens_on_the_active_macro_and_writes_that_file", edit_placement_opens_on_the_active_macro_and_writes_that_file as fn()),
+            ("waiting_interruption_preserves_unfinished_name_and_explicit_cancel", waiting_interruption_preserves_unfinished_name_and_explicit_cancel as fn()),
+            ("native_checkpoint_survives_repeated_interruption_without_commit", native_checkpoint_survives_repeated_interruption_without_commit as fn()),
+            ("native_checkpoint_rejects_invalid_values_atomically_and_keeps_empty_drafts", native_checkpoint_rejects_invalid_values_atomically_and_keeps_empty_drafts as fn()),
+            ("native_caret_survives_placement_but_not_new_draft_or_discard", native_caret_survives_placement_but_not_new_draft_or_discard as fn()),
+            ("waiting_interruption_keeps_placement_edits_but_drops_old_stage_anchor", waiting_interruption_keeps_placement_edits_but_drops_old_stage_anchor as fn()),
+            ("save_dialog_placement_round_trip_and_momentum", save_dialog_placement_round_trip_and_momentum as fn()),
+            ("restore_uses_the_first_anchor_for_the_whole_generation", restore_uses_the_first_anchor_for_the_whole_generation as fn()),
+            ("aerial_start_survives_zero_offset_and_rest_mode", aerial_start_survives_zero_offset_and_rest_mode as fn()),
+            ("character_request_is_once_and_playback_does_not_double_advance", character_request_is_once_and_playback_does_not_double_advance as fn()),
+            ("empty_import_is_rejected_without_opening_a_selector", empty_import_is_rejected_without_opening_a_selector as fn()),
+            ("exact_mii_naming_save_as_and_same_class_ack_keep_identity", exact_mii_naming_save_as_and_same_class_ack_keep_identity as fn()),
+            ("loaded_macro_does_not_undo_manual_cpu_choice", loaded_macro_does_not_undo_manual_cpu_choice as fn()),
+            ("numbered_slot_copy_rejects_over_limit_without_truncation", numbered_slot_copy_rejects_over_limit_without_truncation as fn()),
+            ("slot_facing_parks_only_a_captured_slot", slot_facing_parks_only_a_captured_slot as fn()),
+            ("library_y_binds_only_when_the_slot_label_is_set", library_y_binds_only_when_the_slot_label_is_set as fn()),
+            ("mismatch_prompts_and_keep_plays_the_same_inputs_on_the_current_cpu", mismatch_prompts_and_keep_plays_the_same_inputs_on_the_current_cpu as fn()),
+            ("switch_uses_the_existing_exact_fighter_request_and_keeps_the_inputs", switch_uses_the_existing_exact_fighter_request_and_keeps_the_inputs as fn()),
+            ("cancel_returns_to_the_list_and_changes_nothing", cancel_returns_to_the_list_and_changes_nothing as fn()),
+            ("same_fighter_never_prompts_and_a_disabled_prompt_keeps_the_cpu_silently", same_fighter_never_prompts_and_a_disabled_prompt_keeps_the_cpu_silently as fn()),
+            ("already_matching_exact_mii_loads_without_a_prompt_or_reload", already_matching_exact_mii_loads_without_a_prompt_or_reload as fn()),
+            ("same_class_with_a_different_exact_mii_is_a_mismatch_and_keep_ignores_the_exact_mii", same_class_with_a_different_exact_mii_is_a_mismatch_and_keep_ignores_the_exact_mii as fn()),
+            ("an_older_mii_file_without_its_exact_mii_plays_on_the_current_cpu_without_a_prompt", an_older_mii_file_without_its_exact_mii_plays_on_the_current_cpu_without_a_prompt as fn()),
+            ("a_build_that_cannot_load_the_recorded_identity_keeps_the_cpu_without_asking", a_build_that_cannot_load_the_recorded_identity_keeps_the_cpu_without_asking as fn()),
+            ("a_stale_or_departed_prompt_never_commits_and_leaves_the_previous_macro", a_stale_or_departed_prompt_never_commits_and_leaves_the_previous_macro as fn()),
+            ("a_clip_prompt_reports_its_choice_and_leaves_the_candidate_to_the_editor", a_clip_prompt_reports_its_choice_and_leaves_the_candidate_to_the_editor as fn()),
+            ("external_name_confirms_without_a_macro_payload", external_name_confirms_without_a_macro_payload as fn()),
+            ("keyboard_title_stays_with_the_draft_kind", keyboard_title_stays_with_the_draft_kind as fn()),
+            ("mii_identity_keeps_exact_class_and_refuses_unknown", mii_identity_keeps_exact_class_and_refuses_unknown as fn()),
+        ]);
+    }
+    }
+}

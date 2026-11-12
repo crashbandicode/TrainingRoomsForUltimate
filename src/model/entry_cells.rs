@@ -76,7 +76,6 @@ mod tests {
     lib_unit_tests! {
     use super::*;
 
-    #[test]
     fn the_running_cell_is_the_games_index_when_it_is_filled() {
         // One body: cell 0. A swapped three-body group with the second body running: cell 1. PT's Charizard: cell 2.
         assert_eq!(active_cell(0, 1), Some(0));
@@ -84,14 +83,12 @@ mod tests {
         assert_eq!(active_cell(2, 3), Some(2));
     }
 
-    #[test]
     fn an_index_past_the_filled_cells_has_no_body() {
         assert_eq!(active_cell(1, 1), None, "index past the count");
         assert_eq!(active_cell(3, 4), None, "index past the capacity");
         assert_eq!(active_cell(0, 0), None, "an empty window");
     }
 
-    #[test]
     fn native_reader_tracks_bank_and_trainer_changes_without_caching() {
         // Fake native entry, with sentinel bytes around each native-width field.
         let mut bank = vec![0xa5; 0x5920];
@@ -119,7 +116,6 @@ mod tests {
         }
     }
 
-    #[test]
     fn null_entry_does_not_read_memory() {
         for guarded in [false, true] {
             assert_eq!(
@@ -129,7 +125,6 @@ mod tests {
         }
     }
 
-    #[test]
     fn failed_layout_guard_reads_only_the_legacy_first_body() {
         let mut reads = Vec::new();
         let body = read_active_body(
@@ -145,7 +140,6 @@ mod tests {
         assert_eq!(reads, [0x14160]);
     }
 
-    #[test]
     fn invalid_index_never_reads_outside_the_three_cell_window() {
         for (index, count) in [(1, 1), (2, 2), (3, 4), (255, u64::MAX), (0, 0)] {
             let mut reads = Vec::new();
@@ -167,6 +161,19 @@ mod tests {
             assert_eq!(body, 0);
             assert_eq!(reads, [0x14150]);
         }
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("the_running_cell_is_the_games_index_when_it_is_filled", the_running_cell_is_the_games_index_when_it_is_filled as fn()),
+            ("an_index_past_the_filled_cells_has_no_body", an_index_past_the_filled_cells_has_no_body as fn()),
+            ("native_reader_tracks_bank_and_trainer_changes_without_caching", native_reader_tracks_bank_and_trainer_changes_without_caching as fn()),
+            ("null_entry_does_not_read_memory", null_entry_does_not_read_memory as fn()),
+            ("failed_layout_guard_reads_only_the_legacy_first_body", failed_layout_guard_reads_only_the_legacy_first_body as fn()),
+            ("invalid_index_never_reads_outside_the_three_cell_window", invalid_index_never_reads_outside_the_three_cell_window as fn()),
+        ]);
     }
     }
 }

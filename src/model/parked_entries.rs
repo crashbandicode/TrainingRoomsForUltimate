@@ -423,3 +423,410 @@ fn reload_if_needed(
     }
 }
 
+#[cfg(test)]
+mod tests {
+    lib_unit_tests! {
+    use super::*;
+
+    /// DK then Link: the CPU cycle Mario, choices DK/Link/Samus, original Mario.
+    /// `f9_seat_tests` checks this pair against `character_forms`.
+    fn seats() -> Seats {
+        Seats { entry2: 0x01, entry3: 0x02 }
+    }
+
+    fn facts(
+        previous: u32,
+        quantity: u32,
+        entry2: Body,
+        entry3: Body,
+        borrowed: Option<u32>,
+    ) -> CountFacts {
+        CountFacts {
+            previous: Some(previous),
+            quantity: Some(quantity),
+            borrowed_kind: borrowed,
+            entry2,
+            entry3,
+            seats: Some(seats()),
+            thrown_from_entry3: None,
+            kirby_has_copy: false,
+        }
+    }
+
+    fn promote_ready_body_becomes_that_cpu() {
+        let body = Body::Ready { id: 42, kind: 0x01 };
+        let decision = on_count(facts(1, 2, body, Body::Empty, None));
+        assert_eq!(
+            decision.publish[0],
+            Some(Publish {
+                owner: 2,
+                kind: 0x01,
+                body: 42
+            })
+        );
+        assert!(decision.after_entry2.is_none());
+        assert!(decision.release_now.is_none());
+        // A different ready body is labelled as itself, and the seat member waits until after the walk.
+        let other = on_count(facts(
+            1,
+            2,
+            Body::Ready { id: 7, kind: 0x05 },
+            Body::Empty,
+            None,
+        ));
+        assert_eq!(
+            other.publish[0],
+            Some(Publish {
+                owner: 2,
+                kind: 0x05,
+                body: 7
+            })
+        );
+        assert_eq!(other.after_entry2.unwrap().kind, seats().entry2);
+        assert!(other.hold_installs);
+        // In flight: no publication and no second install.
+        let loading = on_count(facts(
+            1,
+            2,
+            Body::Loading { id: Some(7) },
+            Body::Empty,
+            None,
+        ));
+        assert!(loading.publish[0].is_none());
+        assert!(loading.after_entry2.is_none());
+    }
+
+    fn live_entries_are_not_helper_seats() {
+        assert!(!helper_seat(2, Some(2), false));
+        assert!(helper_seat(3, Some(2), false));
+        assert_eq!(seats().entry3, 0x02);
+        assert!(!helper_seat(2, Some(3), false));
+        assert!(!helper_seat(3, Some(3), false));
+        assert!(helper_seat(2, Some(1), false));
+        assert!(helper_seat(3, Some(1), false));
+        assert!(!helper_seat(3, Some(1), true));
+        assert!(!hat_may_use(2, Some(1), true));
+        for slot in HAT_ENTRIES {
+            assert!(hat_may_use(slot, Some(2), false), "slot {slot}");
+            assert!(hat_may_use(slot, Some(3), false), "slot {slot}");
+        }
+        assert!(!hat_may_use(3, Some(2), true));
+        assert!(!hat_may_use(3, Some(3), true));
+        assert!(hat_may_use(3, Some(1), true));
+        let sources = include_str!("../runtime/roster/character_sources.rs");
+        assert!(
+            !sources.contains("Character resources currently need one visible CPU"),
+            "counts 2 and 3 are still refused"
+        );
+        assert!(sources.contains("training_quantity_open"));
+        assert!(sources.contains("f9_gate::observe_quantity"));
+        let roster = include_str!("../runtime/roster/character_roster.rs");
+        assert!(roster.contains("owner <= 3"));
+        let hud = include_str!("swap/native_hud_refresh.rs");
+        assert!(hud.contains("owner > 3"));
+    }
+
+    fn cutover_rebuilds_hat_and_removes_thrown_item() {
+        let same = plan_cutover(4, 0x06, 4, 0x06, Some(99), true);
+        assert!(same.is_none());
+        let changed = plan_cutover(4, 0x18, 4, 0x02, Some(99), true).unwrap();
+        assert!(changed.clear_hat);
+        assert_eq!(changed.copy_kind, Some(0x02));
+        assert_eq!(changed.item, Some(99));
+        let body = plan_cutover(4, 0x02, 8, 0x02, None, false).unwrap();
+        assert!(body.clear_hat);
+        assert!(body.copy_kind.is_none());
+        assert!(body.item.is_none());
+        // The planned effect has no charge write.
+        let _ = (changed.clear_hat, changed.copy_kind, changed.item);
+    }
+
+    fn raising_the_cpu_count_retires_a_borrowed_hat_before_promotion_uses_entry_3() {
+        let decision = on_count(facts(
+            1,
+            2,
+            Body::Ready { id: 3, kind: 0x01 },
+            Body::Ready { id: 9, kind: 0x18 },
+            Some(0x18),
+        ));
+        assert!(decision.release_now.is_none());
+        assert!(decision.publish[1].is_none());
+        let after = decision.after_entry3.unwrap();
+        assert_eq!(after.slot, 3);
+        assert_eq!(after.kind, seats().entry3);
+        assert_eq!(after.release, Some(Release::Retired));
+        assert!(after.cutover.is_some());
+        assert!(decision.hold_installs);
+        // The hat is not moved onto entry 2.
+        assert_ne!(decision.publish[0].unwrap().kind, 0x18);
+        assert!(decision.after_entry2.is_none());
+    }
+
+    fn a_same_close_raise_to_three_promotes_the_borrowed_hat_then_swaps_to_the_seat_member() {
+        let decision = on_count(facts(
+            1,
+            3,
+            Body::Ready { id: 3, kind: 0x01 },
+            Body::Ready { id: 9, kind: 0x18 },
+            Some(0x18),
+        ));
+        assert_eq!(
+            decision.publish[1],
+            Some(Publish {
+                owner: 3,
+                kind: 0x18,
+                body: 9
+            })
+        );
+        assert_eq!(decision.release_now, Some(Release::Promoted));
+        let after = decision.after_entry3.unwrap();
+        assert_eq!(after.kind, seats().entry3);
+        assert!(after.release.is_none());
+        assert!(after.cutover.is_some());
+        assert!(decision.hold_installs);
+        // Nothing in this decision is an install the activation frame may run.
+        assert!(decision.after_entry2.is_none() || decision.hold_installs);
+    }
+
+    fn a_drop_installs_nothing() {
+        let decision = on_count(facts(
+            3,
+            1,
+            Body::Ready { id: 1, kind: 0x01 },
+            Body::Ready { id: 2, kind: 0x02 },
+            None,
+        ));
+        assert!(!decision.hold_installs);
+        assert!(decision.publish[0].is_none() && decision.publish[1].is_none());
+        assert!(decision.after_entry2.is_none() && decision.after_entry3.is_none());
+        assert!(decision.release_now.is_none());
+    }
+
+    fn setter_is_not_replayed() {
+        let src = include_str!("parked_entries.rs");
+        let replay = ["fn ", "replay("].concat();
+        let defer = ["Setter", "::Defer"].concat();
+        assert!(!src.contains(&replay));
+        assert!(!src.contains(&defer));
+        let decision = on_count(facts(
+            1,
+            2,
+            Body::Ready { id: 1, kind: 0x01 },
+            Body::Empty,
+            None,
+        ));
+        assert!(decision.hold_installs);
+    }
+
+    fn training_counts_one_through_three_are_open() {
+        assert!(training_quantity_open(Some(1)));
+        assert!(training_quantity_open(Some(2)));
+        assert!(training_quantity_open(Some(3)));
+        assert!(!training_quantity_open(None));
+        assert!(!training_quantity_open(Some(0)));
+        assert!(!training_quantity_open(Some(4)));
+    }
+
+    fn a_stale_entry_does_not_dereference_the_body() {
+        let body = classify_parked_body(true, 0, || false, || panic!("dereferenced an unpublished cell"));
+        assert_eq!(body, Body::Empty);
+        let body = classify_parked_body(true, 0, || true, || panic!("dereferenced an unpublished cell"));
+        assert_eq!(body, Body::Loading { id: None });
+    }
+
+    /// Eden covrest-04/05/06 (2026-11-08): at one CPU entries 2 and 3 were never installed (count 0 every read) and
+    /// their loader byte held residue (6, then 88). Read as "in flight", it armed no seat Reload, and after a raise to
+    /// three CPUs 2 and 3 stayed copies of CPU 1 instead of the rotation's next and the one after. (This test failed
+    /// first in its loader-byte form, `classify_parked_body(true, 0, 6, ..)` returning `Loading { id: None }`.)
+    fn an_unpublished_entry_with_a_residue_loader_byte_is_empty() {
+        let body = classify_parked_body(true, 0, || false, || panic!("dereferenced an unpublished cell"));
+        assert_eq!(body, Body::Empty);
+        // The raise to three then arms both seat Reloads after the walk: the rotation's next and the one after.
+        let decision = on_count(facts(1, 3, body, body, None));
+        assert_eq!(decision.after_entry2.map(|after| (after.slot, after.kind)), Some((ENTRY2, seats().entry2)));
+        assert_eq!(decision.after_entry3.map(|after| (after.slot, after.kind)), Some((ENTRY3, seats().entry3)));
+        assert!(decision.hold_installs);
+        // The plugin's own install on that entry is what is in flight; no second install then.
+        let own = classify_parked_body(true, 0, || true, || panic!("dereferenced an unpublished cell"));
+        let decision = on_count(facts(1, 3, own, own, None));
+        assert!(decision.after_entry2.is_none() && decision.after_entry3.is_none());
+    }
+
+    /// Eden covrest-07 (2026-11-08): the pause menu's two Right presses were seen as 1→2 and 2→3 before the close;
+    /// the 2→3 decision replaced the 1→2 one, so entry 2's seat Reload was lost and only entry 3 reloaded later.
+    fn a_raise_seen_in_two_steps_before_the_close_keeps_both_seats() {
+        let first = on_count(facts(1, 2, Body::Empty, Body::Empty, None));
+        let second = on_count(facts(2, 3, Body::Ready { id: 5, kind: 0x41 }, Body::Empty, None));
+        assert!(second.after_entry2.is_none(), "2→3 alone decides entry 3 only");
+        let merged = merge_paused(first, second);
+        assert_eq!(merged.after_entry2.map(|after| (after.slot, after.kind)), Some((ENTRY2, seats().entry2)));
+        assert_eq!(merged.after_entry3.map(|after| (after.slot, after.kind)), Some((ENTRY3, seats().entry3)));
+        assert!(merged.hold_installs);
+        // The later step wins for the entry it decides itself.
+        let ready3 = on_count(facts(2, 3, Body::Empty, Body::Ready { id: 9, kind: seats().entry3 }, None));
+        let merged = merge_paused(first, ready3);
+        assert!(merged.after_entry3.is_none());
+        assert_eq!(merged.publish[1].map(|p| (p.owner, p.kind)), Some((ENTRY3, seats().entry3)));
+        assert_eq!(merged.after_entry2.map(|after| after.kind), Some(seats().entry2));
+        // The gate merges while the earlier step still waits for the close.
+        let gate = include_str!("../runtime/roster/f9_gate.rs");
+        assert!(gate.contains("merge_paused(gate.decision, decision)"));
+    }
+
+    /// Eden covrest-08 (2026-11-08, diag 888badce): the seat Reload installed the CPU rotation's Mii Gunner on entry 2
+    /// as a plain fighter (`install slot=2 kind=0x4a`, no Mii helper). When No. of CPUs rose to 2 the game read null
+    /// every frame (`Unmapped Read64 @ 0x0`, main+0x357bf34). A Mii seat loads with the member's own configuration.
+    fn a_mii_seat_loads_with_its_member_configuration_or_not_at_all() {
+        assert_eq!(seat_load(0x4a, Some((0x4a, Some(7u8)))), Some((0x4a, Some(7))));
+        assert_eq!(seat_load::<u8>(0x4a, Some((0x4a, None))), None, "a Mii class is never a plain fighter");
+        assert_eq!(seat_load::<u8>(0x48, None), None);
+        assert_eq!(seat_load(0x49, Some((0x01, Some(7u8)))), None, "another member's configuration is not this seat's");
+        assert_eq!(seat_load::<u8>(0x01, Some((0x01, None))), Some((0x01, None)));
+        assert_eq!(seat_load::<u8>(0x01, None), Some((0x01, None)), "an ordinary fighter needs no configuration");
+        assert_eq!(seat_load(0x01, Some((0x4a, Some(7u8)))), Some((0x01, None)));
+        // The gate arms only a loadable seat, and the planner's seat branch loads what was armed.
+        let gate = include_str!("../runtime/roster/f9_gate.rs");
+        assert!(gate.contains("parked_entries::seat_load("));
+        let sources = include_str!("../runtime/roster/character_sources.rs");
+        assert!(sources.contains("f9_gate::override_seat(slot as u32)"));
+        assert!(!sources.contains("f9_gate::override_kind("));
+        let preload = include_str!("../runtime/roster/cycle_preload.rs");
+        assert!(preload.contains("cpu_rotation.iter().flatten().next().copied()"), "the members keep their configuration");
+    }
+
+    /// Eden covrest-07/08 (`cr-f9-raise`): the first raise after a scene start showed copies of CPU 1. At one CPU the
+    /// seat branch loaded a member only when the merged plan listed it, and the body bank covered Donkey Kong, so
+    /// entries 2 and 3 stayed empty until a drop armed their Reloads. Reading A: they park the members at one CPU.
+    fn the_seats_park_at_one_cpu_whatever_the_plan_lists() {
+        let dk = Some((0x01u32, None::<u8>));
+        assert_eq!(parked_seat(ENTRY2, Some(1), false, dk), Some((0x01, None)));
+        assert_eq!(parked_seat(ENTRY3, Some(1), false, Some((0x4a, Some(7u8)))), Some((0x4a, Some(7))));
+        assert_eq!(parked_seat(ENTRY3, Some(2), false, dk), Some((0x01, None)), "entry 3 is parked at two CPUs");
+        assert_eq!(parked_seat(ENTRY2, Some(1), true, dk), Some((0x01, None)), "a borrow is entry 3's only");
+        assert_eq!(parked_seat(ENTRY2, Some(2), false, dk), None, "a live entry is not a seat");
+        assert_eq!(parked_seat(ENTRY3, Some(1), true, dk), None, "a borrowed entry 3 holds the hat");
+        assert_eq!(parked_seat::<u8>(ENTRY2, Some(1), false, None), None);
+        assert_eq!(parked_seat::<u8>(ENTRY2, Some(1), false, Some((0x4a, None))), None);
+        assert_eq!(parked_seat(ENTRY2, None, false, dk), None);
+        assert_eq!(parked_seat(4, Some(1), false, dk), None);
+        let sources = include_str!("../runtime/roster/character_sources.rs");
+        assert!(sources.contains("parked_entries::parked_seat("));
+        assert!(!sources.contains("want.kind == kind && want.configuration.is_none()"), "the seat waited for the plan");
+    }
+
+    /// Eden covrest-11 (2026-11-08, `[MiiHelperProof]`): after a raise promoted the Mii Gunner seat on entry 2 and a
+    /// drop parked it again, its helper `Proof` still matched but its Mii record did not, so both Mii owners refused
+    /// every snapshot ("helper row kind/provenance changed") and the Mii classes left both cycles. Reading B (primary
+    /// 16:44Z): once parked, re-record the seat's Mii proof, only when its identity is unchanged.
+    fn a_promoted_seat_is_re_proved_once_parked_only_with_its_identity() {
+        assert_eq!(reproof(false, true, false), Reproof::Wait, "not parked yet");
+        assert_eq!(reproof(false, false, false), Reproof::Wait);
+        assert_eq!(reproof(true, true, true), Reproof::Unchanged);
+        assert_eq!(reproof(true, true, false), Reproof::Rerecord, "only the activation's state bytes changed");
+        assert_eq!(reproof(true, false, false), Reproof::Refuse, "another Mii, row or owner: never re-recorded");
+        assert_eq!(reproof(true, false, true), Reproof::Refuse);
+        let helper = include_str!("../runtime/mii/mii_managed_helper.rs");
+        assert!(helper.contains("crate::model::parked_entries::reproof("));
+        let sources = include_str!("../runtime/roster/character_sources.rs");
+        assert!(sources.contains("f9_gate::mark_promoted("), "a published seat is marked");
+        assert!(sources.contains("mii_managed_helper::reproof_parked("), "and re-proved once parked");
+    }
+
+    /// TASK-OPUS-rc6-open-fixes item 1 (cov-rest 17:14Z): at 2 or 3 CPUs a promoted seat plays as a CPU, so it is
+    /// never parked, and both Mii owners refused every snapshot: the Mii classes were greyed in both cycles. Eden
+    /// covrest-12 `[MiiHelperProof] ... id=2 why=proof parked=false`: the recorded proof equal to the row read now, only
+    /// `parked` false. Reading A (primary 2026-11-08 23:03Z): while live (slot <= No. of CPUs) entries 2/3 are CPU owners
+    /// for the Mii owners' snapshot, not parked helper rows.
+    fn a_promoted_seat_within_the_cpu_count_is_a_live_cpu_owner() {
+        assert!(live_seat(ENTRY2, [true, false], Some(2)));
+        assert!(live_seat(ENTRY2, [true, true], Some(3)));
+        assert!(live_seat(ENTRY3, [true, true], Some(3)));
+        assert!(!live_seat(ENTRY3, [true, true], Some(2)), "entry 3 is parked at two CPUs");
+        assert!(!live_seat(ENTRY2, [true, false], Some(1)), "dropped: parked again, and re-proved by reading B");
+        assert!(!live_seat(ENTRY2, [false, false], Some(3)), "never promoted: its own row policy, unchanged");
+        assert!(!live_seat(ENTRY2, [true, true], None), "the count unknown");
+        assert!(!live_seat(1, [true, true], Some(3)) && !live_seat(4, [true, true], Some(3)), "only entries 2 and 3");
+        let gate = include_str!("../runtime/roster/f9_gate.rs");
+        assert!(gate.contains("crate::model::parked_entries::live_seat("), "F9 publishes its live seats");
+        let native = include_str!("../runtime/mii/mii_ordinary_native.rs");
+        assert!(native.contains("crate::runtime::roster::f9_gate::seat_live(id as u32)"), "the snapshot asks F9");
+        assert!(native.contains("(parked || owner_live)"), "a live seat need not be parked; its proof stays exact");
+    }
+
+    /// Eden covrest-12: after the CPU loaded the Mii Gunner, its HUD portrait leased the seat on entry 2 but its render
+    /// waited ~6 s behind seat 3's INSTALL and met the CPU's next press. Ordering (primary 17:28Z, reading B): an F9
+    /// seat load waits while a portrait job wants a helper or holds one for its render.
+    fn a_seat_load_holds_back_while_a_portrait_render_waits() {
+        assert!(seat_load_waits(true));
+        assert!(!seat_load_waits(false));
+        let sources = include_str!("../runtime/roster/character_sources.rs");
+        assert!(sources.contains("parked_entries::seat_load_waits(portrait_waits(state))"));
+        assert!(sources.contains("matches!(live.consumer, Consumer::Portrait)"));
+    }
+
+    fn the_in_flight_question_is_asked_only_for_an_unpublished_cell() {
+        let ready = classify_parked_body(true, 1, || panic!("asked for a published cell"), || Some((7, 0x01, true)));
+        assert_eq!(ready, Body::Ready { id: 7, kind: 0x01 });
+        assert_eq!(classify_parked_body(false, 0, || panic!("asked for a null entry"), || None), Body::Empty);
+    }
+
+    fn a_published_body_is_ready_only_after_parked_ready() {
+        let mut reads = 0;
+        let ready = classify_parked_body(true, 1, || false, || {
+            reads += 1;
+            Some((7, 0x01, true))
+        });
+        assert_eq!(reads, 1);
+        assert_eq!(ready, Body::Ready { id: 7, kind: 0x01 });
+        let loading = classify_parked_body(true, 1, || false, || Some((7, 0x01, false)));
+        assert_eq!(loading, Body::Loading { id: Some(7) });
+    }
+
+    fn an_unaligned_published_pointer_is_not_a_body() {
+        assert_eq!(
+            classify_parked_body(true, 1, || true, || None),
+            Body::Loading { id: None }
+        );
+        assert_eq!(classify_parked_body(true, 1, || false, || None), Body::Empty);
+        assert_eq!(
+            classify_parked_body(false, 9, || true, || panic!("read a null entry")),
+            Body::Empty
+        );
+    }
+
+    fn the_f9_tracepoint_spec_names_the_stale_skip() {
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/eden/phase23/trace-rc5-f9.md");
+        let text = std::fs::read_to_string(path).expect(path);
+        for needle in ["f9_body_of", "0x4150", "0x4160", "on_return", "slot", "stale"] {
+            assert!(text.contains(needle), "missing {needle}");
+        }
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("promote_ready_body_becomes_that_cpu", promote_ready_body_becomes_that_cpu as fn()),
+            ("live_entries_are_not_helper_seats", live_entries_are_not_helper_seats as fn()),
+            ("cutover_rebuilds_hat_and_removes_thrown_item", cutover_rebuilds_hat_and_removes_thrown_item as fn()),
+            ("raising_the_cpu_count_retires_a_borrowed_hat_before_promotion_uses_entry_3", raising_the_cpu_count_retires_a_borrowed_hat_before_promotion_uses_entry_3 as fn()),
+            ("a_same_close_raise_to_three_promotes_the_borrowed_hat_then_swaps_to_the_seat_member", a_same_close_raise_to_three_promotes_the_borrowed_hat_then_swaps_to_the_seat_member as fn()),
+            ("a_drop_installs_nothing", a_drop_installs_nothing as fn()),
+            ("setter_is_not_replayed", setter_is_not_replayed as fn()),
+            ("training_counts_one_through_three_are_open", training_counts_one_through_three_are_open as fn()),
+            ("a_stale_entry_does_not_dereference_the_body", a_stale_entry_does_not_dereference_the_body as fn()),
+            ("an_unpublished_entry_with_a_residue_loader_byte_is_empty", an_unpublished_entry_with_a_residue_loader_byte_is_empty as fn()),
+            ("a_raise_seen_in_two_steps_before_the_close_keeps_both_seats", a_raise_seen_in_two_steps_before_the_close_keeps_both_seats as fn()),
+            ("a_mii_seat_loads_with_its_member_configuration_or_not_at_all", a_mii_seat_loads_with_its_member_configuration_or_not_at_all as fn()),
+            ("the_seats_park_at_one_cpu_whatever_the_plan_lists", the_seats_park_at_one_cpu_whatever_the_plan_lists as fn()),
+            ("a_promoted_seat_is_re_proved_once_parked_only_with_its_identity", a_promoted_seat_is_re_proved_once_parked_only_with_its_identity as fn()),
+            ("a_promoted_seat_within_the_cpu_count_is_a_live_cpu_owner", a_promoted_seat_within_the_cpu_count_is_a_live_cpu_owner as fn()),
+            ("a_seat_load_holds_back_while_a_portrait_render_waits", a_seat_load_holds_back_while_a_portrait_render_waits as fn()),
+            ("the_in_flight_question_is_asked_only_for_an_unpublished_cell", the_in_flight_question_is_asked_only_for_an_unpublished_cell as fn()),
+            ("a_published_body_is_ready_only_after_parked_ready", a_published_body_is_ready_only_after_parked_ready as fn()),
+            ("an_unaligned_published_pointer_is_not_a_body", an_unaligned_published_pointer_is_not_a_body as fn()),
+            ("the_f9_tracepoint_spec_names_the_stale_skip", the_f9_tracepoint_spec_names_the_stale_skip as fn()),
+        ]);
+    }
+    }
+}

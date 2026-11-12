@@ -57,7 +57,6 @@ mod tests {
         Facts { native_training, lobby_active, waiting_room: lobby_active, busy }
     }
 
-    #[test]
     fn busy_always_reads_as_not_training() {
         for native in [false, true] {
             for lobby in [false, true] {
@@ -67,7 +66,6 @@ mod tests {
         }
     }
 
-    #[test]
     fn native_training_or_active_lobby_is_training_when_not_busy() {
         assert!(is_training(f(true, false, false)));
         assert!(is_training(f(false, true, false)));
@@ -75,7 +73,6 @@ mod tests {
         assert!(!is_training(f(false, false, false)));
     }
 
-    #[test]
     fn the_scene_follows_the_facts_and_native_wins() {
         assert_eq!(scene(f(true, false, false)), Some(Scene::Training));
         assert_eq!(scene(f(false, true, false)), Some(Scene::Lobby));
@@ -83,7 +80,6 @@ mod tests {
         assert_eq!(scene(f(false, false, false)), None);
     }
 
-    #[test]
     fn the_scene_and_the_predicate_agree() {
         for bits in 0..16u8 {
             let facts = Facts {
@@ -96,7 +92,6 @@ mod tests {
         }
     }
 
-    #[test]
     fn a_stale_lobby_flag_outside_the_waiting_room_is_not_training() {
         let stale = Facts { native_training: false, lobby_active: true, waiting_room: false, busy: false };
         assert!(!is_training(stale));
@@ -104,6 +99,18 @@ mod tests {
         let native = Facts { native_training: true, ..stale };
         assert!(is_training(native));
         assert_eq!(scene(native), Some(Scene::Training));
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("busy_always_reads_as_not_training", busy_always_reads_as_not_training as fn()),
+            ("native_training_or_active_lobby_is_training_when_not_busy", native_training_or_active_lobby_is_training_when_not_busy as fn()),
+            ("the_scene_follows_the_facts_and_native_wins", the_scene_follows_the_facts_and_native_wins as fn()),
+            ("the_scene_and_the_predicate_agree", the_scene_and_the_predicate_agree as fn()),
+            ("a_stale_lobby_flag_outside_the_waiting_room_is_not_training", a_stale_lobby_flag_outside_the_waiting_room_is_not_training as fn()),
+        ]);
     }
     }
 }

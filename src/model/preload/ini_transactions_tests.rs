@@ -47,7 +47,6 @@ fn saved() -> Settings {
     Settings { slots: 2, fighters: true, hats: false, measurements: false, bank_members: BANK_MEMBERS_MIN, ..Settings::DEFAULT }
 }
 
-#[test]
 fn a_stored_choice_survives_two_loads_and_loading_never_writes() {
     let dir = Dir::new("two-load");
     let path = dir.path("cycle_preload.ini");
@@ -59,7 +58,6 @@ fn a_stored_choice_survives_two_loads_and_loading_never_writes() {
     assert_eq!(dir.names(), ["cycle_preload.ini"], "no temporary or backup file is left");
 }
 
-#[test]
 fn a_first_boot_creates_the_default_once_and_the_second_boot_reads_it() {
     let dir = Dir::new("first-boot");
     let path = dir.path("cycle_preload.ini");
@@ -69,7 +67,6 @@ fn a_first_boot_creates_the_default_once_and_the_second_boot_reads_it() {
     assert_eq!(dir.names(), ["cycle_preload.ini"]);
 }
 
-#[test]
 fn a_rejected_file_stays_rejected_and_untouched_on_every_boot_until_a_store_replaces_it() {
     let dir = Dir::new("rejected");
     let path = dir.path("cycle_preload.ini");
@@ -88,7 +85,6 @@ fn a_rejected_file_stays_rejected_and_untouched_on_every_boot_until_a_store_repl
     assert_eq!(dir.names(), ["cycle_preload.ini"]);
 }
 
-#[test]
 fn a_failed_store_leaves_the_live_file_and_the_next_boot_reads_it() {
     let dir = Dir::new("failed-write");
     let path = dir.path("cycle_preload.ini");
@@ -104,7 +100,6 @@ fn a_failed_store_leaves_the_live_file_and_the_next_boot_reads_it() {
     assert!(!dir.child("cycle_preload.ini.previous").exists());
 }
 
-#[test]
 fn a_store_into_a_missing_directory_creates_it_and_a_store_that_cannot_is_an_error_not_a_panic() {
     let dir = Dir::new("directory");
     let nested = dir.path("a/b/cycle_preload.ini");
@@ -117,7 +112,6 @@ fn a_store_into_a_missing_directory_creates_it_and_a_store_that_cannot_is_an_err
     assert_eq!(load_ini(&nested), IniLoad::Parsed(saved()), "and the stored one is untouched");
 }
 
-#[test]
 fn a_replace_interrupted_between_its_renames_is_recovered_on_the_next_boot_and_stays_recovered() {
     let dir = Dir::new("interrupted");
     let path = dir.path("cycle_preload.ini");
@@ -130,7 +124,6 @@ fn a_replace_interrupted_between_its_renames_is_recovered_on_the_next_boot_and_s
     assert!(!dir.child("cycle_preload.ini.previous").exists());
 }
 
-#[test]
 fn an_unreadable_previous_copy_fails_closed_on_every_boot() {
     let dir = Dir::new("bad-previous");
     let path = dir.path("cycle_preload.ini");
@@ -142,7 +135,6 @@ fn an_unreadable_previous_copy_fails_closed_on_every_boot() {
     }
 }
 
-#[test]
 fn the_read_envelope_rejects_what_the_parser_alone_would_not_see() {
     let dir = Dir::new("envelope");
     let path = dir.path("cycle_preload.ini");
@@ -168,7 +160,6 @@ fn the_read_envelope_rejects_what_the_parser_alone_would_not_see() {
     assert_eq!(load_ini(&path), IniLoad::Rejected("cycle preload ini is not a file"));
 }
 
-#[test]
 fn an_older_file_adopts_the_saved_menu_and_the_completed_file_is_stable_on_the_next_boot() {
     let dir = Dir::new("older");
     let path = dir.path("cycle_preload.ini");
@@ -186,5 +177,21 @@ fn an_older_file_adopts_the_saved_menu_and_the_completed_file_is_stable_on_the_n
     assert_eq!(unset, Unset::NONE, "the completed file has every key");
     let (third, _) = load_ini_unset(&path);
     assert_eq!(third, IniLoad::Parsed(adopted), "third boot");
+}
+
+/// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+#[test]
+fn case_table() {
+    crate::test_table::run(&[
+        ("a_stored_choice_survives_two_loads_and_loading_never_writes", a_stored_choice_survives_two_loads_and_loading_never_writes as fn()),
+        ("a_first_boot_creates_the_default_once_and_the_second_boot_reads_it", a_first_boot_creates_the_default_once_and_the_second_boot_reads_it as fn()),
+        ("a_rejected_file_stays_rejected_and_untouched_on_every_boot_until_a_store_replaces_it", a_rejected_file_stays_rejected_and_untouched_on_every_boot_until_a_store_replaces_it as fn()),
+        ("a_failed_store_leaves_the_live_file_and_the_next_boot_reads_it", a_failed_store_leaves_the_live_file_and_the_next_boot_reads_it as fn()),
+        ("a_store_into_a_missing_directory_creates_it_and_a_store_that_cannot_is_an_error_not_a_panic", a_store_into_a_missing_directory_creates_it_and_a_store_that_cannot_is_an_error_not_a_panic as fn()),
+        ("a_replace_interrupted_between_its_renames_is_recovered_on_the_next_boot_and_stays_recovered", a_replace_interrupted_between_its_renames_is_recovered_on_the_next_boot_and_stays_recovered as fn()),
+        ("an_unreadable_previous_copy_fails_closed_on_every_boot", an_unreadable_previous_copy_fails_closed_on_every_boot as fn()),
+        ("the_read_envelope_rejects_what_the_parser_alone_would_not_see", the_read_envelope_rejects_what_the_parser_alone_would_not_see as fn()),
+        ("an_older_file_adopts_the_saved_menu_and_the_completed_file_is_stable_on_the_next_boot", an_older_file_adopts_the_saved_menu_and_the_completed_file_is_stable_on_the_next_boot as fn()),
+    ]);
 }
 }

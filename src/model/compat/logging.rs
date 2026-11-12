@@ -74,3 +74,24 @@ pub fn take() -> Vec<String> {
     capture::take()
 }
 
+#[cfg(all(test, not(target_os = "switch")))]
+mod tests {
+    lib_unit_tests! {
+    use super::*;
+
+    #[test]
+    fn a_line_is_captured_once_and_the_buffer_is_bounded() {
+        let _ = take();
+        diagnostic(format_args!("[Probe] one {}", 1));
+        assert_eq!(take(), ["[Probe] one 1"]);
+        assert!(take().is_empty());
+        for n in 0..300 {
+            diagnostic(format_args!("line {n}"));
+        }
+        let lines = take();
+        assert_eq!(lines.len(), 256);
+        assert_eq!(lines[0], "line 44");
+        heap_profile("label");
+    }
+    }
+}

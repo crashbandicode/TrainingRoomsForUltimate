@@ -21,3 +21,47 @@ pub fn id_of(header: &str) -> Option<usize> {
     HEADERS.iter().position(|(_, name)| *name == header)
 }
 
+#[cfg(test)]
+mod tests {
+    lib_unit_tests! {
+    use super::*;
+
+    fn ids_and_headers_are_unique() {
+        for (i, (id, name)) in HEADERS.iter().enumerate() {
+            assert!(HEADERS[i + 1..].iter().all(|(other, other_name)| other != id && other_name != name));
+        }
+    }
+
+    /// Every header the carried lobby files post is in the table (a header outside it would be dropped silently).
+    fn every_header_the_carried_files_post_has_an_id() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");
+        let dir = root.join("lobby");
+        let mut files = vec![
+            dir.join("practice_stage_request.rs"),
+            dir.join("practice_stage.rs"),
+            root.join("mii/mii_editor_bridge/mod.rs"),
+        ];
+        files.extend(["lobby.rs", "practice.rs"].map(|name| dir.join("training").join(name)));
+        let mut seen = 0;
+        for file in files {
+            let text = std::fs::read_to_string(&file).unwrap();
+            for call in text.match_indices("notifications::notification(\"").chain(text.match_indices("notifications::clear_notification(\"")) {
+                let rest = &text[call.0 + call.1.len()..];
+                let header = &rest[..rest.find('"').unwrap()];
+                assert!(id_of(header).is_some(), "{}: header {header:?} has no standing-notice id", file.display());
+                seen += 1;
+            }
+        }
+        assert!(seen >= 4, "the scan found only {seen} calls");
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("ids_and_headers_are_unique", ids_and_headers_are_unique as fn()),
+            ("every_header_the_carried_files_post_has_an_id", every_header_the_carried_files_post_has_an_id as fn()),
+        ]);
+    }
+    }
+}

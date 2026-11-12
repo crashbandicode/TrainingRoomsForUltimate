@@ -26,3 +26,43 @@ pub(super) fn admit(
     Err("Enter Training, Quickplay, or Local Wireless waiting practice to edit a Mii")
 }
 
+#[cfg(test)]
+mod tests {
+    lib_unit_tests! {
+    use super::*;
+
+    fn training_and_quickplay_keep_their_entries() {
+        assert_eq!(admit(true, false, 0x04040000), Ok(Admission::Training));
+        assert_eq!(admit(true, true, 0x02010000), Ok(Admission::Training));
+        assert_eq!(admit(false, true, 0x07010100), Ok(Admission::Quickplay));
+        assert_eq!(admit(false, true, 0x07010102), Ok(Admission::Quickplay));
+        assert_eq!(admit(false, true, 0x07010400), Ok(Admission::Quickplay));
+        assert!(admit(false, false, 0x07010400).is_err());
+        assert!(admit(false, true, 0x07010401).is_err());
+    }
+
+    fn local_wireless_is_its_own_admission() {
+        assert_eq!(admit(false, true, 0x02010000), Ok(Admission::LocalWireless));
+        assert_ne!(admit(false, true, 0x02010000), Ok(Admission::Quickplay));
+        assert_ne!(admit(false, true, 0x02010000), Ok(Admission::Training));
+        assert_eq!(admit(true, true, 0x02010000), Ok(Admission::Training));
+        assert_eq!(
+            admit(false, false, 0x02010000),
+            Err("Enter Training, Quickplay, or Local Wireless waiting practice to edit a Mii"),
+        );
+        assert_eq!(
+            admit(false, true, 0),
+            Err("Enter Training, Quickplay, or Local Wireless waiting practice to edit a Mii"),
+        );
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("training_and_quickplay_keep_their_entries", training_and_quickplay_keep_their_entries as fn()),
+            ("local_wireless_is_its_own_admission", local_wireless_is_its_own_admission as fn()),
+        ]);
+    }
+    }
+}

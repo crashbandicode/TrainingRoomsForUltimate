@@ -85,7 +85,6 @@ mod tests {
     use super::*;
     use std::sync::Arc;
 
-    #[test]
     fn values_come_out_in_order_and_a_full_ring_refuses_and_counts() {
         let ring: OwnedRing<Vec<u32>, 3> = OwnedRing::new();
         assert_eq!(ring.pop(), None);
@@ -102,7 +101,6 @@ mod tests {
     }
 
     /// Values left in the ring are dropped with it (once each).
-    #[test]
     fn a_dropped_ring_drops_what_it_holds_once() {
         let counter = Arc::new(());
         {
@@ -117,7 +115,6 @@ mod tests {
     }
 
     /// A producer far faster than the consumer: every value arrives whole and in order, and each is either taken or refused.
-    #[test]
     fn a_racing_producer_and_consumer_never_lose_or_tear_a_value() {
         const TOTAL: u64 = 100_000;
         let ring: Arc<OwnedRing<Box<[u64; 4]>, 8>> = Arc::new(OwnedRing::new());
@@ -150,6 +147,16 @@ mod tests {
         let refused = producer.join().unwrap();
         assert_eq!(taken + refused, TOTAL, "taken {taken} + refused {refused}");
         assert_eq!(u64::from(ring.take_refused()), refused);
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("values_come_out_in_order_and_a_full_ring_refuses_and_counts", values_come_out_in_order_and_a_full_ring_refuses_and_counts as fn()),
+            ("a_dropped_ring_drops_what_it_holds_once", a_dropped_ring_drops_what_it_holds_once as fn()),
+            ("a_racing_producer_and_consumer_never_lose_or_tear_a_value", a_racing_producer_and_consumer_never_lose_or_tear_a_value as fn()),
+        ]);
     }
     }
 }

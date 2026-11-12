@@ -209,3 +209,278 @@ pub fn notice_body(notice: Notice, out: &mut impl core::fmt::Write) -> core::fmt
     write!(out, "Lv {} from TrainingRooms (Training menu: Lv {})", notice.level, notice.menu)
 }
 
+#[cfg(test)]
+mod tests {
+    lib_unit_tests! {
+    use super::*;
+    use crate::model::menu::table::{Control, Page, Vis, ROWS};
+    use crate::model::settings::{self, Kind, Settings};
+
+    const T: [i32; 8] = RANK_TABLE_13_0_5;
+    const RANKS: [u8; 9] = [0, 15, 21, 31, 42, 48, 60, 75, 100];
+    const PLACES: [Where; 4] =
+        [Where::Training { behavior: behavior::CPU_LEVEL }, Where::Training { behavior: behavior::CONTROL }, Where::Lobby, Where::Elsewhere];
+
+    fn row_of(index: usize) -> Vec<u8> {
+        let mut row = vec![0u8; OPTIONS];
+        row[index] = 1;
+        row
+    }
+
+    fn body(notice: Notice) -> String {
+        let mut text = String::new();
+        notice_body(notice, &mut text).unwrap();
+        text
+    }
+
+    fn cpu_level_row_defaults_to_off_and_round_trips() {
+        let (_, def) = settings::def(ROW_ID).expect("the cpu_level row");
+        assert_eq!((def.kind, def.len), (Kind::Single, OPTIONS));
+        assert_eq!(def.default, row_of(0).as_slice(), "factory Off");
+        let mut file = Settings::factory();
+        assert_eq!(CpuLevel::from_row(file.menu.get(ROW_ID).unwrap()), CpuLevel::Off);
+        file.menu.set(ROW_ID, &row_of(7)).unwrap();
+        let loaded = settings::parse(&file.to_json());
+        assert!(!loaded.corrupt(), "{:?}", loaded.issues);
+        assert_eq!(CpuLevel::from_row(loaded.settings.menu.get(ROW_ID).unwrap()), CpuLevel::Lv(7));
+        assert_eq!(CpuLevel::from_row(loaded.settings.defaults.get(ROW_ID).unwrap()), CpuLevel::Off, "saved defaults stay Off");
+    }
+
+    fn cpu_level_reads_off_and_levels_from_the_row() {
+        assert_eq!(CpuLevel::from_row(&row_of(0)), CpuLevel::Off);
+        for level in 1..=9u8 {
+            assert_eq!(CpuLevel::from_row(&row_of(usize::from(level))), CpuLevel::Lv(level));
+        }
+        assert_eq!(CpuLevel::from_row(&[0; OPTIONS]), CpuLevel::Off, "nothing set");
+        assert_eq!(CpuLevel::from_row(&[]), CpuLevel::Off, "no row");
+        let mut long = vec![0u8; 12];
+        long[11] = 1;
+        assert_eq!(CpuLevel::from_row(&long), CpuLevel::Off, "an option past the list");
+    }
+
+    fn cpu_level_row_is_a_level_dropdown_on_the_cpu_page() {
+        let row = ROWS.iter().find(|row| row.id == ROW_ID).expect("the CPU Level row");
+        assert_eq!(row.title, "CPU Level");
+        assert_eq!(row.page(), Page::Cpu);
+        assert_eq!(row.vis, Vis::Always);
+        let Control::Dropdown(options) = row.control else { panic!("{:?}", row.control) };
+        assert_eq!(options, ["Off", "1", "2", "3", "4", "5", "6", "7", "8", "9"]);
+        assert_eq!(options.len(), OPTIONS);
+        // The CPU page's other level row has the same control and the same level labels.
+        let p1 = ROWS.iter().find(|row| row.id == "p1_cpu_level").unwrap();
+        let Control::Dropdown(p1_options) = p1.control else { panic!() };
+        assert_eq!(&options[1..], p1_options);
+        assert_eq!(p1.page(), Page::Cpu);
+    }
+
+    fn ranks_match_the_native_table() {
+        for level in 1..=9u8 {
+            assert_eq!(rank_for(level, T), Some(RANKS[usize::from(level) - 1]), "Lv {level}");
+        }
+        assert_eq!(rank_for(0, T), None);
+        assert_eq!(rank_for(10, T), None);
+        let mut other = T;
+        other[3] += 1;
+        assert_eq!(rank_for(5, other), None, "another table refuses every level");
+        for index in 0..9u32 {
+            assert_eq!(level_of_menu_index(index), Some(index as u8 + 1));
+        }
+        assert_eq!(level_of_menu_index(9), None);
+    }
+
+    fn off_never_targets_a_rank() {
+        for place in PLACES {
+            for entry in -1..9 {
+                assert_eq!(target(CpuLevel::Off, place, entry, T), None, "{place:?} entry {entry}");
+            }
+        }
+    }
+
+    fn lobby_partners_get_the_level() {
+        for entry in LOBBY_ENTRIES {
+            assert_eq!(target(CpuLevel::Lv(7), Where::Lobby, entry, T), Some(60), "entry {entry}");
+            assert_eq!(target(CpuLevel::Lv(1), Where::Lobby, entry, T), Some(0), "entry {entry}");
+        }
+        for entry in [0, 1, 2, 3, 7] {
+            assert_eq!(target(CpuLevel::Lv(7), Where::Lobby, entry, T), None, "entry {entry} is no partner");
+        }
+        assert_eq!(target(CpuLevel::Lv(7), Where::Lobby, 4, [0; 8]), None, "not the 13.0.5 table");
+    }
+
+    fn training_override_applies_where_training_uses_its_level() {
+        for behavior in [behavior::CPU_LEVEL, behavior::CONTROL] {
+            for entry in 1..8 {
+                assert_eq!(target(CpuLevel::Lv(7), Where::Training { behavior }, entry, T), Some(60), "{behavior} entry {entry}");
+                assert_eq!(target(CpuLevel::Lv(9), Where::Training { behavior }, entry, T), Some(100));
+            }
+        }
+    }
+
+    fn scripted_training_behaviors_keep_the_native_rank() {
+        for behavior in [0, behavior::STOP, 3, 4, 5, 6, 7, 9] {
+            for entry in 1..8 {
+                assert_eq!(target(CpuLevel::Lv(7), Where::Training { behavior }, entry, T), None, "{behavior} entry {entry}");
+            }
+        }
+    }
+
+    fn player_entry_is_never_a_target() {
+        for place in PLACES {
+            for level in 1..=9 {
+                for entry in [0, -1, 8, 9] {
+                    assert_eq!(target(CpuLevel::Lv(level), place, entry, T), None, "{place:?} Lv {level} entry {entry}");
+                }
+            }
+        }
+    }
+
+    fn nothing_applies_in_a_match() {
+        for level in 1..=9 {
+            for entry in -1..9 {
+                assert_eq!(target(CpuLevel::Lv(level), Where::Elsewhere, entry, T), None);
+            }
+        }
+        let mut clock = SessionClock::new();
+        assert_eq!(clock.poll(Where::Elsewhere, true), None, "a match is never a Training session");
+    }
+
+    fn override_returns_after_a_native_change() {
+        let mut entry = EntryRank::new();
+        assert_eq!(entry.step(Some(60), 21), Some(60), "Training's Lv 3 becomes the mod's Lv 7");
+        assert_eq!(entry.step(Some(60), 60), None, "held");
+        // The pause menu (or the lobby's own rank-up) writes a new native rank: the override returns the next frame.
+        assert_eq!(entry.step(Some(60), 31), Some(60));
+        assert_eq!(entry.step(Some(60), 60), None);
+        // The mod's level changes (Lv 7 to Lv 9): our own 60 is not the game's rank.
+        assert_eq!(entry.step(Some(100), 60), Some(100));
+        assert_eq!(entry.step(Some(100), 100), None);
+        // ... and Off gives back the latest native rank.
+        assert_eq!(entry.step(None, 100), Some(31));
+    }
+
+    fn switching_to_off_restores_the_native_rank() {
+        let mut entry = EntryRank::new();
+        assert_eq!(entry.step(None, 21), None, "Off from the start writes nothing");
+        assert_eq!(entry.step(Some(60), 21), Some(60));
+        assert_eq!(entry.step(None, 60), Some(21), "Off: Training's own rank comes back");
+        assert_eq!(entry.step(None, 21), None, "once");
+        // A native change after the override wins: nothing is written over it.
+        assert_eq!(entry.step(Some(60), 21), Some(60));
+        assert_eq!(entry.step(None, 100), None, "the behavior changed to a scripted one: the game's 100 stays");
+        assert_eq!(entry.step(None, 100), None);
+        // A level of 0 is a real rank (Lv 1), not "unset".
+        let mut low = EntryRank::new();
+        assert_eq!(low.step(Some(100), 0), Some(100));
+        assert_eq!(low.step(None, 100), Some(0));
+        low.step(Some(60), 0);
+        low.forget();
+        assert_eq!(low.step(None, 60), None, "forgotten: nothing to give back");
+    }
+
+    fn notice_shows_once_per_training_session() {
+        let mut gate = NoticeGate::new();
+        assert_eq!(gate.poll(Some(1), CpuLevel::Lv(7), None), None, "Training's level not readable yet");
+        assert_eq!(gate.poll(Some(1), CpuLevel::Lv(7), Some(3)), Some(Notice { level: 7, menu: 3 }));
+        for _ in 0..3 {
+            assert_eq!(gate.poll(Some(1), CpuLevel::Lv(7), Some(3)), None);
+        }
+    }
+
+    fn notice_not_again_after_a_mid_session_change() {
+        let mut gate = NoticeGate::new();
+        assert!(gate.poll(Some(4), CpuLevel::Lv(7), Some(3)).is_some());
+        assert_eq!(gate.poll(Some(4), CpuLevel::Lv(7), Some(5)), None, "Training's level changed");
+        assert_eq!(gate.poll(Some(4), CpuLevel::Lv(9), Some(5)), None, "the mod's level changed");
+        assert_eq!(gate.poll(Some(4), CpuLevel::Lv(9), Some(3)), None);
+    }
+
+    fn notice_again_on_the_next_training_entry() {
+        let mut gate = NoticeGate::new();
+        let mut clock = SessionClock::new();
+        let first = clock.poll(Where::Training { behavior: behavior::STOP }, true);
+        assert!(gate.poll(first, CpuLevel::Lv(7), Some(3)).is_some());
+        // The character select: no Training entries.
+        assert_eq!(gate.poll(clock.poll(Where::Training { behavior: 0 }, false), CpuLevel::Lv(7), None), None);
+        let second = clock.poll(Where::Training { behavior: behavior::STOP }, true);
+        assert_ne!(second, first);
+        assert_eq!(gate.poll(second, CpuLevel::Lv(7), Some(3)), Some(Notice { level: 7, menu: 3 }));
+        assert_eq!(gate.poll(second, CpuLevel::Lv(7), Some(3)), None);
+    }
+
+    fn same_level_gives_no_notice() {
+        let mut gate = NoticeGate::new();
+        assert_eq!(gate.poll(Some(1), CpuLevel::Lv(7), Some(7)), None);
+        assert_eq!(gate.poll(Some(1), CpuLevel::Lv(7), Some(3)), None, "a later change in the session is not the start");
+        assert_eq!(gate.poll(Some(2), CpuLevel::Lv(3), Some(3)), None);
+    }
+
+    fn off_never_posts_the_notice() {
+        let mut gate = NoticeGate::new();
+        for menu in 1..=9 {
+            assert_eq!(gate.poll(Some(u64::from(menu)), CpuLevel::Off, Some(menu)), None);
+        }
+        assert_eq!(gate.poll(Some(9), CpuLevel::Lv(7), Some(9)), None, "Off at the start judged the session");
+        assert_eq!(gate.poll(Some(10), CpuLevel::Off, Some(3)), None);
+        assert_eq!(gate.poll(Some(10), CpuLevel::Lv(7), Some(3)), None, "switched on mid-session: not the start");
+    }
+
+    fn lobby_never_posts_a_notice() {
+        let mut gate = NoticeGate::new();
+        let mut clock = SessionClock::new();
+        for _ in 0..5 {
+            let session = clock.poll(Where::Lobby, true);
+            assert_eq!(session, None, "the lobby is no Training session");
+            assert_eq!(gate.poll(session, CpuLevel::Lv(7), Some(3)), None);
+        }
+    }
+
+    fn notice_body_names_both_levels() {
+        assert_eq!(NOTICE_HEADER, "CPU level");
+        assert_eq!(body(Notice { level: 7, menu: 3 }), "Lv 7 from TrainingRooms (Training menu: Lv 3)");
+        assert_eq!(body(Notice { level: 1, menu: 9 }), "Lv 1 from TrainingRooms (Training menu: Lv 9)");
+        assert!(body(Notice { level: 9, menu: 1 }).len() <= crate::model::notify::BODY_MAX);
+    }
+
+    fn session_clock_starts_a_new_session_after_a_gap() {
+        let mut clock = SessionClock::new();
+        let training = Where::Training { behavior: behavior::STOP };
+        let a = clock.poll(training, true);
+        assert!(a.is_some());
+        assert_eq!(clock.poll(Where::Training { behavior: behavior::CPU_LEVEL }, true), a, "a behavior change keeps the session");
+        assert_eq!(clock.poll(Where::Training { behavior: 0 }, true), a, "the pause menu keeps the entries");
+        assert_eq!(clock.poll(training, false), None, "no player entry: the session ended");
+        let b = clock.poll(training, true);
+        assert!(b.is_some() && b != a);
+        assert_eq!(clock.poll(Where::Lobby, true), None);
+        let c = clock.poll(training, true);
+        assert!(c.is_some() && c != b, "the lobby in between ends it too");
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("cpu_level_row_defaults_to_off_and_round_trips", cpu_level_row_defaults_to_off_and_round_trips as fn()),
+            ("cpu_level_reads_off_and_levels_from_the_row", cpu_level_reads_off_and_levels_from_the_row as fn()),
+            ("cpu_level_row_is_a_level_dropdown_on_the_cpu_page", cpu_level_row_is_a_level_dropdown_on_the_cpu_page as fn()),
+            ("ranks_match_the_native_table", ranks_match_the_native_table as fn()),
+            ("off_never_targets_a_rank", off_never_targets_a_rank as fn()),
+            ("lobby_partners_get_the_level", lobby_partners_get_the_level as fn()),
+            ("training_override_applies_where_training_uses_its_level", training_override_applies_where_training_uses_its_level as fn()),
+            ("scripted_training_behaviors_keep_the_native_rank", scripted_training_behaviors_keep_the_native_rank as fn()),
+            ("player_entry_is_never_a_target", player_entry_is_never_a_target as fn()),
+            ("nothing_applies_in_a_match", nothing_applies_in_a_match as fn()),
+            ("override_returns_after_a_native_change", override_returns_after_a_native_change as fn()),
+            ("switching_to_off_restores_the_native_rank", switching_to_off_restores_the_native_rank as fn()),
+            ("notice_shows_once_per_training_session", notice_shows_once_per_training_session as fn()),
+            ("notice_not_again_after_a_mid_session_change", notice_not_again_after_a_mid_session_change as fn()),
+            ("notice_again_on_the_next_training_entry", notice_again_on_the_next_training_entry as fn()),
+            ("same_level_gives_no_notice", same_level_gives_no_notice as fn()),
+            ("off_never_posts_the_notice", off_never_posts_the_notice as fn()),
+            ("lobby_never_posts_a_notice", lobby_never_posts_a_notice as fn()),
+            ("notice_body_names_both_levels", notice_body_names_both_levels as fn()),
+            ("session_clock_starts_a_new_session_after_a_gap", session_clock_starts_a_new_session_after_a_gap as fn()),
+        ]);
+    }
+    }
+}

@@ -1,5 +1,6 @@
 //! Shared fixtures for the unit tests.
 
+lib_unit_tests! {
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -75,4 +76,5 @@ pub fn exact_mii() -> crate::engine::mii::lifetime::Configuration {
         tag_chara: TaggedId((u64::from(TAG_CHARA) << 56) | MiiClass::Brawler.chara_hash40()),
     }).unwrap();
     crate::engine::mii::lifetime::Configuration::from_saved(&saved).unwrap()
+}
 }

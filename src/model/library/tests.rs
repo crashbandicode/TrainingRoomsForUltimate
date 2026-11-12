@@ -78,7 +78,6 @@ fn snapshot(root: &Path) -> Vec<(String, Vec<u8>)> {
     out
 }
 
-#[test]
 fn migration_is_idempotent() {
     let root = scratch("migrate");
     let library = Library::new(root.join(MACROS_DIR));
@@ -186,7 +185,6 @@ fn migration_is_idempotent() {
     assert_eq!(bare_saves.load(&bound).unwrap().name, format!("Slot 1 ({DATE})"));
 }
 
-#[test]
 fn migration_does_not_build_a_chain() {
     let root = scratch("no-chain");
     let settings = json!({"menu": {
@@ -210,7 +208,6 @@ fn migration_does_not_build_a_chain() {
     }
 }
 
-#[test]
 fn migration_maps_the_loop() {
     assert_eq!(mapped("loop-on", Some(vec![1, 0])), LoopCount::Infinite);
     assert_eq!(mapped("loop-off", Some(vec![0, 1])), LoopCount::Finite(1));
@@ -246,7 +243,6 @@ fn mapped(tag: &str, row: Option<Vec<u8>>) -> LoopCount {
     receipt.loop_player
 }
 
-#[test]
 fn hot_five_are_the_most_recently_used() {
     let root = scratch("hot");
     let mut index = RecordingIndex::fresh();
@@ -312,7 +308,6 @@ fn note_all(index: &mut RecordingIndex, kind: Kind, ids: &[String], reasons: &[U
     }
 }
 
-#[test]
 fn a_chain_file_is_an_ordered_list_of_recordings() {
     let root = scratch("chain");
     let chain = Chain::new("Bread and butter", vec!["nair".into(), "upsmash".into()]).unwrap();
@@ -344,7 +339,6 @@ fn a_chain_file_is_an_ordered_list_of_recordings() {
     assert!(chains.skipped.iter().all(|skipped| skipped.file != "broken.json"));
 }
 
-#[test]
 fn the_start_save_switch_defaults_on_and_off_keeps_the_id() {
     let mut recording = MacroRecording::new("Nair", "13.0.5", start(8), frame(1)).unwrap();
     assert!(recording.start_save.is_none());
@@ -373,7 +367,6 @@ fn the_start_save_switch_defaults_on_and_off_keeps_the_id() {
     assert!(recording.set_start_save(Some("../no")).is_err());
 }
 
-#[test]
 fn start_save_state_is_linked_deleted_or_none() {
     assert_eq!(start_save_state(None, true, false), StartSaveState::None);
     assert_eq!(start_save_state(Some(""), false, true), StartSaveState::None);
@@ -391,7 +384,6 @@ fn start_save_state_is_linked_deleted_or_none() {
     assert_eq!(start_save_state(Some("missing-save"), true, false), StartSaveState::Deleted);
 }
 
-#[test]
 fn set_active_replaces_the_roles_macro() {
     let mut index = RecordingIndex::fresh();
     index.set_active(Role::Player, Some("alpha"), 1).unwrap();
@@ -405,7 +397,6 @@ fn set_active_replaces_the_roles_macro() {
     assert_eq!(index.active(Role::Cpu), Some("cpu-1"));
 }
 
-#[test]
 fn each_role_has_its_own_loop_count() {
     let root = scratch("loops");
     let mut index = RecordingIndex::fresh();
@@ -429,7 +420,6 @@ fn each_role_has_its_own_loop_count() {
     assert!(text.contains("\"cpu\": 3") || text.contains("\"cpu\":3"));
 }
 
-#[test]
 fn a_sequence_follows_a_renamed_combo_and_skips_a_deleted_one() {
     let root = scratch("sequence");
     let combos = ComboLibrary::new(root.join("combos"));
@@ -456,7 +446,6 @@ fn a_sequence_follows_a_renamed_combo_and_skips_a_deleted_one() {
     assert_eq!((open.streak, open.best), (2, 4));
 }
 
-#[test]
 fn old_recording_files_still_load() {
     let root = scratch("old");
     let ordinary = MacroRecording::new("Old", "13.0.5", start(8), frame(1)).unwrap();
@@ -484,7 +473,6 @@ fn old_recording_files_still_load() {
     assert!(loaded.start_save_on);
 }
 
-#[test]
 fn the_ordered_id_helper_serves_chains_and_sequences() {
     use crate::model::menu::input::Button;
     use crate::model::menu::table::{COMBOS_SEQ, SAVES_MACROS};
@@ -648,7 +636,6 @@ fn the_ordered_id_helper_serves_chains_and_sequences() {
     assert!(sequence_steps(&screens, "seq").is_empty());
 }
 
-#[test]
 fn deleting_a_recording_closes_the_chain_gap_on_open() {
     use crate::model::menu::input::Button;
     use crate::model::menu::table::SAVES_MACROS;
@@ -669,7 +656,6 @@ fn deleting_a_recording_closes_the_chain_gap_on_open() {
     assert_eq!(macro_steps(&screens, "pressure"), ["nair"]);
 }
 
-#[test]
 fn playback_keeps_a_missing_chain_id() {
     use crate::engine::playback::{Book, Playback};
     use crate::model::ordered_ids::IdList;
@@ -844,7 +830,6 @@ fn exact_mii() -> crate::engine::mii::lifetime::Configuration {
 /// but the index refused its id (only store slugs), so the drill was not kept. docs/COMBOS.md: "File names: any name
 /// works ... Choose it with A to make it the target." The combo store accepts that name (shareable_id); the index,
 /// the hot list and a sequence must accept the same ids, and still refuse a path.
-#[test]
 fn a_shared_combo_file_name_is_drilled_kept_and_sequenced() {
     let root = scratch("shared-combo-id");
     let combos = ComboLibrary::new(root.join("combos"));
@@ -868,5 +853,27 @@ fn a_shared_combo_file_name_is_drilled_kept_and_sequenced() {
     assert!(index.bind_save(Some("Ryu BnB"), 6).is_err(), "a save id stays a store slug");
     assert!(index.set_active(Role::Player, Some("Ryu BnB"), 6).is_err(), "a macro id stays a store slug");
     assert!(Sequence::new("Bad", vec!["../x".into()]).is_err());
+}
+
+/// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+#[test]
+fn case_table() {
+    crate::test_table::run(&[
+        ("migration_is_idempotent", migration_is_idempotent as fn()),
+        ("migration_does_not_build_a_chain", migration_does_not_build_a_chain as fn()),
+        ("migration_maps_the_loop", migration_maps_the_loop as fn()),
+        ("hot_five_are_the_most_recently_used", hot_five_are_the_most_recently_used as fn()),
+        ("a_chain_file_is_an_ordered_list_of_recordings", a_chain_file_is_an_ordered_list_of_recordings as fn()),
+        ("the_start_save_switch_defaults_on_and_off_keeps_the_id", the_start_save_switch_defaults_on_and_off_keeps_the_id as fn()),
+        ("start_save_state_is_linked_deleted_or_none", start_save_state_is_linked_deleted_or_none as fn()),
+        ("set_active_replaces_the_roles_macro", set_active_replaces_the_roles_macro as fn()),
+        ("each_role_has_its_own_loop_count", each_role_has_its_own_loop_count as fn()),
+        ("a_sequence_follows_a_renamed_combo_and_skips_a_deleted_one", a_sequence_follows_a_renamed_combo_and_skips_a_deleted_one as fn()),
+        ("old_recording_files_still_load", old_recording_files_still_load as fn()),
+        ("the_ordered_id_helper_serves_chains_and_sequences", the_ordered_id_helper_serves_chains_and_sequences as fn()),
+        ("deleting_a_recording_closes_the_chain_gap_on_open", deleting_a_recording_closes_the_chain_gap_on_open as fn()),
+        ("playback_keeps_a_missing_chain_id", playback_keeps_a_missing_chain_id as fn()),
+        ("a_shared_combo_file_name_is_drilled_kept_and_sequenced", a_shared_combo_file_name_is_drilled_kept_and_sequenced as fn()),
+    ]);
 }
 }

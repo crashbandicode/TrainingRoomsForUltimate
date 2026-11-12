@@ -74,7 +74,6 @@ mod tests {
     use super::*;
     use std::sync::Arc;
 
-    #[test]
     fn a_reader_sees_whole_values_only() {
         let cell: Arc<SeqCell<8>> = Arc::new(SeqCell::new());
         assert_eq!(cell.read(1), Some([0; 8]));
@@ -98,7 +97,6 @@ mod tests {
         assert!(seen > 0);
     }
 
-    #[test]
     fn a_yielding_reader_outlasts_a_write_left_open() {
         let cell: Arc<SeqCell<2>> = Arc::new(SeqCell::new());
         cell.write(&[7, 7]);
@@ -119,7 +117,6 @@ mod tests {
         writer.join().unwrap();
     }
 
-    #[test]
     fn an_unchanged_value_is_not_rewritten() {
         let cell: SeqCell<2> = SeqCell::new();
         cell.write(&[1, 2]);
@@ -127,6 +124,16 @@ mod tests {
         cell.write(&[1, 2]);
         assert_eq!(cell.seq.load(Relaxed), seq);
         assert_eq!(cell.read(1), Some([1, 2]));
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("a_reader_sees_whole_values_only", a_reader_sees_whole_values_only as fn()),
+            ("a_yielding_reader_outlasts_a_write_left_open", a_yielding_reader_outlasts_a_write_left_open as fn()),
+            ("an_unchanged_value_is_not_rewritten", an_unchanged_value_is_not_rewritten as fn()),
+        ]);
     }
     }
 }

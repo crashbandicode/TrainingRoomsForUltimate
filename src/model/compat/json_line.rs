@@ -78,3 +78,60 @@ impl<T: fmt::Debug> Serialize for DebugStr<T> {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    lib_unit_tests! {
+    use super::*;
+    use serde_json::json;
+
+    #[derive(serde::Serialize)]
+    struct Pair {
+        ai: usize,
+        local_entry: i32,
+        name: &'static str,
+    }
+
+    fn an_object_reads_as_the_json_macro_wrote_it() {
+        let pair = Pair { ai: 77_040_471_552, local_entry: 0, name: "Mii \"Gunner\"\n" };
+        let line = format!("{}", Json(Obj((("detail", Obj((("binding", &pair), ("fim_mask", 0u8)))), ("gate", "admission_ready")))));
+        let old = json!({"gate": "admission_ready", "detail": {"binding": {"ai": 77_040_471_552usize, "local_entry": 0, "name": "Mii \"Gunner\"\n"}, "fim_mask": 0}});
+        assert_eq!(line, old.to_string());
+    }
+
+    fn options_floats_and_debug_text_keep_the_values_format() {
+        #[derive(Debug)]
+        enum Status {
+            Pending,
+        }
+        let line = format!("{}", Json(Obj((("a", None::<u8>), ("b", Some(1.5f32)), ("c", DebugStr(Status::Pending)), ("d", [1u64, 2])))));
+        assert_eq!(line, json!({"a": null, "b": 1.5, "c": "Pending", "d": [1, 2]}).to_string());
+        assert_eq!(format!("{}", Json(DebugStr(Some("x\u{e9}")))), json!(format!("{:?}", Some("x\u{e9}"))).to_string());
+    }
+
+    fn a_full_line_reports_the_formatter_error_and_stops_writing() {
+        struct Short(String);
+        impl fmt::Write for Short {
+            fn write_str(&mut self, s: &str) -> fmt::Result {
+                if self.0.len() + s.len() > 8 {
+                    return Err(fmt::Error);
+                }
+                self.0.push_str(s);
+                Ok(())
+            }
+        }
+        let mut short = Short(String::new());
+        assert!(fmt::write(&mut short, format_args!("{}", Json(Obj((("gate", "admission_ready"),))))).is_err());
+        assert_eq!(short.0, "{\"gate\":");
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("an_object_reads_as_the_json_macro_wrote_it", an_object_reads_as_the_json_macro_wrote_it as fn()),
+            ("options_floats_and_debug_text_keep_the_values_format", options_floats_and_debug_text_keep_the_values_format as fn()),
+            ("a_full_line_reports_the_formatter_error_and_stops_writing", a_full_line_reports_the_formatter_error_and_stops_writing as fn()),
+        ]);
+    }
+    }
+}

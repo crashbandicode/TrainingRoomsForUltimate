@@ -157,7 +157,6 @@ mod tests {
     lib_unit_tests! {
     use super::*;
 
-    #[test]
     fn absent_parent_or_child_ends_the_chain_without_a_dereference() {
         assert_eq!(unsafe { read::<usize>(0, 8) }, None);
         assert!(!unsafe { write::<usize>(0, 16, 7) });
@@ -166,7 +165,6 @@ mod tests {
         assert_eq!(unsafe { child(empty.as_ptr() as usize, size_of::<usize>()) }, None);
     }
 
-    #[test]
     fn a_word_past_the_user_address_space_is_not_a_child() {
         // rc.6 `final-ally-72344fd9`: a finalize followed a window slot holding float bytes (-1.0f under another float) as a
         // body and faulted 8 times; the word is aligned and non-null, so only the address-space bound refuses it.
@@ -176,7 +174,6 @@ mod tests {
         assert!(!object(USER_ADDRESS_END) && object(USER_ADDRESS_END - 8));
     }
 
-    #[test]
     fn only_a_vectors_slots_below_its_size_are_elements() {
         // The body window's shape (`entry+0x4150` size, `+0x4158` data, three cells): one body installed, two members planned,
         // and the second slot holding what final-ally-72344fd9's did. A low wild word past the size is refused as well.
@@ -203,14 +200,12 @@ mod tests {
         assert_eq!(unsafe { inline_elements::<3>(0, 0x4150) }, [None; 3]);
     }
 
-    #[test]
     fn rejects_wrapping_or_misaligned_field_addresses() {
         assert_eq!(address::<usize>(usize::MAX - 7, 8), None);
         assert_eq!(address::<usize>(usize::MAX - 7, 0), None);
         assert_eq!(address::<usize>(1, 0), None);
     }
 
-    #[test]
     fn live_fields_preserve_reads_and_writes_without_taking_ownership() {
         let mut value = [11usize, 22];
         let parent = [value.as_mut_ptr() as usize];
@@ -220,7 +215,6 @@ mod tests {
         assert_eq!(value, [11, 33]);
     }
 
-    #[test]
     fn qualified_required_fields_preserve_the_complete_value() {
         let mut words = [0x1122334455667788u64, 0xfedcba9876543210];
         let base = words.as_mut_ptr() as usize;
@@ -229,7 +223,6 @@ mod tests {
         assert_eq!(unsafe { read_unchecked::<u64>(base, 8) }, 0x13579bdf2468ace0);
     }
 
-    #[test]
     fn chains_preserve_legacy_nullable_walk_results() {
         unsafe fn legacy(mut p: usize, offsets: &[usize]) -> Option<usize> {
             for &offset in offsets {
@@ -254,7 +247,6 @@ mod tests {
         }
     }
 
-    #[test]
     fn native_atomic_words_keep_their_width_and_acquire_ordering() {
         use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
         let word = AtomicU32::new(0);
@@ -263,6 +255,21 @@ mod tests {
         wide.store(0xfedcba9876543210, Ordering::Release);
         assert_eq!(unsafe { load_acquire_u32(&word as *const _ as usize) }, 0x89abcdef);
         assert_eq!(unsafe { load_acquire_u64(&wide as *const _ as usize) }, 0xfedcba9876543210);
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("absent_parent_or_child_ends_the_chain_without_a_dereference", absent_parent_or_child_ends_the_chain_without_a_dereference as fn()),
+            ("a_word_past_the_user_address_space_is_not_a_child", a_word_past_the_user_address_space_is_not_a_child as fn()),
+            ("only_a_vectors_slots_below_its_size_are_elements", only_a_vectors_slots_below_its_size_are_elements as fn()),
+            ("rejects_wrapping_or_misaligned_field_addresses", rejects_wrapping_or_misaligned_field_addresses as fn()),
+            ("live_fields_preserve_reads_and_writes_without_taking_ownership", live_fields_preserve_reads_and_writes_without_taking_ownership as fn()),
+            ("qualified_required_fields_preserve_the_complete_value", qualified_required_fields_preserve_the_complete_value as fn()),
+            ("chains_preserve_legacy_nullable_walk_results", chains_preserve_legacy_nullable_walk_results as fn()),
+            ("native_atomic_words_keep_their_width_and_acquire_ordering", native_atomic_words_keep_their_width_and_acquire_ordering as fn()),
+        ]);
     }
     }
 }

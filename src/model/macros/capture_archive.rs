@@ -900,7 +900,6 @@ mod tests {
         file
     }
 
-    #[test]
     fn mii_metadata_roundtrips_and_conflicting_duplicates_preserve_the_capture() {
         let empty = ReplayMiis::from_bytes(&[1, 0]).unwrap();
         // Synthetic stored entry: Brawler, distinct appearance, neutral special 2.
@@ -928,7 +927,6 @@ mod tests {
         }
     }
 
-    #[test]
     fn saves_and_reopens_explicit_samples_and_truncation_metadata() {
         let temp = TestDir::new();
         let archive = CaptureArchive::new(&temp.0);
@@ -953,7 +951,6 @@ mod tests {
         }
     }
 
-    #[test]
     fn ids_are_separate_from_duplicate_unicode_display_names() {
         let temp = TestDir::new();
         let archive = CaptureArchive::new(&temp.0);
@@ -987,7 +984,6 @@ mod tests {
         );
     }
 
-    #[test]
     fn duplicate_save_preserves_published_bytes_and_rejects_other_identity() {
         let temp = TestDir::new();
         let archive = CaptureArchive::new(&temp.0);
@@ -1018,7 +1014,6 @@ mod tests {
         );
     }
 
-    #[test]
     fn rejects_invalid_game_version_on_save_before_creating_the_archive() {
         let temp = TestDir::new();
         let archive_dir = temp.0.join("archive");
@@ -1033,7 +1028,6 @@ mod tests {
         assert!(!archive_dir.exists());
     }
 
-    #[test]
     fn rejects_invalid_game_versions_in_headers_without_removing_files() {
         let temp = TestDir::new();
         let archive = CaptureArchive::new(&temp.0);
@@ -1077,7 +1071,6 @@ mod tests {
         }
     }
 
-    #[test]
     fn listing_uses_header_only_while_load_validates_samples() {
         let temp = TestDir::new();
         let archive = CaptureArchive::new(&temp.0);
@@ -1101,7 +1094,6 @@ mod tests {
         assert!(path.exists());
     }
 
-    #[test]
     fn malformed_truncated_oversized_and_unsupported_files_are_reported_and_kept() {
         let temp = TestDir::new();
         let archive = CaptureArchive::new(&temp.0);
@@ -1148,6 +1140,21 @@ mod tests {
             assert!(temp.0.join(format!("{id}.tmrc")).exists());
             assert!(archive.load(&id).is_err());
         }
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("mii_metadata_roundtrips_and_conflicting_duplicates_preserve_the_capture", mii_metadata_roundtrips_and_conflicting_duplicates_preserve_the_capture as fn()),
+            ("saves_and_reopens_explicit_samples_and_truncation_metadata", saves_and_reopens_explicit_samples_and_truncation_metadata as fn()),
+            ("ids_are_separate_from_duplicate_unicode_display_names", ids_are_separate_from_duplicate_unicode_display_names as fn()),
+            ("duplicate_save_preserves_published_bytes_and_rejects_other_identity", duplicate_save_preserves_published_bytes_and_rejects_other_identity as fn()),
+            ("rejects_invalid_game_version_on_save_before_creating_the_archive", rejects_invalid_game_version_on_save_before_creating_the_archive as fn()),
+            ("rejects_invalid_game_versions_in_headers_without_removing_files", rejects_invalid_game_versions_in_headers_without_removing_files as fn()),
+            ("listing_uses_header_only_while_load_validates_samples", listing_uses_header_only_while_load_validates_samples as fn()),
+            ("malformed_truncated_oversized_and_unsupported_files_are_reported_and_kept", malformed_truncated_oversized_and_unsupported_files_are_reported_and_kept as fn()),
+        ]);
     }
     }
 }

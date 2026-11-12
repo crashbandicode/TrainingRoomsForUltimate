@@ -2,7 +2,6 @@ lib_unit_tests! {
 use super::*;
 use crate::engine::macros::test_util::{frames, recording, start};
 
-#[test]
 fn new_builds_a_valid_recording_with_default_placement() {
     let rec = MacroRecording::new("  Fox drill  ", "13.0.4", start(), frames(3)).unwrap();
     assert_eq!(rec.schema_version, SCHEMA_VERSION);
@@ -12,7 +11,6 @@ fn new_builds_a_valid_recording_with_default_placement() {
     assert_eq!((rec.placement.delta_x, rec.placement.delta_y), (0.0, 0.0));
 }
 
-#[test]
 fn json_round_trip_is_exact_and_uses_stable_field_names() {
     let mut rec = recording("Round trip");
     rec.frames[0] = InputFrame {
@@ -37,7 +35,6 @@ fn json_round_trip_is_exact_and_uses_stable_field_names() {
     back.validate().unwrap();
 }
 
-#[test]
 fn rejects_empty_and_oversized_frame_lists() {
     let err = MacroRecording::new("Empty", "", start(), Vec::new()).unwrap_err();
     assert!(matches!(err, MacroError::EmptyFrames), "{err}");
@@ -52,7 +49,6 @@ fn rejects_empty_and_oversized_frame_lists() {
     );
 }
 
-#[test]
 fn name_rules() {
     for bad in ["", "   ", "\t", "bad\nname", "nul\0name"] {
         let err = MacroRecording::new(bad, "", start(), frames(1)).unwrap_err();
@@ -71,7 +67,6 @@ fn name_rules() {
     assert!(MacroRecording::new("x".repeat(MAX_NAME_CHARS), "", start(), frames(1)).is_ok());
 }
 
-#[test]
 fn set_name_trims_validates_and_leaves_frames_alone() {
     let mut rec = recording("Before");
     let frames_before = rec.frames.clone();
@@ -82,7 +77,6 @@ fn set_name_trims_validates_and_leaves_frames_alone() {
     assert_eq!(rec.frames, frames_before);
 }
 
-#[test]
 fn game_version_rules() {
     assert!(MacroRecording::new("Ok", "", start(), frames(1)).is_ok());
     let long = "9".repeat(MAX_GAME_VERSION_BYTES + 1);
@@ -94,7 +88,6 @@ fn game_version_rules() {
 
 type SetField = fn(&mut MacroRecording, f32);
 
-#[test]
 fn rejects_non_finite_floats_in_every_field() {
     for bad in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
         let mutations: [(&str, SetField); 5] = [
@@ -116,7 +109,6 @@ fn rejects_non_finite_floats_in_every_field() {
     }
 }
 
-#[test]
 fn rejects_unsupported_schema_version_and_missing_fighter() {
     for version in [0, 3, u32::MAX] {
         let mut rec = recording("Version");
@@ -133,7 +125,6 @@ fn rejects_unsupported_schema_version_and_missing_fighter() {
     assert!(MacroRecording::new("Mario", "", StartState::neutral(0, 0, 1.0), frames(1)).is_ok());
 }
 
-#[test]
 fn neutral_start_has_identity_and_no_motion() {
     let state = StartState::neutral(8, 3, -1.0);
     assert_eq!(
@@ -144,7 +135,6 @@ fn neutral_start_has_identity_and_no_motion() {
     assert_eq!((state.speed_x, state.speed_y), (0.0, 0.0));
 }
 
-#[test]
 fn placement_edit_is_independent_of_frames_and_start() {
     let mut rec = recording("Edit");
     let (frames_before, start_before) = (rec.frames.clone(), rec.start);
@@ -173,7 +163,6 @@ fn placement_edit_is_independent_of_frames_and_start() {
     );
 }
 
-#[test]
 fn placement_is_relative_to_the_anchor_and_never_compounds() {
     let placement = Placement {
         delta_x: -10.0,
@@ -190,7 +179,6 @@ fn placement_is_relative_to_the_anchor_and_never_compounds() {
     assert_eq!(placement.apply((0.0, 0.0)), (-10.0, 25.0));
 }
 
-#[test]
 fn exact_mii_schema_preserves_payload_and_rejects_identity_loss() {
     let ordinary = recording("ordinary");
     let encoded = serde_json::to_value(&ordinary).unwrap();
@@ -224,5 +212,24 @@ fn exact_mii_schema_preserves_payload_and_rejects_identity_loss() {
     let tag = invalid["mii"]["tags"][0].as_u64().unwrap();
     invalid["mii"]["tags"][0] = serde_json::json!(tag ^ 1);
     assert!(serde_json::from_value::<MacroRecording>(invalid).is_err());
+}
+
+/// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+#[test]
+fn case_table() {
+    crate::test_table::run(&[
+        ("new_builds_a_valid_recording_with_default_placement", new_builds_a_valid_recording_with_default_placement as fn()),
+        ("json_round_trip_is_exact_and_uses_stable_field_names", json_round_trip_is_exact_and_uses_stable_field_names as fn()),
+        ("rejects_empty_and_oversized_frame_lists", rejects_empty_and_oversized_frame_lists as fn()),
+        ("name_rules", name_rules as fn()),
+        ("set_name_trims_validates_and_leaves_frames_alone", set_name_trims_validates_and_leaves_frames_alone as fn()),
+        ("game_version_rules", game_version_rules as fn()),
+        ("rejects_non_finite_floats_in_every_field", rejects_non_finite_floats_in_every_field as fn()),
+        ("rejects_unsupported_schema_version_and_missing_fighter", rejects_unsupported_schema_version_and_missing_fighter as fn()),
+        ("neutral_start_has_identity_and_no_motion", neutral_start_has_identity_and_no_motion as fn()),
+        ("placement_edit_is_independent_of_frames_and_start", placement_edit_is_independent_of_frames_and_start as fn()),
+        ("placement_is_relative_to_the_anchor_and_never_compounds", placement_is_relative_to_the_anchor_and_never_compounds as fn()),
+        ("exact_mii_schema_preserves_payload_and_rejects_identity_loss", exact_mii_schema_preserves_payload_and_rejects_identity_loss as fn()),
+    ]);
 }
 }

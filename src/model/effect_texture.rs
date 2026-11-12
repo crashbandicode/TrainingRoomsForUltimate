@@ -584,3 +584,287 @@ impl Memory for Image {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    lib_unit_tests! {
+    use super::*;
+
+    const MGR: usize = 0x10_0000;
+    const SYS: usize = 0x80_0000;
+    const RES_ARRAY: usize = 0x81_0000;
+    const RES: usize = 0x90_0000;
+    const EFFN: usize = 0xa0_0000;
+    const SETS: usize = 0x91_0000;
+    const EMITTERS: usize = 0x92_0000;
+    const EMTR0: usize = 0x93_0000;
+    const FILE: usize = 0x94_0000;
+    const BRTI_ARRAY: usize = 0x95_0000;
+    const BRTI0: usize = 0x96_0000;
+    const BRTI1: usize = 0x96_1000;
+
+    /// A synthetic game: the manager with the file in entry 3, a resource whose set 2 has one emitter with two textures.
+    fn game() -> Image {
+        let mut m = Image::new();
+        m.region(MGR).resize(0x19_5000, 0);
+        m.region(SYS).resize(0x1000, 0);
+        m.region(RES_ARRAY).resize(0x1000, 0);
+        m.region(RES).resize(0x1000, 0);
+        m.region(EFFN).resize(0x2000, 0);
+        m.region(SETS).resize(0x1000, 0);
+        m.region(EMITTERS).resize(0x2000, 0);
+        m.region(EMTR0).resize(EMTR_BYTES, 0);
+        m.region(FILE).resize(0x1000, 0);
+        m.region(BRTI_ARRAY).resize(0x100, 0);
+        m.region(BRTI0).resize(0x100, 0);
+        m.region(BRTI1).resize(0x100, 0);
+        for i in 0..ENTRY_COUNT {
+            m.put_u32(MGR + ENTRY_BASE + i * ENTRY_STRIDE, u32::MAX);
+        }
+        let e = MGR + ENTRY_BASE + 3 * ENTRY_STRIDE;
+        m.put_u32(e + ENTRY_KEY, 7);
+        m.put_u32(e + ENTRY_RESOURCE, 5);
+        m.put_u64(e + ENTRY_HASH, EF_COMMON_HASH40);
+        m.put_u64(e + ENTRY_DATA, EFFN as u64);
+        m.put_u64(MGR + MANAGER_SYSTEM, SYS as u64);
+        m.put_u64(SYS + SYSTEM_RESOURCES, RES_ARRAY as u64);
+        m.put_u64(RES_ARRAY + 5 * 8, RES as u64);
+        m.put(RES + RESOURCE_VALID, &[1]);
+        // EFFN: three effects; names after the entries (with a short padding run first); VFXB block at 0x1000.
+        m.put(EFFN, b"EFFN");
+        m.put(EFFN + EFFN_COUNT, &3u16.to_le_bytes());
+        m.put(EFFN + EFFN_BLOCK, &1i16.to_le_bytes());
+        for (i, set) in [(0usize, 1u32), (1, 3), (2, 2)] {
+            m.put_u32(EFFN + EFFN_ENTRIES + i * 16 + 4, set);
+        }
+        let names_at = EFFN + EFFN_ENTRIES + 3 * 16;
+        m.put(names_at, b"\x01\0O\0SYS_HIT_NORMAL\0SYS_VECTOR\0SYS_HITSTOP_SPARK\0");
+        // The resource: three sets, set 2 has one emitter.
+        m.put_u32(RES + RESOURCE_SET_COUNT, 3);
+        m.put_u64(RES + RESOURCE_SETS, SETS as u64);
+        m.put_u32(SETS + 2 * SET_STRIDE + SET_EMITTER_COUNT, 1);
+        m.put_u64(SETS + 2 * SET_STRIDE + SET_EMITTERS, EMITTERS as u64);
+        m.put_u64(EMITTERS + EMITTER_EMTR, EMTR0 as u64);
+        m.put_u64(EMITTERS + EMITTER_SLOTS[0], 0x0000_0007_0000_0011);
+        m.put_u64(EMITTERS + EMITTER_SLOTS[1], 0x0000_0007_0000_0012);
+        m.put_u64(EMITTERS + EMITTER_SLOTS[2], SLOT_NONE);
+        // The textures.
+        m.put_u32(RES + RESOURCE_TEXTURE_COUNT, 2);
+        m.put_u64(RES + RESOURCE_TEXTURES, FILE as u64);
+        m.put_u64(FILE + FILE_TEXTURES, BRTI_ARRAY as u64);
+        m.put_u64(BRTI_ARRAY, BRTI0 as u64);
+        m.put_u64(BRTI_ARRAY + 8, BRTI1 as u64);
+        for (brti, slot, w, h) in [(BRTI0, 0x0000_0007_0000_0011u64, 64u32, 256u32), (BRTI1, 0x0000_0007_0000_0012, 256, 128)] {
+            m.put(brti, b"BRTI");
+            m.put_u32(brti + BRTI_FORMAT, 0x1a01);
+            m.put_u32(brti + BRTI_WIDTH, w);
+            m.put_u32(brti + BRTI_HEIGHT, h);
+            m.put_u64(brti + BRTI_SLOT, slot);
+            m.put_u64(brti + BRTI_VIEW, brti as u64 + 0x1_0000);
+        }
+        m
+    }
+
+    fn picture_metadata_keeps_the_tint_and_diagnostic_fields_without_key_arrays() {
+        // The callback may hold both the returned collection and a selected
+        // picture. Full EmitterColours in each slot exceeded the fiber budget.
+        assert!(core::mem::size_of::<Pictures>() <= 2048);
+        let mut m = game();
+        let mut bytes = emtr_bytes();
+        bytes[emtr::COLOUR_SCALE..emtr::COLOUR_SCALE + 4].copy_from_slice(&0.0f32.to_le_bytes());
+        m.put(EMTR0, &bytes);
+        let found = pictures(&m, find_common(&m, MGR).unwrap(), Visual::Di).unwrap();
+        let first = found.pictures[0].unwrap();
+        assert_eq!(first.tint, [179, 179, 255, 255]);
+        let summary = first.colours.unwrap();
+        assert_eq!(summary.scale, 0.0);
+        assert_eq!(summary.sources, [Source::Keyed, Source::Fixed, Source::Fixed, Source::Random]);
+        assert_eq!(summary.fixed0, [1.0, 1.0, 1.0, 0.19]);
+        assert_eq!(summary.fixed1, [0.0, 0.457, 1.0, 1.0]);
+        m.put(EMTR0 + emtr::COLOUR_SCALE, &f32::NAN.to_le_bytes());
+        let found = pictures(&m, find_common(&m, MGR).unwrap(), Visual::Di).unwrap();
+        assert!(found.pictures.iter().flatten().all(|p| p.tint == [255; 4] && p.colours.is_none()));
+    }
+
+    fn add_texture(m: &mut Image, index: usize, slot: Slot) {
+        let brti = BRTI0 + index * 0x1000;
+        if index >= 2 { m.region(brti).resize(0x100, 0); }
+        m.put_u64(BRTI_ARRAY + index * 8, brti as u64);
+        m.put(brti, b"BRTI");
+        m.put_u32(brti + BRTI_FORMAT, 0x1a01);
+        m.put_u32(brti + BRTI_WIDTH, 64);
+        m.put_u32(brti + BRTI_HEIGHT, 256);
+        m.put_u64(brti + BRTI_SLOT, slot);
+        m.put_u64(brti + BRTI_VIEW, brti as u64 + 0x1_0000);
+    }
+
+    fn pictures_keep_first_slot_occurrence_in_emitter_then_sampler_order() {
+        let mut m = game();
+        let (a, b, c) = (0x0000_0007_0000_0011, 0x0000_0007_0000_0012, 0x0000_0007_0000_0013);
+        m.put_u32(SETS + 2 * SET_STRIDE + SET_EMITTER_COUNT, 3);
+        m.put_u32(RES + RESOURCE_TEXTURE_COUNT, 3);
+        add_texture(&mut m, 2, c);
+        // A duplicate never changes its first emitter/sampler; a parent-only
+        // slot is skipped without hiding a later resident texture.
+        for (i, slots) in [[b, a, b], [a, 0xdead, b], [c, SLOT_NONE, a]].iter().enumerate() {
+            let at = EMITTERS + i * EMITTER_STRIDE;
+            m.put_u64(at + EMITTER_EMTR, EMTR0 as u64);
+            for (k, slot) in slots.iter().enumerate() { m.put_u64(at + EMITTER_SLOTS[k], *slot); }
+        }
+        let found = pictures(&m, find_common(&m, MGR).unwrap(), Visual::Di).unwrap();
+        assert_eq!((found.set, found.emitters, found.count), (2, 3, 3));
+        let actual: Vec<_> = found.pictures.iter().flatten().map(|p| (p.emitter, p.sampler, p.texture.slot)).collect();
+        assert_eq!(actual, [(0, 0, b), (0, 1, a), (2, 0, c)]);
+    }
+
+    fn pictures_retain_the_first_eight_distinct_slots_at_capacity() {
+        let mut m = game();
+        m.put_u32(SETS + 2 * SET_STRIDE + SET_EMITTER_COUNT, MAX_EMITTERS as u32);
+        m.put_u32(RES + RESOURCE_TEXTURE_COUNT, (MAX_EMITTERS * 3) as u32);
+        for i in 0..MAX_EMITTERS * 3 {
+            let slot = 0x0000_0007_0000_0011 + i as u64;
+            add_texture(&mut m, i, slot);
+            let at = EMITTERS + (i / 3) * EMITTER_STRIDE;
+            m.put_u64(at + EMITTER_EMTR, EMTR0 as u64);
+            m.put_u64(at + EMITTER_SLOTS[i % 3], slot);
+        }
+        let found = pictures(&m, find_common(&m, MGR).unwrap(), Visual::Di).unwrap();
+        assert_eq!(found.count, MAX_PICTURES);
+        for (i, picture) in found.pictures.iter().enumerate() {
+            let p = picture.unwrap();
+            assert_eq!((p.emitter, p.sampler, p.texture.slot), (i / 3, i % 3, 0x0000_0007_0000_0011 + i as u64));
+        }
+    }
+
+    fn the_walk_finds_the_resident_file_its_effect_and_the_emitter_textures() {
+        let m = game();
+        let common = find_common(&m, MGR).unwrap();
+        assert_eq!(common, Common { effn: EFFN, resource: RES, entry: 3 });
+        assert_eq!(effect_set(&m, EFFN, Visual::Di.effect_name()), Ok(2), "SYS_VECTOR is entry 1, set index 3 (1-based) - 1");
+        assert_eq!(effect_set(&m, EFFN, Visual::Sdi.effect_name()), Ok(1));
+        assert_eq!(effect_set(&m, EFFN, b"SYS_NOT_THERE"), Err(Absent::NoEffect));
+        let e = emitters(&m, RES, 2).unwrap();
+        assert_eq!((e.count, e.emitters[0].emtr), (1, EMTR0));
+        assert_eq!(e.emitters[0].slots[2], SLOT_NONE);
+        let t = texture_of_slot(&m, RES, e.emitters[0].slots[1]).unwrap();
+        assert_eq!((t.index, t.width, t.height, t.format), (1, 256, 128, 0x1a01));
+        assert_eq!(t.view, 0x97_1000, "the view pointer of the second texture");
+        assert_eq!(texture_of_slot(&m, RES, SLOT_NONE), Err(Absent::NoTexture));
+        assert_eq!(texture_of_slot(&m, RES, 0x1234), Err(Absent::NoTexture));
+    }
+
+    fn a_manager_without_the_file_or_with_a_free_entry_answers_not_loaded() {
+        let mut m = game();
+        m.put_u32(MGR + ENTRY_BASE + 3 * ENTRY_STRIDE + ENTRY_KEY, u32::MAX);
+        assert_eq!(find_common(&m, MGR), Err(Absent::NotLoaded));
+        let mut m = game();
+        m.put_u64(MGR + ENTRY_BASE + 3 * ENTRY_STRIDE + ENTRY_HASH, 0x1234);
+        assert_eq!(find_common(&m, MGR), Err(Absent::NotLoaded));
+    }
+
+    fn a_file_that_is_not_an_effn_or_a_resource_that_is_not_valid_stops_the_walk() {
+        let mut m = game();
+        m.put(EFFN, b"XXXX");
+        assert_eq!(find_common(&m, MGR), Err(Absent::Shape));
+        let mut m = game();
+        m.put(RES + RESOURCE_VALID, &[0]);
+        assert_eq!(find_common(&m, MGR), Err(Absent::Shape));
+        let mut m = game();
+        m.put_u32(MGR + ENTRY_BASE + 3 * ENTRY_STRIDE + ENTRY_RESOURCE, 99);
+        assert_eq!(find_common(&m, MGR), Err(Absent::NotLoaded), "a resource index past the array");
+    }
+
+    fn the_name_table_must_hold_exactly_the_entry_count_of_names() {
+        let mut m = game();
+        m.put(EFFN + EFFN_COUNT, &4u16.to_le_bytes());
+        assert_eq!(effect_set(&m, EFFN, b"SYS_VECTOR"), Err(Absent::NoEffect), "four entries but three names: the order is not trusted");
+    }
+
+    fn a_bad_set_index_or_emitter_count_is_refused() {
+        let m = game();
+        assert_eq!(emitters(&m, RES, 3), Err(Absent::NoEmitters));
+        assert_eq!(emitters(&m, RES, 1), Err(Absent::NoEmitters), "set 1 has no emitters");
+        let mut m = game();
+        m.put_u32(SETS + 2 * SET_STRIDE + SET_EMITTER_COUNT, 99);
+        assert_eq!(emitters(&m, RES, 2), Err(Absent::NoEmitters));
+    }
+
+    fn a_texture_pointer_that_is_not_a_brti_stops_the_search() {
+        let mut m = game();
+        m.put(BRTI0, b"XXXX");
+        assert_eq!(texture_of_slot(&m, RES, 0x0000_0007_0000_0012), Err(Absent::Shape));
+    }
+
+    fn emtr_bytes() -> Vec<u8> {
+        let mut b = vec![0u8; EMTR_BYTES];
+        let put = |b: &mut Vec<u8>, at: usize, v: [f32; 4]| {
+            for (i, x) in v.iter().enumerate() {
+                b[at + 4 * i..at + 4 * i + 4].copy_from_slice(&x.to_le_bytes());
+            }
+        };
+        b[emtr::COLOUR_SCALE..emtr::COLOUR_SCALE + 4].copy_from_slice(&1.5f32.to_le_bytes());
+        b[emtr::SOURCES..emtr::SOURCES + 4].copy_from_slice(&[2, 0, 0, 3]);
+        put(&mut b, emtr::FIXED0, [1.0, 1.0, 1.0, 0.19]);
+        put(&mut b, emtr::FIXED1, [0.0, 0.457, 1.0, 1.0]);
+        // colour 0: two keys, white at 0 to blue at 1.
+        b[emtr::KEY_COUNTS..emtr::KEY_COUNTS + 4].copy_from_slice(&2u32.to_le_bytes());
+        put(&mut b, emtr::COLOUR0_KEYS, [1.0, 1.0, 1.0, 0.0]);
+        put(&mut b, emtr::COLOUR0_KEYS + 16, [0.0, 0.0, 1.0, 1.0]);
+        // alpha 1: random over two keys.
+        b[emtr::KEY_COUNTS + 12..emtr::KEY_COUNTS + 16].copy_from_slice(&2u32.to_le_bytes());
+        put(&mut b, emtr::ALPHA1_KEYS, [0.2, 0.2, 0.2, 0.0]);
+        put(&mut b, emtr::ALPHA1_KEYS + 16, [0.6, 0.6, 0.6, 0.0]);
+        b
+    }
+
+    fn emitter_colours_follow_the_source_of_each_value() {
+        let c = EmitterColours::parse(&emtr_bytes()).unwrap();
+        assert_eq!(c.sources[0], Source::Keyed);
+        let mid = c.colour0_at(0.5);
+        assert!((mid[0] - 0.5).abs() < 1e-6 && (mid[2] - 1.0).abs() < 1e-6, "{mid:?}");
+        assert_eq!(c.colour0_at(-1.0), [1.0, 1.0, 1.0], "clamped to the first key");
+        assert_eq!(c.colour0_at(9.0), [0.0, 0.0, 1.0], "clamped to the last key");
+        assert_eq!(c.colour1_at(0.3), [0.0, 0.457, 1.0], "fixed");
+        assert!((c.alpha0_at(0.3) - 0.19).abs() < 1e-6, "fixed alpha is the fourth fixed component");
+        assert!((c.alpha1_at(0.3) - 0.4).abs() < 1e-6, "the mean of the random keys");
+    }
+
+    fn the_tint_is_colour_zero_at_the_chip_life_times_the_scale() {
+        let c = EmitterColours::parse(&emtr_bytes()).unwrap();
+        // colour 0 at 0.3 = (0.7, 0.7, 1.0); times 1.5, clamped.
+        assert_eq!(tint_rgba(&c), [255, 255, 255, 255]);
+        let mut b = emtr_bytes();
+        b[emtr::COLOUR_SCALE..emtr::COLOUR_SCALE + 4].copy_from_slice(&0.0f32.to_le_bytes());
+        let c = EmitterColours::parse(&b).unwrap();
+        assert_eq!(tint_rgba(&c), [179, 179, 255, 255], "a zero scale is read as 1");
+    }
+
+    fn a_binary_with_a_non_finite_colour_or_too_many_keys_is_refused() {
+        let mut b = emtr_bytes();
+        b[emtr::FIXED0..emtr::FIXED0 + 4].copy_from_slice(&f32::NAN.to_le_bytes());
+        assert!(EmitterColours::parse(&b).is_none());
+        let mut b = emtr_bytes();
+        b[emtr::KEY_COUNTS..emtr::KEY_COUNTS + 4].copy_from_slice(&9u32.to_le_bytes());
+        assert!(EmitterColours::parse(&b).is_none());
+        assert!(EmitterColours::parse(&b[..16]).is_none());
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("picture_metadata_keeps_the_tint_and_diagnostic_fields_without_key_arrays", picture_metadata_keeps_the_tint_and_diagnostic_fields_without_key_arrays as fn()),
+            ("pictures_keep_first_slot_occurrence_in_emitter_then_sampler_order", pictures_keep_first_slot_occurrence_in_emitter_then_sampler_order as fn()),
+            ("pictures_retain_the_first_eight_distinct_slots_at_capacity", pictures_retain_the_first_eight_distinct_slots_at_capacity as fn()),
+            ("the_walk_finds_the_resident_file_its_effect_and_the_emitter_textures", the_walk_finds_the_resident_file_its_effect_and_the_emitter_textures as fn()),
+            ("a_manager_without_the_file_or_with_a_free_entry_answers_not_loaded", a_manager_without_the_file_or_with_a_free_entry_answers_not_loaded as fn()),
+            ("a_file_that_is_not_an_effn_or_a_resource_that_is_not_valid_stops_the_walk", a_file_that_is_not_an_effn_or_a_resource_that_is_not_valid_stops_the_walk as fn()),
+            ("the_name_table_must_hold_exactly_the_entry_count_of_names", the_name_table_must_hold_exactly_the_entry_count_of_names as fn()),
+            ("a_bad_set_index_or_emitter_count_is_refused", a_bad_set_index_or_emitter_count_is_refused as fn()),
+            ("a_texture_pointer_that_is_not_a_brti_stops_the_search", a_texture_pointer_that_is_not_a_brti_stops_the_search as fn()),
+            ("emitter_colours_follow_the_source_of_each_value", emitter_colours_follow_the_source_of_each_value as fn()),
+            ("the_tint_is_colour_zero_at_the_chip_life_times_the_scale", the_tint_is_colour_zero_at_the_chip_life_times_the_scale as fn()),
+            ("a_binary_with_a_non_finite_colour_or_too_many_keys_is_refused", a_binary_with_a_non_finite_colour_or_too_many_keys_is_refused as fn()),
+        ]);
+    }
+    }
+}

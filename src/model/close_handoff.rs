@@ -60,7 +60,6 @@ mod tests {
     fn intent(opening: u32, epoch: u64, value: Arc<u8>) -> Intent<Arc<u8>> {
         Intent { opening, epoch, value }
     }
-    #[test]
     fn full_returns_identity_and_current_is_held_until_close() {
         let (send, mut receive) = channel(1);
         let value = Arc::new(7);
@@ -75,7 +74,6 @@ mod tests {
         assert!(Arc::ptr_eq(&receive.observe(4, 9, false).unwrap(), &value));
         assert!(receive.observe(4, 9, false).is_none());
     }
-    #[test]
     fn coalesced_reopen_and_epoch_retirement_cancel_only_stale_intents() {
         let (send, mut receive) = channel(2);
         assert!(send.post(intent(1, 8, Arc::new(1))).is_ok());
@@ -85,7 +83,6 @@ mod tests {
         assert!(send.post(intent(5, 9, Arc::new(3))).is_ok());
         assert!(receive.observe(6, 10, false).is_none());
     }
-    #[test]
     fn wrap_and_disconnection_preserve_ownership() {
         let (send, mut receive) = channel(1);
         assert!(send.post(intent(u32::MAX, 8, Arc::new(4))).is_ok());
@@ -94,6 +91,16 @@ mod tests {
         let value = Arc::new(5);
         let returned = send.post(intent(1, 9, Arc::clone(&value))).err().unwrap();
         assert!(Arc::ptr_eq(&returned.value, &value));
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("full_returns_identity_and_current_is_held_until_close", full_returns_identity_and_current_is_held_until_close as fn()),
+            ("coalesced_reopen_and_epoch_retirement_cancel_only_stale_intents", coalesced_reopen_and_epoch_retirement_cancel_only_stale_intents as fn()),
+            ("wrap_and_disconnection_preserve_ownership", wrap_and_disconnection_preserve_ownership as fn()),
+        ]);
     }
     }
 }

@@ -375,3 +375,319 @@ pub fn roster_badges(use_: RosterUse, values: &[u8], excluded: Option<u32>, role
     kinds.iter().map(|&kind| badge(kind)).collect()
 }
 
+#[cfg(test)]
+mod tests {
+    lib_unit_tests! {
+    use super::*;
+
+    fn cell_of(kind: u32) -> usize {
+        let grid = RosterGrid::new(Role::Player);
+        (0..CELLS).find(|c| grid.info(*c).and_then(|i| i.kind()) == Some(kind)).expect("kind on the grid")
+    }
+
+    fn grid_info(editor: &RosterEditor, cell: usize) -> Option<CellContent> {
+        editor.grid.info(cell).map(|i| i.content)
+    }
+
+    fn a_pick_is_one_hot_and_a_second_pick_moves_it() {
+        let mut editor = RosterEditor::new(RosterUse::PlayerPick);
+        let mut values = editor.values(None);
+        assert_eq!(values.len(), CHOICES.len());
+        assert_eq!(editor.press(cell_of(0x58), Button::A, &mut values), Effect::Changed); // Steve
+        assert_eq!(values.iter().filter(|v| **v == 1).count(), 1);
+        assert_eq!(editor.press(cell_of(0x58), Button::A, &mut values), Effect::Nothing);
+        assert_eq!(editor.press(cell_of(0x00), Button::A, &mut values), Effect::Changed); // Mario
+        assert_eq!(values[CHOICES.iter().position(|(k, _)| *k == 0x00).unwrap()], 1);
+        assert_eq!(editor.key(), "player_character");
+    }
+
+    fn an_order_ranks_adds_removes_and_switches_role() {
+        let mut editor = RosterEditor::new(RosterUse::Cycles);
+        let mut values = editor.values(None);
+        assert_eq!(values[0], 1, "factory: All");
+        assert_eq!(editor.press(cell_of(0x58), Button::A, &mut values), Effect::Changed);
+        assert_eq!(editor.press(cell_of(0x07), Button::A, &mut values), Effect::Changed); // Fox
+        assert_eq!(values[0], 0);
+        let kinds = kinds();
+        assert_eq!(group_rank(&kinds, &values, 0x58), Some(1));
+        assert_eq!(group_rank(&kinds, &values, 0x07), Some(2));
+        assert_eq!(editor.press(cell_of(0x58), Button::R, &mut values), Effect::Changed);
+        assert_eq!(group_rank(&kinds, &values, 0x07), Some(1));
+        assert_eq!(editor.press(0, Button::ZR, &mut values), Effect::Shown);
+        assert_eq!(editor.key(), "cpu_roster");
+        let mut frame = Frame::new();
+        editor.decorate(&mut frame, &values);
+        assert!(frame.help[1].string_lossy().contains("CPU"));
+    }
+
+    fn solo_popo_changes_only_the_cycle_role_preference_and_marks_ice_climbers() {
+        let mut editor = RosterEditor::new(RosterUse::Cycles);
+        let mut values = editor.values(None);
+        let before = values.clone();
+        assert_eq!(editor.press(cell_of(0x4b), Button::Y, &mut values), Effect::ToggleSolo);
+        assert_eq!(values, before, "Solo Popo does not remove a roster member");
+        assert_eq!(editor.solo_key(), "solo_popo_player_cycle");
+        let mut frame = Frame::new();
+        editor.decorate(&mut frame, &values);
+        assert!(!frame.tiles[cell_of(0x4b)].string_lossy().contains('S'), "the S is a corner marker, not a name suffix");
+        assert_eq!(editor.press(cell_of(0), Button::Y, &mut values), Effect::Nothing);
+        editor.press(0, Button::ZR, &mut values);
+        assert_eq!(editor.solo_key(), "solo_popo_cpu");
+        for use_ in [RosterUse::PlayerPick, RosterUse::CpuPick, RosterUse::Hats] {
+            let mut other = RosterEditor::new(use_);
+            let mut values = other.values(None);
+            assert_eq!(other.press(cell_of(0x4b), Button::Y, &mut values), Effect::Nothing);
+        }
+    }
+
+    fn solo_popo_persists_independently_for_each_role() {
+        use crate::model::{menu::{Env, Menu}, settings::Settings};
+        let mut menu = Menu::new(Settings::factory(), Env::default());
+        let mut editor = RosterEditor::new(RosterUse::Cycles);
+        let cell = cell_of(0x4b);
+        editor.apply(&mut menu, cell, Button::Y);
+        assert!(editor.solo_enabled(&menu));
+        editor.apply(&mut menu, cell, Button::ZR);
+        assert!(!editor.solo_enabled(&menu));
+        editor.apply(&mut menu, cell, Button::Y);
+        assert!(editor.solo_enabled(&menu));
+        editor.apply(&mut menu, cell, Button::ZR);
+        editor.apply(&mut menu, cell, Button::Y);
+        assert!(!editor.solo_enabled(&menu));
+        assert_eq!(menu.kept("solo_popo_cpu"), Some(&serde_json::json!([1, 0])));
+        assert_eq!(menu.settings().menu.get("solo_popo_original"), Some(&[0, 1][..]));
+    }
+
+    fn values_round_trip_through_the_kept_json_and_bad_json_is_the_factory() {
+        let editor = RosterEditor::new(RosterUse::Hats);
+        let mut values = editor.values(None);
+        values[0] = 0;
+        values[3] = 1;
+        let json = RosterEditor::value_of(&values);
+        assert_eq!(editor.values(Some(&json)), values);
+        assert_eq!(editor.values(Some(&Value::from("x")))[0], 1);
+    }
+
+    fn cycles_values(picks: &[u32]) -> Vec<u8> {
+        // `[all, ranks...]` over the catalog: rank 1.. for the picked kinds in order.
+        let mut values = vec![0u8; CHOICES.len() + 1];
+        values[0] = 0;
+        for (rank, kind) in picks.iter().enumerate() {
+            let index = CHOICES.iter().position(|(k, _)| *k == *kind).expect("picked kind in catalog");
+            values[index + 1] = rank as u8 + 1;
+        }
+        values
+    }
+
+    fn badge_of(badges: &[Option<u8>], kind: u32) -> Option<u8> {
+        badges[CHOICES.iter().position(|(k, _)| *k == kind).expect("kind in catalog")]
+    }
+
+    fn cycles_badges_number_each_role_independently() {
+        let player = cycles_values(&[0x58, 0x07]); // Steve 1, Fox 2
+        let cpu = cycles_values(&[0x42]);          // Ridley 1
+        let player_badges = roster_badges_from_values(RosterUse::Cycles, &player, Some(0x00));
+        let cpu_badges = roster_badges_from_values(RosterUse::Cycles, &cpu, Some(0x0b));
+        // Both roles' numbers exist at once, on their own cells.
+        assert_eq!(badge_of(&player_badges, 0x58), Some(1));
+        assert_eq!(badge_of(&player_badges, 0x07), Some(2));
+        assert_eq!(badge_of(&player_badges, 0x42), None, "the player's order does not number the CPU's pick");
+        assert_eq!(badge_of(&cpu_badges, 0x42), Some(1));
+        assert_eq!(badge_of(&cpu_badges, 0x58), None);
+        // A Mii takes no badge while no catalog admits its class (mii_tiles_follow_the_catalog_admission).
+        assert_eq!(badge_of(&player_badges, 0x49), None);
+    }
+
+    fn all_orders_number_every_member_and_the_all_cell_badges_all() {
+        let mut values = vec![0u8; CHOICES.len() + 1];
+        values[0] = 1; // All
+        let badges = roster_badges_from_values(RosterUse::Cycles, &values, Some(0x00));
+        assert_eq!(badge_of(&badges, 0x00), Some(0), "the excluded original carries the slot-0 badge");
+        assert_eq!(badge_of(&badges, 0x01), Some(1), "the css order starts at the first non-excluded member");
+        assert_eq!(badge_of(&badges, 0x07), Some(7), "the css order is the grid's: DK 1, Link 2, Samus 3, Dark Samus 4, Yoshi 5, Kirby 6, Fox 7");
+        // The All cell's badge carries the text "All" while the order is All (decorate_badges).
+        let mut frame = Frame::new();
+        let editor = RosterEditor::new(RosterUse::Cycles);
+        editor.decorate(&mut frame, &values);
+        editor.decorate_badges(&mut frame, &menu_with_kept(&[("player_roster", &values)]));
+        let all_cell = (0..CELLS).find(|c| matches!(grid_info(&editor, *c), Some(CellContent::All))).expect("the All cell");
+        assert_eq!(frame.tile_badges[0][all_cell].string_lossy(), "All");
+        assert_eq!(frame.tile_badges[1][all_cell].string_lossy(), "All", "the CPU's missing order is the factory All");
+        // The All-stripes follow the role's All order: every numbered member, not the slot-0 original.
+        assert!(frame.tile_stripes[0][cell_of(0x07)]);
+        assert!(!frame.tile_stripes[0][all_cell]);
+    }
+
+    fn the_slot_zero_badge_greys_the_roles_original_group() {
+        // The player's original is Steve; with Steve's Solo Popo off, the cycle exclusion excludes
+        // Steve's group and the badge reads 0.
+        let player = cycles_values(&[0x07]);
+        let badges = roster_badges_from_values(RosterUse::Cycles, &player, cycle_exclusion(Some(0x58), false, false));
+        assert_eq!(badge_of(&badges, 0x58), Some(0));
+        assert_eq!(badge_of(&badges, 0x07), Some(1), "the exclusion does not renumber the others");
+        // The solo flags only spare the Ice Climbers: an IC original with the original Solo Popo on
+        // and the cycle solo off stays a cycle member (no 0 badge), the reverse excludes it.
+        let ic = cycles_values(&[0x4b]);
+        let badges = roster_badges_from_values(RosterUse::Cycles, &ic, cycle_exclusion(Some(0x4b), true, false));
+        assert_eq!(badge_of(&badges, 0x4b), Some(1));
+        let badges = roster_badges_from_values(RosterUse::Cycles, &ic, cycle_exclusion(Some(0x4b), false, false));
+        assert_eq!(badge_of(&badges, 0x4b), Some(0));
+    }
+
+    fn hats_badge_the_hat_order_and_hide_the_solo_markers() {
+        let hats = cycles_values(&[0x0b, 0x07]); // Captain Falcon 1, Fox 2
+        let badges = roster_badges_from_values(RosterUse::Hats, &hats, Some(0x00));
+        assert_eq!(badge_of(&badges, 0x0b), Some(1));
+        assert_eq!(badge_of(&badges, 0x07), Some(2));
+        assert_eq!(badge_of(&badges, 0x06), None, "Kirby cannot be a hat");
+        assert_eq!(badge_of(&badges, 0x49), None, "no Mii helper hat without an admitting catalog");
+        // The Solo Popo markers are cycles-only: the hats view hides them (decorate_badges).
+        let mut frame = Frame::new();
+        let editor = RosterEditor::new(RosterUse::Hats);
+        editor.decorate(&mut frame, &hats);
+        let cycles = cycles_values(&[0x58]); // the cycle order must not leak into the hats view
+        let kept = [("player_kirby_hats", &hats[..]), ("player_roster", &cycles[..]), ("solo_popo_player_cycle", &[1u8, 0][..])];
+        editor.decorate_badges(&mut frame, &menu_with_kept(&kept));
+        assert!(!frame.tile_solo[0]);
+        assert_eq!(frame.tile_badges[0][cell_of(0x0b)].string_lossy(), "1", "the hats view badges the hat order");
+        assert_eq!(frame.tile_badges[0][cell_of(0x07)].string_lossy(), "2");
+        assert!(frame.tile_badges[0][cell_of(0x58)].is_empty(), "not the cycle order's Steve");
+    }
+
+    fn picks_keep_no_badges_and_the_name_labels_carry_the_name_only() {
+        let editor = RosterEditor::new(RosterUse::PlayerPick);
+        let mut values = editor.values(None);
+        values[CHOICES.iter().position(|(k, _)| *k == 0x58).unwrap()] = 1;
+        let mut frame = Frame::new();
+        editor.decorate(&mut frame, &values);
+        assert!(frame.tiles[cell_of(0x58)].string_lossy().contains("Steve"), "the pick's chosen marker stays");
+        assert!(!frame.tiles[cell_of(0x58)].string_lossy().contains("1."), "no rank number in the pick's name label");
+        editor.decorate_badges(&mut frame, &menu_with_kept(&[]));
+        assert!(frame.tile_badges.iter().flatten().all(|b| b.is_empty()), "a pick grid keeps no badges");
+    }
+
+    fn cycles_name_labels_show_the_fighter_name_only() {
+        let editor = RosterEditor::new(RosterUse::Cycles);
+        let values = cycles_values(&[0x58]);
+        let mut frame = Frame::new();
+        editor.decorate(&mut frame, &values);
+        let label = frame.tiles[cell_of(0x58)].string_lossy();
+        assert_eq!(label, "Steve", "the order number moved to the corner badge");
+        editor.decorate_badges(&mut frame, &menu_with_kept(&[("player_roster", &values), ("solo_popo_player_cycle", &[1u8, 0])]));
+        assert!(!frame.tiles[cell_of(0x4b)].string_lossy().contains('S'), "the S is a corner marker now");
+        assert!(frame.tile_solo[0] && !frame.tile_solo[1], "each role's own Solo Popo preference");
+    }
+
+    fn mii_tiles_follow_the_catalog_admission() {
+        // No catalog: no Mii tile can be chosen (the fork greyed them, " - unavailable") and none takes a badge.
+        let brawler = cell_of(0x48);
+        for use_ in [RosterUse::PlayerPick, RosterUse::CpuPick, RosterUse::Cycles, RosterUse::Hats] {
+            let mut editor = RosterEditor::new(use_);
+            let mut values = editor.values(None);
+            assert_eq!(editor.press(brawler, Button::A, &mut values), Effect::Nothing, "{use_:?}");
+            let mut frame = Frame::new();
+            frame.tile_focus = brawler as u8;
+            editor.decorate(&mut frame, &values);
+            assert_eq!(frame.tile_state[brawler], TILE_GREYED, "{use_:?}");
+            assert!(frame.help[1].string_lossy().ends_with(" - unavailable"), "{use_:?}");
+            assert_eq!(frame.tile_state[cell_of(0x07)], 0, "other fighters stay as they are");
+        }
+        // The Player cycle admits the Brawler: it can be added and takes its number; the CPU cycle still does not.
+        let mii = MiiTiles { player: [true, false, false], player_cycle: [true, false, false], ..MiiTiles::default() };
+        let mut editor = RosterEditor::new(RosterUse::Cycles);
+        editor.set_mii(mii);
+        let mut values = cycles_values(&[0x07]);
+        assert_eq!(editor.press(brawler, Button::A, &mut values), Effect::Changed);
+        let badges = roster_badges(RosterUse::Cycles, &values, None, Role::Player, &mii);
+        assert_eq!(badge_of(&badges, 0x07), Some(1));
+        assert_eq!(badge_of(&badges, 0x48), Some(2), "an admitted Mii takes its number");
+        assert_eq!(badge_of(&badges, 0x49), None, "a class with no admitted Mii takes none");
+        assert_eq!(badge_of(&roster_badges(RosterUse::Cycles, &values, None, Role::Cpu, &mii), 0x48), None);
+        assert_eq!(editor.press(0, Button::ZR, &mut values), Effect::Shown);
+        assert_eq!(editor.press(brawler, Button::A, &mut values), Effect::Nothing, "the CPU cycle does not admit it");
+        // Hats follow the helper admission only.
+        let mut hats = RosterEditor::new(RosterUse::Hats);
+        hats.set_mii(MiiTiles { hat: [true, false, false], ..MiiTiles::default() });
+        let mut values = hats.values(None);
+        values[0] = 0;
+        assert_eq!(hats.press(brawler, Button::A, &mut values), Effect::Changed);
+    }
+
+    fn a_mii_original_takes_slot_zero_only_without_a_numbered_place() {
+        let values = cycles_values(&[0x07]);
+        // The CPU's captured Brawler with no other configuration of its class (the CPU cycle does not admit the class,
+        // `cycle_members::cpu_admission`; a manual pick still may): the grey 0.
+        let only = MiiTiles { cpu: [true, false, false], ..MiiTiles::default() };
+        assert_eq!(badge_of(&roster_badges(RosterUse::Cycles, &values, Some(0x48), Role::Cpu, &only), 0x48), Some(0));
+        // With another configuration the CPU cycle admits the class: the Brawler stays a numbered cycle member.
+        let other = MiiTiles { cpu: [true, false, false], cpu_cycle: [true, false, false], ..MiiTiles::default() };
+        let both = cycles_values(&[0x07, 0x48]);
+        assert_eq!(badge_of(&roster_badges(RosterUse::Cycles, &both, Some(0x48), Role::Cpu, &other), 0x48), Some(2));
+        // A Player original whose class the Player cycle does not admit: the grey 0.
+        let badges = roster_badges(RosterUse::Cycles, &values, Some(0x48), Role::Player, &MiiTiles::default());
+        assert_eq!(badge_of(&badges, 0x48), Some(0));
+        assert_eq!(badge_of(&badges, 0x07), Some(1));
+    }
+
+    /// P-CYCLE: the CPU's 0 names the fighter the runtime returns to (the scene's original, `MiiTiles::slot_zero`), not
+    /// the saved pick the runtime overwrites with each fighter it loads; the numbers follow from it.
+    fn the_cpu_zero_is_the_runtimes_original_not_the_overwritten_pick() {
+        let values = cycles_values(&[0x00, 0x07, 0x06]); // Mario, Fox, Kirby
+        let mut pick = vec![0u8; CHOICES.len()];
+        pick[CHOICES.iter().position(|(k, _)| *k == 0x07).unwrap()] = 1; // the runtime wrote Fox after a cycle
+        let kept = [("cpu_roster", &values[..]), ("cpu_character", &pick[..])];
+        let mut editor = RosterEditor::new(RosterUse::Cycles);
+        editor.set_mii(MiiTiles { slot_zero: [None, Some(0x00)], ..MiiTiles::default() });
+        let mut frame = Frame::new();
+        editor.decorate(&mut frame, &values);
+        editor.decorate_badges(&mut frame, &menu_with_kept(&kept));
+        let badge = |kind| frame.tile_badges[1][cell_of(kind)].string_lossy();
+        assert_eq!((badge(0x00), badge(0x07), badge(0x06)), ("0".into(), "1".into(), "2".into()), "Mario is slot 0, as the runtime");
+        // The rows' evidence (`tr_cycle_badges_v1`): Fox and Kirby numbered, two numbers, slot 0 Mario.
+        let numbers = editor.decorate_badges(&mut frame, &menu_with_kept(&kept))[1];
+        let index = |kind| CHOICES.iter().position(|(k, _)| *k == kind).unwrap();
+        let bit = |kind| numbers.mask[index(kind) / 64] >> (index(kind) % 64) & 1 == 1;
+        assert!(bit(0x07) && bit(0x06) && !bit(0x00));
+        assert_eq!((numbers.count, numbers.slot_zero), (2, Some(0x00)));
+        // Without a scene the saved pick stands in (today's form).
+        let mut editor = RosterEditor::new(RosterUse::Cycles);
+        editor.set_mii(MiiTiles::default());
+        let mut frame = Frame::new();
+        editor.decorate(&mut frame, &values);
+        editor.decorate_badges(&mut frame, &menu_with_kept(&kept));
+        let badge = |kind| frame.tile_badges[1][cell_of(kind)].string_lossy();
+        assert_eq!((badge(0x07), badge(0x00)), ("0".into(), "1".into()));
+    }
+
+    /// A minimal menu stub for decorate_badges: the kept keys as JSON arrays.
+    fn menu_with_kept(kept: &[(&'static str, &[u8])]) -> crate::model::menu::Menu {
+        use crate::model::{menu::{Env, Menu}, settings::Settings};
+        let mut menu = Menu::new(Settings::factory(), Env::default());
+        for (key, values) in kept {
+            menu.set_kept(key, serde_json::json!(values.to_vec()));
+        }
+        menu
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("a_pick_is_one_hot_and_a_second_pick_moves_it", a_pick_is_one_hot_and_a_second_pick_moves_it as fn()),
+            ("an_order_ranks_adds_removes_and_switches_role", an_order_ranks_adds_removes_and_switches_role as fn()),
+            ("solo_popo_changes_only_the_cycle_role_preference_and_marks_ice_climbers", solo_popo_changes_only_the_cycle_role_preference_and_marks_ice_climbers as fn()),
+            ("solo_popo_persists_independently_for_each_role", solo_popo_persists_independently_for_each_role as fn()),
+            ("values_round_trip_through_the_kept_json_and_bad_json_is_the_factory", values_round_trip_through_the_kept_json_and_bad_json_is_the_factory as fn()),
+            ("cycles_badges_number_each_role_independently", cycles_badges_number_each_role_independently as fn()),
+            ("all_orders_number_every_member_and_the_all_cell_badges_all", all_orders_number_every_member_and_the_all_cell_badges_all as fn()),
+            ("the_slot_zero_badge_greys_the_roles_original_group", the_slot_zero_badge_greys_the_roles_original_group as fn()),
+            ("hats_badge_the_hat_order_and_hide_the_solo_markers", hats_badge_the_hat_order_and_hide_the_solo_markers as fn()),
+            ("picks_keep_no_badges_and_the_name_labels_carry_the_name_only", picks_keep_no_badges_and_the_name_labels_carry_the_name_only as fn()),
+            ("cycles_name_labels_show_the_fighter_name_only", cycles_name_labels_show_the_fighter_name_only as fn()),
+            ("mii_tiles_follow_the_catalog_admission", mii_tiles_follow_the_catalog_admission as fn()),
+            ("a_mii_original_takes_slot_zero_only_without_a_numbered_place", a_mii_original_takes_slot_zero_only_without_a_numbered_place as fn()),
+            ("the_cpu_zero_is_the_runtimes_original_not_the_overwritten_pick", the_cpu_zero_is_the_runtimes_original_not_the_overwritten_pick as fn()),
+        ]);
+    }
+    }
+}

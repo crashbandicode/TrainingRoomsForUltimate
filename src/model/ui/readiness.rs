@@ -58,3 +58,38 @@ pub fn must_release(facts: Facts) -> bool {
     facts.owns_input && (!facts.installed || !facts.layout_ready || facts.polls_since_tick > STALL_POLLS)
 }
 
+#[cfg(test)]
+mod tests {
+    lib_unit_tests! {
+    use super::*;
+
+    const READY: Facts = Facts { installed: true, layout_ready: true, pause_active: false, closing: false, owns_input: false, polls_since_tick: 0 };
+
+    fn it_opens_only_with_a_renderer_and_no_pause_or_close_window() {
+        assert!(may_open(READY));
+        assert!(!may_open(Facts { installed: false, ..READY }));
+        assert!(!may_open(Facts { layout_ready: false, ..READY }));
+        assert!(!may_open(Facts { pause_active: true, ..READY }));
+        assert!(!may_open(Facts { closing: true, ..READY }));
+    }
+
+    fn an_owning_menu_is_released_when_the_renderer_goes_away() {
+        let owning = Facts { owns_input: true, ..READY };
+        assert!(!must_release(owning));
+        assert!(must_release(Facts { layout_ready: false, ..owning }));
+        assert!(must_release(Facts { installed: false, ..owning }));
+        assert!(!must_release(Facts { polls_since_tick: STALL_POLLS, ..owning }));
+        assert!(must_release(Facts { polls_since_tick: STALL_POLLS + 1, ..owning }), "the tick stopped: the layout is gone");
+        assert!(!must_release(Facts { layout_ready: false, ..READY }), "nothing owned, nothing to release");
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("it_opens_only_with_a_renderer_and_no_pause_or_close_window", it_opens_only_with_a_renderer_and_no_pause_or_close_window as fn()),
+            ("an_owning_menu_is_released_when_the_renderer_goes_away", an_owning_menu_is_released_when_the_renderer_goes_away as fn()),
+        ]);
+    }
+    }
+}

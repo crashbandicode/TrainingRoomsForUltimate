@@ -44,3 +44,89 @@ pub(crate) unsafe fn without_roster_animation(hud: usize, owner: u32, refresh: i
     }
 }
 
+#[cfg(test)]
+mod tests {
+    lib_unit_tests! {
+    use super::*;
+
+    fn fixture() -> (Vec<usize>, Vec<usize>) {
+        let mut hud = vec![0usize; 0x1c00 / 8];
+        let mut cards = vec![0usize; 8 * 0x2d0 / 8];
+        let h = hud.as_mut_ptr() as usize;
+        unsafe {
+            native_fields::write_unchecked(h, 0xb0, cards.as_mut_ptr() as usize);
+            for row in 0..8 {
+                native_fields::write_unchecked(h, row * 0x1d8 + 0xd68, u32::MAX);
+            }
+            native_fields::write_unchecked(h, 0xd68, 1u32);
+            native_fields::write_unchecked(h, 0xd60, 2u32);
+        }
+        (hud, cards)
+    }
+
+    fn synthetic_refresh_keeps_new_portrait_and_suppresses_only_new_flash() {
+        let (mut hud, mut cards) = fixture();
+        let h = hud.as_mut_ptr() as usize;
+        let c = cards.as_mut_ptr() as usize;
+        unsafe {
+            without_roster_animation(h, 1, || {
+                native_fields::write_unchecked(c, 2 * 0x2d0 + 0x23b, 1u8);
+                native_fields::write_unchecked(c, 0, 0xfeedu64);
+            });
+            assert_eq!(native_fields::read::<u8>(c, 2 * 0x2d0 + 0x23b), Some(0));
+            assert_eq!(native_fields::read::<u64>(c, 0), Some(0xfeed));
+        }
+    }
+
+    fn already_pending_native_animation_is_preserved() {
+        let (mut hud, mut cards) = fixture();
+        let h = hud.as_mut_ptr() as usize;
+        let c = cards.as_mut_ptr() as usize;
+        unsafe {
+            native_fields::write_unchecked(c, 2 * 0x2d0 + 0x23b, 1u8);
+            without_roster_animation(h, 1, || {});
+            assert_eq!(native_fields::read::<u8>(c, 2 * 0x2d0 + 0x23b), Some(1));
+        }
+    }
+
+    fn mapping_change_does_not_clear_a_different_owners_record() {
+        let (mut hud, mut cards) = fixture();
+        let h = hud.as_mut_ptr() as usize;
+        let c = cards.as_mut_ptr() as usize;
+        unsafe {
+            without_roster_animation(h, 1, || {
+                native_fields::write_unchecked(c, 2 * 0x2d0 + 0x23b, 1u8);
+                native_fields::write_unchecked(h, 0xd60, 3u32);
+                native_fields::write_unchecked(c, 3 * 0x2d0 + 0x23b, 1u8);
+            });
+            for slot in [2, 3] {
+                assert_eq!(native_fields::read::<u8>(c, slot * 0x2d0 + 0x23b), Some(1));
+            }
+        }
+    }
+
+    fn absent_hud_or_invalid_mapping_does_not_prevent_native_refresh() {
+        let (mut hud, _cards) = fixture();
+        let h = hud.as_mut_ptr() as usize;
+        let mut calls = 0;
+        unsafe {
+            without_roster_animation(0, 1, || calls += 1);
+            without_roster_animation(h, 4, || calls += 1);
+            native_fields::write_unchecked(h, 0xd60, u32::MAX);
+            without_roster_animation(h, 1, || calls += 1);
+        }
+        assert_eq!(calls, 3);
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("synthetic_refresh_keeps_new_portrait_and_suppresses_only_new_flash", synthetic_refresh_keeps_new_portrait_and_suppresses_only_new_flash as fn()),
+            ("already_pending_native_animation_is_preserved", already_pending_native_animation_is_preserved as fn()),
+            ("mapping_change_does_not_clear_a_different_owners_record", mapping_change_does_not_clear_a_different_owners_record as fn()),
+            ("absent_hud_or_invalid_mapping_does_not_prevent_native_refresh", absent_hud_or_invalid_mapping_does_not_prevent_native_refresh as fn()),
+        ]);
+    }
+    }
+}

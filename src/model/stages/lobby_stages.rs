@@ -291,3 +291,160 @@ impl<'de> Deserialize<'de> for LobbyStageOrder {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    lib_unit_tests! {
+    use super::*;
+
+    fn recorded_native_forms_include_exceptions_and_exclude_internal_neighbors() {
+        // Independent recorded fixture facts: table rows0/1,3/4,95/96/97,
+        // 328/329/330 and361/362/363, plus the four form0-only special rows.
+        for (stage, form, expected) in [
+            (0, Form::Omega, 1), (3, Form::Normal, 3),
+            (95, Form::Omega, 96), (95, Form::Normal, 95),
+            (328, Form::Omega, 329), (361, Form::Omega, 362),
+            (3, Form::Battlefield, 4), (95, Form::Battlefield, 97),
+            (328, Form::Battlefield, 330), (361, Form::Battlefield, 363),
+        ] {
+            assert_eq!(native_stage(Selection { stage, form }), Ok(expected));
+        }
+        for stage in [2, 347, 308, 311] {
+            assert_eq!(native_stage(Selection::normal(stage)), Ok(stage));
+            for form in [Form::Omega, Form::Battlefield] {
+                assert_eq!(native_stage(Selection { stage, form }), Err("form unavailable for this stage"));
+            }
+        }
+        assert_eq!(native_forms(3), [Some(3), None, Some(4)]);
+        assert_eq!(native_forms(95), [Some(95), Some(96), Some(97)]);
+        assert_eq!(form_catalog()[4], [Some(3), None, Some(4)]);
+        assert_eq!(Form::ALL, [Form::Normal, Form::Omega, Form::Battlefield]);
+        assert!(native_stage(Selection { stage: 0, form: Form::Battlefield }).is_err());
+        assert!(native_stage(Selection { stage: 3, form: Form::Omega }).is_err());
+        for stage in [1, 4, 194, 309, 310, 327, 331, 354, 364, u32::MAX] {
+            assert!(native_stage(Selection::normal(stage)).is_err());
+        }
+        assert_eq!(Forms::NORMAL.as_slice().len(), STAGES.len());
+        for (stage, _) in STAGES {
+            assert_eq!(native_stage(Selection::normal(*stage)), Ok(*stage));
+        }
+    }
+
+    /// Compare the production mapping to the entire independently recorded
+    /// native table. The private artifact is supplied by the bounded verifier;
+    /// neither game bytes nor a copy of the production mapping is a fixture.
+    #[test]
+    #[ignore = "requires STAGE185_NATIVE_CATALOG pointing to the recorded private catalog"]
+    fn all_forms_match_recorded_native_catalog() {
+        use std::convert::TryFrom;
+        let path = std::env::var_os("STAGE185_NATIVE_CATALOG")
+            .expect("set STAGE185_NATIVE_CATALOG to stage-id-asset-catalog.json");
+        let bytes = std::fs::read(path).expect("read recorded native catalog");
+        let catalog: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(catalog["elf_sha256"], "0789f0a4ae9652f335eca5eabc7df3e58b0954012a0bebdea374f317706536c2");
+        assert_eq!(catalog["table_va"], "0x454a7e8");
+        assert_eq!(catalog["stride"], 72);
+        let rows = catalog["records"].as_array().unwrap();
+        assert_eq!(rows.len(), 364);
+        assert_eq!(catalog["count"], rows.len());
+        let mut ids = std::collections::BTreeSet::new();
+        let mut recorded = std::collections::BTreeMap::new();
+        for row in rows {
+            let id = u32::try_from(row["stage_id"].as_u64().unwrap()).unwrap();
+            let form = usize::try_from(row["form"].as_u64().unwrap()).unwrap();
+            assert!(ids.insert(id), "duplicate recorded native ID {}", id);
+            assert!(form < Form::ALL.len());
+            if row["base_stage_id"].is_null() {
+                assert_eq!(id, 327); // Recorded unresolved TestStage, not selectable.
+                assert!(!STAGES.iter().any(|(stage, _)| *stage == id));
+                continue;
+            }
+            let base = u32::try_from(row["base_stage_id"].as_u64().unwrap()).unwrap();
+            assert!(recorded.insert((base, form), id).is_none(), "duplicate recorded stage/form");
+        }
+        assert!(ids.into_iter().eq(0..364));
+        for (stage, _) in STAGES {
+            let expected: [Option<u32>; 3] = std::array::from_fn(|form| recorded.get(&(*stage, form)).copied());
+            assert_eq!(native_forms(*stage), expected, "base stage {stage}");
+            for form in Form::ALL {
+                let resolved = native_stage(Selection { stage: *stage, form });
+                assert_eq!(resolved.ok(), expected[form as usize], "stage {stage}, {form:?}");
+            }
+        }
+    }
+
+    fn with_form(mut forms: Forms, stage: u32, form: Form) -> Forms {
+        forms.set(STAGES.iter().position(|(id, _)| *id == stage).unwrap(), form).unwrap();
+        forms
+    }
+
+    fn legacy_rank_formats_keep_identity_order_when_forms_are_added() {
+        let mut old_full = vec![0u8; 117];
+        old_full[116] = 1; // Hollow Bastion, before Training was appended.
+        old_full[1] = 2; // Waiting Room.
+        for (value, expected) in [
+            (serde_json::json!([0, 0, 2, 1]), vec![3, 0]),
+            (serde_json::json!(old_full), vec![361, 311]),
+        ] {
+            let order: LobbyStageOrder = serde_json::from_value(value).unwrap();
+            let ranks_before = serde_json::to_value(order).unwrap();
+            let normal = order.selections(&Forms::NORMAL).unwrap();
+            assert_eq!(normal.iter().map(|s| s.stage).collect::<Vec<_>>(), expected);
+            let forms = with_form(with_form(Forms::NORMAL, 0, Form::Omega), 361, Form::Battlefield);
+            let selected = order.selections(&forms).unwrap();
+            assert_eq!(selected.iter().map(|s| s.stage).collect::<Vec<_>>(), expected);
+            assert_eq!(serde_json::to_value(order).unwrap(), ranks_before);
+            let restored_forms: Forms = serde_json::from_value(serde_json::to_value(forms).unwrap()).unwrap();
+            assert_eq!(order.selections(&restored_forms).unwrap(), selected);
+        }
+        let all: LobbyStageOrder = serde_json::from_str("[1,0,0,0]").unwrap();
+        let forms = with_form(Forms::NORMAL, 95, Form::Omega);
+        let selected = all.selections(&forms).unwrap();
+        assert_eq!(selected.len(), STAGES.len());
+        assert!(selected.contains(&Selection { stage: 95, form: Form::Omega }));
+        assert_eq!(selected.last(), Some(&Selection::normal(308)));
+        // An invalid unranked form must not wait to fail until it is selected.
+        let invalid = with_form(Forms::NORMAL, 308, Form::Omega);
+        assert!(LobbyStageOrder::NATIVE.selections(&invalid).is_err());
+    }
+
+    fn invalid_orders_do_not_replace_saved_preferences() {
+        for values in [
+            vec![],
+            vec![0, 0, 0, 0],
+            vec![0, 1, 1, 0],
+            vec![0, 1, 3, 0],
+            vec![1, 1, 0, 0],
+        ] {
+            assert!(serde_json::from_value::<LobbyStageOrder>(serde_json::json!(values)).is_err());
+        }
+    }
+
+    fn training_stage_is_selectable_without_shifting_saved_choices() {
+        // Old full-catalog preferences: Hollow Bastion then Waiting Room.
+        let mut old = vec![0u8; 117];
+        old[116] = 1;
+        old[1] = 2;
+        let restored: LobbyStageOrder = serde_json::from_value(serde_json::json!(old)).unwrap();
+        assert_eq!(restored.stages(), vec![361, 311]);
+        let mut current: Vec<u8> = serde_json::from_value(serde_json::to_value(restored).unwrap()).unwrap();
+        assert_eq!(current.len(), 118);
+        assert_eq!(current[117], 0);
+        current[117] = 3;
+        let selected: LobbyStageOrder = serde_json::from_value(serde_json::json!(current)).unwrap();
+        assert_eq!(selected.stages(), vec![361, 311, 308]);
+    }
+
+
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("recorded_native_forms_include_exceptions_and_exclude_internal_neighbors", recorded_native_forms_include_exceptions_and_exclude_internal_neighbors as fn()),
+            ("legacy_rank_formats_keep_identity_order_when_forms_are_added", legacy_rank_formats_keep_identity_order_when_forms_are_added as fn()),
+            ("invalid_orders_do_not_replace_saved_preferences", invalid_orders_do_not_replace_saved_preferences as fn()),
+            ("training_stage_is_selectable_without_shifting_saved_choices", training_stage_is_selectable_without_shifting_saved_choices as fn()),
+        ]);
+    }
+    }
+}

@@ -241,7 +241,6 @@ mod tests {
 
     /// Every site of every table of the merged tree and every feature the boot reports: the line is whole (longer than the old 8 KiB
     /// buffer) and still ends with its result and the allocation count.
-    #[test]
     fn the_merged_trees_line_is_whole_and_ends_with_its_result() {
         use super::super::{sites, sites_pkg3, sites_pkg4, sites_pkg6, sites_u4, sites_ui};
         let tables: [&[sites::Site]; 6] =
@@ -285,7 +284,6 @@ mod tests {
     }
 
     /// A line longer than its buffer keeps its whole leading fields and ends `result=line_overflow`, never cut inside a field.
-    #[test]
     fn a_line_that_does_not_fit_ends_with_line_overflow() {
         let reports: Vec<SiteReport> = (0..40)
             .map(|_| SiteReport { site: "a_long_enough_site_name", found: GuardOutcome::Stock, written: Written::Checked })
@@ -312,14 +310,12 @@ mod tests {
         assert!(line.to_string().starts_with(text.trim_end_matches(" heap_allocations=7 result=line_overflow")));
     }
 
-    #[test]
     fn ticks_convert_to_milliseconds() {
         assert_eq!(tick_to_ms(0), 0);
         assert_eq!(tick_to_ms(SYSTEM_TICK_HZ), 1000);
         assert_eq!(tick_to_ms(SYSTEM_TICK_HZ * 3600 + 19_199), 3_600_000);
     }
 
-    #[test]
     fn the_developer_gate_outcome_is_on_the_line() {
         let line = |on, reason| InstallLine {
             tick: 7,
@@ -339,7 +335,6 @@ mod tests {
         assert!(line(true, "on").to_string().contains(" developer=on reason=on result="));
     }
 
-    #[test]
     fn an_unsupported_game_line_has_no_sites() {
         let line = InstallLine {
             tick: 1,
@@ -359,6 +354,18 @@ mod tests {
             line.to_string(),
             "1 plugin=training_rooms/0.1.0 game=12.0.0 build=none result=unsupported_version reason=display_version heap_allocations=0"
         );
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("the_merged_trees_line_is_whole_and_ends_with_its_result", the_merged_trees_line_is_whole_and_ends_with_its_result as fn()),
+            ("a_line_that_does_not_fit_ends_with_line_overflow", a_line_that_does_not_fit_ends_with_line_overflow as fn()),
+            ("ticks_convert_to_milliseconds", ticks_convert_to_milliseconds as fn()),
+            ("the_developer_gate_outcome_is_on_the_line", the_developer_gate_outcome_is_on_the_line as fn()),
+            ("an_unsupported_game_line_has_no_sites", an_unsupported_game_line_has_no_sites as fn()),
+        ]);
     }
     }
 }

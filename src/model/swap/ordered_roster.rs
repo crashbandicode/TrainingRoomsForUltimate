@@ -240,3 +240,148 @@ pub const DEFAULT_KIRBY_HATS: OrderedFighterRoster =
         None => unreachable!(),
     };
 
+#[cfg(test)]
+mod tests {
+    lib_unit_tests! {
+    use super::*;
+
+    fn legacy_rosters_keep_their_order_and_all_semantics() {
+        let mut legacy = vec![0u8; 81];
+        legacy[80] = 1; // Sora first, then Mario.
+        legacy[1] = 2;
+        let roster: OrderedFighterRoster =
+            serde_json::from_value(serde_json::json!(legacy)).unwrap();
+        assert_eq!(
+            roster
+                .fighters()
+                .iter()
+                .map(|f| f.kind())
+                .collect::<Vec<_>>(),
+            vec![0x5d, 0]
+        );
+        let current = serde_json::to_value(roster).unwrap();
+        assert_eq!(current.as_array().unwrap().len(), CHOICES.len() + 1);
+        assert!(current.as_array().unwrap()[81..].iter().all(|v| v == 0));
+        legacy.fill(0);
+        legacy[0] = 1;
+        let all: OrderedFighterRoster = serde_json::from_value(serde_json::json!(legacy)).unwrap();
+        assert_eq!(
+            all.fighters().len(),
+            83 + 3 * usize::from(cfg!(feature = "mii-saved-alpha"))
+        );
+        legacy[1] = 1; // All and an explicit rank remain mutually exclusive.
+        assert!(serde_json::from_value::<OrderedFighterRoster>(serde_json::json!(legacy)).is_err());
+        legacy[0] = 0;
+        legacy[80] = 1; // Duplicate ranks remain invalid.
+        assert!(serde_json::from_value::<OrderedFighterRoster>(serde_json::json!(legacy)).is_err());
+        legacy[80] = 3; // As do gaps.
+        assert!(serde_json::from_value::<OrderedFighterRoster>(serde_json::json!(legacy)).is_err());
+        for length in [0, 80, 82, 85, MII_ALPHA_CHOICE_COUNT + 2] {
+            assert!(
+                serde_json::from_value::<OrderedFighterRoster>(serde_json::json!(vec![
+                    0u8;
+                    length
+                ]))
+                .is_err()
+            );
+        }
+    }
+
+    #[cfg(not(feature = "mii-saved-alpha"))]
+    #[test]
+    fn alpha_tail_is_validated_before_base_downgrade() {
+        let mut values = vec![0u8; MII_ALPHA_CHOICE_COUNT + 1];
+        values[80] = 1; // Sora, Sword, Mario.
+        values[87] = 2;
+        values[1] = 3;
+        let read = |v: &[u8]| serde_json::from_value::<OrderedFighterRoster>(serde_json::json!(v));
+        assert_eq!(
+            read(&values).unwrap().fighters(),
+            vec![TrioFighter::from_kind(0x5d).unwrap(), TrioFighter::MARIO]
+        );
+        values[87] = 3; // Removing the unsupported tail must not hide a duplicate.
+        assert!(read(&values).is_err());
+        values[87] = 4; // Nor a gap.
+        assert!(read(&values).is_err());
+        values.fill(0);
+        values[87] = 1;
+        assert_eq!(read(&values).unwrap().fighters(), vec![TrioFighter::MARIO]);
+        values[0] = 1; // All cannot silently discard a nonzero Sword preference.
+        assert!(read(&values).is_err());
+        values[87] = 0;
+        values[82] = 1; // All with Mythra/Ivysaur start preferences is unchanged.
+        values[84] = 1;
+        assert_eq!(read(&values).unwrap().values(), values[..87]);
+        values.push(0); // Unknown adjacent length is not a future-format escape.
+        assert!(read(&values).is_err());
+    }
+
+    fn starting_forms_preserve_explicit_order() {
+        let fighters: Vec<_> = [0x26, 0x5b, 0x24, 0x5a, 0x25]
+            .iter()
+            .copied()
+            .map(|kind| TrioFighter::from_kind(kind).unwrap())
+            .collect();
+        let roster = OrderedFighterRoster::from_fighters(&fighters).unwrap();
+        let restored: OrderedFighterRoster =
+            serde_json::from_str(&serde_json::to_string(&roster).unwrap()).unwrap();
+        assert_eq!(restored.fighters(), fighters[..2]);
+    }
+
+    fn all_uses_the_complete_unchanged_catalog_order() {
+        let all = OrderedFighterRoster::all();
+        assert_eq!(
+            all.fighters().len(),
+            83 + 3 * usize::from(cfg!(feature = "mii-saved-alpha"))
+        );
+        assert_eq!(all.fighters()[16], TrioFighter::ICE_CLIMBERS);
+        assert_eq!(all.fighters()[37].kind(), 0x24);
+        assert_eq!(all.fighters().first(), Some(&TrioFighter::MARIO));
+        assert!(all
+            .fighters()
+            .iter()
+            .all(|fighter| TrioFighter::supported_kind(fighter.kind())));
+        assert_eq!(
+            serde_json::from_str::<OrderedFighterRoster>(&serde_json::to_string(&all).unwrap())
+                .unwrap(),
+            all
+        );
+    }
+
+    fn invalid_empty_duplicate_gapped_or_mixed_ranks_are_rejected() {
+        let mut values = vec![0u8; CHOICES.len() + 1];
+        for sample in [
+            values.clone(),
+            {
+                values[1] = 1;
+                values[2] = 1;
+                values.clone()
+            },
+            {
+                values[2] = 3;
+                values.clone()
+            },
+            {
+                values[0] = 1;
+                values.clone()
+            },
+        ] {
+            assert!(serde_json::from_str::<OrderedFighterRoster>(
+                &serde_json::to_string(&sample).unwrap()
+            )
+            .is_err());
+        }
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("legacy_rosters_keep_their_order_and_all_semantics", legacy_rosters_keep_their_order_and_all_semantics as fn()),
+            ("starting_forms_preserve_explicit_order", starting_forms_preserve_explicit_order as fn()),
+            ("all_uses_the_complete_unchanged_catalog_order", all_uses_the_complete_unchanged_catalog_order as fn()),
+            ("invalid_empty_duplicate_gapped_or_mixed_ranks_are_rejected", invalid_empty_duplicate_gapped_or_mixed_ranks_are_rejected as fn()),
+        ]);
+    }
+    }
+}

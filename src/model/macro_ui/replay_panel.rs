@@ -148,3 +148,74 @@ impl ReplayEditor {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    lib_unit_tests! {
+    use super::*;
+    use {crate::engine::macros::InputFrame, crate::engine::macros::ReplayFrame, crate::engine::macros::ReplayTrack, crate::engine::macros::StartState};
+
+    fn editor() -> ReplayEditor {
+        let frames = (0..2000).map(|i| ReplayFrame { input: InputFrame::default(),
+            start: StartState { status: 14, speed_y: i as f32, ..StartState::neutral(18, 0, 1.0) },
+            x: i as f32, y: 0.0 }).collect();
+        ReplayEditor::new(ReplaySession { tracks: vec![ReplayTrack { entry: 1, frames,
+            quantized_analog: false }], truncated: false, breaks: Vec::new() }, vec![0, 14]).unwrap()
+    }
+
+    fn choose(editor: &mut ReplayEditor, cell: usize) -> Effect {
+        editor.cursor = cell;
+        editor.on_pad(Pad::Confirm)
+    }
+
+    fn precise_game_time_navigation_both_directions_and_custom_seconds() {
+        let mut e = editor();
+        choose(&mut e, 3);
+        assert_eq!(e.window.cursor(), 1);
+        choose(&mut e, 5); choose(&mut e, 3);
+        assert_eq!(e.window.cursor(), 61);
+        choose(&mut e, 6); choose(&mut e, 3);
+        assert_eq!(e.window.cursor(), 361);
+        choose(&mut e, 2);
+        assert_eq!(e.window.cursor(), 61);
+        choose(&mut e, 9); choose(&mut e, 3);
+        assert_eq!(e.window.cursor(), 721); // 11 seconds of game time.
+        choose(&mut e, 2); choose(&mut e, 2);
+        assert_eq!(e.window.cursor(), 0);
+    }
+
+    fn export_uses_the_marked_start_snapshot_and_half_open_end() {
+        let mut e = editor();
+        e.window.seek(60); choose(&mut e, 10);
+        e.window.seek(120); choose(&mut e, 11);
+        let Effect::Export(recording) = choose(&mut e, 15) else { panic!("expected export") };
+        assert_eq!(recording.frames.len(), 60);
+        assert_eq!(recording.start.speed_y, 60.0);
+        assert_eq!(recording.start.fighter_kind, 18);
+        assert!(e.view().labels[20].contains("120/2000"));
+    }
+
+    fn automatic_loop_keeps_the_preceding_complete_capture_selectable() {
+        let complete = editor().session;
+        let mut partial = complete.clone();
+        partial.tracks[0].frames.truncate(75);
+        let mut e = ReplayEditor::new(partial, vec![14]).unwrap().with_previous(Some(complete));
+        assert_eq!(e.window.total(), 75);
+        choose(&mut e, 18);
+        let Effect::Export(recording) = choose(&mut e, 15) else { panic!("expected full export") };
+        assert_eq!(recording.frames.len(), 2000);
+        assert_eq!(e.view().labels[18], "Use latest capture");
+        choose(&mut e, 18);
+        assert_eq!(e.window.total(), 75);
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("precise_game_time_navigation_both_directions_and_custom_seconds", precise_game_time_navigation_both_directions_and_custom_seconds as fn()),
+            ("export_uses_the_marked_start_snapshot_and_half_open_end", export_uses_the_marked_start_snapshot_and_half_open_end as fn()),
+            ("automatic_loop_keeps_the_preceding_complete_capture_selectable", automatic_loop_keeps_the_preceding_complete_capture_selectable as fn()),
+        ]);
+    }
+    }
+}

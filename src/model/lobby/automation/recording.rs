@@ -85,3 +85,61 @@ impl<T: PartialEq> Recording<T> {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    lib_unit_tests! {
+    use super::*;
+
+    fn clocks_do_not_consume_slots_and_change_has_the_original_tick() {
+        let mut r = Recording::new(2, 20);
+        let capacity = r.frames.capacity();
+        for age in 0..10 {
+            assert!(r.observe(7u32, age));
+        }
+        assert!(r.observe(8, 0));
+        assert_eq!(r.frames().len(), 2);
+        assert_eq!(r.frames()[1].tick, 11);
+        assert_eq!(r.frames()[1].native_age, 0);
+        assert_eq!(r.frames()[0].last_tick, 10);
+        assert_eq!(r.frames()[0].last_native_age, 9);
+        assert_eq!(r.frames.capacity(), capacity);
+        r.finish(Stop::NativeExit);
+        assert_eq!(r.stop(), Some(Stop::NativeExit));
+    }
+
+    fn overflow_is_explicit_and_cannot_be_relabelled_as_a_complete_capture() {
+        let mut r = Recording::new(1, 20);
+        assert!(r.observe(1u32, 0));
+        assert!(!r.observe(2, 1));
+        r.finish(Stop::NativeExit);
+        assert_eq!(r.stop(), Some(Stop::SnapshotLimit));
+        assert_eq!(r.frames().len(), 1);
+        assert!(!r.observe(3, 2));
+        assert_eq!(r.ticks(), 2);
+    }
+
+    fn unchanging_capture_ends_at_tick_budget() {
+        let mut r = Recording::new(3, 2);
+        assert!(r.observe(1u32, 0));
+        assert!(!r.observe(1, 1));
+        assert_eq!(r.stop(), Some(Stop::TickLimit));
+        assert_eq!(r.frames().len(), 1);
+        for reason in [Stop::BindingChanged, Stop::Contention, Stop::InvalidBinding] {
+            let mut r = Recording::<u8>::new(1, 1);
+            r.finish(reason);
+            assert!(!r.observe(0, 0));
+            assert_eq!(r.stop(), Some(reason));
+        }
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("clocks_do_not_consume_slots_and_change_has_the_original_tick", clocks_do_not_consume_slots_and_change_has_the_original_tick as fn()),
+            ("overflow_is_explicit_and_cannot_be_relabelled_as_a_complete_capture", overflow_is_explicit_and_cannot_be_relabelled_as_a_complete_capture as fn()),
+            ("unchanging_capture_ends_at_tick_budget", unchanging_capture_ends_at_tick_budget as fn()),
+        ]);
+    }
+    }
+}

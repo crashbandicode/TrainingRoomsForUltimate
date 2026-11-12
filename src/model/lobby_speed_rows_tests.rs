@@ -52,7 +52,6 @@ fn page_plus(label: &str, adrp_at: usize, access_at: usize) -> usize {
     adrp(pc, a) + uimm(word(label, access_at).1)
 }
 
-#[test]
 fn class_update_is_a_mid_inline_hook_on_mov_x0_x20_before_the_flow_check() {
     let r = row("lobby_speed.class_update");
     assert_eq!(r.offset, native::CLASS_UPDATE_SITE);
@@ -66,7 +65,6 @@ fn class_update_is_a_mid_inline_hook_on_mov_x0_x20_before_the_flow_check() {
     assert!(source.contains(&format!("#[skyline::hook(offset = {:#x}, inline)]", native::CLASS_UPDATE_SITE)));
 }
 
-#[test]
 fn the_task_entry_runs_the_scheduler_then_the_class_update() {
     const L: &str = "lobby_speed.task_entry";
     assert_eq!(page_plus(L, 2, 3), native::SCHED_GLOBAL, "ldr x8, [main+0x52c33d8]");
@@ -78,14 +76,12 @@ fn the_task_entry_runs_the_scheduler_then_the_class_update() {
     assert_eq!(word(L, 12).1, 0xd63f_0100, "blr x8");
 }
 
-#[test]
 fn the_paused_word_is_the_one_the_entry_reads() {
     const L: &str = "lobby_speed.paused_flag";
     assert_eq!(page_plus(L, 6, 7), native::PAUSED, "ldr w22, [main+0x52b92e8]");
     assert_eq!(word(L, 7).1 & 0x1f, 22, "into w22, the scheduler's paused argument");
 }
 
-#[test]
 fn the_slow_state_offsets_come_from_the_slow_step() {
     const L: &str = "lobby_speed.slow_step";
     assert_eq!(page_plus(L, 0, 1), native::SLOW_STATE + native::CURRENT_N_AT, "ldrb w8, [current N]");
@@ -103,7 +99,6 @@ fn the_slow_state_offsets_come_from_the_slow_step() {
     assert_eq!(uimm(word(P, 13).1), native::CURRENT_N_AT, "strb w8, [x9, #4]: the target latched at the end");
 }
 
-#[test]
 fn the_scheduler_layout_comes_from_its_walk() {
     const S: &str = "lobby_speed.sched_setup";
     assert_eq!(word(S, 2).1, 0x1280_0015, "mov w21, #-1");
@@ -138,7 +133,6 @@ fn the_scheduler_layout_comes_from_its_walk() {
     assert_eq!(cmp_imm(word(T, 13).1), sched::PER_BLOCK * sched::ELEMENT, "cmp x8, #0x1000: a block");
 }
 
-#[test]
 fn the_skipped_tick_is_the_registry_walker() {
     const L: &str = "lobby_speed.walker_tick";
     assert_eq!(row(L).offset, native::WALKER_TICK);
@@ -147,7 +141,6 @@ fn the_skipped_tick_is_the_registry_walker() {
     assert_eq!(adrp(pc, a) + add_imm(word(L, 7).1), 0x506_21a0, "the inner lambda that ticks each registry object");
 }
 
-#[test]
 fn every_lobby_speed_row_is_compared_and_scoped_to_the_waiting_room() {
     use crate::engine::seams::native_seams::Scopes;
     assert_eq!(ROWS.len(), 10);
@@ -157,4 +150,18 @@ fn every_lobby_speed_row_is_compared_and_scoped_to_the_waiting_room() {
         assert_eq!(r.scopes, Scopes::LOBBY_WAITING, "{}", r.label);
         assert_eq!(r.feature, "", "{}", r.label);
     }
+}
+
+/// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+#[test]
+fn case_table() {
+    crate::test_table::run(&[
+        ("class_update_is_a_mid_inline_hook_on_mov_x0_x20_before_the_flow_check", class_update_is_a_mid_inline_hook_on_mov_x0_x20_before_the_flow_check as fn()),
+        ("the_task_entry_runs_the_scheduler_then_the_class_update", the_task_entry_runs_the_scheduler_then_the_class_update as fn()),
+        ("the_paused_word_is_the_one_the_entry_reads", the_paused_word_is_the_one_the_entry_reads as fn()),
+        ("the_slow_state_offsets_come_from_the_slow_step", the_slow_state_offsets_come_from_the_slow_step as fn()),
+        ("the_scheduler_layout_comes_from_its_walk", the_scheduler_layout_comes_from_its_walk as fn()),
+        ("the_skipped_tick_is_the_registry_walker", the_skipped_tick_is_the_registry_walker as fn()),
+        ("every_lobby_speed_row_is_compared_and_scoped_to_the_waiting_room", every_lobby_speed_row_is_compared_and_scoped_to_the_waiting_room as fn()),
+    ]);
 }

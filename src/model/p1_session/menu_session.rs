@@ -52,3 +52,59 @@ impl Arbitration {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    lib_unit_tests! {
+    use super::*;
+
+    fn menu_changes_replace_or_stop_and_repeated_commits_are_idempotent() {
+        let mut arbitration = Arbitration::new();
+        assert_eq!(arbitration.observe(0, false), None);
+        let on = update(0, level(true, Some(3)));
+        assert_eq!(arbitration.observe(on, false), Some(3));
+        assert_eq!(update(on, 3), on);
+        let changed = update(on, 7);
+        assert_eq!(arbitration.observe(changed, false), Some(7));
+        assert_eq!(arbitration.observe(update(changed, 0), false), None);
+        assert_eq!(level(true, None), 0);
+        assert_eq!(level(true, Some(10)), 0);
+        assert_eq!(level(false, Some(3)), 0);
+    }
+
+    fn request_preempts_until_a_later_explicit_setting_change() {
+        let mut arbitration = Arbitration::new();
+        let on = update(0, 3);
+        assert_eq!(arbitration.observe(on, false), Some(3));
+        arbitration.request_started();
+        assert_eq!(arbitration.observe(on, true), None);
+        let during_request = update(on, 4);
+        assert_eq!(arbitration.observe(during_request, true), None);
+        assert_eq!(arbitration.observe(during_request, false), None);
+        assert_eq!(
+            arbitration.observe(update(during_request, 5), false),
+            Some(5)
+        );
+    }
+
+    fn off_then_on_rearms_even_when_no_fighter_observes_the_off_commit() {
+        let mut arbitration = Arbitration::new();
+        let on = update(0, 3);
+        arbitration.observe(on, true);
+        assert_eq!(arbitration.observe(on, false), None);
+        let off = update(on, 0);
+        let on_again = update(off, 3);
+        assert_ne!(on_again, on);
+        assert_eq!(arbitration.observe(on_again, false), Some(3));
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("menu_changes_replace_or_stop_and_repeated_commits_are_idempotent", menu_changes_replace_or_stop_and_repeated_commits_are_idempotent as fn()),
+            ("request_preempts_until_a_later_explicit_setting_change", request_preempts_until_a_later_explicit_setting_change as fn()),
+            ("off_then_on_rearms_even_when_no_fighter_observes_the_off_commit", off_then_on_rearms_even_when_no_fighter_observes_the_off_commit as fn()),
+        ]);
+    }
+    }
+}

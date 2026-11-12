@@ -8,7 +8,7 @@ pub mod catalog;
 #[cfg(any(test, target_os = "switch"))]
 pub mod lobby_stage_cycle;
 pub mod lobby_stages;
-#[cfg(target_os = "switch")]
+#[cfg(any(test, target_os = "switch"))]
 pub mod practice_stage_request_policy;
 pub mod stage_forms;
 pub mod stage_menu;

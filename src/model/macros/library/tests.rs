@@ -33,7 +33,6 @@ fn edited_json(edit: impl FnOnce(&mut Value)) -> Vec<u8> {
     serde_json::to_vec(&value).unwrap()
 }
 
-#[test]
 fn missing_or_empty_directory_lists_nothing() {
     let tmp = TempDir::new();
     let absent = Library::new(tmp.path().join("absent"));
@@ -41,7 +40,6 @@ fn missing_or_empty_directory_lists_nothing() {
     assert_eq!(Library::new(tmp.path()).list().unwrap(), Listing::default());
 }
 
-#[test]
 fn save_new_persists_and_reloads_through_a_fresh_library() {
     let tmp = TempDir::new();
     let dir = tmp.path().join("ultimate").join("macros");
@@ -78,7 +76,6 @@ fn save_new_persists_and_reloads_through_a_fresh_library() {
     );
 }
 
-#[test]
 fn same_name_saves_as_new_files_and_there_is_no_slot_limit() {
     let tmp = TempDir::new();
     let lib = Library::new(tmp.path());
@@ -97,7 +94,6 @@ fn same_name_saves_as_new_files_and_there_is_no_slot_limit() {
     assert_eq!(lib.list().unwrap().entries.len(), 25);
 }
 
-#[test]
 fn listing_is_sorted_by_name_ignoring_case_then_id() {
     let tmp = TempDir::new();
     let lib = Library::new(tmp.path());
@@ -108,7 +104,6 @@ fn listing_is_sorted_by_name_ignoring_case_then_id() {
     assert_eq!(ids(&listing), ["apple", "apple-2", "banana", "cherry"]);
 }
 
-#[test]
 fn overwrite_replaces_the_target_keeps_its_id_and_leaves_others_alone() {
     let tmp = TempDir::new();
     let lib = Library::new(tmp.path());
@@ -143,7 +138,6 @@ fn overwrite_replaces_the_target_keeps_its_id_and_leaves_others_alone() {
     assert_eq!(file_names(tmp.path()), ["alpha.json", "beta.json"]);
 }
 
-#[test]
 fn a_placement_edit_can_be_saved_as_new_while_the_original_keeps_its_placement() {
     let tmp = TempDir::new();
     let lib = Library::new(tmp.path());
@@ -169,7 +163,6 @@ fn a_placement_edit_can_be_saved_as_new_while_the_original_keeps_its_placement()
     assert_eq!(copy.frames, recording("Drill").frames);
 }
 
-#[test]
 fn overwrite_requires_an_existing_id_and_creates_nothing() {
     let tmp = TempDir::new();
     let lib = Library::new(tmp.path());
@@ -181,7 +174,6 @@ fn overwrite_requires_an_existing_id_and_creates_nothing() {
     assert!(file_names(tmp.path()).is_empty());
 }
 
-#[test]
 fn overwrite_can_repair_a_corrupt_file() {
     let tmp = TempDir::new();
     fs::write(tmp.path().join("broken.json"), "{ not json").unwrap();
@@ -191,7 +183,6 @@ fn overwrite_can_repair_a_corrupt_file() {
     assert_eq!(lib.load("broken").unwrap(), fixed);
 }
 
-#[test]
 fn invalid_input_never_touches_an_existing_file_or_creates_one() {
     let tmp = TempDir::new();
     let lib = Library::new(tmp.path());
@@ -233,7 +224,6 @@ fn invalid_input_never_touches_an_existing_file_or_creates_one() {
     assert!(!fresh_dir.exists());
 }
 
-#[test]
 fn a_failed_write_keeps_the_previous_good_file() {
     let tmp = TempDir::new();
     let lib = Library::new(tmp.path());
@@ -255,7 +245,6 @@ fn a_failed_write_keeps_the_previous_good_file() {
     assert_eq!(lib.load(&id).unwrap(), original);
 }
 
-#[test]
 fn corrupt_files_are_reported_and_never_lost_while_good_ones_still_list() {
     let tmp = TempDir::new();
     let lib = Library::new(tmp.path());
@@ -351,7 +340,6 @@ fn corrupt_files_are_reported_and_never_lost_while_good_ones_still_list() {
     assert_eq!(lib.load(&good_id).unwrap(), recording("Good"));
 }
 
-#[test]
 fn load_reports_the_specific_failure() {
     let tmp = TempDir::new();
     let lib = Library::new(tmp.path());
@@ -389,7 +377,6 @@ fn load_reports_the_specific_failure() {
     assert!(matches!(lib.load("nothing"), Err(MacroError::NotFound(ref id)) if id == "nothing"));
 }
 
-#[test]
 fn unsafe_ids_are_refused_and_cannot_escape_the_directory() {
     let tmp = TempDir::new();
     let dir = tmp.path().join("lib");
@@ -439,7 +426,6 @@ fn unsafe_ids_are_refused_and_cannot_escape_the_directory() {
     assert!(matches!(lib.load("a-b_c9"), Err(MacroError::NotFound(_))));
 }
 
-#[test]
 fn save_new_never_reuses_an_id_even_when_the_existing_file_is_corrupt() {
     let tmp = TempDir::new();
     let lib = Library::new(tmp.path());
@@ -458,7 +444,6 @@ fn save_new_never_reuses_an_id_even_when_the_existing_file_is_corrupt() {
     );
 }
 
-#[test]
 fn names_without_ascii_still_get_unique_ids_and_keep_their_display_name() {
     let tmp = TempDir::new();
     let lib = Library::new(tmp.path());
@@ -468,7 +453,6 @@ fn names_without_ascii_still_get_unique_ids_and_keep_their_display_name() {
     assert!(listing.entries.iter().all(|e| e.name == "日本語"));
 }
 
-#[test]
 fn list_restores_an_orphaned_backup_but_leaves_a_stale_one_alone() {
     let tmp = TempDir::new();
     let lib = Library::new(tmp.path());
@@ -489,7 +473,6 @@ fn list_restores_an_orphaned_backup_but_leaves_a_stale_one_alone() {
     assert_eq!(lib.load(&kept).unwrap(), recording("Kept"));
 }
 
-#[test]
 fn start_state_survives_persistence_exactly() {
     let tmp = TempDir::new();
     let lib = Library::new(tmp.path());
@@ -497,7 +480,6 @@ fn start_state_survives_persistence_exactly() {
     assert_eq!(lib.load(&id).unwrap().start, start());
 }
 
-#[test]
 fn exact_mii_library_restart_and_save_as_preserve_configuration() {
     let tmp = TempDir::new();
     let configuration = crate::engine::macros::test_util::exact_mii();
@@ -557,7 +539,6 @@ fn note(name: &str, body: &str) -> Note {
     Note { schema_version: 7, name: name.to_owned(), body: body.to_owned() }
 }
 
-#[test]
 fn generic_store_takes_schema_set_size_cap_and_summary_from_the_record() {
     let tmp = TempDir::new();
     let store: Store<Note> = Store::new(tmp.path());
@@ -654,7 +635,6 @@ impl Record for Memo {
     }
 }
 
-#[test]
 fn record_error_type_carries_both_store_and_record_failures() {
     let tmp = TempDir::new();
     let store: Store<Memo> = Store::new(tmp.path());
@@ -697,7 +677,6 @@ fn record_error_type_carries_both_store_and_record_failures() {
     assert!(matches!(store.overwrite("ghost", &good), Err(MemoError::Store(MacroError::NotFound(_)))));
 }
 
-#[test]
 fn library_is_the_macro_instantiation_of_the_generic_store() {
     let tmp = TempDir::new();
     let generic: Store<MacroRecording> = Store::new(tmp.path());
@@ -710,5 +689,33 @@ fn library_is_the_macro_instantiation_of_the_generic_store() {
         MacroEntry { id, name: "Same".to_owned(), fighter_kind: 8, costume: 2, frame_count: 8 }
     );
     assert!(format!("{library:?}").starts_with("Store {"));
+}
+
+/// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+#[test]
+fn case_table() {
+    crate::test_table::run(&[
+        ("missing_or_empty_directory_lists_nothing", missing_or_empty_directory_lists_nothing as fn()),
+        ("save_new_persists_and_reloads_through_a_fresh_library", save_new_persists_and_reloads_through_a_fresh_library as fn()),
+        ("same_name_saves_as_new_files_and_there_is_no_slot_limit", same_name_saves_as_new_files_and_there_is_no_slot_limit as fn()),
+        ("listing_is_sorted_by_name_ignoring_case_then_id", listing_is_sorted_by_name_ignoring_case_then_id as fn()),
+        ("overwrite_replaces_the_target_keeps_its_id_and_leaves_others_alone", overwrite_replaces_the_target_keeps_its_id_and_leaves_others_alone as fn()),
+        ("a_placement_edit_can_be_saved_as_new_while_the_original_keeps_its_placement", a_placement_edit_can_be_saved_as_new_while_the_original_keeps_its_placement as fn()),
+        ("overwrite_requires_an_existing_id_and_creates_nothing", overwrite_requires_an_existing_id_and_creates_nothing as fn()),
+        ("overwrite_can_repair_a_corrupt_file", overwrite_can_repair_a_corrupt_file as fn()),
+        ("invalid_input_never_touches_an_existing_file_or_creates_one", invalid_input_never_touches_an_existing_file_or_creates_one as fn()),
+        ("a_failed_write_keeps_the_previous_good_file", a_failed_write_keeps_the_previous_good_file as fn()),
+        ("corrupt_files_are_reported_and_never_lost_while_good_ones_still_list", corrupt_files_are_reported_and_never_lost_while_good_ones_still_list as fn()),
+        ("load_reports_the_specific_failure", load_reports_the_specific_failure as fn()),
+        ("unsafe_ids_are_refused_and_cannot_escape_the_directory", unsafe_ids_are_refused_and_cannot_escape_the_directory as fn()),
+        ("save_new_never_reuses_an_id_even_when_the_existing_file_is_corrupt", save_new_never_reuses_an_id_even_when_the_existing_file_is_corrupt as fn()),
+        ("names_without_ascii_still_get_unique_ids_and_keep_their_display_name", names_without_ascii_still_get_unique_ids_and_keep_their_display_name as fn()),
+        ("list_restores_an_orphaned_backup_but_leaves_a_stale_one_alone", list_restores_an_orphaned_backup_but_leaves_a_stale_one_alone as fn()),
+        ("start_state_survives_persistence_exactly", start_state_survives_persistence_exactly as fn()),
+        ("exact_mii_library_restart_and_save_as_preserve_configuration", exact_mii_library_restart_and_save_as_preserve_configuration as fn()),
+        ("generic_store_takes_schema_set_size_cap_and_summary_from_the_record", generic_store_takes_schema_set_size_cap_and_summary_from_the_record as fn()),
+        ("record_error_type_carries_both_store_and_record_failures", record_error_type_carries_both_store_and_record_failures as fn()),
+        ("library_is_the_macro_instantiation_of_the_generic_store", library_is_the_macro_instantiation_of_the_generic_store as fn()),
+    ]);
 }
 }

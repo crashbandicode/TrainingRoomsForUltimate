@@ -577,7 +577,6 @@ mod tests {
         Note { version: 1, name: name.to_owned() }
     }
 
-    #[test]
     fn ids_come_from_names_and_never_reuse_a_file() {
         let tmp = TempDir::new();
         let store = Store::<Note>::new(tmp.0.join("notes"));
@@ -589,7 +588,6 @@ mod tests {
         assert!(matches!(store.load("Bad Id"), Err(StoreError::InvalidId(_))));
     }
 
-    #[test]
     fn overwrite_is_atomic_and_needs_an_existing_file() {
         let tmp = TempDir::new();
         let store = Store::<Note>::new(&tmp.0);
@@ -609,7 +607,6 @@ mod tests {
         ));
     }
 
-    #[test]
     fn listing_reports_version_size_and_corruption_and_touches_nothing() {
         let tmp = TempDir::new();
         let store = Store::<Note>::new(&tmp.0);
@@ -638,7 +635,6 @@ mod tests {
         }
     }
 
-    #[test]
     fn a_missing_directory_is_an_empty_store_and_an_orphaned_backup_is_restored() {
         let tmp = TempDir::new();
         let missing = Store::<Note>::new(tmp.0.join("nope"));
@@ -650,13 +646,24 @@ mod tests {
         assert!(tmp.0.join("lost.json").exists() && !tmp.0.join("lost.json.bak").exists());
     }
 
-    #[test]
     fn listing_is_sorted_by_name_ignoring_case() {
         let tmp = TempDir::new();
         let store = Store::<Note>::new(&tmp.0);
         store.save_new(&note("beta")).unwrap();
         store.save_new(&note("Alpha")).unwrap();
         assert_eq!(store.list().unwrap().entries, vec!["alpha:Alpha".to_owned(), "beta:beta".to_owned()]);
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("ids_come_from_names_and_never_reuse_a_file", ids_come_from_names_and_never_reuse_a_file as fn()),
+            ("overwrite_is_atomic_and_needs_an_existing_file", overwrite_is_atomic_and_needs_an_existing_file as fn()),
+            ("listing_reports_version_size_and_corruption_and_touches_nothing", listing_reports_version_size_and_corruption_and_touches_nothing as fn()),
+            ("a_missing_directory_is_an_empty_store_and_an_orphaned_backup_is_restored", a_missing_directory_is_an_empty_store_and_an_orphaned_backup_is_restored as fn()),
+            ("listing_is_sorted_by_name_ignoring_case", listing_is_sorted_by_name_ignoring_case as fn()),
+        ]);
     }
     }
 }

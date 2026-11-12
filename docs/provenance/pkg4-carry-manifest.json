@@ -61,7 +61,7 @@
    "dest": "src/model/macros/capture_archive.rs",
    "crate": "macros",
    "src_sha256": "dbfdf217e08fe1421c292b302ea58e60d541a817b7fc17b410b166e8c7458d5f",
-   "dest_sha256": "b1d8d345b95b4ec5d8a275d90432e77326c0d8b6164fb749d528855a1691e5e4",
+   "dest_sha256": "e71c6ea648629b92b56175e52c75cfe06bf36857c6c1272c4b0d8b59f4f66d54",
    "edits": [
     {
      "old": "file_id.as_bytes().chunks_exact(2) {",
@@ -104,11 +104,15 @@
      "reason": "P-TIMER (primary 2026-11-05 18:32Z; DECISIONS DEFERRED-LIST item 7): a capture keeps going across a stretch of the native record with no live play (TIME! to sudden death) as a CaptureBreak, instead of sealing every track at the end of regular time"
     },
     {
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
      "wrap_tests": [
       "tests"
      ],
      "macro": "lib_unit_tests",
-     "reason": "rc.9 test cut: the kept unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -117,13 +121,18 @@
    "dest": "src/model/macros/capture_toggle.rs",
    "crate": "macros",
    "src_sha256": "aa0f6a4b6440d708d0a774e19135ff9b425fa51ea4f16b7b3290279ed28f28d7",
-   "dest_sha256": "17406369b09480908714f66d37ecd5e12e891ad8aed224de91ab2a6e106ff161",
+   "dest_sha256": "a7d591fca8ebfad663b8fa33aec6ffb6ca9df61489a65a0e3c9c899330451946",
    "edits": [
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -132,7 +141,7 @@
    "dest": "src/model/macros/live_capture.rs",
    "crate": "macros",
    "src_sha256": "61ae1a33ce4e788097f81761f12f0c86801b4f32a1ba273498b701ccc0f8bb91",
-   "dest_sha256": "eeaf26f98976e0a564ba24cfc77244f90f764877993a7e6a21822951b92607cf",
+   "dest_sha256": "b8995b54d2c93d461fbde14ff6d99d66e17cf595d16762c4267f7bf1b1805520",
    "edits": [
     {
      "old": "    pub fn active_key(&self) -> Option<NativeRecordKey> { self.active }",
@@ -225,11 +234,15 @@
      "reason": "P-TIMER (primary 2026-11-05 18:32Z; DECISIONS DEFERRED-LIST item 7): a capture keeps going across a stretch of the native record with no live play (TIME! to sudden death) as a CaptureBreak, instead of sealing every track at the end of regular time"
     },
     {
-     "cut_tests": [
-      "worker_first_seal_tests",
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -238,7 +251,7 @@
    "dest": "src/model/macros/live_frame.rs",
    "crate": "macros",
    "src_sha256": "a4f6894336d120ba5d80d20e306f7817c1f6a836d787d809b395bb3c7bf4c471",
-   "dest_sha256": "6ff99b906f899c079f5ed7fa7629cdca7a0aca0f23e9733169acd77de13ba95a",
+   "dest_sha256": "e77f7792ea8b8f66ab9593a9ebd4e9ce85ef775dbd5bef81e51f592f7fb9623f",
    "edits": [
     {
      "old": "}\n\n#[derive(Clone, Debug, Default)]\npub struct LiveSession {\n",
@@ -251,10 +264,11 @@
      "reason": "P-TIMER (primary 2026-11-05 18:32Z; DECISIONS DEFERRED-LIST item 7): a capture keeps going across a stretch of the native record with no live play (TIME! to sudden death) as a CaptureBreak, instead of sealing every track at the end of regular time"
     },
     {
-     "cut_tests": [
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -263,13 +277,18 @@
    "dest": "src/model/macros/move_start.rs",
    "crate": "macros",
    "src_sha256": "c9f0962e3b1023d00376b12717bcd5236f8f8b0abfc20a493d584e2b259fba2e",
-   "dest_sha256": "ffac70686b0cb8c171835796127e7c3f17c2b34992f0bdb84b4f818381cd89c5",
+   "dest_sha256": "8b4670b22b07e22d7ca0601324dfd923e4751173dc388087f19afe6817f703ee",
    "edits": [
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -307,7 +326,7 @@
    "dest": "src/model/macros/replay.rs",
    "crate": "macros",
    "src_sha256": "b04adf37bf6ab0c2419c9fb1699b13ae174b9fb3438eecc5792b0c1b0eac9721",
-   "dest_sha256": "1cdd6615efb4f4166bb920d9d21881b0341529d08ccbb03b0813cb1310f95e5b",
+   "dest_sha256": "a22d85d479a8e6106c41e3fc3a92c7515da2e5d1099a797f76b8e08dd082269a",
    "edits": [
     {
      "old": "    pub tracks: Vec<ReplayTrack>,\n    pub truncated: bool,\n}\n\nimpl ReplaySession {\n    /// Associate only values from the same immutable committed capture. Native\n    /// CFMK row numbers and local live entry IDs are different namespaces.\n",
@@ -320,10 +339,15 @@
      "reason": "P-TIMER (primary 2026-11-05 18:32Z; DECISIONS DEFERRED-LIST item 7): a capture keeps going across a stretch of the native record with no live play (TIME! to sudden death) as a CaptureBreak, instead of sealing every track at the end of regular time"
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -332,7 +356,7 @@
    "dest": "src/model/macros/shared_capture.rs",
    "crate": "macros",
    "src_sha256": "46093f8256ff444e9943ee4672cc6c348ddc46548a6108fc177a45fe65c208f0",
-   "dest_sha256": "ed6f808ad820cfcd8c259cdc4ddeb46233afe01a6fbe4bffc0b69253f08aa40d",
+   "dest_sha256": "f75adcf6691c572d16dcacb6224758debd64c245b0b15e6ec135a40da2bb2ee6",
    "edits": [
     {
      "old": "            }\n        }\n    }\n}\n",
@@ -400,10 +424,15 @@
      "reason": "P-TIMER (primary 2026-11-05 18:32Z; DECISIONS DEFERRED-LIST item 7): a capture keeps going across a stretch of the native record with no live play (TIME! to sudden death) as a CaptureBreak, instead of sealing every track at the end of regular time"
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -412,33 +441,35 @@
    "dest": "src/model/macros/window.rs",
    "crate": "macros",
    "src_sha256": "a2318a537296bac67436de8656f07bcd897b2e4fccbd38b101bcd41210b9c58d",
-   "dest_sha256": "7b42537a584d7e7f7844cdc37f4011de95942d11cc40aea746c938c3a037b039",
-   "edits": [
-    {
-     "cut_tests": [
-      "tests"
-     ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
-    }
-   ]
+   "dest_sha256": "67c037aff31049b905f735d0184c9d0f0ade5c72017831e47a981fec091c99e7"
   },
   {
    "src": "training_mod_macros/src/test_util.rs",
    "dest": "src/model/macros/test_util.rs",
    "crate": "macros",
    "src_sha256": "84136e6677ec3bd094ff71f668289ce080bab17c23e8a9fb041167c3732e6ab7",
-   "dest_sha256": "1fc1c266a299cc345691ca6881747aeb5f32c60dd3d5b3ce11d56064a8d8cceb"
+   "dest_sha256": "5528f32d89b0ad2a803fe597f5b9b08b23930377d31c55287c222f0f7a76b56a",
+   "edits": [
+    {
+     "wrap_file": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    }
+   ]
   },
   {
    "src": "training_mod_macros/src/recording/tests.rs",
    "dest": "src/model/macros/recording/tests.rs",
    "crate": "macros",
    "src_sha256": "d08afc313059da5a98b341647b8187ba0079a96379a5a5377ea8d936e98d1a22",
-   "dest_sha256": "8b22e21dd37b51658afd2c300dbdcc732fb3ddcb32c998f22a89debd61685867",
+   "dest_sha256": "f19b54b6cb48027980a953e1a5bf745f9f0d94789a500596b1045c3c1e315411",
    "edits": [
     {
+     "table_file": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
      "wrap_file": "lib_unit_tests",
-     "reason": "rc.9 test cut: the kept unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -447,8 +478,17 @@
    "dest": "src/model/macros/window/tests.rs",
    "crate": "macros",
    "src_sha256": "2dc0eace36a068b95ca9347fa277446b874dcf8c2f69fd5375432464cffd666f",
-   "dest_sha256": "",
-   "removed": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): test-only file removed"
+   "dest_sha256": "749056d2289fb52ea8948133657b95e20997c0acacd5cd17702135718213aa9e",
+   "edits": [
+    {
+     "table_file": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_file": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    }
+   ]
   },
   {
    "src": "training_mod_macros/src/library.rs",
@@ -494,7 +534,7 @@
    "dest": "src/model/macros/library/tests.rs",
    "crate": "macros",
    "src_sha256": "be96184687f698ec92aa4c7954fdd3299f2c7bcf2edd3586eea8958539af8e55",
-   "dest_sha256": "38133f0b174835c6a9e9df7f86444100bfa22a327fd4bf3212d5e8281e8c91ba",
+   "dest_sha256": "ca931022c699555ed1722de876906583cd7f1b80fcd9292adf7534292b6ae1f7",
    "edits": [
     {
      "old": "use super::*;\nuse {crate::engine::macros::test_util::{frames, recording, start, TempDir}, crate::engine::macros::MomentumMode, crate::engine::macros::Placement, crate::engine::macros::MAX_FRAMES};\n\nconst _: () = assert!(SLUG_CHARS + \"-9999\".len() <= MAX_ID_CHARS);\n",
@@ -532,8 +572,12 @@
      "reason": "Record::Error converts from the store's own StoreError"
     },
     {
+     "table_file": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
      "wrap_file": "lib_unit_tests",
-     "reason": "rc.9 test cut: the kept unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -542,7 +586,7 @@
    "dest": "src/model/macros/mod.rs",
    "crate": "macros",
    "src_sha256": "561c0de012c6f235d735c9d956305c7aa98fe0cdf7a1c560552a0a6275abc4ad",
-   "dest_sha256": "6aee0f40647192830aea1f27665c56e2845f37349ccb0116d7d1d3667293ac01",
+   "dest_sha256": "1dd00b86dc83c819c79501c1733eeb2e3a8d1a580b38ddf349226387e2f9e54b",
    "edits": [
     {
      "old": "mod capture_settings;\n",
@@ -592,12 +636,6 @@
      "old": "#[cfg(any(feature = \"diag\", test))]\npub use live_capture::{FirstSeal, SealReason};\npub use live_frame::{LiveFrame, LiveInput, LiveSession, LiveTrack};\npub use recording::{\n    InputFrame, MacroError, MacroRecording, MomentumMode, Placement, StartState, DEFAULT_FPS,\n",
      "new": "#[cfg(any(feature = \"diag\", test))]\npub use live_capture::{FirstSeal, SealReason};\npub use live_frame::{CaptureBreak, LiveFrame, LiveInput, LiveSession, LiveTrack, MAX_BREAKS};\npub use recording::{\n    InputFrame, MacroError, MacroRecording, MomentumMode, Placement, StartState, DEFAULT_FPS,\n",
      "reason": "P-TIMER (primary 2026-11-05 18:32Z; DECISIONS DEFERRED-LIST item 7): a capture keeps going across a stretch of the native record with no live play (TIME! to sudden death) as a CaptureBreak, instead of sealing every track at the end of regular time"
-    },
-    {
-     "cut_tests": [
-      "move_crop_continuation_tests"
-     ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
     }
    ]
   },
@@ -606,7 +644,7 @@
    "dest": "src/model/macros/move_crop_continuation_tests.rs",
    "crate": "macros",
    "src_sha256": "be8269aefe30822af6f9ad9974c338ff5e3ce5abd5a234f24c1dc12359aa1210",
-   "dest_sha256": "",
+   "dest_sha256": "5c7ae64d72712202d3089fc86a472c79e68160c30cc4224669c000a013a4640d",
    "edits": [
     {
      "old": "use training_mod_macros::*;",
@@ -617,22 +655,30 @@
      "old": "[\"--exact\", \"move_crop_child\", \"--nocapture\"]",
      "new": "[\"--exact\", \"engine::macros::move_crop_continuation_tests::move_crop_child\", \"--nocapture\"]",
      "reason": "the child process re-runs this binary: the exact test name now carries the module path"
+    },
+    {
+     "wrap_file": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
-   ],
-   "removed": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): test-only file removed"
+   ]
   },
   {
    "src": "training_mod_tui/src/clip_browser.rs",
    "dest": "src/model/macro_ui/clip_browser.rs",
    "crate": "tui",
    "src_sha256": "65a095c11c1d2a7eade83f0f3039677736d22257620ddee0d8bf06d33b3b9543",
-   "dest_sha256": "1ae8a7bea2fdca3d90cea2fe8b2d79a11e29c253a33e584e5ac3a0820e01be49",
+   "dest_sha256": "9c7ff789c0329faa5b99279cdd6a01667407accaa2dfa557a63af6c8bcf40539",
    "edits": [
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -641,7 +687,7 @@
    "dest": "src/model/macro_ui/clip_panel.rs",
    "crate": "tui",
    "src_sha256": "0064feed6e12daaa07f3881e49c930bb335458b4216f104a12373fd935db5ea0",
-   "dest_sha256": "7ca861ae0af6257d21e853713bc8c21dc751afff3dee6bb0e50bacb0c7e8aa81",
+   "dest_sha256": "9ceba083444ca62c5cacfa815418fb35d828649c84fe7a015991ff20601e0b24",
    "edits": [
     {
      "old": "            Pad::Extra => ClipAction::TogglePlay,\n        })",
@@ -669,10 +715,15 @@
      "reason": "P-TIMER (primary 2026-11-05 18:32Z; DECISIONS DEFERRED-LIST item 7): a capture keeps going across a stretch of the native record with no live play (TIME! to sudden death) as a CaptureBreak, instead of sealing every track at the end of regular time"
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -681,7 +732,7 @@
    "dest": "src/model/macro_ui/replay_panel.rs",
    "crate": "tui",
    "src_sha256": "7f2595db169a3703c99d74d4ed25a7247c01dfd601bfd5e5cfa19350ea98eef9",
-   "dest_sha256": "33a591eaf8d27bd2841db45c9281b160bcb59b03d8ffdd4ef211b79e3a4b96c9",
+   "dest_sha256": "11bd780e73bf86f164c5a6ee3a08d7fca17aff4c3a9a0df855a053192c5b0a53",
    "edits": [
     {
      "old": "            Pad::Confirm => return self.confirm(),\n        }\n        Effect::None",
@@ -694,10 +745,15 @@
      "reason": "P-TIMER (primary 2026-11-05 18:32Z; DECISIONS DEFERRED-LIST item 7): a capture keeps going across a stretch of the native record with no live play (TIME! to sudden death) as a CaptureBreak, instead of sealing every track at the end of regular time"
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -706,7 +762,7 @@
    "dest": "src/model/macro_ui/macro_panel.rs",
    "crate": "tui",
    "src_sha256": "1b6e698f679029bc6fa83ff9cd43756302bd939debaad2d3eeeacd10fb166da1",
-   "dest_sha256": "ee2526b3c8a48a72ef05a52e0342409e953a47168354a2ac7b91a047a837dc95",
+   "dest_sha256": "6c274b1c1bbc8f75fca6cb6305c8c76143b4ef0eaf7a0866e38a24ca87ca0b29",
    "edits": [
     {
      "old": "    /// Facing, status, and frames for one playback. Empty when the fighter is not ready.\n    pub fn copy_playback(",
@@ -974,10 +1030,15 @@
      "reason": "rc.7 Fighter Mismatch role fix (hot-slots 2026-11-10 18:58Z, cov-mismatch-cancel; primary 19:30Z): the prompt takes the side that plays (recording_menu::ViewRole) and names it with the menu's role names ('current Player 1 {}' / 'current CPU {}'); a library load and a replay clip pass the CPU; open_recording_fighter_prompt and open_fighter_prompt_for take the side; Combo's wording is unchanged"
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -986,7 +1047,7 @@
    "dest": "src/model/macro_ui/macro_panel/fighter.rs",
    "crate": "tui",
    "src_sha256": "1a4e2da3199c28c0d66ad424b2d6cbdb38b9e9ed283e529dfbc8e29e01b50f69",
-   "dest_sha256": "1aa73700511b8530f7d52ba543ac3b61131edb6413aeec6e693f1ed92c951163",
+   "dest_sha256": "b0d1cce073ee04e5f79b0253c743d468845ed2f2ff4c32b23b56175e8d89f29b",
    "edits": [
     {
      "old": "            Pad::Extra => {}",
@@ -1064,10 +1125,15 @@
      "reason": "rc.7 Fighter Mismatch role fix (hot-slots 2026-11-10 18:58Z, cov-mismatch-cancel; primary 19:30Z): the prompt takes the side that plays (recording_menu::ViewRole) and names it with the menu's role names ('current Player 1 {}' / 'current CPU {}'); a library load and a replay clip pass the CPU; open_recording_fighter_prompt and open_fighter_prompt_for take the side; Combo's wording is unchanged"
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },

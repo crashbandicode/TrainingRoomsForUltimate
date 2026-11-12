@@ -152,15 +152,22 @@ mod tests {
     lib_unit_tests! {
     use super::*;
 
-    #[test]
     fn paths_join_in_a_fixed_buffer() {
         assert_eq!(Path::in_root("settings.json").unwrap().as_str(), "sd:/ultimate/TrainingRooms/settings.json");
         assert!(FixedPath::<8>::join("sd:/ultimate", "x").is_none());
     }
 
-    #[test]
     fn the_first_free_copy_number_is_used() {
         assert_eq!(first_free_invalid_copy(|name| name == "settings.invalid-1.json"), Some(2));
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("paths_join_in_a_fixed_buffer", paths_join_in_a_fixed_buffer as fn()),
+            ("the_first_free_copy_number_is_used", the_first_free_copy_number_is_used as fn()),
+        ]);
     }
     }
 }

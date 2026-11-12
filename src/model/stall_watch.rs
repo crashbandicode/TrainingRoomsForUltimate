@@ -72,7 +72,6 @@ mod tests {
     lib_unit_tests! {
     use super::*;
 
-    #[test]
     fn a_silent_count_is_a_stall_once_and_its_end_once() {
         let mut watch = Watch::new();
         assert_eq!(watch.observe(5_000, 1_000), None);
@@ -83,7 +82,6 @@ mod tests {
         assert_eq!(watch.observe(5_100, 9_600), None);
     }
 
-    #[test]
     fn the_boot_and_a_running_game_are_not_stalls() {
         let mut watch = Watch::new();
         assert_eq!(watch.observe(10, 1_000), None);
@@ -91,6 +89,15 @@ mod tests {
         for t in 0..100 {
             assert_eq!(watch.observe(2_000 + t * 60, 61_000 + t * 250), None);
         }
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("a_silent_count_is_a_stall_once_and_its_end_once", a_silent_count_is_a_stall_once_and_its_end_once as fn()),
+            ("the_boot_and_a_running_game_are_not_stalls", the_boot_and_a_running_game_are_not_stalls as fn()),
+        ]);
     }
     }
 }

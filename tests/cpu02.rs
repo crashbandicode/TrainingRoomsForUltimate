@@ -3,6 +3,9 @@
 //! opponent on both sides), Q18 A (SDI rolls on a reset and on a row change, not per hitlag), N9 (SDI
 //! not set means no SDI). Test names are the spec's §9 rows.
 
+// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).
+#[path = "../src/test_table.rs"]
+mod test_table;
 // rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
 macro_rules! lib_unit_tests {
     ($($body:tt)*) => {};
@@ -77,7 +80,6 @@ fn cpu_with(s: CpuSettings) -> (Cpu, FighterKey) {
     (cpu, FighterKey::new(1, false).unwrap())
 }
 
-#[test]
 fn cpu02_direction_angles() {
     assert_eq!(angle(direction::OUT), Some(0.0));
     assert_eq!(angle(direction::UP_OUT), Some(FRAC_PI_4));
@@ -93,7 +95,6 @@ fn cpu02_direction_angles() {
     assert!(near(stick_vector(direction::NEUTRAL, 0.0, 5.0), (0.0, 0.0)));
 }
 
-#[test]
 fn cpu02_unit_vectors_are_cos_and_sin_of_the_angle() {
     // The stick vector uses exact compass vectors (no libm in the image); it must equal (cos a, sin a),
     // and mirrored (cos (π − a), sin (π − a)).
@@ -105,7 +106,6 @@ fn cpu02_unit_vectors_are_cos_and_sin_of_the_angle() {
     }
 }
 
-#[test]
 fn cpu02_mirror_rule() {
     // The player on the CPU's left (x smaller): no mirroring, Out points right (away from the player).
     assert!(near(stick_vector(direction::OUT, -10.0, 0.0), (1.0, 0.0)));
@@ -124,7 +124,6 @@ fn cpu02_mirror_rule() {
     }
 }
 
-#[test]
 fn cpu02_di_case_lifetime() {
     let s = settings(&[("di_state", &dirs(&[direction::UP]))]);
     let mut d = Defence::new();
@@ -148,7 +147,6 @@ fn cpu02_di_case_lifetime() {
     assert_eq!(Defence::new().di_correction(&empty, &mut r, 0.0, 0.0), None);
 }
 
-#[test]
 fn cpu02_sdi_period() {
     assert_eq!(sdi_period(Strength::None), None);
     assert_eq!(sdi_period(Strength::Normal), Some(8));
@@ -171,7 +169,6 @@ fn cpu02_sdi_period() {
     }
 }
 
-#[test]
 fn cpu02_sdi_reroll() {
     // The direction is rolled by the reset bundle and held; the period counter restarts with it.
     let s = settings(&[("sdi_state", &dirs(&[direction::UP, direction::DOWN])), ("sdi_strength", &[0, 1, 0, 0])]);
@@ -188,7 +185,6 @@ fn cpu02_sdi_reroll() {
     assert!([direction::UP, direction::DOWN].contains(&first));
 }
 
-#[test]
 fn cpu02_sdi_rolls_on_row_change_and_reset() {
     // Q18 A: no reset is needed. The menu changes the row; the next CPU frame rolls the new direction.
     let up = settings(&[("sdi_state", &dirs(&[direction::UP])), ("sdi_strength", &[0, 0, 0, 1])]);
@@ -220,7 +216,6 @@ fn cpu02_sdi_rolls_on_row_change_and_reset() {
     assert_eq!(cpu.fighters[key.index()].defence.sdi_dir, Some(direction::IN));
 }
 
-#[test]
 fn cpu02_sdi_roll_not_per_hitlag() {
     // Two directions selected: the CPU keeps the one rolled at the reset across many hitlag episodes
     // (the reset or a row change is the only roll), unlike a roll per episode.
@@ -238,7 +233,6 @@ fn cpu02_sdi_roll_not_per_hitlag() {
     }
 }
 
-#[test]
 fn cpu02_sdi_unset_means_no_sdi() {
     // N9: an empty direction, or Strength None, answers "no input" and never "call the original".
     let none_dir = settings(&[("sdi_strength", &[0, 0, 0, 1])]);
@@ -260,7 +254,6 @@ fn cpu02_sdi_unset_means_no_sdi() {
     assert!((0..20).all(|_| cpu.sdi_query(key, 5.0, 0.0) == SdiAnswer::NoInput));
 }
 
-#[test]
 fn cpu02_airdodge_direction_consistency() {
     let s = settings(&[("air_dodge_dir", &dirs(&[direction::UP, direction::DOWN, direction::OUT, direction::IN]))]);
     let mut d = Defence::new();
@@ -289,7 +282,6 @@ fn cpu02_airdodge_direction_consistency() {
     assert_eq!(seen.len(), 4);
 }
 
-#[test]
 fn cpu02_airdodge_opponent_relative_both_sides() {
     // B7: Out is away from the opponent and In toward it, whichever side the player stands on.
     let out = settings(&[("air_dodge_dir", &dirs(&[direction::OUT]))]);
@@ -301,7 +293,6 @@ fn cpu02_airdodge_opponent_relative_both_sides() {
     assert!(near(stick(&inward, 8.0), (1.0, 0.0)));
 }
 
-#[test]
 fn cpu02_clatter_period_and_step() {
     assert_eq!(clatter_period(Strength::None), None);
     assert_eq!(clatter_period(Strength::Normal), Some(8));
@@ -333,7 +324,6 @@ fn cpu02_clatter_period_and_step() {
     assert_eq!(outside.clatter, None, "outside clatter the counter is left alone");
 }
 
-#[test]
 fn cpu02_stale_flag_follows_setting() {
     // The flag equals !stale_dodges; it is written on the first frame and on any change, never every
     // frame, and a forgotten write (a reset) is repeated.
@@ -352,7 +342,6 @@ fn cpu02_stale_flag_follows_setting() {
     assert_eq!(cpu.frame(key, &wait).stale_flag, Some(true));
 }
 
-#[test]
 fn cpu02_per_fighter_state() {
     // B6: Popo's SDI counter, DI case, air-dodge case and clatter step do not leak into Nana's.
     let s = settings(&[
@@ -380,7 +369,6 @@ fn cpu02_per_fighter_state() {
     assert_eq!(cpu.fighters[popo.index()].defence.sdi_counter, 3, "Nana's queries did not move Popo's counter");
 }
 
-#[test]
 fn cpu02_playback_wins_default() {
     let s = settings(&[
         ("di_state", &dirs(&[direction::UP])),
@@ -402,7 +390,6 @@ fn cpu02_playback_wins_default() {
     assert!(cpu.air_dodge_stick(key, 5.0, 0.0).is_some());
 }
 
-#[test]
 fn cpu02_playback_override_on() {
     let s = settings(&[
         ("di_state", &dirs(&[direction::UP])),
@@ -420,7 +407,6 @@ fn cpu02_playback_override_on() {
     assert_ne!(cpu.sdi_query(key, 5.0, 0.0), SdiAnswer::Native);
 }
 
-#[test]
 fn cpu02_di_case_clears_in_the_frame_dispatch() {
     // The frame dispatch clears the DI case whenever the body is not in hitstun.
     let s = settings(&[("di_state", &dirs(&[direction::UP]))]);
@@ -430,4 +416,28 @@ fn cpu02_di_case_clears_in_the_frame_dispatch() {
     assert!(cpu.fighters[key.index()].defence.di_case.is_some());
     cpu.frame(key, &FrameFacts { status: 1, ..FrameFacts::default() });
     assert!(cpu.fighters[key.index()].defence.di_case.is_none());
+}
+
+/// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+#[test]
+fn case_table() {
+    crate::test_table::run(&[
+        ("cpu02_direction_angles", cpu02_direction_angles as fn()),
+        ("cpu02_unit_vectors_are_cos_and_sin_of_the_angle", cpu02_unit_vectors_are_cos_and_sin_of_the_angle as fn()),
+        ("cpu02_mirror_rule", cpu02_mirror_rule as fn()),
+        ("cpu02_di_case_lifetime", cpu02_di_case_lifetime as fn()),
+        ("cpu02_sdi_period", cpu02_sdi_period as fn()),
+        ("cpu02_sdi_reroll", cpu02_sdi_reroll as fn()),
+        ("cpu02_sdi_rolls_on_row_change_and_reset", cpu02_sdi_rolls_on_row_change_and_reset as fn()),
+        ("cpu02_sdi_roll_not_per_hitlag", cpu02_sdi_roll_not_per_hitlag as fn()),
+        ("cpu02_sdi_unset_means_no_sdi", cpu02_sdi_unset_means_no_sdi as fn()),
+        ("cpu02_airdodge_direction_consistency", cpu02_airdodge_direction_consistency as fn()),
+        ("cpu02_airdodge_opponent_relative_both_sides", cpu02_airdodge_opponent_relative_both_sides as fn()),
+        ("cpu02_clatter_period_and_step", cpu02_clatter_period_and_step as fn()),
+        ("cpu02_stale_flag_follows_setting", cpu02_stale_flag_follows_setting as fn()),
+        ("cpu02_per_fighter_state", cpu02_per_fighter_state as fn()),
+        ("cpu02_playback_wins_default", cpu02_playback_wins_default as fn()),
+        ("cpu02_playback_override_on", cpu02_playback_override_on as fn()),
+        ("cpu02_di_case_clears_in_the_frame_dispatch", cpu02_di_case_clears_in_the_frame_dispatch as fn()),
+    ]);
 }

@@ -204,3 +204,6 @@ impl MoveObserver {
     }
 }
 
+#[cfg(test)]
+#[path = "move_observer_tests.rs"]
+mod tests;

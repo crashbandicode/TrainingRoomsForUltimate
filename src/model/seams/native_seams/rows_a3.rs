@@ -617,7 +617,6 @@ mod tests {
     lib_unit_tests! {
     use super::*;
 
-    #[test]
     fn wp_a3_labels_are_unique_and_prefixed_by_their_group_or_needle() {
         for (i, a) in ROWS.iter().enumerate() {
             assert!(a.label.starts_with(&format!("{}.", a.group)) || a.label.starts_with("needle."), "{}", a.label);
@@ -625,7 +624,6 @@ mod tests {
         }
     }
 
-    #[test]
     fn wp_a3_has_one_hook_row_per_offset_and_justifies_entry_hooks() {
         let hooks: Vec<&Seam> = ROWS.iter().filter(|s| matches!(s.kind, SeamKind::Hook { .. })).collect();
         for (i, a) in hooks.iter().enumerate() {
@@ -636,7 +634,6 @@ mod tests {
         }
     }
 
-    #[test]
     fn wp_a3_guards_are_64_owned_bytes_and_offsets_are_in_main() {
         for s in ROWS {
             assert!(s.guard.iter().any(|b| *b != 0), "{}", s.label);
@@ -653,10 +650,20 @@ mod tests {
         u64::from_le_bytes(target)
     }
 
-    #[test]
     fn wp_a3_vtable_slot_rows_encode_the_original_targets() {
         assert_eq!(slot("training.vtable_on_init_slot"), 0x60dfa0);
         assert_eq!(slot("training.vtable_on_frame_slot"), 0x614630);
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("wp_a3_labels_are_unique_and_prefixed_by_their_group_or_needle", wp_a3_labels_are_unique_and_prefixed_by_their_group_or_needle as fn()),
+            ("wp_a3_has_one_hook_row_per_offset_and_justifies_entry_hooks", wp_a3_has_one_hook_row_per_offset_and_justifies_entry_hooks as fn()),
+            ("wp_a3_guards_are_64_owned_bytes_and_offsets_are_in_main", wp_a3_guards_are_64_owned_bytes_and_offsets_are_in_main as fn()),
+            ("wp_a3_vtable_slot_rows_encode_the_original_targets", wp_a3_vtable_slot_rows_encode_the_original_targets as fn()),
+        ]);
     }
     }
 }

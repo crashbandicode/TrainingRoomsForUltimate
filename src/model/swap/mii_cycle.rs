@@ -344,3 +344,826 @@ fn next_qualified<T>(
     }
     None
 }
+
+#[cfg(all(test, not(target_os = "switch")))]
+#[path = "../../../tests/support/mii_cycle_compact.rs"]
+pub(crate) mod compact_regressions;
+
+#[cfg(all(test, feature = "mii-saved-alpha"))]
+mod tests {
+    lib_unit_tests! {
+    use super::*;
+    use crate::engine::mii::inventory::{build_snapshot, RawSlot, TaggedId, CHARINFO_LEN};
+    use crate::engine::mii::selection::{Fallback, Source};
+
+    fn compact_cycle_values_keep_full_roster_capacity_in_under_two_kib() {
+        assert!(std::mem::size_of::<CycleChoices>() <= 2048);
+        let mut choices = CycleChoices::new();
+        for index in 0..crate::engine::swap::trio::CHOICES.len() {
+            choices.push_fighter(index as u32 + 0x100);
+        }
+        assert_eq!(choices.kinds.len(), crate::engine::swap::trio::CHOICES.len());
+        assert_eq!(choices.get(choices.kinds.len() - 1),
+            Some(Target::Fighter(choices.kinds.len() as u32 - 1 + 0x100)));
+    }
+
+    fn partner_refresh_preserves_the_slot_before_the_next_mii() {
+        let catalog=example();
+        let ordered=roster(&[0x4b,0x48,6]);
+        let preferences=Preferences::default();
+        let refreshed=refresh_partners(0x4b,0x4b,Some(0),true).unwrap();
+        assert_eq!(refreshed,Step {target:Target::Fighter(0x4b),cursor:Some(0)});
+        let next=next_qualified_player_with_ice_climbers(&ordered,&catalog,&preferences,
+            Identity::Fighter(0x4b),applied(refreshed),true,Some).unwrap().0;
+        assert!(matches!(next.target,Target::Saved(choice) if choice.canonical.class==MiiClass::Brawler));
+        assert_eq!(next.cursor,Some(1));
+        assert_eq!(refresh_partners(0x4b,0x4b,None,true),Some(Step {target:Target::Original,cursor:None}));
+        assert_eq!(refresh_partners(0x4b,9,Some(4),true),Some(Step {target:Target::Fighter(0x4b),cursor:Some(4)}));
+        assert_eq!(refresh_partners(0x4b,0x4b,None,false),Some(Step {target:Target::Fighter(0x4b),cursor:None}));
+        assert!(refresh_partners(0x48,0x4b,Some(1),true).is_none());
+        assert_ne!(crate::engine::mii::ordinary_player::Request::REFRESH_PARTNERS,crate::engine::mii::ordinary_player::Request::CYCLE);
+        assert_ne!(crate::engine::mii::ordinary_cpu::Request::REFRESH_PARTNERS,crate::engine::mii::ordinary_cpu::Request::CYCLE);
+        assert!(crate::engine::mii::ordinary_player::Request::REFRESH_PARTNERS.refresh_partners());
+        assert!(crate::engine::mii::ordinary_cpu::Request::REFRESH_PARTNERS.refresh_partners());
+    }
+
+    fn opposite_solo_ice_climbers_stays_in_a_mixed_saved_mii_cycle() {
+        let catalog = example();
+        let preferences = Preferences::default();
+        let ordered = roster(&[0x4b, 0x48, 6]);
+        let original = Identity::Fighter(0x4b);
+        let step = |live, different| next_qualified_player_with_ice_climbers(
+            &ordered, &catalog, &preferences, original, live, different, Some,
+        ).unwrap().0;
+        let climbers = step(Live::Original, true);
+        assert_eq!(climbers, Step { target: Target::Fighter(0x4b), cursor: Some(0) });
+        let mii = step(applied(climbers), true);
+        assert!(matches!(mii.target, Target::Saved(_)));
+        let kirby = step(applied(mii), true);
+        assert_eq!(kirby.target, Target::Fighter(6));
+        assert_eq!(step(applied(kirby), true), Step { target: Target::Original, cursor: None });
+        // Matching Solo preferences exclude only the duplicate IC; the saved
+        // Mii is still the first numbered choice and slot 0 remains reachable.
+        assert!(matches!(step(Live::Original, false).target, Target::Saved(_)));
+        // Qualification failures skip only the unavailable Mii, never the IC.
+        let no_mii = next_qualified_player_with_ice_climbers(
+            &ordered, &catalog, &preferences, original, applied(climbers), true,
+            |step| (!matches!(step.target, Target::Saved(_))).then_some(step),
+        ).unwrap().0;
+        assert_eq!(no_mii.target, Target::Fighter(6));
+    }
+
+    fn raw(index: usize, id: u32, class: MiiClass, face: u8) -> RawSlot {
+        let mut charinfo = [face; CHARINFO_LEN];
+        charinfo[..0x10].fill(index as u8);
+        charinfo[0x10..0x24].fill(b'N');
+        charinfo[0x24..0x26].fill(0);
+        RawSlot {
+            index,
+            slot_id: id,
+            name_len: 1,
+            name_units: [u16::from(face), 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            colour: 0,
+            voice: 37,
+            specials: [0, 0, 0, 0],
+            tag_outfit: TaggedId(0x1300011bfef7a5f7),
+            tag_hat: TaggedId(0x5a00000fa9efa5ea),
+            tag_chara: TaggedId(match class {
+                MiiClass::Brawler => 0xc1004c13fdfdfb2b,
+                MiiClass::Swordfighter => 0xc1004d15d7061f77,
+                MiiClass::Gunner => 0xc1004e1257ab1d87,
+            }),
+            charinfo,
+        }
+    }
+
+    fn example() -> Snapshot {
+        build_snapshot(vec![
+            raw(0, 2622, MiiClass::Swordfighter, b'a'),
+            raw(1, 2700, MiiClass::Swordfighter, b'b'),
+            raw(2, 4155, MiiClass::Brawler, b'c'),
+            raw(3, 4200, MiiClass::Brawler, b'd'),
+            raw(4, 4300, MiiClass::Brawler, b'e'),
+            raw(5, 3137, MiiClass::Gunner, b'f'),
+        ])
+    }
+
+    fn direct_mixed_roster_requests_keep_role_identity_and_continue_the_cycle() {
+        let catalog = example();
+        let preferences = Preferences::default()
+            .with(Role::Player, MiiClass::Brawler, Some(id(&catalog, 4200))).unwrap()
+            .with(Role::Cpu, MiiClass::Brawler, Some(id(&catalog, 4300))).unwrap();
+        let before = preferences;
+        let original = Identity::Fighter(0);
+        let ordered = roster(&[6, 0x48, 8]);
+        let player_request = crate::engine::mii::ordinary_player::Request::direct(7, 0x48).unwrap();
+        let cpu_request = crate::engine::mii::ordinary_cpu::Request::direct(7, 0x48).unwrap();
+        assert!(player_request.current(7, None));
+        assert!(cpu_request.current(7, None));
+        assert!(!player_request.current(8, None));
+        assert!(!cpu_request.current(8, None));
+        assert_eq!(player_request.choice(), None);
+        assert_eq!(cpu_request.choice(), None);
+        for (role, kind, expected_id) in [
+            (Role::Player, player_request.direct_kind().unwrap(), 4200),
+            (Role::Cpu, cpu_request.direct_kind().unwrap(), 4300),
+        ] {
+            let picked = direct(kind, &catalog, &preferences, role, original).unwrap();
+            assert_eq!(saved(picked).canonical, id(&catalog, expected_id));
+            assert_eq!(picked.cursor, None);
+            let next = next_cycle(&ordered, &catalog, &preferences, role, original, applied(picked)).unwrap();
+            assert_eq!(next.target, Target::Fighter(8));
+            assert_eq!(next.cursor, Some(2));
+            let wrap = next_cycle(&ordered, &catalog, &preferences, role, original, applied(next)).unwrap();
+            // Both roles restore their captured slot 0 between numbered loops.
+            assert_eq!(wrap, Step { target: Target::Original, cursor: None });
+            let restart = next_cycle(&ordered, &catalog, &preferences, role, original, applied(wrap)).unwrap();
+            assert_eq!(restart, Step { target: Target::Fighter(6), cursor: Some(0) });
+        }
+        // Manual ordinary swaps remain available with a Mii in the cycle and
+        // retain the requested group's starting form without adding a cycle slot.
+        for kind in [6, 0x25, 0x5b] {
+            assert_eq!(direct(kind, &catalog, &preferences, Role::Player, original),
+                Some(Step { target: Target::Fighter(kind), cursor: None }));
+        }
+        assert_eq!(preferences, before);
+        assert_eq!(ordered, roster(&[6, 0x48, 8]));
+    }
+
+    fn direct_mii_pick_preserves_original_and_does_not_fall_through_to_a_cycle() {
+        let catalog = example();
+        let original = Identity::Saved(id(&catalog, 4155));
+        let preferences = Preferences::default()
+            .with(Role::Player, MiiClass::Brawler, Some(id(&catalog, 4155))).unwrap();
+        let picked = direct(0x48, &catalog, &preferences, Role::Player, original).unwrap();
+        assert_ne!(saved(picked).canonical, id(&catalog, 4155));
+        assert_eq!(saved(picked).canonical, id(&catalog, 4200));
+        let cpu = direct(0x48, &catalog, &preferences, Role::Cpu, original).unwrap();
+        assert_eq!(saved(cpu).canonical, id(&catalog, 4155));
+        let next = next_cycle(&roster(&[0x48]), &catalog, &preferences, Role::Player, original, applied(picked)).unwrap();
+        assert_eq!(next, Step { target: Target::Original, cursor: None });
+        assert_eq!(direct(0x48, &Snapshot::default(), &preferences, Role::Player, original), None);
+        assert_eq!(direct(u32::MAX, &catalog, &preferences, Role::Cpu, original), None);
+        assert_eq!(direct(6, &catalog, &preferences, Role::Player, Identity::Fighter(0x48)), None);
+        assert_eq!(crate::engine::mii::ordinary_player::Request::direct(0, 6), None);
+        assert_eq!(crate::engine::mii::ordinary_cpu::Request::direct(0, 6), None);
+    }
+
+    fn id(catalog: &Snapshot, slot: u32) -> Canonical {
+        catalog
+            .configs
+            .iter()
+            .find(|c| c.slot_id == slot)
+            .unwrap()
+            .canonical
+    }
+
+    fn roster(kinds: &[u32]) -> Vec<TrioFighter> {
+        kinds
+            .iter()
+            .map(|kind| TrioFighter::from_kind(*kind).unwrap())
+            .collect()
+    }
+
+    fn applied(step: Step) -> Live {
+        match step.target {
+            Target::Original => Live::Original,
+            Target::Fighter(kind) => Live::Numbered {
+                identity: Identity::Fighter(kind),
+                cursor: step.cursor,
+            },
+            Target::Saved(choice) => Live::Numbered {
+                identity: Identity::Saved(choice.canonical),
+                cursor: step.cursor,
+            },
+        }
+    }
+
+    fn saved(step: Step) -> Choice {
+        match step.target {
+            Target::Saved(choice) => choice,
+            other => panic!("expected saved choice, got {:?}", other),
+        }
+    }
+
+    fn saved_slot_zero_restores_captured_payload_after_an_ordinary_numbered_target() {
+        use {crate::engine::mii::lifetime::Configuration, crate::engine::mii::ordinary_player::{retained_record,staged_descriptor}};
+        let catalog=example();
+        let config=|slot|Configuration::from_saved(catalog.configs.iter().find(|c|c.slot_id==slot).unwrap()).unwrap();
+        let origin=config(2622);let alternate=config(2700);
+        let order=roster(&[0x49,0x0b]);let preferences=Preferences::default();
+        let first=next_cycle(&order,&catalog,&preferences,Role::Player,
+            Identity::Saved(origin.canonical()),Live::Original).unwrap();
+        assert_eq!(first.target.publish(Some(origin),Some(alternate)),Ok(Some(alternate)));
+        assert!(first.target.publish(Some(origin),Some(origin)).is_err());
+        let second=next_cycle(&order,&catalog,&preferences,Role::Player,
+            Identity::Saved(origin.canonical()),applied(first)).unwrap();
+        assert_eq!(second.target,Target::Fighter(0x0b));
+        assert_eq!(second.target.publish(Some(origin),None),Ok(None));
+        let returned=next_cycle(&order,&catalog,&preferences,Role::Player,
+            Identity::Saved(origin.canonical()),applied(second)).unwrap();
+        assert_eq!(returned,Step{target:Target::Original,cursor:None});
+        let payload=returned.target.publish(Some(origin),None).unwrap();
+        assert_eq!(payload,Some(origin));
+        let after_alternate=retained_record([0x7d;0x68],Some(alternate));
+        let after_fighter=retained_record(after_alternate,None);
+        let after_return=retained_record(after_fighter,payload);
+        assert_eq!(&after_return[..88],origin.charinfo());
+        assert_eq!(&after_return[88..],&after_alternate[88..]);
+        assert_ne!(&after_fighter[..88],origin.charinfo());
+        let descriptor=staged_descriptor([0xa5;0x70],Some(origin));
+        assert_eq!(staged_descriptor(descriptor,None),descriptor);
+        // The same class alternate also returns through the explicit original position.
+        let same_class=next_cycle(&roster(&[0x49]),&catalog,&preferences,Role::Player,
+            Identity::Saved(origin.canonical()),applied(first)).unwrap();
+        assert_eq!(same_class,returned);
+        assert_eq!(same_class.target.publish(Some(origin),None),Ok(Some(origin)));
+    }
+
+    fn player_qualification_skips_unavailable_then_returns_through_original() {
+        let catalog = example();
+        let prefs = Preferences::default();
+        let before = serde_json::to_vec(&prefs).unwrap();
+        let order = roster(&[9, 0x48, 0x49, 0x4a]);
+        let original = Identity::Fighter(9);
+        let qualify = |step: Step| match step.target {
+            Target::Saved(choice) if choice.canonical.class != MiiClass::Gunner => None,
+            _ => Some(()),
+        };
+        let (gunner, ()) = next_qualified_player(&order, &catalog, &prefs,
+            original, Live::Original, qualify).unwrap();
+        assert_eq!(saved(gunner).slot_id.unwrap(), 3137);
+        assert_eq!(gunner.cursor, Some(2));
+        let (returned, ()) = next_qualified_player(&order, &catalog, &prefs,
+            original, applied(gunner), qualify).unwrap();
+        assert_eq!(returned, Step {target: Target::Original, cursor: None});
+        assert_eq!(serde_json::to_vec(&prefs).unwrap(), before);
+    }
+
+    fn player_original_is_not_skipped_or_retried_after_refusal() {
+        let catalog = example();
+        let prefs = Preferences::default();
+        let order = roster(&[0x49, 0x4a]);
+        let mut visited = Vec::new();
+        let result = next_qualified_player(&order, &catalog, &prefs,
+            Identity::Fighter(9), Live::Original, |step| {
+                visited.push(step);
+                None::<()>
+            });
+        assert_eq!(result, None);
+        assert_eq!(visited.len(), 3);
+        assert_eq!(visited[2], Step {target: Target::Original, cursor: None});
+        let (empty, ()) = next_qualified_player(&[], &catalog, &prefs,
+            Identity::Fighter(9), Live::Original, |_| Some(())).unwrap();
+        assert_eq!(empty, Step {target: Target::Original, cursor: None});
+    }
+
+
+    fn cpu_qualification_returns_slot_zero_between_loops() {
+        let catalog = example();
+        let prefs = Preferences::default();
+        let prefs_before = serde_json::to_vec(&prefs).unwrap();
+        let order = roster(&[0x48, 0x49, 0x4a, 9]);
+        let origin = Identity::Fighter(9);
+        let live = Live::Original;
+        let qualify = |step: Step| match step.target {
+            Target::Saved(choice) if choice.canonical.class != MiiClass::Gunner => None,
+            _ => Some(()),
+        };
+        let (first, ()) = next_qualified_cpu(&order, &catalog, &prefs, origin, live, qualify).unwrap();
+        assert_eq!(saved(first).slot_id.unwrap(), 3137);
+        assert_eq!(first.cursor, Some(2));
+        // The policy returns a proposal; the caller's actual live value stays original.
+        assert_eq!(live, Live::Original);
+        let (returned, ()) = next_qualified_cpu(&order, &catalog, &prefs, origin,
+            applied(first), qualify).unwrap();
+        assert_eq!(returned, Step {target: Target::Original, cursor: None});
+        assert_ne!(returned.target, Target::Fighter(9));
+        let (again, ()) = next_qualified_cpu(&order, &catalog, &prefs, origin,
+            Live::Original, qualify).unwrap();
+        assert_eq!(again, first);
+        assert_eq!(serde_json::to_vec(&prefs).unwrap(), prefs_before);
+    }
+
+    fn cpu_all_unqualified_stops_after_one_distinct_traversal() {
+        let catalog = example();
+        let prefs = Preferences::default();
+        let prefs_before = serde_json::to_vec(&prefs).unwrap();
+        // Duplicate Sword must not make a rejected choice get qualified twice.
+        let order = roster(&[0x48, 0x49, 0x49, 0x4a]);
+        let live = Live::Original;
+        let mut visited = Vec::new();
+        let mut saw_original = false;
+        let result = next_qualified_cpu(&order, &catalog, &prefs,
+            Identity::Fighter(9), live, |step| {
+                if step.target == Target::Original {
+                    saw_original = true;
+                    return None;
+                }
+                visited.push((step.cursor, saved(step).slot_id.unwrap()));
+                None::<()>
+            });
+        assert_eq!(result, None);
+        assert!(saw_original);
+        assert_eq!(visited, [(Some(0), 4155), (Some(1), 2622), (Some(2), 3137)]);
+        assert_eq!(live, Live::Original);
+        assert_eq!(serde_json::to_vec(&prefs).unwrap(), prefs_before);
+    }
+
+    fn original_sword_a_visits_sword_b_gunner_brawler_then_exact_slot_zero() {
+        let catalog = example();
+        let origin = Identity::Saved(id(&catalog, 2622));
+        let order = roster(&[0x49, 0x4a, 0x48]);
+        let prefs = Preferences::default();
+        let mut live = Live::Original;
+        for (index, slot) in [2700, 3137, 4155].iter().copied().enumerate() {
+            let step = next_cycle(&order, &catalog, &prefs, Role::Player, origin, live).unwrap();
+            assert_eq!(step.cursor, Some(index));
+            assert_eq!(saved(step).slot_id.unwrap(), slot);
+            live = applied(step);
+        }
+        let step = next_cycle(&order, &catalog, &prefs, Role::Player, origin, live).unwrap();
+        assert_eq!(
+            step,
+            Step {
+                target: Target::Original,
+                cursor: None
+            }
+        );
+        assert_eq!(
+            saved(
+                next_cycle(
+                    &order,
+                    &catalog,
+                    &prefs,
+                    Role::Player,
+                    origin,
+                    applied(step)
+                )
+                .unwrap()
+            )
+            .slot_id.unwrap(),
+            2700
+        );
+    }
+
+    fn mixed_order_preserves_ordinary_positions_and_one_saved_choice_per_class() {
+        let catalog = example();
+        let prefs = Preferences::default()
+            .with(Role::Player, MiiClass::Brawler, Some(id(&catalog, 4300)))
+            .unwrap();
+        let order = roster(&[0x49, 0x0b, 0x48, 0x48, 0x4a]);
+        let origin = Identity::Fighter(9);
+        let mut live = Live::Original;
+        let mut seen = Vec::new();
+        for _ in 0..5 {
+            let step = next_cycle(&order, &catalog, &prefs, Role::Player, origin, live).unwrap();
+            seen.push(match step.target {
+                Target::Original => (0, 0),
+                Target::Fighter(kind) => (1, kind),
+                Target::Saved(choice) => (2, choice.slot_id.unwrap()),
+            });
+            live = applied(step);
+        }
+        assert_eq!(seen, [(2, 2622), (1, 0x0b), (2, 4300), (2, 3137), (0, 0)]);
+    }
+
+    fn cpu_uses_its_preferences_includes_player_original_and_returns_slot_zero() {
+        let catalog = example();
+        let prefs = Preferences::default()
+            .with(
+                Role::Player,
+                MiiClass::Swordfighter,
+                Some(id(&catalog, 2700)),
+            )
+            .unwrap()
+            .with(Role::Cpu, MiiClass::Swordfighter, Some(id(&catalog, 2622)))
+            .unwrap();
+        let order = roster(&[0x49, 0x4a]);
+        let mut live = Live::Original;
+        for slot in [2622, 3137] {
+            let step = next_cycle(
+                &order,
+                &catalog,
+                &prefs,
+                Role::Cpu,
+                Identity::Fighter(9),
+                live,
+            )
+            .unwrap();
+            assert!(step.cursor.is_some());
+            assert_eq!(saved(step).slot_id.unwrap(), slot);
+            live = applied(step);
+        }
+        let returned = next_cycle(
+            &order,
+            &catalog,
+            &prefs,
+            Role::Cpu,
+            Identity::Fighter(9),
+            live,
+        )
+        .unwrap();
+        assert_eq!(returned, Step { target: Target::Original, cursor: None });
+        let again = next_cycle(
+            &order,
+            &catalog,
+            &prefs,
+            Role::Cpu,
+            Identity::Fighter(9),
+            applied(returned),
+        )
+        .unwrap();
+        assert_eq!(saved(again).slot_id.unwrap(), 2622);
+        // Preference 2622 is this CPU's saved original, so the numbered Swordfighter
+        // is the other configuration. Gunner follows, then slot 0. Luigi above is a
+        // different original, which is why 2622 was numbered in that loop.
+        let sword = next_cycle(
+            &order,
+            &catalog,
+            &prefs,
+            Role::Cpu,
+            Identity::Saved(id(&catalog, 2622)),
+            Live::Original,
+        )
+        .unwrap();
+        assert_eq!(saved(sword).slot_id.unwrap(), 2700);
+        let gunner = next_cycle(
+            &order,
+            &catalog,
+            &prefs,
+            Role::Cpu,
+            Identity::Saved(id(&catalog, 2622)),
+            applied(sword),
+        )
+        .unwrap();
+        assert_eq!(saved(gunner).slot_id.unwrap(), 3137);
+        assert_eq!(
+            next_cycle(
+                &order,
+                &catalog,
+                &prefs,
+                Role::Cpu,
+                Identity::Saved(id(&catalog, 2622)),
+                applied(gunner),
+            )
+            .unwrap(),
+            Step { target: Target::Original, cursor: None }
+        );
+    }
+
+    fn cpu_ness_returns_between_numbered_loops() {
+        let catalog = example();
+        let prefs = Preferences::default();
+        let order = roster(&[0x08, 0x0a, 0x06]);
+        let original = Identity::Fighter(0x0a);
+        let first = next_cycle(&order, &catalog, &prefs, Role::Cpu, original, Live::Original).unwrap();
+        assert_eq!(first, Step { target: Target::Fighter(0x08), cursor: Some(0) });
+        let second = next_cycle(&order, &catalog, &prefs, Role::Cpu, original, applied(first)).unwrap();
+        assert_eq!(second, Step { target: Target::Fighter(0x06), cursor: Some(1) });
+        let returned = next_cycle(&order, &catalog, &prefs, Role::Cpu, original, applied(second)).unwrap();
+        assert_eq!(returned, Step { target: Target::Original, cursor: None });
+        let again = next_cycle(&order, &catalog, &prefs, Role::Cpu, original, applied(returned)).unwrap();
+        assert_eq!(again, first);
+        let sentinel = next_cycle(
+            &order, &catalog, &prefs, Role::Cpu, Identity::Fighter(u32::MAX), Live::Original,
+        ).unwrap();
+        assert_eq!(sentinel, Step { target: Target::Fighter(0x08), cursor: Some(0) });
+        let sentinel_wrap = next_cycle(
+            &order, &catalog, &prefs, Role::Cpu, Identity::Fighter(u32::MAX),
+            Live::Numbered { identity: Identity::Fighter(0x06), cursor: Some(2) },
+        ).unwrap();
+        assert_eq!(sentinel_wrap, Step { target: Target::Fighter(0x08), cursor: Some(0) });
+        assert_ne!(sentinel_wrap.target, Target::Original);
+        assert!(next_cycle(
+            &order, &catalog, &prefs, Role::Cpu, Identity::Fighter(0x49), Live::Original,
+        ).is_none());
+    }
+
+    fn cpu_saved_original_skips_exact_config_and_returns_slot_zero() {
+        let catalog = example();
+        let origin = Identity::Saved(id(&catalog, 2622));
+        let order = roster(&[0x49, 0x4a, 0x48]);
+        let prefs = Preferences::default();
+        let mut live = Live::Original;
+        for (index, slot) in [2700, 3137, 4155].iter().copied().enumerate() {
+            let step = next_cycle(&order, &catalog, &prefs, Role::Cpu, origin, live).unwrap();
+            assert_eq!(step.cursor, Some(index));
+            assert_eq!(saved(step).slot_id.unwrap(), slot);
+            assert_ne!(saved(step).slot_id.unwrap(), 2622);
+            live = applied(step);
+        }
+        let step = next_cycle(&order, &catalog, &prefs, Role::Cpu, origin, live).unwrap();
+        assert_eq!(step, Step { target: Target::Original, cursor: None });
+    }
+
+    fn fallback_and_duplicate_only_original_keep_preferences_read_only() {
+        let catalog = example();
+        let origin = Identity::Saved(id(&catalog, 2622));
+        let prefs = Preferences::default()
+            .with(
+                Role::Player,
+                MiiClass::Swordfighter,
+                Some(id(&catalog, 2622)),
+            )
+            .unwrap();
+        let bytes = serde_json::to_vec(&prefs).unwrap();
+        let order = roster(&[0x49, 0x4a]);
+        let choice = saved(
+            next_cycle(
+                &order,
+                &catalog,
+                &prefs,
+                Role::Player,
+                origin,
+                Live::Original,
+            )
+            .unwrap(),
+        );
+        assert_eq!(
+            (choice.slot_id.unwrap(), choice.source),
+            (2700, Source::FirstEligible(Fallback::PreferenceIsOrigin))
+        );
+        let only_original = build_snapshot(vec![
+            raw(0, 2622, MiiClass::Swordfighter, b'a'),
+            raw(1, 2900, MiiClass::Swordfighter, b'a'),
+            raw(2, 3137, MiiClass::Gunner, b'f'),
+        ]);
+        assert_eq!(only_original.of_class(MiiClass::Swordfighter).count(), 1);
+        assert_eq!(
+            saved(
+                next_cycle(
+                    &order,
+                    &only_original,
+                    &prefs,
+                    Role::Player,
+                    origin,
+                    Live::Original
+                )
+                .unwrap()
+            )
+            .slot_id.unwrap(),
+            3137
+        );
+        let stale = Preferences::default()
+            .with(
+                Role::Player,
+                MiiClass::Swordfighter,
+                Some(id(&catalog, 2700)),
+            )
+            .unwrap();
+        let stale_bytes = serde_json::to_vec(&stale).unwrap();
+        let choice = saved(
+            next_cycle(
+                &order,
+                &only_original,
+                &stale,
+                Role::Player,
+                Identity::Fighter(9),
+                Live::Original,
+            )
+            .unwrap(),
+        );
+        assert_eq!(
+            (choice.slot_id.unwrap(), choice.source),
+            (2622, Source::FirstEligible(Fallback::PreferenceUnavailable))
+        );
+        assert_eq!(serde_json::to_vec(&prefs).unwrap(), bytes);
+        assert_eq!(serde_json::to_vec(&stale).unwrap(), stale_bytes);
+    }
+
+    fn transformed_groups_and_stale_cursor_follow_existing_ordinary_slots() {
+        let catalog = example();
+        let prefs = Preferences::default();
+        let order = roster(&[0x0b, 0x5b, 0x25, 0x4b]);
+        for (current, cursor, next, next_cursor) in [
+            (0x5a, Some(1), 0x25, Some(2)),
+            (0x26, Some(2), 0x4b, Some(3)),
+            (0x5a, Some(99), 0x25, Some(2)),
+        ] {
+            let step = next_cycle(
+                &order,
+                &catalog,
+                &prefs,
+                Role::Player,
+                Identity::Fighter(9),
+                Live::Numbered {
+                    identity: Identity::Fighter(current),
+                    cursor,
+                },
+            )
+            .unwrap();
+            assert_eq!(
+                step,
+                Step {
+                    target: Target::Fighter(next),
+                    cursor: next_cursor
+                }
+            );
+            let kinds: Vec<_> = order.iter().map(|f| f.kind()).collect();
+            assert_eq!(
+                crate::engine::swap::character_forms::next_cycle(current, cursor, &kinds, Some(9)),
+                Some((next, next_cursor))
+            );
+        }
+        let step = next_cycle(
+            &order,
+            &catalog,
+            &prefs,
+            Role::Player,
+            Identity::Fighter(9),
+            Live::Numbered {
+                identity: Identity::Fighter(0x4b),
+                cursor: Some(3),
+            },
+        )
+        .unwrap();
+        assert_eq!(step.target, Target::Original);
+        // The original grouped fighter remains excluded as a group, unlike saved-Mii alternates.
+        let step = next_cycle(
+            &roster(&[0x5b, 0x0b]),
+            &catalog,
+            &prefs,
+            Role::Player,
+            Identity::Fighter(0x5a),
+            Live::Original,
+        )
+        .unwrap();
+        assert_eq!(
+            step,
+            Step {
+                target: Target::Fighter(0x0b),
+                cursor: Some(0)
+            }
+        );
+    }
+
+    fn mii_cursor_is_checked_by_identity_not_class_or_old_save_id() {
+        let catalog = example();
+        let order = roster(&[0x49, 0x4a]);
+        let prefs = Preferences::default()
+            .with(
+                Role::Player,
+                MiiClass::Swordfighter,
+                Some(id(&catalog, 2700)),
+            )
+            .unwrap();
+        let origin = Identity::Saved(id(&catalog, 2622));
+        // A stale numeric cursor cannot equate Sword A with the selected Sword B.
+        let step = next_cycle(
+            &order,
+            &catalog,
+            &prefs,
+            Role::Player,
+            origin,
+            Live::Numbered {
+                identity: origin,
+                cursor: Some(0),
+            },
+        )
+        .unwrap();
+        assert_eq!(saved(step).slot_id.unwrap(), 2700);
+        // Reordered slots locate the live canonical configuration, not the old index.
+        let reordered = roster(&[0x4a, 0x49]);
+        let step = next_cycle(
+            &reordered,
+            &catalog,
+            &prefs,
+            Role::Player,
+            origin,
+            Live::Numbered {
+                identity: Identity::Saved(id(&catalog, 2700)),
+                cursor: Some(0),
+            },
+        )
+        .unwrap();
+        assert_eq!(step.target, Target::Original);
+        // A new representative save ID does not change canonical identity.
+        let replaced = build_snapshot(vec![
+            raw(0, 9000, MiiClass::Swordfighter, b'b'),
+            raw(1, 3137, MiiClass::Gunner, b'f'),
+        ]);
+        let step = next_cycle(
+            &order,
+            &replaced,
+            &prefs,
+            Role::Player,
+            Identity::Fighter(9),
+            Live::Numbered {
+                identity: Identity::Saved(id(&catalog, 2700)),
+                cursor: Some(0),
+            },
+        )
+        .unwrap();
+        assert_eq!(saved(step).slot_id.unwrap(), 3137);
+    }
+
+    fn unavailable_mii_choices_and_kind_only_mii_do_not_invent_configuration() {
+        let mut catalog = example();
+        let prefs = Preferences::default();
+        catalog
+            .findings
+            .push(crate::engine::mii::inventory::Finding::Source {
+                slot_id: Some(9999),
+                error: "unreadable".into(),
+            });
+        let order = roster(&[0x49, 0x4a]);
+        let step = next_cycle(
+            &order,
+            &catalog,
+            &prefs,
+            Role::Player,
+            Identity::Fighter(9),
+            Live::Original,
+        )
+        .unwrap();
+        assert_eq!(
+            step,
+            Step {
+                target: Target::Original,
+                cursor: None
+            }
+        );
+        assert_eq!(
+            next_cycle(
+                &order,
+                &catalog,
+                &prefs,
+                Role::Cpu,
+                Identity::Fighter(9),
+                Live::Original
+            ),
+            Some(Step { target: Target::Original, cursor: None })
+        );
+        assert!(next_cycle(
+            &order,
+            &catalog,
+            &prefs,
+            Role::Cpu,
+            Identity::Fighter(0x49),
+            Live::Original
+        )
+        .is_none());
+        assert!(next_cycle(
+            &order,
+            &catalog,
+            &prefs,
+            Role::Cpu,
+            Identity::Fighter(u32::MAX),
+            Live::Original
+        )
+        .is_none());
+        assert!(next_cycle(
+            &order,
+            &catalog,
+            &prefs,
+            Role::Player,
+            Identity::Fighter(0x49),
+            Live::Original
+        )
+        .is_none());
+        let step = next_cycle(
+            &roster(&[0x49, 0x0b]),
+            &catalog,
+            &prefs,
+            Role::Cpu,
+            Identity::Fighter(9),
+            Live::Original,
+        )
+        .unwrap();
+        assert_eq!(
+            step,
+            Step {
+                target: Target::Fighter(0x0b),
+                cursor: Some(0)
+            }
+        );
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("compact_cycle_values_keep_full_roster_capacity_in_under_two_kib", compact_cycle_values_keep_full_roster_capacity_in_under_two_kib as fn()),
+            ("partner_refresh_preserves_the_slot_before_the_next_mii", partner_refresh_preserves_the_slot_before_the_next_mii as fn()),
+            ("opposite_solo_ice_climbers_stays_in_a_mixed_saved_mii_cycle", opposite_solo_ice_climbers_stays_in_a_mixed_saved_mii_cycle as fn()),
+            ("direct_mixed_roster_requests_keep_role_identity_and_continue_the_cycle", direct_mixed_roster_requests_keep_role_identity_and_continue_the_cycle as fn()),
+            ("direct_mii_pick_preserves_original_and_does_not_fall_through_to_a_cycle", direct_mii_pick_preserves_original_and_does_not_fall_through_to_a_cycle as fn()),
+            ("saved_slot_zero_restores_captured_payload_after_an_ordinary_numbered_target", saved_slot_zero_restores_captured_payload_after_an_ordinary_numbered_target as fn()),
+            ("player_qualification_skips_unavailable_then_returns_through_original", player_qualification_skips_unavailable_then_returns_through_original as fn()),
+            ("player_original_is_not_skipped_or_retried_after_refusal", player_original_is_not_skipped_or_retried_after_refusal as fn()),
+            ("cpu_qualification_returns_slot_zero_between_loops", cpu_qualification_returns_slot_zero_between_loops as fn()),
+            ("cpu_all_unqualified_stops_after_one_distinct_traversal", cpu_all_unqualified_stops_after_one_distinct_traversal as fn()),
+            ("original_sword_a_visits_sword_b_gunner_brawler_then_exact_slot_zero", original_sword_a_visits_sword_b_gunner_brawler_then_exact_slot_zero as fn()),
+            ("mixed_order_preserves_ordinary_positions_and_one_saved_choice_per_class", mixed_order_preserves_ordinary_positions_and_one_saved_choice_per_class as fn()),
+            ("cpu_uses_its_preferences_includes_player_original_and_returns_slot_zero", cpu_uses_its_preferences_includes_player_original_and_returns_slot_zero as fn()),
+            ("cpu_ness_returns_between_numbered_loops", cpu_ness_returns_between_numbered_loops as fn()),
+            ("cpu_saved_original_skips_exact_config_and_returns_slot_zero", cpu_saved_original_skips_exact_config_and_returns_slot_zero as fn()),
+            ("fallback_and_duplicate_only_original_keep_preferences_read_only", fallback_and_duplicate_only_original_keep_preferences_read_only as fn()),
+            ("transformed_groups_and_stale_cursor_follow_existing_ordinary_slots", transformed_groups_and_stale_cursor_follow_existing_ordinary_slots as fn()),
+            ("mii_cursor_is_checked_by_identity_not_class_or_old_save_id", mii_cursor_is_checked_by_identity_not_class_or_old_save_id as fn()),
+            ("unavailable_mii_choices_and_kind_only_mii_do_not_invent_configuration", unavailable_mii_choices_and_kind_only_mii_do_not_invent_configuration as fn()),
+        ]);
+    }
+    }
+}

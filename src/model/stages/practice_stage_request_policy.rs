@@ -195,3 +195,294 @@ pub(crate) fn plan_selection(v: View, settled: Option<Commit>, selection: crate:
     plan(v, settled, target, hash)
 }
 
+#[cfg(test)]
+mod tests {
+    lib_unit_tests! {
+    use super::*;
+    use crate::engine::stages::lobby_stages::{Form, Selection};
+
+    fn form_change_uses_native_kind_even_when_battlefield_package_hash_is_shared() {
+        let mut v = waiting();
+        // Recorded table rows0/1 share stage/battlefield/normal. Comparing only
+        // the package hash would wrongly refuse the Normal -> Omega transition.
+        v.descriptor[..4].copy_from_slice(&0u32.to_le_bytes());
+        v.descriptor[8..16].copy_from_slice(&0x18dcbe2bc4u64.to_le_bytes());
+        v.resources[2].as_mut().unwrap().kind = 0;
+        v.resources[2].as_mut().unwrap().hash = 0x18dcbe2bc4;
+        let (commit, descriptor) = plan_selection(v, None,
+            Selection { stage: 0, form: Form::Omega }, 0x18dcbe2bc4).unwrap();
+        assert_eq!(commit.target, 1);
+        assert_eq!(&descriptor[..4], &1u32.to_le_bytes());
+        assert_eq!(&descriptor[4..], &v.descriptor[4..]);
+        let (loaded, ready) = loaded(v, commit);
+        let mut wrong_kind = ready;
+        wrong_kind.target_kind = 0;
+        assert!(acknowledge(loaded, commit, wrong_kind).is_err());
+        assert!(acknowledge(loaded, commit, ready).unwrap().is_some());
+    }
+
+    fn form_requests_reject_special_combinations_and_leave_real_matches_native() {
+        let original = waiting();
+        for stage in [2, 308, 311, 347] {
+            for form in [Form::Omega, Form::Battlefield] {
+                assert_eq!(plan_selection(original, None, Selection { stage, form }, 99),
+                    Err("form unavailable for this stage"));
+            }
+        }
+        assert_eq!(original, waiting());
+        for mode in [0x02010000, 0x07010100, 0x87010101, 0x04040000] {
+            let mut real_match = original;
+            real_match.scene.mode = mode;
+            real_match.scene.melee = 1;
+            let before = real_match;
+            assert_eq!(plan_selection(real_match, None,
+                Selection { stage: 95, form: Form::Omega }, 0x1b9fc8fb46),
+                Err("not owned practice scene"));
+            assert_eq!(real_match, before);
+        }
+        for (mode, melee) in [(0x04040000, 0x20), (0x02010000, 0x0d), (0x07010101, 0x0d)] {
+            let mut practice = original;
+            practice.scene.mode = mode;
+            practice.scene.melee = melee;
+            if melee == 0x20 {
+                practice.active = 0;
+                practice.slots.swap(0, 2);
+                practice.resources.swap(0, 2);
+            }
+            let (commit, descriptor) = plan_selection(practice, None,
+                Selection { stage: 3, form: Form::Battlefield }, 0x100f8e9a50).unwrap();
+            assert_eq!(commit.target, 4);
+            assert_eq!(&descriptor[4..8], &practice.descriptor[4..8]);
+            assert_eq!(&descriptor[16..], &practice.descriptor[16..]);
+        }
+    }
+
+    fn alternate_forms_complete_then_require_a_new_menu_and_preserve_match_cache_ownership() {
+        for (mode, melee) in [(0x04040000, 0x20), (0x02010000, 0x0d), (0x87010101, 0x0d)] {
+            let mut v = waiting();
+            v.scene.mode = mode;
+            v.scene.melee = melee;
+            if melee == 0x20 {
+                v.active = 0;
+                v.slots.swap(0, 2);
+                v.resources.swap(0, 2);
+            }
+            let (first, _) = plan_selection(v, None,
+                Selection { stage: 95, form: Form::Omega }, 0x1b9fc8fb46).unwrap();
+            let (constructed, ready) = loaded(v, first);
+            let acknowledged = acknowledge(constructed, first, ready).unwrap().unwrap();
+            let mut done = constructed;
+            done.state = 0;
+            done.active = first.incoming as i32;
+            done.slots[first.outgoing] = 0;
+            done.resources[first.outgoing] = None;
+            done.descriptor[..4].copy_from_slice(&96u32.to_le_bytes());
+            done.descriptor[8..16].copy_from_slice(&0x1b9fc8fb46u64.to_le_bytes());
+            assert!(complete(done, acknowledged));
+            assert!(!current_request(first.scene, done.scene, first.original.object,
+                done.slots[done.active as usize]));
+            let selection = Selection { stage: 95, form: Form::Battlefield };
+            let (second, _) = plan_selection(done, Some(acknowledged), selection, 0x1b9fc8fb46).unwrap();
+            assert_eq!(second.target, 97); // Shared package, distinct native form.
+            for state in [0, 1] {
+                let mut match_preloading = done;
+                match_preloading.resources[3] = Some(Resource { address: 88, state, kind: 44, hash: 99 });
+                assert_eq!(plan_selection(match_preloading, Some(acknowledged), selection, 0x1b9fc8fb46),
+                    Err("pending match cache occupied"));
+                assert_eq!(match_preloading.resources[3].unwrap().state, state);
+            }
+        }
+    }
+    fn waiting() -> View {
+        let mut descriptor = [0x5a; 0xb0];
+        descriptor[..4].copy_from_slice(&311u32.to_le_bytes());
+        descriptor[8..16].copy_from_slice(&0x165a48f367u64.to_le_bytes());
+        View { scene: Scene { epoch: 7, wrapper: 8, core: 16, mode: 0x02010000, melee: 0xd },
+            resource_owner: 24, task_owner: 32, task: 40, task_state: 0, task_fiber: 0,
+            disabled: 0, stop_mask: 0, state: 0, active: 2, incoming: -1, outgoing: -1,
+            slots: [0, 0, 48], resources: [None, None, Some(Resource { address: 56,
+                state: 1, kind: 311, hash: 0x165a48f367 }), None], descriptor,
+            waiting_ready: true, ui_busy: false, roster_busy: false, item_ready: true }
+    }
+    fn actual_waiting_uses_native_zero_and_preserves_full_descriptor() {
+        let v = waiting();
+        let (c, d) = plan(v, None, 0, 0x123456789a).unwrap();
+        assert_eq!((c.incoming, c.outgoing), (0, 2)); // active XOR1 would be invalid3.
+        assert_eq!(&d[4..8], &v.descriptor[4..8]);
+        assert_eq!(&d[16..], &v.descriptor[16..]);
+        assert_eq!(&d[..4], &0u32.to_le_bytes());
+        assert_eq!(&d[8..16], &0x123456789au64.to_le_bytes());
+        let mut training = v; training.scene.mode=0x04040000; training.scene.melee=0x20;
+        training.active=0; training.slots=[48,0,0]; training.resources.swap(0,2);
+        assert_eq!(admit(training,None),Ok(1));
+    }
+    fn quickplay_waiting_keeps_match_cache_and_scene_ownership_barriers() {
+        for mode in [0x07010100, 0x07010101, 0x07010400, 0x87010400] {
+            let mut v = waiting();
+            v.scene.mode = mode;
+            let (c, descriptor) = plan(v, None, 0, 0x123456789a).unwrap();
+            assert_eq!((c.incoming, c.outgoing), (0, 2));
+            assert_eq!(&descriptor[16..], &v.descriptor[16..]);
+            for cache_state in [0, 1] {
+                let mut match_loading = v;
+                match_loading.resources[3] = Some(Resource {
+                    address: 88, state: cache_state, kind: 44, hash: 99,
+                });
+                assert_eq!(admit(match_loading, None), Err("pending match cache occupied"));
+            }
+            let (mut loaded, ready) = loaded(v, c);
+            loaded.waiting_ready = false;
+            assert_eq!(acknowledge(loaded, c, ready), Ok(None));
+            loaded.waiting_ready = true;
+            assert!(acknowledge(loaded, c, ready).unwrap().is_some());
+            // Match start revokes the original scene even if allocation addresses
+            // have not changed yet. A return with a new epoch cannot revive it.
+            loaded.scene.melee = 0x10;
+            assert_eq!(acknowledge(loaded, c, ready), Err("activation owner changed"));
+            let mut other = v;
+            other.scene.melee = 0x10;
+            assert_eq!(admit(other, None), Err("not owned practice scene"));
+            other = v;
+            other.scene.mode = 0x07010200;
+            assert_eq!(admit(other, None), Err("not owned practice scene"));
+            other = v;
+            other.waiting_ready = false;
+            assert_eq!(admit(other, None), Err("not owned practice scene"));
+            other = v;
+            other.scene.epoch += 1;
+            assert!(!current_request(c.scene, other.scene, 48, 48));
+        }
+    }
+    fn real_pending_match_cache_blocks_both_loading_and_ready() {
+        for state in [0, 1] {
+            let mut v = waiting();
+            v.resources[3]=Some(Resource { address: 64, state, kind: 44, hash: 0x1cb58f24d5 });
+            assert_eq!(admit(v,None),Err("pending match cache occupied"));
+        }
+    }
+    fn task_active_slot_and_unowned_indices_are_not_capacity() {
+        let mut v=waiting(); v.task_state=5;
+        assert_eq!(admit(v,None),Err("native transition or task busy"));
+        v=waiting(); v.task_fiber=64;
+        assert_eq!(admit(v,None),Err("native transition or task busy"));
+        v=waiting(); v.incoming=0;
+        assert_eq!(admit(v,None),Err("ambiguous incoming/outgoing ownership"));
+        v=waiting(); v.slots[0]=64;
+        assert_eq!(admit(v,None),Err("other native slot owned"));
+        v=waiting(); v.resources[2].as_mut().unwrap().hash=0;
+        assert_eq!(admit(v,None),Err("active resource mismatch"));
+    }
+    fn only_exact_native_completion_permits_a_second_request() {
+        let v=waiting(); let(c,_)=plan(v,None,0,0x123456789a).unwrap();
+        let (loaded,ready)=loaded(v,c);
+        let c=acknowledge(loaded,c,ready).unwrap().unwrap();
+        let mut done=v; done.active=0; done.incoming=0; done.outgoing=2;
+        done.slots=[72,0,0]; done.resources=[Some(Resource { address:80,state:1,kind:0,hash:c.hash }),None,None,None];
+        done.descriptor[..4].copy_from_slice(&0u32.to_le_bytes());
+        done.descriptor[8..16].copy_from_slice(&c.hash.to_le_bytes());
+        assert!(complete(done,c));
+        assert!(admit(done,None).is_err());
+        assert_eq!(admit(done,Some(c)),Ok(1));
+        for altered in 0..6 {
+            let mut bad=done;
+            match altered { 0=>bad.scene.epoch+=1, 1=>bad.task_state=5,
+                2=>bad.slots[2]=48, 3=>bad.task_owner+=8,
+                4=>bad.slots[0]+=8, _=>bad.resources[0].as_mut().unwrap().address+=8 }
+            assert!(!complete(bad,c));
+            assert!(admit(bad,Some(c)).is_err());
+        }
+    }
+    fn loaded(mut v:View,c:Commit)->(View,ActivationRead) {
+        v.state=6; v.incoming=c.incoming as i32; v.outgoing=c.outgoing as i32;
+        v.slots[c.incoming]=72;
+        v.resources[c.incoming]=Some(Resource { address:80,state:1,kind:c.target,hash:c.hash });
+        (v,ActivationRead { native_ready:1,ready_bits:3,readiness_stop_mask:0,
+            target_kind:c.target,target_hash:c.hash,target_flag_500:1,
+            request_kind:c.target,request_hash:c.hash })
+    }
+    fn observed_state6_requires_native_readiness_and_exact_allocation_lease_once() {
+        let v=waiting();let(c,_)=plan(v,None,0,0x123456789a).unwrap();
+        let (loaded,ready)=loaded(v,c);
+        assert!(!complete(loaded,c));
+        let mut not_ready=ready;not_ready.native_ready=0;not_ready.ready_bits=1;
+        assert_eq!(acknowledge(loaded,c,not_ready),Ok(None));
+        let ack=acknowledge(loaded,c,ready).unwrap().unwrap();
+        assert_eq!(ack.original,c.original);
+        assert_eq!(ack.activated.unwrap().object,72);
+        assert_eq!(acknowledge(loaded,ack,ready),Err("activation already acknowledged"));
+        let mut changed=loaded;changed.slots[2]+=8;
+        assert_eq!(acknowledge(changed,c,ready),Err("activation original allocation changed"));
+        changed=loaded;changed.resources[2].as_mut().unwrap().address+=8;
+        assert_eq!(acknowledge(changed,c,ready),Err("activation original allocation changed"));
+        changed=loaded;changed.resources[3]=Some(Resource { address:88,state:0,kind:44,hash:99 });
+        assert_eq!(acknowledge(changed,c,ready),Err("activation conflicting native slot"));
+        changed=loaded;changed.scene.epoch+=1;
+        assert_eq!(acknowledge(changed,c,ready),Err("activation owner changed"));
+        changed=loaded;changed.task_fiber=96;
+        assert_eq!(acknowledge(changed,c,ready),Err("activation task not finalized"));
+        let mut wrong=ready;wrong.target_hash+=1;
+        assert_eq!(acknowledge(loaded,c,wrong),Err("activation target not constructed or changed"));
+        wrong=ready;wrong.native_ready=2;
+        assert_eq!(acknowledge(loaded,c,wrong),Err("activation native readiness inconsistent"));
+    }
+    fn state6_transient_wait_clears_then_acknowledges_the_same_lease() {
+        let v=waiting();let(c,_)=plan(v,None,0,0x123456789a).unwrap();
+        let (loaded,ready)=loaded(v,c);
+        let expected=acknowledge(loaded,c,ready).unwrap().unwrap();
+        for temporary in 0..7 {
+            let mut suspended=loaded;let mut not_ready=ready;
+            match temporary {
+                0=>suspended.disabled=1,
+                1=>suspended.stop_mask=1,
+                2=>not_ready.readiness_stop_mask=1,
+                3=>suspended.ui_busy=true,
+                4=>suspended.roster_busy=true,
+                5=>suspended.waiting_ready=false,
+                _=>not_ready.ready_bits=1, // dc1 with a stale per-frame e0 pair.
+            }
+            assert_eq!(acknowledge(suspended,c,not_ready),Ok(None));
+            assert_eq!(acknowledge(loaded,c,ready),Ok(Some(expected)));
+            assert_eq!(acknowledge(loaded,expected,ready),Err("activation already acknowledged"));
+        }
+    }
+    fn state6_transient_wait_does_not_mask_lost_authority() {
+        let v=waiting();let(c,_)=plan(v,None,0,0x123456789a).unwrap();
+        let (mut suspended,mut stale)=loaded(v,c);
+        suspended.ui_busy=true;stale.ready_bits=1;
+        let mut changed=suspended;changed.scene.epoch+=1;
+        assert_eq!(acknowledge(changed,c,stale),Err("activation owner changed"));
+        changed=suspended;changed.incoming=1;
+        assert_eq!(acknowledge(changed,c,stale),Err("activation phase or pair changed"));
+        changed=suspended;changed.resources[c.outgoing].as_mut().unwrap().address+=8;
+        assert_eq!(acknowledge(changed,c,stale),Err("activation original allocation changed"));
+        let mut changed_read=stale;changed_read.target_hash+=1;
+        assert_eq!(acknowledge(suspended,c,changed_read),Err("activation target not constructed or changed"));
+    }
+    fn departure_cancels_even_reused_addresses_before_publication() {
+        let old=waiting().scene;
+        assert!(current_request(old,old,48,48));
+        let mut returned=old; returned.epoch+=1;
+        assert!(!current_request(old,returned,48,48));
+        assert!(!current_request(old,old,48,72));
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("form_change_uses_native_kind_even_when_battlefield_package_hash_is_shared", form_change_uses_native_kind_even_when_battlefield_package_hash_is_shared as fn()),
+            ("form_requests_reject_special_combinations_and_leave_real_matches_native", form_requests_reject_special_combinations_and_leave_real_matches_native as fn()),
+            ("alternate_forms_complete_then_require_a_new_menu_and_preserve_match_cache_ownership", alternate_forms_complete_then_require_a_new_menu_and_preserve_match_cache_ownership as fn()),
+            ("actual_waiting_uses_native_zero_and_preserves_full_descriptor", actual_waiting_uses_native_zero_and_preserves_full_descriptor as fn()),
+            ("quickplay_waiting_keeps_match_cache_and_scene_ownership_barriers", quickplay_waiting_keeps_match_cache_and_scene_ownership_barriers as fn()),
+            ("real_pending_match_cache_blocks_both_loading_and_ready", real_pending_match_cache_blocks_both_loading_and_ready as fn()),
+            ("task_active_slot_and_unowned_indices_are_not_capacity", task_active_slot_and_unowned_indices_are_not_capacity as fn()),
+            ("only_exact_native_completion_permits_a_second_request", only_exact_native_completion_permits_a_second_request as fn()),
+            ("observed_state6_requires_native_readiness_and_exact_allocation_lease_once", observed_state6_requires_native_readiness_and_exact_allocation_lease_once as fn()),
+            ("state6_transient_wait_clears_then_acknowledges_the_same_lease", state6_transient_wait_clears_then_acknowledges_the_same_lease as fn()),
+            ("state6_transient_wait_does_not_mask_lost_authority", state6_transient_wait_does_not_mask_lost_authority as fn()),
+            ("departure_cancels_even_reused_addresses_before_publication", departure_cancels_even_reused_addresses_before_publication as fn()),
+        ]);
+    }
+    }
+}

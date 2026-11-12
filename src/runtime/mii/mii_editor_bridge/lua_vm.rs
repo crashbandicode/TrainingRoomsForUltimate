@@ -289,3 +289,18 @@ impl Drop for Vm {
     fn drop(&mut self) { unsafe { self.reset(); } }
 }
 
+#[cfg(test)]
+mod tests {
+    lib_unit_tests! {
+    use super::*;
+
+    #[test]
+    fn gear_page_waits_for_the_wrapper_yield_and_rejects_a_different_script() {
+        assert!(Vm::gear_suspension(true, Some(0)).is_ok());
+        assert!(matches!(Vm::gear_suspension(true, Some(1)), Err(Error::Binding)));
+        assert!(matches!(Vm::gear_suspension(false, Some(0)), Err(Error::Binding)));
+        assert!(matches!(Vm::gear_suspension(false, None), Err(Error::Binding)));
+        assert!(matches!(Vm::gear_suspension(true, None), Err(Error::Identity)));
+    }
+    }
+}

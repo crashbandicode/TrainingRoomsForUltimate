@@ -683,3 +683,648 @@ fn record(err: impl ToString) -> Error {
     Error::Record(err.to_string())
 }
 
+#[cfg(test)]
+mod tests {
+    lib_unit_tests! {
+    use super::super::library::{start_save_state, Drill, DrillKind};
+    use super::*;
+    use crate::model::combo::{Aim, Event, LinkRec};
+    use crate::model::frame_strip::{Button, Move, Verdict};
+    use crate::model::menu::input::Button as MenuButton;
+    use crate::model::menu::table::{COMBOS_SEQ, SAVES_MACROS};
+    use crate::model::recording_menu::{
+        Catalog, ComboFile, Effect, Face, MacroFile, RecordingScreens, SaveFile, SequenceFile,
+    };
+    use crate::model::state::settings::StateSettings;
+
+    fn frame(buttons: u32) -> InputFrame {
+        InputFrame {
+            buttons,
+            ..InputFrame::default()
+        }
+    }
+
+    fn scratch(tag: &str) -> std::path::PathBuf {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static NEXT: AtomicU64 = AtomicU64::new(0);
+        let n = NEXT.fetch_add(1, Ordering::Relaxed);
+        let dir = std::env::temp_dir().join(format!("tr-rr7-{tag}-{n}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    fn state(kind: i32) -> SavedState {
+        let mut state = SavedState::never_saved();
+        state.fighter_kind = kind;
+        state
+    }
+
+    fn recording(name: &str, buttons: &[u32], save: Option<&str>) -> MacroRecording {
+        let mut recording = MacroRecording::new(
+            name,
+            "13.0.5",
+            StartState::neutral(8, 0, 1.0),
+            buttons.iter().copied().map(frame).collect(),
+        )
+        .unwrap();
+        if let Some(id) = save {
+            recording.set_start_save(Some(id)).unwrap();
+        }
+        recording
+    }
+
+    fn link(from: Move, to: Move) -> LinkRec {
+        LinkRec::presses(
+            from,
+            to,
+            Verdict::True(None),
+            None,
+            &[Event::press(Button::Jump, Aim::Neutral, 2)],
+        )
+    }
+
+    fn record_follows_the_popup_role() {
+        let mut capture = Capture::idle();
+        assert!(toggle_record(&mut capture, Role::Player));
+        push_frame(&mut capture, Role::Player, frame(1));
+        push_frame(&mut capture, Role::Cpu, frame(9));
+        assert_eq!(
+            capture
+                .frames()
+                .iter()
+                .map(|frame| frame.buttons)
+                .collect::<Vec<_>>(),
+            vec![1]
+        );
+        assert!(!toggle_record(&mut capture, Role::Player));
+        assert!(toggle_record(&mut capture, Role::Cpu));
+        push_frame(&mut capture, Role::Player, frame(1));
+        push_frame(&mut capture, Role::Cpu, frame(9));
+        assert_eq!(capture.role(), Role::Cpu);
+        assert_eq!(
+            capture
+                .frames()
+                .iter()
+                .map(|frame| frame.buttons)
+                .collect::<Vec<_>>(),
+            vec![9]
+        );
+    }
+
+    fn record_stores_the_start_save_id() {
+        let root = scratch("record");
+        let mut index = RecordingIndex::fresh();
+        index.set_active(Role::Player, Some("old"), 1).unwrap();
+        index.save(&root).unwrap();
+        let mut capture = Capture::idle();
+        toggle_record(&mut capture, Role::Player);
+        push_frame(&mut capture, Role::Player, frame(4));
+        let stop = finish_recording(&root, &capture, state(13), state(7), (0.0, 0.0), 5).unwrap();
+        let RecordStop::Saved {
+            ref id,
+            ref start_save,
+        } = stop
+        else {
+            panic!("empty")
+        };
+        let id = id.clone();
+        let start_save = start_save.clone();
+        assert_eq!(stop.cursor(), Some(id.as_str()));
+        let macros = Library::new(root.join(MACROS_DIR));
+        let saved = macros.load(&id).unwrap();
+        assert_eq!(saved.name, "Macro 1");
+        assert_eq!(saved.start_save.as_deref(), Some(start_save.as_str()));
+        let saves = Store::<NamedSave>::new(root.join(SAVES_DIR));
+        assert_eq!(saves.load(&start_save).unwrap().name, "Macro 1 · start");
+        let index = RecordingIndex::load(&root).unwrap();
+        assert_eq!(index.active(Role::Player), Some(id.as_str()));
+        assert_eq!(index.active(Role::Cpu), None);
+        assert_eq!(
+            index.hot(Kind::Macro).first().map(String::as_str),
+            Some(id.as_str())
+        );
+    }
+
+    fn a_cpu_role_recording_becomes_the_cpu_active_macro_and_names_the_cpu() {
+        let root = scratch("cpu-active");
+        let mut index = RecordingIndex::fresh();
+        index.set_active(Role::Player, Some("keep-player"), 1).unwrap();
+        index.save(&root).unwrap();
+        let mut capture = Capture::idle();
+        toggle_record(&mut capture, Role::Cpu);
+        push_frame(&mut capture, Role::Cpu, frame(33_281));
+        let stop = finish_recording(&root, &capture, state(0), state(0x1d), (0.0, 0.0), 5).unwrap();
+        let RecordStop::Saved { id, .. } = stop else {
+            panic!("empty")
+        };
+        let saved = Library::new(root.join(MACROS_DIR)).load(&id).unwrap();
+        assert_eq!(saved.start.fighter_kind, 0x1d, "the CPU's fighter, not the player's");
+        let index = RecordingIndex::load(&root).unwrap();
+        assert_eq!(index.active(Role::Cpu), Some(id.as_str()));
+        assert_eq!(index.active(Role::Player), Some("keep-player"));
+    }
+
+    fn a_long_macro_plays_from_a_600_frame_window() {
+        assert!(length_is_kept(MAX_FRAMES));
+        assert!(!length_is_kept(MAX_FRAMES + 1));
+        let frames: Vec<InputFrame> = (0..4_300).map(|index| frame(index as u32)).collect();
+        let mut tape = Tape::load(&frames);
+        assert_eq!(tape.resident_len(), RESIDENT_FRAMES);
+        assert_eq!(tape.hook_frame(3_599).unwrap().buttons, 3_599);
+        assert!(tape.reads().is_empty());
+        assert!(tape.hook_frame(3_600).is_none());
+        tape.fill_window(3_600, |start, count| frames[start..start + count].to_vec());
+        assert_eq!(tape.reads(), &[(3_600, 600)]);
+        assert_eq!(tape.window_len(), 600);
+        assert_eq!(tape.hook_frame(3_600).unwrap().buttons, 3_600);
+        assert_eq!(tape.hook_frame(4_199).unwrap().buttons, 4_199);
+        tape.fill_window(4_100, |start, count| frames[start..start + count].to_vec());
+        assert_eq!(tape.reads().len(), 1);
+        tape.fill_window(4_200, |start, count| frames[start..start + count].to_vec());
+        assert_eq!(tape.reads(), &[(3_600, 600), (4_200, 100)]);
+        assert_eq!(tape.hook_frame(4_200).unwrap().buttons, 4_200);
+        assert_eq!(tape.resident_len(), RESIDENT_FRAMES);
+    }
+
+    fn a_macro_with_no_start_save_does_not_warp() {
+        let mut index = RecordingIndex::fresh();
+        index.set_active(Role::Player, Some("bare"), 1).unwrap();
+        let mut book = Book::new(index);
+        book.add_recording("bare", recording("Bare", &[3, 4], None));
+        let mut machine = Playback::new();
+        let effect = drive_play(&mut machine, Role::Player, &book);
+        assert!(effect.started);
+        assert!(effect.warp.is_none());
+        assert_eq!(machine.warps(Role::Player), 0);
+        assert_eq!(
+            drive_step(&mut machine, Role::Player, &book)
+                .unwrap()
+                .frame
+                .buttons,
+            3
+        );
+        assert!(start_save_notice(start_save_state(None, true, false)).is_none());
+    }
+
+    fn the_play_chords_drive_the_role_machines() {
+        let mut index = RecordingIndex::fresh();
+        index.set_active(Role::Player, Some("p"), 1).unwrap();
+        index.set_active(Role::Cpu, Some("c"), 2).unwrap();
+        index.set_loop(Role::Player, LoopCount::Finite(2));
+        index.bind_save(Some("slot"), 3).unwrap();
+        let mut book = Book::new(index);
+        book.add_recording("p", recording("P", &[1], Some("start-p")));
+        book.add_recording("c", recording("C", &[2], None));
+        book.add_save("start-p");
+        book.add_save("slot");
+        let mut machine = Playback::new();
+        let player = drive_play(&mut machine, Role::Player, &book);
+        assert_eq!(player.warp, Some("start-p"));
+        assert_eq!(machine.warps(Role::Player), 1);
+        let cpu = drive_play(&mut machine, Role::Cpu, &book);
+        assert!(cpu.warp.is_none());
+        assert!(machine.playing(Role::Player) && machine.playing(Role::Cpu));
+        assert_eq!(
+            drive_step(&mut machine, Role::Player, &book)
+                .unwrap()
+                .frame
+                .buttons,
+            1
+        );
+        assert_eq!(
+            drive_step(&mut machine, Role::Player, &book)
+                .unwrap()
+                .frame
+                .buttons,
+            1
+        );
+        assert_eq!(machine.warps(Role::Player), 1);
+        assert!(drive_mash(&mut machine, Role::Player, true));
+        assert!(!machine.playing(Role::Player));
+        assert!(machine.playing(Role::Cpu));
+        let settings = StateSettings {
+            autoload: true,
+            ..StateSettings::default()
+        };
+        let loaded = drive_load(&machine, &book, &settings).unwrap();
+        assert_eq!(loaded.save_id, "slot");
+        assert!(machine.playing(Role::Cpu));
+        let death = drive_auto_load(&machine, &book, &settings).unwrap();
+        assert_eq!(death.save_id, "slot");
+        assert!(machine.playing(Role::Cpu));
+    }
+
+    fn a_chain_asks_fighter_mismatch_for_macro_1_only() {
+        let ask =
+            chain_mismatch(&[("m1", "Pikachu"), ("m2", "Mario")], "Mario", true, true).unwrap();
+        assert_eq!(ask.step, 0);
+        assert_eq!(ask.switch_fighter, "Pikachu");
+        assert_eq!(ask.recorded, "Pikachu");
+        assert_eq!(ask.origin, FighterOrigin::Named);
+        assert!(
+            chain_mismatch(&[("m1", "Mario"), ("m2", "Pikachu")], "Mario", true, true).is_none()
+        );
+        assert!(chain_mismatch(&[("m1", "Pikachu")], "Mario", false, true).is_none());
+    }
+
+    fn rename_uses_the_switch_keyboard_headers() {
+        let mut screens = RecordingScreens::new();
+        screens.set_catalog(header_catalog());
+        assert_header(&mut screens, SAVES_MACROS, 0, "Slot", "Name save state");
+        assert_header(&mut screens, SAVES_MACROS, 1, "Nair", "Name macro");
+        assert_header(&mut screens, SAVES_MACROS, 1, "Corner", "Name chain");
+        assert_header(&mut screens, COMBOS_SEQ, 1, "One", "Name combo");
+        assert_header(&mut screens, COMBOS_SEQ, 0, "Seq", "Name sequence");
+        screens.submit_name("");
+        assert_eq!(screens.catalog().sequences[0].name, "Seq");
+        assert!(!keyboard_opens(true));
+        assert!(offer_keyboard("Name macro", "Macro 1", true).is_none());
+        assert_eq!(
+            offer_keyboard("Name macro", "Macro 1", false)
+                .unwrap()
+                .header,
+            "Name macro"
+        );
+        close_overlay(&mut screens);
+        open_row(&mut screens, SAVES_MACROS, 1, "+ New chain");
+        screens.handle_page(MenuButton::B, true, SAVES_MACROS);
+        screens.submit_name("");
+        assert!(screens.has_chain_named("Chain 1"));
+    }
+
+    fn crop_writes_a_new_file_and_leaves_the_original() {
+        let root = scratch("crop");
+        let macros = Library::new(root.join(MACROS_DIR));
+        let source = recording("Nair", &[1, 2, 3, 4], Some("keep"));
+        let id = macros.save_new(&source).unwrap();
+        let before = std::fs::read(macros.dir().join(format!("{id}.json"))).unwrap();
+        let snapshot = FrameSnapshot {
+            frame: 1,
+            state: StartState::neutral(8, 0, 1.0),
+        };
+        let copy = crop_macro_file(&root, &id, 1, 3, &snapshot, "Nair crop").unwrap();
+        let after = std::fs::read(macros.dir().join(format!("{id}.json"))).unwrap();
+        assert_eq!(before, after);
+        assert_ne!(copy, id);
+        let cropped = macros.load(&copy).unwrap();
+        assert_eq!(cropped.frames.len(), 2);
+        assert_eq!(cropped.frames[0].buttons, 2);
+        assert!(cropped.start_save.is_none());
+        assert_eq!(macros.load(&id).unwrap().frames.len(), 4);
+
+        let combos = ComboLibrary::new(root.join("combos"));
+        let combo = Combo::from_links([
+            link(Move::Aerial, Move::SideTilt),
+            link(Move::SideTilt, Move::NeutralSpecial),
+        ])
+        .unwrap();
+        let combo_id = combos
+            .save_new(&ComboRecord::new("Loop".into(), combo, None))
+            .unwrap();
+        let combo_before = std::fs::read(combos.dir().join(format!("{combo_id}.json"))).unwrap();
+        let cropped_id = crop_combo_file(&root, &combo_id, 0, 1, "Loop crop").unwrap();
+        let combo_after = std::fs::read(combos.dir().join(format!("{combo_id}.json"))).unwrap();
+        assert_eq!(combo_before, combo_after);
+        assert_eq!(combos.load(&cropped_id).unwrap().combo.links().count(), 1);
+        assert_eq!(combos.load(&combo_id).unwrap().combo.links().count(), 2);
+    }
+
+    fn replay_export_has_no_start_save() {
+        let frames = vec![frame(1), frame(2), frame(3)];
+        let snapshot = FrameSnapshot {
+            frame: 0,
+            state: StartState::neutral(8, 0, 1.0),
+        };
+        let exported = replay_export(&frames, 0, 2, &snapshot, "Clip").unwrap();
+        assert!(exported.start_save.is_none());
+        assert_eq!(exported.frames.len(), 2);
+    }
+
+    fn make_combo_on_a_chain_plays_one_pass_on_player_1() {
+        let mut index = RecordingIndex::fresh();
+        index.set_active(Role::Player, Some("pressure"), 1).unwrap();
+        index.set_loop(Role::Player, LoopCount::Infinite);
+        index
+            .set_drill(
+                Some(Drill {
+                    kind: DrillKind::Combo,
+                    id: "drill-1".into(),
+                }),
+                2,
+            )
+            .unwrap();
+        let mut book = Book::new(index);
+        book.add_recording("nair", recording("Nair", &[5], Some("nair-start")));
+        book.add_recording("dash", recording("Dash", &[6], Some("dash-start")));
+        book.add_save("nair-start");
+        book.add_save("dash-start");
+        let mut chain =
+            super::super::library::Chain::new("Corner", vec!["nair".into(), "dash".into()])
+                .unwrap();
+        chain.set_start_save_on(true);
+        book.add_chain("pressure", chain);
+        let pass = make_combo(&book);
+        assert_eq!(pass.role, Role::Player);
+        assert!(pass.strip);
+        assert_eq!(pass.warp.as_deref(), Some("nair-start"));
+        assert_eq!(pass.buttons, vec![5, 6]);
+        assert_eq!(pass.drill.unwrap().id, "drill-1");
+        assert_eq!(book.index.drill().unwrap().id, "drill-1");
+        assert_eq!(book.index.loop_count(Role::Player), LoopCount::Infinite);
+    }
+
+    fn the_missing_start_save_sentence_is_only_for_a_deleted_link() {
+        assert_eq!(
+            start_save_notice(start_save_state(Some("gone"), true, false)),
+            Some(MISSING_START_SAVE)
+        );
+        assert!(start_save_notice(start_save_state(None, true, false)).is_none());
+        assert!(start_save_notice(start_save_state(Some("kept"), false, true)).is_none());
+        let source = include_str!("rr_runtime.rs");
+        let restrictions = include_str!("../../docs/RESTRICTIONS.md");
+        assert!(source.contains("restriction: macro-start-save-missing"));
+        assert!(restrictions.contains("| `macro-start-save-missing` |"));
+        assert!(
+            restrictions.contains("No start save. This macro plays from where the fighters are.")
+        );
+        assert!(restrictions.contains("the connected start file was deleted"));
+    }
+
+    fn the_chord_notice_shows_once() {
+        let mut index = RecordingIndex::fresh();
+        assert_eq!(chord_notice(&mut index), Some(CHORD_NOTICE));
+        assert!(index.chord_notice_seen());
+        assert!(chord_notice(&mut index).is_none());
+    }
+
+    fn the_empty_recording_notice_stays() {
+        let root = scratch("empty");
+        let capture = Capture::idle();
+        let stop = finish_recording(&root, &capture, state(1), state(2), (0.0, 0.0), 1).unwrap();
+        assert_eq!(stop.notice(), Some("Recording was empty"));
+        assert!(stop.cursor().is_none());
+        assert!(!root.join(MACROS_DIR).exists());
+    }
+
+    fn silent_when_a_chain_or_a_sequence_is_empty() {
+        assert!(notice_for_empty_chain_or_sequence().is_none());
+    }
+
+    fn deleting_the_bound_save_clears_the_binding() {
+        let root = scratch("unbind");
+        let id = save_chord(&root, state(3), state(4), 1).unwrap();
+        assert_eq!(
+            RecordingIndex::load(&root).unwrap().bound(),
+            Some(id.as_str())
+        );
+        delete_save(&root, &id, 2).unwrap();
+        assert!(RecordingIndex::load(&root).unwrap().bound().is_none());
+        let next = save_chord(&root, state(8), state(9), 3).unwrap();
+        let index = RecordingIndex::load(&root).unwrap();
+        assert_eq!(index.bound(), Some(next.as_str()));
+        let saved = Store::<NamedSave>::new(root.join(SAVES_DIR))
+            .load(&next)
+            .unwrap();
+        assert_eq!(saved.name, "Save 1");
+        assert_eq!(saved.player.fighter_kind, 8);
+    }
+
+    fn duplicate_copies_the_save_and_leaves_it_bound() {
+        let root = scratch("dup");
+        let id = save_chord(&root, state(3), state(4), 1).unwrap();
+        let copy = duplicate_save(&root, &id, 2).unwrap();
+        assert_ne!(copy, id);
+        let index = RecordingIndex::load(&root).unwrap();
+        assert_eq!(index.bound(), Some(id.as_str()));
+        assert_eq!(
+            index.hot(Kind::Save).first().map(String::as_str),
+            Some(copy.as_str())
+        );
+        let store = Store::<NamedSave>::new(root.join(SAVES_DIR));
+        let original = store.load(&id).unwrap();
+        let copied = store.load(&copy).unwrap();
+        assert_eq!(original.player.fighter_kind, copied.player.fighter_kind);
+        assert_eq!(copied.name, "Save 2");
+        assert_eq!(original.name, "Save 1");
+    }
+
+    fn migration_runs_once_at_boot() {
+        assert_eq!(civil_date(0), "1970-01-01");
+        let root = scratch("boot");
+        let date = "2026-11-06";
+        let mut slots: [Option<LegacySlot>; 5] = [None, None, None, None, None];
+        slots[0] = Some(LegacySlot {
+            frames: vec![frame(6)],
+            start: StartState::neutral(1, 0, 1.0),
+        });
+        let receipt = migrate_at_boot(&root, &slots, date).unwrap();
+        assert_eq!(receipt.recordings.len(), 1);
+        let saved = Library::new(root.join(MACROS_DIR))
+            .load(&receipt.recordings[0])
+            .unwrap();
+        assert_eq!(saved.name, format!("Slot 1 ({date})"));
+        let before = snapshot(&root);
+        slots[1] = Some(LegacySlot {
+            frames: vec![frame(7)],
+            start: StartState::neutral(2, 0, 1.0),
+        });
+        let again = migrate_at_boot(&root, &slots, date).unwrap();
+        assert_eq!(again.recordings, receipt.recordings);
+        assert_eq!(snapshot(&root), before);
+    }
+
+    fn snapshot(root: &Path) -> Vec<(String, Vec<u8>)> {
+        let mut out = Vec::new();
+        fn walk(dir: &Path, root: &Path, out: &mut Vec<(String, Vec<u8>)>) {
+            let Ok(read) = std::fs::read_dir(dir) else {
+                return;
+            };
+            let mut paths: Vec<_> = read.map(|entry| entry.unwrap().path()).collect();
+            paths.sort();
+            for path in paths {
+                if path.is_dir() {
+                    walk(&path, root, out);
+                } else {
+                    let rel = path
+                        .strip_prefix(root)
+                        .unwrap()
+                        .to_string_lossy()
+                        .replace('\\', "/");
+                    out.push((rel, std::fs::read(&path).unwrap()));
+                }
+            }
+        }
+        walk(root, root, &mut out);
+        out.sort();
+        out
+    }
+
+    fn header_catalog() -> Catalog {
+        Catalog {
+            saves: vec![SaveFile {
+                id: "slot".into(),
+                name: "Slot".into(),
+                fighters: String::new(),
+            }],
+            macros: vec![
+                MacroFile {
+                    id: "nair".into(),
+                    name: "Nair".into(),
+                    chain: false,
+                    steps: Vec::new(),
+                    start_save: None,
+                    start_save_on: true,
+                    recorded_on: String::new(),
+                    span: 0,
+                },
+                MacroFile {
+                    id: "pressure".into(),
+                    name: "Corner".into(),
+                    chain: true,
+                    steps: vec!["nair".into()],
+                    start_save: None,
+                    start_save_on: true,
+                    recorded_on: String::new(),
+                    span: 0,
+                },
+            ],
+            combos: vec![ComboFile {
+                id: "c1".into(),
+                name: "One".into(),
+                recorded_on: String::new(),
+                made_from: None,
+                links: Vec::new(),
+                span: 0,
+            }],
+            sequences: vec![SequenceFile {
+                id: "seq".into(),
+                name: "Seq".into(),
+                combos: vec!["c1".into()],
+                streak: 0,
+                best: 0,
+            }],
+            ..Catalog::default()
+        }
+    }
+
+    fn assert_header(
+        screens: &mut RecordingScreens,
+        group: u8,
+        section: u8,
+        name: &str,
+        header: &str,
+    ) {
+        close_overlay(screens);
+        open_row(screens, group, section, name);
+        let rename = screens
+            .file_rows()
+            .iter()
+            .position(|row| row.title == "Rename")
+            .unwrap();
+        screens.set_file_cursor(rename);
+        screens.handle_page(MenuButton::A, true, group);
+        match screens.last_effect() {
+            Effect::Keyboard { header: got, .. } => assert_eq!(*got, header),
+            other => panic!("{other:?}"),
+        }
+    }
+
+    fn open_row(screens: &mut RecordingScreens, group: u8, section: u8, name: &str) {
+        let view = screens.section(Face::Page, group, section);
+        let index = view.rows.iter().position(|row| row.name == name).unwrap();
+        screens.set_cursor(Face::Page, group, section, index);
+        screens.handle_page(MenuButton::A, true, group);
+    }
+
+    fn close_overlay(screens: &mut RecordingScreens) {
+        for _ in 0..4 {
+            if screens.picker_open() || screens.file_open() {
+                screens.handle_page(MenuButton::B, true, SAVES_MACROS);
+            }
+        }
+    }
+
+    /// Eden rc5-opus-final-trace2 (2026-11-08): Record on CPU made `macro-1` the CPU's active file, then a menu open and
+    /// close wrote `active.cpu = null` back. The pop-up had kept its model alive with the selection it took before the
+    /// recording. The worker's steps (`worker::refresh_recording`, `post_recording_effect`) on a scratch card.
+    fn a_menu_close_after_record_on_cpu_keeps_the_new_active_file() {
+        use crate::model::recording_menu::{CatalogWatch, RecordingScreens};
+        use super::super::rr_host::publish_selection;
+
+        let root = scratch("menu-adopt");
+        RecordingIndex::load(&root).unwrap().save(&root).unwrap();
+        let refresh = |screens: &mut RecordingScreens, watch: CatalogWatch, generation: u64| {
+            let (watch, due) = watch.take_load(generation);
+            if due {
+                let loaded = load_catalog(&root).unwrap();
+                screens.set_catalog(loaded.catalog);
+                screens.adopt(loaded.bound, loaded.active, loaded.loops, loaded.drill);
+            }
+            watch
+        };
+        // The pop-up: its model loads generation 0, and its press publishes the selection.
+        let mut screens = RecordingScreens::new();
+        let watch = refresh(&mut screens, CatalogWatch::default(), 0);
+        publish_selection(&root, &screens.selection(), None);
+        // Record on CPU stops: the new file is the CPU's active one, and the generation moves.
+        let mut index = RecordingIndex::load(&root).unwrap();
+        index.set_active(Role::Cpu, Some("macro-1"), 10).unwrap();
+        index.save(&root).unwrap();
+        // The menu opens on the same model and closes: the worker refreshes, then publishes.
+        refresh(&mut screens, watch, 1);
+        publish_selection(&root, &screens.selection(), None);
+        let after = RecordingIndex::load(&root).unwrap();
+        assert_eq!(after.active(Role::Cpu), Some("macro-1"), "the menu published a selection older than the index");
+    }
+
+    /// Eden rc6-covrec-diag1 (2026-11-08): a combo under the cursor showed no CONNECTIONS lines, because the catalog
+    /// the worker loads gave every combo no link lines. RECORDING.md: "The combo's help lines list each link as the
+    /// two moves and TRUE or not, then that link's input events, then its drift".
+    fn the_catalog_gives_each_combo_its_connection_lines() {
+        let root = scratch("combo-lines");
+        RecordingIndex::load(&root).unwrap().save(&root).unwrap();
+        let combo = Combo::from_links([link(Move::Jab, Move::Jab), link(Move::Jab, Move::SideTilt)]).unwrap();
+        let id = ComboLibrary::new(root.join("combos"))
+            .save_new(&ComboRecord::new("Jab jab".into(), combo, None))
+            .unwrap();
+        let loaded = load_catalog(&root).unwrap();
+        let file = loaded.catalog.combos.iter().find(|file| file.id == id).unwrap();
+        assert_eq!(file.links, crate::model::recording_menu::combo_link_lines(&combo));
+        assert!(file.links.iter().any(|line| line.starts_with("L2 ")), "{:?}", file.links);
+        let mut screens = RecordingScreens::new();
+        screens.set_catalog(loaded.catalog);
+        let index = screens.section(Face::Page, COMBOS_SEQ, 1).rows.iter().position(|row| row.name == "Jab jab").unwrap();
+        screens.set_cursor(Face::Page, COMBOS_SEQ, 1, index);
+        let lines: Vec<String> = screens.connections(Face::Page, COMBOS_SEQ).into_iter().map(|line| line.text).collect();
+        assert!(lines.iter().any(|line| line.starts_with("L1 jab → jab")), "{lines:?}");
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("record_follows_the_popup_role", record_follows_the_popup_role as fn()),
+            ("record_stores_the_start_save_id", record_stores_the_start_save_id as fn()),
+            ("a_cpu_role_recording_becomes_the_cpu_active_macro_and_names_the_cpu", a_cpu_role_recording_becomes_the_cpu_active_macro_and_names_the_cpu as fn()),
+            ("a_long_macro_plays_from_a_600_frame_window", a_long_macro_plays_from_a_600_frame_window as fn()),
+            ("a_macro_with_no_start_save_does_not_warp", a_macro_with_no_start_save_does_not_warp as fn()),
+            ("the_play_chords_drive_the_role_machines", the_play_chords_drive_the_role_machines as fn()),
+            ("a_chain_asks_fighter_mismatch_for_macro_1_only", a_chain_asks_fighter_mismatch_for_macro_1_only as fn()),
+            ("rename_uses_the_switch_keyboard_headers", rename_uses_the_switch_keyboard_headers as fn()),
+            ("crop_writes_a_new_file_and_leaves_the_original", crop_writes_a_new_file_and_leaves_the_original as fn()),
+            ("replay_export_has_no_start_save", replay_export_has_no_start_save as fn()),
+            ("make_combo_on_a_chain_plays_one_pass_on_player_1", make_combo_on_a_chain_plays_one_pass_on_player_1 as fn()),
+            ("the_missing_start_save_sentence_is_only_for_a_deleted_link", the_missing_start_save_sentence_is_only_for_a_deleted_link as fn()),
+            ("the_chord_notice_shows_once", the_chord_notice_shows_once as fn()),
+            ("the_empty_recording_notice_stays", the_empty_recording_notice_stays as fn()),
+            ("silent_when_a_chain_or_a_sequence_is_empty", silent_when_a_chain_or_a_sequence_is_empty as fn()),
+            ("deleting_the_bound_save_clears_the_binding", deleting_the_bound_save_clears_the_binding as fn()),
+            ("duplicate_copies_the_save_and_leaves_it_bound", duplicate_copies_the_save_and_leaves_it_bound as fn()),
+            ("migration_runs_once_at_boot", migration_runs_once_at_boot as fn()),
+            ("a_menu_close_after_record_on_cpu_keeps_the_new_active_file", a_menu_close_after_record_on_cpu_keeps_the_new_active_file as fn()),
+            ("the_catalog_gives_each_combo_its_connection_lines", the_catalog_gives_each_combo_its_connection_lines as fn()),
+        ]);
+    }
+    }
+}

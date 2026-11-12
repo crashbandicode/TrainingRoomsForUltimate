@@ -2,6 +2,9 @@
 //! (a changed Ledge Options row re-rolls the held case at once), N3 (Ledge Delay is a checklist or a
 //! range). Test names are the spec's §9 rows.
 
+// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).
+#[path = "../src/test_table.rs"]
+mod test_table;
 // rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
 macro_rules! lib_unit_tests {
     ($($body:tt)*) => {};
@@ -107,7 +110,6 @@ fn grounded() -> FrameFacts {
     FrameFacts { status: WAIT, situation: Situation::Ground, ..FrameFacts::default() }
 }
 
-#[test]
 fn cpu03_case_lifetime() {
     // The case and delay are rolled when the CPU hangs, held for the whole grab, and cleared when it
     // leaves the ledge, so the next grab rolls anew.
@@ -134,7 +136,6 @@ fn cpu03_case_lifetime() {
     assert_eq!(seen.len(), 2);
 }
 
-#[test]
 fn cpu03_option_status_table() {
     for (option, want) in [
         (option::NEUTRAL, CLIFF_CLIMB),
@@ -150,7 +151,6 @@ fn cpu03_option_status_table() {
     }
 }
 
-#[test]
 fn cpu03_buffer_frames() {
     let s = settings(&[("ledge_state", ledge_row(&[option::JUMP as usize]))]);
     // A regular grab (CLIFF_WAIT after CLIFF_CATCH, catch flag false): the request comes on frame 19,
@@ -181,7 +181,6 @@ fn cpu03_buffer_frames() {
     assert_eq!(BUFFER_PLAYBACK_FRAME, 13);
 }
 
-#[test]
 fn cpu03_delay_and_climb_denial() {
     // A 30-frame delay (row option 3 at step 10): nothing before actionability, then 30 ticks.
     let s = settings(&[
@@ -229,7 +228,6 @@ fn cpu03_delay_and_climb_denial() {
     assert!(!cpu.ledge_transition_term(key, CLIFF_WAIT, TERM_CLIMB, true));
 }
 
-#[test]
 fn cpu03_playback_paths() {
     let playback1 = option::PLAYBACK_FIRST as usize;
     // With Ledge Delay set (even "0"), a playback option starts early, on frame 13, while the CPU
@@ -255,7 +253,6 @@ fn cpu03_playback_paths() {
     assert!(cpu.frame(key, &hanging(CLIFF_WAIT, CLIFF_CATCH, 13, false, false)).playback.is_some());
 }
 
-#[test]
 fn cpu03_ledge_playback_frame_asks_for_the_slot_on_the_ledge() {
     let playback1 = option::PLAYBACK_FIRST as usize;
     let row = settings(&[("ledge_state", ledge_row(&[playback1 + 1])), ("ledge_delay", delay_row(&[0]))]);
@@ -265,7 +262,6 @@ fn cpu03_ledge_playback_frame_asks_for_the_slot_on_the_ledge() {
     assert_eq!((start.slot, start.ledge), (1, true));
 }
 
-#[test]
 fn cpu03_post_getup_mash() {
     // Override of the performed kind first, else the mash action when the Ledge Option trigger is
     // ticked, else nothing.
@@ -304,7 +300,6 @@ fn cpu03_post_getup_mash() {
     assert!(cpu.fighters[key.index()].mash.queue.is_empty());
 }
 
-#[test]
 fn cpu03_empty_effective_set() {
     // A waiting scene without practice removes playback options; when nothing else is selected the
     // CPU gets up natively this grab and the climb is not denied.
@@ -321,7 +316,6 @@ fn cpu03_empty_effective_set() {
     assert_eq!(cpu.fighters[key.index()].ledge.case, Some(option::PLAYBACK_FIRST));
 }
 
-#[test]
 fn cpu03_per_fighter_state() {
     // B6: Popo and Nana each roll and hold their own case and delay.
     let s = settings(&[("ledge_state", ledge_row(&[option::NEUTRAL as usize, option::ROLL as usize, option::WAIT as usize]))]);
@@ -341,7 +335,6 @@ fn cpu03_per_fighter_state() {
     assert!(differ, "independent rolls differ somewhere in 50 grabs");
 }
 
-#[test]
 fn cpu03_ledge_delay_range_pick() {
     // N3: a set range is picked uniformly among its step values once per grab.
     let s = settings(&[("ledge_state", ledge_row(&[option::ROLL as usize])), ("ledge_delay_range", vec![3, 6])]);
@@ -363,7 +356,6 @@ fn cpu03_ledge_delay_range_pick() {
     }
 }
 
-#[test]
 fn cpu03_range_counts_as_nonempty_row() {
     // See cpu03_playback_paths: the early playback buffer needs a set Ledge Delay row, and a set
     // range is one.
@@ -372,7 +364,6 @@ fn cpu03_range_counts_as_nonempty_row() {
     assert!(!settings(&[]).ledge_delay.is_set());
 }
 
-#[test]
 fn cpu03_ledge_options_change_rerolls_held_case() {
     // B11: the CPU is parked on the ledge with Wait; the menu changes the row to Roll; it rolls from
     // the new set during the same hang, with no second grab, and the held delay is unchanged.
@@ -402,7 +393,6 @@ fn cpu03_ledge_options_change_rerolls_held_case() {
     assert_eq!(requested, Some(20));
 }
 
-#[test]
 fn cpu03_ledge_options_emptied_clears_case() {
     let roll = settings(&[("ledge_state", ledge_row(&[option::ROLL as usize])), ("ledge_delay", delay_row(&[5]))]);
     let (mut cpu, key) = cpu_with(roll);
@@ -419,7 +409,6 @@ fn cpu03_ledge_options_emptied_clears_case() {
     assert!(cpu.ledge_transition_term(key, CLIFF_WAIT, TERM_CLIMB, true));
 }
 
-#[test]
 fn cpu03_playback_yield_and_reset() {
     // While another playback runs the feature yields entirely (no request, no denial).
     let s = settings(&[("ledge_state", ledge_row(&[option::WAIT as usize]))]);
@@ -444,7 +433,6 @@ fn cpu03_playback_yield_and_reset() {
     assert_eq!(cpu.fighters[key.index()].ledge.case, case);
 }
 
-#[test]
 fn cpu03_whole_settings_replacement_yields_the_menus_reroll_bits() {
     // The diag build replaces the whole settings from a file; the bits are the ones the menu sets row by
     // row: Ledge Options (B11), SDI Direction, Shield Tilt and Throw Options, but not Ledge Delay.
@@ -465,4 +453,26 @@ fn cpu03_whole_settings_replacement_yields_the_menus_reroll_bits() {
     })
     .unwrap();
     assert_eq!(model::menu::rerolls_between(&delayed, &both), reroll::LEDGE_OPTIONS | reroll::SDI_DIRECTION);
+}
+
+/// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+#[test]
+fn case_table() {
+    crate::test_table::run(&[
+        ("cpu03_case_lifetime", cpu03_case_lifetime as fn()),
+        ("cpu03_option_status_table", cpu03_option_status_table as fn()),
+        ("cpu03_buffer_frames", cpu03_buffer_frames as fn()),
+        ("cpu03_delay_and_climb_denial", cpu03_delay_and_climb_denial as fn()),
+        ("cpu03_playback_paths", cpu03_playback_paths as fn()),
+        ("cpu03_ledge_playback_frame_asks_for_the_slot_on_the_ledge", cpu03_ledge_playback_frame_asks_for_the_slot_on_the_ledge as fn()),
+        ("cpu03_post_getup_mash", cpu03_post_getup_mash as fn()),
+        ("cpu03_empty_effective_set", cpu03_empty_effective_set as fn()),
+        ("cpu03_per_fighter_state", cpu03_per_fighter_state as fn()),
+        ("cpu03_ledge_delay_range_pick", cpu03_ledge_delay_range_pick as fn()),
+        ("cpu03_range_counts_as_nonempty_row", cpu03_range_counts_as_nonempty_row as fn()),
+        ("cpu03_ledge_options_change_rerolls_held_case", cpu03_ledge_options_change_rerolls_held_case as fn()),
+        ("cpu03_ledge_options_emptied_clears_case", cpu03_ledge_options_emptied_clears_case as fn()),
+        ("cpu03_playback_yield_and_reset", cpu03_playback_yield_and_reset as fn()),
+        ("cpu03_whole_settings_replacement_yields_the_menus_reroll_bits", cpu03_whole_settings_replacement_yields_the_menus_reroll_bits as fn()),
+    ]);
 }

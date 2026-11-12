@@ -286,7 +286,6 @@ mod tests {
         MappedInputs { buttons: n, ..MappedInputs::NEUTRAL }
     }
 
-    #[test]
     fn two_polls_late() {
         let mut q = DelayQueue::new();
         let out: Vec<_> = (1..=5).map(|n| q.step(2, rec(n)).buttons).collect();
@@ -298,7 +297,6 @@ mod tests {
     /// `menu::captures_input()` is false, and that read the replay editor's owner bit, which `sync_owner` set for the
     /// load itself. The fork's `captures_input` was the menu or a visible panel; a parked editor waiting on its load was
     /// neither. The load keeps P1 neutral (an owner) but is not one the gameplay gates wait for.
-    #[test]
     fn a_replay_load_keeps_p1_neutral_but_does_not_hold_the_gameplay_gates() {
         assert!(Owners::REPLAY_LOADING.any(), "P1 stays neutral while the editor waits");
         let mut q = DelayQueue::new();
@@ -320,7 +318,6 @@ mod tests {
         assert!(recorder.contains("owners.contains(Owners::REPLAY_LOADING)"), "the chords stay modal while it loads");
     }
 
-    #[test]
     fn an_owner_empties_the_queue() {
         let mut q = DelayQueue::new();
         q.step(3, rec(1));
@@ -332,7 +329,6 @@ mod tests {
         Sticks { lx: x, ..Sticks::NEUTRAL }
     }
 
-    #[test]
     fn the_physical_sticks_come_out_with_their_own_record() {
         let mut q = DelayQueue::new();
         let out: Vec<_> = (1..=5).map(|n| q.poll_with(2, Owners::NONE, rec(n), left(n as i8 * 10))).collect();
@@ -343,7 +339,6 @@ mod tests {
         assert_eq!(q.poll_with(0, Owners::NONE, rec(7), left(70)), (rec(7), left(70)), "delay 0 passes both through");
     }
 
-    #[test]
     fn raw_axes_are_record_units_and_a_value_that_is_not_a_stick_is_refused() {
         assert_eq!(Sticks::from_axes([0.0, 0.6, 1.0, -1.0]), Some(Sticks { lx: 0, ly: 72, rx: 120, ry: -120 }));
         assert_eq!(Sticks::from_axes([f32::NAN, 0.0, 0.0, 0.0]), None);
@@ -357,7 +352,6 @@ mod tests {
     /// Eden rc6-covrec-diag1 (2026-11-08): Make combo saved its combo with no input events. The strip read P1's record
     /// before Play wrote the played frame into it, so it saw the idle controller. The display now reads the record
     /// the recorder left: a played jab is a press with the played sticks; an untouched poll keeps the physical sticks.
-    #[test]
     fn the_display_reads_the_played_frame_and_keeps_the_physical_sticks_otherwise() {
         let physical = Sticks { lx: 0, ly: 72, rx: 0, ry: 0 };
         let idle = MappedInputs { buttons: 0x8000, lstick_x: 0, lstick_y: 0, rstick_x: 0, rstick_y: 0 };
@@ -366,6 +360,19 @@ mod tests {
         assert_eq!(sticks.onto(record), played, "the strip reads the played frame");
         let (record, sticks) = physical.after_recorder(idle, idle);
         assert_eq!(sticks.onto(record), physical.onto(idle), "an untouched poll keeps the physical sticks");
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("two_polls_late", two_polls_late as fn()),
+            ("a_replay_load_keeps_p1_neutral_but_does_not_hold_the_gameplay_gates", a_replay_load_keeps_p1_neutral_but_does_not_hold_the_gameplay_gates as fn()),
+            ("an_owner_empties_the_queue", an_owner_empties_the_queue as fn()),
+            ("the_physical_sticks_come_out_with_their_own_record", the_physical_sticks_come_out_with_their_own_record as fn()),
+            ("raw_axes_are_record_units_and_a_value_that_is_not_a_stick_is_refused", raw_axes_are_record_units_and_a_value_that_is_not_a_stick_is_refused as fn()),
+            ("the_display_reads_the_played_frame_and_keeps_the_physical_sticks_otherwise", the_display_reads_the_played_frame_and_keeps_the_physical_sticks_otherwise as fn()),
+        ]);
     }
     }
 }

@@ -5,6 +5,8 @@
 //! row hints are not stable identities: only qualified native getter results may resolve them.
 
 use crate::engine::mii::inventory::{MiiClass, CHARINFO_LEN, LOW40};
+#[cfg(test)]
+use crate::engine::mii::inventory::{TaggedId, TAG_CHARA};
 use crate::engine::mii::lifetime::{Configuration, Tokens};
 use crate::engine::mii::native_values::RowIds;
 
@@ -335,3 +337,302 @@ fn half(bytes: &[u8], offset: usize) -> u16 {
     u16::from_le_bytes([bytes[offset], bytes[offset + 1]])
 }
 
+#[cfg(test)]
+mod tests {
+    lib_unit_tests! {
+    use super::*;
+    use crate::engine::mii::inventory::{classify, RawSlot, TAG_HAT, TAG_OUTFIT};
+
+    fn header() -> Vec<u8> {
+        let mut bytes = vec![0; HEADER_LEN];
+        bytes[4..8].copy_from_slice(b"CFMK");
+        bytes[8..12].copy_from_slice(&VERSION.to_le_bytes());
+        bytes[0x10..0x12].copy_from_slice(&(HEADER_LEN as u16).to_le_bytes());
+        for index in 0..8 {
+            bytes[0x468 + index * 0x260 + 0xa] = 2;
+        }
+        bytes
+    }
+
+    fn put_mii(bytes: &mut [u8], index: usize, kind: u8) {
+        let at = 0x468 + index * 0x260;
+        bytes[at + 8] = kind;
+        bytes[at + 0xa] = 0;
+        for n in 0..88 {
+            bytes[at + 0x150 + n] = n as u8;
+        }
+        // Independent native window: index321,outfit1,hat0,colour4,voice37,2111.
+        bytes[at + 0x1a8..at + 0x1b6]
+            .copy_from_slice(&[65, 1, 1, 0, 0, 0, 4, 0, 37, 0, 1, 0, 0, 0]);
+    }
+
+    fn rows() -> RowIds {
+        RowIds {
+            outfit: 0x1300_011b_fef7_a5f7,
+            hat: 0x5a00_000f_a9ef_a5ea,
+        }
+    }
+
+    fn replay_selection_requires_exact_same_class_payload_and_current_lifetime() {
+        let mut bytes = header();
+        put_mii(&mut bytes, 0, 0x48);
+        let original = ReplayMiis::parse_inner(&bytes)
+            .unwrap()
+            .entry(0)
+            .unwrap()
+            .resolve(rows())
+            .unwrap();
+        let selected = Selection {
+            source: SelectionSource::Clip,
+            generation: 7,
+            revision: 11,
+            target: Target::mii(original),
+        };
+        let refusal = SelectionReceipt { selection: selected, outcome: Err("CPU unchanged hat required") };
+        assert_eq!(refusal.for_selection(selected, 7, 11), Some(Err("CPU unchanged hat required")));
+        assert_eq!(refusal.for_selection(selected, 8, 11), None);
+        assert_eq!(refusal.for_selection(selected, 7, 12), None);
+        let named = Selection {source: SelectionSource::NamedMacro, ..selected};
+        assert_eq!(refusal.for_selection(named, 7, 11), None);
+        let ready = SelectionReceipt {selection: named, outcome: Ok(())};
+        assert_eq!(ready.for_selection(named, 7, 11), Some(Ok(())));
+        assert_eq!(ready.for_selection(selected, 7, 11), None);
+        assert!(selected.current(7, 11));
+        assert!(!selected.current(8, 11));
+        assert!(!selected.current(7, 12));
+        assert!(selected.ready(0x48, Some(original)));
+        bytes[0x468 + 0x150] ^= 255;
+        let same_canonical = ReplayMiis::parse_inner(&bytes)
+            .unwrap()
+            .entry(0)
+            .unwrap()
+            .resolve(rows())
+            .unwrap();
+        assert_eq!(original.canonical(), same_canonical.canonical());
+        assert!(!selected.ready(0x48, Some(same_canonical)));
+        bytes[0x468 + 0x1b2] = 2;
+        let same_class = ReplayMiis::parse_inner(&bytes)
+            .unwrap()
+            .entry(0)
+            .unwrap()
+            .resolve(rows())
+            .unwrap();
+        assert!(!selected.ready(0x48, Some(same_class)));
+        let request = crate::engine::mii::ordinary_cpu::Request::from_replay(selected).unwrap();
+        assert_eq!(request.replay(), Some(selected));
+        assert_eq!(request.choice(), None);
+        assert!(crate::engine::mii::ordinary_cpu::Request::from_replay(Selection {
+            revision: 0,
+            ..selected
+        })
+        .is_none());
+        assert!(crate::engine::mii::ordinary_cpu::Request::from_replay(Selection {
+            target: Target::fighter(0x48),
+            ..selected
+        })
+        .is_none());
+        assert!(!Target::fighter(0).ready(0, Some(original)));
+        assert!(Target::fighter(0).ready(0, None));
+    }
+
+    fn replay_header_keeps_owned_entry_identity_and_ignores_absent_or_ordinary_rows() {
+        let mut bytes = header();
+        put_mii(&mut bytes, 0, 0x48);
+        put_mii(&mut bytes, 7, 0x4a);
+        put_mii(&mut bytes, 3, 0x49);
+        bytes[0x468 + 3 * 0x260 + 0xa] = 2;
+        bytes[0x468 + 3 * 0x260 + 0x1b2] = 255; // Absent stale bytes are not a Mii.
+        bytes[0x468 + 0x260 + 0xa] = 0; // Ordinary Mario has no Mii association.
+        bytes[0x12..0x14].fill(255); // Declared length is not u32.
+        let parsed = ReplayMiis::parse_inner(&bytes).unwrap();
+        assert_eq!(parsed.entries().count(), 2);
+        assert!(
+            parsed.entry(1).is_none() && parsed.entry(3).is_none() && parsed.entry(8).is_none()
+        );
+        let first = parsed.entry(0).unwrap();
+        assert_eq!(
+            (first.entry(), first.class(), first.source_index()),
+            (0, MiiClass::Brawler, 321)
+        );
+        assert_eq!(
+            first.tokens(),
+            Tokens {
+                outfit: 1,
+                hat: 0,
+                colour: 4,
+                voice: 37,
+                specials: [1, 0, 0, 0]
+            }
+        );
+        assert_eq!(first.charinfo(), &core::array::from_fn(|n| n as u8));
+        assert_eq!(
+            (
+                parsed.entry(7).unwrap().entry(),
+                parsed.entry(7).unwrap().class()
+            ),
+            (7, MiiClass::Gunner)
+        );
+        bytes.fill(0); // No view into a later reused native payload survives.
+        assert_eq!(first.charinfo()[87], 87);
+        assert!(parsed.for_track(0, 0x48).is_ok());
+        assert!(parsed.for_track(1, 0x48).is_err());
+        assert!(parsed.for_track(0, 0x49).is_err());
+        let mut ambiguous = header();
+        put_mii(&mut ambiguous, 0, 0x48);
+        put_mii(&mut ambiguous, 7, 0x48);
+        assert!(ReplayMiis::parse_inner(&ambiguous)
+            .unwrap()
+            .for_track(0, 0x48)
+            .is_err());
+    }
+
+    fn replay_header_refuses_unsupported_boundaries_and_any_malformed_active_mii() {
+        let valid = header();
+        for length in [0, HEADER_LEN - 1, HEADER_LEN + 1] {
+            assert_eq!(
+                ReplayMiis::parse_inner(&vec![0; length]).unwrap_err(),
+                Error::Length { actual: length }
+            );
+        }
+        let mut bad = valid.clone();
+        bad[4] = 0;
+        assert_eq!(ReplayMiis::parse_inner(&bad).unwrap_err(), Error::Magic);
+        bad = valid.clone();
+        bad[8] = 4;
+        assert_eq!(
+            ReplayMiis::parse_inner(&bad).unwrap_err(),
+            Error::Version { found: 0xd004 }
+        );
+        bad = valid.clone();
+        bad[0x10] -= 1;
+        assert_eq!(
+            ReplayMiis::parse_inner(&bad).unwrap_err(),
+            Error::DeclaredLength { found: 0x1baf }
+        );
+        for (offset, value) in [
+            (0x1aa, [255, 255]),
+            (0x1ac, [255, 255]),
+            (0x1ae, [0, 1]),
+            (0x1b0, [0, 1]),
+            (0x1b2, [3, 0]),
+        ] {
+            let mut bad = valid.clone();
+            put_mii(&mut bad, 0, 0x48);
+            put_mii(&mut bad, 7, 0x49);
+            let at = 0x468 + 7 * 0x260 + offset;
+            bad[at..at + 2].copy_from_slice(&value);
+            assert_eq!(
+                ReplayMiis::parse_inner(&bad).unwrap_err(),
+                Error::Tokens { entry: 7 }
+            );
+        }
+    }
+
+    fn replay_companion_codec_retains_payload_and_rejects_stale_or_ambiguous_encoding() {
+        let mut bytes = header();
+        put_mii(&mut bytes, 0, 0x48);
+        put_mii(&mut bytes, 7, 0x49);
+        let raw = ReplayMiis::parse_inner(&bytes).unwrap();
+        let encoded = raw.to_bytes();
+        assert_eq!(encoded.len(), 210);
+        assert_eq!(&encoded[..6], &[1, 2, 0, 0x48, 65, 1]);
+        assert_eq!(ReplayMiis::from_bytes(&encoded).unwrap(), raw);
+        let json = serde_json::to_vec(&raw).unwrap();
+        assert_eq!(serde_json::from_slice::<ReplayMiis>(&json).unwrap(), raw);
+        assert_eq!(
+            ReplayMiis::parse_inner(&header()).unwrap().to_bytes(),
+            [1, 0]
+        );
+        for mutate in [0, 1, 106, 107, 206] {
+            let mut bad = encoded.clone();
+            bad[mutate] = match mutate {
+                0 => 2,
+                1 => 9,
+                106 => 0,
+                107 => 0,
+                206 => 3,
+                _ => unreachable!(),
+            };
+            assert!(ReplayMiis::from_bytes(&bad).is_err());
+            assert!(
+                serde_json::from_slice::<ReplayMiis>(&serde_json::to_vec(&bad).unwrap()).is_err()
+            );
+        }
+        assert!(ReplayMiis::from_bytes(&encoded[..209]).is_err());
+    }
+
+    fn replay_rows_require_stable_ids_and_match_existing_canonical_identity() {
+        let mut bytes = header();
+        put_mii(&mut bytes, 0, 0x48);
+        let parsed = ReplayMiis::parse_inner(&bytes).unwrap();
+        let raw = parsed.entry(0).unwrap();
+        let ids = rows();
+        for outfit in [
+            1,
+            ids.outfit ^ (1 << 40),
+            ids.outfit ^ (1 << 56),
+            ids.outfit & !LOW40,
+        ] {
+            assert_eq!(
+                raw.resolve(RowIds { outfit, ..ids }),
+                Err(Error::RowIdentity { entry: 0 })
+            );
+        }
+        let native = classify(&RawSlot {
+            index: 4,
+            slot_id: 13231,
+            name_len: 1,
+            name_units: [65, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            charinfo: core::array::from_fn(|n| n as u8),
+            colour: 4,
+            voice: 37,
+            specials: [1, 0, 0, 0],
+            tag_outfit: TaggedId((u64::from(TAG_OUTFIT) << 56) | (1 << 40) | 0x1b_fef7_a5f7),
+            tag_hat: TaggedId((u64::from(TAG_HAT) << 56) | 0x0f_a9ef_a5ea),
+            tag_chara: TaggedId((u64::from(TAG_CHARA) << 56) | MiiClass::Brawler.chara_hash40()),
+        })
+        .unwrap();
+        let resolved = raw.resolve(ids).unwrap();
+        assert_eq!(resolved, Configuration::from_saved(&native).unwrap());
+        assert_eq!(resolved.charinfo(), raw.charinfo());
+        assert_ne!(
+            resolved.canonical(),
+            raw.resolve(RowIds {
+                outfit: ids.outfit ^ 1,
+                ..ids
+            })
+            .unwrap()
+            .canonical()
+        );
+        bytes[0x468 + 0x150] ^= 0xff; // Metadata prefix is deliberately outside canonical identity.
+        let renamed = ReplayMiis::parse_inner(&bytes)
+            .unwrap()
+            .entry(0)
+            .unwrap()
+            .resolve(ids)
+            .unwrap();
+        assert_eq!(resolved.canonical(), renamed.canonical());
+        assert_ne!(resolved.charinfo(), renamed.charinfo()); // Exact payload is still retained.
+        bytes[0x468 + 0x1b2] = 2;
+        let changed = ReplayMiis::parse_inner(&bytes)
+            .unwrap()
+            .entry(0)
+            .unwrap()
+            .resolve(ids)
+            .unwrap();
+        assert_ne!(resolved.canonical(), changed.canonical());
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("replay_selection_requires_exact_same_class_payload_and_current_lifetime", replay_selection_requires_exact_same_class_payload_and_current_lifetime as fn()),
+            ("replay_header_keeps_owned_entry_identity_and_ignores_absent_or_ordinary_rows", replay_header_keeps_owned_entry_identity_and_ignores_absent_or_ordinary_rows as fn()),
+            ("replay_header_refuses_unsupported_boundaries_and_any_malformed_active_mii", replay_header_refuses_unsupported_boundaries_and_any_malformed_active_mii as fn()),
+            ("replay_companion_codec_retains_payload_and_rejects_stale_or_ambiguous_encoding", replay_companion_codec_retains_payload_and_rejects_stale_or_ambiguous_encoding as fn()),
+            ("replay_rows_require_stable_ids_and_match_existing_canonical_identity", replay_rows_require_stable_ids_and_match_existing_canonical_identity as fn()),
+        ]);
+    }
+    }
+}

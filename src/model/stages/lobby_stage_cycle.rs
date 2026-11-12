@@ -151,7 +151,6 @@ mod tests {
     use super::*;
     use crate::engine::stages::lobby_stages::{native_stage, Form, Selection};
 
-    #[test]
     fn production_preference_admission_preserves_owned_form_and_rejects_new_invalid_choices() {
         use crate::engine::stages::lobby_stages::{Forms, LobbyStageOrder, STAGES};
         use crate::engine::stages::stage_menu::{Mode, Preferences};
@@ -184,7 +183,6 @@ mod tests {
         assert_eq!(cycle.prepare_preferences(true, order, &prefs, false), Ok(Some(Selection::normal(3))));
     }
 
-    #[test]
     fn form_reservation_survives_preload_retries_and_return_without_moving_ranks() {
         let omega = Selection { stage: 95, form: Form::Omega };
         let fd = Selection::normal(3);
@@ -207,7 +205,6 @@ mod tests {
         assert_eq!(cycle.prepare(&order), Some(fd));
     }
 
-    #[test]
     fn independent_form_cursors_do_not_advance_on_fixed_reentry() {
         let mut cycles = [StageCycle::new(), StageCycle::new(), StageCycle::new()];
         let omega = Selection { stage: 0, form: Form::Omega };
@@ -226,7 +223,6 @@ mod tests {
         }
     }
 
-    #[test]
     fn qualified_preload_callers_do_not_admit_match_or_morph_requests() {
         assert!(entry_preload(0x02010000, 0x2335cf0));
         assert!(entry_preload(0x07010100, 0x237cce0));
@@ -248,7 +244,6 @@ mod tests {
         assert!(!waiting(0x04040000, 0x0d));
     }
 
-    #[test]
     fn console_quickplay_uses_the_verified_waiting_driver_and_excludes_matches() {
         // Observed Switch: 0x07010400/0x20 -> resource caller 0x2369208,
         // slot2/stage311 -> melee0x0d waiting -> melee0x10 actual match.
@@ -272,7 +267,6 @@ mod tests {
         }
     }
 
-    #[test]
     fn preload_retries_and_repeated_setup_do_not_skip_entries() {
         let mut cycle = StageCycle::<u32>::new();
         for expected in [0, 3, 0, 3] {
@@ -283,7 +277,6 @@ mod tests {
         }
     }
 
-    #[test]
     fn menu_edits_preserve_the_stage_already_preloaded() {
         let mut cycle = StageCycle::<u32>::new();
         assert_eq!(cycle.prepare(&[0, 3]), Some(0));
@@ -296,7 +289,6 @@ mod tests {
         assert_eq!(cycle.enter(), None);
     }
 
-    #[test]
     fn reordered_list_continues_after_last_stage_and_removed_stage_restarts() {
         let mut cycle = StageCycle::<u32>::new();
         cycle.prepare(&[0, 3, 12]);
@@ -306,7 +298,6 @@ mod tests {
         assert_eq!(cycle.prepare(&[12, 0]), Some(12));
     }
 
-    #[test]
     fn native_preload_after_cancelled_search_does_not_consume_a_stale_stage() {
         let mut cycle = StageCycle::<u32>::new();
         cycle.prepare(&[0, 3]);
@@ -320,7 +311,6 @@ mod tests {
         assert_eq!(cycle.enter(), Some(3));
     }
 
-    #[test]
     fn retained_waiting_entry_requires_native_stage_and_an_unowned_resource_slot() {
         assert!(unprepared_quickplay_entry(0x07010101, 0x0d, 311, true));
         assert!(unprepared_quickplay_entry(0x87010101, 0x0d, 311, true));
@@ -337,7 +327,6 @@ mod tests {
         assert_eq!(cycle.enter(), Some(3));
     }
 
-    #[test]
     fn direct_entries_preserve_rotation_cursor_and_the_owned_preload() {
         let mut cycle = StageCycle::<u32>::new();
         assert_eq!(cycle.prepare(&[0, 3, 12]), Some(0));
@@ -352,6 +341,25 @@ mod tests {
         // Fixed entries never advance the independent rotation cursor.
         assert_eq!(cycle.prepare(&[0, 3, 12]), Some(3));
         assert_eq!(cycle.enter(), Some(3));
+    }
+
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("production_preference_admission_preserves_owned_form_and_rejects_new_invalid_choices", production_preference_admission_preserves_owned_form_and_rejects_new_invalid_choices as fn()),
+            ("form_reservation_survives_preload_retries_and_return_without_moving_ranks", form_reservation_survives_preload_retries_and_return_without_moving_ranks as fn()),
+            ("independent_form_cursors_do_not_advance_on_fixed_reentry", independent_form_cursors_do_not_advance_on_fixed_reentry as fn()),
+            ("qualified_preload_callers_do_not_admit_match_or_morph_requests", qualified_preload_callers_do_not_admit_match_or_morph_requests as fn()),
+            ("console_quickplay_uses_the_verified_waiting_driver_and_excludes_matches", console_quickplay_uses_the_verified_waiting_driver_and_excludes_matches as fn()),
+            ("preload_retries_and_repeated_setup_do_not_skip_entries", preload_retries_and_repeated_setup_do_not_skip_entries as fn()),
+            ("menu_edits_preserve_the_stage_already_preloaded", menu_edits_preserve_the_stage_already_preloaded as fn()),
+            ("reordered_list_continues_after_last_stage_and_removed_stage_restarts", reordered_list_continues_after_last_stage_and_removed_stage_restarts as fn()),
+            ("native_preload_after_cancelled_search_does_not_consume_a_stale_stage", native_preload_after_cancelled_search_does_not_consume_a_stale_stage as fn()),
+            ("retained_waiting_entry_requires_native_stage_and_an_unowned_resource_slot", retained_waiting_entry_requires_native_stage_and_an_unowned_resource_slot as fn()),
+            ("direct_entries_preserve_rotation_cursor_and_the_owned_preload", direct_entries_preserve_rotation_cursor_and_the_owned_preload as fn()),
+        ]);
     }
     }
 }

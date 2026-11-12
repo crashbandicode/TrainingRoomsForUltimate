@@ -134,3 +134,133 @@ pub(crate) unsafe fn install(base: usize, entry: *mut u8, descriptor: &Descripto
     native(entry, descriptor.as_native(), flags.as_ptr());
 }
 
+#[cfg(test)]
+mod tests {
+    lib_unit_tests! {
+    use super::*;
+
+    const GROUPS: [Group; 3] = [
+        Group { count: 1, kinds: [0x1a, 0, 0], actor_count: 1 },
+        Group { count: 3, kinds: [0x24, 0x25, 0x26], actor_count: 3 },
+        Group { count: 2, kinds: [0x5a, 0x5b, u32::MAX], actor_count: 0x1122_3344 },
+    ];
+
+    fn source() -> [u8; DESCRIPTOR_LEN] {
+        let mut bytes = [0; DESCRIPTOR_LEN];
+        for (index, byte) in bytes.iter_mut().enumerate() {
+            *byte = (index as u8).wrapping_mul(37).wrapping_add(11);
+        }
+        bytes
+    }
+
+    // Oracle for the group sites: the replaced pointer-write staging. Keep it independent
+    // of `Descriptor`; it must not be rewritten in terms of the code under test.
+    unsafe fn legacy_group(entry: *const u8, group: Group) -> [u64; 14] {
+        let mut descriptor = [0u64; 14];
+        std::ptr::copy_nonoverlapping(entry, descriptor.as_mut_ptr().cast::<u8>(), 0x70);
+        let raw = descriptor.as_mut_ptr().cast::<u8>();
+        std::ptr::write(raw.add(0x14).cast::<u32>(), group.count);
+        for (index, kind) in group.kinds.iter().copied().enumerate() {
+            std::ptr::write(raw.add(0x18 + index * 4).cast::<u32>(), kind);
+        }
+        std::ptr::write(raw.add(0x28).cast::<u32>(), group.actor_count);
+        std::ptr::write(raw.add(0x43), 0);
+        descriptor
+    }
+
+    // Oracle for the copy-only sites, under the same independence rule.
+    unsafe fn legacy_copy(source: *const u8) -> [u64; 14] {
+        let mut descriptor = [0u64; 14];
+        std::ptr::copy_nonoverlapping(source, descriptor.as_mut_ptr().cast::<u8>(), 0x70);
+        descriptor
+    }
+
+    fn bytes_of(words: &[u64; 14]) -> [u8; DESCRIPTOR_LEN] {
+        let mut bytes = [0; DESCRIPTOR_LEN];
+        for (chunk, word) in bytes.chunks_exact_mut(8).zip(words.iter()) {
+            chunk.copy_from_slice(&word.to_ne_bytes());
+        }
+        bytes
+    }
+
+    fn patched(offset: usize) -> bool {
+        (0x14..0x24).contains(&offset) || (0x28..0x2c).contains(&offset) || offset == 0x43
+    }
+
+    fn layout_matches_the_legacy_u64_buffer() {
+        // Type-check the native boundary without calling a game address on the
+        // host. This also keeps standalone `rustc --test -D warnings` strict.
+        let _: unsafe fn(usize, *mut u8, &Descriptor, Flags) = install;
+        assert_eq!(size_of::<Descriptor>(), DESCRIPTOR_LEN);
+        assert_eq!(size_of::<Descriptor>(), size_of::<[u64; 14]>());
+        assert_eq!(align_of::<Descriptor>(), 8);
+        assert_eq!(align_of::<Descriptor>() % align_of::<[u64; 14]>(), 0);
+    }
+
+    fn copy_only_staging_is_byte_identical() {
+        let source = source();
+        let legacy = bytes_of(&unsafe { legacy_copy(source.as_ptr()) });
+        let copied = unsafe { Descriptor::copy_from(source.as_ptr()) };
+        let restaged = Descriptor::from_bytes(&source);
+        assert_eq!(legacy, source);
+        assert_eq!(copied.bytes(), &legacy);
+        assert_eq!(restaged.bytes(), &legacy);
+        assert_eq!(copied, restaged);
+    }
+
+    fn group_request_matches_legacy_writes_and_keeps_other_bytes() {
+        let source = source();
+        assert_ne!(source[STARTING_FORM], 0);
+        for group in GROUPS.iter().copied() {
+            let legacy = bytes_of(&unsafe { legacy_group(source.as_ptr(), group) });
+            let mut staged = unsafe { Descriptor::copy_from(source.as_ptr()) };
+            staged.request_group(group);
+            let bytes = staged.bytes();
+            assert_eq!(bytes, &legacy, "{:?}", group);
+            for (offset, (now, before)) in bytes.iter().zip(source.iter()).enumerate() {
+                if !patched(offset) {
+                    assert_eq!(now, before, "untouched byte {:#x} for {:?}", offset, group);
+                }
+            }
+            assert_eq!(&bytes[0x24..0x28], &source[0x24..0x28]);
+            assert_eq!(&bytes[0x14..0x18], &group.count.to_ne_bytes());
+            for (index, kind) in group.kinds.iter().enumerate() {
+                assert_eq!(&bytes[0x18 + index * 4..0x1c + index * 4], &kind.to_ne_bytes());
+            }
+            assert_eq!(&bytes[0x28..0x2c], &group.actor_count.to_ne_bytes());
+            assert_eq!(bytes[STARTING_FORM], 0);
+        }
+    }
+
+    fn native_argument_and_borrowed_bytes_are_the_same_staged_words() {
+        let source = source();
+        for group in GROUPS.iter().copied() {
+            let legacy = unsafe { legacy_group(source.as_ptr(), group) };
+            let mut staged = unsafe { Descriptor::copy_from(source.as_ptr()) };
+            staged.request_group(group);
+            let native = staged.as_native();
+            assert_eq!(native as usize % 8, 0);
+            assert_eq!(native as usize, staged.bytes().as_ptr() as usize);
+            let words = unsafe { std::slice::from_raw_parts(native, 14) };
+            assert_eq!(words, &legacy[..]);
+        }
+    }
+
+    fn flags_are_the_existing_byte_arrays() {
+        assert_eq!(Flags::Reload.bytes(), [1, 0, 0]);
+        assert_eq!(Flags::Parked.bytes(), [0, 0, 0]);
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("layout_matches_the_legacy_u64_buffer", layout_matches_the_legacy_u64_buffer as fn()),
+            ("copy_only_staging_is_byte_identical", copy_only_staging_is_byte_identical as fn()),
+            ("group_request_matches_legacy_writes_and_keeps_other_bytes", group_request_matches_legacy_writes_and_keeps_other_bytes as fn()),
+            ("native_argument_and_borrowed_bytes_are_the_same_staged_words", native_argument_and_borrowed_bytes_are_the_same_staged_words as fn()),
+            ("flags_are_the_existing_byte_arrays", flags_are_the_existing_byte_arrays as fn()),
+        ]);
+    }
+    }
+}

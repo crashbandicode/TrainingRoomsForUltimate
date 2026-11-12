@@ -389,3 +389,242 @@ impl RecordUpdate {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    lib_unit_tests! {
+    use super::*;
+
+    fn captured_sword_mirrors_use_four_d_halfwords_and_full_width_owner_tokens() {
+        // Original saved Sword: index0, outfit41, hat0, colour5, voice37, 2/6/2/2 -> 0/2/0/0.
+        let values = Mirrors::decode(
+            [0, 0, 41, 0, 0, 0, 5, 0, 37, 0, 0, 2, 0, 0],
+            [0, 0, 41, 0, 0, 0, 5, 0, 37, 0],
+            [0, 0, 41, 0, 0, 0, 5, 0],
+            [0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [
+                0, 0, 0xfe, 0xed, 41, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 37, 0, 0, 0,
+            ],
+        );
+        let expected = Tokens {
+            outfit: 41,
+            hat: 0,
+            colour: 5,
+            voice: 37,
+            specials: [0, 2, 0, 0],
+        };
+        assert_eq!(values.validate(0, expected), Ok(()));
+        let mut wrong = values;
+        wrong.owner[3] = 0x10025; // low halfword agrees, native u32 does not
+        assert_eq!(wrong.validate(0, expected), Err(Error::OwnerMirror));
+        wrong = values;
+        wrong.d_specials[1] = 0x102;
+        assert_eq!(wrong.validate(0, expected), Err(Error::InformationMirror));
+        wrong = values;
+        wrong.owner_index = 1;
+        assert_eq!(wrong.validate(0, expected), Err(Error::OwnerMirror));
+    }
+
+    fn binding() -> Binding {
+        Binding {
+            epoch: 5,
+            owner: 0,
+            entry: 0x1000,
+            row: 0x2000,
+            holder: 0x3000,
+            manager: 0x4000,
+            vector_begin: 0x5000,
+            vector_end: 0x5000 + 133 * RECORD_LEN,
+            record_index: 0,
+        }
+    }
+
+    fn unchanged_count_does_not_hide_pool_relocation_or_owner_alias() {
+        let original = binding();
+        assert_eq!(record_address(original, original), Ok(0x5000));
+        let mut moved = original;
+        moved.vector_begin += RECORD_LEN;
+        moved.vector_end += RECORD_LEN;
+        assert_eq!(record_address(original, moved), Err(Error::Binding));
+        moved = original;
+        moved.manager += 8;
+        assert_eq!(record_address(original, moved), Err(Error::Binding));
+        let mut kinds = [None; 8];
+        kinds[0] = Some(0x49);
+        kinds[1] = Some(9);
+        assert_eq!(qualified_scope(original, 0x49, kinds), Ok(()));
+        kinds[3] = Some(0x49); // inactive helper is still another Mii owner
+        assert_eq!(qualified_scope(original, 0x49, kinds), Err(Error::OtherMii));
+    }
+
+    fn captured_cpu_owners() -> [CpuOwner; 4] {
+        // Origin01 first visit: actual #281/#284/#297/#298 FE/D/O addresses.
+        // E identities follow the converter captures and their native 0x260 stride.
+        let entries = [0x120293e000, 0x1202944000, 0x120294a000, 0x12053e0000];
+        let objects = [0x11b0867900, 0x11f3e48000, 0x11f3e28700, 0x11f3e43a00];
+        core::array::from_fn(|id| CpuOwner {
+            owner: id as u32,
+            kind: if id == 0 { 9 } else { 0x49 },
+            selector: id as u8,
+            index: id as u16,
+            entry: entries[id],
+            row: 0x8531d730 + id * 0x260,
+            information: entries[id] + 0x110,
+            object: objects[id],
+            alias: 0,
+        })
+    }
+
+    fn saved_cpu_assignments_do_not_admit_index_or_owner_aliases_or_widen_p1() {
+        let owners = captured_cpu_owners();
+        assert_eq!(qualified_cpu_scope(&owners, false), Ok(()));
+        let mut aliased = owners;
+        aliased[2].index = 1; // same CharInfo is not permission to reuse CPU1's record
+        assert_eq!(qualified_cpu_scope(&aliased, false), Err(Error::Scope));
+        aliased = owners;
+        aliased[1].object = owners[0].object;
+        assert_eq!(qualified_cpu_scope(&aliased, false), Err(Error::Binding));
+        aliased = owners;
+        aliased[1].alias = 1;
+        assert_eq!(qualified_cpu_scope(&aliased, false), Err(Error::Scope));
+        aliased = owners;
+        aliased[1].selector = 0;
+        assert_eq!(qualified_cpu_scope(&aliased, false), Err(Error::Scope));
+        assert_eq!(qualified_cpu_scope(&owners, true), Err(Error::Scope));
+        let p1_kinds = [
+            Some(0x49),
+            Some(9),
+            Some(0x49),
+            Some(0x49),
+            None,
+            None,
+            None,
+            None,
+        ];
+        assert_eq!(
+            qualified_scope(binding(), 0x49, p1_kinds),
+            Err(Error::OtherMii)
+        );
+    }
+
+    fn same_helper_hash_does_not_hide_record_resource_or_mirror_changes() {
+        let owners = captured_cpu_owners();
+        let expected = core::array::from_fn(|i| {
+            let index = (i + 2) as u16;
+            CpuHelper {
+                owner: owners[i + 2],
+                mirrors: Mirrors {
+                    index,
+                    tokens: Tokens {
+                        outfit: 41,
+                        hat: 0,
+                        colour: 5,
+                        voice: 37,
+                        specials: [0, 0, 0, 0],
+                    },
+                    fe: [index, 41, 0, 5, 37],
+                    d: [index, 41, 0, 5],
+                    d_specials: [0, 0, 0, 0],
+                    owner_index: index,
+                    owner: [41, 0, 5, 37],
+                },
+                // Synthetic record bytes; native token/owner values above are captured.
+                record: [0x5a; RECORD_LEN],
+                body: 0x1000 + i * 0x1000,
+                body_id: i as u32 + 2,
+            }
+        });
+        assert_eq!(preserved_cpu_helpers(&expected, &expected), Ok(()));
+        let mut changed = expected;
+        changed[0].record[CHARINFO_LEN] ^= 1; // unchanged CharInfo, different shared_ptr data
+        assert_eq!(
+            preserved_cpu_helpers(&expected, &changed),
+            Err(Error::RecordChanged)
+        );
+        changed = expected;
+        changed[1].record[CHARINFO_LEN + 8] ^= 1; // control block is also part of preservation
+        assert_eq!(
+            preserved_cpu_helpers(&expected, &changed),
+            Err(Error::RecordChanged)
+        );
+        changed = expected;
+        changed[1].mirrors.owner_index = 1;
+        assert_eq!(
+            preserved_cpu_helpers(&expected, &changed),
+            Err(Error::RecordChanged)
+        );
+    }
+
+    fn record_copy_compare_is_exact_and_preserves_shared_ownership_bytes() {
+        let before = [0x11; CHARINFO_LEN];
+        let after = [0x22; CHARINFO_LEN];
+        let target = Tokens {
+            outfit: 43,
+            hat: 0,
+            colour: 4,
+            voice: 37,
+            specials: [1, 2, 0, 0],
+        };
+        let mut record = [0xa5; RECORD_LEN];
+        record[..CHARINFO_LEN].copy_from_slice(&before);
+        let update = RecordUpdate::compare_record(before, after, target, &record).unwrap();
+        let mut changed = record;
+        changed[0] ^= 1; // catalog masks this byte, exact live compare must not
+        let saved = changed;
+        assert!(matches!(
+            RecordUpdate::compare_record(before, after, target, &changed),
+            Err(Error::RecordChanged)
+        ));
+        assert_eq!(
+            update.apply_to_copy(&mut changed),
+            Err(Error::RecordChanged)
+        );
+        assert_eq!(changed, saved);
+        assert_eq!(update.apply_to_copy(&mut record), Ok(()));
+        assert_eq!(&record[..CHARINFO_LEN], &after);
+        assert_eq!(&record[CHARINFO_LEN..], &[0xa5; 16]);
+    }
+
+    fn native_tagged_rows_require_saved_hint_and_hash_not_an_asset_index() {
+        let tokens = Tokens {
+            outfit: 43,
+            hat: 0,
+            colour: 4,
+            voice: 37,
+            specials: [1, 2, 0, 0],
+        };
+        let rows = RowIds {
+            outfit: 0x13002b147bc59435,
+            hat: 0x5a00000fa9efa5ea,
+        };
+        assert_eq!(
+            rows.validate_tokens(tokens, 0x147bc59435, 0x0fa9efa5ea),
+            Ok(())
+        );
+        let wrong_hint = Tokens {
+            outfit: 42,
+            ..tokens
+        };
+        assert_eq!(
+            rows.validate_tokens(wrong_hint, 0x147bc59435, 0x0fa9efa5ea),
+            Err(Error::RowIdentity)
+        );
+        assert_eq!(
+            RowIds { outfit: 43, ..rows }.validate_tokens(tokens, 0x147bc59435, 0x0fa9efa5ea),
+            Err(Error::RowIdentity)
+        );
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("captured_sword_mirrors_use_four_d_halfwords_and_full_width_owner_tokens", captured_sword_mirrors_use_four_d_halfwords_and_full_width_owner_tokens as fn()),
+            ("unchanged_count_does_not_hide_pool_relocation_or_owner_alias", unchanged_count_does_not_hide_pool_relocation_or_owner_alias as fn()),
+            ("saved_cpu_assignments_do_not_admit_index_or_owner_aliases_or_widen_p1", saved_cpu_assignments_do_not_admit_index_or_owner_aliases_or_widen_p1 as fn()),
+            ("same_helper_hash_does_not_hide_record_resource_or_mirror_changes", same_helper_hash_does_not_hide_record_resource_or_mirror_changes as fn()),
+            ("record_copy_compare_is_exact_and_preserves_shared_ownership_bytes", record_copy_compare_is_exact_and_preserves_shared_ownership_bytes as fn()),
+            ("native_tagged_rows_require_saved_hint_and_hash_not_an_asset_index", native_tagged_rows_require_saved_hint_and_hash_not_an_asset_index as fn()),
+        ]);
+    }
+    }
+}

@@ -2,6 +2,9 @@
 //! hub are tested in `tests/cpu_core.rs` (`cpu07_should_delay`, `cpu07_tick_types_and_reset`,
 //! `cpu07_single_tick_per_frame`, `state06_hub_order_clears_cpu_state`); this file has the measurement.
 
+// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).
+#[path = "../src/test_table.rs"]
+mod test_table;
 // rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
 macro_rules! lib_unit_tests {
     ($($body:tt)*) => {};
@@ -34,7 +37,6 @@ fn exchange(cpu: &mut Cpu, p: u32, c: u32) -> Vec<(u32, i32)> {
     shown
 }
 
-#[test]
 fn cpu07_frame_advantage_math() {
     // The player recovers first: positive; the CPU first: negative; together: +0.
     let mut cpu = cpu_on();
@@ -62,7 +64,6 @@ fn cpu07_frame_advantage_math() {
     assert_eq!(NOTIFICATION_FRAMES, 60);
 }
 
-#[test]
 fn cpu07_frame_advantage_gates() {
     // Off: no work, nothing shown; a mash set aborts a measurement in progress; no state kept.
     let mut off = Cpu::factory(1);
@@ -85,7 +86,6 @@ fn cpu07_frame_advantage_gates() {
     assert!(!cpu.advantage.counting, "a non-empty Mash Toggles row aborts the measurement");
 }
 
-#[test]
 fn cpu07_reset_bundle_clears_the_measurement() {
     let mut cpu = cpu_on();
     cpu.tick_clock();
@@ -99,4 +99,14 @@ fn cpu07_reset_bundle_clears_the_measurement() {
     cpu.clear_session();
     assert!(!cpu.advantage.counting);
     let _ = HubStep::Combo;
+}
+
+/// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+#[test]
+fn case_table() {
+    crate::test_table::run(&[
+        ("cpu07_frame_advantage_math", cpu07_frame_advantage_math as fn()),
+        ("cpu07_frame_advantage_gates", cpu07_frame_advantage_gates as fn()),
+        ("cpu07_reset_bundle_clears_the_measurement", cpu07_reset_bundle_clears_the_measurement as fn()),
+    ]);
 }

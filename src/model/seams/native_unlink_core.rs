@@ -153,7 +153,6 @@ mod tests {
         Observation { sequence, thread, stack, node, links: [parent, 0, 0, 0, 0, 0], ..Observation::EMPTY }
     }
 
-    #[test]
     fn recursive_children_do_not_replace_parent_entry() {
         let mut table = Correlator::new();
         let parent = record(1, 0x1000, 0x8000, 0x9000, 0xa000);
@@ -166,7 +165,6 @@ mod tests {
         assert_eq!(table.unmatched, 0);
     }
 
-    #[test]
     fn collision_or_other_thread_is_missing_evidence_not_false_pair() {
         let mut table = Correlator::new();
         let first = record(1, 0x1000, 0x8000, 0x9000, 0xa000);
@@ -179,7 +177,6 @@ mod tests {
         assert_eq!(table.unmatched, 1);
     }
 
-    #[test]
     fn reused_stack_and_node_require_new_entry_and_are_consumed_once() {
         let mut table = Correlator::new();
         let first = record(1, 0x1000, 0x8000, 0x9000, 0xa000);
@@ -194,7 +191,6 @@ mod tests {
     fn write(site: u64, parent: u64, tick: u64) -> ParentEvent {
         ParentEvent { tick, thread: 7, site, parent }
     }
-    #[test]
     fn parent_history_distinguishes_link_from_completed_clear() {
         let mut table = ParentHistory::<8>::new();
         table.record(0x1000, 0x2000, 1, write(10, 0, 1));
@@ -206,7 +202,6 @@ mod tests {
         assert_eq!((detached.owner, detached.previous.parent, detached.latest.site), (0x2000, 0x3000, 30));
         assert_eq!(detached.latest.parent, 0);
     }
-    #[test]
     fn constructor_resets_same_address_and_owner_reuse() {
         let mut table = ParentHistory::<8>::new();
         table.record(0x1000, 0x2000, 1, write(10, 0, 1));
@@ -216,7 +211,6 @@ mod tests {
         assert_eq!((next.birth, next.birth_tick), (9, 3));
         assert_eq!(next.previous, ParentEvent::EMPTY);
     }
-    #[test]
     fn bounded_history_eviction_does_not_return_another_node() {
         let mut table = ParentHistory::<2>::new();
         table.record(0x1000, 0x2000, 1, write(10, 0, 1));
@@ -227,7 +221,6 @@ mod tests {
         assert_eq!(table.get(0x1020).node, 0x1020);
         assert_eq!(table.get(0x1040).node, 0x1040);
     }
-    #[test]
     fn changed_owner_without_constructor_is_unknown_generation() {
         let mut table = ParentHistory::<8>::new();
         table.record(0x1000, 0x2000, 1, write(10, 0, 1));
@@ -236,7 +229,6 @@ mod tests {
         assert_eq!((next.birth, next.owner, table.missing_birth), (0, 0x3000, 1));
         assert_eq!(next.previous, ParentEvent::EMPTY);
     }
-    #[test]
     fn invalid_entry_read_preserves_prior_detach_evidence() {
         let mut table = ParentHistory::<8>::new();
         table.record(0x1000, 0x2000, 1, write(10, 0, 1));
@@ -247,6 +239,21 @@ mod tests {
         assert_eq!(table.get(0x1000), detached);
         assert_eq!(detached.previous.parent, 0x3000);
         assert_eq!(detached.latest.site, 30);
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("recursive_children_do_not_replace_parent_entry", recursive_children_do_not_replace_parent_entry as fn()),
+            ("collision_or_other_thread_is_missing_evidence_not_false_pair", collision_or_other_thread_is_missing_evidence_not_false_pair as fn()),
+            ("reused_stack_and_node_require_new_entry_and_are_consumed_once", reused_stack_and_node_require_new_entry_and_are_consumed_once as fn()),
+            ("parent_history_distinguishes_link_from_completed_clear", parent_history_distinguishes_link_from_completed_clear as fn()),
+            ("constructor_resets_same_address_and_owner_reuse", constructor_resets_same_address_and_owner_reuse as fn()),
+            ("bounded_history_eviction_does_not_return_another_node", bounded_history_eviction_does_not_return_another_node as fn()),
+            ("changed_owner_without_constructor_is_unknown_generation", changed_owner_without_constructor_is_unknown_generation as fn()),
+            ("invalid_entry_read_preserves_prior_detach_evidence", invalid_entry_read_preserves_prior_detach_evidence as fn()),
+        ]);
     }
     }
 }

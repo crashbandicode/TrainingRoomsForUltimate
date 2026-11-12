@@ -838,3 +838,37 @@ pub fn parse_build_id(text: &str) -> Option<[u8; 32]> {
     Some(id)
 }
 
+#[cfg(test)]
+mod tests {
+    lib_unit_tests! {
+    use super::*;
+
+    // The change-trace98 harness's `same_thread_reentry_drops_once_without_waiting`, reduced.
+    fn a_held_lock_drops_the_record_without_waiting() {
+        let q = Queue::<4>::new();
+        let held = q.test_hold_lock();
+        assert!(!q.record(1, 2, 3, [4; 5]));
+        drop(held);
+        assert_eq!(q.stats().unwrap().busy, 1);
+        assert!(q.record(1, 2, 3, [4; 5]));
+        assert_eq!(q.pop().unwrap(), [1, 1, 2, 3, 4, 4, 4, 4, 4, 0]);
+    }
+
+    fn the_record_hooks_run_before_the_lock_and_after_admission() {
+        let q = Queue::<4>::new();
+        let (mut before, mut after) = (false, false);
+        assert!(q.test_record_hooks(|| before = true, || after = true));
+        assert!(before && after);
+        assert!(q.pop().is_some());
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("a_held_lock_drops_the_record_without_waiting", a_held_lock_drops_the_record_without_waiting as fn()),
+            ("the_record_hooks_run_before_the_lock_and_after_admission", the_record_hooks_run_before_the_lock_and_after_admission as fn()),
+        ]);
+    }
+    }
+}

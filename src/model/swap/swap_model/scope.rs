@@ -436,3 +436,164 @@ pub fn scope_of(native_training: bool, melee: u8, mode: u32) -> Scope {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    lib_unit_tests! {
+    use super::*;
+
+    fn names_are_unique_and_every_row_is_reviewed() {
+        for (i, c) in CALLBACKS.iter().enumerate() {
+            assert!(CALLBACKS[i + 1..].iter().all(|o| o.name != c.name), "duplicate {}", c.name);
+            assert!(!c.review.is_empty(), "{} has no review", c.name);
+            assert!(c.scopes != Scopes::NONE, "{} declares no scope", c.name);
+            if !c.read_only && c.scopes.contains(Scopes::MATCH) {
+                assert!(!matches!(c.exception, Exception::None), "{} mutates in a match without a reason", c.name);
+            }
+        }
+    }
+
+    fn the_four_pre_gate_calls_are_declared() {
+        for name in [
+            "lobby::update",
+            "character_roster::sources::on_frame",
+            "shield::param_installer",
+            "character_items::on_frame",
+        ] {
+            let c = contract(name).expect(name);
+            assert!(c.per_frame && c.scopes == Scopes::ALL, "{}", name);
+        }
+        assert!(!contract("shield::param_installer").unwrap().read_only);
+    }
+
+    fn cpu_pilot_is_external_and_allowed_online() {
+        for c in CALLBACKS.iter().filter(|c| c.name.starts_with("cpu_pilot::")) {
+            assert!(matches!(c.exception, Exception::External(_)), "{}", c.name);
+        }
+        let frame = contract("cpu_pilot::on_frame").unwrap();
+        assert!(admitted(frame, Scope::Online) && admitted(frame, Scope::Training));
+        assert!(!admitted(frame, Scope::LobbyWaiting), "declared scopes are respected");
+    }
+
+    const ALL_SCOPES: [Scope; 4] = [Scope::Training, Scope::LobbyWaiting, Scope::Match, Scope::Online];
+
+    fn must_complete_rows_are_admitted_in_every_scope() {
+        // U14 constraint: teardown, release and forward-continuation callbacks are never refused, whatever
+        // scene the native words name when they run (finalize, scene exit, a Reload).
+        let rows: Vec<_> = CALLBACKS.iter().filter(|c| matches!(c.exception, Exception::MustComplete(_))).collect();
+        assert_eq!(rows.len(), 6, "the M4 teardown/release/continuation rows");
+        for c in rows {
+            assert_eq!(c.scopes, Scopes::ALL, "{} must declare every scope", c.name);
+            for now in ALL_SCOPES {
+                assert!(admitted(c, now), "{} refused in {}", c.name, now.name());
+            }
+        }
+    }
+
+    fn the_m4_callbacks_are_declared_with_their_contract() {
+        for name in [
+            "body_graph::execute",
+            "r_handle::release",
+            "mii_ordinary_cpu::continue_natively",
+            "mii_ordinary_player::continue_natively",
+            "mii_ordinary_cpu::settle_outcome",
+            "mii_ordinary_player::settle_outcome",
+        ] {
+            let c = contract(name).expect(name);
+            assert!(!c.read_only && matches!(c.exception, Exception::MustComplete(_)), "{}", name);
+        }
+        // Gated starts of mutating work: Training and waiting rooms only, nothing excused.
+        for name in ["native_body_bank::group_prefetch", "mii_ordinary_cpu::prequeue", "mii_ordinary_player::prequeue"] {
+            let c = contract(name).expect(name);
+            assert!(!c.read_only && c.exception == Exception::None && c.scopes == PRACTICE, "{}", name);
+            for now in ALL_SCOPES {
+                assert_eq!(admitted(c, now), matches!(now, Scope::Training | Scope::LobbyWaiting), "{} {}", name, now.name());
+            }
+        }
+        // U5's writer restores the native configure words in every scope.
+        let writer = contract("mii_ordinary_gate::install_r68_on_skip").expect("U5 writer");
+        assert!(!writer.read_only && matches!(writer.exception, Exception::RestoresNative(_)) && writer.scopes == Scopes::ALL);
+        // WP-P's presentation callbacks only read.
+        for name in ["presentation::state_load_started", "presentation::state_load_completed", "presentation::shadow_readback"] {
+            assert!(contract(name).expect(name).read_only, "{}", name);
+        }
+    }
+
+    fn admitted_everywhere_is_exactly_admitted_in_all_four_scopes() {
+        // The dispatcher's no-read fast path must never admit what `admitted` would refuse.
+        for c in CALLBACKS {
+            assert_eq!(admitted_everywhere(c), ALL_SCOPES.iter().all(|now| admitted(c, *now)), "{}", c.name);
+        }
+        assert!(admitted_everywhere(contract("shield::param_installer").unwrap()));
+        assert!(!admitted_everywhere(contract("cpu_pilot::on_frame").unwrap()), "declared scopes are respected");
+        assert!(!admitted_everywhere(contract("mii_ordinary_cpu::prequeue").unwrap()));
+    }
+
+    fn gates_are_the_text_free_projection_of_callbacks() {
+        // The dispatcher reads GATES only: same rows, same order, same decision in every scope.
+        assert_eq!(GATES.len(), CALLBACKS.len());
+        for (g, c) in GATES.iter().zip(CALLBACKS) {
+            assert_eq!(*g, c.gate(), "{}", c.name);
+            assert_eq!((g.name, g.scopes, g.read_only), (c.name, c.scopes, c.read_only));
+            assert_eq!(g.excused, !matches!(c.exception, Exception::None), "{}", c.name);
+            assert_eq!(g.admitted_everywhere(), admitted_everywhere(c), "{}", c.name);
+            for now in ALL_SCOPES {
+                assert_eq!(g.admitted(now), admitted(c, now), "{} {}", c.name, now.name());
+            }
+        }
+    }
+
+    fn every_row_names_an_existing_seam() {
+        for c in CALLBACKS {
+            assert!(c.seam.is_empty() || crate::engine::seams::native_seams::find(c.seam).is_some(), "{}: no seam row `{}`", c.name, c.seam);
+        }
+    }
+
+    fn admitted_truth_table() {
+        let mutating = CallbackContract {
+            name: "x",
+            seam: "",
+            scopes: Scopes::ALL,
+            read_only: false,
+            per_frame: true,
+            exception: Exception::None,
+            review: "test",
+        };
+        let read_only = CallbackContract { read_only: true, ..mutating };
+        let excused = CallbackContract { exception: Exception::CrashGuard("test"), ..mutating };
+        let practice_only = CallbackContract { scopes: PRACTICE, read_only: true, ..mutating };
+        for now in [Scope::Training, Scope::LobbyWaiting, Scope::Match, Scope::Online] {
+            let practice = matches!(now, Scope::Training | Scope::LobbyWaiting);
+            assert_eq!(admitted(&mutating, now), practice, "{}", now.name());
+            assert!(admitted(&read_only, now), "{}", now.name());
+            assert!(admitted(&excused, now), "{}", now.name());
+            assert_eq!(admitted(&practice_only, now), practice, "{}", now.name());
+        }
+    }
+
+    fn scope_from_the_scene_tuple() {
+        assert_eq!(scope_of(true, 0x20, 0x0404_0000), Scope::Training);
+        assert_eq!(scope_of(false, 0x0d, 0x0701_0101), Scope::LobbyWaiting);
+        assert_eq!(scope_of(false, 0x0d, 0x0201_0000), Scope::LobbyWaiting);
+        assert_eq!(scope_of(false, 0x0e, 0x0701_0101), Scope::Online);
+        assert_eq!(scope_of(false, 0x01, 0x0201_0000), Scope::Online);
+        assert_eq!(scope_of(false, 0x01, 0x0101_0000), Scope::Match);
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("names_are_unique_and_every_row_is_reviewed", names_are_unique_and_every_row_is_reviewed as fn()),
+            ("the_four_pre_gate_calls_are_declared", the_four_pre_gate_calls_are_declared as fn()),
+            ("cpu_pilot_is_external_and_allowed_online", cpu_pilot_is_external_and_allowed_online as fn()),
+            ("must_complete_rows_are_admitted_in_every_scope", must_complete_rows_are_admitted_in_every_scope as fn()),
+            ("the_m4_callbacks_are_declared_with_their_contract", the_m4_callbacks_are_declared_with_their_contract as fn()),
+            ("admitted_everywhere_is_exactly_admitted_in_all_four_scopes", admitted_everywhere_is_exactly_admitted_in_all_four_scopes as fn()),
+            ("gates_are_the_text_free_projection_of_callbacks", gates_are_the_text_free_projection_of_callbacks as fn()),
+            ("every_row_names_an_existing_seam", every_row_names_an_existing_seam as fn()),
+            ("admitted_truth_table", admitted_truth_table as fn()),
+            ("scope_from_the_scene_tuple", scope_from_the_scene_tuple as fn()),
+        ]);
+    }
+    }
+}

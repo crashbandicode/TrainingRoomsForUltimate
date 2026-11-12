@@ -56,3 +56,90 @@ impl ReturnGate {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    lib_unit_tests! {
+    use super::ReturnGate;
+
+    fn observed_match_return_resumes_without_an_outer_transition() {
+        let mut gate = ReturnGate::new();
+        gate.arm(7);
+        // Actual private diagnostic sequence: waiting rebuild, match receipt,
+        // then post-match practice. Outer state stayed 8 throughout.
+        let flags = [0xb1_u8, 0xb5, 0xbd, 0xb9, 0xbe, 0xb0, 0xb1, 0xbd];
+        for (index, flags) in flags.iter().copied().enumerate() {
+            gate.observe(7, flags & 2 != 0, flags & 1 != 0);
+            assert_eq!(gate.ready(7), index >= 6);
+        }
+    }
+
+    fn failed_reconstruction_does_not_retry_on_every_frame() {
+        let mut gate = ReturnGate::new();
+        gate.arm(7);
+        gate.observe(7, true, false);
+        gate.observe(7, false, true);
+        gate.attempted(7);
+        for _ in 0..60 { gate.observe(7, false, true); }
+        assert!(!gate.ready(7));
+        gate.observe(7, true, false);
+        gate.observe(7, false, true);
+        assert!(gate.ready(7));
+    }
+
+    fn old_lobby_callbacks_cannot_resume_or_retire_a_new_lobby() {
+        let mut gate = ReturnGate::new();
+        gate.arm(8);
+        gate.observe(7, true, false);
+        gate.observe(7, false, true);
+        gate.end(7);
+        assert!(!gate.ready(7));
+        assert!(!gate.ready(8));
+        gate.observe(8, true, false);
+        gate.observe(8, false, true);
+        assert!(gate.ready(8));
+        gate.end(8);
+        assert!(!gate.ready(8));
+    }
+
+    fn request_refused_before_editor_start_does_not_burn_return() {
+        let mut gate = ReturnGate::new();
+        gate.arm(7);
+        gate.observe(7, true, false);
+        gate.observe(7, false, true);
+        gate.attempted(7);
+        gate.request_refused(6);
+        assert!(!gate.ready(7));
+        gate.request_refused(7);
+        assert!(gate.ready(7));
+        gate.attempted(7);
+        assert!(!gate.ready(7)); // an accepted request still gets only one attempt
+    }
+
+    fn a_new_checkpoint_requires_its_own_match_receipt() {
+        let mut gate = ReturnGate::new();
+        gate.arm(7);
+        gate.observe(7, true, false);
+        gate.observe(7, false, true);
+        assert!(gate.ready(7));
+        gate.arm(7);
+        for _ in 0..60 { gate.observe(7, false, true); }
+        assert!(!gate.ready(7));
+        gate.observe(7, true, false);
+        assert!(!gate.ready(7));
+        gate.observe(7, false, true);
+        assert!(gate.ready(7));
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("observed_match_return_resumes_without_an_outer_transition", observed_match_return_resumes_without_an_outer_transition as fn()),
+            ("failed_reconstruction_does_not_retry_on_every_frame", failed_reconstruction_does_not_retry_on_every_frame as fn()),
+            ("old_lobby_callbacks_cannot_resume_or_retire_a_new_lobby", old_lobby_callbacks_cannot_resume_or_retire_a_new_lobby as fn()),
+            ("request_refused_before_editor_start_does_not_burn_return", request_refused_before_editor_start_does_not_burn_return as fn()),
+            ("a_new_checkpoint_requires_its_own_match_receipt", a_new_checkpoint_requires_its_own_match_receipt as fn()),
+        ]);
+    }
+    }
+}

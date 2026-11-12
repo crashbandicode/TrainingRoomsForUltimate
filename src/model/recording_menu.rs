@@ -2179,3 +2179,998 @@ impl CatalogWatch {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    lib_unit_tests! {
+    use super::*;
+    use crate::model::chords::Request;
+    use crate::model::combo::{Combo, LinkRec};
+    use crate::model::frame_strip::{Move, Verdict};
+    use crate::model::menu::input::Button;
+    use crate::model::menu::table::{Control, Page, GROUPS, ROWS};
+    use crate::model::menu::{Env, Menu};
+    use crate::model::settings::{self, Settings};
+
+    fn link(from: Move, to: Move, tru: bool) -> LinkRec {
+        LinkRec::presses(from, to, if tru { Verdict::True(None) } else { Verdict::Drop(1) }, None, &[])
+    }
+
+    fn a_reopened_menu_loads_the_catalog_without_a_new_file() {
+        let opened = CatalogWatch::default();
+        let (loaded, due) = opened.take_load(3);
+        assert!(due);
+        let (held, due) = loaded.take_load(3);
+        assert!(!due);
+        let (reopened, due) = held.on_menu_dropped().take_load(3);
+        assert!(due);
+        let (held, due) = reopened.take_load(3);
+        assert!(!due);
+        let (_, due) = held.take_load(4);
+        assert!(due);
+    }
+
+    fn example() -> Catalog {
+        let mut saves = Vec::new();
+        for index in 0..16 {
+            saves.push(SaveFile { id: format!("s{index}"), name: format!("Save {index}"), fighters: String::new() });
+        }
+        saves[0] = SaveFile { id: "corner".into(), name: "Corner".into(), fighters: "Pikachu · Mario".into() };
+        saves[1] = SaveFile { id: "platform".into(), name: "Platform".into(), fighters: String::new() };
+        saves[2] = SaveFile { id: "nair-start".into(), name: "Nair loop · start".into(), fighters: String::new() };
+        Catalog {
+            saves,
+            macros: vec![
+                MacroFile {
+                    id: "nair".into(),
+                    name: "Nair loop".into(),
+                    chain: false,
+                    steps: Vec::new(),
+                    start_save: Some("nair-start".into()),
+                    start_save_on: true,
+                    recorded_on: "Pikachu".into(),
+                    span: 12,
+                },
+                MacroFile {
+                    id: "dash".into(),
+                    name: "Dash grab".into(),
+                    chain: false,
+                    steps: Vec::new(),
+                    start_save: None,
+                    start_save_on: true,
+                    recorded_on: String::new(),
+                    span: 0,
+                },
+                MacroFile {
+                    id: "throw".into(),
+                    name: "CPU throw".into(),
+                    chain: false,
+                    steps: Vec::new(),
+                    start_save: None,
+                    start_save_on: true,
+                    recorded_on: String::new(),
+                    span: 0,
+                },
+                MacroFile {
+                    id: "pressure".into(),
+                    name: "Corner pressure".into(),
+                    chain: true,
+                    steps: vec!["nair".into(), "dash".into(), "throw".into()],
+                    start_save: None,
+                    start_save_on: true,
+                    recorded_on: String::new(),
+                    span: 0,
+                },
+            ],
+            combos: vec![ComboFile {
+                id: "nairc".into(),
+                name: "Nair loop combo".into(),
+                recorded_on: String::new(),
+                made_from: Some("nair".into()),
+                links: combo_link_lines(&Combo::from_links([link(Move::Aerial, Move::Aerial, true)]).unwrap()),
+                span: 1,
+            }],
+            sequences: vec![SequenceFile {
+                id: "corner-seq".into(),
+                name: "Corner to kill".into(),
+                combos: vec!["nairc".into()],
+                streak: 2,
+                best: 6,
+            }],
+            hot_saves: vec!["corner".into(), "platform".into(), "nair-start".into()],
+            hot_macros: vec!["nair".into(), "pressure".into(), "dash".into(), "throw".into()],
+            hot_combos: vec!["nairc".into()],
+            hot_sequences: vec!["corner-seq".into()],
+        }
+    }
+
+    fn screens() -> RecordingScreens {
+        let mut screens = RecordingScreens::new();
+        screens.set_catalog(example());
+        screens.bound = Some("corner".into());
+        screens.active[0] = Some("nair".into());
+        screens.active[1] = Some("pressure".into());
+        screens
+    }
+
+    fn open_popup(screens: &mut RecordingScreens) {
+        screens.popup_open = true;
+    }
+
+    fn menu() -> Menu {
+        Menu::new(Settings::factory(), Env::default())
+    }
+
+    fn to_recording(menu: &mut Menu) {
+        menu.press(Button::R);
+        menu.press(Button::R);
+        assert_eq!(menu.page(), Page::Recording);
+    }
+
+    fn cpu_view_has_one_tab_and_sections_scroll_apart() {
+        let mut screens = screens();
+        open_popup(&mut screens);
+        screens.press_popup(Button::R);
+        assert_eq!(screens.role(Face::Popup), ViewRole::Cpu);
+        assert_eq!(screens.tab_names(), ["Save states & Macros"]);
+        let tab = screens.tab();
+        screens.press_popup(Button::ZL);
+        screens.press_popup(Button::ZR);
+        assert_eq!(screens.tab(), tab, "CPU has no tab control");
+        screens.set_cursor(Face::Popup, SAVES_MACROS, 1, 2);
+        let lower = screens.section_cursor(Face::Popup, SAVES_MACROS, 1);
+        screens.set_cursor(Face::Popup, SAVES_MACROS, 0, 0);
+        screens.press_popup(Button::JumpDown);
+        assert_eq!(screens.section_cursor(Face::Popup, SAVES_MACROS, 0), PAGE);
+        assert_eq!(screens.section_cursor(Face::Popup, SAVES_MACROS, 1), lower);
+        assert!(screens.section(Face::Popup, SAVES_MACROS, 0).header == "SAVE STATES");
+        assert!(screens.section(Face::Popup, SAVES_MACROS, 1).header == "MACROS");
+    }
+
+    fn saves_are_a_section_under_both_roles() {
+        let mut screens = screens();
+        open_popup(&mut screens);
+        assert_eq!(screens.tab_names().len(), 2);
+        assert_eq!(screens.section(Face::Popup, SAVES_MACROS, 0).header, "SAVE STATES");
+        screens.press_popup(Button::R);
+        assert_eq!(screens.section(Face::Popup, SAVES_MACROS, 0).header, "SAVE STATES");
+        assert_eq!(screens.tab_names().len(), 1);
+    }
+
+    fn connections_follow_the_focused_row() {
+        let mut screens = screens();
+        open_popup(&mut screens);
+        screens.set_cursor(Face::Popup, SAVES_MACROS, 0, 0);
+        let first = screens.connections(Face::Popup, SAVES_MACROS);
+        assert!(first.iter().any(|line| line.text.contains("Corner")));
+        assert!(first.iter().any(|line| line.text == "Bound to Save / Load: yes"));
+        screens.press_popup(Button::Down);
+        let second = screens.connections(Face::Popup, SAVES_MACROS);
+        assert!(second.iter().any(|line| line.text.contains("Platform")));
+        assert!(!second.iter().any(|line| line.text == "Bound to Save / Load: yes"));
+    }
+
+    fn page_a_opens_and_popup_a_acts() {
+        let mut screens = screens();
+        let bound = screens.selection().bound.clone();
+        screens.set_cursor(Face::Page, SAVES_MACROS, 0, 0);
+        assert_eq!(screens.handle_page(Button::A, true, SAVES_MACROS), PageHit::Consumed);
+        assert!(screens.file_open());
+        assert_eq!(screens.file_rows()[0].title, "Bind to Save / Load");
+        assert_eq!(screens.selection().bound, bound);
+        assert!(screens.hint(Face::Page).contains("A open") || screens.file_open());
+        screens.handle_page(Button::B, true, SAVES_MACROS);
+        open_popup(&mut screens);
+        screens.set_cursor(Face::Popup, SAVES_MACROS, 0, 1);
+        screens.press_popup(Button::A);
+        assert!(!screens.file_open());
+        assert_eq!(screens.selection().bound.as_deref(), Some("platform"));
+    }
+
+    fn a_view_shows_one_roles_active_macro() {
+        let mut screens = screens();
+        open_popup(&mut screens);
+        screens.set_cursor(Face::Popup, SAVES_MACROS, 1, 0);
+        let player = screens.section(Face::Popup, SAVES_MACROS, 1);
+        let nair = player.rows.iter().find(|row| row.name == "Nair loop").unwrap();
+        let chain = player.rows.iter().find(|row| row.name == "Corner pressure").unwrap();
+        assert!(nair.green);
+        assert!(!chain.green);
+        screens.press_popup(Button::R);
+        let cpu = screens.section(Face::Popup, SAVES_MACROS, 1);
+        let nair = cpu.rows.iter().find(|row| row.name == "Nair loop").unwrap();
+        let chain = cpu.rows.iter().find(|row| row.name == "Corner pressure").unwrap();
+        assert!(!nair.green);
+        assert!(chain.green);
+        assert_eq!(screens.page_role(), ViewRole::Player, "the page role is its own");
+    }
+
+    fn the_bound_save_is_marked_in_both_roles() {
+        let mut screens = screens();
+        open_popup(&mut screens);
+        let player = screens.section(Face::Popup, SAVES_MACROS, 0);
+        assert!(player.rows.iter().find(|row| row.name == "Corner").unwrap().green);
+        screens.press_popup(Button::R);
+        let cpu = screens.section(Face::Popup, SAVES_MACROS, 0);
+        assert!(cpu.rows.iter().find(|row| row.name == "Corner").unwrap().green);
+    }
+
+    fn one_save_is_bound_and_the_page_opens_it() {
+        let mut screens = screens();
+        open_popup(&mut screens);
+        screens.set_cursor(Face::Popup, SAVES_MACROS, 0, 1);
+        screens.press_popup(Button::A);
+        screens.press_popup(Button::B);
+        assert_eq!(screens.selection().bound.as_deref(), Some("platform"));
+        assert!(!screens.section(Face::Page, SAVES_MACROS, 0).rows.iter().find(|row| row.name == "Corner").unwrap().green);
+        // The bind was a use: Platform is now the most recently used save, the first row.
+        assert_eq!(screens.section(Face::Page, SAVES_MACROS, 0).rows[0].name, "Platform");
+        screens.set_cursor(Face::Page, SAVES_MACROS, 0, 0);
+        screens.handle_page(Button::A, true, SAVES_MACROS);
+        assert_eq!(screens.file_rows()[0].value, "On");
+        screens.handle_page(Button::Left, true, SAVES_MACROS);
+        assert_eq!(screens.selection().bound, None);
+        screens.handle_page(Button::Right, true, SAVES_MACROS);
+        assert_eq!(screens.selection().bound.as_deref(), Some("platform"));
+    }
+
+    fn sequences_sit_above_combos() {
+        let screens = screens();
+        let upper = screens.section(Face::Page, COMBOS_SEQ, 0);
+        let lower = screens.section(Face::Page, COMBOS_SEQ, 1);
+        assert_eq!(upper.header, "SEQUENCES");
+        assert_eq!(lower.header, "COMBOS");
+        assert!(upper.rows.iter().any(|row| row.name == "Corner to kill"));
+        assert!(lower.rows.iter().any(|row| row.name == "Nair loop combo"));
+    }
+
+    fn popup_buttons_match_q11() {
+        let mut screens = screens();
+        open_popup(&mut screens);
+        screens.set_cursor(Face::Popup, SAVES_MACROS, 0, 2);
+        screens.press_popup(Button::Right);
+        assert_eq!(screens.current_section(Face::Popup, SAVES_MACROS), 1);
+        assert_eq!(screens.section_cursor(Face::Popup, SAVES_MACROS, 1), 2);
+        let before = screens.section_cursor(Face::Popup, SAVES_MACROS, 1);
+        screens.press_popup(Button::Up);
+        assert_eq!(screens.current_section(Face::Popup, SAVES_MACROS), 1);
+        assert_eq!(screens.section_cursor(Face::Popup, SAVES_MACROS, 1), before - 1);
+        screens.set_cursor(Face::Popup, SAVES_MACROS, 0, 0);
+        screens.press_popup(Button::Up);
+        assert_eq!(screens.tab(), 0, "Up does not enter the tab row");
+        screens.press_popup(Button::ZL);
+        assert_eq!(screens.tab(), 1);
+        screens.press_popup(Button::ZR);
+        assert_eq!(screens.tab(), 0);
+        screens.press_popup(Button::L);
+        assert_eq!(screens.role(Face::Popup), ViewRole::Player);
+        screens.press_popup(Button::B);
+        assert!(!screens.popup_open());
+    }
+
+    fn paging_moves_one_section_by_twelve() {
+        let mut screens = screens();
+        open_popup(&mut screens);
+        screens.set_cursor(Face::Popup, SAVES_MACROS, 1, 1);
+        screens.set_cursor(Face::Popup, SAVES_MACROS, 0, 0);
+        screens.press_popup(Button::JumpDown);
+        assert_eq!(screens.section_cursor(Face::Popup, SAVES_MACROS, 0), 12);
+        assert_eq!(screens.section_cursor(Face::Popup, SAVES_MACROS, 1), 1);
+        screens.press_popup(Button::JumpDown);
+        let len = screens.section(Face::Popup, SAVES_MACROS, 0).rows.len();
+        assert_eq!(screens.section_cursor(Face::Popup, SAVES_MACROS, 0), len - 1);
+        screens.press_popup(Button::JumpUp);
+        assert_eq!(screens.section_cursor(Face::Popup, SAVES_MACROS, 0), len - 1 - PAGE);
+        screens.set_cursor(Face::Page, SAVES_MACROS, 0, 0);
+        screens.handle_page(Button::JumpDown, true, SAVES_MACROS);
+        assert_eq!(screens.section_cursor(Face::Page, SAVES_MACROS, 0), 12);
+    }
+
+    fn b_closes_the_popup_without_changing_the_selection() {
+        let mut screens = screens();
+        open_popup(&mut screens);
+        screens.set_cursor(Face::Popup, SAVES_MACROS, 0, 3);
+        let bound = screens.selection().bound.clone();
+        let active = screens.selection().active_player.clone();
+        screens.press_popup(Button::B);
+        assert!(!screens.popup_open());
+        open_popup(&mut screens);
+        assert_eq!(screens.section_cursor(Face::Popup, SAVES_MACROS, 0), 3);
+        assert_eq!(screens.selection().bound, bound);
+        assert_eq!(screens.selection().active_player, active);
+    }
+
+    fn zr_switches_role_on_the_recording_page() {
+        let mut menu = menu();
+        to_recording(&mut menu);
+        menu.recording_mut().set_catalog(example());
+        let before = menu.page();
+        menu.press(Button::ZR);
+        assert_eq!(menu.page(), before);
+        assert_eq!(menu.recording().page_role(), ViewRole::Cpu);
+        menu.press(Button::ZR);
+        assert_eq!(menu.recording().page_role(), ViewRole::Player);
+    }
+
+    fn l_and_r_still_change_the_menu_page() {
+        let mut menu = menu();
+        to_recording(&mut menu);
+        menu.press(Button::R);
+        assert_eq!(menu.page(), Page::FightersStages);
+        menu.press(Button::L);
+        assert_eq!(menu.page(), Page::Recording);
+        menu.recording_mut().set_catalog(example());
+        menu.recording_mut().set_cursor(Face::Page, SAVES_MACROS, 0, 0);
+        menu.press(Button::A);
+        assert!(menu.recording().file_open());
+        menu.press(Button::L);
+        menu.press(Button::R);
+        assert_eq!(menu.page(), Page::Recording, "a file screen keeps L and R");
+    }
+
+    fn x_cycles_the_loop_only_in_macros() {
+        let mut screens = screens();
+        open_popup(&mut screens);
+        screens.set_cursor(Face::Popup, SAVES_MACROS, 1, 0);
+        assert_eq!(screens.loop_of(ViewRole::Player), LoopMark::Finite(1));
+        for (presses, mark) in [(1, LoopMark::Finite(2)), (2, LoopMark::Finite(3)), (3, LoopMark::Finite(5)), (4, LoopMark::Finite(10)), (5, LoopMark::Infinite), (6, LoopMark::Finite(1))] {
+            let mut step = screens.clone();
+            for _ in 0..presses {
+                step.press_popup(Button::X);
+            }
+            assert_eq!(step.loop_of(ViewRole::Player), mark);
+        }
+        screens.set_cursor(Face::Popup, SAVES_MACROS, 0, 0);
+        screens.press_popup(Button::X);
+        assert_eq!(screens.loop_of(ViewRole::Player), LoopMark::Finite(1));
+        screens.press_popup(Button::ZL);
+        screens.press_popup(Button::X);
+        assert_eq!(screens.loop_of(ViewRole::Player), LoopMark::Finite(1));
+        screens.set_cursor(Face::Page, SAVES_MACROS, 1, 0);
+        screens.handle_page(Button::X, true, SAVES_MACROS);
+        assert_eq!(screens.loop_of(ViewRole::Player), LoopMark::Finite(2));
+        screens.handle_page(Button::A, true, SAVES_MACROS);
+        let during_file = screens.loop_of(ViewRole::Player);
+        screens.handle_page(Button::X, true, SAVES_MACROS);
+        assert_eq!(screens.loop_of(ViewRole::Player), during_file);
+
+        let mut menu = menu();
+        to_recording(&mut menu);
+        let mash = ROWS.iter().position(|row| row.id == "playback_mash").unwrap();
+        loop {
+            if menu.focused_row() == Some(mash) {
+                break;
+            }
+            menu.press(Button::Down);
+        }
+        menu.press(Button::A);
+        let changed = menu.settings().menu.get("playback_mash").unwrap().to_vec();
+        assert_ne!(menu.settings().defaults.get("playback_mash").unwrap(), changed.as_slice());
+        menu.press(Button::X);
+        assert_ne!(menu.settings().defaults.get("playback_mash").unwrap(), changed.as_slice(), "X does not save defaults");
+        menu.press(Button::L);
+        menu.press(Button::L);
+        menu.press(Button::X);
+        assert_eq!(menu.settings().defaults.get("playback_mash").unwrap(), changed.as_slice());
+    }
+
+    fn set_active_is_one_row_for_the_role_in_view() {
+        let mut screens = screens();
+        let dash = screens.section(Face::Page, SAVES_MACROS, 1).rows.iter().position(|row| row.name == "Dash grab").unwrap();
+        screens.set_cursor(Face::Page, SAVES_MACROS, 1, dash);
+        screens.handle_page(Button::A, true, SAVES_MACROS);
+        let titles: Vec<_> = screens.file_rows().iter().map(|row| row.title.clone()).collect();
+        assert_eq!(titles.iter().filter(|title| title.as_str() == "Set active").count(), 1);
+        let row = screens.file_rows().iter().position(|row| row.title == "Set active").unwrap();
+        screens.set_file_cursor(row);
+        screens.handle_page(Button::Right, true, SAVES_MACROS);
+        assert_eq!(screens.file_rows().iter().find(|row| row.title == "Set active").unwrap().value, "On · Player 1");
+        assert_eq!(screens.selection().active_player.as_deref(), Some("dash"));
+        assert_eq!(screens.selection().active_cpu.as_deref(), Some("pressure"));
+        screens.handle_page(Button::Left, true, SAVES_MACROS);
+        assert_eq!(screens.selection().active_player, None);
+        screens.handle_page(Button::Left, true, SAVES_MACROS);
+        assert_eq!(screens.selection().active_cpu.as_deref(), Some("pressure"));
+    }
+
+    fn a_chain_screen_has_no_crop() {
+        let mut screens = screens();
+        let chain = screens.section(Face::Page, SAVES_MACROS, 1).rows.iter().position(|row| row.name == "Corner pressure").unwrap();
+        screens.set_cursor(Face::Page, SAVES_MACROS, 1, chain);
+        screens.handle_page(Button::A, true, SAVES_MACROS);
+        let titles: Vec<_> = screens.file_rows().into_iter().map(|row| row.title).collect();
+        assert!(!titles.iter().any(|title| title == "Crop"));
+        assert!(titles.iter().any(|title| title == "Edit chain"));
+        screens.handle_page(Button::B, true, SAVES_MACROS);
+        let macro_row = screens.section(Face::Page, SAVES_MACROS, 1).rows.iter().position(|row| row.name == "Nair loop").unwrap();
+        screens.set_cursor(Face::Page, SAVES_MACROS, 1, macro_row);
+        screens.handle_page(Button::A, true, SAVES_MACROS);
+        let titles: Vec<_> = screens.file_rows().into_iter().map(|row| row.title).collect();
+        assert!(titles.iter().any(|title| title == "Crop"));
+        assert!(!titles.iter().any(|title| title == "Edit chain"));
+    }
+
+    fn retired_rows_leave_the_menu_and_old_settings_still_load() {
+        for id in ["recording_slot", "record_trigger", "recording_duration", "playback_button_slots", "save_state_playback", "macro_source", "save_state_slot", "randomize_slots"] {
+            assert!(ROWS.iter().all(|row| row.id != id), "{id} left the menu");
+            assert!(settings::def(id).is_some(), "{id} stays in the factory");
+        }
+        for title in ["Named library", "Save slot to library...", "Record Slot", "Randomize Slots"] {
+            assert!(ROWS.iter().all(|row| row.title != title), "{title}");
+        }
+        let loaded = settings::parse(r#"{"menu":{"recording_slot":[0,1,0,0,0]}}"#);
+        assert_eq!(loaded.settings.menu.get("recording_slot"), Some(&[0, 1, 0, 0, 0][..]));
+    }
+
+    fn the_combo_panel_reads_the_file_links() {
+        let combo = Combo::from_links([link(Move::Aerial, Move::Aerial, true), link(Move::Aerial, Move::Aerial, true)]).unwrap();
+        let lines = combo_link_lines(&combo);
+        assert_eq!(lines[0], "L1 aerial → aerial TRUE");
+        let mut screens = screens();
+        screens.set_links("nairc", lines);
+        // Row 0 of COMBOS is + Save last combo…; the combo is row 1.
+        screens.set_cursor(Face::Page, COMBOS_SEQ, 1, 1);
+        let panel = screens.connections(Face::Page, COMBOS_SEQ);
+        assert!(panel.iter().any(|line| line.text == "L1 aerial → aerial TRUE"));
+    }
+
+    fn the_combo_panel_lists_each_links_events_and_drift() {
+        use crate::model::combo::{retain, Dir, Event, Flick, Kind};
+        use crate::model::frame_strip::Button;
+        let nair = |drift| {
+            let mut link = LinkRec::presses(Move::Aerial, Move::Aerial, Verdict::True(None), None, &[]);
+            link.presses_only = false;
+            link.events = retain([
+                Event::press(Button::Jump, crate::model::combo::Aim::Neutral, 0),
+                Event { kind: Kind::Release(Button::Jump), dir: Dir::Neutral, offset: 3 },
+                Event { kind: Kind::Flick(Flick::FastFall), dir: Dir::Down, offset: 8 },
+                Event::press(Button::Attack, crate::model::combo::Aim::Neutral, 10),
+            ]);
+            link.drift = drift;
+            link
+        };
+        let combo = Combo::from_links([nair(Some(Dir::Forward)), nair(Some(Dir::Back))]).unwrap();
+        let lines = combo_link_lines(&combo);
+        assert_eq!(lines[0], "L1 aerial → aerial TRUE");
+        assert_eq!(lines[1], "jump · release · ↓ flick · A");
+        assert_eq!(lines[2], "drift →");
+        assert_eq!(lines[3], "L2 aerial → aerial TRUE");
+        assert_eq!(lines[4], "jump · release · ↓ flick · A");
+        assert_eq!(lines[5], "drift ←");
+        let mut screens = screens();
+        screens.set_links("nairc", lines);
+        // Row 0 of COMBOS is + Save last combo…; the combo is row 1.
+        screens.set_cursor(Face::Page, COMBOS_SEQ, 1, 1);
+        let panel = screens.connections(Face::Page, COMBOS_SEQ);
+        let text: Vec<&str> = panel.iter().map(|line| line.text.as_str()).collect();
+        assert!(text.contains(&"jump · release · ↓ flick · A"));
+        assert!(text.contains(&"drift →"));
+        assert!(text.contains(&"drift ←"));
+
+        let old = Combo::from_links([LinkRec::presses(
+            Move::Aerial,
+            Move::Aerial,
+            Verdict::True(None),
+            None,
+            &[
+                Event::press(Button::Attack, crate::model::combo::Aim::Side, 1),
+                Event::press(Button::Jump, crate::model::combo::Aim::Up, 4),
+            ],
+        )])
+        .unwrap();
+        let old_lines = combo_link_lines(&old);
+        assert_eq!(old_lines, vec!["L1 aerial → aerial TRUE".to_string(), "A · jump".to_string()]);
+        assert!(old_lines.iter().all(|line| !line.contains("drift") && !line.contains("release") && !line.contains("flick")));
+    }
+
+    fn player_text_says_sequence_and_the_helper_says_link() {
+        assert!(GROUPS.iter().any(|group| group.title == "Combos & Sequences"));
+        assert!(GROUPS.iter().all(|group| !group.title.to_ascii_lowercase().contains("conversion")));
+        let screens = screens();
+        let section = screens.section(Face::Page, COMBOS_SEQ, 0);
+        assert!(section.rows.iter().any(|row| row.name == "+ New sequence"));
+        assert_eq!(section.header, "SEQUENCES");
+        let helper = ROWS.iter().find(|row| row.id == "combo_helper").unwrap();
+        assert!(helper.help_lines().0.contains("link") || helper.help_lines().1.contains("link"));
+        let phrases = ["+ New sequence", "Drill sequence", "SEQUENCES", "sequence"];
+        assert!(phrases.iter().all(|phrase| !phrase.contains("conversion")));
+    }
+
+    fn the_floppy_is_grey_when_the_switch_is_off() {
+        let mut screens = screens();
+        let row = screens.section(Face::Page, SAVES_MACROS, 1).rows.into_iter().find(|row| row.name == "Nair loop").unwrap();
+        assert_eq!(row.floppy, Some(Floppy::On));
+        assert_eq!(Floppy::On.color(), [242, 152, 72, 255]);
+        let index = screens.section(Face::Page, SAVES_MACROS, 1).rows.iter().position(|row| row.name == "Nair loop").unwrap();
+        screens.set_cursor(Face::Page, SAVES_MACROS, 1, index);
+        screens.handle_page(Button::A, true, SAVES_MACROS);
+        screens.handle_page(Button::Left, true, SAVES_MACROS);
+        screens.handle_page(Button::B, true, SAVES_MACROS);
+        let row = screens.section(Face::Page, SAVES_MACROS, 1).rows.into_iter().find(|row| row.name == "Nair loop").unwrap();
+        assert_eq!(row.floppy, Some(Floppy::Off));
+        assert_eq!(row.floppy.unwrap().color(), [126, 132, 144, 255]);
+        assert_eq!(screens.start_save_id("nair"), Some("nair-start"));
+        assert_eq!(screens.section(Face::Page, SAVES_MACROS, 0).header_floppy, Some(Floppy::On));
+    }
+
+    fn the_start_save_row_of_a_file_screen_carries_the_rows_floppy() {
+        let mut screens = screens();
+        let index = screens.section(Face::Page, SAVES_MACROS, 1).rows.iter().position(|row| row.name == "Nair loop").unwrap();
+        screens.set_cursor(Face::Page, SAVES_MACROS, 1, index);
+        screens.handle_page(Button::A, true, SAVES_MACROS);
+        let rows = screens.file_rows();
+        assert_eq!(rows[0].title, "Start save");
+        assert_eq!(rows[0].floppy, Some(Floppy::On));
+        assert!(rows[1..].iter().all(|row| row.floppy.is_none()));
+        screens.handle_page(Button::Left, true, SAVES_MACROS);
+        assert_eq!(screens.file_rows()[0].floppy, Some(Floppy::Off), "grey with the switch Off, like the list row");
+        assert!(screens.crop_rows().iter().all(|row| row.floppy.is_none()));
+    }
+
+    fn y_does_nothing_on_the_new_screens() {
+        let mut screens = screens();
+        open_popup(&mut screens);
+        screens.set_cursor(Face::Popup, SAVES_MACROS, 0, 2);
+        let before = screens.selection();
+        screens.press_popup(Button::Y);
+        assert!(screens.popup_open());
+        assert_eq!(screens.section_cursor(Face::Popup, SAVES_MACROS, 0), 2);
+        assert_eq!(screens.selection().bound, before.bound);
+        assert_eq!(screens.loop_of(ViewRole::Player), LoopMark::Finite(1));
+
+        let mut menu = menu();
+        to_recording(&mut menu);
+        let mash = ROWS.iter().position(|row| row.id == "playback_mash").unwrap();
+        for _ in 0..menu.entry_count(Page::Recording) + 8 {
+            if menu.focused_row() == Some(mash) {
+                break;
+            }
+            menu.press(Button::Down);
+        }
+        assert_eq!(menu.focused_row(), Some(mash));
+        menu.press(Button::A);
+        let changed = menu.settings().menu.get("playback_mash").unwrap().to_vec();
+        menu.press(Button::Y);
+        assert_eq!(menu.settings().menu.get("playback_mash").unwrap(), changed.as_slice());
+    }
+
+    fn new_chain_and_new_sequence_open_the_picker() {
+        let mut screens = screens();
+        let last = screens.section(Face::Page, SAVES_MACROS, 1).rows.len() - 1;
+        assert_eq!(screens.section(Face::Page, SAVES_MACROS, 1).rows[last].name, "+ New chain");
+        screens.set_cursor(Face::Page, SAVES_MACROS, 1, last);
+        screens.handle_page(Button::A, true, SAVES_MACROS);
+        assert!(screens.picker_open());
+        assert!(screens.picker_recording_ids().iter().all(|id| id != "pressure"), "a chain is not a step");
+        screens.handle_page(Button::B, true, SAVES_MACROS);
+        assert!(matches!(screens.last_effect(), Effect::Keyboard { header: "Name chain", .. }));
+        screens.submit_name("");
+        assert!(screens.has_chain_named("Chain 1"));
+
+        let last = screens.section(Face::Page, COMBOS_SEQ, 0).rows.len() - 1;
+        assert_eq!(screens.section(Face::Page, COMBOS_SEQ, 0).rows[last].name, "+ New sequence");
+        screens.set_cursor(Face::Page, COMBOS_SEQ, 0, last);
+        screens.handle_page(Button::A, true, COMBOS_SEQ);
+        assert!(screens.picker_open());
+    }
+
+    fn the_crop_screen_posts_a_new_range_and_b_returns() {
+        let mut screens = screens();
+        let row = screens.section(Face::Page, SAVES_MACROS, 1).rows.iter().position(|row| row.name == "Nair loop").unwrap();
+        screens.set_cursor(Face::Page, SAVES_MACROS, 1, row);
+        screens.handle_page(Button::A, true, SAVES_MACROS);
+        let crop = screens.file_rows().iter().position(|row| row.title == "Crop").unwrap();
+        screens.set_file_cursor(crop);
+        screens.handle_page(Button::A, true, SAVES_MACROS);
+        assert!(screens.crop_open());
+        assert!(matches!(screens.last_effect(), Effect::None));
+        assert!(screens.diag_line(Face::Page, SAVES_MACROS).contains("screen=crop source=nair combo=0"));
+        screens.handle_page(Button::R, true, SAVES_MACROS);
+        screens.handle_page(Button::Down, true, SAVES_MACROS);
+        screens.handle_page(Button::L, true, SAVES_MACROS);
+        screens.handle_page(Button::A, true, SAVES_MACROS);
+        match screens.last_effect() {
+            Effect::Crop { source, combo, start, end } => {
+                assert_eq!((source.as_str(), *combo, *start, *end), ("nair", false, 1, 11));
+            }
+            other => panic!("crop effect, got {other:?}"),
+        }
+        assert!(!screens.crop_open());
+        assert!(screens.catalog().macros.iter().any(|file| file.id == "nair" && file.name == "Nair loop"));
+        let _ = screens.take_effect();
+
+        screens.handle_page(Button::A, true, SAVES_MACROS);
+        assert!(screens.crop_open());
+        screens.handle_page(Button::B, true, SAVES_MACROS);
+        assert!(!screens.crop_open());
+        assert!(matches!(screens.take_effect(), Effect::None));
+    }
+
+    fn the_waiting_room_names_chain_n_without_a_keyboard() {
+        let mut screens = screens();
+        screens.set_keyboard_blocked(true);
+        let last = screens.section(Face::Page, SAVES_MACROS, 1).rows.len() - 1;
+        screens.set_cursor(Face::Page, SAVES_MACROS, 1, last);
+        screens.handle_page(Button::A, true, SAVES_MACROS);
+        screens.handle_page(Button::B, true, SAVES_MACROS);
+        assert!(!screens.naming());
+        assert!(screens.has_chain_named("Chain 1"));
+        assert!(matches!(screens.last_effect(), Effect::WriteChain { .. }));
+    }
+
+    fn the_popup_diag_names_the_hot_boundary() {
+        let mut screens = screens();
+        open_popup(&mut screens);
+        let line = screens.diag_line(Face::Popup, SAVES_MACROS);
+        assert!(line.contains("screen=recording-popup"));
+        assert!(line.contains("role=player"));
+        assert!(line.contains("loop="));
+    }
+
+    fn recording_popup_request_opens_the_popup() {
+        let mut menu = menu();
+        assert!(!menu.recording().popup_open());
+        menu.on_request(Request::RecordingPopup);
+        assert!(menu.recording().popup_open());
+        menu.on_request(Request::RecordingPopup);
+        assert!(!menu.recording().popup_open());
+        menu.on_request(Request::PlayPlayer);
+        assert!(!menu.recording().popup_open());
+    }
+
+    fn the_recording_page_is_the_page_the_menu_shows() {
+        assert_eq!(Page::Recording.title(), "Recording");
+        let mut menu = menu();
+        to_recording(&mut menu);
+        assert_eq!(menu.page().title(), "Recording");
+        let titles: Vec<_> = GROUPS.iter().filter(|group| group.page == Page::Recording).map(|group| group.title).collect();
+        assert_eq!(titles, ["Save states & Macros", "Combos & Sequences", "Replays", "Options"]);
+        assert!(matches!(ROWS.iter().find(|row| row.id == "playback_loop").unwrap().control, Control::Dropdown(labels) if labels.len() == 6));
+    }
+
+    // ---- rc.6: sequences are drilled, edited and deleted on the card ------------------------------------------------
+
+    /// The example catalog with a second combo, Ryu BnB, first in Corner to kill.
+    fn two_combo_screens() -> RecordingScreens {
+        let mut screens = screens();
+        screens.catalog.combos.insert(
+            0,
+            ComboFile {
+                id: "ryu".into(),
+                name: "Ryu BnB".into(),
+                recorded_on: String::new(),
+                made_from: None,
+                links: combo_link_lines(&Combo::from_links([link(Move::Jab, Move::Aerial, true)]).unwrap()),
+                span: 1,
+            },
+        );
+        screens.catalog.sequences[0].combos = vec!["ryu".into(), "nairc".into()];
+        screens
+    }
+
+    fn open_sequence(screens: &mut RecordingScreens) {
+        let row = screens.section(Face::Page, COMBOS_SEQ, 0).rows.iter().position(|row| row.name == "Corner to kill").unwrap();
+        screens.set_cursor(Face::Page, COMBOS_SEQ, 0, row);
+        screens.handle_page(Button::A, true, COMBOS_SEQ);
+        assert!(screens.file_open());
+    }
+
+    fn press_file_row(screens: &mut RecordingScreens, title: &str) {
+        let row = screens.file_rows().iter().position(|row| row.title == title).unwrap_or_else(|| panic!("no {title:?}"));
+        screens.set_file_cursor(row);
+        screens.handle_page(Button::A, true, COMBOS_SEQ);
+    }
+
+    fn a_numbered_row_drills_that_combo_and_drill_sequence_drills_the_sequence() {
+        let mut screens = two_combo_screens();
+        open_sequence(&mut screens);
+        let titles: Vec<_> = screens.file_rows().into_iter().map(|row| row.title).collect();
+        assert_eq!(&titles[..3], ["Drill sequence", "1 Ryu BnB", "2 Nair loop combo"]);
+        press_file_row(&mut screens, "2 Nair loop combo");
+        assert_eq!(screens.selection().drill.as_deref(), Some("nairc"), "the combo alone is the drill");
+        assert_eq!(screens.catalog().sequences[0].combos, ["ryu", "nairc"], "the sequence stays");
+        assert!(matches!(screens.last_effect(), Effect::None), "nothing is written to the sequence");
+        press_file_row(&mut screens, "Drill sequence");
+        assert_eq!(screens.selection().drill.as_deref(), Some("corner-seq"), "the sequence replaces the combo");
+    }
+
+    fn edit_combos_writes_the_new_order_and_r_removes_the_last_number() {
+        let mut screens = two_combo_screens();
+        open_sequence(&mut screens);
+        press_file_row(&mut screens, "Edit combos");
+        assert!(screens.picker_open());
+        let ranks = |s: &RecordingScreens| s.picker_rows().iter().map(|row| (row.name.clone(), row.rank)).collect::<Vec<_>>();
+        assert_eq!(ranks(&screens), [("Ryu BnB".to_string(), 1), ("Nair loop combo".to_string(), 2)]);
+        // R on Ryu BnB takes its number off; Nair loop combo closes up to 1. A gives Ryu BnB the next number.
+        screens.handle_page(Button::R, true, COMBOS_SEQ);
+        assert_eq!(ranks(&screens), [("Ryu BnB".to_string(), 0), ("Nair loop combo".to_string(), 1)]);
+        screens.handle_page(Button::A, true, COMBOS_SEQ);
+        screens.handle_page(Button::B, true, COMBOS_SEQ);
+        assert_eq!(
+            screens.last_effect(),
+            &Effect::WriteSequenceCombos { id: "corner-seq".into(), combos: vec!["nairc".into(), "ryu".into()] }
+        );
+        assert_eq!(screens.catalog().sequences[0].combos, ["nairc", "ryu"]);
+        // R on every number leaves an empty sequence, which drills nothing. It is still written.
+        let _ = screens.take_effect();
+        press_file_row(&mut screens, "Edit combos");
+        screens.handle_page(Button::R, true, COMBOS_SEQ);
+        screens.handle_page(Button::Down, true, COMBOS_SEQ);
+        screens.handle_page(Button::R, true, COMBOS_SEQ);
+        assert!(ranks(&screens).iter().all(|(_, rank)| *rank == 0), "R removed the last number");
+        screens.handle_page(Button::B, true, COMBOS_SEQ);
+        assert_eq!(screens.last_effect(), &Effect::WriteSequenceCombos { id: "corner-seq".into(), combos: vec![] });
+    }
+
+    fn delete_posts_the_file_for_the_host_to_remove() {
+        let mut screens = two_combo_screens();
+        open_sequence(&mut screens);
+        screens.drill = Some("corner-seq".into());
+        press_file_row(&mut screens, "Delete");
+        assert_eq!(screens.last_effect(), &Effect::DeleteFile { kind: FileKind::Sequence, id: "corner-seq".into() });
+        assert!(screens.catalog().sequences.is_empty());
+        assert_eq!(screens.selection().drill, None, "a deleted drill is no longer drilled");
+        let row = screens.section(Face::Page, COMBOS_SEQ, 1).rows.iter().position(|row| row.name == "Ryu BnB").unwrap();
+        screens.set_cursor(Face::Page, COMBOS_SEQ, 1, row);
+        screens.handle_page(Button::A, true, COMBOS_SEQ);
+        press_file_row(&mut screens, "Delete");
+        assert_eq!(screens.last_effect(), &Effect::DeleteFile { kind: FileKind::Combo, id: "ryu".into() });
+        let chain = screens.section(Face::Page, SAVES_MACROS, 1).rows.iter().position(|row| row.name == "Corner pressure").unwrap();
+        screens.set_cursor(Face::Page, SAVES_MACROS, 1, chain);
+        screens.handle_page(Button::A, true, SAVES_MACROS);
+        let delete = screens.file_rows().iter().position(|row| row.title == "Delete").unwrap();
+        screens.set_file_cursor(delete);
+        screens.handle_page(Button::A, true, SAVES_MACROS);
+        assert_eq!(screens.last_effect(), &Effect::DeleteFile { kind: FileKind::Chain, id: "pressure".into() });
+    }
+
+    /// Operator 2026-11-08 (primary inbox 13:08Z): "+ Save last combo…" heads the COMBOS list on the Recording page and in
+    /// the pop-up's Combos & Sequences tab. A opens the keyboard titled for a combo; the combos keep their hot marks.
+    fn save_last_combo_heads_the_combos_list_and_opens_the_keyboard() {
+        for face in [Face::Page, Face::Popup] {
+            let mut screens = screens();
+            if face == Face::Popup {
+                open_popup(&mut screens);
+                screens.press_popup(Button::ZR);
+            }
+            let combos = screens.section(face, COMBOS_SEQ, 1);
+            assert_eq!(combos.rows[0].name, "+ Save last combo…", "{face:?}");
+            assert!(!combos.rows[0].hot && !combos.rows[0].green);
+            assert_eq!(combos.rows[1].name, "Nair loop combo");
+            assert!(combos.rows[1].hot, "a hot combo stays hot under the new row");
+            screens.set_cursor(face, COMBOS_SEQ, 1, 0);
+            let lines = screens.connections(face, COMBOS_SEQ);
+            assert!(lines.iter().any(|line| line.text.contains("latest exchange")), "{lines:?}");
+            match face {
+                Face::Page => {
+                    screens.handle_page(Button::A, true, COMBOS_SEQ);
+                }
+                Face::Popup => screens.press_popup(Button::A),
+            }
+            assert_eq!(screens.take_effect(), Effect::Keyboard { header: "Name combo", draft: String::new() }, "{face:?}");
+        }
+    }
+
+    /// RECORDING.md: "The five most recently used of a kind are listed first, most recent first." A drill and a bind are
+    /// uses (the index notes them); the live list follows at once, as Set active already does, not only after the model
+    /// is rebuilt (Eden rc6-covrec-diag2 cov-combo-other-fighter: the pop-up kept Luigi first after Mario was drilled).
+    fn a_drill_or_a_bind_in_the_popup_puts_that_file_first() {
+        let mut screens = screens();
+        let mut catalog = example();
+        catalog.combos.push(ComboFile {
+            id: "other".into(),
+            name: "Another combo".into(),
+            recorded_on: String::new(),
+            made_from: None,
+            links: Vec::new(),
+            span: 1,
+        });
+        screens.set_catalog(catalog);
+        open_popup(&mut screens);
+        screens.press_popup(Button::ZR);
+        // COMBOS: + Save last combo…, Nair loop combo (hot), Another combo.
+        screens.set_cursor(Face::Popup, COMBOS_SEQ, 1, 2);
+        screens.press_popup(Button::A);
+        let combos = screens.section(Face::Popup, COMBOS_SEQ, 1);
+        assert_eq!(combos.rows[1].name, "Another combo");
+        assert!(combos.rows[1].hot && combos.rows[1].green);
+        screens.press_popup(Button::ZR);
+        screens.set_cursor(Face::Popup, SAVES_MACROS, 0, 2);
+        let third = screens.section(Face::Popup, SAVES_MACROS, 0).rows[2].name.clone();
+        screens.press_popup(Button::A);
+        assert_eq!(screens.section(Face::Popup, SAVES_MACROS, 0).rows[0].name, third);
+    }
+
+    /// #49 in rc.6 terms: the COMBOS list replaces Saved combos, so a combo's CONNECTIONS name the fighter it was recorded
+    /// on, first, as a macro's do (rc.5 fixes2 footer; r8 mockup "Fighters"). The help joins its lines into one, so the
+    /// fighter leads and a long list of links cannot push it out.
+    fn a_combos_connections_name_its_recorded_fighter_first() {
+        let mut screens = screens();
+        let mut catalog = example();
+        catalog.combos[0].recorded_on = "Luigi".into();
+        screens.set_catalog(catalog);
+        screens.set_cursor(Face::Page, COMBOS_SEQ, 1, 1);
+        let lines = screens.connections(Face::Page, COMBOS_SEQ);
+        assert_eq!(lines.first().map(|line| line.text.as_str()), Some("Recorded on Luigi"), "{lines:?}");
+    }
+
+    /// Primary 2026-11-08 15:55Z: the r8 pop-up as drawn. Its CONNECTIONS are kind boxes in a tree
+    /// (`RECORDING-REDESIGN-r8-popup-combo.png`, `-macro.png`, `-save.png`): the row under the cursor, a heading, the
+    /// files joined to it, then plain lines.
+    fn the_popup_connections_are_the_r8_boxes() {
+        use super::{ConnItem as I, ConnKind as K, FileTag as T};
+        let item = |kind, text: &str| I { kind, text: text.to_string() };
+        let mut screens = screens();
+        screens.set_cursor(Face::Popup, COMBOS_SEQ, 1, 1);
+        let combo = screens.connection_items(Face::Popup, COMBOS_SEQ);
+        assert_eq!(
+            combo[..6],
+            [
+                item(K::Head(T::Combo), "Nair loop combo"),
+                item(K::Heading, "made from"),
+                item(K::Child(T::Macro), "Nair loop"),
+                item(K::Heading, "in sequences"),
+                item(K::Child(T::Sequence), "Corner to kill #1"),
+                item(K::Heading, "Its links (1)"),
+            ]
+        );
+        assert_eq!(combo[6].kind, K::Link, "{combo:?}");
+        assert!(combo[6..].iter().all(|line| matches!(line.kind, K::Link | K::LinkSub)), "{combo:?}");
+
+        screens.set_cursor(Face::Popup, SAVES_MACROS, 1, 0);
+        assert_eq!(
+            screens.connection_items(Face::Popup, SAVES_MACROS),
+            [
+                item(K::Head(T::Macro), "Nair loop"),
+                item(K::Heading, "starts from (warps there once, first)"),
+                item(K::Child(T::Save), "Nair loop · start · On"),
+                item(K::Heading, "in chains"),
+                item(K::Child(T::Macro), "Corner pressure as 1"),
+                item(K::Heading, "combos made from it"),
+                item(K::Child(T::Combo), "Nair loop combo"),
+                item(K::Detail, "Recorded on  Pikachu · 0.2 s · information only"),
+            ]
+        );
+
+        screens.set_cursor(Face::Popup, SAVES_MACROS, 0, 2);
+        assert_eq!(
+            screens.connection_items(Face::Popup, SAVES_MACROS),
+            [
+                item(K::Head(T::Save), "Nair loop · start"),
+                item(K::Heading, "start save of"),
+                item(K::Child(T::Macro), "Nair loop"),
+                item(K::Child(T::Macro), "Corner pressure"),
+                item(K::Detail, "Bound to Save / Load  no"),
+            ]
+        );
+
+        screens.set_cursor(Face::Popup, COMBOS_SEQ, 0, 0);
+        assert_eq!(
+            screens.connection_items(Face::Popup, COMBOS_SEQ),
+            [
+                item(K::Head(T::Sequence), "Corner to kill"),
+                item(K::Heading, "combos"),
+                item(K::Child(T::Combo), "1 Nair loop combo"),
+                item(K::Detail, "streak 2 · best 6"),
+            ]
+        );
+    }
+
+    /// The r8 mockup counts each section's files beside its header ("SAVE STATES (7)"); action rows are not files.
+    fn sections_count_their_files() {
+        let screens = screens();
+        let files = |group, section| screens.section(Face::Popup, group, section).files;
+        assert_eq!((files(SAVES_MACROS, 0), files(SAVES_MACROS, 1)), (16, 4));
+        assert_eq!((files(COMBOS_SEQ, 0), files(COMBOS_SEQ, 1)), (1, 1));
+    }
+
+    /// The r8 footer names what A does in the section under the cursor, then the pop-up's keys
+    /// (`RECORDING-REDESIGN-r8-popup-save.png`: "A bind", `-macro.png`: "A set active   X loop", `-combo.png`: "A drill").
+    fn the_popup_footer_is_the_r8_footer() {
+        let mut screens = screens();
+        open_popup(&mut screens);
+        let keys = "   Left/Right section   ZL/ZR tab   L/R role   ZL+Up/Down page   B close";
+        screens.set_cursor(Face::Popup, SAVES_MACROS, 0, 0);
+        assert_eq!(screens.hint(Face::Popup), format!("A bind{keys}"));
+        screens.set_cursor(Face::Popup, SAVES_MACROS, 1, 0);
+        assert_eq!(screens.hint(Face::Popup), format!("A set active   X loop{keys}"));
+        screens.press_popup(Button::ZR);
+        screens.set_cursor(Face::Popup, COMBOS_SEQ, 1, 1);
+        assert_eq!(screens.hint(Face::Popup), format!("A drill{keys}"));
+        screens.press_popup(Button::R);
+        assert_eq!(screens.role(Face::Popup), ViewRole::Cpu);
+        screens.set_cursor(Face::Popup, SAVES_MACROS, 1, 0);
+        assert_eq!(
+            screens.hint(Face::Popup),
+            "A set active   X loop   Left/Right section   L/R role   ZL+Up/Down page   B close",
+            "the CPU has one tab"
+        );
+    }
+
+    /// Primary 2026-11-08 (#49, #19): the r8 mockup's line under each row (`RECORDING-REDESIGN-r8-popup-combo.png`,
+    /// `-macro.png`): "Recorded on …" under a combo and a macro, the fighters under a save, the steps under a chain and
+    /// a sequence. An action row has none.
+    fn rows_carry_the_r8_sublines() {
+        let mut screens = screens();
+        let mut catalog = example();
+        catalog.combos[0].recorded_on = "Pikachu → Mario".into();
+        screens.set_catalog(catalog);
+        let row = |screens: &RecordingScreens, group: u8, section: u8, name: &str| {
+            let view = screens.section(Face::Popup, group, section);
+            view.rows.iter().find(|row| row.name == name).map(|row| row.sub.clone()).unwrap_or_else(|| panic!("{name}: {view:?}"))
+        };
+        assert_eq!(row(&screens, COMBOS_SEQ, 1, "Nair loop combo"), "Recorded on Pikachu → Mario");
+        assert_eq!(row(&screens, COMBOS_SEQ, 1, "+ Save last combo…"), "");
+        assert_eq!(row(&screens, COMBOS_SEQ, 0, "Corner to kill"), "Nair loop combo");
+        assert_eq!(row(&screens, SAVES_MACROS, 0, "Corner"), "Pikachu · Mario");
+        assert_eq!(row(&screens, SAVES_MACROS, 1, "Nair loop"), "Recorded on Pikachu");
+        assert_eq!(row(&screens, SAVES_MACROS, 1, "Corner pressure"), "Nair loop → Dash grab → CPU throw");
+        assert_eq!(row(&screens, SAVES_MACROS, 1, "Dash grab"), "", "nothing recorded on file");
+    }
+
+    /// The typed name goes to the host with the save; an empty name lets the host pick Combo N. Where no keyboard can
+    /// open (an online room), A saves at once under Combo N.
+    fn save_last_combo_posts_the_typed_name_or_combo_n() {
+        let mut screens = screens();
+        screens.set_cursor(Face::Page, COMBOS_SEQ, 1, 0);
+        screens.handle_page(Button::A, true, COMBOS_SEQ);
+        let _ = screens.take_effect();
+        screens.submit_name("  Ryu BnB ");
+        assert_eq!(screens.take_effect(), Effect::SaveLastCombo { name: "Ryu BnB".into() });
+        screens.handle_page(Button::A, true, COMBOS_SEQ);
+        let _ = screens.take_effect();
+        screens.submit_name("");
+        assert_eq!(screens.take_effect(), Effect::SaveLastCombo { name: String::new() });
+        screens.set_keyboard_blocked(true);
+        screens.handle_page(Button::A, true, COMBOS_SEQ);
+        assert_eq!(screens.take_effect(), Effect::SaveLastCombo { name: String::new() });
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("a_reopened_menu_loads_the_catalog_without_a_new_file", a_reopened_menu_loads_the_catalog_without_a_new_file as fn()),
+            ("cpu_view_has_one_tab_and_sections_scroll_apart", cpu_view_has_one_tab_and_sections_scroll_apart as fn()),
+            ("saves_are_a_section_under_both_roles", saves_are_a_section_under_both_roles as fn()),
+            ("connections_follow_the_focused_row", connections_follow_the_focused_row as fn()),
+            ("page_a_opens_and_popup_a_acts", page_a_opens_and_popup_a_acts as fn()),
+            ("a_view_shows_one_roles_active_macro", a_view_shows_one_roles_active_macro as fn()),
+            ("the_bound_save_is_marked_in_both_roles", the_bound_save_is_marked_in_both_roles as fn()),
+            ("one_save_is_bound_and_the_page_opens_it", one_save_is_bound_and_the_page_opens_it as fn()),
+            ("sequences_sit_above_combos", sequences_sit_above_combos as fn()),
+            ("popup_buttons_match_q11", popup_buttons_match_q11 as fn()),
+            ("paging_moves_one_section_by_twelve", paging_moves_one_section_by_twelve as fn()),
+            ("b_closes_the_popup_without_changing_the_selection", b_closes_the_popup_without_changing_the_selection as fn()),
+            ("zr_switches_role_on_the_recording_page", zr_switches_role_on_the_recording_page as fn()),
+            ("l_and_r_still_change_the_menu_page", l_and_r_still_change_the_menu_page as fn()),
+            ("x_cycles_the_loop_only_in_macros", x_cycles_the_loop_only_in_macros as fn()),
+            ("set_active_is_one_row_for_the_role_in_view", set_active_is_one_row_for_the_role_in_view as fn()),
+            ("a_chain_screen_has_no_crop", a_chain_screen_has_no_crop as fn()),
+            ("retired_rows_leave_the_menu_and_old_settings_still_load", retired_rows_leave_the_menu_and_old_settings_still_load as fn()),
+            ("the_combo_panel_reads_the_file_links", the_combo_panel_reads_the_file_links as fn()),
+            ("the_combo_panel_lists_each_links_events_and_drift", the_combo_panel_lists_each_links_events_and_drift as fn()),
+            ("player_text_says_sequence_and_the_helper_says_link", player_text_says_sequence_and_the_helper_says_link as fn()),
+            ("the_floppy_is_grey_when_the_switch_is_off", the_floppy_is_grey_when_the_switch_is_off as fn()),
+            ("the_start_save_row_of_a_file_screen_carries_the_rows_floppy", the_start_save_row_of_a_file_screen_carries_the_rows_floppy as fn()),
+            ("y_does_nothing_on_the_new_screens", y_does_nothing_on_the_new_screens as fn()),
+            ("new_chain_and_new_sequence_open_the_picker", new_chain_and_new_sequence_open_the_picker as fn()),
+            ("the_crop_screen_posts_a_new_range_and_b_returns", the_crop_screen_posts_a_new_range_and_b_returns as fn()),
+            ("the_waiting_room_names_chain_n_without_a_keyboard", the_waiting_room_names_chain_n_without_a_keyboard as fn()),
+            ("the_popup_diag_names_the_hot_boundary", the_popup_diag_names_the_hot_boundary as fn()),
+            ("recording_popup_request_opens_the_popup", recording_popup_request_opens_the_popup as fn()),
+            ("the_recording_page_is_the_page_the_menu_shows", the_recording_page_is_the_page_the_menu_shows as fn()),
+            ("a_numbered_row_drills_that_combo_and_drill_sequence_drills_the_sequence", a_numbered_row_drills_that_combo_and_drill_sequence_drills_the_sequence as fn()),
+            ("edit_combos_writes_the_new_order_and_r_removes_the_last_number", edit_combos_writes_the_new_order_and_r_removes_the_last_number as fn()),
+            ("delete_posts_the_file_for_the_host_to_remove", delete_posts_the_file_for_the_host_to_remove as fn()),
+            ("save_last_combo_heads_the_combos_list_and_opens_the_keyboard", save_last_combo_heads_the_combos_list_and_opens_the_keyboard as fn()),
+            ("a_drill_or_a_bind_in_the_popup_puts_that_file_first", a_drill_or_a_bind_in_the_popup_puts_that_file_first as fn()),
+            ("a_combos_connections_name_its_recorded_fighter_first", a_combos_connections_name_its_recorded_fighter_first as fn()),
+            ("the_popup_connections_are_the_r8_boxes", the_popup_connections_are_the_r8_boxes as fn()),
+            ("sections_count_their_files", sections_count_their_files as fn()),
+            ("the_popup_footer_is_the_r8_footer", the_popup_footer_is_the_r8_footer as fn()),
+            ("rows_carry_the_r8_sublines", rows_carry_the_r8_sublines as fn()),
+            ("save_last_combo_posts_the_typed_name_or_combo_n", save_last_combo_posts_the_typed_name_or_combo_n as fn()),
+        ]);
+    }
+    }
+}

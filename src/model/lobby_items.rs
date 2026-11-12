@@ -67,3 +67,91 @@ pub fn collect<const N: usize>(count: usize, mut id_at: impl FnMut(usize) -> u32
     (ids, n)
 }
 
+#[cfg(test)]
+mod tests {
+    lib_unit_tests! {
+    use super::*;
+
+    fn only_a_waiting_scene_with_the_row_off_suppresses() {
+        assert!(suppress(true, false));
+        assert!(!suppress(true, true));
+        assert!(!suppress(false, false), "Training, matches and online matches are untouched");
+        assert!(!suppress(false, true));
+    }
+
+    fn on_never_removes_and_never_asks_the_gate() {
+        let mut r = Removal::new();
+        for _ in 0..100 {
+            assert!(!r.step(true, true, || panic!("no gate read while On")));
+        }
+    }
+
+    fn an_off_edge_removes_once_and_never_sweeps() {
+        let mut r = Removal::new();
+        assert!(!r.step(true, true, || true));
+        assert!(r.step(true, false, || true), "the edge removes");
+        for _ in 0..1000 {
+            assert!(!r.step(true, false, || panic!("no gate read once paid")), "no per-frame sweep");
+        }
+        assert!(!r.step(true, true, || true));
+        assert!(r.step(true, false, || true), "the next Off edge removes again");
+    }
+
+    fn a_scene_entered_with_the_row_off_removes_once() {
+        let mut r = Removal::new();
+        assert!(r.step(true, false, || true));
+        assert!(!r.step(true, false, || true));
+    }
+
+    fn a_refused_gate_defers_without_losing_the_removal() {
+        let mut r = Removal::new();
+        assert!(!r.step(true, false, || false));
+        assert!(r.owed());
+        assert!(!r.step(true, false, || false));
+        assert!(r.owed());
+        assert!(r.step(true, false, || true), "paid as soon as the gate allows it");
+        assert!(!r.owed());
+        assert!(!r.step(true, false, || true));
+    }
+
+    fn turning_on_cancels_an_owed_removal() {
+        let mut r = Removal::new();
+        assert!(!r.step(true, false, || false));
+        assert!(!r.step(true, true, || true));
+        assert!(!r.owed());
+        assert!(!r.step(true, true, || true));
+    }
+
+    fn leaving_the_waiting_scene_forgets_everything() {
+        let mut r = Removal::new();
+        assert!(!r.step(true, false, || false));
+        assert!(!r.step(false, false, || panic!("no gate read outside a waiting scene")));
+        assert!(!r.owed());
+        assert_eq!(r, Removal::default());
+        assert!(r.step(true, false, || true), "the next waiting scene, entered Off, removes once");
+    }
+
+    fn collect_takes_the_ids_first_skips_empty_slots_and_caps() {
+        let (ids, n) = collect::<4>(3, |i| [7, 0, 9][i]);
+        assert_eq!(&ids[..n], &[7, 9]);
+        let (ids, n) = collect::<2>(5, |i| i as u32 + 1);
+        assert_eq!(&ids[..n], &[1, 2]);
+        assert_eq!(collect::<2>(0, |_| unreachable!()).1, 0);
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("only_a_waiting_scene_with_the_row_off_suppresses", only_a_waiting_scene_with_the_row_off_suppresses as fn()),
+            ("on_never_removes_and_never_asks_the_gate", on_never_removes_and_never_asks_the_gate as fn()),
+            ("an_off_edge_removes_once_and_never_sweeps", an_off_edge_removes_once_and_never_sweeps as fn()),
+            ("a_scene_entered_with_the_row_off_removes_once", a_scene_entered_with_the_row_off_removes_once as fn()),
+            ("a_refused_gate_defers_without_losing_the_removal", a_refused_gate_defers_without_losing_the_removal as fn()),
+            ("turning_on_cancels_an_owed_removal", turning_on_cancels_an_owed_removal as fn()),
+            ("leaving_the_waiting_scene_forgets_everything", leaving_the_waiting_scene_forgets_everything as fn()),
+            ("collect_takes_the_ids_first_skips_empty_slots_and_caps", collect_takes_the_ids_first_skips_empty_slots_and_caps as fn()),
+        ]);
+    }
+    }
+}

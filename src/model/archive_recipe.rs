@@ -231,7 +231,6 @@ mod tests {
         out
     }
 
-    #[test]
     fn a_made_recipe_rebuilds_the_target_and_holds_only_the_changed_bytes() {
         let stock = stock();
         let target = target(&stock);
@@ -240,7 +239,6 @@ mod tests {
         assert!(recipe.len() < 200, "recipe is {} bytes", recipe.len());
     }
 
-    #[test]
     fn a_changed_stock_archive_is_refused() {
         let stock = stock();
         let recipe = make(&stock, &target(&stock));
@@ -250,7 +248,6 @@ mod tests {
         assert_eq!(build(&stock[..4000], &recipe), Err("stock layout archive mismatch"));
     }
 
-    #[test]
     fn a_partial_or_corrupted_recipe_is_never_accepted() {
         let stock = stock();
         let recipe = make(&stock, &target(&stock));
@@ -264,7 +261,6 @@ mod tests {
         }
     }
 
-    #[test]
     fn the_header_reads_without_applying() {
         let stock = stock();
         let target = target(&stock);
@@ -276,7 +272,6 @@ mod tests {
     /// R2-7 (decided 2026-11-02): the plugin builds its archive into buffers made once at boot, so a hand-out allocates
     /// nothing. This is the bound: the shipped recipe's output and stock sizes, and that `build_into` neither grows nor
     /// moves the buffer it is given.
-    #[test]
     fn the_shipped_recipe_fits_the_boot_buffers_and_building_never_allocates() {
         let recipe: &[u8] = include_bytes!("../../assets/info_training.tra1");
         let head = header(recipe).unwrap();
@@ -301,6 +296,18 @@ mod tests {
         let mut tiny: Vec<u8> = Vec::with_capacity(16);
         assert_eq!(build_into(&mut source, &small, &mut tiny), Err("archive output larger than the boot buffer"));
         assert!(tiny.is_empty() && tiny.capacity() < target.len());
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("a_made_recipe_rebuilds_the_target_and_holds_only_the_changed_bytes", a_made_recipe_rebuilds_the_target_and_holds_only_the_changed_bytes as fn()),
+            ("a_changed_stock_archive_is_refused", a_changed_stock_archive_is_refused as fn()),
+            ("a_partial_or_corrupted_recipe_is_never_accepted", a_partial_or_corrupted_recipe_is_never_accepted as fn()),
+            ("the_header_reads_without_applying", the_header_reads_without_applying as fn()),
+            ("the_shipped_recipe_fits_the_boot_buffers_and_building_never_allocates", the_shipped_recipe_fits_the_boot_buffers_and_building_never_allocates as fn()),
+        ]);
     }
     }
 }

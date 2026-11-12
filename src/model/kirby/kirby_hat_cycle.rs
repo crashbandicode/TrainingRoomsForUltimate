@@ -154,3 +154,181 @@ pub const fn commit_ends_request(kind: u32) -> bool {
     kind != 6
 }
 
+#[cfg(test)]
+mod tests {
+    lib_unit_tests! {
+    use super::*;
+
+    fn lobby_return_restores_equipped_hat_once_for_each_role() {
+        let mut roles = [HatContinuation::new(), HatContinuation::new()];
+        for (role, kind) in [0x48, 0x02].iter().copied().enumerate() {
+            let mut cycle = HatCycle::new();
+            cycle.commit(kind);
+            roles[role].observe(HatSnapshot { cycle, equipped: Some(kind) });
+            roles[role].scene_changed(true); // Match departure.
+            roles[role].scene_changed(true); // Waiting practice returns.
+            roles[role].observe(HatSnapshot::default()); // Transitional native body.
+            assert_eq!(roles[role].take_restore().unwrap().equipped, Some(kind));
+            assert!(roles[role].take_restore().is_none());
+        }
+    }
+
+    fn lost_hat_stays_lost_but_shortcut_cursor_survives_return() {
+        let mut memory = HatContinuation::new();
+        let mut cycle = HatCycle::new();
+        cycle.commit(0x48);
+        memory.observe(HatSnapshot { cycle, equipped: Some(0x48) });
+        memory.observe(HatSnapshot { cycle, equipped: None });
+        assert!(!memory.pending()); // Ordinary loss never queues a restore.
+        memory.scene_changed(true);
+        let snapshot = memory.take_restore().unwrap();
+        assert_eq!(snapshot.equipped, None);
+        assert_eq!(snapshot.cycle.target(&[0x02, 0x48], None), Some(0x48));
+    }
+
+    fn fresh_session_or_non_kirby_choice_forgets_hat() {
+        for fresh_scene in [false, true] {
+            let mut memory = HatContinuation::new();
+            memory.observe(HatSnapshot { cycle: HatCycle::new(), equipped: Some(0x48) });
+            if fresh_scene { memory.scene_changed(false); } else { memory.clear(); }
+            memory.scene_changed(true);
+            assert!(memory.take_restore().is_none());
+        }
+    }
+
+    fn starts_advances_restores_and_wraps() {
+        let mut cycle = HatCycle::default();
+        let choices = [0, 3, 0x53];
+        assert_eq!(cycle.target(&choices, Some(3)), Some(0));
+        cycle.commit(0);
+        assert_eq!(cycle.target(&choices, Some(0)), Some(3));
+        cycle.commit(3);
+        assert_eq!(cycle.target(&choices, None), Some(3));
+        cycle.commit(3);
+        assert_eq!(cycle.target(&choices, Some(3)), Some(0x53));
+        cycle.commit(0x53);
+        assert_eq!(cycle.target(&choices, Some(0x53)), Some(0));
+    }
+
+    fn unaccepted_load_does_not_advance_and_roles_are_independent() {
+        let mut roles = [HatCycle::default(); 2];
+        roles[0].commit(0);
+        assert_eq!(roles[0].target(&[0, 3], Some(0)), Some(3));
+        // No native acceptance, therefore no commit.
+        assert_eq!(roles[0].target(&[0, 3], Some(0)), Some(3));
+        assert_eq!(roles[1].target(&[3, 0], None), Some(3));
+        assert_eq!(roles[0].target(&[0, 3], None), Some(0));
+    }
+
+    fn edited_list_uses_current_order_without_equipping_anything() {
+        let mut cycle = HatCycle::default();
+        cycle.commit(3);
+        assert_eq!(cycle.target(&[3, 0, 2], Some(3)), Some(0));
+        assert_eq!(cycle.target(&[0, 2], Some(3)), Some(0));
+        assert_eq!(cycle.target(&[], None), None);
+        assert_eq!(cycle.target(&[3], None), Some(3));
+        assert_eq!(cycle.target(&[3], Some(3)), Some(3));
+    }
+
+    fn held_shortcut_is_consumed_until_special_release() {
+        let mut latch = ShortcutLatch::default();
+        assert_eq!(
+            latch.sample(true, true, true, false, [true; 2]),
+            (Some(0), true)
+        );
+        for _ in 0..60 {
+            assert_eq!(
+                latch.sample(true, true, true, false, [true; 2]),
+                (None, true)
+            );
+        }
+        assert_eq!(
+            latch.sample(true, true, false, false, [true; 2]),
+            (None, true)
+        );
+        assert_eq!(
+            latch.sample(false, true, false, false, [true; 2]),
+            (None, false)
+        );
+        assert_eq!(
+            latch.sample(true, true, false, true, [true; 2]),
+            (Some(1), true)
+        );
+    }
+
+    fn directional_unavailable_and_ambiguous_chords_do_not_request() {
+        let mut latch = ShortcutLatch::default();
+        assert_eq!(
+            latch.sample(true, false, true, false, [true; 2]),
+            (None, false)
+        );
+        assert_eq!(
+            latch.sample(true, true, true, false, [true; 2]),
+            (None, false)
+        );
+        assert_eq!(
+            latch.sample(false, true, false, false, [true; 2]),
+            (None, false)
+        );
+        assert_eq!(
+            latch.sample(true, true, true, false, [false, true]),
+            (None, false)
+        );
+        // Becoming available while held must not equip unexpectedly.
+        assert_eq!(
+            latch.sample(true, true, true, false, [true; 2]),
+            (None, false)
+        );
+        latch.sample(false, true, false, false, [true; 2]);
+        assert_eq!(
+            latch.sample(true, true, true, true, [true; 2]),
+            (None, false)
+        );
+    }
+
+    fn cpu_operator_chords_cycle_only_the_cpu_hat_on_their_own_latch() {
+        let sample = |latch: &mut ShortcutLatch, special, left_click, right_click, available| {
+            let (left, right) = operator_clicks(left_click, right_click);
+            latch.sample(special, true, left, right, available)
+        };
+        let release = |latch: &mut ShortcutLatch| sample(latch, false, false, false, [true; 2]);
+        let (mut p1, mut operator) = (ShortcutLatch::new(), ShortcutLatch::new());
+        // P1 holds its CPU chord (Special + R3); the operator's separate latch still takes
+        // the same chord once, for the CPU.
+        assert_eq!(p1.sample(true, true, false, true, [true; 2]), (Some(1), true));
+        assert_eq!(sample(&mut operator, true, false, true, [true; 2]), (Some(1), true));
+        assert_eq!(sample(&mut operator, true, false, true, [true; 2]), (None, true));
+        release(&mut operator);
+        // Special + L3 is an alias for the same CPU request.
+        assert_eq!(sample(&mut operator, true, true, false, [true; 2]), (Some(1), true));
+        release(&mut operator);
+        // Never P1's hat, even when only P1 is an eligible Kirby.
+        assert_eq!(sample(&mut operator, true, true, false, [true, false]), (None, false));
+        assert_eq!(sample(&mut operator, true, false, true, [true, false]), (None, false));
+        release(&mut operator);
+        // Both clicks hold the chord without a request; releasing one is not a new edge.
+        assert_eq!(operator_clicks(true, true), (true, true));
+        assert_eq!(sample(&mut operator, true, true, true, [true; 2]), (None, false));
+        assert_eq!(sample(&mut operator, true, false, true, [true; 2]), (None, false));
+        release(&mut operator);
+        assert_eq!(operator_clicks(false, false), (false, false));
+        assert_eq!(sample(&mut operator, true, false, false, [true; 2]), (None, false));
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("lobby_return_restores_equipped_hat_once_for_each_role", lobby_return_restores_equipped_hat_once_for_each_role as fn()),
+            ("lost_hat_stays_lost_but_shortcut_cursor_survives_return", lost_hat_stays_lost_but_shortcut_cursor_survives_return as fn()),
+            ("fresh_session_or_non_kirby_choice_forgets_hat", fresh_session_or_non_kirby_choice_forgets_hat as fn()),
+            ("starts_advances_restores_and_wraps", starts_advances_restores_and_wraps as fn()),
+            ("unaccepted_load_does_not_advance_and_roles_are_independent", unaccepted_load_does_not_advance_and_roles_are_independent as fn()),
+            ("edited_list_uses_current_order_without_equipping_anything", edited_list_uses_current_order_without_equipping_anything as fn()),
+            ("held_shortcut_is_consumed_until_special_release", held_shortcut_is_consumed_until_special_release as fn()),
+            ("directional_unavailable_and_ambiguous_chords_do_not_request", directional_unavailable_and_ambiguous_chords_do_not_request as fn()),
+            ("cpu_operator_chords_cycle_only_the_cpu_hat_on_their_own_latch", cpu_operator_chords_cycle_only_the_cpu_hat_on_their_own_latch as fn()),
+        ]);
+    }
+    }
+}

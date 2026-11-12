@@ -483,7 +483,6 @@ impl<T: Copy + Default> Default for CaptureBuffer<T> {
 #[cfg(test)]
 mod tests {
     lib_unit_tests! {
-    #[test]
     fn preview_idle_close_ignores_a_stale_open_snapshot() {
         let retirement = super::PreviewRetirement::new();
         let snapshot = MacroQueries { clip_editor_open: true, ..MacroQueries::IDLE };
@@ -493,7 +492,6 @@ mod tests {
         assert_eq!(retirement.stop(false), Some(true));
     }
 
-    #[test]
     fn preview_active_close_survives_coalesced_stops_until_cleanup_finishes() {
         let retirement = super::PreviewRetirement::new();
         assert_eq!(retirement.stop(true), None);
@@ -509,7 +507,6 @@ mod tests {
         assert!(retirement.finish(), "scene invalidation owns its separate retirement");
     }
 
-    #[test]
     fn preview_close_cancelling_queued_play_retires_when_drain_becomes_idle() {
         let retirement = super::PreviewRetirement::new();
         retirement.request_close();
@@ -519,7 +516,6 @@ mod tests {
         assert!(retirement.finish(), "retirement was delivered exactly once");
     }
 
-    #[test]
     fn preview_parked_editor_and_crop_stop_retain_the_anchor_without_focus() {
         let retirement = super::PreviewRetirement::new();
         let parked = MacroQueries { clip_editor_open: true, replay_loading: true,
@@ -530,7 +526,6 @@ mod tests {
         assert!(retirement.finish(), "crop/export stop retains the same anchor");
     }
 
-    #[test]
     fn capture_access_is_exclusive_even_when_hook_calls_overlap() {
         use std::sync::atomic::{AtomicBool, Ordering};
         use std::sync::Arc;
@@ -569,7 +564,6 @@ mod tests {
 
     use super::{CaptureBuffer, MacroQueries, PlayBuffers};
 
-    #[test]
     fn numbered_slot_transfer_preserves_frames_origin_and_refusals() {
         use super::{SlotTransfer, SlotResult};
         use crate::model::recording::{Recorder, Origin, ImportRefusal, ExportRefusal, SLOT_FRAMES};
@@ -594,7 +588,6 @@ mod tests {
         assert_eq!(invalid.result, SlotResult::ExportFailed(ExportRefusal::SlotOutOfRange));
     }
 
-    #[test]
     fn in_place_slot_import_is_atomic_on_refusal_and_preserves_full_length() {
         use super::{SlotTransfer, SlotResult};
         use crate::model::recording::{Recorder, Origin, ImportRefusal, SLOT_FRAMES, SLOTS};
@@ -630,13 +623,11 @@ mod tests {
         assert_eq!(short.exported(), Some((&[MappedInputs::NEUTRAL][..], Origin::NONE)));
     }
 
-    #[test]
     fn the_idle_snapshot_has_nothing_loaded_or_visible() {
         let idle = MacroQueries::IDLE;
         assert!(!idle.source_is_named && !idle.playback_allowed && !idle.panel_visible && idle.loaded_kind == -1);
     }
 
-    #[test]
     fn a_published_macro_is_read_by_value_and_a_new_one_replaces_it() {
         let buffers = PlayBuffers::<u32>::new();
         assert_eq!((buffers.len(), buffers.frame_at(0)), (0, None));
@@ -653,7 +644,6 @@ mod tests {
         assert_eq!((buffers.len(), buffers.frame_at(0)), (0, None));
     }
 
-    #[test]
     fn readers_never_see_a_torn_buffer_while_the_worker_republishes() {
         use std::sync::atomic::{AtomicBool, Ordering};
         use std::sync::{Arc, Barrier};
@@ -701,7 +691,6 @@ mod tests {
         }
     }
 
-    #[test]
     fn a_slow_worker_keeps_its_capture_until_it_has_copied_the_result() {
         use std::sync::{Arc, Barrier};
         let capture = Arc::new(CaptureBuffer::<u16>::new());
@@ -734,7 +723,6 @@ mod tests {
         assert_eq!(capture.take(<[u16]>::to_vec), Some(vec![7]));
     }
 
-    #[test]
     fn the_capture_buffer_moves_hook_to_worker_and_back_without_growing_in_the_hook() {
         let capture = CaptureBuffer::<u16>::new();
         assert!(!capture.store(0, 1), "not capturing yet");
@@ -752,6 +740,25 @@ mod tests {
         capture.cancel();
         assert_eq!(capture.finish(), None);
         assert!(capture.begin(), "a cancelled capture returns the buffer ready");
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("preview_idle_close_ignores_a_stale_open_snapshot", preview_idle_close_ignores_a_stale_open_snapshot as fn()),
+            ("preview_active_close_survives_coalesced_stops_until_cleanup_finishes", preview_active_close_survives_coalesced_stops_until_cleanup_finishes as fn()),
+            ("preview_close_cancelling_queued_play_retires_when_drain_becomes_idle", preview_close_cancelling_queued_play_retires_when_drain_becomes_idle as fn()),
+            ("preview_parked_editor_and_crop_stop_retain_the_anchor_without_focus", preview_parked_editor_and_crop_stop_retain_the_anchor_without_focus as fn()),
+            ("capture_access_is_exclusive_even_when_hook_calls_overlap", capture_access_is_exclusive_even_when_hook_calls_overlap as fn()),
+            ("numbered_slot_transfer_preserves_frames_origin_and_refusals", numbered_slot_transfer_preserves_frames_origin_and_refusals as fn()),
+            ("in_place_slot_import_is_atomic_on_refusal_and_preserves_full_length", in_place_slot_import_is_atomic_on_refusal_and_preserves_full_length as fn()),
+            ("the_idle_snapshot_has_nothing_loaded_or_visible", the_idle_snapshot_has_nothing_loaded_or_visible as fn()),
+            ("a_published_macro_is_read_by_value_and_a_new_one_replaces_it", a_published_macro_is_read_by_value_and_a_new_one_replaces_it as fn()),
+            ("readers_never_see_a_torn_buffer_while_the_worker_republishes", readers_never_see_a_torn_buffer_while_the_worker_republishes as fn()),
+            ("a_slow_worker_keeps_its_capture_until_it_has_copied_the_result", a_slow_worker_keeps_its_capture_until_it_has_copied_the_result as fn()),
+            ("the_capture_buffer_moves_hook_to_worker_and_back_without_growing_in_the_hook", the_capture_buffer_moves_hook_to_worker_and_back_without_growing_in_the_hook as fn()),
+        ]);
     }
     }
 }

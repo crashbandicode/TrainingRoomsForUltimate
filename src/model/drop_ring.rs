@@ -80,7 +80,6 @@ mod tests {
     use super::*;
     use std::sync::Arc;
 
-    #[test]
     fn values_come_out_in_order_and_a_full_ring_drops_the_oldest() {
         let ring: DropRing<2, 4> = DropRing::new();
         assert_eq!(ring.pop(), None);
@@ -97,7 +96,6 @@ mod tests {
 
     /// A producer far faster than the consumer: every value the consumer takes is whole (both words agree), in increasing order,
     /// and every value is either taken or counted as dropped.
-    #[test]
     fn a_racing_producer_and_consumer_never_tear_or_lose_a_value() {
         let ring: Arc<DropRing<4, 3>> = Arc::new(DropRing::new());
         const TOTAL: u64 = 200_000;
@@ -130,6 +128,15 @@ mod tests {
         producer.join().unwrap();
         assert_eq!(taken + dropped, TOTAL, "taken {taken} + dropped {dropped}");
         assert_eq!(last, TOTAL, "the newest value always gets through");
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("values_come_out_in_order_and_a_full_ring_drops_the_oldest", values_come_out_in_order_and_a_full_ring_drops_the_oldest as fn()),
+            ("a_racing_producer_and_consumer_never_tear_or_lose_a_value", a_racing_producer_and_consumer_never_tear_or_lose_a_value as fn()),
+        ]);
     }
     }
 }

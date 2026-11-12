@@ -77,7 +77,6 @@ fn movz_movk(lo: u32, hi: u32) -> u32 {
     ((lo >> 5) & 0xffff) | ((hi >> 5) & 0xffff) << 16
 }
 
-#[test]
 fn game_speed_rows_decode_the_native_offsets() {
     let labels: Vec<_> = ROWS.iter().map(|r| r.label).collect();
     assert_eq!(labels, SEAM_ROWS, "the runtime gates every row of the group");
@@ -214,7 +213,6 @@ fn rt(w: u32) -> u32 {
 /// rc.8 R1 fix: the HUD speed indicator refresh the bind runs after a closed-menu step, decoded from its rows: the
 /// object (the chain's first five hops), its shown flag, the two animations, the function that plays them, and the
 /// state table that runs the refresh only in the menu state.
-#[test]
 fn game_speed_rows_decode_the_hud_icon() {
     use crate::model::game_speed::{hud, Speed};
     let at = |r: &crate::engine::seams::native_seams::Seam, n: usize| (r.offset + 4 * n, word(r.guard, n));
@@ -261,7 +259,6 @@ fn game_speed_rows_decode_the_hud_icon() {
     assert_eq!(rt(stored), table_base, "the object stored at +0x210 is the one whose state table holds the refresh");
 }
 
-#[test]
 fn game_speed_rows_decode_the_training_apply() {
     use crate::model::game_speed::{mode, Speed};
     let at = |r: &crate::engine::seams::native_seams::Seam, n: usize| (r.offset + 4 * n, word(r.guard, n));
@@ -349,4 +346,14 @@ fn game_speed_rows_decode_the_training_apply() {
     assert_eq!(Speed::OneAndHalf.rate().divisor, Some(2));
     assert_eq!(Speed::TwoThirds.rate().divisor, Some(3));
     assert_eq!(Speed::Quarter.rate().divisor, Some(4));
+}
+
+/// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+#[test]
+fn case_table() {
+    crate::test_table::run(&[
+        ("game_speed_rows_decode_the_native_offsets", game_speed_rows_decode_the_native_offsets as fn()),
+        ("game_speed_rows_decode_the_hud_icon", game_speed_rows_decode_the_hud_icon as fn()),
+        ("game_speed_rows_decode_the_training_apply", game_speed_rows_decode_the_training_apply as fn()),
+    ]);
 }

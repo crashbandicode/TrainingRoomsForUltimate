@@ -715,3 +715,6 @@ impl Renderer {
     }
 }
 
+#[cfg(test)]
+#[path = "combo_plan_tests.rs"]
+mod tests;

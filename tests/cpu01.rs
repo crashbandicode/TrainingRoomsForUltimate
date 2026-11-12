@@ -2,6 +2,9 @@
 //! B4, B6, B8 (one roll per situation entry; a disabled mash empties the queue once), N4. Test names
 //! are the spec's §9 rows. The shared pieces (queue, weighted pick, role) are in `tests/cpu_core.rs`.
 
+// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).
+#[path = "../src/test_table.rs"]
+mod test_table;
 // rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
 macro_rules! lib_unit_tests {
     ($($body:tt)*) => {};
@@ -92,7 +95,6 @@ fn facts(status: i32) -> CmdFacts {
     CmdFacts { status, situation: Situation::Ground, ..CmdFacts::default() }
 }
 
-#[test]
 fn cpu01_trigger_priority() {
     // tech > clatter > tumble > hitstun > parry > footstool > trump > landing > generic.
     let t = base();
@@ -117,7 +119,6 @@ fn cpu01_trigger_priority() {
     assert!(pick_situation(&t, &s2, &facts(WAIT)).is_none());
 }
 
-#[test]
 fn cpu01_override_precedence() {
     let t = base();
     // An override with options replaces mash_state even when its trigger is not ticked; an empty
@@ -132,7 +133,6 @@ fn cpu01_override_precedence() {
     assert!(pick_situation(&t, &neither, &facts(DAMAGE)).is_none());
 }
 
-#[test]
 fn cpu01_distance_thresholds() {
     let t = base();
     let near = |d: f32, trig: usize| {
@@ -147,7 +147,6 @@ fn cpu01_distance_thresholds() {
     assert!(!near(f32::INFINITY, 15));
 }
 
-#[test]
 fn cpu01_one_roll_per_situation() {
     // B8: the pick is made when the situation is entered and kept while it lasts; it is made again
     // the next time the situation starts.
@@ -200,7 +199,6 @@ fn queued(action: Action) -> (Cpu, FighterKey) {
     (cpu, key)
 }
 
-#[test]
 fn cpu01_action_flags_table() {
     let t = base();
     for (action, flag, expected) in action_rows() {
@@ -237,7 +235,6 @@ fn cpu01_action_flags_table() {
     assert_eq!(cpu.command_flags(key, false, &facts(WAIT)).bits, 0);
 }
 
-#[test]
 fn cpu01_dash_attack_sequence() {
     let t = base();
     let dash = t.get(C::StatusDash);
@@ -260,7 +257,6 @@ fn cpu01_dash_attack_sequence() {
     assert_eq!(cpu.fighters[key.index()].mash.queue.current(), Some(Action::DASH_ATTACK), "ROLL_F did not replace it");
 }
 
-#[test]
 fn cpu01_character_specific_completion() {
     let t = table(&[
         (C::KindKoopa, 7),
@@ -286,7 +282,6 @@ fn cpu01_character_specific_completion() {
     assert!(!run(Action::NEUTRAL_B, 8, 640) && !run(Action::NEUTRAL_B, 8, 599));
 }
 
-#[test]
 fn cpu01_menu_disable_clears_queue() {
     let (mut cpu, key) = cpu_with(base(), &[("mash_state", actions(&[18])), ("mash_triggers", triggers(&[0]))]);
     cpu.fighters[key.index()].mash.queue.push(Action::JAB);
@@ -302,7 +297,6 @@ fn cpu01_menu_disable_clears_queue() {
     assert!(!cpu.fighters[key.index()].mash.queue.is_empty());
 }
 
-#[test]
 fn cpu01_reset_clears_queue() {
     // No choice while a save state loads; the reset bundle empties the queue and the situation latch.
     let (mut cpu, key) = cpu_with(base(), &[("mash_state", actions(&[18])), ("mash_triggers", triggers(&[0]))]);
@@ -317,7 +311,6 @@ fn cpu01_reset_clears_queue() {
     assert_eq!(cpu.fighters[key.index()].mash.latch, None);
 }
 
-#[test]
 fn cpu01_nana_and_missing_accessor() {
     // Nana is her own body and gets the same bits as Popo on her own query; a table with nothing
     // resolved asks for nothing and never panics.
@@ -334,7 +327,6 @@ fn cpu01_nana_and_missing_accessor() {
     assert_eq!(empty.command_flags(popo, false, &facts(WAIT)).bits, 0);
 }
 
-#[test]
 fn cpu01_playback_stops_on_a_triggered_mash() {
     use model::cpu::playback::PlaybackState;
     let (mut cpu, key) = cpu_with(base(), &[("mash_state", actions(&[18])), ("mash_triggers", triggers(&[0]))]);
@@ -350,7 +342,6 @@ fn cpu01_playback_stops_on_a_triggered_mash() {
 
 /// R2-4 (review R2): the CPU's mash waits for the save-state loading fact for as long as it is true and resumes
 /// when it clears (the runtime copies `states::is_loading()` into `Cpu::save_loading` every frame).
-#[test]
 fn r2_4_cpu_mash_waits_for_the_loading_fact_throughout_the_load() {
     let (mut cpu, key) = cpu_with(base(), &[("mash_state", actions(&[18])), ("mash_triggers", triggers(&[0]))]);
     for _ in 0..30 {
@@ -361,4 +352,23 @@ fn r2_4_cpu_mash_waits_for_the_loading_fact_throughout_the_load() {
     cpu.save_loading = false;
     cpu.command_flags(key, false, &facts(DAMAGE));
     assert!(!cpu.fighters[key.index()].mash.queue.is_empty());
+}
+
+/// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+#[test]
+fn case_table() {
+    crate::test_table::run(&[
+        ("cpu01_trigger_priority", cpu01_trigger_priority as fn()),
+        ("cpu01_override_precedence", cpu01_override_precedence as fn()),
+        ("cpu01_distance_thresholds", cpu01_distance_thresholds as fn()),
+        ("cpu01_one_roll_per_situation", cpu01_one_roll_per_situation as fn()),
+        ("cpu01_action_flags_table", cpu01_action_flags_table as fn()),
+        ("cpu01_dash_attack_sequence", cpu01_dash_attack_sequence as fn()),
+        ("cpu01_character_specific_completion", cpu01_character_specific_completion as fn()),
+        ("cpu01_menu_disable_clears_queue", cpu01_menu_disable_clears_queue as fn()),
+        ("cpu01_reset_clears_queue", cpu01_reset_clears_queue as fn()),
+        ("cpu01_nana_and_missing_accessor", cpu01_nana_and_missing_accessor as fn()),
+        ("cpu01_playback_stops_on_a_triggered_mash", cpu01_playback_stops_on_a_triggered_mash as fn()),
+        ("r2_4_cpu_mash_waits_for_the_loading_fact_throughout_the_load", r2_4_cpu_mash_waits_for_the_loading_fact_throughout_the_load as fn()),
+    ]);
 }

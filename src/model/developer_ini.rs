@@ -156,3 +156,16 @@ pub fn load(path: &str) -> DeveloperIni {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    lib_unit_tests! {
+    use super::*;
+
+    #[test]
+    fn only_exact_on_shows_the_page() {
+        assert!(parse(b"developer_page=on").developer_page);
+        assert!(!parse(b"developer_page=yes").developer_page);
+        assert!(!parse(b"").developer_page);
+    }
+    }
+}

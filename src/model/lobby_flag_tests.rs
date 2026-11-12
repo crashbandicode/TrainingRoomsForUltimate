@@ -2,7 +2,6 @@
 // The by-path test crates include model.rs and cannot see crate::engine, so these tests do not live in lobby_flag.rs.
 #[cfg(test)]
 mod tests {
-    lib_unit_tests! {
     use crate::model::lobby_flag::{is_waiting_room, scene_key, step, FlagClock, Scene, Step};
     use crate::engine::macro_ui::clip_panel::CloseInputGuard;
     use crate::engine::stages::training_stage_rotation_policy::{TRAINING_MELEE, TRAINING_MODE};
@@ -112,7 +111,6 @@ mod tests {
         decision
     }
 
-    #[test]
     fn training_behaviour_follows_the_live_scene_at_every_station() {
         let modes = [
             0x0201_0000,
@@ -201,7 +199,6 @@ mod tests {
         }
     }
 
-    #[test]
     fn slot_one_still_tears_the_waiting_room_down() {
         let clock = ready(WAITING);
         let decision = battle_from("slot 1", clock);
@@ -214,7 +211,6 @@ mod tests {
         );
     }
 
-    #[test]
     fn a_battle_at_station_1_keeps_the_games_death_parameters() {
         let settings = StateSettings::default();
         assert!(settings.enable && !settings.autoload && !settings.respawn_invincibility);
@@ -252,7 +248,6 @@ mod tests {
     /// The scene is already the battle and the clock has not run. The cached flag is still true.
     /// Queries, the five death parameters and every widened gate answer like vanilla. Unreadable
     /// mode words are not a waiting room, so the lobby term is false then too.
-    #[test]
     fn a_battle_with_no_clock_tick_is_not_training() {
         let settings = StateSettings::default();
         assert!(asked(true, Some(WAITING), false), "the same flag in the waiting room is practice");
@@ -277,7 +272,6 @@ mod tests {
         }
     }
 
-    #[test]
     fn a_waiting_room_after_a_station_1_battle_practices_again() {
         let clock = ready(WAITING);
         let (clock, _) = step(clock, Some(BATTLE), true);
@@ -294,7 +288,6 @@ mod tests {
         assert!(live(false, practicing.active));
     }
 
-    #[test]
     fn every_is_training_answer_is_vanilla_outside_training() {
         let found = runtime_gates();
         assert!(found.len() > 20, "the scan missed the runtime gates");
@@ -494,5 +487,17 @@ mod tests {
         }
         None
     }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("training_behaviour_follows_the_live_scene_at_every_station", training_behaviour_follows_the_live_scene_at_every_station as fn()),
+            ("slot_one_still_tears_the_waiting_room_down", slot_one_still_tears_the_waiting_room_down as fn()),
+            ("a_battle_at_station_1_keeps_the_games_death_parameters", a_battle_at_station_1_keeps_the_games_death_parameters as fn()),
+            ("a_battle_with_no_clock_tick_is_not_training", a_battle_with_no_clock_tick_is_not_training as fn()),
+            ("a_waiting_room_after_a_station_1_battle_practices_again", a_waiting_room_after_a_station_1_battle_practices_again as fn()),
+            ("every_is_training_answer_is_vanilla_outside_training", every_is_training_answer_is_vanilla_outside_training as fn()),
+        ]);
     }
 }

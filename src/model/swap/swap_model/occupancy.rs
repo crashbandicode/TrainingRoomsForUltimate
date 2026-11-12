@@ -276,3 +276,284 @@ impl super::native_model::Policy for LedgerPolicy {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    lib_unit_tests! {
+    use super::*;
+    use super::super::capabilities::{CellRule, Qualification};
+    use super::super::ledger::{release_kind_footprint, OwnerState, KIRBY, NANA, POPO};
+    use super::super::native_model::{kind_table, parse_fixture, replay, Event, Fault, G68Hazard, OldPolicy, Policy};
+
+    fn occupancy() -> KindOccupancy { KindOccupancy::default() }
+
+    fn conflicts_encode_the_kirby_drain_and_suspend_rules_and_the_live_copy_guard() {
+        let rules = Rules::C116_1;
+        // D-KIRBY1 S2: Kirby live and copying Mario on P1's R.
+        let mut occ = occupancy();
+        occ.live[0] = Some(KIRBY);
+        occ.kirby_copy[0] = Some(0x00);
+        assert_eq!(occ.conflicts(Role::Player, 0x00, Use::Release, &rules), Some(Conflict::LiveCopySharesRegistry));
+        assert_eq!(occ.conflicts(Role::Player, 0x00, Use::Acquire, &rules), Some(Conflict::LiveCopySharesRegistry));
+        assert_eq!(occ.conflicts(Role::Player, 0x07, Use::Release, &rules), None, "another kind's key may go");
+        assert_eq!(occ.conflicts(Role::Player, 0x07, Use::Acquire, &rules), Some(Conflict::PrefetchDebtUnderLiveKirby), "suspend while Kirby is live");
+        assert_eq!(occ.conflicts(Role::Cpu, 0x07, Use::Acquire, &rules), None, "the other role's R is not suspended");
+        // Drain: a Kirby target with prefetch debt on R conflicts until the debt is returned.
+        let mut occ = occupancy();
+        occ.live[0] = Some(0x07);
+        occ.prefetched[0].insert(0x00);
+        assert_eq!(occ.conflicts(Role::Player, KIRBY, Use::TargetKind, &rules), Some(Conflict::PrefetchDebtUnderLiveKirby));
+        assert_eq!(occ.conflicts(Role::Player, 0x08, Use::TargetKind, &rules), None, "an ordinary target needs no drain");
+        occ.prefetched[0] = KindSet64::default();
+        assert_eq!(occ.conflicts(Role::Player, KIRBY, Use::TargetKind, &rules), None);
+        assert!(!occ.prefetch_suspended(Role::Player));
+        // K2 (HYP): the hat source built into the window while a copy exists.
+        let mut occ = occupancy();
+        occ.kirby_copy[0] = Some(0x00);
+        occ.hat_sources.insert(0x00);
+        assert_eq!(occ.conflicts(Role::Player, 0x00, Use::Build, &rules), Some(Conflict::HatSourceLive));
+        let relaxed = Rules { hat_source: None, ..rules };
+        assert_eq!(occ.conflicts(Role::Player, 0x00, Use::Build, &relaxed), None);
+        // The mirror rule is off: D-HANG1-SEPARATION S-A completed 3/3.
+        let mut occ = occupancy();
+        occ.live[1] = Some(0x1d);
+        assert_eq!(occ.conflicts(Role::Player, 0x1d, Use::TargetKind, &rules), None);
+        let mirror = Rules { other_role_live: Some(Grade::Hyp), ..rules };
+        assert_eq!(occ.conflicts(Role::Player, 0x1d, Use::TargetKind, &mirror), Some(Conflict::OtherRoleLive));
+        // Through the ledger's trait.
+        let consumers = Occupancy { kinds: KindOccupancy { live: [Some(KIRBY), None], ..occupancy() }, rules };
+        assert_eq!(consumers.conflict(Role::Player, 0x07, Use::Acquire), Some(Conflict::PrefetchDebtUnderLiveKirby));
+    }
+
+    /// Primary 2026-11-09 05:38Z: a detached PT group's object re-arm runs under a live Kirby through the ledger. The
+    /// suspend rule covers the fighter kinds a Kirby copy can share on R; the trainer's object kind (and the Aegis
+    /// partner's) is admitted, every fighter kind still is not, and the live copy's guard is unchanged. Eden rc6-kr1
+    /// (the gate lifted, the ledger not): `object kind NOT re-acquired … reason=Conflict(PrefetchDebtUnderLiveKirby)`.
+    fn an_object_kind_is_acquired_under_a_live_kirby_and_a_fighter_kind_is_not() {
+        use super::super::ledger::{GroupId, Holder, Ledger, ReleaseRecipe, AEGIS_OBJECT_KIND, PT_OBJECT_KIND};
+        let rules = Rules::C116_1;
+        let mut occ = occupancy();
+        occ.live[0] = Some(KIRBY);
+        for copy in [None, Some(0x24), Some(0x00)] {
+            occ.kirby_copy[0] = copy;
+            assert_eq!(occ.conflicts(Role::Player, PT_OBJECT_KIND, Use::Acquire, &rules), None, "{copy:?}");
+            assert_eq!(occ.conflicts(Role::Player, AEGIS_OBJECT_KIND, Use::Acquire, &rules), None, "{copy:?}");
+            assert_eq!(occ.conflicts(Role::Player, PT_OBJECT_KIND, Use::Release, &rules), None, "{copy:?}");
+            let squirtle = if copy == Some(0x24) { Conflict::LiveCopySharesRegistry } else { Conflict::PrefetchDebtUnderLiveKirby };
+            assert_eq!(occ.conflicts(Role::Player, 0x24, Use::Acquire, &rules), Some(squirtle), "{copy:?}");
+            assert_eq!(occ.conflicts(Role::Player, 0x07, Use::Acquire, &rules), Some(Conflict::PrefetchDebtUnderLiveKirby));
+        }
+        // The re-arm's own acquisition through the ledger (`r_handle::acquire`: `Holder::Prefetch`, the occupancy that
+        // names the live copy).
+        let consumers = Occupancy { kinds: occ, rules };
+        let mut ledger = Ledger::new(RFlags::TRAINING);
+        let batch = ledger.new_batch();
+        assert!(ledger.acquire(PT_OBJECT_KIND, Holder::Prefetch(GroupId(1)), ReleaseRecipe::OwnedPerKind, batch, &consumers,
+            Role::Player).is_ok());
+        assert!(ledger.acquire(0x07, Holder::Prefetch(GroupId(2)), ReleaseRecipe::OwnedPerKind, batch, &consumers,
+            Role::Player).is_err(), "a fighter kind's prefetch still waits for the live Kirby");
+    }
+
+    fn footprint_admission_keeps_a_copied_kinds_registry_and_residents_name_the_copy() {
+        let state = OwnerState { task_pending: false, loads_completed: true, costume: 0, map_nodes: 2 };
+        let footprint = release_kind_footprint(0x00, RFlags::TRAINING, state, 2);
+        assert_eq!(footprint_admitted(&footprint, kirby_registry_of(Some(0x00))), Err(Conflict::LiveCopySharesRegistry));
+        assert_eq!(footprint_admitted(&footprint, kirby_registry_of(Some(0x07))), Ok(()));
+        assert_eq!(footprint_admitted(&footprint, kirby_registry_of(None)), Ok(()));
+        let not_loaded = release_kind_footprint(0x00, RFlags::TRAINING, OwnerState { loads_completed: false, ..state }, 2);
+        assert_eq!(footprint_admitted(&not_loaded, kirby_registry_of(Some(0x00))), Ok(()), "no mirror release before the loads completed");
+        let deps = resident_dependencies([0x07, KIRBY, 0x08, NO_KIND], Some(0x00));
+        assert_eq!(deps.kinds.iter().collect::<Vec<_>>(), vec![0x00, KIRBY, 0x07, 0x08]);
+        assert!(kirby_registry_of(None).is_empty());
+    }
+
+    /// The `body_bank` wrappers WP4 re-pointed at the ledger data equal the bodies they replaced
+    /// (kept here as the oracle) on every window shape the adapters ask about; the one intended
+    /// difference is named.
+    fn consts_wrappers_equal_the_old_bodies_they_now_derive_from_the_ledger() {
+        use crate::engine::swap::body_bank::{orphan_object_keys, pair_resource_references, supplemental_acquisitions, Members, Special, AEGIS_OBJECT_KIND, NATIVE_MEMBERS};
+        fn old_supplemental(members: Members) -> ([u32; NATIVE_MEMBERS], usize) {
+            let first_extra = if members.kinds()[0] == 0x4b { 2 } else { 1 };
+            let mut kinds = [u32::MAX; NATIVE_MEMBERS];
+            let mut count = 0;
+            for kind in members.kinds().iter().take(members.count()).skip(first_extra) {
+                kinds[count] = *kind;
+                count += 1;
+            }
+            (kinds, count)
+        }
+        fn old_pair_refs(members: Members) -> Option<u32> { members.is_pair().then_some(members.count() as u32) }
+        fn old_orphans(kind: u32) -> ([u32; 2], usize) {
+            match kind { AEGIS_OBJECT_KIND => ([AEGIS_OBJECT_KIND * 42 + 6, u32::MAX], 1), _ => ([u32::MAX; 2], 0) }
+        }
+        let singles = [0x00u32, 0x02, 0x03, 0x06, 0x07, 0x08, 0x2d];
+        let mut shapes = Vec::new();
+        // Rotations are laid out (`Members::laid_out`, CellRule::PinCell0: Kirby to cell 0); the pair-lead
+        // window never takes Kirby as its extra.
+        for &a in &singles {
+            shapes.push(Members::laid_out(&[a]).unwrap());
+            for &b in &singles {
+                if b == a { continue; }
+                shapes.push(Members::laid_out(&[a, b]).unwrap());
+                for &c in &singles {
+                    if c == a || c == b { continue; }
+                    shapes.push(Members::laid_out(&[a, b, c]).unwrap());
+                }
+            }
+            if let Some(lead) = Members::pair_lead(a) { shapes.push(lead); }
+        }
+        shapes.push(Members::new(&[POPO]).unwrap());
+        shapes.push(Members::from_forms(Forms::solo_popo(), &[0x02], 1).unwrap());
+        shapes.push(Members::from_forms(Forms::solo_popo(), &[0x02, 0x07], 2).unwrap());
+        shapes.push(Members::pair_group());
+        for window in shapes {
+            assert_eq!(supplemental_acquisitions(window), old_supplemental(window), "{window:?}");
+            assert_eq!(pair_resource_references(window), old_pair_refs(window), "{window:?}");
+        }
+        // The intended difference: a native group's window is requested whole by `0x17e5bc0`
+        // (members and object kind), so nothing is supplemental; the old rule would have requested
+        // the second and third forms again (never reached: a native group is never a window build).
+        for group in [Members::native_group(0x24).unwrap(), Members::native_group(0x5a).unwrap()] {
+            assert_eq!(supplemental_acquisitions(group), ([u32::MAX; NATIVE_MEMBERS], 0), "{group:?}");
+            assert_eq!(pair_resource_references(group), old_pair_refs(group));
+            assert!(matches!(group.special(), Special::Native(_)));
+        }
+        for kind in (0u32..0x80).chain([u32::MAX]) {
+            assert_eq!(orphan_object_keys(kind), old_orphans(kind), "{kind:#x}");
+        }
+    }
+
+    fn fixture(text: &str, name: &str) -> Vec<Event> {
+        parse_fixture(text).unwrap_or_else(|e| panic!("{}: {}", name, e))
+    }
+
+    fn real_faults(faults: Vec<Fault>, name: &str, policy: &str) -> Vec<Fault> {
+        let bad: Vec<&Fault> = faults.iter().filter(|f| matches!(f, Fault::Expectation { .. } | Fault::Malformed { .. })).collect();
+        assert!(bad.is_empty(), "{} {}: calibration or fixture errors {:?}", name, policy, bad);
+        faults
+    }
+
+    fn the_ledger_policy_reproduces_no_catalogue_fault_on_the_wp4_fixtures() {
+        let table = kind_table();
+        let policy = LedgerPolicy::default();
+        for (name, text, old_first) in [
+            ("d-sg1-aegis-orphan", include_str!("../../../../tests/fixtures/swap/d-sg1-aegis-orphan.jsonl"), Fault::LoaderRefused7 { role: 0, residual: vec![0x1338] }),
+            ("ic-b119-state11", include_str!("../../../../tests/fixtures/swap/ic-b119-state11.jsonl"), Fault::State11Stall { role: 0 }),
+            // The recorded window holds Kirby at cell 1 (the old code's rotation-order layout); the
+            // ledger policy lays it out at cell 0 (`CellRule::PinCell0`), so neither the mirror release
+            // under a live copy nor the cell-1 unload spin (`KirbyCopyListAtNonZeroCell`) remains.
+            ("d-kirby1-k1", include_str!("../../../../tests/fixtures/swap/d-kirby1-k1.jsonl"), Fault::Spin { role: 0, hazard: G68Hazard::MirrorReleaseUnderLiveCopy }),
+        ] {
+            let events = fixture(text, name);
+            let old = real_faults(replay(&events, &OldPolicy, &table), name, "old");
+            assert_eq!(old.first(), Some(&old_first), "{}: the recorded fault reproduces under the old policy", name);
+            let new = real_faults(replay(&events, &policy, &table), name, "ledger");
+            assert!(new.is_empty(), "{} under the ledger policy: {:?}", name, new);
+        }
+        for (name, text) in [
+            ("solo-stall-double-link", include_str!("../../../../tests/fixtures/swap/solo-stall-double-link.jsonl")),
+            ("defect2-lobby-cpu-aegis-prefetch", include_str!("../../../../tests/fixtures/swap/defect2-lobby-cpu-aegis-prefetch.jsonl")),
+        ] {
+            let events = fixture(text, name);
+            let old = real_faults(replay(&events, &OldPolicy, &table), name, "old");
+            assert!(matches!(old.first(), Some(Fault::LoaderRefused7 { .. })), "{}: {:?}", name, old);
+            let new = real_faults(replay(&events, &policy, &table), name, "ledger");
+            assert!(new.is_empty(), "{} under the ledger policy: {:?}", name, new);
+        }
+    }
+
+    fn the_kirby_row_decides_the_s_b_replay_on_the_model() {
+        let table = kind_table();
+        let events = fixture(include_str!("../../../../tests/fixtures/swap/d-hang1-s-b.jsonl"), "d-hang1-s-b");
+        // Shipped row (`CellRule::PinCell0`): the recorded [5, 6, 7] window is laid out [6, 5, 7] with
+        // Yoshi active at cell 1, Kirby is sub 0 of its entry, and the teardown to Chrom completes
+        // (RE-KIRBY-UNLOAD §0/§6: S-K, Kirby at sub 0, completes). The old and recipe policies keep
+        // Kirby at cell 1 and spin (WP2's own tests).
+        let policy = LedgerPolicy::default();
+        assert_eq!(policy.plan_window([0x05, KIRBY, 0x07]), [KIRBY, 0x05, 0x07]);
+        assert_eq!(policy.plan_window([0x05, 0x07, KIRBY]), [KIRBY, 0x05, 0x07]);
+        assert_eq!(policy.plan_window([KIRBY, 0x05, 0x07]), [KIRBY, 0x05, 0x07]);
+        assert_eq!(policy.plan_window([0x05, KIRBY, NO_KIND]), [KIRBY, 0x05, NO_KIND]);
+        // Row 4: an upcoming Solo Popo is pinned the same way; with both pinned kinds the later
+        // one in rotation order waits for the next window.
+        assert_eq!(policy.plan_window([0x05, POPO, 0x07]), [POPO, 0x05, 0x07]);
+        assert_eq!(policy.plan_window([0x05, 0x07, POPO]), [POPO, 0x05, 0x07]);
+        assert_eq!(policy.plan_window([0x05, KIRBY, POPO]), [KIRBY, 0x05, NO_KIND]);
+        assert_eq!(policy.plan_window([0x05, POPO, KIRBY]), [POPO, 0x05, NO_KIND]);
+        assert_eq!(policy.plan_window([KIRBY, POPO, 0x07]), [KIRBY, NO_KIND, 0x07]);
+        let shipped = real_faults(replay(&events, &policy, &table), "d-hang1-s-b", "ledger/shipped");
+        assert!(shipped.is_empty(), "{:?}", shipped);
+        // WORKPLAN §5.3 fallback row: Kirby canonical-only; the 7a candidate: active only. Either keeps
+        // Kirby out of the parked cells, and the Reload completes on the model too.
+        for kirby in [
+            Capabilities { qualification: Qualification::Gated("D-HANG1/D-KIRBY1 class unproven"), ..capabilities(FormClass::Kirby) },
+            Capabilities { window_cell: CellRule::ActiveOnly, ..capabilities(FormClass::Kirby) },
+        ] {
+            let policy = LedgerPolicy { kirby, ..LedgerPolicy::default() };
+            assert_eq!(policy.plan_window([0x05, KIRBY, 0x07]), [0x05, NO_KIND, 0x07]);
+            let faults = real_faults(replay(&events, &policy, &table), "d-hang1-s-b", "ledger/fallback");
+            assert!(faults.is_empty(), "{:?}", faults);
+        }
+        // Native shapes pass through the planner untouched.
+        let policy = LedgerPolicy::default();
+        assert_eq!(policy.plan_window([POPO, NANA, 0x0a]), [POPO, NANA, 0x0a]);
+        assert_eq!(policy.plan_window([0x24, 0x25, 0x26]), [0x24, 0x25, 0x26]);
+        assert_eq!(policy.plan_window([0x07, 0x08, 0x09]), [0x07, 0x08, 0x09]);
+        assert_eq!(policy.supplemental([POPO, 0x03, 0x07], 3), vec![0x07], "SOLO-STALL: Link is native's request");
+        assert_eq!(policy.supplemental([0x07, 0x08, 0x09], 3), vec![0x08, 0x09]);
+        assert_eq!(policy.supplemental([POPO, NANA, 0x0a], 3), vec![0x0a]);
+        assert_eq!(policy.pair_refs([POPO, NANA, 0x02], 3), Some(3));
+        assert_eq!(policy.pair_refs([POPO, 0x03, 0x07], 3), None);
+        assert!(!policy.prefetch_admitted(Some(KIRBY)) && policy.prefetch_admitted(Some(0x07)) && policy.prefetch_admitted(None));
+        assert!(!policy.key_release_admitted(0x00, Some(0x00)) && policy.key_release_admitted(0x00, Some(0x07)));
+    }
+
+    /// rc.7 F1: with the G68 step owned (`Rules::OWNED_G68`), the D-SG1/K1 shapes above raise no D-KIRBY1 conflict (the
+    /// copy's acquire and release, the suspend and the drain), and the rules that are not D-KIRBY1's stand.
+    fn with_the_g68_step_owned_no_d_kirby1_rule_is_left() {
+        let rules = Rules::OWNED_G68;
+        assert!(rules.g68_owned && !Rules::C116_1.g68_owned);
+        assert_eq!(Rules { g68_owned: false, ..rules }, Rules::C116_1, "only the ownership differs");
+        let mut occ = occupancy();
+        occ.live[0] = Some(KIRBY);
+        occ.kirby_copy[0] = Some(0x00);
+        for usage in [Use::Release, Use::Acquire] {
+            assert_eq!(occ.conflicts(Role::Player, 0x00, usage, &rules), None, "the copied kind, {usage:?}");
+        }
+        assert_eq!(occ.conflicts(Role::Player, 0x07, Use::Acquire, &rules), None, "no suspend while Kirby is live");
+        let mut occ = occupancy();
+        occ.live[0] = Some(0x07);
+        occ.prefetched[0].insert(0x00);
+        assert_eq!(occ.conflicts(Role::Player, KIRBY, Use::TargetKind, &rules), None, "no drain before a Kirby target");
+        let mut occ = occupancy();
+        occ.kirby_copy[0] = Some(0x00);
+        occ.hat_sources.insert(0x00);
+        assert_eq!(occ.conflicts(Role::Player, 0x00, Use::Build, &rules), Some(Conflict::HatSourceLive), "K2 is not D-KIRBY1's");
+    }
+
+    /// rc.7 F1: the runtime's D-KIRBY1 gates see the live kind only while the G68 step is native's.
+    fn the_d_kirby1_gates_see_a_live_kirby_only_while_the_g68_step_is_natives() {
+        use super::super::capabilities::{d_kirby1_applies, d_kirby1_live, prefetch_admitted};
+        assert_eq!(d_kirby1_live(Some(KIRBY), false), Some(KIRBY));
+        assert_eq!(d_kirby1_live(Some(KIRBY), true), None);
+        assert_eq!(d_kirby1_live(Some(0x07), false), Some(0x07));
+        assert!(prefetch_admitted(d_kirby1_live(Some(KIRBY), false)).is_err(), "rc.6: a live Kirby defers the prefetch");
+        assert!(prefetch_admitted(d_kirby1_live(Some(KIRBY), true)).is_ok(), "rc.7 F1: it does not");
+        assert!(d_kirby1_applies(true, false) && !d_kirby1_applies(true, true) && !d_kirby1_applies(false, false));
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("conflicts_encode_the_kirby_drain_and_suspend_rules_and_the_live_copy_guard", conflicts_encode_the_kirby_drain_and_suspend_rules_and_the_live_copy_guard as fn()),
+            ("an_object_kind_is_acquired_under_a_live_kirby_and_a_fighter_kind_is_not", an_object_kind_is_acquired_under_a_live_kirby_and_a_fighter_kind_is_not as fn()),
+            ("footprint_admission_keeps_a_copied_kinds_registry_and_residents_name_the_copy", footprint_admission_keeps_a_copied_kinds_registry_and_residents_name_the_copy as fn()),
+            ("consts_wrappers_equal_the_old_bodies_they_now_derive_from_the_ledger", consts_wrappers_equal_the_old_bodies_they_now_derive_from_the_ledger as fn()),
+            ("the_ledger_policy_reproduces_no_catalogue_fault_on_the_wp4_fixtures", the_ledger_policy_reproduces_no_catalogue_fault_on_the_wp4_fixtures as fn()),
+            ("the_kirby_row_decides_the_s_b_replay_on_the_model", the_kirby_row_decides_the_s_b_replay_on_the_model as fn()),
+            ("with_the_g68_step_owned_no_d_kirby1_rule_is_left", with_the_g68_step_owned_no_d_kirby1_rule_is_left as fn()),
+            ("the_d_kirby1_gates_see_a_live_kirby_only_while_the_g68_step_is_natives", the_d_kirby1_gates_see_a_live_kirby_only_while_the_g68_step_is_natives as fn()),
+        ]);
+    }
+    }
+}

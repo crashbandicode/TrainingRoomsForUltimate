@@ -85,7 +85,6 @@ mod tests {
         bytes
     }
 
-    #[test]
     fn reads_both_endians_without_searching_payload_or_unnamed_entries() {
         for little in [false, true] {
             assert_eq!(contains(&fixture(little, Some(b"target"), b"data"), b"target"), Some(true));
@@ -95,7 +94,6 @@ mod tests {
         }
     }
 
-    #[test]
     fn truncated_or_invalid_directory_never_matches() {
         let good = fixture(true, Some(b"target"), b"data");
         for end in 0..good.len() { assert_eq!(contains(&good[..end], b"target"), None); }
@@ -109,9 +107,18 @@ mod tests {
         assert_eq!(contains(&bad, b"target"), None);
     }
 
-    #[test]
     fn non_utf8_names_do_not_match_valid_layout_names() {
         assert_eq!(contains(&fixture(true, Some(b"\xff"), b"data"), b"target"), Some(false));
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("reads_both_endians_without_searching_payload_or_unnamed_entries", reads_both_endians_without_searching_payload_or_unnamed_entries as fn()),
+            ("truncated_or_invalid_directory_never_matches", truncated_or_invalid_directory_never_matches as fn()),
+            ("non_utf8_names_do_not_match_valid_layout_names", non_utf8_names_do_not_match_valid_layout_names as fn()),
+        ]);
     }
     }
 }

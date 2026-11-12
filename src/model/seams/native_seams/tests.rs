@@ -34,7 +34,6 @@ const NOP_FAR: [u32; 5] = [NOP, LDR_X17_LITERAL_8, BR_X17, 0x8100_0000, 0x0000_0
 /// The `.quad` both far jumps above carry (little endian words 0x8100_0000, 0).
 const FAR_TARGET: u64 = 0x8100_0000;
 
-#[test]
 fn f6_control_task_guards_cover_the_final_instruction_word() {
     for label in ["group_swap.control_callback", "group_swap.control_functor"] {
         let (_, site) = find_site(label).expect("F6 task call must have a seam");
@@ -45,7 +44,6 @@ fn f6_control_task_guards_cover_the_final_instruction_word() {
     }
 }
 
-#[test]
 fn identical_bytes_are_stock_for_every_kind() {
     for kind in [HOOK, INLINE, SeamKind::Called, SeamKind::Relied] {
         assert_eq!(guard_outcome(&stock(), &stock(), kind), GuardOutcome::Stock);
@@ -54,7 +52,6 @@ fn identical_bytes_are_stock_for_every_kind() {
     assert_eq!(GuardOutcome::Stock.code(), "stock");
 }
 
-#[test]
 fn another_plugins_hook_in_the_words_we_replace_occupies_a_hook_site() {
     for (shape, len) in [(&[B][..], 1), (&FAR[..], 4), (&NOP_FAR[..], 5)] {
         let actual = with_words(stock(), 0, shape);
@@ -69,7 +66,6 @@ fn another_plugins_hook_in_the_words_we_replace_occupies_a_hook_site() {
     assert_eq!(guard_outcome(&stock(), &actual, INLINE), GuardOutcome::HookedByOther { at: 12, usable: false });
 }
 
-#[test]
 fn hooks_past_our_span_are_allowed_and_reported() {
     let actual = with_words(stock(), HOOK_SPAN_WORDS, &FAR);
     let outcome = guard_outcome(&stock(), &actual, HOOK);
@@ -83,7 +79,6 @@ fn hooks_past_our_span_are_allowed_and_reported() {
     assert_eq!(guard_outcome(&stock(), &actual, HOOK), GuardOutcome::HookedByOther { at: 8, usable: false });
 }
 
-#[test]
 fn a_relied_on_word_must_stay_but_hooks_after_it_are_fine() {
     let at0 = with_words(stock(), 0, &[B]);
     assert_eq!(guard_outcome(&stock(), &at0, SeamKind::Relied), GuardOutcome::HookedByOther { at: 0, usable: false });
@@ -91,7 +86,6 @@ fn a_relied_on_word_must_stay_but_hooks_after_it_are_fine() {
     assert_eq!(guard_outcome(&stock(), &at1, SeamKind::Relied), GuardOutcome::HookedByOther { at: 4, usable: true });
 }
 
-#[test]
 fn anything_that_is_not_a_hook_shape_is_foreign() {
     for kind in [HOOK, INLINE, SeamKind::Called, SeamKind::Relied] {
         let actual = with_words(stock(), 7, &[0xd280_0000]);
@@ -107,7 +101,6 @@ fn anything_that_is_not_a_hook_shape_is_foreign() {
     assert_eq!(GuardOutcome::Foreign { first_diff: 0 }.code(), "foreign");
 }
 
-#[test]
 fn scopes_are_a_bit_set() {
     let lobby = Scopes::TRAINING.with(Scopes::LOBBY_WAITING);
     assert!(lobby.contains(Scopes::TRAINING) && lobby.contains(Scopes::LOBBY_WAITING));
@@ -116,7 +109,6 @@ fn scopes_are_a_bit_set() {
     assert!(Scopes::ALL.contains(Scopes::NONE));
 }
 
-#[test]
 fn the_table_rows_are_well_formed() {
     let mut labels = BTreeSet::new();
     for seam in all() {
@@ -151,7 +143,6 @@ fn the_table_rows_are_well_formed() {
     assert!(find("no.such_label").is_none());
 }
 
-#[test]
 fn the_card_scan_export_lists_each_offset_once() {
     let offsets: Vec<usize> = scan_offsets().collect();
     let unique: BTreeSet<usize> = offsets.iter().copied().collect();
@@ -279,7 +270,6 @@ fn has_row(rule: &Rule) -> bool {
     || matches!(rule, Rule::Name(pattern) if images::IMAGE_ROWS.iter().any(|seam| by_name(seam.label, pattern)))
 }
 
-#[test]
 fn glob_matches_macro_generated_names() {
     assert!(glob("handle_*daikon_*_prob", "handle_daisydaikon_1_prob"));
     assert!(!glob("handle_*daikon_*_prob", "handle_daisydaikon_1_probe"));
@@ -287,7 +277,6 @@ fn glob_matches_macro_generated_names() {
     assert!(!glob("prepare_models", "prepare_model"));
 }
 
-#[test]
 fn every_skyline_hook_attribute_has_a_row_or_is_listed_unconverted() {
     let attrs = hook_attributes();
     // The fork counted 150+ hooks over its whole src/. Here only the carried runtime areas are scanned and they
@@ -317,7 +306,6 @@ fn every_skyline_hook_attribute_has_a_row_or_is_listed_unconverted() {
 /// (`core/src/native.rs`), so `cpu_pilot` guards its one hook and the three game functions the library's
 /// `native` calls (`offsets::AI_THINK`, `AI_SET_RANK`, `AI_RESET`). The legacy body checks in
 /// `cpu_pilot::init` (still deciding while the group is shadow) are sub-windows of these guards.
-#[test]
 fn the_cpu_pilot_rows_guard_its_hook_and_every_function_the_library_calls() {
     let row = |label: &str| find(label).map(|(_, s)| s).unwrap_or_else(|| panic!("no row {}", label));
     let rows: Vec<_> = all().filter(|s| s.group == "cpu_pilot").collect();
@@ -362,7 +350,6 @@ fn the_cpu_pilot_rows_guard_its_hook_and_every_function_the_library_calls() {
 
 /// `Sharing::OwnHook` (M4d): only a far jump at the entry whose `.quad` is the registered replacement,
 /// with the other 64 bytes stock, reads `Stock`; every other shape keeps `outcome_for`'s answer.
-#[test]
 fn an_own_hook_row_reads_stock_only_for_our_registered_far_jump() {
     let own = Sharing::OwnHook { hook: "needle.x" };
     let rule = |actual: &[u8; GUARD_BYTES], target: Option<u64>| outcome_for_own(&stock(), actual, SeamKind::Called, own, target);
@@ -396,7 +383,6 @@ fn an_own_hook_row_reads_stock_only_for_our_registered_far_jump() {
 
 /// Every `Sharing::OwnHook` row names a replace/entry hook row of ours at the same address with the
 /// same 64 bytes, and none is an image row (the installer registers main replace hooks only).
-#[test]
 fn own_hook_rows_name_our_replace_hook_at_the_same_address() {
     let own: Vec<_> = all().filter(|s| matches!(s.sharing, Sharing::OwnHook { .. })).collect();
     assert_eq!(own.len(), OWN_HOOK_ROWS);
@@ -413,14 +399,12 @@ fn own_hook_rows_name_our_replace_hook_at_the_same_address() {
     assert!(images::IMAGE_ROWS.iter().all(|s| !matches!(s.sharing, Sharing::OwnHook { .. })));
 }
 
-#[test]
 fn the_outcome_tables_are_sized_from_the_row_files() {
     assert_eq!(COUNT, count(), "COUNT must count every row (the installer sizes its table with it)");
     assert_eq!(COUNT, all().count());
     assert_eq!(IMAGE_COUNT, images::IMAGE_ROWS.len());
 }
 
-#[test]
 fn a_chain_row_accepts_a_far_jump_at_its_entry_and_nothing_else() {
     let chain = |actual: &[u8; GUARD_BYTES]| outcome_for(&stock(), actual, HOOK, Sharing::Chain);
     for far in [&FAR[..], &NOP_FAR[..]] {
@@ -444,7 +428,6 @@ fn a_chain_row_accepts_a_far_jump_at_its_entry_and_nothing_else() {
 /// `Sharing::EntryOrBody` (SEAMS-ALL): the entry is ours when stock; another plugin's far jump over the
 /// entry that ends before the body, with every other word stock, is `Shared` (we take the body); a
 /// one-word branch, a far jump reaching the body, or any further change stays unusable.
-#[test]
 fn an_entry_or_body_row_is_stock_or_shared_and_nothing_else() {
     let rule = |actual: &[u8; GUARD_BYTES]| entry_or_body_outcome(&stock(), actual, HOOK, 4);
     assert_eq!(rule(&stock()), GuardOutcome::Stock);
@@ -468,7 +451,6 @@ fn an_entry_or_body_row_is_stock_or_shared_and_nothing_else() {
 
 /// Every `Sharing::EntryOrBody` row's body is a row of ours inside the entry's 64 bytes, word-aligned
 /// and past a 4-word far jump, and the run-time view applies the rule to the real row.
-#[test]
 fn entry_or_body_rows_name_a_body_row_inside_their_window() {
     assert_eq!(ENTRY_OR_BODY_COUNT, 1);
     assert_eq!(ENTRY_OR_BODY_ROWS, [("replay.write_record", "smash_replay_to_mp4", 0x143e2b0)]);
@@ -487,7 +469,6 @@ fn entry_or_body_rows_name_a_body_row_inside_their_window() {
 /// The diagnostic hook-sharing drill (`src/swap_native/seam_drill.rs`, `foreign=` in `diag.txt`): each
 /// stand-in form on the one site per sharing rule it hooks reads as the drill expects. `inline` is a
 /// one-word branch, `far` a 4-word far jump to the stand-in handler.
-#[test]
 fn the_drill_sites_classify_each_standin_form() {
     let at = |label: &str, form: &[u32]| {
         let (_, site) = find_site(label).unwrap_or_else(|| panic!("no row {}", label));
@@ -536,7 +517,6 @@ fn the_drill_sites_classify_each_standin_form() {
     assert_eq!(EntryForm::FarJump.name(), "far");
 }
 
-#[test]
 fn the_image_rows_are_well_formed() {
     let mut labels: BTreeSet<&str> = all().map(|s| s.label).collect();
     for seam in images::IMAGE_ROWS {
@@ -555,7 +535,6 @@ fn the_image_rows_are_well_formed() {
     }
 }
 
-#[test]
 fn every_compared_row_lies_in_one_read_only_region_and_rodata_rows_are_relied() {
     let mut problems = Vec::new();
     for seam in all().filter(|s| s.compared()) {
@@ -570,7 +549,6 @@ fn every_compared_row_lies_in_one_read_only_region_and_rodata_rows_are_relied() 
     assert!(problems.is_empty(), "{}", problems.join("\n"));
 }
 
-#[test]
 fn rodata_rows_compare_exactly_and_code_rows_by_their_kind() {
     assert_eq!(region_of(0), Some(MainRegion::Text));
     assert_eq!(region_of(MAIN_TEXT_END - GUARD_BYTES), Some(MainRegion::Text));
@@ -650,7 +628,6 @@ fn sections(elf: &[u8]) -> Vec<(String, Section)> {
         .collect()
 }
 
-#[test]
 fn compared_rows_match_the_owned_elf() {
     let Some(elf) = owned_elf("compared_rows_match_the_owned_elf") else {
         return;
@@ -680,7 +657,6 @@ fn compared_rows_match_the_owned_elf() {
     assert!(problems.is_empty(), "{}", problems.join("\n"));
 }
 
-#[test]
 fn the_runtime_sites_are_the_authored_rows_without_their_text() {
     // U17: the NRO reads only `SITES` / `IMAGE_SITES`, the rows' guard data and labels in table order;
     // the review text (`note`, `feature`, scopes, flags, sharing reasons) stays in the authored rows.
@@ -718,5 +694,68 @@ fn the_runtime_sites_are_the_authored_rows_without_their_text() {
         assert_eq!(site.chain, seam.sharing == Sharing::Chain, "{}: sharing", seam.label);
         assert_eq!(find_image(seam.label).map(|(at, _)| at), Some(index), "{}: index", seam.label);
     }
+}
+
+/// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+#[test]
+fn case_table() {
+    crate::test_table::run(&[
+        ("f6_control_task_guards_cover_the_final_instruction_word", f6_control_task_guards_cover_the_final_instruction_word as fn()),
+        ("identical_bytes_are_stock_for_every_kind", identical_bytes_are_stock_for_every_kind as fn()),
+        ("another_plugins_hook_in_the_words_we_replace_occupies_a_hook_site", another_plugins_hook_in_the_words_we_replace_occupies_a_hook_site as fn()),
+        ("hooks_past_our_span_are_allowed_and_reported", hooks_past_our_span_are_allowed_and_reported as fn()),
+        ("a_relied_on_word_must_stay_but_hooks_after_it_are_fine", a_relied_on_word_must_stay_but_hooks_after_it_are_fine as fn()),
+        ("anything_that_is_not_a_hook_shape_is_foreign", anything_that_is_not_a_hook_shape_is_foreign as fn()),
+        ("scopes_are_a_bit_set", scopes_are_a_bit_set as fn()),
+        ("the_table_rows_are_well_formed", the_table_rows_are_well_formed as fn()),
+        ("the_card_scan_export_lists_each_offset_once", the_card_scan_export_lists_each_offset_once as fn()),
+        ("glob_matches_macro_generated_names", glob_matches_macro_generated_names as fn()),
+        ("every_skyline_hook_attribute_has_a_row_or_is_listed_unconverted", every_skyline_hook_attribute_has_a_row_or_is_listed_unconverted as fn()),
+        ("the_cpu_pilot_rows_guard_its_hook_and_every_function_the_library_calls", the_cpu_pilot_rows_guard_its_hook_and_every_function_the_library_calls as fn()),
+        ("an_own_hook_row_reads_stock_only_for_our_registered_far_jump", an_own_hook_row_reads_stock_only_for_our_registered_far_jump as fn()),
+        ("own_hook_rows_name_our_replace_hook_at_the_same_address", own_hook_rows_name_our_replace_hook_at_the_same_address as fn()),
+        ("the_outcome_tables_are_sized_from_the_row_files", the_outcome_tables_are_sized_from_the_row_files as fn()),
+        ("a_chain_row_accepts_a_far_jump_at_its_entry_and_nothing_else", a_chain_row_accepts_a_far_jump_at_its_entry_and_nothing_else as fn()),
+        ("an_entry_or_body_row_is_stock_or_shared_and_nothing_else", an_entry_or_body_row_is_stock_or_shared_and_nothing_else as fn()),
+        ("entry_or_body_rows_name_a_body_row_inside_their_window", entry_or_body_rows_name_a_body_row_inside_their_window as fn()),
+        ("the_drill_sites_classify_each_standin_form", the_drill_sites_classify_each_standin_form as fn()),
+        ("the_image_rows_are_well_formed", the_image_rows_are_well_formed as fn()),
+        ("every_compared_row_lies_in_one_read_only_region_and_rodata_rows_are_relied", every_compared_row_lies_in_one_read_only_region_and_rodata_rows_are_relied as fn()),
+        ("rodata_rows_compare_exactly_and_code_rows_by_their_kind", rodata_rows_compare_exactly_and_code_rows_by_their_kind as fn()),
+        ("compared_rows_match_the_owned_elf", compared_rows_match_the_owned_elf as fn()),
+        ("the_runtime_sites_are_the_authored_rows_without_their_text", the_runtime_sites_are_the_authored_rows_without_their_text as fn()),
+    ]);
+}
+
+/// rc.9 coverage. The run-time tables are compile-time projections of the row files. Recomputed at run time, each projection is
+/// the table the NRO carries and agrees with a plain walk of the authored rows.
+#[test]
+fn the_compile_time_projections_are_the_row_files_walked_in_order() {
+    let rows: Vec<&Seam> = all().collect();
+    assert_eq!(total(&TABLES), rows.len());
+    assert_eq!(COUNT, rows.len());
+    let sites = project(&TABLES);
+    assert!(sites.iter().zip(&rows).all(|(site, row)| site.label == row.label && site.offset == row.offset));
+    assert!(SITES.iter().zip(&sites).all(|(a, b)| a.label == b.label && a.offset == b.offset && a.guard == b.guard));
+    let own: Vec<(&str, &str)> =
+        rows.iter().filter_map(|row| if let Sharing::OwnHook { hook } = row.sharing { Some((row.label, hook)) } else { None }).collect();
+    assert_eq!(own_hook_rows(&TABLES), own.len());
+    assert_eq!(own_hook_pairs(&TABLES).as_slice(), own.as_slice());
+    assert_eq!(OWN_HOOK_PAIRS.as_slice(), own.as_slice());
+    let patches: Vec<usize> = rows.iter().enumerate().filter(|(_, row)| writes_code(row)).map(|(index, _)| index).collect();
+    assert_eq!(patch_rows(&TABLES), patches.len());
+    assert_eq!(patch_sites(&TABLES).as_slice(), patches.as_slice());
+    assert_eq!(PATCH_SITES.as_slice(), patches.as_slice());
+    let shared: Vec<(&str, &str, usize)> = rows
+        .iter()
+        .filter_map(|row| if let Sharing::EntryOrBody { owner, body } = row.sharing { Some((row.label, owner, body)) } else { None })
+        .collect();
+    assert_eq!(entry_or_body_count(&TABLES), shared.len());
+    assert_eq!(entry_or_body_rows(&TABLES).as_slice(), shared.as_slice());
+    assert_eq!(ENTRY_OR_BODY_ROWS.as_slice(), shared.as_slice());
+    let images = project_images(images::IMAGE_ROWS);
+    assert_eq!(images.len(), IMAGE_COUNT);
+    assert!(images.iter().zip(images::IMAGE_ROWS).all(|(site, row)| site.label == row.label && site.chain == matches!(row.sharing, Sharing::Chain)));
+    assert!(IMAGE_SITES.iter().zip(&images).all(|(a, b)| a.label == b.label && a.guard == b.guard));
 }
 }

@@ -593,3 +593,15 @@ pub fn apply_combo_action(queue: &mut super::notify::Queue, text: &str) {
         super::notify::DEFAULT_COLOR,
     );
 }
+
+#[cfg(test)]
+#[path = "combo_record_tests.rs"]
+mod tests;
+
+#[cfg(test)]
+#[path = "combo_record_share_tests.rs"]
+mod share_tests;
+
+#[cfg(test)]
+#[path = "combo_notice_tests.rs"]
+mod notice_tests;

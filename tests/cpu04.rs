@@ -2,6 +2,9 @@
 //! B5 / N4 (the recording wins by default), B6 (one state per fighter), B8 (Mistech Options no longer
 //! depend on Tech Options). Test names are the spec's §9 rows.
 
+// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).
+#[path = "../src/test_table.rs"]
+mod test_table;
 // rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
 macro_rules! lib_unit_tests {
     ($($body:tt)*) => {};
@@ -114,7 +117,6 @@ fn request(requested: i32) -> TechRequest {
     TechRequest { requested, second_prev: WAIT, passive: true, passive_wall: true, passive_ceil: true, script_passive_enabled: true }
 }
 
-#[test]
 fn cpu04_ground_tech_table() {
     for (option, want, roll) in [
         (3usize, Some(PASSIVE), None),
@@ -149,7 +151,6 @@ fn cpu04_ground_tech_table() {
     assert_eq!(cpu.rng, before, "no roll unless a tech situation applies");
 }
 
-#[test]
 fn cpu04_wall_ceiling_tech() {
     // Wall: In Place wall-techs, Roll Forwards wall-jumps, Roll Backwards and No Tech do nothing.
     for (option, want) in [(3usize, Some(PASSIVE_WALL)), (1, Some(PASSIVE_WALL_JUMP)), (2, None), (0, None)] {
@@ -174,7 +175,6 @@ fn cpu04_wall_ceiling_tech() {
     assert_eq!(cpu.tech_status_change(key, &TechRequest { passive_ceil: false, ..request(STOP_CEIL) }), TechChange::Unchanged);
 }
 
-#[test]
 fn cpu04_motion_substitution() {
     let m = MotionHashes::new();
     assert_eq!(m.passive_stand_f, hash40("passive_stand_f"));
@@ -214,7 +214,6 @@ fn frame_in(cpu: &mut Cpu, key: FighterKey, status: i32) -> model::cpu::facts::F
     cpu.frame(key, &FrameFacts { status, ..FrameFacts::default() })
 }
 
-#[test]
 fn cpu04_mistech_table() {
     // Down-wait (both kinds): Getup, Getup Attack, Roll Forwards, Roll Backwards.
     for (option, want) in [(0usize, DOWN_STAND), (1, DOWN_STAND_ATTACK), (2, DOWN_STAND_FB), (3, DOWN_STAND_FB)] {
@@ -239,7 +238,6 @@ fn cpu04_mistech_table() {
     assert_eq!(frame_in(&mut cpu, key, DOWN_WAIT).force_status, None);
 }
 
-#[test]
 fn cpu04_mistech_gate_is_its_own_row() {
     // B8 (question 1): clearing Tech Options no longer disables Mistech Options.
     let mut rows = miss_only(0);
@@ -248,7 +246,6 @@ fn cpu04_mistech_gate_is_its_own_row() {
     assert_eq!(frame_in(&mut cpu, key, DOWN_WAIT).force_status, Some(DOWN_STAND));
 }
 
-#[test]
 fn cpu04_laydown_lockout() {
     // lockout = min(base + damage / damage_max * (max - base), max), truncated.
     assert_eq!(laydown_lockout(10.0, 50.0, 100.0, 0.0), 10);
@@ -281,7 +278,6 @@ fn cpu04_laydown_lockout() {
     assert_eq!(cpu.fighters[key.index()].counters.count(model::cpu::counter::CounterId::LayDown), 0);
 }
 
-#[test]
 fn cpu04_tech_triggers_mash() {
     // A tech with the Tech Option trigger ticked buffers the override (non-empty) else mash_state.
     let mut triggers = vec![0u8; 17];
@@ -315,7 +311,6 @@ fn cpu04_tech_triggers_mash() {
     assert_eq!(cpu.fighters[key.index()].mash.queue.current().map(|a| a.0), Some(18));
 }
 
-#[test]
 fn cpu04_a_departed_entry_forgets_its_hidden_record_and_the_scene_forgets_any() {
     let (mut cpu, key) = cpu_with(&[("tech_hide", vec![1, 0])]);
     cpu.frame(key, &hide_facts(DOWN, 2, 40, 12.5));
@@ -335,7 +330,6 @@ fn hide_facts(status: i32, frame: i32, end: i32, cursor: f32) -> FrameFacts {
     FrameFacts { status, motion_frame: frame, tech: TechFacts { end_frame: end, cursor_offset: cursor, ..TechFacts::default() }, ..FrameFacts::default() }
 }
 
-#[test]
 fn cpu04_hide_tech_lifecycle() {
     let (mut cpu, key) = cpu_with(&[("tech_hide", vec![1, 0])]);
     // First frame of a missed tech: the record is made and the cursor goes off screen; nothing hidden yet.
@@ -362,7 +356,6 @@ fn cpu04_hide_tech_lifecycle() {
     }
 }
 
-#[test]
 fn cpu04_hide_tech_toggle_off_mid_tech() {
     let (mut cpu, key) = cpu_with(&[("tech_hide", vec![1, 0])]);
     cpu.frame(key, &hide_facts(DOWN, 2, 40, 7.0));
@@ -374,7 +367,6 @@ fn cpu04_hide_tech_toggle_off_mid_tech() {
     assert!(cpu.hidden.is_none());
 }
 
-#[test]
 fn cpu04_primary_body_only() {
     // Hide tech acts on the primary body only; Nana stays visible; a replaced body forgets the record.
     let (mut cpu, popo) = cpu_with(&[("tech_hide", vec![1, 0])]);
@@ -394,7 +386,6 @@ fn cpu04_primary_body_only() {
     assert!(cpu.hidden.is_none(), "the record dies with the session");
 }
 
-#[test]
 fn cpu04_quake_rule() {
     let t = table();
     let on = settings(&[("tech_hide", vec![1, 0])]);
@@ -404,7 +395,6 @@ fn cpu04_quake_rule() {
     assert!(!quake_suppressed(&t, &off, DOWN), "only with Hide Tech Animations On");
 }
 
-#[test]
 fn cpu04_camera_table() {
     assert_eq!(camera_centre(StageClass::Standard), Some([0.0, 50.0, 230.0]));
     assert_eq!(camera_centre(StageClass::Smashville), Some([0.0, 35.0, 350.0]));
@@ -412,7 +402,6 @@ fn cpu04_camera_table() {
     assert_eq!(camera_centre(StageClass::Other), None, "the game's own centre stays");
 }
 
-#[test]
 fn cpu04_per_fighter_state() {
     // B6: Popo's held roll directions do not leak into Nana's.
     let (mut cpu, popo) = cpu_with(&[("tech_state", tech_only(2))]);
@@ -422,7 +411,6 @@ fn cpu04_per_fighter_state() {
     assert_eq!(cpu.fighters[nana.index()].tech.tech_roll, None);
 }
 
-#[test]
 fn cpu04_playback_wins_default() {
     let playing = PlaybackState { running: true, ..PlaybackState::default() };
     // Tech, mistech and the animation substitution yield to a playing recording.
@@ -438,7 +426,6 @@ fn cpu04_playback_wins_default() {
     assert_eq!(frame_in(&mut cpu, key, DOWN_WAIT).force_status, Some(DOWN_STAND));
 }
 
-#[test]
 fn cpu04_playback_override_on() {
     let mut rows = miss_only(0);
     rows.push(("tech_state", tech_only(3)));
@@ -449,7 +436,6 @@ fn cpu04_playback_override_on() {
     assert_eq!(frame_in(&mut cpu, key, DOWN_WAIT).force_status, Some(DOWN_STAND));
 }
 
-#[test]
 fn cpu04_stage_class_follows_the_native_ids_and_the_record_form() {
     use model::cpu::tech::{stage, stage_class};
     // The stages themselves (form 0).
@@ -469,7 +455,6 @@ fn cpu04_stage_class_follows_the_native_ids_and_the_record_form() {
     assert_eq!(stage_class(stage::STAGE_COUNT, None), StageClass::Other);
 }
 
-#[test]
 fn cpu04_camera_setup_and_mode_apply_the_stage_value_and_restore_the_default() {
     let game = [0.0, 40.0, 200.0];
     // Hide Tech Animations On: the stage's value goes in, at the setup and at the mode change.
@@ -487,4 +472,29 @@ fn cpu04_camera_setup_and_mode_apply_the_stage_value_and_restore_the_default() {
     assert_eq!(cpu.camera_mode(StageClass::Smashville, 4), None, "nothing captured yet");
     assert_eq!(cpu.camera_setup(StageClass::Smashville, game), None, "Off: the setup passes through");
     assert_eq!(cpu.camera_mode(StageClass::Smashville, 4), Some(game));
+}
+
+/// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+#[test]
+fn case_table() {
+    crate::test_table::run(&[
+        ("cpu04_ground_tech_table", cpu04_ground_tech_table as fn()),
+        ("cpu04_wall_ceiling_tech", cpu04_wall_ceiling_tech as fn()),
+        ("cpu04_motion_substitution", cpu04_motion_substitution as fn()),
+        ("cpu04_mistech_table", cpu04_mistech_table as fn()),
+        ("cpu04_mistech_gate_is_its_own_row", cpu04_mistech_gate_is_its_own_row as fn()),
+        ("cpu04_laydown_lockout", cpu04_laydown_lockout as fn()),
+        ("cpu04_tech_triggers_mash", cpu04_tech_triggers_mash as fn()),
+        ("cpu04_a_departed_entry_forgets_its_hidden_record_and_the_scene_forgets_any", cpu04_a_departed_entry_forgets_its_hidden_record_and_the_scene_forgets_any as fn()),
+        ("cpu04_hide_tech_lifecycle", cpu04_hide_tech_lifecycle as fn()),
+        ("cpu04_hide_tech_toggle_off_mid_tech", cpu04_hide_tech_toggle_off_mid_tech as fn()),
+        ("cpu04_primary_body_only", cpu04_primary_body_only as fn()),
+        ("cpu04_quake_rule", cpu04_quake_rule as fn()),
+        ("cpu04_camera_table", cpu04_camera_table as fn()),
+        ("cpu04_per_fighter_state", cpu04_per_fighter_state as fn()),
+        ("cpu04_playback_wins_default", cpu04_playback_wins_default as fn()),
+        ("cpu04_playback_override_on", cpu04_playback_override_on as fn()),
+        ("cpu04_stage_class_follows_the_native_ids_and_the_record_form", cpu04_stage_class_follows_the_native_ids_and_the_record_form as fn()),
+        ("cpu04_camera_setup_and_mode_apply_the_stage_value_and_restore_the_default", cpu04_camera_setup_and_mode_apply_the_stage_value_and_restore_the_default as fn()),
+    ]);
 }

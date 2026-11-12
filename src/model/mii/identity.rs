@@ -241,3 +241,196 @@ pub fn verify(before: &Identity, now: &Identity, allowed: ExpectedMutation) -> R
     }
 }
 
+#[cfg(test)]
+mod tests {
+    lib_unit_tests! {
+    use super::*;
+    use crate::engine::mii::inventory::{Appearance, Canonical, MiiClass, MiiConfig, TaggedId, CHARINFO_LEN, CHARINFO_MASK_END};
+
+    /// The `lifetime` tests' sample configuration (a Swordfighter preset), rebuilt here.
+    fn configuration() -> Configuration {
+        let face = 7u8;
+        let mut info = [face; CHARINFO_LEN];
+        info[..CHARINFO_MASK_END].fill(1);
+        let mut masked = info;
+        masked[..CHARINFO_MASK_END].fill(0);
+        let canonical = Canonical {
+            class: MiiClass::Swordfighter,
+            appearance: Appearance {
+                charinfo_masked: masked, specials: [face % 3, 0, 0, 0], colour: 4, voice: 37,
+                outfit: 0x14_7bc5_9435, hat: 0x0f_a9ef_a5ea, chara: MiiClass::Swordfighter.chara_hash40(),
+            },
+        };
+        Configuration::from_saved(&MiiConfig {
+            slot_id: 107, slot_index: 0, name: String::new(), charinfo: info,
+            raw_tags: [TaggedId(0x13002b147bc59435), TaggedId(0x5a00000fa9efa5ea), TaggedId(0xc1004d15d7061f77)],
+            canonical, copies: vec![],
+        }).unwrap()
+    }
+
+    fn pta116t_before() -> Identity {
+        // PTA116T #658: the CPU's exchanged group [0x21, 0x1e] (count 2, actor 1) over the window
+        // bank [9, 1, 5]; the shared R header is still the window's [1, 9, 1, 5, 0].
+        let mut descriptor = [0u8; DESCRIPTOR_LEN];
+        GroupLayout { count: 2, kinds: [0x21, 0x1e, u32::MAX], actors: 1 }.apply(&mut descriptor);
+        descriptor[0x10..0x14].copy_from_slice(&(-1i32).to_le_bytes());
+        descriptor[0x34] = 1; descriptor[0x35] = 1; descriptor[0x37] = 100;
+        Identity { entry: 0x11af92c000, owner: 1, epoch: 7, resource: 0x2000, object: 0x11afee3200, header: [1, 9, 1, 5, 0],
+            descriptor, index: 0, tokens: [0; 4], bodies: [(0x90000, 1), (0xa0000, 2), (0, 0)], active: 0 }
+    }
+
+    fn exchanged_group_header_is_its_own_capture_not_the_descriptor_words() {
+        let before = pta116t_before();
+        let now = before;
+        assert_eq!(verify(&before, &now, ExpectedMutation::None), Ok(()), "the prequeue compares capture against capture");
+        // The old predicate expected [selector, FE+0x18, FE+0x1c, FE+0x20, FE+0x41] = [1, 0x21, 0x1e, -1, 0].
+        let derived = Identity { header: [1, 0x21, 0x1e, u32::MAX, 0], ..before };
+        assert_eq!(verify(&derived, &now, ExpectedMutation::None), Err(Mismatch { field: Field::Header(1), expected: 0x21, actual: 9 }),
+            "D-PTA1: a derived header is a mismatch, and the first word that differs is named");
+        for word in 0..5 {
+            let mut foreign = now; foreign.header[word] ^= 0x100;
+            assert_eq!(verify(&before, &foreign, ExpectedMutation::None).unwrap_err().field, Field::Header(word as u8));
+            assert_eq!(verify(&before, &foreign, ExpectedMutation::NativeBehavior).unwrap_err().field, Field::Header(word as u8), "no mutation frees the header except an exact Mii setup");
+        }
+        let mut other_object = now; other_object.object += 0x100;
+        assert_eq!(verify(&before, &other_object, ExpectedMutation::None).unwrap_err().field, Field::Object);
+        let mut other_index = now; other_index.index = 3;
+        assert_eq!(verify(&before, &other_index, ExpectedMutation::None).unwrap_err().field, Field::Index);
+        let mut other_tokens = now; other_tokens.tokens[2] = 9;
+        assert_eq!(verify(&before, &other_tokens, ExpectedMutation::None).unwrap_err().field, Field::Tokens(2));
+    }
+
+    fn configure_skipped_admits_exactly_the_installed_r68_and_tokens() {
+        // W-M2-4: the gate installed R+0x68 = FE+0x46 of the incoming Mii and the configured tokens on
+        // the skip path; the receipt proves those values and refuses any other change.
+        let before = pta116t_before();
+        let mut now = before; now.index = 7; now.tokens = [0x10b, 0x2, 0x33, 0x0];
+        let allowed = ExpectedMutation::ConfigureSkipped { index: 7, tokens: [0x10b, 0x2, 0x33, 0x0] };
+        assert_eq!(verify(&before, &now, allowed), Ok(()));
+        assert_eq!(verify(&before, &now, ExpectedMutation::None).unwrap_err().field, Field::Index, "without the receipt the install is a mismatch");
+        let mut stale = now; stale.index = 0;
+        assert_eq!(verify(&before, &stale, allowed), Err(Mismatch { field: Field::Index, expected: 7, actual: 0 }), "a stale R+0x68 is the defect");
+        let mut other_token = now; other_token.tokens[2] = 0x34;
+        assert_eq!(verify(&before, &other_token, allowed).unwrap_err().field, Field::Tokens(2));
+        let mut header = now; header.header[1] ^= 1;
+        assert_eq!(verify(&before, &header, allowed).unwrap_err().field, Field::Header(1), "the skip path writes nothing else");
+        let mut body = now; body.bodies[0].1 += 1;
+        assert_eq!(verify(&before, &body, allowed).unwrap_err().field, Field::Body(0));
+    }
+
+    fn training_menu_live_bytes_are_tolerated_only_in_domain_and_nothing_else_is() {
+        let before = pta116t_before();
+        // C120 S2 #934 / C104 #336..#342: Behavior=Control writes ffffffff>00000001, 01>00, 01>24, 100>21; FE+0x36 as written.
+        let mut now = before;
+        now.descriptor[0x10..0x14].copy_from_slice(&1i32.to_le_bytes());
+        now.descriptor[0x34] = 0; now.descriptor[0x35] = 0x24; now.descriptor[0x36] ^= 0x5a; now.descriptor[0x37] = 21;
+        assert_eq!(verify(&before, &now, ExpectedMutation::NativeBehavior), Ok(()));
+        assert_eq!(verify(&now, &before, ExpectedMutation::NativeBehavior), Ok(()), "releasing Control is live too");
+        assert_eq!(verify(&before, &now, ExpectedMutation::None).unwrap_err().field, Field::Descriptor(0x10), "a Track proof admits no writer");
+        // Out of domain on the new side …
+        let mut rank = now; rank.descriptor[0x37] = 101;
+        assert_eq!(verify(&before, &rank, ExpectedMutation::NativeBehavior), Err(Mismatch { field: Field::Descriptor(0x37), expected: 100, actual: 101 }));
+        let mut pad = now; pad.descriptor[0x10..0x14].copy_from_slice(&9i32.to_le_bytes());
+        assert_eq!(verify(&before, &pad, ExpectedMutation::NativeBehavior).unwrap_err().field, Field::Descriptor(0x10));
+        let mut control = now; control.descriptor[0x35] = 0x28;
+        assert_eq!(verify(&before, &control, ExpectedMutation::NativeBehavior).unwrap_err().field, Field::Descriptor(0x35));
+        // … and on the old side (Astra review 2.1: rank 101 → 21 must refuse).
+        let mut odd_base = before; odd_base.descriptor[0x37] = 101;
+        assert_eq!(verify(&odd_base, &now, ExpectedMutation::NativeBehavior).unwrap_err().field, Field::Descriptor(0x37));
+        let mut unchanged_odd = before; unchanged_odd.descriptor[0x37] = 101;
+        let mut same = unchanged_odd; same.descriptor[0x34] = 0;
+        assert_eq!(verify(&unchanged_odd, &same, ExpectedMutation::NativeBehavior), Ok(()), "an unchanged byte keeps any value");
+        // The descriptor count written to 255 is a foreign change even under NativeBehavior (Astra review 2.1).
+        let mut count = now; count.descriptor[0x14] = 255;
+        assert_eq!(verify(&before, &count, ExpectedMutation::NativeBehavior), Err(Mismatch { field: Field::Descriptor(0x14), expected: 2, actual: 255 }));
+        // Every non-live byte flipped alone is refused and named.
+        for offset in 0..DESCRIPTOR_LEN {
+            if is_live_behavior_byte(offset) { continue; }
+            let mut flipped = now; flipped.descriptor[offset] ^= 0xff;
+            assert_eq!(verify(&before, &flipped, ExpectedMutation::NativeBehavior).unwrap_err().field, Field::Descriptor(offset as u8), "offset {offset:#x}");
+        }
+        // Bodies and the active member are never behaviour.
+        let mut body = now; body.bodies[1].0 += 8;
+        assert_eq!(verify(&before, &body, ExpectedMutation::NativeBehavior).unwrap_err().field, Field::Body(1));
+        let mut active = now; active.active = 1;
+        assert_eq!(verify(&before, &active, ExpectedMutation::NativeBehavior).unwrap_err().field, Field::Active);
+    }
+
+    fn a_group_exchange_permits_exactly_the_minted_layout_and_bodies() {
+        // GSFIX D1: window [3, 7, 8] exchanged for the group [10, 11, 21]; R header stays [1, 3, 7, 8, 2].
+        let mut before = pta116t_before();
+        before.header = [1, 3, 7, 8, 2];
+        GroupLayout { count: 3, kinds: [3, 7, 8], actors: 1 }.apply(&mut before.descriptor);
+        before.descriptor[0x41] = 2;
+        before.bodies = [(0x3000, 1), (0x4000, 262144), (0x5000, 327680)];
+        let layout = GroupLayout { count: 3, kinds: [10, 11, 21], actors: 1 };
+        let bodies = [(0x6000, 393216), (0x7000, 458752), (0x8000, 524288)];
+        let mut after = before;
+        layout.apply(&mut after.descriptor);
+        after.bodies = bodies;
+        let exchange = ExpectedMutation::GroupExchange { layout, bodies };
+        assert_eq!(verify(&before, &after, exchange), Ok(()));
+        assert_eq!(GroupLayout::of(&after.descriptor), layout);
+        assert_eq!(verify(&before, &after, ExpectedMutation::None).unwrap_err().field, Field::Descriptor(0x18), "the exchange is the only writer of the words");
+        let mut header = after; header.header[1] = 10;
+        assert_eq!(verify(&before, &header, exchange), Err(Mismatch { field: Field::Header(1), expected: 3, actual: 10 }), "the header is never re-derived from the words");
+        let mut other_bodies = after; other_bodies.bodies[2].1 += 1;
+        assert_eq!(verify(&before, &other_bodies, exchange).unwrap_err().field, Field::Body(2));
+        let mut other_layout = after;
+        GroupLayout { count: 2, kinds: [10, 11, u32::MAX], actors: 1 }.apply(&mut other_layout.descriptor);
+        assert_eq!(verify(&before, &other_layout, exchange).unwrap_err().field, Field::Descriptor(0x14));
+        let mut flag = after; flag.descriptor[0x41] ^= 1;
+        assert_eq!(verify(&before, &flag, exchange).unwrap_err().field, Field::Descriptor(0x41));
+        // After the exchange the receipt admits only live behaviour (C118 D5 / C120 D5).
+        let mut toggled = after;
+        toggled.descriptor[0x10..0x14].copy_from_slice(&1i32.to_le_bytes());
+        toggled.descriptor[0x34] = 0; toggled.descriptor[0x35] = 0x24; toggled.descriptor[0x37] = 21;
+        assert_eq!(verify(&after, &toggled, ExpectedMutation::NativeBehavior), Ok(()));
+        assert_eq!(verify(&after, &toggled, ExpectedMutation::None).unwrap_err().field, Field::Descriptor(0x10));
+    }
+
+    fn a_native_form_selection_changes_only_the_selected_member() {
+        let before = pta116t_before();
+        let mut now = before; now.active = 1;
+        assert_eq!(verify(&before, &now, ExpectedMutation::NativeFormSelection(1)), Ok(()));
+        assert_eq!(verify(&before, &now, ExpectedMutation::None).unwrap_err().field, Field::Active);
+        assert_eq!(verify(&before, &now, ExpectedMutation::NativeFormSelection(2)), Err(Mismatch { field: Field::Active, expected: 2, actual: 1 }));
+        let mut out_of_range = before; out_of_range.active = 3;
+        assert_eq!(verify(&before, &out_of_range, ExpectedMutation::NativeFormSelection(3)).unwrap_err().field, Field::Active);
+        let mut plus_bytes = now; plus_bytes.descriptor[0x18] ^= 1;
+        assert_eq!(verify(&before, &plus_bytes, ExpectedMutation::NativeFormSelection(1)).unwrap_err().field, Field::Descriptor(0x18), "the form change rewrites no descriptor word");
+        assert_eq!(verify(&before, &before, ExpectedMutation::NativeFormSelection(1)), Ok(()), "an unchanged selection is admitted too");
+    }
+
+    fn an_exact_mii_publication_frees_only_what_the_setup_owns() {
+        let before = pta116t_before();
+        let layout = GroupLayout { count: 1, kinds: [0x4a, u32::MAX, u32::MAX], actors: 1 };
+        let configuration = configuration();
+        let allowed = ExpectedMutation::ExactMii { layout, configuration };
+        let mut now = before;
+        layout.apply(&mut now.descriptor);
+        now.header = [1, 0x4a, u32::MAX, u32::MAX, 0];
+        now.index = 5; now.tokens = [1, 2, 3, 4];
+        for offset in MII_BYTES { now.descriptor[offset] = 0x5a; }
+        now.bodies = [(0x9000, 7), (0, 0), (0, 0)];
+        assert_eq!(verify(&before, &now, allowed), Ok(()));
+        let mut foreign = now; foreign.descriptor[0x30] ^= 1;
+        assert_eq!(verify(&before, &foreign, allowed).unwrap_err().field, Field::Descriptor(0x30));
+        let mut other_entry = now; other_entry.entry += 8;
+        assert_eq!(verify(&before, &other_entry, allowed).unwrap_err().field, Field::Entry);
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("exchanged_group_header_is_its_own_capture_not_the_descriptor_words", exchanged_group_header_is_its_own_capture_not_the_descriptor_words as fn()),
+            ("configure_skipped_admits_exactly_the_installed_r68_and_tokens", configure_skipped_admits_exactly_the_installed_r68_and_tokens as fn()),
+            ("training_menu_live_bytes_are_tolerated_only_in_domain_and_nothing_else_is", training_menu_live_bytes_are_tolerated_only_in_domain_and_nothing_else_is as fn()),
+            ("a_group_exchange_permits_exactly_the_minted_layout_and_bodies", a_group_exchange_permits_exactly_the_minted_layout_and_bodies as fn()),
+            ("a_native_form_selection_changes_only_the_selected_member", a_native_form_selection_changes_only_the_selected_member as fn()),
+            ("an_exact_mii_publication_frees_only_what_the_setup_owns", an_exact_mii_publication_frees_only_what_the_setup_owns as fn()),
+        ]);
+    }
+    }
+}

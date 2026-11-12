@@ -49,7 +49,6 @@ mod tests {
     fn value(sequence: u32, epoch: u64, n: u32) -> Publication<Arc<u32>> {
         Publication { sequence, epoch, value: Arc::new(n) }
     }
-    #[test]
     fn full_returns_exact_identity_and_retries_after_worker_drains() {
         let (send, mut receive) = channel(1);
         assert!(send.post(value(2, 8, 10)).is_ok());
@@ -62,7 +61,6 @@ mod tests {
         assert!(Arc::ptr_eq(&identity, &receive.take(2, 8, true).unwrap()));
         assert!(receive.take(2, 8, true).is_none());
     }
-    #[test]
     fn close_reopen_and_retired_epoch_cannot_mount_old_publication() {
         let (send, mut receive) = channel(2);
         assert!(send.post(value(2, 8, 10)).is_ok());
@@ -74,7 +72,6 @@ mod tests {
         assert!(send.post(value(6, 10, 40)).is_ok());
         assert_eq!(*receive.take(6, 10, true).unwrap(), 40);
     }
-    #[test]
     fn newest_current_value_wins_without_stale_value_overwriting_it() {
         let (send, mut receive) = channel(3);
         assert!(send.post(value(4, 9, 10)).is_ok());
@@ -82,12 +79,22 @@ mod tests {
         assert!(send.post(value(2, 8, 99)).is_ok());
         assert_eq!(*receive.take(4, 9, true).unwrap(), 20);
     }
-    #[test]
     fn disconnected_consumer_returns_ownership() {
         let (send, receive) = channel(1);
         drop(receive);
         let returned = send.post(value(2, 8, 10)).err().unwrap();
         assert_eq!(*returned.value, 10);
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("full_returns_exact_identity_and_retries_after_worker_drains", full_returns_exact_identity_and_retries_after_worker_drains as fn()),
+            ("close_reopen_and_retired_epoch_cannot_mount_old_publication", close_reopen_and_retired_epoch_cannot_mount_old_publication as fn()),
+            ("newest_current_value_wins_without_stale_value_overwriting_it", newest_current_value_wins_without_stale_value_overwriting_it as fn()),
+            ("disconnected_consumer_returns_ownership", disconnected_consumer_returns_ownership as fn()),
+        ]);
     }
     }
 }

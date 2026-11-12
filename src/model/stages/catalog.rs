@@ -39,3 +39,46 @@ pub fn controls_help(controls: HelpControls) -> &'static str {
     controls.bare()
 }
 
+#[cfg(test)]
+mod tests {
+    lib_unit_tests! {
+    use super::*;
+
+    fn the_catalog_is_117_stages_and_the_grid_is_118_tiles_on_eight_pages() {
+        assert_eq!(STAGE_COUNT, 117);
+        assert_eq!(TILE_COUNT, 118);
+        assert_eq!(PAGE_SIZE, 16);
+        assert_eq!(PAGE_COUNT, 8, "MENU-DRAFT: eight pages of 4 x 4");
+        assert_eq!(STAGES[0], (311, "Waiting Room"));
+        assert_eq!(STAGES[1].1, "Battlefield");
+        let mut ids: Vec<u32> = STAGES.iter().map(|(id, _)| *id).collect();
+        ids.sort_unstable();
+        ids.dedup();
+        assert_eq!(ids.len(), STAGE_COUNT, "no stage id is listed twice");
+    }
+
+    fn paging_wraps_and_clamps_on_the_last_page() {
+        assert_eq!(page_cursor(0, TILE_COUNT, true), Some(16));
+        assert_eq!(page_cursor(0, TILE_COUNT, false), Some(TILE_COUNT - 1).map(|last| (7 * 16).min(last)));
+        assert_eq!(page_cursor(117, TILE_COUNT, true), Some(5));
+        assert_eq!(page_cursor(0, 0, true), None);
+    }
+
+    fn the_help_lines_name_the_form_and_the_legend() {
+        let forms = native_forms(0);
+        let line = form_help(Form::Normal, forms, HelpControls::TrainingApply);
+        assert!(line.starts_with("Form: Normal"));
+        assert!(line.ends_with(controls_help(HelpControls::TrainingApply)));
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("the_catalog_is_117_stages_and_the_grid_is_118_tiles_on_eight_pages", the_catalog_is_117_stages_and_the_grid_is_118_tiles_on_eight_pages as fn()),
+            ("paging_wraps_and_clamps_on_the_last_page", paging_wraps_and_clamps_on_the_last_page as fn()),
+            ("the_help_lines_name_the_form_and_the_legend", the_help_lines_name_the_form_and_the_legend as fn()),
+        ]);
+    }
+    }
+}

@@ -97,3 +97,98 @@ impl ClipBrowser {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    lib_unit_tests! {
+    use super::*;
+
+    fn browser() -> ClipBrowser {
+        ClipBrowser::new(vec![
+            LibraryRow { id: "saved:500".into(), label: "Replay500f".into() },
+            LibraryRow { id: "saved:other".into(), label: "Other capture".into() },
+        ], 0)
+    }
+
+    fn active_waiting_cpu_can_finish_before_the_exact_capture_opens() {
+        let mut browser = browser();
+        assert_eq!(browser.on_pad(Pad::Confirm, true), Effect::None);
+        assert!(browser.pending());
+        // Counterexample: Mario is attacking, rather than an idle Training CPU.
+        // The browser must release its panel stop and wait, not reopen/refreeze.
+        assert!(browser.release_cpu(false));
+        for _ in 0..45 {
+            assert_eq!(browser.tick(true, false), Effect::None);
+            assert_eq!(browser.on_pad(Pad::Confirm, true), Effect::None);
+            assert_eq!(browser.on_pad(Pad::Right, true), Effect::None);
+        }
+        // WAIT or either admitted fall status is sampled by the native adapter.
+        assert!(!browser.release_cpu(true));
+        assert_eq!(browser.tick(true, true), Effect::Open("saved:500".into()));
+        assert!(browser.opening());
+        assert!(!browser.release_cpu(false));
+        assert_eq!(browser.tick(true, true), Effect::None); // One load only.
+    }
+
+    fn idle_training_stays_immediate_and_waiting_can_choose_another_capture() {
+        let mut training = browser();
+        assert_eq!(training.on_pad(Pad::Confirm, false), Effect::Open("saved:500".into()));
+        assert!(!training.release_cpu(false));
+        // The waiting-only layout clock must not cancel a synchronous Training load.
+        assert_eq!(training.tick(false, true), Effect::None);
+        assert!(training.opening());
+
+        let mut waiting = browser();
+        assert_eq!(waiting.on_pad(Pad::Right, true), Effect::None);
+        assert_eq!(waiting.on_pad(Pad::Confirm, true), Effect::None);
+        assert_eq!(waiting.tick(true, true), Effect::Open("saved:other".into()));
+    }
+
+    fn explicit_cancel_before_or_after_readiness_cannot_open_on_return() {
+        for ready in [false, true] {
+            let mut browser = browser();
+            browser.on_pad(Pad::Confirm, true);
+            browser.tick(true, ready);
+            assert_eq!(browser.on_pad(Pad::Back, true), Effect::Close);
+            assert!(!browser.pending());
+            assert!(!browser.opening()); // Native publication rejects this state.
+            assert!(!browser.release_cpu(false));
+            assert!(browser.view().is_none());
+            assert_eq!(browser.tick(true, true), Effect::None);
+        }
+    }
+
+    fn departure_or_native_ui_preempts_same_tick_readiness() {
+        let mut browser = browser();
+        browser.on_pad(Pad::Confirm, true);
+        assert_eq!(browser.tick(false, true), Effect::Close);
+        assert!(!browser.pending());
+        assert!(!browser.release_cpu(false));
+        assert_eq!(browser.tick(true, true), Effect::None);
+    }
+
+    fn repeated_confirm_cannot_extend_the_180_tick_deadline() {
+        let mut browser = browser();
+        browser.on_pad(Pad::Confirm, true);
+        for _ in 0..179 {
+            assert_eq!(browser.tick(true, false), Effect::None);
+            assert_eq!(browser.on_pad(Pad::Confirm, true), Effect::None);
+        }
+        assert_eq!(browser.tick(true, false), Effect::TimedOut);
+        assert!(!browser.pending());
+        assert!(!browser.release_cpu(false));
+        assert_eq!(browser.tick(true, true), Effect::None);
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("active_waiting_cpu_can_finish_before_the_exact_capture_opens", active_waiting_cpu_can_finish_before_the_exact_capture_opens as fn()),
+            ("idle_training_stays_immediate_and_waiting_can_choose_another_capture", idle_training_stays_immediate_and_waiting_can_choose_another_capture as fn()),
+            ("explicit_cancel_before_or_after_readiness_cannot_open_on_return", explicit_cancel_before_or_after_readiness_cannot_open_on_return as fn()),
+            ("departure_or_native_ui_preempts_same_tick_readiness", departure_or_native_ui_preempts_same_tick_readiness as fn()),
+            ("repeated_confirm_cannot_extend_the_180_tick_deadline", repeated_confirm_cannot_extend_the_180_tick_deadline as fn()),
+        ]);
+    }
+    }
+}

@@ -83,7 +83,6 @@ fn check(text: &BTreeMap<usize, u8>, patches: &[OwnPatch], label: &str) -> Guard
     seam.outcome(&seen)
 }
 
-#[test]
 fn every_hook_row_in_code_is_a_patch_site_and_nothing_else_is() {
     let expected: Vec<usize> = native_seams::all()
         .enumerate()
@@ -95,7 +94,6 @@ fn every_hook_row_in_code_is_a_patch_site_and_nothing_else_is() {
     assert!(PATCH_SITES.iter().any(|&index| SITES[index].label == "lobby_stage.resource_request"));
 }
 
-#[test]
 fn the_practice_stage_group_verifies_after_the_lobby_stage_hook_in_the_wrong_order() {
     let mut text = text();
     let mut patches = prime(&text);
@@ -119,7 +117,6 @@ fn the_practice_stage_group_verifies_after_the_lobby_stage_hook_in_the_wrong_ord
     assert_eq!(check(&text, &patches, "lobby_stage.resource_request").code(), "occupied");
 }
 
-#[test]
 fn every_group_reads_stock_with_all_our_hooks_installed_in_any_order() {
     // Every compared hook row's site hooked (the most our boot can write), checked after all of them: every compared row
     // reads stock, in either order, because each write is put back to the bytes it replaced.
@@ -141,7 +138,6 @@ fn every_group_reads_stock_with_all_our_hooks_installed_in_any_order() {
     }
 }
 
-#[test]
 fn a_refused_row_is_named_once_in_the_shipped_log() {
     use super::native_seams::report::{names_row, RefusedLine, FOREIGN, OCCUPIED, OTHER, OUT_OF_REGION, SKIPPED, STOCK, UNCHECKED};
     // A first check, or a change, to a refused code names the row; the same code again, or a usable one, does not.
@@ -158,5 +154,16 @@ fn a_refused_row_is_named_once_in_the_shipped_log() {
     let text = line.to_string();
     assert_eq!(text, "[TrainingSeams] seam=lobby_stage.resource_request group=lobby_stage_probe offset=0x25f7874 outcome=occupied");
     assert!(crate::model::diag_ring::shipped(text.as_bytes()));
+}
+
+/// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+#[test]
+fn case_table() {
+    crate::test_table::run(&[
+        ("every_hook_row_in_code_is_a_patch_site_and_nothing_else_is", every_hook_row_in_code_is_a_patch_site_and_nothing_else_is as fn()),
+        ("the_practice_stage_group_verifies_after_the_lobby_stage_hook_in_the_wrong_order", the_practice_stage_group_verifies_after_the_lobby_stage_hook_in_the_wrong_order as fn()),
+        ("every_group_reads_stock_with_all_our_hooks_installed_in_any_order", every_group_reads_stock_with_all_our_hooks_installed_in_any_order as fn()),
+        ("a_refused_row_is_named_once_in_the_shipped_log", a_refused_row_is_named_once_in_the_shipped_log as fn()),
+    ]);
 }
 }

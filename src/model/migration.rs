@@ -202,16 +202,23 @@ mod tests {
     lib_unit_tests! {
     use super::*;
 
-    #[test]
     fn the_marker_alone_blocks_a_rerun() {
         assert_eq!(plan(true, None, |_| true), Plan::MarkerPresent);
         assert_eq!(plan(false, None, |_| true), Plan::NoSource);
     }
 
-    #[test]
     fn routes_rename_the_settings_file() {
         assert_eq!(route("training_modpack_menu.conf").map(|r| r.to), Some("settings.json"));
         assert!(route("training_modpack.json").is_none());
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("the_marker_alone_blocks_a_rerun", the_marker_alone_blocks_a_rerun as fn()),
+            ("routes_rename_the_settings_file", routes_rename_the_settings_file as fn()),
+        ]);
     }
     }
 }

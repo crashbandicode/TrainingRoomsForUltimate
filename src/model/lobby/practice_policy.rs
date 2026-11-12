@@ -51,3 +51,56 @@ pub fn depart_session(retire_lease: impl FnOnce(), clear_consumers: impl FnOnce(
     clear_consumers();
 }
 
+#[cfg(test)]
+mod tests {
+    lib_unit_tests! {
+    use super::*;
+    fn waiting_roles_are_not_dense_training_slots() {
+        for mode in [0x02010000, 0x07010100, 0x87010101, 0x07010400, 0x87010400] {
+            let c = context(false, true, 0x0d, mode, true).unwrap();
+            assert_eq!([c.role(0), c.role(1), c.role(4), c.role(7)],
+                [Some(0), None, Some(1), None]);
+        }
+        let c = context(true, true, 0x20, 0x04040000, false).unwrap();
+        assert_eq!([c.role(0), c.role(1), c.role(4)], [Some(0), Some(1), None]);
+    }
+    fn match_css_results_arena_and_unready_waiting_cannot_acquire() {
+        for (initialized, melee, mode, active) in [
+            (true, 1, 0x02010000, true), (true, 1, 0x07010100, true),
+            (true, 0x0e, 0x07010101, true),
+            (true, 0x10, 0x07010400, true), (true, 0x0e, 0x07010400, true),
+            (true, 0x0d, 0x07010401, true),
+            (true, 0x0d, 0x07010200, true), (true, 0x20, 0x04040000, false),
+            (true, 0x0d, 0x02010000, false), (false, 0x0d, 0x02010000, true),
+        ] { assert_eq!(context(false, initialized, melee, mode, active), None); }
+    }
+    fn replacement_and_mode_change_invalidate_both_roles() {
+        let owned = Entries { context: Context::Waiting, player: 0x1000, cpu: 0x9000 };
+        let mut lease = EntryLease::new();
+        assert!(lease.acquire(owned));
+        assert!(lease.owns(0x9000));
+        assert!(!lease.owns(0x5000));
+        // A new body inside the same entry does not change entry ownership.
+        assert!(!lease.replaced(Some(owned)));
+        assert!(lease.replaced(None));
+        assert!(!lease.acquire(Entries { cpu: 0xa000, ..owned }));
+        assert!(lease.replaced(Some(Entries { context: Context::Training, ..owned })));
+        // Destruction retires the old operation even when an allocator reuses
+        // both addresses. Return may acquire a NEW operation, never resume it.
+        assert!(lease.retire());
+        assert!(!lease.active());
+        assert!(!lease.owns(0x9000));
+        assert!(lease.acquire(owned));
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("waiting_roles_are_not_dense_training_slots", waiting_roles_are_not_dense_training_slots as fn()),
+            ("match_css_results_arena_and_unready_waiting_cannot_acquire", match_css_results_arena_and_unready_waiting_cannot_acquire as fn()),
+            ("replacement_and_mode_change_invalidate_both_roles", replacement_and_mode_change_invalidate_both_roles as fn()),
+        ]);
+    }
+    }
+}

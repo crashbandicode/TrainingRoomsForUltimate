@@ -70,7 +70,6 @@ mod tests {
     lib_unit_tests! {
     use super::*;
 
-    #[test]
     fn frames_come_out_once_in_order() {
         let mut q = FrameQueue::new();
         for i in 0..10u64 {
@@ -81,7 +80,6 @@ mod tests {
         assert_eq!(q.pop(), None);
     }
 
-    #[test]
     fn a_full_queue_refuses_and_keeps_every_frame() {
         let mut q = FrameQueue::new();
         for i in 0..AHEAD as u64 {
@@ -96,7 +94,6 @@ mod tests {
         assert_eq!(out.last(), Some(&7));
     }
 
-    #[test]
     fn clear_drops_the_buffered_frames() {
         let mut q = FrameQueue::new();
         assert!(q.push(1));
@@ -106,6 +103,16 @@ mod tests {
         assert_eq!(q.room(), AHEAD);
         assert!(q.push(9));
         assert_eq!(q.pop(), Some(9));
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("frames_come_out_once_in_order", frames_come_out_once_in_order as fn()),
+            ("a_full_queue_refuses_and_keeps_every_frame", a_full_queue_refuses_and_keeps_every_frame as fn()),
+            ("clear_drops_the_buffered_frames", clear_drops_the_buffered_frames as fn()),
+        ]);
     }
     }
 }

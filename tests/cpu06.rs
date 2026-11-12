@@ -3,6 +3,9 @@
 //! mash-driven attacks), B11 (a changed Throw Options row re-rolls the held case), N3 (delay ranges).
 //! Test names are the spec's §9 rows; `cpu06_roll_points` is in `tests/cpu_core.rs`.
 
+// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).
+#[path = "../src/test_table.rs"]
+mod test_table;
 // rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
 macro_rules! lib_unit_tests {
     ($($body:tt)*) => {};
@@ -71,7 +74,6 @@ fn ground(status: C) -> CmdFacts {
     CmdFacts { status: st(status), situation: Situation::Ground, ..CmdFacts::default() }
 }
 
-#[test]
 fn cpu06_aerial_delay_rules() {
     // A 10-frame delay counts only on frames where CONT_ATTACK_AIR is enabled; 0 and "already in
     // ATTACK_AIR" wait for nothing.
@@ -112,7 +114,6 @@ fn cpu06_aerial_delay_rules() {
     assert_ne!(cpu.command_flags(key, false, &f).bits & st(C::FlagAttackN) as u32, 0);
 }
 
-#[test]
 fn cpu06_falling_aerial() {
     let (mut cpu, key) = cpu_with(&[]);
     cpu.fighters[key.index()].mash.queue.push(Action::NAIR);
@@ -124,7 +125,6 @@ fn cpu06_falling_aerial() {
     assert_ne!(cpu.command_flags(key, false, &falling).bits & attack_n, 0, "pressed once the gravity speed is negative");
 }
 
-#[test]
 fn cpu06_full_hop_hold() {
     // A grounded aerial mash returns only the jump bit when a full hop was rolled; the jump buttons are
     // held during JUMP_SQUAT only, released never; a short hop does not hold.
@@ -150,7 +150,6 @@ fn cpu06_full_hop_hold() {
     assert_eq!(cpu.full_hop_button(key, true), None);
 }
 
-#[test]
 fn cpu06_fast_fall_rules() {
     let (mut cpu, key) = cpu_with(&[("fast_fall_delay", delay(&[5]))]);
     cpu.fighters[key.index()].mash.rolled.fast_fall = true;
@@ -181,7 +180,6 @@ fn cpu06_fast_fall_rules() {
     assert_eq!(s.fast_fall_delay, DelayRow::Range { min: 2, max: 4, step: 1 });
 }
 
-#[test]
 fn cpu06_attack_angle() {
     // Up and Down values; neutral and an empty row leave the game's; not on the ledge; not during a
     // playback; the angle clears when the queue empties (decision B8).
@@ -203,7 +201,6 @@ fn cpu06_attack_angle() {
     assert_eq!(cpu.fighters[key.index()].mash.rolled.attack_angle, None);
 }
 
-#[test]
 fn cpu06_crouch_statuses() {
     let (mut cpu, key) = cpu_with(&[("crouch", vec![1, 0])]);
     for status in [C::StatusWait, C::StatusSquat, C::StatusSquatB, C::StatusSquatF, C::StatusSquatRv, C::StatusSquatWait] {
@@ -221,7 +218,6 @@ fn holding() -> CmdFacts {
     CmdFacts { cont_throw_hi: true, ..ground(C::StatusCatchWait) }
 }
 
-#[test]
 fn cpu06_throw_state_machine() {
     // Up throw after 30 frames, pummelling from frame 10 while it waits; the throw bits come on the
     // category-2 query; the mash after the throw ignores the triggers.
@@ -278,7 +274,6 @@ fn cpu06_throw_state_machine() {
     }
 }
 
-#[test]
 fn cpu06_throw_options_change_rerolls_held_case() {
     // B11: the CPU holds someone with Back Throw held; the menu changes the row to Forward Throw; the
     // case is cleared at once and rolled again in the same hold; the held delays are unchanged.
@@ -304,7 +299,6 @@ fn cpu06_throw_options_change_rerolls_held_case() {
     assert_eq!(bits, st(C::FlagThrowF) as u32, "the new option comes out in the same hold");
 }
 
-#[test]
 fn cpu06_throw_yields_to_playback() {
     let mut throw = vec![0u8; 5];
     throw[1] = 1;
@@ -320,7 +314,6 @@ fn cpu06_throw_yields_to_playback() {
     assert_ne!(cpu.command_flags(key, true, &hold).bits, 0, "Settings override playback On: the throw settings win");
 }
 
-#[test]
 fn cpu06_range_picks_and_exclusive_rows() {
     // N3: ranges for the four delay rows of this spec; a set Pummel Delay range turns pummelling on.
     let s = settings(&[
@@ -335,7 +328,6 @@ fn cpu06_range_picks_and_exclusive_rows() {
     assert!(!settings(&[]).pummel_delay.is_set());
 }
 
-#[test]
 fn cpu06_per_fighter_state() {
     // B6: Popo's held throw does not leak into Nana's.
     let (mut cpu, popo) = cpu_with(&[("throw_state", vec![0, 1, 0, 0, 0])]);
@@ -343,4 +335,22 @@ fn cpu06_per_fighter_state() {
     cpu.command_flags(popo, true, &holding());
     assert!(cpu.fighters[popo.index()].throw.case.is_some());
     assert!(cpu.fighters[nana.index()].throw.case.is_none());
+}
+
+/// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+#[test]
+fn case_table() {
+    crate::test_table::run(&[
+        ("cpu06_aerial_delay_rules", cpu06_aerial_delay_rules as fn()),
+        ("cpu06_falling_aerial", cpu06_falling_aerial as fn()),
+        ("cpu06_full_hop_hold", cpu06_full_hop_hold as fn()),
+        ("cpu06_fast_fall_rules", cpu06_fast_fall_rules as fn()),
+        ("cpu06_attack_angle", cpu06_attack_angle as fn()),
+        ("cpu06_crouch_statuses", cpu06_crouch_statuses as fn()),
+        ("cpu06_throw_state_machine", cpu06_throw_state_machine as fn()),
+        ("cpu06_throw_options_change_rerolls_held_case", cpu06_throw_options_change_rerolls_held_case as fn()),
+        ("cpu06_throw_yields_to_playback", cpu06_throw_yields_to_playback as fn()),
+        ("cpu06_range_picks_and_exclusive_rows", cpu06_range_picks_and_exclusive_rows as fn()),
+        ("cpu06_per_fighter_state", cpu06_per_fighter_state as fn()),
+    ]);
 }

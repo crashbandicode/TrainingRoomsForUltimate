@@ -189,7 +189,6 @@ mod tests {
     /// The longest line the boot can write: every row of every table with the longest outcome words, the most feature reports
     /// with the longest names and reasons, the seam fields at their longest, every fixed field at its longest. It fits the buffer
     /// with the reserve to spare, ends with its result and allocation count, and the buffer was not reallocated.
-    #[test]
     fn the_worst_case_line_fits_the_capacity_and_the_buffer_never_grows() {
         let reports: Vec<SiteReport> = TABLES
             .iter()
@@ -229,7 +228,6 @@ mod tests {
     }
 
     /// The constants the bound assumes hold for every row and every word the line writes.
-    #[test]
     fn the_bounds_cover_every_word() {
         for outcome in [
             GuardOutcome::Stock,
@@ -255,6 +253,39 @@ mod tests {
         ] {
             assert!(feature.name().len() <= MAX_FEATURE_NAME);
         }
+    }
+
+
+    /// rc.9 coverage. The capacity's parts are compile-time sums over the site tables. Recomputed at run time and against a plain
+    /// walk of the same tables, they are the constants: every reported row is counted once, at its longest.
+    fn the_capacity_parts_are_the_table_rows_at_their_longest() {
+        let rows = || TABLES.iter().flat_map(|table| table.iter());
+        let walked: usize = rows().map(|site| 1 + site.name.len() + 1 + MAX_FOUND_WORD + 1 + MAX_WRITTEN_WORD).sum();
+        assert_eq!(site_fields(&TABLES), walked);
+        assert_eq!(SITE_FIELDS, walked);
+        let longest = rows().map(|site| site.name.len()).max().unwrap();
+        assert_eq!(longest_name(&TABLES), longest);
+        assert_eq!((max(1, 2), max(2, 1), max(3, 3)), (2, 2, 3));
+        let per_report = 1 + MAX_FEATURE_NAME + "=not_installed".len() + " reason=".len() + max(MAX_REASON, "site:".len() + longest);
+        assert_eq!(FEATURE_FIELDS, MAX_FEATURE_REPORTS * per_report);
+        let labels: usize = native_seams::SITES.iter().map(|row| row.label.len()).sum();
+        let count = native_seams::SITES.len();
+        // three lists print `<label>:<code>,`, one prints `<label>,`; then the missing labels, the fixed words and four five-digit counts
+        let lists = 3 * (labels + count * (MAX_SEAM_CODE + 2)) + labels + count;
+        let words = "seams= seams_stock= seams_other=[] seams_skipped=[] seams_shadow_diff=[] seams_missing=[] seams_external=[] seams_unchecked= seams_images_unchecked=";
+        assert_eq!(seam_fields(), lists + MISSING_SHOWN * (MAX_MISSING_LABEL + 1) + ",...".len() + words.len() + 4 * 5);
+        assert_eq!(SEAM_FIELDS, seam_fields());
+        assert_eq!(INSTALL_LINE_CAPACITY, FIXED_FIELDS + SITE_FIELDS + FEATURE_FIELDS + SEAM_FIELDS + DRILL_FIELDS + OVERFLOW_TAIL);
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("the_worst_case_line_fits_the_capacity_and_the_buffer_never_grows", the_worst_case_line_fits_the_capacity_and_the_buffer_never_grows as fn()),
+            ("the_bounds_cover_every_word", the_bounds_cover_every_word as fn()),
+            ("the_capacity_parts_are_the_table_rows_at_their_longest", the_capacity_parts_are_the_table_rows_at_their_longest as fn()),
+        ]);
     }
     }
 }

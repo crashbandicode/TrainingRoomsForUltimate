@@ -308,7 +308,6 @@ mod tests {
         }
     }
 
-    #[test]
     fn export_uses_saved_pair_and_rejects_mismatched_stage_halves() {
         let mut saved = pair();
         let record = export("Setup", &saved).unwrap();
@@ -322,7 +321,6 @@ mod tests {
         assert_eq!(export("Setup", &saved).unwrap().stage_id, None);
     }
 
-    #[test]
     fn selection_and_commit_revalidate_without_changing_frozen_target() {
         let prepared = Prepared::new(&export("Setup", &pair()).unwrap(), [None::<u64>; 2]).unwrap();
         let frozen = target();
@@ -352,7 +350,6 @@ mod tests {
         assert_eq!(frozen.slot, 3);
     }
 
-    #[test]
     fn bind_only_allows_unknown_stage_and_disabled_saves_but_not_invalid_situation() {
         let mut record = export("Setup", &pair()).unwrap();
         record.stage_id = None;
@@ -377,7 +374,6 @@ mod tests {
         );
     }
 
-    #[test]
     fn exact_mii_rechecked_and_owned_json_never_crosses_game_pair() {
         let mut record = export("Setup", &pair()).unwrap();
         record.cpu.fighter_kind = 0x48;
@@ -395,7 +391,6 @@ mod tests {
         assert!(record.cpu.mii.is_some());
     }
 
-    #[test]
     fn machine_commits_both_roles_only_when_idle_and_restores_the_frozen_slot() {
         let mut machine = Machine::default();
         let settings = StateSettings::default();
@@ -426,7 +421,6 @@ mod tests {
         assert_eq!(machine.file, loading);
     }
 
-    #[test]
     fn accepted_exchange_survives_game_and_writer_until_matching_worker_poll() {
         let exchange = Exchange::new();
         let ticket = exchange.submit(Box::new(vec![17, 23])).unwrap();
@@ -453,7 +447,6 @@ mod tests {
         assert_eq!(*exchange.poll(next).unwrap(), vec![55]);
     }
 
-    #[test]
     fn departure_can_retire_unstarted_job_but_cannot_discard_committed_binding() {
         let exchange = Exchange::new();
         let ticket = exchange.submit(Box::new(4u64)).unwrap();
@@ -474,6 +467,20 @@ mod tests {
         let (id, job) = exchange.take_writer().unwrap();
         exchange.finish_writer(id, job);
         assert_eq!(*exchange.poll(ticket).unwrap(), 6);
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("export_uses_saved_pair_and_rejects_mismatched_stage_halves", export_uses_saved_pair_and_rejects_mismatched_stage_halves as fn()),
+            ("selection_and_commit_revalidate_without_changing_frozen_target", selection_and_commit_revalidate_without_changing_frozen_target as fn()),
+            ("bind_only_allows_unknown_stage_and_disabled_saves_but_not_invalid_situation", bind_only_allows_unknown_stage_and_disabled_saves_but_not_invalid_situation as fn()),
+            ("exact_mii_rechecked_and_owned_json_never_crosses_game_pair", exact_mii_rechecked_and_owned_json_never_crosses_game_pair as fn()),
+            ("machine_commits_both_roles_only_when_idle_and_restores_the_frozen_slot", machine_commits_both_roles_only_when_idle_and_restores_the_frozen_slot as fn()),
+            ("accepted_exchange_survives_game_and_writer_until_matching_worker_poll", accepted_exchange_survives_game_and_writer_until_matching_worker_poll as fn()),
+            ("departure_can_retire_unstarted_job_but_cannot_discard_committed_binding", departure_can_retire_unstarted_job_but_cannot_discard_committed_binding as fn()),
+        ]);
     }
     }
 }

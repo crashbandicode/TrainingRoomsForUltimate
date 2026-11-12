@@ -126,24 +126,31 @@ mod tests {
     lib_unit_tests! {
     use super::*;
 
-    #[test]
     fn entry_ids_are_zero_to_seven() {
         assert!(entry_id_valid(0) && entry_id_valid(7));
         assert!(!entry_id_valid(-1) && !entry_id_valid(8));
     }
 
-    #[test]
     fn off_clears_x8_in_training_only() {
         assert_eq!(x8_write(false, true), Some(0));
         assert_eq!(x8_write(false, false), None);
         assert_eq!(x8_write(true, true), None);
     }
 
-    #[test]
     fn the_hub_runs_every_step_in_order() {
         let mut seen = Vec::new();
         run_hub(|step| seen.push(step));
         assert_eq!(seen, HUB_ORDER);
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("entry_ids_are_zero_to_seven", entry_ids_are_zero_to_seven as fn()),
+            ("off_clears_x8_in_training_only", off_clears_x8_in_training_only as fn()),
+            ("the_hub_runs_every_step_in_order", the_hub_runs_every_step_in_order as fn()),
+        ]);
     }
     }
 }

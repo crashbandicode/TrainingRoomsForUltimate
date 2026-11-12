@@ -435,3 +435,413 @@ fn linked<'a>(id: &'a str, on: bool, saves: &BTreeSet<String>) -> Option<&'a str
     }
 }
 
+#[cfg(test)]
+mod tests {
+    lib_unit_tests! {
+    use super::*;
+    use crate::engine::library::{LoopCount, RecordingIndex, Role};
+    use crate::engine::macros::{InputFrame, MacroRecording, StartState};
+    use crate::model::cpu::rng::Rng;
+    use crate::model::cpu::settings::Weights;
+    use crate::model::recording::{LoadAction, Recorder, RecorderSettings};
+    use crate::model::state::settings::{Buffs, DamageMode, Mirroring, StateSettings};
+
+    fn frames(buttons: &[u32]) -> Vec<InputFrame> {
+        buttons
+            .iter()
+            .map(|buttons| InputFrame {
+                buttons: *buttons,
+                ..InputFrame::default()
+            })
+            .collect()
+    }
+
+    fn recording(name: &str, buttons: &[u32], save: Option<&str>, on: bool) -> MacroRecording {
+        let mut recording = MacroRecording::new(
+            name,
+            "13.0.5",
+            StartState::neutral(8, 0, 1.0),
+            frames(buttons),
+        )
+        .unwrap();
+        if let Some(id) = save {
+            recording.set_start_save(Some(id)).unwrap();
+            recording.set_start_save_on(on);
+        }
+        recording
+    }
+
+    fn chain(name: &str, steps: &[&str], on: bool) -> crate::engine::library::Chain {
+        let mut chain = crate::engine::library::Chain::new(
+            name,
+            steps.iter().map(|id| (*id).to_owned()).collect(),
+        )
+        .unwrap();
+        chain.set_start_save_on(on);
+        chain
+    }
+
+    fn drain<'a>(machine: &mut Playback, role: Role, book: &'a Book) -> Vec<Played<'a>> {
+        let mut played = Vec::new();
+        for _ in 0..64 {
+            match machine.step(role, book) {
+                Some(frame) => played.push(frame),
+                None => return played,
+            }
+        }
+        panic!("playback did not finish");
+    }
+
+    fn buttons_of(played: &[Played<'_>]) -> Vec<u32> {
+        played.iter().map(|played| played.frame.buttons).collect()
+    }
+
+    fn load_starts_no_playback() {
+        let mut rng = Rng::new(5);
+        let mut settings = RecorderSettings::factory();
+        assert_eq!(
+            Recorder::on_state_restored(&settings, false, &mut rng),
+            LoadAction::None
+        );
+        settings.save_state_slots = Weights([0, 0, 2, 0, 0]);
+        assert_eq!(
+            Recorder::on_state_restored(&settings, false, &mut rng),
+            LoadAction::None
+        );
+        assert_eq!(
+            Recorder::on_state_restored(&settings, true, &mut rng),
+            LoadAction::None
+        );
+        settings.trigger_save_state = true;
+        assert_eq!(
+            Recorder::on_state_restored(&settings, true, &mut rng),
+            LoadAction::None
+        );
+
+        let mut index = RecordingIndex::fresh();
+        index.set_active(Role::Player, Some("macro-a"), 1).unwrap();
+        index.bind_save(Some("save-a"), 1).unwrap();
+        let mut book = Book::new(index);
+        book.add_recording("macro-a", recording("A", &[1, 2], Some("save-start"), true));
+        book.add_save("save-a");
+        book.add_save("save-start");
+        let state = StateSettings {
+            mirroring: Mirroring::Alternate,
+            ..StateSettings::default()
+        };
+        let mut machine = Playback::new();
+        let warp = machine.load(&book, &state).unwrap();
+        assert_eq!(warp.save_id, "save-a");
+        assert_eq!(warp.mirroring, Mirroring::Alternate);
+        assert!(!machine.playing(Role::Player));
+        assert!(machine.step(Role::Player, &book).is_none());
+        assert_eq!(machine.warps(Role::Player), 0);
+
+        let mut playing = Playback::new();
+        let started = playing.play_chord(Role::Player, &book);
+        assert_eq!(started.warp, Some("save-start"));
+        assert_eq!(playing.warps(Role::Player), 1);
+        let during = playing.load(&book, &state).unwrap();
+        assert_eq!(during.save_id, "save-a");
+        assert!(playing.playing(Role::Player));
+        assert_eq!(playing.warps(Role::Player), 1);
+        assert_eq!(playing.step(Role::Player, &book).unwrap().frame.buttons, 1);
+
+        book.index.bind_save(None, 2).unwrap();
+        assert!(playing.load(&book, &state).is_none());
+        let off = StateSettings {
+            enable: false,
+            ..state
+        };
+        book.index.bind_save(Some("save-a"), 3).unwrap();
+        assert!(Playback::new().load(&book, &off).is_none());
+    }
+
+    fn auto_load_only_warps_to_the_bound_save() {
+        let mut index = RecordingIndex::fresh();
+        index.set_active(Role::Cpu, Some("macro-a"), 1).unwrap();
+        index.bind_save(Some("save-a"), 1).unwrap();
+        let mut book = Book::new(index);
+        book.add_recording("macro-a", recording("A", &[4], Some("save-start"), true));
+        book.add_save("save-a");
+        let settings = StateSettings {
+            autoload: true,
+            mirroring: Mirroring::Random,
+            damage_player: DamageMode::SaveState,
+            damage_cpu: DamageMode::Random,
+            limits_player: (10, 40),
+            limits_cpu: (0, 80),
+            buffs: Buffs(1 << Buffs::ACCELERATE),
+            ..StateSettings::default()
+        };
+        let mut machine = Playback::new();
+        let warp = machine.auto_load_on_death(&book, &settings).unwrap();
+        assert_eq!(warp.save_id, "save-a");
+        assert_eq!(warp.mirroring, Mirroring::Random);
+        assert_eq!(warp.damage_player, DamageMode::SaveState);
+        assert_eq!(warp.damage_cpu, DamageMode::Random);
+        assert_eq!(warp.limits_player, (10, 40));
+        assert_eq!(warp.limits_cpu, (0, 80));
+        assert!(warp.buffs.has(Buffs::ACCELERATE));
+        assert!(!machine.playing(Role::Cpu));
+        assert!(machine.step(Role::Cpu, &book).is_none());
+
+        book.index.bind_save(None, 2).unwrap();
+        assert!(machine.auto_load_on_death(&book, &settings).is_none());
+        book.index.bind_save(Some("save-gone"), 3).unwrap();
+        assert!(machine.auto_load_on_death(&book, &settings).is_none());
+        book.index.bind_save(Some("save-a"), 4).unwrap();
+        let off = StateSettings {
+            autoload: false,
+            ..settings
+        };
+        assert!(machine.auto_load_on_death(&book, &off).is_none());
+
+        let mut playing = Playback::new();
+        playing.play_chord(Role::Cpu, &book);
+        let before = playing.warps(Role::Cpu);
+        assert!(playing.auto_load_on_death(&book, &settings).is_some());
+        assert!(playing.playing(Role::Cpu));
+        assert_eq!(playing.warps(Role::Cpu), before);
+    }
+
+    fn a_chain_warps_to_macro_1_start_save_only() {
+        let mut index = RecordingIndex::fresh();
+        index.set_active(Role::Player, Some("chain-a"), 1).unwrap();
+        index.set_loop(Role::Player, LoopCount::Finite(1));
+        let mut book = Book::new(index);
+        book.add_recording("macro-1", recording("One", &[1], Some("save-1"), false));
+        book.add_recording("macro-2", recording("Two", &[2], Some("save-2"), true));
+        book.add_chain("chain-a", chain("Chain", &["macro-1", "macro-2"], true));
+        book.add_save("save-1");
+        book.add_save("save-2");
+        let mut machine = Playback::new();
+        let effect = machine.play_chord(Role::Player, &book);
+        assert_eq!(effect.warp, Some("save-1"));
+        assert!(effect.notice.is_none());
+        let played = drain(&mut machine, Role::Player, &book);
+        assert_eq!(buttons_of(&played), vec![1, 2]);
+        assert_eq!(
+            played
+                .iter()
+                .map(|played| played.recording_id)
+                .collect::<Vec<_>>(),
+            vec!["macro-1", "macro-2"]
+        );
+        assert_eq!(machine.warps(Role::Player), 1);
+
+        book.chains
+            .get_mut("chain-a")
+            .unwrap()
+            .set_start_save_on(false);
+        let mut off = Playback::new();
+        let effect = off.play_chord(Role::Player, &book);
+        assert!(effect.warp.is_none());
+        assert_eq!(off.warps(Role::Player), 0);
+        assert_eq!(
+            buttons_of(&drain(&mut off, Role::Player, &book)),
+            vec![1, 2]
+        );
+
+        book.chains
+            .get_mut("chain-a")
+            .unwrap()
+            .set_start_save_on(true);
+        book.recordings
+            .get_mut("macro-1")
+            .unwrap()
+            .set_start_save(None)
+            .unwrap();
+        let mut missing = Playback::new();
+        let effect = missing.play_chord(Role::Player, &book);
+        assert!(effect.warp.is_none());
+        assert_eq!(
+            buttons_of(&drain(&mut missing, Role::Player, &book)),
+            vec![1, 2]
+        );
+        assert_eq!(missing.warps(Role::Player), 0);
+    }
+
+    fn the_loop_loads_the_start_save_once() {
+        let mut index = RecordingIndex::fresh();
+        index.set_active(Role::Player, Some("macro-a"), 1).unwrap();
+        index.set_loop(Role::Player, LoopCount::Finite(3));
+        index.set_active(Role::Cpu, Some("chain-a"), 1).unwrap();
+        index.set_loop(Role::Cpu, LoopCount::Finite(2));
+        let mut book = Book::new(index);
+        book.add_recording("macro-a", recording("A", &[1, 2], Some("save-a"), true));
+        book.add_recording("macro-b", recording("B", &[3], Some("save-b"), true));
+        book.add_recording("macro-c", recording("C", &[4], Some("save-c"), true));
+        book.add_chain("chain-a", chain("Chain", &["macro-b", "macro-c"], true));
+        book.add_save("save-a");
+        book.add_save("save-b");
+        book.add_save("save-c");
+
+        let mut machine = Playback::new();
+        assert_eq!(
+            machine.play_chord(Role::Player, &book).warp,
+            Some("save-a")
+        );
+        assert_eq!(
+            buttons_of(&drain(&mut machine, Role::Player, &book)),
+            vec![1, 2, 1, 2, 1, 2]
+        );
+        assert!(!machine.playing(Role::Player));
+        assert_eq!(machine.warps(Role::Player), 1);
+
+        assert_eq!(
+            machine.play_chord(Role::Cpu, &book).warp,
+            Some("save-b")
+        );
+        assert_eq!(
+            buttons_of(&drain(&mut machine, Role::Cpu, &book)),
+            vec![3, 4, 3, 4]
+        );
+        assert_eq!(machine.warps(Role::Cpu), 1);
+
+        book.recordings
+            .get_mut("macro-a")
+            .unwrap()
+            .set_start_save_on(false);
+        book.index.set_loop(Role::Player, LoopCount::Finite(2));
+        let mut off = Playback::new();
+        assert!(off.play_chord(Role::Player, &book).warp.is_none());
+        assert_eq!(
+            buttons_of(&drain(&mut off, Role::Player, &book)),
+            vec![1, 2, 1, 2]
+        );
+        assert_eq!(off.warps(Role::Player), 0);
+
+        book.index.set_loop(Role::Player, LoopCount::Infinite);
+        book.recordings
+            .get_mut("macro-a")
+            .unwrap()
+            .set_start_save_on(true);
+        let mut forever = Playback::new();
+        assert_eq!(
+            forever.play_chord(Role::Player, &book).warp,
+            Some("save-a")
+        );
+        for _ in 0..4 {
+            assert!(forever.step(Role::Player, &book).is_some());
+        }
+        assert!(forever.playing(Role::Player));
+        assert_eq!(forever.warps(Role::Player), 1);
+        assert!(forever.play_chord(Role::Player, &book).stopped);
+        assert!(forever.step(Role::Player, &book).is_none());
+    }
+
+    fn both_roles_can_play_and_a_chain_is_sequential() {
+        let mut index = RecordingIndex::fresh();
+        index.set_active(Role::Player, Some("macro-a"), 1).unwrap();
+        index.set_active(Role::Cpu, Some("chain-a"), 1).unwrap();
+        let mut book = Book::new(index);
+        book.add_recording("macro-a", recording("A", &[1, 2], None, true));
+        book.add_recording("macro-b", recording("B", &[10], Some("save-b"), true));
+        book.add_recording("macro-c", recording("C", &[20], Some("save-c"), true));
+        book.add_chain("chain-a", chain("Chain", &["macro-b", "macro-c"], true));
+        book.add_save("save-b");
+        book.add_save("save-c");
+        let mut machine = Playback::new();
+        assert!(machine.play_chord(Role::Player, &book).warp.is_none());
+        assert_eq!(
+            machine.play_chord(Role::Cpu, &book).warp,
+            Some("save-b")
+        );
+        assert!(machine.playing(Role::Player) && machine.playing(Role::Cpu));
+        assert_eq!(machine.step(Role::Player, &book).unwrap().frame.buttons, 1);
+        assert_eq!(
+            machine.step(Role::Cpu, &book).unwrap().recording_id,
+            "macro-b"
+        );
+        assert_eq!(
+            machine.step(Role::Cpu, &book).unwrap().recording_id,
+            "macro-c"
+        );
+        assert_eq!(machine.warps(Role::Cpu), 1);
+        assert_eq!(machine.step(Role::Player, &book).unwrap().frame.buttons, 2);
+        assert!(machine.play_chord(Role::Cpu, &book).stopped);
+        assert!(!machine.playing(Role::Cpu));
+        assert!(machine.playing(Role::Player));
+    }
+
+    fn mash_stops_the_playing_macro() {
+        let mut index = RecordingIndex::fresh();
+        index.set_active(Role::Player, Some("chain-a"), 1).unwrap();
+        index.set_active(Role::Cpu, Some("macro-a"), 1).unwrap();
+        let mut book = Book::new(index);
+        book.add_recording("macro-a", recording("A", &[1, 2, 3], None, true));
+        book.add_recording("macro-b", recording("B", &[4, 5], None, true));
+        book.add_recording("macro-c", recording("C", &[6], None, true));
+        book.add_chain("chain-a", chain("Chain", &["macro-b", "macro-c"], true));
+        let mut machine = Playback::new();
+        machine.play_chord(Role::Player, &book);
+        assert_eq!(machine.step(Role::Player, &book).unwrap().frame.buttons, 4);
+        assert!(machine.mash(Role::Player, true));
+        assert!(!machine.playing(Role::Player));
+        assert!(machine.step(Role::Player, &book).is_none());
+        assert!(!machine.mash(Role::Player, true));
+
+        machine.play_chord(Role::Cpu, &book);
+        assert!(!machine.mash(Role::Cpu, false));
+        assert_eq!(machine.step(Role::Cpu, &book).unwrap().frame.buttons, 1);
+        assert!(machine.playing(Role::Cpu));
+    }
+
+    fn the_play_chord_with_no_active_macro_does_nothing() {
+        let mut index = RecordingIndex::fresh();
+        index.set_active(Role::Cpu, Some("macro-a"), 1).unwrap();
+        let mut book = Book::new(index);
+        book.add_recording("macro-a", recording("A", &[7, 8], Some("save-a"), true));
+        book.add_save("save-a");
+        let mut machine = Playback::new();
+        let effect = machine.play_chord(Role::Player, &book);
+        assert_eq!(effect, Effect::default());
+        assert!(!machine.playing(Role::Player));
+        assert_eq!(machine.warps(Role::Player), 0);
+        assert!(machine.play_chord(Role::Cpu, &book).started);
+        let again = machine.play_chord(Role::Player, &book);
+        assert_eq!(again, Effect::default());
+        assert!(machine.playing(Role::Cpu));
+        assert!(!machine.playing(Role::Player));
+        assert_eq!(machine.step(Role::Cpu, &book).unwrap().frame.buttons, 7);
+    }
+
+    fn rc5wire_chain_skips_a_missing_macro() {
+        let mut index = RecordingIndex::fresh();
+        index.set_active(Role::Player, Some("chain-a"), 1).unwrap();
+        let mut book = Book::new(index);
+        book.add_recording("macro-b", recording("B", &[10], None, true));
+        book.add_chain("chain-a", chain("Chain", &["gone", "macro-b"], true));
+        let mut machine = Playback::new();
+        assert!(machine.play_chord(Role::Player, &book).started);
+        let played = machine.step(Role::Player, &book).unwrap();
+        assert_eq!(played.recording_id, "macro-b");
+        assert_eq!(played.frame.buttons, 10);
+        assert!(machine.step(Role::Player, &book).is_none());
+
+        let mut empty = RecordingIndex::fresh();
+        empty.set_active(Role::Player, Some("chain-b"), 1).unwrap();
+        let mut gone = Book::new(empty);
+        gone.add_chain("chain-b", chain("Gone", &["missing"], true));
+        let mut stopped = Playback::new();
+        assert!(!stopped.play_chord(Role::Player, &gone).started);
+        assert!(!stopped.playing(Role::Player));
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("load_starts_no_playback", load_starts_no_playback as fn()),
+            ("auto_load_only_warps_to_the_bound_save", auto_load_only_warps_to_the_bound_save as fn()),
+            ("a_chain_warps_to_macro_1_start_save_only", a_chain_warps_to_macro_1_start_save_only as fn()),
+            ("the_loop_loads_the_start_save_once", the_loop_loads_the_start_save_once as fn()),
+            ("both_roles_can_play_and_a_chain_is_sequential", both_roles_can_play_and_a_chain_is_sequential as fn()),
+            ("mash_stops_the_playing_macro", mash_stops_the_playing_macro as fn()),
+            ("the_play_chord_with_no_active_macro_does_nothing", the_play_chord_with_no_active_macro_does_nothing as fn()),
+            ("rc5wire_chain_skips_a_missing_macro", rc5wire_chain_skips_a_missing_macro as fn()),
+        ]);
+    }
+    }
+}

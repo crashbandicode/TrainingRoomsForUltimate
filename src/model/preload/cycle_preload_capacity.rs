@@ -23,6 +23,38 @@ pub fn source_callback(slot: u32, third: bool, current: Option<CallbackIdentity>
                 && registered == Some(identity)))
 }
 
+#[cfg(test)]
+mod callback_tests {
+    lib_unit_tests! {
+    use super::*;
+    use crate::engine::swap::source_lifetime::SourceBook;
+
+    #[test]
+    fn count_promotion_dispatch_accepts_only_current_owned_training_four() {
+        let mut book = SourceBook::<1, 1>::new();
+        let current = CallbackIdentity {layout: Layout::Training, epoch: book.epoch(), entry: 0x4000};
+        assert!(source_callback(4, true, Some(current), Some(current)));
+        assert!(!source_callback(4, false, Some(current), Some(current)));
+        assert!(!source_callback(4, true, Some(current), None));
+        assert!(!source_callback(4, true, Some(current), Some(CallbackIdentity {entry: 0x5000, ..current})));
+        for layout in [Layout::Ldn, Layout::Quickplay] {
+            let waiting = CallbackIdentity {layout, ..current};
+            assert!(!source_callback(4, true, Some(waiting), Some(waiting)));
+            assert!(!source_callback(4, true, Some(waiting), Some(current)));
+        }
+        book.depart_scene().unwrap();
+        let next = CallbackIdentity {epoch: book.epoch(), ..current};
+        assert!(!source_callback(4, true, Some(next), Some(current)));
+        assert!(!source_callback(4, true, None, Some(current)));
+        assert!(!source_callback(0, true, Some(current), Some(current)));
+        let absent = CallbackIdentity {entry: 0, ..current};
+        assert!(!source_callback(4, true, Some(absent), Some(absent)));
+        for slot in [2, 3, 5, 6] { assert!(source_callback(slot, false, None, None)); }
+        assert!(source_callback(7, true, None, None));
+        assert!(!source_callback(7, false, None, None));
+    }
+    }
+}
 
 /// Potential entries, not permission to create or dereference them. Training
 /// extensions and solo waiting extensions require separate opt-in features.
@@ -70,3 +102,48 @@ pub fn reusable_extras(kinds: &[u32], active: u32, canonical_original: Option<u3
     kinds.iter().filter(|&&kind| kind != active && Some(kind) != canonical_original).count() as u8
 }
 
+#[cfg(test)]
+mod tests {
+    lib_unit_tests! {
+    use super::*;
+    fn only_training_can_use_every_extra_and_waiting_seats_stay_reserved() {
+        assert_eq!(slots(Layout::Training,true,true,true),[2,3,7,6,5,4]);
+        assert_eq!(slots(Layout::Training,true,true,false),[2,3,7,8,8,8]);
+        assert_eq!(slots(Layout::Ldn,true,true,true),[5,6,7,8,8,8]);
+        assert_eq!(slots(Layout::Ldn,true,false,true),[5,6,8,8,8,8]);
+        assert_eq!(slots(Layout::Quickplay,true,true,true),[5,6,8,8,8,8]);
+        assert_eq!(slots(Layout::Training,false,true,true),[2,3,8,8,8,8]);
+    }
+    fn every_requested_budget_obeys_the_backend_limit() {
+        assert_eq!(supported_count(Layout::Training,true,true,true), 6);
+        assert_eq!(MAX_TARGETS, 5, "renderer demand must not extend the saved preload menu");
+        for count in 0..=u8::MAX {
+            assert_eq!(target_count(count,Layout::Training,true,true,true),usize::from(count).min(MAX_TARGETS));
+            assert_eq!(target_count(count,Layout::Ldn,true,true,true),usize::from(count).min(3));
+            assert_eq!(target_count(count,Layout::Quickplay,true,true,true),usize::from(count).min(2));
+        }
+        for (i, slot) in EXTRA_SLOTS.iter().enumerate() {assert_eq!(capacity_index(*slot),Some(i));}
+        assert_eq!(capacity_index(4),Some(3));
+        assert_eq!(capacity_index(8),None);
+    }
+    fn waiting_capacity_is_opt_in_and_uses_its_own_plan() {
+        for layout in [Layout::Ldn, Layout::Quickplay] {
+            assert_eq!(slots_with_waiting(layout,true,true,true,true),[5,6,7,3,2,8]);
+            assert_eq!(slots_with_waiting(layout,false,true,true,true),[5,6,8,8,8,8]);
+            for count in 0..=u8::MAX {
+                assert_eq!(target_count_with_waiting(count,layout,true,true,true,true),usize::from(count).min(5));
+            }
+        }
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("only_training_can_use_every_extra_and_waiting_seats_stay_reserved", only_training_can_use_every_extra_and_waiting_seats_stay_reserved as fn()),
+            ("every_requested_budget_obeys_the_backend_limit", every_requested_budget_obeys_the_backend_limit as fn()),
+            ("waiting_capacity_is_opt_in_and_uses_its_own_plan", waiting_capacity_is_opt_in_and_uses_its_own_plan as fn()),
+        ]);
+    }
+    }
+}

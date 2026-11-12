@@ -413,3 +413,200 @@ pub fn fnv1a64(bytes: &[u8]) -> u64 {
     bytes.iter().fold(0xcbf29ce484222325u64, |h, b| (h ^ u64::from(*b)).wrapping_mul(0x100000001b3))
 }
 
+#[cfg(test)]
+mod tests {
+    lib_unit_tests! {
+    use super::*;
+
+    const OUTFIT_4155: u64 = 0x1300011bfef7a5f7;
+    const HAT_DEFAULT: u64 = 0x5a00000fa9efa5ea;
+    const CHARA_BRAWLER: u64 = 0xc1004c13fdfdfb2b;
+    const CHARA_SWORD: u64 = 0xc1004d15d7061f77;
+    const CHARA_GUNNER: u64 = 0xc1004e1257ab1d87;
+
+    fn charinfo(create_id: u8, name: u8, face: u8) -> [u8; CHARINFO_LEN] {
+        let mut c = [face; CHARINFO_LEN];
+        c[..0x10].fill(create_id);
+        c[0x10..0x24].fill(name);
+        c[0x24] = 0;
+        c[0x25] = 0;
+        c
+    }
+
+    fn slot(index: usize, slot_id: u32, chara: u64, face: u8, create_id: u8, specials: [u8; 4], colour: u8) -> RawSlot {
+        RawSlot {
+            index,
+            slot_id,
+            name_len: 2,
+            name_units: [b'A' as u16, b'B' as u16, 0, 0, 0, 0, 0, 0, 0, 0],
+            colour,
+            voice: 37,
+            specials,
+            tag_outfit: TaggedId(OUTFIT_4155),
+            tag_hat: TaggedId(HAT_DEFAULT),
+            tag_chara: TaggedId(chara),
+            charinfo: charinfo(create_id, b'N', face),
+        }
+    }
+
+    fn class_from_verified_chara_ids() {
+        assert_eq!(MiiClass::from_chara_id(TaggedId(CHARA_BRAWLER)), Ok(MiiClass::Brawler));
+        assert_eq!(MiiClass::from_chara_id(TaggedId(CHARA_SWORD)), Ok(MiiClass::Swordfighter));
+        assert_eq!(MiiClass::from_chara_id(TaggedId(CHARA_GUNNER)), Ok(MiiClass::Gunner));
+        assert_eq!(MiiClass::from_chara_id(TaggedId(0xc1000013fdfdfb2b)), Ok(MiiClass::Brawler));
+        assert_eq!(MiiClass::from_chara_id(TaggedId(0xc2004c13fdfdfb2b)), Err(ClassError::BadTag(0xc2)));
+        assert_eq!(MiiClass::from_chara_id(TaggedId(0xc1004c1300000001)), Err(ClassError::UnknownLabel(0x1300000001)));
+    }
+
+    fn copied_or_renamed_configurations_collapse_to_lowest_slot_id() {
+        let a = slot(0, 4155, CHARA_BRAWLER, 7, 0x11, [1, 1, 2, 1], 1);
+        let mut b = slot(1, 2622, CHARA_BRAWLER, 7, 0x22, [1, 1, 2, 1], 1);
+        b.name_units[0] = b'Z' as u16;
+        let snap = build_snapshot(vec![a, b]);
+        assert_eq!(snap.configs.len(), 1);
+        assert_eq!(snap.configs[0].slot_id, 2622);
+        assert_eq!(snap.configs[0].copies, vec![4155]);
+        assert_eq!(snap.findings, vec![Finding::DuplicateCollapsed { slot_id: 4155, representative: 2622 }]);
+        assert!(snap.is_complete());
+    }
+
+    fn same_appearance_different_class_stays_separate() {
+        let a = slot(0, 10, CHARA_BRAWLER, 7, 0x11, [0, 0, 0, 0], 5);
+        let b = slot(1, 11, CHARA_GUNNER, 7, 0x11, [0, 0, 0, 0], 5);
+        let snap = build_snapshot(vec![a, b]);
+        assert_eq!(snap.configs.len(), 2);
+        assert_eq!(snap.of_class(MiiClass::Brawler).count(), 1);
+        assert_eq!(snap.of_class(MiiClass::Gunner).count(), 1);
+        assert_ne!(snap.configs[0].canonical, snap.configs[1].canonical);
+    }
+
+    fn specials_colour_and_voice_are_identity() {
+        let base = slot(0, 1, CHARA_SWORD, 3, 0x11, [0, 0, 0, 0], 5);
+        let other_special = slot(1, 2, CHARA_SWORD, 3, 0x11, [1, 0, 0, 0], 5);
+        let other_colour = slot(2, 3, CHARA_SWORD, 3, 0x11, [0, 0, 0, 0], 2);
+        let mut other_voice = slot(3, 4, CHARA_SWORD, 3, 0x11, [0, 0, 0, 0], 5);
+        other_voice.voice = 3;
+        let snap = build_snapshot(vec![base, other_special, other_colour, other_voice]);
+        assert_eq!(snap.configs.len(), 4, "a voice-only difference is a different configuration");
+        assert!(snap.findings.is_empty());
+    }
+
+    fn outfit_and_hat_are_identity_with_correct_semantics() {
+        let base = slot(0, 1, CHARA_BRAWLER, 3, 0x11, [0, 0, 0, 0], 0);
+        let mut other_outfit = slot(1, 2, CHARA_BRAWLER, 3, 0x11, [0, 0, 0, 0], 0);
+        other_outfit.tag_outfit = TaggedId(0x1300291bfef7a5f8);
+        let mut other_hat = slot(2, 3, CHARA_BRAWLER, 3, 0x11, [0, 0, 0, 0], 0);
+        other_hat.tag_hat = TaggedId(0x5a00030fa9efa5eb);
+        let configs = build_snapshot(vec![base, other_outfit, other_hat]).configs;
+        assert_eq!(configs.len(), 3);
+        assert_eq!(configs[0].canonical.appearance.outfit, OUTFIT_4155 & LOW40);
+        assert_eq!(configs[0].canonical.appearance.hat, HAT_DEFAULT & LOW40);
+        assert_eq!(configs[1].canonical.appearance.outfit, 0x1bfef7a5f8);
+        assert_eq!(configs[1].outfit_hint(), 0x29);
+        assert_eq!(configs[2].canonical.appearance.hat, 0x0fa9efa5eb);
+        assert_eq!(configs[2].hat_hint(), 3);
+        // Swapped tags are reported against the right offsets.
+        let mut swapped = slot(0, 9, CHARA_BRAWLER, 3, 0x11, [0, 0, 0, 0], 0);
+        swapped.tag_outfit = TaggedId(HAT_DEFAULT);
+        assert_eq!(classify(&swapped), Err(Finding::BadTag { slot_index: 0, slot_id: 9, field: "+0x130", tag: 0x5a }));
+        let mut swapped_hat = slot(0, 9, CHARA_BRAWLER, 3, 0x11, [0, 0, 0, 0], 0);
+        swapped_hat.tag_hat = TaggedId(OUTFIT_4155);
+        assert_eq!(classify(&swapped_hat), Err(Finding::BadTag { slot_index: 0, slot_id: 9, field: "+0x138", tag: 0x13 }));
+    }
+
+    fn row_hint_bits_do_not_change_identity_but_raw_tags_keep_them() {
+        let a = slot(0, 5, CHARA_BRAWLER, 9, 0x11, [2, 2, 2, 2], 0);
+        let mut b = slot(1, 6, 0xc1000013fdfdfb2b, 9, 0x11, [2, 2, 2, 2], 0);
+        b.tag_outfit = TaggedId(0x1300ff1bfef7a5f7);
+        b.tag_hat = TaggedId(0x5a00010fa9efa5ea);
+        let ca = classify(&a).unwrap();
+        let cb = classify(&b).unwrap();
+        assert_eq!(ca.canonical, cb.canonical);
+        assert_eq!(ca.canonical.to_bytes(), cb.canonical.to_bytes());
+        assert_ne!(ca.raw_tags, cb.raw_tags);
+        let snap = build_snapshot(vec![a, b]);
+        assert_eq!(snap.configs.len(), 1);
+        assert_eq!(snap.configs[0].slot_id, 5);
+    }
+
+    fn deliberate_hash_collision_does_not_merge_different_bytes() {
+        let a = classify(&slot(0, 20, CHARA_BRAWLER, 1, 0x11, [0, 0, 0, 0], 0)).unwrap();
+        let b = classify(&slot(1, 21, CHARA_BRAWLER, 2, 0x11, [0, 0, 0, 0], 0)).unwrap();
+        let (out, findings) = dedupe_with(vec![a, b], |_| 7);
+        assert_eq!(out.len(), 2);
+        assert!(findings.is_empty());
+    }
+
+    fn invalid_and_unknown_slots_are_reported_not_dropped() {
+        let bad_special = slot(0, 30, CHARA_BRAWLER, 1, 0x11, [3, 0, 0, 0], 0);
+        let bad_tag = slot(1, 31, 0xc2004c13fdfdfb2b, 1, 0x11, [0, 0, 0, 0], 0);
+        let unknown = slot(2, 32, 0xc1004c1300000001, 1, 0x11, [0, 0, 0, 0], 0);
+        let mut no_name = slot(3, 33, CHARA_GUNNER, 1, 0x11, [0, 0, 0, 0], 0);
+        no_name.name_len = 0;
+        let good = slot(4, 34, CHARA_GUNNER, 1, 0x11, [0, 0, 0, 0], 0);
+        let snap = build_snapshot(vec![bad_special, bad_tag, unknown, no_name, good]);
+        assert_eq!(snap.slots_seen, 5);
+        assert_eq!(snap.configs.len(), 1);
+        assert_eq!(snap.configs[0].slot_id, 34);
+        assert_eq!(snap.defects().count(), 4);
+        assert!(!snap.is_complete());
+        assert!(snap.findings.contains(&Finding::SpecialOutOfRange { slot_index: 0, slot_id: 30, specials: [3, 0, 0, 0] }));
+        assert!(snap.findings.contains(&Finding::BadTag { slot_index: 1, slot_id: 31, field: "+0x1a0", tag: 0xc2 }));
+        assert!(snap.findings.contains(&Finding::UnknownClassLabel { slot_index: 2, slot_id: 32, hash40: 0x1300000001 }));
+        assert!(snap.findings.contains(&Finding::NameLength { slot_index: 3, slot_id: 33, len: 0 }));
+    }
+
+    fn persisted_identity_round_trips_and_rejects_tampering_and_old_layout() {
+        let cfg = classify(&slot(0, 4155, CHARA_BRAWLER, 7, 0x11, [1, 1, 2, 1], 1)).unwrap();
+        let hex = cfg.canonical.to_hex();
+        assert_eq!(hex.len(), 220);
+        let back = Canonical::from_hex(&hex).unwrap();
+        assert_eq!(back, cfg.canonical);
+        assert_eq!(back.to_bytes(), cfg.canonical.to_bytes());
+        let mut bytes = cfg.canonical.to_bytes();
+        bytes[0] = 0x4a;
+        assert_eq!(Canonical::from_bytes(&bytes), Err(CanonicalError::ClassMismatch));
+        bytes[0] = 0x07;
+        assert_eq!(Canonical::from_bytes(&bytes), Err(CanonicalError::ClassByte(0x07)));
+        assert_eq!(Canonical::from_hex("abc"), Err(CanonicalError::Length(3)));
+        // A revision-1 string (218 chars) is rejected by length, never reinterpreted.
+        assert_eq!(Canonical::from_hex(&"0".repeat(218)), Err(CanonicalError::Length(218)));
+        let mut odd = hex.clone();
+        odd.replace_range(0..1, "z");
+        assert_eq!(Canonical::from_hex(&odd), Err(CanonicalError::Hex));
+    }
+
+    fn canonical_layout_is_exact() {
+        let mut raw = slot(0, 4155, CHARA_BRAWLER, 7, 0x11, [1, 1, 2, 1], 1);
+        raw.voice = 37;
+        let cfg = classify(&raw).unwrap();
+        let b = cfg.canonical.to_bytes();
+        assert_eq!(b.len(), 0x6e);
+        assert_eq!(b[0], 0x48);
+        assert!(b[1..1 + CHARINFO_MASK_END].iter().all(|x| *x == 0));
+        assert_eq!(&b[0x59..0x5d], &[1, 1, 2, 1]);
+        assert_eq!(b[0x5d], 1);
+        assert_eq!(b[0x5e], 37);
+        assert_eq!(get40(&b[0x5f..0x64]), OUTFIT_4155 & LOW40);
+        assert_eq!(get40(&b[0x64..0x69]), HAT_DEFAULT & LOW40);
+        assert_eq!(get40(&b[0x69..0x6e]), HASH40_UI_CHARA_MIIFIGHTER);
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("class_from_verified_chara_ids", class_from_verified_chara_ids as fn()),
+            ("copied_or_renamed_configurations_collapse_to_lowest_slot_id", copied_or_renamed_configurations_collapse_to_lowest_slot_id as fn()),
+            ("same_appearance_different_class_stays_separate", same_appearance_different_class_stays_separate as fn()),
+            ("specials_colour_and_voice_are_identity", specials_colour_and_voice_are_identity as fn()),
+            ("outfit_and_hat_are_identity_with_correct_semantics", outfit_and_hat_are_identity_with_correct_semantics as fn()),
+            ("row_hint_bits_do_not_change_identity_but_raw_tags_keep_them", row_hint_bits_do_not_change_identity_but_raw_tags_keep_them as fn()),
+            ("deliberate_hash_collision_does_not_merge_different_bytes", deliberate_hash_collision_does_not_merge_different_bytes as fn()),
+            ("invalid_and_unknown_slots_are_reported_not_dropped", invalid_and_unknown_slots_are_reported_not_dropped as fn()),
+            ("persisted_identity_round_trips_and_rejects_tampering_and_old_layout", persisted_identity_round_trips_and_rejects_tampering_and_old_layout as fn()),
+            ("canonical_layout_is_exact", canonical_layout_is_exact as fn()),
+        ]);
+    }
+    }
+}

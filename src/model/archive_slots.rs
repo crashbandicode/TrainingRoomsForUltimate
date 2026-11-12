@@ -133,7 +133,6 @@ mod tests {
     lib_unit_tests! {
     use super::*;
 
-    #[test]
     fn a_buffer_goes_out_parks_for_its_grace_and_comes_back() {
         let slots: Slots<2> = Slots::new();
         assert!(slots.claim().is_none(), "no buffer before boot");
@@ -159,7 +158,6 @@ mod tests {
         assert!(reused.iter_mut().all(|claim| claim.bytes().is_empty()));
     }
 
-    #[test]
     fn the_hook_and_the_retire_thread_never_share_a_buffer() {
         use std::sync::Arc;
         let slots: Arc<Slots<2>> = Arc::new(Slots::new());
@@ -191,6 +189,15 @@ mod tests {
         assert!(handed > 0 && released <= handed);
         let all: Vec<_> = (0..2).filter_map(|_| slots.claim()).collect();
         assert_eq!(all.len(), 2, "every buffer is free again");
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("a_buffer_goes_out_parks_for_its_grace_and_comes_back", a_buffer_goes_out_parks_for_its_grace_and_comes_back as fn()),
+            ("the_hook_and_the_retire_thread_never_share_a_buffer", the_hook_and_the_retire_thread_never_share_a_buffer as fn()),
+        ]);
     }
     }
 }

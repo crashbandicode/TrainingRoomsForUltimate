@@ -88,7 +88,6 @@ impl<T> Drop for Job<'_, T> {
 mod tests {
     lib_unit_tests! {
     use super::*;
-    #[test]
     fn abandoned_reader_does_not_recycle_live_writer_or_leak_old_completion() {
         let pool = Pool::new(1);
         let (ticket, job) = pool.claim().unwrap();
@@ -103,7 +102,6 @@ mod tests {
         drop(ticket);
         assert!(pool.claim().is_some());
     }
-    #[test]
     fn dropped_job_reports_failure_and_receiver_must_retire_before_reuse() {
         let pool = Pool::<u32>::new(1);
         let (ticket, job) = pool.claim().unwrap();
@@ -115,7 +113,6 @@ mod tests {
         job.complete(7);
         assert_eq!(ticket.try_recv(), Ok(Ok(7)));
     }
-    #[test]
     fn concurrent_claim_return_and_cross_thread_completion_keep_values_distinct() {
         let pool = Pool::new(4);
         std::thread::scope(|scope| {
@@ -134,6 +131,16 @@ mod tests {
                 });
             }
         });
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("abandoned_reader_does_not_recycle_live_writer_or_leak_old_completion", abandoned_reader_does_not_recycle_live_writer_or_leak_old_completion as fn()),
+            ("dropped_job_reports_failure_and_receiver_must_retire_before_reuse", dropped_job_reports_failure_and_receiver_must_retire_before_reuse as fn()),
+            ("concurrent_claim_return_and_cross_thread_completion_keep_values_distinct", concurrent_claim_return_and_cross_thread_completion_keep_values_distinct as fn()),
+        ]);
     }
     }
 }

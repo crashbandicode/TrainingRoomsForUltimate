@@ -2284,4 +2284,145 @@ pub(super) mod managed {
         ));
     }
 
+    #[cfg(test)]
+    mod tests {
+    lib_unit_tests! {
+        use super::super::super::native_source;
+        use super::super::Layout;
+        use super::{exact_mii_for_expansion, exact_mii_owner, owner_admission, owner_facts, ExactMiiProof, OwnerFacts};
+        use crate::engine::mii::inventory::MiiClass;
+
+        fn facts(
+            index: usize, count: u32, installed: u64, kind: u32, exact_mii: ExactMiiProof,
+        ) -> OwnerFacts {
+            owner_facts(index, count, installed, kind, exact_mii)
+        }
+
+        fn exact_gunner_base_helper_admits_and_a_bare_mii_kind_does_not() {
+            assert_eq!(MiiClass::from_kind(0x4a), Some(MiiClass::Gunner));
+            assert!(!native_source::ordinary_kind(0x4a));
+            assert!(native_source::ordinary_kind(0xb));
+            // Extra creation still uses source_kind. Without grouped admission that
+            // remains ordinary_kind, so a Mii is not itself an extra target.
+            #[cfg(not(feature = "managed-grouped-source-alpha"))]
+            {
+                assert!(!super::source_kind(0x4a));
+                assert!(super::source_kind(0xb));
+            }
+            assert!(owner_admission(
+                Layout::Training, facts(2, 1, 1, 0x4a, ExactMiiProof::Proven)
+            ).admits);
+            for proof in [ExactMiiProof::NotApplicable, ExactMiiProof::Busy, ExactMiiProof::Refused] {
+                assert!(!owner_admission(
+                    Layout::Training, facts(2, 1, 1, 0x4a, proof)
+                ).admits, "{:?}", proof);
+            }
+        }
+
+        fn sword_and_brawler_helpers_use_the_same_exact_proof() {
+            for (index, kind, class) in [
+                (2usize, 0x48u32, MiiClass::Brawler),
+                (3, 0x49, MiiClass::Swordfighter),
+            ] {
+                assert_eq!(MiiClass::from_kind(kind), Some(class));
+                assert!(!native_source::ordinary_kind(kind));
+                assert!(owner_admission(
+                    Layout::Training, facts(index, 1, 1, kind, ExactMiiProof::Proven)
+                ).admits);
+                assert!(!owner_admission(
+                    Layout::Training, facts(index, 1, 1, kind, ExactMiiProof::Refused)
+                ).admits);
+            }
+        }
+
+        /// lobby-preload A (was `visible_mii_and_non_mii_proof_flags_stay_refused`): a visible
+        /// exact Mii is admitted only with the visible committed-authority proof.
+        fn visible_mii_admits_only_with_the_visible_proof() {
+            for index in [0usize, 1] {
+                assert!(owner_admission(
+                    Layout::Training, facts(index, 1, 1, 0x4a, ExactMiiProof::Proven)
+                ).admits);
+                for proof in [ExactMiiProof::NotApplicable, ExactMiiProof::Busy, ExactMiiProof::Refused] {
+                    assert!(!owner_admission(
+                        Layout::Training, facts(index, 1, 1, 0x4a, proof)
+                    ).admits);
+                }
+            }
+            // Pyra (0x5a) is not a Mii class. A Proven flag cannot admit it.
+            assert!(MiiClass::from_kind(0x5a).is_none());
+            assert!(!native_source::ordinary_kind(0x5a));
+            assert!(!owner_admission(
+                Layout::Training, facts(2, 1, 1, 0x5a, ExactMiiProof::Proven)
+            ).admits);
+            assert!(!owner_admission(
+                Layout::Training, facts(2, 1, 0, 0x4a, ExactMiiProof::Proven)
+            ).admits);
+            // Count 4 is outside both the exact count-1 proof and the grouped 2..=3 range.
+            assert!(!owner_admission(
+                Layout::Training, facts(2, 4, 1, 0x4a, ExactMiiProof::Proven)
+            ).admits);
+        }
+
+        fn ordinary_owners_beside_one_exact_gunner_helper_still_admit() {
+            let owners = [
+                (0usize, 0x1cu32, ExactMiiProof::NotApplicable),
+                (1, 0x00, ExactMiiProof::NotApplicable),
+                (2, 0x4a, ExactMiiProof::Proven),
+                (3, 0x0b, ExactMiiProof::NotApplicable),
+            ];
+            for (index, kind, proof) in owners {
+                assert!(native_source::ordinary_kind(kind) || kind == 0x4a);
+                assert!(owner_admission(Layout::Training, facts(index, 1, 1, kind, proof)).admits);
+            }
+            assert!(!owner_admission(
+                Layout::Training, facts(2, 1, 1, 0x4a, ExactMiiProof::Refused)
+            ).admits);
+        }
+
+        fn helper_proof_does_not_lock_a_visible_or_ordinary_owner() {
+            unsafe {
+                // The visible path takes the native lock only for a count-1 installed Mii.
+                for (count, installed, kind) in [(1u32, 1u64, 0x0bu32), (2, 1, 0x4a), (1, 0, 0x4a)] {
+                    assert_eq!(
+                        exact_mii_owner(1, 1, core::ptr::null(), count, installed, kind).0,
+                        ExactMiiProof::NotApplicable
+                    );
+                }
+                assert_eq!(
+                    exact_mii_for_expansion(0, 0, 1, 1, 0x4a),
+                    ExactMiiProof::NotApplicable
+                );
+                assert_eq!(
+                    exact_mii_for_expansion(1, 1, 1, 1, 0x4a),
+                    ExactMiiProof::NotApplicable
+                );
+                assert_eq!(
+                    exact_mii_for_expansion(2, 2, 1, 1, 0x0b),
+                    ExactMiiProof::NotApplicable
+                );
+                assert_eq!(
+                    exact_mii_for_expansion(2, 2, 2, 1, 0x4a),
+                    ExactMiiProof::NotApplicable
+                );
+                assert_eq!(
+                    exact_mii_for_expansion(2, 2, 1, 0, 0x4a),
+                    ExactMiiProof::NotApplicable
+                );
+            }
+        }
+    
+
+        /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+        #[test]
+        fn case_table() {
+            crate::test_table::run(&[
+                ("exact_gunner_base_helper_admits_and_a_bare_mii_kind_does_not", exact_gunner_base_helper_admits_and_a_bare_mii_kind_does_not as fn()),
+                ("sword_and_brawler_helpers_use_the_same_exact_proof", sword_and_brawler_helpers_use_the_same_exact_proof as fn()),
+                ("visible_mii_admits_only_with_the_visible_proof", visible_mii_admits_only_with_the_visible_proof as fn()),
+                ("ordinary_owners_beside_one_exact_gunner_helper_still_admit", ordinary_owners_beside_one_exact_gunner_helper_still_admit as fn()),
+                ("helper_proof_does_not_lock_a_visible_or_ordinary_owner", helper_proof_does_not_lock_a_visible_or_ordinary_owner as fn()),
+            ]);
+        }
+    }
+}
 }

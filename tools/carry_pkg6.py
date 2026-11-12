@@ -173,6 +173,9 @@ def transform(entry: dict, modules: dict, stage_bytes: bytes, dest_by_src: dict)
         if cut is not None:
             out = cut.encode("utf-8")
             continue
+        if "append" in e:  # rc.9 coverage: a new test at the end of a carried test file
+            out = (s + e["append"]).encode("utf-8")
+            continue
         if "delete_from" in e:
             # delete [delete_from, delete_to): `delete_from` must occur once; `delete_to` is the first occurrence after it
             # (or, with `delete_to_last`, the last occurrence in the file); the text from delete_to on stays

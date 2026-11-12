@@ -85,3 +85,126 @@ impl ReloadPose {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    lib_unit_tests! {
+    use super::*;
+
+    struct Fixture {
+        entry: Vec<u64>,
+        body: [u64; 8],
+        info: Vec<u64>,
+        module: [u64; 1],
+    }
+
+    impl Fixture {
+        fn new() -> Self {
+            Self { entry: vec![0; 0x5a00 / 8], body: [0; 8], info: vec![0xabababababababab; 0xa00 / 8], module: [0] }
+        }
+        unsafe fn prepare(&mut self, owner: u32, index: usize) -> usize {
+            let e = self.entry.as_mut_ptr() as usize;
+            let b = self.body.as_mut_ptr() as usize;
+            fields::write_unchecked(e, 0xe0, owner);
+            fields::write_unchecked(e, 0x14, 3u32);
+            fields::write_unchecked(e, 0x5918, index as u8);
+            fields::write_unchecked(e, 0x18 + index * 4, 0x4au32);
+            fields::write_unchecked(e, 0x4160 + index * 8, b);
+            fields::write_unchecked(e, 0xf8, self.info.as_mut_ptr() as usize);
+            fields::write_unchecked(b, 0, 0x84f80210usize);
+            fields::write_unchecked(b, 0xc, 0x4au32);
+            fields::write_unchecked(b, 0x10, u64::from(owner));
+            fields::write_unchecked(b, 0x20, self.module.as_mut_ptr() as usize);
+            // Native active state, independent of the production constant.
+            fields::write_unchecked(b, 0x3a, 4u8);
+            e
+        }
+    }
+
+    fn valid_save_restore_replaces_stale_rebirth_pose_only() {
+        for (owner, index) in [(0, 0), (1, 1), (4, 2)] {
+            let mut f = Fixture::new();
+            let entry = unsafe { f.prepare(owner, index) };
+            let info = f.info.as_mut_ptr() as usize;
+            unsafe { fields::write_unchecked(info, 0x9f0, [36.0f32, 70.0, 0.0]); }
+            let before = f.info.clone();
+            let pose = unsafe { capture(0x80000000, entry, owner, |module| {
+                assert_eq!(module, f.module.as_ptr() as usize);
+                Some(SpawnPose::Current([36.0, 0.01, 0.0], -1.0))
+            }) }.unwrap();
+            unsafe { pose.stage(); }
+            assert_eq!(unsafe { fields::read::<[f32; 3]>(info, 0x9f0) }, Some([36.0, 0.01, 0.0]));
+            assert_eq!(unsafe { fields::read::<f32>(info, 0x9e0) }, Some(-1.0));
+            let before = before.iter().flat_map(|v| v.to_ne_bytes()).collect::<Vec<_>>();
+            let after = f.info.iter().flat_map(|v| v.to_ne_bytes()).collect::<Vec<_>>();
+            for i in 0..before.len() {
+                if !(0x9e0..0x9e4).contains(&i) && !(0x9f0..0x9fc).contains(&i) {
+                    assert_eq!(before[i], after[i], "unrelated information byte {i:x}");
+                }
+            }
+        }
+    }
+
+    fn malformed_or_departing_body_never_calls_posture_or_writes() {
+        for case in 0..8 {
+            let mut f = Fixture::new();
+            let entry = unsafe { f.prepare(0, 0) };
+            let b = f.body.as_mut_ptr() as usize;
+            unsafe {
+                match case {
+                    0 => fields::write_unchecked(entry, 0xe0, 4u32),
+                    1 => fields::write_unchecked(entry, 0x5918, 3u8),
+                    2 => fields::write_unchecked(entry, 0xf8, 0usize),
+                    3 => fields::write_unchecked(b, 0, 0usize),
+                    4 => fields::write_unchecked(b, 0x10, 1u64),
+                    5 => fields::write_unchecked(b, 0xc, 9u32),
+                    6 => fields::write_unchecked(b, 0x3a, 3u8),
+                    _ => fields::write_unchecked(b, 0x20, 0usize),
+                }
+            }
+            let before = f.info.clone();
+            assert!(unsafe { capture(0x80000000, entry, 0, |_| panic!("invalid body")) }.is_none());
+            assert_eq!(f.info, before);
+        }
+    }
+
+    fn finite_airborne_pose_is_preserved_and_invalid_values_refuse_without_writes() {
+        for (position, facing, accepted) in [
+            ([11.0, 26.5, 2.0], 1.0, true),
+            ([f32::NAN, 0.0, 0.0], 1.0, false),
+            ([0.0, f32::INFINITY, 0.0], 1.0, false),
+            ([0.0, 0.0, 0.0], 0.0, false),
+        ] {
+            let mut f = Fixture::new();
+            let entry = unsafe { f.prepare(0, 0) };
+            let before = f.info.clone();
+            let pose = unsafe { capture(0x80000000, entry, 0, |_| Some(SpawnPose::Current(position, facing))) };
+            assert_eq!(pose.is_some(), accepted);
+            assert_eq!(f.info, before, "capture is read-only even on success");
+            if let Some(pose) = pose {
+                unsafe { pose.stage(); }
+                assert_eq!(unsafe { fields::read::<[f32; 3]>(f.info.as_ptr() as usize, 0x9f0) }, Some(position));
+            }
+        }
+    }
+
+    fn native_spawn_keeps_the_entire_anchor_unchanged() {
+        let mut f = Fixture::new();
+        let entry = unsafe { f.prepare(4, 0) };
+        let before = f.info.clone();
+        let pose = unsafe { capture(0x80000000, entry, 4, |_| Some(SpawnPose::Native)) }.unwrap();
+        unsafe { pose.stage(); }
+        assert_eq!(f.info, before);
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("valid_save_restore_replaces_stale_rebirth_pose_only", valid_save_restore_replaces_stale_rebirth_pose_only as fn()),
+            ("malformed_or_departing_body_never_calls_posture_or_writes", malformed_or_departing_body_never_calls_posture_or_writes as fn()),
+            ("finite_airborne_pose_is_preserved_and_invalid_values_refuse_without_writes", finite_airborne_pose_is_preserved_and_invalid_values_refuse_without_writes as fn()),
+            ("native_spawn_keeps_the_entire_anchor_unchanged", native_spawn_keeps_the_entire_anchor_unchanged as fn()),
+        ]);
+    }
+    }
+}

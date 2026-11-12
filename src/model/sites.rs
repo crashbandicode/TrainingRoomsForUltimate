@@ -416,17 +416,24 @@ mod tests {
     lib_unit_tests! {
     use super::*;
 
-    #[test]
     fn every_site_name_is_unique_and_found() {
         for site in &SITES {
             assert_eq!(find(site.name).map(|s| s.offset), Some(site.offset));
         }
     }
 
-    #[test]
     fn an_unsupported_game_installs_nothing() {
         assert!(install_plan(Verdict::UnsupportedBuild).is_empty());
         assert_eq!(install_plan(Verdict::Supported).len(), SITES.len());
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("every_site_name_is_unique_and_found", every_site_name_is_unique_and_found as fn()),
+            ("an_unsupported_game_installs_nothing", an_unsupported_game_installs_nothing as fn()),
+        ]);
     }
     }
 }

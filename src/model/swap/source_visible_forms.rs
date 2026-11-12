@@ -104,3 +104,185 @@ pub(crate) fn merge_slots(
     (expected == observed).then_some(expected)
 }
 
+#[cfg(test)]
+mod tests {
+    lib_unit_tests! {
+    use super::*;
+
+    // The two route values are the exact LDN05 B #531/#556 input failure.
+    // Other bank fields are explicit native-reader contract fixtures, not a
+    // claim that B logged each actor/control field (it did not).
+    fn bank(kinds: [u32; 3], owner: u32) -> Bank {
+        let count = if kinds[2] == u32::MAX { 2 } else { 3 };
+        let mut result = Bank {
+            entry: 0x12_0be0_4000, owner, resource: (0x11_faf7_5100, kinds[0], 0),
+            kinds, bodies: [(0, 0); 3], members: [None; 3], active: 0,
+            record: 0x11_f543_f010 + owner as usize * 0x280,
+            route: (0, 0, 0),
+        };
+        result.route = (owner as i32, result.record, owner as i32);
+        for (index, kind) in kinds.iter().copied().enumerate().take(count) {
+            result.bodies[index] = (0x1000 + index * 0x100, index as u32);
+            result.members[index] = Some(Member {
+                actor: 0x2000 + index * 0x80, control: 0x3000 + index * 0x100, kind,
+            });
+        }
+        result
+    }
+
+    fn row(bank: Bank) -> Slot {
+        let member = bank.members[bank.active].unwrap();
+        (member.control, if bank.owner == 0 { 0 } else { 1 }, member.kind as i32,
+            if bank.owner == 0 { -1 } else { bank.owner as i32 },
+            if bank.owner == 0 { -1 } else { bank.owner as i32 })
+    }
+
+    fn rows(bank: Bank) -> [Slot; 16] {
+        let mut rows = [(0, 2, -1, -1, -1); 16];
+        rows[bank.owner as usize] = row(bank);
+        rows
+    }
+
+    fn authority(bank: Bank) -> ([u32; 2], [Option<Bank>; 2]) {
+        if bank.owner == 0 { ([0, 4], [Some(bank), None]) }
+        else { ([0, bank.owner], [None, Some(bank)]) }
+    }
+
+    fn captured_ldn05_aegis_delta_requires_same_native_bank() {
+        let mut before = bank([0x5b, 0x5a, u32::MAX], 0);
+        // Canonical actor order is Pyra/Mythra even when body order starts Mythra.
+        before.members.swap(0, 1);
+        before.active = 1;
+        before.members[0].as_mut().unwrap().control = 0x11_dba6_0c00;
+        before.members[1].as_mut().unwrap().control = 0x11_80ee_2e00;
+        let previous = (0x11_80ee_2e00, 0, 0x5b, -1, -1);
+        let observed = (0x11_dba6_0c00, 0, 0x5a, -1, -1);
+        assert_ne!(previous, observed); // The unchanged strict comparator rejects B.
+        let mut after = before; after.active = 0;
+        assert_eq!(expected_slot(previous, before, after), Some(observed));
+        assert_eq!(merge_slots(rows(before), rows(after), [0, 4],
+            [Some(before), None], [Some(after), None]), Some(rows(after)));
+        let mut wrong = after; wrong.entry += 8;
+        assert_eq!(expected_slot(previous, before, wrong), None);
+        wrong = after; wrong.members[0].as_mut().unwrap().control += 8;
+        assert_eq!(expected_slot(previous, before, wrong), None);
+    }
+
+    fn trainer_all_normal_switch_edges_for_visible_player_and_cpu() {
+        for owner in [0, 1, 4] {
+            for start in 0..3 {
+                let mut before = bank([0x25, 0x26, 0x24], owner); before.active = start;
+                let mut after = before; after.active = (start + 1) % 3;
+                assert_eq!(expected_slot(row(before), before, after), Some(row(after)));
+                let (owners, saved) = authority(before);
+                assert_eq!(merge_slots(rows(before), rows(after), owners, saved, authority(after).1), Some(rows(after)));
+            }
+        }
+    }
+
+    fn stable_control_and_return_to_previous_form_are_exact() {
+        for owner in [0, 1, 4] {
+            let before = bank([0x5b, 0x5a, u32::MAX], owner);
+            assert_eq!(expected_slot(row(before), before, before), Some(row(before)));
+            let mut after = before; after.active = 1;
+            assert_eq!(expected_slot(row(before), before, after), Some(row(after)));
+            assert_eq!(expected_slot(row(after), after, before), Some(row(before)));
+        }
+    }
+
+    fn changed_lifetime_group_body_or_control_authority_is_refused() {
+        let before = bank([0x25, 0x26, 0x24], 4);
+        let mut after = before; after.active = 1;
+        let reject = |bad| assert_eq!(expected_slot(row(before), before, bad), None);
+        let mut bad = after; bad.entry += 8; reject(bad);
+        bad = after; bad.owner = 0; reject(bad);
+        bad = after; bad.resource.0 += 8; reject(bad);
+        bad = after; bad.resource.2 += 1; reject(bad);
+        bad = after; bad.bodies[1].1 += 1; reject(bad);
+        bad = after; bad.members[1].as_mut().unwrap().actor += 8; reject(bad);
+        bad = after; bad.members[1].as_mut().unwrap().kind = 0x5a; reject(bad);
+        bad = after; bad.route.0 = 7; reject(bad);
+        bad = after; bad.route.1 += 0x280; reject(bad);
+        bad = after; bad.route.2 = 7; reject(bad);
+        bad = after; bad.active = 3; reject(bad);
+        bad = after; bad.kinds.swap(0, 1); reject(bad);
+    }
+
+    fn ic_solopopo_kirby_and_bowser_gain_no_pointer_change_exception() {
+        for kinds in [[0x4b, 0x4c, u32::MAX], [0x4b, u32::MAX, u32::MAX],
+                      [6, u32::MAX, u32::MAX], [0xf, u32::MAX, u32::MAX]] {
+            let before = bank(kinds, 0);
+            let mut after = before; after.active = 1;
+            assert_eq!(expected_slot(row(before), before, after), None);
+        }
+    }
+
+    fn forged_old_input_is_refused() {
+        let before = bank([0x5b, 0x5a, u32::MAX], 0);
+        let mut after = before; after.active = 1;
+        let original = row(before); let expected = expected_slot(original, before, after).unwrap();
+        assert_eq!(expected, row(after));
+        let mut forged = original; forged.0 += 8;
+        assert_eq!(expected_slot(forged, before, after), None);
+        forged = original; forged.2 = 6;
+        assert_eq!(expected_slot(forged, before, after), None);
+    }
+
+    fn merge_refuses_state_owner_alias_and_other_row_changes() {
+        for owner in [0, 1, 4] {
+            let before = bank([0x5b, 0x5a, u32::MAX], owner);
+            let mut after = before; after.active = 1;
+            let expected = rows(before); let observed = rows(after);
+            let (owners, saved) = authority(before);
+            let merge = |observed| merge_slots(expected, observed, owners, saved, authority(after).1);
+            let slot = owner as usize;
+            assert_eq!(merge(observed), Some(observed));
+            let mut bad = observed; bad[slot].1 ^= 1; assert_eq!(merge(bad), None);
+            bad = observed; bad[slot].3 = 7; assert_eq!(merge(bad), None);
+            bad = observed; bad[slot].4 = 7; assert_eq!(merge(bad), None);
+            bad = observed; bad[slot].0 += 8; assert_eq!(merge(bad), None);
+            bad = observed; bad[slot].2 = 6; assert_eq!(merge(bad), None);
+            for other in [0, 1, 4, 7, 15].iter().copied().filter(|other| *other != slot) {
+                bad = observed; bad[other].0 = 0x1230; assert_eq!(merge(bad), None);
+            }
+            bad = observed; bad[7].1 = 0; assert_eq!(merge(bad), None);
+        }
+    }
+
+    fn missing_authority_preserves_strict_path_but_never_accepts_a_delta() {
+        let before = bank([0x5b, 0x5a, u32::MAX], 0);
+        let mut after = before; after.active = 1;
+        assert_eq!(merge_slots(rows(before), rows(before), [0, 4], [None; 2], [None; 2]), Some(rows(before)));
+        assert_eq!(merge_slots(rows(before), rows(after), [0, 4], [None; 2], [Some(after), None]), None);
+        assert_eq!(merge_slots(rows(before), rows(after), [0, 4], [Some(before), None], [None; 2]), None);
+    }
+
+    fn invalid_owner_and_duplicate_member_controls_cannot_authorize_merge() {
+        let mut before = bank([0x5b, 0x5a, u32::MAX], 7);
+        let mut after = before; after.active = 1;
+        assert_eq!(expected_slot(row(before), before, after), None);
+        assert_eq!(merge_slots(rows(before), rows(after), [0, 7], [None, Some(before)], [None, Some(after)]), None);
+        before = bank([0x5b, 0x5a, u32::MAX], 0);
+        let first_control = before.members[0].unwrap().control;
+        before.members[1].as_mut().unwrap().control = first_control;
+        after = before; after.active = 1;
+        assert_eq!(merge_slots(rows(before), rows(after), [0, 4], [Some(before), None], [Some(after), None]), None);
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("captured_ldn05_aegis_delta_requires_same_native_bank", captured_ldn05_aegis_delta_requires_same_native_bank as fn()),
+            ("trainer_all_normal_switch_edges_for_visible_player_and_cpu", trainer_all_normal_switch_edges_for_visible_player_and_cpu as fn()),
+            ("stable_control_and_return_to_previous_form_are_exact", stable_control_and_return_to_previous_form_are_exact as fn()),
+            ("changed_lifetime_group_body_or_control_authority_is_refused", changed_lifetime_group_body_or_control_authority_is_refused as fn()),
+            ("ic_solopopo_kirby_and_bowser_gain_no_pointer_change_exception", ic_solopopo_kirby_and_bowser_gain_no_pointer_change_exception as fn()),
+            ("forged_old_input_is_refused", forged_old_input_is_refused as fn()),
+            ("merge_refuses_state_owner_alias_and_other_row_changes", merge_refuses_state_owner_alias_and_other_row_changes as fn()),
+            ("missing_authority_preserves_strict_path_but_never_accepts_a_delta", missing_authority_preserves_strict_path_but_never_accepts_a_delta as fn()),
+            ("invalid_owner_and_duplicate_member_controls_cannot_authorize_merge", invalid_owner_and_duplicate_member_controls_cannot_authorize_merge as fn()),
+        ]);
+    }
+    }
+}

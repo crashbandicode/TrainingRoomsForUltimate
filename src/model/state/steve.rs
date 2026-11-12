@@ -68,3 +68,26 @@ pub fn from_parts(parts: &Parts) -> Steve {
 pub const fn tool_offset(i: usize) -> usize {
     i * TOOL_STRIDE
 }
+
+#[cfg(test)]
+mod tests {
+    lib_unit_tests! {
+    use super::*;
+
+    /// rc.9 coverage. A Steve record and its parts are the same values in the record's order: the seven counts, then the four tools'
+    /// material byte and durability; tool records are `TOOL_STRIDE` apart.
+    #[test]
+    fn a_steve_record_and_its_parts_carry_the_same_values_in_order() {
+        let parts_in = Parts { counts: [1, 2, 3, 4, 5, 6, 7], tools: [(1, 10.5), (2, 20.25), (3, 0.0), (4, 99.0)] };
+        let steve = from_parts(&parts_in);
+        assert_eq!((steve.mat_g1, steve.mat_wood, steve.mat_stone, steve.mat_iron), (1, 2, 3, 4));
+        assert_eq!((steve.mat_gold, steve.mat_redstone, steve.mat_diamond), (5, 6, 7));
+        assert_eq!((steve.sword_mat, steve.axe_mat, steve.pick_mat, steve.shovel_mat), (1, 2, 3, 4));
+        assert_eq!((steve.sword_durability, steve.shovel_durability), (10.5, 99.0));
+        assert_eq!(parts(&steve), parts_in);
+        assert_eq!(COUNT_IDS.len(), parts_in.counts.len());
+        assert_eq!((0..TOOLS).map(tool_offset).collect::<Vec<_>>(), [0, 0xC, 0x18, 0x24]);
+        assert_eq!((TOOL_MATERIAL_OFFSET, TOOL_DURABILITY_OFFSET), (0, 4));
+    }
+    }
+}

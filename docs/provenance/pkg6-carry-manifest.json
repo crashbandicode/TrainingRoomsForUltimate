@@ -178,7 +178,7 @@
    "dest": "src/model/seams/native_fields.rs",
    "crate": "root",
    "src_sha256": "1659bef7f17ee20e313258ec62aa6d912e93761bb0c124142337c149c429b835",
-   "dest_sha256": "12887b8e9dbacf2608131ba4ffef607f88d9cde3daa935b262890c8fe226505c",
+   "dest_sha256": "2b822516fb5d81dc4b4f519de9997eb2b77d757b7622af09ae16b04279bf1450",
    "edits": [
     {
      "old": "use std::mem::{align_of, size_of};\n\n",
@@ -201,11 +201,15 @@
      "reason": "rc.6 ship blocker (final-ally-72344fd9, 2026-11-10 00:56Z): a teardown read a body window slot past the window size (+0x4150) and followed float bytes 0xb31caf33bf800000 as a body (8 Unmapped reads in retire_window). native_fields::object refuses words past the user address space (39-bit on Horizon), inline_elements returns only a native inline vector slots below its size, and retire_window and the pair traces read the window through it, checking the fighter vtable before any other field"
     },
     {
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
      "wrap_tests": [
       "tests"
      ],
      "macro": "lib_unit_tests",
-     "reason": "rc.9 test cut: the kept unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -214,14 +218,18 @@
    "dest": "src/model/seams/native_unlink_core.rs",
    "crate": "root",
    "src_sha256": "cc0beb6ca3ab506dc57ada0e048f9d19547c3a4407d3e6f534a761ba7952ce94",
-   "dest_sha256": "ef54f4ac9522bdb18be840f697b566642bfd53d610f0a7e42d631620fca70ae5",
+   "dest_sha256": "f494084bf632d1240b45c569d76de0dd9b9ad586b23e3c09cf5b86763afa4cfc",
    "edits": [
+    {
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
     {
      "wrap_tests": [
       "tests"
      ],
      "macro": "lib_unit_tests",
-     "reason": "rc.9 test cut: the kept unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -230,7 +238,7 @@
    "dest": "src/model/seams/native_unlink_guard.rs",
    "crate": "root",
    "src_sha256": "647fb995e92587a94b0d519f5aad706419ddc8795759febc89986f704b2879ea",
-   "dest_sha256": "8d1fbc3650b8f2d32c75fc9d96216c34426f909158de16a287d11afe435111e3",
+   "dest_sha256": "0dc50e9cc1919e15669b4c1220a11fc08327df30ebf418118ad19e567c3752b8",
    "edits": [
     {
      "old": "/// Safety: caller must supply the exact native store's live node/address/value.\n",
@@ -238,11 +246,15 @@
      "reason": "clippy::missing_safety_doc wants a `# Safety` heading; the fork silenced it with a crate-level allow in its (mixed) lib.rs, which is not carried (root-cause fix instead of an allow)"
     },
     {
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
      "wrap_tests": [
       "tests"
      ],
      "macro": "lib_unit_tests",
-     "reason": "rc.9 test cut: the kept unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -489,7 +501,7 @@
    "dest": "src/model/seams/native_seams/rows_a2.rs",
    "crate": "consts",
    "src_sha256": "d2894a66f249d8dab23cfd8ecede6ce4a59784fb4ba58db998072b6251ef5ace",
-   "dest_sha256": "4f1b0ec644d2e77cfc425bf788085b53e25c30bf5683cfb309b57ede8a25b49a",
+   "dest_sha256": "c756fbfc28d9d38da97a7ef757531baf8ee38bdfc178ecd46e3030dc971e9d1f",
    "edits": [
     {
      "old": "                0xe0, 0x03, 0x13, 0xaa, 0x14, 0x9f, 0x09, 0x94, 0xbb, 0x01, 0x00, 0xb4, 0x68, 0x23, 0x00, 0x91],\n        feature: \"mii-ordinary-player-alpha\", scopes: Scopes::ALL, read_only: true, per_frame: false, sharing: Sharing::None,\n        note: \"\" },\n    Seam { label: \"mii_quit_observer.update_entry\", group: \"mii_quit_observer\", offset: 0x376bce0,\n        kind: SeamKind::Hook { form: HookForm::Inline, placement: Placement::Entry },\n        guard: [0xff, 0x83, 0x02, 0xd1, 0xe8, 0x23, 0x00, 0xfd, 0xfa, 0x67, 0x05, 0xa9, 0xf8, 0x5f, 0x06, 0xa9,\n                0xf6, 0x57, 0x07, 0xa9, 0xf4, 0x4f, 0x08, 0xa9, 0xfd, 0x7b, 0x09, 0xa9, 0xfd, 0x43, 0x02, 0x91,\n                0xf8, 0xd9, 0x00, 0xb0, 0x18, 0x43, 0x45, 0xf9, 0x17, 0x00, 0x80, 0x12, 0x17, 0x5c, 0x02, 0xb9,\n                0x1f, 0x00, 0x05, 0x79, 0x00, 0x03, 0xc0, 0x3d, 0x08, 0xec, 0x40, 0x39, 0xf4, 0x03, 0x01, 0xaa],\n        feature: \"mii-quit-observer\", scopes: Scopes::ALL, read_only: true, per_frame: false, sharing: Sharing::None,\n        note: \"entry inline, diag-only; records entry sp/lr against the 0xa0 frame: must stay at the entry\" },\n    Seam { label: \"mii_quit_observer.direct_action\", group: \"mii_quit_observer\", offset: 0x376c32c,\n        kind: SeamKind::Hook { form: HookForm::Inline, placement: Placement::Mid },\n        guard: [0x68, 0x56, 0x42, 0xb9, 0x61, 0x52, 0x42, 0xb9, 0x1f, 0x05, 0x00, 0x31, 0x60, 0x35, 0x00, 0x54,\n                0x69, 0xde, 0x40, 0xf9, 0xe9, 0x2d, 0x00, 0xb4, 0x75, 0xe2, 0x06, 0x91, 0xe8, 0x03, 0x15, 0xaa,\n                0x2a, 0x21, 0x40, 0xb9, 0x5f, 0x01, 0x01, 0x6b, 0xea, 0xa7, 0x9f, 0x1a, 0x08, 0xb1, 0x89, 0x9a,\n                0x29, 0x59, 0x6a, 0xf8, 0x69, 0xff, 0xff, 0xb5, 0x1f, 0x01, 0x15, 0xeb, 0x60, 0x05, 0x00, 0x54],\n        feature: \"mii-quit-observer\", scopes: Scopes::ALL, read_only: true, per_frame: false, sharing: Sharing::None,\n        note: \"\" },\n    Seam { label: \"mii_quit_observer.registered_store\", group: \"mii_quit_observer\", offset: 0x376c6f0,\n        kind: SeamKind::Hook { form: HookForm::Inline, placement: Placement::Mid },\n        guard: [0x68, 0x5e, 0x02, 0xb9, 0xe9, 0x06, 0x00, 0x35, 0xca, 0x02, 0x40, 0xf9, 0xaa, 0x01, 0x00, 0xb4,\n                0xe9, 0x03, 0x16, 0xaa, 0x4b, 0x21, 0x40, 0xb9, 0x7f, 0x01, 0x08, 0x6b, 0xeb, 0xa7, 0x9f, 0x1a,\n                0x29, 0xb1, 0x8a, 0x9a, 0x4a, 0x59, 0x6b, 0xf8, 0x6a, 0xff, 0xff, 0xb5, 0x3f, 0x01, 0x16, 0xeb,\n                0x80, 0x00, 0x00, 0x54, 0x2a, 0x21, 0x40, 0xb9, 0x5f, 0x01, 0x08, 0x6b, 0xed, 0x29, 0x00, 0x54],\n        feature: \"mii-quit-observer\", scopes: Scopes::ALL, read_only: true, per_frame: false, sharing: Sharing::None,\n        note: \"\" },\n    Seam { label: \"mii_quit_observer.update_return\", group: \"mii_quit_observer\", offset: 0x376cc3c,\n        kind: SeamKind::Hook { form: HookForm::Inline, placement: Placement::Mid },\n        guard: [0xe8, 0x23, 0x40, 0xfd, 0xfd, 0x7b, 0x49, 0xa9, 0xf4, 0x4f, 0x48, 0xa9, 0xf6, 0x57, 0x47, 0xa9,\n                0xf8, 0x5f, 0x46, 0xa9, 0xfa, 0x67, 0x45, 0xa9, 0xff, 0x83, 0x02, 0x91, 0xc0, 0x03, 0x5f, 0xd6,\n                0x1f, 0x05, 0x00, 0x31, 0x61, 0xd9, 0xff, 0x54, 0x2a, 0xfe, 0xff, 0x17, 0x21, 0x15, 0x40, 0xf9,\n                0xb2, 0xfe, 0xff, 0x17, 0x60, 0x0e, 0x01, 0xf0, 0x00, 0x60, 0x26, 0x91, 0x8e, 0x4e, 0x09, 0x94],\n        feature: \"mii-quit-observer\", scopes: Scopes::ALL, read_only: true, per_frame: false, sharing: Sharing::None,\n        note: \"\" },\n    Seam { label: \"mii_quit_observer.called_376d5d0\", group: \"mii_quit_observer\", offset: 0x376d5d0,\n        kind: SeamKind::Called,\n        guard: [0xf5, 0x0f, 0x1d, 0xf8, 0xf4, 0x4f, 0x01, 0xa9, 0xfd, 0x7b, 0x02, 0xa9, 0xfd, 0x83, 0x00, 0x91,\n                0x28, 0xa0, 0x41, 0xb9, 0x09, 0x50, 0x42, 0xb9, 0x1f, 0x01, 0x09, 0x6b, 0x41, 0x09, 0x00, 0x54,\n                0x08, 0xfc, 0x40, 0x39, 0xf3, 0x03, 0x01, 0xaa, 0xf4, 0x03, 0x00, 0xaa, 0xa8, 0x00, 0x00, 0x34,\n                0x68, 0x02, 0x40, 0xf9, 0x08, 0xc1, 0x40, 0xf9, 0xe0, 0x03, 0x13, 0xaa, 0x00, 0x01, 0x3f, 0xd6],\n        feature: \"mii-quit-observer\", scopes: Scopes::ALL, read_only: true, per_frame: false, sharing: Sharing::None,\n        note: \"\" },\n    Seam { label: \"mii_quit_observer.predicate_return\", group: \"mii_quit_observer\", offset: 0x376d6dc,\n        kind: SeamKind::Hook { form: HookForm::Inline, placement: Placement::Mid },\n        guard: [0x20, 0x01, 0x00, 0x36, 0x68, 0xa2, 0x41, 0xb9, 0x88, 0x5a, 0x02, 0xb9, 0x68, 0x02, 0x40, 0xf9,\n                0x08, 0x19, 0x41, 0xf9, 0xe0, 0x03, 0x13, 0xaa, 0x00, 0x01, 0x3f, 0xd6, 0x08, 0x00, 0x00, 0x12,\n                0x88, 0x12, 0x0a, 0x39, 0x88, 0xea, 0x40, 0x39, 0x88, 0x00, 0x00, 0x35, 0x88, 0x36, 0x40, 0xb9,\n                0x1f, 0x0d, 0x00, 0x71, 0xa1, 0x00, 0x00, 0x54, 0xfd, 0x7b, 0x42, 0xa9, 0xf4, 0x4f, 0x41, 0xa9],\n        feature: \"mii-quit-observer\", scopes: Scopes::ALL, read_only: true, per_frame: false, sharing: Sharing::None,\n        note: \"\" },\n    Seam { label: \"mii_quit_observer.called_376d860\", group: \"mii_quit_observer\", offset: 0x376d860,\n        kind: SeamKind::Called,\n        guard: [0x00, 0x80, 0x00, 0xd1, 0x5b, 0xff, 0xff, 0x17, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,\n                0xff, 0xc3, 0x00, 0xd1, 0xf4, 0x4f, 0x01, 0xa9, 0xfd, 0x7b, 0x02, 0xa9, 0xfd, 0x83, 0x00, 0x91,\n                0xc1, 0x07, 0x00, 0xb4, 0x08, 0x58, 0x40, 0xf9, 0xf4, 0x03, 0x00, 0xaa, 0x68, 0x07, 0x00, 0xb4,\n                0x28, 0x00, 0x40, 0xf9, 0x08, 0xb9, 0x40, 0xf9, 0xe0, 0x03, 0x01, 0xaa, 0xf3, 0x03, 0x01, 0xaa],\n        feature: \"mii-quit-observer\", scopes: Scopes::ALL, read_only: true, per_frame: false, sharing: Sharing::None,\n        note: \"\" },\n    Seam { label: \"mii_quit_observer.called_376ded0\", group: \"mii_quit_observer\", offset: 0x376ded0,\n        kind: SeamKind::Called,\n        guard: [0xf8, 0x5f, 0xbc, 0xa9, 0xf6, 0x57, 0x01, 0xa9, 0xf4, 0x4f, 0x02, 0xa9, 0xfd, 0x7b, 0x03, 0xa9,\n                0xfd, 0xc3, 0x00, 0x91, 0x08, 0xec, 0x40, 0x39, 0x68, 0x00, 0x00, 0x34, 0x13, 0x00, 0x80, 0x12,\n                0x55, 0x00, 0x00, 0x14, 0x18, 0xf0, 0x40, 0xf9, 0x16, 0xa0, 0x07, 0x91, 0x1f, 0x03, 0x16, 0xeb,\n                0x60, 0xff, 0xff, 0x54, 0xf4, 0x03, 0x01, 0xaa, 0x17, 0xe0, 0x06, 0x91, 0x13, 0x00, 0x80, 0x12],\n        feature: \"mii-quit-observer\", scopes: Scopes::ALL, read_only: true, per_frame: false, sharing: Sharing::None,\n        note: \"\" },\n    Seam { label: \"mii_quit_observer.registered_action\", group: \"mii_quit_observer\", offset: 0x376e044,\n        kind: SeamKind::Hook { form: HookForm::Inline, placement: Placement::Mid },\n        guard: [0xe0, 0x03, 0x13, 0x2a, 0xfd, 0x7b, 0x43, 0xa9, 0xf4, 0x4f, 0x42, 0xa9, 0xf6, 0x57, 0x41, 0xa9,\n                0xf8, 0x5f, 0xc4, 0xa8, 0xc0, 0x03, 0x5f, 0xd6, 0x13, 0x1f, 0x40, 0xb9, 0xf9, 0xff, 0xff, 0x17,\n                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x82, 0x15, 0x00, 0xb4,\n                0xff, 0x43, 0x01, 0xd1, 0xf8, 0x5f, 0x01, 0xa9, 0xf6, 0x57, 0x02, 0xa9, 0xf4, 0x4f, 0x03, 0xa9],\n        feature: \"mii-quit-observer\", scopes: Scopes::ALL, read_only: true, per_frame: false, sharing: Sharing::None,\n        note: \"\" },\n    Seam { label: \"mii_hud_portrait.relied_377aef0\", group: \"mii_hud_portrait\", offset: 0x377aef0,\n        kind: SeamKind::Relied,\n        guard: [0xfd, 0xc3, 0x00, 0x91, 0x08, 0x04, 0x40, 0xf9, 0x13, 0x05, 0x40, 0xf9, 0x13, 0x08, 0x00, 0xb4,\n",
@@ -607,11 +619,15 @@
      "reason": "rc.3 Mii port (2026-11-05): the Colour selector main+0x376d990 that cosmetic_resume::apply_color calls (fork cosmetic_resume.rs COLOR_SELECT) gets an exact 64-byte row in the editor preflight; the fork had no guard for it."
     },
     {
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
      "wrap_tests": [
       "tests"
      ],
      "macro": "lib_unit_tests",
-     "reason": "rc.9 test cut: the kept unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -620,7 +636,7 @@
    "dest": "src/model/seams/native_seams/rows_a3.rs",
    "crate": "consts",
    "src_sha256": "78b74b30208d4d09007bedb5f5ae50ed1dcc4531ffca39700e28bb14bc233925",
-   "dest_sha256": "8cfc1973268109aeb3cfb3471c15b644513081470c7e5fedfc6560fd01315b88",
+   "dest_sha256": "ca444f2bb9270c20b9966370d01a63468da2b27d9bcc8d4750370724981ca754",
    "edits": [
     {
      "old": "                0x00, 0x28, 0x40, 0xf9, 0x08, 0x00, 0x40, 0xf9, 0x03, 0x5d, 0x40, 0xf9, 0x60, 0x00, 0x1f, 0xd6],\n        feature: \"debug_assertions\", scopes: Scopes::ALL, read_only: false, per_frame: false, sharing: Sharing::None,\n        note: \"entry: replace hook owns the function (leaf thunk, no prologue)\" },\n    Seam { label: \"needle.is_visible_backshield\", group: \"training\", offset: 0x1655610,\n        kind: SeamKind::Called,\n        guard: [0xfd, 0x7b, 0xbf, 0xa9, 0xfd, 0x03, 0x00, 0x91, 0x00, 0x28, 0x40, 0xf9, 0x08, 0x00, 0x40, 0xf9,\n                0x08, 0x85, 0x40, 0xf9, 0xa1, 0x0f, 0x80, 0x52, 0x01, 0x00, 0xa4, 0x72, 0x00, 0x01, 0x3f, 0xd6,\n                0xe8, 0x03, 0x20, 0x2a, 0x00, 0x01, 0x00, 0x12, 0xfd, 0x7b, 0xc1, 0xa8, 0xc0, 0x03, 0x5f, 0xd6,\n                0x00, 0x28, 0x40, 0xf9, 0x08, 0x00, 0x40, 0xf9, 0x02, 0x85, 0x40, 0xf9, 0xc1, 0x0f, 0x80, 0x52],\n        feature: \"debug_assertions\", scopes: Scopes::ALL, read_only: true, per_frame: false, sharing: Sharing::None,\n        note: \"\" },\n    Seam { label: \"needle.copy_setup\", group: \"training\", offset: 0xba0e80,\n        kind: SeamKind::Called,\n        guard: [0xe8, 0x0f, 0x19, 0xfc, 0xfc, 0x6f, 0x01, 0xa9, 0xfa, 0x67, 0x02, 0xa9, 0xf8, 0x5f, 0x03, 0xa9,\n                0xf6, 0x57, 0x04, 0xa9, 0xf4, 0x4f, 0x05, 0xa9, 0xfd, 0x7b, 0x06, 0xa9, 0xfd, 0x83, 0x01, 0x91,\n                0xff, 0x43, 0x17, 0xd1, 0x18, 0xa4, 0x40, 0xf9, 0xfa, 0x03, 0x03, 0x2a, 0x5f, 0x18, 0x00, 0x71,\n                0xc1, 0x02, 0x00, 0x54, 0x1a, 0xac, 0x00, 0x36, 0x08, 0x03, 0x40, 0xf9, 0x07, 0x55, 0x40, 0xf9],\n        feature: \"\", scopes: Scopes::ALL, read_only: true, per_frame: false, sharing: Sharing::None,\n        note: \"\" },\n    Seam { label: \"needle.get_battle_object_from_id\", group: \"training\", offset: 0x3ac560,\n        kind: SeamKind::Called,\n        guard: [0x08, 0x7c, 0x1c, 0x53, 0x1f, 0x11, 0x00, 0x71, 0x68, 0x07, 0x00, 0x54, 0x69, 0x08, 0x02, 0x90,\n                0x29, 0xd1, 0x07, 0x91, 0x28, 0x79, 0xa8, 0xb8, 0x08, 0x01, 0x09, 0x8b, 0x00, 0x01, 0x1f, 0xd6,\n                0x68, 0x78, 0x02, 0x90, 0x08, 0xa5, 0x42, 0xf9, 0x09, 0x01, 0x40, 0xf9, 0x08, 0x6c, 0x10, 0x53,\n                0x2a, 0x19, 0x40, 0xb9, 0x1f, 0x01, 0x0a, 0x6b, 0xe2, 0x05, 0x00, 0x54, 0x29, 0x05, 0x40, 0xf9],\n        feature: \"\", scopes: Scopes::ALL, read_only: true, per_frame: false, sharing: Sharing::None,\n        note: \"\" },\n    Seam { label: \"needle.ui_pass_calculate\", group: \"training\", offset: 0x375efa8,\n",
@@ -653,11 +669,15 @@
      "reason": "Integrate approved Slim4b86500 retirement/scope and cold-owner/SDK roots into current composed source. Preserve current pkg6 const locks, F6 task ordering, Setup lifecycle and Deluxe persistence. Retired probe consumers removed with their features; shared host oracle retained. New exact composition requires fresh gates."
     },
     {
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
      "wrap_tests": [
       "tests"
      ],
      "macro": "lib_unit_tests",
-     "reason": "rc.9 test cut: the kept unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -730,7 +750,7 @@
    "dest": "src/model/seams/native_seams/report.rs",
    "crate": "consts",
    "src_sha256": "b8dc43434245d6cc9c1d149cd17e762daebac0e5adc312e674509bac1501a0ad",
-   "dest_sha256": "1ec12cd5826fbf0ecb75396ec79f292e9147e82b2357f93cf5203832be023b11",
+   "dest_sha256": "02b8d2f3d3db6e51e19e2710ff6390507bc7172a55e46ed0622bfd0ce2c7405f",
    "edits": [
     {
      "old": "    matches!(bits & CODE_MASK, OCCUPIED | FOREIGN | OUT_OF_REGION | UNCAPTURED)\n}\n",
@@ -738,10 +758,15 @@
      "reason": "rc.4 seam-self (2026-11-05, primary 35137355): seam checks put this plugin's own writes back before comparing (model::own_patches; prime/seal record the bytes at every site a hook row writes), and a refused row is named once in the shipped log (report::names_row / RefusedLine). Root cause of rc.2's Change Stage skip: a check read our own lobby_stage hook as occupied."
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -757,7 +782,7 @@
       "tests"
      ],
      "macro": "lib_unit_tests",
-     "reason": "rc.9 test cut: the kept unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -766,7 +791,7 @@
    "dest": "src/model/seams/native_seams/tests.rs",
    "crate": "consts",
    "src_sha256": "fd7c889851be63354f4db71a22b2cfe61024eec5268f2e4dcc455b92ffc5c163",
-   "dest_sha256": "bc763e50f6efc713894ffdbfe1f3601ab9a978412d44cc95905ea81502a459e6",
+   "dest_sha256": "7d263c2fd178d8c013591b2b5f88656d2f128557a073e2703b35e76841f60b89",
    "edits": [
     {
      "old": "Path::new(env!(\"CARGO_MANIFEST_DIR\")).join(\"..\");",
@@ -794,8 +819,16 @@
      "reason": "Integrate exact F6 7bdeacf into reviewed a850/pkg4 composition: native control-init task ordering and guarded callback/functor sites, bounded allocation-free diagnostic timing; preserve current owner locks and release semantics. Original F6 behavior/native evidence retained, final integrated acceptance pending."
     },
     {
+     "table_file": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "append": "\n/// rc.9 coverage. The run-time tables are compile-time projections of the row files. Recomputed at run time, each projection is\n/// the table the NRO carries and agrees with a plain walk of the authored rows.\n#[test]\nfn the_compile_time_projections_are_the_row_files_walked_in_order() {\n    let rows: Vec<&Seam> = all().collect();\n    assert_eq!(total(&TABLES), rows.len());\n    assert_eq!(COUNT, rows.len());\n    let sites = project(&TABLES);\n    assert!(sites.iter().zip(&rows).all(|(site, row)| site.label == row.label && site.offset == row.offset));\n    assert!(SITES.iter().zip(&sites).all(|(a, b)| a.label == b.label && a.offset == b.offset && a.guard == b.guard));\n    let own: Vec<(&str, &str)> =\n        rows.iter().filter_map(|row| if let Sharing::OwnHook { hook } = row.sharing { Some((row.label, hook)) } else { None }).collect();\n    assert_eq!(own_hook_rows(&TABLES), own.len());\n    assert_eq!(own_hook_pairs(&TABLES).as_slice(), own.as_slice());\n    assert_eq!(OWN_HOOK_PAIRS.as_slice(), own.as_slice());\n    let patches: Vec<usize> = rows.iter().enumerate().filter(|(_, row)| writes_code(row)).map(|(index, _)| index).collect();\n    assert_eq!(patch_rows(&TABLES), patches.len());\n    assert_eq!(patch_sites(&TABLES).as_slice(), patches.as_slice());\n    assert_eq!(PATCH_SITES.as_slice(), patches.as_slice());\n    let shared: Vec<(&str, &str, usize)> = rows\n        .iter()\n        .filter_map(|row| if let Sharing::EntryOrBody { owner, body } = row.sharing { Some((row.label, owner, body)) } else { None })\n        .collect();\n    assert_eq!(entry_or_body_count(&TABLES), shared.len());\n    assert_eq!(entry_or_body_rows(&TABLES).as_slice(), shared.as_slice());\n    assert_eq!(ENTRY_OR_BODY_ROWS.as_slice(), shared.as_slice());\n    let images = project_images(images::IMAGE_ROWS);\n    assert_eq!(images.len(), IMAGE_COUNT);\n    assert!(images.iter().zip(images::IMAGE_ROWS).all(|(site, row)| site.label == row.label && site.chain == matches!(row.sharing, Sharing::Chain)));\n    assert!(IMAGE_SITES.iter().zip(&images).all(|(a, b)| a.label == b.label && a.guard == b.guard));\n}\n",
+     "reason": "rc.9 coverage: a new case (docs/COVERAGE-rc9.md)"
+    },
+    {
      "wrap_file": "lib_unit_tests",
-     "reason": "rc.9 test cut: the kept unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -804,14 +837,19 @@
    "dest": "src/model/swap/source_descriptor.rs",
    "crate": "root",
    "src_sha256": "36e7170964bd32eef13962c50f1bb559f3e0adc691d66366615ec4042fc2dcce",
-   "dest_sha256": "25946ebdf2b3fc79bb23e757a55151d0675ec32b13d75653f6e7617d0f1b7b46",
+   "dest_sha256": "02515c0f5d2d16f10b8385b5d1acde57e54e7c83e1698e1dd3222a3ad8e4d026",
    "widen": true,
    "edits": [
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -820,7 +858,7 @@
    "dest": "src/model/swap/source_lifetime.rs",
    "crate": "root",
    "src_sha256": "9908fbdce2de0082c581e18c4a452ba4ac1e1cc18fac63b7f954f8b8e96aecaf",
-   "dest_sha256": "5969c69499e799d2259002db7419a71f66ec45bcffd282099d7ebbe6b39d2c35",
+   "dest_sha256": "2b64f5fc749d6295879a19e37f3a834a2fb556e222cacef9ed0a70b8c3862dc1",
    "edits": [
     {
      "old": "    /// Every acquire owns a distinct lease, even when holder values are equal.\n",
@@ -890,10 +928,15 @@
      "reason": "Original s6-12 count-promotion HUD regression: production publication/fullidentity gate rejects stale/unpublished/missing/changed identities, active Reload marker, INSTALL, reused entry and departed epoch; reset dispatcher covers only Training0..3."
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -902,14 +945,19 @@
    "dest": "src/model/swap/source_visible_forms.rs",
    "crate": "root",
    "src_sha256": "87647851bc41c795d6f61a6b526068a8493f57fdbe040231c909d549fcc21885",
-   "dest_sha256": "0686f41af65d9267ae5d710a150a5118fe5622c659cf09cf5fb6ef95cf986fb7",
+   "dest_sha256": "5f86e1cb2e7c01d4610ebb941a2322540bedd86174e179261499e9f18eb8d1f2",
    "widen": true,
    "edits": [
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -918,7 +966,7 @@
    "dest": "src/model/swap/native_hud_refresh.rs",
    "crate": "root",
    "src_sha256": "b92d55d6aaed20764d3f98aa45ef152464c52d139e97d074ea91d821e2233bbb",
-   "dest_sha256": "7c0d21f7ed545a9605603c738c43e38d8e33c8dbcd5f097c84ea003c62e131b2",
+   "dest_sha256": "0518b50a0b0e3d0ed4f45842eadb82524824c48b9973003e577fea74668e9a1a",
    "widen": true,
    "edits": [
     {
@@ -927,10 +975,15 @@
      "reason": "F9: Training counts 1 through 3 admit helper resources; a count raise publishes a ready body's own kind and reloads entry 2 or 3 only after the activation frame (LANE-GROK-F9-REPORT.md)"
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -939,7 +992,7 @@
    "dest": "src/model/swap/source_load.rs",
    "crate": "consts",
    "src_sha256": "96037cc4840bc01c6dd2466b9ddbe751e790404a324af9d65d6ac6c58205bf6f",
-   "dest_sha256": "ec348d746a61806f217b3feabfff6052c0305e03f263174720fd62f80ca1afeb",
+   "dest_sha256": "b15f2dc48ce419f32c022c4be140df6a54d32489155991033c0ef78af3ec88c0",
    "edits": [
     {
      "old": "pub enum Blocker {\n    Backend,\n    ReadyGo,\n    Menu,\n    NativeUi,\n    Shortcut,\n    Install,\n    SaveState,\n    Recording,\n    ReplayPreview,\n    Roster,\n}\n\nimpl Blocker {\n    pub fn reason(self) -> &'static str {\n        match self {\n            Blocker::Backend => \"Mii backend not ready\",\n            Blocker::ReadyGo => \"match not at ready-go\",\n            Blocker::Menu => \"menu captures input\",\n            Blocker::NativeUi => \"native UI busy\",\n            Blocker::Shortcut => \"another shortcut pending\",\n            Blocker::Install => \"INSTALL held\",\n            Blocker::SaveState => \"save-state restore\",\n            Blocker::Recording => \"recording or playback\",\n            Blocker::ReplayPreview => \"replay preview\",\n            Blocker::Roster => \"roster transaction\",\n        }\n    }\n}\n\n/// Once-per-change note for one queued request: the same request waiting on the same blocker on every\n/// callback is noted once; a different blocker or request is noted again; no blocker re-arms it.\n#[derive(Clone, Copy, Debug, PartialEq, Eq)]\npub struct Waiting<R> {\n    last: Option<(R, Blocker)>,\n}\n\nimpl<R: Copy + PartialEq> Waiting<R> {\n    pub const fn new() -> Self {\n        Self { last: None }\n    }\n\n    /// `Some(blocker)` when this callback's (request, blocker) differs from the last one noted.\n    pub fn note(&mut self, request: R, blocker: Option<Blocker>) -> Option<Blocker> {\n        let now = blocker.map(|blocker| (request, blocker));\n        if now == self.last {\n            return None;\n        }\n        self.last = now;\n        blocker\n    }\n}\n\nimpl<R: Copy + PartialEq> Default for Waiting<R> {\n    fn default() -> Self {\n        Self::new()\n    }\n}\n\n#[cfg(test)]\nmod tests {\n    use super::*;\n\n    /// M5c's rule",
@@ -947,10 +1000,15 @@
      "reason": "p23/rc6-cov-rest portrait race (primary 2026-11-08 17:28Z, readings A and B; Eden covrest-12): the CPU's next press was submitted in the frame the CPU's HUD portrait render was issued on helper 2 (the F9 seat holding the same exact Mii); its snapshot refused the row mid-render and the portrait's after-render proof quarantined helper 2 for the scene, so presses 1-5 loaded nothing. A: a Mii owner's begin (CPU begin_blocker, Player permitted) waits while that role's portrait job holds a helper lease or has its render issued (Blocker::Portrait, mii_hud_portrait::render_holds_helper); the press runs after the render, never dropped. B: the F9 seat branch of purpose_view starts no seat load while a portrait job wants a helper or holds one (portrait_waits, parked_entries::seat_load_waits), so the render is not pushed behind the seat's INSTALL."
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -959,7 +1017,7 @@
    "dest": "src/model/swap/roster_grid.rs",
    "crate": "tui",
    "src_sha256": "90f7eaf48933ccfb39e4696cb8dd38782dfd194630bfd031ed4bbf2442cc5d20",
-   "dest_sha256": "224d20bb74e7ae19b8b6bd38bc3165370996ed3e4b344a8011e87164e2bb6459",
+   "dest_sha256": "8a584420c7e7249cbbe03ee52923eaadb1a93db448e506a6e88e5e095e5ef7fd",
    "edits": [
     {
      "old": "pub fn css_order(kinds: &[u32], values: &[u8], excluded: Option<u32>) -> Vec<u32> {\n    GRID.iter()\n        .filter_map(|slot| match slot {\n            Slot::Fighter(kind, _) => Some(*kind),\n            Slot::Shared(group) => {\n                let default = group.forms()[0].0;\n                Some(\n                    selected_group_index(kinds, values, default)\n                        .map(|i| kinds[i])\n                        .unwrap_or(default),\n                )\n            }\n            _ => None,\n        })\n        .filter(|kind| kinds.contains(kind) && excluded.map(group_kind) != Some(group_kind(*kind)))\n        .collect()\n}",
@@ -967,10 +1025,15 @@
      "reason": "R5 / fix ledger F10 (lead ruling 2026-11-02): the preload planner calls this on every planning tick inside the fighter-frame hook scope, and the Vec-returning form allocated 14 times a second (Eden s6-06, `allocs=roster_preload:3943`); the allocation-free form is now the single implementation and the Vec form, for the callers outside hooks, copies it"
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -979,13 +1042,18 @@
    "dest": "src/model/preload/cycle_admission_grace.rs",
    "crate": "consts",
    "src_sha256": "2552af2ee8e87bbcdbb0bdca70a277930a97f948a1c99c6e655f0c7a8adc4737",
-   "dest_sha256": "8cd846c37b569e24fe774ea534e45a86ad69a4b387cd23ce35c56851756b8caa",
+   "dest_sha256": "bff83012527e2b7264bfe609330afdbb6c863a8fa84e2b14e0d850b2950f86f5",
    "edits": [
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -994,13 +1062,18 @@
    "dest": "src/model/preload/notice_queue.rs",
    "crate": "consts",
    "src_sha256": "c4013a040c6660e14820aa75ec08e92b10d8b2981d09e42d3faeec1c7d21a11e",
-   "dest_sha256": "2b7c2a8ee56bfbfbcf0be79b04c56b3a467662f6aed45d1af0585ccfbe42653a",
+   "dest_sha256": "570aaa717e2a015c8af788e21a769265d9aace29ed660eebb80dfd3bbae1e548",
    "edits": [
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -1009,7 +1082,7 @@
    "dest": "src/model/mii/auto_init.rs",
    "crate": "mii",
    "src_sha256": "cc0ab5f24f0c3866420026c9d364746a48321c0dac80dc525cb0fe1054e9207e",
-   "dest_sha256": "4da4493426ccb55445e4a9d5c14fcb6d36906296f7e604c872be1a53f8b1afe1",
+   "dest_sha256": "d9f0b59ea1247e56927880c3ed16276b2110cc2082ab3c9e82643beecb0bb2d6",
    "edits": [
     {
      "old": "//! One automatic catalog read per visible-entry lifetime. Values only; no IO or native access.\nuse crate::engine::mii::inventory::MiiClass;\n\n#[derive(Clone, Copy, Debug, PartialEq, Eq)]\npub struct Token {\n    pub generations: [u64; 2],\n    pub opening: u64,\n}\n\n#[derive(Clone, Copy, Debug, PartialEq, Eq)]\nenum Phase {\n    Waiting,\n    Reading,\n    Finished,\n}\n\npub struct Initialization {\n    token: Option<Token>,\n    ready: u8,\n    phase: Phase,\n}\n\nimpl Initialization {\n    pub const fn empty() -> Self {\n        Self {\n            token: None,\n            ready: 0,\n            phase: Phase::Waiting,\n        }\n    }\n\n    pub fn pending(&self) -> bool {\n        self.phase != Phase::Finished\n    }\n\n    /// `eligible` includes both known originals, the current role's native readiness,\n    /// and the existing practice exclusions. A callback supplies only its own role.\n    pub fn observe(&mut self, token: Token, role: u32, eligible: bool) -> Option<Token> {\n        if role > 1 || self.phase != Phase::Waiting {\n            return None;\n        }\n        if self.token.is_some_and(|previous| previous != token) {\n            return None;\n        }\n        self.token = Some(token);\n        let bit = 1 << role;\n        if eligible {\n            self.ready |= bit;\n        } else {\n            self.ready &= !bit;\n        }\n        if self.ready != 3 {\n            return None;\n        }\n        self.phase = Phase::Reading;\n        Some(token)\n    }\n\n    /// Consume this read exactly once, including incomplete or stale results.\n    /// An old completion cannot consume a new lifetime's pending read.\n    pub fn finish(&mut self, token: Token, current: Token, complete: bool) -> bool {\n        if self.phase != Phase::Reading || self.token != Some(token) {\n            return false;\n        }\n        self.phase = Phase::Finished;\n        token == current && complete\n    }\n\n    /// An explicit menu refresh supersedes automatic work for this lifetime.\n    pub fn cancel(&mut self) {\n        self.phase = Phase::Finished;\n    }\n\n    /// Scene change and visible-entry destruction both start a fresh lifetime.\n    pub fn reset(&mut self) {\n        *self = Self::empty();\n    }\n\n    pub fn reading(&self) -> Option<Token> {\n        if self.phase == Phase::Reading { self.token } else { None }\n    }\n}\n\n/// A mixed Player roster waits only while its native qualification can still finish.\n/// Explicit Mii/original-Mii protection is independent of this temporary wait.\npub fn player_qualifying(\n    native_training: bool,\n    cpu_quantity: Option<u32>,\n    automatic: bool,\n    capture: bool,\n) -> bool {\n    native_training && cpu_quantity == Some(1) && (automatic || capture)\n}\n\n/// Until capture succeeds, consume Mii-related input without creating a request.\n/// Plain ordinary-only routing remains available while the catalog is loading.\npub fn requires_owner(original: Option<u32>, roster_has_mii: bool, direct: Option<u32>) -> bool {\n    roster_has_mii\n        || original.and_then(MiiClass::from_kind).is_some()\n        || direct.and_then(MiiClass::from_kind).is_some()\n}\n\n/// A continuation or an early manual choice replaces the visible CSS-origin body,\n/// and origin capture accepts only that body. Hold the replacement while\n/// the role has no owner for the current generation, the visible body is still the\n/// immutable origin, and qualification can still finish: the automatic read is\n/// pending or the role's capture is armed, and the backend is before ready-go or\n/// exactly ready (the read's own readiness gate). Otherwise the continuation proceeds\n/// unchanged; an owner applies its own rules.\npub fn holds_origin_replacement(\n    qualified: bool,\n    origin_body: bool,\n    automatic: bool,\n    capture: bool,\n    ready_go: bool,\n    backend_ready: bool,\n) -> bool {\n    !qualified && origin_body && (automatic || capture) && (!ready_go || backend_ready)\n}\n\n#[cfg(test)]\nmod tests {\n    use super::*;\n\n    const FIRST: Token = Token {\n        generations: [7, 11],\n        opening: 13,\n    };\n\n    #[test]\n    fn one_read_and_one_arm_per_lifetime_even_after_read_failure() {\n        for complete in [true, false] {\n            let mut init = Initialization::empty();\n            assert_eq!(init.observe(FIRST, 0, true), None);\n            assert_eq!(init.observe(FIRST, 0, true), None);\n            assert_eq!(init.observe(FIRST, 1, true), Some(FIRST));\n            assert_eq!(init.observe(FIRST, 1, true), None);\n            assert_eq!(init.finish(FIRST, FIRST, complete), complete);\n            assert!(!init.finish(FIRST, FIRST, true));\n            assert!(!init.pending());\n            assert_eq!(init.observe(FIRST, 0, true), None);\n            assert_eq!(init.observe(FIRST, 1, true), None);\n        }\n    }\n\n    #[test]\n    fn scene_destructor_and_menu_changes_reject_stale_completion() {\n        let mut init = Initialization::empty();\n        init.observe(FIRST, 0, true);\n        init.observe(FIRST, 1, true);\n        init.cancel(); // A real menu opening owns its independent refresh.\n        assert!(!init.finish(FIRST, FIRST, true));\n        assert!(!init.pending());\n        for next in [\n            Token {\n                generations: [8, 12],\n                opening: 14,\n            }, // Scene boundary.\n            Token {\n                generations: [7, 12],\n                opening: 14,\n            }, // CPU entry destruction.\n        ] {\n            init.reset();\n            assert_eq!(init.observe(next, 0, true), None);\n            assert_eq!(init.observe(next, 1, true), Some(next));\n            assert!(!init.finish(FIRST, next, true));\n            assert!(init.pending());\n            assert!(init.finish(next, next, true));\n        }\n        init.reset();\n        init.observe(FIRST, 0, true);\n        init.observe(FIRST, 1, true);\n        assert!(!init.finish(\n            FIRST,\n            Token {\n                opening: 14,\n                ..FIRST\n            },\n            true\n        ));\n    }\n\n    #[test]\n    fn readiness_precedes_arming_and_mii_input_never_falls_through_unqualified() {\n        let mut init = Initialization::empty();\n        assert_eq!(init.observe(FIRST, 0, false), None); // Original/readiness unavailable.\n        assert_eq!(init.observe(FIRST, 1, true), None);\n        assert_eq!(init.observe(FIRST, 0, false), None); // INSTALL or another action owns practice.\n        assert_eq!(init.observe(FIRST, 4, true), None); // Not a visible Training role.\n        assert!(!init.finish(FIRST, FIRST, true));\n        assert!(requires_owner(Some(0x49), false, None));\n        assert!(requires_owner(Some(9), true, None));\n        assert!(requires_owner(Some(9), false, Some(0x48)));\n        assert!(!requires_owner(Some(9), false, Some(0x0f)));\n        assert!(!requires_owner(None, false, None));\n        let mixed_player = |native, quantity, automatic, capture| {\n            requires_owner(\n                Some(9),\n                player_qualifying(native, quantity, automatic, capture),\n                None,\n            )\n        };\n        assert!(mixed_player(true, Some(1), init.pending(), false));\n        assert!(!mixed_player(false, Some(1), init.pending(), false)); // Waiting scope.\n        assert!(!mixed_player(true, Some(2), init.pending(), false)); // Unsupported quantity.\n        assert!(!mixed_player(true, None, init.pending(), true)); // Unknown native quantity.\n        assert_eq!(init.observe(FIRST, 0, true), Some(FIRST));\n        assert!(init.finish(FIRST, FIRST, true));\n        assert!(mixed_player(true, Some(1), init.pending(), true)); // Catalog done; role capture armed.\n        assert!(!mixed_player(true, Some(1), init.pending(), false)); // Refused/completed capture.\n        init.reset();\n        init.observe(FIRST, 0, true);\n        init.observe(FIRST, 1, true);\n        assert!(!init.finish(FIRST, FIRST, false)); // Incomplete catalog consumes the attempt.\n        assert!(!mixed_player(true, Some(1), init.pending(), false));\n        assert!(requires_owner(Some(0x49), false, None)); // Immutable Mii origin remains protected.\n        assert!(requires_owner(Some(9), false, Some(0x48))); // Direct Mii remains refused.\n    }\n\n    const ORIGIN: u32 = 0x0e;\n    const REMEMBERED: u32 = 6;\n    const RETURN: Token = Token {\n        generations: [18, 18],\n        opening: 19,\n    };\n\n    type Hold = fn(bool, bool, bool, bool, bool, bool) -> bool;\n\n    /// One waiting lifetime after a match, frame by frame in callback order: auto-init,\n    /// the role's capture, then the roster's continuation consult. Capture qualifies\n    /// only the CSS-origin body; an unheld continuation replaces it at once. Ready-go is\n    /// frame 3; `menu` cancels the automatic read at frame 4 and arms capture itself.\n    /// Returns (frame qualified, frame replaced, capture still armed).\n    fn after_match(\n        hold: Hold,\n        complete: bool,\n        ready: bool,\n        menu: bool,\n    ) -> (Option<u32>, Option<u32>, bool) {\n        let mut init = Initialization::empty();\n        init.reset();\n        let (mut body, mut capture, mut reading) = (ORIGIN, false, None);\n        let (mut qualified_at, mut replaced_at) = (None, None);\n        for frame in 0..12 {\n            let go = frame >= 3;\n            if menu && frame == 4 {\n                init.cancel();\n                capture = true;\n            }\n            if let Some(token) = reading.take() {\n                capture |= init.finish(token, RETURN, complete);\n            } else if go && ready {\n                init.observe(RETURN, 0, true);\n                reading = init.observe(RETURN, 1, true);\n            }\n            if capture && body == ORIGIN {\n                capture = false;\n                qualified_at = Some(frame);\n            }\n            let (qualified, origin) = (qualified_at.is_some(), body == ORIGIN);\n            let automatic = init.pending();\n            let held = hold(qualified, origin, automatic, capture, go, ready);\n            if origin && !held {\n                body = REMEMBERED;\n                replaced_at = Some(frame);\n            }\n        }\n        (qualified_at, replaced_at, capture)\n    }\n\n    #[test]\n    fn match_return_qualifies_the_css_origin_before_its_continuation() {\n        let unheld: Hold = |_, _, _, _, _, _| false;\n        // Counterexample (C99 return): the continuation replaces the CSS body first,\n        // so the armed capture can never qualify and stays armed.\n        let old = after_match(unheld, true, true, false);\n        assert_eq!(old, (None, Some(0), true));\n        // Held: the delivered read arms capture, the origin qualifies, then the\n        // remembered choice continues in the same frame's later consult.\n        let held = (Some(4), Some(4), false);\n        assert_eq!(after_match(holds_origin_replacement, true, true, false), held);\n        // A menu that supersedes the read arms capture itself; same order.\n        assert_eq!(after_match(holds_origin_replacement, true, true, true), held);\n    }\n\n    #[test]\n    fn continuation_hold_is_released_when_qualification_cannot_finish() {\n        // An incomplete catalog consumes the read without arming capture.\n        let incomplete = after_match(holds_origin_replacement, false, true, false);\n        assert_eq!(incomplete, (None, Some(4), false));\n        // A backend that is not exactly ready at ready-go never starts the read.\n        let unready = after_match(holds_origin_replacement, true, false, false);\n        assert_eq!(unready, (None, Some(3), false));\n        // Before ready-go the visible entries may still be loading: held regardless.\n        assert!(holds_origin_replacement(false, true, true, false, false, false));\n        // A qualified owner, or neither a pending read nor an armed capture, never holds.\n        assert!(!holds_origin_replacement(true, true, true, true, false, true));\n        assert!(!holds_origin_replacement(false, true, false, false, false, true));\n        // An armed capture alone holds while the backend can still qualify it.\n        assert!(holds_origin_replacement(false, true, false, true, true, true));\n        assert!(!holds_origin_replacement(false, true, false, true, true, false));\n        // A body that is no longer the CSS origin can never be captured: never held.\n        assert!(!holds_origin_replacement(false, false, true, true, true, true));\n        assert!(!holds_origin_replacement(false, false, true, true, false, false));\n    }\n}\n",
@@ -1017,10 +1090,15 @@
      "reason": "F9: Training counts 1 through 3 admit helper resources; a count raise publishes a ready body's own kind and reloads entry 2 or 3 only after the activation frame (LANE-GROK-F9-REPORT.md)"
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -1029,7 +1107,7 @@
    "dest": "src/model/mii/backend.rs",
    "crate": "mii",
    "src_sha256": "7bee3bae61809c3743530da2bf3721dcd88d52b4e419964db5192dd1d8e8ffbc",
-   "dest_sha256": "0e13bbccb7ea9832cf225c904e5fa478d88d7becd2a878fb094890cb3d7b44bc",
+   "dest_sha256": "f92a24a19a41c4e2009eb1e323bbb806c92ee4f20c05fd3387ea283f1bb8c808",
    "edits": [
     {
      "old": "//! Exact native backend shapes; logical roles are never physical owner indices.\n//!\n//! Local-wireless and Quickplay waiting share one PracticeScene setup (13.0.5\n//! `0x1790020`, reached identically from the general controller `0x2310570` and\n//! the online controller `0x237e970`): one primary row/entry 0 and CPU rows/entries\n//! 4/5/6, with no mode branch around that construction. They stay distinct variants\n//! so a mode word is never inferred from a shape and every live-shape gate still runs.\n#[derive(Clone, Copy, Debug, PartialEq, Eq)]\npub enum Layout { Training, Ldn, Quickplay }\nimpl Layout {\n    /// The two observed online waiting routes use the same native PracticeScene\n    /// owner map 0/4/5/6. Hardware C108 logs #630-660 and #718-737 witness the\n    /// 0x07010400 route; it was previously excluded even though stage loading\n    /// admitted it. This only classifies a mode: scene() still requires active\n    /// waiting melee0d, and native adapters still prove every live owner.\n    /// Arenas and unobserved 0x070104 submodes remain excluded.\n    pub const fn quickplay_family(mode:u32)->Option<u32> {\n        let mode=mode & 0x7fffffff;\n        if mode & 0xffffff00 == 0x07010100 {Some(0x07010100)}\n        else if mode == 0x07010400 {Some(mode)} else {None}\n    }\n    pub const fn quickplay_waiting_mode(mode:u32)->bool {Self::quickplay_family(mode).is_some()}\n\n    /// Value-only continuity across an observed match excursion. Never grants\n    /// permission to call a practice API in a live match. The second online\n    /// route uses melee10 (hardware #661-675 and #706-717), not melee0e.\n    pub const fn continuation(initialized:bool,melee:u8,mode:u32)->Option<u32> {\n        if !initialized {return None;}\n        if mode==0x02010000 && matches!(melee,0x01|0x0d) {return Some(mode);}\n        match Self::quickplay_family(mode) {\n            Some(0x07010100) if matches!(melee,0x01|0x0d|0x0e)=>Some(0x07010100),\n            Some(0x07010400) if matches!(melee,0x0d|0x0e|0x10)=>Some(0x07010400),\n            _=>None,\n        }\n    }\n    pub fn scene(initialized:bool,melee:u8,mode:u32,waiting_active:bool)->Option<Self> {\n        match (initialized,melee,mode) {\n            (true,0x20,0x04040000)=>Some(Self::Training),\n            (true,0x0d,0x02010000) if waiting_active=>Some(Self::Ldn),\n            (true,0x0d,mode) if waiting_active && Self::quickplay_waiting_mode(mode)=>Some(Self::Quickplay),\n            _=>None,\n        }\n    }\n    /// The shared waiting shape: visible 0/4, helpers 5/6, native selection indices.\n    pub const fn waiting(self)->bool {!matches!(self,Self::Training)}\n    pub const fn visible(self)->[u32;2] {match self {Self::Training=>[0,1],Self::Ldn|Self::Quickplay=>[0,4]}}\n    pub const fn helpers(self)->[u32;2] {match self {Self::Training=>[2,3],Self::Ldn|Self::Quickplay=>[5,6]}}\n    pub fn owners(self)->[usize;4] {let v=self.visible();let h=self.helpers();[v[0] as usize,v[1] as usize,h[0] as usize,h[1] as usize]}\n    pub fn logical(self,physical:u32)->Option<usize> {self.visible().iter().position(|id|*id==physical)}\n    pub fn helper(self,physical:usize)->Option<usize> {self.helpers().iter().position(|id|*id as usize==physical)}\n    pub fn selector(self,physical:usize)->bool {physical!=0 && self.owners().contains(&physical)}\n    pub fn shape(self,entries:&[usize;8])->bool {\n        let ids=self.owners();\n        entries.iter().enumerate().all(|(id,p)|(*p!=0)==ids.contains(&id))\n            && ids.iter().enumerate().all(|(i,id)|ids[..i].iter().all(|other|entries[*id]!=entries[*other]))\n    }\n    /// `shape` plus exactly the registered entries for this layout. No\n    /// other nonzero slot, moved identity or owner/extra alias is accepted.\n    pub fn shape_with(self,entries:&[usize;8],extras:crate::engine::mii::capacity::Extras)->bool {\n        if !extras.matches(self) {return false;}\n        let Some(view)=extras.view(entries) else {return false;};\n        self.shape(&view) && extras.slots().all(|(_,entry)|!view.contains(&entry))\n    }\n    /// Raw map facts shared by native waiting admission and Mii owner adapters.\n    /// An identity registration never substitutes for this fresh physical check.\n    pub fn waiting_map(self,primary:&[usize;8],backup:&[usize;8],count:u32,\n        extras:crate::engine::mii::capacity::Extras)->bool {\n        self.waiting() && count==self.count_with(extras) && *backup==[0;8]\n            && self.shape_with(primary,extras)\n            && primary.iter().all(|pointer|pointer.is_multiple_of(8))\n    }\n    /// Native entry count of a `shape_with` map.\n    pub fn count_with(self,extras:crate::engine::mii::capacity::Extras)->u32 {(self.owners().len()+extras.count()) as u32}\n    pub fn quantity(self,quantity:Option<u32>)->bool {match self {Self::Training=>quantity==Some(1),Self::Ldn|Self::Quickplay=>quantity.is_none()}}\n}\n\n#[cfg(test)] mod tests {\n    use super::*;\n    #[test] fn registered_waiting_map_preserves_all_native_guards() {\n        use crate::engine::mii::capacity::Extras;\n        for layout in [Layout::Ldn,Layout::Quickplay] {\n            let base=[0x1000,0,0,0,0x4000,0x5000,0x6000,0];\n            assert!(layout.waiting_map(&base,&[0;8],4,Extras::NONE));\n            for entries in [[0x7000,0,0],[0x7000,0x3000,0],[0x7000,0x3000,0x2000]] {\n                let extras=Extras::new_for(layout,entries).unwrap();\n                let physical=extras.physical(&base);let count=4+extras.count() as u32;\n                assert!(layout.waiting_map(&physical,&[0;8],count,extras));\n                assert!(!layout.waiting_map(&physical,&[0;8],4,extras));\n                assert!(!layout.waiting_map(&physical,&[0;8],count,Extras::NONE));\n                for slot in 0..8 {\n                    let mut backup=[0;8];backup[slot]=0x8000;\n                    assert!(!layout.waiting_map(&physical,&backup,count,extras));\n                    let mut changed=physical;changed[slot]=0x9000;\n                    if !layout.owners().contains(&slot) {\n                        assert!(!layout.waiting_map(&changed,&[0;8],count,extras));\n                    }\n                }\n                let mut misaligned=physical;misaligned[4]+=1;\n                assert!(!layout.waiting_map(&misaligned,&[0;8],count,extras));\n            }\n        }\n    }\n\n    #[test] fn exact_backend_shape_and_logical_cpu() {\n        let map=[0x1000,0,0,0,0x2000,0x3000,0x4000,0];\n        assert_eq!(Layout::scene(true,13,0x02010000,true),Some(Layout::Ldn));\n        for (melee,mode) in [(1,0x02010000),(13,0x07010000),(32,0x02010000)] {\n            assert_eq!(Layout::scene(true,melee,mode,true),None);\n        }\n        assert!(Layout::Ldn.shape(&map));assert!(!Layout::Training.shape(&map));\n        assert_eq!(Layout::Ldn.logical(4),Some(1));assert_eq!(Layout::Ldn.logical(1),None);\n        assert_eq!(Layout::Ldn.helper(5),Some(0));assert_eq!(Layout::Ldn.helper(6),Some(1));\n        assert!(Layout::Ldn.quantity(None));assert!(!Layout::Ldn.quantity(Some(1)));\n        assert!(Layout::Training.quantity(Some(1)));assert!(!Layout::Training.quantity(None));\n        let mut alias=map;alias[6]=map[5];assert!(!Layout::Ldn.shape(&alias));\n    }\n    #[test] fn quickplay_waiting_shares_the_shape_but_keeps_its_own_mode_family() {\n        for mode in [0x07010100,0x07010101,0x07010102,0x07010400,0x87010400] {\n            assert_eq!(Layout::scene(true,0x0d,mode,true),Some(Layout::Quickplay));\n            assert_eq!(Layout::scene(true,0x0d,mode,false),None);\n            assert_eq!(Layout::scene(false,0x0d,mode,true),None);\n        }\n        // Arenas, unobserved submodes, both online match melees and other families stay out.\n        for (melee,mode) in [(0x0d,0x07010300),(0x0d,0x07010401),(0x10,0x07010400),(0x0e,0x07010400),(0x0e,0x07010101),(0x01,0x07010101),(0x0d,0x08010100),(0x20,0x07010101)] {\n            assert_eq!(Layout::scene(true,melee,mode,true),None);\n        }\n        assert_ne!(Layout::Quickplay,Layout::Ldn);\n        assert!(Layout::Quickplay.waiting() && Layout::Ldn.waiting() && !Layout::Training.waiting());\n        let map=[0x1000,0,0,0,0x2000,0x3000,0x4000,0];\n        assert!(Layout::Quickplay.shape(&map));\n        assert_eq!(Layout::Quickplay.visible(),Layout::Ldn.visible());\n        assert_eq!(Layout::Quickplay.helpers(),Layout::Ldn.helpers());\n        assert_eq!(Layout::Quickplay.owners(),Layout::Ldn.owners());\n        assert_eq!(Layout::Quickplay.logical(4),Some(1));assert_eq!(Layout::Quickplay.logical(1),None);\n        assert_eq!(Layout::Quickplay.helper(5),Some(0));assert_eq!(Layout::Quickplay.helper(6),Some(1));\n        assert!(Layout::Quickplay.selector(5) && !Layout::Quickplay.selector(0) && !Layout::Quickplay.selector(2));\n        assert!(Layout::Quickplay.quantity(None) && !Layout::Quickplay.quantity(Some(1)));\n        let mut alias=map;alias[6]=map[5];assert!(!Layout::Quickplay.shape(&alias));\n    }\n    #[test] fn only_registered_training_extras_extend_the_shape() {\n        use crate::engine::mii::capacity::Extras;\n        let training=[0x10,0x20,0x30,0x40,0,0,0,0];\n        assert!(Layout::Training.shape_with(&training,Extras::NONE));\n        assert_eq!(Layout::Training.count_with(Extras::NONE),4);\n        let mut created=training;created[7]=0x70;created[6]=0x60;\n        let extras=Extras::new([0x70,0x60,0]).unwrap();\n        assert!(Layout::Training.shape_with(&created,extras));\n        assert_eq!(Layout::Training.count_with(extras),6);\n        assert!(!Layout::Training.shape(&created),\"plain shape stays exact\");\n        // Unregistered, moved, slot4 or aliased extras are refused.\n        assert!(!Layout::Training.shape_with(&created,Extras::new([0x70,0,0]).unwrap()));\n        let mut moved=created;moved[6]=0x61;assert!(!Layout::Training.shape_with(&moved,extras));\n        let mut four=created;four[4]=0x44;assert!(!Layout::Training.shape_with(&four,extras));\n        let mut alias=training;alias[7]=0x30;\n        assert!(!Layout::Training.shape_with(&alias,Extras::new([0x30,0,0]).unwrap()));\n        // Registered extras never extend a waiting layout.\n        let mut waiting=[0x10,0,0,0,0x20,0x30,0x40,0];\n        assert!(Layout::Ldn.shape_with(&waiting,Extras::NONE));\n        waiting[7]=0x70;\n        assert!(!Layout::Ldn.shape_with(&waiting,Extras::new([0x70,0,0]).unwrap()));\n        assert!(!Layout::Quickplay.shape_with(&waiting,Extras::new([0x70,0,0]).unwrap()));\n    }\n}\n",
@@ -1037,10 +1115,15 @@
      "reason": "F9: Training counts 1 through 3 admit helper resources; a count raise publishes a ready body's own kind and reloads entry 2 or 3 only after the activation frame (LANE-GROK-F9-REPORT.md)"
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -1049,7 +1132,7 @@
    "dest": "src/model/mii/capacity.rs",
    "crate": "mii",
    "src_sha256": "5d1c327198a51570b05277dde4bacc9260b6a1c92341eba4fcaf1c2d8178838e",
-   "dest_sha256": "28de69170204c4c4707980b550f1c6abd3b58c3408da025c7a3e2a7510caf59e",
+   "dest_sha256": "91d404270af7d048e7f9c57843ae93252d457cb0aec4cf7f0e1e3abe526f0a01",
    "edits": [
     {
      "old": "        let Some(index) = extra_slots(self.layout).iter().position(|value| *value == slot)\n            .filter(|index| self.entries[*index] != 0) else {\n            return Err(\"extra slot is not a registered creation\");\n        };\n        self.roots[index].ok_or(\"extra registered roots unavailable\")\n    }\n\n    /// A registered extra's current native roots must equal its registration.\n    /// Raw values only; the caller reads them from current roots under its lock.\n    pub fn owned_roots(\n",
@@ -1087,10 +1170,15 @@
      "reason": "F9 four exclusive Training created renderer rows, four-owner provenance and strict layout-specific capacity; preserve five-target saved preload budget and promoted CPU publication identity. Development slice, native lifetime acceptance pending."
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -1099,13 +1187,18 @@
    "dest": "src/model/mii/catalog_request.rs",
    "crate": "mii",
    "src_sha256": "8cefd069f0af12e1a80415acf619a6122009d8d6aab9158f45580a77cc8388ec",
-   "dest_sha256": "a814e3351cfe0ce9501917b05aad71083df692addb86ad79b2819cf954bad046",
+   "dest_sha256": "ccf11a4e0398db1263e44668db6e21d95f18ce3597bfd0682cba2d5d0b742f3f",
    "edits": [
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -1114,13 +1207,18 @@
    "dest": "src/model/mii/draft.rs",
    "crate": "mii",
    "src_sha256": "fdd17191625c0bf1c132758259fd93d0cac53f8f42314b6a8d0cf83fab3d7b21",
-   "dest_sha256": "f9a53ec91bcca40258509449862c101b6b92b02b5df8dc6c9ae6dea6b79b349a",
+   "dest_sha256": "656ea63e53137bdb1ffc4f8ae8be599c943e9ab2c4f6c573a22d70b8e4f1f78b",
    "edits": [
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -1129,7 +1227,7 @@
    "dest": "src/model/mii/draft_store.rs",
    "crate": "mii",
    "src_sha256": "dcca386efde444feee28fedd097cc5acb3b3f8c98353335d04a995305bf17451",
-   "dest_sha256": "af4d553581437485f6d8e312d344272d708db6a8ae88e04d18456376767ac080",
+   "dest_sha256": "e0d0aad8616d5dda89bfe4656c33f7fd6334ac147fee9e3f0b5c4f8a82fb20c0",
    "edits": [
     {
      "old": ".args([\"--exact\", \"draft_store::tests::preset_continues_in_a_fresh_process\", \"--nocapture\"])",
@@ -1137,10 +1235,15 @@
      "reason": "the test re-runs its own binary by test name; the module path in front of the name depends on where the crate is compiled (library or by-path test crate), so the filter is the name tail without --exact"
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -1149,7 +1252,7 @@
    "dest": "src/model/mii/editor_row.rs",
    "crate": "mii",
    "src_sha256": "bd6f9f383f890d202164a8ee194797bcbbe69e9c73a816c0c5bc3ed21788176d",
-   "dest_sha256": "d14e148790f6f7ab8650be463b1f44ea5fbe791d486ad54b3b1a7346d1fbbe3c",
+   "dest_sha256": "cbbed6679dcc3b97f16f60972741cf4a12ba8558ca4a5190bfb89ff46b23826f",
    "edits": [
     {
      "old": "}\n\npub fn parse(row: &Row) -> Result<(String, Configuration), &'static str> {\n    let raw = saved::parse_header(0, 0, row).map_err(|_| \"Invalid owned editor row\")?;\n    let config = inventory::classify(&raw).map_err(|_| \"Invalid edited Mii\")?;\n    let value = Configuration::from_saved(&config).map_err(|_| \"Edited Mii resources differ\")?;\n    Ok((config.name, value))\n}\n\n#[cfg(test)]\n",
@@ -1170,10 +1273,15 @@
      "reason": "Lead 2026-11-03 00:07:39Z: native default caller uses same validated canonical/raw fields without allocated display name, relying on identical existing New Mii fallback. from_seed uses bounded ten UTF16 units and value-only validation, preserving scalar truncation, error precedence, native calls and output bytes."
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -1182,13 +1290,18 @@
    "dest": "src/model/mii/identity.rs",
    "crate": "mii",
    "src_sha256": "8099b07738c2f57ea09e7b47f37d10248c2d8376943c3400f312de9996cd798d",
-   "dest_sha256": "fd97552b034c9dfec672d7c017cb19030e247d7c9ec86288dd9dcc785cfb1759",
+   "dest_sha256": "1fcba8318d176c1afa3af69f2a58c96a6deb1a1e03bcb8553687f1679b6e4ee7",
    "edits": [
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -1197,7 +1310,7 @@
    "dest": "src/model/mii/inventory.rs",
    "crate": "mii",
    "src_sha256": "7cb9fa0651cbee81e6a3d0cc62745e62f3c2f798acf84f9ea25eeafb65c7cf2f",
-   "dest_sha256": "0c6589cdaa8f18543eb463deecab73d75cc2d7010e6428fd996825eca6480677",
+   "dest_sha256": "5d6264e77408ac273947bb8f48117d08c644561da2dcee81ee227ecfa6ccd12e",
    "edits": [
     {
      "old": "}\n\npub fn classify(slot: &RawSlot) -> Result<MiiConfig, Finding> {\n    let (slot_index, slot_id) = (slot.index, slot.slot_id);\n    if slot.specials.iter().any(|s| *s > 2) {\n        return Err(Finding::SpecialOutOfRange { slot_index, slot_id, specials: slot.specials });\n",
@@ -1212,10 +1325,15 @@
      "reason": "Lead 2026-11-02 23:58:44Z and 2026-11-03 00:02:03Z: private typed Draft intent with fixed owned row storage and semantic equality; preserve all consumer transitions and error precedence. Share canonical/header validation while native Draft skips discarded name allocation; existing name-returning APIs and saved error messages remain equivalent."
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -1245,7 +1363,7 @@
    "dest": "src/model/mii/lifetime.rs",
    "crate": "mii",
    "src_sha256": "c5ae4c4aa0aaaacbf795debce87f951fa1332a83ecee6743af029ceb0387feb0",
-   "dest_sha256": "8ecfefaea220ae3d20161c9187ab8738b91f8e741e1246fd5cca4052377e1c22",
+   "dest_sha256": "97efea238e82d8a142e34a4ef58f8e0c9d9f1594b869c4d5294ae6478dd00df4",
    "edits": [
     {
      "old": "#[derive(Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]\n#[serde(try_from = \"StoredConfiguration\", into = \"StoredConfiguration\")]\npub struct Configuration {\n    canonical: Canonical,\n    charinfo: [u8; CHARINFO_LEN],\n    tokens: Tokens,\n}\n",
@@ -1290,11 +1408,16 @@
      "reason": "Lead 2026-11-02 23:48:38Z: derive canonical identity from owned exact CharInfo, class, stable hashes and validated Tokens; preserve serialization and Copy/Eq identity, remove only the two portrait large-enum suppressions resolved by this representation."
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "observed_configuration_tests",
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -1310,13 +1433,18 @@
    "dest": "src/model/mii/native_values.rs",
    "crate": "mii",
    "src_sha256": "d95d260023c31acdfa4520346c1914b07a6a3037ea70cf688390acdb4dac1ae3",
-   "dest_sha256": "95f13a4e71bd1b7a587202e7881373c092df660ca7a1798650e4dc636835f412",
+   "dest_sha256": "27ff4b1cefc7be89baf0fe0aa0a2e47396223c7c363e03898506d74e6dc126c4",
    "edits": [
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -1325,7 +1453,7 @@
    "dest": "src/model/mii/ordinary_cpu.rs",
    "crate": "mii",
    "src_sha256": "e4628b4e3e7a00dc2c29d715b9755284f5afa3446513824912066178f0cc6caf",
-   "dest_sha256": "e00e943298dddfae83d5bb0950cc18283eb3d4f9ff1027fce1f1af0440eea6e5",
+   "dest_sha256": "4969da242bf30455439d4a0ea4bf0cc7221a8539c89bedf209de5cbeef58a9c4",
    "edits": [
     {
      "old": "/// and an extra index/selector equal to the destination refuses. A protected set\n/// that cannot fit the fixed record table refuses instead of truncating.\npub fn assignment_with(layout:crate::engine::mii::backend::Layout,extras:crate::engine::mii::capacity::Extras,\n    destination:usize,owners:&[Option<Owner>;8])->Option<[Option<u16>;8]> {\n    if !layout.selector(destination) || extras.entry(destination).is_some() {return None;}\n    if !layout.shape_with(&owners.map(|o|o.map_or(0,|o|o.entry)),extras) {\n        return None;\n    }\n    let mut protected = [None; 8];\n    let mut used = 0;\n",
@@ -1348,15 +1476,19 @@
      "reason": "Pkg6 cumulative created-source/promotion/fixed-seat cut-over integration from1dd2629 against immutable main3ba1c02. Preserve main probe retirement, pristine-load, Q15 and F6 roots; feature-disabled coexistence guards composed. Development source only; integrated compile/runtime acceptance pending."
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "generic_completion_tests",
       "native_rank_tests",
       "tests",
       "helper_tests",
-      "recapture_diagnostic_tests",
-      "created_destination_tests"
+      "recapture_diagnostic_tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -1365,14 +1497,19 @@
    "dest": "src/model/mii/ordinary_player.rs",
    "crate": "mii",
    "src_sha256": "602bba789924053897d816ea58b838f135f8cec49c8e955a4249d5687cf9b7d6",
-   "dest_sha256": "071d42a41048e535e283f1f907f5fda9e8618dc2f4390fa6feeba08f2706b76e",
+   "dest_sha256": "fb4a820f0c73f4549cb80e35e532c17093d1866fd8cb383ce322444931a088fb",
    "edits": [
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests",
       "generic_completion_tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -1388,18 +1525,18 @@
    "dest": "src/model/mii/replay.rs",
    "crate": "mii",
    "src_sha256": "dd58afdd5a0bcfeff0dd6a53708d1aebb509e46e15552edc04859632897df7c7",
-   "dest_sha256": "a8f4d382216e135cdd7aecf3a77dd836270ad574176a6c887faf2b2138f0ff7e",
+   "dest_sha256": "39710255d94b340c29527ce3c1c2aec8cd1140ed480ddfa7d1bd48565ef954b4",
    "edits": [
     {
-     "old": "#[cfg(test)]\nuse crate::engine::mii::inventory::{TaggedId, TAG_CHARA};\n",
-     "new": "",
-     "reason": "rc.9 test cut: used only by the removed unit tests on the host; the Switch build is unchanged"
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
     },
     {
-     "cut_tests": [
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -1415,13 +1552,18 @@
    "dest": "src/model/mii/role_owner.rs",
    "crate": "mii",
    "src_sha256": "827c41e73a22759abc5030859250e699425bf568795b56dd83338c23774e2adb",
-   "dest_sha256": "8172c2ce36b518cb13701a074ef4b7c12737e1f64e11d1c56d0455fcdb92a7d7",
+   "dest_sha256": "d35a99965c350deef82ed116a453dfe5b3abe5a046dbb534d4827dbc830b6306",
    "edits": [
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -1430,7 +1572,7 @@
    "dest": "src/model/mii/saved.rs",
    "crate": "mii",
    "src_sha256": "56a7f3f2957398f6efbfd5944e1a1dbab5c45bbae2057916c8b2dff92d54a976",
-   "dest_sha256": "ba84a8cf7c8b893f51fca47c9101f8fbd09c7d2b5ed6d7aaef77e23df761c138",
+   "dest_sha256": "3462ce8b46b37b0de4f871ce732dd532e393ecb0c0d18b182d4904b714283efb",
    "edits": [
     {
      "old": "\n/// Owned bytes only. Validation of class, tags, name length and specials is shared with inventory.\npub fn parse_header(id: u32, index: usize, bytes: &[u8; HEADER_LEN]) -> Result<RawSlot, String> {\n    let u32_at = |off| u32::from_le_bytes(bytes[off..off + 4].try_into().unwrap());\n    let u64_at = |off| u64::from_le_bytes(bytes[off..off + 8].try_into().unwrap());\n    let stored = u32_at(0);\n    if stored != id {\n        return Err(format!(\"filename id {id} differs from header id {stored}\"));\n    }\n    let mut name_units = [0; 10];\n    for (i, unit) in name_units.iter_mut().enumerate() {\n",
@@ -1439,10 +1581,15 @@
      "reason": "Lead 2026-11-02 23:58:44Z and 2026-11-03 00:02:03Z: private typed Draft intent with fixed owned row storage and semantic equality; preserve all consumer transitions and error precedence. Share canonical/header validation while native Draft skips discarded name allocation; existing name-returning APIs and saved error messages remain equivalent."
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -1451,7 +1598,7 @@
    "dest": "src/model/mii/selection.rs",
    "crate": "mii",
    "src_sha256": "f20f5a2389b4035988e7d61b8fcf86afa7aafe056e839f54d0903719430a9215",
-   "dest_sha256": "1ca76c53c603bfe8f5554d1a64affd9c272c2a00bc96a9fe1208e911aa132009",
+   "dest_sha256": "0a5c3a429032c8f0dfabfd20975164957ba238359cc87c373545e57067ca92de",
    "edits": [
     {
      "old": "#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]\n",
@@ -1484,10 +1631,15 @@
      "reason": "rc.6 freeze class (primary 2026-11-09 19:44Z; rc6-qpf3, tests/lock_order.rs): compat::menu::KEPT is a hos_lock::Published copy hooks read without waiting; mii::selection::Preferences is Copy (six Option<Canonical>), so its clones are copies and the preload planner copies it instead of holding a read guard"
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -1496,13 +1648,18 @@
    "dest": "src/model/mii/transition.rs",
    "crate": "mii",
    "src_sha256": "e3cacfe4b9540f009acf22e17a98742dd7ae9b1c376a04858308803b3f56befb",
-   "dest_sha256": "b37277690235ad11b5da89b62351edbd784c7bb96524a8ae791efb23852f63b8",
+   "dest_sha256": "4109ca1b705f16b9e854726be163781982452673005ebf100ea317930948287a",
    "edits": [
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -1511,7 +1668,7 @@
    "dest": "src/model/swap/body_bank.rs",
    "crate": "consts",
    "src_sha256": "ab3c4adcf084b2dd9433a5fe5715b428fb38c26d3b143d7632fb3d33078df0d6",
-   "dest_sha256": "af8e6aaf7278d7ef4d331ddc6dd9ff1b47e180bc9d8aae95a3efe9848b56b0f3",
+   "dest_sha256": "2ce18695cae3aecb4365850929585f7d9fa3fe6eb719e24ccd4571490ca878b8",
    "edits": [
     {
      "old": "    // a native group): count it so hats and helper slots agree with the planner.\n    let used: usize = windows.iter().map(|window| window.map_or(1, |members| members.count())).sum::<usize>()\n        + existing.iter().flat_map(|groups| groups.iter()).map(|members| members.count()).sum::<usize>()\n        + budget.hats_wanted;\n    let mut remaining = budget.ready_fighters.saturating_sub(used).min(budget.pool_free);\n    // (lane depth, kind): depth is the distance from the live fighter, so a role\n    // whose nearer neighbours are already built does not outrank the other role.\n    let mut candidates: [Vec<(usize, u32)>; 2] = [Vec::new(), Vec::new()];\n    // Whole special groups (PT, Aegis, the pair) at their lane depth.\n    let mut specials: [Vec<(usize, Members)>; 2] = [Vec::new(), Vec::new()];\n    let mut room = [0usize; 2];\n    let mut group_slots = [0usize; 2];\n    for role in 0..2 {\n        let Some(window) = windows[role].filter(|window| window_swappable_with(*window, policy)) else { continue; };\n        group_slots[role] = MAX_EXTRA_GROUPS.saturating_sub(existing[role].len());\n        room[role] = group_slots[role] * NATIVE_MEMBERS;\n        for (depth, &kind) in upcoming[role].iter().enumerate() {\n            if exclude[role] == Some(kind)\n                || window.index_of(kind).is_some()\n                || existing[role].iter().any(|group| group.index_of(kind).is_some())\n            { continue; }\n            if let Some(group) = Members::special_group(kind, budget.special) {\n                // One Mii identity per resource owner: a second lane Mii, or a\n                // Mii group this role already holds, stays canonical (DESIGN \u00a72).\n                let second_mii = group.special() == Special::Mii\n                    && (specials[role].iter().any(|(_, held)| held.special() == Special::Mii)\n                        || existing[role].iter().any(|held| held.special() == Special::Mii));\n                if !second_mii && !specials[role].iter().any(|(_, held)| held.kinds()[0] == group.kinds()[0]) {\n                    specials[role].push((depth, group));\n                }\n                continue;\n            }\n            if group_member_kind(kind, policy) && !candidates[role].iter().any(|(_, held)| *held == kind) {\n                candidates[role].push((depth, kind));\n            }\n        }\n    }\n    // Special groups are taken whole at their own lane depth, interleaved with\n    // the ordinary candidates; one that no longer fits the remaining bodies or a\n    // free group slot is skipped, never split.\n    let mut chosen_special: [Vec<Members>; 2] = [Vec::new(), Vec::new()];\n    let mut scursor = [0usize; 2];\n    let mut chosen: [Vec<u32>; 2] = [Vec::new(), Vec::new()];\n    let mut cursor = [0usize; 2];\n    let take = |role: usize, chosen: &mut [Vec<u32>; 2], cursor: &mut [usize; 2], remaining: &mut usize| -> bool {\n        if *remaining == 0 || cursor[role] >= candidates[role].len() || chosen[role].len() >= room[role] {\n            return false;\n        }\n        chosen[role].push(candidates[role][cursor[role]].1);\n        cursor[role] += 1;\n        *remaining -= 1;\n        true\n    };\n    let deepest = upcoming.iter().map(|lane| lane.len()).max().unwrap_or(0);\n    for depth in 0..deepest {\n        for role in 0..2 {\n            if cursor[role] < candidates[role].len() && candidates[role][cursor[role]].0 == depth {\n                take(role, &mut chosen, &mut cursor, &mut remaining);\n            } else if scursor[role] < specials[role].len() && specials[role][scursor[role]].0 == depth {\n                let group = specials[role][scursor[role]].1;\n                scursor[role] += 1;\n                let slots_used = chosen_special[role].len() + chosen[role].len().div_ceil(NATIVE_MEMBERS);\n                if remaining >= group.count() && slots_used < group_slots[role] {\n                    chosen_special[role].push(group);\n                    remaining -= group.count();\n",
@@ -2189,10 +2346,15 @@
      "reason": "rc.7 FLAG 3 tests (the docs lane's review, 2026-11-10 22:42Z): the two-bank test steps the banks through a shared helper (step_banks) and asserts in the tree that 7d720c68's pick, which ignored the deferral, makes no progress; a one-bank variant (a deferred group waiting for its own bank's build); test-only"
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -2201,7 +2363,7 @@
    "dest": "src/model/swap/body_bank/memory.rs",
    "crate": "consts",
    "src_sha256": "bfbc9c80a215184a125634c4b90fbf97c63007608db892a95df466d784869915",
-   "dest_sha256": "0f1f0dc3c46959ccf1b8088f42b0ada50a504b9db3b1320809f1f4c04ec5c206",
+   "dest_sha256": "c8fffa1a39742b4541495bfd48d6a269fc59c847dd62fa9d5dc64f3ea2ec7e2f",
    "edits": [
     {
      "old": "        GroupState::Prefetching => with_margin(cost.total()),\n        GroupState::Prefetched => with_margin(cost.build),\n        GroupState::Planned | GroupState::Built | GroupState::Failed => 0,\n    }\n}\n",
@@ -2229,10 +2391,15 @@
      "reason": "rc.6 window admission (primary 2026-11-09 13:28Z; Eden final-e39-xps-hot hs08b on e39479df: the CPU switch planned the window [42, 44, 1c] at 27.6 MB of headroom, prepare_resources acquired both supplements and the game page commit aborted in the build, Userspace PANIC): the supplements are admitted where the switch plans the window (proposed, process_memory::admit_window, memory::window_extras: the planner prefix that fits, the group prefetch rule and margin; the target is never refused), and a created entry creation or speculative load leaves what the cycle waits for (process_memory::admit_created, memory::created_admission: refused window supplements, WINDOW_WAITING, and groups held for memory, cycle_waiting). Design: artifacts/phase23/rc6-window-admission/DESIGN-window-admission.md"
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -2248,13 +2415,18 @@
    "dest": "src/model/swap/body_bank/window_share.rs",
    "crate": "consts",
    "src_sha256": "f9528f8532d1fc5cac2fd50a7e8e758f3ce491b78163d4322a93d5e2978b5e33",
-   "dest_sha256": "3ae5bada0afb64b2428c67c66212a069834b43d2e3c80dc1751a81b7efb99b78",
+   "dest_sha256": "3f7cb6fd2526a3c3d7f67e8d4d382052dcb46e0e2f7d5faf4353023d2886006d",
    "edits": [
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -2263,13 +2435,18 @@
    "dest": "src/model/swap/body_bank/mii_publish.rs",
    "crate": "consts",
    "src_sha256": "27966b691dd20370a74df9dabe406316f7ae39f900b1f8165f0870be03fb927f",
-   "dest_sha256": "cc49c73ecb672f9bb14a616367b3b3b4ece1ac0414d7e3fcba444ca0b39b58db",
+   "dest_sha256": "22ccab2df2478c0c7e704882fd277649e3fe7149c6e92634d30cd1dd83aaf8f1",
    "edits": [
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -2332,7 +2509,7 @@
    "dest": "src/model/swap/swap_model/copy_packages.rs",
    "crate": "consts",
    "src_sha256": "a39d0ce52841ce038c3d0e67a8c747a87e5a182edef9a03b03487e508ee0c655",
-   "dest_sha256": "ca37a84eb0262fbcfa90929905c0d7b88aa924d78f25b160d291feb6738e94b3",
+   "dest_sha256": "5ab0af9a09edae2b4a091101ead1dd48fff630d0bdc896cf0eada72af32dd6c3",
    "edits": [
     {
      "old": "//! member set it may register, exactly what the completion would take for that set\n//! ([`acquisitions`]). It releases each with the same inputs (exact inverse), and admits a\n//! registration only once G68 reports ready.\n\nuse super::copy_registry::{registry_costume, Registry, Roster, ENTRIES, NO_KIND, SUBS};\nuse super::request_bit::{acquired_keys, completion_members, copy_key, released_keys};\nuse std::collections::BTreeMap;\n\n/// One native acquisition `0x17efb40(G68, roster, member, costume)`. Its release is\n/// `0x17f0290(G68, roster, member, costume)` with the same values.\n#[derive(Clone, Debug, PartialEq, Eq)]\npub struct Acquisition {\n    pub set: [u32; SUBS],\n    pub member: u32,\n    pub costume: u32,\n    pub roster: Roster,\n",
@@ -2375,10 +2552,18 @@
      "reason": "R5 CopyPkg native inputs carry the existing window plus three-group bound in their type; at most three completion members per set bounds holdings and changed acquisition/release receipts. Shared occurrence matching preserves acquisition order and descending releases without heap storage; no cap on generic model inputs or resource-ledger obligations."
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "keep": [
+      "k14_needs_the_helper_kirby_s_packages_for_every_group_body"
+     ],
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -2387,13 +2572,18 @@
    "dest": "src/model/swap/swap_model/copy_registry.rs",
    "crate": "consts",
    "src_sha256": "ae8205b2e710ea906058b3dfedb8675327113bdca5c0e71eddb96af4c509853f",
-   "dest_sha256": "9f0adaf9eaef03cb96a291db66f9a56fad21ba694f55fddb39e0a927fa46e723",
+   "dest_sha256": "742021181255050e3eabf1135e328d5538f57f4a8243cae3a9ed6c3c2010c12a",
    "edits": [
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -2402,7 +2592,7 @@
    "dest": "src/model/swap/swap_model/fallback.rs",
    "crate": "consts",
    "src_sha256": "2345a0a33be95738ef34f24f357c69e2bcea4c566ad6d9141cae3c3784d26065",
-   "dest_sha256": "42b4e9c18a750648bf0d324f61c1ab90337ea214aceace588d8029ba181b04a6",
+   "dest_sha256": "2c424e0964bd4134598a4d7cba99ccf34efce5c4dd470dad205938239e45cee8",
    "edits": [
     {
      "old": "        _ if reason.transient() => Disposition::Keep,\n        GroupState::Prefetched => Disposition::FailReturningKeys,\n        GroupState::Planned | GroupState::Failed => Disposition::Fail,\n    }\n}\n",
@@ -2420,10 +2610,15 @@
      "reason": "rc.6 item 3 (operator decision 2026-11-08, INBOX-opus-rc6-hotslots 19:12Z and 19:21Z; verdict LANE-OPUS-RC6-HOTSLOTS-REPORT 19:46Z): a Prefetched ordinary group is built in the background beside the live window (one game-thread tick for 0x654dc0/0x655320 with the live window saved and put back, the control init 0x64f820 queued on a scratch copy of the entry, body init's prepare_entry skipped for the owner, the bodies kept in the group record with their own cell byte at body+0xf816); a cycle change releases every detached group a member of which left the cycle (leave_group) and plans the new members into the freed slots"
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -2432,13 +2627,18 @@
    "dest": "src/model/swap/swap_model/hud_model.rs",
    "crate": "consts",
    "src_sha256": "15b229a86c290378e17aa8781d5bd326b03f4a2f6d4209b830a4cad9f1453b2d",
-   "dest_sha256": "7ce450d5776e6599ce9976ac3ce3eec5fae53c16177d0e6d0982aed2d4e508db",
+   "dest_sha256": "e00353e0c4ede775fbffbd8507686f9183eaec061c0cae3d928239c84910d284",
    "edits": [
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -2447,7 +2647,7 @@
    "dest": "src/model/swap/swap_model/ledger.rs",
    "crate": "consts",
    "src_sha256": "900a579c038101633b6234a001024943cbea9a6e88df249aa1eee89ff7bf8487",
-   "dest_sha256": "fc7400374af0ea5a27d2a5d8a136ef906670ade01730c182a9531b06b4404207",
+   "dest_sha256": "7e1203fe8969f9425062acc2de06665a5db8a007e00ad1d380a71e340d54ca8d",
    "edits": [
     {
      "old": "    pub const fn with(self, n: u8) -> Self { KeySet(self.0 | (1 << n)) }\n    pub const fn minus(self, other: KeySet) -> KeySet { KeySet(self.0 & !other.0) }\n    pub const fn union(self, other: KeySet) -> KeySet { KeySet(self.0 | other.0) }\n    pub const fn is_empty(self) -> bool { self.0 == 0 }\n    pub const fn len(self) -> usize { self.0.count_ones() as usize }\n    pub fn iter(self, kind: u32) -> impl Iterator<Item = KeyId> {\n        (0u8..8).filter(move |n| self.contains(*n)).map(move |n| KeyId { kind, n })\n    }\n}\n\n/// Resource-owner bytes the key rules depend on: `R+0x48`, `R+0x7d`, `R+0x7f` (module doc).\n",
@@ -2485,10 +2685,15 @@
      "reason": "R5 each release recipe emits at most eight KeySet bits plus one ReleaseKind call, so native callers use a fixed nine-call receipt. Generic Vec API delegates to the same implementation; orphan-before-kind order and refusals unchanged. No cap on active or retained obligations."
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -2497,7 +2702,7 @@
    "dest": "src/model/swap/swap_model/lifecycle.rs",
    "crate": "consts",
    "src_sha256": "8bfb6a934f7d9250c7800ae01bbbd3372caa737fdba33cbbed9ea95b07a9275b",
-   "dest_sha256": "55f85ec46faff6caf9c35826551b2ff4db4f665ff3b20ab00dffefd35dbd97bc",
+   "dest_sha256": "0ac0854c6d657eadc38650298c2261b42e1fad7e0d3e567d733b953be0e4e2ba",
    "edits": [
     {
      "old": "impl Phases {\n    fn route(&mut self, slot: u8, controller: usize) {\n        if !self.routes.iter().any(|(s, _)| *s == slot) { self.routes.push((slot, controller)); }\n    }\n\n    /// Every route slot naming one of `controllers` is cleared first (D-PTA1c).\n    fn routes_for(&mut self, owner: u32, controllers: &[usize], consumers: &NativeConsumers) {\n        for route in consumers.pad_routes.iter().flatten() {\n            if route.controller != 0 && controllers.contains(&route.controller) { self.route(route.slot, route.controller); }\n        }\n        // Nana's route (`owner+8`, U2): the same rule from the separately probed word.\n        if let Some(controller) = consumers.nana_owner_plus_8 {\n            let slot = owner.saturating_add(8);\n            if controller != 0 && slot < PAD_SLOTS as u32 && controllers.contains(&controller) { self.route(slot as u8, controller); }\n        }\n    }\n\n    /// Kirby fields count only `valid` refs: an invalid ref's `kind` is the planned kind, not the\n    /// body's own `+0xc` that `unprepare` reads (Yoga `m4b3` #140: the incoming window's Kirby\n",
@@ -2535,10 +2740,15 @@
      "reason": "R5 detached teardown streams ordered actions from borrowed validated snapshots using existing native group/cell bounds; exact duplicate, refusal and aggregate key-release semantics remain. Copy-package diagnostic keys stream sorted unique values without temporary collections."
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -2547,24 +2757,14 @@
    "dest": "src/model/swap/swap_model/mod.rs",
    "crate": "consts",
    "src_sha256": "9eaf8a4afc10f7ad20140f9cb97b2ebe0e65dc45c49dd17cb0341c36d4cea60f",
-   "dest_sha256": "61eb972dc3c8a1dc93f4627ac0a10f5d42fd4e13844f8acf7b99b641cc76be4c",
-   "edits": [
-    {
-     "cut_tests": [
-      "tests",
-      "pair_after_objects",
-      "order_replay"
-     ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
-    }
-   ]
+   "dest_sha256": "9eaf8a4afc10f7ad20140f9cb97b2ebe0e65dc45c49dd17cb0341c36d4cea60f"
   },
   {
    "src": "training_mod_consts/src/swap_model/native_model.rs",
    "dest": "src/model/swap/swap_model/native_model.rs",
    "crate": "consts",
    "src_sha256": "78ba97e97253bb7f7a46782ba9caf07c698a8a2ec3e78982c6747531286b4a87",
-   "dest_sha256": "747a8f7d451921b898d4a5888ff2645bc59da79db461c2121b820272088e62da",
+   "dest_sha256": "936ba8c87b542246c56a2b4825cfa61e31fa7233090d9916c6e33a251788b26a",
    "edits": [
     {
      "old": "    }\n\n    #[test]\n    fn d_pta1c_old_policy_leaves_the_pad_route_dangling_through_the_reload() {\n",
@@ -2572,10 +2772,15 @@
      "reason": "rc.6, the object re-arm under a live Kirby (primary 2026-11-09 05:38Z): a detached PT group takes its object kind 0x72 again while the live member is Kirby (body_bank object_rearm_admitted; native_body_bank kirby_rearm); D-KIRBY1 unchanged for fighter keys"
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -2584,7 +2789,7 @@
    "dest": "src/model/swap/swap_model/occupancy.rs",
    "crate": "consts",
    "src_sha256": "e190e95a1db710a75729ba9c1b82798483e7d8cc7107bbed32d9fcfd0373da0a",
-   "dest_sha256": "308c493687fec1ed053dede5d1292dc6eea9dfb4009b8f37d5c5dc9893e178c1",
+   "dest_sha256": "b7f91aaa20c2d549582a323803cb7fa3425a33ae9be13f1feec029c48b581d88",
    "edits": [
     {
      "old": "//!   R while a member whose row has `prefetch_while_live: false` (Kirby) is live \u2014 *suspend*:\n//!   no acquisition while it is live; *drain*: a transition whose target is such a member must\n//!   first return every prefetched key (the planner drains Prefetched groups to Planned before the\n",
@@ -2637,10 +2842,15 @@
      "reason": "rc.7 item 3, the Kirby guard removal (D-KIRBY1 root fix F1, p23/rc7-kirby-unguard; docs lane report 12:55Z): the bank owns the G68 step of the releases it causes (g68_step), and the D-KIRBY1 gates stand only while that hook is not installed"
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -2649,29 +2859,52 @@
    "dest": "src/model/swap/swap_model/order_replay.rs",
    "crate": "consts",
    "src_sha256": "5928a2d8fe09b5796c8757e6c4d1e91698c271b474a5ae3f2039bfd9c41c4684",
-   "dest_sha256": "",
-   "removed": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): test-only file removed"
+   "dest_sha256": "5fa8cafa799ab279276107126df11d79ab49ad9a6d352096d8b8ec26132a5ad5",
+   "edits": [
+    {
+     "table_file": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_file": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    }
+   ]
   },
   {
    "src": "training_mod_consts/src/swap_model/pair_after_objects.rs",
    "dest": "src/model/swap/swap_model/pair_after_objects.rs",
    "crate": "consts",
    "src_sha256": "e8ffe87991c0ee88243f09164116eb193e265cc092eea67c2713bc036f1fa3b4",
-   "dest_sha256": "",
-   "removed": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): test-only file removed"
+   "dest_sha256": "8441e86497b0f53c340f313b11a045bff38844a5285b64cc92aadd0c5c381310",
+   "edits": [
+    {
+     "table_file": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_file": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    }
+   ]
   },
   {
    "src": "training_mod_consts/src/swap_model/presentation.rs",
    "dest": "src/model/swap/swap_model/presentation.rs",
    "crate": "consts",
    "src_sha256": "9799543979d2cadb54791db843919ff133837d121b96695935ca5334c2ab6bde",
-   "dest_sha256": "05e42ddf40b6f53d0f292c14f6bba2393100962f33dc1a6af806ceae31feef25",
+   "dest_sha256": "cf60220f4c8fff53fb480bc4d9f229afcde61e69065777d3350587f160988bef",
    "edits": [
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "waiting_icon_tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -2680,7 +2913,7 @@
    "dest": "src/model/swap/swap_model/request_bit.rs",
    "crate": "consts",
    "src_sha256": "38def5e05fd40dcc04450002c012aa62e35a68630851ec69e382db46c82ddf73",
-   "dest_sha256": "e16257a12e618ebb2b4708cfcfe2cb3ad89eb21307b4cf0479e90fa0903ab140",
+   "dest_sha256": "ef6a215605c70281d0f75d13c7abb42146a2c47d59e928627f03034aca66c50e",
    "edits": [
     {
      "old": "/// `0x17efb40(G68, roster, kind, costume)` as its control flow (`0x17efb50\u20130x17eff9c`): Kirby takes a\n/// key per kind of every record whose first kind is neither `-1` nor Kirby (the second and third\n/// unless `0x4b/0x4c/-1`) under `costume`; any other kind takes its own key once per Kirby record,\n/// under that record's `+0x51`.\npub fn acquired_keys(roster: &Roster, kind: u32, costume: u32) -> Vec<u32> {\n    let mut keys = Vec::new();\n    if kind == KIRBY {\n        for record in roster {\n            let [k0, k1, k2] = record.kinds;\n            if k0 == NO_KIND || k0 == KIRBY { continue; }\n            keys.extend(copy_key(k0, costume));\n            for k in [k1, k2] {\n                if (POPO..=NANA).contains(&k) || k == NO_KIND { continue; }\n                keys.extend(copy_key(k, costume));\n            }\n        }\n    } else {\n        for record in roster {\n            if record.kinds[0] == KIRBY { keys.extend(copy_key(kind, record.costume)); }\n        }\n    }\n    keys\n}\n\n/// `0x17f0290(G68, roster, kind, costume)`, transcribed a second time from its own listing (not\n/// from [`acquired_keys`]): early exit for `-1`, `0x4d..=0x50` or negative (`0x17f02a4\u20130x17f02bc`);\n/// Kirby walks the records (`0x17f03ac\u20130x17f03c8`), the first kind unless `-1`/Kirby\n",
@@ -2768,10 +3001,15 @@
      "reason": "rc.7 item 3, the Kirby guard removal (D-KIRBY1 root fix F1, p23/rc7-kirby-unguard; docs lane report 12:55Z): the bank owns the G68 step of the releases it causes (g68_step), and the D-KIRBY1 gates stand only while that hook is not installed"
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -2780,7 +3018,7 @@
    "dest": "src/model/swap/swap_model/scope.rs",
    "crate": "consts",
    "src_sha256": "45d14a9c5d825e1622e369d16f6af119955d609ddec5dd0fe7f06a45d144d4e7",
-   "dest_sha256": "17ed7039ee19cc091de8123519385d5d48889ec55a2c3fc930d1e3550c4b6ecb",
+   "dest_sha256": "aa46e5361141d919359a20d9eb313b3d090f4289478c9a107298a71ddb7b26a1",
    "edits": [
     {
      "delete_from": "    CallbackContract {\n        name: \"cpu_pilot::thinking\",",
@@ -2793,10 +3031,15 @@
      "reason": "P-HOT B (LANE-HOT-SLOTS-REPORT section 12; operator 2026-11-06 \"Yes pursue B\"): the start-up window built into Training's own start: H1 header extension at main+0x66de14 (own seam row and scope contract), the pending bank, H3 creation rewrite at the 0x678174 observer, H4 binding in prepare_models, scene_changed keeps the new scene's window"
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -2805,7 +3048,7 @@
    "dest": "src/model/swap/swap_model/special_articles.rs",
    "crate": "consts",
    "src_sha256": "293f62f71c979736335d10aa9feb57310d2fbaef3ae8d03df06c0449f3298973",
-   "dest_sha256": "33d362b7a9883df6c646886370e88083fef92b9b36dbb2e23baab41ce0f04946",
+   "dest_sha256": "cb832beaaa9c2499a68c5c896127949e9f8c3772ae3c2027b5b865691fd9efdf",
    "edits": [
     {
      "old": "    (flags & PT_WINDOW_FLAG != 0 && holder && articles == 0).then_some(ArticleStep::Rebuild)\n}\n",
@@ -2828,10 +3071,15 @@
      "reason": "Inbox 02:42Z (worker B): a PT attach rebuilt its retired article pool inside the switch's setup tick (0x3a6270: 209-382 ms the first time, 43-63 ms after); a detached group's retired pool is now built on the task worker once the group holds 0x72 again (state 11's trainer task with the plugin's functor: 0x3a6270 only), under INSTALL, and the attach finds it filled"
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -2847,7 +3095,7 @@
    "dest": "src/model/swap/swap_model/tests.rs",
    "crate": "consts",
    "src_sha256": "9bdd8d3cea3f8d7a5bad644dc013b83467236d6c0eac668cac48c8eafd7f2a00",
-   "dest_sha256": "",
+   "dest_sha256": "fc60dc9df8dee24a56b94c9eb7d10e44e2aad77087c17bfbe28f7a5cc56ea13f",
    "edits": [
     {
      "old": "    assert_eq!(capabilities::previous_cell_index(2, 2, 2), 0);\n}",
@@ -2858,9 +3106,16 @@
      "old": "    assert!(original_form_bankable(POPO, Forms::starting(POPO), true));\n    assert!(!original_form_bankable(POPO, Forms::starting(POPO), false), \"pair bank off\");\n    assert!(!original_form_bankable(POPO, Forms::solo_popo(), true), \"Solo Popo\");\n    assert!(!original_bankable(POPO) && !original_bankable(NANA), \"the kind-only predicate is unchanged\");\n    for kind in kinds().filter(|kind| *kind != POPO) {\n        for pair_bank in [false, true] {\n            assert_eq!(original_form_bankable(kind, Forms::starting(kind), pair_bank), original_bankable(kind), \"{kind:#x}\");\n        }\n    }\n    assert!(original_form_bankable(0x00, Forms::starting(0x00), false));\n    assert!(original_form_bankable(KIRBY, Forms::starting(KIRBY), false));\n    for kind in [0x24, 0x5a, 0x48] {\n        assert!(!original_form_bankable(kind, Forms::starting(kind), true), \"{kind:#x}: native group or Mii\");\n    }\n}",
      "new": "    assert!(original_form_bankable(POPO, Forms::starting(POPO), true, false));\n    assert!(!original_form_bankable(POPO, Forms::starting(POPO), false, false), \"pair bank off\");\n    assert!(!original_form_bankable(POPO, Forms::solo_popo(), true, false), \"Solo Popo\");\n    assert!(!original_bankable(POPO) && !original_bankable(NANA), \"the kind-only predicate is unchanged\");\n    for kind in kinds().filter(|kind| *kind != POPO) {\n        for pair_bank in [false, true] {\n            assert_eq!(original_form_bankable(kind, Forms::starting(kind), pair_bank, false), original_bankable(kind), \"{kind:#x}\");\n        }\n    }\n    assert!(original_form_bankable(0x00, Forms::starting(0x00), false, false));\n    assert!(original_form_bankable(KIRBY, Forms::starting(KIRBY), false, false));\n    for kind in [0x24, 0x5a, 0x48] {\n        assert!(!original_form_bankable(kind, Forms::starting(kind), true, false), \"{kind:#x}: native group or Mii\");\n    }\n}\n\n/// rc.6 item 3, a session that starts on Pok\u00e9mon Trainer or Pyra/Mythra (INBOX-opus-rc6-hotslots 01:09Z: the operator\n/// decided \"All groups in rc.6\", and lifting the EXCLUSIONS \u00a79 PT/Aegis-original row is approved). The start-up window is\n/// the native group itself (`entry_window`), so the return to that original must not be the canonical Reload that\n/// retires the role's bank: while native groups are on, the native group original is a bank member, served by the\n/// window or by the detached record holding it (`group_serves`). The kind-only `original_bankable` is unchanged for every\n/// caller (a native group is never a single-body cell), and every other kind answers as before.\n#[test]\nfn a_native_group_original_is_a_bank_member_while_native_groups_are_on() {\n    use capabilities::{original_bankable, original_form_bankable, FormClass};\n    assert!(capabilities::capabilities(FormClass::PokemonTrainer).original_bankable);\n    assert!(capabilities::capabilities(FormClass::Aegis).original_bankable);\n    for kind in [0x24, 0x25, 0x26, 0x5a, 0x5b] {\n        assert!(original_form_bankable(kind, Forms::starting(kind), false, true), \"{kind:#x}\");\n        assert!(!original_form_bankable(kind, Forms::starting(kind), true, false), \"{kind:#x}: native groups off\");\n        assert!(!original_bankable(kind), \"{kind:#x}: the kind-only predicate is unchanged\");\n    }\n    for kind in kinds().filter(|kind| !matches!(*kind, 0x24..=0x26 | 0x5a | 0x5b | POPO)) {\n        for native_bank in [false, true] {\n            assert_eq!(original_form_bankable(kind, Forms::starting(kind), false, native_bank), original_bankable(kind), \"{kind:#x}\");\n        }\n    }\n    assert!(original_form_bankable(POPO, Forms::starting(POPO), true, true), \"the pair keeps its own rule\");\n    assert!(!original_form_bankable(0x48, Forms::starting(0x48), true, true), \"a Mii\");\n}\n",
      "reason": "Merge of p23/rc6-pt-start (a5c3ef84) into p23/rc6-integration: p23/rc6-pt-start over integration d5db7387 (whose merge of p23/rc6-hot-slots-mii is taken as it is): the PT/Aegis start-up window (de452e2: entry_window native lead, scene_header gate, creation kept, the native arm of original_form_bankable/original_member/excluded_original, the PT/Aegis rows' original_bankable) and X5 (c7ff799: a Mii group builds beside a live native or pair window; the tick's diag line), with their host tests"
+    },
+    {
+     "table_file": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_file": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
-   ],
-   "removed": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): test-only file removed"
+   ]
   },
   {
    "src": "training_mod_consts/tests/fixtures/swap/README.md",
@@ -2965,70 +3220,140 @@
    "dest": "tests/mii_helper147_headgear.rs",
    "crate": "mii",
    "src_sha256": "0deda79e22972927e655373b79f29baea059ce0eb964e5089999b351529981b6",
-   "dest_sha256": "",
+   "dest_sha256": "d8066ff6d0694b6deadffe1ce433df40221035af8092797bb353a3bbacdbc217",
    "prepend": "#[allow(dead_code, unused_imports)]\n#[path = \"../src/model/mii/mod.rs\"]\npub mod mii;\n#[allow(unused_imports)]\nmod engine {\n    pub use super::mii;\n}\n\n",
-   "removed": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): test-only file removed"
+   "edits": [
+    {
+     "table_file": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "insert_before_line": 5,
+     "text": "// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.\nmacro_rules! lib_unit_tests {\n    ($($body:tt)*) => {};\n}\n// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).\n#[path = \"../src/test_table.rs\"]\nmod test_table;\n",
+     "reason": "rc.9: the by-path unit tests run in the lib's binary; this file's cases run as one table"
+    }
+   ]
   },
   {
    "src": "training_mod_mii/tests/ldn_handshake.rs",
    "dest": "tests/mii_ldn_handshake.rs",
    "crate": "mii",
    "src_sha256": "958bfb6b45fa72514d23ffb3f477df5332d7d6b30b8c68a40ac59f0a3eb485f3",
-   "dest_sha256": "",
+   "dest_sha256": "2049e25a8c452ea6cd16bf7f11180473ee6d421aedc6e2bff50936ff86666b9e",
    "prepend": "#[allow(dead_code, unused_imports)]\n#[path = \"../src/model/mii/mod.rs\"]\npub mod mii;\n#[allow(unused_imports)]\nmod engine {\n    pub use super::mii;\n}\n\n",
-   "removed": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): test-only file removed"
+   "edits": [
+    {
+     "table_file": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "insert_before_line": 5,
+     "text": "// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.\nmacro_rules! lib_unit_tests {\n    ($($body:tt)*) => {};\n}\n// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).\n#[path = \"../src/test_table.rs\"]\nmod test_table;\n",
+     "reason": "rc.9: the by-path unit tests run in the lib's binary; this file's cases run as one table"
+    }
+   ]
   },
   {
    "src": "training_mod_mii/tests/mii_bank_groups.rs",
    "dest": "tests/mii_bank_groups.rs",
    "crate": "mii",
    "src_sha256": "101fa5ca3b74af22a7c58eaa9f1aeb873f09a83c419f1224b0f2784e81aab057",
-   "dest_sha256": "",
+   "dest_sha256": "10b9c4ed1f3b8fa699ae101d4b43f42ddd2e28133c904edac1322729ee174ecb",
    "prepend": "#[allow(dead_code, unused_imports)]\n#[path = \"../src/model/mii/mod.rs\"]\npub mod mii;\n#[allow(unused_imports)]\nmod engine {\n    pub use super::mii;\n}\n\n",
-   "removed": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): test-only file removed"
+   "edits": [
+    {
+     "table_file": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "insert_before_line": 1,
+     "text": "// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.\nmacro_rules! lib_unit_tests {\n    ($($body:tt)*) => {};\n}\n// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).\n#[path = \"../src/test_table.rs\"]\nmod test_table;\n",
+     "reason": "rc.9: the by-path unit tests run in the lib's binary; this file's cases run as one table"
+    }
+   ]
   },
   {
    "src": "training_mod_mii/tests/mii_bank_publication.rs",
    "dest": "tests/mii_bank_publication.rs",
    "crate": "mii",
    "src_sha256": "e52d41ffa711a1d75f345676a03c17f1e5c9c5b90ef8b3257fa0d0ec6dd1a7da",
-   "dest_sha256": "",
+   "dest_sha256": "fb25e28618c25ddba83aabe2645bbaf479933306ab2df66935bae81639b6ce29",
    "prepend": "#[allow(dead_code, unused_imports)]\n#[path = \"../src/model/mii/mod.rs\"]\npub mod mii;\n#[allow(unused_imports)]\nmod engine {\n    pub use super::mii;\n}\n\n",
-   "removed": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): test-only file removed"
+   "edits": [
+    {
+     "table_file": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "insert_before_line": 1,
+     "text": "// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.\nmacro_rules! lib_unit_tests {\n    ($($body:tt)*) => {};\n}\n// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).\n#[path = \"../src/test_table.rs\"]\nmod test_table;\n",
+     "reason": "rc.9: the by-path unit tests run in the lib's binary; this file's cases run as one table"
+    }
+   ]
   },
   {
    "src": "training_mod_mii/tests/mii_setup_preflight.rs",
    "dest": "tests/mii_setup_preflight.rs",
    "crate": "mii",
    "src_sha256": "ed0cbedbfa6380329e52a254458f16dc7e7b856cf4453836cfa4e1e9d4dbc0c9",
-   "dest_sha256": "",
+   "dest_sha256": "827ee62df90005258af589997097d41ffaec44ccd3f3245e30fca192ba53e6d4",
    "prepend": "#[allow(dead_code, unused_imports)]\n#[path = \"../src/model/mii/mod.rs\"]\npub mod mii;\n#[allow(unused_imports)]\nmod engine {\n    pub use super::mii;\n}\n\n",
-   "removed": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): test-only file removed"
+   "edits": [
+    {
+     "table_file": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "insert_before_line": 1,
+     "text": "// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.\nmacro_rules! lib_unit_tests {\n    ($($body:tt)*) => {};\n}\n// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).\n#[path = \"../src/test_table.rs\"]\nmod test_table;\n",
+     "reason": "rc.9: the by-path unit tests run in the lib's binary; this file's cases run as one table"
+    }
+   ]
   },
   {
    "src": "training_mod_mii/tests/player146_headgear_ownership.rs",
    "dest": "tests/mii_player146_headgear_ownership.rs",
    "crate": "mii",
    "src_sha256": "67c0fb189b4fefec4f57f0271ca8c0bdf49b1f5100fe51b13027c02abf2cec9b",
-   "dest_sha256": "",
+   "dest_sha256": "cc7d83d00a39454cb26a2cdedafd04326a46ffc5239d68600d766c71545add6a",
    "prepend": "#[allow(dead_code, unused_imports)]\n#[path = \"../src/model/mii/mod.rs\"]\npub mod mii;\n#[allow(unused_imports)]\nmod engine {\n    pub use super::mii;\n}\n\n",
-   "removed": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): test-only file removed"
+   "edits": [
+    {
+     "table_file": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "insert_before_line": 5,
+     "text": "// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.\nmacro_rules! lib_unit_tests {\n    ($($body:tt)*) => {};\n}\n// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).\n#[path = \"../src/test_table.rs\"]\nmod test_table;\n",
+     "reason": "rc.9: the by-path unit tests run in the lib's binary; this file's cases run as one table"
+    }
+   ]
   },
   {
    "src": "training_mod_mii/tests/role_adapter.rs",
    "dest": "tests/mii_role_adapter.rs",
    "crate": "mii",
    "src_sha256": "c0afddd51f968b3bc5e7db8f72abde8bb9b8439cdfb3ba5b310ac0af7cd58b58",
-   "dest_sha256": "",
+   "dest_sha256": "6ff3229d571bf1d6e6b2df14fe1d86277cd77e0cd89e29d6acd3a747613db052",
    "prepend": "#[allow(dead_code, unused_imports)]\n#[path = \"../src/model/mii/mod.rs\"]\npub mod mii;\n#[allow(unused_imports)]\nmod engine {\n    pub use super::mii;\n}\n\n",
-   "removed": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): test-only file removed"
+   "edits": [
+    {
+     "table_file": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "insert_before_line": 1,
+     "text": "// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.\nmacro_rules! lib_unit_tests {\n    ($($body:tt)*) => {};\n}\n// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).\n#[path = \"../src/test_table.rs\"]\nmod test_table;\n",
+     "reason": "rc.9: the by-path unit tests run in the lib's binary; this file's cases run as one table"
+    }
+   ]
   },
   {
    "src": "training_mod_consts/src/character_forms.rs",
    "dest": "src/model/swap/character_forms.rs",
    "crate": "consts",
    "src_sha256": "3ab7ebcd981e92f7def72ed19d1476862b2436e4ffddc5b6157f3078571dca1a",
-   "dest_sha256": "aca214ae242404a722579f0d053661602d861d9d2b31ec3e08ce1e4fcc9102da",
+   "dest_sha256": "3c499209c8601f94001cc732d85ceae84a9aa5380352a35d00d8fb9be252cda5",
    "edits": [
     {
      "old": "        return None;\n    }\n    Some(if member == 0x4c { 0x4b } else { member })\n}\n\n#[derive(Clone, Copy, Debug)]\npub struct EntryState {\n    pub count: u32,\n    pub kinds: [u32; 3],\n    pub actor_count: u32,\n    pub installed: u64,\n",
@@ -3051,10 +3376,15 @@
      "reason": "F9 s6-11 native count retains completed parked install marker; separate reserved promotion shape by completed transaction purpose, preserving strict reload completion, exact native identity and G ownership."
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -3063,13 +3393,18 @@
    "dest": "src/model/swap/identity_view.rs",
    "crate": "consts",
    "src_sha256": "a263f5fe3881315a37a9bd0cf159f691f79df7db800d85d923b51d63ca2b8fa2",
-   "dest_sha256": "00cdc9f9f16d24b18692ac0d90138242f4d14bdab7e5d587520fdb6fb586c0cd",
+   "dest_sha256": "0dfeb004f53dc3a0f94a0309649cbbf7a96a7579b9c1349722679198dea97ae0",
    "edits": [
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -3078,7 +3413,7 @@
    "dest": "src/model/swap/trio.rs",
    "crate": "consts",
    "src_sha256": "4e90058defa07842f8c417a17dbe678086ee45a20935f8811bc672f474e042cc",
-   "dest_sha256": "fc50373fbdad718ad463506a9ce05d3830ac6016f1c60bbe591f5014eb3d2574",
+   "dest_sha256": "1d29101f2ceaef437fc8463ccc9fea25719473ef31ce789ae1a73b482b606f75",
    "edits": [
     {
      "old": "use {training_mod_tui::StatefulTable, training_mod_tui::SubMenu, training_mod_tui::SubMenuType, training_mod_tui::Toggle, crate::engine::compat::grid::NX_SUBMENU_COLUMNS, training_mod_tui::NX_SUBMENU_ROWS};\n",
@@ -3101,10 +3436,15 @@
      "reason": "the two tests drive the fork's picker and full menu app (to_submenu, create_app); the one-hot choice semantics they also touched stay covered by the three serde tests above them; the picker behaviour is re-tested with the editor rows"
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -3113,13 +3453,18 @@
    "dest": "src/model/swap/capacity_creation.rs",
    "crate": "consts",
    "src_sha256": "f130c2364f384fd3ab98e41b45416b73ed3c595dfa8e5576721a1f855157a304",
-   "dest_sha256": "76509cf98b364e840a8b7a219f7b35b46caa84e2b8935e69d0f861fb1f037af9",
+   "dest_sha256": "623c716c94fee27970cd14ab8d35bedfb016daf29f131b94d29c03f4264adb1e",
    "edits": [
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -3128,7 +3473,7 @@
    "dest": "src/model/swap/ordered_roster.rs",
    "crate": "consts",
    "src_sha256": "d51c3fa83b6288383d654a6e9fb4721d194317c6e9cbc1b11cfde1d2230b103f",
-   "dest_sha256": "45e6e237943beab401cbcab56fcf300a4ccae2df89c0c89875ea6ab9eb513d66",
+   "dest_sha256": "5e7ddd04474746be480977368c9f69b72d22a1937751f93d2334f57d6b2d9bc9",
    "edits": [
     {
      "old": "use {training_mod_tui::StatefulTable, training_mod_tui::SubMenu, training_mod_tui::SubMenuType, training_mod_tui::Toggle, crate::engine::compat::grid::NX_SUBMENU_COLUMNS, training_mod_tui::NX_SUBMENU_ROWS};\n",
@@ -3171,10 +3516,15 @@
      "reason": "R5 / fix ledger F10 (lead ruling 2026-11-02): the preload planner calls this on every planning tick inside the fighter-frame hook scope, and the Vec-returning form allocated 14 times a second (Eden s6-06, `allocs=roster_preload:3943`); the allocation-free form is now the single implementation and the Vec form, for the callers outside hooks, copies it"
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -3183,7 +3533,7 @@
    "dest": "src/model/swap/mii_cycle.rs",
    "crate": "consts",
    "src_sha256": "c413a3b1fe5ea1eadc36be20913a55a780bcbac58bf81dded0f0c278d4eb0fe2",
-   "dest_sha256": "bf9a431b2b01524bb59ffc47b5c59565231dc435dda4c539dd45394c70cdb584",
+   "dest_sha256": "da207a8a7f98471570364723f0f6d9504ee979f5415f7003a3082c8a17094992",
    "edits": [
     {
      "old": "    let mut choices = Vec::with_capacity(ordered.len());\n",
@@ -3259,11 +3609,15 @@
      "reason": "rc.6 freeze class (primary 2026-11-09 19:44Z; rc6-qpf3, tests/lock_order.rs): compat::menu::KEPT is a hos_lock::Published copy hooks read without waiting; mii::selection::Preferences is Copy (six Option<Canonical>), so its clones are copies and the preload planner copies it instead of holding a read guard"
     },
     {
-     "cut_tests": [
-      "compact_regressions",
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -3272,7 +3626,7 @@
    "dest": "src/model/preload/cycle_preload_capacity.rs",
    "crate": "consts",
    "src_sha256": "4ebdbabc047d5540685b728840afd5862f940aec24ba8d0ff65e7f4c2d7ba07c",
-   "dest_sha256": "ae173f28429d7c73e406e9d210c1196726cca1d4907cc22e67e0978c5b665a2e",
+   "dest_sha256": "a6365d517fb2b7f82b4a6c4e70d62d3b298787855f54df41c56d927f4f510f04",
    "edits": [
     {
      "old": "//! Value-only capacity contract for cycle preloading. Counts and backend limits\n//! live here; the slot order is the single `mii::capacity` contract that Mii\n//! owner checks also use. Native ownership must still qualify every entry.\nuse crate::engine::mii::backend::Layout;\n\npub use crate::engine::mii::capacity::{capacity_index, extra_slots, Extras, ALL_EXTRA_SLOTS, BASE_HELPERS, EXTRA_SLOTS, MAX_TARGETS};\npub const ABSENT_SLOT: u32 = 8;\n\n/// Potential entries, not permission to create or dereference them. Training\n/// extensions and solo waiting extensions require separate opt-in features.\npub fn slots(layout: Layout, third: bool, ldn_third: bool, extended: bool)\n    -> [u32; MAX_TARGETS] {\n    slots_with_waiting(layout, third, ldn_third, extended, false)\n}\n\npub fn slots_with_waiting(layout: Layout, third: bool, ldn_third: bool, extended: bool, waiting: bool)\n    -> [u32; MAX_TARGETS] {\n    let mut slots = [ABSENT_SLOT; MAX_TARGETS];\n    slots[..BASE_HELPERS].copy_from_slice(&layout.helpers());\n    let extra_count = if !third { 0 } else {\n        match layout {\n            Layout::Training => if extended { EXTRA_SLOTS.len() } else { 1 },\n            Layout::Ldn => if waiting { extra_slots(layout).len() } else { usize::from(ldn_third) },\n",
@@ -3295,11 +3649,16 @@
      "reason": "R5 original shortcut allocation root fix; F9 current-owned Training slot4 dispatch and bounded changed-outcome evidence at existing count/service callbacks. Strict identity predicate unchanged; no new hook/native writes/admission relaxation. Runtime acceptance pending."
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "callback_tests",
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -3308,7 +3667,7 @@
    "dest": "src/model/preload/cycle_preload_policy.rs",
    "crate": "root",
    "src_sha256": "8f006ae6d6f978d500da383c4edbb5e731d9b91e19fa7b3e18037e73224ae7b2",
-   "dest_sha256": "9268a74db36fd4ec49545a457980d2ddc6de7db751414a60a65147f1842d54b4",
+   "dest_sha256": "338ef3cf4c631a699bbca50701909b0a9d9de5e0faf30d56b60b56346501bd6a",
    "edits": [
     {
      "old": "/// CPU's fighter look-ahead. Each CPU fighter that `merge` would place before the last Player hat\n/// moves, in its own order, to just behind that hat; every other pair of targets keeps `merge`'s\n/// order, and a target in both lanes keeps the earlier, hat position. The cost is the CPU's next\n/// swap, which may then find no warm helper for its fighter. Without a Player hat this is `merge`.\npub fn merge_player_hats_first<T: Copy + Eq, const N: usize>(lanes: [[Option<T>; N]; 4], slots: u8) -> [Option<T>; N] {\n    let mut order: Vec<(usize, T)> = Vec::with_capacity(4 * N);\n    for depth in 0..N {\n        for (lane, targets) in lanes.iter().enumerate() {\n            if let Some(target) = targets[depth] {\n                order.push((lane, target));\n            }\n        }\n    }\n    if let Some(last_hat) = order.iter().rposition(|(lane, _)| *lane == PLAYER_HATS) {\n        let (head, tail) = order.split_at(last_hat + 1);\n        let mut ranked: Vec<(usize, T)> = head.iter().copied().filter(|(lane, _)| *lane != CPU_FIGHTERS).collect();\n        ranked.extend(head.iter().copied().filter(|(lane, _)| *lane == CPU_FIGHTERS));\n        ranked.extend_from_slice(tail);\n        order = ranked;\n    }\n    let limit = usize::from(slots).min(crate::engine::preload::cycle_preload_capacity::MAX_TARGETS).min(N);\n    let mut result = [None; N];\n    let mut count = 0;\n    for (_, target) in order {\n        if count >= limit {\n",
@@ -3466,10 +3825,15 @@
      "reason": "Merge of p23/rc6-planner-fixes (b3cabf74) into p23/rc6-integration: rc.6 planner fix, primary inbox 2026-11-09 06:16Z (hot rc6-hot-xps26 x6-align): after a CPU switch the two parked F9 seats' members sat swapped and missing() found each on the other entry, so both stayed idle and the notice never settled. A parked seat is judged on its own entry (seat_missing, parked_seat_view); diag-only reason lines ([PreloadBlocked], [CharacterSources] service slot, [PreloadPlan]) and preload_blocked_reason. Host tests a_parked_seat_loads_its_member_even_when_the_other_seat_holds_it, tests/preload_seat_wiring.rs; Eden rc6-bg-pf5."
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -3478,13 +3842,18 @@
    "dest": "src/model/swap/character_memory.rs",
    "crate": "root",
    "src_sha256": "513ed484fc3ab77d9d39567ced7626950b7c63ecc54acdd6f99e08db293c3cc8",
-   "dest_sha256": "2b042e65553db5b9d78c67f6135c59a6159e266b1096765618d3b859039a42df",
+   "dest_sha256": "bd1b8f4f4d0b5a2a761e1714b04a53a33b2159f7844d2492660b369a69d63bc1",
    "edits": [
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -3493,7 +3862,7 @@
    "dest": "src/model/kirby/kirby_hat_cycle.rs",
    "crate": "root",
    "src_sha256": "685316a7023abcc3e32de85829aa6450514c2807e32191b536920dbb84184528",
-   "dest_sha256": "ff9b8e73419e53651a984d4f8962cff7f62932b20470b6809d31661175a4b5cd",
+   "dest_sha256": "b698cdbeb43c6d7d2bd7a1596a2deb9d8381c190e714cd08a0f89beabed22053",
    "edits": [
     {
      "old": "    (left_click && right_click, left_click || right_click)\n}\n",
@@ -3506,10 +3875,15 @@
      "reason": "HAT-REQUEST-END (operator option A, 2026-11-05; docs/DECISIONS.md on review/menu-proposal deccd62): R1, a pending request ages every game frame (kirby_hats::tick from lobby::frame, request_frame) and always ends after 900 frames with Kirby hat could not be loaded; R2, fighter_committed(role, non-Kirby) clears the role's pending request and releases its lease (commit_ends_request)"
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -3518,7 +3892,7 @@
    "dest": "src/model/mii_root/mii_hud_portrait_policy.rs",
    "crate": "root",
    "src_sha256": "aa4526a723fa74aa0b811c2883a7671c699797bda691622e5348604c674a2c33",
-   "dest_sha256": "ca7eaba748a442dbfea4fff55470802c3616ece747247ef53e83dd05f9b91d44",
+   "dest_sha256": "64d7e8c5cbf6dd582e78e6186a78b52d3ab3d3a72e9ed658cb8adce6f3b01901",
    "edits": [
     {
      "old": "\n/// Candidate request subs on a helper row. Nothing here claims native code never uses\n/// them: first use requires `RequestWords::idle_unregistered`, and an owned request that\n/// stops reading live is disowned.\npub const PORTRAIT_SUBS: [u32; 3] = [7, 8, 9];\npub const VISIBLE_OWNERS: usize = 2;\n/// Two helper rows times three subs.\npub const OWNED_CAPACITY: usize = 6;\n\n/// The two exact-portrait request channels in the shared source registry.\n/// Configuration alone cannot identify a portrait: Kirby Mii hats carry it too.\npub const SOURCE_CHANNELS: [usize; 2] = [3, 4];\npub fn source_channel_admitted(channel: usize, exact: bool, menu_open: bool) -> bool {\n    !menu_open || (SOURCE_CHANNELS.contains(&channel) && exact)\n}\n\n/// Count active helper acquisition attempts, not time deliberately spent behind\n",
@@ -3626,7 +4000,11 @@
      "reason": "RC reset lead composition: apply reviewed pkg6 cf161f5 F9/created-exact retirement after Slim 7950485 observer removal; preserve both closures and ordinary Mii/helper safety."
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "rebuild_tests",
       "hud_asset_tests",
       "stage_hide_tests",
@@ -3635,7 +4013,8 @@
       "prepared_tests",
       "native_admission_tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -3644,7 +4023,7 @@
    "dest": "src/model/lobby/practice_policy.rs",
    "crate": "root",
    "src_sha256": "6d28615050b338db6a207bbc955159e9f47347d91dfb402c3a4036135bf9f477",
-   "dest_sha256": "15dd0462e75fc1aa39874dbca34a8c5decbdee2d6d3e5775ea2a8ac9f578ea46",
+   "dest_sha256": "c0d66a9b6ade5ed256f00914f27f2b9c5adb1a9ebd6736e2d32aab0bd5e0f528",
    "edits": [
     {
      "old": "pub struct EntryLease(Option<Entries>);\n",
@@ -3657,10 +4036,15 @@
      "reason": "RC7 R3-1 and shared R3-3 lifetime root: unconditional ordered scene/P1 retirement independent of operation leases; production adapter also exercised by host probes. TrainingRooms-only correction, no fork sync or new native address."
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -3669,7 +4053,7 @@
    "dest": "src/model/stages/stage_forms.rs",
    "crate": "tui",
    "src_sha256": "104cea14a4d26ba7791ac7b432dd39f4e44b1e09340de932789a8596c318b500",
-   "dest_sha256": "60885b024b5e69812c1cec690f39dbfc5e66214194334e40bbedde0f38adba06",
+   "dest_sha256": "191dbff9aeb629ce2769641cbe70df010aae2a57f46ccf7b1a1e02bb185b0738",
    "edits": [
     {
      "old": "pub(crate) enum HelpControls",
@@ -3677,10 +4061,15 @@
      "reason": "dead_code: its only constructor was the fork's tui container (not carried; package 5's renderer is the consumer); `pub` states the model API"
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -3689,13 +4078,18 @@
    "dest": "src/model/stages/stage_menu.rs",
    "crate": "tui",
    "src_sha256": "7dece73f4a1563cb27d760b54577627d5ecbfe54867701737f45a3ffcb70592c",
-   "dest_sha256": "cfdbbec199490c74b94ff2070b81de6b313b43c1dc573d059e90b72ab65511e1",
+   "dest_sha256": "89f9e74d1f77deba66c381674a581661d48fada65d24a7f1eb198371578e7bc4",
    "edits": [
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -3704,7 +4098,7 @@
    "dest": "src/model/stages/lobby_stages.rs",
    "crate": "consts",
    "src_sha256": "86d084f7400d24e8e6be5554b391071a5b3a36d6208ccf28651727199b37586f",
-   "dest_sha256": "0d86f4186e7011a504e0bacf4a76d416af45f3962a806e3587713390f57dfd50",
+   "dest_sha256": "4a342ab66a59f317cdf4bfc45f2faf13e384d43730b87fac580979012ba03bdd",
    "edits": [
     {
      "old": "use {training_mod_tui::StatefulTable, training_mod_tui::SubMenu, training_mod_tui::SubMenuType, training_mod_tui::Toggle, crate::engine::compat::grid::NX_SUBMENU_COLUMNS, training_mod_tui::NX_SUBMENU_ROWS};\n",
@@ -3737,10 +4131,15 @@
      "reason": "the remaining tests drive the fork's full menu app (create_app, App, AppPage, MenuJsonStruct): the fork's old menu structure (StatefulTable/SubMenu/App/MenuJsonStruct) is replaced by package 1's editor rows and settings reader, and package 5's renderer (docs/PACKAGE-6-PLAN.md section 3.2)"
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -3749,15 +4148,19 @@
    "dest": "src/model/stages/lobby_stage_cycle.rs",
    "crate": "root",
    "src_sha256": "c4a313db7890e6529419e036dbc9403a4e503f0533633438f7828df58beed3cf",
-   "dest_sha256": "2edefeec3821d44e1c5d46258a40b0f63ee7ea116d1cabcd7af7fe2b1d94cb1e",
+   "dest_sha256": "2f62df89a2aaf4e1d53f127c7c2e6fb876f4014d617c277781e38175fd2cd2f8",
    "widen": true,
    "edits": [
+    {
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
     {
      "wrap_tests": [
       "tests"
      ],
      "macro": "lib_unit_tests",
-     "reason": "rc.9 test cut: the kept unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -3766,14 +4169,19 @@
    "dest": "src/model/stages/practice_stage_request_policy.rs",
    "crate": "root",
    "src_sha256": "f21325a210af687c2c008978356be0f0850b064390c242c8bb2d8ec955d002a6",
-   "dest_sha256": "8ec3e7e3146c6b940ebe048aa9a8f82cb654aa6e88e867b86448dc8fa8ca9aab",
+   "dest_sha256": "dd68affed8a3237d120e4f9d7eae340052b4a46ef83a8c41d76fc8ec658b4181",
    "widen": true,
    "edits": [
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -3782,14 +4190,19 @@
    "dest": "src/model/stages/training_stage_rotation_policy.rs",
    "crate": "root",
    "src_sha256": "7c87c293b95021b738e748aad978d7e90399781320f8a1cfa1b7b2fde7a81981",
-   "dest_sha256": "3902aad528386f1601ce5fa2c08ad28c10465ebd674d4e15b14da1adb4ba0531",
+   "dest_sha256": "a09f1bf074ffb5bd83f6e5595595adbeb67a180beef7ea52fb007ccb2803cf35",
    "widen": true,
    "edits": [
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -3798,13 +4211,18 @@
    "dest": "src/model/stages/waiting_hazards_policy.rs",
    "crate": "root",
    "src_sha256": "8a378ab2499cab662a7412a336edffea5920caed1057c11190052b6380092b40",
-   "dest_sha256": "413b8cee07ddf3e42e9b8d7a7e7e5916e8ed09be914c85e959906b0cab213429",
+   "dest_sha256": "a1effe42d70933ece5d49eb3ed3c78684e899aec22a80aba15a80a0b6c07d308",
    "edits": [
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -3813,7 +4231,7 @@
    "dest": "src/model/items/character_items.rs",
    "crate": "consts",
    "src_sha256": "57640dd2a5a9ea201d3a588e05bb950f5f7cecb551d602acfeeb44d0b5a3c2bf",
-   "dest_sha256": "15775c8c67141cd74825f1cb9efc14d221c205873fda93a4f9674f58983ca584",
+   "dest_sha256": "a7392e0d537bb364a2d468e2b9c621c5329df04ec47575c03ea26c7800bb1819",
    "edits": [
     {
      "old": "use {crate::StatefulTable, crate::SubMenu, crate::SubMenuType, crate::Toggle, crate::NX_SUBMENU_COLUMNS, crate::NX_SUBMENU_ROWS};\n",
@@ -3831,10 +4249,15 @@
      "reason": "the test drives the fork's full menu app: the fork's old menu structure (StatefulTable/SubMenu/App/create_app) is replaced by package 1's item-grid editor row and package 5's renderer (docs/PACKAGE-6-PLAN.md section 3.2)"
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -3843,7 +4266,7 @@
    "dest": "src/model/preload/cycle_preload_config.rs",
    "crate": "consts",
    "src_sha256": "49c8a777d9e7c728aa8ecc7a51df2f7990f3edf458fdf7163be3b82fa9e3bf01",
-   "dest_sha256": "ca4fd56fe776b236b1053c42f8623b36ef1fb9e5c2367d10634fc5103e71686d",
+   "dest_sha256": "a2654c447eed0fa8b9fb373a8b17493c3bf0bca9f154c30488d506fe4db1da8c",
    "edits": [
     {
      "delete_from": "// The exported menu macro resolves these names at its use site.\nmod bank_submenu {",
@@ -3906,10 +4329,15 @@
      "reason": "Merge of p23/rc6-bg-ic (a46c6b3) into p23/rc6-integration: rc.6 item 3, the return to an Ice Climbers original is warm (operator decisions 2026-11-08 All groups in rc.6 and a session that starts on IC/PT still gets its groups built; primary 2026-11-09 00:23Z): EXCLUSIONS 9 lifted for the normal pair original while the pair bank is on (capabilities original_form_bankable, IcPair row; native_body_bank original_member, excluded_original; both Mii adapters Original gates)"
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -3918,18 +4346,12 @@
    "dest": "src/model/p1/mod.rs",
    "crate": "root",
    "src_sha256": "8ff76c77d68c59c624181e162478eed7816bb1b4f1c7442977fd3b6c22dd4c7f",
-   "dest_sha256": "ada9b4ae2175b1cb5c45292e602747d0616dbd1c2982bfeb1016b7fed7a722cd",
+   "dest_sha256": "884bfed2072b7cfea4a409bccc7f68fac823bfa45ab764faed425c2135496bde",
    "edits": [
     {
      "old": "    }\n}\n\n/// Original draft encoder retained, unverified against native input at runtime.\npub fn encode(buttons: u32, stick_x: f32, stick_y: f32) -> u64 {\n    let axis = |value: f32| -> u8 {\n        let units = if value.is_finite() {\n            (value * 120.0).round().clamp(-120.0, 120.0)\n        } else {\n            0.0\n        };\n        (units as i8) as u8\n    };\n    u64::from(buttons) | (u64::from(axis(stick_x)) << 32) | (u64::from(axis(stick_y)) << 40)\n}\n\n/// Existing walk-off proposal: nearer edge, then down/out in air. Native\n/// ledge/drop-through behavior remains root-owned and runtime-unverified.\npub fn walk_off(p1_x: f32, left_edge: f32, right_edge: f32, grounded: bool) -> u64 {\n    let out = if (right_edge - p1_x) <= (p1_x - left_edge) {\n        1.0\n    } else {\n        -1.0\n    };\n    encode(0, out, if grounded { 0.0 } else { -1.0 })\n}\n\n#[cfg(test)]\nmod tests;\n",
      "new": "    }\n}\n\n#[cfg(test)]\nmod tests;\n",
      "reason": "Integrate approved Slim4b86500 retirement/scope and cold-owner/SDK roots into current composed source. Preserve current pkg6 const locks, F6 task ordering, Setup lifecycle and Deluxe persistence. Retired probe consumers removed with their features; shared host oracle retained. New exact composition requires fresh gates."
-    },
-    {
-     "cut_tests": [
-      "tests"
-     ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
     }
    ]
   },
@@ -3952,18 +4374,12 @@
    "dest": "src/model/p1/move_observer.rs",
    "crate": "root",
    "src_sha256": "6d3622c0864094c4896f0f2791dd4391fcc5a73b4708fd3f0f181ff4b5562325",
-   "dest_sha256": "da283586a96ed58374cb6db56763371f1b9018f1815bbbe55feeffd81c30a0c9",
+   "dest_sha256": "b3cdaf8954d0c3e02cca4f81e23415e192bdef0d4c1396c01292c178a3af4a17",
    "edits": [
     {
      "old": "}\n\nimpl MoveObserver {\n    pub fn active_family(&self) -> Option<Family> {\n        self.active\n    }\n\n    /// Reset on a new bound match/fighter identity; does not invent a completion.\n    pub fn reset(&mut self) {\n        *self = Self::default();\n    }\n",
      "new": "}\n\nimpl MoveObserver {\n    #[cfg(test)]\n    pub fn active_family(&self) -> Option<Family> {\n        self.active\n    }\n\n    /// Reset on a new bound match/fighter identity; does not invent a completion.\n    #[cfg(test)]\n    pub fn reset(&mut self) {\n        *self = Self::default();\n    }\n",
      "reason": "Integrate approved Slim4b86500 retirement/scope and cold-owner/SDK roots into current composed source. Preserve current pkg6 const locks, F6 task ordering, Setup lifecycle and Deluxe persistence. Retired probe consumers removed with their features; shared host oracle retained. New exact composition requires fresh gates."
-    },
-    {
-     "cut_tests": [
-      "tests"
-     ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
     }
    ]
   },
@@ -3972,16 +4388,34 @@
    "dest": "src/model/p1/move_observer_tests.rs",
    "crate": "root",
    "src_sha256": "7b0ca617626f81d6073e39323b913d172f897a718bb94f567e70d2adc7c61ac2",
-   "dest_sha256": "",
-   "removed": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): test-only file removed"
+   "dest_sha256": "003eafe75708b9af188b3442fabe5a4e7095ecbfe08eec9ac9144d34e4380af1",
+   "edits": [
+    {
+     "table_file": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_file": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    }
+   ]
   },
   {
    "src": "src/cpu_pilot/tests.rs",
    "dest": "src/model/p1/tests.rs",
    "crate": "root",
    "src_sha256": "3cd60855f7604ae17959a1c669e4d2ed80d8f8fb644ea02534ef8dc2035e5ffb",
-   "dest_sha256": "",
-   "removed": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): test-only file removed"
+   "dest_sha256": "dabd97f1e02b51b7b4085b0855c7ccf3bc8de4f5d804f97a1e0981e069580d92",
+   "edits": [
+    {
+     "table_file": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_file": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    }
+   ]
   },
   {
    "src": "src/cpu_pilot/examples/completed-attacks-walk-off.json",
@@ -4009,7 +4443,7 @@
    "dest": "src/model/preload/preload_metrics.rs",
    "crate": "root",
    "src_sha256": "795ede5522c0ac2c16bd2c03e774f06ec9e3ba838feea46d20101926d192cfca",
-   "dest_sha256": "0d22b43546a0077b4e18e3dedc323398ce0e7b665c1ceedce7d3206f5446ede0",
+   "dest_sha256": "8df510ed01672c127038852ebd79e585887a159470e464f028dbaa72b87883d9",
    "edits": [
     {
      "old": "//! callback counts supplied by the caller. Capture never allocates, locks, or logs;\n//! only `snapshot` and `OperationStamp::finish` write, one bounded diagnostic line each.\nuse std::convert::TryFrom;\nuse std::fmt;\nuse std::sync::atomic::{AtomicBool, Ordering};\nuse std::sync::Mutex;\n\n/// Result stored when this build cannot issue the SVC (host value tests).\npub const UNSUPPORTED: u32 = u32::MAX;\n/// Frame-interval bucket upper bounds; the last bucket holds everything above 50 ms.\nconst GAP_BOUNDS_US: [u64; 5] = [17_500, 20_000, 25_000, 34_000, 50_000];\n",
@@ -4027,15 +4461,15 @@
      "reason": "R5 compiled note->source scene_end->metrics finish reaches lazy SESSION mutex. Existing const hos_lock removes cold allocation; sample/guard/drop/log order unchanged, native panic=abort excludes poisoned continuation. Owner contract pkg6-owner-locks.md."
     },
     {
-     "old": "    #[cfg(test)]\n    const MISSING: Self = Self {\n        result: UNSUPPORTED,\n        value: 0,\n    };\n\n    #[cfg(test)]\n    const fn ok(value: u64) -> Self {\n        Self { result: 0, value }\n    }\n\n",
-     "new": "",
-     "reason": "rc.9 test cut: used only by the removed unit tests on the host; the Switch build is unchanged"
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
     },
     {
-     "cut_tests": [
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -4160,14 +4594,19 @@
    "dest": "src/model/p1_session/menu_session.rs",
    "crate": "root",
    "src_sha256": "327f70c40386384a06de1e06f1a646439005325fca51b609e71b71e829095982",
-   "dest_sha256": "d2cdf203a6f47911abd7c37c087d88a93f0932e16a0c0e1c5d3e639bf39460c5",
+   "dest_sha256": "680fad09a78ecd3a9662155fe19ace0a686d77b2dfffb8c0540cec7996b4e7e1",
    "widen": true,
    "edits": [
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -4176,14 +4615,19 @@
    "dest": "src/model/p1_session/stage_session.rs",
    "crate": "root",
    "src_sha256": "058be3adc1bce088239c483540ae5bf77ca4ad455467393e78eaaafac21afc67",
-   "dest_sha256": "37e957d33d2459f2ed4232bf2ac8b646d26dc71eb85004fdd9a652ad1902c8e8",
+   "dest_sha256": "2a7f1464645b8b53d4a9c16a5a1631188cbbdcfc5616e730fa8a439129a7fec1",
    "widen": true,
    "edits": [
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -4754,7 +5198,7 @@
    "dest": "src/runtime/roster/observe.rs",
    "crate": "root",
    "src_sha256": "cba5ec7868f1c03d20dbd97a586115115f69cb5707ef03e856a40aa97a4770ae",
-   "dest_sha256": "5214920f7b8b9d762a98b2f9a2ecc4e912977c0c3ecbf2088a8cf66553b90cfa",
+   "dest_sha256": "35b62971646c8c331e345600f857bf574e6a081685bea0c1506cc82371a84977",
    "edits": [
     {
      "old": "//!  predicted=[(key, refs)\u2026] actual=[\u2026] residual=[\u2026] missing=[\u2026]`.\n\nuse crate::engine::seams::native_fields as fields;\nuse std::convert::TryFrom; // root crate is edition 2018: not in the prelude\nuse crate::engine::swap::swap_model::ledger::RFlags;\n\n/// Nodes a walk may visit. Every recorded lap stayed at `map<=15`; two prefetched specials plus a\n/// window cannot exceed 24 keys (8 + 8 + 8).\npub(crate) const MAP_WALK_LIMIT: usize = 64;\n\n",
@@ -4772,10 +5216,11 @@
      "reason": "R5 map reconciliation uses the existing 64-node validation bound for its local tree walk and streams prediction/residual/missing diagnostics without heap collections. Preserve sorted last-duplicate-wins actual values and original two-pass missing order; retain stale-token vector capacity when draining. No new native limit or resource-ledger obligation cap."
     },
     {
-     "cut_tests": [
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -4784,13 +5229,18 @@
    "dest": "src/runtime/roster/native_reload_pose.rs",
    "crate": "root",
    "src_sha256": "dd6f0ef6aa6dbc7d7f5dd1a86bcf8d4bc678ce58856bc3d760cfdb1d5c1ccd15",
-   "dest_sha256": "f530f8323239a947a9dd956d495b4f3fe1e74d5aee4b7d1639685a85187eaa58",
+   "dest_sha256": "11b475bfdf04fa32715019734a9b25cf78f8c091a719a8fc8cca9c30f04fb989",
    "edits": [
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -9905,7 +10355,7 @@
    "dest": "src/runtime/roster/native_source_capacity.rs",
    "crate": "root",
    "src_sha256": "91a1f6cfe224e155389df685821a34b376fd6fe0ddef267f8ceee3d34c2fe95b",
-   "dest_sha256": "3c6aa3860a0d678edc1a40c7857f67107ce153253f16a276fa6dc5acea3855b1",
+   "dest_sha256": "7b3b99af21842caf61fb86ad416a65ca282b0d5d35da64fa15b9afda2f6391ed",
    "edits": [
     {
      "old": "unsafe fn listener_removed(ctx: &InlineCtx) {\n",
@@ -10408,10 +10858,15 @@
      "reason": "Merge of p23/rc6-hot-slots-mii (b027703) into p23/rc6-integration: Operator decision 2026-11-08 23:42Z, INBOX-opus-rc6-hotslots (\"free under the pause menu\"; native body destroy holds the game thread 75-134 ms per body, rc6-hot-xps16/17): a Built group that left the cycle is parked (leaves_at_pause), counts only the members its cycle keeps (kept_members) and is destroyed when Training's pause opens (pause_state_exit -> body_bank::pause_opening); new members the parked groups crowd out wait for the pause, shown as waiting for memory (waiting_for_pause), and load in the background after it; with the Mii background build fixes (rc6-hot-xps14..xps17): the Mii adapters adopt the record change of a background setup, an identity moves only into or out of a Mii window, the configuration moves with it, each window keeps its D+0x3a0 words, and a release puts back the live pad-slot controller it cleared"
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -10488,13 +10943,18 @@
    "dest": "src/runtime/roster/practice_trace_core.rs",
    "crate": "root",
    "src_sha256": "54d110515a0525ff44d8703e310792869ea92405c17698ee842a61b315c0e0f7",
-   "dest_sha256": "7dabf67089578befa83d9b2c75b079e8014e7c0627597c42f9b16306b5cd7cd0",
+   "dest_sha256": "a0f5933bd1e12fdfba7a0253c3f1c672dabf645ca841c02211fd848da128d04f",
    "edits": [
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -10560,7 +11020,7 @@
    "dest": "src/runtime/mii/native_keyboard.rs",
    "crate": "root",
    "src_sha256": "6416fd30fcebbcd18e6672070a744b1321ea32c8ec9726f1ae7aaed7de718ef4",
-   "dest_sha256": "399e993099566ecb251036bc6eadd3d9d3426aea4bbe5b1f0edc3176997adcbe",
+   "dest_sha256": "42d808b912ea6f2521aae847625e497610f64b3712e8c2c609590fb57bfc6456",
    "edits": [
     {
      "old": "use parking_lot::Mutex;",
@@ -10568,10 +11028,15 @@
      "reason": "stream/sync (menu-close hang, 2026-11-02): parking_lot's parker on os=switch is a pure spin loop that livelocks under Horizon's fixed priorities; the plugin's locks are hos-lock (crates/hos-lock: kernel address arbiter, no heap, same API)"
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -10691,7 +11156,7 @@
    "dest": "src/runtime/mii/mii_native_access.rs",
    "crate": "root",
    "src_sha256": "eeddc0e5ea9cecd6ae48b4f82e9f25d7e9d2538138a9e742bb6d4224b77b1731",
-   "dest_sha256": "64526407daa6a243cf1afec244fd7fff082aad66050057bf8a6319bb8311cff6",
+   "dest_sha256": "925487d723f7144a4c7b72a3d889ee31a110ce1ddf2260efe6b681b5004089bf",
    "edits": [
     {
      "old": "        Self { g, unlock }\n    }\n}\n#[cfg(any(feature = \"mii-native-adapter-probe\", feature = \"mii-saved-alpha\"))]\nimpl Drop for PoolLock {\n    fn drop(&mut self) {\n        unsafe { (self.unlock)(self.g) }\n    }\n}\n/// The single CharInfo write primitive used by diagnostic and alpha adapters. All validation\n/// must precede this call. Native shared_ptr bytes +58..68 are deliberately untouched.\n#[cfg(any(feature = \"mii-native-adapter-probe\", feature = \"mii-saved-alpha\"))]\npub(crate) unsafe fn copy_update(record: usize, update: &RecordUpdate) {\n    for (offset, byte) in update.charinfo().iter().enumerate() {\n        wr(record, offset, *byte);\n    }\n}\n#[cfg(any(feature = \"mii-cpu-adapter-probe\", feature = \"mii-saved-alpha\"))]\n#[path = \"mii_native_cpu_scope.rs\"]\npub(crate) mod cpu;\n",
@@ -10729,10 +11194,11 @@
      "reason": "Integrate approved Slim4b86500 retirement/scope and cold-owner/SDK roots into current composed source. Preserve current pkg6 const locks, F6 task ordering, Setup lifecycle and Deluxe persistence. Retired probe consumers removed with their features; shared host oracle retained. New exact composition requires fresh gates."
     },
     {
-     "cut_tests": [
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -12455,7 +12921,7 @@
    "dest": "src/runtime/mii/mii_ordinary_native.rs",
    "crate": "root",
    "src_sha256": "f359be35b161aa256850d33edc2f12d042927bbfb7e1fac4192e14876a8238d2",
-   "dest_sha256": "ac2e965722f8d1af108d7356bd8ca17b16c3b57b141921ca759b89dce39b1562",
+   "dest_sha256": "16374f27c97bdb50ab69893018456e29b3e22c7745001fe540c2fca5102864e5",
    "edits": [
     {
      "old": "super::note(&format!(\"[MiiOrdinaryPlayer] bank settle diverged",
@@ -12798,10 +13264,11 @@
      "reason": "rc.8 R5 (TASK-rc8.md SCOPE REOPENED; the operator 2026-11-11 11:24Z): the native service poll's deeper chains, cut by outlining and borrowing with the same calls in the same order (no heap): the warm-exit settle in three frames (exit_plan, exit_settled, exit_adopt), the bank settle's outcome in bank_applied, the source service as gate, capacity and load, the CPU origin capture as recapture and new origin, begin_prepare's preflight snapshots in their own frames, and the kept MiiExit borrowed, not copied"
     },
     {
-     "cut_tests": [
+     "wrap_tests": [
       "scalar_write_tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -13594,7 +14061,7 @@
    "dest": "src/runtime/mii/mii_source_provenance.rs",
    "crate": "root",
    "src_sha256": "31fabf9212a6f91d03a6ecc8e5505f8961ea671c4274075f6bbc10c605073c4e",
-   "dest_sha256": "096e109a4094d3166effbbf2ab39caf33937a6456c349fdd6c28b19a963214be",
+   "dest_sha256": "2c14d662520ef4c38cb49e7ad717601b2a3ad92cf3b7dc94dc382171020b3b05",
    "edits": [
     {
      "old": "            Helper::Unmanaged => crate::engine::mii::role_owner::original_row_matches(\n                now.kind, now.original.kind),\n            Helper::Unavailable { .. } => false,\n            Helper::Ready { ready, key, proof } => {\n                let token = ready.source();\n                token.slot() == id && Some(token.epoch()) == self.epoch\n",
@@ -13772,12 +14239,16 @@
      "reason": "rc.8 section 7 (TASK-rc8 sections 4 and 7, primary 2026-11-11 03:30Z): stack waste in the native service's poll, behaviour unchanged. helpers::View (4,520 B) methods take &self and its by-value parameters (check_helpers, check_helpers_for, final_registry, final_registry_for, helper_kind, note_refused_proof, created_kind) take &View; bank_service, bank_settle and bank_refused take &BankTrack (9.5 KB) and read STATE's bank through as_ref; exit_settled reads the kept MiiExit (18.5 KB) itself, once, and borrows it; bank_settled and exit_settled are #[inline(never)] so their snapshots leave bank_service's frame"
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests",
-      "mii_tests",
-      "created_source_provenance_tests"
+      "mii_tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -13948,7 +14419,7 @@
    "dest": "src/runtime/mii/mii_editor_bridge/cosmetic_resume.rs",
    "crate": "root",
    "src_sha256": "4fee54144e8912baa2f94b43cef3ca023d6e4d603359c64f218ffa02ddd99f31",
-   "dest_sha256": "56ec09c0089150b5bb7575202064394a15477e287e0d48e4105786f8da3f35f9",
+   "dest_sha256": "3119c7669c8dadc5a77d75b2ad3c25aa7fc806eaf2845517d2f362676296f240",
    "edits": [
     {
      "old": "}\n\npub(super) unsafe fn poll_voice(context: usize, wanted: VoiceSelection) -> Poll {\n    let (failed, wrote) = VOICE.lock().unwrap().as_ref()\n        .map(|job| (job.failed, job.wrote)).unwrap_or((None, false));\n    if let Some(detail) = failed { return Poll::Failed(detail); }\n    // voice_focus reconciles pitch button 1 before wrote is set. Matching\n",
@@ -14006,10 +14477,15 @@
      "reason": "Integrate approved Slim4b86500 retirement/scope and cold-owner/SDK roots into current composed source. Preserve current pkg6 const locks, F6 task ordering, Setup lifecycle and Deluxe persistence. Retired probe consumers removed with their features; shared host oracle retained. New exact composition requires fresh gates."
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -14116,13 +14592,18 @@
    "dest": "src/runtime/mii/mii_editor_bridge/connected_native.rs",
    "crate": "root",
    "src_sha256": "df061e002c881c1a57c7219077fa97b027c123af7216c81b94ca1f7c50953839",
-   "dest_sha256": "291bfd3c54d342d7e76c5d25f166d1a60cf436c660f630f76d599d931e852c52",
+   "dest_sha256": "a9d8531f0d3e1e8867723d3172d2f24412029c6a6466fa658d52b1ad05602c26",
    "edits": [
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -14146,7 +14627,7 @@
    "dest": "src/runtime/mii/mii_editor_bridge/settings_resume.rs",
    "crate": "root",
    "src_sha256": "f1c4d34b2513d591adff5cd660a3a07155c219874e6b528c5d855eaa9bfea4d1",
-   "dest_sha256": "235d0f13bf70695866342377d1e71a1d3201d40261d281f0e57225ababcccf6e",
+   "dest_sha256": "e1a8fdab021ccbe65d2f736f0a9625107fd4edf03fe09150e38d2e1b1f63b172",
    "edits": [
     {
      "old": "    // Age 1 is the first main resume, and this hook runs before it. The\n    // method table already holds update_random. Local Wireless must finish\n    // its replacement first.\n    let policy_settled = POLICY.lock().unwrap().as_ref().is_some_and(|entry|\n        entry.settled && entry.context == context && entry.component == component);\n    if bound && wrapper_after_policy(suppress, policy_settled) {\n        ensure_random_wrapper(context, component);\n    }\n    // Age 0 starts the coroutine; wait until its default selection has run.\n    if bound && pending && native::read::<u32>(component, 0xe4) > 1 {\n        let mut job = JOB.lock().unwrap().take().unwrap();\n        let capture = matches!(job.operation, Operation::Capture);\n        let result = job.step(component);\n        let completed = matches!(result, Ok(None));\n        if capture || !completed { job.result = Some(result); }\n        *JOB.lock().unwrap() = Some(job);\n        // Freeze a captured interaction for this tick. A completed native\n        // action must propagate normally; never convert Cancel into Save.\n        if capture && !completed { return; }\n",
@@ -14184,10 +14665,15 @@
      "reason": "Integrate approved Slim4b86500 retirement/scope and cold-owner/SDK roots into current composed source. Preserve current pkg6 const locks, F6 task ordering, Setup lifecycle and Deluxe persistence. Retired probe consumers removed with their features; shared host oracle retained. New exact composition requires fresh gates."
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -14203,13 +14689,18 @@
    "dest": "src/runtime/mii/mii_editor_bridge/editor_origin.rs",
    "crate": "root",
    "src_sha256": "c3530b9636eacbd7cab848235a06d45e2ce647aa77537ececf331bdc8665f420",
-   "dest_sha256": "656a38298cfb1a43a880187deaaef7b3d9ef3da50be86683f5685387c6238878",
+   "dest_sha256": "dc267cd0a13d67dbf5e658df3cfb56a2c22947e91a758cf90dad3a144259a1b8",
    "edits": [
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -14237,13 +14728,14 @@
    "dest": "src/runtime/mii/mii_editor_bridge/lua_vm.rs",
    "crate": "root",
    "src_sha256": "ada145e3ea2fe8b8c431b19cfbd6ce41264d77fa38ea345b2e13889beead6383",
-   "dest_sha256": "56226befe10f36380fa3c7acc6c8a4a7038b15d8eb32daa90eeaf3b469df1714",
+   "dest_sha256": "05f1ad3a38c3fff17565ac73fe279824c6e9d7b289d77457a9120c955251ce8e",
    "edits": [
     {
-     "cut_tests": [
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -14840,13 +15332,18 @@
    "dest": "src/runtime/mii/mii_editor_bridge/return_gate.rs",
    "crate": "root",
    "src_sha256": "8828460840d5d17897e634a4b03aa5a508fe38284144b9a205419c6736640c59",
-   "dest_sha256": "7a90597d3f531ad66cf5bce265cfaab8a279400d72ca68059687304a1f400c8d",
+   "dest_sha256": "7eee62ad451b8c08172d70ce2c8d8aa38186b6a6897234ff817d190dfed60d3f",
    "edits": [
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -15252,13 +15749,18 @@
    "dest": "src/model/mii_root/resume.rs",
    "crate": "tui",
    "src_sha256": "e92b99bdb4e7b7f4c3ed2c211610992fa1daf5a5ae23b460697565d2023e0793",
-   "dest_sha256": "d0c8cd993ce7d91ce257413a9fc33a6773b53532d71ab189df015b818cd033e7",
+   "dest_sha256": "d2b033b78b530b3d2648d6367f5703217bf28c731882baf0047f926508a6071f",
    "edits": [
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -15267,7 +15769,7 @@
    "dest": "src/model/mii_root/mii_menu.rs",
    "crate": "tui",
    "src_sha256": "94d7a41fe2ff5d3c4dcaed6ff0e87df4c96d64bd927a99e4550a198784cb761c",
-   "dest_sha256": "f5aec880c7530e088ae89a66a4c0889c5194b2863b47207c568366f3b784be73",
+   "dest_sha256": "f4bc0613a377d07fc396c082a5a1c9f3d65dbeddbe857b3ef5bbd4a33307fc89",
    "edits": [
     {
      "old": "use {crate::macro_panel, crate::StatefulTable, crate::SubMenu, crate::SubMenuType, crate::engine::compat::grid::NX_SUBMENU_COLUMNS, crate::NX_SUBMENU_ROWS};",
@@ -15395,10 +15897,15 @@
      "reason": "rc.6 freeze class (primary 2026-11-09 19:44Z; rc6-qpf3, tests/lock_order.rs): compat::menu::KEPT is a hos_lock::Published copy hooks read without waiting; mii::selection::Preferences is Copy (six Option<Canonical>), so its clones are copies and the preload planner copies it instead of holding a read guard"
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "connected_editor_tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -15407,7 +15914,7 @@
    "dest": "src/model/lobby/automation/adapter.rs",
    "crate": "root",
    "src_sha256": "df094011e9da70957a2c7e308f5a7b761a5213b04190e7e508bfc59fe6f71940",
-   "dest_sha256": "179c90497c9c9fa2419380ffd99c61e0762d83f8e00302ee703bd96cd4a39cde",
+   "dest_sha256": "1332f7899edf2ebc0ccd5bb206fc56b70d075e63cd391d219c76e8c17a94d665",
    "edits": [
     {
      "old": "impl Adapter {\n",
@@ -15415,10 +15922,15 @@
      "reason": "clippy `new_without_default` on `Adapter::new()`: the root-cause fix is the `Default` impl the lint asks for (no lint `allow`)"
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -15427,7 +15939,7 @@
    "dest": "src/model/lobby/automation/control.rs",
    "crate": "root",
    "src_sha256": "b32c1c5dde398e494832b1ae4f266a99368054c9c5fc2a2767fb2047797bd64f",
-   "dest_sha256": "7e12bbd568b06ae6a6862fa10c9a71fd55d25351ceee59a2d0e58ef9600e8a58",
+   "dest_sha256": "dca67cd0953fdece3762708d33c6335518c30695444bdeef4de176a95c723d1b",
    "edits": [
     {
      "old": "impl Controls {\n",
@@ -15435,10 +15947,15 @@
      "reason": "clippy `new_without_default` on `Controls::new()`: the root-cause fix is the `Default` impl the lint asks for (no lint `allow`)"
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -15447,7 +15964,7 @@
    "dest": "src/model/lobby/automation/flow.rs",
    "crate": "root",
    "src_sha256": "c8576428768e6cde2e41a7fbb60fcc74ca8dbb1c773af67690e24469cd4b646a",
-   "dest_sha256": "3b0e4c544499ccc8f957b87ad8d6ab5f6b4d4824cc8dd35b85d70647011f181a",
+   "dest_sha256": "cc989bd6d0a6f198f674225de7a36403c4eed3a60bafbe15b3095e552088bad4",
    "edits": [
     {
      "old": "    #[cfg_attr(not(test), expect(dead_code, reason = \"The native adapter starts at cards; intro readiness is not yet connected.\"))]\n",
@@ -15455,10 +15972,15 @@
      "reason": "the fork's `expect(dead_code)` on `Screen::IntroReady` is removed: the enum is a public item of the public `engine::lobby` area, so the dead-code lint never applies to it and the expectation was unfulfilled in every build (an `unfulfilled_lint_expectations` warning on the Switch build). Root cause, not a lint workaround: the lint attribute only existed for the fork's private module"
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -15467,7 +15989,7 @@
    "dest": "src/model/lobby/automation/popup.rs",
    "crate": "root",
    "src_sha256": "35a9ea32b9fa302cac348caf781a556e60ef74b0fcdd45ef39b6b59e9fb3d98d",
-   "dest_sha256": "98e035c38f80dccd4abbb901edf79496199d51e66f6ea67db22ad410f0d73bcf",
+   "dest_sha256": "e527619cd1a24c8ff538cb59dc752e2126ef2dd039c9e62cbea778e3604032ce",
    "edits": [
     {
      "old": "impl Popup {\n",
@@ -15475,10 +15997,15 @@
      "reason": "clippy `new_without_default` on `Popup::new()`: the root-cause fix is the `Default` impl the lint asks for (no lint `allow`)"
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -15487,7 +16014,7 @@
    "dest": "src/model/lobby/automation/pulse.rs",
    "crate": "root",
    "src_sha256": "3a4561a96f75be9cdca1705de9579c026f94039b2809350c886fefec98702563",
-   "dest_sha256": "8610c042eec175c01b0878630bfc35d40972cc2f4ada13580d719c11304c6b19",
+   "dest_sha256": "65eb4dc2ca4ab1bcedbaeed46186c19e4902deeed1d7bb7385fcdafe8f09735b",
    "edits": [
     {
      "old": "impl Scheduler {\n",
@@ -15500,10 +16027,15 @@
      "reason": "clippy `new_without_default` on `Slot::new()`: the root-cause fix is the `Default` impl the lint asks for (no lint `allow`)"
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -15512,7 +16044,7 @@
    "dest": "src/model/lobby/automation/recording.rs",
    "crate": "root",
    "src_sha256": "b1ba255dad55df7122d31a61128d406fc298753682a4d9a5bafadd38fd5fdd29",
-   "dest_sha256": "5975f9580a873dc171de9ad1176502f70a0a4995f6ed64cf75d57d6bda58d135",
+   "dest_sha256": "202a8f88f3edde4ea7e8f9cd2d0909201b48032290ab1a0f93b5e333ea57d55f",
    "edits": [
     {
      "old": "#[cfg_attr(feature = \"automation-results-observer\", derive(serde::Serialize))]\n",
@@ -15521,10 +16053,15 @@
      "reason": "RC RESET option2: retire observer-only serialization attributes; preserve the pure recording model."
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -15533,13 +16070,18 @@
    "dest": "src/runtime/roster/native_install.rs",
    "crate": "root",
    "src_sha256": "5f514294935e471005ff55921bc9b8103498d73ae736ab96fca202e0aba5b290",
-   "dest_sha256": "88cfa11ac2680f3a16bb3326e4774ef61616d444babbdae87670ad164f9b3100",
+   "dest_sha256": "656e22e27076950fe2168f07795a107e351cb118df2e3f97635caf0f3a977b52",
    "edits": [
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -15548,7 +16090,7 @@
    "dest": "src/runtime/roster/native_fighter_install.rs",
    "crate": "root",
    "src_sha256": "106a7d1043e7f940521d4fb95581fa83b201b632c5bff08662db0b4debb7ef0f",
-   "dest_sha256": "a8b51f00e7f694d5ac5eb1335ba108268d3f13f5eea3f6eb185822067c78ca50",
+   "dest_sha256": "65d638c9fa7571926791e39494d0cec806446dad69fdacb8b1835b268aec35d9",
    "edits": [
     {
      "old": "        self.put(ACTOR_COUNT, group.actor_count);\n    }\n\n    #[cfg_attr(\n        not(any(feature = \"mii-ordinary-player-alpha\", feature = \"mii-ordinary-cpu-alpha\")),\n        allow(dead_code)\n    )]\n    #[inline]\n    pub(crate) fn bytes(&self) -> &[u8; DESCRIPTOR_LEN] {\n        &self.0\n",
@@ -15561,10 +16103,15 @@
      "reason": "Integrate approved Slim4b86500 retirement/scope and cold-owner/SDK roots into current composed source. Preserve current pkg6 const locks, F6 task ordering, Setup lifecycle and Deluxe persistence. Retired probe consumers removed with their features; shared host oracle retained. New exact composition requires fresh gates."
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -15597,7 +16144,7 @@
    "dest": "src/model/mii/inline_keyboard.rs",
    "crate": "root",
    "src_sha256": "4e3eb198a8c8924d0513ca9475f851543e4e53947f05b95847af70491a4cf154",
-   "dest_sha256": "050ee86f2889e6ab747a74d659439211963048922f5cafbb942473d033bfc273",
+   "dest_sha256": "b67d17d37d8f5bb287a8138ca83ec5c180830de172902989c443f117e98fa11b",
    "edits": [
     {
      "old": "#[cfg_attr(not(feature = \"mii-editor-alpha\"), allow(dead_code))]\n    pub(crate) fn new",
@@ -15780,10 +16327,15 @@
      "reason": "Lead21:18 authorized root fix: bounded byte metadata and streaming UTF-16 validation remove callback allocations, preserving scalar/caret and native buffer contracts."
     },
     {
-     "cut_tests": [
+     "table_tests": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "wrap_tests": [
       "tests"
      ],
-     "reason": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): unit tests removed"
+     "macro": "lib_unit_tests",
+     "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
     }
    ]
   },
@@ -15813,7 +16365,7 @@
    "dest": "tests/mii_replay185_headgear.rs",
    "crate": "mii",
    "src_sha256": "dc1217eeec20f201115dee096c09af7b3fc3b66afd8961353e56d481539109dd",
-   "dest_sha256": "",
+   "dest_sha256": "4abd003c3e48b2b07ab6ae7374b37dcff075af8a84899244d61c558b8b064af3",
    "prepend": "#[allow(dead_code, unused_imports)]\n#[path = \"../src/model/mii/mod.rs\"]\npub mod mii;\n#[allow(unused_imports)]\nmod engine {\n    pub use super::mii;\n}\n\n",
    "edits": [
     {
@@ -15825,16 +16377,24 @@
      "old": "        < begin.find(\"native::same_owned(&now,&expected,retained || active.is_some())\").unwrap());\n",
      "new": "        < begin.find(\"let Some(current)=preflight_current(entry,origin.original_kind,&expected,retained || active.is_some(),request)\").unwrap());\n",
      "reason": "rc.8 R5 (g5): the CPU preflight snapshot is preflight_current, in its own frame, and still takes the refreshed expected (after refresh_idle_metadata)"
+    },
+    {
+     "table_file": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
+    },
+    {
+     "insert_before_line": 6,
+     "text": "// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.\nmacro_rules! lib_unit_tests {\n    ($($body:tt)*) => {};\n}\n// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).\n#[path = \"../src/test_table.rs\"]\nmod test_table;\n",
+     "reason": "rc.9: the by-path unit tests run in the lib's binary; this file's cases run as one table"
     }
-   ],
-   "removed": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): test-only file removed"
+   ]
   },
   {
    "src": "training_mod_mii/tests/quickplay_backend.rs",
    "dest": "src/model/mii_fork_tests/quickplay_backend.rs",
    "crate": "mii",
    "src_sha256": "ceae39afaf18aadd6fceaaabc9c6f1189d680cd454bdceb8f83a7bf4cf1921d6",
-   "dest_sha256": "",
+   "dest_sha256": "f6f078da5addfb5c74d86ccb2403a890475ba2238ac84fd1f8d4dacdf08f4e02",
    "edits": [
     {
      "old": "extern crate self as training_mod_consts;\npub use training_mod_mii as mii;\n",
@@ -15865,16 +16425,19 @@
      "old": "// This host harness exercises native_fields' in-memory tests without the\n// Switch-only feature names declared by the product crate.\n",
      "new": "",
      "reason": "rc.3 Mii port (2026-11-05): the fork harness note about native_fields does not apply to the lib test module"
+    },
+    {
+     "table_file": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
     }
-   ],
-   "removed": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): test-only file removed"
+   ]
   },
   {
    "src": "training_mod_mii/tests/ldn_backend.rs",
    "dest": "src/model/mii_fork_tests/ldn_backend.rs",
    "crate": "mii",
    "src_sha256": "09d80635f2cb30c8be3d7400b786cf6ca14cc7a37c66ba2c50be14443f824a36",
-   "dest_sha256": "",
+   "dest_sha256": "0c17d09d305301ea23ce47023c49f70af51b71d306467468a20cd3d261da4f55",
    "edits": [
     {
      "old": "extern crate self as training_mod_consts;\npub use training_mod_mii as mii;\n",
@@ -15890,9 +16453,12 @@
      "old": "#[allow(dead_code)]\n#[path = \"../swap/source_lifetime.rs\"]\nmod source_lifetime;",
      "new": "use crate::engine::swap::source_lifetime;",
      "reason": "rc.3 Mii port (2026-11-05): the fork test is a lib test module here (src/model/mii_fork_tests), so the engine module it included by path is the crate engine module itself"
+    },
+    {
+     "table_file": true,
+     "reason": "rc.9 (docs/COVERAGE-rc9.md): the module's tests are the cases of one table-driven test"
     }
-   ],
-   "removed": "rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): test-only file removed"
+   ]
   }
  ],
  "not_carried": [

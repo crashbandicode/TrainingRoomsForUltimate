@@ -66,7 +66,6 @@ mod tests {
     lib_unit_tests! {
     use super::*;
 
-    #[test]
     fn repeated_flights_reuse_endpoint_and_deliver_once() {
         let mut replies = Replies::new();
         for value in 0..20 {
@@ -79,7 +78,6 @@ mod tests {
         }
     }
 
-    #[test]
     fn lost_job_reports_failure_and_allows_later_fallback() {
         let mut replies = Replies::<u32>::new();
         drop(Job::new(replies.begin().unwrap()));
@@ -88,13 +86,22 @@ mod tests {
         assert_eq!(replies.poll(), Ok(Ok(9)));
     }
 
-    #[test]
     fn full_queue_returns_endpoint_before_retry() {
         let mut replies = Replies::new();
         let sender = replies.begin().unwrap();
         replies.rejected(Job::new(sender).rejected());
         Job::new(replies.begin().unwrap()).complete(7);
         assert_eq!(replies.poll(), Ok(Ok(7)));
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("repeated_flights_reuse_endpoint_and_deliver_once", repeated_flights_reuse_endpoint_and_deliver_once as fn()),
+            ("lost_job_reports_failure_and_allows_later_fallback", lost_job_reports_failure_and_allows_later_fallback as fn()),
+            ("full_queue_returns_endpoint_before_retry", full_queue_returns_endpoint_before_retry as fn()),
+        ]);
     }
     }
 }

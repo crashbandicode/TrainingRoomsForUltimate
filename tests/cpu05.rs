@@ -3,6 +3,9 @@
 //! Q18 A (a changed Shield Tilt applies at the next CPU frame), N3 (OoS Offset and Reaction Time are a
 //! checklist or a range). Test names are the spec's §9 rows.
 
+// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).
+#[path = "../src/test_table.rs"]
+mod test_table;
 // rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
 macro_rules! lib_unit_tests {
     ($($body:tt)*) => {};
@@ -95,7 +98,6 @@ fn frame(cpu: &mut Cpu, key: FighterKey, status: i32, prev: i32) {
     cpu.frame(key, &FrameFacts { status, prev_status: prev, situation: Situation::Ground, ..FrameFacts::default() });
 }
 
-#[test]
 fn cpu05_should_hold_shield() {
     let base = HoldFacts::default();
     // Any of Hold, Infinite and Constant holds; None holds only while the queue asks for the shield.
@@ -132,7 +134,6 @@ fn cpu05_should_hold_shield() {
     assert_eq!(cpu.guard_button(key, true), ButtonAnswer::Original);
 }
 
-#[test]
 fn cpu05_decay_override_rules() {
     assert!(decay_override_active(ShieldMode::Infinite, false) && decay_override_active(ShieldMode::Infinite, true));
     assert!(decay_override_active(ShieldMode::Constant, true));
@@ -159,7 +160,6 @@ fn cpu05_decay_override_rules() {
     assert_eq!(cpu.shield_param(key, true), None, "None keeps the native decay");
 }
 
-#[test]
 fn cpu05_damage_mul_restore() {
     // Infinite in Training writes 0.0; every other mode, and every frame outside Training, writes the
     // value the game booted with, so leaving Training restores it.
@@ -190,7 +190,6 @@ fn shieldstun_triggers() -> Vec<u8> {
     t
 }
 
-#[test]
 fn cpu05_oos_offset_count() {
     // OoS Offset 2: the CPU may take two hits and acts out of the third (the offset starts at N + 1).
     let (mut cpu, key) = cpu_with(&[
@@ -218,7 +217,6 @@ fn cpu05_oos_offset_count() {
     assert!(!cpu.fighters[key.index()].mash.queue.is_empty());
 }
 
-#[test]
 fn cpu05_reaction_time() {
     // Reaction 10 frames: counted after the shieldstun, the decision waits, then acts; a parry blocks.
     let (mut cpu, key) = cpu_with(&[
@@ -257,7 +255,6 @@ fn cpu05_reaction_time() {
     assert_eq!(cpu.fighters[key.index()].counters.count(CounterId::Reaction), 0);
 }
 
-#[test]
 fn cpu05_oos_action_table() {
     let facts = OosFacts { cont_escape: true, ..OosFacts::default() };
     let decide = |action: Action, state: usize| {
@@ -292,7 +289,6 @@ fn cpu05_oos_action_table() {
     }
 }
 
-#[test]
 fn cpu05_shieldstun_override() {
     // The shieldstun override replaces mash_state; without it the trigger buffers mash_state; with
     // neither nothing is buffered.
@@ -317,7 +313,6 @@ fn cpu05_shieldstun_override() {
     assert!(cpu.fighters[key.index()].mash.queue.is_empty());
 }
 
-#[test]
 fn cpu05_shield_tilt() {
     // Up: the vector (0, 1) whichever side the player stands on; empty is the native stick.
     let (mut cpu, key) = cpu_with(&[("shield_tilt", {
@@ -336,7 +331,6 @@ fn cpu05_shield_tilt() {
     assert_eq!(cpu.shield_tilt_stick(key, 10.0, 0.0), None);
 }
 
-#[test]
 fn cpu05_shield_tilt_applies_next_frame() {
     // Q18 A: no reset is needed; the menu commit leaves the re-read pending and the next frame takes it.
     let (mut cpu, key) = cpu_with(&[]);
@@ -355,7 +349,6 @@ fn cpu05_shield_tilt_applies_next_frame() {
     assert_eq!(cpu.fighters[key.index()].shield.tilt, Some(6));
 }
 
-#[test]
 fn cpu05_shield_tilt_opponent_relative() {
     // B7: In is toward the opponent and Out away on both sides; Left and Right are absolute.
     let tilt = |dir: usize, player_x: f32| {
@@ -373,7 +366,6 @@ fn cpu05_shield_tilt_opponent_relative() {
     assert!(near(tilt(9, 8.0), (-1.0, 0.0)) && near(tilt(10, -8.0), (1.0, 0.0)), "Left and Right never mirror");
 }
 
-#[test]
 fn cpu05_oos_offset_range_pick() {
     // N3: a set range is picked uniformly where the checklist is picked today (at each offset reset).
     let s = settings(&[("oos_offset_range", vec![1, 3])]);
@@ -387,7 +379,6 @@ fn cpu05_oos_offset_range_pick() {
     assert_eq!(seen.into_iter().collect::<Vec<_>>(), vec![2, 3, 4], "the offset is the pick plus one");
 }
 
-#[test]
 fn cpu05_reaction_time_range_pick() {
     let (mut cpu, key) = cpu_with(&[("reaction_time_range", vec![5, 8])]);
     let mut seen = std::collections::BTreeSet::new();
@@ -399,7 +390,6 @@ fn cpu05_reaction_time_range_pick() {
     assert_eq!(seen.into_iter().collect::<Vec<_>>(), vec![5, 6, 7, 8]);
 }
 
-#[test]
 fn cpu05_per_fighter_state() {
     // B6: Popo's offset and Hold flag do not leak into Nana's.
     let (mut cpu, popo) = cpu_with(&[mode(2), ("oos_offset", delay(&[4]))]);
@@ -411,4 +401,24 @@ fn cpu05_per_fighter_state() {
     assert!(cpu.fighters[popo.index()].shield.decay_enabled);
     assert_eq!(cpu.fighters[nana.index()].shield.offset, 0);
     assert!(!cpu.fighters[nana.index()].shield.decay_enabled);
+}
+
+/// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+#[test]
+fn case_table() {
+    crate::test_table::run(&[
+        ("cpu05_should_hold_shield", cpu05_should_hold_shield as fn()),
+        ("cpu05_decay_override_rules", cpu05_decay_override_rules as fn()),
+        ("cpu05_damage_mul_restore", cpu05_damage_mul_restore as fn()),
+        ("cpu05_oos_offset_count", cpu05_oos_offset_count as fn()),
+        ("cpu05_reaction_time", cpu05_reaction_time as fn()),
+        ("cpu05_oos_action_table", cpu05_oos_action_table as fn()),
+        ("cpu05_shieldstun_override", cpu05_shieldstun_override as fn()),
+        ("cpu05_shield_tilt", cpu05_shield_tilt as fn()),
+        ("cpu05_shield_tilt_applies_next_frame", cpu05_shield_tilt_applies_next_frame as fn()),
+        ("cpu05_shield_tilt_opponent_relative", cpu05_shield_tilt_opponent_relative as fn()),
+        ("cpu05_oos_offset_range_pick", cpu05_oos_offset_range_pick as fn()),
+        ("cpu05_reaction_time_range_pick", cpu05_reaction_time_range_pick as fn()),
+        ("cpu05_per_fighter_state", cpu05_per_fighter_state as fn()),
+    ]);
 }

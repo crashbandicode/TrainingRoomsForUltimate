@@ -162,3 +162,317 @@ impl RowState {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    lib_unit_tests! {
+    use super::*;
+    use crate::engine::macros::CAPTURE_OFF;
+    use deluxe_plugin_sdk::{abi, register, register_with};
+    use std::cell::{Cell, RefCell};
+    use std::ffi::{c_char, c_void, CStr};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    /// What a fake host kept from one `register` call: the user pointer, the callbacks and copies of the strings.
+    #[derive(Default)]
+    struct Registered {
+        calls: u32,
+        versions: Vec<u32>,
+        user: usize,
+        current: Option<abi::CurrentFn>,
+        request: Option<abi::RequestFn>,
+        id: String,
+        label: String,
+        options: Vec<Opt>,
+        config_path_null: bool,
+        flags: u32,
+    }
+
+    /// One option as the host copied it.
+    struct Opt {
+        id: String,
+        label: String,
+        choices: Vec<String>,
+        flags: u32,
+        key_null: bool,
+        tones: Vec<u8>,
+    }
+
+    thread_local! {
+        static HOST: RefCell<Registered> = RefCell::new(Registered::default());
+        static ACCEPTED: Cell<(u32, u32)> = const { Cell::new((2, 5)) };
+    }
+
+    unsafe fn text(ptr: *const c_char) -> String {
+        unsafe { CStr::from_ptr(ptr) }.to_str().unwrap().to_owned()
+    }
+
+    /// A fake host whose `register` applies the checks the card's Deluxe 0.10.1 `register` (`.text+0x1fdb0`) applies
+    /// first, as read from the NRO: null descriptor -> -1; `struct_size != 0x48` or `abi_version - 2 > 3` -> -2
+    /// (descriptor versions 2..=5 accepted); `flags > 1` -> -3; a null callback -> -6. `ACCEPTED` narrows the version
+    /// range to model an older host. It copies what it needs, as the real host does.
+    unsafe extern "C" fn fake_register(desc: *const abi::PluginDesc) -> i32 {
+        if desc.is_null() {
+            return abi::REGISTER_ERR_NULL;
+        }
+        let desc = unsafe { &*desc };
+        let (low, high) = ACCEPTED.with(Cell::get);
+        HOST.with(|host| {
+            let mut host = host.borrow_mut();
+            host.calls += 1;
+            host.versions.push(desc.abi_version);
+        });
+        if desc.struct_size != 0x48 || desc.abi_version.wrapping_sub(2) > 3 || desc.abi_version < low || desc.abi_version > high {
+            return abi::REGISTER_ERR_ABI;
+        }
+        if desc.flags > 1 {
+            return abi::REGISTER_ERR_INVALID;
+        }
+        if desc.current.is_none() || desc.request.is_none() {
+            return abi::REGISTER_ERR_CALLBACKS;
+        }
+        let options = (0..desc.option_count as usize)
+            .map(|i| {
+                let o = unsafe { &*desc.options.add(i) };
+                let choices = (0..o.choice_count as usize).map(|c| unsafe { text(*o.choices.add(c)) }).collect();
+                let tones = if o.choice_tones.is_null() {
+                    Vec::new()
+                } else {
+                    unsafe { std::slice::from_raw_parts(o.choice_tones, o.choice_count as usize) }.to_vec()
+                };
+                Opt { id: unsafe { text(o.id) }, label: unsafe { text(o.label) }, choices, flags: o.flags, key_null: o.config_key.is_null(), tones }
+            })
+            .collect();
+        HOST.with(|host| {
+            let mut host = host.borrow_mut();
+            host.user = desc.user as usize;
+            host.current = desc.current;
+            host.request = desc.request;
+            host.id = unsafe { text(desc.id) };
+            host.label = unsafe { text(desc.label) };
+            host.options = options;
+            host.config_path_null = desc.config_path.is_null();
+            host.flags = desc.flags;
+        });
+        0
+    }
+
+    unsafe extern "C" fn fake_status() -> u32 {
+        abi::HOST_STATUS_MENU_ACTIVE
+    }
+
+    unsafe extern "C" fn fake_build() -> *const c_char {
+        c"0.10.1-test".as_ptr()
+    }
+
+    /// The table the card's 0.10.1 host returns from `ssbu_online_deluxe_plugin_api_v1` (`.data+0x1155d8`):
+    /// `struct_size = 0x20`, table `abi_version = 1`, then `register`, `host_status`, `host_build`.
+    fn host_0101() -> abi::PluginApiV1 {
+        abi::PluginApiV1 { struct_size: 0x20, abi_version: 1, register: fake_register, host_status: fake_status, host_build: fake_build }
+    }
+
+    fn reset(accepted: (u32, u32)) {
+        HOST.with(|host| *host.borrow_mut() = Registered::default());
+        ACCEPTED.with(|a| a.set(accepted));
+    }
+
+    // One toggle and one persist counter per test: each test names its own statics so tests run in parallel.
+    macro_rules! row {
+        ($toggle:ident, $writes:ident) => {{
+            static $toggle: CaptureToggle = CaptureToggle::new();
+            static $writes: AtomicUsize = AtomicUsize::new(0);
+            fn toggle() -> &'static CaptureToggle {
+                &$toggle
+            }
+            fn persist() {
+                $writes.fetch_add(1, Ordering::SeqCst);
+            }
+            (CaptureRow { toggle, persist }, &$toggle, &$writes)
+        }};
+    }
+
+    /// Calls `current` / `request` the way the host does: through the C callbacks it was handed, with its `user`.
+    fn host_current(option: u32) -> u32 {
+        let (current, user) = HOST.with(|h| (h.borrow().current.unwrap(), h.borrow().user));
+        unsafe { current(user as *mut c_void, option) }
+    }
+
+    fn host_request(option: u32, choice: u32) -> u32 {
+        let (request, user) = HOST.with(|h| (h.borrow().request.unwrap(), h.borrow().user));
+        unsafe { request(user as *mut c_void, option, choice) }
+    }
+
+    fn version_4_registers_on_the_0101_host_in_one_call_with_no_persistence() {
+        reset((2, 5));
+        let (row, _, _) = row!(T, W);
+        let result = unsafe { register_with(&host_0101(), &SPEC, row) };
+        assert_eq!(result, Ok(Handle(0)));
+        assert_eq!(RowState::from_result(&result), RowState::Registered);
+        HOST.with(|host| {
+            let host = host.borrow();
+            assert_eq!(host.calls, 1, "the SDK calls register exactly once");
+            assert_eq!(host.versions, vec![abi::ABI_VERSION]);
+            assert_eq!(abi::ABI_VERSION, 4);
+            assert_eq!((host.id.as_str(), host.label.as_str()), ("training_rooms", "Training Rooms"));
+            assert_eq!(host.flags, 0, "a group on the shared Plugins page");
+            assert!(host.config_path_null, "the host is not asked to write replay_capture.ini");
+            assert_eq!(host.options.len(), 1);
+            let option = &host.options[0];
+            assert_eq!((option.id.as_str(), option.label.as_str()), ("replay_capture", "Replay capture"));
+            assert_eq!(option.choices, ["Off", "On"]);
+            assert_eq!(option.flags, abi::OPTION_FLAG_NO_PERSIST);
+            assert!(option.key_null);
+            assert_eq!(option.tones, [abi::TONE_NEUTRAL, abi::TONE_OK]);
+        });
+    }
+
+    fn a_host_older_than_0_5_3_answers_abi_once_and_is_not_retried() {
+        // Hosts before 0.5.3 took descriptor versions 2..=3 only.
+        reset((2, 3));
+        let (row, _, _) = row!(T, W);
+        let result = unsafe { register_with(&host_0101(), &SPEC, row) };
+        assert_eq!(result, Err(RegisterError::Abi));
+        assert_eq!(RowState::from_result(&result), RowState::HostTooOld);
+        assert_eq!(RowState::HostTooOld.reason(), Some("host_older_than_0_5_3"));
+        HOST.with(|host| assert_eq!(host.borrow().versions, vec![4], "no fallback to an older descriptor version"));
+    }
+
+    fn a_table_of_another_shape_is_incompatible_and_never_called() {
+        for (size, version) in [(0x20, 2), (0x18, 1), (0x28, 1)] {
+            reset((2, 5));
+            let (row, _, _) = row!(T, W);
+            let api = abi::PluginApiV1 { struct_size: size, abi_version: version, ..host_0101() };
+            let result = unsafe { register_with(&api, &SPEC, row) };
+            assert_eq!(result, Err(RegisterError::HostIncompatible), "{size:#x}/{version}");
+            assert_eq!(RowState::from_result(&result).reason(), Some("host_incompatible"));
+            HOST.with(|host| assert_eq!(host.borrow().calls, 0));
+        }
+    }
+
+    fn no_host_off_the_console_means_no_row_and_nothing_else() {
+        let (row, toggle, writes) = row!(T, W);
+        toggle.seed(true);
+        toggle.set_ready();
+        let result = register(&SPEC, row);
+        assert_eq!(result, Err(RegisterError::HostMissing));
+        assert_eq!(RowState::from_result(&result).reason(), Some("host_missing"));
+        assert_eq!(writes.load(Ordering::SeqCst), 0);
+        assert!(toggle.desired());
+    }
+
+    fn the_host_reads_and_changes_the_one_preference_and_each_change_schedules_one_write() {
+        reset((2, 5));
+        let (row, toggle, writes) = row!(T, W);
+        toggle.seed(false);
+        unsafe { register_with(&host_0101(), &SPEC, row) }.unwrap();
+        // Before the capture adapter is ready the row shows Unavailable and changes nothing.
+        assert_eq!(host_current(0), abi::CHOICE_UNAVAILABLE);
+        assert_eq!(host_request(0, 1), abi::REQUEST_UNAVAILABLE);
+        assert!(!toggle.desired());
+        assert_eq!(writes.load(Ordering::SeqCst), 0);
+        toggle.set_ready();
+        assert_eq!(host_current(0), CAPTURE_OFF as u32);
+        assert_eq!(host_request(0, CAPTURE_ON as u32), abi::REQUEST_APPLIED);
+        assert!(toggle.desired());
+        assert_eq!(host_current(0), CAPTURE_ON as u32);
+        assert_eq!(writes.load(Ordering::SeqCst), 1);
+        // L+R+X (0.10.1): a request for the choice already shown is applied and writes nothing.
+        assert_eq!(host_request(0, CAPTURE_ON as u32), abi::REQUEST_APPLIED);
+        assert_eq!(writes.load(Ordering::SeqCst), 1);
+        // The menu row changes the same preference: the host sees it on its next frame.
+        assert_eq!(toggle.request_choice(CAPTURE_OFF), ToggleRequest::Applied);
+        assert_eq!(host_current(0), CAPTURE_OFF as u32);
+        // Out-of-range indices never reach the handler (the SDK's trampolines).
+        assert_eq!(host_request(0, 2), abi::REQUEST_REJECTED);
+        assert_eq!(host_request(1, 0), abi::REQUEST_REJECTED);
+        assert_eq!(host_current(1), abi::CHOICE_UNAVAILABLE);
+        assert_eq!(writes.load(Ordering::SeqCst), 1);
+    }
+
+    fn a_change_during_a_record_is_pending_shows_the_latched_value_and_is_written_at_once() {
+        reset((2, 5));
+        let (row, toggle, writes) = row!(T, W);
+        toggle.seed(true);
+        toggle.set_ready();
+        unsafe { register_with(&host_0101(), &SPEC, row) }.unwrap();
+        assert!(toggle.begin_record());
+        assert_eq!(host_request(0, CAPTURE_OFF as u32), abi::REQUEST_PENDING);
+        // `current` keeps the record's arm state until the record ends; the INI holds the next-record preference.
+        assert_eq!(host_current(0), CAPTURE_ON as u32);
+        assert!(!toggle.desired());
+        assert_eq!(writes.load(Ordering::SeqCst), 1);
+        toggle.end_record().unwrap();
+        assert_eq!(host_current(0), CAPTURE_OFF as u32);
+        // Stepping back to the live value before the record ends is a second change, a second write.
+        assert!(!toggle.begin_record());
+        assert_eq!(host_request(0, CAPTURE_ON as u32), abi::REQUEST_PENDING);
+        assert_eq!(host_request(0, CAPTURE_OFF as u32), abi::REQUEST_APPLIED);
+        assert_eq!(writes.load(Ordering::SeqCst), 3);
+    }
+
+    fn the_handler_maps_every_toggle_answer() {
+        assert_eq!(status(ToggleRequest::Applied), RequestStatus::Applied);
+        assert_eq!(status(ToggleRequest::Pending), RequestStatus::Pending);
+        assert_eq!(status(ToggleRequest::Rejected), RequestStatus::Rejected);
+        assert_eq!(status(ToggleRequest::Unavailable), RequestStatus::Unavailable);
+    }
+
+    fn every_register_error_has_a_state_a_reason_and_a_code_that_round_trips() {
+        let errors = [
+            (RegisterError::HostMissing, "host_missing"),
+            (RegisterError::HostIncompatible, "host_incompatible"),
+            (RegisterError::Abi, "host_older_than_0_5_3"),
+            (RegisterError::Invalid, "invalid_spec"),
+            (RegisterError::Null, "host_null"),
+            (RegisterError::Full, "host_full"),
+            (RegisterError::Duplicate, "duplicate_id"),
+            (RegisterError::Callbacks, "callbacks"),
+            (RegisterError::Unknown(-9), "host_error"),
+        ];
+        for (error, reason) in errors {
+            let state = RowState::from_result(&Err(error));
+            assert!(!state.registered());
+            assert_eq!(state.reason(), Some(reason));
+            assert_eq!(RowState::from_code(state.code()), state);
+        }
+        assert_eq!(RowState::from_code(RowState::Registered.code()), RowState::Registered);
+        assert_eq!(RowState::Registered.reason(), None);
+        assert_eq!(RowState::from_code(0), RowState::LayerOff);
+        assert_eq!(RowState::LayerOff.reason(), Some("capture_layer_off"));
+        assert_eq!(RowState::from_code(200), RowState::LayerOff);
+    }
+
+    fn other_host_answers_map_to_their_states() {
+        for (code, state) in [
+            (abi::REGISTER_ERR_FULL, RowState::Full),
+            (abi::REGISTER_ERR_DUPLICATE, RowState::Duplicate),
+            (abi::REGISTER_ERR_INVALID, RowState::Invalid),
+            (-42, RowState::HostError),
+        ] {
+            thread_local!(static CODE: Cell<i32> = const { Cell::new(0) });
+            unsafe extern "C" fn answer(_: *const abi::PluginDesc) -> i32 {
+                CODE.with(Cell::get)
+            }
+            CODE.with(|c| c.set(code));
+            let (row, _, _) = row!(T, W);
+            let api = abi::PluginApiV1 { register: answer, ..host_0101() };
+            assert_eq!(RowState::from_result(&unsafe { register_with(&api, &SPEC, row) }), state);
+        }
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("version_4_registers_on_the_0101_host_in_one_call_with_no_persistence", version_4_registers_on_the_0101_host_in_one_call_with_no_persistence as fn()),
+            ("a_host_older_than_0_5_3_answers_abi_once_and_is_not_retried", a_host_older_than_0_5_3_answers_abi_once_and_is_not_retried as fn()),
+            ("a_table_of_another_shape_is_incompatible_and_never_called", a_table_of_another_shape_is_incompatible_and_never_called as fn()),
+            ("no_host_off_the_console_means_no_row_and_nothing_else", no_host_off_the_console_means_no_row_and_nothing_else as fn()),
+            ("the_host_reads_and_changes_the_one_preference_and_each_change_schedules_one_write", the_host_reads_and_changes_the_one_preference_and_each_change_schedules_one_write as fn()),
+            ("a_change_during_a_record_is_pending_shows_the_latched_value_and_is_written_at_once", a_change_during_a_record_is_pending_shows_the_latched_value_and_is_written_at_once as fn()),
+            ("the_handler_maps_every_toggle_answer", the_handler_maps_every_toggle_answer as fn()),
+            ("every_register_error_has_a_state_a_reason_and_a_code_that_round_trips", every_register_error_has_a_state_a_reason_and_a_code_that_round_trips as fn()),
+            ("other_host_answers_map_to_their_states", other_host_answers_map_to_their_states as fn()),
+        ]);
+    }
+    }
+}

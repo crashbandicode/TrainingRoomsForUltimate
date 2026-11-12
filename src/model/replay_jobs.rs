@@ -110,7 +110,6 @@ mod tests {
     const A: Identity = Identity { epoch: 1, revision: 3 };
     const B: Identity = Identity { epoch: 1, revision: 4 };
 
-    #[test]
     fn retired_inflight_cannot_complete_into_reused_slot() {
         let mut q = Queue::new(1);
         let old = q.submit(10, Some(A)).unwrap();
@@ -128,7 +127,6 @@ mod tests {
         assert_eq!(q.poll(new), Poll::Retired);
     }
 
-    #[test]
     fn selected_priority_and_durable_fifo_survive_retirement() {
         let mut q = Queue::<_, ()>::new(4);
         let durable = q.submit(1, None).unwrap();
@@ -146,7 +144,6 @@ mod tests {
         assert_eq!(q.take_next().unwrap().request, 2);
     }
 
-    #[test]
     fn epoch_retirement_discards_unread_completion_and_queued_request() {
         let mut q = Queue::new(2);
         let done = q.submit(1, Some(A)).unwrap();
@@ -157,6 +154,16 @@ mod tests {
         assert_eq!(q.poll(done), Poll::Retired);
         assert_eq!(q.poll(waiting), Poll::Retired);
         assert!(!q.has_work());
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("retired_inflight_cannot_complete_into_reused_slot", retired_inflight_cannot_complete_into_reused_slot as fn()),
+            ("selected_priority_and_durable_fifo_survive_retirement", selected_priority_and_durable_fifo_survive_retirement as fn()),
+            ("epoch_retirement_discards_unread_completion_and_queued_request", epoch_retirement_discards_unread_completion_and_queued_request as fn()),
+        ]);
     }
     }
 }

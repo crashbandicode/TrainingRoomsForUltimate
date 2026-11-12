@@ -10,7 +10,6 @@ use super::*;
 
 // --- plans -----------------------------------------------------------------------------------------------------------
 
-#[test]
 fn each_lobby_speed_has_its_plan_and_none_raises_the_update_rate() {
     assert_eq!(LobbyPlan::of(Speed::X1), LobbyPlan::X1);
     assert_eq!(LobbyPlan::of(Speed::Half), LobbyPlan::Slot(2));
@@ -84,7 +83,6 @@ fn run(slow: &mut Slow, keeper: &mut LobbySlot, speed: Speed, updates: usize) ->
     ends.windows(2).map(|w| w[1] - w[0]).collect()
 }
 
-#[test]
 fn two_thirds_paces_periods_of_one_and_two_updates() {
     let mut slow = Slow::new();
     let mut keeper = LobbySlot::new();
@@ -101,7 +99,6 @@ fn two_thirds_paces_periods_of_one_and_two_updates() {
     assert!(held.divisor == 1 || held.divisor == 2);
 }
 
-#[test]
 fn half_and_quarter_are_not_paced_and_two_thirds_yields_to_a_longer_slow() {
     for (speed, n) in [(Speed::Half, 2usize), (Speed::Quarter, 4)] {
         let mut slow = Slow::new();
@@ -119,7 +116,6 @@ fn half_and_quarter_are_not_paced_and_two_thirds_yields_to_a_longer_slow() {
     assert!(periods[2..].iter().all(|p| *p == 4), "{periods:?}");
 }
 
-#[test]
 fn the_paced_slot_is_kept_through_its_divisors_and_freed_with_the_one_it_holds() {
     let mut t = fresh_table();
     let mut keeper = LobbySlot::new();
@@ -156,7 +152,6 @@ fn the_paced_slot_is_kept_through_its_divisors_and_freed_with_the_one_it_holds()
 
 /// R9 with R2: a match found from the waiting room at 2/3 (no busy edge; the practice P1's destroy is the session clear):
 /// the release frees the slot with the divisor the pace left, and the match's table holds no slot of the plugin.
-#[test]
 fn match_found_at_two_thirds_frees_the_paced_slot_before_the_drop() {
     for divisor_at_the_drop in [1u8, 2] {
         let mut t = fresh_table();
@@ -178,7 +173,6 @@ fn match_found_at_two_thirds_frees_the_paced_slot_before_the_drop() {
     }
 }
 
-#[test]
 fn paced_divisor_alternates_at_period_ends_only() {
     assert_eq!(paced_divisor(1, 0), Some(2));
     assert_eq!(paced_divisor(2, 0), Some(1));
@@ -188,7 +182,6 @@ fn paced_divisor_alternates_at_period_ends_only() {
 
 // --- x1.5: cadence and gate ------------------------------------------------------------------------------------------
 
-#[test]
 fn the_extra_pass_runs_on_every_other_update_and_restarts_after_a_reset() {
     let mut cadence = Cadence::new();
     let due: Vec<bool> = (0..6).map(|_| cadence.due()).collect();
@@ -199,7 +192,6 @@ fn the_extra_pass_runs_on_every_other_update_and_restarts_after_a_reset() {
     assert!(cadence.due());
 }
 
-#[test]
 fn the_extra_pass_needs_the_live_practice_unpaused_with_no_slow_and_between_passes() {
     let ok = PassNow { live: true, in_practice: true, ui_busy: false, paused: 0, current_n: 1, target_n: 1, phase_word: u32::MAX };
     assert!(pass_allowed(ok));
@@ -324,7 +316,6 @@ fn element(m: &Fake, phase: usize, i: usize) -> (usize, usize, usize) {
     (entry, task, m.u64(task) as usize)
 }
 
-#[test]
 fn the_walk_follows_the_scheduler_and_leaves_out_the_walker_and_masked_groups() {
     let phases: [&[(i32, usize)]; 10] = [
         &[(9, tick(1)), (0, tick(2))],
@@ -355,7 +346,6 @@ fn the_walk_follows_the_scheduler_and_leaves_out_the_walker_and_masked_groups() 
     }
 }
 
-#[test]
 fn a_walk_that_is_not_whole_or_has_no_walker_is_not_run() {
     let phases: [&[(i32, usize)]; 10] = [&[(0, tick(1)), (8, WALKER)], &[], &[], &[], &[], &[], &[], &[], &[], &[]];
     let m = scheduler(&phases, &[]);
@@ -392,7 +382,6 @@ fn a_walk_that_is_not_whole_or_has_no_walker_is_not_run() {
 
 // --- the pass (the docs lane's R2 review, findings 1 and 2) ----------------------------------------------------------
 
-#[test]
 fn counting_and_listing_walks_agree_and_a_phase_wider_than_the_buffer_is_not_run() {
     let m = scheduler(&SAMPLE, MASKS);
     let mut out = [Task::default(); 16];
@@ -405,7 +394,6 @@ fn counting_and_listing_walks_agree_and_a_phase_wider_than_the_buffer_is_not_run
     assert!(!survey.runnable(), "one phase holds more tasks than the pass's buffer");
 }
 
-#[test]
 fn the_pass_ticks_every_task_in_the_schedulers_order_and_is_whole() {
     let m = scheduler(&SAMPLE, MASKS);
     let mut out = [Task::default(); 16];
@@ -417,7 +405,6 @@ fn the_pass_ticks_every_task_in_the_schedulers_order_and_is_whole() {
     assert_eq!(ticked, out[..9]);
 }
 
-#[test]
 fn each_phase_is_read_again_right_before_its_ticks() {
     // Phase 0's first tick gives phase 3's first task another tick: phase 3 ticks the new one.
     let m = scheduler(&SAMPLE, MASKS);
@@ -446,7 +433,6 @@ fn each_phase_is_read_again_right_before_its_ticks() {
     assert_eq!(ticked, [tick(1), tick(2), tick(3), tick(4)]);
 }
 
-#[test]
 fn the_pass_stops_between_ticks_once_the_practice_is_no_longer_live() {
     let m = scheduler(&SAMPLE, MASKS);
     let live = Cell::new(true);
@@ -468,5 +454,26 @@ fn the_pass_stops_between_ticks_once_the_practice_is_no_longer_live() {
     let mut narrow = [Task::EMPTY; 2];
     let pass = run_pass(&m, S, WALKER, &mut narrow, || true, |_| calls += 1);
     assert_eq!((pass.ticked, pass.whole, calls), (0, false, 0));
+}
+
+/// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+#[test]
+fn case_table() {
+    crate::test_table::run(&[
+        ("each_lobby_speed_has_its_plan_and_none_raises_the_update_rate", each_lobby_speed_has_its_plan_and_none_raises_the_update_rate as fn()),
+        ("two_thirds_paces_periods_of_one_and_two_updates", two_thirds_paces_periods_of_one_and_two_updates as fn()),
+        ("half_and_quarter_are_not_paced_and_two_thirds_yields_to_a_longer_slow", half_and_quarter_are_not_paced_and_two_thirds_yields_to_a_longer_slow as fn()),
+        ("the_paced_slot_is_kept_through_its_divisors_and_freed_with_the_one_it_holds", the_paced_slot_is_kept_through_its_divisors_and_freed_with_the_one_it_holds as fn()),
+        ("match_found_at_two_thirds_frees_the_paced_slot_before_the_drop", match_found_at_two_thirds_frees_the_paced_slot_before_the_drop as fn()),
+        ("paced_divisor_alternates_at_period_ends_only", paced_divisor_alternates_at_period_ends_only as fn()),
+        ("the_extra_pass_runs_on_every_other_update_and_restarts_after_a_reset", the_extra_pass_runs_on_every_other_update_and_restarts_after_a_reset as fn()),
+        ("the_extra_pass_needs_the_live_practice_unpaused_with_no_slow_and_between_passes", the_extra_pass_needs_the_live_practice_unpaused_with_no_slow_and_between_passes as fn()),
+        ("the_walk_follows_the_scheduler_and_leaves_out_the_walker_and_masked_groups", the_walk_follows_the_scheduler_and_leaves_out_the_walker_and_masked_groups as fn()),
+        ("a_walk_that_is_not_whole_or_has_no_walker_is_not_run", a_walk_that_is_not_whole_or_has_no_walker_is_not_run as fn()),
+        ("counting_and_listing_walks_agree_and_a_phase_wider_than_the_buffer_is_not_run", counting_and_listing_walks_agree_and_a_phase_wider_than_the_buffer_is_not_run as fn()),
+        ("the_pass_ticks_every_task_in_the_schedulers_order_and_is_whole", the_pass_ticks_every_task_in_the_schedulers_order_and_is_whole as fn()),
+        ("each_phase_is_read_again_right_before_its_ticks", each_phase_is_read_again_right_before_its_ticks as fn()),
+        ("the_pass_stops_between_ticks_once_the_practice_is_no_longer_live", the_pass_stops_between_ticks_once_the_practice_is_no_longer_live as fn()),
+    ]);
 }
 }

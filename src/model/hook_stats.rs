@@ -489,7 +489,6 @@ mod tests {
     lib_unit_tests! {
     use super::*;
 
-    #[test]
     fn every_hook_has_a_unique_name_in_index_order() {
         for (i, id) in HookId::ALL.iter().enumerate() {
             assert_eq!(*id as usize, i);
@@ -497,7 +496,6 @@ mod tests {
         }
     }
 
-    #[test]
     fn a_per_load_allocation_is_counted_apart_from_the_steady_state_ones() {
         // The host test binary has no counting allocator, so drive the counting rule directly.
         let (hooks, loads) = (hook_allocations(), load_allocations());
@@ -510,7 +508,6 @@ mod tests {
         assert_eq!((hook_allocations(), load_allocations()), (hooks + 1, loads + 1), "a hook allocation outside per_load is the steady-state kind");
     }
 
-    #[test]
     fn a_quiet_sample_reports_nothing_and_an_active_one_reports_once() {
         let mut observer = Observer::new();
         let quiet = Snapshot { allocations: 0, entries: [0; HOOK_COUNT], allocs: [0; HOOK_COUNT] };
@@ -522,6 +519,16 @@ mod tests {
         assert!(first.covered(HookId::ResetCheck) && !first.covered(HookId::HazardRule));
         assert_eq!(first.to_string(), "[TrainingRooms] hook_stats allocations=0 delta=0 hook_calls=3 hooks=reset_check:3");
         assert!(observer.observe(busy).is_none(), "nothing new since the report");
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("every_hook_has_a_unique_name_in_index_order", every_hook_has_a_unique_name_in_index_order as fn()),
+            ("a_per_load_allocation_is_counted_apart_from_the_steady_state_ones", a_per_load_allocation_is_counted_apart_from_the_steady_state_ones as fn()),
+            ("a_quiet_sample_reports_nothing_and_an_active_one_reports_once", a_quiet_sample_reports_nothing_and_an_active_one_reports_once as fn()),
+        ]);
     }
     }
 }

@@ -136,13 +136,11 @@ mod tests {
     lib_unit_tests! {
     use super::*;
 
-    #[test]
     fn the_manager_slot_decodes_from_the_pass_words() {
         let slot = decode_adrp_ldr(UI_MANAGER_GLOBAL_OFFSET as u64, UI_MANAGER_ADRP_LDR[0], UI_MANAGER_ADRP_LDR[1]);
         assert_eq!(slot, Some(UI_MANAGER_SLOT_OFFSET as u64));
     }
 
-    #[test]
     fn the_decode_refuses_other_words_and_other_registers() {
         assert_eq!(decode_adrp_ldr(0, 0xd503_201f, UI_MANAGER_ADRP_LDR[1]), None);
         assert_eq!(decode_adrp_ldr(0, UI_MANAGER_ADRP_LDR[0], 0xd503_201f), None);
@@ -150,13 +148,22 @@ mod tests {
         assert_eq!(decode_adrp_ldr(0, UI_MANAGER_ADRP_LDR[0], (UI_MANAGER_ADRP_LDR[1] & !0x3e0) | (27 << 5)), None);
     }
 
-    #[test]
     fn every_row_is_a_hook_or_a_relied_word_of_the_ui_feature() {
         for site in &UI_SITES {
             assert_eq!(site.feature, Feature::Ui);
         }
         assert_eq!(UI_SITES.iter().filter(|s| matches!(s.kind, SeamKind::Hook { .. })).count(), 3);
         assert_eq!(UI_SITES.iter().filter(|s| matches!(s.kind, SeamKind::Called)).count(), 2);
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("the_manager_slot_decodes_from_the_pass_words", the_manager_slot_decodes_from_the_pass_words as fn()),
+            ("the_decode_refuses_other_words_and_other_registers", the_decode_refuses_other_words_and_other_registers as fn()),
+            ("every_row_is_a_hook_or_a_relied_word_of_the_ui_feature", every_row_is_a_hook_or_a_relied_word_of_the_ui_feature as fn()),
+        ]);
     }
     }
 }

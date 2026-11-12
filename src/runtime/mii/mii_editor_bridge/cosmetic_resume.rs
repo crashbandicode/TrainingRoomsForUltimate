@@ -525,3 +525,200 @@ pub(super) unsafe fn poll_voice(context: usize, wanted: VoiceSelection) -> Poll 
     }
 }
 
+#[cfg(test)]
+mod tests {
+    lib_unit_tests! {
+    use super::*;
+
+    fn existing_screens_and_test_preview_stay() {
+        assert_eq!(leaf(3, None), Leaf::Settings);
+        assert_eq!(leaf(4, None), Leaf::Name);
+        assert_eq!(leaf(8, None), Leaf::Specials);
+        assert_eq!(leaf(10, None), Leaf::Test);
+        assert_eq!(leaf(11, Some(10)), Leaf::Test);
+        assert_eq!(leaf(11, None), Leaf::Test);
+        assert_eq!(leaf(11, Some(3)), Leaf::Test);
+    }
+
+    fn cosmetic_pages_are_their_own_states() {
+        assert_eq!(leaf(5, Some(3)), Leaf::Headgear);
+        assert_eq!(leaf(6, Some(3)), Leaf::Outfit);
+        assert_eq!(leaf(7, Some(3)), Leaf::Color);
+        assert_eq!(leaf(9, Some(3)), Leaf::Voice);
+        assert_eq!(leaf(11, Some(9)), Leaf::Voice);
+    }
+
+    fn selections_reject_commit_shaped_or_untagged_values() {
+        let live = HAT_TAG | 0x11;
+        let paired = HAT_TAG | 0x22;
+        assert_eq!(gear(4, 0, live, paired), Some(GearSelection { cursor: 4, sort: 0, live, paired }));
+        assert_eq!(gear(4, 0, 0x11, paired), None, "untagged id is not a hat or outfit");
+        let outfit_live = 0x13002b147bc59435;
+        let outfit_paired = 0x1300291cce3b03f5;
+        assert_eq!(gear(4, 0, outfit_live, outfit_paired).map(|gear| (gear.live, gear.paired)),
+            Some((outfit_live, outfit_paired)));
+        assert_eq!(gear(4, 0, 0x13ffff0000000000, outfit_paired), None, "outfit sentinel is not a row");
+        assert_eq!(gear(GEAR_CURSOR_MAX + 1, 0, live, paired), None);
+        assert_eq!(gear(4, SORT_MAX + 1, live, paired), None);
+        assert_eq!(color(11, 0, 11, u32::MAX), Some(ColorSelection { cursor: 11, paired: 0 }));
+        assert_eq!(color(3, 99, 3, u32::MAX), None);
+        assert_eq!(color(3, 5, 3, 3), None, "native confirmation is already in progress");
+        assert_eq!(color(12, 0, 12, u32::MAX), None);
+        assert_eq!(color(7, 5, 6, u32::MAX), None, "highlight without its source index");
+        assert_eq!(voice(3, 1, 2), Some(VoiceSelection { cursor: 3, voice_type: 1, voice_pitch: 2 }));
+        assert_eq!(voice(-1, 1, 2), None);
+        assert_eq!(gear_item(7), Some(7));
+        assert_eq!(gear_item(0), Some(0));
+        assert_eq!(gear_item(-1), None);
+    }
+
+    fn gear_ready_needs_the_sort_the_index_and_the_tagged_id() {
+        let live = HAT_TAG | 0x11;
+        let other = HAT_TAG | 0x33;
+        let equipped = HAT_TAG | 0x22;
+        let wanted = gear(4, 1, live, equipped).expect("wanted");
+        assert!(!gear_row_ready(false, wanted, wanted));
+        assert!(gear_row_ready(true, wanted, wanted));
+        assert!(!gear_row_ready(true, gear(0, 1, live, equipped).expect("index"), wanted));
+        assert!(!gear_row_ready(true, gear(4, 0, live, equipped).expect("sort"), wanted));
+        assert!(!gear_row_ready(true, gear(4, 1, other, equipped).expect("id"), wanted));
+        assert!(!gear_row_ready(true, gear(4, 1, live, HAT_TAG | 0x44).expect("equipped"), wanted));
+    }
+
+    fn open_headgear_keeps_the_preview_id_and_a_closed_page_does_not() {
+        // Run109 component 0x11fdc49880 while 1-Up was highlighted and unconfirmed.
+        // `+0x148`/`+0x150` were the equipped default. `+0x140` was the other tagged id.
+        // `+0x164` was 0. `+0xe8` was 1 and byte `+0x168` was 0.
+        const PREVIEW: u64 = 0x5a000114d6b13212;
+        const EQUIPPED: u64 = 0x5a00000fa9efa5ea;
+        match gear_window(1, 0, PREVIEW, EQUIPPED) {
+            GearWindow::Open(selection) => {
+                assert_eq!(selection.live, PREVIEW);
+                assert_eq!(selection.paired, EQUIPPED);
+                assert_ne!(selection.live, selection.paired);
+                // Scroller index and sort are filled by the page read, not here.
+                assert_eq!(selection.cursor, 0);
+                assert_eq!(selection.sort, 0);
+            }
+            other => panic!("open page did not keep the preview: {:?}", other),
+        }
+        // Highlight still on the equipped hat: the preview id is that hat, not a cancel.
+        match gear_window(1, 0, EQUIPPED, EQUIPPED) {
+            GearWindow::Open(selection) => assert_eq!(selection.live, EQUIPPED),
+            other => panic!("equipped highlight was dropped: {:?}", other),
+        }
+        assert_eq!(gear_window(1, 1, PREVIEW, EQUIPPED), GearWindow::Deciding);
+        assert_eq!(gear_window(0, 0, 0, 0), GearWindow::Closed);
+        assert_eq!(gear_window(2, 0, PREVIEW, EQUIPPED), GearWindow::Pending);
+        assert_eq!(gear_window(1, 0, 0, EQUIPPED), GearWindow::Unreadable);
+        assert_eq!(gear_window(1, 0, 0x5affff0000000000, EQUIPPED), GearWindow::Unreadable);
+        // Pirate Outfit, unconfirmed. Top 16 bits are 0x1300, not the hat tag.
+        const OUTFIT_PREVIEW: u64 = 0x13002b147bc59435;
+        const OUTFIT_EQUIPPED: u64 = 0x1300291cce3b03f5;
+        match gear_window(1, 0, OUTFIT_PREVIEW, OUTFIT_EQUIPPED) {
+            GearWindow::Open(selection) => {
+                assert_eq!(selection.live, OUTFIT_PREVIEW);
+                assert_eq!(selection.paired, OUTFIT_EQUIPPED);
+            }
+            other => panic!("open outfit was dropped: {:?}", other),
+        }
+        assert_eq!(gear_window(1, 0, 0x13ffff0000000000, OUTFIT_EQUIPPED), GearWindow::Unreadable);
+    }
+
+    fn color_highlight_requires_the_same_source_index() {
+        // Cyan was highlight 6 and pink was 7. Equipped blue stayed 5 at +0xdc.
+        // Selector +0x25c stays the captured decided word. -1 is all bits set.
+        let cyan = color(6, 5, 6, u32::MAX).expect("cyan");
+        let pink = color(7, 5, 7, u32::MAX).expect("pink");
+        assert_eq!(cyan.cursor, 6);
+        assert_eq!(pink.cursor, 7);
+        assert_eq!(cyan.paired, 5);
+        assert_eq!(pink.paired, 5);
+        assert_ne!(cyan.cursor, cyan.paired);
+        assert_eq!(color(7, 5, 5, u32::MAX), None);
+        assert_ne!(pink, color(7, 6, 7, u32::MAX).expect("equipped changed"));
+        assert_eq!(color(7, 5, 7, 5), None, "decided source is not an unfinished highlight");
+    }
+
+    fn random_is_not_a_child_state() {
+        assert_eq!(leaf(3, None), Leaf::Settings);
+        assert_ne!(leaf(3, None), Leaf::Headgear);
+    }
+
+    fn checkpoint_keeps_the_equipped_id_when_the_packed_field_is_the_preview() {
+        let preview = HAT_TAG | 0x111;
+        let equipped = HAT_TAG | 0x222;
+        let outfit = OUTFIT_TAG | 0x333;
+        let selected_gear = gear(4, 0, preview, equipped).expect("row");
+        let mut row = vec![0u8; 0x140];
+        row[0x130..0x138].copy_from_slice(&outfit.to_le_bytes());
+        row[0x138..0x140].copy_from_slice(&preview.to_le_bytes());
+        keep_equipped_part(&mut row, true, selected_gear);
+        let at = |row: &[u8], offset: usize| {
+            let mut bytes = [0u8; 8];
+            bytes.copy_from_slice(&row[offset..offset + 8]);
+            u64::from_le_bytes(bytes)
+        };
+        assert_eq!(at(&row, 0x138), equipped);
+        assert_eq!(at(&row, 0x130), outfit);
+        keep_equipped_part(&mut row, true, selected_gear);
+        assert_eq!(at(&row, 0x138), equipped);
+        row[0x138..0x140].copy_from_slice(&(HAT_TAG | 0x444).to_le_bytes());
+        keep_equipped_part(&mut row, true, selected_gear);
+        assert_eq!(at(&row, 0x138), HAT_TAG | 0x444);
+        let outfit_gear = gear(2, 0, outfit, OUTFIT_TAG | 0x555).expect("outfit");
+        row[0x130..0x138].copy_from_slice(&outfit.to_le_bytes());
+        keep_equipped_part(&mut row, false, outfit_gear);
+        assert_eq!(at(&row, 0x130), OUTFIT_TAG | 0x555);
+        assert_eq!(at(&row, 0x138), HAT_TAG | 0x444);
+        let same = gear(1, 0, equipped, equipped).expect("same");
+        row[0x138..0x140].copy_from_slice(&equipped.to_le_bytes());
+        keep_equipped_part(&mut row, true, same);
+        assert_eq!(at(&row, 0x138), equipped);
+        keep_equipped_part(&mut [], true, selected_gear);
+    }
+
+    fn checkpoint_keeps_the_equipped_color_when_the_packed_byte_is_the_preview() {
+        let selected = color(7, 5, 7, u32::MAX).expect("pink");
+        let mut row = vec![0u8; 0x142];
+        row[0x130] = 0x11;
+        row[0x140] = 7;
+        row[0x141] = 37;
+        keep_equipped_color(&mut row, selected);
+        assert_eq!(row[0x140], 5);
+        assert_eq!(row[0x141], 37);
+        assert_eq!(row[0x130], 0x11);
+        keep_equipped_color(&mut row, selected);
+        assert_eq!(row[0x140], 5);
+        row[0x140] = 6;
+        keep_equipped_color(&mut row, selected);
+        assert_eq!(row[0x140], 6);
+        let same = color(5, 5, 5, u32::MAX).expect("blue");
+        row[0x140] = 7;
+        keep_equipped_color(&mut row, same);
+        assert_eq!(row[0x140], 7);
+        row[0x140] = 5;
+        keep_equipped_color(&mut row, same);
+        assert_eq!(row[0x140], 5);
+        keep_equipped_color(&mut [], selected);
+        assert_eq!(row[0x141], 37);
+    }
+
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("existing_screens_and_test_preview_stay", existing_screens_and_test_preview_stay as fn()),
+            ("cosmetic_pages_are_their_own_states", cosmetic_pages_are_their_own_states as fn()),
+            ("selections_reject_commit_shaped_or_untagged_values", selections_reject_commit_shaped_or_untagged_values as fn()),
+            ("gear_ready_needs_the_sort_the_index_and_the_tagged_id", gear_ready_needs_the_sort_the_index_and_the_tagged_id as fn()),
+            ("open_headgear_keeps_the_preview_id_and_a_closed_page_does_not", open_headgear_keeps_the_preview_id_and_a_closed_page_does_not as fn()),
+            ("color_highlight_requires_the_same_source_index", color_highlight_requires_the_same_source_index as fn()),
+            ("random_is_not_a_child_state", random_is_not_a_child_state as fn()),
+            ("checkpoint_keeps_the_equipped_id_when_the_packed_field_is_the_preview", checkpoint_keeps_the_equipped_id_when_the_packed_field_is_the_preview as fn()),
+            ("checkpoint_keeps_the_equipped_color_when_the_packed_byte_is_the_preview", checkpoint_keeps_the_equipped_color_when_the_packed_byte_is_the_preview as fn()),
+        ]);
+    }
+    }
+}

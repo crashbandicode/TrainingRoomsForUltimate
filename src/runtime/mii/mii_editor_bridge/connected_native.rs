@@ -371,3 +371,46 @@ pub(super) unsafe fn interrupt_editor(
     None
 }
 
+#[cfg(test)]
+mod tests {
+    lib_unit_tests! {
+    use super::{local_wireless_parent_waiting, LOCAL_WIRELESS_PARENT, QUICKPLAY_PARENT, revealed_preview_level};
+
+    fn preview_wait_pops_one_level_only_while_state_11_is_current() {
+        assert_eq!(revealed_preview_level(11, 2, 11), Some(1));
+        assert_eq!(revealed_preview_level(11, 1, 11), Some(0));
+        assert_eq!(revealed_preview_level(11, 18, 11), Some(17));
+        // The handler's `b.lt` leaves a zero level in place.
+        assert_eq!(revealed_preview_level(11, 0, 11), None);
+        assert_eq!(revealed_preview_level(11, 19, 11), None);
+        // Voice and Test themselves are not this pop.
+        assert_eq!(revealed_preview_level(9, 2, 9), None);
+        assert_eq!(revealed_preview_level(10, 2, 10), None);
+        // A stale top slot is not the waiter, even if the state word says 11.
+        assert_eq!(revealed_preview_level(11, 2, 9), None);
+    }
+
+    fn local_wireless_parent_is_not_quickplay_state_8() {
+        assert_ne!(LOCAL_WIRELESS_PARENT, QUICKPLAY_PARENT);
+        // Run107 waiting: level 0, state 6, stack top 6.
+        assert!(local_wireless_parent_waiting(0, 6, 6));
+        assert!(local_wireless_parent_waiting(18, 6, 6));
+        // Quickplay's parent state must not open this owner.
+        assert!(!local_wireless_parent_waiting(0, 8, 8));
+        // The child controller's slot 3 is not this parent's top.
+        assert!(!local_wireless_parent_waiting(0, 6, 3));
+        assert!(!local_wireless_parent_waiting(0, 5, 5));
+        assert!(!local_wireless_parent_waiting(0x13, 6, 6));
+        assert!(!local_wireless_parent_waiting(-1, 6, 6));
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("preview_wait_pops_one_level_only_while_state_11_is_current", preview_wait_pops_one_level_only_while_state_11_is_current as fn()),
+            ("local_wireless_parent_is_not_quickplay_state_8", local_wireless_parent_is_not_quickplay_state_8 as fn()),
+        ]);
+    }
+    }
+}

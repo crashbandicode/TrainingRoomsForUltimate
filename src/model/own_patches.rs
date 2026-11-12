@@ -95,7 +95,6 @@ mod tests {
         }
     }
 
-    #[test]
     fn our_own_hook_reads_stock_while_booting_and_after_the_record() {
         let original = text(0x200);
         let mut live = original.clone();
@@ -116,7 +115,6 @@ mod tests {
         }
     }
 
-    #[test]
     fn another_plugins_patch_is_never_put_back() {
         let original = text(0x200);
         let site = 0x40;
@@ -142,7 +140,6 @@ mod tests {
         assert_eq!(unpatch(site, &window(&live, site), [far]).1, 0);
     }
 
-    #[test]
     fn a_nop_aligned_far_jump_and_a_one_word_patch_are_put_back_exactly() {
         let original = text(0x200);
         let mut live = original.clone();
@@ -160,6 +157,16 @@ mod tests {
         // A window that covers the far jump's tail and the patched word's site.
         let (seen, n) = unpatch(0x50, &window(&live, 0x50), patches);
         assert_eq!((seen, n), (window(&original, 0x50), 2));
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("our_own_hook_reads_stock_while_booting_and_after_the_record", our_own_hook_reads_stock_while_booting_and_after_the_record as fn()),
+            ("another_plugins_patch_is_never_put_back", another_plugins_patch_is_never_put_back as fn()),
+            ("a_nop_aligned_far_jump_and_a_one_word_patch_are_put_back_exactly", a_nop_aligned_far_jump_and_a_one_word_patch_are_put_back_exactly as fn()),
+        ]);
     }
     }
 }

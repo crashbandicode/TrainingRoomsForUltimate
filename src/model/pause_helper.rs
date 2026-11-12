@@ -135,3 +135,112 @@ impl<const N: usize> Ledger<N> {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    lib_unit_tests! {
+    use super::*;
+
+    fn facts(phase: u8, mark: u32, actor: u64) -> EntryFacts {
+        EntryFacts { phase, mark, actor }
+    }
+
+    fn the_exit_loop_walks_exactly_what_0x1558f84_walks() {
+        assert!(facts(0, 0x5000_0000, 0).walked(), "a fresh created entry (phase 0) is walked");
+        assert!(facts(6, 0x5000_0000, 0x1234).walked(), "an active entry (phase 6) is walked");
+        assert!(!facts(3, 0x5000_0000, 0).walked(), "phase 3 (Reload) is skipped by the loop");
+        assert!(!facts(0, 0, 0).walked(), "no live mark: skipped");
+        assert!(!facts(0, 0x4000_0000, 0).walked(), "another mark: skipped");
+    }
+
+    fn only_a_walked_entry_without_an_actor_is_exposed() {
+        assert!(facts(0, 0x5000_0000, 0).exposed(), "the b4t case: created, walked, no actor");
+        assert!(!facts(0, 0x5000_0000, 0x11a7108600).exposed(), "its actor is installed");
+        assert!(!facts(3, 0x5000_0000, 0).exposed(), "a hat Reload at phase 3 is not walked");
+        assert!(!facts(0, 0, 0).exposed());
+    }
+
+    fn a_retire_completes_once_both_native_callbacks_arrived_in_either_order() {
+        let mut ledger = Ledger::<6>::new();
+        assert!(ledger.begin(1, 0x11c60aa000));
+        assert!(!ledger.destroyed(1, 0x11c60aa000), "owner cleanup still to come");
+        assert!(ledger.owner_retired(1), "both arrived: create it again");
+        assert!(!ledger.owner_retired(1), "already complete");
+        assert!(ledger.begin(0, 0x11c60a4000));
+        assert!(!ledger.owner_retired(0), "the owner can retire first");
+        assert!(ledger.destroyed(0, 0x11c60a4000));
+    }
+
+    fn callbacks_for_other_entries_and_idle_slots_change_nothing() {
+        let mut ledger = Ledger::<6>::new();
+        assert!(!ledger.destroyed(1, 0x10), "an idle slot: an ordinary destruction");
+        assert!(!ledger.owner_retired(1), "an idle slot: an ordinary owner cleanup");
+        assert!(ledger.begin(1, 0x20));
+        assert!(!ledger.destroyed(1, 0x30), "another entry in that slot");
+        assert!(!ledger.owner_retired(1));
+        assert!(ledger.destroyed(1, 0x20), "still waiting for 0x20, then complete");
+        assert!(!ledger.destroyed(9, 0x20) && !ledger.owner_retired(9), "out of range never panics");
+    }
+
+    fn a_slot_mid_retire_is_not_retired_again_and_a_refusal_undoes_the_begin() {
+        let mut ledger = Ledger::<6>::new();
+        assert!(ledger.begin(2, 0x40));
+        assert!(!ledger.begin(2, 0x40), "two pauses before the callbacks: one native retire");
+        assert!(!ledger.begin(2, 0x50));
+        assert!(!ledger.begin(6, 0x40), "out of range");
+        assert!(!ledger.begin(3, 0), "a null entry is never retired");
+        ledger.refused(2);
+        ledger.refused(9);
+        assert!(ledger.begin(2, 0x40), "a later pause can retire it");
+    }
+
+    fn only_the_bound_live_empty_owner_is_reused() {
+        let owner = Owner { resource: 0x1180, alias: 0x1180, vtable: true, header: u32::MAX };
+        assert!(owner.reusable(0x1180), "the summon-removal case: owner kept, empty");
+        assert!(!owner.reusable(0x2200), "another owner is bound to the claim");
+        assert!(!owner.reusable(0), "no bound owner");
+        assert!(!Owner { resource: 0, alias: 0, ..owner }.reusable(0x1180), "the owner was cleaned up: create a new one");
+        assert!(!Owner { alias: 0, ..owner }.reusable(0x1180), "0x4eb6a0 would create a new owner over it");
+        assert!(!Owner { vtable: false, ..owner }.reusable(0x1180));
+        assert!(!Owner { header: 0x5c, ..owner }.reusable(0x1180), "a header kind: not the empty owner creation checks");
+    }
+
+    fn a_reused_owner_completes_the_retire_on_the_destructor_alone() {
+        let mut ledger = Ledger::<6>::new();
+        assert!(!ledger.retiring(1, 0x20) && !ledger.reused(1, 0x20), "an ordinary destruction is not a retire");
+        assert!(ledger.begin(1, 0x20));
+        assert!(ledger.retiring(1, 0x20) && !ledger.retiring(1, 0x30) && !ledger.retiring(9, 0x20));
+        assert!(!ledger.reused(1, 0x30), "another entry");
+        assert!(ledger.reused(1, 0x20), "complete: the slot is created again with its owner");
+        assert!(!ledger.retiring(1, 0x20) && !ledger.owner_retired(1), "the departure's owner cleanup is ordinary again");
+    }
+
+    /// The b4t sequence end to end: a helper is created, a pause opens inside its no-actor window, the entry is
+    /// retired before the walk; with its owner kept the slot is created again at once (or, without a reusable owner,
+    /// once the owner cleanup arrives) and its actor arrives later.
+    fn the_b4t_window_is_retired_at_pause_open_and_recreated() {
+        let mut ledger = Ledger::<6>::new();
+        assert!(facts(0, 0x5000_0000, 0).exposed());
+        assert!(ledger.begin(1, 0x11c60aa000));
+        assert!(ledger.reused(1, 0x11c60aa000), "the destructor runs inside the retire; the owner is kept");
+        assert!(ledger.begin(1, 0x11c60b0000), "the re-created entry, caught by a later pause");
+        assert!(!ledger.destroyed(1, 0x11c60b0000), "no reusable owner: wait for its cleanup");
+        assert!(ledger.owner_retired(1), "owner cleanup: create again");
+        assert!(!facts(0, 0x5000_0000, 0x11a7108600).exposed(), "the recreated helper's actor arrives");
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("the_exit_loop_walks_exactly_what_0x1558f84_walks", the_exit_loop_walks_exactly_what_0x1558f84_walks as fn()),
+            ("only_a_walked_entry_without_an_actor_is_exposed", only_a_walked_entry_without_an_actor_is_exposed as fn()),
+            ("a_retire_completes_once_both_native_callbacks_arrived_in_either_order", a_retire_completes_once_both_native_callbacks_arrived_in_either_order as fn()),
+            ("callbacks_for_other_entries_and_idle_slots_change_nothing", callbacks_for_other_entries_and_idle_slots_change_nothing as fn()),
+            ("a_slot_mid_retire_is_not_retired_again_and_a_refusal_undoes_the_begin", a_slot_mid_retire_is_not_retired_again_and_a_refusal_undoes_the_begin as fn()),
+            ("only_the_bound_live_empty_owner_is_reused", only_the_bound_live_empty_owner_is_reused as fn()),
+            ("a_reused_owner_completes_the_retire_on_the_destructor_alone", a_reused_owner_completes_the_retire_on_the_destructor_alone as fn()),
+            ("the_b4t_window_is_retired_at_pause_open_and_recreated", the_b4t_window_is_retired_at_pause_open_and_recreated as fn()),
+        ]);
+    }
+    }
+}

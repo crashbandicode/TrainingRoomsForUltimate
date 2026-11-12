@@ -1115,3 +1115,185 @@ pub const fn spec(index: usize) -> Spec {
 pub fn specs() -> Vec<Spec> {
     (0..COUNT).map(spec).collect()
 }
+#[cfg(test)]
+mod tests {
+    lib_unit_tests! {
+    use super::*;
+
+    fn names_are_unique_and_fit_the_bflyt_limit() {
+        let all = specs();
+        for (i, a) in all.iter().enumerate() {
+            assert!(a.name.as_bytes().len() <= 24 && !a.name.as_bytes().is_empty());
+            // The layout builder and the resolver read names as text: every byte must be printable ASCII
+            // (2026-11-04: the roster marks' one-digit `name2` slot produced bytes above '9', invalid text).
+            assert!(a.name.as_bytes().iter().all(|c| c.is_ascii_alphanumeric() || *c == b'_'), "pane {i} has a non-text name {:?}", a.name.as_bytes());
+            for b in &all[i + 1..] {
+                assert_ne!(a.name.as_str(), b.name.as_str(), "{:?} is listed twice", a.name);
+            }
+        }
+        assert_ne!(ROOT, name_of(IDX_BG));
+        assert_eq!(all.len(), COUNT);
+        for i in 0..COUNT {
+            assert_eq!(all.iter().filter(|s| s.name == name_of(i)).count(), 1, "{i}");
+        }
+        for i in IDX_ITEM_ICON..IDX_ITEM_ICON + ITEM_ICONS {
+            assert!(i < MENU_COUNT, "item pictures must be resolved in the menu pointer array");
+            assert_eq!(spec(i).parent, ROOT);
+            assert!(!spec(i).visible);
+        }
+        // P0 2026-11-04: the roster grid's marks are drawn through the menu pointer array too.
+        for i in IDX_TILE_BADGE..IDX_TILE_SOLO + 2 {
+            assert!(i < MENU_COUNT, "roster mark {i} must be resolved in the menu pointer array");
+            assert_eq!(spec(i).parent, ROOT, "resolved under the menu container, by name");
+            assert!(!spec(i).visible);
+        }
+        for i in IDX_FLOPPY..MENU_COUNT {
+            assert!(i < MENU_COUNT, "recording mark {i} must be resolved in the menu pointer array");
+            assert_eq!(spec(i).parent, ROOT, "resolved under the menu container, by name");
+            assert!(!spec(i).visible);
+        }
+        assert_eq!(IDX_NOTICE, MENU_COUNT, "the input package's panes follow the menu's block");
+    }
+
+    /// Eden rc6-covrec-diag1 (2026-11-08): the pop-up's black panel was narrower and shorter than what the pop-up
+    /// draws, so the row highlight and the MACROS loop count ran onto the stage, and the tabs, help and hint sat
+    /// outside it. Primary 2026-11-08 13:05Z: the r8 mockup decides, and there everything is inside the panel.
+    fn the_popup_panel_encloses_its_tabs_rows_help_and_hint() {
+        let (half_w, half_h) = (POPUP_W / 2.0, POPUP_H / 2.0);
+        let drawn = [IDX_TAB_HI, IDX_TAB, IDX_TITLE, IDX_SEP, IDX_CRUMB, IDX_ROW_HI, IDX_ROW, IDX_ROW + 1,
+            IDX_ROW + 2 * (ROWS - 1), IDX_ROW + 2 * (ROWS - 1) + 1, IDX_SEP_HELP, IDX_HELP, IDX_HELP + 1, IDX_HINT];
+        for index in drawn {
+            let s = spec(index);
+            assert!(s.x - s.w / 2.0 >= -half_w && s.x + s.w / 2.0 <= half_w, "{} leaves the panel sideways", s.name.as_str());
+            assert!(s.y - s.h / 2.0 >= -half_h && s.y + s.h / 2.0 <= half_h, "{} leaves the panel", s.name.as_str());
+        }
+        // A loop count and a floppy are drawn left of the row's right end (`frame::p_row_x`), inside the highlight.
+        assert!(ROW_RIGHT <= half_w);
+    }
+
+    fn the_pane_table_fits_with_the_stick_row() {
+        let walk = include_str!("../../runtime/ui/pane.rs");
+        let limit = walk
+            .lines()
+            .find(|line| line.contains("const WALK_LIMIT"))
+            .and_then(|line| line.split('=').nth(1))
+            .and_then(|rest| rest.trim().trim_end_matches(';').parse::<usize>().ok())
+            .expect("WALK_LIMIT");
+        assert_eq!(limit, 4096);
+        assert_eq!(iv::at::COUNT - iv::at::STICK, iv::WINDOW, "one stick pane per frame");
+        assert_eq!(iv::COUNT, 181);
+        // The merged table already contains the stick row, the twelve recording icons and the
+        // recording chrome (green plates, hairline, outlines, white cursor).
+        assert_eq!(FLOPPIES + LOOPS, 12);
+        assert_eq!(CHROME, 26);
+        assert_eq!(name_of(IDX_FLOPPY).as_str(), "tr_floppy_00");
+        assert_eq!(name_of(IDX_LOOP - 1).as_str(), "tr_floppy_09");
+        assert_eq!(name_of(IDX_LOOP).as_str(), "tr_loop_00");
+        assert_eq!(name_of(IDX_SUB - 1).as_str(), "tr_loop_01");
+        // The r8 pop-up's sublines and CONNECTIONS column (primary 2026-11-08 #19, #49).
+        let r8 = SUBS + 2 + CONN_LINES;
+        assert_eq!(r8, 28);
+        assert_eq!(name_of(IDX_SUB).as_str(), "tr_sub_00");
+        assert_eq!(name_of(IDX_CONN_BOX - 1).as_str(), "tr_conn_13");
+        // The r8 tree (boxes, pills, stem and ticks) and the role tabs (primary 2026-11-08 15:55Z).
+        let r8_drawn = 4 * CONN_BOXES + 2 * CONN_BOXES + CONN_TREE + 8;
+        assert_eq!(r8_drawn, 50);
+        assert_eq!(name_of(IDX_ROLE_KEY + 1).as_str(), "tr_rkey_01");
+        // The header squares, the order badges and the boxed page tabs (primary 2026-11-08 16:51Z).
+        let r8_lists = 2 + 2 * BADGES + 4 * TAB_BOXES;
+        assert_eq!(r8_lists, 26);
+        assert_eq!(name_of(IDX_HEAD_SQ).as_str(), "tr_hsq_00");
+        assert_eq!(name_of(IDX_BADGE).as_str(), "tr_obg_00");
+        assert_eq!(name_of(IDX_BADGE_NUM + BADGES - 1).as_str(), "tr_obn_07");
+        assert_eq!(name_of(MENU_COUNT - 1).as_str(), "tr_tbx_07");
+        assert!(COUNT < limit, "plugin table {COUNT} exceeds the walk {limit}");
+        // rc.6: the sequence bar's header, chips and arrows (`cb::at::SEQ_BACKDROP..`).
+        let sequence_bar = cb::COUNT - cb::at::SEQ_BACKDROP;
+        assert_eq!(sequence_bar, 35);
+        assert_eq!(COUNT, 1424 + CHROME + r8 + r8_drawn + r8_lists + sequence_bar);
+        assert_eq!(limit - COUNT, 2672 - CHROME - r8 - r8_drawn - r8_lists - sequence_bar);
+        let strip_tree = iv::COUNT + cb::COUNT;
+        assert!(strip_tree <= limit, "the strip walk, combo bar included, is {strip_tree}");
+        let first = spec(IDX_IV + iv::at::STICK);
+        let last = spec(IDX_IV + iv::at::COUNT - 1);
+        assert_eq!(first.name.as_str(), "TrIvSk00");
+        assert_eq!(last.name.as_str(), "TrIvSk59");
+        assert_eq!(first.parent.as_str(), "TrIv");
+        assert_eq!(last.parent.as_str(), "TrIv");
+        assert!(!first.visible);
+    }
+
+    /// The r8 mockup (`RECORDING-REDESIGN-r8-popup-combo.png`): the lists on the left, CONNECTIONS on the right, a rule
+    /// between them, everything inside the panel and above the help; a row's subline stays inside its plate.
+    fn the_popup_has_the_r8_two_columns() {
+        const { assert!(POP_ROW_RIGHT < CONN_DIVIDER_X && CONN_DIVIDER_X < CONN_LEFT, "the list, the rule, CONNECTIONS") };
+        const { assert!(POP_ROW_LEFT >= -POPUP_W / 2.0 && CONN_RIGHT <= POPUP_W / 2.0) };
+        let help_top = HELP_Y[0] + 48.0;
+        for index in [IDX_CONN_HEAD, IDX_CONN, IDX_CONN + CONN_LINES - 1, IDX_CONN_DIV] {
+            let s = spec(index);
+            assert!(s.x - s.w / 2.0 >= CONN_DIVIDER_X - 2.0 && s.x + s.w / 2.0 <= CONN_RIGHT, "{:?} is in the right column", s.name);
+            assert!(s.y - s.h / 2.0 > help_top && s.y + s.h / 2.0 <= ROW_FIRST_Y + ROW_H, "{:?} is above the help", s.name);
+        }
+        for row in 0..ROWS {
+            let sub = spec(IDX_SUB + row);
+            assert!(sub.x + sub.w / 2.0 <= POP_ROW_RIGHT, "a subline stays in the list column");
+            let plate_bottom = row_y(row) - ROW_H / 2.0;
+            assert!(sub.y - SUB_H / 2.0 >= plate_bottom - 2.0, "row {row}'s subline stays on its plate");
+        }
+        assert!(row_label_left(true) + row_label_w(true) <= POP_ROW_RIGHT - row_value_w(true), "the name ends before the value");
+        // The role tabs and their key caps sit on the title line inside the panel, right of "Recording".
+        for index in [IDX_ROLE_BG, IDX_ROLE_HI, IDX_ROLE, IDX_ROLE + 1, IDX_ROLE_CAP, IDX_ROLE_CAP + 1] {
+            let s = spec(index);
+            assert!(s.x - s.w / 2.0 >= 0.0 && s.x + s.w / 2.0 <= POPUP_W / 2.0, "{:?} sits right of the title", s.name);
+            assert!((s.y - TAB_Y).abs() < 1.0, "{:?} is on the title line", s.name);
+        }
+        // The page tabs go under the title line and stay clear of the first row.
+        assert!(POP_TAB_Y - TAB_H / 2.0 >= row_y(0) + ROW_H / 2.0 && POP_TAB_Y + TAB_H / 2.0 <= TAB_Y - ROLE_H / 2.0);
+        // A box's pill and a joined file's indent fit the column.
+        assert!(CONN_LEFT + CONN_INDENT + 8.0 + pill_w(10) + 120.0 <= CONN_RIGHT, "a SAVE STATE pill and a name fit");
+        assert!(row_label_left(false) + row_label_w(false) <= ROW_RIGHT - row_value_w(false) + 1.0, "the page is unchanged");
+        // A badge sits at the row's left edge, before the name; a header's mark sits before the header's name.
+        const { assert!(BADGE_X + BADGE_W / 2.0 <= POP_ROW_LEFT + POP_LABEL_INSET && BADGE_X - BADGE_W / 2.0 >= POP_ROW_LEFT) };
+        const { assert!(HEAD_MARK_X + 14.0 <= POP_ROW_LEFT + POP_LABEL_INSET && HEAD_MARK_X - 14.0 >= POP_ROW_LEFT) };
+        for index in [IDX_HEAD_SQ, IDX_BADGE, IDX_BADGE_NUM] {
+            assert!(!spec(index).visible, "{:?} is hidden until drawn", spec(index).name);
+        }
+    }
+
+    fn the_linear_conversion_darkens_and_keeps_alpha() {
+        assert_eq!(linear([0, 255, 128, 77]), [0, 255, 55, 77]);
+        assert!(linear([8, 10, 14, 236])[0] <= 1);
+    }
+
+    fn indexed_names_have_two_digits() {
+        assert_eq!(name_of(tab_index(3)).as_str(), "tr_tab_03");
+        assert_eq!(name_of(row_value_index(11)).as_str(), "tr_rv_11");
+    }
+
+    fn every_pane_lies_inside_the_panel() {
+        for s in specs().into_iter().filter(|s| s.parent == ROOT) {
+            assert!(s.x - s.w / 2.0 >= -PANEL_W / 2.0 - 1.0 && s.x + s.w / 2.0 <= PANEL_W / 2.0 + 1.0, "{:?} x", s.name);
+            assert!(s.y - s.h / 2.0 >= -PANEL_H / 2.0 - 1.0 && s.y + s.h / 2.0 <= PANEL_H / 2.0 + 1.0, "{:?} y", s.name);
+        }
+    }
+
+    fn the_rows_do_not_run_into_the_help_panel() {
+        assert!(row_y(ROWS - 1) - ROW_H / 2.0 > HELP_Y[0] + 48.0 + 4.0);
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("names_are_unique_and_fit_the_bflyt_limit", names_are_unique_and_fit_the_bflyt_limit as fn()),
+            ("the_popup_panel_encloses_its_tabs_rows_help_and_hint", the_popup_panel_encloses_its_tabs_rows_help_and_hint as fn()),
+            ("the_pane_table_fits_with_the_stick_row", the_pane_table_fits_with_the_stick_row as fn()),
+            ("the_popup_has_the_r8_two_columns", the_popup_has_the_r8_two_columns as fn()),
+            ("the_linear_conversion_darkens_and_keeps_alpha", the_linear_conversion_darkens_and_keeps_alpha as fn()),
+            ("indexed_names_have_two_digits", indexed_names_have_two_digits as fn()),
+            ("every_pane_lies_inside_the_panel", every_pane_lies_inside_the_panel as fn()),
+            ("the_rows_do_not_run_into_the_help_panel", the_rows_do_not_run_into_the_help_panel as fn()),
+        ]);
+    }
+    }
+}

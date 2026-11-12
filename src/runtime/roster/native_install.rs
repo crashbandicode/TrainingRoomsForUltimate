@@ -47,3 +47,65 @@ impl InstallGate {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    lib_unit_tests! {
+    use super::*;
+
+    fn resource_load_keeps_practice_available_but_excludes_other_installs() {
+        let gate = InstallGate::new();
+        let source = gate.try_begin(false).unwrap();
+        assert!(gate.active());
+        assert!(!gate.suspends_practice());
+        assert_eq!(gate.try_begin(true), None);
+        assert_eq!(gate.try_begin(false), None);
+        assert!(gate.finish(source));
+        let roster = gate.try_begin(true).unwrap();
+        assert!(gate.suspends_practice());
+        assert!(gate.finish(roster));
+        assert!(!gate.active());
+    }
+
+    fn stale_completion_cannot_release_a_new_install() {
+        let gate = InstallGate::new();
+        let old = gate.try_begin(false).unwrap();
+        assert!(gate.finish(old));
+        let current = gate.try_begin(true).unwrap();
+        assert_ne!(old, current);
+        assert!(!gate.owns(old));
+        assert!(gate.owns(current));
+        assert!(!gate.finish(old));
+        assert!(gate.suspends_practice());
+        assert_eq!(gate.try_begin(false), None);
+        assert!(gate.finish(current));
+    }
+
+    fn competing_callbacks_obtain_only_one_owner() {
+        let gate = InstallGate::new();
+        let barrier = std::sync::Barrier::new(8);
+        let tokens = std::thread::scope(|scope| {
+            let jobs: Vec<_> = (0..8).map(|index| {
+                let gate = &gate;
+                let barrier = &barrier;
+                scope.spawn(move || {
+                    barrier.wait();
+                    gate.try_begin(index % 2 == 0)
+                })
+            }).collect();
+            jobs.into_iter().filter_map(|job| job.join().unwrap()).collect::<Vec<_>>()
+        });
+        assert_eq!(tokens.len(), 1);
+        assert!(gate.finish(tokens[0]));
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("resource_load_keeps_practice_available_but_excludes_other_installs", resource_load_keeps_practice_available_but_excludes_other_installs as fn()),
+            ("stale_completion_cannot_release_a_new_install", stale_completion_cannot_release_a_new_install as fn()),
+            ("competing_callbacks_obtain_only_one_owner", competing_callbacks_obtain_only_one_owner as fn()),
+        ]);
+    }
+    }
+}

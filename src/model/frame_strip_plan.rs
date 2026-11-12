@@ -469,3 +469,6 @@ impl Renderer {
     }
 }
 
+#[cfg(test)]
+#[path = "frame_strip_plan_tests.rs"]
+mod tests;

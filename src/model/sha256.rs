@@ -135,7 +135,6 @@ mod tests {
     lib_unit_tests! {
     use super::*;
 
-    #[test]
     fn the_fips_vectors() {
         assert_eq!(sha256_hex(b""), "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
         assert_eq!(sha256_hex(b"abc"), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
@@ -147,7 +146,6 @@ mod tests {
         assert_eq!(sha256_hex(&million), "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0");
     }
 
-    #[test]
     fn chunking_does_not_change_the_hash() {
         let data: Vec<u8> = (0..1000u32).map(|i| (i * 7 % 251) as u8).collect();
         let mut hasher = Sha256::new();
@@ -155,6 +153,15 @@ mod tests {
             hasher.update(chunk);
         }
         assert_eq!(hex(&hasher.finish()), sha256_hex(&data));
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("the_fips_vectors", the_fips_vectors as fn()),
+            ("chunking_does_not_change_the_hash", chunking_does_not_change_the_hash as fn()),
+        ]);
     }
     }
 }

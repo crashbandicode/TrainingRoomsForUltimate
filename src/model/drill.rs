@@ -291,3 +291,79 @@ impl SequenceRun {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    lib_unit_tests! {
+    use super::*;
+    use crate::model::combo::{Outcome, Summary};
+
+    fn pass() -> Summary {
+        Summary { outcome: Outcome::Completed, graded: 1, true_links: 0, total: 1, clean: true, fault: None }
+    }
+
+    fn missed() -> Summary {
+        Summary { outcome: Outcome::Stopped, graded: 1, true_links: 0, total: 1, clean: false, fault: None }
+    }
+
+    fn a_drop_restarts_the_sequence_and_keeps_best() {
+        let mut drill = SequenceDrill::new("seq", &["combo-1", "combo-2"]);
+        drill.note_summary(&pass());
+        drill.note_summary(&pass());
+        drill.note_summary(&pass());
+        drill.note_summary(&pass());
+        assert_eq!((drill.walk().cursor(), drill.streak(), drill.best()), (0, 2, 2));
+        drill.note_summary(&pass());
+        assert_eq!(drill.walk().cursor(), 1);
+        assert_eq!(drill.target(), Some("combo-2"));
+        drill.note_summary(&missed());
+        assert_eq!(drill.walk().cursor(), 0);
+        assert_eq!(drill.target(), Some("combo-1"));
+        assert_eq!((drill.streak(), drill.best()), (0, 2), "streak 0, best kept");
+        drill.note_summary(&pass());
+        drill.note_summary(&pass());
+        assert_eq!((drill.streak(), drill.best()), (1, 2), "best = max(best, streak) after a finished run");
+    }
+
+    fn the_walk_says_what_each_grade_does() {
+        let mut walk = SequenceWalk::resume(3, 4, 9);
+        assert_eq!(walk.note_summary(&pass()), Advance::Next(1));
+        assert_eq!(walk.note_summary(&pass()), Advance::Next(2));
+        assert_eq!(walk.note_summary(&pass()), Advance::Finished);
+        assert_eq!((walk.cursor(), walk.streak(), walk.best()), (0, 5, 9), "a saved streak goes on from 4");
+        assert_eq!(walk.note_summary(&pass()), Advance::Next(1));
+        assert_eq!(walk.note_summary(&missed()), Advance::Dropped);
+        assert_eq!((walk.cursor(), walk.streak(), walk.best()), (0, 0, 9));
+        assert_eq!(SequenceWalk::new(0).note_summary(&pass()), Advance::Idle, "an empty sequence drills nothing");
+    }
+
+    fn a_sequence_of_twenty_combos_has_twenty_steps() {
+        let ids: Vec<String> = (0..20).map(|n| format!("combo-{n}")).collect();
+        let ids: Vec<&str> = ids.iter().map(String::as_str).collect();
+        assert_eq!(SequenceDrill::new("seq", &ids).step(), (1, 20), "every combo is a step");
+    }
+
+    fn one_drill_and_make_combo_leaves_it() {
+        let mut drill = OneDrill::new();
+        drill.select(Kind::Sequence, "seq-1");
+        drill.select(Kind::Combo, "combo-a");
+        assert_eq!(drill.current(), Some((Kind::Combo, "combo-a")), "a combo replaces the sequence");
+        drill.select(Kind::Sequence, "seq-2");
+        assert_eq!(drill.current(), Some((Kind::Sequence, "seq-2")), "a sequence replaces the combo");
+        let made = drill.make_combo("combo-new");
+        assert_eq!(made.as_str(), "combo-new");
+        assert_eq!(drill.made(), Some("combo-new"));
+        assert_eq!(drill.current(), Some((Kind::Sequence, "seq-2")), "Make combo leaves the drill");
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("a_drop_restarts_the_sequence_and_keeps_best", a_drop_restarts_the_sequence_and_keeps_best as fn()),
+            ("the_walk_says_what_each_grade_does", the_walk_says_what_each_grade_does as fn()),
+            ("a_sequence_of_twenty_combos_has_twenty_steps", a_sequence_of_twenty_combos_has_twenty_steps as fn()),
+            ("one_drill_and_make_combo_leaves_it", one_drill_and_make_combo_leaves_it as fn()),
+        ]);
+    }
+    }
+}

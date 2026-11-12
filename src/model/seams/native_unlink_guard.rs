@@ -52,7 +52,6 @@ mod tests {
     use super::*;
     fn pointer<T>(value: &mut T) -> u64 { value as *mut T as u64 }
 
-    #[test]
     fn valid_native_store_has_identical_effect_and_no_guard_action() {
         let mut node = [0u64; 6];
         let mut destination = 17u64;
@@ -61,7 +60,6 @@ mod tests {
         assert_eq!(destination, 29);
     }
 
-    #[test]
     fn both_null_parent_offsets_are_skipped_without_touching_node() {
         let mut node = [0u64, 0, 0, 0x123400, 0, 0x567800];
         let before = node;
@@ -71,7 +69,6 @@ mod tests {
         assert_eq!(node, before);
     }
 
-    #[test]
     fn absent_header_owner_or_root_preserves_the_remaining_cleanup() {
         let mut node = [0u64; 6];
         let mut owner = [0u64; 0x1f8 / 8];
@@ -85,7 +82,6 @@ mod tests {
         }
     }
 
-    #[test]
     fn lost_header_backlink_advances_root_until_empty() {
         let mut owner = [0u64; 0x1f8 / 8];
         let mut root = [0u64; 6];
@@ -108,7 +104,6 @@ mod tests {
         assert_eq!(unsafe { store(16, 0, b, o, false) }, SKIPPED_NULL_STORE);
     }
 
-    #[test]
     fn unrelated_root_is_not_rewritten_and_valid_parent_path_is_unchanged() {
         let mut owner = [0u64; 0x1f8 / 8];
         let mut root = [0u64, 0x123400, 0x123400, 0, 0, 0];
@@ -122,6 +117,18 @@ mod tests {
         assert_eq!(unsafe { store(pointer(&mut destination), 77, pointer(&mut node), 0, true) }, 0);
         assert_eq!(destination, 77);
         assert_eq!(root, expected);
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("valid_native_store_has_identical_effect_and_no_guard_action", valid_native_store_has_identical_effect_and_no_guard_action as fn()),
+            ("both_null_parent_offsets_are_skipped_without_touching_node", both_null_parent_offsets_are_skipped_without_touching_node as fn()),
+            ("absent_header_owner_or_root_preserves_the_remaining_cleanup", absent_header_owner_or_root_preserves_the_remaining_cleanup as fn()),
+            ("lost_header_backlink_advances_root_until_empty", lost_header_backlink_advances_root_until_empty as fn()),
+            ("unrelated_root_is_not_rewritten_and_valid_parent_path_is_unchanged", unrelated_root_is_not_rewritten_and_valid_parent_path_is_unchanged as fn()),
+        ]);
     }
     }
 }

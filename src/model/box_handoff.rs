@@ -174,7 +174,6 @@ mod tests {
         }
     }
 
-    #[test]
     fn the_newest_post_is_installed_and_every_value_is_dropped_by_the_producer_once() {
         let handoff: BoxHandoff<u64> = BoxHandoff::new();
         let mut current = None;
@@ -198,7 +197,6 @@ mod tests {
     }
 
     /// A take moves the value out and gives the box back; a discard drops nothing on the consumer; the newest post wins.
-    #[test]
     fn a_take_moves_the_value_out_and_gives_the_box_back() {
         let handoff: BoxHandoff<Vec<u8>> = BoxHandoff::new();
         assert_eq!(handoff.take(std::mem::take), None, "nothing posted");
@@ -218,7 +216,6 @@ mod tests {
     }
 
     /// Without a reap the consumer fills both retire slots and then waits (counted), and never drops a value itself.
-    #[test]
     fn a_full_retire_stalls_the_install_and_never_drops_on_the_consumer() {
         let handoff: BoxHandoff<u64> = BoxHandoff::new();
         let mut current = Some(Box::new(0));
@@ -237,7 +234,6 @@ mod tests {
 
     /// A producer posting as fast as it can against a consumer installing as fast as it can: the consumer sees increasing ids
     /// only, ends on the last post, never drops a value, and every value but the installed one is dropped exactly once.
-    #[test]
     fn a_racing_producer_and_consumer_never_lose_double_drop_or_drop_on_the_consumer() {
         const TOTAL: u64 = 50_000;
         let handoff: Arc<BoxHandoff<Counted>> = Arc::new(BoxHandoff::new());
@@ -280,6 +276,17 @@ mod tests {
         assert_eq!(drops.load(SeqCst), (TOTAL - 1) as usize, "every value but the installed one dropped once");
         drop(current);
         assert_eq!(drops.load(SeqCst), TOTAL as usize);
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("the_newest_post_is_installed_and_every_value_is_dropped_by_the_producer_once", the_newest_post_is_installed_and_every_value_is_dropped_by_the_producer_once as fn()),
+            ("a_take_moves_the_value_out_and_gives_the_box_back", a_take_moves_the_value_out_and_gives_the_box_back as fn()),
+            ("a_full_retire_stalls_the_install_and_never_drops_on_the_consumer", a_full_retire_stalls_the_install_and_never_drops_on_the_consumer as fn()),
+            ("a_racing_producer_and_consumer_never_lose_double_drop_or_drop_on_the_consumer", a_racing_producer_and_consumer_never_lose_double_drop_or_drop_on_the_consumer as fn()),
+        ]);
     }
     }
 }

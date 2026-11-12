@@ -243,7 +243,6 @@ mod tests {
     use std::sync::Barrier;
     use std::time::{Duration, Instant};
 
-    #[test]
     fn delivers_in_posting_order_up_to_capacity_and_refuses_the_rest() {
         let (tx, rx) = sync_channel(2);
         assert!(tx.try_send(1).is_ok());
@@ -258,7 +257,6 @@ mod tests {
 
     /// The rc.8 hang's interleaving: a sender stopped between its claim and its publication. std's `try_recv` spins here
     /// until the sender runs again; this one says "not ready" at once, every time, and delivers after the publication.
-    #[test]
     fn a_writer_paused_mid_write_leaves_the_reader_not_ready_and_never_spinning() {
         let (tx, rx) = sync_channel(2);
         let writing = tx.claim().expect("an empty slot");
@@ -273,7 +271,6 @@ mod tests {
     }
 
     /// A later message waits behind an earlier one still being written; neither side waits on the other.
-    #[test]
     fn a_message_behind_an_unpublished_predecessor_waits_for_a_later_poll() {
         let (tx, rx) = sync_channel(3);
         let first = tx.claim().expect("slot");
@@ -292,7 +289,6 @@ mod tests {
         assert_eq!(rx.try_recv(), Err(TryRecvError::Empty));
     }
 
-    #[test]
     fn a_full_slot_the_receiver_has_not_emptied_makes_the_sender_refuse_not_wait() {
         let (tx, rx) = sync_channel(1);
         assert!(tx.try_send(1).is_ok());
@@ -305,7 +301,6 @@ mod tests {
         assert!(tx.try_send(2).is_ok());
     }
 
-    #[test]
     fn a_claim_dropped_unwritten_frees_its_slot() {
         let (tx, rx) = sync_channel(1);
         drop(tx.claim().expect("slot"));
@@ -313,7 +308,6 @@ mod tests {
         assert_eq!(rx.try_recv(), Ok(5));
     }
 
-    #[test]
     fn disconnection_follows_std() {
         let (tx, rx) = sync_channel::<u8>(1);
         let tx2 = tx.clone();
@@ -328,7 +322,6 @@ mod tests {
         assert!(matches!(tx.try_send(9), Err(TrySendError::Disconnected(9))));
     }
 
-    #[test]
     fn queued_values_are_dropped_with_the_channel() {
         let value = Arc::new(());
         let (tx, rx) = sync_channel(2);
@@ -339,7 +332,6 @@ mod tests {
         assert_eq!(Arc::strong_count(&value), 1);
     }
 
-    #[test]
     fn a_blocking_receiver_wakes_for_each_post_and_for_the_last_sender() {
         let (tx, rx) = sync_channel(2);
         let reader = std::thread::spawn(move || {
@@ -366,7 +358,6 @@ mod tests {
         assert_eq!(reader.join().unwrap(), (0..200).collect::<Vec<_>>());
     }
 
-    #[test]
     fn many_senders_and_one_polling_receiver_lose_and_duplicate_nothing() {
         const SENDERS: u32 = 4;
         const EACH: u32 = 5_000;
@@ -417,6 +408,22 @@ mod tests {
             thread.join().unwrap();
         }
         assert_eq!(count, SENDERS * EACH);
+    }
+
+    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("delivers_in_posting_order_up_to_capacity_and_refuses_the_rest", delivers_in_posting_order_up_to_capacity_and_refuses_the_rest as fn()),
+            ("a_writer_paused_mid_write_leaves_the_reader_not_ready_and_never_spinning", a_writer_paused_mid_write_leaves_the_reader_not_ready_and_never_spinning as fn()),
+            ("a_message_behind_an_unpublished_predecessor_waits_for_a_later_poll", a_message_behind_an_unpublished_predecessor_waits_for_a_later_poll as fn()),
+            ("a_full_slot_the_receiver_has_not_emptied_makes_the_sender_refuse_not_wait", a_full_slot_the_receiver_has_not_emptied_makes_the_sender_refuse_not_wait as fn()),
+            ("a_claim_dropped_unwritten_frees_its_slot", a_claim_dropped_unwritten_frees_its_slot as fn()),
+            ("disconnection_follows_std", disconnection_follows_std as fn()),
+            ("queued_values_are_dropped_with_the_channel", queued_values_are_dropped_with_the_channel as fn()),
+            ("a_blocking_receiver_wakes_for_each_post_and_for_the_last_sender", a_blocking_receiver_wakes_for_each_post_and_for_the_last_sender as fn()),
+            ("many_senders_and_one_polling_receiver_lose_and_duplicate_nothing", many_senders_and_one_polling_receiver_lose_and_duplicate_nothing as fn()),
+        ]);
     }
     }
 }
