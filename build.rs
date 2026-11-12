@@ -5,7 +5,7 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-const BUILD_NAME: &str = "rc10";
+const BUILD_NAME: &str = "rc11";
 
 /// The binary's inputs: an edit after a clean build reruns this script, so the tag gains `-dirty`.
 const SOURCES: [&str; 7] = ["src", "data", "assets", "crates", "third_party", "Cargo.toml", "Cargo.lock"];
