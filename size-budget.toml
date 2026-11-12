@@ -1611,3 +1611,10 @@ basis = "rustfmt-sloc4"
 ceiling = 162692
 date = "2026-11-12"
 reason = "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): code no Switch build uses removed, or moved behind #[cfg(test)] where only tests use it (eight whole files and about 270 items), on rc10 f5146184 (165930); measured 162692 (tools/size_gate.py), -3238. A cut: the ratchet."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 154519
+date = "2026-11-12"
+reason = "rc.10 S1 (docs/CODE-REDUCTION-rc10.md): the rows of the 23 guard tables moved to data/tables/*.tsv, which build.rs turns into the same tables, on rc10 6c6ad6bb (162692); measured 154519 (tools/size_gate.py), -8173. A cut: the ratchet."

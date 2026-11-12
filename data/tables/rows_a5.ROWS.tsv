@@ -1,0 +1,253 @@
+#! Seam	label	group	offset	kind	guard	feature	scopes	read_only	per_frame	sharing	note
+# lobby_stage:relied/code:exact=20 training_rotation:relied/code:exact=20
+"lobby_stage.setter_window"	"lobby_stage_probe"	0x1790e18	SeamKind::Relied	e3030032e0031faae20314aae4031f2ae6e6ff97c8db01d009016739ea1740b93f010a6be00100540a012739a8d90190082d46f9080540f9084540f9494c8d52	"lobby-stage-probe"	Scopes::ALL	false	false	Sharing::None	"orr w3,wzr,#1; x0/x2/w4 setup; the exact BL to the practice stage setter: the callback rewrites w1/w3 for that call"
+# lobby_stage:hook/inline:exact=20
+"lobby_stage.stage_entry"	"lobby_stage_probe"	0x1790e1c	SeamKind::Hook { form: HookForm::Inline, placement: Placement::Mid }	e0031faae20314aae4031f2ae6e6ff97c8db01d009016739ea1740b93f010a6be00100540a012739a8d90190082d46f9080540f9084540f9494c8d524900a072	"lobby-stage-probe"	Scopes::ALL	false	false	Sharing::None	"mid-function, after the native w3=1"
+# lobby_stage:hook/inline:exact=20 training_rotation:relied/code:exact=20 practice_stage:relied/code:exact=20
+"lobby_stage.resource_request"	"lobby_stage_probe"	0x25f7874	SeamKind::Hook { form: HookForm::Inline, placement: Placement::AfterPrologue }	5f08007148040054f30300aa005862f8f40301aaf603022a400200b4e10314aaab2a0094757a76f880000036a80254396800003516000014550100b4a80240b9	"lobby-stage-probe"	Scopes::ALL	false	false	Sharing::None	"After-prologue inline observation hook (C116.1, operator decision row 34): shared stage-resource request (practice_stage_observer and training_stage_rotation share this callback): reads x1 (stack descriptor), w2 (slot) and x30 (caller LR) and may rewrite the descriptor, which the body first reads at 0x25f7884; the prologue before it changes none of them (it only spills callee-saved registers and sets x29). No branch in the function targets the 20 B the far jump overwrites (branch_into_window.py); the relocated words are cmp, b.hi (relocated), mov, ldr, mov."
+# lobby_stage:relied/code:exact=48 training_rotation:relied/code:exact=48
+"lobby_stage.qp_loader_slot"	"lobby_stage_probe"	0x14f5754	SeamKind::Relied	088341391f350071e8179f1ab4f101b013791f5388ea44f9085973f8a80000b4080140b908011f321f0d007120020054e8f001f00861139108fddf08e8a10036	"lobby-stage-probe"	Scopes::ALL	false	false	Sharing::None	"generic loader slot choice (melee 0x0d -> slot 2)"
+# lobby_stage:relied/code:exact=48 training_rotation:relied/code:exact=48
+"lobby_stage.qp_loader_call"	"lobby_stage_probe"	0x14f5794	SeamKind::Relied	88ee019008e142f91f0900f1a2a50054091680528aee01904a0106910829099b80ea44f901411191e203132a2808449435ee0190a87a43b9e95f00321f01096b	"lobby-stage-probe"	Scopes::ALL	false	false	Sharing::None	"generic loader resource call"
+# lobby_stage:relied/code:exact=60
+"lobby_stage.qp_css_driver"	"lobby_stage_probe"	0x236841c	SeamKind::Relied	695241b93f11007161040054e9268052e96300b9097e01d020e944f9ea6c9ed20a49abf2e8c3013908e0dfd2ca02c0f2e83ffbf2e1830191e2031f32ea3700f9	"lobby-stage-probe"	Scopes::ALL	false	false	Sharing::None	"Quickplay CSS driver stage311 preload"
+# lobby_stage:relied/code:exact=12
+"lobby_stage.qp_css_call"	"lobby_stage_probe"	0x23684a8	SeamKind::Relied	9f4203f8ed3c0a94fd7b54a9fc8b40f9f44f53a9f65752a9ff430591c0035fd688060011e97c01b028f100b92900001488fe0b11e97c01b028f100b969120591	"lobby-stage-probe"	Scopes::ALL	false	false	Sharing::None	"its resource call"
+# lobby_stage:relied/code:exact=60
+"lobby_stage.qp_return_driver"	"lobby_stage_probe"	0x2369174	SeamKind::Relied	a95241b93f11007161040054e9268052e95b00b9097e01b020e944f9ea6c9ed20a49abf2e8a3013908e0dfd2ca02c0f2e83ffbf2e1630191e2031f32ea3300f9	"lobby-stage-probe"	Scopes::ALL	false	false	Sharing::None	"Quickplay return driver preload"
+# lobby_stage:relied/code:exact=12
+"lobby_stage.qp_return_call"	"lobby_stage_probe"	0x2369200	SeamKind::Relied	ffc308f897390a94ff030891fd7b45a9f44f44a9f65743a9f85f42a9fa6741a9fc6fc6a8c0035fd6407d01f000601391205d599460aaff3472ebcf97c09fffd0	"lobby-stage-probe"	Scopes::ALL	false	false	Sharing::None	"its resource call"
+# lobby_stage:relied/code:exact=48
+"lobby_stage.qp_driver3"	"lobby_stage_probe"	0x236c9c0	SeamKind::Relied	e97d01d020e944f9ea268052ea1b00b9ea6c9ed20a49abf2e8a3003908e0dfd2ca02c0f2e83ffbf2e1630091e2031f32ea1300f9ff1b00f9ff3b00b9e82300f9	"lobby-stage-probe"	Scopes::ALL	false	false	Sharing::None	"third driver preload"
+# lobby_stage:relied/code:exact=12
+"lobby_stage.qp_driver3_call"	"lobby_stage_probe"	0x236ca40	SeamKind::Relied	ffc304f8872b0a94e0d740f9600000b4e0db00f93b085794ff031091fd7b45a9f44f44a9f65743a9f85f42a9fa6741a9fc6fc6a8c0035fd6407d019000601391	"lobby-stage-probe"	Scopes::ALL	false	false	Sharing::None	"its resource call"
+# lobby_stage:relied/code:exact=60
+"lobby_stage.qp_driver4"	"lobby_stage_probe"	0x237cc4c	SeamKind::Relied	a91a42b93f19007161040054e9268052e93300b9697d01d020e944f9ea6c9ed20a49abf2e803013908e0dfd2ca02c0f2e83ffbf2e1c30091e2031f32ea1f00f9	"lobby-stage-probe"	Scopes::ALL	false	false	Sharing::None	"fourth driver preload"
+# lobby_stage:relied/code:exact=12
+"lobby_stage.qp_driver4_call"	"lobby_stage_probe"	0x237ccd8	SeamKind::Relied	ff4306f8e1ea0994ff430991fd7b45a9f44f44a9f65743a9f85f42a9fa6741a9fc6fc6a8c0035fd654165994000000000000000000000000fc6fbaa9fa6701a9	"lobby-stage-probe"	Scopes::ALL	false	false	Sharing::None	"its resource call"
+# lobby_stage:relied/code:exact=8
+"lobby_stage.qp_callers"	"lobby_stage_probe"	0x237ebd4	SeamKind::Relied	bf32d0971245d097730240f9094a8ed2296cacf2a801c0d2892ecdf269acecf2e82700a9686a8c52a8ccad72ab0c8052e81300b90a0a805229018052eb2b0079	"lobby-stage-probe"	Scopes::ALL	false	false	Sharing::None	"the two BLs into the drivers"
+# training_rotation:relied/code:exact=24
+"training_rotation.setter_stores"	"training_stage_rotation"	0x178ab08	SeamKind::Relied	6b9d40920c16805269260c9b180100b92b2d02f92a811139ea0340b9eb0b4079ec1b40397fb307b87f3307f8ffb302f8ff3302f8ffb301f8ff3301f80c5d0039	"training-stage-rotation-alpha"	Scopes::ALL	false	false	Sharing::None	"the setter's descriptor stores (id +0, 40-bit hash +8, flag +0x10)"
+# training_rotation:relied/code:exact=32
+"training_rotation.installer_window"	"training_stage_rotation"	0x23ecb10	SeamKind::Relied	9f7e01a988fa00b99ff203399f1a00f99f7e02a99fa20ea99ffe0da99ffe0ca99ffe0ba99ffe0aa99ffe09a99ffe08a99ffe07a99ffe06a99ffe05a99ffe04a9	"training-stage-rotation-alpha"	Scopes::ALL	false	false	Sharing::None	"installer window around the reenter-byte clear (covers the hook site)"
+# training_rotation:hook/inline:exact=16
+"training_rotation.sequence_initialized"	"training_stage_rotation"	0x23ecb18	SeamKind::Hook { form: HookForm::Inline, placement: Placement::Mid }	9ff203399f1a00f99f7e02a99fa20ea99ffe0da99ffe0ca99ffe0ba99ffe0aa99ffe09a99ffe08a99ffe07a99ffe06a99ffe05a99ffe04a99ffe03a9cfdb4c94	"training-stage-rotation-alpha"	Scopes::ALL	false	false	Sharing::None	"mid-function (x20 = new state context)"
+# practice_stage:hook/inline:exact=32
+"practice_stage.stage_update"	"practice_stage_observer"	0x2607360	SeamKind::Hook { form: HookForm::Inline, placement: Placement::Entry }	ff8305d1e88b00fdfc5f12a9f65713a9f44f14a9fd7b15a9fd430591130040f968e245397f7200f908010034e88b40fdfd7b55a9f44f54a9f65753a9fc5f52a9	"practice-stage-observer"	Scopes::ALL	false	false	Sharing::None	"Entry hook, disclosed and kept (C116.1 row 34 review): inline hook on the prologue of the PracticeScene stage update (after a noreturn bl, INFERENCE from the ELF), reads x0 (scene) only. Not moved: every after-prologue site's far jump (16-20 B from 0x260737c) overwrites 0x260738c, the shared epilogue that five branches target (0x2607458, 0x2607474, 0x260811c, 0x2608128, 0x26081f4), and a later site would miss the early-return path the observer sees today."
+# practice_stage:relied/code:exact=20
+"practice_stage.update_fields"	"practice_stage_observer"	0x260743c	SeamKind::Relied	685242b9695642b93f01086a80010054740a41f9730e41f99f0213eba0f9ff54808640f8080040f9081940f900013fd67f0214eb61ffff54c6ffff1768be40b9	"practice-stage-observer"	Scopes::ALL	false	false	Sharing::None	"field reads"
+# practice_stage:relied/code:exact=24
+"practice_stage.item_manager"	"practice_stage_observer"	0x14a52e8	SeamKind::Relied	e8f001f0083940f9085140f9080140f9000140f935660494a007003668f301f00861139109fddf088913003609f10190290117912a0140b9ea032a2a0b168052	"practice-stage-observer"	Scopes::ALL	false	false	Sharing::None	"ItemManager indirection"
+# practice_stage:relied/code:exact=64
+"practice_stage.item_predicate"	"practice_stage_observer"	0x15bec5c	SeamKind::Relied	882e40b908094092157868f8400000b4b5bf8d9434e801d0883a40f9082d40f908a541f9bf0208eb0831959a1f0900f168020054680240f908b1403908021837	"practice-stage-observer"	Scopes::ALL	false	false	Sharing::None	"fixed-list predicate (0x15bebd0 body)"
+# practice_stage:relied/code:exact=60
+"practice_stage.item_predicate+0x40"	"practice_stage_observer"	0x15bec9c	SeamKind::Relied	2502009429e801b029613f91282540a91f0109eb000100548a3a40f94a2d40f90b4580b84b796bf8ab0000b53f0108eb81ffff54e003003202000014e0031f2a	"practice-stage-observer"	Scopes::ALL	false	false	Sharing::None	""
+# practice_stage:relied/code:exact=64
+"practice_stage.item_list_init"	"practice_stage_observer"	0x15bf5bc	SeamKind::Relied	c91480d20a1b80d221e8019021603f9108200191200000f96915c0f20a17c0f2280800f9092800a9491980d20a2980d20925c0f2ea26c0f2092801a9492080d2	"practice-stage-observer"	Scopes::ALL	false	false	Sharing::None	"fixed item list initializer (0x15bf530 body)"
+# practice_stage:relied/code:exact=48
+"practice_stage.item_list_init+0x40"	"practice_stage_observer"	0x15bf5fc	SeamKind::Relied	ca2080d26920c0f2aa21c0f2092802a9a91f80d28a1c80d2491ec0f22a1cc0f2092803a9692a80d2892ac0f2092000f96086ffd000003c91c2ca019042000091	"practice-stage-observer"	Scopes::ALL	false	false	Sharing::None	""
+# practice_stage:relied/code:exact=48
+"practice_stage.scene_fields"	"practice_stage_observer"	0x260235c	SeamKind::Relied	080040b908791f121f090071e0130054152040b9280040b9f30301aaf40300aabf02086b21130054881640f9690640f91f0109eba1120054884240b9692240b9	"practice-stage-observer"	Scopes::ALL	false	false	Sharing::None	"scene field reads"
+# stage_request:relied/code:exact=40
+"stage_request.native_14a53cc"	"practice_stage_request"	0x14a53cc	SeamKind::Relied	32f401b052ea44f9e03700f9520240f9520200b4520240b952021f325f0e0071e0179f1a0e000014e80300326842033968be40b91f4d007162130054e9031f2a	"practice-stage-request-alpha"	Scopes::ALL	false	false	Sharing::None	"retained ELF words"
+# stage_request:relied/code:exact=64
+"stage_request.native_14a5428"	"practice_stage_request"	0x14a5428	SeamKind::Relied	92ee44f9520240f9417e41b93f040031a006005442be40b9620600353f00006b20060054492a00294b0600f94c420039a9835eb8aac35e78abe35e384d0e00f9	"practice-stage-request-alpha"	Scopes::ALL	false	false	Sharing::None	"retained ELF words"
+# stage_request:relied/code:exact=64
+"stage_request.native_14a5428+0x40"	"practice_stage_request"	0x14a5468	SeamKind::Relied	4e3e0429501600f951c200394b5e00394a520178491201b8e9ab40a9ebb341a94c9204f84b1204f84a9203f8491203f8e9ab42a9ebb343a94c9206f84b1206f8	"practice-stage-request-alpha"	Scopes::ALL	false	false	Sharing::None	""
+# stage_request:relied/code:exact=64
+"stage_request.native_14a5428+0x80"	"practice_stage_request"	0x14a54a8	SeamKind::Relied	4a9205f8491205f8e9ab44a9ebb345a94c9208f84b1208f84a9207f8491207f8e9ab46a9eb3f40f9ecf347f84a9209f84ac24339491209f8e903183249920179	"practice-stage-request-alpha"	Scopes::ALL	false	false	Sharing::None	""
+# stage_request:relied/code:exact=36
+"stage_request.native_14a5428+0xc0"	"practice_stage_request"	0x14a54e8	SeamKind::Relied	e90300324c5600f94b120af8400616295fc600b949be00b94a0000345fc203395fe2023909fddf080906003614f1019089c245b9e903292a2901409289e202f9	"practice-stage-request-alpha"	Scopes::ALL	false	false	Sharing::None	""
+# stage_request:relied/code:exact=40
+"stage_request.native_2602b1c"	"practice_stage_request"	0x2602b1c	SeamKind::Relied	687e41b91f0900717f8e01b908150054680e088b168940f9c122009102168052e023009168f54e94c8da40b908011c32c8da00b9687e41b9d56240f91f0d0071	"practice-stage-request-alpha"	Scopes::ALL	false	false	Sharing::None	"retained ELF words"
+# stage_request:relied/code:exact=48
+"stage_request.native_26074e0"	"practice_stage_request"	0x26074e0	SeamKind::Relied	086901f000e944f962b240b9e10313aadcc0ff97e86501d0007d40f91d3cc59768624339e82e003460b601797801001469ba40f968b240b9b4c301d1a1c301d1	"practice-stage-request-alpha"	Scopes::ALL	false	false	Sharing::None	"retained ELF words"
+# stage_request:relied/code:exact=64
+"stage_request.native_260765c"	"practice_stage_request"	0x260765c	SeamKind::Relied	48690190084542f9140140f9880240b91f150071811f0054800640f9a2d43c94950640f99f0600f9b50000b4e00315aa4dd43c94e00315aa2b9d4c94e8071f32	"practice-stage-request-alpha"	Scopes::ALL	false	false	Sharing::None	"retained ELF words"
+# stage_request:relied/code:exact=8
+"stage_request.native_260765c+0x40"	"practice_stage_request"	0x260769c	SeamKind::Relied	9f0200b968be00b9e8010014084ea8d2084ee8f2686200f9e80300326892017968b640b91f0d007162760054680e088b088940f9e9031f3209dd00b9e8031d32	"practice-stage-request-alpha"	Scopes::ALL	false	false	Sharing::None	""
+# stage_request:relied/code:exact=64
+"stage_request.native_2607930"	"practice_stage_request"	0x2607930	SeamKind::Relied	48690190084542f9140140f9880240b91f150071e1080054800640f9edd33c94950640f99f0600f9b50000b4e00315aa98d33c94e00315aa769c4c949f0200b9	"practice-stage-request-alpha"	Scopes::ALL	false	false	Sharing::None	"retained ELF words"
+# stage_request:relied/code:exact=8
+"stage_request.native_2607ad8"	"practice_stage_request"	0x2607ad8	SeamKind::Relied	7fbe00b981010014e803003260b6017968620339e8031f3268be00b9d4000014080040f9081140f900013fd6a8008052c000001461c640bd2018201e090d45f8	"practice-stage-request-alpha"	Scopes::ALL	false	false	Sharing::None	"retained ELF words"
+# stage_request:relied/code:exact=52
+"stage_request.native_2602f20"	"practice_stage_request"	0x2602f20	SeamKind::Relied	880e088b008940f91f8900f9800000b4080040f9082542f900013fd64869019000e944f9681240b9e9030032fd7b41a92921c89a297d40921f050031e103899a	"practice-stage-request-alpha"	Scopes::ALL	false	false	Sharing::None	"retained ELF words"
+# stage_request:relied/code:exact=64
+"stage_request.native_2605ee4"	"practice_stage_request"	0x2605ee4	SeamKind::Relied	608a40f97f8a00f9800000b4080040f9082542f900013fd6608e40f97f8e00f9800000b4080040f9082542f900013fd6609240f97f9200f9800000b4080040f9	"practice-stage-request-alpha"	Scopes::ALL	false	false	Sharing::None	"retained ELF words"
+# stage_request:relied/code:exact=44
+"stage_request.native_2605ee4+0x40"	"practice_stage_request"	0x2605f24	SeamKind::Relied	082542f900013fd6556901d0b44642f9d40000b4e00314aa31e32d94e00314aaffa24c94bf4602f9742241f97f2201f9740300b4e00314aa99ee4e94e00314aa	"practice-stage-request-alpha"	Scopes::ALL	false	false	Sharing::None	""
+# stage_request:relied/code:exact=40
+"stage_request.ack_14a5690"	"practice_stage_request"	0x14a5690	SeamKind::Relied	28f401b008ed44f9080140f909bd40b93f1900710104005409714339c9030034e90b003209bd00b968f301f008611391f30300aa000040f908fddf0848030036	"practice-stage-request-alpha"	Scopes::ALL	false	false	Sharing::None	"state6 acknowledgment"
+# stage_request:relied/code:exact=44
+"stage_request.ack_24b9a90"	"practice_stage_request"	0x24b9a90	SeamKind::Relied	090140f92abd40b95f190071a10000542a7143396a000034ea0b00322abd00b9080140f908bd40b988120035c87201f00861139108fddf08e812003660700190	"practice-stage-request-alpha"	Scopes::ALL	false	false	Sharing::None	"observer-owned continuation"
+# stage_request:relied/code:exact=64
+"stage_request.native_2608794"	"practice_stage_request"	0x2608794	SeamKind::Relied	1f0d0071a2030054684e288b008940f9080040f9084542f900013fd680000036687240f9080140b2687200f9687e41b91f0d007122020054680e088b008940f9	"practice-stage-request-alpha"	Scopes::ALL	false	false	Sharing::None	"retained ELF words"
+# stage_request:relied/code:exact=56
+"stage_request.native_2608794+0x40"	"practice_stage_request"	0x26087d4	SeamKind::Relied	080040f908dd40f900013fd6687240f96000003708017fb2687200f91f0d00f181000054e803003268720339baffff177f720339b8ffff1791e74e94f50f1df8	"practice-stage-request-alpha"	Scopes::ALL	false	false	Sharing::None	""
+# stage_request:relied/code:exact=60
+"stage_request.native_26076a8"	"practice_stage_request"	0x26076a8	SeamKind::Relied	084ea8d2084ee8f2686200f9e80300326892017968b640b91f0d007162760054680e088b088940f9e9031f3209dd00b9e8031d3268be00b9d901001460c640bd	"practice-stage-request-alpha"	Scopes::ALL	false	false	Sharing::None	"retained ELF words"
+# stage_request:relied/code:exact=64
+"stage_request.native_26078ac"	"practice_stage_request"	0x26078ac	SeamKind::Relied	680a41f9740e41f91f0114eb4003005416210091f5030032c0825ff8080040f9083140f900013fd6b502000a9f0216eb60000054d622009100ff0737b52a0036	"practice-stage-request-alpha"	Scopes::ALL	false	false	Sharing::None	"retained ELF words"
+# stage_request:relied/code:exact=64
+"stage_request.native_26078ac+0x40"	"practice_stage_request"	0x26078ec	SeamKind::Relied	750a41f9760e41f9bf0216eb40010054b48640f8880240f9083540f9e00314aa00013fd6df0215eb9ff200399f2200f901ffff54680180527f62053968be00b9	"practice-stage-request-alpha"	Scopes::ALL	false	false	Sharing::None	""
+# stage_request:relied/code:exact=4
+"stage_request.native_26078ac+0x80"	"practice_stage_request"	0x260792c	SeamKind::Relied	4601001448690190084542f9140140f9880240b91f150071e1080054800640f9edd33c94950640f99f0600f9b50000b4e00315aa98d33c94e00315aa769c4c94	"practice-stage-request-alpha"	Scopes::ALL	false	false	Sharing::None	""
+# stage_request:relied/code:exact=40
+"stage_request.native_26086cc"	"practice_stage_request"	0x26086cc	SeamKind::Relied	130040f968e24539a8000035685242b9695642b91f05096a80000054fd7b41a9f30742f8c0035fd6687e41b91f0500316004005469be40b93f25007160040054	"practice-stage-request-alpha"	Scopes::ALL	false	false	Sharing::None	"retained ELF words"
+# unlink:relied/code:exact=12
+"unlink.leave_window"	"native_unlink_install"	0x38958e0	SeamKind::Relied	29210091280100f968a641a9690000b4280d00f903000014690240f9280900f97f0200f99f7e01a99f7e00a9fd7b41a9f44fc2a8c0035fd60000000000000000	"native-unlink-guard"	Scopes::ALL	false	false	Sharing::None	"displaced STR and its neighbours"
+# unlink:hook/raw_inline_nop:exact=20
+"unlink.leave"	"native_unlink_install"	0x38958e4	SeamKind::Hook { form: HookForm::Raw, placement: Placement::Mid }	280100f968a641a9690000b4280d00f903000014690240f9280900f97f0200f99f7e01a99f7e00a9fd7b41a9f44fc2a8c0035fd60000000000000000ffc305d1	"native-unlink-guard"	Scopes::ALL	false	false	Sharing::None	"mid-function; STR replaced by NOP then inline-hooked; must come out as a one-word b (:93-95)"
+# unlink:relied/code:exact=12
+"unlink.recursive_last_window"	"native_unlink_install"	0x38958f8	SeamKind::Relied	690240f9280900f97f0200f99f7e01a99f7e00a9fd7b41a9f44fc2a8c0035fd60000000000000000ffc305d1fc6f11a9fa6712a9f85f13a9f65714a9f44f15a9	"native-unlink-guard"	Scopes::ALL	false	false	Sharing::None	"displaced STR window"
+# unlink:hook/raw_inline_nop:exact=20
+"unlink.recursive_last"	"native_unlink_install"	0x38958fc	SeamKind::Hook { form: HookForm::Raw, placement: Placement::Mid }	280900f97f0200f99f7e01a99f7e00a9fd7b41a9f44fc2a8c0035fd60000000000000000ffc305d1fc6f11a9fa6712a9f85f13a9f65714a9f44f15a9fd7b16a9	"native-unlink-guard"	Scopes::ALL	false	false	Sharing::None	"mid-function"
+# unlink:relied/code:exact=12
+"unlink.sister_first_window"	"native_unlink_install"	0x3895850	SeamKind::Relied	29210091280100f968a641a9690000b4280d00f903000014690240f9280900f97f0200f99f7e01a99f7e00a9fd7b41a9f44fc2a8c0035fd60000000000000000	"native-unlink-guard"	Scopes::ALL	false	false	Sharing::None	"displaced STR window"
+# unlink:hook/raw_inline_nop:exact=20
+"unlink.sister_first"	"native_unlink_install"	0x3895854	SeamKind::Hook { form: HookForm::Raw, placement: Placement::Mid }	280100f968a641a9690000b4280d00f903000014690240f9280900f97f0200f99f7e01a99f7e00a9fd7b41a9f44fc2a8c0035fd60000000000000000f44fbea9	"native-unlink-guard"	Scopes::ALL	false	false	Sharing::None	"mid-function"
+# unlink:relied/code:exact=12
+"unlink.sister_last_window"	"native_unlink_install"	0x3895868	SeamKind::Relied	690240f9280900f97f0200f99f7e01a99f7e00a9fd7b41a9f44fc2a8c0035fd60000000000000000f44fbea9fd7b01a9fd430091f40300aaf30300aa808e40f8	"native-unlink-guard"	Scopes::ALL	false	false	Sharing::None	"displaced STR window"
+# unlink:hook/raw_inline_nop:exact=20
+"unlink.sister_last"	"native_unlink_install"	0x389586c	SeamKind::Hook { form: HookForm::Raw, placement: Placement::Mid }	280900f97f0200f99f7e01a99f7e00a9fd7b41a9f44fc2a8c0035fd60000000000000000f44fbea9fd7b01a9fd430091f40300aaf30300aa808e40f8400000b4	"native-unlink-guard"	Scopes::ALL	false	false	Sharing::None	"mid-function"
+# unlink:relied/code:exact=12
+"unlink.header_first_window"	"native_unlink_install"	0x38951d8	SeamKind::Relied	29210091280100f9a8a641a9690000b4280d00f903000014a90240f9280900f9bf0200f9df7e01a9df7e00a9685240f9150540f9f5f9ffb5f70313aaf48e44f8	"native-unlink-guard"	Scopes::ALL	false	false	Sharing::None	"displaced STR window"
+# unlink:hook/raw_inline_nop:exact=20
+"unlink.header_first"	"native_unlink_install"	0x38951dc	SeamKind::Hook { form: HookForm::Raw, placement: Placement::Mid }	280100f9a8a641a9690000b4280d00f903000014a90240f9280900f9bf0200f9df7e01a9df7e00a9685240f9150540f9f5f9ffb5f70313aaf48e44f8f80640f9	"native-unlink-guard"	Scopes::ALL	false	false	Sharing::None	"mid-function"
+# unlink:relied/code:exact=12
+"unlink.header_last_window"	"native_unlink_install"	0x38951f0	SeamKind::Relied	a90240f9280900f9bf0200f9df7e01a9df7e00a9685240f9150540f9f5f9ffb5f70313aaf48e44f8f80640f99f0218ebe006005499d000f0393b45f9950240f9	"native-unlink-guard"	Scopes::ALL	false	false	Sharing::None	"displaced STR window"
+# unlink:hook/raw_inline_nop:exact=20
+"unlink.header_last"	"native_unlink_install"	0x38951f4	SeamKind::Hook { form: HookForm::Raw, placement: Placement::Mid }	280900f9bf0200f9df7e01a9df7e00a9685240f9150540f9f5f9ffb5f70313aaf48e44f8f80640f99f0218ebe006005499d000f0393b45f9950240f9f50500b4	"native-unlink-guard"	Scopes::ALL	false	false	Sharing::None	"mid-function"
+# unlink:relied/code:exact=12
+"unlink.vector_first_window"	"native_unlink_install"	0x38952a4	SeamKind::Relied	29210091280100f9a8a641a9690000b42961009103000014a90240f929410091280100f9bf0200f9df7e01a9df7e00a9790000b4e00315aab5b10494e00315aa	"native-unlink-guard"	Scopes::ALL	false	false	Sharing::None	"displaced STR window"
+# unlink:hook/raw_inline_nop:exact=16
+"unlink.vector_first"	"native_unlink_install"	0x38952a8	SeamKind::Hook { form: HookForm::Raw, placement: Placement::Mid }	280100f9a8a641a9690000b42961009103000014a90240f929410091280100f9bf0200f9df7e01a9df7e00a9790000b4e00315aab5b10494e00315aa17660294	"native-unlink-guard"	Scopes::ALL	false	false	Sharing::None	"mid-function"
+# unlink:relied/code:exact=12
+"unlink.vector_last_window"	"native_unlink_install"	0x38952c0	SeamKind::Relied	29410091280100f9bf0200f9df7e01a9df7e00a9790000b4e00315aab5b10494e00315aa176602949f0200f9942200911f0314ebc1f9ff54f40240f9683240f9	"native-unlink-guard"	Scopes::ALL	false	false	Sharing::None	"displaced STR window"
+# unlink:hook/raw_inline_nop:exact=20
+"unlink.vector_last"	"native_unlink_install"	0x38952c4	SeamKind::Hook { form: HookForm::Raw, placement: Placement::Mid }	280100f9bf0200f9df7e01a9df7e00a9790000b4e00315aab5b10494e00315aa176602949f0200f9942200911f0314ebc1f9ff54f40240f9683240f9683600f9	"native-unlink-guard"	Scopes::ALL	false	false	Sharing::None	"mid-function"
+# unlink:relied/code:exact=12
+"unlink.observed_38958a4"	"native_unlink_install"	0x38958a0	SeamKind::Relied	f30300aa808e40f8400000b4f9ffff97601240f9e00000b4f6ffff97681240f9690e40f9c90000b42981009106000014e8031faa690e40f989ffffb5690240f9	"native-unlink-guard"	Scopes::ALL	false	false	Sharing::None	"walker window (refusal precondition of the guard)"
+# unlink:relied/code:exact=12
+"unlink.observed_3895148"	"native_unlink_install"	0x3895144	SeamKind::Relied	14008092e90314aaea0315aa4a0140f929050091caffffb5ea0315aa4b0540f98b0100b54b1140f94b0100b54a0140f9aaffffb5ec031faa3f010ceba2010054	"native-unlink-guard"	Scopes::ALL	false	false	Sharing::None	"walker window"
+# unlink:relied/code:exact=12
+"unlink.observed_38951c4"	"native_unlink_install"	0x38951c0	SeamKind::Relied	b4010094a9a241a9690000b42981009103000014a90240f929210091280100f9a8a641a9690000b4280d00f903000014a90240f9280900f9bf0200f9df7e01a9	"native-unlink-guard"	Scopes::ALL	false	false	Sharing::None	"walker window"
+# unlink:relied/code:exact=12
+"unlink.observed_3896bbc"	"native_unlink_install"	0x3896bb8	SeamKind::Relied	681600f9680241397c3200b976e20039680000377f82007910000014682a40f91f010039680241397f2600f96801003688d000d0772a40f9083945f9680000b4	"native-unlink-guard"	Scopes::ALL	false	false	Sharing::None	"destructor window"
+# unlink:relied/code:exact=12
+"unlink.observed_38952cc"	"native_unlink_install"	0x38952c8	SeamKind::Relied	bf0200f9df7e01a9df7e00a9790000b4e00315aab5b10494e00315aa176602949f0200f9942200911f0314ebc1f9ff54f40240f9683240f9683600f9ff0200f9	"native-unlink-guard"	Scopes::ALL	false	false	Sharing::None	"walker window"
+# unlink:relied/code:exact=12
+"unlink.observed_3895904"	"native_unlink_install"	0x3895900	SeamKind::Relied	7f0200f99f7e01a99f7e00a9fd7b41a9f44fc2a8c0035fd60000000000000000ffc305d1fc6f11a9fa6712a9f85f13a9f65714a9f44f15a9fd7b16a9fd830591	"native-unlink-guard"	Scopes::ALL	false	false	Sharing::None	"walker window"
+# unlink:relied/code:exact=12
+"unlink.observed_3895874"	"native_unlink_install"	0x3895870	SeamKind::Relied	7f0200f99f7e01a99f7e00a9fd7b41a9f44fc2a8c0035fd60000000000000000f44fbea9fd7b01a9fd430091f40300aaf30300aa808e40f8400000b4f9ffff97	"native-unlink-guard"	Scopes::ALL	false	false	Sharing::None	"walker window"
+# unlink:relied/code:exact=12
+"unlink.observed_38951fc"	"native_unlink_install"	0x38951f8	SeamKind::Relied	bf0200f9df7e01a9df7e00a9685240f9150540f9f5f9ffb5f70313aaf48e44f8f80640f99f0218ebe006005499d000f0393b45f9950240f9f50500b4a8024139	"native-unlink-guard"	Scopes::ALL	false	false	Sharing::None	"walker window"
+# unlink_probe:hook/raw_inline:exact=20
+"unlink_probe.walk_38958a4"	"native_unlink_probe"	0x38958a4	SeamKind::Hook { form: HookForm::Raw, placement: Placement::Mid }	808e40f8400000b4f9ffff97601240f9e00000b4f6ffff97681240f9690e40f9c90000b42981009106000014e8031faa690e40f989ffffb5690240f929210091	"native-unlink-probe"	Scopes::ALL	false	false	Sharing::None	"diag observer"
+# unlink_probe:hook/raw_inline:exact=16
+"unlink_probe.walk_3895148"	"native_unlink_probe"	0x3895148	SeamKind::Hook { form: HookForm::Raw, placement: Placement::Mid }	e90314aaea0315aa4a0140f929050091caffffb5ea0315aa4b0540f98b0100b54b1140f94b0100b54a0140f9aaffffb5ec031faa3f010ceba20100548a0100b4	"native-unlink-probe"	Scopes::ALL	false	false	Sharing::None	"diag observer"
+# unlink_probe:hook/raw_inline:exact=20
+"unlink_probe.walk_38951c4"	"native_unlink_probe"	0x38951c4	SeamKind::Hook { form: HookForm::Raw, placement: Placement::Mid }	a9a241a9690000b42981009103000014a90240f929210091280100f9a8a641a9690000b4280d00f903000014a90240f9280900f9bf0200f9df7e01a9df7e00a9	"native-unlink-probe"	Scopes::ALL	false	false	Sharing::None	"diag observer"
+# unlink_probe:hook/raw_inline:exact=20
+"unlink_probe.destroy_3896bbc"	"native_unlink_probe"	0x3896bbc	SeamKind::Hook { form: HookForm::Raw, placement: Placement::Mid }	680241397c3200b976e20039680000377f82007910000014682a40f91f010039680241397f2600f96801003688d000d0772a40f9083945f9680000b4e00317aa	"native-unlink-probe"	Scopes::ALL	false	false	Sharing::None	"diag observer"
+# unlink_probe:hook/raw_inline:exact=20
+"unlink_probe.walk_38952cc"	"native_unlink_probe"	0x38952cc	SeamKind::Hook { form: HookForm::Raw, placement: Placement::Mid }	df7e01a9df7e00a9790000b4e00315aab5b10494e00315aa176602949f0200f9942200911f0314ebc1f9ff54f40240f9683240f9683600f9ff0200f9fffe00a9	"native-unlink-probe"	Scopes::ALL	false	false	Sharing::None	"diag observer"
+# unlink_probe:hook/raw_inline:exact=20
+"unlink_probe.walk_3895904"	"native_unlink_probe"	0x3895904	SeamKind::Hook { form: HookForm::Raw, placement: Placement::Mid }	9f7e01a99f7e00a9fd7b41a9f44fc2a8c0035fd60000000000000000ffc305d1fc6f11a9fa6712a9f85f13a9f65714a9f44f15a9fd7b16a9fd830591f40301aa	"native-unlink-probe"	Scopes::ALL	false	false	Sharing::None	"diag observer"
+# unlink_probe:hook/raw_inline:exact=20
+"unlink_probe.walk_3895874"	"native_unlink_probe"	0x3895874	SeamKind::Hook { form: HookForm::Raw, placement: Placement::Mid }	9f7e01a99f7e00a9fd7b41a9f44fc2a8c0035fd60000000000000000f44fbea9fd7b01a9fd430091f40300aaf30300aa808e40f8400000b4f9ffff97601240f9	"native-unlink-probe"	Scopes::ALL	false	false	Sharing::None	"diag observer"
+# unlink_probe:hook/raw_inline:exact=20
+"unlink_probe.walk_38951fc"	"native_unlink_probe"	0x38951fc	SeamKind::Hook { form: HookForm::Raw, placement: Placement::Mid }	df7e01a9df7e00a9685240f9150540f9f5f9ffb5f70313aaf48e44f8f80640f99f0218ebe006005499d000f0393b45f9950240f9f50500b4a8024139e8000036	"native-unlink-probe"	Scopes::ALL	false	false	Sharing::None	"diag observer"
+# gc_guard:relied/code:exact=60
+"gc_guard.loop"	"native_gc_guard"	0x38ffcc0	SeamKind::Relied	891a40f92a01158b4a2140390a013036216975f8292440393f05007280000054e00313aa97f9ff97881640b9d6060091b5420091dfc228eb4bfeff54881240b9	"native-unlink-guard"	Scopes::ALL	false	false	Sharing::None	"the whole 15-word Lua GC constant loop, checked before any patch"
+# gc_guard:patch/data:exact=4
+"gc_guard.patch_1"	"native_gc_guard"	0x38ffcc4	SeamKind::Hook { form: HookForm::Patch, placement: Placement::Mid }	2a01158b4a2140390a013036216975f8292440393f05007280000054e00313aa97f9ff97881640b9d6060091b5420091dfc228eb4bfeff54881240b91f050071	"native-unlink-guard"	Scopes::ALL	false	false	Sharing::None	"add x9,x9,x21 (post-write verify or abort kept)"
+# gc_guard:patch/data:exact=4
+"gc_guard.patch_2"	"native_gc_guard"	0x38ffcc8	SeamKind::Hook { form: HookForm::Patch, placement: Placement::Mid }	4a2140390a013036216975f8292440393f05007280000054e00313aa97f9ff97881640b9d6060091b5420091dfc228eb4bfeff54881240b91f0500710b020054	"native-unlink-guard"	Scopes::ALL	false	false	Sharing::None	"ldp x1,x10,[x9]"
+# gc_guard:patch/data:exact=4
+"gc_guard.patch_3"	"native_gc_guard"	0x38ffcd0	SeamKind::Hook { form: HookForm::Patch, placement: Placement::Mid }	216975f8292440393f05007280000054e00313aa97f9ff97881640b9d6060091b5420091dfc228eb4bfeff54881240b91f0500710b020054f5031faaf6031faa	"native-unlink-guard"	Scopes::ALL	false	false	Sharing::None	"cbz x1,0x38ffcec"
+# game_mode:relied/code:exact=40
+"game_mode.popup_binding"	"game_mode"	0x33678dc	SeamKind::Relied	48fe0090081144f9140540f9888a40f9f30300aa004140f94f21ae9788fa40b91f010071890a4539e8079f1a0801202ae0030032080100120801092a690a40f9	""	Scopes::ALL	false	false	Sharing::None	"AppPopupManager is_busy Lua binding: singleton, state fields, presentation-idle call"
+# game_mode:called/fn:exact=0
+"game_mode.popup_idle"	"game_mode"	0x1eefe30	SeamKind::Called	fd7bbfa9fd030091086840f9080140f909614039e903003409c040b93f0d0071200200543f05007141030054080940f9000540f9e00200b4812901d021540191	""	Scopes::ALL	false	false	Sharing::None	"called; NEW Called row (today the call is unguarded)"
+# hazard:relied/code:exact=8
+"hazard.hook_window"	"hazard_manager"	0x2311be4	SeamKind::Relied	c97f01b0396989b9880500343f0f007122770154ba7d01905a0306914817198b09c88a528900a072e1f289d201cfaaf2a101c0f21b20edd2166969f809c98a52	""	Scopes::ALL	false	false	Sharing::None	"adrp; ldrsw (the scan pattern before the cbz)"
+# hazard:hook/raw_inline:exact=20
+"hazard.intercept"	"hazard_manager"	0x2311bec	SeamKind::Hook { form: HookForm::Raw, placement: Placement::Mid }	880500343f0f007122770154ba7d01905a0306914817198b09c88a528900a072e1f289d201cfaaf2a101c0f21b20edd2166969f809c98a528900a072136969b8	""	Scopes::ALL	false	false	Sharing::None	"mid-function on the cbz found by the scan (B123-pre runtime log line 1396)"
+# hazard:relied/code:exact=24
+"hazard.flag_scan"	"hazard_manager"	0x17408c4	SeamKind::Relied	54de01d094f22591a80351f889024039080140f92a0500515f110071ea0300324925891a221d40920001138b615901f021bc1b91ea158a94a80351f8080140f9	""	Scopes::ALL	false	false	Sharing::None	"adrp; add; ldur; ldrb; ldr; sub. Flag = (pc & ~0xfff) + adrp + add + 9 = 0x530a985 (bss), derived from these words"
+# practice_trace:hook/raw_inline:exact=16
+"practice_trace.list_callback_enter"	"practice_trace"	0x23ef1d0	SeamKind::Hook { form: HookForm::Raw, placement: Placement::Mid }	00013fd6930240f92003003732000014801240f9a00200b4080040f9081140f900013fd620020037281f42f9080140f908054039a8010034882e40b91f011a6b	"console-practice-trace"	Scopes::ALL	false	false	Sharing::None	"diag"
+# practice_trace:hook/raw_inline:exact=16
+"practice_trace.list_step"	"practice_trace"	0x23ef1e0	SeamKind::Hook { form: HookForm::Raw, placement: Placement::Entry }	801240f9a00200b4080040f9081140f900013fd620020037281f42f9080140f908054039a8010034882e40b91f011a6b41010054e8a24e391f050071e1000054	"console-practice-trace"	Scopes::ALL	false	false	Sharing::None	"Diag only (console-practice-trace). Placement heuristic says entry because the previous word is an unconditional b; it is a branch target inside the list callback loop (mid-function)."
+# turnip:relied/code:exact=64
+"turnip.lua_module_public"	"turnip_identity"	0x2056ab0	SeamKind::Relied	00c840f9080040f9022d40f940001fd600c840f9080040f9023140f940001fd600c840f9080040f9023540f940001fd600c840f9080040f9014140f920001fd6	""	Scopes::ALL	false	false	Sharing::None	"lua-module-public wrappers"
+# turnip:relied/code:exact=64
+"turnip.lua_module_public+0x40"	"turnip_identity"	0x2056af0	SeamKind::Relied	00c840f9080040f9024540f940001fd600c840f9080040f9025540f940001fd600c840f9080040f9025940f940001fd600c840f9080040f9025d40f940001fd6	""	Scopes::ALL	false	false	Sharing::None	""
+# turnip:relied/code:exact=16
+"turnip.lua_module_public+0x80"	"turnip_identity"	0x2056b30	SeamKind::Relied	f657bda9f44f01a9fd7b02a9fd83009108805ff8e80700b414bd40f9b40700b4091040f9290140f9080840f9e1030032e2031faa29410091150109cbf30300aa	""	Scopes::ALL	false	false	Sharing::None	""
+# turnip:relied/code:exact=64
+"turnip.main_15dd8e8"	"turnip_identity"	0x15dd8e8	SeamKind::Relied	089d9352b46a28f8089e9352bf6a28f808a09352a002088bb602098b678a8f9408d69352bf6a28f808d59352bf6a28f808d49352bf6a28f808d39352bf6a28f8	""	Scopes::ALL	false	false	Sharing::None	"MAIN_CODE span"
+# turnip:relied/code:exact=64
+"turnip.main_15dd8e8+0x40"	"turnip_identity"	0x15dd928	SeamKind::Relied	08d29352bf6a28f8089f9352bb6a28b808d79352bf6a28f808d89352bf6a287888d89352490180520d039452a96a28b808df9352bf6a28f808de9352bf6a28f8	""	Scopes::ALL	false	false	Sharing::None	""
+# turnip:relied/code:exact=56
+"turnip.main_15dd8e8+0x80"	"turnip_identity"	0x15dd968	SeamKind::Relied	08dd9352bf6a28f8c8d401f008210091c80200f908e09352bf6a28f808e19352bb6a287808e29352a902088b88cc01f008211191e9db04a9280100f908e39352	""	Scopes::ALL	false	false	Sharing::None	""
+# turnip:relied/code:exact=8
+"turnip.main_15edc2c"	"turnip_identity"	0x15edc2c	SeamKind::Relied	ee2b40f98eca00f9ee3740f98ece00f9ee0b40f98ec200f9ee1f40f98ec600f98b7a00f9eb1740f98bde0fa9eb1340f98b8600f9eb0f40f98b7200f9eb1b40f9	""	Scopes::ALL	false	false	Sharing::None	"MAIN_CODE span"
+# turnip:relied/code:exact=64
+"turnip.motion_slot_28"	"turnip_identity"	0x161b2c0	SeamKind::Relied	ff0302d1f72300f9f65705a9f44f06a9fd7b07a9fdc30191355040f9366c42f9f40301aaf30300aa010a8052e0031c32e84b8c94f70300aa600200b5a8e801f0	""	Scopes::ALL	false	false	Sharing::None	"vtable+0x28 target body (also compared as a pointer, :118)"
+# turnip:relied/code:exact=64
+"turnip.motion_slot_28+0x40"	"turnip_identity"	0x161b300	SeamKind::Relied	008147f9e00100b4080a8052bf831db8a1a300d1e80300f9080040f9081940f9e203009100013fd6c0000036010a8052e0031c32d74b8c94f70300aa400000b5	""	Scopes::ALL	false	false	Sharing::None	""
+# turnip:relied/code:exact=64
+"turnip.motion_slot_28+0x80"	"turnip_identity"	0x161b340	SeamKind::Relied	f7031faae30f1e32e00317aae10315aae20316aa8b2e8494750a40f9770a00f9d50000b4e00315aad62e8494e00315aaf44d8c94770a40f9690640f98a0240f9	""	Scopes::ALL	false	false	Sharing::None	""
+# turnip:relied/code:exact=64
+"turnip.motion_slot_28+0xc0"	"turnip_identity"	0x161b380	SeamKind::Relied	686200918c6242392b0940b98d9e40b98eaa40b96baa01b96cb206396db201b96eb601b969aa1ba97ffe1ca9e90240f9290540f928811ff8808a42f9400100b4	""	Scopes::ALL	false	false	Sharing::None	""
+# turnip:relied/code:exact=64
+"turnip.motion_slot_28+0x100"	"turnip_identity"	0x161b3c0	SeamKind::Relied	88c213911f0100eb20010054080040f9080940f900013fd6e01300f9800100b52c000014ff1300f92a000014e8030091e81300f9080040f9080d40f9e1030091	""	Scopes::ALL	false	false	Sharing::None	""
+# turnip:relied/code:exact=64
+"turnip.motion_slot_28+0x140"	"turnip_identity"	0x161b400	SeamKind::Relied	00013fd6e01340f9400400b469aa40a94a0140f9880240f9a1a300d1e2e30091e3c300914a0540f9a8831df8ea2703a9080040f9081940f900013fd6400100b4	""	Scopes::ALL	false	false	Sharing::None	""
+# turnip:relied/code:exact=64
+"turnip.motion_slot_28+0x180"	"turnip_identity"	0x161b440	SeamKind::Relied	e80300aa60ee40f968ee00f9800000b4080040f9080540f900013fd6e803003268820739e01340f9e80300911f0100eba0000054e00000b4080040f9081540f9	""	Scopes::ALL	false	false	Sharing::None	""
+# turnip:relied/code:exact=64
+"turnip.motion_slot_28+0x1c0"	"turnip_identity"	0x161b480	SeamKind::Relied	03000014080040f9081140f900013fd6e803003268a20839880a40b90900aa521f01096b8001005449e501b02a3940f9492941a93f010aebe00000542b8540f8	""	Scopes::ALL	false	false	Sharing::None	""
+# turnip:relied/code:exact=64
+"turnip.motion_slot_28+0x200"	"turnip_identity"	0x161b4c0	SeamKind::Relied	6c0940b99f01086b800000545f0109eb61ffff54eb031faa6b1201f9fd7b47a9f44f46a9f72340f9f65745a9ff030291c0035fd6000000000000000000000000	""	Scopes::ALL	false	false	Sharing::None	""
+# turnip:relied/code:exact=64
+"turnip.motion_slot_30"	"turnip_identity"	0x161b500	SeamKind::Relied	f44fbea9fd7b01a9fd430091f30300aa00ec40f9a00000b47fee00f9080040f9080540f900013fd6740a40f97f820739140100b4e00314aa7f0a00f9612e8494	""	Scopes::ALL	false	false	Sharing::None	"vtable+0x30 target body"
+# turnip:relied/code:exact=32
+"turnip.motion_slot_30+0x40"	"turnip_identity"	0x161b540	SeamKind::Relied	fd7b41a9e00314aaf44fc2a87d4d8c14fd7b41a9f44fc2a8c0035fd600000000ff0301d1f65701a9f44f02a9fd7b03a9fdc3009148018052f30300aa1f840739	""	Scopes::ALL	false	false	Sharing::None	""
+# turnip:relied/code:exact=64
+"turnip.motion_slot_38"	"turnip_identity"	0x161b560	SeamKind::Relied	ff0301d1f65701a9f44f02a9fd7b03a9fdc3009148018052f30300aa1f84073908e401b91ffc1fa9610640f9006000917ffe1ea9233fb697680240f97fe601b9	""	Scopes::ALL	false	false	Sharing::None	"vtable+0x38 target body"
+# turnip:relied/code:exact=64
+"turnip.motion_slot_38+0x40"	"turnip_identity"	0x161b5a0	SeamKind::Relied	082d40f9e00313aae1031f2a00013fd6680240f9082940f9e00313aa00013fd64003003660ee40f9c18498d2018ea7f28101c0f2e2230091e3031faaff0700f9	""	Scopes::ALL	false	false	Sharing::None	""
+# turnip:relied/code:exact=64
+"turnip.motion_slot_38+0x80"	"turnip_identity"	0x161b5e0	SeamKind::Relied	c84a8494f30740f9d30300b4750a40f9f4031faa0200001494060091a86a74381fcd01716000005488ffff3511000014760640f9c07a74f8400000b4494d8c94	""	Scopes::ALL	false	false	Sharing::None	""
+# turnip:relied/code:exact=64
+"turnip.motion_slot_38+0xc0"	"turnip_identity"	0x161b620	SeamKind::Relied	df7a34f8f5ffff17680a40f9f44f42a9080140f9000540f9216f01b021502891fd7b43a9f65741a9ff0301910d318414e00740f9400000b43a4d8c94ff0700f9	""	Scopes::ALL	false	false	Sharing::None	""
+# turnip:relied/code:exact=32
+"turnip.motion_slot_38+0x100"	"turnip_identity"	0x161b660	SeamKind::Relied	fd7b43a9f44f42a9f65741a9ff030191c0035fd6000000000000000000000000c0035fd6000000000000000000000000ff0301d1f65701a9f44f02a9fd7b03a9	""	Scopes::ALL	false	false	Sharing::None	""
+# turnip:relied/code:exact=64
+"turnip.main_3736330"	"turnip_identity"	0x3736330	SeamKind::Relied	080040b91f150071e1000054fd7bbfa9fd030091000440f916f7ff97fd7bc1a8c0035fd6201001b000a00e91c0035fd6ff8300d1fd7b01a9fd430091e10700f9	""	Scopes::ALL	false	false	Sharing::None	"MAIN_CODE span"
+# turnip:relied/code:exact=48
+"turnip.main_3736330+0x40"	"turnip_identity"	0x3736370	SeamKind::Relied	080040b91f150071a1000054000440f9e1230091dff7ff9703000014201001b000a00e91fd7b41a9ff830091c0035fd6ff8300d1fd7b01a9fd430091080040b9	""	Scopes::ALL	false	false	Sharing::None	""
+# turnip:relied/code:exact=64
+"turnip.main_3734300"	"turnip_identity"	0x3734300	SeamKind::Relied	ff4301d1f70b00f9f65702a9f44f03a9fd7b04a9fd030191f60300aad78e42f8f40301aaf30300aab70200b4880240f976a20091089d409203000014f60317aa	""	Scopes::ALL	false	false	Sharing::None	"MAIN_CODE span"
+# turnip:relied/code:exact=64
+"turnip.main_3734300+0x40"	"turnip_identity"	0x3734340	SeamKind::Relied	f70309aae91240f9299d40921f0109eb82000054e90240f929ffffb52a0000143f0108ebe2000054f60317aac98e40f8890000b4f70309aaf3ffff17f70316aa	""	Scopes::ALL	false	false	Sharing::None	""
+# turnip:relied/code:exact=64
+"turnip.main_3734300+0x80"	"turnip_identity"	0x3734380	SeamKind::Relied	d50240f9550500b5e0031c32e10b1d32c0e70794f50300aae00100b5e8df00d0008147f9e80b1d32ff1f00b9e1730091e80700f9080040f9081940f9e2230091	""	Scopes::ALL	false	false	Sharing::None	""
+# turnip:relied/code:exact=64
+"turnip.main_3734300+0xc0"	"turnip_identity"	0x37343c0	SeamKind::Relied	00013fd6e0031c32e10b1d32b1e70794f50300aa880240f9a81200f9bf2a00b9bf7e00a9b70a00f9d50200f9681240f9080140f9080100b4681200f9c10240f9	""	Scopes::ALL	false	false	Sharing::None	""
+# turnip:relied/code:exact=64
+"turnip.main_3734300+0x100"	"turnip_identity"	0x3734400	SeamKind::Relied	06000014f60317aad50240f9150100b5deffff17e10315aa601640f975c53297681a40f908050091681a00f9a0a20091fd7b44a9f44f43a9f70b40f9f65742a9	""	Scopes::ALL	false	false	Sharing::None	""
+# turnip:relied/code:exact=16
+"turnip.main_3734300+0x140"	"turnip_identity"	0x3734440	SeamKind::Relied	ff430191c0035fd60000000000000000082040f9a80200b40b8d42f8ab0200b4290040f92a9d4092e90308aa6c1140f98c9d40929f010aebec279f1a29318b9a	""	Scopes::ALL	false	false	Sharing::None	""
+# turnip:relied/code:exact=64
+"turnip.main_3734670"	"turnip_identity"	0x3734670	SeamKind::Relied	e8030032080000b928000012080800b9c0035fd6000000000000000000000000e8031f32080000b9287c4093080400f9c0035fd6000000000000000000000000	""	Scopes::ALL	false	false	Sharing::None	"MAIN_CODE span"
+# turnip:relied/code:exact=64
+"turnip.main_3734670+0x40"	"turnip_identity"	0x37346b0	SeamKind::Relied	e8031f32080000b9e803012a080400f9c0035fd6000000000000000000000000e8031f32080000b9010400f9c0035fd6e8031f32080000b9010400f9c0035fd6	""	Scopes::ALL	false	false	Sharing::None	""
+# turnip:relied/code:exact=64
+"turnip.main_3734670+0x80"	"turnip_identity"	0x37346f0	SeamKind::Relied	e8070032080000b9000800bdc0035fd6e8031e32080000b9010400f9c0035fd6a8008052080000b9010400f9280040b908050011280000b9c0035fd600000000	""	Scopes::ALL	false	false	Sharing::None	""
+# turnip:relied/code:exact=64
+"turnip.main_3735130"	"turnip_identity"	0x3735130	SeamKind::Relied	080040b91f1d0071a00000541f0d0071a00000541f090071c1000054000440f9c0035fd6000840bd0000389ec0035fd6e0031faac0035fd60000000000000000	""	Scopes::ALL	false	false	Sharing::None	"MAIN_CODE span"

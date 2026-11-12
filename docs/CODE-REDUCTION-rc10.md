@@ -1,7 +1,7 @@
 # rc.10 code reduction: measurement and plan
 
 The plan of `TASK-rc10-code-reduction.md`, measured on `main` `b1e27e5a`, 2026-11-12 (UTC), and the result of each
-slice as it lands on `rc10`. Done so far: **S3** (below, "S3: done").
+slice as it lands on `rc10`. Done so far: **S3** and **S1** (below, "S3: done", "S1: done").
 
 ## The short answer
 
@@ -289,6 +289,26 @@ added or removed.
 - The default Switch build has one `dead_code` warning that was there before S3: `runtime::lobby::lobby_speed::passes`
   is called only from diag blocks.
 - `build.rs` still names the build `rc9`.
+## S1: done (2026-11-12)
+
+The rows of the 23 guard tables are data files, `data/tables/*.tsv` (format: `data/tables/README.md`). `build.rs`
+turns each file into the array its source file includes, so the tables are the same Rust values in the same order.
+
+- **Product lines: 119,817 to 111,612 (−8,205).** Non-test lines: 126,703 to 118,493. On `tools/sloc.py`: 162,692 to
+  154,519 (−8,173). The budget is ratcheted down to 154,519.
+- **The lines moved; they were not deleted.** 958 rows left 22 `*.rs` files (8,526 lines) and are 1,231 lines of
+  data (350 KB). `build.rs` grew by about 50 lines.
+- **Every row is identical.** `src/model/table_digest_tests.rs` pins a SHA-256 over every row's `Debug` text, in
+  table order, for the 690 seam rows, the 258 site rows and the two small tables. The digests were taken while the
+  rows were still Rust literals and pass unchanged on the data files.
+- **Every data row has a 64-byte guard:** a host test reads the files, and `build.rs` fails the build on a guard that
+  is not 128 hex digits.
+- **The playbook's compliance row "every site guard is 64 bytes"** reads `guard: [..]` literals in `src/`. It still
+  passes, on the few literals that remain (the empty row, two test rows), not on the 958 rows.
+- The generators (`tools/gen_*.py`) still write a table as Rust; `tools/rows_tsv.py table` turns that into the data
+  file (`tools/test_rows_tsv.py`).
+- The 86 rows of removed and non-shipped probes are still in the tables, so the install line is unchanged. S4 drops
+  the rows of the probes it removes.
 ## Line deltas per slice
 
 | Slice | Head | Raw non-test (product) | `tools/sloc.py` | Tests | Coverage |
@@ -296,3 +316,4 @@ added or removed.
 | Plan baseline | `b1e27e5a` | 129,593 (122,707) | 165,931 | 865 (917 with the crates' gates) | 91.54% |
 | `rc10` start | `f5146184` | 129,593 (122,707) | 165,930 | 821 (873) | 90.18% |
 | S3 | `6c419689` | 126,703 (119,817) | 162,692 | 821 (873) | 90.59% |
+| S1 | the commit after `6c6ad6bb` | 118,493 (111,612) | 154,519 | 824 (876) | not re-measured |

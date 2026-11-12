@@ -40,6 +40,10 @@ pub mod seams;
 #[cfg(test)]
 #[path = "../model/game_speed_rows_tests.rs"]
 mod game_speed_rows_tests;
+/// rc.10 S1: every row of every guard table against the digest taken before the rows became data files.
+#[cfg(test)]
+#[path = "../model/table_digest_tests.rs"]
+mod table_digest_tests;
 /// rc.8 R2: the lobby speed rows' guard words decoded against `model::lobby_speed`.
 #[cfg(test)]
 #[path = "../model/lobby_speed_rows_tests.rs"]
