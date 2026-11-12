@@ -18,6 +18,10 @@ action, result) before a clip was kept. The raw takes stay outside git with thei
   - `rc11-waiting-hitboxes.gif` (`docs-ldn66d-0c628724` `fx-waiting-hitboxes`, rc.11, the Surface LDN pair): the
     guest's waiting room as its first practice; the menu turns Hitbox Visualization On, the overlay appears; Off, it
     goes (#66).
+  - `rc11-qp-station1-battle.gif` (`docs-qp67c-0c628724` `r1-battle`, rc.11, the XPS pair; the CPU pilot plays both
+    fighters, as the Quickplay rule asks: both attack): b joined second (station 1); the online match, a stock lost to
+    an attack, TIME!; both detectors `sync_end … desync_seen=0`, and b's waiting-room practice goes `active=false`
+    when the match's scene starts (#67).
   - `rc11-migration.gif` (`docs-rd16d-0c628724` `fx-migration`, rc.11): a boot on pre-rc.5 slot files; the menu's
     Recording page lists the migrated saves `Slot 1 (2026-11-12)` and `Slot 2 (2026-11-12)` and `Old jab` (#37).
   - On rc.10's diag `79922abe` (`docs-rd14`, `docs-rd14b` and `docs-rd15-32ee7595`; rc.11 changes nothing they show):
@@ -27,6 +31,7 @@ action, result) before a clip was kept. The raw takes stay outside git with thei
 | File | Run, row | Embedded in | Length, size | Raw windows kept | What the frames show |
 | --- | --- | --- | --- | --- | --- |
 | `media/rc11-footer-tag.gif` | `docs-rd18-0c628724`, `fx-footer-tag` (the Surface, 17:51–17:58Z) | TECHNICAL.md, the build tag | 9.1 s, 1.7 MB | 0.0–9.1 s | Mario vs Chrom in Training; the menu opens on Fighters & Stages, R to Display & Controls; both pages' key hints end with `0.2.0-rc.6 · rc11 0c628724`; the menu closes. |
+| `media/rc11-strip-under-menu.gif` | `docs-strip92b-0c628724`, `lp-q2-change` (the XPS, 20:28–20:43Z; b alone in the Quickplay waiting room, after `qp-check` found no pop-up) | README, Input display | 9.8 s, 9.0 MB | 0.0–9.8 s | The waiting room with the frame strip at the top; Plus opens the game's menu (Training Partners, Training Partner Behavior) and the strip is gone; Right adds a second partner, Down and Left set Behavior to Attack; the menu closes and the strip is back while the partners attack. The log: `[LobbyPersist] saved … change=Partners(2)`, then `change=Behavior(7)`. |
 | `media/rc11-lobby-speed.gif` | `docs-lb4-0c628724`, `fx-lobby-speed` (the XPS, 17:51–18:12Z; the same-boot retry) | README, Game speed | 9.1 s, 5.0 MB | 0.2–3.0, 66.6–68.4, 69.4–73.9 s | The Quickplay waiting room, Sephiroth and a CPU partner. A forward smash at x1; the "Game speed" pop-up steps to 2/3, then 1/2; the same forward smash at 1/2 is slower and knocks the partner off. The log: `[GameSpeed] step place=Lobby dir=Left speed=1/2`, `lobby Taken(… divisor: 2 …) in_practice=true`; ms per motion frame ×1.946 at 1/2. |
 
 ## rc.10 docs clips (2026-11-12)

@@ -43,7 +43,8 @@ See every hitbox, hurtbox and grab box. Display & Controls › Hitbox Visualizat
 ### Input display
 A strip at the top shows your inputs and the CPU's, and who can act first. R + D-pad Down turns it on and off.
 
-![R + D-pad Down hides the strip, then shows it again](docs/media/rc8-input-display-chord.gif)<br>*Turning the input display off and on*
+![R + D-pad Down hides the strip, then shows it again](docs/media/rc8-input-display-chord.gif)<br>*Turning the input display off and on*<br>
+![In the online waiting room, Plus opens the game's menu and the strip steps aside until it closes](docs/media/rc11-strip-under-menu.gif)<br>*It steps aside for the waiting room's menu*
 
 How to read it: [the frame strip guide](docs/FRAME-STRIP.md)
 
