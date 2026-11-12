@@ -324,6 +324,14 @@ is not behind feature switches", which supersedes D11).
   exact identities, and 16 conditions were simplified by hand, keeping the same evaluation: the dropped operands are
   pure, or were already short-circuited away. Two dead branches went with them (`runtime/roster/kirby_hats.rs`,
   `runtime/roster/character_items.rs`). Where a constant is only passed along as an argument, it stays `true`.
+- **The NROs are not byte-identical to S1's, and cannot be:** the enabled feature set is part of the crate's symbol
+  hash, so every symbol is renamed and the code is laid out in another order; the machine outliner then splits a few
+  functions differently. Sizes are the same (release: every section; diag: `.text` +32 bytes).
+- **The code is the same, function by function.** S1 and S2 release ELFs built with the machine outliner off have the
+  same 7,150 functions, and 7,145 have the same instructions once addresses are masked. The other five: one closure
+  whose index changed (same body); `prepare_with` in `runtime/roster/character_sources.rs`, whose simplified filter
+  makes the same two calls in the other order and is one instruction shorter; and two functions whose only difference
+  is an address-dependent encoding (`adrp`+`add` against `nop`+`adr`, a padding word).
 - **`Cargo.toml`** keeps `deluxe-sdk` (an optional dependency), `diag`, the diagnostic family and `simulator`.
   `default = ["deluxe-sdk"]`.
 - **`cargo build --no-default-features`** is now the whole product without the Deluxe SDK.
@@ -342,4 +350,4 @@ is not behind feature switches", which supersedes D11).
 | `rc10` start | `f5146184` | 129,593 (122,707) | 165,930 | 821 (873) | 90.18% |
 | S3 | `6c419689` | 126,703 (119,817) | 162,692 | 821 (873) | 90.59% |
 | S1 | `13e8ef5d` | 118,493 (111,612) | 154,519 | 824 (876) | not re-measured |
-| S2 | the commit after `0d9b8be9` | 117,248 (110,367) | 152,990 | 824 (876) | not re-measured |
+| S2 | `84e39648` | 117,248 (110,367) | 152,990 | 824 (876) | not re-measured |
