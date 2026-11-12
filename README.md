@@ -194,7 +194,8 @@ Playback is shown in [docs/RECORDING.md](docs/RECORDING.md). Cuts inside are lis
 
 While an AI drives Player 1, for example the standalone CPU pilot, Record is refused, from the chord and from the
 pop-up: the notice reads "P1 is controlled by an AI: recording is off", and nothing is recorded. A recording that is
-already running can always be stopped.
+already running can always be stopped. Play on Player 1 and the waiting room's Quick Reset are refused the same way
+("… Play on Player 1 is off", "… Quick Reset is off"), and Player 1's input is left to the pilot.
 
 ### Combos
 
@@ -360,6 +361,9 @@ The *Replay capture* row and the Online Deluxe overlay show the same setting.
 newest build (the release link resolves once it is published: TODO-FINAL-PASS). It follows 0.2.0-rc.3.1: 0.2.0-rc.5
 was withdrawn before players ran it, and there is no separate 0.2.0-rc.4. What it changes is
 [docs/RELEASE-NOTES-rc6.md](docs/RELEASE-NOTES-rc6.md), on top of [docs/RELEASE-NOTES-rc5.md](docs/RELEASE-NOTES-rc5.md).
+The builds after it, rc.8 and rc.9, are in [docs/RELEASE-NOTES-rc8.md](docs/RELEASE-NOTES-rc8.md) and
+[docs/RELEASE-NOTES-rc9.md](docs/RELEASE-NOTES-rc9.md): rc.9 fixes the shortcut conflicts with Online Deluxe, the CPU
+pilot and imgui_smash.
 
 **0.2.0-rc.3** (2026-11-05) is the previous console test build. It adds to rc.2:
 - the **frame strip** input display, replacing the 15-row input log;
