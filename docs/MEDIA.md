@@ -15,6 +15,11 @@ action, result) before a clip was kept. The raw takes stay outside git with thei
   frames):
   - `rc11-vs-sudden-death.gif` (`docs-rd17c-0c628724` `vs-route`, rc.11): TIME!, sudden death at 300%, a Bob-omb,
     GAME!, while the replay capture runs on (#71).
+  - `rc11-waiting-hitboxes.gif` (`docs-ldn66d-0c628724` `fx-waiting-hitboxes`, rc.11, the Surface LDN pair): the
+    guest's waiting room as its first practice; the menu turns Hitbox Visualization On, the overlay appears; Off, it
+    goes (#66).
+  - `rc11-migration.gif` (`docs-rd16d-0c628724` `fx-migration`, rc.11): a boot on pre-rc.5 slot files; the menu's
+    Recording page lists the migrated saves `Slot 1 (2026-11-12)` and `Slot 2 (2026-11-12)` and `Old jab` (#37).
   - On rc.10's diag `79922abe` (`docs-rd14`, `docs-rd14b` and `docs-rd15-32ee7595`; rc.11 changes nothing they show):
     `rc10-rename.gif` (#32), `rc10-chain-picker.gif` (#21), `rc10-active-after-record.gif` (#12), `rc10-hot-five.gif`
     (#30), `rc10-edit-placement.gif` (#70), `rc10-intro-fresh.gif` (#65) and `rc10-mash-interrupt.gif` (#22).
