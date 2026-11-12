@@ -412,18 +412,39 @@ lane's evidence folder). Release and diag ELFs of `83e91989` against `2c728893`:
   build two `stp` instructions sit in the function, in the other in its outlined helper. The four differ by 4 or 8
   bytes each and sum to the same size.
 - The stack table, svc and game-thread checks pass on both ELFs.
-## After S4: where rc.10 stands, and S5 to S7 re-measured
+## S3c: dead fields and variants, tried and not taken (2026-11-12)
 
-| | Start (`f5146184`) | After S3, S1, S2, S4 (`fb028a9b`) | Change |
+After S3b, 34 enum variants and 37 struct fields are still dead in every Switch build. The order was to remove those
+in plain Rust types (no `repr`, never across FFI), with the same function-by-function proof.
+
+- **Tried:** ten variants no build constructs and no test uses, and one field nothing reads, with their match arms:
+  `Sharing::External`, `ClipEffect::None`, `PlayRefusal::FightersMissing`, `Phase::Idle`, `CellContent::Unsupported`,
+  `NativeCall::WritePairRefs` and `SetRequestBit`, `LedgerRefusal::ResetNotExclusive`, `Exception::CrashGuard`, and
+  `RecordStop::Saved`'s `start_save`. All gates passed. The saving was 16 product lines.
+- **The proof fails, by nature.** Removing a variant renumbers the enum's discriminants and removes arms from the
+  code that matches on it; removing a field changes the struct. In the release ELF about 90 functions changed size or
+  instructions (`.text` −1,104 bytes), among them `body_bank::group_lifecycle`'s closures and `store::decode`.
+- **So it is not on `rc10`.** For 16 lines it would need its own Eden pass. The commit is kept as a patch in the
+  lane's evidence folder (`s3c-9c167a0a-not-pushed.patch`).
+- **The rest were never candidates:**
+  - 30 or so are used by tests (a test constructs the variant or reads the field);
+  - the menu editors' five variants (`NamedLibrary`, `SaveSlotToLibrary`, `ComboSave`, `ComboLibrary`,
+    `ComboTarget`) have whole panels as their match arms in `runtime/ui`: removing them is a UI change;
+  - the fields of the guard-table rows (`note`, `feature`, `scopes`, `read_only`, `per_frame`), of the callback
+    contracts (`seam`, `per_frame`, `review`), of the pane table and of the thread table are data and review records;
+    the layout builder and the stack tool read some of them.
+## Where rc.10 stands, and S5 to S7 re-measured
+
+| | Start (`f5146184`) | After S3, S1, S2, S4, S3b (`2c728893`) | Change |
 | --- | --- | --- | --- |
-| Product lines (raw) | 122,707 | 110,364 | −12,343 |
+| Product lines (raw) | 122,707 | 107,697 | −15,010 |
 | Diag-only lines (raw) | 6,755 | 5,692 | −1,063 |
-| Non-test lines (raw) | 129,593 | 116,187 | −13,406 (−10.3%) |
-| `tools/sloc.py` | 165,930 | 151,623 | −14,307 |
+| Non-test lines (raw) | 129,593 | 113,520 | −16,073 (−12.4%) |
+| `tools/sloc.py` | 165,930 | 147,878 | −18,052 |
 
-Against upstream's 24,325 that is 4.8 times, from 5.3. It is inside the floor this plan gave (110,000–117,000).
+Against upstream's 24,325 that is 4.7 times, from 5.3. It is inside the floor this plan gave (110,000–117,000).
 
-The three slices left, measured again on `fb028a9b`:
+The three slices left, measured on `fb028a9b` (before S3b):
 
 | Slice | What is there now | Realistic saving | Risk and cost |
 | --- | --- | --- | --- |
@@ -432,8 +453,7 @@ The three slices left, measured again on `fb028a9b`:
 | S7, menu and pop-up tables | 549 `X => "text"` arms, at most 65 in one module. An arm is already one line; a table does not make it shorter. | under −300 | Medium: the menu and panel tests, and an Eden menu tour. |
 
 Together that is about 800 lines, 0.7% of what is left, for two Eden passes and a high-risk refactor. My
-recommendation is not to do S5 to S7 for rc.10. The larger remaining saving is the roughly 2,500 dead lines S3 left
-in place (dead types and what touches them), which needs a decision on its proof, not new engineering.
+recommendation is not to do S5 to S7 for rc.10. (The roughly 2,500 dead lines S3 had left are taken in S3b.)
 ## Line deltas per slice
 
 | Slice | Head | Raw non-test (product) | `tools/sloc.py` | Tests | Coverage |
