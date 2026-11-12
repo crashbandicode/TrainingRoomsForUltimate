@@ -64,7 +64,7 @@ changed is [RELEASE-NOTES-rc8.md](RELEASE-NOTES-rc8.md).
 
 ### The build in the menu footer
 
-- The build tag at the foot of every menu page now names rc.9, for example `0.2.0-rc.6 · rc9 ef4113c2`.
+- The build tag at the foot of every menu page now names rc.9, for example `0.2.0-rc.6 · rc9 01950601`.
 
 ## The plugins that ship beside it
 
@@ -100,9 +100,11 @@ changed is [RELEASE-NOTES-rc8.md](RELEASE-NOTES-rc8.md).
 
 ## For developers
 
-- **The host tests:** the suite went from 41,918 tests to 942 at the start of rc.9, and is 948 with the chord-fix tests.
-  Every cut and the reason for it is in [TEST-CUT-LEDGER-rc9.md](TEST-CUT-LEDGER-rc9.md).
-- **Coverage:** COVERAGE-rc9.md (link to follow when it's posted).
+- **The host tests:** the suite went from 41,918 tests to 865, under the 1,000 limit.
+  - The cut first took it to 942. Every cut and the reason for it is in [TEST-CUT-LEDGER-rc9.md](TEST-CUT-LEDGER-rc9.md).
+  - The cut tests then came back as table-driven tests.
+- **Coverage:** line coverage is 91.5% with those 865 tests (90.8% before the cut, 34.2% just after it). How it was
+  measured, and what keeps it below 95%, is in [COVERAGE-rc9.md](COVERAGE-rc9.md).
 - **Where the rules live:**
   - The chord rules are `model::chords::passes_row` (C3, C4) and `model::game_speed::Hold` (the speed hold).
   - Deluxe's export is read by `model::deluxe_overlay` and `runtime::deluxe_overlay`: looked up once, then again after
