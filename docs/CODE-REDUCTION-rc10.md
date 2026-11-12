@@ -372,6 +372,28 @@ The five probes nothing used are deleted (the operator's Group A): `mii-ldn-qual
   log); it failed the same way on the base build in the integration lane's last run of this set
   (`final-rc8-surface-1-eca14e4b`). The console has no panic, abort, crash or unmapped-access line. This boot is also
   S2's check: S2's binary was not byte-identical, and the build under test contains it.
+## After S4: where rc.10 stands, and S5 to S7 re-measured
+
+| | Start (`f5146184`) | After S3, S1, S2, S4 (`fb028a9b`) | Change |
+| --- | --- | --- | --- |
+| Product lines (raw) | 122,707 | 110,364 | −12,343 |
+| Diag-only lines (raw) | 6,755 | 5,692 | −1,063 |
+| Non-test lines (raw) | 129,593 | 116,187 | −13,406 (−10.3%) |
+| `tools/sloc.py` | 165,930 | 151,623 | −14,307 |
+
+Against upstream's 24,325 that is 4.8 times, from 5.3. It is inside the floor this plan gave (110,000–117,000).
+
+The three slices left, measured again on `fb028a9b`:
+
+| Slice | What is there now | Realistic saving | Risk and cost |
+| --- | --- | --- | --- |
+| S5, one guard-table system | The tables are data already. What is left is two row structs and their projections (`native_seams/mod.rs`, `sites.rs`) and the two installers that read them. | about −300 | Medium: both installers change; an Eden boot. |
+| S6, one Mii role owner | `runtime/mii/mii_ordinary_cpu.rs` and `mii_ordinary_player.rs` share about 350 lines each of identical 6-line windows. | about −300 (one copy stays, plus the plumbing a shared owner needs) | High: native Mii transactions under locks; the Eden Mii rows for both roles. |
+| S7, menu and pop-up tables | 549 `X => "text"` arms, at most 65 in one module. An arm is already one line; a table does not make it shorter. | under −300 | Medium: the menu and panel tests, and an Eden menu tour. |
+
+Together that is about 800 lines, 0.7% of what is left, for two Eden passes and a high-risk refactor. My
+recommendation is not to do S5 to S7 for rc.10. The larger remaining saving is the roughly 2,500 dead lines S3 left
+in place (dead types and what touches them), which needs a decision on its proof, not new engineering.
 ## Line deltas per slice
 
 | Slice | Head | Raw non-test (product) | `tools/sloc.py` | Tests | Coverage |
