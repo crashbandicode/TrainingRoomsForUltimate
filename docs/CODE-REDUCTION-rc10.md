@@ -1,7 +1,7 @@
 # rc.10 code reduction: measurement and plan
 
 The plan of `TASK-rc10-code-reduction.md`, measured on `main` `b1e27e5a`, 2026-11-12 (UTC), and the result of each
-slice as it lands on `rc10`. Done so far: **S3**, **S1** and **S2** (below, "S3: done", "S1: done", "S2: done").
+slice as it lands on `rc10`. Done so far: **S3**, **S1**, **S2** and **S4** (below, one section each).
 
 ## The short answer
 
@@ -342,7 +342,7 @@ is not behind feature switches", which supersedes D11).
   its description. Two tests that pin source text follow the new text (`model/parked_entries.rs`,
   `tests/lock_order.rs`: `runtime/compat/filesystem.rs` is now gated by `diag` alone, so the call graph treats its
   thread as diag-only, which it is).
-## S4: done in the tree, Eden boot pending (2026-11-12)
+## S4: done (2026-11-12)
 
 The five probes nothing used are deleted (the operator's Group A): `mii-ldn-qualification-probe`,
 `native-unlink-probe`, `texture-probe`, `console-swap-trace` and `automation-results-native`. Group B stays
@@ -365,6 +365,13 @@ The five probes nothing used are deleted (the operator's Group A): `mii-ldn-qual
 - **Tests and tools:** `tests/pkg6_features.rs` (the table is 9 names; the five are asserted gone),
   `tests/lock_order.rs` (the probe's eight hook entries leave the list), `tools/feature_matrix.py` (its combinations).
 - The other 71 rows of features that no longer exist stay in the tables: they were not in the operator's Group A.
+- **Eden boot** (run `rc10-s4-fb028a9b-g2`, the Surface, diag NRO `d2d39f02…` of `fb028a9b`, the GDB stub on before
+  the load, tracing off): the plugin installed (`result=installed heap_allocations=0`); 11 rows passed: the stub and
+  the load, boot to Training, the old settings, the migration, a chord, the CPU fighter through the menu, five hot
+  switches, a held item, the Replay window and a named Mii. One row failed, `acc-hook` (no `hook_stats` line in the
+  log); it failed the same way on the base build in the integration lane's last run of this set
+  (`final-rc8-surface-1-eca14e4b`). The console has no panic, abort, crash or unmapped-access line. This boot is also
+  S2's check: S2's binary was not byte-identical, and the build under test contains it.
 ## Line deltas per slice
 
 | Slice | Head | Raw non-test (product) | `tools/sloc.py` | Tests | Coverage |
@@ -374,4 +381,4 @@ The five probes nothing used are deleted (the operator's Group A): `mii-ldn-qual
 | S3 | `6c419689` | 126,703 (119,817) | 162,692 | 821 (873) | 90.59% |
 | S1 | `13e8ef5d` | 118,493 (111,612) | 154,519 | 824 (876) | not re-measured |
 | S2 | `84e39648` | 117,248 (110,367) | 152,990 | 824 (876) | not re-measured |
-| S4 | the commit after `745834de` | 116,187 (110,364) | 151,623 | 824 (876) | not re-measured |
+| S4 | `fb028a9b` | 116,187 (110,364) | 151,623 | 824 (876) | not re-measured |
