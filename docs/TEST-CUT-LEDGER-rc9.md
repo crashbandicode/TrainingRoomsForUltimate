@@ -4,7 +4,9 @@
 guards real behaviour and the ship gates. This file lists every cut and why, and what is kept. Base: `28082c29` (rc.8 notes on `main`).
 
 **2026-11-12:** most of the cut tests returned as table-driven tests (one `#[test]` per module) for the coverage order:
-`docs/COVERAGE-rc9.md`. The count is 865. This file describes the cut as it was made at `7a4cba64`.
+`docs/COVERAGE-rc9.md`. Of those, the cases that add no line coverage were removed again (its "Option (b)" section): 1,205 cases,
+nearly all covering only lines a kept case covers. The count is 821 test functions and 1,689 cases. This file describes the
+cut as it was made at `7a4cba64`.
 
 ## Before and after
 

@@ -2,7 +2,8 @@
 
 2026-11-12. Line coverage of the `training_rooms` crate's host-compiled product code, measured with `cargo llvm-cov` 0.9.1
 (rustc 1.98.1, LLVM 22) at `a25fbbc6`. The order was 95% if possible with at most 1,000 tests. **Reached: 91.54% with 865 tests.**
-What blocks the rest is under "Why not 95%".
+What blocks the rest is under "Why not 95%". **Then reduced on the operator's choice to the cases that add coverage: 90.18% with 821 test
+functions and 1,689 cases** (the last section, "Option (b)"); the sections before it describe the state before that reduction.
 
 ## Figures
 
@@ -137,3 +138,92 @@ numbers in 16 panic locations. The test cut's re-gates of `swap/mod.rs`, `stages
 (the two names are imported by its test module). `docs/TEST-CUT-LEDGER-rc9.md` describes the cut as it was made; where it says a
 module's tests are removed, this file says how they returned.
 
+## Option (b): only the cases that add coverage (2026-11-12)
+
+The table tests above put the cut tests back as rows: 863 test functions, but 2,894 cases. The operator chose to keep only the
+cases that add coverage nothing else gives, with at most a 1.5-point drop.
+
+| | Test functions | Cases | Line coverage |
+| --- | ---: | ---: | ---: |
+| Before (`b1e27e5a`) | 863 | 2,894 | 91.53% (36,116 of 39,457) |
+| After | 821 | 1,689 | 90.18% (35,583 of 39,457) |
+
+- A case is one row of a `case_table` or one plain `#[test]`. After: 1,113 rows in 245 tables and 576 plain tests.
+- With the two vendored crates' own gates the test functions are 873. The limit is 1,000.
+
+### Method
+
+- **Per-case lines.** `tools/case_cover.py measure` runs every case alone, in its own process with its own profile
+  (`TR_TABLE_CASE` selects one row; a plain test runs with `--exact`), and exports the product lines it covers from its own
+  binary. The union of the 2,894 per-case sets is the full run's set (36,118 lines against 36,116).
+- **Always kept (1,065 cases), whatever they cover:**
+  - 942: kept by the test cut.
+  - 80: required guard group.
+  - 34: rc.8/rc.9 fix case.
+  - 6: docs lane / kept file.
+  - 3: new case of the coverage work.
+  - "Kept by the test cut" is every test of `7a4cba64`, which holds the required groups of the test-cut order. "Required guard
+    group" adds restored cases whose path names one of those groups (hand-offs, `nowait_channel`, locks, svc, stacks, build tag,
+    seams, chords, game and lobby speed, settings, store, save-state, setup, recording, library and capture files). An "rc.8/rc.9
+    fix case" is a restored case whose text names rc.8, rc.9, C3/C4/C10/C13/C14, R1/R2/R7/R14, a freeze, a hang or a spin.
+- **Greedy set cover over the rest (1,829 cases).** Starting from the lines the always-kept cases cover (19,157), it adds the
+  case with the most new lines until 35,560 lines are covered (90.12%; the allowed floor is 90.0%, 35,512 lines). It kept 565.
+- **59 more cases stay** in eight files (`deluxe_row.rs`, `swap/source_load.rs`, `swap_model/copy_registry.rs`, `rr_host.rs`,
+  `runtime/roster/observe.rs`, `tests/mii_bust_context.rs`, `tests/capture_completion.rs`, `tests/common/preload_allocations.rs`):
+  dropping them would leave a test model half used (unread fields, an unused variant) or a product item without a host user,
+  which would need a `cfg` re-gate in product code. Keeping the cases avoids both.
+- **Removed: 1,205 cases**, with their code, the test helpers and imports only they used, 20 test modules and 6 integration
+  files left without a case (`lobby_items`, `notice_plates`, `pkg4_capture_status`, `pkg6_item_table`, `state04_convert`,
+  `timer_recording`).
+
+### What was dropped, and why it is redundant
+
+All but a few dropped cases cover only product lines that the kept cases also cover: measured, case by case. The few that
+covered more account for the cost: 533 lines (1.35 points) that only dropped cases covered. This is redundancy of coverage,
+not of assertions: a dropped case may have asserted a different outcome on the same lines. None is in a required group or
+names an rc.8/rc.9 fix.
+
+| Area | Cases dropped | Files | What they were |
+| --- | ---: | ---: | --- |
+| `src/model/swap` | 282 | 32 | body-bank, source and swap-model policy cases of the carried fork engine: many scenarios over the same planner and ledger paths |
+| integration files (`tests/*.rs`) | 202 | 31 | spec-row cases of the menu model, state detail, input notifications, Mii suites and the first-boot plan that walk code other rows already walk |
+| other `src/model/*.rs` (combo, frame strip, recording menu, effect, drill and other models) | 180 | 25 | UI-model and feature-model cases repeating a path with another label, row or value |
+| `src/model/mii` | 114 | 20 | Mii policy cases (ordinary player/CPU, inventory, selection, saved) over shared admission and recapture paths |
+| `src/model/preload` | 74 | 8 | cycle-preload config and policy cases over the same parse and decision paths |
+| `src/model/macros` | 61 | 9 | capture window, toggle and live-capture cases; the recording, library and archive file cases are kept |
+| `src/model/ui` | 56 | 8 | screen, frame and pane text cases |
+| `src/model/macro_ui` | 44 | 6 | clip and macro panel cases |
+| `src/model/lobby` | 34 | 10 | waiting-room automation cases |
+| `src/model/mii_root` | 33 | 3 | Mii HUD portrait policy and menu cases |
+| `src/model/stages` | 26 | 7 | stage rotation and request policy cases |
+| `src/editors` | 24 | 7 | roster, stage and clip editor cases |
+| `src/model/cpu` | 15 | 1 | cases over paths the kept cases already cover |
+| `src/model/compat` | 14 | 4 | cases over paths the kept cases already cover |
+| `src/model/p1` | 12 | 2 | cases over paths the kept cases already cover |
+| `src/model/mii_fork_tests` | 7 | 2 | cases over paths the kept cases already cover |
+| crate root test files (`src/*_tests.rs`) | 6 | 4 | cases over paths the kept cases already cover |
+| `src/model/kirby` | 6 | 1 | cases over paths the kept cases already cover |
+| `src/runtime` unit tests run through a host include | 5 | 2 | cases over paths the kept cases already cover |
+| `src/model/items` | 4 | 1 | cases over paths the kept cases already cover |
+| `src/model/p1_session` | 3 | 2 | cases over paths the kept cases already cover |
+| `src/model/state` | 2 | 1 | cases over paths the kept cases already cover |
+| shared test hosts (`tests/common`, `tests/support`) | 1 | 1 | cases over paths the kept cases already cover |
+| **Total** | **1,205** | **187** | |
+
+The full list (file, case, binary, test path) is `artifacts/phase23/rc9-coverage/option-b/dropped.tsv` in the workspace; the kept
+cases and why each is kept are in `kept.tsv` beside it. Every dropped case is in git: `git show b1e27e5a:<file>`.
+
+### Reproduce
+
+```text
+CARGO_TARGET_DIR=<fresh dir> cargo llvm-cov --no-fail-fast --no-report
+python3 -I tools/case_cover.py count <fresh dir>                  # cases, table rows, plain tests
+python3 -I tools/case_cover.py measure <fresh dir> <out dir>      # per-case lines (about 12 minutes, 4 jobs)
+python3 -I tools/coverage.py export <fresh dir> cov.lcov && python3 -I tools/coverage.py report cov.lcov .
+```
+
+### Product code
+
+No product behaviour change. The release and diag NROs at `b1e27e5a` and after this change have the same sizes and differ in 53
+bytes each (build id, commit characters in the build tag, panic-location line numbers). With test modules removed, every `src/`
+file is the text it was, except a `#[cfg(test)] use` in `mii/replay.rs` that only removed cases used.
