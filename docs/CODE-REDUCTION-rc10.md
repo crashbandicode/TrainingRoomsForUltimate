@@ -1,7 +1,7 @@
 # rc.10 code reduction: measurement and plan
 
 The plan of `TASK-rc10-code-reduction.md`, measured on `main` `b1e27e5a`, 2026-11-12 (UTC), and the result of each
-slice as it lands on `rc10`. Done so far: **S3**, **S1**, **S2** and **S4** (below, one section each).
+slice as it lands on `rc10`. Done so far: **S3**, **S1**, **S2**, **S4** and **S3b** (below, one section each).
 
 ## The short answer
 
@@ -376,6 +376,42 @@ The five probes nothing used are deleted (the operator's Group A): `mii-ldn-qual
   log); it failed the same way on the base build in the integration lane's last run of this set
   (`final-rc8-surface-1-eca14e4b`). The console has no panic, abort, crash or unmapped-access line. This boot is also
   S2's check: S2's binary was not byte-identical, and the build under test contains it.
+## S3b: done (2026-11-12)
+
+The dead code S3 left in place is removed: the dead types, their impl blocks and what touched them. The operator's
+and the primary's answer (2026-11-12 05:25Z) was to take it, with a function-by-function proof in place of byte
+identity and the rc.10 final Eden pass on top.
+
+- **Product lines: 110,364 to 107,697 (−2,667).** Non-test lines: 116,187 to 113,520. On `tools/sloc.py`: 151,623 to
+  147,878 (−3,745). The budget is ratcheted down to 147,878.
+- **Method:** S3's, re-measured on `83e91989` (565 items dead in the default, diag and all-probes Switch builds; 140
+  of them dead in the unit tests too), without S3's rule that kept dead types and everything touching them. 354
+  functions, methods, constants, statics and types moved: deleted where no test uses them, behind `#[cfg(test)]`
+  where only tests do. Fields and enum variants are a separate step.
+- **Why the NRO is not byte-identical:** an impl block, written or derived, is numbered among the impls of its
+  module, and that number is in the mangled name of everything in the later impls. Removing a type renames code that
+  stays, and the linker lays functions out by name.
+
+**The proof** (`tools` of the lane: `symcmp.py`; results `symcmp-s3b-release.txt`, `symcmp-s3b-diag.txt` in the
+lane's evidence folder). Release and diag ELFs of `83e91989` against `2c728893`:
+
+| | Release | Diag |
+| --- | --- | --- |
+| NRO size | 4,132,864 B both | 4,325,376 B both |
+| `.text`, `.rodata`, `.data`, `.bss` | each the same size | each the same size |
+| Function symbols | 13,474 both | 13,888 both |
+| Same demangled name and size | all | all but 5 |
+| Same instructions, addresses masked | all | all but 5 |
+| Function order | differs | differs |
+
+- "Addresses masked" means branch and `adrp` targets, wide hex immediates, and the low-12-bit offset of the
+  instruction right after an `adrp`. Everything else in an instruction must match.
+- **The five in the diag build** are four derived `Debug::fmt` functions (`mii::capacity::Roots`,
+  `lobby::practice_stage::Resource`, `native_source_capacity::InputSlot`, `practice_stage_request_policy::Scene`) and
+  one outlined helper. The machine outliner cut them at another place because the functions around them moved: in one
+  build two `stp` instructions sit in the function, in the other in its outlined helper. The four differ by 4 or 8
+  bytes each and sum to the same size.
+- The stack table, svc and game-thread checks pass on both ELFs.
 ## After S4: where rc.10 stands, and S5 to S7 re-measured
 
 | | Start (`f5146184`) | After S3, S1, S2, S4 (`fb028a9b`) | Change |
@@ -408,3 +444,4 @@ in place (dead types and what touches them), which needs a decision on its proof
 | S1 | `13e8ef5d` | 118,493 (111,612) | 154,519 | 824 (876) | not re-measured |
 | S2 | `84e39648` | 117,248 (110,367) | 152,990 | 824 (876) | not re-measured |
 | S4 | `fb028a9b` | 116,187 (110,364) | 151,623 | 824 (876) | not re-measured |
+| S3b | `2c728893` | 113,520 (107,697) | 147,878 | 824 (876) | not re-measured |
