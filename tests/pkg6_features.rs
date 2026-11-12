@@ -73,9 +73,8 @@ fn the_product_is_not_behind_feature_switches() {
     // Explicit: a new feature must change this test.
     let names: BTreeSet<&str> = map.keys().map(String::as_str).collect();
     assert_eq!(names, BTreeSet::from([
-        "automation-results-native", "console-practice-trace", "console-swap-trace", "default", "deluxe-sdk", "diag", "hang-trace",
-        "mii-ldn-qualification-probe", "named-input-trace", "native-unlink-probe", "plugin-heap-meter", "seam-drill", "simulator",
-        "texture-probe",
+        "console-practice-trace", "default", "deluxe-sdk", "diag", "hang-trace", "named-input-trace", "plugin-heap-meter",
+        "seam-drill", "simulator",
     ]));
 }
 
@@ -138,13 +137,9 @@ fn every_probe_trace_observer_and_meter_requires_diag() {
     // Explicit retained inventory: approved probe retirements must not erase unresolved diagnostics.
     let expected = BTreeSet::from([
         "console-practice-trace",
-        "console-swap-trace",
         "hang-trace",
-        "mii-ldn-qualification-probe",
         "named-input-trace",
-        "native-unlink-probe",
         "plugin-heap-meter",
-        "texture-probe",
     ]);
     assert_eq!(checked, expected);
 }
@@ -201,7 +196,7 @@ fn the_feature_matrix_lists_every_feature() {
         assert!(listing.contains(&format!("default+{name} --features {name}\n")), "{name} missing from the `each` set");
         assert!(listing.contains(&format!("alone:{name} --no-default-features --features {name}\n")), "{name} missing from the `alone` set");
     }
-    assert!(listing.contains("--features diag,console-practice-trace,native-unlink-probe,plugin-heap-meter"));
+    assert!(listing.contains("--features diag,console-practice-trace,plugin-heap-meter"));
 }
 
 /// Both mutually exclusive observer experiments have been retired. There must
@@ -246,7 +241,12 @@ fn rc_retired_observation_features_and_modules_cannot_be_reenabled() {
         assert!(!root.join(path).exists(), "retired module {path}");
     }
     // Option 3 was not approved. Keep the historical tools.
-    for feature in ["console-practice-trace", "console-swap-trace", "hang-trace", "native-unlink-probe", "plugin-heap-meter"] {
+    // rc.10 S4 (operator 2026-11-12): the probes nothing used are deleted.
+    for feature in ["console-swap-trace", "native-unlink-probe", "mii-ldn-qualification-probe", "texture-probe",
+        "automation-results-native"] {
+        assert!(!map.contains_key(feature), "deleted probe feature {feature}");
+    }
+    for feature in ["console-practice-trace", "hang-trace", "named-input-trace", "plugin-heap-meter"] {
         assert!(map.contains_key(feature), "retained feature {feature}");
     }
 }

@@ -15,9 +15,7 @@ import re
 import sys
 
 DIAG_FEATURES = {
-    "diag", "texture-probe", "seam-drill", "console-practice-trace", "console-swap-trace",
-    "native-unlink-probe", "hang-trace", "plugin-heap-meter", "named-input-trace",
-    "mii-ldn-qualification-probe", "automation-results-native", "simulator",
+    "diag", "seam-drill", "console-practice-trace", "hang-trace", "plugin-heap-meter", "named-input-trace", "simulator",
 }
 SKIP_DIRS = {"target", "tests", "third_party", "vendor", ".git"}
 

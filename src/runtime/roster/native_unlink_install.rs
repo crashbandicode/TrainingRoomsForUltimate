@@ -68,8 +68,6 @@ fn mismatch(main: usize, windows: &[(usize, [u32; 3])]) -> Option<usize> {
 /// Shared walker-leave site: observe first (inert unless the probe is ready),
 /// then execute the displaced store through the guard, as before.
 unsafe extern "C" fn leave(ctx: &InlineCtx) {
-    #[cfg(feature = "native-unlink-probe")]
-    crate::runtime::roster::native_unlink_probe::observe_leave(ctx);
     guarded_store(ctx, 0x38958e4, false, false);
 }
 
@@ -137,12 +135,6 @@ pub fn init() {
     }
     // Optional diagnostics only. File, SD or build-identity failure disables
     // the observer and never prevents the qualified guard below.
-    #[cfg(feature = "native-unlink-probe")]
-    let observer = crate::runtime::seams::seam_install::gate("native_unlink_probe", &[
-        "unlink_probe.walk_38958a4", "unlink_probe.walk_3895148", "unlink_probe.walk_38951c4",
-        "unlink_probe.destroy_3896bbc", "unlink_probe.walk_38952cc", "unlink_probe.walk_3895904",
-        "unlink_probe.walk_3895874", "unlink_probe.walk_38951fc"], crate::runtime::roster::native_unlink_probe::prepare(main));
-    #[cfg(not(feature = "native-unlink-probe"))]
     let observer = false;
     let shared = true;
     unsafe {
@@ -157,12 +149,6 @@ pub fn init() {
         if shared {
             hook(main, 0x38958e4, leave);
         }
-        #[cfg(feature = "native-unlink-probe")]
-        if observer {
-            for (offset, callback) in crate::runtime::roster::native_unlink_probe::observer_hooks() {
-                hook(main, offset, callback);
-            }
-        }
         for (offset, callback) in [
             (0x38958fc, recursive_last_guard as unsafe extern "C" fn(&InlineCtx)),
             (0x3895854, sister_first_guard), (0x389586c, sister_last_guard),
@@ -171,10 +157,6 @@ pub fn init() {
         ] {
             hook(main, offset, callback);
         }
-    }
-    #[cfg(feature = "native-unlink-probe")]
-    if observer {
-        crate::runtime::roster::native_unlink_probe::publish_ready();
     }
     crate::engine::compat::logging::diagnostic(format_args!(
         "[NativeUnlink] experimental missing-parent guard enabled; observer={observer}; writer unknown"));

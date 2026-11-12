@@ -4,7 +4,6 @@
 //! The functions at the bottom are the call sites the fork's mixed code made (decision D5): `init` once from boot after the roster
 //! cycle, `update` once per game frame, `observe` from the fighter init path and `frame` from the per-fighter frame callback.
 
-pub(crate) mod automation_helper;
 pub(crate) mod game_mode;
 pub(crate) mod lobby_items;
 pub(crate) mod lobby_persist;

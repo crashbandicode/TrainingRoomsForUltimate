@@ -342,6 +342,29 @@ is not behind feature switches", which supersedes D11).
   its description. Two tests that pin source text follow the new text (`model/parked_entries.rs`,
   `tests/lock_order.rs`: `runtime/compat/filesystem.rs` is now gated by `diag` alone, so the call graph treats its
   thread as diag-only, which it is).
+## S4: done in the tree, Eden boot pending (2026-11-12)
+
+The five probes nothing used are deleted (the operator's Group A): `mii-ldn-qualification-probe`,
+`native-unlink-probe`, `texture-probe`, `console-swap-trace` and `automation-results-native`. Group B stays
+(`console-practice-trace`, `named-input-trace`, `hang-trace` with `stall_watch`, `plugin-heap-meter`).
+
+- **Diag-only lines: 6,750 to 5,692 (−1,058).** Product lines 110,367 to 110,364. Non-test lines: 117,248 to
+  116,187. On `tools/sloc.py`: 152,990 to 151,623 (−1,367). The budget is ratcheted down to 151,623.
+- **Files deleted:** `runtime/mii/mii_ldn_qualification.rs`, `runtime/roster/native_unlink_probe.rs`,
+  `runtime/ui/texture_probe.rs`, `runtime/lobby/automation_helper.rs` (it held only a comment). 43 gated items in 11
+  other files went with the features.
+- **15 seam rows deleted** from the data tables: 8 of `native-unlink-probe` (`rows_a5`) and 7 of
+  `automation-results-native` (`rows_a4`). The seam table has 675 rows, was 690. This changes the release NRO: the
+  installer compares 15 fewer sites at boot and the install line counts 15 fewer rows. The seam digest in
+  `src/model/table_digest_tests.rs` is updated on purpose; the other three digests are unchanged.
+- **Log lines the Eden rows expect:** the deleted code printed lines under `[MiiLdnQualification]`, `[NativeUnlink]`
+  and `[Texture]`. No Eden row names `[MiiLdnQualification]`. The rows' `[NativeUnlink] experimental missing-parent
+  guard enabled` and `[Texture] install usable=` lines come from product code that stays
+  (`runtime/roster/native_unlink_install.rs`, `runtime/ui/texture.rs`). One file expects a deleted line:
+  `eden/u4/shoot_u4.py`, the texture probe's own proof script (`[Texture] shown`); it cannot run any more.
+- **Tests and tools:** `tests/pkg6_features.rs` (the table is 9 names; the five are asserted gone),
+  `tests/lock_order.rs` (the probe's eight hook entries leave the list), `tools/feature_matrix.py` (its combinations).
+- The other 71 rows of features that no longer exist stay in the tables: they were not in the operator's Group A.
 ## Line deltas per slice
 
 | Slice | Head | Raw non-test (product) | `tools/sloc.py` | Tests | Coverage |
@@ -351,3 +374,4 @@ is not behind feature switches", which supersedes D11).
 | S3 | `6c419689` | 126,703 (119,817) | 162,692 | 821 (873) | 90.59% |
 | S1 | `13e8ef5d` | 118,493 (111,612) | 154,519 | 824 (876) | not re-measured |
 | S2 | `84e39648` | 117,248 (110,367) | 152,990 | 824 (876) | not re-measured |
+| S4 | the commit after `745834de` | 116,187 (110,364) | 151,623 | 824 (876) | not re-measured |

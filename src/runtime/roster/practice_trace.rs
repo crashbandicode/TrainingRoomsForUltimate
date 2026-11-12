@@ -32,13 +32,6 @@ pub struct Scope {
 #[cfg(feature = "console-practice-trace")]
 #[inline(always)]
 pub fn scope(id: u64) -> Scope {
-    #[cfg(feature = "console-swap-trace")]
-    let stack: u64;
-    #[cfg(feature = "console-swap-trace")]
-    unsafe {
-        std::arch::asm!("mov {}, sp", out(reg) stack, options(nomem, nostack, preserves_flags));
-    }
-    #[cfg(not(feature = "console-swap-trace"))]
     let stack = 0;
     event(110, [id, stack, 0, 0, 0]);
     Scope { id }
@@ -63,14 +56,8 @@ mod enabled {
     use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
     use std::time::{Duration, Instant};
 
-    #[cfg(not(feature = "console-swap-trace"))]
     const PATH: &str = "sd:/ultimate/TrainingRooms/practice-trace-controlled.bin";
-    #[cfg(not(feature = "console-swap-trace"))]
     const NATIVE_PATH: &[u8] = b"sd:/ultimate/TrainingRooms/practice-trace-controlled.bin\0";
-    #[cfg(feature = "console-swap-trace")]
-    const PATH: &str = "sd:/ultimate/TrainingRooms/practice-trace-swap.bin";
-    #[cfg(feature = "console-swap-trace")]
-    const NATIVE_PATH: &[u8] = b"sd:/ultimate/TrainingRooms/practice-trace-swap.bin\0";
     static STARTED: AtomicBool = AtomicBool::new(false);
     // Capture even the generated main-entry scope and bootstrap Rust allocations
     // before init. They stay in the same bounded FIFO until init starts the writer.
@@ -103,12 +90,6 @@ mod enabled {
         // Keep bulk source/statement/allocation traffic out of this diagnostic's
         // FIFO. Allocation live/peak counters still run; metadata records them.
         // The separate file preserves the previous broad capture for comparison.
-        #[cfg(feature = "console-swap-trace")]
-        if !(matches!(code, 1 | 2 | 20 | 21 | 30..=33 | 220..=223 | 900..=909 | 999 | 1200..=1209)
-            || matches!(code, 110 | 111) && (0x1080000..=0x10800ff).contains(&args[0]))
-        {
-            return;
-        }
         if let Some(ticket) = QUEUE.admission_ticket() {
             let (tick, thread) = clock();
             // The recorder's IO/logging/thread teardown cannot trace itself.

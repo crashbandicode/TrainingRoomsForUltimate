@@ -9306,7 +9306,7 @@
    "dest": "src/runtime/roster/native_service.rs",
    "crate": "root",
    "src_sha256": "4e685fad23d6d367d0c007dda4efa0e97ed780643aef51c3b10130df82a4c2ba",
-   "dest_sha256": "b5daa22be5ea095b4a6a3ff0f1138b4a8e3118f2fd0ef50003687e5ca8ea2378",
+   "dest_sha256": "3a29115f2dede09ad55a32c6d95e84cd84ddcd53180b0dce6297d24889fc9f16",
    "edits": [
     {
      "old": "    context: &ServiceEntryContext,\n) -> u64 {\n",
@@ -9412,6 +9412,21 @@
       ]
      ],
      "reason": "rc.10 S2 (docs/CODE-REDUCTION-rc10.md; docs/DECISIONS.md, D11 superseded): the always-on Cargo features are not switches; their cfg gates are removed and the code that compiled only with one off is deleted"
+    },
+    {
+     "line_patch": [
+      [
+       15,
+       20,
+       []
+      ],
+      [
+       157,
+       159,
+       []
+      ]
+     ],
+     "reason": "rc.10 S4 (docs/CODE-REDUCTION-rc10.md): the probes nothing used are deleted (operator 2026-11-12): mii-ldn-qualification-probe, native-unlink-probe, texture-probe, console-swap-trace, automation-results-native"
     }
    ]
   },
@@ -9420,7 +9435,7 @@
    "dest": "src/runtime/roster/native_unlink_install.rs",
    "crate": "root",
    "src_sha256": "f1f7f6372a6e40b707a3aef468217055a477e0d6164ab212ec9d4af23cf9ed74",
-   "dest_sha256": "e630cd3cab18a9c58116e50faebc8c5da55ef0f788a784a543daed9ab8170877",
+   "dest_sha256": "8d5b0e94eb8ca11c8822f5e1e58975606cfd3fa42834229a9f5b5afb2392258f",
    "edits": [
     {
      "line_patch": [
@@ -9536,6 +9551,31 @@
       ]
      ],
      "reason": "rc.10 S2 (docs/CODE-REDUCTION-rc10.md; docs/DECISIONS.md, D11 superseded): the always-on Cargo features are not switches; their cfg gates are removed and the code that compiled only with one off is deleted"
+    },
+    {
+     "line_patch": [
+      [
+       71,
+       72,
+       []
+      ],
+      [
+       140,
+       145,
+       []
+      ],
+      [
+       160,
+       165,
+       []
+      ],
+      [
+       175,
+       178,
+       []
+      ]
+     ],
+     "reason": "rc.10 S4 (docs/CODE-REDUCTION-rc10.md): the probes nothing used are deleted (operator 2026-11-12): mii-ldn-qualification-probe, native-unlink-probe, texture-probe, console-swap-trace, automation-results-native"
     }
    ]
   },
@@ -9594,7 +9634,7 @@
    "dest": "src/runtime/roster/character_roster.rs",
    "crate": "root",
    "src_sha256": "07d282cdc6c5b4b080a5c0b3e4107a033f623ea3e5809783e0ff595afe759dd5",
-   "dest_sha256": "1273410afe5e3407cec59764a104a6b28f5c50bf2665e2f2481081cbfd47b02f",
+   "dest_sha256": "4a889f8d34e85f19aac2d56ee8eda5a3fbc8b4888ca50db478474f05ddae7433",
    "edits": [
     {
      "old": "fn notify(role: Role, message: String) {",
@@ -10762,6 +10802,61 @@
       ]
      ],
      "reason": "rc.10 S2 (docs/CODE-REDUCTION-rc10.md; docs/DECISIONS.md, D11 superseded): the always-on Cargo features are not switches; their cfg gates are removed and the code that compiled only with one off is deleted"
+    },
+    {
+     "line_patch": [
+      [
+       73,
+       75,
+       []
+      ],
+      [
+       877,
+       878,
+       []
+      ],
+      [
+       1082,
+       1083,
+       []
+      ],
+      [
+       1091,
+       1092,
+       []
+      ],
+      [
+       1411,
+       1412,
+       []
+      ],
+      [
+       1419,
+       1420,
+       []
+      ],
+      [
+       1422,
+       1423,
+       []
+      ],
+      [
+       1425,
+       1426,
+       []
+      ],
+      [
+       1441,
+       1442,
+       []
+      ],
+      [
+       2321,
+       2322,
+       []
+      ]
+     ],
+     "reason": "rc.10 S4 (docs/CODE-REDUCTION-rc10.md): the probes nothing used are deleted (operator 2026-11-12): mii-ldn-qualification-probe, native-unlink-probe, texture-probe, console-swap-trace, automation-results-native"
     }
    ]
   },
@@ -17667,7 +17762,7 @@
    "dest": "src/runtime/roster/practice_trace.rs",
    "crate": "root",
    "src_sha256": "1171afec60fa91a1568fa3df9e74812cd46adc726518626b7560e2a1cf8f2cbb",
-   "dest_sha256": "55854dce68991bb0a3e8dc42ec65394af70a76f7aa7129716bf3cd1622f8f923",
+   "dest_sha256": "095d3a4ec7b1de8949a79981ff45584eafc05ccc480a99206cb93aefeeab39ce",
    "edits": [
     {
      "old": "use std::alloc::{GlobalAlloc, Layout, System};",
@@ -17713,6 +17808,36 @@
      "old": "core::DISK_CAP, core::QUEUE_CAPACITY, STACK_BYTES,",
      "new": "core::DISK_CAP, core::QUEUE_CAPACITY, crate::model::thread_stacks::of(crate::model::thread_stacks::ThreadId::PracticeTrace).bytes,",
      "reason": "stream/stack: the session line prints the table's stack size"
+    },
+    {
+     "line_patch": [
+      [
+       35,
+       41,
+       []
+      ],
+      [
+       66,
+       66,
+       []
+      ],
+      [
+       68,
+       68,
+       []
+      ],
+      [
+       70,
+       73,
+       []
+      ],
+      [
+       106,
+       111,
+       []
+      ]
+     ],
+     "reason": "rc.10 S4 (docs/CODE-REDUCTION-rc10.md): the probes nothing used are deleted (operator 2026-11-12): mii-ldn-qualification-probe, native-unlink-probe, texture-probe, console-swap-trace, automation-results-native"
     }
    ]
   },
@@ -17755,7 +17880,8 @@
    "dest": "src/runtime/roster/native_unlink_probe.rs",
    "crate": "root",
    "src_sha256": "fb90a4e72ac9ddb5b0b0acd827d7ff46d19b379830c6f2826780f47ec1be8f9c",
-   "dest_sha256": "936f87d816d3ae37ec5e248e0ef07b282020843de418f7b41886715ebc631192"
+   "dest_sha256": "",
+   "removed": "rc.10 S4 (docs/CODE-REDUCTION-rc10.md): the probes nothing used are deleted (operator 2026-11-12): mii-ldn-qualification-probe, native-unlink-probe, texture-probe, console-swap-trace, automation-results-native"
   },
   {
    "src": "src/heap_metrics.rs",
@@ -18878,14 +19004,15 @@
    "dest": "src/runtime/mii/mii_ldn_qualification.rs",
    "crate": "root",
    "src_sha256": "30a65caa8eddecfb43916fff091fc8e4e40dc83b93cbefccb23069455b8af2f6",
-   "dest_sha256": "a0f4678c47003e1ee5afc0e06f13188300673411818f509e7b7b5dd4e8eb608e",
+   "dest_sha256": "",
    "edits": [
     {
      "old": "    }\n    if INSTALL.active() {\n        return Err((3, \"native install active\", 0, 0));\n    }\n    let busy = STATES.iter().any(|state| {\n        let state = state.lock().unwrap();\n        state.active.is_some() || state.pending.is_some()\n    });\n    if busy {\n        return Err((4, \"roster replacement pending/active\", 0, 0));\n    }\n",
      "new": "    }\n    if INSTALL.active() {\n        return Err((3, \"native install active\", 0, 0));\n    }\n    let busy = STATES.iter().any(|state| {\n        let state = state.lock();\n        state.active.is_some() || state.pending.is_some()\n    });\n    if busy {\n        return Err((4, \"roster replacement pending/active\", 0, 0));\n    }\n",
      "reason": "R5 cold scene owner locks use existing const hos_lock mutex instead of lazy heap-backed Switch pthread mutex. Audited owner/entry contracts in pkg6-owner-locks.md; same guard extents, exclusion, non-reentrancy and try_lock refusal. Probe readers only adapt parent guard API. Release panic=abort; no boot warming or counter exemption."
     }
-   ]
+   ],
+   "removed": "rc.10 S4 (docs/CODE-REDUCTION-rc10.md): the probes nothing used are deleted (operator 2026-11-12): mii-ldn-qualification-probe, native-unlink-probe, texture-probe, console-swap-trace, automation-results-native"
   },
   {
    "src": "src/mii_managed_helper.rs",
@@ -19136,7 +19263,7 @@
    "dest": "src/runtime/mii/mii_ordinary_cpu.rs",
    "crate": "root",
    "src_sha256": "db7e15715560db924eba68ba570e97540f1b445b1cf4989a172c0426dd32c6ce",
-   "dest_sha256": "a5ae9808269acfffbafb76c85d3364e18a39b9f02771226d5f3cfed9467b74d7",
+   "dest_sha256": "37243c61d1a5f5e0de725e8832059cac75704cf11bfd7803433b09dd68f40c63",
    "edits": [
     {
      "old": "fn note(reason:&str) { trace!(\"[MiiOrdinaryCpu] {reason}\"); }",
@@ -19889,6 +20016,41 @@
       ]
      ],
      "reason": "rc.10 S2 (docs/CODE-REDUCTION-rc10.md; docs/DECISIONS.md, D11 superseded): the always-on Cargo features are not switches; their cfg gates are removed and the code that compiled only with one off is deleted"
+    },
+    {
+     "line_patch": [
+      [
+       637,
+       638,
+       []
+      ],
+      [
+       713,
+       714,
+       []
+      ],
+      [
+       786,
+       787,
+       []
+      ],
+      [
+       857,
+       858,
+       []
+      ],
+      [
+       1570,
+       1571,
+       []
+      ],
+      [
+       1600,
+       1601,
+       []
+      ]
+     ],
+     "reason": "rc.10 S4 (docs/CODE-REDUCTION-rc10.md): the probes nothing used are deleted (operator 2026-11-12): mii-ldn-qualification-probe, native-unlink-probe, texture-probe, console-swap-trace, automation-results-native"
     }
    ]
   },
@@ -20787,7 +20949,7 @@
    "dest": "src/runtime/mii/mii_ordinary_player.rs",
    "crate": "root",
    "src_sha256": "73e84c925f3aaedd6c09fd082ba41364d160e8cca38cc604617d5fdc38431b8d",
-   "dest_sha256": "b3a7e9c23411889df30ebc7f95313fd0378903bf5f2e34ab3ebccc26207364f6",
+   "dest_sha256": "9e62b89d990f2cab1b52f7121116ce37174cab1bd915346ca0f00e9da4601246",
    "edits": [
     {
      "old": "fn note(reason:&str) { trace!(\"[MiiOrdinaryPlayer] {reason}\"); }",
@@ -21525,6 +21687,41 @@
       ]
      ],
      "reason": "rc.10 S2 (docs/CODE-REDUCTION-rc10.md; docs/DECISIONS.md, D11 superseded): the always-on Cargo features are not switches; their cfg gates are removed and the code that compiled only with one off is deleted"
+    },
+    {
+     "line_patch": [
+      [
+       518,
+       519,
+       []
+      ],
+      [
+       588,
+       589,
+       []
+      ],
+      [
+       659,
+       660,
+       []
+      ],
+      [
+       697,
+       698,
+       []
+      ],
+      [
+       1340,
+       1341,
+       []
+      ],
+      [
+       1370,
+       1371,
+       []
+      ]
+     ],
+     "reason": "rc.10 S4 (docs/CODE-REDUCTION-rc10.md): the probes nothing used are deleted (operator 2026-11-12): mii-ldn-qualification-probe, native-unlink-probe, texture-probe, console-swap-trace, automation-results-native"
     }
    ]
   },
@@ -21562,7 +21759,7 @@
    "dest": "src/runtime/mii/mii_saved_alpha.rs",
    "crate": "root",
    "src_sha256": "11c19c8277d129eeb64184454664d43c1a1fa00a2ea086c79667923de78649a8",
-   "dest_sha256": "942e9c128bb67b3f065368b89acc324ecb76497adebeea4ec05d358e7ae7b0f7",
+   "dest_sha256": "602f12161f30973825138255241b899932047146c367411a9a00d3a150c11436",
    "edits": [
     {
      "old": "pub(super) fn init(base: usize) {",
@@ -21857,6 +22054,16 @@
       ]
      ],
      "reason": "rc.10 S2 (docs/CODE-REDUCTION-rc10.md; docs/DECISIONS.md, D11 superseded): the always-on Cargo features are not switches; their cfg gates are removed and the code that compiled only with one off is deleted"
+    },
+    {
+     "line_patch": [
+      [
+       301,
+       302,
+       []
+      ]
+     ],
+     "reason": "rc.10 S4 (docs/CODE-REDUCTION-rc10.md): the probes nothing used are deleted (operator 2026-11-12): mii-ldn-qualification-probe, native-unlink-probe, texture-probe, console-swap-trace, automation-results-native"
     }
    ]
   },

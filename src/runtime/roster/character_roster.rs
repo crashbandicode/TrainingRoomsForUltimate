@@ -70,9 +70,6 @@ mod mii_ordinary_player;
 mod mii_ordinary_cpu;
 #[path="../mii/mii_selector_native.rs"]
 mod mii_selector_native;
-#[cfg(feature="mii-ldn-qualification-probe")]
-#[path="../mii/mii_ldn_qualification.rs"]
-mod mii_ldn_qualification;
 #[path="../mii/mii_managed_helper.rs"]
 mod mii_managed_helper;
 #[path="../mii/mii_auto_init.rs"]
@@ -874,8 +871,6 @@ pub fn scene_changed(mode: game_mode::Mode) {
     body_bank::scene_changed();
     mii_saved_alpha::scene_changed();
     body_bank::adopt_scene_generation();
-    #[cfg(feature="mii-ldn-qualification-probe")]
-    mii_ldn_qualification::scene_changed();
     sources::scene_changed();
     mii_hud_portrait::scene_changed();
     crate::runtime::roster::character_items::scene_changed();
@@ -1079,8 +1074,6 @@ unsafe fn service(ctx: &ServiceEntryContext, entry: *mut u8) {
     }
     let owner = read::<u32>(entry, 0xe0);
     body_bank::service(entry, owner);
-    #[cfg(feature="mii-ldn-qualification-probe")]
-    mii_ldn_qualification::service(entry, owner);
     sources::service(ctx, entry, owner);
     mii_hud_portrait::service(entry, owner);
     republish_after_rebuild(entry, owner);
@@ -1088,8 +1081,6 @@ unsafe fn service(ctx: &ServiceEntryContext, entry: *mut u8) {
 }
 
 unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
-    #[cfg(feature = "console-swap-trace")]
-    let _swap_stack = crate::runtime::roster::practice_trace::scope(0x1080000);
     if !matches!(owner, 0 | 1 | 4) {
         return;
     }
@@ -1408,22 +1399,14 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
     training::clear_session_state();
     trace!("[CharacterRoster] install owner={} entry=0x{:x} from=0x{:x} to=0x{:x} slot={:?} epoch={} mode=0x{:x}",
         owner, entry as usize, current, target.kind(), slot.map(|i| i+1), active.epoch, active.scope.mode);
-    #[cfg(feature = "console-swap-trace")]
-    crate::runtime::roster::practice_trace::checkpoint(901, [entry as u64, u64::from(owner), u64::from(current), u64::from(target.kind()), active.epoch as u64]);
     if owner == 0 {
         mii_ordinary_player::begin_generic(entry, install_token, descriptor.bytes());
     }
     if role == Role::Cpu {
         mii_ordinary_cpu::begin_generic(entry, install_token, descriptor.bytes());
     }
-    #[cfg(feature = "console-swap-trace")]
-    crate::runtime::roster::practice_trace::checkpoint(902, [entry as u64, u64::from(owner), u64::from(current), u64::from(target.kind()), active.epoch as u64]);
     let base = BASE.load(Ordering::Acquire);
-    #[cfg(feature = "native-unlink-probe")]
-    crate::runtime::roster::native_unlink_probe::arm(entry as usize, owner, current, target.kind());
     reload_at_pose(base, entry, &descriptor, pose);
-    #[cfg(feature = "console-swap-trace")]
-    crate::runtime::roster::practice_trace::checkpoint(903, [entry as u64, u64::from(owner), u64::from(current), u64::from(target.kind()), active.epoch as u64]);
 }
 
 /// Called before native entry destruction, while that argument is still owned.
@@ -1438,8 +1421,6 @@ pub unsafe fn on_destroy(entry: *const u8) {
     mii_saved_alpha::on_destroy(entry,owner);
     mii_ordinary_player::on_destroy(entry);
     mii_ordinary_cpu::on_destroy(entry);
-    #[cfg(feature="mii-ldn-qualification-probe")]
-    mii_ldn_qualification::on_destroy(entry, owner);
     sources::on_destroy(entry, owner);
     mii_hud_portrait::on_destroy(entry, owner);
     if !matches!(owner, 0 | 1 | 4) {
@@ -2318,8 +2299,6 @@ pub fn init(load_contract: Option<VerifiedLoad>) {
         // own patch at 0x6510f4 is outside all capacity fingerprint ranges.
         if !mii_ordinary_player::init(base) {return;}
         native_source_capacity::init(base, load_contract);
-        #[cfg(feature="mii-ldn-qualification-probe")]
-        mii_ldn_qualification::init(base);
         mii_ordinary_cpu::init();
         native_service::install(base);
         body_bank::install(base);

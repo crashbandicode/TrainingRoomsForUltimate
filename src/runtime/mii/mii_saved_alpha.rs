@@ -298,8 +298,6 @@ pub(super) unsafe fn service(entry: *mut u8, owner: u32) -> bool {
 // Those three stay separate so a reload tick does not reserve their frames.
 #[inline(never)]
 unsafe fn service_work(entry: *mut u8, owner: u32, i: usize) -> bool {
-    #[cfg(feature = "console-swap-trace")]
-    let _swap_stack = crate::runtime::roster::practice_trace::scope(0x1080030);
     let track = ALPHA.lock().track[i];
     if let Some(mut track) = track {
         if track.entry != entry as usize {

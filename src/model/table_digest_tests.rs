@@ -2,6 +2,9 @@
 //! into the same Rust tables. These digests were taken from the tables while they were still Rust literals
 //! (`f5146184`): every row of every table, in table order, as its `Debug` text. A changed, missing, added or moved
 //! row changes a digest.
+//!
+//! rc.10 S4 took the 15 seam rows of the deleted probes out (`native-unlink-probe` 8, `automation-results-native` 7): 690
+//! rows to 675, and the seam digest with them. The other three digests are still the ones of `f5146184`.
 
 use crate::model::sha256::sha256_hex;
 use std::fmt::Write;
@@ -66,8 +69,8 @@ fn every_data_row_has_a_64_byte_guard() {
     assert_eq!((files, rows), (23, SEAM_ROWS + SITE_ROWS + UI_ROWS + COMMON_ROWS));
 }
 
-const SEAM_ROWS: usize = 690;
-const SEAM_DIGEST: &str = "5846c7ca5a38c59b4f0780b1c791bc2b0014c4a2dd980baf30c7d7de26f26170";
+const SEAM_ROWS: usize = 675;
+const SEAM_DIGEST: &str = "f2b776f8c611c629be133337e17428f0ae29dc5fd0621a022c4795210dcaccaa";
 const SITE_ROWS: usize = 258;
 const SITE_DIGEST: &str = "f86958e64401e05a6acac006e94b5be53b062f03a5da5bdbf027197436f2ea4d";
 const UI_ROWS: usize = 6;

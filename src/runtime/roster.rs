@@ -46,8 +46,6 @@ pub(crate) mod kirby_hats;
 pub(crate) mod roster_requests;
 pub(crate) mod native_gc_guard;
 pub(crate) mod native_unlink_install;
-#[cfg(feature = "native-unlink-probe")]
-pub(crate) mod native_unlink_probe;
 pub(crate) mod practice_trace;
 #[cfg(feature = "console-practice-trace")]
 pub(crate) mod practice_trace_core;

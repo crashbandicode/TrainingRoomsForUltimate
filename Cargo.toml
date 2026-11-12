@@ -68,23 +68,19 @@ default = ["deluxe-sdk"]
 # Eden-only diagnostics (stand-ins, per-event lines). The shipped NRO never enables it. Every probe,
 # observer, trace and meter below requires it (decision D11; the fork's diag taxonomy).
 diag = []
-# Eden probes with no caller in a plain diag build, each behind its own feature so the diag NRO carries none of their code: the u4
-# texture helper's Eden proof (the stage grid's thumbnails replaced it in normal builds) and the playbook's hook-sharing drill on the
-# seam rows (`foreign=` in diag.txt, HOOK-SHARING "Testing the chain in Eden").
-texture-probe = ["diag"]
+# An Eden probe with no caller in a plain diag build, behind its own feature so the diag NRO carries none of its code: the
+# playbook's hook-sharing drill on the seam rows (`foreign=` in diag.txt, HOOK-SHARING "Testing the chain in Eden"). rc.10 S4
+# deleted the probes nothing used (texture-probe, native-unlink-probe, console-swap-trace, mii-ldn-qualification-probe,
+# automation-results-native).
 seam-drill = ["diag"]
 
 # --- The carried diagnostic features (package 6) ---------------------------------------------------------
 # From the fork's root Cargo.toml of stage m5o (CARRY-OVER.md pkg6 section): the probes, traces and meters, never in a
 # shipped build, and `automation-results-native`.
 console-practice-trace = ["diag"]
-console-swap-trace = ["console-practice-trace"]
-native-unlink-probe = ["console-swap-trace"]
-automation-results-native = ["deluxe-sdk"]
 hang-trace = ["diag", "hos-lock/owners"]
 plugin-heap-meter = ["diag"]
 named-input-trace = ["diag"]
-mii-ldn-qualification-probe = ["diag"]
 # Runtime capture toggle on the Deluxe Plugins page (Q7): `engine::deluxe_row` (src/model/deluxe_row.rs), `runtime::deluxe_row`.
 deluxe-sdk = ["dep:deluxe-plugin-sdk"]
 # The fork's host-only replay simulator (consts feature; used by the swap-model replay tests).

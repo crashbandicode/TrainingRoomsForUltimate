@@ -13,12 +13,6 @@ impl ServiceEntryContext {
     pub(super) fn caller_lr(&self) -> usize {
         self.words[3]
     }
-    #[cfg(feature = "console-swap-trace")]
-    fn native_sp(&self) -> usize {
-        // native_service.S places these four words at original SP - 0x20.
-        // Capture the actual callback stack; TLS alone cannot identify a fiber stack.
-        self as *const Self as usize + std::mem::size_of::<Self>()
-    }
     pub(super) fn dispatcher_tuple(&self) -> [usize; 4] {
         self.words
     }
@@ -154,9 +148,6 @@ unsafe extern "C" fn training_mod_native_service_dispatch(
 #[no_mangle]
 #[inline(never)]
 unsafe extern "C" fn training_mod_native_service_pre(entry: *mut u8, context: &ServiceEntryContext) -> u64 {
-    #[cfg(feature = "console-swap-trace")]
-    let native_sp = context.native_sp() as u64;
-    #[cfg(not(feature = "console-swap-trace"))]
     let native_sp = 0;
     crate::runtime::roster::practice_trace::event(220, [entry as u64, context.caller_lr() as u64, native_sp, 0, 0]);
     #[cfg(feature = "diag")]

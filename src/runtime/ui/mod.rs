@@ -28,8 +28,6 @@ pub mod setups;
 pub mod state;
 pub mod texture;
 pub mod thumbs;
-#[cfg(feature = "texture-probe")]
-pub mod texture_probe;
 pub mod tick;
 pub mod view;
 pub mod worker;

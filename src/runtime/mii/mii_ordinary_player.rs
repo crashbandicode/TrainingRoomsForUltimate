@@ -515,8 +515,6 @@ pub(super) fn published_admission()->crate::engine::swap::cycle_members::MiiAdmi
 }
 #[inline(never)]
 pub(super) unsafe fn service(entry:*mut u8,owner:u32)->bool {
-    #[cfg(feature = "console-swap-trace")]
-    let _swap_stack = crate::runtime::roster::practice_trace::scope(0x1080001);
     if owner!=0 || !ENABLED.load(Ordering::Acquire) {return false;}
     // P1-CYCLE: the admission the menu shows is the one the walkers walk, refreshed every frame from this state.
     publish_admission(cycle_admission(&STATE.lock()));
@@ -585,8 +583,6 @@ unsafe fn mii_group_record_publication(entry:*mut u8)->bool {
 
 #[inline(never)]
 unsafe fn complete(entry:*const u8,t:&Track) {
-    #[cfg(feature = "console-swap-trace")]
-    let _swap_stack = crate::runtime::roster::practice_trace::scope(0x1080004);
             let result=native::completed(t);
             let mut s=STATE.lock();
             if !s.track.as_ref().is_some_and(|now|now.ticket==t.ticket) {return;}
@@ -656,8 +652,6 @@ fn bank_build_refused(t:&Track,reason:&'static str) {
 
 #[inline(never)]
 unsafe fn capture(entry:*mut u8) {
-    #[cfg(feature = "console-swap-trace")]
-    let _swap_stack = crate::runtime::roster::practice_trace::scope(0x1080002);
     let kind=read::<u32>(entry,0x18);
     let captured=STATE.lock().owner.as_ref().map(|o|o.origin.original_kind);
     let Some(original)=captured.or_else(||original_kind(Role::Player)) else {return;};
@@ -694,8 +688,6 @@ type BankSubmit=(Option<super::body_bank::Plan>,super::native_reload_pose::Reloa
 /// returns, so that frame and `submit_bank`'s chain no longer stack on the native service poll's deepest path.
 #[inline(never)]
 unsafe fn begin(entry:*mut u8)->bool {
-    #[cfg(feature = "console-swap-trace")]
-    let _swap_stack = crate::runtime::roster::practice_trace::scope(0x1080003);
     let mut bank:Option<BankSubmit>=None;
     let started=begin_prepare(entry,&mut bank);
     match bank {
@@ -1337,8 +1329,6 @@ fn refuse(entry:usize,reason:&str) {
 /// committed helper/CPU changes. A missing receipt never alters the load or grants authority.
 #[inline(never)]
 pub(super) unsafe fn begin_generic(entry:*mut u8,token:InstallToken,descriptor:&[u8;0x70]) {
-    #[cfg(feature = "console-swap-trace")]
-    let _swap_stack = crate::runtime::roster::practice_trace::scope(0x1080005);
     if !enabled() {return;}
     let pending={
         let mut s=STATE.lock();
@@ -1367,8 +1357,6 @@ pub(super) unsafe fn begin_generic(entry:*mut u8,token:InstallToken,descriptor:&
 }
 #[inline(never)]
 pub(super) unsafe fn complete_generic(entry:*mut u8,token:InstallToken,kind:u32) {
-    #[cfg(feature = "console-swap-trace")]
-    let _swap_stack = crate::runtime::roster::practice_trace::scope(0x1080006);
     if !enabled() {return;}
     let generic={
         let mut s=STATE.lock();

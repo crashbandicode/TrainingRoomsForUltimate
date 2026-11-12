@@ -143,22 +143,6 @@
 "unlink.observed_3895874"	"native_unlink_install"	0x3895870	SeamKind::Relied	7f0200f99f7e01a99f7e00a9fd7b41a9f44fc2a8c0035fd60000000000000000f44fbea9fd7b01a9fd430091f40300aaf30300aa808e40f8400000b4f9ffff97	"native-unlink-guard"	Scopes::ALL	false	false	Sharing::None	"walker window"
 # unlink:relied/code:exact=12
 "unlink.observed_38951fc"	"native_unlink_install"	0x38951f8	SeamKind::Relied	bf0200f9df7e01a9df7e00a9685240f9150540f9f5f9ffb5f70313aaf48e44f8f80640f99f0218ebe006005499d000f0393b45f9950240f9f50500b4a8024139	"native-unlink-guard"	Scopes::ALL	false	false	Sharing::None	"walker window"
-# unlink_probe:hook/raw_inline:exact=20
-"unlink_probe.walk_38958a4"	"native_unlink_probe"	0x38958a4	SeamKind::Hook { form: HookForm::Raw, placement: Placement::Mid }	808e40f8400000b4f9ffff97601240f9e00000b4f6ffff97681240f9690e40f9c90000b42981009106000014e8031faa690e40f989ffffb5690240f929210091	"native-unlink-probe"	Scopes::ALL	false	false	Sharing::None	"diag observer"
-# unlink_probe:hook/raw_inline:exact=16
-"unlink_probe.walk_3895148"	"native_unlink_probe"	0x3895148	SeamKind::Hook { form: HookForm::Raw, placement: Placement::Mid }	e90314aaea0315aa4a0140f929050091caffffb5ea0315aa4b0540f98b0100b54b1140f94b0100b54a0140f9aaffffb5ec031faa3f010ceba20100548a0100b4	"native-unlink-probe"	Scopes::ALL	false	false	Sharing::None	"diag observer"
-# unlink_probe:hook/raw_inline:exact=20
-"unlink_probe.walk_38951c4"	"native_unlink_probe"	0x38951c4	SeamKind::Hook { form: HookForm::Raw, placement: Placement::Mid }	a9a241a9690000b42981009103000014a90240f929210091280100f9a8a641a9690000b4280d00f903000014a90240f9280900f9bf0200f9df7e01a9df7e00a9	"native-unlink-probe"	Scopes::ALL	false	false	Sharing::None	"diag observer"
-# unlink_probe:hook/raw_inline:exact=20
-"unlink_probe.destroy_3896bbc"	"native_unlink_probe"	0x3896bbc	SeamKind::Hook { form: HookForm::Raw, placement: Placement::Mid }	680241397c3200b976e20039680000377f82007910000014682a40f91f010039680241397f2600f96801003688d000d0772a40f9083945f9680000b4e00317aa	"native-unlink-probe"	Scopes::ALL	false	false	Sharing::None	"diag observer"
-# unlink_probe:hook/raw_inline:exact=20
-"unlink_probe.walk_38952cc"	"native_unlink_probe"	0x38952cc	SeamKind::Hook { form: HookForm::Raw, placement: Placement::Mid }	df7e01a9df7e00a9790000b4e00315aab5b10494e00315aa176602949f0200f9942200911f0314ebc1f9ff54f40240f9683240f9683600f9ff0200f9fffe00a9	"native-unlink-probe"	Scopes::ALL	false	false	Sharing::None	"diag observer"
-# unlink_probe:hook/raw_inline:exact=20
-"unlink_probe.walk_3895904"	"native_unlink_probe"	0x3895904	SeamKind::Hook { form: HookForm::Raw, placement: Placement::Mid }	9f7e01a99f7e00a9fd7b41a9f44fc2a8c0035fd60000000000000000ffc305d1fc6f11a9fa6712a9f85f13a9f65714a9f44f15a9fd7b16a9fd830591f40301aa	"native-unlink-probe"	Scopes::ALL	false	false	Sharing::None	"diag observer"
-# unlink_probe:hook/raw_inline:exact=20
-"unlink_probe.walk_3895874"	"native_unlink_probe"	0x3895874	SeamKind::Hook { form: HookForm::Raw, placement: Placement::Mid }	9f7e01a99f7e00a9fd7b41a9f44fc2a8c0035fd60000000000000000f44fbea9fd7b01a9fd430091f40300aaf30300aa808e40f8400000b4f9ffff97601240f9	"native-unlink-probe"	Scopes::ALL	false	false	Sharing::None	"diag observer"
-# unlink_probe:hook/raw_inline:exact=20
-"unlink_probe.walk_38951fc"	"native_unlink_probe"	0x38951fc	SeamKind::Hook { form: HookForm::Raw, placement: Placement::Mid }	df7e01a9df7e00a9685240f9150540f9f5f9ffb5f70313aaf48e44f8f80640f99f0218ebe006005499d000f0393b45f9950240f9f50500b4a8024139e8000036	"native-unlink-probe"	Scopes::ALL	false	false	Sharing::None	"diag observer"
 # gc_guard:relied/code:exact=60
 "gc_guard.loop"	"native_gc_guard"	0x38ffcc0	SeamKind::Relied	891a40f92a01158b4a2140390a013036216975f8292440393f05007280000054e00313aa97f9ff97881640b9d6060091b5420091dfc228eb4bfeff54881240b9	"native-unlink-guard"	Scopes::ALL	false	false	Sharing::None	"the whole 15-word Lua GC constant loop, checked before any patch"
 # gc_guard:patch/data:exact=4

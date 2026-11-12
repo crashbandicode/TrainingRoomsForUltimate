@@ -4,8 +4,8 @@ supersedes D11) the table is `deluxe-sdk`, `diag` and the diagnostic family; the
 
 The feature table of `Cargo.toml` is the source: this lists (and, with `--run`, compiles) a set of feature combinations:
 
-  set `core`   default; no default features; default + diag; the three heap/allocator features alone and together
-               (`console-practice-trace`, `native-unlink-probe`, `plugin-heap-meter`: the fork gave each its own global allocator;
+  set `core`   default; no default features; default + diag; the two heap/allocator features alone and together
+               (`console-practice-trace`, `plugin-heap-meter`: the fork gave each its own global allocator;
                the plugin has one, `tests/pkg6_features.rs::the_plugin_has_one_global_allocator`)
   set `each`   every feature of the table on top of the default features
   set `alone`  every feature of the table by itself with `--no-default-features` (the feature's own `requires` closure only)
@@ -68,10 +68,8 @@ CORE = [
     ("default+diag", ["--features", "diag"]),
     # Explicit product/diagnostic combinations, rather than an all-features product.
     ("trace", ["--features", "diag,console-practice-trace"]),
-    ("swap-trace", ["--features", "diag,console-swap-trace"]),
-    ("unlink-probe", ["--features", "diag,native-unlink-probe"]),
     ("heap-meter", ["--features", "diag,plugin-heap-meter"]),
-    ("trace+unlink+meter", ["--features", "diag,console-practice-trace,native-unlink-probe,plugin-heap-meter"]),
+    ("trace+meter", ["--features", "diag,console-practice-trace,plugin-heap-meter"]),
     ("hang-trace", ["--features", "diag,hang-trace"]),
 ]
 

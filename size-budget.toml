@@ -1625,3 +1625,10 @@ basis = "rustfmt-sloc4"
 ceiling = 152990
 date = "2026-11-12"
 reason = "rc.10 S2 (docs/CODE-REDUCTION-rc10.md; docs/DECISIONS.md, D11 superseded): the 25 always-on Cargo features are not switches; their gates are removed and the code that compiled only with one off is deleted, on rc10 0d9b8be9 (154519); measured 152990 (tools/size_gate.py), -1529. A cut: the ratchet."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 151623
+date = "2026-11-12"
+reason = "rc.10 S4 (docs/CODE-REDUCTION-rc10.md): the five probes nothing used are deleted with their 15 seam rows (operator 2026-11-12), on rc10 745834de (152990); measured 151623 (tools/size_gate.py), -1367. A cut: the ratchet."
