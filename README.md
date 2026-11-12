@@ -51,7 +51,8 @@ How to read it: [the frame strip guide](docs/FRAME-STRIP.md)
 Slow the game down or speed it up. Hold R + D-pad Up and press Left or Right.
 
 ![The speed steps to 1/2, then 1/4, and the jabs slow down](docs/media/rc8-game-speed-chord.gif)<br>*Stepping down to 1/4*<br>
-![The stopwatch shows x1.5, then goes away at x1](docs/media/rc8-speed-hud-fixed.gif)<br>*The stopwatch follows the speed*
+![The stopwatch shows x1.5, then goes away at x1](docs/media/rc8-speed-hud-fixed.gif)<br>*The stopwatch follows the speed*<br>
+![In the online waiting room: a forward smash at x1, the speed steps to 1/2, and the next smash is slower](docs/media/rc11-lobby-speed.gif)<br>*It works in the online waiting rooms too*
 
 ### CPU reactions
 Teach the CPU to DI, tech, shield, mash and more, on the CPU page.

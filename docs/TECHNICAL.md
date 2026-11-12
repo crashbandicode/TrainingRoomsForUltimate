@@ -58,12 +58,12 @@ current values as defaults, B goes back. Each page ends with *Reset page to defa
 where you left it. The chords are edited on Display & Controls › Button chords.
 
 The key hints at the foot of every page end with the build tag: the version, then the build name and the commit the NRO
-was built from, for example `0.2.0-rc.6 · rc10 32ee7595` (rc.8 and rc.9 builds read `rc8` and `rc9`). A build from
+was built from, for example `0.2.0-rc.6 · rc11 0c628724` (rc.8 to rc.10 builds read `rc8` to `rc10`). A build from
 uncommitted changes adds `-dirty`.
 
-**Clip** [`rc10-footer-tag.gif`](media/rc10-footer-tag.gif): the menu opens on two pages whose key hints end with `0.2.0-rc.6 · rc10 32ee7595`
+**Clip** [`rc11-footer-tag.gif`](media/rc11-footer-tag.gif): the menu opens on two pages whose key hints end with `0.2.0-rc.6 · rc11 0c628724`
 
-*Eden, 2026-11-12, rc.10 `32ee7595` as shipped (diag NRO `79922abe`), `docs-rd13-32ee7595` `fx-footer-tag`: Training,
+*Eden, 2026-11-12, rc.11 `0c628724` as shipped (diag NRO `bd0bc61b`), `docs-rd18-0c628724` `fx-footer-tag`: Training,
 the menu on Fighters & Stages, R to Display & Controls, the menu closes. The tag is read from the frames (it isn't
 logged). The cut is listed in [MEDIA.md](MEDIA.md).*
 

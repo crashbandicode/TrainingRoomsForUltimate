@@ -4,6 +4,26 @@ Every GIF in [`media/`](media/) is actual Eden footage: whole screen, 1280×720,
 game-speed timing kept, trimmed at the ends (any cut inside a clip is listed with it). Frames were reviewed (start,
 action, result) before a clip was kept. The raw takes stay outside git with their runs.
 
+## rc.11 docs clips (2026-11-12)
+
+- **Build:** rc.11 `0c628724` as shipped, its diag NRO `bd0bc61b…`.
+- **Runs:** muted, Eden's GDB stub on, no gamepad overlay; every row passed.
+  - `docs-rd18-0c628724`, the Surface, one instance: the footer.
+  - `docs-lb4-0c628724`, the XPS, b alone in the Quickplay waiting room with Lobby Items Off. The lobby speed row
+    passed on its same-boot retry.
+- **Evidence clips** (640 wide, outside git with the runs, `feature-gifs/evidence/`; the feature ledger lists each one's
+  frames):
+  - `rc11-vs-sudden-death.gif` (`docs-rd17c-0c628724` `vs-route`, rc.11): TIME!, sudden death at 300%, a Bob-omb,
+    GAME!, while the replay capture runs on (#71).
+  - On rc.10's diag `79922abe` (`docs-rd14`, `docs-rd14b` and `docs-rd15-32ee7595`; rc.11 changes nothing they show):
+    `rc10-rename.gif` (#32), `rc10-chain-picker.gif` (#21), `rc10-active-after-record.gif` (#12), `rc10-hot-five.gif`
+    (#30), `rc10-edit-placement.gif` (#70), `rc10-intro-fresh.gif` (#65) and `rc10-mash-interrupt.gif` (#22).
+
+| File | Run, row | Embedded in | Length, size | Raw windows kept | What the frames show |
+| --- | --- | --- | --- | --- | --- |
+| `media/rc11-footer-tag.gif` | `docs-rd18-0c628724`, `fx-footer-tag` (the Surface, 17:51–17:58Z) | TECHNICAL.md, the build tag | 9.1 s, 1.7 MB | 0.0–9.1 s | Mario vs Chrom in Training; the menu opens on Fighters & Stages, R to Display & Controls; both pages' key hints end with `0.2.0-rc.6 · rc11 0c628724`; the menu closes. |
+| `media/rc11-lobby-speed.gif` | `docs-lb4-0c628724`, `fx-lobby-speed` (the XPS, 17:51–18:12Z; the same-boot retry) | README, Game speed | 9.1 s, 5.0 MB | 0.2–3.0, 66.6–68.4, 69.4–73.9 s | The Quickplay waiting room, Sephiroth and a CPU partner. A forward smash at x1; the "Game speed" pop-up steps to 2/3, then 1/2; the same forward smash at 1/2 is slower and knocks the partner off. The log: `[GameSpeed] step place=Lobby dir=Left speed=1/2`, `lobby Taken(… divisor: 2 …) in_practice=true`; ms per motion frame ×1.946 at 1/2. |
+
 ## rc.10 docs clips (2026-11-12)
 
 - **Build:** rc.10 `32ee7595` as shipped, its diag NRO `79922abe…`.
