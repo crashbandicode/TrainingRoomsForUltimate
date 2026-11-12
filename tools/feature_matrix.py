@@ -73,6 +73,8 @@ CORE = [
     ("hang-trace", ["--features", "diag,hang-trace"]),
     # rc.10: this probe stopped compiling unnoticed (a `.bits()` on a `u32`); it is in the core set so it cannot rot again.
     ("named-input-trace", ["--features", "diag,named-input-trace"]),
+    # 2026-11-12 thread-safety audit item 3: the ARC probe left the diag build; here it keeps compiling.
+    ("arc-probe", ["--features", "diag,arc-probe"]),
 ]
 
 

@@ -124,7 +124,7 @@ mod imp {
         #[cfg(feature = "diag")] DIAG_RELOAD = [DiagReload];
         MENU = [Menu];
         ARCHIVE = [Archive];
-        #[cfg(feature = "diag")] PROBE = [Probe];
+        #[cfg(feature = "arc-probe")] PROBE = [Probe];
         #[cfg(feature = "diag")] MACRO_DIAG = [MacroDiag];
         REPLAY_SAVE = [ReplaySave];
         MII_CATALOG = [MiiCatalog];

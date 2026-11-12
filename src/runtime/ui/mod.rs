@@ -20,6 +20,9 @@ pub mod input;
 pub mod menu_app;
 pub mod native_pause;
 pub mod pane;
+// `arc-probe` only (audit 2026-11-12 item 3). `diag` stays on the line above the declaration: the tests' source scans
+// (tests/common/callgraph.rs, tests/hook_locks.rs) read that pair as an Eden-only module.
+#[cfg(feature = "arc-probe")]
 #[cfg(feature = "diag")]
 pub mod probe;
 pub mod registry;
@@ -114,7 +117,7 @@ pub fn clear_session_state() {
 pub fn install(settings: &Settings, input_ready: bool, found: [GuardOutcome; UI_SITES.len()]) -> UiInstall {
     worker::remember(settings.clone());
     state::PILOT_PRESENT.store(pilot_export().is_some(), std::sync::atomic::Ordering::Release);
-    #[cfg(feature = "diag")]
+    #[cfg(feature = "arc-probe")]
     probe::install();
     // Authoritative pre-write outcomes from boot. The native observer has now
     // written our own anchor hooks; rereading those as pristine self-rejects UI.

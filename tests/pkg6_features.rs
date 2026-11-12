@@ -73,8 +73,8 @@ fn the_product_is_not_behind_feature_switches() {
     // Explicit: a new feature must change this test.
     let names: BTreeSet<&str> = map.keys().map(String::as_str).collect();
     assert_eq!(names, BTreeSet::from([
-        "console-practice-trace", "default", "deluxe-sdk", "diag", "hang-trace", "named-input-trace", "plugin-heap-meter",
-        "seam-drill", "simulator",
+        "arc-probe", "console-practice-trace", "default", "deluxe-sdk", "diag", "hang-trace", "named-input-trace",
+        "plugin-heap-meter", "seam-drill", "simulator",
     ]));
 }
 
@@ -136,6 +136,7 @@ fn every_probe_trace_observer_and_meter_requires_diag() {
     }
     // Explicit retained inventory: approved probe retirements must not erase unresolved diagnostics.
     let expected = BTreeSet::from([
+        "arc-probe",
         "console-practice-trace",
         "hang-trace",
         "named-input-trace",

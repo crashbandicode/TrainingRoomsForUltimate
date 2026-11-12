@@ -73,6 +73,10 @@ diag = []
 # deleted the probes nothing used (texture-probe, native-unlink-probe, console-swap-trace, mii-ldn-qualification-probe,
 # automation-results-native).
 seam-drill = ["diag"]
+# The ARC file-route probe (`runtime::ui::probe`, SPEC-core-07 U1-U3 and V5, answered in docs/test-provenance/package-5.md),
+# off the diag build since the thread-safety audit of 2026-11-12 (item 3): its thread called into ARCropolis without
+# ARCropolis's lock and seeked `arc:` files at every diag boot. Its own feature keeps it compiling (feature_matrix core).
+arc-probe = ["diag"]
 
 # --- The carried diagnostic features (package 6) ---------------------------------------------------------
 # From the fork's root Cargo.toml of stage m5o (CARRY-OVER.md pkg6 section): the probes, traces and meters, never in a
