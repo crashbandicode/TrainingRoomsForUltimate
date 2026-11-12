@@ -4725,6 +4725,9 @@ unsafe fn settle_background(entry: *mut u8, owner: u32, role: usize) {
                 }
                 return;
             }
+            // The worker's writes (the scratch's selected context) are read after this settled count: a plain read does not
+            // order them on ARM, so acquire them (thread-safety audit of 2026-11-12, §3).
+            std::sync::atomic::fence(Ordering::Acquire);
             let control = b.control;
             b.control = 0;
             b.control_us = now.saturating_sub(b.started_us);
@@ -4784,6 +4787,8 @@ unsafe fn settle_background(entry: *mut u8, owner: u32, role: usize) {
                 return;
             }
         }
+        // The same for the bodies, the shadow and Pokémon Trainer's pool, read after every count settled.
+        std::sync::atomic::fence(Ordering::Acquire);
         bank.background.take().unwrap()
     };
     let mut background = background;

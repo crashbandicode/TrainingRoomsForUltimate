@@ -15659,7 +15659,7 @@
    "dest": "src/runtime/roster/native_body_bank.rs",
    "crate": "root",
    "src_sha256": "ccf7ac678691fa0101a1eff5dbd9300a1b12fe64e9ebbde515697adfbb841c98",
-   "dest_sha256": "388e7fd7b8e6fd12ae714955615bb881226ab9078f6f6ab74c6c7bd5704cb288",
+   "dest_sha256": "e13a034d45872fb1d3880931a93ca32a7ebb136927599eaef5a932c0b969dfa4",
    "edits": [
     {
      "old": "unsafe fn finalize_entry(entry: *mut u8) -> u64 {\n",
@@ -18103,6 +18103,16 @@
       ]
      ],
      "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
+    },
+    {
+     "old": "            let control = b.control;\n            b.control = 0;\n            b.control_us = now.saturating_sub(b.started_us);\n",
+     "new": "            // The worker's writes (the scratch's selected context) are read after this settled count: a plain read does not\n            // order them on ARM, so acquire them (thread-safety audit of 2026-11-12, \u00a73).\n            std::sync::atomic::fence(Ordering::Acquire);\n            let control = b.control;\n            b.control = 0;\n            b.control_us = now.saturating_sub(b.started_us);\n",
+     "reason": "thread-safety audit 2026-11-12 section 3 (pre-existing, approved 15:14Z): the background build reads the game worker's results after a plain read of each task's pending count; fence(Acquire) after the settled decision orders those reads on ARM (control init: the scratch)"
+    },
+    {
+     "old": "        bank.background.take().unwrap()\n    };\n    let mut background = background;\n",
+     "new": "        // The same for the bodies, the shadow and Pok\u00e9mon Trainer's pool, read after every count settled.\n        std::sync::atomic::fence(Ordering::Acquire);\n        bank.background.take().unwrap()\n    };\n    let mut background = background;\n",
+     "reason": "thread-safety audit 2026-11-12 section 3 (pre-existing, approved 15:14Z): the background build reads the game worker's results after a plain read of each task's pending count; fence(Acquire) after the settled decision orders those reads on ARM (bodies: the shadow, each task's body, the trainer pool)"
     }
    ]
   },
