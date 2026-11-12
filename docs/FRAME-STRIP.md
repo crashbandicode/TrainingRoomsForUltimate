@@ -6,7 +6,7 @@ The Input display chord, R + D-pad Down by default (R is Z on a GameCube control
 
 It keeps the last 60 game frames, about one second. The newest frame is on the right. Player 1 and the CPU each have a lane. Player 1's button presses are chips above the lanes. On the right, three readouts say who could act first after the last hit, whether the last follow-up was a true combo, and how the press was timed. A LAST row under the lanes keeps the last four follow-ups.
 
-The strip hides while the TrainingRooms menu, the recording pop-up, the Fighter Mismatch question, or the game's pause menu is open, while Input Display is Off, and outside Training and lobby practice. It clears when the scene changes, when you hot-swap, when a save state loads, and when Training resets or replaces a fighter. The frames from before that did not happen. While the strip is on screen, the separate Frame Advantage notice stays down, because the ADVANTAGE readout is that number.
+The strip hides while the TrainingRooms menu, the recording pop-up, the Fighter Mismatch question, the game's pause menu, or the waiting room's own menu is open, while Input Display is Off, and outside Training and lobby practice. It clears when the scene changes, when you hot-swap, when a save state loads, and when Training resets or replaces a fighter. The frames from before that did not happen. While the strip is on screen, the separate Frame Advantage notice stays down, because the ADVANTAGE readout is that number.
 
 An older settings file that still says Smash Inputs, Raw Inputs, or Status Only becomes Frame strip. Off stays Off.
 

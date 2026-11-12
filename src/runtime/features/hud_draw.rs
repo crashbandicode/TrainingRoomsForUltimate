@@ -14,7 +14,6 @@ use hos_lock::Mutex;
 use skyline::nn::ui2d::{Layout, Pane};
 
 use crate::model::frame_strip_plan::{Changed, Look};
-use crate::model::input_delay::Owners;
 use crate::model::notify::TickOut;
 use crate::model::panes::{self as p, cb, iv};
 #[cfg(feature = "diag")]
@@ -112,7 +111,7 @@ pub unsafe fn draw(layout: *mut Layout, name: &[u8]) {
         (c.notice as *mut Pane, c.strip, c.bar)
     };
     let owners = published::input_owners();
-    let menu_open = owners.contains(Owners::MENU) || owners.contains(Owners::VANILLA_PAUSE);
+    let menu_open = owners.covers_strip();
     write_notice(notice, &notices::hud_tick(!waiting && !notice.is_null()));
     if strip[iv::at::CONTAINER] != 0 {
         input_display::hud_tick(menu_open, |local, look, changed| {

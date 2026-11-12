@@ -134,6 +134,12 @@ impl Owners {
     pub const fn holds_gameplay(self) -> bool {
         self.0 & !(Self::STOP_CHORD.0 | Self::REPLAY_LOADING.0) != 0
     }
+
+    /// What hides the frame strip and the combo bar (docs/FRAME-STRIP.md): the plugin's menu, the game's pause menu, or
+    /// the waiting room's own menu (Leave Battle, Training Partners, Behavior), which the strip drew over before rc.11.
+    pub const fn covers_strip(self) -> bool {
+        self.0 & (Self::MENU.0 | Self::VANILLA_PAUSE.0 | Self::NATIVE_UI_BUSY.0) != 0
+    }
 }
 
 /// Why the queue was emptied outside a poll.
@@ -299,6 +305,23 @@ mod tests {
         assert_eq!(out, [0, 0, 1, 2, 3]);
     }
 
+    /// rc.11 (operator, 2026-11-12): in a waiting room the strip drew over the game's own menu (its Leave Battle tab).
+    /// The menu sets and clears the native UI owner bit (`set_native_ui_owner`); the strip hides while it is set and
+    /// shows again once it clears, as for the plugin's menu and the game's pause menu.
+    fn the_strip_hides_while_the_waiting_rooms_menu_is_open() {
+        let mut bits = Owners::NONE.bits();
+        assert!(!Owners::from_bits(bits).covers_strip(), "gameplay: shown");
+        bits |= Owners::NATIVE_UI_BUSY.bits();
+        assert!(Owners::from_bits(bits).covers_strip(), "the waiting room's menu is open: hidden");
+        bits &= !Owners::NATIVE_UI_BUSY.bits();
+        assert!(!Owners::from_bits(bits).covers_strip(), "the menu closed: shown again");
+        assert!(Owners::MENU.covers_strip() && Owners::VANILLA_PAUSE.covers_strip(), "as before");
+        assert!(Owners::NATIVE_UI_BUSY.with(Owners::STOP_CHORD).covers_strip());
+        for owner in [Owners::STOP_CHORD, Owners::REPLAY_EDITOR, Owners::REPLAY_LOADING] {
+            assert!(!owner.covers_strip(), "{owner:?} leaves the strip as it was");
+        }
+    }
+
     /// #68 (cov-rec diag2/diag3, 2026-11-08): the Replay window's Mii track stayed on "Reading recorded Mii..." for 15 s.
     /// The window waits in `replay_capture::loading()` for the capture's Mii import, the import's service waits until
     /// `menu::captures_input()` is false, and that read the replay editor's owner bit, which `sync_owner` set for the
@@ -374,6 +397,7 @@ mod tests {
     fn case_table() {
         crate::test_table::run(&[
             ("two_polls_late", two_polls_late as fn()),
+            ("the_strip_hides_while_the_waiting_rooms_menu_is_open", the_strip_hides_while_the_waiting_rooms_menu_is_open as fn()),
             ("a_replay_load_keeps_p1_neutral_but_does_not_hold_the_gameplay_gates", a_replay_load_keeps_p1_neutral_but_does_not_hold_the_gameplay_gates as fn()),
             ("an_owner_empties_the_queue", an_owner_empties_the_queue as fn()),
             ("the_physical_sticks_come_out_with_their_own_record", the_physical_sticks_come_out_with_their_own_record as fn()),
