@@ -5,6 +5,8 @@
 //! The values are the game's own encoding (13.0.5, the waiting room's practice panel): partners `0..=3`, or
 //! [`AUTOMATIC`]; behavior [`ATTACK`] or [`STOP`]. Nothing saved leaves the game's defaults (Automatic, Attack).
 
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+
 use serde_json::{Map, Value};
 
 /// Training Partners: Automatic (the panel's `+0x420`; `0..=3` is that many partners).
@@ -140,6 +142,18 @@ pub fn restore(saved: Saved, choices: &[u32]) -> [Option<Apply>; 2] {
     [partners, behavior]
 }
 
+/// The writer thread stored `pair` (`None`: nothing was due). `due` is cleared first and set again when the save hook
+/// published a newer pair into `saved` meanwhile: checking before clearing lost a change saved between the two (the
+/// thread-safety audit of 2026-11-12, item 1). `between` runs after the clear, the one point a save can land inside this.
+pub fn clear_stored(due: &AtomicBool, saved: &AtomicU32, pair: Option<Saved>, between: impl FnOnce()) {
+    if pair.is_some() && due.swap(false, Ordering::AcqRel) {
+        between();
+        if pair != Some(Saved::unpack(saved.load(Ordering::Acquire))) {
+            due.store(true, Ordering::Release);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     lib_unit_tests! {
@@ -192,6 +206,67 @@ mod tests {
         assert_eq!(saved.with(Change::Partners(1)), saved, "the same value is no change");
     }
 
+    /// The save hook's two stores (`runtime::lobby::lobby_persist::save`): the pair, then the store is due.
+    fn hook_save(due: &AtomicBool, saved: &AtomicU32, next: Saved) {
+        saved.store(next.pack(), Ordering::Release);
+        due.store(true, Ordering::Release);
+    }
+
+    /// The writer's read (`runtime::lobby::lobby_persist::store_due`).
+    fn store_due(due: &AtomicBool, saved: &AtomicU32) -> Option<Saved> {
+        due.load(Ordering::Acquire).then(|| Saved::unpack(saved.load(Ordering::Acquire)))
+    }
+
+    fn a_change_saved_while_the_writer_clears_stays_due() {
+        let (due, saved) = (AtomicBool::new(false), AtomicU32::new(Saved::NONE.pack()));
+        let first = Saved { partners: Some(1), behavior: None };
+        let newer = first.with(Change::Behavior(STOP));
+        hook_save(&due, &saved, first);
+        let pair = store_due(&due, &saved);
+        assert_eq!(pair, Some(first));
+        // The hook saves inside the writer's clear (after it, before the re-check): the newer pair stays due.
+        clear_stored(&due, &saved, pair, || hook_save(&due, &saved, newer));
+        assert_eq!(store_due(&due, &saved), Some(newer), "the newer pair stays due");
+        // The hook saves after the writer read the pair and before its clear (where the check-then-clear lost it).
+        let pair = store_due(&due, &saved);
+        let newest = newer.with(Change::Partners(3));
+        hook_save(&due, &saved, newest);
+        clear_stored(&due, &saved, pair, || {});
+        assert_eq!(store_due(&due, &saved), Some(newest), "a pair saved before the clear stays due");
+        // Nothing newer: the store is done.
+        clear_stored(&due, &saved, Some(newest), || {});
+        assert_eq!(store_due(&due, &saved), None);
+        // Nothing was due: no clear, and `between` does not run.
+        clear_stored(&due, &saved, None, || hook_save(&due, &saved, first));
+        assert_eq!(store_due(&due, &saved), None);
+    }
+
+    fn the_writer_ends_on_the_last_saved_pair() {
+        // Two real threads: the hook saves 20,000 changes while the writer stores and clears. Once the hook has stopped
+        // the writer's last stored pair is the last one saved (a lost `due` would leave it on an older pair).
+        let (due, saved, done) = (AtomicBool::new(false), AtomicU32::new(Saved::NONE.pack()), AtomicBool::new(false));
+        let last = std::thread::scope(|scope| {
+            scope.spawn(|| {
+                for i in 0..20_000u32 {
+                    let behavior = if i % 2 == 0 { ATTACK } else { STOP };
+                    hook_save(&due, &saved, Saved { partners: Some(i % 4), behavior: Some(behavior) });
+                }
+                done.store(true, Ordering::Release);
+            });
+            let mut last = None;
+            loop {
+                let finished = done.load(Ordering::Acquire);
+                let pair = store_due(&due, &saved);
+                last = pair.or(last);
+                clear_stored(&due, &saved, pair, || {});
+                if finished && !due.load(Ordering::Acquire) {
+                    break last;
+                }
+            }
+        });
+        assert_eq!(last, Some(Saved::unpack(saved.load(Ordering::Acquire))));
+    }
+
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
@@ -200,6 +275,8 @@ mod tests {
             ("chosen_maps_the_row_handler_to_the_panel_values", chosen_maps_the_row_handler_to_the_panel_values as fn()),
             ("restore_applies_only_what_the_room_offers", restore_applies_only_what_the_room_offers as fn()),
             ("a_change_updates_only_its_own_row", a_change_updates_only_its_own_row as fn()),
+            ("a_change_saved_while_the_writer_clears_stays_due", a_change_saved_while_the_writer_clears_stays_due as fn()),
+            ("the_writer_ends_on_the_last_saved_pair", the_writer_ends_on_the_last_saved_pair as fn()),
         ]);
     }
     }

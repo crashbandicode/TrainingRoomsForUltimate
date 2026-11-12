@@ -62,11 +62,10 @@ pub(crate) fn store_due() -> Option<Saved> {
     STORE_DUE.load(Ordering::Acquire).then(published)
 }
 
-/// The writer thread stored `pair` (`None`: nothing was due).
+/// The writer thread stored `pair` (`None`: nothing was due): cleared, and due again when the hook saved a newer pair
+/// meanwhile (`model::lobby_persist::clear_stored`).
 pub(crate) fn clear_store(pair: Option<Saved>) {
-    if pair.is_some() && pair == Some(published()) {
-        STORE_DUE.store(false, Ordering::Release);
-    }
+    crate::model::lobby_persist::clear_stored(&STORE_DUE, &SAVED, pair, || {});
 }
 
 /// A local-wireless or Quickplay waiting room (`lobby_stage_cycle::family`, the outer mode the panel is built for).
