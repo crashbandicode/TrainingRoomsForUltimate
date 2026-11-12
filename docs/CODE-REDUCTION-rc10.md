@@ -443,6 +443,7 @@ in plain Rust types (no `repr`, never across FFI), with the same function-by-fun
 | `tools/sloc.py` | 165,930 | 147,878 | −18,052 |
 
 Against upstream's 24,325 that is 4.7 times, from 5.3. It is inside the floor this plan gave (110,000–117,000).
+Line coverage after S3b is 90.75% (it was 90.18% at the start), with 824 test functions.
 
 The three slices left, measured on `fb028a9b` (before S3b):
 
@@ -452,8 +453,10 @@ The three slices left, measured on `fb028a9b` (before S3b):
 | S6, one Mii role owner | `runtime/mii/mii_ordinary_cpu.rs` and `mii_ordinary_player.rs` share about 350 lines each of identical 6-line windows. | about −300 (one copy stays, plus the plumbing a shared owner needs) | High: native Mii transactions under locks; the Eden Mii rows for both roles. |
 | S7, menu and pop-up tables | 549 `X => "text"` arms, at most 65 in one module. An arm is already one line; a table does not make it shorter. | under −300 | Medium: the menu and panel tests, and an Eden menu tour. |
 
-Together that is about 800 lines, 0.7% of what is left, for two Eden passes and a high-risk refactor. My
-recommendation is not to do S5 to S7 for rc.10. (The roughly 2,500 dead lines S3 had left are taken in S3b.)
+Together that is about 800 lines, 0.7% of what is left, for two Eden passes and a high-risk refactor.
+
+**Decision (the primary, 2026-11-12 06:55Z): S5 to S7 are skipped for rc.10.** S8 was never planned. The code
+reduction of rc.10 ends with S3b. (The roughly 2,500 dead lines S3 had left are taken in S3b.)
 ## Line deltas per slice
 
 | Slice | Head | Raw non-test (product) | `tools/sloc.py` | Tests | Coverage |
@@ -464,4 +467,4 @@ recommendation is not to do S5 to S7 for rc.10. (The roughly 2,500 dead lines S3
 | S1 | `13e8ef5d` | 118,493 (111,612) | 154,519 | 824 (876) | not re-measured |
 | S2 | `84e39648` | 117,248 (110,367) | 152,990 | 824 (876) | not re-measured |
 | S4 | `fb028a9b` | 116,187 (110,364) | 151,623 | 824 (876) | not re-measured |
-| S3b | `2c728893` | 113,520 (107,697) | 147,878 | 824 (876) | not re-measured |
+| S3b | `2c728893` | 113,520 (107,697) | 147,878 | 824 (876) | 90.75% (34,633 of 38,162 lines) |
