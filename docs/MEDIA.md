@@ -43,6 +43,14 @@ file in the README and the docs; the old file stays in `media/` with a note in i
   `rs11-f02-lanes.gif` (#2), `rs11-f03-stick-row.gif` (#3), `rs11-f04-cstick.gif` (#4), `rs11-f07-adv-frames.gif`
   (#7: jab −14, forward tilt −13, forward smash −21, neutral air −6 on shield), `rs11-f08-readouts.gif` (#8) and
   `rs11-f23-mismatch.gif` (#23, #24, #25: Keep plays, the strip hidden under the prompt, B plays nothing).
+- **Combos and Mii evidence** (`docs-rs7-0c628724`, slot 1, 08:47–09:05Z; everything through the Recording page):
+  `rs11-f38-sequence.gif` (#38), `rs11-f45-shared-combo.gif` (#45), `rs11-f46-other-fighter.gif` (#46, #47),
+  `rs11-f51-mii-identical.gif` (#51) and `rs11-f54-named-mii.gif` (#54).
+- **Migration, placement and the CPU pilot** (`docs-rs8-0c628724`, slot 2, 08:43–09:00Z): `rs11-f37-migration.gif`
+  (#37; its first 3.5 s is a receipt card listing the card's pre-rc.5 files, since no screen in the game shows them,
+  then the Recording page after the first Training entry), `rs11-f70-edit-placement.gif` (#70: Offset X −40, the
+  same jab whiffs) and `rs11-f84-pilot-refusals.gif` (#84, #87 and #89's Play half: Record and Play on Player 1
+  refused, R + D-pad Down inert while Online Deluxe shows a page with rows, B + D-pad Up still opening the menu).
 - **Cycle and hot-slot evidence** (`docs-rs3b-0c628724`, slot 1, 05:29–05:45Z): `rs11-f55-cpu-cycle.gif` (#55, the
   CPU list zoomed, then Captain Falcon, the Mii Gunner and Peach in order; a greyed Mii class can't be shown on this
   card, whose Smash save holds a Mii of every class) and `rs11-f57-hot-slots.gif` (#57, "Fighters · Loading 4/10" to
