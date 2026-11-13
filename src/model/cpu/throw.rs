@@ -100,8 +100,14 @@ impl Throw {
     }
 }
 
+/// The airborne statuses whose main takes a reserved dive (rc.12: a hop stays in Jump or Jump Aerial past its apex,
+/// so a rule limited to Fall and Attack Air fast-fell a frame before the landing; the operator 2026-11-13: "at the peak
+/// of the hop not later").
+const DIVE_STATUSES: [C; 5] = [C::StatusJump, C::StatusJumpAerial, C::StatusFall, C::StatusFallAerial, C::StatusAttackAir];
+
 /// The fast-fall rule (SPEC-cpu-06 §5 "Fast fall", once per frame): `true` when the flag and the
-/// flash effect are to be applied now. A running playback (the step's context) yields.
+/// flash effect are to be applied now: the apex (the first falling frame) plus the rolled delay, in a status that takes
+/// the dive. A running playback (the step's context) yields.
 pub fn fast_fall_frame(step: Step, f: &FrameFacts) -> bool {
     let Step { t, s, rng, counters, mash, ctx } = step;
     if !mash.rolled.fast_fall || f.situation != Situation::Air {
@@ -113,7 +119,7 @@ pub fn fast_fall_frame(step: Step, f: &FrameFacts) -> bool {
         counters.get(CounterId::FastFall).full_reset();
         return false;
     }
-    if !(t.is(C::StatusFall, f.status) || t.is(C::StatusAttackAir, f.status)) || ctx.playback.running || f.reserve_dive {
+    if !DIVE_STATUSES.iter().any(|c| t.is(*c, f.status)) || ctx.playback.running || f.reserve_dive {
         return false;
     }
     !counters.get(CounterId::FastFall).should_delay(mash.rolled.fast_fall_delay)

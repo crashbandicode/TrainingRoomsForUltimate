@@ -345,7 +345,8 @@ Whether the CPU's jumps are full hops (Yes) or short hops (No), including the ju
 
 ### Fast Fall
 
-Whether the CPU fast falls once it starts falling after a jump or an aerial.
+Whether the CPU fast falls at the peak of a jump or an aerial: the first frame it starts falling, in a jump, a fall
+or an aerial.
 
 - **Values:** Yes, No, Random (either way each time).
 - **Default:** No.
@@ -353,7 +354,7 @@ Whether the CPU fast falls once it starts falling after a jump or an aerial.
 
 ### Fast Fall Delay
 
-Frames after the CPU starts falling before it fast falls. Used only when [Fast Fall](#fast-fall) says Yes.
+Frames after the peak of the jump (the CPU starts falling) before it fast falls. Used only when [Fast Fall](#fast-fall) says Yes.
 
 - **Values:** 0 to 30 frames. Tick values, or set a minimum and a maximum.
 - **Default:** none ticked: it fast falls at once.

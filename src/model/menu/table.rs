@@ -282,7 +282,7 @@ pub static ROWS: [Row; 92] = [
     r(ATTACKS, "Fast Fall", "fast_fall", Control::YesNoRandom,
       "Whether the CPU fast falls during a jump.\nRandom picks either way each time."),
     delay(ATTACKS, "Fast Fall Delay", "fast_fall_delay", 1, "fast_fall_delay_range",
-          "Frames the CPU waits before fast falling.\nTick values, or set a minimum and a maximum."),
+          "Frames after the jump's peak before fast falling.\nTick values, or set a minimum and a maximum."),
     r(ATTACKS, "Crouch", "crouch", TOGGLE, "On: the CPU crouches in place.\nOff: it stands."),
     // CPU > Player 1 control (the fallback exists only without the pilot)
     Row { vis: Vis::PilotPresent, ..r(P1, "P1 control", "", Control::Info(Info::PilotControl),

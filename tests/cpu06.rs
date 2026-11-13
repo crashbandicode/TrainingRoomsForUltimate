@@ -172,12 +172,33 @@ fn cpu06_fast_fall_rules() {
     assert_eq!(at, Some(5));
     // Already reserved: nothing. Wrong status: nothing. Playback: nothing.
     assert!(!frame(&mut cpu, true, fall, true));
-    assert!(!frame(&mut cpu, true, st(C::StatusJump), false));
+    assert!(!frame(&mut cpu, true, st(C::StatusEscapeAir), false));
     cpu.playback = PlaybackState { running: true, ..PlaybackState::default() };
     assert!(!frame(&mut cpu, true, fall, false));
     // N3: a set range is picked uniformly (fast fall delay range).
     let s = settings(&[("fast_fall_delay_range", vec![2, 4])]);
     assert_eq!(s.fast_fall_delay, DelayRow::Range { min: 2, max: 4, step: 1 });
+}
+
+/// rc.12 (the operator 2026-11-13: "it's supposed to do so at the peak of the hop not later"; terra-gif-1
+/// fast-fall-boot2: the spark one frame before the landing): a hop stays in Jump or Jump Aerial past its apex, so the
+/// fast fall comes on the first falling frame (plus the delay) in every airborne status that takes a dive.
+fn cpu06_fast_fall_at_the_apex_of_a_hop() {
+    for (status, delay_at) in [(C::StatusJump, 0usize), (C::StatusJumpAerial, 0), (C::StatusJump, 3), (C::StatusFallAerial, 2)] {
+        let (mut cpu, key) = cpu_with(&[("fast_fall_delay", delay(&[delay_at]))]);
+        cpu.fighters[key.index()].mash.rolled.fast_fall = true;
+        let frame = |cpu: &mut Cpu, falling: bool| {
+            cpu.tick_clock();
+            cpu.frame(key, &FrameFacts { status: st(status), situation: Situation::Air, falling, ..FrameFacts::default() }).fast_fall
+        };
+        // Rising: nothing.
+        for _ in 0..4 {
+            assert!(!frame(&mut cpu, false), "{status:?} rising");
+        }
+        // The apex: the first falling frame, plus the delay.
+        let at = (0..12).find(|_| frame(&mut cpu, true));
+        assert_eq!(at, Some(delay_at), "{status:?} delay {delay_at}");
+    }
 }
 
 fn cpu06_attack_angle() {
@@ -370,6 +391,7 @@ fn case_table() {
         ("cpu06_falling_aerial", cpu06_falling_aerial as fn()),
         ("cpu06_full_hop_hold", cpu06_full_hop_hold as fn()),
         ("cpu06_fast_fall_rules", cpu06_fast_fall_rules as fn()),
+        ("cpu06_fast_fall_at_the_apex_of_a_hop", cpu06_fast_fall_at_the_apex_of_a_hop as fn()),
         ("cpu06_attack_angle", cpu06_attack_angle as fn()),
         ("cpu06_crouch_statuses", cpu06_crouch_statuses as fn()),
         ("cpu06_throw_state_machine", cpu06_throw_state_machine as fn()),
