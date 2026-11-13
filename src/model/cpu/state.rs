@@ -321,11 +321,12 @@ impl Cpu {
             fighter.shield.reread_tilt(settings);
             fighter.pending &= !reroll::SHIELD_TILT;
         }
+        let in_shieldstun = status::in_shieldstun(ids, f.status, f.prev_status);
         fighter.shield.frame(
             settings,
             rng,
-            status::idle(ids, f.status) || status::in_hitstun(ids, f.status),
-            status::in_shieldstun(ids, f.status, f.prev_status),
+            !status::shielding(ids, f.status) && !in_shieldstun,
+            in_shieldstun,
             ids.is(super::ids::C::StatusGuard, f.status),
         );
         out.fast_fall =

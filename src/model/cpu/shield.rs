@@ -128,11 +128,12 @@ impl Shield {
         self.tilt = s.shield_tilt;
     }
 
-    /// The per-frame part (SPEC-cpu-05 §5): the hit offset resets when the body is idle or in hitstun;
+    /// The per-frame part (SPEC-cpu-05 §5): the hit offset resets whenever the body is out of its shield (idle,
+    /// hitstun, or straight back from an out-of-shield action: a held shield goes up on the same frame as `WAIT`);
     /// the first frame of each shieldstun rolls the reaction delay and takes one hit off the offset; the
     /// Hold decay flag drops whenever the status is not `GUARD`.
-    pub fn frame(&mut self, s: &CpuSettings, rng: &mut Rng, idle_or_hitstun: bool, in_shieldstun: bool, status_is_guard: bool) {
-        if idle_or_hitstun {
+    pub fn frame(&mut self, s: &CpuSettings, rng: &mut Rng, out_of_shield: bool, in_shieldstun: bool, status_is_guard: bool) {
+        if out_of_shield {
             self.offset = s.oos_offset.pick(rng).saturating_add(1);
         }
         if in_shieldstun {

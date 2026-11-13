@@ -241,7 +241,8 @@ A change applies from the CPU's next frame. A reset (L+R+A or loading a save sta
 ### OoS Offset
 
 How many hits the CPU's shield takes before it acts out of shield. At 0 it acts after the first hit; at 2 it lets two
-hits through and acts after the third. The count starts again when the CPU stands still or is hit.
+hits through and acts after the third. The count starts again whenever the CPU leaves its shield: when it stands still,
+is hit, or has acted out of shield.
 
 - **Values:** 0 to 30 hits. Tick values, or set a minimum and a maximum.
 - **Default:** none ticked: it acts after the first hit.

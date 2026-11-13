@@ -210,6 +210,22 @@ fn cpu05_oos_offset_count() {
     // Idle or hitstun resets the count.
     frame(&mut cpu, key, WAIT, GUARD);
     assert_eq!(cpu.fighters[key.index()].shield.offset, 3);
+    // With the shield held the CPU is back in its shield straight from the dodge (or from any other status), with no
+    // frame of WAIT or hitstun between (wa-diag10: `31 → 27`, `65 → 27`); leaving the shield starts the count again,
+    // so the next three hits go the same way.
+    for (gone, back) in [(ESCAPE, ESCAPE), (99, 99)] {
+        cpu.fighters[key.index()].shield.offset = 0;
+        frame(&mut cpu, key, gone, GUARD);
+        frame(&mut cpu, key, 49, back);
+        frame(&mut cpu, key, GUARD, 49);
+        for hit in 1..=3 {
+            hit_and_decide(&mut cpu, key, OosFacts { cont_escape: false, ..OosFacts::default() });
+            let acted = !cpu.fighters[key.index()].mash.queue.is_empty();
+            assert_eq!(acted, hit == 3, "after status {gone}, hit {hit}");
+            cpu.fighters[key.index()].mash.queue.clear();
+            frame(&mut cpu, key, GUARD, GUARD);
+        }
+    }
     // An empty row means 0: the first hit acts.
     let (mut cpu, key) = cpu_with(&[mode(2), ("mash_state", actions(&[3])), ("mash_triggers", shieldstun_triggers())]);
     frame(&mut cpu, key, WAIT, WAIT);
