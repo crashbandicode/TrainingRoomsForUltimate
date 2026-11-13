@@ -304,12 +304,14 @@ impl Mash {
             Action::D_TILT => (flag(t, C::FlagAttackLw3), Some(C::StatusAttackLw3)),
             _ => return out, // a playback action produces no bits
         };
-        // Completion: the expected status, or the character-specific table.
+        // Completion: the expected status, or the character-specific table. The action has started, so its command is
+        // not pressed again: a dodge still pressed when it can be cancelled re-enters itself and never ends.
         if let Some(expected) = expected {
             if t.is(expected, f.status) || character_completes(t, f, expected) {
                 self.complete();
                 self.rolled.angle_status = self.rolled.attack_angle.map(|_| f.status);
                 let _ = s;
+                return out;
             }
         }
         // Never interrupt a dash with command bits.

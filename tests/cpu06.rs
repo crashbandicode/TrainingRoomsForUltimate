@@ -111,7 +111,9 @@ fn cpu06_aerial_delay_rules() {
     cpu.fighters[key.index()].mash.queue.push(Action::FAIR);
     cpu.fighters[key.index()].mash.rolled.aerial_delay = 30;
     let f = air(C::StatusAttackAir);
-    assert_ne!(cpu.command_flags(key, false, &f).bits & st(C::FlagAttackN) as u32, 0);
+    // rc.13: the aerial is done at once, not after the delay; started, it is not pressed again.
+    assert_eq!(cpu.command_flags(key, false, &f).bits & st(C::FlagAttackN) as u32, 0);
+    assert!(cpu.fighters[key.index()].mash.queue.is_empty(), "no wait in ATTACK_AIR");
 }
 
 fn cpu06_falling_aerial() {

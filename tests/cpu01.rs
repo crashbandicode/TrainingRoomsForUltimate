@@ -188,6 +188,23 @@ fn cpu01_one_roll_per_situation() {
     assert!(cpu.fighters[key.index()].mash.queue.is_empty(), "one roll per hitstun");
 }
 
+/// rc.13: an action that has started is not pressed again. Escape's main runs the ground checks once it can be
+/// cancelled, so a dodge whose command is still held re-enters itself (31 -> 31). With a generic trigger the mash
+/// re-rolls the dodge on every frame of it, and the CPU never got back to Wait (gna-p2-rtj-1 / rtk-1, Mash Spot Dodge
+/// on Always: one `ESCAPE`, then `bits=0x1000000 queued=false` in status 31 and the same pose for 13 s).
+fn cpu01_a_started_dodge_is_not_pressed_again() {
+    for (at, flag, status) in [(3, C::FlagEscape, C::StatusEscape), (4, C::FlagEscapeF, C::StatusEscapeF), (5, C::FlagEscapeB, C::StatusEscapeB)] {
+        let (mut cpu, key) = cpu_with(base(), &[("mash_state", actions(&[at])), ("mash_triggers", triggers(&[16]))]);
+        let (bits, dodging) = (cpu.ids.get(flag) as u32, cpu.ids.get(status));
+        for dodge in 1..=3 {
+            assert_eq!(cpu.command_flags(key, false, &facts(WAIT)).bits, bits, "{status:?} {dodge} from WAIT");
+            for frame in 0..30 {
+                assert_eq!(cpu.command_flags(key, false, &facts(dodging)).bits, 0, "{status:?} {dodge}: pressed on frame {frame}");
+            }
+        }
+    }
+}
+
 /// (action, flag, expected status) for the straightforward actions of the table.
 fn action_rows() -> Vec<(Action, C, C)> {
     vec![
@@ -378,6 +395,7 @@ fn case_table() {
         ("cpu01_override_precedence", cpu01_override_precedence as fn()),
         ("cpu01_distance_thresholds", cpu01_distance_thresholds as fn()),
         ("cpu01_one_roll_per_situation", cpu01_one_roll_per_situation as fn()),
+        ("cpu01_a_started_dodge_is_not_pressed_again", cpu01_a_started_dodge_is_not_pressed_again as fn()),
         ("cpu01_action_flags_table", cpu01_action_flags_table as fn()),
         ("cpu01_dash_attack_sequence", cpu01_dash_attack_sequence as fn()),
         ("cpu01_character_specific_completion", cpu01_character_specific_completion as fn()),

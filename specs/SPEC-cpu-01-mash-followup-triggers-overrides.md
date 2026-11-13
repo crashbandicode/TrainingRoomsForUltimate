@@ -182,7 +182,7 @@ One queue of at most two entries: the main action and, behind it, the follow-up.
 
    Aerial rule: when grounded, include `JUMP_BUTTON`; if full hop was rolled, return only that (the attack waits until airborne). Then, if falling-aerial was rolled and the fighter is not yet falling (SPEC-cpu-06 "is falling"), or the aerial delay has not elapsed (SPEC-cpu-06), return the bits so far. Otherwise set the queued aerial kind to the action and add `ATTACK_N`; the `get_attack_air_kind` hook turns it into the right aerial.
 
-   Completion check (applied whenever a flag is produced for an expected status): if the current status equals the expected status, or the character-specific table says so, pop the current action. If the current status is `DASH`, return 0 regardless (never interrupt a dash with command bits; the dash attack path is handled by status requests).
+   Completion check (applied whenever a flag is produced for an expected status): if the current status equals the expected status, or the character-specific table says so, pop the current action and return 0: the action has started, and its command is not pressed again (rc.13; upstream still returns the flag on this frame, and with a generic trigger re-rolling the dodge every frame of it, a spot dodge or roll whose command is still held when Escape can be cancelled re-enters itself and the CPU never gets back to Wait: gna-p2-rtj-1 / rtk-1). If the current status is `DASH`, return 0 regardless (never interrupt a dash with command bits; the dash attack path is handled by status requests).
 
 ### Ordering against other features
 
