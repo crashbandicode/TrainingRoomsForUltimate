@@ -286,6 +286,8 @@ More: [Combos](../guide/recording.md#combos)
 How many frames an input may be away from the recorded one and still count as on time. An input outside it drops the
 attempt.
 
+![Combo 1 (jab > jab) as the drill and On-time tolerance at Exact: Play on Player 1 of a recorded jab > jab whose first A press is let go 1 frame later than in the combo, and the bar reads "L1 Attack release 1f late" with the streak at 0; set to 1 frame, the same play is clean and the streak goes to 1. Labels name the inputs; the warps and waits between them are cut](../media/rc11-on-time-tolerance.gif)
+
 - **Values:** Exact, 1 frame, 2 frames
 - **Default:** 1 frame
 - **How:** Left/Right cycle through the values; A opens the list.
