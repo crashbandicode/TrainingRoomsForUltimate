@@ -27,6 +27,11 @@ file in the README and the docs; the old file stays in `media/` with a note in i
   `rs11-f56-cycle-switch.gif` (#56, `docs-rs3` `rs-cycle-switch` at 640, with a zoomed inset of the grid's badges)
   and `rs11-f79-cycle-change.gif` (#79, `docs-rs3` `rs-cycle-change`: A on Donkey Kong adds "2" (inset), "Fighters ·
   Loading 8/9" at once after the close, the chord to Link, "Ready 9/9", the chord to Donkey Kong).
+- **Recording and playback evidence** (`docs-rs4-0c628724`, slot 2, 04:56–05:12Z; the CPU made Mario so the lanes
+  match; rc.11 posts no notice for Record, Play or Load, so those presses are named in the ledger, with their log
+  lines in the receipts): `rs11-f10-record.gif` (#10), `rs11-f12-active-after-record.gif` (#12),
+  `rs11-f13-play-cpu.gif` (#13), `rs11-f15-playback.gif` (#15, the strip zoomed), `rs11-f17-both-play.gif` (#17),
+  `rs11-f22-mash-interrupt.gif` (#22) and `rs11-f29-bind-load.gif` (#29). The ledger lists each one's frames.
 
 | File | Run, row | Embedded in | Length, size | Raw windows kept | What the frames show |
 | --- | --- | --- | --- | --- | --- |
