@@ -338,12 +338,8 @@ impl Panes {
                 FileTag::Sequence => (&[83, 69, 81, 85, 69, 78, 67, 69], [235, 105, 170, 255]),
             };
             let left = if child { p::CONN_LEFT + p::CONN_INDENT } else { p::CONN_LEFT };
-            let (h, edge, mid) = (p::CONN_BOX_H, 2.0, (left + p::CONN_RIGHT) / 2.0);
-            let base = p::IDX_CONN_BOX + 4 * boxes;
-            self.rect_at(base, left + edge / 2.0, y, edge, h, color);
-            self.rect_at(base + 1, p::CONN_RIGHT - edge / 2.0, y, edge, h, color);
-            self.rect_at(base + 2, mid, y + h / 2.0 - edge / 2.0, p::CONN_RIGHT - left, edge, color);
-            self.rect_at(base + 3, mid, y - h / 2.0 + edge / 2.0, p::CONN_RIGHT - left, edge, color);
+            let edge = 2.0;
+            self.box_at(p::IDX_CONN_BOX + 4 * boxes, (left + p::CONN_RIGHT) / 2.0, y, p::CONN_RIGHT - left, p::CONN_BOX_H, color);
             let pill_w = p::pill_w(pill.len());
             let pill_x = left + 8.0 + pill_w / 2.0;
             self.rect_at(p::IDX_CONN_PILL + boxes, pill_x, y, pill_w, p::PILL_H, color);
@@ -394,21 +390,9 @@ impl Panes {
 
     /// Floppy and loop pictures, and the smaller pop-up background. Hidden marks stay hidden.
     unsafe fn draw_marks(&self, frame: &Frame) {
-        for i in 0..p::FLOPPIES {
-            let icon = frame.icons[i];
+        // The floppies' panes run straight into the loops' (`IDX_LOOP` = `IDX_FLOPPY + FLOPPIES`), as their icons do.
+        for (i, icon) in frame.icons.iter().enumerate() {
             let index = p::IDX_FLOPPY + i;
-            self.show(index, icon.on);
-            if icon.on {
-                self.at(index, icon.x, icon.y);
-                let pane = self.all[index];
-                if !pane.is_null() {
-                    pane::set_rect_color(pane, p::linear(icon.color));
-                }
-            }
-        }
-        for i in 0..p::LOOPS {
-            let icon = frame.icons[p::FLOPPIES + i];
-            let index = p::IDX_LOOP + i;
             self.show(index, icon.on);
             if icon.on {
                 self.at(index, icon.x, icon.y);
@@ -481,23 +465,8 @@ const CHIP_ANGLE: [Option<f32>; 11] = [
 ];
 
 impl Panes {
-    unsafe fn rect(&self, index: usize, x: f32, y: f32, w: f32, h: f32, color: [u8; 4]) {
-        let pane = self.all[index];
-        if pane.is_null() {
-            return;
-        }
-        pane::set_visible(pane, true);
-        pane::set_pos(pane, x, y);
-        pane::set_width(pane, w);
-        pane::set_height(pane, h);
-        pane::set_rect_color(pane, p::linear(color));
-    }
-
     unsafe fn hide(&self, index: usize) {
-        let pane = self.all[index];
-        if !pane.is_null() {
-            pane::set_visible(pane, false);
-        }
+        self.show(index, false);
     }
 
     unsafe fn label(&self, index: usize, units: &[u16], x: f32, y: f32, w: f32, color: [u8; 4]) {
@@ -525,24 +494,24 @@ impl Panes {
             let (x, y) = p::chip_xy(col, row);
             let weight = frame.chip_weights[i];
             let tile = if weight != 0 { [58, 66, 84, 255] } else { p::HIGHLIGHT };
-            self.rect(p::IDX_CHIP + i, x, y, p::CHIP_SIZE, p::CHIP_SIZE, tile);
+            self.rect_at(p::IDX_CHIP + i, x, y, p::CHIP_SIZE, p::CHIP_SIZE, tile);
             // DI / SDI: the pointer carries the game's own effect texture (`chips`), turned to the chip's direction.
             let layer = if i == crate::runtime::ui::chips::NEUTRAL { None } else { crate::runtime::ui::chips::layer() };
             match (CHIP_ANGLE[i], layer) {
                 (Some(angle), Some(layer)) => {
                     let at = crate::model::effect_chips::place(layer.visual, angle, x, y, p::CHIP_SIZE, layer.width, layer.height);
                     let tint = if weight != 0 { layer.tint } else { [layer.tint[0] / 2, layer.tint[1] / 2, layer.tint[2] / 2, 255] };
-                    self.rect(p::IDX_CHIP_NEEDLE + i, at.x, at.y, at.w, at.h, tint);
+                    self.rect_at(p::IDX_CHIP_NEEDLE + i, at.x, at.y, at.w, at.h, tint);
                     pane::set_rot_z(self.all[p::IDX_CHIP_NEEDLE + i], at.rot);
                 }
                 (Some(angle), None) => {
                     let radians = angle.to_radians();
                     let (dx, dy) = (radians.cos(), radians.sin());
-                    self.rect(p::IDX_CHIP_NEEDLE + i, x + dx * 34.0, y + 12.0 + dy * 34.0, 12.0, 52.0, if weight != 0 { p::TEXT } else { p::TEXT_DIM });
+                    self.rect_at(p::IDX_CHIP_NEEDLE + i, x + dx * 34.0, y + 12.0 + dy * 34.0, 12.0, 52.0, if weight != 0 { p::TEXT } else { p::TEXT_DIM });
                     pane::set_rot_z(self.all[p::IDX_CHIP_NEEDLE + i], angle - 90.0);
                 }
                 (None, _) => {
-                    self.rect(p::IDX_CHIP_NEEDLE + i, x, y + 12.0, 30.0, 30.0, if weight != 0 { p::TEXT } else { p::TEXT_DIM });
+                    self.rect_at(p::IDX_CHIP_NEEDLE + i, x, y + 12.0, 30.0, 30.0, if weight != 0 { p::TEXT } else { p::TEXT_DIM });
                     pane::set_rot_z(self.all[p::IDX_CHIP_NEEDLE + i], 0.0);
                 }
             }
@@ -561,7 +530,7 @@ impl Panes {
             let (col, row) = CHIP_POS[usize::from(frame.chip_focus).min(p::CHIPS - 1)];
             let (x, y) = p::chip_xy(col, row);
             // The ring sits behind the tiles: it is a larger rectangle at the same place.
-            self.rect(p::IDX_CHIP_HI, x, y, p::CHIP_SIZE + 16.0, p::CHIP_SIZE + 16.0, p::ACCENT);
+            self.rect_at(p::IDX_CHIP_HI, x, y, p::CHIP_SIZE + 16.0, p::CHIP_SIZE + 16.0, p::ACCENT);
         } else {
             self.hide(p::IDX_CHIP_HI);
         }
@@ -592,10 +561,10 @@ impl Panes {
             }
             let (x, y) = centre(i);
             if frame.tile_item_grid && usize::from(frame.tile_n[i]) < p::ITEM_ICONS {
-                self.rect(p::IDX_TILE + i, x, y, cell_w - 10.0, cell_h - 8.0, p::HIGHLIGHT);
+                self.rect_at(p::IDX_TILE + i, x, y, cell_w - 10.0, cell_h - 8.0, p::HIGHLIGHT);
                 let size = 64.0_f32.min(cell_h - 12.0).min(cell_w / 3.0);
                 let left = x - cell_w / 2.0 + 10.0;
-                self.rect(p::IDX_ITEM_ICON + usize::from(frame.tile_n[i]), left + size / 2.0, y, size, size, [255; 4]);
+                self.rect_at(p::IDX_ITEM_ICON + usize::from(frame.tile_n[i]), left + size / 2.0, y, size, size, [255; 4]);
                 let label_left = left + size + 8.0;
                 let label_w = cell_w - size - 28.0;
                 self.label(p::IDX_TILE_LABEL + i, frame.tiles[i].units(), label_left + label_w / 2.0, y, label_w, p::TEXT);
@@ -606,7 +575,7 @@ impl Panes {
             if frame.tile_roster_grid && crate::runtime::ui::thumbs::is_bound(i) {
                 let (icon, label, _) = p::roster_tile(cell_w, cell_h, true);
                 let tint = if greyed { [110, 110, 110, 150] } else { [255, 255, 255, 255] };
-                self.rect(p::IDX_TILE + i, x, y + icon.y, icon.w, icon.h, tint);
+                self.rect_at(p::IDX_TILE + i, x, y + icon.y, icon.w, icon.h, tint);
                 self.label(p::IDX_TILE_LABEL + i, frame.tiles[i].units(), x, y + label.y, label.w, if greyed { p::TEXT_OFF } else { p::TEXT });
                 continue;
             }
@@ -620,7 +589,7 @@ impl Panes {
                     (cell_h - 10.0, x - cell_w / 2.0 + 8.0 + (cell_h - 10.0) * 0.6, y)
                 };
                 let image_w = image_h * 1.2;
-                self.rect(p::IDX_TILE + i, image_x, image_y, image_w, image_h, [255, 255, 255, 255]);
+                self.rect_at(p::IDX_TILE + i, image_x, image_y, image_w, image_h, [255, 255, 255, 255]);
                 let (label_x, label_w, label_y) = if tall {
                     (x, cell_w - 18.0, y - cell_h / 2.0 + 20.0)
                 } else {
@@ -631,7 +600,7 @@ impl Panes {
                 self.label(p::IDX_TILE_LABEL + i, frame.tiles[i].units(), label_x, label_y, label_w, p::TEXT);
                 continue;
             }
-            self.rect(p::IDX_TILE + i, x, y, cell_w - 10.0, cell_h - 8.0, p::HIGHLIGHT);
+            self.rect_at(p::IDX_TILE + i, x, y, cell_w - 10.0, cell_h - 8.0, p::HIGHLIGHT);
             self.label(p::IDX_TILE_LABEL + i, frame.tiles[i].units(), x, y, cell_w - 18.0, if greyed { p::TEXT_OFF } else { p::TEXT });
         }
         if shown && frame.tile_count > 0 {
@@ -640,7 +609,7 @@ impl Panes {
             // editing role's colour at alpha 80, so the same-role order badge stays legible over it.
             let [r, g, b, _] = [PLAYER, CPU][usize::from(frame.tile_cpu)];
             let tint = [p::ACCENT, [r, g, b, 80]][usize::from(frame.tile_roster_grid)];
-            self.rect(p::IDX_TILE_HI, x, y, cell_w + 2.0, cell_h + 2.0, tint);
+            self.rect_at(p::IDX_TILE_HI, x, y, cell_w + 2.0, cell_h + 2.0, tint);
         } else {
             self.hide(p::IDX_TILE_HI);
         }
@@ -660,7 +629,7 @@ impl Panes {
                 let on = roster && i < count && frame.tile_state[i] != TILE_HIDDEN;
                 let ((x, y), b, at) = (centre(i), &frame.tile_badges[r][i], r * p::TILES + i);
                 let (stripe, badge) = (p::IDX_TILE_STRIPE + at, p::IDX_TILE_BADGE + at);
-                self.rect(stripe, x + side * 56.0, y, 4.0, 86.0, colour);
+                self.rect_at(stripe, x + side * 56.0, y, 4.0, 86.0, colour);
                 self.show(stripe, on && frame.tile_stripes[r][i]);
                 self.label(badge, b.units(), x + side * 36.0, y + 35.0, 52.0, colour);
                 self.show(badge, on && !b.is_empty());
@@ -691,10 +660,10 @@ fn delay_handle_x(index: u8, top: u8) -> f32 {
 
 /// Label slot (x, width, y) and value slot (x, width, y) of the popup's text line `i`.
 fn delay_text_slot(i: usize, frame: &Frame) -> (f32, f32, f32, f32, f32, f32) {
-    let right = |y: f32| (p::ROW_RIGHT - 150.0, 300.0, y - p::VALUE_DROP);
+    let row = |y: f32| (p::ROW_LEFT + 300.0, 600.0, y, p::ROW_RIGHT - 150.0, 300.0, y - p::VALUE_DROP);
     match i {
-        0 => (p::ROW_LEFT + 300.0, 600.0, 312.0, right(312.0).0, right(312.0).1, right(312.0).2),
-        1 => (p::ROW_LEFT + 300.0, 600.0, DELAY_RANGE_HEAD_Y, right(DELAY_RANGE_HEAD_Y).0, right(DELAY_RANGE_HEAD_Y).1, right(DELAY_RANGE_HEAD_Y).2),
+        0 => row(312.0),
+        1 => row(DELAY_RANGE_HEAD_Y),
         _ => {
             let at = if i == 2 { frame.range.min } else { frame.range.max };
             let x = delay_handle_x(at, frame.range.top);
@@ -721,32 +690,32 @@ impl Panes {
                 2 => (p::HIGHLIGHT, p::TEXT_OFF),
                 _ => (p::HIGHLIGHT, p::TEXT),
             };
-            self.rect(p::IDX_TILE + i, x, y, DELAY_CELL_W - 12.0, DELAY_PITCH - 10.0, fill);
+            self.rect_at(p::IDX_TILE + i, x, y, DELAY_CELL_W - 12.0, DELAY_PITCH - 10.0, fill);
             self.label(p::IDX_TILE_LABEL + i, frame.tiles[i].units(), x, y, DELAY_CELL_W - 20.0, text);
         }
         if frame.tile_focus != 255 && frame.tile_count > 0 {
             let i = usize::from(frame.tile_focus);
             let (c, r) = (i / rows, i % rows);
-            self.rect(p::IDX_TILE_HI, p::ROW_LEFT + (c as f32 + 0.5) * DELAY_CELL_W, DELAY_FIRST_Y - r as f32 * DELAY_PITCH, DELAY_CELL_W - 2.0, DELAY_PITCH - 2.0, p::ACCENT_RING);
+            self.rect_at(p::IDX_TILE_HI, p::ROW_LEFT + (c as f32 + 0.5) * DELAY_CELL_W, DELAY_FIRST_Y - r as f32 * DELAY_PITCH, DELAY_CELL_W - 2.0, DELAY_PITCH - 2.0, p::ACCENT_RING);
         } else {
             self.hide(p::IDX_TILE_HI);
         }
         // The range control: a track, the span between the handles, the two handles, a ring on the focused one.
         let range = frame.range;
         let (track, span, handle) = if range.grey { (p::HIGHLIGHT, p::HIGHLIGHT, p::TEXT_OFF) } else { ([70, 78, 92, 255], p::ACCENT, p::TEXT) };
-        self.rect(p::IDX_CHIP, DELAY_BAR_L + DELAY_BAR_W / 2.0, DELAY_BAR_Y, DELAY_BAR_W, 8.0, track);
+        self.rect_at(p::IDX_CHIP, DELAY_BAR_L + DELAY_BAR_W / 2.0, DELAY_BAR_Y, DELAY_BAR_W, 8.0, track);
         let (lo, hi) = if range.set { (delay_handle_x(range.min, range.top), delay_handle_x(range.max, range.top)) } else { (DELAY_BAR_L, DELAY_BAR_L + DELAY_BAR_W) };
         if range.set {
-            self.rect(p::IDX_CHIP + 1, (lo + hi) / 2.0, DELAY_BAR_Y, (hi - lo).max(4.0), 8.0, span);
+            self.rect_at(p::IDX_CHIP + 1, (lo + hi) / 2.0, DELAY_BAR_Y, (hi - lo).max(4.0), 8.0, span);
         } else {
             self.hide(p::IDX_CHIP + 1);
         }
         let held = if range.editing { p::ACCENT } else { handle };
-        self.rect(p::IDX_CHIP + 2, lo, DELAY_BAR_Y, 26.0, 44.0, if range.focus == 1 { held } else { handle });
-        self.rect(p::IDX_CHIP + 3, hi, DELAY_BAR_Y, 26.0, 44.0, if range.focus == 2 { held } else { handle });
+        self.rect_at(p::IDX_CHIP + 2, lo, DELAY_BAR_Y, 26.0, 44.0, if range.focus == 1 { held } else { handle });
+        self.rect_at(p::IDX_CHIP + 3, hi, DELAY_BAR_Y, 26.0, 44.0, if range.focus == 2 { held } else { handle });
         match range.focus {
-            1 => self.rect(p::IDX_CHIP_HI, lo, DELAY_BAR_Y, 44.0, 64.0, p::ACCENT_RING),
-            2 => self.rect(p::IDX_CHIP_HI, hi, DELAY_BAR_Y, 44.0, 64.0, p::ACCENT_RING),
+            1 => self.rect_at(p::IDX_CHIP_HI, lo, DELAY_BAR_Y, 44.0, 64.0, p::ACCENT_RING),
+            2 => self.rect_at(p::IDX_CHIP_HI, hi, DELAY_BAR_Y, 44.0, 64.0, p::ACCENT_RING),
             _ => self.hide(p::IDX_CHIP_HI),
         }
         for i in 4..p::CHIPS {
@@ -774,12 +743,12 @@ impl Panes {
             }
             let (x, y) = at(i);
             let on = frame.tile_state[i] == 1;
-            self.rect(p::IDX_TILE + i, x, y, OVERRIDE_COL_W - 12.0, OVERRIDE_PITCH - 12.0, if on { p::ACCENT } else { p::HIGHLIGHT });
+            self.rect_at(p::IDX_TILE + i, x, y, OVERRIDE_COL_W - 12.0, OVERRIDE_PITCH - 12.0, if on { p::ACCENT } else { p::HIGHLIGHT });
             self.label(p::IDX_TILE_LABEL + i, frame.tiles[i].units(), x, y, OVERRIDE_COL_W - 24.0, p::TEXT);
         }
         if frame.tile_focus != 255 {
             let (x, y) = at(usize::from(frame.tile_focus));
-            self.rect(p::IDX_TILE_HI, x, y, OVERRIDE_COL_W, OVERRIDE_PITCH - 4.0, p::ACCENT_RING);
+            self.rect_at(p::IDX_TILE_HI, x, y, OVERRIDE_COL_W, OVERRIDE_PITCH - 4.0, p::ACCENT_RING);
         } else {
             self.hide(p::IDX_TILE_HI);
         }
@@ -804,11 +773,11 @@ impl Panes {
         let bar = frame.clip;
         let (start, end, now) = (clip_x(bar.start, bar.total), clip_x(bar.end, bar.total), clip_x(bar.cursor, bar.total));
         let held = |handle: u8| if bar.handle == handle { p::ACCENT_RING } else { p::TEXT };
-        self.rect(p::IDX_CHIP, CLIP_BAR_L + CLIP_BAR_W / 2.0, CLIP_BAR_Y, CLIP_BAR_W, 8.0, [70, 78, 92, 255]);
-        self.rect(p::IDX_CHIP + 1, (start + end) / 2.0, CLIP_BAR_Y, (end - start).max(4.0), 8.0, p::ACCENT);
-        self.rect(p::IDX_CHIP + 2, start, CLIP_BAR_Y, 22.0, 44.0, held(1));
-        self.rect(p::IDX_CHIP + 3, end, CLIP_BAR_Y, 22.0, 44.0, held(2));
-        self.rect(p::IDX_CHIP + 4, now, CLIP_BAR_Y, 6.0, 96.0, if bar.playing { p::TEXT_ON } else { held(0) });
+        self.rect_at(p::IDX_CHIP, CLIP_BAR_L + CLIP_BAR_W / 2.0, CLIP_BAR_Y, CLIP_BAR_W, 8.0, [70, 78, 92, 255]);
+        self.rect_at(p::IDX_CHIP + 1, (start + end) / 2.0, CLIP_BAR_Y, (end - start).max(4.0), 8.0, p::ACCENT);
+        self.rect_at(p::IDX_CHIP + 2, start, CLIP_BAR_Y, 22.0, 44.0, held(1));
+        self.rect_at(p::IDX_CHIP + 3, end, CLIP_BAR_Y, 22.0, 44.0, held(2));
+        self.rect_at(p::IDX_CHIP + 4, now, CLIP_BAR_Y, 6.0, 96.0, if bar.playing { p::TEXT_ON } else { held(0) });
         for i in 5..p::CHIPS {
             self.hide(p::IDX_CHIP + i);
         }
