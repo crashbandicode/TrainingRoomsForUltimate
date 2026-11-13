@@ -342,6 +342,8 @@ instant. Off: only the fighter on screen, and no groups.
 On: each role can keep more groups of fighters ready besides its own slot, up to Ready Fighters. Off: only the
 role's own slot; the group entries of [Swap groups](#swap-groups) are greyed ("Group Swap is Off").
 
+![Side by side, the same Link to Kirby swap with Group Swap Off and On: Off leaves the spot empty until about 2.9 s, On swaps at once](../media/rc12-group-swap.gif)
+
 - **Values:** On, Off
 - **Default:** On
 - **How:** A flips it.
@@ -350,6 +352,8 @@ role's own slot; the group entries of [Swap groups](#swap-groups) are greyed ("G
 
 Opens seven switches for the fighters that need special care when they are kept ready. The row shows how many are On,
 such as "7 of 7".
+
+![Side by side, the same CPU swap from Dark Samus to Mii Gunner with Mii groups On and Off: On shows Mii Gunner at once, Off leaves the spot empty until about 2.0 s](../media/rc12-swap-groups.gif)
 
 - **Values:** each entry On or Off
 - **Default:** all On

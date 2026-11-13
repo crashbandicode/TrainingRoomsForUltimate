@@ -135,6 +135,8 @@ More: [Direction chips](../guide/cpu-behaviour.md#direction-chips)
 
 How often the CPU SDIs during hitlag: Normal once every 8 frames, Medium every 6, High every 4. None turns SDI off.
 
+![Side by side, Kirby's rapid jab on CPU Mario with SDI Strength None and High, Direction Out: None stays in for 19 hits, High slides out after 10](../media/rc12-sdi-strength.gif)
+
 - **Values:** None, Normal, Medium, High.
 - **Default:** None.
 - **How:** Left/Right cycle through the values (wrapping); A opens the list.
