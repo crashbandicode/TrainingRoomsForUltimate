@@ -599,7 +599,7 @@ This records the decision only; the implementation, host tests and Eden proofs a
 ## Open (2026-11-13)
 
 Opened by the primary for the operator from the lanes' reports of 2026-11-13. An item the operator has answered says
-**Decided** under its heading (rc13-memory); the rest are still open. Each item says what is being decided, the options with their cost to the player, and a recommendation. In each picture the
+**Decided** under its heading (rc13-DI-lines, rc13-memory); the rest are still open. Each item says what is being decided, the options with their cost to the player, and a recommendation. In each picture the
 recommended option has a **green outline**. The pictures are drawn by `tools/render_decisions_1113.py`
 (rc13-DI-lines: author-2's mockup as drawn; rc13-memory: `tools/render_rc13_memory.py`).
 
@@ -618,7 +618,7 @@ recommended option has a **green outline**. The pictures are drawn by `tools/ren
 | TR7 | Crop trailing neutral (#14) | B: make Record trim |
 | TR8 | Player Character with Player Swapping Off (#17) | B: a pick loads now |
 | TR9 | Retire the old Record trigger row (V2), or keep its legacy start | A: V2, retire the row |
-| rc13-DI-lines | DI chips like the game's blue DI indicator (A–D rejected) | E2 x3 (glow plus streaks); E1 x2 is the closest to the native look |
+| rc13-DI-lines | DI chips like the game's blue DI indicator (A–D rejected) | **Decided 11-13: E1 x1**, all 4 layers at today's width |
 | rc13-memory | Memory levers for TrainingRooms' share | **Decided 11-13: dropped**, no lever implemented |
 | OP1 | Push the held doc fixes | A: push the docs now, `c49681c9` after TR5 and TR8 |
 | OP2 | The standalone `libimgui_smash.nro` on the card | A: remove it |
@@ -796,7 +796,11 @@ switch off. V2 matches the design in `migrate.rs`, and it lets TR2 take (b)(ii)'
 Not listed: #19 (Give item's item arrives when the menu closes). The code's comment gives the reason: a short-fuse item
 must not expire while the picker still has the inputs.
 
-#### rc13-DI-lines · DI chips like the game's blue DI indicator (rc.13 item 2)
+#### rc13-DI-lines · DI chips like the game's blue DI indicator (rc.13 item 2): E1 x1
+
+**Decided 2026-11-13 (~22:57Z): E1 x1.** After seeing the E1 x1 render, the operator said: "go with 1x". The look is
+all four layers of `P_CmnVector` (flare01 glow, tri00 body, line09 streaks, line11 white core) at today's width
+(`DI_WIDTH_RATIO` 1.2/3.5). Cost: +33 panes, no new textures. The decided look is the last picture below.
 
 How the pointers on the **CPU › Defence › DI Direction** chips should look. The operator said today's lines are "super
 skinny". Of the first mockup's options, the operator said "none of those options seem right for di", so A–D (wider or
@@ -826,7 +830,7 @@ four pictures (`describe Di ... pictures=4`). E1 and E2 only reference them, so 
 because its UI code has no blend control. On the dark navy tiles that is close to the mockup. True additive blending
 would need a BFLYT material change in `tools/layout-builder`, which hasn't been checked.
 
-**Recommendation: E2 x3,** for the cost (+11 panes). **E1 x2 is the closest to the native look,** because it has the
+**Recommendation (not taken; E1 x1 was chosen): E2 x3,** for the cost (+11 panes). **E1 x2 is the closest to the native look,** because it has the
 white core, if 33 more panes are acceptable.
 
 The picture is author-2's mockup (`artifacts/rc13-di-lines/MOCKUP-blue.png` and `NOTE-blue.md`, in the workspace),
@@ -839,7 +843,7 @@ Eden crop of the real indicator: Mario's forward smash, CPU at 120 %, DI Up, Gam
 E1 x1, as the operator asked: all four layers of P_CmnVector at today's width (DI_WIDTH_RATIO 1.2/3.5). Cost: +33
 panes, no new textures.
 
-![rc13-DI-lines E1 x1: today, the native blue DI indicator, and all four layers at today's width, with a 3x close-up](decisions/rc13-DI-lines-e1-x1.png)
+![rc13-DI-lines E1 x1, the decided look: today, the native blue DI indicator, and all four layers at today's width, with a 3x close-up](decisions/rc13-DI-lines-e1-x1.png)
 
 #### rc13-memory · Memory levers (rc.13): dropped
 
