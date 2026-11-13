@@ -135,6 +135,8 @@ capture opened in the [Replay window](#replay-window), Play on a macro or a chai
 made on another fighter asks first (Keep current fighter, or Switch to recorded fighter). Off: the fighter you have
 stays, without asking, as if you had picked Keep.
 
+![With Ask before switching fighter On, playing a macro recorded as Luigi while Player 1 is Mario opens the Fighter Mismatch prompt; turned Off, the same macro plays at once without asking](../media/rc12-ask-before-switching-fighter.gif)
+
 - **Values:** On, Off
 - **Default:** On
 - **How:** A flips it.
@@ -158,6 +160,9 @@ writing.
 - **How:** A opens it. The D-pad moves between keys, A presses one, B leaves. If it can't open, the help line says
   why, such as "Make a macro active for this role first" or "Link a start save to the macro first" (the macro has no
   start save, or its Start save switch is Off).
+
+![Play on Player 1: the jab hits; Edit placement, X- forty times, Write; the same Play starts 40 units left and misses](../media/rc11-edit-placement.gif)<br>
+*Play on Player 1, then Edit placement moves its start 40 units left (X- forty times) and Write; the same Play now starts at the new spot and the jab misses. Cut at the menu steps. Eden, rc.11.*
 
 More: [Edit placement and the Replay window](../guide/recording.md#replays-edit-placement-and-the-replay-window)
 
@@ -205,6 +210,8 @@ sticks rest in the middle. Off: it keeps every frame up to the stop; use this fo
 still. A take that is idle throughout saves nothing ("Recording was empty"). To cut a macro anywhere, use Crop on
 its own screen (see [Save states & Macros](#save-states--macros)).
 
+![Side by side, the same macro on Loop 2 with Crop trailing neutral Off and On: On starts again every 1.22 s, while Off waits out the recorded idle and starts again every 4.07 s](../media/rc12-crop-trailing-neutral.gif)
+
 - **Values:** On, Off
 - **Default:** On
 - **How:** A flips it.
@@ -217,6 +224,8 @@ Ends (when the freeze of the hit ends) or As Hitstop Begins (at the hit).
 It is read when the CPU starts one of its Playback Slot actions in Mash, Followup or the overrides (Ledge Options start
 their own way). A slot plays the macro you gave it on the macro's page (Playback slot). See
 [The Playback Slot actions](../guide/cpu-behaviour.md#the-playback-slot-actions).
+
+![Side by side at game speed 1/2, lined up on the hit: with As Hitstop Begins the CPU's macro starts at the hit, with As Hitstun Ends about 1.3 s later](../media/rc12-hitstun-timing.gif)
 
 - **Values:** As Hitstun Ends, As Hitstop Ends, As Hitstop Begins
 - **Default:** As Hitstun Ends
@@ -232,6 +241,9 @@ the mash action. Player 1's macro keeps playing. Off: the macro plays to its end
 - **Default:** On
 - **How:** A flips it.
 
+![CPU Mash set; Play on CPU starts its taunt loop; a jab hits, the CPU mashes out and the macro stops](../media/rc11-mash-interrupts.gif)<br>
+*Mash interrupts playback On (the default), CPU › Reactions › Mash set: Play on CPU starts its taunt loop; Mario's jab hits, the CPU does its mash action and the macro stops. Eden, rc.11.*
+
 More: [Recordings and the CPU settings](../guide/cpu-behaviour.md#recordings-and-the-cpu-settings)
 
 ### Loop
@@ -240,6 +252,8 @@ How many times the active macro plays each time you press its Play chord. Player
 count, and the row shows the count of the view you're in (ZR). ∞ plays until you press the Play chord again. Only
 the first pass warps to the start save (when its Start save switch is On); later passes play on from where the
 fighters are. A chain repeats as a whole.
+
+![Loop is set from 1 to 3 in the menu, and the macro then plays again and again on its own](../media/rc12-loop.gif)
 
 - **Values:** ∞, 1, 2, 3, 5, 10
 - **Default:** 1, for Player 1 and for the CPU
@@ -256,6 +270,8 @@ More: [The loop](../guide/recording.md#the-loop)
 An advanced row: the page shows it as "Settings override playback (advanced)". Off: while a macro plays on the CPU,
 the macro wins, and DI Direction, SDI Direction, Airdodge Direction, Tech Options, Mistech Options and Throw wait until
 it ends. On: those settings act during the macro too.
+
+![The CPU plays a macro that holds the stick Down (it crouches), DI Direction is Up, and each Load puts it at 80%. Off: Mario's forward smash sends it on a low line along the floor, the macro's Down as its DI. Turned On: the same load, play and smash send it on a steep line, high in the air, because DI Up now acts during the macro. Labels name the inputs; the time between the halves is cut](../media/rc11-settings-override.gif)
 
 - **Values:** On, Off
 - **Default:** Off
@@ -282,6 +298,8 @@ More: [Combos](../guide/recording.md#combos)
 How many frames an input may be away from the recorded one and still count as on time. An input outside it drops the
 attempt.
 
+![Combo 1 (jab > jab) as the drill and On-time tolerance at Exact: Play on Player 1 of a recorded jab > jab whose first A press is let go 1 frame later than in the combo, and the bar reads "L1 Attack release 1f late" with the streak at 0; set to 1 frame, the same play is clean and the streak goes to 1. Labels name the inputs; the warps and waits between them are cut](../media/rc11-on-time-tolerance.gif)
+
 - **Values:** Exact, 1 frame, 2 frames
 - **Default:** 1 frame
 - **How:** Left/Right cycle through the values; A opens the list.
@@ -294,6 +312,9 @@ exchange is over, the bound save loads, as the Load chord does, so you retry fro
 - **Values:** Keep playing, Load save state
 - **Default:** Keep playing
 - **How:** Left/Right cycle through the values; A opens the list.
+
+![After an attempt set to Load save state; a jab > jab attempt on the drill, and the save loads by itself](../media/rc11-after-an-attempt.gif)<br>
+*With Combo 1 as the drill: B + Up, Right sets After an attempt to Load save state, B. Then jab > jab (it drops); once the exchange is over, the bound save loads on its own and both fighters are back on the spot at 0%. The 5.4 s between (the menu closing, the Load chord) is cut. Eden, rc.11.*
 
 More: [Save states](../guide/save-states.md)
 
@@ -323,6 +344,9 @@ Under the title are the pop-up's own tabs:
 - **Player:** Save states & Macros, and Combos & Sequences. ZL or ZR switches between them.
 - **CPU:** Save states & Macros only. ZL and ZR do nothing.
 
+![ZR + Right opens the Recording pop-up on Player; R lights the CPU tab; B closes it](../media/rc11-popup-player-cpu.gif)<br>
+*ZR + Right opens the pop-up over the match on the Player tab; R switches to the CPU tab and its list; B closes it. Eden, rc.11.*
+
 ### The lists and the hot five
 
 Each tab shows the same two lists as the page's section, four rows of each. Up/Down move inside a list, Left/Right
@@ -340,6 +364,9 @@ MACROS, "A drill" in COMBOS and SEQUENCES.
 - A on a combo or a sequence makes it the drill.
 - A on *+ New chain*, *+ New sequence* or *+ Save last combo…* works as on the page.
 - Y does nothing.
+
+![MACROS: the hot five, then A on Macro D below the line; Macro D moves to the top; Y changes nothing](../media/rc11-popup-hot-five.gif)<br>
+*MACROS shows the five used last first, inside the green outline. A on Macro D, below the line, makes it active; it moves to the top of the hot five. Y changes nothing. Eden, rc.11.*
 
 ### Setting the active macro
 
@@ -362,5 +389,8 @@ More: [Set active, and the Play chords](../guide/recording.md#set-active-and-the
 
 X, with the cursor in MACROS, steps the loop count of the side you're on: ∞, 1, 2, 3, 5, 10, then ∞ again. The
 MACROS header shows it. It is the same count as the page's [Loop](#loop) row.
+
+![X sets the CPU macro's loop count to 2; Play on CPU plays it twice without warping back](../media/rc11-popup-loop-count.gif)<br>
+*On the CPU tab, X steps Walk + jab's loop count to 2; Play on CPU: the CPU walks and jabs, then again from where it stands. Eden, rc.11.*
 
 More: [The pop-up](../guide/recording.md#the-pop-up), [The loop](../guide/recording.md#the-loop)

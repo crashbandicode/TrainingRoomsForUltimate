@@ -22,12 +22,17 @@ The CPU is not affected: its chord and [CPU Character](#cpu-character) always wo
 
 With it Off, Cycle Player does nothing and shows no notice.
 
+![Player Swapping Off; A turns it On; Player Character, Captain Falcon, A; Player 1 loads Captain Falcon](../media/rc11-player-swapping.gif)<br>
+*B + Up opens the menu on Player Swapping (Off); A turns it On; then Player Character, Captain Falcon, A, and B closes the menu: Player 1 loads Captain Falcon. The 8 s load is cut. Eden, rc.11.*
+
 More: [Fighter cycles › Player Swapping](../guide/fighter-cycles.md#player-swapping)
 
 ### Player Character
 
 Opens a portrait grid of every fighter. A picks Player 1's fighter, and "> " marks the pick. The new fighter loads
 when you close the menu, with [Player Swapping](#player-swapping) On or Off.
+
+![With Player Swapping Off, picking Link as Player Character shows "Player fighter applied" and Player 1 becomes Link at once](../media/rc12-player-character.gif)
 
 - **Values:** any fighter on the grid
 - **How:** A opens the grid. The D-pad moves, A picks, B goes back. X on a shared slot (Pokémon Trainer, Pyra / Mythra)
@@ -44,6 +49,9 @@ changes the first training partner.
 
 - **Values:** any fighter on the grid
 - **How:** as [Player Character](#player-character).
+
+![CPU Character grid: Right to Donkey Kong, A; the CPU loads Donkey Kong](../media/rc11-cpu-character.gif)<br>
+*CPU Character: A opens the grid, Right and A pick Donkey Kong, B closes the menu, and the CPU loads it ("CPU fighter applied"). The 3.6 s load is cut. Eden, rc.11.*
 
 ### Character Cycles
 
@@ -75,6 +83,9 @@ Player 1's 0 in the cycle too. The Ice Climbers in a cycle list have their own S
 - **Values:** On, Off
 - **Default:** Off
 - **How:** A flips it.
+
+![Ice Climbers in Training; Solo Popo turned On; Player 1 reloads as Popo alone](../media/rc11-solo-popo.gif)<br>
+*Player 1 picked Ice Climbers at the character select: Popo and Nana. B + Up, A turns Solo Popo On, B closes the menu; Player 1 reloads as Popo alone ("Player Character · 0. Ice Climbers"). The 3.3 s reload is cut. Eden, rc.11.*
 
 More: [Fighter cycles › Solo Popo](../guide/fighter-cycles.md#solo-popo)
 
@@ -111,6 +122,9 @@ Most items need their fighter's data, which the plugin loads for you. If it can'
 Player or CPU first". Daisy's and Peach's Bob-omb and Mr. Saturn, and Diddy Kong's Banana Peel, need nothing. Nothing
 is given during a fighter swap, a save-state load, a recording or a playback.
 
+![Give item grid: Daisy Bob-omb, A; Player 1 gets the Bob-omb](../media/rc11-give-item.gif)<br>
+*Give item: A opens the grid, Down, Right, Right to Daisy: Bob-omb, A, B closes the menu: Player 1 gets the Bob-omb (the notice names it). Eden, rc.11.*
+
 ### Mii Brawler
 
 Opens the list of Mii Brawlers for Player 1; ZR switches to the CPU's list. It lists your saved Miis, then the Miis
@@ -134,12 +148,18 @@ The same list for the Mii Swordfighter.
 - **Values:** a saved Mii, a replay Mii, or a new one
 - **How:** as [Mii Brawler](#mii-brawler).
 
+![Mii Swordfighter list: ZR to the CPU, Down, A; the CPU's Swordfighter reloads as that Mii](../media/rc11-mii-swordfighter.gif)<br>
+*With the CPU a Mii Swordfighter: A opens the list (Player 1's), ZR switches to the CPU's, Down and A pick the second saved Swordfighter, and B closes the menu; the CPU reloads it ("Saved Mii applied"). The two saved Miis on this profile look alike. The 6.6 s load is cut. Eden, rc.11.*
+
 ### Mii Gunner
 
 The same list for the Mii Gunner.
 
 - **Values:** a saved Mii, a replay Mii, or a new one
 - **How:** as [Mii Brawler](#mii-brawler).
+
+![Mii Gunner list: Player 1's list, then ZR to the CPU's list](../media/rc11-mii-gunner.gif)<br>
+*A opens Player 1's Mii Gunner list; ZR switches to the CPU's. This profile has one saved Gunner, then Add New…, which opens Smash's Mii editor (as for the Brawler). Eden, rc.11.*
 
 ## Stages
 
@@ -152,7 +172,9 @@ requested", then "Stage ready". It works in Training and in waiting-room practic
 - **How:** A opens the grid. The D-pad moves, L / R turn its page, Y picks the focused stage's form first (the tile
   shows [N], [Ω] or [BF]), A goes there, B goes back.
 
-![Change Stage: Battlefield, Y for its Ω form, and Training reloads there](../media/rc11-change-stage.gif)
+![Change Stage: A on Battlefield (Ω), then the stage morph from the training stage to Battlefield Ω](../media/rc11-change-stage.gif)
+
+*A on Battlefield (Ω) closes the menu ("Stage requested"); then the whole morph to Battlefield Ω and "Stage ready". The 3 s wait between them, where nothing moves, is cut. Eden, rc.11.*
 
 More: [Stages › Change Stage](../guide/stages.md#change-stage)
 
@@ -165,6 +187,9 @@ the game, and the menu doesn't open there. Turn it On in Training before you go.
 - **Values:** On, Off
 - **Default:** Off
 - **How:** A flips it.
+
+![In a local wireless waiting room: Lobby Practice turned Off in the menu; then B + Up reaches the fighter instead](../media/rc11-lobby-practice.gif)<br>
+*In a local wireless waiting room with Lobby Practice On: B + Up opens the menu, A turns Lobby Practice Off, B closes it, and the frame strip goes. B + Up again opens no menu: Byleth does its up special. Eden, rc.11.*
 
 More: [Waiting rooms](../guide/waiting-rooms.md)
 
@@ -207,6 +232,8 @@ More: [Stages › Training Stage Rotation](../guide/stages.md#training-stage-rot
 On: stage hazards are active in Training. Off: they are not. It takes effect when a stage loads: when you enter
 Training, or go to a stage with Change Stage. The stage you are on keeps its hazards until then.
 
+![On Mario Bros. with Stage Hazards Off there are no POW blocks and no enemies; after it is set On, the stage reloads with POW blocks and Shellcreepers](../media/rc12-stage-hazards.gif)
+
 - **Values:** On, Off
 - **Default:** Off
 - **How:** A flips it.
@@ -218,6 +245,8 @@ room.
 
 On: items appear in the waiting room as usual. Off: no items appear there, and the ones on the floor are removed when
 you turn it Off. Training is not affected.
+
+![Side by side in the Quickplay waiting room: with Lobby Items On there are items on the floor; after it is set Off, there are none](../media/rc12-lobby-items.gif)
 
 - **Values:** On, Off
 - **Default:** On
@@ -256,6 +285,8 @@ More: [Fighter cycles › What the Loading rows do](../guide/fighter-cycles.md#w
 How many of the next fighters in each role's cycle are kept ready. Off: none are; each swap loads its fighter then,
 which takes longer.
 
+![Side by side, the same Link to Kirby swap with Cycle Preload Off and at 5: Off leaves the spot empty for about 1.7 s, 5 swaps at once](../media/rc12-cycle-preload.gif)
+
 - **Values:** Off, 1, 2, 3, 4, 5
 - **Default:** 5
 - **How:** Left or Right switches it; A opens the list.
@@ -265,6 +296,8 @@ which takes longer.
 What is kept ready: the fighters of your cycles, Kirby's hats, or both. The banks and groups below need Fighters or
 Both.
 
+![Side by side, the same Donkey Kong to Link swap with Preload at Hats and at Both: with Hats the spot stays empty for about 0.9 s, with Both Link appears at once](../media/rc12-preload.gif)
+
 - **Values:** Fighters, Hats, Both
 - **Default:** Both
 - **How:** Left or Right switches it; A opens the list.
@@ -272,6 +305,8 @@ Both.
 ### Ready Fighters
 
 The total number of fighters kept loaded, for Player 1 and the CPU together, the two on screen included.
+
+![Side by side, the same Link to Kirby swap with Ready Fighters at 4 and at 10: 4 leaves the spot empty for about 1.3 s, 10 swaps at once](../media/rc12-ready-fighters.gif)
 
 - **Values:** 2 to 12
 - **Default:** 10
@@ -282,6 +317,8 @@ The total number of fighters kept loaded, for Player 1 and the CPU together, the
 How many Kirby hats are kept ready, apart from Ready Fighters. A hat whose fighter is already kept ready uses that
 fighter, and takes no place of its own.
 
+![Kirby copies a fighter whose hat is not ready yet, and the hat comes only after "Fighters · Loading"; with Ready Hats raised to 5, the next copy (Sheik) gets its hat at once](../media/rc12-preload-hats.gif)
+
 - **Values:** 0 to 5
 - **Default:** 5
 - **How:** Left or Right steps one (it stops at 0 and 5); A opens the list.
@@ -290,6 +327,8 @@ fighter, and takes no place of its own.
 
 How many fighters each role keeps loaded in its own slot, the one on screen included. Switching among them is
 instant. Off: only the fighter on screen, and no groups.
+
+![Side by side, the same Donkey Kong to Link swap with Ready Fighter Bodies Off and at 3: Off leaves the spot empty for about 0.35 s, 3 swaps at once](../media/rc12-ready-fighter-bodies.gif)
 
 - **Values:** Off, 2, 3
 - **Default:** 3
@@ -301,6 +340,8 @@ instant. Off: only the fighter on screen, and no groups.
 On: each role can keep more groups of fighters ready besides its own slot, up to Ready Fighters. Off: only the
 role's own slot; the group entries of [Swap groups](#swap-groups) are greyed ("Group Swap is Off").
 
+![Side by side, the same Link to Kirby swap with Group Swap Off and On: Off leaves the spot empty until about 2.9 s, On swaps at once](../media/rc12-group-swap.gif)
+
 - **Values:** On, Off
 - **Default:** On
 - **How:** A flips it.
@@ -309,6 +350,8 @@ role's own slot; the group entries of [Swap groups](#swap-groups) are greyed ("G
 
 Opens seven switches for the fighters that need special care when they are kept ready. The row shows how many are On,
 such as "7 of 7".
+
+![Side by side, the same CPU swap from Dark Samus to Mii Gunner with Mii groups On and Off: On shows Mii Gunner at once, Off leaves the spot empty until about 2.0 s](../media/rc12-swap-groups.gif)
 
 - **Values:** each entry On or Off
 - **Default:** all On

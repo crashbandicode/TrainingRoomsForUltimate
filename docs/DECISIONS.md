@@ -598,9 +598,10 @@ This records the decision only; the implementation, host tests and Eden proofs a
 
 ## Open (2026-11-13)
 
-Opened by the primary for the operator from the lanes' reports of 2026-11-13. Nothing here is decided yet. Each item
-says what is being decided, the options with their cost to the player, and a recommendation. In each picture the
-recommended option has a **green outline**. The pictures are drawn by `tools/render_decisions_1113.py`.
+Opened by the primary for the operator from the lanes' reports of 2026-11-13. An item the operator has answered says
+**Decided** under its heading (rc13-memory); the rest are still open. Each item says what is being decided, the options with their cost to the player, and a recommendation. In each picture the
+recommended option has a **green outline**. The pictures are drawn by `tools/render_decisions_1113.py`
+(rc13-DI-lines: author-2's mockup as drawn; rc13-memory: `tools/render_rc13_memory.py`).
 
 "The held fix" means `c49681c9`: worker A's in-game text fixes, a local commit not yet on `main`
 (`artifacts/phase23/docs-audit-1113/WORKER-A-TEXT-FIXES.md`). TR1–TR8 come from the docs lane's audit of in-game text
@@ -617,6 +618,8 @@ recommended option has a **green outline**. The pictures are drawn by `tools/ren
 | TR7 | Crop trailing neutral (#14) | B: make Record trim |
 | TR8 | Player Character with Player Swapping Off (#17) | B: a pick loads now |
 | TR9 | Retire the old Record trigger row (V2), or keep its legacy start | A: V2, retire the row |
+| rc13-DI-lines | DI chips like the game's blue DI indicator (A–D rejected) | E2 x3 (glow plus streaks); E1 x2 is the closest to the native look |
+| rc13-memory | Memory levers for TrainingRooms' share | **Decided 11-13: dropped**, no lever implemented |
 | OP1 | Push the held doc fixes | A: push the docs now, `c49681c9` after TR5 and TR8 |
 | OP2 | The standalone `libimgui_smash.nro` on the card | A: remove it |
 | OP3 | Deluxe's hidden Stages + Counterpick page | A: show it |
@@ -792,6 +795,118 @@ switch off. V2 matches the design in `migrate.rs`, and it lets TR2 take (b)(ii)'
 
 Not listed: #19 (Give item's item arrives when the menu closes). The code's comment gives the reason: a short-fuse item
 must not expire while the picker still has the inputs.
+
+#### rc13-DI-lines · DI chips like the game's blue DI indicator (rc.13 item 2)
+
+How the pointers on the **CPU › Defence › DI Direction** chips should look. The operator said today's lines are "super
+skinny". Of the first mockup's options, the operator said "none of those options seem right for di", so A–D (wider or
+fight-trail-like streaks) are rejected. The target is "the di trajectory indicator when someone gets hit in a match":
+the blue DI indicator.
+
+Today (rc.12) each pointer is one picture pane with the streak texture `line09`, in its pale tint, and unweighted chips
+draw at half tint. The game's blue indicator is the effect `P_CmnVector` (`ef_common.eff`), with four picture layers:
+
+| Layer | Picture | Role | Tint |
+| --- | --- | --- | --- |
+| emitter 4 | `flare01` | the glow | (12, 119, 255) |
+| emitter 0 | `tri00` | the body | (0, 177, 255) |
+| emitter 1 | `line09` | the streaks (today's only layer) | (200, 244, 255) |
+| emitter 2 | `line11` | the white core | (255, 255, 255) |
+
+The options, each at x2 or x3 of today's width (`DI_WIDTH_RATIO` 1.2/3.5):
+- **Today (rc.12):** `line09` alone. Cost to the player: the hairline stays.
+- **E1 · all 4 layers** (flare01 glow + tri00 body + line09 streaks + line11 white core). Cost: **+33 panes** (3 more
+  layers × 11 chips) in the menu layout (`tools/layout-builder`).
+- **E2 · glow plus streaks** (flare01 + line09). Cost: **+11 panes** (1 more layer × 11 chips).
+
+For both: **no new textures.** `ef_common.eff` is resident in Training, and TrainingRooms' loader already finds all
+four pictures (`describe Di ... pictures=4`). E1 and E2 only reference them, so nothing new is loaded.
+
+**Caveat:** the game blends these layers additively. TrainingRooms' panes draw with the layout material's normal alpha,
+because its UI code has no blend control. On the dark navy tiles that is close to the mockup. True additive blending
+would need a BFLYT material change in `tools/layout-builder`, which hasn't been checked.
+
+**Recommendation: E2 x3,** for the cost (+11 panes). **E1 x2 is the closest to the native look,** because it has the
+white core, if 33 more panes are acceptable.
+
+The picture is author-2's mockup (`artifacts/rc13-di-lines/MOCKUP-blue.png` and `NOTE-blue.md`, in the workspace),
+with its own green outline on E2 x3. It is a mockup, not the game's render: the colours and gains come from
+`P_CmnVector`'s emitters (TrainingRooms' diagnostics), and the layer shapes are approximated. The "Native" panel is an
+Eden crop of the real indicator: Mario's forward smash, CPU at 120 %, DI Up, Game speed 1/4.
+
+![rc13-DI-lines: today, the native blue DI indicator, and E1 / E2 at x2 and x3, with E2 x3 recommended](decisions/rc13-DI-lines-blue.png)
+
+E1 x1, as the operator asked: all four layers of P_CmnVector at today's width (DI_WIDTH_RATIO 1.2/3.5). Cost: +33
+panes, no new textures.
+
+![rc13-DI-lines E1 x1: today, the native blue DI indicator, and all four layers at today's width, with a 3x close-up](decisions/rc13-DI-lines-e1-x1.png)
+
+#### rc13-memory · Memory levers (rc.13): dropped
+
+**Decided 2026-11-13 (~22:55Z): dropped; no lever will be implemented.** The operator: "drop the memory optimization.
+Seems it's already fine. I don't want to sacrifice perforance." The measurements below stay as the record:
+TrainingRooms' share is 398 MiB on the card settings and about 582 MiB at a cycle-lap peak.
+
+Which levers to build to lower TrainingRooms' memory and widen Training's headroom. No feature is dropped by any of
+them. The numbers come from worker B-2's measurements (`artifacts/rc13-memory/MEASURE.md`, in the workspace). They are
+from Eden, on the rc.12 candidate diag, with the card's plugin set. The memory budget is 3,285 MiB, the same as the
+console's.
+
+**What "about 1 GiB" can mean.**
+- **The whole process can't get to 1 GiB.** The game alone uses about 2.1 GiB at the main menu (2,129–2,164 MiB), and
+  Training with TrainingRooms' preload Off uses 2,452 MiB. That is the floor in Training.
+- **TrainingRooms' own share is already below 1 GiB:**
+  - 398 MiB on the card settings;
+  - 476 MiB on the defaults;
+  - about 582 MiB at the peak of a CPU cycle lap.
+- **So the levers lower that share and widen the headroom.**
+
+**Baseline** (MiB used of 3,285, free in brackets; two boots):
+
+| Scene and setting | rc13-mem-2 | rc13-mem-3 |
+| --- | ---: | ---: |
+| Main menu | 2,129 (1,155) | 2,164 (1,120) |
+| Character select | 2,318 (966) | 2,348 (936) |
+| Training, card settings: Preload Both, Ready Fighters 8, Ready Hats 5, 3 bodies, 5 slots | 2,822 (462) | 2,850 (434) |
+| Training, preload Off, fresh entry (the game floor) | — | 2,452 (832) |
+| Training, defaults: Both, Ready Fighters 10, Hats 5, 3 bodies, fresh entry | — | 2,928 (356) |
+| CPU cycle lap, 4 steps, after the defaults (peak) | 3,034 (250) | — |
+
+At the cycle-lap peak, a helper was refused for memory (it needed 272.8 MB with 268.3 MB of headroom), and TrainingRooms
+showed "(1 waiting for memory)". The rc.11 console sample at the 11-13 hang was 3.05 GB used, 393 MB free.
+
+**The levers**, as B-2 wrote them. Savings are estimates at Training entry on the defaults (2,928 MiB) unless the row
+says otherwise.
+
+| # | Lever | Estimated saving | Effect on features | Evidence or confidence |
+| --- | --- | ---: | --- | --- |
+| L1 | Ready Fighters default 10 → 8. The setting stays, with 2–12 available. | 78 MiB | Two fewer pre-built fighters by default. Those two load when first picked: one swap of ~0.4–1.0 s each, instead of warm (~50 ms). | measured (2,928 vs 2,850) |
+| L2 | Bodies per role default 3 → 2. The setting keeps Off/2/3. | 100–125 MiB | The in-window instant swap covers 2 fighters per role instead of 3. The third goes through a group swap. | derived (~61 per body × 2) |
+| L3 | Build extra groups on first use instead of at Training entry. Groups and their swap are kept. | 100–185 MiB at entry | The first swap into each extra group pays its build (~0.4–1.0 s; first pair ~2.1 s). Later swaps stay warm. | measured deltas (card 112, defaults 184) |
+| L4 | Load hats and helper seats on first use (Ready Hats kept). | 40–50 MiB at entry | The first hat for a fighter is slower (~770 ms vs ~80 ms warm); later ones are warm. | measured deltas |
+| L5 | Stagger the start-up window: build the bank bodies after the scene's own load settles, not inside it. | 150–190 MiB of **transient** peak | Banks are ready a few seconds later after entering Training. The settled use is unchanged. This targets the 11-13 abort, which came 64 ms after the window built 3-member banks. | derived from window headroom steps (−181 MiB at creation, −180 when bound) |
+| L6 | Raise the admission floor from 16 to 512 MiB of headroom. | 0 at entry; up to ~260 MiB at the **peak** (cycle lap 3,034 → ≤ 2,773) | More "waiting for memory" while cycling, with those fighters loading on swap. Nothing is refused for good. | derived from the cycle-lap refusal at a 268 MiB headroom |
+| L7 | Trim the plugin image and bss (TrainingRooms bss 1.7 MiB, diag ring and stacks). | 1–2 MiB | None | measured NRO header; too small to matter |
+
+B-2's combined estimates: L1 + L3 + L4 brings Training entry to about 2,620–2,700 MiB (585–665 MiB free); L2 on top
+gives about 2,500–2,600 MiB. L5 + L6 lower the peaks, not the settled figure.
+
+**Recommendation (not taken; the item is dropped): L5 + L6 as the core, plus L4.**
+- **L5 + L6:** they are peak-safety levers aimed at the 11-13 console abort. Neither changes the settled figure or any
+  default.
+- **L4:** hats and helper seats load on first use. It saves 40–50 MiB, and only the first hat per fighter is slower.
+- **L1, L2 and L3 are offered, not recommended.** They trade swap speed for memory.
+
+Limits (MEASURE.md §5):
+- One run per state; the two boots agree within 35 MiB.
+- L2 and L4 are derived from build deltas, not fresh entries.
+- Eden carried about 60–90 MiB less than the console's 11-13 sample.
+- No waiting-room or online scene was measured.
+
+The picture is redrawn from B-2's `01-baseline.svg` and `03-levers.svg` by `tools/render_rc13_memory.py`; the per-lever
+charts are `lever-1..7.svg` in the same folder.
+
+![rc13-memory levers](decisions/rc13-memory.png)
 
 ### Other projects
 

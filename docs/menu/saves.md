@@ -37,6 +37,8 @@ More: [Save states › Saving and loading](../guide/save-states.md#saving-and-lo
 Flips a load left to right: each fighter lands at the mirror image of its saved spot, across the middle of the stage,
 and faces the other way. Use it to practise the same situation from both sides.
 
+![Mirroring None: Load puts Mario left and the CPU right; set to Alternate, the next Load puts each fighter at the mirror image of its saved spot, facing the other way](../media/rc11-mirroring.gif)
+
 - **Values:** None, Alternate, Random
 - **Default:** None
 - **How:** Left or Right switches it; A opens the list.
@@ -50,6 +52,8 @@ More: [Save states › Mirroring](../guide/save-states.md#mirroring)
 
 On: when Player 1 or the CPU is KO'd, the save state loads at once instead of a respawn. Off: you load it yourself with
 the Load chord.
+
+![Auto-load on death turned On, then Mario runs off the stage: at the KO the save state loads at once instead of a respawn](../media/rc11-auto-load-on-death.gif)
 
 - **Values:** On, Off
 - **Default:** Off
@@ -66,6 +70,8 @@ More: [Save states › Auto-load on death](../guide/save-states.md#auto-load-on-
 
 Player 1's damage after a load.
 
+![The save holds Player 1 at 42% and the CPU at 80%: with Default a Load gives 0%; with Save State for Player 1 and the CPU it gives 42% and 80%](../media/rc11-damage-on-load.gif)
+
 - **Values:** Default (0%, as after a respawn), Save State (the damage Player 1 had when you saved), Random Value (a
   random damage within [Player damage range](#player-damage-range))
 - **Default:** Default
@@ -79,6 +85,8 @@ More: [Save states › Damage on load](../guide/save-states.md#damage-on-load)
 
 The lowest and the highest damage Random Value can give Player 1.
 
+![Random Value with both ranges 0-150 gives any damage (104% and 46%, then 113% and 31%); with Player damage range and CPU damage range set to 140-150, every load gives 140-150% (144% and 149%, then 149% and 141%)](../media/rc11-damage-range.gif)
+
 - **Values:** 0 to 150 for each end; the lower end stays at or below the upper
 - **Default:** 0 to 150
 - **How:** A opens the slider. Left or Right chooses the lower or the upper handle, A picks it up, Left / Right move it
@@ -88,6 +96,8 @@ The lowest and the highest damage Random Value can give Player 1.
 ### CPU damage on load
 
 The CPU's damage after a load. It works like [Player damage on load](#player-damage-on-load), for the CPU.
+
+![The save holds Player 1 at 42% and the CPU at 80%: with Default a Load gives 0%; with Save State for Player 1 and the CPU it gives 42% and 80%](../media/rc11-damage-on-load.gif)
 
 - **Values:** Default (0%), Save State (the CPU's saved damage), Random Value (a random damage within
   [CPU damage range](#cpu-damage-range))
@@ -99,6 +109,8 @@ More: [Save states › Damage on load](../guide/save-states.md#damage-on-load)
 ### CPU damage range
 
 The lowest and the highest damage Random Value can give the CPU.
+
+![Random Value with both ranges 0-150 gives any damage (104% and 46%, then 113% and 31%); with Player damage range and CPU damage range set to 140-150, every load gives 140-150% (144% and 149%, then 149% and 141%)](../media/rc11-damage-range.gif)
 
 - **Values:** 0 to 150 for each end; the lower end stays at or below the upper
 - **Default:** 0 to 150
@@ -121,6 +133,8 @@ other fighter gets nothing.
 | Min Min | Power Dragon | Her left arm is the powered-up Dragon. |
 | Wario | Mini Waft, Half Waft, Full Waft | The waft is charged to one of the ticked levels, picked at random. |
 
+![The CPU Joker loads without Arsene; with Arsene ticked in Buffs on load, the next load fills the rebellion gauge and Arsene comes out](../media/rc11-buffs-on-load.gif)
+
 - **Values:** the 18 buffs above
 - **Default:** none ticked
 - **How:** A opens the checklist. A ticks or unticks, ZL ticks all (or none when all are ticked), B goes back. The row
@@ -139,6 +153,8 @@ A setup is a named copy of a save state, with the stage it was saved on. Setups 
 ### Save setup to library...
 
 Keeps what the Load chord would load now (normally your bound save) as a new setup, under a name you type.
+
+![The Setup library is empty ("No setups saved"); Save setup to library... keeps the saved spot as the setup Corner trap, and the Setup library then lists it (Corner trap · Mario / Mario)](../media/rc11-save-setup.gif)
 
 - **How:** A reads the save ("Reading the selected saved setup…"; B cancels), then the keyboard opens with the name
   "Setup". Type a name of up to 48 characters and confirm. The notice reads "Saved setup" and the name. Each setup is
@@ -167,5 +183,7 @@ closes".
 A needs Save States On, the stage the setup was saved on, and the same fighters on both sides (for a Mii, the same
 Mii). If one of them doesn't match, a notice says which, and that Y can bind the setup without moving. Y needs none of
 them. With no setups saved, the list reads "No setups saved".
+
+![Setup library: A on a setup binds and restores it; when the menu closes both fighters stand where the setup was saved](../media/rc11-setup-library.gif)
 
 More: [Save states › The setup library](../guide/save-states.md#the-setup-library)

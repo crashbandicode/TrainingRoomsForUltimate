@@ -31,6 +31,8 @@ ticked, it picks one at random each time.
 The Playback Slot actions play the macro you gave that slot on its page in the Recording page: see
 [The Playback Slot actions](../guide/cpu-behaviour.md#the-playback-slot-actions).
 
+![Mash none: Mario's three-hit jab lands in full; Mash Jump: the CPU jumps away after the second hit](../media/rc11-cpu-mash.gif)<br>*Mash: none, then Jump*
+
 More: [Mash and Followup](../guide/cpu-behaviour.md#mash-and-followup)
 
 ### Followup
@@ -41,6 +43,8 @@ override, or the mash after a ledge getup, a tech or a throw. The follow-up is p
 - **Values:** the same 30 actions as Mash.
 - **Default:** none ticked: no follow-up.
 - **How:** A opens the checklist; A ticks, ZL ticks all or none, B goes back.
+
+![Mash Jump: out of the jab the CPU jumps; with Followup Neutral Air it jumps, then does a neutral air](../media/rc11-cpu-followup.gif)<br>*Followup: none, then Neutral Air*
 
 More: [Mash and Followup](../guide/cpu-behaviour.md#mash-and-followup)
 
@@ -55,6 +59,8 @@ The situations that make the CPU do its Mash action. Nothing happens here until 
 
 Hitstun doesn't cover tumble (a hard launch): tick Tumble too to mash out of both.
 
+![Mash Jump with the default triggers: the CPU stands still; with Always ticked it jumps on its own](../media/rc11-cpu-mash-triggers.gif)<br>*Mash Triggers: Always ticked*
+
 More: [Mash Triggers](../guide/cpu-behaviour.md#mash-triggers)
 
 ### Situation overrides
@@ -68,6 +74,8 @@ and Ledge Trump. With several actions ticked, the CPU picks one at random.
 - **How:** A opens the editor. On its top line, Left/Right pick the situation. Down moves into that situation's
   actions, drawn in columns: Up/Down move, Left/Right step a column, A ticks, ZL ticks all or none. B goes back. Y on
   the row clears every situation back to your default.
+
+![Mash Jump: the CPU jumps out of the jab's hitstun; with Hitstun overridden to Shield it shields instead](../media/rc11-cpu-situation-overrides.gif)<br>*Hitstun overridden with Shield*
 
 More: [Situation overrides](../guide/cpu-behaviour.md#situation-overrides)
 
@@ -88,6 +96,8 @@ relative to you. Other air dodges keep the game's direction.
   as "Selected: Up x2, Out x1".
 
 One direction is picked for each hit and kept until the next.
+
+![Mash Air Dodge, an up smash at 40%: with no direction the CPU tumbles down and lands; with Up it air dodges upward and stays high](../media/rc11-cpu-airdodge-direction.gif)<br>*Airdodge Direction: none, then Up*
 
 More: [Direction chips](../guide/cpu-behaviour.md#direction-chips)
 
@@ -125,6 +135,8 @@ More: [Direction chips](../guide/cpu-behaviour.md#direction-chips)
 
 How often the CPU SDIs during hitlag: Normal once every 8 frames, Medium every 6, High every 4. None turns SDI off.
 
+![Side by side, Kirby's rapid jab on CPU Mario with SDI Strength None and High, Direction Out: None stays in for 19 hits, High slides out after 10](../media/rc12-sdi-strength.gif)
+
 - **Values:** None, Normal, Medium, High.
 - **Default:** None.
 - **How:** Left/Right cycle through the values (wrapping); A opens the list.
@@ -137,6 +149,8 @@ every 2.
 - **Values:** None, Normal, Medium, High.
 - **Default:** None: it doesn't mash out.
 - **How:** Left/Right cycle through the values; A opens the list.
+
+![Mario grabs the CPU at 100%: with Clatter Strength None it stays held; with High it breaks free at once](../media/rc11-cpu-clatter-strength.gif)<br>*Clatter Strength: None, then High*
 
 ### Dodge Staling
 
@@ -161,6 +175,8 @@ again at once. After its getup, roll, jump or attack, the CPU can mash: the matc
 Getup, Ledge Roll, Ledge Jump or Ledge Attack) if one is set, otherwise Mash when Ledge Option is ticked in Mash
 Triggers.
 
+![The CPU hangs on the ledge: with Ledge Options Neutral Getup it climbs onto the stage; with Jump it jumps up from the ledge](../media/rc11-cpu-ledge-options.gif)<br>*Ledge Options: Neutral Getup, then Jump*
+
 More: [Situation overrides](../guide/cpu-behaviour.md#situation-overrides)
 
 ### Ledge Delay
@@ -173,6 +189,8 @@ How long the CPU waits on the ledge before its ledge option, counted from when i
 - **How:** A opens the delay pop-up. Tick values with A, or move down to Min or Max: A picks the handle up,
   Left/Right move it one step, Up/Down ten steps, A puts it down. While values are ticked the range is greyed, and the
   other way round; Y clears whichever is set. ZL ticks every value. B goes back.
+
+![Neutral Getup from the ledge: with no Ledge Delay the CPU climbs up at once; with 60 frames it hangs about a second first](../media/rc11-cpu-ledge-delay.gif)<br>*Ledge Delay: none, then 60 frames*
 
 More: [Delay rows](../guide/cpu-behaviour.md#delay-rows)
 
@@ -188,6 +206,8 @@ random each time.
 On a wall, Tech In Place is a wall tech and Roll Forwards a wall jump; Roll Backwards and No Tech miss the tech. On a
 ceiling, anything but No Tech techs. With nothing ticked, the game decides.
 
+![Up smash at 50%: with No Tech the CPU lands flat and gets up; with Roll Forwards it tech-rolls past Mario](../media/rc11-cpu-tech-options.gif)<br>*Tech Options: No Tech, then Roll Forwards*
+
 ### Mistech Options
 
 What the CPU does when it lies on the ground after a missed tech, or after it trips. With several ticked, it picks
@@ -199,6 +219,8 @@ one at random each time.
 
 With nothing ticked, the game decides. Tick Mistech Option in Mash Triggers to make the CPU mash after it gets up.
 
+![No Tech: with Neutral Getup the CPU gets up from the floor; with Getup Attack it attacks as it gets up](../media/rc11-cpu-mistech-options.gif)<br>*Mistech Options: Neutral Getup, then Getup Attack*
+
 ### Hide Tech Animations
 
 On: you can't read the CPU's choice from its tech animation. A few frames into a tech, a tech roll or a missed-tech
@@ -209,6 +231,8 @@ camera's centre on Battlefield, Final Destination and some other stages.
 - **Values:** On, Off.
 - **Default:** Off.
 - **How:** A switches it.
+
+![The CPU tech-rolls after an up smash: with Hide Tech Animations Off the roll is in plain sight; with On the CPU disappears during it](../media/rc11-cpu-hide-tech-animations.gif)<br>*Hide Tech Animations: Off, then On*
 
 ## Shield
 
@@ -227,6 +251,8 @@ The CPU lowers its shield while a recording plays on it or a save state loads.
 - **Default:** None.
 - **How:** Left/Right cycle through the values; A opens the list.
 
+![Shield None: the three-hit jab lands; Shield Infinite: the CPU holds its shield and the jabs hit it](../media/rc11-cpu-shield.gif)<br>*Shield: None, then Infinite*
+
 ### Shield Tilt
 
 Where the CPU tilts its shield. In and Out are relative to you.
@@ -238,11 +264,15 @@ Where the CPU tilts its shield. In and Out are relative to you.
 
 A change applies from the CPU's next frame. A reset (L+R+A or loading a save state) reads the row again.
 
+![Shield Infinite: with no tilt the shield sits on the CPU down to the floor; with Up it rides higher and the CPU's feet show under it](../media/rc11-cpu-shield-tilt.gif)<br>*Shield Tilt: none, then Up*
+
 ### OoS Offset
 
 How many hits the CPU's shield takes before it acts out of shield. At 0 it acts after the first hit; at 2 it lets two
 hits through and acts after the third. The count starts again whenever the CPU leaves its shield: when it stands still,
 is hit, or has acted out of shield.
+
+![Mario jabs the shielding CPU: with no OoS Offset it acts out of shield right after the first hit; after 2 is ticked in OoS Offset, it holds its shield for the next hits first](../media/rc12-oos-offset.gif)
 
 - **Values:** 0 to 30 hits. Tick values, or set a minimum and a maximum.
 - **Default:** none ticked: it acts after the first hit.
@@ -262,6 +292,8 @@ Frames the CPU waits after shieldstun before it acts out of shield. A new value 
 - **How:** A opens the delay pop-up: tick values with A, or pick up Min or Max with A and move it with Left/Right
   (Up/Down ten at a time). Y clears whichever is set. B goes back.
 
+![Side by side, the CPU shields Mario's jab with Reaction Time at none and at 30: with none it drops its shield and escapes at about 0.7 s, with 30 it holds its shield until about 1.3 s](../media/rc12-reaction-time.gif)
+
 More: [Delay rows](../guide/cpu-behaviour.md#delay-rows)
 
 ## Attacks & Movement
@@ -275,6 +307,8 @@ the CPU, these rows wait; Throw acts anyway if
 
 The angle of the CPU's angled attacks, such as forward tilt and forward smash. With several ticked, it picks one at
 random each time. It is not used on the ledge.
+
+![Side by side at 1/4 speed, the CPU's forward tilt with Attack Angle at none and at Up: the Up tilt is angled upward](../media/rc12-attack-angle.gif)
 
 - **Values:** Neutral, Up, Down.
 - **Default:** none ticked: the game's own angle.
@@ -292,6 +326,8 @@ After a throw, the CPU does its Mash action at once, whatever Mash Triggers says
 
 If you change the row while the CPU holds you, it picks again at once.
 
+![Mash Grab out of Mario's jab: with Throw None the CPU grabs and lets go; with Backward Throw it throws Mario behind it](../media/rc11-cpu-throw.gif)<br>*Throw: None, then Backward Throw*
+
 ### Throw Delay
 
 Frames the CPU holds you before throwing, counted from when it can throw.
@@ -301,6 +337,8 @@ Frames the CPU holds you before throwing, counted from when it can throw.
 - **How:** A opens the delay pop-up: tick values with A, or pick up Min or Max with A and move it with Left/Right
   (Up/Down ten at a time). Y clears whichever is set. B goes back.
 
+![Forward Throw: with no Throw Delay the CPU throws at once; with 60 frames it holds Mario a second first](../media/rc11-cpu-throw-delay.gif)<br>*Throw Delay: none, then 60 frames*
+
 More: [Delay rows](../guide/cpu-behaviour.md#delay-rows)
 
 ### Pummel Delay
@@ -309,6 +347,8 @@ Frames after the grab before the CPU pummels, and again between pummels. Any val
 nothing ticked means no pummels. With a throw ticked in [Throw](#throw), the CPU pummels while it waits out the
 [Throw Delay](#throw-delay), so that one needs to be longer. With Throw None it never throws, and it keeps pummelling
 until the grab ends, when you break free.
+
+![With Throw None and no Pummel Delay the CPU grabs Mario and only holds him (0%); after 10 is ticked in Pummel Delay, the same grab pummels him to 3%](../media/rc12-pummel-delay.gif)
 
 - **Values:** 0 to 150 frames, in steps of 5. Tick values, or set a minimum and a maximum.
 - **Default:** none ticked: no pummels.
@@ -325,6 +365,8 @@ Whether the CPU waits until it is falling before its aerial.
 - **Default:** No.
 - **How:** Left/Right cycle Yes, No, Random; A opens the list.
 
+![The CPU jumps out of Mario's jab and does a neutral air, three times: Falling Aerials No (on the way up), Falling Aerials Yes (on the way down), then Aerial Delay 30 frames (later still); a zoomed view of the CPU at the right](../media/rc11-cpu-falling-aerials-aerial-delay.gif)<br>*Falling Aerials No, then Yes, then Aerial Delay 30 (shared with Aerial Delay)*
+
 ### Aerial Delay
 
 Frames the CPU waits, once it can, before its aerial.
@@ -333,6 +375,8 @@ Frames the CPU waits, once it can, before its aerial.
 - **Default:** none ticked: no wait.
 - **How:** A opens the delay pop-up: tick values with A, or pick up Min or Max with A and move it with Left/Right
   (Up/Down ten at a time). Y clears whichever is set. B goes back.
+
+![The CPU jumps out of Mario's jab and does a neutral air, three times: Falling Aerials No, Falling Aerials Yes, then Aerial Delay 30 frames (the kick comes later); a zoomed view of the CPU at the right](../media/rc11-cpu-falling-aerials-aerial-delay.gif)<br>*Falling Aerials No, then Yes, then Aerial Delay 30 (shared with Falling Aerials)*
 
 More: [Delay rows](../guide/cpu-behaviour.md#delay-rows)
 
@@ -344,10 +388,14 @@ Whether the CPU's jumps are full hops (Yes) or short hops (No), including the ju
 - **Default:** Yes.
 - **How:** Left/Right cycle Yes, No, Random; A opens the list.
 
+![The CPU jumps over and over: full hops with Full Hop Yes, short hops with No](../media/rc11-cpu-full-hop.gif)<br>*Full Hop: Yes, then No*
+
 ### Fast Fall
 
 Whether the CPU fast falls at the peak of a jump or an aerial: the first frame it starts falling, in a jump, a fall
 or an aerial.
+
+![Side by side at 1/4 speed, the CPU's jump with Fast Fall at No and at Yes: with Yes it falls faster and lands at about 2.0 s, against 3.4 s with No](../media/rc12-fast-fall.gif)
 
 - **Values:** Yes, No, Random (either way each time).
 - **Default:** No.
@@ -356,6 +404,8 @@ or an aerial.
 ### Fast Fall Delay
 
 Frames after the peak of the jump (the CPU starts falling) before it fast falls. Used only when [Fast Fall](#fast-fall) says Yes.
+
+![Side by side at 1/4 speed, the CPU's fast fall with Fast Fall Delay at 0 and at 30: at 0 it sparks at the top of the jump and lands first](../media/rc12-fast-fall-delay.gif)
 
 - **Values:** 0 to 30 frames. Tick values, or set a minimum and a maximum.
 - **Default:** none ticked: it fast falls at once.
@@ -372,6 +422,8 @@ On: the CPU crouches in place instead of standing. Off: it stands.
 - **Default:** Off.
 - **How:** A switches it.
 
+![Crouch Off: the CPU stands; Crouch On: it crouches in place](../media/rc11-cpu-crouch.gif)<br>*Crouch: Off, then On*
+
 ## Player 1 control
 
 Lets the game's CPU play Player 1 for you. This group shows one of two things. If the separate CPU pilot plugin is
@@ -385,6 +437,8 @@ you set it on its own page (Online Deluxe's CPU Pilot page), not here.
 - **Values:** none: the row is read-only.
 - **How:** nothing to change here; it tells you the pilot is in charge of Player 1.
 
+![With the CPU pilot plugin installed, the P1 control row reads CPU pilot plugin](../media/rc11-cpu-p1-control.png)<br>*P1 control with the CPU pilot plugin (a still: the row is read-only)*
+
 ### P1 CPU Control
 
 Shown only when the CPU pilot plugin is not installed. On: the game's CPU AI plays Player 1 in Training once you close
@@ -394,6 +448,8 @@ Player 1 are refused.
 - **Values:** On, Off.
 - **Default:** Off: you play Player 1.
 - **How:** A switches it.
+
+![P1 CPU Control Off: Player 1 stands still; On: the game's AI plays Player 1](../media/rc11-cpu-p1-cpu-control.gif)<br>*P1 CPU Control: Off, then On*
 
 More: [Controls](../guide/controls.md)
 
@@ -405,6 +461,8 @@ the strongest.
 - **Values:** 1 to 9.
 - **Default:** 3.
 - **How:** Left/Right cycle through the levels; A opens the list.
+
+![P1 CPU Control On: at level 1 the AI hops about; at level 9 it goes after the CPU](../media/rc11-cpu-p1-cpu-level.gif)<br>*P1 CPU Level: 1, then 9*
 
 ## Level
 
