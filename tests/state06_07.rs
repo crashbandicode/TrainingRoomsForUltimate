@@ -161,6 +161,23 @@ fn state07_write_rule() {
     assert_eq!(hz::rule_byte(s.stage_hazards(), true), Some(1));
 }
 
+/// rc.12 (operator 2026-11-13, "yes fix it in rc12"): Change Stage in Training takes the Stage Hazards setting. The
+/// request copies the active stage's descriptor, whose hazards byte was fixed at Training entry, and the hook's rule
+/// byte is not read on a Change Stage; so Off at entry and On before Change Stage gave no hazards.
+#[test]
+fn state07_change_stage_takes_the_setting() {
+    const TRAINING: (u32, u8) = (0x04040000, 0x20);
+    for on in [false, true] {
+        assert_eq!(hz::change_stage_byte(true, TRAINING.0, TRAINING.1, None, on), Some(u8::from(on)), "Training, {on}");
+        assert_eq!(hz::change_stage_byte(false, TRAINING.0, TRAINING.1, None, on), None, "not initialized");
+        // Waiting rooms keep the carried rule's byte (or none).
+        assert_eq!(hz::change_stage_byte(true, 0x02010000, 0x0d, Some(u8::from(on)), !on), Some(u8::from(on)));
+        assert_eq!(hz::change_stage_byte(true, 0x02010000, 0x0d, None, on), None);
+        // A match keeps its own.
+        assert_eq!(hz::change_stage_byte(true, 0x02010000, 0x01, None, on), None);
+    }
+}
+
 #[test]
 fn state07_missing_address_disables() {
     assert_eq!(hz::plan(Some(1), true), Plan::Enabled);

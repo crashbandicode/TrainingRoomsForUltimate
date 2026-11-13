@@ -205,7 +205,7 @@ More: [Stages › Training Stage Rotation](../guide/stages.md#training-stage-rot
 ### Stage Hazards
 
 On: stage hazards are active in Training. Off: they are not. It takes effect when a stage loads: when you enter
-Training, or go to a stage with Change Stage.
+Training, or go to a stage with Change Stage. The stage you are on keeps its hazards until then.
 
 - **Values:** On, Off
 - **Default:** Off

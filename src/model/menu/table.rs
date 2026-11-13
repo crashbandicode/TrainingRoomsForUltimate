@@ -371,7 +371,7 @@ pub static ROWS: [Row; 92] = [
     r(STAGES, "Training Stage Rotation", "training_stage_rotation", TOGGLE,
       "On: Training moves through the Lobby Stages order.\nThe factory list is only the Waiting Room. Off: it stays."),
     r(STAGES, "Stage Hazards", "stage_hazards", TOGGLE,
-      "On: stage hazards are active in Training. Off: they are not.\nWith Lobby Practice On, this sets the waiting room's too."),
+      "On: stage hazards are active in Training. Off: they are not.\nIt applies as a stage loads: Training entry or Change Stage.\nWith Lobby Practice On, this sets the waiting room's too."),
     // Phase 2 N11 (docs/ROADMAP.md): the waiting room's item spawner.
     r(STAGES, "Lobby Items", "lobby_items", TOGGLE,
       "On: items appear in the waiting room as usual.\nOff: no items appear there."),

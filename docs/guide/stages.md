@@ -76,5 +76,6 @@ Training loads stages with their hazards on, as it has no rules screen.
 Fighters & Stages › [Stage Hazards](../menu/fighters-and-stages.md#stage-hazards) decides instead: On keeps the
 hazards, Off (the default) turns them off.
 
-- It takes effect when a stage loads: when you enter Training, or go to a stage with Change Stage.
+- It takes effect when a stage loads: when you enter Training, or go to a stage with Change Stage. The stage you are
+  on keeps its hazards until then: to apply a change now, Change Stage to another stage.
 - With Lobby Practice On, the waiting room's stage follows it too, from the moment you enter the room.

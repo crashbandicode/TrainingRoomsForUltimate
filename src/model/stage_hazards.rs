@@ -27,6 +27,19 @@ pub const fn rule_byte(hazards_on: bool, training_live: bool) -> Option<u8> {
     }
 }
 
+/// rc.12: the hazards byte (descriptor +0x10) of a Change Stage request, or `None` to keep the active stage's. A
+/// Change Stage swaps the stage in place from a copy of the active descriptor and does not run the stage-loading
+/// routine, so the hook's rule byte is not read again: the request's own byte is what the new stage takes.
+/// Waiting rooms keep the carried rule (`waiting`, from `waiting_hazards_policy`).
+pub fn change_stage_byte(initialized: bool, mode: u32, melee: u8, waiting: Option<u8>, hazards_on: bool) -> Option<u8> {
+    // Native Training's mode and melee words, the scene `practice_stage_request_policy::admit` owns.
+    if initialized && mode == 0x0404_0000 && melee == 0x20 {
+        Some(u8::from(hazards_on))
+    } else {
+        waiting
+    }
+}
+
 /// What is missing when the feature cannot be installed (SPEC-state-07 question 2: each condition
 /// gets its own text; upstream attached them the wrong way round).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
