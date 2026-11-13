@@ -359,6 +359,18 @@ ZL + Up/Down jumps between a page's sections (in popup lists, a screenful). The 
 left. ZR no longer resets a page: each page ends with *Reset page to defaults*, which asks first. *Eden, 2026-11-05,
 `p23/menu-nav` diag NRO `1273c29f`, the navigation code rc.3 merged.*
 
+### The Developer page
+
+A sixth page, after Display & Controls, for testing the plugin itself. It shows only when
+`sd:/ultimate/TrainingRooms/developer.ini` holds exactly one `developer_page=on` line (read once at boot; anything
+else keeps it hidden, decision N1). While it's hidden its rows do nothing. All three start Off:
+
+| Row | What it does |
+| --- | --- |
+| Preload Samples | Writes sparse timing and memory samples of preloads to the diagnostics file. |
+| Reload developer config | While On, holding L + R + A on Player 1 re-reads the developer config file every frame. |
+| Debug hooks | Turns on the debug watch on the Kirby backshield work float. |
+
 ### Menu shortcuts and replay capture
 
 **Clip** [`rc7-menu-shortcut.gif`](media/rc7-menu-shortcut.gif): Menu shortcut 1 changed from Minus to ZL + D-pad Up, which then opens the menu
