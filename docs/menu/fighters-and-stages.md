@@ -287,6 +287,8 @@ More: [Fighter cycles › What the Loading rows do](../guide/fighter-cycles.md#w
 How many of the next fighters in each role's cycle are kept ready. Off: none are; each swap loads its fighter then,
 which takes longer.
 
+![Side by side, the same Link to Kirby swap with Cycle Preload Off and at 5: Off leaves the spot empty for about 1.7 s, 5 swaps at once](../media/rc12-cycle-preload.gif)
+
 - **Values:** Off, 1, 2, 3, 4, 5
 - **Default:** 5
 - **How:** Left or Right switches it; A opens the list.
@@ -305,6 +307,8 @@ Both.
 ### Ready Fighters
 
 The total number of fighters kept loaded, for Player 1 and the CPU together, the two on screen included.
+
+![Side by side, the same Link to Kirby swap with Ready Fighters at 4 and at 10: 4 leaves the spot empty for about 1.3 s, 10 swaps at once](../media/rc12-ready-fighters.gif)
 
 - **Values:** 2 to 12
 - **Default:** 10

@@ -269,6 +269,8 @@ A change applies from the CPU's next frame. A reset (L+R+A or loading a save sta
 How many hits the CPU's shield takes before it acts out of shield. At 0 it acts after the first hit; at 2 it lets two
 hits through and acts after the third. The count starts again when the CPU stands still or is hit.
 
+![Mario jabs the shielding CPU: with no OoS Offset it acts out of shield right after the first hit; after 2 is ticked in OoS Offset, it holds its shield for the next hits first](../media/rc12-oos-offset.gif)
+
 - **Values:** 0 to 30 hits. Tick values, or set a minimum and a maximum.
 - **Default:** none ticked: it acts after the first hit.
 - **How:** A opens the delay pop-up: tick values with A, or pick up Min or Max with A and move it with Left/Right
