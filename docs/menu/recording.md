@@ -261,6 +261,8 @@ An advanced row: the page shows it as "Settings override playback (advanced)". O
 the macro wins, and DI Direction, SDI Direction, Airdodge Direction, Tech Options, Mistech Options and Throw wait until
 it ends. On: those settings act during the macro too.
 
+![The CPU plays a macro that holds the stick Down (it crouches), DI Direction is Up, and each Load puts it at 80%. Off: Mario's forward smash sends it on a low line along the floor, the macro's Down as its DI. Turned On: the same load, play and smash send it on a steep line, high in the air, because DI Up now acts during the macro. Labels name the inputs; the time between the halves is cut](../media/rc11-settings-override.gif)
+
 - **Values:** On, Off
 - **Default:** Off
 - **How:** A flips it.
